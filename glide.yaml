@@ -1,0 +1,21 @@
+package: go.universe.tf/metallb
+import:
+- package: github.com/golang/glog
+- package: k8s.io/api
+  subpackages:
+  - core/v1
+- package: k8s.io/apimachinery
+  subpackages:
+  - pkg/fields
+  - pkg/util/runtime
+  - pkg/util/wait
+- package: k8s.io/client-go
+  version: ^5.0.1
+  subpackages:
+  - kubernetes
+  - kubernetes/scheme
+  - kubernetes/typed/core/v1
+  - tools/cache
+  - tools/clientcmd
+  - tools/record
+  - util/workqueue
