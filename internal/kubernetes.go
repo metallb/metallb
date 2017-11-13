@@ -32,8 +32,8 @@ import (
 )
 
 const (
-	AnnotationAssignedIP    = "metallb.go.universe.tf/assigned-ip"
-	AnnotationAutoAllocated = "metallb.go.universe.tf/auto-allocated"
+	AnnotationAssignedIP  = "metallb.universe.tf/assigned-ip"
+	AnnotationAddressPool = "metallb.universe.tf/address-pool"
 )
 
 func Client(masterAddr, kubeconfig, componentName string) (*kubernetes.Clientset, record.EventRecorder, error) {

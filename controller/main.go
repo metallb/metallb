@@ -17,36 +17,39 @@ package main
 import (
 	"flag"
 	"fmt"
-	"net"
 	"reflect"
+	"sync"
 
 	"go.universe.tf/metallb/internal"
+	"go.universe.tf/metallb/internal/config"
 
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/tools/record"
+	"k8s.io/client-go/util/workqueue"
 )
 
 type controller struct {
 	client *kubernetes.Clientset
 	events record.EventRecorder
+
+	queue workqueue.RateLimitingInterface
+
+	svcIndexer  cache.Indexer
+	svcInformer cache.Controller
+	cmIndexer   cache.Indexer
+	cmInformer  cache.Controller
+
+	sync.Mutex
+	config  *config.Config
+	ipToSvc map[string]string
+	svcToIP map[string]string
 }
 
-func (c *controller) UpdateBalancer(name string, svcRo *v1.Service, eps *v1.Endpoints) error {
-	// Check service type
-	// Set assigned-ip
-	//   from LoadBalancerIP
-	//   from IP allocation
-	// Check policies/permissions
-	// Program nodes
-	//   Set ExternalIPs
-	//   Set ExternalTrafficPolicy
-	// Set status
-	//   Update Ingress
-	// Set advertise-after
-
+func (c *controller) UpdateBalancer(name string, svcRo *v1.Service) error {
 	if svcRo.Spec.Type != "LoadBalancer" {
 		return nil
 	}
@@ -56,7 +59,7 @@ func (c *controller) UpdateBalancer(name string, svcRo *v1.Service, eps *v1.Endp
 	// copy makes the code much easier to follow, and we have a GC for
 	// a reason.
 	svc := svcRo.DeepCopy()
-	c.convergeBalancer(svc)
+	c.convergeService(name, svc)
 	var err error
 	if !(reflect.DeepEqual(svcRo.Annotations, svc.Annotations) && reflect.DeepEqual(svcRo.Spec, svc.Spec)) {
 		svcRo, err = c.client.CoreV1().Services(svc.Namespace).Update(svc)
@@ -78,62 +81,31 @@ func (c *controller) UpdateBalancer(name string, svcRo *v1.Service, eps *v1.Endp
 	return nil
 }
 
-func (c *controller) convergeBalancer(svc *v1.Service) {
-	lbIP := net.ParseIP(svc.Annotations[internal.AnnotationAssignedIP]).To4()
-	if lbIP == nil {
-		clearServiceState(svc)
-	}
+func (c *controller) DeleteBalancer(name string) error { return nil }
 
-	if svc.Spec.LoadBalancerIP != "" && svc.Spec.LoadBalancerIP != svc.Annotations[internal.AnnotationAssignedIP] {
-		clearServiceState(svc)
-		lbIP = net.ParseIP(svc.Spec.LoadBalancerIP).To4()
-		if lbIP == nil {
-			c.events.Eventf(svc, v1.EventTypeWarning, "BadIP", "Invalid IPv4 address %q given as LoadBalancer", svc.Spec.LoadBalancerIP)
-			return
+func (c *controller) UpdateConfig(cm *v1.ConfigMap) error {
+	var (
+		cfg *config.Config
+		err error
+	)
+	if cm != nil {
+		cfg, err = config.Parse([]byte(cm.Data["config"]))
+		if err != nil {
+			c.events.Eventf(cm, v1.EventTypeWarning, "InvalidConfig", "%s", err)
+			return nil
 		}
-		svc.Annotations[internal.AnnotationAssignedIP] = svc.Spec.LoadBalancerIP
-		c.events.Eventf(svc, v1.EventTypeNormal, "IPAllocated", "Using loadBalancerIP %q", svc.Spec.LoadBalancerIP)
 	}
 
-	if svc.Spec.LoadBalancerIP == "" && lbIP != nil {
-		clearServiceState(svc)
-		c.events.Eventf(svc, v1.EventTypeNormal, "UnassignIP", "IP %q unassigned", lbIP.String())
-		lbIP = nil
+	c.Lock()
+	defer c.Unlock()
+	c.config = cfg
+	// Reprocess all services on config change
+	for svc := range c.svcToIP {
+		c.queue.AddRateLimited(svcKey(svc))
 	}
 
-	// TODO: IP allocation
-	if lbIP == nil {
-		c.events.Event(svc, v1.EventTypeWarning, "ActionRequired", "Must manually set LoadBalancerIP, automatic allocation not supported yet")
-		return
-	}
-
-	if err := c.checkPolicy(lbIP); err != nil {
-		clearServiceState(svc)
-		c.events.Eventf(svc, v1.EventTypeWarning, "PolicyError", "Policy check error: %s", err)
-		return
-	}
-
-	if len(svc.Spec.ExternalIPs) != 1 || svc.Spec.ExternalIPs[0] != lbIP.String() || svc.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeLocal {
-		svc.Spec.ExternalIPs = []string{lbIP.String()}
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
-		c.events.Eventf(svc, v1.EventTypeNormal, "NodeConfig", "Configured node routing for %q", lbIP.String())
-	}
-	svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: lbIP.String()}}
-}
-
-func clearServiceState(svc *v1.Service) {
-	delete(svc.Annotations, internal.AnnotationAssignedIP)
-	delete(svc.Annotations, internal.AnnotationAutoAllocated)
-	svc.Spec.ExternalIPs = nil
-	svc.Status.LoadBalancer = v1.LoadBalancerStatus{}
-}
-
-func (c *controller) checkPolicy(ip net.IP) error {
-	// TODO: check policies
 	return nil
 }
-
-func (c *controller) DeleteBalancer(name string) error { return nil }
 
 func main() {
 	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
@@ -145,10 +117,12 @@ func main() {
 		glog.Fatalf("Error getting k8s client: %s", err)
 	}
 
-	s := &controller{
-		client: client,
-		events: events,
+	c := &controller{
+		client:  client,
+		events:  events,
+		ipToSvc: map[string]string{},
+		svcToIP: map[string]string{},
 	}
 
-	glog.Fatal(internal.WatchServices(client, s))
+	glog.Fatal(c.watch())
 }
