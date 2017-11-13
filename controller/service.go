@@ -19,17 +19,23 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/golang/glog"
 	"go.universe.tf/metallb/internal"
 	"go.universe.tf/metallb/internal/config"
 	"k8s.io/api/core/v1"
 )
 
 func (c *controller) convergeService(key string, svc *v1.Service) {
-	// The assigned IP annotation is the end state of convergence. If
-	// there's none or a malformed one, nuke all controlled state so
-	// that we start converging from a clean slate.
-	lbIP := net.ParseIP(svc.Annotations[internal.AnnotationAssignedIP]).To4()
+	var lbIP net.IP
+
+	// The assigned LB IP is the end state of convergence. If there's
+	// none or a malformed one, nuke all controlled state so that we
+	// start converging from a clean slate.
+	if len(svc.Status.LoadBalancer.Ingress) == 1 {
+		lbIP = net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
+	}
 	if lbIP == nil {
+		glog.Infof("%q has no valid ingress IP currently", key)
 		c.clearServiceState(key, svc)
 	}
 
@@ -37,18 +43,39 @@ func (c *controller) convergeService(key string, svc *v1.Service) {
 	// makes sense. If so, clear it out and give the rest of the logic
 	// a chance to allocate again.
 	if lbIP != nil && !c.ipIsValid(lbIP) {
+		glog.Infof("%q has assigned IP %q, but that IP is no longer valid per config", key, lbIP)
 		c.clearServiceState(key, svc)
+		lbIP = nil
+	}
+
+	// If there's an LB IP, but we think it's currently assigned to
+	// someone else, clear it! Something needs fixing.
+	if lbIP != nil {
+		conflict := false
+		if s, ok := c.ipToSvc[lbIP.String()]; ok && s != key {
+			conflict = true
+		} else if i, ok := c.svcToIP[key]; ok && i != lbIP.String() {
+			conflict = true
+		}
+		if conflict {
+			glog.Infof("%q has assigned IP %q, in conflict with another service", key, lbIP)
+			c.clearServiceState(key, svc)
+			lbIP = nil
+		}
 	}
 
 	// User set or changed the desired LB IP, nuke the
 	// state. allocateIP will pay attention to LoadBalancerIP and try
 	// to meet the user's demands.
-	if svc.Spec.LoadBalancerIP != "" && svc.Spec.LoadBalancerIP != svc.Annotations[internal.AnnotationAssignedIP] {
+	if svc.Spec.LoadBalancerIP != "" && svc.Spec.LoadBalancerIP != lbIP.String() {
+		glog.Infof("%q assigned %q, user requested %q", key, lbIP, svc.Spec.LoadBalancerIP)
 		c.clearServiceState(key, svc)
+		lbIP = nil
 	}
 
 	// If lbIP is still nil at this point, try to allocate.
 	if lbIP == nil {
+		glog.Infof("%q allocating IP", key)
 		ip, err := c.allocateIP(key, svc)
 		if err != nil {
 			c.events.Eventf(svc, v1.EventTypeWarning, "AllocationFailed", "Failed to allocate IP for %q: %s", key, err)
@@ -58,27 +85,30 @@ func (c *controller) convergeService(key string, svc *v1.Service) {
 			return
 		}
 		lbIP = ip
+		glog.Infof("%q has been allocated IP %q", key, lbIP)
 	}
 
 	if lbIP == nil {
+		glog.Infof("%q failed to allocate an IP, but did not exit convergeService early", key)
 		c.events.Eventf(svc, v1.EventTypeWarning, "InternalError", "didn't allocate an IP but also did not fail")
 		return
 	}
 
 	// At this point, we have an IP selected somehow, all that remains
-	// is to program the data plane.
+	// is to program the data plane...
 	svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 	svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: lbIP.String()}}
+
+	// ... and record that we allocated the IP.
+	c.ipToSvc[lbIP.String()] = key
+	c.svcToIP[key] = lbIP.String()
 }
 
 // clearServiceState clears all fields that are actively managed by
 // this controller.
 func (c *controller) clearServiceState(key string, svc *v1.Service) {
-	c.Lock()
-	defer c.Unlock()
 	delete(c.ipToSvc, c.svcToIP[key])
 	delete(c.svcToIP, key)
-	delete(svc.Annotations, internal.AnnotationAssignedIP)
 	svc.Status.LoadBalancer = v1.LoadBalancerStatus{}
 }
 
@@ -95,9 +125,6 @@ func (c *controller) ipIsValid(ip net.IP) bool {
 }
 
 func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
-	c.Lock()
-	defer c.Unlock()
-
 	// If the user asked for a specific IP, try that.
 	if svc.Spec.LoadBalancerIP != "" {
 		ip := net.ParseIP(svc.Spec.LoadBalancerIP).To4()
@@ -160,9 +187,6 @@ func (c *controller) assignIP(key string, svc *v1.Service, ip net.IP) error {
 		return errors.New("address is not part of any known pool")
 	}
 
-	c.ipToSvc[ip.String()] = key
-	c.svcToIP[key] = ip.String()
-	svc.Annotations[internal.AnnotationAssignedIP] = ip.String()
 	c.events.Eventf(svc, v1.EventTypeNormal, "IPAllocated", "Assigned IP %q", ip)
 	return nil
 }

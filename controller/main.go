@@ -18,7 +18,6 @@ import (
 	"flag"
 	"fmt"
 	"reflect"
-	"sync"
 
 	"go.universe.tf/metallb/internal"
 	"go.universe.tf/metallb/internal/config"
@@ -43,7 +42,6 @@ type controller struct {
 	cmIndexer   cache.Indexer
 	cmInformer  cache.Controller
 
-	sync.Mutex
 	config  *config.Config
 	ipToSvc map[string]string
 	svcToIP map[string]string
@@ -60,6 +58,11 @@ func (c *controller) UpdateBalancer(name string, svcRo *v1.Service) error {
 	// a reason.
 	svc := svcRo.DeepCopy()
 	c.convergeService(name, svc)
+	if reflect.DeepEqual(svcRo, svc) {
+		glog.Infof("%q converged, no change", name)
+		return nil
+	}
+
 	var err error
 	if !(reflect.DeepEqual(svcRo.Annotations, svc.Annotations) && reflect.DeepEqual(svcRo.Spec, svc.Spec)) {
 		svcRo, err = c.client.CoreV1().Services(svc.Namespace).Update(svc)
@@ -81,7 +84,15 @@ func (c *controller) UpdateBalancer(name string, svcRo *v1.Service) error {
 	return nil
 }
 
-func (c *controller) DeleteBalancer(name string) error { return nil }
+func (c *controller) DeleteBalancer(name string) error {
+	ip, ok := c.svcToIP[name]
+	if ok {
+		delete(c.svcToIP, name)
+		delete(c.ipToSvc, ip)
+		glog.Infof("%q deleted", name)
+	}
+	return nil
+}
 
 func (c *controller) UpdateConfig(cm *v1.ConfigMap) error {
 	var (
@@ -96,8 +107,6 @@ func (c *controller) UpdateConfig(cm *v1.ConfigMap) error {
 		}
 	}
 
-	c.Lock()
-	defer c.Unlock()
 	c.config = cfg
 	// Reprocess all services on config change
 	for svc := range c.svcToIP {
