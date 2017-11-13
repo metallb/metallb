@@ -74,7 +74,7 @@ func (c *controller) watch() error {
 		},
 	}
 	cmWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "configmaps", "kube-system", fields.OneTermEqualSelector("metadata.name", "metallb-config"))
-	c.cmIndexer, c.cmInformer = cache.NewIndexerInformer(cmWatcher, &v1.Service{}, 0, cmHandlers, cache.Indexers{})
+	c.cmIndexer, c.cmInformer = cache.NewIndexerInformer(cmWatcher, &v1.ConfigMap{}, 0, cmHandlers, cache.Indexers{})
 
 	stop := make(chan struct{})
 	defer close(stop)
