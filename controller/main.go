@@ -52,6 +52,12 @@ func (c *controller) UpdateBalancer(name string, svcRo *v1.Service) error {
 		return nil
 	}
 
+	if c.config == nil {
+		// Config hasn't been read yet, nothing we can do just yet.
+		glog.Infof("%q skipped, no config loaded", name)
+		return nil
+	}
+
 	// Making a copy unconditionally is a bit wasteful, since we don't
 	// always need to update the service. But, making an unconditional
 	// copy makes the code much easier to follow, and we have a GC for
@@ -109,8 +115,9 @@ func (c *controller) UpdateConfig(cm *v1.ConfigMap) error {
 
 	c.config = cfg
 	// Reprocess all services on config change
-	for svc := range c.svcToIP {
-		c.queue.AddRateLimited(svcKey(svc))
+	glog.Infof("config changed, reconverging all services")
+	for _, k := range c.svcIndexer.ListKeys() {
+		c.queue.AddRateLimited(svcKey(k))
 	}
 
 	return nil
