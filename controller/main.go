@@ -19,41 +19,41 @@ import (
 	"fmt"
 	"reflect"
 
-	"go.universe.tf/metallb/internal"
 	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/k8s"
 
 	"github.com/golang/glog"
 
 	"k8s.io/api/core/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/workqueue"
 )
 
+// Service offers methods to mutate a Kubernetes service object.
+type service interface {
+	Update(svc *v1.Service) (*v1.Service, error)
+	UpdateStatus(svc *v1.Service) error
+	Infof(svc *v1.Service, desc, msg string, args ...interface{})
+	Errorf(svc *v1.Service, desc, msg string, args ...interface{})
+}
+
 type controller struct {
-	client *kubernetes.Clientset
-	events record.EventRecorder
-
-	queue workqueue.RateLimitingInterface
-
-	svcIndexer  cache.Indexer
-	svcInformer cache.Controller
-	cmIndexer   cache.Indexer
-	cmInformer  cache.Controller
-
+	client  service
+	synced  bool
 	config  *config.Config
 	ipToSvc map[string]string
 	svcToIP map[string]string
 }
 
-func (c *controller) UpdateBalancer(name string, svcRo *v1.Service) error {
+func (c *controller) SetBalancer(name string, svcRo *v1.Service, _ *v1.Endpoints) error {
+	if svcRo == nil {
+		return c.deleteBalancer(name)
+	}
+
 	if svcRo.Spec.Type != "LoadBalancer" {
 		return nil
 	}
 
 	if c.config == nil {
-		// Config hasn't been read yet, nothing we can do just yet.
+		// Config hasn't been read, nothing we can do just yet.
 		glog.Infof("%q skipped, no config loaded", name)
 		return nil
 	}
@@ -63,7 +63,7 @@ func (c *controller) UpdateBalancer(name string, svcRo *v1.Service) error {
 	// copy makes the code much easier to follow, and we have a GC for
 	// a reason.
 	svc := svcRo.DeepCopy()
-	c.convergeService(name, svc)
+	c.convergeBalancer(name, svc)
 	if reflect.DeepEqual(svcRo, svc) {
 		glog.Infof("%q converged, no change", name)
 		return nil
@@ -71,7 +71,7 @@ func (c *controller) UpdateBalancer(name string, svcRo *v1.Service) error {
 
 	var err error
 	if !(reflect.DeepEqual(svcRo.Annotations, svc.Annotations) && reflect.DeepEqual(svcRo.Spec, svc.Spec)) {
-		svcRo, err = c.client.CoreV1().Services(svc.Namespace).Update(svc)
+		svcRo, err = c.client.Update(svc)
 		if err != nil {
 			return fmt.Errorf("updating service: %s", err)
 		}
@@ -80,8 +80,7 @@ func (c *controller) UpdateBalancer(name string, svcRo *v1.Service) error {
 	if !reflect.DeepEqual(svcRo.Status, svc.Status) {
 		st, svc := svc.Status, svcRo.DeepCopy()
 		svc.Status = st
-		svc, err = c.client.CoreV1().Services(svcRo.Namespace).UpdateStatus(svc)
-		if err != nil {
+		if err = c.client.UpdateStatus(svc); err != nil {
 			return fmt.Errorf("updating status: %s", err)
 		}
 		glog.Infof("updated service status %q", name)
@@ -90,7 +89,7 @@ func (c *controller) UpdateBalancer(name string, svcRo *v1.Service) error {
 	return nil
 }
 
-func (c *controller) DeleteBalancer(name string) error {
+func (c *controller) deleteBalancer(name string) error {
 	ip, ok := c.svcToIP[name]
 	if ok {
 		delete(c.svcToIP, name)
@@ -100,27 +99,14 @@ func (c *controller) DeleteBalancer(name string) error {
 	return nil
 }
 
-func (c *controller) UpdateConfig(cm *v1.ConfigMap) error {
-	var (
-		cfg *config.Config
-		err error
-	)
-	if cm != nil {
-		cfg, err = config.Parse([]byte(cm.Data["config"]))
-		if err != nil {
-			c.events.Eventf(cm, v1.EventTypeWarning, "InvalidConfig", "%s", err)
-			return nil
-		}
-	}
-
+func (c *controller) SetConfig(cfg *config.Config) error {
 	c.config = cfg
-	// Reprocess all services on config change
-	glog.Infof("config changed, reconverging all services")
-	for _, k := range c.svcIndexer.ListKeys() {
-		c.queue.AddRateLimited(svcKey(k))
-	}
-
 	return nil
+}
+
+func (c *controller) MarkSynced() {
+	c.synced = true
+	glog.Infof("controller synced, can allocate IPs now")
 }
 
 func main() {
@@ -128,17 +114,17 @@ func main() {
 	master := flag.String("master", "", "master url")
 	flag.Parse()
 
-	client, events, err := internal.Client(*master, *kubeconfig, "metallb-controller")
-	if err != nil {
-		glog.Fatalf("Error getting k8s client: %s", err)
-	}
-
 	c := &controller{
-		client:  client,
-		events:  events,
 		ipToSvc: map[string]string{},
 		svcToIP: map[string]string{},
 	}
 
-	glog.Fatal(c.watch())
+	client, err := k8s.NewClient("metallb-controller", *master, *kubeconfig, c, false)
+	if err != nil {
+		glog.Fatalf("Error getting k8s client: %s", err)
+	}
+
+	c.client = client
+
+	glog.Fatal(client.Run())
 }

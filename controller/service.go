@@ -25,7 +25,7 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-func (c *controller) convergeService(key string, svc *v1.Service) {
+func (c *controller) convergeBalancer(key string, svc *v1.Service) error {
 	var lbIP net.IP
 
 	// The assigned LB IP is the end state of convergence. If there's
@@ -75,14 +75,18 @@ func (c *controller) convergeService(key string, svc *v1.Service) {
 
 	// If lbIP is still nil at this point, try to allocate.
 	if lbIP == nil {
+		if !c.synced {
+			glog.Infof("%q not allocating IP yet, state not synced", key)
+			return errors.New("not allocating IPs yet, not synced")
+		}
 		glog.Infof("%q allocating IP", key)
 		ip, err := c.allocateIP(key, svc)
 		if err != nil {
-			c.events.Eventf(svc, v1.EventTypeWarning, "AllocationFailed", "Failed to allocate IP for %q: %s", key, err)
+			c.client.Errorf(svc, "AllocationFailed", "Failed to allocate IP for %q: %s", key, err)
 			// TODO: should retry on pool exhaustion allocation
 			// failures, once we keep track of when pools become
 			// non-full.
-			return
+			return nil
 		}
 		lbIP = ip
 		glog.Infof("%q has been allocated IP %q", key, lbIP)
@@ -90,8 +94,8 @@ func (c *controller) convergeService(key string, svc *v1.Service) {
 
 	if lbIP == nil {
 		glog.Infof("%q failed to allocate an IP, but did not exit convergeService early", key)
-		c.events.Eventf(svc, v1.EventTypeWarning, "InternalError", "didn't allocate an IP but also did not fail")
-		return
+		c.client.Errorf(svc, "InternalError", "didn't allocate an IP but also did not fail")
+		return nil
 	}
 
 	// At this point, we have an IP selected somehow, all that remains
@@ -102,6 +106,7 @@ func (c *controller) convergeService(key string, svc *v1.Service) {
 	// ... and record that we allocated the IP.
 	c.ipToSvc[lbIP.String()] = key
 	c.svcToIP[key] = lbIP.String()
+	return nil
 }
 
 // clearServiceState clears all fields that are actively managed by
@@ -117,11 +122,18 @@ func (c *controller) ipIsValid(ip net.IP) bool {
 	for _, p := range c.config.Pools {
 		for _, c := range p.CIDR {
 			if c.Contains(ip) {
+				if p.AvoidBuggyIPs && ipConfusesBuggyFirmwares(ip) {
+					return false
+				}
 				return true
 			}
 		}
 	}
 	return false
+}
+
+func ipConfusesBuggyFirmwares(ip net.IP) bool {
+	return ip[len(ip)-1] == 0 || ip[len(ip)-1] == 255
 }
 
 func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
@@ -162,6 +174,9 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 func (c *controller) allocateIPFromPool(key string, svc *v1.Service, pool *config.Pool) (net.IP, error) {
 	for _, cidr := range pool.CIDR {
 		for ip := cidr.IP; cidr.Contains(ip); ip = nextIP(ip) {
+			if pool.AvoidBuggyIPs && ipConfusesBuggyFirmwares(ip) {
+				continue
+			}
 			if _, ok := c.ipToSvc[ip.String()]; !ok {
 				// Minor inefficiency here, assignIP will
 				// retraverse the pools to check that ip is
@@ -187,7 +202,7 @@ func (c *controller) assignIP(key string, svc *v1.Service, ip net.IP) error {
 		return errors.New("address is not part of any known pool")
 	}
 
-	c.events.Eventf(svc, v1.EventTypeNormal, "IPAllocated", "Assigned IP %q", ip)
+	c.client.Infof(svc, "IPAllocated", "Assigned IP %q", ip)
 	return nil
 }
 

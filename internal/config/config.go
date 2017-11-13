@@ -35,6 +35,7 @@ type configFile struct {
 	Pools       []struct {
 		Name           string
 		CIDR           []string
+		AvoidBuggyIPs  bool `yaml:"avoid-buggy-ips"`
 		Advertisements []struct {
 			AggregationLength int `yaml:"aggregation-length"`
 			LocalPref         uint32
@@ -57,6 +58,7 @@ type Peer struct {
 
 type Pool struct {
 	CIDR           []*net.IPNet
+	AvoidBuggyIPs  bool
 	Advertisements []Advertisement
 }
 
@@ -104,7 +106,9 @@ func Parse(bs []byte) (*Config, error) {
 		if _, ok := cfg.Pools[p.Name]; ok {
 			return nil, fmt.Errorf("duplicate pool definition for %q", p.Name)
 		}
-		pool := &Pool{}
+		pool := &Pool{
+			AvoidBuggyIPs: p.AvoidBuggyIPs,
+		}
 		cfg.Pools[p.Name] = pool
 
 		for _, cidr := range p.CIDR {
