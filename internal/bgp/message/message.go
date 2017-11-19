@@ -11,8 +11,6 @@ import (
 	"time"
 )
 
-//go:generate go run fuzz-gen.go
-
 type ErrorCode uint16
 
 type openOptionType uint8

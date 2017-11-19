@@ -1,0 +1,4 @@
+panic: I haz a notification
+go.universe.tf/metallb/internal/bgp/message.Fuzz
+go-fuzz-dep.Main
+main.main
