@@ -115,8 +115,8 @@ func mkBGP(cfg config.Peer) (*server.BgpServer, error) {
 	bgpCfg := &bgpconfig.Global{
 		Config: bgpconfig.GlobalConfig{
 			As:       cfg.MyASN,
-			RouterId: "127.0.0.1", // TODO
-			Port:     -1,          // Don't listen anywhere, we only connect out.
+			RouterId: "192.168.16.45", // TODO
+			Port:     -1,              // Don't listen anywhere, we only connect out.
 		},
 	}
 	if err := s.Start(bgpCfg); err != nil {

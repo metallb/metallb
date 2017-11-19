@@ -75,18 +75,30 @@ func main() {
 			fatalf("generating IP: %s", err)
 		}
 		m := &message.Open{
-			ASN:      r.Uint32(),
+			ASN:      uint16(r.Uint32()),
 			HoldTime: time.Duration(rand.Uint32()) * time.Second,
 			RouterID: net.IP(ip),
+		}
+		if m.ASN == 0 {
+			m.ASN++
+		}
+		nCaps := r.Intn(10)
+		for j := 0; j < nCaps; j++ {
+			sz := r.Intn(10)
+			cap := message.Capability{uint8(r.Intn(256)), make([]byte, sz)}
+			if _, err := r.Read(cap.Data); err != nil {
+				fatalf("generating cap data: %s", err)
+			}
+			m.Capabilities = append(m.Capabilities, cap)
 		}
 		write(fmt.Sprintf("autogen-open-%d", i), m)
 	}
 
 	write("autogen-keepalive", &message.Keepalive{})
 
-	for i := 0; i < 65535; i += 41 {
+	for i := 0; i < 65535; i++ {
 		n := &message.Notification{
-			Code: message.ErrorCode(i),
+			Code: uint16(i),
 			Data: make([]byte, r.Intn(100)),
 		}
 		if _, err := r.Read(n.Data); err != nil {

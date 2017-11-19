@@ -74,50 +74,61 @@ func TestMsgSerialization(t *testing.T) {
 		{
 			desc: "valid OPEN",
 			msg: &Open{
-				ASN:      1234,
-				HoldTime: 42 * time.Second,
-				RouterID: net.ParseIP("2.3.4.5").To4(),
+				ASN:          1234,
+				HoldTime:     42 * time.Second,
+				RouterID:     net.ParseIP("2.3.4.5").To4(),
+				Capabilities: []Capability{},
 			},
 		},
 		{
 			desc: "bad OPEN ASN",
 			msg: &Open{
-				ASN:      0,
-				HoldTime: 42 * time.Second,
-				RouterID: net.ParseIP("2.3.4.5").To4(),
+				ASN:          0,
+				HoldTime:     42 * time.Second,
+				RouterID:     net.ParseIP("2.3.4.5").To4(),
+				Capabilities: []Capability{},
 			},
 			wantMarshalErr: true,
 		},
 		{
 			desc: "bad OPEN HoldTime",
 			msg: &Open{
-				ASN:      1234,
-				HoldTime: 1 * time.Second,
-				RouterID: net.ParseIP("2.3.4.5").To4(),
+				ASN:          1234,
+				HoldTime:     1 * time.Second,
+				RouterID:     net.ParseIP("2.3.4.5").To4(),
+				Capabilities: []Capability{},
 			},
 			wantMarshalErr: true,
 		},
 		{
 			desc: "bad OPEN RouterID",
 			msg: &Open{
-				ASN:      1234,
-				HoldTime: 42 * time.Second,
-				RouterID: net.ParseIP("::1"),
+				ASN:          1234,
+				HoldTime:     42 * time.Second,
+				RouterID:     net.ParseIP("::1"),
+				Capabilities: []Capability{},
 			},
 			wantMarshalErr: true,
 		},
 		{
 			desc: "nil OPEN RouterID",
 			msg: &Open{
-				ASN:      1234,
-				HoldTime: 42 * time.Second,
-				RouterID: nil,
+				ASN:          1234,
+				HoldTime:     42 * time.Second,
+				RouterID:     nil,
+				Capabilities: []Capability{},
 			},
 			wantMarshalErr: true,
 		},
 		{
-			desc: "Keepalive",
+			desc: "keepalive",
 			msg:  &Keepalive{},
+		},
+		{desc: "notification",
+			msg: &Notification{
+				Code: 42,
+				Data: []byte("foo"),
+			},
 		},
 	}
 
@@ -127,6 +138,10 @@ func TestMsgSerialization(t *testing.T) {
 			if !test.wantMarshalErr {
 				t.Errorf("%s: marshal message: %s", test.desc, err)
 			}
+			continue
+		}
+		if err == nil && test.wantMarshalErr {
+			t.Errorf("%s: marshal message %#v should have failed", test.desc, test.msg)
 			continue
 		}
 

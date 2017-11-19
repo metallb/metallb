@@ -1,0 +1,5 @@
+panic: runtime error: invalid memory address or nil pointer dereference
+go.universe.tf/metallb/internal/bgp/message.(*Open).MarshalBinary
+go.universe.tf/metallb/internal/bgp/message.Fuzz
+go-fuzz-dep.Main
+main.main
