@@ -117,6 +117,15 @@ type Capability struct {
 	Data []byte
 }
 
+func Capability4ByteASN(asn uint32) Capability {
+	ret := Capability{
+		Code: 65,
+		Data: make([]byte, 4),
+	}
+	binary.BigEndian.PutUint32(ret.Data, asn)
+	return ret
+}
+
 func decodeCapabilities(r io.Reader) ([]Capability, error) {
 	ret := []Capability{}
 
