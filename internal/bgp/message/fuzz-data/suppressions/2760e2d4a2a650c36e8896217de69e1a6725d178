@@ -1,4 +1,0 @@
-panic: decoded something I cannot encode
-go.universe.tf/metallb/internal/bgp/message.Fuzz
-go-fuzz-dep.Main
-main.main

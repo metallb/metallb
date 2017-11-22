@@ -1,4 +1,0 @@
-panic: decoded message that doesn't reencode the same
-go.universe.tf/metallb/internal/bgp/message.Fuzz
-go-fuzz-dep.Main
-main.main
