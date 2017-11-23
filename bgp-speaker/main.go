@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"sort"
 
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
@@ -35,9 +36,12 @@ type service interface {
 }
 
 type controller struct {
+	myIP   net.IP
 	client service
+
 	config *config.Config
 	peers  []*peer
+	svcAds map[string][]*bgp.Advertisement
 }
 
 type peer struct {
@@ -46,6 +50,7 @@ type peer struct {
 }
 
 func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
+	glog.Infof("SetBalancer %q", name)
 	if svc == nil {
 		return c.deleteBalancer(name)
 	}
@@ -61,31 +66,77 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 	}
 
 	if len(svc.Status.LoadBalancer.Ingress) != 1 {
-		glog.Infof("%q skipped, no IP allocated", name)
+		// No IP allocated, nothing to route.
+		return c.deleteBalancer(name)
 	}
 
-	for _, p := range c.peers {
-		err := p.bgp.Advertise(&bgp.Advertisement{
-			Prefix: &net.IPNet{
-				IP:   net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP),
-				Mask: net.CIDRMask(32, 32),
-			},
-			NextHop:     net.ParseIP("192.168.16.42"),
-			Communities: []uint32{1, 2, 3},
-		})
-		if err != nil {
-			glog.Errorf("Advertising %q: %s", name, err)
+	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP).To4()
+	if lbIP == nil {
+		glog.Errorf("%q: invalid loadBalancer IP %q", name, svc.Status.LoadBalancer.Ingress[0].IP)
+		return c.deleteBalancer(name)
+	}
+
+	// Find the advertisement configuration for the IP
+	var ads []config.Advertisement
+findAds:
+	for _, pool := range c.config.Pools {
+		for _, cidr := range pool.CIDR {
+			if cidr.Contains(lbIP) {
+				ads = pool.Advertisements
+				break findAds
+			}
 		}
 	}
 
-	glog.Infof("TODO: do stuff with balancer")
+	c.svcAds[name] = nil
+	for _, adCfg := range ads {
+		m := net.CIDRMask(adCfg.AggregationLength, 32)
+		ad := &bgp.Advertisement{
+			Prefix: &net.IPNet{
+				IP:   lbIP.Mask(m),
+				Mask: m,
+			},
+			NextHop:   c.myIP,
+			LocalPref: adCfg.LocalPref,
+		}
+		for comm := range adCfg.Communities {
+			ad.Communities = append(ad.Communities, comm)
+		}
+		sort.Slice(ad.Communities, func(i, j int) bool { return ad.Communities[i] < ad.Communities[j] })
+		c.svcAds[name] = append(c.svcAds[name], ad)
+	}
+
+	if err := c.updateAds(); err != nil {
+		return err
+	}
 
 	return nil
 }
 
-func (c *controller) deleteBalancer(name string) error {
-	glog.Infof("TODO: delete balancer")
+func (c *controller) updateAds() error {
+	var allAds []*bgp.Advertisement
+	for _, ads := range c.svcAds {
+		// This list might contain duplicates, but that's fine,
+		// they'll get compacted by the session code when it's
+		// calculating advertisements.
+		//
+		// TODO: be more intelligent about compacting advertisements
+		// and detecting conflicting advertisements.
+		allAds = append(allAds, ads...)
+	}
+	for _, peer := range c.peers {
+		glog.Infof("BgpSet %#v", allAds)
+		if err := peer.bgp.Set(allAds...); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func (c *controller) deleteBalancer(name string) error {
+	glog.Infof("DeleteBalancer %q", name)
+	delete(c.svcAds, name)
+	return c.updateAds()
 }
 
 func (c *controller) SetConfig(cfg *config.Config) error {
@@ -127,7 +178,7 @@ func (c *controller) SetConfig(cfg *config.Config) error {
 			continue
 		}
 
-		s, err := mkBGP(p.cfg)
+		s, err := bgp.New(fmt.Sprintf("%s:179", p.cfg.Addr), p.cfg.MyASN, net.ParseIP("192.168.18.65"), p.cfg.ASN, p.cfg.HoldTime)
 		if err != nil {
 			return fmt.Errorf("creating BGP session for %q: %s", p.cfg.Addr, err)
 		}
@@ -138,24 +189,23 @@ func (c *controller) SetConfig(cfg *config.Config) error {
 	return nil
 }
 
-func mkBGP(cfg *config.Peer) (*bgp.Session, error) {
-	// TODO: router ID
-	s, err := bgp.New(fmt.Sprintf("%s:179", cfg.Addr), cfg.MyASN, net.ParseIP("192.168.18.65"), cfg.ASN, cfg.HoldTime)
-	if err != nil {
-		return nil, err
-	}
-
-	return s, nil
-}
-
 func (c *controller) MarkSynced() {}
 
 func main() {
 	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	master := flag.String("master", "", "master url")
+	myIPstr := flag.String("node-ip", "", "IP address of this Kubernetes node")
 	flag.Parse()
 
-	c := &controller{}
+	myIP := net.ParseIP(*myIPstr).To4()
+	if myIP == nil {
+		glog.Fatalf("Invalid --node-ip %q, must be an IPv4 address", *myIPstr)
+	}
+
+	c := &controller{
+		myIP:   myIP,
+		svcAds: map[string][]*bgp.Advertisement{},
+	}
 
 	client, err := k8s.NewClient("metallb-bgp-speaker", *master, *kubeconfig, c, false)
 	if err != nil {

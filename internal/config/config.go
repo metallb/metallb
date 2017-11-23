@@ -152,6 +152,13 @@ func Parse(bs []byte) (*Config, error) {
 			if ad.AggregationLength > 32 {
 				return nil, fmt.Errorf("invalid aggregation length %q in pool %q", ad.AggregationLength, p.Name)
 			}
+			for _, cidr := range pool.CIDR {
+				o, _ := cidr.Mask.Size()
+				if ad.AggregationLength < o {
+					return nil, fmt.Errorf("invalid aggregation length %d in pool %q: prefix %q in this pool is more specific than the aggregation length", ad.AggregationLength, p.Name, cidr)
+				}
+			}
+
 			comms := map[uint32]bool{}
 			for _, c := range ad.Communities {
 				if v, ok := communities[c]; ok {
