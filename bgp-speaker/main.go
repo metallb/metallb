@@ -17,15 +17,14 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
 	"reflect"
 
+	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 
 	"github.com/golang/glog"
-	"github.com/kr/pretty"
-	bgpconfig "github.com/osrg/gobgp/config"
-	"github.com/osrg/gobgp/server"
 
 	"k8s.io/api/core/v1"
 )
@@ -38,12 +37,12 @@ type service interface {
 type controller struct {
 	client service
 	config *config.Config
-	peers  []peer
+	peers  []*peer
 }
 
 type peer struct {
 	cfg *config.Peer
-	bgp *server.BgpServer
+	bgp *bgp.Session
 }
 
 func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
@@ -61,6 +60,24 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 		return nil
 	}
 
+	if len(svc.Status.LoadBalancer.Ingress) != 1 {
+		glog.Infof("%q skipped, no IP allocated", name)
+	}
+
+	for _, p := range c.peers {
+		err := p.bgp.Advertise(&bgp.Advertisement{
+			Prefix: &net.IPNet{
+				IP:   net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP),
+				Mask: net.CIDRMask(32, 32),
+			},
+			NextHop:     net.ParseIP("192.168.16.42"),
+			Communities: []uint32{1, 2, 3},
+		})
+		if err != nil {
+			glog.Errorf("Advertising %q: %s", name, err)
+		}
+	}
+
 	glog.Infof("TODO: do stuff with balancer")
 
 	return nil
@@ -72,9 +89,9 @@ func (c *controller) deleteBalancer(name string) error {
 }
 
 func (c *controller) SetConfig(cfg *config.Config) error {
-	pretty.Printf("Newconfig! %# v\n", cfg)
+	glog.Infof("Converging configuration...")
 
-	newPeers := make([]peer, len(cfg.Peers))
+	newPeers := make([]*peer, len(cfg.Peers))
 	for i, p := range cfg.Peers {
 		if i <= len(c.peers)-1 {
 			if reflect.DeepEqual(p, c.peers[i].cfg) {
@@ -84,63 +101,48 @@ func (c *controller) SetConfig(cfg *config.Config) error {
 			}
 		}
 
-		newPeers[i].cfg = &p
-		glog.Infof("New BGP peer %#v", p)
-		s, err := mkBGP(p)
-		if err != nil {
-			return fmt.Errorf("creating BGP session for %q: %s", p.Addr, err)
+		newPeers[i] = &peer{
+			cfg: &p,
 		}
-		newPeers[i].bgp = s
+		glog.Infof("New BGP peer %#v", p)
 	}
 
 	c.config = cfg
 	oldPeers := c.peers
+	glog.Infof("oldPeers %#v", oldPeers)
+	glog.Infof("newPeers %#v", newPeers)
 	c.peers = newPeers
 	for _, p := range oldPeers {
 		if p.bgp == nil {
 			continue
 		}
-		if err := p.bgp.Stop(); err != nil {
+		glog.Infof("CLOSE BGP %q", p.cfg.Addr)
+		if err := p.bgp.Close(); err != nil {
 			return fmt.Errorf("shutting down BGP session to %q: %s", p.cfg.Addr, err)
 		}
 	}
+
+	for _, p := range c.peers {
+		if p.bgp != nil {
+			continue
+		}
+
+		s, err := mkBGP(p.cfg)
+		if err != nil {
+			return fmt.Errorf("creating BGP session for %q: %s", p.cfg.Addr, err)
+		}
+		p.bgp = s
+	}
+
 	glog.Infof("New config loaded")
 	return nil
 }
 
-func mkBGP(cfg config.Peer) (*server.BgpServer, error) {
-	s := server.NewBgpServer()
-	go s.Serve()
-
-	bgpCfg := &bgpconfig.Global{
-		Config: bgpconfig.GlobalConfig{
-			As:       cfg.MyASN,
-			RouterId: "192.168.16.45", // TODO
-			Port:     -1,              // Don't listen anywhere, we only connect out.
-		},
-	}
-	if err := s.Start(bgpCfg); err != nil {
-		return nil, fmt.Errorf("starting BGP server: %s", err)
-	}
-
-	n := &bgpconfig.Neighbor{
-		Config: bgpconfig.NeighborConfig{
-			NeighborAddress: cfg.Addr.String(),
-			PeerAs:          cfg.ASN,
-		},
-		Timers: bgpconfig.Timers{
-			Config: bgpconfig.TimersConfig{
-				ConnectRetry:           1.0,
-				IdleHoldTimeAfterReset: 1.0,
-			},
-		},
-	}
-	if err := s.AddNeighbor(n); err != nil {
-		return nil, fmt.Errorf("adding neighbor: %s", err)
-	}
-
-	if err := s.EnableNeighbor(cfg.Addr.String()); err != nil {
-		return nil, fmt.Errorf("starting neighbor: %s", err)
+func mkBGP(cfg *config.Peer) (*bgp.Session, error) {
+	// TODO: router ID
+	s, err := bgp.New(fmt.Sprintf("%s:179", cfg.Addr), cfg.MyASN, net.ParseIP("192.168.18.65"), cfg.ASN, cfg.HoldTime)
+	if err != nil {
+		return nil, err
 	}
 
 	return s, nil

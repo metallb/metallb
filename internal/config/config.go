@@ -19,6 +19,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"time"
 
 	yaml "gopkg.in/yaml.v2"
 )
@@ -27,9 +28,10 @@ import (
 // without validation or useful high level types.
 type configFile struct {
 	Peers []struct {
-		MyASN uint32 `yaml:"my-asn"`
-		ASN   uint32 `yaml:"peer-asn"`
-		Addr  string `yaml:"peer-address"`
+		MyASN    uint32 `yaml:"my-asn"`
+		ASN      uint32 `yaml:"peer-asn"`
+		Addr     string `yaml:"peer-address"`
+		HoldTime string `yaml:"hold-time"`
 	}
 	Communities map[string]string
 	Pools       []struct {
@@ -50,10 +52,11 @@ type Config struct {
 }
 
 type Peer struct {
-	MyASN uint32
-	ASN   uint32
-	Addr  net.IP
-	// TODO: BGP session settings
+	MyASN    uint32
+	ASN      uint32
+	Addr     net.IP
+	HoldTime time.Duration
+	// TODO: more BGP session settings
 }
 
 type Pool struct {
@@ -66,6 +69,20 @@ type Advertisement struct {
 	AggregationLength int
 	LocalPref         uint32
 	Communities       map[uint32]bool
+}
+
+func parseHoldTime(ht string) (time.Duration, error) {
+	if ht == "" {
+		return 90 * time.Second, nil
+	}
+	d, err := time.ParseDuration(ht)
+	if err != nil {
+		return 0, fmt.Errorf("invalid hold time %q: %s", ht, err)
+	}
+	if s := int(d.Seconds()); s != 0 && s < 3 {
+		return 0, fmt.Errorf("invalid hold time %q: must be 0 or >=3s", ht)
+	}
+	return d.Round(time.Second), nil
 }
 
 func Parse(bs []byte) (*Config, error) {
@@ -82,10 +99,15 @@ func Parse(bs []byte) (*Config, error) {
 		if ip == nil {
 			return nil, fmt.Errorf("invalid peer IP %q", p.Addr)
 		}
+		holdTime, err := parseHoldTime(p.HoldTime)
+		if err != nil {
+			return nil, err
+		}
 		cfg.Peers = append(cfg.Peers, Peer{
-			MyASN: p.MyASN,
-			ASN:   p.ASN,
-			Addr:  ip,
+			MyASN:    p.MyASN,
+			ASN:      p.ASN,
+			Addr:     ip,
+			HoldTime: holdTime,
 		})
 	}
 
