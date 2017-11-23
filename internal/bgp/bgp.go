@@ -29,13 +29,16 @@ type Session struct {
 	peerASN  uint32
 	holdTime time.Duration
 
-	mu         sync.Mutex
-	cond       *sync.Cond
-	closed     bool
-	conn       net.Conn
-	advertised map[string]*Advertisement
-	changed    map[string]*net.IPNet
-	pending    *list.List
+	newHoldTime chan bool
+
+	mu             sync.Mutex
+	cond           *sync.Cond
+	closed         bool
+	conn           net.Conn
+	actualHoldTime time.Duration
+	advertised     map[string]*Advertisement
+	changed        map[string]*net.IPNet
+	pending        *list.List
 }
 
 func (s *Session) run() {
@@ -124,9 +127,13 @@ func (s *Session) connect() error {
 		conn.Close()
 		return fmt.Errorf("read OPEN from %q: %s", s.addr, err)
 	}
-	hold := s.holdTime
-	if requestedHold < hold {
-		hold = requestedHold
+	s.actualHoldTime = s.holdTime
+	if requestedHold < s.actualHoldTime {
+		s.actualHoldTime = requestedHold
+	}
+	select {
+	case s.newHoldTime <- true:
+	default:
 	}
 
 	// Consume BGP messages until the connection closes.
@@ -143,15 +150,36 @@ func (s *Session) connect() error {
 }
 
 func (s *Session) sendKeepalives() {
+	var (
+		t  *time.Ticker
+		ch <-chan time.Time
+	)
+
 	for {
-		time.Sleep(s.holdTime / 3)
-		if err := s.sendKeepalive(); err != nil {
-			if err == errClosed {
-				// Session has been closed by package caller, we're
-				// done here.
-				return
+		select {
+		case <-s.newHoldTime:
+			s.mu.Lock()
+			ht := s.actualHoldTime
+			s.mu.Unlock()
+			if t != nil {
+				t.Stop()
+				t = nil
+				ch = nil
 			}
-			glog.Error(err)
+			if ht != 0 {
+				t = time.NewTicker(ht / 3)
+				ch = t.C
+			}
+
+		case <-ch:
+			if err := s.sendKeepalive(); err != nil {
+				if err == errClosed {
+					// Session has been closed by package caller, we're
+					// done here.
+					return
+				}
+				glog.Error(err)
+			}
 		}
 	}
 }
@@ -304,14 +332,14 @@ func sendUpdate(w io.Writer, asn uint32, adv *Advertisement) error {
 
 func New(addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time.Duration) (*Session, error) {
 	ret := &Session{
-		addr:         addr,
-		asn:          asn,
-		routerID:     routerID.To4(),
-		peerASN:      peerASN,
-		holdTime:     holdTime,
-		advertised:   map[string]*Advertisement{},
-		changed:      map[string]*net.IPNet{},
-		newKeepalive: make(chan (<-chan time.Time)),
+		addr:        addr,
+		asn:         asn,
+		routerID:    routerID.To4(),
+		peerASN:     peerASN,
+		holdTime:    holdTime,
+		newHoldTime: make(chan bool, 1),
+		advertised:  map[string]*Advertisement{},
+		changed:     map[string]*net.IPNet{},
 	}
 	if ret.routerID == nil {
 		return nil, fmt.Errorf("invalid routerID %q, must be IPv4", routerID)
