@@ -100,7 +100,6 @@ func (c *controller) convergeBalancer(key string, svc *v1.Service) error {
 
 	// At this point, we have an IP selected somehow, all that remains
 	// is to program the data plane...
-	svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
 	svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: lbIP.String()}}
 
 	// ... and record that we allocated the IP.

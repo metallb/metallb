@@ -37,6 +37,7 @@ type service interface {
 
 type controller struct {
 	myIP   net.IP
+	myNode string
 	client service
 
 	config *config.Config
@@ -67,6 +68,13 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 	if len(svc.Status.LoadBalancer.Ingress) != 1 {
 		// No IP allocated, nothing to route.
 		return c.deleteBalancer(name, "no IP allocated by controller")
+	}
+
+	// Should we advertise? Yes, if externalTrafficPolicy is Cluster,
+	// or Local && there's a ready local endpoint.
+	if !c.shouldAdvertise(svc, eps) {
+		glog.Infof("%q: should not advertise, based on endpoints state", name)
+		return c.deleteBalancer(name, "node should not advertise, based on endpoints")
 	}
 
 	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP).To4()
@@ -112,6 +120,39 @@ findAds:
 	}
 
 	return nil
+}
+
+func (c *controller) shouldAdvertise(svc *v1.Service, eps *v1.Endpoints) bool {
+	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeCluster {
+		return true
+	}
+
+	// Local balancing policy, is there a healthy endpoint on the current node?
+	ready := map[string]bool{}
+	for _, subset := range eps.Subsets {
+		for _, ep := range subset.Addresses {
+			if ep.NodeName == nil || *ep.NodeName != c.myNode {
+				continue
+			}
+			if _, ok := ready[ep.IP]; !ok {
+				// Only set true if nothing else has expressed an
+				// opinion. This means that false will take precedence
+				// if there's any unready ports for a given endpoint.
+				ready[ep.IP] = true
+			}
+		}
+		for _, ep := range subset.NotReadyAddresses {
+			ready[ep.IP] = false
+		}
+	}
+
+	for _, r := range ready {
+		if r {
+			// At least one fully healthy endpoint on this machine.
+			return true
+		}
+	}
+	return false
 }
 
 func (c *controller) updateAds() error {
@@ -208,6 +249,7 @@ func main() {
 	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	master := flag.String("master", "", "master url")
 	myIPstr := flag.String("node-ip", "", "IP address of this Kubernetes node")
+	myNode := flag.String("node-name", "", "Name of this Kubernetes node")
 	flag.Parse()
 
 	myIP := net.ParseIP(*myIPstr).To4()
@@ -215,12 +257,17 @@ func main() {
 		glog.Fatalf("Invalid --node-ip %q, must be an IPv4 address", *myIPstr)
 	}
 
+	if *myNode == "" {
+		glog.Fatalf("Must specify --node-name")
+	}
+
 	c := &controller{
 		myIP:   myIP,
+		myNode: *myNode,
 		svcAds: map[string][]*bgp.Advertisement{},
 	}
 
-	client, err := k8s.NewClient("metallb-bgp-speaker", *master, *kubeconfig, c, false)
+	client, err := k8s.NewClient("metallb-bgp-speaker", *master, *kubeconfig, c, true)
 	if err != nil {
 		glog.Fatalf("Error getting k8s client: %s", err)
 	}
