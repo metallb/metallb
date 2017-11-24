@@ -18,6 +18,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/http"
 	"reflect"
 	"sort"
 
@@ -26,6 +27,8 @@ import (
 	"go.universe.tf/metallb/internal/k8s"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"k8s.io/api/core/v1"
 )
@@ -43,6 +46,10 @@ type controller struct {
 	config *config.Config
 	peers  []*peer
 	svcAds map[string][]*bgp.Advertisement
+	svcIP  map[string]net.IP
+
+	// Metrics
+	announcing *prometheus.GaugeVec
 }
 
 type peer struct {
@@ -98,6 +105,7 @@ findAds:
 		}
 	}
 
+	c.svcIP[name] = lbIP
 	c.svcAds[name] = nil
 	for _, adCfg := range ads {
 		m := net.CIDRMask(adCfg.AggregationLength, 32)
@@ -121,6 +129,12 @@ findAds:
 	if err := c.updateAds(); err != nil {
 		return err
 	}
+
+	c.announcing.With(prometheus.Labels{
+		"service": name,
+		"node":    c.myNode,
+		"ip":      lbIP.String(),
+	}).Set(1)
 
 	return nil
 }
@@ -177,7 +191,13 @@ func (c *controller) deleteBalancer(name, reason string) error {
 		return nil
 	}
 	glog.Infof("%s: stopping announcements, %s", name, reason)
+	c.announcing.Delete(prometheus.Labels{
+		"service": name,
+		"node":    c.myNode,
+		"ip":      c.svcIP[name].String(),
+	})
 	delete(c.svcAds, name)
+	delete(c.svcIP, name)
 	return c.updateAds()
 }
 
@@ -249,6 +269,7 @@ func main() {
 	master := flag.String("master", "", "master url")
 	myIPstr := flag.String("node-ip", "", "IP address of this Kubernetes node")
 	myNode := flag.String("node-name", "", "Name of this Kubernetes node")
+	port := flag.Int("port", 4242, "HTTP listening port")
 	flag.Parse()
 
 	myIP := net.ParseIP(*myIPstr).To4()
@@ -264,6 +285,18 @@ func main() {
 		myIP:   myIP,
 		myNode: *myNode,
 		svcAds: map[string][]*bgp.Advertisement{},
+		svcIP:  map[string]net.IP{},
+
+		announcing: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: "metallb",
+			Subsystem: "speaker",
+			Name:      "announced",
+			Help:      "Services being announced from this node. This is desired state, it does not guarantee that the routing protocols have converged.",
+		}, []string{
+			"service",
+			"node",
+			"ip",
+		}),
 	}
 
 	client, err := k8s.NewClient("metallb-bgp-speaker", *master, *kubeconfig, c, true)
@@ -273,5 +306,12 @@ func main() {
 
 	c.client = client
 
+	// HTTP server for metrics
+	prometheus.MustRegister(c.announcing)
+
+	http.Handle("/metrics", promhttp.Handler())
+	go func() {
+		glog.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
+	}()
 	glog.Fatal(client.Run())
 }

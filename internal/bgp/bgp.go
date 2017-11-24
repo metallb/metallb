@@ -41,12 +41,14 @@ type Session struct {
 }
 
 func (s *Session) run() {
+	defer stats.DeleteSession(s.addr)
 	for {
 		if err := s.connect(); err != nil {
 			glog.Error(err)
 			time.Sleep(backoff)
 			continue
 		}
+		stats.SessionUp(s.addr)
 
 		glog.Infof("BGP session to %q established", s.addr)
 
@@ -56,7 +58,7 @@ func (s *Session) run() {
 			}
 			glog.Error(err)
 		}
-
+		stats.SessionDown(s.addr)
 		glog.Infof("BGP session to %q down", s.addr)
 	}
 }
@@ -79,7 +81,9 @@ func (s *Session) sendUpdates() error {
 			s.abort()
 			return fmt.Errorf("sending update of %q to %q: %s", c, s.addr, err)
 		}
+		stats.UpdateSent(s.addr)
 	}
+	stats.AdvertisedPrefixes(s.addr, len(s.advertised))
 
 	for {
 		for s.new == nil && s.conn != nil {
@@ -109,6 +113,7 @@ func (s *Session) sendUpdates() error {
 				s.abort()
 				return fmt.Errorf("sending update of %q to %q: %s", c, s.addr, err)
 			}
+			stats.UpdateSent(s.addr)
 		}
 
 		wdr := []*net.IPNet{}
@@ -122,8 +127,10 @@ func (s *Session) sendUpdates() error {
 				s.abort()
 				return fmt.Errorf("sending withdraw of %q to %q: %s", wdr, s.addr, err)
 			}
+			stats.UpdateSent(s.addr)
 		}
 		s.advertised, s.new = s.new, nil
+		stats.AdvertisedPrefixes(s.addr, len(s.advertised))
 	}
 }
 
@@ -239,6 +246,9 @@ func New(addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time
 	go ret.sendKeepalives()
 	go ret.run()
 
+	stats.sessionUp.WithLabelValues(ret.addr).Set(0)
+	stats.prefixes.WithLabelValues(ret.addr).Set(0)
+
 	return ret, nil
 }
 
@@ -294,6 +304,7 @@ func (s *Session) Set(advs ...*Advertisement) error {
 	}
 
 	s.new = newAdvs
+	stats.PendingPrefixes(s.addr, len(s.new))
 	s.cond.Broadcast()
 	return nil
 }
@@ -302,11 +313,13 @@ func (s *Session) abort() {
 	if s.conn != nil {
 		s.conn.Close()
 		s.conn = nil
+		stats.SessionDown(s.addr)
 	}
 	// Next time we retry the connection, we can just skip straight to
 	// the desired end state.
 	if s.new != nil {
 		s.advertised, s.new = s.new, nil
+		stats.PendingPrefixes(s.addr, len(s.advertised))
 	}
 	s.cond.Broadcast()
 }
