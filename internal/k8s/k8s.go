@@ -150,8 +150,9 @@ func (c *Client) Run() error {
 		if quit {
 			return nil
 		}
-
+		updates.Inc()
 		if err := c.sync(key); err != nil {
+			updateErrors.Inc()
 			glog.Infof("error syncing %q: %s", key, err)
 			c.queue.AddRateLimited(key)
 		} else {
