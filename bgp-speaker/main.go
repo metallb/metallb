@@ -55,31 +55,34 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 		return c.deleteBalancer(name, "service deleted")
 	}
 
+	glog.Infof("%s: start update", name)
+	defer glog.Infof("%s: end update", name)
+
 	if svc.Spec.Type != "LoadBalancer" {
+		glog.Infof("%s: not a LoadBalancer", name)
 		return nil
 	}
 
 	if c.config == nil {
-		// Config hasn't been read, nothing we can do just yet.
-		glog.Infof("%q skipped, no config loaded", name)
+		glog.Infof("%s: skipped, waiting for config", name)
 		return nil
 	}
 
 	if len(svc.Status.LoadBalancer.Ingress) != 1 {
-		// No IP allocated, nothing to route.
+		glog.Infof("%s: no IP allocated by controller", name)
 		return c.deleteBalancer(name, "no IP allocated by controller")
 	}
 
 	// Should we advertise? Yes, if externalTrafficPolicy is Cluster,
 	// or Local && there's a ready local endpoint.
-	if !c.shouldAdvertise(svc, eps) {
-		glog.Infof("%q: should not advertise, based on endpoints state", name)
-		return c.deleteBalancer(name, "node should not advertise, based on endpoints")
+	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !c.nodeHasHealthyEndpoint(eps) {
+		glog.Infof("%s: externalTrafficPolicy is Local, and no healthy local endpoints", name)
+		return c.deleteBalancer(name, "no healthy local endpoints")
 	}
 
 	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP).To4()
 	if lbIP == nil {
-		glog.Errorf("%q: invalid loadBalancer IP %q", name, svc.Status.LoadBalancer.Ingress[0].IP)
+		glog.Errorf("%s: invalid LoadBalancer IP %q", name, svc.Status.LoadBalancer.Ingress[0].IP)
 		return c.deleteBalancer(name, "invalid IP allocated by balancer")
 	}
 
@@ -113,7 +116,7 @@ findAds:
 		c.svcAds[name] = append(c.svcAds[name], ad)
 	}
 
-	glog.Infof("%q updated, making %d advertisements", name, len(c.svcAds[name]))
+	glog.Infof("%s: announcable, making %d advertisements", name, len(c.svcAds[name]))
 
 	if err := c.updateAds(); err != nil {
 		return err
@@ -122,12 +125,7 @@ findAds:
 	return nil
 }
 
-func (c *controller) shouldAdvertise(svc *v1.Service, eps *v1.Endpoints) bool {
-	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeCluster {
-		return true
-	}
-
-	// Local balancing policy, is there a healthy endpoint on the current node?
+func (c *controller) nodeHasHealthyEndpoint(eps *v1.Endpoints) bool {
 	ready := map[string]bool{}
 	for _, subset := range eps.Subsets {
 		for _, ep := range subset.Addresses {
@@ -178,13 +176,14 @@ func (c *controller) deleteBalancer(name, reason string) error {
 	if _, ok := c.svcAds[name]; !ok {
 		return nil
 	}
-	glog.Infof("Deleting %q (%s)", name, reason)
+	glog.Infof("%s: stopping announcements, %s", name, reason)
 	delete(c.svcAds, name)
 	return c.updateAds()
 }
 
 func (c *controller) SetConfig(cfg *config.Config) error {
-	glog.Infof("Converging configuration...")
+	glog.Infof("Start config update")
+	defer glog.Infof("End config update")
 
 	newPeers := make([]*peer, 0, len(cfg.Peers))
 newPeers:
@@ -213,9 +212,9 @@ newPeers:
 		if p == nil {
 			continue
 		}
-		glog.Infof("CLOSE BGP %q", p.cfg.Addr)
+		glog.Infof("Peer %q deconfigured, closing BGP session", p.cfg.Addr)
 		if err := p.bgp.Close(); err != nil {
-			glog.Warningf("shutting down BGP session to %q: %s", p.cfg.Addr, err)
+			glog.Warningf("Shutting down BGP session to %q: %s", p.cfg.Addr, err)
 		}
 	}
 
@@ -225,9 +224,10 @@ newPeers:
 			continue
 		}
 
+		glog.Infof("Peer %q configured, starting BGP session", p.cfg.Addr)
 		s, err := bgp.New(fmt.Sprintf("%s:179", p.cfg.Addr), p.cfg.MyASN, net.ParseIP("192.168.18.65"), p.cfg.ASN, p.cfg.HoldTime)
 		if err != nil {
-			errs = append(errs, fmt.Errorf("creating BGP session for %q: %s", p.cfg.Addr, err))
+			errs = append(errs, fmt.Errorf("Creating BGP session to %q: %s", p.cfg.Addr, err))
 		} else {
 			p.bgp = s
 		}
@@ -239,7 +239,6 @@ newPeers:
 		return fmt.Errorf("%d new BGP sessions failed to start", len(errs))
 	}
 
-	glog.Infof("New config loaded")
 	return nil
 }
 
