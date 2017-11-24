@@ -50,9 +50,8 @@ type peer struct {
 }
 
 func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
-	glog.Infof("SetBalancer %q", name)
 	if svc == nil {
-		return c.deleteBalancer(name)
+		return c.deleteBalancer(name, "service deleted")
 	}
 
 	if svc.Spec.Type != "LoadBalancer" {
@@ -67,13 +66,13 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 
 	if len(svc.Status.LoadBalancer.Ingress) != 1 {
 		// No IP allocated, nothing to route.
-		return c.deleteBalancer(name)
+		return c.deleteBalancer(name, "no IP allocated by controller")
 	}
 
 	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP).To4()
 	if lbIP == nil {
 		glog.Errorf("%q: invalid loadBalancer IP %q", name, svc.Status.LoadBalancer.Ingress[0].IP)
-		return c.deleteBalancer(name)
+		return c.deleteBalancer(name, "invalid IP allocated by balancer")
 	}
 
 	// Find the advertisement configuration for the IP
@@ -106,6 +105,8 @@ findAds:
 		c.svcAds[name] = append(c.svcAds[name], ad)
 	}
 
+	glog.Infof("%q updated, making %d advertisements", name, len(c.svcAds[name]))
+
 	if err := c.updateAds(); err != nil {
 		return err
 	}
@@ -125,7 +126,6 @@ func (c *controller) updateAds() error {
 		allAds = append(allAds, ads...)
 	}
 	for _, peer := range c.peers {
-		glog.Infof("BgpSet %#v", allAds)
 		if err := peer.bgp.Set(allAds...); err != nil {
 			return err
 		}
@@ -133,8 +133,11 @@ func (c *controller) updateAds() error {
 	return nil
 }
 
-func (c *controller) deleteBalancer(name string) error {
-	glog.Infof("DeleteBalancer %q", name)
+func (c *controller) deleteBalancer(name, reason string) error {
+	if _, ok := c.svcAds[name]; !ok {
+		return nil
+	}
+	glog.Infof("Deleting %q (%s)", name, reason)
 	delete(c.svcAds, name)
 	return c.updateAds()
 }
@@ -142,37 +145,40 @@ func (c *controller) deleteBalancer(name string) error {
 func (c *controller) SetConfig(cfg *config.Config) error {
 	glog.Infof("Converging configuration...")
 
-	newPeers := make([]*peer, len(cfg.Peers))
-	for i, p := range cfg.Peers {
-		if i <= len(c.peers)-1 {
-			if reflect.DeepEqual(p, c.peers[i].cfg) {
-				newPeers[i] = c.peers[i]
-				c.peers[i].bgp = nil
+	newPeers := make([]*peer, 0, len(cfg.Peers))
+newPeers:
+	for _, p := range cfg.Peers {
+		for i, ep := range c.peers {
+			if ep == nil {
 				continue
 			}
+			if reflect.DeepEqual(&p, ep.cfg) {
+				newPeers = append(newPeers, ep)
+				c.peers[i] = nil
+				continue newPeers
+			}
 		}
-
-		newPeers[i] = &peer{
+		// No existing peers match, create a new one.
+		newPeers = append(newPeers, &peer{
 			cfg: &p,
-		}
-		glog.Infof("New BGP peer %#v", p)
+		})
 	}
 
 	c.config = cfg
 	oldPeers := c.peers
-	glog.Infof("oldPeers %#v", oldPeers)
-	glog.Infof("newPeers %#v", newPeers)
 	c.peers = newPeers
+
 	for _, p := range oldPeers {
-		if p.bgp == nil {
+		if p == nil {
 			continue
 		}
 		glog.Infof("CLOSE BGP %q", p.cfg.Addr)
 		if err := p.bgp.Close(); err != nil {
-			return fmt.Errorf("shutting down BGP session to %q: %s", p.cfg.Addr, err)
+			glog.Warningf("shutting down BGP session to %q: %s", p.cfg.Addr, err)
 		}
 	}
 
+	var errs []error
 	for _, p := range c.peers {
 		if p.bgp != nil {
 			continue
@@ -180,9 +186,16 @@ func (c *controller) SetConfig(cfg *config.Config) error {
 
 		s, err := bgp.New(fmt.Sprintf("%s:179", p.cfg.Addr), p.cfg.MyASN, net.ParseIP("192.168.18.65"), p.cfg.ASN, p.cfg.HoldTime)
 		if err != nil {
-			return fmt.Errorf("creating BGP session for %q: %s", p.cfg.Addr, err)
+			errs = append(errs, fmt.Errorf("creating BGP session for %q: %s", p.cfg.Addr, err))
+		} else {
+			p.bgp = s
 		}
-		p.bgp = s
+	}
+	if len(errs) != 0 {
+		for _, err := range errs {
+			glog.Error(err)
+		}
+		return fmt.Errorf("%d new BGP sessions failed to start", len(errs))
 	}
 
 	glog.Infof("New config loaded")

@@ -195,13 +195,18 @@ func encodePathAttrs(b *bytes.Buffer, asn uint32, adv *Advertisement) error {
 		2, // incomplete
 
 		0x40, 2, // mandatory, as-path
-		6, // len
-		1, // AS_SET
-		1, // len (in number of ASes)
-
 	})
-	if err := binary.Write(b, binary.BigEndian, asn); err != nil {
-		return err
+	if asn == 0 {
+		b.WriteByte(0) // empty AS path
+	} else {
+		b.Write([]byte{
+			6, // len
+			1, // AS_SET
+			1, // len (in number of ASes)
+		})
+		if err := binary.Write(b, binary.BigEndian, asn); err != nil {
+			return err
+		}
 	}
 	b.Write([]byte{
 		0x40, 3, // mandatory, next-hop

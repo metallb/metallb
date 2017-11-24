@@ -65,12 +65,17 @@ func (s *Session) sendUpdates() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	asn := s.asn
+	if s.peerASN == s.asn {
+		asn = 0
+	}
+
 	if s.new != nil {
 		s.advertised, s.new = s.new, nil
 	}
 
 	for c, adv := range s.advertised {
-		if err := sendUpdate(s.conn, s.asn, adv); err != nil {
+		if err := sendUpdate(s.conn, asn, adv); err != nil {
 			s.abort()
 			return fmt.Errorf("sending update of %q to %q: %s", c, s.addr, err)
 		}
@@ -94,13 +99,13 @@ func (s *Session) sendUpdates() error {
 		}
 
 		for c, adv := range s.new {
-			if adv2, ok := s.advertised[c]; ok && adv2.NextHop.Equal(adv.NextHop) && !reflect.DeepEqual(adv2.Communities, adv.Communities) {
+			if adv2, ok := s.advertised[c]; ok && adv2.NextHop.Equal(adv.NextHop) && reflect.DeepEqual(adv2.Communities, adv.Communities) {
 				// Peer already has correct state for this
 				// advertisement, nothing to do.
 				continue
 			}
 
-			if err := sendUpdate(s.conn, s.asn, adv); err != nil {
+			if err := sendUpdate(s.conn, asn, adv); err != nil {
 				s.abort()
 				return fmt.Errorf("sending update of %q to %q: %s", c, s.addr, err)
 			}
@@ -294,8 +299,10 @@ func (s *Session) Set(advs ...*Advertisement) error {
 }
 
 func (s *Session) abort() {
-	s.conn.Close()
-	s.conn = nil
+	if s.conn != nil {
+		s.conn.Close()
+		s.conn = nil
+	}
 	// Next time we retry the connection, we can just skip straight to
 	// the desired end state.
 	if s.new != nil {
