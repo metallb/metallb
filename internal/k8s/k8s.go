@@ -231,7 +231,8 @@ func (c *Client) sync(key interface{}) error {
 
 		if err := c.controller.SetConfig(cfg); err != nil {
 			configStale.Set(1)
-			return err
+			c.events.Eventf(cm, v1.EventTypeWarning, "InvalidConfig", "%s", err)
+			return nil
 		}
 
 		configLoaded.Set(1)
