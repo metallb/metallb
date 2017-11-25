@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/ipallocator"
 	"go.universe.tf/metallb/internal/k8s"
 
 	"github.com/golang/glog"
@@ -40,7 +40,7 @@ type controller struct {
 	client service
 	synced bool
 	config *config.Config
-	ips    *ipallocator.Allocator
+	ips    *allocator.Allocator
 }
 
 func (c *controller) SetBalancer(name string, svcRo *v1.Service, _ *v1.Endpoints) error {
@@ -123,7 +123,7 @@ func main() {
 	flag.Parse()
 
 	c := &controller{
-		ips: ipallocator.New(),
+		ips: allocator.New(),
 	}
 
 	client, err := k8s.NewClient("metallb-controller", *master, *kubeconfig, c, false)
