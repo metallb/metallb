@@ -52,9 +52,12 @@ func (c *controller) SetBalancer(name string, svcRo *v1.Service, _ *v1.Endpoints
 		return nil
 	}
 
+	glog.Infof("%s: start update", name)
+	defer glog.Infof("%s: end update", name)
+
 	if c.config == nil {
 		// Config hasn't been read, nothing we can do just yet.
-		glog.Infof("%q skipped, no config loaded", name)
+		glog.Infof("%s: skipped, waiting for config", name)
 		return nil
 	}
 
@@ -65,7 +68,7 @@ func (c *controller) SetBalancer(name string, svcRo *v1.Service, _ *v1.Endpoints
 	svc := svcRo.DeepCopy()
 	c.convergeBalancer(name, svc)
 	if reflect.DeepEqual(svcRo, svc) {
-		glog.Infof("%q converged, no change", name)
+		glog.Infof("%s: converged, no change", name)
 		return nil
 	}
 
@@ -73,17 +76,17 @@ func (c *controller) SetBalancer(name string, svcRo *v1.Service, _ *v1.Endpoints
 	if !(reflect.DeepEqual(svcRo.Annotations, svc.Annotations) && reflect.DeepEqual(svcRo.Spec, svc.Spec)) {
 		svcRo, err = c.client.Update(svc)
 		if err != nil {
-			return fmt.Errorf("updating service: %s", err)
+			return fmt.Errorf("updating service %q: %s", name, err)
 		}
-		glog.Infof("updated service %q", name)
+		glog.Infof("%s: updated service", name)
 	}
 	if !reflect.DeepEqual(svcRo.Status, svc.Status) {
 		st, svc := svc.Status, svcRo.DeepCopy()
 		svc.Status = st
 		if err = c.client.UpdateStatus(svc); err != nil {
-			return fmt.Errorf("updating status: %s", err)
+			return fmt.Errorf("updating status on service %q: %s", name, err)
 		}
-		glog.Infof("updated service status %q", name)
+		glog.Infof("%s: updated service status", name)
 	}
 
 	return nil
@@ -94,19 +97,22 @@ func (c *controller) deleteBalancer(name string) error {
 	if ok {
 		delete(c.svcToIP, name)
 		delete(c.ipToSvc, ip)
-		glog.Infof("%q deleted", name)
+		glog.Infof("%s: service deleted", name)
 	}
 	return nil
 }
 
 func (c *controller) SetConfig(cfg *config.Config) error {
+	glog.Infof("Start config update")
+	defer glog.Infof("End config update")
+
 	c.config = cfg
 	return nil
 }
 
 func (c *controller) MarkSynced() {
 	c.synced = true
-	glog.Infof("controller synced, can allocate IPs now")
+	glog.Infof("Controller synced, can allocate IPs now")
 }
 
 func main() {

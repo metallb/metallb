@@ -62,13 +62,13 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 		return c.deleteBalancer(name, "service deleted")
 	}
 
-	glog.Infof("%s: start update", name)
-	defer glog.Infof("%s: end update", name)
-
 	if svc.Spec.Type != "LoadBalancer" {
 		glog.Infof("%s: not a LoadBalancer", name)
 		return nil
 	}
+
+	glog.Infof("%s: start update", name)
+	defer glog.Infof("%s: end update", name)
 
 	if c.config == nil {
 		glog.Infof("%s: skipped, waiting for config", name)

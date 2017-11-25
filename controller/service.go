@@ -35,7 +35,7 @@ func (c *controller) convergeBalancer(key string, svc *v1.Service) error {
 		lbIP = net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
 	}
 	if lbIP == nil {
-		glog.Infof("%q has no valid ingress IP currently", key)
+		glog.Infof("%s: currently has no ingress IP", key)
 		c.clearServiceState(key, svc)
 	}
 
@@ -43,7 +43,7 @@ func (c *controller) convergeBalancer(key string, svc *v1.Service) error {
 	// makes sense. If so, clear it out and give the rest of the logic
 	// a chance to allocate again.
 	if lbIP != nil && !c.ipIsValid(lbIP) {
-		glog.Infof("%q has assigned IP %q, but that IP is no longer valid per config", key, lbIP)
+		glog.Infof("%s: clearing assignment %q, no longer valid per config", key, lbIP)
 		c.clearServiceState(key, svc)
 		lbIP = nil
 	}
@@ -51,14 +51,14 @@ func (c *controller) convergeBalancer(key string, svc *v1.Service) error {
 	// If there's an LB IP, but we think it's currently assigned to
 	// someone else, clear it! Something needs fixing.
 	if lbIP != nil {
-		conflict := false
+		conflict := ""
 		if s, ok := c.ipToSvc[lbIP.String()]; ok && s != key {
-			conflict = true
+			conflict = s
 		} else if i, ok := c.svcToIP[key]; ok && i != lbIP.String() {
-			conflict = true
+			conflict = s
 		}
-		if conflict {
-			glog.Infof("%q has assigned IP %q, in conflict with another service", key, lbIP)
+		if conflict != "" {
+			glog.Infof("%s: clearing assignment %q, in conflict with service %q", key, lbIP, conflict)
 			c.clearServiceState(key, svc)
 			lbIP = nil
 		}
@@ -68,7 +68,7 @@ func (c *controller) convergeBalancer(key string, svc *v1.Service) error {
 	// state. allocateIP will pay attention to LoadBalancerIP and try
 	// to meet the user's demands.
 	if svc.Spec.LoadBalancerIP != "" && svc.Spec.LoadBalancerIP != lbIP.String() {
-		glog.Infof("%q assigned %q, user requested %q", key, lbIP, svc.Spec.LoadBalancerIP)
+		glog.Infof("%s: clearing assignment %q, user requested %q", key, lbIP, svc.Spec.LoadBalancerIP)
 		c.clearServiceState(key, svc)
 		lbIP = nil
 	}
@@ -76,12 +76,13 @@ func (c *controller) convergeBalancer(key string, svc *v1.Service) error {
 	// If lbIP is still nil at this point, try to allocate.
 	if lbIP == nil {
 		if !c.synced {
-			glog.Infof("%q not allocating IP yet, state not synced", key)
+			glog.Infof("%s: not allocating IP yet, controller not synced", key)
 			return errors.New("not allocating IPs yet, not synced")
 		}
-		glog.Infof("%q allocating IP", key)
+		glog.Infof("%s: needs an IP, allocating", key)
 		ip, err := c.allocateIP(key, svc)
 		if err != nil {
+			glog.Infof("%s: allocation failed: %s", key, err)
 			c.client.Errorf(svc, "AllocationFailed", "Failed to allocate IP for %q: %s", key, err)
 			// TODO: should retry on pool exhaustion allocation
 			// failures, once we keep track of when pools become
@@ -89,11 +90,11 @@ func (c *controller) convergeBalancer(key string, svc *v1.Service) error {
 			return nil
 		}
 		lbIP = ip
-		glog.Infof("%q has been allocated IP %q", key, lbIP)
+		glog.Infof("%s: allocated %q", key, lbIP)
 	}
 
 	if lbIP == nil {
-		glog.Infof("%q failed to allocate an IP, but did not exit convergeService early", key)
+		glog.Infof("%s: failed to allocate an IP, but did not exit convergeService early (BUG!)", key)
 		c.client.Errorf(svc, "InternalError", "didn't allocate an IP but also did not fail")
 		return nil
 	}
