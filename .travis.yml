@@ -1,0 +1,20 @@
+language: go
+go_import_path: go.universe.tf/metallb
+
+os:
+- linux
+go:
+- 1.8
+- 1.9
+- tip
+
+install:
+- go get github.com/Masterminds/glide
+- go get github.com/golang/lint/golint
+
+script:
+- glide install
+- go install go.universe.tf/metallb/controller go.universe.tf/metallb/bgp-speaker
+- go test $(glide novendor)
+- go vet $(glide novendor)
+- glide novendor | xargs -n1 golint
