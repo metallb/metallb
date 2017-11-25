@@ -1,19 +1,34 @@
 language: go
 go_import_path: go.universe.tf/metallb
-
 os:
 - linux
 go:
+- 1.8
 - 1.9
 - tip
-
 install:
 - go get github.com/Masterminds/glide
 - go get github.com/golang/lint/golint
-
 script:
 - glide install
 - go install go.universe.tf/metallb/controller go.universe.tf/metallb/bgp-speaker
 - go test $(glide novendor)
 - go vet $(glide novendor)
 - glide novendor | xargs -n1 golint
+jobs:
+  include:
+  - stage: deploy
+    go: 1.9
+    env:
+    - NAME=quay_io
+    script: true
+    deploy:
+    - provider: script
+      script: go run dockerfiles/trigger_build.go
+      on:
+        branch: master
+env:
+  global:
+  # Docker hub and quay trigger URLs for deploy
+  - secure: EAL3IbUp+yTYQhp6hDJKvWeVLZFo/hNhPZWGTbJBLdQNV4VG/6FaBUfISS5HaDji52HLuW1iHbQ94BeuQTecH/62vIai7hyJBTLD+QDZAXobfcu8VTymr1ss+APFQFLbhFWPYGttBOSK1NtP78+h0DlPX2QVobAi1oRba0mnpVPQKaXWoJwaFXifKxTrM8KnU+a9qUCi57q4e2L17gSGuRh66ZhvCDimf16Q3vWpsqTgdrARtf/8O6szOKdrVmqUm9pj5NSlbuJ4HMniyLgi6SWXR3hxXsiD+TOregkgmVCXzJKziiX9GVvo7fX2m8Bj8+tLCDrcnYd6/YrJHBmMhqswBLST8wXdoMkN9zRwJLDSN8n9s3aTlTTzIppFLlCdaHtBSZ44wCfHbMv8gBrp8qwOZWgwPHtKN+PZBJRcfZpchUCcmh1haTSThY6e1D2LuPoe71ga1Ir+urJ2XYmmkimB62meFt7u5rAWZXcJ3Vo8FiQTdRk15aUcqVKPM7Qy0+Gt87o+79au43xZCZ2bQYYr2XSNPS523phrdoHj7JkT6W/DyK2cZ6whXysCkvQgXx7UsNcJP6KlCgetFSZz44ZcS9UyQW/jqFESqMfCOxFA4hipaFC6qPWv+FPRaslKgrC1YHOoqIoj1cBe3T4WnSr0/36F3HVT9cxUVSttiLE=
+  - secure: CH4QDYgONRms8F7+v4nzVeRARgw4AuIcZ8Knqq5S4Ozo7NuJQ6RZd64fVCngxOEfRRuM21Wl44M0dgb73JQOL8pErUabzlp7WcE/k9CiLi7i+dAsvqtxVWhynhGqx2J3L4Q6KfTLTy7g0BCUbmVjIRuoFfWEduqjJttGsE1e7k1VxUd2HBr/go73UrQC19bAHEKTDJqIxnyzFNQw024pRUic3hscTHl7VaZBrfArcMbH7SdjqYDZCW3whFbWQhm+FTfqIbVEqQKhmublIv0fcmbArtCMJVt0PAUTkxydHfwySAAEqGv2j53bZdc555V8DUhAIn/RUh75dkPiXvNDkz3DZYdi2CWDbXxVyQqAbGtR5cFu4s7ttni6oimjy9+KR/kG0iMpV7tPdKMIM9MDbXnfG0HoQu+4NkHO6rvwAq4PFMyHctFgO+RSvXmLtzt65ehlpSvsi0e1EIkwDd5wzLc+3nUtz5MJmgw/1sIuWuS5H7ykIbmtLGu5uTSD0KPLfbyShhZ+hWpeC029fXBudCskb9RE0/L5kYsqZPxWSPbNE0YQMHnTfOuU7rtkITiWwOmOSyiQXilvaIqqbPatZA6qZTVpYl7eXeDdYq+xokeuRbv8D2NxiXORoSTW7ycuMiZqgpMiZljC3sd8hdgQ+g5aB6aQ9XShqcmjTNOk0gk=
