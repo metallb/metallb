@@ -21,6 +21,7 @@ import (
 	"reflect"
 	"sort"
 
+	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
@@ -44,7 +45,7 @@ type controller struct {
 	config *config.Config
 	peers  []*peer
 	svcAds map[string][]*bgp.Advertisement
-	svcIP  map[string]net.IP
+	ips    *allocator.Allocator
 
 	// Metrics
 	announcing *prometheus.GaugeVec
@@ -87,24 +88,22 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP).To4()
 	if lbIP == nil {
 		glog.Errorf("%s: invalid LoadBalancer IP %q", name, svc.Status.LoadBalancer.Ingress[0].IP)
-		return c.deleteBalancer(name, "invalid IP allocated by balancer")
+		return c.deleteBalancer(name, "invalid IP allocated by controller")
 	}
 
-	// Find the advertisement configuration for the IP
-	var ads []config.Advertisement
-findAds:
-	for _, pool := range c.config.Pools {
-		for _, cidr := range pool.CIDR {
-			if cidr.Contains(lbIP) {
-				ads = pool.Advertisements
-				break findAds
-			}
-		}
+	if err := c.ips.Assign(name, lbIP); err != nil {
+		glog.Errorf("%s: IP %q assigned by controller is not allowed by config", name, lbIP)
+		return c.deleteBalancer(name, "invalid IP allocated by controller")
 	}
 
-	c.svcIP[name] = lbIP
+	poolName := c.ips.GetPool(name)
+	pool := c.config.Pools[c.ips.GetPool(name)]
+	if pool == nil {
+		glog.Errorf("%s: could not find pool %q that definitely should exist!", name, poolName)
+	}
+
 	c.svcAds[name] = nil
-	for _, adCfg := range ads {
+	for _, adCfg := range pool.Advertisements {
 		m := net.CIDRMask(adCfg.AggregationLength, 32)
 		ad := &bgp.Advertisement{
 			Prefix: &net.IPNet{
@@ -191,16 +190,21 @@ func (c *controller) deleteBalancer(name, reason string) error {
 	c.announcing.Delete(prometheus.Labels{
 		"service": name,
 		"node":    c.myNode,
-		"ip":      c.svcIP[name].String(),
+		"ip":      c.ips.GetIP(name).String(),
 	})
+	c.ips.Unassign(name)
 	delete(c.svcAds, name)
-	delete(c.svcIP, name)
 	return c.updateAds()
 }
 
 func (c *controller) SetConfig(cfg *config.Config) error {
 	glog.Infof("Start config update")
 	defer glog.Infof("End config update")
+
+	if err := c.ips.SetPools(cfg.Pools); err != nil {
+		glog.Errorf("Applying new configuration failed: %s", err)
+		return fmt.Errorf("configuration rejected: %s", err)
+	}
 
 	newPeers := make([]*peer, 0, len(cfg.Peers))
 newPeers:
@@ -282,7 +286,7 @@ func main() {
 		myIP:   myIP,
 		myNode: *myNode,
 		svcAds: map[string][]*bgp.Advertisement{},
-		svcIP:  map[string]net.IP{},
+		ips:    allocator.New(),
 
 		announcing: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: "metallb",

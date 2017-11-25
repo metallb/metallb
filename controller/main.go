@@ -105,7 +105,7 @@ func (c *controller) SetConfig(cfg *config.Config) error {
 
 	if err := c.ips.SetPools(cfg.Pools); err != nil {
 		glog.Errorf("Applying new configuration failed: %s", err)
-		return nil
+		return fmt.Errorf("configuration rejected: %s", err)
 	}
 	c.config = cfg
 	return nil

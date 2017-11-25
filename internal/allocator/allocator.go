@@ -35,7 +35,7 @@ func New() *Allocator {
 func (a *Allocator) SetPools(pools map[string]*config.Pool) error {
 	for svc, ip := range a.svcToIP {
 		if poolFor(pools, svc, ip) == "" {
-			return fmt.Errorf("new config not compatible with assigned IPs: service %q cannot %q under new config", svc, ip)
+			return fmt.Errorf("new config not compatible with assigned IPs: service %q cannot own %q under new config", svc, ip)
 		}
 	}
 

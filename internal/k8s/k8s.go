@@ -218,18 +218,24 @@ func (c *Client) sync(key interface{}) error {
 			return fmt.Errorf("get configmap %q: %s", k, err)
 		}
 		if !exists {
+			configStale.Set(1)
 			return c.controller.SetConfig(nil)
 		}
 		cm := cmi.(*v1.ConfigMap)
 		cfg, err := config.Parse([]byte(cm.Data["config"]))
 		if err != nil {
+			configStale.Set(1)
 			c.events.Eventf(cm, v1.EventTypeWarning, "InvalidConfig", "%s", err)
 			return nil
 		}
 
 		if err := c.controller.SetConfig(cfg); err != nil {
+			configStale.Set(1)
 			return err
 		}
+
+		configLoaded.Set(1)
+		configStale.Set(0)
 
 		glog.Infof("config changed, reconverging all services")
 		for _, k := range c.svcIndexer.ListKeys() {
