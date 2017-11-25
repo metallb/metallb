@@ -163,7 +163,7 @@ func (a *Allocator) allocateFromPool(service, pname string) net.IP {
 	return nil
 }
 
-// AllocateFromPool assigns an availabe IP from pool to service.
+// AllocateFromPool assigns an available IP from pool to service.
 func (a *Allocator) AllocateFromPool(service, pool string) (net.IP, error) {
 	if a.pools[pool] == nil {
 		return nil, fmt.Errorf("pool %q does not exist", pool)
