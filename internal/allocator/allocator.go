@@ -3,6 +3,7 @@ package allocator
 import (
 	"errors"
 	"fmt"
+	"math"
 	"net"
 
 	"go.universe.tf/metallb/internal/config"
@@ -38,6 +39,13 @@ func (a *Allocator) SetPools(pools map[string]*config.Pool) error {
 		}
 	}
 
+	for n := range a.pools {
+		if pools[n] == nil {
+			stats.poolCapacity.DeleteLabelValues(n)
+			stats.poolActive.DeleteLabelValues(n)
+		}
+	}
+
 	a.pools = pools
 
 	// Need to readjust the existing pool mappings and counts
@@ -49,7 +57,43 @@ func (a *Allocator) SetPools(pools map[string]*config.Pool) error {
 			a.poolAllocated[a.svcToPool[svc]]++
 		}
 	}
+
+	for n, pool := range a.pools {
+		stats.poolCapacity.WithLabelValues(n).Set(float64(poolCount(pool)))
+		stats.poolActive.WithLabelValues(n).Set(float64(a.poolAllocated[n]))
+	}
+
 	return nil
+}
+
+// poolCount returns the number of addresses in the pool.
+func poolCount(p *config.Pool) int64 {
+	var total int64
+	for _, cidr := range p.CIDR {
+		o, b := cidr.Mask.Size()
+		sz := int64(math.Pow(2, float64(b-o)))
+		if p.AvoidBuggyIPs {
+			if o <= 24 {
+				// A pair of buggy IPs occur for each /24 present in the range.
+				buggies := int64(math.Pow(2, float64(24-o))) * 2
+				sz -= buggies
+			} else {
+				// Ranges smaller than /24 contain 1 buggy IP if they
+				// start/end on a /24 boundary, otherwise they contain
+				// none.
+				ip := cidr.IP.Mask(cidr.Mask).To4()
+				if ipConfusesBuggyFirmwares(ip) {
+					sz--
+				}
+				ip[3] += byte(math.Pow(2, float64(b-o)))
+				if ipConfusesBuggyFirmwares(ip) {
+					sz--
+				}
+			}
+		}
+		total += sz
+	}
+	return total
 }
 
 // poolFor returns the pool that owns the requested IP, or "" if none.
@@ -72,6 +116,7 @@ func poolFor(pools map[string]*config.Pool, service string, ip net.IP) string {
 func (a *Allocator) assign(service, pool string, ip net.IP) {
 	if !a.svcToIP[service].Equal(ip) {
 		a.poolAllocated[pool]++
+		stats.poolActive.WithLabelValues(pool).Inc()
 	}
 	a.svcToIP[service] = ip
 	a.svcToPool[service] = pool
@@ -148,6 +193,7 @@ func (a *Allocator) Unassign(service string) bool {
 		return false
 	}
 	a.poolAllocated[a.svcToPool[service]]--
+	stats.poolActive.WithLabelValues(a.svcToPool[service]).Dec()
 	delete(a.svcToIP, service)
 	delete(a.svcToPool, service)
 	delete(a.ipToSvc, ip.String())
