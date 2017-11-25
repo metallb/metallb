@@ -21,6 +21,7 @@ const (
 
 var errClosed = errors.New("session closed")
 
+// Session represents one BGP session to an external router.
 type Session struct {
 	asn      uint32
 	routerID net.IP
@@ -40,6 +41,7 @@ type Session struct {
 	pending        *list.List
 }
 
+// run tries to stay connected to the peer, and pumps route updates to it.
 func (s *Session) run() {
 	defer stats.DeleteSession(s.addr)
 	for {
@@ -63,6 +65,8 @@ func (s *Session) run() {
 	}
 }
 
+// sendUpdates waits for changes to desired advertisements, and pushes
+// them out to the peer.
 func (s *Session) sendUpdates() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -134,6 +138,7 @@ func (s *Session) sendUpdates() error {
 	}
 }
 
+// connect establishes the BGP session with the peer.
 func (s *Session) connect() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -181,6 +186,8 @@ func (s *Session) connect() error {
 	return nil
 }
 
+// sendKeepalives sends BGP KEEPALIVE packets at the negotiated rate
+// whenever the session is connected.
 func (s *Session) sendKeepalives() {
 	var (
 		t  *time.Ticker
@@ -216,6 +223,7 @@ func (s *Session) sendKeepalives() {
 	}
 }
 
+// sendKeepalive sends a single BGP KEEPALIVE packet.
 func (s *Session) sendKeepalive() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -233,6 +241,10 @@ func (s *Session) sendKeepalive() error {
 	return nil
 }
 
+// New creates a BGP session using the given session parameters.
+//
+// The session will immediately try to connect and synchronize its
+// local state with the peer.
 func New(addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time.Duration) (*Session, error) {
 	ret := &Session{
 		addr:        addr,
@@ -256,6 +268,9 @@ func New(addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time
 	return ret, nil
 }
 
+// consumeBGP receives BGP messages from the peer, and ignores
+// them. It does minimal checks for the well-formedness of messages,
+// and terminates the connection if something looks wrong.
 func (s *Session) consumeBGP(conn net.Conn) {
 	defer func() {
 		s.mu.Lock()
@@ -288,6 +303,10 @@ func (s *Session) consumeBGP(conn net.Conn) {
 	}
 }
 
+// Set updates the set of Advertisements that this session's peer should receive.
+//
+// Changes are propagated to the peer asynchronously, Set may return
+// before the peer learns about the changes.
 func (s *Session) Set(advs ...*Advertisement) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -313,6 +332,8 @@ func (s *Session) Set(advs ...*Advertisement) error {
 	return nil
 }
 
+// abort closes any existing connection, updates stats, and cleans up
+// state ready for another connection attempt.
 func (s *Session) abort() {
 	if s.conn != nil {
 		s.conn.Close()
@@ -328,6 +349,7 @@ func (s *Session) abort() {
 	s.cond.Broadcast()
 }
 
+// Close shuts down the BGP session.
 func (s *Session) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -336,13 +358,20 @@ func (s *Session) Close() error {
 	return nil
 }
 
+// Advertisement represents one network path and its BGP attributes.
 type Advertisement struct {
-	Prefix      *net.IPNet
-	NextHop     net.IP
-	LocalPref   uint32
+	// The prefix being advertised to the peer.
+	Prefix *net.IPNet
+	// The address of the router to which the peer should forward traffic.
+	NextHop net.IP
+	// The local preference of this route. Only propagated to IBGP
+	// peers (i.e. where the peer ASN matches the local ASN).
+	LocalPref uint32
+	// BGP communities to attach to the path.
 	Communities []uint32
 }
 
+// Equal returns true if a and b are equivalent advertisements.
 func (a *Advertisement) Equal(b *Advertisement) bool {
 	if a.Prefix.String() != b.Prefix.String() {
 		return false
