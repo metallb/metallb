@@ -20,7 +20,6 @@ import (
 	"net"
 
 	"github.com/golang/glog"
-	"go.universe.tf/metallb/internal"
 	"go.universe.tf/metallb/internal/config"
 	"k8s.io/api/core/v1"
 )
@@ -150,7 +149,7 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 	}
 
 	// Otherwise, did the user ask for a specific pool?
-	desiredPool := svc.Annotations[internal.AnnotationAddressPool]
+	desiredPool := svc.Annotations["metallb.universe.tf/address-pool"]
 	if desiredPool != "" {
 		if p, ok := c.config.Pools[desiredPool]; ok {
 			return c.allocateIPFromPool(key, svc, p)
