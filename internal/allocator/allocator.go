@@ -200,10 +200,14 @@ func (a *Allocator) Unassign(service string) bool {
 	return true
 }
 
+// GetIP returns the IP address allocated to service, or nil if none
+// are allocated.
 func (a *Allocator) GetIP(service string) net.IP {
 	return a.svcToIP[service]
 }
 
+// GetPool returns the pool from which service's IP was allocated. If
+// service has no IP allocated, "" is returned.
 func (a *Allocator) GetPool(service string) string {
 	return a.svcToPool[service]
 }
