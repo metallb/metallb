@@ -12,21 +12,19 @@ import (
 )
 
 func main() {
-	qerr := quay()
-	herr := dockerhub()
-
-	if qerr != nil {
-		log.Printf("Error triggering quay.io build: %s", qerr)
+	log.Printf("Triggering controller build")
+	if err := quay("QUAY_TRIGGER_URL_CONTROLLER"); err != nil {
+		log.Print(err)
+		os.Exit(1)
 	}
-	if herr != nil {
-		log.Printf("Error triggering hub.docker.com build: %s", herr)
-	}
-	if qerr != nil || herr != nil {
+	log.Printf("Triggering BGP speaker build")
+	if err := quay("QUAY_TRIGGER_URL_BGP_SPEAKER"); err != nil {
+		log.Print(err)
 		os.Exit(1)
 	}
 }
 
-func quay() error {
+func quay(env string) error {
 	info := struct {
 		Commit string `json:"commit"`
 		Ref    string `json:"ref"`
@@ -46,9 +44,9 @@ func quay() error {
 		return fmt.Errorf("marshal commit info: %s", err)
 	}
 
-	url := os.Getenv("QUAY_TRIGGER_URL")
+	url := os.Getenv(env)
 	if url == "" {
-		return errors.New("no QUAY_TRIGGER_URL found in environment")
+		return fmt.Errorf("no %s found in environment", env)
 	}
 
 	resp, err := http.Post(url, "application/json", bytes.NewBuffer(bs))
@@ -61,26 +59,6 @@ func quay() error {
 			return fmt.Errorf("reading error message from quay trigger response: %s", err)
 		}
 		return fmt.Errorf("non-200 status from quay trigger: %s (%q)", resp.Status, string(msg))
-	}
-	return nil
-}
-
-func dockerhub() error {
-	url := os.Getenv("DOCKER_TRIGGER_URL")
-	if url == "" {
-		return errors.New("no DOCKER_TRIGGER_URL found in environment")
-	}
-
-	resp, err := http.Post(url, "application/json", bytes.NewBufferString(`{"docker_tag": "latest"}`))
-	if err != nil {
-		return fmt.Errorf("post to docker trigger: %s", err)
-	}
-	if resp.StatusCode != 200 {
-		msg, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return fmt.Errorf("reading error message from docker trigger response: %s", err)
-		}
-		return fmt.Errorf("non-200 status from docker trigger: %s (%q)", resp.Status, string(msg))
 	}
 	return nil
 }
