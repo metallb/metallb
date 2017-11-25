@@ -148,10 +148,14 @@ func (s *Session) connect() error {
 		return fmt.Errorf("send OPEN to %q: %s", s.addr, err)
 	}
 
-	requestedHold, err := readOpen(conn, s.peerASN)
+	asn, requestedHold, err := readOpen(conn)
 	if err != nil {
 		conn.Close()
 		return fmt.Errorf("read OPEN from %q: %s", s.addr, err)
+	}
+	if asn != s.peerASN {
+		conn.Close()
+		return fmt.Errorf("unexpected peer ASN %d, want %d", asn, s.peerASN)
 	}
 
 	// Consume BGP messages until the connection closes.

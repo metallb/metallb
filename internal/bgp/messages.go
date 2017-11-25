@@ -64,7 +64,7 @@ func sendOpen(w io.Writer, asn uint32, routerID net.IP, holdTime time.Duration) 
 	return binary.Write(w, binary.BigEndian, msg)
 }
 
-func readOpen(r io.Reader, asn uint32) (time.Duration, error) {
+func readOpen(r io.Reader) (uint32, time.Duration, error) {
 	hdr := struct {
 		// Header
 		Marker1, Marker2 uint64
@@ -72,16 +72,16 @@ func readOpen(r io.Reader, asn uint32) (time.Duration, error) {
 		Type             uint8
 	}{}
 	if err := binary.Read(r, binary.BigEndian, &hdr); err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	if hdr.Marker1 != 0xffffffffffffffff || hdr.Marker2 != 0xffffffffffffffff {
-		return 0, fmt.Errorf("synchronization error, incorrect header marker")
+		return 0, 0, fmt.Errorf("synchronization error, incorrect header marker")
 	}
 	if hdr.Type != 1 {
-		return 0, fmt.Errorf("message type is not OPEN, got %d, want 1", hdr.Type)
+		return 0, 0, fmt.Errorf("message type is not OPEN, got %d, want 1", hdr.Type)
 	}
 	if hdr.Len < 37 {
-		return 0, fmt.Errorf("message length %d too small to be OPEN", hdr.Len)
+		return 0, 0, fmt.Errorf("message length %d too small to be OPEN", hdr.Len)
 	}
 
 	lr := &io.LimitedReader{
@@ -98,20 +98,22 @@ func readOpen(r io.Reader, asn uint32) (time.Duration, error) {
 		OptLen   uint8
 	}{}
 	if err := binary.Read(lr, binary.BigEndian, &open); err != nil {
-		return 0, err
+		return 0, 0, err
 	}
 	if open.Version != 4 {
-		return 0, fmt.Errorf("wrong BGP version")
+		return 0, 0, fmt.Errorf("wrong BGP version")
 	}
 	if open.HoldTime != 0 && open.HoldTime < 3 {
-		return 0, fmt.Errorf("invalid hold time %q, must be 0 or >=3s", open.HoldTime)
+		return 0, 0, fmt.Errorf("invalid hold time %q, must be 0 or >=3s", open.HoldTime)
 	}
 	if open.OptType != 2 {
-		return 0, fmt.Errorf("unknown option %d", open.OptType)
+		return 0, 0, fmt.Errorf("unknown option %d", open.OptType)
 	}
 
+	asn := uint32(open.ASN16)
+
 	if int64(open.OptLen) != lr.N {
-		return 0, fmt.Errorf("%d trailing garbage bytes after capabilities", lr.N)
+		return 0, 0, fmt.Errorf("%d trailing garbage bytes after capabilities", lr.N)
 	}
 	for {
 		cap := struct {
@@ -120,24 +122,20 @@ func readOpen(r io.Reader, asn uint32) (time.Duration, error) {
 		}{}
 		if err := binary.Read(lr, binary.BigEndian, &cap); err != nil {
 			if err == io.EOF {
-				return time.Duration(open.HoldTime) * time.Second, nil
+				return asn, time.Duration(open.HoldTime) * time.Second, nil
 			}
-			return 0, err
+			return 0, 0, err
 		}
 		if cap.Code != 65 {
 			// TODO: only ignore capabilities that we know are fine to
 			// ignore.
 			if _, err := io.Copy(ioutil.Discard, io.LimitReader(lr, int64(cap.Len))); err != nil {
-				return 0, err
+				return 0, 0, err
 			}
 			continue
 		}
-		var peerASN uint32
-		if err := binary.Read(lr, binary.BigEndian, &peerASN); err != nil {
-			return 0, err
-		}
-		if peerASN != asn {
-			return 0, fmt.Errorf("unexpected peer ASN %d, want %d", peerASN, asn)
+		if err := binary.Read(lr, binary.BigEndian, &asn); err != nil {
+			return 0, 0, err
 		}
 	}
 }
