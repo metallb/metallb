@@ -20,6 +20,7 @@ import (
 	"reflect"
 
 	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/ipallocator"
 	"go.universe.tf/metallb/internal/k8s"
 
 	"github.com/golang/glog"
@@ -36,11 +37,10 @@ type service interface {
 }
 
 type controller struct {
-	client  service
-	synced  bool
-	config  *config.Config
-	ipToSvc map[string]string
-	svcToIP map[string]string
+	client service
+	synced bool
+	config *config.Config
+	ips    *ipallocator.Allocator
 }
 
 func (c *controller) SetBalancer(name string, svcRo *v1.Service, _ *v1.Endpoints) error {
@@ -93,10 +93,7 @@ func (c *controller) SetBalancer(name string, svcRo *v1.Service, _ *v1.Endpoints
 }
 
 func (c *controller) deleteBalancer(name string) error {
-	ip, ok := c.svcToIP[name]
-	if ok {
-		delete(c.svcToIP, name)
-		delete(c.ipToSvc, ip)
+	if c.ips.Unassign(name) {
 		glog.Infof("%s: service deleted", name)
 	}
 	return nil
@@ -106,6 +103,10 @@ func (c *controller) SetConfig(cfg *config.Config) error {
 	glog.Infof("Start config update")
 	defer glog.Infof("End config update")
 
+	if err := c.ips.SetPools(cfg.Pools); err != nil {
+		glog.Errorf("Applying new configuration failed: %s", err)
+		return nil
+	}
 	c.config = cfg
 	return nil
 }
@@ -122,8 +123,7 @@ func main() {
 	flag.Parse()
 
 	c := &controller{
-		ipToSvc: map[string]string{},
-		svcToIP: map[string]string{},
+		ips: ipallocator.New(),
 	}
 
 	client, err := k8s.NewClient("metallb-controller", *master, *kubeconfig, c, false)
