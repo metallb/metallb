@@ -18,5 +18,6 @@ RUN go test $(glide nv)
 
 FROM alpine:3.6
 MAINTAINER David Anderson <dave@natulte.net>
+RUN apk --update --no-cache upgrade
 COPY --from=builder /%%BINARY%% /
 ENTRYPOINT ["/%%BINARY%%"]
