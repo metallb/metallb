@@ -6,6 +6,7 @@ ENV GOPATH=/go
 ENV GOBIN=/
 
 RUN apk update
+RUN apk upgrade
 RUN apk add git go glide musl-dev
 RUN mkdir -p $GOPATH/src/go.universe.tf
 RUN git clone https://github.com/google/metallb $GOPATH/src/go.universe.tf/metallb
