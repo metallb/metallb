@@ -46,29 +46,55 @@ type configFile struct {
 	} `yaml:"address-pools"`
 }
 
+// Config is a parsed MetalLB configuration.
 type Config struct {
+	// BGP routers that MetalLB should peer with.
 	Peers []Peer
+	// Address pools from which to allocate load balancer IPs.
 	Pools map[string]*Pool
 }
 
+// Peer is the configuration of a BGP peering session.
 type Peer struct {
-	MyASN    uint32
-	ASN      uint32
-	Addr     net.IP
+	// AS number to use for the local end of the session.
+	MyASN uint32
+	// AS number to expect from the remote end of the session.
+	ASN uint32
+	// Address to dial when establishing the session.
+	Addr net.IP
+	// Requested BGP hold time, per RFC4271.
 	HoldTime time.Duration
 	// TODO: more BGP session settings
 }
 
+// Pool is the configuration of an IP address pool.
 type Pool struct {
-	CIDR           []*net.IPNet
-	AvoidBuggyIPs  bool
+	// The addresses that are part of this pool, expressed as CIDR
+	// prefixes. config.Parse guarantees that these are
+	// non-overlapping, both within and between pools.
+	CIDR []*net.IPNet
+	// Some buggy consumer devices mistakenly drop IPv4 traffic for IP
+	// addresses ending in .0 or .255, due to poor implementations of
+	// smurf protection. This setting marks such addresses as
+	// unusable, for maximum compatibility with ancient parts of the
+	// internet.
+	AvoidBuggyIPs bool
+	// When an IP is allocated from this pool, how should it be
+	// translated into BGP announcements?
 	Advertisements []Advertisement
 }
 
+// Advertisement describes one translation from an IP address to a BGP advertisement.
 type Advertisement struct {
+	// Roll up the IP address into a CIDR prefix of this
+	// length. Optional, defaults to 32 (i.e. no aggregation) if not
+	// specified.
 	AggregationLength int
-	LocalPref         uint32
-	Communities       map[uint32]bool
+	// Value of the LOCAL_PREF BGP path attribute. Used only when
+	// advertising to IBGP peers (i.e. Peer.MyASN == Peer.ASN).
+	LocalPref uint32
+	// Value of the COMMUNITIES path attribute.
+	Communities map[uint32]bool
 }
 
 func parseHoldTime(ht string) (time.Duration, error) {
@@ -86,6 +112,7 @@ func parseHoldTime(ht string) (time.Duration, error) {
 	return rounded, nil
 }
 
+// Parse loads and validates a Config from bs.
 func Parse(bs []byte) (*Config, error) {
 	var raw configFile
 	if err := yaml.Unmarshal([]byte(bs), &raw); err != nil {
