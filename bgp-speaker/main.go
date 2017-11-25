@@ -18,7 +18,6 @@ import (
 	"flag"
 	"fmt"
 	"net"
-	"net/http"
 	"reflect"
 	"sort"
 
@@ -28,7 +27,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"k8s.io/api/core/v1"
 )
@@ -269,7 +267,7 @@ func main() {
 	master := flag.String("master", "", "master url")
 	myIPstr := flag.String("node-ip", "", "IP address of this Kubernetes node")
 	myNode := flag.String("node-name", "", "Name of this Kubernetes node")
-	port := flag.Int("port", 4242, "HTTP listening port")
+	port := flag.Int("port", 4241, "HTTP listening port")
 	flag.Parse()
 
 	myIP := net.ParseIP(*myIPstr).To4()
@@ -309,9 +307,5 @@ func main() {
 	// HTTP server for metrics
 	prometheus.MustRegister(c.announcing)
 
-	http.Handle("/metrics", promhttp.Handler())
-	go func() {
-		glog.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", *port), nil))
-	}()
-	glog.Fatal(client.Run())
+	glog.Fatal(client.Run(*port))
 }

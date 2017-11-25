@@ -3,8 +3,10 @@ package k8s
 import (
 	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/golang/glog"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.universe.tf/metallb/internal/config"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -124,7 +126,12 @@ func NewClient(name, masterAddr, kubeconfig string, ctrl Controller, watchEps bo
 	return ret, nil
 }
 
-func (c *Client) Run() error {
+func (c *Client) Run(httpPort int) error {
+	http.Handle("/metrics", promhttp.Handler())
+	go func() {
+		glog.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", httpPort), nil))
+	}()
+
 	stop := make(chan struct{})
 	defer close(stop)
 
