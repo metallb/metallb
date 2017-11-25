@@ -4,7 +4,6 @@ go_import_path: go.universe.tf/metallb
 os:
 - linux
 go:
-- 1.8
 - 1.9
 - tip
 
