@@ -39,7 +39,7 @@ type configFile struct {
 		CIDR           []string
 		AvoidBuggyIPs  bool `yaml:"avoid-buggy-ips"`
 		Advertisements []struct {
-			AggregationLength int `yaml:"aggregation-length"`
+			AggregationLength *int `yaml:"aggregation-length"`
 			LocalPref         uint32
 			Communities       []string
 		}
@@ -150,12 +150,16 @@ func Parse(bs []byte) (*Config, error) {
 
 		for _, ad := range p.Advertisements {
 			// TODO: ipv6 support :(
-			if ad.AggregationLength > 32 {
+			agLen := 32
+			if ad.AggregationLength != nil {
+				agLen = *ad.AggregationLength
+			}
+			if agLen > 32 {
 				return nil, fmt.Errorf("invalid aggregation length %q in pool %q", ad.AggregationLength, p.Name)
 			}
 			for _, cidr := range pool.CIDR {
 				o, _ := cidr.Mask.Size()
-				if ad.AggregationLength < o {
+				if agLen < o {
 					return nil, fmt.Errorf("invalid aggregation length %d in pool %q: prefix %q in this pool is more specific than the aggregation length", ad.AggregationLength, p.Name, cidr)
 				}
 			}
@@ -173,7 +177,7 @@ func Parse(bs []byte) (*Config, error) {
 				}
 			}
 			pool.Advertisements = append(pool.Advertisements, Advertisement{
-				AggregationLength: ad.AggregationLength,
+				AggregationLength: agLen,
 				LocalPref:         ad.LocalPref,
 				Communities:       comms,
 			})
