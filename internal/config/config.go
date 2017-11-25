@@ -40,7 +40,7 @@ type configFile struct {
 		AvoidBuggyIPs  bool `yaml:"avoid-buggy-ips"`
 		Advertisements []struct {
 			AggregationLength *int `yaml:"aggregation-length"`
-			LocalPref         uint32
+			LocalPref         *uint32
 			Communities       []string
 		}
 	} `yaml:"address-pools"`
@@ -176,9 +176,15 @@ func Parse(bs []byte) (*Config, error) {
 					comms[v] = true
 				}
 			}
+
+			localPref := uint32(0)
+			if ad.LocalPref != nil {
+				localPref = *ad.LocalPref
+			}
+
 			pool.Advertisements = append(pool.Advertisements, Advertisement{
 				AggregationLength: agLen,
-				LocalPref:         ad.LocalPref,
+				LocalPref:         localPref,
 				Communities:       comms,
 			})
 		}

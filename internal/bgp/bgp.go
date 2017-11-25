@@ -103,7 +103,7 @@ func (s *Session) sendUpdates() error {
 		}
 
 		for c, adv := range s.new {
-			if adv2, ok := s.advertised[c]; ok && adv2.NextHop.Equal(adv.NextHop) && reflect.DeepEqual(adv2.Communities, adv.Communities) {
+			if adv2, ok := s.advertised[c]; ok && adv.Equal(adv2) {
 				// Peer already has correct state for this
 				// advertisement, nothing to do.
 				continue
@@ -341,4 +341,17 @@ type Advertisement struct {
 	NextHop     net.IP
 	LocalPref   uint32
 	Communities []uint32
+}
+
+func (a *Advertisement) Equal(b *Advertisement) bool {
+	if a.Prefix.String() != b.Prefix.String() {
+		return false
+	}
+	if !a.NextHop.Equal(b.NextHop) {
+		return false
+	}
+	if a.LocalPref != b.LocalPref {
+		return false
+	}
+	return reflect.DeepEqual(a.Communities, b.Communities)
 }
