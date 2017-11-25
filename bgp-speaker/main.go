@@ -61,7 +61,6 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 	}
 
 	if svc.Spec.Type != "LoadBalancer" {
-		glog.Infof("%s: not a LoadBalancer", name)
 		return nil
 	}
 
