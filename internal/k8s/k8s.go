@@ -19,12 +19,24 @@ import (
 	"k8s.io/client-go/util/workqueue"
 )
 
+// A Controller takes action when watched Kubernetes objects change.
 type Controller interface {
+	// SetBalancer is called whenever a Service or its related
+	// Endpoints change. When the Service is deleted, SetBalancer is
+	// called with svc=nil and eps=nil.
 	SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error
+	// SetConfig is called whenever the MetalLB configuration for the
+	// cluster changes. If the config is deleted from the cluster,
+	// SetConfig is called with cfg=nil.
 	SetConfig(cfg *config.Config) error
+	// MarkSynced is called when SetBalancer has been called at least
+	// once for every Service in the cluster, and SetConfig has been
+	// called.
 	MarkSynced()
 }
 
+// Client watches a Kubernetes cluster and translates events into
+// Controller method calls.
 type Client struct {
 	controller Controller
 
@@ -45,6 +57,14 @@ type svcKey string
 type cmKey string
 type synced string
 
+// NewClient connects to masterAddr, using kubeconfig to authenticate,
+// and calls methods on ctrl as the cluster state changes.
+//
+// The client uses the given name to identify itself to the cluster
+// (e.g. when logging events). watchEps defines whether ctrl cares
+// about the endpoints associated with a service. If watchEps is
+// false, the controller will not watch endpoint objects, and the
+// endpoints in SetBalancer calls will always be nil.
 func NewClient(name, masterAddr, kubeconfig string, ctrl Controller, watchEps bool) (*Client, error) {
 	config, err := clientcmd.BuildConfigFromFlags(masterAddr, kubeconfig)
 	if err != nil {
@@ -126,6 +146,8 @@ func NewClient(name, masterAddr, kubeconfig string, ctrl Controller, watchEps bo
 	return ret, nil
 }
 
+// Run watches for events on the Kubernetes cluster, and dispatches
+// calls to the Controller.
 func (c *Client) Run(httpPort int) error {
 	http.Handle("/metrics", promhttp.Handler())
 	go func() {
@@ -168,19 +190,26 @@ func (c *Client) Run(httpPort int) error {
 	}
 }
 
+// Update writes svc back into the Kubernetes cluster. If successful,
+// the updated Service is returned. Note that changes to svc.Status
+// are not propagated, for that you need to call UpdateStatus.
 func (c *Client) Update(svc *v1.Service) (*v1.Service, error) {
 	return c.client.CoreV1().Services(svc.Namespace).Update(svc)
 }
 
+// UpdateStatus writes the protected "status" field of svc back into
+// the Kubernetes cluster.
 func (c *Client) UpdateStatus(svc *v1.Service) error {
 	_, err := c.client.CoreV1().Services(svc.Namespace).UpdateStatus(svc)
 	return err
 }
 
+// Infof logs an informational event about svc to the Kubernetes cluster.
 func (c *Client) Infof(svc *v1.Service, kind, msg string, args ...interface{}) {
 	c.events.Eventf(svc, v1.EventTypeNormal, kind, msg, args...)
 }
 
+// Errorf logs an error event about svc to the Kubernetes cluster.
 func (c *Client) Errorf(svc *v1.Service, kind, msg string, args ...interface{}) {
 	c.events.Eventf(svc, v1.EventTypeWarning, kind, msg, args...)
 }
