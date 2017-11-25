@@ -79,10 +79,11 @@ func parseHoldTime(ht string) (time.Duration, error) {
 	if err != nil {
 		return 0, fmt.Errorf("invalid hold time %q: %s", ht, err)
 	}
-	if s := int(d.Seconds()); s != 0 && s < 3 {
+	rounded := time.Duration(int(d.Seconds())) * time.Second
+	if rounded != 0 && rounded < 3 {
 		return 0, fmt.Errorf("invalid hold time %q: must be 0 or >=3s", ht)
 	}
-	return d.Round(time.Second), nil
+	return rounded, nil
 }
 
 func Parse(bs []byte) (*Config, error) {
