@@ -1,0 +1,21 @@
+# -*- mode: dockerfile -*-
+
+FROM alpine:3.6 as builder
+
+ENV GOPATH=/go
+ENV GOBIN=/
+
+RUN apk update
+RUN apk add git go glide musl-dev
+RUN mkdir -p $GOPATH/src/go.universe.tf
+RUN git clone https://github.com/google/metallb $GOPATH/src/go.universe.tf/metallb
+WORKDIR $GOPATH/src/go.universe.tf/metallb
+RUN glide install
+RUN go install -v ./bgp-speaker
+RUN go test $(glide nv)
+
+
+FROM alpine:3.6
+MAINTAINER David Anderson <dave@natulte.net>
+COPY --from=builder /bgp-speaker /
+ENTRYPOINT ["/bgp-speaker"]
