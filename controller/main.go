@@ -125,7 +125,7 @@ func (c *controller) MarkSynced() {
 func main() {
 	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	master := flag.String("master", "", "master url")
-	port := flag.Int("port", 4242, "HTTP listening port")
+	port := flag.Int("port", 80, "HTTP listening port")
 	flag.Parse()
 
 	c := &controller{

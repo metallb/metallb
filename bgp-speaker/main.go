@@ -276,7 +276,7 @@ func main() {
 	master := flag.String("master", "", "master url")
 	myIPstr := flag.String("node-ip", "", "IP address of this Kubernetes node")
 	myNode := flag.String("node-name", "", "Name of this Kubernetes node")
-	port := flag.Int("port", 4241, "HTTP listening port")
+	port := flag.Int("port", 80, "HTTP listening port")
 	flag.Parse()
 
 	myIP := net.ParseIP(*myIPstr).To4()
