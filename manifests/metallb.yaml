@@ -130,43 +130,53 @@ spec:
             cpu: "0.1"
             memory: "100Mi"
         securityContext:
-          capabilities:
-            drop:
-              - all
-            add:
-            - NET_BIND_SERVICE
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
       securityContext:
         runAsNonRoot: true
 ---
 
-# # BGP speaker DaemonSet
-# apiVersion: apps/v1beta2
-# kind: DaemonSet
-# metadata:
-#   namespace: kube-system
-#   name: metallb-bgp-speaker
-#   app: metallb-bgp-speaker
-# spec:
-#   selector:
-#     matchLabels:
-#       app: metallb-bgp-speaker
-#   template:
-#     metadata:
-#       labels:
-#         app: metallb-controller
-#     spec:
-#       containers:
-#       - name: metallb-bgp-speaker
-#         image: quay.io/metallb/bgp-speaker:latest
-#         ports:
-#         resources:
-#           limits:
-#             cpu: "0.1"
-#             memory: "100Mi"
-#         securityContext:
-#           allowPrivilegeEscalation: false
-#           readOnlyRootFilesystem: true
-#       securityContext:
-#         runAsNonRoot: true
+# BGP speaker DaemonSet
+apiVersion: apps/v1beta2
+kind: DaemonSet
+metadata:
+  namespace: metallb-system
+  name: bgp-speaker
+  labels:
+    app: bgp-speaker
+spec:
+  selector:
+    matchLabels:
+      app: bgp-speaker
+  template:
+    metadata:
+      labels:
+        app: bgp-speaker
+    spec:
+      serviceAccountName: bgp-speaker
+      containers:
+      - name: bgp-speaker
+        image: quay.io/metallb/bgp-speaker:latest
+        args:
+        - --port=8080
+        env:
+        - name: METALLB_NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: METALLB_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        ports:
+        - name: monitoring
+          containerPort: 8080
+        resources:
+          limits:
+            cpu: "0.1"
+            memory: "100Mi"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+      securityContext:
+        runAsNonRoot: true
