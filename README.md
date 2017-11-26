@@ -22,9 +22,14 @@ The [requirements](docs/requirements.md) page goes into more detail.
 
 # Usage
 
-Install MetalLB on your cluster by applying the MetalLB manifest.
+Want to test-drive MetalLB? Follow the [tutorial]() to set up a
+self-contained MetalLB in minikube.
 
-(TODO: write more of this)
+Deploying to a real cluster? Familiarize yourself with
+the [concepts](), then head to the [installation guide]().
+
+Once MetalLB is running, take a look at [advanced usage]() for some
+interesting things you can do.
 
 # Disclaimer
 
