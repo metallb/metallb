@@ -3,7 +3,7 @@
 MetalLB is a load-balancer implementation for bare
 metal [Kubernetes](https://kubernetes.io) clusters, using BGP.
 
-[![license](https://img.shields.io/github/license/google/metallb.svg?maxAge=2592000)](https://github.com/google/netboot/blob/master/LICENSE) [![Travis](https://img.shields.io/travis/google/metallb.svg?maxAge=2592000)](https://travis-ci.org/google/netboot) [![Quay.io](https://img.shields.io/badge/containers-ready-green.svg)](https://quay.io/metallb) [![Go report card](https://goreportcard.com/badge/github.com/google/metallb)](https://goreportcard.com/report/github.com/google/metallb)
+[![Project maturity: alpha](https://img.shields.io/badge/maturity-alpha-yellow.svg)](docs/maturity.md) [![license](https://img.shields.io/github/license/google/metallb.svg?maxAge=2592000)](https://github.com/google/netboot/blob/master/LICENSE) [![Travis](https://img.shields.io/travis/google/metallb.svg?maxAge=2592000)](https://travis-ci.org/google/netboot) [![Quay.io](https://img.shields.io/badge/containers-ready-green.svg)](https://quay.io/metallb) [![Go report card](https://goreportcard.com/badge/github.com/google/metallb)](https://goreportcard.com/report/github.com/google/metallb)
 
 # Requirements
 
@@ -19,6 +19,11 @@ MetalLB requires the following to function:
 - Some IPv4 addresses for MetalLB to hand out.
 
 The [requirements](docs/requirements.md) page goes into more detail.
+
+You should also note that MetalLB is currently a young project, so you
+should treat it as an "alpha"
+product. The [project maturity](docs/maturity.md) explains what that
+implies.
 
 # Usage
 
