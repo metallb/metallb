@@ -1,0 +1,83 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: bgp-router
+spec:
+  selector:
+    matchLabels:
+      app: bgp-router
+  template:
+    metadata:
+      labels:
+        app: bgp-router
+    spec:
+      containers:
+      - name: router
+        image: quay.io/metallb/tutorial-bgp-router:latest
+        env:
+        - name: METALLB_NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        ports:
+        - name: bgp
+          containerPort: 1179
+        - name: http
+          containerPort: 8080
+        securityContext:
+          capabilities:
+            add:
+            - NET_ADMIN
+            - NET_RAW
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bgp-router
+spec:
+  ports:
+  - name: bgp
+    port: 179
+    protocol: TCP
+    targetPort: bgp
+  selector:
+    app: bgp-router
+  type: NodePort
+  clusterIP: 10.0.0.100
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bgp-spy
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http
+  selector:
+    app: bgp-router
+  type: NodePort
+
+---
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  name: test
+spec:
+  selector:
+    matchLabels:
+      app: test
+  template:
+    metadata:
+      labels:
+        app: test
+    spec:
+      containers:
+      - name: test
+        image: ubuntu:latest
+        args:
+        - /bin/sleep
+        - "36000"
