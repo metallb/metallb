@@ -1,11 +1,5 @@
 language: go
 go_import_path: go.universe.tf/metallb
-os:
-- linux
-go:
-- 1.8
-- 1.9
-- tip
 install:
 - go get github.com/Masterminds/glide
 - go get github.com/golang/lint/golint
@@ -15,18 +9,26 @@ script:
 - go test $(glide novendor)
 - go vet $(glide novendor)
 - glide novendor | xargs -n1 golint
+os:
+- linux
+go:
+- 1.8
+- 1.9
 jobs:
   include:
   - stage: deploy
     go: 1.9
-    env:
-    - NAME=build_containers
+    install: true
     script: true
     deploy:
     - provider: script
       script: go run dockerfiles/trigger_build.go
       on:
         branch: master
+  # Go tip testing is included for completeness so we can adapt to
+  # upcoming changes, but shouldn't block container builds.
+  - stage: tip-test
+    go: tip    
 env:
   global:
   # QUAY_TRIGGER_URL_CONTROLLER
