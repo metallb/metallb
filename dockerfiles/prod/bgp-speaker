@@ -21,3 +21,4 @@ MAINTAINER David Anderson <dave@natulte.net>
 RUN apk --update --no-cache upgrade
 COPY --from=builder /bgp-speaker /
 ENTRYPOINT ["/bgp-speaker"]
+USER nobody:nobody
