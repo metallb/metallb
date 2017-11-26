@@ -19,6 +19,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"os"
 	"reflect"
 	"sort"
 
@@ -278,6 +279,13 @@ func main() {
 	myNode := flag.String("node-name", "", "Name of this Kubernetes node")
 	port := flag.Int("port", 80, "HTTP listening port")
 	flag.Parse()
+
+	if *myIPstr == "" {
+		*myIPstr = os.Getenv("METALLB_NODE_IP")
+	}
+	if *myNode == "" {
+		*myNode = os.Getenv("METALLB_NODE_NAME")
+	}
 
 	myIP := net.ParseIP(*myIPstr).To4()
 	if myIP == nil {
