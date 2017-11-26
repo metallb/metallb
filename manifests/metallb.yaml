@@ -4,43 +4,30 @@ kind: Namespace
 metadata:
   name: metallb-system
 ---
-
 ## RBAC roles
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: metallb-system:services-watcher
+  name: metallb-system:controller
 rules:
 - apiGroups: [""]
   resources: ["services"]
-  verbs: ["get", "list", "watch"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: metallb-system:endpoints-watcher
-rules:
+  verbs: ["get", "list", "watch", "update"]
 - apiGroups: [""]
-  resources: ["endpoints"]
-  verbs: ["get", "list", "watch"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: metallb-system:services-updater
-rules:
-- apiGroups: [""]
-  resources: ["services", "services/status"]
+  resources: ["services/status"]
   verbs: ["update"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: metallb-system:events-creator
-rules:
 - apiGroups: [""]
   resources: ["events"]
   verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: metallb-system:bgp-speaker
+rules:
+- apiGroups: [""]
+  resources: ["services", "endpoints"]
+  verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -71,57 +58,28 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: metallb-system:services-watcher
+  name: metallb-system:controller
 subjects:
 - kind: ServiceAccount
   namespace: metallb-system
   name: controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: metallb-system:controller
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metallb-system:bgp-speaker
+subjects:
 - kind: ServiceAccount
   namespace: metallb-system
   name: bgp-speaker
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: metallb-system:services-watcher
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: metallb-system:endpoints-watcher
-subjects:
-- kind: ServiceAccount
-  namespace: metallb-system
-  name: bgp-speaker
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: metallb-system:endpoints-watcher
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: metallb-system:services-updater
-subjects:
-- kind: ServiceAccount
-  namespace: metallb-system
-  name: controller
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: metallb-system:services-updater
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: metallb-system:events-creator
-subjects:
-- kind: ServiceAccount
-  namespace: metallb-system
-  name: controller
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: metallb-system:events-creator
+  name: metallb-system:bgp-speaker
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -130,10 +88,8 @@ metadata:
   name: config-watcher
 subjects:
 - kind: ServiceAccount
-  namespace: metallb-system
   name: controller
 - kind: ServiceAccount
-  namespace: metallb-system
   name: bgp-speaker
 roleRef:
   apiGroup: rbac.authorization.k8s.io
