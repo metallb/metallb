@@ -15,6 +15,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"reflect"
@@ -102,6 +103,11 @@ func (c *controller) deleteBalancer(name string) error {
 func (c *controller) SetConfig(cfg *config.Config) error {
 	glog.Infof("Start config update")
 	defer glog.Infof("End config update")
+
+	if cfg == nil {
+		glog.Errorf("No MetalLB configuration in cluster")
+		return errors.New("configuration missing")
+	}
 
 	if err := c.ips.SetPools(cfg.Pools); err != nil {
 		glog.Errorf("Applying new configuration failed: %s", err)
