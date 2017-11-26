@@ -20,23 +20,24 @@ MetalLB requires the following to function:
 
 ## Compatibility with Kubernetes deployments
 
+MetalLB is a good fit for bare metal (aka "on premises") clusters:
+- [Kubeadm](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/)-managed clusters
+- [Tectonic](https://coreos.com/tectonic/) on bare metal
+- [Minikube](https://github.com/kubernetes/minikube) sandboxes
+
 Kubernetes's current design does not permit several load-balancing
-implementations to coexist. This means that MetalLB will not work with
+implementations to coexist. This means that MetalLB will _not_ work with
 fully hosted cloud Kubernetes solutions like:
 - [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine/)
 - [Azure Container Service](https://azure.microsoft.com/en-us/services/container-service/)
 
 If you're using a cloud provider as a pure VM host, MetalLB can be
 made to work, with unusual custom configuration. The following
-deployment types are not recommended for first-time users:
+deployment types are _not recommended_ for first-time users:
 - [Google Compute Engine](https://kubernetes.io/docs/getting-started-guides/gce/)
 - [Azure ACS-Engine](https://github.com/Azure/acs-engine/blob/master/docs/kubernetes.md)
 - [Amazon Elastic Compute Cloud](https://kubernetes.io/docs/getting-started-guides/aws/)
 
-MetalLB is a good fit for bare metal (aka "on premises") clusters:
-- [Kubeadm](https://kubernetes.io/docs/setup/independent/create-cluster-kubeadm/)-managed clusters
-- [Tectonic](https://coreos.com/tectonic/) on bare metal
-- [Minikube](https://github.com/kubernetes/minikube) sandboxes
 
 # Usage
 
