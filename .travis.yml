@@ -27,7 +27,7 @@ jobs:
         branch: master
   # Go tip testing is included for completeness so we can adapt to
   # upcoming changes, but shouldn't block container builds.
-  - stage: tip-test
+  - stage: test on tip
     go: tip    
 env:
   global:
