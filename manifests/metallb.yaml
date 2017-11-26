@@ -1,0 +1,216 @@
+## Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: metallb-system
+---
+
+## RBAC roles
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: metallb-system:services-watcher
+rules:
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: metallb-system:endpoints-watcher
+rules:
+- apiGroups: [""]
+  resources: ["endpoints"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: metallb-system:services-updater
+rules:
+- apiGroups: [""]
+  resources: ["services", "services/status"]
+  verbs: ["update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: metallb-system:events-creator
+rules:
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: metallb-system
+  name: config-watcher
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+---
+
+## Service accounts
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: metallb-system
+  name: controller
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: metallb-system
+  name: bgp-speaker
+---
+
+## Role bindings
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metallb-system:services-watcher
+subjects:
+- kind: ServiceAccount
+  namespace: metallb-system
+  name: controller
+- kind: ServiceAccount
+  namespace: metallb-system
+  name: bgp-speaker
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: metallb-system:services-watcher
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metallb-system:endpoints-watcher
+subjects:
+- kind: ServiceAccount
+  namespace: metallb-system
+  name: bgp-speaker
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: metallb-system:endpoints-watcher
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metallb-system:services-updater
+subjects:
+- kind: ServiceAccount
+  namespace: metallb-system
+  name: controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: metallb-system:services-updater
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: metallb-system:events-creator
+subjects:
+- kind: ServiceAccount
+  namespace: metallb-system
+  name: controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: metallb-system:events-creator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: metallb-system
+  name: config-watcher
+subjects:
+- kind: ServiceAccount
+  namespace: metallb-system
+  name: controller
+- kind: ServiceAccount
+  namespace: metallb-system
+  name: bgp-speaker
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: config-watcher
+---
+
+## Controller deployment
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  namespace: metallb-system
+  name: metallb-controller
+  labels:
+    app: metallb-controller
+spec:
+  selector:
+    matchLabels:
+      app: metallb-controller
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: metallb-controller
+    spec:
+      serviceAccountName: controller
+      containers:
+      - name: metallb-controller
+        image: quay.io/metallb/controller:latest
+        args:
+        - --port=8080
+        ports:
+        - name: monitoring
+          containerPort: 8080
+        resources:
+          limits:
+            cpu: "0.1"
+            memory: "100Mi"
+        securityContext:
+          capabilities:
+            drop:
+              - all
+            add:
+            - NET_BIND_SERVICE
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+      securityContext:
+        runAsNonRoot: true
+---
+
+# # BGP speaker DaemonSet
+# apiVersion: apps/v1beta2
+# kind: DaemonSet
+# metadata:
+#   namespace: kube-system
+#   name: metallb-bgp-speaker
+#   app: metallb-bgp-speaker
+# spec:
+#   selector:
+#     matchLabels:
+#       app: metallb-bgp-speaker
+#   template:
+#     metadata:
+#       labels:
+#         app: metallb-controller
+#     spec:
+#       containers:
+#       - name: metallb-bgp-speaker
+#         image: quay.io/metallb/bgp-speaker:latest
+#         ports:
+#         resources:
+#           limits:
+#             cpu: "0.1"
+#             memory: "100Mi"
+#         securityContext:
+#           allowPrivilegeEscalation: false
+#           readOnlyRootFilesystem: true
+#       securityContext:
+#         runAsNonRoot: true
