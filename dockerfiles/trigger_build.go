@@ -22,6 +22,11 @@ func main() {
 		log.Print(err)
 		os.Exit(1)
 	}
+	log.Printf("Triggering tutorial BGP router build")
+	if err := quay("QUAY_TRIGGER_URL_TUTORIAL_BGP_ROUTER"); err != nil {
+		log.Print(err)
+		os.Exit(1)
+	}
 }
 
 func quay(env string) error {
