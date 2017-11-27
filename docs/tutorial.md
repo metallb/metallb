@@ -17,7 +17,8 @@ Here is the outline of what we're going to do:
 3. Install MetalLB on the cluster,
 4. Configure MetalLB to peer with our mock BGP router, and give it some IP addresses to manage,
 5. Create a load-balanced service, and observe how MetalLB sets it up,
-6. Tweak MetalLB's configuration, to see how the cluster reacts.
+6. Change MetalLB's configuration, and fix a bad configuration,
+7. Tear down the playground.
 
 # Set up a Minikube cluster
 
@@ -338,3 +339,15 @@ _One final bit of clunkiness: right now, you need to inspect metallb's
 logs to see that a new configuration was successfully loaded. Once
 MetalLB only allows valid configurations to be submitted, this
 clunkiness will also go away._
+
+# Teardown
+
+If you're not using the minikube cluster for anything else, you can
+clean up simply by running `minikube delete`. If you want to do a more
+targeted cleanup, you can delete just the things we created in this
+tutorial with:
+
+`kubectl delete -f manifests/tutorial-3.yaml,manifests/tutorial-1.yaml,manifests/metallb.yaml`
+
+This will tear down all of MetalLB, as well as our toy BGP router and
+the nginx load-balanced service.
