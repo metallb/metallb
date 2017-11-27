@@ -31,7 +31,8 @@ Want to test-drive MetalLB? Follow the [tutorial](docs/tutorial.md) to
 set up a self-contained MetalLB in minikube.
 
 Deploying to a real cluster? Familiarize yourself with
-the [concepts](), then head to the [installation guide]().
+the [concepts and limitations](docs/concepts-limitations.md), then
+head to the [installation guide]().
 
 Once MetalLB is running, take a look at [advanced usage]() for some
 interesting things you can do.
