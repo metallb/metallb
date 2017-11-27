@@ -253,7 +253,7 @@ newPeers:
 		}
 
 		glog.Infof("Peer %q configured, starting BGP session", p.cfg.Addr)
-		s, err := bgp.New(fmt.Sprintf("%s:179", p.cfg.Addr), p.cfg.MyASN, net.ParseIP("192.168.18.65"), p.cfg.ASN, p.cfg.HoldTime)
+		s, err := bgp.New(fmt.Sprintf("%s:179", p.cfg.Addr), p.cfg.MyASN, c.myIP, p.cfg.ASN, p.cfg.HoldTime)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("Creating BGP session to %q: %s", p.cfg.Addr, err))
 		} else {
