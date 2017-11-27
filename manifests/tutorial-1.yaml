@@ -60,24 +60,3 @@ spec:
   selector:
     app: bgp-router
   type: NodePort
-
----
-apiVersion: apps/v1beta2
-kind: Deployment
-metadata:
-  name: test
-spec:
-  selector:
-    matchLabels:
-      app: test
-  template:
-    metadata:
-      labels:
-        app: test
-    spec:
-      containers:
-      - name: test
-        image: ubuntu:latest
-        args:
-        - /bin/sleep
-        - "36000"
