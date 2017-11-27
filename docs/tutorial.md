@@ -71,5 +71,96 @@ shows us what the router is thinking.
 Let's open that UI now. Run: `minikube service bgp-spy`. This will
 open a new browser tab that should look something like this:
 
-![BGP spy, with MetalLB not connected](img/metallb-bgp-spy-not-connected.jpg)
+![BGP spy, with MetalLB not connected](img/metallb-bgp-spy-not-connected.png)
 
+If you're comfortable with BGP and networking, the raw BIRD status may
+be interesting. If you're not, don't worry, the important part is
+above: our router is running, but knows nothing about our Kubernetes
+cluster, because MetalLB is not connected.
+
+Obviously, MetalLB isn't connected to our router, it's not installed
+yet! Let's address that. Keep the bgp-spy tab open, we'll come back to
+it shortly.
+
+# Install MetalLB
+
+MetalLB runs in two parts: a cluster-wide controller, and a
+per-machine BGP speaker. Since Minikube is a Kubernetes cluster with a
+single VM, we'll end up with the controller and one BGP speaker.
+
+Install MetalLB by applying the manifest:
+
+`kubectl apply -f manifests/metallb.yaml`
+
+This manifest creates a bunch of resources. Most of them are related
+to access control, so that MetalLB can read and write the Kubernetes
+objects it needs to do its job.
+
+Ignore those bits for now, the two pieces of interest are the
+"controller" deployment, and the "bgp-speaker" daemonset. Wait for
+these to start by monitoring `kubectl get pods -n
+metallb-system`. Eventually, you should see two running pods (again,
+the pod name suffixes will be different on your cluster).
+
+```
+NAME                          READY     STATUS    RESTARTS   AGE
+bgp-speaker-flxtr             1/1       Running   0          33s
+controller-74dddf4794-zq69z   1/1       Running   0          33s
+```
+
+Refresh the bgp-spy tab from earlier, and... It's the same! MetalLB is
+still not connected, and our router still knows nothing about cluster
+services.
+
+That's because the MetalLB installation manifest doesn't come with a
+configuration, so both the controller and BGP speaker are sitting
+idle, waiting to be told what they should do. Let's fix that!
+
+# Configure MetalLB
+
+We have a sample MetalLB configuration in
+`manifests/tutorial-2.yaml`. Let's take a look at it before applying
+it:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: metallb-config
+data:
+  config: |
+    peers:
+    - my-asn: 64512
+      peer-asn: 64512
+      peer-address: 10.0.0.100
+    address-pools:
+    - name: my-ip-space
+      cidr:
+      - 198.51.100.0/24
+      advertisements:
+      - localpref: 100
+```
+
+MetalLB's configuration is a standard Kubernetes ConfigMap,
+`metallb-config` under the `metallb-system` namespace. It contains two
+pieces of information: who MetalLB should talk to, and what IP
+addresses it's allowed to hand out.
+
+In this configuration, we're setting up a BGP peering with
+`10.0.0.100`, which is the IP address of the `bgp-router` service we
+created in step 2. And we're giving MetalLB 256 IP addresses to use,
+from 198.51.100.0 to 198.51.100.255. The final section gives MetalLB
+some BGP attributes that it should use when announcing IP addresses to
+our router.
+
+Apply this configuration now:
+
+`kubectl apply -f manifests/tutorial-2.yaml`
+
+The configuration should take effect within a few seconds. Refresh the
+bgp-spy browser page again (run `minikube service bgp-spy` if you
+closed it and need to get it back). If all went well, you should see a
+much happier router:
+
+![BGP spy, with MetalLB connected](img/metallb-bgp-spy-connected.png)
