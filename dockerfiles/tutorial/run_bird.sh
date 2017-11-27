@@ -12,6 +12,11 @@ iptables -t nat -A INPUT -p tcp --dport 1179 -j SNAT --to $METALLB_NODE_IP
 cat >/etc/bird/bird.conf <<EOF
 router id 10.0.0.100;
 listen bgp port 1179;
+protocol device {
+}
+protocol static {
+  route ${METALLB_NODE_IP}/32 via "eth0";
+}
 protocol bgp minikube {
   local 10.0.0.100 as 64512;
   neighbor $METALLB_NODE_IP as 64512;
