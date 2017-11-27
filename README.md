@@ -22,8 +22,8 @@ The [requirements](docs/requirements.md) page goes into more detail.
 
 You should also note that MetalLB is currently a young project, so you
 should treat it as an "alpha"
-product. The [project maturity](docs/maturity.md) explains what that
-implies.
+product. The [project maturity](docs/maturity.md) page explains what
+that implies.
 
 # Usage
 
