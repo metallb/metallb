@@ -102,23 +102,23 @@ apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
   namespace: metallb-system
-  name: metallb-controller
+  name: controller
   labels:
-    app: metallb-controller
+    app: controller
 spec:
   selector:
     matchLabels:
-      app: metallb-controller
+      app: controller
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: metallb-controller
+        app: controller
     spec:
       serviceAccountName: controller
       containers:
-      - name: metallb-controller
+      - name: controller
         image: quay.io/metallb/controller:latest
         args:
         - --port=8080
