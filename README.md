@@ -27,8 +27,8 @@ implies.
 
 # Usage
 
-Want to test-drive MetalLB? Follow the [tutorial]() to set up a
-self-contained MetalLB in minikube.
+Want to test-drive MetalLB? Follow the [tutorial](docs/tutorial.md) to
+set up a self-contained MetalLB in minikube.
 
 Deploying to a real cluster? Familiarize yourself with
 the [concepts](), then head to the [installation guide]().
