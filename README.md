@@ -32,7 +32,9 @@ set up a self-contained MetalLB in minikube.
 
 Deploying to a real cluster? Familiarize yourself with
 the [concepts and limitations](docs/concepts-limitations.md), then
-head to the [installation, configuration and usage]() guide.
+head to
+the [installation, configuration and usage](docs/installation.md)
+guide.
 
 # Disclaimer
 
