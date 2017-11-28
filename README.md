@@ -5,6 +5,24 @@ metal [Kubernetes](https://kubernetes.io) clusters, using BGP.
 
 [![Project maturity: alpha](https://img.shields.io/badge/maturity-alpha-yellow.svg)](docs/maturity.md) [![license](https://img.shields.io/github/license/google/metallb.svg?maxAge=2592000)](https://github.com/google/netboot/blob/master/LICENSE) [![Travis](https://img.shields.io/travis/google/metallb.svg?maxAge=2592000)](https://travis-ci.org/google/netboot) [![Quay.io](https://img.shields.io/badge/containers-ready-green.svg)](https://quay.io/metallb) [![Go report card](https://goreportcard.com/badge/github.com/google/metallb)](https://goreportcard.com/report/github.com/google/metallb)
 
+# Why?
+
+Kubernetes does not offer an implementation of network load-balancers (Service
+objects with `spec.type=LoadBalancer`) for bare metal clusters. The
+implementations of Network LB that Kubernetes does ship with are all glue code
+that calls out to various IaaS platforms (GCP, AWS, Azure...). If you're not
+running on one of those platforms, `LoadBalancer`s will remain in the "pending"
+state indefinitely when created.
+
+Bare metal cluster operators are left with two lesser tools to bring user
+traffic into their clusters, `NodePort` and `externalIPs` services. Both of
+these options have significant downsides for production use, which makes bare
+metal clusters second class citizens in the Kubernetes ecosystem.
+
+MetalLB aims to redress this imbalance by offering a Network LB implementation
+that integrates with standard network equipment, so that external services on
+bare metal clusters also "just work" as much as possible.
+
 # Requirements
 
 MetalLB requires the following to function:
