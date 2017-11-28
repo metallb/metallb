@@ -36,6 +36,16 @@ head to
 the [installation, configuration and usage](docs/installation.md)
 guide.
 
+# Contributing
+
+We welcome contributions in all forms. Please check out
+the [contributing guide](CONTRIBUTING.md) for more information.
+
+One lightweight way you can contribute is
+to
+[tell us that you're using MetalLB](https://github.com/google/metallb/issues/5),
+which will give us warm fuzzy feelings :).
+
 # Disclaimer
 
 This is not an official Google project, it is just code that happens
