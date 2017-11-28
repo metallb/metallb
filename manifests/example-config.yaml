@@ -37,6 +37,12 @@ data:
       cidr:
       - 198.51.100.0/24
       - 192.168.0.0/16
+      # (optional) If true, MetalLB will not allocate any address that
+      # ends in .0 or .255. Some old, buggy consumer devices
+      # mistakenly block traffic to such addresses under the guise of
+      # smurf protection. Such devices have become fairly rare, but
+      # the option is here if you encounter serving issues.
+      avoid-buggy-ips: true
       # A list of BGP advertisements to make. Each address that gets
       # assigned out of this pool will turn into this many
       # advertisements. For most simple setups, you'll probably just
