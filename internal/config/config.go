@@ -31,6 +31,7 @@ type configFile struct {
 		MyASN    uint32 `yaml:"my-asn"`
 		ASN      uint32 `yaml:"peer-asn"`
 		Addr     string `yaml:"peer-address"`
+		Port     uint16 `yaml:"peer-port"`
 		HoldTime string `yaml:"hold-time"`
 	}
 	Communities map[string]string
@@ -62,6 +63,8 @@ type Peer struct {
 	ASN uint32
 	// Address to dial when establishing the session.
 	Addr net.IP
+	// Port to dial when establishing the session.
+	Port uint16
 	// Requested BGP hold time, per RFC4271.
 	HoldTime time.Duration
 	// TODO: more BGP session settings
@@ -131,10 +134,15 @@ func Parse(bs []byte) (*Config, error) {
 		if err != nil {
 			return nil, err
 		}
+		port := uint16(179)
+		if p.Port != 0 {
+			port = p.Port
+		}
 		cfg.Peers = append(cfg.Peers, Peer{
 			MyASN:    p.MyASN,
 			ASN:      p.ASN,
 			Addr:     ip,
+			Port:     port,
 			HoldTime: holdTime,
 		})
 	}
