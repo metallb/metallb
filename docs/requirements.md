@@ -34,7 +34,7 @@ this, it is _not recommended_ unless you know what you're doing.
 - [Azure ACS-Engine](https://github.com/Azure/acs-engine/blob/master/docs/kubernetes.md)
 - [Amazon Elastic Compute Cloud](https://kubernetes.io/docs/getting-started-guides/aws/)
 
-Fully hosted cloud Kubernetes solutions to not allow disabling the cloud platform integrations, meaning MetalLB will _not_ work with:
+Fully hosted cloud Kubernetes solutions do not allow disabling the cloud platform integrations, meaning MetalLB will _not_ work with:
 - [Google Kubernetes Engine](https://cloud.google.com/kubernetes-engine/)
 - [Azure Container Service](https://azure.microsoft.com/en-us/services/container-service/)
 
