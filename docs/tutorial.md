@@ -128,7 +128,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   namespace: metallb-system
-  name: metallb-config
+  name: config
 data:
   config: |
     peers:
@@ -144,7 +144,7 @@ data:
 ```
 
 MetalLB's configuration is a standard Kubernetes ConfigMap,
-`metallb-config` under the `metallb-system` namespace. It contains two
+`config` under the `metallb-system` namespace. It contains two
 pieces of information: who MetalLB should talk to, and what IP
 addresses it's allowed to hand out.
 
@@ -241,7 +241,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   namespace: metallb-system
-  name: metallb-config
+  name: config
 data:
   config: |
     peers:
@@ -272,7 +272,7 @@ that this address should not be used. What happened?
 
 To answer that, let's inspect the running configuration in Kubernetes,
 by running `kubectl describe configmap -n metallb-system
-metallb-config`. At the bottom of the output, you should see an event
+config`. At the bottom of the output, you should see an event
 log that looks like this:
 
 ```

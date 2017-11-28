@@ -124,7 +124,7 @@ func NewClient(name, masterAddr, kubeconfig string, ctrl Controller, watchEps bo
 			}
 		},
 	}
-	cmWatcher := cache.NewListWatchFromClient(clientset.CoreV1().RESTClient(), "configmaps", "metallb-system", fields.OneTermEqualSelector("metadata.name", "metallb-config"))
+	cmWatcher := cache.NewListWatchFromClient(clientset.CoreV1().RESTClient(), "configmaps", "metallb-system", fields.OneTermEqualSelector("metadata.name", "config"))
 	cmIndexer, cmInformer := cache.NewIndexerInformer(cmWatcher, &v1.ConfigMap{}, 0, cmHandlers, cache.Indexers{})
 
 	ret := &Client{
