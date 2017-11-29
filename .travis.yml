@@ -17,7 +17,7 @@ go:
 jobs:
   include:
   - stage: deploy
-    if: type = push AND branch = master
+    if: type = push
     go: 1.9
     install: true
     script: printenv TRAVIS_BRANCH

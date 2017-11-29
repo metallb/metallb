@@ -36,8 +36,8 @@ func quay(env string) error {
 		Branch string `json:"default_branch"`
 	}{
 		Commit: os.Getenv("TRAVIS_COMMIT"),
-		Ref:    "refs/heads/master",
-		Branch: "master",
+		Ref:    fmt.Sprintf("refs/heads/%s", os.Getenv("TRAVIS_BRANCH")),
+		Branch: "dev",
 	}
 
 	if info.Commit == "" {
