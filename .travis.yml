@@ -17,14 +17,13 @@ go:
 jobs:
   include:
   - stage: deploy
+    if: type = push AND branch = master
     go: 1.9
     install: true
-    script: true
+    script: printenv TRAVIS_BRANCH
     deploy:
     - provider: script
       script: go run dockerfiles/trigger_build.go
-      on:
-        branch: master
   - stage: test on tip
     go: tip
 env:
