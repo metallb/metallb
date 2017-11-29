@@ -10,6 +10,11 @@ import (
 	"time"
 )
 
+const (
+	afiIPv4 = 1
+	afiIPv6 = 2
+)
+
 func sendOpen(w io.Writer, asn uint32, routerID net.IP, holdTime time.Duration) error {
 	if routerID.To4() == nil {
 		panic("ipv4 address used as RouterID")
@@ -32,7 +37,19 @@ func sendOpen(w io.Writer, asn uint32, routerID net.IP, holdTime time.Duration) 
 		OptType uint8
 		OptLen  uint8
 
-		// Capabilities (we send only one, 4-byte ASN)
+		// Capabilities: multiprotocol extension for IPv4+IPv6
+		// unicast, and 4-byte ASNs
+
+		MP4Type uint8
+		MP4Len  uint8
+		AFI4    uint16
+		SAFI4   uint16
+
+		MP6Type uint8
+		MP6Len  uint8
+		AFI6    uint16
+		SAFI6   uint16
+
 		CapType uint8
 		CapLen  uint8
 		ASN32   uint32
@@ -47,9 +64,19 @@ func sendOpen(w io.Writer, asn uint32, routerID net.IP, holdTime time.Duration) 
 		HoldTime: uint16(holdTime.Seconds()),
 		// RouterID filled below
 
-		OptsLen: 8,
+		OptsLen: 20,
 		OptType: 2, // Capabilities
-		OptLen:  6,
+		OptLen:  18,
+
+		MP4Type: 1, // BGP Multi-protocol Extensions
+		MP4Len:  4,
+		AFI4:    1, // IPv4
+		SAFI4:   1, // Unicast
+
+		MP6Type: 1, // BGP Multi-protocol Extensions
+		MP6Len:  4,
+		AFI6:    2, // IPv6
+		SAFI6:   1, // Unicast
 
 		CapType: 65, // 4-byte ASN
 		CapLen:  4,
@@ -64,7 +91,14 @@ func sendOpen(w io.Writer, asn uint32, routerID net.IP, holdTime time.Duration) 
 	return binary.Write(w, binary.BigEndian, msg)
 }
 
-func readOpen(r io.Reader) (uint32, time.Duration, error) {
+type openResult struct {
+	asn      uint32
+	holdTime time.Duration
+	mp4      bool
+	mp6      bool
+}
+
+func readOpen(r io.Reader) (*openResult, error) {
 	hdr := struct {
 		// Header
 		Marker1, Marker2 uint64
@@ -72,16 +106,16 @@ func readOpen(r io.Reader) (uint32, time.Duration, error) {
 		Type             uint8
 	}{}
 	if err := binary.Read(r, binary.BigEndian, &hdr); err != nil {
-		return 0, 0, err
+		return nil, err
 	}
 	if hdr.Marker1 != 0xffffffffffffffff || hdr.Marker2 != 0xffffffffffffffff {
-		return 0, 0, fmt.Errorf("synchronization error, incorrect header marker")
+		return nil, fmt.Errorf("synchronization error, incorrect header marker")
 	}
 	if hdr.Type != 1 {
-		return 0, 0, fmt.Errorf("message type is not OPEN, got %d, want 1", hdr.Type)
+		return nil, fmt.Errorf("message type is not OPEN, got %d, want 1", hdr.Type)
 	}
 	if hdr.Len < 37 {
-		return 0, 0, fmt.Errorf("message length %d too small to be OPEN", hdr.Len)
+		return nil, fmt.Errorf("message length %d too small to be OPEN", hdr.Len)
 	}
 
 	lr := &io.LimitedReader{
@@ -94,48 +128,99 @@ func readOpen(r io.Reader) (uint32, time.Duration, error) {
 		HoldTime uint16
 		RouterID uint32
 		OptsLen  uint8
-		OptType  uint8
-		OptLen   uint8
 	}{}
 	if err := binary.Read(lr, binary.BigEndian, &open); err != nil {
-		return 0, 0, err
+		return nil, err
 	}
+	fmt.Printf("%#v\n", open)
 	if open.Version != 4 {
-		return 0, 0, fmt.Errorf("wrong BGP version")
+		return nil, fmt.Errorf("wrong BGP version")
 	}
 	if open.HoldTime != 0 && open.HoldTime < 3 {
-		return 0, 0, fmt.Errorf("invalid hold time %q, must be 0 or >=3s", open.HoldTime)
-	}
-	if open.OptType != 2 {
-		return 0, 0, fmt.Errorf("unknown option %d", open.OptType)
+		return nil, fmt.Errorf("invalid hold time %q, must be 0 or >=3s", open.HoldTime)
 	}
 
-	asn := uint32(open.ASN16)
-
-	if int64(open.OptLen) != lr.N {
-		return 0, 0, fmt.Errorf("%d trailing garbage bytes after capabilities", lr.N)
+	ret := &openResult{
+		asn:      uint32(open.ASN16),
+		holdTime: time.Duration(open.HoldTime) * time.Second,
 	}
+
+	if err := readOptions(lr, ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
+func readOptions(r io.Reader, ret *openResult) error {
+	for {
+		hdr := struct {
+			Type uint8
+			Len  uint8
+		}{}
+		if err := binary.Read(r, binary.BigEndian, &hdr); err != nil {
+			if err == io.EOF {
+				return nil
+			}
+			return err
+		}
+
+		if hdr.Type != 2 {
+			return fmt.Errorf("unknown BGP option type %d", hdr.Type)
+		}
+		lr := &io.LimitedReader{
+			R: r,
+			N: int64(hdr.Len),
+		}
+		if err := readCapabilities(lr, ret); err != nil {
+			return err
+		}
+		if lr.N != 0 {
+			return fmt.Errorf("%d trailing garbage bytes after capability option", lr.N)
+		}
+	}
+}
+
+func readCapabilities(r io.Reader, ret *openResult) error {
 	for {
 		cap := struct {
 			Code uint8
 			Len  uint8
 		}{}
-		if err := binary.Read(lr, binary.BigEndian, &cap); err != nil {
+		if err := binary.Read(r, binary.BigEndian, &cap); err != nil {
 			if err == io.EOF {
-				return asn, time.Duration(open.HoldTime) * time.Second, nil
+				return nil
 			}
-			return 0, 0, err
+			return err
 		}
-		if cap.Code != 65 {
+		lr := io.LimitedReader{
+			R: r,
+			N: int64(cap.Len),
+		}
+		switch cap.Code {
+		case 65:
+			if err := binary.Read(&lr, binary.BigEndian, &ret.asn); err != nil {
+				return err
+			}
+		case 1:
+			af := struct{ AFI, SAFI uint16 }{}
+			if err := binary.Read(&lr, binary.BigEndian, &af); err != nil {
+				return err
+			}
+			switch {
+			case af.AFI == 1 && af.SAFI == 1:
+				ret.mp4 = true
+			case af.AFI == 2 && af.SAFI == 1:
+				ret.mp6 = true
+			}
+		default:
 			// TODO: only ignore capabilities that we know are fine to
 			// ignore.
-			if _, err := io.Copy(ioutil.Discard, io.LimitReader(lr, int64(cap.Len))); err != nil {
-				return 0, 0, err
+			if _, err := io.Copy(ioutil.Discard, &lr); err != nil {
+				return err
 			}
-			continue
 		}
-		if err := binary.Read(lr, binary.BigEndian, &asn); err != nil {
-			return 0, 0, err
+		if lr.N != 0 {
+			return fmt.Errorf("%d leftover bytes after decoding capability %d", lr.N, cap.Code)
 		}
 	}
 }
