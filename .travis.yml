@@ -20,7 +20,7 @@ jobs:
     if: type = push
     go: 1.9
     install: true
-    script: printenv TRAVIS_BRANCH
+    script: true
     deploy:
     - provider: script
       script: go run dockerfiles/trigger_build.go
