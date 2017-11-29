@@ -160,14 +160,14 @@ func (s *Session) connect() error {
 		return fmt.Errorf("send OPEN to %q: %s", s.addr, err)
 	}
 
-	asn, requestedHold, err := readOpen(conn)
+	op, err := readOpen(conn)
 	if err != nil {
 		conn.Close()
 		return fmt.Errorf("read OPEN from %q: %s", s.addr, err)
 	}
-	if asn != s.peerASN {
+	if op.asn != s.peerASN {
 		conn.Close()
-		return fmt.Errorf("unexpected peer ASN %d, want %d", asn, s.peerASN)
+		return fmt.Errorf("unexpected peer ASN %d, want %d", op.asn, s.peerASN)
 	}
 
 	// BGP session is established, clear the connect timeout deadline.
@@ -184,8 +184,8 @@ func (s *Session) connect() error {
 
 	// Set up regular keepalives from now on.
 	s.actualHoldTime = s.holdTime
-	if requestedHold < s.actualHoldTime {
-		s.actualHoldTime = requestedHold
+	if op.holdTime < s.actualHoldTime {
+		s.actualHoldTime = op.holdTime
 	}
 	select {
 	case s.newHoldTime <- true:
