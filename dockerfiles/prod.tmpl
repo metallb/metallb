@@ -8,8 +8,10 @@ ENV GOBIN=/
 RUN apk update
 RUN apk upgrade
 RUN apk add git go glide musl-dev libcap
-RUN mkdir -p $GOPATH/src/go.universe.tf
-RUN git clone https://github.com/google/metallb $GOPATH/src/go.universe.tf/metallb
+RUN mkdir -p $GOPATH/src/go.universe.tf/metallb
+COPY . $GOPATH/src/go.universe.tf/metallb
+RUN ls $GOPATH/src/go.universe.tf/metallb
+#RUN git clone https://github.com/google/metallb $GOPATH/src/go.universe.tf/metallb
 WORKDIR $GOPATH/src/go.universe.tf/metallb
 RUN glide install
 RUN go install -v ./%%BINARY%%
