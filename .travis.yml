@@ -24,6 +24,9 @@ jobs:
     deploy:
     - provider: script
       script: go run dockerfiles/trigger_build.go
+      on:
+        all_branches: true
+
   - stage: test on tip
     go: tip
 env:
