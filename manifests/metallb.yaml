@@ -109,8 +109,6 @@ spec:
   selector:
     matchLabels:
       app: controller
-  strategy:
-    type: Recreate
   template:
     metadata:
       labels:

@@ -72,10 +72,12 @@ def _build(ts, name):
             local("sudo docker push localhost:5000/%s:%s" % (name, ts))
             local("sudo docker rmi localhost:5000/%s:%s" % (name, ts))
 
-        local("kubectl set image -n metallb-system deploy/controller controller=%s/controller:%s" % (_registry_clusterip(), ts))
-        local("kubectl set image -n metallb-system ds/bgp-speaker bgp-speaker=%s/bgp-speaker:%s" % (_registry_clusterip(), ts))
 
 def push():
     ts = "%f" % time.time()
     _build(ts, "controller")
     _build(ts, "bgp-speaker")
+    local("kubectl set image -n metallb-system deploy/controller controller=%s/controller:%s" % (_registry_clusterip(), ts))
+    local("kubectl set image -n metallb-system ds/bgp-speaker bgp-speaker=%s/bgp-speaker:%s" % (_registry_clusterip(), ts))
+    local("kubectl rollout status -n metallb-system deployment controller")
+    local("kubectl rollout status -n metallb-system daemonset bgp-speaker")
