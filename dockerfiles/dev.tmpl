@@ -1,3 +1,4 @@
-FROM ubuntu:latest
-COPY %%BINARY%% /
-ENTRYPOINT ["/%%BINARY%%"]
+FROM busybox:glibc
+COPY ./%%BINARY%% /
+ENTRYPOINT ["/%%BINARY%%", "--logtostderr"]
+USER nobody:nobody
