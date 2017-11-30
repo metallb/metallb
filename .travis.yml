@@ -26,8 +26,8 @@ jobs:
       script: go run dockerfiles/trigger_build.go
       on:
         all_branches: true
-  - stage: test on tip
-    go: tip
+  #- stage: test on tip
+  #  go: tip
 env:
   global:
   - # tutorial container
