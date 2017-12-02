@@ -5,6 +5,7 @@ metadata:
   name: config
 data:
   config: |
+    # Cosmetic edit to make MetalLB notice that this is a new config.
     peers:
     - my-asn: 64512
       peer-asn: 64512

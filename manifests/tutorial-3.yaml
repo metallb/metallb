@@ -1,34 +1,18 @@
-apiVersion: apps/v1beta2
-kind: Deployment
-metadata:
-  name: nginx
-spec:
-  selector:
-    matchLabels:
-      app: nginx
-  template:
-    metadata:
-      labels:
-        app: nginx
-    spec:
-      containers:
-      - name: nginx
-        image: nginx:latest
-        ports:
-        - name: http
-          containerPort: 80
-
----
 apiVersion: v1
-kind: Service
+kind: ConfigMap
 metadata:
-  name: nginx
-spec:
-  ports:
-  - name: http
-    port: 80
-    protocol: TCP
-    targetPort: 80
-  selector:
-    app: nginx
-  type: LoadBalancer
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    peers:
+    - my-asn: 64512
+      peer-asn: 64512
+      peer-address: 10.0.0.100
+    address-pools:
+    - name: my-ip-space
+      avoid-buggy-ips: true
+      cidr:
+      - 198.51.100.0/24
+      advertisements:
+      -
