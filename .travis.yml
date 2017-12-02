@@ -26,6 +26,9 @@ jobs:
       script: go run dockerfiles/trigger_build.go
       on:
         all_branches: true
+  - stage: test on tip
+    go: tip
+
 env:
   global:
   - secure: MS9luk0gu4nwbiecMrzo/uThfu/a0xbMAtkOvWIkYnVZ7tc/nV6Y0SLGUe2DgrgpF2ONSChTZvFjcQvM0PrhI8R4o3gMGl+P9NlbG1LlTBN6N4fkqEDgQRThTZTxRaioGbWXv2cxJUjen+VKhNkW0qKCe9dU3R0EiZJAKYiPkDhf53f1ecvCZ1lIS7OTBrA/doi8vT+LFEUep6w8fCOFDeyj+wqDS1YkI4qzJ32ROOr/kgDTbEzfum6fXvg+Z0yx1HkcAd7LyupN/stw748tMf8NvDdyIoptgt0T5iEriMgbHE1KCRGvaczDezXy5nabsGJCs7nnevfj5xA8/T6J44dHr0OxncLJwPMc2S51PnWH9RqKCN6bR/KL0LWaywTzrBp/PIn70BWRZ4wlGPpoSUPfpqjK633Ju7RwGob8fwx6Mh684WJcMfenXsl1e5bjuArO3dNTJZ5veeGi3/eOBzjH/z/Bn5DxJZHW7J2paZ8TPvHu3HEZ0284H+U007FqhbC568ZD196Jueb5vKL3WTiAJYEeBqx+FCIzKENRmVZ5eOR5ZrSTd8jMkuLwAZ+kaIDUYUgtx88UC85ZrZ1Sm0rHBq1f01uI+Pq7HojFzinQtLS3Lkq3AONbfkj7ps3sCCaCRvfZh5lmvuuSo4IjM5g1fti/RQDQyTOwmr1f7EU=
