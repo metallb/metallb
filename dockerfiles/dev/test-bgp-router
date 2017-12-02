@@ -1,0 +1,4 @@
+FROM ubuntu:latest
+RUN apt update && apt -y install bird iptables
+COPY ./test-bgp-router /
+ENTRYPOINT ["/test-bgp-router"]

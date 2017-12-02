@@ -1,0 +1,54 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  namespace: metallb-system
+  name: test-bgp-router
+spec:
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: test-bgp-router
+  template:
+    metadata:
+      labels:
+        app: test-bgp-router
+    spec:
+      containers:
+      - name: test-bgp-router
+        image: quay.io/metallb/test-bgp-router:latest
+        env:
+        - name: METALLB_NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        ports:
+        - name: bgp
+          containerPort: 1179
+        - name: http
+          containerPort: 8080
+        securityContext:
+          capabilities:
+            add:
+            - NET_ADMIN
+            - NET_RAW
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: metallb-system
+  name: test-bgp-router
+spec:
+  ports:
+  - name: bgp
+    port: 179
+    protocol: TCP
+    targetPort: bgp
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http
+  selector:
+    app: test-bgp-router
+  type: NodePort
+  clusterIP: 10.0.0.100

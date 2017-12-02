@@ -1,0 +1,18 @@
+FROM ubuntu:artful
+
+ENV GOPATH=/go
+ENV GOBIN=/
+
+RUN apt update && apt -y install golang git
+RUN mkdir -p $GOPATH/src/go.universe.tf/metallb
+COPY . $GOPATH/src/go.universe.tf/metallb
+WORKDIR $GOPATH/src/go.universe.tf/metallb
+RUN go get github.com/Masterminds/glide
+RUN /glide install
+RUN go install -v ./test-bgp-router
+RUN go test $(/glide nv)
+
+FROM ubuntu:latest
+RUN apt update && apt -y install bird iptables
+COPY --from=0 /test-bgp-router /
+ENTRYPOINT ["/test-bgp-router"]

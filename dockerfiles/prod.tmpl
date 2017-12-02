@@ -11,7 +11,7 @@ RUN apk add git go glide musl-dev libcap
 RUN mkdir -p $GOPATH/src/go.universe.tf/metallb
 COPY . $GOPATH/src/go.universe.tf/metallb
 WORKDIR $GOPATH/src/go.universe.tf/metallb
-RUN glide install
+RUN /glide install
 RUN go install -v ./%%BINARY%%
 RUN go test $(glide nv)
 RUN setcap 'cap_net_bind_service=+ep' /%%BINARY%%

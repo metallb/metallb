@@ -106,6 +106,7 @@ metadata:
   labels:
     app: controller
 spec:
+  revisionHistoryLimit: 3
   selector:
     matchLabels:
       app: controller

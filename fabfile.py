@@ -26,10 +26,9 @@ def _tempdir():
 
 def gen_docker():
     """Generate ./dockerfiles/{dev,prod}"""
-    local("rm -rf ./dockerfiles/prod ./dockerfiles/dev")
     local("mkdir -p ./dockerfiles/prod ./dockerfiles/dev")
     for env in ('dev', 'prod'):
-        for binary in ('controller', 'bgp-speaker', 'bgp-spy'):
+        for binary in ('controller', 'bgp-speaker'):
             local('sed -e "s/%%BINARY%%/{0}/g" ./dockerfiles/{1}.tmpl >./dockerfiles/{1}/{0}'.format(binary, env))
 
 ## Minikube bringup/teardown
@@ -85,6 +84,12 @@ def _build(ts, name):
             local("sudo docker push localhost:5000/%s:%s" % (name, ts))
         local("sudo docker rmi localhost:5000/%s:%s" % (name, ts))
 
+def _set_image(ts, name, job):
+    local("kubectl set image -n metallb-system {2} {1}={3}/{1}:{0}".format(ts, name, job, _registry_clusterip()))
+
+def _wait_for_rollout(typ, name):
+    local("kubectl rollout status -n metallb-system {0} {1}".format(typ, name))
+    
 def push():
     """Build and repush metallb binaries"""
     if _silent_nofail("kubectl get ns metallb-system").failed:
@@ -93,7 +98,12 @@ def push():
     ts = "%f" % time.time()
     _build(ts, "controller")
     _build(ts, "bgp-speaker")
-    local("kubectl set image -n metallb-system deploy/controller controller=%s/controller:%s" % (_registry_clusterip(), ts))
-    local("kubectl set image -n metallb-system ds/bgp-speaker bgp-speaker=%s/bgp-speaker:%s" % (_registry_clusterip(), ts))
-    local("kubectl rollout status -n metallb-system deployment controller")
-    local("kubectl rollout status -n metallb-system daemonset bgp-speaker")
+    _build(ts, "test-bgp-router")
+
+    _set_image(ts, "controller", "deploy/controller")
+    _set_image(ts, "bgp-speaker", "ds/bgp-speaker")
+    _set_image(ts, "test-bgp-router", "deploy/test-bgp-router")
+
+    _wait_for_rollout("deployment", "controller")
+    _wait_for_rollout("daemonset", "bgp-speaker")
+    _wait_for_rollout("deployment", "test-bgp-router")
