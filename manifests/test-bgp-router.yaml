@@ -44,6 +44,18 @@ spec:
     port: 179
     protocol: TCP
     targetPort: bgp
+  selector:
+    app: test-bgp-router
+  clusterIP: 10.0.0.100
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: metallb-system
+  name: test-bgp-router-ui
+spec:
+  ports:
   - name: http
     port: 80
     protocol: TCP
@@ -51,4 +63,3 @@ spec:
   selector:
     app: test-bgp-router
   type: NodePort
-  clusterIP: 10.0.0.100

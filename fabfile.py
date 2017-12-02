@@ -71,7 +71,7 @@ def _proxy_to_registry():
 
 def push_manifests():
     """Push the metallb binary manifests"""
-    local("kubectl apply -f manifests/metallb.yaml")
+    local("kubectl apply -f manifests/metallb.yaml,manifests/test-bgp-router.yaml")
 
 def _build(ts, name):
     with _tempdir() as tmp:
