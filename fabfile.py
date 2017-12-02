@@ -66,8 +66,13 @@ def _kube_obj_exists(n):
 def _proxy_to_registry():
     registry_pod = _silent("kubectl get pod -n kube-system -l kubernetes.io/minikube-addons=registry -o go-template=\"{{(index .items 0).metadata.name}}\"")
     p = subprocess.Popen("kubectl port-forward -n kube-system %s 5000:5000" % registry_pod, shell=True)
-    yield
-    p.kill()
+    try:
+        print("Waiting for kube port-forward to come up...")
+        while _silent_nofail("curl http://localhost:5000/").failed:
+            time.sleep(0.1)
+        yield
+    finally:
+        p.kill()
 
 def push_manifests():
     """Push the metallb binary manifests"""
