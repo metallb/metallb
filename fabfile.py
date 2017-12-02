@@ -22,6 +22,16 @@ def _tempdir():
     finally:
         shutil.rmtree(name)
 
+## Dockerfile generation
+
+def gen_docker():
+    """Generate ./dockerfiles/{dev,prod}"""
+    local("rm -rf ./dockerfiles/prod ./dockerfiles/dev")
+    local("mkdir -p ./dockerfiles/prod ./dockerfiles/dev")
+    for env in ('dev', 'prod'):
+        for binary in ('controller', 'bgp-speaker', 'bgp-spy'):
+            local('sed -e "s/%%BINARY%%/{0}/g" ./dockerfiles/{1}.tmpl >./dockerfiles/{1}/{0}'.format(binary, env))
+
 ## Minikube bringup/teardown
 
 def _minikube_running():
@@ -74,7 +84,6 @@ def _build(ts, name):
         with _proxy_to_registry():
             local("sudo docker push localhost:5000/%s:%s" % (name, ts))
         local("sudo docker rmi localhost:5000/%s:%s" % (name, ts))
-
 
 def push():
     """Build and repush metallb binaries"""
