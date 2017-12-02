@@ -34,6 +34,8 @@ func runBird() error {
 		return err
 	}
 	c := exec.Command("/usr/sbin/bird", "-d", "-c", "/etc/bird/bird.conf")
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
 	if err := c.Start(); err != nil {
 		return err
 	}
@@ -50,6 +52,8 @@ func writeBirdConfig() error {
 	cfg := fmt.Sprintf(`
 router id 10.0.0.100;
 listen bgp port 1179;
+log stderr all;
+debug protocols all;
 protocol device {
 }
 protocol static {
