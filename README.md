@@ -57,7 +57,8 @@ guide.
 # Contributing
 
 We welcome contributions in all forms. Please check out
-the [contributing guide](CONTRIBUTING.md) for more information.
+the [contributing guide](CONTRIBUTING.md) for more information, and
+the [hacking guide](docs/hacking.md) for some technical pointers.
 
 One lightweight way you can contribute is
 to
