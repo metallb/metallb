@@ -74,9 +74,16 @@ def _proxy_to_registry():
     finally:
         p.kill()
 
+def push_config():
+    """Push a basic MetalLB config that connects to test-bgp-router."""
+    # As it happens, the tutorial config is exactly what we need here.
+    local("kubectl apply -f manifests/tutorial-1.yaml")
+
 def push_manifests():
     """Push the metallb binary manifests"""
     local("kubectl apply -f manifests/metallb.yaml,manifests/test-bgp-router.yaml")
+    if _silent_nofail("kubectl get configmap -n metallb-system config").failed:
+        push_config()
 
 def _build(ts, name):
     with _tempdir() as tmp:
