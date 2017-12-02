@@ -59,6 +59,7 @@ protocol bgp minikube {
   local 10.0.0.100 as 64512;
   neighbor %s as 64512;
   passive;
+  error wait time 1, 2;
 }
 `, nodeIP(), nodeIP())
 	if err := ioutil.WriteFile("/etc/bird/bird.conf", []byte(cfg), 0644); err != nil {
