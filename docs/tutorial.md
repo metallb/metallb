@@ -49,7 +49,7 @@ to forward traffic based on the data it receives. Instead, we'll just
 inspect that data to see what a real router _would_ do.
 
 Deploy this test router with `kubectl`:
-https://raw.githubusercontent.com/google/metallb/v0.1/manifests/test-bgp-router.yaml
+
 `kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.1/manifests/test-bgp-router.yaml`
 
 This will create a deployment for our BGP router, as well as two
