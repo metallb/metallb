@@ -153,6 +153,7 @@ spec:
         app: bgp-speaker
     spec:
       serviceAccountName: bgp-speaker
+      terminationGracePeriodSeconds: 0
       containers:
       - name: bgp-speaker
         image: quay.io/metallb/bgp-speaker:latest
