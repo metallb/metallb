@@ -13,6 +13,6 @@ RUN go install -v ./test-bgp-router
 RUN go test $(/glide nv)
 
 FROM ubuntu:latest
-RUN apt update && apt -y install bird quagga iptables tcpdump
+RUN apt update && apt -y install bird quagga iptables tcpdump && mkdir /run/quagga /run/bird && chown quagga:quagga /run/quagga
 COPY --from=0 /test-bgp-router /
 ENTRYPOINT ["/test-bgp-router"]
