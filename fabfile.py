@@ -31,6 +31,15 @@ def gen_docker():
         for binary in ('controller', 'bgp-speaker'):
             local('sed -e "s/%%BINARY%%/{0}/g" ./dockerfiles/{1}.tmpl >./dockerfiles/{1}/{0}'.format(binary, env))
 
+## Debugging
+
+def wireshark():
+    node = _silent('kubectl get nodes -o go-template="{{ (index (index .items 0).status.addresses 0).address }}"')
+    nodePort = _silent('kubectl get svc -n metallb-system test-bgp-router-ui -o go-template="{{ (index .spec.ports 0).nodePort }}"')
+    with _tempdir() as tmp:
+        local('curl -o {0}/pcap http://{1}:{2}/pcap'.format(tmp, node, nodePort))
+        local('wireshark-gtk {0}/pcap'.format(tmp))
+
 ## Minikube bringup/teardown
 
 def _minikube_running():

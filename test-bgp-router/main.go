@@ -17,11 +17,15 @@ func main() {
 	if err := writeBirdConfig(); err != nil {
 		glog.Exitf("Failed to write bird config: %s", err)
 	}
+	if err := runTCPDump(); err != nil {
+		glog.Exitf("Failed to start tcpdump: %s", err)
+	}
 	if err := runBird(); err != nil {
 		glog.Exitf("Trying to start Bird: %s", err)
 	}
 
 	http.HandleFunc("/", status)
+	http.HandleFunc("/pcap", writePcap)
 	http.ListenAndServe(":8080", nil)
 }
 
@@ -44,6 +48,23 @@ func runBird() error {
 			glog.Exitf("Bird exited with an error: %s", err)
 		}
 		glog.Exitf("Bird exited")
+	}()
+	return nil
+}
+
+func runTCPDump() error {
+	if err := os.Mkdir("/run/tcpdump", 0600); err != nil {
+		return err
+	}
+	c := exec.Command("/usr/sbin/tcpdump", "-i", "eth0", "-w", "/run/tcpdump/pcap", "tcp", "port", "1179")
+	if err := c.Start(); err != nil {
+		return err
+	}
+	go func() {
+		if err := c.Wait(); err != nil {
+			glog.Exitf("tcpdump exited with an error: %s", err)
+		}
+		glog.Exitf("tcpdump exited")
 	}()
 	return nil
 }
