@@ -66,13 +66,13 @@ data:
         communities:
         - 64512:1
         - no-export
-      # (optional) BGP community aliases. Instead of using hard to
-      # read BGP community numbers in address pool advertisement
-      # configurations, you can define alias names here and use those
-      # elsewhere in the configuration. The "no-export" community used
-      # above is defined below.
-      communities:
-        # no-export is a well-known BGP community that prevents
-        # re-advertisement outside of the immediate autonomous system,
-        # but people don't usually recognize its numerical value. :)
-        no-export: 65535:65281
+    # (optional) BGP community aliases. Instead of using hard to
+    # read BGP community numbers in address pool advertisement
+    # configurations, you can define alias names here and use those
+    # elsewhere in the configuration. The "no-export" community used
+    # above is defined below.
+    communities:
+      # no-export is a well-known BGP community that prevents
+      # re-advertisement outside of the immediate autonomous system,
+      # but people don't usually recognize its numerical value. :)
+      no-export: 65535:65281
