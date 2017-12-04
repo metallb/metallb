@@ -12,13 +12,13 @@ script:
 os:
 - linux
 go:
-- 1.8
-- 1.9
+- 1.8.x
+- 1.9.x
 jobs:
   include:
   - stage: deploy
     if: type = push
-    go: 1.9
+    go: 1.9.x
     install: true
     script: true
     deploy:
@@ -28,7 +28,7 @@ jobs:
         all_branches: true
   - stage: deploy
     if: type = push
-    go: 1.9
+    go: 1.9.x
     install: true
     script: true
     deploy:
