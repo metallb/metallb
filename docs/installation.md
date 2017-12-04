@@ -2,7 +2,7 @@
 
 Installing MetalLB is very simple: just apply the manifest!
 
-`kubectl apply -f manifests/metallb.yaml`
+`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.1/manifests/metallb.yaml`
 
 This will deploy MetalLB to your cluster, under the `metallb-system`
 namespace. The components in the manifest are:
@@ -22,7 +22,7 @@ until you define and deploy a configmap.
 
 To configure MetalLB, write a config map to `metallb-system/config`
 
-There is an example configmap in `manifests/example-config.yaml`,
+There is an example configmap in [`manifests/example-config.yaml`](https://raw.githubusercontent.com/google/metallb/v0.1/manifests/example-config.yaml),
 annotated with explanatory comments.
 
 For a basic configuration featuring one BGP router and one IP address
