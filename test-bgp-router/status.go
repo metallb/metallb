@@ -4,15 +4,13 @@ import (
 	"html/template"
 	"net"
 	"net/http"
-	"os/exec"
-	"strings"
 )
 
 var tmpl = template.Must(template.New("").Parse(`<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>BGP Spy</title>
+  <title>BGP Router Status</title>
 </head>
 
 <body>
@@ -46,60 +44,19 @@ var tmpl = template.Must(template.New("").Parse(`<!doctype html>
 </pre></code>
 <p><b>MetalLB is not connected</b>, I don't know anything about services in the cluster.</p>
 {{ end }}
-  <h2>Raw status from the BIRD BGP router</h2>
-  <pre><code>{{.Proto}}
-{{.Route}}</code></pre>
+  <h2>Raw status from the BGP router</h2>
+  <pre><code>{{.ProtocolStatus}}
+{{.Routes}}</code></pre>
 </body>
 </html>`))
 
-func status(w http.ResponseWriter, r *http.Request) {
-	proto, err := bird("show protocol all minikube")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	routes, err := bird("show route all protocol minikube")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	summary, err := bird("show route protocol minikube")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	var cidrs []*net.IPNet
-	// Quick and dirty parser to extract the prefixes from the route
-	// dump.
-	for _, l := range strings.Split(summary, "\n") {
-		fs := strings.Split(l, " ")
-		if len(fs) < 1 {
-			continue
-		}
-		_, n, err := net.ParseCIDR(fs[0])
-		if err != nil {
-			continue
-		}
-		cidrs = append(cidrs, n)
-	}
-
-	v := map[string]interface{}{
-		"Connected": strings.Contains(proto, "Established"),
-		"Prefixes":  cidrs,
-
-		"Proto": proto,
-		"Route": routes,
-	}
-	tmpl.Execute(w, v)
+type values struct {
+	Connected      bool
+	Prefixes       []*net.IPNet
+	ProtocolStatus string
+	Routes         string
 }
 
-func bird(cmd string) (string, error) {
-	c := exec.Command("/usr/sbin/birdc", strings.Split(cmd, " ")...)
-	bs, err := c.CombinedOutput()
-	if err != nil {
-		return "", err
-	}
-	return string(bs), nil
+func renderStatus(w http.ResponseWriter, v *values) {
+	tmpl.Execute(w, v)
 }

@@ -1,4 +1,6 @@
 FROM ubuntu:artful
 RUN apt update && apt -y install bird quagga iptables tcpdump
+RUN mkdir /run/quagga /run/bird
+RUN chown quagga:quagga /run/quagga
 COPY ./test-bgp-router /
 ENTRYPOINT ["/test-bgp-router"]
