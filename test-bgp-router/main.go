@@ -20,27 +20,21 @@ func main() {
 		glog.Exitf("Failed to start tcpdump: %s", err)
 	}
 
-	switch *router {
-	case "bird":
-		if err := writeBirdConfig(); err != nil {
-			glog.Exitf("Failed to write bird config: %s", err)
-		}
-		if err := runBird(); err != nil {
-			glog.Exitf("Trying to start bird: %s", err)
-		}
-		http.HandleFunc("/", birdStatus)
-	case "quagga":
-		if err := writeQuaggaConfig(); err != nil {
-			glog.Exitf("Failed to write quagga config: %s", err)
-		}
-		if err := runQuagga(); err != nil {
-			glog.Exitf("Trying to start quagga: %s", err)
-		}
-		http.HandleFunc("/", quaggaStatus)
-	default:
-		glog.Exitf("Unknown router implementation %q", *router)
+	if err := writeBirdConfig(); err != nil {
+		glog.Exitf("Failed to write bird config: %s", err)
+	}
+	if err := writeQuaggaConfig(); err != nil {
+		glog.Exitf("Failed to write quagga config: %s", err)
 	}
 
+	if err := runBird(); err != nil {
+		glog.Exitf("Trying to start bird: %s", err)
+	}
+	if err := runQuagga(); err != nil {
+		glog.Exitf("Trying to start quagga: %s", err)
+	}
+
+	http.HandleFunc("/", status)
 	http.HandleFunc("/pcap", writePcap)
 	http.ListenAndServe(":8080", nil)
 }
@@ -68,6 +62,10 @@ func runTCPDump() error {
 
 func installNatRule() error {
 	c := exec.Command("/sbin/iptables", "-t", "nat", "-A", "INPUT", "-p", "tcp", "--dport", "1179", "-j", "SNAT", "--to", os.Getenv("METALLB_NODE_IP"))
+	if err := c.Run(); err != nil {
+		return err
+	}
+	c = exec.Command("/sbin/iptables", "-t", "nat", "-A", "INPUT", "-p", "tcp", "--dport", "179", "-j", "SNAT", "--to", os.Getenv("METALLB_NODE_IP"))
 	return c.Run()
 }
 
@@ -85,5 +83,4 @@ func runOrCrash(cmd ...string) error {
 		glog.Exitf("%s exited", cmd[0])
 	}()
 	return nil
-
 }

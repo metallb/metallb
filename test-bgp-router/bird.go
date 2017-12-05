@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"net/http"
 	"os/exec"
 	"strings"
 )
@@ -37,22 +36,19 @@ func runBird() error {
 	return runOrCrash("/usr/sbin/bird", "-d", "-c", "/etc/bird/bird.conf")
 }
 
-func birdStatus(w http.ResponseWriter, r *http.Request) {
+func birdStatus() (*values, error) {
 	proto, err := bird("show protocol all minikube")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 	routes, err := bird("show route all protocol minikube")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 
 	summary, err := bird("show route protocol minikube")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 
 	var cidrs []*net.IPNet
@@ -70,12 +66,13 @@ func birdStatus(w http.ResponseWriter, r *http.Request) {
 		cidrs = append(cidrs, n)
 	}
 
-	renderStatus(w, &values{
+	return &values{
+		Name:           "BIRD",
 		Connected:      strings.Contains(proto, "Established"),
 		Prefixes:       cidrs,
 		ProtocolStatus: proto,
 		Routes:         routes,
-	})
+	}, nil
 }
 
 func bird(cmd string) (string, error) {
