@@ -2,6 +2,7 @@ package bgp
 
 import (
 	"container/list"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -143,10 +144,16 @@ func (s *Session) connect() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	conn, err := net.Dial("tcp", s.addr)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var d net.Dialer
+	conn, err := d.DialContext(ctx, "tcp", s.addr)
 	if err != nil {
 		return fmt.Errorf("dial %q: %s", s.addr, err)
 	}
+	deadline, _ := ctx.Deadline()
+	conn.SetDeadline(deadline)
 
 	if err := sendOpen(conn, s.asn, s.routerID, s.holdTime); err != nil {
 		conn.Close()
@@ -162,6 +169,9 @@ func (s *Session) connect() error {
 		conn.Close()
 		return fmt.Errorf("unexpected peer ASN %d, want %d", asn, s.peerASN)
 	}
+
+	// BGP session is established, clear the connect timeout deadline.
+	conn.SetDeadline(time.Time{})
 
 	// Consume BGP messages until the connection closes.
 	go s.consumeBGP(conn)
