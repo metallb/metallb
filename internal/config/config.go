@@ -50,7 +50,7 @@ type configFile struct {
 // Config is a parsed MetalLB configuration.
 type Config struct {
 	// BGP routers that MetalLB should peer with.
-	Peers []Peer
+	Peers []*Peer
 	// Address pools from which to allocate load balancer IPs.
 	Pools map[string]*Pool
 }
@@ -138,7 +138,7 @@ func Parse(bs []byte) (*Config, error) {
 		if p.Port != 0 {
 			port = p.Port
 		}
-		cfg.Peers = append(cfg.Peers, Peer{
+		cfg.Peers = append(cfg.Peers, &Peer{
 			MyASN:    p.MyASN,
 			ASN:      p.ASN,
 			Addr:     ip,

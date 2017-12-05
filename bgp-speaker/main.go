@@ -220,7 +220,7 @@ newPeers:
 			if ep == nil {
 				continue
 			}
-			if reflect.DeepEqual(&p, ep.cfg) {
+			if reflect.DeepEqual(p, ep.cfg) {
 				newPeers = append(newPeers, ep)
 				c.peers[i] = nil
 				continue newPeers
@@ -228,7 +228,7 @@ newPeers:
 		}
 		// No existing peers match, create a new one.
 		newPeers = append(newPeers, &peer{
-			cfg: &p,
+			cfg: p,
 		})
 	}
 
