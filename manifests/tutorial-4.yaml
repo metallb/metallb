@@ -5,15 +5,18 @@ metadata:
   name: config
 data:
   config: |
-    # Cosmetic edit to make MetalLB notice that this is a new config.
     peers:
+    # Cosmetic edit to make MetalLB notice that this is a new config.
     - my-asn: 64512
       peer-asn: 64512
       peer-address: 10.0.0.100
+    - my-asn: 64512
+      peer-asn: 64512
+      peer-address: 10.0.0.101
     address-pools:
     - name: my-ip-space
       avoid-buggy-ips: true
       cidr:
       - 198.51.100.0/24
       advertisements:
-      -
+      - localpref: 100

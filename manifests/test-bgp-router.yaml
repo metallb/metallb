@@ -28,8 +28,10 @@ spec:
             fieldRef:
               fieldPath: status.hostIP
         ports:
-        - name: bgp
+        - name: bird
           containerPort: 1179
+        - name: quagga
+          containerPort: 179
         - name: http
           containerPort: 8080
         securityContext:
@@ -37,22 +39,39 @@ spec:
             add:
             - NET_ADMIN
             - NET_RAW
+            - SYS_ADMIN
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
   namespace: metallb-system
-  name: test-bgp-router
+  name: test-bgp-router-bird
 spec:
   ports:
   - name: bgp
     port: 179
     protocol: TCP
-    targetPort: bgp
+    targetPort: bird
   selector:
     app: test-bgp-router
   clusterIP: 10.0.0.100
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  namespace: metallb-system
+  name: test-bgp-router-quagga
+spec:
+  ports:
+  - name: bgp
+    port: 179
+    protocol: TCP
+    targetPort: quagga
+  selector:
+    app: test-bgp-router
+  clusterIP: 10.0.0.101
 
 ---
 apiVersion: v1
