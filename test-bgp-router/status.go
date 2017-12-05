@@ -14,51 +14,63 @@ var tmpl = template.Must(template.New("").Parse(`<!doctype html>
 </head>
 
 <body>
+  <style>
+td {
+  border-style: solid; border-width: 2px; padding: 15px; vertical-align: top;
+}
+
+h2 { text-align: center; margin: 0; padding: 0; }
+h3 { text-align: center; margin: 0; padding: 0; }
+  </style>
   <h1 align="center">Router status</h1>
 <table style="margin: auto; border-collapse: collapse">
-  <thead><tr>
-    {{ range . }}
-    <th>{{ .Name }}</th>
-    {{ end }}
-  </tr></thead>
+  <tr><td colspan="2"><h2>Router Status</h2></td></tr>
+  <tr>{{range .}}<td><h3>{{.Name}}</h3></td>{{end}}</tr>
   <tr>
     {{ range . }}
-    <td style="border-style: double; border-width: 5px; padding: 15px">
-
-{{ if .Connected }}
-<pre><code>
+    <td>
+      {{ if .Connected }}
+      <pre><code>
     __________               ╔═════════════╗               _____________
    |          |              ║             ║      BGP     |             |
    | Internet |--------------║ This router ║<-------------| Minikube VM |     
    |__________|              ║             ║              |_____________|
                              ╚═════════════╝
-</pre></code>
-<p><b>MetalLB is connected!</b><p>
-{{ if .Prefixes }}
-<p>MetalLB is giving me routes to these destinations:</p>
-<ul>
-{{ range .Prefixes }}
-<li>{{.}}</li>
-{{ end }}
-</ul>
-{{ else }}
-<p>MetalLB is not telling me about any IPs yet. Try defining a LoadBalancer service?</p>
-{{ end }}
-{{ else }}
-<pre><code>
+      </code></pre>
+      <p><b>MetalLB is connected!</b><p>
+      {{ if .Prefixes }}
+        <p>MetalLB is giving me routes to these destinations:</p>
+        <ul>
+          {{ range .Prefixes }}<li>{{.}}</li>{{ end }}
+        </ul>
+      {{ else }}
+        <p>MetalLB is not telling me about any IPs yet. Try defining a LoadBalancer service?</p>
+      {{ end }}
+      {{ else }}
+      <pre><code>
     __________               ╔═════════════╗               _____________
    |          |              ║             ║              |             |
    | Internet |--------------║ This router ║      ~?~     | Minikube VM |
    |__________|              ║             ║              |_____________|
                              ╚═════════════╝
-</pre></code>
-<p><b>MetalLB is not connected</b>, I don't know anything about services in the cluster.</p>
-{{ end }}
-  <h2>Raw status from the BGP router</h2>
-  <pre><code>{{.ProtocolStatus}}
-{{.Routes}}</code></pre>
+      </code></pre>
+      <p><b>MetalLB is not connected</b>, I don't know anything about services in the cluster.</p>
+      {{ end }}
     </td>
     {{ end }}
+  </tr>
+
+  <tr><td colspan="2"><h2>Raw Router Status</h2></td></tr>
+  <tr>{{range .}}<td><h3>{{.Name}}</h3></td>{{end}}</tr>
+
+  <tr>
+  {{ range . }}
+  <td>
+    <pre><code>{{.ProtocolStatus}}
+    {{.Routes}}
+    </code></pre>
+  </td>
+  {{ end }}
   </tr>
 </table>
 </body>
