@@ -16,9 +16,10 @@ currently have, relative to the top-level directory:
 - `bgp-speaker` is the per-node daemon that advertises services with
   assigned IPs to configured BGP peers.
 - `test-bgp-router` is a small wrapper around
-  the [BIRD](http://bird.network.cz) open-source BGP router that
-  presents a read-only interface over HTTP. We use it in the tutorial,
-  and during development of MetalLB.
+  the [BIRD](http://bird.network.cz)
+  and [Quagga](http://www.nongnu.org/quagga) open-source BGP routers
+  that presents a read-only interface over HTTP. We use it in the
+  tutorial, and during development of MetalLB.
 - `internal/k8s` contains the bowels of the logic to talk to the
   Kubernetes apiserver to get and modify service information. It
   allows most of the rest of the MetalLB code to be ignorant of the
@@ -83,8 +84,8 @@ setup, but running your locally built binaries.
 Start by running `fab start`. This will:
 - Create the Minikube sandbox in a local VM
 - Enable the registry addon, so that we can host container images in the sandbox
-- Deploy `test-bgp-router`, which sets up
-  a [BIRD](http://bird.network.cz) router as a pod inside the cluster
+- Deploy `test-bgp-router`, which sets up BIRD and Quagga router as a
+  pod inside the cluster
 - Deploy MetalLB, which will install the `controller` and `bgp-speaker`
 - Push a MetalLB configuration that connects MetalLB to the `test-bgp-router`
 
@@ -93,8 +94,8 @@ MetalLB, pulled from [quay.io](https://quay.io/metallb).
 
 You can inspect the state of the `test-bgp-router` by running
 `minikube service test-bgp-router-ui`, which will open a browser tab
-that shows you the current BGP connection and routing state, as seen
-by the test router.
+that shows you the current BGP connections and routing state, as seen
+by the test routers.
 
 ### Pushing test binaries
 
@@ -149,6 +150,6 @@ pool from the default config*! The default configuration uses the
 `TEST-NET-2` IP range
 from [RFC5735](https://tools.ietf.org/html/rfc5735), which is reserved
 for use in documentation and example code. It's fine to use it with
-our `test-bgp-router`, since it doesn't propagate the addresses beyond
-itself, but if you try injecting those addresses into a real network,
-you may run into trouble.
+our `test-bgp-router`, since they doesn't propagate the addresses
+beyond themselves, but if you try injecting those addresses into a
+real network, you may run into trouble.
