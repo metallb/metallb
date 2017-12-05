@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"net/http"
 	"os/exec"
 	"strings"
 )
@@ -23,7 +22,7 @@ func writeQuaggaConfig() error {
 
 	bgpdConfig := fmt.Sprintf(`
 router bgp 64512
- bgp router-id 10.0.0.100
+ bgp router-id 10.0.0.101
  neighbor %s remote-as 64512
  neighbor %s passive
 !
@@ -38,28 +37,25 @@ func runQuagga() error {
 	if err := runOrCrash("/usr/sbin/zebra", "-A", "127.0.0.1", "-f", "/etc/quagga/zebra.conf"); err != nil {
 		return err
 	}
-	if err := runOrCrash("/usr/sbin/bgpd", "-p", "1179", "-A", "127.0.0.1", "-f", "/etc/quagga/bgpd.conf"); err != nil {
+	if err := runOrCrash("/usr/sbin/bgpd", "-A", "127.0.0.1", "-f", "/etc/quagga/bgpd.conf"); err != nil {
 		return err
 	}
 	return nil
 }
 
-func quaggaStatus(w http.ResponseWriter, r *http.Request) {
+func quaggaStatus() (*values, error) {
 	proto, err := quagga("show ip bgp neighbors")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 	routes, err := quagga("show ip route bgp")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 
 	summary, err := quagga("show ip route bgp")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		return nil, err
 	}
 
 	var cidrs []*net.IPNet
@@ -77,12 +73,13 @@ func quaggaStatus(w http.ResponseWriter, r *http.Request) {
 		cidrs = append(cidrs, n)
 	}
 
-	renderStatus(w, &values{
+	return &values{
+		Name:           "Quagga",
 		Connected:      strings.Contains(proto, "Established"),
 		Prefixes:       cidrs,
 		ProtocolStatus: proto,
 		Routes:         routes,
-	})
+	}, nil
 }
 
 func quagga(cmd string) (string, error) {

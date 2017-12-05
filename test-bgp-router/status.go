@@ -14,7 +14,17 @@ var tmpl = template.Must(template.New("").Parse(`<!doctype html>
 </head>
 
 <body>
-  <h1>Router status</h1>
+  <h1 align="center">Router status</h1>
+<table style="margin: auto; border-collapse: collapse">
+  <thead><tr>
+    {{ range . }}
+    <th>{{ .Name }}</th>
+    {{ end }}
+  </tr></thead>
+  <tr>
+    {{ range . }}
+    <td style="border-style: double; border-width: 5px; padding: 15px">
+
 {{ if .Connected }}
 <pre><code>
     __________               ╔═════════════╗               _____________
@@ -47,16 +57,32 @@ var tmpl = template.Must(template.New("").Parse(`<!doctype html>
   <h2>Raw status from the BGP router</h2>
   <pre><code>{{.ProtocolStatus}}
 {{.Routes}}</code></pre>
+    </td>
+    {{ end }}
+  </tr>
+</table>
 </body>
 </html>`))
 
 type values struct {
+	Name           string
 	Connected      bool
 	Prefixes       []*net.IPNet
 	ProtocolStatus string
 	Routes         string
 }
 
-func renderStatus(w http.ResponseWriter, v *values) {
-	tmpl.Execute(w, v)
+func status(w http.ResponseWriter, r *http.Request) {
+	bStat, err := birdStatus()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	qStat, err := quaggaStatus()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	tmpl.Execute(w, []*values{bStat, qStat})
 }
