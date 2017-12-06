@@ -1,5 +1,5 @@
 hash: 414d677a1eafa9b32b07bb2cea2ab6a6c5615b933afd0de4fd6d786a3bd9f28f
-updated: 2017-11-24T14:11:54.142711171-08:00
+updated: 2017-12-05T20:29:42.083382651-08:00
 imports:
 - name: github.com/beorn7/perks
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
@@ -83,7 +83,7 @@ imports:
 - name: github.com/peterbourgon/diskv
   version: 5f041e8faa004a95c88a202771f4cc3e991971e6
 - name: github.com/prometheus/client_golang
-  version: 1cdba8fdde81f444626530cce66e138d2f68ae1c
+  version: 661e31bf844dfca9aeba15f27ea8aa0d485ad212
   subpackages:
   - prometheus
   - prometheus/promhttp
