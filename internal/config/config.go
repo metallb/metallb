@@ -84,7 +84,7 @@ type Pool struct {
 	AvoidBuggyIPs bool
 	// When an IP is allocated from this pool, how should it be
 	// translated into BGP announcements?
-	Advertisements []Advertisement
+	Advertisements []*Advertisement
 }
 
 // Advertisement describes one translation from an IP address to a BGP advertisement.
@@ -109,7 +109,7 @@ func parseHoldTime(ht string) (time.Duration, error) {
 		return 0, fmt.Errorf("invalid hold time %q: %s", ht, err)
 	}
 	rounded := time.Duration(int(d.Seconds())) * time.Second
-	if rounded != 0 && rounded < 3 {
+	if rounded != 0 && rounded < 3*time.Second {
 		return 0, fmt.Errorf("invalid hold time %q: must be 0 or >=3s", ht)
 	}
 	return rounded, nil
@@ -125,7 +125,13 @@ func Parse(bs []byte) (*Config, error) {
 	cfg := &Config{
 		Pools: map[string]*Pool{},
 	}
-	for _, p := range raw.Peers {
+	for i, p := range raw.Peers {
+		if p.MyASN == 0 {
+			return nil, fmt.Errorf("peer #%d missing local ASN", i+1)
+		}
+		if p.ASN == 0 {
+			return nil, fmt.Errorf("peer #%d missing peer ASN", i+1)
+		}
 		ip := net.ParseIP(p.Addr)
 		if ip == nil {
 			return nil, fmt.Errorf("invalid peer IP %q", p.Addr)
@@ -153,14 +159,14 @@ func Parse(bs []byte) (*Config, error) {
 		if err != nil {
 			return nil, fmt.Errorf("parsing community %q: %s", n, err)
 		}
-		if _, ok := communities[n]; ok {
-			return nil, fmt.Errorf("duplicate community definition for %q", n)
-		}
 		communities[n] = c
 	}
 
 	var allCIDRs []*net.IPNet
-	for _, p := range raw.Pools {
+	for i, p := range raw.Pools {
+		if p.Name == "" {
+			return nil, fmt.Errorf("address pool #%d is missing name", i+1)
+		}
 		if _, ok := cfg.Pools[p.Name]; ok {
 			return nil, fmt.Errorf("duplicate pool definition for %q", p.Name)
 		}
@@ -206,7 +212,7 @@ func Parse(bs []byte) (*Config, error) {
 				} else {
 					v, err := parseCommunity(c)
 					if err != nil {
-						return nil, fmt.Errorf("invalid community %q in advertisement of pool %q", c, p.Name)
+						return nil, fmt.Errorf("invalid community %q in advertisement of pool %q: %s", c, p.Name, err)
 					}
 					comms[v] = true
 				}
@@ -217,7 +223,7 @@ func Parse(bs []byte) (*Config, error) {
 				localPref = *ad.LocalPref
 			}
 
-			pool.Advertisements = append(pool.Advertisements, Advertisement{
+			pool.Advertisements = append(pool.Advertisements, &Advertisement{
 				AggregationLength: agLen,
 				LocalPref:         localPref,
 				Communities:       comms,

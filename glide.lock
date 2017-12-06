@@ -1,5 +1,5 @@
-hash: 414d677a1eafa9b32b07bb2cea2ab6a6c5615b933afd0de4fd6d786a3bd9f28f
-updated: 2017-12-05T20:29:42.083382651-08:00
+hash: 83b3da37b7b89a1b6e65176f857acda2580cc471104255269e482dccc85677b4
+updated: 2017-12-05T20:41:13.778049646-08:00
 imports:
 - name: github.com/beorn7/perks
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
@@ -46,6 +46,10 @@ imports:
   - ptypes/timestamp
 - name: github.com/google/btree
   version: 7d79101e329e5a3adf994758c578dab82b90c017
+- name: github.com/google/go-cmp
+  version: 8099a9787ce5dc5984ed879a3bda47dc730a8e97
+  subpackages:
+  - cmp
 - name: github.com/google/gofuzz
   version: 44d81051d367757e1c7c6a5a86423ece9afcf63c
 - name: github.com/googleapis/gnostic

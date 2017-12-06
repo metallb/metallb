@@ -21,3 +21,7 @@ import:
   - tools/record
   - util/workqueue
 - package: gopkg.in/yaml.v2
+- package: github.com/google/go-cmp
+  version: ^0.1.0
+  subpackages:
+  - cmp
