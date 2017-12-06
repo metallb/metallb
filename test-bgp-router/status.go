@@ -24,7 +24,7 @@ h3 { text-align: center; margin: 0; padding: 0; }
   </style>
   <h1 align="center">Router status</h1>
 <table style="margin: auto; border-collapse: collapse">
-  <tr><td colspan="2"><h2>Router Status</h2></td></tr>
+  <tr><td colspan="{{len .}}"><h2>Router Status</h2></td></tr>
   <tr>{{range .}}<td><h3>{{.Name}}</h3></td>{{end}}</tr>
   <tr>
     {{ range . }}
@@ -60,7 +60,7 @@ h3 { text-align: center; margin: 0; padding: 0; }
     {{ end }}
   </tr>
 
-  <tr><td colspan="2"><h2>Raw Router Status</h2></td></tr>
+  <tr><td colspan="{{len .}}"><h2>Raw Router Status</h2></td></tr>
   <tr>{{range .}}<td><h3>{{.Name}}</h3></td>{{end}}</tr>
 
   <tr>
@@ -95,6 +95,11 @@ func status(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	gStat, err := goBGPStatus()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-	tmpl.Execute(w, []*values{bStat, qStat})
+	tmpl.Execute(w, []*values{bStat, qStat, gStat})
 }

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 
 	"github.com/golang/glog"
 )
@@ -26,12 +27,18 @@ func main() {
 	if err := writeQuaggaConfig(); err != nil {
 		glog.Exitf("Failed to write quagga config: %s", err)
 	}
+	if err := writeGoBGPConfig(); err != nil {
+		glog.Exitf("Failed to write gobgp config: %s", err)
+	}
 
 	if err := runBird(); err != nil {
 		glog.Exitf("Trying to start bird: %s", err)
 	}
 	if err := runQuagga(); err != nil {
 		glog.Exitf("Trying to start quagga: %s", err)
+	}
+	if err := runGoBGP(); err != nil {
+		glog.Exitf("Trying to start gobgp: %s", err)
 	}
 
 	http.HandleFunc("/", status)
@@ -61,12 +68,13 @@ func runTCPDump() error {
 }
 
 func installNatRule() error {
-	c := exec.Command("/sbin/iptables", "-t", "nat", "-A", "INPUT", "-p", "tcp", "--dport", "1179", "-j", "SNAT", "--to", os.Getenv("METALLB_NODE_IP"))
-	if err := c.Run(); err != nil {
-		return err
+	for _, port := range []int{179, 1179, 2179} {
+		c := exec.Command("/sbin/iptables", "-t", "nat", "-A", "INPUT", "-p", "tcp", "--dport", strconv.Itoa(port), "-j", "SNAT", "--to", os.Getenv("METALLB_NODE_IP"))
+		if err := c.Run(); err != nil {
+			return err
+		}
 	}
-	c = exec.Command("/sbin/iptables", "-t", "nat", "-A", "INPUT", "-p", "tcp", "--dport", "179", "-j", "SNAT", "--to", os.Getenv("METALLB_NODE_IP"))
-	return c.Run()
+	return nil
 }
 
 func runOrCrash(cmd ...string) error {
