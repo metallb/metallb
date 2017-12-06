@@ -25,3 +25,7 @@ import:
   version: ^0.1.0
   subpackages:
   - cmp
+testImport:
+- package: github.com/osrg/gobgp
+  subpackages:
+  - server
