@@ -16,8 +16,10 @@ currently have, relative to the top-level directory:
 - `bgp-speaker` is the per-node daemon that advertises services with
   assigned IPs to configured BGP peers.
 - `test-bgp-router` is a small wrapper around
-  the [BIRD](http://bird.network.cz)
-  and [Quagga](http://www.nongnu.org/quagga) open-source BGP routers
+  the
+  [BIRD](http://bird.network.cz),
+  [Quagga](http://www.nongnu.org/quagga)
+  and [GoBGP](https://github.com/osrg/gobgp) open-source BGP routers
   that presents a read-only interface over HTTP. We use it in the
   tutorial, and during development of MetalLB.
 - `internal/k8s` contains the bowels of the logic to talk to the
@@ -84,7 +86,7 @@ setup, but running your locally built binaries.
 Start by running `fab start`. This will:
 - Create the Minikube sandbox in a local VM
 - Enable the registry addon, so that we can host container images in the sandbox
-- Deploy `test-bgp-router`, which sets up BIRD and Quagga router as a
+- Deploy `test-bgp-router`, which sets up BIRD, Quagga and GoBGP routers as a
   pod inside the cluster
 - Deploy MetalLB, which will install the `controller` and `bgp-speaker`
 - Push a MetalLB configuration that connects MetalLB to the `test-bgp-router`
