@@ -130,7 +130,8 @@ spec:
             cpu: "0.1"
             memory: "100Mi"
         securityContext:
-          allowPrivilegeEscalation: false
+          # Temporarily disabled due to #21
+          #allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
       securityContext:
         runAsNonRoot: true
@@ -178,7 +179,8 @@ spec:
             cpu: "0.1"
             memory: "100Mi"
         securityContext:
-          allowPrivilegeEscalation: false
+          # Temporarily disabled due to #21
+          #allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
       securityContext:
         runAsNonRoot: true
