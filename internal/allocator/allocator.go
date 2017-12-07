@@ -1,4 +1,4 @@
-package allocator
+package allocator // import "go.universe.tf/metallb/internal/allocator"
 
 import (
 	"errors"

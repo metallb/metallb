@@ -1,4 +1,4 @@
-package k8s
+package k8s // import "go.universe.tf/metallb/internal/k8s"
 
 import (
 	"errors"
