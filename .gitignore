@@ -1,2 +1,1 @@
-internal/bgp/message/fuzz-data/corpus/autogen-*
-internal/bgp/message/message-fuzz.zip
+vendor/
