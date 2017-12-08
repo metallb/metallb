@@ -153,12 +153,12 @@ func (s *Session) connect() error {
 		return fmt.Errorf("dial %q: %s", s.addr, err)
 	}
 	deadline, _ := ctx.Deadline()
-	if err := conn.SetDeadline(deadline); err != nil {
+	if err = conn.SetDeadline(deadline); err != nil {
 		conn.Close()
 		return fmt.Errorf("setting deadline on conn to %q: %s", s.addr, err)
 	}
 
-	if err := sendOpen(conn, s.asn, s.routerID, s.holdTime); err != nil {
+	if err = sendOpen(conn, s.asn, s.routerID, s.holdTime); err != nil {
 		conn.Close()
 		return fmt.Errorf("send OPEN to %q: %s", s.addr, err)
 	}
