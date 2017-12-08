@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"net/http"
 	"os"
 	"os/exec"
@@ -10,10 +9,7 @@ import (
 	"github.com/golang/glog"
 )
 
-var router = flag.String("router", "bird", "router implementation to use, one of 'bird' or 'quagga'")
-
 func main() {
-	flag.Parse()
 	if err := installNatRule(); err != nil {
 		glog.Exitf("Failed to install NAT rule: %s", err)
 	}
