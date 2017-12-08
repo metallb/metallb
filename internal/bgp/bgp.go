@@ -1,7 +1,6 @@
 package bgp // import "go.universe.tf/metallb/internal/bgp"
 
 import (
-	"container/list"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -39,7 +38,6 @@ type Session struct {
 	actualHoldTime time.Duration
 	advertised     map[string]*Advertisement
 	new            map[string]*Advertisement
-	pending        *list.List
 }
 
 // run tries to stay connected to the peer, and pumps route updates to it.
