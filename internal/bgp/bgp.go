@@ -285,7 +285,7 @@ func New(addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time
 // consumeBGP receives BGP messages from the peer, and ignores
 // them. It does minimal checks for the well-formedness of messages,
 // and terminates the connection if something looks wrong.
-func (s *Session) consumeBGP(conn net.Conn) {
+func (s *Session) consumeBGP(conn io.ReadCloser) {
 	defer func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
