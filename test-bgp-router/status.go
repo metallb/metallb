@@ -101,5 +101,7 @@ func status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmpl.Execute(w, []*values{bStat, qStat, gStat})
+	if err := tmpl.Execute(w, []*values{bStat, qStat, gStat}); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 }
