@@ -36,6 +36,10 @@ cluster: Running
 kubectl: Correctly Configured: pointing to minikube-vm at 192.168.99.100
 ```
 
+*You need to use Minikube >=0.24!* Previous versions use a different
+IP range for cluster services, which is incompatible with the
+manifests used in this tutorial.
+
 # Set up a BGP routers
 
 MetalLB exposes load-balanced services using the BGP routing protocol,
