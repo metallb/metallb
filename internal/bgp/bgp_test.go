@@ -1,4 +1,9 @@
+// +build !race
+
 package bgp
+
+// This test is disabled when using the race detector, because of
+// https://github.com/osrg/gobgp/issues/1530.
 
 import (
 	"context"
@@ -68,8 +73,6 @@ func runGoBGP(ctx context.Context) (chan *table.Path, error) {
 }
 
 func TestInterop(t *testing.T) {
-	t.Skip("https://github.com/osrg/gobgp/issues/1530")
-
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
