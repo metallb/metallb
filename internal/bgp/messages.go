@@ -10,11 +10,6 @@ import (
 	"time"
 )
 
-const (
-	afiIPv4 = 1
-	afiIPv6 = 2
-)
-
 func sendOpen(w io.Writer, asn uint32, routerID net.IP, holdTime time.Duration) error {
 	if routerID.To4() == nil {
 		panic("ipv4 address used as RouterID")
