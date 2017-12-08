@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"net"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/kr/pretty"
 
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -96,7 +96,7 @@ func TestControllerMutation(t *testing.T) {
 	// In steady state, every input below should be equivalent to a
 	// pure function that reliably produces the same end state
 	// regardless of past controller state.
-	tests := []struct {
+	tests := []*struct {
 		desc    string
 		in      *v1.Service
 		want    *v1.Service
@@ -147,6 +147,17 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned("1.2.3.1"),
 			},
+		},
+
+		{
+			desc: "request invalid IP",
+			in: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					LoadBalancerIP: "please sir may I have an IP address thank you",
+				},
+			},
+			wantErr: true,
 		},
 
 		{
@@ -251,52 +262,70 @@ func TestControllerMutation(t *testing.T) {
 		},
 	}
 
-	for _, test := range tests {
-		t.Logf("Running case %q", test.desc)
-		k.reset()
-		// Delete the test balancer, to clean up all state
+	for i := 0; i < 100; i++ {
+		for _, test := range tests {
+			t.Logf("Running case %q", test.desc)
+			k.reset()
+			// Delete the test balancer, to clean up all state
 
-		if err := c.SetBalancer("test", test.in, nil); err != nil {
-			t.Errorf("%q: SetBalancer returned error: %s", test.desc, err)
-			continue
-		}
-		if test.wantErr != k.loggedWarning {
-			t.Errorf("%q: unexpected loggedWarning value, want %v, got %v", test.desc, test.wantErr, k.loggedWarning)
-		}
-
-		gotSvc := k.updateService
-		if k.updateServiceStatus != nil {
-			if gotSvc == nil {
-				gotSvc = new(v1.Service)
-				*gotSvc = *test.in
+			if err := c.SetBalancer("test", test.in, nil); err != nil {
+				t.Errorf("%q: SetBalancer returned error: %s", test.desc, err)
+				continue
 			}
-			gotSvc.Status = *k.updateServiceStatus
-		}
-		pretty.Print(test.in)
-		pretty.Print(gotSvc)
-		// v5 of the k8s client does not correctly compare nil
-		// *metav1.Time objects, which svc.ObjectMeta contains. Add
-		// some dummy non-nil values to all of in, want, got to work
-		// around this until we migrate to v6.
-		if test.in != nil {
-			test.in.ObjectMeta.DeletionTimestamp = &metav1.Time{}
-		}
-		if test.want != nil {
-			test.want.ObjectMeta.DeletionTimestamp = &metav1.Time{}
-		}
-		if gotSvc != nil {
-			gotSvc.ObjectMeta.DeletionTimestamp = &metav1.Time{}
-		}
+			if test.wantErr != k.loggedWarning {
+				t.Errorf("%q: unexpected loggedWarning value, want %v, got %v", test.desc, test.wantErr, k.loggedWarning)
+			}
 
-		switch {
-		case test.want == nil && gotSvc != nil:
-			t.Errorf("%q: unexpectedly mutated service (-in +out)\n%s", test.desc, cmp.Diff(test.in, gotSvc))
-		case test.want != nil && gotSvc == nil:
-			t.Errorf("%q: did not mutate service, wanted (-in +out)\n%s", test.desc, cmp.Diff(test.in, test.want))
-		case test.want != nil && gotSvc != nil:
-			if diff := cmp.Diff(test.want, gotSvc); diff != "" {
-				t.Errorf("%q: wrong service mutation (-want +got)\n%s", test.desc, diff)
+			gotSvc := k.updateService
+			if k.updateServiceStatus != nil {
+				if gotSvc == nil {
+					gotSvc = new(v1.Service)
+					*gotSvc = *test.in
+				}
+				gotSvc.Status = *k.updateServiceStatus
+			}
+
+			// v5 of the k8s client does not correctly compare nil
+			// *metav1.Time objects, which svc.ObjectMeta contains. Add
+			// some dummy non-nil values to all of in, want, got to work
+			// around this until we migrate to v6.
+			if test.in != nil {
+				test.in.ObjectMeta.DeletionTimestamp = &metav1.Time{}
+			}
+			if test.want != nil {
+				test.want.ObjectMeta.DeletionTimestamp = &metav1.Time{}
+			}
+			if gotSvc != nil {
+				gotSvc.ObjectMeta.DeletionTimestamp = &metav1.Time{}
+			}
+
+			switch {
+			case test.want == nil && gotSvc != nil:
+				t.Errorf("%q: unexpectedly mutated service (-in +out)\n%s", test.desc, cmp.Diff(test.in, gotSvc))
+			case test.want != nil && gotSvc == nil:
+				t.Errorf("%q: did not mutate service, wanted (-in +out)\n%s", test.desc, cmp.Diff(test.in, test.want))
+			case test.want != nil && gotSvc != nil:
+				if diff := cmp.Diff(test.want, gotSvc); diff != "" {
+					t.Errorf("%q: wrong service mutation (-want +got)\n%s", test.desc, diff)
+				}
+			}
+
+			if test.want != nil && len(test.want.Status.LoadBalancer.Ingress) > 0 && test.want.Status.LoadBalancer.Ingress[0].IP != "" {
+				ip := net.ParseIP(test.want.Status.LoadBalancer.Ingress[0].IP)
+				if ip == nil {
+					panic("bad wanted IP in loadbalancer status")
+				}
+				if !ip.Equal(c.ips.GetIP("test")) {
+					t.Errorf("%q: controller internal state does not match IP that controller claimed to allocate: want %q, got %q", test.desc, ip, c.ips.GetIP("test"))
+				}
 			}
 		}
+
+		// Shuffle the input vector, and run again.
+		for x := range tests {
+			nx := rand.Intn(len(tests) - x)
+			tests[x], tests[nx] = tests[nx], tests[x]
+		}
+		t.Logf("Shuffled test cases")
 	}
 }
