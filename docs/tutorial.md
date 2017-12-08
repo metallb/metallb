@@ -88,7 +88,7 @@ Let's open that UI now. Run: `minikube service -n metallb-system
 test-bgp-router-ui`. This will open a new browser tab that should look
 something like this:
 
-![BGP routers, with MetalLB not connected](img/metallb-bgp-router-not-connected.png)
+[![BGP routers, with MetalLB not connected](img/metallb-bgp-router-not-connected.png)](https://raw.githubusercontent.com/google/metallb/master/docs/img/metallb-bgp-router-not-connected.png)
 
 If you're comfortable with BGP and networking, the raw router status
 may be interesting. If you're not, don't worry, the important part is
@@ -186,7 +186,7 @@ test-bgp-router-ui browser page again (run `minikube service -n
 metallb-system test-bgp-router-ui` if you closed it and need to get it
 back). If all went well, you should see happier routers:
 
-![BGP router, with MetalLB connected](img/metallb-bgp-router-connected.png)
+[![BGP routers, with MetalLB connected](img/metallb-bgp-router-connected.png)](https://raw.githubusercontent.com/google/metallb/master/docs/img/metallb-bgp-router-connected.png)
 
 Success! The MetalLB BGP speaker connected to our routers. You can
 verify this by looking at the logs for the BGP speaker. Run `kubectl
@@ -245,7 +245,7 @@ describe service nginx`:
 
 Refresh your test-bgp-router-ui page, and see what our routers thinks:
 
-![BGP router, receiving a route from MetalLB](img/metallb-bgp-router-announcing.png)
+[![BGP routers, receiving a route from MetalLB](img/metallb-bgp-router-announcing.png)](https://raw.githubusercontent.com/google/metallb/master/docs/img/metallb-bgp-router-announcing.png)
 
 Success! MetalLB told our routers that 198.51.100.0 exists on our
 Minikube VM, and that the routers should forward any traffic for that
