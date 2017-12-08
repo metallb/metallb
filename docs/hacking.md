@@ -58,7 +58,8 @@ To develop MetalLB, you'll need a couple of pieces of software:
 - [Docker](https://www.docker.com/docker-community), the container
   running system
 - [Kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), the Kubernetes commandline interface
-- [Minikube](https://kubernetes.io/docs/tasks/tools/install-minikube/), the Kubernetes sandbox manager
+- [Minikube](https://kubernetes.io/docs/tasks/tools/install-minikube/),
+  the Kubernetes sandbox manager (version 0.24 or later)
 - [Fabric](http://www.fabfile.org/), the devops scripting toolkit
 
 ## Building the code
