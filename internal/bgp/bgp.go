@@ -153,7 +153,10 @@ func (s *Session) connect() error {
 		return fmt.Errorf("dial %q: %s", s.addr, err)
 	}
 	deadline, _ := ctx.Deadline()
-	conn.SetDeadline(deadline)
+	if err := conn.SetDeadline(deadline); err != nil {
+		conn.Close()
+		return fmt.Errorf("setting deadline on conn to %q: %s", s.addr, err)
+	}
 
 	if err := sendOpen(conn, s.asn, s.routerID, s.holdTime); err != nil {
 		conn.Close()
@@ -171,7 +174,10 @@ func (s *Session) connect() error {
 	}
 
 	// BGP session is established, clear the connect timeout deadline.
-	conn.SetDeadline(time.Time{})
+	if err := conn.SetDeadline(time.Time{}); err != nil {
+		conn.Close()
+		return fmt.Errorf("clearing deadline on conn to %q: %s", s.addr, err)
+	}
 
 	// Consume BGP messages until the connection closes.
 	go s.consumeBGP(conn)
