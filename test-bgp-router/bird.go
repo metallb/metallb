@@ -10,7 +10,7 @@ import (
 
 func writeBirdConfig() error {
 	cfg := fmt.Sprintf(`
-router id 10.0.0.100;
+router id 10.96.0.100;
 listen bgp port 1179;
 log stderr all;
 debug protocols all;
@@ -20,7 +20,7 @@ protocol static {
   route %s/32 via "eth0";
 }
 protocol bgp minikube {
-  local 10.0.0.100 as 64512;
+  local 10.96.0.100 as 64512;
   neighbor %s as 64512;
   passive;
   error wait time 1, 2;

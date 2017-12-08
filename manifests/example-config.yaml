@@ -9,7 +9,7 @@ data:
     # is one entry for each router you want to peer with.
     peers:
     - # The target IP address for the BGP session.
-      peer-address: 10.0.0.100
+      peer-address: 10.0.0.1
       # The BGP AS number that MetalLB expects to see advertised by
       # the router.
       peer-asn: 64512

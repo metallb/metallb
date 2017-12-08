@@ -12,7 +12,7 @@ func writeGoBGPConfig() error {
 	cfg := fmt.Sprintf(`
 [global.config]
   as = 64512
-  router-id = "10.0.0.102"
+  router-id = "10.96.0.102"
   port = 2179
 
 [[neighbors]]

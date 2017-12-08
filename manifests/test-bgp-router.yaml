@@ -57,7 +57,7 @@ spec:
     targetPort: bird
   selector:
     app: test-bgp-router
-  clusterIP: 10.0.0.100
+  clusterIP: 10.96.0.100
 
 ---
 apiVersion: v1
@@ -73,7 +73,7 @@ spec:
     targetPort: quagga
   selector:
     app: test-bgp-router
-  clusterIP: 10.0.0.101
+  clusterIP: 10.96.0.101
 
 ---
 apiVersion: v1
@@ -89,7 +89,7 @@ spec:
     targetPort: gobgp
   selector:
     app: test-bgp-router
-  clusterIP: 10.0.0.102
+  clusterIP: 10.96.0.102
 
 ---
 apiVersion: v1

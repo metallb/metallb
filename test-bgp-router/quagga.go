@@ -22,7 +22,7 @@ func writeQuaggaConfig() error {
 
 	bgpdConfig := fmt.Sprintf(`
 router bgp 64512
- bgp router-id 10.0.0.101
+ bgp router-id 10.96.0.101
  neighbor %s remote-as 64512
  neighbor %s passive
 !

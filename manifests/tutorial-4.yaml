@@ -9,10 +9,13 @@ data:
     # Cosmetic edit to make MetalLB notice that this is a new config.
     - my-asn: 64512
       peer-asn: 64512
-      peer-address: 10.0.0.100
+      peer-address: 10.96.0.100
     - my-asn: 64512
       peer-asn: 64512
-      peer-address: 10.0.0.101
+      peer-address: 10.96.0.101
+    - my-asn: 64512
+      peer-asn: 64512
+      peer-address: 10.96.0.102
     address-pools:
     - name: my-ip-space
       avoid-buggy-ips: true
