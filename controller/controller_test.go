@@ -15,6 +15,26 @@ import (
 	"go.universe.tf/metallb/internal/config"
 )
 
+func diffService(a, b *v1.Service) string {
+	// v5 of the k8s client does not correctly compare nil
+	// *metav1.Time objects, which svc.ObjectMeta contains. Add
+	// some dummy non-nil values to all of in, want, got to work
+	// around this until we migrate to v6.
+	if a != nil {
+		newA := new(v1.Service)
+		*newA = *a
+		newA.ObjectMeta.DeletionTimestamp = &metav1.Time{}
+		a = newA
+	}
+	if b != nil {
+		newB := new(v1.Service)
+		*newB = *b
+		newB.ObjectMeta.DeletionTimestamp = &metav1.Time{}
+		b = newB
+	}
+	return cmp.Diff(a, b)
+}
+
 func ipnet(s string) *net.IPNet {
 	_, n, err := net.ParseCIDR(s)
 	if err != nil {
@@ -45,13 +65,11 @@ type testK8S struct {
 }
 
 func (s *testK8S) Update(svc *v1.Service) (*v1.Service, error) {
-	s.t.Logf("k8s service updated")
 	s.updateService = svc
 	return svc, nil
 }
 
 func (s *testK8S) UpdateStatus(svc *v1.Service) error {
-	s.t.Logf("k8s service status updated")
 	s.updateServiceStatus = &svc.Status
 	return nil
 }
@@ -69,6 +87,24 @@ func (s *testK8S) reset() {
 	s.updateService = nil
 	s.updateServiceStatus = nil
 	s.loggedWarning = false
+}
+
+func (s *testK8S) gotService(in *v1.Service) *v1.Service {
+	if s.updateService == nil && s.updateServiceStatus == nil {
+		return nil
+	}
+
+	ret := new(v1.Service)
+	if in != nil {
+		*ret = *in
+	}
+	if s.updateService != nil {
+		*ret = *s.updateService
+	}
+	if s.updateServiceStatus != nil {
+		ret.Status = *s.updateServiceStatus
+	}
+	return ret
 }
 
 func TestControllerMutation(t *testing.T) {
@@ -276,36 +312,15 @@ func TestControllerMutation(t *testing.T) {
 				t.Errorf("%q: unexpected loggedWarning value, want %v, got %v", test.desc, test.wantErr, k.loggedWarning)
 			}
 
-			gotSvc := k.updateService
-			if k.updateServiceStatus != nil {
-				if gotSvc == nil {
-					gotSvc = new(v1.Service)
-					*gotSvc = *test.in
-				}
-				gotSvc.Status = *k.updateServiceStatus
-			}
-
-			// v5 of the k8s client does not correctly compare nil
-			// *metav1.Time objects, which svc.ObjectMeta contains. Add
-			// some dummy non-nil values to all of in, want, got to work
-			// around this until we migrate to v6.
-			if test.in != nil {
-				test.in.ObjectMeta.DeletionTimestamp = &metav1.Time{}
-			}
-			if test.want != nil {
-				test.want.ObjectMeta.DeletionTimestamp = &metav1.Time{}
-			}
-			if gotSvc != nil {
-				gotSvc.ObjectMeta.DeletionTimestamp = &metav1.Time{}
-			}
+			gotSvc := k.gotService(test.in)
 
 			switch {
 			case test.want == nil && gotSvc != nil:
-				t.Errorf("%q: unexpectedly mutated service (-in +out)\n%s", test.desc, cmp.Diff(test.in, gotSvc))
+				t.Errorf("%q: unexpectedly mutated service (-in +out)\n%s", test.desc, diffService(test.in, gotSvc))
 			case test.want != nil && gotSvc == nil:
-				t.Errorf("%q: did not mutate service, wanted (-in +out)\n%s", test.desc, cmp.Diff(test.in, test.want))
+				t.Errorf("%q: did not mutate service, wanted (-in +out)\n%s", test.desc, diffService(test.in, test.want))
 			case test.want != nil && gotSvc != nil:
-				if diff := cmp.Diff(test.want, gotSvc); diff != "" {
+				if diff := diffService(test.want, gotSvc); diff != "" {
 					t.Errorf("%q: wrong service mutation (-want +got)\n%s", test.desc, diff)
 				}
 			}
@@ -327,5 +342,98 @@ func TestControllerMutation(t *testing.T) {
 			tests[x], tests[nx] = tests[nx], tests[x]
 		}
 		t.Logf("Shuffled test cases")
+	}
+}
+
+func TestControllerConfig(t *testing.T) {
+	k := &testK8S{t: t}
+	c := &controller{
+		ips:    allocator.New(),
+		client: k,
+	}
+
+	// Create service that would need an IP allocation
+
+	svc := &v1.Service{
+		Spec: v1.ServiceSpec{
+			Type: "LoadBalancer",
+		},
+	}
+	if err := c.SetBalancer("test", svc, nil); err != nil {
+		t.Fatalf("SetBalancer failed: %s", err)
+	}
+
+	gotSvc := k.gotService(svc)
+	if gotSvc != nil {
+		t.Errorf("SetBalancer with no configuration mutated service (-in +out)\n%s", diffService(svc, gotSvc))
+	}
+	if k.loggedWarning {
+		t.Error("SetBalancer with no configuration logged an error")
+	}
+
+	// Set an empty config. Balancer should still not do anything to
+	// our unallocated service, and return an error to force a
+	// retry after sync is complete.
+	if err := c.SetConfig(&config.Config{}); err != nil {
+		t.Fatalf("SetConfig with empty config failed: %s", err)
+	}
+	if err := c.SetBalancer("test", svc, nil); err == nil {
+		t.Fatal("SetBalancer did not fail")
+	}
+
+	gotSvc = k.gotService(svc)
+	if gotSvc != nil {
+		t.Errorf("unsynced SetBalancer mutated service (-in +out)\n%s", diffService(svc, gotSvc))
+	}
+	if k.loggedWarning {
+		t.Error("unsynced SetBalancer logged an error")
+	}
+
+	// Set a config with some IPs. Still no allocation, not synced.
+	cfg := &config.Config{
+		Pools: map[string]*config.Pool{
+			"default": &config.Pool{
+				CIDR: []*net.IPNet{ipnet("1.2.3.0/24")},
+			},
+		},
+	}
+	if err := c.SetConfig(cfg); err != nil {
+		t.Fatalf("SetConfig failed: %s", err)
+	}
+	if err := c.SetBalancer("test", svc, nil); err == nil {
+		t.Fatal("SetBalancer did not fail")
+	}
+
+	gotSvc = k.gotService(svc)
+	if gotSvc != nil {
+		t.Errorf("unsynced SetBalancer mutated service (-in +out)\n%s", diffService(svc, gotSvc))
+	}
+	if k.loggedWarning {
+		t.Error("unsynced SetBalancer logged an error")
+	}
+
+	// Mark synced. Finally, we can allocate.
+	c.MarkSynced()
+
+	if err := c.SetBalancer("test", svc, nil); err != nil {
+		t.Fatalf("SetBalancer failed: %s", err)
+	}
+
+	gotSvc = k.gotService(svc)
+	wantSvc := new(v1.Service)
+	*wantSvc = *svc
+	wantSvc.Status = statusAssigned("1.2.3.0")
+	if diff := diffService(wantSvc, gotSvc); diff != "" {
+		t.Errorf("SetBalancer produced unexpected mutation (-want +got)\n%s", diff)
+	}
+
+	// Now that an IP is allocated, removing the IP pool is not allowed.
+	if err := c.SetConfig(&config.Config{}); err == nil {
+		t.Fatalf("SetConfig that deletes allocated IPs was accepted")
+	}
+
+	// Deleting the config also makes MetalLB sad.
+	if err := c.SetConfig(nil); err == nil {
+		t.Fatalf("SetConfig that deletes the config was accepted")
 	}
 }
