@@ -118,8 +118,7 @@ spec:
       serviceAccountName: controller
       containers:
       - name: controller
-        image: quay.io/metallb/controller:master
-        imagePullPolicy: Always
+        image: quay.io/metallb/controller:latest
         args:
         - --port=8080
         ports:
@@ -158,8 +157,7 @@ spec:
       terminationGracePeriodSeconds: 0
       containers:
       - name: bgp-speaker
-        image: quay.io/metallb/bgp-speaker:master
-        imagePullPolicy: Always
+        image: quay.io/metallb/bgp-speaker:latest
         args:
         - --port=8080
         env:
