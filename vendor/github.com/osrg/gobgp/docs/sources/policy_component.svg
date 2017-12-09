@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0" y="0" width="717.356" height="530.298" viewBox="0, 0, 717.356, 530.298">
+  <g id="Layer_1" transform="translate(-9.234, -15.25)">
+    <g>
+      <path d="M10.734,16.75 L163.734,16.75 L163.734,326.75 L10.734,326.75 L10.734,16.75 z" fill="#FFFFFF" fill-opacity="0.182"/>
+      <path d="M10.734,16.75 L163.734,16.75 L163.734,326.75 L10.734,326.75 L10.734,16.75 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+    </g>
+    <g>
+      <path d="M179.734,16.75 L332.734,16.75 L332.734,163.75 L179.734,163.75 L179.734,16.75 z" fill="#FFFFFF" fill-opacity="0.182"/>
+      <path d="M179.734,16.75 L332.734,16.75 L332.734,163.75 L179.734,163.75 L179.734,16.75 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+    </g>
+    <g>
+      <path d="M188.734,49.75 L323.734,49.75 L323.734,93.75 L188.734,93.75 L188.734,49.75 z" fill="#FFFFFF" fill-opacity="0.182"/>
+      <path d="M188.734,49.75 L323.734,49.75 L323.734,93.75 L188.734,93.75 L188.734,49.75 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+    </g>
+    <text transform="matrix(1, 0, 0, 1, 242.038, 66.25)">
+      <tspan x="-49.195" y="4" font-family="HelveticaNeue-Bold" font-size="16" fill="#363636">Condition</tspan>
+    </text>
+    <g>
+      <path d="M188.734,107.75 L323.734,107.75 L323.734,152.75 L188.734,152.75 L188.734,107.75 z" fill="#FFFFFF" fill-opacity="0.182"/>
+      <path d="M188.734,107.75 L323.734,107.75 L323.734,152.75 L188.734,152.75 L188.734,107.75 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+    </g>
+    <text transform="matrix(1, 0, 0, 1, 235.429, 126.25)">
+      <tspan x="-42.195" y="4" font-family="HelveticaNeue-Bold" font-size="16" fill="#363636">Action</tspan>
+    </text>
+    <text transform="matrix(1, 0, 0, 1, 242.429, 32.25)">
+      <tspan x="-49.195" y="4" font-family="HelveticaNeue-Bold" font-size="16" fill="#363636">Statement</tspan>
+    </text>
+    <g>
+      <path d="M19.734,48.75 L154.734,48.75 L154.734,114.75 L19.734,114.75 L19.734,48.75 z" fill="#FFFFFF" fill-opacity="0.182"/>
+      <path d="M19.734,48.75 L154.734,48.75 L154.734,114.75 L19.734,114.75 L19.734,48.75 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+    </g>
+    <text transform="matrix(1, 0, 0, 1, 74.038, 66.25)">
+      <tspan x="-49.195" y="4" font-family="HelveticaNeue-Bold" font-size="16" fill="#363636">Statement</tspan>
+    </text>
+    <g>
+      <path d="M19.734,126.75 L154.734,126.75 L154.734,192.75 L19.734,192.75 L19.734,126.75 z" fill="#FFFFFF" fill-opacity="0.182"/>
+      <path d="M19.734,126.75 L154.734,126.75 L154.734,192.75 L19.734,192.75 L19.734,126.75 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+    </g>
+    <text transform="matrix(1, 0, 0, 1, 74.038, 144.25)">
+      <tspan x="-49.195" y="4" font-family="HelveticaNeue-Bold" font-size="16" fill="#363636">Statement</tspan>
+    </text>
+    <g>
+      <path d="M19.734,251.126 L154.734,251.126 L154.734,317.126 L19.734,317.126 L19.734,251.126 z" fill="#FFFFFF" fill-opacity="0.182"/>
+      <path d="M19.734,251.126 L154.734,251.126 L154.734,317.126 L19.734,317.126 L19.734,251.126 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+    </g>
+    <text transform="matrix(1, 0, 0, 1, 74.038, 269.25)">
+      <tspan x="-49.195" y="4" font-family="HelveticaNeue-Bold" font-size="16" fill="#363636">Statement</tspan>
+    </text>
+    <text transform="matrix(1, 0, 0, 1, 52.429, 34.25)">
+      <tspan x="-27.195" y="4" font-family="HelveticaNeue-Bold" font-size="16" fill="#363636">Policy</tspan>
+    </text>
+    <text transform="matrix(-0, -1, 1, -0, 95.853, 222.75)">
+      <tspan x="-13.877" y="-6.38" font-family="HelveticaNeue-Bold" font-size="22" fill="#363636">…</tspan>
+    </text>
+    <g>
+      <path d="M349.734,16.75 L522.734,16.75 L522.734,163.75 L349.734,163.75 L349.734,16.75 z" fill="#FFFFFF" fill-opacity="0.182"/>
+      <path d="M349.734,16.75 L522.734,16.75 L522.734,163.75 L349.734,163.75 L349.734,16.75 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+    </g>
+    <path d="M353.03,509.618 L353.03,508.375" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+    <text transform="matrix(1, 0, 0, 1, 412.429, 32.25)">
+      <tspan x="-49.195" y="4" font-family="HelveticaNeue-Bold" font-size="16" fill="#363636">Condition</tspan>
+    </text>
+    <text transform="matrix(1, 0, 0, 1, 437.136, 99.25)">
+      <tspan x="-80.293" y="-41" font-family="HelveticaNeue-Bold" font-size="12" fill="#363636">- prefix-set-name</tspan>
+      <tspan x="-80.293" y="-26" font-family="HelveticaNeue-Bold" font-size="12" fill="#363636">- neighbor-set-name</tspan>
+      <tspan x="-80.293" y="-11" font-family="HelveticaNeue-Bold" font-size="12" fill="#363636">- community-set-name</tspan>
+      <tspan x="-80.293" y="4" font-family="HelveticaNeue-Bold" font-size="12" fill="#363636">- ext-community-set-name</tspan>
+      <tspan x="-80.293" y="19" font-family="HelveticaNeue-Bold" font-size="12" fill="#363636">- as-path-set-name</tspan>
+      <tspan x="-80.293" y="34" font-family="HelveticaNeue-Bold" font-size="12" fill="#363636">- as-path-length</tspan>
+      <tspan x="-80.293" y="49" font-family="HelveticaNeue-Bold" font-size="12" fill="#363636">- rpki-validation-result</tspan>
+    </text>
+    <g>
+      <path d="M535.583,16.75 L726.089,16.75 L726.089,545.048 L535.583,545.048 L535.583,16.75 z" fill="#FFFFFF" fill-opacity="0.182"/>
+      <path d="M535.583,16.75 L726.089,16.75 L726.089,545.048 L535.583,545.048 L535.583,16.75 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+    </g>
+    <g>
+      <path d="M349.734,183.75 L522.734,183.75 L522.734,291.503 L349.734,291.503 L349.734,183.75 z" fill="#FFFFFF" fill-opacity="0.182"/>
+      <path d="M349.734,183.75 L522.734,183.75 L522.734,291.503 L349.734,291.503 L349.734,183.75 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+    </g>
+    <text transform="matrix(1, 0, 0, 1, 412.429, 199.25)">
+      <tspan x="-49.195" y="4" font-family="HelveticaNeue-Bold" font-size="16" fill="#363636">Action</tspan>
+    </text>
+    <text transform="matrix(1, 0, 0, 1, 437.136, 249.003)">
+      <tspan x="-80.293" y="-26" font-family="HelveticaNeue-Bold" font-size="12" fill="#363636">- accept/reject</tspan>
+      <tspan x="-80.293" y="-11" font-family="HelveticaNeue-Bold" font-size="12" fill="#363636">- add/remove community/</tspan>
+      <tspan x="-80.293" y="4" font-family="HelveticaNeue-Bold" font-size="12" fill="#363636">ext-community</tspan>
+      <tspan x="-80.293" y="19" font-family="HelveticaNeue-Bold" font-size="12" fill="#363636">- prepend as-path</tspan>
+      <tspan x="-80.293" y="34" font-family="HelveticaNeue-Bold" font-size="12" fill="#363636">- manipulate MED</tspan>
+    </text>
+    <path d="M154.734,78.75 L179.734,78.75" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+    <path d="M323.734,72.527 L349.734,39.527" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+    <path d="M323.734,129.75 L349.734,205.75" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+    <g>
+      <g>
+        <path d="M547.466,46.75 L713.843,46.75 L713.843,134.75 L547.466,134.75 L547.466,46.75 z" fill="#FFFFFF" fill-opacity="0.182"/>
+        <path d="M547.466,46.75 L713.843,46.75 L713.843,134.75 L547.466,134.75 L547.466,46.75 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+      </g>
+      <text transform="matrix(1, 0, 0, 1, 602.144, 61.25)">
+        <tspan x="-47.935" y="6" font-family="HelveticaNeue-Bold" font-size="16" fill="#363636">Prefix Sets</tspan>
+      </text>
+      <g>
+        <path d="M554.705,77.007 L702.846,76.978 L702.853,105.237 L554.712,105.266 L554.705,77.007 z" fill="#FFFFFF" fill-opacity="0.182"/>
+        <path d="M554.705,77.007 L702.846,76.978 L702.853,105.237 L554.712,105.266 L554.705,77.007 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+      </g>
+      <text transform="matrix(1, 0, 0, 1, 595.312, 92.627)">
+        <tspan x="-35.867" y="-0.13" font-family="HelveticaNeue-Bold" font-size="12" fill="#363636">prefix-set</tspan>
+      </text>
+      <text transform="matrix(-0, -1, 1, -0, 640.615, 116.373)">
+        <tspan x="-13.877" y="-10.105" font-family="HelveticaNeue-Bold" font-size="22" fill="#363636">…</tspan>
+      </text>
+    </g>
+    <text transform="matrix(1, 0, 0, 1, 590.91, 32.25)">
+      <tspan x="-49.195" y="4" font-family="HelveticaNeue-Bold" font-size="16" fill="#363636">Defined Sets</tspan>
+    </text>
+    <g>
+      <g>
+        <path d="M547.466,145.46 L713.843,145.46 L713.843,233.46 L547.466,233.46 L547.466,145.46 z" fill="#FFFFFF" fill-opacity="0.182"/>
+        <path d="M547.466,145.46 L713.843,145.46 L713.843,233.46 L547.466,233.46 L547.466,145.46 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+      </g>
+      <text transform="matrix(1, 0, 0, 1, 618.683, 160.648)">
+        <tspan x="-64.474" y="5.312" font-family="HelveticaNeue-Bold" font-size="16" fill="#363636">Neighbor Sets</tspan>
+      </text>
+      <g>
+        <path d="M554.705,175.717 L702.846,175.688 L702.853,203.947 L554.712,203.976 L554.705,175.717 z" fill="#FFFFFF" fill-opacity="0.182"/>
+        <path d="M554.705,175.717 L702.846,175.688 L702.853,203.947 L554.712,203.976 L554.705,175.717 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+      </g>
+      <text transform="matrix(1, 0, 0, 1, 615.332, 194.707)">
+        <tspan x="-55.888" y="-3.5" font-family="HelveticaNeue-Bold" font-size="12" fill="#363636">neighbor-set</tspan>
+      </text>
+      <text transform="matrix(-0, -1, 1, -0, 640.615, 215.084)">
+        <tspan x="-13.877" y="-10.105" font-family="HelveticaNeue-Bold" font-size="22" fill="#363636">…</tspan>
+      </text>
+    </g>
+    <g>
+      <g>
+        <path d="M547.466,245.709 L713.843,245.709 L713.843,333.709 L547.466,333.709 L547.466,245.709 z" fill="#FFFFFF" fill-opacity="0.182"/>
+        <path d="M547.466,245.709 L713.843,245.709 L713.843,333.709 L547.466,333.709 L547.466,245.709 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+      </g>
+      <text transform="matrix(1, 0, 0, 1, 631.74, 260.897)">
+        <tspan x="-77.531" y="5.312" font-family="HelveticaNeue-Bold" font-size="16" fill="#363636">Community Sets</tspan>
+      </text>
+      <g>
+        <path d="M554.705,275.966 L702.846,275.937 L702.853,304.196 L554.712,304.225 L554.705,275.966 z" fill="#FFFFFF" fill-opacity="0.182"/>
+        <path d="M554.705,275.966 L702.846,275.937 L702.853,304.196 L554.712,304.225 L554.705,275.966 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+      </g>
+      <text transform="matrix(1, 0, 0, 1, 618.814, 294.956)">
+        <tspan x="-59.369" y="-3.5" font-family="HelveticaNeue-Bold" font-size="12" fill="#363636">community-set</tspan>
+      </text>
+      <text transform="matrix(-0, -1, 1, -0, 640.615, 315.333)">
+        <tspan x="-13.877" y="-10.105" font-family="HelveticaNeue-Bold" font-size="22" fill="#363636">…</tspan>
+      </text>
+    </g>
+    <g>
+      <g>
+        <path d="M547.466,345.595 L713.843,345.595 L713.843,433.595 L547.466,433.595 L547.466,345.595 z" fill="#FFFFFF" fill-opacity="0.182"/>
+        <path d="M547.466,345.595 L713.843,345.595 L713.843,433.595 L547.466,433.595 L547.466,345.595 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+      </g>
+      <text transform="matrix(1, 0, 0, 1, 631.55, 369.595)">
+        <tspan x="-78.209" y="-3.5" font-family="HelveticaNeue-Bold" font-size="16" fill="#363636">ExtCommunity Sets</tspan>
+      </text>
+      <g>
+        <path d="M553.839,375.852 L702.63,375.819 L702.636,404.079 L553.845,404.112 L553.839,375.852 z" fill="#FFFFFF" fill-opacity="0.182"/>
+        <path d="M553.839,375.852 L702.63,375.819 L702.636,404.079 L553.845,404.112 L553.839,375.852 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+      </g>
+      <text transform="matrix(1, 0, 0, 1, 616.341, 402.342)">
+        <tspan x="-58.39" y="-11" font-family="HelveticaNeue-Bold" font-size="12" fill="#363636">ext-community-set</tspan>
+      </text>
+      <text transform="matrix(-0, -1, 1, -0, 638.401, 415.219)">
+        <tspan x="-13.877" y="-6.38" font-family="HelveticaNeue-Bold" font-size="22" fill="#363636">…</tspan>
+      </text>
+    </g>
+    <g>
+      <g>
+        <path d="M547.466,445.148 L713.843,445.148 L713.843,533.148 L547.466,533.148 L547.466,445.148 z" fill="#FFFFFF" fill-opacity="0.182"/>
+        <path d="M547.466,445.148 L713.843,445.148 L713.843,533.148 L547.466,533.148 L547.466,445.148 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+      </g>
+      <text transform="matrix(1, 0, 0, 1, 602.144, 459.648)">
+        <tspan x="-47.935" y="6" font-family="HelveticaNeue-Bold" font-size="16" fill="#363636">AsPath Sets</tspan>
+      </text>
+      <g>
+        <path d="M554.705,475.405 L702.846,475.376 L702.853,503.635 L554.712,503.664 L554.705,475.405 z" fill="#FFFFFF" fill-opacity="0.182"/>
+        <path d="M554.705,475.405 L702.846,475.376 L702.853,503.635 L554.712,503.664 L554.705,475.405 z" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+      </g>
+      <text transform="matrix(1, 0, 0, 1, 595.312, 491.024)">
+        <tspan x="-35.867" y="-0.13" font-family="HelveticaNeue-Bold" font-size="12" fill="#363636">as-path-set</tspan>
+      </text>
+      <text transform="matrix(-0, -1, 1, -0, 640.615, 514.771)">
+        <tspan x="-13.877" y="-10.105" font-family="HelveticaNeue-Bold" font-size="22" fill="#363636">…</tspan>
+      </text>
+    </g>
+    <path d="M522.466,56.027 L547.466,56.027" fill-opacity="0" stroke="#000000" stroke-width="1" stroke-opacity="0.457"/>
+  </g>
+</svg>
