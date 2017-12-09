@@ -53,8 +53,6 @@ To develop MetalLB, you'll need a couple of pieces of software:
 - [git](https://git-scm.com), the version control system
 - The [Go](https://golang.org) programming language (notably the `go`
   tool)
-- [glide](https://github.com/Masterminds/glide), a Go dependency
-  manager
 - [Docker](https://www.docker.com/docker-community), the container
   running system
 - [Kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), the Kubernetes commandline interface
@@ -62,17 +60,18 @@ To develop MetalLB, you'll need a couple of pieces of software:
   the Kubernetes sandbox manager (version 0.24 or later)
 - [Fabric](http://www.fabfile.org/), the devops scripting toolkit
 
+Optionally, if you want to update the vendored dependency, you'll
+need [glide](https://github.com/Masterminds/glide), the Go dependency
+manager
+
 ## Building the code
 
 Start by cloning the MetalLB repository, with `git clone
 https://github.com/google/metallb`.
 
-In the top-level directory, run `glide install` to download the
-correct version of third-party dependencies and get them all set up.
-
-With that done, you can use normal Go commands to build binaries and
-run unit tests, e.g. `go install go.universe.tf/metallb/bgp-speaker`,
-`go test ./internal/allocator`.
+From there, you can use normal Go commands to build binaries and run
+unit tests, e.g. `go install go.universe.tf/metallb/bgp-speaker`, `go
+test ./internal/allocator`.
 
 ## Testing in Minikube
 
