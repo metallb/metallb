@@ -1,5 +1,5 @@
 hash: fedc4e687d70a7688e7b945a995b314ea7baf60aae9ab4f8c668a29096ff5c0e
-updated: 2017-12-05T21:52:16.839010184-08:00
+updated: 2017-12-09T14:12:56.429921125-08:00
 imports:
 - name: github.com/beorn7/perks
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
@@ -87,6 +87,12 @@ imports:
   version: c12348ce28de40eed0136aa2b644d0ee0650e56c
   subpackages:
   - pbutil
+- name: github.com/mdlayher/arp
+  version: c12cc541320bc610c540dd575436b27a8c78a1f3
+- name: github.com/mdlayher/ethernet
+  version: e72cf8343052938936194daba1914fd1bb33d2fe
+- name: github.com/mdlayher/raw
+  version: c44c46bde6c64f1634e266e930ed5798181286c2
 - name: github.com/peterbourgon/diskv
   version: 5f041e8faa004a95c88a202771f4cc3e991971e6
 - name: github.com/prometheus/client_golang
@@ -121,6 +127,7 @@ imports:
 - name: golang.org/x/net
   version: 1c05540f6879653db88113bc4a2b70aec4bd491f
   subpackages:
+  - bpf
   - context
   - http2
   - http2/hpack
