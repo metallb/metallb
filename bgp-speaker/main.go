@@ -18,10 +18,12 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"reflect"
 	"sort"
+	"time"
 
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/bgp"
@@ -34,15 +36,9 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-type service interface {
-	Infof(svc *v1.Service, desc, msg string, args ...interface{})
-	Errorf(svc *v1.Service, desc, msg string, args ...interface{})
-}
-
 type controller struct {
 	myIP   net.IP
 	myNode string
-	client service
 
 	config *config.Config
 	peers  []*peer
@@ -55,7 +51,7 @@ type controller struct {
 
 type peer struct {
 	cfg *config.Peer
-	bgp *bgp.Session
+	bgp session
 }
 
 func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
@@ -253,7 +249,7 @@ newPeers:
 		}
 
 		glog.Infof("Peer %q configured, starting BGP session", p.cfg.Addr)
-		s, err := bgp.New(fmt.Sprintf("%s:%d", p.cfg.Addr, p.cfg.Port), p.cfg.MyASN, c.myIP, p.cfg.ASN, p.cfg.HoldTime)
+		s, err := newBGP(fmt.Sprintf("%s:%d", p.cfg.Addr, p.cfg.Port), p.cfg.MyASN, c.myIP, p.cfg.ASN, p.cfg.HoldTime)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("Creating BGP session to %q: %s", p.cfg.Addr, err))
 		} else {
@@ -270,7 +266,38 @@ newPeers:
 	return nil
 }
 
+type session interface {
+	io.Closer
+	Set(advs ...*bgp.Advertisement) error
+}
+
+var newBGP = func(addr string, myASN uint32, myIP net.IP, asn uint32, hold time.Duration) (session, error) {
+	return bgp.New(addr, myASN, myIP, asn, hold)
+}
+
 func (c *controller) MarkSynced() {}
+
+func newController(myIP net.IP, myNode string) *controller {
+	ret := &controller{
+		myIP:   myIP,
+		myNode: myNode,
+		svcAds: map[string][]*bgp.Advertisement{},
+		ips:    allocator.New(),
+
+		announcing: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+			Namespace: "metallb",
+			Subsystem: "speaker",
+			Name:      "announced",
+			Help:      "Services being announced from this node. This is desired state, it does not guarantee that the routing protocols have converged.",
+		}, []string{
+			"service",
+			"node",
+			"ip",
+		}),
+	}
+	prometheus.MustRegister(ret.announcing)
+	return ret
+}
 
 func main() {
 	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
@@ -296,33 +323,11 @@ func main() {
 		glog.Fatalf("Must specify --node-name")
 	}
 
-	c := &controller{
-		myIP:   myIP,
-		myNode: *myNode,
-		svcAds: map[string][]*bgp.Advertisement{},
-		ips:    allocator.New(),
-
-		announcing: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: "metallb",
-			Subsystem: "speaker",
-			Name:      "announced",
-			Help:      "Services being announced from this node. This is desired state, it does not guarantee that the routing protocols have converged.",
-		}, []string{
-			"service",
-			"node",
-			"ip",
-		}),
-	}
+	c := newController(myIP, *myNode)
 
 	client, err := k8s.NewClient("metallb-bgp-speaker", *master, *kubeconfig, c, true)
 	if err != nil {
 		glog.Fatalf("Error getting k8s client: %s", err)
 	}
-
-	c.client = client
-
-	// HTTP server for metrics
-	prometheus.MustRegister(c.announcing)
-
 	glog.Fatal(client.Run(*port))
 }
