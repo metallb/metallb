@@ -40,7 +40,7 @@ googleAnalytics = ""
 
 [social]
 	twitter = ""
-	github  = "https://github.com/google/metallb"
+	github  = "google/metallb"
 	email   = ""
 
 
