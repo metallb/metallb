@@ -1,4 +1,4 @@
-baseurl = "https://metallb.universe.tf/"
+baseurl = "/"
 languageCode = "en-us"
 title = "MetalLB, bare metal load-balancer for Kubernetes"
 theme = "hugo-material-docs"
