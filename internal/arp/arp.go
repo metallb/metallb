@@ -119,7 +119,16 @@ func (a *Announce) Announce(ip net.IP) bool {
 
 // Unsolicited returns a slice of ARP responses that can be send out as unsolicited ARPs.
 func (a *Announce) Unsolicited() []*arp.Packet {
-	return nil
+	a.RLock()
+	defer a.RUnlock()
+
+	arps := []*arp.Packet{}
+	for _, ip := range a.ips {
+		if a, err := arp.NewPacket(arp.OperationReply, a.hardwareAddr, ip, ethernet.Broadcast, ip); err == nil {
+			arps = append(arps, a)
+		}
+	}
+	return arps
 }
 
 // interfaceByIP returns the interface that has ip.

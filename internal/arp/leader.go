@@ -31,7 +31,6 @@ func (a *Announce) Acquire() {
 
 		for _, u := range a.Unsolicited() {
 			a.client.WriteTo(u, ethernet.Broadcast)
-			// glog errors?
 		}
 
 		time.Sleep(500 * time.Millisecond)
