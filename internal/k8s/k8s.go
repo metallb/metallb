@@ -214,6 +214,9 @@ func (c *Client) Errorf(svc *v1.Service, kind, msg string, args ...interface{}) 
 	c.events.Eventf(svc, v1.EventTypeWarning, kind, msg, args...)
 }
 
+// ClientCoreV1 returns the embeded k8s client from Client.
+func (c *Client) ClientCoreV1() v1core.CoreV1Interface { return c.client.CoreV1() }
+
 func (c *Client) sync(key interface{}) error {
 	defer c.queue.Done(key)
 
