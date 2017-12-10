@@ -79,6 +79,10 @@ googleAnalytics = ""
 	url    = "license/"
 	weight = 60
 
+[[menu.main]]
+    name   = "Versions"
+    url    = "versions/"
+    weight = 70
 
 [blackfriday]
 	smartypants	= true
