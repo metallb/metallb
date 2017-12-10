@@ -3,6 +3,7 @@ import subprocess
 import tempfile
 import time
 import shutil
+import sys
 
 from fabric.api import *
 
@@ -39,6 +40,91 @@ def wireshark():
     with _tempdir() as tmp:
         local('curl -o {0}/pcap http://{1}:{2}/pcap'.format(tmp, node, nodePort))
         local('wireshark-gtk {0}/pcap'.format(tmp))
+
+## Releases
+
+def _error(msg):
+    print(msg)
+    sys.exit(1)
+
+def _versions_md(vi):
+    import semver
+    versions = []
+    tags = _silent("git tag").split("\n")
+    for tag in tags:
+        if not tag.startswith('v'):
+            continue
+        versions.append(semver.parse_version_info(tag[1:]))
+
+    seen = {}
+    version_lines = []
+    for v in sorted(versions, reverse=True):
+        maj_min = (v.major, v.minor)
+        if maj_min in seen:
+            continue
+        if vi is not None and maj_min == (vi.major, vi.minor):
+            continue
+        site = "https://v{0}.{1}--metallb.netlify.com/".format(v.major, v.minor)
+        if maj_min == (0, 1):
+            site = "https://github.com/google/metallb/tree/v0.1"
+        version_lines.append("- [{0}.{1}.x]({2})".format(v.major, v.minor, site))
+    version_lines.append("- [latest development build](https://master--metallb.netlify.com/)")
+
+    out = """---
+title: Versions
+weight: 70
+---
+"""
+    if vi is None:
+        out += """This site is for the **development** version of MetalLB.
+
+Here are all versions of the website:
+
+"""
+    else:
+        out += """This site is for the {0}.{1}.x releases of MetalLB.
+
+Here are the websites for other versions:
+
+""".format(vi.major, vi.minor)
+    out +='\n'.join(version_lines)
+    return out
+
+def release(version):
+    # Import here so that people who aren't making releases don't
+    # need to pip install.
+    import semver
+
+    _versions_md(None)
+    if _silent("git status --porcelain"):
+        _error("git working directory not clean, cannot prepare release")
+    vi = semver.parse_version_info(version)
+    branch_name = 'v{0}.{1}'.format(vi.major, vi.minor)
+    if vi.patch != 0 and _silent_nofail("git rev-parse --verify {0}".format(branch_name)).failed:
+        _error("Cannot release {0}, branch {1} does not exist".format(version, branch_name))
+    if vi.patch == 0:
+        local("git checkout master")
+        local("git checkout -b {0}".format(branch_name))
+
+        with lcd("website/content"):
+            local("perl -pi -e 's#/google/metallb/master#/google/metallb/{0}#g' *".format(branch_name))
+        with lcd("manifests"):
+            local("perl -pi -e 's/:latest/:v{0}/g' *".format(version))
+        with open("website/content/versions.md", "wb") as f:
+            f.write(_versions_md(vi))
+    else:
+        local("git checkout {0}".format(branch_name))
+        with lcd("manifests"):
+            local("perl -pi -e 's/:v{0}.{1}.{2}/:v{0}.{1}.{3}/g' *".format(vi.major, vi.minor, vi.patch-1, vi.patch))
+    with lcd("website"):
+        local("perl -pi -e 's/version = .*/version = \"v{0}\"/g' config.toml".format(version))
+    local('git commit -a -m "Update documentation for release {0}"'.format(version))
+    local('git tag v{0} -m "Release version {0}"'.format(version))
+    local('git checkout master')
+    if vi.patch == 0:
+        with open("website/content/versions.md", "wb") as f:
+            f.write(_versions_md(None))
+        local('git commit -a -m "Update website versions for release {0}"'.format(version))
 
 ## Minikube bringup/teardown
 
