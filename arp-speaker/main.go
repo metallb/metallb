@@ -186,7 +186,7 @@ func newController(myIP net.IP, myNode string) (*controller, error) {
 
 	prometheus.MustRegister(c.announcing)
 	// just start this as a goroutine, the life time is bound to this process, so there is no way to stop it.
-	go func() { ann.Start() }()
+	go func() { ann.Run() }()
 	return c, nil
 }
 
