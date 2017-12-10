@@ -1,7 +1,7 @@
-package bgp
+package bgp // import "go.universe.tf/metallb/internal/bgp"
 
 import (
-	"container/list"
+	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -38,7 +38,6 @@ type Session struct {
 	actualHoldTime time.Duration
 	advertised     map[string]*Advertisement
 	new            map[string]*Advertisement
-	pending        *list.List
 }
 
 // run tries to stay connected to the peer, and pumps route updates to it.
@@ -143,24 +142,39 @@ func (s *Session) connect() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	conn, err := net.Dial("tcp", s.addr)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	var d net.Dialer
+	conn, err := d.DialContext(ctx, "tcp", s.addr)
 	if err != nil {
 		return fmt.Errorf("dial %q: %s", s.addr, err)
 	}
+	deadline, _ := ctx.Deadline()
+	if err = conn.SetDeadline(deadline); err != nil {
+		conn.Close()
+		return fmt.Errorf("setting deadline on conn to %q: %s", s.addr, err)
+	}
 
-	if err := sendOpen(conn, s.asn, s.routerID, s.holdTime); err != nil {
+	if err = sendOpen(conn, s.asn, s.routerID, s.holdTime); err != nil {
 		conn.Close()
 		return fmt.Errorf("send OPEN to %q: %s", s.addr, err)
 	}
 
-	asn, requestedHold, err := readOpen(conn)
+	op, err := readOpen(conn)
 	if err != nil {
 		conn.Close()
 		return fmt.Errorf("read OPEN from %q: %s", s.addr, err)
 	}
-	if asn != s.peerASN {
+	if op.asn != s.peerASN {
 		conn.Close()
-		return fmt.Errorf("unexpected peer ASN %d, want %d", asn, s.peerASN)
+		return fmt.Errorf("unexpected peer ASN %d, want %d", op.asn, s.peerASN)
+	}
+
+	// BGP session is established, clear the connect timeout deadline.
+	if err := conn.SetDeadline(time.Time{}); err != nil {
+		conn.Close()
+		return fmt.Errorf("clearing deadline on conn to %q: %s", s.addr, err)
 	}
 
 	// Consume BGP messages until the connection closes.
@@ -174,8 +188,8 @@ func (s *Session) connect() error {
 
 	// Set up regular keepalives from now on.
 	s.actualHoldTime = s.holdTime
-	if requestedHold < s.actualHoldTime {
-		s.actualHoldTime = requestedHold
+	if op.holdTime < s.actualHoldTime {
+		s.actualHoldTime = op.holdTime
 	}
 	select {
 	case s.newHoldTime <- true:
@@ -271,7 +285,7 @@ func New(addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time
 // consumeBGP receives BGP messages from the peer, and ignores
 // them. It does minimal checks for the well-formedness of messages,
 // and terminates the connection if something looks wrong.
-func (s *Session) consumeBGP(conn net.Conn) {
+func (s *Session) consumeBGP(conn io.ReadCloser) {
 	defer func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()

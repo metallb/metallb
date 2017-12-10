@@ -1,5 +1,5 @@
-hash: 414d677a1eafa9b32b07bb2cea2ab6a6c5615b933afd0de4fd6d786a3bd9f28f
-updated: 2017-11-24T14:11:54.142711171-08:00
+hash: fedc4e687d70a7688e7b945a995b314ea7baf60aae9ab4f8c668a29096ff5c0e
+updated: 2017-12-09T14:12:56.429921125-08:00
 imports:
 - name: github.com/beorn7/perks
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
@@ -46,6 +46,13 @@ imports:
   - ptypes/timestamp
 - name: github.com/google/btree
   version: 7d79101e329e5a3adf994758c578dab82b90c017
+- name: github.com/google/go-cmp
+  version: 8099a9787ce5dc5984ed879a3bda47dc730a8e97
+  subpackages:
+  - cmp
+  - cmp/internal/diff
+  - cmp/internal/function
+  - cmp/internal/value
 - name: github.com/google/gofuzz
   version: 44d81051d367757e1c7c6a5a86423ece9afcf63c
 - name: github.com/googleapis/gnostic
@@ -80,10 +87,16 @@ imports:
   version: c12348ce28de40eed0136aa2b644d0ee0650e56c
   subpackages:
   - pbutil
+- name: github.com/mdlayher/arp
+  version: c12cc541320bc610c540dd575436b27a8c78a1f3
+- name: github.com/mdlayher/ethernet
+  version: e72cf8343052938936194daba1914fd1bb33d2fe
+- name: github.com/mdlayher/raw
+  version: c44c46bde6c64f1634e266e930ed5798181286c2
 - name: github.com/peterbourgon/diskv
   version: 5f041e8faa004a95c88a202771f4cc3e991971e6
 - name: github.com/prometheus/client_golang
-  version: 1cdba8fdde81f444626530cce66e138d2f68ae1c
+  version: 661e31bf844dfca9aeba15f27ea8aa0d485ad212
   subpackages:
   - prometheus
   - prometheus/promhttp
@@ -114,6 +127,7 @@ imports:
 - name: golang.org/x/net
   version: 1c05540f6879653db88113bc4a2b70aec4bd491f
   subpackages:
+  - bpf
   - context
   - http2
   - http2/hpack
@@ -268,4 +282,68 @@ imports:
   version: 868f2f29720b192240e18284659231b440f9cda5
   subpackages:
   - pkg/common
-testImports: []
+testImports:
+- name: github.com/armon/go-radix
+  version: 1fca145dffbcaa8fe914309b1ec0cfc67500fe61
+- name: github.com/dgryski/go-farm
+  version: ac7624ea8da311f2fbbd94401d8c1cf66089f9fb
+- name: github.com/eapache/channels
+  version: 47238d5aae8c0fefd518ef2bee46290909cf8263
+- name: github.com/eapache/queue
+  version: 44cc805cf13205b55f69e14bcb69867d1ae92f98
+- name: github.com/fsnotify/fsnotify
+  version: 4da3e2cfbabc9f751898f250b49f2439785783a1
+- name: github.com/hashicorp/hcl
+  version: 23c074d0eceb2b8a5bfdbb271ab780cde70f05a8
+  subpackages:
+  - hcl/ast
+  - hcl/parser
+  - hcl/scanner
+  - hcl/strconv
+  - hcl/token
+  - json/parser
+  - json/scanner
+  - json/token
+- name: github.com/influxdata/influxdb
+  version: 383332daed5595926c235f250b11433f67229c35
+  subpackages:
+  - client/v2
+  - models
+  - pkg/escape
+- name: github.com/magiconair/properties
+  version: 49d762b9817ba1c2e9d0c69183c2b4a8b8f1d934
+- name: github.com/mitchellh/mapstructure
+  version: 06020f85339e21b2478f756a78e295255ffa4d6a
+- name: github.com/osrg/gobgp
+  version: 2c03fdbcb894e319976aa3282794409e04108c7f
+  subpackages:
+  - config
+  - packet/bgp
+  - packet/bmp
+  - packet/mrt
+  - packet/rtr
+  - server
+  - table
+  - zebra
+- name: github.com/pelletier/go-toml
+  version: 4e9e0ee19b60b13eb79915933f44d8ed5f268bdd
+- name: github.com/satori/go.uuid
+  version: 5bf94b69c6b68ee1b541973bb8e1144db23a194b
+- name: github.com/sirupsen/logrus
+  version: 89742aefa4b206dcf400792f3bd35b542998eb3b
+- name: github.com/spf13/afero
+  version: 8d919cbe7e2627e417f3e45c3c0e489a5b7e2536
+  subpackages:
+  - mem
+- name: github.com/spf13/cast
+  version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
+- name: github.com/spf13/jwalterweatherman
+  version: 12bd96e66386c1960ab0f74ced1362f66f552f7b
+- name: github.com/spf13/viper
+  version: 4dddf7c62e16bce5807744018f5b753bfe21bbd2
+- name: github.com/vishvananda/netlink
+  version: 1e2e08e8a2dcdacaae3f14ac44c5cfa31361f270
+  subpackages:
+  - nl
+- name: gopkg.in/tomb.v2
+  version: d5d1b5820637886def9eef33e03a27a9f166942c

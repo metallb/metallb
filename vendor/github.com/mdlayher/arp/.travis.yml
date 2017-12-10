@@ -1,0 +1,12 @@
+language: go
+go:
+  - 1.x
+before_install:
+  - go get github.com/axw/gocov/gocov
+  - go get github.com/mattn/goveralls
+  - go get golang.org/x/tools/cmd/cover
+before_script:
+  - go get -d ./...
+script:
+  - go test -v ./...
+  - if ! $HOME/gopath/bin/goveralls -service=travis-ci -repotoken $COVERALLS_TOKEN; then echo "Coveralls not available."; fi

@@ -67,7 +67,9 @@ func (c *controller) SetBalancer(name string, svcRo *v1.Service, _ *v1.Endpoints
 	// copy makes the code much easier to follow, and we have a GC for
 	// a reason.
 	svc := svcRo.DeepCopy()
-	c.convergeBalancer(name, svc)
+	if err := c.convergeBalancer(name, svc); err != nil {
+		return err
+	}
 	if reflect.DeepEqual(svcRo, svc) {
 		glog.Infof("%s: converged, no change", name)
 		return nil

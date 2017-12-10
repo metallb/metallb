@@ -1,4 +1,4 @@
-package allocator
+package allocator // import "go.universe.tf/metallb/internal/allocator"
 
 import (
 	"errors"
@@ -235,5 +235,8 @@ func nextIP(prev net.IP) net.IP {
 // firmwares, leaving to packet drops.
 func ipConfusesBuggyFirmwares(ip net.IP) bool {
 	ip = ip.To4()
-	return ip[len(ip)-1] == 0 || ip[len(ip)-1] == 255
+	if ip == nil {
+		return false
+	}
+	return ip[net.IPv4len-1] == 0 || ip[net.IPv4len-1] == 255
 }

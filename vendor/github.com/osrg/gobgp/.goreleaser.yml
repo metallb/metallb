@@ -1,0 +1,26 @@
+#
+# .goreleaser.yml
+# Build customization
+builds:
+  - main: ./gobgp/
+    binary: gobgp
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - 386
+      - arm
+
+  - main: ./gobgpd/
+    binary: gobgpd
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - 386
+      - arm
+
+archive:
+  files:
+    - LICENSE
+    - README.md
