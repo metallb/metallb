@@ -40,9 +40,9 @@ func New(ip net.IP) (*Announce, error) {
 	}, nil
 }
 
-// Start starts the announcer, making it listen on the interface for ARP requests. It only responds to these
+// Run starts the announcer, making it listen on the interface for ARP requests. It only responds to these
 // requests when a.leader is set to true, i.e. we are the current cluster wide leader for sending ARPs.
-func (a *Announce) Start() {
+func (a *Announce) Run() {
 	for {
 		pkt, eth, err := a.client.Read()
 
