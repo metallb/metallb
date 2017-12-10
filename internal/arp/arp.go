@@ -15,9 +15,11 @@ import (
 type Announce struct {
 	hardwareAddr net.HardwareAddr
 	client       *arp.Client
-	c            chan *arp.Packet
 	ips          map[string]net.IP // map containing IPs we should announce
 	sync.RWMutex                   // protects ips
+
+	leader   bool
+	leaderMu sync.RWMutex
 }
 
 // New return an initialized Announce.
@@ -34,54 +36,47 @@ func New(ip net.IP) (*Announce, error) {
 	return &Announce{
 		hardwareAddr: ifi.HardwareAddr,
 		client:       client,
-		c:            make(chan *arp.Packet),
 		ips:          make(map[string]net.IP),
 	}, nil
 }
 
-// Start starts the announcer, making it listen on the interface for ARP requests.
+// Start starts the announcer, making it listen on the interface for ARP requests. It only responds to these
+// requests when a.leader is set to true, i.e. we are the current cluster wide leader for sending ARPs.
 func (a *Announce) Start() {
-	// Read packet from the wire.
-	go func() {
-		for {
-			pkt, eth, err := a.client.Read()
+	for {
+		pkt, eth, err := a.client.Read()
 
-			// Ignore ARP replies.
-			if pkt.Operation != arp.OperationRequest {
-				continue
-			}
-
-			// Ignore ARP requests which are not broadcast or bound directly for this machine.
-			if !bytes.Equal(eth.Destination, ethernet.Broadcast) && !bytes.Equal(eth.Destination, a.hardwareAddr) {
-				continue
-			}
-
-			// Ignore ARP requests which do not indicate the target IP that we should announce.
-			if !a.Announce(pkt.TargetIP) {
-				continue
-			}
-
-			if err != nil {
-				continue
-			}
-
-			a.c <- pkt
+		if err != nil {
+			continue
 		}
-	}()
 
-	go func() {
-		for {
-			select {
-			case pkt := <-a.c:
-				// pkt.TargetIP has been vetted to be "the one".
-				glog.Infof("request: who-has %s?  tell %s (%s). reply: %s is-at %s", pkt.TargetIP, pkt.SenderIP, pkt.SenderHardwareAddr, pkt.TargetIP, a.hardwareAddr)
-
-				if err := a.Reply(pkt, pkt.TargetIP); err != nil {
-					glog.Warningf("Failed to writes ARP response for %s: %s", pkt.TargetIP, err)
-				}
-			}
+		// Ignore ARP replies.
+		if pkt.Operation != arp.OperationRequest {
+			continue
 		}
-	}()
+
+		// Ignore ARP requests which are not broadcast or bound directly for this machine.
+		if !bytes.Equal(eth.Destination, ethernet.Broadcast) && !bytes.Equal(eth.Destination, a.hardwareAddr) {
+			continue
+		}
+
+		// Ignore ARP requests which do not indicate the target IP that we should announce.
+		if !a.Announce(pkt.TargetIP) {
+			continue
+		}
+
+		// We are not the leader, do not reply.
+		if !a.Leader() {
+			continue
+		}
+
+		// pkt.TargetIP has been vetted to be "the one".
+		glog.Infof("request: who-has %s?  tell %s (%s). reply: %s is-at %s", pkt.TargetIP, pkt.SenderIP, pkt.SenderHardwareAddr, pkt.TargetIP, a.hardwareAddr)
+
+		if err := a.Reply(pkt, pkt.TargetIP); err != nil {
+			glog.Warningf("Failed to writes ARP response for %s: %s", pkt.TargetIP, err)
+		}
+	}
 }
 
 // Reply sends a arp reply using the client in a.
@@ -94,15 +89,14 @@ func (a *Announce) Close() error {
 	return a.client.Close()
 }
 
-// SetBalancer implementes.. bla bla bla
-// Now only uses an net.IP.
+// SetBalancer implementes adds ip to the set of announced address.
 func (a *Announce) SetBalancer(name string, ip net.IP) {
 	a.Lock()
 	defer a.Unlock()
 	a.ips[name] = ip
 }
 
-// DeleteBalancer deletes...
+// DeleteBalancer an address from the set of address we should announce.
 func (a *Announce) DeleteBalancer(name string) {
 	a.Lock()
 	defer a.Unlock()
@@ -121,6 +115,11 @@ func (a *Announce) Announce(ip net.IP) bool {
 		}
 	}
 	return false
+}
+
+// Unsolicited returns a slice of ARP responses that can be send out as unsolicited ARPs.
+func (a *Announce) Unsolicited() []*arp.Packet {
+	return nil
 }
 
 // interfaceByIP returns the interface that has ip.

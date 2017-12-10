@@ -28,7 +28,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
-
 	"k8s.io/api/core/v1"
 )
 
@@ -184,9 +183,10 @@ func newController(myIP net.IP, myNode string) (*controller, error) {
 			"ip",
 		}),
 	}
-	// get arp.ann and start that as well, figure out interface from IP address.
+
 	prometheus.MustRegister(c.announcing)
-	ann.Start()
+	// just start this as a goroutine, the life time is bound to this process, so there is no way to stop it.
+	go func() { ann.Start() }()
 	return c, nil
 }
 
@@ -223,5 +223,12 @@ func main() {
 	if err != nil {
 		glog.Fatalf("Error getting k8s client: %s", err)
 	}
+
+	le, err := NewLeaderElector(c.ann, "metallb-system", client.ClientCoreV1()) // TODO(miek): hardcoded ns here.
+	if err != nil {
+		glog.Fatalf("Error setting up leader election: %s", err)
+	}
+	go func() { le.Run() }()
+
 	glog.Fatal(client.Run(*port))
 }
