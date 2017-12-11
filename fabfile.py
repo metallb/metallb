@@ -188,7 +188,7 @@ def _build(ts, name):
         local("env GOOS=linux GOARCH=amd64 go build -o %s/%s ./%s" % (tmp, name, name))
         local("cp ./dockerfiles/dev/%s %s/Dockerfile" % (name, tmp))
         local("sudo docker build -t %s:5000/%s:latest %s" % (localhost_address, name, tmp))
-        local("sudo docker tag %s:5000/%s:latest docker.for.mac.localhost:5000/%s:%s" % (localhost_address, name, name, ts))
+        local("sudo docker tag %s:5000/%s:latest %s:5000/%s:%s" % (localhost_address, name, localhost_address, name, ts))
         with _proxy_to_registry():
             local("sudo docker push %s:5000/%s:%s" % (localhost_address, name, ts))
         local("sudo docker rmi %s:5000/%s:%s" % (localhost_address, name, ts))
