@@ -1,4 +1,4 @@
-package main
+package k8s
 
 import (
 	"time"
@@ -6,14 +6,13 @@ import (
 	"go.universe.tf/metallb/internal/arp"
 
 	"github.com/golang/glog"
-	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 	le "k8s.io/client-go/tools/leaderelection"
 	rl "k8s.io/client-go/tools/leaderelection/resourcelock"
 )
 
-// NewLeaderElector returns a new LeaderElector used for endpoint leader election.
-func NewLeaderElector(a *arp.Announce, ns string, client corev1.CoreV1Interface) (*le.LeaderElector, error) {
-	lock, err := rl.New(rl.EndpointsResourceLock, ns, identity, client, rl.ResourceLockConfig{Identity: identity, EventRecorder: nil})
+// NewLeaderElector returns a new LeaderElector used for endpoint leader election using c.
+func (c *Client) NewLeaderElector(a *arp.Announce, identity string) (*le.LeaderElector, error) {
+	lock, err := rl.New(rl.EndpointsResourceLock, "metallb-system", identity, c.client.CoreV1(), rl.ResourceLockConfig{Identity: identity, EventRecorder: nil})
 	if err != nil {
 		return nil, err
 	}
@@ -37,5 +36,3 @@ func NewLeaderElector(a *arp.Announce, ns string, client corev1.CoreV1Interface)
 
 	return le.NewLeaderElector(lec)
 }
-
-const identity = "metallb-arp-speaker"
