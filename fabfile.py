@@ -4,6 +4,7 @@ import tempfile
 import time
 import shutil
 import sys
+import platform
 
 from fabric.api import *
 
@@ -181,15 +182,16 @@ def push_manifests():
         push_config()
 
 def _build(ts, name):
+    localhost_address = "docker.for.mac.localhost" if platform.system() == "Darwin" else "localhost"
     with _tempdir() as tmp:
         local("go install ./%s" % name)
         local("go build -o %s/%s ./%s" % (tmp, name, name))
         local("cp ./dockerfiles/dev/%s %s/Dockerfile" % (name, tmp))
-        local("sudo docker build -t localhost:5000/%s:latest %s" % (name, tmp))
-        local("sudo docker tag localhost:5000/%s:latest localhost:5000/%s:%s" % (name, name, ts))
+        local("sudo docker build -t %s:5000/%s:latest %s" % (localhost_address, name, tmp))
+        local("sudo docker tag %s:5000/%s:latest docker.for.mac.localhost:5000/%s:%s" % (localhost_address, name, name, ts))
         with _proxy_to_registry():
-            local("sudo docker push localhost:5000/%s:%s" % (name, ts))
-        local("sudo docker rmi localhost:5000/%s:%s" % (name, ts))
+            local("sudo docker push %s:5000/%s:%s" % (localhost_address, name, ts))
+        local("sudo docker rmi %s:5000/%s:%s" % (localhost_address, name, ts))
 
 def _set_image(ts, name, job):
     local("kubectl set image -n metallb-system {2} {1}={3}/{1}:{0}".format(ts, name, job, _registry_clusterip()))
