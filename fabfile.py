@@ -181,17 +181,16 @@ def push_manifests():
     if _silent_nofail("kubectl get configmap -n metallb-system config").failed:
         push_config()
 
-def _build(ts, name):
-    localhost_address = "docker.for.mac.localhost" if platform.system() == "Darwin" else "localhost"
+def _build(ts, name, registry):
     with _tempdir() as tmp:
         local("go install ./%s" % name)
         local("env GOOS=linux GOARCH=amd64 go build -o %s/%s ./%s" % (tmp, name, name))
         local("cp ./dockerfiles/dev/%s %s/Dockerfile" % (name, tmp))
-        local("sudo docker build -t %s:5000/%s:latest %s" % (localhost_address, name, tmp))
-        local("sudo docker tag %s:5000/%s:latest %s:5000/%s:%s" % (localhost_address, name, localhost_address, name, ts))
+        local("sudo docker build -t %s/%s:latest %s" % (registry, name, tmp))
+        local("sudo docker tag %s/%s:latest %s/%s:%s" % (registry, name, registry, name, ts))
         with _proxy_to_registry():
-            local("sudo docker push %s:5000/%s:%s" % (localhost_address, name, ts))
-        local("sudo docker rmi %s:5000/%s:%s" % (localhost_address, name, ts))
+            local("sudo docker push %s/%s:%s" % (registry, name, ts))
+        local("sudo docker rmi %s/%s:%s" % (registry, name, ts))
 
 def _set_image(ts, name, job):
     local("kubectl set image -n metallb-system {2} {1}={3}/{1}:{0}".format(ts, name, job, _registry_clusterip()))
@@ -199,15 +198,15 @@ def _set_image(ts, name, job):
 def _wait_for_rollout(typ, name):
     local("kubectl rollout status -n metallb-system {0} {1}".format(typ, name))
 
-def push():
+def push(registry="localhost:5000"):
     """Build and repush metallb binaries"""
     if _silent_nofail("kubectl get ns metallb-system").failed:
         push_manifests()
 
     ts = "%f" % time.time()
-    _build(ts, "controller")
-    _build(ts, "bgp-speaker")
-    _build(ts, "test-bgp-router")
+    _build(ts, "controller", registry)
+    _build(ts, "bgp-speaker", registry)
+    _build(ts, "test-bgp-router", registry)
 
     _set_image(ts, "controller", "deploy/controller")
     _set_image(ts, "bgp-speaker", "ds/bgp-speaker")
