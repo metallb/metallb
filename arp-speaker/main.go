@@ -191,12 +191,12 @@ func main() {
 		glog.Fatalf("Error getting controller: %s", err)
 	}
 
-	client, err := k8s.NewClient("metallb-arp-speaker", *master, *kubeconfig, c, true)
+	client, err := k8s.NewClient(identity, *master, *kubeconfig, c, true)
 	if err != nil {
 		glog.Fatalf("Error getting k8s client: %s", err)
 	}
 
-	le, err := NewLeaderElector(c.ann, "metallb-system", client.ClientCoreV1()) // TODO(miek): hardcoded ns here.
+	le, err := client.NewLeaderElector(c.ann, identity)
 	if err != nil {
 		glog.Fatalf("Error setting up leader election: %s", err)
 	}
@@ -204,3 +204,5 @@ func main() {
 
 	glog.Fatal(client.Run(*port))
 }
+
+const identity = "metallb-arp-speaker"
