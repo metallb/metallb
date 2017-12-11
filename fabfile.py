@@ -185,7 +185,7 @@ def _build(ts, name):
     localhost_address = "docker.for.mac.localhost" if platform.system() == "Darwin" else "localhost"
     with _tempdir() as tmp:
         local("go install ./%s" % name)
-        local("go build -o %s/%s ./%s" % (tmp, name, name))
+        local("env GOOS=linux GOARCH=amd64 go build -o %s/%s ./%s" % (tmp, name, name))
         local("cp ./dockerfiles/dev/%s %s/Dockerfile" % (name, tmp))
         local("sudo docker build -t %s:5000/%s:latest %s" % (localhost_address, name, tmp))
         local("sudo docker tag %s:5000/%s:latest docker.for.mac.localhost:5000/%s:%s" % (localhost_address, name, name, ts))
@@ -198,7 +198,7 @@ def _set_image(ts, name, job):
 
 def _wait_for_rollout(typ, name):
     local("kubectl rollout status -n metallb-system {0} {1}".format(typ, name))
-    
+
 def push():
     """Build and repush metallb binaries"""
     if _silent_nofail("kubectl get ns metallb-system").failed:
