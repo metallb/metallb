@@ -182,7 +182,7 @@ def push_manifests():
 
 def _build(ts, name, registry):
     with _tempdir() as tmp:
-        local("go install ./%s" % name)
+        local("env GOOS=linux GOARCH=amd64 go install ./%s" % name)
         local("env GOOS=linux GOARCH=amd64 go build -o %s/%s ./%s" % (tmp, name, name))
         local("cp ./dockerfiles/dev/%s %s/Dockerfile" % (name, tmp))
         local("sudo docker build -t %s/%s:latest %s" % (registry, name, tmp))
