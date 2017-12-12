@@ -4,7 +4,6 @@ import tempfile
 import time
 import shutil
 import sys
-import platform
 
 from fabric.api import *
 
