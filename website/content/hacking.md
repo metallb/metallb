@@ -144,6 +144,10 @@ Once the push is done, MetalLB will still be running in your Minikube
 sandbox, but using binaries built from your local source code instead
 of the public images.
 
+*Note for MacOS users:* Since Docker is run inside a virtual machine in MacOS the local registry won't work out of the box and so won't ```fab push```. Instead it is necessary to add ```docker.for.mac.localhost:5000``` under **Insecure registries** in your Docker daemon preferences and run ```fab push:registry=docker.for.mac.localhost:5000```
+
+[![Docker for Mac config](/images/dockerformacconfig.png)](/images/dockerformacconfig.png)
+
 Note that if you push a binary that crash-loops in Kubernetes, the
 final waiting stage may never complete, because Fabric is waiting for
 a rollout that will never succeed. If that happens, it's safe to
