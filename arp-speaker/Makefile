@@ -2,7 +2,13 @@ SYSTEM:=
 DOCKER:=miek
 NAME:=arp-speaker
 DOCKER_IMAGE_NAME:=$(DOCKER)/$(NAME)
+
+EMPTY :=
+SPACE := $(EMPTY) $(EMPTY)
+COMMA := $(EMPTY),$(EMPTY)
+
 LINUX_ARCH:=amd64 arm arm64 ppc64le s390x
+PLATFORMS:=$(subst $(SPACE),$(COMMA),$(foreach arch,$(LINUX_ARCH),linux/$(arch)))
 
 ifeq (, $(shell which manifest-tool))
     $(error "No manifest-tool in $$PATH, install with: go get github.com/estesp/manifest-tool")
@@ -19,14 +25,14 @@ arp-speaker: main.go
 
 .PHONY: docker-build
 docker-build: build
-	# 1. Assume binary is build in build/docker/linux/<arch>s
-	# 2. Copy Dockerfile to build/docker/linux/<arch>
+	# 1. Assume binary is build in build/x/linux/<arch>s
+	# 2. Copy Dockerfile to build/linux/<arch>
 	# 3. Replace base image from alpine:latest to <arch>/alpine:latest
 	# <arch>:
 	# arm: arm32v6
 	# arm64: arm64v8
 	for arch in $(LINUX_ARCH); do \
-	    cp Dockerfile build/docker/linux/$$arch ;\
+	    cp Dockerfile build/linux/$$arch ;\
 	    if [ $$arch != amd64 ]; then \
 		case $$arch in \
 	        arm) \
@@ -39,9 +45,9 @@ docker-build: build
 	            BASEIMAGE=$$arch ;\
 	            ;; \
 	        esac ;\
-	        sed -e "s/alpine:latest/$$BASEIMAGE\\/alpine:latest/" -i build/docker/linux/$$arch/Dockerfile ;\
+	        sed -e "s/alpine:latest/$$BASEIMAGE\\/alpine:latest/" -i build/linux/$$arch/Dockerfile ;\
 	    fi ;\
-	    docker build -t arp-speaker build/docker/linux/$$arch ;\
+	    docker build -t arp-speaker build/linux/$$arch ;\
 	    docker tag arp-speaker $(DOCKER_IMAGE_NAME):arp-speaker-$$arch ;\
 	done
 
