@@ -9,6 +9,7 @@ Installing MetalLB is very simple: just apply the manifest!
 
 This will deploy MetalLB to your cluster, under the `metallb-system`
 namespace. The components in the manifest are:
+
 - The `metallb-system/controller` deployment. This is the cluster-wide
   controller that handles IP address assignments.
 - The `metallb-system/bgp-speaker` daemonset. This is the component

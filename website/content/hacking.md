@@ -42,6 +42,7 @@ MetalLB's code is divided between a number of binaries, and some
 supporting libraries. The libraries live in the `internal` directory,
 and each binary has its own top-level directory. Here's what we
 currently have, relative to the top-level directory:
+
 - `controller` is the cluster-wide MetalLB controller, in charge of
   IP assignment.
 - `bgp-speaker` is the per-node daemon that advertises services with
@@ -67,6 +68,7 @@ currently have, relative to the top-level directory:
 
 In addition to code, there's deployment configuration and
 documentation:
+
 - `docs` contains various documents, such as a tutorial, an
   installation guide, and this hacking guide.
 - `dockerfiles` contains the Docker build configurations that package
@@ -81,6 +83,7 @@ documentation:
 ## Required software
 
 To develop MetalLB, you'll need a couple of pieces of software:
+
 - [git](https://git-scm.com), the version control system
 - The [Go](https://golang.org) programming language (notably the `go`
   tool)
@@ -115,6 +118,7 @@ setup, but running your locally built binaries.
 ### Sandbox setup
 
 Start by running `fab start`. This will:
+
 - Create the Minikube sandbox in a local VM
 - Enable the registry addon, so that we can host container images in the sandbox
 - Deploy `test-bgp-router`, which sets up BIRD, Quagga and GoBGP routers as a
@@ -134,6 +138,7 @@ by the test routers.
 
 When you're ready to test a local change you've made to MetalLB, run
 `fab push`. This will:
+
 - Build all MetalLB binaries (`controller`, `bgp-speaker`, and `test-bgp-router`)
 - Build ephemeral container images with those binaries inside
 - Push the ephemeral containers to Minikube's internal container registry
@@ -144,7 +149,12 @@ Once the push is done, MetalLB will still be running in your Minikube
 sandbox, but using binaries built from your local source code instead
 of the public images.
 
-*Note for MacOS users:* Since Docker is run inside a virtual machine in MacOS the local registry won't work out of the box and so won't ```fab push```. Instead it is necessary to add ```docker.for.mac.localhost:5000``` under **Insecure registries** in your Docker daemon preferences and run ```fab push:registry=docker.for.mac.localhost:5000```
+*Note for MacOS users:* Since Docker is run inside a virtual machine
+in MacOS the local registry won't work out of the box and so won't
+```fab push```. Instead it is necessary to add
+```docker.for.mac.localhost:5000``` under **Insecure registries** in
+your Docker daemon preferences and run ```fab
+push:registry=docker.for.mac.localhost:5000```
 
 [![Docker for Mac config](/images/dockerformacconfig.png)](/images/dockerformacconfig.png)
 

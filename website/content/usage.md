@@ -12,6 +12,7 @@ annotated with explanatory comments.
 
 For a basic configuration featuring one BGP router and one IP address
 range, you need 4 pieces of information:
+
 - The router IP address that MetalLB should connect to,
 - The router's AS number,
 - The AS number MetalLB should use,
@@ -234,6 +235,7 @@ packet loss or blackholing, just a one-time clean break.
 
 Depending on what your services do, there are a couple of mitigation
 strategies you can employ:
+
 - Pin your service deployments to specific nodes, to minimize the pool
   of nodes that you have to be "careful" about.
 - Schedule changes to your service deployments during "trough", when
