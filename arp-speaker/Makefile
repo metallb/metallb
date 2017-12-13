@@ -41,15 +41,15 @@ docker-build: build
 	        esac ;\
 	        sed -e "s/alpine:latest/$$BASEIMAGE\\/alpine:latest/" -i build/docker/linux/$$arch/Dockerfile ;\
 	    fi ;\
-	    docker build -t coredns build/docker/linux/$$arch ;\
-	    docker tag coredns $(DOCKER_IMAGE_NAME):coredns-$$arch ;\
+	    docker build -t arp-speaker build/docker/linux/$$arch ;\
+	    docker tag arp-speaker $(DOCKER_IMAGE_NAME):arp-speaker-$$arch ;\
 	done
 
 .PHONY: docker-upload
 docker-upload:
 	@echo Pushing: $(VERSION)
 	for arch in $(LINUX_ARCH); do \
-	    docker push $(DOCKER_IMAGE_NAME):coredns-$$arch ;\
+	    docker push $(DOCKER_IMAGE_NAME):arp-speaker-$$arch ;\
 	done
-	manifest-tool push from-args --platforms $(PLATFORMS) --template $(DOCKER_IMAGE_NAME):coredns-ARCH --target $(DOCKER_IMAGE_NAME):$(VERSION)
-	manifest-tool push from-args --platforms $(PLATFORMS) --template $(DOCKER_IMAGE_NAME):coredns-ARCH --target $(DOCKER_IMAGE_NAME):latest
+	manifest-tool push from-args --platforms $(PLATFORMS) --template $(DOCKER_IMAGE_NAME):arp-speaker-ARCH --target $(DOCKER_IMAGE_NAME):$(VERSION)
+	manifest-tool push from-args --platforms $(PLATFORMS) --template $(DOCKER_IMAGE_NAME):arp-speaker-ARCH --target $(DOCKER_IMAGE_NAME):latest
