@@ -143,8 +143,9 @@ def _build(ts, name, registry):
             local("sudo docker push %s/%s:%s" % (registry, name, ts))
         local("sudo docker rmi %s/%s:%s" % (registry, name, ts))
 
-def _set_image(ts, name, job):
-    local("kubectl set image -n metallb-system {2} {1}={3}/{1}:{0}".format(ts, name, job, _registry_clusterip()))
+def _set_image(ts, name, job, registry):
+    set_from_registry = _registry_clusterip() if "localhost" in registry else registry
+    local("kubectl set image -n metallb-system {2} {1}={3}/{1}:{0}".format(ts, name, job, registry))
 
 def _wait_for_rollout(typ, name):
     local("kubectl rollout status -n metallb-system {0} {1}".format(typ, name))
@@ -159,9 +160,9 @@ def push(registry="localhost:5000"):
     _build(ts, "bgp-speaker", registry)
     _build(ts, "test-bgp-router", registry)
 
-    _set_image(ts, "controller", "deploy/controller")
-    _set_image(ts, "bgp-speaker", "ds/bgp-speaker")
-    _set_image(ts, "test-bgp-router", "deploy/test-bgp-router")
+    _set_image(ts, "controller", "deploy/controller", registry)
+    _set_image(ts, "bgp-speaker", "ds/bgp-speaker", registry)
+    _set_image(ts, "test-bgp-router", "deploy/test-bgp-router", registry)
 
     _wait_for_rollout("deployment", "controller")
     _wait_for_rollout("daemonset", "bgp-speaker")
