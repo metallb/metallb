@@ -69,8 +69,6 @@ currently have, relative to the top-level directory:
 In addition to code, there's deployment configuration and
 documentation:
 
-- `docs` contains various documents, such as a tutorial, an
-  installation guide, and this hacking guide.
 - `dockerfiles` contains the Docker build configurations that package
   MetalLB into container images. It contains one set of "prod"
   configurations, which is what users of MetalLB install, and one set
@@ -79,6 +77,8 @@ documentation:
 - `manifests` contains a variety of Kubernetes manifests. The most
   important one is `manifests/metallb.yaml`, which specifies how to
   deploy MetalLB onto a cluster.
+- `website` contains the website for MetalLB. The `website/content`
+  subdirectory is where all the pages live, in Markdown format.
 
 ## Required software
 
@@ -200,3 +200,25 @@ for use in documentation and example code. It's fine to use it with
 our `test-bgp-router`, since they doesn't propagate the addresses
 beyond themselves, but if you try injecting those addresses into a
 real network, you may run into trouble.
+
+## The website
+
+The website at https://metallb.universe.tf is pinned to the latest
+released version, so that users who don't care about ongoing
+development see documentation that is consistent with the released
+code.
+
+However, there is a version of the website synced to the latest master
+branch
+at
+[https://master--metallb.netlify.com](https://master--metallb.netlify.com). Similarly,
+every branch has a published website at `<branch
+name>--metallb.netlify.com`. So if you want to view the documentation
+for the 0.2 version, regardless of what the currently released version
+is, you can
+visit
+[https://v0.2--metallb.netlify.com](https://v0.2--metallb.netlify.com).
+
+When editing the website, you can preview your changes locally by
+installing [Hugo](https://gohugo.io/) and running `hugo server` from
+the `website` directory.
