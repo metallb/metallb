@@ -143,6 +143,7 @@ func newController(myIP net.IP, myNode string) (*controller, error) {
 		myIP:   myIP,
 		myNode: myNode,
 		ips:    allocator.New(),
+		ann:    ann,
 
 		announcing: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: "metallb",
