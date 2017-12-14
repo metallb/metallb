@@ -52,7 +52,6 @@ def release(version):
     # need to pip install.
     import semver
 
-    _versions_md(None)
     if _silent("git status --porcelain"):
         _error("git working directory not clean, cannot prepare release")
     vi = semver.parse_version_info(version)
