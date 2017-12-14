@@ -1,3 +1,5 @@
+// +build darwin
+
 package raw
 
 import (

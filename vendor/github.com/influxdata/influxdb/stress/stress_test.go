@@ -54,7 +54,8 @@ func TestTimer_Elapsed(t *testing.T) {
 	time.Sleep(2 * time.Second)
 	tmr.StopTimer()
 	e := tmr.Elapsed()
-	if time.Duration(2*time.Second) > e || e > time.Duration(3*time.Second) {
+
+	if time.Duration(1990*time.Millisecond) > e || e > time.Duration(3*time.Second) {
 		t.Errorf("expected around %s got %s", time.Duration(2*time.Second), e)
 	}
 }
@@ -387,7 +388,10 @@ var basicQC = &BasicQueryClient{
 
 func TestBasicQueryClient_Query(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		time.Sleep(50 * time.Millisecond)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.Header().Set("X-Influxdb-Version", "x.x")
+		w.Header().Set("X-Influxdb-Build", "OSS")
 		var data client.Response
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(data)
@@ -412,8 +416,8 @@ func TestBasicQueryClient_Query(t *testing.T) {
 	}
 
 	elapsed := r.Timer.Elapsed()
-	if elapsed == time.Duration(0) {
-		t.Errorf("Expected %v to not be 0", elapsed)
+	if elapsed.Nanoseconds() == 0 {
+		t.Errorf("Expected %v to not be 0", elapsed.Nanoseconds())
 	}
 
 }

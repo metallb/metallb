@@ -32,8 +32,8 @@ type Client struct {
 // to send and receive ARP packets.
 func Dial(ifi *net.Interface) (*Client, error) {
 	// Open raw socket to send and receive ARP packets using ethernet frames
-	// we build ourselves
-	p, err := raw.ListenPacket(ifi, protocolARP)
+	// we build ourselves.
+	p, err := raw.ListenPacket(ifi, protocolARP, nil)
 	if err != nil {
 		return nil, err
 	}

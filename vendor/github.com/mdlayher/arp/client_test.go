@@ -1,7 +1,6 @@
 package arp
 
 import (
-	"bytes"
 	"net"
 	"reflect"
 	"testing"
@@ -228,7 +227,7 @@ func Test_firstIPv4Addr(t *testing.T) {
 			continue
 		}
 
-		if want, got := tt.ip.To4(), ip.To4(); !bytes.Equal(want, got) {
+		if want, got := tt.ip.To4(), ip.To4(); !want.Equal(got) {
 			t.Fatalf("[%02d] test %q, unexpected IPv4 address: %v != %v",
 				i, tt.desc, want, got)
 		}

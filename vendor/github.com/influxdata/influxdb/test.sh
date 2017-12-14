@@ -6,11 +6,10 @@
 # Usage: ./test.sh <environment_index>
 # Corresponding environments for environment_index:
 #      0: normal 64bit tests
-#      1: tsm 64bit tests
-#      2: race enabled 64bit tests
-#      3: normal 32bit tests
-#      4: normal 64bit tests against Go 1.6
-#      save: build the docker images and save them to DOCKER_SAVE_DIR. Do not run tests.
+#      1: race enabled 64bit tests
+#      2: normal 32bit tests
+#      3: tsi build
+#      4: go 1.9
 #      count: print the number of test environments
 #      *: to run all tests in parallel containers
 #
@@ -24,12 +23,10 @@ cd $DIR
 ENVIRONMENT_INDEX=$1
 # Set the default OUTPUT_DIR
 OUTPUT_DIR=${OUTPUT_DIR-./test-logs}
-# Set the default DOCKER_SAVE_DIR
-DOCKER_SAVE_DIR=${DOCKER_SAVE_DIR-$HOME/docker}
 # Set default parallelism
 PARALLELISM=${PARALLELISM-1}
 # Set default timeout
-TIMEOUT=${TIMEOUT-480s}
+TIMEOUT=${TIMEOUT-1200s}
 
 # Default to deleteing the container
 DOCKER_RM=${DOCKER_RM-true}
@@ -76,6 +73,8 @@ function run_test_docker {
          -e "INFLUXDB_DATA_ENGINE=$INFLUXDB_DATA_ENGINE" \
          -e "GORACE=$GORACE" \
          -e "GO_CHECKOUT=$GO_CHECKOUT" \
+         -e "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" \
+         -e "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" \
          "$imagename" \
          "--parallel=$PARALLELISM" \
          "--timeout=$TIMEOUT" \
@@ -91,36 +90,9 @@ function build_docker_image {
     local imagename=$2
 
     echo "Building docker image $imagename"
-    exit_if_fail docker build -f "$dockerfile" -t "$imagename" .
+    exit_if_fail docker build --rm=$DOCKER_RM -f "$dockerfile" -t "$imagename" .
 }
 
-
-# Saves a docker image to $DOCKER_SAVE_DIR
-function save_docker_image {
-    local dockerfile=$1
-    local imagename=$(filename2imagename "$dockerfile")
-    local imagefile="$DOCKER_SAVE_DIR/${imagename}.tar.gz"
-
-    if [ ! -d  "$DOCKER_SAVE_DIR" ]
-    then
-        mkdir -p "$DOCKER_SAVE_DIR"
-    fi
-
-    if [[ -e "$imagefile" ]]
-    then
-        zcat $imagefile | docker load
-    fi
-    imageid=$(docker images -q --no-trunc "$imagename")
-    build_docker_image "$dockerfile" "$imagename"
-    newimageid=$(docker images -q --no-trunc "$imagename")
-    rc=0
-    if [ "$imageid" != "$newimageid" ]
-    then
-        docker save "$imagename" | gzip > "$imagefile"
-        rc="${PIPESTATUS[0]}"
-    fi
-    return "$rc"
-}
 
 if [ ! -d "$OUTPUT_DIR" ]
 then
@@ -131,56 +103,30 @@ fi
 case $ENVIRONMENT_INDEX in
     0)
         # 64 bit tests
-        run_test_docker Dockerfile_build_ubuntu64 test_64bit --debug --generate --test
+        run_test_docker Dockerfile_build_ubuntu64 test_64bit --test --junit-report
         rc=$?
         ;;
     1)
-        # 64 bit tsm tests
-        INFLUXDB_DATA_ENGINE="tsm1"
-        run_test_docker Dockerfile_build_ubuntu64 test_64bit_tsm --debug --generate --test
+        # 64 bit race tests
+        GORACE="halt_on_error=1"
+        run_test_docker Dockerfile_build_ubuntu64 test_64bit_race --test --junit-report --race
         rc=$?
         ;;
     2)
-        # 64 bit race tests
-        GORACE="halt_on_error=1"
-        run_test_docker Dockerfile_build_ubuntu64 test_64bit_race --debug --generate --test --race
+        # 32 bit tests
+        run_test_docker Dockerfile_build_ubuntu32 test_32bit --test --junit-report --arch=i386
         rc=$?
         ;;
     3)
-        # 32 bit tests
-        run_test_docker Dockerfile_build_ubuntu32 test_32bit --debug --generate --test
+        # tsi
+        INFLUXDB_DATA_INDEX_VERSION="tsi1"
+        run_test_docker Dockerfile_build_ubuntu64 test_64bit --test --junit-report
         rc=$?
         ;;
     4)
-        # 64 bit tests on golang go1.6
-        GO_CHECKOUT=go1.6
-        run_test_docker Dockerfile_build_ubuntu64_git test_64bit_go1.6 --debug --generate --test --no-vet
+        # go1.9
+        run_test_docker Dockerfile_build_ubuntu64_go19 test_64bit --test --junit-report
         rc=$?
-        ;;
-    "save")
-        # Save docker images for every Dockerfile_build* file.
-        # Useful for creating an external cache.
-        pids=()
-        for d in Dockerfile_build*
-        do
-            echo "Building and saving $d ..."
-            save_docker_image "$d" > $OUTPUT_DIR/${d}.log 2>&1 &
-            pids+=($!)
-        done
-        echo "Waiting..."
-        # Wait for all saves to finish
-        for pid in "${pids[@]}"
-        do
-            wait $pid
-            rc=$(($? + $rc))
-        done
-        # Check if all saves passed
-        if [ $rc -eq 0 ]
-        then
-            echo "All saves succeeded"
-        else
-            echo "Some saves failed, check logs in $OUTPUT_DIR"
-        fi
         ;;
     "count")
         echo $ENV_COUNT
@@ -216,4 +162,3 @@ case $ENVIRONMENT_INDEX in
 esac
 
 exit $rc
-

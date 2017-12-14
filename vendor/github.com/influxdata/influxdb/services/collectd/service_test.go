@@ -4,40 +4,184 @@ import (
 	"encoding/hex"
 	"errors"
 	"io/ioutil"
-	"log"
 	"net"
+	"os"
+	"path"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/influxdata/influxdb/internal"
+	"github.com/influxdata/influxdb/logger"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/toml"
 )
 
-// Test that the service checks / creates the target database on startup.
+func TestService_OpenClose(t *testing.T) {
+	service := NewTestService(1, time.Second, "split")
+
+	// Closing a closed service is fine.
+	if err := service.Service.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Closing a closed service again is fine.
+	if err := service.Service.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := service.Service.Open(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Opening an already open service is fine.
+	if err := service.Service.Open(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Reopening a previously opened service is fine.
+	if err := service.Service.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := service.Service.Open(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Tidy up.
+	if err := service.Service.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Test that the service can read types DB files from a directory.
+func TestService_Open_TypesDBDir(t *testing.T) {
+	t.Parallel()
+
+	// Make a temp dir to write types.db into.
+	tmpDir, err := ioutil.TempDir(os.TempDir(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	// Write types.db.
+	if err := ioutil.WriteFile(path.Join(tmpDir, "types.db"), []byte(typesDBText), 0777); err != nil {
+		t.Fatal(err)
+	}
+
+	// Setup config to read all files in the temp dir.
+	c := Config{
+		BindAddress:   "127.0.0.1:0",
+		Database:      "collectd_test",
+		BatchSize:     1000,
+		BatchDuration: toml.Duration(time.Second),
+		TypesDB:       tmpDir,
+	}
+
+	s := &TestService{
+		Config:     c,
+		Service:    NewService(c),
+		MetaClient: &internal.MetaClientMock{},
+	}
+
+	if testing.Verbose() {
+		s.Service.WithLogger(logger.New(os.Stderr))
+	}
+
+	s.MetaClient.CreateDatabaseFn = func(name string) (*meta.DatabaseInfo, error) {
+		return nil, nil
+	}
+
+	s.Service.PointsWriter = s
+	s.Service.MetaClient = s.MetaClient
+
+	if err := s.Service.Open(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := s.Service.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Test that the service checks / creates the target database every time we
+// try to write points.
 func TestService_CreatesDatabase(t *testing.T) {
 	t.Parallel()
 
-	s := newTestService(1, time.Second)
+	s := NewTestService(1, time.Second, "split")
 
-	createDatabaseCalled := false
+	s.WritePointsFn = func(string, string, models.ConsistencyLevel, []models.Point) error {
+		return nil
+	}
 
-	ms := &testMetaClient{}
-	ms.CreateDatabaseIfNotExistsFn = func(name string) (*meta.DatabaseInfo, error) {
+	called := make(chan struct{})
+	s.MetaClient.CreateDatabaseFn = func(name string) (*meta.DatabaseInfo, error) {
 		if name != s.Config.Database {
 			t.Errorf("\n\texp = %s\n\tgot = %s\n", s.Config.Database, name)
 		}
-		createDatabaseCalled = true
+		// Allow some time for the caller to return and the ready status to
+		// be set.
+		time.AfterFunc(10*time.Millisecond, func() { called <- struct{}{} })
+		return nil, errors.New("an error")
+	}
+
+	if err := s.Service.Open(); err != nil {
+		t.Fatal(err)
+	}
+
+	points, err := models.ParsePointsString(`cpu value=1`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s.Service.batcher.In() <- points[0] // Send a point.
+	s.Service.batcher.Flush()
+	select {
+	case <-called:
+		// OK
+	case <-time.NewTimer(5 * time.Second).C:
+		t.Fatal("Service should have attempted to create database")
+	}
+
+	// ready status should not have been switched due to meta client error.
+	s.Service.mu.RLock()
+	ready := s.Service.ready
+	s.Service.mu.RUnlock()
+
+	if got, exp := ready, false; got != exp {
+		t.Fatalf("got %v, expected %v", got, exp)
+	}
+
+	// This time MC won't cause an error.
+	s.MetaClient.CreateDatabaseFn = func(name string) (*meta.DatabaseInfo, error) {
+		// Allow some time for the caller to return and the ready status to
+		// be set.
+		time.AfterFunc(10*time.Millisecond, func() { called <- struct{}{} })
 		return nil, nil
 	}
-	s.Service.MetaClient = ms
 
-	s.Open()
-	s.Close()
-
-	if !createDatabaseCalled {
-		t.Errorf("CreateDatabaseIfNotExists should have been called when the service opened.")
+	s.Service.batcher.In() <- points[0] // Send a point.
+	s.Service.batcher.Flush()
+	select {
+	case <-called:
+		// OK
+	case <-time.NewTimer(5 * time.Second).C:
+		t.Fatal("Service should have attempted to create database")
 	}
+
+	// ready status should not have been switched due to meta client error.
+	s.Service.mu.RLock()
+	ready = s.Service.ready
+	s.Service.mu.RUnlock()
+
+	if got, exp := ready, true; got != exp {
+		t.Fatalf("got %v, expected %v", got, exp)
+	}
+
+	s.Service.Close()
 }
 
 // Test that the collectd service correctly batches points by BatchSize.
@@ -51,11 +195,10 @@ func TestService_BatchSize(t *testing.T) {
 
 	for _, batchSize := range batchSizes {
 		func() {
-			s := newTestService(batchSize, time.Second)
+			s := NewTestService(batchSize, time.Second, "split")
 
 			pointCh := make(chan models.Point)
-			s.MetaClient.CreateDatabaseIfNotExistsFn = func(name string) (*meta.DatabaseInfo, error) { return nil, nil }
-			s.PointsWriter.WritePointsFn = func(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error {
+			s.WritePointsFn = func(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error {
 				if len(points) != batchSize {
 					t.Errorf("\n\texp = %d\n\tgot = %d\n", batchSize, len(points))
 				}
@@ -66,13 +209,13 @@ func TestService_BatchSize(t *testing.T) {
 				return nil
 			}
 
-			if err := s.Open(); err != nil {
+			if err := s.Service.Open(); err != nil {
 				t.Fatal(err)
 			}
-			defer func() { t.Log("closing service"); s.Close() }()
+			defer func() { t.Log("closing service"); s.Service.Close() }()
 
 			// Get the address & port the service is listening on for collectd data.
-			addr := s.Addr()
+			addr := s.Service.Addr()
 			conn, err := net.Dial("udp", addr.String())
 			if err != nil {
 				t.Fatal(err)
@@ -85,16 +228,18 @@ func TestService_BatchSize(t *testing.T) {
 				t.Fatalf("only sent %d of %d bytes", n, len(testData))
 			}
 
-			points := []models.Point{}
+			var points []models.Point
+			timer := time.NewTimer(time.Second)
 		Loop:
 			for {
+				timer.Reset(time.Second)
 				select {
 				case p := <-pointCh:
 					points = append(points, p)
 					if len(points) == totalPoints {
 						break Loop
 					}
-				case <-time.After(time.Second):
+				case <-timer.C:
 					t.Logf("exp %d points, got %d", totalPoints, len(points))
 					t.Fatal("timed out waiting for points from collectd service")
 				}
@@ -114,30 +259,30 @@ func TestService_BatchSize(t *testing.T) {
 	}
 }
 
-// Test that the collectd service correctly batches points using BatchDuration.
-func TestService_BatchDuration(t *testing.T) {
+// Test that the parse-multi-value-plugin config works properly.
+// The other tests already verify the 'split' config, so this only runs the 'join' test.
+func TestService_ParseMultiValuePlugin(t *testing.T) {
 	t.Parallel()
 
-	totalPoints := len(expPoints)
+	totalPoints := len(expPointsTupled)
 
-	s := newTestService(5000, 250*time.Millisecond)
+	s := NewTestService(1, time.Second, "join")
 
 	pointCh := make(chan models.Point, 1000)
-	s.MetaClient.CreateDatabaseIfNotExistsFn = func(name string) (*meta.DatabaseInfo, error) { return nil, nil }
-	s.PointsWriter.WritePointsFn = func(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error {
+	s.WritePointsFn = func(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error {
 		for _, p := range points {
 			pointCh <- p
 		}
 		return nil
 	}
 
-	if err := s.Open(); err != nil {
+	if err := s.Service.Open(); err != nil {
 		t.Fatal(err)
 	}
-	defer func() { t.Log("closing service"); s.Close() }()
+	defer func() { t.Log("closing service"); s.Service.Close() }()
 
 	// Get the address & port the service is listening on for collectd data.
-	addr := s.Addr()
+	addr := s.Service.Addr()
 	conn, err := net.Dial("udp", addr.String())
 	if err != nil {
 		t.Fatal(err)
@@ -150,16 +295,80 @@ func TestService_BatchDuration(t *testing.T) {
 		t.Fatalf("only sent %d of %d bytes", n, len(testData))
 	}
 
-	points := []models.Point{}
+	var points []models.Point
+
+	timer := time.NewTimer(time.Second)
 Loop:
 	for {
+		timer.Reset(time.Second)
 		select {
 		case p := <-pointCh:
 			points = append(points, p)
 			if len(points) == totalPoints {
 				break Loop
 			}
-		case <-time.After(time.Second):
+		case <-timer.C:
+			t.Logf("exp %d points, got %d", totalPoints, len(points))
+			t.Fatal("timed out waiting for points from collectd service")
+		}
+	}
+
+	for i, exp := range expPointsTupled {
+		got := points[i].String()
+		if got != exp {
+			t.Fatalf("\n\texp = %s\n\tgot = %s\n", exp, got)
+		}
+	}
+
+}
+
+// Test that the collectd service correctly batches points using BatchDuration.
+func TestService_BatchDuration(t *testing.T) {
+	t.Parallel()
+
+	totalPoints := len(expPoints)
+
+	s := NewTestService(5000, 250*time.Millisecond, "split")
+
+	pointCh := make(chan models.Point, 1000)
+	s.WritePointsFn = func(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error {
+		for _, p := range points {
+			pointCh <- p
+		}
+		return nil
+	}
+
+	if err := s.Service.Open(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { t.Log("closing service"); s.Service.Close() }()
+
+	// Get the address & port the service is listening on for collectd data.
+	addr := s.Service.Addr()
+	conn, err := net.Dial("udp", addr.String())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Send the test data to the service.
+	if n, err := conn.Write(testData); err != nil {
+		t.Fatal(err)
+	} else if n != len(testData) {
+		t.Fatalf("only sent %d of %d bytes", n, len(testData))
+	}
+
+	var points []models.Point
+	timer := time.NewTimer(time.Second)
+Loop:
+	for {
+		timer.Reset(time.Second)
+		select {
+		case p := <-pointCh:
+			points = append(points, p)
+			if len(points) == totalPoints {
+				break Loop
+			}
+		case <-timer.C:
 			t.Logf("exp %d points, got %d", totalPoints, len(points))
 			t.Fatal("timed out waiting for points from collectd service")
 		}
@@ -177,69 +386,49 @@ Loop:
 	}
 }
 
-type testService struct {
-	*Service
-	MetaClient   testMetaClient
-	PointsWriter testPointsWriter
+type TestService struct {
+	Service       *Service
+	Config        Config
+	MetaClient    *internal.MetaClientMock
+	WritePointsFn func(string, string, models.ConsistencyLevel, []models.Point) error
 }
 
-func newTestService(batchSize int, batchDuration time.Duration) *testService {
-	s := &testService{
-		Service: NewService(Config{
-			BindAddress:   "127.0.0.1:0",
-			Database:      "collectd_test",
-			BatchSize:     batchSize,
-			BatchDuration: toml.Duration(batchDuration),
-		}),
+func NewTestService(batchSize int, batchDuration time.Duration, parseOpt string) *TestService {
+	c := Config{
+		BindAddress:           "127.0.0.1:0",
+		Database:              "collectd_test",
+		BatchSize:             batchSize,
+		BatchDuration:         toml.Duration(batchDuration),
+		ParseMultiValuePlugin: parseOpt,
 	}
-	s.Service.PointsWriter = &s.PointsWriter
-	s.Service.MetaClient = &s.MetaClient
+
+	s := &TestService{
+		Config:     c,
+		Service:    NewService(c),
+		MetaClient: &internal.MetaClientMock{},
+	}
+
+	s.MetaClient.CreateDatabaseFn = func(name string) (*meta.DatabaseInfo, error) {
+		return nil, nil
+	}
+
+	s.Service.PointsWriter = s
+	s.Service.MetaClient = s.MetaClient
 
 	// Set the collectd types using test string.
-	if err := s.SetTypes(typesDBText); err != nil {
+	if err := s.Service.SetTypes(typesDBText); err != nil {
 		panic(err)
 	}
 
-	if !testing.Verbose() {
-		s.Logger = log.New(ioutil.Discard, "", log.LstdFlags)
+	if testing.Verbose() {
+		s.Service.WithLogger(logger.New(os.Stderr))
 	}
 
 	return s
 }
 
-type testPointsWriter struct {
-	WritePointsFn func(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
-}
-
-func (w *testPointsWriter) WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error {
+func (w *TestService) WritePointsPrivileged(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error {
 	return w.WritePointsFn(database, retentionPolicy, consistencyLevel, points)
-}
-
-type testMetaClient struct {
-	CreateDatabaseIfNotExistsFn func(name string) (*meta.DatabaseInfo, error)
-	//DatabaseFn func(name string) (*meta.DatabaseInfo, error)
-}
-
-func (ms *testMetaClient) CreateDatabase(name string) (*meta.DatabaseInfo, error) {
-	return ms.CreateDatabaseIfNotExistsFn(name)
-}
-
-func wait(c chan struct{}, d time.Duration) (err error) {
-	select {
-	case <-c:
-	case <-time.After(d):
-		err = errors.New("timed out")
-	}
-	return
-}
-
-func waitInt(c chan int, d time.Duration) (i int, err error) {
-	select {
-	case i = <-c:
-	case <-time.After(d):
-		err = errors.New("timed out")
-	}
-	return
 }
 
 func check(err error) {
@@ -250,7 +439,31 @@ func check(err error) {
 
 // Raw data sent by collectd, captured using Wireshark.
 var testData = func() []byte {
-	b, err := hex.DecodeString("000000167066312d36322d3231302d39342d313733000001000c00000000544928ff0007000c00000000000000050002000c656e74726f7079000004000c656e74726f7079000006000f0001010000000000007240000200086370750000030006310000040008637075000005000969646c65000006000f0001000000000000a674620005000977616974000006000f0001000000000000000000000200076466000003000500000400076466000005000d6c6976652d636f7700000600180002010100000000a090b641000000a0cb6a2742000200086370750000030006310000040008637075000005000e696e74657272757074000006000f00010000000000000000fe0005000c736f6674697271000006000f000100000000000000000000020007646600000300050000040007646600000500096c6976650000060018000201010000000000000000000000e0ec972742000200086370750000030006310000040008637075000005000a737465616c000006000f00010000000000000000000003000632000005000975736572000006000f0001000000000000005f36000500096e696365000006000f0001000000000000000ad80002000e696e746572666163650000030005000004000e69665f6f6374657473000005000b64756d6d79300000060018000200000000000000000000000000000000041a000200076466000004000764660000050008746d70000006001800020101000000000000f240000000a0ea972742000200086370750000030006320000040008637075000005000b73797374656d000006000f00010000000000000045d30002000e696e746572666163650000030005000004000f69665f7061636b657473000005000b64756d6d79300000060018000200000000000000000000000000000000000f000200086370750000030006320000040008637075000005000969646c65000006000f0001000000000000a66480000200076466000003000500000400076466000005000d72756e2d6c6f636b000006001800020101000000000000000000000000000054410002000e696e74657266616365000004000e69665f6572726f7273000005000b64756d6d793000000600180002000000000000000000000000000000000000000200086370750000030006320000040008637075000005000977616974000006000f00010000000000000000000005000e696e74657272757074000006000f0001000000000000000132")
+	data := []string{
+		"000000167066312d36322d3231302d39342d313733000001000c00000000544928ff0007000c0000000",
+		"0000000050002000c656e74726f7079000004000c656e74726f7079000006000f000101000000000000",
+		"7240000200086370750000030006310000040008637075000005000969646c65000006000f000100000",
+		"0000000a674620005000977616974000006000f00010000000000000000000002000764660000030005",
+		"00000400076466000005000d6c6976652d636f7700000600180002010100000000a090b641000000a0c",
+		"b6a2742000200086370750000030006310000040008637075000005000e696e74657272757074000006",
+		"000f00010000000000000000fe0005000c736f6674697271000006000f0001000000000000000000000",
+		"20007646600000300050000040007646600000500096c69766500000600180002010100000000000000",
+		"00000000e0ec972742000200086370750000030006310000040008637075000005000a737465616c000",
+		"006000f00010000000000000000000003000632000005000975736572000006000f0001000000000000",
+		"005f36000500096e696365000006000f0001000000000000000ad80002000e696e74657266616365000",
+		"0030005000004000e69665f6f6374657473000005000b64756d6d793000000600180002000000000000",
+		"00000000000000000000041a000200076466000004000764660000050008746d7000000600180002010",
+		"1000000000000f240000000a0ea97274200020008637075000003000632000004000863707500000500",
+		"0b73797374656d000006000f00010000000000000045d30002000e696e7465726661636500000300050",
+		"00004000f69665f7061636b657473000005000b64756d6d793000000600180002000000000000000000",
+		"00000000000000000f000200086370750000030006320000040008637075000005000969646c6500000",
+		"6000f0001000000000000a66480000200076466000003000500000400076466000005000d72756e2d6c",
+		"6f636b000006001800020101000000000000000000000000000054410002000e696e746572666163650",
+		"00004000e69665f6572726f7273000005000b64756d6d79300000060018000200000000000000000000",
+		"00000000000000000002000863707500000300063200000400086370750000050009776169740000060",
+		"00f00010000000000000000000005000e696e74657272757074000006000f0001000000000000000132",
+	}
+	b, err := hex.DecodeString(strings.Join(data, ""))
 	check(err)
 	return b
 }()
@@ -282,6 +495,28 @@ var expPoints = []string{
 	"interface_tx,host=pf1-62-210-94-173,type=if_errors,type_instance=dummy0 value=0 1414080767000000000",
 	"cpu_value,host=pf1-62-210-94-173,instance=2,type=cpu,type_instance=wait value=0 1414080767000000000",
 	"cpu_value,host=pf1-62-210-94-173,instance=2,type=cpu,type_instance=interrupt value=306 1414080767000000000",
+}
+
+var expPointsTupled = []string{
+	"entropy,host=pf1-62-210-94-173,type=entropy value=288 1414080767000000000",
+	"cpu,host=pf1-62-210-94-173,instance=1,type=cpu,type_instance=idle value=10908770 1414080767000000000",
+	"cpu,host=pf1-62-210-94-173,instance=1,type=cpu,type_instance=wait value=0 1414080767000000000",
+	"df,host=pf1-62-210-94-173,type=df,type_instance=live-cow free=50287988736,used=378576896 1414080767000000000",
+	"cpu,host=pf1-62-210-94-173,instance=1,type=cpu,type_instance=interrupt value=254 1414080767000000000",
+	"cpu,host=pf1-62-210-94-173,instance=1,type=cpu,type_instance=softirq value=0 1414080767000000000",
+	"df,host=pf1-62-210-94-173,type=df,type_instance=live free=50666565632,used=0 1414080767000000000",
+	"cpu,host=pf1-62-210-94-173,instance=1,type=cpu,type_instance=steal value=0 1414080767000000000",
+	"cpu,host=pf1-62-210-94-173,instance=2,type=cpu,type_instance=user value=24374 1414080767000000000",
+	"cpu,host=pf1-62-210-94-173,instance=2,type=cpu,type_instance=nice value=2776 1414080767000000000",
+	"interface,host=pf1-62-210-94-173,type=if_octets,type_instance=dummy0 rx=0,tx=1050 1414080767000000000",
+	"df,host=pf1-62-210-94-173,type=df,type_instance=tmp free=50666491904,used=73728 1414080767000000000",
+	"cpu,host=pf1-62-210-94-173,instance=2,type=cpu,type_instance=system value=17875 1414080767000000000",
+	"interface,host=pf1-62-210-94-173,type=if_packets,type_instance=dummy0 rx=0,tx=15 1414080767000000000",
+	"cpu,host=pf1-62-210-94-173,instance=2,type=cpu,type_instance=idle value=10904704 1414080767000000000",
+	"df,host=pf1-62-210-94-173,type=df,type_instance=run-lock free=5242880,used=0 1414080767000000000",
+	"interface,host=pf1-62-210-94-173,type=if_errors,type_instance=dummy0 rx=0,tx=0 1414080767000000000",
+	"cpu,host=pf1-62-210-94-173,instance=2,type=cpu,type_instance=wait value=0 1414080767000000000",
+	"cpu,host=pf1-62-210-94-173,instance=2,type=cpu,type_instance=interrupt value=306 1414080767000000000",
 }
 
 // Taken from /usr/share/collectd/types.db on a Ubuntu system

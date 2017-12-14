@@ -1,10 +1,11 @@
-package opentsdb_test
+package opentsdb
 
 import (
-	"io/ioutil"
-	"log"
+	"errors"
+	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"reflect"
 	"strings"
 	"sync/atomic"
@@ -12,24 +13,141 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
+	"github.com/influxdata/influxdb/internal"
+	"github.com/influxdata/influxdb/logger"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/services/meta"
-	"github.com/influxdata/influxdb/services/opentsdb"
 )
+
+func Test_Service_OpenClose(t *testing.T) {
+	// Let the OS assign a random port since we are only opening and closing the service,
+	// not actually connecting to it.
+	service := NewTestService("db0", "127.0.0.1:0")
+
+	// Closing a closed service is fine.
+	if err := service.Service.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Closing a closed service again is fine.
+	if err := service.Service.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := service.Service.Open(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Opening an already open service is fine.
+	if err := service.Service.Open(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Reopening a previously opened service is fine.
+	if err := service.Service.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := service.Service.Open(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Tidy up.
+	if err := service.Service.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Ensure a point can be written via the telnet protocol.
+func TestService_CreatesDatabase(t *testing.T) {
+	t.Parallel()
+
+	database := "db0"
+	s := NewTestService(database, "127.0.0.1:0")
+	s.WritePointsFn = func(string, string, models.ConsistencyLevel, []models.Point) error {
+		return nil
+	}
+
+	called := make(chan struct{})
+	s.MetaClient.CreateDatabaseFn = func(name string) (*meta.DatabaseInfo, error) {
+		if name != database {
+			t.Errorf("\n\texp = %s\n\tgot = %s\n", database, name)
+		}
+		// Allow some time for the caller to return and the ready status to
+		// be set.
+		time.AfterFunc(10*time.Millisecond, func() { called <- struct{}{} })
+		return nil, errors.New("an error")
+	}
+
+	if err := s.Service.Open(); err != nil {
+		t.Fatal(err)
+	}
+
+	points, err := models.ParsePointsString(`cpu value=1`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	s.Service.batcher.In() <- points[0] // Send a point.
+	s.Service.batcher.Flush()
+	select {
+	case <-called:
+		// OK
+	case <-time.NewTimer(5 * time.Second).C:
+		t.Fatal("Service should have attempted to create database")
+	}
+
+	// ready status should not have been switched due to meta client error.
+	s.Service.mu.RLock()
+	ready := s.Service.ready
+	s.Service.mu.RUnlock()
+
+	if got, exp := ready, false; got != exp {
+		t.Fatalf("got %v, expected %v", got, exp)
+	}
+
+	// This time MC won't cause an error.
+	s.MetaClient.CreateDatabaseFn = func(name string) (*meta.DatabaseInfo, error) {
+		// Allow some time for the caller to return and the ready status to
+		// be set.
+		time.AfterFunc(10*time.Millisecond, func() { called <- struct{}{} })
+		return nil, nil
+	}
+
+	s.Service.batcher.In() <- points[0] // Send a point.
+	s.Service.batcher.Flush()
+	select {
+	case <-called:
+		// OK
+	case <-time.NewTimer(5 * time.Second).C:
+		t.Fatal("Service should have attempted to create database")
+	}
+
+	// ready status should not have been switched due to meta client error.
+	s.Service.mu.RLock()
+	ready = s.Service.ready
+	s.Service.mu.RUnlock()
+
+	if got, exp := ready, true; got != exp {
+		t.Fatalf("got %v, expected %v", got, exp)
+	}
+
+	s.Service.Close()
+}
 
 // Ensure a point can be written via the telnet protocol.
 func TestService_Telnet(t *testing.T) {
 	t.Parallel()
 
-	s := NewService("db0")
-	if err := s.Open(); err != nil {
+	s := NewTestService("db0", "127.0.0.1:0")
+	if err := s.Service.Open(); err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer s.Service.Close()
 
 	// Mock points writer.
 	var called int32
-	s.PointsWriter.WritePointsFn = func(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error {
+	s.WritePointsFn = func(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error {
 		atomic.StoreInt32(&called, 1)
 
 		if database != "db0" {
@@ -39,7 +157,7 @@ func TestService_Telnet(t *testing.T) {
 		} else if !reflect.DeepEqual(points, []models.Point{
 			models.MustNewPoint(
 				"sys.cpu.user",
-				map[string]string{"host": "webserver01", "cpu": "0"},
+				models.NewTags(map[string]string{"host": "webserver01", "cpu": "0"}),
 				map[string]interface{}{"value": 42.5},
 				time.Unix(1356998400, 0),
 			),
@@ -50,7 +168,7 @@ func TestService_Telnet(t *testing.T) {
 	}
 
 	// Open connection to the service.
-	conn, err := net.Dial("tcp", s.Addr().String())
+	conn, err := net.Dial("tcp", s.Service.Addr().String())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,15 +202,15 @@ func TestService_Telnet(t *testing.T) {
 func TestService_HTTP(t *testing.T) {
 	t.Parallel()
 
-	s := NewService("db0")
-	if err := s.Open(); err != nil {
+	s := NewTestService("db0", "127.0.0.1:0")
+	if err := s.Service.Open(); err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer s.Service.Close()
 
 	// Mock points writer.
 	var called bool
-	s.PointsWriter.WritePointsFn = func(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error {
+	s.WritePointsFn = func(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error {
 		called = true
 		if database != "db0" {
 			t.Fatalf("unexpected database: %s", database)
@@ -101,7 +219,7 @@ func TestService_HTTP(t *testing.T) {
 		} else if !reflect.DeepEqual(points, []models.Point{
 			models.MustNewPoint(
 				"sys.cpu.nice",
-				map[string]string{"dc": "lga", "host": "web01"},
+				models.NewTags(map[string]string{"dc": "lga", "host": "web01"}),
 				map[string]interface{}{"value": 18.0},
 				time.Unix(1346846400, 0),
 			),
@@ -113,7 +231,7 @@ func TestService_HTTP(t *testing.T) {
 	}
 
 	// Write HTTP request to server.
-	resp, err := http.Post("http://"+s.Addr().String()+"/api/put", "application/json", strings.NewReader(`{"metric":"sys.cpu.nice", "timestamp":1346846400, "value":18, "tags":{"host":"web01", "dc":"lga"}}`))
+	resp, err := http.Post("http://"+s.Service.Addr().String()+"/api/put", "application/json", strings.NewReader(`{"metric":"sys.cpu.nice", "timestamp":1346846400, "value":18, "tags":{"host":"web01", "dc":"lga"}}`))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,41 +248,45 @@ func TestService_HTTP(t *testing.T) {
 	}
 }
 
-type Service struct {
-	*opentsdb.Service
-	PointsWriter PointsWriter
-}
-
-// NewService returns a new instance of Service.
-func NewService(database string) *Service {
-	srv, _ := opentsdb.NewService(opentsdb.Config{
-		BindAddress:      "127.0.0.1:0",
-		Database:         database,
-		ConsistencyLevel: "one",
-	})
-	s := &Service{Service: srv}
-	s.Service.PointsWriter = &s.PointsWriter
-	s.Service.MetaClient = &DatabaseCreator{}
-
-	if !testing.Verbose() {
-		s.Logger = log.New(ioutil.Discard, "", log.LstdFlags)
-	}
-
-	return s
-}
-
-// PointsWriter represents a mock impl of PointsWriter.
-type PointsWriter struct {
+type TestService struct {
+	Service       *Service
+	MetaClient    *internal.MetaClientMock
 	WritePointsFn func(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
 }
 
-func (w *PointsWriter) WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error {
-	return w.WritePointsFn(database, retentionPolicy, consistencyLevel, points)
+// NewTestService returns a new instance of Service.
+func NewTestService(database string, bind string) *TestService {
+	s, err := NewService(Config{
+		BindAddress:      bind,
+		Database:         database,
+		ConsistencyLevel: "one",
+	})
+
+	if err != nil {
+		panic(err)
+	}
+
+	service := &TestService{
+		Service:    s,
+		MetaClient: &internal.MetaClientMock{},
+	}
+
+	service.MetaClient.CreateDatabaseFn = func(db string) (*meta.DatabaseInfo, error) {
+		if got, exp := db, database; got != exp {
+			return nil, fmt.Errorf("got %v, expected %v", got, exp)
+		}
+		return nil, nil
+	}
+
+	if testing.Verbose() {
+		service.Service.WithLogger(logger.New(os.Stderr))
+	}
+
+	service.Service.MetaClient = service.MetaClient
+	service.Service.PointsWriter = service
+	return service
 }
 
-type DatabaseCreator struct {
-}
-
-func (d *DatabaseCreator) CreateDatabase(name string) (*meta.DatabaseInfo, error) {
-	return nil, nil
+func (s *TestService) WritePointsPrivileged(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error {
+	return s.WritePointsFn(database, retentionPolicy, consistencyLevel, points)
 }

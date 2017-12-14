@@ -102,11 +102,17 @@ func (c *Conn) SetPromiscuous(b bool) error {
 // data at the network interface device driver level.
 //
 // ifi specifies the network interface which will be used to send and receive
-// data.  proto specifies the protocol (usually the EtherType) which should be
+// data.
+//
+// proto specifies the protocol (usually the EtherType) which should be
 // captured and transmitted.  proto, if needed, is automatically converted to
 // network byte order (big endian), akin to the htons() function in C.
-func ListenPacket(ifi *net.Interface, proto uint16) (*Conn, error) {
-	p, err := listenPacket(ifi, proto)
+//
+// cfg specifies optional configuration which may be operating system-specific.
+// A nil Config is equivalent to the default configuration: send and receive
+// data at the network interface device driver level (usually raw Ethernet frames).
+func ListenPacket(ifi *net.Interface, proto uint16, cfg *Config) (*Conn, error) {
+	p, err := listenPacket(ifi, proto, cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -114,6 +120,13 @@ func ListenPacket(ifi *net.Interface, proto uint16) (*Conn, error) {
 	return &Conn{
 		p: p,
 	}, nil
+}
+
+// A Config can be used to specify additional options for a Conn.
+type Config struct {
+	// Linux only: call socket(7) with SOCK_DGRAM instead of SOCK_RAW.
+	// Has no effect on other operating systems.
+	LinuxSockDGRAM bool
 }
 
 // htons converts a short (uint16) from host-to-network byte order.

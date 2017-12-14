@@ -6042,6 +6042,20 @@ func (p *PathAttributeMpUnreachNLRI) Serialize(options ...*MarshallingOption) ([
 	return p.PathAttribute.Serialize(options...)
 }
 
+func (p *PathAttributeMpUnreachNLRI) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type  BGPAttrType           `json:"type"`
+		AFI   uint16                `json:"afi"`
+		SAFI  uint8                 `json:"safi"`
+		Value []AddrPrefixInterface `json:"value"`
+	}{
+		Type:  p.GetType(),
+		AFI:   p.AFI,
+		SAFI:  p.SAFI,
+		Value: p.Value,
+	})
+}
+
 func (p *PathAttributeMpUnreachNLRI) String() string {
 	if len(p.Value) > 0 {
 		return fmt.Sprintf("{MpUnreach(%s): {NLRIs: %s}}", AfiSafiToRouteFamily(p.AFI, p.SAFI), p.Value)

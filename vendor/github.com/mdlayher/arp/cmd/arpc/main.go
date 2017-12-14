@@ -37,6 +37,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer c.Close()
 
 	// Set request deadline from flag
 	if err := c.SetDeadline(time.Now().Add(*durFlag)); err != nil {
@@ -51,7 +52,4 @@ func main() {
 	}
 
 	fmt.Printf("%s -> %s", ip, mac)
-
-	// Clean up ARP client socket
-	_ = c.Close()
 }

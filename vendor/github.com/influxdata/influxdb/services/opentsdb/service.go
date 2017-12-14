@@ -1,28 +1,26 @@
+// Package opentsdb provides a service for InfluxDB to ingest data via the opentsdb protocol.
 package opentsdb // import "github.com/influxdata/influxdb/services/opentsdb"
 
 import (
 	"bufio"
 	"bytes"
 	"crypto/tls"
-	"expvar"
+	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/textproto"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/tsdb"
+	"go.uber.org/zap"
 )
-
-const leaderWaitTimeout = 30 * time.Second
 
 // statistics gathered by the openTSDB package.
 const (
@@ -36,7 +34,7 @@ const (
 	statTelnetBadTime            = "tlBadTime"
 	statTelnetBadTag             = "tlBadTag"
 	statTelnetBadFloat           = "tlBadFloat"
-	statBatchesTrasmitted        = "batchesTx"
+	statBatchesTransmitted       = "batchesTx"
 	statPointsTransmitted        = "pointsTx"
 	statBatchesTransmitFail      = "batchesTxFail"
 	statConnectionsActive        = "connsActive"
@@ -49,19 +47,20 @@ type Service struct {
 	ln     net.Listener  // main listener
 	httpln *chanListener // http channel-based listener
 
-	mu   sync.Mutex
 	wg   sync.WaitGroup
-	done chan struct{}
-	err  chan error
 	tls  bool
 	cert string
+
+	mu    sync.RWMutex
+	ready bool          // Has the required database been created?
+	done  chan struct{} // Is the service closing or closed?
 
 	BindAddress     string
 	Database        string
 	RetentionPolicy string
 
 	PointsWriter interface {
-		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
+		WritePointsPrivileged(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
 	}
 	MetaClient interface {
 		CreateDatabase(name string) (*meta.DatabaseInfo, error)
@@ -74,53 +73,52 @@ type Service struct {
 	batcher      *tsdb.PointBatcher
 
 	LogPointErrors bool
-	Logger         *log.Logger
-	statMap        *expvar.Map
+	Logger         *zap.Logger
+
+	stats       *Statistics
+	defaultTags models.StatisticTags
 }
 
 // NewService returns a new instance of Service.
 func NewService(c Config) (*Service, error) {
+	// Use defaults where necessary.
+	d := c.WithDefaults()
+
 	s := &Service{
-		done:            make(chan struct{}),
-		tls:             c.TLSEnabled,
-		cert:            c.Certificate,
-		err:             make(chan error),
-		BindAddress:     c.BindAddress,
-		Database:        c.Database,
-		RetentionPolicy: c.RetentionPolicy,
-		batchSize:       c.BatchSize,
-		batchPending:    c.BatchPending,
-		batchTimeout:    time.Duration(c.BatchTimeout),
-		Logger:          log.New(os.Stderr, "[opentsdb] ", log.LstdFlags),
-		LogPointErrors:  c.LogPointErrors,
+		tls:             d.TLSEnabled,
+		cert:            d.Certificate,
+		BindAddress:     d.BindAddress,
+		Database:        d.Database,
+		RetentionPolicy: d.RetentionPolicy,
+		batchSize:       d.BatchSize,
+		batchPending:    d.BatchPending,
+		batchTimeout:    time.Duration(d.BatchTimeout),
+		Logger:          zap.NewNop(),
+		LogPointErrors:  d.LogPointErrors,
+		stats:           &Statistics{},
+		defaultTags:     models.StatisticTags{"bind": d.BindAddress},
 	}
 	return s, nil
 }
 
-// Open starts the service
+// Open starts the service.
 func (s *Service) Open() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.Logger.Println("Starting OpenTSDB service")
-
-	// Configure expvar monitoring. It's OK to do this even if the service fails to open and
-	// should be done before any data could arrive for the service.
-	key := strings.Join([]string{"opentsdb", s.BindAddress}, ":")
-	tags := map[string]string{"bind": s.BindAddress}
-	s.statMap = influxdb.NewStatistics(key, "opentsdb", tags)
-
-	if _, err := s.MetaClient.CreateDatabase(s.Database); err != nil {
-		s.Logger.Printf("Failed to ensure target database %s exists: %s", s.Database, err.Error())
-		return err
+	if s.done != nil {
+		return nil // Already open.
 	}
+	s.done = make(chan struct{})
+
+	s.Logger.Info("Starting OpenTSDB service")
 
 	s.batcher = tsdb.NewPointBatcher(s.batchSize, s.batchPending, s.batchTimeout)
 	s.batcher.Start()
 
 	// Start processing batches.
 	s.wg.Add(1)
-	go s.processBatches(s.batcher)
+	go func() { defer s.wg.Done(); s.processBatches(s.batcher) }()
 
 	// Open listener.
 	if s.tls {
@@ -136,7 +134,7 @@ func (s *Service) Open() error {
 			return err
 		}
 
-		s.Logger.Println("Listening on TLS:", listener.Addr().String())
+		s.Logger.Info(fmt.Sprint("Listening on TLS: ", listener.Addr().String()))
 		s.ln = listener
 	} else {
 		listener, err := net.Listen("tcp", s.BindAddress)
@@ -144,41 +142,143 @@ func (s *Service) Open() error {
 			return err
 		}
 
-		s.Logger.Println("Listening on:", listener.Addr().String())
+		s.Logger.Info(fmt.Sprint("Listening on: ", listener.Addr().String()))
 		s.ln = listener
 	}
 	s.httpln = newChanListener(s.ln.Addr())
 
 	// Begin listening for connections.
 	s.wg.Add(2)
-	go s.serveHTTP()
-	go s.serve()
+	go func() { defer s.wg.Done(); s.serve() }()
+	go func() { defer s.wg.Done(); s.serveHTTP() }()
 
 	return nil
 }
 
-// Close closes the openTSDB service
+// Close closes the openTSDB service.
 func (s *Service) Close() error {
+	if wait, err := func() (bool, error) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
+		if s.closed() {
+			return false, nil // Already closed.
+		}
+		close(s.done)
+
+		// Close the listeners.
+		if err := s.ln.Close(); err != nil {
+			return false, err
+		}
+		if err := s.httpln.Close(); err != nil {
+			return false, err
+		}
+
+		if s.batcher != nil {
+			s.batcher.Stop()
+		}
+		return true, nil
+	}(); err != nil {
+		return err
+	} else if !wait {
+		return nil
+	}
+	s.wg.Wait()
+
+	s.mu.Lock()
+	s.done = nil
+	s.mu.Unlock()
+
+	return nil
+}
+
+// Closed returns true if the service is currently closed.
+func (s *Service) Closed() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.closed()
+}
 
-	if s.ln != nil {
-		return s.ln.Close()
+func (s *Service) closed() bool {
+	select {
+	case <-s.done:
+		// Service is closing.
+		return true
+	default:
+		return s.done == nil
+	}
+}
+
+// createInternalStorage ensures that the required database has been created.
+func (s *Service) createInternalStorage() error {
+	s.mu.RLock()
+	ready := s.ready
+	s.mu.RUnlock()
+	if ready {
+		return nil
 	}
 
-	if s.batcher != nil {
-		s.batcher.Stop()
+	if _, err := s.MetaClient.CreateDatabase(s.Database); err != nil {
+		return err
 	}
-	close(s.done)
-	s.wg.Wait()
+
+	// The service is now ready.
+	s.mu.Lock()
+	s.ready = true
+	s.mu.Unlock()
 	return nil
 }
 
-// SetLogger sets the internal logger to the logger passed in.
-func (s *Service) SetLogger(l *log.Logger) { s.Logger = l }
+// WithLogger sets the logger for the service.
+func (s *Service) WithLogger(log *zap.Logger) {
+	s.Logger = log.With(zap.String("service", "opentsdb"))
+}
 
-// Err returns a channel for fatal errors that occur on the listener.
-func (s *Service) Err() <-chan error { return s.err }
+// Statistics maintains statistics for the subscriber service.
+type Statistics struct {
+	HTTPConnectionsHandled   int64
+	ActiveTelnetConnections  int64
+	HandledTelnetConnections int64
+	TelnetPointsReceived     int64
+	TelnetBytesReceived      int64
+	TelnetReadError          int64
+	TelnetBadLine            int64
+	TelnetBadTime            int64
+	TelnetBadTag             int64
+	TelnetBadFloat           int64
+	BatchesTransmitted       int64
+	PointsTransmitted        int64
+	BatchesTransmitFail      int64
+	ActiveConnections        int64
+	HandledConnections       int64
+	InvalidDroppedPoints     int64
+}
+
+// Statistics returns statistics for periodic monitoring.
+func (s *Service) Statistics(tags map[string]string) []models.Statistic {
+	return []models.Statistic{{
+		Name: "opentsdb",
+		Tags: s.defaultTags.Merge(tags),
+		Values: map[string]interface{}{
+			statHTTPConnectionsHandled:   atomic.LoadInt64(&s.stats.HTTPConnectionsHandled),
+			statTelnetConnectionsActive:  atomic.LoadInt64(&s.stats.ActiveTelnetConnections),
+			statTelnetConnectionsHandled: atomic.LoadInt64(&s.stats.HandledTelnetConnections),
+			statTelnetPointsReceived:     atomic.LoadInt64(&s.stats.TelnetPointsReceived),
+			statTelnetBytesReceived:      atomic.LoadInt64(&s.stats.TelnetBytesReceived),
+			statTelnetReadError:          atomic.LoadInt64(&s.stats.TelnetReadError),
+			statTelnetBadLine:            atomic.LoadInt64(&s.stats.TelnetBadLine),
+			statTelnetBadTime:            atomic.LoadInt64(&s.stats.TelnetBadTime),
+			statTelnetBadTag:             atomic.LoadInt64(&s.stats.TelnetBadTag),
+			statTelnetBadFloat:           atomic.LoadInt64(&s.stats.TelnetBadFloat),
+			statBatchesTransmitted:       atomic.LoadInt64(&s.stats.BatchesTransmitted),
+			statPointsTransmitted:        atomic.LoadInt64(&s.stats.PointsTransmitted),
+			statBatchesTransmitFail:      atomic.LoadInt64(&s.stats.BatchesTransmitFail),
+			statConnectionsActive:        atomic.LoadInt64(&s.stats.ActiveConnections),
+			statConnectionsHandled:       atomic.LoadInt64(&s.stats.HandledConnections),
+			statDroppedPointsInvalid:     atomic.LoadInt64(&s.stats.InvalidDroppedPoints),
+		},
+	}}
+}
 
 // Addr returns the listener's address. Returns nil if listener is closed.
 func (s *Service) Addr() net.Addr {
@@ -190,16 +290,14 @@ func (s *Service) Addr() net.Addr {
 
 // serve serves the handler from the listener.
 func (s *Service) serve() {
-	defer s.wg.Done()
-
 	for {
 		// Wait for next connection.
 		conn, err := s.ln.Accept()
 		if opErr, ok := err.(*net.OpError); ok && !opErr.Temporary() {
-			s.Logger.Println("openTSDB TCP listener closed")
+			s.Logger.Info("openTSDB TCP listener closed")
 			return
 		} else if err != nil {
-			s.Logger.Println("error accepting openTSDB: ", err.Error())
+			s.Logger.Info(fmt.Sprint("error accepting openTSDB: ", err.Error()))
 			continue
 		}
 
@@ -210,9 +308,9 @@ func (s *Service) serve() {
 
 // handleConn processes conn. This is run in a separate goroutine.
 func (s *Service) handleConn(conn net.Conn) {
-	defer s.statMap.Add(statConnectionsActive, -1)
-	s.statMap.Add(statConnectionsActive, 1)
-	s.statMap.Add(statConnectionsHandled, 1)
+	defer atomic.AddInt64(&s.stats.ActiveConnections, -1)
+	atomic.AddInt64(&s.stats.ActiveConnections, 1)
+	atomic.AddInt64(&s.stats.HandledConnections, 1)
 
 	// Read header into buffer to check if it's HTTP.
 	var buf bytes.Buffer
@@ -227,7 +325,7 @@ func (s *Service) handleConn(conn net.Conn) {
 
 	// If no HTTP parsing error occurred then process as HTTP.
 	if err == nil {
-		s.statMap.Add(statHTTPConnectionsHandled, 1)
+		atomic.AddInt64(&s.stats.HTTPConnectionsHandled, 1)
 		s.httpln.ch <- conn
 		return
 	}
@@ -235,6 +333,7 @@ func (s *Service) handleConn(conn net.Conn) {
 	// Otherwise handle in telnet format.
 	s.wg.Add(1)
 	s.handleTelnetConn(conn)
+	s.wg.Done()
 }
 
 // handleTelnetConn accepts OpenTSDB's telnet protocol.
@@ -242,10 +341,9 @@ func (s *Service) handleConn(conn net.Conn) {
 //   put sys.cpu.user 1356998400 42.5 host=webserver01 cpu=0
 func (s *Service) handleTelnetConn(conn net.Conn) {
 	defer conn.Close()
-	defer s.wg.Done()
-	defer s.statMap.Add(statTelnetConnectionsActive, -1)
-	s.statMap.Add(statTelnetConnectionsActive, 1)
-	s.statMap.Add(statTelnetConnectionsHandled, 1)
+	defer atomic.AddInt64(&s.stats.ActiveTelnetConnections, -1)
+	atomic.AddInt64(&s.stats.ActiveTelnetConnections, 1)
+	atomic.AddInt64(&s.stats.HandledTelnetConnections, 1)
 
 	// Get connection details.
 	remoteAddr := conn.RemoteAddr().String()
@@ -256,13 +354,13 @@ func (s *Service) handleTelnetConn(conn net.Conn) {
 		line, err := r.ReadLine()
 		if err != nil {
 			if err != io.EOF {
-				s.statMap.Add(statTelnetReadError, 1)
-				s.Logger.Println("error reading from openTSDB connection", err.Error())
+				atomic.AddInt64(&s.stats.TelnetReadError, 1)
+				s.Logger.Info(fmt.Sprint("error reading from openTSDB connection ", err.Error()))
 			}
 			return
 		}
-		s.statMap.Add(statTelnetPointsReceived, 1)
-		s.statMap.Add(statTelnetBytesReceived, int64(len(line)))
+		atomic.AddInt64(&s.stats.TelnetPointsReceived, 1)
+		atomic.AddInt64(&s.stats.TelnetBytesReceived, int64(len(line)))
 
 		inputStrs := strings.Fields(line)
 
@@ -272,9 +370,9 @@ func (s *Service) handleTelnetConn(conn net.Conn) {
 		}
 
 		if len(inputStrs) < 4 || inputStrs[0] != "put" {
-			s.statMap.Add(statTelnetBadLine, 1)
+			atomic.AddInt64(&s.stats.TelnetBadLine, 1)
 			if s.LogPointErrors {
-				s.Logger.Printf("malformed line '%s' from %s", line, remoteAddr)
+				s.Logger.Info(fmt.Sprintf("malformed line '%s' from %s", line, remoteAddr))
 			}
 			continue
 		}
@@ -287,23 +385,21 @@ func (s *Service) handleTelnetConn(conn net.Conn) {
 		var t time.Time
 		ts, err := strconv.ParseInt(tsStr, 10, 64)
 		if err != nil {
-			s.statMap.Add(statTelnetBadTime, 1)
+			atomic.AddInt64(&s.stats.TelnetBadTime, 1)
 			if s.LogPointErrors {
-				s.Logger.Printf("malformed time '%s' from %s", tsStr, remoteAddr)
+				s.Logger.Info(fmt.Sprintf("malformed time '%s' from %s", tsStr, remoteAddr))
 			}
 		}
 
 		switch len(tsStr) {
 		case 10:
 			t = time.Unix(ts, 0)
-			break
 		case 13:
 			t = time.Unix(ts/1000, (ts%1000)*1000)
-			break
 		default:
-			s.statMap.Add(statTelnetBadTime, 1)
+			atomic.AddInt64(&s.stats.TelnetBadTime, 1)
 			if s.LogPointErrors {
-				s.Logger.Printf("bad time '%s' must be 10 or 13 chars, from %s ", tsStr, remoteAddr)
+				s.Logger.Info(fmt.Sprintf("bad time '%s' must be 10 or 13 chars, from %s ", tsStr, remoteAddr))
 			}
 			continue
 		}
@@ -312,9 +408,9 @@ func (s *Service) handleTelnetConn(conn net.Conn) {
 		for t := range tagStrs {
 			parts := strings.SplitN(tagStrs[t], "=", 2)
 			if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
-				s.statMap.Add(statTelnetBadTag, 1)
+				atomic.AddInt64(&s.stats.TelnetBadTag, 1)
 				if s.LogPointErrors {
-					s.Logger.Printf("malformed tag data '%v' from %s", tagStrs[t], remoteAddr)
+					s.Logger.Info(fmt.Sprintf("malformed tag data '%v' from %s", tagStrs[t], remoteAddr))
 				}
 				continue
 			}
@@ -326,19 +422,19 @@ func (s *Service) handleTelnetConn(conn net.Conn) {
 		fields := make(map[string]interface{})
 		fv, err := strconv.ParseFloat(valueStr, 64)
 		if err != nil {
-			s.statMap.Add(statTelnetBadFloat, 1)
+			atomic.AddInt64(&s.stats.TelnetBadFloat, 1)
 			if s.LogPointErrors {
-				s.Logger.Printf("bad float '%s' from %s", valueStr, remoteAddr)
+				s.Logger.Info(fmt.Sprintf("bad float '%s' from %s", valueStr, remoteAddr))
 			}
 			continue
 		}
 		fields["value"] = fv
 
-		pt, err := models.NewPoint(measurement, tags, fields, t)
+		pt, err := models.NewPoint(measurement, models.NewTags(tags), fields, t)
 		if err != nil {
-			s.statMap.Add(statTelnetBadFloat, 1)
+			atomic.AddInt64(&s.stats.TelnetBadFloat, 1)
 			if s.LogPointErrors {
-				s.Logger.Printf("bad float '%s' from %s", valueStr, remoteAddr)
+				s.Logger.Info(fmt.Sprintf("bad float '%s' from %s", valueStr, remoteAddr))
 			}
 			continue
 		}
@@ -348,32 +444,37 @@ func (s *Service) handleTelnetConn(conn net.Conn) {
 
 // serveHTTP handles connections in HTTP format.
 func (s *Service) serveHTTP() {
-	srv := &http.Server{Handler: &Handler{
+	handler := &Handler{
 		Database:        s.Database,
 		RetentionPolicy: s.RetentionPolicy,
 		PointsWriter:    s.PointsWriter,
 		Logger:          s.Logger,
-		statMap:         s.statMap,
-	}}
+		stats:           s.stats,
+	}
+	srv := &http.Server{Handler: handler}
 	srv.Serve(s.httpln)
 }
 
 // processBatches continually drains the given batcher and writes the batches to the database.
 func (s *Service) processBatches(batcher *tsdb.PointBatcher) {
-	defer s.wg.Done()
 	for {
 		select {
-		case batch := <-batcher.Out():
-			if err := s.PointsWriter.WritePoints(s.Database, s.RetentionPolicy, models.ConsistencyLevelAny, batch); err == nil {
-				s.statMap.Add(statBatchesTrasmitted, 1)
-				s.statMap.Add(statPointsTransmitted, int64(len(batch)))
-			} else {
-				s.Logger.Printf("failed to write point batch to database %q: %s", s.Database, err)
-				s.statMap.Add(statBatchesTransmitFail, 1)
-			}
-
 		case <-s.done:
 			return
+		case batch := <-batcher.Out():
+			// Will attempt to create database if not yet created.
+			if err := s.createInternalStorage(); err != nil {
+				s.Logger.Info(fmt.Sprintf("Required database %s does not yet exist: %s", s.Database, err.Error()))
+				continue
+			}
+
+			if err := s.PointsWriter.WritePointsPrivileged(s.Database, s.RetentionPolicy, models.ConsistencyLevelAny, batch); err == nil {
+				atomic.AddInt64(&s.stats.BatchesTransmitted, 1)
+				atomic.AddInt64(&s.stats.PointsTransmitted, int64(len(batch)))
+			} else {
+				s.Logger.Info(fmt.Sprintf("failed to write point batch to database %q: %s", s.Database, err))
+				atomic.AddInt64(&s.stats.BatchesTransmitFail, 1)
+			}
 		}
 	}
 }

@@ -13,16 +13,17 @@ func init() {
 	startTime = time.Now().UTC()
 }
 
-// system captures system-level diagnostics
+// system captures system-level diagnostics.
 type system struct{}
 
 func (s *system) Diagnostics() (*diagnostics.Diagnostics, error) {
-	diagnostics := map[string]interface{}{
+	currentTime := time.Now().UTC()
+	d := map[string]interface{}{
 		"PID":         os.Getpid(),
-		"currentTime": time.Now().UTC(),
+		"currentTime": currentTime,
 		"started":     startTime,
-		"uptime":      time.Since(startTime).String(),
+		"uptime":      currentTime.Sub(startTime).String(),
 	}
 
-	return DiagnosticsFromMap(diagnostics), nil
+	return diagnostics.RowFromMap(d), nil
 }

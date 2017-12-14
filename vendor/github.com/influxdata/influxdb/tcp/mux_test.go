@@ -2,6 +2,7 @@ package tcp_test
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -41,6 +42,8 @@ func TestMux(t *testing.T) {
 		if !testing.Verbose() {
 			mux.Logger = log.New(ioutil.Discard, "", 0)
 		}
+
+		errC := make(chan error)
 		for i := uint8(0); i < n; i++ {
 			ln := mux.Listen(byte(i))
 
@@ -58,7 +61,8 @@ func TestMux(t *testing.T) {
 				// doesn't match then expect close.
 				if len(msg) == 0 || msg[0] != byte(i) {
 					if err == nil || err.Error() != "network connection closed" {
-						t.Fatalf("unexpected error: %s", err)
+						errC <- fmt.Errorf("unexpected error: %s", err)
+						return
 					}
 					return
 				}
@@ -67,14 +71,17 @@ func TestMux(t *testing.T) {
 				// then expect a connection and read the message.
 				var buf bytes.Buffer
 				if _, err := io.CopyN(&buf, conn, int64(len(msg)-1)); err != nil {
-					t.Fatal(err)
+					errC <- err
+					return
 				} else if !bytes.Equal(msg[1:], buf.Bytes()) {
-					t.Fatalf("message mismatch:\n\nexp=%x\n\ngot=%x\n\n", msg[1:], buf.Bytes())
+					errC <- fmt.Errorf("message mismatch:\n\nexp=%x\n\ngot=%x\n\n", msg[1:], buf.Bytes())
+					return
 				}
 
 				// Write response.
 				if _, err := conn.Write([]byte("OK")); err != nil {
-					t.Fatal(err)
+					errC <- err
+					return
 				}
 			}(i, ln)
 		}
@@ -114,9 +121,21 @@ func TestMux(t *testing.T) {
 
 		// Close original TCP listener and wait for all goroutines to close.
 		tcpListener.Close()
-		wg.Wait()
 
-		return true
+		go func() {
+			wg.Wait()
+			close(errC)
+		}()
+
+		ok := true
+		for err := range errC {
+			if err != nil {
+				ok = false
+				t.Error(err)
+			}
+		}
+
+		return ok
 	}, nil); err != nil {
 		t.Error(err)
 	}
@@ -134,4 +153,60 @@ func TestMux_Listen_ErrAlreadyRegistered(t *testing.T) {
 	mux := tcp.NewMux()
 	mux.Listen(5)
 	mux.Listen(5)
+}
+
+// Ensure that closing a listener from mux.Listen releases an Accept call and
+// deregisters the mux.
+func TestMux_Close(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("unexpected error: %s", err)
+	}
+
+	done := make(chan struct{})
+	mux := tcp.NewMux()
+	go func() {
+		mux.Serve(listener)
+		close(done)
+	}()
+	l := mux.Listen(5)
+
+	closed := make(chan struct{})
+	go func() {
+		_, err := l.Accept()
+		if err == nil || !strings.Contains(err.Error(), "connection closed") {
+			t.Errorf("unexpected error: %s", err)
+		}
+		close(closed)
+	}()
+	l.Close()
+
+	timer := time.NewTimer(100 * time.Millisecond)
+	select {
+	case <-closed:
+		timer.Stop()
+	case <-timer.C:
+		t.Errorf("timeout while waiting for the mux to close")
+	}
+
+	// We should now be able to register a new listener at the same byte
+	// without causing a panic.
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("unexpected recover: %#v", r)
+		}
+	}()
+	l = mux.Listen(5)
+
+	// Verify that closing the listener does not cause a panic.
+	listener.Close()
+	timer = time.NewTimer(100 * time.Millisecond)
+	select {
+	case <-done:
+		timer.Stop()
+		// This should not panic.
+		l.Close()
+	case <-timer.C:
+		t.Errorf("timeout while waiting for the mux to close")
+	}
 }

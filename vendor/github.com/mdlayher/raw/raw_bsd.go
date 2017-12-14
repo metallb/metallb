@@ -63,7 +63,9 @@ type packetConn struct {
 
 // listenPacket creates a net.PacketConn which can be used to send and receive
 // data at the device driver level.
-func listenPacket(ifi *net.Interface, proto uint16) (*packetConn, error) {
+func listenPacket(ifi *net.Interface, proto uint16, _ *Config) (*packetConn, error) {
+	// Config is, as of now, unused on BSD.
+
 	var f *os.File
 	var err error
 

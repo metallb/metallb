@@ -5,31 +5,34 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"errors"
-	"expvar"
+	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/models"
+	"go.uber.org/zap"
 )
 
-// Handler is an http.Handler for the service.
+// Handler is an http.Handler for the OpenTSDB service.
 type Handler struct {
 	Database        string
 	RetentionPolicy string
 
 	PointsWriter interface {
-		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
+		WritePointsPrivileged(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
 	}
 
-	Logger *log.Logger
+	Logger *zap.Logger
 
-	statMap *expvar.Map
+	stats *Statistics
 }
 
+// ServeHTTP handles an HTTP request of the OpenTSDB REST API.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/api/metadata/put":
@@ -41,7 +44,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ServeHTTP implements OpenTSDB's HTTP /api/put endpoint
+// servePut implements OpenTSDB's HTTP /api/put endpoint.
 func (h *Handler) servePut(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
@@ -111,22 +114,24 @@ func (h *Handler) servePut(w http.ResponseWriter, r *http.Request) {
 			ts = time.Unix(p.Time/1000, (p.Time%1000)*1000)
 		}
 
-		pt, err := models.NewPoint(p.Metric, p.Tags, map[string]interface{}{"value": p.Value}, ts)
+		pt, err := models.NewPoint(p.Metric, models.NewTags(p.Tags), map[string]interface{}{"value": p.Value}, ts)
 		if err != nil {
-			h.Logger.Printf("Dropping point %v: %v", p.Metric, err)
-			h.statMap.Add(statDroppedPointsInvalid, 1)
+			h.Logger.Info(fmt.Sprintf("Dropping point %v: %v", p.Metric, err))
+			if h.stats != nil {
+				atomic.AddInt64(&h.stats.InvalidDroppedPoints, 1)
+			}
 			continue
 		}
 		points = append(points, pt)
 	}
 
 	// Write points.
-	if err := h.PointsWriter.WritePoints(h.Database, h.RetentionPolicy, models.ConsistencyLevelAny, points); influxdb.IsClientError(err) {
-		h.Logger.Println("write series error: ", err)
+	if err := h.PointsWriter.WritePointsPrivileged(h.Database, h.RetentionPolicy, models.ConsistencyLevelAny, points); influxdb.IsClientError(err) {
+		h.Logger.Info(fmt.Sprint("write series error: ", err))
 		http.Error(w, "write series error: "+err.Error(), http.StatusBadRequest)
 		return
 	} else if err != nil {
-		h.Logger.Println("write series error: ", err)
+		h.Logger.Info(fmt.Sprint("write series error: ", err))
 		http.Error(w, "write series error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -136,8 +141,10 @@ func (h *Handler) servePut(w http.ResponseWriter, r *http.Request) {
 
 // chanListener represents a listener that receives connections through a channel.
 type chanListener struct {
-	addr net.Addr
-	ch   chan net.Conn
+	addr   net.Addr
+	ch     chan net.Conn
+	done   chan struct{}
+	closer sync.Once // closer ensures that Close is idempotent.
 }
 
 // newChanListener returns a new instance of chanListener.
@@ -145,21 +152,28 @@ func newChanListener(addr net.Addr) *chanListener {
 	return &chanListener{
 		addr: addr,
 		ch:   make(chan net.Conn),
+		done: make(chan struct{}),
 	}
 }
 
 func (ln *chanListener) Accept() (net.Conn, error) {
-	conn, ok := <-ln.ch
-	if !ok {
-		return nil, errors.New("network connection closed")
+	errClosed := errors.New("network connection closed")
+	select {
+	case <-ln.done:
+		return nil, errClosed
+	case conn, ok := <-ln.ch:
+		if !ok {
+			return nil, errClosed
+		}
+		return conn, nil
 	}
-	log.Println("TSDB listener accept ", conn)
-	return conn, nil
 }
 
 // Close closes the connection channel.
 func (ln *chanListener) Close() error {
-	close(ln.ch)
+	ln.closer.Do(func() {
+		close(ln.done)
+	})
 	return nil
 }
 

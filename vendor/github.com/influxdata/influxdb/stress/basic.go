@@ -504,7 +504,6 @@ func (b *BasicQueryClient) Exec(qs <-chan Query, r chan<- response) error {
 // InfluxDB instance.
 func resetDB(c client.Client, database string) error {
 	_, err := c.Query(client.Query{
-		// Change to DROP DATABASE %s IF EXISTS
 		Command: fmt.Sprintf("DROP DATABASE %s", database),
 	})
 	if err != nil {
@@ -559,15 +558,7 @@ type BroadcastChannel struct {
 
 func NewBroadcastChannel() *BroadcastChannel {
 	chs := make([]chan response, 0)
-
-	var wg sync.WaitGroup
-
-	b := &BroadcastChannel{
-		chs: chs,
-		wg:  wg,
-	}
-
-	return b
+	return &BroadcastChannel{chs: chs}
 }
 
 func (b *BroadcastChannel) Register(fn responseHandler) {
@@ -678,9 +669,10 @@ func (o *outputConfig) HTTPHandler(method string) func(r <-chan response, rt *Ti
 			Precision:       "ns",
 		})
 		for p := range r {
-			o.mu.Lock()
-			tags := o.tags
-			o.mu.Unlock()
+			tags := make(map[string]string, len(o.tags))
+			for k, v := range o.tags {
+				tags[k] = v
+			}
 			tags["method"] = method
 			fields := map[string]interface{}{
 				"response_time": float64(p.Timer.Elapsed()),
@@ -689,13 +681,11 @@ func (o *outputConfig) HTTPHandler(method string) func(r <-chan response, rt *Ti
 			bp.AddPoint(pt)
 			if len(bp.Points())%1000 == 0 && len(bp.Points()) != 0 {
 				c.Write(bp)
-				o.mu.Lock()
 				bp, _ = client.NewBatchPoints(client.BatchPointsConfig{
 					Database:        o.database,
 					RetentionPolicy: o.retentionPolicy,
 					Precision:       "ns",
 				})
-				o.mu.Unlock()
 			}
 		}
 

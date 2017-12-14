@@ -1,9 +1,11 @@
+// The influx command is a CLI client to InfluxDB.
 package main
 
 import (
 	"flag"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/influxdata/influxdb/client"
 	"github.com/influxdata/influxdb/cmd/influx/cli"
@@ -11,7 +13,7 @@ import (
 
 // These variables are populated via the Go linker.
 var (
-	version = "0.9"
+	version string
 )
 
 const (
@@ -26,27 +28,35 @@ const (
 	defaultPPS = 0
 )
 
+func init() {
+	// If version is not set, make that clear.
+	if version == "" {
+		version = "unknown"
+	}
+}
+
 func main() {
 	c := cli.New(version)
 
 	fs := flag.NewFlagSet("InfluxDB shell version "+version, flag.ExitOnError)
 	fs.StringVar(&c.Host, "host", client.DefaultHost, "Influxdb host to connect to.")
 	fs.IntVar(&c.Port, "port", client.DefaultPort, "Influxdb port to connect to.")
-	fs.StringVar(&c.Username, "username", c.Username, "Username to connect to the server.")
-	fs.StringVar(&c.Password, "password", c.Password, `Password to connect to the server.  Leaving blank will prompt for password (--password="").`)
+	fs.StringVar(&c.ClientConfig.UnixSocket, "socket", "", "Influxdb unix socket to connect to.")
+	fs.StringVar(&c.ClientConfig.Username, "username", "", "Username to connect to the server.")
+	fs.StringVar(&c.ClientConfig.Password, "password", "", `Password to connect to the server.  Leaving blank will prompt for password (--password="").`)
 	fs.StringVar(&c.Database, "database", c.Database, "Database to connect to the server.")
 	fs.BoolVar(&c.Ssl, "ssl", false, "Use https for connecting to cluster.")
-	fs.BoolVar(&c.UnsafeSsl, "unsafeSsl", false, "Set this when connecting to the cluster using https and not use SSL verification.")
+	fs.BoolVar(&c.ClientConfig.UnsafeSsl, "unsafeSsl", false, "Set this when connecting to the cluster using https and not use SSL verification.")
 	fs.StringVar(&c.Format, "format", defaultFormat, "Format specifies the format of the server responses:  json, csv, or column.")
-	fs.StringVar(&c.Precision, "precision", defaultPrecision, "Precision specifies the format of the timestamp:  rfc3339,h,m,s,ms,u or ns.")
-	fs.StringVar(&c.WriteConsistency, "consistency", "any", "Set write consistency level: any, one, quorum, or all.")
+	fs.StringVar(&c.ClientConfig.Precision, "precision", defaultPrecision, "Precision specifies the format of the timestamp:  rfc3339,h,m,s,ms,u or ns.")
+	fs.StringVar(&c.ClientConfig.WriteConsistency, "consistency", "all", "Set write consistency level: any, one, quorum, or all.")
 	fs.BoolVar(&c.Pretty, "pretty", false, "Turns on pretty print for the json format.")
 	fs.StringVar(&c.Execute, "execute", c.Execute, "Execute command and quit.")
 	fs.BoolVar(&c.ShowVersion, "version", false, "Displays the InfluxDB version.")
 	fs.BoolVar(&c.Import, "import", false, "Import a previous database.")
-	fs.IntVar(&c.PPS, "pps", defaultPPS, "How many points per second the import will allow.  By default it is zero and will not throttle importing.")
-	fs.StringVar(&c.Path, "path", "", "path to the file to import")
-	fs.BoolVar(&c.Compressed, "compressed", false, "set to true if the import file is compressed")
+	fs.IntVar(&c.ImporterConfig.PPS, "pps", defaultPPS, "How many points per second the import will allow.  By default it is zero and will not throttle importing.")
+	fs.StringVar(&c.ImporterConfig.Path, "path", "", "path to the file to import")
+	fs.BoolVar(&c.ImporterConfig.Compressed, "compressed", false, "set to true if the import file is compressed")
 
 	// Define our own custom usage to print
 	fs.Usage = func() {
@@ -57,6 +67,8 @@ func main() {
        Host to connect to.
   -port 'port #'
        Port to connect to.
+  -socket 'unix domain socket'
+       Unix socket to connect to.
   -database 'database name'
        Database to connect to the server.
   -password 'password'
@@ -96,6 +108,13 @@ Examples:
 `)
 	}
 	fs.Parse(os.Args[1:])
+
+	argsNotParsed := fs.Args()
+	if len(argsNotParsed) > 0 {
+		fmt.Fprintf(os.Stderr, "unknown arguments: %s\n", strings.Join(argsNotParsed, " "))
+		fs.Usage()
+		os.Exit(1)
+	}
 
 	if c.ShowVersion {
 		c.Version()

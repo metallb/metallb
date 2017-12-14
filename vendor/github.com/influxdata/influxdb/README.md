@@ -1,17 +1,16 @@
-# InfluxDB [![Circle CI](https://circleci.com/gh/influxdata/influxdb/tree/master.svg?style=svg)](https://circleci.com/gh/influxdata/influxdb/tree/master)
+# InfluxDB [![Circle CI](https://circleci.com/gh/influxdata/influxdb/tree/master.svg?style=svg)](https://circleci.com/gh/influxdata/influxdb/tree/master) [![Go Report Card](https://goreportcard.com/badge/github.com/influxdata/influxdb)](https://goreportcard.com/report/github.com/influxdata/influxdb) [![Docker pulls](https://img.shields.io/docker/pulls/library/influxdb.svg)](https://hub.docker.com/_/influxdb/)
 
-## An Open-Source, Distributed, Time Series Database
+## An Open-Source Time Series Database
 
-InfluxDB is an open source **distributed time series database** with
+InfluxDB is an open source **time series database** with
 **no external dependencies**. It's useful for recording metrics,
 events, and performing analytics.
 
 ## Features
 
-* Built-in [HTTP API](https://docs.influxdata.com/influxdb/v0.10/guides/writing_data/) so you don't have to write any server side code to get up and running.
+* Built-in [HTTP API](https://docs.influxdata.com/influxdb/latest/guides/writing_data/) so you don't have to write any server side code to get up and running.
 * Data can be tagged, allowing very flexible querying.
 * SQL-like query language.
-* Clustering is supported out of the box, so that you can scale horizontally to handle your data. **Clustering is currently in an alpha state.**
 * Simple to install and manage, and fast to get data in and out.
 * It aims to answer queries in real-time. That means every data point is
   indexed as it comes in and is immediately available in queries that
@@ -30,38 +29,38 @@ We recommend installing InfluxDB using one of the [pre-built packages](https://i
 ### Create your first database
 
 ```
-curl -G 'http://localhost:8086/query' --data-urlencode "q=CREATE DATABASE mydb"
+curl -XPOST "http://localhost:8086/query" --data-urlencode "q=CREATE DATABASE mydb"
 ```
 
 ### Insert some data
 ```
-curl -XPOST 'http://localhost:8086/write?db=mydb' \
+curl -XPOST "http://localhost:8086/write?db=mydb" \
 -d 'cpu,host=server01,region=uswest load=42 1434055562000000000'
 
-curl -XPOST 'http://localhost:8086/write?db=mydb' \
+curl -XPOST "http://localhost:8086/write?db=mydb" \
 -d 'cpu,host=server02,region=uswest load=78 1434055562000000000'
 
-curl -XPOST 'http://localhost:8086/write?db=mydb' \
+curl -XPOST "http://localhost:8086/write?db=mydb" \
 -d 'cpu,host=server03,region=useast load=15.4 1434055562000000000'
 ```
 
 ### Query for the data
 ```JSON
-curl -G http://localhost:8086/query?pretty=true --data-urlencode "db=mydb" \
+curl -G "http://localhost:8086/query?pretty=true" --data-urlencode "db=mydb" \
 --data-urlencode "q=SELECT * FROM cpu WHERE host='server01' AND time < now() - 1d"
 ```
 
 ### Analyze the data
 ```JSON
-curl -G http://localhost:8086/query?pretty=true --data-urlencode "db=mydb" \
+curl -G "http://localhost:8086/query?pretty=true" --data-urlencode "db=mydb" \
 --data-urlencode "q=SELECT mean(load) FROM cpu WHERE region='uswest'"
 ```
 
 ## Documentation
 
-* Read more about the [design goals and motivations of the project](https://docs.influxdata.com/influxdb/v0.10/).
-* Follow the [getting started guide](https://docs.influxdata.com/influxdb/v0.10/introduction/getting_started/) to learn the basics in just a few minutes.
-* Learn more about [InfluxDB's key concepts](https://docs.influxdata.com/influxdb/v0.10/guides/writing_data/).
+* Read more about the [design goals and motivations of the project](https://docs.influxdata.com/influxdb/latest/).
+* Follow the [getting started guide](https://docs.influxdata.com/influxdb/latest/introduction/getting_started/) to learn the basics in just a few minutes.
+* Learn more about [InfluxDB's key concepts](https://docs.influxdata.com/influxdb/latest/concepts/key_concepts/).
 
 ## Contributing
 
