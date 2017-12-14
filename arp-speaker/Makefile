@@ -2,6 +2,8 @@ SYSTEM:=
 DOCKER:=miek
 NAME:=arp-speaker
 DOCKER_IMAGE_NAME:=$(DOCKER)/$(NAME)
+VERSION:=$(shell git tag | head -1 | tr -d 'v')
+BINARY:=arp-speaker
 
 EMPTY :=
 SPACE := $(EMPTY) $(EMPTY)
@@ -14,14 +16,16 @@ ifeq (, $(shell which manifest-tool))
     $(error "No manifest-tool in $$PATH, install with: go get github.com/estesp/manifest-tool")
 endif
 
+# PHONY because we need to rebuild for every arch.
+.PHONY: arp-speaker
+arp-speaker:
+	CGO_ENABLED=0 $(SYSTEM) go build -o $(BINARY)
+
 .PHONY: build
 build:
 	for arch in $(LINUX_ARCH); do \
 	    mkdir -p build/linux/$$arch && $(MAKE) arp-speaker BINARY=build/linux/$$arch/$(NAME) SYSTEM="GOOS=linux GOARCH=$$arch";\
 	done
-
-arp-speaker: main.go
-	CGO_ENABLED=0 $(SYSTEM) go build -o arp-speaker
 
 .PHONY: docker-build
 docker-build: build
