@@ -143,6 +143,7 @@ func newController(myIP net.IP, myNode string) (*controller, error) {
 		myIP:   myIP,
 		myNode: myNode,
 		ips:    allocator.New(),
+		ann:    ann,
 
 		announcing: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 			Namespace: "metallb",
@@ -157,7 +158,7 @@ func newController(myIP net.IP, myNode string) (*controller, error) {
 	}
 
 	prometheus.MustRegister(c.announcing)
-	// just start this as a goroutine, the life time is bound to this process, so there is no way to stop it.
+	// just start this as a goroutine, the life time is bound to this process, so there is no need to stop it.
 	go func() { ann.Run() }()
 	return c, nil
 }
