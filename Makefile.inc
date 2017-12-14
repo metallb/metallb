@@ -3,9 +3,9 @@ DOCKER:=miek
 SYSTEM:=
 NAME:=
 BINARY:=
-DOCKER_IMAGE_NAME:=$(DOCKER)/$(NAME)
-VERSION:=$(shell git tag | head -1 | tr -d 'v')
+DOCKER_IMAGE_NAME:=
 
+VERSION:=$(shell git tag | head -1 | tr -d 'v')
 EMPTY :=
 SPACE := $(EMPTY) $(EMPTY)
 COMMA := $(EMPTY),$(EMPTY)
