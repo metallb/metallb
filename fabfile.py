@@ -145,7 +145,7 @@ def _build(ts, name, registry):
 
 def _set_image(ts, name, job, registry):
     set_from_registry = _registry_clusterip() if "localhost" in registry else registry
-    local("kubectl set image -n metallb-system {2} {1}={3}/{1}:{0}".format(ts, name, job, registry))
+    local("kubectl set image -n metallb-system {2} {1}={3}/{1}:{0}".format(ts, name, job, set_from_registry))
 
 def _wait_for_rollout(typ, name):
     local("kubectl rollout status -n metallb-system {0} {1}".format(typ, name))
