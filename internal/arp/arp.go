@@ -146,7 +146,6 @@ func interfaceByIP(ip net.IP) (*net.Interface, error) {
 		}
 		for _, addr := range addrs {
 			glog.Infof("Address found %s for interface: %v", addr.String(), i)
-			var ip net.IP
 			switch v := addr.(type) {
 			case *net.IPNet:
 				if ip.Equal(v.IP) {
@@ -157,6 +156,7 @@ func interfaceByIP(ip net.IP) (*net.Interface, error) {
 					return &i, nil
 				}
 			}
+
 		}
 	}
 
