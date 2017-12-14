@@ -75,7 +75,7 @@ def release(version):
     with lcd("website"):
         local("perl -pi -e 's/version = .*/version = \"v{0}\"/g' config.toml".format(version))
     local('git commit -a -m "Update documentation for release {0}"'.format(version))
-    local('git tag v{0} -m "See the [release notes](https://metallb.universe.tf/release-notes/#version-0-2-0) for details."'.format(version))
+    local('git tag v{0} -m "See the release notes for details:\n\nhttps://metallb.universe.tf/release-notes/#version-0-2-0"'.format(version))
     local('git checkout master')
 
 ## Minikube bringup/teardown
