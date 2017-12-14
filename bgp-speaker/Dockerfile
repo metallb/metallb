@@ -1,5 +1,5 @@
 FROM alpine:latest
 MAINTAINER Miek Gieben <miek@miek.nl> @miekg
-ADD arp-speaker /arp-speaker
+ADD bgp-speaker /bgp-speaker
 USER nobody:nobody
-ENTRYPOINT ["/arp-speaker", "--logtostderr"]
+ENTRYPOINT ["/bgp-speaker", "--logtostderr"]

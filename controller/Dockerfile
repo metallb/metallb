@@ -1,5 +1,5 @@
 FROM alpine:latest
 MAINTAINER Miek Gieben <miek@miek.nl> @miekg
-ADD arp-speaker /arp-speaker
+ADD controller /controller
 USER nobody:nobody
-ENTRYPOINT ["/arp-speaker", "--logtostderr"]
+ENTRYPOINT ["/controller", "--logtostderr"]
