@@ -16,7 +16,7 @@ googleAnalytics = ""
 	provider = "GitHub"
 	repo_url = "https://github.com/google/metallb"
 
-	version = "tip"
+	version = "v0.2.0"
 	logo = "images/logo.png"
 	favicon = ""
 
