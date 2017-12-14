@@ -82,16 +82,26 @@ func (a *Announce) Run() {
 
 // Reply sends a arp reply using the client in a.
 func (a *Announce) Reply(pkt *arp.Packet, ip net.IP) error {
+	if a == nil {
+		return nil
+	}
 	return a.client.Reply(pkt, a.hardwareAddr, ip)
 }
 
 // Close closes the arp client in a.
 func (a *Announce) Close() error {
+	if a == nil {
+		return nil
+	}
 	return a.client.Close()
 }
 
 // SetBalancer implementes adds ip to the set of announced address.
 func (a *Announce) SetBalancer(name string, ip net.IP) {
+	if a == nil {
+		return
+	}
+
 	a.Lock()
 	defer a.Unlock()
 	a.ips[name] = ip
@@ -99,6 +109,10 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 
 // DeleteBalancer an address from the set of address we should announce.
 func (a *Announce) DeleteBalancer(name string) {
+	if a == nil {
+		return
+	}
+
 	a.Lock()
 	defer a.Unlock()
 	if _, ok := a.ips[name]; ok {
@@ -108,6 +122,10 @@ func (a *Announce) DeleteBalancer(name string) {
 
 // Announce checks if ip should be announced.
 func (a *Announce) Announce(ip net.IP) bool {
+	if a == nil {
+		return false
+	}
+
 	a.RLock()
 	defer a.RUnlock()
 	for _, i := range a.ips {
@@ -120,6 +138,10 @@ func (a *Announce) Announce(ip net.IP) bool {
 
 // Unsolicited returns a slice of ARP responses that can be send out as unsolicited ARPs.
 func (a *Announce) Unsolicited() []*arp.Packet {
+	if a == nil {
+		return nil
+	}
+
 	a.RLock()
 	defer a.RUnlock()
 
