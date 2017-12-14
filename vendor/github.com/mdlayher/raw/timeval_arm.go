@@ -1,4 +1,4 @@
-// +build darwin
+// +build arm
 
 package raw
 
@@ -14,7 +14,7 @@ func newTimeval(timeout time.Duration) (*syscall.Timeval, error) {
 		return nil, &timeoutError{}
 	}
 	return &syscall.Timeval{
-		Sec:  int64(timeout / time.Second),
+		Sec:  int32(timeout / time.Second),
 		Usec: int32(timeout % time.Second / time.Microsecond),
 	}, nil
 }

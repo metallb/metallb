@@ -1,4 +1,4 @@
-// +build !darwin
+// +build !darwin,!arm
 
 package raw
 
