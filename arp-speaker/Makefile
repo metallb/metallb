@@ -28,10 +28,11 @@ build:
 	done
 
 .PHONY: docker-build
-docker-build: build
-	# 1. Assume binary is build in build/x/linux/<arch>s
+docker-build:
+	# 1. Assume binary is build in build/linux/<arch>
 	# 2. Copy Dockerfile to build/linux/<arch>
 	# 3. Replace base image from alpine:latest to <arch>/alpine:latest
+	#
 	# <arch>:
 	# arm: arm32v6
 	# arm64: arm64v8
