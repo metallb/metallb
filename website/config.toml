@@ -80,8 +80,8 @@ googleAnalytics = ""
 	weight = 60
 
 [[menu.main]]
-    name   = "Versions"
-    url    = "versions/"
+    name   = "Release Notes"
+    url    = "release-notes/"
     weight = 70
 
 [blackfriday]
