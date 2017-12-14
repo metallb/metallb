@@ -1,8 +1,8 @@
 include ../Makefile.inc
 
-NAME:=arp-speaker
+NAME:=bgp-speaker
 BINARY:=$(NAME)
 
-.PHONY: arp-speaker
-arp-speaker:
+.PHONY: bgp-speaker
+bgp-speaker:
 	CGO_ENABLED=0 $(SYSTEM) go build -o $(BINARY)
