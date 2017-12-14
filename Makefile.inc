@@ -1,7 +1,8 @@
+DOCKER:=miek
+
 SYSTEM:=
 NAME:=
 BINARY:=
-DOCKER:=miek
 DOCKER_IMAGE_NAME:=$(DOCKER)/$(NAME)
 VERSION:=$(shell git tag | head -1 | tr -d 'v')
 
