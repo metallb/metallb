@@ -41,43 +41,64 @@ func New(ip net.IP) (*Announce, error) {
 	}, nil
 }
 
+// A dropReason is a reason an Announce drops an incoming ARP packet.
+type dropReason int
+
+// Possible dropReason values.
+const (
+	dropReasonNone dropReason = iota
+	dropReasonReadError
+	dropReasonARPReply
+	dropReasonEthernetDestination
+	dropReasonAnnounceIP
+	dropReasonNotLeader
+)
+
 // Run starts the announcer, making it listen on the interface for ARP requests. It only responds to these
 // requests when a.leader is set to true, i.e. we are the current cluster wide leader for sending ARPs.
 func (a *Announce) Run() {
 	for {
-		pkt, eth, err := a.client.Read()
-
-		if err != nil {
-			continue
-		}
-
-		// Ignore ARP replies.
-		if pkt.Operation != arp.OperationRequest {
-			continue
-		}
-
-		// Ignore ARP requests which are not broadcast or bound directly for this machine.
-		if !bytes.Equal(eth.Destination, ethernet.Broadcast) && !bytes.Equal(eth.Destination, a.hardwareAddr) {
-			continue
-		}
-
-		// Ignore ARP requests which do not indicate the target IP that we should announce.
-		if !a.Announce(pkt.TargetIP) {
-			continue
-		}
-
-		// We are not the leader, do not reply.
-		if !a.Leader() {
-			continue
-		}
-
-		// pkt.TargetIP has been vetted to be "the one".
-		glog.Infof("request: who-has %s?  tell %s (%s). reply: %s is-at %s", pkt.TargetIP, pkt.SenderIP, pkt.SenderHardwareAddr, pkt.TargetIP, a.hardwareAddr)
-
-		if err := a.Reply(pkt, pkt.TargetIP); err != nil {
-			glog.Warningf("Failed to writes ARP response for %s: %s", pkt.TargetIP, err)
-		}
+		a.readPacket()
 	}
+}
+
+// readPacket reads and handles a single ARP packet, and reports any reason why
+// the packet was dropped.
+func (a *Announce) readPacket() dropReason {
+	pkt, eth, err := a.client.Read()
+
+	if err != nil {
+		return dropReasonReadError
+	}
+
+	// Ignore ARP replies.
+	if pkt.Operation != arp.OperationRequest {
+		return dropReasonARPReply
+	}
+
+	// Ignore ARP requests which are not broadcast or bound directly for this machine.
+	if !bytes.Equal(eth.Destination, ethernet.Broadcast) && !bytes.Equal(eth.Destination, a.hardwareAddr) {
+		return dropReasonEthernetDestination
+	}
+
+	// Ignore ARP requests which do not indicate the target IP that we should announce.
+	if !a.Announce(pkt.TargetIP) {
+		return dropReasonAnnounceIP
+	}
+
+	// We are not the leader, do not reply.
+	if !a.Leader() {
+		return dropReasonNotLeader
+	}
+
+	// pkt.TargetIP has been vetted to be "the one".
+	glog.Infof("request: who-has %s?  tell %s (%s). reply: %s is-at %s", pkt.TargetIP, pkt.SenderIP, pkt.SenderHardwareAddr, pkt.TargetIP, a.hardwareAddr)
+
+	if err := a.Reply(pkt, pkt.TargetIP); err != nil {
+		glog.Warningf("Failed to writes ARP response for %s: %s", pkt.TargetIP, err)
+	}
+
+	return dropReasonNone
 }
 
 // Reply sends a arp reply using the client in a.
