@@ -3,6 +3,7 @@ package arp
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"net"
 	"sync"
 
@@ -26,7 +27,7 @@ type Announce struct {
 func New(ip net.IP) (*Announce, error) {
 	ifi, err := interfaceByIP(ip)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("arp: can't find interface for %s: %s", ip, err)
 	}
 	client, err := arp.Dial(ifi)
 	if err != nil {
@@ -135,14 +136,16 @@ func (a *Announce) Unsolicited() []*arp.Packet {
 func interfaceByIP(ip net.IP) (*net.Interface, error) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("No interfaces found: %s", err)
 	}
 	for _, i := range ifaces {
+		glog.Infof("Found interface: %v", i)
 		addrs, err := i.Addrs()
 		if err != nil {
 			continue
 		}
 		for _, addr := range addrs {
+			glog.Infof("Address found %s for interface: %v", addr.String(), i)
 			var ip net.IP
 			switch v := addr.(type) {
 			case *net.IPNet:
