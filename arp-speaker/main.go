@@ -104,6 +104,10 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 }
 
 func (c *controller) deleteBalancer(name, reason string) error {
+	if !c.ann.AnnounceName(name) {
+		return nil
+	}
+
 	glog.Infof("%s: stopping announcements, %s", name, reason)
 	c.announcing.Delete(prometheus.Labels{
 		"service": name,
