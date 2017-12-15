@@ -133,6 +133,8 @@ func (c *controller) SetConfig(cfg *config.Config) error {
 		return fmt.Errorf("configuration rejected: %s", err)
 	}
 
+	c.config = cfg
+
 	return nil
 }
 
