@@ -23,7 +23,7 @@ def _tempdir():
     finally:
         shutil.rmtree(name)
 
-## Dockerfile generation
+## Docker stuff
 
 def gen_docker():
     """Generate ./dockerfiles/{dev,prod}"""
@@ -31,6 +31,32 @@ def gen_docker():
     for env in ('dev', 'prod'):
         for binary in ('controller', 'bgp-speaker'):
             local('sed -e "s/%%BINARY%%/{0}/g" ./dockerfiles/{1}.tmpl >./dockerfiles/{1}/{0}'.format(binary, env))
+
+def build_image(name, arch, tag, registry, extra_env=None):
+    if extra_env is not None:
+        extra_env = " ".join("{0}={1}".format(k, v) for k,v in extra_env.iteritems())
+    else:
+        extra_env = ""
+    if arch != "amd64":
+        tag = "{0}-{1}".format(tag, arch)
+
+    with _tempdir() as tmp:
+        local("env CGO_ENABLED=0 GOOS=linux GOARCH={0} {1} go build -o {2}/{3} ./{3}".format(arch, extra_env, tmp, name))
+        with open("./{0}/Dockerfile".format(name)) as f:
+            dockerfile = f.read()
+        if arch != "amd64":
+            repo = {"arm": "arm32v6", "arm64": "arm64v8"}.get(arch, arch)
+            dockerfile = dockerfile.replace("alpine:latest", "{0}/alpine:latest".format(repo))
+        with open("{0}/Dockerfile".format(tmp), "wb") as f:
+            f.write(dockerfile)
+        local("sudo docker build -t {0}/{1}:{2} {3}".format(registry, name, tag, tmp))
+
+def build_images():
+    """Build Docker images for all MetalLB binaries, on all architectures"""
+
+    goarches = ["amd64", "arm", "arm64", "ppc64le", "s390x"]
+    # ARM is a bit complex, there's multiple targets for different instruction sets.
+        
 
 ## Debugging
 
