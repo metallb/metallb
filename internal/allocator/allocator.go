@@ -175,9 +175,12 @@ func (a *Allocator) AllocateFromPool(service, pool string) (net.IP, error) {
 	return ip, nil
 }
 
-// Allocate assigns any available IP to service.
+// Allocate assigns any available and assignable IP to service.
 func (a *Allocator) Allocate(service string) (net.IP, error) {
 	for pname := range a.pools {
+		if !a.pools[pname].AutoAssign {
+			continue
+		}
 		if ip := a.allocateFromPool(service, pname); ip != nil {
 			return ip, nil
 		}

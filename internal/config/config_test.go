@@ -55,6 +55,7 @@ address-pools:
   - 10.20.0.0/16
   - 10.50.0.0/24
   avoid-buggy-ips: true
+  auto-assign: false
   advertisements:
   - aggregation-length: 32
     localpref: 100
@@ -85,6 +86,7 @@ address-pools:
 					"pool1": &Pool{
 						CIDR:          []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
 						AvoidBuggyIPs: true,
+						AutoAssign: false,
 						Advertisements: []*Advertisement{
 							{
 								AggregationLength: 32,
@@ -102,6 +104,7 @@ address-pools:
 					},
 					"pool2": &Pool{
 						CIDR: []*net.IPNet{ipnet("30.0.0.0/8")},
+						AutoAssign: true,
 					},
 				},
 			},
@@ -195,7 +198,9 @@ address-pools:
 `,
 			want: &Config{
 				Pools: map[string]*Pool{
-					"pool1": &Pool{},
+					"pool1": &Pool{
+						AutoAssign: true,
+					},
 				},
 			},
 		},
@@ -231,6 +236,7 @@ address-pools:
 			want: &Config{
 				Pools: map[string]*Pool{
 					"pool1": &Pool{
+						AutoAssign: true,
 						Advertisements: []*Advertisement{
 							{
 								AggregationLength: 32,

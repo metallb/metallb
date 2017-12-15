@@ -43,6 +43,10 @@ data:
       # smurf protection. Such devices have become fairly rare, but
       # the option is here if you encounter serving issues.
       avoid-buggy-ips: true
+      # (optional) If false, MetalLB will not automatically allocate
+      # any address in this pool. Addresses can still explicitly be
+      # requested via loadBalancerIP or the address-pool annotation.
+      # auto-assign: false
       # A list of BGP advertisements to make. Each address that gets
       # assigned out of this pool will turn into this many
       # advertisements. For most simple setups, you'll probably just
