@@ -118,6 +118,14 @@ func (a *Announce) Announce(ip net.IP) bool {
 	return false
 }
 
+// AnnounceName returns true when we have an announcement under name.
+func (a *Announce) AnnounceName(name string) bool {
+	a.RLock()
+	defer a.RUnlock()
+	_, ok := a.ips[name]
+	return ok
+}
+
 // Unsolicited returns a slice of ARP responses that can be send out as unsolicited ARPs.
 func (a *Announce) Unsolicited() []*arp.Packet {
 	a.RLock()
