@@ -116,6 +116,7 @@ func TestControllerMutation(t *testing.T) {
 	cfg := &config.Config{
 		Pools: map[string]*config.Pool{
 			"pool1": &config.Pool{
+				AutoAssign: true,
 				CIDR: []*net.IPNet{ipnet("1.2.3.0/31")},
 			},
 		},
@@ -393,6 +394,7 @@ func TestControllerConfig(t *testing.T) {
 	cfg := &config.Config{
 		Pools: map[string]*config.Pool{
 			"default": &config.Pool{
+				AutoAssign: true,
 				CIDR: []*net.IPNet{ipnet("1.2.3.0/24")},
 			},
 		},
