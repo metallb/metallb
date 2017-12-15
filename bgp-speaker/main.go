@@ -54,10 +54,6 @@ type peer struct {
 }
 
 func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
-	if svc == nil {
-		return c.deleteBalancer(name, "service deleted")
-	}
-
 	if svc.Spec.Type != "LoadBalancer" {
 		return nil
 	}
@@ -72,25 +68,25 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 
 	if len(svc.Status.LoadBalancer.Ingress) != 1 {
 		glog.Infof("%s: no IP allocated by controller", name)
-		return c.deleteBalancer(name, "no IP allocated by controller")
+		return c.DeleteBalancer(name)
 	}
 
 	// Should we advertise? Yes, if externalTrafficPolicy is Cluster,
 	// or Local && there's a ready local endpoint.
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !k8s.NodeHasHealthyEndpoint(eps, c.myNode) {
 		glog.Infof("%s: externalTrafficPolicy is Local, and no healthy local endpoints", name)
-		return c.deleteBalancer(name, "no healthy local endpoints")
+		return c.DeleteBalancer(name)
 	}
 
 	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP).To4()
 	if lbIP == nil {
 		glog.Errorf("%s: invalid LoadBalancer IP %q", name, svc.Status.LoadBalancer.Ingress[0].IP)
-		return c.deleteBalancer(name, "invalid IP allocated by controller")
+		return c.DeleteBalancer(name)
 	}
 
 	if err := c.ips.Assign(name, lbIP); err != nil {
 		glog.Errorf("%s: IP %q assigned by controller is not allowed by config", name, lbIP)
-		return c.deleteBalancer(name, "invalid IP allocated by controller")
+		return c.DeleteBalancer(name)
 	}
 
 	poolName := c.ips.GetPool(name)
@@ -151,11 +147,12 @@ func (c *controller) updateAds() error {
 	return nil
 }
 
-func (c *controller) deleteBalancer(name, reason string) error {
+// DeleteBalancer implements the controller interface.
+func (c *controller) DeleteBalancer(name string) error {
 	if _, ok := c.svcAds[name]; !ok {
 		return nil
 	}
-	glog.Infof("%s: stopping announcements, %s", name, reason)
+	glog.Infof("%s: stopping announcements, %s", name)
 	c.announcing.Delete(prometheus.Labels{
 		"service": name,
 		"node":    c.myNode,

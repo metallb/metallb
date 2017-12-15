@@ -90,7 +90,7 @@ func (a *Announce) Close() error {
 	return a.client.Close()
 }
 
-// SetBalancer implementes adds ip to the set of announced address.
+// SetBalancer adds an ip to the set of announced address.
 func (a *Announce) SetBalancer(name string, ip net.IP) {
 	a.Lock()
 	defer a.Unlock()
