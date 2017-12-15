@@ -7,7 +7,7 @@ ENV GOBIN=/
 
 RUN apk update
 RUN apk upgrade
-RUN apk add git go glide musl-dev libcap
+RUN apk add git go glide musl-dev libcap linux-headers
 RUN mkdir -p $GOPATH/src/go.universe.tf/metallb
 COPY . $GOPATH/src/go.universe.tf/metallb
 WORKDIR $GOPATH/src/go.universe.tf/metallb
