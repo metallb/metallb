@@ -416,6 +416,58 @@ func TestConfigReload(t *testing.T) {
 	}
 }
 
+func TestAutoAssign(t *testing.T) {
+	alloc := New()
+	if err := alloc.SetPools(pools(
+		pool("test1", false, false, "1.2.3.4/31"),
+		pool("test2", false, true, "1.2.3.10/31"))); err != nil {
+		t.Fatalf("SetPools: %s", err)
+	}
+
+	validIPs := map[string]bool{
+		"1.2.3.4":  false,
+		"1.2.3.5":  false,
+		"1.2.3.10": true,
+		"1.2.3.11": true,
+	}
+
+	tests := []struct {
+		svc      string
+		wantErr  bool
+	}{
+		{svc: "s1"},
+		{svc: "s2"},
+		{
+			svc: "s3",
+			wantErr: true,
+		},
+		{
+			svc: "s4",
+			wantErr: true,
+		},
+		{
+			svc: "s5",
+			wantErr: true,
+		},
+	}
+
+	for i, test := range tests {
+		ip, err := alloc.Allocate(test.svc)
+		if test.wantErr {
+			if err == nil {
+				t.Errorf("#%d should have caused an error, but did not", i+1)
+			}
+			continue
+		}
+		if err != nil {
+			t.Errorf("#%d Allocate(%q, \"test\"): %s", i+1, test.svc, err)
+		}
+		if !validIPs[ip.String()] {
+			t.Errorf("#%d allocated unexpected IP %q", i+1, ip)
+		}
+	}
+}
+
 // Some helpers
 
 // Peeks inside Allocator to find the allocated IP and pool for a service.
