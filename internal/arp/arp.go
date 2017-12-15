@@ -18,6 +18,7 @@ type Announce struct {
 	client       *arp.Client
 	ips          map[string]net.IP // map containing IPs we should announce
 	sync.RWMutex                   // protects ips
+	stop         chan bool         // stop unsolicited arp spamming
 
 	leader   bool
 	leaderMu sync.RWMutex
@@ -38,6 +39,7 @@ func New(ip net.IP) (*Announce, error) {
 		hardwareAddr: ifi.HardwareAddr,
 		client:       client,
 		ips:          make(map[string]net.IP),
+		stop:         make(chan bool),
 	}, nil
 }
 
@@ -58,7 +60,10 @@ const (
 // requests when a.leader is set to true, i.e. we are the current cluster wide leader for sending ARPs.
 func (a *Announce) Run() {
 	for {
-		a.readPacket()
+		dropped := a.readPacket()
+		if dropped != dropReasonNone {
+			glog.Infof("ARP packet dropped %d", dropped)
+		}
 	}
 }
 
@@ -70,6 +75,8 @@ func (a *Announce) readPacket() dropReason {
 	if err != nil {
 		return dropReasonReadError
 	}
+
+	glog.Infof("Request: who-has %s?  tell %s (%s)", pkt.TargetIP, pkt.SenderIP, pkt.SenderHardwareAddr)
 
 	// Ignore ARP replies.
 	if pkt.Operation != arp.OperationRequest {
@@ -92,10 +99,10 @@ func (a *Announce) readPacket() dropReason {
 	}
 
 	// pkt.TargetIP has been vetted to be "the one".
-	glog.Infof("request: who-has %s?  tell %s (%s). reply: %s is-at %s", pkt.TargetIP, pkt.SenderIP, pkt.SenderHardwareAddr, pkt.TargetIP, a.hardwareAddr)
+	glog.Infof("Request: who-has %s?  tell %s (%s). reply: %s is-at %s", pkt.TargetIP, pkt.SenderIP, pkt.SenderHardwareAddr, pkt.TargetIP, a.hardwareAddr)
 
 	if err := a.Reply(pkt, pkt.TargetIP); err != nil {
-		glog.Warningf("Failed to writes ARP response for %s: %s", pkt.TargetIP, err)
+		glog.Warningf("Failed to write ARP response for %s: %s", pkt.TargetIP, err)
 	}
 
 	return dropReasonNone
@@ -147,8 +154,8 @@ func (a *Announce) AnnounceName(name string) bool {
 	return ok
 }
 
-// Unsolicited returns a slice of ARP responses that can be send out as unsolicited ARPs.
-func (a *Announce) Unsolicited() []*arp.Packet {
+// Packets returns a slice of ARP packets that can be send out as unsolicited ARPs.
+func (a *Announce) Packets() []*arp.Packet {
 	a.RLock()
 	defer a.RUnlock()
 
