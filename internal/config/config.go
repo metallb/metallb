@@ -39,6 +39,7 @@ type configFile struct {
 		Name           string
 		CIDR           []string
 		AvoidBuggyIPs  bool `yaml:"avoid-buggy-ips"`
+		AutoAssign     *bool `yaml:"auto-assign"`
 		Advertisements []struct {
 			AggregationLength *int `yaml:"aggregation-length"`
 			LocalPref         *uint32
@@ -82,6 +83,8 @@ type Pool struct {
 	// unusable, for maximum compatibility with ancient parts of the
 	// internet.
 	AvoidBuggyIPs bool
+	// Prevents IP addresses to be automatically assigned from this pool.
+	AutoAssign bool
 	// When an IP is allocated from this pool, how should it be
 	// translated into BGP announcements?
 	Advertisements []*Advertisement
@@ -170,8 +173,14 @@ func Parse(bs []byte) (*Config, error) {
 		if _, ok := cfg.Pools[p.Name]; ok {
 			return nil, fmt.Errorf("duplicate pool definition for %q", p.Name)
 		}
+
+		autoAssign := true
+		if p.AutoAssign != nil {
+			autoAssign = *p.AutoAssign
+		}
 		pool := &Pool{
 			AvoidBuggyIPs: p.AvoidBuggyIPs,
+			AutoAssign:    autoAssign,
 		}
 		cfg.Pools[p.Name] = pool
 

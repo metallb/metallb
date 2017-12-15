@@ -11,8 +11,8 @@ import (
 func TestAssignment(t *testing.T) {
 	alloc := New()
 	if err := alloc.SetPools(pools(
-		pool("test", false, "1.2.3.4/31"),
-		pool("test2", true, "1.2.4.0/24"))); err != nil {
+		pool("test", false, true, "1.2.3.4/31"),
+		pool("test2", true, true, "1.2.4.0/24"))); err != nil {
 		t.Fatalf("SetPools: %s", err)
 	}
 
@@ -118,9 +118,9 @@ func TestPoolAllocation(t *testing.T) {
 	// out of IPs quickly even though there are tons available in
 	// other pools.
 	if err := alloc.SetPools(pools(
-		pool("not_this_one", false, "192.168.0.0/16"),
-		pool("test", false, "1.2.3.4/31", "1.2.3.10/31"),
-		pool("test2", false, "10.20.30.0/24"))); err != nil {
+		pool("not_this_one", false, true, "192.168.0.0/16"),
+		pool("test", false, true, "1.2.3.4/31", "1.2.3.10/31"),
+		pool("test2", false, true, "10.20.30.0/24"))); err != nil {
 		t.Fatalf("SetPools: %s", err)
 	}
 
@@ -189,8 +189,8 @@ func TestPoolAllocation(t *testing.T) {
 func TestAllocation(t *testing.T) {
 	alloc := New()
 	if err := alloc.SetPools(pools(
-		pool("test1", false, "1.2.3.4/31"),
-		pool("test2", false, "1.2.3.10/31"))); err != nil {
+		pool("test1", false, true, "1.2.3.4/31"),
+		pool("test2", false, true, "1.2.3.10/31"))); err != nil {
 		t.Fatalf("SetPools: %s", err)
 	}
 
@@ -254,10 +254,10 @@ func TestAllocation(t *testing.T) {
 func TestBuggyIPs(t *testing.T) {
 	alloc := New()
 	if err := alloc.SetPools(pools(
-		pool("test", false, "1.2.3.0/31"),
-		pool("test2", false, "1.2.3.254/31"),
-		pool("test3", true, "1.2.4.0/31"),
-		pool("test4", true, "1.2.4.254/31"))); err != nil {
+		pool("test", false, true, "1.2.3.0/31"),
+		pool("test2", false, true, "1.2.3.254/31"),
+		pool("test3", true, true, "1.2.4.0/31"),
+		pool("test4", true, true, "1.2.4.254/31"))); err != nil {
 		t.Fatalf("SetPools: %s", err)
 	}
 
@@ -332,7 +332,7 @@ func TestNextIP(t *testing.T) {
 
 func TestConfigReload(t *testing.T) {
 	alloc := New()
-	if err := alloc.SetPools(pool("test", false, "1.2.3.0/30")); err != nil {
+	if err := alloc.SetPools(pool("test", false, true, "1.2.3.0/30")); err != nil {
 		t.Fatalf("SetPools: %s", err)
 	}
 	if err := alloc.Assign("s1", net.ParseIP("1.2.3.0")); err != nil {
@@ -347,54 +347,54 @@ func TestConfigReload(t *testing.T) {
 	}{
 		{
 			desc:  "set same config is no-op",
-			pools: pool("test", false, "1.2.3.0/30"),
+			pools: pool("test", false, true, "1.2.3.0/30"),
 			pool:  "test",
 		},
 		{
 			desc:  "expand pool",
-			pools: pool("test", false, "1.2.3.0/24"),
+			pools: pool("test", false, true, "1.2.3.0/24"),
 			pool:  "test",
 		},
 		{
 			desc:  "shrink pool",
-			pools: pool("test", false, "1.2.3.0/30"),
+			pools: pool("test", false, true, "1.2.3.0/30"),
 			pool:  "test",
 		},
 		{
 			desc:    "can't shrink further",
-			pools:   pool("test", false, "1.2.3.2/31"),
+			pools:   pool("test", false, true, "1.2.3.2/31"),
 			pool:    "test",
 			wantErr: true,
 		},
 		{
 			desc:  "rename the pool",
-			pools: pool("test2", false, "1.2.3.0/30"),
+			pools: pool("test2", false, true, "1.2.3.0/30"),
 			pool:  "test2",
 		},
 		{
 			desc:  "split pool",
-			pools: pools(pool("test", false, "1.2.3.0/31"), pool("test2", false, "1.2.3.2/31")),
+			pools: pools(pool("test", false, true, "1.2.3.0/31"), pool("test2", false, true, "1.2.3.2/31")),
 			pool:  "test",
 		},
 		{
 			desc:  "swap pool names",
-			pools: pools(pool("test2", false, "1.2.3.0/31"), pool("test", false, "1.2.3.2/31")),
+			pools: pools(pool("test2", false, true,"1.2.3.0/31"), pool("test", false, true, "1.2.3.2/31")),
 			pool:  "test2",
 		},
 		{
 			desc:    "delete used pool",
-			pools:   pool("test", true, "1.2.3.2/31"),
+			pools:   pool("test", true, true, "1.2.3.2/31"),
 			pool:    "test2",
 			wantErr: true,
 		},
 		{
 			desc:  "delete unused pool",
-			pools: pool("test2", false, "1.2.3.0/31"),
+			pools: pool("test2", false, true, "1.2.3.0/31"),
 			pool:  "test2",
 		},
 		{
 			desc:    "enable buggy IPs not allowed",
-			pools:   pool("test2", true, "1.2.3.0/31"),
+			pools:   pool("test2", true, true, "1.2.3.0/31"),
 			pool:    "test2",
 			wantErr: true,
 		},
@@ -440,9 +440,10 @@ func pools(pools ...map[string]*config.Pool) map[string]*config.Pool {
 	return ret
 }
 
-func pool(name string, avoidBuggyIPs bool, cidrs ...string) map[string]*config.Pool {
+func pool(name string, avoidBuggyIPs, autoAssign bool, cidrs ...string) map[string]*config.Pool {
 	ret := &config.Pool{
 		AvoidBuggyIPs: avoidBuggyIPs,
+		AutoAssign:    autoAssign,
 	}
 	for _, cidr := range cidrs {
 		_, n, err := net.ParseCIDR(cidr)
