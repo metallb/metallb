@@ -26,14 +26,14 @@ protocol bgp minikube {
   error wait time 1, 2;
 }
 `, nodeIP(), nodeIP())
-	if err := ioutil.WriteFile("/etc/bird/bird.conf", []byte(cfg), 0644); err != nil {
+	if err := ioutil.WriteFile("/etc/bird.conf", []byte(cfg), 0644); err != nil {
 		return err
 	}
 	return nil
 }
 
 func runBird() error {
-	return runOrCrash("/usr/sbin/bird", "-d", "-c", "/etc/bird/bird.conf")
+	return runOrCrash("/usr/sbin/bird", "-d", "-c", "/etc/bird.conf")
 }
 
 func birdStatus() (*values, error) {

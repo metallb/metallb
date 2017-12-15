@@ -65,8 +65,7 @@ func runTCPDump() error {
 
 func installNatRule() error {
 	for _, port := range []int{179, 1179, 2179} {
-		c := exec.Command("/sbin/iptables", "-t", "nat", "-A", "INPUT", "-p", "tcp", "--dport", strconv.Itoa(port), "-j", "SNAT", "--to", os.Getenv("METALLB_NODE_IP"))
-		if err := c.Run(); err != nil {
+		if err := runBlocking("/sbin/iptables", "-t", "nat", "-A", "INPUT", "-p", "tcp", "--dport", strconv.Itoa(port), "-j", "SNAT", "--to", nodeIP()); err != nil {
 			return err
 		}
 	}
@@ -87,4 +86,11 @@ func runOrCrash(cmd ...string) error {
 		glog.Exitf("%s exited", cmd[0])
 	}()
 	return nil
+}
+
+func runBlocking(cmd ...string) error {
+	c := exec.Command(cmd[0], cmd[1:]...)
+	c.Stdout = os.Stdout
+	c.Stderr = os.Stderr
+	return c.Run()
 }
