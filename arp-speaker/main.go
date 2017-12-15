@@ -205,7 +205,7 @@ func main() {
 	if err != nil {
 		glog.Fatalf("Error setting up leader election: %s", err)
 	}
-	le.Run()
+	go func() { le.Run() }()
 
 	glog.Fatal(client.Run(*port))
 }
