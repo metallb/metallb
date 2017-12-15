@@ -45,10 +45,6 @@ type controller struct {
 }
 
 func (c *controller) SetBalancer(name string, svcRo *v1.Service, _ *v1.Endpoints) error {
-	if svcRo == nil {
-		return c.deleteBalancer(name)
-	}
-
 	if svcRo.Spec.Type != "LoadBalancer" {
 		return nil
 	}
@@ -95,7 +91,7 @@ func (c *controller) SetBalancer(name string, svcRo *v1.Service, _ *v1.Endpoints
 	return nil
 }
 
-func (c *controller) deleteBalancer(name string) error {
+func (c *controller) DeleteBalancer(name string) error {
 	if c.ips.Unassign(name) {
 		glog.Infof("%s: service deleted", name)
 	}
