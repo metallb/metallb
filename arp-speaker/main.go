@@ -44,10 +44,6 @@ type controller struct {
 }
 
 func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
-	if svc == nil {
-		return c.deleteBalancer(name, "service deleted")
-	}
-
 	if svc.Spec.Type != "LoadBalancer" {
 		return nil
 	}
@@ -62,32 +58,32 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 
 	if len(svc.Status.LoadBalancer.Ingress) != 1 {
 		glog.Infof("%s: no IP allocated by controller", name)
-		return c.deleteBalancer(name, "no IP allocated by controller")
+		return c.DeleteBalancer(name)
 	}
 
 	// Should we advertise? Yes, if externalTrafficPolicy is Cluster,
 	// or Local && there's a ready local endpoint.
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !k8s.NodeHasHealthyEndpoint(eps, c.myNode) {
 		glog.Infof("%s: externalTrafficPolicy is Local, and no healthy local endpoints", name)
-		return c.deleteBalancer(name, "no healthy local endpoints")
+		return c.DeleteBalancer(name)
 	}
 
 	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP).To4()
 	if lbIP == nil {
 		glog.Errorf("%s: invalid LoadBalancer IP %q", name, svc.Status.LoadBalancer.Ingress[0].IP)
-		return c.deleteBalancer(name, "invalid IP allocated by controller")
+		return c.DeleteBalancer(name)
 	}
 
 	if err := c.ips.Assign(name, lbIP); err != nil {
 		glog.Errorf("%s: IP %q assigned by controller is not allowed by config", name, lbIP)
-		return c.deleteBalancer(name, "invalid IP allocated by controller")
+		return c.DeleteBalancer(name)
 	}
 
 	poolName := c.ips.GetPool(name)
 	pool := c.config.Pools[c.ips.GetPool(name)]
 	if pool == nil {
 		glog.Errorf("%s: could not find pool %q that definitely should exist!", name, poolName)
-		return c.deleteBalancer(name, "can't find pool")
+		return c.DeleteBalancer(name)
 	}
 
 	glog.Infof("%s: announcable, making advertisement", name)
@@ -103,8 +99,8 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 	return nil
 }
 
-func (c *controller) deleteBalancer(name, reason string) error {
-	glog.Infof("%s: stopping announcements, %s", name, reason)
+// DeleteBalancer implements the controller interface
+func (c *controller) DeleteBalancer(name string) error {
 	c.announcing.Delete(prometheus.Labels{
 		"service": name,
 		"node":    c.myNode,

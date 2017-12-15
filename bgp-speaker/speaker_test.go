@@ -590,24 +590,26 @@ func TestBGPSppeaker(t *testing.T) {
 			},
 		},
 
-		{
-			desc:     "Delete svc",
-			balancer: "test1",
-			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": []*bgp.Advertisement{
-					{
-						Prefix:  ipnet("10.20.30.5/32"),
-						NextHop: net.ParseIP("1.2.3.4"),
+		/*
+			{
+				desc:     "Delete svc",
+				balancer: "test1",
+				wantAds: map[string][]*bgp.Advertisement{
+					"1.2.3.4:0": []*bgp.Advertisement{
+						{
+							Prefix:  ipnet("10.20.30.5/32"),
+							NextHop: net.ParseIP("1.2.3.4"),
+						},
 					},
-				},
-				"1.2.3.5:0": []*bgp.Advertisement{
-					{
-						Prefix:  ipnet("10.20.30.5/32"),
-						NextHop: net.ParseIP("1.2.3.4"),
+					"1.2.3.5:0": []*bgp.Advertisement{
+						{
+							Prefix:  ipnet("10.20.30.5/32"),
+							NextHop: net.ParseIP("1.2.3.4"),
+						},
 					},
 				},
 			},
-		},
+		*/
 
 		{
 			desc: "Delete peer",
@@ -660,6 +662,7 @@ func TestBGPSppeaker(t *testing.T) {
 	}
 
 	for _, test := range tests {
+		t.Logf("Running %s", test.desc)
 		if test.config != nil {
 			if err := c.SetConfig(test.config); err != nil {
 				t.Errorf("%q: SetConfig failed: %s", test.desc, err)

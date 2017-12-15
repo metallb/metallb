@@ -139,10 +139,6 @@ func TestControllerMutation(t *testing.T) {
 		wantErr bool
 	}{
 		{
-			desc: "deleted balancer",
-		},
-
-		{
 			desc: "simple non-LoadBalancer",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{

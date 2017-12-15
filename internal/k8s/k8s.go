@@ -26,10 +26,15 @@ type Controller interface {
 	// Endpoints change. When the Service is deleted, SetBalancer is
 	// called with svc=nil and eps=nil.
 	SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error
+
+	// DeleteBalancer is called whenever a Service is deleted.
+	DeleteBalancer(name string) error
+
 	// SetConfig is called whenever the MetalLB configuration for the
 	// cluster changes. If the config is deleted from the cluster,
 	// SetConfig is called with cfg=nil.
 	SetConfig(cfg *config.Config) error
+
 	// MarkSynced is called when SetBalancer has been called at least
 	// once for every Service in the cluster, and SetConfig has been
 	// called.
@@ -264,7 +269,7 @@ func (c *Client) sync(key interface{}) error {
 				return fmt.Errorf("get endpoints %q: %s", k, err)
 			}
 			if !exists {
-				return c.controller.SetBalancer(string(k), nil, nil)
+				return c.controller.DeleteBalancer(string(k))
 			}
 			eps = epsIntf.(*v1.Endpoints)
 		}
