@@ -5,7 +5,7 @@ metadata:
   name: config
 data:
   config: |
-    protocol: "arp"
+    protocol: "bgp"
     # The peers section tells MetalLB what BGP routers to connect too. There
     # is one entry for each router you want to peer with.
     peers:
