@@ -42,10 +42,6 @@ type arpController struct {
 }
 
 func (c *arpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
-	if c.config.Protocol != config.ProtoARP {
-		return nil
-	}
-
 	if svc == nil {
 		return c.deleteBalancer(name, "service deleted")
 	}
@@ -59,6 +55,10 @@ func (c *arpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 
 	if c.config == nil {
 		glog.Infof("%s: skipped, waiting for config", name)
+		return nil
+	}
+
+	if c.config.Protocol != config.ProtoARP {
 		return nil
 	}
 
