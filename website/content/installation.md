@@ -5,7 +5,7 @@ weight: 20
 
 Installing MetalLB is very simple: just apply the manifest!
 
-`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.2.0/manifests/metallb.yaml`
+`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.2.1/manifests/metallb.yaml`
 
 This will deploy MetalLB to your cluster, under the `metallb-system`
 namespace. The components in the manifest are:

@@ -7,7 +7,7 @@ weight: 30
 
 To configure MetalLB, write a config map to `metallb-system/config`
 
-There is an example configmap in [`manifests/example-config.yaml`](https://raw.githubusercontent.com/google/metallb/v0.2.0/manifests/example-config.yaml),
+There is an example configmap in [`manifests/example-config.yaml`](https://raw.githubusercontent.com/google/metallb/v0.2.1/manifests/example-config.yaml),
 annotated with explanatory comments.
 
 For a basic configuration featuring one BGP router and one IP address
