@@ -44,6 +44,10 @@ type controller struct {
 }
 
 func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
+	if a.config.Protocol != config.ProtoARP {
+		return nil
+	}
+
 	if svc == nil {
 		return c.deleteBalancer(name, "service deleted")
 	}
