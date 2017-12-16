@@ -39,7 +39,7 @@ func TestParse(t *testing.T) {
 		{
 			desc: "config with protocol set to arp",
 			raw: `
-protocol: "arp"
+protocol: arp
 `,
 			want: &Config{
 				Protocol: ProtoARP,
