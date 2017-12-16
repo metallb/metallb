@@ -83,7 +83,8 @@ type Pool struct {
 	// unusable, for maximum compatibility with ancient parts of the
 	// internet.
 	AvoidBuggyIPs bool
-	// Prevents IP addresses to be automatically assigned from this pool.
+	// If false, prevents IP addresses to be automatically assigned
+	// from this pool.
 	AutoAssign bool
 	// When an IP is allocated from this pool, how should it be
 	// translated into BGP announcements?
