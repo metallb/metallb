@@ -60,6 +60,10 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 		return nil
 	}
 
+	if c.config.Protocol != config.ProtoARP {
+		return nil
+	}
+
 	if len(svc.Status.LoadBalancer.Ingress) != 1 {
 		glog.Infof("%s: no IP allocated by controller", name)
 		return c.deleteBalancer(name, "no IP allocated by controller")
