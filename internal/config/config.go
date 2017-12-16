@@ -27,7 +27,8 @@ import (
 // configFile is the configuration as parsed out of the ConfigMap,
 // without validation or useful high level types.
 type configFile struct {
-	Peers []struct {
+	Protocol Proto
+	Peers    []struct {
 		MyASN    uint32 `yaml:"my-asn"`
 		ASN      uint32 `yaml:"peer-asn"`
 		Addr     string `yaml:"peer-address"`
@@ -50,11 +51,21 @@ type configFile struct {
 
 // Config is a parsed MetalLB configuration.
 type Config struct {
-	// BGP routers that MetalLB should peer with.
+	// Protocol that MetalLB should use, supported values "arp", "bgp" and "rip".
+	Protocol Proto
+	// Routers that MetalLB should peer with.
 	Peers []*Peer
 	// Address pools from which to allocate load balancer IPs.
 	Pools map[string]*Pool
 }
+
+type Proto string
+
+const (
+	ProtoARP Proto = "arp"
+	ProtoBGP Proto = "bgp"
+	ProtoRIP Proto = "rip"
+)
 
 // Peer is the configuration of a BGP peering session.
 type Peer struct {
@@ -127,8 +138,22 @@ func Parse(bs []byte) (*Config, error) {
 	}
 
 	cfg := &Config{
-		Pools: map[string]*Pool{},
+		Protocol: ProtoBGP,
+		Pools:    map[string]*Pool{},
 	}
+	switch raw.Protocol {
+	case "arp":
+		cfg.Protocol = ProtoARP
+	case "bgp":
+		cfg.Protocol = ProtoBGP
+	case "rip":
+		cfg.Protocol = ProtoRIP
+	case "":
+		// Not set default to BGP.
+	default:
+		return nil, fmt.Errorf("wrong value for protocol %s", raw.Protocol)
+	}
+
 	for i, p := range raw.Peers {
 		if p.MyASN == 0 {
 			return nil, fmt.Errorf("peer #%d missing local ASN", i+1)
