@@ -49,20 +49,37 @@ type dropReason int
 // Possible dropReason values.
 const (
 	dropReasonNone dropReason = iota
-	dropReasonReadError
+	dropReasonError
 	dropReasonARPReply
 	dropReasonEthernetDestination
 	dropReasonAnnounceIP
 	dropReasonNotLeader
 )
 
+func (d dropReason) String() string {
+	switch d {
+	case dropReasonNone:
+		return ""
+	case dropReasonError:
+		return "error"
+	case dropReasonARPReply:
+		return "unsolicited reply"
+	case dropReasonEthernetDestination:
+		return "bad ethernet destination"
+	case dropReasonAnnounceIP:
+		return "non-LB ip"
+	case dropReasonNotLeader:
+		return "not leader"
+	}
+	return "unknown"
+}
+
 // Run starts the announcer, making it listen on the interface for ARP requests. It only responds to these
 // requests when a.leader is set to true, i.e. we are the current cluster wide leader for sending ARPs.
 func (a *Announce) Run() {
 	for {
-		dropped := a.readPacket()
-		if dropped != dropReasonNone {
-			glog.Infof("ARP packet dropped %d", dropped)
+		if dropped := a.readPacket(); dropped != dropReasonNone {
+			glog.Infof("ARP packet dropped: %s", dropped)
 		}
 	}
 }
@@ -73,10 +90,8 @@ func (a *Announce) readPacket() dropReason {
 	pkt, eth, err := a.client.Read()
 
 	if err != nil {
-		return dropReasonReadError
+		return dropReasonError
 	}
-
-	glog.Infof("Request: who-has %s?  tell %s (%s)", pkt.TargetIP, pkt.SenderIP, pkt.SenderHardwareAddr)
 
 	// Ignore ARP replies.
 	if pkt.Operation != arp.OperationRequest {
