@@ -5,7 +5,7 @@ install:
 - go get github.com/golang/lint/golint
 script:
 - glide install
-- go install -v go.universe.tf/metallb/controller go.universe.tf/metallb/bgp-speaker
+- go install -v go.universe.tf/metallb/controller go.universe.tf/metallb/speaker
 - go test $(glide novendor)
 - go test -race $(glide novendor)
 - go vet $(glide novendor)
