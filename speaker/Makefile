@@ -1,9 +1,9 @@
 include ../Makefile.inc
 
-NAME:=bgp-speaker
+NAME:=speaker
 BINARY:=$(NAME)
 DOCKER_IMAGE_NAME:=$(DOCKER)/$(NAME)
 
-.PHONY: bgp-speaker
-bgp-speaker:
+.PHONY: speaker
+speaker:
 	CGO_ENABLED=0 $(SYSTEM) go build -o $(BINARY)

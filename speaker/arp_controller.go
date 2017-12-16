@@ -16,10 +16,8 @@ package main
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"net"
-	"os"
 
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/arp"
@@ -31,7 +29,7 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-type controller struct {
+type arpController struct {
 	myIP   net.IP
 	myNode string
 
@@ -43,8 +41,8 @@ type controller struct {
 	announcing *prometheus.GaugeVec
 }
 
-func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
-	if a.config.Protocol != config.ProtoARP {
+func (c *arpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
+	if c.config.Protocol != config.ProtoARP {
 		return nil
 	}
 
@@ -98,32 +96,34 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 
 	c.ann.SetBalancer(name, lbIP)
 
-	c.announcing.With(prometheus.Labels{
-		"service": name,
-		"node":    c.myNode,
-		"ip":      lbIP.String(),
+	announcing.With(prometheus.Labels{
+		"protocol": string(config.ProtoARP),
+		"service":  name,
+		"node":     c.myNode,
+		"ip":       lbIP.String(),
 	}).Set(1)
 
 	return nil
 }
 
-func (c *controller) deleteBalancer(name, reason string) error {
+func (c *arpController) deleteBalancer(name, reason string) error {
 	if !c.ann.AnnounceName(name) {
 		return nil
 	}
 
 	glog.Infof("%s: stopping announcements, %s", name, reason)
-	c.announcing.Delete(prometheus.Labels{
-		"service": name,
-		"node":    c.myNode,
-		"ip":      c.ips.GetIP(name).String(),
+	announcing.Delete(prometheus.Labels{
+		"protocol": string(config.ProtoARP),
+		"service":  name,
+		"node":     c.myNode,
+		"ip":       c.ips.GetIP(name).String(),
 	})
 	c.ips.Unassign(name)
 	c.ann.DeleteBalancer(name)
 	return nil
 }
 
-func (c *controller) SetConfig(cfg *config.Config) error {
+func (c *arpController) SetConfig(cfg *config.Config) error {
 	glog.Infof("Start config update")
 	defer glog.Infof("End config update")
 
@@ -142,78 +142,22 @@ func (c *controller) SetConfig(cfg *config.Config) error {
 	return nil
 }
 
-func (c *controller) MarkSynced() {}
+func (c *arpController) MarkSynced() {}
 
-func newController(myIP net.IP, myNode string) (*controller, error) {
+func newARPController(myIP net.IP, myNode string) (*arpController, error) {
 	ann, err := arp.New(myIP)
 	if err != nil {
 		return nil, err
 	}
-	c := &controller{
+
+	c := &arpController{
 		myIP:   myIP,
 		myNode: myNode,
 		ips:    allocator.New(),
 		ann:    ann,
-
-		announcing: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: "metallb",
-			Subsystem: "speaker",
-			Name:      "announced",
-			Help:      "Services being announced from this node. This is desired state, it does not guarantee that the routing protocols have converged.",
-		}, []string{
-			"service",
-			"node",
-			"ip",
-		}),
 	}
 
-	prometheus.MustRegister(c.announcing)
 	// just start this as a goroutine, the life time is bound to this process, so there is no need to stop it.
 	go func() { ann.Run() }()
 	return c, nil
 }
-
-func main() {
-	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-	master := flag.String("master", "", "master url")
-	myIPstr := flag.String("node-ip", "", "IP address of this Kubernetes node")
-	myNode := flag.String("node-name", "", "name of this Kubernetes node")
-	port := flag.Int("port", 80, "HTTP listening port")
-	flag.Parse()
-
-	if *myIPstr == "" {
-		*myIPstr = os.Getenv("METALLB_NODE_IP")
-	}
-	if *myNode == "" {
-		*myNode = os.Getenv("METALLB_NODE_NAME")
-	}
-
-	myIP := net.ParseIP(*myIPstr).To4()
-	if myIP == nil {
-		glog.Fatalf("Invalid --node-ip %q, must be an IPv4 address", *myIPstr)
-	}
-
-	if *myNode == "" {
-		glog.Fatalf("Must specify --node-name")
-	}
-
-	c, err := newController(myIP, *myNode)
-	if err != nil {
-		glog.Fatalf("Error getting controller: %s", err)
-	}
-
-	client, err := k8s.NewClient(identity, *master, *kubeconfig, c, true)
-	if err != nil {
-		glog.Fatalf("Error getting k8s client: %s", err)
-	}
-
-	le, err := client.NewLeaderElector(c.ann, identity)
-	if err != nil {
-		glog.Fatalf("Error setting up leader election: %s", err)
-	}
-	go func() { le.Run() }()
-
-	glog.Fatal(client.Run(*port))
-}
-
-const identity = "metallb-arp-speaker"
