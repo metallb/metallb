@@ -8,4 +8,4 @@ data:
     address-pools:
     - name: my-ip-space
       cidr:
-      - 192.168.1.240/29
+      - 192.168.1.240/28
