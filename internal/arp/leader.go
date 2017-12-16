@@ -3,6 +3,7 @@ package arp
 import (
 	"time"
 
+	"github.com/golang/glog"
 	"github.com/mdlayher/ethernet"
 )
 
@@ -52,7 +53,11 @@ func (a *Announce) Unsolicited() {
 	for {
 		select {
 		case <-ticker.C:
-			for _, u := range a.Packets() {
+			packets := a.Packets()
+
+			glog.Infof("Sending unsolicited ARPs for %d addresses", len(packets))
+
+			for _, u := range packets {
 				a.client.WriteTo(u, ethernet.Broadcast)
 			}
 

@@ -2,7 +2,6 @@ package arp
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"net"
 	"sync"
@@ -167,29 +166,28 @@ func (a *Announce) Packets() []*arp.Packet {
 func interfaceByIP(ip net.IP) (*net.Interface, error) {
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		return nil, fmt.Errorf("No interfaces found: %s", err)
+		return nil, fmt.Errorf("no interfaces found: %s", err)
 	}
 	for _, i := range ifaces {
-		glog.Infof("Found interface: %v", i)
 		addrs, err := i.Addrs()
 		if err != nil {
 			continue
 		}
 		for _, addr := range addrs {
-			glog.Infof("Address found %s for interface: %v", addr.String(), i)
 			switch v := addr.(type) {
 			case *net.IPNet:
 				if ip.Equal(v.IP) {
+					glog.Infof("Address found %s for interface: %v", addr.String(), i)
 					return &i, nil
 				}
 			case *net.IPAddr:
 				if ip.Equal(v.IP) {
+					glog.Infof("Address found %s for interface: %v", addr.String(), i)
 					return &i, nil
 				}
 			}
-
 		}
 	}
 
-	return nil, errors.New("not found")
+	return nil, fmt.Errorf("address not found in %d interfaces", len(ifaces))
 }
