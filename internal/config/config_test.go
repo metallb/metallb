@@ -26,13 +26,25 @@ func TestParse(t *testing.T) {
 			desc: "empty config",
 			raw:  "",
 			want: &Config{
-				Pools: map[string]*Pool{},
+				Protocol: ProtoBGP,
+				Pools:    map[string]*Pool{},
 			},
 		},
 
 		{
 			desc: "invalid yaml",
 			raw:  "foo:<>$@$2r24j90",
+		},
+
+		{
+			desc: "config with protocol set to arp",
+			raw: `
+protocol: "arp"
+`,
+			want: &Config{
+				Protocol: ProtoARP,
+				Pools:    map[string]*Pool{},
+			},
 		},
 
 		{
@@ -65,6 +77,7 @@ address-pools:
   - 30.0.0.0/8
 `,
 			want: &Config{
+				Protocol: ProtoBGP,
 				Peers: []*Peer{
 					{
 						MyASN:    42,
@@ -116,6 +129,7 @@ peers:
   peer-address: 1.2.3.4
 `,
 			want: &Config{
+				Protocol: ProtoBGP,
 				Peers: []*Peer{
 					{
 						MyASN:    42,
@@ -194,6 +208,7 @@ address-pools:
 - name: pool1
 `,
 			want: &Config{
+				Protocol: ProtoBGP,
 				Pools: map[string]*Pool{
 					"pool1": &Pool{},
 				},
@@ -229,6 +244,7 @@ address-pools:
   -
 `,
 			want: &Config{
+				Protocol: ProtoBGP,
 				Pools: map[string]*Pool{
 					"pool1": &Pool{
 						Advertisements: []*Advertisement{

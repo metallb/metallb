@@ -5,6 +5,7 @@ metadata:
   name: config
 data:
   config: |
+    protocol: "arp"
     # The peers section tells MetalLB what BGP routers to connect too. There
     # is one entry for each router you want to peer with.
     peers:
@@ -26,7 +27,7 @@ data:
     # allowed to allocate, along with settings for how to advertise
     # those addresses over BGP once assigned. You can have as many
     # address pools as you want.
-    address-pools:      
+    address-pools:
     - # A name for the address pool. Services can request allocation
       # from a specific address pool using this name, by listing this
       # name under the 'metallb.universe.tf/address-pool' annotation.
