@@ -56,31 +56,11 @@ const (
 	dropReasonNotLeader
 )
 
-func (d dropReason) String() string {
-	switch d {
-	case dropReasonNone:
-		return ""
-	case dropReasonError:
-		return "error"
-	case dropReasonARPReply:
-		return "unsolicited reply"
-	case dropReasonEthernetDestination:
-		return "bad ethernet destination"
-	case dropReasonAnnounceIP:
-		return "non-LB ip"
-	case dropReasonNotLeader:
-		return "not leader"
-	}
-	return "unknown"
-}
-
 // Run starts the announcer, making it listen on the interface for ARP requests. It only responds to these
 // requests when a.leader is set to true, i.e. we are the current cluster wide leader for sending ARPs.
 func (a *Announce) Run() {
 	for {
-		if dropped := a.readPacket(); dropped != dropReasonNone {
-			glog.Infof("ARP packet dropped: %s", dropped)
-		}
+		a.readPacket()
 	}
 }
 
@@ -118,6 +98,7 @@ func (a *Announce) readPacket() dropReason {
 
 	if err := a.Reply(pkt, pkt.TargetIP); err != nil {
 		glog.Warningf("Failed to write ARP response for %s: %s", pkt.TargetIP, err)
+		return dropReasonError
 	}
 
 	return dropReasonNone
