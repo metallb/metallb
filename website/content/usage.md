@@ -83,6 +83,34 @@ spec:
   type: LoadBalancer
 ```
 
+## Control automatic address pool allocation
+
+In some environments, you'll have some large address pools of "cheap" IPs
+(e.g. RFC1918), and some smaller pools of "expensive" IPs (e.g. public
+IPv4 addresses leased on the grey market).
+
+By default, MetalLB will allocate IPs from any configured address pool
+with free addresses. This might end up using "expensive" addresses for
+services that don't require it.
+
+To prevent this behaviour you can disable automatic allocation for a pool
+by setting the `auto-assign` flag to `false`:
+
+```yaml
+# Rest of config omitted for brevity
+address-pools:
+- name: cheap
+  cidr:
+  - 192.168.144.0/20
+- name: expensive
+  cidr:
+  - 42.176.25.64/30
+  auto-assign: false
+```
+
+Addresses can still be specifically allocated from the "expensive" pool
+with the methods described in the "Requesting specific IPs" section above.
+
 ## Traffic policies
 
 MetalLB respects the service's `externalTrafficPolicy` option, and
