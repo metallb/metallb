@@ -16,11 +16,9 @@ package main
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"io"
 	"net"
-	"os"
 	"reflect"
 	"sort"
 	"time"
@@ -35,7 +33,7 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-type controller struct {
+type bgpController struct {
 	myIP   net.IP
 	myNode string
 
@@ -53,7 +51,7 @@ type peer struct {
 	bgp session
 }
 
-func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
+func (c *bgpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
 	if c.config.Protocol != config.ProtoBGP {
 		return nil
 	}
@@ -127,16 +125,17 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 		return err
 	}
 
-	c.announcing.With(prometheus.Labels{
-		"service": name,
-		"node":    c.myNode,
-		"ip":      lbIP.String(),
+	announcing.With(prometheus.Labels{
+		"protocol": string(config.ProtoBGP),
+		"service":  name,
+		"node":     c.myNode,
+		"ip":       lbIP.String(),
 	}).Set(1)
 
 	return nil
 }
 
-func (c *controller) updateAds() error {
+func (c *bgpController) updateAds() error {
 	var allAds []*bgp.Advertisement
 	for _, ads := range c.svcAds {
 		// This list might contain duplicates, but that's fine,
@@ -155,22 +154,23 @@ func (c *controller) updateAds() error {
 	return nil
 }
 
-func (c *controller) deleteBalancer(name, reason string) error {
+func (c *bgpController) deleteBalancer(name, reason string) error {
 	if _, ok := c.svcAds[name]; !ok {
 		return nil
 	}
 	glog.Infof("%s: stopping announcements, %s", name, reason)
-	c.announcing.Delete(prometheus.Labels{
-		"service": name,
-		"node":    c.myNode,
-		"ip":      c.ips.GetIP(name).String(),
+	announcing.Delete(prometheus.Labels{
+		"protocol": string(config.ProtoBGP),
+		"service":  name,
+		"node":     c.myNode,
+		"ip":       c.ips.GetIP(name).String(),
 	})
 	c.ips.Unassign(name)
 	delete(c.svcAds, name)
 	return c.updateAds()
 }
 
-func (c *controller) SetConfig(cfg *config.Config) error {
+func (c *bgpController) SetConfig(cfg *config.Config) error {
 	glog.Infof("Start config update")
 	defer glog.Infof("End config update")
 
@@ -250,59 +250,13 @@ var newBGP = func(addr string, myASN uint32, myIP net.IP, asn uint32, hold time.
 	return bgp.New(addr, myASN, myIP, asn, hold)
 }
 
-func (c *controller) MarkSynced() {}
+func (c *bgpController) MarkSynced() {}
 
-func newController(myIP net.IP, myNode string) *controller {
-	ret := &controller{
+func newBGPController(myIP net.IP, myNode string) (*bgpController, error) {
+	return &bgpController{
 		myIP:   myIP,
 		myNode: myNode,
 		svcAds: map[string][]*bgp.Advertisement{},
 		ips:    allocator.New(),
-
-		announcing: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-			Namespace: "metallb",
-			Subsystem: "speaker",
-			Name:      "announced",
-			Help:      "Services being announced from this node. This is desired state, it does not guarantee that the routing protocols have converged.",
-		}, []string{
-			"service",
-			"node",
-			"ip",
-		}),
-	}
-	prometheus.MustRegister(ret.announcing)
-	return ret
-}
-
-func main() {
-	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-	master := flag.String("master", "", "master url")
-	myIPstr := flag.String("node-ip", "", "IP address of this Kubernetes node")
-	myNode := flag.String("node-name", "", "Name of this Kubernetes node")
-	port := flag.Int("port", 8080, "HTTP listening port for Prometheus metrics")
-	flag.Parse()
-
-	if *myIPstr == "" {
-		*myIPstr = os.Getenv("METALLB_NODE_IP")
-	}
-	if *myNode == "" {
-		*myNode = os.Getenv("METALLB_NODE_NAME")
-	}
-
-	myIP := net.ParseIP(*myIPstr).To4()
-	if myIP == nil {
-		glog.Fatalf("Invalid --node-ip %q, must be an IPv4 address", *myIPstr)
-	}
-
-	if *myNode == "" {
-		glog.Fatalf("Must specify --node-name")
-	}
-
-	c := newController(myIP, *myNode)
-
-	client, err := k8s.NewClient("metallb-bgp-speaker", *master, *kubeconfig, c, true)
-	if err != nil {
-		glog.Fatalf("Error getting k8s client: %s", err)
-	}
-	glog.Fatal(client.Run(*port))
+	}, nil
 }
