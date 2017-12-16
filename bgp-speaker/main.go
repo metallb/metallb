@@ -54,10 +54,6 @@ type peer struct {
 }
 
 func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
-	if c.config.Protocol != config.ProtoBGP {
-		return nil
-	}
-
 	if svc == nil {
 		return c.deleteBalancer(name, "service deleted")
 	}
@@ -71,6 +67,10 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 
 	if c.config == nil {
 		glog.Infof("%s: skipped, waiting for config", name)
+		return nil
+	}
+
+	if c.config.Protocol != config.ProtoBGP {
 		return nil
 	}
 
