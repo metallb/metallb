@@ -131,8 +131,6 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
-      securityContext:
-        runAsNonRoot: true
 ---
 
 # BGP speaker DaemonSet
@@ -178,5 +176,3 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
-      securityContext:
-        runAsNonRoot: true
