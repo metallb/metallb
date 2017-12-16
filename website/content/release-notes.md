@@ -3,9 +3,19 @@ title: Release notes
 weight: 70
 ---
 
-## Version 0.2.0
+## Version 0.2.1
 
 [Documentation for this release](https://metallb.universe.tf)
+
+Notable fixes:
+
+- MetalLB unable to start because Kubernetes cannot verify that
+  "nobody" is a non-root
+  user ([#85](https://github.com/google/metallb/issues/85))
+
+## Version 0.2.0
+
+[Documentation for this release](https://v0-2-0--metallb.netlify.com)
 
 Major themes for this version are: improved BGP interoperability,
 vastly increased test coverage, and improved documentation structure
