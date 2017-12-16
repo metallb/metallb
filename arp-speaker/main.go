@@ -44,7 +44,7 @@ type controller struct {
 }
 
 func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
-	if a.config.Protocol != config.ProtoARP {
+	if c.config.Protocol != config.ProtoARP {
 		return nil
 	}
 
