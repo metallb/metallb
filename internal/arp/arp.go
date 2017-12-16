@@ -98,7 +98,6 @@ func (a *Announce) readPacket() dropReason {
 
 	if err := a.Reply(pkt, pkt.TargetIP); err != nil {
 		glog.Warningf("Failed to write ARP response for %s: %s", pkt.TargetIP, err)
-		return dropReasonError
 	}
 
 	return dropReasonNone
