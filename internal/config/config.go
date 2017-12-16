@@ -58,8 +58,10 @@ type Config struct {
 	Pools map[string]*Pool
 }
 
+// Proto holds the protocol we are speaking.
 type Proto string
 
+// MetalLB supported protocols.
 const (
 	ProtoARP Proto = "arp"
 	ProtoBGP Proto = "bgp"

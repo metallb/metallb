@@ -661,6 +661,8 @@ func TestBGPSppeaker(t *testing.T) {
 
 	for _, test := range tests {
 		if test.config != nil {
+			// Add BGP protocol
+			test.config.Protocol = config.ProtoBGP
 			if err := c.SetConfig(test.config); err != nil {
 				t.Errorf("%q: SetConfig failed: %s", test.desc, err)
 			}
