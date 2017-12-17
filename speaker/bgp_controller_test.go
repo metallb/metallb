@@ -207,7 +207,8 @@ func TestBGPSppeaker(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": &config.Pool{
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						Protocol: config.BGP,
+						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
 						Advertisements: []*config.Advertisement{
 							{
 								AggregationLength: 32,
@@ -397,7 +398,8 @@ func TestBGPSppeaker(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": &config.Pool{
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						Protocol: config.BGP,
+						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
 						Advertisements: []*config.Advertisement{
 							{
 								AggregationLength: 32,
@@ -462,7 +464,8 @@ func TestBGPSppeaker(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": &config.Pool{
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						Protocol: config.BGP,
+						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
 						Advertisements: []*config.Advertisement{
 							{
 								AggregationLength: 32,
@@ -619,7 +622,8 @@ func TestBGPSppeaker(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": &config.Pool{
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						Protocol: config.BGP,
+						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
 						Advertisements: []*config.Advertisement{
 							{
 								AggregationLength: 32,
@@ -661,8 +665,6 @@ func TestBGPSppeaker(t *testing.T) {
 
 	for _, test := range tests {
 		if test.config != nil {
-			// Add BGP protocol
-			test.config.Protocol = config.ProtoBGP
 			if err := c.SetConfig(test.config); err != nil {
 				t.Errorf("%q: SetConfig failed: %s", test.desc, err)
 			}

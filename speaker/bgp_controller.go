@@ -68,10 +68,6 @@ func (c *bgpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 		return nil
 	}
 
-	if c.config.Protocol != config.ProtoBGP {
-		return nil
-	}
-
 	if len(svc.Status.LoadBalancer.Ingress) != 1 {
 		glog.Infof("%s: no IP allocated by controller", name)
 		return c.deleteBalancer(name, "no IP allocated by controller")
@@ -101,6 +97,11 @@ func (c *bgpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 		glog.Errorf("%s: could not find pool %q that definitely should exist!", name, poolName)
 	}
 
+	if pool.Protocol != config.BGP {
+		glog.Errorf("%s: protocol %s in pool is not set to ARP", name, pool.Protocol)
+		return nil
+	}
+
 	c.svcAds[name] = nil
 	for _, adCfg := range pool.Advertisements {
 		m := net.CIDRMask(adCfg.AggregationLength, 32)
@@ -126,7 +127,7 @@ func (c *bgpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 	}
 
 	announcing.With(prometheus.Labels{
-		"protocol": string(config.ProtoBGP),
+		"protocol": string(config.BGP),
 		"service":  name,
 		"node":     c.myNode,
 		"ip":       lbIP.String(),
@@ -160,7 +161,7 @@ func (c *bgpController) deleteBalancer(name, reason string) error {
 	}
 	glog.Infof("%s: stopping announcements, %s", name, reason)
 	announcing.Delete(prometheus.Labels{
-		"protocol": string(config.ProtoBGP),
+		"protocol": string(config.BGP),
 		"service":  name,
 		"node":     c.myNode,
 		"ip":       c.ips.GetIP(name).String(),

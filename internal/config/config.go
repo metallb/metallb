@@ -39,7 +39,7 @@ type configFile struct {
 	Pools       []struct {
 		Name           string
 		CIDR           []string
-		AvoidBuggyIPs  bool `yaml:"avoid-buggy-ips"`
+		AvoidBuggyIPs  bool  `yaml:"avoid-buggy-ips"`
 		AutoAssign     *bool `yaml:"auto-assign"`
 		Advertisements []struct {
 			AggregationLength *int `yaml:"aggregation-length"`
@@ -51,8 +51,6 @@ type configFile struct {
 
 // Config is a parsed MetalLB configuration.
 type Config struct {
-	// Protocol that MetalLB should use, supported values "arp", "bgp" and "rip".
-	Protocol Proto
 	// Routers that MetalLB should peer with.
 	Peers []*Peer
 	// Address pools from which to allocate load balancer IPs.
@@ -64,9 +62,9 @@ type Proto string
 
 // MetalLB supported protocols.
 const (
-	ProtoARP Proto = "arp"
-	ProtoBGP Proto = "bgp"
-	ProtoRIP Proto = "rip"
+	ARP Proto = "arp"
+	BGP Proto = "bgp"
+	RIP Proto = "rip"
 )
 
 // Peer is the configuration of a BGP peering session.
@@ -86,6 +84,9 @@ type Peer struct {
 
 // Pool is the configuration of an IP address pool.
 type Pool struct {
+	// Protocol for this pool, supported values "arp", "bgp" and "rip".
+	// Defaults to BGP is not set.
+	Protocol Proto
 	// The addresses that are part of this pool, expressed as CIDR
 	// prefixes. config.Parse guarantees that these are
 	// non-overlapping, both within and between pools.
@@ -139,23 +140,7 @@ func Parse(bs []byte) (*Config, error) {
 		return nil, fmt.Errorf("could not parse config: %s", err)
 	}
 
-	cfg := &Config{
-		Protocol: ProtoBGP,
-		Pools:    map[string]*Pool{},
-	}
-	switch raw.Protocol {
-	case "arp":
-		cfg.Protocol = ProtoARP
-	case "bgp":
-		cfg.Protocol = ProtoBGP
-	case "rip":
-		cfg.Protocol = ProtoRIP
-	case "":
-		// Not set default to BGP.
-	default:
-		return nil, fmt.Errorf("wrong value for protocol %s", raw.Protocol)
-	}
-
+	cfg := &Config{Pools: map[string]*Pool{}}
 	for i, p := range raw.Peers {
 		if p.MyASN == 0 {
 			return nil, fmt.Errorf("peer #%d missing local ASN", i+1)
@@ -206,7 +191,23 @@ func Parse(bs []byte) (*Config, error) {
 		if p.AutoAssign != nil {
 			autoAssign = *p.AutoAssign
 		}
+
+		proto := BGP
+		switch raw.Protocol {
+		case "arp":
+			proto = ARP
+		case "bgp":
+			proto = BGP
+		case "rip":
+			proto = RIP
+		case "":
+			// Not set default to BGP.
+		default:
+			return nil, fmt.Errorf("address pool #%d has wrong protocol %s", i+1, raw.Protocol)
+		}
+
 		pool := &Pool{
+			Protocol:      proto,
 			AvoidBuggyIPs: p.AvoidBuggyIPs,
 			AutoAssign:    autoAssign,
 		}
