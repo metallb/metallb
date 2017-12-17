@@ -143,6 +143,10 @@ ci-lint:
 	go vet $$(glide novendor)
 	glide novendor | xargs -n1 golint
 
+.PHONY: ci-deploy
+ci-deploy:
+	+make all-arch-images REGISTRY=danderson
+
 ################################
 ## Release
 ##

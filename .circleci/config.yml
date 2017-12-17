@@ -37,6 +37,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
+      - docker login -u $DOCKER_USER -p $DOCKER_PASSWORD quay.io
 workflows:
   version: 2
   test-and-deploy:
