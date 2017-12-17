@@ -131,7 +131,7 @@ ci-prepare:
 
 .PHONY: ci-build
 ci-build:
-	go install .v ./controller ./speaker ./test-bgp-router
+	go install -v ./controller ./speaker ./test-bgp-router
 
 .PHONY: ci-test
 ci-test:
