@@ -25,7 +25,6 @@ import (
 	"go.universe.tf/metallb/internal/k8s"
 
 	"github.com/golang/glog"
-
 	"k8s.io/api/core/v1"
 )
 

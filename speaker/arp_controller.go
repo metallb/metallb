@@ -81,8 +81,8 @@ func (c *arpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 		return c.deleteBalancer(name, "invalid IP allocated by controller")
 	}
 
-	poolName := c.ips.GetPool(name)
-	pool := c.config.Pools[c.ips.GetPool(name)]
+	poolName := c.ips.Pool(name)
+	pool := c.config.Pools[c.ips.Pool(name)]
 	if pool == nil {
 		glog.Errorf("%s: could not find pool %q that definitely should exist!", name, poolName)
 		return c.deleteBalancer(name, "can't find pool")
@@ -117,7 +117,7 @@ func (c *arpController) deleteBalancer(name, reason string) error {
 		"protocol": string(config.ARP),
 		"service":  name,
 		"node":     c.myNode,
-		"ip":       c.ips.GetIP(name).String(),
+		"ip":       c.ips.IP(name).String(),
 	})
 	c.ips.Unassign(name)
 	c.ann.DeleteBalancer(name)

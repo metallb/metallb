@@ -6,13 +6,12 @@ import (
 	"net"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
-
-	"k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/config"
+
+	"github.com/google/go-cmp/cmp"
+	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func diffService(a, b *v1.Service) string {
@@ -117,7 +116,7 @@ func TestControllerMutation(t *testing.T) {
 		Pools: map[string]*config.Pool{
 			"pool1": &config.Pool{
 				AutoAssign: true,
-				CIDR: []*net.IPNet{ipnet("1.2.3.0/31")},
+				CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
 			},
 		},
 	}
@@ -331,8 +330,8 @@ func TestControllerMutation(t *testing.T) {
 				if ip == nil {
 					panic("bad wanted IP in loadbalancer status")
 				}
-				if !ip.Equal(c.ips.GetIP("test")) {
-					t.Errorf("%q: controller internal state does not match IP that controller claimed to allocate: want %q, got %q", test.desc, ip, c.ips.GetIP("test"))
+				if !ip.Equal(c.ips.IP("test")) {
+					t.Errorf("%q: controller internal state does not match IP that controller claimed to allocate: want %q, got %q", test.desc, ip, c.ips.IP("test"))
 				}
 			}
 		}
@@ -395,7 +394,7 @@ func TestControllerConfig(t *testing.T) {
 		Pools: map[string]*config.Pool{
 			"default": &config.Pool{
 				AutoAssign: true,
-				CIDR: []*net.IPNet{ipnet("1.2.3.0/24")},
+				CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
 			},
 		},
 	}

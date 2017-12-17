@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-	"k8s.io/api/core/v1"
-
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
+
+	"github.com/google/go-cmp/cmp"
+	"k8s.io/api/core/v1"
 )
 
 func strptr(s string) *string {

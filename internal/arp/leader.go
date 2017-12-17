@@ -7,7 +7,7 @@ import (
 	"github.com/mdlayher/ethernet"
 )
 
-// Leader returns true if we are the leader in the daemonSet.
+// Leader returns true if we are the leader in the daemon set.
 func (a *Announce) Leader() bool {
 	a.leaderMu.RLock()
 	defer a.leaderMu.RUnlock()
@@ -21,7 +21,7 @@ func (a *Announce) SetLeader(b bool) {
 	a.leader = b
 }
 
-// Relinquish set the leader bit to false and stop the go-routine that sends unsolicited APR replies.
+// Relinquish set the leader bit to false and stops the go-routine that sends unsolicited APR replies.
 func (a *Announce) Relinquish() {
 	a.stop <- true
 
@@ -43,11 +43,11 @@ func (a *Announce) Acquire() {
 
 		time.Sleep(500 * time.Millisecond)
 	}
-	go a.Unsolicited()
+	go a.unsolicited()
 }
 
-// Unsolicited sends unsolicited ARP replies every 10 seconds.
-func (a *Announce) Unsolicited() {
+// unsolicited sends unsolicited ARP replies every 10 seconds.
+func (a *Announce) unsolicited() {
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
 	for {

@@ -23,7 +23,7 @@ type Announce struct {
 	leaderMu sync.RWMutex
 }
 
-// New return an initialized Announce.
+// New returns an initialized Announce.
 func New(ip net.IP) (*Announce, error) {
 	ifi, err := interfaceByIP(ip)
 	if err != nil {
@@ -95,15 +95,15 @@ func (a *Announce) readPacket() dropReason {
 	// pkt.TargetIP has been vetted to be "the one".
 	glog.Infof("Request: who-has %s?  tell %s (%s). reply: %s is-at %s", pkt.TargetIP, pkt.SenderIP, pkt.SenderHardwareAddr, pkt.TargetIP, a.hardwareAddr)
 
-	if err := a.Reply(pkt, pkt.TargetIP); err != nil {
+	if err := a.reply(pkt, pkt.TargetIP); err != nil {
 		glog.Warningf("Failed to write ARP response for %s: %s", pkt.TargetIP, err)
 	}
 
 	return dropReasonNone
 }
 
-// Reply sends a arp reply using the client in a.
-func (a *Announce) Reply(pkt *arp.Packet, ip net.IP) error {
+// reply sends a arp reply using the client in a.
+func (a *Announce) reply(pkt *arp.Packet, ip net.IP) error {
 	return a.client.Reply(pkt, a.hardwareAddr, ip)
 }
 
@@ -112,14 +112,14 @@ func (a *Announce) Close() error {
 	return a.client.Close()
 }
 
-// SetBalancer implementes adds ip to the set of announced address.
+// SetBalancer adds ip to the set of announced addresses.
 func (a *Announce) SetBalancer(name string, ip net.IP) {
 	a.Lock()
 	defer a.Unlock()
 	a.ips[name] = ip
 }
 
-// DeleteBalancer an address from the set of address we should announce.
+// DeleteBalancer deletes an address from the set of addresses we should announce.
 func (a *Announce) DeleteBalancer(name string) {
 	a.Lock()
 	defer a.Unlock()

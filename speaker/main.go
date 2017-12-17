@@ -19,7 +19,6 @@ import (
 	"net"
 	"os"
 
-	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 
 	"github.com/golang/glog"
@@ -66,7 +65,6 @@ func main() {
 
 	// Setup both ARP and BGP clients and speakers, config decides what is being done runtime.
 
-	// BGP
 	cBGP, err := newBGPController(myIP, *myNode)
 	if err != nil {
 		glog.Fatalf("Error getting BGP controller: %s", err)
@@ -76,12 +74,12 @@ func main() {
 		glog.Fatalf("Error getting ARP controller: %s", err)
 	}
 
-	client, err := k8s.NewClient("metallb-speaker", *master, *kubeconfig, true, cBGP, cARP)
+	client, err := k8s.NewClient(speaker, *master, *kubeconfig, true, cBGP, cARP)
 	if err != nil {
 		glog.Fatalf("Error getting k8s client: %s", err)
 	}
 
-	le, err := client.NewLeaderElector(cARP.ann, "metallb-speaker")
+	le, err := client.NewLeaderElector(cARP.ann, speaker)
 	if err != nil {
 		glog.Fatalf("Error setting up leader election: %s", err)
 	}
@@ -89,7 +87,5 @@ func main() {
 
 	glog.Fatal(client.Run(*port))
 }
-
-func name(proto config.Proto) string { return speaker + "-" + string(proto) }
 
 const speaker = "metallb-speaker"
