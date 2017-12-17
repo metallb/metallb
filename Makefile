@@ -145,7 +145,7 @@ ci-lint:
 
 .PHONY: ci-deploy
 ci-deploy:
-	+make all-arch-images REGISTRY=danderson
+	+make all-arch-images
 
 ################################
 ## Release
