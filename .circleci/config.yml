@@ -18,3 +18,8 @@ jobs:
       steps:
         - checkout
         - setup_remote_docker
+workflows:
+  version: 2
+  test:
+    jobs:
+      - test
