@@ -38,6 +38,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD quay.io
+      - run: make ci-deploy TAG=$CIRCLE_BRANCH REGISTRY=quay.io/metallb
 workflows:
   version: 2
   test-and-deploy:
