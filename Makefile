@@ -96,3 +96,36 @@ gen-image-targets:
 ##
 ## `make release VERSION=1.2.3` creates/updates the release branch,
 ## and tags the new release.
+
+VERSION:=
+ifneq ($(VERSION),)
+	MAJOR=$(shell echo $(VERSION) | cut -f1 -d'.')
+	MINOR=$(shell echo $(VERSION) | cut -f2 -d'.')
+	PATCH=$(shell echo $(VERSION) | cut -f3 -d'.')
+endif
+
+release:
+ifeq ($(VERSION),)
+	$(error VERSION is required)
+endif
+ifneq ($(shell git status --porcelain),)
+	$(error git working directory is not clean, cannot prepare release)
+endif
+	git checkout master
+ifeq ($(shell grep "\#\# Version $(VERSION)" website/content/release-notes.md),)
+	$(error no release notes for $(VERSION))
+endif
+ifeq ($(PATCH),0)
+	git ckeckout -b v$(MAJOR).$(MINOR)
+	perl -pi -e 's#/google/metallb/master#/google/metallb/v$(VERSION)#g' website/content/*.md
+	perl -pi -e 's/:latest/:v$(VERSION)/g' manifests/*.yaml
+else
+	git checkout v$(MAJOR).$(MINOR)
+	perl -pi -e "s#/google/metallb/v$(MAJOR).$(MINOR).$$(($(PATCH)-1))#/google/metallb/v$(VERSION)#g" website/content/*.md
+	perl -pi -e "s#:v$(MAJOR).$(MINOR).$$(($(PATCH)-1))#:v$(VERSION)#g" manifests/*.yaml
+endif
+	git checkout master -- website/content/release-notes.md
+	perl -pi -e 's/version = .*/version = "v$(VERSION)"/g' website/config.toml
+	git commit -a -m "Update documentation for release $(VERSION)"
+	git tag v$(VERSION) -m "See the release notes for details:\n\nhttps://metallb.universe.tf/release-notes/#version-$(MAJOR)-$(MINOR)-$(PATCH)"
+	git checkout master
