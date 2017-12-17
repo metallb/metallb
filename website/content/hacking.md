@@ -45,8 +45,8 @@ currently have, relative to the top-level directory:
 
 - `controller` is the cluster-wide MetalLB controller, in charge of
   IP assignment.
-- `bgp-speaker` is the per-node daemon that advertises services with
-  assigned IPs to configured BGP peers.
+- `speaker` is the per-node daemon that advertises services with
+  assigned IPs using various advertising strategies.
 - `test-bgp-router` is a small wrapper around
   the
   [BIRD](http://bird.network.cz),
@@ -69,11 +69,6 @@ currently have, relative to the top-level directory:
 In addition to code, there's deployment configuration and
 documentation:
 
-- `dockerfiles` contains the Docker build configurations that package
-  MetalLB into container images. It contains one set of "prod"
-  configurations, which is what users of MetalLB install, and one set
-  of "dev" configurations which get used during development (more on
-  that below).
 - `manifests` contains a variety of Kubernetes manifests. The most
   important one is `manifests/metallb.yaml`, which specifies how to
   deploy MetalLB onto a cluster.
@@ -92,7 +87,6 @@ To develop MetalLB, you'll need a couple of pieces of software:
 - [Kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), the Kubernetes commandline interface
 - [Minikube](https://kubernetes.io/docs/tasks/tools/install-minikube/),
   the Kubernetes sandbox manager (version 0.24 or later)
-- [Fabric](http://www.fabfile.org/), the devops scripting toolkit
 
 Optionally, if you want to update the vendored dependency, you'll
 need [glide](https://github.com/Masterminds/glide), the Go dependency
@@ -100,12 +94,23 @@ manager
 
 ## Building the code
 
-Start by cloning the MetalLB repository, with `git clone
-https://github.com/google/metallb`.
+Start by fetching the MetalLB repository, with `go get
+go.universe.tf/metallb`.
 
 From there, you can use normal Go commands to build binaries and run
 unit tests, e.g. `go install go.universe.tf/metallb/bgp-speaker`, `go
 test ./internal/allocator`.
+
+For development, fork
+the [github repository](https://github.com/google/metallb), and add
+your fork as a remote in `$GOPATH/src/go.universe.tf/metallb`, with
+`git remote add fork git@github.com:<your-github-user>/metallb.git`.
+
+**Note**: the repository must be checked out at
+`$GOPATH/src/go.universe.tf/metallb`. The source code uses canonical
+import paths, so if you check it out at
+`$GOPATH/src/github.com/google/metallb` or similar, it will fail to
+compile.
 
 ## Testing in Minikube
 
@@ -117,13 +122,13 @@ setup, but running your locally built binaries.
 
 ### Sandbox setup
 
-Start by running `fab start`. This will:
+Start by running `make start-minikube`. This will:
 
 - Create the Minikube sandbox in a local VM
 - Enable the registry addon, so that we can host container images in the sandbox
 - Deploy `test-bgp-router`, which sets up BIRD, Quagga and GoBGP routers as a
   pod inside the cluster
-- Deploy MetalLB, which will install the `controller` and `bgp-speaker`
+- Deploy MetalLB, which will install the `controller` and `speaker`
 - Push a MetalLB configuration that connects MetalLB to the `test-bgp-router`
 
 At this point, your sandbox is running the precompiled version of
@@ -136,10 +141,15 @@ by the test routers.
 
 ### Pushing test binaries
 
-When you're ready to test a local change you've made to MetalLB, run
-`fab push`. This will:
+When you're ready to test a local change you've made to MetalLB, you
+can build and deploy MetalLB containers to your sandbox. First, if
+you're using minikube, leave `make proxy-to-registry` running in a
+second terminal. This will make the cluster's internal registry
+available on `localhost`, so that we can push to it.
 
-- Build all MetalLB binaries (`controller`, `bgp-speaker`, and `test-bgp-router`)
+To deploy your changes, run `make push`. This will:
+
+- Build all MetalLB binaries (`controller`, `speaker`, and `test-bgp-router`)
 - Build ephemeral container images with those binaries inside
 - Push the ephemeral containers to Minikube's internal container registry
 - Update the MetalLB deployments and daemonsets to use the ephemeral containers
@@ -150,45 +160,61 @@ sandbox, but using binaries built from your local source code instead
 of the public images.
 
 *Note for MacOS users:* Since Docker is run inside a virtual machine
-in MacOS the local registry won't work out of the box and so won't
-```fab push```. Instead it is necessary to add
-```docker.for.mac.localhost:5000``` under **Insecure registries** in
-your Docker daemon preferences and run ```fab
-push:registry=docker.for.mac.localhost:5000```
+in MacOS the local registry won't work out of the box. To make it work
+you have to add `docker.for.mac.localhost:5000` under **Insecure
+registries** in your Docker daemon preferences. Once you've done that,
+`make push` should work.
 
 [![Docker for Mac config](/images/dockerformacconfig.png)](/images/dockerformacconfig.png)
 
-Note that if you push a binary that crash-loops in Kubernetes, the
-final waiting stage may never complete, because Fabric is waiting for
-a rollout that will never succeed. If that happens, it's safe to
-interrupt Fabric and then use `kubectl` to troubleshoot the issue.
-
-If you need to get back to a working configuration, `fab
-push_manifests` will revert MetalLB to running from the public quay.io
-images. Likewise, `fab push_config` will revert any config changes you
-made and go back to the minimalist configuration that `fab start`
-installed.
+If you need to get back to a working configuration, `make
+push-manifests` will revert MetalLB to running from the public quay.io
+images and the config from the repository.
 
 ### Sandbox teardown
 
-When you're done with minikube, run `fab stop` to destroy the sandbox.
+When you're done with minikube, run `minikube delete` to destroy the
+sandbox.
 
 ### Existing users of Minikube
 
-If you're already using minikube, be warned: `fab start` and `fab
-stop` will touch the default minikube sandbox. So for example, if you
-run `fab stop`, the default Minikube instance will be destroyed, and
-take any other things you had in there with it.
+If you're already using minikube, be warned: `make start-minikube`
+will touch the default minikube sandbox, and so may interfere with
+other experiments you have going on.
 
-### Testing in bigger clusters
+## Testing outside of Minikube
 
-If you've outgrown Minikube, you can also use `fab push` against
-"real" clusters. The `fab push` command will deploy MetalLB with
-custom binaries to whichever cluster `kubectl` is currently pointing
-to. If you want to use a cluster other than minikube, select it with
-`kubectl config use-context <context name>` before you run `fab push`.
+You can also use `make push` on clusters other than minikube. `make
+push` will deploy to whichever cluster your `kubectl` is currently
+pointing to.
 
-### Peering with real BGP routers
+If your cluster has a local registry, usage instructions are exactly
+the same as with minikube: leave `make proxy-to-registry` running in a
+secondary terminal, and then `make push` each time you want to test
+your changes.
+
+If you want to use an external registry, you can specify it with the
+`REGISTRY` make variable. For example, `make push REGISTRY=danderson`
+will push the docker images
+to
+[danderson's account on docker hub](https://hub.docker.com/u/danderson/),
+and make the cluster pull from there as well.
+
+## Cross compiling
+
+Released versions of MetalLB (0.3.0 and later) use multi-architecture
+images, and so should work on all platforms supported by
+kubernetes. However, the dev builds made by `make push` only build for
+one architecture, to save time.
+
+By default, `make push` builds binaries for amd64 (aka x86_64). If you
+want to test on a different architecture (for example a raspberry pi
+cluster), you can select the architecture of the dev builds by setting
+the `ARCH` make variable to your desired architecture, one of amd64,
+arm, arm64, ppc64le, s390x. For example, `make push ARCH=arm` will
+build and deploy containers that work on ARM machines.
+
+## Peering with real BGP routers
 
 While testing, it might be useful to peer with "real" routers outside
 of the cluster, rather than always use the in-cluster

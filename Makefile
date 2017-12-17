@@ -47,6 +47,10 @@ proxy-to-registry:
 		kubectl port-forward -n kube-system $$pod 5000:5000 ;\
 	)
 
+.PHONY: push-manifests
+push-manifests:
+	kubectl apply -f manifests/metallb.yaml,manifests/test-bgp-router.yaml,manifests/tutorial-1.yaml
+
 .PHONY: push
 push: gen-image-targets
 	sudo -v
