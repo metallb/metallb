@@ -5,4 +5,4 @@ jobs:
        - image: circleci/golang:1.9
      steps:
        - checkout
-       - run: echo "hello world"
+       - setup_remote_docker
