@@ -12,10 +12,10 @@ namespace. The components in the manifest are:
 
 - The `metallb-system/controller` deployment. This is the cluster-wide
   controller that handles IP address assignments.
-- The `metallb-system/bgp-speaker` daemonset. This is the component
-  that peers with your BGP router(s) and announces assigned service
-  IPs to the world.
-- Service accounts for the controller and BGP speaker, along with the
+- The `metallb-system/speaker` daemonset. This is the component
+  that peers with your BGP router(s) or sends out ARPs requests
+  and announces assigned service IPs to the world.
+- Service accounts for the controller and peaker, along with the
   RBAC permissions that the components need to function.
 
 The installation manifest does not include a configuration

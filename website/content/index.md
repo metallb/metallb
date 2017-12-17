@@ -5,7 +5,7 @@ weight: 2
 ---
 
 MetalLB is a load-balancer implementation for bare
-metal [Kubernetes](https://kubernetes.io) clusters, using BGP.
+metal [Kubernetes](https://kubernetes.io) clusters, using BGP or ARP.
 
 ## Why?
 
@@ -35,7 +35,8 @@ MetalLB requires the following to function:
 - One or
   more [BGP](https://en.wikipedia.org/wiki/Border_Gateway_Protocol)
   capable routers that support 4-byte AS numbers
-  ([RFC 6793](https://tools.ietf.org/html/rfc6793)).
+  ([RFC 6793](https://tools.ietf.org/html/rfc6793)) or, in the case of ARP, no new equipment is
+  needed at all.
 - Some IPv4 addresses for MetalLB to hand out.
 
 The [requirements]({{% relref "installation.md#requirements" %}}) page goes into more detail.

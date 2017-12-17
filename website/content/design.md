@@ -44,9 +44,10 @@ as you want, and doesn't care what "kind" of addresses you give it.
 
 Once MetalLB has assigned an external IP address to a service, it
 needs to make the network beyond the cluster aware that the IP "lives"
-in the cluster.
+in the cluster. Currently MetalLB has two ways of achieving this, it
+can speak BGP or ARP.
 
-MetalLB does this by speaking BGP to a nearby network router that you
+In the case of BGP, MetalLB does this by speaking to a nearby network router that you
 control, and telling it how to forward traffic to assigned service
 IPs.
 
@@ -55,7 +56,10 @@ your particular environment, there is no "one size fits all"
 solution. These specifics make up the bulk of MetalLB's configuration
 file, to give you the flexibility to adapt MetalLB to your cluster.
 
-## Limitations
+In the case of ARP, MetalLB will spoof ARP packets and reply to ARP requests for the load-balanced
+IPs.
+
+## BGP Limitations
 
 MetalLB uses the BGP routing protocol to implement
 load-balancing. This has the advantage of simplicity, in that you
