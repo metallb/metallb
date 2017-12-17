@@ -135,12 +135,12 @@ ci-build:
 
 .PHONY: ci-test
 ci-test:
-	go test $(glide novendor)
-	go test -race $(glide novendor)
+	go test $$(glide novendor)
+	go test -race $$(glide novendor)
 
 .PHONY: ci-lint
 ci-lint:
-	go vet $(glide novendor)
+	go vet $$(glide novendor)
 	glide novendor | xargs -n1 golint
 
 ################################
