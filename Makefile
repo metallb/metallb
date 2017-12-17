@@ -130,13 +130,16 @@ ci-prepare:
 	glide install
 
 .PHONY: ci-build
+ci-build:
 	go install .v ./controller ./speaker ./test-bgp-router
 
 .PHONY: ci-test
+ci-test:
 	go test $(glide novendor)
 	go test -race $(glide novendor)
 
 .PHONY: ci-lint
+ci-lint:
 	go vet $(glide novendor)
 	glide novendor | xargs -n1 golint
 
