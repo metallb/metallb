@@ -19,7 +19,7 @@ Here is the outline of what we're going to do:
 ## Cluster addresses
 
 The Raspberry PI cluster we have build using 192.168.1.0/24 as the address space. The main router
-is configured to hand out (DHCP) address in 192.168.1.100-150. As the load-balanced IP addresses need
+is configured to hand out DHCP address in 192.168.1.100-150. As the load-balanced IP addresses need
 to be in the same network we'll allocate 192.168.1.240/28 for those.
 
 ## Install MetalLB
@@ -134,4 +134,4 @@ MetalLB is sending out unsolicited ARP responses and replies to ARP requests wit
 the node that has won the master election. It is using the first address of the assigned range
 (192.168.1.240).
 
-When you curl <http://192.168.1.240> you should see the default nginx page: "Welcome to nginx!"
+When you `curl http://192.168.1.240` you should see the default nginx page: "Welcome to nginx!"
