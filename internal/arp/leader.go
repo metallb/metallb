@@ -54,6 +54,9 @@ func (a *Announce) Unsolicited() {
 		select {
 		case <-ticker.C:
 			packets := a.Packets()
+			if len(packets) == 0 {
+				continue
+			}
 
 			glog.Infof("Sending unsolicited ARPs for %d addresses", len(packets))
 
