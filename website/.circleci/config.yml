@@ -1,0 +1,8 @@
+version: 2
+jobs:
+   build:
+     docker:
+       - image: circleci/golang:1.9
+     steps:
+       - checkout
+       - run: echo "hello world"
