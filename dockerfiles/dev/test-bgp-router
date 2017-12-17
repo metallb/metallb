@@ -1,8 +1,0 @@
-FROM ubuntu:artful
-RUN apt update && apt -y install bird quagga iptables tcpdump wget tar
-RUN wget -O /gobgp.tgz https://github.com/osrg/gobgp/releases/download/v1.26/gobgp_1.26_linux_amd64.tar.gz
-RUN cd / && tar zxvf /gobgp.tgz
-RUN mkdir /run/quagga /run/bird
-RUN chown quagga:quagga /run/quagga
-COPY ./test-bgp-router /
-ENTRYPOINT ["/test-bgp-router"]

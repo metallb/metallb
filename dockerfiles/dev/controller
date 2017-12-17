@@ -1,4 +1,0 @@
-FROM busybox:glibc
-COPY ./controller /
-ENTRYPOINT ["/controller", "--logtostderr"]
-USER nobody:nobody

@@ -1,4 +1,0 @@
-FROM busybox:glibc
-COPY ./bgp-speaker /
-ENTRYPOINT ["/bgp-speaker", "--logtostderr"]
-USER nobody:nobody

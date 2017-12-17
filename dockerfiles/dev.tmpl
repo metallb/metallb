@@ -1,4 +1,0 @@
-FROM busybox:glibc
-COPY ./%%BINARY%% /
-ENTRYPOINT ["/%%BINARY%%", "--logtostderr"]
-USER nobody:nobody
