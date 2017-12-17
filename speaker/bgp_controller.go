@@ -99,7 +99,7 @@ func (c *bgpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 	}
 
 	if pool.Protocol != config.BGP {
-		glog.Errorf("%s: protocol %s in pool is not set to %s", name, pool.Protocol, string(config.BGP))
+		glog.Errorf("%s: protocol in pool is not set to %s, got %s", name, pool.Protocol, string(config.BGP), pool.Protocol)
 		return nil
 	}
 
