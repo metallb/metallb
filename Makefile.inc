@@ -45,6 +45,9 @@ image: dockerfile binary
 .PHONY: dockerfile
 dockerfile: build-dir
 	perl -pe "s#alpine:latest#$(DOCKERFILE_BASE)#g" ./$(BINARY)/Dockerfile >$(BUILD_DIR)/Dockerfile
+ifneq ($(GOARCH),amd64)
+	perl -pi -e "s/^RUN.*//g" $(BUILD_DIR)/Dockerfile
+endif
 
 .PHONY: binary
 binary: build-dir
