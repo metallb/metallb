@@ -7,8 +7,8 @@ In this tutorial we deploy MetalLB in a (ARM) cluster and announce a load-balanc
 assume you have a bare metal [cluster
 running](https://blog.hypriot.com/post/setup-kubernetes-raspberry-pi-cluster/).
 
-The nice thing of (abusing) the ARP protocol is that you don't need any fancy network hardware at
-all, you current SOHO router should just do fine.
+The nice thing of the ARP protocol is that you don't need any fancy network hardware at all, your
+current SOHO router should just do fine.
 
 Here is the outline of what we're going to do:
 
@@ -35,7 +35,7 @@ This manifest creates a bunch of resources. Most of them are related to access c
 MetalLB can read and write the Kubernetes objects it needs to do its job.
 
 Ignore those bits for now, the two pieces of interest are the "controller" deployment, and the
-"speaker" daemonset. Wait for these to start by monitoring `kubectl get pods -n metallb-system`.
+"speaker" DaemonSet. Wait for these to start by monitoring `kubectl get pods -n metallb-system`.
 Eventually, you should see four running pods, in addition to the BGP router from the previous step
 (again, the pod name suffixes will be different on your cluster).
 
@@ -46,7 +46,7 @@ speaker-skfrp                 1/1       Running   0          31m
 speaker-zmtb4                 1/1       Running   0          32m
 ```
 
-Nothing has been announced yet, because we didn't supply a configMap, nor a service with
+Nothing has been announced yet, because we didn't supply a ConfigMap, nor a service with
 a load-balanced address.
 
 ## Configure MetalLB
@@ -76,7 +76,7 @@ which protocol to do that with.
 
 In this configuration we tell MetalLB to hand out address from the 192.168.1.240/28 range and use
 ARP: `protocol: arp` to do it. If you leave out the protocol bit it will default to BGP and things
-wont work. Apply this configuration:
+will not work. Apply this configuration:
 
 `kubectl apply -f https://raw.githubusercontent.com/google/metallb/master/manifests/example-arp-config-1.yaml`
 
@@ -91,8 +91,8 @@ I1217 10:18:07.403748       1 arp_controller.go:128] Start config update
 I1217 10:18:07.403883       1 arp_controller.go:143] End config update
 ```
 
-Both the ARP and BGP speaker have seen the config, but haven't done anything else, because there is
-no service IP to be announced.
+Both the ARP and BGP speakers have seen the configuration, but haven't done anything else, because
+there is no service IP to be announced.
 
 ## Create a load-balanced service
 
@@ -111,6 +111,7 @@ nginx-558d677d68-j9x9x       1/1       Running   0          47s
 ```
 
 Once it's running, take a look at the `nginx` service with `kubectl get service nginx`:
+
 ```
 NAME      TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)        AGE
 nginx     LoadBalancer   10.102.30.250   192.168.1.240   80:31517/TCP   1d
@@ -130,7 +131,7 @@ I1217 10:19:05.235623       1 arp.go:96] Request: who-has 192.168.1.240?  tell 1
 ```
 
 MetalLB is sending out unsolicited ARP responses and replies to ARP requests with the MAC address of
-the node that has one the master election and using the first address of the assigned range
+the node that has won the master election. It is using the first address of the assigned range
 (192.168.1.240).
 
 When you curl <http://192.168.1.240> you should see the default nginx page: "Welcome to nginx!"
