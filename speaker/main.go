@@ -67,37 +67,27 @@ func main() {
 	// Setup both ARP and BGP clients and speakers, config decides what is being done runtime.
 
 	// BGP
-	cb, err := newBGPController(myIP, *myNode)
+	cBGP, err := newBGPController(myIP, *myNode)
 	if err != nil {
 		glog.Fatalf("Error getting BGP controller: %s", err)
 	}
-
-	clientb, err := k8s.NewClient(name(config.ProtoBGP), *master, *kubeconfig, cb, true)
-	if err != nil {
-		glog.Fatalf("Error getting k8s client: %s", err)
-	}
-	go func() { glog.Fatal(clientb.Run(*port)) }()
-
-	// ARP
-	ca, err := newARPController(myIP, *myNode)
+	cARP, err := newARPController(myIP, *myNode)
 	if err != nil {
 		glog.Fatalf("Error getting ARP controller: %s", err)
 	}
 
-	clienta, err := k8s.NewClient(name(config.ProtoARP), *master, *kubeconfig, ca, true)
+	client, err := k8s.NewClient("metallb-speaker", *master, *kubeconfig, true, cBGP, cARP)
 	if err != nil {
 		glog.Fatalf("Error getting k8s client: %s", err)
 	}
 
-	le, err := clienta.NewLeaderElector(ca.ann, name(config.ProtoARP))
+	le, err := client.NewLeaderElector(cARP.ann, "metallb-speaker")
 	if err != nil {
 		glog.Fatalf("Error setting up leader election: %s", err)
 	}
 	go func() { le.Run() }()
-	go func() { glog.Fatal(clienta.Run(*port)) }()
 
-	// Block main() for ever.
-	select {}
+	glog.Fatal(client.Run(*port))
 }
 
 func name(proto config.Proto) string { return speaker + "-" + string(proto) }

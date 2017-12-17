@@ -59,14 +59,14 @@ type cmKey string
 type synced string
 
 // NewClient connects to masterAddr, using kubeconfig to authenticate,
-// and calls methods on ctrl as the cluster state changes.
+// and calls methods on ctrls as the cluster state changes.
 //
 // The client uses the given name to identify itself to the cluster
 // (e.g. when logging events). watchEps defines whether ctrl cares
 // about the endpoints associated with a service. If watchEps is
 // false, the controller will not watch endpoint objects, and the
 // endpoints in SetBalancer calls will always be nil.
-func NewClient(name, masterAddr, kubeconfig string, ctrl Controller, watchEps bool) (*Client, error) {
+func NewClient(name, masterAddr, kubeconfig string, watchEps bool, ctrls ...Controller) (*Client, error) {
 	config, err := clientcmd.BuildConfigFromFlags(masterAddr, kubeconfig)
 	if err != nil {
 		return nil, fmt.Errorf("building client config: %s", err)
@@ -129,7 +129,7 @@ func NewClient(name, masterAddr, kubeconfig string, ctrl Controller, watchEps bo
 	cmIndexer, cmInformer := cache.NewIndexerInformer(cmWatcher, &v1.ConfigMap{}, 0, cmHandlers, cache.Indexers{})
 
 	ret := &Client{
-		controller:  ctrl,
+		controller:  multiController(ctrls),
 		client:      clientset,
 		events:      recorder,
 		queue:       queue,
@@ -310,5 +310,39 @@ func (c *Client) sync(key interface{}) error {
 
 	default:
 		panic(fmt.Errorf("unknown key type for %#v (%T)", key, key))
+	}
+}
+
+type multiController []Controller
+
+func (m multiController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
+	var errs []error
+	for _, ctrl := range m {
+		errs = append(errs, ctrl.SetBalancer(name, svc, eps))
+	}
+	for _, err := range errs {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m multiController) SetConfig(cfg *config.Config) error {
+	var errs []error
+	for _, ctrl := range m {
+		errs = append(errs, ctrl.SetConfig(cfg))
+	}
+	for _, err := range errs {
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (m multiController) MarkSynced() {
+	for _, ctrl := range m {
+		ctrl.MarkSynced()
 	}
 }

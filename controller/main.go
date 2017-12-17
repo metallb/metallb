@@ -134,7 +134,7 @@ func main() {
 		ips: allocator.New(),
 	}
 
-	client, err := k8s.NewClient("metallb-controller", *master, *kubeconfig, c, false)
+	client, err := k8s.NewClient("metallb-controller", *master, *kubeconfig, false, c)
 	if err != nil {
 		glog.Fatalf("Error getting k8s client: %s", err)
 	}
