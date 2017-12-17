@@ -5,7 +5,6 @@ metadata:
   name: config
 data:
   config: |
-    protocol: "bgp"
     # The peers section tells MetalLB what BGP routers to connect too. There
     # is one entry for each router you want to peer with.
     peers:
@@ -32,6 +31,9 @@ data:
       # from a specific address pool using this name, by listing this
       # name under the 'metallb.universe.tf/address-pool' annotation.
       name: my-ip-space
+      # Protocol can be used to select how the announcement is done.
+      # It defaults to bgp. Supported values are bgp and arp.
+      protocol: bgp
       # A list of IP address ranges over which MetalLB has authority,
       # expressed as CIDR prefixes. You can list multiple prefixes in
       # a single pool, they will all share the same BGP settings.
