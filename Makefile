@@ -113,6 +113,34 @@ gen-image-targets:
 	/bin/echo "" >>$(MK_IMAGE_TARGETS)
 
 ################################
+## For CircleCI
+##
+## CircleCI doesn't yet support parameterized jobs on their 2.0
+## platform, so we need to fully replicate the build instructions for
+## each version of Go we want to test on.
+##
+## To make the repetition less verbose, we bundle all the stages of
+## execution into this one make command, so that the job specs on
+## circleci are all simple.
+
+.PHONY: ci-prepare
+ci-prepare:
+	go get github.com/Masterminds/glide
+	go get github.com/golang/lint/golint
+	glide install
+
+.PHONY: ci-build
+	go install .v ./controller ./speaker ./test-bgp-router
+
+.PHONY: ci-test
+	go test $(glide novendor)
+	go test -race $(glide novendor)
+
+.PHONY: ci-lint
+	go vet $(glide novendor)
+	glide novendor | xargs -n1 golint
+
+################################
 ## Release
 ##
 ## `make release VERSION=1.2.3` creates/updates the release branch,

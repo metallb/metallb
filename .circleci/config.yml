@@ -1,25 +1,50 @@
 version: 2
 jobs:
-  test:
+  test-1.8:
+    working_directory: /go/src/go.universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.8
+    steps:
+      - checkout
+      - run: make ci-prepare
+      - run: make ci-build
+      - run: make ci-test
+      - run: make ci-lint
+  test-1.9:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
       - image: circleci/golang:1.9
     steps:
       - checkout
-      - run: go get github.com/Masterminds/glide
-      - run: go get github.com/golang/lint/golint
-      - run: glide install
-      - run: go install -v ./controller ./speaker ./test-bgp-router
-      - run: go test $(glide novendor)
-      - run: go test -race $(glide novendor)
-      - run: go vet $(glide novendor)
-      - run: glide novendor | xargs -n1 golint
-    deploy:
-      steps:
-        - checkout
-        - setup_remote_docker
+      - run: make ci-prepare
+      - run: make ci-build
+      - run: make ci-test
+      - run: make ci-lint
+  test-1.10beta1:
+    working_directory: /go/src/go.universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.10beta1
+    steps:
+      - checkout
+      - run: make ci-prepare
+      - run: make ci-build
+      - run: make ci-test
+      - run: make ci-lint
+  deploy:
+    working_directory: /go/src/go.universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - setup_remote_docker
 workflows:
   version: 2
-  test:
+  test-and-deploy:
     jobs:
-      - test
+      - test-1.8
+      - test-1.9
+      - test-1.10beta1
+      - deploy:
+          requires:
+            - test-1.8
+            - test-1.9
