@@ -1,3 +1,4 @@
 *.pyc
+Makefile.defaults
 Makefile.image-targets
 build/

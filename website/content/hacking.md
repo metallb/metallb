@@ -214,6 +214,23 @@ the `ARCH` make variable to your desired architecture, one of amd64,
 arm, arm64, ppc64le, s390x. For example, `make push ARCH=arm` will
 build and deploy containers that work on ARM machines.
 
+## Build customizations
+
+You can write custom make configuration options to
+`Makefile.defaults`, and they will be included as defaults for all
+builds. For example, if you normally build with go1.10beta1 and push
+arm64 binaries to a custom registry, you can use the following
+Makefile.defaults:
+
+```make
+GOCMD=go1.10beta1
+ARCH=arm64
+REGISTRY=my-cool-images
+```
+
+To see a list of customizable options and what they do, look at the
+top of `Makefile`.
+
 ## Peering with real BGP routers
 
 While testing, it might be useful to peer with "real" routers outside

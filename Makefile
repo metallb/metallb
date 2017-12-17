@@ -1,19 +1,34 @@
 # -*- mode: makefile-gmake -*-
 
-# Magical rubbish to teach make what commas and spaces are.
-EMPTY :=
-SPACE := $(EMPTY) $(EMPTY)
-COMMA := $(EMPTY),$(EMPTY)
+## Customizable options. If you want to change these for your local
+## checkout, write the custom values to Makefile.defaults.
 
-
+# The architecture to use for `make push`.
 ARCH:=amd64
+# The registry to push images to. The default works for Minikube.
 REGISTRY:=localhost:5000
 ifeq ($(shell uname -s),Darwin)
 	REGISTRY:=docker.for.mac.localhost:5000
 endif
+# The tag to use when building images. The default is a running
+# timestamp, so that every build is a different image.
 TAG:=$(shell date +"%s.%N")
+# The command to use to build Go binaries.
 GOCMD:=go
+# If non-empty, invoke all docker commands with `sudo`.
 DOCKER_SUDO:=
+
+## End of customizable options.
+
+# Local customizations to the above.
+ifneq ($(wildcard Makefile.defaults),)
+include Makefile.defaults
+endif
+
+# Magical rubbish to teach make what commas and spaces are.
+EMPTY :=
+SPACE := $(EMPTY) $(EMPTY)
+COMMA := $(EMPTY),$(EMPTY)
 
 ALL_ARCH:=amd64 arm arm64 ppc64le s390x
 BINARIES:=controller speaker test-bgp-router
