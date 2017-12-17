@@ -27,8 +27,7 @@ import (
 // configFile is the configuration as parsed out of the ConfigMap,
 // without validation or useful high level types.
 type configFile struct {
-	Protocol Proto
-	Peers    []struct {
+	Peers []struct {
 		MyASN    uint32 `yaml:"my-asn"`
 		ASN      uint32 `yaml:"peer-asn"`
 		Addr     string `yaml:"peer-address"`
@@ -37,6 +36,7 @@ type configFile struct {
 	}
 	Communities map[string]string
 	Pools       []struct {
+		Protocol       Proto
 		Name           string
 		CIDR           []string
 		AvoidBuggyIPs  bool  `yaml:"avoid-buggy-ips"`
@@ -84,8 +84,8 @@ type Peer struct {
 
 // Pool is the configuration of an IP address pool.
 type Pool struct {
-	// Protocol for this pool, supported values "arp", "bgp" and "rip".
-	// Defaults to BGP is not set.
+	// Protocol for this pool, supported values: "arp", "bgp" and "rip".
+	// Defaults to BGP if not set.
 	Protocol Proto
 	// The addresses that are part of this pool, expressed as CIDR
 	// prefixes. config.Parse guarantees that these are
@@ -193,17 +193,17 @@ func Parse(bs []byte) (*Config, error) {
 		}
 
 		proto := BGP
-		switch raw.Protocol {
+		switch p.Protocol {
 		case "arp":
 			proto = ARP
+		case "":
+			fallthrough
 		case "bgp":
 			proto = BGP
 		case "rip":
 			proto = RIP
-		case "":
-			// Not set default to BGP.
 		default:
-			return nil, fmt.Errorf("address pool #%d has wrong protocol %s", i+1, raw.Protocol)
+			return nil, fmt.Errorf("address pool #%d has wrong protocol %s", i+1, p.Protocol)
 		}
 
 		pool := &Pool{

@@ -89,7 +89,7 @@ func (c *arpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 	}
 
 	if pool.Protocol != config.ARP {
-		glog.Errorf("%s: protocol in pool is not set to %s, got %s", name, pool.Protocol, string(config.BGP), pool.Protocol)
+		glog.Errorf("%s: protocol in pool is not set to %s, got %s", name, string(config.ARP), pool.Protocol)
 		return nil
 	}
 
