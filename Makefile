@@ -24,6 +24,9 @@ ifeq ($(findstring localhost,$(REGISTRY)),localhost)
 	IN_CLUSTER_REGISTRY:=$(shell kubectl get svc -n kube-system registry -o go-template='{{.spec.clusterIP}}'):80
 endif
 
+all:
+	$(error Please request a specific thing, there is no default target)
+
 ################################
 ## Iteration during development
 ##
