@@ -119,7 +119,7 @@ to access control, so that MetalLB can read and write the Kubernetes
 objects it needs to do its job.
 
 Ignore those bits for now, the two pieces of interest are the
-"controller" deployment, and the "bgp-speaker" daemonset. Wait for
+"controller" deployment, and the "speaker" daemonset. Wait for
 these to start by monitoring `kubectl get pods -n
 metallb-system`. Eventually, you should see two running pods, in
 addition to the BGP router from the previous step (again, the pod name
@@ -127,7 +127,7 @@ suffixes will be different on your cluster).
 
 ```
 NAME                               READY     STATUS    RESTARTS   AGE
-bgp-speaker-5x8rf                  1/1       Running   0          2m
+speaker-5x8rf                      1/1       Running   0          2m
 controller-65c85447-8tngv          1/1       Running   0          3m
 test-bgp-router-57fb7c798f-xccv8   1/1       Running   0          3m
 ```
@@ -195,7 +195,7 @@ back). If all went well, you should see happier routers:
 
 Success! The MetalLB BGP speaker connected to our routers. You can
 verify this by looking at the logs for the BGP speaker. Run `kubectl
-logs -n metallb-system -l app=bgp-speaker`, and among other log
+logs -n metallb-system -l app=speaker`, and among other log
 entries, you should find something like:
 
 ```
@@ -315,7 +315,7 @@ Events:
   Type     Reason         Age   From                 Message
   ----     ------         ----  ----                 -------
   Warning  InvalidConfig  29s   metallb-controller   configuration rejected: new config not compatible with assigned IPs: service "default/nginx" cannot own "198.51.100.0" under new config
-  Warning  InvalidConfig  29s   metallb-bgp-speaker  configuration rejected: new config not compatible with assigned IPs: service "default/nginx" cannot own "198.51.100.0" under new config
+  Warning  InvalidConfig  29s   metallb-speaker      configuration rejected: new config not compatible with assigned IPs: service "default/nginx" cannot own "198.51.100.0" under new config
 ```
 
 Oops! Both the controller and the BGP speaker rejected our new
