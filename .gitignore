@@ -1,1 +1,3 @@
 *.pyc
+Makefile.image-targets
+build/
