@@ -21,6 +21,7 @@ RUN go get -d github.com/osrg/gobgp/gobgpd
 WORKDIR $GOPATH/src/github.com/osrg/gobgp
 RUN /dep ensure
 RUN go install github.com/osrg/gobgp/gobgpd
+RUN go install github.com/osrg/gobgp/gobgp
 
 FROM alpine:latest
 
@@ -28,6 +29,7 @@ RUN echo http://nl.alpinelinux.org/alpine/edge/testing >> /etc/apk/repositories 
     apk --update --no-cache upgrade && \
     apk --no-cache add bird quagga iptables tcpdump wget tar
 COPY --from=builder /gobgpd /gobgpd
+COPY --from=builder /gobgp /gobgp
 ADD test-bgp-router /test-bgp-router
 
 ENTRYPOINT ["/test-bgp-router"]

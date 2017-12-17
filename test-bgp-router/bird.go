@@ -4,9 +4,15 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"os"
 	"os/exec"
 	"strings"
 )
+
+func hasBird() bool {
+	_, err := os.Stat("/usr/sbin/bird")
+	return err == nil
+}
 
 func writeBirdConfig() error {
 	cfg := fmt.Sprintf(`

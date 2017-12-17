@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"os"
 	"os/exec"
 	"strings"
 )
@@ -14,6 +15,11 @@ password zebra
 enable password zebra
 log stdout
 `
+
+func hasQuagga() bool {
+	_, err := os.Stat("/usr/sbin/bgpd")
+	return err == nil
+}
 
 func writeQuaggaConfig() error {
 	if err := ioutil.WriteFile("/etc/quagga/zebra.conf", []byte(zebraConfig), 0644); err != nil {

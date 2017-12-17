@@ -4,9 +4,15 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"os"
 	"os/exec"
 	"strings"
 )
+
+func hasGoBGP() bool {
+	_, err := os.Stat("/gobgpd")
+	return err == nil
+}
 
 func writeGoBGPConfig() error {
 	cfg := fmt.Sprintf(`

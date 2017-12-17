@@ -17,24 +17,31 @@ func main() {
 		glog.Exitf("Failed to start tcpdump: %s", err)
 	}
 
-	if err := writeBirdConfig(); err != nil {
-		glog.Exitf("Failed to write bird config: %s", err)
-	}
-	if err := writeQuaggaConfig(); err != nil {
-		glog.Exitf("Failed to write quagga config: %s", err)
-	}
-	if err := writeGoBGPConfig(); err != nil {
-		glog.Exitf("Failed to write gobgp config: %s", err)
+	if hasBird() {
+		if err := writeBirdConfig(); err != nil {
+			glog.Exitf("Failed to write bird config: %s", err)
+		}
+		if err := runBird(); err != nil {
+			glog.Exitf("Trying to start bird: %s", err)
+		}
 	}
 
-	if err := runBird(); err != nil {
-		glog.Exitf("Trying to start bird: %s", err)
+	if hasQuagga() {
+		if err := writeQuaggaConfig(); err != nil {
+			glog.Exitf("Failed to write quagga config: %s", err)
+		}
+		if err := runQuagga(); err != nil {
+			glog.Exitf("Trying to start quagga: %s", err)
+		}
 	}
-	if err := runQuagga(); err != nil {
-		glog.Exitf("Trying to start quagga: %s", err)
-	}
-	if err := runGoBGP(); err != nil {
-		glog.Exitf("Trying to start gobgp: %s", err)
+
+	if hasGoBGP() {
+		if err := writeGoBGPConfig(); err != nil {
+			glog.Exitf("Failed to write gobgp config: %s", err)
+		}
+		if err := runGoBGP(); err != nil {
+			glog.Exitf("Trying to start gobgp: %s", err)
+		}
 	}
 
 	http.HandleFunc("/", status)

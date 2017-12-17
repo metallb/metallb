@@ -85,23 +85,34 @@ type values struct {
 }
 
 func status(w http.ResponseWriter, r *http.Request) {
-	bStat, err := birdStatus()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	var vals []*values
+
+	if hasBird() {
+		bStat, err := birdStatus()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		vals = append(vals, bStat)
 	}
-	qStat, err := quaggaStatus()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	if hasQuagga() {
+		qStat, err := quaggaStatus()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		vals = append(vals, qStat)
 	}
-	gStat, err := goBGPStatus()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	if hasGoBGP() {
+		gStat, err := goBGPStatus()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		vals = append(vals, gStat)
 	}
 
-	if err := tmpl.Execute(w, []*values{bStat, qStat, gStat}); err != nil {
+	if err := tmpl.Execute(w, vals); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }
