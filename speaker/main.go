@@ -95,6 +95,9 @@ func main() {
 	}
 	go func() { le.Run() }()
 	go func() { glog.Fatal(clienta.Run(*port)) }()
+
+	// Block main() for ever.
+	select {}
 }
 
 func name(proto config.Proto) string { return speaker + "-" + string(proto) }
