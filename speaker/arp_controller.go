@@ -58,10 +58,6 @@ func (c *arpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 		return nil
 	}
 
-	if c.config.Protocol != config.ProtoARP {
-		return nil
-	}
-
 	if len(svc.Status.LoadBalancer.Ingress) != 1 {
 		glog.Infof("%s: no IP allocated by controller", name)
 		return c.deleteBalancer(name, "no IP allocated by controller")
@@ -92,12 +88,17 @@ func (c *arpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 		return c.deleteBalancer(name, "can't find pool")
 	}
 
+	if pool.Protocol != config.ARP {
+		glog.Errorf("%s: protocol %s in pool is not set to ARP", name, pool.Protocol)
+		return nil
+	}
+
 	glog.Infof("%s: announcable, making advertisement", name)
 
 	c.ann.SetBalancer(name, lbIP)
 
 	announcing.With(prometheus.Labels{
-		"protocol": string(config.ProtoARP),
+		"protocol": string(config.ARP),
 		"service":  name,
 		"node":     c.myNode,
 		"ip":       lbIP.String(),
@@ -113,7 +114,7 @@ func (c *arpController) deleteBalancer(name, reason string) error {
 
 	glog.Infof("%s: stopping announcements, %s", name, reason)
 	announcing.Delete(prometheus.Labels{
-		"protocol": string(config.ProtoARP),
+		"protocol": string(config.ARP),
 		"service":  name,
 		"node":     c.myNode,
 		"ip":       c.ips.GetIP(name).String(),

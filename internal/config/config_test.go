@@ -26,8 +26,7 @@ func TestParse(t *testing.T) {
 			desc: "empty config",
 			raw:  "",
 			want: &Config{
-				Protocol: ProtoBGP,
-				Pools:    map[string]*Pool{},
+				Pools: map[string]*Pool{},
 			},
 		},
 
@@ -42,8 +41,7 @@ func TestParse(t *testing.T) {
 protocol: "arp"
 `,
 			want: &Config{
-				Protocol: ProtoARP,
-				Pools:    map[string]*Pool{},
+				Pools: map[string]*Pool{},
 			},
 		},
 
@@ -78,7 +76,6 @@ address-pools:
   - 30.0.0.0/8
 `,
 			want: &Config{
-				Protocol: ProtoBGP,
 				Peers: []*Peer{
 					{
 						MyASN:    42,
@@ -97,9 +94,10 @@ address-pools:
 				},
 				Pools: map[string]*Pool{
 					"pool1": &Pool{
+						Protocol:      BGP,
 						CIDR:          []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
 						AvoidBuggyIPs: true,
-						AutoAssign: false,
+						AutoAssign:    false,
 						Advertisements: []*Advertisement{
 							{
 								AggregationLength: 32,
@@ -116,7 +114,8 @@ address-pools:
 						},
 					},
 					"pool2": &Pool{
-						CIDR: []*net.IPNet{ipnet("30.0.0.0/8")},
+						Protocol:   BGP,
+						CIDR:       []*net.IPNet{ipnet("30.0.0.0/8")},
 						AutoAssign: true,
 					},
 				},
@@ -132,7 +131,6 @@ peers:
   peer-address: 1.2.3.4
 `,
 			want: &Config{
-				Protocol: ProtoBGP,
 				Peers: []*Peer{
 					{
 						MyASN:    42,
@@ -211,9 +209,9 @@ address-pools:
 - name: pool1
 `,
 			want: &Config{
-				Protocol: ProtoBGP,
 				Pools: map[string]*Pool{
 					"pool1": &Pool{
+						Protocol:   BGP,
 						AutoAssign: true,
 					},
 				},
@@ -249,9 +247,9 @@ address-pools:
   -
 `,
 			want: &Config{
-				Protocol: ProtoBGP,
 				Pools: map[string]*Pool{
 					"pool1": &Pool{
+						Protocol:   BGP,
 						AutoAssign: true,
 						Advertisements: []*Advertisement{
 							{
