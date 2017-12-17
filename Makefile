@@ -12,7 +12,7 @@ ifeq ($(shell uname -s),Darwin)
 	REGISTRY:=docker.for.mac.localhost:5000
 endif
 TAG:=$(shell date +"%s.%N")
-GOCMD:=go1.10beta1
+GOCMD:=go
 
 ALL_ARCH:=amd64 arm arm64 ppc64le s390x
 BINARIES:=controller speaker
