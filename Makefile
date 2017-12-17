@@ -53,7 +53,6 @@ push-manifests:
 
 .PHONY: push
 push: gen-image-targets
-	sudo -v
 	+make -f $(MK_IMAGE_TARGETS) $(foreach bin,$(BINARIES),$(bin)/$(ARCH))
 	kubectl set image -n metallb-system deploy/controller controller=$(IN_CLUSTER_REGISTRY)/controller:$(TAG)-$(ARCH)
 	kubectl set image -n metallb-system ds/speaker speaker=$(IN_CLUSTER_REGISTRY)/speaker:$(TAG)-$(ARCH)
@@ -68,7 +67,6 @@ push: gen-image-targets
 
 .PHONY: all-arch-images
 all-arch-images: gen-image-targets
-	sudo -v
 	+make -f $(MK_IMAGE_TARGETS) all
 
 .PHONY: gen-image-targets
@@ -76,24 +74,24 @@ gen-image-targets:
 	echo "" >$(MK_IMAGE_TARGETS)
 	for binary in $(BINARIES); do \
 		for arch in $(ALL_ARCH); do \
-			echo ".PHONY: $$binary/$$arch" >>$(MK_IMAGE_TARGETS) ;\
-			echo "$$binary/$$arch:" >>$(MK_IMAGE_TARGETS) ;\
-			echo -e "\t+make -f Makefile.inc push BINARY=$$binary GOARCH=$$arch TAG=$(TAG)-$$arch GOCMD=$(GOCMD) REGISTRY=$(REGISTRY)" >>$(MK_IMAGE_TARGETS) ;\
-			echo "" >>$(MK_IMAGE_TARGETS) ;\
+			/bin/echo ".PHONY: $$binary/$$arch" >>$(MK_IMAGE_TARGETS) ;\
+			/bin/echo "$$binary/$$arch:" >>$(MK_IMAGE_TARGETS) ;\
+			/bin/echo -e "\t+make -f Makefile.inc push BINARY=$$binary GOARCH=$$arch TAG=$(TAG)-$$arch GOCMD=$(GOCMD) REGISTRY=$(REGISTRY)" >>$(MK_IMAGE_TARGETS) ;\
+			/bin/echo "" >>$(MK_IMAGE_TARGETS) ;\
 		done ;\
-		echo ".PHONY: $$binary" >>$(MK_IMAGE_TARGETS) ;\
-		echo -n "$$binary: " >>$(MK_IMAGE_TARGETS) ;\
+		/bin/echo ".PHONY: $$binary" >>$(MK_IMAGE_TARGETS) ;\
+		/bin/echo -n "$$binary: " >>$(MK_IMAGE_TARGETS) ;\
 		for arch in $(ALL_ARCH); do \
-			echo -n "$$binary/$$arch " >>$(MK_IMAGE_TARGETS) ;\
+			/bin/echo -n "$$binary/$$arch " >>$(MK_IMAGE_TARGETS) ;\
 		done ;\
-		echo "" >>$(MK_IMAGE_TARGETS) ;\
-		echo -e "\tmanifest-tool push from-args --platforms $(PLATFORMS) --template $(REGISTRY)/$${binary}:$(TAG)-ARCH --target $(REGISTRY)/$${binary}:$(TAG)\n" >>$(MK_IMAGE_TARGETS) ;\
+		/bin/echo "" >>$(MK_IMAGE_TARGETS) ;\
+		/bin/echo -e "\tmanifest-tool push from-args --platforms $(PLATFORMS) --template $(REGISTRY)/$${binary}:$(TAG)-ARCH --target $(REGISTRY)/$${binary}:$(TAG)\n" >>$(MK_IMAGE_TARGETS) ;\
 	done
-	echo -n "all: " >>$(MK_IMAGE_TARGETS)
+	/bin/echo -n "all: " >>$(MK_IMAGE_TARGETS)
 	for binary in $(BINARIES); do \
-		echo -ne "$$binary " >>$(MK_IMAGE_TARGETS) ;\
+		/bin/echo -ne "$$binary " >>$(MK_IMAGE_TARGETS) ;\
 	done
-	echo "" >>$(MK_IMAGE_TARGETS)
+	/bin/echo "" >>$(MK_IMAGE_TARGETS)
 
 ################################
 ## Release

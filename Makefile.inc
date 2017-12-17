@@ -36,11 +36,11 @@ endif
 
 .PHONY: push
 push: image
-	sudo -n docker push $(REGISTRY)/$(BINARY):$(TAG)
+	docker push $(REGISTRY)/$(BINARY):$(TAG)
 
 .PHONY: image
 image: dockerfile binary
-	sudo -n docker build -t $(REGISTRY)/$(BINARY):$(TAG) $(BUILD_DIR)
+	docker build -t $(REGISTRY)/$(BINARY):$(TAG) $(BUILD_DIR)
 
 .PHONY: dockerfile
 dockerfile: build-dir
@@ -52,7 +52,7 @@ endif
 .PHONY: binary
 binary: build-dir
 	CGO_ENABLED=0 GOOS=linux GOARCH=$(GOARCH) GOARM=6 \
-		$(GOCMD) build -v -o $(BUILD_DIR)/$(BINARY) go.universe.tf/metallb/$(BINARY)
+		$(GOCMD) build -o $(BUILD_DIR)/$(BINARY) go.universe.tf/metallb/$(BINARY)
 
 .PHONY: build-dir
 build-dir:
