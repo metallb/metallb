@@ -95,6 +95,7 @@ func (c *bgpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 	pool := c.config.Pools[c.ips.GetPool(name)]
 	if pool == nil {
 		glog.Errorf("%s: could not find pool %q that definitely should exist!", name, poolName)
+		return c.deleteBalancer(name, "can't find pool")
 	}
 
 	if pool.Protocol != config.BGP {
