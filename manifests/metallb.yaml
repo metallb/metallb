@@ -23,11 +23,21 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: metallb-system:bgp-speaker
+  name: metallb-system:speaker
 rules:
 - apiGroups: [""]
   resources: ["services", "endpoints"]
   verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: metallb-system
+  name: leader-election
+rules:
+- apiGroups: [""]
+  resources: ["endpoints"]
+  verbs: ["get", "list", "watch", "create", "update"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -51,7 +61,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   namespace: metallb-system
-  name: bgp-speaker
+  name: speaker
 ---
 
 ## Role bindings
@@ -71,15 +81,15 @@ roleRef:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: metallb-system:bgp-speaker
+  name: metallb-system:speaker
 subjects:
 - kind: ServiceAccount
   namespace: metallb-system
-  name: bgp-speaker
+  name: speaker
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: metallb-system:bgp-speaker
+  name: metallb-system:speaker
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -90,11 +100,24 @@ subjects:
 - kind: ServiceAccount
   name: controller
 - kind: ServiceAccount
-  name: bgp-speaker
+  name: speaker
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: config-watcher
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: metallb-system
+  name: leader-election
+subjects:
+- kind: ServiceAccount
+  name: speaker
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: leader-election
 ---
 
 ## Controller deployment
@@ -131,32 +154,31 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
-      securityContext:
-        runAsNonRoot: true
 ---
 
-# BGP speaker DaemonSet
+# Speaker DaemonSet
 apiVersion: apps/v1beta2
 kind: DaemonSet
 metadata:
   namespace: metallb-system
-  name: bgp-speaker
+  name: speaker
   labels:
-    app: bgp-speaker
+    app: speaker
 spec:
   selector:
     matchLabels:
-      app: bgp-speaker
+      app: speaker
   template:
     metadata:
       labels:
-        app: bgp-speaker
+        app: speaker
     spec:
-      serviceAccountName: bgp-speaker
+      serviceAccountName: speaker
       terminationGracePeriodSeconds: 0
+      hostNetwork: true
       containers:
-      - name: bgp-speaker
-        image: quay.io/metallb/bgp-speaker:latest
+      - name: speaker
+        image: quay.io/metallb/speaker:latest
         args:
         - --port=8080
         env:
@@ -178,5 +200,3 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
-      securityContext:
-        runAsNonRoot: true
