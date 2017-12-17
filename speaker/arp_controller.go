@@ -93,7 +93,7 @@ func (c *arpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 		return nil
 	}
 
-	glog.Infof("%s: announcable, making advertisement", name)
+	glog.Infof("%s: announcable, making 1 advertisement using ARP", name)
 
 	c.ann.SetBalancer(name, lbIP)
 

@@ -121,7 +121,7 @@ func (c *bgpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 		c.svcAds[name] = append(c.svcAds[name], ad)
 	}
 
-	glog.Infof("%s: announcable, making %d advertisements", name, len(c.svcAds[name]))
+	glog.Infof("%s: announcable, making %d advertisements using BGP", name, len(c.svcAds[name]))
 
 	if err := c.updateAds(); err != nil {
 		return err
