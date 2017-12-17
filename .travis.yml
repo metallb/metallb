@@ -18,26 +18,26 @@ go:
 - 1.10beta1
 jobs:
   include:
-  - stage: deploy
-    if: type = push
-    go: 1.9.x
-    install: true
-    script: true
-    deploy:
-    - provider: script
-      script: go run dockerfiles/trigger_build.go
-      on:
-        all_branches: true
-  - stage: deploy
-    if: type = push
-    go: 1.9.x
-    install: true
-    script: true
-    deploy:
-    - provider: script
-      script: go run dockerfiles/trigger_build.go
-      on:
-        tags: true
+  # - stage: deploy
+  #   if: type = push
+  #   go: 1.9.x
+  #   install: true
+  #   script: true
+  #   deploy:
+  #   - provider: script
+  #     script: go run dockerfiles/trigger_build.go
+  #     on:
+  #       all_branches: true
+  # - stage: deploy
+  #   if: type = push
+  #   go: 1.9.x
+  #   install: true
+  #   script: true
+  #   deploy:
+  #   - provider: script
+  #     script: go run dockerfiles/trigger_build.go
+  #     on:
+  #       tags: true
   - stage: test on tip
     go: tip
 
