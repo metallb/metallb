@@ -1,8 +1,20 @@
 version: 2
 jobs:
-   build:
-     docker:
-       - image: circleci/golang:1.9
-     steps:
-       - checkout
-       - setup_remote_docker
+  test:
+    working_directory: /go/src/go.universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - run: go get github.com/Masterminds/glide
+      - run: go get github.com/golang/lint/golint
+      - run: glide install
+      - run: go install -v ./controller ./speaker ./test-bgp-router
+      - run: go test $(glide novendor)
+      - run: go test -race $(glide novendor)
+      - run: go vet $(glide novendor)
+      - run: glide novendor | xargs -n1 golint
+    deploy:
+      steps:
+        - checkout
+        - setup_remote_docker
