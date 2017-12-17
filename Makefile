@@ -73,6 +73,9 @@ push-manifests:
 .PHONY: push
 push: gen-image-targets
 	+make -f $(MK_IMAGE_TARGETS) $(foreach bin,$(BINARIES),$(bin)/$(ARCH))
+
+.PHONY: set-image
+set-image:
 	kubectl set image -n metallb-system deploy/controller controller=$(IN_CLUSTER_REGISTRY)/controller:$(TAG)-$(ARCH)
 	kubectl set image -n metallb-system ds/speaker speaker=$(IN_CLUSTER_REGISTRY)/speaker:$(TAG)-$(ARCH)
 	kubectl set image -n metallb-system deploy/test-bgp-router test-bgp-router=$(IN_CLUSTER_REGISTRY)/test-bgp-router:$(TAG)-$(ARCH)
