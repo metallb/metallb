@@ -15,7 +15,7 @@ TAG:=$(shell date +"%s.%N")
 GOCMD:=go
 
 ALL_ARCH:=amd64 arm arm64 ppc64le s390x
-BINARIES:=controller speaker
+BINARIES:=controller speaker test-bgp-router
 PLATFORMS:=$(subst $(SPACE),$(COMMA),$(foreach arch,$(ALL_ARCH),linux/$(arch)))
 MK_IMAGE_TARGETS:=Makefile.image-targets
 IN_CLUSTER_REGISTRY:=$(REGISTRY)
