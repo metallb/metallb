@@ -13,6 +13,7 @@ ifeq ($(shell uname -s),Darwin)
 endif
 TAG:=$(shell date +"%s.%N")
 GOCMD:=go
+DOCKER_SUDO:=
 
 ALL_ARCH:=amd64 arm arm64 ppc64le s390x
 BINARIES:=controller speaker test-bgp-router
@@ -76,7 +77,7 @@ gen-image-targets:
 		for arch in $(ALL_ARCH); do \
 			/bin/echo ".PHONY: $$binary/$$arch" >>$(MK_IMAGE_TARGETS) ;\
 			/bin/echo "$$binary/$$arch:" >>$(MK_IMAGE_TARGETS) ;\
-			/bin/echo -e "\t+make -f Makefile.inc push BINARY=$$binary GOARCH=$$arch TAG=$(TAG)-$$arch GOCMD=$(GOCMD) REGISTRY=$(REGISTRY)" >>$(MK_IMAGE_TARGETS) ;\
+			/bin/echo -e "\t+make -f Makefile.inc push BINARY=$$binary GOARCH=$$arch TAG=$(TAG)-$$arch GOCMD=$(GOCMD) DOCKER_SUDO=$(DOCKER_SUDO) REGISTRY=$(REGISTRY)" >>$(MK_IMAGE_TARGETS) ;\
 			/bin/echo "" >>$(MK_IMAGE_TARGETS) ;\
 		done ;\
 		/bin/echo ".PHONY: $$binary" >>$(MK_IMAGE_TARGETS) ;\

@@ -6,6 +6,7 @@ BINARY:=
 TAG:=
 REGISTRY:=
 GOCMD:=go
+DOCKER_SUDO:=
 
 ifeq ($(GOARCH),)
 	$(error GOARCH not specified)
@@ -23,6 +24,10 @@ endif
 # Other variables.
 GITCOMMIT:=$(shell git describe --dirty --always)
 BUILD_DIR:=build/$(GOARCH)$(GOARM)/$(BINARY)
+DOCKERCMD:=docker
+ifneq ($(DOCKER_SUDO),)
+	DOCKERCMD:=sudo docker
+endif
 DOCKERFILE_BASE:=alpine:latest
 ifneq ($(GOARCH),amd64)
 	DOCKERFILE_BASE:=$(GOARCH)/alpine:latest
@@ -36,11 +41,11 @@ endif
 
 .PHONY: push
 push: image
-	docker push $(REGISTRY)/$(BINARY):$(TAG)
+	$(DOCKERCMD) push $(REGISTRY)/$(BINARY):$(TAG)
 
 .PHONY: image
 image: dockerfile binary
-	docker build -t $(REGISTRY)/$(BINARY):$(TAG) $(BUILD_DIR)
+	$(DOCKERCMD) build -t $(REGISTRY)/$(BINARY):$(TAG) $(BUILD_DIR)
 
 .PHONY: dockerfile
 dockerfile: build-dir
