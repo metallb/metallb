@@ -22,9 +22,9 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
-      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD quay.io
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
       - run: make ci-prepare
-      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=quay.io/metallb
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=metallb
       - run: make -f Makefile.image-targets {{$bin}}
 {{- end }}
 workflows:
