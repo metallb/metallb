@@ -93,7 +93,7 @@ address-pools:
 					},
 				},
 				Pools: map[string]*Pool{
-					"pool1": &Pool{
+					"pool1": {
 						Protocol:      BGP,
 						CIDR:          []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
 						AvoidBuggyIPs: true,
@@ -113,7 +113,7 @@ address-pools:
 							},
 						},
 					},
-					"pool2": &Pool{
+					"pool2": {
 						Protocol:   BGP,
 						CIDR:       []*net.IPNet{ipnet("30.0.0.0/8")},
 						AutoAssign: true,
@@ -210,7 +210,7 @@ address-pools:
 `,
 			want: &Config{
 				Pools: map[string]*Pool{
-					"pool1": &Pool{
+					"pool1": {
 						Protocol:   BGP,
 						AutoAssign: true,
 					},
@@ -248,7 +248,7 @@ address-pools:
 `,
 			want: &Config{
 				Pools: map[string]*Pool{
-					"pool1": &Pool{
+					"pool1": {
 						Protocol:   BGP,
 						AutoAssign: true,
 						Advertisements: []*Advertisement{

@@ -114,7 +114,7 @@ func TestControllerMutation(t *testing.T) {
 	}
 	cfg := &config.Config{
 		Pools: map[string]*config.Pool{
-			"pool1": &config.Pool{
+			"pool1": {
 				AutoAssign: true,
 				CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
 			},
@@ -392,7 +392,7 @@ func TestControllerConfig(t *testing.T) {
 	// Set a config with some IPs. Still no allocation, not synced.
 	cfg := &config.Config{
 		Pools: map[string]*config.Pool{
-			"default": &config.Pool{
+			"default": {
 				AutoAssign: true,
 				CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
 			},

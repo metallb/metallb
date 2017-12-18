@@ -206,7 +206,7 @@ func TestBGPSppeaker(t *testing.T) {
 					},
 				},
 				Pools: map[string]*config.Pool{
-					"default": &config.Pool{
+					"default": {
 						Protocol: config.BGP,
 						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
 						Advertisements: []*config.Advertisement{
@@ -271,7 +271,7 @@ func TestBGPSppeaker(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": []*bgp.Advertisement{
+				"1.2.3.4:0": {
 					{
 						Prefix:  ipnet("10.20.30.1/32"),
 						NextHop: net.ParseIP("1.2.3.4"),
@@ -334,7 +334,7 @@ func TestBGPSppeaker(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": []*bgp.Advertisement{
+				"1.2.3.4:0": {
 					{
 						Prefix:  ipnet("10.20.30.1/32"),
 						NextHop: net.ParseIP("1.2.3.4"),
@@ -397,7 +397,7 @@ func TestBGPSppeaker(t *testing.T) {
 					},
 				},
 				Pools: map[string]*config.Pool{
-					"default": &config.Pool{
+					"default": {
 						Protocol: config.BGP,
 						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
 						Advertisements: []*config.Advertisement{
@@ -435,7 +435,7 @@ func TestBGPSppeaker(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": []*bgp.Advertisement{
+				"1.2.3.4:0": {
 					{
 						Prefix:      ipnet("10.20.30.1/32"),
 						NextHop:     net.ParseIP("1.2.3.4"),
@@ -463,7 +463,7 @@ func TestBGPSppeaker(t *testing.T) {
 					},
 				},
 				Pools: map[string]*config.Pool{
-					"default": &config.Pool{
+					"default": {
 						Protocol: config.BGP,
 						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
 						Advertisements: []*config.Advertisement{
@@ -495,13 +495,13 @@ func TestBGPSppeaker(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": []*bgp.Advertisement{
+				"1.2.3.4:0": {
 					{
 						Prefix:  ipnet("10.20.30.1/32"),
 						NextHop: net.ParseIP("1.2.3.4"),
 					},
 				},
-				"1.2.3.5:0": []*bgp.Advertisement{
+				"1.2.3.5:0": {
 					{
 						Prefix:  ipnet("10.20.30.1/32"),
 						NextHop: net.ParseIP("1.2.3.4"),
@@ -532,13 +532,13 @@ func TestBGPSppeaker(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": []*bgp.Advertisement{
+				"1.2.3.4:0": {
 					{
 						Prefix:  ipnet("10.20.30.1/32"),
 						NextHop: net.ParseIP("1.2.3.4"),
 					},
 				},
-				"1.2.3.5:0": []*bgp.Advertisement{
+				"1.2.3.5:0": {
 					{
 						Prefix:  ipnet("10.20.30.1/32"),
 						NextHop: net.ParseIP("1.2.3.4"),
@@ -570,7 +570,7 @@ func TestBGPSppeaker(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": []*bgp.Advertisement{
+				"1.2.3.4:0": {
 					{
 						Prefix:  ipnet("10.20.30.1/32"),
 						NextHop: net.ParseIP("1.2.3.4"),
@@ -580,7 +580,7 @@ func TestBGPSppeaker(t *testing.T) {
 						NextHop: net.ParseIP("1.2.3.4"),
 					},
 				},
-				"1.2.3.5:0": []*bgp.Advertisement{
+				"1.2.3.5:0": {
 					{
 						Prefix:  ipnet("10.20.30.1/32"),
 						NextHop: net.ParseIP("1.2.3.4"),
@@ -597,13 +597,13 @@ func TestBGPSppeaker(t *testing.T) {
 			desc:     "Delete svc",
 			balancer: "test1",
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": []*bgp.Advertisement{
+				"1.2.3.4:0": {
 					{
 						Prefix:  ipnet("10.20.30.5/32"),
 						NextHop: net.ParseIP("1.2.3.4"),
 					},
 				},
-				"1.2.3.5:0": []*bgp.Advertisement{
+				"1.2.3.5:0": {
 					{
 						Prefix:  ipnet("10.20.30.5/32"),
 						NextHop: net.ParseIP("1.2.3.4"),
@@ -621,7 +621,7 @@ func TestBGPSppeaker(t *testing.T) {
 					},
 				},
 				Pools: map[string]*config.Pool{
-					"default": &config.Pool{
+					"default": {
 						Protocol: config.BGP,
 						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
 						Advertisements: []*config.Advertisement{
@@ -653,7 +653,7 @@ func TestBGPSppeaker(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.5:0": []*bgp.Advertisement{
+				"1.2.3.5:0": {
 					{
 						Prefix:  ipnet("10.20.30.5/32"),
 						NextHop: net.ParseIP("1.2.3.4"),

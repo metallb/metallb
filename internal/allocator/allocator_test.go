@@ -378,7 +378,7 @@ func TestConfigReload(t *testing.T) {
 		},
 		{
 			desc:  "swap pool names",
-			pools: pools(pool("test2", false, true,"1.2.3.0/31"), pool("test", false, true, "1.2.3.2/31")),
+			pools: pools(pool("test2", false, true, "1.2.3.0/31"), pool("test", false, true, "1.2.3.2/31")),
 			pool:  "test2",
 		},
 		{
@@ -432,21 +432,21 @@ func TestAutoAssign(t *testing.T) {
 	}
 
 	tests := []struct {
-		svc      string
-		wantErr  bool
+		svc     string
+		wantErr bool
 	}{
 		{svc: "s1"},
 		{svc: "s2"},
 		{
-			svc: "s3",
+			svc:     "s3",
 			wantErr: true,
 		},
 		{
-			svc: "s4",
+			svc:     "s4",
 			wantErr: true,
 		},
 		{
-			svc: "s5",
+			svc:     "s5",
 			wantErr: true,
 		},
 	}
