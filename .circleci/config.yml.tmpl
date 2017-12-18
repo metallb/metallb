@@ -22,6 +22,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
+      - run: echo $CIRCLE_BRANCH
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
       - run: make ci-prepare
       - run: make gen-image-targets TAG=${CIRCLE_BRANCH:-${CIRCLE_TAG}} REGISTRY=metallb
@@ -40,6 +41,8 @@ workflows:
 {{- range $bin := $.Binary }}
       - deploy-{{$bin}}:
           filters:
+            branches:
+              ignore: /pull\/.*/
             tags:
               only: /.*/
           requires:
