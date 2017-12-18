@@ -36,6 +36,7 @@ jobs:
       - image: circleci/golang:1.9
     steps:
       - checkout
+      - go get github.com/estesp/manifest-tool
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
       - run: make ci-deploy TAG=$CIRCLE_BRANCH REGISTRY=danderson
