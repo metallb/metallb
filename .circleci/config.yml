@@ -44,6 +44,7 @@ jobs:
       - run: make ci-prepare
       - run: make gen-image-targets TAG=${CIRCLE_BRANCH:-${CIRCLE_TAG}} REGISTRY=metallb
       - run: make -f Makefile.image-targets controller
+      - run: if [[ "${CIRCLE_BRANCH}" == "master" ]]; then docker tag metallb/controller:master metallb/controller:latest && docker push metallb/controller:latest; done
   deploy-speaker:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
@@ -56,6 +57,7 @@ jobs:
       - run: make ci-prepare
       - run: make gen-image-targets TAG=${CIRCLE_BRANCH:-${CIRCLE_TAG}} REGISTRY=metallb
       - run: make -f Makefile.image-targets speaker
+      - run: if [[ "${CIRCLE_BRANCH}" == "master" ]]; then docker tag metallb/speaker:master metallb/speaker:latest && docker push metallb/speaker:latest; done
   deploy-test-bgp-router:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
@@ -68,6 +70,7 @@ jobs:
       - run: make ci-prepare
       - run: make gen-image-targets TAG=${CIRCLE_BRANCH:-${CIRCLE_TAG}} REGISTRY=metallb
       - run: make -f Makefile.image-targets test-bgp-router
+      - run: if [[ "${CIRCLE_BRANCH}" == "master" ]]; then docker tag metallb/test-bgp-router:master metallb/test-bgp-router:latest && docker push metallb/test-bgp-router:latest; done
 workflows:
   version: 2
   test-and-deploy:
