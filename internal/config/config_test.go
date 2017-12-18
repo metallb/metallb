@@ -69,7 +69,13 @@ address-pools:
 - name: pool3
   protocol: arp
   cidr:
-  - 40.0.0.0/16
+  - 40.0.0.0/25
+- name: pool4
+  protocol: arp
+  cidr:
+  - 50.0.0.0/16
+  - 50.20.0.0/24
+  arp-network: 50.0.0.0/8
 `,
 			want: &Config{
 				Peers: []*Peer{
@@ -122,14 +128,15 @@ address-pools:
 					},
 					"pool3": {
 						Protocol:   ARP,
-						CIDR:       []*net.IPNet{ipnet("40.0.0.0/16")},
+						CIDR:       []*net.IPNet{ipnet("40.0.0.0/25")},
 						AutoAssign: true,
-						BGPAdvertisements: []*BGPAdvertisement{
-							{
-								AggregationLength: 32,
-								Communities:       map[uint32]bool{},
-							},
-						},
+						ARPNetwork: ipnet("40.0.0.0/24"),
+					},
+					"pool4": {
+						Protocol:   ARP,
+						CIDR:       []*net.IPNet{ipnet("50.0.0.0/16"), ipnet("50.20.0.0/24")},
+						AutoAssign: true,
+						ARPNetwork: ipnet("50.0.0.0/8"),
 					},
 				},
 			},

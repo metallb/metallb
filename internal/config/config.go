@@ -48,6 +48,7 @@ type addressPool struct {
 	AvoidBuggyIPs     bool               `yaml:"avoid-buggy-ips"`
 	AutoAssign        *bool              `yaml:"auto-assign"`
 	BGPAdvertisements []bgpAdvertisement `yaml:"bgp-advertisements"`
+	ARPNetwork        string             `yaml:"arp-network"`
 }
 
 type bgpAdvertisement struct {
@@ -108,6 +109,10 @@ type Pool struct {
 	// When an IP is allocated from this pool, how should it be
 	// translated into BGP announcements?
 	BGPAdvertisements []*BGPAdvertisement
+	// The L2 network that contains this ARP-advertised pool. Used to
+	// make sure we don't allocate the network's base or broadcast
+	// addresses.
+	ARPNetwork *net.IPNet
 }
 
 // BGPAdvertisement describes one translation from an IP address to a BGP advertisement.
@@ -234,14 +239,6 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 		ret.AutoAssign = *p.AutoAssign
 	}
 
-	switch ret.Protocol {
-	case ARP, BGP:
-	case "":
-		return nil, errors.New("address pool is missing the protocol field")
-	default:
-		return nil, fmt.Errorf("unknown protocol %q", ret.Protocol)
-	}
-
 	if len(p.CIDR) == 0 {
 		return nil, errors.New("pool has no prefixes defined")
 	}
@@ -253,11 +250,33 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 		ret.CIDR = append(ret.CIDR, n)
 	}
 
-	ads, err := parseBGPAdvertisements(p.BGPAdvertisements, ret.CIDR, bgpCommunities)
-	if err != nil {
-		return nil, fmt.Errorf("parsing BGP communities: %s", err)
+	switch ret.Protocol {
+	case ARP:
+		if len(p.BGPAdvertisements) > 0 {
+			return nil, errors.New("cannot have bgp-advertisements configuration element in an ARP address pool")
+		}
+
+		arpNet, err := parseARPNetwork(p.ARPNetwork, ret.CIDR)
+		if err != nil {
+			return nil, fmt.Errorf("parsing ARP network: %s", err)
+		}
+		ret.ARPNetwork = arpNet
+	case BGP:
+		if p.ARPNetwork != "" {
+			return nil, errors.New("cannot have arp-network configuration element in a BGP address pool")
+		}
+
+		ads, err := parseBGPAdvertisements(p.BGPAdvertisements, ret.CIDR, bgpCommunities)
+		if err != nil {
+			return nil, fmt.Errorf("parsing BGP communities: %s", err)
+		}
+		ret.BGPAdvertisements = ads
+
+	case "":
+		return nil, errors.New("address pool is missing the protocol field")
+	default:
+		return nil, fmt.Errorf("unknown protocol %q", ret.Protocol)
 	}
-	ret.BGPAdvertisements = ads
 
 	return ret, nil
 }
@@ -316,6 +335,37 @@ func parseBGPAdvertisements(ads []bgpAdvertisement, cidrs []*net.IPNet, communit
 	return ret, nil
 }
 
+func parseARPNetwork(a string, cidr []*net.IPNet) (*net.IPNet, error) {
+	var ret *net.IPNet
+	if a == "" {
+		ret = &net.IPNet{
+			IP:   cidr[0].IP.Mask(net.CIDRMask(24, 32)),
+			Mask: net.CIDRMask(24, 32),
+		}
+	} else {
+		_, arpNet, err := net.ParseCIDR(a)
+		if err != nil {
+			return nil, fmt.Errorf("parsing ARP network: %s", err)
+		}
+		ret = arpNet
+	}
+
+	// All CIDRs must be contained within the arp-network.
+	for _, cidr := range cidr {
+		if !cidrContainsCIDR(ret, cidr) {
+			if a == "" {
+				// This validation is failing based on a
+				// default-selected value. Make the error point this
+				// out to better guide the user.
+				return nil, fmt.Errorf("pool did not specify an arp-network, and CIDR %q falls outside the inferred arp-network %q (maybe explicitly define arp-network?)", cidr, ret)
+			}
+			return nil, fmt.Errorf("CIDR %q is not contained within the enclosing ARP network %q", cidr, ret)
+		}
+	}
+
+	return ret, nil
+}
+
 func parseCommunity(c string) (uint32, error) {
 	fs := strings.Split(c, ":")
 	if len(fs) != 2 {
@@ -334,15 +384,16 @@ func parseCommunity(c string) (uint32, error) {
 }
 
 func cidrsOverlap(a, b *net.IPNet) bool {
-	al, _ := a.Mask.Size()
-	bl, _ := b.Mask.Size()
-	if al == bl && a.IP.Equal(b.IP) {
+	return cidrContainsCIDR(a, b) || cidrContainsCIDR(b, a)
+}
+
+func cidrContainsCIDR(outer, inner *net.IPNet) bool {
+	ol, _ := outer.Mask.Size()
+	il, _ := inner.Mask.Size()
+	if ol == il && outer.IP.Equal(inner.IP) {
 		return true
 	}
-	if al > bl && b.Contains(a.IP) {
-		return true
-	}
-	if bl > al && a.Contains(b.IP) {
+	if ol < il && outer.Contains(inner.IP) {
 		return true
 	}
 	return false
