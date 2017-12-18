@@ -40,6 +40,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make ci-prepare
       - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
       - run: make -f Makefile.image-targets controller/amd64
   deploy-controller-arm:
@@ -50,6 +51,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make ci-prepare
       - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
       - run: make -f Makefile.image-targets controller/arm
   deploy-controller-arm64:
@@ -60,6 +62,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make ci-prepare
       - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
       - run: make -f Makefile.image-targets controller/arm64
   deploy-controller-ppc64le:
@@ -70,6 +73,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make ci-prepare
       - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
       - run: make -f Makefile.image-targets controller/ppc64le
   deploy-controller-s390x:
@@ -80,6 +84,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make ci-prepare
       - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
       - run: make -f Makefile.image-targets controller/s390x
   deploy-controller:
@@ -90,6 +95,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make ci-prepare
       - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
       - run: make -f Makefile.image-targets controller-manifest-only
   deploy-speaker-amd64:
@@ -100,6 +106,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make ci-prepare
       - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
       - run: make -f Makefile.image-targets speaker/amd64
   deploy-speaker-arm:
@@ -110,6 +117,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make ci-prepare
       - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
       - run: make -f Makefile.image-targets speaker/arm
   deploy-speaker-arm64:
@@ -120,6 +128,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make ci-prepare
       - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
       - run: make -f Makefile.image-targets speaker/arm64
   deploy-speaker-ppc64le:
@@ -130,6 +139,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make ci-prepare
       - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
       - run: make -f Makefile.image-targets speaker/ppc64le
   deploy-speaker-s390x:
@@ -140,6 +150,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make ci-prepare
       - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
       - run: make -f Makefile.image-targets speaker/s390x
   deploy-speaker:
@@ -150,6 +161,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make ci-prepare
       - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
       - run: make -f Makefile.image-targets speaker-manifest-only
   deploy-test-bgp-router-amd64:
@@ -160,6 +172,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make ci-prepare
       - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
       - run: make -f Makefile.image-targets test-bgp-router/amd64
   deploy-test-bgp-router-arm:
@@ -170,6 +183,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make ci-prepare
       - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
       - run: make -f Makefile.image-targets test-bgp-router/arm
   deploy-test-bgp-router-arm64:
@@ -180,6 +194,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make ci-prepare
       - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
       - run: make -f Makefile.image-targets test-bgp-router/arm64
   deploy-test-bgp-router-ppc64le:
@@ -190,6 +205,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make ci-prepare
       - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
       - run: make -f Makefile.image-targets test-bgp-router/ppc64le
   deploy-test-bgp-router-s390x:
@@ -200,6 +216,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make ci-prepare
       - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
       - run: make -f Makefile.image-targets test-bgp-router/s390x
   deploy-test-bgp-router:
@@ -210,6 +227,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make ci-prepare
       - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
       - run: make -f Makefile.image-targets test-bgp-router-manifest-only
 workflows:
