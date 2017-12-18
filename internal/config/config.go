@@ -15,6 +15,7 @@
 package config // import "go.universe.tf/metallb/internal/config"
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -27,26 +28,32 @@ import (
 // configFile is the configuration as parsed out of the ConfigMap,
 // without validation or useful high level types.
 type configFile struct {
-	Peers []struct {
-		MyASN    uint32 `yaml:"my-asn"`
-		ASN      uint32 `yaml:"peer-asn"`
-		Addr     string `yaml:"peer-address"`
-		Port     uint16 `yaml:"peer-port"`
-		HoldTime string `yaml:"hold-time"`
-	}
+	Peers          []peer
 	BGPCommunities map[string]string `yaml:"bgp-communities"`
-	Pools          []struct {
-		Protocol          Proto
-		Name              string
-		CIDR              []string
-		AvoidBuggyIPs     bool  `yaml:"avoid-buggy-ips"`
-		AutoAssign        *bool `yaml:"auto-assign"`
-		BGPAdvertisements []struct {
-			AggregationLength *int `yaml:"aggregation-length"`
-			LocalPref         *uint32
-			Communities       []string
-		} `yaml:"bgp-advertisements"`
-	} `yaml:"address-pools"`
+	Pools          []addressPool     `yaml:"address-pools"`
+}
+
+type peer struct {
+	MyASN    uint32 `yaml:"my-asn"`
+	ASN      uint32 `yaml:"peer-asn"`
+	Addr     string `yaml:"peer-address"`
+	Port     uint16 `yaml:"peer-port"`
+	HoldTime string `yaml:"hold-time"`
+}
+
+type addressPool struct {
+	Protocol          Proto
+	Name              string
+	CIDR              []string
+	AvoidBuggyIPs     bool               `yaml:"avoid-buggy-ips"`
+	AutoAssign        *bool              `yaml:"auto-assign"`
+	BGPAdvertisements []bgpAdvertisement `yaml:"bgp-advertisements"`
+}
+
+type bgpAdvertisement struct {
+	AggregationLength *int `yaml:"aggregation-length"`
+	LocalPref         *uint32
+	Communities       []string
 }
 
 // Config is a parsed MetalLB configuration.
@@ -140,31 +147,11 @@ func Parse(bs []byte) (*Config, error) {
 
 	cfg := &Config{Pools: map[string]*Pool{}}
 	for i, p := range raw.Peers {
-		if p.MyASN == 0 {
-			return nil, fmt.Errorf("peer #%d missing local ASN", i+1)
-		}
-		if p.ASN == 0 {
-			return nil, fmt.Errorf("peer #%d missing peer ASN", i+1)
-		}
-		ip := net.ParseIP(p.Addr)
-		if ip == nil {
-			return nil, fmt.Errorf("invalid peer IP %q", p.Addr)
-		}
-		holdTime, err := parseHoldTime(p.HoldTime)
+		peer, err := parsePeer(p)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("parsing peer #%d: %s", i+1, err)
 		}
-		port := uint16(179)
-		if p.Port != 0 {
-			port = p.Port
-		}
-		cfg.Peers = append(cfg.Peers, &Peer{
-			MyASN:    p.MyASN,
-			ASN:      p.ASN,
-			Addr:     ip,
-			Port:     port,
-			HoldTime: holdTime,
-		})
+		cfg.Peers = append(cfg.Peers, peer)
 	}
 
 	communities := map[string]uint32{}
@@ -178,98 +165,152 @@ func Parse(bs []byte) (*Config, error) {
 
 	var allCIDRs []*net.IPNet
 	for i, p := range raw.Pools {
-		if p.Name == "" {
-			return nil, fmt.Errorf("address pool #%d is missing name", i+1)
-		}
-		if _, ok := cfg.Pools[p.Name]; ok {
-			return nil, fmt.Errorf("duplicate pool definition for %q", p.Name)
+		pool, err := parseAddressPool(p, communities)
+		if err != nil {
+			return nil, fmt.Errorf("parsing address pool #%d: %s", i+1, err)
 		}
 
-		autoAssign := true
-		if p.AutoAssign != nil {
-			autoAssign = *p.AutoAssign
+		// Check that the pool isn't already defined
+		if cfg.Pools[p.Name] != nil {
+			return nil, fmt.Errorf("duplicate definition of pool %q", p.Name)
 		}
 
-		switch p.Protocol {
-		case ARP, BGP:
-		case "":
-			return nil, fmt.Errorf("address pool #%d is missing the protocol field", i+1)
-		default:
-			return nil, fmt.Errorf("address pool #%d has unknown protocol %s", i+1, p.Protocol)
-		}
-
-		pool := &Pool{
-			Protocol:      p.Protocol,
-			AvoidBuggyIPs: p.AvoidBuggyIPs,
-			AutoAssign:    autoAssign,
-		}
-		cfg.Pools[p.Name] = pool
-
-		for _, cidr := range p.CIDR {
-			_, n, err := net.ParseCIDR(cidr)
-			if err != nil {
-				return nil, fmt.Errorf("invalid CIDR %q in pool %q", cidr, p.Name)
-			}
+		// Check that all specified CIDR ranges are non-overlapping.
+		for _, cidr := range pool.CIDR {
 			for _, m := range allCIDRs {
-				if cidrsOverlap(n, m) {
-					return nil, fmt.Errorf("CIDR %q in pool %q overlaps with already defined CIDR %q", n, p.Name, m)
+				if cidrsOverlap(cidr, m) {
+					return nil, fmt.Errorf("CIDR %q in pool %q overlaps with already defined CIDR %q", cidr, p.Name, m)
 				}
 			}
-			pool.CIDR = append(pool.CIDR, n)
-			allCIDRs = append(allCIDRs, n)
+			allCIDRs = append(allCIDRs, cidr)
 		}
 
-		if len(p.BGPAdvertisements) == 0 {
-			pool.BGPAdvertisements = []*BGPAdvertisement{
-				{
-					AggregationLength: 32,
-					Communities:       map[uint32]bool{},
-				},
-			}
-		}
-		for _, ad := range p.BGPAdvertisements {
-			// TODO: ipv6 support :(
-			agLen := 32
-			if ad.AggregationLength != nil {
-				agLen = *ad.AggregationLength
-			}
-			if agLen > 32 {
-				return nil, fmt.Errorf("invalid aggregation length %q in pool %q", ad.AggregationLength, p.Name)
-			}
-			for _, cidr := range pool.CIDR {
-				o, _ := cidr.Mask.Size()
-				if agLen < o {
-					return nil, fmt.Errorf("invalid aggregation length %d in pool %q: prefix %q in this pool is more specific than the aggregation length", ad.AggregationLength, p.Name, cidr)
-				}
-			}
-
-			comms := map[uint32]bool{}
-			for _, c := range ad.Communities {
-				if v, ok := communities[c]; ok {
-					comms[v] = true
-				} else {
-					v, err := parseCommunity(c)
-					if err != nil {
-						return nil, fmt.Errorf("invalid community %q in BGP advertisement of pool %q: %s", c, p.Name, err)
-					}
-					comms[v] = true
-				}
-			}
-
-			localPref := uint32(0)
-			if ad.LocalPref != nil {
-				localPref = *ad.LocalPref
-			}
-
-			pool.BGPAdvertisements = append(pool.BGPAdvertisements, &BGPAdvertisement{
-				AggregationLength: agLen,
-				LocalPref:         localPref,
-				Communities:       comms,
-			})
-		}
+		cfg.Pools[p.Name] = pool
 	}
 
 	return cfg, nil
+}
+
+func parsePeer(p peer) (*Peer, error) {
+	if p.MyASN == 0 {
+		return nil, errors.New("missing local ASN")
+	}
+	if p.ASN == 0 {
+		return nil, errors.New("missing peer ASN")
+	}
+	ip := net.ParseIP(p.Addr)
+	if ip == nil {
+		return nil, fmt.Errorf("invalid peer IP %q", p.Addr)
+	}
+	holdTime, err := parseHoldTime(p.HoldTime)
+	if err != nil {
+		return nil, err
+	}
+	port := uint16(179)
+	if p.Port != 0 {
+		port = p.Port
+	}
+	return &Peer{
+		MyASN:    p.MyASN,
+		ASN:      p.ASN,
+		Addr:     ip,
+		Port:     port,
+		HoldTime: holdTime,
+	}, nil
+}
+
+func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, error) {
+	if p.Name == "" {
+		return nil, errors.New("missing pool name")
+	}
+
+	ret := &Pool{
+		Protocol:      p.Protocol,
+		AvoidBuggyIPs: p.AvoidBuggyIPs,
+		AutoAssign:    true,
+	}
+
+	if p.AutoAssign != nil {
+		ret.AutoAssign = *p.AutoAssign
+	}
+
+	switch ret.Protocol {
+	case ARP, BGP:
+	case "":
+		return nil, errors.New("address pool is missing the protocol field")
+	default:
+		return nil, fmt.Errorf("unknown protocol %q", ret.Protocol)
+	}
+
+	for _, cidr := range p.CIDR {
+		_, n, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid CIDR %q in pool %q", cidr, p.Name)
+		}
+		ret.CIDR = append(ret.CIDR, n)
+	}
+
+	ads, err := parseBGPAdvertisements(p.BGPAdvertisements, ret.CIDR, bgpCommunities)
+	if err != nil {
+		return nil, fmt.Errorf("parsing BGP communities: %s", err)
+	}
+	ret.BGPAdvertisements = ads
+
+	return ret, nil
+}
+
+func parseBGPAdvertisements(ads []bgpAdvertisement, cidrs []*net.IPNet, communities map[string]uint32) ([]*BGPAdvertisement, error) {
+	if len(ads) == 0 {
+		return []*BGPAdvertisement{
+			{
+				AggregationLength: 32,
+				LocalPref:         0,
+				Communities:       map[uint32]bool{},
+			},
+		}, nil
+	}
+
+	var ret []*BGPAdvertisement
+	for _, rawAd := range ads {
+		ad := &BGPAdvertisement{
+			AggregationLength: 32,
+			LocalPref:         0,
+			Communities:       map[uint32]bool{},
+		}
+
+		if rawAd.AggregationLength != nil {
+			ad.AggregationLength = *rawAd.AggregationLength
+		}
+		if ad.AggregationLength > 32 {
+			return nil, fmt.Errorf("invalid aggregation length %q", ad.AggregationLength)
+		}
+		for _, cidr := range cidrs {
+			o, _ := cidr.Mask.Size()
+			if ad.AggregationLength < o {
+				return nil, fmt.Errorf("invalid aggregation length %d: prefix %q in this pool is more specific than the aggregation length", ad.AggregationLength, cidr)
+			}
+		}
+
+		if rawAd.LocalPref != nil {
+			ad.LocalPref = *rawAd.LocalPref
+		}
+
+		for _, c := range rawAd.Communities {
+			if v, ok := communities[c]; ok {
+				ad.Communities[v] = true
+			} else {
+				v, err := parseCommunity(c)
+				if err != nil {
+					return nil, fmt.Errorf("invalid community %q in BGP advertisement: %s", c, err)
+				}
+				ad.Communities[v] = true
+			}
+		}
+
+		ret = append(ret, ad)
+	}
+
+	return ret, nil
 }
 
 func parseCommunity(c string) (uint32, error) {
