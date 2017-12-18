@@ -39,9 +39,8 @@ spec:
         securityContext:
           capabilities:
             add:
-            - NET_ADMIN
-            - NET_RAW
-            - SYS_ADMIN
+            - net_admin
+            - sys_admin
 
 ---
 apiVersion: v1
