@@ -19,6 +19,8 @@ spec:
       labels:
         app: test-bgp-router
     spec:
+      terminationGracePeriodSeconds: 0
+      automountServiceAccountToken: false
       containers:
       - name: test-bgp-router
         image: metallb/test-bgp-router:latest
