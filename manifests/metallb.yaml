@@ -37,7 +37,8 @@ metadata:
 rules:
 - apiGroups: [""]
   resources: ["endpoints"]
-  verbs: ["get", "list", "watch", "create", "update"]
+  resourceNames: ["metallb-speaker"]
+  verbs: ["get", "create", "update"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
