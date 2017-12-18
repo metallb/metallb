@@ -132,7 +132,9 @@ ci-config:
 
 .PHONY: ci-prepare
 ci-prepare:
+	go get github.com/Masterminds/glide
 	go get github.com/golang/lint/golint
+	glide install
 
 .PHONY: ci-build
 ci-build:
@@ -140,12 +142,13 @@ ci-build:
 
 .PHONY: ci-test
 ci-test:
-	go test ./...
-	go test -race ./...
+	go test $$(glide novendor)
+	go test -race $$(glide novendor)
 
 .PHONY: ci-lint
 ci-lint:
-	go vet ./...
+	go vet $$(glide novendor)
+	glide novendor | xargs -n1 golint
 
 .PHONY: ci-deploy
 ci-deploy:
