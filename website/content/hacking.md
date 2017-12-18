@@ -132,7 +132,7 @@ Start by running `make start-minikube`. This will:
 - Push a MetalLB configuration that connects MetalLB to the `test-bgp-router`
 
 At this point, your sandbox is running the precompiled version of
-MetalLB, pulled from [quay.io](https://quay.io/metallb).
+MetalLB, pulled from [Docker Hub](https://hub.docker.com/u/metallb/).
 
 You can inspect the state of the `test-bgp-router` by running
 `minikube service test-bgp-router-ui`, which will open a browser tab
@@ -168,8 +168,8 @@ registries** in your Docker daemon preferences. Once you've done that,
 [![Docker for Mac config](/images/dockerformacconfig.png)](/images/dockerformacconfig.png)
 
 If you need to get back to a working configuration, `make
-push-manifests` will revert MetalLB to running from the public quay.io
-images and the config from the repository.
+push-manifests` will revert MetalLB to running from the public Docker
+Hub images and the config from the repository.
 
 ### Sandbox teardown
 

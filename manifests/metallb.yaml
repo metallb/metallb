@@ -141,7 +141,7 @@ spec:
       serviceAccountName: controller
       containers:
       - name: controller
-        image: quay.io/metallb/controller:latest
+        image: metallb/controller:latest
         args:
         - --port=8080
         ports:
@@ -178,7 +178,7 @@ spec:
       hostNetwork: true
       containers:
       - name: speaker
-        image: quay.io/metallb/speaker:latest
+        image: metallb/speaker:latest
         args:
         - --port=8080
         env:

@@ -21,7 +21,7 @@ spec:
     spec:
       containers:
       - name: test-bgp-router
-        image: quay.io/metallb/test-bgp-router:latest
+        image: metallb/test-bgp-router:latest
         env:
         - name: METALLB_NODE_IP
           valueFrom:

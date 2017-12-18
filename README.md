@@ -1,9 +1,10 @@
 # MetalLB
 
 MetalLB is a load-balancer implementation for bare
-metal [Kubernetes](https://kubernetes.io) clusters, using BGP.
+metal [Kubernetes](https://kubernetes.io) clusters, using standard
+routing protocols.
 
-[![Project maturity: alpha](https://img.shields.io/badge/maturity-alpha-yellow.svg)](https://metallb.universe.tf/maturity/) [![license](https://img.shields.io/github/license/google/metallb.svg?maxAge=2592000)](https://github.com/google/netboot/blob/master/LICENSE) [![Travis](https://img.shields.io/travis/google/metallb.svg?maxAge=2592000)](https://travis-ci.org/google/netboot) [![Quay.io](https://img.shields.io/badge/containers-ready-green.svg)](https://quay.io/metallb) [![Go report card](https://goreportcard.com/badge/github.com/google/metallb)](https://goreportcard.com/report/github.com/google/metallb)
+[![Project maturity: alpha](https://img.shields.io/badge/maturity-alpha-yellow.svg)](https://metallb.universe.tf/maturity/) [![license](https://img.shields.io/github/license/google/metallb.svg?maxAge=2592000)](https://github.com/google/netboot/blob/master/LICENSE) [![CircleCI](https://img.shields.io/circleci/project/github/google/metallb.svg)](https://circleci.com/gh/google/metallb) [![Containers](https://img.shields.io/badge/containers-ready-green.svg)](https://hub.docker.com/u/metallb) [![Go report card](https://goreportcard.com/badge/github.com/google/metallb)](https://goreportcard.com/report/github.com/google/metallb)
 
 Check out [MetalLB's website](https://metallb.universe.tf) for more
 information.
