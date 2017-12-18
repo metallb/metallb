@@ -34,10 +34,6 @@ ALL_ARCH:=amd64 arm arm64 ppc64le s390x
 BINARIES:=controller speaker test-bgp-router
 PLATFORMS:=$(subst $(SPACE),$(COMMA),$(foreach arch,$(ALL_ARCH),linux/$(arch)))
 MK_IMAGE_TARGETS:=Makefile.image-targets
-IN_CLUSTER_REGISTRY:=$(REGISTRY)
-ifeq ($(findstring localhost,$(REGISTRY)),localhost)
-	IN_CLUSTER_REGISTRY:=$(shell kubectl get svc -n kube-system registry -o go-template='{{.spec.clusterIP}}'):80
-endif
 
 all:
 	$(error Please request a specific thing, there is no default target)
@@ -73,9 +69,15 @@ push-manifests:
 .PHONY: push
 push: gen-image-targets
 	+make -f $(MK_IMAGE_TARGETS) $(foreach bin,$(BINARIES),$(bin)/$(ARCH))
-	kubectl set image -n metallb-system deploy/controller controller=$(IN_CLUSTER_REGISTRY)/controller:$(TAG)-$(ARCH)
-	kubectl set image -n metallb-system ds/speaker speaker=$(IN_CLUSTER_REGISTRY)/speaker:$(TAG)-$(ARCH)
-	kubectl set image -n metallb-system deploy/test-bgp-router test-bgp-router=$(IN_CLUSTER_REGISTRY)/test-bgp-router:$(TAG)-$(ARCH)
+ifeq ($(findstring localhost,$(REGISTRY)),localhost)
+	kubectl set image -n metallb-system deploy/controller controller=$(shell kubectl get svc -n kube-system registry -o go-template='{{.spec.clusterIP}}'):80/controller:$(TAG)-$(ARCH)
+	kubectl set image -n metallb-system ds/speaker speaker=$(shell kubectl get svc -n kube-system registry -o go-template='{{.spec.clusterIP}}'):80/speaker:$(TAG)-$(ARCH)
+	kubectl set image -n metallb-system deploy/test-bgp-router test-bgp-router=$(shell kubectl get svc -n kube-system registry -o go-template='{{.spec.clusterIP}}'):80/test-bgp-router:$(TAG)-$(ARCH)
+else
+	kubectl set image -n metallb-system deploy/controller controller=$(REGISTRY)/controller:$(TAG)-$(ARCH)
+	kubectl set image -n metallb-system ds/speaker speaker=$(REGISTRY)/speaker:$(TAG)-$(ARCH)
+	kubectl set image -n metallb-system deploy/test-bgp-router test-bgp-router=$(REGISTRY)/test-bgp-router:$(TAG)-$(ARCH)
+endif
 
 ################################
 ## Building full images
@@ -104,10 +106,11 @@ gen-image-targets:
 			/bin/echo -n "$$binary/$$arch " >>$(MK_IMAGE_TARGETS) ;\
 		done ;\
 		/bin/echo "" >>$(MK_IMAGE_TARGETS) ;\
-		/bin/echo -e "\tmanifest-tool push from-args --platforms $(PLATFORMS) --template $(REGISTRY)/$${binary}:$(TAG)-ARCH --target $(REGISTRY)/$${binary}:$(TAG)\n" >>$(MK_IMAGE_TARGETS) ;\
-		/bin/echo ".PHONY: $${binary}-manifest-only" >>$(MK_IMAGE_TARGETS) ;\
-		/bin/echo "$${binary}-manifest-only:" >>$(MK_IMAGE_TARGETS) ;\
-		/bin/echo -e "\tmanifest-tool push from-args --platforms $(PLATFORMS) --template $(REGISTRY)/$${binary}:$(TAG)-ARCH --target $(REGISTRY)/$${binary}:$(TAG)\n" >>$(MK_IMAGE_TARGETS) ;\
+		/bin/echo -e "\tmanifest-tool push from-args --platforms $(PLATFORMS) --template $(REGISTRY)/$${binary}:$(TAG)-ARCH --target $(REGISTRY)/$${binary}:$(TAG)" >>$(MK_IMAGE_TARGETS) ;\
+		if [[ "$(TAG)" == "master" ]]; then \
+			/bin/echo -e "\tmanifest-tool push from-args --platforms $(PLATFORMS) --template $(REGISTRY)/$${binary}:$(TAG)-ARCH --target $(REGISTRY)/$${binary}:latest" >>$(MK_IMAGE_TARGETS) ;\
+		fi ;\
+		/bin/echo "" >>$(MK_IMAGE_TARGETS) ;\
 	done
 	/bin/echo -n "all: " >>$(MK_IMAGE_TARGETS)
 	for binary in $(BINARIES); do \
