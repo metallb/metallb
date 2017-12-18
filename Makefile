@@ -132,9 +132,7 @@ ci-config:
 
 .PHONY: ci-prepare
 ci-prepare:
-	go get github.com/Masterminds/glide
 	go get github.com/golang/lint/golint
-	glide install
 
 .PHONY: ci-build
 ci-build:

@@ -17,7 +17,7 @@ jobs:
 {{- range $bin := $.Binary }}
 {{- range $arch := $.Arch }}
   deploy-{{$bin}}-{{$arch}}:
-    working_directory: /go/src/go/universe.tf/metallb
+    working_directory: /go/src/go.universe.tf/metallb
     docker:
       - image: circleci/golang:1.9
     steps:
@@ -29,7 +29,7 @@ jobs:
       - run: make -f Makefile.image-targets {{$bin}}/{{$arch}}    
 {{- end }}
   deploy-{{$bin}}:
-    working_directory: /go/src/go/universe.tf/metallb
+    working_directory: /go/src/go.universe.tf/metallb
     docker:
       - image: circleci/golang:1.9
     steps:
