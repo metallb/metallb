@@ -39,9 +39,9 @@ googleAnalytics = ""
 
 
 [social]
-	twitter = ""
-	github  = "google/metallb"
-	email   = ""
+    twitter = ""
+    github  = "google/metallb"
+    email   = ""
 
 
 [[menu.main]]
@@ -83,6 +83,11 @@ googleAnalytics = ""
     name   = "Release Notes"
     url    = "release-notes/"
     weight = 70
+
+[[menu.main]]
+    name   = "Community"
+    url    = "community/"
+    weight = 80
 
 [blackfriday]
 	smartypants	= true
