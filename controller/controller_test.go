@@ -115,8 +115,14 @@ func TestControllerMutation(t *testing.T) {
 	cfg := &config.Config{
 		Pools: map[string]*config.Pool{
 			"pool1": {
+				Protocol:   config.BGP,
 				AutoAssign: true,
 				CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
+			},
+			"pool2": {
+				Protocol:   config.ARP,
+				AutoAssign: false,
+				CIDR:       []*net.IPNet{ipnet("3.4.5.6/32")},
 			},
 		},
 	}
@@ -294,6 +300,43 @@ func TestControllerMutation(t *testing.T) {
 					Type: "LoadBalancer",
 				},
 				Status: statusAssigned("1.2.3.0"),
+			},
+		},
+
+		{
+			desc: "request ARP service",
+			in: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					LoadBalancerIP: "3.4.5.6",
+				},
+			},
+			want: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					LoadBalancerIP:        "3.4.5.6",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("3.4.5.6"),
+			},
+		},
+
+		{
+			desc: "ARP service with the wrong traffic policy",
+			in: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					LoadBalancerIP:        "3.4.5.6",
+					ExternalTrafficPolicy: "Local",
+				},
+			},
+			want: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					LoadBalancerIP:        "3.4.5.6",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("3.4.5.6"),
 			},
 		},
 	}

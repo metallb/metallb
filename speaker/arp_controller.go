@@ -22,7 +22,6 @@ import (
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/arp"
 	"go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/k8s"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -58,13 +57,6 @@ func (c *arpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 	if len(svc.Status.LoadBalancer.Ingress) != 1 {
 		glog.Infof("%s: no IP allocated by controller", name)
 		return c.deleteBalancer(name, "no IP allocated by controller")
-	}
-
-	// Should we advertise? Yes, if externalTrafficPolicy is Cluster,
-	// or Local && there's a ready local endpoint.
-	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !k8s.NodeHasHealthyEndpoint(eps, c.myNode) {
-		glog.Infof("%s: externalTrafficPolicy is Local, and no healthy local endpoints", name)
-		return c.deleteBalancer(name, "no healthy local endpoints")
 	}
 
 	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP).To4()

@@ -21,6 +21,8 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
+
+	"go.universe.tf/metallb/internal/config"
 )
 
 func (c *controller) convergeBalancer(key string, svc *v1.Service) error {
@@ -85,6 +87,23 @@ func (c *controller) convergeBalancer(key string, svc *v1.Service) error {
 		c.client.Errorf(svc, "InternalError", "didn't allocate an IP but also did not fail")
 		c.clearServiceState(key, svc)
 		return nil
+	}
+
+	pool := c.ips.Pool(key)
+	if pool == "" || c.config.Pools[pool] == nil {
+		glog.Infof("%s: allocated IP has no matching pool (BUG!)", key)
+		c.client.Errorf(svc, "InternalError", "allocated an IP that has no pool")
+		c.clearServiceState(key, svc)
+		return nil
+	}
+
+	if c.config.Pools[pool].Protocol == config.ARP {
+		// When advertising in ARP mode, any node in the cluster could
+		// become the leader in charge of advertising the IP. The
+		// local traffic policy makes no sense for such services, so
+		// we force the service to be load-balanced at the cluster
+		// scope.
+		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
 	}
 
 	// At this point, we have an IP selected somehow, all that remains
