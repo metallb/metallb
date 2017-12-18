@@ -134,7 +134,7 @@ ci-config:
 ci-prepare:
 	go get github.com/Masterminds/glide
 	go get github.com/golang/lint/golint
-	glide install
+	go get github.com/estesp/manifest-tool
 
 .PHONY: ci-build
 ci-build:
@@ -149,10 +149,6 @@ ci-test:
 ci-lint:
 	go vet $$(glide novendor)
 	glide novendor | xargs -n1 golint
-
-.PHONY: ci-deploy
-ci-deploy:
-	+make all-arch-images
 
 ################################
 ## Release
