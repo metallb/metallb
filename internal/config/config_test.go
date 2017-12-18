@@ -222,20 +222,6 @@ address-pools:
 - name: pool1
   protocol: bgp
 `,
-			want: &Config{
-				Pools: map[string]*Pool{
-					"pool1": {
-						Protocol:   BGP,
-						AutoAssign: true,
-						BGPAdvertisements: []*BGPAdvertisement{
-							{
-								AggregationLength: 32,
-								Communities:       map[uint32]bool{},
-							},
-						},
-					},
-				},
-			},
 		},
 
 		{
@@ -281,6 +267,7 @@ address-pools:
 address-pools:
 - name: pool1
   protocol: bgp
+  cidr: ["1.2.3.0/24"]
   bgp-advertisements:
   -
 `,
@@ -289,6 +276,7 @@ address-pools:
 					"pool1": {
 						Protocol:   BGP,
 						AutoAssign: true,
+						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -305,6 +293,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
+  cidr: ["1.2.3.0/24"]
   protocol: bgp
 `,
 			want: &Config{
@@ -312,6 +301,7 @@ address-pools:
 					"pool1": {
 						Protocol:   BGP,
 						AutoAssign: true,
+						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								AggregationLength: 32,

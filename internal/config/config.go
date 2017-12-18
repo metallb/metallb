@@ -242,6 +242,9 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 		return nil, fmt.Errorf("unknown protocol %q", ret.Protocol)
 	}
 
+	if len(p.CIDR) == 0 {
+		return nil, errors.New("pool has no prefixes defined")
+	}
 	for _, cidr := range p.CIDR {
 		_, n, err := net.ParseCIDR(cidr)
 		if err != nil {
