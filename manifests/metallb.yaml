@@ -140,6 +140,7 @@ spec:
         app: controller
     spec:
       serviceAccountName: controller
+      terminationGracePeriodSeconds: 0
       containers:
       - name: controller
         image: metallb/controller:latest
@@ -154,7 +155,13 @@ spec:
             memory: "100Mi"
         securityContext:
           allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - all
           readOnlyRootFilesystem: true
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534 # nobody
 ---
 
 # Speaker DaemonSet
