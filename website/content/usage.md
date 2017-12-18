@@ -99,9 +99,11 @@ by setting the `auto-assign` flag to `false`:
 # Rest of config omitted for brevity
 address-pools:
 - name: cheap
+  protocol: bgp
   cidr:
   - 192.168.144.0/20
 - name: expensive
+  protocol: bgp
   cidr:
   - 42.176.25.64/30
   auto-assign: false

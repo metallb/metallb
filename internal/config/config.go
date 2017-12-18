@@ -63,8 +63,7 @@ type Proto string
 // MetalLB supported protocols.
 const (
 	ARP Proto = "arp"
-	BGP Proto = "bgp"
-	RIP Proto = "rip"
+	BGP       = "bgp"
 )
 
 // Peer is the configuration of a BGP peering session.
@@ -84,8 +83,7 @@ type Peer struct {
 
 // Pool is the configuration of an IP address pool.
 type Pool struct {
-	// Protocol for this pool, supported values: "arp", "bgp" and "rip".
-	// Defaults to BGP if not set.
+	// Protocol for this pool, supported values: "arp" and "bgp".
 	Protocol Proto
 	// The addresses that are part of this pool, expressed as CIDR
 	// prefixes. config.Parse guarantees that these are
@@ -192,22 +190,16 @@ func Parse(bs []byte) (*Config, error) {
 			autoAssign = *p.AutoAssign
 		}
 
-		proto := BGP
 		switch p.Protocol {
-		case "arp":
-			proto = ARP
+		case ARP, BGP:
 		case "":
-			fallthrough
-		case "bgp":
-			proto = BGP
-		case "rip":
-			proto = RIP
+			return nil, fmt.Errorf("address pool #%d is missing the protocol field", i+1)
 		default:
-			return nil, fmt.Errorf("address pool #%d has wrong protocol %s", i+1, p.Protocol)
+			return nil, fmt.Errorf("address pool #%d has unknown protocol %s", i+1, p.Protocol)
 		}
 
 		pool := &Pool{
-			Protocol:      proto,
+			Protocol:      p.Protocol,
 			AvoidBuggyIPs: p.AvoidBuggyIPs,
 			AutoAssign:    autoAssign,
 		}

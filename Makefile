@@ -135,22 +135,22 @@ ci-config:
 
 .PHONY: ci-prepare
 ci-prepare:
-	go get github.com/Masterminds/glide
-	go get github.com/golang/lint/golint
-	go get github.com/estesp/manifest-tool
+	$(GOCMD) get github.com/Masterminds/glide
+	$(GOCMD) get github.com/golang/lint/golint
+	$(GOCMD) get github.com/estesp/manifest-tool
 
 .PHONY: ci-build
 ci-build:
-	go install -v ./controller ./speaker ./test-bgp-router
+	$(GOCMD) install -v ./controller ./speaker ./test-bgp-router
 
 .PHONY: ci-test
 ci-test:
-	go test $$(glide novendor)
-	go test -race $$(glide novendor)
+	$(GOCMD) test $$(glide novendor)
+	$(GOCMD) test -race $$(glide novendor)
 
 .PHONY: ci-lint
 ci-lint:
-	go get -u github.com/alecthomas/gometalinter
+	$(GOCMD) get -u github.com/alecthomas/gometalinter
 	gometalinter --install golint
 	gometalinter --deadline=1m --disable-all --enable=gofmt --enable=golint --enable=vet --enable=vetshadow --enable=structcheck --enable=unconvert --vendor ./...
 

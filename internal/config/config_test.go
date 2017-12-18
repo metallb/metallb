@@ -63,6 +63,7 @@ address-pools:
     communities: ["bar", "1234:2345"]
   - aggregation-length: 24
 - name: pool2
+  protocol: bgp
   cidr:
   - 30.0.0.0/8
 - name: pool3
@@ -219,6 +220,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
+  protocol: bgp
 `,
 			want: &Config{
 				Pools: map[string]*Pool{
@@ -234,6 +236,23 @@ address-pools:
 					},
 				},
 			},
+		},
+
+		{
+			desc: "address pool with no protocol",
+			raw: `
+address-pools:
+- name: pool1
+`,
+		},
+
+		{
+			desc: "address pool with unknown protocol",
+			raw: `
+address-pools:
+- name: pool1
+  protocol: babel
+`,
 		},
 
 		{
@@ -261,6 +280,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
+  protocol: bgp
   bgp-advertisements:
   -
 `,
@@ -285,6 +305,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
+  protocol: bgp
 `,
 			want: &Config{
 				Pools: map[string]*Pool{
@@ -307,6 +328,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
+  protocol: bgp
   bgp-advertisements:
   - aggregation-length: 33
 `,
@@ -317,6 +339,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
+  protocol: bgp
   cidr:
   - 10.20.30.40/24
   - 1.2.3.0/28
@@ -330,6 +353,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
+  protocol: bgp
   bgp-advertisements:
   - communities: ["1234"]
 `,
@@ -340,6 +364,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
+  protocol: bgp
   bgp-advertisements:
   - communities: ["99999999:1"]
 `,
@@ -350,6 +375,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
+  protocol: bgp
   bgp-advertisements:
   - communities: ["1:99999999"]
 `,
@@ -360,6 +386,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
+  protocol: bgp
   bgp-advertisements:
   - communities: ["flarb"]
 `,
@@ -372,6 +399,7 @@ bgp-communities:
   flarb: 99999999:1
 address-pools:
 - name: pool1
+  protocol: bgp
   bgp-advertisements:
   - communities: ["flarb"]
 `,
@@ -384,6 +412,7 @@ bgp-communities:
   flarb: 1:99999999
 address-pools:
 - name: pool1
+  protocol: bgp
   bgp-advertisements:
   - communities: ["flarb"]
 `,
@@ -394,8 +423,11 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
+  protocol: bgp
 - name: pool1
+  protocol: bgp
 - name: pool2
+  protocol: bgp
 `,
 		},
 
@@ -404,9 +436,11 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
+  protocol: bgp
   cidr:
   - 10.0.0.0/8
 - name: pool2
+  protocol: bgp
   cidr:
   - 10.0.0.0/8
 `,
@@ -417,9 +451,11 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
+  protocol: bgp
   cidr:
   - 10.0.0.0/8
 - name: pool2
+  protocol: bgp
   cidr:
   - 10.0.0.0/16
 `,

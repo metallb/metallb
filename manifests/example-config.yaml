@@ -32,7 +32,7 @@ data:
       # name under the 'metallb.universe.tf/address-pool' annotation.
       name: my-ip-space
       # Protocol can be used to select how the announcement is done.
-      # It defaults to bgp. Supported values are bgp and arp.
+      # Supported values are bgp and arp.
       protocol: bgp
       # A list of IP address ranges over which MetalLB has authority,
       # expressed as CIDR prefixes. You can list multiple prefixes in
