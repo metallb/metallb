@@ -140,13 +140,12 @@ ci-build:
 
 .PHONY: ci-test
 ci-test:
-	go test $$(glide novendor)
-	go test -race $$(glide novendor)
+	go test ./...
+	go test -race ./...
 
 .PHONY: ci-lint
 ci-lint:
-	go vet $$(glide novendor)
-	glide novendor | xargs -n1 golint
+	go vet ./...
 
 .PHONY: ci-deploy
 ci-deploy:
