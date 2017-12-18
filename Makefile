@@ -107,7 +107,7 @@ gen-image-targets:
 		done ;\
 		/bin/echo "" >>$(MK_IMAGE_TARGETS) ;\
 		/bin/echo -e "\tmanifest-tool push from-args --platforms $(PLATFORMS) --template $(REGISTRY)/$${binary}:$(TAG)-ARCH --target $(REGISTRY)/$${binary}:$(TAG)" >>$(MK_IMAGE_TARGETS) ;\
-		if [[ "$(TAG)" == "master" ]]; then \
+		if [ "$(TAG)" = "master" ]; then \
 			/bin/echo -e "\tmanifest-tool push from-args --platforms $(PLATFORMS) --template $(REGISTRY)/$${binary}:$(TAG)-ARCH --target $(REGISTRY)/$${binary}:latest" >>$(MK_IMAGE_TARGETS) ;\
 		fi ;\
 		/bin/echo "" >>$(MK_IMAGE_TARGETS) ;\
