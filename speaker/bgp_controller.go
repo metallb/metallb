@@ -41,9 +41,6 @@ type bgpController struct {
 	peers  []*peer
 	svcAds map[string][]*bgp.Advertisement
 	ips    *allocator.Allocator
-
-	// Metrics
-	announcing *prometheus.GaugeVec
 }
 
 type peer struct {

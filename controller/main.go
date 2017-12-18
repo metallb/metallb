@@ -83,7 +83,8 @@ func (c *controller) SetBalancer(name string, svcRo *v1.Service, _ *v1.Endpoints
 		glog.Infof("%s: updated service", name)
 	}
 	if !reflect.DeepEqual(svcRo.Status, svc.Status) {
-		st, svc := svc.Status, svcRo.DeepCopy()
+		var st v1.ServiceStatus
+		st, svc = svc.Status, svcRo.DeepCopy()
 		svc.Status = st
 		if err = c.client.UpdateStatus(svc); err != nil {
 			return fmt.Errorf("updating status on service %q: %s", name, err)

@@ -36,9 +36,6 @@ type arpController struct {
 	config *config.Config
 	ips    *allocator.Allocator
 	ann    *arp.Announce
-
-	// Metrics
-	announcing *prometheus.GaugeVec
 }
 
 func (c *arpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
