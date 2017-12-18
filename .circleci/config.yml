@@ -1,3 +1,5 @@
+# -*- mode: yaml -*-
+
 version: 2
 jobs:
   test-1.8:
@@ -30,25 +32,271 @@ jobs:
       - run: make ci-build
       - run: make ci-test
       - run: make ci-lint
-  deploy:
-    working_directory: /go/src/go.universe.tf/metallb
+  deploy-controller-amd64:
+    working_directory: /go/src/go/universe.tf/metallb
     docker:
       - image: circleci/golang:1.9
     steps:
       - checkout
-      - run: go get github.com/estesp/manifest-tool
       - setup_remote_docker
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
-      - run: make ci-deploy TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make -f Makefile.image-targets controller/amd64
+  deploy-controller-arm:
+    working_directory: /go/src/go/universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make -f Makefile.image-targets controller/arm
+  deploy-controller-arm64:
+    working_directory: /go/src/go/universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make -f Makefile.image-targets controller/arm64
+  deploy-controller-ppc64le:
+    working_directory: /go/src/go/universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make -f Makefile.image-targets controller/ppc64le
+  deploy-controller-s390x:
+    working_directory: /go/src/go/universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make -f Makefile.image-targets controller/s390x
+  deploy-controller:
+    working_directory: /go/src/go/universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make -f Makefile.image-targets controller-manifest-only
+  deploy-speaker-amd64:
+    working_directory: /go/src/go/universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make -f Makefile.image-targets speaker/amd64
+  deploy-speaker-arm:
+    working_directory: /go/src/go/universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make -f Makefile.image-targets speaker/arm
+  deploy-speaker-arm64:
+    working_directory: /go/src/go/universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make -f Makefile.image-targets speaker/arm64
+  deploy-speaker-ppc64le:
+    working_directory: /go/src/go/universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make -f Makefile.image-targets speaker/ppc64le
+  deploy-speaker-s390x:
+    working_directory: /go/src/go/universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make -f Makefile.image-targets speaker/s390x
+  deploy-speaker:
+    working_directory: /go/src/go/universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make -f Makefile.image-targets speaker-manifest-only
+  deploy-test-bgp-router-amd64:
+    working_directory: /go/src/go/universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make -f Makefile.image-targets test-bgp-router/amd64
+  deploy-test-bgp-router-arm:
+    working_directory: /go/src/go/universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make -f Makefile.image-targets test-bgp-router/arm
+  deploy-test-bgp-router-arm64:
+    working_directory: /go/src/go/universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make -f Makefile.image-targets test-bgp-router/arm64
+  deploy-test-bgp-router-ppc64le:
+    working_directory: /go/src/go/universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make -f Makefile.image-targets test-bgp-router/ppc64le
+  deploy-test-bgp-router-s390x:
+    working_directory: /go/src/go/universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make -f Makefile.image-targets test-bgp-router/s390x
+  deploy-test-bgp-router:
+    working_directory: /go/src/go/universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.9
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
+      - run: make gen-image-targets TAG=$CIRCLE_BRANCH REGISTRY=danderson
+      - run: make -f Makefile.image-targets test-bgp-router-manifest-only
 workflows:
   version: 2
   test-and-deploy:
     jobs:
-      - deploy
-      # - test-1.8
-      # - test-1.9
-      # - test-1.10beta1
-      # - deploy:
-      #     requires:
-      #       - test-1.8
-      #       - test-1.9
+      - test-1.8
+      - test-1.9
+      - test-1.10beta1
+      - deploy-controller-amd64:
+          requires:
+            - test-1.8
+            - test-1.9
+      - deploy-controller-arm:
+          requires:
+            - test-1.8
+            - test-1.9
+      - deploy-controller-arm64:
+          requires:
+            - test-1.8
+            - test-1.9
+      - deploy-controller-ppc64le:
+          requires:
+            - test-1.8
+            - test-1.9
+      - deploy-controller-s390x:
+          requires:
+            - test-1.8
+            - test-1.9
+      - deploy-controller:
+          requires:
+            - deploy-controller-amd64
+            - deploy-controller-arm
+            - deploy-controller-arm64
+            - deploy-controller-ppc64le
+            - deploy-controller-s390x
+      - deploy-speaker-amd64:
+          requires:
+            - test-1.8
+            - test-1.9
+      - deploy-speaker-arm:
+          requires:
+            - test-1.8
+            - test-1.9
+      - deploy-speaker-arm64:
+          requires:
+            - test-1.8
+            - test-1.9
+      - deploy-speaker-ppc64le:
+          requires:
+            - test-1.8
+            - test-1.9
+      - deploy-speaker-s390x:
+          requires:
+            - test-1.8
+            - test-1.9
+      - deploy-speaker:
+          requires:
+            - deploy-speaker-amd64
+            - deploy-speaker-arm
+            - deploy-speaker-arm64
+            - deploy-speaker-ppc64le
+            - deploy-speaker-s390x
+      - deploy-test-bgp-router-amd64:
+          requires:
+            - test-1.8
+            - test-1.9
+      - deploy-test-bgp-router-arm:
+          requires:
+            - test-1.8
+            - test-1.9
+      - deploy-test-bgp-router-arm64:
+          requires:
+            - test-1.8
+            - test-1.9
+      - deploy-test-bgp-router-ppc64le:
+          requires:
+            - test-1.8
+            - test-1.9
+      - deploy-test-bgp-router-s390x:
+          requires:
+            - test-1.8
+            - test-1.9
+      - deploy-test-bgp-router:
+          requires:
+            - deploy-test-bgp-router-amd64
+            - deploy-test-bgp-router-arm
+            - deploy-test-bgp-router-arm64
+            - deploy-test-bgp-router-ppc64le
+            - deploy-test-bgp-router-s390x

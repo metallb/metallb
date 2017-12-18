@@ -105,6 +105,9 @@ gen-image-targets:
 		done ;\
 		/bin/echo "" >>$(MK_IMAGE_TARGETS) ;\
 		/bin/echo -e "\tmanifest-tool push from-args --platforms $(PLATFORMS) --template $(REGISTRY)/$${binary}:$(TAG)-ARCH --target $(REGISTRY)/$${binary}:$(TAG)\n" >>$(MK_IMAGE_TARGETS) ;\
+		/bin/echo ".PHONY: $${binary}-manifest-only" >>$(MK_IMAGE_TARGETS) ;\
+		/bin/echo "$${binary}-manifest-only:" >>$(MK_IMAGE_TARGETS) ;\
+		/bin/echo -e "\tmanifest-tool push from-args --platforms $(PLATFORMS) --template $(REGISTRY)/$${binary}:$(TAG)-ARCH --target $(REGISTRY)/$${binary}:$(TAG)\n" >>$(MK_IMAGE_TARGETS) ;\
 	done
 	/bin/echo -n "all: " >>$(MK_IMAGE_TARGETS)
 	for binary in $(BINARIES); do \
@@ -122,6 +125,10 @@ gen-image-targets:
 ## To make the repetition less verbose, we bundle all the stages of
 ## execution into this one make command, so that the job specs on
 ## circleci are all simple.
+
+.PHONY: ci-config
+ci-config:
+	(cd .circleci && go run gen-config.go >config.yml)
 
 .PHONY: ci-prepare
 ci-prepare:
