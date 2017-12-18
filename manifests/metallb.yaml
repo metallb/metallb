@@ -141,6 +141,9 @@ spec:
     spec:
       serviceAccountName: controller
       terminationGracePeriodSeconds: 0
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534 # nobody
       containers:
       - name: controller
         image: metallb/controller:latest
@@ -159,9 +162,6 @@ spec:
             drop:
             - all
           readOnlyRootFilesystem: true
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 65534 # nobody
 ---
 
 # Speaker DaemonSet
@@ -208,3 +208,8 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - all
+            add:
+            - net_raw
