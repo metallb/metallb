@@ -35,7 +35,7 @@ spec:
         - name: gobgp
           containerPort: 2179
         - name: http
-          containerPort: 8080
+          containerPort: 7472
         securityContext:
           capabilities:
             add:

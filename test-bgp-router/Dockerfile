@@ -10,4 +10,3 @@ RUN apk --update --no-cache add bird quagga iptables tcpdump wget tar
 ADD test-bgp-router /test-bgp-router
 
 ENTRYPOINT ["/test-bgp-router"]
-EXPOSE 8080

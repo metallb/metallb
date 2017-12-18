@@ -46,7 +46,7 @@ func main() {
 
 	http.HandleFunc("/", status)
 	http.HandleFunc("/pcap", writePcap)
-	glog.Fatal(http.ListenAndServe(":8080", nil))
+	glog.Fatal(http.ListenAndServe(":7472", nil))
 }
 
 func nodeIP() string {
