@@ -36,16 +36,6 @@ func TestParse(t *testing.T) {
 		},
 
 		{
-			desc: "config with protocol set to arp",
-			raw: `
-protocol: "arp"
-`,
-			want: &Config{
-				Pools: map[string]*Pool{},
-			},
-		},
-
-		{
 			desc: "config using all features",
 			raw: `
 peers:
@@ -57,16 +47,17 @@ peers:
 - my-asn: 100
   peer-asn: 200
   peer-address: 2.3.4.5
-communities:
+bgp-communities:
   bar: 64512:1234
 address-pools:
 - name: pool1
+  protocol: bgp
   cidr:
   - 10.20.0.0/16
   - 10.50.0.0/24
   avoid-buggy-ips: true
   auto-assign: false
-  advertisements:
+  bgp-advertisements:
   - aggregation-length: 32
     localpref: 100
     communities: ["bar", "1234:2345"]
@@ -74,6 +65,10 @@ address-pools:
 - name: pool2
   cidr:
   - 30.0.0.0/8
+- name: pool3
+  protocol: arp
+  cidr:
+  - 40.0.0.0/16
 `,
 			want: &Config{
 				Peers: []*Peer{
@@ -98,7 +93,7 @@ address-pools:
 						CIDR:          []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
 						AvoidBuggyIPs: true,
 						AutoAssign:    false,
-						Advertisements: []*Advertisement{
+						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								AggregationLength: 32,
 								LocalPref:         100,
@@ -117,6 +112,23 @@ address-pools:
 						Protocol:   BGP,
 						CIDR:       []*net.IPNet{ipnet("30.0.0.0/8")},
 						AutoAssign: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength: 32,
+								Communities:       map[uint32]bool{},
+							},
+						},
+					},
+					"pool3": {
+						Protocol:   ARP,
+						CIDR:       []*net.IPNet{ipnet("40.0.0.0/16")},
+						AutoAssign: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength: 32,
+								Communities:       map[uint32]bool{},
+							},
+						},
 					},
 				},
 			},
@@ -213,6 +225,12 @@ address-pools:
 					"pool1": {
 						Protocol:   BGP,
 						AutoAssign: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength: 32,
+								Communities:       map[uint32]bool{},
+							},
+						},
 					},
 				},
 			},
@@ -243,7 +261,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
-  advertisements:
+  bgp-advertisements:
   -
 `,
 			want: &Config{
@@ -251,7 +269,29 @@ address-pools:
 					"pool1": {
 						Protocol:   BGP,
 						AutoAssign: true,
-						Advertisements: []*Advertisement{
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength: 32,
+								Communities:       map[uint32]bool{},
+							},
+						},
+					},
+				},
+			},
+		},
+
+		{
+			desc: "advertisement with default BGP settings",
+			raw: `
+address-pools:
+- name: pool1
+`,
+			want: &Config{
+				Pools: map[string]*Pool{
+					"pool1": {
+						Protocol:   BGP,
+						AutoAssign: true,
+						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								AggregationLength: 32,
 								Communities:       map[uint32]bool{},
@@ -267,7 +307,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
-  advertisements:
+  bgp-advertisements:
   - aggregation-length: 33
 `,
 		},
@@ -280,7 +320,7 @@ address-pools:
   cidr:
   - 10.20.30.40/24
   - 1.2.3.0/28
-  advertisements:
+  bgp-advertisements:
   - aggregation-length: 26
 `,
 		},
@@ -290,7 +330,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
-  advertisements:
+  bgp-advertisements:
   - communities: ["1234"]
 `,
 		},
@@ -300,7 +340,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
-  advertisements:
+  bgp-advertisements:
   - communities: ["99999999:1"]
 `,
 		},
@@ -310,7 +350,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
-  advertisements:
+  bgp-advertisements:
   - communities: ["1:99999999"]
 `,
 		},
@@ -320,7 +360,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
-  advertisements:
+  bgp-advertisements:
   - communities: ["flarb"]
 `,
 		},
@@ -328,11 +368,11 @@ address-pools:
 		{
 			desc: "bad community ref (ref asn doesn't fit)",
 			raw: `
-communities:
+bgp-communities:
   flarb: 99999999:1
 address-pools:
 - name: pool1
-  advertisements:
+  bgp-advertisements:
   - communities: ["flarb"]
 `,
 		},
@@ -340,11 +380,11 @@ address-pools:
 		{
 			desc: "bad community ref (ref community# doesn't fit)",
 			raw: `
-communities:
+bgp-communities:
   flarb: 1:99999999
 address-pools:
 - name: pool1
-  advertisements:
+  bgp-advertisements:
   - communities: ["flarb"]
 `,
 		},

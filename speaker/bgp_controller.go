@@ -101,7 +101,7 @@ func (c *bgpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 	}
 
 	c.svcAds[name] = nil
-	for _, adCfg := range pool.Advertisements {
+	for _, adCfg := range pool.BGPAdvertisements {
 		m := net.CIDRMask(adCfg.AggregationLength, 32)
 		ad := &bgp.Advertisement{
 			Prefix: &net.IPNet{

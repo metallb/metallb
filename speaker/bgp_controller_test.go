@@ -209,7 +209,7 @@ func TestBGPSppeaker(t *testing.T) {
 					"default": {
 						Protocol: config.BGP,
 						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
-						Advertisements: []*config.Advertisement{
+						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
 							},
@@ -400,7 +400,7 @@ func TestBGPSppeaker(t *testing.T) {
 					"default": {
 						Protocol: config.BGP,
 						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
-						Advertisements: []*config.Advertisement{
+						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
 								LocalPref:         100,
@@ -466,7 +466,7 @@ func TestBGPSppeaker(t *testing.T) {
 					"default": {
 						Protocol: config.BGP,
 						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
-						Advertisements: []*config.Advertisement{
+						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
 							},
@@ -624,7 +624,7 @@ func TestBGPSppeaker(t *testing.T) {
 					"default": {
 						Protocol: config.BGP,
 						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
-						Advertisements: []*config.Advertisement{
+						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
 							},

@@ -36,10 +36,9 @@ data:
       my-asn: 42
     address-pools:
     - name: default
+      protocol: bgp
       cidr:
       - 192.168.10.0/24
-      advertisements:
-      - aggregation-length: 32
 ```
 
 ## Simple balancers
@@ -207,18 +206,18 @@ address-pools:
 - # Production services will go here. Public IPs are expensive, so we leased
   # just 4 of them.
   name: production
+  protocol: bgp
   cidr:
   - 42.176.25.64/30
-  advertisements:
-  - aggregation-length: 32
 
 - # On the other hand, the sandbox environment uses private IP space,
   # which is free and plentiful. We give this address pool a ton of IPs,
   # so that developers can spin up as many sandboxes as they need.
   name: sandbox
+  protocol: bgp
   cidr:
   - 192.168.144.0/20
-  advertisements:
+  bgp-advertisements:
   - communities:
     - vpn-only
 ```

@@ -34,18 +34,18 @@ type configFile struct {
 		Port     uint16 `yaml:"peer-port"`
 		HoldTime string `yaml:"hold-time"`
 	}
-	Communities map[string]string
-	Pools       []struct {
-		Protocol       Proto
-		Name           string
-		CIDR           []string
-		AvoidBuggyIPs  bool  `yaml:"avoid-buggy-ips"`
-		AutoAssign     *bool `yaml:"auto-assign"`
-		Advertisements []struct {
+	BGPCommunities map[string]string `yaml:"bgp-communities"`
+	Pools          []struct {
+		Protocol          Proto
+		Name              string
+		CIDR              []string
+		AvoidBuggyIPs     bool  `yaml:"avoid-buggy-ips"`
+		AutoAssign        *bool `yaml:"auto-assign"`
+		BGPAdvertisements []struct {
 			AggregationLength *int `yaml:"aggregation-length"`
 			LocalPref         *uint32
 			Communities       []string
-		}
+		} `yaml:"bgp-advertisements"`
 	} `yaml:"address-pools"`
 }
 
@@ -102,11 +102,11 @@ type Pool struct {
 	AutoAssign bool
 	// When an IP is allocated from this pool, how should it be
 	// translated into BGP announcements?
-	Advertisements []*Advertisement
+	BGPAdvertisements []*BGPAdvertisement
 }
 
-// Advertisement describes one translation from an IP address to a BGP advertisement.
-type Advertisement struct {
+// BGPAdvertisement describes one translation from an IP address to a BGP advertisement.
+type BGPAdvertisement struct {
 	// Roll up the IP address into a CIDR prefix of this
 	// length. Optional, defaults to 32 (i.e. no aggregation) if not
 	// specified.
@@ -170,7 +170,7 @@ func Parse(bs []byte) (*Config, error) {
 	}
 
 	communities := map[string]uint32{}
-	for n, v := range raw.Communities {
+	for n, v := range raw.BGPCommunities {
 		c, err := parseCommunity(v)
 		if err != nil {
 			return nil, fmt.Errorf("parsing community %q: %s", n, err)
@@ -227,7 +227,15 @@ func Parse(bs []byte) (*Config, error) {
 			allCIDRs = append(allCIDRs, n)
 		}
 
-		for _, ad := range p.Advertisements {
+		if len(p.BGPAdvertisements) == 0 {
+			pool.BGPAdvertisements = []*BGPAdvertisement{
+				{
+					AggregationLength: 32,
+					Communities:       map[uint32]bool{},
+				},
+			}
+		}
+		for _, ad := range p.BGPAdvertisements {
 			// TODO: ipv6 support :(
 			agLen := 32
 			if ad.AggregationLength != nil {
@@ -250,7 +258,7 @@ func Parse(bs []byte) (*Config, error) {
 				} else {
 					v, err := parseCommunity(c)
 					if err != nil {
-						return nil, fmt.Errorf("invalid community %q in advertisement of pool %q: %s", c, p.Name, err)
+						return nil, fmt.Errorf("invalid community %q in BGP advertisement of pool %q: %s", c, p.Name, err)
 					}
 					comms[v] = true
 				}
@@ -261,7 +269,7 @@ func Parse(bs []byte) (*Config, error) {
 				localPref = *ad.LocalPref
 			}
 
-			pool.Advertisements = append(pool.Advertisements, &Advertisement{
+			pool.BGPAdvertisements = append(pool.BGPAdvertisements, &BGPAdvertisement{
 				AggregationLength: agLen,
 				LocalPref:         localPref,
 				Communities:       comms,

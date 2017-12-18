@@ -163,10 +163,9 @@ data:
       peer-address: 10.96.0.101
     address-pools:
     - name: my-ip-space
+      protocol: bgp
       cidr:
       - 198.51.100.0/24
-      advertisements:
-      - localpref: 100
 ```
 
 MetalLB's configuration is a standard Kubernetes ConfigMap,
@@ -285,11 +284,10 @@ data:
       peer-address: 10.96.0.101
     address-pools:
     - name: my-ip-space
+      protocol: bgp
       avoid-buggy-ips: true
       cidr:
       - 198.51.100.0/24
-      advertisements:
-      - localpref: 100
 ```
 
 There's just one change compared to our previous configuration: in the

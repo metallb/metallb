@@ -17,7 +17,6 @@ data:
       peer-address: 10.96.0.102
     address-pools:
     - name: my-ip-space
+      protocol: bgp
       cidr:
       - 198.51.100.0/24
-      advertisements:
-      - localpref: 100

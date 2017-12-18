@@ -50,11 +50,14 @@ data:
       # allocate any address in this pool. Addresses can still explicitly
       # be requested via loadBalancerIP or the address-pool annotation.
       auto-assign: false
-      # A list of BGP advertisements to make. Each address that gets
-      # assigned out of this pool will turn into this many
-      # advertisements. For most simple setups, you'll probably just
-      # want one.
-      advertisements:
+      # (optional) A list of BGP advertisements to make, when
+      # protocol=bgp. Each address that gets assigned out of this pool
+      # will turn into this many advertisements. For most simple
+      # setups, you'll probably just want one.
+      #
+      # The default value for this field is a single advertisement with
+      # all parameters set to their respective defaults.
+      bgp-advertisements:
       - # (optional) How much you want to aggregate up the IP address
         # before advertising. For example, advertising 1.2.3.4 with
         # aggregation-length=24 would end up advertising 1.2.3.0/24.
@@ -78,7 +81,7 @@ data:
     # configurations, you can define alias names here and use those
     # elsewhere in the configuration. The "no-export" community used
     # above is defined below.
-    communities:
+    bgp-communities:
       # no-export is a well-known BGP community that prevents
       # re-advertisement outside of the immediate autonomous system,
       # but people don't usually recognize its numerical value. :)
