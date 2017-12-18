@@ -67,11 +67,11 @@ type synced string
 // false, the controller will not watch endpoint objects, and the
 // endpoints in SetBalancer calls will always be nil.
 func NewClient(name, masterAddr, kubeconfig string, watchEps bool, ctrls ...Controller) (*Client, error) {
-	config, err := clientcmd.BuildConfigFromFlags(masterAddr, kubeconfig)
+	k8sConfig, err := clientcmd.BuildConfigFromFlags(masterAddr, kubeconfig)
 	if err != nil {
 		return nil, fmt.Errorf("building client config: %s", err)
 	}
-	clientset, err := kubernetes.NewForConfig(config)
+	clientset, err := kubernetes.NewForConfig(k8sConfig)
 	if err != nil {
 		return nil, fmt.Errorf("creating kubernetes client: %s", err)
 	}
