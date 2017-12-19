@@ -72,23 +72,35 @@ func poolCount(p *config.Pool) int64 {
 	for _, cidr := range p.CIDR {
 		o, b := cidr.Mask.Size()
 		sz := int64(math.Pow(2, float64(b-o)))
+		avoidedFirst, avoidedLast := false, false
 		if p.AvoidBuggyIPs {
 			if o <= 24 {
 				// A pair of buggy IPs occur for each /24 present in the range.
 				buggies := int64(math.Pow(2, float64(24-o))) * 2
 				sz -= buggies
+				avoidedFirst, avoidedLast = true, true
 			} else {
 				// Ranges smaller than /24 contain 1 buggy IP if they
 				// start/end on a /24 boundary, otherwise they contain
 				// none.
-				ip := cidr.IP.Mask(cidr.Mask).To4()
-				if ipConfusesBuggyFirmwares(ip) {
+				if ipConfusesBuggyFirmwares(firstIP(cidr)) {
+					avoidedFirst = true
 					sz--
 				}
-				ip[3] += byte(math.Pow(2, float64(b-o)))
-				if ipConfusesBuggyFirmwares(ip) {
+				if ipConfusesBuggyFirmwares(lastIP(cidr)) {
+					avoidedLast = true
 					sz--
 				}
+			}
+		}
+		if p.ARPNetwork != nil {
+			if ipForbiddenByARPNetwork(firstIP(cidr), p.ARPNetwork) && !avoidedFirst {
+				avoidedFirst = true
+				sz--
+			}
+			if ipForbiddenByARPNetwork(lastIP(cidr), p.ARPNetwork) && !avoidedLast {
+				avoidedLast = true
+				sz--
 			}
 		}
 		total += sz
@@ -99,7 +111,10 @@ func poolCount(p *config.Pool) int64 {
 // poolFor returns the pool that owns the requested IP, or "" if none.
 func poolFor(pools map[string]*config.Pool, service string, ip net.IP) string {
 	for pname, p := range pools {
-		if ipConfusesBuggyFirmwares(ip) && p.AvoidBuggyIPs {
+		if p.AvoidBuggyIPs && ipConfusesBuggyFirmwares(ip) {
+			continue
+		}
+		if p.ARPNetwork != nil && ipForbiddenByARPNetwork(ip, p.ARPNetwork) {
 			continue
 		}
 		for _, cidr := range p.CIDR {
@@ -150,6 +165,9 @@ func (a *Allocator) allocateFromPool(service, pname string) net.IP {
 	for _, cidr := range pool.CIDR {
 		for ip := cidr.IP; cidr.Contains(ip); ip = nextIP(ip) {
 			if pool.AvoidBuggyIPs && ipConfusesBuggyFirmwares(ip) {
+				continue
+			}
+			if pool.ARPNetwork != nil && ipForbiddenByARPNetwork(ip, pool.ARPNetwork) {
 				continue
 			}
 			if a.ipToSvc[ip.String()] == "" {
@@ -231,14 +249,38 @@ func nextIP(prev net.IP) net.IP {
 	return ip
 }
 
+// lastIP returns the last IP in the given IPNet.
+func lastIP(ipnet *net.IPNet) net.IP {
+	var ip net.IP
+	ip = append(ip, ipnet.IP...)
+	if ip4 := ip.To4(); ip4 != nil {
+		ip = ip4
+	}
+	for i := range ip {
+		ip[i] |= ^ipnet.Mask[i]
+	}
+	return ip
+}
+
+// firstIP returns the first IP in the given IPNet.
+func firstIP(ipnet *net.IPNet) net.IP {
+	return ipnet.IP.Mask(ipnet.Mask)
+}
+
 // ipConfusesBuggyFirmwares returns true if ip is an IPv4 address ending in 0 or 255.
 //
 // Such addresses can confuse smurf protection on crappy CPE
-// firmwares, leaving to packet drops.
+// firmwares, leading to packet drops.
 func ipConfusesBuggyFirmwares(ip net.IP) bool {
 	ip = ip.To4()
 	if ip == nil {
 		return false
 	}
-	return ip[net.IPv4len-1] == 0 || ip[net.IPv4len-1] == 255
+	return ip[3] == 0 || ip[3] == 255
+}
+
+// ipForbiddenByARPNetwork returns true if ip is the network or
+// broadcast address of arpNet.
+func ipForbiddenByARPNetwork(ip net.IP, arpNet *net.IPNet) bool {
+	return ip.Equal(firstIP(arpNet)) || ip.Equal(lastIP(arpNet))
 }
