@@ -10,11 +10,11 @@ import (
 func TestAssignment(t *testing.T) {
 	alloc := New()
 	if err := alloc.SetPools(map[string]*config.Pool{
-		"test": &config.Pool{
+		"test": {
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.3.4/31")},
 		},
-		"test2": &config.Pool{
+		"test2": {
 			AvoidBuggyIPs: true,
 			AutoAssign:    true,
 			CIDR:          []*net.IPNet{ipnet("1.2.4.0/24")},
@@ -125,15 +125,15 @@ func TestPoolAllocation(t *testing.T) {
 	// out of IPs quickly even though there are tons available in
 	// other pools.
 	if err := alloc.SetPools(map[string]*config.Pool{
-		"not_this_one": &config.Pool{
+		"not_this_one": {
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("192.168.0.0/16")},
 		},
-		"test": &config.Pool{
+		"test": {
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.3.4/31"), ipnet("1.2.3.10/31")},
 		},
-		"test2": &config.Pool{
+		"test2": {
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("10.20.30.0/24")},
 		},
@@ -206,11 +206,11 @@ func TestPoolAllocation(t *testing.T) {
 func TestAllocation(t *testing.T) {
 	alloc := New()
 	if err := alloc.SetPools(map[string]*config.Pool{
-		"test1": &config.Pool{
+		"test1": {
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.3.4/31")},
 		},
-		"test2": &config.Pool{
+		"test2": {
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.3.10/31")},
 		},
@@ -278,20 +278,20 @@ func TestAllocation(t *testing.T) {
 func TestBuggyIPs(t *testing.T) {
 	alloc := New()
 	if err := alloc.SetPools(map[string]*config.Pool{
-		"test": &config.Pool{
+		"test": {
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
 		},
-		"test2": &config.Pool{
+		"test2": {
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.3.254/31")},
 		},
-		"test3": &config.Pool{
+		"test3": {
 			AvoidBuggyIPs: true,
 			AutoAssign:    true,
 			CIDR:          []*net.IPNet{ipnet("1.2.4.0/31")},
 		},
-		"test4": &config.Pool{
+		"test4": {
 			AvoidBuggyIPs: true,
 			AutoAssign:    true,
 			CIDR:          []*net.IPNet{ipnet("1.2.4.254/31")},
@@ -347,20 +347,20 @@ func TestBuggyIPs(t *testing.T) {
 func TestARPForbidden(t *testing.T) {
 	alloc := New()
 	if err := alloc.SetPools(map[string]*config.Pool{
-		"test": &config.Pool{
+		"test": {
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
 		},
-		"test2": &config.Pool{
+		"test2": {
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.3.254/31")},
 		},
-		"test3": &config.Pool{
+		"test3": {
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.4.0/31")},
 			ARPNetwork: ipnet("1.2.4.0/24"),
 		},
-		"test4": &config.Pool{
+		"test4": {
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.4.254/31")},
 			ARPNetwork: ipnet("1.2.4.0/24"),
@@ -441,7 +441,7 @@ func TestNextIP(t *testing.T) {
 func TestConfigReload(t *testing.T) {
 	alloc := New()
 	if err := alloc.SetPools(map[string]*config.Pool{
-		"test": &config.Pool{
+		"test": {
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.3.0/30")},
 		},
@@ -461,7 +461,7 @@ func TestConfigReload(t *testing.T) {
 		{
 			desc: "set same config is no-op",
 			pools: map[string]*config.Pool{
-				"test": &config.Pool{
+				"test": {
 					AutoAssign: true,
 					CIDR:       []*net.IPNet{ipnet("1.2.3.0/30")},
 				},
@@ -471,7 +471,7 @@ func TestConfigReload(t *testing.T) {
 		{
 			desc: "expand pool",
 			pools: map[string]*config.Pool{
-				"test": &config.Pool{
+				"test": {
 					AutoAssign: true,
 					CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
 				},
@@ -481,7 +481,7 @@ func TestConfigReload(t *testing.T) {
 		{
 			desc: "shrink pool",
 			pools: map[string]*config.Pool{
-				"test": &config.Pool{
+				"test": {
 					AutoAssign: true,
 					CIDR:       []*net.IPNet{ipnet("1.2.3.0/30")},
 				},
@@ -491,7 +491,7 @@ func TestConfigReload(t *testing.T) {
 		{
 			desc: "can't shrink further",
 			pools: map[string]*config.Pool{
-				"test": &config.Pool{
+				"test": {
 					AutoAssign: true,
 					CIDR:       []*net.IPNet{ipnet("1.2.3.2/31")},
 				},
@@ -502,7 +502,7 @@ func TestConfigReload(t *testing.T) {
 		{
 			desc: "rename the pool",
 			pools: map[string]*config.Pool{
-				"test2": &config.Pool{
+				"test2": {
 					AutoAssign: true,
 					CIDR:       []*net.IPNet{ipnet("1.2.3.0/30")},
 				},
@@ -512,11 +512,11 @@ func TestConfigReload(t *testing.T) {
 		{
 			desc: "split pool",
 			pools: map[string]*config.Pool{
-				"test": &config.Pool{
+				"test": {
 					AutoAssign: true,
 					CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
 				},
-				"test2": &config.Pool{
+				"test2": {
 					AutoAssign: true,
 					CIDR:       []*net.IPNet{ipnet("1.2.3.2/31")},
 				},
@@ -526,11 +526,11 @@ func TestConfigReload(t *testing.T) {
 		{
 			desc: "swap pool names",
 			pools: map[string]*config.Pool{
-				"test2": &config.Pool{
+				"test2": {
 					AutoAssign: true,
 					CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
 				},
-				"test": &config.Pool{
+				"test": {
 					AutoAssign: true,
 					CIDR:       []*net.IPNet{ipnet("1.2.3.2/31")},
 				},
@@ -540,7 +540,7 @@ func TestConfigReload(t *testing.T) {
 		{
 			desc: "delete used pool",
 			pools: map[string]*config.Pool{
-				"test": &config.Pool{
+				"test": {
 					AutoAssign: true,
 					CIDR:       []*net.IPNet{ipnet("1.2.3.2/31")},
 				},
@@ -551,7 +551,7 @@ func TestConfigReload(t *testing.T) {
 		{
 			desc: "delete unused pool",
 			pools: map[string]*config.Pool{
-				"test2": &config.Pool{
+				"test2": {
 					AutoAssign: true,
 					CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
 				},
@@ -561,7 +561,7 @@ func TestConfigReload(t *testing.T) {
 		{
 			desc: "enable buggy IPs not allowed",
 			pools: map[string]*config.Pool{
-				"test2": &config.Pool{
+				"test2": {
 					AutoAssign:    true,
 					AvoidBuggyIPs: true,
 					CIDR:          []*net.IPNet{ipnet("1.2.3.0/31")},
@@ -591,11 +591,11 @@ func TestConfigReload(t *testing.T) {
 func TestAutoAssign(t *testing.T) {
 	alloc := New()
 	if err := alloc.SetPools(map[string]*config.Pool{
-		"test1": &config.Pool{
+		"test1": {
 			AutoAssign: false,
 			CIDR:       []*net.IPNet{ipnet("1.2.3.4/31")},
 		},
-		"test2": &config.Pool{
+		"test2": {
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.3.10/31")},
 		},
