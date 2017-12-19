@@ -1,96 +1,36 @@
 baseurl = "/"
 languageCode = "en-us"
+DefaultContentLanguage = "en"
+
 title = "MetalLB, bare metal load-balancer for Kubernetes"
-theme = "hugo-material-docs"
-metadataformat = "yaml"
-canonifyurls = true
-# Enable Google Analytics by entering your tracking id
-googleAnalytics = ""
+theme = "docdock"
 
 [params]
 	# General information
+    editURL = "https://github.com/google/metallb/edit/master/website/content/"
 	description = "MetalLB, bare metal load-balancer for Kubernetes"
-	copyright = "Released under the Apache license v2.0"
+    disableNavChevron = true
 
-	# Repository
-	provider = "GitHub"
-	repo_url = "https://github.com/google/metallb"
+[outputs]
+home = ["HTML", "RSS", "JSON"]
 
-	version = "tip"
-	logo = "images/logo.png"
-	favicon = ""
+[[menu.shortcuts]]
+pre = "<hr>"
+name = "<i class='fa fa-github'></i> Github repo"
+url = "https://github.com/google/metallb"
+weight = 10
 
-	permalink = "#"
+[[menu.shortcuts]]
+name = "<i class='fa fa-envelope-open-o'></i> Mailing list"
+url = "https://groups.google.com/forum/#!forum/metallb-users"
+weight = 20
 
-	# Custom assets
-	custom_css = []
-	custom_js  = []
+[[menu.shortcuts]]
+name = "<i class='fa fa-slack'></i> Slack"
+url = "https://kubernetes.slack.com/messages/metallb"
+weight = 30
 
-	# Syntax highlighting theme
-	highlight_css  = ""
-
-	[params.palette]
-    	primary = "indigo"
-    	accent  = "teal"
-
-    [params.font]
-    	text = "Ubuntu"
-    	code = "Ubuntu Mono"
-
-
-[social]
-    twitter = ""
-    github  = "google/metallb"
-    email   = ""
-
-
-[[menu.main]]
-	name   = "Welcome"
-	url    = "/"
-	weight = 1
-
-[[menu.main]]
-	name   = "Tutorial"
-	url    = "tutorial/"
-	weight = 10
-
-[[menu.main]]
-	name   = "Installation"
-	url    = "installation/"
-	weight = 20
-
-[[menu.main]]
-	name   = "Usage"
-	url    = "usage/"
-	weight = 30
-
-[[menu.main]]
-	name   = "Design"
-	url    = "design/"
-	weight = 40
-
-[[menu.main]]
-	name   = "Hacking"
-	url    = "hacking/"
-	weight = 50
-
-[[menu.main]]
-	name   = "License"
-	url    = "license/"
-	weight = 60
-
-[[menu.main]]
-    name   = "Release Notes"
-    url    = "release-notes/"
-    weight = 70
-
-[[menu.main]]
-    name   = "Community"
-    url    = "community/"
-    weight = 80
-
-[blackfriday]
-	smartypants	= true
-	fractions = true
-	smartDashes = true
-	plainIDAnchors = true
+[[menu.shortcuts]]
+name = "<i class='fa fa-copyright'></i> License"
+url = "https://github.com/google/metallb/blob/master/LICENSE"
+weight = 40
