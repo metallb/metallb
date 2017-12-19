@@ -76,6 +76,17 @@ data:
         communities:
         - 64512:1
         - no-export
+      # (optional) The full network over which MetalLB is advertising
+      # with ARP. All CIDRs (above) in this address pool must be
+      # contained in this network. MetalLB will not allocate the
+      # network and broadcast IPs of this network, even if they are
+      # contained in one of the available CIDR prefixes.
+      #
+      # The default value for this field is the /24 network that
+      # contains all of this pool's CIDR prefixes. If no such /24
+      # exists because the CIDRs span multiple /24s, arp-network must
+      # be explicitly specified.
+      arp-network: 192.168.0.0/24
     # (optional) BGP community aliases. Instead of using hard to
     # read BGP community numbers in address pool advertisement
     # configurations, you can define alias names here and use those
