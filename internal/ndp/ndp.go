@@ -5,6 +5,8 @@ import (
 	"net"
 	"sync"
 
+	"go.universe.tf/metallb/internal/iface"
+
 	"github.com/golang/glog"
 	"github.com/mdlayher/ndp"
 )
@@ -23,7 +25,7 @@ type Announce struct {
 
 // New returns an initialized Announce.
 func New(ip net.IP) (*Announce, error) {
-	ifi, err := interfaceByIP(ip)
+	ifi, err := iface.ByIP(ip)
 	if err != nil {
 		return nil, fmt.Errorf("ndp: can't find interface for %s: %s", ip, err)
 	}
@@ -40,19 +42,6 @@ func New(ip net.IP) (*Announce, error) {
 	}, nil
 }
 
-// A dropReason is a reason an Announce drops an incoming NDP packet.
-type dropReason int
-
-// Possible dropReason values.
-const (
-	dropReasonNone dropReason = iota
-	dropReasonError
-	dropReasonMessageType
-	dropReasonNoSourceLL
-	dropReasonAnnounceIP
-	dropReasonNotLeader
-)
-
 // Run starts the announcer, making it listen on the interface for NDP requests.
 // It only responds to these requests when a.leader is set to true, i.e. we are
 // the current cluster wide leader for sending NDP messages.
@@ -64,16 +53,16 @@ func (a *Announce) Run() {
 
 // readMessage reads and handles a single NDP message, and reports any reason why
 // the packet was dropped.
-func (a *Announce) readMessage() dropReason {
+func (a *Announce) readMessage() iface.DropReason {
 	msg, _, src, err := a.conn.ReadFrom()
 	if err != nil {
-		return dropReasonError
+		return iface.DropReasonError
 	}
 
 	// Ignore all messages other than neighbor solicitations.
 	ns, ok := msg.(*ndp.NeighborSolicitation)
 	if !ok {
-		return dropReasonMessageType
+		return iface.DropReasonMessageType
 	}
 
 	// Retrieve the sender's source link-layer address.
@@ -92,17 +81,17 @@ func (a *Announce) readMessage() dropReason {
 		break
 	}
 	if nsLLAddr == nil {
-		return dropReasonNoSourceLL
+		return iface.DropReasonNoSourceLL
 	}
 
 	// Ignore ndp requests which do not indicate the target IP that we should announce.
 	if !a.Announce(ns.TargetAddress) {
-		return dropReasonAnnounceIP
+		return iface.DropReasonAnnounceIP
 	}
 
 	// We are not the leader, do not reply.
 	if !a.Leader() {
-		return dropReasonNotLeader
+		return iface.DropReasonNotLeader
 	}
 
 	// pkt.TargetIP has been vetted to be "the one".
@@ -114,7 +103,7 @@ func (a *Announce) readMessage() dropReason {
 		glog.Warningf("Failed to write NDP neighbor advertisement for %s: %s", ns.TargetAddress, err)
 	}
 
-	return dropReasonNone
+	return iface.DropReasonNone
 }
 
 // advertise sends a NDP neighbor advertisement to dst for IP target using the
@@ -184,34 +173,4 @@ func (a *Announce) Advertise() {
 	for _, ip := range a.ips {
 		_ = a.advertise(net.IPv6linklocalallnodes, ip, solicited)
 	}
-}
-
-// interfaceByIP returns the interface that has ip.
-func interfaceByIP(ip net.IP) (*net.Interface, error) {
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		return nil, fmt.Errorf("no interfaces found: %s", err)
-	}
-	for _, i := range ifaces {
-		addrs, err := i.Addrs()
-		if err != nil {
-			continue
-		}
-		for _, addr := range addrs {
-			switch v := addr.(type) {
-			case *net.IPNet:
-				if ip.Equal(v.IP) {
-					glog.Infof("Address found %s for interface: %v", addr.String(), i)
-					return &i, nil
-				}
-			case *net.IPAddr:
-				if ip.Equal(v.IP) {
-					glog.Infof("Address found %s for interface: %v", addr.String(), i)
-					return &i, nil
-				}
-			}
-		}
-	}
-
-	return nil, fmt.Errorf("address not found in %d interfaces", len(ifaces))
 }

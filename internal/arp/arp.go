@@ -6,6 +6,8 @@ import (
 	"net"
 	"sync"
 
+	"go.universe.tf/metallb/internal/iface"
+
 	"github.com/golang/glog"
 	"github.com/mdlayher/arp"
 	"github.com/mdlayher/ethernet"
@@ -25,7 +27,7 @@ type Announce struct {
 
 // New returns an initialized Announce.
 func New(ip net.IP) (*Announce, error) {
-	ifi, err := interfaceByIP(ip)
+	ifi, err := iface.ByIP(ip)
 	if err != nil {
 		return nil, fmt.Errorf("arp: can't find interface for %s: %s", ip, err)
 	}
@@ -42,19 +44,6 @@ func New(ip net.IP) (*Announce, error) {
 	}, nil
 }
 
-// A dropReason is a reason an Announce drops an incoming ARP packet.
-type dropReason int
-
-// Possible dropReason values.
-const (
-	dropReasonNone dropReason = iota
-	dropReasonError
-	dropReasonARPReply
-	dropReasonEthernetDestination
-	dropReasonAnnounceIP
-	dropReasonNotLeader
-)
-
 // Run starts the announcer, making it listen on the interface for ARP requests. It only responds to these
 // requests when a.leader is set to true, i.e. we are the current cluster wide leader for sending ARPs.
 func (a *Announce) Run() {
@@ -65,31 +54,31 @@ func (a *Announce) Run() {
 
 // readPacket reads and handles a single ARP packet, and reports any reason why
 // the packet was dropped.
-func (a *Announce) readPacket() dropReason {
+func (a *Announce) readPacket() iface.DropReason {
 	pkt, eth, err := a.client.Read()
 
 	if err != nil {
-		return dropReasonError
+		return iface.DropReasonError
 	}
 
 	// Ignore ARP replies.
 	if pkt.Operation != arp.OperationRequest {
-		return dropReasonARPReply
+		return iface.DropReasonARPReply
 	}
 
 	// Ignore ARP requests which are not broadcast or bound directly for this machine.
 	if !bytes.Equal(eth.Destination, ethernet.Broadcast) && !bytes.Equal(eth.Destination, a.hardwareAddr) {
-		return dropReasonEthernetDestination
+		return iface.DropReasonEthernetDestination
 	}
 
 	// Ignore ARP requests which do not indicate the target IP that we should announce.
 	if !a.Announce(pkt.TargetIP) {
-		return dropReasonAnnounceIP
+		return iface.DropReasonAnnounceIP
 	}
 
 	// We are not the leader, do not reply.
 	if !a.Leader() {
-		return dropReasonNotLeader
+		return iface.DropReasonNotLeader
 	}
 
 	// pkt.TargetIP has been vetted to be "the one".
@@ -99,7 +88,7 @@ func (a *Announce) readPacket() dropReason {
 		glog.Warningf("Failed to write ARP response for %s: %s", pkt.TargetIP, err)
 	}
 
-	return dropReasonNone
+	return iface.DropReasonNone
 }
 
 // reply sends a arp reply using the client in a.
@@ -160,34 +149,4 @@ func (a *Announce) Packets() []*arp.Packet {
 		}
 	}
 	return arps
-}
-
-// interfaceByIP returns the interface that has ip.
-func interfaceByIP(ip net.IP) (*net.Interface, error) {
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		return nil, fmt.Errorf("no interfaces found: %s", err)
-	}
-	for _, i := range ifaces {
-		addrs, err := i.Addrs()
-		if err != nil {
-			continue
-		}
-		for _, addr := range addrs {
-			switch v := addr.(type) {
-			case *net.IPNet:
-				if ip.Equal(v.IP) {
-					glog.Infof("Address found %s for interface: %v", addr.String(), i)
-					return &i, nil
-				}
-			case *net.IPAddr:
-				if ip.Equal(v.IP) {
-					glog.Infof("Address found %s for interface: %v", addr.String(), i)
-					return &i, nil
-				}
-			}
-		}
-	}
-
-	return nil, fmt.Errorf("address not found in %d interfaces", len(ifaces))
 }

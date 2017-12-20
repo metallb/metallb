@@ -7,6 +7,8 @@ import (
 	"sync"
 	"testing"
 
+	"go.universe.tf/metallb/internal/iface"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/arp"
 	"github.com/mdlayher/ethernet"
@@ -20,26 +22,26 @@ func TestAnnounceRun(t *testing.T) {
 		modify   func(f *ethernet.Frame, p *arp.Packet)
 		announce net.IP
 		leader   bool
-		reason   dropReason
+		reason   iface.DropReason
 	}{
 		{
 			name: "ARP reply",
 			modify: func(_ *ethernet.Frame, p *arp.Packet) {
 				p.Operation = arp.OperationReply
 			},
-			reason: dropReasonARPReply,
+			reason: iface.DropReasonARPReply,
 		},
 		{
 			name: "bad Ethernet destination",
 			modify: func(f *ethernet.Frame, _ *arp.Packet) {
 				f.Destination = net.HardwareAddr{0x00, 0x11, 0x22, 0x33, 0x44, 0x55}
 			},
-			reason: dropReasonEthernetDestination,
+			reason: iface.DropReasonEthernetDestination,
 		},
 		{
 			name:   "not announcing IP",
 			modify: func(_ *ethernet.Frame, _ *arp.Packet) {},
-			reason: dropReasonAnnounceIP,
+			reason: iface.DropReasonAnnounceIP,
 		},
 		{
 			name: "not leader",
@@ -47,7 +49,7 @@ func TestAnnounceRun(t *testing.T) {
 				p.TargetIP = announceIP
 			},
 			announce: announceIP,
-			reason:   dropReasonNotLeader,
+			reason:   iface.DropReasonNotLeader,
 		},
 		{
 			name: "OK",
@@ -56,7 +58,7 @@ func TestAnnounceRun(t *testing.T) {
 			},
 			announce: announceIP,
 			leader:   true,
-			reason:   dropReasonNone,
+			reason:   iface.DropReasonNone,
 		},
 	}
 
@@ -103,7 +105,7 @@ func TestAnnounceRun(t *testing.T) {
 			wg.Add(1)
 			defer wg.Wait()
 
-			dropC := make(chan dropReason)
+			dropC := make(chan iface.DropReason)
 			go func() {
 				defer wg.Done()
 
