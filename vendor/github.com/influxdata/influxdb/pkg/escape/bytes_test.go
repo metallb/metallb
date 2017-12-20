@@ -1,9 +1,7 @@
 package escape
 
 import (
-	"bytes"
 	"reflect"
-	"strings"
 	"testing"
 )
 
@@ -44,25 +42,4 @@ func TestUnescape(t *testing.T) {
 			t.Errorf("[%d] Unescape(%#v) = %#v, expected %#v", ii, string(tt.in), string(got), string(tt.out))
 		}
 	}
-}
-
-func TestAppendUnescaped(t *testing.T) {
-	cases := strings.Split(strings.TrimSpace(`
-normal
-inv\alid
-goo\"d
-sp\ ace
-\,\"\ \=
-f\\\ x
-`), "\n")
-
-	for _, c := range cases {
-		exp := Unescape([]byte(c))
-		got := AppendUnescaped(nil, []byte(c))
-
-		if !bytes.Equal(got, exp) {
-			t.Errorf("AppendUnescaped failed for %#q: got %#q, exp %#q", c, got, exp)
-		}
-	}
-
 }

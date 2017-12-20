@@ -1,20 +1,22 @@
-// Package restore is the restore subcommand for the influxd command,
-// for restoring from a backup.
 package restore
 
 import (
 	"archive/tar"
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"flag"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 
-	"github.com/influxdata/influxdb/cmd/influxd/backup_util"
+	"github.com/influxdata/influxdb/cmd/influxd/backup"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/services/snapshotter"
 )
@@ -116,7 +118,7 @@ func (cmd *Command) parseFlags(args []string) error {
 // cluster and replaces the root metadata.
 func (cmd *Command) unpackMeta() error {
 	// find the meta file
-	metaFiles, err := filepath.Glob(filepath.Join(cmd.backupFilesPath, backup_util.Metafile+".*"))
+	metaFiles, err := filepath.Glob(filepath.Join(cmd.backupFilesPath, backup.Metafile+".*"))
 	if err != nil {
 		return err
 	}
@@ -158,7 +160,7 @@ func (cmd *Command) unpackMeta() error {
 	// Size of the node.json bytes
 	length = int(binary.BigEndian.Uint64(b[i : i+8]))
 	i += 8
-	nodeBytes := b[i : i+length]
+	nodeBytes := b[i:]
 
 	// Unpack into metadata.
 	var data meta.Data
@@ -181,6 +183,7 @@ func (cmd *Command) unpackMeta() error {
 	}
 
 	client := meta.NewClient(c)
+	client.SetLogger(log.New(ioutil.Discard, "", 0))
 	if err := client.Open(); err != nil {
 		return err
 	}
@@ -227,7 +230,7 @@ func (cmd *Command) unpackShard(shardID string) error {
 	}
 
 	// find the shard backup files
-	pat := filepath.Join(cmd.backupFilesPath, fmt.Sprintf(backup_util.BackupFilePattern, cmd.database, cmd.retention, id))
+	pat := filepath.Join(cmd.backupFilesPath, fmt.Sprintf(backup.BackupFilePattern, cmd.database, cmd.retention, id))
 	return cmd.unpackFiles(pat + ".*")
 }
 
@@ -307,8 +310,7 @@ func (cmd *Command) unpackTar(tarFile string) error {
 
 // unpackFile will copy the current file from the tar archive to the data dir
 func (cmd *Command) unpackFile(tr *tar.Reader, fileName string) error {
-	nativeFileName := filepath.FromSlash(fileName)
-	fn := filepath.Join(cmd.datadir, nativeFileName)
+	fn := filepath.Join(cmd.datadir, fileName)
 	fmt.Printf("unpacking %s\n", fn)
 
 	if err := os.MkdirAll(filepath.Dir(fn), 0777); err != nil {
@@ -330,26 +332,57 @@ func (cmd *Command) unpackFile(tr *tar.Reader, fileName string) error {
 
 // printUsage prints the usage message to STDERR.
 func (cmd *Command) printUsage() {
-	fmt.Fprintf(cmd.Stdout, `Uses backups from the PATH to restore the metastore, databases,
+	fmt.Fprintf(cmd.Stdout, `usage: influxd restore [flags] PATH
+
+Restore uses backups from the PATH to restore the metastore, databases,
 retention policies, or specific shards. The InfluxDB process must not be
-running during a restore.
+running during restore.
 
-Usage: influxd restore [flags] PATH
-
-    -metadir <path>
-            Optional. If set the metastore will be recovered to the given path.
-    -datadir <path>
-            Optional. If set the restore process will recover the specified
-            database, retention policy or shard to the given directory.
-    -database <name>
-            Optional. Required if no metadir given. Will restore the database
-            TSM files.
-    -retention <name>
-            Optional. If given, database is required. Will restore the retention policy's
-            TSM files.
-    -shard <id>
-            Optional. If given, database and retention are required. Will restore the shard's
-            TSM files.
+Options:
+  -metadir <path>
+        Optional. If set the metastore will be recovered to the given path.
+  -datadir <path>
+        Optional. If set the restore process will recover the specified
+        database, retention policy or shard to the given directory.
+  -database <name>
+        Optional. Required if no metadir given. Will restore the database
+        TSM files.
+  -retention <name>
+        Optional. If given, database is required. Will restore the retention policy's
+        TSM files.
+  -shard <id>
+    Optional. If given, database and retention are required. Will restore the shard's
+    TSM files.
 
 `)
 }
+
+type nopListener struct {
+	mu      sync.Mutex
+	closing chan struct{}
+}
+
+func newNopListener() *nopListener {
+	return &nopListener{closing: make(chan struct{})}
+}
+
+func (ln *nopListener) Accept() (net.Conn, error) {
+	ln.mu.Lock()
+	defer ln.mu.Unlock()
+
+	<-ln.closing
+	return nil, errors.New("listener closing")
+}
+
+func (ln *nopListener) Close() error {
+	if ln.closing != nil {
+		close(ln.closing)
+		ln.mu.Lock()
+		defer ln.mu.Unlock()
+
+		ln.closing = nil
+	}
+	return nil
+}
+
+func (ln *nopListener) Addr() net.Addr { return &net.TCPAddr{} }

@@ -5,10 +5,8 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"reflect"
+	"syscall"
 	"testing"
-	"time"
-
-	"golang.org/x/sys/unix"
 )
 
 type testSerializer interface {
@@ -33,7 +31,7 @@ func testDeserializeSerialize(t *testing.T, orig []byte, safemsg testSerializer,
 func (msg *IfInfomsg) write(b []byte) {
 	native := NativeEndian()
 	b[0] = msg.Family
-	// pad byte is skipped because it is not exported on linux/s390x
+	b[1] = msg.X__ifi_pad
 	native.PutUint16(b[2:4], msg.Type)
 	native.PutUint32(b[4:8], uint32(msg.Index))
 	native.PutUint32(b[8:12], msg.Flags)
@@ -41,7 +39,7 @@ func (msg *IfInfomsg) write(b []byte) {
 }
 
 func (msg *IfInfomsg) serializeSafe() []byte {
-	length := unix.SizeofIfInfomsg
+	length := syscall.SizeofIfInfomsg
 	b := make([]byte, length)
 	msg.write(b)
 	return b
@@ -49,52 +47,14 @@ func (msg *IfInfomsg) serializeSafe() []byte {
 
 func deserializeIfInfomsgSafe(b []byte) *IfInfomsg {
 	var msg = IfInfomsg{}
-	binary.Read(bytes.NewReader(b[0:unix.SizeofIfInfomsg]), NativeEndian(), &msg)
+	binary.Read(bytes.NewReader(b[0:syscall.SizeofIfInfomsg]), NativeEndian(), &msg)
 	return &msg
 }
 
 func TestIfInfomsgDeserializeSerialize(t *testing.T) {
-	var orig = make([]byte, unix.SizeofIfInfomsg)
+	var orig = make([]byte, syscall.SizeofIfInfomsg)
 	rand.Read(orig)
-	// zero out the pad byte
-	orig[1] = 0
 	safemsg := deserializeIfInfomsgSafe(orig)
 	msg := DeserializeIfInfomsg(orig)
 	testDeserializeSerialize(t, orig, safemsg, msg)
-}
-
-func TestIfSocketCloses(t *testing.T) {
-	nlSock, err := Subscribe(unix.NETLINK_ROUTE, unix.RTNLGRP_NEIGH)
-	if err != nil {
-		t.Fatalf("Error on creating the socket: %v", err)
-	}
-	nlSock.SetReceiveTimeout(&unix.Timeval{Sec: 2, Usec: 0})
-	endCh := make(chan error)
-	go func(sk *NetlinkSocket, endCh chan error) {
-		endCh <- nil
-		for {
-			_, err := sk.Receive()
-			// Receive returned because of a timeout and the FD == -1 means that the socket got closed
-			if err == unix.EAGAIN && nlSock.GetFd() == -1 {
-				endCh <- err
-				return
-			}
-		}
-	}(nlSock, endCh)
-
-	// first receive nil
-	if msg := <-endCh; msg != nil {
-		t.Fatalf("Expected nil instead got: %v", msg)
-	}
-	// this to guarantee that the receive is invoked before the close
-	time.Sleep(4 * time.Second)
-
-	// Close the socket
-	nlSock.Close()
-
-	// Expect to have an error
-	msg := <-endCh
-	if msg == nil {
-		t.Fatalf("Expected error instead received nil")
-	}
 }

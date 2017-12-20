@@ -1,4 +1,3 @@
-// Package tcp provides a simple multiplexer over TCP.
 package tcp // import "github.com/influxdata/influxdb/tcp"
 
 import (
@@ -23,8 +22,6 @@ type Mux struct {
 	ln net.Listener
 	m  map[byte]*listener
 
-	defaultListener *listener
-
 	wg sync.WaitGroup
 
 	// The amount of time to wait for the first header byte.
@@ -34,27 +31,7 @@ type Mux struct {
 	Logger *log.Logger
 }
 
-type replayConn struct {
-	net.Conn
-	firstByte     byte
-	readFirstbyte bool
-}
-
-func (rc *replayConn) Read(b []byte) (int, error) {
-	if rc.readFirstbyte {
-		return rc.Conn.Read(b)
-	}
-
-	if len(b) == 0 {
-		return 0, nil
-	}
-
-	b[0] = rc.firstByte
-	rc.readFirstbyte = true
-	return 1, nil
-}
-
-// NewMux returns a new instance of Mux.
+// NewMux returns a new instance of Mux for ln.
 func NewMux() *Mux {
 	return &Mux{
 		m:       make(map[byte]*listener),
@@ -63,7 +40,7 @@ func NewMux() *Mux {
 	}
 }
 
-// Serve handles connections from ln and multiplexes then across registered listeners.
+// Serve handles connections from ln and multiplexes then across registered listener.
 func (mux *Mux) Serve(ln net.Listener) error {
 	mux.mu.Lock()
 	mux.ln = ln
@@ -81,18 +58,9 @@ func (mux *Mux) Serve(ln net.Listener) error {
 		if err != nil {
 			// Wait for all connections to be demux
 			mux.wg.Wait()
-
-			mux.mu.Lock()
 			for _, ln := range mux.m {
 				close(ln.c)
 			}
-			mux.m = nil
-			mux.mu.Unlock()
-
-			if mux.defaultListener != nil {
-				close(mux.defaultListener.c)
-			}
-
 			return err
 		}
 
@@ -129,17 +97,9 @@ func (mux *Mux) handleConn(conn net.Conn) {
 	// Retrieve handler based on first byte.
 	handler := mux.m[typ[0]]
 	if handler == nil {
-		if mux.defaultListener == nil {
-			conn.Close()
-			mux.Logger.Printf("tcp.Mux: handler not registered: %d. Connection from %s closed", typ[0], conn.RemoteAddr())
-			return
-		}
-
-		conn = &replayConn{
-			Conn:      conn,
-			firstByte: typ[0],
-		}
-		handler = mux.defaultListener
+		conn.Close()
+		mux.Logger.Printf("tcp.Mux: handler not registered: %d. Connection from %s closed", typ[0], conn.RemoteAddr())
+		return
 	}
 
 	// Send connection to handler.  The handler is responsible for closing the connection.
@@ -173,39 +133,6 @@ func (mux *Mux) Listen(header byte) net.Listener {
 	return ln
 }
 
-// release removes the listener from the mux.
-func (mux *Mux) release(ln *listener) bool {
-	mux.mu.Lock()
-	defer mux.mu.Unlock()
-
-	for b, l := range mux.m {
-		if l == ln {
-			delete(mux.m, b)
-			return true
-		}
-	}
-	return false
-}
-
-// DefaultListener will return a net.Listener that will pass-through any
-// connections with non-registered values for the first byte of the connection.
-// The connections returned from this listener's Accept() method will replay the
-// first byte of the connection as a short first Read().
-//
-// This can be used to pass to an HTTP server, so long as there are no conflicts
-// with registered listener bytes and the first character of the HTTP request:
-// 71 ('G') for GET, etc.
-func (mux *Mux) DefaultListener() net.Listener {
-	if mux.defaultListener == nil {
-		mux.defaultListener = &listener{
-			c:   make(chan net.Conn),
-			mux: mux,
-		}
-	}
-
-	return mux.defaultListener
-}
-
 // listener is a receiver for connections received by Mux.
 type listener struct {
 	c   chan net.Conn
@@ -221,13 +148,8 @@ func (ln *listener) Accept() (c net.Conn, err error) {
 	return conn, nil
 }
 
-// Close removes this listener from the parent mux and closes the channel.
-func (ln *listener) Close() error {
-	if ok := ln.mux.release(ln); ok {
-		close(ln.c)
-	}
-	return nil
-}
+// Close is a no-op. The mux's listener should be closed instead.
+func (ln *listener) Close() error { return nil }
 
 // Addr returns the Addr of the listener
 func (ln *listener) Addr() net.Addr {

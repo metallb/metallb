@@ -1,4 +1,3 @@
-// Package bz1 reads data from bz1 shards.
 package bz1 // import "github.com/influxdata/influxdb/cmd/influx_tsm/bz1"
 
 import (

@@ -1,7 +1,6 @@
 package client_test
 
 import (
-	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
@@ -140,8 +139,8 @@ func TestClient_Ping(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error.  expected %v, actual %v", nil, err)
 	}
-	if d.Nanoseconds() == 0 {
-		t.Fatalf("expected a duration greater than zero.  actual %v", d.Nanoseconds())
+	if d == 0 {
+		t.Fatalf("expected a duration greater than zero.  actual %v", d)
 	}
 	if version != "x.x" {
 		t.Fatalf("unexpected version.  expected %s,  actual %v", "x.x", version)
@@ -194,86 +193,6 @@ func TestClient_ChunkedQuery(t *testing.T) {
 	}
 }
 
-func TestClient_QueryContext(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var data client.Response
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(data)
-	}))
-	defer ts.Close()
-
-	u, _ := url.Parse(ts.URL)
-	config := client.Config{URL: *u}
-	c, err := client.NewClient(config)
-	if err != nil {
-		t.Fatalf("unexpected error.  expected %v, actual %v", nil, err)
-	}
-
-	query := client.Query{}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	_, err = c.QueryContext(ctx, query)
-	if err != nil {
-		t.Fatalf("unexpected error.  expected %v, actual %v", nil, err)
-	}
-}
-
-func TestClient_QueryContext_Cancelled(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var data client.Response
-		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(data)
-	}))
-	defer ts.Close()
-
-	u, _ := url.Parse(ts.URL)
-	config := client.Config{URL: *u}
-	c, err := client.NewClient(config)
-	if err != nil {
-		t.Fatalf("unexpected error.  expected %v, actual %v", nil, err)
-	}
-
-	query := client.Query{}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	_, err = c.QueryContext(ctx, query)
-	if err == nil {
-		t.Fatalf("Since context was cancelled an error was expected, but got nil.")
-	}
-}
-
-func TestClient_ChunkedQuery_WithContext(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var data client.Response
-		w.WriteHeader(http.StatusOK)
-		enc := json.NewEncoder(w)
-		_ = enc.Encode(data)
-		_ = enc.Encode(data)
-	}))
-	defer ts.Close()
-
-	u, _ := url.Parse(ts.URL)
-	config := client.Config{URL: *u}
-	c, err := client.NewClient(config)
-	if err != nil {
-		t.Fatalf("unexpected error.  expected %v, actual %v", nil, err)
-	}
-
-	query := client.Query{Chunked: true}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	_, err = c.QueryContext(ctx, query)
-	if err != nil {
-		t.Fatalf("unexpected error.  expected %v, actual %v", nil, err)
-	}
-}
-
 func TestClient_BasicAuth(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u, p, ok := r.BasicAuth()
@@ -307,12 +226,6 @@ func TestClient_BasicAuth(t *testing.T) {
 
 func TestClient_Write(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		in, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			t.Fatalf("unexpected error: %s", err)
-		} else if have, want := strings.TrimSpace(string(in)), `m0,host=server01 v1=2,v2=2i,v3=2u,v4="foobar",v5=true 0`; have != want {
-			t.Errorf("unexpected write protocol: %s != %s", have, want)
-		}
 		var data client.Response
 		w.WriteHeader(http.StatusNoContent)
 		_ = json.NewEncoder(w).Encode(data)
@@ -326,24 +239,7 @@ func TestClient_Write(t *testing.T) {
 		t.Fatalf("unexpected error.  expected %v, actual %v", nil, err)
 	}
 
-	bp := client.BatchPoints{
-		Points: []client.Point{
-			{
-				Measurement: "m0",
-				Tags: map[string]string{
-					"host": "server01",
-				},
-				Time: time.Unix(0, 0).UTC(),
-				Fields: map[string]interface{}{
-					"v1": float64(2),
-					"v2": int64(2),
-					"v3": uint64(2),
-					"v4": "foobar",
-					"v5": true,
-				},
-			},
-		},
-	}
+	bp := client.BatchPoints{}
 	r, err := c.Write(bp)
 	if err != nil {
 		t.Fatalf("unexpected error.  expected %v, actual %v", nil, err)
@@ -422,44 +318,6 @@ func TestClient_UserAgent(t *testing.T) {
 		if receivedUserAgent != test.expected {
 			t.Fatalf("Unexpected user agent. expected %v, actual %v", test.expected, receivedUserAgent)
 		}
-	}
-}
-
-func TestClient_Messages(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(`{"results":[{"messages":[{"level":"warning","text":"deprecation test"}]}]}`))
-	}))
-	defer ts.Close()
-
-	u, _ := url.Parse(ts.URL)
-	config := client.Config{URL: *u}
-	c, err := client.NewClient(config)
-	if err != nil {
-		t.Fatalf("unexpected error.  expected %v, actual %v", nil, err)
-	}
-
-	query := client.Query{}
-	resp, err := c.Query(query)
-	if err != nil {
-		t.Fatalf("unexpected error.  expected %v, actual %v", nil, err)
-	}
-
-	if got, exp := len(resp.Results), 1; got != exp {
-		t.Fatalf("unexpected number of results.  expected %v, actual %v", exp, got)
-	}
-
-	r := resp.Results[0]
-	if got, exp := len(r.Messages), 1; got != exp {
-		t.Fatalf("unexpected number of messages.  expected %v, actual %v", exp, got)
-	}
-
-	m := r.Messages[0]
-	if got, exp := m.Level, "warning"; got != exp {
-		t.Errorf("unexpected message level.  expected %v, actual %v", exp, got)
-	}
-	if got, exp := m.Text, "deprecation test"; got != exp {
-		t.Errorf("unexpected message text.  expected %v, actual %v", exp, got)
 	}
 }
 
@@ -643,7 +501,7 @@ func TestEpochToTime(t *testing.T) {
 		if e != nil {
 			t.Fatalf("unexpected error: expected %v, actual: %v", nil, e)
 		}
-		if !tm.Equal(test.expected) {
+		if tm != test.expected {
 			t.Fatalf("unexpected time: expected %v, actual %v", test.expected, tm)
 		}
 	}
@@ -653,7 +511,6 @@ func TestEpochToTime(t *testing.T) {
 
 func emptyTestServer() *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(50 * time.Millisecond)
 		w.Header().Set("X-Influxdb-Version", "x.x")
 		return
 	}))
@@ -744,6 +601,36 @@ func TestClient_NoTimeout(t *testing.T) {
 	_, err = c.Query(query)
 	if err != nil {
 		t.Fatalf("unexpected error.  expected %v, actual %v", nil, err)
+	}
+}
+
+func TestClient_WriteUint64(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var data client.Response
+		w.WriteHeader(http.StatusNoContent)
+		_ = json.NewEncoder(w).Encode(data)
+	}))
+	defer ts.Close()
+
+	u, _ := url.Parse(ts.URL)
+	config := client.Config{URL: *u}
+	c, err := client.NewClient(config)
+	if err != nil {
+		t.Fatalf("unexpected error.  expected %v, actual %v", nil, err)
+	}
+	bp := client.BatchPoints{
+		Points: []client.Point{
+			{
+				Fields: map[string]interface{}{"value": uint64(10)},
+			},
+		},
+	}
+	r, err := c.Write(bp)
+	if err == nil {
+		t.Fatalf("unexpected error. expected err, actual %v", err)
+	}
+	if r != nil {
+		t.Fatalf("unexpected response. expected %v, actual %v", nil, r)
 	}
 }
 

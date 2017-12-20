@@ -2,20 +2,19 @@ package netlink
 
 import (
 	"fmt"
-
-	"golang.org/x/sys/unix"
+	"syscall"
 )
 
 // Proto is an enum representing an ipsec protocol.
 type Proto uint8
 
 const (
-	XFRM_PROTO_ROUTE2    Proto = unix.IPPROTO_ROUTING
-	XFRM_PROTO_ESP       Proto = unix.IPPROTO_ESP
-	XFRM_PROTO_AH        Proto = unix.IPPROTO_AH
-	XFRM_PROTO_HAO       Proto = unix.IPPROTO_DSTOPTS
-	XFRM_PROTO_COMP      Proto = 0x6c // NOTE not defined on darwin
-	XFRM_PROTO_IPSEC_ANY Proto = unix.IPPROTO_RAW
+	XFRM_PROTO_ROUTE2    Proto = syscall.IPPROTO_ROUTING
+	XFRM_PROTO_ESP       Proto = syscall.IPPROTO_ESP
+	XFRM_PROTO_AH        Proto = syscall.IPPROTO_AH
+	XFRM_PROTO_HAO       Proto = syscall.IPPROTO_DSTOPTS
+	XFRM_PROTO_COMP      Proto = syscall.IPPROTO_COMP
+	XFRM_PROTO_IPSEC_ANY Proto = syscall.IPPROTO_RAW
 )
 
 func (p Proto) String() string {
@@ -62,14 +61,4 @@ func (m Mode) String() string {
 		return "beet"
 	}
 	return fmt.Sprintf("%d", m)
-}
-
-// XfrmMark represents the mark associated to the state or policy
-type XfrmMark struct {
-	Value uint32
-	Mask  uint32
-}
-
-func (m *XfrmMark) String() string {
-	return fmt.Sprintf("(0x%x,0x%x)", m.Value, m.Mask)
 }

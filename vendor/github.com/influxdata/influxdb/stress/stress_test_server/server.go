@@ -3,14 +3,13 @@ package main
 import (
 	"expvar"
 	"fmt"
+	"github.com/paulbellamy/ratecounter"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
-
-	"github.com/paulbellamy/ratecounter"
 )
 
 var (

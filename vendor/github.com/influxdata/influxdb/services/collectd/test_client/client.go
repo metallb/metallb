@@ -4,7 +4,6 @@ import (
 	"collectd.org/api"
 	"collectd.org/network"
 
-	"context"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -60,8 +59,7 @@ func main() {
 			Interval: 10 * time.Second,
 			Values:   []api.Value{api.Gauge(42.0)},
 		}
-		ctx := context.TODO()
-		if err := conn.Write(ctx, &vl); err != nil {
+		if err := conn.Write(vl); err != nil {
 			fmt.Println(err)
 			os.Exit(1)
 		}

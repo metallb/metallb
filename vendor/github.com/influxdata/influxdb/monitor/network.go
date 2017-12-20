@@ -6,7 +6,7 @@ import (
 	"github.com/influxdata/influxdb/monitor/diagnostics"
 )
 
-// network captures network diagnostics.
+// network captures network diagnostics
 type network struct{}
 
 func (n *network) Diagnostics() (*diagnostics.Diagnostics, error) {
@@ -15,9 +15,9 @@ func (n *network) Diagnostics() (*diagnostics.Diagnostics, error) {
 		return nil, err
 	}
 
-	d := map[string]interface{}{
+	diagnostics := map[string]interface{}{
 		"hostname": h,
 	}
 
-	return diagnostics.RowFromMap(d), nil
+	return DiagnosticsFromMap(diagnostics), nil
 }

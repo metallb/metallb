@@ -26,7 +26,7 @@ Though not necessary for experimentation, you may want to create a new user
 and authenticate the connection to your database.
 
 For more information please check out the
-[Admin Docs](https://docs.influxdata.com/influxdb/latest/administration/).
+[Admin Docs](https://docs.influxdata.com/influxdb/v0.10/administration).
 
 For the impatient, you can create a new admin user _bubba_ by firing off the
 [InfluxDB CLI](https://github.com/influxdata/influxdb/blob/master/cmd/influx/main.go).
@@ -49,8 +49,10 @@ the configuration below.
 package main
 
 import (
+	"net/url"
+	"fmt"
 	"log"
-	"time"
+	"os"
 
 	"github.com/influxdata/influxdb/client/v2"
 )
@@ -61,25 +63,26 @@ const (
 	password = "bumblebeetuna"
 )
 
-
 func main() {
-	// Create a new HTTPClient
+	// Make client
 	c, err := client.NewHTTPClient(client.HTTPConfig{
-		Addr:     "http://localhost:8086",
+		Addr: "http://localhost:8086",
 		Username: username,
 		Password: password,
 	})
+	
 	if err != nil {
-		log.Fatal(err)
+	    log.Fatalln("Error: ", err)
 	}
-
+	
 	// Create a new point batch
 	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
 		Database:  MyDB,
 		Precision: "s",
 	})
+	
 	if err != nil {
-		log.Fatal(err)
+	    log.Fatalln("Error: ", err)
 	}
 
 	// Create a point and add to batch
@@ -89,17 +92,16 @@ func main() {
 		"system": 53.3,
 		"user":   46.6,
 	}
-
 	pt, err := client.NewPoint("cpu_usage", tags, fields, time.Now())
+	
 	if err != nil {
-		log.Fatal(err)
+	    log.Fatalln("Error: ", err)
 	}
+    	
 	bp.AddPoint(pt)
 
 	// Write the batch
-	if err := c.Write(bp); err != nil {
-		log.Fatal(err)
-	}
+	c.Write(bp)
 }
 
 ```
@@ -119,19 +121,15 @@ NOTE: You can specify a RetentionPolicy as part of the batch points. If not
 provided InfluxDB will use the database _default_ retention policy.
 
 ```go
-
 func writePoints(clnt client.Client) {
 	sampleSize := 1000
+	rand.Seed(42)
 
-	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
+	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
 		Database:  "systemstats",
 		Precision: "us",
 	})
-	if err != nil {
-		log.Fatal(err)
-	}
 
-    rand.Seed(time.Now().UnixNano())
 	for i := 0; i < sampleSize; i++ {
 		regions := []string{"us-west1", "us-west2", "us-west3", "us-east1"}
 		tags := map[string]string{
@@ -146,31 +144,21 @@ func writePoints(clnt client.Client) {
 			"busy": 100.0 - idle,
 		}
 
-		pt, err := client.NewPoint(
+		bp.AddPoint(client.NewPoint(
 			"cpu_usage",
 			tags,
 			fields,
 			time.Now(),
-		)
-		if err != nil {
-			log.Fatal(err)
-		}
-		bp.AddPoint(pt)
+		))
 	}
 
-	if err := clnt.Write(bp); err != nil {
+	err := clnt.Write(bp)
+	if err != nil {
 		log.Fatal(err)
 	}
 }
 ```
 
-#### Uint64 Support
-
-The `uint64` data type is supported if your server is version `1.4.0` or
-greater. To write a data point as an unsigned integer, you must insert
-the point as `uint64`. You cannot use `uint` or any of the other
-derivatives because previous versions of the client have supported
-writing those types as an integer.
 
 ### Querying Data
 
@@ -221,7 +209,7 @@ log.Printf("Found a total of %v records\n", count)
 #### Find the last 10 _shapes_ records
 
 ```go
-q := fmt.Sprintf("SELECT * FROM %s LIMIT %d", MyMeasurement, 10)
+q := fmt.Sprintf("SELECT * FROM %s LIMIT %d", MyMeasurement, 20)
 res, err = queryDB(clnt, q)
 if err != nil {
 	log.Fatal(err)
@@ -244,11 +232,8 @@ The **InfluxDB** client also supports writing over UDP.
 ```go
 func WriteUDP() {
 	// Make client
-	c, err := client.NewUDPClient("localhost:8089")
-	if err != nil {
-		panic(err.Error())
-	}
-	
+	c := client.NewUDPClient("localhost:8089")
+
 	// Create a new point batch
 	bp, _ := client.NewBatchPoints(client.BatchPointsConfig{
 		Precision: "s",
@@ -271,28 +256,6 @@ func WriteUDP() {
 	c.Write(bp)
 }
 ```
-
-### Point Splitting
-
-The UDP client now supports splitting single points that exceed the configured
-payload size. The logic for processing each point is listed here, starting with
-an empty payload.
-
-1. If adding the point to the current (non-empty) payload would exceed the
-   configured size, send the current payload. Otherwise, add it to the current
-   payload.
-1. If the point is smaller than the configured size, add it to the payload.
-1. If the point has no timestamp, just try to send the entire point as a single
-   UDP payload, and process the next point.
-1. Since the point has a timestamp, re-use the existing measurement name,
-   tagset, and timestamp and create multiple new points by splitting up the
-   fields. The per-point length will be kept close to the configured size,
-   staying under it if possible. This does mean that one large field, maybe a
-   long string, could be sent as a larger-than-configured payload.
-
-The above logic attempts to respect configured payload sizes, but not sacrifice
-any data integrity. Points without a timestamp can't be split, as that may
-cause fields to have differing timestamps when processed by the server.
 
 ## Go Docs
 

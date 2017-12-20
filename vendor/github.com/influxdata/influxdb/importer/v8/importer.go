@@ -1,4 +1,3 @@
-// Package v8 contains code for importing data from 0.8 instances of InfluxDB.
 package v8 // import "github.com/influxdata/influxdb/importer/v8"
 
 import (
@@ -7,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -18,17 +18,20 @@ const batchSize = 5000
 
 // Config is the config used to initialize a Importer importer
 type Config struct {
-	Path       string // Path to import data.
-	Version    string
-	Compressed bool // Whether import data is gzipped.
-	PPS        int  // points per second importer imports with.
-
-	client.Config
+	Username         string
+	Password         string
+	URL              url.URL
+	Precision        string
+	WriteConsistency string
+	Path             string
+	Version          string
+	Compressed       bool
+	PPS              int
 }
 
 // NewConfig returns an initialized *Config
-func NewConfig() Config {
-	return Config{Config: client.NewConfig()}
+func NewConfig() *Config {
+	return &Config{}
 }
 
 // Importer is the importer used for importing 0.8 data
@@ -36,7 +39,7 @@ type Importer struct {
 	client                *client.Client
 	database              string
 	retentionPolicy       string
-	config                Config
+	config                *Config
 	batch                 []string
 	totalInserts          int
 	failedInserts         int
@@ -44,26 +47,25 @@ type Importer struct {
 	throttlePointsWritten int
 	lastWrite             time.Time
 	throttle              *time.Ticker
-
-	stderrLogger *log.Logger
-	stdoutLogger *log.Logger
 }
 
 // NewImporter will return an intialized Importer struct
-func NewImporter(config Config) *Importer {
-	config.UserAgent = fmt.Sprintf("influxDB importer/%s", config.Version)
+func NewImporter(config *Config) *Importer {
 	return &Importer{
-		config:       config,
-		batch:        make([]string, 0, batchSize),
-		stdoutLogger: log.New(os.Stdout, "", log.LstdFlags),
-		stderrLogger: log.New(os.Stderr, "", log.LstdFlags),
+		config: config,
+		batch:  make([]string, 0, batchSize),
 	}
 }
 
 // Import processes the specified file in the Config and writes the data to the databases in chunks specified by batchSize
 func (i *Importer) Import() error {
-	// Create a client and try to connect.
-	cl, err := client.NewClient(i.config.Config)
+	// Create a client and try to connect
+	config := client.NewConfig()
+	config.URL = i.config.URL
+	config.Username = i.config.Username
+	config.Password = i.config.Password
+	config.UserAgent = fmt.Sprintf("influxDB importer/%s", i.config.Version)
+	cl, err := client.NewClient(config)
 	if err != nil {
 		return fmt.Errorf("could not create client %s", err)
 	}
@@ -79,9 +81,9 @@ func (i *Importer) Import() error {
 
 	defer func() {
 		if i.totalInserts > 0 {
-			i.stdoutLogger.Printf("Processed %d commands\n", i.totalCommands)
-			i.stdoutLogger.Printf("Processed %d inserts\n", i.totalInserts)
-			i.stdoutLogger.Printf("Failed %d inserts\n", i.failedInserts)
+			log.Printf("Processed %d commands\n", i.totalCommands)
+			log.Printf("Processed %d inserts\n", i.totalInserts)
+			log.Printf("Failed %d inserts\n", i.failedInserts)
 		}
 	}()
 
@@ -109,12 +111,10 @@ func (i *Importer) Import() error {
 	}
 
 	// Get our reader
-	scanner := bufio.NewReader(r)
+	scanner := bufio.NewScanner(r)
 
 	// Process the DDL
-	if err := i.processDDL(scanner); err != nil {
-		return fmt.Errorf("reading standard input: %s", err)
-	}
+	i.processDDL(scanner)
 
 	// Set up our throttle channel.  Since there is effectively no other activity at this point
 	// the smaller resolution gets us much closer to the requested PPS
@@ -125,35 +125,22 @@ func (i *Importer) Import() error {
 	i.lastWrite = time.Now()
 
 	// Process the DML
-	if err := i.processDML(scanner); err != nil {
+	i.processDML(scanner)
+
+	// Check if we had any errors scanning the file
+	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("reading standard input: %s", err)
-	}
-
-	// If there were any failed inserts then return an error so that a non-zero
-	// exit code can be returned.
-	if i.failedInserts > 0 {
-		plural := " was"
-		if i.failedInserts > 1 {
-			plural = "s were"
-		}
-
-		return fmt.Errorf("%d point%s not inserted", i.failedInserts, plural)
 	}
 
 	return nil
 }
 
-func (i *Importer) processDDL(scanner *bufio.Reader) error {
-	for {
-		line, err := scanner.ReadString(byte('\n'))
-		if err != nil && err != io.EOF {
-			return err
-		} else if err == io.EOF {
-			return nil
-		}
+func (i *Importer) processDDL(scanner *bufio.Scanner) {
+	for scanner.Scan() {
+		line := scanner.Text()
 		// If we find the DML token, we are done with DDL
 		if strings.HasPrefix(line, "# DML") {
-			return nil
+			return
 		}
 		if strings.HasPrefix(line, "#") {
 			continue
@@ -166,17 +153,10 @@ func (i *Importer) processDDL(scanner *bufio.Reader) error {
 	}
 }
 
-func (i *Importer) processDML(scanner *bufio.Reader) error {
+func (i *Importer) processDML(scanner *bufio.Scanner) {
 	start := time.Now()
-	for {
-		line, err := scanner.ReadString(byte('\n'))
-		if err != nil && err != io.EOF {
-			return err
-		} else if err == io.EOF {
-			// Call batchWrite one last time to flush anything out in the batch
-			i.batchWrite()
-			return nil
-		}
+	for scanner.Scan() {
+		line := scanner.Text()
 		if strings.HasPrefix(line, "# CONTEXT-DATABASE:") {
 			i.database = strings.TrimSpace(strings.Split(line, ":")[1])
 		}
@@ -192,16 +172,18 @@ func (i *Importer) processDML(scanner *bufio.Reader) error {
 		}
 		i.batchAccumulator(line, start)
 	}
+	// Call batchWrite one last time to flush anything out in the batch
+	i.batchWrite()
 }
 
 func (i *Importer) execute(command string) {
 	response, err := i.client.Query(client.Query{Command: command, Database: i.database})
 	if err != nil {
-		i.stderrLogger.Printf("error: %s\n", err)
+		log.Printf("error: %s\n", err)
 		return
 	}
 	if err := response.Error(); err != nil {
-		i.stderrLogger.Printf("error: %s\n", response.Error())
+		log.Printf("error: %s\n", response.Error())
 	}
 }
 
@@ -220,7 +202,7 @@ func (i *Importer) batchAccumulator(line string, start time.Time) {
 		if processed%100000 == 0 {
 			since := time.Since(start)
 			pps := float64(processed) / since.Seconds()
-			i.stdoutLogger.Printf("Processed %d lines.  Time elapsed: %s.  Points per second (PPS): %d", processed, since.String(), int64(pps))
+			log.Printf("Processed %d lines.  Time elapsed: %s.  Points per second (PPS): %d", processed, since.String(), int64(pps))
 		}
 	}
 }
@@ -253,8 +235,9 @@ func (i *Importer) batchWrite() {
 
 	_, e := i.client.WriteLineProtocol(strings.Join(i.batch, "\n"), i.database, i.retentionPolicy, i.config.Precision, i.config.WriteConsistency)
 	if e != nil {
-		i.stderrLogger.Println("error writing batch: ", e)
-		i.stderrLogger.Println(strings.Join(i.batch, "\n"))
+		log.Println("error writing batch: ", e)
+		// Output failed lines to STDOUT so users can capture lines that failed to import
+		fmt.Println(strings.Join(i.batch, "\n"))
 		i.failedInserts += len(i.batch)
 	} else {
 		i.totalInserts += len(i.batch)

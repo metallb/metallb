@@ -222,18 +222,14 @@ func TestParse(t *testing.T) {
 			// If we erred out,it was intended and the following tests won't work
 			continue
 		}
-		if string(point.Name()) != test.measurement {
-			t.Fatalf("name parse failer.  expected %v, got %v", test.measurement, string(point.Name()))
+		if point.Name() != test.measurement {
+			t.Fatalf("name parse failer.  expected %v, got %v", test.measurement, point.Name())
 		}
 		if len(point.Tags()) != len(test.tags) {
 			t.Fatalf("tags len mismatch.  expected %d, got %d", len(test.tags), len(point.Tags()))
 		}
-		fields, err := point.Fields()
-		if err != nil {
-			t.Fatal(err)
-		}
-		f := fields["value"].(float64)
-		if fields["value"] != f {
+		f := point.Fields()["value"].(float64)
+		if point.Fields()["value"] != f {
 			t.Fatalf("floatValue value mismatch.  expected %v, got %v", test.value, f)
 		}
 		if point.Time().UnixNano()/1000000 != test.time.UnixNano()/1000000 {
@@ -265,7 +261,7 @@ func TestFilterMatchDefault(t *testing.T) {
 	}
 
 	exp := models.MustNewPoint("miss.servers.localhost.cpu_load",
-		models.NewTags(map[string]string{}),
+		models.Tags{},
 		models.Fields{"value": float64(11)},
 		time.Unix(1435077219, 0))
 
@@ -286,7 +282,7 @@ func TestFilterMatchMultipleMeasurement(t *testing.T) {
 	}
 
 	exp := models.MustNewPoint("cpu.cpu_load.10",
-		models.NewTags(map[string]string{"host": "localhost"}),
+		models.Tags{"host": "localhost"},
 		models.Fields{"value": float64(11)},
 		time.Unix(1435077219, 0))
 
@@ -310,7 +306,7 @@ func TestFilterMatchMultipleMeasurementSeparator(t *testing.T) {
 	}
 
 	exp := models.MustNewPoint("cpu_cpu_load_10",
-		models.NewTags(map[string]string{"host": "localhost"}),
+		models.Tags{"host": "localhost"},
 		models.Fields{"value": float64(11)},
 		time.Unix(1435077219, 0))
 
@@ -331,7 +327,7 @@ func TestFilterMatchSingle(t *testing.T) {
 	}
 
 	exp := models.MustNewPoint("cpu_load",
-		models.NewTags(map[string]string{"host": "localhost"}),
+		models.Tags{"host": "localhost"},
 		models.Fields{"value": float64(11)},
 		time.Unix(1435077219, 0))
 
@@ -352,7 +348,7 @@ func TestParseNoMatch(t *testing.T) {
 	}
 
 	exp := models.MustNewPoint("servers.localhost.memory.VmallocChunk",
-		models.NewTags(map[string]string{}),
+		models.Tags{},
 		models.Fields{"value": float64(11)},
 		time.Unix(1435077219, 0))
 
@@ -373,7 +369,7 @@ func TestFilterMatchWildcard(t *testing.T) {
 	}
 
 	exp := models.MustNewPoint("cpu_load",
-		models.NewTags(map[string]string{"host": "localhost"}),
+		models.Tags{"host": "localhost"},
 		models.Fields{"value": float64(11)},
 		time.Unix(1435077219, 0))
 
@@ -396,7 +392,7 @@ func TestFilterMatchExactBeforeWildcard(t *testing.T) {
 	}
 
 	exp := models.MustNewPoint("cpu_load",
-		models.NewTags(map[string]string{"host": "localhost"}),
+		models.Tags{"host": "localhost"},
 		models.Fields{"value": float64(11)},
 		time.Unix(1435077219, 0))
 
@@ -424,7 +420,7 @@ func TestFilterMatchMostLongestFilter(t *testing.T) {
 	}
 
 	exp := models.MustNewPoint("cpu_load",
-		models.NewTags(map[string]string{"host": "localhost", "resource": "cpu"}),
+		models.Tags{"host": "localhost", "resource": "cpu"},
 		models.Fields{"value": float64(11)},
 		time.Unix(1435077219, 0))
 
@@ -451,7 +447,7 @@ func TestFilterMatchMultipleWildcards(t *testing.T) {
 	}
 
 	exp := models.MustNewPoint("cpu_load",
-		models.NewTags(map[string]string{"host": "server01"}),
+		models.Tags{"host": "server01"},
 		models.Fields{"value": float64(11)},
 		time.Unix(1435077219, 0))
 
@@ -466,17 +462,17 @@ func TestFilterMatchMultipleWildcards(t *testing.T) {
 }
 
 func TestParseDefaultTags(t *testing.T) {
-	p, err := graphite.NewParser([]string{"servers.localhost .host.measurement*"}, models.NewTags(map[string]string{
+	p, err := graphite.NewParser([]string{"servers.localhost .host.measurement*"}, models.Tags{
 		"region": "us-east",
 		"zone":   "1c",
 		"host":   "should not set",
-	}))
+	})
 	if err != nil {
 		t.Fatalf("unexpected error creating parser, got %v", err)
 	}
 
 	exp := models.MustNewPoint("cpu_load",
-		models.NewTags(map[string]string{"host": "localhost", "region": "us-east", "zone": "1c"}),
+		models.Tags{"host": "localhost", "region": "us-east", "zone": "1c"},
 		models.Fields{"value": float64(11)},
 		time.Unix(1435077219, 0))
 
@@ -491,16 +487,16 @@ func TestParseDefaultTags(t *testing.T) {
 }
 
 func TestParseDefaultTemplateTags(t *testing.T) {
-	p, err := graphite.NewParser([]string{"servers.localhost .host.measurement* zone=1c"}, models.NewTags(map[string]string{
+	p, err := graphite.NewParser([]string{"servers.localhost .host.measurement* zone=1c"}, models.Tags{
 		"region": "us-east",
 		"host":   "should not set",
-	}))
+	})
 	if err != nil {
 		t.Fatalf("unexpected error creating parser, got %v", err)
 	}
 
 	exp := models.MustNewPoint("cpu_load",
-		models.NewTags(map[string]string{"host": "localhost", "region": "us-east", "zone": "1c"}),
+		models.Tags{"host": "localhost", "region": "us-east", "zone": "1c"},
 		models.Fields{"value": float64(11)},
 		time.Unix(1435077219, 0))
 
@@ -515,16 +511,16 @@ func TestParseDefaultTemplateTags(t *testing.T) {
 }
 
 func TestParseDefaultTemplateTagsOverridGlobal(t *testing.T) {
-	p, err := graphite.NewParser([]string{"servers.localhost .host.measurement* zone=1c,region=us-east"}, models.NewTags(map[string]string{
+	p, err := graphite.NewParser([]string{"servers.localhost .host.measurement* zone=1c,region=us-east"}, models.Tags{
 		"region": "shot not be set",
 		"host":   "should not set",
-	}))
+	})
 	if err != nil {
 		t.Fatalf("unexpected error creating parser, got %v", err)
 	}
 
 	exp := models.MustNewPoint("cpu_load",
-		models.NewTags(map[string]string{"host": "localhost", "region": "us-east", "zone": "1c"}),
+		models.Tags{"host": "localhost", "region": "us-east", "zone": "1c"},
 		models.Fields{"value": float64(11)},
 		time.Unix(1435077219, 0))
 
@@ -539,16 +535,16 @@ func TestParseDefaultTemplateTagsOverridGlobal(t *testing.T) {
 }
 
 func TestParseTemplateWhitespace(t *testing.T) {
-	p, err := graphite.NewParser([]string{"servers.localhost        .host.measurement*           zone=1c"}, models.NewTags(map[string]string{
+	p, err := graphite.NewParser([]string{"servers.localhost        .host.measurement*           zone=1c"}, models.Tags{
 		"region": "us-east",
 		"host":   "should not set",
-	}))
+	})
 	if err != nil {
 		t.Fatalf("unexpected error creating parser, got %v", err)
 	}
 
 	exp := models.MustNewPoint("cpu_load",
-		models.NewTags(map[string]string{"host": "localhost", "region": "us-east", "zone": "1c"}),
+		models.Tags{"host": "localhost", "region": "us-east", "zone": "1c"},
 		models.Fields{"value": float64(11)},
 		time.Unix(1435077219, 0))
 
@@ -683,9 +679,6 @@ func TestApplyTemplateField(t *testing.T) {
 	}
 
 	measurement, _, field, err := p.ApplyTemplate("current.users.logged_in")
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	if measurement != "current_users" {
 		t.Errorf("Parser.ApplyTemplate unexpected result. got %s, exp %s",
@@ -713,12 +706,4 @@ func TestApplyTemplateFieldError(t *testing.T) {
 		t.Errorf("Parser.ApplyTemplate unexpected result. got %s, exp %s", err,
 			"'field' can only be used once in each template: current.users.logged_in")
 	}
-}
-
-// Test Helpers
-func errstr(err error) string {
-	if err != nil {
-		return err.Error()
-	}
-	return ""
 }

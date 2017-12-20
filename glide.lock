@@ -1,5 +1,5 @@
 hash: fedc4e687d70a7688e7b945a995b314ea7baf60aae9ab4f8c668a29096ff5c0e
-updated: 2017-12-14T12:19:59.3755248-08:00
+updated: 2017-12-20T14:02:52.856895765-08:00
 imports:
 - name: github.com/beorn7/perks
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
@@ -91,12 +91,14 @@ imports:
   version: 7140e8e22da120cb3efc8e1096f299933624024e
 - name: github.com/mdlayher/ethernet
   version: e72cf8343052938936194daba1914fd1bb33d2fe
+- name: github.com/mdlayher/ndp
+  version: 803984b023bd8208782145b555ecb5f53668694e
 - name: github.com/mdlayher/raw
   version: 9df8b4265df2bcf01458b1759cf7ec4b81b50b65
 - name: github.com/peterbourgon/diskv
   version: 5f041e8faa004a95c88a202771f4cc3e991971e6
 - name: github.com/prometheus/client_golang
-  version: 1cdba8fdde81f444626530cce66e138d2f68ae1c
+  version: 661e31bf844dfca9aeba15f27ea8aa0d485ad212
   subpackages:
   - prometheus
   - prometheus/promhttp
@@ -131,7 +133,12 @@ imports:
   - context
   - http2
   - http2/hpack
+  - icmp
   - idna
+  - internal/iana
+  - internal/socket
+  - ipv4
+  - ipv6
   - lex/httplex
 - name: golang.org/x/sys
   version: 7ddbeae9ae08c6a06a59597f0c9edbc5ff2444ce
@@ -300,7 +307,6 @@ testImports:
   subpackages:
   - hcl/ast
   - hcl/parser
-  - hcl/printer
   - hcl/scanner
   - hcl/strconv
   - hcl/token
@@ -308,7 +314,7 @@ testImports:
   - json/scanner
   - json/token
 - name: github.com/influxdata/influxdb
-  version: a0b2195d6baa7c8afdabca3f058381de4fe7884b
+  version: 383332daed5595926c235f250b11433f67229c35
   subpackages:
   - client/v2
   - models
@@ -318,7 +324,7 @@ testImports:
 - name: github.com/mitchellh/mapstructure
   version: 06020f85339e21b2478f756a78e295255ffa4d6a
 - name: github.com/osrg/gobgp
-  version: 9da6e7c3a25cfaa1f33ed5ddcc0ad1699c430e17
+  version: 2c03fdbcb894e319976aa3282794409e04108c7f
   subpackages:
   - config
   - packet/bgp
@@ -333,7 +339,7 @@ testImports:
 - name: github.com/satori/go.uuid
   version: 5bf94b69c6b68ee1b541973bb8e1144db23a194b
 - name: github.com/sirupsen/logrus
-  version: d682213848ed68c0a260ca37d6dd5ace8423f5ba
+  version: 89742aefa4b206dcf400792f3bd35b542998eb3b
 - name: github.com/spf13/afero
   version: 8d919cbe7e2627e417f3e45c3c0e489a5b7e2536
   subpackages:
@@ -343,12 +349,10 @@ testImports:
 - name: github.com/spf13/jwalterweatherman
   version: 12bd96e66386c1960ab0f74ced1362f66f552f7b
 - name: github.com/spf13/viper
-  version: 1a0c4a370c3e8286b835467d2dfcdaf636c3538b
+  version: 4dddf7c62e16bce5807744018f5b753bfe21bbd2
 - name: github.com/vishvananda/netlink
-  version: f67b75edbf5e3bb7dfe70bb788610693a71be3d1
+  version: 1e2e08e8a2dcdacaae3f14ac44c5cfa31361f270
   subpackages:
   - nl
-- name: github.com/vishvananda/netns
-  version: be1fbeda19366dea804f00efff2dd73a1642fdcc
 - name: gopkg.in/tomb.v2
   version: d5d1b5820637886def9eef33e03a27a9f166942c

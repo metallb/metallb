@@ -112,6 +112,12 @@ func TestAPIs(t *testing.T) {
 		}
 	}
 
+	doSeries := func(matcher string, startTime time.Time, endTime time.Time) func() (interface{}, error) {
+		return func() (interface{}, error) {
+			return queryAPI.Series(context.Background(), []string{matcher}, startTime, endTime)
+		}
+	}
+
 	queryTests := []apiTest{
 		{
 			do: doQuery("2", testTime),
@@ -180,6 +186,43 @@ func TestAPIs(t *testing.T) {
 			reqMethod: "GET",
 			reqPath:   "/api/v1/label/mylabel/values",
 			err:       fmt.Errorf("some error"),
+		},
+
+		{
+			do: doSeries("up", testTime.Add(-time.Minute), testTime),
+			inRes: []map[string]string{
+				{
+					"__name__": "up",
+					"job":      "prometheus",
+					"instance": "localhost:9090"},
+			},
+			reqMethod: "GET",
+			reqPath:   "/api/v1/series",
+			reqParam: url.Values{
+				"match": []string{"up"},
+				"start": []string{testTime.Add(-time.Minute).Format(time.RFC3339Nano)},
+				"end":   []string{testTime.Format(time.RFC3339Nano)},
+			},
+			res: []model.LabelSet{
+				model.LabelSet{
+					"__name__": "up",
+					"job":      "prometheus",
+					"instance": "localhost:9090",
+				},
+			},
+		},
+
+		{
+			do:        doSeries("up", testTime.Add(-time.Minute), testTime),
+			inErr:     fmt.Errorf("some error"),
+			reqMethod: "GET",
+			reqPath:   "/api/v1/series",
+			reqParam: url.Values{
+				"match": []string{"up"},
+				"start": []string{testTime.Add(-time.Minute).Format(time.RFC3339Nano)},
+				"end":   []string{testTime.Format(time.RFC3339Nano)},
+			},
+			err: fmt.Errorf("some error"),
 		},
 	}
 

@@ -1,5 +1,3 @@
-// Command influx_tsm converts b1 or bz1 shards (from InfluxDB releases earlier than v0.11)
-// to the current tsm1 format.
 package main
 
 import (
@@ -59,7 +57,7 @@ type options struct {
 	SkipBackup     bool
 	UpdateInterval time.Duration
 	Yes            bool
-	CPUFile        string
+	CpuFile        string
 }
 
 func (o *options) Parse() error {
@@ -75,7 +73,7 @@ func (o *options) Parse() error {
 	fs.StringVar(&opts.DebugAddr, "debug", "", "If set, http debugging endpoints will be enabled on the given address")
 	fs.DurationVar(&opts.UpdateInterval, "interval", 5*time.Second, "How often status updates are printed.")
 	fs.BoolVar(&opts.Yes, "y", false, "Don't ask, just convert")
-	fs.StringVar(&opts.CPUFile, "profile", "", "CPU Profile location")
+	fs.StringVar(&opts.CpuFile, "profile", "", "CPU Profile location")
 	fs.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: %v [options] <data-path> \n", os.Args[0])
 		fmt.Fprintf(os.Stderr, "%v\n\nOptions:\n", description)
@@ -219,8 +217,8 @@ func main() {
 	}
 	fmt.Println("Conversion starting....")
 
-	if opts.CPUFile != "" {
-		f, err := os.Create(opts.CPUFile)
+	if opts.CpuFile != "" {
+		f, err := os.Create(opts.CpuFile)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -302,7 +300,7 @@ func backupDatabase(db string) error {
 			if err := out.Truncate(0); err != nil {
 				return err
 			}
-			if _, err := out.Seek(0, io.SeekStart); err != nil {
+			if _, err := out.Seek(0, os.SEEK_SET); err != nil {
 				return err
 			}
 		}
@@ -311,11 +309,11 @@ func backupDatabase(db string) error {
 			log.Printf("Resuming backup of file %v, starting at %v bytes", path, dstInfo.Size())
 		}
 
-		off, err := out.Seek(0, io.SeekEnd)
+		off, err := out.Seek(0, os.SEEK_END)
 		if err != nil {
 			return err
 		}
-		if _, err := in.Seek(off, io.SeekStart); err != nil {
+		if _, err := in.Seek(off, os.SEEK_SET); err != nil {
 			return err
 		}
 

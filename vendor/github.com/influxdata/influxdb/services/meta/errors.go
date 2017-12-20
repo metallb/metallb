@@ -11,6 +11,28 @@ var (
 
 	// ErrStoreClosed is returned when closing an already closed store.
 	ErrStoreClosed = errors.New("raft store already closed")
+
+	// ErrTooManyPeers is returned when more than 3 peers are used.
+	ErrTooManyPeers = errors.New("too many peers; influxdb v0.9.0 is limited to 3 nodes in a cluster")
+)
+
+var (
+	// ErrNodeExists is returned when creating an already existing node.
+	ErrNodeExists = errors.New("node already exists")
+
+	// ErrNodeNotFound is returned when mutating a node that doesn't exist.
+	ErrNodeNotFound = errors.New("node not found")
+
+	// ErrNodesRequired is returned when at least one node is required for an operation.
+	// This occurs when creating a shard group.
+	ErrNodesRequired = errors.New("at least one node required")
+
+	// ErrNodeIDRequired is returned when using a zero node id.
+	ErrNodeIDRequired = errors.New("node id must be greater than 0")
+
+	// ErrNodeUnableToDropFinalNode is returned if the node being dropped is the last
+	// node in the cluster
+	ErrNodeUnableToDropFinalNode = errors.New("unable to drop the final node in a cluster")
 )
 
 var (
@@ -22,25 +44,15 @@ var (
 
 	// ErrDatabaseNameRequired is returned when creating a database without a name.
 	ErrDatabaseNameRequired = errors.New("database name required")
-
-	// ErrInvalidName is returned when attempting to create a database or retention policy with an invalid name
-	ErrInvalidName = errors.New("invalid name")
 )
 
 var (
 	// ErrRetentionPolicyExists is returned when creating an already existing policy.
 	ErrRetentionPolicyExists = errors.New("retention policy already exists")
 
-	// ErrRetentionPolicyNotFound is returned when an expected policy wasn't found.
-	ErrRetentionPolicyNotFound = errors.New("retention policy not found")
-
 	// ErrRetentionPolicyDefault is returned when attempting a prohibited operation
 	// on a default retention policy.
 	ErrRetentionPolicyDefault = errors.New("retention policy is default")
-
-	// ErrRetentionPolicyRequired is returned when a retention policy is required
-	// by an operation, but a nil policy was passed.
-	ErrRetentionPolicyRequired = errors.New("retention policy required")
 
 	// ErrRetentionPolicyNameRequired is returned when creating a policy without a name.
 	ErrRetentionPolicyNameRequired = errors.New("retention policy name required")
@@ -51,16 +63,12 @@ var (
 
 	// ErrRetentionPolicyDurationTooLow is returned when updating a retention
 	// policy that has a duration lower than the allowed minimum.
-	ErrRetentionPolicyDurationTooLow = fmt.Errorf("retention policy duration must be at least %s", MinRetentionPolicyDuration)
+	ErrRetentionPolicyDurationTooLow = errors.New(fmt.Sprintf("retention policy duration must be at least %s",
+		MinRetentionPolicyDuration))
 
 	// ErrRetentionPolicyConflict is returned when creating a retention policy conflicts
 	// with an existing policy.
 	ErrRetentionPolicyConflict = errors.New("retention policy conflicts with an existing policy")
-
-	// ErrIncompatibleDurations is returned when creating or updating a
-	// retention policy that has a duration lower than the current shard
-	// duration.
-	ErrIncompatibleDurations = errors.New("retention policy duration must be greater than the shard duration")
 
 	// ErrReplicationFactorTooLow is returned when the replication factor is not in an
 	// acceptable range.
@@ -94,11 +102,6 @@ var (
 	// ErrSubscriptionNotFound is returned when removing a subscription that doesn't exist.
 	ErrSubscriptionNotFound = errors.New("subscription not found")
 )
-
-// ErrInvalidSubscriptionURL is returned when the subscription's destination URL is invalid.
-func ErrInvalidSubscriptionURL(url string) error {
-	return fmt.Errorf("invalid subscription URL: %s", url)
-}
 
 var (
 	// ErrUserExists is returned when creating an already existing user.

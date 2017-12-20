@@ -13,10 +13,7 @@ import (
 
 // Minimum and maximum supported dates for timestamps.
 var (
-	// The minimum graphite timestamp allowed.
 	MinDate = time.Date(1901, 12, 13, 0, 0, 0, 0, time.UTC)
-
-	// The maximum graphite timestamp allowed.
 	MaxDate = time.Date(2038, 1, 19, 0, 0, 0, 0, time.UTC)
 )
 
@@ -36,14 +33,14 @@ type Parser struct {
 	tags    models.Tags
 }
 
-// Options are configurable values that can be provided to a Parser.
+// Options are configurable values that can be provided to a Parser
 type Options struct {
 	Separator   string
 	Templates   []string
 	DefaultTags models.Tags
 }
 
-// NewParserWithOptions returns a graphite parser using the given options.
+// NewParserWithOptions returns a graphite parser using the given options
 func NewParserWithOptions(options Options) (*Parser, error) {
 
 	matcher := newMatcher()
@@ -67,12 +64,12 @@ func NewParserWithOptions(options Options) (*Parser, error) {
 		}
 
 		// Parse out the default tags specific to this template
-		var tags models.Tags
+		tags := models.Tags{}
 		if strings.Contains(parts[len(parts)-1], "=") {
 			tagStrs := strings.Split(parts[len(parts)-1], ",")
 			for _, kv := range tagStrs {
 				parts := strings.Split(kv, "=")
-				tags.SetString(parts[0], parts[1])
+				tags[parts[0]] = parts[1]
 			}
 		}
 
@@ -154,12 +151,12 @@ func (p *Parser) Parse(line string) (models.Point, error) {
 	}
 
 	// Set the default tags on the point if they are not already set
-	for _, t := range p.tags {
-		if _, ok := tags[string(t.Key)]; !ok {
-			tags[string(t.Key)] = string(t.Value)
+	for k, v := range p.tags {
+		if _, ok := tags[k]; !ok {
+			tags[k] = v
 		}
 	}
-	return models.NewPoint(measurement, models.NewTags(tags), fieldValues, timestamp)
+	return models.NewPoint(measurement, tags, fieldValues, timestamp)
 }
 
 // ApplyTemplate extracts the template fields from the given line and
@@ -174,15 +171,15 @@ func (p *Parser) ApplyTemplate(line string) (string, map[string]string, string, 
 	template := p.matcher.Match(fields[0])
 	name, tags, field, err := template.Apply(fields[0])
 	// Set the default tags on the point if they are not already set
-	for _, t := range p.tags {
-		if _, ok := tags[string(t.Key)]; !ok {
-			tags[string(t.Key)] = string(t.Value)
+	for k, v := range p.tags {
+		if _, ok := tags[k]; !ok {
+			tags[k] = v
 		}
 	}
 	return name, tags, field, err
 }
 
-// template represents a pattern and tags to map a graphite metric string to a influxdb Point.
+// template represents a pattern and tags to map a graphite metric string to a influxdb Point
 type template struct {
 	tags              []string
 	defaultTags       models.Tags
@@ -214,7 +211,7 @@ func NewTemplate(pattern string, defaultTags models.Tags, separator string) (*te
 }
 
 // Apply extracts the template fields from the given line and returns the measurement
-// name and tags.
+// name and tags
 func (t *template) Apply(line string) (string, map[string]string, string, error) {
 	fields := strings.Split(line, ".")
 	var (
@@ -226,8 +223,8 @@ func (t *template) Apply(line string) (string, map[string]string, string, error)
 	)
 
 	// Set any default tags
-	for _, t := range t.defaultTags {
-		tags[string(t.Key)] = append(tags[string(t.Key)], string(t.Value))
+	for k, v := range t.defaultTags {
+		tags[k] = append(tags[k], v)
 	}
 
 	// See if an invalid combination has been specified in the template:
@@ -287,7 +284,7 @@ func newMatcher() *matcher {
 	}
 }
 
-// Add inserts the template in the filter tree based the given filter.
+// Add inserts the template in the filter tree based the given filter
 func (m *matcher) Add(filter string, template *template) {
 	if filter == "" {
 		m.AddDefaultTemplate(template)
@@ -300,7 +297,7 @@ func (m *matcher) AddDefaultTemplate(template *template) {
 	m.defaultTemplate = template
 }
 
-// Match returns the template that matches the given graphite line.
+// Match returns the template that matches the given graphite line
 func (m *matcher) Match(line string) *template {
 	tmpl := m.root.Search(line)
 	if tmpl != nil {

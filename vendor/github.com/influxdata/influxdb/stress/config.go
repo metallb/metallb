@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/BurntSushi/toml"
 )
@@ -31,7 +32,7 @@ type Write struct {
 // PointGenerators is a struct that contains the configuration
 // parameters for all implemented PointGenerator's.
 type PointGenerators struct {
-	Basic *BasicPointGenerator `toml:"basic"`
+	Basic BasicPointGenerator `toml:"basic"`
 }
 
 // InfluxClients is a struct that contains the configuration
@@ -104,6 +105,7 @@ type outputConfig struct {
 	addr            string
 	database        string
 	retentionPolicy string
+	mu              sync.Mutex
 }
 
 func (t *outputConfig) SetParams(addr, db, rp string) {

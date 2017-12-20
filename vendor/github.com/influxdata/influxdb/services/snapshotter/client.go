@@ -44,6 +44,7 @@ func (c *Client) MetastoreBackup() (*meta.Data, error) {
 	length := int(binary.BigEndian.Uint64(b[i : i+8]))
 	i += 8
 	metaBytes := b[i : i+length]
+	i += int(length)
 
 	// Unpack meta data.
 	var data meta.Data
@@ -64,10 +65,6 @@ func (c *Client) doRequest(req *Request) ([]byte, error) {
 	defer conn.Close()
 
 	// Write the request
-	_, err = conn.Write([]byte{byte(req.Type)})
-	if err != nil {
-		return nil, err
-	}
 	if err := json.NewEncoder(conn).Encode(req); err != nil {
 		return nil, fmt.Errorf("encode snapshot request: %s", err)
 	}

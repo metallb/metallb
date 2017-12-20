@@ -1,96 +1,120 @@
-// The influx_inspect command displays detailed information about InfluxDB data files.
 package main
 
 import (
+	"flag"
 	"fmt"
-	"io"
-	"log"
 	"os"
 
-	"github.com/influxdata/influxdb/cmd"
-	"github.com/influxdata/influxdb/cmd/influx_inspect/dumptsi"
-	"github.com/influxdata/influxdb/cmd/influx_inspect/dumptsm"
-	"github.com/influxdata/influxdb/cmd/influx_inspect/export"
-	"github.com/influxdata/influxdb/cmd/influx_inspect/help"
-	"github.com/influxdata/influxdb/cmd/influx_inspect/inmem2tsi"
-	"github.com/influxdata/influxdb/cmd/influx_inspect/report"
-	"github.com/influxdata/influxdb/cmd/influx_inspect/verify"
 	_ "github.com/influxdata/influxdb/tsdb/engine"
 )
 
+func usage() {
+	println(`Usage: influx_inspect <command> [options]
+
+Displays detailed information about InfluxDB data files.
+`)
+
+	println(`Commands:
+  info - displays series meta-data for all shards.  Default location [$HOME/.influxdb]
+  dumptsm - dumps low-level details about tsm1 files.
+  dumptsmdev - dumps low-level details about tsm1dev files.`)
+	println()
+}
+
 func main() {
-	m := NewMain()
-	if err := m.Run(os.Args[1:]...); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+
+	flag.Usage = usage
+	flag.Parse()
+
+	if len(flag.Args()) == 0 {
+		flag.Usage()
+		os.Exit(0)
+	}
+
+	switch flag.Args()[0] {
+	case "info":
+		var path string
+		fs := flag.NewFlagSet("info", flag.ExitOnError)
+		fs.StringVar(&path, "dir", os.Getenv("HOME")+"/.influxdb", "Root storage path. [$HOME/.influxdb]")
+
+		fs.Usage = func() {
+			println("Usage: influx_inspect info [options]\n\n   Displays series meta-data for all shards..")
+			println()
+			println("Options:")
+			fs.PrintDefaults()
+		}
+
+		if err := fs.Parse(flag.Args()[1:]); err != nil {
+			fmt.Printf("%v", err)
+			os.Exit(1)
+		}
+		cmdInfo(path)
+	case "dumptsm":
+		var dumpAll bool
+		opts := &tsdmDumpOpts{}
+		fs := flag.NewFlagSet("file", flag.ExitOnError)
+		fs.BoolVar(&opts.dumpIndex, "index", false, "Dump raw index data")
+		fs.BoolVar(&opts.dumpBlocks, "blocks", false, "Dump raw block data")
+		fs.BoolVar(&dumpAll, "all", false, "Dump all data. Caution: This may print a lot of information")
+		fs.StringVar(&opts.filterKey, "filter-key", "", "Only display index and block data match this key substring")
+
+		fs.Usage = func() {
+			println("Usage: influx_inspect dumptsm [options] <path>\n\n  Dumps low-level details about tsm1 files.")
+			println()
+			println("Options:")
+			fs.PrintDefaults()
+			os.Exit(0)
+		}
+
+		if err := fs.Parse(flag.Args()[1:]); err != nil {
+			fmt.Printf("%v", err)
+			os.Exit(1)
+		}
+
+		if len(fs.Args()) == 0 || fs.Args()[0] == "" {
+			fmt.Printf("TSM file not specified\n\n")
+			fs.Usage()
+			fs.PrintDefaults()
+			os.Exit(1)
+		}
+		opts.path = fs.Args()[0]
+		opts.dumpBlocks = opts.dumpBlocks || dumpAll || opts.filterKey != ""
+		opts.dumpIndex = opts.dumpIndex || dumpAll || opts.filterKey != ""
+		cmdDumpTsm1(opts)
+	case "dumptsmdev":
+		var dumpAll bool
+		opts := &tsdmDumpOpts{}
+		fs := flag.NewFlagSet("file", flag.ExitOnError)
+		fs.BoolVar(&opts.dumpIndex, "index", false, "Dump raw index data")
+		fs.BoolVar(&opts.dumpBlocks, "blocks", false, "Dump raw block data")
+		fs.BoolVar(&dumpAll, "all", false, "Dump all data. Caution: This may print a lot of information")
+		fs.StringVar(&opts.filterKey, "filter-key", "", "Only display index and block data match this key substring")
+
+		fs.Usage = func() {
+			println("Usage: influx_inspect dumptsm [options] <path>\n\n  Dumps low-level details about tsm1 files.")
+			println()
+			println("Options:")
+			fs.PrintDefaults()
+			os.Exit(0)
+		}
+
+		if err := fs.Parse(flag.Args()[1:]); err != nil {
+			fmt.Printf("%v", err)
+			os.Exit(1)
+		}
+
+		if len(fs.Args()) == 0 || fs.Args()[0] == "" {
+			fmt.Printf("TSM file not specified\n\n")
+			fs.Usage()
+			fs.PrintDefaults()
+			os.Exit(1)
+		}
+		opts.path = fs.Args()[0]
+		opts.dumpBlocks = opts.dumpBlocks || dumpAll || opts.filterKey != ""
+		opts.dumpIndex = opts.dumpIndex || dumpAll || opts.filterKey != ""
+		cmdDumpTsm1dev(opts)
+	default:
+		flag.Usage()
 		os.Exit(1)
 	}
-}
-
-// Main represents the program execution.
-type Main struct {
-	Logger *log.Logger
-
-	Stdin  io.Reader
-	Stdout io.Writer
-	Stderr io.Writer
-}
-
-// NewMain returns a new instance of Main.
-func NewMain() *Main {
-	return &Main{
-		Logger: log.New(os.Stderr, "[influx_inspect] ", log.LstdFlags),
-		Stdin:  os.Stdin,
-		Stdout: os.Stdout,
-		Stderr: os.Stderr,
-	}
-}
-
-// Run determines and runs the command specified by the CLI args.
-func (m *Main) Run(args ...string) error {
-	name, args := cmd.ParseCommandName(args)
-
-	// Extract name from args.
-	switch name {
-	case "", "help":
-		if err := help.NewCommand().Run(args...); err != nil {
-			return fmt.Errorf("help: %s", err)
-		}
-	case "dumptsi":
-		name := dumptsi.NewCommand()
-		if err := name.Run(args...); err != nil {
-			return fmt.Errorf("dumptsi: %s", err)
-		}
-	case "dumptsmdev":
-		fmt.Fprintf(m.Stderr, "warning: dumptsmdev is deprecated, use dumptsm instead.\n")
-		fallthrough
-	case "dumptsm":
-		name := dumptsm.NewCommand()
-		if err := name.Run(args...); err != nil {
-			return fmt.Errorf("dumptsm: %s", err)
-		}
-	case "export":
-		name := export.NewCommand()
-		if err := name.Run(args...); err != nil {
-			return fmt.Errorf("export: %s", err)
-		}
-	case "inmem2tsi":
-		name := inmem2tsi.NewCommand()
-		if err := name.Run(args...); err != nil {
-			return fmt.Errorf("inmem2tsi: %s", err)
-		}
-	case "report":
-		name := report.NewCommand()
-		if err := name.Run(args...); err != nil {
-			return fmt.Errorf("report: %s", err)
-		}
-	case "verify":
-		name := verify.NewCommand()
-		if err := name.Run(args...); err != nil {
-			return fmt.Errorf("verify: %s", err)
-		}
-	default:
-		return fmt.Errorf(`unknown command "%s"`+"\n"+`Run 'influx_inspect help' for usage`+"\n\n", name)
-	}
-
-	return nil
 }

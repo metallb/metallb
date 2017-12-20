@@ -1,26 +1,24 @@
-// Package udp provides the UDP input service for InfluxDB.
 package udp // import "github.com/influxdata/influxdb/services/udp"
 
 import (
 	"errors"
-	"fmt"
+	"expvar"
+	"log"
 	"net"
+	"os"
+	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
+	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/tsdb"
-	"go.uber.org/zap"
 )
 
 const (
 	// Arbitrary, testing indicated that this doesn't typically get over 10
 	parserChanLen = 1000
-
-	// MaxUDPPayload is largest payload size the UDP service will accept.
-	MaxUDPPayload = 64 * 1024
 )
 
 // statistics gathered by the UDP package.
@@ -29,59 +27,57 @@ const (
 	statBytesReceived       = "bytesRx"
 	statPointsParseFail     = "pointsParseFail"
 	statReadFail            = "readFail"
-	statBatchesTransmitted  = "batchesTx"
+	statBatchesTrasmitted   = "batchesTx"
 	statPointsTransmitted   = "pointsTx"
 	statBatchesTransmitFail = "batchesTxFail"
 )
 
-// Service is a UDP service that will listen for incoming packets of line protocol.
+//
+// Service represents here an UDP service
+// that will listen for incoming packets
+// formatted with the inline protocol
+//
 type Service struct {
 	conn *net.UDPConn
 	addr *net.UDPAddr
 	wg   sync.WaitGroup
-
-	mu    sync.RWMutex
-	ready bool          // Has the required database been created?
-	done  chan struct{} // Is the service closing or closed?
+	done chan struct{}
 
 	parserChan chan []byte
 	batcher    *tsdb.PointBatcher
 	config     Config
 
 	PointsWriter interface {
-		WritePointsPrivileged(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
+		WritePoints(database, retentionPolicy string, consistencyLevel models.ConsistencyLevel, points []models.Point) error
 	}
 
 	MetaClient interface {
 		CreateDatabase(name string) (*meta.DatabaseInfo, error)
 	}
 
-	Logger      *zap.Logger
-	stats       *Statistics
-	defaultTags models.StatisticTags
+	Logger  *log.Logger
+	statMap *expvar.Map
 }
 
 // NewService returns a new instance of Service.
 func NewService(c Config) *Service {
 	d := *c.WithDefaults()
 	return &Service{
-		config:      d,
-		parserChan:  make(chan []byte, parserChanLen),
-		Logger:      zap.NewNop(),
-		stats:       &Statistics{},
-		defaultTags: models.StatisticTags{"bind": d.BindAddress},
+		config:     d,
+		done:       make(chan struct{}),
+		parserChan: make(chan []byte, parserChanLen),
+		batcher:    tsdb.NewPointBatcher(d.BatchSize, d.BatchPending, time.Duration(d.BatchTimeout)),
+		Logger:     log.New(os.Stderr, "[udp] ", log.LstdFlags),
 	}
 }
 
-// Open starts the service.
+// Open starts the service
 func (s *Service) Open() (err error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if !s.closed() {
-		return nil // Already open.
-	}
-	s.done = make(chan struct{})
+	// Configure expvar monitoring. It's OK to do this even if the service fails to open and
+	// should be done before any data could arrive for the service.
+	key := strings.Join([]string{"udp", s.config.BindAddress}, ":")
+	tags := map[string]string{"bind": s.config.BindAddress}
+	s.statMap = influxdb.NewStatistics(key, "udp", tags)
 
 	if s.config.BindAddress == "" {
 		return errors.New("bind address has to be specified in config")
@@ -90,30 +86,32 @@ func (s *Service) Open() (err error) {
 		return errors.New("database has to be specified in config")
 	}
 
+	if _, err := s.MetaClient.CreateDatabase(s.config.Database); err != nil {
+		return errors.New("Failed to ensure target database exists")
+	}
+
 	s.addr, err = net.ResolveUDPAddr("udp", s.config.BindAddress)
 	if err != nil {
-		s.Logger.Info(fmt.Sprintf("Failed to resolve UDP address %s: %s", s.config.BindAddress, err))
+		s.Logger.Printf("Failed to resolve UDP address %s: %s", s.config.BindAddress, err)
 		return err
 	}
 
 	s.conn, err = net.ListenUDP("udp", s.addr)
 	if err != nil {
-		s.Logger.Info(fmt.Sprintf("Failed to set up UDP listener at address %s: %s", s.addr, err))
+		s.Logger.Printf("Failed to set up UDP listener at address %s: %s", s.addr, err)
 		return err
 	}
 
 	if s.config.ReadBuffer != 0 {
 		err = s.conn.SetReadBuffer(s.config.ReadBuffer)
 		if err != nil {
-			s.Logger.Info(fmt.Sprintf("Failed to set UDP read buffer to %d: %s",
-				s.config.ReadBuffer, err))
+			s.Logger.Printf("Failed to set UDP read buffer to %d: %s",
+				s.config.ReadBuffer, err)
 			return err
 		}
 	}
-	s.batcher = tsdb.NewPointBatcher(s.config.BatchSize, s.config.BatchPending, time.Duration(s.config.BatchTimeout))
-	s.batcher.Start()
 
-	s.Logger.Info(fmt.Sprintf("Started listening on UDP: %s", s.config.BindAddress))
+	s.Logger.Printf("Started listening on UDP: %s", s.config.BindAddress)
 
 	s.wg.Add(3)
 	go s.serve()
@@ -123,52 +121,18 @@ func (s *Service) Open() (err error) {
 	return nil
 }
 
-// Statistics maintains statistics for the UDP service.
-type Statistics struct {
-	PointsReceived      int64
-	BytesReceived       int64
-	PointsParseFail     int64
-	ReadFail            int64
-	BatchesTransmitted  int64
-	PointsTransmitted   int64
-	BatchesTransmitFail int64
-}
-
-// Statistics returns statistics for periodic monitoring.
-func (s *Service) Statistics(tags map[string]string) []models.Statistic {
-	return []models.Statistic{{
-		Name: "udp",
-		Tags: s.defaultTags.Merge(tags),
-		Values: map[string]interface{}{
-			statPointsReceived:      atomic.LoadInt64(&s.stats.PointsReceived),
-			statBytesReceived:       atomic.LoadInt64(&s.stats.BytesReceived),
-			statPointsParseFail:     atomic.LoadInt64(&s.stats.PointsParseFail),
-			statReadFail:            atomic.LoadInt64(&s.stats.ReadFail),
-			statBatchesTransmitted:  atomic.LoadInt64(&s.stats.BatchesTransmitted),
-			statPointsTransmitted:   atomic.LoadInt64(&s.stats.PointsTransmitted),
-			statBatchesTransmitFail: atomic.LoadInt64(&s.stats.BatchesTransmitFail),
-		},
-	}}
-}
-
 func (s *Service) writer() {
 	defer s.wg.Done()
 
 	for {
 		select {
 		case batch := <-s.batcher.Out():
-			// Will attempt to create database if not yet created.
-			if err := s.createInternalStorage(); err != nil {
-				s.Logger.Info(fmt.Sprintf("Required database %s does not yet exist: %s", s.config.Database, err.Error()))
-				continue
-			}
-
-			if err := s.PointsWriter.WritePointsPrivileged(s.config.Database, s.config.RetentionPolicy, models.ConsistencyLevelAny, batch); err == nil {
-				atomic.AddInt64(&s.stats.BatchesTransmitted, 1)
-				atomic.AddInt64(&s.stats.PointsTransmitted, int64(len(batch)))
+			if err := s.PointsWriter.WritePoints(s.config.Database, s.config.RetentionPolicy, models.ConsistencyLevelAny, batch); err == nil {
+				s.statMap.Add(statBatchesTrasmitted, 1)
+				s.statMap.Add(statPointsTransmitted, int64(len(batch)))
 			} else {
-				s.Logger.Info(fmt.Sprintf("failed to write point batch to database %q: %s", s.config.Database, err))
-				atomic.AddInt64(&s.stats.BatchesTransmitFail, 1)
+				s.Logger.Printf("failed to write point batch to database %q: %s", s.config.Database, err)
+				s.statMap.Add(statBatchesTransmitFail, 1)
 			}
 
 		case <-s.done:
@@ -180,25 +144,24 @@ func (s *Service) writer() {
 func (s *Service) serve() {
 	defer s.wg.Done()
 
-	buf := make([]byte, MaxUDPPayload)
+	s.batcher.Start()
 	for {
+
 		select {
 		case <-s.done:
 			// We closed the connection, time to go.
 			return
 		default:
 			// Keep processing.
+			buf := make([]byte, s.config.UDPPayloadSize)
 			n, _, err := s.conn.ReadFromUDP(buf)
 			if err != nil {
-				atomic.AddInt64(&s.stats.ReadFail, 1)
-				s.Logger.Info(fmt.Sprintf("Failed to read UDP message: %s", err))
+				s.statMap.Add(statReadFail, 1)
+				s.Logger.Printf("Failed to read UDP message: %s", err)
 				continue
 			}
-			atomic.AddInt64(&s.stats.BytesReceived, int64(n))
-
-			bufCopy := make([]byte, n)
-			copy(bufCopy, buf[:n])
-			s.parserChan <- bufCopy
+			s.statMap.Add(statBytesReceived, int64(n))
+			s.parserChan <- buf[:n]
 		}
 	}
 }
@@ -213,98 +176,45 @@ func (s *Service) parser() {
 		case buf := <-s.parserChan:
 			points, err := models.ParsePointsWithPrecision(buf, time.Now().UTC(), s.config.Precision)
 			if err != nil {
-				atomic.AddInt64(&s.stats.PointsParseFail, 1)
-				s.Logger.Info(fmt.Sprintf("Failed to parse points: %s", err))
+				s.statMap.Add(statPointsParseFail, 1)
+				s.Logger.Printf("Failed to parse points: %s", err)
 				continue
 			}
 
 			for _, point := range points {
 				s.batcher.In() <- point
 			}
-			atomic.AddInt64(&s.stats.PointsReceived, int64(len(points)))
+			s.statMap.Add(statPointsReceived, int64(len(points)))
 		}
 	}
 }
 
-// Close closes the service and the underlying listener.
+// Close closes the underlying listener.
 func (s *Service) Close() error {
-	if wait := func() bool {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-
-		if s.closed() {
-			return false // Already closed.
-		}
-		close(s.done)
-
-		if s.conn != nil {
-			s.conn.Close()
-		}
-
-		if s.batcher != nil {
-			s.batcher.Stop()
-		}
-		return true
-	}(); !wait {
-		return nil
+	if s.conn == nil {
+		return errors.New("Service already closed")
 	}
+
+	s.conn.Close()
+	s.batcher.Flush()
+	close(s.done)
 	s.wg.Wait()
 
 	// Release all remaining resources.
-	s.mu.Lock()
 	s.done = nil
 	s.conn = nil
-	s.batcher = nil
-	s.mu.Unlock()
 
-	s.Logger.Info("Service closed")
+	s.Logger.Print("Service closed")
 
 	return nil
 }
 
-// Closed returns true if the service is currently closed.
-func (s *Service) Closed() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.closed()
+// SetLogger sets the internal logger to the logger passed in.
+func (s *Service) SetLogger(l *log.Logger) {
+	s.Logger = l
 }
 
-func (s *Service) closed() bool {
-	select {
-	case <-s.done:
-		// Service is closing.
-		return true
-	default:
-	}
-	return s.done == nil
-}
-
-// createInternalStorage ensures that the required database has been created.
-func (s *Service) createInternalStorage() error {
-	s.mu.RLock()
-	ready := s.ready
-	s.mu.RUnlock()
-	if ready {
-		return nil
-	}
-
-	if _, err := s.MetaClient.CreateDatabase(s.config.Database); err != nil {
-		return err
-	}
-
-	// The service is now ready.
-	s.mu.Lock()
-	s.ready = true
-	s.mu.Unlock()
-	return nil
-}
-
-// WithLogger sets the logger on the service.
-func (s *Service) WithLogger(log *zap.Logger) {
-	s.Logger = log.With(zap.String("service", "udp"))
-}
-
-// Addr returns the listener's address.
+// Addr returns the listener's address
 func (s *Service) Addr() net.Addr {
 	return s.addr
 }

@@ -3,7 +3,7 @@ package subscriber
 import (
 	"net"
 
-	"github.com/influxdata/influxdb/coordinator"
+	"github.com/influxdata/influxdb/cluster"
 )
 
 // UDP supports writing points over UDP using the line protocol.
@@ -17,7 +17,7 @@ func NewUDP(addr string) *UDP {
 }
 
 // WritePoints writes points over UDP transport.
-func (u *UDP) WritePoints(p *coordinator.WritePointsRequest) (err error) {
+func (u *UDP) WritePoints(p *cluster.WritePointsRequest) (err error) {
 	var addr *net.UDPAddr
 	var con *net.UDPConn
 	addr, err = net.ResolveUDPAddr("udp", u.addr)
