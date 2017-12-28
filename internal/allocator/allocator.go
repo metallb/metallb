@@ -13,7 +13,10 @@ import (
 type Allocator struct {
 	pools map[string]*config.Pool
 
-	svcToIP       map[string]net.IP
+	// svcToIP stores the addresses that we have. This can be a net.TCPAddr or net.UDPAddr. We zero out the port (for now).
+	// To check if we own an address we now need to iterate over the map. We also need our own stringer for the address
+	// to add the network back in, UDP/TCPAddr have the same string presentation by default.
+	svcToIP       map[string]*Addr
 	svcToPool     map[string]string
 	ipToSvc       map[string]string
 	poolAllocated map[string]int64
@@ -24,18 +27,18 @@ func New() *Allocator {
 	return &Allocator{
 		pools: map[string]*config.Pool{},
 
-		svcToIP:       map[string]net.IP{},
-		svcToPool:     map[string]string{},
+		svcToIP:       map[string]*Addr{},
 		ipToSvc:       map[string]string{},
+		svcToPool:     map[string]string{},
 		poolAllocated: map[string]int64{},
 	}
 }
 
 // SetPools updates the set of address pools that the allocator owns.
 func (a *Allocator) SetPools(pools map[string]*config.Pool) error {
-	for svc, ip := range a.svcToIP {
-		if poolFor(pools, svc, ip) == "" {
-			return fmt.Errorf("new config not compatible with assigned IPs: service %q cannot own %q under new config", svc, ip)
+	for svc, addr := range a.svcToIP {
+		if poolFor(pools, svc, addr.IP()) == "" {
+			return fmt.Errorf("new config not compatible with assigned IPs: service %q cannot own %q under new config", svc, addr.IP)
 		}
 	}
 
@@ -49,8 +52,8 @@ func (a *Allocator) SetPools(pools map[string]*config.Pool) error {
 	a.pools = pools
 
 	// Need to readjust the existing pool mappings and counts
-	for svc, ip := range a.svcToIP {
-		pool := poolFor(a.pools, svc, ip)
+	for svc, addr := range a.svcToIP {
+		pool := poolFor(a.pools, svc, addr.IP())
 		if a.svcToPool[svc] != pool {
 			a.poolAllocated[a.svcToPool[svc]]--
 			a.svcToPool[svc] = pool
@@ -128,34 +131,34 @@ func poolFor(pools map[string]*config.Pool, service string, ip net.IP) string {
 
 // assign records an assignment. It is the caller's responsibility to
 // verify that the assignment is permissible.
-func (a *Allocator) assign(service, pool string, ip net.IP) {
-	if !a.svcToIP[service].Equal(ip) {
+func (a *Allocator) assign(service, pool string, addr *Addr) {
+	if !(a.svcToIP[service]).Equal(addr.IP()) {
 		a.poolAllocated[pool]++
 		stats.poolActive.WithLabelValues(pool).Inc()
 	}
-	a.svcToIP[service] = ip
+	a.svcToIP[service] = addr
 	a.svcToPool[service] = pool
-	a.ipToSvc[ip.String()] = service
+	a.ipToSvc[addr.String()] = service
 }
 
 // Assign marks service as the owner of ip, if that address is available.
-func (a *Allocator) Assign(service string, ip net.IP) error {
-	if other, ok := a.ipToSvc[ip.String()]; ok {
+func (a *Allocator) Assign(service string, addr *Addr) error {
+	if other, ok := a.ipToSvc[addr.String()]; ok {
 		if other != service {
-			return fmt.Errorf("cannot assign %q to %q, already owned by %q", ip, service, other)
+			return fmt.Errorf("cannot assign %q to %q, already owned by %q", addr, service, other)
 		}
 		// IP already allocated correctly, nothing to do.
 		return nil
 	}
-	pool := poolFor(a.pools, service, ip)
+	pool := poolFor(a.pools, service, addr.IP())
 	if pool == "" {
-		return fmt.Errorf("cannot assign %q to %q, no pool owns that IP", ip, service)
+		return fmt.Errorf("cannot assign %q to %q, no pool owns that IP", addr.IP(), service)
 	}
 
 	// If the service already has another assignment, clear it. This
 	// is idempotent, so won't do harm if there's no allocation.
 	a.Unassign(service)
-	a.assign(service, pool, ip)
+	a.assign(service, pool, addr)
 	return nil
 }
 
@@ -170,8 +173,15 @@ func (a *Allocator) allocateFromPool(service, pname string) net.IP {
 			if pool.ARPNetwork != nil && ipForbiddenByARPNetwork(ip, pool.ARPNetwork) {
 				continue
 			}
-			if a.ipToSvc[ip.String()] == "" {
-				a.assign(service, pname, ip)
+
+			tcpAddr := &Addr{&net.TCPAddr{IP: ip}}
+			if a.ipToSvc[tcpAddr.String()] == "" {
+				a.assign(service, pname, tcpAddr)
+				return ip
+			}
+			udpAddr := &Addr{&net.UDPAddr{IP: ip}}
+			if a.ipToSvc[udpAddr.String()] == "" {
+				a.assign(service, pname, udpAddr)
 				return ip
 			}
 		}
@@ -223,7 +233,7 @@ func (a *Allocator) Unassign(service string) bool {
 
 // IP returns the IP address allocated to service, or nil if none are allocated.
 func (a *Allocator) IP(service string) net.IP {
-	return a.svcToIP[service]
+	return a.svcToIP[service].IP()
 }
 
 // Pool returns the pool from which service's IP was allocated. If
