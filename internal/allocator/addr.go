@@ -21,7 +21,12 @@ func (a *Addr) String() string {
 }
 
 // Equal return true if the IP in a is equal to ip.
-func (a *Addr) Equal(ip net.IP) bool { return a.IP().Equal(ip) }
+func (a *Addr) Equal(ip net.IP) bool {
+	if a == nil || a.IP() == nil {
+		return false
+	}
+	return a.IP().Equal(ip)
+}
 
 // IP returns the IP address of a.
 func (a *Addr) IP() net.IP {
