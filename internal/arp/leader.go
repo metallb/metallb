@@ -28,20 +28,9 @@ func (a *Announce) Relinquish() {
 }
 
 // Acquire sets the leader bit to true and sends out a unsolicited ARP replies for all VIPs that should
-// be announced. It does this repeatedly - every 0.5s - for a duration of 5 seconds.
+// be announced.
 func (a *Announce) Acquire() {
-	start := time.Now()
-
 	a.SetLeader(true)
-
-	for time.Since(start) < 5*time.Second {
-
-		for _, u := range a.Packets() {
-			a.client.WriteTo(u, ethernet.Broadcast)
-		}
-
-		time.Sleep(500 * time.Millisecond)
-	}
 	go a.unsolicited()
 }
 

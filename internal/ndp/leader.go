@@ -27,17 +27,9 @@ func (a *Announce) Relinquish() {
 }
 
 // Acquire sets the leader bit to true and sends out unsolicited NDP neighbor
-// advertisements for all VIPs that should be announced. It does this repeatedly
-// - every 0.5s - for a duration of 5 seconds.
+// advertisements for all VIPs that should be announced.
 func (a *Announce) Acquire() {
-	start := time.Now()
-
 	a.SetLeader(true)
-
-	for time.Since(start) < 5*time.Second {
-		a.Advertise()
-		time.Sleep(500 * time.Millisecond)
-	}
 	go a.unsolicited()
 }
 
