@@ -20,6 +20,8 @@ func (c *Client) NewLeaderElector(a *arp.Announce, identity string) (*le.LeaderE
 		return nil, err
 	}
 
+	leader.Set(-1)
+
 	lec := le.LeaderElectionConfig{
 		Lock:          lock,
 		LeaseDuration: 30 * time.Minute,
@@ -28,10 +30,12 @@ func (c *Client) NewLeaderElector(a *arp.Announce, identity string) (*le.LeaderE
 		Callbacks: le.LeaderCallbacks{
 			OnStartedLeading: func(stop <-chan struct{}) {
 				glog.Infof("Acquiring leadership")
+				leader.Set(1)
 				a.Acquire()
 			},
 			OnStoppedLeading: func() {
 				glog.Infof("Lost leadership")
+				leader.Set(0)
 				a.Relinquish()
 			},
 		},
