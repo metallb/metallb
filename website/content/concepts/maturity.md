@@ -1,6 +1,6 @@
 ---
 title: Project Maturity
-weight: 0
+weight: 4
 ---
 
 MetalLB is currently in *alpha*.

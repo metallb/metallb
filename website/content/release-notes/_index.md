@@ -1,6 +1,6 @@
 ---
 title: Release Notes
-weight: 6
+weight: 7
 ---
 
 
@@ -35,8 +35,8 @@ Notable features:
   EdgeRouter and Unifi product lines.
 - The development workflow with Minikube now works with Docker for
   Mac, allowing mac users to hack on MetalLB. See
-  the [hacking documentation]({{% relref "hacking.md" %}}) for the
-  required additional setup.
+  the [hacking documentation]({{% relref "community/_index.md" %}})
+  for the required additional setup.
 
 Notable fixes:
 

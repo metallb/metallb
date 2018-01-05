@@ -14,12 +14,14 @@ namespace. The components in the manifest are:
 
 - The `metallb-system/controller` deployment. This is the cluster-wide
   controller that handles IP address assignments.
-- The `metallb-system/speaker` daemonset. This is the component
-  that peers with your BGP router(s) or sends out ARP requests
-  and announces assigned service IPs to the world.
+- The `metallb-system/speaker` daemonset. This is the component that
+  speaks the protocol(s) of your choice to make the services
+  reachable.
 - Service accounts for the controller and speaker, along with the
   RBAC permissions that the components need to function.
 
 The installation manifest does not include a configuration
 file. MetalLB's components will still start, but will remain idle
-until you define and deploy a configmap.
+until
+you
+[define and deploy a configmap]({{% relref "../configuration/_index.md" %}}).

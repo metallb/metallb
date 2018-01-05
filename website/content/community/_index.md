@@ -1,6 +1,6 @@
 ---
 title: Community
-weight: 5
+weight: 6
 ---
 
 We would love to hear from you! Here are some places you can find us.

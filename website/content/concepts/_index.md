@@ -44,71 +44,29 @@ as you want, and doesn't care what "kind" of addresses you give it.
 
 Once MetalLB has assigned an external IP address to a service, it
 needs to make the network beyond the cluster aware that the IP "lives"
-in the cluster. Currently MetalLB has two ways of achieving this, it
-can speak BGP or ARP.
+in the cluster. MetalLB uses standard routing protocols to achieve
+this, one of ARP or BGP.
 
-In the case of BGP, MetalLB does this by speaking to a nearby network router that you
-control, and telling it how to forward traffic to assigned service
-IPs.
+### ARP
 
-Again, the specifics of the routers and BGP advertisements depend on
-your particular environment, there is no "one size fits all"
-solution. These specifics make up the bulk of MetalLB's configuration
-file, to give you the flexibility to adapt MetalLB to your cluster.
+In ARP mode, one machine in the cluster takes ownership of the service
+IPs, and uses
+standard
+[ARP](https://en.wikipedia.org/wiki/Address_Resolution_Protocol)
+packets to make those IPs reachable. From the LAN's point of view, the
+announcing machine simply has multiple IP addresses.
 
-In the case of ARP, MetalLB will spoof ARP packets and reply to ARP requests for the load-balanced
-IPs.
+The [ARP mode]({{% relref "arp.md" %}}) sub-page has more details on
+ARP mode's operation and limitations.
 
-## BGP Limitations
+### BGP 
 
-MetalLB uses the BGP routing protocol to implement
-load-balancing. This has the advantage of simplicity, in that you
-don't need specialized equipment, but it comes with some downsides as
-well.
+In BGP mode, all machines in the cluster
+establish [BGP](https://en.wikipedia.org/wiki/Border_Gateway_Protocol)
+peering sessions with nearby routers that you control, and tell those
+routers how to forward traffic to the service IPs. Using BGP allows
+for true load balancing across multiple nodes, and fine-grained
+traffic control thanks to BGP's policy mechanisms.
 
-The biggest is that BGP-based load balancing does not react gracefully
-to changes in the _backend set_ for an address. What it effectively
-means is that when a cluster node goes down, you should expect _all_
-active connections to your service to be broken (users will see
-"Connection reset by peer").
-
-BGP-based routers implement stateless load-balancing. They assign a
-given packet to a specific next hop by hashing some fields in the
-packet header, and using that hash as an index into the array of
-available backends.
-
-The problem is that the hashes used in routers are not _stable_, so
-whenever the size of the backend set changes (for example when a
-node's BGP session goes down), existing connections will be rehashed
-effectively randomly, which means that the majority of existing
-connections will end up suddenly being forwarded to a different
-backend, one that has no knowledge of the connection in question.
-
-The consequence of this is that any time the IP→Node mapping changes
-for your service, you should expect to see a one-time hit where most
-active connections to the service break. There's no ongoing packet
-loss or blackholing, just a one-time clean break.
-
-Depending on what your services do, there are a couple of mitigation
-strategies you can employ:
-
-- Pin your service deployments to specific nodes, to minimize the pool
-  of nodes that you have to be "careful" about.
-- Schedule changes to your service deployments during "trough", when
-  most of your users are asleep and your traffic is low.
-- Split each logical service into two Kubernetes services with
-  different IPs, and use DNS to gracefully migrate user traffic from
-  one to the other prior to disrupting the "drained" service.
-- Add transparent retry logic on the client side, to gracefully
-  recover from sudden disconnections. This works especially well if
-  your clients are things like mobile apps or rich single page web
-  apps.
-- Put your services behind an ingress controller. The ingress
-  controller itself can use MetalLB to receive traffic, but having a
-  stateful layer between BGP and your services means you can change
-  your services without concern. You only have to be careful when
-  changing the deployment of the ingress controller itself (e.g. when
-  adding more nginx pods to scale up).
-- Accept that there will be occasional bursts of reset
-  connections. For low-availability internal services, this may be
-  acceptable as-is.
+The [BGP mode]({{% relref "bgp.md" %}}) sub-page has more details on
+BGP mode's operation and limitations.

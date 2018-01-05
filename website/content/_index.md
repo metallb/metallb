@@ -10,7 +10,7 @@ routing protocols.
 
 {{% notice note %}}
 MetalLB is a young project, so you should treat it as an **alpha**
-system. The [project maturity]({{% relref "maturity.md" %}}) page
+system. The [project maturity]({{% relref "concepts/maturity.md" %}}) page
 explains what that implies.
 {{% /notice %}}
 
@@ -52,21 +52,21 @@ MetalLB requires the following to function:
 
 ## Usage
 
+The [concepts]({{% relref "concepts/_index.md" %}}) section will give
+you a primer on what MetalLB does in your cluster.
+
 Want to test-drive MetalLB? Follow
-the [tutorial]({{% relref "tutorial.md" %}}) to set up a
+the [tutorial]({{% relref "tutorial/_index.md" %}}) to set up a
 self-contained MetalLB in minikube.
 
 Deploying to a real cluster? Head to
-the [installation]({{% relref "installation.md" %}})
-and [usage]({{% relref "usage.md" %}}) guides.
-
-You might also find the [design document]({{% relref "design.md" %}})
-useful to better understand how MetalLB operates.
+the [installation]({{% relref "installation/_index.md" %}})
+and [usage]({{% relref "usage/_index.md" %}}) guides.
 
 ## Contributing
 
 We welcome contributions in all forms. Please check out
-the [contributing guide]({{% relref "hacking.md" %}}) for more
+the [contributing guide]({{% relref "community/_index.md" %}}) for more
 information.
 
 One lightweight way you can contribute is
