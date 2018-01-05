@@ -1,0 +1,15 @@
+{{ $header := print "_header." .Lang }}
+	{{ range where .Site.Pages "Source.BaseFileName" $header }}
+	{{ .Content }} 
+	{{else}}
+  {{ if .Site.GetPage "page" "_header.md" }}
+    {{(.Site.GetPage "page" "_header.md").Content}}
+  {{else}}
+    <span style="font-size:smaller">
+    <a id="logo" href="{{.Site.BaseURL}}">
+    <span class="fa fa-gears" style="font-size:large"></span>
+    </a>
+    {{ T "create-header-md" }}
+    </span>
+  {{end}}
+{{end}}

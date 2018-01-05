@@ -1,0 +1,5 @@
+@media print {
+	header,nav,aside,aside.footline,footer,#nav-select{
+		display:none;
+	}
+}
