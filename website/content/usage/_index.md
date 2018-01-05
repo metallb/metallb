@@ -71,8 +71,8 @@ apiVersion: v1
 kind: Service
 metadata:
   name: nginx
-annotations:
-  metallb.universe.tf/address-pool: production-public-ips
+  annotations:
+    metallb.universe.tf/address-pool: production-public-ips
 spec:
   ports:
   - port: 80
