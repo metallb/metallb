@@ -46,9 +46,7 @@ MetalLB requires the following to function:
 - Depending on the operating mode, you may need one or more routers
   capable of
   speaking
-  [BGP](https://en.wikipedia.org/wiki/Border_Gateway_Protocol)
-  or
-  [RIP](https://en.wikipedia.org/wiki/Routing_Information_Protocol).
+  [BGP](https://en.wikipedia.org/wiki/Border_Gateway_Protocol).
 
 ## Usage
 
