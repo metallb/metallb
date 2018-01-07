@@ -169,8 +169,7 @@ func UpdatePathAttrs4ByteAs(msg *bgp.BGPUpdate) error {
 			keepNum -= param.ASLen()
 		} else {
 			// only SEQ param reaches here
-			param.AS = param.AS[:keepNum]
-			newParams = append(newParams, param)
+			newParams = append(newParams, bgp.NewAs4PathParam(param.Type, param.AS[:keepNum]))
 			keepNum = 0
 		}
 
@@ -183,11 +182,10 @@ func UpdatePathAttrs4ByteAs(msg *bgp.BGPUpdate) error {
 		lastParam := newParams[len(newParams)-1]
 		if param.Type == lastParam.Type && param.Type == bgp.BGP_ASPATH_ATTR_TYPE_SEQ {
 			if len(lastParam.AS)+len(param.AS) > 255 {
-				lastParam.AS = append(lastParam.AS, param.AS[:255-len(lastParam.AS)]...)
-				param.AS = param.AS[255-len(lastParam.AS):]
-				newParams = append(newParams, param)
+				newParams[len(newParams)-1] = bgp.NewAs4PathParam(param.Type, append(lastParam.AS, param.AS[:255-len(lastParam.AS)]...))
+				newParams = append(newParams, bgp.NewAs4PathParam(param.Type, param.AS[255-len(lastParam.AS):]))
 			} else {
-				lastParam.AS = append(lastParam.AS, param.AS...)
+				newParams[len(newParams)-1] = bgp.NewAs4PathParam(param.Type, append(lastParam.AS, param.AS...))
 			}
 		} else {
 			newParams = append(newParams, param)

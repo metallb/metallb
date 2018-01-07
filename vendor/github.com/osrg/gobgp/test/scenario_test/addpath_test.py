@@ -74,7 +74,10 @@ class GoBGPTestBase(unittest.TestCase):
         self.e1.add_route(route='192.168.100.0/24', identifier=10, aspath=[100, 200, 300])
         self.e1.add_route(route='192.168.100.0/24', identifier=20, aspath=[100, 200])
         self.e1.add_route(route='192.168.100.0/24', identifier=30, aspath=[100])
-        time.sleep(1)  # XXX: wait for routes re-calculated and advertised
+        # Because ExaBGPContainer will be restarted internally for adding or
+        # deleting routes, here waits for re-establishment.
+        self.g1.wait_for(expected_state=BGP_FSM_ESTABLISHED, peer=self.e1)
+        time.sleep(1)
 
     # test three routes are installed to the rib due to add-path feature
     def test_02_check_g1_global_rib(self):
@@ -98,7 +101,10 @@ class GoBGPTestBase(unittest.TestCase):
     # withdraw a route with path_id (no error check)
     def test_05_withdraw_route_with_path_id(self):
         self.e1.del_route(route='192.168.100.0/24', identifier=30)
-        time.sleep(1)  # XXX: wait for routes re-calculated and advertised
+        # Because ExaBGPContainer will be restarted internally for adding or
+        # deleting routes, here waits for re-establishment.
+        self.g1.wait_for(expected_state=BGP_FSM_ESTABLISHED, peer=self.e1)
+        time.sleep(1)
 
     # test the withdrawn route is removed from the rib
     def test_06_check_g1_global_rib(self):

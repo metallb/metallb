@@ -75,24 +75,6 @@ func ReadConfigfileServe(path, format string, configCh chan *BgpConfigSet) {
 	}
 }
 
-func inSlice(n Neighbor, b []Neighbor) int {
-	for i, nb := range b {
-		if nb.State.NeighborAddress == n.State.NeighborAddress {
-			return i
-		}
-	}
-	return -1
-}
-
-func existPeerGroup(n string, b []PeerGroup) int {
-	for i, nb := range b {
-		if nb.Config.PeerGroupName == n {
-			return i
-		}
-	}
-	return -1
-}
-
 func ConfigSetToRoutingPolicy(c *BgpConfigSet) *RoutingPolicy {
 	return &RoutingPolicy{
 		DefinedSets:       c.DefinedSets,

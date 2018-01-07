@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net"
 	"sort"
+	"strings"
 
 	"github.com/armon/go-radix"
 	"github.com/osrg/gobgp/packet/bgp"
@@ -284,6 +285,41 @@ func (t *Table) GetLongerPrefixDestinations(key string) ([]*Destination, error) 
 	return results, nil
 }
 
+func (t *Table) GetEvpnDestinationsWithRouteType(typ string) ([]*Destination, error) {
+	var routeType uint8
+	switch strings.ToLower(typ) {
+	case "a-d":
+		routeType = bgp.EVPN_ROUTE_TYPE_ETHERNET_AUTO_DISCOVERY
+	case "macadv":
+		routeType = bgp.EVPN_ROUTE_TYPE_MAC_IP_ADVERTISEMENT
+	case "multicast":
+		routeType = bgp.EVPN_INCLUSIVE_MULTICAST_ETHERNET_TAG
+	case "esi":
+		routeType = bgp.EVPN_ETHERNET_SEGMENT_ROUTE
+	case "prefix":
+		routeType = bgp.EVPN_IP_PREFIX
+	default:
+		return nil, fmt.Errorf("unsupported evpn route type: %s", typ)
+	}
+	destinations := t.GetDestinations()
+	results := make([]*Destination, 0, len(destinations))
+	switch t.routeFamily {
+	case bgp.RF_EVPN:
+		for _, dst := range destinations {
+			if nlri, ok := dst.nlri.(*bgp.EVPNNLRI); !ok {
+				return nil, fmt.Errorf("invalid evpn nlri type detected: %T", dst.nlri)
+			} else if nlri.RouteType == routeType {
+				results = append(results, dst)
+			}
+		}
+	default:
+		for _, dst := range destinations {
+			results = append(results, dst)
+		}
+	}
+	return results, nil
+}
+
 func (t *Table) setDestination(key string, dest *Destination) {
 	t.destinations[key] = dest
 }
@@ -400,8 +436,21 @@ func (t *Table) Select(option ...TableSelectOption) (*Table, error) {
 					}
 				}
 			}
+		case bgp.RF_EVPN:
+			for _, p := range prefixes {
+				// Uses LookupPrefix.Prefix as EVPN Route Type string
+				ds, err := t.GetEvpnDestinationsWithRouteType(p.Prefix)
+				if err != nil {
+					return nil, err
+				}
+				for _, dst := range ds {
+					if d := dst.Select(dOption); d != nil {
+						dsts[dst.GetNlri().String()] = d
+					}
+				}
+			}
 		default:
-			return nil, fmt.Errorf("route filtering is only supported for IPv4/IPv6 unicast/mpls routes")
+			return nil, fmt.Errorf("route filtering is not supported for this family")
 		}
 	} else {
 		for k, dst := range t.GetDestinations() {

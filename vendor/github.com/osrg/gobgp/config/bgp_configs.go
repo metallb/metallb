@@ -5986,7 +5986,7 @@ type NeighborSet struct {
 	NeighborSetName string `mapstructure:"neighbor-set-name" json:"neighbor-set-name,omitempty"`
 	// original -> gobgp:neighbor-info
 	// original type is list of inet:ip-address
-	// neighbor ip address.
+	// neighbor ip address or prefix.
 	NeighborInfoList []string `mapstructure:"neighbor-info-list" json:"neighbor-info-list,omitempty"`
 }
 

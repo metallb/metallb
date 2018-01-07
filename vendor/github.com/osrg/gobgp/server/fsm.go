@@ -999,7 +999,7 @@ func open2Cap(open *bgp.BGPOpen, n *config.Neighbor) (map[bgp.BGPCapabilityCode]
 		capMap[bgp.BGP_CAP_MULTIPROTOCOL] = []bgp.ParameterCapabilityInterface{bgp.NewCapMultiProtocol(bgp.RF_IPv4_UC)}
 	}
 
-	local := config.CreateRfMap(n)
+	local := n.CreateRfMap()
 	remote := make(map[bgp.RouteFamily]bgp.BGPAddPathMode)
 	for _, c := range capMap[bgp.BGP_CAP_MULTIPROTOCOL] {
 		family := c.(*bgp.CapMultiProtocol).CapValue

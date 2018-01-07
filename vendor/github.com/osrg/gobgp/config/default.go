@@ -43,64 +43,6 @@ func defaultAfiSafi(typ AfiSafiType, enable bool) AfiSafi {
 	}
 }
 
-// yaml is decoded as []interface{}
-// but toml is decoded as []map[string]interface{}.
-// currently, viper can't hide this difference.
-// handle the difference here.
-func extractArray(intf interface{}) ([]interface{}, error) {
-	if intf != nil {
-		list, ok := intf.([]interface{})
-		if ok {
-			return list, nil
-		}
-		l, ok := intf.([]map[string]interface{})
-		if !ok {
-			return nil, fmt.Errorf("invalid configuration: neither []interface{} nor []map[string]interface{}")
-		}
-		list = make([]interface{}, 0, len(l))
-		for _, m := range l {
-			list = append(list, m)
-		}
-		return list, nil
-	}
-	return nil, nil
-}
-
-func getIPv6LinkLocalAddress(ifname string) (string, error) {
-	ifi, err := net.InterfaceByName(ifname)
-	if err != nil {
-		return "", err
-	}
-	addrs, err := ifi.Addrs()
-	if err != nil {
-		return "", err
-	}
-	for _, addr := range addrs {
-		ip := addr.(*net.IPNet).IP
-		if ip.To4() == nil && ip.IsLinkLocalUnicast() {
-			return fmt.Sprintf("%s%%%s", ip.String(), ifname), nil
-		}
-	}
-	return "", fmt.Errorf("no ipv6 link local address for %s", ifname)
-}
-
-func isLocalLinkLocalAddress(ifindex int, addr net.IP) (bool, error) {
-	ifi, err := net.InterfaceByIndex(ifindex)
-	if err != nil {
-		return false, err
-	}
-	addrs, err := ifi.Addrs()
-	if err != nil {
-		return false, err
-	}
-	for _, a := range addrs {
-		if ip, _, _ := net.ParseCIDR(a.String()); addr.Equal(ip) {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
 func SetDefaultNeighborConfigValues(n *Neighbor, pg *PeerGroup, g *Global) error {
 	// Determines this function is called against the same Neighbor struct,
 	// and if already called, returns immediately.

@@ -174,12 +174,12 @@ func (b *bmpClient) loop() {
 							}
 							for _, u := range table.CreateUpdateMsgFromPaths(pathList) {
 								payload, _ := u.Serialize()
-								if err := write(bmpPeerRoute(bmp.BMP_PEER_TYPE_GLOBAL, msg.PostPolicy, 0, info, msg.Timestamp.Unix(), payload)); err != nil {
+								if err := write(bmpPeerRoute(bmp.BMP_PEER_TYPE_GLOBAL, msg.PostPolicy, 0, true, info, msg.Timestamp.Unix(), payload)); err != nil {
 									return false
 								}
 							}
 						} else {
-							if err := write(bmpPeerRoute(bmp.BMP_PEER_TYPE_GLOBAL, msg.PostPolicy, 0, info, msg.Timestamp.Unix(), msg.Payload)); err != nil {
+							if err := write(bmpPeerRoute(bmp.BMP_PEER_TYPE_GLOBAL, msg.PostPolicy, 0, msg.FourBytesAs, info, msg.Timestamp.Unix(), msg.Payload)); err != nil {
 								return false
 							}
 						}
@@ -193,7 +193,7 @@ func (b *bmpClient) loop() {
 							u := table.CreateUpdateMsgFromPaths([]*table.Path{p})[0]
 							if payload, err := u.Serialize(); err != nil {
 								return false
-							} else if err = write(bmpPeerRoute(bmp.BMP_PEER_TYPE_LOCAL_RIB, false, 0, info, p.GetTimestamp().Unix(), payload)); err != nil {
+							} else if err = write(bmpPeerRoute(bmp.BMP_PEER_TYPE_LOCAL_RIB, false, 0, true, info, p.GetTimestamp().Unix(), payload)); err != nil {
 								return false
 							}
 						}
@@ -275,10 +275,13 @@ func bmpPeerDown(reason uint8, t uint8, policy bool, pd uint64, peeri *table.Pee
 	return bmp.NewBMPPeerDownNotification(*ph, reason, nil, []byte{})
 }
 
-func bmpPeerRoute(t uint8, policy bool, pd uint64, peeri *table.PeerInfo, timestamp int64, payload []byte) *bmp.BMPMessage {
+func bmpPeerRoute(t uint8, policy bool, pd uint64, fourBytesAs bool, peeri *table.PeerInfo, timestamp int64, payload []byte) *bmp.BMPMessage {
 	var flags uint8 = 0
 	if policy {
 		flags |= bmp.BMP_PEER_FLAG_POST_POLICY
+	}
+	if !fourBytesAs {
+		flags |= bmp.BMP_PEER_FLAG_TWO_AS
 	}
 	ph := bmp.NewBMPPeerHeader(t, flags, pd, peeri.Address.String(), peeri.AS, peeri.ID.String(), float64(timestamp))
 	m := bmp.NewBMPRouteMonitoring(*ph, nil)

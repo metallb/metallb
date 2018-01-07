@@ -327,6 +327,50 @@ func TestAsPathAs4TransInvalid4(t *testing.T) {
 	assert.Equal(t, msg.PathAttributes[0].(*bgp.PathAttributeAsPath).Value[0].(*bgp.As4PathParam).AS[4], uint32(40001))
 }
 
+func TestASPathAs4TransMultipleParams(t *testing.T) {
+	as1 := []uint16{17676, 2914, 174, 50607}
+	as2 := []uint16{bgp.AS_TRANS, bgp.AS_TRANS}
+	params := []bgp.AsPathParamInterface{bgp.NewAsPathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, as1), bgp.NewAsPathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, as2)}
+	aspath := bgp.NewPathAttributeAsPath(params)
+
+	as41 := []uint32{2914, 174, 50607}
+	as42 := []uint32{198035, 198035}
+	as4param1 := bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, as41)
+	as4param2 := bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, as42)
+	param4s := []*bgp.As4PathParam{as4param1, as4param2}
+	as4path := bgp.NewPathAttributeAs4Path(param4s)
+	msg := bgp.NewBGPUpdateMessage(nil, []bgp.PathAttributeInterface{aspath, as4path}, nil).Body.(*bgp.BGPUpdate)
+	UpdatePathAttrs4ByteAs(msg)
+	for _, param := range msg.PathAttributes[0].(*bgp.PathAttributeAsPath).Value {
+		p := param.(*bgp.As4PathParam)
+		assert.Equal(t, p.Num, uint8(len(p.AS)))
+	}
+}
+
+func TestASPathAs4TransMultipleLargeParams(t *testing.T) {
+	as1 := make([]uint16, 0, 255)
+	for i := 0; i < 255-5; i++ {
+		as1 = append(as1, uint16(i+1))
+	}
+	as1 = append(as1, []uint16{17676, 2914, 174, 50607}...)
+	as2 := []uint16{bgp.AS_TRANS, bgp.AS_TRANS}
+	params := []bgp.AsPathParamInterface{bgp.NewAsPathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, as1), bgp.NewAsPathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, as2)}
+	aspath := bgp.NewPathAttributeAsPath(params)
+
+	as41 := []uint32{2914, 174, 50607}
+	as42 := []uint32{198035, 198035}
+	as4param1 := bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, as41)
+	as4param2 := bgp.NewAs4PathParam(bgp.BGP_ASPATH_ATTR_TYPE_SEQ, as42)
+	param4s := []*bgp.As4PathParam{as4param1, as4param2}
+	as4path := bgp.NewPathAttributeAs4Path(param4s)
+	msg := bgp.NewBGPUpdateMessage(nil, []bgp.PathAttributeInterface{aspath, as4path}, nil).Body.(*bgp.BGPUpdate)
+	UpdatePathAttrs4ByteAs(msg)
+	for _, param := range msg.PathAttributes[0].(*bgp.PathAttributeAsPath).Value {
+		p := param.(*bgp.As4PathParam)
+		assert.Equal(t, p.Num, uint8(len(p.AS)))
+	}
+}
+
 func TestAggregator4BytesASes(t *testing.T) {
 	getAggr := func(msg *bgp.BGPUpdate) *bgp.PathAttributeAggregator {
 		for _, attr := range msg.PathAttributes {

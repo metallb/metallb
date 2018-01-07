@@ -23,6 +23,12 @@ _cgo_export.*
 
 _testmain.go
 
+test/scenario_test/nosetest*.xml
+
 *.exe
 *.test
 *.prof
+
+# IDE workspace
+.idea
+.vscode

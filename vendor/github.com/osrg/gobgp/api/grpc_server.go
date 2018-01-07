@@ -1440,13 +1440,13 @@ func NewDefinedSetFromApiStruct(a *DefinedSet) (table.DefinedSet, error) {
 		}
 		return table.NewPrefixSetFromApiStruct(a.Name, prefixes)
 	case table.DEFINED_TYPE_NEIGHBOR:
-		list := make([]net.IP, 0, len(a.List))
+		list := make([]net.IPNet, 0, len(a.List))
 		for _, x := range a.List {
-			addr := net.ParseIP(x)
-			if addr == nil {
-				return nil, fmt.Errorf("invalid ip address format: %s", x)
+			_, addr, err := net.ParseCIDR(x)
+			if err != nil {
+				return nil, fmt.Errorf("invalid address or prefix: %s", x)
 			}
-			list = append(list, addr)
+			list = append(list, *addr)
 		}
 		return table.NewNeighborSetFromApiStruct(a.Name, list)
 	case table.DEFINED_TYPE_AS_PATH:

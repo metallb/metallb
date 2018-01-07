@@ -48,6 +48,10 @@ BGP_ATTR_TYPE_CLUSTER_LIST = 10
 BGP_ATTR_TYPE_MP_REACH_NLRI = 14
 BGP_ATTR_TYPE_EXTENDED_COMMUNITIES = 16
 
+# with this label, we can do filtering in `docker ps` and `docker network prune`
+TEST_CONTAINER_LABEL = 'gobgp-test'
+TEST_NETWORK_LABEL = TEST_CONTAINER_LABEL
+
 env.abort_exception = RuntimeError
 output.stderr = False
 
@@ -156,7 +160,7 @@ class Bridge(object):
             v6 = ''
             if self.subnet.version == 6:
                 v6 = '--ipv6'
-            self.id = local('docker network create --driver bridge {0} --subnet {1} {2}'.format(v6, subnet, self.name), capture=True)
+            self.id = local('docker network create --driver bridge {0} --subnet {1} --label {2} {3}'.format(v6, subnet, TEST_NETWORK_LABEL, self.name), capture=True)
         try_several_times(f)
 
         self.self_ip = self_ip
@@ -200,7 +204,7 @@ class Container(object):
 
     def docker_name(self):
         if TEST_PREFIX == DEFAULT_TEST_PREFIX:
-            return self.name
+            return '{0}'.format(self.name)
         return '{0}_{1}'.format(TEST_PREFIX, self.name)
 
     def next_if_name(self):
@@ -213,7 +217,7 @@ class Container(object):
         c << "docker run --privileged=true"
         for sv in self.shared_volumes:
             c << "-v {0}:{1}".format(sv[0], sv[1])
-        c << "--name {0} -id {1}".format(self.docker_name(), self.image)
+        c << "--name {0} -l {1} -id {2}".format(self.docker_name(), TEST_CONTAINER_LABEL, self.image)
         self.id = try_several_times(lambda: local(str(c), capture=True))
         self.is_running = True
         self.local("ip li set up dev lo")

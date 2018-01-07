@@ -714,8 +714,13 @@ func showNeighborRib(r string, name string, args []string) error {
 	var filter []*table.LookupPrefix
 	if len(args) > 0 {
 		target := args[0]
-		if _, _, err = parseCIDRorIP(args[0]); err != nil {
-			return err
+		switch family {
+		case bgp.RF_EVPN:
+			// Uses target as EVPN Route Type string
+		default:
+			if _, _, err = parseCIDRorIP(target); err != nil {
+				return err
+			}
 		}
 		var option table.LookupOption
 		args = args[1:]

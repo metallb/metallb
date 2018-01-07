@@ -873,6 +873,62 @@ func Test_MpReachNLRIWithIPv6PrefixWithIPv4Peering(t *testing.T) {
 	assert.Equal(bufin, bufout)
 }
 
+func Test_MpReachNLRIWithIPv6(t *testing.T) {
+	assert := assert.New(t)
+	bufin := []byte{
+		0x90, 0x0e, 0x00, 0x1e, // flags(1), type(1), length(2),
+		0x00, 0x02, 0x01, 0x10, // afi(2), safi(1), nexthoplen(1)
+		0x20, 0x01, 0x0d, 0xb8, // nexthop(16)
+		0x00, 0x01, 0x00, 0x00, // = "2001:db8:1::1"
+		0x00, 0x00, 0x00, 0x00,
+		0x00, 0x00, 0x00, 0x01,
+		0x00,                   // reserved(1)
+		0x40, 0x20, 0x01, 0x0d, // nlri(9)
+		0xb8, 0x00, 0x53, 0x00, // = "2001:db8:53::/64"
+		0x00,
+	}
+	// Test DecodeFromBytes()
+	p := &PathAttributeMpReachNLRI{}
+	err := p.DecodeFromBytes(bufin)
+	assert.Nil(err)
+	// Test decoded values
+	assert.Equal(BGPAttrFlag(0x90), p.Flags)
+	assert.Equal(BGPAttrType(0xe), p.Type)
+	assert.Equal(uint16(0x1e), p.Length)
+	assert.Equal(uint16(AFI_IP6), p.AFI)
+	assert.Equal(uint8(SAFI_UNICAST), p.SAFI)
+	assert.Equal(net.ParseIP("2001:db8:1::1"), p.Nexthop)
+	value := []AddrPrefixInterface{
+		NewIPv6AddrPrefix(64, "2001:db8:53::"),
+	}
+	assert.Equal(value, p.Value)
+}
+
+func Test_MpUnreachNLRIWithIPv6(t *testing.T) {
+	assert := assert.New(t)
+	bufin := []byte{
+		0x90, 0x0f, 0x00, 0x0c, // flags(1), type(1), length(2),
+		0x00, 0x02, 0x01, // afi(2), safi(1),
+		0x40, 0x20, 0x01, 0x0d, // nlri(9)
+		0xb8, 0x00, 0x53, 0x00, // = "2001:db8:53::/64"
+		0x00,
+	}
+	// Test DecodeFromBytes()
+	p := &PathAttributeMpUnreachNLRI{}
+	err := p.DecodeFromBytes(bufin)
+	assert.Nil(err)
+	// Test decoded values
+	assert.Equal(BGPAttrFlag(0x90), p.Flags)
+	assert.Equal(BGPAttrType(0xf), p.Type)
+	assert.Equal(uint16(0x0c), p.Length)
+	assert.Equal(uint16(AFI_IP6), p.AFI)
+	assert.Equal(uint8(SAFI_UNICAST), p.SAFI)
+	value := []AddrPrefixInterface{
+		NewIPv6AddrPrefix(64, "2001:db8:53::"),
+	}
+	assert.Equal(value, p.Value)
+}
+
 func Test_MpReachNLRIWithIPv6PrefixWithLinkLocalNexthop(t *testing.T) {
 	assert := assert.New(t)
 	bufin := []byte{
@@ -1084,7 +1140,7 @@ func Test_ParseEthernetSegmentIdentifier(t *testing.T) {
 	}, esi)
 
 	// ESI_LACP
-	args = []string{"lacp", "aa:bb:cc:dd:ee:ff", strconv.Itoa(0x1122)} // lower case
+	args = []string{"lacp", "aa:bb:cc:dd:ee:ff", strconv.FormatInt(0x1122, 10)} // lower case
 	esi, err = ParseEthernetSegmentIdentifier(args)
 	assert.Nil(err)
 	assert.Equal(EthernetSegmentIdentifier{
@@ -1093,7 +1149,7 @@ func Test_ParseEthernetSegmentIdentifier(t *testing.T) {
 	}, esi)
 
 	// ESI_MSTP
-	args = []string{"esi_mstp", "aa:bb:cc:dd:ee:ff", strconv.Itoa(0x1122)} // omit "ESI_" + lower case
+	args = []string{"esi_mstp", "aa:bb:cc:dd:ee:ff", strconv.FormatInt(0x1122, 10)} // omit "ESI_" + lower case
 	esi, err = ParseEthernetSegmentIdentifier(args)
 	assert.Nil(err)
 	assert.Equal(EthernetSegmentIdentifier{
@@ -1102,7 +1158,7 @@ func Test_ParseEthernetSegmentIdentifier(t *testing.T) {
 	}, esi)
 
 	// ESI_MAC
-	args = []string{"ESI_MAC", "aa:bb:cc:dd:ee:ff", strconv.Itoa(0x112233)}
+	args = []string{"ESI_MAC", "aa:bb:cc:dd:ee:ff", strconv.FormatInt(0x112233, 10)}
 	esi, err = ParseEthernetSegmentIdentifier(args)
 	assert.Nil(err)
 	assert.Equal(EthernetSegmentIdentifier{
@@ -1111,7 +1167,7 @@ func Test_ParseEthernetSegmentIdentifier(t *testing.T) {
 	}, esi)
 
 	// ESI_ROUTERID
-	args = []string{"ESI_ROUTERID", "1.1.1.1", strconv.Itoa(0x11223344)}
+	args = []string{"ESI_ROUTERID", "1.1.1.1", strconv.FormatInt(0x11223344, 10)}
 	esi, err = ParseEthernetSegmentIdentifier(args)
 	assert.Nil(err)
 	assert.Equal(EthernetSegmentIdentifier{
@@ -1120,7 +1176,7 @@ func Test_ParseEthernetSegmentIdentifier(t *testing.T) {
 	}, esi)
 
 	// ESI_AS
-	args = []string{"ESI_AS", strconv.Itoa(0xaabbccdd), strconv.Itoa(0x11223344)}
+	args = []string{"ESI_AS", strconv.FormatInt(0xaabbccdd, 10), strconv.FormatInt(0x11223344, 10)}
 	esi, err = ParseEthernetSegmentIdentifier(args)
 	assert.Nil(err)
 	assert.Equal(EthernetSegmentIdentifier{

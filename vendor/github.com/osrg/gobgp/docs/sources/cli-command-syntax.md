@@ -90,7 +90,10 @@ The following options can be specified in the global subcommand:
 |--------|---------------|--------------------------------------------|---------|
 |a       |address-family |specify any one from among `ipv4`, `ipv6`, `vpnv4`, `vpnv6`, `ipv4-labeled`, `ipv6-labeled`, `evpn`, `encap`, `rtc`, `ipv4-flowspec`, `ipv6-flowspec`, `l2vpn-flowspec`, `opaque` | `ipv4` |
 
-For the `*-flowspec` address family, see also [CLI Syntax for Flow Specification](flowspec.md#cli-syntax)
+Also, refer to the following for the detail syntax of each address family.
+
+- `evpn` address family: [CLI Syntax for EVPN](evpn.md#cli-syntax)
+- `*-flowspec` address family: [CLI Syntax for Flow Specification](flowspec.md#cli-syntax)
 
 ## 2. <a name="neighbor"> neighbor subcommand
 ### 2.1. Show Neighbor Status
@@ -211,7 +214,7 @@ If you want to remove one element(prefix) of PrefixSet, to specify a prefix in a
 #### Syntax
 ```shell
 # add NeighborSet
-% gobgp policy neighbor add <neighbor set name> <neighbor address>
+% gobgp policy neighbor add <neighbor set name> <neighbor address/prefix>
 # delete a NeighborSet
 % gobgp policy neighbor del <neighbor set name>
 # delete a neighbor from a NeighborSet
@@ -227,7 +230,11 @@ If you want to add the NeighborSet：
 ```shell
 % gobgp policy neighbor add ns1 10.0.0.1
 ```
-A NeighborSet it is possible to have multiple address, if you want to remove the NeighborSet to specify only NeighborSet name.
+You can also specify a neighbor address range with the prefix representation:
+```shell
+% gobgp policy neighbor add ns 10.0.0.0/24
+``````
+A NeighborSet is possible to have multiple address, if you want to remove the NeighborSet to specify only NeighborSet name.
 ```shell
 % gobgp policy neighbor del ns1
 ```
@@ -428,11 +435,11 @@ If you want to remove one element(extended community) of ExtCommunitySet, to spe
 #### Syntax
 ```shell
 # add routes to vrf
-% gobgp vrf <vrf name> rib add <prefix> -a <address family>
+% gobgp vrf <vrf name> rib add <prefix> [-a <address family>]
 # del routes from vrf
-% gobgp vrf <vrf name> rib del <prefix> -a <address family>
+% gobgp vrf <vrf name> rib del <prefix> [-a <address family>]
 # show routes in vrf
-% gobgp vrf <vrf name>
+% gobgp vrf <vrf name> rib [-a <address family>]
 ```
 
 #### Example

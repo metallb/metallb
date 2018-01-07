@@ -45,41 +45,44 @@ const (
 	ENCAP
 	ESI_LABEL
 	ROUTER_MAC
+	DEFAULT_GATEWAY
 	VALID
 	NOT_FOUND
 	INVALID
 )
 
 var ExtCommNameMap = map[ExtCommType]string{
-	ACCEPT:     "accept",
-	DISCARD:    "discard",
-	RATE:       "rate-limit",
-	REDIRECT:   "redirect",
-	MARK:       "mark",
-	ACTION:     "action",
-	RT:         "rt",
-	ENCAP:      "encap",
-	ESI_LABEL:  "esi-label",
-	ROUTER_MAC: "router-mac",
-	VALID:      "valid",
-	NOT_FOUND:  "not-found",
-	INVALID:    "invalid",
+	ACCEPT:          "accept",
+	DISCARD:         "discard",
+	RATE:            "rate-limit",
+	REDIRECT:        "redirect",
+	MARK:            "mark",
+	ACTION:          "action",
+	RT:              "rt",
+	ENCAP:           "encap",
+	ESI_LABEL:       "esi-label",
+	ROUTER_MAC:      "router-mac",
+	DEFAULT_GATEWAY: "default-gateway",
+	VALID:           "valid",
+	NOT_FOUND:       "not-found",
+	INVALID:         "invalid",
 }
 
 var ExtCommValueMap = map[string]ExtCommType{
-	ExtCommNameMap[ACCEPT]:     ACCEPT,
-	ExtCommNameMap[DISCARD]:    DISCARD,
-	ExtCommNameMap[RATE]:       RATE,
-	ExtCommNameMap[REDIRECT]:   REDIRECT,
-	ExtCommNameMap[MARK]:       MARK,
-	ExtCommNameMap[ACTION]:     ACTION,
-	ExtCommNameMap[RT]:         RT,
-	ExtCommNameMap[ENCAP]:      ENCAP,
-	ExtCommNameMap[ESI_LABEL]:  ESI_LABEL,
-	ExtCommNameMap[ROUTER_MAC]: ROUTER_MAC,
-	ExtCommNameMap[VALID]:      VALID,
-	ExtCommNameMap[NOT_FOUND]:  NOT_FOUND,
-	ExtCommNameMap[INVALID]:    INVALID,
+	ExtCommNameMap[ACCEPT]:          ACCEPT,
+	ExtCommNameMap[DISCARD]:         DISCARD,
+	ExtCommNameMap[RATE]:            RATE,
+	ExtCommNameMap[REDIRECT]:        REDIRECT,
+	ExtCommNameMap[MARK]:            MARK,
+	ExtCommNameMap[ACTION]:          ACTION,
+	ExtCommNameMap[RT]:              RT,
+	ExtCommNameMap[ENCAP]:           ENCAP,
+	ExtCommNameMap[ESI_LABEL]:       ESI_LABEL,
+	ExtCommNameMap[ROUTER_MAC]:      ROUTER_MAC,
+	ExtCommNameMap[DEFAULT_GATEWAY]: DEFAULT_GATEWAY,
+	ExtCommNameMap[VALID]:           VALID,
+	ExtCommNameMap[NOT_FOUND]:       NOT_FOUND,
+	ExtCommNameMap[INVALID]:         INVALID,
 }
 
 func rateLimitParser(args []string) ([]bgp.ExtendedCommunityInterface, error) {
@@ -247,6 +250,18 @@ func routerMacParser(args []string) ([]bgp.ExtendedCommunityInterface, error) {
 	return []bgp.ExtendedCommunityInterface{o}, nil
 }
 
+func defaultGatewayParser(args []string) ([]bgp.ExtendedCommunityInterface, error) {
+	if len(args) < 1 || args[0] != ExtCommNameMap[DEFAULT_GATEWAY] {
+		return nil, fmt.Errorf("invalid default-gateway")
+	}
+	o := &bgp.OpaqueExtended{
+		IsTransitive: true,
+		Value:        &bgp.DefaultGatewayExtended{},
+		SubType:      bgp.EC_SUBTYPE_DEFAULT_GATEWAY,
+	}
+	return []bgp.ExtendedCommunityInterface{o}, nil
+}
+
 func validationParser(args []string) ([]bgp.ExtendedCommunityInterface, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("invalid validation state")
@@ -269,19 +284,20 @@ func validationParser(args []string) ([]bgp.ExtendedCommunityInterface, error) {
 }
 
 var ExtCommParserMap = map[ExtCommType]func([]string) ([]bgp.ExtendedCommunityInterface, error){
-	ACCEPT:     nil,
-	DISCARD:    rateLimitParser,
-	RATE:       rateLimitParser,
-	REDIRECT:   redirectParser,
-	MARK:       markParser,
-	ACTION:     actionParser,
-	RT:         rtParser,
-	ENCAP:      encapParser,
-	ESI_LABEL:  esiLabelParser,
-	ROUTER_MAC: routerMacParser,
-	VALID:      validationParser,
-	NOT_FOUND:  validationParser,
-	INVALID:    validationParser,
+	ACCEPT:          nil,
+	DISCARD:         rateLimitParser,
+	RATE:            rateLimitParser,
+	REDIRECT:        redirectParser,
+	MARK:            markParser,
+	ACTION:          actionParser,
+	RT:              rtParser,
+	ENCAP:           encapParser,
+	ESI_LABEL:       esiLabelParser,
+	ROUTER_MAC:      routerMacParser,
+	DEFAULT_GATEWAY: defaultGatewayParser,
+	VALID:           validationParser,
+	NOT_FOUND:       validationParser,
+	INVALID:         validationParser,
 }
 
 func ParseExtendedCommunities(args []string) ([]bgp.ExtendedCommunityInterface, error) {
@@ -443,11 +459,11 @@ func ParseEvpnEthernetAutoDiscoveryArgs(args []string) (bgp.AddrPrefixInterface,
 
 func ParseEvpnMacAdvArgs(args []string) (bgp.AddrPrefixInterface, []string, error) {
 	// Format:
-	// <mac address> <ip address> [esi <esi>] etag <etag> label <label> rd <rd> [rt <rt>...] [encap <encap type>]
+	// <mac address> <ip address> [esi <esi>] etag <etag> label <label> rd <rd> [rt <rt>...] [encap <encap type>] [default-gateway]
 	// or
-	// <mac address> <ip address> <etag> [esi <esi>] label <label> rd <rd> [rt <rt>...] [encap <encap type>]
+	// <mac address> <ip address> <etag> [esi <esi>] label <label> rd <rd> [rt <rt>...] [encap <encap type>] [default-gateway]
 	// or
-	// <mac address> <ip address> <etag> <label> [esi <esi>] rd <rd> [rt <rt>...] [encap <encap type>]
+	// <mac address> <ip address> <etag> <label> [esi <esi>] rd <rd> [rt <rt>...] [encap <encap type>] [default-gateway]
 	req := 6
 	if len(args) < req {
 		return nil, nil, fmt.Errorf("%d args required at least, but got %d", req, len(args))
@@ -528,6 +544,12 @@ func ParseEvpnMacAdvArgs(args []string) (bgp.AddrPrefixInterface, []string, erro
 	}
 	if len(m["encap"]) > 0 {
 		extcomms = append(extcomms, "encap", m["encap"][0])
+	}
+	for _, a := range args {
+		if a == "default-gateway" {
+			extcomms = append(extcomms, "default-gateway")
+			break
+		}
 	}
 
 	r := &bgp.EVPNMacIPAdvertisementRoute{
@@ -1320,7 +1342,7 @@ usage: %s rib -a %%s %s%%s match <MATCH> then <THEN>%%s%%s%%s
 		helpErrMap[bgp.RF_FS_L2_VPN] = fmt.Errorf(fsHelpMsgFmt, "l2vpn-flowspec", " rd <RD>", " [rt <RT>]", rdHelpMsgFmt, l2vpnFsMatchExpr)
 		helpErrMap[bgp.RF_EVPN] = fmt.Errorf(`usage: %s rib %s { a-d <A-D> | macadv <MACADV> | multicast <MULTICAST> | esi <ESI> | prefix <PREFIX> } -a evpn
     <A-D>       : esi <esi> etag <etag> label <label> rd <rd> [rt <rt>...] [encap <encap type>] [esi-label <esi-label> [single-active | all-active]]
-    <MACADV>    : <mac address> <ip address> [esi <esi>] etag <etag> label <label> rd <rd> [rt <rt>...] [encap <encap type>]
+    <MACADV>    : <mac address> <ip address> [esi <esi>] etag <etag> label <label> rd <rd> [rt <rt>...] [encap <encap type>] [default-gateway]
     <MULTICAST> : <ip address> etag <etag> rd <rd> [rt <rt>...] [encap <encap type>]
     <ESI>       : <ip address> esi <esi> rd <rd> [rt <rt>...] [encap <encap type>]
     <PREFIX>    : <ip prefix> [gw <gateway>] [esi <esi>] etag <etag> [label <label>] rd <rd> [rt <rt>...] [encap <encap type>] [router-mac <mac address>]`, cmdstr, modtype)

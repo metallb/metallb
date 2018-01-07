@@ -110,7 +110,7 @@ A lot of containers, networks temporary files are created during the test.
 Let's clean up.
 
 ```shell
-$ sudo docker rm -f $(sudo docker ps -a -q)
-$ sudo docker network prune -f
+$ sudo docker rm -f $(sudo docker ps -a -q -f "label=gobgp-test")
+$ sudo docker network prune -f --filter "label=gobgp-test"
 $ sudo rm -rf /tmp/gobgp
 ```

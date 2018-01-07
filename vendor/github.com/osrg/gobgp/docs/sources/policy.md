@@ -272,6 +272,10 @@ prefix-sets and neighbor-sets section are prefix match part and neighbor match p
   [[defined-sets.neighbor-sets]]
     neighbor-set-name = "ns1"
     neighbor-info-list = ["10.0.255.1"]
+  # Prefix representations are also acceptable.
+  [[defined-sets.neighbor-sets]]
+    neighbor-set-name = "ns2"
+    neighbor-info-list = ["10.0.0.0/24"]
   ```
 
  - example 2

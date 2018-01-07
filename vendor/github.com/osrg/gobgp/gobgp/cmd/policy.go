@@ -176,7 +176,10 @@ func parseNeighborSet(args []string) (table.DefinedSet, error) {
 	for _, arg := range args {
 		address := net.ParseIP(arg)
 		if address.To4() == nil && address.To16() == nil {
-			return nil, fmt.Errorf("invalid address: %s\nplease enter ipv4 or ipv6 format", arg)
+			_, _, err := net.ParseCIDR(arg)
+			if err != nil {
+				return nil, fmt.Errorf("invalid address or prefix: %s\nplease enter ipv4 or ipv6 format", arg)
+			}
 		}
 	}
 	return table.NewNeighborSet(config.NeighborSet{

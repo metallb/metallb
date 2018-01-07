@@ -1,31 +1,43 @@
 package: go.universe.tf/metallb
-license: Apache-2.0
 import:
 - package: github.com/golang/glog
+- package: github.com/mdlayher/arp
+- package: github.com/mdlayher/ethernet
+- package: github.com/mdlayher/ndp
+- package: github.com/osrg/gobgp
+  version: ^1.27.0
+  subpackages:
+  - api
+  - config
+  - server
+- package: github.com/prometheus/client_golang
+  version: ^0.9.0-pre1
+  subpackages:
+  - prometheus
+  - prometheus/promhttp
+- package: gopkg.in/yaml.v2
 - package: k8s.io/api
   subpackages:
   - core/v1
 - package: k8s.io/apimachinery
   subpackages:
+  - pkg/apis/meta/v1
   - pkg/fields
-  - pkg/util/runtime
-  - pkg/util/wait
+  - pkg/runtime
 - package: k8s.io/client-go
-  version: ^5.0.1
+  version: ^6.0.0
   subpackages:
   - kubernetes
   - kubernetes/scheme
   - kubernetes/typed/core/v1
   - tools/cache
   - tools/clientcmd
+  - tools/leaderelection
+  - tools/leaderelection/resourcelock
   - tools/record
   - util/workqueue
-- package: gopkg.in/yaml.v2
+testImport:
 - package: github.com/google/go-cmp
   version: ^0.1.0
   subpackages:
   - cmp
-testImport:
-- package: github.com/osrg/gobgp
-  subpackages:
-  - server

@@ -912,7 +912,7 @@ module gobgp {
 
     leaf-list neighbor-info {
       description
-            "neighbor ip address";
+            "neighbor ip address or prefix";
       type inet:ip-address;
     }
   }

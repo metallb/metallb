@@ -168,7 +168,7 @@
         masklength-range = "24..32"
 [[defined-sets.neighbor-sets]]
    neighbor-set-name = "ns0"
-   neighbor-info-list = ["192.168.10.2"]
+   neighbor-info-list = ["192.168.10.2", "172.13.0.0/24"]
 [[defined-sets.bgp-defined-sets.community-sets]]
     community-set-name = "cs0"
     community-list = ["100:100"]
