@@ -8,6 +8,7 @@ var (
 	gitBranch string // Provided by ldflags during build
 )
 
+// String returns a human-readable version string.
 func String() string {
 	hasVersion := version != ""
 	hasBuildInfo := gitCommit != ""
