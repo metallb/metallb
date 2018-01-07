@@ -2,46 +2,54 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
 	"strings"
+
+	api "github.com/osrg/gobgp/api"
+	"github.com/osrg/gobgp/config"
+	"github.com/osrg/gobgp/server"
 )
 
-func hasGoBGP() bool {
-	_, err := os.Stat("/gobgpd")
-	return err == nil
-}
+func runGoBGP() error {
+	s := server.NewBgpServer()
+	go s.Serve()
+	g := api.NewGrpcServer(s, ":50051")
+	go g.Serve()
+	global := &config.Global{
+		Config: config.GlobalConfig{
+			As:       64512,
+			RouterId: "10.96.0.102",
+			Port:     2179,
+		},
+	}
 
-func writeGoBGPConfig() error {
-	cfg := fmt.Sprintf(`
-[global.config]
-  as = 64512
-  router-id = "10.96.0.102"
-  port = 2179
-
-[[neighbors]]
-  [neighbors.config]
-    neighbor-address = "%s"
-    peer-as = 64512
-`, nodeIP())
-	if err := ioutil.WriteFile("/gobgp.conf", []byte(cfg), 0644); err != nil {
+	if err := s.Start(global); err != nil {
 		return err
 	}
+
+	// neighbor configuration
+	n := &config.Neighbor{
+		Config: config.NeighborConfig{
+			NeighborAddress: nodeIP(),
+			PeerAs:          64512,
+		},
+	}
+
+	if err := s.AddNeighbor(n); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-func runGoBGP() error {
-	return runOrCrash("/gobgpd", "-f", "/gobgp.conf")
-}
-
 func goBGPStatus() (*values, error) {
-	proto, err := gobgp(fmt.Sprintf("neighbor %s", nodeIP()))
+	proto, err := gobgp("neighbor", nodeIP())
 	if err != nil {
 		return nil, err
 	}
-	routes, err := gobgp("global rib")
+	routes, err := gobgp("global", "rib")
 	if err != nil {
 		return nil, err
 	}
@@ -70,11 +78,11 @@ func goBGPStatus() (*values, error) {
 	}, nil
 }
 
-func gobgp(cmd string) (string, error) {
-	c := exec.Command("/gobgp", strings.Split(cmd, " ")...)
+func gobgp(args ...string) (string, error) {
+	c := exec.Command(os.Args[0], append([]string{"gobgp"}, args...)...)
 	bs, err := c.CombinedOutput()
 	if err != nil {
-		return "", fmt.Errorf("run %q: %s", cmd, err)
+		return "", fmt.Errorf("run %q: %s\n%s", strings.Join(args, " "), err, string(bs))
 	}
 	return string(bs), nil
 }
