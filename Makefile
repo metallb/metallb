@@ -35,7 +35,7 @@ BINARIES:=controller speaker test-bgp-router
 PLATFORMS:=$(subst $(SPACE),$(COMMA),$(foreach arch,$(ALL_ARCH),linux/$(arch)))
 MK_IMAGE_TARGETS:=Makefile.image-targets
 
-GITCOMMIT=$(shell git describe --dirty --broken --always)
+GITCOMMIT=$(shell git describe --dirty --always)
 GITBRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 
 all:
