@@ -1,5 +1,5 @@
-hash: 9ab4bd622d08e7b03eeea5e9ad46912cfc7f05cb8a95cf847d8bcd1566a7e5f0
-updated: 2018-01-07T02:14:47.640068842-08:00
+hash: 7558d39a1f9d75f52a991f253d2093578ac76fb458b16994ecbde5baff234f56
+updated: 2018-01-07T02:51:11.128084596-08:00
 imports:
 - name: github.com/armon/go-radix
   version: 1fca145dffbcaa8fe914309b1ec0cfc67500fe61
@@ -30,9 +30,9 @@ imports:
 - name: github.com/go-openapi/jsonreference
   version: 13c6e3589ad90f49bd3e3bbe2c2cb3d7a4142272
 - name: github.com/go-openapi/spec
-  version: 6aced65f8501fe1217321abf0749d354824ba2ff
+  version: 7abd5745472fff5eb3685386d5fb8bf38683154d
 - name: github.com/go-openapi/swag
-  version: 1d0bd113de87027671077d3c71eb3ac5d7dbba72
+  version: f3f9494671f93fcff853e3c6e9e948b3eb71e590
 - name: github.com/gogo/protobuf
   version: c0656edd0d9eab7c66d1eb0c568f9039345796f7
   subpackages:
@@ -45,7 +45,7 @@ imports:
   subpackages:
   - lru
 - name: github.com/golang/protobuf
-  version: 4bd1920723d7b7c925de087aa32e2187708897f7
+  version: 1643683e1b54a9e88ad26d98f81400c8c9d9f4f9
   subpackages:
   - proto
   - ptypes
@@ -85,6 +85,8 @@ imports:
   version: bf9dde6d0d2c004a008c27aaee91170c786f6db8
 - name: github.com/imdario/mergo
   version: 6633656539c1639d9d78127b7d47c622b5d7b6dc
+- name: github.com/inconshreveable/mousetrap
+  version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
 - name: github.com/influxdata/influxdb
   version: 383332daed5595926c235f250b11433f67229c35
   subpackages:
@@ -98,7 +100,7 @@ imports:
 - name: github.com/magiconair/properties
   version: 49d762b9817ba1c2e9d0c69183c2b4a8b8f1d934
 - name: github.com/mailru/easyjson
-  version: d5b7844b561a7bc640052f1b935f7b800330d7e0
+  version: 2f5df55504ebc322e4d52d34df6a1f5b503bf26d
   subpackages:
   - buffer
   - jlexer
@@ -121,7 +123,9 @@ imports:
   version: 77136fac6dfd8a70ef5375b321fd05d7736659a7
   subpackages:
   - api
+  - client
   - config
+  - gobgp/cmd
   - packet/bgp
   - packet/bmp
   - packet/mrt
@@ -166,6 +170,8 @@ imports:
   - mem
 - name: github.com/spf13/cast
   version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
+- name: github.com/spf13/cobra
+  version: b95ab734e27d33e0d8fbabf71ca990568d4e2020
 - name: github.com/spf13/jwalterweatherman
   version: 12bd96e66386c1960ab0f74ced1362f66f552f7b
 - name: github.com/spf13/pflag
@@ -281,9 +287,8 @@ imports:
   - storage/v1alpha1
   - storage/v1beta1
 - name: k8s.io/apimachinery
-  version: 019ae5ada31de202164b118aee88ee2d14075c31
+  version: 180eddb345a5be3a157cea1c624700ad5bd27b8f
   subpackages:
-  - pkg/api/equality
   - pkg/api/errors
   - pkg/api/meta
   - pkg/api/resource
@@ -293,7 +298,6 @@ imports:
   - pkg/apis/meta/v1alpha1
   - pkg/conversion
   - pkg/conversion/queryparams
-  - pkg/conversion/unstructured
   - pkg/fields
   - pkg/labels
   - pkg/runtime
@@ -383,9 +387,10 @@ imports:
   - util/integer
   - util/workqueue
 - name: k8s.io/kube-openapi
-  version: 868f2f29720b192240e18284659231b440f9cda5
+  version: 39a7bf85c140f972372c2a0d1ee40adbf0c8bfe1
   subpackages:
   - pkg/common
+  - pkg/util/proto
 testImports:
 - name: github.com/google/go-cmp
   version: 8099a9787ce5dc5984ed879a3bda47dc730a8e97
