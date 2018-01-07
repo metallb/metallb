@@ -310,6 +310,12 @@ func (s *Session) consumeBGP(conn io.ReadCloser) {
 			// TODO: propagate
 			return
 		}
+		if hdr.Type == 3 {
+			// TODO: propagate better than just logging directly.
+			err := readNotification(conn)
+			glog.Errorf("%s", err)
+			return
+		}
 		if _, err := io.Copy(ioutil.Discard, io.LimitReader(conn, int64(hdr.Len)-19)); err != nil {
 			// TODO: propagate
 			return

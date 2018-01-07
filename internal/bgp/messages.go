@@ -93,6 +93,62 @@ type openResult struct {
 	mp6      bool
 }
 
+var notificationCodes = map[uint16]string{
+	0x0100: "Message header error (unspecific)",
+	0x0101: "Connection not synchronized",
+	0x0102: "Bad message length",
+	0x0103: "Bad message type",
+
+	0x0200: "OPEN message error (unspecific)",
+	0x0201: "Unsupported version number",
+	0x0202: "Bad peer AS",
+	0x0203: "Bad BGP identifier",
+	0x0204: "Unsupported optional parameter",
+	0x0206: "Unacceptable hold time",
+	0x0207: "Unsupported capability",
+
+	0x0300: "UPDATE message error (unspecific)",
+	0x0301: "Malformed Attribute List",
+	0x0302: "Unrecognized Well-known Attribute",
+	0x0303: "Missing Well-known Attribute",
+	0x0304: "Attribute Flags Error",
+	0x0305: "Attribute Length Error",
+	0x0306: "Invalid ORIGIN Attribute",
+	0x0308: "Invalid NEXT_HOP Attribute",
+	0x0309: "Optional Attribute Error",
+	0x030a: "Invalid Network Field",
+	0x030b: "Malformed AS_PATH",
+
+	0x0500: "BGP FSM state error (unspecific)",
+	0x0501: "Receive Unexpected Message in OpenSent State",
+	0x0502: "Receive Unexpected Message in OpenConfirm State",
+	0x0503: "Receive Unexpected Message in Established State",
+
+	0x0601: "Maximum Number of Prefixes Reached",
+	0x0602: "Administrative Shutdown",
+	0x0603: "Peer De-configured",
+	0x0604: "Administrative Reset",
+	0x0605: "Connection Rejected",
+	0x0606: "Other Configuration Change",
+	0x0607: "Connection Collision Resolution",
+	0x0608: "Out of Resources",
+}
+
+// readNotification reads the body of a notification message (header
+// has already been consumed). It must always return an error, because
+// receiving a notification is an error.
+func readNotification(r io.Reader) error {
+	var code uint16
+	if err := binary.Read(r, binary.BigEndian, &code); err != nil {
+		return err
+	}
+	v, ok := notificationCodes[code]
+	if !ok {
+		v = "unknown code"
+	}
+	return fmt.Errorf("got BGP notification code 0x%04x (%s)", code, v)
+}
+
 func readOpen(r io.Reader) (*openResult, error) {
 	hdr := struct {
 		// Header
@@ -105,6 +161,9 @@ func readOpen(r io.Reader) (*openResult, error) {
 	}
 	if hdr.Marker1 != 0xffffffffffffffff || hdr.Marker2 != 0xffffffffffffffff {
 		return nil, fmt.Errorf("synchronization error, incorrect header marker")
+	}
+	if hdr.Type == 3 {
+		return nil, readNotification(r)
 	}
 	if hdr.Type != 1 {
 		return nil, fmt.Errorf("message type is not OPEN, got %d, want 1", hdr.Type)
