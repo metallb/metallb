@@ -1,21 +1,23 @@
+// Command influxd is the InfluxDB server.
 package main
 
 import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"math/rand"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
+	"github.com/influxdata/influxdb/cmd"
 	"github.com/influxdata/influxdb/cmd/influxd/backup"
 	"github.com/influxdata/influxdb/cmd/influxd/help"
 	"github.com/influxdata/influxdb/cmd/influxd/restore"
 	"github.com/influxdata/influxdb/cmd/influxd/run"
+	"github.com/influxdata/influxdb/logger"
+	"go.uber.org/zap"
 )
 
 // These variables are populated via the Go linker.
@@ -50,7 +52,7 @@ func main() {
 
 // Main represents the program execution.
 type Main struct {
-	Logger *log.Logger
+	Logger *zap.Logger
 
 	Stdin  io.Reader
 	Stdout io.Writer
@@ -60,7 +62,7 @@ type Main struct {
 // NewMain return a new instance of Main.
 func NewMain() *Main {
 	return &Main{
-		Logger: log.New(os.Stderr, "[run] ", log.LstdFlags),
+		Logger: logger.New(os.Stderr),
 		Stdin:  os.Stdin,
 		Stdout: os.Stdout,
 		Stderr: os.Stderr,
@@ -69,7 +71,7 @@ func NewMain() *Main {
 
 // Run determines and runs the command specified by the CLI args.
 func (m *Main) Run(args ...string) error {
-	name, args := ParseCommandName(args)
+	name, args := cmd.ParseCommandName(args)
 
 	// Extract name from args.
 	switch name {
@@ -80,6 +82,7 @@ func (m *Main) Run(args ...string) error {
 		cmd.Version = version
 		cmd.Commit = commit
 		cmd.Branch = branch
+		cmd.Logger = m.Logger
 
 		if err := cmd.Run(args...); err != nil {
 			return fmt.Errorf("run: %s", err)
@@ -87,27 +90,23 @@ func (m *Main) Run(args ...string) error {
 
 		signalCh := make(chan os.Signal, 1)
 		signal.Notify(signalCh, os.Interrupt, syscall.SIGTERM)
-		m.Logger.Println("Listening for signals")
+		m.Logger.Info("Listening for signals")
 
 		// Block until one of the signals above is received
-		select {
-		case <-signalCh:
-			m.Logger.Println("Signal received, initializing clean shutdown...")
-			go func() {
-				cmd.Close()
-			}()
-		}
+		<-signalCh
+		m.Logger.Info("Signal received, initializing clean shutdown...")
+		go cmd.Close()
 
 		// Block again until another signal is received, a shutdown timeout elapses,
 		// or the Command is gracefully closed
-		m.Logger.Println("Waiting for clean shutdown...")
+		m.Logger.Info("Waiting for clean shutdown...")
 		select {
 		case <-signalCh:
-			m.Logger.Println("second signal received, initializing hard shutdown")
+			m.Logger.Info("second signal received, initializing hard shutdown")
 		case <-time.After(time.Second * 30):
-			m.Logger.Println("time limit reached, initializing hard shutdown")
+			m.Logger.Info("time limit reached, initializing hard shutdown")
 		case <-cmd.Closed:
-			m.Logger.Println("server shutdown completed")
+			m.Logger.Info("server shutdown completed")
 		}
 
 		// goodbye.
@@ -141,32 +140,6 @@ func (m *Main) Run(args ...string) error {
 	return nil
 }
 
-// ParseCommandName extracts the command name and args from the args list.
-func ParseCommandName(args []string) (string, []string) {
-	// Retrieve command name as first argument.
-	var name string
-	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
-		name = args[0]
-	}
-
-	// Special case -h immediately following binary name
-	if len(args) > 0 && args[0] == "-h" {
-		name = "help"
-	}
-
-	// If command is "help" and has an argument then rewrite args to use "-h".
-	if name == "help" && len(args) > 1 {
-		args[0], args[1] = args[1], "-h"
-		name = args[0]
-	}
-
-	// If a named command is specified then return it with its arguments.
-	if name != "" {
-		return name, args[1:]
-	}
-	return "", args
-}
-
 // VersionCommand represents the command executed by "influxd version".
 type VersionCommand struct {
 	Stdout io.Writer
@@ -185,7 +158,7 @@ func NewVersionCommand() *VersionCommand {
 func (cmd *VersionCommand) Run(args ...string) error {
 	// Parse flags in case -h is specified.
 	fs := flag.NewFlagSet("", flag.ContinueOnError)
-	fs.Usage = func() { fmt.Fprintln(cmd.Stderr, strings.TrimSpace(versionUsage)) }
+	fs.Usage = func() { fmt.Fprintln(cmd.Stderr, versionUsage) }
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -196,8 +169,7 @@ func (cmd *VersionCommand) Run(args ...string) error {
 	return nil
 }
 
-var versionUsage = `
-usage: version
+var versionUsage = `Displays the InfluxDB version, build branch and git commit hash.
 
-	version displays the InfluxDB version, build branch and git commit hash
+Usage: influxd version
 `

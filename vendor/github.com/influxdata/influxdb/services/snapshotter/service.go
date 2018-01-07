@@ -1,3 +1,4 @@
+// Package snapshotter provides the meta snapshot service.
 package snapshotter // import "github.com/influxdata/influxdb/services/snapshotter"
 
 import (
@@ -6,9 +7,8 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"log"
+	"io"
 	"net"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +16,7 @@ import (
 	"github.com/influxdata/influxdb"
 	"github.com/influxdata/influxdb/services/meta"
 	"github.com/influxdata/influxdb/tsdb"
+	"go.uber.org/zap"
 )
 
 const (
@@ -29,33 +30,36 @@ const (
 
 // Service manages the listener for the snapshot endpoint.
 type Service struct {
-	wg  sync.WaitGroup
-	err chan error
+	wg sync.WaitGroup
 
 	Node *influxdb.Node
 
 	MetaClient interface {
 		encoding.BinaryMarshaler
-		Database(name string) (*meta.DatabaseInfo, error)
+		Database(name string) *meta.DatabaseInfo
 	}
 
-	TSDBStore *tsdb.Store
+	TSDBStore interface {
+		BackupShard(id uint64, since time.Time, w io.Writer) error
+		ExportShard(id uint64, ExportStart time.Time, ExportEnd time.Time, w io.Writer) error
+		Shard(id uint64) *tsdb.Shard
+		ShardRelativePath(id uint64) (string, error)
+	}
 
 	Listener net.Listener
-	Logger   *log.Logger
+	Logger   *zap.Logger
 }
 
 // NewService returns a new instance of Service.
 func NewService() *Service {
 	return &Service{
-		err:    make(chan error),
-		Logger: log.New(os.Stderr, "[snapshot] ", log.LstdFlags),
+		Logger: zap.NewNop(),
 	}
 }
 
 // Open starts the service.
 func (s *Service) Open() error {
-	s.Logger.Println("Starting snapshot service")
+	s.Logger.Info("Starting snapshot service")
 
 	s.wg.Add(1)
 	go s.serve()
@@ -65,19 +69,18 @@ func (s *Service) Open() error {
 // Close implements the Service interface.
 func (s *Service) Close() error {
 	if s.Listener != nil {
-		s.Listener.Close()
+		if err := s.Listener.Close(); err != nil {
+			return err
+		}
 	}
 	s.wg.Wait()
 	return nil
 }
 
-// SetLogger sets the internal logger to the logger passed in.
-func (s *Service) SetLogger(l *log.Logger) {
-	s.Logger = l
+// WithLogger sets the logger on the service.
+func (s *Service) WithLogger(log *zap.Logger) {
+	s.Logger = log.With(zap.String("service", "snapshot"))
 }
-
-// Err returns a channel for fatal out-of-band errors.
-func (s *Service) Err() <-chan error { return s.err }
 
 // serve serves snapshot requests from the listener.
 func (s *Service) serve() {
@@ -86,11 +89,12 @@ func (s *Service) serve() {
 	for {
 		// Wait for next connection.
 		conn, err := s.Listener.Accept()
+
 		if err != nil && strings.Contains(err.Error(), "connection closed") {
-			s.Logger.Println("snapshot listener closed")
+			s.Logger.Info("snapshot listener closed")
 			return
 		} else if err != nil {
-			s.Logger.Println("error accepting snapshot request: ", err.Error())
+			s.Logger.Info(fmt.Sprint("error accepting snapshot request: ", err.Error()))
 			continue
 		}
 
@@ -100,7 +104,7 @@ func (s *Service) serve() {
 			defer s.wg.Done()
 			defer conn.Close()
 			if err := s.handleConn(conn); err != nil {
-				s.Logger.Println(err)
+				s.Logger.Info(err.Error())
 			}
 		}(conn)
 	}
@@ -108,14 +112,25 @@ func (s *Service) serve() {
 
 // handleConn processes conn. This is run in a separate goroutine.
 func (s *Service) handleConn(conn net.Conn) error {
+	var typ [1]byte
+
+	_, err := conn.Read(typ[:])
+	if err != nil {
+		return err
+	}
+
 	r, err := s.readRequest(conn)
 	if err != nil {
 		return fmt.Errorf("read request: %s", err)
 	}
 
-	switch r.Type {
+	switch RequestType(typ[0]) {
 	case RequestShardBackup:
 		if err := s.TSDBStore.BackupShard(r.ShardID, r.Since, conn); err != nil {
+			return err
+		}
+	case RequestShardExport:
+		if err := s.TSDBStore.ExportShard(r.ShardID, r.ExportStart, r.ExportEnd, conn); err != nil {
 			return err
 		}
 	case RequestMetastoreBackup:
@@ -123,9 +138,9 @@ func (s *Service) handleConn(conn net.Conn) error {
 			return err
 		}
 	case RequestDatabaseInfo:
-		return s.writeDatabaseInfo(conn, r.Database)
+		return s.writeDatabaseInfo(conn, r.BackupDatabase)
 	case RequestRetentionPolicyInfo:
-		return s.writeRetentionPolicyInfo(conn, r.Database, r.RetentionPolicy)
+		return s.writeRetentionPolicyInfo(conn, r.BackupDatabase, r.BackupRetentionPolicy)
 	default:
 		return fmt.Errorf("request type unknown: %v", r.Type)
 	}
@@ -136,6 +151,7 @@ func (s *Service) handleConn(conn net.Conn) error {
 func (s *Service) writeMetaStore(conn net.Conn) error {
 	// Retrieve and serialize the current meta data.
 	metaBlob, err := s.MetaClient.MarshalBinary()
+
 	if err != nil {
 		return fmt.Errorf("marshal meta: %s", err)
 	}
@@ -171,37 +187,42 @@ func (s *Service) writeMetaStore(conn net.Conn) error {
 }
 
 // writeDatabaseInfo will write the relative paths of all shards in the database on
-// this server into the connection
+// this server into the connection.
 func (s *Service) writeDatabaseInfo(conn net.Conn, database string) error {
 	res := Response{}
-	db, err := s.MetaClient.Database(database)
-	if err != nil {
-		return err
+	dbs := []meta.DatabaseInfo{}
+	if database != "" {
+		db := s.MetaClient.Database(database)
+		if db == nil {
+			return influxdb.ErrDatabaseNotFound(database)
+		}
+		dbs = append(dbs, *db)
+	} else {
+		// we'll allow collecting info on all databases
+		dbs = s.MetaClient.(*meta.Client).Databases()
 	}
-	if db == nil {
-		return influxdb.ErrDatabaseNotFound(database)
-	}
 
-	for _, rp := range db.RetentionPolicies {
-		for _, sg := range rp.ShardGroups {
-			for _, sh := range sg.Shards {
-				// ignore if the shard isn't on the server
-				if s.TSDBStore.Shard(sh.ID) == nil {
-					continue
+	for _, db := range dbs {
+		for _, rp := range db.RetentionPolicies {
+			for _, sg := range rp.ShardGroups {
+				for _, sh := range sg.Shards {
+					// ignore if the shard isn't on the server
+					if s.TSDBStore.Shard(sh.ID) == nil {
+						continue
+					}
+
+					path, err := s.TSDBStore.ShardRelativePath(sh.ID)
+					if err != nil {
+						return err
+					}
+
+					res.Paths = append(res.Paths, path)
 				}
-
-				path, err := s.TSDBStore.ShardRelativePath(sh.ID)
-				if err != nil {
-					return err
-				}
-
-				res.Paths = append(res.Paths, path)
 			}
 		}
 	}
-
 	if err := json.NewEncoder(conn).Encode(res); err != nil {
-		return fmt.Errorf("encode resonse: %s", err.Error())
+		return fmt.Errorf("encode response: %s", err.Error())
 	}
 
 	return nil
@@ -211,10 +232,7 @@ func (s *Service) writeDatabaseInfo(conn net.Conn, database string) error {
 // this server into the connection
 func (s *Service) writeRetentionPolicyInfo(conn net.Conn, database, retentionPolicy string) error {
 	res := Response{}
-	db, err := s.MetaClient.Database(database)
-	if err != nil {
-		return err
-	}
+	db := s.MetaClient.Database(database)
 	if db == nil {
 		return influxdb.ErrDatabaseNotFound(database)
 	}
@@ -255,7 +273,7 @@ func (s *Service) writeRetentionPolicyInfo(conn net.Conn, database, retentionPol
 	return nil
 }
 
-// readRequest Unmarshals a request object from the conn
+// readRequest unmarshals a request object from the conn.
 func (s *Service) readRequest(conn net.Conn) (Request, error) {
 	var r Request
 	if err := json.NewDecoder(conn).Decode(&r); err != nil {
@@ -264,27 +282,55 @@ func (s *Service) readRequest(conn net.Conn) (Request, error) {
 	return r, nil
 }
 
+// RequestType indicates the typeof snapshot request.
 type RequestType uint8
 
 const (
+	// RequestShardBackup represents a request for a shard backup.
 	RequestShardBackup RequestType = iota
+
+	// RequestMetastoreBackup represents a request to back up the metastore.
 	RequestMetastoreBackup
+
+	// RequestSeriesFileBackup represents a request to back up the database series file.
+	RequestSeriesFileBackup
+
+	// RequestDatabaseInfo represents a request for database info.
 	RequestDatabaseInfo
+
+	// RequestRetentionPolicyInfo represents a request for retention policy info.
 	RequestRetentionPolicyInfo
+
+	// RequestShardExport represents a request to export Shard data.  Similar to a backup, but shards
+	// may be filtered based on the start/end times on each block.
+	RequestShardExport
+
+	// RequestMetaStoreUpdate represents a request to upload a metafile that will be used to do a live update
+	// to the existing metastore.
+	RequestMetaStoreUpdate
+
+	// RequestShardUpdate will initiate the upload of a shard data tar file
+	// and have the engine import the data.
+	RequestShardUpdate
 )
 
 // Request represents a request for a specific backup or for information
-// about the shards on this server for a database or retention policy
+// about the shards on this server for a database or retention policy.
 type Request struct {
-	Type            RequestType
-	Database        string
-	RetentionPolicy string
-	ShardID         uint64
-	Since           time.Time
+	Type                   RequestType
+	BackupDatabase         string
+	RestoreDatabase        string
+	BackupRetentionPolicy  string
+	RestoreRetentionPolicy string
+	ShardID                uint64
+	Since                  time.Time
+	ExportStart            time.Time
+	ExportEnd              time.Time
+	UploadSize             int64
 }
 
 // Response contains the relative paths for all the shards on this server
-// that are in the requested database or retention policy
+// that are in the requested database or retention policy.
 type Response struct {
 	Paths []string
 }

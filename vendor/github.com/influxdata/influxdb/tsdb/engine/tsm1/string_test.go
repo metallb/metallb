@@ -8,15 +8,15 @@ import (
 )
 
 func Test_StringEncoder_NoValues(t *testing.T) {
-	enc := NewStringEncoder()
+	enc := NewStringEncoder(1024)
 	b, err := enc.Bytes()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	dec, err := NewStringDecoder(b)
-	if err != nil {
-		t.Fatalf("unexpected erorr creating string decoder: %v", err)
+	var dec StringDecoder
+	if err := dec.SetBytes(b); err != nil {
+		t.Fatalf("unexpected error creating string decoder: %v", err)
 	}
 	if dec.Next() {
 		t.Fatalf("unexpected next value: got true, exp false")
@@ -24,7 +24,7 @@ func Test_StringEncoder_NoValues(t *testing.T) {
 }
 
 func Test_StringEncoder_Single(t *testing.T) {
-	enc := NewStringEncoder()
+	enc := NewStringEncoder(1024)
 	v1 := "v1"
 	enc.Write(v1)
 	b, err := enc.Bytes()
@@ -32,9 +32,9 @@ func Test_StringEncoder_Single(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	dec, err := NewStringDecoder(b)
-	if err != nil {
-		t.Fatalf("unexpected erorr creating string decoder: %v", err)
+	var dec StringDecoder
+	if dec.SetBytes(b); err != nil {
+		t.Fatalf("unexpected error creating string decoder: %v", err)
 	}
 	if !dec.Next() {
 		t.Fatalf("unexpected next value: got false, exp true")
@@ -46,7 +46,7 @@ func Test_StringEncoder_Single(t *testing.T) {
 }
 
 func Test_StringEncoder_Multi_Compressed(t *testing.T) {
-	enc := NewStringEncoder()
+	enc := NewStringEncoder(1024)
 
 	values := make([]string, 10)
 	for i := range values {
@@ -63,12 +63,12 @@ func Test_StringEncoder_Multi_Compressed(t *testing.T) {
 		t.Fatalf("unexpected encoding: got %v, exp %v", b[0], stringCompressedSnappy)
 	}
 
-	if exp := 47; len(b) != exp {
+	if exp := 51; len(b) != exp {
 		t.Fatalf("unexpected length: got %v, exp %v", len(b), exp)
 	}
 
-	dec, err := NewStringDecoder(b)
-	if err != nil {
+	var dec StringDecoder
+	if err := dec.SetBytes(b); err != nil {
 		t.Fatalf("unexpected erorr creating string decoder: %v", err)
 	}
 
@@ -93,7 +93,7 @@ func Test_StringEncoder_Quick(t *testing.T) {
 			expected = []string{}
 		}
 		// Write values to encoder.
-		enc := NewStringEncoder()
+		enc := NewStringEncoder(1024)
 		for _, v := range values {
 			enc.Write(v)
 		}
@@ -106,8 +106,8 @@ func Test_StringEncoder_Quick(t *testing.T) {
 
 		// Read values out of decoder.
 		got := make([]string, 0, len(values))
-		dec, err := NewStringDecoder(buf)
-		if err != nil {
+		var dec StringDecoder
+		if err := dec.SetBytes(buf); err != nil {
 			t.Fatal(err)
 		}
 		for dec.Next() {
@@ -124,4 +124,54 @@ func Test_StringEncoder_Quick(t *testing.T) {
 
 		return true
 	}, nil)
+}
+
+func Test_StringDecoder_Empty(t *testing.T) {
+	var dec StringDecoder
+	if err := dec.SetBytes([]byte{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if dec.Next() {
+		t.Fatalf("exp Next() == false, got true")
+	}
+}
+
+func Test_StringDecoder_CorruptRead(t *testing.T) {
+	cases := []string{
+		"\x10\x03\b\x03Hi", // Higher length than actual data
+		"\x10\x1dp\x9c\x90\x90\x90\x90\x90\x90\x90\x90\x90length overflow----",
+	}
+
+	for _, c := range cases {
+		var dec StringDecoder
+		if err := dec.SetBytes([]byte(c)); err != nil {
+			t.Fatal(err)
+		}
+
+		if !dec.Next() {
+			t.Fatalf("exp Next() to return true, got false")
+		}
+
+		_ = dec.Read()
+		if dec.Error() == nil {
+			t.Fatalf("exp an err, got nil: %q", c)
+		}
+	}
+}
+
+func Test_StringDecoder_CorruptSetBytes(t *testing.T) {
+	cases := []string{
+		"0t\x00\x01\x000\x00\x01\x000\x00\x01\x000\x00\x01\x000\x00\x01" +
+			"\x000\x00\x01\x000\x00\x01\x000\x00\x00\x00\xff:\x01\x00\x01\x00\x01" +
+			"\x00\x01\x00\x01\x00\x01\x00\x010\x010\x000\x010\x010\x010\x01" +
+			"0\x010\x010\x010\x010\x010\x010\x010\x010\x010\x010", // Upper slice bounds overflows negative
+	}
+
+	for _, c := range cases {
+		var dec StringDecoder
+		if err := dec.SetBytes([]byte(c)); err == nil {
+			t.Fatalf("exp an err, got nil: %q", c)
+		}
+	}
 }

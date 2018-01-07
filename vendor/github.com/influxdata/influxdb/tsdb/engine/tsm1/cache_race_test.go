@@ -1,5 +1,3 @@
-// +build !race
-
 package tsm1_test
 
 import (
@@ -11,10 +9,10 @@ import (
 	"github.com/influxdata/influxdb/tsdb/engine/tsm1"
 )
 
-func TestCheckConcurrentReadsAreSafe(t *testing.T) {
+func TestCacheCheckConcurrentReadsAreSafe(t *testing.T) {
 	values := make(tsm1.Values, 1000)
 	timestamps := make([]int64, len(values))
-	series := make([]string, 100)
+	series := make([][]byte, 100)
 	for i := range timestamps {
 		timestamps[i] = int64(rand.Int63n(int64(len(values))))
 	}
@@ -24,7 +22,7 @@ func TestCheckConcurrentReadsAreSafe(t *testing.T) {
 	}
 
 	for i := range series {
-		series[i] = fmt.Sprintf("series%d", i)
+		series[i] = []byte(fmt.Sprintf("series%d", i))
 	}
 
 	wg := sync.WaitGroup{}
@@ -36,17 +34,17 @@ func TestCheckConcurrentReadsAreSafe(t *testing.T) {
 			c.Write(s, tsm1.Values{v})
 		}
 		wg.Add(3)
-		go func(s string) {
+		go func(s []byte) {
 			defer wg.Done()
 			<-ch
 			c.Values(s)
 		}(s)
-		go func(s string) {
+		go func(s []byte) {
 			defer wg.Done()
 			<-ch
 			c.Values(s)
 		}(s)
-		go func(s string) {
+		go func(s []byte) {
 			defer wg.Done()
 			<-ch
 			c.Values(s)
@@ -59,7 +57,7 @@ func TestCheckConcurrentReadsAreSafe(t *testing.T) {
 func TestCacheRace(t *testing.T) {
 	values := make(tsm1.Values, 1000)
 	timestamps := make([]int64, len(values))
-	series := make([]string, 100)
+	series := make([][]byte, 100)
 	for i := range timestamps {
 		timestamps[i] = int64(rand.Int63n(int64(len(values))))
 	}
@@ -69,7 +67,7 @@ func TestCacheRace(t *testing.T) {
 	}
 
 	for i := range series {
-		series[i] = fmt.Sprintf("series%d", i)
+		series[i] = []byte(fmt.Sprintf("series%d", i))
 	}
 
 	wg := sync.WaitGroup{}
@@ -81,15 +79,17 @@ func TestCacheRace(t *testing.T) {
 			c.Write(s, tsm1.Values{v})
 		}
 		wg.Add(1)
-		go func(s string) {
+		go func(s []byte) {
 			defer wg.Done()
 			<-ch
 			c.Values(s)
 		}(s)
 	}
+
+	errC := make(chan error)
 	wg.Add(1)
 	go func() {
-		wg.Done()
+		defer wg.Done()
 		<-ch
 		s, err := c.Snapshot()
 		if err == tsm1.ErrSnapshotInProgress {
@@ -97,19 +97,32 @@ func TestCacheRace(t *testing.T) {
 		}
 
 		if err != nil {
-			t.Fatalf("failed to snapshot cache: %v", err)
+			errC <- fmt.Errorf("failed to snapshot cache: %v", err)
+			return
 		}
+
 		s.Deduplicate()
 		c.ClearSnapshot(true)
 	}()
+
 	close(ch)
-	wg.Wait()
+
+	go func() {
+		wg.Wait()
+		close(errC)
+	}()
+
+	for err := range errC {
+		if err != nil {
+			t.Error(err)
+		}
+	}
 }
 
 func TestCacheRace2Compacters(t *testing.T) {
 	values := make(tsm1.Values, 1000)
 	timestamps := make([]int64, len(values))
-	series := make([]string, 100)
+	series := make([][]byte, 100)
 	for i := range timestamps {
 		timestamps[i] = int64(rand.Int63n(int64(len(values))))
 	}
@@ -119,7 +132,7 @@ func TestCacheRace2Compacters(t *testing.T) {
 	}
 
 	for i := range series {
-		series[i] = fmt.Sprintf("series%d", i)
+		series[i] = []byte(fmt.Sprintf("series%d", i))
 	}
 
 	wg := sync.WaitGroup{}
@@ -131,7 +144,7 @@ func TestCacheRace2Compacters(t *testing.T) {
 			c.Write(s, tsm1.Values{v})
 		}
 		wg.Add(1)
-		go func(s string) {
+		go func(s []byte) {
 			defer wg.Done()
 			<-ch
 			c.Values(s)
@@ -140,10 +153,11 @@ func TestCacheRace2Compacters(t *testing.T) {
 	fileCounter := 0
 	mapFiles := map[int]bool{}
 	mu := sync.Mutex{}
+	errC := make(chan error)
 	for i := 0; i < 2; i++ {
 		wg.Add(1)
 		go func() {
-			wg.Done()
+			defer wg.Done()
 			<-ch
 			s, err := c.Snapshot()
 			if err == tsm1.ErrSnapshotInProgress {
@@ -151,7 +165,8 @@ func TestCacheRace2Compacters(t *testing.T) {
 			}
 
 			if err != nil {
-				t.Fatalf("failed to snapshot cache: %v", err)
+				errC <- fmt.Errorf("failed to snapshot cache: %v", err)
+				return
 			}
 
 			mu.Lock()
@@ -168,7 +183,8 @@ func TestCacheRace2Compacters(t *testing.T) {
 			defer mu.Unlock()
 			for k, _ := range myFiles {
 				if _, ok := mapFiles[k]; !ok {
-					t.Fatalf("something else deleted one of my files")
+					errC <- fmt.Errorf("something else deleted one of my files")
+					return
 				} else {
 					delete(mapFiles, k)
 				}
@@ -176,5 +192,15 @@ func TestCacheRace2Compacters(t *testing.T) {
 		}()
 	}
 	close(ch)
-	wg.Wait()
+
+	go func() {
+		wg.Wait()
+		close(errC)
+	}()
+
+	for err := range errC {
+		if err != nil {
+			t.Error(err)
+		}
+	}
 }

@@ -5,91 +5,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/influxdata/influxdb/influxql"
+	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/tsdb"
 )
-
-// Test comparing SeriesIDs for equality.
-func Test_SeriesIDs_Equals(t *testing.T) {
-	ids1 := tsdb.SeriesIDs([]uint64{1, 2, 3})
-	ids2 := tsdb.SeriesIDs([]uint64{1, 2, 3})
-	ids3 := tsdb.SeriesIDs([]uint64{4, 5, 6})
-
-	if !ids1.Equals(ids2) {
-		t.Fatal("expected ids1 == ids2")
-	} else if ids1.Equals(ids3) {
-		t.Fatal("expected ids1 != ids3")
-	}
-}
-
-// Test intersecting sets of SeriesIDs.
-func Test_SeriesIDs_Intersect(t *testing.T) {
-	// Test swaping l & r, all branches of if-else, and exit loop when 'j < len(r)'
-	ids1 := tsdb.SeriesIDs([]uint64{1, 3, 4, 5, 6})
-	ids2 := tsdb.SeriesIDs([]uint64{1, 2, 3, 7})
-	exp := tsdb.SeriesIDs([]uint64{1, 3})
-	got := ids1.Intersect(ids2)
-
-	if !exp.Equals(got) {
-		t.Fatalf("exp=%v, got=%v", exp, got)
-	}
-
-	// Test exit for loop when 'i < len(l)'
-	ids1 = tsdb.SeriesIDs([]uint64{1})
-	ids2 = tsdb.SeriesIDs([]uint64{1, 2})
-	exp = tsdb.SeriesIDs([]uint64{1})
-	got = ids1.Intersect(ids2)
-
-	if !exp.Equals(got) {
-		t.Fatalf("exp=%v, got=%v", exp, got)
-	}
-}
-
-// Test union sets of SeriesIDs.
-func Test_SeriesIDs_Union(t *testing.T) {
-	// Test all branches of if-else, exit loop because of 'j < len(r)', and append remainder from left.
-	ids1 := tsdb.SeriesIDs([]uint64{1, 2, 3, 7})
-	ids2 := tsdb.SeriesIDs([]uint64{1, 3, 4, 5, 6})
-	exp := tsdb.SeriesIDs([]uint64{1, 2, 3, 4, 5, 6, 7})
-	got := ids1.Union(ids2)
-
-	if !exp.Equals(got) {
-		t.Fatalf("exp=%v, got=%v", exp, got)
-	}
-
-	// Test exit because of 'i < len(l)' and append remainder from right.
-	ids1 = tsdb.SeriesIDs([]uint64{1})
-	ids2 = tsdb.SeriesIDs([]uint64{1, 2})
-	exp = tsdb.SeriesIDs([]uint64{1, 2})
-	got = ids1.Union(ids2)
-
-	if !exp.Equals(got) {
-		t.Fatalf("exp=%v, got=%v", exp, got)
-	}
-}
-
-// Test removing one set of SeriesIDs from another.
-func Test_SeriesIDs_Reject(t *testing.T) {
-	// Test all branches of if-else, exit loop because of 'j < len(r)', and append remainder from left.
-	ids1 := tsdb.SeriesIDs([]uint64{1, 2, 3, 7})
-	ids2 := tsdb.SeriesIDs([]uint64{1, 3, 4, 5, 6})
-	exp := tsdb.SeriesIDs([]uint64{2, 7})
-	got := ids1.Reject(ids2)
-
-	if !exp.Equals(got) {
-		t.Fatalf("exp=%v, got=%v", exp, got)
-	}
-
-	// Test exit because of 'i < len(l)'.
-	ids1 = tsdb.SeriesIDs([]uint64{1})
-	ids2 = tsdb.SeriesIDs([]uint64{1, 2})
-	exp = tsdb.SeriesIDs{}
-	got = ids1.Reject(ids2)
-
-	if !exp.Equals(got) {
-		t.Fatalf("exp=%v, got=%v", exp, got)
-	}
-}
 
 // Ensure tags can be marshaled into a byte slice.
 func TestMarshalTags(t *testing.T) {
@@ -142,47 +60,101 @@ func benchmarkMarshalTags(b *testing.B, keyN int) {
 	}
 }
 
-func BenchmarkCreateSeriesIndex_1K(b *testing.B) {
-	benchmarkCreateSeriesIndex(b, genTestSeries(38, 3, 3))
+// Ensure tags can be marshaled into a byte slice.
+func TestMakeTagsKey(t *testing.T) {
+	for i, tt := range []struct {
+		keys   []string
+		tags   models.Tags
+		result []byte
+	}{
+		{
+			keys:   nil,
+			tags:   nil,
+			result: nil,
+		},
+		{
+			keys:   []string{"foo"},
+			tags:   models.NewTags(map[string]string{"foo": "bar"}),
+			result: []byte(`foo|bar`),
+		},
+		{
+			keys:   []string{"foo"},
+			tags:   models.NewTags(map[string]string{"baz": "battttt"}),
+			result: []byte(``),
+		},
+		{
+			keys:   []string{"baz", "foo"},
+			tags:   models.NewTags(map[string]string{"baz": "battttt"}),
+			result: []byte(`baz|battttt`),
+		},
+		{
+			keys:   []string{"baz", "foo", "zzz"},
+			tags:   models.NewTags(map[string]string{"foo": "bar"}),
+			result: []byte(`foo|bar`),
+		},
+		{
+			keys:   []string{"baz", "foo"},
+			tags:   models.NewTags(map[string]string{"foo": "bar", "baz": "battttt"}),
+			result: []byte(`baz|foo|battttt|bar`),
+		},
+		{
+			keys:   []string{"baz"},
+			tags:   models.NewTags(map[string]string{"baz": "battttt", "foo": "bar"}),
+			result: []byte(`baz|battttt`),
+		},
+	} {
+		result := tsdb.MakeTagsKey(tt.keys, tt.tags)
+		if !bytes.Equal(result, tt.result) {
+			t.Fatalf("%d. unexpected result: exp=%s, got=%s", i, tt.result, result)
+		}
+	}
 }
 
-func BenchmarkCreateSeriesIndex_100K(b *testing.B) {
-	benchmarkCreateSeriesIndex(b, genTestSeries(32, 5, 5))
-}
+func BenchmarkMakeTagsKey_KeyN1(b *testing.B)  { benchmarkMakeTagsKey(b, 1) }
+func BenchmarkMakeTagsKey_KeyN3(b *testing.B)  { benchmarkMakeTagsKey(b, 3) }
+func BenchmarkMakeTagsKey_KeyN5(b *testing.B)  { benchmarkMakeTagsKey(b, 5) }
+func BenchmarkMakeTagsKey_KeyN10(b *testing.B) { benchmarkMakeTagsKey(b, 10) }
 
-func BenchmarkCreateSeriesIndex_1M(b *testing.B) {
-	benchmarkCreateSeriesIndex(b, genTestSeries(330, 5, 5))
-}
+func makeTagsAndKeys(keyN int) ([]string, models.Tags) {
+	const keySize, valueSize = 8, 15
 
-func benchmarkCreateSeriesIndex(b *testing.B, series []*TestSeries) {
-	idxs := make([]*tsdb.DatabaseIndex, 0, b.N)
-	for i := 0; i < b.N; i++ {
-		idxs = append(idxs, tsdb.NewDatabaseIndex(fmt.Sprintf("db%d", i)))
+	// Generate tag map.
+	keys := make([]string, keyN)
+	tags := make(map[string]string)
+	for i := 0; i < keyN; i++ {
+		keys[i] = fmt.Sprintf("%0*d", keySize, i)
+		tags[keys[i]] = fmt.Sprintf("%0*d", valueSize, i)
 	}
 
-	b.ResetTimer()
-	for n := 0; n < b.N; n++ {
-		idx := idxs[n]
-		for _, s := range series {
-			idx.CreateSeriesIndexIfNotExists(s.Measurement, s.Series)
-		}
+	return keys, models.NewTags(tags)
+}
+
+func benchmarkMakeTagsKey(b *testing.B, keyN int) {
+	keys, tags := makeTagsAndKeys(keyN)
+
+	// Unmarshal map into byte slice.
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		tsdb.MakeTagsKey(keys, tags)
 	}
 }
 
 type TestSeries struct {
 	Measurement string
-	Series      *tsdb.Series
+	Key         string
+	Tags        models.Tags
 }
 
 func genTestSeries(mCnt, tCnt, vCnt int) []*TestSeries {
 	measurements := genStrList("measurement", mCnt)
 	tagSets := NewTagSetGenerator(tCnt, vCnt).AllSets()
-	series := []*TestSeries{}
+	var series []*TestSeries
 	for _, m := range measurements {
 		for _, ts := range tagSets {
 			series = append(series, &TestSeries{
 				Measurement: m,
-				Series:      tsdb.NewSeries(fmt.Sprintf("%s:%s", m, string(tsdb.MarshalTags(ts))), ts),
+				Key:         fmt.Sprintf("%s:%s", m, string(tsdb.MarshalTags(ts))),
+				Tags:        models.NewTags(ts),
 			})
 		}
 	}
@@ -286,17 +258,4 @@ func genStrList(prefix string, n int) []string {
 		lst = append(lst, fmt.Sprintf("%s%d", prefix, i))
 	}
 	return lst
-}
-
-// MustParseExpr parses an expression string and returns its AST representation.
-func MustParseExpr(s string) influxql.Expr {
-	expr, err := influxql.ParseExpr(s)
-	if err != nil {
-		panic(err.Error())
-	}
-	return expr
-}
-
-func strref(s string) *string {
-	return &s
 }

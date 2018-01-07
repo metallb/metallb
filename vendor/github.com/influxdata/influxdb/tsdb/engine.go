@@ -1,16 +1,21 @@
 package tsdb
 
 import (
-	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"regexp"
 	"sort"
 	"time"
 
-	"github.com/influxdata/influxdb/influxql"
 	"github.com/influxdata/influxdb/models"
+	"github.com/influxdata/influxdb/pkg/estimator"
+	"github.com/influxdata/influxdb/pkg/limiter"
+	"github.com/influxdata/influxdb/query"
+	"github.com/influxdata/influxql"
+	"go.uber.org/zap"
 )
 
 var (
@@ -27,24 +32,53 @@ var (
 type Engine interface {
 	Open() error
 	Close() error
+	SetEnabled(enabled bool)
+	SetCompactionsEnabled(enabled bool)
+	ScheduleFullCompaction() error
 
-	SetLogOutput(io.Writer)
-	LoadMetadataIndex(shard *Shard, index *DatabaseIndex) error
+	WithLogger(*zap.Logger)
 
-	CreateIterator(opt influxql.IteratorOptions) (influxql.Iterator, error)
-	SeriesKeys(opt influxql.IteratorOptions) (influxql.SeriesList, error)
+	LoadMetadataIndex(shardID uint64, index Index) error
+
+	CreateSnapshot() (string, error)
+	Backup(w io.Writer, basePath string, since time.Time) error
+	Export(w io.Writer, basePath string, start time.Time, end time.Time) error
+	Restore(r io.Reader, basePath string) error
+	Import(r io.Reader, basePath string) error
+	Digest() (io.ReadCloser, error)
+
+	CreateIterator(ctx context.Context, measurement string, opt query.IteratorOptions) (query.Iterator, error)
+	CreateCursor(ctx context.Context, r *CursorRequest) (Cursor, error)
+	IteratorCost(measurement string, opt query.IteratorOptions) (query.IteratorCost, error)
 	WritePoints(points []models.Point) error
-	DeleteSeries(keys []string) error
-	DeleteMeasurement(name string, seriesKeys []string) error
-	SeriesCount() (n int, err error)
-	MeasurementFields(measurement string) *MeasurementFields
 
-	// Format will return the format for the engine
-	Format() EngineFormat
+	CreateSeriesIfNotExists(key, name []byte, tags models.Tags) error
+	CreateSeriesListIfNotExists(keys, names [][]byte, tags []models.Tags) error
+	DeleteSeriesRange(itr SeriesIterator, min, max int64, removeIndex bool) error
+
+	MeasurementsSketches() (estimator.Sketch, estimator.Sketch, error)
+	SeriesN() int64
+
+	MeasurementExists(name []byte) (bool, error)
+
+	MeasurementNamesByRegex(re *regexp.Regexp) ([][]byte, error)
+	MeasurementFieldSet() *MeasurementFieldSet
+	MeasurementFields(measurement []byte) *MeasurementFields
+	ForEachMeasurementName(fn func(name []byte) error) error
+	DeleteMeasurement(name []byte) error
+
+	HasTagKey(name, key []byte) (bool, error)
+	MeasurementTagKeysByExpr(name []byte, expr influxql.Expr) (map[string]struct{}, error)
+	TagKeyCardinality(name, key []byte) int
+
+	// Statistics will return statistics relevant to this engine.
+	Statistics(tags map[string]string) []models.Statistic
+	LastModified() time.Time
+	DiskSize() int64
+	IsIdle() bool
+	Free() error
 
 	io.WriterTo
-
-	Backup(w io.Writer, basePath string, since time.Time) error
 }
 
 // EngineFormat represents the format for an engine.
@@ -56,7 +90,7 @@ const (
 )
 
 // NewEngineFunc creates a new engine.
-type NewEngineFunc func(path string, walPath string, options EngineOptions) Engine
+type NewEngineFunc func(id uint64, i Index, database, path string, walPath string, sfile *SeriesFile, options EngineOptions) Engine
 
 // newEngineFuncs is a lookup of engine constructors by name.
 var newEngineFuncs = make(map[string]NewEngineFunc)
@@ -81,14 +115,14 @@ func RegisteredEngines() []string {
 
 // NewEngine returns an instance of an engine based on its format.
 // If the path does not exist then the DefaultFormat is used.
-func NewEngine(path string, walPath string, options EngineOptions) (Engine, error) {
+func NewEngine(id uint64, i Index, database, path string, walPath string, sfile *SeriesFile, options EngineOptions) (Engine, error) {
 	// Create a new engine
 	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return newEngineFuncs[options.EngineVersion](path, walPath, options), nil
+		return newEngineFuncs[options.EngineVersion](id, i, database, path, walPath, sfile, options), nil
 	}
 
 	// If it's a dir then it's a tsm1 engine
-	format := "tsm1"
+	format := DefaultEngine
 	if fi, err := os.Stat(path); err != nil {
 		return nil, err
 	} else if !fi.Mode().IsDir() {
@@ -103,12 +137,18 @@ func NewEngine(path string, walPath string, options EngineOptions) (Engine, erro
 		return nil, fmt.Errorf("invalid engine format: %q", format)
 	}
 
-	return fn(path, walPath, options), nil
+	return fn(id, i, database, path, walPath, sfile, options), nil
 }
 
 // EngineOptions represents the options used to initialize the engine.
 type EngineOptions struct {
 	EngineVersion string
+	IndexVersion  string
+	ShardID       uint64
+	InmemIndex    interface{} // shared in-memory index
+
+	CompactionLimiter           limiter.Fixed
+	CompactionThroughputLimiter limiter.Rate
 
 	Config Config
 }
@@ -117,33 +157,10 @@ type EngineOptions struct {
 func NewEngineOptions() EngineOptions {
 	return EngineOptions{
 		EngineVersion: DefaultEngine,
+		IndexVersion:  DefaultIndex,
 		Config:        NewConfig(),
 	}
 }
 
-// DedupeEntries returns slices with unique keys (the first 8 bytes).
-func DedupeEntries(a [][]byte) [][]byte {
-	// Convert to a map where the last slice is used.
-	m := make(map[string][]byte)
-	for _, b := range a {
-		m[string(b[0:8])] = b
-	}
-
-	// Convert map back to a slice of byte slices.
-	other := make([][]byte, 0, len(m))
-	for _, v := range m {
-		other = append(other, v)
-	}
-
-	// Sort entries.
-	sort.Sort(ByteSlices(other))
-
-	return other
-}
-
-// ByteSlices wraps a list of byte-slices for sorting.
-type ByteSlices [][]byte
-
-func (a ByteSlices) Len() int           { return len(a) }
-func (a ByteSlices) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByteSlices) Less(i, j int) bool { return bytes.Compare(a[i], a[j]) == -1 }
+// NewInmemIndex returns a new "inmem" index type.
+var NewInmemIndex func(name string, sfile *SeriesFile) (interface{}, error)

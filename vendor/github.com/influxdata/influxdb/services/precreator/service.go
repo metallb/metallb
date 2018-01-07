@@ -1,10 +1,12 @@
+// Package precreator provides the shard precreation service.
 package precreator // import "github.com/influxdata/influxdb/services/precreator"
 
 import (
-	"log"
-	"os"
+	"fmt"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 // Service manages the shard precreation service.
@@ -12,7 +14,7 @@ type Service struct {
 	checkInterval time.Duration
 	advancePeriod time.Duration
 
-	Logger *log.Logger
+	Logger *zap.Logger
 
 	done chan struct{}
 	wg   sync.WaitGroup
@@ -23,19 +25,17 @@ type Service struct {
 }
 
 // NewService returns an instance of the precreation service.
-func NewService(c Config) (*Service, error) {
-	s := Service{
+func NewService(c Config) *Service {
+	return &Service{
 		checkInterval: time.Duration(c.CheckInterval),
 		advancePeriod: time.Duration(c.AdvancePeriod),
-		Logger:        log.New(os.Stderr, "[shard-precreation] ", log.LstdFlags),
+		Logger:        zap.NewNop(),
 	}
-
-	return &s, nil
 }
 
-// SetLogger sets the internal logger to the logger passed in.
-func (s *Service) SetLogger(l *log.Logger) {
-	s.Logger = l
+// WithLogger sets the logger for the service.
+func (s *Service) WithLogger(log *zap.Logger) {
+	s.Logger = log.With(zap.String("service", "shard-precreation"))
 }
 
 // Open starts the precreation service.
@@ -44,8 +44,8 @@ func (s *Service) Open() error {
 		return nil
 	}
 
-	s.Logger.Printf("Starting precreation service with check interval of %s, advance period of %s",
-		s.checkInterval, s.advancePeriod)
+	s.Logger.Info(fmt.Sprintf("Starting precreation service with check interval of %s, advance period of %s",
+		s.checkInterval, s.advancePeriod))
 
 	s.done = make(chan struct{})
 
@@ -75,10 +75,10 @@ func (s *Service) runPrecreation() {
 		select {
 		case <-time.After(s.checkInterval):
 			if err := s.precreate(time.Now().UTC()); err != nil {
-				s.Logger.Printf("failed to precreate shards: %s", err.Error())
+				s.Logger.Info(fmt.Sprintf("failed to precreate shards: %s", err.Error()))
 			}
 		case <-s.done:
-			s.Logger.Println("Precreation service terminating")
+			s.Logger.Info("Precreation service terminating")
 			return
 		}
 	}

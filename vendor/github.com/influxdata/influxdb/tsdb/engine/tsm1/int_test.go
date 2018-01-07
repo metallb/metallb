@@ -9,7 +9,7 @@ import (
 )
 
 func Test_IntegerEncoder_NoValues(t *testing.T) {
-	enc := NewIntegerEncoder()
+	enc := NewIntegerEncoder(0)
 	b, err := enc.Bytes()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -19,14 +19,15 @@ func Test_IntegerEncoder_NoValues(t *testing.T) {
 		t.Fatalf("unexpected lenght: exp 0, got %v", len(b))
 	}
 
-	dec := NewIntegerDecoder(b)
+	var dec IntegerDecoder
+	dec.SetBytes(b)
 	if dec.Next() {
 		t.Fatalf("unexpected next value: got true, exp false")
 	}
 }
 
 func Test_IntegerEncoder_One(t *testing.T) {
-	enc := NewIntegerEncoder()
+	enc := NewIntegerEncoder(1)
 	v1 := int64(1)
 
 	enc.Write(1)
@@ -39,7 +40,8 @@ func Test_IntegerEncoder_One(t *testing.T) {
 		t.Fatalf("encoding type mismatch: exp uncompressed, got %v", got)
 	}
 
-	dec := NewIntegerDecoder(b)
+	var dec IntegerDecoder
+	dec.SetBytes(b)
 	if !dec.Next() {
 		t.Fatalf("unexpected next value: got true, exp false")
 	}
@@ -50,7 +52,7 @@ func Test_IntegerEncoder_One(t *testing.T) {
 }
 
 func Test_IntegerEncoder_Two(t *testing.T) {
-	enc := NewIntegerEncoder()
+	enc := NewIntegerEncoder(2)
 	var v1, v2 int64 = 1, 2
 
 	enc.Write(v1)
@@ -65,7 +67,8 @@ func Test_IntegerEncoder_Two(t *testing.T) {
 		t.Fatalf("encoding type mismatch: exp uncompressed, got %v", got)
 	}
 
-	dec := NewIntegerDecoder(b)
+	var dec IntegerDecoder
+	dec.SetBytes(b)
 	if !dec.Next() {
 		t.Fatalf("unexpected next value: got true, exp false")
 	}
@@ -84,7 +87,7 @@ func Test_IntegerEncoder_Two(t *testing.T) {
 }
 
 func Test_IntegerEncoder_Negative(t *testing.T) {
-	enc := NewIntegerEncoder()
+	enc := NewIntegerEncoder(3)
 	var v1, v2, v3 int64 = -2, 0, 1
 
 	enc.Write(v1)
@@ -100,7 +103,8 @@ func Test_IntegerEncoder_Negative(t *testing.T) {
 		t.Fatalf("encoding type mismatch: exp uncompressed, got %v", got)
 	}
 
-	dec := NewIntegerDecoder(b)
+	var dec IntegerDecoder
+	dec.SetBytes(b)
 	if !dec.Next() {
 		t.Fatalf("unexpected next value: got true, exp false")
 	}
@@ -127,7 +131,7 @@ func Test_IntegerEncoder_Negative(t *testing.T) {
 }
 
 func Test_IntegerEncoder_Large_Range(t *testing.T) {
-	enc := NewIntegerEncoder()
+	enc := NewIntegerEncoder(2)
 	var v1, v2 int64 = math.MinInt64, math.MaxInt64
 	enc.Write(v1)
 	enc.Write(v2)
@@ -140,7 +144,8 @@ func Test_IntegerEncoder_Large_Range(t *testing.T) {
 		t.Fatalf("encoding type mismatch: exp uncompressed, got %v", got)
 	}
 
-	dec := NewIntegerDecoder(b)
+	var dec IntegerDecoder
+	dec.SetBytes(b)
 	if !dec.Next() {
 		t.Fatalf("unexpected next value: got true, exp false")
 	}
@@ -159,7 +164,7 @@ func Test_IntegerEncoder_Large_Range(t *testing.T) {
 }
 
 func Test_IntegerEncoder_Uncompressed(t *testing.T) {
-	enc := NewIntegerEncoder()
+	enc := NewIntegerEncoder(3)
 	var v1, v2, v3 int64 = 0, 1, 1 << 60
 
 	enc.Write(v1)
@@ -180,7 +185,8 @@ func Test_IntegerEncoder_Uncompressed(t *testing.T) {
 		t.Fatalf("encoding type mismatch: exp uncompressed, got %v", got)
 	}
 
-	dec := NewIntegerDecoder(b)
+	var dec IntegerDecoder
+	dec.SetBytes(b)
 	if !dec.Next() {
 		t.Fatalf("unexpected next value: got true, exp false")
 	}
@@ -217,7 +223,7 @@ func Test_IntegerEncoder_NegativeUncompressed(t *testing.T) {
 		2761419461769776844, -1324397441074946198, -680758138988210958,
 		94468846694902125, -2394093124890745254, -2682139311758778198,
 	}
-	enc := NewIntegerEncoder()
+	enc := NewIntegerEncoder(256)
 	for _, v := range values {
 		enc.Write(v)
 	}
@@ -231,7 +237,8 @@ func Test_IntegerEncoder_NegativeUncompressed(t *testing.T) {
 		t.Fatalf("encoding type mismatch: exp uncompressed, got %v", got)
 	}
 
-	dec := NewIntegerDecoder(b)
+	var dec IntegerDecoder
+	dec.SetBytes(b)
 
 	i := 0
 	for dec.Next() {
@@ -251,7 +258,7 @@ func Test_IntegerEncoder_NegativeUncompressed(t *testing.T) {
 }
 
 func Test_IntegerEncoder_AllNegative(t *testing.T) {
-	enc := NewIntegerEncoder()
+	enc := NewIntegerEncoder(3)
 	values := []int64{
 		-10, -5, -1,
 	}
@@ -269,7 +276,8 @@ func Test_IntegerEncoder_AllNegative(t *testing.T) {
 		t.Fatalf("encoding type mismatch: exp uncompressed, got %v", got)
 	}
 
-	dec := NewIntegerDecoder(b)
+	var dec IntegerDecoder
+	dec.SetBytes(b)
 	i := 0
 	for dec.Next() {
 		if i > len(values) {
@@ -288,7 +296,7 @@ func Test_IntegerEncoder_AllNegative(t *testing.T) {
 }
 
 func Test_IntegerEncoder_CounterPacked(t *testing.T) {
-	enc := NewIntegerEncoder()
+	enc := NewIntegerEncoder(16)
 	values := []int64{
 		1e15, 1e15 + 1, 1e15 + 2, 1e15 + 3, 1e15 + 4, 1e15 + 6,
 	}
@@ -312,7 +320,8 @@ func Test_IntegerEncoder_CounterPacked(t *testing.T) {
 		t.Fatalf("encoded length mismatch: got %v, exp %v", len(b), exp)
 	}
 
-	dec := NewIntegerDecoder(b)
+	var dec IntegerDecoder
+	dec.SetBytes(b)
 	i := 0
 	for dec.Next() {
 		if i > len(values) {
@@ -331,9 +340,97 @@ func Test_IntegerEncoder_CounterPacked(t *testing.T) {
 }
 
 func Test_IntegerEncoder_CounterRLE(t *testing.T) {
-	enc := NewIntegerEncoder()
+	enc := NewIntegerEncoder(16)
 	values := []int64{
 		1e15, 1e15 + 1, 1e15 + 2, 1e15 + 3, 1e15 + 4, 1e15 + 5,
+	}
+
+	for _, v := range values {
+		enc.Write(v)
+	}
+
+	b, err := enc.Bytes()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if b[0]>>4 != intCompressedRLE {
+		t.Fatalf("unexpected encoding format: expected RLE, got %v", b[0]>>4)
+	}
+
+	// Should use 1 header byte, 8 byte first value, 1 var-byte for delta and 1 var-byte for
+	// count of deltas in this particular RLE.
+	if exp := 11; len(b) != exp {
+		t.Fatalf("encoded length mismatch: got %v, exp %v", len(b), exp)
+	}
+
+	var dec IntegerDecoder
+	dec.SetBytes(b)
+	i := 0
+	for dec.Next() {
+		if i > len(values) {
+			t.Fatalf("read too many values: got %v, exp %v", i, len(values))
+		}
+
+		if values[i] != dec.Read() {
+			t.Fatalf("read value %d mismatch: got %v, exp %v", i, dec.Read(), values[i])
+		}
+		i += 1
+	}
+
+	if i != len(values) {
+		t.Fatalf("failed to read enough values: got %v, exp %v", i, len(values))
+	}
+}
+
+func Test_IntegerEncoder_Descending(t *testing.T) {
+	enc := NewIntegerEncoder(16)
+	values := []int64{
+		7094, 4472, 1850,
+	}
+
+	for _, v := range values {
+		enc.Write(v)
+	}
+
+	b, err := enc.Bytes()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if b[0]>>4 != intCompressedRLE {
+		t.Fatalf("unexpected encoding format: expected simple, got %v", b[0]>>4)
+	}
+
+	// Should use 1 header byte, 8 byte first value, 1 var-byte for delta and 1 var-byte for
+	// count of deltas in this particular RLE.
+	if exp := 12; len(b) != exp {
+		t.Fatalf("encoded length mismatch: got %v, exp %v", len(b), exp)
+	}
+
+	var dec IntegerDecoder
+	dec.SetBytes(b)
+	i := 0
+	for dec.Next() {
+		if i > len(values) {
+			t.Fatalf("read too many values: got %v, exp %v", i, len(values))
+		}
+
+		if values[i] != dec.Read() {
+			t.Fatalf("read value %d mismatch: got %v, exp %v", i, dec.Read(), values[i])
+		}
+		i += 1
+	}
+
+	if i != len(values) {
+		t.Fatalf("failed to read enough values: got %v, exp %v", i, len(values))
+	}
+}
+
+func Test_IntegerEncoder_Flat(t *testing.T) {
+	enc := NewIntegerEncoder(16)
+	values := []int64{
+		1, 1, 1, 1,
 	}
 
 	for _, v := range values {
@@ -355,7 +452,8 @@ func Test_IntegerEncoder_CounterRLE(t *testing.T) {
 		t.Fatalf("encoded length mismatch: got %v, exp %v", len(b), exp)
 	}
 
-	dec := NewIntegerDecoder(b)
+	var dec IntegerDecoder
+	dec.SetBytes(b)
 	i := 0
 	for dec.Next() {
 		if i > len(values) {
@@ -374,7 +472,7 @@ func Test_IntegerEncoder_CounterRLE(t *testing.T) {
 }
 
 func Test_IntegerEncoder_MinMax(t *testing.T) {
-	enc := NewIntegerEncoder()
+	enc := NewIntegerEncoder(2)
 	values := []int64{
 		math.MinInt64, math.MaxInt64,
 	}
@@ -396,7 +494,8 @@ func Test_IntegerEncoder_MinMax(t *testing.T) {
 		t.Fatalf("encoded length mismatch: got %v, exp %v", len(b), exp)
 	}
 
-	dec := NewIntegerDecoder(b)
+	var dec IntegerDecoder
+	dec.SetBytes(b)
 	i := 0
 	for dec.Next() {
 		if i > len(values) {
@@ -422,7 +521,7 @@ func Test_IntegerEncoder_Quick(t *testing.T) {
 		}
 
 		// Write values to encoder.
-		enc := NewIntegerEncoder()
+		enc := NewIntegerEncoder(1024)
 		for _, v := range values {
 			enc.Write(v)
 		}
@@ -435,7 +534,8 @@ func Test_IntegerEncoder_Quick(t *testing.T) {
 
 		// Read values out of decoder.
 		got := make([]int64, 0, len(values))
-		dec := NewIntegerDecoder(buf)
+		var dec IntegerDecoder
+		dec.SetBytes(buf)
 		for dec.Next() {
 			if err := dec.Error(); err != nil {
 				t.Fatal(err)
@@ -452,8 +552,27 @@ func Test_IntegerEncoder_Quick(t *testing.T) {
 	}, nil)
 }
 
+func Test_IntegerDecoder_Corrupt(t *testing.T) {
+	cases := []string{
+		"",                     // Empty
+		"\x00abc",              // Uncompressed: less than 8 bytes
+		"\x10abc",              // Packed: less than 8 bytes
+		"\x20abc",              // RLE: less than 8 bytes
+		"\x2012345678\x90",     // RLE: valid starting value but invalid delta value
+		"\x2012345678\x01\x90", // RLE: valid starting, valid delta value, invalid repeat value
+	}
+
+	for _, c := range cases {
+		var dec IntegerDecoder
+		dec.SetBytes([]byte(c))
+		if dec.Next() {
+			t.Fatalf("exp next == false, got true")
+		}
+	}
+}
+
 func BenchmarkIntegerEncoderRLE(b *testing.B) {
-	enc := NewIntegerEncoder()
+	enc := NewIntegerEncoder(1024)
 	x := make([]int64, 1024)
 	for i := 0; i < len(x); i++ {
 		x[i] = int64(i)
@@ -467,7 +586,7 @@ func BenchmarkIntegerEncoderRLE(b *testing.B) {
 }
 
 func BenchmarkIntegerEncoderPackedSimple(b *testing.B) {
-	enc := NewIntegerEncoder()
+	enc := NewIntegerEncoder(1024)
 	x := make([]int64, 1024)
 	for i := 0; i < len(x); i++ {
 		// Small amount of randomness prevents RLE from being used
@@ -478,16 +597,16 @@ func BenchmarkIntegerEncoderPackedSimple(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		enc.Bytes()
+		enc.Reset()
+		for i := 0; i < len(x); i++ {
+			enc.Write(x[i])
+		}
 	}
-}
-
-type byteSetter interface {
-	SetBytes(b []byte)
 }
 
 func BenchmarkIntegerDecoderPackedSimple(b *testing.B) {
 	x := make([]int64, 1024)
-	enc := NewIntegerEncoder()
+	enc := NewIntegerEncoder(1024)
 	for i := 0; i < len(x); i++ {
 		// Small amount of randomness prevents RLE from being used
 		x[i] = int64(i) + int64(rand.Intn(10))
@@ -497,7 +616,7 @@ func BenchmarkIntegerDecoderPackedSimple(b *testing.B) {
 
 	b.ResetTimer()
 
-	dec := NewIntegerDecoder(bytes)
+	var dec IntegerDecoder
 	for i := 0; i < b.N; i++ {
 		dec.SetBytes(bytes)
 		for dec.Next() {
@@ -507,7 +626,7 @@ func BenchmarkIntegerDecoderPackedSimple(b *testing.B) {
 
 func BenchmarkIntegerDecoderRLE(b *testing.B) {
 	x := make([]int64, 1024)
-	enc := NewIntegerEncoder()
+	enc := NewIntegerEncoder(1024)
 	for i := 0; i < len(x); i++ {
 		x[i] = int64(i)
 		enc.Write(x[i])
@@ -516,7 +635,8 @@ func BenchmarkIntegerDecoderRLE(b *testing.B) {
 
 	b.ResetTimer()
 
-	dec := NewIntegerDecoder(bytes)
+	var dec IntegerDecoder
+	dec.SetBytes(bytes)
 
 	for i := 0; i < b.N; i++ {
 		dec.SetBytes(bytes)
