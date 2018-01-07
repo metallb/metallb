@@ -1,15 +1,22 @@
 package main
 
 import (
+	"flag"
 	"net/http"
 	"os"
 	"os/exec"
 	"strconv"
 
+	"go.universe.tf/metallb/internal/version"
+
 	"github.com/golang/glog"
 )
 
 func main() {
+	flag.Parse()
+
+	glog.Infof("MetalLB test-bgp-router %s", version.String())
+
 	if err := installNatRule(); err != nil {
 		glog.Exitf("Failed to install NAT rule: %s", err)
 	}

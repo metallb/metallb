@@ -23,6 +23,7 @@ import (
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
+	"go.universe.tf/metallb/internal/version"
 
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
@@ -129,6 +130,8 @@ func main() {
 	master := flag.String("master", "", "master url")
 	port := flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
 	flag.Parse()
+
+	glog.Infof("MetalLB controller %s", version.String())
 
 	c := &controller{
 		ips: allocator.New(),

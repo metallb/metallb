@@ -35,6 +35,9 @@ BINARIES:=controller speaker test-bgp-router
 PLATFORMS:=$(subst $(SPACE),$(COMMA),$(foreach arch,$(ALL_ARCH),linux/$(arch)))
 MK_IMAGE_TARGETS:=Makefile.image-targets
 
+GITCOMMIT=$(shell git describe --dirty --broken --always)
+GITBRANCH=$(shell git rev-parse --abbrev-ref HEAD)
+
 all:
 	$(error Please request a specific thing, there is no default target)
 
@@ -46,6 +49,10 @@ all:
 ##
 ## `make push` builds timestamped images, pushes them to REGISTRY, and
 ## updates your currently active cluster to pull them.
+
+.PHONY: build
+build:
+	$(GOCMD) install -v -ldflags="-X go.universe.tf/metallb/internal/version.gitCommit=$(GITCOMMIT) -X go.universe.tf/metallb/internal/version.gitBranch=$(GITBRANCH)" ./controller ./speaker ./test-bgp-router
 
 .PHONY: start-minikube
 start-minikube:
@@ -140,8 +147,7 @@ ci-prepare:
 	$(GOCMD) get github.com/estesp/manifest-tool
 
 .PHONY: ci-build
-ci-build:
-	$(GOCMD) install -v ./controller ./speaker ./test-bgp-router
+ci-build: build
 
 .PHONY: ci-test
 ci-test:
@@ -175,20 +181,22 @@ ifneq ($(shell git status --porcelain),)
 	$(error git working directory is not clean, cannot prepare release)
 endif
 	git checkout master
-ifeq ($(shell grep "\#\# Version $(VERSION)" website/content/release-notes.md),)
+ifeq ($(shell grep "\#\# Version $(VERSION)" website/content/release-notes/_index.md),)
 	$(error no release notes for $(VERSION))
 endif
 ifeq ($(PATCH),0)
-	git ckeckout -b v$(MAJOR).$(MINOR)
-	perl -pi -e 's#/google/metallb/master#/google/metallb/v$(VERSION)#g' website/content/*.md
+	git checkout -b v$(MAJOR).$(MINOR)
+	perl -pi -e 's#/google/metallb/master#/google/metallb/v$(VERSION)#g' website/content/*.md website/content/*/*.md
 	perl -pi -e 's/:latest/:v$(VERSION)/g' manifests/*.yaml
 else
 	git checkout v$(MAJOR).$(MINOR)
-	perl -pi -e "s#/google/metallb/v$(MAJOR).$(MINOR).$$(($(PATCH)-1))#/google/metallb/v$(VERSION)#g" website/content/*.md
+	perl -pi -e "s#/google/metallb/v$(MAJOR).$(MINOR).$$(($(PATCH)-1))#/google/metallb/v$(VERSION)#g" website/content/*.md website/content/*/*.md
 	perl -pi -e "s#:v$(MAJOR).$(MINOR).$$(($(PATCH)-1))#:v$(VERSION)#g" manifests/*.yaml
 endif
-	git checkout master -- website/content/release-notes.md
-	perl -pi -e 's/version = .*/version = "v$(VERSION)"/g' website/config.toml
+	git checkout master -- website/content/release-notes/_index.md
+	perl -pi -e 's/MetalLB \(.*\)/MetalLB v$(VERSION)/g' website/content/_header.md
+	perl -pi -e 's/version\s+=.*/version = "$(VERSION)"/g' internal/version/version.go
+	gofmt -w internal/version/version.go
 	git commit -a -m "Update documentation for release $(VERSION)"
 	git tag v$(VERSION) -m "See the release notes for details:\n\nhttps://metallb.universe.tf/release-notes/#version-$(MAJOR)-$(MINOR)-$(PATCH)"
 	git checkout master

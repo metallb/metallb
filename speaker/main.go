@@ -20,6 +20,7 @@ import (
 	"os"
 
 	"go.universe.tf/metallb/internal/k8s"
+	"go.universe.tf/metallb/internal/version"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -46,6 +47,8 @@ func main() {
 	myNode := flag.String("node-name", "", "name of this Kubernetes node")
 	port := flag.Int("port", 80, "HTTP listening port")
 	flag.Parse()
+
+	glog.Infof("MetalLB speaker %s", version.String())
 
 	if *myIPstr == "" {
 		*myIPstr = os.Getenv("METALLB_NODE_IP")
