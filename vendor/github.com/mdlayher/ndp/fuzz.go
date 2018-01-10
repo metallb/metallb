@@ -1,8 +1,8 @@
-// +build gofuzz
-
 package ndp
 
-func Fuzz(data []byte) int {
+// fuzz is a shared function for go-fuzz and tests that verify go-fuzz bugs
+// are fixed.
+func fuzz(data []byte) int {
 	m, err := ParseMessage(data)
 	if err != nil {
 		return 0

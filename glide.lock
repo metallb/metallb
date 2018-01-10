@@ -1,5 +1,5 @@
-hash: bc15923c24fedb85a96a0abf6a3993fe8389b6d0fe7be3916aa59edd771ef32f
-updated: 2018-01-07T03:15:17.485710421-08:00
+hash: 1f8f3ff1ae44087e8f8157a02771824b9b33856ad0489f8accc81c96e83f5f96
+updated: 2018-01-10T17:29:14.876752897-05:00
 imports:
 - name: github.com/armon/go-radix
   version: 1fca145dffbcaa8fe914309b1ec0cfc67500fe61
@@ -115,7 +115,7 @@ imports:
 - name: github.com/mdlayher/ethernet
   version: e72cf8343052938936194daba1914fd1bb33d2fe
 - name: github.com/mdlayher/ndp
-  version: 803984b023bd8208782145b555ecb5f53668694e
+  version: 065b0cac88fd06c8aec908eb390d3669ac3ea836
 - name: github.com/mdlayher/raw
   version: 9df8b4265df2bcf01458b1759cf7ec4b81b50b65
 - name: github.com/mitchellh/mapstructure

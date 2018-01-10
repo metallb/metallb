@@ -1,8 +1,8 @@
 package ndp
 
 import (
-	"fmt"
 	"net"
+	"time"
 
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv6"
@@ -16,33 +16,34 @@ type Conn struct {
 	pc *ipv6.PacketConn
 	cm *ipv6.ControlMessage
 
-	allNodes *net.IPAddr
-	llAddr   *net.IPAddr
+	ifi  *net.Interface
+	addr *net.IPAddr
 }
 
-// Dial dials a NDP connection using the specified interface.  It returns
-// a Conn and the link-local IPv6 address of the interface.
-func Dial(ifi *net.Interface) (*Conn, net.IP, error) {
-	llAddr, err := linkLocalAddr(ifi)
+// Dial dials a NDP connection using the specified interface and address type.
+//
+// As a special case, literal IPv6 addresses may be specified to bind to a
+// specific address for an interface.  If the IPv6 address does not exist on
+// the interface, an error will be returned.
+//
+// Dial returns a Conn and the chosen IPv6 address of the interface.
+func Dial(ifi *net.Interface, addr Addr) (*Conn, net.IP, error) {
+	addrs, err := ifi.Addrs()
 	if err != nil {
 		return nil, nil, err
 	}
 
-	ic, err := icmp.ListenPacket("ip6:ipv6-icmp", llAddr.String())
+	ipAddr, err := chooseAddr(addrs, ifi.Name, addr)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	// Join the "all nodes" multicast group for this interface.
-	allNodes := &net.IPAddr{
-		IP:   net.IPv6linklocalallnodes,
-		Zone: ifi.Name,
+	ic, err := icmp.ListenPacket("ip6:ipv6-icmp", ipAddr.String())
+	if err != nil {
+		return nil, nil, err
 	}
 
 	pc := ic.IPv6PacketConn()
-	if err := pc.JoinGroup(ifi, allNodes); err != nil {
-		return nil, nil, err
-	}
 
 	// Calculate and place ICMPv6 checksum at correct offset in all messages.
 	const chkOff = 2
@@ -56,15 +57,15 @@ func Dial(ifi *net.Interface) (*Conn, net.IP, error) {
 		// The default control message used when none is specified.
 		cm: &ipv6.ControlMessage{
 			HopLimit: HopLimit,
-			Src:      llAddr.IP,
+			Src:      ipAddr.IP,
 			IfIndex:  ifi.Index,
 		},
 
-		allNodes: allNodes,
-		llAddr:   llAddr,
+		ifi:  ifi,
+		addr: ipAddr,
 	}
 
-	return c, llAddr.IP, nil
+	return c, ipAddr.IP, nil
 }
 
 // Close closes the Conn's underlying connection.
@@ -72,20 +73,25 @@ func (c *Conn) Close() error {
 	return c.pc.Close()
 }
 
+// SetReadDeadline sets a deadline for the next NDP message to arrive.
+func (c *Conn) SetReadDeadline(t time.Time) error {
+	return c.pc.SetReadDeadline(t)
+}
+
 // ReadFrom reads a Message from the Conn and returns its control message and
 // source network address.  Messages sourced from this machine and malformed or
 // unrecognized ICMPv6 messages are filtered.
 func (c *Conn) ReadFrom() (Message, *ipv6.ControlMessage, net.IP, error) {
-	b := make([]byte, 1280)
+	b := make([]byte, c.ifi.MTU)
 	for {
 		n, cm, src, err := c.pc.ReadFrom(b)
 		if err != nil {
 			return nil, nil, nil, err
 		}
 
-		// Did this machine send this message?
+		// If the source isn't unspecified, did this address send this message?
 		ip := src.(*net.IPAddr).IP
-		if ip.Equal(c.llAddr.IP) {
+		if !ip.IsUnspecified() && ip.Equal(c.addr.IP) {
 			continue
 		}
 
@@ -114,38 +120,11 @@ func (c *Conn) WriteTo(m Message, cm *ipv6.ControlMessage, dst net.IP) error {
 		cm = c.cm
 	}
 
-	addr := &net.IPAddr{IP: dst}
+	addr := &net.IPAddr{
+		IP:   dst,
+		Zone: c.ifi.Name,
+	}
+
 	_, err = c.pc.WriteTo(b, cm, addr)
 	return err
-}
-
-// linkLocalAddr searches for a valid IPv6 link-local address for the specified
-// interface.
-func linkLocalAddr(ifi *net.Interface) (*net.IPAddr, error) {
-	addrs, err := ifi.Addrs()
-	if err != nil {
-		return nil, err
-	}
-
-	for _, a := range addrs {
-		ipn, ok := a.(*net.IPNet)
-		if !ok {
-			continue
-		}
-
-		if err := checkIPv6(ipn.IP); err != nil {
-			continue
-		}
-
-		if !ipn.IP.IsLinkLocalUnicast() {
-			continue
-		}
-
-		return &net.IPAddr{
-			IP:   ipn.IP,
-			Zone: ifi.Name,
-		}, nil
-	}
-
-	return nil, fmt.Errorf("ndp: no link local address for interface %q", ifi.Name)
 }
