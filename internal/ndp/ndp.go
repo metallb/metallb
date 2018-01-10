@@ -29,7 +29,9 @@ func New(ip net.IP) (*Announce, error) {
 	if err != nil {
 		return nil, fmt.Errorf("ndp: can't find interface for %s: %s", ip, err)
 	}
-	conn, _, err := ndp.Dial(ifi)
+
+	// Use ip as the source IPv6 address for NDP communications.
+	conn, _, err := ndp.Dial(ifi, ndp.Addr(ip.String()))
 	if err != nil {
 		return nil, err
 	}
