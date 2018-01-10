@@ -2,25 +2,31 @@ package ndp
 
 import (
 	"encoding"
+	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
+	"time"
 )
+
+// Infinity indicates that a prefix is valid for an infinite amount of time,
+// unless a new, finite, value is received in a subsequent router advertisement.
+const Infinity = time.Duration(0xffffffff) * time.Second
 
 const (
 	// Length of a link-layer address for Ethernet networks.
 	ethAddrLen = 6
 
-	// The assumed NDP option length (in units of 8 bytes) for a source or
-	// target link layer address option for Ethernet networks.
+	// The assumed NDP option length (in units of 8 bytes) for fixed length options.
 	llaOptLen = 1
+	piOptLen  = 4
+	mtuOptLen = 1
 
 	// Type values for each type of valid Option.
-	optSourceLLA = 1
-	optTargetLLA = 2
-
-	// Minimum byte length values for each type of valid Option.
-	llaByteLen = 8
+	optSourceLLA         = 1
+	optTargetLLA         = 2
+	optPrefixInformation = 3
+	optMTU               = 5
 )
 
 // A Direction specifies the direction of a LinkLayerAddress Option as a source
@@ -64,35 +70,228 @@ func (lla *LinkLayerAddress) MarshalBinary() ([]byte, error) {
 		return nil, fmt.Errorf("ndp: invalid link-layer address: %q", lla.Addr.String())
 	}
 
-	b := make([]byte, llaByteLen)
-	b[0] = lla.code()
-	b[1] = llaOptLen
-	copy(b[2:], lla.Addr)
+	raw := &RawOption{
+		Type:   lla.code(),
+		Length: llaOptLen,
+		Value:  lla.Addr,
+	}
 
-	return b, nil
+	return raw.MarshalBinary()
 }
 
 // UnmarshalBinary implements Option.
 func (lla *LinkLayerAddress) UnmarshalBinary(b []byte) error {
-	if len(b) < llaByteLen {
-		return io.ErrUnexpectedEOF
+	raw := new(RawOption)
+	if err := raw.UnmarshalBinary(b); err != nil {
+		return err
 	}
 
-	d := Direction(b[0])
+	d := Direction(raw.Type)
 	if d != Source && d != Target {
 		return fmt.Errorf("ndp: invalid link-layer address direction: %d", d)
 	}
 
-	if l := b[1]; l != llaOptLen {
+	if l := raw.Length; l != llaOptLen {
 		return fmt.Errorf("ndp: unexpected link-layer address option length: %d", l)
 	}
 
 	*lla = LinkLayerAddress{
 		Direction: d,
-		Addr:      make(net.HardwareAddr, ethAddrLen),
+		Addr:      net.HardwareAddr(raw.Value),
 	}
 
-	copy(lla.Addr, b[2:])
+	return nil
+}
+
+var _ Option = new(MTU)
+
+// TODO(mdlayher): decide if this should just be a struct type instead.
+
+// An MTU is an MTU option, as described in RFC 4861, Section 4.6.1.
+type MTU uint32
+
+// NewMTU creates an MTU Option from an MTU value.
+func NewMTU(mtu uint32) *MTU {
+	m := MTU(mtu)
+	return &m
+}
+
+func (m *MTU) code() byte { return optMTU }
+
+// MarshalBinary implements Option.
+func (m *MTU) MarshalBinary() ([]byte, error) {
+	raw := &RawOption{
+		Type:   m.code(),
+		Length: mtuOptLen,
+		// 2 reserved bytes, 4 for MTU.
+		Value: make([]byte, 6),
+	}
+
+	binary.BigEndian.PutUint32(raw.Value[2:6], uint32(*m))
+
+	return raw.MarshalBinary()
+}
+
+// UnmarshalBinary implements Option.
+func (m *MTU) UnmarshalBinary(b []byte) error {
+	raw := new(RawOption)
+	if err := raw.UnmarshalBinary(b); err != nil {
+		return err
+	}
+
+	*m = MTU(binary.BigEndian.Uint32(raw.Value[2:6]))
+
+	return nil
+}
+
+var _ Option = &PrefixInformation{}
+
+// An PrefixInformation is an PrefixInformation option, as described in RFC 4861, Section 4.6.1.
+type PrefixInformation struct {
+	PrefixLength                   uint8
+	OnLink                         bool
+	AutonomousAddressConfiguration bool
+	ValidLifetime                  time.Duration
+	PreferredLifetime              time.Duration
+	Prefix                         net.IP
+}
+
+func (pi *PrefixInformation) code() byte { return optPrefixInformation }
+
+// MarshalBinary implements Option.
+func (pi *PrefixInformation) MarshalBinary() ([]byte, error) {
+	// Per the RFC:
+	// "The bits in the prefix after the prefix length are reserved and MUST
+	// be initialized to zero by the sender and ignored by the receiver."
+	//
+	// Therefore, any prefix, when masked with its specified length, should be
+	// identical to the prefix itself for it to be valid.
+	mask := net.CIDRMask(int(pi.PrefixLength), 128)
+	if masked := pi.Prefix.Mask(mask); !pi.Prefix.Equal(masked) {
+		return nil, fmt.Errorf("ndp: invalid prefix information: %s/%d", pi.Prefix.String(), pi.PrefixLength)
+	}
+
+	raw := &RawOption{
+		Type:   pi.code(),
+		Length: piOptLen,
+		// 30 bytes for PrefixInformation body.
+		Value: make([]byte, 30),
+	}
+
+	raw.Value[0] = pi.PrefixLength
+
+	if pi.OnLink {
+		raw.Value[1] |= (1 << 7)
+	}
+	if pi.AutonomousAddressConfiguration {
+		raw.Value[1] |= (1 << 6)
+	}
+
+	valid := pi.ValidLifetime.Seconds()
+	binary.BigEndian.PutUint32(raw.Value[2:6], uint32(valid))
+
+	pref := pi.PreferredLifetime.Seconds()
+	binary.BigEndian.PutUint32(raw.Value[6:10], uint32(pref))
+
+	// 4 bytes reserved.
+
+	copy(raw.Value[14:30], pi.Prefix)
+
+	return raw.MarshalBinary()
+}
+
+// UnmarshalBinary implements Option.
+func (pi *PrefixInformation) UnmarshalBinary(b []byte) error {
+	raw := new(RawOption)
+	if err := raw.UnmarshalBinary(b); err != nil {
+		return err
+	}
+
+	// Guard against incorrect option length.
+	if raw.Length != piOptLen {
+		return io.ErrUnexpectedEOF
+	}
+
+	var (
+		oFlag = (raw.Value[1] & 0x80) != 0
+		aFlag = (raw.Value[1] & 0x40) != 0
+
+		valid     = time.Duration(binary.BigEndian.Uint32(raw.Value[2:6])) * time.Second
+		preferred = time.Duration(binary.BigEndian.Uint32(raw.Value[6:10])) * time.Second
+	)
+
+	// Skip reserved area.
+	addr := net.IP(raw.Value[14:30])
+	if err := checkIPv6(addr); err != nil {
+		return err
+	}
+
+	// Per the RFC, bits in prefix past prefix length are ignored by the
+	// receiver.
+	l := raw.Value[0]
+	mask := net.CIDRMask(int(l), 128)
+	addr = addr.Mask(mask)
+
+	*pi = PrefixInformation{
+		PrefixLength: l,
+		OnLink:       oFlag,
+		AutonomousAddressConfiguration: aFlag,
+		ValidLifetime:                  valid,
+		PreferredLifetime:              preferred,
+		// raw.Value is already a copy of b, so just point to the address.
+		Prefix: addr,
+	}
+
+	return nil
+}
+
+var _ Option = &RawOption{}
+
+// A RawOption is an Option in its raw and unprocessed format.  Options which
+// are not recognized by this package can be represented using a RawOption.
+type RawOption struct {
+	Type   uint8
+	Length uint8
+	Value  []byte
+}
+
+func (u *RawOption) code() byte { return u.Type }
+
+// MarshalBinary implements Option.
+func (u *RawOption) MarshalBinary() ([]byte, error) {
+	// Length specified in units of 8 bytes, and the caller must provide
+	// an accurate length.
+	l := int(u.Length * 8)
+	if 1+1+len(u.Value) != l {
+		return nil, io.ErrUnexpectedEOF
+	}
+
+	b := make([]byte, u.Length*8)
+	b[0] = u.Type
+	b[1] = u.Length
+
+	copy(b[2:], u.Value)
+
+	return b, nil
+}
+
+// UnmarshalBinary implements Option.
+func (u *RawOption) UnmarshalBinary(b []byte) error {
+	if len(b) < 2 {
+		return io.ErrUnexpectedEOF
+	}
+
+	u.Type = b[0]
+	u.Length = b[1]
+	// Exclude type and length fields from value's length.
+	l := int(u.Length*8) - 2
+
+	if l > len(b[2:]) {
+		return io.ErrUnexpectedEOF
+	}
+
+	u.Value = make([]byte, l)
+	copy(u.Value, b[2:])
 
 	return nil
 }
@@ -131,8 +330,17 @@ func parseOptions(b []byte) ([]Option, error) {
 		switch t {
 		case optSourceLLA, optTargetLLA:
 			o = new(LinkLayerAddress)
+		case optMTU:
+			o = new(MTU)
+		case optPrefixInformation:
+			o = new(PrefixInformation)
 		default:
-			return nil, fmt.Errorf("ndp: unrecognized NDP option type: %d", t)
+			o = new(RawOption)
+		}
+
+		// Verify that we won't advance beyond the end of the byte slice.
+		if l > len(b[i:]) {
+			return nil, io.ErrUnexpectedEOF
 		}
 
 		// Unmarshal at the current offset, up to the expected length.
@@ -140,11 +348,7 @@ func parseOptions(b []byte) ([]Option, error) {
 			return nil, err
 		}
 
-		// Verify that we won't advance beyond the end of the byte slice, and
 		// Advance to the next option's type field.
-		if i+l > len(b[i:]) {
-			return nil, io.ErrUnexpectedEOF
-		}
 		i += l
 
 		options = append(options, o)
