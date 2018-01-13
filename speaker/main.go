@@ -18,6 +18,7 @@ import (
 	"flag"
 	"net"
 	"os"
+	"time"
 
 	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/version"
@@ -86,7 +87,13 @@ func main() {
 	if err != nil {
 		glog.Fatalf("Error setting up leader election: %s", err)
 	}
-	go func() { le.Run() }()
+	go func() {
+		for {
+			le.Run()
+			glog.Info("Restarting leader election loop in 10s")
+			time.Sleep(10 * time.Second)
+		}
+	}()
 
 	glog.Fatal(client.Run(*port))
 }
