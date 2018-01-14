@@ -25,6 +25,12 @@ Here is the outline of what we're going to do:
 6. Change MetalLB's configuration, and fix a bad configuration,
 7. Tear down the playground.
 
+{{% notice note %}}
+This tutorial currently only works on amd64 (aka x86_64) systems,
+because the test BGP router container image doesn't work on other
+platforms yet.
+{{% /notice %}}
+
 ## Set up a Minikube cluster
 
 If you don't already have a Minikube cluster set up, follow
@@ -40,9 +46,11 @@ cluster: Running
 kubectl: Correctly Configured: pointing to minikube-vm at 192.168.99.100
 ```
 
-**You need to use Minikube >=0.24!** Previous versions use a different
-IP range for cluster services, which is incompatible with the
-manifests used in this tutorial.
+{{% notice info %}}
+You need to use Minikube >=0.24. Previous versions use a different IP
+range for cluster services, which is incompatible with the manifests
+used in this tutorial.
+{{% /notice %}}
 
 ## Set up a BGP routers
 
