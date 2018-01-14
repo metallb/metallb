@@ -141,6 +141,9 @@ spec:
     metadata:
       labels:
         app: controller
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
     spec:
       serviceAccountName: controller
       terminationGracePeriodSeconds: 0
@@ -183,6 +186,9 @@ spec:
     metadata:
       labels:
         app: speaker
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
     spec:
       serviceAccountName: speaker
       terminationGracePeriodSeconds: 0
