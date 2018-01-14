@@ -22,17 +22,21 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 
+	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/config"
 )
 
 func (c *controller) convergeBalancer(key string, svc *v1.Service) error {
-	var lbIP net.IP
+	var lbIP *allocator.Addr
 
 	// The assigned LB IP is the end state of convergence. If there's
 	// none or a malformed one, nuke all controlled state so that we
 	// start converging from a clean slate.
 	if len(svc.Status.LoadBalancer.Ingress) == 1 {
-		lbIP = net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
+		lbIP = &allocator.Addr{&net.TCPAddr{IP: net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)}}
+		if svc.Spec.Ports[0].Protocol == "UDP" {
+			lbIP = &allocator.Addr{&net.UDPAddr{IP: net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)}}
+		}
 	}
 	if lbIP == nil {
 		glog.Infof("%s: currently has no ingress IP", key)
@@ -77,7 +81,12 @@ func (c *controller) convergeBalancer(key string, svc *v1.Service) error {
 			// non-full.
 			return nil
 		}
-		lbIP = ip
+
+		lbIP = &allocator.Addr{&net.TCPAddr{IP: ip}}
+		if svc.Spec.Ports[0].Protocol == "UDP" {
+			lbIP = &allocator.Addr{&net.UDPAddr{IP: ip}}
+		}
+
 		glog.Infof("%s: allocated %q", key, lbIP)
 		c.client.Infof(svc, "IPAllocated", "Assigned IP %q", lbIP)
 	}
@@ -126,7 +135,13 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 		if ip == nil {
 			return nil, fmt.Errorf("invalid spec.loadBalancerIP %q", svc.Spec.LoadBalancerIP)
 		}
-		if err := c.ips.Assign(key, ip); err != nil {
+
+		addr := &allocator.Addr{&net.TCPAddr{IP: ip}}
+		if svc.Spec.Ports[0].Protocol == "UDP" {
+			addr = &allocator.Addr{&net.UDPAddr{IP: ip}}
+		}
+
+		if err := c.ips.Assign(key, addr); err != nil {
 			return nil, err
 		}
 		return ip, nil

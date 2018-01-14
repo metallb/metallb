@@ -83,7 +83,11 @@ func (c *bgpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 		return c.deleteBalancer(name, "invalid IP allocated by controller")
 	}
 
-	if err := c.ips.Assign(name, lbIP); err != nil {
+	addr := &allocator.Addr{&net.TCPAddr{IP: lbIP}}
+	if svc.Spec.Ports[0].Protocol == "UDP" {
+		addr = &allocator.Addr{&net.UDPAddr{IP: lbIP}}
+	}
+	if err := c.ips.Assign(name, addr); err != nil {
 		glog.Errorf("%s: IP %q assigned by controller is not allowed by config", name, lbIP)
 		return c.deleteBalancer(name, "invalid IP allocated by controller")
 	}
