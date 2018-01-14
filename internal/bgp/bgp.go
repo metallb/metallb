@@ -45,6 +45,9 @@ func (s *Session) run() {
 	defer stats.DeleteSession(s.addr)
 	for {
 		if err := s.connect(); err != nil {
+			if err == errClosed {
+				return
+			}
 			glog.Error(err)
 			time.Sleep(backoff)
 			continue
@@ -141,6 +144,10 @@ func (s *Session) sendUpdates() error {
 func (s *Session) connect() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if s.closed {
+		return errClosed
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
