@@ -132,6 +132,9 @@ metadata:
   name: controller
   labels:
     app: controller
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "7472"
 spec:
   revisionHistoryLimit: 3
   selector:
@@ -183,6 +186,9 @@ spec:
     metadata:
       labels:
         app: speaker
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "7472"
     spec:
       serviceAccountName: speaker
       terminationGracePeriodSeconds: 0
