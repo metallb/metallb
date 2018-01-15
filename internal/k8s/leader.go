@@ -24,10 +24,17 @@ func (c *Client) NewLeaderElector(a *arp.Announce, lockName string, identity str
 	leader.Set(-1)
 
 	lec := le.LeaderElectionConfig{
-		Lock:          lock,
-		LeaseDuration: 30 * time.Minute,
-		RenewDeadline: 10 * time.Second,
-		RetryPeriod:   5 * time.Second,
+		Lock: lock,
+		// Time before the lock expires and other replicas can try to
+		// become leader.
+		LeaseDuration: 10 * time.Second,
+		// Elected leader refreshes the lock this often. It should be
+		// less than LeaseDuration, so that even if there is clock
+		// skew in the cluster the leader can keep their lock.
+		RenewDeadline: 5 * time.Second,
+		// Time to wait between operation retries, if we get an error
+		// back.
+		RetryPeriod: 1 * time.Second,
 		Callbacks: le.LeaderCallbacks{
 			OnStartedLeading: func(stop <-chan struct{}) {
 				glog.Infof("Host %s acquiring leadership", hostname)
