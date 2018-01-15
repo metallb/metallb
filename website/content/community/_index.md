@@ -15,16 +15,12 @@ discussion (although for the latter we mostly use Github directly).
 
 ## Slack
 
-_Under construction! We're waiting for the Kubernetes Slack admins to
-create the channel. Please use other communication methods for now._
-
-<!-- For a more interactive experience, we have
+For a more interactive experience, we have
 the
 [#metallb slack channel on k8s.slack.com](https://kubernetes.slack.com/messages/metallb/). If
 you're not already logged into the Kubernetes slack organization,
 you'll need to [request an invite](http://slack.k8s.io/) before you
-can join. -->
-
+can join.
 
 ## IRC
 
