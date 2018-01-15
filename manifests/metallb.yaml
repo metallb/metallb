@@ -130,7 +130,7 @@ roleRef:
 ---
 
 ## Controller deployment
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   namespace: metallb-system
@@ -176,7 +176,7 @@ spec:
 ---
 
 # Speaker DaemonSet
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   namespace: metallb-system
