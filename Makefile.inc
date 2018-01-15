@@ -7,6 +7,8 @@ TAG:=
 REGISTRY:=
 GOCMD:=go
 DOCKER_SUDO:=
+GITCOMMIT:=
+GITBRANCH:=
 
 ifeq ($(GOARCH),)
 	$(error GOARCH not specified)
@@ -57,7 +59,9 @@ endif
 .PHONY: binary
 binary: build-dir
 	CGO_ENABLED=0 GOOS=linux GOARCH=$(GOARCH) GOARM=6 \
-		$(GOCMD) build -o $(BUILD_DIR)/$(BINARY) go.universe.tf/metallb/$(BINARY)
+		$(GOCMD) build -o $(BUILD_DIR)/$(BINARY) \
+		-ldflags="-X go.universe.tf/metallb/internal/version.gitCommit=$(GITCOMMIT) -X go.universe.tf/metallb/internal/version.gitBranch=$(GITBRANCH)" \
+		go.universe.tf/metallb/$(BINARY)
 
 .PHONY: build-dir
 build-dir:
