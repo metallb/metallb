@@ -14,8 +14,8 @@ import (
 )
 
 // NewLeaderElector returns a new LeaderElector used for endpoint leader election using c.
-func (c *Client) NewLeaderElector(a *arp.Announce, lockName string, identity string) (*le.LeaderElector, error) {
-	conf := rl.ResourceLockConfig{Identity: identity, EventRecorder: &noopEvent{}}
+func (c *Client) NewLeaderElector(a *arp.Announce, lockName string) (*le.LeaderElector, error) {
+	conf := rl.ResourceLockConfig{Identity: hostname, EventRecorder: &noopEvent{}}
 	lock, err := rl.New(rl.EndpointsResourceLock, "metallb-system", lockName, c.client.CoreV1(), conf)
 	if err != nil {
 		return nil, err
@@ -28,13 +28,12 @@ func (c *Client) NewLeaderElector(a *arp.Announce, lockName string, identity str
 		// Time before the lock expires and other replicas can try to
 		// become leader.
 		LeaseDuration: 10 * time.Second,
-		// Elected leader refreshes the lock this often. It should be
-		// less than LeaseDuration, so that even if there is clock
-		// skew in the cluster the leader can keep their lock.
-		RenewDeadline: 5 * time.Second,
-		// Time to wait between operation retries, if we get an error
-		// back.
-		RetryPeriod: 1 * time.Second,
+		// How long we should keep trying to hold the lock before
+		// giving up and deciding we've lost it.
+		RenewDeadline: 9 * time.Second,
+		// Time to wait between refreshing the lock when we are
+		// leader.
+		RetryPeriod: 5 * time.Second,
 		Callbacks: le.LeaderCallbacks{
 			OnStartedLeading: func(stop <-chan struct{}) {
 				glog.Infof("Host %s acquiring leadership", hostname)

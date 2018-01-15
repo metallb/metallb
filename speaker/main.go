@@ -83,7 +83,7 @@ func main() {
 		glog.Fatalf("Error getting k8s client: %s", err)
 	}
 
-	le, err := client.NewLeaderElector(cARP.ann, speaker, myIP.String())
+	le, err := client.NewLeaderElector(cARP.ann, speaker)
 	if err != nil {
 		glog.Fatalf("Error setting up leader election: %s", err)
 	}
