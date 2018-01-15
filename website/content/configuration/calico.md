@@ -38,12 +38,11 @@ graph BT
 {{< /mermaid >}}
 
 Unfortunately, Calico does not currently provide the extension points
-we would need to make MetalLB coexist peacefully. There are a few
-workarounds you can use, although they sacrifice some ease of use or
-elegance.
-
-This page lists some workarounds that, depending on your specific
-situation, you may be able to use.
+we would need to make MetalLB coexist peacefully. There
+are
+[bugs](https://github.com/projectcalico/calico/issues/1603) [filed](https://github.com/projectcalico/calico/issues/1604) with
+Calico to add these extension points, but in the meantime, we can only
+offer some hacky workarounds.
 
 ## Workaround: Peer with spine routers
 
