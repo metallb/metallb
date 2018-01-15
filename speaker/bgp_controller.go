@@ -223,7 +223,11 @@ newPeers:
 		}
 
 		glog.Infof("Peer %q configured, starting BGP session", p.cfg.Addr)
-		s, err := newBGP(fmt.Sprintf("%s:%d", p.cfg.Addr, p.cfg.Port), p.cfg.MyASN, c.myIP, p.cfg.ASN, p.cfg.HoldTime)
+		routerID := c.myIP
+		if p.cfg.RouterID != nil {
+			routerID = p.cfg.RouterID
+		}
+		s, err := newBGP(fmt.Sprintf("%s:%d", p.cfg.Addr, p.cfg.Port), p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime)
 		if err != nil {
 			errs = append(errs, fmt.Errorf("Creating BGP session to %q: %s", p.cfg.Addr, err))
 		} else {
@@ -245,8 +249,8 @@ type session interface {
 	Set(advs ...*bgp.Advertisement) error
 }
 
-var newBGP = func(addr string, myASN uint32, myIP net.IP, asn uint32, hold time.Duration) (session, error) {
-	return bgp.New(addr, myASN, myIP, asn, hold)
+var newBGP = func(addr string, myASN uint32, routerID net.IP, asn uint32, hold time.Duration) (session, error) {
+	return bgp.New(addr, myASN, routerID, asn, hold)
 }
 
 func (c *bgpController) MarkSynced() {}

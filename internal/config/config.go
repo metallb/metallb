@@ -39,6 +39,7 @@ type peer struct {
 	Addr     string `yaml:"peer-address"`
 	Port     uint16 `yaml:"peer-port"`
 	HoldTime string `yaml:"hold-time"`
+	RouterID string `yaml:"router-id"`
 }
 
 type addressPool struct {
@@ -86,6 +87,8 @@ type Peer struct {
 	Port uint16
 	// Requested BGP hold time, per RFC4271.
 	HoldTime time.Duration
+	// BGP router ID to advertise to the peer
+	RouterID net.IP
 	// TODO: more BGP session settings
 }
 
@@ -215,12 +218,23 @@ func parsePeer(p peer) (*Peer, error) {
 	if p.Port != 0 {
 		port = p.Port
 	}
+	// Ideally we would set a default RouterID here, instead of having
+	// to do it elsewhere in the code. Unfortunately, we don't know
+	// the node IP here.
+	var routerID net.IP
+	if p.RouterID != "" {
+		routerID = net.ParseIP(p.RouterID)
+		if routerID == nil {
+			return nil, fmt.Errorf("invalid router ID %q", p.RouterID)
+		}
+	}
 	return &Peer{
 		MyASN:    p.MyASN,
 		ASN:      p.ASN,
 		Addr:     ip,
 		Port:     port,
 		HoldTime: holdTime,
+		RouterID: routerID,
 	}, nil
 }
 
