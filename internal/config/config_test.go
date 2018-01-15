@@ -44,6 +44,7 @@ peers:
   peer-address: 1.2.3.4
   peer-port: 1179
   hold-time: 180s
+  router-id: 10.20.30.40
 - my-asn: 100
   peer-asn: 200
   peer-address: 2.3.4.5
@@ -85,6 +86,7 @@ address-pools:
 						Addr:     net.ParseIP("1.2.3.4"),
 						Port:     1179,
 						HoldTime: 180 * time.Second,
+						RouterID: net.ParseIP("10.20.30.40"),
 					},
 					{
 						MyASN:    100,
@@ -211,6 +213,17 @@ peers:
   peer-asn: 42
   peer-address: 1.2.3.4
   hold-time: 1s
+`,
+		},
+
+		{
+			desc: "invalid router ID",
+			raw: `
+peers:
+- my-asn: 42
+  peer-asn: 42
+  peer-address: 1.2.3.4
+  router-id: oh god how do I BGP
 `,
 		},
 
