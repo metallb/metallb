@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"os"
 	"time"
 
 	"go.universe.tf/metallb/internal/arp"
@@ -29,14 +30,20 @@ func (c *Client) NewLeaderElector(a *arp.Announce, identity string) (*le.LeaderE
 		RetryPeriod:   5 * time.Second,
 		Callbacks: le.LeaderCallbacks{
 			OnStartedLeading: func(stop <-chan struct{}) {
-				glog.Infof("Acquiring leadership")
+				glog.Infof("Host %s acquiring leadership", hostname)
+
 				leader.Set(1)
-				a.Acquire()
+				a.SetLeader(true)
+
+				go a.Acquire()
 			},
 			OnStoppedLeading: func() {
-				glog.Infof("Lost leadership")
+				glog.Infof("Host %s lost leadership", hostname)
+
 				leader.Set(0)
-				a.Relinquish()
+				a.SetLeader(false)
+
+				go a.Relinquish()
 			},
 		},
 	}
@@ -56,3 +63,8 @@ func (f *noopEvent) Eventf(object runtime.Object, eventtype, reason, messageFmt 
 func (f *noopEvent) PastEventf(object runtime.Object, timestamp metav1.Time, eventtype, reason, messageFmt string, args ...interface{}) {
 	/* noop */
 }
+
+var hostname = func() string {
+	h, _ := os.Hostname()
+	return h
+}()

@@ -23,18 +23,22 @@ func (a *Announce) SetLeader(b bool) {
 // Relinquish set the leader bit to false and stops the go-routine that sends unsolicited APR replies.
 func (a *Announce) Relinquish() {
 	a.stop <- true
-
-	a.SetLeader(false)
 }
 
-// Acquire sets the leader bit to true and sends out a unsolicited ARP replies for all VIPs that should
-// be announced. It does this repeatedly - every 0.5s - for a duration of 5 seconds.
+// Acquire sends out a unsolicited ARP replies for all VIPs that should be announced.
 func (a *Announce) Acquire() {
+	go a.spam()
+	a.unsolicited()
+}
+
+// spam broadcasts unsolicited ARP replies for 5 seconds.
+func (a *Announce) spam() {
 	start := time.Now()
-
-	a.SetLeader(true)
-
 	for time.Since(start) < 5*time.Second {
+
+		if !a.Leader() {
+			return
+		}
 
 		for _, u := range a.Packets() {
 			a.client.WriteTo(u, ethernet.Broadcast)
@@ -42,7 +46,6 @@ func (a *Announce) Acquire() {
 
 		time.Sleep(500 * time.Millisecond)
 	}
-	go a.unsolicited()
 }
 
 // unsolicited sends unsolicited ARP replies every 10 seconds.
@@ -52,6 +55,10 @@ func (a *Announce) unsolicited() {
 	for {
 		select {
 		case <-ticker.C:
+			// Double check that we're still master.
+			if !a.Leader() {
+				continue
+			}
 			for _, u := range a.Packets() {
 				a.client.WriteTo(u, ethernet.Broadcast)
 			}
