@@ -14,9 +14,9 @@ import (
 )
 
 // NewLeaderElector returns a new LeaderElector used for endpoint leader election using c.
-func (c *Client) NewLeaderElector(a *arp.Announce, identity string) (*le.LeaderElector, error) {
+func (c *Client) NewLeaderElector(a *arp.Announce, lockName string, identity string) (*le.LeaderElector, error) {
 	conf := rl.ResourceLockConfig{Identity: identity, EventRecorder: &noopEvent{}}
-	lock, err := rl.New(rl.EndpointsResourceLock, "metallb-system", identity, c.client.CoreV1(), conf)
+	lock, err := rl.New(rl.EndpointsResourceLock, "metallb-system", lockName, c.client.CoreV1(), conf)
 	if err != nil {
 		return nil, err
 	}
