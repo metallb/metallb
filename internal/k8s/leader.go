@@ -36,6 +36,7 @@ func (c *Client) NewLeaderElector(a *arp.Announce, identity string) (*le.LeaderE
 				a.SetLeader(true)
 
 				go a.Acquire()
+				select {}
 			},
 			OnStoppedLeading: func() {
 				glog.Infof("Host %s lost leadership", hostname)
