@@ -10,7 +10,7 @@ import (
 func main() {
 	tmpl := template.Must(template.ParseFiles("config.yml.tmpl"))
 	v := map[string][]string{
-		"GoVersions": []string{"1.8", "1.9", "1.10beta1"},
+		"GoVersions": []string{"1.8", "1.9", "1.10beta2"},
 		"Binary":     []string{"controller", "speaker", "test-bgp-router"},
 		"Arch":       []string{"amd64", "arm", "arm64", "ppc64le", "s390x"},
 	}

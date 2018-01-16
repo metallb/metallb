@@ -22,10 +22,10 @@ jobs:
       - run: make ci-build
       - run: make ci-test
       - run: make ci-lint
-  test-1.10beta1:
+  test-1.10beta2:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
-      - image: circleci/golang:1.10beta1
+      - image: circleci/golang:1.10beta2
     steps:
       - checkout
       - run: make ci-prepare
@@ -80,7 +80,7 @@ workflows:
           filters:
             tags:
               only: /.*/
-      - test-1.10beta1:
+      - test-1.10beta2:
           filters:
             tags:
               only: /.*/
