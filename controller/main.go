@@ -44,7 +44,7 @@ type controller struct {
 	ips    *allocator.Allocator
 }
 
-func (c *controller) SetBalancer(name string, svcRo *v1.Service, _ *v1.Endpoints) error {
+func (c *controller) SetBalancer(name string, svcRo *v1.Service) error {
 	if svcRo == nil {
 		return c.deleteBalancer(name)
 	}
@@ -137,10 +137,13 @@ func main() {
 		ips: allocator.New(),
 	}
 
-	client, err := k8s.NewClient("metallb-controller", *master, *kubeconfig, false, c)
+	client, err := k8s.New("metallb-controller", *master, *kubeconfig)
 	if err != nil {
 		glog.Fatalf("Error getting k8s client: %s", err)
 	}
+	client.HandleService(c.SetBalancer)
+	client.HandleConfig(c.SetConfig)
+	client.HandleSynced(c.MarkSynced)
 
 	c.client = client
 

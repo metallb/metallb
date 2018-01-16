@@ -132,7 +132,14 @@ func (c *arpController) SetConfig(cfg *config.Config) error {
 	return nil
 }
 
-func (c *arpController) MarkSynced() {}
+func (c *arpController) SetLeader(leader bool) {
+	c.ann.SetLeader(leader)
+	if leader {
+		go c.ann.Acquire()
+	} else {
+		go c.ann.Relinquish()
+	}
+}
 
 func newARPController(myIP net.IP, myNode string) (*arpController, error) {
 	ann, err := arp.New(myIP)

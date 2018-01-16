@@ -18,10 +18,11 @@ import (
 	"flag"
 	"net"
 	"os"
-	"time"
 
+	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/version"
+	"k8s.io/api/core/v1"
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
@@ -78,22 +79,24 @@ func main() {
 		glog.Fatalf("Error getting ARP controller: %s", err)
 	}
 
-	client, err := k8s.NewClient(speaker, *master, *kubeconfig, true, cBGP, cARP)
+	client, err := k8s.New(speaker, *master, *kubeconfig)
 	if err != nil {
 		glog.Fatalf("Error getting k8s client: %s", err)
 	}
-
-	le, err := client.NewLeaderElector(cARP.ann, speaker)
-	if err != nil {
-		glog.Fatalf("Error setting up leader election: %s", err)
-	}
-	go func() {
-		for {
-			le.Run()
-			glog.Info("Restarting leader election loop in 10s")
-			time.Sleep(10 * time.Second)
+	// Hacky: dispatch to both controllers for now.
+	client.HandleServiceAndEndpoints(func(k string, svc *v1.Service, eps *v1.Endpoints) error {
+		if err := cBGP.SetBalancer(k, svc, eps); err != nil {
+			return err
 		}
-	}()
+		return cARP.SetBalancer(k, svc, eps)
+	})
+	client.HandleConfig(func(cfg *config.Config) error {
+		if err := cBGP.SetConfig(cfg); err != nil {
+			return err
+		}
+		return cARP.SetConfig(cfg)
+	})
+	client.HandleLeadership(*myNode, cARP.SetLeader)
 
 	glog.Fatal(client.Run(*port))
 }

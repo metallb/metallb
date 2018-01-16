@@ -347,7 +347,7 @@ func TestControllerMutation(t *testing.T) {
 			k.reset()
 			// Delete the test balancer, to clean up all state
 
-			if err := c.SetBalancer("test", test.in, nil); err != nil {
+			if err := c.SetBalancer("test", test.in); err != nil {
 				t.Errorf("%q: SetBalancer returned error: %s", test.desc, err)
 				continue
 			}
@@ -402,7 +402,7 @@ func TestControllerConfig(t *testing.T) {
 			Type: "LoadBalancer",
 		},
 	}
-	if err := c.SetBalancer("test", svc, nil); err != nil {
+	if err := c.SetBalancer("test", svc); err != nil {
 		t.Fatalf("SetBalancer failed: %s", err)
 	}
 
@@ -420,7 +420,7 @@ func TestControllerConfig(t *testing.T) {
 	if err := c.SetConfig(&config.Config{}); err != nil {
 		t.Fatalf("SetConfig with empty config failed: %s", err)
 	}
-	if err := c.SetBalancer("test", svc, nil); err == nil {
+	if err := c.SetBalancer("test", svc); err == nil {
 		t.Fatal("SetBalancer did not fail")
 	}
 
@@ -444,7 +444,7 @@ func TestControllerConfig(t *testing.T) {
 	if err := c.SetConfig(cfg); err != nil {
 		t.Fatalf("SetConfig failed: %s", err)
 	}
-	if err := c.SetBalancer("test", svc, nil); err == nil {
+	if err := c.SetBalancer("test", svc); err == nil {
 		t.Fatal("SetBalancer did not fail")
 	}
 
@@ -459,7 +459,7 @@ func TestControllerConfig(t *testing.T) {
 	// Mark synced. Finally, we can allocate.
 	c.MarkSynced()
 
-	if err := c.SetBalancer("test", svc, nil); err != nil {
+	if err := c.SetBalancer("test", svc); err != nil {
 		t.Fatalf("SetBalancer failed: %s", err)
 	}
 

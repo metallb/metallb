@@ -253,8 +253,6 @@ var newBGP = func(addr string, myASN uint32, routerID net.IP, asn uint32, hold t
 	return bgp.New(addr, myASN, routerID, asn, hold)
 }
 
-func (c *bgpController) MarkSynced() {}
-
 func newBGPController(myIP net.IP, myNode string) (*bgpController, error) {
 	return &bgpController{
 		myIP:   myIP,
