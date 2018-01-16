@@ -25,6 +25,22 @@ data:
       # to the node IP address. Generally only useful when you need to peer with
       # another BGP router running on the same machine as MetalLB.
       router-id: 1.2.3.4
+      # (optional) The nodes that should connect to this peer. A node
+      # matches if at least one of the node selectors matches. Within
+      # one selector, a node matches if all the matchers are
+      # satisfied. The semantics of each selector are the same as the
+      # label- and set-based selectors in Kubernetes, documented at
+      # https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/.
+      # By default, all nodes are selected.
+      node-selectors:
+      - # Match by label=value
+        match-labels:
+          kubernetes.io/hostname: prod-01
+        # Match by 'key OP values' expressions
+        match-expressions:
+        - key: beta.kubernetes.io/arch
+          operator: In
+          values: [amd64, arm]
 
     # The address-pools section lists the IP addresses that MetalLB is
     # allowed to allocate, along with settings for how to advertise
