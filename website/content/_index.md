@@ -40,7 +40,7 @@ as possible.
 MetalLB requires the following to function:
 
 - A [Kubernetes](https://kubernetes.io) cluster, running Kubernetes
-  1.8.0 or later, that does not already have network load-balancing
+  1.9.0 or later, that does not already have network load-balancing
   functionality.
 - Some IPv4 addresses for MetalLB to hand out.
 - Depending on the operating mode, you may need one or more routers
