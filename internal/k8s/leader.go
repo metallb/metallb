@@ -7,6 +7,8 @@ import (
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 )
 
+// HandleLeadership starts a leader election and notifies handler of
+// changes to leadership state.
 func (c *Client) HandleLeadership(nodeName string, handler func(bool)) {
 	if c.elector != nil {
 		panic("HandleLeadership called twice")

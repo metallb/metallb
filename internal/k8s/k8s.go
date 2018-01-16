@@ -122,6 +122,8 @@ func (c *Client) HandleService(handler func(string, *v1.Service) error) {
 	c.syncFuncs = append(c.syncFuncs, c.svcInformer.HasSynced)
 }
 
+// HandleServiceAndEndpoints registers a handler for changes to Service objects
+// and their associated Endpoints.
 func (c *Client) HandleServiceAndEndpoints(handler func(string, *v1.Service, *v1.Endpoints) error) {
 	c.HandleService(nil)
 
@@ -152,6 +154,7 @@ func (c *Client) HandleServiceAndEndpoints(handler func(string, *v1.Service, *v1
 	c.syncFuncs = append(c.syncFuncs, c.epInformer.HasSynced)
 }
 
+// HandleConfig registers a handler for changes to MetalLB's configuration.
 func (c *Client) HandleConfig(handler func(*config.Config) error) {
 	if c.configChanged != nil {
 		panic("HandleConfig called twice")
@@ -184,7 +187,8 @@ func (c *Client) HandleConfig(handler func(*config.Config) error) {
 	c.syncFuncs = append(c.syncFuncs, c.cmInformer.HasSynced)
 }
 
-func (c *Client) HandleMyNode(nodeName string, handler func(*v1.Node) error) {
+// HandleNode registers a handler for changes to the given Node.
+func (c *Client) HandleNode(nodeName string, handler func(*v1.Node) error) {
 	if c.nodeChanged != nil {
 		panic("HandleMyNode called twice")
 	}
@@ -216,6 +220,7 @@ func (c *Client) HandleMyNode(nodeName string, handler func(*v1.Node) error) {
 	c.syncFuncs = append(c.syncFuncs, c.nodeInformer.HasSynced)
 }
 
+// HandleSynced registers a handler for the "local cache synced" signal.
 func (c *Client) HandleSynced(handler func()) {
 	if c.synced != nil {
 		panic("HandleSynced called twice")
@@ -405,7 +410,7 @@ func (c *Client) sync(key interface{}) error {
 			return fmt.Errorf("get node %q: %s", k, err)
 		}
 		if !exists {
-			return fmt.Errorf("node %q doesn't exist, but it's my node!", k)
+			return fmt.Errorf("node %q doesn't exist", k)
 		}
 		node := n.(*v1.Node)
 		return c.nodeChanged(node)
