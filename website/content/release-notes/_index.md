@@ -3,10 +3,73 @@ title: Release Notes
 weight: 7
 ---
 
+## Version 0.3.0
+
+[Documentation for this release](https://metallb.universe.tf)
+
+Action required if upgrading from 0.2.x:
+
+- The `bgp-speaker` DaemonSet has been renamed to just
+  `speaker`. Before applying the manifest for 0.3.0, delete the old
+  daemonset with `kubectl delete -n metallb-system
+  ds/bgp-speaker`. This will take down your load-balancers until you
+  deploy the new DaemonSet.
+- The
+  [configuration file format](https://raw.githubusercontent.com/google/metallb/master/manifests/example-config.yaml) has
+  changed in a few backwards-incompatible ways. You need to update
+  your ConfigMap by hand:
+  - Each `address-pool` must now have a `protocol` field, to select
+    between ARP and BGP mode. For your existing configurations, add
+    `protocol: bgp` to each address pool definition.
+  - The `advertisements` field of `address-pool` has been renamed to
+    `bgp-advertisements`, and is now optional. If you don't need any
+    special advertisement settings, you can remove the section
+    entirely, and MetalLB will use a reasonable default.
+  - The `communities` section has been renamed to `bgp-communities`.
+
+New features:
+
+- MetalLB now supports ARP advertisement, enabled by setting
+  `protocol: arp` on an address pool. ARP mode does not require any
+  special network equipment, and minimal configuration. You can follow
+  the [ARP mode tutorial]({{% relref "tutorial/arp.md" %}}) to get
+  started. There is also a page about ARP
+  mode's [behavior and tradeoffs]({{% relref "concepts/arp.md" %}}),
+  and documentation
+  on [configuring ARP mode]({{% relref "configuration/_index.md" %}}).
+- The container images are
+  now
+  [multi-architecture images](https://blog.docker.com/2017/11/multi-arch-all-the-things/). MetalLB
+  now supports running on all supported Kubernetes architectures:
+  amd64, arm, arm64, ppc64le, and s390x.
+- You can
+  now
+  [disable automatic address allocation]({{% relref "configuration/_index.md" %}}#controlling-automatic-address-allocation) on
+  address pools, if you want to have manual control over the use of
+  some addresses.
+- MetalLB pods now come
+  with
+  [Prometheus scrape annotations](https://github.com/prometheus/prometheus/blob/master/documentation/examples/prometheus-kubernetes.yml). If
+  you've configured your Prometheus-on-Kubernetes to automatically
+  discover monitorable pods, MetalLB will be discovered and scraped
+  automatically. For more advanced monitoring needs,
+  the
+  [Prometheus Operator](https://coreos.com/operators/prometheus/docs/latest/user-guides/getting-started.html) supports
+  more flexible monitoring configurations in a Kubernetes-native way.
+- We've documented how
+  to
+  [Integrate with the Romana networking system]({{% relref "configuration/romana.md" %}}),
+  so that you can use MetalLB alongside Romana's BGP route publishing.
+- The website got a makeover, to accommodate the growing amount of
+  documentation in a discoverable way.
+
+This release includes contributions from David Anderson, Charles
+Eckman, Miek Gieben, Matt Layher, Xavier Naveira, Marcus Söderberg,
+Kouhei Ueno. Thanks to all of them for making MetalLB better!
 
 ## Version 0.2.1
 
-[Documentation for this release](https://metallb.universe.tf)
+[Documentation for this release](https://v0-2-1--metallb.netlify.com)
 
 Notable fixes:
 
