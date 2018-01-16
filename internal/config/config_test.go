@@ -6,7 +6,16 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"k8s.io/apimachinery/pkg/labels"
 )
+
+func selector(s string) labels.Selector {
+	ret, err := labels.Parse(s)
+	if err != nil {
+		panic(err)
+	}
+	return ret
+}
 
 func ipnet(s string) *net.IPNet {
 	_, n, err := net.ParseCIDR(s)
@@ -48,6 +57,11 @@ peers:
 - my-asn: 100
   peer-asn: 200
   peer-address: 2.3.4.5
+  node-selectors:
+  - match-labels:
+      foo: bar
+    match-expressions:
+      - {key: bar, operator: In, values: [quux]}
 bgp-communities:
   bar: 64512:1234
 address-pools:
@@ -81,19 +95,21 @@ address-pools:
 			want: &Config{
 				Peers: []*Peer{
 					{
-						MyASN:    42,
-						ASN:      142,
-						Addr:     net.ParseIP("1.2.3.4"),
-						Port:     1179,
-						HoldTime: 180 * time.Second,
-						RouterID: net.ParseIP("10.20.30.40"),
+						MyASN:         42,
+						ASN:           142,
+						Addr:          net.ParseIP("1.2.3.4"),
+						Port:          1179,
+						HoldTime:      180 * time.Second,
+						RouterID:      net.ParseIP("10.20.30.40"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 					{
-						MyASN:    100,
-						ASN:      200,
-						Addr:     net.ParseIP("2.3.4.5"),
-						Port:     179,
-						HoldTime: 90 * time.Second,
+						MyASN:         100,
+						ASN:           200,
+						Addr:          net.ParseIP("2.3.4.5"),
+						Port:          179,
+						HoldTime:      90 * time.Second,
+						NodeSelectors: []labels.Selector{selector("bar in (quux),foo=bar")},
 					},
 				},
 				Pools: map[string]*Pool{
@@ -155,11 +171,12 @@ peers:
 			want: &Config{
 				Peers: []*Peer{
 					{
-						MyASN:    42,
-						ASN:      42,
-						Addr:     net.ParseIP("1.2.3.4"),
-						Port:     179,
-						HoldTime: 90 * time.Second,
+						MyASN:         42,
+						ASN:           42,
+						Addr:          net.ParseIP("1.2.3.4"),
+						Port:          179,
+						HoldTime:      90 * time.Second,
+						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
 				Pools: map[string]*Pool{},
@@ -213,6 +230,97 @@ peers:
   peer-asn: 42
   peer-address: 1.2.3.4
   hold-time: 1s
+`,
+		},
+
+		{
+			desc: "invalid router ID",
+			raw: `
+peers:
+- my-asn: 42
+  peer-asn: 42
+  peer-address: 1.2.3.4
+  router-id: oh god how do I BGP
+`,
+		},
+
+		{
+			desc: "empty node selector (select everything)",
+			raw: `
+peers:
+- my-asn: 42
+  peer-asn: 42
+  peer-address: 1.2.3.4
+`,
+			want: &Config{
+				Peers: []*Peer{
+					{
+						MyASN:         42,
+						ASN:           42,
+						Addr:          net.ParseIP("1.2.3.4"),
+						Port:          179,
+						HoldTime:      90 * time.Second,
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+				},
+				Pools: map[string]*Pool{},
+			},
+		},
+
+		{
+			desc: "invalid label node selector shape",
+			raw: `
+peers:
+- my-asn: 42
+  peer-asn: 42
+  peer-address: 1.2.3.4
+  node-selectors:
+  - match-labels:
+      foo:
+        bar: baz
+`,
+		},
+
+		{
+			desc: "invalid expression node selector (missing key)",
+			raw: `
+peers:
+- my-asn: 42
+  peer-asn: 42
+  peer-address: 1.2.3.4
+  node-selectors:
+  - match-expressions:
+    - operator: In
+      values: [foo, bar]
+`,
+		},
+
+		{
+			desc: "invalid expression node selector (missing operator)",
+			raw: `
+peers:
+- my-asn: 42
+  peer-asn: 42
+  peer-address: 1.2.3.4
+  node-selectors:
+  - match-expressions:
+    - key: foo
+      values: [foo, bar]
+`,
+		},
+
+		{
+			desc: "invalid expression node selector (invalid operator)",
+			raw: `
+peers:
+- my-asn: 42
+  peer-asn: 42
+  peer-address: 1.2.3.4
+  node-selectors:
+  - match-expressions:
+    - key: foo
+      operator: Surrounds
+      values: [foo, bar]
 `,
 		},
 
@@ -482,7 +590,25 @@ address-pools:
 			t.Errorf("%q: parse unexpectedly succeeded", test.desc)
 			continue
 		}
-		if diff := cmp.Diff(test.want, got); diff != "" {
+		selectorComparer := cmp.Comparer(func(x, y labels.Selector) bool {
+			if x == nil {
+				return y == nil
+			}
+			if y == nil {
+				return x == nil
+			}
+			// Nothing() and Everything() have the same string
+			// representation, stupidly. So, compare explicitly for
+			// Nothing.
+			if x == labels.Nothing() {
+				return y == labels.Nothing()
+			}
+			if y == labels.Nothing() {
+				return x == labels.Nothing()
+			}
+			return x.String() == y.String()
+		})
+		if diff := cmp.Diff(test.want, got, selectorComparer); diff != "" {
 			t.Errorf("%q: parse returned wrong result (-want, +got)\n%s", test.desc, diff)
 		}
 	}

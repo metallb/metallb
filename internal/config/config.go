@@ -23,6 +23,8 @@ import (
 	"time"
 
 	yaml "gopkg.in/yaml.v2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 // configFile is the configuration as parsed out of the ConfigMap,
@@ -34,12 +36,24 @@ type configFile struct {
 }
 
 type peer struct {
-	MyASN    uint32 `yaml:"my-asn"`
-	ASN      uint32 `yaml:"peer-asn"`
-	Addr     string `yaml:"peer-address"`
-	Port     uint16 `yaml:"peer-port"`
-	HoldTime string `yaml:"hold-time"`
-	RouterID string `yaml:"router-id"`
+	MyASN         uint32         `yaml:"my-asn"`
+	ASN           uint32         `yaml:"peer-asn"`
+	Addr          string         `yaml:"peer-address"`
+	Port          uint16         `yaml:"peer-port"`
+	HoldTime      string         `yaml:"hold-time"`
+	RouterID      string         `yaml:"router-id"`
+	NodeSelectors []nodeSelector `yaml:"node-selectors"`
+}
+
+type nodeSelector struct {
+	MatchLabels      map[string]string      `yaml:"match-labels"`
+	MatchExpressions []selectorRequirements `yaml:"match-expressions"`
+}
+
+type selectorRequirements struct {
+	Key      string   `yaml:"key"`
+	Operator string   `yaml:"operator"`
+	Values   []string `yaml:"values"`
 }
 
 type addressPool struct {
@@ -89,6 +103,10 @@ type Peer struct {
 	HoldTime time.Duration
 	// BGP router ID to advertise to the peer
 	RouterID net.IP
+	// Only connect to this peer on nodes that match one of these
+	// selectors.
+	NodeSelectors []labels.Selector
+
 	// TODO: more BGP session settings
 }
 
@@ -129,6 +147,31 @@ type BGPAdvertisement struct {
 	LocalPref uint32
 	// Value of the COMMUNITIES path attribute.
 	Communities map[uint32]bool
+}
+
+func parseNodeSelector(ns *nodeSelector) (labels.Selector, error) {
+	if len(ns.MatchLabels)+len(ns.MatchExpressions) == 0 {
+		return labels.Everything(), nil
+	}
+
+	// Convert to a metav1.LabelSelector so we can use the fancy
+	// parsing function to create a Selector.
+	//
+	// Why not use metav1.LabelSelector in the raw config object?
+	// Because metav1.LabelSelector doesn't have yaml tag
+	// specifications.
+	sel := &metav1.LabelSelector{
+		MatchLabels: ns.MatchLabels,
+	}
+	for _, req := range ns.MatchExpressions {
+		sel.MatchExpressions = append(sel.MatchExpressions, metav1.LabelSelectorRequirement{
+			Key:      req.Key,
+			Operator: metav1.LabelSelectorOperator(req.Operator),
+			Values:   req.Values,
+		})
+	}
+
+	return metav1.LabelSelectorAsSelector(sel)
 }
 
 func parseHoldTime(ht string) (time.Duration, error) {
@@ -228,13 +271,31 @@ func parsePeer(p peer) (*Peer, error) {
 			return nil, fmt.Errorf("invalid router ID %q", p.RouterID)
 		}
 	}
+
+	// We use a non-pointer in the raw json object, so that if the
+	// user doesn't provide a node selector, we end up with an empty,
+	// but non-nil selector, which means "select everything".
+	var nodeSels []labels.Selector
+	if len(p.NodeSelectors) == 0 {
+		nodeSels = []labels.Selector{labels.Everything()}
+	} else {
+		for _, sel := range p.NodeSelectors {
+			nodeSel, err := parseNodeSelector(&sel)
+			if err != nil {
+				return nil, fmt.Errorf("parsing node selector: %s", err)
+			}
+			nodeSels = append(nodeSels, nodeSel)
+		}
+	}
+
 	return &Peer{
-		MyASN:    p.MyASN,
-		ASN:      p.ASN,
-		Addr:     ip,
-		Port:     port,
-		HoldTime: holdTime,
-		RouterID: routerID,
+		MyASN:         p.MyASN,
+		ASN:           p.ASN,
+		Addr:          ip,
+		Port:          port,
+		HoldTime:      holdTime,
+		RouterID:      routerID,
+		NodeSelectors: nodeSels,
 	}, nil
 }
 
