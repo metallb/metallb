@@ -157,7 +157,7 @@ spec:
         runAsUser: 65534 # nobody
       containers:
       - name: controller
-        image: metallb/controller:v0.3.0
+        image: metallb/controller:v0.3.1
         args:
         - --port=7472
         ports:
@@ -200,7 +200,7 @@ spec:
       hostNetwork: true
       containers:
       - name: speaker
-        image: metallb/speaker:v0.3.0
+        image: metallb/speaker:v0.3.1
         args:
         - --port=7472
         env:
