@@ -3,9 +3,26 @@ title: Release Notes
 weight: 7
 ---
 
-## Version 0.3.0
+## Version 0.3.1
 
 [Documentation for this release](https://metallb.universe.tf)
+
+Fixes a couple
+of [embarrassing bugs](https://github.com/google/metallb/issues/142)
+that sneaked into 0.3.
+
+Bugfixes:
+
+- Revert to using `apps/v1beta2` instead of `apps/v1` for MetalLB's
+  Deployment and Daemonset, to remain compatible with Kubernetes 1.8.
+- Create the `metallb-system` namespace when installing
+  `test-bgp-router`.
+- Disable BIRD in `test-bgp-router`. Bird got updated to 2.0, and the
+  integration with `test-bgp-router` needs some reworking.
+
+## Version 0.3.0
+
+[Documentation for this release](https://v0-3-0--metallb.netlify.com)
 
 Action required if upgrading from 0.2.x:
 
