@@ -1,3 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: metallb-system
+
+---
 apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
