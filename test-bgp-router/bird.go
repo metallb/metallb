@@ -4,14 +4,15 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"os"
 	"os/exec"
 	"strings"
 )
 
 func hasBird() bool {
-	_, err := os.Stat("/usr/sbin/bird")
-	return err == nil
+	// Disabled pending bug #142
+	// _, err := os.Stat("/usr/sbin/bird")
+	// return err == nil
+	return false
 }
 
 func writeBirdConfig() error {

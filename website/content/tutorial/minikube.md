@@ -67,6 +67,12 @@ will be configured to speak BGP, but won't configure Linux to forward
 traffic based on the data they receive. Instead, we'll just inspect
 that data to see what a real router _would_ do.
 
+{{% notice note %}}
+BIRD is temporarily disabled due to
+a [bug](https://github.com/google/metallb/issues/142), so screenshots
+will look slightly different.
+{{% /notice %}}
+
 Deploy these test routers with `kubectl`:
 
 `kubectl apply -f https://raw.githubusercontent.com/google/metallb/master/manifests/test-bgp-router.yaml`

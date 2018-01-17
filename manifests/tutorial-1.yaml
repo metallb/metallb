@@ -6,9 +6,10 @@ metadata:
 data:
   config: |
     peers:
-    - my-asn: 64512
-      peer-asn: 64512
-      peer-address: 10.96.0.100
+    # Temporarily disabled due to bug #142
+    # - my-asn: 64512
+    #   peer-asn: 64512
+    #   peer-address: 10.96.0.100
     - my-asn: 64512
       peer-asn: 64512
       peer-address: 10.96.0.101
