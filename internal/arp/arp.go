@@ -36,17 +36,19 @@ func New(ip net.IP) (*Announce, error) {
 		return nil, err
 	}
 
-	return &Announce{
+	ret := &Announce{
 		hardwareAddr: ifi.HardwareAddr,
 		client:       client,
 		ips:          make(map[string]net.IP),
 		stop:         make(chan bool),
-	}, nil
+	}
+	go ret.run()
+	return ret, nil
 }
 
-// Run starts the announcer, making it listen on the interface for ARP requests. It only responds to these
+// run starts the announcer, making it listen on the interface for ARP requests. It only responds to these
 // requests when a.leader is set to true, i.e. we are the current cluster wide leader for sending ARPs.
-func (a *Announce) Run() {
+func (a *Announce) run() {
 	for {
 		a.readPacket()
 	}

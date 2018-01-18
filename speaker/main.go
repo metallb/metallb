@@ -131,8 +131,6 @@ func newController(myIP net.IP, myNode string) (*controller, error) {
 		bgpSvcAds: map[string][]*bgp.Advertisement{},
 		bgpIPs:    allocator.New(),
 	}
-	// just start this as a goroutine, the life time is bound to this process, so there is no need to stop it.
-	go arpAnn.Run()
 
 	return ret, nil
 }
