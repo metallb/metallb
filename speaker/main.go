@@ -79,7 +79,7 @@ func main() {
 		glog.Fatalf("Error getting controller: %s", err)
 	}
 
-	client, err := k8s.New(speaker, *master, *kubeconfig)
+	client, err := k8s.New("metallb-speaker", *master, *kubeconfig)
 	if err != nil {
 		glog.Fatalf("Error getting k8s client: %s", err)
 	}
@@ -134,5 +134,3 @@ func newController(myIP net.IP, myNode string) (*controller, error) {
 
 	return ret, nil
 }
-
-const speaker = "metallb-speaker"
