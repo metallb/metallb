@@ -74,7 +74,7 @@ func main() {
 
 	// Setup both ARP and BGP clients and speakers, config decides what is being done runtime.
 
-	ctrl, err := newController(myIP, *myNode)
+	ctrl, err := newController(myIP, *myNode, false)
 	if err != nil {
 		glog.Fatalf("Error getting controller: %s", err)
 	}
@@ -115,10 +115,16 @@ type controller struct {
 	bgpIPs    *allocator.Allocator
 }
 
-func newController(myIP net.IP, myNode string) (*controller, error) {
-	arpAnn, err := arp.New(myIP)
-	if err != nil {
-		return nil, fmt.Errorf("making ARP announcer: %s", err)
+func newController(myIP net.IP, myNode string, noARP bool) (*controller, error) {
+	var (
+		arpAnn *arp.Announce
+		err    error
+	)
+	if !noARP {
+		arpAnn, err = arp.New(myIP)
+		if err != nil {
+			return nil, fmt.Errorf("making ARP announcer: %s", err)
+		}
 	}
 
 	ret := &controller{

@@ -160,7 +160,10 @@ func TestBGPSppeaker(t *testing.T) {
 		gotAds: map[string][]*bgp.Advertisement{},
 	}
 	newBGP = b.New
-	c, _ := newBGPController(net.ParseIP("1.2.3.4"), "pandora")
+	c, err := newController(net.ParseIP("1.2.3.4"), "pandora", true)
+	if err != nil {
+		t.Fatalf("creating controller: %s", err)
+	}
 
 	tests := []struct {
 		desc string
@@ -665,12 +668,12 @@ func TestBGPSppeaker(t *testing.T) {
 
 	for _, test := range tests {
 		if test.config != nil {
-			if err := c.SetConfig(test.config); err != nil {
+			if err := c.SetConfigBGP(test.config); err != nil {
 				t.Errorf("%q: SetConfig failed: %s", test.desc, err)
 			}
 		}
 		if test.balancer != "" {
-			if err := c.SetBalancer(test.balancer, test.svc, test.eps); err != nil {
+			if err := c.SetBalancerBGP(test.balancer, test.svc, test.eps); err != nil {
 				t.Errorf("%q: SetBalancer failed: %s", test.desc, err)
 			}
 		}
