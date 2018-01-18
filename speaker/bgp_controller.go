@@ -23,7 +23,6 @@ import (
 	"sort"
 	"time"
 
-	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
@@ -33,24 +32,14 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-type bgpController struct {
-	myIP   net.IP
-	myNode string
-
-	config *config.Config
-	peers  []*peer
-	svcAds map[string][]*bgp.Advertisement
-	ips    *allocator.Allocator
-}
-
 type peer struct {
 	cfg *config.Peer
 	bgp session
 }
 
-func (c *bgpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
+func (c *controller) SetBalancerBGP(name string, svc *v1.Service, eps *v1.Endpoints) error {
 	if svc == nil {
-		return c.deleteBalancer(name, "service deleted")
+		return c.deleteBalancerBGP(name, "service deleted")
 	}
 
 	if svc.Spec.Type != "LoadBalancer" {
@@ -60,39 +49,39 @@ func (c *bgpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 	glog.Infof("%s: start update", name)
 	defer glog.Infof("%s: end update", name)
 
-	if c.config == nil {
+	if c.bgpConfig == nil {
 		glog.Infof("%s: skipped, waiting for config", name)
 		return nil
 	}
 
 	if len(svc.Status.LoadBalancer.Ingress) != 1 {
 		glog.Infof("%s: no IP allocated by controller", name)
-		return c.deleteBalancer(name, "no IP allocated by controller")
+		return c.deleteBalancerBGP(name, "no IP allocated by controller")
 	}
 
 	// Should we advertise? Yes, if externalTrafficPolicy is Cluster,
 	// or Local && there's a ready local endpoint.
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !k8s.NodeHasHealthyEndpoint(eps, c.myNode) {
 		glog.Infof("%s: externalTrafficPolicy is Local, and no healthy local endpoints", name)
-		return c.deleteBalancer(name, "no healthy local endpoints")
+		return c.deleteBalancerBGP(name, "no healthy local endpoints")
 	}
 
 	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP).To4()
 	if lbIP == nil {
 		glog.Errorf("%s: invalid LoadBalancer IP %q", name, svc.Status.LoadBalancer.Ingress[0].IP)
-		return c.deleteBalancer(name, "invalid IP allocated by controller")
+		return c.deleteBalancerBGP(name, "invalid IP allocated by controller")
 	}
 
-	if err := c.ips.Assign(name, lbIP); err != nil {
+	if err := c.bgpIPs.Assign(name, lbIP); err != nil {
 		glog.Errorf("%s: IP %q assigned by controller is not allowed by config", name, lbIP)
-		return c.deleteBalancer(name, "invalid IP allocated by controller")
+		return c.deleteBalancerBGP(name, "invalid IP allocated by controller")
 	}
 
-	poolName := c.ips.Pool(name)
-	pool := c.config.Pools[c.ips.Pool(name)]
+	poolName := c.bgpIPs.Pool(name)
+	pool := c.bgpConfig.Pools[c.bgpIPs.Pool(name)]
 	if pool == nil {
 		glog.Errorf("%s: could not find pool %q that definitely should exist!", name, poolName)
-		return c.deleteBalancer(name, "can't find pool")
+		return c.deleteBalancerBGP(name, "can't find pool")
 	}
 
 	if pool.Protocol != config.BGP {
@@ -100,7 +89,7 @@ func (c *bgpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 		return nil
 	}
 
-	c.svcAds[name] = nil
+	c.bgpSvcAds[name] = nil
 	for _, adCfg := range pool.BGPAdvertisements {
 		m := net.CIDRMask(adCfg.AggregationLength, 32)
 		ad := &bgp.Advertisement{
@@ -115,12 +104,12 @@ func (c *bgpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 			ad.Communities = append(ad.Communities, comm)
 		}
 		sort.Slice(ad.Communities, func(i, j int) bool { return ad.Communities[i] < ad.Communities[j] })
-		c.svcAds[name] = append(c.svcAds[name], ad)
+		c.bgpSvcAds[name] = append(c.bgpSvcAds[name], ad)
 	}
 
-	glog.Infof("%s: announcable, making %d advertisements using BGP", name, len(c.svcAds[name]))
+	glog.Infof("%s: announcable, making %d advertisements using BGP", name, len(c.bgpSvcAds[name]))
 
-	if err := c.updateAds(); err != nil {
+	if err := c.updateAdsBGP(); err != nil {
 		return err
 	}
 
@@ -134,9 +123,9 @@ func (c *bgpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 	return nil
 }
 
-func (c *bgpController) updateAds() error {
+func (c *controller) updateAdsBGP() error {
 	var allAds []*bgp.Advertisement
-	for _, ads := range c.svcAds {
+	for _, ads := range c.bgpSvcAds {
 		// This list might contain duplicates, but that's fine,
 		// they'll get compacted by the session code when it's
 		// calculating advertisements.
@@ -145,7 +134,7 @@ func (c *bgpController) updateAds() error {
 		// and detecting conflicting advertisements.
 		allAds = append(allAds, ads...)
 	}
-	for _, peer := range c.peers {
+	for _, peer := range c.bgpPeers {
 		if err := peer.bgp.Set(allAds...); err != nil {
 			return err
 		}
@@ -153,8 +142,8 @@ func (c *bgpController) updateAds() error {
 	return nil
 }
 
-func (c *bgpController) deleteBalancer(name, reason string) error {
-	if _, ok := c.svcAds[name]; !ok {
+func (c *controller) deleteBalancerBGP(name, reason string) error {
+	if _, ok := c.bgpSvcAds[name]; !ok {
 		return nil
 	}
 	glog.Infof("%s: stopping announcements, %s", name, reason)
@@ -162,14 +151,14 @@ func (c *bgpController) deleteBalancer(name, reason string) error {
 		"protocol": string(config.BGP),
 		"service":  name,
 		"node":     c.myNode,
-		"ip":       c.ips.IP(name).String(),
+		"ip":       c.bgpIPs.IP(name).String(),
 	})
-	c.ips.Unassign(name)
-	delete(c.svcAds, name)
-	return c.updateAds()
+	c.bgpIPs.Unassign(name)
+	delete(c.bgpSvcAds, name)
+	return c.updateAdsBGP()
 }
 
-func (c *bgpController) SetConfig(cfg *config.Config) error {
+func (c *controller) SetConfigBGP(cfg *config.Config) error {
 	glog.Infof("Start config update")
 	defer glog.Infof("End config update")
 
@@ -178,7 +167,7 @@ func (c *bgpController) SetConfig(cfg *config.Config) error {
 		return errors.New("configuration missing")
 	}
 
-	if err := c.ips.SetPools(cfg.Pools); err != nil {
+	if err := c.bgpIPs.SetPools(cfg.Pools); err != nil {
 		glog.Errorf("Applying new configuration failed: %s", err)
 		return fmt.Errorf("configuration rejected: %s", err)
 	}
@@ -186,13 +175,13 @@ func (c *bgpController) SetConfig(cfg *config.Config) error {
 	newPeers := make([]*peer, 0, len(cfg.Peers))
 newPeers:
 	for _, p := range cfg.Peers {
-		for i, ep := range c.peers {
+		for i, ep := range c.bgpPeers {
 			if ep == nil {
 				continue
 			}
 			if reflect.DeepEqual(p, ep.cfg) {
 				newPeers = append(newPeers, ep)
-				c.peers[i] = nil
+				c.bgpPeers[i] = nil
 				continue newPeers
 			}
 		}
@@ -202,9 +191,9 @@ newPeers:
 		})
 	}
 
-	c.config = cfg
-	oldPeers := c.peers
-	c.peers = newPeers
+	c.bgpConfig = cfg
+	oldPeers := c.bgpPeers
+	c.bgpPeers = newPeers
 
 	for _, p := range oldPeers {
 		if p == nil {
@@ -217,7 +206,7 @@ newPeers:
 	}
 
 	var errs []error
-	for _, p := range c.peers {
+	for _, p := range c.bgpPeers {
 		if p.bgp != nil {
 			continue
 		}
@@ -251,13 +240,4 @@ type session interface {
 
 var newBGP = func(addr string, myASN uint32, routerID net.IP, asn uint32, hold time.Duration) (session, error) {
 	return bgp.New(addr, myASN, routerID, asn, hold)
-}
-
-func newBGPController(myIP net.IP, myNode string) (*bgpController, error) {
-	return &bgpController{
-		myIP:   myIP,
-		myNode: myNode,
-		svcAds: map[string][]*bgp.Advertisement{},
-		ips:    allocator.New(),
-	}, nil
 }

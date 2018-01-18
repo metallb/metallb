@@ -19,8 +19,6 @@ import (
 	"fmt"
 	"net"
 
-	"go.universe.tf/metallb/internal/allocator"
-	"go.universe.tf/metallb/internal/arp"
 	"go.universe.tf/metallb/internal/config"
 
 	"github.com/golang/glog"
@@ -28,18 +26,9 @@ import (
 	"k8s.io/api/core/v1"
 )
 
-type arpController struct {
-	myIP   net.IP
-	myNode string
-
-	config *config.Config
-	ips    *allocator.Allocator
-	ann    *arp.Announce
-}
-
-func (c *arpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
+func (c *controller) SetBalancerARP(name string, svc *v1.Service, eps *v1.Endpoints) error {
 	if svc == nil {
-		return c.deleteBalancer(name, "service deleted")
+		return c.deleteBalancerARP(name, "service deleted")
 	}
 
 	if svc.Spec.Type != "LoadBalancer" {
@@ -49,32 +38,32 @@ func (c *arpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 	glog.Infof("%s: start update", name)
 	defer glog.Infof("%s: end update", name)
 
-	if c.config == nil {
+	if c.arpConfig == nil {
 		glog.Infof("%s: skipped, waiting for config", name)
 		return nil
 	}
 
 	if len(svc.Status.LoadBalancer.Ingress) != 1 {
 		glog.Infof("%s: no IP allocated by controller", name)
-		return c.deleteBalancer(name, "no IP allocated by controller")
+		return c.deleteBalancerARP(name, "no IP allocated by controller")
 	}
 
 	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP).To4()
 	if lbIP == nil {
 		glog.Errorf("%s: invalid LoadBalancer IP %q", name, svc.Status.LoadBalancer.Ingress[0].IP)
-		return c.deleteBalancer(name, "invalid IP allocated by controller")
+		return c.deleteBalancerARP(name, "invalid IP allocated by controller")
 	}
 
-	if err := c.ips.Assign(name, lbIP); err != nil {
+	if err := c.arpIPs.Assign(name, lbIP); err != nil {
 		glog.Errorf("%s: IP %q assigned by controller is not allowed by config", name, lbIP)
-		return c.deleteBalancer(name, "invalid IP allocated by controller")
+		return c.deleteBalancerARP(name, "invalid IP allocated by controller")
 	}
 
-	poolName := c.ips.Pool(name)
-	pool := c.config.Pools[c.ips.Pool(name)]
+	poolName := c.arpIPs.Pool(name)
+	pool := c.arpConfig.Pools[c.arpIPs.Pool(name)]
 	if pool == nil {
 		glog.Errorf("%s: could not find pool %q that definitely should exist!", name, poolName)
-		return c.deleteBalancer(name, "can't find pool")
+		return c.deleteBalancerARP(name, "can't find pool")
 	}
 
 	if pool.Protocol != config.ARP {
@@ -84,7 +73,7 @@ func (c *arpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 
 	glog.Infof("%s: announcable, making 1 advertisement using ARP", name)
 
-	c.ann.SetBalancer(name, lbIP)
+	c.arpAnn.SetBalancer(name, lbIP)
 
 	announcing.With(prometheus.Labels{
 		"protocol": string(config.ARP),
@@ -96,8 +85,8 @@ func (c *arpController) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoi
 	return nil
 }
 
-func (c *arpController) deleteBalancer(name, reason string) error {
-	if !c.ann.AnnounceName(name) {
+func (c *controller) deleteBalancerARP(name, reason string) error {
+	if !c.arpAnn.AnnounceName(name) {
 		return nil
 	}
 
@@ -106,14 +95,14 @@ func (c *arpController) deleteBalancer(name, reason string) error {
 		"protocol": string(config.ARP),
 		"service":  name,
 		"node":     c.myNode,
-		"ip":       c.ips.IP(name).String(),
+		"ip":       c.arpIPs.IP(name).String(),
 	})
-	c.ips.Unassign(name)
-	c.ann.DeleteBalancer(name)
+	c.arpIPs.Unassign(name)
+	c.arpAnn.DeleteBalancer(name)
 	return nil
 }
 
-func (c *arpController) SetConfig(cfg *config.Config) error {
+func (c *controller) SetConfigARP(cfg *config.Config) error {
 	glog.Infof("Start config update")
 	defer glog.Infof("End config update")
 
@@ -122,39 +111,21 @@ func (c *arpController) SetConfig(cfg *config.Config) error {
 		return errors.New("configuration missing")
 	}
 
-	if err := c.ips.SetPools(cfg.Pools); err != nil {
+	if err := c.arpIPs.SetPools(cfg.Pools); err != nil {
 		glog.Errorf("Applying new configuration failed: %s", err)
 		return fmt.Errorf("configuration rejected: %s", err)
 	}
 
-	c.config = cfg
+	c.arpConfig = cfg
 
 	return nil
 }
 
-func (c *arpController) SetLeader(leader bool) {
-	c.ann.SetLeader(leader)
+func (c *controller) SetLeaderARP(leader bool) {
+	c.arpAnn.SetLeader(leader)
 	if leader {
-		go c.ann.Acquire()
+		go c.arpAnn.Acquire()
 	} else {
-		go c.ann.Relinquish()
+		go c.arpAnn.Relinquish()
 	}
-}
-
-func newARPController(myIP net.IP, myNode string) (*arpController, error) {
-	ann, err := arp.New(myIP)
-	if err != nil {
-		return nil, err
-	}
-
-	c := &arpController{
-		myIP:   myIP,
-		myNode: myNode,
-		ips:    allocator.New(),
-		ann:    ann,
-	}
-
-	// just start this as a goroutine, the life time is bound to this process, so there is no need to stop it.
-	go func() { ann.Run() }()
-	return c, nil
 }
