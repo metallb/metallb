@@ -120,12 +120,3 @@ func (c *controller) SetConfigARP(cfg *config.Config) error {
 
 	return nil
 }
-
-func (c *controller) SetLeaderARP(leader bool) {
-	c.arpAnn.SetLeader(leader)
-	if leader {
-		go c.arpAnn.Acquire()
-	} else {
-		go c.arpAnn.Relinquish()
-	}
-}

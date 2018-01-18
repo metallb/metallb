@@ -96,7 +96,7 @@ func main() {
 		}
 		return ctrl.SetConfigARP(cfg)
 	})
-	client.HandleLeadership(*myNode, ctrl.SetLeaderARP)
+	client.HandleLeadership(*myNode, ctrl.arpAnn.SetLeader)
 
 	glog.Fatal(client.Run(*port))
 }

@@ -18,6 +18,11 @@ func (a *Announce) SetLeader(b bool) {
 	a.leaderMu.Lock()
 	defer a.leaderMu.Unlock()
 	a.leader = b
+	if a.leader {
+		go a.Acquire()
+	} else {
+		go a.Relinquish()
+	}
 }
 
 // Relinquish set the leader bit to false and stops the go-routine that sends unsolicited APR replies.
