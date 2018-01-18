@@ -15,10 +15,12 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"net"
 	"os"
+	"reflect"
 
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/arp"
@@ -90,12 +92,7 @@ func main() {
 		}
 		return ctrl.SetBalancerARP(k, svc, eps)
 	})
-	client.HandleConfig(func(cfg *config.Config) error {
-		if err := ctrl.SetConfigBGP(cfg); err != nil {
-			return err
-		}
-		return ctrl.SetConfigARP(cfg)
-	})
+	client.HandleConfig(ctrl.SetConfig)
 	client.HandleLeadership(*myNode, ctrl.arpAnn.SetLeader)
 
 	glog.Fatal(client.Run(*port))
@@ -138,4 +135,79 @@ func newController(myIP net.IP, myNode string, noARP bool) (*controller, error) 
 	}
 
 	return ret, nil
+}
+
+func (c *controller) SetConfig(cfg *config.Config) error {
+	glog.Infof("Start config update")
+	defer glog.Infof("End config update")
+
+	if cfg == nil {
+		glog.Errorf("No MetalLB configuration in cluster")
+		return errors.New("configuration missing")
+	}
+
+	if err := c.ips.SetPools(cfg.Pools); err != nil {
+		glog.Errorf("Applying new configuration failed: %s", err)
+		return fmt.Errorf("configuration rejected: %s", err)
+	}
+
+	newPeers := make([]*peer, 0, len(cfg.Peers))
+newPeers:
+	for _, p := range cfg.Peers {
+		for i, ep := range c.bgpPeers {
+			if ep == nil {
+				continue
+			}
+			if reflect.DeepEqual(p, ep.cfg) {
+				newPeers = append(newPeers, ep)
+				c.bgpPeers[i] = nil
+				continue newPeers
+			}
+		}
+		// No existing peers match, create a new one.
+		newPeers = append(newPeers, &peer{
+			cfg: p,
+		})
+	}
+
+	c.config = cfg
+	oldPeers := c.bgpPeers
+	c.bgpPeers = newPeers
+
+	for _, p := range oldPeers {
+		if p == nil {
+			continue
+		}
+		glog.Infof("Peer %q deconfigured, closing BGP session", p.cfg.Addr)
+		if err := p.bgp.Close(); err != nil {
+			glog.Warningf("Shutting down BGP session to %q: %s", p.cfg.Addr, err)
+		}
+	}
+
+	var errs []error
+	for _, p := range c.bgpPeers {
+		if p.bgp != nil {
+			continue
+		}
+
+		glog.Infof("Peer %q configured, starting BGP session", p.cfg.Addr)
+		routerID := c.myIP
+		if p.cfg.RouterID != nil {
+			routerID = p.cfg.RouterID
+		}
+		s, err := newBGP(fmt.Sprintf("%s:%d", p.cfg.Addr, p.cfg.Port), p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("Creating BGP session to %q: %s", p.cfg.Addr, err))
+		} else {
+			p.bgp = s
+		}
+	}
+	if len(errs) != 0 {
+		for _, err := range errs {
+			glog.Error(err)
+		}
+		return fmt.Errorf("%d new BGP sessions failed to start", len(errs))
+	}
+
+	return nil
 }

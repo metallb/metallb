@@ -668,7 +668,7 @@ func TestBGPSppeaker(t *testing.T) {
 
 	for _, test := range tests {
 		if test.config != nil {
-			if err := c.SetConfigBGP(test.config); err != nil {
+			if err := c.SetConfig(test.config); err != nil {
 				t.Errorf("%q: SetConfig failed: %s", test.desc, err)
 			}
 		}

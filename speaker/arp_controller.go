@@ -15,8 +15,6 @@
 package main
 
 import (
-	"errors"
-	"fmt"
 	"net"
 
 	"go.universe.tf/metallb/internal/config"
@@ -99,24 +97,5 @@ func (c *controller) deleteBalancerARP(name, reason string) error {
 	})
 	c.ips.Unassign(name)
 	c.arpAnn.DeleteBalancer(name)
-	return nil
-}
-
-func (c *controller) SetConfigARP(cfg *config.Config) error {
-	glog.Infof("Start config update")
-	defer glog.Infof("End config update")
-
-	if cfg == nil {
-		glog.Errorf("No MetalLB configuration in cluster")
-		return errors.New("configuration missing")
-	}
-
-	if err := c.ips.SetPools(cfg.Pools); err != nil {
-		glog.Errorf("Applying new configuration failed: %s", err)
-		return fmt.Errorf("configuration rejected: %s", err)
-	}
-
-	c.config = cfg
-
 	return nil
 }
