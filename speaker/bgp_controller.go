@@ -49,7 +49,7 @@ func (c *controller) SetBalancerBGP(name string, svc *v1.Service, eps *v1.Endpoi
 	glog.Infof("%s: start update", name)
 	defer glog.Infof("%s: end update", name)
 
-	if c.bgpConfig == nil {
+	if c.config == nil {
 		glog.Infof("%s: skipped, waiting for config", name)
 		return nil
 	}
@@ -72,13 +72,13 @@ func (c *controller) SetBalancerBGP(name string, svc *v1.Service, eps *v1.Endpoi
 		return c.deleteBalancerBGP(name, "invalid IP allocated by controller")
 	}
 
-	if err := c.bgpIPs.Assign(name, lbIP); err != nil {
+	if err := c.ips.Assign(name, lbIP); err != nil {
 		glog.Errorf("%s: IP %q assigned by controller is not allowed by config", name, lbIP)
 		return c.deleteBalancerBGP(name, "invalid IP allocated by controller")
 	}
 
-	poolName := c.bgpIPs.Pool(name)
-	pool := c.bgpConfig.Pools[c.bgpIPs.Pool(name)]
+	poolName := c.ips.Pool(name)
+	pool := c.config.Pools[c.ips.Pool(name)]
 	if pool == nil {
 		glog.Errorf("%s: could not find pool %q that definitely should exist!", name, poolName)
 		return c.deleteBalancerBGP(name, "can't find pool")
@@ -151,9 +151,9 @@ func (c *controller) deleteBalancerBGP(name, reason string) error {
 		"protocol": string(config.BGP),
 		"service":  name,
 		"node":     c.myNode,
-		"ip":       c.bgpIPs.IP(name).String(),
+		"ip":       c.ips.IP(name).String(),
 	})
-	c.bgpIPs.Unassign(name)
+	c.ips.Unassign(name)
 	delete(c.bgpSvcAds, name)
 	return c.updateAdsBGP()
 }
@@ -167,7 +167,7 @@ func (c *controller) SetConfigBGP(cfg *config.Config) error {
 		return errors.New("configuration missing")
 	}
 
-	if err := c.bgpIPs.SetPools(cfg.Pools); err != nil {
+	if err := c.ips.SetPools(cfg.Pools); err != nil {
 		glog.Errorf("Applying new configuration failed: %s", err)
 		return fmt.Errorf("configuration rejected: %s", err)
 	}
@@ -191,7 +191,7 @@ newPeers:
 		})
 	}
 
-	c.bgpConfig = cfg
+	c.config = cfg
 	oldPeers := c.bgpPeers
 	c.bgpPeers = newPeers
 

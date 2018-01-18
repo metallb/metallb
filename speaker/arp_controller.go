@@ -38,7 +38,7 @@ func (c *controller) SetBalancerARP(name string, svc *v1.Service, eps *v1.Endpoi
 	glog.Infof("%s: start update", name)
 	defer glog.Infof("%s: end update", name)
 
-	if c.arpConfig == nil {
+	if c.config == nil {
 		glog.Infof("%s: skipped, waiting for config", name)
 		return nil
 	}
@@ -54,13 +54,13 @@ func (c *controller) SetBalancerARP(name string, svc *v1.Service, eps *v1.Endpoi
 		return c.deleteBalancerARP(name, "invalid IP allocated by controller")
 	}
 
-	if err := c.arpIPs.Assign(name, lbIP); err != nil {
+	if err := c.ips.Assign(name, lbIP); err != nil {
 		glog.Errorf("%s: IP %q assigned by controller is not allowed by config", name, lbIP)
 		return c.deleteBalancerARP(name, "invalid IP allocated by controller")
 	}
 
-	poolName := c.arpIPs.Pool(name)
-	pool := c.arpConfig.Pools[c.arpIPs.Pool(name)]
+	poolName := c.ips.Pool(name)
+	pool := c.config.Pools[c.ips.Pool(name)]
 	if pool == nil {
 		glog.Errorf("%s: could not find pool %q that definitely should exist!", name, poolName)
 		return c.deleteBalancerARP(name, "can't find pool")
@@ -95,9 +95,9 @@ func (c *controller) deleteBalancerARP(name, reason string) error {
 		"protocol": string(config.ARP),
 		"service":  name,
 		"node":     c.myNode,
-		"ip":       c.arpIPs.IP(name).String(),
+		"ip":       c.ips.IP(name).String(),
 	})
-	c.arpIPs.Unassign(name)
+	c.ips.Unassign(name)
 	c.arpAnn.DeleteBalancer(name)
 	return nil
 }
@@ -111,12 +111,12 @@ func (c *controller) SetConfigARP(cfg *config.Config) error {
 		return errors.New("configuration missing")
 	}
 
-	if err := c.arpIPs.SetPools(cfg.Pools); err != nil {
+	if err := c.ips.SetPools(cfg.Pools); err != nil {
 		glog.Errorf("Applying new configuration failed: %s", err)
 		return fmt.Errorf("configuration rejected: %s", err)
 	}
 
-	c.arpConfig = cfg
+	c.config = cfg
 
 	return nil
 }

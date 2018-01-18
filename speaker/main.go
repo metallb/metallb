@@ -105,14 +105,13 @@ type controller struct {
 	myIP   net.IP
 	myNode string
 
-	arpConfig *config.Config
-	arpIPs    *allocator.Allocator
-	arpAnn    *arp.Announce
+	config *config.Config
+	ips    *allocator.Allocator
 
-	bgpConfig *config.Config
+	arpAnn *arp.Announce
+
 	bgpPeers  []*peer
 	bgpSvcAds map[string][]*bgp.Advertisement
-	bgpIPs    *allocator.Allocator
 }
 
 func newController(myIP net.IP, myNode string, noARP bool) (*controller, error) {
@@ -131,11 +130,11 @@ func newController(myIP net.IP, myNode string, noARP bool) (*controller, error) 
 		myIP:   myIP,
 		myNode: myNode,
 
-		arpIPs: allocator.New(),
+		ips: allocator.New(),
+
 		arpAnn: arpAnn,
 
 		bgpSvcAds: map[string][]*bgp.Advertisement{},
-		bgpIPs:    allocator.New(),
 	}
 
 	return ret, nil
