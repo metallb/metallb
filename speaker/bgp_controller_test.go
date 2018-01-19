@@ -673,7 +673,7 @@ func TestBGPSppeaker(t *testing.T) {
 			}
 		}
 		if test.balancer != "" {
-			if err := c.SetBalancerBGP(test.balancer, test.svc, test.eps); err != nil {
+			if err := c.SetBalancer(test.balancer, test.svc, test.eps); err != nil {
 				t.Errorf("%q: SetBalancer failed: %s", test.desc, err)
 			}
 		}
