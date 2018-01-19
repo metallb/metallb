@@ -1,7 +1,6 @@
 package ndp
 
 import (
-	"encoding"
 	"encoding/binary"
 	"fmt"
 	"io"
@@ -41,10 +40,16 @@ const (
 
 // An Option is a Neighbor Discovery Protocol option.
 type Option interface {
-	encoding.BinaryMarshaler
-	encoding.BinaryUnmarshaler
+	// Code specifies the NDP option code for an Option.
+	Code() uint8
 
-	code() uint8
+	// "Code" as a method name isn't actually accurate because NDP options
+	// also refer to that field as "Type", but we want to avoid confusion
+	// with Message implementations which already use Type.
+
+	// Called when dealing with a Message's Options.
+	marshal() ([]byte, error)
+	unmarshal(b []byte) error
 }
 
 var _ Option = &LinkLayerAddress{}
@@ -58,10 +63,10 @@ type LinkLayerAddress struct {
 
 // TODO(mdlayher): deal with non-ethernet links and variable option length?
 
-func (lla *LinkLayerAddress) code() byte { return byte(lla.Direction) }
+// Code implements Option.
+func (lla *LinkLayerAddress) Code() byte { return byte(lla.Direction) }
 
-// MarshalBinary implements Option.
-func (lla *LinkLayerAddress) MarshalBinary() ([]byte, error) {
+func (lla *LinkLayerAddress) marshal() ([]byte, error) {
 	if d := lla.Direction; d != Source && d != Target {
 		return nil, fmt.Errorf("ndp: invalid link-layer address direction: %d", d)
 	}
@@ -71,18 +76,17 @@ func (lla *LinkLayerAddress) MarshalBinary() ([]byte, error) {
 	}
 
 	raw := &RawOption{
-		Type:   lla.code(),
+		Type:   lla.Code(),
 		Length: llaOptLen,
 		Value:  lla.Addr,
 	}
 
-	return raw.MarshalBinary()
+	return raw.marshal()
 }
 
-// UnmarshalBinary implements Option.
-func (lla *LinkLayerAddress) UnmarshalBinary(b []byte) error {
+func (lla *LinkLayerAddress) unmarshal(b []byte) error {
 	raw := new(RawOption)
-	if err := raw.UnmarshalBinary(b); err != nil {
+	if err := raw.unmarshal(b); err != nil {
 		return err
 	}
 
@@ -116,12 +120,12 @@ func NewMTU(mtu uint32) *MTU {
 	return &m
 }
 
-func (m *MTU) code() byte { return optMTU }
+// Code implements Option.
+func (m *MTU) Code() byte { return optMTU }
 
-// MarshalBinary implements Option.
-func (m *MTU) MarshalBinary() ([]byte, error) {
+func (m *MTU) marshal() ([]byte, error) {
 	raw := &RawOption{
-		Type:   m.code(),
+		Type:   m.Code(),
 		Length: mtuOptLen,
 		// 2 reserved bytes, 4 for MTU.
 		Value: make([]byte, 6),
@@ -129,13 +133,12 @@ func (m *MTU) MarshalBinary() ([]byte, error) {
 
 	binary.BigEndian.PutUint32(raw.Value[2:6], uint32(*m))
 
-	return raw.MarshalBinary()
+	return raw.marshal()
 }
 
-// UnmarshalBinary implements Option.
-func (m *MTU) UnmarshalBinary(b []byte) error {
+func (m *MTU) unmarshal(b []byte) error {
 	raw := new(RawOption)
-	if err := raw.UnmarshalBinary(b); err != nil {
+	if err := raw.unmarshal(b); err != nil {
 		return err
 	}
 
@@ -146,7 +149,7 @@ func (m *MTU) UnmarshalBinary(b []byte) error {
 
 var _ Option = &PrefixInformation{}
 
-// An PrefixInformation is an PrefixInformation option, as described in RFC 4861, Section 4.6.1.
+// A PrefixInformation is a a Prefix Information option, as described in RFC 4861, Section 4.6.1.
 type PrefixInformation struct {
 	PrefixLength                   uint8
 	OnLink                         bool
@@ -156,10 +159,10 @@ type PrefixInformation struct {
 	Prefix                         net.IP
 }
 
-func (pi *PrefixInformation) code() byte { return optPrefixInformation }
+// Code implements Option.
+func (pi *PrefixInformation) Code() byte { return optPrefixInformation }
 
-// MarshalBinary implements Option.
-func (pi *PrefixInformation) MarshalBinary() ([]byte, error) {
+func (pi *PrefixInformation) marshal() ([]byte, error) {
 	// Per the RFC:
 	// "The bits in the prefix after the prefix length are reserved and MUST
 	// be initialized to zero by the sender and ignored by the receiver."
@@ -172,7 +175,7 @@ func (pi *PrefixInformation) MarshalBinary() ([]byte, error) {
 	}
 
 	raw := &RawOption{
-		Type:   pi.code(),
+		Type:   pi.Code(),
 		Length: piOptLen,
 		// 30 bytes for PrefixInformation body.
 		Value: make([]byte, 30),
@@ -197,13 +200,12 @@ func (pi *PrefixInformation) MarshalBinary() ([]byte, error) {
 
 	copy(raw.Value[14:30], pi.Prefix)
 
-	return raw.MarshalBinary()
+	return raw.marshal()
 }
 
-// UnmarshalBinary implements Option.
-func (pi *PrefixInformation) UnmarshalBinary(b []byte) error {
+func (pi *PrefixInformation) unmarshal(b []byte) error {
 	raw := new(RawOption)
-	if err := raw.UnmarshalBinary(b); err != nil {
+	if err := raw.unmarshal(b); err != nil {
 		return err
 	}
 
@@ -255,10 +257,10 @@ type RawOption struct {
 	Value  []byte
 }
 
-func (u *RawOption) code() byte { return u.Type }
+// Code implements Option.
+func (u *RawOption) Code() byte { return u.Type }
 
-// MarshalBinary implements Option.
-func (u *RawOption) MarshalBinary() ([]byte, error) {
+func (u *RawOption) marshal() ([]byte, error) {
 	// Length specified in units of 8 bytes, and the caller must provide
 	// an accurate length.
 	l := int(u.Length * 8)
@@ -275,8 +277,7 @@ func (u *RawOption) MarshalBinary() ([]byte, error) {
 	return b, nil
 }
 
-// UnmarshalBinary implements Option.
-func (u *RawOption) UnmarshalBinary(b []byte) error {
+func (u *RawOption) unmarshal(b []byte) error {
 	if len(b) < 2 {
 		return io.ErrUnexpectedEOF
 	}
@@ -286,8 +287,9 @@ func (u *RawOption) UnmarshalBinary(b []byte) error {
 	// Exclude type and length fields from value's length.
 	l := int(u.Length*8) - 2
 
-	if l > len(b[2:]) {
-		return io.ErrUnexpectedEOF
+	// Enforce a valid length value that matches the expected one.
+	if lb := len(b[2:]); l != lb {
+		return fmt.Errorf("ndp: option value byte length should be %d, but length is %d", l, lb)
 	}
 
 	u.Value = make([]byte, l)
@@ -300,7 +302,7 @@ func (u *RawOption) UnmarshalBinary(b []byte) error {
 func marshalOptions(options []Option) ([]byte, error) {
 	var b []byte
 	for _, o := range options {
-		ob, err := o.MarshalBinary()
+		ob, err := o.marshal()
 		if err != nil {
 			return nil, err
 		}
@@ -344,7 +346,7 @@ func parseOptions(b []byte) ([]Option, error) {
 		}
 
 		// Unmarshal at the current offset, up to the expected length.
-		if err := o.UnmarshalBinary(b[i : i+l]); err != nil {
+		if err := o.unmarshal(b[i : i+l]); err != nil {
 			return nil, err
 		}
 

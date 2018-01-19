@@ -1,6 +1,7 @@
 package ndp
 
 import (
+	"fmt"
 	"net"
 	"time"
 
@@ -18,6 +19,14 @@ type Conn struct {
 
 	ifi  *net.Interface
 	addr *net.IPAddr
+
+	// Used only in tests:
+	//
+	// icmpTest disables the self-filtering mechanism in ReadFrom, and
+	// udpTestPort enables the Conn to run over UDP for easier unprivileged
+	// tests.
+	icmpTest    bool
+	udpTestPort int
 }
 
 // Dial dials a NDP connection using the specified interface and address type.
@@ -51,21 +60,27 @@ func Dial(ifi *net.Interface, addr Addr) (*Conn, net.IP, error) {
 		return nil, nil, err
 	}
 
+	return newConn(pc, ipAddr, ifi)
+}
+
+// newConn is an internal test constructor used for creating a Conn from an
+// arbitrary ipv6.PacketConn.
+func newConn(pc *ipv6.PacketConn, src *net.IPAddr, ifi *net.Interface) (*Conn, net.IP, error) {
 	c := &Conn{
 		pc: pc,
 
 		// The default control message used when none is specified.
 		cm: &ipv6.ControlMessage{
 			HopLimit: HopLimit,
-			Src:      ipAddr.IP,
+			Src:      src.IP,
 			IfIndex:  ifi.Index,
 		},
 
 		ifi:  ifi,
-		addr: ipAddr,
+		addr: src,
 	}
 
-	return c, ipAddr.IP, nil
+	return c, src.IP, nil
 }
 
 // Close closes the Conn's underlying connection.
@@ -89,9 +104,11 @@ func (c *Conn) ReadFrom() (Message, *ipv6.ControlMessage, net.IP, error) {
 			return nil, nil, nil, err
 		}
 
-		// If the source isn't unspecified, did this address send this message?
-		ip := src.(*net.IPAddr).IP
-		if !ip.IsUnspecified() && ip.Equal(c.addr.IP) {
+		// Filter message if:
+		//   - not testing the Conn implementation.
+		//   - this address sent this message.
+		ip := srcIP(src)
+		if !c.test() && ip.Equal(c.addr.IP) {
 			continue
 		}
 
@@ -115,16 +132,45 @@ func (c *Conn) WriteTo(m Message, cm *ipv6.ControlMessage, dst net.IP) error {
 		return err
 	}
 
-	// Set reasonable defaults if control message or destination are nil.
+	// Set reasonable defaults if control message is nil.
 	if cm == nil {
 		cm = c.cm
 	}
 
-	addr := &net.IPAddr{
-		IP:   dst,
-		Zone: c.ifi.Name,
+	_, err = c.pc.WriteTo(b, cm, c.dstAddr(dst, c.ifi.Name))
+	return err
+}
+
+// dstAddr returns a different net.Addr type depending on if the Conn is
+// configured for testing.
+func (c *Conn) dstAddr(ip net.IP, zone string) net.Addr {
+	if !c.test() {
+		return &net.IPAddr{
+			IP:   ip,
+			Zone: zone,
+		}
 	}
 
-	_, err = c.pc.WriteTo(b, cm, addr)
-	return err
+	return &net.UDPAddr{
+		IP:   ip,
+		Port: c.udpTestPort,
+		Zone: c.ifi.Name,
+	}
+}
+
+// test determines if Conn is configured for testing.
+func (c *Conn) test() bool {
+	return c.icmpTest || c.udpTestPort != 0
+}
+
+// srcIP retrieves the net.IP from possible net.Addr types used in a Conn.
+func srcIP(addr net.Addr) net.IP {
+	switch a := addr.(type) {
+	case *net.IPAddr:
+		return a.IP
+	case *net.UDPAddr:
+		return a.IP
+	default:
+		panic(fmt.Sprintf("ndp: unhandled source net.Addr: %#v", addr))
+	}
 }

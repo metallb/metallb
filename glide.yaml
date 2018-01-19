@@ -4,7 +4,7 @@ import:
 - package: github.com/mdlayher/arp
 - package: github.com/mdlayher/ethernet
 - package: github.com/mdlayher/ndp
-  version: 065b0cac88fd06c8aec908eb390d3669ac3ea836
+  version: 43aea02eeef3a76c02084be996a86130c6bbb231
   # Because k8s is idiotis and holds back pflag to a stupidly ancient version.
 - package: github.com/spf13/cobra
   version: 35136c09d8da66b901337c6e86fd8e88a1a255bd

@@ -8,15 +8,6 @@ func fuzz(data []byte) int {
 		return 0
 	}
 
-	b1, err := m.MarshalBinary()
-	if err != nil {
-		panic(err)
-	}
-
-	if err := m.UnmarshalBinary(b1); err != nil {
-		panic(err)
-	}
-
 	b2, err := MarshalMessage(m)
 	if err != nil {
 		panic(err)
