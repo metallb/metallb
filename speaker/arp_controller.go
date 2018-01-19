@@ -21,65 +21,11 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/api/core/v1"
 )
 
-func (c *controller) SetBalancerARP(name string, svc *v1.Service, eps *v1.Endpoints) error {
-	if svc == nil {
-		return c.deleteBalancerARP(name, "service deleted")
-	}
-
-	if svc.Spec.Type != "LoadBalancer" {
-		return nil
-	}
-
-	glog.Infof("%s: start update", name)
-	defer glog.Infof("%s: end update", name)
-
-	if c.config == nil {
-		glog.Infof("%s: skipped, waiting for config", name)
-		return nil
-	}
-
-	if len(svc.Status.LoadBalancer.Ingress) != 1 {
-		glog.Infof("%s: no IP allocated by controller", name)
-		return c.deleteBalancerARP(name, "no IP allocated by controller")
-	}
-
-	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP).To4()
-	if lbIP == nil {
-		glog.Errorf("%s: invalid LoadBalancer IP %q", name, svc.Status.LoadBalancer.Ingress[0].IP)
-		return c.deleteBalancerARP(name, "invalid IP allocated by controller")
-	}
-
-	if err := c.ips.Assign(name, lbIP); err != nil {
-		glog.Errorf("%s: IP %q assigned by controller is not allowed by config", name, lbIP)
-		return c.deleteBalancerARP(name, "invalid IP allocated by controller")
-	}
-
-	poolName := c.ips.Pool(name)
-	pool := c.config.Pools[c.ips.Pool(name)]
-	if pool == nil {
-		glog.Errorf("%s: could not find pool %q that definitely should exist!", name, poolName)
-		return c.deleteBalancerARP(name, "can't find pool")
-	}
-
-	if pool.Protocol != config.ARP {
-		glog.Errorf("%s: protocol in pool is not set to %s, got %s", name, string(config.ARP), pool.Protocol)
-		return nil
-	}
-
-	glog.Infof("%s: announcable, making 1 advertisement using ARP", name)
-
+func (c *controller) SetBalancerARP(name string, lbIP net.IP, pool *config.Pool) error {
+	glog.Infof("%s: making 1 advertisement using ARP", name)
 	c.arpAnn.SetBalancer(name, lbIP)
-
-	announcing.With(prometheus.Labels{
-		"protocol": string(config.ARP),
-		"service":  name,
-		"node":     c.myNode,
-		"ip":       lbIP.String(),
-	}).Set(1)
-
 	return nil
 }
 

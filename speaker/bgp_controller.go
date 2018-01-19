@@ -22,11 +22,8 @@ import (
 
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/k8s"
 
 	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
-	"k8s.io/api/core/v1"
 )
 
 type peer struct {
@@ -34,58 +31,7 @@ type peer struct {
 	bgp session
 }
 
-func (c *controller) SetBalancerBGP(name string, svc *v1.Service, eps *v1.Endpoints) error {
-	if svc == nil {
-		return c.deleteBalancerBGP(name, "service deleted")
-	}
-
-	if svc.Spec.Type != "LoadBalancer" {
-		return nil
-	}
-
-	glog.Infof("%s: start update", name)
-	defer glog.Infof("%s: end update", name)
-
-	if c.config == nil {
-		glog.Infof("%s: skipped, waiting for config", name)
-		return nil
-	}
-
-	if len(svc.Status.LoadBalancer.Ingress) != 1 {
-		glog.Infof("%s: no IP allocated by controller", name)
-		return c.deleteBalancerBGP(name, "no IP allocated by controller")
-	}
-
-	// Should we advertise? Yes, if externalTrafficPolicy is Cluster,
-	// or Local && there's a ready local endpoint.
-	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !k8s.NodeHasHealthyEndpoint(eps, c.myNode) {
-		glog.Infof("%s: externalTrafficPolicy is Local, and no healthy local endpoints", name)
-		return c.deleteBalancerBGP(name, "no healthy local endpoints")
-	}
-
-	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP).To4()
-	if lbIP == nil {
-		glog.Errorf("%s: invalid LoadBalancer IP %q", name, svc.Status.LoadBalancer.Ingress[0].IP)
-		return c.deleteBalancerBGP(name, "invalid IP allocated by controller")
-	}
-
-	if err := c.ips.Assign(name, lbIP); err != nil {
-		glog.Errorf("%s: IP %q assigned by controller is not allowed by config", name, lbIP)
-		return c.deleteBalancerBGP(name, "invalid IP allocated by controller")
-	}
-
-	poolName := c.ips.Pool(name)
-	pool := c.config.Pools[c.ips.Pool(name)]
-	if pool == nil {
-		glog.Errorf("%s: could not find pool %q that definitely should exist!", name, poolName)
-		return c.deleteBalancerBGP(name, "can't find pool")
-	}
-
-	if pool.Protocol != config.BGP {
-		glog.Errorf("%s: protocol in pool is not set to %s, got %s", name, string(config.BGP), pool.Protocol)
-		return nil
-	}
-
+func (c *controller) SetBalancerBGP(name string, lbIP net.IP, pool *config.Pool) error {
 	c.bgpSvcAds[name] = nil
 	for _, adCfg := range pool.BGPAdvertisements {
 		m := net.CIDRMask(adCfg.AggregationLength, 32)
@@ -104,18 +50,11 @@ func (c *controller) SetBalancerBGP(name string, svc *v1.Service, eps *v1.Endpoi
 		c.bgpSvcAds[name] = append(c.bgpSvcAds[name], ad)
 	}
 
-	glog.Infof("%s: announcable, making %d advertisements using BGP", name, len(c.bgpSvcAds[name]))
-
 	if err := c.updateAdsBGP(); err != nil {
 		return err
 	}
 
-	announcing.With(prometheus.Labels{
-		"protocol": string(config.BGP),
-		"service":  name,
-		"node":     c.myNode,
-		"ip":       lbIP.String(),
-	}).Set(1)
+	glog.Infof("%s: making %d advertisements using BGP", name, len(c.bgpSvcAds[name]))
 
 	return nil
 }
@@ -144,13 +83,6 @@ func (c *controller) deleteBalancerBGP(name, reason string) error {
 		return nil
 	}
 	glog.Infof("%s: stopping announcements, %s", name, reason)
-	announcing.Delete(prometheus.Labels{
-		"protocol": string(config.BGP),
-		"service":  name,
-		"node":     c.myNode,
-		"ip":       c.ips.IP(name).String(),
-	})
-	c.ips.Unassign(name)
 	delete(c.bgpSvcAds, name)
 	return c.updateAdsBGP()
 }

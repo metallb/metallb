@@ -86,12 +86,7 @@ func main() {
 		glog.Fatalf("Error getting k8s client: %s", err)
 	}
 	// Hacky: dispatch to both controllers for now.
-	client.HandleServiceAndEndpoints(func(k string, svc *v1.Service, eps *v1.Endpoints) error {
-		if err := ctrl.SetBalancerBGP(k, svc, eps); err != nil {
-			return err
-		}
-		return ctrl.SetBalancerARP(k, svc, eps)
-	})
+	client.HandleServiceAndEndpoints(ctrl.SetBalancer)
 	client.HandleConfig(ctrl.SetConfig)
 	client.HandleLeadership(*myNode, ctrl.arpAnn.SetLeader)
 
@@ -135,6 +130,101 @@ func newController(myIP net.IP, myNode string, noARP bool) (*controller, error) 
 	}
 
 	return ret, nil
+}
+
+func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
+	if svc == nil {
+		return c.deleteBalancerBGP(name, "service deleted")
+	}
+
+	if svc.Spec.Type != "LoadBalancer" {
+		return nil
+	}
+
+	glog.Infof("%s: start update", name)
+	defer glog.Infof("%s: end update", name)
+
+	if c.config == nil {
+		glog.Infof("%s: skipped, waiting for config", name)
+		return nil
+	}
+
+	if len(svc.Status.LoadBalancer.Ingress) != 1 {
+		glog.Infof("%s: no IP allocated by controller", name)
+		return c.deleteBalancerBGP(name, "no IP allocated by controller")
+	}
+
+	// Should we advertise? Yes, if externalTrafficPolicy is Cluster,
+	// or Local && there's a ready local endpoint.
+	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !k8s.NodeHasHealthyEndpoint(eps, c.myNode) {
+		glog.Infof("%s: externalTrafficPolicy is Local, and no healthy local endpoints", name)
+		return c.deleteBalancerBGP(name, "no healthy local endpoints")
+	}
+
+	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP).To4()
+	if lbIP == nil {
+		glog.Errorf("%s: invalid LoadBalancer IP %q", name, svc.Status.LoadBalancer.Ingress[0].IP)
+		return c.deleteBalancerBGP(name, "invalid IP allocated by controller")
+	}
+
+	if err := c.ips.Assign(name, lbIP); err != nil {
+		glog.Errorf("%s: IP %q assigned by controller is not allowed by config", name, lbIP)
+		return c.deleteBalancerBGP(name, "invalid IP allocated by controller")
+	}
+
+	poolName := c.ips.Pool(name)
+	pool := c.config.Pools[c.ips.Pool(name)]
+	if pool == nil {
+		glog.Errorf("%s: could not find pool %q that definitely should exist!", name, poolName)
+		return c.deleteBalancerBGP(name, "can't find pool")
+	}
+
+	switch pool.Protocol {
+	case config.ARP:
+		if err := c.SetBalancerARP(name, lbIP, pool); err != nil {
+			return err
+		}
+	case config.BGP:
+		if err := c.SetBalancerBGP(name, lbIP, pool); err != nil {
+			return err
+		}
+	default:
+		glog.Errorf("%s: unknown balancer protocol %q. This should not happen, please file a bug!", name, pool.Protocol)
+		return c.deleteBalancer(name, "internal error (unknown balancer protocol)")
+	}
+
+	announcing.With(prometheus.Labels{
+		"protocol": string(pool.Protocol),
+		"service":  name,
+		"node":     c.myNode,
+		"ip":       lbIP.String(),
+	}).Set(1)
+
+	return nil
+}
+
+func (c *controller) deleteBalancer(name, reason string) error {
+	if err := c.deleteBalancerARP(name, reason); err != nil {
+		return err
+	}
+	if err := c.deleteBalancerBGP(name, reason); err != nil {
+		return err
+	}
+
+	// TODO: put the log about stopping announcements here, a few
+	// refactoring steps down the road.
+
+	c.ips.Unassign(name)
+
+	for _, proto := range []config.Proto{config.ARP, config.BGP} {
+		announcing.Delete(prometheus.Labels{
+			"protocol": string(proto),
+			"service":  name,
+			"node":     c.myNode,
+			"ip":       c.ips.IP(name).String(),
+		})
+	}
+	return nil
 }
 
 func (c *controller) SetConfig(cfg *config.Config) error {
