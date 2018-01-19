@@ -99,7 +99,7 @@ newPeers:
 	return nil
 }
 
-func (c *bgpController) SetBalancerBGP(name string, lbIP net.IP, pool *config.Pool) error {
+func (c *bgpController) SetBalancer(name string, lbIP net.IP, pool *config.Pool) error {
 	c.svcAds[name] = nil
 	for _, adCfg := range pool.BGPAdvertisements {
 		m := net.CIDRMask(adCfg.AggregationLength, 32)
@@ -118,7 +118,7 @@ func (c *bgpController) SetBalancerBGP(name string, lbIP net.IP, pool *config.Po
 		c.svcAds[name] = append(c.svcAds[name], ad)
 	}
 
-	if err := c.updateAdsBGP(); err != nil {
+	if err := c.updateAds(); err != nil {
 		return err
 	}
 
@@ -127,7 +127,7 @@ func (c *bgpController) SetBalancerBGP(name string, lbIP net.IP, pool *config.Po
 	return nil
 }
 
-func (c *bgpController) updateAdsBGP() error {
+func (c *bgpController) updateAds() error {
 	var allAds []*bgp.Advertisement
 	for _, ads := range c.svcAds {
 		// This list might contain duplicates, but that's fine,
@@ -146,13 +146,13 @@ func (c *bgpController) updateAdsBGP() error {
 	return nil
 }
 
-func (c *bgpController) DeleteBalancerBGP(name, reason string) error {
+func (c *bgpController) DeleteBalancer(name, reason string) error {
 	if _, ok := c.svcAds[name]; !ok {
 		return nil
 	}
 	glog.Infof("%s: stopping announcements, %s", name, reason)
 	delete(c.svcAds, name)
-	return c.updateAdsBGP()
+	return c.updateAds()
 }
 
 type session interface {

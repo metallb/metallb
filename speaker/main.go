@@ -186,7 +186,7 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 			return err
 		}
 	case config.BGP:
-		if err := c.bgp.SetBalancerBGP(name, lbIP, pool); err != nil {
+		if err := c.bgp.SetBalancer(name, lbIP, pool); err != nil {
 			return err
 		}
 	default:
@@ -210,7 +210,7 @@ func (c *controller) deleteBalancer(name, reason string) error {
 			return err
 		}
 	}
-	if err := c.bgp.DeleteBalancerBGP(name, reason); err != nil {
+	if err := c.bgp.DeleteBalancer(name, reason); err != nil {
 		return err
 	}
 
