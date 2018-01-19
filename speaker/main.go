@@ -87,7 +87,7 @@ func main() {
 	// Hacky: dispatch to both controllers for now.
 	client.HandleServiceAndEndpoints(ctrl.SetBalancer)
 	client.HandleConfig(ctrl.SetConfig)
-	client.HandleLeadership(*myNode, ctrl.arpAnn.SetLeader)
+	client.HandleLeadership(*myNode, ctrl.arp.announcer.SetLeader)
 
 	glog.Fatal(client.Run(*port))
 }
@@ -99,20 +99,19 @@ type controller struct {
 	config *config.Config
 	ips    *allocator.Allocator
 
-	arpAnn *arp.Announce
-
+	arp *arpController
 	bgp *bgpController
 }
 
 func newController(myIP net.IP, myNode string, noARP bool) (*controller, error) {
-	var (
-		arpAnn *arp.Announce
-		err    error
-	)
+	var arpCtrl *arpController
 	if !noARP {
-		arpAnn, err = arp.New(myIP)
+		arpAnn, err := arp.New(myIP)
 		if err != nil {
 			return nil, fmt.Errorf("making ARP announcer: %s", err)
+		}
+		arpCtrl = &arpController{
+			announcer: arpAnn,
 		}
 	}
 
@@ -122,8 +121,7 @@ func newController(myIP net.IP, myNode string, noARP bool) (*controller, error) 
 
 		ips: allocator.New(),
 
-		arpAnn: arpAnn,
-
+		arp: arpCtrl,
 		bgp: &bgpController{
 			myIP:   myIP,
 			svcAds: make(map[string][]*bgp.Advertisement),
@@ -182,7 +180,7 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 
 	switch pool.Protocol {
 	case config.ARP:
-		if err := c.SetBalancerARP(name, lbIP, pool); err != nil {
+		if err := c.arp.SetBalancer(name, lbIP, pool); err != nil {
 			return err
 		}
 	case config.BGP:
@@ -205,8 +203,8 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 }
 
 func (c *controller) deleteBalancer(name, reason string) error {
-	if c.arpAnn != nil {
-		if err := c.deleteBalancerARP(name, reason); err != nil {
+	if c.arp != nil {
+		if err := c.arp.DeleteBalancer(name, reason); err != nil {
 			return err
 		}
 	}
@@ -250,5 +248,10 @@ func (c *controller) SetConfig(cfg *config.Config) error {
 		glog.Errorf("Applying new configuration failed: %s", err)
 		return fmt.Errorf("configuration rejected: %s", err)
 	}
+	if err := c.arp.SetConfig(cfg); err != nil {
+		glog.Errorf("Applying new configuration failed: %s", err)
+		return fmt.Errorf("configuration rejected: %s", err)
+	}
+
 	return nil
 }

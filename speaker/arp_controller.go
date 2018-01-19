@@ -17,31 +17,30 @@ package main
 import (
 	"net"
 
+	"go.universe.tf/metallb/internal/arp"
 	"go.universe.tf/metallb/internal/config"
 
 	"github.com/golang/glog"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
-func (c *controller) SetBalancerARP(name string, lbIP net.IP, pool *config.Pool) error {
-	glog.Infof("%s: making 1 advertisement using ARP", name)
-	c.arpAnn.SetBalancer(name, lbIP)
+type arpController struct {
+	announcer *arp.Announce
+}
+
+func (c *arpController) SetConfig(*config.Config) error {
 	return nil
 }
 
-func (c *controller) deleteBalancerARP(name, reason string) error {
-	if !c.arpAnn.AnnounceName(name) {
+func (c *arpController) SetBalancer(name string, lbIP net.IP, pool *config.Pool) error {
+	glog.Infof("%s: making 1 advertisement using ARP", name)
+	c.announcer.SetBalancer(name, lbIP)
+	return nil
+}
+
+func (c *arpController) DeleteBalancer(name, reason string) error {
+	if !c.announcer.AnnounceName(name) {
 		return nil
 	}
-
-	glog.Infof("%s: stopping announcements, %s", name, reason)
-	announcing.Delete(prometheus.Labels{
-		"protocol": string(config.ARP),
-		"service":  name,
-		"node":     c.myNode,
-		"ip":       c.ips.IP(name).String(),
-	})
-	c.ips.Unassign(name)
-	c.arpAnn.DeleteBalancer(name)
+	c.announcer.DeleteBalancer(name)
 	return nil
 }
