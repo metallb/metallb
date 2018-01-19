@@ -82,12 +82,26 @@ func printRA(ll *log.Logger, ra *ndp.RouterAdvertisement, from net.IP) {
 		opts += fmt.Sprintf("        - %s\n", optStr(o))
 	}
 
+	var flags string
+	if ra.ManagedConfiguration {
+		flags += "M"
+	}
+	if ra.OtherConfiguration {
+		flags += "O"
+	}
+	if ra.MobileIPv6HomeAgent {
+		flags += "H"
+	}
+	if ra.NeighborDiscoveryProxy {
+		flags += "P"
+	}
+
 	ll.Printf(
 		raFormat,
 		from.String(),
 		ra.CurrentHopLimit,
-		ra.ManagedConfiguration,
-		ra.OtherConfiguration,
+		flags,
+		ra.RouterSelectionPreference,
 		ra.RouterLifetime,
 		ra.ReachableTime,
 		ra.RetransmitTimer,
@@ -97,8 +111,8 @@ func printRA(ll *log.Logger, ra *ndp.RouterAdvertisement, from net.IP) {
 
 const raFormat = `router advertisement from: %s:
     - hop limit:        %d
-    - managed:          %t
-    - other:            %t
+    - flags:            [%s]
+    - preference:       %d
     - router lifetime:  %s
     - reachable time:   %s
     - retransmit timer: %s
@@ -117,16 +131,15 @@ func optStr(o ndp.Option) string {
 	case *ndp.MTU:
 		return fmt.Sprintf("MTU: %d", *o)
 	case *ndp.PrefixInformation:
-		flags := "["
+		var flags string
 		if o.OnLink {
 			flags += "O"
 		}
 		if o.AutonomousAddressConfiguration {
 			flags += "A"
 		}
-		flags += "]"
 
-		return fmt.Sprintf("prefix information: %s/%d, flags: %s, valid: %s, preferred: %s",
+		return fmt.Sprintf("prefix information: %s/%d, flags: [%s], valid: %s, preferred: %s",
 			o.Prefix.String(),
 			o.PrefixLength,
 			flags,

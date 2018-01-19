@@ -1,11 +1,11 @@
 package ndp
 
 import (
-	"fmt"
 	"net"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/mdlayher/ndp/internal/ndptest"
 )
 
 func Test_chooseAddr(t *testing.T) {
@@ -14,11 +14,11 @@ func Test_chooseAddr(t *testing.T) {
 
 	var (
 		ip4 = net.IPv4(192, 168, 1, 1).To4()
-		ip6 = mustIPv6("2001:db8::1000")
+		ip6 = ndptest.MustIPv6("2001:db8::1000")
 
-		gua = mustIPv6("2001:db8::1")
-		ula = mustIPv6("fc00::1")
-		lla = mustIPv6("fe80::1")
+		gua = ndptest.MustIPv6("2001:db8::1")
+		ula = ndptest.MustIPv6("fc00::1")
+		lla = ndptest.MustIPv6("fe80::1")
 	)
 
 	addrs := []net.Addr{
@@ -119,13 +119,4 @@ func Test_chooseAddr(t *testing.T) {
 			}
 		})
 	}
-}
-
-func mustIPv6(s string) net.IP {
-	ip := net.ParseIP(s)
-	if ip == nil || ip.To4() != nil {
-		panic(fmt.Sprintf("invalid IPv6 address: %q", s))
-	}
-
-	return ip
 }

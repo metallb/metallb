@@ -1,8 +1,8 @@
 package ndp
 
 import (
-	"encoding"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -25,10 +25,12 @@ const (
 
 // A Message is a Neighbor Discovery Protocol message.
 type Message interface {
-	encoding.BinaryMarshaler
-	encoding.BinaryUnmarshaler
+	// Type specifies the ICMPv6 type for a Message.
+	Type() ipv6.ICMPType
 
-	icmpType() ipv6.ICMPType
+	// Called via MarshalMessage and ParseMessage.
+	marshal() ([]byte, error)
+	unmarshal(b []byte) error
 }
 
 // MarshalMessage marshals a Message into its binary form and prepends an
@@ -37,13 +39,13 @@ type Message interface {
 // It is assumed that the operating system or caller will calculate and place
 // the ICMPv6 checksum in the result.
 func MarshalMessage(m Message) ([]byte, error) {
-	mb, err := m.MarshalBinary()
+	mb, err := m.marshal()
 	if err != nil {
 		return nil, err
 	}
 
 	im := icmp.Message{
-		Type: m.icmpType(),
+		Type: m.Type(),
 		// Always zero.
 		Code: 0,
 		// Calculated by caller or OS.
@@ -80,7 +82,7 @@ func ParseMessage(b []byte) (Message, error) {
 		return nil, fmt.Errorf("ndp: unrecognized ICMPv6 type: %d", t)
 	}
 
-	if err := m.UnmarshalBinary(b[icmpLen:]); err != nil {
+	if err := m.unmarshal(b[icmpLen:]); err != nil {
 		return nil, err
 	}
 
@@ -99,10 +101,10 @@ type NeighborAdvertisement struct {
 	Options       []Option
 }
 
-func (na *NeighborAdvertisement) icmpType() ipv6.ICMPType { return ipv6.ICMPTypeNeighborAdvertisement }
+// Type implements Message.
+func (na *NeighborAdvertisement) Type() ipv6.ICMPType { return ipv6.ICMPTypeNeighborAdvertisement }
 
-// MarshalBinary implements Message.
-func (na *NeighborAdvertisement) MarshalBinary() ([]byte, error) {
+func (na *NeighborAdvertisement) marshal() ([]byte, error) {
 	if err := checkIPv6(na.TargetAddress); err != nil {
 		return nil, err
 	}
@@ -131,8 +133,7 @@ func (na *NeighborAdvertisement) MarshalBinary() ([]byte, error) {
 	return b, nil
 }
 
-// UnmarshalBinary implements Message.
-func (na *NeighborAdvertisement) UnmarshalBinary(b []byte) error {
+func (na *NeighborAdvertisement) unmarshal(b []byte) error {
 	if len(b) < naLen {
 		return io.ErrUnexpectedEOF
 	}
@@ -172,10 +173,10 @@ type NeighborSolicitation struct {
 	Options       []Option
 }
 
-func (ns *NeighborSolicitation) icmpType() ipv6.ICMPType { return ipv6.ICMPTypeNeighborSolicitation }
+// Type implements Message.
+func (ns *NeighborSolicitation) Type() ipv6.ICMPType { return ipv6.ICMPTypeNeighborSolicitation }
 
-// MarshalBinary implements Message.
-func (ns *NeighborSolicitation) MarshalBinary() ([]byte, error) {
+func (ns *NeighborSolicitation) marshal() ([]byte, error) {
 	if err := checkIPv6(ns.TargetAddress); err != nil {
 		return nil, err
 	}
@@ -193,8 +194,7 @@ func (ns *NeighborSolicitation) MarshalBinary() ([]byte, error) {
 	return b, nil
 }
 
-// UnmarshalBinary implements Message.
-func (ns *NeighborSolicitation) UnmarshalBinary(b []byte) error {
+func (ns *NeighborSolicitation) unmarshal(b []byte) error {
 	if len(b) < nsLen {
 		return io.ErrUnexpectedEOF
 	}
@@ -226,19 +226,38 @@ var _ Message = &RouterAdvertisement{}
 // A RouterAdvertisement is a Router Advertisement message as
 // described in RFC 4861, Section 4.1.
 type RouterAdvertisement struct {
-	CurrentHopLimit      uint8
-	ManagedConfiguration bool
-	OtherConfiguration   bool
-	RouterLifetime       time.Duration
-	ReachableTime        time.Duration
-	RetransmitTimer      time.Duration
-	Options              []Option
+	CurrentHopLimit           uint8
+	ManagedConfiguration      bool
+	OtherConfiguration        bool
+	MobileIPv6HomeAgent       bool
+	RouterSelectionPreference RouterSelectionPreference
+	NeighborDiscoveryProxy    bool
+	RouterLifetime            time.Duration
+	ReachableTime             time.Duration
+	RetransmitTimer           time.Duration
+	Options                   []Option
 }
 
-func (ra *RouterAdvertisement) icmpType() ipv6.ICMPType { return ipv6.ICMPTypeRouterAdvertisement }
+// A RouterSelectionPreference is a router selection preference value as
+// described in RFC 4191, Section 2.1.
+type RouterSelectionPreference int
 
-// MarshalBinary implements Message.
-func (ra *RouterAdvertisement) MarshalBinary() ([]byte, error) {
+// Possible RouterSelectionPreference values.
+const (
+	Medium      RouterSelectionPreference = 0
+	High        RouterSelectionPreference = 1
+	prfReserved RouterSelectionPreference = 2
+	Low         RouterSelectionPreference = 3
+)
+
+// Type implements Message.
+func (ra *RouterAdvertisement) Type() ipv6.ICMPType { return ipv6.ICMPTypeRouterAdvertisement }
+
+func (ra *RouterAdvertisement) marshal() ([]byte, error) {
+	if err := checkPrf(ra.RouterSelectionPreference); err != nil {
+		return nil, err
+	}
+
 	b := make([]byte, raLen)
 
 	b[0] = ra.CurrentHopLimit
@@ -248,6 +267,15 @@ func (ra *RouterAdvertisement) MarshalBinary() ([]byte, error) {
 	}
 	if ra.OtherConfiguration {
 		b[1] |= (1 << 6)
+	}
+	if ra.MobileIPv6HomeAgent {
+		b[1] |= (1 << 5)
+	}
+	if prf := uint8(ra.RouterSelectionPreference); prf != 0 {
+		b[1] |= (prf << 3)
+	}
+	if ra.NeighborDiscoveryProxy {
+		b[1] |= (1 << 2)
 	}
 
 	lifetime := ra.RouterLifetime.Seconds()
@@ -269,8 +297,7 @@ func (ra *RouterAdvertisement) MarshalBinary() ([]byte, error) {
 	return b, nil
 }
 
-// UnmarshalBinary implements Message.
-func (ra *RouterAdvertisement) UnmarshalBinary(b []byte) error {
+func (ra *RouterAdvertisement) unmarshal(b []byte) error {
 	if len(b) < raLen {
 		return io.ErrUnexpectedEOF
 	}
@@ -284,20 +311,33 @@ func (ra *RouterAdvertisement) UnmarshalBinary(b []byte) error {
 	var (
 		mFlag = (b[1] & 0x80) != 0
 		oFlag = (b[1] & 0x40) != 0
+		hFlag = (b[1] & 0x20) != 0
+		prf   = RouterSelectionPreference((b[1] & 0x18) >> 3)
+		pFlag = (b[1] & 0x04) != 0
 
 		lifetime = time.Duration(binary.BigEndian.Uint16(b[2:4])) * time.Second
 		reach    = time.Duration(binary.BigEndian.Uint32(b[4:8])) * time.Millisecond
 		retrans  = time.Duration(binary.BigEndian.Uint32(b[8:12])) * time.Millisecond
 	)
 
+	// Per RFC 4191, Section 2.2:
+	// "If the Reserved (10) value is received, the receiver MUST treat the
+	// value as if it were (00)."
+	if prf == prfReserved {
+		prf = Medium
+	}
+
 	*ra = RouterAdvertisement{
-		CurrentHopLimit:      b[0],
-		ManagedConfiguration: mFlag,
-		OtherConfiguration:   oFlag,
-		RouterLifetime:       lifetime,
-		ReachableTime:        reach,
-		RetransmitTimer:      retrans,
-		Options:              options,
+		CurrentHopLimit:           b[0],
+		ManagedConfiguration:      mFlag,
+		OtherConfiguration:        oFlag,
+		MobileIPv6HomeAgent:       hFlag,
+		RouterSelectionPreference: prf,
+		NeighborDiscoveryProxy:    pFlag,
+		RouterLifetime:            lifetime,
+		ReachableTime:             reach,
+		RetransmitTimer:           retrans,
+		Options:                   options,
 	}
 
 	return nil
@@ -311,10 +351,10 @@ type RouterSolicitation struct {
 	Options []Option
 }
 
-func (rs *RouterSolicitation) icmpType() ipv6.ICMPType { return ipv6.ICMPTypeRouterSolicitation }
+// Type implements Message.
+func (rs *RouterSolicitation) Type() ipv6.ICMPType { return ipv6.ICMPTypeRouterSolicitation }
 
-// MarshalBinary implements Message.
-func (rs *RouterSolicitation) MarshalBinary() ([]byte, error) {
+func (rs *RouterSolicitation) marshal() ([]byte, error) {
 	// b contains reserved area.
 	b := make([]byte, rsLen)
 
@@ -328,8 +368,7 @@ func (rs *RouterSolicitation) MarshalBinary() ([]byte, error) {
 	return b, nil
 }
 
-// UnmarshalBinary implements Message.
-func (rs *RouterSolicitation) UnmarshalBinary(b []byte) error {
+func (rs *RouterSolicitation) unmarshal(b []byte) error {
 	if len(b) < rsLen {
 		return io.ErrUnexpectedEOF
 	}
@@ -354,4 +393,16 @@ func checkIPv6(ip net.IP) error {
 	}
 
 	return nil
+}
+
+// checkPrf checks the validity of a RouterSelectionPreference value.
+func checkPrf(prf RouterSelectionPreference) error {
+	switch prf {
+	case Low, Medium, High:
+		return nil
+	case prfReserved:
+		return errors.New("ndp: cannot use reserved router selection preference value")
+	default:
+		return fmt.Errorf("ndp: unknown router selection preference value: %d", prf)
+	}
 }
