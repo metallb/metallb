@@ -15,8 +15,10 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"net"
+	"reflect"
 	"sort"
 	"time"
 
@@ -31,8 +33,74 @@ type peer struct {
 	bgp session
 }
 
-func (c *controller) SetBalancerBGP(name string, lbIP net.IP, pool *config.Pool) error {
-	c.bgpSvcAds[name] = nil
+type bgpController struct {
+	myIP   net.IP
+	peers  []*peer
+	svcAds map[string][]*bgp.Advertisement
+}
+
+func (c *bgpController) SetConfig(cfg *config.Config) error {
+	newPeers := make([]*peer, 0, len(cfg.Peers))
+newPeers:
+	for _, p := range cfg.Peers {
+		for i, ep := range c.peers {
+			if ep == nil {
+				continue
+			}
+			if reflect.DeepEqual(p, ep.cfg) {
+				newPeers = append(newPeers, ep)
+				c.peers[i] = nil
+				continue newPeers
+			}
+		}
+		// No existing peers match, create a new one.
+		newPeers = append(newPeers, &peer{
+			cfg: p,
+		})
+	}
+
+	oldPeers := c.peers
+	c.peers = newPeers
+
+	for _, p := range oldPeers {
+		if p == nil {
+			continue
+		}
+		glog.Infof("Peer %q deconfigured, closing BGP session", p.cfg.Addr)
+		if err := p.bgp.Close(); err != nil {
+			glog.Warningf("Shutting down BGP session to %q: %s", p.cfg.Addr, err)
+		}
+	}
+
+	var errs []error
+	for _, p := range c.peers {
+		if p.bgp != nil {
+			continue
+		}
+
+		glog.Infof("Peer %q configured, starting BGP session", p.cfg.Addr)
+		routerID := c.myIP
+		if p.cfg.RouterID != nil {
+			routerID = p.cfg.RouterID
+		}
+		s, err := newBGP(fmt.Sprintf("%s:%d", p.cfg.Addr, p.cfg.Port), p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime)
+		if err != nil {
+			errs = append(errs, fmt.Errorf("Creating BGP session to %q: %s", p.cfg.Addr, err))
+		} else {
+			p.bgp = s
+		}
+	}
+	if len(errs) != 0 {
+		for _, err := range errs {
+			glog.Error(err)
+		}
+		return fmt.Errorf("%d new BGP sessions failed to start", len(errs))
+	}
+	return nil
+}
+
+func (c *bgpController) SetBalancerBGP(name string, lbIP net.IP, pool *config.Pool) error {
+	c.svcAds[name] = nil
 	for _, adCfg := range pool.BGPAdvertisements {
 		m := net.CIDRMask(adCfg.AggregationLength, 32)
 		ad := &bgp.Advertisement{
@@ -47,21 +115,21 @@ func (c *controller) SetBalancerBGP(name string, lbIP net.IP, pool *config.Pool)
 			ad.Communities = append(ad.Communities, comm)
 		}
 		sort.Slice(ad.Communities, func(i, j int) bool { return ad.Communities[i] < ad.Communities[j] })
-		c.bgpSvcAds[name] = append(c.bgpSvcAds[name], ad)
+		c.svcAds[name] = append(c.svcAds[name], ad)
 	}
 
 	if err := c.updateAdsBGP(); err != nil {
 		return err
 	}
 
-	glog.Infof("%s: making %d advertisements using BGP", name, len(c.bgpSvcAds[name]))
+	glog.Infof("%s: making %d advertisements using BGP", name, len(c.svcAds[name]))
 
 	return nil
 }
 
-func (c *controller) updateAdsBGP() error {
+func (c *bgpController) updateAdsBGP() error {
 	var allAds []*bgp.Advertisement
-	for _, ads := range c.bgpSvcAds {
+	for _, ads := range c.svcAds {
 		// This list might contain duplicates, but that's fine,
 		// they'll get compacted by the session code when it's
 		// calculating advertisements.
@@ -70,7 +138,7 @@ func (c *controller) updateAdsBGP() error {
 		// and detecting conflicting advertisements.
 		allAds = append(allAds, ads...)
 	}
-	for _, peer := range c.bgpPeers {
+	for _, peer := range c.peers {
 		if err := peer.bgp.Set(allAds...); err != nil {
 			return err
 		}
@@ -78,12 +146,12 @@ func (c *controller) updateAdsBGP() error {
 	return nil
 }
 
-func (c *controller) deleteBalancerBGP(name, reason string) error {
-	if _, ok := c.bgpSvcAds[name]; !ok {
+func (c *bgpController) DeleteBalancerBGP(name, reason string) error {
+	if _, ok := c.svcAds[name]; !ok {
 		return nil
 	}
 	glog.Infof("%s: stopping announcements, %s", name, reason)
-	delete(c.bgpSvcAds, name)
+	delete(c.svcAds, name)
 	return c.updateAdsBGP()
 }
 

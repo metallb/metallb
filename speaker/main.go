@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"reflect"
 
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/arp"
@@ -102,8 +101,7 @@ type controller struct {
 
 	arpAnn *arp.Announce
 
-	bgpPeers  []*peer
-	bgpSvcAds map[string][]*bgp.Advertisement
+	bgp *bgpController
 }
 
 func newController(myIP net.IP, myNode string, noARP bool) (*controller, error) {
@@ -126,7 +124,10 @@ func newController(myIP net.IP, myNode string, noARP bool) (*controller, error) 
 
 		arpAnn: arpAnn,
 
-		bgpSvcAds: map[string][]*bgp.Advertisement{},
+		bgp: &bgpController{
+			myIP:   myIP,
+			svcAds: make(map[string][]*bgp.Advertisement),
+		},
 	}
 
 	return ret, nil
@@ -134,7 +135,7 @@ func newController(myIP net.IP, myNode string, noARP bool) (*controller, error) 
 
 func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
 	if svc == nil {
-		return c.deleteBalancerBGP(name, "service deleted")
+		return c.deleteBalancer(name, "service deleted")
 	}
 
 	if svc.Spec.Type != "LoadBalancer" {
@@ -151,32 +152,32 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 
 	if len(svc.Status.LoadBalancer.Ingress) != 1 {
 		glog.Infof("%s: no IP allocated by controller", name)
-		return c.deleteBalancerBGP(name, "no IP allocated by controller")
+		return c.deleteBalancer(name, "no IP allocated by controller")
 	}
 
 	// Should we advertise? Yes, if externalTrafficPolicy is Cluster,
 	// or Local && there's a ready local endpoint.
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !k8s.NodeHasHealthyEndpoint(eps, c.myNode) {
 		glog.Infof("%s: externalTrafficPolicy is Local, and no healthy local endpoints", name)
-		return c.deleteBalancerBGP(name, "no healthy local endpoints")
+		return c.deleteBalancer(name, "no healthy local endpoints")
 	}
 
 	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP).To4()
 	if lbIP == nil {
 		glog.Errorf("%s: invalid LoadBalancer IP %q", name, svc.Status.LoadBalancer.Ingress[0].IP)
-		return c.deleteBalancerBGP(name, "invalid IP allocated by controller")
+		return c.deleteBalancer(name, "invalid IP allocated by controller")
 	}
 
 	if err := c.ips.Assign(name, lbIP); err != nil {
 		glog.Errorf("%s: IP %q assigned by controller is not allowed by config", name, lbIP)
-		return c.deleteBalancerBGP(name, "invalid IP allocated by controller")
+		return c.deleteBalancer(name, "invalid IP allocated by controller")
 	}
 
 	poolName := c.ips.Pool(name)
 	pool := c.config.Pools[c.ips.Pool(name)]
 	if pool == nil {
 		glog.Errorf("%s: could not find pool %q that definitely should exist!", name, poolName)
-		return c.deleteBalancerBGP(name, "can't find pool")
+		return c.deleteBalancer(name, "can't find pool")
 	}
 
 	switch pool.Protocol {
@@ -185,7 +186,7 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 			return err
 		}
 	case config.BGP:
-		if err := c.SetBalancerBGP(name, lbIP, pool); err != nil {
+		if err := c.bgp.SetBalancerBGP(name, lbIP, pool); err != nil {
 			return err
 		}
 	default:
@@ -204,10 +205,12 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 }
 
 func (c *controller) deleteBalancer(name, reason string) error {
-	if err := c.deleteBalancerARP(name, reason); err != nil {
-		return err
+	if c.arpAnn != nil {
+		if err := c.deleteBalancerARP(name, reason); err != nil {
+			return err
+		}
 	}
-	if err := c.deleteBalancerBGP(name, reason); err != nil {
+	if err := c.bgp.DeleteBalancerBGP(name, reason); err != nil {
 		return err
 	}
 
@@ -241,63 +244,11 @@ func (c *controller) SetConfig(cfg *config.Config) error {
 		return fmt.Errorf("configuration rejected: %s", err)
 	}
 
-	newPeers := make([]*peer, 0, len(cfg.Peers))
-newPeers:
-	for _, p := range cfg.Peers {
-		for i, ep := range c.bgpPeers {
-			if ep == nil {
-				continue
-			}
-			if reflect.DeepEqual(p, ep.cfg) {
-				newPeers = append(newPeers, ep)
-				c.bgpPeers[i] = nil
-				continue newPeers
-			}
-		}
-		// No existing peers match, create a new one.
-		newPeers = append(newPeers, &peer{
-			cfg: p,
-		})
-	}
-
 	c.config = cfg
-	oldPeers := c.bgpPeers
-	c.bgpPeers = newPeers
 
-	for _, p := range oldPeers {
-		if p == nil {
-			continue
-		}
-		glog.Infof("Peer %q deconfigured, closing BGP session", p.cfg.Addr)
-		if err := p.bgp.Close(); err != nil {
-			glog.Warningf("Shutting down BGP session to %q: %s", p.cfg.Addr, err)
-		}
+	if err := c.bgp.SetConfig(cfg); err != nil {
+		glog.Errorf("Applying new configuration failed: %s", err)
+		return fmt.Errorf("configuration rejected: %s", err)
 	}
-
-	var errs []error
-	for _, p := range c.bgpPeers {
-		if p.bgp != nil {
-			continue
-		}
-
-		glog.Infof("Peer %q configured, starting BGP session", p.cfg.Addr)
-		routerID := c.myIP
-		if p.cfg.RouterID != nil {
-			routerID = p.cfg.RouterID
-		}
-		s, err := newBGP(fmt.Sprintf("%s:%d", p.cfg.Addr, p.cfg.Port), p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("Creating BGP session to %q: %s", p.cfg.Addr, err))
-		} else {
-			p.bgp = s
-		}
-	}
-	if len(errs) != 0 {
-		for _, err := range errs {
-			glog.Error(err)
-		}
-		return fmt.Errorf("%d new BGP sessions failed to start", len(errs))
-	}
-
 	return nil
 }
