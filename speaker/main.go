@@ -84,7 +84,6 @@ func main() {
 	if err != nil {
 		glog.Fatalf("Error getting k8s client: %s", err)
 	}
-	// Hacky: dispatch to both controllers for now.
 	client.HandleServiceAndEndpoints(ctrl.SetBalancer)
 	client.HandleConfig(ctrl.SetConfig)
 	client.HandleLeadership(*myNode, ctrl.SetLeader)
