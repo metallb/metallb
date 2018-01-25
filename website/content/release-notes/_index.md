@@ -3,6 +3,22 @@ title: Release Notes
 weight: 7
 ---
 
+## Version 0.4.0 (not released yet)
+
+[Documentation for this release](https://master--metallb.netlify.com)
+
+Action required if upgrading from 0.3.x:
+
+- TODO: none yet?
+
+New features:
+
+- BGP peers now have
+  a
+  [node selector]({{% relref "configuration/_index.md" %}}#limiting-peers-to-certain-nodes). You
+  can use this to integrate MetalLB into more complex cluster network
+  topologies.
+
 ## Version 0.3.1
 
 [Documentation for this release](https://metallb.universe.tf)

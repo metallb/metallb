@@ -191,6 +191,72 @@ configurations. This is completely optional, you could just specify
 `65535:65281` directly in the configuration of the `/24` if you
 prefer.
 
+### Limiting peers to certain nodes
+
+By default, every node in the cluster connects to all the peers listed
+in the configuration. In more advanced cluster topologies, you may
+want each node to connect to different routers. For example, if you
+have a "rack and spine" network topology, you likely want each machine
+to peer with its top-of-rack router, but not the routers in other
+racks.
+
+{{<mermaid align="center">}}
+graph BT
+    subgraph ""
+      metallbA("MetalLB<br>Speaker")
+    end
+    subgraph ""
+      metallbB("MetalLB<br>Speaker")
+    end
+
+    subgraph ""
+      metallbC("MetalLB<br>Speaker")
+    end
+    subgraph ""
+      metallbD("MetalLB<br>Speaker")
+    end
+
+    metallbA-->torA(ToR Router)
+    metallbB-->torA(ToR Router)
+    metallbC-->torB(ToR Router)
+    metallbD-->torB(ToR Router)
+
+    torA-->spine(Spine Router)
+    torB-->spine(Spine Router)
+{{< /mermaid >}}
+
+You can limit peers to certain nodes by using the `node-selectors`
+attribute of peers in the configuration. The semantics of these
+selectors are the same as those used elsewhere in Kubernetes, so refer
+to
+the
+[labels documentation](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/) on
+the Kubernetes website.
+
+For example, this is a (somewhat contrived) definition for a peer that
+will only be used by machines:
+
+- With hostname `hostA` or `hostB`, or
+- That have the `rack=frontend` label, but _not_ the label `network-speed=slow`:
+
+```yaml
+peers:
+- peer-address: 10.0.0.1
+  peer-asn: 100
+  my-asn: 42
+  node-selectors:
+  - match-labels:
+      rack: frontend
+    match-expressions:
+    - key: network-speed
+      operator: NotIn
+      values: [slow]
+  - match-expressions:
+    - key: kubernetes.io/hostname
+      operator: In
+      values: [hostA, hostB]
+```
+
 ## Advanced address pool configuration
 
 ### Controlling automatic address allocation
