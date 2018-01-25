@@ -26,7 +26,7 @@ metadata:
   name: metallb-system:speaker
 rules:
 - apiGroups: [""]
-  resources: ["services", "endpoints"]
+  resources: ["services", "endpoints", "nodes"]
   verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
