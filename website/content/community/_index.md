@@ -1,5 +1,5 @@
 ---
-title: Community
+title: Community & Contributing
 weight: 6
 ---
 
