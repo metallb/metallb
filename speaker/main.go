@@ -87,7 +87,7 @@ func main() {
 	// Hacky: dispatch to both controllers for now.
 	client.HandleServiceAndEndpoints(ctrl.SetBalancer)
 	client.HandleConfig(ctrl.SetConfig)
-	client.HandleLeadership(*myNode, ctrl.arp.announcer.SetLeader)
+	client.HandleLeadership(*myNode, ctrl.SetLeader)
 
 	glog.Fatal(client.Run(*port))
 }
@@ -99,8 +99,8 @@ type controller struct {
 	config *config.Config
 	ips    *allocator.Allocator
 
-	arp *arpController
-	bgp *bgpController
+	protocols map[config.Proto]Protocol
+	announced map[string]config.Proto // service name -> protocol advertising it
 }
 
 func newController(myIP net.IP, myNode string, noARP bool) (*controller, error) {
@@ -121,11 +121,14 @@ func newController(myIP net.IP, myNode string, noARP bool) (*controller, error) 
 
 		ips: allocator.New(),
 
-		arp: arpCtrl,
-		bgp: &bgpController{
-			myIP:   myIP,
-			svcAds: make(map[string][]*bgp.Advertisement),
+		protocols: map[config.Proto]Protocol{
+			config.ARP: arpCtrl,
+			config.BGP: &bgpController{
+				myIP:   myIP,
+				svcAds: make(map[string][]*bgp.Advertisement),
+			},
 		},
+		announced: map[string]config.Proto{},
 	}
 
 	return ret, nil
@@ -178,20 +181,22 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 		return c.deleteBalancer(name, "can't find pool")
 	}
 
-	switch pool.Protocol {
-	case config.ARP:
-		if err := c.arp.SetBalancer(name, lbIP, pool); err != nil {
-			return err
+	if proto, ok := c.announced[name]; ok && proto != pool.Protocol {
+		if err := c.protocols[proto].DeleteBalancer(name, fmt.Sprintf("protocol changed to %q", pool.Protocol)); err != nil {
+			return fmt.Errorf("deleting balancer %q from %q protocol: %s", name, proto, err)
 		}
-	case config.BGP:
-		if err := c.bgp.SetBalancer(name, lbIP, pool); err != nil {
-			return err
-		}
-	default:
+		delete(c.announced, name)
+	}
+	handler := c.protocols[pool.Protocol]
+	if handler == nil {
 		glog.Errorf("%s: unknown balancer protocol %q. This should not happen, please file a bug!", name, pool.Protocol)
 		return c.deleteBalancer(name, "internal error (unknown balancer protocol)")
 	}
+	if err := handler.SetBalancer(name, lbIP, pool); err != nil {
+		return err
+	}
 
+	c.announced[name] = pool.Protocol
 	announcing.With(prometheus.Labels{
 		"protocol": string(pool.Protocol),
 		"service":  name,
@@ -203,28 +208,30 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 }
 
 func (c *controller) deleteBalancer(name, reason string) error {
-	if c.arp != nil {
-		if err := c.arp.DeleteBalancer(name, reason); err != nil {
-			return err
-		}
+	if _, ok := c.announced[name]; !ok {
+		return nil
 	}
-	if err := c.bgp.DeleteBalancer(name, reason); err != nil {
+
+	glog.Infof("%s: stopping announcements, %s", name, reason)
+
+	proto, ok := c.announced[name]
+	if !ok {
+		glog.Errorf("%s: unknown balancer protocol. This should not happen, please file a bug!", name)
+		return errors.New("internal error (unknown balancer protocol)")
+	}
+
+	if err := c.protocols[proto].DeleteBalancer(name, reason); err != nil {
 		return err
 	}
 
-	// TODO: put the log about stopping announcements here, a few
-	// refactoring steps down the road.
-
+	delete(c.announced, name)
 	c.ips.Unassign(name)
-
-	for _, proto := range []config.Proto{config.ARP, config.BGP} {
-		announcing.Delete(prometheus.Labels{
-			"protocol": string(proto),
-			"service":  name,
-			"node":     c.myNode,
-			"ip":       c.ips.IP(name).String(),
-		})
-	}
+	announcing.Delete(prometheus.Labels{
+		"protocol": string(proto),
+		"service":  name,
+		"node":     c.myNode,
+		"ip":       c.ips.IP(name).String(),
+	})
 	return nil
 }
 
@@ -242,16 +249,28 @@ func (c *controller) SetConfig(cfg *config.Config) error {
 		return fmt.Errorf("configuration rejected: %s", err)
 	}
 
+	for proto, handler := range c.protocols {
+		if err := handler.SetConfig(cfg); err != nil {
+			glog.Errorf("Applying new configuration to protocol %q failed: %s", proto, err)
+			return fmt.Errorf("configuration rejected: %s", err)
+		}
+	}
+
 	c.config = cfg
 
-	if err := c.bgp.SetConfig(cfg); err != nil {
-		glog.Errorf("Applying new configuration failed: %s", err)
-		return fmt.Errorf("configuration rejected: %s", err)
-	}
-	if err := c.arp.SetConfig(cfg); err != nil {
-		glog.Errorf("Applying new configuration failed: %s", err)
-		return fmt.Errorf("configuration rejected: %s", err)
-	}
-
 	return nil
+}
+
+func (c *controller) SetLeader(isLeader bool) {
+	for _, handler := range c.protocols {
+		handler.SetLeader(isLeader)
+	}
+}
+
+// A Protocol can advertise an IP address.
+type Protocol interface {
+	SetConfig(*config.Config) error
+	SetBalancer(name string, lbIP net.IP, pool *config.Pool) error
+	DeleteBalancer(name, reason string) error
+	SetLeader(bool)
 }

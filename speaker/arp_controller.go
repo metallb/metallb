@@ -19,8 +19,6 @@ import (
 
 	"go.universe.tf/metallb/internal/arp"
 	"go.universe.tf/metallb/internal/config"
-
-	"github.com/golang/glog"
 )
 
 type arpController struct {
@@ -32,7 +30,6 @@ func (c *arpController) SetConfig(*config.Config) error {
 }
 
 func (c *arpController) SetBalancer(name string, lbIP net.IP, pool *config.Pool) error {
-	glog.Infof("%s: making 1 advertisement using ARP", name)
 	c.announcer.SetBalancer(name, lbIP)
 	return nil
 }
@@ -43,4 +40,8 @@ func (c *arpController) DeleteBalancer(name, reason string) error {
 	}
 	c.announcer.DeleteBalancer(name)
 	return nil
+}
+
+func (c *arpController) SetLeader(isLeader bool) {
+	c.announcer.SetLeader(isLeader)
 }

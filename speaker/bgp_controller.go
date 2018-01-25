@@ -150,7 +150,6 @@ func (c *bgpController) DeleteBalancer(name, reason string) error {
 	if _, ok := c.svcAds[name]; !ok {
 		return nil
 	}
-	glog.Infof("%s: stopping announcements, %s", name, reason)
 	delete(c.svcAds, name)
 	return c.updateAds()
 }
@@ -159,6 +158,8 @@ type session interface {
 	io.Closer
 	Set(advs ...*bgp.Advertisement) error
 }
+
+func (c *bgpController) SetLeader(bool) {}
 
 var newBGP = func(addr string, myASN uint32, routerID net.IP, asn uint32, hold time.Duration) (session, error) {
 	return bgp.New(addr, myASN, routerID, asn, hold)
