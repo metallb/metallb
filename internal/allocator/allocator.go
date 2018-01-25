@@ -7,6 +7,8 @@ import (
 	"net"
 
 	"go.universe.tf/metallb/internal/config"
+
+	"github.com/mikioh/ipaddr"
 )
 
 // An Allocator tracks IP address pools and allocates addresses from them.
@@ -73,6 +75,11 @@ func poolCount(p *config.Pool) int64 {
 		o, b := cidr.Mask.Size()
 		sz := int64(math.Pow(2, float64(b-o)))
 		avoidedFirst, avoidedLast := false, false
+
+		cur := newCursor(cidr)
+		firstIP := cur.First().IP
+		lastIP := cur.Last().IP
+
 		if p.AvoidBuggyIPs {
 			if o <= 24 {
 				// A pair of buggy IPs occur for each /24 present in the range.
@@ -83,22 +90,22 @@ func poolCount(p *config.Pool) int64 {
 				// Ranges smaller than /24 contain 1 buggy IP if they
 				// start/end on a /24 boundary, otherwise they contain
 				// none.
-				if ipConfusesBuggyFirmwares(firstIP(cidr)) {
+				if ipConfusesBuggyFirmwares(firstIP) {
 					avoidedFirst = true
 					sz--
 				}
-				if ipConfusesBuggyFirmwares(lastIP(cidr)) {
+				if ipConfusesBuggyFirmwares(lastIP) {
 					avoidedLast = true
 					sz--
 				}
 			}
 		}
 		if p.ARPNetwork != nil {
-			if ipForbiddenByARPNetwork(firstIP(cidr), p.ARPNetwork) && !avoidedFirst {
+			if ipForbiddenByARPNetwork(firstIP, p.ARPNetwork) && !avoidedFirst {
 				avoidedFirst = true
 				sz--
 			}
-			if ipForbiddenByARPNetwork(lastIP(cidr), p.ARPNetwork) && !avoidedLast {
+			if ipForbiddenByARPNetwork(lastIP, p.ARPNetwork) && !avoidedLast {
 				avoidedLast = true
 				sz--
 			}
@@ -163,7 +170,9 @@ func (a *Allocator) Assign(service string, ip net.IP) error {
 func (a *Allocator) allocateFromPool(service, pname string) net.IP {
 	pool := a.pools[pname]
 	for _, cidr := range pool.CIDR {
-		for ip := cidr.IP; cidr.Contains(ip); ip = nextIP(ip) {
+		c := newCursor(cidr)
+		for pos := c.First(); pos != nil; pos = c.Next() {
+			ip := pos.IP
 			if pool.AvoidBuggyIPs && ipConfusesBuggyFirmwares(ip) {
 				continue
 			}
@@ -232,39 +241,11 @@ func (a *Allocator) Pool(service string) string {
 	return a.svcToPool[service]
 }
 
-// nextIP returns the next IP in sequence after prev.
-func nextIP(prev net.IP) net.IP {
-	var ip net.IP
-	ip = append(ip, prev...)
-	if ip.To4() != nil {
-		ip = ip.To4()
-	}
-	for o := 0; o < len(ip); o++ {
-		if ip[len(ip)-o-1] != 255 {
-			ip[len(ip)-o-1]++
-			return ip
-		}
-		ip[len(ip)-o-1] = 0
-	}
-	return ip
-}
-
-// lastIP returns the last IP in the given IPNet.
-func lastIP(ipnet *net.IPNet) net.IP {
-	var ip net.IP
-	ip = append(ip, ipnet.IP...)
-	if ip4 := ip.To4(); ip4 != nil {
-		ip = ip4
-	}
-	for i := range ip {
-		ip[i] |= ^ipnet.Mask[i]
-	}
-	return ip
-}
-
-// firstIP returns the first IP in the given IPNet.
-func firstIP(ipnet *net.IPNet) net.IP {
-	return ipnet.IP.Mask(ipnet.Mask)
+// newCursor creates an IP address traversal cursor from a CIDR network.
+func newCursor(cidr *net.IPNet) *ipaddr.Cursor {
+	return ipaddr.NewCursor([]ipaddr.Prefix{
+		*ipaddr.NewPrefix(cidr),
+	})
 }
 
 // ipConfusesBuggyFirmwares returns true if ip is an IPv4 address ending in 0 or 255.
@@ -282,5 +263,6 @@ func ipConfusesBuggyFirmwares(ip net.IP) bool {
 // ipForbiddenByARPNetwork returns true if ip is the network or
 // broadcast address of arpNet.
 func ipForbiddenByARPNetwork(ip net.IP, arpNet *net.IPNet) bool {
-	return ip.Equal(firstIP(arpNet)) || ip.Equal(lastIP(arpNet))
+	c := newCursor(arpNet)
+	return ip.Equal(c.First().IP) || ip.Equal(c.Last().IP)
 }

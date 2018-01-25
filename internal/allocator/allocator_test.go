@@ -413,31 +413,6 @@ func TestARPForbidden(t *testing.T) {
 
 }
 
-func TestNextIP(t *testing.T) {
-	tests := []struct {
-		in, out string
-	}{
-		{"1.2.3.4", "1.2.3.5"},
-		{"0.0.0.0", "0.0.0.1"},
-		{"1.2.3.255", "1.2.4.0"},
-		{"1.2.255.255", "1.3.0.0"},
-		{"1.255.255.255", "2.0.0.0"},
-		{"255.255.255.255", "0.0.0.0"},
-		{"::1", "::2"},
-	}
-
-	for i, test := range tests {
-		in, out := net.ParseIP(test.in), net.ParseIP(test.out)
-		if in == nil || out == nil {
-			t.Fatalf("Invalid test case #%d, IPs don't parse", i+1)
-		}
-		got := nextIP(in)
-		if !got.Equal(out) {
-			t.Errorf("nextIP(%q), got %q, want %q", in, got, out)
-		}
-	}
-}
-
 func TestConfigReload(t *testing.T) {
 	alloc := New()
 	if err := alloc.SetPools(map[string]*config.Pool{
