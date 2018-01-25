@@ -170,7 +170,11 @@ func TestBGPSpeaker(t *testing.T) {
 		gotAds: map[string][]*bgp.Advertisement{},
 	}
 	newBGP = b.New
-	c, err := newController(net.ParseIP("1.2.3.4"), "pandora", true)
+	c, err := newController(controllerConfig{
+		NodeIP:     net.ParseIP("1.2.3.4"),
+		MyNode:     "pandora",
+		DisableARP: true,
+	})
 	if err != nil {
 		t.Fatalf("creating controller: %s", err)
 	}
@@ -708,7 +712,11 @@ func TestNodeSelectors(t *testing.T) {
 		gotAds: map[string][]*bgp.Advertisement{},
 	}
 	newBGP = b.New
-	c, err := newController(net.ParseIP("1.2.3.4"), "pandora", true)
+	c, err := newController(controllerConfig{
+		NodeIP:     net.ParseIP("1.2.3.4"),
+		MyNode:     "pandora",
+		DisableARP: true,
+	})
 	if err != nil {
 		t.Fatalf("creating controller: %s", err)
 	}
