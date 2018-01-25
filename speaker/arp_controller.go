@@ -19,6 +19,7 @@ import (
 
 	"go.universe.tf/metallb/internal/arp"
 	"go.universe.tf/metallb/internal/config"
+	"k8s.io/api/core/v1"
 )
 
 type arpController struct {
@@ -44,4 +45,8 @@ func (c *arpController) DeleteBalancer(name, reason string) error {
 
 func (c *arpController) SetLeader(isLeader bool) {
 	c.announcer.SetLeader(isLeader)
+}
+
+func (c *arpController) SetNode(*v1.Node) error {
+	return nil
 }

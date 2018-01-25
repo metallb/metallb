@@ -24,6 +24,8 @@ import (
 
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
+	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/golang/glog"
 )
@@ -34,9 +36,10 @@ type peer struct {
 }
 
 type bgpController struct {
-	myIP   net.IP
-	peers  []*peer
-	svcAds map[string][]*bgp.Advertisement
+	myIP       net.IP
+	nodeLabels labels.Set
+	peers      []*peer
+	svcAds     map[string][]*bgp.Advertisement
 }
 
 func (c *bgpController) SetConfig(cfg *config.Config) error {
@@ -160,6 +163,21 @@ type session interface {
 }
 
 func (c *bgpController) SetLeader(bool) {}
+
+func (c *bgpController) SetNode(node *v1.Node) error {
+	nodeLabels := node.Labels
+	if nodeLabels == nil {
+		nodeLabels = map[string]string{}
+	}
+	ns := labels.Set(nodeLabels)
+	if c.nodeLabels != nil && labels.Equals(c.nodeLabels, ns) {
+		// Node labels unchanged, no action required.
+		return nil
+	}
+	c.nodeLabels = ns
+	// TODO: reprocess peering setup, to reprocess all peers.
+	return nil
+}
 
 var newBGP = func(addr string, myASN uint32, routerID net.IP, asn uint32, hold time.Duration) (session, error) {
 	return bgp.New(addr, myASN, routerID, asn, hold)

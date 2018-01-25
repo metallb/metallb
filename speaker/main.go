@@ -87,6 +87,7 @@ func main() {
 	client.HandleServiceAndEndpoints(ctrl.SetBalancer)
 	client.HandleConfig(ctrl.SetConfig)
 	client.HandleLeadership(*myNode, ctrl.SetLeader)
+	client.HandleNode(*myNode, ctrl.SetNode)
 
 	glog.Fatal(client.Run(*port))
 }
@@ -266,10 +267,20 @@ func (c *controller) SetLeader(isLeader bool) {
 	}
 }
 
+func (c *controller) SetNode(node *v1.Node) error {
+	for proto, handler := range c.protocols {
+		if err := handler.SetNode(node); err != nil {
+			return fmt.Errorf("propagating node info to protocol %q: %s", proto, err)
+		}
+	}
+	return nil
+}
+
 // A Protocol can advertise an IP address.
 type Protocol interface {
 	SetConfig(*config.Config) error
 	SetBalancer(name string, lbIP net.IP, pool *config.Pool) error
 	DeleteBalancer(name, reason string) error
 	SetLeader(bool)
+	SetNode(*v1.Node) error
 }
