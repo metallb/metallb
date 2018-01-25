@@ -13,6 +13,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 func strptr(s string) *string {
@@ -154,7 +155,7 @@ func (f *fakeSession) Set(ads ...*bgp.Advertisement) error {
 	return nil
 }
 
-func TestBGPSppeaker(t *testing.T) {
+func TestBGPSpeaker(t *testing.T) {
 	b := &fakeBGP{
 		t:      t,
 		gotAds: map[string][]*bgp.Advertisement{},
@@ -205,7 +206,8 @@ func TestBGPSppeaker(t *testing.T) {
 			config: &config.Config{
 				Peers: []*config.Peer{
 					{
-						Addr: net.ParseIP("1.2.3.4"),
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
 				Pools: map[string]*config.Pool{
@@ -396,7 +398,8 @@ func TestBGPSppeaker(t *testing.T) {
 			config: &config.Config{
 				Peers: []*config.Peer{
 					{
-						Addr: net.ParseIP("1.2.3.4"),
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
 				Pools: map[string]*config.Pool{
@@ -459,10 +462,12 @@ func TestBGPSppeaker(t *testing.T) {
 			config: &config.Config{
 				Peers: []*config.Peer{
 					{
-						Addr: net.ParseIP("1.2.3.4"),
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 					{
-						Addr: net.ParseIP("1.2.3.5"),
+						Addr:          net.ParseIP("1.2.3.5"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
 				Pools: map[string]*config.Pool{
@@ -620,7 +625,8 @@ func TestBGPSppeaker(t *testing.T) {
 			config: &config.Config{
 				Peers: []*config.Peer{
 					{
-						Addr: net.ParseIP("1.2.3.5"),
+						Addr:          net.ParseIP("1.2.3.5"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
 				Pools: map[string]*config.Pool{

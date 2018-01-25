@@ -70,34 +70,60 @@ newPeers:
 			continue
 		}
 		glog.Infof("Peer %q deconfigured, closing BGP session", p.cfg.Addr)
-		if err := p.bgp.Close(); err != nil {
-			glog.Warningf("Shutting down BGP session to %q: %s", p.cfg.Addr, err)
+		if p.bgp != nil {
+			if err := p.bgp.Close(); err != nil {
+				glog.Warningf("Shutting down BGP session to %q: %s", p.cfg.Addr, err)
+			}
 		}
 	}
 
+	return c.syncPeers()
+}
+
+// Called when either the peer list or node labels have changed,
+// implying that the set of running BGP sessions may need tweaking.
+func (c *bgpController) syncPeers() error {
 	var errs []error
 	for _, p := range c.peers {
-		if p.bgp != nil {
-			continue
+		// First, determine if the peering should be active for this
+		// node.
+		shouldRun := false
+		for _, ns := range p.cfg.NodeSelectors {
+			if ns.Matches(c.nodeLabels) {
+				shouldRun = true
+				break
+			}
 		}
 
-		glog.Infof("Peer %q configured, starting BGP session", p.cfg.Addr)
-		routerID := c.myIP
-		if p.cfg.RouterID != nil {
-			routerID = p.cfg.RouterID
-		}
-		s, err := newBGP(fmt.Sprintf("%s:%d", p.cfg.Addr, p.cfg.Port), p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime)
-		if err != nil {
-			errs = append(errs, fmt.Errorf("Creating BGP session to %q: %s", p.cfg.Addr, err))
-		} else {
-			p.bgp = s
+		// Now, compare current state to intended state, and correct.
+		if p.bgp != nil && !shouldRun {
+			// Oops, session is running but shouldn't be. Shut it down.
+			glog.Infof("Peer %q deconfigured, stopping BGP session", p.cfg.Addr)
+			if err := p.bgp.Close(); err != nil {
+				glog.Warningf("Shutting down BGP session to %q: %s", p.cfg.Addr, err)
+			}
+			p.bgp = nil
+		} else if p.bgp == nil && shouldRun {
+			// Session doesn't exist, but should be running. Create
+			// it.
+			glog.Infof("Peer %q configured, starting BGP session", p.cfg.Addr)
+			routerID := c.myIP
+			if p.cfg.RouterID != nil {
+				routerID = p.cfg.RouterID
+			}
+			s, err := newBGP(fmt.Sprintf("%s:%d", p.cfg.Addr, p.cfg.Port), p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("Creating BGP session to %q: %s", p.cfg.Addr, err))
+			} else {
+				p.bgp = s
+			}
 		}
 	}
 	if len(errs) != 0 {
 		for _, err := range errs {
 			glog.Error(err)
 		}
-		return fmt.Errorf("%d new BGP sessions failed to start", len(errs))
+		return fmt.Errorf("%d BGP sessions failed to start", len(errs))
 	}
 	return nil
 }
@@ -142,6 +168,9 @@ func (c *bgpController) updateAds() error {
 		allAds = append(allAds, ads...)
 	}
 	for _, peer := range c.peers {
+		if peer.bgp == nil {
+			continue
+		}
 		if err := peer.bgp.Set(allAds...); err != nil {
 			return err
 		}
@@ -175,8 +204,8 @@ func (c *bgpController) SetNode(node *v1.Node) error {
 		return nil
 	}
 	c.nodeLabels = ns
-	// TODO: reprocess peering setup, to reprocess all peers.
-	return nil
+	glog.Infof("Node labels changed, resyncing BGP peers")
+	return c.syncPeers()
 }
 
 var newBGP = func(addr string, myASN uint32, routerID net.IP, asn uint32, hold time.Duration) (session, error) {
