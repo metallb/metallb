@@ -1,6 +1,8 @@
 package: go.universe.tf/metallb
 import:
 - package: github.com/golang/glog
+- package: github.com/mikioh/ipaddr
+  version: ef85e35a1b1801b80c891a443c8b68f100095452
 - package: github.com/mdlayher/arp
 - package: github.com/mdlayher/ethernet
 - package: github.com/mdlayher/ndp
