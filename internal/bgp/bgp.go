@@ -15,10 +15,6 @@ import (
 	"github.com/golang/glog"
 )
 
-const (
-	backoff = 2 * time.Second
-)
-
 var errClosed = errors.New("session closed")
 
 // Session represents one BGP session to an external router.
@@ -30,6 +26,7 @@ type Session struct {
 	holdTime time.Duration
 
 	newHoldTime chan bool
+	backoff     backoff
 
 	mu             sync.Mutex
 	cond           *sync.Cond
@@ -48,11 +45,14 @@ func (s *Session) run() {
 			if err == errClosed {
 				return
 			}
-			glog.Error(err)
+			glog.Errorf("Connecting to %q: %s", s.addr, err)
+			backoff := s.backoff.Duration()
+			glog.Infof("Retrying %q in %s", s.addr, backoff)
 			time.Sleep(backoff)
 			continue
 		}
 		stats.SessionUp(s.addr)
+		s.backoff.Reset()
 
 		glog.Infof("BGP session to %q established", s.addr)
 
