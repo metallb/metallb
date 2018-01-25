@@ -2,7 +2,6 @@ package arp
 
 import (
 	"bytes"
-	"fmt"
 	"net"
 	"sync"
 
@@ -26,11 +25,9 @@ type Announce struct {
 }
 
 // New returns an initialized Announce.
-func New(ip net.IP) (*Announce, error) {
-	ifi, err := iface.ByIP(ip)
-	if err != nil {
-		return nil, fmt.Errorf("arp: can't find interface for %s: %s", ip, err)
-	}
+func New(ifi *net.Interface) (*Announce, error) {
+	glog.Infof("creating ARP announcer on interface %q", ifi.Name)
+
 	client, err := arp.Dial(ifi)
 	if err != nil {
 		return nil, err

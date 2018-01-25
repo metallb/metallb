@@ -25,6 +25,7 @@ import (
 	"go.universe.tf/metallb/internal/arp"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/iface"
 	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/version"
 	"k8s.io/api/core/v1"
@@ -48,11 +49,13 @@ var announcing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 func main() {
 	prometheus.MustRegister(announcing)
 
-	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-	master := flag.String("master", "", "master url")
-	myIPstr := flag.String("node-ip", "", "IP address of this Kubernetes node")
-	myNode := flag.String("node-name", "", "name of this Kubernetes node")
-	port := flag.Int("port", 80, "HTTP listening port")
+	var (
+		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+		master     = flag.String("master", "", "master url")
+		myIPstr    = flag.String("node-ip", "", "IP address of this Kubernetes node")
+		myNode     = flag.String("node-name", "", "name of this Kubernetes node")
+		port       = flag.Int("port", 80, "HTTP listening port")
+	)
 	flag.Parse()
 
 	glog.Infof("MetalLB speaker %s", version.String())
@@ -64,18 +67,29 @@ func main() {
 		*myNode = os.Getenv("METALLB_NODE_NAME")
 	}
 
-	myIP := net.ParseIP(*myIPstr).To4()
+	myIP := net.ParseIP(*myIPstr)
 	if myIP == nil {
-		glog.Fatalf("Invalid --node-ip %q, must be an IPv4 address", *myIPstr)
+		glog.Fatalf("Invalid --node-ip %q, must be an IPv4 or IPv6 address", *myIPstr)
 	}
 
 	if *myNode == "" {
 		glog.Fatalf("Must specify --node-name")
 	}
 
-	// Setup both ARP and BGP clients and speakers, config decides what is being done runtime.
+	// It is possible for Kubernetes to provide an IPv4 or IPv6 node IP.
+	// Therefore, we must determine the interface that owns that IP address
+	// and use that interface for our speaker protocols.
+	ifi, err := iface.ByIP(myIP)
+	if err != nil {
+		glog.Fatalf("could not detect interface for IP address %q", myIP.String())
+	}
 
-	ctrl, err := newController(myIP, *myNode, false)
+	// Setup all clients and speakers, config decides what is being done runtime.
+	ctrl, err := newController(controllerConfig{
+		Interface: ifi,
+		NodeIP:    myIP,
+		MyNode:    *myNode,
+	})
 	if err != nil {
 		glog.Fatalf("Error getting controller: %s", err)
 	}
@@ -93,7 +107,6 @@ func main() {
 }
 
 type controller struct {
-	myIP   net.IP
 	myNode string
 
 	config *config.Config
@@ -103,31 +116,42 @@ type controller struct {
 	announced map[string]config.Proto // service name -> protocol advertising it
 }
 
-func newController(myIP net.IP, myNode string, noARP bool) (*controller, error) {
-	var arpCtrl *arpController
-	if !noARP {
-		arpAnn, err := arp.New(myIP)
+type controllerConfig struct {
+	Interface *net.Interface
+	NodeIP    net.IP
+	MyNode    string
+
+	// For testing only, and will be removed in a future release.
+	// See: https://github.com/google/metallb/issues/152.
+	DisableARP bool
+}
+
+func newController(cfg controllerConfig) (*controller, error) {
+	protocols := map[config.Proto]Protocol{
+		config.BGP: &bgpController{
+			myIP:   cfg.NodeIP,
+			svcAds: make(map[string][]*bgp.Advertisement),
+		},
+	}
+
+	if !cfg.DisableARP {
+		a, err := arp.New(cfg.Interface)
 		if err != nil {
 			return nil, fmt.Errorf("making ARP announcer: %s", err)
 		}
-		arpCtrl = &arpController{
-			announcer: arpAnn,
+		protocols[config.ARP] = &arpController{
+			announcer: a,
 		}
 	}
 
+	// TODO(mdlayher): construct NDP controller if address is non-nil.
+
 	ret := &controller{
-		myIP:   myIP,
-		myNode: myNode,
+		myNode: cfg.MyNode,
 
 		ips: allocator.New(),
 
-		protocols: map[config.Proto]Protocol{
-			config.ARP: arpCtrl,
-			config.BGP: &bgpController{
-				myIP:   myIP,
-				svcAds: make(map[string][]*bgp.Advertisement),
-			},
-		},
+		protocols: protocols,
 		announced: map[string]config.Proto{},
 	}
 
