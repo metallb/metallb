@@ -13,11 +13,20 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 func strptr(s string) *string {
 	return &s
+}
+
+func mustSelector(s string) labels.Selector {
+	res, err := labels.Parse(s)
+	if err != nil {
+		panic(err)
+	}
+	return res
 }
 
 func ipnet(s string) *net.IPNet {
@@ -681,6 +690,207 @@ func TestBGPSpeaker(t *testing.T) {
 		if test.balancer != "" {
 			if err := c.SetBalancer(test.balancer, test.svc, test.eps); err != nil {
 				t.Errorf("%q: SetBalancer failed: %s", test.desc, err)
+			}
+		}
+
+		gotAds := b.Ads()
+		sortAds(test.wantAds)
+		sortAds(gotAds)
+		if diff := cmp.Diff(test.wantAds, gotAds); diff != "" {
+			t.Errorf("%q: unexpected advertisement state (-want +got)\n%s", test.desc, diff)
+		}
+	}
+}
+
+func TestNodeSelectors(t *testing.T) {
+	b := &fakeBGP{
+		t:      t,
+		gotAds: map[string][]*bgp.Advertisement{},
+	}
+	newBGP = b.New
+	c, err := newController(net.ParseIP("1.2.3.4"), "pandora", true)
+	if err != nil {
+		t.Fatalf("creating controller: %s", err)
+	}
+
+	pools := map[string]*config.Pool{
+		"default": {
+			Protocol: config.BGP,
+			CIDR:     []*net.IPNet{ipnet("1.2.3.0/24")},
+			BGPAdvertisements: []*config.BGPAdvertisement{
+				{
+					AggregationLength: 32,
+				},
+			},
+		},
+	}
+
+	tests := []struct {
+		desc    string
+		config  *config.Config
+		node    *v1.Node
+		wantAds map[string][]*bgp.Advertisement
+	}{
+		{
+			desc:    "No config, no advertisements",
+			wantAds: map[string][]*bgp.Advertisement{},
+		},
+
+		{
+			desc: "One peer, default node selector, no node labels",
+			config: &config.Config{
+				Peers: []*config.Peer{
+					{
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+				},
+				Pools: pools,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+			},
+		},
+
+		{
+			desc: "Second peer, non-matching node selector",
+			config: &config.Config{
+				Peers: []*config.Peer{
+					{
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+					{
+						Addr: net.ParseIP("2.3.4.5"),
+						NodeSelectors: []labels.Selector{
+							mustSelector("foo=bar"),
+						},
+					},
+				},
+				Pools: pools,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+			},
+		},
+
+		{
+			desc: "Add node label that matches",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				},
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+				"2.3.4.5:0": nil,
+			},
+		},
+
+		{
+			desc: "Change node label so it no longer matches",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"foo": "baz",
+					},
+				},
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+			},
+		},
+
+		{
+			desc: "Change node selector so it matches again",
+			config: &config.Config{
+				Peers: []*config.Peer{
+					{
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+					{
+						Addr: net.ParseIP("2.3.4.5"),
+						NodeSelectors: []labels.Selector{
+							mustSelector("foo in (bar, baz)"),
+						},
+					},
+				},
+				Pools: pools,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+				"2.3.4.5:0": nil,
+			},
+		},
+
+		{
+			desc: "Change node label back, still matches",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"foo": "bar",
+					},
+				},
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+				"2.3.4.5:0": nil,
+			},
+		},
+
+		{
+			desc: "Multiple node selectors, only one matches",
+			config: &config.Config{
+				Peers: []*config.Peer{
+					{
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+					{
+						Addr: net.ParseIP("2.3.4.5"),
+						NodeSelectors: []labels.Selector{
+							mustSelector("host=frontend"),
+							mustSelector("foo in (bar, baz)"),
+						},
+					},
+				},
+				Pools: pools,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+				"2.3.4.5:0": nil,
+			},
+		},
+
+		{
+			desc: "Change node labels to match the other selector",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"host": "frontend",
+					},
+				},
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+				"2.3.4.5:0": nil,
+			},
+		},
+	}
+
+	for _, test := range tests {
+		if test.config != nil {
+			if err := c.SetConfig(test.config); err != nil {
+				t.Errorf("%q: SetConfig failed: %s", test.desc, err)
+			}
+		}
+
+		if test.node != nil {
+			if err := c.SetNode(test.node); err != nil {
+				t.Errorf("%q: SetNode failed: %s", test.desc, err)
 			}
 		}
 
