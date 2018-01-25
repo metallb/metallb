@@ -194,7 +194,7 @@ else
 	perl -pi -e "s#:v$(MAJOR).$(MINOR).$$(($(PATCH)-1))#:v$(VERSION)#g" manifests/*.yaml
 endif
 	git checkout master -- website/content/release-notes/_index.md
-	perl -pi -e 's/MetalLB \(.*\)/MetalLB v$(VERSION)/g' website/content/_header.md
+	perl -pi -e 's/MetalLB .*/MetalLB v$(VERSION)/g' website/content/_header.md
 	perl -pi -e 's/version\s+=.*/version = "$(VERSION)"/g' internal/version/version.go
 	gofmt -w internal/version/version.go
 	git commit -a -m "Update documentation for release $(VERSION)"
