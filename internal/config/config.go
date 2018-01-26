@@ -86,7 +86,8 @@ type Proto string
 // MetalLB supported protocols.
 const (
 	ARP Proto = "arp"
-	BGP       = "bgp"
+	BGP Proto = "bgp"
+	NDP Proto = "ndp"
 )
 
 // Peer is the configuration of a BGP peering session.
@@ -112,7 +113,7 @@ type Peer struct {
 
 // Pool is the configuration of an IP address pool.
 type Pool struct {
-	// Protocol for this pool, supported values: "arp" and "bgp".
+	// Protocol for this pool.
 	Protocol Proto
 	// The addresses that are part of this pool, expressed as CIDR
 	// prefixes. config.Parse guarantees that these are
@@ -327,6 +328,12 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 
 	switch ret.Protocol {
 	case ARP:
+		for _, cidr := range ret.CIDR {
+			if !isIPv4(cidr.IP) {
+				return nil, errors.New("only IPv4 addresses can be used in ARP pools")
+			}
+		}
+
 		if len(p.BGPAdvertisements) > 0 {
 			return nil, errors.New("cannot have bgp-advertisements configuration element in an ARP address pool")
 		}
@@ -346,7 +353,16 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 			return nil, fmt.Errorf("parsing BGP communities: %s", err)
 		}
 		ret.BGPAdvertisements = ads
+	case NDP:
+		for _, cidr := range ret.CIDR {
+			if !isIPv6(cidr.IP) {
+				return nil, errors.New("only IPv6 addresses can be used in NDP pools")
+			}
+		}
 
+		if len(p.BGPAdvertisements) > 0 {
+			return nil, errors.New("cannot have bgp-advertisements configuration element in an NDP address pool")
+		}
 	case "":
 		return nil, errors.New("address pool is missing the protocol field")
 	default:
@@ -472,4 +488,12 @@ func cidrContainsCIDR(outer, inner *net.IPNet) bool {
 		return true
 	}
 	return false
+}
+
+func isIPv4(ip net.IP) bool {
+	return ip.To16() != nil && ip.To4() != nil
+}
+
+func isIPv6(ip net.IP) bool {
+	return ip.To16() != nil && ip.To4() == nil
 }
