@@ -24,24 +24,23 @@ type Announce struct {
 }
 
 // New returns an initialized Announce.
-func New(ip net.IP) (*Announce, error) {
-	ifi, err := iface.ByIP(ip)
-	if err != nil {
-		return nil, fmt.Errorf("ndp: can't find interface for %s: %s", ip, err)
-	}
+func New(ifi *net.Interface) (*Announce, error) {
+	glog.Infof("creating NDP announcer on interface %q", ifi.Name)
 
-	// Use ip as the source IPv6 address for NDP communications.
-	conn, _, err := ndp.Dial(ifi, ndp.Addr(ip.String()))
+	// Use link-local address as the source IPv6 address for NDP communications.
+	conn, _, err := ndp.Dial(ifi, ndp.LinkLocal)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Announce{
+	ret := &Announce{
 		hardwareAddr: ifi.HardwareAddr,
 		conn:         conn,
 		ips:          make(map[string]net.IP),
 		stop:         make(chan bool),
-	}, nil
+	}
+	go ret.Run()
+	return ret, nil
 }
 
 // Run starts the announcer, making it listen on the interface for NDP requests.
@@ -99,9 +98,13 @@ func (a *Announce) readMessage() iface.DropReason {
 	// pkt.TargetIP has been vetted to be "the one".
 	glog.Infof("Request: who-has %s?  tell %s (%s). reply: %s is-at %s", ns.TargetAddress, src, nsLLAddr, ns.TargetAddress, a.hardwareAddr)
 
-	// This request was solicited.
-	solicited := true
-	if err := a.advertise(src, ns.TargetAddress, solicited); err != nil {
+	// This request was solicited, but should not override previous entries.
+	var (
+		solicited = true
+		override  = false
+	)
+
+	if err := a.advertise(src, ns.TargetAddress, solicited, override); err != nil {
 		glog.Warningf("Failed to write NDP neighbor advertisement for %s: %s", ns.TargetAddress, err)
 	}
 
@@ -110,9 +113,10 @@ func (a *Announce) readMessage() iface.DropReason {
 
 // advertise sends a NDP neighbor advertisement to dst for IP target using the
 // client in a.
-func (a *Announce) advertise(dst, target net.IP, solicited bool) error {
+func (a *Announce) advertise(dst, target net.IP, solicited, override bool) error {
 	m := &ndp.NeighborAdvertisement{
 		Solicited:     solicited,
+		Override:      override,
 		TargetAddress: target,
 		Options: []ndp.Option{
 			&ndp.LinkLayerAddress{
@@ -134,6 +138,24 @@ func (a *Announce) Close() error {
 func (a *Announce) SetBalancer(name string, ip net.IP) {
 	a.Lock()
 	defer a.Unlock()
+
+	// Kubernetes may inform us that we should advertise this address multiple
+	// times, so just no-op any subsequent requests.
+	if _, ok := a.ips[name]; ok {
+		return
+	}
+
+	// To receive neighbor solicitations for this address, we have to join its
+	// solicited-node multicast group.
+	group, err := ndp.SolicitedNodeMulticast(ip)
+	if err != nil {
+		panic(fmt.Sprintf("ndp: failed to create solicited node multicast group for %s: %v", ip, err))
+	}
+
+	if err := a.conn.JoinGroup(group); err != nil {
+		panic(fmt.Sprintf("ndp: failed to join solicited node multicast group for %s: %v", ip, err))
+	}
+
 	a.ips[name] = ip
 }
 
@@ -141,9 +163,25 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 func (a *Announce) DeleteBalancer(name string) {
 	a.Lock()
 	defer a.Unlock()
-	if _, ok := a.ips[name]; ok {
-		delete(a.ips, name)
+
+	ip, ok := a.ips[name]
+	if !ok {
+		// IP already removed from our set, no-op.
+		return
 	}
+
+	// No longer announcing this address; leave its solicited-node multicast
+	// group and clean it up.
+	group, err := ndp.SolicitedNodeMulticast(ip)
+	if err != nil {
+		panic(fmt.Sprintf("ndp: failed to create solicited node multicast group for %s: %v", ip, err))
+	}
+
+	if err := a.conn.LeaveGroup(group); err != nil {
+		panic(fmt.Sprintf("ndp: failed to join solicited node multicast group for %s: %v", ip, err))
+	}
+
+	delete(a.ips, name)
 }
 
 // Announce checks if ip should be announced.
@@ -171,8 +209,14 @@ func (a *Announce) Advertise() {
 	a.RLock()
 	defer a.RUnlock()
 
-	solicited := false
+	// We are sending unsolicited advertisements, and clients should update
+	// their neighbor cache.
+	var (
+		solicited = false
+		override  = true
+	)
+
 	for _, ip := range a.ips {
-		_ = a.advertise(net.IPv6linklocalallnodes, ip, solicited)
+		_ = a.advertise(net.IPv6linklocalallnodes, ip, solicited, override)
 	}
 }

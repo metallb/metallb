@@ -16,14 +16,17 @@ func (a *Announce) SetLeader(b bool) {
 	a.leaderMu.Lock()
 	defer a.leaderMu.Unlock()
 	a.leader = b
+	if a.leader {
+		go a.Acquire()
+	} else {
+		go a.Relinquish()
+	}
 }
 
 // Relinquish set the leader bit to false and stops the goroutine that sends
 // unsolicited NDP neighbor advertisement messages.
 func (a *Announce) Relinquish() {
 	a.stop <- true
-
-	a.SetLeader(false)
 }
 
 // Acquire sets the leader bit to true and sends out unsolicited NDP neighbor
@@ -31,8 +34,6 @@ func (a *Announce) Relinquish() {
 // - every 0.5s - for a duration of 5 seconds.
 func (a *Announce) Acquire() {
 	start := time.Now()
-
-	a.SetLeader(true)
 
 	for time.Since(start) < 5*time.Second {
 		a.Advertise()
@@ -48,6 +49,11 @@ func (a *Announce) unsolicited() {
 	for {
 		select {
 		case <-ticker.C:
+			// Double check that we're still master.
+			if !a.Leader() {
+				continue
+			}
+
 			a.Advertise()
 		case <-a.stop:
 			return
