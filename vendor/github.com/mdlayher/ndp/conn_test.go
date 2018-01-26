@@ -5,6 +5,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/mdlayher/ndp/internal/ndptest"
+
 	"github.com/google/go-cmp/cmp"
 )
 
@@ -86,6 +88,53 @@ func withConns(t *testing.T, fn func(t *testing.T, c1, c2 *Conn, addr net.IP)) {
 			defer done()
 
 			fn(t, c1, c2, addr)
+		})
+	}
+}
+
+func TestSolicitedNodeMulticast(t *testing.T) {
+	tests := []struct {
+		name string
+		ip   net.IP
+		snm  net.IP
+		ok   bool
+	}{
+		{
+			name: "bad, IPv4",
+			ip:   net.IPv4(192, 168, 1, 1),
+		},
+		{
+			name: "ok, link-local",
+			ip:   ndptest.MustIPv6("fe80::1234:5678"),
+			snm:  ndptest.MustIPv6("ff02::1:ff34:5678"),
+			ok:   true,
+		},
+		{
+			name: "ok, global",
+			ip:   ndptest.MustIPv6("2001:db8::dead:beef"),
+			snm:  ndptest.MustIPv6("ff02::1:ffad:beef"),
+			ok:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			snm, err := SolicitedNodeMulticast(tt.ip)
+
+			if err != nil && tt.ok {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if err == nil && !tt.ok {
+				t.Fatal("expected an error, but none occurred")
+			}
+			if err != nil {
+				t.Logf("OK error: %v", err)
+				return
+			}
+
+			if diff := cmp.Diff(tt.snm, snm); diff != "" {
+				t.Fatalf("unexpected solicited-node multicast address (-want +got):\n%s", diff)
+			}
 		})
 	}
 }
