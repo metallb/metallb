@@ -93,6 +93,22 @@ func (c *Conn) SetReadDeadline(t time.Time) error {
 	return c.pc.SetReadDeadline(t)
 }
 
+// JoinGroup joins the specified multicast group.
+func (c *Conn) JoinGroup(group net.IP) error {
+	return c.pc.JoinGroup(c.ifi, &net.IPAddr{
+		IP:   group,
+		Zone: c.ifi.Name,
+	})
+}
+
+// LeaveGroup leaves the specified multicast group.
+func (c *Conn) LeaveGroup(group net.IP) error {
+	return c.pc.LeaveGroup(c.ifi, &net.IPAddr{
+		IP:   group,
+		Zone: c.ifi.Name,
+	})
+}
+
 // ReadFrom reads a Message from the Conn and returns its control message and
 // source network address.  Messages sourced from this machine and malformed or
 // unrecognized ICMPv6 messages are filtered.
@@ -173,4 +189,20 @@ func srcIP(addr net.Addr) net.IP {
 	default:
 		panic(fmt.Sprintf("ndp: unhandled source net.Addr: %#v", addr))
 	}
+}
+
+// SolicitedNodeMulticast returns the solicited-node multicast address for
+// an IPv6 address.
+func SolicitedNodeMulticast(ip net.IP) (net.IP, error) {
+	if err := checkIPv6(ip); err != nil {
+		return nil, err
+	}
+
+	// Fixed prefix, and low 24 bits taken from input address.
+	snm := net.ParseIP("ff02::1:ff00:0")
+	for i := 13; i < 16; i++ {
+		snm[i] = ip[i]
+	}
+
+	return snm, nil
 }
