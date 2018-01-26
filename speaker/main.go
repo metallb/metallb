@@ -27,6 +27,7 @@ import (
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/iface"
 	"go.universe.tf/metallb/internal/k8s"
+	"go.universe.tf/metallb/internal/ndp"
 	"go.universe.tf/metallb/internal/version"
 	"k8s.io/api/core/v1"
 
@@ -124,6 +125,7 @@ type controllerConfig struct {
 	// For testing only, and will be removed in a future release.
 	// See: https://github.com/google/metallb/issues/152.
 	DisableARP bool
+	DisableNDP bool
 }
 
 func newController(cfg controllerConfig) (*controller, error) {
@@ -144,7 +146,15 @@ func newController(cfg controllerConfig) (*controller, error) {
 		}
 	}
 
-	// TODO(mdlayher): construct NDP controller if address is non-nil.
+	if !cfg.DisableNDP {
+		a, err := ndp.New(cfg.Interface)
+		if err != nil {
+			return nil, fmt.Errorf("making NDP announcer: %s", err)
+		}
+		protocols[config.NDP] = &ndpController{
+			announcer: a,
+		}
+	}
 
 	ret := &controller{
 		myNode: cfg.MyNode,
@@ -187,7 +197,8 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 		return c.deleteBalancer(name, "no healthy local endpoints")
 	}
 
-	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP).To4()
+	// May be either an IPv4 or IPv6 address.
+	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
 	if lbIP == nil {
 		glog.Errorf("%s: invalid LoadBalancer IP %q", name, svc.Status.LoadBalancer.Ingress[0].IP)
 		return c.deleteBalancer(name, "invalid IP allocated by controller")
