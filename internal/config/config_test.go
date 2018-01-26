@@ -91,6 +91,10 @@ address-pools:
   - 50.0.0.0/16
   - 50.20.0.0/24
   arp-network: 50.0.0.0/8
+- name: pool5
+  protocol: ndp
+  cidr:
+  - 2001:db8::/64
 `,
 			want: &Config{
 				Peers: []*Peer{
@@ -155,6 +159,11 @@ address-pools:
 						CIDR:       []*net.IPNet{ipnet("50.0.0.0/16"), ipnet("50.20.0.0/24")},
 						AutoAssign: true,
 						ARPNetwork: ipnet("50.0.0.0/8"),
+					},
+					"pool5": {
+						Protocol:   NDP,
+						CIDR:       []*net.IPNet{ipnet("2001:db8::/64")},
+						AutoAssign: true,
 					},
 				},
 			},
@@ -578,38 +587,88 @@ address-pools:
   - 10.0.0.0/16
 `,
 		},
+
+		{
+			desc: "IPv6 CIDR in ARP pool",
+			raw: `
+address-pools:
+- name: pool1
+  protocol: arp
+  cidr:
+  - 2001:db8::/64
+`,
+		},
+
+		{
+			desc: "BGP advertisements in ARP pool",
+			raw: `
+address-pools:
+- name: pool1
+  protocol: arp
+  cidr:
+  - 10.0.0.0/16
+  bgp-advertisements:
+  - communities: ["flarb"]
+`,
+		},
+
+		{
+			desc: "IPv4 CIDR in NDP pool",
+			raw: `
+address-pools:
+- name: pool1
+  protocol: ndp
+  cidr:
+  - 10.0.0.0/16
+`,
+		},
+
+		{
+			desc: "BGP advertisements in NDP pool",
+			raw: `
+address-pools:
+- name: pool1
+  protocol: ndp
+  cidr:
+  - 2001:db8::/64
+  bgp-advertisements:
+  - communities: ["flarb"]
+`,
+		},
 	}
 
 	for _, test := range tests {
-		got, err := Parse([]byte(test.raw))
-		if err != nil && test.want != nil {
-			t.Errorf("%q: parse failed: %s", test.desc, err)
-			continue
-		}
-		if test.want == nil && err == nil {
-			t.Errorf("%q: parse unexpectedly succeeded", test.desc)
-			continue
-		}
-		selectorComparer := cmp.Comparer(func(x, y labels.Selector) bool {
-			if x == nil {
-				return y == nil
+		t.Run(test.desc, func(t *testing.T) {
+			got, err := Parse([]byte(test.raw))
+			if err != nil && test.want != nil {
+				t.Errorf("%q: parse failed: %s", test.desc, err)
+				return
 			}
-			if y == nil {
-				return x == nil
+			if test.want == nil && err == nil {
+				t.Errorf("%q: parse unexpectedly succeeded", test.desc)
+				return
 			}
-			// Nothing() and Everything() have the same string
-			// representation, stupidly. So, compare explicitly for
-			// Nothing.
-			if x == labels.Nothing() {
-				return y == labels.Nothing()
+			selectorComparer := cmp.Comparer(func(x, y labels.Selector) bool {
+				if x == nil {
+					return y == nil
+				}
+				if y == nil {
+					return x == nil
+				}
+				// Nothing() and Everything() have the same string
+				// representation, stupidly. So, compare explicitly for
+				// Nothing.
+				if x == labels.Nothing() {
+					return y == labels.Nothing()
+				}
+				if y == labels.Nothing() {
+					return x == labels.Nothing()
+				}
+				return x.String() == y.String()
+			})
+			if diff := cmp.Diff(test.want, got, selectorComparer); diff != "" {
+				t.Errorf("%q: parse returned wrong result (-want, +got)\n%s", test.desc, diff)
 			}
-			if y == labels.Nothing() {
-				return x == labels.Nothing()
-			}
-			return x.String() == y.String()
 		})
-		if diff := cmp.Diff(test.want, got, selectorComparer); diff != "" {
-			t.Errorf("%q: parse returned wrong result (-want, +got)\n%s", test.desc, diff)
-		}
 	}
 }
