@@ -91,8 +91,8 @@ range, you need 4 pieces of information:
 - An IP address range expressed as a CIDR prefix.
 
 As an example, if you want to give MetalLB the range 192.168.10.0/24
-and AS number 42, and connect it to a router at 10.0.0.1 with AS
-number 100, your configuration will look like:
+and AS number 64500, and connect it to a router at 10.0.0.1 with AS
+number 64501, your configuration will look like:
 
 ```yaml
 apiVersion: v1
@@ -104,8 +104,8 @@ data:
   config: |
     peers:
     - peer-address: 10.0.0.1
-      peer-asn: 100
-      my-asn: 42
+      peer-asn: 64501
+      my-asn: 64500
     address-pools:
     - name: default
       protocol: bgp
@@ -149,8 +149,8 @@ data:
   config: |
     peers:
     - peer-address: 10.0.0.1
-      peer-asn: 100
-      my-asn: 42
+      peer-asn: 64501
+      my-asn: 64500
     address-pools:
     - name: default
       protocol: bgp
@@ -242,8 +242,8 @@ will only be used by machines:
 ```yaml
 peers:
 - peer-address: 10.0.0.1
-  peer-asn: 100
-  my-asn: 42
+  peer-asn: 64501
+  my-asn: 64500
   node-selectors:
   - match-labels:
       rack: frontend
