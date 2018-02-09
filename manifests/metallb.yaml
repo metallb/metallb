@@ -52,9 +52,7 @@ rules:
 - apiGroups: [""]
   resources: ["configmaps"]
   verbs: ["get", "list", "watch"]
-- # Allow creating events in the metallb-system namespace
-  # so that watchers can post config errors.
-  apiGroups: [""]
+- apiGroups: [""]
   resources: ["events"]
   verbs: ["create"]
 ---
