@@ -12,7 +12,7 @@ Because this will be a simulated environment inside Minikube, this
 setup only lets you inspect the routers's state and see what it
 _would_ do in a real deployment. Once you've experimented in this
 setting and are ready to set up MetalLB on a real cluster, refer to
-the [installation guide]() for instructions.
+the [installation guide](https://metallb.universe.tf/installation/) for instructions.
 
 Here is the outline of what we're going to do:
 
