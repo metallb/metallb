@@ -24,6 +24,10 @@ import (
 // IndexName is the name of the index.
 const IndexName = "tsi1"
 
+// ErrCompactionInterrupted is returned if compactions are disabled or
+// an index is closed while a compaction is occurring.
+var ErrCompactionInterrupted = errors.New("tsi1: compaction interrupted")
+
 func init() {
 	// FIXME(edd): Remove this.
 	if os.Getenv("TSI_PARTITIONS") != "" {
@@ -34,9 +38,8 @@ func init() {
 		DefaultPartitionN = uint64(i)
 	}
 
-	tsdb.RegisterIndex(IndexName, func(_ uint64, db, path string, sfile *tsdb.SeriesFile, _ tsdb.EngineOptions) tsdb.Index {
-		idx := NewIndex(sfile, WithPath(path))
-		idx.database = db
+	tsdb.RegisterIndex(IndexName, func(_ uint64, db, path string, _ *tsdb.SeriesIDSet, sfile *tsdb.SeriesFile, _ tsdb.EngineOptions) tsdb.Index {
+		idx := NewIndex(sfile, db, WithPath(path))
 		return idx
 	})
 }
@@ -73,36 +76,46 @@ var WithLogger = func(l zap.Logger) IndexOption {
 	}
 }
 
+// WithMaximumLogFileSize sets the maximum size of LogFiles before they're
+// compacted into IndexFiles.
+var WithMaximumLogFileSize = func(size int64) IndexOption {
+	return func(i *Index) {
+		i.maxLogFileSize = size
+	}
+}
+
 // Index represents a collection of layered index files and WAL.
 type Index struct {
 	mu         sync.RWMutex
 	partitions []*Partition
 	opened     bool
 
-	// The following can be set when initialising an Index.
+	// The following may be set when initializing an Index.
 	path               string      // Root directory of the index partitions.
 	disableCompactions bool        // Initially disables compactions on the index.
+	maxLogFileSize     int64       // Maximum size of a LogFile before it's compacted.
 	logger             *zap.Logger // Index's logger.
 
-	sfile *tsdb.SeriesFile // series lookup file
+	// The following must be set when initializing an Index.
+	sfile    *tsdb.SeriesFile // series lookup file
+	database string           // Name of database.
 
 	// Index's version.
 	version int
-
-	// Name of database.
-	database string
 
 	// Number of partitions used by the index.
 	PartitionN uint64
 }
 
 // NewIndex returns a new instance of Index.
-func NewIndex(sfile *tsdb.SeriesFile, options ...IndexOption) *Index {
+func NewIndex(sfile *tsdb.SeriesFile, database string, options ...IndexOption) *Index {
 	idx := &Index{
-		logger:     zap.NewNop(),
-		version:    Version,
-		sfile:      sfile,
-		PartitionN: DefaultPartitionN,
+		maxLogFileSize: DefaultMaxLogFileSize,
+		logger:         zap.NewNop(),
+		version:        Version,
+		sfile:          sfile,
+		database:       database,
+		PartitionN:     DefaultPartitionN,
 	}
 
 	for _, option := range options {
@@ -124,10 +137,6 @@ func (i *Index) Database() string {
 func (i *Index) WithLogger(l *zap.Logger) {
 	i.mu.Lock()
 	defer i.mu.Unlock()
-
-	for i, p := range i.partitions {
-		p.logger = l.With(zap.String("index", "tsi"), zap.String("partition", fmt.Sprint(i+1)))
-	}
 	i.logger = l.With(zap.String("index", "tsi"))
 }
 
@@ -136,6 +145,18 @@ func (i *Index) Type() string { return IndexName }
 
 // SeriesFile returns the series file attached to the index.
 func (i *Index) SeriesFile() *tsdb.SeriesFile { return i.sfile }
+
+// SeriesIDSet returns the set of series ids associated with series in this
+// index. Any series IDs for series no longer present in the index are filtered out.
+func (i *Index) SeriesIDSet() *tsdb.SeriesIDSet {
+	seriesIDSet := tsdb.NewSeriesIDSet()
+	others := make([]*tsdb.SeriesIDSet, 0, i.PartitionN)
+	for _, p := range i.partitions {
+		others = append(others, p.seriesIDSet)
+	}
+	seriesIDSet.Merge(others...)
+	return seriesIDSet
+}
 
 // Open opens the index.
 func (i *Index) Open() error {
@@ -151,13 +172,13 @@ func (i *Index) Open() error {
 		return err
 	}
 
-	// Inititalise index partitions.
+	// Initialize index partitions.
 	i.partitions = make([]*Partition, i.PartitionN)
 	for j := 0; j < len(i.partitions); j++ {
 		p := NewPartition(i.sfile, filepath.Join(i.path, fmt.Sprint(j)))
+		p.MaxLogFileSize = i.maxLogFileSize
 		p.Database = i.database
-		p.compactionsDisabled = i.disableCompactions
-		p.logger = i.logger.With(zap.String("partition", fmt.Sprint(j+1)))
+		p.logger = i.logger.With(zap.String("index", "tsi"), zap.String("partition", fmt.Sprint(j+1)))
 		i.partitions[j] = p
 	}
 
@@ -205,6 +226,18 @@ func (i *Index) Compact() {
 	}
 }
 
+func (i *Index) EnableCompactions() {
+	for _, p := range i.partitions {
+		p.EnableCompactions()
+	}
+}
+
+func (i *Index) DisableCompactions() {
+	for _, p := range i.partitions {
+		p.DisableCompactions()
+	}
+}
+
 // Wait blocks until all outstanding compactions have completed.
 func (i *Index) Wait() {
 	for _, p := range i.partitions {
@@ -224,6 +257,8 @@ func (i *Index) Close() error {
 		}
 	}
 
+	// Mark index as closed.
+	i.opened = false
 	return nil
 }
 
@@ -345,6 +380,18 @@ func (i *Index) MeasurementExists(name []byte) (bool, error) {
 	return atomic.LoadUint32(&found) == 1, nil
 }
 
+// MeasurementHasSeries returns true if a measurement has non-tombstoned series.
+func (i *Index) MeasurementHasSeries(name []byte) (bool, error) {
+	for _, p := range i.partitions {
+		if v, err := p.MeasurementHasSeries(name); err != nil {
+			return false, err
+		} else if v {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // fetchByteValues is a helper for gathering values from each partition in the index,
 // based on some criteria.
 //
@@ -455,7 +502,7 @@ func (i *Index) DropMeasurement(name []byte) error {
 }
 
 // CreateSeriesListIfNotExists creates a list of series if they doesn't exist in bulk.
-func (i *Index) CreateSeriesListIfNotExists(_ [][]byte, names [][]byte, tagsSlice []models.Tags) error {
+func (i *Index) CreateSeriesListIfNotExists(keys [][]byte, names [][]byte, tagsSlice []models.Tags) error {
 	// All slices must be of equal length.
 	if len(names) != len(tagsSlice) {
 		return errors.New("names/tags length mismatch in index")
@@ -467,13 +514,10 @@ func (i *Index) CreateSeriesListIfNotExists(_ [][]byte, names [][]byte, tagsSlic
 	pTags := make([][]models.Tags, i.PartitionN)
 
 	// Determine partition for series using each series key.
-	buf := make([]byte, 2048)
-	for k, _ := range names {
-		buf = tsdb.AppendSeriesKey(buf[:0], names[k], tagsSlice[k])
-
-		pidx := i.partitionIdx(buf)
-		pNames[pidx] = append(pNames[pidx], names[k])
-		pTags[pidx] = append(pTags[pidx], tagsSlice[k])
+	for ki, key := range keys {
+		pidx := i.partitionIdx(key)
+		pNames[pidx] = append(pNames[pidx], names[ki])
+		pTags[pidx] = append(pTags[pidx], tagsSlice[ki])
 	}
 
 	// Process each subset of series on each partition.
@@ -514,42 +558,51 @@ func (i *Index) InitializeSeries(key, name []byte, tags models.Tags) error {
 	return nil
 }
 
-// DropSeries drops the provided series from the index.
-func (i *Index) DropSeries(key []byte, ts int64) error {
+// DropSeries drops the provided series from the index.  If cascade is true
+// and this is the last series to the measurement, the measurment will also be dropped.
+func (i *Index) DropSeries(seriesID uint64, key []byte, cascade bool) error {
 	// Remove from partition.
-	if err := i.partition(key).DropSeries(key, ts); err != nil {
+	if err := i.partition(key).DropSeries(seriesID); err != nil {
 		return err
+	}
+
+	if !cascade {
+		return nil
 	}
 
 	// Extract measurement name.
-	name, _ := models.ParseKey(key)
-	mname := []byte(name)
+	name, _ := models.ParseKeyBytes(key)
 
 	// Check if that was the last series for the measurement in the entire index.
-	itr, err := i.MeasurementSeriesIDIterator(mname)
-	if err != nil {
+	if ok, err := i.MeasurementHasSeries(name); err != nil {
 		return err
-	} else if itr == nil {
-		return nil
-	}
-	itr = tsdb.FilterUndeletedSeriesIDIterator(i.sfile, itr)
-	defer itr.Close()
-
-	if e, err := itr.Next(); err != nil {
-		return err
-	} else if e.SeriesID != 0 {
+	} else if ok {
 		return nil
 	}
 
 	// If no more series exist in the measurement then delete the measurement.
-	if err := i.DropMeasurement(mname); err != nil {
+	if err := i.DropMeasurement(name); err != nil {
 		return err
 	}
 	return nil
 }
 
+// DropMeasurementIfSeriesNotExist drops a measurement only if there are no more
+// series for the measurment.
+func (i *Index) DropMeasurementIfSeriesNotExist(name []byte) error {
+	// Check if that was the last series for the measurement in the entire index.
+	if ok, err := i.MeasurementHasSeries(name); err != nil {
+		return err
+	} else if ok {
+		return nil
+	}
+
+	// If no more series exist in the measurement then delete the measurement.
+	return i.DropMeasurement(name)
+}
+
 // MeasurementsSketches returns the two sketches for the index by merging all
-// instances of the type sketch types in all the index files.
+// instances of the type sketch types in all the partitions.
 func (i *Index) MeasurementsSketches() (estimator.Sketch, estimator.Sketch, error) {
 	s, ts := hll.NewDefaultPlus(), hll.NewDefaultPlus()
 	for _, p := range i.partitions {
@@ -569,13 +622,33 @@ func (i *Index) MeasurementsSketches() (estimator.Sketch, estimator.Sketch, erro
 	return s, ts, nil
 }
 
-// SeriesN returns the number of unique non-tombstoned series in the index.
+// SeriesSketches returns the two sketches for the index by merging all
+// instances of the type sketch types in all the partitions.
+func (i *Index) SeriesSketches() (estimator.Sketch, estimator.Sketch, error) {
+	s, ts := hll.NewDefaultPlus(), hll.NewDefaultPlus()
+	for _, p := range i.partitions {
+		// Get partition's measurement sketches and merge.
+		ps, pts, err := p.SeriesSketches()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		if err := s.Merge(ps); err != nil {
+			return nil, nil, err
+		} else if err := ts.Merge(pts); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return s, ts, nil
+}
+
 // Since indexes are not shared across shards, the count returned by SeriesN
 // cannot be combined with other shard's results. If you need to count series
-// across indexes then use SeriesSketches and merge the results from other
-// indexes.
+// across indexes then use either the database-wide series file, or merge the
+// index-level bitsets or sketches.
 func (i *Index) SeriesN() int64 {
-	return int64(i.sfile.SeriesCount())
+	return int64(i.SeriesIDSet().Cardinality())
 }
 
 // HasTagKey returns true if tag key exists. It returns the first error
@@ -802,13 +875,8 @@ func (i *Index) RetainFileSet() (*FileSet, error) {
 	return fs, nil
 }
 
+// SetFieldName is a no-op on this index.
 func (i *Index) SetFieldName(measurement []byte, name string) {}
-func (i *Index) RemoveShard(shardID uint64)                   {}
-func (i *Index) AssignShard(k string, shardID uint64)         {}
 
-func (i *Index) UnassignShard(k string, shardID uint64, ts int64) error {
-	// This can be called directly once inmem is gone.
-	return i.DropSeries([]byte(k), ts)
-}
-
+// Rebuild rebuilds an index. It's a no-op for this index.
 func (i *Index) Rebuild() {}

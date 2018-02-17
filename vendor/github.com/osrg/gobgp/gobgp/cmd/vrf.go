@@ -18,11 +18,13 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/osrg/gobgp/packet/bgp"
-	"github.com/spf13/cobra"
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/spf13/cobra"
+
+	"github.com/osrg/gobgp/packet/bgp"
 )
 
 func getVrfs() (vrfs, error) {
@@ -125,14 +127,14 @@ func modVrf(typ string, args []string) error {
 				return fmt.Errorf("Usage: gobgp vrf add <vrf name> rd <rd> rt { import | export | both } <rt>...")
 			}
 		}
-		vrfId := 0
+		var id uint64
 		if len(a["id"]) > 0 {
-			vrfId, err = strconv.Atoi(a["id"][0])
+			id, err = strconv.ParseUint(a["id"][0], 10, 32)
 			if err != nil {
 				return err
 			}
 		}
-		err = client.AddVRF(name, vrfId, rd, importRt, exportRt)
+		err = client.AddVRF(name, int(id), rd, importRt, exportRt)
 	case CMD_DEL:
 		if len(args) != 1 {
 			return fmt.Errorf("Usage: gobgp vrf del <vrf name>")

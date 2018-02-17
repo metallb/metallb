@@ -232,7 +232,7 @@ func (p Prefix) String() string {
 
 // Subnets returns a list of prefixes that are split from p, into
 // small address blocks by n which represents a number of subnetworks
-// in power of 2 notation.
+// in the power of 2 notation.
 func (p *Prefix) Subnets(n int) []Prefix {
 	if 0 > n || n > 17 { // don't bother runtime.makeslice by big numbers
 		return nil

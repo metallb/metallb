@@ -24,10 +24,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/osrg/gobgp/config"
-	"github.com/osrg/gobgp/packet/bgp"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/osrg/gobgp/config"
+	"github.com/osrg/gobgp/packet/bgp"
 )
 
 func TestPrefixCalcurateNoRange(t *testing.T) {
@@ -2800,9 +2801,9 @@ func createNeighborSet(name string, addr string) config.NeighborSet {
 
 func createAs4Value(s string) uint32 {
 	v := strings.Split(s, ".")
-	upper, _ := strconv.Atoi(v[0])
-	lower, _ := strconv.Atoi(v[1])
-	return uint32(upper)<<16 + uint32(lower)
+	upper, _ := strconv.ParseUint(v[0], 10, 16)
+	lower, _ := strconv.ParseUint(v[1], 10, 16)
+	return uint32(upper<<16 | lower)
 }
 
 func TestPrefixSetOperation(t *testing.T) {

@@ -119,6 +119,7 @@ message Arguments {
   Resource resource = 1;
   uint32 family = 2;
   string name = 3;
+  bool current = 4;
 }
 
 message AddPathRequest {

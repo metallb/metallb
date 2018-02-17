@@ -217,6 +217,14 @@
   # Determines whether HTTP request logging is enabled.
   # log-enabled = true
 
+  # When HTTP request logging is enabled, this option specifies the path where
+  # log entries should be written. If unspecified, the default is to write to stderr, which
+  # intermingles HTTP logs with internal InfluxDB logging.
+  #
+  # If influxd is unable to access the specified path, it will log an error and fall back to writing
+  # the request log to stderr.
+  # access-log-path = ""
+
   # Determines whether detailed write logging is enabled.
   # write-tracing = false
 
@@ -269,6 +277,25 @@
   # The bind address used by the ifql RPC service.
   # bind-address = ":8082"
 
+
+###
+### [logging]
+###
+### Controls how the logger emits logs to the output.
+###
+
+[logging]
+  # Determines which log encoder to use for logs. Available options
+  # are logfmt, console, and json. console is a more user-friendly
+  # output format, but not as easily machine-readable.
+  # format = "logfmt"
+
+  # Determines which level of logs will be emitted.
+  # level = "info"
+
+  # Suppresses the logo output that is printed when the program is started.
+  # The logo is always suppressed if STDOUT is not a TTY.
+  # suppress-logo = false
 
 ###
 ### [subscriber]

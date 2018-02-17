@@ -1374,6 +1374,10 @@ func (m *mmapAccessor) init() (*indirectIndex, error) {
 		return nil, fmt.Errorf("mmapAccessor: invalid indexStart")
 	}
 
+	// Hint to the kernal that we will be reading the file.  It would be better to hint
+	// that we will be reading the index section, but that doesn't seem to work ATM.
+	_ = madviseWillNeed(m.b)
+
 	m.index = NewIndirectIndex()
 	if err := m.index.UnmarshalBinary(m.b[indexStart:indexOfsPos]); err != nil {
 		return nil, err
@@ -1451,11 +1455,7 @@ func (m *mmapAccessor) rename(path string) error {
 	}
 
 	m.b, err = mmap(m.f, 0, int(stat.Size()))
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (m *mmapAccessor) read(key []byte, timestamp int64) ([]Value, error) {

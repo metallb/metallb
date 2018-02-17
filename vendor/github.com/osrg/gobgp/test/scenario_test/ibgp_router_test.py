@@ -51,19 +51,18 @@ class GoBGPTestBase(unittest.TestCase):
         qs = [q1, q2]
         ctns = [g1, q1, q2]
 
-        # advertise a route from q1, q2
-        for idx, c in enumerate(qs):
-            route = '10.0.{0}.0/24'.format(idx + 1)
-            c.add_route(route)
-
         initial_wait_time = max(ctn.run() for ctn in ctns)
-
         time.sleep(initial_wait_time)
 
         # ibgp peer. loop topology
         for a, b in combinations(ctns, 2):
             a.add_peer(b)
             b.add_peer(a)
+
+        # advertise a route from q1, q2
+        for idx, c in enumerate(qs):
+            route = '10.0.{0}.0/24'.format(idx + 1)
+            c.add_route(route)
 
         cls.gobgp = g1
         cls.quaggas = {'q1': q1, 'q2': q2}
@@ -163,13 +162,13 @@ class GoBGPTestBase(unittest.TestCase):
     def test_07_add_ebgp_peer(self):
         q3 = QuaggaBGPContainer(name='q3', asn=65001, router_id='192.168.0.4')
         self.quaggas['q3'] = q3
-
-        q3.add_route('10.0.3.0/24')
-
         initial_wait_time = q3.run()
         time.sleep(initial_wait_time)
+
         self.gobgp.add_peer(q3)
         q3.add_peer(self.gobgp)
+
+        q3.add_route('10.0.3.0/24')
 
         self.gobgp.wait_for(expected_state=BGP_FSM_ESTABLISHED, peer=q3)
 
@@ -246,14 +245,14 @@ class GoBGPTestBase(unittest.TestCase):
     def test_15_add_ebgp_peer(self):
         q4 = QuaggaBGPContainer(name='q4', asn=65001, router_id='192.168.0.5')
         self.quaggas['q4'] = q4
+        initial_wait_time = q4.run()
+        time.sleep(initial_wait_time)
+
+        self.gobgp.add_peer(q4)
+        q4.add_peer(self.gobgp)
 
         prefix = '10.0.4.0/24'
         q4.add_route(prefix)
-
-        initial_wait_time = q4.run()
-        time.sleep(initial_wait_time)
-        self.gobgp.add_peer(q4)
-        q4.add_peer(self.gobgp)
 
         self.gobgp.wait_for(expected_state=BGP_FSM_ESTABLISHED, peer=q4)
 

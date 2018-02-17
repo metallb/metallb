@@ -989,10 +989,10 @@ func modNeighbor(cmdType string, args []string) error {
 		}
 	}
 
-	getConf := func(asn int) (*config.Neighbor, error) {
+	getConf := func(asn uint32) (*config.Neighbor, error) {
 		peer := &config.Neighbor{
 			Config: config.NeighborConfig{
-				PeerAs: uint32(asn),
+				PeerAs: asn,
 			},
 		}
 		if unnumbered {
@@ -1032,7 +1032,7 @@ func modNeighbor(cmdType string, args []string) error {
 			}
 		}
 		if option, ok := m["allow-own-as"]; ok {
-			as, err := strconv.Atoi(option[0])
+			as, err := strconv.ParseUint(option[0], 10, 8)
 			if err != nil {
 				return nil, err
 			}
@@ -1054,16 +1054,15 @@ func modNeighbor(cmdType string, args []string) error {
 		return peer, nil
 	}
 
-	var as int
+	var as uint64
 	if len(m["as"]) > 0 {
 		var err error
-		as, err = strconv.Atoi(m["as"][0])
-		if err != nil {
+		if as, err = strconv.ParseUint(m["as"][0], 10, 32); err != nil {
 			return err
 		}
 	}
 
-	n, err := getConf(as)
+	n, err := getConf(uint32(as))
 	if err != nil {
 		return err
 	}

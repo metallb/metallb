@@ -112,8 +112,8 @@ var mrtOpts struct {
 	OutputDir   string
 	FileFormat  string
 	Filename    string `long:"filename" description:"MRT file name"`
-	RecordCount int    `long:"count" description:"Number of records to inject"`
-	RecordSkip  int    `long:"skip" description:"Number of records to skip before injecting"`
+	RecordCount int64  `long:"count" description:"Number of records to inject"`
+	RecordSkip  int64  `long:"skip" description:"Number of records to skip before injecting"`
 	QueueSize   int    `long:"batch-size" description:"Maximum number of updates to keep queued"`
 	Best        bool   `long:"only-best" description:"only keep best path routes"`
 	SkipV4      bool   `long:"no-ipv4" description:"Skip importing IPv4 routes"`

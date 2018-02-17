@@ -408,6 +408,19 @@ func (fs *FileSet) MeasurementsSketches() (estimator.Sketch, estimator.Sketch, e
 	return sketch, tsketch, nil
 }
 
+// SeriesSketches returns the merged measurement sketches for the FileSet.
+func (fs *FileSet) SeriesSketches() (estimator.Sketch, estimator.Sketch, error) {
+	sketch, tsketch := hll.NewDefaultPlus(), hll.NewDefaultPlus()
+
+	// Iterate over all the files and merge the sketches into the result.
+	for _, f := range fs.files {
+		if err := f.MergeSeriesSketches(sketch, tsketch); err != nil {
+			return nil, nil, err
+		}
+	}
+	return sketch, tsketch, nil
+}
+
 // File represents a log or index file.
 type File interface {
 	Close() error
@@ -418,6 +431,7 @@ type File interface {
 
 	Measurement(name []byte) MeasurementElem
 	MeasurementIterator() MeasurementIterator
+	MeasurementHasSeries(ss *tsdb.SeriesIDSet, name []byte) bool
 
 	TagKey(name, key []byte) TagKeyElem
 	TagKeyIterator(name []byte) TagKeyIterator
@@ -432,6 +446,11 @@ type File interface {
 
 	// Sketches for cardinality estimation
 	MergeMeasurementsSketches(s, t estimator.Sketch) error
+	MergeSeriesSketches(s, t estimator.Sketch) error
+
+	// Bitmap series existance.
+	SeriesIDSet() (*tsdb.SeriesIDSet, error)
+	TombstoneSeriesIDSet() (*tsdb.SeriesIDSet, error)
 
 	// Reference counting.
 	Retain()

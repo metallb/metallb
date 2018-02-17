@@ -599,7 +599,7 @@ func TestMetaClient_CreateUser(t *testing.T) {
 	if exp, got := "fred", u.ID(); exp != got {
 		t.Fatalf("unexpected user name: exp: %s got: %s", exp, got)
 	}
-	if !u.IsAdmin() {
+	if !isAdmin(u) {
 		t.Fatalf("expected user to be admin")
 	}
 
@@ -650,7 +650,7 @@ func TestMetaClient_CreateUser(t *testing.T) {
 	if exp, got := "wilma", u.ID(); exp != got {
 		t.Fatalf("unexpected user name: exp: %s got: %s", exp, got)
 	}
-	if u.IsAdmin() {
+	if isAdmin(u) {
 		t.Fatalf("expected user not to be an admin")
 	}
 
@@ -670,7 +670,7 @@ func TestMetaClient_CreateUser(t *testing.T) {
 	if exp, got := "wilma", u.ID(); exp != got {
 		t.Fatalf("unexpected user name: exp: %s got: %s", exp, got)
 	}
-	if !u.IsAdmin() {
+	if !isAdmin(u) {
 		t.Fatalf("expected user to be an admin")
 	}
 
@@ -686,7 +686,7 @@ func TestMetaClient_CreateUser(t *testing.T) {
 	if exp, got := "wilma", u.ID(); exp != got {
 		t.Fatalf("unexpected user name: exp: %s got: %s", exp, got)
 	}
-	if u.IsAdmin() {
+	if isAdmin(u) {
 		t.Fatalf("expected user not to be an admin")
 	}
 
@@ -736,8 +736,7 @@ func TestMetaClient_CreateUser(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	u, err = c.User("wilma")
-	if err != meta.ErrUserNotFound {
+	if _, err = c.User("wilma"); err != meta.ErrUserNotFound {
 		t.Fatalf("user lookup should fail with %s", meta.ErrUserNotFound)
 	}
 
@@ -809,9 +808,9 @@ func TestMetaClient_ContinuousQueries(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Dropping a nonexistent CQ should return an error.
-	if err := c.DropContinuousQuery("db0", "not-a-cq"); err == nil {
-		t.Fatal("expected an error, got nil")
+	// Dropping a nonexistent CQ should not return an error.
+	if err := c.DropContinuousQuery("db0", "not-a-cq"); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -1163,4 +1162,9 @@ func testTempDir(skip int) string {
 		panic(err)
 	}
 	return dir
+}
+
+func isAdmin(u meta.User) bool {
+	ui := u.(*meta.UserInfo)
+	return ui.Admin
 }

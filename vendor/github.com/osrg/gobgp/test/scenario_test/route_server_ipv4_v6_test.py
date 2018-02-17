@@ -52,16 +52,7 @@ class GoBGPIPv6Test(unittest.TestCase):
         v4 = [q1, q2]
         v6 = [q3, q4]
 
-        for idx, q in enumerate(v4):
-            route = '10.0.{0}.0/24'.format(idx + 1)
-            q.add_route(route)
-
-        for idx, q in enumerate(v6):
-            route = '2001:{0}::/96'.format(idx + 1)
-            q.add_route(route, rf='ipv6')
-
         initial_wait_time = max(ctn.run() for ctn in ctns)
-
         time.sleep(initial_wait_time)
 
         for ctn in v4:
@@ -71,6 +62,14 @@ class GoBGPIPv6Test(unittest.TestCase):
         for ctn in v6:
             g1.add_peer(ctn, is_rs_client=True, v6=True)
             ctn.add_peer(g1, v6=True)
+
+        for idx, q in enumerate(v4):
+            route = '10.0.{0}.0/24'.format(idx + 1)
+            q.add_route(route)
+
+        for idx, q in enumerate(v6):
+            route = '2001:{0}::/96'.format(idx + 1)
+            q.add_route(route, rf='ipv6')
 
         cls.gobgp = g1
         cls.quaggas = {'q1': q1, 'q2': q2, 'q3': q3, 'q4': q4}

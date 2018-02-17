@@ -23,8 +23,9 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/osrg/gobgp/packet/bgp"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/osrg/gobgp/packet/bgp"
 )
 
 const (
@@ -755,14 +756,30 @@ func (c *Client) SendRedistributeDelete(t ROUTE_TYPE) error {
 func (c *Client) SendIPRoute(vrfId uint16, body *IPRouteBody, isWithdraw bool) error {
 	command := IPV4_ROUTE_ADD
 	if c.Version <= 3 {
-		if isWithdraw {
-			command = IPV4_ROUTE_DELETE
+		if body.Prefix.To4() != nil {
+			if isWithdraw {
+				command = IPV4_ROUTE_DELETE
+			}
+		} else {
+			if isWithdraw {
+				command = IPV6_ROUTE_DELETE
+			} else {
+				command = IPV6_ROUTE_ADD
+			}
 		}
 	} else { // version >= 4
-		if isWithdraw {
-			command = FRR_IPV4_ROUTE_DELETE
+		if body.Prefix.To4() != nil {
+			if isWithdraw {
+				command = FRR_IPV4_ROUTE_DELETE
+			} else {
+				command = FRR_IPV4_ROUTE_ADD
+			}
 		} else {
-			command = FRR_IPV4_ROUTE_ADD
+			if isWithdraw {
+				command = FRR_IPV6_ROUTE_DELETE
+			} else {
+				command = FRR_IPV6_ROUTE_ADD
+			}
 		}
 	}
 	return c.SendCommand(command, vrfId, body)

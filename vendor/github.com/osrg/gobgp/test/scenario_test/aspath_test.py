@@ -25,7 +25,10 @@ import nose
 from lib.noseplugin import OptionParser, parser_option
 
 from lib import base
-from lib.base import BGP_FSM_ESTABLISHED
+from lib.base import (
+    BGP_FSM_ESTABLISHED,
+    assert_several_times,
+)
 from lib.gobgp import GoBGPContainer
 from lib.quagga import QuaggaBGPContainer
 
@@ -69,8 +72,10 @@ class GoBGPTestBase(unittest.TestCase):
         self.q1.wait_for(expected_state=BGP_FSM_ESTABLISHED, peer=self.g2)
 
     def test_02_check_reject_as_loop(self):
-        time.sleep(1)
-        self.assertTrue(len(self.g2.get_global_rib()) == 0)
+        def f():
+            self.assertEqual(len(self.g2.get_global_rib()), 0)
+
+        assert_several_times(f)
 
     def test_03_update_peer(self):
         self.g2.update_peer(self.q1, allow_as_in=10)
@@ -78,8 +83,10 @@ class GoBGPTestBase(unittest.TestCase):
         self.q1.wait_for(expected_state=BGP_FSM_ESTABLISHED, peer=self.g2)
 
     def test_04_check_accept_as_loop(self):
-        time.sleep(1)
-        self.assertTrue(len(self.g2.get_global_rib()) == 1)
+        def f():
+            self.assertEqual(len(self.g2.get_global_rib()), 1)
+
+        assert_several_times(f)
 
     def test_05_check_remove_private_as_peer_all(self):
         g3 = GoBGPContainer(name='g3', asn=100, router_id='192.168.0.4',
@@ -102,8 +109,13 @@ class GoBGPTestBase(unittest.TestCase):
         self.g2.wait_for(expected_state=BGP_FSM_ESTABLISHED, peer=g3)
         g3.wait_for(expected_state=BGP_FSM_ESTABLISHED, peer=g4)
 
-        time.sleep(1)
-        self.assertTrue(g4.get_global_rib()[0]['paths'][0]['aspath'] == [100])
+        def f():
+            rib = g4.get_global_rib()
+            self.assertEqual(len(rib), 1)
+            self.assertEqual(len(rib[0]['paths']), 1)
+            self.assertEqual(rib[0]['paths'][0]['aspath'], [100])
+
+        assert_several_times(f)
 
     def test_06_check_remove_private_as_peer_replace(self):
         g3 = self.ctns['g3']
@@ -112,8 +124,11 @@ class GoBGPTestBase(unittest.TestCase):
 
         g3.wait_for(expected_state=BGP_FSM_ESTABLISHED, peer=g4)
 
-        time.sleep(1)
-        self.assertTrue(g4.get_global_rib()[0]['paths'][0]['aspath'] == [100, 100, 100, 100])
+        def f():
+            rib = g4.get_global_rib()
+            self.assertEqual(rib[0]['paths'][0]['aspath'], [100, 100, 100, 100])
+
+        assert_several_times(f)
 
     def test_07_check_replace_peer_as(self):
         g5 = GoBGPContainer(name='g5', asn=100, router_id='192.168.0.6',
@@ -127,8 +142,11 @@ class GoBGPTestBase(unittest.TestCase):
 
         g4.wait_for(expected_state=BGP_FSM_ESTABLISHED, peer=g5)
 
-        time.sleep(1)
-        self.assertTrue(g5.get_global_rib()[0]['paths'][0]['aspath'] == [200, 200, 200, 200, 200])
+        def f():
+            rib = g5.get_global_rib()
+            self.assertEqual(rib[0]['paths'][0]['aspath'], [200, 200, 200, 200, 200])
+
+        assert_several_times(f)
 
 
 if __name__ == '__main__':

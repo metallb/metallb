@@ -457,14 +457,18 @@ If you want to remove one element(extended community) of ExtCommunitySet, to spe
 ```
 
 ## 5. <a name="monitor"> monitor subcommand
+
 ### 5.1 monitor global rib
+
 #### Syntax
+
 ```shell
 # monitor global rib
-% gobgp monitor global rib
+% gobgp monitor global rib [-a <address family>] [--current]
 ```
 
 #### Example
+
 ```shell
 [TERM1]
 % gobgp monitor global rib
@@ -476,27 +480,54 @@ If you want to remove one element(extended community) of ExtCommunitySet, to spe
 ```
 
 ### 5.2 monitor neighbor status
+
 #### Syntax
+
 ```shell
 # monitor neighbor status
-% gobgp monitor neighbor
+% gobgp monitor neighbor [--current]
 # monitor specific neighbor status
-% gobgp monitor neighbor <neighbor address>
+% gobgp monitor neighbor <neighbor address> [--current]
 ```
 
 #### Example
+
 ```shell
 [TERM1]
 % gobgp monitor neighbor
-[NEIGH] 192.168.10.2 fsm: BGP_FSM_IDLE admin: ADMIN_STATE_DOWN
-[NEIGH] 192.168.10.2 fsm: BGP_FSM_ACTIVE admin: ADMIN_STATE_UP
-[NEIGH] 192.168.10.2 fsm: BGP_FSM_OPENSENT admin: ADMIN_STATE_UP
-[NEIGH] 192.168.10.2 fsm: BGP_FSM_OPENCONFIRM admin: ADMIN_STATE_UP
-[NEIGH] 192.168.10.2 fsm: BGP_FSM_ESTABLISHED admin: ADMIN_STATE_UP
+[NEIGH] 192.168.10.2 fsm: BGP_FSM_IDLE admin: down
+[NEIGH] 192.168.10.2 fsm: BGP_FSM_ACTIVE admin: up
+[NEIGH] 192.168.10.2 fsm: BGP_FSM_OPENSENT admin: up
+[NEIGH] 192.168.10.2 fsm: BGP_FSM_OPENCONFIRM admin: up
+[NEIGH] 192.168.10.2 fsm: BGP_FSM_ESTABLISHED admin: up
 
 [TERM2]
 % gobgp neighbor 192.168.10.2 disable
 % gobgp neighbor 192.168.10.2 enable
+```
+
+### 5.3 monitor Adj-RIB-In
+
+#### Syntax
+
+```shell
+# monitor Adj-RIB-In
+% gobgp monitor adj-in [-a <address family>] [--current]
+# monitor Adj-RIB-In for specific neighbor
+% gobgp monitor adj-in <neighbor address> [-a <address family>] [--current]
+```
+
+#### Example
+
+```shell
+[GoBGP1]
+% gobgp monitor adj-in
+[ROUTE] 0:10.2.1.0/24 via 10.0.0.2 aspath [65002] attrs [{Origin: ?}]
+[DELROUTE] 0:10.2.1.0/24 via <nil> aspath [] attrs []
+
+[GoBGP2]
+% gobgp global rib -a ipv4 add 10.2.1.0/24
+% gobgp global rib -a ipv4 del 10.2.1.0/24
 ```
 
 ## 6. <a name="mrt"> mrt subcommand

@@ -1,16 +1,16 @@
 language: go
 
-_go: &_go
-  go: 1.8
-
 _dep_ensure: &_dep_ensure
-  <<: *_go
+  go: 1.8
   before_install: go get -u github.com/golang/dep/cmd/dep
   install: $GOPATH/bin/dep ensure
 
 _unittest: &_unittest
   <<: *_dep_ensure
-  script: go test $(go list ./... | grep -v '/vendor/')
+  script:
+    - go test $(go list ./... | grep -v '/vendor/')
+    - go build -o ./gobgp/gobgp   ./gobgp/
+    - go build -o ./gobgpd/gobgpd ./gobgpd/
 
 _build: &_build
   <<: *_dep_ensure
@@ -48,14 +48,29 @@ matrix:
   allow_failures:
     - go: tip
   include:
+#
+# Unit Tests
+#
     - <<: *_unittest
+      env:
+        - DESCRIPTION="Unit Tests"
       go: tip
     - <<: *_unittest
+      env:
+        - DESCRIPTION="Unit Tests"
       go: 1.8
     - <<: *_unittest
+      env:
+        - DESCRIPTION="Unit Tests + goreleaser"
       go: 1.9
       after_success:
         - test -n "$TRAVIS_TAG" && curl -sL https://git.io/goreleaser | bash
+    - <<: *_unittest
+      env:
+        - DESCRIPTION="Unit Tests on i386"
+      before_script:
+        - export GOARCH="386"
+        - go env
 #
 # Cross-compile
 #
@@ -80,20 +95,20 @@ matrix:
       before_script:
         - export GOOS="darwin"
         - go env
-    - <<: *_build
-      env:
-        - GOARCH="386"
-      before_script:
-        - export GOARCH="386"
-        - go env
 #
 # Misc
 #
-    - <<: *_go
-      script: test -z "$(go fmt ./...)"
-    - <<: *_go
-      script: test -z "$(go vet ./...)"
     - <<: *_dep_ensure
+      env:
+        - DESCRIPTION="go fmt"
+      script: test -z "$(go fmt $(go list ./... | grep -v '/vendor/'))"
+    - <<: *_dep_ensure
+      env:
+        - DESCRIPTION="go vet"
+      script: test -z "$(go vet $(go list ./... | grep -v '/vendor/'))"
+    - <<: *_dep_ensure
+      env:
+        - DESCRIPTION="build_embeded_go.py"
       script: python test/scenario_test/ci-scripts/build_embeded_go.py docs/sources/lib.md
 #
 # Docker
@@ -177,11 +192,15 @@ matrix:
       env:
         - TEST=bgp_confederation_test.py
 #
-# Spell Check
+# Tools
 #
     - <<: *_python
+      env:
+        - DESCRIPTION="Tools"
       install: pip install scspell3k
-      script: bash tools/spell-check/scspell.sh
+      script:
+        - bash tools/spell-check/scspell.sh
+        - bash tools/grep_avoided_functions.sh
 
 cache:
   pip: true

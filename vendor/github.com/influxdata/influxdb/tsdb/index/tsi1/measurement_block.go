@@ -255,7 +255,7 @@ func ReadMeasurementBlockTrailer(data []byte) (MeasurementBlockTrailer, error) {
 
 	// Read tombstone measurement sketch info.
 	t.TSketch.Offset, buf = int64(binary.BigEndian.Uint64(buf[0:8])), buf[8:]
-	t.TSketch.Size, buf = int64(binary.BigEndian.Uint64(buf[0:8])), buf[8:]
+	t.TSketch.Size = int64(binary.BigEndian.Uint64(buf[0:8]))
 
 	return t, nil
 }
@@ -350,16 +350,26 @@ func (e *MeasurementBlockElem) HasSeries() bool { return e.series.n > 0 }
 // It requires loading the entire list of series in-memory.
 func (e *MeasurementBlockElem) SeriesIDs() []uint64 {
 	a := make([]uint64, 0, e.series.n)
+	e.ForEachSeriesID(func(id uint64) error {
+		a = append(a, id)
+		return nil
+	})
+	return a
+}
+
+func (e *MeasurementBlockElem) ForEachSeriesID(fn func(uint64) error) error {
 	var prev uint64
 	for data := e.series.data; len(data) > 0; {
 		delta, n := binary.Uvarint(data)
 		data = data[n:]
 
 		seriesID := prev + uint64(delta)
-		a = append(a, seriesID)
+		if err := fn(seriesID); err != nil {
+			return err
+		}
 		prev = seriesID
 	}
-	return a
+	return nil
 }
 
 // Size returns the size of the element.
@@ -515,11 +525,7 @@ func (mw *MeasurementBlockWriter) WriteTo(w io.Writer) (n int64, err error) {
 	// Write trailer.
 	nn, err := t.WriteTo(w)
 	n += nn
-	if err != nil {
-		return n, err
-	}
-
-	return n, nil
+	return n, err
 }
 
 // writeMeasurementTo encodes a single measurement entry into w.
@@ -567,11 +573,8 @@ func (mw *MeasurementBlockWriter) writeMeasurementTo(w io.Writer, name []byte, m
 		return err
 	}
 	nn, err := mw.buf.WriteTo(w)
-	if *n += nn; err != nil {
-		return err
-	}
-
-	return nil
+	*n += nn
+	return err
 }
 
 // writeSketchTo writes an estimator.Sketch into w, updating the number of bytes

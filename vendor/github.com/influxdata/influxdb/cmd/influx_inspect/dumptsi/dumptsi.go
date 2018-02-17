@@ -174,6 +174,7 @@ func (cmd *Command) readFileSet(sfile *tsdb.SeriesFile) (*tsi1.Index, *tsi1.File
 			return nil, nil, err
 		} else if fi.IsDir() {
 			idx := tsi1.NewIndex(sfile,
+				"",
 				tsi1.WithPath(cmd.paths[0]),
 				tsi1.DisableCompactions(),
 			)
@@ -446,11 +447,7 @@ func (cmd *Command) printIndexFileSummary(f *tsi1.IndexFile) error {
 	fmt.Fprintf(tw, "  Series:\t%d\n", valueSeriesN)
 	fmt.Fprintf(tw, "  Series data size:\t%d (%s)\n", valueSeriesSize, formatSize(valueSeriesSize))
 	fmt.Fprintf(tw, "  Bytes per series:\t%.01fb\n", float64(valueSeriesSize)/float64(valueSeriesN))
-	if err := tw.Flush(); err != nil {
-		return err
-	}
-
-	return nil
+	return tw.Flush()
 }
 
 // matchSeries returns true if the command filters matches the series.

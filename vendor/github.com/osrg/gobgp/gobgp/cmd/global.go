@@ -92,7 +92,7 @@ func rateLimitParser(args []string) ([]bgp.ExtendedCommunityInterface, error) {
 		return nil, fmt.Errorf("invalid rate-limit")
 	}
 	var rate float32
-	var as int
+	var as uint64
 	if elems[2] == ExtCommNameMap[RATE] {
 		f, err := strconv.ParseFloat(elems[3]+elems[4], 32)
 		if err != nil {
@@ -102,7 +102,7 @@ func rateLimitParser(args []string) ([]bgp.ExtendedCommunityInterface, error) {
 	}
 	if elems[7] != "" {
 		var err error
-		as, err = strconv.Atoi(elems[7])
+		as, err = strconv.ParseUint(elems[7], 10, 16)
 		if err != nil {
 			return nil, err
 		}
@@ -139,7 +139,7 @@ func markParser(args []string) ([]bgp.ExtendedCommunityInterface, error) {
 	if len(args) < 2 || args[0] != ExtCommNameMap[MARK] {
 		return nil, fmt.Errorf("invalid mark")
 	}
-	dscp, err := strconv.Atoi(args[1])
+	dscp, err := strconv.ParseUint(args[1], 10, 8)
 	if err != nil {
 		return nil, fmt.Errorf("invalid mark")
 	}
@@ -216,7 +216,7 @@ func esiLabelParser(args []string) ([]bgp.ExtendedCommunityInterface, error) {
 	if len(args) < 2 || args[0] != ExtCommNameMap[ESI_LABEL] {
 		return nil, fmt.Errorf("invalid esi-label")
 	}
-	label, err := strconv.Atoi(args[1])
+	label, err := strconv.ParseUint(args[1], 10, 32)
 	if err != nil {
 		return nil, err
 	}
@@ -418,13 +418,13 @@ func ParseEvpnEthernetAutoDiscoveryArgs(args []string) (bgp.AddrPrefixInterface,
 		return nil, nil, err
 	}
 
-	e, err := strconv.Atoi(m["etag"][0])
+	e, err := strconv.ParseUint(m["etag"][0], 10, 32)
 	if err != nil {
 		return nil, nil, err
 	}
 	etag := uint32(e)
 
-	l, err := strconv.Atoi(m["label"][0])
+	l, err := strconv.ParseUint(m["label"][0], 10, 32)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -518,14 +518,14 @@ func ParseEvpnMacAdvArgs(args []string) (bgp.AddrPrefixInterface, []string, erro
 		return nil, nil, err
 	}
 
-	eTag, err := strconv.Atoi(eTagStr)
+	eTag, err := strconv.ParseUint(eTagStr, 10, 32)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid etag: %s: %s", eTagStr, err)
 	}
 
 	var labels []uint32
 	for _, l := range strings.SplitN(labelStr, ",", 2) {
-		label, err := strconv.Atoi(l)
+		label, err := strconv.ParseUint(l, 10, 32)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid label: %s: %s", labelStr, err)
 		}
@@ -604,7 +604,7 @@ func ParseEvpnMulticastArgs(args []string) (bgp.AddrPrefixInterface, []string, e
 		ipLen = net.IPv6len * 8
 	}
 
-	eTag, err := strconv.Atoi(eTagStr)
+	eTag, err := strconv.ParseUint(eTagStr, 10, 32)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid etag: %s: %s", eTagStr, err)
 	}
@@ -727,7 +727,7 @@ func ParseEvpnIPPrefixArgs(args []string) (bgp.AddrPrefixInterface, []string, er
 		return nil, nil, err
 	}
 
-	e, err := strconv.Atoi(m["etag"][0])
+	e, err := strconv.ParseUint(m["etag"][0], 10, 32)
 	if err != nil {
 		return nil, nil, fmt.Errorf("invalid etag: %s: %s", m["etag"][0], err)
 	}
@@ -735,7 +735,7 @@ func ParseEvpnIPPrefixArgs(args []string) (bgp.AddrPrefixInterface, []string, er
 
 	var label uint32
 	if len(m["label"]) > 0 {
-		e, err := strconv.Atoi(m["label"][0])
+		e, err := strconv.ParseUint(m["label"][0], 10, 32)
 		if err != nil {
 			return nil, nil, fmt.Errorf("invalid label: %s: %s", m["label"][0], err)
 		}
@@ -810,17 +810,17 @@ func extractOrigin(args []string) ([]string, bgp.PathAttributeInterface, error) 
 func toAs4Value(s string) (uint32, error) {
 	if strings.Contains(s, ".") {
 		v := strings.Split(s, ".")
-		upper, err := strconv.Atoi(v[0])
+		upper, err := strconv.ParseUint(v[0], 10, 16)
 		if err != nil {
 			return 0, nil
 		}
-		lower, err := strconv.Atoi(v[1])
+		lower, err := strconv.ParseUint(v[1], 10, 16)
 		if err != nil {
 			return 0, nil
 		}
-		return uint32(upper)<<16 + uint32(lower), nil
+		return uint32(upper<<16 | lower), nil
 	}
-	i, err := strconv.Atoi(s)
+	i, err := strconv.ParseUint(s, 10, 32)
 	if err != nil {
 		return 0, err
 	}
@@ -898,7 +898,7 @@ func extractNexthop(rf bgp.RouteFamily, args []string) ([]string, string, error)
 func extractLocalPref(args []string) ([]string, bgp.PathAttributeInterface, error) {
 	for idx, arg := range args {
 		if arg == "local-pref" && len(args) > (idx+1) {
-			metric, err := strconv.Atoi(args[idx+1])
+			metric, err := strconv.ParseUint(args[idx+1], 10, 32)
 			if err != nil {
 				return nil, nil, err
 			}
@@ -912,12 +912,12 @@ func extractLocalPref(args []string) ([]string, bgp.PathAttributeInterface, erro
 func extractMed(args []string) ([]string, bgp.PathAttributeInterface, error) {
 	for idx, arg := range args {
 		if arg == "med" && len(args) > (idx+1) {
-			metric, err := strconv.Atoi(args[idx+1])
+			med, err := strconv.ParseUint(args[idx+1], 10, 32)
 			if err != nil {
 				return nil, nil, err
 			}
 			args = append(args[:idx], args[idx+2:]...)
-			return args, bgp.NewPathAttributeMultiExitDisc(uint32(metric)), nil
+			return args, bgp.NewPathAttributeMultiExitDisc(uint32(med)), nil
 		}
 	}
 	return args, nil, nil
@@ -970,7 +970,7 @@ func extractAigp(args []string) ([]string, bgp.PathAttributeInterface, error) {
 			typ := args[idx+1]
 			switch typ {
 			case "metric":
-				metric, err := strconv.Atoi(args[idx+2])
+				metric, err := strconv.ParseUint(args[idx+2], 10, 64)
 				if err != nil {
 					return nil, nil, err
 				}
@@ -1077,11 +1077,11 @@ func ParsePath(rf bgp.RouteFamily, args []string) (*table.Path, error) {
 		}
 
 		if len(args) > 2 && args[1] == "identifier" {
-			if id, err := strconv.Atoi(args[2]); err != nil {
+			id, err := strconv.ParseUint(args[2], 10, 32)
+			if err != nil {
 				return nil, fmt.Errorf("invalid format")
-			} else {
-				nlri.SetPathIdentifier(uint32(id))
 			}
+			nlri.SetPathIdentifier(uint32(id))
 			extcomms = args[3:]
 		} else {
 			extcomms = args[1:]
@@ -1094,8 +1094,8 @@ func ParsePath(rf bgp.RouteFamily, args []string) (*table.Path, error) {
 		ip, nw, _ := net.ParseCIDR(args[0])
 		ones, _ := nw.Mask.Size()
 
-		label := 0
-		if label, err = strconv.Atoi(args[2]); err != nil {
+		label, err := strconv.ParseUint(args[2], 10, 32)
+		if err != nil {
 			return nil, fmt.Errorf("invalid format")
 		}
 		mpls := bgp.NewMPLSLabelStack(uint32(label))
@@ -1397,7 +1397,7 @@ func modGlobalConfig(args []string) error {
 	if len(m["as"]) != 1 || len(m["router-id"]) != 1 {
 		return fmt.Errorf("usage: gobgp global as <VALUE> router-id <VALUE> [use-multipath] [listen-port <VALUE>] [listen-addresses <VALUE>...]")
 	}
-	asn, err := strconv.Atoi(m["as"][0])
+	asn, err := strconv.ParseUint(m["as"][0], 10, 32)
 	if err != nil {
 		return err
 	}
@@ -1405,9 +1405,11 @@ func modGlobalConfig(args []string) error {
 	if id.To4() == nil {
 		return fmt.Errorf("invalid router-id format")
 	}
-	var port int
+	var port int64
 	if len(m["listen-port"]) > 0 {
-		port, err = strconv.Atoi(m["listen-port"][0])
+		// Note: GlobalConfig.Port is uint32 type, but the TCP/UDP port is
+		// 16-bit length.
+		port, err = strconv.ParseInt(m["listen-port"][0], 10, 16)
 		if err != nil {
 			return err
 		}

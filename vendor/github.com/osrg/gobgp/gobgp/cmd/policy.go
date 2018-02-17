@@ -25,9 +25,10 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/osrg/gobgp/config"
 	"github.com/osrg/gobgp/table"
-	"github.com/spf13/cobra"
 )
 
 func formatDefinedSet(head bool, typ string, indent int, list []table.DefinedSet) string {
@@ -592,7 +593,7 @@ func modCondition(name, op string, args []string) error {
 		if len(args) < 2 {
 			return fmt.Errorf("%s as-path-length <length> { eq | ge | le }", usage)
 		}
-		length, err := strconv.Atoi(args[0])
+		length, err := strconv.ParseUint(args[0], 10, 32)
 		if err != nil {
 			return err
 		}
@@ -721,7 +722,7 @@ func modAction(name, op string, args []string) error {
 		if len(args) < 2 {
 			return fmt.Errorf("%s med { add | sub | set } <value>", usage)
 		}
-		med, err := strconv.Atoi(args[1])
+		med, err := strconv.ParseUint(args[1], 10, 32)
 		if err != nil {
 			return err
 		}
@@ -749,7 +750,7 @@ func modAction(name, op string, args []string) error {
 			return fmt.Errorf("%s as-prepend { <asn> | last-as } <repeat-value>", usage)
 		}
 		stmt.Actions.BgpActions.SetAsPathPrepend.As = args[0]
-		repeat, err := strconv.Atoi(args[1])
+		repeat, err := strconv.ParseUint(args[1], 10, 8)
 		if err != nil {
 			return err
 		}

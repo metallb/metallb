@@ -49,8 +49,9 @@ type Partition struct {
 	fileSet       *FileSet         // current file set
 	seq           int              // file id sequence
 
-	// Fast series lookup.
-	seriesSet *SeriesSet
+	// Fast series lookup of series IDs in the series file that have been present
+	// in this partition. This set tracks both insertions and deletions of a series.
+	seriesIDSet *tsdb.SeriesIDSet
 
 	// Compaction management
 	levels          []CompactionLevel // compaction levels
@@ -75,8 +76,8 @@ type Partition struct {
 	MaxLogFileSize int64
 
 	// Frequency of compaction checks.
-	compactionsDisabled       bool
-	compactionMonitorInterval time.Duration
+	compactionInterrupt chan struct{}
+	compactionsDisabled int
 
 	logger *zap.Logger
 
@@ -90,14 +91,16 @@ type Partition struct {
 // NewPartition returns a new instance of Partition.
 func NewPartition(sfile *tsdb.SeriesFile, path string) *Partition {
 	return &Partition{
-		closing:   make(chan struct{}),
-		path:      path,
-		sfile:     sfile,
-		seriesSet: NewSeriesSet(),
+		closing:     make(chan struct{}),
+		path:        path,
+		sfile:       sfile,
+		seriesIDSet: tsdb.NewSeriesIDSet(),
 
 		// Default compaction thresholds.
 		MaxLogFileSize: DefaultMaxLogFileSize,
+
 		// compactionEnabled: true,
+		compactionInterrupt: make(chan struct{}),
 
 		logger:  zap.NewNop(),
 		version: Version,
@@ -184,7 +187,7 @@ func (i *Partition) Open() error {
 	}
 	i.fileSet = fs
 
-	// Set initial sequnce number.
+	// Set initial sequence number.
 	i.seq = i.fileSet.MaxID()
 
 	// Delete any files not in the manifest.
@@ -260,47 +263,31 @@ func (i *Partition) deleteNonManifestFiles(m *Manifest) error {
 	return nil
 }
 
-func (i *Partition) buildSeriesSet() error {
-	fs := i.retainFileSet()
+func (p *Partition) buildSeriesSet() error {
+	fs := p.retainFileSet()
 	defer fs.Release()
 
-	i.seriesSet = NewSeriesSet()
+	p.seriesIDSet = tsdb.NewSeriesIDSet()
 
-	mitr := fs.MeasurementIterator()
-	if mitr == nil {
-		return nil
-	}
+	// Read series sets from files in reverse.
+	for i := len(fs.files) - 1; i >= 0; i-- {
+		f := fs.files[i]
 
-	// Iterate over each measurement.
-	for {
-		me := mitr.Next()
-		if me == nil {
-			return nil
-		}
-
-		// Iterate over each series id.
-		if err := func() error {
-			sitr := fs.MeasurementSeriesIDIterator(me.Name())
-			if sitr == nil {
-				return nil
-			}
-			defer sitr.Close()
-
-			for {
-				elem, err := sitr.Next()
-				if err != nil {
-					return err
-				} else if elem.SeriesID == 0 {
-					return nil
-				}
-
-				// Add id to series set.
-				i.seriesSet.Add(elem.SeriesID)
-			}
-		}(); err != nil {
+		// Delete anything that's been tombstoned.
+		ts, err := f.TombstoneSeriesIDSet()
+		if err != nil {
 			return err
 		}
+		p.seriesIDSet.Diff(ts)
+
+		// Add series created within the file.
+		ss, err := f.SeriesIDSet()
+		if err != nil {
+			return err
+		}
+		p.seriesIDSet.Merge(ss)
 	}
+	return nil
 }
 
 // Wait returns once outstanding compactions have finished.
@@ -311,13 +298,15 @@ func (i *Partition) Wait() {
 // Close closes the index.
 func (i *Partition) Close() error {
 	// Wait for goroutines to finish outstanding compactions.
+	i.once.Do(func() {
+		close(i.closing)
+		close(i.compactionInterrupt)
+	})
 	i.wg.Wait()
 
 	// Lock index and close remaining
 	i.mu.Lock()
 	defer i.mu.Unlock()
-
-	i.once.Do(func() { close(i.closing) })
 
 	// Close log files.
 	for _, f := range i.fileSet.files {
@@ -330,14 +319,14 @@ func (i *Partition) Close() error {
 
 // closing returns true if the partition is currently closing. It does not require
 // a lock so will always return to callers.
-// func (i *Partition) closing() bool {
-// 	select {
-// 	case <-i.closing:
-// 		return true
-// 	default:
-// 		return false
-// 	}
-// }
+func (p *Partition) isClosing() bool {
+	select {
+	case <-p.closing:
+		return true
+	default:
+		return false
+	}
+}
 
 // Path returns the path to the partition.
 func (i *Partition) Path() string { return i.path }
@@ -463,6 +452,23 @@ func (i *Partition) ForEachMeasurementName(fn func(name []byte) error) error {
 	return nil
 }
 
+// MeasurementHasSeries returns true if a measurement has at least one non-tombstoned series.
+func (p *Partition) MeasurementHasSeries(name []byte) (bool, error) {
+	fs, err := p.RetainFileSet()
+	if err != nil {
+		return false, err
+	}
+	defer fs.Release()
+
+	for _, f := range fs.files {
+		if f.MeasurementHasSeries(p.seriesIDSet, name) {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
 // MeasurementIterator returns an iterator over all measurement names.
 func (i *Partition) MeasurementIterator() (tsdb.MeasurementIterator, error) {
 	fs, err := i.RetainFileSet()
@@ -518,7 +524,8 @@ func (i *Partition) MeasurementSeriesIDIterator(name []byte) (tsdb.SeriesIDItera
 	return newFileSetSeriesIDIterator(fs, fs.MeasurementSeriesIDIterator(name)), nil
 }
 
-// DropMeasurement deletes a measurement from the index.
+// DropMeasurement deletes a measurement from the index. DropMeasurement does
+// not remove any series from the index directly.
 func (i *Partition) DropMeasurement(name []byte) error {
 	fs, err := i.RetainFileSet()
 	if err != nil {
@@ -557,25 +564,18 @@ func (i *Partition) DropMeasurement(name []byte) error {
 		}
 	}
 
-	// Delete all series in measurement.
-	if sitr := fs.MeasurementSeriesIDIterator(name); sitr != nil {
-		defer sitr.Close()
-
+	// Delete all series.
+	if itr := fs.MeasurementSeriesIDIterator(name); itr != nil {
+		defer itr.Close()
 		for {
-			s, err := sitr.Next()
+			elem, err := itr.Next()
 			if err != nil {
 				return err
-			} else if s.SeriesID == 0 {
+			} else if elem.SeriesID == 0 {
 				break
 			}
-			if !fs.SeriesFile().IsDeleted(s.SeriesID) {
-				if err := func() error {
-					i.mu.RLock()
-					defer i.mu.RUnlock()
-					return i.sfile.DeleteSeriesID(s.SeriesID)
-				}(); err != nil {
-					return err
-				}
+			if err := i.activeLogFile.DeleteSeriesID(elem.SeriesID); err != nil {
+				return err
 			}
 		}
 	}
@@ -600,6 +600,13 @@ func (i *Partition) DropMeasurement(name []byte) error {
 // createSeriesListIfNotExists creates a list of series if they doesn't exist in
 // bulk.
 func (i *Partition) createSeriesListIfNotExists(names [][]byte, tagsSlice []models.Tags) error {
+	// Is there anything to do? The partition may have been sent an empty batch.
+	if len(names) == 0 {
+		return nil
+	} else if len(names) != len(tagsSlice) {
+		return fmt.Errorf("uneven batch, partition %s sent %d names and %d tags", i.id, len(names), len(tagsSlice))
+	}
+
 	// Maintain reference count on files in file set.
 	fs, err := i.RetainFileSet()
 	if err != nil {
@@ -610,7 +617,7 @@ func (i *Partition) createSeriesListIfNotExists(names [][]byte, tagsSlice []mode
 	// Ensure fileset cannot change during insert.
 	i.mu.RLock()
 	// Insert series into log file.
-	if err := i.activeLogFile.AddSeriesList(i.seriesSet, names, tagsSlice); err != nil {
+	if err := i.activeLogFile.AddSeriesList(i.seriesIDSet, names, tagsSlice); err != nil {
 		i.mu.RUnlock()
 		return err
 	}
@@ -619,34 +626,19 @@ func (i *Partition) createSeriesListIfNotExists(names [][]byte, tagsSlice []mode
 	return i.CheckLogFile()
 }
 
-func (i *Partition) DropSeries(key []byte, ts int64) error {
-	// TODO: Use ts.
-
-	if err := func() error {
-		i.mu.RLock()
-		defer i.mu.RUnlock()
-
-		name, tags := models.ParseKey(key)
-
-		mname := []byte(name)
-		seriesID := i.sfile.SeriesID(mname, tags, nil)
-		if err := i.sfile.DeleteSeriesID(seriesID); err != nil {
-			return err
-		}
-
-		return nil
-	}(); err != nil {
+func (i *Partition) DropSeries(seriesID uint64) error {
+	// Delete series from index.
+	if err := i.activeLogFile.DeleteSeriesID(seriesID); err != nil {
 		return err
 	}
+
+	i.seriesIDSet.Remove(seriesID)
 
 	// Swap log file, if necessary.
-	if err := i.CheckLogFile(); err != nil {
-		return err
-	}
-	return nil
+	return i.CheckLogFile()
 }
 
-// MeasurementsSketches returns the two sketches for the index by merging all
+// MeasurementsSketches returns the two sketches for the partition by merging all
 // instances of the type sketch types in all the index files.
 func (i *Partition) MeasurementsSketches() (estimator.Sketch, estimator.Sketch, error) {
 	fs, err := i.RetainFileSet()
@@ -655,6 +647,17 @@ func (i *Partition) MeasurementsSketches() (estimator.Sketch, estimator.Sketch, 
 	}
 	defer fs.Release()
 	return fs.MeasurementsSketches()
+}
+
+// SeriesSketches returns the two sketches for the partition by merging all
+// instances of the type sketch types in all the index files.
+func (i *Partition) SeriesSketches() (estimator.Sketch, estimator.Sketch, error) {
+	fs, err := i.RetainFileSet()
+	if err != nil {
+		return nil, nil, err
+	}
+	defer fs.Release()
+	return fs.SeriesSketches()
 }
 
 // HasTagKey returns true if tag key exists.
@@ -787,11 +790,46 @@ func (i *Partition) Compact() {
 	i.compact()
 }
 
-// compact compacts continguous groups of files that are not currently compacting.
-func (i *Partition) compact() {
-	if i.compactionsDisabled {
+func (i *Partition) DisableCompactions() {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.compactionsDisabled++
+
+	select {
+	case <-i.closing:
+		return
+	default:
+	}
+
+	if i.compactionsDisabled == 0 {
+		close(i.compactionInterrupt)
+		i.compactionInterrupt = make(chan struct{})
+	}
+}
+
+func (i *Partition) EnableCompactions() {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	// Already enabled?
+	if i.compactionsEnabled() {
 		return
 	}
+	i.compactionsDisabled--
+}
+
+func (i *Partition) compactionsEnabled() bool {
+	return i.compactionsDisabled == 0
+}
+
+// compact compacts continguous groups of files that are not currently compacting.
+func (i *Partition) compact() {
+	if i.isClosing() {
+		return
+	} else if !i.compactionsEnabled() {
+		return
+	}
+	interrupt := i.compactionInterrupt
 
 	fs := i.retainFileSet()
 	defer fs.Release()
@@ -828,7 +866,7 @@ func (i *Partition) compact() {
 				defer i.wg.Done()
 
 				// Compact to a new level.
-				i.compactToLevel(files, level+1)
+				i.compactToLevel(files, level+1, interrupt)
 
 				// Ensure compaction lock for the level is released.
 				i.mu.Lock()
@@ -844,12 +882,20 @@ func (i *Partition) compact() {
 
 // compactToLevel compacts a set of files into a new file. Replaces old files with
 // compacted file on successful completion. This runs in a separate goroutine.
-func (i *Partition) compactToLevel(files []*IndexFile, level int) {
+func (i *Partition) compactToLevel(files []*IndexFile, level int, interrupt <-chan struct{}) {
 	assert(len(files) >= 2, "at least two index files are required for compaction")
 	assert(level > 0, "cannot compact level zero")
 
 	// Build a logger for this compaction.
 	logger := i.logger.With(zap.String("token", generateCompactionToken()))
+
+	// Check for cancellation.
+	select {
+	case <-interrupt:
+		logger.Error("cannot begin compaction", zap.Error(ErrCompactionInterrupted))
+		return
+	default:
+	}
 
 	// Files have already been retained by caller.
 	// Ensure files are released only once.
@@ -863,7 +909,7 @@ func (i *Partition) compactToLevel(files []*IndexFile, level int) {
 	path := filepath.Join(i.path, FormatIndexFileName(i.NextSequence(), level))
 	f, err := os.Create(path)
 	if err != nil {
-		logger.Error("cannot create compation files", zap.Error(err))
+		logger.Error("cannot create compaction files", zap.Error(err))
 		return
 	}
 	defer f.Close()
@@ -875,7 +921,7 @@ func (i *Partition) compactToLevel(files []*IndexFile, level int) {
 
 	// Compact all index files to new index file.
 	lvl := i.levels[level]
-	n, err := IndexFiles(files).CompactTo(f, i.sfile, lvl.M, lvl.K)
+	n, err := IndexFiles(files).CompactTo(f, i.sfile, lvl.M, lvl.K, interrupt)
 	if err != nil {
 		logger.Error("cannot compact index files", zap.Error(err))
 		return
@@ -987,6 +1033,14 @@ func (i *Partition) checkLogFile() error {
 // same identifier but will have a ".tsi" extension. Once the log file is
 // compacted then the manifest is updated and the log file is discarded.
 func (i *Partition) compactLogFile(logFile *LogFile) {
+	if i.isClosing() {
+		return
+	}
+
+	i.mu.Lock()
+	interrupt := i.compactionInterrupt
+	i.mu.Unlock()
+
 	start := time.Now()
 
 	// Retrieve identifier from current path.
@@ -1010,7 +1064,7 @@ func (i *Partition) compactLogFile(logFile *LogFile) {
 
 	// Compact log file to new index file.
 	lvl := i.levels[1]
-	n, err := logFile.CompactTo(f, lvl.M, lvl.K)
+	n, err := logFile.CompactTo(f, lvl.M, lvl.K, interrupt)
 	if err != nil {
 		logger.Error("cannot compact log file", zap.Error(err), zap.String("path", logFile.Path()))
 		return
@@ -1067,8 +1121,6 @@ func (i *Partition) compactLogFile(logFile *LogFile) {
 		logger.Error("cannot remove log file", zap.Error(err))
 		return
 	}
-
-	return
 }
 
 // unionStringSets returns the union of two sets

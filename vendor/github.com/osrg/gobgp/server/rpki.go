@@ -25,12 +25,13 @@ import (
 	"time"
 
 	"github.com/armon/go-radix"
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/net/context"
+
 	"github.com/osrg/gobgp/config"
 	"github.com/osrg/gobgp/packet/bgp"
 	"github.com/osrg/gobgp/packet/rtr"
 	"github.com/osrg/gobgp/table"
-	log "github.com/sirupsen/logrus"
-	"golang.org/x/net/context"
 )
 
 const (
@@ -453,7 +454,9 @@ func (c *roaManager) GetServers() []*config.RpkiServer {
 		l = append(l, &config.RpkiServer{
 			Config: config.RpkiServerConfig{
 				Address: addr,
-				Port:    func() uint32 { p, _ := strconv.Atoi(port); return uint32(p) }(),
+				// Note: RpkiServerConfig.Port is uint32 type, but the TCP/UDP
+				// port is 16-bit length.
+				Port: func() uint32 { p, _ := strconv.ParseUint(port, 10, 16); return uint32(p) }(),
 			},
 			State: client.state,
 		})
