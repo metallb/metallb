@@ -78,11 +78,7 @@ func Unescape(in []byte) []byte {
 
 	i := 0
 	inLen := len(in)
-
-	// The output size will be no more than inLen. Preallocating the
-	// capacity of the output is faster and uses less memory than
-	// letting append() do its own (over)allocation.
-	out := make([]byte, 0, inLen)
+	var out []byte
 
 	for {
 		if i >= inLen {

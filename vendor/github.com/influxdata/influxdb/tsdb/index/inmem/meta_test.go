@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/query"
@@ -207,6 +208,7 @@ func benchmarkTagSets(b *testing.B, n int, opt query.IteratorOptions) {
 	for i := 0; i < n; i++ {
 		tags := map[string]string{"tag1": "value1", "tag2": "value2"}
 		s := newSeries(uint64(i), m, fmt.Sprintf("m,tag1=value1,tag2=value2"), models.NewTags(tags))
+		s.AssignShard(0, time.Now().UnixNano())
 		m.AddSeries(s)
 	}
 

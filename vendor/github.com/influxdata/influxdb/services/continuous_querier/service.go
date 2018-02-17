@@ -156,6 +156,11 @@ type Statistics struct {
 	QueryFail int64
 }
 
+type statistic struct {
+	ok   uint64
+	fail uint64
+}
+
 // Statistics returns statistics for periodic monitoring.
 func (s *Service) Statistics(tags map[string]string) []models.Statistic {
 	return []models.Statistic{{

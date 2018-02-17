@@ -195,15 +195,12 @@ func (c *compiledStatement) compileFields(stmt *influxql.SelectStatement) error 
 
 		// Append this field to the list of processed fields and compile it.
 		field := &compiledField{
-			global: c,
-			Field: &influxql.Field{
-				Expr:  influxql.Reduce(f.Expr, nil),
-				Alias: f.Alias,
-			},
+			global:        c,
+			Field:         f,
 			AllowWildcard: true,
 		}
 		c.Fields = append(c.Fields, field)
-		if err := field.compileExpr(field.Field.Expr); err != nil {
+		if err := field.compileExpr(f.Expr); err != nil {
 			return err
 		}
 	}

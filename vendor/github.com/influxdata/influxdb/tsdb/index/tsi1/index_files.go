@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb/pkg/bytesutil"
-	"github.com/influxdata/influxdb/pkg/estimator/hll"
 	"github.com/influxdata/influxdb/tsdb"
 )
 
@@ -45,43 +44,6 @@ func (p IndexFiles) Files() []File {
 		other[i] = f
 	}
 	return other
-}
-
-func (p IndexFiles) buildSeriesIDSets() (seriesIDSet, tombstoneSeriesIDSet *tsdb.SeriesIDSet, err error) {
-	if len(p) == 0 {
-		return tsdb.NewSeriesIDSet(), tsdb.NewSeriesIDSet(), nil
-	}
-
-	// Start with sets from last file.
-	if seriesIDSet, err = p[len(p)-1].SeriesIDSet(); err != nil {
-		return nil, nil, err
-	} else if tombstoneSeriesIDSet, err = p[len(p)-1].TombstoneSeriesIDSet(); err != nil {
-		return nil, nil, err
-	}
-
-	// Build sets in reverse order.
-	// This assumes that bits in both sets are mutually exclusive.
-	for i := len(p) - 2; i >= 0; i-- {
-		ss, err := p[i].SeriesIDSet()
-		if err != nil {
-			return nil, nil, err
-		}
-
-		ts, err := p[i].TombstoneSeriesIDSet()
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// Add tombstones and remove from old series existence set.
-		seriesIDSet.Diff(ts)
-		tombstoneSeriesIDSet.Merge(ts)
-
-		// Add new series and remove from old series tombstone set.
-		tombstoneSeriesIDSet.Diff(ss)
-		seriesIDSet.Merge(ss)
-	}
-
-	return seriesIDSet, tombstoneSeriesIDSet, nil
 }
 
 // MeasurementNames returns a sorted list of all measurement names for all files.
@@ -152,22 +114,14 @@ func (p IndexFiles) TagValueSeriesIDIterator(name, key, value []byte) tsdb.Serie
 }
 
 // CompactTo merges all index files and writes them to w.
-func (p IndexFiles) CompactTo(w io.Writer, sfile *tsdb.SeriesFile, m, k uint64, cancel <-chan struct{}) (n int64, err error) {
+func (p IndexFiles) CompactTo(w io.Writer, sfile *tsdb.SeriesFile, m, k uint64) (n int64, err error) {
 	var t IndexFileTrailer
-
-	// Check for cancellation.
-	select {
-	case <-cancel:
-		return n, ErrCompactionInterrupted
-	default:
-	}
 
 	// Wrap writer in buffered I/O.
 	bw := bufio.NewWriter(w)
 
 	// Setup context object to track shared data for this compaction.
 	var info indexCompactInfo
-	info.cancel = cancel
 	info.tagSets = make(map[string]indexTagSetPos)
 
 	// Write magic number.
@@ -192,65 +146,8 @@ func (p IndexFiles) CompactTo(w io.Writer, sfile *tsdb.SeriesFile, m, k uint64, 
 	}
 	t.MeasurementBlock.Size = n - t.MeasurementBlock.Offset
 
-	// Build series sets.
-	seriesIDSet, tombstoneSeriesIDSet, err := p.buildSeriesIDSets()
-	if err != nil {
-		return n, err
-	}
-
-	// Generate sketches from series sets.
-	sketch := hll.NewDefaultPlus()
-	seriesIDSet.ForEach(func(id uint64) {
-		if key := sfile.SeriesKey(id); key != nil {
-			sketch.Add(key)
-		}
-	})
-
-	tSketch := hll.NewDefaultPlus()
-	tombstoneSeriesIDSet.ForEach(func(id uint64) {
-		if key := sfile.SeriesKey(id); key != nil {
-			tSketch.Add(key)
-		}
-	})
-
-	// Write series set.
-	t.SeriesIDSet.Offset = n
-	nn, err := seriesIDSet.WriteTo(bw)
-	if n += nn; err != nil {
-		return n, err
-	}
-	t.SeriesIDSet.Size = n - t.SeriesIDSet.Offset
-
-	// Write tombstone series set.
-	t.TombstoneSeriesIDSet.Offset = n
-	nn, err = tombstoneSeriesIDSet.WriteTo(bw)
-	if n += nn; err != nil {
-		return n, err
-	}
-	t.TombstoneSeriesIDSet.Size = n - t.TombstoneSeriesIDSet.Offset
-
-	// Write series sketches. TODO(edd): Implement WriterTo on HLL++.
-	t.SeriesSketch.Offset = n
-	data, err := sketch.MarshalBinary()
-	if err != nil {
-		return n, err
-	} else if _, err := bw.Write(data); err != nil {
-		return n, err
-	}
-	t.SeriesSketch.Size = int64(len(data))
-	n += t.SeriesSketch.Size
-
-	t.TombstoneSeriesSketch.Offset = n
-	if data, err = tSketch.MarshalBinary(); err != nil {
-		return n, err
-	} else if _, err := bw.Write(data); err != nil {
-		return n, err
-	}
-	t.TombstoneSeriesSketch.Size = int64(len(data))
-	n += t.TombstoneSeriesSketch.Size
-
 	// Write trailer.
-	nn, err = t.WriteTo(bw)
+	nn, err := t.WriteTo(bw)
 	n += nn
 	if err != nil {
 		return n, err
@@ -282,19 +179,11 @@ func (p IndexFiles) writeTagsetsTo(w io.Writer, info *indexCompactInfo, n *int64
 func (p IndexFiles) writeTagsetTo(w io.Writer, name []byte, info *indexCompactInfo, n *int64) error {
 	var seriesIDs []uint64
 
-	// Check for cancellation.
-	select {
-	case <-info.cancel:
-		return ErrCompactionInterrupted
-	default:
-	}
-
 	kitr, err := p.TagKeyIterator(name)
 	if err != nil {
 		return err
 	}
 
-	var seriesN int
 	enc := NewTagBlockEncoder(w)
 	for ke := kitr.Next(); ke != nil; ke = kitr.Next() {
 		// Encode key.
@@ -320,15 +209,6 @@ func (p IndexFiles) writeTagsetTo(w io.Writer, name []byte, info *indexCompactIn
 							break
 						}
 						seriesIDs = append(seriesIDs, se.SeriesID)
-
-						// Check for cancellation periodically.
-						if seriesN++; seriesN%1000 == 0 {
-							select {
-							case <-info.cancel:
-								return ErrCompactionInterrupted
-							default:
-							}
-						}
 					}
 				}
 
@@ -362,17 +242,9 @@ func (p IndexFiles) writeTagsetTo(w io.Writer, name []byte, info *indexCompactIn
 func (p IndexFiles) writeMeasurementBlockTo(w io.Writer, info *indexCompactInfo, n *int64) error {
 	mw := NewMeasurementBlockWriter()
 
-	// Check for cancellation.
-	select {
-	case <-info.cancel:
-		return ErrCompactionInterrupted
-	default:
-	}
-
 	// Add measurement data & compute sketches.
 	mitr := p.MeasurementIterator()
 	if mitr != nil {
-		var seriesN int
 		for m := mitr.Next(); m != nil; m = mitr.Next() {
 			name := m.Name()
 
@@ -390,15 +262,6 @@ func (p IndexFiles) writeMeasurementBlockTo(w io.Writer, info *indexCompactInfo,
 						break
 					}
 					seriesIDs = append(seriesIDs, e.SeriesID)
-
-					// Check for cancellation periodically.
-					if seriesN++; seriesN%1000 == 0 {
-						select {
-						case <-info.cancel:
-							return ErrCompactionInterrupted
-						default:
-						}
-					}
 				}
 				sort.Sort(uint64Slice(seriesIDs))
 
@@ -451,7 +314,7 @@ type IndexFilesInfo struct {
 // indexCompactInfo is a context object used for tracking position information
 // during the compaction of index files.
 type indexCompactInfo struct {
-	cancel <-chan struct{}
+	sfile *tsdb.SeriesFile
 
 	// Tracks offset/size for each measurement's tagset.
 	tagSets map[string]indexTagSetPos

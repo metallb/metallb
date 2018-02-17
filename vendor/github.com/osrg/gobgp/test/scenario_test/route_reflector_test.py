@@ -61,7 +61,13 @@ class GoBGPTestBase(unittest.TestCase):
         qs = [q1, q2, q3, q4]
         ctns = [g1, q1, q2, q3, q4]
 
+        # advertise a route from q1, q2
+        for idx, c in enumerate(qs):
+            route = '10.0.{0}.0/24'.format(idx + 1)
+            c.add_route(route)
+
         initial_wait_time = max(ctn.run() for ctn in ctns)
+
         time.sleep(initial_wait_time)
 
         # g1 as a route reflector
@@ -73,11 +79,6 @@ class GoBGPTestBase(unittest.TestCase):
         q3.add_peer(g1)
         g1.add_peer(q4)
         q4.add_peer(g1)
-
-        # advertise a route from q1, q2
-        for idx, c in enumerate(qs):
-            route = '10.0.{0}.0/24'.format(idx + 1)
-            c.add_route(route)
 
         cls.gobgp = g1
         cls.quaggas = {'q1': q1, 'q2': q2, 'q3': q3, 'q4': q4}

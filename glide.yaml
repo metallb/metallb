@@ -1,12 +1,20 @@
 package: go.universe.tf/metallb
 import:
 - package: github.com/golang/glog
+- package: github.com/mikioh/ipaddr
+  version: ef85e35a1b1801b80c891a443c8b68f100095452
 - package: github.com/mdlayher/arp
 - package: github.com/mdlayher/ethernet
 - package: github.com/mdlayher/ndp
-- package: github.com/mikioh/ipaddr
+  version: 557f9155ccf6e77213da2cd13ad39cc120a34f76
+  # Because k8s is idiotis and holds back pflag to a stupidly ancient version.
+- package: github.com/spf13/cobra
+  version: 35136c09d8da66b901337c6e86fd8e88a1a255bd
+  # Because this package author is trash and breaks API compatibility on a widely used package.
+- package: github.com/satori/go.uuid
+  version: f58768cc1a7a7e77a3bd49e98cdd21419399b6a3
 - package: github.com/osrg/gobgp
-  version: ^1.28.0
+  version: ^1.27.0
   subpackages:
   - api
   - config
@@ -25,7 +33,7 @@ import:
   subpackages:
   - pkg/apis/meta/v1
   - pkg/fields
-  - pkg/labels
+  - pkg/runtime
 - package: k8s.io/client-go
   version: ^6.0.0
   subpackages:
@@ -38,10 +46,6 @@ import:
   - tools/leaderelection/resourcelock
   - tools/record
   - util/workqueue
-# Manual forcing of github.com/prometheus/procfs to a more recent version.
-# Another example of why transitive dependencies should be forbidden/ignored.
-- package: github.com/prometheus/procfs
-  version: 282c8707aa210456a825798969cc27edda34992a
 testImport:
 - package: github.com/google/go-cmp
   version: ^0.1.0

@@ -1,5 +1,5 @@
-hash: 879d2bd84fc2b3df1ee5e811a7ac35670fc87efe4ca8ee7c04027ef69ca1d043
-updated: 2018-02-16T19:07:33.912970132-08:00
+hash: f6ad34a6f5ad0c11cd7e25faa94f0bfd58419feee72527d4ed1ad6eafb7b1a6f
+updated: 2018-01-26T15:22:33.002386352-05:00
 imports:
 - name: github.com/armon/go-radix
   version: 1fca145dffbcaa8fe914309b1ec0cfc67500fe61
@@ -12,7 +12,7 @@ imports:
   subpackages:
   - spew
 - name: github.com/dgryski/go-farm
-  version: 2de33835d10275975374b37b2dcfd22c9020a1f5
+  version: ac7624ea8da311f2fbbd94401d8c1cf66089f9fb
 - name: github.com/eapache/channels
   version: 47238d5aae8c0fefd518ef2bee46290909cf8263
 - name: github.com/eapache/queue
@@ -22,7 +22,7 @@ imports:
   subpackages:
   - log
 - name: github.com/fsnotify/fsnotify
-  version: c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9
+  version: 4da3e2cfbabc9f751898f250b49f2439785783a1
 - name: github.com/ghodss/yaml
   version: 73d445a93680fa1a78ae23a5839bad48f32ba1ee
 - name: github.com/go-openapi/jsonpointer
@@ -39,7 +39,7 @@ imports:
   - proto
   - sortkeys
 - name: github.com/golang/glog
-  version: 44145f04b68cf362d9c4df2182967c2275eaefed
+  version: 23def4e6c14b4da8ac2ed8007337bc5eb5007998
 - name: github.com/golang/groupcache
   version: 02826c3e79038b59d737d3b1c0a1d937f71a4433
   subpackages:
@@ -89,7 +89,7 @@ imports:
 - name: github.com/inconshreveable/mousetrap
   version: 76626ae9c91c4f2a10f34cad8ce83ea42c93bb75
 - name: github.com/influxdata/influxdb
-  version: 6d008c3453668d7ea64bd5265c0fb915964215eb
+  version: a43cff36eeef00a32ab53d8be7dedb1740ec64a5
   subpackages:
   - client/v2
   - models
@@ -99,7 +99,7 @@ imports:
 - name: github.com/juju/ratelimit
   version: 5b9ff866471762aa2ab2dced63c9fb6f53921342
 - name: github.com/magiconair/properties
-  version: c3beff4c2358b44d0493c7dda585e7db7ff28ae6
+  version: 49d762b9817ba1c2e9d0c69183c2b4a8b8f1d934
 - name: github.com/mailru/easyjson
   version: 2f5df55504ebc322e4d52d34df6a1f5b503bf26d
   subpackages:
@@ -115,15 +115,15 @@ imports:
 - name: github.com/mdlayher/ethernet
   version: e72cf8343052938936194daba1914fd1bb33d2fe
 - name: github.com/mdlayher/ndp
-  version: 277ca8114e3f454c8da507af486fdbf653d63909
+  version: 557f9155ccf6e77213da2cd13ad39cc120a34f76
 - name: github.com/mdlayher/raw
-  version: d49579e77ad7a5760451ccca3bbbf88fdba2d193
+  version: 9df8b4265df2bcf01458b1759cf7ec4b81b50b65
 - name: github.com/mikioh/ipaddr
-  version: dcfd1d901fadb30123fc03857e79ed2acd07dc76
+  version: ef85e35a1b1801b80c891a443c8b68f100095452
 - name: github.com/mitchellh/mapstructure
-  version: a4e142e9c047c904fa2f1e144d9a84e6133024bc
+  version: 06020f85339e21b2478f756a78e295255ffa4d6a
 - name: github.com/osrg/gobgp
-  version: 5dfe0ba86f401774f0742444d47dc58d0f4949a8
+  version: 77136fac6dfd8a70ef5375b321fd05d7736659a7
   subpackages:
   - api
   - client
@@ -137,7 +137,7 @@ imports:
   - table
   - zebra
 - name: github.com/pelletier/go-toml
-  version: acdc4509485b587f5e675510c4f2c63e90ff68a8
+  version: 0131db6d737cfbbfb678f8b7d92e55e27ce46224
 - name: github.com/peterbourgon/diskv
   version: 5f041e8faa004a95c88a202771f4cc3e991971e6
 - name: github.com/prometheus/client_golang
@@ -150,41 +150,39 @@ imports:
   subpackages:
   - go
 - name: github.com/prometheus/common
-  version: 89604d197083d4781071d3c65855d24ecfb0a563
+  version: 2e54d0b93cba2fd133edc32211dcc32c06ef72ca
   subpackages:
   - expfmt
   - internal/bitbucket.org/ww/goautoneg
   - model
 - name: github.com/prometheus/procfs
-  version: 282c8707aa210456a825798969cc27edda34992a
+  version: b15cd069a83443be3154b719d0cc9fe8117f09fb
   subpackages:
-  - internal/util
-  - nfs
   - xfs
 - name: github.com/PuerkitoBio/purell
   version: 8a290539e2e8629dbc4e6bad948158f790ec31f4
 - name: github.com/PuerkitoBio/urlesc
   version: 5bd2802263f21d8788851d5305584c82a5c75d7e
 - name: github.com/satori/go.uuid
-  version: 36e9d2ebbde5e3f13ab2e25625fd453271d6522e
+  version: f58768cc1a7a7e77a3bd49e98cdd21419399b6a3
 - name: github.com/sirupsen/logrus
-  version: 8c0189d9f6bbf301e5d055d34268156b317016af
+  version: d682213848ed68c0a260ca37d6dd5ace8423f5ba
 - name: github.com/spf13/afero
-  version: bbf41cb36dffe15dff5bf7e18c447801e7ffe163
+  version: 57afd63c68602b63ed976de00dd066ccb3c319db
   subpackages:
   - mem
 - name: github.com/spf13/cast
-  version: 8965335b8c7107321228e3e3702cab9832751bac
+  version: acbeb36b902d72a7a4c18e8f3241075e7ab763e4
 - name: github.com/spf13/cobra
-  version: be77323fc05148ef091e83b3866c0d47c8e74a8b
+  version: 35136c09d8da66b901337c6e86fd8e88a1a255bd
 - name: github.com/spf13/jwalterweatherman
-  version: 7c0cea34c8ece3fbeb2b27ab9b59511d360fb394
+  version: 12bd96e66386c1960ab0f74ced1362f66f552f7b
 - name: github.com/spf13/pflag
   version: 9ff6c6923cfffbcd502984b8e0c80539a94968b7
 - name: github.com/spf13/viper
   version: aafc9e6bc7b7bb53ddaa75a5ef49a17d6e654be5
 - name: github.com/vishvananda/netlink
-  version: 25d2c79295b361cac34eb41cfae90d5c69078b2a
+  version: 1882fa99fc5adc217f354c6f37a172876877f77d
   subpackages:
   - nl
 - name: github.com/vishvananda/netns
@@ -229,11 +227,11 @@ imports:
   - unicode/norm
   - width
 - name: google.golang.org/genproto
-  version: 2b5a72b8730b0b16380010cfe5286c42108d88e7
+  version: a8101f21cf983e773d0c1133ebc5424792003214
   subpackages:
   - googleapis/rpc/status
 - name: google.golang.org/grpc
-  version: dfa18343df54bda471a4b53677aa7c0d0df882d1
+  version: 6913ad5caedced5d627918609375b057963334a5
   subpackages:
   - balancer
   - balancer/base
@@ -242,7 +240,6 @@ imports:
   - connectivity
   - credentials
   - encoding
-  - encoding/proto
   - grpclb/grpc_lb_v1/messages
   - grpclog
   - internal
@@ -262,7 +259,7 @@ imports:
 - name: gopkg.in/tomb.v2
   version: d5d1b5820637886def9eef33e03a27a9f166942c
 - name: gopkg.in/yaml.v2
-  version: 53feefa2559fb8dfa8d81baad31be332c97d6c77
+  version: 0e4404da71227dcc02fb1deee803d93e86d08f72
 - name: k8s.io/api
   version: 11147472b7c934c474a2c484af3c0c5210b7a3af
   subpackages:

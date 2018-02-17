@@ -21,10 +21,10 @@ enabled = false
 	}
 
 	// Validate configuration.
-	if c.Enabled {
+	if c.Enabled != false {
 		t.Errorf("unexpected enabled state: %v", c.Enabled)
 	}
-	if c.InsecureSkipVerify {
+	if c.InsecureSkipVerify == true {
 		t.Errorf("InsecureSkipVerify: expected %v. got %v", false, c.InsecureSkipVerify)
 	}
 }
@@ -49,13 +49,13 @@ write-concurrency = 10
 	}
 
 	// Validate configuration.
-	if !c.Enabled {
+	if c.Enabled != true {
 		t.Errorf("unexpected enabled state: %v", c.Enabled)
 	}
 	if c.CaCerts != abspath {
 		t.Errorf("CaCerts: expected %s. got %s", abspath, c.CaCerts)
 	}
-	if !c.InsecureSkipVerify {
+	if c.InsecureSkipVerify != true {
 		t.Errorf("InsecureSkipVerify: expected %v. got %v", true, c.InsecureSkipVerify)
 	}
 	err = c.Validate()
@@ -96,13 +96,13 @@ write-concurrency = 10
 	}
 
 	// Validate configuration.
-	if !c.Enabled {
+	if c.Enabled != true {
 		t.Errorf("unexpected enabled state: %v", c.Enabled)
 	}
 	if c.CaCerts != tmpfile.Name() {
 		t.Errorf("CaCerts: expected %v. got %v", tmpfile.Name(), c.CaCerts)
 	}
-	if c.InsecureSkipVerify {
+	if c.InsecureSkipVerify != false {
 		t.Errorf("InsecureSkipVerify: expected %v. got %v", false, c.InsecureSkipVerify)
 	}
 	if err := c.Validate(); err != nil {

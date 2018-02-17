@@ -21,12 +21,11 @@ import (
 	"testing"
 	"time"
 
-	log "github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
-
 	"github.com/osrg/gobgp/config"
 	"github.com/osrg/gobgp/packet/bgp"
 	"github.com/osrg/gobgp/table"
+	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestModPolicyAssign(t *testing.T) {
@@ -125,10 +124,8 @@ func TestMonitor(test *testing.T) {
 		}
 	}
 
-	// Test WatchBestPath.
 	w := s.Watch(WatchBestPath(false))
 
-	// Advertises a route.
 	attrs := []bgp.PathAttributeInterface{
 		bgp.NewPathAttributeOrigin(0),
 		bgp.NewPathAttributeNextHop("10.0.0.1"),
@@ -136,77 +133,27 @@ func TestMonitor(test *testing.T) {
 	if _, err := t.AddPath("", []*table.Path{table.NewPath(nil, bgp.NewIPAddrPrefix(24, "10.0.0.0"), false, attrs, time.Now(), false)}); err != nil {
 		log.Fatal(err)
 	}
+
 	ev := <-w.Event()
 	b := ev.(*WatchEventBestPath)
-	assert.Equal(1, len(b.PathList))
-	assert.Equal("10.0.0.0/24", b.PathList[0].GetNlri().String())
-	assert.False(b.PathList[0].IsWithdraw)
+	assert.Equal(len(b.PathList), 1)
+	assert.Equal(b.PathList[0].GetNlri().String(), "10.0.0.0/24")
+	assert.Equal(b.PathList[0].IsWithdraw, false)
 
-	// Withdraws the previous route.
-	// NOTE: Withdow should not require any path attribute.
-	if _, err := t.AddPath("", []*table.Path{table.NewPath(nil, bgp.NewIPAddrPrefix(24, "10.0.0.0"), true, nil, time.Now(), false)}); err != nil {
+	if _, err := t.AddPath("", []*table.Path{table.NewPath(nil, bgp.NewIPAddrPrefix(24, "10.0.0.0"), true, attrs, time.Now(), false)}); err != nil {
 		log.Fatal(err)
 	}
+
 	ev = <-w.Event()
 	b = ev.(*WatchEventBestPath)
-	assert.Equal(1, len(b.PathList))
-	assert.Equal("10.0.0.0/24", b.PathList[0].GetNlri().String())
-	assert.True(b.PathList[0].IsWithdraw)
+	assert.Equal(len(b.PathList), 1)
+	assert.Equal(b.PathList[0].GetNlri().String(), "10.0.0.0/24")
+	assert.Equal(b.PathList[0].IsWithdraw, true)
 
-	// Stops the watcher still having an item.
-	w.Stop()
-
-	// Prepares an initial route to test WatchUpdate with "current" flag.
-	if _, err := t.AddPath("", []*table.Path{table.NewPath(nil, bgp.NewIPAddrPrefix(24, "10.1.0.0"), false, attrs, time.Now(), false)}); err != nil {
+	if _, err := t.AddPath("", []*table.Path{table.NewPath(nil, bgp.NewIPAddrPrefix(24, "10.0.0.0"), true, attrs, time.Now(), false)}); err != nil {
 		log.Fatal(err)
 	}
-	for {
-		// Waits for the initial route will be advertised.
-		rib, err := s.GetRib("", bgp.RF_IPv4_UC, nil)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if len(rib.GetKnownPathList("")) > 0 {
-			break
-		}
-		time.Sleep(1)
-	}
-
-	// Test WatchUpdate with "current" flag.
-	w = s.Watch(WatchUpdate(true))
-
-	// Test the initial route.
-	ev = <-w.Event()
-	u := ev.(*WatchEventUpdate)
-	assert.Equal(1, len(u.PathList))
-	assert.Equal("10.1.0.0/24", u.PathList[0].GetNlri().String())
-	assert.False(u.PathList[0].IsWithdraw)
-	ev = <-w.Event()
-	u = ev.(*WatchEventUpdate)
-	assert.Equal(len(u.PathList), 0) // End of RIB
-
-	// Advertises an additional route.
-	if _, err := t.AddPath("", []*table.Path{table.NewPath(nil, bgp.NewIPAddrPrefix(24, "10.2.0.0"), false, attrs, time.Now(), false)}); err != nil {
-		log.Fatal(err)
-	}
-	ev = <-w.Event()
-	u = ev.(*WatchEventUpdate)
-	assert.Equal(1, len(u.PathList))
-	assert.Equal("10.2.0.0/24", u.PathList[0].GetNlri().String())
-	assert.False(u.PathList[0].IsWithdraw)
-
-	// Withdraws the previous route.
-	// NOTE: Withdow should not require any path attribute.
-	if _, err := t.AddPath("", []*table.Path{table.NewPath(nil, bgp.NewIPAddrPrefix(24, "10.2.0.0"), true, nil, time.Now(), false)}); err != nil {
-		log.Fatal(err)
-	}
-	ev = <-w.Event()
-	u = ev.(*WatchEventUpdate)
-	assert.Equal(1, len(u.PathList))
-	assert.Equal("10.2.0.0/24", u.PathList[0].GetNlri().String())
-	assert.True(u.PathList[0].IsWithdraw)
-
-	// Stops the watcher still having an item.
+	//stop the watcher still having an item.
 	w.Stop()
 }
 

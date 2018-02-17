@@ -612,7 +612,7 @@ func (s *Server) MonitorPeerState(arg *Arguments, stream GobgpApi_MonitorPeerSta
 		return fmt.Errorf("invalid request")
 	}
 	return func() error {
-		w := s.bgpServer.Watch(server.WatchPeerState(arg.Current))
+		w := s.bgpServer.Watch(server.WatchPeerState(false))
 		defer func() { w.Stop() }()
 
 		for {
@@ -1489,8 +1489,8 @@ func (s *Server) GetDefinedSet(ctx context.Context, arg *GetDefinedSetRequest) (
 				for _, p := range cs.PrefixList {
 					exp := regexp.MustCompile("(\\d+)\\.\\.(\\d+)")
 					elems := exp.FindStringSubmatch(p.MasklengthRange)
-					min, _ := strconv.ParseUint(elems[1], 10, 32)
-					max, _ := strconv.ParseUint(elems[2], 10, 32)
+					min, _ := strconv.Atoi(elems[1])
+					max, _ := strconv.Atoi(elems[2])
 
 					l = append(l, &Prefix{IpPrefix: p.IpPrefix, MaskLengthMin: uint32(min), MaskLengthMax: uint32(max)})
 				}
@@ -1664,12 +1664,12 @@ func toStatementApi(s *config.Statement) *Statement {
 			case "+", "-":
 				action = MedActionType_MED_MOD
 			}
-			value, err := strconv.ParseInt(matches[1]+matches[2], 10, 64)
+			value, err := strconv.Atoi(matches[1] + matches[2])
 			if err != nil {
 				return nil
 			}
 			return &MedAction{
-				Value: value,
+				Value: int64(value),
 				Type:  action,
 			}
 		}(),
@@ -1677,10 +1677,10 @@ func toStatementApi(s *config.Statement) *Statement {
 			if len(s.Actions.BgpActions.SetAsPathPrepend.As) == 0 {
 				return nil
 			}
-			var asn uint64
+			asn := 0
 			useleft := false
 			if s.Actions.BgpActions.SetAsPathPrepend.As != "last-as" {
-				asn, _ = strconv.ParseUint(s.Actions.BgpActions.SetAsPathPrepend.As, 10, 32)
+				asn, _ = strconv.Atoi(s.Actions.BgpActions.SetAsPathPrepend.As)
 			} else {
 				useleft = true
 			}

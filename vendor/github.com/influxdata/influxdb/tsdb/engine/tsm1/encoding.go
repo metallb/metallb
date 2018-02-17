@@ -444,7 +444,11 @@ func DecodeFloatBlock(block []byte, a *[]FloatValue) ([]FloatValue, error) {
 		}
 
 		// Did float decoding have an error?
-		return vdec.Error()
+		err = vdec.Error()
+		if err != nil {
+			return err
+		}
+		return nil
 	}(*a)
 
 	timeDecoderPool.Put(tdec)
@@ -571,7 +575,11 @@ func DecodeBooleanBlock(block []byte, a *[]BooleanValue) ([]BooleanValue, error)
 			return err
 		}
 		// Did boolean decoding have an error?
-		return vdec.Error()
+		err = vdec.Error()
+		if err != nil {
+			return err
+		}
+		return nil
 	}(*a)
 
 	timeDecoderPool.Put(tdec)
@@ -690,7 +698,11 @@ func DecodeIntegerBlock(block []byte, a *[]IntegerValue) ([]IntegerValue, error)
 			return err
 		}
 		// Did int64 decoding have an error?
-		return vdec.Error()
+		err = vdec.Error()
+		if err != nil {
+			return err
+		}
+		return nil
 	}(*a)
 
 	timeDecoderPool.Put(tdec)
@@ -809,7 +821,11 @@ func DecodeUnsignedBlock(block []byte, a *[]UnsignedValue) ([]UnsignedValue, err
 			return err
 		}
 		// Did int64 decoding have an error?
-		return vdec.Error()
+		err = vdec.Error()
+		if err != nil {
+			return err
+		}
+		return nil
 	}(*a)
 
 	timeDecoderPool.Put(tdec)
@@ -931,7 +947,11 @@ func DecodeStringBlock(block []byte, a *[]StringValue) ([]StringValue, error) {
 			return err
 		}
 		// Did string decoding have an error?
-		return vdec.Error()
+		err = vdec.Error()
+		if err != nil {
+			return err
+		}
+		return nil
 	}(*a)
 
 	timeDecoderPool.Put(tdec)

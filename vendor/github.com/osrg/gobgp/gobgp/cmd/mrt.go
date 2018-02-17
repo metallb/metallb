@@ -22,11 +22,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/spf13/cobra"
-
-	"github.com/osrg/gobgp/packet/bgp"
 	"github.com/osrg/gobgp/packet/mrt"
 	"github.com/osrg/gobgp/table"
+	"github.com/spf13/cobra"
 )
 
 func injectMrt() error {
@@ -40,7 +38,7 @@ func injectMrt() error {
 		fmt.Println("You should probably specify either --no-ipv4 or --no-ipv6 when overwriting nexthop, unless your dump contains only one type of routes")
 	}
 
-	var idx int64
+	idx := 0
 	if mrtOpts.QueueSize < 1 {
 		return fmt.Errorf("Specified queue size is smaller than 1, refusing to run with unbounded memory usage")
 	}
@@ -118,22 +116,7 @@ func injectMrt() error {
 						ID: peers[e.PeerIndex].BgpId,
 					}
 					t := time.Unix(int64(e.OriginatedTime), 0)
-
-					switch subType {
-					case mrt.RIB_IPV4_UNICAST, mrt.RIB_IPV4_UNICAST_ADDPATH:
-						paths = append(paths, table.NewPath(source, nlri, false, e.PathAttributes, t, false))
-					default:
-						attrs := make([]bgp.PathAttributeInterface, 0, len(e.PathAttributes))
-						for _, attr := range e.PathAttributes {
-							if attr.GetType() != bgp.BGP_ATTR_TYPE_MP_REACH_NLRI {
-								attrs = append(attrs, attr)
-							} else {
-								a := attr.(*bgp.PathAttributeMpReachNLRI)
-								attrs = append(attrs, bgp.NewPathAttributeMpReachNLRI(a.Nexthop.String(), []bgp.AddrPrefixInterface{nlri}))
-							}
-						}
-						paths = append(paths, table.NewPath(source, nlri, false, attrs, t, false))
-					}
+					paths = append(paths, table.NewPath(source, nlri, false, e.PathAttributes, t, false))
 				}
 				if mrtOpts.NextHop != nil {
 					for _, p := range paths {
@@ -195,12 +178,12 @@ func NewMrtCmd() *cobra.Command {
 			mrtOpts.Filename = args[0]
 			if len(args) > 1 {
 				var err error
-				mrtOpts.RecordCount, err = strconv.ParseInt(args[1], 10, 64)
+				mrtOpts.RecordCount, err = strconv.Atoi(args[1])
 				if err != nil {
 					exitWithError(fmt.Errorf("invalid count value: %s", args[1]))
 				}
 				if len(args) > 2 {
-					mrtOpts.RecordSkip, err = strconv.ParseInt(args[2], 10, 64)
+					mrtOpts.RecordSkip, err = strconv.Atoi(args[2])
 					if err != nil {
 						exitWithError(fmt.Errorf("invalid skip value: %s", args[2]))
 					}

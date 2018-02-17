@@ -20,8 +20,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
-	"net"
 	"runtime"
 	"strconv"
 	"strings"
@@ -112,27 +110,26 @@ func startBenchmarkServer(config *testpb.ServerConfig, serverPort int) (*benchma
 	if port == 0 {
 		port = serverPort
 	}
-	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", port))
-	if err != nil {
-		grpclog.Fatalf("Failed to listen: %v", err)
-	}
-	addr := lis.Addr().String()
 
 	// Create different benchmark server according to config.
-	var closeFunc func()
+	var (
+		addr      string
+		closeFunc func()
+		err       error
+	)
 	if config.PayloadConfig != nil {
 		switch payload := config.PayloadConfig.Payload.(type) {
 		case *testpb.PayloadConfig_BytebufParams:
 			opts = append(opts, grpc.CustomCodec(byteBufCodec{}))
-			closeFunc = benchmark.StartServer(benchmark.ServerInfo{
+			addr, closeFunc = benchmark.StartServer(benchmark.ServerInfo{
+				Addr:     ":" + strconv.Itoa(port),
 				Type:     "bytebuf",
 				Metadata: payload.BytebufParams.RespSize,
-				Listener: lis,
 			}, opts...)
 		case *testpb.PayloadConfig_SimpleParams:
-			closeFunc = benchmark.StartServer(benchmark.ServerInfo{
-				Type:     "protobuf",
-				Listener: lis,
+			addr, closeFunc = benchmark.StartServer(benchmark.ServerInfo{
+				Addr: ":" + strconv.Itoa(port),
+				Type: "protobuf",
 			}, opts...)
 		case *testpb.PayloadConfig_ComplexParams:
 			return nil, status.Errorf(codes.Unimplemented, "unsupported payload config: %v", config.PayloadConfig)
@@ -141,9 +138,9 @@ func startBenchmarkServer(config *testpb.ServerConfig, serverPort int) (*benchma
 		}
 	} else {
 		// Start protobuf server if payload config is nil.
-		closeFunc = benchmark.StartServer(benchmark.ServerInfo{
-			Type:     "protobuf",
-			Listener: lis,
+		addr, closeFunc = benchmark.StartServer(benchmark.ServerInfo{
+			Addr: ":" + strconv.Itoa(port),
+			Type: "protobuf",
 		}, opts...)
 	}
 

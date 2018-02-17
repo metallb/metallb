@@ -13,7 +13,7 @@ import (
 // basically defines the maximum number of partitions you can have in the ring.
 // If a smaller number of partitions are chosen when creating a ring, then
 // they're evenly spread across this many partitions in the ring.
-const partitions = 16
+const partitions = 4096
 
 // ring is a structure that maps series keys to entries.
 //
@@ -252,7 +252,7 @@ func (p *partition) write(key []byte, values Values) (bool, error) {
 	}
 
 	// Create a new entry using a preallocated size if we have a hint available.
-	e, err := newEntryValues(values)
+	e, err := newEntryValues(values, 32)
 	if err != nil {
 		return false, err
 	}

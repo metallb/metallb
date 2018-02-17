@@ -281,13 +281,12 @@ func (t *http2Server) operateHeaders(frame *http2.MetaHeadersFrame, handle func(
 
 	buf := newRecvBuffer()
 	s := &Stream{
-		id:             streamID,
-		st:             t,
-		buf:            buf,
-		fc:             &inFlow{limit: uint32(t.initialWindowSize)},
-		recvCompress:   state.encoding,
-		method:         state.method,
-		contentSubtype: state.contentSubtype,
+		id:           streamID,
+		st:           t,
+		buf:          buf,
+		fc:           &inFlow{limit: uint32(t.initialWindowSize)},
+		recvCompress: state.encoding,
+		method:       state.method,
 	}
 
 	if frame.StreamEnded() {
@@ -731,7 +730,7 @@ func (t *http2Server) WriteHeader(s *Stream, md metadata.MD) error {
 	// first and create a slice of that exact size.
 	headerFields := make([]hpack.HeaderField, 0, 2) // at least :status, content-type will be there if none else.
 	headerFields = append(headerFields, hpack.HeaderField{Name: ":status", Value: "200"})
-	headerFields = append(headerFields, hpack.HeaderField{Name: "content-type", Value: contentType(s.contentSubtype)})
+	headerFields = append(headerFields, hpack.HeaderField{Name: "content-type", Value: "application/grpc"})
 	if s.sendCompress != "" {
 		headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-encoding", Value: s.sendCompress})
 	}
@@ -750,9 +749,9 @@ func (t *http2Server) WriteHeader(s *Stream, md metadata.MD) error {
 		endStream: false,
 	})
 	if t.stats != nil {
-		// Note: WireLength is not set in outHeader.
-		// TODO(mmukhi): Revisit this later, if needed.
-		outHeader := &stats.OutHeader{}
+		outHeader := &stats.OutHeader{
+		//WireLength: // TODO(mmukhi): Revisit this later, if needed.
+		}
 		t.stats.HandleRPC(s.Context(), outHeader)
 	}
 	return nil
@@ -793,7 +792,7 @@ func (t *http2Server) WriteStatus(s *Stream, st *status.Status) error {
 	headerFields := make([]hpack.HeaderField, 0, 2) // grpc-status and grpc-message will be there if none else.
 	if !headersSent {
 		headerFields = append(headerFields, hpack.HeaderField{Name: ":status", Value: "200"})
-		headerFields = append(headerFields, hpack.HeaderField{Name: "content-type", Value: contentType(s.contentSubtype)})
+		headerFields = append(headerFields, hpack.HeaderField{Name: "content-type", Value: "application/grpc"})
 	}
 	headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-status", Value: strconv.Itoa(int(st.Code()))})
 	headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-message", Value: encodeGrpcMessage(st.Message())})
@@ -843,6 +842,10 @@ func (t *http2Server) Write(s *Stream, hdr []byte, data []byte, opts *Options) e
 
 	var writeHeaderFrame bool
 	s.mu.Lock()
+	if s.state == streamDone {
+		s.mu.Unlock()
+		return streamErrorf(codes.Unknown, "the stream has been done")
+	}
 	if !s.headerOk {
 		writeHeaderFrame = true
 	}
@@ -888,8 +891,6 @@ func (t *http2Server) Write(s *Stream, hdr []byte, data []byte, opts *Options) e
 			}
 			ltq, _, err := t.localSendQuota.get(size, s.waiters)
 			if err != nil {
-				// Add the acquired quota back to transport.
-				t.sendQuotaPool.add(tq)
 				return err
 			}
 			// even if ltq is smaller than size we don't adjust size since,

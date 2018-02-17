@@ -17,21 +17,19 @@ package server
 
 import (
 	"fmt"
+	"github.com/eapache/channels"
+	"github.com/osrg/gobgp/config"
+	"github.com/osrg/gobgp/packet/bgp"
+	"github.com/osrg/gobgp/packet/bmp"
+	"github.com/osrg/gobgp/table"
+	log "github.com/sirupsen/logrus"
+	"gopkg.in/tomb.v2"
 	"io"
 	"math/rand"
 	"net"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/eapache/channels"
-	log "github.com/sirupsen/logrus"
-	"gopkg.in/tomb.v2"
-
-	"github.com/osrg/gobgp/config"
-	"github.com/osrg/gobgp/packet/bgp"
-	"github.com/osrg/gobgp/packet/bmp"
-	"github.com/osrg/gobgp/table"
 )
 
 type FsmStateReason string
@@ -274,7 +272,7 @@ func hostport(addr net.Addr) (string, uint16) {
 		if err != nil {
 			return "", 0
 		}
-		p, _ := strconv.ParseUint(port, 10, 16)
+		p, _ := strconv.Atoi(port)
 		return host, uint16(p)
 	}
 	return "", 0

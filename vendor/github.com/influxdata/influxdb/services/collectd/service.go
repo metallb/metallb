@@ -453,7 +453,8 @@ func (s *Service) UnmarshalValueList(vl *api.ValueList) []models.Point {
 
 	var points []models.Point
 	for i := range vl.Values {
-		name := fmt.Sprintf("%s_%s", vl.Identifier.Plugin, vl.DSName(i))
+		var name string
+		name = fmt.Sprintf("%s_%s", vl.Identifier.Plugin, vl.DSName(i))
 		tags := make(map[string]string, 4)
 		fields := make(map[string]interface{}, 1)
 

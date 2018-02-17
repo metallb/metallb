@@ -28,7 +28,7 @@ const (
 	TUNTAP_TUN_EXCL             TuntapFlag = unix.IFF_TUN_EXCL
 	TUNTAP_NO_PI                TuntapFlag = unix.IFF_NO_PI
 	TUNTAP_ONE_QUEUE            TuntapFlag = unix.IFF_ONE_QUEUE
-	TUNTAP_MULTI_QUEUE          TuntapFlag = unix.IFF_MULTI_QUEUE
+	TUNTAP_MULTI_QUEUE          TuntapFlag = 0x0100
 	TUNTAP_MULTI_QUEUE_DEFAULTS TuntapFlag = TUNTAP_MULTI_QUEUE | TUNTAP_NO_PI
 )
 
@@ -1310,15 +1310,11 @@ func LinkDeserialize(hdr *unix.NlMsghdr, m []byte) (Link, error) {
 						link = &Macvtap{}
 					case "gretap":
 						link = &Gretap{}
-					case "ip6gretap":
-						link = &Gretap{}
 					case "ipip":
 						link = &Iptun{}
 					case "sit":
 						link = &Sittun{}
 					case "gre":
-						link = &Gretun{}
-					case "ip6gre":
 						link = &Gretun{}
 					case "vti":
 						link = &Vti{}
@@ -1349,15 +1345,11 @@ func LinkDeserialize(hdr *unix.NlMsghdr, m []byte) (Link, error) {
 						parseMacvtapData(link, data)
 					case "gretap":
 						parseGretapData(link, data)
-					case "ip6gretap":
-						parseGretapData(link, data)
 					case "ipip":
 						parseIptunData(link, data)
 					case "sit":
 						parseSittunData(link, data)
 					case "gre":
-						parseGretunData(link, data)
-					case "ip6gre":
 						parseGretunData(link, data)
 					case "vti":
 						parseVtiData(link, data)
@@ -1476,13 +1468,13 @@ type LinkUpdate struct {
 // LinkSubscribe takes a chan down which notifications will be sent
 // when links change.  Close the 'done' chan to stop subscription.
 func LinkSubscribe(ch chan<- LinkUpdate, done <-chan struct{}) error {
-	return linkSubscribeAt(netns.None(), netns.None(), ch, done, nil, false)
+	return linkSubscribeAt(netns.None(), netns.None(), ch, done, nil)
 }
 
 // LinkSubscribeAt works like LinkSubscribe plus it allows the caller
 // to choose the network namespace in which to subscribe (ns).
 func LinkSubscribeAt(ns netns.NsHandle, ch chan<- LinkUpdate, done <-chan struct{}) error {
-	return linkSubscribeAt(ns, netns.None(), ch, done, nil, false)
+	return linkSubscribeAt(ns, netns.None(), ch, done, nil)
 }
 
 // LinkSubscribeOptions contains a set of options to use with
@@ -1490,7 +1482,6 @@ func LinkSubscribeAt(ns netns.NsHandle, ch chan<- LinkUpdate, done <-chan struct
 type LinkSubscribeOptions struct {
 	Namespace     *netns.NsHandle
 	ErrorCallback func(error)
-	ListExisting  bool
 }
 
 // LinkSubscribeWithOptions work like LinkSubscribe but enable to
@@ -1501,10 +1492,10 @@ func LinkSubscribeWithOptions(ch chan<- LinkUpdate, done <-chan struct{}, option
 		none := netns.None()
 		options.Namespace = &none
 	}
-	return linkSubscribeAt(*options.Namespace, netns.None(), ch, done, options.ErrorCallback, options.ListExisting)
+	return linkSubscribeAt(*options.Namespace, netns.None(), ch, done, options.ErrorCallback)
 }
 
-func linkSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- LinkUpdate, done <-chan struct{}, cberr func(error), listExisting bool) error {
+func linkSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- LinkUpdate, done <-chan struct{}, cberr func(error)) error {
 	s, err := nl.SubscribeAt(newNs, curNs, unix.NETLINK_ROUTE, unix.RTNLGRP_LINK)
 	if err != nil {
 		return err
@@ -1514,15 +1505,6 @@ func linkSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- LinkUpdate, done <-c
 			<-done
 			s.Close()
 		}()
-	}
-	if listExisting {
-		req := pkgHandle.newNetlinkRequest(unix.RTM_GETLINK,
-			unix.NLM_F_DUMP)
-		msg := nl.NewIfInfomsg(unix.AF_UNSPEC)
-		req.AddData(msg)
-		if err := s.Send(req); err != nil {
-			return err
-		}
 	}
 	go func() {
 		defer close(ch)
@@ -1535,20 +1517,6 @@ func linkSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- LinkUpdate, done <-c
 				return
 			}
 			for _, m := range msgs {
-				if m.Header.Type == unix.NLMSG_DONE {
-					continue
-				}
-				if m.Header.Type == unix.NLMSG_ERROR {
-					native := nl.NativeEndian()
-					error := int32(native.Uint32(m.Data[0:4]))
-					if error == 0 {
-						continue
-					}
-					if cberr != nil {
-						cberr(syscall.Errno(-error))
-					}
-					return
-				}
 				ifmsg := nl.DeserializeIfInfomsg(m.Data)
 				header := unix.NlMsghdr(m.Header)
 				link, err := LinkDeserialize(&header, m.Data)
@@ -1882,17 +1850,12 @@ func addGretapAttrs(gretap *Gretap, linkInfo *nl.RtAttr) {
 		return
 	}
 
-	if ip := gretap.Local; ip != nil {
-		if ip.To4() != nil {
-			ip = ip.To4()
-		}
+	ip := gretap.Local.To4()
+	if ip != nil {
 		nl.NewRtAttrChild(data, nl.IFLA_GRE_LOCAL, []byte(ip))
 	}
-
-	if ip := gretap.Remote; ip != nil {
-		if ip.To4() != nil {
-			ip = ip.To4()
-		}
+	ip = gretap.Remote.To4()
+	if ip != nil {
 		nl.NewRtAttrChild(data, nl.IFLA_GRE_REMOTE, []byte(ip))
 	}
 
@@ -1931,9 +1894,9 @@ func parseGretapData(link Link, data []syscall.NetlinkRouteAttr) {
 		case nl.IFLA_GRE_IKEY:
 			gre.OKey = ntohl(datum.Value[0:4])
 		case nl.IFLA_GRE_LOCAL:
-			gre.Local = net.IP(datum.Value[0:16])
+			gre.Local = net.IP(datum.Value[0:4])
 		case nl.IFLA_GRE_REMOTE:
-			gre.Remote = net.IP(datum.Value[0:16])
+			gre.Remote = net.IP(datum.Value[0:4])
 		case nl.IFLA_GRE_ENCAP_SPORT:
 			gre.EncapSport = ntohs(datum.Value[0:2])
 		case nl.IFLA_GRE_ENCAP_DPORT:
@@ -1964,17 +1927,12 @@ func parseGretapData(link Link, data []syscall.NetlinkRouteAttr) {
 func addGretunAttrs(gre *Gretun, linkInfo *nl.RtAttr) {
 	data := nl.NewRtAttrChild(linkInfo, nl.IFLA_INFO_DATA, nil)
 
-	if ip := gre.Local; ip != nil {
-		if ip.To4() != nil {
-			ip = ip.To4()
-		}
+	ip := gre.Local.To4()
+	if ip != nil {
 		nl.NewRtAttrChild(data, nl.IFLA_GRE_LOCAL, []byte(ip))
 	}
-
-	if ip := gre.Remote; ip != nil {
-		if ip.To4() != nil {
-			ip = ip.To4()
-		}
+	ip = gre.Remote.To4()
+	if ip != nil {
 		nl.NewRtAttrChild(data, nl.IFLA_GRE_REMOTE, []byte(ip))
 	}
 
@@ -2013,9 +1971,9 @@ func parseGretunData(link Link, data []syscall.NetlinkRouteAttr) {
 		case nl.IFLA_GRE_IKEY:
 			gre.OKey = ntohl(datum.Value[0:4])
 		case nl.IFLA_GRE_LOCAL:
-			gre.Local = net.IP(datum.Value[0:16])
+			gre.Local = net.IP(datum.Value[0:4])
 		case nl.IFLA_GRE_REMOTE:
-			gre.Remote = net.IP(datum.Value[0:16])
+			gre.Remote = net.IP(datum.Value[0:4])
 		case nl.IFLA_GRE_IFLAGS:
 			gre.IFlags = ntohs(datum.Value[0:2])
 		case nl.IFLA_GRE_OFLAGS:

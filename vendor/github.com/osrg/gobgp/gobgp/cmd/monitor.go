@@ -21,10 +21,9 @@ import (
 	"io"
 	"net"
 
-	"github.com/spf13/cobra"
-
 	"github.com/osrg/gobgp/packet/bgp"
 	"github.com/osrg/gobgp/table"
+	"github.com/spf13/cobra"
 )
 
 func makeMonitorRouteArgs(p *table.Path, showIdentifier bgp.BGPAddPathMode) []interface{} {
@@ -115,6 +114,7 @@ func NewMonitorCmd() *cobra.Command {
 		},
 	}
 	ribCmd.PersistentFlags().StringVarP(&subOpts.AddressFamily, "address-family", "a", "", "address family")
+	ribCmd.PersistentFlags().BoolVarP(&current, "current", "", false, "dump current contents")
 
 	globalCmd := &cobra.Command{
 		Use: CMD_GLOBAL,
@@ -122,14 +122,9 @@ func NewMonitorCmd() *cobra.Command {
 	globalCmd.AddCommand(ribCmd)
 
 	neighborCmd := &cobra.Command{
-		Use:  fmt.Sprintf("%s [<neighbor address>]", CMD_NEIGHBOR),
-		Args: cobra.MaximumNArgs(1),
+		Use: CMD_NEIGHBOR,
 		Run: func(cmd *cobra.Command, args []string) {
-			name := ""
-			if len(args) > 0 {
-				name = args[0]
-			}
-			stream, err := client.MonitorNeighborState(name, current)
+			stream, err := client.MonitorNeighborState(args...)
 			if err != nil {
 				exitWithError(err)
 			}
@@ -177,6 +172,7 @@ func NewMonitorCmd() *cobra.Command {
 		},
 	}
 	adjInCmd.PersistentFlags().StringVarP(&subOpts.AddressFamily, "address-family", "a", "", "address family")
+	adjInCmd.PersistentFlags().BoolVarP(&current, "current", "", false, "dump current contents")
 
 	monitorCmd := &cobra.Command{
 		Use: CMD_MONITOR,
@@ -184,8 +180,6 @@ func NewMonitorCmd() *cobra.Command {
 	monitorCmd.AddCommand(globalCmd)
 	monitorCmd.AddCommand(neighborCmd)
 	monitorCmd.AddCommand(adjInCmd)
-
-	monitorCmd.PersistentFlags().BoolVarP(&current, "current", "", false, "dump current contents")
 
 	return monitorCmd
 }

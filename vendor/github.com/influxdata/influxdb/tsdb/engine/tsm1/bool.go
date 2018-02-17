@@ -10,9 +10,14 @@ import (
 	"fmt"
 )
 
-// Note: an uncompressed boolean format is not yet implemented.
-// booleanCompressedBitPacked is a bit packed format using 1 bit per boolean
-const booleanCompressedBitPacked = 1
+const (
+	// booleanUncompressed is an uncompressed boolean format.
+	// Not yet implemented.
+	booleanUncompressed = 0
+
+	// booleanCompressedBitPacked is an bit packed format using 1 bit per boolean
+	booleanCompressedBitPacked = 1
+)
 
 // BooleanEncoder encodes a series of booleans to an in-memory buffer.
 type BooleanEncoder struct {

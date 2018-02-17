@@ -16,8 +16,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/influxdata/influxdb/tsdb/index/inmem"
-
 	"github.com/davecgh/go-spew/spew"
 	"github.com/influxdata/influxdb/internal"
 	"github.com/influxdata/influxdb/logger"
@@ -142,110 +140,31 @@ func TestStore_CreateShard(t *testing.T) {
 	}
 }
 
-// Ensure the store does not return an error when delete from a non-existent db.
-func TestStore_DeleteSeries_NonExistentDB(t *testing.T) {
+// Ensure the store can delete an existing shard.
+func TestStore_DeleteShard(t *testing.T) {
 	t.Parallel()
 
 	test := func(index string) {
 		s := MustOpenStore(index)
 		defer s.Close()
 
-		if err := s.DeleteSeries("db0", nil, nil); err != nil {
-			t.Fatal(err.Error())
+		// Create a new shard and verify that it exists.
+		if err := s.CreateShard("db0", "rp0", 1, true); err != nil {
+			t.Fatal(err)
+		} else if sh := s.Shard(1); sh == nil {
+			t.Fatalf("expected shard")
+		}
+
+		// Reopen shard and recheck.
+		if err := s.Reopen(); err != nil {
+			t.Fatal(err)
+		} else if sh := s.Shard(1); sh == nil {
+			t.Fatalf("shard exists")
 		}
 	}
 
 	for _, index := range tsdb.RegisteredIndexes() {
 		t.Run(index, func(t *testing.T) { test(index) })
-	}
-}
-
-// Ensure the store can delete an existing shard.
-func TestStore_DeleteShard(t *testing.T) {
-	t.Parallel()
-
-	test := func(index string) error {
-		s := MustOpenStore(index)
-		defer s.Close()
-
-		// Create a new shard and verify that it exists.
-		if err := s.CreateShard("db0", "rp0", 1, true); err != nil {
-			return err
-		} else if sh := s.Shard(1); sh == nil {
-			return fmt.Errorf("expected shard")
-		}
-
-		// Create another shard.
-		if err := s.CreateShard("db0", "rp0", 2, true); err != nil {
-			return err
-		} else if sh := s.Shard(2); sh == nil {
-			return fmt.Errorf("expected shard")
-		}
-
-		// and another, but in a different db.
-		if err := s.CreateShard("db1", "rp0", 3, true); err != nil {
-			return err
-		} else if sh := s.Shard(3); sh == nil {
-			return fmt.Errorf("expected shard")
-		}
-
-		// Write series data to the db0 shards.
-		s.MustWriteToShardString(1, "cpu,servera=a v=1", "cpu,serverb=b v=1", "mem,serverc=a v=1")
-		s.MustWriteToShardString(2, "cpu,servera=a v=1", "mem,serverc=a v=1")
-
-		// Write similar data to db1 database
-		s.MustWriteToShardString(3, "cpu,serverb=b v=1")
-
-		// Reopen the store and check all shards still exist
-		if err := s.Reopen(); err != nil {
-			return err
-		}
-		for i := uint64(1); i <= 3; i++ {
-			if sh := s.Shard(i); sh == nil {
-				return fmt.Errorf("shard %d missing", i)
-			}
-		}
-
-		// Remove the first shard from the store.
-		if err := s.DeleteShard(1); err != nil {
-			return err
-		}
-
-		// cpu,serverb=b should be removed from the series file for db0 because
-		// shard 1 was the only owner of that series.
-		// Verify by getting  all tag keys.
-		keys, err := s.TagKeys(nil, []uint64{2}, nil)
-		if err != nil {
-			return err
-		}
-
-		expKeys := []tsdb.TagKeys{
-			{Measurement: "cpu", Keys: []string{"servera"}},
-			{Measurement: "mem", Keys: []string{"serverc"}},
-		}
-		if got, exp := keys, expKeys; !reflect.DeepEqual(got, exp) {
-			return fmt.Errorf("got keys %v, expected %v", got, exp)
-		}
-
-		// Verify that the same series was not removed from other databases'
-		// series files.
-		if keys, err = s.TagKeys(nil, []uint64{3}, nil); err != nil {
-			return err
-		}
-
-		expKeys = []tsdb.TagKeys{{Measurement: "cpu", Keys: []string{"serverb"}}}
-		if got, exp := keys, expKeys; !reflect.DeepEqual(got, exp) {
-			return fmt.Errorf("got keys %v, expected %v", got, exp)
-		}
-		return nil
-	}
-
-	for _, index := range tsdb.RegisteredIndexes() {
-		t.Run(index, func(t *testing.T) {
-			if err := test(index); err != nil {
-				t.Error(err)
-			}
-		})
 	}
 }
 
@@ -282,7 +201,8 @@ func TestStore_Open(t *testing.T) {
 	t.Parallel()
 
 	test := func(index string) {
-		s := NewStore(index)
+		s := NewStore()
+		s.EngineOptions.IndexVersion = index
 		defer s.Close()
 
 		if err := os.MkdirAll(filepath.Join(s.Path(), "db0", "rp0", "2"), 0777); err != nil {
@@ -325,7 +245,8 @@ func TestStore_Open_InvalidDatabaseFile(t *testing.T) {
 	t.Parallel()
 
 	test := func(index string) {
-		s := NewStore(index)
+		s := NewStore()
+		s.EngineOptions.IndexVersion = index
 		defer s.Close()
 
 		// Create a file instead of a directory for a database.
@@ -351,7 +272,8 @@ func TestStore_Open_InvalidRetentionPolicy(t *testing.T) {
 	t.Parallel()
 
 	test := func(index string) {
-		s := NewStore(index)
+		s := NewStore()
+		s.EngineOptions.IndexVersion = index
 		defer s.Close()
 
 		// Create an RP file instead of a directory.
@@ -381,7 +303,8 @@ func TestStore_Open_InvalidShard(t *testing.T) {
 	t.Parallel()
 
 	test := func(index string) {
-		s := NewStore(index)
+		s := NewStore()
+		s.EngineOptions.IndexVersion = index
 		defer s.Close()
 
 		// Create a non-numeric shard file.
@@ -569,41 +492,6 @@ func TestStore_BackupRestoreShard(t *testing.T) {
 		})
 	}
 }
-func TestStore_Shard_SeriesN(t *testing.T) {
-	t.Parallel()
-
-	test := func(index string) error {
-		s := MustOpenStore(index)
-		defer s.Close()
-
-		// Create shard with data.
-		s.MustCreateShardWithData("db0", "rp0", 1,
-			`cpu value=1 0`,
-			`cpu,host=serverA value=2 10`,
-		)
-
-		// Create 2nd shard w/ same measurements.
-		s.MustCreateShardWithData("db0", "rp0", 2,
-			`cpu value=1 0`,
-			`cpu value=2 10`,
-		)
-
-		if got, exp := s.Shard(1).SeriesN(), int64(2); got != exp {
-			return fmt.Errorf("[shard %d] got series count of %d, but expected %d", 1, got, exp)
-		} else if got, exp := s.Shard(2).SeriesN(), int64(1); got != exp {
-			return fmt.Errorf("[shard %d] got series count of %d, but expected %d", 2, got, exp)
-		}
-		return nil
-	}
-
-	for _, index := range tsdb.RegisteredIndexes() {
-		t.Run(index, func(t *testing.T) {
-			if err := test(index); err != nil {
-				t.Error(err)
-			}
-		})
-	}
-}
 
 func TestStore_MeasurementNames_Deduplicate(t *testing.T) {
 	t.Parallel()
@@ -667,13 +555,13 @@ func testStoreCardinalityTombstoning(t *testing.T, store *Store) {
 	}
 
 	// Delete all the series for each measurement.
-	mnames, err := store.MeasurementNames(nil, "db", nil)
+	mnames, err := store.MeasurementNames(query.OpenAuthorizer, "db", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	for _, name := range mnames {
-		if err := store.DeleteSeries("db", []influxql.Source{&influxql.Measurement{Name: string(name)}}, nil); err != nil {
+		if err := store.DeleteSeries("db", []influxql.Source{&influxql.Measurement{Name: string(name)}}, nil, true); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -685,8 +573,9 @@ func testStoreCardinalityTombstoning(t *testing.T, store *Store) {
 	}
 
 	// Estimated cardinality should be well within 10 of the actual cardinality.
-	if got, exp := int(cardinality), 10; got > exp {
-		t.Errorf("series cardinality was %v (expected within %v), expected was: %d", got, exp, 0)
+	// TODO(edd): this epsilon is arbitrary. How can I make it better?
+	if got, exp := cardinality, int64(10); got > exp {
+		t.Errorf("series cardinality out by %v (expected within %v), estimation was: %d", got, exp, cardinality)
 	}
 
 	// Since all the series have been deleted, all the measurements should have
@@ -697,12 +586,14 @@ func testStoreCardinalityTombstoning(t *testing.T, store *Store) {
 
 	// Estimated cardinality should be well within 2 of the actual cardinality.
 	// TODO(edd): this is totally arbitrary. How can I make it better?
-	if got, exp := int(cardinality), 2; got > exp {
-		t.Errorf("measurement cardinality was %v (expected within %v), expected was: %d", got, exp, 0)
+	if got, exp := cardinality, int64(2); got > exp {
+		t.Errorf("measurement cardinality out by %v (expected within %v), estimation was: %d", got, exp, cardinality)
 	}
 }
 
 func TestStore_Cardinality_Tombstoning(t *testing.T) {
+	t.Skip("TODO(benbjohnson): Fix once series file moved to DB")
+
 	t.Parallel()
 
 	if testing.Short() || os.Getenv("GORACE") != "" || os.Getenv("APPVEYOR") != "" {
@@ -710,7 +601,8 @@ func TestStore_Cardinality_Tombstoning(t *testing.T) {
 	}
 
 	test := func(index string) {
-		store := NewStore(index)
+		store := NewStore()
+		store.EngineOptions.IndexVersion = index
 		if err := store.Open(); err != nil {
 			panic(err)
 		}
@@ -768,6 +660,8 @@ func testStoreCardinalityUnique(t *testing.T, store *Store) {
 }
 
 func TestStore_Cardinality_Unique(t *testing.T) {
+	t.Skip("TODO(benbjohnson): Merge series file to DB level")
+
 	t.Parallel()
 
 	if testing.Short() || os.Getenv("GORACE") != "" || os.Getenv("APPVEYOR") != "" {
@@ -775,7 +669,8 @@ func TestStore_Cardinality_Unique(t *testing.T) {
 	}
 
 	test := func(index string) {
-		store := NewStore(index)
+		store := NewStore()
+		store.EngineOptions.IndexVersion = index
 		store.EngineOptions.Config.MaxSeriesPerDatabase = 0
 		if err := store.Open(); err != nil {
 			panic(err)
@@ -857,7 +752,8 @@ func TestStore_Cardinality_Duplicates(t *testing.T) {
 	}
 
 	test := func(index string) {
-		store := NewStore(index)
+		store := NewStore()
+		store.EngineOptions.IndexVersion = index
 		store.EngineOptions.Config.MaxSeriesPerDatabase = 0
 		if err := store.Open(); err != nil {
 			panic(err)
@@ -925,145 +821,14 @@ func TestStore_Cardinality_Compactions(t *testing.T) {
 	}
 
 	test := func(index string) error {
-		store := NewStore(index)
+		store := NewStore()
+		store.EngineOptions.Config.Index = "inmem"
 		store.EngineOptions.Config.MaxSeriesPerDatabase = 0
 		if err := store.Open(); err != nil {
 			panic(err)
 		}
 		defer store.Close()
 		return testStoreCardinalityCompactions(store)
-	}
-
-	for _, index := range tsdb.RegisteredIndexes() {
-		t.Run(index, func(t *testing.T) {
-			if err := test(index); err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
-}
-
-func TestStore_Sketches(t *testing.T) {
-	t.Parallel()
-
-	checkCardinalities := func(store *tsdb.Store, series, tseries, measurements, tmeasurements int) error {
-		// Get sketches and check cardinality...
-		sketch, tsketch, err := store.SeriesSketches("db")
-		if err != nil {
-			return err
-		}
-
-		// delta calculates a rough 10% delta. If i is small then a minimum value
-		// of 2 is used.
-		delta := func(i int) int {
-			v := i / 10
-			if v == 0 {
-				v = 2
-			}
-			return v
-		}
-
-		// series cardinality should be well within 10%.
-		if got, exp := int(sketch.Count()), series; got-exp < -delta(series) || got-exp > delta(series) {
-			return fmt.Errorf("got series cardinality %d, expected ~%d", got, exp)
-		}
-
-		// check series tombstones
-		if got, exp := int(tsketch.Count()), tseries; got-exp < -delta(tseries) || got-exp > delta(tseries) {
-			return fmt.Errorf("got series tombstone cardinality %d, expected ~%d", got, exp)
-		}
-
-		// Check measurement cardinality.
-		if sketch, tsketch, err = store.MeasurementsSketches("db"); err != nil {
-			return err
-		}
-
-		if got, exp := int(sketch.Count()), measurements; got-exp < -delta(measurements) || got-exp > delta(measurements) {
-			return fmt.Errorf("got measurement cardinality %d, expected ~%d", got, exp)
-		}
-
-		if got, exp := int(tsketch.Count()), tmeasurements; got-exp < -delta(tmeasurements) || got-exp > delta(tmeasurements) {
-			return fmt.Errorf("got measurement tombstone cardinality %d, expected ~%d", got, exp)
-		}
-		return nil
-	}
-
-	test := func(index string) error {
-		store := MustOpenStore(index)
-		defer store.Close()
-
-		// Generate point data to write to the shards.
-		series := genTestSeries(10, 2, 4) // 160 series
-
-		points := make([]models.Point, 0, len(series))
-		for _, s := range series {
-			points = append(points, models.MustNewPoint(s.Measurement, s.Tags, map[string]interface{}{"value": 1.0}, time.Now()))
-		}
-
-		// Create requested number of shards in the store & write points across
-		// shards such that we never write the same series to multiple shards.
-		for shardID := 0; shardID < 4; shardID++ {
-			if err := store.CreateShard("db", "rp", uint64(shardID), true); err != nil {
-				return fmt.Errorf("create shard: %s", err)
-			}
-
-			if err := store.BatchWrite(shardID, points[shardID*40:(shardID+1)*40]); err != nil {
-				return fmt.Errorf("batch write: %s", err)
-			}
-		}
-
-		// Check cardinalities
-		if err := checkCardinalities(store.Store, 160, 0, 10, 0); err != nil {
-			return fmt.Errorf("[initial] %v", err)
-		}
-
-		// Reopen the store.
-		if err := store.Reopen(); err != nil {
-			return err
-		}
-
-		// Check cardinalities
-		if err := checkCardinalities(store.Store, 160, 0, 10, 0); err != nil {
-			return fmt.Errorf("[initial|re-open] %v", err)
-		}
-
-		// Delete half the the measurements data
-		mnames, err := store.MeasurementNames(nil, "db", nil)
-		if err != nil {
-			return err
-		}
-
-		for _, name := range mnames[:len(mnames)/2] {
-			if err := store.DeleteSeries("db", []influxql.Source{&influxql.Measurement{Name: string(name)}}, nil); err != nil {
-				return err
-			}
-		}
-
-		// Check cardinalities - tombstones should be in
-		if err := checkCardinalities(store.Store, 160, 80, 10, 5); err != nil {
-			return fmt.Errorf("[initial|re-open|delete] %v", err)
-		}
-
-		// Reopen the store.
-		if err := store.Reopen(); err != nil {
-			return err
-		}
-
-		// Check cardinalities. In this case, the indexes behave differently.
-		//
-		// - The inmem index will report that there are 80 series and no tombstones.
-		// - The tsi1 index will report that there are 160 series and 80 tombstones.
-		//
-		// The result is the same, but the implementation differs.
-		expS, expTS, expM, expTM := 160, 80, 10, 5
-		if index == inmem.IndexName {
-			expS, expTS, expM, expTM = 80, 0, 5, 0
-		}
-
-		if err := checkCardinalities(store.Store, expS, expTS, expM, expTM); err != nil {
-			return fmt.Errorf("[initial|re-open|delete|re-open] %v", err)
-		}
-		return nil
 	}
 
 	for _, index := range tsdb.RegisteredIndexes() {
@@ -1255,7 +1020,7 @@ func TestStore_Measurements_Auth(t *testing.T) {
 			return err
 		}
 
-		if err := s.DeleteSeries("db0", nil, cond); err != nil {
+		if err := s.DeleteSeries("db0", nil, cond, true); err != nil {
 			return err
 		}
 
@@ -1347,7 +1112,7 @@ func TestStore_TagKeys_Auth(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if err := s.DeleteSeries("db0", nil, cond); err != nil {
+		if err := s.DeleteSeries("db0", nil, cond, true); err != nil {
 			return err
 		}
 
@@ -1450,7 +1215,7 @@ func TestStore_TagValues_Auth(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if err := s.DeleteSeries("db0", nil, cond); err != nil {
+		if err := s.DeleteSeries("db0", nil, cond, true); err != nil {
 			return err
 		}
 
@@ -1484,7 +1249,7 @@ func TestStore_TagValues_Auth(t *testing.T) {
 		}
 
 		if gotValues != expValues {
-			return fmt.Errorf("got %d values, but expected %d", gotValues, expValues)
+			return fmt.Errorf("got %d tags, but expected %d", gotValues, expValues)
 		}
 		return nil
 	}
@@ -1524,7 +1289,8 @@ func createTagValues(mname string, kvs map[string][]string) tsdb.TagValues {
 
 func BenchmarkStore_SeriesCardinality_100_Shards(b *testing.B) {
 	for _, index := range tsdb.RegisteredIndexes() {
-		store := NewStore(index)
+		store := NewStore()
+		store.EngineOptions.IndexVersion = index
 		if err := store.Open(); err != nil {
 			panic(err)
 		}
@@ -1627,7 +1393,8 @@ func BenchmarkStore_TagValues(b *testing.B) {
 
 	var s *Store
 	setup := func(shards, measurements, tagValues int, index string, useRandom bool) []uint64 { // returns shard ids
-		s := NewStore(index)
+		s = NewStore()
+		s.EngineOptions.IndexVersion = index
 		if err := s.Open(); err != nil {
 			panic(err)
 		}
@@ -1729,18 +1496,16 @@ func BenchmarkStore_TagValues(b *testing.B) {
 // Store is a test wrapper for tsdb.Store.
 type Store struct {
 	*tsdb.Store
-	index string
 }
 
 // NewStore returns a new instance of Store with a temporary path.
-func NewStore(index string) *Store {
+func NewStore() *Store {
 	path, err := ioutil.TempDir("", "influxdb-tsdb-")
 	if err != nil {
 		panic(err)
 	}
 
-	s := &Store{Store: tsdb.NewStore(path), index: index}
-	s.EngineOptions.IndexVersion = index
+	s := &Store{Store: tsdb.NewStore(path)}
 	s.EngineOptions.Config.WALDir = filepath.Join(path, "wal")
 	s.EngineOptions.Config.TraceLoggingEnabled = true
 
@@ -1754,7 +1519,8 @@ func NewStore(index string) *Store {
 // MustOpenStore returns a new, open Store using the specified index,
 // at a temporary path.
 func MustOpenStore(index string) *Store {
-	s := NewStore(index)
+	s := NewStore()
+	s.EngineOptions.IndexVersion = index
 
 	if err := s.Open(); err != nil {
 		panic(err)
@@ -1769,13 +1535,7 @@ func (s *Store) Reopen() error {
 	}
 
 	s.Store = tsdb.NewStore(s.Path())
-	s.EngineOptions.IndexVersion = s.index
 	s.EngineOptions.Config.WALDir = filepath.Join(s.Path(), "wal")
-	s.EngineOptions.Config.TraceLoggingEnabled = true
-
-	if testing.Verbose() {
-		s.WithLogger(logger.New(os.Stdout))
-	}
 	return s.Store.Open()
 }
 

@@ -818,9 +818,7 @@ func (cli *Client) GetRPKI() ([]*config.RpkiServer, error) {
 	}
 	servers := make([]*config.RpkiServer, 0, len(rsp.Servers))
 	for _, s := range rsp.Servers {
-		// Note: RpkiServerConfig.Port is uint32 type, but the TCP/UDP port is
-		// 16-bit length.
-		port, err := strconv.ParseUint(s.Conf.RemotePort, 10, 16)
+		port, err := strconv.Atoi(s.Conf.RemotePort)
 		if err != nil {
 			return nil, err
 		}
@@ -995,10 +993,16 @@ func (c *MonitorNeighborStateClient) Recv() (*config.Neighbor, error) {
 	return api.NewNeighborFromAPIStruct(p)
 }
 
-func (cli *Client) MonitorNeighborState(name string, current bool) (*MonitorNeighborStateClient, error) {
+func (cli *Client) MonitorNeighborState(names ...string) (*MonitorNeighborStateClient, error) {
+	if len(names) > 1 {
+		return nil, fmt.Errorf("support one name at most: %d", len(names))
+	}
+	name := ""
+	if len(names) > 0 {
+		name = names[0]
+	}
 	stream, err := cli.cli.MonitorPeerState(context.Background(), &api.Arguments{
-		Name:    name,
-		Current: current,
+		Name: name,
 	})
 	if err != nil {
 		return nil, err

@@ -12,10 +12,14 @@ import (
 	"github.com/golang/snappy"
 )
 
-// Note: an uncompressed format is not yet implemented.
+const (
+	// stringUncompressed is a an uncompressed format encoding strings as raw bytes.
+	// Not yet implemented.
+	stringUncompressed = 0
 
-// stringCompressedSnappy is a compressed encoding using Snappy compression
-const stringCompressedSnappy = 1
+	// stringCompressedSnappy is a compressed encoding using Snappy compression
+	stringCompressedSnappy = 1
+)
 
 // StringEncoder encodes multiple strings into a byte slice.
 type StringEncoder struct {

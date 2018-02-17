@@ -165,13 +165,6 @@ func (idx *SeriesIndex) execEntry(flag uint8, id uint64, offset int64, key []byt
 		idx.keyIDMap.Put(key, id)
 		idx.idOffsetMap[id] = offset
 
-		if id > idx.maxSeriesID {
-			idx.maxSeriesID = id
-		}
-		if offset > idx.maxOffset {
-			idx.maxOffset = offset
-		}
-
 	case SeriesEntryTombstoneFlag:
 		idx.tombstones[id] = struct{}{}
 
@@ -182,7 +175,7 @@ func (idx *SeriesIndex) execEntry(flag uint8, id uint64, offset int64, key []byt
 
 func (idx *SeriesIndex) FindIDBySeriesKey(segments []*SeriesSegment, key []byte) uint64 {
 	if v := idx.keyIDMap.Get(key); v != nil {
-		if id, _ := v.(uint64); id != 0 && !idx.IsDeleted(id) {
+		if id, _ := v.(uint64); id != 0 {
 			return id
 		}
 	}
@@ -204,11 +197,7 @@ func (idx *SeriesIndex) FindIDBySeriesKey(segments []*SeriesSegment, key []byte)
 		if d > rhh.Dist(elemHash, pos, idx.capacity) {
 			return 0
 		} else if elemHash == hash && bytes.Equal(elemKey, key) {
-			id := binary.BigEndian.Uint64(elem[8:])
-			if idx.IsDeleted(id) {
-				return 0
-			}
-			return id
+			return binary.BigEndian.Uint64(elem[8:])
 		}
 	}
 }
@@ -266,8 +255,6 @@ func (idx *SeriesIndex) Clone() *SeriesIndex {
 		count:        idx.count,
 		capacity:     idx.capacity,
 		mask:         idx.mask,
-		maxSeriesID:  idx.maxSeriesID,
-		maxOffset:    idx.maxOffset,
 		data:         idx.data,
 		keyIDData:    idx.keyIDData,
 		idOffsetData: idx.idOffsetData,

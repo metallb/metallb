@@ -27,8 +27,8 @@ func hash32Len0to4(s []byte, seed uint32) uint32 {
 	b := seed
 	c := uint32(9)
 	for i := 0; i < slen; i++ {
-		v := int8(s[i])
-		b = (b * c1) + uint32(v)
+		v := uint32(s[i])
+		b = (b * c1) + v
 		c ^= b
 	}
 	return fmix(mur(b, mur(uint32(slen), c)))

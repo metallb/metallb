@@ -45,7 +45,7 @@ type Engine interface {
 	Export(w io.Writer, basePath string, start time.Time, end time.Time) error
 	Restore(r io.Reader, basePath string) error
 	Import(r io.Reader, basePath string) error
-	Digest() (io.ReadCloser, int64, error)
+	Digest() (io.ReadCloser, error)
 
 	CreateIterator(ctx context.Context, measurement string, opt query.IteratorOptions) (query.Iterator, error)
 	CreateCursor(ctx context.Context, r *CursorRequest) (Cursor, error)
@@ -54,10 +54,9 @@ type Engine interface {
 
 	CreateSeriesIfNotExists(key, name []byte, tags models.Tags) error
 	CreateSeriesListIfNotExists(keys, names [][]byte, tags []models.Tags) error
-	DeleteSeriesRange(itr SeriesIterator, min, max int64) error
+	DeleteSeriesRange(itr SeriesIterator, min, max int64, removeIndex bool) error
 
 	MeasurementsSketches() (estimator.Sketch, estimator.Sketch, error)
-	SeriesSketches() (estimator.Sketch, estimator.Sketch, error)
 	SeriesN() int64
 
 	MeasurementExists(name []byte) (bool, error)
@@ -80,11 +79,6 @@ type Engine interface {
 	Free() error
 
 	io.WriterTo
-}
-
-// SeriesIDSets provides access to the total set of series IDs
-type SeriesIDSets interface {
-	ForEach(f func(ids *SeriesIDSet)) error
 }
 
 // EngineFormat represents the format for an engine.
@@ -156,8 +150,7 @@ type EngineOptions struct {
 	CompactionLimiter           limiter.Fixed
 	CompactionThroughputLimiter limiter.Rate
 
-	Config       Config
-	SeriesIDSets SeriesIDSets
+	Config Config
 }
 
 // NewEngineOptions returns the default options.

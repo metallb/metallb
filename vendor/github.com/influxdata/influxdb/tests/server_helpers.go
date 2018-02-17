@@ -27,7 +27,6 @@ import (
 var verboseServerLogs bool
 var indexType string
 var cleanupData bool
-var seed int64
 
 // Server represents a test wrapper for run.Server.
 type Server interface {
@@ -107,7 +106,10 @@ func (s *RemoteServer) CreateDatabaseAndRetentionPolicy(db string, rp *meta.Rete
 	}
 
 	_, err := s.HTTPPost(s.URL()+"/query?q="+stmt, nil)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *RemoteServer) CreateSubscription(database, rp, name, mode string, destinations []string) error {
@@ -120,14 +122,20 @@ func (s *RemoteServer) CreateSubscription(database, rp, name, mode string, desti
 		name, database, rp, mode, strings.Join(dests, ","))
 
 	_, err := s.HTTPPost(s.URL()+"/query?q="+stmt, nil)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *RemoteServer) DropDatabase(db string) error {
 	stmt := fmt.Sprintf("DROP+DATABASE+%s", db)
 
 	_, err := s.HTTPPost(s.URL()+"/query?q="+stmt, nil)
-	return err
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 // Reset attempts to remove all database state by dropping everything
@@ -233,7 +241,7 @@ func OpenServerWithVersion(c *Config, version string) Server {
 // OpenDefaultServer opens a test server with a default database & retention policy.
 func OpenDefaultServer(c *Config) Server {
 	s := OpenServer(c)
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		panic(err)
 	}
 	return s
@@ -521,8 +529,7 @@ func NewConfig() *Config {
 	return c
 }
 
-// form a correct retention policy given name, replication factor and duration
-func NewRetentionPolicySpec(name string, rf int, duration time.Duration) *meta.RetentionPolicySpec {
+func newRetentionPolicySpec(name string, rf int, duration time.Duration) *meta.RetentionPolicySpec {
 	return &meta.RetentionPolicySpec{Name: name, ReplicaN: &rf, Duration: &duration}
 }
 
@@ -571,7 +578,11 @@ func RemoteEnabled() bool {
 }
 
 func expectPattern(exp, act string) bool {
-	return regexp.MustCompile(exp).MatchString(act)
+	re := regexp.MustCompile(exp)
+	if !re.MatchString(act) {
+		return false
+	}
+	return true
 }
 
 type Query struct {
@@ -722,7 +733,7 @@ func writeTestData(s Server, t *Test) error {
 			w.rp = t.retentionPolicy()
 		}
 
-		if err := s.CreateDatabaseAndRetentionPolicy(w.db, NewRetentionPolicySpec(w.rp, 1, 0), true); err != nil {
+		if err := s.CreateDatabaseAndRetentionPolicy(w.db, newRetentionPolicySpec(w.rp, 1, 0), true); err != nil {
 			return err
 		}
 		if res, err := s.Write(w.db, w.rp, w.data, t.params); err != nil {

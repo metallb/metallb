@@ -90,9 +90,9 @@ enabled = true
 		t.Fatalf("unexpected opentsdb bind address: %s", c.OpenTSDBInputs[2].BindAddress)
 	} else if c.UDPInputs[0].BindAddress != ":4444" {
 		t.Fatalf("unexpected udp bind address: %s", c.UDPInputs[0].BindAddress)
-	} else if !c.Subscriber.Enabled {
+	} else if c.Subscriber.Enabled != true {
 		t.Fatalf("unexpected subscriber enabled: %v", c.Subscriber.Enabled)
-	} else if !c.ContinuousQuery.Enabled {
+	} else if c.ContinuousQuery.Enabled != true {
 		t.Fatalf("unexpected continuous query enabled: %v", c.ContinuousQuery.Enabled)
 	}
 }
@@ -400,9 +400,9 @@ enabled = true
 		t.Fatalf("unexpected opentsdb bind address: %s", c.OpenTSDBInputs[2].BindAddress)
 	} else if c.UDPInputs[0].BindAddress != ":4444" {
 		t.Fatalf("unexpected udp bind address: %s", c.UDPInputs[0].BindAddress)
-	} else if !c.Subscriber.Enabled {
+	} else if c.Subscriber.Enabled != true {
 		t.Fatalf("unexpected subscriber enabled: %v", c.Subscriber.Enabled)
-	} else if !c.ContinuousQuery.Enabled {
+	} else if c.ContinuousQuery.Enabled != true {
 		t.Fatalf("unexpected continuous query enabled: %v", c.ContinuousQuery.Enabled)
 	}
 }
@@ -493,9 +493,9 @@ enabled = true
 		t.Fatalf("unexpected opentsdb bind address: %s", c.OpenTSDBInputs[2].BindAddress)
 	} else if c.UDPInputs[0].BindAddress != ":4444" {
 		t.Fatalf("unexpected udp bind address: %s", c.UDPInputs[0].BindAddress)
-	} else if !c.Subscriber.Enabled {
+	} else if c.Subscriber.Enabled != true {
 		t.Fatalf("unexpected subscriber enabled: %v", c.Subscriber.Enabled)
-	} else if !c.ContinuousQuery.Enabled {
+	} else if c.ContinuousQuery.Enabled != true {
 		t.Fatalf("unexpected continuous query enabled: %v", c.ContinuousQuery.Enabled)
 	}
 }

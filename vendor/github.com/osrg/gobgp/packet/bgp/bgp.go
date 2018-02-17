@@ -1392,17 +1392,17 @@ func ParseRouteDistinguisher(rd string) (RouteDistinguisherInterface, error) {
 	if err != nil {
 		return nil, err
 	}
-	assigned, _ := strconv.ParseUint(elems[10], 10, 32)
+	assigned, _ := strconv.Atoi(elems[10])
 	ip := net.ParseIP(elems[1])
 	switch {
 	case ip.To4() != nil:
 		return NewRouteDistinguisherIPAddressAS(elems[1], uint16(assigned)), nil
 	case elems[6] == "" && elems[7] == "":
-		asn, _ := strconv.ParseUint(elems[8], 10, 16)
+		asn, _ := strconv.Atoi(elems[8])
 		return NewRouteDistinguisherTwoOctetAS(uint16(asn), uint32(assigned)), nil
 	default:
-		fst, _ := strconv.ParseUint(elems[7], 10, 16)
-		snd, _ := strconv.ParseUint(elems[8], 10, 16)
+		fst, _ := strconv.Atoi(elems[7])
+		snd, _ := strconv.Atoi(elems[8])
 		asn := fst<<16 | snd
 		return NewRouteDistinguisherFourOctetAS(uint32(asn), uint16(assigned)), nil
 	}
@@ -1514,11 +1514,11 @@ func ParseMPLSLabelStack(buf string) (*MPLSLabelStack, error) {
 		goto ERR
 	}
 	for _, elem := range elems {
-		i, err := strconv.ParseUint(elem, 10, 32)
+		i, err := strconv.Atoi(elem)
 		if err != nil {
 			goto ERR
 		}
-		if i > ((1 << 20) - 1) {
+		if i < 0 || i > ((1<<20)-1) {
 			goto ERR
 		}
 		labels = append(labels, uint32(i))
@@ -2025,7 +2025,7 @@ func ParseEthernetSegmentIdentifier(args []string) (EthernetSegmentIdentifier, e
 	case "AS":
 		esi.Type = ESI_AS
 	default:
-		typ, err := strconv.ParseUint(args[0], 10, 0)
+		typ, err := strconv.Atoi(args[0])
 		if err != nil {
 			return esi, fmt.Errorf("invalid esi type: %s", args[0])
 		}
@@ -2048,7 +2048,7 @@ func ParseEthernetSegmentIdentifier(args []string) (EthernetSegmentIdentifier, e
 		}
 		copy(esi.Value[0:6], mac)
 		// Port Key or Bridge Priority
-		i, err := strconv.ParseUint(args[2], 10, 16)
+		i, err := strconv.Atoi(args[2])
 		if err != nil {
 			return esi, invalidEsiValuesError
 		}
@@ -2064,7 +2064,7 @@ func ParseEthernetSegmentIdentifier(args []string) (EthernetSegmentIdentifier, e
 		}
 		copy(esi.Value[0:6], mac)
 		// Local Discriminator
-		i, err := strconv.ParseUint(args[2], 10, 32)
+		i, err := strconv.Atoi(args[2])
 		if err != nil {
 			return esi, invalidEsiValuesError
 		}
@@ -2082,7 +2082,7 @@ func ParseEthernetSegmentIdentifier(args []string) (EthernetSegmentIdentifier, e
 		}
 		copy(esi.Value[0:4], ip.To4())
 		// Local Discriminator
-		i, err := strconv.ParseUint(args[2], 10, 32)
+		i, err := strconv.Atoi(args[2])
 		if err != nil {
 			return esi, invalidEsiValuesError
 		}
@@ -2092,13 +2092,13 @@ func ParseEthernetSegmentIdentifier(args []string) (EthernetSegmentIdentifier, e
 			return esi, invalidEsiValuesError
 		}
 		// AS
-		as, err := strconv.ParseUint(args[1], 10, 32)
+		as, err := strconv.Atoi(args[1])
 		if err != nil {
 			return esi, invalidEsiValuesError
 		}
 		binary.BigEndian.PutUint32(esi.Value[0:4], uint32(as))
 		// Local Discriminator
-		i, err := strconv.ParseUint(args[2], 10, 32)
+		i, err := strconv.Atoi(args[2])
 		if err != nil {
 			return esi, invalidEsiValuesError
 		}
@@ -6378,7 +6378,7 @@ func ParseExtendedCommunity(subtype ExtendedCommunityAttrSubType, com string) (E
 	if err != nil {
 		return nil, err
 	}
-	localAdmin, _ := strconv.ParseUint(elems[10], 10, 32)
+	localAdmin, _ := strconv.Atoi(elems[10])
 	ip := net.ParseIP(elems[1])
 	isTransitive := true
 	switch {
@@ -6387,11 +6387,11 @@ func ParseExtendedCommunity(subtype ExtendedCommunityAttrSubType, com string) (E
 	case ip.To16() != nil:
 		return NewIPv6AddressSpecificExtended(subtype, elems[1], uint16(localAdmin), isTransitive), nil
 	case elems[6] == "" && elems[7] == "":
-		asn, _ := strconv.ParseUint(elems[8], 10, 16)
+		asn, _ := strconv.Atoi(elems[8])
 		return NewTwoOctetAsSpecificExtended(subtype, uint16(asn), uint32(localAdmin), isTransitive), nil
 	default:
-		fst, _ := strconv.ParseUint(elems[7], 10, 16)
-		snd, _ := strconv.ParseUint(elems[8], 10, 16)
+		fst, _ := strconv.Atoi(elems[7])
+		snd, _ := strconv.Atoi(elems[8])
 		asn := fst<<16 | snd
 		return NewFourOctetAsSpecificExtended(subtype, uint32(asn), uint16(localAdmin), isTransitive), nil
 	}

@@ -7,7 +7,6 @@ import (
 	"os"
 	"reflect"
 	"sort"
-	"sync"
 	"testing"
 	"time"
 
@@ -284,9 +283,7 @@ func expvarMap(name string, tags map[string]string, fields map[string]interface{
 
 func TestMonitor_Expvar(t *testing.T) {
 	done := make(chan struct{})
-	var once sync.Once
-	// Ensure the done channel will always be closed by calling this early.
-	defer once.Do(func() { close(done) })
+	defer close(done)
 	ch := make(chan models.Points)
 
 	var mc MetaClient
@@ -342,9 +339,6 @@ func TestMonitor_Expvar(t *testing.T) {
 		t.Fatalf("unexpected error: %s", err)
 	}
 	defer s.Close()
-	// Call this again here. Since defers run in first in, last out order, we want to close
-	// the done channel before we call close on the monitor. This prevents a deadlock in the test.
-	defer once.Do(func() { close(done) })
 
 	hostname, _ := os.Hostname()
 	timer := time.NewTimer(100 * time.Millisecond)

@@ -389,7 +389,7 @@ type BasicQuery struct {
 
 // QueryGenerate returns a Query channel
 func (q *BasicQuery) QueryGenerate(now func() time.Time) (<-chan Query, error) {
-	c := make(chan Query)
+	c := make(chan Query, 0)
 
 	go func(chan Query) {
 		defer close(c)
@@ -406,6 +406,7 @@ func (q *BasicQuery) QueryGenerate(now func() time.Time) (<-chan Query, error) {
 // SetTime sets the internal state of time
 func (q *BasicQuery) SetTime(t time.Time) {
 	q.time = t
+	return
 }
 
 // BasicQueryClient implements the QueryClient interface
@@ -512,7 +513,11 @@ func resetDB(c client.Client, database string) error {
 	_, err = c.Query(client.Query{
 		Command: fmt.Sprintf("CREATE DATABASE %s", database),
 	})
-	return err
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // BasicProvisioner implements the Provisioner
@@ -557,7 +562,7 @@ func NewBroadcastChannel() *BroadcastChannel {
 }
 
 func (b *BroadcastChannel) Register(fn responseHandler) {
-	ch := make(chan response)
+	ch := make(chan response, 0)
 
 	b.chs = append(b.chs, ch)
 

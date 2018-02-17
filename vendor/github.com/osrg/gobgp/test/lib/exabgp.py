@@ -15,11 +15,11 @@
 
 from __future__ import absolute_import
 
-from itertools import chain
 import time
 
 from fabric import colors
 from fabric.api import local
+from itertools import chain
 
 from lib.base import (
     BGPContainer,
@@ -124,11 +124,11 @@ class ExaBGPContainer(BGPContainer):
                     cmd << '{0};'.format(str(r))
                 cmd << '    }'
 
-            routes = self._extract_routes(['ipv4-flowspec', 'ipv6-flowspec'])
-            for key, routes in routes.items():
+            routes = [r for r in chain.from_iterable(self.routes.itervalues()) if 'flowspec' in r['rf']]
+            if len(routes) > 0:
                 cmd << '    flow {'
                 for route in routes:
-                    cmd << '        route {0} {{'.format(key)
+                    cmd << '        route {0}{{'.format(route['prefix'])
                     cmd << '            match {'
                     for match in route['matchs']:
                         cmd << '                {0};'.format(match)

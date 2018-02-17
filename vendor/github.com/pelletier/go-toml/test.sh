@@ -1,7 +1,6 @@
 #!/bin/bash
 # fail out of the script if anything here fails
 set -e
-set -o pipefail
 
 # set the path to the present working directory
 export GOPATH=`pwd`

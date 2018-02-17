@@ -389,7 +389,7 @@ func (path *Path) SetUUID(id []byte) {
 }
 
 func (path *Path) AssignNewUUID() {
-	path.OriginInfo().uuid, _ = uuid.NewV4()
+	path.OriginInfo().uuid = uuid.NewV4()
 }
 
 func (path *Path) Filter(id string, reason PolicyDirection) {

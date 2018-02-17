@@ -25,7 +25,6 @@ from lib.base import (
     BGPContainer,
     CmdBuffer,
     try_several_times,
-    wait_for_completion,
 )
 
 
@@ -48,13 +47,6 @@ class BirdContainer(BGPContainer):
         cmd = 'chmod 755 {0}/start.sh'.format(self.config_dir)
         local(cmd)
         self.local('{0}/start.sh'.format(self.SHARED_VOLUME))
-
-    def _wait_for_boot(self):
-        def _f():
-            ret = self.local('birdc show status > /dev/null 2>&1; echo $?', capture=True)
-            return ret == '0'
-
-        return wait_for_completion(_f)
 
     def run(self):
         super(BirdContainer, self).run()
@@ -89,16 +81,13 @@ class BirdContainer(BGPContainer):
                     if 'bird' in line:
                         running = True
                 return running
-
             if _is_running():
                 self.local('birdc configure')
             else:
                 self._start_bird()
-
-            self._wait_for_boot()
+            time.sleep(1)
             if not _is_running():
                 raise RuntimeError()
-
         try_several_times(_reload)
 
 

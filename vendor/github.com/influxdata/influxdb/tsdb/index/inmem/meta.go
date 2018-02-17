@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"sort"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/influxdata/influxdb/models"
 	"github.com/influxdata/influxdb/pkg/bytesutil"
@@ -66,7 +68,7 @@ func (m *measurement) Authorized(auth query.Authorizer) bool {
 			continue
 		}
 
-		if query.AuthorizerIsOpen(auth) || auth.AuthorizeSeriesRead(m.Database, m.NameBytes, s.Tags) {
+		if auth == nil || auth.AuthorizeSeriesRead(m.Database, m.NameBytes, s.Tags) {
 			return true
 		}
 	}
@@ -264,7 +266,15 @@ func (m *measurement) AddSeries(s *series) bool {
 			valueMap = newTagKeyValue()
 			m.seriesByTagKeyValue[string(t.Key)] = valueMap
 		}
-		valueMap.InsertSeriesIDByte(t.Value, s.ID)
+		ids := valueMap.LoadByte(t.Value)
+		ids = append(ids, s.ID)
+
+		// most of the time the series ID will be higher than all others because it's a new
+		// series. So don't do the sort if we don't have to.
+		if len(ids) > 1 && ids[len(ids)-1] < ids[len(ids)-2] {
+			sort.Sort(ids)
+		}
+		valueMap.StoreByte(t.Value, ids)
 	}
 
 	return true
@@ -321,8 +331,6 @@ func (m *measurement) Rebuild() *measurement {
 
 	for _, id := range m.sortedSeriesIDs {
 		if s := m.seriesByID[id]; s != nil {
-			// Explicitly set the new measurement on the series.
-			s.Measurement = nm
 			nm.AddSeries(s)
 		}
 	}
@@ -400,7 +408,7 @@ func (m *measurement) TagSets(shardID uint64, opt query.IteratorOptions) ([]*que
 		}
 
 		s := m.seriesByID[id]
-		if s == nil || s.Deleted() {
+		if s == nil || s.Deleted() || !s.Assigned(shardID) {
 			continue
 		}
 
@@ -862,6 +870,64 @@ func (m *measurement) WalkWhereForSeriesIds(expr influxql.Expr) (seriesIDs, Filt
 	}
 }
 
+// expandExpr returns a list of expressions expanded by all possible tag
+// combinations.
+func (m *measurement) expandExpr(expr influxql.Expr) []tagSetExpr {
+	// Retrieve list of unique values for each tag.
+	valuesByTagKey := m.uniqueTagValues(expr)
+
+	// Convert keys to slices.
+	keys := make([]string, 0, len(valuesByTagKey))
+	for key := range valuesByTagKey {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	// Order uniques by key.
+	uniques := make([][]string, len(keys))
+	for i, key := range keys {
+		uniques[i] = valuesByTagKey[key]
+	}
+
+	// Reduce a condition for each combination of tag values.
+	return expandExprWithValues(expr, keys, []tagExpr{}, uniques, 0)
+}
+
+func expandExprWithValues(expr influxql.Expr, keys []string, tagExprs []tagExpr, uniques [][]string, index int) []tagSetExpr {
+	// If we have no more keys left then execute the reduction and return.
+	if index == len(keys) {
+		// Create a map of tag key/values.
+		m := make(map[string]*string, len(keys))
+		for i, key := range keys {
+			if tagExprs[i].op == influxql.EQ {
+				m[key] = &tagExprs[i].values[0]
+			} else {
+				m[key] = nil
+			}
+		}
+
+		// TODO: Rewrite full expressions instead of VarRef replacement.
+
+		// Reduce using the current tag key/value set.
+		// Ignore it if reduces down to "false".
+		e := influxql.Reduce(expr, &tagValuer{tags: m})
+		if e, ok := e.(*influxql.BooleanLiteral); ok && !e.Val {
+			return nil
+		}
+
+		return []tagSetExpr{{values: copyTagExprs(tagExprs), expr: e}}
+	}
+
+	// Otherwise expand for each possible equality value of the key.
+	var exprs []tagSetExpr
+	for _, v := range uniques[index] {
+		exprs = append(exprs, expandExprWithValues(expr, keys, append(tagExprs, tagExpr{keys[index], []string{v}, influxql.EQ}), uniques, index+1)...)
+	}
+	exprs = append(exprs, expandExprWithValues(expr, keys, append(tagExprs, tagExpr{keys[index], uniques[index], influxql.NEQ}), uniques, index+1)...)
+
+	return exprs
+}
+
 // SeriesIDsAllOrByExpr walks an expressions for matching series IDs
 // or, if no expressions is given, returns all series IDs for the measurement.
 func (m *measurement) SeriesIDsAllOrByExpr(expr influxql.Expr) (seriesIDs, error) {
@@ -979,6 +1045,91 @@ func (m *measurement) tagKeysByFilter(op influxql.Token, val string, regex *rege
 	return ss
 }
 
+// tagValuer is used during expression expansion to evaluate all sets of tag values.
+type tagValuer struct {
+	tags map[string]*string
+}
+
+// Value returns the string value of a tag and true if it's listed in the tagset.
+func (v *tagValuer) Value(name string) (interface{}, bool) {
+	if value, ok := v.tags[name]; ok {
+		if value == nil {
+			return nil, true
+		}
+		return *value, true
+	}
+	return nil, false
+}
+
+// tagSetExpr represents a set of tag keys/values and associated expression.
+type tagSetExpr struct {
+	values []tagExpr
+	expr   influxql.Expr
+}
+
+// tagExpr represents one or more values assigned to a given tag.
+type tagExpr struct {
+	key    string
+	values []string
+	op     influxql.Token // EQ or NEQ
+}
+
+func copyTagExprs(a []tagExpr) []tagExpr {
+	other := make([]tagExpr, len(a))
+	copy(other, a)
+	return other
+}
+
+// uniqueTagValues returns a list of unique tag values used in an expression.
+func (m *measurement) uniqueTagValues(expr influxql.Expr) map[string][]string {
+	// Track unique value per tag.
+	tags := make(map[string]map[string]struct{})
+
+	// Find all tag values referenced in the expression.
+	influxql.WalkFunc(expr, func(n influxql.Node) {
+		switch n := n.(type) {
+		case *influxql.BinaryExpr:
+			// Ignore operators that are not equality.
+			if n.Op != influxql.EQ {
+				return
+			}
+
+			// Extract ref and string literal.
+			var key, value string
+			switch lhs := n.LHS.(type) {
+			case *influxql.VarRef:
+				if rhs, ok := n.RHS.(*influxql.StringLiteral); ok {
+					key, value = lhs.Val, rhs.Val
+				}
+			case *influxql.StringLiteral:
+				if rhs, ok := n.RHS.(*influxql.VarRef); ok {
+					key, value = rhs.Val, lhs.Val
+				}
+			}
+			if key == "" {
+				return
+			}
+
+			// Add value to set.
+			if tags[key] == nil {
+				tags[key] = make(map[string]struct{})
+			}
+			tags[key][value] = struct{}{}
+		}
+	})
+
+	// Convert to map of slices.
+	out := make(map[string][]string)
+	for k, values := range tags {
+		out[k] = make([]string, 0, len(values))
+		for v := range values {
+			out[k] = append(out[k], v)
+		}
+		sort.Strings(out[k])
+	}
+	return out
+}
+
 // Measurements represents a list of *Measurement.
 type measurements []*measurement
 
@@ -1050,30 +1201,81 @@ func (a measurements) Union(other measurements) measurements {
 
 // series belong to a Measurement and represent unique time series in a database.
 type series struct {
-	mu      sync.RWMutex
-	deleted bool
+	// lastModified tracks the last time the series was created.  If the series
+	// already exists and a request to create is received (a no-op), lastModified
+	// is increased to track that it is still in use.
+	lastModified int64
 
 	// immutable
 	ID          uint64
 	Measurement *measurement
 	Key         string
 	Tags        models.Tags
+
+	mu       sync.RWMutex
+	shardIDs map[uint64]struct{} // shards that have this series defined
+
+	deleted bool
 }
 
 // newSeries returns an initialized series struct
 func newSeries(id uint64, m *measurement, key string, tags models.Tags) *series {
 	return &series{
-		ID:          id,
-		Measurement: m,
-		Key:         key,
-		Tags:        tags,
+		ID:           id,
+		Measurement:  m,
+		Key:          key,
+		Tags:         tags,
+		shardIDs:     make(map[uint64]struct{}),
+		lastModified: time.Now().UTC().UnixNano(),
 	}
 }
 
-// Delete marks this series as deleted.  A deleted series should not be returned for queries.
-func (s *series) Delete() {
+func (s *series) AssignShard(shardID uint64, ts int64) {
+	atomic.StoreInt64(&s.lastModified, ts)
+	if s.Assigned(shardID) {
+		return
+	}
+
 	s.mu.Lock()
-	s.deleted = true
+	// Skip the existence check under the write lock because we're just storing
+	// and empty struct.
+	s.deleted = false
+	s.shardIDs[shardID] = struct{}{}
+	s.mu.Unlock()
+}
+
+func (s *series) UnassignShard(shardID uint64, ts int64) {
+	s.mu.Lock()
+	if s.LastModified() < ts {
+		delete(s.shardIDs, shardID)
+	}
+	s.mu.Unlock()
+}
+
+func (s *series) Assigned(shardID uint64) bool {
+	s.mu.RLock()
+	_, ok := s.shardIDs[shardID]
+	s.mu.RUnlock()
+	return ok
+}
+
+func (s *series) LastModified() int64 {
+	return atomic.LoadInt64(&s.lastModified)
+}
+
+func (s *series) ShardN() int {
+	s.mu.RLock()
+	n := len(s.shardIDs)
+	s.mu.RUnlock()
+	return n
+}
+
+// Delete marks this series as deleted.  A deleted series should not be returned for queries.
+func (s *series) Delete(ts int64) {
+	s.mu.Lock()
+	if s.LastModified() < ts {
+		s.deleted = true
+	}
 	s.mu.Unlock()
 }
 
@@ -1090,13 +1292,13 @@ func (s *series) Deleted() bool {
 //
 // TODO(edd): This could possibly be replaced by a sync.Map once we use Go 1.9.
 type tagKeyValue struct {
-	mu      sync.RWMutex
-	entries map[string]*tagKeyValueEntry
+	mu       sync.RWMutex
+	valueIDs map[string]seriesIDs
 }
 
 // NewTagKeyValue initialises a new TagKeyValue.
 func newTagKeyValue() *tagKeyValue {
-	return &tagKeyValue{entries: make(map[string]*tagKeyValueEntry)}
+	return &tagKeyValue{valueIDs: make(map[string]seriesIDs)}
 }
 
 // Cardinality returns the number of values in the TagKeyValue.
@@ -1107,7 +1309,7 @@ func (t *tagKeyValue) Cardinality() int {
 
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	return len(t.entries)
+	return len(t.valueIDs)
 }
 
 // Contains returns true if the TagKeyValue contains value.
@@ -1118,32 +1320,8 @@ func (t *tagKeyValue) Contains(value string) bool {
 
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	_, ok := t.entries[value]
+	_, ok := t.valueIDs[value]
 	return ok
-}
-
-// InsertSeriesID adds a series id to the tag key value.
-func (t *tagKeyValue) InsertSeriesID(value string, id uint64) {
-	t.mu.Lock()
-	entry := t.entries[value]
-	if entry == nil {
-		entry = newTagKeyValueEntry()
-		t.entries[value] = entry
-	}
-	entry.m[id] = struct{}{}
-	t.mu.Unlock()
-}
-
-// InsertSeriesIDByte adds a series id to the tag key value.
-func (t *tagKeyValue) InsertSeriesIDByte(value []byte, id uint64) {
-	t.mu.Lock()
-	entry := t.entries[string(value)]
-	if entry == nil {
-		entry = newTagKeyValueEntry()
-		t.entries[string(value)] = entry
-	}
-	entry.m[id] = struct{}{}
-	t.mu.Unlock()
 }
 
 // Load returns the SeriesIDs for the provided tag value.
@@ -1153,10 +1331,9 @@ func (t *tagKeyValue) Load(value string) seriesIDs {
 	}
 
 	t.mu.RLock()
-	entry := t.entries[value]
-	ids := entry.ids()
+	sIDs := t.valueIDs[value]
 	t.mu.RUnlock()
-	return ids
+	return sIDs
 }
 
 // LoadByte returns the SeriesIDs for the provided tag value. It makes use of
@@ -1167,10 +1344,9 @@ func (t *tagKeyValue) LoadByte(value []byte) seriesIDs {
 	}
 
 	t.mu.RLock()
-	entry := t.entries[string(value)]
-	ids := entry.ids()
+	sIDs := t.valueIDs[string(value)]
 	t.mu.RUnlock()
-	return ids
+	return sIDs
 }
 
 // Range calls f sequentially on each key and value. A call to Range on a nil
@@ -1184,9 +1360,8 @@ func (t *tagKeyValue) Range(f func(tagValue string, a seriesIDs) bool) {
 
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	for tagValue, entry := range t.entries {
-		ids := entry.ids()
-		if !f(tagValue, ids) {
+	for tagValue, a := range t.valueIDs {
+		if !f(tagValue, a) {
 			return
 		}
 	}
@@ -1201,33 +1376,18 @@ func (t *tagKeyValue) RangeAll(f func(k string, a seriesIDs)) {
 	})
 }
 
-type tagKeyValueEntry struct {
-	m map[uint64]struct{} // series id set
-	a seriesIDs           // lazily sorted list of series.
+// Store stores ids under the value key.
+func (t *tagKeyValue) Store(value string, ids seriesIDs) {
+	t.mu.Lock()
+	t.valueIDs[value] = ids
+	t.mu.Unlock()
 }
 
-func newTagKeyValueEntry() *tagKeyValueEntry {
-	return &tagKeyValueEntry{m: make(map[uint64]struct{})}
-}
-
-func (e *tagKeyValueEntry) ids() seriesIDs {
-	if e == nil {
-		return nil
-	}
-
-	if len(e.a) == len(e.m) {
-		return e.a
-	}
-
-	a := make(seriesIDs, 0, len(e.m))
-	for id := range e.m {
-		a = append(a, id)
-	}
-	sort.Sort(a)
-
-	e.a = a
-	return e.a
-
+// StoreByte stores ids under the value key.
+func (t *tagKeyValue) StoreByte(value []byte, ids seriesIDs) {
+	t.mu.Lock()
+	t.valueIDs[string(value)] = ids
+	t.mu.Unlock()
 }
 
 // SeriesIDs is a convenience type for sorting, checking equality, and doing
@@ -1463,7 +1623,7 @@ func (m *measurement) TagValues(auth query.Authorizer, key string) []string {
 	values := make([]string, 0, m.seriesByTagKeyValue[key].Cardinality())
 
 	m.seriesByTagKeyValue[key].RangeAll(func(k string, a seriesIDs) {
-		if query.AuthorizerIsOpen(auth) {
+		if auth == nil {
 			values = append(values, k)
 		} else {
 			for _, sid := range a {
@@ -1566,6 +1726,20 @@ func (s stringSet) intersect(o stringSet) stringSet {
 		}
 	}
 	return ns
+}
+
+// filter removes v from a if it exists.  a must be sorted in ascending
+// order.
+func filter(a []uint64, v uint64) []uint64 {
+	// binary search for v
+	i := sort.Search(len(a), func(i int) bool { return a[i] >= v })
+	if i >= len(a) || a[i] != v {
+		return a
+	}
+
+	// we found it, so shift the right half down one, overwriting v's position.
+	copy(a[i:], a[i+1:])
+	return a[:len(a)-1]
 }
 
 type byTagKey []*query.TagSet

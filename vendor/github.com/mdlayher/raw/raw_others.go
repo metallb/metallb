@@ -18,7 +18,7 @@ var (
 type packetConn struct{}
 
 // listenPacket is not currently implemented on this platform.
-func listenPacket(ifi *net.Interface, proto uint16, cfg *Config) (*packetConn, error) {
+func listenPacket(ifi *net.Interface, proto uint16) (*packetConn, error) {
 	return nil, ErrNotImplemented
 }
 

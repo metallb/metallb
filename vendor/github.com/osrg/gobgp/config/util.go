@@ -247,25 +247,25 @@ func ParseMaskLength(prefix, mask string) (int, int, error) {
 		return 0, 0, fmt.Errorf("invalid mask length range: %s", mask)
 	}
 	// we've already checked the range is sane by regexp
-	min, _ := strconv.ParseUint(elems[1], 10, 8)
-	max, _ := strconv.ParseUint(elems[2], 10, 8)
+	min, _ := strconv.Atoi(elems[1])
+	max, _ := strconv.Atoi(elems[2])
 	if min > max {
 		return 0, 0, fmt.Errorf("invalid mask length range: %s", mask)
 	}
 	if ipv4 := ipNet.IP.To4(); ipv4 != nil {
-		f := func(i uint64) bool {
-			return i <= 32
+		f := func(i int) bool {
+			return i >= 0 && i <= 32
 		}
 		if !f(min) || !f(max) {
 			return 0, 0, fmt.Errorf("ipv4 mask length range outside scope :%s", mask)
 		}
 	} else {
-		f := func(i uint64) bool {
-			return i <= 128
+		f := func(i int) bool {
+			return i >= 0 && i <= 128
 		}
 		if !f(min) || !f(max) {
 			return 0, 0, fmt.Errorf("ipv6 mask length range outside scope :%s", mask)
 		}
 	}
-	return int(min), int(max), nil
+	return min, max, nil
 }

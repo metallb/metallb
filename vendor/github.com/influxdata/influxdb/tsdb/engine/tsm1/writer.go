@@ -246,6 +246,12 @@ func NewDiskIndexWriter(f *os.File) IndexWriter {
 	return &directIndex{fd: f, w: bufio.NewWriterSize(f, 1024*1024)}
 }
 
+// indexBlock represent an index information for a series within a TSM file.
+type indexBlock struct {
+	key     []byte
+	entries *indexEntries
+}
+
 type syncer interface {
 	Name() string
 	Sync() error
@@ -635,11 +641,6 @@ func (t *tsmWriter) Write(key []byte, values Values) error {
 
 	// Increment file position pointer
 	t.n += int64(n)
-
-	if len(t.index.Entries(key)) >= maxIndexEntries {
-		return ErrMaxBlocksExceeded
-	}
-
 	return nil
 }
 

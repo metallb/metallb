@@ -29,6 +29,10 @@ import (
 	"go.uber.org/zap"
 )
 
+// monitorStatInterval is the interval at which the shard is inspected
+// for the purpose of determining certain monitoring statistics.
+const monitorStatInterval = 30 * time.Second
+
 const (
 	statWriteReq           = "writeReq"
 	statWriteReqOK         = "writeReqOk"
@@ -133,6 +137,8 @@ type Shard struct {
 	mu      sync.RWMutex
 	_engine Engine
 	index   Index
+
+	closing chan struct{}
 	enabled bool
 
 	// expvar-based stats.
@@ -156,6 +162,7 @@ func NewShard(id uint64, path string, walPath string, sfile *SeriesFile, opt Eng
 		walPath: walPath,
 		sfile:   sfile,
 		options: opt,
+		closing: make(chan struct{}),
 
 		stats: &ShardStatistics{},
 		defaultTags: models.StatisticTags{
@@ -288,11 +295,9 @@ func (s *Shard) Open() error {
 			return nil
 		}
 
-		seriesIDSet := NewSeriesIDSet()
-
 		// Initialize underlying index.
 		ipath := filepath.Join(s.path, "index")
-		idx, err := NewIndex(s.id, s.database, ipath, seriesIDSet, s.sfile, s.options)
+		idx, err := NewIndex(s.id, s.database, ipath, s.sfile, s.options)
 		if err != nil {
 			return err
 		}
@@ -329,7 +334,7 @@ func (s *Shard) Open() error {
 
 		return nil
 	}(); err != nil {
-		s.close()
+		s.close(true)
 		return NewShardError(s.id, err)
 	}
 
@@ -345,14 +350,37 @@ func (s *Shard) Open() error {
 func (s *Shard) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.close()
+	return s.close(true)
+}
+
+// CloseFast closes the shard without cleaning up the shard ID or any of the
+// shard's series keys from the index it belongs to.
+//
+// CloseFast can be called when the entire index is being removed, e.g., when
+// the database the shard belongs to is being dropped.
+func (s *Shard) CloseFast() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.close(false)
 }
 
 // close closes the shard an removes reference to the shard from associated
 // indexes, unless clean is false.
-func (s *Shard) close() error {
+func (s *Shard) close(clean bool) error {
 	if s._engine == nil {
 		return nil
+	}
+
+	// Close the closing channel at most once.
+	select {
+	case <-s.closing:
+	default:
+		close(s.closing)
+	}
+
+	if clean {
+		// Don't leak our shard ID and series keys in the index
+		s.index.RemoveShard(s.id)
 	}
 
 	err := s._engine.Close()
@@ -395,6 +423,16 @@ func (s *Shard) LastModified() time.Time {
 		return time.Time{}
 	}
 	return engine.LastModified()
+}
+
+// UnloadIndex removes all references to this shard from the DatabaseIndex
+func (s *Shard) UnloadIndex() {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if err := s.ready(); err != nil {
+		return
+	}
+	s.index.RemoveShard(s.id)
 }
 
 // Index returns a reference to the underlying index. It returns an error if
@@ -679,12 +717,12 @@ func (s *Shard) createFieldsAndMeasurements(fieldsToCreate []*FieldCreate) error
 }
 
 // DeleteSeriesRange deletes all values from for seriesKeys between min and max (inclusive)
-func (s *Shard) DeleteSeriesRange(itr SeriesIterator, min, max int64) error {
+func (s *Shard) DeleteSeriesRange(itr SeriesIterator, min, max int64, removeIndex bool) error {
 	engine, err := s.engine()
 	if err != nil {
 		return err
 	}
-	return engine.DeleteSeriesRange(itr, min, max)
+	return engine.DeleteSeriesRange(itr, min, max, removeIndex)
 }
 
 // DeleteMeasurement deletes a measurement and all underlying series.
@@ -703,15 +741,6 @@ func (s *Shard) SeriesN() int64 {
 		return 0
 	}
 	return engine.SeriesN()
-}
-
-// SeriesSketches returns the measurement sketches for the shard.
-func (s *Shard) SeriesSketches() (estimator.Sketch, estimator.Sketch, error) {
-	engine, err := s.engine()
-	if err != nil {
-		return nil, nil, err
-	}
-	return engine.SeriesSketches()
 }
 
 // MeasurementsSketches returns the measurement sketches for the shard.
@@ -1083,16 +1112,16 @@ func (s *Shard) TagKeyCardinality(name, key []byte) int {
 }
 
 // Digest returns a digest of the shard.
-func (s *Shard) Digest() (io.ReadCloser, int64, error) {
+func (s *Shard) Digest() (io.ReadCloser, error) {
 	engine, err := s.engine()
 	if err != nil {
-		return nil, 0, err
+		return nil, err
 	}
 
 	// Make sure the shard is idle/cold. (No use creating a digest of a
 	// hot shard that is rapidly changing.)
 	if !engine.IsIdle() {
-		return nil, 0, ErrShardNotIdle
+		return nil, ErrShardNotIdle
 	}
 
 	return engine.Digest()
@@ -1473,10 +1502,10 @@ func NewMeasurementFieldSet(path string) (*MeasurementFieldSet, error) {
 		fields: make(map[string]*MeasurementFields),
 		path:   path,
 	}
-
-	// If there is a load error, return the error and an empty set so
-	// it can be rebuild manually.
-	return fs, fs.load()
+	if err := fs.load(); err != nil {
+		return nil, err
+	}
+	return fs, nil
 }
 
 // Fields returns fields for a measurement by name.
@@ -1593,11 +1622,7 @@ func (fs *MeasurementFieldSet) saveNoLock() error {
 		return err
 	}
 
-	if err := file.RenameFile(path, fs.path); err != nil {
-		return err
-	}
-
-	return file.SyncDir(filepath.Dir(fs.path))
+	return file.RenameFile(path, fs.path)
 }
 
 func (fs *MeasurementFieldSet) load() error {

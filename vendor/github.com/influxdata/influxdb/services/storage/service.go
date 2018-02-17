@@ -8,11 +8,6 @@ import (
 	"go.uber.org/zap"
 )
 
-type StorageMetaClient interface {
-	Database(name string) *meta.DatabaseInfo
-	ShardGroupsByTimeRange(database, policy string, min, max time.Time) (a []meta.ShardGroupInfo, err error)
-}
-
 // Service manages the listener and handler for an HTTP endpoint.
 type Service struct {
 	addr           string
@@ -22,7 +17,10 @@ type Service struct {
 
 	Store      *Store
 	TSDBStore  *tsdb.Store
-	MetaClient StorageMetaClient
+	MetaClient interface {
+		Database(name string) *meta.DatabaseInfo
+		ShardGroupsByTimeRange(database, policy string, min, max time.Time) (a []meta.ShardGroupInfo, err error)
+	}
 }
 
 // NewService returns a new instance of Service.

@@ -187,7 +187,10 @@ func (w *csvFormatter) WriteResponse(resp Response) (n int, err error) {
 		}
 	}
 	csv.Flush()
-	return n, csv.Error()
+	if err := csv.Error(); err != nil {
+		return n, err
+	}
+	return n, nil
 }
 
 type msgpackFormatter struct {
@@ -205,7 +208,7 @@ func (f *msgpackFormatter) WriteResponse(resp Response) (n int, err error) {
 	enc.WriteMapHeader(1)
 	if resp.Err != nil {
 		enc.WriteString("error")
-		enc.WriteString(resp.Err.Error())
+		enc.WriteString(err.Error())
 		return 0, nil
 	} else {
 		enc.WriteString("results")

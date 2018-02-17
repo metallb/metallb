@@ -12,7 +12,6 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -120,9 +119,8 @@ func NewHTTPClient(conf HTTPConfig) (Client, error) {
 // Ping returns how long the request took, the version of the server it connected to, and an error if one occurred.
 func (c *client) Ping(timeout time.Duration) (time.Duration, string, error) {
 	now := time.Now()
-
 	u := c.url
-	u.Path = path.Join(u.Path, "ping")
+	u.Path = "ping"
 
 	req, err := http.NewRequest("GET", u.String(), nil)
 	if err != nil {
@@ -171,7 +169,7 @@ func (c *client) Close() error {
 // once the client is instantiated.
 type client struct {
 	// N.B - if url.UserInfo is accessed in future modifications to the
-	// methods on client, you will need to synchronize access to url.
+	// methods on client, you will need to syncronise access to url.
 	url        url.URL
 	username   string
 	password   string
@@ -321,8 +319,8 @@ func (p *Point) String() string {
 
 // PrecisionString returns a line-protocol string of the Point,
 // with the timestamp formatted for the given precision.
-func (p *Point) PrecisionString(precision string) string {
-	return p.pt.PrecisionString(precision)
+func (p *Point) PrecisionString(precison string) string {
+	return p.pt.PrecisionString(precison)
 }
 
 // Name returns the measurement name of the point.
@@ -369,8 +367,7 @@ func (c *client) Write(bp BatchPoints) error {
 	}
 
 	u := c.url
-	u.Path = path.Join(u.Path, "write")
-
+	u.Path = "write"
 	req, err := http.NewRequest("POST", u.String(), &b)
 	if err != nil {
 		return err
@@ -476,7 +473,7 @@ type Result struct {
 // Query sends a command to the server and returns the Response.
 func (c *client) Query(q Query) (*Response, error) {
 	u := c.url
-	u.Path = path.Join(u.Path, "query")
+	u.Path = "query"
 
 	jsonParameters, err := json.Marshal(q.Parameters)
 

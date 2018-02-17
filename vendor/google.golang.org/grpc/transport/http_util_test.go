@@ -72,25 +72,24 @@ func TestTimeoutDecode(t *testing.T) {
 	}
 }
 
-func TestContentSubtype(t *testing.T) {
+func TestValidContentType(t *testing.T) {
 	tests := []struct {
-		contentType string
-		want        string
-		wantValid   bool
+		h    string
+		want bool
 	}{
-		{"application/grpc", "", true},
-		{"application/grpc+", "", true},
-		{"application/grpc+blah", "blah", true},
-		{"application/grpc;", "", true},
-		{"application/grpc;blah", "blah", true},
-		{"application/grpcd", "", false},
-		{"application/grpd", "", false},
-		{"application/grp", "", false},
+		{"application/grpc", true},
+		{"application/grpc+", true},
+		{"application/grpc+blah", true},
+		{"application/grpc;", true},
+		{"application/grpc;blah", true},
+		{"application/grpcd", false},
+		{"application/grpd", false},
+		{"application/grp", false},
 	}
 	for _, tt := range tests {
-		got, gotValid := contentSubtype(tt.contentType)
-		if got != tt.want || gotValid != tt.wantValid {
-			t.Errorf("contentSubtype(%q) = (%v, %v); want (%v, %v)", tt.contentType, got, gotValid, tt.want, tt.wantValid)
+		got := validContentType(tt.h)
+		if got != tt.want {
+			t.Errorf("validContentType(%q) = %v; want %v", tt.h, got, tt.want)
 		}
 	}
 }

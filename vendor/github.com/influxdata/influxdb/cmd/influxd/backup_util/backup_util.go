@@ -3,21 +3,16 @@ package backup_util
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"io"
 	"os"
-	"sort"
 	"strings"
 
-	"github.com/gogo/protobuf/proto"
-	internal "github.com/influxdata/influxdb/cmd/influxd/backup_util/internal"
+	"encoding/json"
 	"github.com/influxdata/influxdb/services/snapshotter"
 	"io/ioutil"
 	"path/filepath"
 )
-
-//go:generate protoc --gogo_out=. internal/data.proto
 
 const (
 	// Suffix is a suffix added to the backup while it's in-process.
@@ -30,29 +25,12 @@ const (
 	// file. They follow the scheme <database>.<retention>.<shardID>.<increment>
 	BackupFilePattern = "%s.%s.%05d"
 
-	PortableFileNamePattern = "20060102T150405Z"
+	EnterpriseFileNamePattern = "20060102T150405Z"
+
+	OSSManifest = "OSS"
+
+	ENTManifest = "ENT"
 )
-
-type PortablePacker struct {
-	Data      []byte
-	MaxNodeID uint64
-}
-
-func (ep PortablePacker) MarshalBinary() ([]byte, error) {
-	ed := internal.PortableData{Data: ep.Data, MaxNodeID: &ep.MaxNodeID}
-	return proto.Marshal(&ed)
-}
-
-func (ep *PortablePacker) UnmarshalBinary(data []byte) error {
-	var pb internal.PortableData
-	if err := proto.Unmarshal(data, &pb); err != nil {
-		return err
-	}
-
-	ep.Data = pb.GetData()
-	ep.MaxNodeID = pb.GetMaxNodeID()
-	return nil
-}
 
 func GetMetaBytes(fname string) ([]byte, error) {
 	f, err := os.Open(fname)
@@ -87,9 +65,10 @@ func GetMetaBytes(fname string) ([]byte, error) {
 // If Limited is false, the manifest contains a full backup, otherwise
 // it is a partial backup.
 type Manifest struct {
-	Meta    MetaEntry `json:"meta"`
-	Limited bool      `json:"limited"`
-	Files   []Entry   `json:"files"`
+	Platform string    `json:"platform"`
+	Meta     MetaEntry `json:"meta"`
+	Limited  bool      `json:"limited"`
+	Files    []Entry   `json:"files"`
 
 	// If limited is true, then one (or all) of the following fields will be set
 
@@ -142,64 +121,6 @@ func (manifest *Manifest) Save(filename string) error {
 	}
 
 	return ioutil.WriteFile(filename, b, 0600)
-}
-
-// LoadIncremental loads multiple manifest files from a given directory.
-func LoadIncremental(dir string) (*MetaEntry, map[uint64]*Entry, error) {
-	manifests, err := filepath.Glob(filepath.Join(dir, "*.manifest"))
-	if err != nil {
-		return nil, nil, err
-	}
-	shards := make(map[uint64]*Entry)
-
-	if len(manifests) == 0 {
-		return nil, shards, nil
-	}
-
-	sort.Sort(sort.Reverse(sort.StringSlice(manifests)))
-	var metaEntry MetaEntry
-
-	for _, fileName := range manifests {
-		fi, err := os.Stat(fileName)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		if fi.IsDir() {
-			continue
-		}
-
-		f, err := os.Open(fileName)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		var manifest Manifest
-		err = json.NewDecoder(f).Decode(&manifest)
-		f.Close()
-		if err != nil {
-			return nil, nil, fmt.Errorf("read manifest: %v", err)
-		}
-
-		// sorted (descending) above, so first manifest is most recent
-		if metaEntry.FileName == "" {
-			metaEntry = manifest.Meta
-		}
-
-		for i := range manifest.Files {
-			sh := manifest.Files[i]
-			if _, err := os.Stat(filepath.Join(dir, sh.FileName)); err != nil {
-				continue
-			}
-
-			e := shards[sh.ShardID]
-			if e == nil || sh.LastModified > e.LastModified {
-				shards[sh.ShardID] = &sh
-			}
-		}
-	}
-
-	return &metaEntry, shards, nil
 }
 
 type CountingWriter struct {

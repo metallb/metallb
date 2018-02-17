@@ -26,21 +26,21 @@ max-body-size = 100
 	}
 
 	// Validate configuration.
-	if !c.Enabled {
+	if c.Enabled != true {
 		t.Fatalf("unexpected enabled: %v", c.Enabled)
 	} else if c.BindAddress != ":8080" {
 		t.Fatalf("unexpected bind address: %s", c.BindAddress)
-	} else if !c.AuthEnabled {
+	} else if c.AuthEnabled != true {
 		t.Fatalf("unexpected auth enabled: %v", c.AuthEnabled)
-	} else if !c.LogEnabled {
+	} else if c.LogEnabled != true {
 		t.Fatalf("unexpected log enabled: %v", c.LogEnabled)
-	} else if !c.WriteTracing {
+	} else if c.WriteTracing != true {
 		t.Fatalf("unexpected write tracing: %v", c.WriteTracing)
-	} else if !c.HTTPSEnabled {
+	} else if c.HTTPSEnabled != true {
 		t.Fatalf("unexpected https enabled: %v", c.HTTPSEnabled)
 	} else if c.HTTPSCertificate != "/dev/null" {
 		t.Fatalf("unexpected https certificate: %v", c.HTTPSCertificate)
-	} else if !c.UnixSocketEnabled {
+	} else if c.UnixSocketEnabled != true {
 		t.Fatalf("unexpected unix socket enabled: %v", c.UnixSocketEnabled)
 	} else if c.BindSocket != "/var/run/influxdb.sock" {
 		t.Fatalf("unexpected bind unix socket: %v", c.BindSocket)

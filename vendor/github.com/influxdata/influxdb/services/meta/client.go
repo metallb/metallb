@@ -78,7 +78,7 @@ func NewClient(config *Config) *Client {
 		closing:             make(chan struct{}),
 		changed:             make(chan struct{}),
 		logger:              zap.NewNop(),
-		authCache:           make(map[string]authUser),
+		authCache:           make(map[string]authUser, 0),
 		path:                config.Dir,
 		retentionAutoCreate: config.RetentionAutoCreate,
 	}
@@ -458,7 +458,11 @@ func (c *Client) UpdateUser(name, password string) error {
 
 	delete(c.authCache, name)
 
-	return c.commit(data)
+	if err := c.commit(data); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // DropUser removes the user with the given name.

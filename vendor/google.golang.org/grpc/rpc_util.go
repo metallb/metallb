@@ -25,7 +25,6 @@ import (
 	"io"
 	"io/ioutil"
 	"math"
-	"strings"
 	"sync"
 	"time"
 
@@ -33,7 +32,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/encoding"
-	"google.golang.org/grpc/encoding/proto"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/peer"
 	"google.golang.org/grpc/stats"
@@ -132,8 +130,6 @@ type callInfo struct {
 	maxReceiveMessageSize *int
 	maxSendMessageSize    *int
 	creds                 credentials.PerRPCCredentials
-	contentSubtype        string
-	codec                 baseCodec
 }
 
 func defaultCallInfo() *callInfo {
@@ -256,49 +252,6 @@ func UseCompressor(name string) CallOption {
 	})
 }
 
-// CallContentSubtype returns a CallOption that will set the content-subtype
-// for a call. For example, if content-subtype is "json", the Content-Type over
-// the wire will be "application/grpc+json". The content-subtype is converted
-// to lowercase before being included in Content-Type. See Content-Type on
-// https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests for
-// more details.
-//
-// If CallCustomCodec is not also used, the content-subtype will be used to
-// look up the Codec to use in the registry controlled by RegisterCodec. See
-// the documention on RegisterCodec for details on registration. The lookup
-// of content-subtype is case-insensitive. If no such Codec is found, the call
-// will result in an error with code codes.Internal.
-//
-// If CallCustomCodec is also used, that Codec will be used for all request and
-// response messages, with the content-subtype set to the given contentSubtype
-// here for requests.
-func CallContentSubtype(contentSubtype string) CallOption {
-	contentSubtype = strings.ToLower(contentSubtype)
-	return beforeCall(func(c *callInfo) error {
-		c.contentSubtype = contentSubtype
-		return nil
-	})
-}
-
-// CallCustomCodec returns a CallOption that will set the given Codec to be
-// used for all request and response messages for a call. The result of calling
-// String() will be used as the content-subtype in a case-insensitive manner.
-//
-// See Content-Type on
-// https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#requests for
-// more details. Also see the documentation on RegisterCodec and
-// CallContentSubtype for more details on the interaction between Codec and
-// content-subtype.
-//
-// This function is provided for advanced users; prefer to use only
-// CallContentSubtype to select a registered codec instead.
-func CallCustomCodec(codec Codec) CallOption {
-	return beforeCall(func(c *callInfo) error {
-		c.codec = codec
-		return nil
-	})
-}
-
 // The format of the payload: compressed or not?
 type payloadFormat uint8
 
@@ -314,8 +267,8 @@ type parser struct {
 	// error types.
 	r io.Reader
 
-	// The header of a gRPC message. Find more detail at
-	// https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
+	// The header of a gRPC message. Find more detail
+	// at https://grpc.io/docs/guides/wire.html.
 	header [5]byte
 }
 
@@ -364,7 +317,7 @@ func (p *parser) recvMsg(maxReceiveMessageSize int) (pf payloadFormat, msg []byt
 // encode serializes msg and returns a buffer of message header and a buffer of msg.
 // If msg is nil, it generates the message header and an empty msg buffer.
 // TODO(ddyihai): eliminate extra Compressor parameter.
-func encode(c baseCodec, msg interface{}, cp Compressor, outPayload *stats.OutPayload, compressor encoding.Compressor) ([]byte, []byte, error) {
+func encode(c Codec, msg interface{}, cp Compressor, outPayload *stats.OutPayload, compressor encoding.Compressor) ([]byte, []byte, error) {
 	var (
 		b    []byte
 		cbuf *bytes.Buffer
@@ -441,7 +394,7 @@ func checkRecvPayload(pf payloadFormat, recvCompress string, haveCompressor bool
 // For the two compressor parameters, both should not be set, but if they are,
 // dc takes precedence over compressor.
 // TODO(dfawley): wrap the old compressor/decompressor using the new API?
-func recv(p *parser, c baseCodec, s *transport.Stream, dc Decompressor, m interface{}, maxReceiveMessageSize int, inPayload *stats.InPayload, compressor encoding.Compressor) error {
+func recv(p *parser, c Codec, s *transport.Stream, dc Decompressor, m interface{}, maxReceiveMessageSize int, inPayload *stats.InPayload, compressor encoding.Compressor) error {
 	pf, d, err := p.recvMsg(maxReceiveMessageSize)
 	if err != nil {
 		return err
@@ -536,27 +489,6 @@ func Errorf(c codes.Code, format string, a ...interface{}) error {
 	return status.Errorf(c, format, a...)
 }
 
-// setCallInfoCodec should only be called after CallOptions have been applied.
-func setCallInfoCodec(c *callInfo) error {
-	if c.codec != nil {
-		// codec was already set by a CallOption; use it.
-		return nil
-	}
-
-	if c.contentSubtype == "" {
-		// No codec specified in CallOptions; use proto by default.
-		c.codec = encoding.GetCodec(proto.Name)
-		return nil
-	}
-
-	// c.contentSubtype is already lowercased in CallContentSubtype
-	c.codec = encoding.GetCodec(c.contentSubtype)
-	if c.codec == nil {
-		return status.Errorf(codes.Internal, "no codec registered for content-subtype %s", c.contentSubtype)
-	}
-	return nil
-}
-
 // The SupportPackageIsVersion variables are referenced from generated protocol
 // buffer files to ensure compatibility with the gRPC version used.  The latest
 // support package version is 5.
@@ -572,6 +504,6 @@ const (
 )
 
 // Version is the current grpc version.
-const Version = "1.11.0-dev"
+const Version = "1.10.0-dev"
 
 const grpcUA = "grpc-go/" + Version

@@ -225,7 +225,10 @@ func (e *StatementExecutor) executeAlterRetentionPolicyStatement(stmt *influxql.
 	}
 
 	// Update the retention policy.
-	return e.MetaClient.UpdateRetentionPolicy(stmt.Database, stmt.Name, rpu, stmt.Default)
+	if err := e.MetaClient.UpdateRetentionPolicy(stmt.Database, stmt.Name, rpu, stmt.Default); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (e *StatementExecutor) executeCreateContinuousQueryStatement(q *influxql.CreateContinuousQueryStatement) error {
@@ -303,7 +306,11 @@ func (e *StatementExecutor) executeCreateRetentionPolicyStatement(stmt *influxql
 
 	// Create new retention policy.
 	_, err := e.MetaClient.CreateRetentionPolicy(stmt.Database, &spec, stmt.Default)
-	return err
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (e *StatementExecutor) executeCreateSubscriptionStatement(q *influxql.CreateSubscriptionStatement) error {
@@ -323,8 +330,8 @@ func (e *StatementExecutor) executeDeleteSeriesStatement(stmt *influxql.DeleteSe
 	// Convert "now()" to current time.
 	stmt.Condition = influxql.Reduce(stmt.Condition, &influxql.NowValuer{Now: time.Now().UTC()})
 
-	// Locally delete the series.
-	return e.TSDBStore.DeleteSeries(database, stmt.Sources, stmt.Condition)
+	// Locally delete the series. The series will not be removed from the index.
+	return e.TSDBStore.DeleteSeries(database, stmt.Sources, stmt.Condition, false)
 }
 
 func (e *StatementExecutor) executeDropContinuousQueryStatement(q *influxql.DropContinuousQueryStatement) error {
@@ -368,7 +375,7 @@ func (e *StatementExecutor) executeDropSeriesStatement(stmt *influxql.DropSeries
 	}
 
 	// Locally drop the series.
-	return e.TSDBStore.DeleteSeries(database, stmt.Sources, stmt.Condition)
+	return e.TSDBStore.DeleteSeries(database, stmt.Sources, stmt.Condition, true)
 }
 
 func (e *StatementExecutor) executeDropShardStatement(stmt *influxql.DropShardStatement) error {
@@ -779,10 +786,6 @@ func (e *StatementExecutor) executeShowMeasurementsStatement(q *influxql.ShowMea
 }
 
 func (e *StatementExecutor) executeShowMeasurementCardinalityStatement(stmt *influxql.ShowMeasurementCardinalityStatement) (models.Rows, error) {
-	if stmt.Database == "" {
-		return nil, ErrDatabaseNameRequired
-	}
-
 	n, err := e.TSDBStore.MeasurementsCardinality(stmt.Database)
 	if err != nil {
 		return nil, err
@@ -850,10 +853,6 @@ func (e *StatementExecutor) executeShowShardsStatement(stmt *influxql.ShowShards
 }
 
 func (e *StatementExecutor) executeShowSeriesCardinalityStatement(stmt *influxql.ShowSeriesCardinalityStatement) (models.Rows, error) {
-	if stmt.Database == "" {
-		return nil, ErrDatabaseNameRequired
-	}
-
 	n, err := e.TSDBStore.SeriesCardinality(stmt.Database)
 	if err != nil {
 		return nil, err
@@ -1376,7 +1375,7 @@ type TSDBStore interface {
 	DeleteDatabase(name string) error
 	DeleteMeasurement(database, name string) error
 	DeleteRetentionPolicy(database, name string) error
-	DeleteSeries(database string, sources []influxql.Source, condition influxql.Expr) error
+	DeleteSeries(database string, sources []influxql.Source, condition influxql.Expr, removeIndex bool) error
 	DeleteShard(id uint64) error
 
 	MeasurementNames(auth query.Authorizer, database string, cond influxql.Expr) ([][]byte, error)

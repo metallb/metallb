@@ -789,13 +789,13 @@ func (h *Handle) RouteGet(destination net.IP) ([]Route, error) {
 // RouteSubscribe takes a chan down which notifications will be sent
 // when routes are added or deleted. Close the 'done' chan to stop subscription.
 func RouteSubscribe(ch chan<- RouteUpdate, done <-chan struct{}) error {
-	return routeSubscribeAt(netns.None(), netns.None(), ch, done, nil, false)
+	return routeSubscribeAt(netns.None(), netns.None(), ch, done, nil)
 }
 
 // RouteSubscribeAt works like RouteSubscribe plus it allows the caller
 // to choose the network namespace in which to subscribe (ns).
 func RouteSubscribeAt(ns netns.NsHandle, ch chan<- RouteUpdate, done <-chan struct{}) error {
-	return routeSubscribeAt(ns, netns.None(), ch, done, nil, false)
+	return routeSubscribeAt(ns, netns.None(), ch, done, nil)
 }
 
 // RouteSubscribeOptions contains a set of options to use with
@@ -803,7 +803,6 @@ func RouteSubscribeAt(ns netns.NsHandle, ch chan<- RouteUpdate, done <-chan stru
 type RouteSubscribeOptions struct {
 	Namespace     *netns.NsHandle
 	ErrorCallback func(error)
-	ListExisting  bool
 }
 
 // RouteSubscribeWithOptions work like RouteSubscribe but enable to
@@ -814,10 +813,10 @@ func RouteSubscribeWithOptions(ch chan<- RouteUpdate, done <-chan struct{}, opti
 		none := netns.None()
 		options.Namespace = &none
 	}
-	return routeSubscribeAt(*options.Namespace, netns.None(), ch, done, options.ErrorCallback, options.ListExisting)
+	return routeSubscribeAt(*options.Namespace, netns.None(), ch, done, options.ErrorCallback)
 }
 
-func routeSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- RouteUpdate, done <-chan struct{}, cberr func(error), listExisting bool) error {
+func routeSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- RouteUpdate, done <-chan struct{}, cberr func(error)) error {
 	s, err := nl.SubscribeAt(newNs, curNs, unix.NETLINK_ROUTE, unix.RTNLGRP_IPV4_ROUTE, unix.RTNLGRP_IPV6_ROUTE)
 	if err != nil {
 		return err
@@ -827,15 +826,6 @@ func routeSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- RouteUpdate, done <
 			<-done
 			s.Close()
 		}()
-	}
-	if listExisting {
-		req := pkgHandle.newNetlinkRequest(unix.RTM_GETROUTE,
-			unix.NLM_F_DUMP)
-		infmsg := nl.NewIfInfomsg(unix.AF_UNSPEC)
-		req.AddData(infmsg)
-		if err := s.Send(req); err != nil {
-			return err
-		}
 	}
 	go func() {
 		defer close(ch)
@@ -848,20 +838,6 @@ func routeSubscribeAt(newNs, curNs netns.NsHandle, ch chan<- RouteUpdate, done <
 				return
 			}
 			for _, m := range msgs {
-				if m.Header.Type == unix.NLMSG_DONE {
-					continue
-				}
-				if m.Header.Type == unix.NLMSG_ERROR {
-					native := nl.NativeEndian()
-					error := int32(native.Uint32(m.Data[0:4]))
-					if error == 0 {
-						continue
-					}
-					if cberr != nil {
-						cberr(syscall.Errno(-error))
-					}
-					return
-				}
 				route, err := deserializeRoute(m.Data)
 				if err != nil {
 					if cberr != nil {

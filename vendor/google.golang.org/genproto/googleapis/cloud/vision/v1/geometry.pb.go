@@ -29,7 +29,6 @@ It has these top-level messages:
 	CropHint
 	CropHintsAnnotation
 	CropHintsParams
-	WebDetectionParams
 	ImageContext
 	AnnotateImageRequest
 	AnnotateImageResponse

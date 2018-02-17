@@ -14,7 +14,6 @@
 # limitations under the License.
 
 from __future__ import absolute_import
-from __future__ import print_function
 
 import sys
 import time
@@ -35,17 +34,6 @@ from lib.quagga import QuaggaBGPContainer
 
 
 class GoBGPTestBase(unittest.TestCase):
-    # The same topology for IPv4 and IPv6 environment.
-    # o1: Quagga (not router)
-    # g1: GoBGP
-    # q1: Quagga (Zebra + BGPd)
-    # o2: Quagga (not router)
-    #
-    # +----+       +----+           +----+       +----+
-    # | o1 |       | g1 |===(BGP)===| q1 |       | o2 |
-    # +----+       +----+           +----+       +----+
-    #    |          |  |             |  |          |
-    #    +--(br01)--+  +---(br02)----+  +--(br03)--+
 
     @classmethod
     def setUpClass(cls):
@@ -80,22 +68,11 @@ class GoBGPTestBase(unittest.TestCase):
         br02_v6 = Bridge(name='br02_v6', subnet='2001:20::/32')
         br03_v6 = Bridge(name='br03_v6', subnet='2001:30::/32')
 
-        cls.ctns = {
-            'ipv4': [g1_v4, q1_v4, o1_v4, o2_v4],
-            'ipv6': [g1_v6, q1_v6, o1_v6, o2_v6],
-        }
-        cls.gobgps = {
-            'ipv4': g1_v4,
-            'ipv6': g1_v6,
-        }
-        cls.quaggas = {
-            'ipv4': q1_v4,
-            'ipv6': q1_v6,
-        }
-        cls.others = {
-            'ipv4': [o1_v4, o2_v4],
-            'ipv6': [o1_v6, o2_v6],
-        }
+        cls.ctns = {'ipv4': [g1_v4, q1_v4, o1_v4, o2_v4],
+                    'ipv6': [g1_v6, q1_v6, o1_v6, o2_v6]}
+        cls.gobgps = {'ipv4': g1_v4, 'ipv6': g1_v6}
+        cls.quaggas = {'ipv4': q1_v4, 'ipv6': q1_v6}
+        cls.others = {'ipv4': [o1_v4, o2_v4], 'ipv6': [o1_v6, o2_v6]}
         cls.bridges = {
             'br01_v4': br01_v4,
             'br02_v4': br02_v4,
@@ -131,31 +108,42 @@ class GoBGPTestBase(unittest.TestCase):
 
     """
       No.2 check whether the ping is reachable in container
-           that have previously beyond the GoBGP in ipv4 environment
+           that have previously beyond the gobpg in ipv4 environment
     """
 
-    def test_02_check_reachability_between_o1_and_o2(self):
+    def test_02_check_reachablily_beyond_gobgp_from_quagga(self):
         g1 = self.gobgps['ipv4']
         q1 = self.quaggas['ipv4']
         o1 = self.others['ipv4'][0]
-        o2 = self.others['ipv4'][1]
 
-        # set o1's default gateway as g1
-        g1_addr = g1.ip_addrs[1][1].split('/')[0]
-        o1.add_static_route(self.bridges['br03_v4'].subnet, g1_addr)
-
-        # set o2's default gateway as q1
-        q1_addr = q1.ip_addrs[2][1].split('/')[0]
-        o2.add_static_route(self.bridges['br01_v4'].subnet, q1_addr)
-
-        # test reachability between o1 and o2
-        addrs = [e[1] for e in o2.ip_addrs if 'br03_v4' in e[2]]
-        self.assertTrue(len(addrs) == 1)
-        o2_addr = addrs[0]
-        o1.get_reachability(o2_addr)
+        next_hop = None
+        for info in g1.ip_addrs:
+            if 'br01_v4' in info[2]:
+                next_hop = info[1].split('/')[0]
+        self.assertFalse(next_hop is None)
+        o1.add_static_route(self.bridges['br02_v4'].subnet, next_hop)
+        addr = [e[1] for e in o1.ip_addrs if 'br01_v4' in e[2]]
+        self.assertTrue(len(addr) == 1)
+        q1.get_reachablily(addr[0])
 
     """
-      No.4 start up ipv6 containers and check state
+      No.3 check whether the ping is reachable in container
+           that have previously beyond the quagga in ipv4 environment
+    """
+
+    def test_03_check_reachablily_beyond_quagga_from_gobgp(self):
+        g1 = self.gobgps['ipv4']
+        q1 = self.quaggas['ipv4']
+        o2 = self.others['ipv4'][1]
+
+        next_hop = q1.ip_addrs[2][1].split('/')[0]
+        o2.add_static_route(self.bridges['br02_v4'].subnet, next_hop)
+        addr = [e[1] for e in o2.ip_addrs if 'br03_v4' in e[2]]
+        self.assertTrue(len(addr) == 1)
+        g1.get_reachablily(addr[0])
+
+    """
+      No.4 start up ipv4 containers and check state
            each neighbor is established in ipv6 environment
     """
 
@@ -180,28 +168,37 @@ class GoBGPTestBase(unittest.TestCase):
 
     """
       No.5 check whether the ping is reachable in container
-           that have previously beyond the GoBGP in ipv6 environment
+           that have previously beyond the gobpg in ipv6 environment
     """
 
-    def test_05_check_reachability_between_o1_and_o2(self):
+    def test_05_check_reachablily_beyond_gobgp_from_quagga(self):
         g1 = self.gobgps['ipv6']
         q1 = self.quaggas['ipv6']
         o1 = self.others['ipv6'][0]
+
+        next_hop = g1.ip_addrs[1][1].split('/')[0]
+        g1.set_ipv6_forward()
+        o1.add_static_route(self.bridges['br02_v6'].subnet, next_hop)
+        addr = [e[1] for e in o1.ip_addrs if 'br01_v6' in e[2]]
+        self.assertTrue(len(addr) == 1)
+        q1.get_reachablily(addr[0])
+
+    """
+      No.6 check whether the ping is reachable in container
+           that have previously beyond the quagga in ipv6 environment
+    """
+
+    def test_06_check_reachablily_beyond_quagga_from_gobgp(self):
+        g1 = self.gobgps['ipv6']
+        q1 = self.quaggas['ipv6']
         o2 = self.others['ipv6'][1]
 
-        # set o1's default gateway as g1
-        g1_addr = g1.ip_addrs[1][1].split('/')[0]
-        o1.add_static_route(self.bridges['br03_v6'].subnet, g1_addr)
-
-        # set o2's default gateway as q1
-        q1_addr = q1.ip_addrs[2][1].split('/')[0]
-        o2.add_static_route(self.bridges['br01_v6'].subnet, q1_addr)
-
-        # test reachability between o1 and o2
-        addrs = [e[1] for e in o2.ip_addrs if 'br03_v6' in e[2]]
-        self.assertTrue(len(addrs) == 1)
-        o2_addr = addrs[0]
-        o1.get_reachability(o2_addr)
+        next_hop = q1.ip_addrs[2][1].split('/')[0]
+        q1.set_ipv6_forward()
+        o2.add_static_route(self.bridges['br02_v6'].subnet, next_hop)
+        addr = [e[1] for e in o2.ip_addrs if 'br03_v6' in e[2]]
+        self.assertTrue(len(addr) == 1)
+        g1.get_reachablily(addr[0])
 
     def test_07_mpath_test_setup(self):
         g1 = GoBGPContainer(name='g1', asn=65000, router_id='192.168.0.1',
@@ -306,7 +303,7 @@ class GoBGPTestBase(unittest.TestCase):
 if __name__ == '__main__':
     output = local("which docker 2>&1 > /dev/null ; echo $?", capture=True)
     if int(output) is not 0:
-        print("docker not found")
+        print "docker not found"
         sys.exit(1)
 
     nose.main(argv=sys.argv, addplugins=[OptionParser()],

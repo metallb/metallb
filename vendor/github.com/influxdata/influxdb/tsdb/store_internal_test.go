@@ -132,11 +132,11 @@ func createtagValues(mname string, kvs map[string][]string) tagValues {
 	for k := range kvs {
 		out.keys = append(out.keys, k)
 	}
-	sort.Strings(out.keys)
+	sort.Sort(sort.StringSlice(out.keys))
 
 	for i, k := range out.keys {
 		values := kvs[k]
-		sort.Strings(values)
+		sort.Sort(sort.StringSlice(values))
 		out.values[i] = values
 	}
 	return out

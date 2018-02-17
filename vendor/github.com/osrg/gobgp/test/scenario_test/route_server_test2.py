@@ -47,20 +47,22 @@ class GoBGPTestBase(unittest.TestCase):
         g2 = GoBGPContainer(name='g2', asn=65001, router_id='192.168.0.2',
                             ctn_image_name=gobgp_ctn_image_name)
         e1 = ExaBGPContainer(name='e1', asn=65002, router_id='192.168.0.3')
-
         ctns = [g1, g2, e1]
-        cls.clients = {cli.name: cli for cli in (g2, e1)}
-
-        initial_wait_time = max(ctn.run() for ctn in ctns)
-        time.sleep(initial_wait_time)
-
-        for cli in cls.clients.values():
-            g1.add_peer(cli, is_rs_client=True, passwd='passwd', passive=True, prefix_limit=10)
-            cli.add_peer(g1, passwd='passwd')
 
         # advertise a route from route-server-clients
-        g2.add_route('10.0.0.0/24')
-        e1.add_route('10.0.1.0/24')
+        cls.clients = {}
+        for idx, cli in enumerate((g2, e1)):
+            route = '10.0.{0}.0/24'.format(idx)
+            cli.add_route(route)
+            cls.clients[cli.name] = cli
+
+        initial_wait_time = max(ctn.run() for ctn in ctns)
+
+        time.sleep(initial_wait_time)
+
+        for cli in cls.clients.itervalues():
+            g1.add_peer(cli, is_rs_client=True, passwd='passwd', passive=True, prefix_limit=10)
+            cli.add_peer(g1, passwd='passwd')
 
         cls.gobgp = g1
 

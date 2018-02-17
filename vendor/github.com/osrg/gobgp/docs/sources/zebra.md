@@ -7,20 +7,14 @@ different routing protocols. GoBGP uses zebra included in
 
 ## Prerequisites
 
-Assume you finished [Getting Started](getting-started.md)
+Assume you finished [Getting Started](https://github.com/osrg/gobgp/blob/master/docs/sources/getting-started.md)
 and installing Quagga or FRRouting on the same host with GoBGP.
 
-**Note:** For the integration with FRRouting, ONLY version 3.0.x is supported,
-because the API (using Zebra protocol) of FRRouging is updated so fast and its
-backward compatibility is not been kept.
-
 ## Contents
+- [Configuration](#section0)
+- [Check routes from zebra](#section1)
 
-- [Configuration](#configuration)
-- [Check routes from zebra](#check-routes-from-zebra)
-
-## Configuration
-
+## <a name="section0"> Configuration
 You need to enable the zebra feature in the Global configuration as follows.
 
 ```toml
@@ -32,30 +26,26 @@ You need to enable the zebra feature in the Global configuration as follows.
         version = 2
 ```
 
-- `url` specifies the path to the unix domain socket or the TCP port for
-  connecting to Zebra API.
-  If omitted, GoBGP will use `"unix:/var/run/quagga/zserv.api"` by the default.
-  Please note that with FRRouting, the path to the unix domain socket would be
-  like `"unix:/var/run/frr/zserv.api"`.
-  To specify the TCP port, `url` value would be like `"tcp:192.168.24.1:2600"`.
+- `url` specifies the path to the unix domain socket or the TCP port for connecting to Zebra API.
+If omitted, GoBGP will use `"unix:/var/run/quagga/zserv.api"` by the default.
+Please note that with FRRouting, the path to the unix domain socket would be like
+`"unix:/var/run/frr/zserv.api"`.
+To specify the TCP port, `url` value would be like `"tcp:192.168.24.1:2600"`.
 
-- `redistribute-route-type-list` specifies which route types you want to
-  receive from Zebra daemon.
-  For example, with `["connect"]`, GoBGP will receive the connected routes and
-  redistribute them.
+- `redistribute-route-type-list` specifies which route types you want to receive from Zebra
+daemon. For example, with `["connect"]`, GoBGP will receive the connected routes and redistribute
+them.
 
-- `version` specifies Zebra API version.
-  `2` is the version used by Quagga on Ubuntu 16.04 LTS.
-  To enable the Next-Hop Tracking features, please specify `3` or later.
-  For connecting to FRRouting, please specify `4`.
+- `version` specifies Zebra API version. `2` is the version used by Quagga on Ubuntu 16.04 LTS.
+To enable the Next-Hop Tracking features, please specify `3` or later.
+For connecting to FRRouting, please specify `4`.
 
-## Check Routes from zebra
+## <a name="section1">Check Routes from zebra
 
 Zebra has 3 connected routes in this example's environment.
-
-- 172.16.1.100/30
-- 172.16.6.100/30
-- 192.168.31.0/24
+ - 172.16.1.100/30
+ - 172.16.6.100/30
+ - 192.168.31.0/24
 
 Let's check these routes with GoBGP cli.
 
@@ -68,3 +58,4 @@ $ gobgp global rib
 ```
 
 You can see connected routes stored in the GoBGP global rib.
+

@@ -49,26 +49,6 @@ func TestGenerateIndexFile(t *testing.T) {
 	}
 }
 
-// Ensure a MeasurementHashSeries returns false when all series are tombstoned.
-func TestIndexFile_MeasurementHasSeries_Tombstoned(t *testing.T) {
-	sfile := MustOpenSeriesFile()
-	defer sfile.Close()
-
-	f, err := CreateIndexFile(sfile.SeriesFile, []Series{
-		{Name: []byte("cpu"), Tags: models.NewTags(map[string]string{"region": "east"})},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Simulate all series are tombstoned
-	ss := tsdb.NewSeriesIDSet()
-
-	if f.MeasurementHasSeries(ss, []byte("cpu")) {
-		t.Fatalf("MeasurementHasSeries got true, exp false")
-	}
-}
-
 func BenchmarkIndexFile_TagValueSeries(b *testing.B) {
 	b.Run("M=1,K=2,V=3", func(b *testing.B) {
 		sfile := MustOpenSeriesFile()
@@ -109,16 +89,16 @@ func CreateIndexFile(sfile *tsdb.SeriesFile, series []Series) (*tsi1.IndexFile, 
 
 	// Write index file to buffer.
 	var buf bytes.Buffer
-	if _, err := lf.CompactTo(&buf, M, K, nil); err != nil {
+	if _, err := lf.CompactTo(&buf, M, K); err != nil {
 		return nil, err
 	}
 
 	// Load index file from buffer.
-	f := tsi1.NewIndexFile(sfile)
+	var f tsi1.IndexFile
 	if err := f.UnmarshalBinary(buf.Bytes()); err != nil {
 		return nil, err
 	}
-	return f, nil
+	return &f, nil
 }
 
 // GenerateIndexFile generates an index file from a set of series based on the count arguments.
@@ -132,16 +112,16 @@ func GenerateIndexFile(sfile *tsdb.SeriesFile, measurementN, tagN, valueN int) (
 
 	// Compact log file to buffer.
 	var buf bytes.Buffer
-	if _, err := lf.CompactTo(&buf, M, K, nil); err != nil {
+	if _, err := lf.CompactTo(&buf, M, K); err != nil {
 		return nil, err
 	}
 
 	// Load index file from buffer.
-	f := tsi1.NewIndexFile(sfile)
+	var f tsi1.IndexFile
 	if err := f.UnmarshalBinary(buf.Bytes()); err != nil {
 		return nil, err
 	}
-	return f, nil
+	return &f, nil
 }
 
 func MustGenerateIndexFile(sfile *tsdb.SeriesFile, measurementN, tagN, valueN int) *tsi1.IndexFile {

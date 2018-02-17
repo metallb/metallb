@@ -690,17 +690,21 @@ func (itr *floatFillIterator) Next() (*FloatPoint, error) {
 	}
 
 	// Check if the next point is outside of our window or is nil.
-	if p == nil || p.Name != itr.window.name || p.Tags.ID() != itr.window.tags.ID() {
+	for p == nil || p.Name != itr.window.name || p.Tags.ID() != itr.window.tags.ID() {
 		// If we are inside of an interval, unread the point and continue below to
 		// constructing a new point.
-		if itr.opt.Ascending && itr.window.time <= itr.endTime {
-			itr.input.unread(p)
-			p = nil
-			goto CONSTRUCT
-		} else if !itr.opt.Ascending && itr.window.time >= itr.endTime && itr.endTime != influxql.MinTime {
-			itr.input.unread(p)
-			p = nil
-			goto CONSTRUCT
+		if itr.opt.Ascending {
+			if itr.window.time <= itr.endTime {
+				itr.input.unread(p)
+				p = nil
+				break
+			}
+		} else {
+			if itr.window.time >= itr.endTime && itr.endTime != influxql.MinTime {
+				itr.input.unread(p)
+				p = nil
+				break
+			}
 		}
 
 		// We are *not* in a current interval. If there is no next point,
@@ -719,10 +723,10 @@ func (itr *floatFillIterator) Next() (*FloatPoint, error) {
 			_, itr.window.offset = itr.opt.Zone(itr.window.time)
 		}
 		itr.prev = FloatPoint{Nil: true}
+		break
 	}
 
 	// Check if the point is our next expected point.
-CONSTRUCT:
 	if p == nil || (itr.opt.Ascending && p.Time > itr.window.time) || (!itr.opt.Ascending && p.Time < itr.window.time) {
 		if p != nil {
 			itr.input.unread(p)
@@ -4102,17 +4106,21 @@ func (itr *integerFillIterator) Next() (*IntegerPoint, error) {
 	}
 
 	// Check if the next point is outside of our window or is nil.
-	if p == nil || p.Name != itr.window.name || p.Tags.ID() != itr.window.tags.ID() {
+	for p == nil || p.Name != itr.window.name || p.Tags.ID() != itr.window.tags.ID() {
 		// If we are inside of an interval, unread the point and continue below to
 		// constructing a new point.
-		if itr.opt.Ascending && itr.window.time <= itr.endTime {
-			itr.input.unread(p)
-			p = nil
-			goto CONSTRUCT
-		} else if !itr.opt.Ascending && itr.window.time >= itr.endTime && itr.endTime != influxql.MinTime {
-			itr.input.unread(p)
-			p = nil
-			goto CONSTRUCT
+		if itr.opt.Ascending {
+			if itr.window.time <= itr.endTime {
+				itr.input.unread(p)
+				p = nil
+				break
+			}
+		} else {
+			if itr.window.time >= itr.endTime && itr.endTime != influxql.MinTime {
+				itr.input.unread(p)
+				p = nil
+				break
+			}
 		}
 
 		// We are *not* in a current interval. If there is no next point,
@@ -4131,10 +4139,10 @@ func (itr *integerFillIterator) Next() (*IntegerPoint, error) {
 			_, itr.window.offset = itr.opt.Zone(itr.window.time)
 		}
 		itr.prev = IntegerPoint{Nil: true}
+		break
 	}
 
 	// Check if the point is our next expected point.
-CONSTRUCT:
 	if p == nil || (itr.opt.Ascending && p.Time > itr.window.time) || (!itr.opt.Ascending && p.Time < itr.window.time) {
 		if p != nil {
 			itr.input.unread(p)
@@ -7511,17 +7519,21 @@ func (itr *unsignedFillIterator) Next() (*UnsignedPoint, error) {
 	}
 
 	// Check if the next point is outside of our window or is nil.
-	if p == nil || p.Name != itr.window.name || p.Tags.ID() != itr.window.tags.ID() {
+	for p == nil || p.Name != itr.window.name || p.Tags.ID() != itr.window.tags.ID() {
 		// If we are inside of an interval, unread the point and continue below to
 		// constructing a new point.
-		if itr.opt.Ascending && itr.window.time <= itr.endTime {
-			itr.input.unread(p)
-			p = nil
-			goto CONSTRUCT
-		} else if !itr.opt.Ascending && itr.window.time >= itr.endTime && itr.endTime != influxql.MinTime {
-			itr.input.unread(p)
-			p = nil
-			goto CONSTRUCT
+		if itr.opt.Ascending {
+			if itr.window.time <= itr.endTime {
+				itr.input.unread(p)
+				p = nil
+				break
+			}
+		} else {
+			if itr.window.time >= itr.endTime && itr.endTime != influxql.MinTime {
+				itr.input.unread(p)
+				p = nil
+				break
+			}
 		}
 
 		// We are *not* in a current interval. If there is no next point,
@@ -7540,10 +7552,10 @@ func (itr *unsignedFillIterator) Next() (*UnsignedPoint, error) {
 			_, itr.window.offset = itr.opt.Zone(itr.window.time)
 		}
 		itr.prev = UnsignedPoint{Nil: true}
+		break
 	}
 
 	// Check if the point is our next expected point.
-CONSTRUCT:
 	if p == nil || (itr.opt.Ascending && p.Time > itr.window.time) || (!itr.opt.Ascending && p.Time < itr.window.time) {
 		if p != nil {
 			itr.input.unread(p)
@@ -10920,17 +10932,21 @@ func (itr *stringFillIterator) Next() (*StringPoint, error) {
 	}
 
 	// Check if the next point is outside of our window or is nil.
-	if p == nil || p.Name != itr.window.name || p.Tags.ID() != itr.window.tags.ID() {
+	for p == nil || p.Name != itr.window.name || p.Tags.ID() != itr.window.tags.ID() {
 		// If we are inside of an interval, unread the point and continue below to
 		// constructing a new point.
-		if itr.opt.Ascending && itr.window.time <= itr.endTime {
-			itr.input.unread(p)
-			p = nil
-			goto CONSTRUCT
-		} else if !itr.opt.Ascending && itr.window.time >= itr.endTime && itr.endTime != influxql.MinTime {
-			itr.input.unread(p)
-			p = nil
-			goto CONSTRUCT
+		if itr.opt.Ascending {
+			if itr.window.time <= itr.endTime {
+				itr.input.unread(p)
+				p = nil
+				break
+			}
+		} else {
+			if itr.window.time >= itr.endTime && itr.endTime != influxql.MinTime {
+				itr.input.unread(p)
+				p = nil
+				break
+			}
 		}
 
 		// We are *not* in a current interval. If there is no next point,
@@ -10949,10 +10965,10 @@ func (itr *stringFillIterator) Next() (*StringPoint, error) {
 			_, itr.window.offset = itr.opt.Zone(itr.window.time)
 		}
 		itr.prev = StringPoint{Nil: true}
+		break
 	}
 
 	// Check if the point is our next expected point.
-CONSTRUCT:
 	if p == nil || (itr.opt.Ascending && p.Time > itr.window.time) || (!itr.opt.Ascending && p.Time < itr.window.time) {
 		if p != nil {
 			itr.input.unread(p)
@@ -14315,17 +14331,21 @@ func (itr *booleanFillIterator) Next() (*BooleanPoint, error) {
 	}
 
 	// Check if the next point is outside of our window or is nil.
-	if p == nil || p.Name != itr.window.name || p.Tags.ID() != itr.window.tags.ID() {
+	for p == nil || p.Name != itr.window.name || p.Tags.ID() != itr.window.tags.ID() {
 		// If we are inside of an interval, unread the point and continue below to
 		// constructing a new point.
-		if itr.opt.Ascending && itr.window.time <= itr.endTime {
-			itr.input.unread(p)
-			p = nil
-			goto CONSTRUCT
-		} else if !itr.opt.Ascending && itr.window.time >= itr.endTime && itr.endTime != influxql.MinTime {
-			itr.input.unread(p)
-			p = nil
-			goto CONSTRUCT
+		if itr.opt.Ascending {
+			if itr.window.time <= itr.endTime {
+				itr.input.unread(p)
+				p = nil
+				break
+			}
+		} else {
+			if itr.window.time >= itr.endTime && itr.endTime != influxql.MinTime {
+				itr.input.unread(p)
+				p = nil
+				break
+			}
 		}
 
 		// We are *not* in a current interval. If there is no next point,
@@ -14344,10 +14364,10 @@ func (itr *booleanFillIterator) Next() (*BooleanPoint, error) {
 			_, itr.window.offset = itr.opt.Zone(itr.window.time)
 		}
 		itr.prev = BooleanPoint{Nil: true}
+		break
 	}
 
 	// Check if the point is our next expected point.
-CONSTRUCT:
 	if p == nil || (itr.opt.Ascending && p.Time > itr.window.time) || (!itr.opt.Ascending && p.Time < itr.window.time) {
 		if p != nil {
 			itr.input.unread(p)

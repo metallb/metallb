@@ -26,7 +26,7 @@ func TestLogFile_AddSeriesList(t *testing.T) {
 
 	f := MustOpenLogFile(sfile.SeriesFile)
 	defer f.Close()
-	seriesSet := tsdb.NewSeriesIDSet()
+	seriesSet := tsi1.NewSeriesSet()
 
 	// Add test data.
 	if err := f.AddSeriesList(seriesSet, [][]byte{
@@ -73,7 +73,7 @@ func TestLogFile_SeriesStoredInOrder(t *testing.T) {
 
 	f := MustOpenLogFile(sfile.SeriesFile)
 	defer f.Close()
-	seriesSet := tsdb.NewSeriesIDSet()
+	seriesSet := tsi1.NewSeriesSet()
 
 	// Generate and add test data
 	tvm := make(map[string]struct{})
@@ -130,7 +130,7 @@ func TestLogFile_DeleteMeasurement(t *testing.T) {
 
 	f := MustOpenLogFile(sfile.SeriesFile)
 	defer f.Close()
-	seriesSet := tsdb.NewSeriesIDSet()
+	seriesSet := tsi1.NewSeriesSet()
 
 	// Add test data.
 	if err := f.AddSeriesList(seriesSet, [][]byte{
@@ -206,7 +206,7 @@ func (f *LogFile) Reopen() error {
 // CreateLogFile creates a new temporary log file and adds a list of series.
 func CreateLogFile(sfile *tsdb.SeriesFile, series []Series) (*LogFile, error) {
 	f := MustOpenLogFile(sfile)
-	seriesSet := tsdb.NewSeriesIDSet()
+	seriesSet := tsi1.NewSeriesSet()
 	for _, serie := range series {
 		if err := f.AddSeriesList(seriesSet, [][]byte{serie.Name}, []models.Tags{serie.Tags}); err != nil {
 			return nil, err
@@ -221,7 +221,7 @@ func GenerateLogFile(sfile *tsdb.SeriesFile, measurementN, tagN, valueN int) (*L
 	tagValueN := pow(valueN, tagN)
 
 	f := MustOpenLogFile(sfile)
-	seriesSet := tsdb.NewSeriesIDSet()
+	seriesSet := tsi1.NewSeriesSet()
 	for i := 0; i < measurementN; i++ {
 		name := []byte(fmt.Sprintf("measurement%d", i))
 
@@ -241,13 +241,21 @@ func GenerateLogFile(sfile *tsdb.SeriesFile, measurementN, tagN, valueN int) (*L
 	return f, nil
 }
 
+func MustGenerateLogFile(sfile *tsdb.SeriesFile, measurementN, tagN, valueN int) *LogFile {
+	f, err := GenerateLogFile(sfile, measurementN, tagN, valueN)
+	if err != nil {
+		panic(err)
+	}
+	return f
+}
+
 func benchmarkLogFile_AddSeries(b *testing.B, measurementN, seriesKeyN, seriesValueN int) {
 	sfile := MustOpenSeriesFile()
 	defer sfile.Close()
 
 	b.StopTimer()
 	f := MustOpenLogFile(sfile.SeriesFile)
-	seriesSet := tsdb.NewSeriesIDSet()
+	seriesSet := tsi1.NewSeriesSet()
 
 	type Datum struct {
 		Name []byte
@@ -305,7 +313,7 @@ func BenchmarkLogFile_WriteTo(b *testing.B) {
 
 			f := MustOpenLogFile(sfile.SeriesFile)
 			defer f.Close()
-			seriesSet := tsdb.NewSeriesIDSet()
+			seriesSet := tsi1.NewSeriesSet()
 
 			// Estimate bloom filter size.
 			m, k := bloom.Estimate(uint64(seriesN), 0.02)
@@ -332,7 +340,7 @@ func BenchmarkLogFile_WriteTo(b *testing.B) {
 			// Compact log file.
 			for i := 0; i < b.N; i++ {
 				buf := bytes.NewBuffer(make([]byte, 0, 150*seriesN))
-				if _, err := f.CompactTo(buf, m, k, nil); err != nil {
+				if _, err := f.CompactTo(buf, m, k); err != nil {
 					b.Fatal(err)
 				}
 				b.Logf("sz=%db", buf.Len())

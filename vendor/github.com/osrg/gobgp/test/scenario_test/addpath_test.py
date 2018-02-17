@@ -21,10 +21,7 @@ import nose
 from fabric.api import local
 
 from lib import base
-from lib.base import (
-    BGP_FSM_ESTABLISHED,
-    assert_several_times,
-)
+from lib.base import BGP_FSM_ESTABLISHED
 from lib.gobgp import GoBGPContainer
 from lib.exabgp import ExaBGPContainer
 from lib.noseplugin import OptionParser, parser_option
@@ -77,176 +74,148 @@ class GoBGPTestBase(unittest.TestCase):
         self.e1.add_route(route='192.168.100.0/24', identifier=10, aspath=[100, 200, 300])
         self.e1.add_route(route='192.168.100.0/24', identifier=20, aspath=[100, 200])
         self.e1.add_route(route='192.168.100.0/24', identifier=30, aspath=[100])
+        # Because ExaBGPContainer will be restarted internally for adding or
+        # deleting routes, here waits for re-establishment.
+        self.g1.wait_for(expected_state=BGP_FSM_ESTABLISHED, peer=self.e1)
+        time.sleep(1)
 
     # test three routes are installed to the rib due to add-path feature
     def test_02_check_g1_global_rib(self):
-        def f():
-            rib = self.g1.get_global_rib()
-            self.assertEqual(len(rib), 1)
-            self.assertEqual(len(rib[0]['paths']), 3)
-
-        assert_several_times(f)
+        rib = self.g1.get_global_rib()
+        self.assertEqual(len(rib), 1)
+        self.assertEqual(len(rib[0]['paths']), 3)
 
     # test only the best path is advertised to g2
     def test_03_check_g2_global_rib(self):
-        def f():
-            rib = self.g2.get_global_rib()
-            self.assertEqual(len(rib), 1)
-            self.assertEqual(len(rib[0]['paths']), 1)
-            self.assertEqual(rib[0]['paths'][0]['aspath'], [100])
-
-        assert_several_times(f)
+        rib = self.g2.get_global_rib()
+        self.assertEqual(len(rib), 1)
+        self.assertEqual(len(rib[0]['paths']), 1)
+        self.assertEqual(rib[0]['paths'][0]['aspath'], [100])
 
     # test three routes are advertised to g3
     def test_04_check_g3_global_rib(self):
-        def f():
-            rib = self.g3.get_global_rib()
-            self.assertEqual(len(rib), 1)
-            self.assertEqual(len(rib[0]['paths']), 3)
-
-        assert_several_times(f)
+        rib = self.g3.get_global_rib()
+        self.assertEqual(len(rib), 1)
+        self.assertEqual(len(rib[0]['paths']), 3)
 
     # withdraw a route with path_id (no error check)
     def test_05_withdraw_route_with_path_id(self):
         self.e1.del_route(route='192.168.100.0/24', identifier=30)
+        # Because ExaBGPContainer will be restarted internally for adding or
+        # deleting routes, here waits for re-establishment.
+        self.g1.wait_for(expected_state=BGP_FSM_ESTABLISHED, peer=self.e1)
+        time.sleep(1)
 
     # test the withdrawn route is removed from the rib
     def test_06_check_g1_global_rib(self):
-        def f():
-            rib = self.g1.get_global_rib()
-            self.assertEqual(len(rib), 1)
-            self.assertEqual(len(rib[0]['paths']), 2)
-            for path in rib[0]['paths']:
-                self.assertIn(path['aspath'], ([100, 200, 300],
-                                               [100, 200]))
-
-        assert_several_times(f)
+        rib = self.g1.get_global_rib()
+        self.assertEqual(len(rib), 1)
+        self.assertEqual(len(rib[0]['paths']), 2)
+        for path in rib[0]['paths']:
+            self.assertTrue(path['aspath'] == [100, 200, 300] or
+                            path['aspath'] == [100, 200])
 
     # test the best path is replaced due to the removal from g1 rib
     def test_07_check_g2_global_rib(self):
-        def f():
-            rib = self.g2.get_global_rib()
-            self.assertEqual(len(rib), 1)
-            self.assertEqual(len(rib[0]['paths']), 1)
-            self.assertEqual(rib[0]['paths'][0]['aspath'], [100, 200])
-
-        assert_several_times(f)
+        rib = self.g2.get_global_rib()
+        self.assertEqual(len(rib), 1)
+        self.assertEqual(len(rib[0]['paths']), 1)
+        self.assertEqual(rib[0]['paths'][0]['aspath'], [100, 200])
 
     # test the withdrawn route is removed from the rib of g3
     def test_08_check_g3_global_rib(self):
-        def f():
-            rib = self.g3.get_global_rib()
-            self.assertEqual(len(rib), 1)
-            self.assertEqual(len(rib[0]['paths']), 2)
-            for path in rib[0]['paths']:
-                self.assertIn(path['aspath'], ([100, 200, 300],
-                                               [100, 200]))
-
-        assert_several_times(f)
+        rib = self.g3.get_global_rib()
+        self.assertEqual(len(rib), 1)
+        self.assertEqual(len(rib[0]['paths']), 2)
+        for path in rib[0]['paths']:
+            self.assertTrue(path['aspath'] == [100, 200, 300] or
+                            path['aspath'] == [100, 200])
 
     # install a route with path_id via GoBGP CLI (no error check)
     def test_09_install_add_paths_route_via_cli(self):
         # identifier is duplicated with the identifier of the route from e1
         self.g1.add_route(route='192.168.100.0/24', identifier=10, local_pref=500)
+        time.sleep(1)  # XXX: wait for routes re-calculated and advertised
 
     # test the route from CLI is installed to the rib
     def test_10_check_g1_global_rib(self):
-        def f():
-            rib = self.g1.get_global_rib()
-            self.assertEqual(len(rib), 1)
-            self.assertEqual(len(rib[0]['paths']), 3)
-            for path in rib[0]['paths']:
-                self.assertIn(path['aspath'], ([100, 200, 300],
-                                               [100, 200],
-                                               []))
-                if not path['aspath']:  # path['aspath'] == []
-                    self.assertEqual(path['local-pref'], 500)
-
-        assert_several_times(f)
+        rib = self.g1.get_global_rib()
+        self.assertEqual(len(rib), 1)
+        self.assertEqual(len(rib[0]['paths']), 3)
+        for path in rib[0]['paths']:
+            self.assertTrue(path['aspath'] == [100, 200, 300] or
+                            path['aspath'] == [100, 200] or
+                            path['aspath'] == [])
+            if len(path['aspath']) == 0:
+                self.assertEqual(path['local-pref'], 500)
 
     # test the best path is replaced due to the CLI route from g1 rib
     def test_11_check_g2_global_rib(self):
-        def f():
-            rib = self.g2.get_global_rib()
-            self.assertEqual(len(rib), 1)
-            self.assertEqual(len(rib[0]['paths']), 1)
-            self.assertEqual(rib[0]['paths'][0]['aspath'], [])
-
-        assert_several_times(f)
+        rib = self.g2.get_global_rib()
+        self.assertEqual(len(rib), 1)
+        self.assertEqual(len(rib[0]['paths']), 1)
+        self.assertEqual(rib[0]['paths'][0]['aspath'], [])
 
     # test the route from CLI is advertised from g1
     def test_12_check_g3_global_rib(self):
-        def f():
-            rib = self.g3.get_global_rib()
-            self.assertEqual(len(rib), 1)
-            self.assertEqual(len(rib[0]['paths']), 3)
-            for path in rib[0]['paths']:
-                self.assertIn(path['aspath'], ([100, 200, 300],
-                                               [100, 200],
-                                               []))
-                if not path['aspath']:  # path['aspath'] == []
-                    self.assertEqual(path['local-pref'], 500)
-
-        assert_several_times(f)
+        rib = self.g3.get_global_rib()
+        self.assertEqual(len(rib), 1)
+        self.assertEqual(len(rib[0]['paths']), 3)
+        for path in rib[0]['paths']:
+            self.assertTrue(path['aspath'] == [100, 200, 300] or
+                            path['aspath'] == [100, 200] or
+                            path['aspath'] == [])
+            if len(path['aspath']) == 0:
+                self.assertEqual(path['local-pref'], 500)
 
     # remove non-existing route with path_id via GoBGP CLI (no error check)
     def test_13_remove_non_existing_add_paths_route_via_cli(self):
         # specify locally non-existing identifier which has the same value
         # with the identifier of the route from e1
         self.g1.del_route(route='192.168.100.0/24', identifier=20)
+        time.sleep(1)  # XXX: wait for routes re-calculated and advertised
 
     # test none of route is removed by non-existing path_id via CLI
     def test_14_check_g1_global_rib(self):
-        def f():
-            rib = self.g1.get_global_rib()
-            self.assertEqual(len(rib), 1)
-            self.assertEqual(len(rib[0]['paths']), 3)
-            for path in rib[0]['paths']:
-                self.assertIn(path['aspath'], ([100, 200, 300],
-                                               [100, 200],
-                                               []))
-                if not path['aspath']:  # path['aspath'] == []
-                    self.assertEqual(path['local-pref'], 500)
-
-        assert_several_times(f)
+        rib = self.g1.get_global_rib()
+        self.assertEqual(len(rib), 1)
+        self.assertEqual(len(rib[0]['paths']), 3)
+        for path in rib[0]['paths']:
+            self.assertTrue(path['aspath'] == [100, 200, 300] or
+                            path['aspath'] == [100, 200] or
+                            path['aspath'] == [])
+            if len(path['aspath']) == 0:
+                self.assertEqual(path['local-pref'], 500)
 
     # remove route with path_id via GoBGP CLI (no error check)
     def test_15_remove_add_paths_route_via_cli(self):
         self.g1.del_route(route='192.168.100.0/24', identifier=10)
+        time.sleep(1)  # XXX: wait for routes re-calculated and advertised
 
     # test the route is removed from the rib via CLI
     def test_16_check_g1_global_rib(self):
-        def f():
-            rib = self.g1.get_global_rib()
-            self.assertEqual(len(rib), 1)
-            self.assertEqual(len(rib[0]['paths']), 2)
-            for path in rib[0]['paths']:
-                self.assertIn(path['aspath'], ([100, 200, 300],
-                                               [100, 200]))
-
-        assert_several_times(f)
+        rib = self.g1.get_global_rib()
+        self.assertEqual(len(rib), 1)
+        self.assertEqual(len(rib[0]['paths']), 2)
+        for path in rib[0]['paths']:
+            self.assertTrue(path['aspath'] == [100, 200, 300] or
+                            path['aspath'] == [100, 200])
 
     # test the best path is replaced the removal from g1 rib
     def test_17_check_g2_global_rib(self):
-        def f():
-            rib = self.g2.get_global_rib()
-            self.assertEqual(len(rib), 1)
-            self.assertEqual(len(rib[0]['paths']), 1)
-            self.assertEqual(rib[0]['paths'][0]['aspath'], [100, 200])
-
-        assert_several_times(f)
+        rib = self.g2.get_global_rib()
+        self.assertEqual(len(rib), 1)
+        self.assertEqual(len(rib[0]['paths']), 1)
+        self.assertEqual(rib[0]['paths'][0]['aspath'], [100, 200])
 
     # test the removed route from CLI is withdrawn by g1
     def test_18_check_g3_global_rib(self):
-        def f():
-            rib = self.g3.get_global_rib()
-            self.assertEqual(len(rib), 1)
-            self.assertEqual(len(rib[0]['paths']), 2)
-            for path in rib[0]['paths']:
-                self.assertIn(path['aspath'], ([100, 200, 300],
-                                               [100, 200]))
-
-        assert_several_times(f)
+        rib = self.g3.get_global_rib()
+        self.assertEqual(len(rib), 1)
+        self.assertEqual(len(rib[0]['paths']), 2)
+        for path in rib[0]['paths']:
+            self.assertTrue(path['aspath'] == [100, 200, 300] or
+                            path['aspath'] == [100, 200])
 
 
 if __name__ == '__main__':

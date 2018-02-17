@@ -69,10 +69,8 @@ func writeReplayEsn(replayWindow int) []byte {
 		ReplayWindow: uint32(replayWindow),
 	}
 
-	// Linux stores the bitmap to identify the already received sequence packets in blocks of uint32 elements.
-	// Therefore bitmap length is the minimum number of uint32 elements needed. The following is a ceiling operation.
-	bytesPerElem := int(unsafe.Sizeof(replayEsn.BmpLen)) // Any uint32 variable is good for this
-	replayEsn.BmpLen = uint32((replayWindow + (bytesPerElem * 8) - 1) / (bytesPerElem * 8))
+	// taken from iproute2/ip/xfrm_state.c:
+	replayEsn.BmpLen = uint32((replayWindow + (4 * 8) - 1) / (4 * 8))
 
 	return replayEsn.Serialize()
 }

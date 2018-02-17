@@ -853,8 +853,6 @@ func (server *BgpServer) handleFSMMessage(peer *Peer, e *FsmMsg) {
 				peer.stopPeerRestarting()
 				go peer.stopFSM()
 				delete(server.neighborMap, peer.fsm.pConf.State.NeighborAddress)
-				server.broadcastPeerState(peer, oldState)
-				return
 			}
 		} else if peer.fsm.pConf.GracefulRestart.State.PeerRestarting && nextState == bgp.BGP_FSM_IDLE {
 			if peer.fsm.pConf.GracefulRestart.State.LongLivedEnabled {
@@ -1346,29 +1344,27 @@ func (s *BgpServer) DeletePath(uuid []byte, f bgp.RouteFamily, vrfId string, pat
 	return s.mgmtOperation(func() error {
 		deletePathList := make([]*table.Path, 0)
 		if len(uuid) > 0 {
-			// Delete locally generated path which has the given UUID
 			path := func() *table.Path {
 				for _, path := range s.globalRib.GetPathList(table.GLOBAL_RIB_NAME, s.globalRib.GetRFlist()) {
-					if path.IsLocal() && len(path.UUID()) > 0 && bytes.Equal(path.UUID().Bytes(), uuid) {
+					if len(path.UUID()) > 0 && bytes.Equal(path.UUID().Bytes(), uuid) {
 						return path
 					}
 				}
 				return nil
 			}()
-			if path == nil {
+			if path != nil {
+				deletePathList = append(deletePathList, path.Clone(true))
+			} else {
 				return fmt.Errorf("Can't find a specified path")
 			}
-			deletePathList = append(deletePathList, path.Clone(true))
 		} else if len(pathList) == 0 {
-			// Delete all locally generated paths
+			// delete all paths
 			families := s.globalRib.GetRFlist()
 			if f != 0 {
 				families = []bgp.RouteFamily{f}
 			}
 			for _, path := range s.globalRib.GetPathList(table.GLOBAL_RIB_NAME, families) {
-				if path.IsLocal() {
-					deletePathList = append(deletePathList, path.Clone(true))
-				}
+				deletePathList = append(deletePathList, path.Clone(true))
 			}
 		} else {
 			if err := s.fixupApiPath(vrfId, pathList); err != nil {
@@ -2727,7 +2723,6 @@ func (s *BgpServer) Watch(opts ...WatchOption) (w *Watcher) {
 							Payload:      buf,
 							PostPolicy:   false,
 							Neighbor:     configNeighbor,
-							PathList:     []*table.Path{path},
 						})
 					}
 					eor := bgp.NewEndOfRib(rf)
@@ -2775,7 +2770,6 @@ func (s *BgpServer) Watch(opts ...WatchOption) (w *Watcher) {
 							Payload:     buf,
 							PostPolicy:  true,
 							Neighbor:    configNeighbor,
-							PathList:    []*table.Path{path},
 						})
 					}
 					eor := bgp.NewEndOfRib(rf)

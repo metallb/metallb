@@ -40,7 +40,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/encoding"
-	"google.golang.org/grpc/encoding/proto"
 	"google.golang.org/grpc/grpclog"
 	"google.golang.org/grpc/internal"
 	"google.golang.org/grpc/keepalive"
@@ -106,7 +105,7 @@ type Server struct {
 
 type options struct {
 	creds                 credentials.TransportCredentials
-	codec                 baseCodec
+	codec                 Codec
 	cp                    Compressor
 	dc                    Decompressor
 	unaryInt              UnaryServerInterceptor
@@ -183,8 +182,6 @@ func KeepaliveEnforcementPolicy(kep keepalive.EnforcementPolicy) ServerOption {
 }
 
 // CustomCodec returns a ServerOption that sets a codec for message marshaling and unmarshaling.
-//
-// This will override any lookups by content-subtype for Codecs registered with RegisterCodec.
 func CustomCodec(codec Codec) ServerOption {
 	return func(o *options) {
 		o.codec = codec
@@ -329,6 +326,10 @@ func NewServer(opt ...ServerOption) *Server {
 	opts := defaultServerOptions
 	for _, o := range opt {
 		o(&opts)
+	}
+	if opts.codec == nil {
+		// Set the default codec.
+		opts.codec = protoCodec{}
 	}
 	s := &Server{
 		lis:   make(map[net.Listener]bool),
@@ -694,7 +695,7 @@ func (s *Server) serveUsingHandler(conn net.Conn) {
 // available through grpc-go's HTTP/2 server, and it is currently EXPERIMENTAL
 // and subject to change.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	st, err := transport.NewServerHandlerTransport(w, r, s.opts.statsHandler)
+	st, err := transport.NewServerHandlerTransport(w, r)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -758,7 +759,7 @@ func (s *Server) sendResponse(t transport.ServerTransport, stream *transport.Str
 	if s.opts.statsHandler != nil {
 		outPayload = &stats.OutPayload{}
 	}
-	hdr, data, err := encode(s.getCodec(stream.ContentSubtype()), msg, cp, outPayload, comp)
+	hdr, data, err := encode(s.opts.codec, msg, cp, outPayload, comp)
 	if err != nil {
 		grpclog.Errorln("grpc: server failed to encode response: ", err)
 		return err
@@ -903,7 +904,7 @@ func (s *Server) processUnaryRPC(t transport.ServerTransport, stream *transport.
 			// java implementation.
 			return status.Errorf(codes.ResourceExhausted, "grpc: received message larger than max (%d vs. %d)", len(req), s.opts.maxReceiveMessageSize)
 		}
-		if err := s.getCodec(stream.ContentSubtype()).Unmarshal(req, v); err != nil {
+		if err := s.opts.codec.Unmarshal(req, v); err != nil {
 			return status.Errorf(codes.Internal, "grpc: error unmarshalling request: %v", err)
 		}
 		if inPayload != nil {
@@ -995,7 +996,7 @@ func (s *Server) processStreamingRPC(t transport.ServerTransport, stream *transp
 		t:     t,
 		s:     stream,
 		p:     &parser{r: stream},
-		codec: s.getCodec(stream.ContentSubtype()),
+		codec: s.opts.codec,
 		maxReceiveMessageSize: s.opts.maxReceiveMessageSize,
 		maxSendMessageSize:    s.opts.maxSendMessageSize,
 		trInfo:                trInfo,
@@ -1259,22 +1260,6 @@ func init() {
 	internal.TestingUseHandlerImpl = func(arg interface{}) {
 		arg.(*Server).opts.useHandlerImpl = true
 	}
-}
-
-// contentSubtype must be lowercase
-// cannot return nil
-func (s *Server) getCodec(contentSubtype string) baseCodec {
-	if s.opts.codec != nil {
-		return s.opts.codec
-	}
-	if contentSubtype == "" {
-		return encoding.GetCodec(proto.Name)
-	}
-	codec := encoding.GetCodec(contentSubtype)
-	if codec == nil {
-		return encoding.GetCodec(proto.Name)
-	}
-	return codec
 }
 
 // SetHeader sets the header metadata.
