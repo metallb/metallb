@@ -13,7 +13,7 @@ information.
 
 We welcome contributions in all forms. Please check out
 the
-[hacking and contributing guide](https://metallb.universe.tf/hacking/)
+[hacking and contributing guide](https://metallb.universe.tf/community/#contributing)
 for more information.
 
 Participation in this project is subject to
