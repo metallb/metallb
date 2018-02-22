@@ -174,6 +174,7 @@ ci-lint:
 ## and tags the new release.
 
 VERSION:=
+SKIPRELNOTES:=
 ifneq ($(VERSION),)
 	MAJOR=$(shell echo $(VERSION) | cut -f1 -d'.')
 	MINOR=$(shell echo $(VERSION) | cut -f2 -d'.')
@@ -189,7 +190,9 @@ ifneq ($(shell git status --porcelain),)
 endif
 	git checkout master
 ifeq ($(shell grep "\#\# Version $(VERSION)" website/content/release-notes/_index.md),)
+ifeq ($(SKIPRELNOTES),)
 	$(error no release notes for $(VERSION))
+endif
 endif
 ifeq ($(PATCH),0)
 	git checkout -b v$(MAJOR).$(MINOR)
