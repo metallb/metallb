@@ -1,0 +1,44 @@
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  namespace: metallb-system
+  name: controller
+  labels:
+    app: controller
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "7472"
+spec:
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: controller
+  template:
+    metadata:
+      labels:
+        app: controller
+    spec:
+{{- if .Values.rbac.create }}
+      serviceAccountName: controller
+{{- end }}
+      terminationGracePeriodSeconds: 0
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534 # nobody
+      containers:
+      - name: controller
+        image: "{{.Values.controller.image.repository}}:{{.Values.controller.image.tag}}"
+        pullPolicy: "{{.Values.controller.image.pullPolicy}}"
+        args:
+        - --port=7472
+        ports:
+        - name: monitoring
+          containerPort: 7472
+        resources:
+{{ toYaml .Values.controller.resources | indent 10 }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - all
+          readOnlyRootFilesystem: true

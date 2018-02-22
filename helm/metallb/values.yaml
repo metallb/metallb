@@ -1,0 +1,29 @@
+# Default values for metallb.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+arpCIDR:
+config:
+
+rbac:
+  create: true
+
+controller:
+  image:
+    repository: metallb/controller
+    tag: v0.3.1
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 100m
+      memory: 100Mi
+
+speaker:
+  image:
+    repository: metallb/speaker
+    tag: v0.3.1
+    pullPolicy: IfNotPresent
+  resources:
+    limits:
+      cpu: 100m
+      memory: 100Mi
