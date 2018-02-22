@@ -197,12 +197,17 @@ endif
 ifeq ($(PATCH),0)
 	git checkout -b v$(MAJOR).$(MINOR)
 	perl -pi -e 's#/google/metallb/master#/google/metallb/v$(VERSION)#g' website/content/*.md website/content/*/*.md
-	perl -pi -e 's/:latest/:v$(VERSION)/g' manifests/*.yaml
 else
 	git checkout v$(MAJOR).$(MINOR)
 	perl -pi -e "s#/google/metallb/v$(MAJOR).$(MINOR).$$(($(PATCH)-1))#/google/metallb/v$(VERSION)#g" website/content/*.md website/content/*/*.md
-	perl -pi -e "s#:v$(MAJOR).$(MINOR).$$(($(PATCH)-1))#:v$(VERSION)#g" manifests/*.yaml
 endif
+	perl -pi -e 's#image: metallb/(.*):.*#image: metallb/$$1:v$(VERSION)#g' manifests/*.yaml
+
+	perl -pi -e 's/appVersion: .*/appVersion: $(VERSION)/g' helm/metallb/Chart.yaml
+	perl -pi -e 's/tag: .*/tag: v$(VERSION)/g' helm/metallb/values.yaml
+	perl -pi -e 's/pullPolicy: .*/pullPolicy: IfNotPresent/g' helm/metallb/values.yaml
+
+	+make manifest
 	git checkout master -- website/content/release-notes/_index.md
 	perl -pi -e 's/MetalLB .*/MetalLB v$(VERSION)/g' website/content/_header.md
 	perl -pi -e 's/version\s+=.*/version = "$(VERSION)"/g' internal/version/version.go
