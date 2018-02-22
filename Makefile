@@ -50,6 +50,13 @@ all:
 ## `make push` builds timestamped images, pushes them to REGISTRY, and
 ## updates your currently active cluster to pull them.
 
+.PHONY: manifest
+manifest:
+	(cd helm/metallb && helm template -x templates/namespace.yaml . >../../manifests/metallb.yaml)
+	(cd helm/metallb && helm template -x templates/rbac.yaml . >>../../manifests/metallb.yaml)
+	(cd helm/metallb && helm template -x templates/controller.yaml . >>../../manifests/metallb.yaml)
+	(cd helm/metallb && helm template -x templates/speaker.yaml . >>../../manifests/metallb.yaml)
+
 .PHONY: build
 build:
 	$(GOCMD) install -v -ldflags="-X go.universe.tf/metallb/internal/version.gitCommit=$(GITCOMMIT) -X go.universe.tf/metallb/internal/version.gitBranch=$(GITBRANCH)" ./controller ./speaker ./test-bgp-router
