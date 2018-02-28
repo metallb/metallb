@@ -49,7 +49,7 @@ func (a *Announce) spam() {
 			a.client.WriteTo(u, ethernet.Broadcast)
 		}
 
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(1100 * time.Millisecond)
 	}
 }
 
