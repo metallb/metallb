@@ -10,20 +10,10 @@ import (
 	"go.universe.tf/metallb/internal/version"
 
 	"github.com/golang/glog"
-	"github.com/osrg/gobgp/gobgp/cmd"
 )
 
 func main() {
 	flag.Parse()
-
-	if len(os.Args) > 1 && os.Args[1] == "gobgp" {
-		c := cmd.NewRootCmd()
-		c.SetArgs(os.Args[2:])
-		if err := c.Execute(); err != nil {
-			glog.Exitf("%s", err)
-		}
-		return
-	}
 
 	glog.Infof("MetalLB test-bgp-router %s", version.String())
 
@@ -50,10 +40,6 @@ func main() {
 		if err := runQuagga(); err != nil {
 			glog.Exitf("Trying to start quagga: %s", err)
 		}
-	}
-
-	if err := runGoBGP(); err != nil {
-		glog.Exitf("Trying to start gobgp: %s", err)
 	}
 
 	http.HandleFunc("/", status)

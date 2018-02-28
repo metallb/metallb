@@ -103,12 +103,6 @@ func status(w http.ResponseWriter, r *http.Request) {
 		}
 		vals = append(vals, qStat)
 	}
-	gStat, err := goBGPStatus()
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	vals = append(vals, gStat)
 
 	if err := tmpl.Execute(w, vals); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
