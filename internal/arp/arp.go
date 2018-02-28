@@ -146,6 +146,9 @@ func (a *Announce) Packets() []*arp.Packet {
 		if a, err := arp.NewPacket(arp.OperationReply, a.hardwareAddr, ip, ethernet.Broadcast, ip); err == nil {
 			arps = append(arps, a)
 		}
+		if a, err := arp.NewPacket(arp.OperationRequest, a.hardwareAddr, ip, ethernet.Broadcast, ip); err == nil {
+			arps = append(arps, a)
+		}
 	}
 	return arps
 }
