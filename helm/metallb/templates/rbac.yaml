@@ -1,4 +1,4 @@
-{{- if .Values.createRBAC -}}
+{{- if .Values.rbac.create -}}
 
 # Roles
 apiVersion: rbac.authorization.k8s.io/v1

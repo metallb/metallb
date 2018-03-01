@@ -13,8 +13,9 @@ config:
 # field is recommended instead of arpCIDR.
 arpCIDR:
 
-# createRBAC specifies whether to install and use RBAC rules.
-createRBAC: true
+rbac:
+  # create specifies whether to install and use RBAC rules.
+  create: true
 
 # controller contains configuration specific to the MetalLB cluster
 # controller.

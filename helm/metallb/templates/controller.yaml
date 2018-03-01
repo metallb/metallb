@@ -31,7 +31,7 @@ spec:
         app: {{ template "metallb.name" . }}
         component: controller
     spec:
-{{- if .Values.createRBAC }}
+{{- if .Values.rbac.create }}
       serviceAccountName: controller
 {{- end }}
       terminationGracePeriodSeconds: 0
