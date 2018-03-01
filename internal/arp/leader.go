@@ -47,6 +47,7 @@ func (a *Announce) spam() {
 
 		for _, u := range a.Packets() {
 			a.client.WriteTo(u, ethernet.Broadcast)
+			stats.SentGratuitous(u.TargetIP.String())
 		}
 
 		time.Sleep(1100 * time.Millisecond)

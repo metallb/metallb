@@ -75,6 +75,8 @@ func (a *Announce) readPacket() iface.DropReason {
 		return iface.DropReasonAnnounceIP
 	}
 
+	stats.GotRequest(pkt.TargetIP.String())
+
 	// We are not the leader, do not reply.
 	if !a.Leader() {
 		return iface.DropReasonNotLeader
@@ -86,6 +88,8 @@ func (a *Announce) readPacket() iface.DropReason {
 	if err := a.reply(pkt, pkt.TargetIP); err != nil {
 		glog.Warningf("Failed to write ARP response for %s: %s", pkt.TargetIP, err)
 	}
+
+	stats.SentResponse(pkt.TargetIP.String())
 
 	return iface.DropReasonNone
 }
