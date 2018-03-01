@@ -4,32 +4,36 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"os"
 	"os/exec"
 	"strings"
 )
 
 func hasBird() bool {
-	// Disabled pending bug #142
-	// _, err := os.Stat("/usr/sbin/bird")
-	// return err == nil
-	return false
+	_, err := os.Stat("/usr/sbin/bird")
+	return err == nil
 }
 
 func writeBirdConfig() error {
 	cfg := fmt.Sprintf(`
 router id 10.96.0.100;
-listen bgp port 1179;
 log stderr all;
 debug protocols all;
 protocol device {
 }
 protocol static {
+  ipv4;
   route %s/32 via "eth0";
 }
 protocol bgp minikube {
-  local 10.96.0.100 as 64512;
+  local as 64512;
   neighbor %s as 64512;
   passive;
+  multihop;
+  ipv4 {
+    table master4;
+    import all;
+  };
   error wait time 1, 2;
 }
 `, nodeIP(), nodeIP())

@@ -6,16 +6,12 @@ metadata:
 data:
   config: |
     peers:
-    # Temporarily disabled due to bug #142
-    # - my-asn: 64512
-    #   peer-asn: 64512
-    #   peer-address: 10.96.0.100
+    - my-asn: 64512
+      peer-asn: 64512
+      peer-address: 10.96.0.100
     - my-asn: 64512
       peer-asn: 64512
       peer-address: 10.96.0.101
-    - my-asn: 64512
-      peer-asn: 64512
-      peer-address: 10.96.0.102
     address-pools:
     - name: my-ip-space
       protocol: bgp

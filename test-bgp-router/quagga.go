@@ -43,7 +43,7 @@ func runQuagga() error {
 	if err := runOrCrash("/usr/sbin/zebra", "-A", "127.0.0.1", "-f", "/etc/quagga/zebra.conf"); err != nil {
 		return err
 	}
-	if err := runOrCrash("/usr/sbin/bgpd", "-A", "127.0.0.1", "-f", "/etc/quagga/bgpd.conf"); err != nil {
+	if err := runOrCrash("/usr/sbin/bgpd", "-p 1179", "-A", "127.0.0.1", "-f", "/etc/quagga/bgpd.conf"); err != nil {
 		return err
 	}
 	return nil

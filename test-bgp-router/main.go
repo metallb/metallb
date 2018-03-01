@@ -55,7 +55,7 @@ func runTCPDump() error {
 	if err := os.Mkdir("/run/tcpdump", 0600); err != nil {
 		return err
 	}
-	c := exec.Command("/usr/sbin/tcpdump", "-i", "eth0", "-w", "/run/tcpdump/pcap", "tcp", "port", "1179")
+	c := exec.Command("/usr/sbin/tcpdump", "-i", "eth0", "-w", "/run/tcpdump/pcap", "tcp", "port", "179", "or", "tcp", "port", "1179")
 	if err := c.Start(); err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func runTCPDump() error {
 }
 
 func installNatRule() error {
-	for _, port := range []int{179, 1179, 2179} {
+	for _, port := range []int{179, 1179} {
 		if err := runBlocking("/sbin/iptables", "-t", "nat", "-A", "INPUT", "-p", "tcp", "--dport", strconv.Itoa(port), "-j", "SNAT", "--to", nodeIP()); err != nil {
 			return err
 		}
