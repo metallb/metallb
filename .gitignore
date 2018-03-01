@@ -4,3 +4,4 @@ Makefile.image-targets
 build/
 website/public
 .envrc
+terraform/.terraform
