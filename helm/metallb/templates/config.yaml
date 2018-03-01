@@ -1,3 +1,4 @@
+{{- if (or .Values.config .Values.arpCIDR) }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -7,12 +8,11 @@ data:
   config: |
 {{- if .Values.config }}
 {{ toYaml .Values.override_config | indent 4 }}
-{{- else if .Values.arpCIDR }}
+{{- else }}
     address-pools:
     - name: default
       protocol: arp
       cidr:
       - {{ .Values.arpCIDR }}
-{{- else }}
-    # No configuration defined, MetalLB will not do anything useful.
+{{- end }}
 {{- end }}
