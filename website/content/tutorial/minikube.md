@@ -52,6 +52,12 @@ range for cluster services, which is incompatible with the manifests
 used in this tutorial.
 {{% /notice %}}
 
+{{% notice info %}}
+If you want to use Helm to install MetalLB, you need to install
+minikube using the `kubeadm` bootstrapper. The older `localkube`
+bootstrapper creates RBAC rules that are incompatible with Helm.
+{{% /notice %}}
+
 ## Set up a BGP routers
 
 MetalLB exposes load-balanced services using the BGP routing protocol,

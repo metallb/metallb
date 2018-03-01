@@ -63,7 +63,7 @@ build:
 
 .PHONY: start-minikube
 start-minikube:
-	minikube start
+	minikube start --bootstrapper=kubeadm
 	minikube addons enable registry
 	kubectl apply -f manifests/metallb.yaml
 	kubectl apply -f manifests/test-bgp-router.yaml
