@@ -20,6 +20,9 @@ spec:
     matchLabels:
       app: {{ template "metallb.name" . }}
       component: controller
+      {{- if .Values.helmLabels }}
+      release: {{ .Release.Name | quote }}
+      {{- end }}
   template:
     metadata:
       labels:

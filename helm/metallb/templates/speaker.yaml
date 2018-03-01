@@ -16,6 +16,9 @@ spec:
     matchLabels:
       app: {{ template "metallb.name" . }}
       component: speaker
+      {{- if .Values.helmLabels }}
+      release: {{ .Release.Name | quote }}
+      {{- end }}
   template:
     metadata:
       labels:
