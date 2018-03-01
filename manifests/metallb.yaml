@@ -136,7 +136,8 @@ metadata:
   namespace: metallb-system
   name: controller
   labels:
-    app: controller
+    app: metallb
+    component: controller
   annotations:
     prometheus.io/scrape: "true"
     prometheus.io/port: "7472"
@@ -144,11 +145,13 @@ spec:
   revisionHistoryLimit: 3
   selector:
     matchLabels:
-      app: controller
+      app: metallb
+      component: controller
   template:
     metadata:
       labels:
-        app: controller
+        app: metallb
+        component: controller
     spec:
       serviceAccountName: controller
       terminationGracePeriodSeconds: 0
@@ -184,15 +187,18 @@ metadata:
   namespace: metallb-system
   name: speaker
   labels:
-    app: speaker
+    app: metallb
+    component: speaker
 spec:
   selector:
     matchLabels:
-      app: speaker
+      app: metallb
+      component: speaker
   template:
     metadata:
       labels:
-        app: speaker
+        app: metallb
+        component: speaker
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "7472"

@@ -9,6 +9,12 @@ weight: 7
 
 Action required if upgrading from 0.3.x:
 
+- MetalLB's use of Kubernetes labels has changed slightly to conform
+  to Kubernetes best practices. If you were using a label match on
+  `app: controller` or `app: speaker` Kubernetes labels to find
+  MetalLB objects, you should now match on a combination of `app:
+  metallb`, `component: controller` or `component: speaker`, depending
+  on what objects you want to select.
 - TODO: none yet?
 
 New features:

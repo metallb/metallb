@@ -52,10 +52,10 @@ all:
 
 .PHONY: manifest
 manifest:
-	(cd helm/metallb && helm template -x templates/namespace.yaml . >../../manifests/metallb.yaml)
-	(cd helm/metallb && helm template -x templates/rbac.yaml . >>../../manifests/metallb.yaml)
-	(cd helm/metallb && helm template -x templates/controller.yaml . >>../../manifests/metallb.yaml)
-	(cd helm/metallb && helm template -x templates/speaker.yaml . >>../../manifests/metallb.yaml)
+	(cd helm/metallb && helm template -x templates/namespace.yaml --set helmLabels=false . >../../manifests/metallb.yaml)
+	(cd helm/metallb && helm template -x templates/rbac.yaml --set helmLabels=false . >>../../manifests/metallb.yaml)
+	(cd helm/metallb && helm template -x templates/controller.yaml --set helmLabels=false . >>../../manifests/metallb.yaml)
+	(cd helm/metallb && helm template -x templates/speaker.yaml --set helmLabels=false . >>../../manifests/metallb.yaml)
 
 .PHONY: build
 build:

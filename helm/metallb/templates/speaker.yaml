@@ -4,20 +4,33 @@ metadata:
   namespace: metallb-system
   name: speaker
   labels:
-    app: speaker
+    {{- if .Values.helmLabels }}
+    heritage: {{ .Release.Service | quote }}
+    release: {{ .Release.Name | quote }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+    {{- end }}
+    app: {{ template "metallb.name" . }}
+    component: speaker
 spec:
   selector:
     matchLabels:
-      app: speaker
+      app: {{ template "metallb.name" . }}
+      component: speaker
   template:
     metadata:
       labels:
-        app: speaker
+        {{- if .Values.helmLabels }}
+        heritage: {{ .Release.Service | quote }}
+        release: {{ .Release.Name | quote }}
+        chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+        {{- end }}
+        app: {{ template "metallb.name" . }}
+        component: speaker
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "7472"
     spec:
-{{- if .Values.rbac.create }}
+{{- if .Values.createRBAC }}
       serviceAccountName: speaker
 {{- end }}
       terminationGracePeriodSeconds: 0

@@ -4,7 +4,13 @@ metadata:
   namespace: metallb-system
   name: controller
   labels:
-    app: controller
+    {{- if .Values.helmLabels }}
+    heritage: {{ .Release.Service | quote }}
+    release: {{ .Release.Name | quote }}
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+    {{- end }}
+    app: {{ template "metallb.name" . }}
+    component: controller
   annotations:
     prometheus.io/scrape: "true"
     prometheus.io/port: "7472"
@@ -12,13 +18,20 @@ spec:
   revisionHistoryLimit: 3
   selector:
     matchLabels:
-      app: controller
+      app: {{ template "metallb.name" . }}
+      component: controller
   template:
     metadata:
       labels:
-        app: controller
+        {{- if .Values.helmLabels }}
+        heritage: {{ .Release.Service | quote }}
+        release: {{ .Release.Name | quote }}
+        chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+        {{- end }}
+        app: {{ template "metallb.name" . }}
+        component: controller
     spec:
-{{- if .Values.rbac.create }}
+{{- if .Values.createRBAC }}
       serviceAccountName: controller
 {{- end }}
       terminationGracePeriodSeconds: 0
