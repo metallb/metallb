@@ -90,6 +90,8 @@ func (a *Announce) readMessage() iface.DropReason {
 		return iface.DropReasonAnnounceIP
 	}
 
+	stats.GotRequest(ns.TargetAddress.String())
+
 	// We are not the leader, do not reply.
 	if !a.Leader() {
 		return iface.DropReasonNotLeader
@@ -107,6 +109,8 @@ func (a *Announce) readMessage() iface.DropReason {
 	if err := a.advertise(src, ns.TargetAddress, solicited, override); err != nil {
 		glog.Warningf("Failed to write NDP neighbor advertisement for %s: %s", ns.TargetAddress, err)
 	}
+
+	stats.SentResponse(ns.TargetAddress.String())
 
 	return iface.DropReasonNone
 }
@@ -218,5 +222,6 @@ func (a *Announce) Advertise() {
 
 	for _, ip := range a.ips {
 		_ = a.advertise(net.IPv6linklocalallnodes, ip, solicited, override)
+		stats.SentGratuitous(ip.String())
 	}
 }
