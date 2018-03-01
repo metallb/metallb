@@ -67,17 +67,10 @@ EdgeRouter), or a soft router using open-source software (e.g. a Linux
 machine running the [BIRD](http://bird.network.cz) routing suite).
 
 For this tutorial, we'll deploy a pod inside minikube that runs both
-the BIRD, [Quagga](http://www.nongnu.org/quagga/)
-and [GoBGP](https://github.com/osrg/gobgp) software BGP routers. They
-will be configured to speak BGP, but won't configure Linux to forward
-traffic based on the data they receive. Instead, we'll just inspect
-that data to see what a real router _would_ do.
-
-{{% notice note %}}
-BIRD is temporarily disabled due to
-a [bug](https://github.com/google/metallb/issues/142), so screenshots
-will look slightly different.
-{{% /notice %}}
+the BIRD and [Quagga](http://www.nongnu.org/quagga/). They will be
+configured to speak BGP, but won't configure Linux to forward traffic
+based on the data they receive. Instead, we'll just inspect that data
+to see what a real router _would_ do.
 
 Deploy these test routers with `kubectl`:
 
@@ -104,8 +97,6 @@ created four cluster-internal services:
 to.
 - Similarly, the `test-bgp-router-quagga` service exposes the Quagga
 router at `10.96.0.101`.
-- The `test-bgp-router-gobgp` service exposes, you guessed it, the
-GoBGP router at 10.96.0.102.
 - Finally, the `test-bgp-router-ui` service is a little UI that shows
 us what routers are thinking.
 
@@ -195,11 +186,11 @@ addresses it's allowed to hand out.
 
 In this configuration, we're setting up a BGP peering with
 `10.96.0.100`, `10.96.0.101`, `10.96.0.102`, which are the addresses
-of the `test-bgp-router-bird`, `test-bgp-router-quagga` and
-`test-bgp-router-gobgp` services respectively. And we're giving
-MetalLB 256 IP addresses to use, from 198.51.100.0 to
-198.51.100.255. The final section gives MetalLB some BGP attributes
-that it should use when announcing IP addresses to our router.
+of the `test-bgp-router-bird`, and `test-bgp-router-quagga` services
+respectively. And we're giving MetalLB 256 IP addresses to use, from
+198.51.100.0 to 198.51.100.255. The final section gives MetalLB some
+BGP attributes that it should use when announcing IP addresses to our
+router.
 
 Apply this configuration now:
 
@@ -221,11 +212,9 @@ entries, you should find something like:
 I1127 08:53:49.118588       1 main.go:203] Start config update
 I1127 08:53:49.118705       1 main.go:255] Peer "10.96.0.100" configured, starting BGP session
 I1127 08:53:49.118710       1 main.go:255] Peer "10.96.0.101" configured, starting BGP session
-I1127 08:53:49.118715       1 main.go:255] Peer "10.96.0.102" configured, starting BGP session
 I1127 08:53:49.118729       1 main.go:270] End config update
 I1127 08:53:49.170535       1 bgp.go:55] BGP session to "10.96.0.100:179" established
 I1127 08:53:49.170932       1 bgp.go:55] BGP session to "10.96.0.101:179" established
-I1127 08:53:49.171023       1 bgp.go:55] BGP session to "10.96.0.102:179" established
 ```
 
 However, as the BGP routers pointed out, MetalLB is connected, but
