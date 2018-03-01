@@ -27,8 +27,8 @@ spec:
         runAsUser: 65534 # nobody
       containers:
       - name: controller
-        image: {{.Values.controller.image.repository}}:{{.Values.controller.image.tag}}
-        imagePullPolicy: {{.Values.controller.image.pullPolicy}}
+        image: {{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag }}
+        imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
         args:
         - --port=7472
         ports:

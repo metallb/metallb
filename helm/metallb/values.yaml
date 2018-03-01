@@ -2,12 +2,22 @@
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
-arpCIDR:
+# config is the MetalLB configuration, in YAML format. Refer to
+# https://metallb.universe.tf/configuration/ for available options.
 config:
 
-rbac:
-  create: true
+# load-balancers. When arpCIDR is specified instead of config, the
+# chart will install a trivial "quick start" MetalLB configuration
+# that uses ARP mode. Refer to https://metallb.universe.tf/ for more
+# information. For production configurations, use of the `config`
+# field is recommended instead of arpCIDR.
+arpCIDR:
 
+# createRBAC specifies whether to install and use RBAC rules.
+createRBAC: true
+
+# controller contains configuration specific to the MetalLB cluster
+# controller.
 controller:
   image:
     repository: metallb/controller
@@ -18,6 +28,8 @@ controller:
       cpu: 100m
       memory: 100Mi
 
+# controller contains configuration specific to the MetalLB speaker
+# daemonset.
 speaker:
   image:
     repository: metallb/speaker
