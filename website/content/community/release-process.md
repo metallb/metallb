@@ -26,6 +26,13 @@ release's documentation link points to `metallb.universe.tf`, and the
 previous releases point to `vX.Y.Z--metallb.netlify.com`, which is the
 website pinned at that tagged release.
 
+To get a list of contributors to the release, run `git log
+--format="%aN" <COMMIT>..HEAD | sort -u`, where `<COMMIT>` is the
+first commit after you branched the previous release. Also think about
+whether there were significant contributions that weren't in the form
+of a commit, and include those people as well. It's better to err on
+the side of being _too_ thankful!
+
 Commit the finalized release notes.
 
 ### Clean the working directory
