@@ -197,6 +197,7 @@ endif
 ifeq ($(PATCH),0)
 	git checkout -b v$(MAJOR).$(MINOR)
 	perl -pi -e 's#/google/metallb/master#/google/metallb/v$(VERSION)#g' website/content/*.md website/content/*/*.md
+	perl -pi -e 's#/google/metallb/tree/master#/google/metallb/tree/v$(VERSION)#g' website/content/*.md website/content/*/*.md
 else
 	git checkout v$(MAJOR).$(MINOR)
 	perl -pi -e "s#/google/metallb/v$(MAJOR).$(MINOR).$$(($(PATCH)-1))#/google/metallb/v$(VERSION)#g" website/content/*.md website/content/*/*.md
