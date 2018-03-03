@@ -29,27 +29,40 @@ should the current leader node fail for some reason.
 ## Limitations
 
 ARP mode has two main limitations you should be aware of: single-node
-bottlenecking, and slow failover.
+bottlenecking, and potentially slow failover.
 
 As explained above, in ARP mode a single leader-elected node receives
 all traffic for all service IPs. This means that your cluster ingress
 bandwidth is limited to the bandwidth of a single node. This is a
 fundamental limitation of using ARP to steer traffic.
 
-In the current implementation of ARP mode, failover between nodes is
-quite slow. ARP mode does not use virtual MAC addresses to facilitate
-failovers, so if the cluster leader switches from node A to node B,
-traffic from existing clients will continue to flow to node A until
-the client's ARP caches expire. On most systems, the ARP cache expires
-every 1-2 minutes.
+In the current implementation of ARP mode, failover between nodes
+depends on cooperation from the clients. When a failover occurs,
+MetalLB sends a number of gratuitous ARP packets (a bit of a
+misnomer - it should really be called "unsollicited ARP packets") to
+notify clients that the MAC address associated with the service IPs
+has changed.
 
-This means that during a planned failover, you should keep the old
-leader node up for a couple of minutes after flipping leadership, so
-that it can continue forwarding traffic for old clients until their
-ARP caches refresh.
+Most operating systems handle "gratuitous ARP" correctly, and update
+their ARP caches promptly. In that case, failover happens within a few
+seconds. However, some systems either don't implement gratuitous ARP
+handling at all, or have buggy implementations that delay the ARP
+cache update.
+
+All modern versions of major OSes (Windows, Mac, Linux) implement ARP
+failover correctly, so the only situation where issues may happen is
+with older or less common OSes.
+
+To minimize the impact of planned failover on buggy clients, you
+should keep the old leader node up for a couple of minutes after
+flipping leadership, so that it can continue forwarding traffic for
+old clients until their ARP caches refresh.
 
 During an unplanned failover, the service IPs will be unreachable
-until the clients refresh their ARP cache entries.
+until the buggy clients refresh their ARP cache entries.
 
-This slow failover is a limitation of the current implementation of
-ARP mode. Future improvements will eliminate the failover delay.
+If you encounter a situation where ARP failover is slow (more than
+about 10s),
+please [file a bug](https://github.com/google/metallb/issues/new)! We
+can help you investigate and determine if the issue is with the
+client, or a bug in MetalLB.
