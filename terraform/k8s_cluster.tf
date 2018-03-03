@@ -11,7 +11,7 @@ resource "libvirt_network" "net" {
 ##
 resource "libvirt_volume" "runner" {
   name = "runner.qcow2"
-  base_volume_name = "debian.qcow2"
+  base_volume_name = "fedora.qcow2"
   base_volume_pool = "default"
 }
 
@@ -37,7 +37,7 @@ resource "libvirt_domain" "runner" {
   }
 
   connection {
-    user = "debian"
+    user = "fedora"
     bastion_host = "${google_compute_instance.virt_host.network_interface.0.access_config.0.assigned_nat_ip}"
     bastion_user = "root"
   }
@@ -52,7 +52,7 @@ resource "libvirt_domain" "runner" {
 ##
 resource "libvirt_volume" "k8s_controller" {
   name = "k8s_controller.qcow2"
-  base_volume_name = "debian.qcow2"
+  base_volume_name = "fedora.qcow2"
   base_volume_pool = "default"
 }
 
@@ -77,7 +77,7 @@ resource "libvirt_domain" "k8s_controller" {
   }
 
   connection {
-    user = "debian"
+    user = "fedora"
     bastion_host = "${google_compute_instance.virt_host.network_interface.0.access_config.0.assigned_nat_ip}"
     bastion_user = "root"
   }
@@ -96,7 +96,7 @@ resource "libvirt_domain" "k8s_controller" {
 ##
 resource "libvirt_volume" "k8s_node1" {
   name = "k8s_node1.qcow2"
-  base_volume_name = "debian.qcow2"
+  base_volume_name = "fedora.qcow2"
   base_volume_pool = "default"
 }
 
@@ -122,7 +122,7 @@ resource "libvirt_domain" "k8s_node1" {
   }
 
   connection {
-    user = "debian"
+    user = "fedora"
     bastion_host = "${google_compute_instance.virt_host.network_interface.0.access_config.0.assigned_nat_ip}"
     bastion_user = "root"
   }
@@ -141,7 +141,7 @@ resource "libvirt_domain" "k8s_node1" {
 ##
 resource "libvirt_volume" "k8s_node2" {
   name = "k8s_node2.qcow2"
-  base_volume_name = "debian.qcow2"
+  base_volume_name = "fedora.qcow2"
   base_volume_pool = "default"
 }
 
@@ -167,7 +167,7 @@ resource "libvirt_domain" "k8s_node2" {
   }
 
   connection {
-    user = "debian"
+    user = "fedora"
     bastion_host = "${google_compute_instance.virt_host.network_interface.0.access_config.0.assigned_nat_ip}"
     bastion_user = "root"
   }

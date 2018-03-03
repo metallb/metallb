@@ -5,3 +5,4 @@ build/
 website/public
 .envrc
 terraform/.terraform
+terraform/terraform.tfstate*

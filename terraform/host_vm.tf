@@ -37,10 +37,8 @@ EOF
       "virsh pool-define-as --name=default --type=dir --target=/var/lib/libvirt/images",
       "virsh pool-start default",
       "virsh pool-autostart default",
-      "wget -O /var/lib/libvirt/images/debian-orig.qcow2 https://cdimage.debian.org/cdimage/openstack/current-9/debian-9-openstack-amd64.qcow2",
-      "qemu-img resize /var/lib/libvirt/images/debian-orig.qcow2 10GB",
-      "cp /var/lib/libvirt/images/debian-orig.qcow2 /var/lib/libvirt/images/debian.qcow2",
-      "virt-resize --expand /dev/sda1 /var/lib/libvirt/images/debian-orig.qcow2 /var/lib/libvirt/images/debian.qcow2",
+      "wget -O /var/lib/libvirt/images/fedora.qcow2 https://download.fedoraproject.org/pub/fedora/linux/releases/27/CloudImages/x86_64/images/Fedora-Cloud-Base-27-1.6.x86_64.qcow2",
+      "qemu-img resize /var/lib/libvirt/images/fedora.qcow2 10G",
     ]
   }
 
