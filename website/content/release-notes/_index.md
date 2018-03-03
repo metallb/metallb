@@ -62,7 +62,7 @@ Other improvements:
 - Binary internals were refactored to share more common code. This
   should reduce the amount of visual noise in the logs.
 
-This release includes contributions from David Anderson, driftavalli,
+This release includes contributions from Oga Ajima, David Anderson,
 Matt Layher, John Marcou, Paweł Prażak, and Hugo Slabbert. Thanks to
 all of them for making MetalLB better!
 
