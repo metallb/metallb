@@ -15,15 +15,56 @@ Action required if upgrading from 0.3.x:
   MetalLB objects, you should now match on a combination of `app:
   metallb`, `component: controller` or `component: speaker`, depending
   on what objects you want to select.
-- TODO: none yet?
+- RBAC rules have changed, and now allow the MetalLB speaker to list
+  and watch Node objects. If you are not installing MetalLB via the
+  provided manifest, you will need to make this change by hand.
+- If you want to switch to using Helm to manage your MetalLB
+  installation, you must first uninstall the manifest-based version,
+  with `kubectl delete -f metallb.yaml`.
 
 New features:
 
+- Initial IPv6 support! The `ndp` protocol allows v6 Kubernetes
+  clusters to advertise their services using
+  the
+  [Neighbor Discovery Protocol](https://en.wikipedia.org/wiki/Neighbor_Discovery_Protocol),
+  IPv6's analog to ARP. If you have an IPv6 Kubernetes cluster, please
+  try it out
+  and [file bugs](https://github.com/google/metallb/issues/new)!
 - BGP peers now have
   a
   [node selector]({{% relref "configuration/_index.md" %}}#limiting-peers-to-certain-nodes). You
   can use this to integrate MetalLB into more complex cluster network
   topologies.
+- MetalLB now has
+  a
+  [Helm chart](https://github.com/google/metallb/tree/master/helm/metallb). If
+  you use [Helm](https://helm.sh) on your cluster, this should make it
+  easier to track and manage your MetalLB installation. The chart will
+  be submitted for inclusion in the main Helm stable repository
+  shortly after the release is finalized. Use of Helm is optional,
+  installing the manifest directly is still fully supported.
+
+Other improvements:
+- MetalLB
+  now
+  [backs off on failing BGP connections](https://github.com/google/metallb/issues/84),
+  to avoid flooding logs with failures
+- ARP mode should be a little
+  more
+  [interoperable with clients](https://github.com/google/metallb/issues/172),
+  and failover should be a little faster, thanks to tweaks to its
+  advertisement logic.
+- ARP and NDP modes export [Prometheus](https://prometheus.io) metrics
+  for requests received, responses sent, and failover-related
+  transmissions. This brings them up to "monitoring parity" with BGP
+  mode.
+- Binary internals were refactored to share more common code. This
+  should reduce the amount of visual noise in the logs.
+
+This release includes contributions from David Anderson, driftavalli,
+Matt Layher, John Marcou, Paweł Prażak, and Hugo Slabbert. Thanks to
+all of them for making MetalLB better!
 
 ## Version 0.3.1
 
