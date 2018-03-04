@@ -3,9 +3,9 @@ title: Release Notes
 weight: 7
 ---
 
-## Version 0.4.0 (not released yet)
+## Version 0.4.0
 
-[Documentation for this release](https://master--metallb.netlify.com)
+[Documentation for this release](https://metallb.universe.tf)
 
 Action required if upgrading from 0.3.x:
 
@@ -69,7 +69,7 @@ all of them for making MetalLB better!
 
 ## Version 0.3.1
 
-[Documentation for this release](https://metallb.universe.tf)
+[Documentation for this release](https://v0-3-1--metallb.netlify.com)
 
 Fixes a couple
 of [embarrassing bugs](https://github.com/google/metallb/issues/142)
