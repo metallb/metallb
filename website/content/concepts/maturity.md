@@ -7,9 +7,10 @@ MetalLB is currently in *alpha*.
 
 ## Adoption
 
-MetalLB is being used in at least 1 non-critical production cluster,
-and is stable there. However, it has not been "battle tested" by many
-people yet.
+MetalLB is being used in several production and non-production
+clusters, by several people and companies. So far, it appears to be
+very stable in those deployments, but in the grand scheme of things,
+MetalLB is still not hugely "battle tested."
 
 If you use it today, you'll be an early adopter and may encounter more
 issues than usual. Please file bugs! We want to hear from you and
@@ -17,9 +18,10 @@ address pain points.
 
 ## Test coverage
 
-The codebase has some test coverage, but it it's still sorely lacking
-in important places. Empirical testing shows that the common codepaths
-work properly, but edge cases may have bugs.
+The codebase has reasonable test coverage, but lacks comprehensive
+end-to-end tests. Empirical testing, combined with the unit tests we
+have, show that the common codepaths work properly, but edge cases may
+have bugs.
 
 Increasing test coverage is an active area of work.
 
@@ -27,10 +29,12 @@ Increasing test coverage is an active area of work.
 
 The configuration format was grown organically during the prototyping
 phase, and may change in backwards-incompatible ways as the project is
-refactored to support routing protocols other than BGP.
+refactored to support additional routing protocols and features.
 
 Release notes during alpha will highlight any required changes to
-configuration when upgrading between versions.
+configuration when upgrading between versions. Stabilization of the
+configuration format is the main blocker for graduating MetalLB to
+"beta" status.
 
 ## Documentation
 
