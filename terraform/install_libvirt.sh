@@ -2,9 +2,9 @@
 
 set -e
 
-#perl -pi -e 's/stretch/testing/g' /etc/apt/sources.list
+perl -pi -e 's/stretch/testing/g' /etc/apt/sources.list
 apt -qq update
-#DEBIAN_FRONTEND=noninteractive apt -o Dpkg::Options::="--force-confold" -qq -y dist-upgrade
+DEBIAN_FRONTEND=noninteractive apt -o Dpkg::Options::="--force-confold" -qq -y dist-upgrade
 DEBIAN_FRONTEND=noninteractive apt -qq -y install libvirt-daemon-system virtinst virt-goodies netcat-openbsd xorriso libguestfs-tools
 ln -s /usr/bin/xorrisofs /usr/bin/mkisofs
 virsh pool-define-as --name=default --type=dir --target=/var/lib/libvirt/images
