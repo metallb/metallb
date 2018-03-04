@@ -201,6 +201,7 @@ ifeq ($(PATCH),0)
 else
 	git checkout v$(MAJOR).$(MINOR)
 	perl -pi -e "s#/google/metallb/v$(MAJOR).$(MINOR).$$(($(PATCH)-1))#/google/metallb/v$(VERSION)#g" website/content/*.md website/content/*/*.md
+	perl -pi -e "s#/google/metallb/tree/v$(MAJOR).$(MINOR).$$(($(PATCH)-1))#/google/metallb/tree/v$(VERSION)#g" website/content/*.md website/content/*/*.md
 endif
 	perl -pi -e 's#image: metallb/(.*):.*#image: metallb/$$1:v$(VERSION)#g' manifests/*.yaml
 
