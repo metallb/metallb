@@ -45,9 +45,9 @@ as you want, and doesn't care what "kind" of addresses you give it.
 Once MetalLB has assigned an external IP address to a service, it
 needs to make the network beyond the cluster aware that the IP "lives"
 in the cluster. MetalLB uses standard routing protocols to achieve
-this, one of ARP or BGP.
+this: ARP, NDP, or BGP.
 
-### ARP
+### ARP and NDP
 
 In ARP mode, one machine in the cluster takes ownership of the service
 IPs, and uses
@@ -56,8 +56,11 @@ standard
 packets to make those IPs reachable. From the LAN's point of view, the
 announcing machine simply has multiple IP addresses.
 
-The [ARP mode]({{% relref "arp.md" %}}) sub-page has more details on
-ARP mode's operation and limitations.
+[NDP](https://en.wikipedia.org/wiki/Neighbor_Discovery_Protocol) mode
+serves an identical function, but for IPv6 addresses.
+
+The [ARP and NDP modes]({{% relref "arp-ndp.md" %}}) sub-page has more
+details on the behavior and limitations of ARP and NDP modes.
 
 ### BGP 
 

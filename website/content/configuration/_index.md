@@ -13,6 +13,7 @@ The specific configuration depends on the protocol(s) you want to use
 to announce service IPs. Jump to:
 
 - [ARP configuration](#arp-configuration)
+- [NDP configuration](#ndp-configuration)
 - [BGP configuration](#bgp-configuration)
 - [Advanced configuration](#advanced-address-pool-configuration)
 
@@ -79,6 +80,37 @@ data:
       cidr:
       - 10.42.42.0/24
 ```
+
+## NDP configuration
+
+NDP mode is the same as ARP mode, but for IPv6. Like with ARP, in many
+cases you just need to specify IP addresses, and nothing else.
+
+For example, the following configuration gives MetalLB control over
+the `2001:db8:42::/120` IP range, and configures NDP mode:
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    address-pools:
+    - name: default
+      protocol: ndp
+      cidr:
+      - 2001:db8:42::/120
+```
+
+{{% notice note %}}
+Due to limitations of Kubernetes, you can only use IPv6 service
+addresses in an IPv6 Kubernetes cluster. Conversely, you can only use
+IPv4 service addresses in IPv4 clusters. Unfortunately, "dual-stack"
+clusters are not possible at this time.
+{{% /notice %}}
+
 
 ## BGP configuration
 

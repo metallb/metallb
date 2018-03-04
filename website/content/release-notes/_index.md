@@ -114,7 +114,7 @@ New features:
   special network equipment, and minimal configuration. You can follow
   the [ARP mode tutorial]({{% relref "tutorial/arp.md" %}}) to get
   started. There is also a page about ARP
-  mode's [behavior and tradeoffs]({{% relref "concepts/arp.md" %}}),
+  mode's [behavior and tradeoffs]({{% relref "concepts/arp-ndp.md" %}}),
   and documentation
   on [configuring ARP mode]({{% relref "configuration/_index.md" %}}).
 - The container images are
