@@ -10,7 +10,7 @@ resource "google_compute_instance" "virt_host" {
   boot_disk {
     initialize_params {
       image = "${data.google_compute_image.debian_vmx.self_link}"
-      size = 200
+      size = 30
       type = "pd-ssd"
     }
   }
@@ -30,18 +30,7 @@ EOF
   }
 
   provisioner "remote-exec" {
-    inline = [
-      "apt -qq update",
-      "DEBIAN_FRONTEND=noninteractive apt -qq -y install libvirt-daemon-system virtinst virt-goodies netcat-openbsd xorriso libguestfs-tools",
-      "ln -s /usr/bin/xorrisofs /usr/bin/mkisofs",
-      "virsh pool-define-as --name=default --type=dir --target=/var/lib/libvirt/images",
-      "virsh pool-start default",
-      "virsh pool-autostart default",
-      "wget -O /var/lib/libvirt/images/fedora.qcow2 https://download.fedoraproject.org/pub/fedora/linux/releases/27/CloudImages/x86_64/images/Fedora-Cloud-Base-27-1.6.x86_64.qcow2",
-      "qemu-img resize /var/lib/libvirt/images/fedora.qcow2 10G",
-      "rm /dev/random",
-      "ln -s /dev/urandom /dev/random",
-    ]
+    script = "install_libvirt.sh"
   }
 
   # This hackery teaches SSH about the correct host key for this new
