@@ -7,3 +7,6 @@ description: MetalLB is a load-balancer implementation for bare metal Kubernetes
 keywords: ["load-balancer", "balancer", "lb", "bgp", "arp", "vrrp", "vip"]
 home: https://metallb.universe.tf
 icon: https://metallb.universe.tf/images/logo.png
+maintainers:
+- name: David Anderson
+  email: dave@natulte.net
