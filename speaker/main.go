@@ -149,10 +149,13 @@ func newController(cfg controllerConfig) (*controller, error) {
 	if !cfg.DisableNDP {
 		a, err := ndp.New(cfg.Interface)
 		if err != nil {
-			return nil, fmt.Errorf("making NDP announcer: %s", err)
-		}
-		protocols[config.NDP] = &ndpController{
-			announcer: a,
+			// TODO(bug 180): make this fail in a more principled way.
+			glog.Errorf("Constructing NDP announcer failed: %s", err)
+			glog.Warningf("IPv6 load-balancing is unavailable")
+		} else {
+			protocols[config.NDP] = &ndpController{
+				announcer: a,
+			}
 		}
 	}
 
