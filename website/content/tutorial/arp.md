@@ -159,7 +159,7 @@ I1217 10:19:05.235623       1 arp.go:96] Request: who-has 192.168.1.240?  tell 1
 ```
 
 MetalLB is sending out unsolicited ARP responses and replies to ARP
-requests with the MAC address of the node that has won the master
+requests with the MAC address of the node that has won the leader
 election. It is using the first address of the assigned range
 (192.168.1.240).
 
