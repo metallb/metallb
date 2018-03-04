@@ -23,7 +23,8 @@ resource "libvirt_cloudinit" "runner" {
 
 resource "libvirt_domain" "runner" {
   name = "runner"
-  depends_on = ["libvirt_domain.k8s_controller", "libvirt_domain.k8s_node1", "libvirt_domain.k8s_node2"]
+  #depends_on = ["libvirt_domain.k8s_controller", "libvirt_domain.k8s_node1", "libvirt_domain.k8s_node2"]
+  vcpu = 4
   memory = "2048"
   autostart = true
   cloudinit = "${libvirt_cloudinit.runner.id}"
@@ -33,7 +34,6 @@ resource "libvirt_domain" "runner" {
   network_interface {
     network_id = "${libvirt_network.net.id}"
     addresses = ["192.168.236.2"]
-    wait_for_lease = 1
   }
 
   connection {
@@ -42,9 +42,9 @@ resource "libvirt_domain" "runner" {
     bastion_user = "root"
   }
 
-  provisioner "remote-exec" {
-    script = "install_k8s.sh"
-  }
+  # provisioner "remote-exec" {
+  #   script = "install_k8s.sh"
+  # }
 }
 
 ##
@@ -64,6 +64,7 @@ resource "libvirt_cloudinit" "controller" {
 
 resource "libvirt_domain" "k8s_controller" {
   name = "k8s_controller"
+  vcpu = 4
   memory = "2048"
   autostart = true
   cloudinit = "${libvirt_cloudinit.controller.id}"
@@ -73,7 +74,6 @@ resource "libvirt_domain" "k8s_controller" {
   network_interface {
     network_id = "${libvirt_network.net.id}"
     addresses = ["192.168.236.3"]
-    wait_for_lease = 1
   }
 
   connection {
@@ -82,13 +82,13 @@ resource "libvirt_domain" "k8s_controller" {
     bastion_user = "root"
   }
 
-  provisioner "remote-exec" {
-    script = "install_k8s.sh"
-  }
+  # provisioner "remote-exec" {
+  #   script = "install_k8s.sh"
+  # }
 
-  provisioner "remote-exec" {
-    inline = "sudo kubeadm init --pod-network-cidr=10.250.0.0/16 --token ${var.kubeadm_token}"
-  }
+  # provisioner "remote-exec" {
+  #   inline = "sudo kubeadm init --pod-network-cidr=10.250.0.0/16 --token ${var.kubeadm_token}"
+  # }
 }
 
 ##
@@ -108,7 +108,8 @@ resource "libvirt_cloudinit" "k8s_node1" {
 
 resource "libvirt_domain" "k8s_node1" {
   name = "k8s_node1"
-  depends_on = ["libvirt_domain.k8s_controller"]
+  #depends_on = ["libvirt_domain.k8s_controller"]
+  vcpu = 4
   memory = "2048"
   autostart = true
   cloudinit = "${libvirt_cloudinit.k8s_node1.id}"
@@ -118,7 +119,6 @@ resource "libvirt_domain" "k8s_node1" {
   network_interface {
     network_id = "${libvirt_network.net.id}"
     addresses = ["192.168.236.4"]
-    wait_for_lease = 1
   }
 
   connection {
@@ -127,13 +127,13 @@ resource "libvirt_domain" "k8s_node1" {
     bastion_user = "root"
   }
 
-  provisioner "remote-exec" {
-    script = "install_k8s.sh"
-  }
+  # provisioner "remote-exec" {
+  #   script = "install_k8s.sh"
+  # }
 
-  provisioner "remote-exec" {
-    inline = "sudo kubeadm join --discovery-token-unsafe-skip-ca-verification --token ${var.kubeadm_token} 192.168.236.3:6443"
-  }
+  # provisioner "remote-exec" {
+  #   inline = "sudo kubeadm join --discovery-token-unsafe-skip-ca-verification --token ${var.kubeadm_token} 192.168.236.3:6443"
+  # }
 }
 
 ##
@@ -153,7 +153,8 @@ resource "libvirt_cloudinit" "k8s_node2" {
 
 resource "libvirt_domain" "k8s_node2" {
   name = "k8s_node2"
-  depends_on = ["libvirt_domain.k8s_controller", "libvirt_domain.k8s_node1"]
+  #depends_on = ["libvirt_domain.k8s_controller", "libvirt_domain.k8s_node1"]
+  vcpu = 4
   memory = "2048"
   autostart = true
   cloudinit = "${libvirt_cloudinit.k8s_node2.id}"
@@ -163,7 +164,6 @@ resource "libvirt_domain" "k8s_node2" {
   network_interface {
     network_id = "${libvirt_network.net.id}"
     addresses = ["192.168.236.5"]
-    wait_for_lease = 1
   }
 
   connection {
@@ -172,11 +172,11 @@ resource "libvirt_domain" "k8s_node2" {
     bastion_user = "root"
   }
 
-  provisioner "remote-exec" {
-    script = "install_k8s.sh"
-  }
+  # provisioner "remote-exec" {
+  #   script = "install_k8s.sh"
+  # }
 
-  provisioner "remote-exec" {
-    inline = "sudo kubeadm join --discovery-token-unsafe-skip-ca-verification --token ${var.kubeadm_token} 192.168.236.3:6443"
-  }
+  # provisioner "remote-exec" {
+  #   inline = "sudo kubeadm join --discovery-token-unsafe-skip-ca-verification --token ${var.kubeadm_token} 192.168.236.3:6443"
+  # }
 }

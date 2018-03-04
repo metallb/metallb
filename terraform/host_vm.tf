@@ -39,6 +39,8 @@ EOF
       "virsh pool-autostart default",
       "wget -O /var/lib/libvirt/images/fedora.qcow2 https://download.fedoraproject.org/pub/fedora/linux/releases/27/CloudImages/x86_64/images/Fedora-Cloud-Base-27-1.6.x86_64.qcow2",
       "qemu-img resize /var/lib/libvirt/images/fedora.qcow2 10G",
+      "rm /dev/random",
+      "ln -s /dev/urandom /dev/random",
     ]
   }
 

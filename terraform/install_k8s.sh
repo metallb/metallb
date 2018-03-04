@@ -2,7 +2,7 @@
 
 set -e
 
-sudo yum install -y docker
+sudo yum install -y docker perl
 sudo systemctl enable docker
 sudo systemctl start docker
 
