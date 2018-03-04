@@ -46,6 +46,7 @@ New features:
   installing the manifest directly is still fully supported.
 
 Other improvements:
+
 - MetalLB
   now
   [backs off on failing BGP connections](https://github.com/google/metallb/issues/84),
