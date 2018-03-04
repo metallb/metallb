@@ -22,8 +22,8 @@ rbac:
 controller:
   image:
     repository: metallb/controller
-    tag: latest
-    pullPolicy: Always
+    tag: v0.4.0
+    pullPolicy: IfNotPresent
   resources:
     limits:
       cpu: 100m
@@ -34,8 +34,8 @@ controller:
 speaker:
   image:
     repository: metallb/speaker
-    tag: latest
-    pullPolicy: Always
+    tag: v0.4.0
+    pullPolicy: IfNotPresent
   resources:
     limits:
       cpu: 100m
