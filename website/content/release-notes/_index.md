@@ -3,9 +3,17 @@ title: Release Notes
 weight: 7
 ---
 
-## Version 0.4.1
+## Version 0.4.2
 
 [Documentation for this release](https://metallb.universe.tf)
+
+Bugfixes:
+
+- [Speaker doesn't readvertise existing services on sessions added by node label changes](https://github.com/google/metallb/issues/181).
+
+## Version 0.4.1
+
+[Documentation for this release](https://v0-4-1--metallb.netlify.com)
 
 Bugfixes:
 
