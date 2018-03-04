@@ -9,10 +9,7 @@ weight: 7
 
 Bugfixes:
 
-- Make
-  speaker
-  [not crash on RHEL7/OEL7](https://github.com/google/metallb/issues/180),
-  which have no IPv6 support at all (not even link-local addresses).
+- [Make speaker not crash on machines with IPv6 disabled](https://github.com/google/metallb/issues/180).
 
 ## Version 0.4.0
 
