@@ -110,7 +110,7 @@ func (c *bgpController) syncPeers() error {
 			// Session doesn't exist, but should be running. Create
 			// it.
 			glog.Infof("Peer %q configured, starting BGP session", p.cfg.Addr)
-			routerID := c.myIP
+			var routerID net.IP
 			if p.cfg.RouterID != nil {
 				routerID = p.cfg.RouterID
 			}

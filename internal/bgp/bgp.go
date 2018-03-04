@@ -20,7 +20,7 @@ var errClosed = errors.New("session closed")
 // Session represents one BGP session to an external router.
 type Session struct {
 	asn      uint32
-	routerID net.IP
+	routerID net.IP // May be nil, meaning "derive from context"
 	addr     string
 	peerASN  uint32
 	holdTime time.Duration
@@ -163,7 +163,22 @@ func (s *Session) connect() error {
 		return fmt.Errorf("setting deadline on conn to %q: %s", s.addr, err)
 	}
 
-	if err = sendOpen(conn, s.asn, s.routerID, s.holdTime); err != nil {
+	routerID := s.routerID
+	if routerID == nil {
+		// Use the connection's source IP as the router ID
+		addr, ok := conn.LocalAddr().(*net.TCPAddr)
+		if !ok {
+			conn.Close()
+			return fmt.Errorf("getting local addr for router ID to %q: %s", s.addr, err)
+		}
+		routerID = addr.IP.To4()
+		if routerID == nil {
+			conn.Close()
+			return fmt.Errorf("cannot automatically derive router ID for IPv6 connection to %q", s.addr)
+		}
+	}
+
+	if err = sendOpen(conn, s.asn, routerID, s.holdTime); err != nil {
 		conn.Close()
 		return fmt.Errorf("send OPEN to %q: %s", s.addr, err)
 	}
@@ -275,9 +290,6 @@ func New(addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time
 		holdTime:    holdTime,
 		newHoldTime: make(chan bool, 1),
 		advertised:  map[string]*Advertisement{},
-	}
-	if ret.routerID == nil {
-		return nil, fmt.Errorf("invalid routerID %q, must be IPv4", routerID)
 	}
 	ret.cond = sync.NewCond(&ret.mu)
 	go ret.sendKeepalives()
