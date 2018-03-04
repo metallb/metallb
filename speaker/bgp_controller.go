@@ -36,7 +36,6 @@ type peer struct {
 }
 
 type bgpController struct {
-	myIP       net.IP
 	nodeLabels labels.Set
 	peers      []*peer
 	svcAds     map[string][]*bgp.Advertisement
@@ -147,7 +146,6 @@ func (c *bgpController) SetBalancer(name string, lbIP net.IP, pool *config.Pool)
 				IP:   lbIP.Mask(m),
 				Mask: m,
 			},
-			NextHop:   c.myIP,
 			LocalPref: adCfg.LocalPref,
 		}
 		for comm := range adCfg.Communities {

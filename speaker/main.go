@@ -131,7 +131,6 @@ type controllerConfig struct {
 func newController(cfg controllerConfig) (*controller, error) {
 	protocols := map[config.Proto]Protocol{
 		config.BGP: &bgpController{
-			myIP:   cfg.NodeIP,
 			svcAds: make(map[string][]*bgp.Advertisement),
 		},
 	}

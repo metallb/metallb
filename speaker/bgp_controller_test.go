@@ -292,8 +292,7 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
 					{
-						Prefix:  ipnet("10.20.30.1/32"),
-						NextHop: net.ParseIP("1.2.3.4"),
+						Prefix: ipnet("10.20.30.1/32"),
 					},
 				},
 			},
@@ -355,8 +354,7 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
 					{
-						Prefix:  ipnet("10.20.30.1/32"),
-						NextHop: net.ParseIP("1.2.3.4"),
+						Prefix: ipnet("10.20.30.1/32"),
 					},
 				},
 			},
@@ -458,13 +456,11 @@ func TestBGPSpeaker(t *testing.T) {
 				"1.2.3.4:0": {
 					{
 						Prefix:      ipnet("10.20.30.1/32"),
-						NextHop:     net.ParseIP("1.2.3.4"),
 						LocalPref:   100,
 						Communities: []uint32{1234, 2345},
 					},
 					{
 						Prefix:    ipnet("10.20.30.0/24"),
-						NextHop:   net.ParseIP("1.2.3.4"),
 						LocalPref: 1000,
 					},
 				},
@@ -519,14 +515,12 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
 					{
-						Prefix:  ipnet("10.20.30.1/32"),
-						NextHop: net.ParseIP("1.2.3.4"),
+						Prefix: ipnet("10.20.30.1/32"),
 					},
 				},
 				"1.2.3.5:0": {
 					{
-						Prefix:  ipnet("10.20.30.1/32"),
-						NextHop: net.ParseIP("1.2.3.4"),
+						Prefix: ipnet("10.20.30.1/32"),
 					},
 				},
 			},
@@ -556,14 +550,12 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
 					{
-						Prefix:  ipnet("10.20.30.1/32"),
-						NextHop: net.ParseIP("1.2.3.4"),
+						Prefix: ipnet("10.20.30.1/32"),
 					},
 				},
 				"1.2.3.5:0": {
 					{
-						Prefix:  ipnet("10.20.30.1/32"),
-						NextHop: net.ParseIP("1.2.3.4"),
+						Prefix: ipnet("10.20.30.1/32"),
 					},
 				},
 			},
@@ -594,22 +586,18 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
 					{
-						Prefix:  ipnet("10.20.30.1/32"),
-						NextHop: net.ParseIP("1.2.3.4"),
+						Prefix: ipnet("10.20.30.1/32"),
 					},
 					{
-						Prefix:  ipnet("10.20.30.5/32"),
-						NextHop: net.ParseIP("1.2.3.4"),
+						Prefix: ipnet("10.20.30.5/32"),
 					},
 				},
 				"1.2.3.5:0": {
 					{
-						Prefix:  ipnet("10.20.30.1/32"),
-						NextHop: net.ParseIP("1.2.3.4"),
+						Prefix: ipnet("10.20.30.1/32"),
 					},
 					{
-						Prefix:  ipnet("10.20.30.5/32"),
-						NextHop: net.ParseIP("1.2.3.4"),
+						Prefix: ipnet("10.20.30.5/32"),
 					},
 				},
 			},
@@ -621,14 +609,12 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
 					{
-						Prefix:  ipnet("10.20.30.5/32"),
-						NextHop: net.ParseIP("1.2.3.4"),
+						Prefix: ipnet("10.20.30.5/32"),
 					},
 				},
 				"1.2.3.5:0": {
 					{
-						Prefix:  ipnet("10.20.30.5/32"),
-						NextHop: net.ParseIP("1.2.3.4"),
+						Prefix: ipnet("10.20.30.5/32"),
 					},
 				},
 			},
@@ -678,8 +664,7 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.5:0": {
 					{
-						Prefix:  ipnet("10.20.30.5/32"),
-						NextHop: net.ParseIP("1.2.3.4"),
+						Prefix: ipnet("10.20.30.5/32"),
 					},
 				},
 			},

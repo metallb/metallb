@@ -33,6 +33,7 @@ type Session struct {
 	closed         bool
 	conn           net.Conn
 	actualHoldTime time.Duration
+	defaultNextHop net.IP
 	advertised     map[string]*Advertisement
 	new            map[string]*Advertisement
 }
@@ -83,7 +84,7 @@ func (s *Session) sendUpdates() error {
 	}
 
 	for c, adv := range s.advertised {
-		if err := sendUpdate(s.conn, asn, adv); err != nil {
+		if err := sendUpdate(s.conn, asn, s.defaultNextHop, adv); err != nil {
 			s.abort()
 			return fmt.Errorf("sending update of %q to %q: %s", c, s.addr, err)
 		}
@@ -115,7 +116,7 @@ func (s *Session) sendUpdates() error {
 				continue
 			}
 
-			if err := sendUpdate(s.conn, asn, adv); err != nil {
+			if err := sendUpdate(s.conn, asn, s.defaultNextHop, adv); err != nil {
 				s.abort()
 				return fmt.Errorf("sending update of %q to %q: %s", c, s.addr, err)
 			}
@@ -163,15 +164,17 @@ func (s *Session) connect() error {
 		return fmt.Errorf("setting deadline on conn to %q: %s", s.addr, err)
 	}
 
+	addr, ok := conn.LocalAddr().(*net.TCPAddr)
+	if !ok {
+		conn.Close()
+		return fmt.Errorf("getting local addr for default nexthop to %q: %s", s.addr, err)
+	}
+	s.defaultNextHop = addr.IP
+
 	routerID := s.routerID
 	if routerID == nil {
 		// Use the connection's source IP as the router ID
-		addr, ok := conn.LocalAddr().(*net.TCPAddr)
-		if !ok {
-			conn.Close()
-			return fmt.Errorf("getting local addr for router ID to %q: %s", s.addr, err)
-		}
-		routerID = addr.IP.To4()
+		routerID = s.defaultNextHop.To4()
 		if routerID == nil {
 			conn.Close()
 			return fmt.Errorf("cannot automatically derive router ID for IPv6 connection to %q", s.addr)
@@ -356,7 +359,7 @@ func (s *Session) Set(advs ...*Advertisement) error {
 			return fmt.Errorf("cannot advertise non-v4 prefix %q", adv.Prefix)
 		}
 
-		if adv.NextHop.To4() == nil {
+		if adv.NextHop != nil && adv.NextHop.To4() == nil {
 			return fmt.Errorf("next-hop must be IPv4, got %q", adv.NextHop)
 		}
 		if len(adv.Communities) > 63 {
