@@ -12,7 +12,7 @@ import (
 
 func sendOpen(w io.Writer, asn uint32, routerID net.IP, holdTime time.Duration) error {
 	if routerID.To4() == nil {
-		panic("ipv4 address used as RouterID")
+		panic("non-ipv4 address used as RouterID")
 	}
 
 	msg := struct {
