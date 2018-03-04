@@ -209,6 +209,9 @@ endif
 	perl -pi -e "s#/google/metallb/$(PREV_VERSION)#/google/metallb/v$(VERSION)#g" website/content/*.md website/content/*/*.md
 	perl -pi -e "s#/google/metallb/tree/$(PREV_VERSION)#/google/metallb/tree/v$(VERSION)#g" website/content/*.md website/content/*/*.md
 	perl -pi -e "s#/google/metallb/blob/$(PREV_VERSION)#/google/metallb/tree/v$(VERSION)#g" website/content/*.md website/content/*/*.md
+	perl -pi -e "s#/google/metallb/master#/google/metallb/v$(VERSION)#g" website/content/*.md website/content/*/*.md
+	perl -pi -e "s#/google/metallb/tree/master#/google/metallb/tree/v$(VERSION)#g" website/content/*.md website/content/*/*.md
+	perl -pi -e "s#/google/metallb/blob/master#/google/metallb/tree/v$(VERSION)#g" website/content/*.md website/content/*/*.md
 
 	perl -pi -e 's#image: metallb/(.*):.*#image: metallb/$$1:v$(VERSION)#g' manifests/*.yaml
 
