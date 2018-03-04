@@ -83,7 +83,10 @@ newPeers:
 // Called when either the peer list or node labels have changed,
 // implying that the set of running BGP sessions may need tweaking.
 func (c *bgpController) syncPeers() error {
-	var errs []error
+	var (
+		errs          []error
+		needUpdateAds bool
+	)
 	for _, p := range c.peers {
 		// First, determine if the peering should be active for this
 		// node.
@@ -116,7 +119,14 @@ func (c *bgpController) syncPeers() error {
 				errs = append(errs, fmt.Errorf("Creating BGP session to %q: %s", p.cfg.Addr, err))
 			} else {
 				p.bgp = s
+				needUpdateAds = true
 			}
+		}
+	}
+	if needUpdateAds {
+		// Some new sessions came up, resync advertisement state.
+		if err := c.updateAds(); err != nil {
+			return err
 		}
 	}
 	if len(errs) != 0 {
