@@ -3,9 +3,20 @@ title: Release Notes
 weight: 7
 ---
 
-## Version 0.4.0
+## Version 0.4.1
 
 [Documentation for this release](https://metallb.universe.tf)
+
+Bugfixes:
+
+- Make
+  speaker
+  [not crash on RHEL7/OEL7](https://github.com/google/metallb/issues/180),
+  which have no IPv6 support at all (not even link-local addresses).
+
+## Version 0.4.0
+
+[Documentation for this release](https://v0-4-0--metallb.netlify.com)
 
 Action required if upgrading from 0.3.x:
 
