@@ -193,7 +193,7 @@ func parseHoldTime(ht string) (time.Duration, error) {
 // Parse loads and validates a Config from bs.
 func Parse(bs []byte) (*Config, error) {
 	var raw configFile
-	if err := yaml.Unmarshal(bs, &raw); err != nil {
+	if err := yaml.UnmarshalStrict(bs, &raw); err != nil {
 		return nil, fmt.Errorf("could not parse config: %s", err)
 	}
 
