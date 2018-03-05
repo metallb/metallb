@@ -3,6 +3,29 @@ title: Release Notes
 weight: 7
 ---
 
+<!---
+## Version 0.5.0
+
+[Documentation for this release](https://metallb.universe.tf)
+
+Action required if upgrading from 0.4.x:
+
+- The router IDs used on BGP sessions may be different, in clusters
+  where nodes have multiple IP addresses. If your BGP infrastructure
+  monitors or enforces specific router IDs for peers, you may need to
+  update those systems to match new router IDs.
+
+New features:
+
+- BGP mode supports nodes with multiple interfaces and IP addresses
+  ([#182](https://github.com/google/metallb/issues/182)). Previously,
+  MetalLB could only establish working BGP sessions on the node's
+  "primary" interface, i.e. the one that owned the IP that Kubernetes
+  uses to identify the node. Now, peerings may be established via any
+  interface on the nodes, and traffic will flow in the expected
+  manner.
+--->
+
 ## Version 0.4.2
 
 [Documentation for this release](https://metallb.universe.tf)
