@@ -1,4 +1,4 @@
-package arpndp
+package layer2
 
 import (
 	"time"

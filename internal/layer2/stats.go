@@ -1,11 +1,11 @@
-package arpndp
+package layer2
 
 import "github.com/prometheus/client_golang/prometheus"
 
 var stats = metrics{
 	in: prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "metallb",
-		Subsystem: "arpndp",
+		Subsystem: "layer2",
 		Name:      "requests_received",
 		Help:      "Number of ARP/NDP requests received for owned IPs",
 	}, []string{
@@ -14,7 +14,7 @@ var stats = metrics{
 
 	out: prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "metallb",
-		Subsystem: "arpndp",
+		Subsystem: "layer2",
 		Name:      "responses_sent",
 		Help:      "Number of ARP/NDP responses sent for owned IPs in response to requests",
 	}, []string{
@@ -23,7 +23,7 @@ var stats = metrics{
 
 	gratuitous: prometheus.NewCounterVec(prometheus.CounterOpts{
 		Namespace: "metallb",
-		Subsystem: "arpndp",
+		Subsystem: "layer2",
 		Name:      "gratuitous_sent",
 		Help:      "Number of gratuitous ARP/NDP packets sent for owned IPs as a result of failovers",
 	}, []string{

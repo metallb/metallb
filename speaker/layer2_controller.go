@@ -17,25 +17,25 @@ package main
 import (
 	"net"
 
-	"go.universe.tf/metallb/internal/arpndp"
 	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/layer2"
 	"k8s.io/api/core/v1"
 )
 
-type arpndpController struct {
-	announcer *arpndp.Announce
+type layer2Controller struct {
+	announcer *layer2.Announce
 }
 
-func (c *arpndpController) SetConfig(*config.Config) error {
+func (c *layer2Controller) SetConfig(*config.Config) error {
 	return nil
 }
 
-func (c *arpndpController) SetBalancer(name string, lbIP net.IP, pool *config.Pool) error {
+func (c *layer2Controller) SetBalancer(name string, lbIP net.IP, pool *config.Pool) error {
 	c.announcer.SetBalancer(name, lbIP)
 	return nil
 }
 
-func (c *arpndpController) DeleteBalancer(name, reason string) error {
+func (c *layer2Controller) DeleteBalancer(name, reason string) error {
 	if !c.announcer.AnnounceName(name) {
 		return nil
 	}
@@ -43,10 +43,10 @@ func (c *arpndpController) DeleteBalancer(name, reason string) error {
 	return nil
 }
 
-func (c *arpndpController) SetLeader(isLeader bool) {
+func (c *layer2Controller) SetLeader(isLeader bool) {
 	c.announcer.SetLeader(isLeader)
 }
 
-func (c *arpndpController) SetNode(*v1.Node) error {
+func (c *layer2Controller) SetNode(*v1.Node) error {
 	return nil
 }

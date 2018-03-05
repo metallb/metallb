@@ -22,11 +22,11 @@ import (
 	"os"
 
 	"go.universe.tf/metallb/internal/allocator"
-	"go.universe.tf/metallb/internal/arpndp"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/iface"
 	"go.universe.tf/metallb/internal/k8s"
+	"go.universe.tf/metallb/internal/layer2"
 	"go.universe.tf/metallb/internal/version"
 	"k8s.io/api/core/v1"
 
@@ -134,11 +134,11 @@ func newController(cfg controllerConfig) (*controller, error) {
 	}
 
 	if !cfg.DisableARPNDP {
-		a, err := arpndp.New(cfg.Interface)
+		a, err := layer2.New(cfg.Interface)
 		if err != nil {
 			return nil, fmt.Errorf("making ARP/NDP announcer: %s", err)
 		}
-		protocols[config.ARP] = &arpndpController{
+		protocols[config.ARP] = &layer2Controller{
 			announcer: a,
 		}
 		protocols[config.NDP] = protocols[config.ARP]
