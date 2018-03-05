@@ -9,7 +9,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/arp"
 	"github.com/mdlayher/ethernet"
-	"go.universe.tf/metallb/internal/iface"
 )
 
 func TestARPResponder(t *testing.T) {
@@ -19,47 +18,47 @@ func TestARPResponder(t *testing.T) {
 		arpTgt         net.IP
 		arpOp          arp.Operation
 		shouldAnnounce announceFunc
-		reason         iface.DropReason
+		reason         dropReason
 	}{
 		{
 			name:   "ARP reply",
 			arpOp:  arp.OperationReply,
-			reason: iface.DropReasonARPReply,
+			reason: dropReasonARPReply,
 		},
 		{
 			name:   "bad Ethernet destination",
 			dstMAC: net.HardwareAddr{6, 5, 4, 3, 2, 1},
-			reason: iface.DropReasonEthernetDestination,
+			reason: dropReasonEthernetDestination,
 		},
 		{
 			name:   "OK (unicast)",
-			reason: iface.DropReasonNone,
+			reason: dropReasonNone,
 		},
 		{
 			name:   "OK (broadcast)",
 			dstMAC: ethernet.Broadcast,
-			reason: iface.DropReasonNone,
+			reason: dropReasonNone,
 		},
 		{
 			name: "shouldAnnounce denies request",
-			shouldAnnounce: func(ip net.IP) iface.DropReason {
+			shouldAnnounce: func(ip net.IP) dropReason {
 				if net.IPv4(192, 168, 1, 20).Equal(ip) {
-					return iface.DropReasonNone
+					return dropReasonNone
 				}
-				return iface.DropReasonNotLeader
+				return dropReasonNotLeader
 			},
-			reason: iface.DropReasonNotLeader,
+			reason: dropReasonNotLeader,
 		},
 		{
 			name:   "shouldAnnounce allows request",
 			arpTgt: net.IPv4(192, 168, 1, 20),
-			shouldAnnounce: func(ip net.IP) iface.DropReason {
+			shouldAnnounce: func(ip net.IP) dropReason {
 				if net.IPv4(192, 168, 1, 20).Equal(ip) {
-					return iface.DropReasonNone
+					return dropReasonNone
 				}
-				return iface.DropReasonNotLeader
+				return dropReasonNotLeader
 			},
-			reason: iface.DropReasonNone,
+			reason: dropReasonNone,
 		},
 	}
 
@@ -67,8 +66,8 @@ func TestARPResponder(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			shouldAnnounce := tt.shouldAnnounce
 			if shouldAnnounce == nil {
-				shouldAnnounce = func(net.IP) iface.DropReason {
-					return iface.DropReasonNone
+				shouldAnnounce = func(net.IP) dropReason {
+					return dropReasonNone
 				}
 			}
 			a, conn, done := newTestARP(t, shouldAnnounce)
@@ -98,7 +97,7 @@ func TestARPResponder(t *testing.T) {
 			eth.Payload = mustMarshal(pkt)
 			b := mustMarshal(eth)
 
-			dropC := make(chan iface.DropReason)
+			dropC := make(chan dropReason)
 			go func() {
 				dropC <- a.processRequest()
 			}()

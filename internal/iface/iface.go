@@ -7,22 +7,6 @@ import (
 	"github.com/golang/glog"
 )
 
-// DropReason is the reason why a packet was dropped.
-type DropReason int
-
-// Various reasons why a packet was dropped.
-const (
-	DropReasonNone DropReason = iota
-	DropReasonClosed
-	DropReasonError
-	DropReasonARPReply
-	DropReasonMessageType
-	DropReasonNoSourceLL
-	DropReasonEthernetDestination
-	DropReasonAnnounceIP
-	DropReasonNotLeader
-)
-
 // ByIP returns the interface that has ip.
 func ByIP(ip net.IP) (*net.Interface, error) {
 	ifaces, err := net.Interfaces()

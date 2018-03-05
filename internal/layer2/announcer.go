@@ -4,8 +4,6 @@ import (
 	"net"
 	"sync"
 
-	"go.universe.tf/metallb/internal/iface"
-
 	"github.com/golang/glog"
 	"github.com/mdlayher/ndp"
 )
@@ -44,18 +42,18 @@ func New(ifi *net.Interface) (*Announce, error) {
 	return ret, nil
 }
 
-func (a *Announce) shouldAnnounce(ip net.IP) iface.DropReason {
+func (a *Announce) shouldAnnounce(ip net.IP) dropReason {
 	a.RLock()
 	defer a.RUnlock()
 	if !a.leader {
-		return iface.DropReasonNotLeader
+		return dropReasonNotLeader
 	}
 	for _, i := range a.ips {
 		if i.Equal(ip) {
-			return iface.DropReasonNone
+			return dropReasonNone
 		}
 	}
-	return iface.DropReasonAnnounceIP
+	return dropReasonAnnounceIP
 }
 
 // SetBalancer adds ip to the set of announced addresses.
@@ -115,3 +113,20 @@ func (a *Announce) AnnounceName(name string) bool {
 	_, ok := a.ips[name]
 	return ok
 }
+
+// dropReason is the reason why a layer2 protocol packet was not
+// responded to.
+type dropReason int
+
+// Various reasons why a packet was dropped.
+const (
+	dropReasonNone dropReason = iota
+	dropReasonClosed
+	dropReasonError
+	dropReasonARPReply
+	dropReasonMessageType
+	dropReasonNoSourceLL
+	dropReasonEthernetDestination
+	dropReasonAnnounceIP
+	dropReasonNotLeader
+)

@@ -6,7 +6,6 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/mdlayher/ndp"
-	"go.universe.tf/metallb/internal/iface"
 )
 
 type ndpResponder struct {
@@ -42,19 +41,19 @@ func (n *ndpResponder) Gratuitous(ip net.IP) error {
 }
 
 func (n *ndpResponder) run() {
-	for n.processRequest() != iface.DropReasonClosed {
+	for n.processRequest() != dropReasonClosed {
 	}
 }
 
-func (n *ndpResponder) processRequest() iface.DropReason {
+func (n *ndpResponder) processRequest() dropReason {
 	msg, _, src, err := n.conn.ReadFrom()
 	if err != nil {
-		return iface.DropReasonError
+		return dropReasonError
 	}
 
 	ns, ok := msg.(*ndp.NeighborSolicitation)
 	if !ok {
-		return iface.DropReasonMessageType
+		return dropReasonMessageType
 	}
 
 	// Retrieve sender's source link-layer address
@@ -73,11 +72,11 @@ func (n *ndpResponder) processRequest() iface.DropReason {
 		break
 	}
 	if nsLLAddr == nil {
-		return iface.DropReasonNoSourceLL
+		return dropReasonNoSourceLL
 	}
 
 	// Ignore NDP requests that the announcer tells us to ignore.
-	if reason := n.announce(ns.TargetAddress); reason != iface.DropReasonNone {
+	if reason := n.announce(ns.TargetAddress); reason != dropReasonNone {
 		return reason
 	}
 
@@ -90,7 +89,7 @@ func (n *ndpResponder) processRequest() iface.DropReason {
 	} else {
 		stats.SentResponse(ns.TargetAddress.String())
 	}
-	return iface.DropReasonNone
+	return dropReasonNone
 }
 
 func (n *ndpResponder) advertise(dst, target net.IP, gratuitous bool) error {

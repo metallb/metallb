@@ -9,10 +9,9 @@ import (
 	"github.com/golang/glog"
 	"github.com/mdlayher/arp"
 	"github.com/mdlayher/ethernet"
-	"go.universe.tf/metallb/internal/iface"
 )
 
-type announceFunc func(net.IP) iface.DropReason
+type announceFunc func(net.IP) dropReason
 
 type arpResponder struct {
 	hardwareAddr net.HardwareAddr
@@ -54,31 +53,31 @@ func (a *arpResponder) Gratuitous(ip net.IP) error {
 }
 
 func (a *arpResponder) run() {
-	for a.processRequest() != iface.DropReasonClosed {
+	for a.processRequest() != dropReasonClosed {
 	}
 }
 
-func (a *arpResponder) processRequest() iface.DropReason {
+func (a *arpResponder) processRequest() dropReason {
 	pkt, eth, err := a.conn.Read()
 	if err != nil {
 		if err == io.EOF {
-			return iface.DropReasonClosed
+			return dropReasonClosed
 		}
-		return iface.DropReasonError
+		return dropReasonError
 	}
 
 	// Ignore ARP replies.
 	if pkt.Operation != arp.OperationRequest {
-		return iface.DropReasonARPReply
+		return dropReasonARPReply
 	}
 
 	// Ignore ARP requests which are not broadcast or bound directly for this machine.
 	if !bytes.Equal(eth.Destination, ethernet.Broadcast) && !bytes.Equal(eth.Destination, a.hardwareAddr) {
-		return iface.DropReasonEthernetDestination
+		return dropReasonEthernetDestination
 	}
 
 	// Ignore ARP requests that the announcer tells us to ignore.
-	if reason := a.announce(pkt.TargetIP); reason != iface.DropReasonNone {
+	if reason := a.announce(pkt.TargetIP); reason != dropReasonNone {
 		return reason
 	}
 
@@ -90,5 +89,5 @@ func (a *arpResponder) processRequest() iface.DropReason {
 	} else {
 		stats.SentResponse(pkt.TargetIP.String())
 	}
-	return iface.DropReasonNone
+	return dropReasonNone
 }
