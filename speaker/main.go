@@ -22,12 +22,11 @@ import (
 	"os"
 
 	"go.universe.tf/metallb/internal/allocator"
-	arp "go.universe.tf/metallb/internal/arpndp"
+	"go.universe.tf/metallb/internal/arpndp"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/iface"
 	"go.universe.tf/metallb/internal/k8s"
-	"go.universe.tf/metallb/internal/ndp"
 	"go.universe.tf/metallb/internal/version"
 	"k8s.io/api/core/v1"
 
@@ -124,8 +123,7 @@ type controllerConfig struct {
 
 	// For testing only, and will be removed in a future release.
 	// See: https://github.com/google/metallb/issues/152.
-	DisableARP bool
-	DisableNDP bool
+	DisableARPNDP bool
 }
 
 func newController(cfg controllerConfig) (*controller, error) {
@@ -135,27 +133,15 @@ func newController(cfg controllerConfig) (*controller, error) {
 		},
 	}
 
-	if !cfg.DisableARP {
-		a, err := arp.New(cfg.Interface)
+	if !cfg.DisableARPNDP {
+		a, err := arpndp.New(cfg.Interface)
 		if err != nil {
-			return nil, fmt.Errorf("making ARP announcer: %s", err)
+			return nil, fmt.Errorf("making ARP/NDP announcer: %s", err)
 		}
-		protocols[config.ARP] = &arpController{
+		protocols[config.ARP] = &arpndpController{
 			announcer: a,
 		}
-	}
-
-	if !cfg.DisableNDP {
-		a, err := ndp.New(cfg.Interface)
-		if err != nil {
-			// TODO(bug 180): make this fail in a more principled way.
-			glog.Errorf("Constructing NDP announcer failed: %s", err)
-			glog.Warningf("IPv6 load-balancing is unavailable")
-		} else {
-			protocols[config.NDP] = &ndpController{
-				announcer: a,
-			}
-		}
+		protocols[config.NDP] = protocols[config.ARP]
 	}
 
 	ret := &controller{
