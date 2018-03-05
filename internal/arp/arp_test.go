@@ -149,7 +149,8 @@ func newTestARP(t *testing.T, shouldAnnounce announceFunc) (*arpResponder, *net.
 			continue
 		}
 
-		c, err := arp.New(&intf, pc)
+		var c *arp.Client
+		c, err = arp.New(&intf, pc)
 		if err != nil {
 			t.Fatalf("failed to create ARP client: %s", err)
 		}
