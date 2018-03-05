@@ -87,9 +87,8 @@ func (a *arpResponder) processRequest() iface.DropReason {
 	glog.Infof("Request: who-has %s?  tell %s (%s). reply: %s is-at %s", pkt.TargetIP, pkt.SenderIP, pkt.SenderHardwareAddr, pkt.TargetIP, a.hardwareAddr)
 	if err := a.conn.Reply(pkt, a.hardwareAddr, pkt.TargetIP); err != nil {
 		glog.Warningf("Failed to write ARP response for %q: %s", pkt.TargetIP, err)
-		return iface.DropReasonError
+	} else {
+		stats.SentResponse(pkt.TargetIP.String())
 	}
-
-	stats.SentResponse(pkt.TargetIP.String())
 	return iface.DropReasonNone
 }

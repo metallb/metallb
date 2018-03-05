@@ -39,17 +39,17 @@ func TestAnnounceRun(t *testing.T) {
 			reason: iface.DropReasonEthernetDestination,
 		},
 		{
-			name:   "not announcing IP",
-			modify: func(_ *ethernet.Frame, _ *arp.Packet) {},
-			reason: iface.DropReasonAnnounceIP,
-		},
-		{
 			name: "not leader",
 			modify: func(_ *ethernet.Frame, p *arp.Packet) {
 				p.TargetIP = announceIP
 			},
-			announce: announceIP,
-			reason:   iface.DropReasonNotLeader,
+			reason: iface.DropReasonNotLeader,
+		},
+		{
+			name:   "not announcing IP",
+			modify: func(_ *ethernet.Frame, _ *arp.Packet) {},
+			leader: true,
+			reason: iface.DropReasonAnnounceIP,
 		},
 		{
 			name: "OK",
