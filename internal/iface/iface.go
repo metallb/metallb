@@ -13,6 +13,7 @@ type DropReason int
 // Various reasons why a packet was dropped.
 const (
 	DropReasonNone DropReason = iota
+	DropReasonClosed
 	DropReasonError
 	DropReasonARPReply
 	DropReasonMessageType

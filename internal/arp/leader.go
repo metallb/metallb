@@ -3,37 +3,29 @@ package arp
 import (
 	"time"
 
-	"github.com/mdlayher/ethernet"
+	"github.com/golang/glog"
 )
 
 // Leader returns true if we are the leader in the daemon set.
 func (a *Announce) Leader() bool {
-	a.leaderMu.RLock()
-	defer a.leaderMu.RUnlock()
+	a.RLock()
+	defer a.RUnlock()
 	return a.leader
 }
 
 // SetLeader sets the leader boolean to b.
 func (a *Announce) SetLeader(b bool) {
-	a.leaderMu.Lock()
-	defer a.leaderMu.Unlock()
+	a.Lock()
+	defer a.Unlock()
 	a.leader = b
 	if a.leader {
 		go a.Acquire()
-	} else {
-		go a.Relinquish()
 	}
-}
-
-// Relinquish set the leader bit to false and stops the go-routine that sends unsolicited APR replies.
-func (a *Announce) Relinquish() {
-	a.stop <- true
 }
 
 // Acquire sends out a unsolicited ARP replies for all VIPs that should be announced.
 func (a *Announce) Acquire() {
 	go a.spam()
-	a.unsolicited()
 }
 
 // spam broadcasts unsolicited ARP replies for 5 seconds.
@@ -45,32 +37,11 @@ func (a *Announce) spam() {
 			return
 		}
 
-		for _, u := range a.Packets() {
-			a.client.WriteTo(u, ethernet.Broadcast)
-			stats.SentGratuitous(u.TargetIP.String())
+		for _, ip := range a.ips {
+			if err := a.responder.Gratuitous(ip); err != nil {
+				glog.Errorf("Broadcasting gratuitous ARP for %q: %s", ip, err)
+			}
 		}
-
 		time.Sleep(1100 * time.Millisecond)
-	}
-}
-
-// unsolicited sends unsolicited ARP replies every 10 seconds.
-func (a *Announce) unsolicited() {
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			// Double check that we're still master.
-			if !a.Leader() {
-				continue
-			}
-			for _, u := range a.Packets() {
-				a.client.WriteTo(u, ethernet.Broadcast)
-			}
-
-		case <-a.stop:
-			return
-		}
 	}
 }
