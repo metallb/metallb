@@ -14,6 +14,10 @@ Action required if upgrading from 0.4.x:
   where nodes have multiple IP addresses. If your BGP infrastructure
   monitors or enforces specific router IDs for peers, you may need to
   update those systems to match new router IDs.
+- The Prometheus metrics for ARP and NDP traffic have been
+  merged. Instead of `arp_*` and `ndp_*` metrics, there is now single
+  set of `arpndp_*` metrics, in which the `ip` label can be IPv4 or
+  IPv6.
 
 New features:
 
