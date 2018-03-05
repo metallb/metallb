@@ -79,12 +79,12 @@ func TestAnnounceRun(t *testing.T) {
 				srcHW = net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0xde, 0xad}
 				srcIP = net.IPv4(192, 168, 1, 1).To4()
 
-				dstHW = a.hardwareAddr
+				dstHW = a.responder.hardwareAddr
 				dstIP = net.IPv4(192, 168, 1, 10).To4()
 			)
 
 			eth := &ethernet.Frame{
-				Destination: a.hardwareAddr,
+				Destination: a.responder.hardwareAddr,
 				Source:      srcHW,
 				EtherType:   ethernet.EtherTypeARP,
 			}
@@ -109,7 +109,7 @@ func TestAnnounceRun(t *testing.T) {
 			go func() {
 				defer wg.Done()
 
-				dropC <- a.readPacket()
+				dropC <- a.responder.processRequest()
 			}()
 
 			// Send a packet to receiver goroutine.
@@ -153,9 +153,12 @@ func newAnnounce(t *testing.T) (*Announce, *net.UDPConn, func()) {
 	}
 
 	a := &Announce{
+		ips: make(map[string]net.IP),
+	}
+	a.responder = &arpResponder{
 		hardwareAddr: ifi.HardwareAddr,
-		client:       c,
-		ips:          make(map[string]net.IP),
+		conn:         c,
+		announce:     a.shouldAnnounce,
 	}
 
 	uc, err := net.DialUDP("udp", nil, pc.LocalAddr().(*net.UDPAddr))
@@ -166,6 +169,6 @@ func newAnnounce(t *testing.T) (*Announce, *net.UDPConn, func()) {
 	return a, uc, func() {
 		uc.Close()
 		pc.Close()
-		a.Close()
+		a.responder.Close()
 	}
 }
