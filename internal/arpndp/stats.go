@@ -1,4 +1,4 @@
-package arpndpndp
+package arpndp
 
 import "github.com/prometheus/client_golang/prometheus"
 
