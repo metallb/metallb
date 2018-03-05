@@ -22,7 +22,7 @@ import (
 	"os"
 
 	"go.universe.tf/metallb/internal/allocator"
-	"go.universe.tf/metallb/internal/arp"
+	arp "go.universe.tf/metallb/internal/arpndp"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/iface"

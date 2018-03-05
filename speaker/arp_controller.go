@@ -17,7 +17,7 @@ package main
 import (
 	"net"
 
-	"go.universe.tf/metallb/internal/arp"
+	arp "go.universe.tf/metallb/internal/arpndp"
 	"go.universe.tf/metallb/internal/config"
 	"k8s.io/api/core/v1"
 )
