@@ -23,7 +23,7 @@ type arpResponder struct {
 func newARP(ifi *net.Interface, ann announceFunc) (*arpResponder, error) {
 	client, err := arp.Dial(ifi)
 	if err != nil {
-		return nil, fmt.Errorf("creating responder for %q: %s", ifi.Name, err)
+		return nil, fmt.Errorf("creating ARP responder for %q: %s", ifi.Name, err)
 	}
 
 	ret := &arpResponder{

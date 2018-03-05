@@ -38,8 +38,14 @@ func (a *Announce) spam() {
 		}
 
 		for _, ip := range a.ips {
-			if err := a.responder.Gratuitous(ip); err != nil {
-				glog.Errorf("Broadcasting gratuitous ARP for %q: %s", ip, err)
+			var err error
+			if ip.To4() == nil {
+				err = a.ndpResponder.Gratuitous(ip)
+			} else {
+				err = a.arpResponder.Gratuitous(ip)
+			}
+			if err != nil {
+				glog.Errorf("Broadcasting gratuitous ARP/NDP for %q: %s", ip, err)
 			}
 		}
 		time.Sleep(1100 * time.Millisecond)
