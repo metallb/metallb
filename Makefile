@@ -153,6 +153,9 @@ ci-prepare:
 	$(GOCMD) get github.com/golang/lint/golint
 	$(GOCMD) get github.com/estesp/manifest-tool
 
+.PHONY: ci
+ci: ci-build ci-test ci-lint
+
 .PHONY: ci-build
 ci-build: build
 
