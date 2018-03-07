@@ -3,9 +3,45 @@ title: Release Notes
 weight: 7
 ---
 
-## Version 0.4.2
+<!---
+## Version 0.5.0
 
 [Documentation for this release](https://metallb.universe.tf)
+
+Action required if upgrading from 0.4.x:
+
+- The router IDs used on BGP sessions may be different, in clusters
+  where nodes have multiple IP addresses. If your BGP infrastructure
+  monitors or enforces specific router IDs for peers, you may need to
+  update those systems to match new router IDs.
+- The Prometheus metrics for ARP and NDP traffic have been
+  merged. Instead of `arp_*` and `ndp_*` metrics, there is now single
+  set of `layer2_*` metrics, in which the `ip` label can be IPv4 or
+  IPv6.
+
+New features:
+
+- BGP mode supports nodes with multiple interfaces and IP addresses
+  ([#182](https://github.com/google/metallb/issues/182)). Previously,
+  MetalLB could only establish working BGP sessions on the node's
+  "primary" interface, i.e. the one that owned the IP that Kubernetes
+  uses to identify the node. Now, peerings may be established via any
+  interface on the nodes, and traffic will flow in the expected
+  manner.
+--->
+
+## Version 0.4.3
+
+[Documentation for this release](https://metallb.universe.tf)
+
+Changes:
+
+- Make the configmap's namespace and name configurable via flags, for
+  Helm upstreaming.
+
+## Version 0.4.2
+
+[Documentation for this release](https://v0-4-2--metallb.netlify.com)
 
 Bugfixes:
 
@@ -54,7 +90,7 @@ New features:
   topologies.
 - MetalLB now has
   a
-  [Helm chart](https://github.com/google/metallb/tree/v0.4.2/helm/metallb). If
+  [Helm chart](https://github.com/google/metallb/tree/v0.4.3/helm/metallb). If
   you use [Helm](https://helm.sh) on your cluster, this should make it
   easier to track and manage your MetalLB installation. The chart will
   be submitted for inclusion in the main Helm stable repository
@@ -112,7 +148,7 @@ Action required if upgrading from 0.2.x:
   ds/bgp-speaker`. This will take down your load-balancers until you
   deploy the new DaemonSet.
 - The
-  [configuration file format](https://raw.githubusercontent.com/google/metallb/v0.4.2/manifests/example-config.yaml) has
+  [configuration file format](https://raw.githubusercontent.com/google/metallb/v0.4.3/manifests/example-config.yaml) has
   changed in a few backwards-incompatible ways. You need to update
   your ConfigMap by hand:
   - Each `address-pool` must now have a `protocol` field, to select
