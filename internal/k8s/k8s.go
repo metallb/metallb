@@ -155,7 +155,7 @@ func (c *Client) HandleServiceAndEndpoints(handler func(string, *v1.Service, *v1
 }
 
 // HandleConfig registers a handler for changes to MetalLB's configuration.
-func (c *Client) HandleConfig(handler func(*config.Config) error) {
+func (c *Client) HandleConfig(namespace, configMap string, handler func(*config.Config) error) {
 	if c.configChanged != nil {
 		panic("HandleConfig called twice")
 	}
@@ -180,7 +180,7 @@ func (c *Client) HandleConfig(handler func(*config.Config) error) {
 			}
 		},
 	}
-	cmWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "configmaps", "metallb-system", fields.OneTermEqualSelector("metadata.name", "config"))
+	cmWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "configmaps", namespace, fields.OneTermEqualSelector("metadata.name", configMap))
 	c.cmIndexer, c.cmInformer = cache.NewIndexerInformer(cmWatcher, &v1.ConfigMap{}, 0, cmHandlers, cache.Indexers{})
 
 	c.configChanged = handler
