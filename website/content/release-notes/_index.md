@@ -30,9 +30,18 @@ New features:
   manner.
 --->
 
-## Version 0.4.2
+## Version 0.4.3
 
 [Documentation for this release](https://metallb.universe.tf)
+
+Changes:
+
+- Make the configmap's namespace and name configurable via flags, for
+  Helm upstreaming.
+
+## Version 0.4.2
+
+[Documentation for this release](https://v0-4-2--metallb.netlify.com)
 
 Bugfixes:
 
