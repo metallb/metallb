@@ -129,6 +129,8 @@ func main() {
 	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	master := flag.String("master", "", "master url")
 	port := flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
+	configNS := flag.String("config-ns", "metallb-system", "Kubernetes namespace containing MetalLB's configuration")
+	config := flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
 	flag.Parse()
 
 	glog.Infof("MetalLB controller %s", version.String())
@@ -142,7 +144,7 @@ func main() {
 		glog.Fatalf("Error getting k8s client: %s", err)
 	}
 	client.HandleService(c.SetBalancer)
-	client.HandleConfig(c.SetConfig)
+	client.HandleConfig(*configNS, *config, c.SetConfig)
 	client.HandleSynced(c.MarkSynced)
 
 	c.client = client
