@@ -52,10 +52,6 @@ func (c *controller) SetBalancer(name string, svcRo *v1.Service) error {
 		return c.deleteBalancer(name)
 	}
 
-	if svcRo.Spec.Type != "LoadBalancer" {
-		return c.deleteBalancer(name)
-	}
-
 	if c.config == nil {
 		// Config hasn't been read, nothing we can do just yet.
 		glog.Infof("%s: skipped, waiting for config", name)
