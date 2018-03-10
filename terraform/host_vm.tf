@@ -10,7 +10,7 @@ resource "google_compute_instance" "virt_host" {
   boot_disk {
     initialize_params {
       image = "${data.google_compute_image.debian_vmx.self_link}"
-      size = 30
+      #size = 30
       type = "pd-ssd"
     }
   }

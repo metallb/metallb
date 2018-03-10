@@ -8,4 +8,4 @@ if [[ $# -ne 1 ]]; then
 fi
 
 gcloud compute images delete --quiet --project=$1 debian-vmx || true
-gcloud compute images create debian-vmx --project=$1 --source-image-family debian-9 --source-image-project debian-cloud --licenses=https://www.googleapis.com/compute/v1/projects/vm-options/global/licenses/enable-vmx
+gcloud compute images create debian-vmx --project=$1 --source-image-family debian-9 --source-image-project debian-cloud --licenses "https://www.googleapis.com/compute/v1/projects/vm-options/global/licenses/enable-vmx"

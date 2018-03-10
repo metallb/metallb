@@ -5,7 +5,7 @@ variable "gcp_project" {
 
 variable "gcp_zone" {
   type = "string"
-  default = "us-west1-a"
+  default = "us-central1-b"
 }
 
 variable "gcp_machine_type" {
@@ -18,7 +18,12 @@ variable "root_ssh_key_file" {
   default = "~/.ssh/google_compute_engine.pub"
 }
 
-variable "kubeadm_token" {
+variable "ipv4_machine_cidr" {
   type = "string"
-  default = "8fa246.5abb934bdd5cce9d"
+  default = "192.168.210.0/24"
+}
+
+variable "ipv6_machine_cidr" {
+  type = "string"
+  default = "fc00:236::/120"
 }
