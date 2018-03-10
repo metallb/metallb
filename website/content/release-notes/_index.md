@@ -30,13 +30,20 @@ New features:
   manner.
 --->
 
-## Version 0.4.4
+## Version 0.4.5
 
 [Documentation for this release](https://metallb.universe.tf)
 
 Bugfixes:
 
 - [Controller doesn't clean up balancers that change their type away from LoadBalancer](https://github.com/google/metallb/issues/190)
+
+## Version 0.4.4
+
+[Documentation for this release](https://v0-4-4--metallb.netlify.tf)
+
+This was a broken attempt to fix the same bugs as 0.4.5. You should
+not use this version.
 
 ## Version 0.4.3
 
