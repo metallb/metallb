@@ -40,7 +40,7 @@ per-machine protocol speaker.
 
 Install MetalLB by applying the manifest:
 
-`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.4.3/manifests/metallb.yaml`
+`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.4.4/manifests/metallb.yaml`
 
 This manifest creates a bunch of resources. Most of them are related
 to access control, so that MetalLB can read and write the Kubernetes
@@ -72,7 +72,7 @@ a load-balanced address.
 ## Configure MetalLB
 
 We have a sample MetalLB configuration in
-[`manifests/example-arp-config.yaml`](https://raw.githubusercontent.com/google/metallb/v0.4.3/manifests/example-arp-config.yaml).
+[`manifests/example-arp-config.yaml`](https://raw.githubusercontent.com/google/metallb/v0.4.4/manifests/example-arp-config.yaml).
 Let's take a look at it before applying it:
 
 ```yaml
@@ -104,7 +104,7 @@ In this configuration we tell MetalLB to hand out address from the
 `192.168.1.240/28` range, using ARP (`protocol: arp`). Apply this
 configuration:
 
-`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.4.3/manifests/example-arp-config.yaml`
+`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.4.4/manifests/example-arp-config.yaml`
 
 The configuration should take effect within a few seconds. By
 following the logs we can see what's going on: `kubectl logs -l
@@ -123,11 +123,11 @@ else yet, because there are no LoadBalancer services in the cluster.
 
 ## Create a load-balanced service
 
-[`manifests/tutorial-2.yaml`](https://raw.githubusercontent.com/google/metallb/v0.4.3/manifests/tutorial-2.yaml) contains
+[`manifests/tutorial-2.yaml`](https://raw.githubusercontent.com/google/metallb/v0.4.4/manifests/tutorial-2.yaml) contains
 a trivial service: an nginx pod, and a load-balancer service pointing
 at nginx. Deploy it to the cluster:
 
-`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.4.3/manifests/tutorial-2.yaml`
+`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.4.4/manifests/tutorial-2.yaml`
 
 Wait for nginx to start by monitoring `kubectl get pods`, until you
 see a running nginx pod. It should look something like this:
