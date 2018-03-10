@@ -304,6 +304,23 @@ func TestControllerMutation(t *testing.T) {
 		},
 
 		{
+			desc: "former LoadBalancer, now NodePort",
+			in: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:      "NodePort",
+					ClusterIP: "1.2.3.4",
+				},
+				Status: statusAssigned("1.2.3.0"),
+			},
+			want: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:      "NodePort",
+					ClusterIP: "1.2.3.4",
+				},
+			},
+		},
+
+		{
 			desc: "request ARP service",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{

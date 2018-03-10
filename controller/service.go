@@ -28,6 +28,16 @@ import (
 func (c *controller) convergeBalancer(key string, svc *v1.Service) error {
 	var lbIP net.IP
 
+	// Not a LoadBalancer, early exit. It might have been a balancer
+	// in the past, so we still need to clear LB state.
+	if svc.Spec.Type != "LoadBalancer" {
+		glog.Infof("%s: not a LoadBalancer, clearing assignment", key)
+		c.clearServiceState(key, svc)
+		// Early return, we explicitly do *not* want to reallocate
+		// an IP.
+		return nil
+	}
+
 	// The assigned LB IP is the end state of convergence. If there's
 	// none or a malformed one, nuke all controlled state so that we
 	// start converging from a clean slate.
