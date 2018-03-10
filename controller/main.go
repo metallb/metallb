@@ -45,16 +45,16 @@ type controller struct {
 }
 
 func (c *controller) SetBalancer(name string, svcRo *v1.Service) error {
+	glog.Infof("%s: start update", name)
+	defer glog.Infof("%s: end update", name)
+
 	if svcRo == nil {
 		return c.deleteBalancer(name)
 	}
 
 	if svcRo.Spec.Type != "LoadBalancer" {
-		return nil
+		return c.deleteBalancer(name)
 	}
-
-	glog.Infof("%s: start update", name)
-	defer glog.Infof("%s: end update", name)
 
 	if c.config == nil {
 		// Config hasn't been read, nothing we can do just yet.
