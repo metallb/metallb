@@ -30,13 +30,20 @@ New features:
   manner.
 --->
 
-## Version 0.4.4
+## Version 0.4.5
 
 [Documentation for this release](https://metallb.universe.tf)
 
 Bugfixes:
 
 - [Controller doesn't clean up balancers that change their type away from LoadBalancer](https://github.com/google/metallb/issues/190)
+
+## Version 0.4.4
+
+[Documentation for this release](https://v0-4-4--metallb.netlify.tf)
+
+This was a broken attempt to fix the same bugs as 0.4.5. You should
+not use this version.
 
 ## Version 0.4.3
 
@@ -98,7 +105,7 @@ New features:
   topologies.
 - MetalLB now has
   a
-  [Helm chart](https://github.com/google/metallb/tree/v0.4.4/helm/metallb). If
+  [Helm chart](https://github.com/google/metallb/tree/v0.4.5/helm/metallb). If
   you use [Helm](https://helm.sh) on your cluster, this should make it
   easier to track and manage your MetalLB installation. The chart will
   be submitted for inclusion in the main Helm stable repository
@@ -156,7 +163,7 @@ Action required if upgrading from 0.2.x:
   ds/bgp-speaker`. This will take down your load-balancers until you
   deploy the new DaemonSet.
 - The
-  [configuration file format](https://raw.githubusercontent.com/google/metallb/v0.4.4/manifests/example-config.yaml) has
+  [configuration file format](https://raw.githubusercontent.com/google/metallb/v0.4.5/manifests/example-config.yaml) has
   changed in a few backwards-incompatible ways. You need to update
   your ConfigMap by hand:
   - Each `address-pool` must now have a `protocol` field, to select
