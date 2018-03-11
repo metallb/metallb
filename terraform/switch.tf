@@ -32,7 +32,7 @@ EOF
 
   provisioner "remote-exec" {
     inline = [
-      "bash /tmp/configure_vpn.sh switch ${local.num_machines}",
+      "bash /tmp/configure_vpn.sh switch 20",
     ]
   }
 }

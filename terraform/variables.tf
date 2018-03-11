@@ -48,6 +48,4 @@ variable "kubeadm_token" {
 
 locals {
   ssh_key = "${file(pathexpand(var.ssh_key_file))}"
-  machine_cidr_prefix_len = "${element(split("/", var.machine_cidr), 1)}"
-  num_machines = 4
 }
