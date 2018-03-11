@@ -42,7 +42,7 @@ function mk_access() {
     ADDR=$1
     NETMASK=$2
     REMOTE=$3
-    SUFFIX=$(echo $ADDR | cut -f4 -d'.')
+    SUFFIX=$(echo $ADDR | tr ':.' '  ' | awk '{print $NF}')
     PORT=$((2000+SUFFIX))
     ip tuntap add dev tun${PORT} mode tap
     ip addr add ${ADDR}/${NETMASK} dev tun${PORT}

@@ -37,8 +37,13 @@ EOF
 
   provisioner "remote-exec" {
     inline = [
-      "bash /tmp/configure_vpn.sh access ${cidrhost(var.machine_cidr, 3+count.index)} ${element(split("/", var.machine_cidr), 1)} ${google_compute_instance.switch.network_interface.0.address}",
-      "kubeadm join --discovery-token-unsafe-skip-ca-verification --token ${var.kubeadm_token} ${cidrhost(var.machine_cidr, 1)}:6443",
+      "bash /tmp/configure_vpn.sh access ${cidrhost(local.machine_cidr, 3+count.index)} ${element(split("/", local.machine_cidr), 1)} ${google_compute_instance.switch.network_interface.0.address}",
+      "kubeadm join --discovery-token-unsafe-skip-ca-verification --token ${var.kubeadm_token} ${local.k8s_server_ip_port}",
     ]
   }
+}
+
+locals {
+  k8s_server_ip = "${cidrhost(local.machine_cidr, 1)}"
+  k8s_server_ip_port = "${var.protocol == "ipv6" ? "[" : ""}${local.k8s_server_ip}${var.protocol == "ipv6" ? "]" : ""}:6443"
 }

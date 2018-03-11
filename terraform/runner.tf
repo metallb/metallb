@@ -36,7 +36,7 @@ EOF
 
   provisioner "remote-exec" {
     inline = [
-      "bash /tmp/configure_vpn.sh access ${cidrhost(var.machine_cidr, 2)} ${element(split("/", var.machine_cidr), 1)} ${google_compute_instance.switch.network_interface.0.address}",
+      "bash /tmp/configure_vpn.sh access ${cidrhost(local.machine_cidr, 2)} ${element(split("/", local.machine_cidr), 1)} ${google_compute_instance.switch.network_interface.0.address}",
       "apt -qq -y install netcat-openbsd",
       "nc -l 1234 >/etc/admin.conf",
     ]

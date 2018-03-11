@@ -36,18 +36,10 @@ EOF
 
   provisioner "remote-exec" {
     inline = [
-      "bash /tmp/configure_vpn.sh access ${cidrhost(var.machine_cidr, 1)} ${element(split("/", var.machine_cidr), 1)} ${google_compute_instance.switch.network_interface.0.address}",
-      "kubeadm init --pod-network-cidr=${var.pod_cidr} --service-cidr=${var.service_cidr} --token=${var.kubeadm_token} --apiserver-advertise-address=${cidrhost(var.machine_cidr, 1)}",
+      "bash /tmp/configure_vpn.sh access ${cidrhost(local.machine_cidr, 1)} ${element(split("/", local.machine_cidr), 1)} ${google_compute_instance.switch.network_interface.0.address}",
+      "kubeadm init --pod-network-cidr=${local.pod_cidr} --service-cidr=${local.service_cidr} --token=${var.kubeadm_token} --apiserver-advertise-address=${cidrhost(local.machine_cidr, 1)}",
       "apt -qq -y install netcat-openbsd",
-      "while ! `nc -w 2 -N ${cidrhost(var.machine_cidr, 2)} 1234 </etc/kubernetes/admin.conf`; do sleep 1; done",
+      "while ! `nc -w 2 -N ${cidrhost(local.machine_cidr, 2)} 1234 </etc/kubernetes/admin.conf`; do sleep 1; done",
     ]
-  }
-}
-
-data "template_file" "nginx" {
-  template = "${file("nginx.conf")}"
-
-  vars {
-    ip = "${cidrhost(var.machine_cidr, 1)}"
   }
 }
