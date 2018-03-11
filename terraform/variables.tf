@@ -1,3 +1,4 @@
+# GCP configs
 variable "gcp_project" {
   type = "string"
   default = "metallb-e2e-testing"
@@ -5,25 +6,48 @@ variable "gcp_project" {
 
 variable "gcp_zone" {
   type = "string"
-  default = "us-central1-b"
+  default = "us-west1-a"
 }
 
 variable "gcp_machine_type" {
   type = "string"
-  default = "n1-standard-4"
+  default = "n1-standard-1"
 }
 
-variable "root_ssh_key_file" {
+# VM stuff
+variable "cluster_name" {
   type = "string"
-  default = "~/.ssh/google_compute_engine.pub"
+  default = "k8s"
 }
 
-variable "ipv4_machine_cidr" {
+variable "ssh_key_file" {
   type = "string"
-  default = "192.168.210.0/24"
+  default = "~/.ssh/id_rsa.pub"
 }
 
-variable "ipv6_machine_cidr" {
+variable "machine_cidr" {
   type = "string"
-  default = "fc00:236::/120"
+  default = "192.168.0.0/24"
+}
+
+# k8s cluster data
+variable "pod_cidr" {
+  type = "string"
+  default = "192.168.128.0/17"
+}
+
+variable "service_cidr" {
+  type = "string"
+  default = "192.168.1.0/24"
+}
+
+variable "kubeadm_token" {
+  type = "string"
+  default = "8fa246.5abb934bdd5cce9d"
+}
+
+locals {
+  ssh_key = "${file(pathexpand(var.ssh_key_file))}"
+  machine_cidr_prefix_len = "${element(split("/", var.machine_cidr), 1)}"
+  num_machines = 4
 }

@@ -1,22 +1,19 @@
 #!/bin/bash
 
-set -e
+sudo modprobe br_netfilter
+sudo sysctl net.bridge.bridge-nf-call-iptables=1
 
-sudo yum install -y docker perl
-sudo systemctl enable docker
-sudo systemctl start docker
+sudo apt -qq update
+sudo apt -qq -y install ebtables ethtool apt-transport-https ca-certificates curl gnupg2 software-properties-common bridge-utils
 
-cat <<EOF | sudo tee /etc/yum.repos.d/kubernetes.repo
-[kubernetes]
-name=Kubernetes
-baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
-enabled=1
-gpgcheck=1
-repo_gpgcheck=1
-gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
-EOF
-sudo setenforce 0
-sudo perl -pi -e 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
-sudo yum install -y kubelet kubeadm kubectl
-sudo systemctl enable kubelet
-sudo systemctl start kubelet
+curl -fsSL https://download.docker.com/linux/$(. /etc/os-release; echo "$ID")/gpg | sudo apt-key add -
+curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add -
+
+sudo add-apt-repository \
+   "deb [arch=amd64] https://download.docker.com/linux/$(. /etc/os-release; echo "$ID") \
+   $(lsb_release -cs) \
+   stable"
+sudo add-apt-repository "deb http://apt.kubernetes.io/ kubernetes-xenial main"
+
+sudo apt -qq update
+sudo apt -qq -y install docker-ce kubelet kubeadm kubectl
