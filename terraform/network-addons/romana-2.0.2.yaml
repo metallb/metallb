@@ -185,6 +185,7 @@ spec:
         image: quay.io/romana/daemon:v2.0.2
         imagePullPolicy: Always
         args:
+        - --initial-network=/var/lib/romana/initial-network/kubeadm-network.json
         - --network-cidr-overrides=romana-network=${pod_cidr}
 ---
 apiVersion: extensions/v1beta1

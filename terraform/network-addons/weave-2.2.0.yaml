@@ -164,6 +164,8 @@ items:
                     fieldRef:
                       apiVersion: v1
                       fieldPath: spec.nodeName
+                - name: IPALLOC_RANGE
+                  value: ${pod_cidr}
               image: 'weaveworks/weave-kube:2.2.0'
               livenessProbe:
                 httpGet:
