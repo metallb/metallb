@@ -4,5 +4,5 @@ Makefile.image-targets
 build/
 website/public
 .envrc
-terraform/.terraform
-terraform/terraform.tfstate*
+e2etest/terraform/.terraform
+e2etest/terraform/terraform.tfstate*
