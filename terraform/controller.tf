@@ -34,12 +34,26 @@ EOF
     destination = "/tmp/configure_vpn.sh"
   }
 
+  provisioner "file" {
+    content = "${data.template_file.network_addon.rendered}"
+    destination = "/tmp/network.yaml"
+  }
+  
   provisioner "remote-exec" {
     inline = [
       "bash /tmp/configure_vpn.sh access ${cidrhost(local.machine_cidr, 1)} ${element(split("/", local.machine_cidr), 1)} ${google_compute_instance.switch.network_interface.0.address}",
       "kubeadm init --pod-network-cidr=${local.pod_cidr} --service-cidr=${local.service_cidr} --token=${var.kubeadm_token} --apiserver-advertise-address=${cidrhost(local.machine_cidr, 1)}",
+      "kubectl --kubeconfig=/etc/kubernetes/admin.conf apply -f /tmp/network.yaml",
       "apt -qq -y install netcat-openbsd",
       "while ! `nc -w 2 -N ${cidrhost(local.machine_cidr, 2)} 1234 </etc/kubernetes/admin.conf`; do sleep 1; done",
     ]
+  }
+}
+
+data "template_file" "network_addon" {
+  template = "${file(local.network_addon_file)}"
+  vars {
+    pod_cidr = "${local.pod_cidr}"
+    service_cidr = "${local.service_cidr}"
   }
 }

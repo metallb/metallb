@@ -38,13 +38,19 @@ variable "protocol" {
   default = "ipv4"
 }
 
+variable "network_addon" {
+  type = "string"
+  default = "flannel"
+}
+
 locals {
   ssh_key = "${file(pathexpand(var.ssh_key_file))}"
 
   machine_cidr = "${local.machine_cidrs[var.protocol]}"
   pod_cidr = "${local.pod_cidrs[var.protocol]}"
   service_cidr = "${local.service_cidrs[var.protocol]}"
-
+  network_addon_file = "network-addons/${local.network_addons[var.network_addon]}"
+  
   machine_cidrs = {
     "ipv4" = "192.168.0.0/24"
     "ipv6" = "fd00:1::/120"
@@ -54,7 +60,17 @@ locals {
     "ipv6" = "fd00:2::/80"
   }
   service_cidrs = {
+    # This might overlap with GCP's VPCs, but in practice it happens
+    # not to. And several network addons assume that the service range
+    # is this in their manifests, so it's simpler to just conform for
+    # now.
     "ipv4" = "192.168.1.0/24"
     "ipv6" = "fd00:3::/112"
+  }
+  network_addons = {
+    "flannel" = "flannel-0.9.1.yaml"
+    "calico" = "calico-3.0.yaml"
+    "romana" = "romana-2.0.2.yaml"
+    "weave" = "weave-2.2.0.yaml"
   }
 }
