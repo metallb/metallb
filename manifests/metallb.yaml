@@ -1,17 +1,10 @@
 ---
-# Source: metallb/templates/namespace.yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: metallb-system
-
----
 # Source: metallb/templates/rbac.yaml
 # Roles
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: metallb-system:controller
+  name: metallb:controller
 rules:
 - apiGroups: [""]
   resources: ["services"]
@@ -26,7 +19,7 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: metallb-system:speaker
+  name: metallb:speaker
 rules:
 - apiGroups: [""]
   resources: ["services", "endpoints", "nodes"]
@@ -35,7 +28,6 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  namespace: metallb-system
   name: leader-election
 rules:
 - apiGroups: [""]
@@ -49,7 +41,6 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  namespace: metallb-system
   name: config-watcher
 rules:
 - apiGroups: [""]
@@ -64,13 +55,11 @@ rules:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  namespace: metallb-system
   name: controller
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  namespace: metallb-system
   name: speaker
 ---
 
@@ -78,33 +67,32 @@ metadata:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: metallb-system:controller
+  name: metallb:controller
 subjects:
 - kind: ServiceAccount
-  namespace: metallb-system
   name: controller
+  namespace: default
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: metallb-system:controller
+  name: metallb:controller
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: metallb-system:speaker
+  name: metallb:speaker
 subjects:
 - kind: ServiceAccount
-  namespace: metallb-system
   name: speaker
+  namespace: default
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: metallb-system:speaker
+  name: metallb:speaker
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  namespace: metallb-system
   name: config-watcher
 subjects:
 - kind: ServiceAccount
@@ -119,7 +107,6 @@ roleRef:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  namespace: metallb-system
   name: leader-election
 subjects:
 - kind: ServiceAccount
@@ -133,7 +120,6 @@ roleRef:
 apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
-  namespace: metallb-system
   name: controller
   labels:
     app: metallb
@@ -184,7 +170,6 @@ spec:
 apiVersion: apps/v1beta2
 kind: DaemonSet
 metadata:
-  namespace: metallb-system
   name: speaker
   labels:
     app: metallb

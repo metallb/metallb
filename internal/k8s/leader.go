@@ -13,8 +13,9 @@ func (c *Client) HandleLeadership(nodeName string, handler func(bool)) {
 	if c.elector != nil {
 		panic("HandleLeadership called twice")
 	}
+
 	conf := resourcelock.ResourceLockConfig{Identity: nodeName, EventRecorder: c.events}
-	lock, err := resourcelock.New(resourcelock.EndpointsResourceLock, "metallb-system", "metallb-speaker", c.client.CoreV1(), conf)
+	lock, err := resourcelock.New(resourcelock.EndpointsResourceLock, c.namespace, "metallb-speaker", c.client.CoreV1(), conf)
 	if err != nil {
 		panic(err)
 	}
