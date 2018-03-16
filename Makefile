@@ -84,13 +84,13 @@ push-manifests:
 push: gen-image-targets
 	+make -f $(MK_IMAGE_TARGETS) $(foreach bin,$(BINARIES),$(bin)/$(ARCH))
 ifeq ($(findstring localhost,$(REGISTRY)),localhost)
-	kubectl set image -n metallb-system deploy/controller controller=$(shell kubectl get svc -n kube-system registry -o go-template='{{.spec.clusterIP}}'):80/controller:$(TAG)-$(ARCH)
-	kubectl set image -n metallb-system ds/speaker speaker=$(shell kubectl get svc -n kube-system registry -o go-template='{{.spec.clusterIP}}'):80/speaker:$(TAG)-$(ARCH)
-	kubectl set image -n metallb-system deploy/test-bgp-router test-bgp-router=$(shell kubectl get svc -n kube-system registry -o go-template='{{.spec.clusterIP}}'):80/test-bgp-router:$(TAG)-$(ARCH)
+	kubectl set image deploy/controller controller=$(shell kubectl get svc -n kube-system registry -o go-template='{{.spec.clusterIP}}'):80/controller:$(TAG)-$(ARCH)
+	kubectl set image ds/speaker speaker=$(shell kubectl get svc -n kube-system registry -o go-template='{{.spec.clusterIP}}'):80/speaker:$(TAG)-$(ARCH)
+	kubectl set image deploy/test-bgp-router test-bgp-router=$(shell kubectl get svc -n kube-system registry -o go-template='{{.spec.clusterIP}}'):80/test-bgp-router:$(TAG)-$(ARCH)
 else
-	kubectl set image -n metallb-system deploy/controller controller=$(REGISTRY)/controller:$(TAG)-$(ARCH)
-	kubectl set image -n metallb-system ds/speaker speaker=$(REGISTRY)/speaker:$(TAG)-$(ARCH)
-	kubectl set image -n metallb-system deploy/test-bgp-router test-bgp-router=$(REGISTRY)/test-bgp-router:$(TAG)-$(ARCH)
+	kubectl set image deploy/controller controller=$(REGISTRY)/controller:$(TAG)-$(ARCH)
+	kubectl set image ds/speaker speaker=$(REGISTRY)/speaker:$(TAG)-$(ARCH)
+	kubectl set image deploy/test-bgp-router test-bgp-router=$(REGISTRY)/test-bgp-router:$(TAG)-$(ARCH)
 endif
 
 ################################

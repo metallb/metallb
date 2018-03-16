@@ -3,7 +3,10 @@ package k8s // import "go.universe.tf/metallb/internal/k8s"
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"go.universe.tf/metallb/internal/config"
@@ -25,8 +28,9 @@ import (
 // Client watches a Kubernetes cluster and translates events into
 // Controller method calls.
 type Client struct {
-	client *kubernetes.Clientset
-	events record.EventRecorder
+	client    *kubernetes.Clientset
+	events    record.EventRecorder
+	namespace string
 
 	queue workqueue.RateLimitingInterface
 
@@ -78,10 +82,16 @@ func New(processName, masterAddr, kubeconfig string) (*Client, error) {
 
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
+	namespace, err := InClusterNamespace()
+	if err != nil {
+		return nil, err
+	}
+
 	return &Client{
-		client: clientset,
-		events: recorder,
-		queue:  queue,
+		client:    clientset,
+		events:    recorder,
+		namespace: namespace,
+		queue:     queue,
 	}, nil
 }
 
@@ -155,7 +165,7 @@ func (c *Client) HandleServiceAndEndpoints(handler func(string, *v1.Service, *v1
 }
 
 // HandleConfig registers a handler for changes to MetalLB's configuration.
-func (c *Client) HandleConfig(namespace, configMap string, handler func(*config.Config) error) {
+func (c *Client) HandleConfig(configMap string, handler func(*config.Config) error) {
 	if c.configChanged != nil {
 		panic("HandleConfig called twice")
 	}
@@ -180,7 +190,7 @@ func (c *Client) HandleConfig(namespace, configMap string, handler func(*config.
 			}
 		},
 	}
-	cmWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "configmaps", namespace, fields.OneTermEqualSelector("metadata.name", configMap))
+	cmWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "configmaps", c.namespace, fields.OneTermEqualSelector("metadata.name", configMap))
 	c.cmIndexer, c.cmInformer = cache.NewIndexerInformer(cmWatcher, &v1.ConfigMap{}, 0, cmHandlers, cache.Indexers{})
 
 	c.configChanged = handler
@@ -434,4 +444,24 @@ func (c *Client) sync(key interface{}) error {
 	default:
 		panic(fmt.Errorf("unknown key type for %#v (%T)", key, key))
 	}
+}
+
+// InClusterNamespace retrieves the namespace metallb is running in, when
+// running in-cluster.
+func InClusterNamespace() (string, error) {
+	// Support downward API
+	if ns := os.Getenv("POD_NAMESPACE"); ns != "" {
+		return ns, nil
+	}
+
+	// Fall back to the namespace associated with the service account token
+	data, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err != nil {
+		return "", err
+	}
+
+	namespace := strings.TrimSpace(string(data))
+	glog.Infof("Running in namespace %s", namespace)
+
+	return namespace, nil
 }
