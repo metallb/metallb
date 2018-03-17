@@ -654,36 +654,36 @@ func TestPoolCount(t *testing.T) {
 			want: 381,
 		},
 		{
-			desc: "ARP /24 in /24",
+			desc: "ARPNetwork /24 in /24",
 			pool: &config.Pool{
-				Protocol:   config.ARP,
+				Protocol:   config.Layer2,
 				CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
 				ARPNetwork: ipnet("1.2.3.0/24"),
 			},
 			want: 254,
 		},
 		{
-			desc: "ARP /25 in /24",
+			desc: "ARPNetwork /25 in /24",
 			pool: &config.Pool{
-				Protocol:   config.ARP,
+				Protocol:   config.Layer2,
 				CIDR:       []*net.IPNet{ipnet("1.2.3.0/25")},
 				ARPNetwork: ipnet("1.2.3.0/24"),
 			},
 			want: 127,
 		},
 		{
-			desc: "ARP /24 in /22",
+			desc: "ARPNetwork /24 in /22",
 			pool: &config.Pool{
-				Protocol:   config.ARP,
+				Protocol:   config.Layer2,
 				CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
 				ARPNetwork: ipnet("1.2.2.0/22"),
 			},
 			want: 255,
 		},
 		{
-			desc: "ARP /24 in /21",
+			desc: "ARPNetwork /24 in /21",
 			pool: &config.Pool{
-				Protocol:   config.ARP,
+				Protocol:   config.Layer2,
 				CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
 				ARPNetwork: ipnet("1.2.2.0/21"),
 			},

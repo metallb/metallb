@@ -124,7 +124,7 @@ type controllerConfig struct {
 
 	// For testing only, and will be removed in a future release.
 	// See: https://github.com/google/metallb/issues/152.
-	DisableARPNDP bool
+	DisableLayer2 bool
 }
 
 func newController(cfg controllerConfig) (*controller, error) {
@@ -134,15 +134,14 @@ func newController(cfg controllerConfig) (*controller, error) {
 		},
 	}
 
-	if !cfg.DisableARPNDP {
+	if !cfg.DisableLayer2 {
 		a, err := layer2.New(cfg.Interface)
 		if err != nil {
-			return nil, fmt.Errorf("making ARP/NDP announcer: %s", err)
+			return nil, fmt.Errorf("making layer2 announcer: %s", err)
 		}
-		protocols[config.ARP] = &layer2Controller{
+		protocols[config.Layer2] = &layer2Controller{
 			announcer: a,
 		}
-		protocols[config.NDP] = protocols[config.ARP]
 	}
 
 	ret := &controller{

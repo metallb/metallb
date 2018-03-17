@@ -120,7 +120,7 @@ func TestControllerMutation(t *testing.T) {
 				CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
 			},
 			"pool2": {
-				Protocol:   config.ARP,
+				Protocol:   config.Layer2,
 				AutoAssign: false,
 				CIDR:       []*net.IPNet{ipnet("3.4.5.6/32")},
 			},
@@ -321,7 +321,7 @@ func TestControllerMutation(t *testing.T) {
 		},
 
 		{
-			desc: "request ARP service",
+			desc: "request layer2 service",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
 					Type:           "LoadBalancer",
@@ -339,7 +339,7 @@ func TestControllerMutation(t *testing.T) {
 		},
 
 		{
-			desc: "ARP service with the wrong traffic policy",
+			desc: "Layer2 service with the wrong traffic policy",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
 					Type:                  "LoadBalancer",
