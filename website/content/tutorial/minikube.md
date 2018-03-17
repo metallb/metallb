@@ -74,7 +74,7 @@ to see what a real router _would_ do.
 
 Deploy these test routers with `kubectl`:
 
-`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.4.5/manifests/test-bgp-router.yaml`
+`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.4.6/manifests/test-bgp-router.yaml`
 
 This will create a deployment for our BGP routers, as well as four
 cluster-internal services. Wait for the router pod to start, by
@@ -123,7 +123,7 @@ single VM, we'll end up with the controller and one BGP speaker.
 
 Install MetalLB by applying the manifest:
 
-`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.4.5/manifests/metallb.yaml`
+`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.4.6/manifests/metallb.yaml`
 
 This manifest creates a bunch of resources. Most of them are related
 to access control, so that MetalLB can read and write the Kubernetes
@@ -154,7 +154,7 @@ idle, waiting to be told what they should do. Let's fix that!
 ## Configure MetalLB
 
 We have a sample MetalLB configuration in
-[`manifests/tutorial-1.yaml`](https://raw.githubusercontent.com/google/metallb/v0.4.5/manifests/tutorial-1.yaml). Let's take a look at it before applying
+[`manifests/tutorial-1.yaml`](https://raw.githubusercontent.com/google/metallb/v0.4.6/manifests/tutorial-1.yaml). Let's take a look at it before applying
 it:
 
 ```yaml
@@ -194,7 +194,7 @@ router.
 
 Apply this configuration now:
 
-`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.4.5/manifests/tutorial-1.yaml`
+`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.4.6/manifests/tutorial-1.yaml`
 
 The configuration should take effect within a few seconds. Refresh the
 test-bgp-router-ui browser page again (run `minikube service -n
@@ -224,10 +224,10 @@ change that!
 
 ## Create a load-balanced service
 
-[`manifests/tutorial-2.yaml`](https://raw.githubusercontent.com/google/metallb/v0.4.5/manifests/tutorial-2.yaml) contains a trivial service: an nginx pod,
+[`manifests/tutorial-2.yaml`](https://raw.githubusercontent.com/google/metallb/v0.4.6/manifests/tutorial-2.yaml) contains a trivial service: an nginx pod,
 and a load-balancer service pointing at nginx. Deploy it to the cluster now:
 
-`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.4.5/manifests/tutorial-2.yaml`
+`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.4.6/manifests/tutorial-2.yaml`
 
 Again, wait for nginx to start by monitoring `kubectl get pods`, until
 you see a running nginx pod. It should look something like this:
@@ -274,7 +274,7 @@ because it ends in `.0`.
 As it turns out, one of our customers called and complained of this
 exact problem. Fortunately, MetalLB has a configuration option to
 address this. Take a look at the configuration in
-[`manifests/tutorial-3.yaml`](https://raw.githubusercontent.com/google/metallb/v0.4.5/manifests/tutorial-3.yaml):
+[`manifests/tutorial-3.yaml`](https://raw.githubusercontent.com/google/metallb/v0.4.6/manifests/tutorial-3.yaml):
 
 ```yaml
 apiVersion: v1
@@ -306,7 +306,7 @@ assigned.
 
 Sounds easy enough, let's apply that configuration:
 
-`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.4.5/manifests/tutorial-3.yaml`
+`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.4.6/manifests/tutorial-3.yaml`
 
 Refresh the test-bgp-router-ui page and... Hmm, strange, our routers
 are still being told to use `198.51.100.0`, even though we just told
@@ -357,7 +357,7 @@ Now, the new configuration that we tried to apply is valid, because
 nothing is using the `.0` address any more. Let's reapply it, so that
 MetalLB reloads again:
 
-`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.4.5/manifests/tutorial-4.yaml`
+`kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.4.6/manifests/tutorial-4.yaml`
 
 _You may have noticed that we applied tutorial-4.yaml, not the
 tutorial-3.yaml from before. This is another rough edge in the current
@@ -389,7 +389,7 @@ clean up simply by running `minikube delete`. If you want to do a more
 targeted cleanup, you can delete just the things we created in this
 tutorial with:
 
-`kubectl delete -f https://raw.githubusercontent.com/google/metallb/v0.4.5/manifests/tutorial-2.yaml,https://raw.githubusercontent.com/google/metallb/v0.4.5/manifests/test-bgp-router.yaml,https://raw.githubusercontent.com/google/metallb/v0.4.5/manifests/metallb.yaml`
+`kubectl delete -f https://raw.githubusercontent.com/google/metallb/v0.4.6/manifests/tutorial-2.yaml,https://raw.githubusercontent.com/google/metallb/v0.4.6/manifests/test-bgp-router.yaml,https://raw.githubusercontent.com/google/metallb/v0.4.6/manifests/metallb.yaml`
 
 This will tear down all of MetalLB, as well as our test BGP routers
 and the nginx load-balanced service.
