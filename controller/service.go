@@ -107,8 +107,8 @@ func (c *controller) convergeBalancer(key string, svc *v1.Service) error {
 		return nil
 	}
 
-	if c.config.Pools[pool].Protocol == config.ARP {
-		// When advertising in ARP mode, any node in the cluster could
+	if c.config.Pools[pool].Protocol == config.Layer2 {
+		// When advertising in Layer2 mode, any node in the cluster could
 		// become the leader in charge of advertising the IP. The
 		// local traffic policy makes no sense for such services, so
 		// we force the service to be load-balanced at the cluster

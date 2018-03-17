@@ -85,9 +85,8 @@ type Proto string
 
 // MetalLB supported protocols.
 const (
-	ARP Proto = "arp"
-	BGP Proto = "bgp"
-	NDP Proto = "ndp"
+	BGP    Proto = "bgp"
+	Layer2       = "layer2"
 )
 
 // Peer is the configuration of a BGP peering session.
@@ -327,15 +326,12 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 	}
 
 	switch ret.Protocol {
-	case ARP:
-		for _, cidr := range ret.CIDR {
-			if !isIPv4(cidr.IP) {
-				return nil, errors.New("only IPv4 addresses can be used in ARP pools")
-			}
-		}
-
+	case "arp", "ndp":
+		ret.Protocol = Layer2
+		fallthrough
+	case Layer2:
 		if len(p.BGPAdvertisements) > 0 {
-			return nil, errors.New("cannot have bgp-advertisements configuration element in an ARP address pool")
+			return nil, errors.New("cannot have bgp-advertisements configuration element in a layer2 address pool")
 		}
 
 		arpNet, err := parseARPNetwork(p.ARPNetwork, ret.CIDR)
@@ -353,16 +349,6 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 			return nil, fmt.Errorf("parsing BGP communities: %s", err)
 		}
 		ret.BGPAdvertisements = ads
-	case NDP:
-		for _, cidr := range ret.CIDR {
-			if !isIPv6(cidr.IP) {
-				return nil, errors.New("only IPv6 addresses can be used in NDP pools")
-			}
-		}
-
-		if len(p.BGPAdvertisements) > 0 {
-			return nil, errors.New("cannot have bgp-advertisements configuration element in an NDP address pool")
-		}
 	case "":
 		return nil, errors.New("address pool is missing the protocol field")
 	default:
@@ -429,9 +415,14 @@ func parseBGPAdvertisements(ads []bgpAdvertisement, cidrs []*net.IPNet, communit
 func parseARPNetwork(a string, cidr []*net.IPNet) (*net.IPNet, error) {
 	var ret *net.IPNet
 	if a == "" {
-		ret = &net.IPNet{
-			IP:   cidr[0].IP.Mask(net.CIDRMask(24, 32)),
-			Mask: net.CIDRMask(24, 32),
+		for _, cidr := range cidr {
+			if cidr.IP.To4() == nil {
+				continue
+			}
+			ret = &net.IPNet{
+				IP:   cidr.IP.Mask(net.CIDRMask(24, 32)),
+				Mask: net.CIDRMask(24, 32),
+			}
 		}
 	} else {
 		_, arpNet, err := net.ParseCIDR(a)
@@ -443,6 +434,10 @@ func parseARPNetwork(a string, cidr []*net.IPNet) (*net.IPNet, error) {
 
 	// All CIDRs must be contained within the arp-network.
 	for _, cidr := range cidr {
+		if cidr.IP.To4() == nil {
+			// arp-network doesn't apply to IPv6.
+			continue
+		}
 		if !cidrContainsCIDR(ret, cidr) {
 			if a == "" {
 				// This validation is failing based on a

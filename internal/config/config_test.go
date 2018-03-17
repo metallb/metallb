@@ -82,7 +82,7 @@ address-pools:
   cidr:
   - 30.0.0.0/8
 - name: pool3
-  protocol: arp
+  protocol: layer2
   cidr:
   - 40.0.0.0/25
 - name: pool4
@@ -149,19 +149,19 @@ address-pools:
 						},
 					},
 					"pool3": {
-						Protocol:   ARP,
+						Protocol:   Layer2,
 						CIDR:       []*net.IPNet{ipnet("40.0.0.0/25")},
 						AutoAssign: true,
 						ARPNetwork: ipnet("40.0.0.0/24"),
 					},
 					"pool4": {
-						Protocol:   ARP,
+						Protocol:   Layer2,
 						CIDR:       []*net.IPNet{ipnet("50.0.0.0/16"), ipnet("50.20.0.0/24")},
 						AutoAssign: true,
 						ARPNetwork: ipnet("50.0.0.0/8"),
 					},
 					"pool5": {
-						Protocol:   NDP,
+						Protocol:   Layer2,
 						CIDR:       []*net.IPNet{ipnet("2001:db8::/64")},
 						AutoAssign: true,
 					},
@@ -589,48 +589,13 @@ address-pools:
 		},
 
 		{
-			desc: "IPv6 CIDR in ARP pool",
+			desc: "BGP advertisements in layer2 pool",
 			raw: `
 address-pools:
 - name: pool1
-  protocol: arp
-  cidr:
-  - 2001:db8::/64
-`,
-		},
-
-		{
-			desc: "BGP advertisements in ARP pool",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: arp
+  protocol: layer2
   cidr:
   - 10.0.0.0/16
-  bgp-advertisements:
-  - communities: ["flarb"]
-`,
-		},
-
-		{
-			desc: "IPv4 CIDR in NDP pool",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: ndp
-  cidr:
-  - 10.0.0.0/16
-`,
-		},
-
-		{
-			desc: "BGP advertisements in NDP pool",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: ndp
-  cidr:
-  - 2001:db8::/64
   bgp-advertisements:
   - communities: ["flarb"]
 `,

@@ -7,7 +7,7 @@ var stats = metrics{
 		Namespace: "metallb",
 		Subsystem: "layer2",
 		Name:      "requests_received",
-		Help:      "Number of ARP/NDP requests received for owned IPs",
+		Help:      "Number of layer2 requests received for owned IPs",
 	}, []string{
 		"ip",
 	}),
@@ -16,7 +16,7 @@ var stats = metrics{
 		Namespace: "metallb",
 		Subsystem: "layer2",
 		Name:      "responses_sent",
-		Help:      "Number of ARP/NDP responses sent for owned IPs in response to requests",
+		Help:      "Number of layer2 responses sent for owned IPs in response to requests",
 	}, []string{
 		"ip",
 	}),
@@ -25,7 +25,7 @@ var stats = metrics{
 		Namespace: "metallb",
 		Subsystem: "layer2",
 		Name:      "gratuitous_sent",
-		Help:      "Number of gratuitous ARP/NDP packets sent for owned IPs as a result of failovers",
+		Help:      "Number of gratuitous layer2 packets sent for owned IPs as a result of failovers",
 	}, []string{
 		"ip",
 	}),
