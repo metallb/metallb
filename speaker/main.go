@@ -55,7 +55,6 @@ func main() {
 		myIPstr    = flag.String("node-ip", "", "IP address of this Kubernetes node")
 		myNode     = flag.String("node-name", "", "name of this Kubernetes node")
 		port       = flag.Int("port", 80, "HTTP listening port")
-		configNS   = flag.String("config-ns", "metallb-system", "Kubernetes namespace containing MetalLB's configuration")
 		config     = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
 	)
 	flag.Parse()
@@ -101,7 +100,7 @@ func main() {
 		glog.Fatalf("Error getting k8s client: %s", err)
 	}
 	client.HandleServiceAndEndpoints(ctrl.SetBalancer)
-	client.HandleConfig(*configNS, *config, ctrl.SetConfig)
+	client.HandleConfig(*config, ctrl.SetConfig)
 	client.HandleLeadership(*myNode, ctrl.SetLeader)
 	client.HandleNode(*myNode, ctrl.SetNode)
 

@@ -3,6 +3,7 @@ package k8s // import "go.universe.tf/metallb/internal/k8s"
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"time"
 
@@ -25,6 +26,8 @@ import (
 // Client watches a Kubernetes cluster and translates events into
 // Controller method calls.
 type Client struct {
+	namespace string
+
 	client *kubernetes.Clientset
 	events record.EventRecorder
 
@@ -71,6 +74,11 @@ func New(processName, masterAddr, kubeconfig string) (*Client, error) {
 		return nil, fmt.Errorf("creating kubernetes client: %s", err)
 	}
 
+	bs, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err != nil {
+		return nil, fmt.Errorf("getting namespace from pod service account data: %s", err)
+	}
+
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartLogging(glog.Infof)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(clientset.CoreV1().RESTClient()).Events("")})
@@ -79,9 +87,10 @@ func New(processName, masterAddr, kubeconfig string) (*Client, error) {
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
 	return &Client{
-		client: clientset,
-		events: recorder,
-		queue:  queue,
+		namespace: string(bs),
+		client:    clientset,
+		events:    recorder,
+		queue:     queue,
 	}, nil
 }
 
@@ -155,7 +164,7 @@ func (c *Client) HandleServiceAndEndpoints(handler func(string, *v1.Service, *v1
 }
 
 // HandleConfig registers a handler for changes to MetalLB's configuration.
-func (c *Client) HandleConfig(namespace, configMap string, handler func(*config.Config) error) {
+func (c *Client) HandleConfig(configMap string, handler func(*config.Config) error) {
 	if c.configChanged != nil {
 		panic("HandleConfig called twice")
 	}
@@ -180,7 +189,7 @@ func (c *Client) HandleConfig(namespace, configMap string, handler func(*config.
 			}
 		},
 	}
-	cmWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "configmaps", namespace, fields.OneTermEqualSelector("metadata.name", configMap))
+	cmWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "configmaps", c.namespace, fields.OneTermEqualSelector("metadata.name", configMap))
 	c.cmIndexer, c.cmInformer = cache.NewIndexerInformer(cmWatcher, &v1.ConfigMap{}, 0, cmHandlers, cache.Indexers{})
 
 	c.configChanged = handler
