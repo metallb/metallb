@@ -12,7 +12,7 @@ simulated environment. If you don't have a bare metal cluster to test
 on yet, or if you want to explore MetalLB's BGP functionality, this is
 the tutorial for you.
 
-The [ARP tutorial]({{% relref "arp.md" %}}) demonstrates setting up
-ARP mode. For this tutorial you will need to bring your own bare metal
-cluster, unfortunately we don't yet have a Minikube-friendly
-demonstration for ARP mode.
+The [Layer 2 tutorial]({{% relref "layer2.md" %}}) demonstrates
+setting up layer 2 mode. For this tutorial you will need to bring your
+own bare metal cluster, unfortunately we don't yet have a
+Minikube-friendly demonstration for layer 2 mode.

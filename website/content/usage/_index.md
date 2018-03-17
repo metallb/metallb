@@ -48,9 +48,9 @@ MetalLB understands the service's `externalTrafficPolicy` option, and
 implements different announcements modes depending on the policy and
 announcement protocol you select.
 
-### ARP
+### Layer2
 
-When announcing over ARP, MetalLB forces the traffic policy to
+When announcing in layer2 mode, MetalLB forces the traffic policy to
 `Cluster`. In this mode, the elected leader node receives all the
 inbound traffic, and `kube-proxy` load-balances from there to
 individual pods.

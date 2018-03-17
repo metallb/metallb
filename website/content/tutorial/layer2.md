@@ -1,22 +1,22 @@
 ---
-title: ARP mode tutorial
+title: Layer 2 mode tutorial
 weight: 20
 ---
 
 In this tutorial we deploy MetalLB in a cluster and announce a
-load-balanced IP using ARP. We assume you have a bare metal cluster
-already running, for example
+load-balanced IP using layer 2 mode. We assume you have a bare metal
+cluster already running, for example
 a
 [Raspberry Pi Kubernetes cluster](https://blog.hypriot.com/post/setup-kubernetes-raspberry-pi-cluster/).
 
-The nice thing about ARP mode is that you don't need any fancy network
-hardware at all, it should just work on any ethernet network.
+The nice thing about layer 2 mode is that you don't need any fancy
+network hardware at all, it should just work on any ethernet network.
 
 Here is the outline of what we're going to do:
 
 1. Install MetalLB on the cluster,
-1. Configure MetalLB to announce using ARP mode and give it some IP
-   addresses to manage,
+1. Configure MetalLB to announce using layer 2 mode and give it some
+   IP addresses to manage,
 1. Create a load-balanced service, and observe how MetalLB sets it up.
 
 ## Cluster addresses
@@ -72,7 +72,7 @@ a load-balanced address.
 ## Configure MetalLB
 
 We have a sample MetalLB configuration in
-[`manifests/example-arp-config.yaml`](https://raw.githubusercontent.com/google/metallb/master/manifests/example-arp-config.yaml).
+[`manifests/example-arp-config.yaml`](https://raw.githubusercontent.com/google/metallb/master/manifests/example-layer2-config.yaml).
 Let's take a look at it before applying it:
 
 ```yaml
@@ -85,7 +85,7 @@ data:
   config: |
     address-pools:
     - name: my-ip-space
-      protocol: arp
+      protocol: layer2
       cidr:
       - 192.168.1.240/28
 ```
@@ -101,14 +101,14 @@ information: what IP addresses it's allowed to hand out and which
 protocol to do that with.
 
 In this configuration we tell MetalLB to hand out address from the
-`192.168.1.240/28` range, using ARP (`protocol: arp`). Apply this
-configuration:
+`192.168.1.240/28` range, using layer 2 mode (`protocol:
+layer2`). Apply this configuration:
 
-`kubectl apply -f https://raw.githubusercontent.com/google/metallb/master/manifests/example-arp-config.yaml`
+`kubectl apply -f https://raw.githubusercontent.com/google/metallb/master/manifests/example-layer2-config.yaml`
 
 The configuration should take effect within a few seconds. By
 following the logs we can see what's going on: `kubectl logs -l
-app=speaker -n metallb-system`:
+component=speaker -n metallb-system`:
 
 ```
 I1217 10:18:05.212018       1 leaderelection.go:174] attempting to acquire leader lease...
@@ -158,10 +158,9 @@ I1217 10:19:05.105780       1 arp.go:96] Request: who-has 192.168.1.240?  tell 1
 I1217 10:19:05.235623       1 arp.go:96] Request: who-has 192.168.1.240?  tell 192.168.1.1 (b4:75:0e:63:b2:20). reply: 192.168.1.240 is-at b8:27:eb:86:e2:85
 ```
 
-MetalLB is sending out unsolicited ARP responses and replies to ARP
-requests with the MAC address of the node that has won the leader
-election. It is using the first address of the assigned range
-(192.168.1.240).
+MetalLB is sending out replies to ARP requests with the MAC address of
+the node that has won the leader election. It is using the first
+address of the assigned range (192.168.1.240).
 
 When you `curl http://192.168.1.240` you should see the default nginx
 page: "Welcome to nginx!"

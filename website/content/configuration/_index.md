@@ -12,18 +12,17 @@ annotated with explanatory comments.
 The specific configuration depends on the protocol(s) you want to use
 to announce service IPs. Jump to:
 
-- [ARP configuration](#arp-configuration)
-- [NDP configuration](#ndp-configuration)
+- [Layer 2 configuration](#layer-2-configuration)
 - [BGP configuration](#bgp-configuration)
 - [Advanced configuration](#advanced-address-pool-configuration)
 
-## ARP configuration
+## Layer 2 configuration
 
-ARP mode is the simplest to configure: in many cases, you don't need
-any protocol-specific configuration, only IP addresses.
+Layer 2 mode is the simplest to configure: in many cases, you don't
+need any protocol-specific configuration, only IP addresses.
 
 For example, the following configuration gives MetalLB control over
-the `192.168.1.240/28` IP range, and configures ARP mode:
+the `192.168.1.240/28` IP range, and configures Layer 2 mode:
 
 ```yaml
 apiVersion: v1
@@ -35,16 +34,16 @@ data:
   config: |
     address-pools:
     - name: default
-      protocol: arp
+      protocol: layer2
       cidr:
       - 192.168.1.240/28
 ```
 
-### Advanced ARP configuration for non-`/24` networks
+### Advanced ARP (IPv4 layer 2) configuration for non-`/24` networks
 
-ARP mode advertises IPs into an ethernet LAN. Ethernet LANs have two
-"special" IPs, the network and broadcast addresses, which cannot be
-used for normal network traffic. In a typical home network like
+Layer 2 mode advertises IPs into an ethernet LAN. Ethernet LANs have
+two "special" IPs, the network and broadcast addresses, which cannot
+be used for normal network traffic. In a typical home network like
 `192.168.0.0/24`, the network and broadcast IPs are the `.0` and
 `.255` addresses.
 
@@ -56,7 +55,7 @@ advertise into a `/24` network. It will look for the `/24` that
 contains the IP range(s) you gave in the configuration, and use that
 to figure out the network and broadcast IPs.
 
-If you are using ARP mode on a LAN that is not `/24`, you must
+If you are using layer 2 mode on a LAN that is not `/24`, you must
 manually specify the network prefix using the `arp-network`
 configuration option. MetalLB will derive the network and broadcast
 IPs from that, instead of trying to deduce the values from the
@@ -75,42 +74,11 @@ data:
   config: |
     address-pools:
     - name: default
-      protocol: arp
+      protocol: layer2
       arp-network: 10.0.0.0/8
       cidr:
       - 10.42.42.0/24
 ```
-
-## NDP configuration
-
-NDP mode is the same as ARP mode, but for IPv6. Like with ARP, in many
-cases you just need to specify IP addresses, and nothing else.
-
-For example, the following configuration gives MetalLB control over
-the `2001:db8:42::/120` IP range, and configures NDP mode:
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  namespace: metallb-system
-  name: config
-data:
-  config: |
-    address-pools:
-    - name: default
-      protocol: ndp
-      cidr:
-      - 2001:db8:42::/120
-```
-
-{{% notice note %}}
-Due to limitations of Kubernetes, you can only use IPv6 service
-addresses in an IPv6 Kubernetes cluster. Conversely, you can only use
-IPv4 service addresses in IPv4 clusters. Unfortunately, "dual-stack"
-clusters are not possible at this time.
-{{% /notice %}}
-
 
 ## BGP configuration
 
