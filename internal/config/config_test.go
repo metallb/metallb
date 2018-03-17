@@ -85,6 +85,7 @@ address-pools:
   protocol: layer2
   cidr:
   - 40.0.0.0/25
+  - 40.0.0.150-40.0.0.200
 - name: pool4
   protocol: arp
   cidr:
@@ -149,8 +150,15 @@ address-pools:
 						},
 					},
 					"pool3": {
-						Protocol:   Layer2,
-						CIDR:       []*net.IPNet{ipnet("40.0.0.0/25")},
+						Protocol: Layer2,
+						CIDR: []*net.IPNet{
+							ipnet("40.0.0.0/25"),
+							ipnet("40.0.0.150/31"),
+							ipnet("40.0.0.152/29"),
+							ipnet("40.0.0.160/27"),
+							ipnet("40.0.0.192/29"),
+							ipnet("40.0.0.200/32"),
+						},
 						AutoAssign: true,
 						ARPNetwork: ipnet("40.0.0.0/24"),
 					},
