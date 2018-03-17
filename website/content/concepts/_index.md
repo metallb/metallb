@@ -47,20 +47,18 @@ needs to make the network beyond the cluster aware that the IP "lives"
 in the cluster. MetalLB uses standard routing protocols to achieve
 this: ARP, NDP, or BGP.
 
-### ARP and NDP
+### Layer 2 mode (ARP/NDP)
 
-In ARP mode, one machine in the cluster takes ownership of the service
-IPs, and uses
-standard
-[ARP](https://en.wikipedia.org/wiki/Address_Resolution_Protocol)
-packets to make those IPs reachable. From the LAN's point of view, the
-announcing machine simply has multiple IP addresses.
+In layer 2 mode, one machine in the cluster takes ownership of the
+service IPs, and uses standard address discovery protocols
+([ARP](https://en.wikipedia.org/wiki/Address_Resolution_Protocol) for
+IPv4, [NDP](https://en.wikipedia.org/wiki/Neighbor_Discovery_Protocol)
+for IPv6) to make those IPs reachable on the local network. From the
+LAN's point of view, the announcing machine simply has multiple IP
+addresses.
 
-[NDP](https://en.wikipedia.org/wiki/Neighbor_Discovery_Protocol) mode
-serves an identical function, but for IPv6 addresses.
-
-The [ARP and NDP modes]({{% relref "arp-ndp.md" %}}) sub-page has more
-details on the behavior and limitations of ARP and NDP modes.
+The [layer 2 mode]({{% relref "layer2.md" %}}) sub-page has more
+details on the behavior and limitations of layer 2 mode.
 
 ### BGP 
 

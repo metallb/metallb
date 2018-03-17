@@ -7,6 +7,6 @@ data:
   config: |
     address-pools:
     - name: my-ip-space
-      protocol: arp
+      protocol: layer2
       cidr:
       - 192.168.1.240/28
