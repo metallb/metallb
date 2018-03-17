@@ -30,9 +30,17 @@ New features:
   manner.
 --->
 
-## Version 0.4.5
+## Version 0.4.6
 
 [Documentation for this release](https://metallb.universe.tf)
+
+Bugfixes:
+
+- [Remove the --config-ns flag](https://github.com/google/metallb/issues/193)
+
+## Version 0.4.5
+
+[Documentation for this release](https://v0-4-5--metallb.netlify.com)
 
 Bugfixes:
 
