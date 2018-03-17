@@ -34,9 +34,20 @@ EOF
     destination = "/tmp/configure_vpn.sh"
   }
 
+  provisioner "file" {
+    source = "configure_bird.sh"
+    destination = "/tmp/configure_bird.sh"
+  }
+
   provisioner "remote-exec" {
     inline = [
       "bash /tmp/configure_vpn.sh access ${cidrhost(local.machine_cidr, 2)} ${element(split("/", local.machine_cidr), 1)} ${google_compute_instance.switch.network_interface.0.address}",
+      "curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash",
+      "apt -qq -y install bird",
+      "bash /tmp/configure_bird.sh access ${var.protocol} ${cidrhost(local.machine_cidr, 2)} 2",
+
+      # Do this bit last, so that we don't block on the controller
+      # coming up until we're basicallly done.
       "apt -qq -y install netcat-openbsd",
       "nc -l 1234 >/etc/admin.conf",
       "echo 'export KUBECONFIG=/etc/admin.conf' >>/etc/profile",
