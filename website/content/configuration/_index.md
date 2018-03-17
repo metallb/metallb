@@ -22,7 +22,8 @@ Layer 2 mode is the simplest to configure: in many cases, you don't
 need any protocol-specific configuration, only IP addresses.
 
 For example, the following configuration gives MetalLB control over
-the `192.168.1.240/28` IP range, and configures Layer 2 mode:
+IPs from `192.168.1.240` to `192.168.1.250`, and configures Layer 2
+mode:
 
 ```yaml
 apiVersion: v1
@@ -36,7 +37,7 @@ data:
     - name: default
       protocol: layer2
       cidr:
-      - 192.168.1.240/28
+      - 192.168.1.240-192.168.1.250
 ```
 
 ### Advanced ARP (IPv4 layer 2) configuration for non-`/24` networks

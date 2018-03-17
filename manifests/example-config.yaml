@@ -54,12 +54,14 @@ data:
       # Protocol can be used to select how the announcement is done.
       # Supported values are bgp and arp.
       protocol: bgp
-      # A list of IP address ranges over which MetalLB has authority,
-      # expressed as CIDR prefixes. You can list multiple prefixes in
-      # a single pool, they will all share the same BGP settings.
+      
+      # A list of IP address ranges over which MetalLB has
+      # authority. You can list multiple ranges in a single pool, they
+      # will all share the same settings. Each range can be either a
+      # CIDR prefix, or an explicit start-end range of IPs.
       cidr:
       - 198.51.100.0/24
-      - 192.168.0.0/16
+      - 192.168.0.150-192.168.0.200
       # (optional) If true, MetalLB will not allocate any address that
       # ends in .0 or .255. Some old, buggy consumer devices
       # mistakenly block traffic to such addresses under the guise of
@@ -97,14 +99,14 @@ data:
         - 64512:1
         - no-export
       # (optional) The full network over which MetalLB is advertising
-      # with ARP. All CIDRs (above) in this address pool must be
+      # with ARP. All IP ranges (above) in this address pool must be
       # contained in this network. MetalLB will not allocate the
       # network and broadcast IPs of this network, even if they are
-      # contained in one of the available CIDR prefixes.
+      # contained in one of the available ranges.
       #
       # The default value for this field is the /24 network that
-      # contains all of this pool's CIDR prefixes. If no such /24
-      # exists because the CIDRs span multiple /24s, arp-network must
+      # contains all of this pool's IP ranges. If no such /24
+      # exists because the ranges span multiple /24s, arp-network must
       # be explicitly specified.
       arp-network: 192.168.0.0/24
     # (optional) BGP community aliases. Instead of using hard to
