@@ -10,10 +10,17 @@ weight: 7
 
 Action required if upgrading from 0.4.x:
 
-- The router IDs used on BGP sessions may be different, in clusters
-  where nodes have multiple IP addresses. If your BGP infrastructure
-  monitors or enforces specific router IDs for peers, you may need to
-  update those systems to match new router IDs.
+- The `cidr` field of address pools in the configuration file has been
+  renamed to `addresses`. MetalLB 0.5 understands both `cidr` and
+  `addresses`, but in 0.6 it will only understand `addresses`, so
+  please update now.
+- The `arp` and `ndp` protocols have been replaced by a unified
+  `layer2` protocol. MetalLB 0.5 understands both the old and new
+  names, but 0.6 will only understand `layer2`, so please update now.
+- The router IDs used on BGP sessions may change in this version, in
+  clusters where nodes have multiple IP addresses. If your BGP
+  infrastructure monitors or enforces specific router IDs for peers,
+  you may need to update those systems to match new router IDs.
 - The Prometheus metrics for ARP and NDP traffic have been
   merged. Instead of `arp_*` and `ndp_*` metrics, there is now single
   set of `layer2_*` metrics, in which the `ip` label can be IPv4 or
@@ -21,6 +28,16 @@ Action required if upgrading from 0.4.x:
 
 New features:
 
+- ARP and NDP modes have been replaced by a single "layer 2" mode,
+  indicated by `protocol: layer2` in the configuration file. Layer 2
+  mode uses ARP and NDP under the hood, but having a single protocol
+  name makes it easier to build protocol-agnostic configuration
+  templates.
+- You can give addresses to MetalLB using a simple IP range notation,
+  in addition to CIDR prefixes. For example,
+  `192.168.0.0-192.168.0.255` is equivalent to `192.168.0.0/24`. This
+  makes it much easier to allocate IP ranges that don't fall cleanly
+  on CIDR prefix boundaries.
 - BGP mode supports nodes with multiple interfaces and IP addresses
   ([#182](https://github.com/google/metallb/issues/182)). Previously,
   MetalLB could only establish working BGP sessions on the node's
