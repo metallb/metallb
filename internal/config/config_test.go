@@ -67,7 +67,7 @@ bgp-communities:
 address-pools:
 - name: pool1
   protocol: bgp
-  cidr:
+  addresses:
   - 10.20.0.0/16
   - 10.50.0.0/24
   avoid-buggy-ips: true
@@ -79,22 +79,23 @@ address-pools:
   - aggregation-length: 24
 - name: pool2
   protocol: bgp
-  cidr:
+  addresses:
   - 30.0.0.0/8
 - name: pool3
   protocol: layer2
-  cidr:
+  addresses:
   - 40.0.0.0/25
+  cidr:
   - 40.0.0.150-40.0.0.200
 - name: pool4
   protocol: arp
-  cidr:
+  addresses:
   - 50.0.0.0/16
   - 50.20.0.0/24
   arp-network: 50.0.0.0/8
 - name: pool5
   protocol: ndp
-  cidr:
+  addresses:
   - 2001:db8::/64
 `,
 			want: &Config{
@@ -391,7 +392,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
-  cidr:
+  addresses:
   - 100.200.300.400/24
 `,
 		},
@@ -401,7 +402,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
-  cidr:
+  addresses:
   - 1.2.3.0/33
 `,
 		},
@@ -412,7 +413,7 @@ address-pools:
 address-pools:
 - name: pool1
   protocol: bgp
-  cidr: ["1.2.3.0/24"]
+  addresses: ["1.2.3.0/24"]
   bgp-advertisements:
   -
 `,
@@ -438,7 +439,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
-  cidr: ["1.2.3.0/24"]
+  addresses: ["1.2.3.0/24"]
   protocol: bgp
 `,
 			want: &Config{
@@ -475,7 +476,7 @@ address-pools:
 address-pools:
 - name: pool1
   protocol: bgp
-  cidr:
+  addresses:
   - 10.20.30.40/24
   - 1.2.3.0/28
   bgp-advertisements:
@@ -572,11 +573,11 @@ address-pools:
 address-pools:
 - name: pool1
   protocol: bgp
-  cidr:
+  addresses:
   - 10.0.0.0/8
 - name: pool2
   protocol: bgp
-  cidr:
+  addresses:
   - 10.0.0.0/8
 `,
 		},
@@ -587,11 +588,11 @@ address-pools:
 address-pools:
 - name: pool1
   protocol: bgp
-  cidr:
+  addresses:
   - 10.0.0.0/8
 - name: pool2
   protocol: bgp
-  cidr:
+  addresses:
   - 10.0.0.0/16
 `,
 		},
@@ -602,7 +603,7 @@ address-pools:
 address-pools:
 - name: pool1
   protocol: layer2
-  cidr:
+  addresses:
   - 10.0.0.0/16
   bgp-advertisements:
   - communities: ["flarb"]

@@ -86,7 +86,7 @@ data:
     address-pools:
     - name: my-ip-space
       protocol: layer2
-      cidr:
+      addresses:
       - 192.168.1.240/28
 ```
 

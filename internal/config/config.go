@@ -60,7 +60,8 @@ type selectorRequirements struct {
 type addressPool struct {
 	Protocol          Proto
 	Name              string
-	CIDR              []string
+	Addresses         []string
+	CIDR              []string           // TODO: remove in 0.6.0
 	AvoidBuggyIPs     bool               `yaml:"avoid-buggy-ips"`
 	AutoAssign        *bool              `yaml:"auto-assign"`
 	BGPAdvertisements []bgpAdvertisement `yaml:"bgp-advertisements"`
@@ -315,10 +316,11 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 		ret.AutoAssign = *p.AutoAssign
 	}
 
-	if len(p.CIDR) == 0 {
+	p.Addresses = append(p.Addresses, p.CIDR...)
+	if len(p.Addresses) == 0 {
 		return nil, errors.New("pool has no prefixes defined")
 	}
-	for _, cidr := range p.CIDR {
+	for _, cidr := range p.Addresses {
 		nets, err := parseCIDR(cidr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid CIDR %q in pool %q", cidr, p.Name)
