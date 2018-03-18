@@ -31,7 +31,7 @@ address-pools:
   # just 4 of them.
   name: production
   protocol: bgp
-  cidr:
+  addresses:
   - 42.176.25.64/30
 
 - # On the other hand, the sandbox environment uses private IP space,
@@ -39,7 +39,7 @@ address-pools:
   # so that developers can spin up as many sandboxes as they need.
   name: sandbox
   protocol: bgp
-  cidr:
+  addresses:
   - 192.168.144.0/20
   bgp-advertisements:
   - communities:

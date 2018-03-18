@@ -175,7 +175,7 @@ data:
     address-pools:
     - name: my-ip-space
       protocol: bgp
-      cidr:
+      addresses:
       - 198.51.100.0/24
 ```
 
@@ -295,7 +295,7 @@ data:
     - name: my-ip-space
       protocol: bgp
       avoid-buggy-ips: true
-      cidr:
+      addresses:
       - 198.51.100.0/24
 ```
 

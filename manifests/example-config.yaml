@@ -59,7 +59,7 @@ data:
       # authority. You can list multiple ranges in a single pool, they
       # will all share the same settings. Each range can be either a
       # CIDR prefix, or an explicit start-end range of IPs.
-      cidr:
+      addresses:
       - 198.51.100.0/24
       - 192.168.0.150-192.168.0.200
       # (optional) If true, MetalLB will not allocate any address that

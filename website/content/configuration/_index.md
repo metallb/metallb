@@ -36,7 +36,7 @@ data:
     address-pools:
     - name: default
       protocol: layer2
-      cidr:
+      addresses:
       - 192.168.1.240-192.168.1.250
 ```
 
@@ -77,7 +77,7 @@ data:
     - name: default
       protocol: layer2
       arp-network: 10.0.0.0/8
-      cidr:
+      addresses:
       - 10.42.42.0/24
 ```
 
@@ -110,7 +110,7 @@ data:
     address-pools:
     - name: default
       protocol: bgp
-      cidr:
+      addresses:
       - 192.168.10.0/24
 ```
 
@@ -155,7 +155,7 @@ data:
     address-pools:
     - name: default
       protocol: bgp
-      cidr:
+      addresses:
       - 198.51.100.0/24
       bgp-advertisements:
       - aggregation-length: 32
@@ -278,11 +278,11 @@ by setting the `auto-assign` flag to `false`:
 address-pools:
 - name: cheap
   protocol: bgp
-  cidr:
+  addresses:
   - 192.168.144.0/20
 - name: expensive
   protocol: bgp
-  cidr:
+  addresses:
   - 42.176.25.64/30
   auto-assign: false
 ```
