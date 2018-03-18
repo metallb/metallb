@@ -36,7 +36,7 @@ func New() *Allocator {
 // SetPools updates the set of address pools that the allocator owns.
 func (a *Allocator) SetPools(pools map[string]*config.Pool) error {
 	for svc, ip := range a.svcToIP {
-		if poolFor(pools, svc, ip) == "" {
+		if poolFor(pools, ip) == "" {
 			return fmt.Errorf("new config not compatible with assigned IPs: service %q cannot own %q under new config", svc, ip)
 		}
 	}
@@ -52,7 +52,7 @@ func (a *Allocator) SetPools(pools map[string]*config.Pool) error {
 
 	// Need to readjust the existing pool mappings and counts
 	for svc, ip := range a.svcToIP {
-		pool := poolFor(a.pools, svc, ip)
+		pool := poolFor(a.pools, ip)
 		if a.svcToPool[svc] != pool {
 			a.poolAllocated[a.svcToPool[svc]]--
 			a.svcToPool[svc] = pool
@@ -102,7 +102,7 @@ func poolCount(p *config.Pool) int64 {
 }
 
 // poolFor returns the pool that owns the requested IP, or "" if none.
-func poolFor(pools map[string]*config.Pool, service string, ip net.IP) string {
+func poolFor(pools map[string]*config.Pool, ip net.IP) string {
 	for pname, p := range pools {
 		if p.AvoidBuggyIPs && ipConfusesBuggyFirmwares(ip) {
 			continue
@@ -137,7 +137,7 @@ func (a *Allocator) Assign(service string, ip net.IP) error {
 		// IP already allocated correctly, nothing to do.
 		return nil
 	}
-	pool := poolFor(a.pools, service, ip)
+	pool := poolFor(a.pools, ip)
 	if pool == "" {
 		return fmt.Errorf("cannot assign %q to %q, no pool owns that IP", ip, service)
 	}
