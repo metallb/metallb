@@ -1,6 +1,7 @@
 package layer2
 
 import (
+	"errors"
 	"net"
 	"sync"
 
@@ -20,24 +21,35 @@ type Announce struct {
 
 // New returns an initialized Announce.
 func New(ifi *net.Interface) (*Announce, error) {
-	glog.Infof("creating ARP announcer on interface %q", ifi.Name)
+	glog.Infof("creating layer 2 announcer on interface %q", ifi.Name)
 
 	ret := &Announce{
 		ips: make(map[string]net.IP),
 	}
 
+	// One of ARP or NDP has to successfully create, but we allow one
+	// of the two to fail, to account for machines with IPv6
+	// completely disabled (or IPv4 completely disabled, in a
+	// wonderful future).
 	arpResp, err := newARP(ifi, ret.shouldAnnounce)
 	if err != nil {
-		return nil, err
+		glog.Warningf("ARP announcer creation failed: %s", err)
+		glog.Warningf("Announcing IPv4 services will not work")
+		arpResp = nil
 	}
 	ret.arpResponder = arpResp
 
 	ndpResp, err := newNDP(ifi, ret.shouldAnnounce)
 	if err != nil {
-		// TODO(bug 180): make this fail in a more principled way.
+		glog.Warningf("NDP announcer creation failed: %s", err)
+		glog.Warningf("Announcing IPv6 services will not work")
 		ndpResp = nil
 	}
 	ret.ndpResponder = ndpResp
+
+	if ret.arpResponder == nil && ret.ndpResponder == nil {
+		return nil, errors.New("all protocol announcers failed to create")
+	}
 
 	return ret, nil
 }
