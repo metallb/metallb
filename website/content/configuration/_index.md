@@ -40,47 +40,6 @@ data:
       - 192.168.1.240-192.168.1.250
 ```
 
-### Advanced ARP (IPv4 layer 2) configuration for non-`/24` networks
-
-Layer 2 mode advertises IPs into an ethernet LAN. Ethernet LANs have
-two "special" IPs, the network and broadcast addresses, which cannot
-be used for normal network traffic. In a typical home network like
-`192.168.0.0/24`, the network and broadcast IPs are the `.0` and
-`.255` addresses.
-
-MetalLB needs to know what the network and broadcast IPs are, so that
-it doesn't accidentally try to use them as service IPs.
-
-By default, MetalLB assumes the common case: that you are trying to
-advertise into a `/24` network. It will look for the `/24` that
-contains the IP range(s) you gave in the configuration, and use that
-to figure out the network and broadcast IPs.
-
-If you are using layer 2 mode on a LAN that is not `/24`, you must
-manually specify the network prefix using the `arp-network`
-configuration option. MetalLB will derive the network and broadcast
-IPs from that, instead of trying to deduce the values from the
-assigned IPs.
-
-For example, this is a configuration for a LAN that uses
-`10.0.0.0/8`. We've allocated `10.42.42.0/24` to MetalLB.
-
-```yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  namespace: metallb-system
-  name: config
-data:
-  config: |
-    address-pools:
-    - name: default
-      protocol: layer2
-      arp-network: 10.0.0.0/8
-      addresses:
-      - 10.42.42.0/24
-```
-
 ## BGP configuration
 
 For a basic configuration featuring one BGP router and one IP address
