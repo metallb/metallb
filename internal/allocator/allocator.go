@@ -74,7 +74,6 @@ func poolCount(p *config.Pool) int64 {
 	for _, cidr := range p.CIDR {
 		o, b := cidr.Mask.Size()
 		sz := int64(math.Pow(2, float64(b-o)))
-		avoidedFirst, avoidedLast := false, false
 
 		cur := newCursor(cidr)
 		firstIP := cur.First().IP
@@ -85,29 +84,16 @@ func poolCount(p *config.Pool) int64 {
 				// A pair of buggy IPs occur for each /24 present in the range.
 				buggies := int64(math.Pow(2, float64(24-o))) * 2
 				sz -= buggies
-				avoidedFirst, avoidedLast = true, true
 			} else {
 				// Ranges smaller than /24 contain 1 buggy IP if they
 				// start/end on a /24 boundary, otherwise they contain
 				// none.
 				if ipConfusesBuggyFirmwares(firstIP) {
-					avoidedFirst = true
 					sz--
 				}
 				if ipConfusesBuggyFirmwares(lastIP) {
-					avoidedLast = true
 					sz--
 				}
-			}
-		}
-		if p.ARPNetwork != nil {
-			if ipForbiddenByARPNetwork(firstIP, p.ARPNetwork) && !avoidedFirst {
-				avoidedFirst = true
-				sz--
-			}
-			if ipForbiddenByARPNetwork(lastIP, p.ARPNetwork) && !avoidedLast {
-				avoidedLast = true
-				sz--
 			}
 		}
 		total += sz
@@ -119,9 +105,6 @@ func poolCount(p *config.Pool) int64 {
 func poolFor(pools map[string]*config.Pool, service string, ip net.IP) string {
 	for pname, p := range pools {
 		if p.AvoidBuggyIPs && ipConfusesBuggyFirmwares(ip) {
-			continue
-		}
-		if p.ARPNetwork != nil && ipForbiddenByARPNetwork(ip, p.ARPNetwork) {
 			continue
 		}
 		for _, cidr := range p.CIDR {
@@ -174,9 +157,6 @@ func (a *Allocator) allocateFromPool(service, pname string) net.IP {
 		for pos := c.First(); pos != nil; pos = c.Next() {
 			ip := pos.IP
 			if pool.AvoidBuggyIPs && ipConfusesBuggyFirmwares(ip) {
-				continue
-			}
-			if pool.ARPNetwork != nil && ipForbiddenByARPNetwork(ip, pool.ARPNetwork) {
 				continue
 			}
 			if a.ipToSvc[ip.String()] == "" {
@@ -258,11 +238,4 @@ func ipConfusesBuggyFirmwares(ip net.IP) bool {
 		return false
 	}
 	return ip[3] == 0 || ip[3] == 255
-}
-
-// ipForbiddenByARPNetwork returns true if ip is the network or
-// broadcast address of arpNet.
-func ipForbiddenByARPNetwork(ip net.IP, arpNet *net.IPNet) bool {
-	c := newCursor(arpNet)
-	return ip.Equal(c.First().IP) || ip.Equal(c.Last().IP)
 }

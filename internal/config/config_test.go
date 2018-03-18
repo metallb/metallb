@@ -92,7 +92,6 @@ address-pools:
   addresses:
   - 50.0.0.0/16
   - 50.20.0.0/24
-  arp-network: 50.0.0.0/8
 - name: pool5
   protocol: ndp
   addresses:
@@ -161,13 +160,11 @@ address-pools:
 							ipnet("40.0.0.200/32"),
 						},
 						AutoAssign: true,
-						ARPNetwork: ipnet("40.0.0.0/24"),
 					},
 					"pool4": {
 						Protocol:   Layer2,
 						CIDR:       []*net.IPNet{ipnet("50.0.0.0/16"), ipnet("50.20.0.0/24")},
 						AutoAssign: true,
-						ARPNetwork: ipnet("50.0.0.0/8"),
 					},
 					"pool5": {
 						Protocol:   Layer2,

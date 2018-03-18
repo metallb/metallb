@@ -17,6 +17,10 @@ Action required if upgrading from 0.4.x:
 - The `arp` and `ndp` protocols have been replaced by a unified
   `layer2` protocol. MetalLB 0.5 understands both the old and new
   names, but 0.6 will only understand `layer2`, so please update now.
+- Remove any `arp-network` entries from your configuration. If your
+  address pool overlaps with the ethernet network or broadcast
+  addresses for your LAN, use IP range notation (see new features) to
+  exclude them from your address pool.
 - The router IDs used on BGP sessions may change in this version, in
   clusters where nodes have multiple IP addresses. If your BGP
   infrastructure monitors or enforces specific router IDs for peers,

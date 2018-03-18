@@ -344,75 +344,6 @@ func TestBuggyIPs(t *testing.T) {
 
 }
 
-func TestARPForbidden(t *testing.T) {
-	alloc := New()
-	if err := alloc.SetPools(map[string]*config.Pool{
-		"test": {
-			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
-		},
-		"test2": {
-			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.254/31")},
-		},
-		"test3": {
-			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.4.0/31")},
-			ARPNetwork: ipnet("1.2.4.0/24"),
-		},
-		"test4": {
-			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.4.254/31")},
-			ARPNetwork: ipnet("1.2.4.0/24"),
-		},
-	}); err != nil {
-		t.Fatalf("SetPools: %s", err)
-	}
-
-	validIPs := map[string]bool{
-		"1.2.3.0":   true,
-		"1.2.3.1":   true,
-		"1.2.3.254": true,
-		"1.2.3.255": true,
-		"1.2.4.1":   true,
-		"1.2.4.254": true,
-	}
-
-	tests := []struct {
-		svc     string
-		wantErr bool
-	}{
-		{svc: "s1"},
-		{svc: "s2"},
-		{svc: "s3"},
-		{svc: "s4"},
-		{svc: "s5"},
-		{svc: "s6"},
-		{
-			svc:     "s7",
-			wantErr: true,
-		},
-	}
-
-	for i, test := range tests {
-		ip, err := alloc.Allocate(test.svc)
-		if test.wantErr {
-			if err == nil {
-				t.Errorf("#%d should have caused an error, but did not", i+1)
-
-			}
-			continue
-		}
-		if err != nil {
-			t.Errorf("#%d Allocate(%q, \"test\"): %s", i+1, test.svc, err)
-		}
-		if !validIPs[ip.String()] {
-			t.Errorf("#%d allocated unexpected IP %q", i+1, ip)
-		}
-	}
-
-}
-
 func TestConfigReload(t *testing.T) {
 	alloc := New()
 	if err := alloc.SetPools(map[string]*config.Pool{
@@ -652,42 +583,6 @@ func TestPoolCount(t *testing.T) {
 				AvoidBuggyIPs: true,
 			},
 			want: 381,
-		},
-		{
-			desc: "ARPNetwork /24 in /24",
-			pool: &config.Pool{
-				Protocol:   config.Layer2,
-				CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
-				ARPNetwork: ipnet("1.2.3.0/24"),
-			},
-			want: 254,
-		},
-		{
-			desc: "ARPNetwork /25 in /24",
-			pool: &config.Pool{
-				Protocol:   config.Layer2,
-				CIDR:       []*net.IPNet{ipnet("1.2.3.0/25")},
-				ARPNetwork: ipnet("1.2.3.0/24"),
-			},
-			want: 127,
-		},
-		{
-			desc: "ARPNetwork /24 in /22",
-			pool: &config.Pool{
-				Protocol:   config.Layer2,
-				CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
-				ARPNetwork: ipnet("1.2.2.0/22"),
-			},
-			want: 255,
-		},
-		{
-			desc: "ARPNetwork /24 in /21",
-			pool: &config.Pool{
-				Protocol:   config.Layer2,
-				CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
-				ARPNetwork: ipnet("1.2.2.0/21"),
-			},
-			want: 256,
 		},
 	}
 

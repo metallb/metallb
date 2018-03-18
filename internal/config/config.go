@@ -65,7 +65,7 @@ type addressPool struct {
 	AvoidBuggyIPs     bool               `yaml:"avoid-buggy-ips"`
 	AutoAssign        *bool              `yaml:"auto-assign"`
 	BGPAdvertisements []bgpAdvertisement `yaml:"bgp-advertisements"`
-	ARPNetwork        string             `yaml:"arp-network"`
+	ARPNetwork        string             `yaml:"arp-network"` // TODO: remove in 0.6.0
 }
 
 type bgpAdvertisement struct {
@@ -132,10 +132,6 @@ type Pool struct {
 	// When an IP is allocated from this pool, how should it be
 	// translated into BGP announcements?
 	BGPAdvertisements []*BGPAdvertisement
-	// The L2 network that contains this ARP-advertised pool. Used to
-	// make sure we don't allocate the network's base or broadcast
-	// addresses.
-	ARPNetwork *net.IPNet
 }
 
 // BGPAdvertisement describes one translation from an IP address to a BGP advertisement.
@@ -336,17 +332,7 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 		if len(p.BGPAdvertisements) > 0 {
 			return nil, errors.New("cannot have bgp-advertisements configuration element in a layer2 address pool")
 		}
-
-		arpNet, err := parseARPNetwork(p.ARPNetwork, ret.CIDR)
-		if err != nil {
-			return nil, fmt.Errorf("parsing ARP network: %s", err)
-		}
-		ret.ARPNetwork = arpNet
 	case BGP:
-		if p.ARPNetwork != "" {
-			return nil, errors.New("cannot have arp-network configuration element in a BGP address pool")
-		}
-
 		ads, err := parseBGPAdvertisements(p.BGPAdvertisements, ret.CIDR, bgpCommunities)
 		if err != nil {
 			return nil, fmt.Errorf("parsing BGP communities: %s", err)
@@ -410,46 +396,6 @@ func parseBGPAdvertisements(ads []bgpAdvertisement, cidrs []*net.IPNet, communit
 		}
 
 		ret = append(ret, ad)
-	}
-
-	return ret, nil
-}
-
-func parseARPNetwork(a string, cidr []*net.IPNet) (*net.IPNet, error) {
-	var ret *net.IPNet
-	if a == "" {
-		for _, cidr := range cidr {
-			if cidr.IP.To4() == nil {
-				continue
-			}
-			ret = &net.IPNet{
-				IP:   cidr.IP.Mask(net.CIDRMask(24, 32)),
-				Mask: net.CIDRMask(24, 32),
-			}
-		}
-	} else {
-		_, arpNet, err := net.ParseCIDR(a)
-		if err != nil {
-			return nil, fmt.Errorf("parsing ARP network: %s", err)
-		}
-		ret = arpNet
-	}
-
-	// All CIDRs must be contained within the arp-network.
-	for _, cidr := range cidr {
-		if cidr.IP.To4() == nil {
-			// arp-network doesn't apply to IPv6.
-			continue
-		}
-		if !cidrContainsCIDR(ret, cidr) {
-			if a == "" {
-				// This validation is failing based on a
-				// default-selected value. Make the error point this
-				// out to better guide the user.
-				return nil, fmt.Errorf("pool did not specify an arp-network, and CIDR %q falls outside the inferred arp-network %q (maybe explicitly define arp-network?)", cidr, ret)
-			}
-			return nil, fmt.Errorf("CIDR %q is not contained within the enclosing ARP network %q", cidr, ret)
-		}
 	}
 
 	return ret, nil
