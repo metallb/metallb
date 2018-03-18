@@ -12,6 +12,9 @@ type ndpResponder struct {
 	hardwareAddr net.HardwareAddr
 	conn         *ndp.Conn
 	announce     announceFunc
+	// Refcount of how many watchers for each solicited node
+	// multicast group.
+	solicitedNodeGroups map[string]int64
 }
 
 func newNDP(ifi *net.Interface, ann announceFunc) (*ndpResponder, error) {
@@ -22,9 +25,10 @@ func newNDP(ifi *net.Interface, ann announceFunc) (*ndpResponder, error) {
 	}
 
 	ret := &ndpResponder{
-		hardwareAddr: ifi.HardwareAddr,
-		conn:         conn,
-		announce:     ann,
+		hardwareAddr:        ifi.HardwareAddr,
+		conn:                conn,
+		announce:            ann,
+		solicitedNodeGroups: map[string]int64{},
 	}
 	go ret.run()
 	return ret, nil
@@ -38,6 +42,40 @@ func (n *ndpResponder) Gratuitous(ip net.IP) error {
 	err := n.advertise(net.IPv6linklocalallnodes, ip, true)
 	stats.SentGratuitous(ip.String())
 	return err
+}
+
+func (n *ndpResponder) Watch(ip net.IP) error {
+	if ip.To4() != nil {
+		return nil
+	}
+	group, err := ndp.SolicitedNodeMulticast(ip)
+	if err != nil {
+		return fmt.Errorf("looking up solicited node multicast group for %q: %s", ip, err)
+	}
+	if n.solicitedNodeGroups[group.String()] == 0 {
+		if err = n.conn.JoinGroup(group); err != nil {
+			return fmt.Errorf("joining solicited node multicast group for %q: %s", ip, err)
+		}
+	}
+	n.solicitedNodeGroups[group.String()]++
+	return nil
+}
+
+func (n *ndpResponder) Unwatch(ip net.IP) error {
+	if ip.To4() != nil {
+		return nil
+	}
+	group, err := ndp.SolicitedNodeMulticast(ip)
+	if err != nil {
+		return fmt.Errorf("looking up solicited node multicast group for %q: %s", ip, err)
+	}
+	n.solicitedNodeGroups[group.String()]--
+	if n.solicitedNodeGroups[group.String()] == 0 {
+		if err = n.conn.LeaveGroup(group); err != nil {
+			return fmt.Errorf("leaving solicited node multicast group for %q: %s", ip, err)
+		}
+	}
+	return nil
 }
 
 func (n *ndpResponder) run() {

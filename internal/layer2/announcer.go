@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/golang/glog"
-	"github.com/mdlayher/ndp"
 )
 
 // Announce is used to "announce" new IPs mapped to the node's MAC address.
@@ -79,15 +78,9 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 		return
 	}
 
-	if ip.To4() == nil {
-		// For IPv6, we have to join the sollicited node multicast
-		// group for the target IP, so that we receive requests for
-		// that IP's MAC address.
-		group, err := ndp.SolicitedNodeMulticast(ip)
-		if err != nil {
-			glog.Errorf("Failed to look up solicited node multicast group for %q: %s", ip, err)
-		} else if err = a.ndpResponder.conn.JoinGroup(group); err != nil {
-			glog.Errorf("Failed to join solicited node multicast group for %q: %s", ip, err)
+	if a.ndpResponder != nil {
+		if err := a.ndpResponder.Watch(ip); err != nil {
+			glog.Errorf("configuring announcement for %q: %s", ip, err)
 		}
 	}
 
@@ -104,14 +97,9 @@ func (a *Announce) DeleteBalancer(name string) {
 		return
 	}
 
-	if ip.To4() == nil {
-		// Leave the solicited multicast group for this IP.
-		// TODO(bug 184): solicited node multicast group memberships need to be refcounted.
-		group, err := ndp.SolicitedNodeMulticast(ip)
-		if err != nil {
-			glog.Errorf("Failed to look up solicited node multicast group for %q: %s", ip, err)
-		} else if err = a.ndpResponder.conn.LeaveGroup(group); err != nil {
-			glog.Errorf("Failed to leave solicited node multicast group for %q: %s", ip, err)
+	if a.ndpResponder != nil {
+		if err := a.ndpResponder.Unwatch(ip); err != nil {
+			glog.Errorf("removing announcement for %q: %s", ip, err)
 		}
 	}
 
