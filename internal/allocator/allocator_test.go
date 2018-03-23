@@ -99,7 +99,7 @@ func TestAssignment(t *testing.T) {
 		if ip == nil {
 			t.Fatalf("invalid IP %q in test %q", test.ip, test.desc)
 		}
-		err := alloc.Assign(test.svc, ip)
+		err := alloc.Assign(test.svc, ip, nil, "", "")
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("%q should have caused an error, but did not", test.desc)
@@ -181,7 +181,7 @@ func TestPoolAllocation(t *testing.T) {
 			alloc.Unassign(test.svc)
 			continue
 		}
-		ip, err := alloc.AllocateFromPool(test.svc, "test")
+		ip, err := alloc.AllocateFromPool(test.svc, "test", nil, "", "")
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("#%d should have caused an error, but did not", i+1)
@@ -198,7 +198,7 @@ func TestPoolAllocation(t *testing.T) {
 	}
 
 	alloc.Unassign("s5")
-	if _, err := alloc.AllocateFromPool("s5", "nonexistentpool"); err == nil {
+	if _, err := alloc.AllocateFromPool("s5", "nonexistentpool", nil, "", ""); err == nil {
 		t.Error("Allocating from non-existent pool succeeded")
 	}
 }
@@ -258,11 +258,10 @@ func TestAllocation(t *testing.T) {
 			alloc.Unassign(test.svc)
 			continue
 		}
-		ip, err := alloc.Allocate(test.svc)
+		ip, err := alloc.Allocate(test.svc, nil, "", "")
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("#%d should have caused an error, but did not", i+1)
-
 			}
 			continue
 		}
@@ -326,7 +325,7 @@ func TestBuggyIPs(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		ip, err := alloc.Allocate(test.svc)
+		ip, err := alloc.Allocate(test.svc, nil, "", "")
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("#%d should have caused an error, but did not", i+1)
@@ -354,7 +353,7 @@ func TestConfigReload(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SetPools: %s", err)
 	}
-	if err := alloc.Assign("s1", net.ParseIP("1.2.3.0")); err != nil {
+	if err := alloc.Assign("s1", net.ParseIP("1.2.3.0"), nil, "", ""); err != nil {
 		t.Fatalf("Assign(s1, 1.2.3.0): %s", err)
 	}
 
@@ -487,7 +486,7 @@ func TestConfigReload(t *testing.T) {
 		} else if err != nil {
 			t.Errorf("%q failed to SetPools: %s", test.desc, err)
 		}
-		gotPool := assignedPool(alloc, "s1")
+		gotPool := alloc.Pool("s1")
 		if gotPool != test.pool {
 			t.Errorf("%q: s1 is in wrong pool, want %q, got %q", test.desc, test.pool, gotPool)
 		}
@@ -537,7 +536,7 @@ func TestAutoAssign(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		ip, err := alloc.Allocate(test.svc)
+		ip, err := alloc.Allocate(test.svc, nil, "", "")
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("#%d should have caused an error, but did not", i+1)
@@ -595,17 +594,14 @@ func TestPoolCount(t *testing.T) {
 }
 
 // Some helpers
-
+//
 // Peeks inside Allocator to find the allocated IP and pool for a service.
 func assigned(a *Allocator, svc string) string {
-	if a.svcToIP[svc] == nil {
+	ip := a.IP(svc)
+	if ip == nil {
 		return ""
 	}
-	return a.svcToIP[svc].String()
-}
-
-func assignedPool(a *Allocator, svc string) string {
-	return a.svcToPool[svc]
+	return ip.String()
 }
 
 func ipnet(s string) *net.IPNet {

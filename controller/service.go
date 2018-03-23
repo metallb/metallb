@@ -22,6 +22,7 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 
+	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/config"
 )
 
@@ -55,7 +56,7 @@ func (c *controller) convergeBalancer(key string, svc *v1.Service) error {
 	if lbIP != nil {
 		// This assign is idempotent if the config is consistent,
 		// otherwise it'll fail and tell us why.
-		if err := c.ips.Assign(key, lbIP); err != nil {
+		if err := c.ips.Assign(key, lbIP, allocatorPorts(svc), "", ""); err != nil {
 			glog.Infof("%s: clearing assignment %q, %s", key, lbIP)
 			c.clearServiceState(key, svc)
 			lbIP = nil
@@ -122,6 +123,17 @@ func (c *controller) convergeBalancer(key string, svc *v1.Service) error {
 	return nil
 }
 
+func allocatorPorts(svc *v1.Service) []allocator.Port {
+	var ret []allocator.Port
+	for _, port := range svc.Spec.Ports {
+		ret = append(ret, allocator.Port{
+			Proto: string(port.Protocol),
+			Port:  int(port.Port),
+		})
+	}
+	return ret
+}
+
 // clearServiceState clears all fields that are actively managed by
 // this controller.
 func (c *controller) clearServiceState(key string, svc *v1.Service) {
@@ -136,7 +148,7 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 		if ip == nil {
 			return nil, fmt.Errorf("invalid spec.loadBalancerIP %q", svc.Spec.LoadBalancerIP)
 		}
-		if err := c.ips.Assign(key, ip); err != nil {
+		if err := c.ips.Assign(key, ip, allocatorPorts(svc), "", ""); err != nil {
 			return nil, err
 		}
 		return ip, nil
@@ -145,7 +157,7 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 	// Otherwise, did the user ask for a specific pool?
 	desiredPool := svc.Annotations["metallb.universe.tf/address-pool"]
 	if desiredPool != "" {
-		ip, err := c.ips.AllocateFromPool(key, desiredPool)
+		ip, err := c.ips.AllocateFromPool(key, desiredPool, allocatorPorts(svc), "", "")
 		if err != nil {
 			return nil, err
 		}
@@ -153,5 +165,5 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 	}
 
 	// Okay, in that case just bruteforce across all pools.
-	return c.ips.Allocate(key)
+	return c.ips.Allocate(key, allocatorPorts(svc), "", "")
 }
