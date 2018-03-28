@@ -17,7 +17,7 @@ the
 for more information.
 
 Participation in this project is subject to
-a [code of conduct](https://metallb.universe.tf/code-of-conduct/).
+a [code of conduct](https://metallb.universe.tf/community/code-of-conduct/).
 
 One lightweight way you can contribute is
 to
