@@ -230,51 +230,90 @@ func TestPoolAllocation(t *testing.T) {
 	}
 
 	tests := []struct {
-		svc      string
-		unassign bool
-		wantErr  bool
+		desc       string
+		svc        string
+		ports      []Port
+		sharingKey string
+		unassign   bool
+		wantErr    bool
 	}{
-		{svc: "s1"},
-		{svc: "s2"},
-		{svc: "s3"},
-		{svc: "s4"},
 		{
+			desc: "s1 gets an IP",
+			svc:  "s1",
+		},
+		{
+			desc: "s2 gets an IP",
+			svc:  "s2",
+		},
+		{
+			desc: "s3 gets an IP",
+			svc:  "s3",
+		},
+		{
+			desc: "s4 gets an IP",
+			svc:  "s4",
+		},
+		{
+			desc:    "s5 can't get an IP",
 			svc:     "s5",
 			wantErr: true,
 		},
 		{
+			desc:    "s6 can't get an IP",
 			svc:     "s6",
 			wantErr: true,
 		},
 		{
+			desc:     "s1 releases its IP",
 			svc:      "s1",
 			unassign: true,
 		},
-		{svc: "s5"},
 		{
+			desc: "s5 can now grab s1's former IP",
+			svc:  "s5",
+		},
+		{
+			desc:    "s6 still can't get an IP",
 			svc:     "s6",
 			wantErr: true,
 		},
+		{
+			desc:     "s5 unassigns in prep for enabling IP sharing",
+			svc:      "s5",
+			unassign: true,
+		},
+		{
+			desc:       "s5 enables IP sharing",
+			svc:        "s5",
+			ports:      ports("tcp/80"),
+			sharingKey: "share",
+		},
+		{
+			desc:       "s6 can get an IP now, with sharing",
+			svc:        "s6",
+			ports:      ports("tcp/443"),
+			sharingKey: "share",
+		},
 	}
 
-	for i, test := range tests {
+	for _, test := range tests {
 		if test.unassign {
 			alloc.Unassign(test.svc)
 			continue
 		}
-		ip, err := alloc.AllocateFromPool(test.svc, "test", nil, "", "")
+		ip, err := alloc.AllocateFromPool(test.svc, "test", test.ports, test.sharingKey, "")
 		if test.wantErr {
 			if err == nil {
-				t.Errorf("#%d should have caused an error, but did not", i+1)
+				t.Errorf("%s: should have caused an error, but did not", test.desc)
 
 			}
 			continue
 		}
 		if err != nil {
-			t.Errorf("#%d AllocateFromPool(%q, \"test\"): %s", i+1, test.svc, err)
+			t.Errorf("%s: AllocateFromPool(%q, \"test\"): %s", test.desc, test.svc, err)
 		}
 		if !validIPs[ip.String()] {
-			t.Errorf("#%d allocated unexpected IP %q", i+1, ip)
+			t.Errorf("%s: allocated unexpected IP %q", test.desc, ip)
 		}
 	}
 
@@ -307,50 +346,80 @@ func TestAllocation(t *testing.T) {
 	}
 
 	tests := []struct {
-		svc      string
-		unassign bool
-		wantErr  bool
+		desc       string
+		svc        string
+		ports      []Port
+		sharingKey string
+		unassign   bool
+		wantErr    bool
 	}{
-		{svc: "s1"},
-		{svc: "s2"},
-		{svc: "s3"},
-		{svc: "s4"},
 		{
+			desc: "s1 gets an IP",
+			svc:  "s1",
+		},
+		{
+			desc: "s2 gets an IP",
+			svc:  "s2",
+		},
+		{
+			desc: "s3 gets an IP",
+			svc:  "s3",
+		},
+		{
+			desc: "s4 gets an IP",
+			svc:  "s4",
+		},
+		{
+			desc:    "s5 can't get an IP",
 			svc:     "s5",
 			wantErr: true,
 		},
 		{
+			desc:    "s6 can't get an IP",
 			svc:     "s6",
 			wantErr: true,
 		},
 		{
+			desc:     "s1 gives up its IP",
 			svc:      "s1",
 			unassign: true,
 		},
-		{svc: "s5"},
 		{
+			desc:       "s5 can now get an IP",
+			svc:        "s5",
+			ports:      ports("tcp/80"),
+			sharingKey: "share",
+		},
+		{
+			desc:    "s6 still can't get an IP",
 			svc:     "s6",
 			wantErr: true,
 		},
+		{
+			desc:       "s6 can get an IP with sharing",
+			svc:        "s6",
+			ports:      ports("tcp/443"),
+			sharingKey: "share",
+		},
 	}
 
-	for i, test := range tests {
+	for _, test := range tests {
 		if test.unassign {
 			alloc.Unassign(test.svc)
 			continue
 		}
-		ip, err := alloc.Allocate(test.svc, nil, "", "")
+		ip, err := alloc.Allocate(test.svc, test.ports, test.sharingKey, "")
 		if test.wantErr {
 			if err == nil {
-				t.Errorf("#%d should have caused an error, but did not", i+1)
+				t.Errorf("%s: should have caused an error, but did not", test.desc)
 			}
 			continue
 		}
 		if err != nil {
-			t.Errorf("#%d Allocate(%q, \"test\"): %s", i+1, test.svc, err)
+			t.Errorf("%s: Allocate(%q, \"test\"): %s", test.desc, test.svc, err)
 		}
 		if !validIPs[ip.String()] {
-			t.Errorf("#%d allocated unexpected IP %q", i+1, ip)
+			t.Errorf("%s allocated unexpected IP %q", test.desc, ip)
 		}
 	}
 }
