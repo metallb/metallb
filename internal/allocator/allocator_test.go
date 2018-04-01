@@ -2,6 +2,8 @@ package allocator
 
 import (
 	"net"
+	"strconv"
+	"strings"
 	"testing"
 
 	"go.universe.tf/metallb/internal/config"
@@ -24,10 +26,13 @@ func TestAssignment(t *testing.T) {
 	}
 
 	tests := []struct {
-		desc    string
-		svc     string
-		ip      string
-		wantErr bool
+		desc       string
+		svc        string
+		ip         string
+		ports      []Port
+		sharingKey string
+		backendKey string
+		wantErr    bool
 	}{
 		{
 			desc: "assign s1",
@@ -88,6 +93,81 @@ func TestAssignment(t *testing.T) {
 			svc:  "s3",
 			ip:   "1.2.4.254",
 		},
+		{
+			desc:       "s4 takes an IP, with sharing",
+			svc:        "s4",
+			ip:         "1.2.4.3",
+			ports:      ports("tcp/80"),
+			sharingKey: "share",
+			backendKey: "backend",
+		},
+		{
+			desc:       "s3 can't share with s4 (port conflict)",
+			svc:        "s3",
+			ip:         "1.2.4.3",
+			ports:      ports("tcp/80"),
+			sharingKey: "share",
+			backendKey: "backend",
+			wantErr:    true,
+		},
+		{
+			desc:       "s3 can't share with s4 (wrong sharing key)",
+			svc:        "s3",
+			ip:         "1.2.4.3",
+			ports:      ports("tcp/443"),
+			sharingKey: "othershare",
+			backendKey: "backend",
+			wantErr:    true,
+		},
+		{
+			desc:       "s3 can't share with s4 (wrong backend key)",
+			svc:        "s3",
+			ip:         "1.2.4.3",
+			ports:      ports("tcp/443"),
+			sharingKey: "share",
+			backendKey: "otherbackend",
+			wantErr:    true,
+		},
+		{
+			desc:       "s3 takes the same IP as s4",
+			svc:        "s3",
+			ip:         "1.2.4.3",
+			ports:      ports("tcp/443"),
+			sharingKey: "share",
+			backendKey: "backend",
+		},
+		{
+			desc:       "s3 can't change its ports while keeping the same IP",
+			svc:        "s3",
+			ip:         "1.2.4.3",
+			ports:      ports("udp/53"),
+			sharingKey: "share",
+			backendKey: "backend",
+			wantErr:    true,
+		},
+		{
+			desc:       "s3 can't change its sharing key while keeping the same IP",
+			svc:        "s3",
+			ip:         "1.2.4.3",
+			ports:      ports("tcp/443"),
+			sharingKey: "othershare",
+			backendKey: "backend",
+			wantErr:    true,
+		},
+		{
+			desc:       "s3 can't change its backend key while keeping the same IP",
+			svc:        "s3",
+			ip:         "1.2.4.3",
+			ports:      ports("tcp/443"),
+			sharingKey: "share",
+			backendKey: "otherbackend",
+			wantErr:    true,
+		},
+		{
+			desc: "s4 takes s3's former IP",
+			svc:  "s4",
+			ip:   "1.2.4.254",
+		},
 	}
 
 	for _, test := range tests {
@@ -99,11 +179,12 @@ func TestAssignment(t *testing.T) {
 		if ip == nil {
 			t.Fatalf("invalid IP %q in test %q", test.ip, test.desc)
 		}
-		err := alloc.Assign(test.svc, ip, nil, "", "")
+		alreadyHasIP := assigned(alloc, test.svc) == test.ip
+		err := alloc.Assign(test.svc, ip, test.ports, test.sharingKey, test.backendKey)
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("%q should have caused an error, but did not", test.desc)
-			} else if a := assigned(alloc, test.svc); a == test.ip {
+			} else if a := assigned(alloc, test.svc); !alreadyHasIP && a == test.ip {
 				t.Errorf("%q: Assign(%q, %q) failed, but allocator did record allocation", test.desc, test.svc, test.ip)
 			}
 
@@ -594,8 +675,7 @@ func TestPoolCount(t *testing.T) {
 }
 
 // Some helpers
-//
-// Peeks inside Allocator to find the allocated IP and pool for a service.
+
 func assigned(a *Allocator, svc string) string {
 	ip := a.IP(svc)
 	if ip == nil {
@@ -610,4 +690,17 @@ func ipnet(s string) *net.IPNet {
 		panic(err)
 	}
 	return n
+}
+
+func ports(ports ...string) []Port {
+	var ret []Port
+	for _, s := range ports {
+		fs := strings.Split(s, "/")
+		p, err := strconv.Atoi(fs[1])
+		if err != nil {
+			panic("bad port in test")
+		}
+		ret = append(ret, Port{fs[0], p})
+	}
+	return ret
 }
