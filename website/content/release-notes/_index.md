@@ -3,7 +3,6 @@ title: Release Notes
 weight: 7
 ---
 
-<!---
 ## Version 0.5.0
 
 [Documentation for this release](https://metallb.universe.tf)
@@ -49,11 +48,18 @@ New features:
   uses to identify the node. Now, peerings may be established via any
   interface on the nodes, and traffic will flow in the expected
   manner.
---->
+
+Bugfixes
+
+- The NDP
+  handler
+  [refcounts its sollicited multicast group memberships](https://github.com/google/metallb/issues/184),
+  to avoid extremely rare cases where it might stop responding for a
+  service IP.
 
 ## Version 0.4.6
 
-[Documentation for this release](https://metallb.universe.tf)
+[Documentation for this release](https://v0-4-6--metallb.netlify.com)
 
 Bugfixes:
 
