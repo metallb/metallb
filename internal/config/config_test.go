@@ -85,7 +85,6 @@ address-pools:
   protocol: layer2
   addresses:
   - 40.0.0.0/25
-  cidr:
   - 40.0.0.150-40.0.0.200
 - name: pool4
   protocol: arp
