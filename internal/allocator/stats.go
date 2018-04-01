@@ -3,8 +3,9 @@ package allocator
 import "github.com/prometheus/client_golang/prometheus"
 
 var stats = struct {
-	poolCapacity *prometheus.GaugeVec
-	poolActive   *prometheus.GaugeVec
+	poolCapacity  *prometheus.GaugeVec
+	poolActive    *prometheus.GaugeVec
+	poolAllocated *prometheus.GaugeVec
 }{
 	poolCapacity: prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "metallb",
@@ -22,9 +23,18 @@ var stats = struct {
 	}, []string{
 		"pool",
 	}),
+	poolAllocated: prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "metallb",
+		Subsystem: "allocator",
+		Name:      "services_allocated_total",
+		Help:      "Number of services allocated, per pool",
+	}, []string{
+		"pool",
+	}),
 }
 
 func init() {
 	prometheus.MustRegister(stats.poolCapacity)
 	prometheus.MustRegister(stats.poolActive)
+	prometheus.MustRegister(stats.poolAllocated)
 }
