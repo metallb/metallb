@@ -15,9 +15,11 @@ import (
 type Allocator struct {
 	pools map[string]*config.Pool
 
-	allocated       map[string]*alloc        // svc -> alloc
-	sharingKeyForIP map[string]*key          // ip.String() -> assigned sharing key
-	portsInUse      map[string]map[Port]bool // ip.String() + Port -> in-use?
+	allocated       map[string]*alloc         // svc -> alloc
+	sharingKeyForIP map[string]*key           // ip.String() -> assigned sharing key
+	portsInUse      map[string]map[Port]bool  // ip.String() + Port -> in-use?
+	poolIPsInUse    map[string]map[string]int // poolName -> ip.String() -> number of users
+	poolServices    map[string]int            // poolName -> #services
 }
 
 // Port represents one port in use by a service.
@@ -37,6 +39,7 @@ type key struct {
 }
 
 type alloc struct {
+	pool  string
 	ip    net.IP
 	ports []Port
 	key
@@ -50,6 +53,8 @@ func New() *Allocator {
 		allocated:       map[string]*alloc{},
 		sharingKeyForIP: map[string]*key{},
 		portsInUse:      map[string]map[Port]bool{},
+		poolIPsInUse:    map[string]map[string]int{},
+		poolServices:    map[string]int{},
 	}
 }
 
@@ -65,17 +70,58 @@ func (a *Allocator) SetPools(pools map[string]*config.Pool) error {
 		}
 	}
 
+	for n := range a.pools {
+		if pools[n] == nil {
+			stats.poolCapacity.DeleteLabelValues(n)
+			stats.poolActive.DeleteLabelValues(n)
+			stats.poolAllocated.DeleteLabelValues(n)
+		}
+	}
+
 	a.pools = pools
 
-	// TODO: readjust stats.
+	// Need to rearrange existing pool mappings and counts
+	for svc, alloc := range a.allocated {
+		pool := poolFor(a.pools, alloc.ip)
+		if pool != alloc.pool {
+			a.Unassign(svc)
+			alloc.pool = pool
+			// Use the internal assign, we know for a fact the IP is
+			// still usable.
+			a.assign(svc, alloc)
+		}
+	}
 
 	return nil
+}
+
+// assign unconditionally updates internal state to reflect svc's
+// allocation of alloc. Caller must ensure that this call is safe.
+func (a *Allocator) assign(svc string, alloc *alloc) {
+	a.Unassign(svc)
+	a.allocated[svc] = alloc
+	a.sharingKeyForIP[alloc.ip.String()] = &alloc.key
+	if a.portsInUse[alloc.ip.String()] == nil {
+		a.portsInUse[alloc.ip.String()] = map[Port]bool{}
+	}
+	for _, port := range alloc.ports {
+		a.portsInUse[alloc.ip.String()][port] = true
+	}
+	if a.poolIPsInUse[alloc.pool] == nil {
+		a.poolIPsInUse[alloc.pool] = map[string]int{}
+	}
+	a.poolIPsInUse[alloc.pool][alloc.ip.String()]++
+	a.poolServices[alloc.pool]++
+
+	stats.poolActive.WithLabelValues(alloc.pool).Set(float64(len(a.poolIPsInUse[alloc.pool])))
+	stats.poolActive.WithLabelValues(alloc.pool).Set(float64(a.poolServices[alloc.pool]))
 }
 
 // Assign assigns the requested ip to svc, if the assignment is
 // permissible by sharingKey and backendKey.
 func (a *Allocator) Assign(svc string, ip net.IP, ports []Port, sharingKey, backendKey string) error {
-	if poolFor(a.pools, ip) == "" {
+	pool := poolFor(a.pools, ip)
+	if pool == "" {
 		return fmt.Errorf("%q is not allowed in config", ip)
 	}
 	sk := &key{
@@ -122,20 +168,17 @@ func (a *Allocator) Assign(svc string, ip net.IP, ports []Port, sharingKey, back
 	// case we're mutating an existing service (see the "already have
 	// an allocation" block above). Unassigning is idempotent, so it's
 	// unconditionally safe to do.
-	a.Unassign(svc)
-	a.allocated[svc] = &alloc{
+	alloc := &alloc{
+		pool:  pool,
 		ip:    ip,
 		ports: make([]Port, len(ports)),
 		key:   *sk,
 	}
-	a.sharingKeyForIP[ip.String()] = sk
-	if a.portsInUse[ip.String()] == nil {
-		a.portsInUse[ip.String()] = map[Port]bool{}
+	for i, port := range ports {
+		port := port
+		alloc.ports[i] = port
 	}
-	for _, port := range ports {
-		a.portsInUse[ip.String()][port] = true
-	}
-
+	a.assign(svc, alloc)
 	return nil
 }
 
@@ -154,6 +197,13 @@ func (a *Allocator) Unassign(svc string) bool {
 		delete(a.portsInUse, al.ip.String())
 		delete(a.sharingKeyForIP, al.ip.String())
 	}
+	a.poolIPsInUse[al.pool][al.ip.String()]--
+	if a.poolIPsInUse[al.pool][al.ip.String()] == 0 {
+		// Explicitly delete unused IPs from the pool, so that len()
+		// is an accurate count of IPs in use.
+		delete(a.poolIPsInUse[al.pool], al.ip.String())
+	}
+	a.poolServices[al.pool]--
 	return true
 }
 
