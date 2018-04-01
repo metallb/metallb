@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"strings"
 
 	"go.universe.tf/metallb/internal/config"
 
@@ -15,11 +16,12 @@ import (
 type Allocator struct {
 	pools map[string]*config.Pool
 
-	allocated       map[string]*alloc         // svc -> alloc
-	sharingKeyForIP map[string]*key           // ip.String() -> assigned sharing key
-	portsInUse      map[string]map[Port]bool  // ip.String() + Port -> in-use?
-	poolIPsInUse    map[string]map[string]int // poolName -> ip.String() -> number of users
-	poolServices    map[string]int            // poolName -> #services
+	allocated       map[string]*alloc          // svc -> alloc
+	sharingKeyForIP map[string]*key            // ip.String() -> assigned sharing key
+	portsInUse      map[string]map[Port]string // ip.String() -> Port -> svc
+	servicesOnIP    map[string]map[string]bool // ip.String() -> svc -> allocated?
+	poolIPsInUse    map[string]map[string]int  // poolName -> ip.String() -> number of users
+	poolServices    map[string]int             // poolName -> #services
 }
 
 // Port represents one port in use by a service.
@@ -52,7 +54,8 @@ func New() *Allocator {
 
 		allocated:       map[string]*alloc{},
 		sharingKeyForIP: map[string]*key{},
-		portsInUse:      map[string]map[Port]bool{},
+		portsInUse:      map[string]map[Port]string{},
+		servicesOnIP:    map[string]map[string]bool{},
 		poolIPsInUse:    map[string]map[string]int{},
 		poolServices:    map[string]int{},
 	}
@@ -102,11 +105,15 @@ func (a *Allocator) assign(svc string, alloc *alloc) {
 	a.allocated[svc] = alloc
 	a.sharingKeyForIP[alloc.ip.String()] = &alloc.key
 	if a.portsInUse[alloc.ip.String()] == nil {
-		a.portsInUse[alloc.ip.String()] = map[Port]bool{}
+		a.portsInUse[alloc.ip.String()] = map[Port]string{}
 	}
 	for _, port := range alloc.ports {
-		a.portsInUse[alloc.ip.String()][port] = true
+		a.portsInUse[alloc.ip.String()][port] = svc
 	}
+	if a.servicesOnIP[alloc.ip.String()] == nil {
+		a.servicesOnIP[alloc.ip.String()] = map[string]bool{}
+	}
+	a.servicesOnIP[alloc.ip.String()][svc] = true
 	if a.poolIPsInUse[alloc.pool] == nil {
 		a.poolIPsInUse[alloc.pool] = map[string]int{}
 	}
@@ -129,35 +136,27 @@ func (a *Allocator) Assign(svc string, ip net.IP, ports []Port, sharingKey, back
 		backend: backendKey,
 	}
 
-	// Does the service already have an allocation for a matching IP? If so,
-	// attributes need to match.
-	if s := a.allocated[svc]; s != nil && ip.Equal(s.ip) {
-		if *sk != s.key {
-			// TODO: just update the sharing key, if this is the only
-			// consumer of the IP.
-			return fmt.Errorf("%q sharing key differs, cannot change", svc)
-		}
-
-		if !portsEqual(ports, s.ports) {
-			// TODO: just update port allocs if the new ones are
-			// non-conflicting.
-			return errors.New("current ports don't match requested ports")
-		}
-
-		// Already assigned, and everything is happy.
-		return nil
-	}
-
 	// Does the IP already have allocs? If so, needs to be the same
 	// sharing key, and have non-overlapping ports. If not, the
 	// proposed IP needs to be allowed by configuration.
 	if existingSK := a.sharingKeyForIP[ip.String()]; existingSK != nil {
 		if err := sharingOK(existingSK, sk); err != nil {
-			return fmt.Errorf("cannot use %q: %s", ip, err)
+			// Sharing key is incompatible. However, if the owner is
+			// the same service, and is the only user of the IP, we
+			// can just update its sharing key in place.
+			var otherSvcs []string
+			for otherSvc := range a.servicesOnIP[ip.String()] {
+				if otherSvc != svc {
+					otherSvcs = append(otherSvcs, otherSvc)
+				}
+			}
+			if len(otherSvcs) > 0 {
+				return fmt.Errorf("can't change sharing key for %q, address also in use by %s", svc, strings.Join(otherSvcs, ","))
+			}
 		}
 
 		for _, port := range ports {
-			if a.portsInUse[ip.String()][port] {
+			if curSvc, ok := a.portsInUse[ip.String()][port]; ok && curSvc != svc {
 				return fmt.Errorf("port %s is already in use on %q", port, ip)
 			}
 		}
@@ -191,8 +190,12 @@ func (a *Allocator) Unassign(svc string) bool {
 	al := a.allocated[svc]
 	delete(a.allocated, svc)
 	for _, port := range al.ports {
+		if curSvc := a.portsInUse[al.ip.String()][port]; curSvc != svc {
+			panic(fmt.Sprintf("incoherent state, I thought port %q belonged to service %q, but it seems to belong to %q", port, svc, curSvc))
+		}
 		delete(a.portsInUse[al.ip.String()], port)
 	}
+	delete(a.servicesOnIP[al.ip.String()], svc)
 	if len(a.portsInUse[al.ip.String()]) == 0 {
 		delete(a.portsInUse, al.ip.String())
 		delete(a.sharingKeyForIP, al.ip.String())
