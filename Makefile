@@ -50,13 +50,6 @@ all:
 ## `make push` builds timestamped images, pushes them to REGISTRY, and
 ## updates your currently active cluster to pull them.
 
-.PHONY: manifest
-manifest:
-	(cd helm/metallb && helm template -x templates/namespace.yaml --set helmLabels=false . >../../manifests/metallb.yaml)
-	(cd helm/metallb && helm template -x templates/rbac.yaml --set helmLabels=false . >>../../manifests/metallb.yaml)
-	(cd helm/metallb && helm template -x templates/controller.yaml --set helmLabels=false . >>../../manifests/metallb.yaml)
-	(cd helm/metallb && helm template -x templates/speaker.yaml --set helmLabels=false . >>../../manifests/metallb.yaml)
-
 .PHONY: build
 build:
 	$(GOCMD) install -v -ldflags="-X go.universe.tf/metallb/internal/version.gitCommit=$(GITCOMMIT) -X go.universe.tf/metallb/internal/version.gitBranch=$(GITBRANCH)" ./controller ./speaker ./test-bgp-router
@@ -222,7 +215,6 @@ endif
 	perl -pi -e 's/tag: .*/tag: v$(VERSION)/g' helm/metallb/values.yaml
 	perl -pi -e 's/pullPolicy: .*/pullPolicy: IfNotPresent/g' helm/metallb/values.yaml
 
-	+make manifest
 	perl -pi -e 's/MetalLB .*/MetalLB v$(VERSION)/g' website/content/_header.md
 	perl -pi -e 's/version\s+=.*/version = "$(VERSION)"/g' internal/version/version.go
 	gofmt -w internal/version/version.go
