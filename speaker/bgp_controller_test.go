@@ -603,17 +603,61 @@ func TestBGPSpeaker(t *testing.T) {
 		},
 
 		{
+			desc:     "Second balancer, ingress shared with first",
+			balancer: "test2",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type: "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: &v1.Endpoints{
+				Subsets: []v1.EndpointSubset{
+					{
+						Addresses: []v1.EndpointAddress{
+							{
+								IP:       "2.3.4.5",
+								NodeName: strptr("iris"),
+							},
+						},
+					},
+				},
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					// Prefixes duplicated because the dedupe happens
+					// inside the real BGP session.
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
+				"1.2.3.5:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
+			},
+		},
+
+		{
 			desc:     "Delete svc",
 			balancer: "test1",
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
 					{
-						Prefix: ipnet("10.20.30.5/32"),
+						Prefix: ipnet("10.20.30.1/32"),
 					},
 				},
 				"1.2.3.5:0": {
 					{
-						Prefix: ipnet("10.20.30.5/32"),
+						Prefix: ipnet("10.20.30.1/32"),
 					},
 				},
 			},
@@ -646,7 +690,7 @@ func TestBGPSpeaker(t *testing.T) {
 					Type: "LoadBalancer",
 					ExternalTrafficPolicy: "Cluster",
 				},
-				Status: statusAssigned("10.20.30.5"),
+				Status: statusAssigned("10.20.30.1"),
 			},
 			eps: &v1.Endpoints{
 				Subsets: []v1.EndpointSubset{
@@ -663,9 +707,17 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.5:0": {
 					{
-						Prefix: ipnet("10.20.30.5/32"),
+						Prefix: ipnet("10.20.30.1/32"),
 					},
 				},
+			},
+		},
+
+		{
+			desc:     "Delete second svc",
+			balancer: "test2",
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.5:0": nil,
 			},
 		},
 	}

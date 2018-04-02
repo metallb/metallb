@@ -21,8 +21,6 @@ import (
 	"net"
 	"os"
 
-	"go.universe.tf/metallb/internal/allocator"
-	"go.universe.tf/metallb/internal/allocator/k8salloc"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/iface"
@@ -112,10 +110,12 @@ type controller struct {
 	myNode string
 
 	config *config.Config
-	ips    *allocator.Allocator
+	//ips    *allocator.Allocator
 
 	protocols map[config.Proto]Protocol
 	announced map[string]config.Proto // service name -> protocol advertising it
+	svcIP     map[string]net.IP       // service name -> assigned IP
+	ipRefcnt  map[string]int          // IP string -> number of consumers
 }
 
 type controllerConfig struct {
@@ -148,10 +148,10 @@ func newController(cfg controllerConfig) (*controller, error) {
 	ret := &controller{
 		myNode: cfg.MyNode,
 
-		ips: allocator.New(),
-
 		protocols: protocols,
 		announced: map[string]config.Proto{},
+		svcIP:     map[string]net.IP{},
+		ipRefcnt:  map[string]int{},
 	}
 
 	return ret, nil
@@ -186,31 +186,30 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 		return c.deleteBalancer(name, "no healthy local endpoints")
 	}
 
-	// May be either an IPv4 or IPv6 address.
 	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
 	if lbIP == nil {
 		glog.Errorf("%s: invalid LoadBalancer IP %q", name, svc.Status.LoadBalancer.Ingress[0].IP)
 		return c.deleteBalancer(name, "invalid IP allocated by controller")
 	}
 
-	if err := c.ips.Assign(name, lbIP, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
+	poolName := poolFor(c.config.Pools, lbIP)
+	if poolName == "" {
 		glog.Errorf("%s: IP %q assigned by controller is not allowed by config", name, lbIP)
 		return c.deleteBalancer(name, "invalid IP allocated by controller")
 	}
 
-	poolName := c.ips.Pool(name)
-	pool := c.config.Pools[c.ips.Pool(name)]
+	pool := c.config.Pools[poolName]
 	if pool == nil {
 		glog.Errorf("%s: could not find pool %q that definitely should exist!", name, poolName)
 		return c.deleteBalancer(name, "can't find pool")
 	}
 
 	if proto, ok := c.announced[name]; ok && proto != pool.Protocol {
-		if err := c.protocols[proto].DeleteBalancer(name, fmt.Sprintf("protocol changed to %q", pool.Protocol)); err != nil {
-			return fmt.Errorf("deleting balancer %q from %q protocol: %s", name, proto, err)
+		if err := c.deleteBalancer(name, fmt.Sprintf("protocol changed to %q", pool.Protocol)); err != nil {
+			return fmt.Errorf("deleting balancer %q: %s", name, err)
 		}
-		delete(c.announced, name)
 	}
+
 	handler := c.protocols[pool.Protocol]
 	if handler == nil {
 		glog.Errorf("%s: unknown balancer protocol %q. This should not happen, please file a bug!", name, pool.Protocol)
@@ -220,7 +219,12 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 		return err
 	}
 
-	c.announced[name] = pool.Protocol
+	if c.announced[name] == "" {
+		c.announced[name] = pool.Protocol
+		c.svcIP[name] = lbIP
+		c.ipRefcnt[lbIP.String()]++
+	}
+
 	announcing.With(prometheus.Labels{
 		"protocol": string(pool.Protocol),
 		"service":  name,
@@ -232,31 +236,42 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 }
 
 func (c *controller) deleteBalancer(name, reason string) error {
-	if _, ok := c.announced[name]; !ok {
+	proto, ok := c.announced[name]
+	if !ok {
 		return nil
 	}
 
 	glog.Infof("%s: stopping announcements, %s", name, reason)
 
-	proto, ok := c.announced[name]
-	if !ok {
-		glog.Errorf("%s: unknown balancer protocol. This should not happen, please file a bug!", name)
-		return errors.New("internal error (unknown balancer protocol)")
-	}
-
-	if err := c.protocols[proto].DeleteBalancer(name, reason); err != nil {
-		return err
-	}
-
-	delete(c.announced, name)
-	c.ips.Unassign(name)
+	c.ipRefcnt[c.svcIP[name].String()]--
+	ref := c.ipRefcnt[c.svcIP[name].String()]
 	announcing.Delete(prometheus.Labels{
 		"protocol": string(proto),
 		"service":  name,
 		"node":     c.myNode,
-		"ip":       c.ips.IP(name).String(),
+		"ip":       c.svcIP[name].String(),
 	})
+	delete(c.announced, name)
+	delete(c.svcIP, name)
+
+	if ref == 0 {
+		if err := c.protocols[proto].DeleteBalancer(name, reason); err != nil {
+			return err
+		}
+	}
+
 	return nil
+}
+
+func poolFor(pools map[string]*config.Pool, ip net.IP) string {
+	for pname, p := range pools {
+		for _, cidr := range p.CIDR {
+			if cidr.Contains(ip) {
+				return pname
+			}
+		}
+	}
+	return ""
 }
 
 func (c *controller) SetConfig(cfg *config.Config) error {
@@ -268,9 +283,11 @@ func (c *controller) SetConfig(cfg *config.Config) error {
 		return errors.New("configuration missing")
 	}
 
-	if err := c.ips.SetPools(cfg.Pools); err != nil {
-		glog.Errorf("Applying new configuration failed: %s", err)
-		return fmt.Errorf("configuration rejected: %s", err)
+	for svc, ip := range c.svcIP {
+		if pool := poolFor(cfg.Pools, ip); pool == "" {
+			glog.Errorf("Applying new configuration failed: service %q has no configuration under new config", svc)
+			return fmt.Errorf("configuration rejected: service %q has no configuration under new config", svc)
+		}
 	}
 
 	for proto, handler := range c.protocols {
