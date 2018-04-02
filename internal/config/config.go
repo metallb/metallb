@@ -322,9 +322,6 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 	}
 
 	switch ret.Protocol {
-	case "arp", "ndp":
-		ret.Protocol = Layer2
-		fallthrough
 	case Layer2:
 		if len(p.BGPAdvertisements) > 0 {
 			return nil, errors.New("cannot have bgp-advertisements configuration element in a layer2 address pool")
