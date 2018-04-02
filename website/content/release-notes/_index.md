@@ -3,6 +3,31 @@ title: Release Notes
 weight: 7
 ---
 
+<!--## Version 0.6.0
+
+[Documentation for this release](https://metallb.universe.tf)
+
+Action required if upgrading from 0.5.x:
+
+- As documented in the 0.5.0 release notes, several deprecated fields
+  have been removed from the configuration. If you didn't update your
+  configurations for 0.5, you may need to make the following changes:
+  - Rename the `cidr` field of address pools to `addresses`
+  - Rename `protocol: arp` and `protocol: ndp` to `protocol: layer2`
+  - Replace `arp-network` statements with a range-based IP allocation
+
+New features:
+
+- You can now colocate multiple services on a single IP address, using
+  annotations on the Service objects. See
+  the
+  [IP sharing documentation]({{% relref "usage/_index.md" %}}#ip-address-sharing) for
+  instructions and caveats.
+
+Bugfixes:
+
+-->
+
 ## Version 0.5.0
 
 [Documentation for this release](https://metallb.universe.tf)
@@ -49,7 +74,7 @@ New features:
   interface on the nodes, and traffic will flow in the expected
   manner.
 
-Bugfixes
+Bugfixes:
 
 - The NDP
   handler

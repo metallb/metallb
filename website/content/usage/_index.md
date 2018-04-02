@@ -130,3 +130,41 @@ best mode to use with BGP
 announcements. See
 [issue 1](https://github.com/google/metallb/issues/1) for more
 information.
+
+## IP address sharing
+
+By default, Services do not share IP addresses. If you have a need to
+colocate services on a single IP, you can enable selective IP sharing
+by adding the `metallb.universe.tf/allow-shared-ip` annotation to
+services.
+
+The value of the annotation is a "sharing key." Services can share an
+IP address under the following conditions:
+
+- They both have the same sharing key.
+- They request the use of different ports (e.g. tcp/80 for one and
+  tcp/443 for the other).
+- They both use the `Cluster` external traffic policy, or both have
+  the _exact_ same selector.
+
+If these conditions are satisfied, MetalLB _may_ colocate the two
+services on the same IP, but does not have to. If you want to ensure
+that they share a specific address, use the `spec.LoadBalancerIP`
+functionality described above.
+
+There are two main reasons to colocate services in this fashion: to
+work around a Kubernetes limitation, and to work with limited IP
+addresses.
+
+[Kubernetes does not currently allow multiprotocol LoadBalancer services](https://github.com/kubernetes/kubernetes/issues/23880). This
+would normally make it impossible to run services like DNS, because
+they have to listen on both TCP and UDP. To work around this
+limitation of Kubernetes with MetalLB, create two services (one for
+TCP, one for UDP), both with the same pod selector. Then, give them
+the same sharing key and `spec.loadBalancerIP` to colocate the TCP and
+UDP serving ports on the same IP address.
+
+The second reason is much simpler: if you have more services than
+available IP addresses, and you can't or don't want to get more
+addresses, the only alternative is to colocate multiple services per
+IP address.
