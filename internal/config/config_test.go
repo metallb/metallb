@@ -87,12 +87,7 @@ address-pools:
   - 40.0.0.0/25
   - 40.0.0.150-40.0.0.200
 - name: pool4
-  protocol: arp
-  addresses:
-  - 50.0.0.0/16
-  - 50.20.0.0/24
-- name: pool5
-  protocol: ndp
+  protocol: layer2
   addresses:
   - 2001:db8::/64
 `,
@@ -161,11 +156,6 @@ address-pools:
 						AutoAssign: true,
 					},
 					"pool4": {
-						Protocol:   Layer2,
-						CIDR:       []*net.IPNet{ipnet("50.0.0.0/16"), ipnet("50.20.0.0/24")},
-						AutoAssign: true,
-					},
-					"pool5": {
 						Protocol:   Layer2,
 						CIDR:       []*net.IPNet{ipnet("2001:db8::/64")},
 						AutoAssign: true,
