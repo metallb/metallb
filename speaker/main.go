@@ -22,6 +22,7 @@ import (
 	"os"
 
 	"go.universe.tf/metallb/internal/allocator"
+	"go.universe.tf/metallb/internal/allocator/k8salloc"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/iface"
@@ -192,7 +193,7 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 		return c.deleteBalancer(name, "invalid IP allocated by controller")
 	}
 
-	if err := c.ips.Assign(name, lbIP, allocatorPorts(svc), "", ""); err != nil {
+	if err := c.ips.Assign(name, lbIP, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 		glog.Errorf("%s: IP %q assigned by controller is not allowed by config", name, lbIP)
 		return c.deleteBalancer(name, "invalid IP allocated by controller")
 	}
@@ -228,17 +229,6 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 	}).Set(1)
 
 	return nil
-}
-
-func allocatorPorts(svc *v1.Service) []allocator.Port {
-	var ret []allocator.Port
-	for _, port := range svc.Spec.Ports {
-		ret = append(ret, allocator.Port{
-			Proto: string(port.Protocol),
-			Port:  int(port.Port),
-		})
-	}
-	return ret
 }
 
 func (c *controller) deleteBalancer(name, reason string) error {
