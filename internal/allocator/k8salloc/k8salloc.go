@@ -25,5 +25,9 @@ func SharingKey(svc *v1.Service) string {
 
 // BackendKey extracts the backend key for a service.
 func BackendKey(svc *v1.Service) string {
-	return labels.Set(svc.Spec.Selector).String()
+	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
+		return labels.Set(svc.Spec.Selector).String()
+	}
+	// Cluster traffic policy can share services regardless of backends.
+	return ""
 }
