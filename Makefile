@@ -99,31 +99,31 @@ all-arch-images: gen-image-targets
 
 .PHONY: gen-image-targets
 gen-image-targets:
-	echo "" >$(MK_IMAGE_TARGETS)
+	printf "\n" >$(MK_IMAGE_TARGETS)
 	for binary in $(BINARIES); do \
 		for arch in $(ALL_ARCH); do \
-			/bin/echo ".PHONY: $$binary/$$arch" >>$(MK_IMAGE_TARGETS) ;\
-			/bin/echo "$$binary/$$arch:" >>$(MK_IMAGE_TARGETS) ;\
-			/bin/echo -e "\t+make -f Makefile.inc push BINARY=$$binary GOARCH=$$arch TAG=$(TAG)-$$arch GOCMD=$(GOCMD) DOCKER_SUDO=$(DOCKER_SUDO) REGISTRY=$(REGISTRY) GITCOMMIT=$(GITCOMMIT) GITBRANCH=$(GITBRANCH)" >>$(MK_IMAGE_TARGETS) ;\
-			/bin/echo "" >>$(MK_IMAGE_TARGETS) ;\
+			printf ".PHONY: $$binary/$$arch\n" >>$(MK_IMAGE_TARGETS) ;\
+			printf "$$binary/$$arch:\n" >>$(MK_IMAGE_TARGETS) ;\
+			printf "\t+make -f Makefile.inc push BINARY=$$binary GOARCH=$$arch TAG=$(TAG)-$$arch GOCMD=$(GOCMD) DOCKER_SUDO=$(DOCKER_SUDO) REGISTRY=$(REGISTRY) GITCOMMIT=$(GITCOMMIT) GITBRANCH=$(GITBRANCH)\n" >>$(MK_IMAGE_TARGETS) ;\
+			printf "\n" >>$(MK_IMAGE_TARGETS) ;\
 		done ;\
-		/bin/echo ".PHONY: $$binary" >>$(MK_IMAGE_TARGETS) ;\
-		/bin/echo -n "$$binary: " >>$(MK_IMAGE_TARGETS) ;\
+		printf ".PHONY: $$binary\n" >>$(MK_IMAGE_TARGETS) ;\
+		printf "$$binary: " >>$(MK_IMAGE_TARGETS) ;\
 		for arch in $(ALL_ARCH); do \
-			/bin/echo -n "$$binary/$$arch " >>$(MK_IMAGE_TARGETS) ;\
+			printf  "$$binary/$$arch " >>$(MK_IMAGE_TARGETS) ;\
 		done ;\
-		/bin/echo "" >>$(MK_IMAGE_TARGETS) ;\
-		/bin/echo -e "\tmanifest-tool push from-args --platforms $(PLATFORMS) --template $(REGISTRY)/$${binary}:$(TAG)-ARCH --target $(REGISTRY)/$${binary}:$(TAG)" >>$(MK_IMAGE_TARGETS) ;\
+		printf "\n" >>$(MK_IMAGE_TARGETS) ;\
+		printf "\tmanifest-tool push from-args --platforms $(PLATFORMS) --template $(REGISTRY)/$${binary}:$(TAG)-ARCH --target $(REGISTRY)/$${binary}:$(TAG)" >>$(MK_IMAGE_TARGETS) ;\
 		if [ "$(TAG)" = "master" ]; then \
-			/bin/echo -e "\tmanifest-tool push from-args --platforms $(PLATFORMS) --template $(REGISTRY)/$${binary}:$(TAG)-ARCH --target $(REGISTRY)/$${binary}:latest" >>$(MK_IMAGE_TARGETS) ;\
+			printf "\tmanifest-tool push from-args --platforms $(PLATFORMS) --template $(REGISTRY)/$${binary}:$(TAG)-ARCH --target $(REGISTRY)/$${binary}:latest" >>$(MK_IMAGE_TARGETS) ;\
 		fi ;\
-		/bin/echo "" >>$(MK_IMAGE_TARGETS) ;\
+		printf "\n" >>$(MK_IMAGE_TARGETS) ;\
 	done
-	/bin/echo -n "all: " >>$(MK_IMAGE_TARGETS)
+	printf "all: " >>$(MK_IMAGE_TARGETS)
 	for binary in $(BINARIES); do \
-		/bin/echo -ne "$$binary " >>$(MK_IMAGE_TARGETS) ;\
+		printf "$$binary " >>$(MK_IMAGE_TARGETS) ;\
 	done
-	/bin/echo "" >>$(MK_IMAGE_TARGETS)
+	printf "\n" >>$(MK_IMAGE_TARGETS)
 
 ################################
 ## For CircleCI
