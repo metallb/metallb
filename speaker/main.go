@@ -231,6 +231,7 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 		"node":     c.myNode,
 		"ip":       lbIP.String(),
 	}).Set(1)
+	glog.Infof("%s: announcing IP %s using protocol %q", name, lbIP, string(pool.Protocol))
 
 	return nil
 }

@@ -61,23 +61,30 @@ func (a *arpResponder) processRequest() dropReason {
 	pkt, eth, err := a.conn.Read()
 	if err != nil {
 		if err == io.EOF {
+			glog.Infof("DEBUG: responder %s closed", a.hardwareAddr)
 			return dropReasonClosed
 		}
+		glog.Infof("DEBUG: responder %s errored: %s", a.hardwareAddr, err)
 		return dropReasonError
 	}
 
 	// Ignore ARP replies.
 	if pkt.Operation != arp.OperationRequest {
+		glog.Infof("DEBUG: responder %s got a non-request ARP packet", a.hardwareAddr, err)
 		return dropReasonARPReply
 	}
 
 	// Ignore ARP requests which are not broadcast or bound directly for this machine.
 	if !bytes.Equal(eth.Destination, ethernet.Broadcast) && !bytes.Equal(eth.Destination, a.hardwareAddr) {
+		glog.Infof("DEBUG: responder %s ignored packet, %q is not bcast or local ethernet addr", a.hardwareAddr, eth.Destination)
 		return dropReasonEthernetDestination
 	}
 
+	glog.Infof("Request: who-has %s?  tell %s (%s).", pkt.TargetIP, pkt.SenderIP, pkt.SenderHardwareAddr)
+
 	// Ignore ARP requests that the announcer tells us to ignore.
 	if reason := a.announce(pkt.TargetIP); reason != dropReasonNone {
+		glog.Infof("DEBUG: responder %s ignored packet, not programmed to advertise this IP (reason %d)", a.hardwareAddr, eth.Destination, reason)
 		return reason
 	}
 
