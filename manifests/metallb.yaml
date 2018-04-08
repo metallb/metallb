@@ -1,31 +1,34 @@
----
-# Source: metallb/templates/namespace.yaml
 apiVersion: v1
 kind: Namespace
 metadata:
   name: metallb-system
-
+  labels:
+    app: metallb
 ---
-## Service accounts
+
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   namespace: metallb-system
   name: controller
+  labels:
+    app: metallb
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   namespace: metallb-system
   name: speaker
+  labels:
+    app: metallb
 
 ---
-# Source: metallb/templates/rbac.yaml
-# Roles
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: metallb-system:controller
+  labels:
+    app: metallb
 rules:
 - apiGroups: [""]
   resources: ["services"]
@@ -41,6 +44,8 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: metallb-system:speaker
+  labels:
+    app: metallb
 rules:
 - apiGroups: [""]
   resources: ["services", "endpoints", "nodes"]
@@ -51,6 +56,8 @@ kind: Role
 metadata:
   namespace: metallb-system
   name: leader-election
+  labels:
+    app: metallb
 rules:
 - apiGroups: [""]
   resources: ["endpoints"]
@@ -65,6 +72,8 @@ kind: Role
 metadata:
   namespace: metallb-system
   name: config-watcher
+  labels:
+    app: metallb
 rules:
 - apiGroups: [""]
   resources: ["configmaps"]
@@ -79,10 +88,12 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: metallb-system:controller
+  labels:
+    app: metallb
 subjects:
 - kind: ServiceAccount
-  namespace: metallb-system
   name: controller
+  namespace: metallb-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -92,10 +103,12 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   name: metallb-system:speaker
+  labels:
+    app: metallb
 subjects:
 - kind: ServiceAccount
-  namespace: metallb-system
   name: speaker
+  namespace: metallb-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -106,6 +119,8 @@ kind: RoleBinding
 metadata:
   namespace: metallb-system
   name: config-watcher
+  labels:
+    app: metallb
 subjects:
 - kind: ServiceAccount
   name: controller
@@ -121,6 +136,8 @@ kind: RoleBinding
 metadata:
   namespace: metallb-system
   name: leader-election
+  labels:
+    app: metallb
 subjects:
 - kind: ServiceAccount
   name: speaker
@@ -129,7 +146,6 @@ roleRef:
   kind: Role
   name: leader-election
 ---
-# Source: metallb/templates/speaker.yaml
 apiVersion: apps/v1beta2
 kind: DaemonSet
 metadata:
@@ -157,7 +173,7 @@ spec:
       hostNetwork: true
       containers:
       - name: speaker
-        image: metallb/speaker:latest
+        image: metallb/speaker:master
         imagePullPolicy: Always
         args:
         - --port=7472
@@ -186,8 +202,8 @@ spec:
             - all
             add:
             - net_raw
+
 ---
-# Source: metallb/templates/controller.yaml
 apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
@@ -196,9 +212,6 @@ metadata:
   labels:
     app: metallb
     component: controller
-  annotations:
-    prometheus.io/scrape: "true"
-    prometheus.io/port: "7472"
 spec:
   revisionHistoryLimit: 3
   selector:
@@ -210,6 +223,9 @@ spec:
       labels:
         app: metallb
         component: controller
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "7472"
     spec:
       serviceAccountName: controller
       terminationGracePeriodSeconds: 0
@@ -218,7 +234,7 @@ spec:
         runAsUser: 65534 # nobody
       containers:
       - name: controller
-        image: metallb/controller:latest
+        image: metallb/controller:master
         imagePullPolicy: Always
         args:
         - --port=7472
@@ -236,3 +252,7 @@ spec:
             drop:
             - all
           readOnlyRootFilesystem: true
+
+---
+
+
