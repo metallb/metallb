@@ -50,18 +50,19 @@ all:
 ## `make push` builds timestamped images, pushes them to REGISTRY, and
 ## updates your currently active cluster to pull them.
 
+MANIFESTFILE=manifests/metallb.yaml
 .PHONY: manifest
 manifest:
-	cat manifests/namespace.yaml >manifests/metallb.yaml
-	cd helm-chart && helm template --namespace metallb-system --set controller.resources.limits.cpu=100m,controller.resources.limits.memory=100Mi,speaker.resources.limits.cpu=100m,speaker.resources.limits.memory=100Mi,prometheus.scrapeAnnotations=true . >>../manifests/metallb.yaml
-	sed -i '/heritage: /d' manifests/metallb.yaml
-	sed -i '/release: /d' manifests/metallb.yaml
-	sed -i '/chart: /d' manifests/metallb.yaml
-	sed -i '/- --config=/d' manifests/metallb.yaml
-	sed -i '/^# /d' manifests/metallb.yaml
-	sed -i 's/RELEASE-NAME-metallb-//g' manifests/metallb.yaml
-	sed -i 's/RELEASE-NAME-metallb:/metallb-system:/g' manifests/metallb.yaml
-	perl -p0i -e 's/metadata:\n  name: (?!metallb-system)/metadata:\n  namespace: metallb-system\n  name: /gs' manifests/metallb.yaml
+	cat manifests/namespace.yaml >$(MANIFESTFILE)
+	cd helm-chart && helm template --namespace metallb-system --set controller.resources.limits.cpu=100m,controller.resources.limits.memory=100Mi,speaker.resources.limits.cpu=100m,speaker.resources.limits.memory=100Mi,prometheus.scrapeAnnotations=true . >>../$(MANIFESTFILE)
+	sed -i '/heritage: /d' $(MANIFESTFILE)
+	sed -i '/release: /d' $(MANIFESTFILE)
+	sed -i '/chart: /d' $(MANIFESTFILE)
+	sed -i '/- --config=/d' $(MANIFESTFILE)
+	sed -i '/^# /d' $(MANIFESTFILE)
+	sed -i 's/RELEASE-NAME-metallb-//g' $(MANIFESTFILE)
+	sed -i 's/RELEASE-NAME-metallb:/metallb-system:/g' $(MANIFESTFILE)
+	perl -p0i -e 's/metadata:\n  name: (?!metallb-system)/metadata:\n  namespace: metallb-system\n  name: /gs' $(MANIFESTFILE)
 
 .PHONY: build
 build:
@@ -160,21 +161,21 @@ ci-prepare:
 	$(GOCMD) get github.com/estesp/manifest-tool
 
 .PHONY: ci
-ci: ci-build ci-test ci-lint
+ci: ci-prepare build test lint
 
-.PHONY: ci-build
-ci-build: build
-
-.PHONY: ci-test
-ci-test:
+.PHONY: test
+test:
 	$(GOCMD) test $$(glide novendor)
 	$(GOCMD) test -race $$(glide novendor)
 
-.PHONY: ci-lint
-ci-lint:
+.PHONY: lint
+lint:
 	$(GOCMD) get -u github.com/alecthomas/gometalinter
 	gometalinter --install golint
 	gometalinter --deadline=1m --disable-all --enable=gofmt --enable=golint --enable=vet --enable=vetshadow --enable=structcheck --enable=unconvert --vendor ./...
+	+make manifest MANIFESTFILE=manifests/metallb.yaml.new
+	diff -u manifests/metallb.yaml manifests/metallb.yaml.new
+	rm manifests/metallb.yaml.new
 
 ################################
 ## Release
