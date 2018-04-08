@@ -3,6 +3,12 @@ title: Installation
 weight: 3
 ---
 
+Before starting with installation, make sure you meet all
+the [requirements]({{% relref "/_index.md" %}}#requirements). In
+particular, you should pay attention
+to
+[network addon compatibility]({{% relref "installation/network-addons.md" %}}).
+
 There are two supported ways to install MetalLB: using Kubernetes
 manifests, or using the [Helm](https://helm.sh) package manager.
 
