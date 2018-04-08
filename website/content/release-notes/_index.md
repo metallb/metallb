@@ -23,6 +23,9 @@ New features:
   the
   [IP sharing documentation]({{% relref "usage/_index.md" %}}#ip-address-sharing) for
   instructions and caveats.
+- Layer 2 mode now listens on all interfaces for ARP and NDP requests,
+  not just the interface used for communication by Kubernetes
+  components.
 
 Bugfixes:
 
