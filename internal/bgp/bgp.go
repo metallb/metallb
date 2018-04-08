@@ -11,6 +11,10 @@ import (
 	"reflect"
 	"sync"
 	"time"
+	"syscall"
+	"unsafe"
+        "os"
+	"strconv"
 
 	"github.com/go-kit/kit/log"
 )
@@ -25,6 +29,7 @@ type Session struct {
 	peerASN  uint32
 	holdTime time.Duration
 	logger   log.Logger
+	password     string
 
 	newHoldTime chan bool
 	backoff     backoff
@@ -144,6 +149,7 @@ func (s *Session) sendUpdates() bool {
 }
 
 // connect establishes the BGP session with the peer.
+// sets TCP_MD5 sockopt if password is !="", 
 func (s *Session) connect() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -155,8 +161,21 @@ func (s *Session) connect() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	var d net.Dialer
-	conn, err := d.DialContext(ctx, "tcp", s.addr)
+	laddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("0.0.0.0", "0")) 
+	var conn net.Conn
+	d := TCPDialer{
+		Dialer: net.Dialer{
+			LocalAddr: laddr,
+			Timeout:  10*time.Second,
+		},
+		AuthPassword: s.password ,
+        }
+
+        d.Ttl = 10
+	tcphost, portstr , err:= net.SplitHostPort( s.addr )
+	port, err := strconv.Atoi(portstr)
+        conn, err = d.DialTCP(tcphost, port )
+
 	if err != nil {
 		return fmt.Errorf("dial %q: %s", s.addr, err)
 	}
@@ -284,7 +303,7 @@ func (s *Session) sendKeepalive() error {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func New(l log.Logger, addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time.Duration) (*Session, error) {
+func New(l log.Logger, addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time.Duration, password string) (*Session, error) {
 	ret := &Session{
 		addr:        addr,
 		asn:         asn,
@@ -294,6 +313,7 @@ func New(l log.Logger, addr string, asn uint32, routerID net.IP, peerASN uint32,
 		logger:      log.With(l, "peer", addr, "localASN", asn, "peerASN", peerASN),
 		newHoldTime: make(chan bool, 1),
 		advertised:  map[string]*Advertisement{},
+		password:    password,
 	}
 	ret.cond = sync.NewCond(&ret.mu)
 	go ret.sendKeepalives()
@@ -427,3 +447,208 @@ func (a *Advertisement) Equal(b *Advertisement) bool {
 	}
 	return reflect.DeepEqual(a.Communities, b.Communities)
 }
+
+
+const (
+	TCP_MD5SIG       = 14 // TCP MD5 Signature (RFC2385)
+	IPV6_MINHOPCOUNT = 73 // Generalized TTL Security Mechanism (RFC5082)
+)
+
+type tcpmd5sig struct {
+	ss_family uint16
+	ss        [126]byte
+	pad1      uint16
+	keylen    uint16
+	pad2      uint32
+	key       [80]byte
+}
+
+func buildTcpMD5Sig(address string, key string) (tcpmd5sig, error) {
+	t := tcpmd5sig{}
+	addr := net.ParseIP(address)
+	if addr.To4() != nil {
+		t.ss_family = syscall.AF_INET
+		copy(t.ss[2:], addr.To4())
+	} else {
+		t.ss_family = syscall.AF_INET6
+		copy(t.ss[6:], addr.To16())
+	}
+
+	t.keylen = uint16(len(key))
+	copy(t.key[0:], []byte(key))
+
+	return t, nil
+}
+
+
+
+
+type TCPDialer struct {
+	net.Dialer
+
+	// MD5 authentication password.
+	AuthPassword string
+
+	// The TTL value to set outgoing connection.
+	Ttl uint8
+}
+
+func (d *TCPDialer) DialTCP(tcphost string, port int ) (*net.TCPConn, error) {
+	var family int
+	var ra, la syscall.Sockaddr
+	laddr, err := net.ResolveTCPAddr("tcp", d.LocalAddr.String())
+	if err != nil {
+		return nil, fmt.Errorf("invalid local address: %s", err)
+	}
+
+	raddr, err := net.ResolveTCPAddr("tcp",  net.JoinHostPort(tcphost, fmt.Sprintf("%d", port) ) )
+	if err != nil {
+		return nil, fmt.Errorf("invalid remote address: %s %s ", err  )
+	}
+
+	if raddr.IP.To4() != nil {
+		family = syscall.AF_INET
+		rsockaddr := &syscall.SockaddrInet4{Port: port}
+		copy(rsockaddr.Addr[:], raddr.IP.To4())
+		ra = rsockaddr
+		lsockaddr := &syscall.SockaddrInet4{}
+		copy(lsockaddr.Addr[:], laddr.IP.To4())
+		la = lsockaddr
+	} else {
+		family = syscall.AF_INET6
+		rsockaddr := &syscall.SockaddrInet6{Port: port}
+		copy(rsockaddr.Addr[:], raddr.IP.To16())
+		ra = rsockaddr
+		var zone uint32
+		if laddr.Zone != "" {
+			if intf, err := net.InterfaceByName(laddr.Zone); err != nil {
+				return nil, err
+			} else {
+				zone = uint32(intf.Index)
+			}
+		}
+		lsockaddr := &syscall.SockaddrInet6{ZoneId: zone}
+		copy(lsockaddr.Addr[:], laddr.IP.To16())
+		la = lsockaddr
+	}
+
+	sockType := syscall.SOCK_STREAM | syscall.SOCK_CLOEXEC | syscall.SOCK_NONBLOCK
+	proto := 0
+	fd, err := syscall.Socket(family, sockType, proto)
+	if err != nil {
+	        glog.Errorf(" syscall.socket %s ",  err)
+		return nil, err
+	}
+	fi := os.NewFile(uintptr(fd), "")
+	defer fi.Close()
+	// A new socket was created so we must close it before this
+	// function returns either on failure or success. On success,
+	// net.FileConn() in newTCPConn() increases the refcount of
+	// the socket so this fi.Close() doesn't destroy the socket.
+	// The caller must call Close() with the file later.
+	// Note that the above os.NewFile() doesn't play with the
+	// refcount.
+
+	if err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_BROADCAST, 1); err != nil {
+		return nil, os.NewSyscallError("setsockopt", err)
+	}
+
+	if err = syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_NODELAY, 1); err != nil {
+		return nil, os.NewSyscallError("setsockopt", err)
+	}
+
+	if d.AuthPassword != "" {
+		if err = setsockoptTcpMD5Sig(fd,  tcphost , d.AuthPassword); err != nil {
+			return nil, err
+		}
+	}
+
+	if d.Ttl != 0 {
+		if err = setsockoptIpTtl(fd, family, int(d.Ttl)); err != nil {
+			return nil, err
+		}
+	}
+
+	if err = syscall.Bind(fd, la); err != nil {
+		return nil, os.NewSyscallError("bind", err)
+	}
+
+	newTCPConn := func(fi *os.File) (*net.TCPConn, error) {
+		if conn, err := net.FileConn(fi); err != nil {
+			return nil, err
+		} else {
+			return conn.(*net.TCPConn), err
+		}
+	}
+
+	err = syscall.Connect(fd, ra)
+	switch err {
+	case syscall.EINPROGRESS, syscall.EALREADY, syscall.EINTR:
+		// do timeout handling
+	case nil, syscall.EISCONN:
+		return newTCPConn(fi)
+	default:
+		return nil, os.NewSyscallError("connect", err)
+	}
+
+	epfd, err := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
+	if err != nil {
+		return nil, err
+	}
+	defer syscall.Close(epfd)
+
+	var event syscall.EpollEvent
+	events := make([]syscall.EpollEvent, 1)
+
+	event.Events = syscall.EPOLLIN | syscall.EPOLLOUT | syscall.EPOLLPRI
+	event.Fd = int32(fd)
+	if err = syscall.EpollCtl(epfd, syscall.EPOLL_CTL_ADD, fd, &event); err != nil {
+		return nil, err
+	}
+
+	for {
+		nevents, err := syscall.EpollWait(epfd, events, int(d.Timeout/1000000) /*msec*/)
+		if err != nil {
+			return nil, err
+		}
+		if nevents == 0 {
+			return nil, fmt.Errorf("timeout")
+		} else if nevents == 1 && events[0].Fd == int32(fd) {
+			nerr, err := syscall.GetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_ERROR)
+			if err != nil {
+				return nil, os.NewSyscallError("getsockopt", err)
+			}
+			switch err := syscall.Errno(nerr); err {
+			case syscall.EINPROGRESS, syscall.EALREADY, syscall.EINTR:
+			case syscall.Errno(0), syscall.EISCONN:
+				return newTCPConn(fi)
+			default:
+				return nil, os.NewSyscallError("getsockopt", err)
+			}
+		} else {
+			return nil, fmt.Errorf("unexpected epoll behavior")
+		}
+	}
+}
+
+// Better way may be available in  Go 1.11, see go-review.googlesource.com/c/go/+/72810
+func setsockoptTcpMD5Sig(fd int, address string, key string) error {
+	t, err := buildTcpMD5Sig(address, key)
+	if err != nil {
+		return err
+	}
+	b := *(*[unsafe.Sizeof(t)]byte)(unsafe.Pointer(&t))
+	return os.NewSyscallError("setsockopt", syscall.SetsockoptString(fd, syscall.IPPROTO_TCP, TCP_MD5SIG, string(b[:])))
+}
+
+
+func setsockoptIpTtl(fd int, family int, value int) error {
+	level := syscall.IPPROTO_IP
+	name := syscall.IP_TTL
+	if family == syscall.AF_INET6 {
+		level = syscall.IPPROTO_IPV6
+		name = syscall.IPV6_UNICAST_HOPS
+	}
+	return os.NewSyscallError("setsockopt", syscall.SetsockoptInt(fd, level, name, value))
+}
+

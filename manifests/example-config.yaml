@@ -108,3 +108,7 @@ data:
       # re-advertisement outside of the immediate autonomous system,
       # but people don't usually recognize its numerical value. :)
       no-export: 65535:65281
+    # (optional) Password for  TCPMD5  authenticated BGP sessions
+    # offered by some peers.
+    # Uncomment this line and fill it with your password
+    #password: "yourPassword"
