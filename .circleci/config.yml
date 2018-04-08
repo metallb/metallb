@@ -8,20 +8,14 @@ jobs:
       - image: circleci/golang:1.9
     steps:
       - checkout
-      - run: make ci-prepare
-      - run: make ci-build
-      - run: make ci-test
-      - run: make ci-lint
+      - run: make ci
   test-1.10:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
       - image: circleci/golang:1.10
     steps:
       - checkout
-      - run: make ci-prepare
-      - run: make ci-build
-      - run: make ci-test
-      - run: make ci-lint
+      - run: make ci
   deploy-controller:
     working_directory: /go/src/go.universe.tf/metallb
     docker:

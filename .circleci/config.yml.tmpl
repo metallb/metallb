@@ -9,10 +9,7 @@ jobs:
       - image: circleci/golang:{{.}}
     steps:
       - checkout
-      - run: make ci-prepare
-      - run: make ci-build
-      - run: make ci-test
-      - run: make ci-lint
+      - run: make ci
 {{- end }}
 {{- range $bin := $.Binary }}
   deploy-{{$bin}}:
