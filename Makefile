@@ -50,6 +50,19 @@ all:
 ## `make push` builds timestamped images, pushes them to REGISTRY, and
 ## updates your currently active cluster to pull them.
 
+.PHONY: manifest
+manifest:
+	cat manifests/namespace.yaml >manifests/metallb.yaml
+	cd helm-chart && helm template --namespace metallb-system --set controller.resources.limits.cpu=100m,controller.resources.limits.memory=100Mi,speaker.resources.limits.cpu=100m,speaker.resources.limits.memory=100Mi,prometheus.scrapeAnnotations=true . >>../manifests/metallb.yaml
+	sed -i '/heritage: /d' manifests/metallb.yaml
+	sed -i '/release: /d' manifests/metallb.yaml
+	sed -i '/chart: /d' manifests/metallb.yaml
+	sed -i '/- --config=/d' manifests/metallb.yaml
+	sed -i '/^# /d' manifests/metallb.yaml
+	sed -i 's/RELEASE-NAME-metallb-//g' manifests/metallb.yaml
+	sed -i 's/RELEASE-NAME-metallb:/metallb-system:/g' manifests/metallb.yaml
+	perl -p0i -e 's/metadata:\n  name: (?!metallb-system)/metadata:\n  namespace: metallb-system\n  name: /gs' manifests/metallb.yaml
+
 .PHONY: build
 build:
 	$(GOCMD) install -v -ldflags="-X go.universe.tf/metallb/internal/version.gitCommit=$(GITCOMMIT) -X go.universe.tf/metallb/internal/version.gitBranch=$(GITBRANCH)" ./controller ./speaker ./test-bgp-router
@@ -215,6 +228,7 @@ endif
 	perl -pi -e 's/tag: .*/tag: v$(VERSION)/g' helm/metallb/values.yaml
 	perl -pi -e 's/pullPolicy: .*/pullPolicy: IfNotPresent/g' helm/metallb/values.yaml
 
+	+make manifest
 	perl -pi -e 's/MetalLB .*/MetalLB v$(VERSION)/g' website/content/_header.md
 	perl -pi -e 's/version\s+=.*/version = "$(VERSION)"/g' internal/version/version.go
 	gofmt -w internal/version/version.go
