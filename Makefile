@@ -197,6 +197,7 @@ else
 	PREV_VERSION=v$(MAJOR).$(MINOR).$(shell expr $(PATCH) - 1)
 endif
 
+.PHONY: release
 release:
 ifeq ($(VERSION),)
 	$(error VERSION is required)
