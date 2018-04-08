@@ -40,7 +40,7 @@ func (a *Announce) spam() {
 		for _, ip := range a.ips {
 			var err error
 			if ip.To4() == nil {
-				err = a.ndpResponder.Gratuitous(ip)
+				err = a.ndp.Gratuitous(ip)
 			} else {
 				err = a.arp.Gratuitous(ip)
 			}
