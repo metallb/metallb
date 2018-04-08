@@ -156,6 +156,7 @@ ci-config:
 
 .PHONY: ci-prepare
 ci-prepare:
+	curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash
 	$(GOCMD) get github.com/Masterminds/glide
 	$(GOCMD) get github.com/golang/lint/golint
 	$(GOCMD) get github.com/estesp/manifest-tool
