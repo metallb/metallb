@@ -177,6 +177,7 @@ spec:
         imagePullPolicy: Always
         args:
         - --port=7472
+        - --config=config
         env:
         - name: METALLB_NODE_IP
           valueFrom:
@@ -238,6 +239,7 @@ spec:
         imagePullPolicy: Always
         args:
         - --port=7472
+        - --config=config
         ports:
         - name: monitoring
           containerPort: 7472
