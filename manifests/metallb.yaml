@@ -129,57 +129,6 @@ roleRef:
   kind: Role
   name: leader-election
 ---
-# Source: metallb/templates/controller.yaml
-apiVersion: apps/v1beta2
-kind: Deployment
-metadata:
-  namespace: metallb-system
-  name: controller
-  labels:
-    app: metallb
-    component: controller
-  annotations:
-    prometheus.io/scrape: "true"
-    prometheus.io/port: "7472"
-spec:
-  revisionHistoryLimit: 3
-  selector:
-    matchLabels:
-      app: metallb
-      component: controller
-  template:
-    metadata:
-      labels:
-        app: metallb
-        component: controller
-    spec:
-      serviceAccountName: controller
-      terminationGracePeriodSeconds: 0
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 65534 # nobody
-      containers:
-      - name: controller
-        image: metallb/controller:latest
-        imagePullPolicy: Always
-        args:
-        - --port=7472
-        ports:
-        - name: monitoring
-          containerPort: 7472
-        resources:
-          limits:
-            cpu: 100m
-            memory: 100Mi
-          
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop:
-            - all
-          readOnlyRootFilesystem: true
-
----
 # Source: metallb/templates/speaker.yaml
 apiVersion: apps/v1beta2
 kind: DaemonSet
@@ -237,4 +186,53 @@ spec:
             - all
             add:
             - net_raw
-
+---
+# Source: metallb/templates/controller.yaml
+apiVersion: apps/v1beta2
+kind: Deployment
+metadata:
+  namespace: metallb-system
+  name: controller
+  labels:
+    app: metallb
+    component: controller
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "7472"
+spec:
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: metallb
+      component: controller
+  template:
+    metadata:
+      labels:
+        app: metallb
+        component: controller
+    spec:
+      serviceAccountName: controller
+      terminationGracePeriodSeconds: 0
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534 # nobody
+      containers:
+      - name: controller
+        image: metallb/controller:latest
+        imagePullPolicy: Always
+        args:
+        - --port=7472
+        ports:
+        - name: monitoring
+          containerPort: 7472
+        resources:
+          limits:
+            cpu: 100m
+            memory: 100Mi
+          
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - all
+          readOnlyRootFilesystem: true
