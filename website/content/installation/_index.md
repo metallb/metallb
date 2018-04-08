@@ -3,7 +3,12 @@ title: Installation
 weight: 3
 ---
 
-Installing MetalLB is very simple: just apply the manifest!
+There are two supported ways to install MetalLB: using Kubernetes
+manifests, or using the [Helm](https://helm.sh) package manager.
+
+## Installation with Kubernetes manifests
+
+To install MetalLB, simply apply the manifest:
 
 ```shell
 kubectl apply -f https://raw.githubusercontent.com/google/metallb/master/manifests/metallb.yaml
@@ -25,3 +30,35 @@ file. MetalLB's components will still start, but will remain idle
 until
 you
 [define and deploy a configmap]({{% relref "../configuration/_index.md" %}}).
+
+## Installation with Helm
+
+{{% notice note %}}
+Due to code review turnaround time, it usually takes a few days after
+each MetalLB release before the Helm chart is updated in the stable
+repository.
+{{% /notice %}}
+
+MetalLB maintains a Helm package in the `stable` package
+repository. If you use the Helm package manager in your cluster, you
+can install MetalLB that way.
+
+```
+helm install --name metallb stable/metallb
+```
+
+{{% notice warning %}}
+Although Helm allows you to easily deploy multiple releases at the
+same time, you should _not_ do this with MetalLB! Multiple copies of
+MetalLB will conflict with each other and lead to cluster instability.
+{{% /notice %}}
+
+By default, the helm chart looks for MetalLB configuration in the
+`metallb-config` ConfigMap, in the namespace you deployed to. It's up
+to you
+to [define and deploy]({{% relref "../configuration/_index.md" %}})
+that configuration.
+
+Alternatively, you can manage the configuration with Helm itself, by
+putting the configuration under the `config.inline` key in your
+`values.yaml`.

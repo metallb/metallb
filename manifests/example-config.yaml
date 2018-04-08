@@ -52,7 +52,7 @@ data:
       # name under the 'metallb.universe.tf/address-pool' annotation.
       name: my-ip-space
       # Protocol can be used to select how the announcement is done.
-      # Supported values are bgp and arp.
+      # Supported values are bgp and layer2.
       protocol: bgp
       
       # A list of IP address ranges over which MetalLB has
