@@ -6,6 +6,20 @@ metadata:
   name: metallb-system
 
 ---
+## Service accounts
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: metallb-system
+  name: controller
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: metallb-system
+  name: speaker
+
+---
 # Source: metallb/templates/rbac.yaml
 # Roles
 apiVersion: rbac.authorization.k8s.io/v1
@@ -58,20 +72,6 @@ rules:
 - apiGroups: [""]
   resources: ["events"]
   verbs: ["create"]
----
-
-## Service accounts
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  namespace: metallb-system
-  name: controller
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  namespace: metallb-system
-  name: speaker
 ---
 
 ## Role bindings
