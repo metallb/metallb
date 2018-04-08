@@ -75,8 +75,7 @@ func (a *arpCoordinator) updateInterfaces() error {
 			continue
 		}
 		if a.responders[ifi.Index] == nil {
-			fifi := ifi
-			resp, err := newARPResponder(&fifi, a.announce)
+			resp, err := newARPResponder(&ifi, a.announce)
 			if err != nil {
 				return fmt.Errorf("Creating ARP responder for %q: %s", ifi.Name, err)
 			}
