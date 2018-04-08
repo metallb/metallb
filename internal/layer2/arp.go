@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"sync"
+	"time"
 
 	"github.com/golang/glog"
 	"github.com/mdlayher/arp"
@@ -13,13 +15,119 @@ import (
 
 type announceFunc func(net.IP) dropReason
 
+type arpCoordinator struct {
+	stop     chan struct{}
+	announce announceFunc
+
+	mu         sync.Mutex
+	responders map[int]*arpResponder
+}
+
+func newARP(ann announceFunc) *arpCoordinator {
+	ret := &arpCoordinator{
+		stop:       make(chan struct{}),
+		announce:   ann,
+		responders: map[int]*arpResponder{},
+	}
+
+	go ret.periodicScan()
+	return ret
+}
+
+func (a *arpCoordinator) Gratuitous(ip net.IP) error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	for _, client := range a.responders {
+		if err := client.Gratuitous(ip); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (a *arpCoordinator) periodicScan() {
+	for {
+		select {
+		case <-a.stop:
+			return
+		default:
+		}
+		if err := a.updateInterfaces(); err != nil {
+			glog.Errorf("Updating interfaces: %s", err)
+		}
+		time.Sleep(10 * time.Second)
+	}
+}
+
+func (a *arpCoordinator) updateInterfaces() error {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	ifs, err := net.Interfaces()
+	if err != nil {
+		return fmt.Errorf("Couldn't list interfaces: %s", err)
+	}
+	keep := map[int]bool{}
+	for _, ifi := range ifs {
+		if !useInterfaceForARP(ifi) {
+			continue
+		}
+		if a.responders[ifi.Index] == nil {
+			fifi := ifi
+			resp, err := newARPResponder(&fifi, a.announce)
+			if err != nil {
+				return fmt.Errorf("Creating ARP responder for %q: %s", ifi.Name, err)
+			}
+			a.responders[ifi.Index] = resp
+			glog.Infof("Created ARP listener on interface %d (%q)", ifi.Index, ifi.Name)
+		}
+		keep[ifi.Index] = true
+	}
+
+	for i, client := range a.responders {
+		if !keep[i] {
+			client.Close()
+			delete(a.responders, i)
+			glog.Infof("Deleted ARP listener on interface %d", i)
+		}
+	}
+
+	return nil
+}
+
+func useInterfaceForARP(ifi net.Interface) bool {
+	addrs, err := ifi.Addrs()
+	if err != nil {
+		glog.Errorf("Couldn't get addresses for %s: %s", ifi.Name, err)
+		return false
+	}
+
+	for _, a := range addrs {
+		ipaddr, ok := a.(*net.IPNet)
+		if !ok {
+			continue
+		}
+		if ipaddr.IP.To4() == nil {
+			continue
+		}
+		if !ipaddr.IP.IsGlobalUnicast() {
+			continue
+		}
+		return true
+	}
+
+	return false
+}
+
 type arpResponder struct {
 	hardwareAddr net.HardwareAddr
 	conn         *arp.Client
 	announce     announceFunc
 }
 
-func newARP(ifi *net.Interface, ann announceFunc) (*arpResponder, error) {
+func newARPResponder(ifi *net.Interface, ann announceFunc) (*arpResponder, error) {
 	client, err := arp.Dial(ifi)
 	if err != nil {
 		return nil, fmt.Errorf("creating ARP responder for %q: %s", ifi.Name, err)

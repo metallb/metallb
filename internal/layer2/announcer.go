@@ -1,7 +1,6 @@
 package layer2
 
 import (
-	"errors"
 	"net"
 	"sync"
 
@@ -10,7 +9,7 @@ import (
 
 // Announce is used to "announce" new IPs mapped to the node's MAC address.
 type Announce struct {
-	arpResponder *arpResponder
+	arp          *arpCoordinator
 	ndpResponder *ndpResponder
 
 	sync.RWMutex
@@ -26,17 +25,7 @@ func New(ifi *net.Interface) (*Announce, error) {
 		ips: make(map[string]net.IP),
 	}
 
-	// One of ARP or NDP has to successfully create, but we allow one
-	// of the two to fail, to account for machines with IPv6
-	// completely disabled (or IPv4 completely disabled, in a
-	// wonderful future).
-	arpResp, err := newARP(ifi, ret.shouldAnnounce)
-	if err != nil {
-		glog.Warningf("ARP announcer creation failed: %s", err)
-		glog.Warningf("Announcing IPv4 services will not work")
-		arpResp = nil
-	}
-	ret.arpResponder = arpResp
+	ret.arp = newARP(ret.shouldAnnounce)
 
 	ndpResp, err := newNDP(ifi, ret.shouldAnnounce)
 	if err != nil {
@@ -45,10 +34,6 @@ func New(ifi *net.Interface) (*Announce, error) {
 		ndpResp = nil
 	}
 	ret.ndpResponder = ndpResp
-
-	if ret.arpResponder == nil && ret.ndpResponder == nil {
-		return nil, errors.New("all protocol announcers failed to create")
-	}
 
 	return ret, nil
 }

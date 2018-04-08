@@ -42,7 +42,7 @@ func (a *Announce) spam() {
 			if ip.To4() == nil {
 				err = a.ndpResponder.Gratuitous(ip)
 			} else {
-				err = a.arpResponder.Gratuitous(ip)
+				err = a.arp.Gratuitous(ip)
 			}
 			if err != nil {
 				glog.Errorf("Broadcasting gratuitous ARP/NDP for %q: %s", ip, err)
