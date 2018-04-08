@@ -227,9 +227,9 @@ endif
 
 	perl -pi -e 's#image: metallb/(.*):.*#image: metallb/$$1:v$(VERSION)#g' manifests/*.yaml
 
-	perl -pi -e 's/appVersion: .*/appVersion: $(VERSION)/g' helm/metallb/Chart.yaml
-	perl -pi -e 's/tag: .*/tag: v$(VERSION)/g' helm/metallb/values.yaml
-	perl -pi -e 's/pullPolicy: .*/pullPolicy: IfNotPresent/g' helm/metallb/values.yaml
+	perl -pi -e 's/appVersion: .*/appVersion: $(VERSION)/g' helm-chart/Chart.yaml
+	perl -pi -e 's/tag: .*/tag: v$(VERSION)/g' helm-chart/values.yaml
+	perl -pi -e 's/pullPolicy: .*/pullPolicy: IfNotPresent/g' helm-chart/values.yaml
 
 	+make manifest
 	perl -pi -e 's/MetalLB .*/MetalLB v$(VERSION)/g' website/content/_header.md
