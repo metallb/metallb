@@ -9,8 +9,8 @@ import (
 
 // Announce is used to "announce" new IPs mapped to the node's MAC address.
 type Announce struct {
-	arp          *arpCoordinator
-	ndpResponder *ndpResponder
+	arp *arpCoordinator
+	ndp *ndpCoordinator
 
 	sync.RWMutex
 	ips    map[string]net.IP // map containing IPs we should announce
@@ -26,14 +26,7 @@ func New(ifi *net.Interface) (*Announce, error) {
 	}
 
 	ret.arp = newARP(ret.shouldAnnounce)
-
-	ndpResp, err := newNDP(ifi, ret.shouldAnnounce)
-	if err != nil {
-		glog.Warningf("NDP announcer creation failed: %s", err)
-		glog.Warningf("Announcing IPv6 services will not work")
-		ndpResp = nil
-	}
-	ret.ndpResponder = ndpResp
+	ret.ndp = newNDP(ret.shouldAnnounce)
 
 	return ret, nil
 }
@@ -63,8 +56,8 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 		return
 	}
 
-	if a.ndpResponder != nil {
-		if err := a.ndpResponder.Watch(ip); err != nil {
+	if a.ndp != nil {
+		if err := a.ndp.Watch(ip); err != nil {
 			glog.Errorf("configuring announcement for %q: %s", ip, err)
 		}
 	}
@@ -82,10 +75,8 @@ func (a *Announce) DeleteBalancer(name string) {
 		return
 	}
 
-	if a.ndpResponder != nil {
-		if err := a.ndpResponder.Unwatch(ip); err != nil {
-			glog.Errorf("removing announcement for %q: %s", ip, err)
-		}
+	if err := a.ndp.Unwatch(ip); err != nil {
+		glog.Errorf("removing announcement for %q: %s", ip, err)
 	}
 
 	delete(a.ips, name)
