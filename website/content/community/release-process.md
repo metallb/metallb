@@ -79,6 +79,13 @@ tags that don't exist until CircleCI makes them exist.
 Check on Docker Hub for a `vX.Y.Z` tag on each image, or check on
 CircleCI that the deploy has completed.
 
+### Update the official Helm chart
+
+Clone https://github.com/kubernetes/charts , and overwrite the
+`stable/metallb` directory with the contents of `helm-chart` from the
+release branch. Send as a PR. In the meantime, bump the chart version
+in master for the next time.
+
 ### Repoint the live website
 
 Move the `live-website` branch to the newly created tag with `git
