@@ -46,14 +46,14 @@ variable "network_addon" {
 locals {
   ssh_key = "${file(pathexpand(var.ssh_key_file))}"
 
-  machine_cidr = "${local.machine_cidrs[var.protocol]}"
+  machine_cidrs = "${local.machine_cidrs_by_proto[var.protocol]}"
   pod_cidr = "${local.pod_cidrs[var.protocol]}"
   service_cidr = "${local.service_cidrs[var.protocol]}"
   network_addon_file = "network-addons/${local.network_addons[var.network_addon]}"
-  
-  machine_cidrs = {
-    "ipv4" = "192.168.0.0/24"
-    "ipv6" = "fd00:1::/120"
+
+  machine_cidrs_by_proto = {
+    "ipv4" = ["192.168.0.0/24", "192.168.1.0/24"]
+    "ipv6" = ["fd00:1::/120", "fd00:2::/120"]
   }
   pod_cidrs = {
     "ipv4" = "192.168.128.0/17"

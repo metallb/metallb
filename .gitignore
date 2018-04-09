@@ -5,4 +5,4 @@ build/
 website/public
 .envrc
 e2etest/terraform/.terraform
-e2etest/terraform/terraform.tfstate*
+e2etest/terraform/*.tfstate*

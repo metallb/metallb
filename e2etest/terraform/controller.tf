@@ -38,14 +38,14 @@ EOF
     content = "${data.template_file.network_addon.rendered}"
     destination = "/tmp/network.yaml"
   }
-  
+ 
   provisioner "remote-exec" {
     inline = [
-      "bash /tmp/configure_vpn.sh access ${cidrhost(local.machine_cidr, 1)} ${element(split("/", local.machine_cidr), 1)} ${google_compute_instance.switch.network_interface.0.address}",
-      "kubeadm init --pod-network-cidr=${local.pod_cidr} --service-cidr=${local.service_cidr} --token=${var.kubeadm_token} --apiserver-advertise-address=${cidrhost(local.machine_cidr, 1)}",
+      "bash /tmp/configure_vpn.sh access 1 ${cidrhost(local.machine_cidrs[0], 1)} ${element(split("/", local.machine_cidrs[0]), 1)} ${google_compute_instance.switch.network_interface.0.address}",
+      "kubeadm init --pod-network-cidr=${local.pod_cidr} --service-cidr=${local.service_cidr} --token=${var.kubeadm_token} --apiserver-advertise-address=${cidrhost(local.machine_cidrs[0], 1)}",
       "kubectl --kubeconfig=/etc/kubernetes/admin.conf apply -f /tmp/network.yaml",
       "apt -qq -y install netcat-openbsd",
-      "while ! `nc -w 2 -N ${cidrhost(local.machine_cidr, 2)} 1234 </etc/kubernetes/admin.conf`; do sleep 1; done",
+      "while ! `nc -w 2 -N ${cidrhost(local.machine_cidrs[0], 2)} 1234 </etc/kubernetes/admin.conf`; do sleep 1; done",
     ]
   }
 }

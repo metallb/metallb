@@ -3,8 +3,8 @@
 set -e
 
 PROTOCOL=$1
-MACHINE_IP=$2
-NUM_CLIENTS=$3
+NUM_CLIENTS=$2
+shift 2
 
 case $PROTOCOL in
     ipv4)
@@ -37,16 +37,22 @@ protocol kernel {
 }
 EOF
 
-for i in `seq 1 $NUM_CLIENTS`; do
-    PEER_IP=${MACHINE_IP%?}$((2+i))
-    cat >>$CONFIG <<EOF
-protocol bgp peer${i} {
+C=0
+while [[ $# > 0 ]]; do
+    MACHINE_IP=$1
+    shift
+    for i in `seq 1 $NUM_CLIENTS`; do
+        PEER_IP=${MACHINE_IP%?}$((2+i))
+        cat >>$CONFIG <<EOF
+protocol bgp peer${C} {
   local $MACHINE_IP as 64512;
   neighbor $PEER_IP as 64512;
   passive;
   error wait time 1, 2;
 }
 EOF
+        C=$((C+1))
+    done
 done
 
 systemctl restart $ENABLE

@@ -41,10 +41,11 @@ EOF
 
   provisioner "remote-exec" {
     inline = [
-      "bash /tmp/configure_vpn.sh access ${cidrhost(local.machine_cidr, 2)} ${element(split("/", local.machine_cidr), 1)} ${google_compute_instance.switch.network_interface.0.address}",
+      "bash /tmp/configure_vpn.sh access 1 ${cidrhost(local.machine_cidrs[0], 2)} ${element(split("/", local.machine_cidrs[0]), 1)} ${google_compute_instance.switch.network_interface.0.address}",
+      "bash /tmp/configure_vpn.sh access 2 ${cidrhost(local.machine_cidrs[1], 2)} ${element(split("/", local.machine_cidrs[1]), 1)} ${google_compute_instance.switch.network_interface.0.address}",
       "curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash",
       "apt -qq -y install bird",
-      "bash /tmp/configure_bird.sh access ${var.protocol} ${cidrhost(local.machine_cidr, 2)} 2",
+      "bash /tmp/configure_bird.sh ${var.protocol} 2 ${cidrhost(local.machine_cidrs[0], 2)} ${cidrhost(local.machine_cidrs[1], 2)}",
 
       # Do this bit last, so that we don't block on the controller
       # coming up until we're basicallly done.

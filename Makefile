@@ -86,9 +86,12 @@ proxy-to-registry:
 push-manifests:
 	kubectl apply -f manifests/metallb.yaml,manifests/test-bgp-router.yaml,manifests/tutorial-1.yaml
 
-.PHONY: push
-push: gen-image-targets
+.PHONY: push-images
+push-images: gen-image-targets
 	+make -f $(MK_IMAGE_TARGETS) $(foreach bin,$(BINARIES),$(bin)/$(ARCH))
+
+.PHONY: push
+push: push-images
 ifeq ($(findstring localhost,$(REGISTRY)),localhost)
 	kubectl set image -n metallb-system deploy/controller controller=$(shell kubectl get svc -n kube-system registry -o go-template='{{.spec.clusterIP}}'):80/controller:$(TAG)-$(ARCH)
 	kubectl set image -n metallb-system ds/speaker speaker=$(shell kubectl get svc -n kube-system registry -o go-template='{{.spec.clusterIP}}'):80/speaker:$(TAG)-$(ARCH)
