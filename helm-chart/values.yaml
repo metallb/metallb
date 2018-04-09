@@ -39,13 +39,13 @@ serviceAccounts:
     create: true
     # The name of the ServiceAccount to use.  If not set and create is
     # true, a name is generated using the fullname template
-    name:
+    name: ""
   speaker:
     # Specifies whether a ServiceAccount should be created
     create: true
     # The name of the ServiceAccount to use.  If not set and create is
     # true, a name is generated using the fullname template
-    name:
+    name: ""
 
 # controller contains configuration specific to the MetalLB cluster
 # controller.
@@ -54,7 +54,7 @@ controller:
     repository: metallb/controller
     tag: master
     pullPolicy: Always
-  resources:
+  resources: {}
     # limits:
       # cpu: 100m
       # memory: 100Mi
@@ -66,7 +66,7 @@ speaker:
     repository: metallb/speaker
     tag: master
     pullPolicy: Always
-  resources:
+  resources: {}
     # limits:
       # cpu: 100m
       # memory: 100Mi
