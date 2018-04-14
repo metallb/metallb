@@ -338,7 +338,7 @@ func encodePathAttrs(b *bytes.Buffer, asn uint32, defaultNextHop net.IP, adv *Ad
 	} else {
 		b.Write([]byte{
 			6, // len
-			1, // AS_SET
+			2, // AS_SEQUENCE
 			1, // len (in number of ASes)
 		})
 		if err := binary.Write(b, binary.BigEndian, asn); err != nil {
