@@ -104,7 +104,6 @@ func runTests(m *testing.M) int {
 		}()
 	}
 	if *build {
-		clusterName := fmt.Sprintf("%s-%s-%s", *pfx, *proto, *addon)
 		if err := terraformDestroy(*gcpProject, clusterName); err != nil {
 			log.Printf("pre-bringup cleanup of %q failed: %s", clusterName, err)
 			return 1
