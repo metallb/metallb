@@ -142,6 +142,24 @@ gen-image-targets:
 	printf "\n" >>$(MK_IMAGE_TARGETS)
 
 ################################
+## e2e tests
+##
+
+GCP_PROJECT:=metallb-e2e-testing
+CLUSTER_PREFIX:=test
+PROTOCOL:=ipv4
+NETWORK_ADDON:=flannel
+CLUSTER_NAME:=$(CLUSTER_PREFIX)-$(PROTOCOL)-$(NETWORK_ADDON)
+
+.PHONY: e2e-up-cluster
+e2e-up-cluster:
+	(cd e2etest/terraform && terraform apply -state=$(CLUSTER_NAME).tfstate -backup=- -auto-approve -no-color -var=cluster_name=$(CLUSTER_NAME) -var=protocol=$(PROTOCOL) -var=network_addon=$(NETWORK_ADDON) -var=gcp_project=$(GCP_PROJECT))
+
+.PHONY: e2e-down-cluster
+e2e-down-cluster:
+	(cd e2etest/terraform && terraform destroy -state=$(CLUSTER_NAME).tfstate -backup=- -force -no-color -var=gcp_project=$(GCP_PROJECT))
+
+################################
 ## For CircleCI
 ##
 ## CircleCI doesn't yet support parameterized jobs on their 2.0
