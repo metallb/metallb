@@ -17,6 +17,7 @@ type arpResponder struct {
 	intf         string
 	hardwareAddr net.HardwareAddr
 	conn         *arp.Client
+	closed       chan struct{}
 	announce     announceFunc
 }
 
@@ -30,6 +31,7 @@ func newARPResponder(ifi *net.Interface, ann announceFunc) (*arpResponder, error
 		intf:         ifi.Name,
 		hardwareAddr: ifi.HardwareAddr,
 		conn:         client,
+		closed:       make(chan struct{}),
 		announce:     ann,
 	}
 	go ret.run()
@@ -37,6 +39,7 @@ func newARPResponder(ifi *net.Interface, ann announceFunc) (*arpResponder, error
 }
 
 func (a *arpResponder) Close() error {
+	close(a.closed)
 	return a.conn.Close()
 }
 
@@ -62,6 +65,14 @@ func (a *arpResponder) run() {
 func (a *arpResponder) processRequest() dropReason {
 	pkt, eth, err := a.conn.Read()
 	if err != nil {
+		// ARP listener doesn't cleanly return EOF when closed, so we
+		// need to hook into the call to arpResponder.Close()
+		// independently.
+		select {
+		case <-a.closed:
+			return dropReasonClosed
+		default:
+		}
 		if err == io.EOF {
 			glog.Infof("DEBUG: %s %s responder closed", a.intf, a.hardwareAddr)
 			return dropReasonClosed
