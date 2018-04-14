@@ -58,19 +58,23 @@ func (a *Announce) updateInterfaces() error {
 			return fmt.Errorf("couldn't get addresses for %q: %s", ifi.Name, err)
 		}
 
+		if ifi.Flags&net.FlagUp == 0 {
+			continue
+		}
+		if ifi.Flags&net.FlagBroadcast != 0 {
+			keepARP[ifi.Index] = true
+		}
+
 		for _, a := range addrs {
 			ipaddr, ok := a.(*net.IPNet)
 			if !ok {
 				continue
 			}
-			if !ipaddr.IP.IsGlobalUnicast() {
+			if ipaddr.IP.To4() != nil || !ipaddr.IP.IsLinkLocalUnicast() {
 				continue
 			}
-			if ipaddr.IP.To4() == nil {
-				keepNDP[ifi.Index] = true
-			} else {
-				keepARP[ifi.Index] = true
-			}
+			keepNDP[ifi.Index] = true
+			break
 		}
 
 		if keepARP[ifi.Index] && a.arps[ifi.Index] == nil {
@@ -113,7 +117,7 @@ func (a *Announce) gratuitous(ip net.IP) error {
 	a.Lock()
 	defer a.Unlock()
 
-	if ip.To4() == nil {
+	if ip.To4() != nil {
 		for _, client := range a.arps {
 			if err := client.Gratuitous(ip); err != nil {
 				return err

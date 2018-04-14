@@ -157,6 +157,7 @@ func newTestARP(t *testing.T, shouldAnnounce announceFunc) (*arpResponder, *net.
 		a = &arpResponder{
 			hardwareAddr: intf.HardwareAddr,
 			conn:         c,
+			closed:       make(chan struct{}),
 			announce:     shouldAnnounce,
 		}
 	}
