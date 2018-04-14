@@ -23,7 +23,6 @@ import (
 
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/iface"
 	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/layer2"
 	"go.universe.tf/metallb/internal/version"
@@ -51,7 +50,6 @@ func main() {
 	var (
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 		master     = flag.String("master", "", "master url")
-		myIPstr    = flag.String("node-ip", "", "IP address of this Kubernetes node")
 		myNode     = flag.String("node-name", "", "name of this Kubernetes node")
 		port       = flag.Int("port", 80, "HTTP listening port")
 		config     = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
@@ -60,35 +58,17 @@ func main() {
 
 	glog.Infof("MetalLB speaker %s", version.String())
 
-	if *myIPstr == "" {
-		*myIPstr = os.Getenv("METALLB_NODE_IP")
-	}
 	if *myNode == "" {
 		*myNode = os.Getenv("METALLB_NODE_NAME")
-	}
-
-	myIP := net.ParseIP(*myIPstr)
-	if myIP == nil {
-		glog.Fatalf("Invalid --node-ip %q, must be an IPv4 or IPv6 address", *myIPstr)
 	}
 
 	if *myNode == "" {
 		glog.Fatalf("Must specify --node-name")
 	}
 
-	// It is possible for Kubernetes to provide an IPv4 or IPv6 node IP.
-	// Therefore, we must determine the interface that owns that IP address
-	// and use that interface for our speaker protocols.
-	ifi, err := iface.ByIP(myIP)
-	if err != nil {
-		glog.Fatalf("could not detect interface for IP address %q", myIP.String())
-	}
-
 	// Setup all clients and speakers, config decides what is being done runtime.
 	ctrl, err := newController(controllerConfig{
-		Interface: ifi,
-		NodeIP:    myIP,
-		MyNode:    *myNode,
+		MyNode: *myNode,
 	})
 	if err != nil {
 		glog.Fatalf("Error getting controller: %s", err)
@@ -110,7 +90,6 @@ type controller struct {
 	myNode string
 
 	config *config.Config
-	//ips    *allocator.Allocator
 
 	protocols map[config.Proto]Protocol
 	announced map[string]config.Proto // service name -> protocol advertising it
@@ -119,9 +98,7 @@ type controller struct {
 }
 
 type controllerConfig struct {
-	Interface *net.Interface
-	NodeIP    net.IP
-	MyNode    string
+	MyNode string
 
 	// For testing only, and will be removed in a future release.
 	// See: https://github.com/google/metallb/issues/152.
@@ -136,7 +113,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 	}
 
 	if !cfg.DisableLayer2 {
-		a, err := layer2.New(cfg.Interface)
+		a, err := layer2.New()
 		if err != nil {
 			return nil, fmt.Errorf("making layer2 announcer: %s", err)
 		}
