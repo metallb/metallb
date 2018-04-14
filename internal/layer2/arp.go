@@ -14,6 +14,7 @@ import (
 type announceFunc func(net.IP) dropReason
 
 type arpResponder struct {
+	intf         string
 	hardwareAddr net.HardwareAddr
 	conn         *arp.Client
 	announce     announceFunc
@@ -26,6 +27,7 @@ func newARPResponder(ifi *net.Interface, ann announceFunc) (*arpResponder, error
 	}
 
 	ret := &arpResponder{
+		intf:         ifi.Name,
 		hardwareAddr: ifi.HardwareAddr,
 		conn:         client,
 		announce:     ann,
@@ -61,36 +63,36 @@ func (a *arpResponder) processRequest() dropReason {
 	pkt, eth, err := a.conn.Read()
 	if err != nil {
 		if err == io.EOF {
-			glog.Infof("DEBUG: responder %s closed", a.hardwareAddr)
+			glog.Infof("DEBUG: %s %s responder closed", a.intf, a.hardwareAddr)
 			return dropReasonClosed
 		}
-		glog.Infof("DEBUG: responder %s errored: %s", a.hardwareAddr, err)
+		glog.Infof("DEBUG: %s %s responder errored: %s", a.intf, a.hardwareAddr, err)
 		return dropReasonError
 	}
 
 	// Ignore ARP replies.
 	if pkt.Operation != arp.OperationRequest {
-		glog.Infof("DEBUG: responder %s got a non-request ARP packet", a.hardwareAddr, err)
+		glog.Infof("DEBUG: %s %s responder got a non-request ARP packet", a.intf, a.hardwareAddr, err)
 		return dropReasonARPReply
 	}
 
 	// Ignore ARP requests which are not broadcast or bound directly for this machine.
 	if !bytes.Equal(eth.Destination, ethernet.Broadcast) && !bytes.Equal(eth.Destination, a.hardwareAddr) {
-		glog.Infof("DEBUG: responder %s ignored packet, %q is not bcast or local ethernet addr", a.hardwareAddr, eth.Destination)
+		glog.Infof("DEBUG: %s %s responder ignored packet, %q is not bcast or local ethernet addr", a.intf, a.hardwareAddr, eth.Destination)
 		return dropReasonEthernetDestination
 	}
 
-	glog.Infof("Request: who-has %s?  tell %s (%s).", pkt.TargetIP, pkt.SenderIP, pkt.SenderHardwareAddr)
+	glog.Infof("Request: %s %s who-has %s?  tell %s (%s).", a.intf, a.hardwareAddr, pkt.TargetIP, pkt.SenderIP, pkt.SenderHardwareAddr)
 
 	// Ignore ARP requests that the announcer tells us to ignore.
 	if reason := a.announce(pkt.TargetIP); reason != dropReasonNone {
-		glog.Infof("DEBUG: responder %s ignored packet, not programmed to advertise this IP (reason %d)", a.hardwareAddr, eth.Destination, reason)
+		glog.Infof("DEBUG: %s %s responder ignored packet (%s %s %s), not programmed to advertise this IP (reason %d)", a.intf, a.hardwareAddr, pkt.TargetIP, pkt.SenderIP, eth.Destination, reason)
 		return reason
 	}
 
 	stats.GotRequest(pkt.TargetIP.String())
 
-	glog.Infof("Request: who-has %s?  tell %s (%s). reply: %s is-at %s", pkt.TargetIP, pkt.SenderIP, pkt.SenderHardwareAddr, pkt.TargetIP, a.hardwareAddr)
+	glog.Infof("Request: %s %s who-has %s?  tell %s (%s). reply: %s is-at %s", a.intf, a.hardwareAddr, pkt.TargetIP, pkt.SenderIP, pkt.SenderHardwareAddr, pkt.TargetIP, a.hardwareAddr)
 	if err := a.conn.Reply(pkt, a.hardwareAddr, pkt.TargetIP); err != nil {
 		glog.Warningf("Failed to write ARP response for %q: %s", pkt.TargetIP, err)
 	} else {
