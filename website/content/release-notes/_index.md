@@ -29,6 +29,9 @@ New features:
 
 Bugfixes:
 
+- Correctly use AS_SEQUENCE in eBGP session messages, rather than
+  AS_SET ([#225](https://github.com/google/metallb/issues/225))
+
 -->
 
 ## Version 0.5.0
