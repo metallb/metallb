@@ -19,9 +19,7 @@ type Announce struct {
 }
 
 // New returns an initialized Announce.
-func New(ifi *net.Interface) (*Announce, error) {
-	glog.Infof("creating layer 2 announcer on interface %q", ifi.Name)
-
+func New() (*Announce, error) {
 	ret := &Announce{
 		arps: map[int]*arpResponder{},
 		ndps: map[int]*ndpResponder{},

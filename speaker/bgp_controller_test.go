@@ -171,7 +171,6 @@ func TestBGPSpeaker(t *testing.T) {
 	}
 	newBGP = b.New
 	c, err := newController(controllerConfig{
-		NodeIP:        net.ParseIP("1.2.3.4"),
 		MyNode:        "pandora",
 		DisableLayer2: true,
 	})
@@ -750,7 +749,6 @@ func TestNodeSelectors(t *testing.T) {
 	}
 	newBGP = b.New
 	c, err := newController(controllerConfig{
-		NodeIP:        net.ParseIP("1.2.3.4"),
 		MyNode:        "pandora",
 		DisableLayer2: true,
 	})
