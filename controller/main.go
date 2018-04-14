@@ -18,6 +18,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 	"reflect"
 
 	"go.universe.tf/metallb/internal/allocator"
@@ -122,10 +123,20 @@ func (c *controller) MarkSynced() {
 }
 
 func main() {
-	kubeconfig := flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-	master := flag.String("master", "", "master url")
-	port := flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
-	config := flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
+	// glog is a hostile package that registers a bunch of flags and
+	// does forced initialization outside of the program's
+	// control. This is a huge workaround to just make it log to
+	// stderr as well as we can, and then hide all the crap it
+	// defined.
+	flag.Set("logtostderr", "true")
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+
+	var (
+		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
+		master     = flag.String("master", "", "master url")
+		port       = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
+		config     = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
+	)
 	flag.Parse()
 
 	glog.Infof("MetalLB controller %s", version.String())

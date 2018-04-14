@@ -1,4 +1,4 @@
 FROM alpine:latest
 
 ADD controller /controller
-ENTRYPOINT ["/controller", "--logtostderr"]
+ENTRYPOINT ["/controller"]
