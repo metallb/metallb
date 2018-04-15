@@ -10,7 +10,6 @@ import (
 	"go.universe.tf/metallb/internal/config"
 
 	"github.com/go-kit/kit/log"
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -46,9 +45,9 @@ type Client struct {
 
 	syncFuncs []cache.InformerSynced
 
-	serviceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) error
-	configChanged  func(log.Logger, *config.Config) error
-	nodeChanged    func(log.Logger, *v1.Node) error
+	serviceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) bool
+	configChanged  func(log.Logger, *config.Config) bool
+	nodeChanged    func(log.Logger, *v1.Node) bool
 	leaderChanged  func(log.Logger, bool)
 	synced         func(log.Logger)
 }
@@ -63,9 +62,9 @@ type Config struct {
 	ReadEndpoints bool
 	Logger        log.Logger
 
-	ServiceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) error
-	ConfigChanged  func(log.Logger, *config.Config) error
-	NodeChanged    func(log.Logger, *v1.Node) error
+	ServiceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) bool
+	ConfigChanged  func(log.Logger, *config.Config) bool
+	NodeChanged    func(log.Logger, *v1.Node) bool
 	LeaderChanged  func(log.Logger, bool)
 	Synced         func(log.Logger)
 }
@@ -285,7 +284,6 @@ func (c *Client) Run() error {
 		go func() {
 			for {
 				c.elector.Run()
-				glog.Info("Restarting leader election loop in 10s")
 				time.Sleep(10 * time.Second)
 			}
 		}()
@@ -303,9 +301,8 @@ func (c *Client) Run() error {
 			return nil
 		}
 		updates.Inc()
-		if err := c.sync(key); err != nil {
+		if !c.sync(key) {
 			updateErrors.Inc()
-			glog.Infof("error syncing %q: %s", key, err)
 			c.queue.AddRateLimited(key)
 		} else {
 			c.queue.Forget(key)
@@ -366,75 +363,83 @@ func NodeHasHealthyEndpoint(eps *v1.Endpoints, node string) bool {
 	return false
 }
 
-func (c *Client) sync(key interface{}) error {
+func (c *Client) sync(key interface{}) bool {
 	defer c.queue.Done(key)
 
 	switch k := key.(type) {
 	case svcKey:
+		l := log.With(c.logger, "service", string(k))
 		svc, exists, err := c.svcIndexer.GetByKey(string(k))
 		if err != nil {
-			return fmt.Errorf("get service %q: %s", k, err)
+			l.Log("op", "getService", "error", err, "msg", "failed to get service")
+			return false
 		}
 		if !exists {
-			return c.serviceChanged(c.logger, string(k), nil, nil)
+			return c.serviceChanged(l, string(k), nil, nil)
 		}
 
 		var eps *v1.Endpoints
 		if c.epIndexer != nil {
 			epsIntf, exists, err := c.epIndexer.GetByKey(string(k))
 			if err != nil {
-				return fmt.Errorf("get endpoints %q: %s", k, err)
+				l.Log("op", "getEndpoints", "error", err, "msg", "failed to get endpoints")
+				return false
 			}
 			if !exists {
-				return c.serviceChanged(c.logger, string(k), nil, nil)
+				return c.serviceChanged(l, string(k), nil, nil)
 			}
 			eps = epsIntf.(*v1.Endpoints)
 		}
 
-		return c.serviceChanged(c.logger, string(k), svc.(*v1.Service), eps)
+		return c.serviceChanged(l, string(k), svc.(*v1.Service), eps)
 
 	case cmKey:
+		l := log.With(c.logger, "configmap", string(k))
 		cmi, exists, err := c.cmIndexer.GetByKey(string(k))
 		if err != nil {
-			return fmt.Errorf("get configmap %q: %s", k, err)
+			l.Log("op", "getConfigMap", "error", err, "msg", "failed to get configmap")
+			return false
 		}
 		if !exists {
 			configStale.Set(1)
-			return c.configChanged(c.logger, nil)
+			return c.configChanged(l, nil)
 		}
 		cm := cmi.(*v1.ConfigMap)
 		cfg, err := config.Parse([]byte(cm.Data["config"]))
 		if err != nil {
+			l.Log("event", "configStale", "msg", "config (re)load failed, config marked stale")
 			configStale.Set(1)
-			c.events.Eventf(cm, v1.EventTypeWarning, "InvalidConfig", "%s", err)
-			return nil
+			return true
 		}
 
-		if err := c.configChanged(c.logger, cfg); err != nil {
+		if !c.configChanged(l, cfg) {
+			l.Log("event", "configStale", "msg", "config (re)load failed, config marked stale")
 			configStale.Set(1)
-			c.events.Eventf(cm, v1.EventTypeWarning, "InvalidConfig", "%s", err)
-			return nil
+			return true
 		}
 
 		configLoaded.Set(1)
 		configStale.Set(0)
 
+		l.Log("event", "configLoaded", "msg", "config (re)loaded")
 		if c.svcIndexer != nil {
-			glog.Infof("config changed, reconverging all services")
 			for _, k := range c.svcIndexer.ListKeys() {
 				c.queue.AddRateLimited(svcKey(k))
 			}
 		}
 
-		return nil
+		return true
 
 	case nodeKey:
+		l := log.With(c.logger, "node", string(k))
 		n, exists, err := c.nodeIndexer.GetByKey(string(k))
 		if err != nil {
-			return fmt.Errorf("get node %q: %s", k, err)
+			l.Log("op", "getNode", "error", err, "msg", "failed to get node")
+			return false
 		}
 		if !exists {
-			return fmt.Errorf("node %q doesn't exist", k)
+			l.Log("op", "getNode", "error", "node doesn't exist in k8s, but I'm running on it!")
+			return false
 		}
 		node := n.(*v1.Node)
 		return c.nodeChanged(c.logger, node)
@@ -447,13 +452,13 @@ func (c *Client) sync(key interface{}) error {
 			leader.Set(0)
 			c.leaderChanged(c.logger, false)
 		}
-		return nil
+		return true
 
 	case synced:
 		if c.synced != nil {
 			c.synced(c.logger)
 		}
-		return nil
+		return true
 
 	default:
 		panic(fmt.Errorf("unknown key type for %#v (%T)", key, key))

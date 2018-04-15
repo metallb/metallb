@@ -66,7 +66,7 @@ func collectGlogs(f *os.File, logger log.Logger) {
 		}
 
 		level, ts, caller, msg := deformat(buf)
-		logger.Log("level", level, "ts", ts.Format(time.RFC3339Nano), "caller", caller, "msg", msg)
+		logger.Log("ts", ts.Format(time.RFC3339Nano), "level", level, "caller", caller, "msg", msg)
 	}
 }
 

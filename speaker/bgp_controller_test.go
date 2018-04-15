@@ -725,13 +725,13 @@ func TestBGPSpeaker(t *testing.T) {
 	l := log.NewNopLogger()
 	for _, test := range tests {
 		if test.config != nil {
-			if err := c.SetConfig(l, test.config); err != nil {
-				t.Errorf("%q: SetConfig failed: %s", test.desc, err)
+			if !c.SetConfig(l, test.config) {
+				t.Errorf("%q: SetConfig failed", test.desc)
 			}
 		}
 		if test.balancer != "" {
-			if err := c.SetBalancer(l, test.balancer, test.svc, test.eps); err != nil {
-				t.Errorf("%q: SetBalancer failed: %s", test.desc, err)
+			if !c.SetBalancer(l, test.balancer, test.svc, test.eps) {
+				t.Errorf("%q: SetBalancer failed", test.desc)
 			}
 		}
 
@@ -929,14 +929,14 @@ func TestNodeSelectors(t *testing.T) {
 	l := log.NewNopLogger()
 	for _, test := range tests {
 		if test.config != nil {
-			if err := c.SetConfig(l, test.config); err != nil {
-				t.Errorf("%q: SetConfig failed: %s", test.desc, err)
+			if !c.SetConfig(l, test.config) {
+				t.Errorf("%q: SetConfig failed", test.desc)
 			}
 		}
 
 		if test.node != nil {
-			if err := c.SetNode(l, test.node); err != nil {
-				t.Errorf("%q: SetNode failed: %s", test.desc, err)
+			if !c.SetNode(l, test.node) {
+				t.Errorf("%q: SetNode failed", test.desc)
 			}
 		}
 

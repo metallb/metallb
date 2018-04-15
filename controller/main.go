@@ -15,7 +15,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -47,18 +46,19 @@ type controller struct {
 	ips    *allocator.Allocator
 }
 
-func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ *v1.Endpoints) error {
-	glog.Infof("%s: start update", name)
-	defer glog.Infof("%s: end update", name)
+func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ *v1.Endpoints) bool {
+	l.Log("event", "startUpdate", "msg", "start of service update")
+	defer l.Log("event", "endUpdate", "msg", "end of service update")
 
 	if svcRo == nil {
-		return c.deleteBalancer(l, name)
+		c.deleteBalancer(l, name)
+		return true
 	}
 
 	if c.config == nil {
 		// Config hasn't been read, nothing we can do just yet.
-		glog.Infof("%s: skipped, waiting for config", name)
-		return nil
+		l.Log("event", "noConfig", "msg", "not processing, still waiting for config")
+		return true
 	}
 
 	// Making a copy unconditionally is a bit wasteful, since we don't
@@ -66,62 +66,62 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 	// copy makes the code much easier to follow, and we have a GC for
 	// a reason.
 	svc := svcRo.DeepCopy()
-	if err := c.convergeBalancer(l, name, svc); err != nil {
-		return err
+	if !c.convergeBalancer(l, name, svc) {
+		return false
 	}
 	if reflect.DeepEqual(svcRo, svc) {
-		glog.Infof("%s: converged, no change", name)
-		return nil
+		l.Log("event", "noChange", "msg", "service converged, no change")
+		return true
 	}
 
 	var err error
 	if !(reflect.DeepEqual(svcRo.Annotations, svc.Annotations) && reflect.DeepEqual(svcRo.Spec, svc.Spec)) {
 		svcRo, err = c.client.Update(svc)
 		if err != nil {
-			return fmt.Errorf("updating service %q: %s", name, err)
+			l.Log("op", "updateService", "error", err, "msg", "failed to update service")
+			return false
 		}
-		glog.Infof("%s: updated service", name)
 	}
 	if !reflect.DeepEqual(svcRo.Status, svc.Status) {
 		var st v1.ServiceStatus
 		st, svc = svc.Status, svcRo.DeepCopy()
 		svc.Status = st
 		if err = c.client.UpdateStatus(svc); err != nil {
-			return fmt.Errorf("updating status on service %q: %s", name, err)
+			l.Log("op", "updateServiceStatus", "error", err, "msg", "failed to update service status")
+			return false
 		}
-		glog.Infof("%s: updated service status", name)
 	}
+	l.Log("event", "serviceUpdated", "msg", "updated service object")
 
-	return nil
+	return true
 }
 
-func (c *controller) deleteBalancer(l log.Logger, name string) error {
+func (c *controller) deleteBalancer(l log.Logger, name string) {
 	if c.ips.Unassign(name) {
-		glog.Infof("%s: service deleted", name)
+		l.Log("event", "serviceDeleted", "msg", "service deleted")
 	}
-	return nil
 }
 
-func (c *controller) SetConfig(l log.Logger, cfg *config.Config) error {
-	glog.Infof("Start config update")
-	defer glog.Infof("End config update")
+func (c *controller) SetConfig(l log.Logger, cfg *config.Config) bool {
+	l.Log("event", "startUpdate", "msg", "start of config update")
+	defer l.Log("event", "endUpdate", "msg", "end of config update")
 
 	if cfg == nil {
-		glog.Errorf("No MetalLB configuration in cluster")
-		return errors.New("configuration missing")
+		l.Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
+		return false
 	}
 
 	if err := c.ips.SetPools(cfg.Pools); err != nil {
-		glog.Errorf("Applying new configuration failed: %s", err)
-		return fmt.Errorf("configuration rejected: %s", err)
+		l.Log("op", "setConfig", "error", err, "msg", "applying new configuration failed")
+		return false
 	}
 	c.config = cfg
-	return nil
+	return true
 }
 
 func (c *controller) MarkSynced(l log.Logger) {
 	c.synced = true
-	glog.Infof("Controller synced, can allocate IPs now")
+	l.Log("event", "stateSynced", "msg", "controller synced, can allocate IPs now")
 }
 
 func main() {
@@ -154,9 +154,12 @@ func main() {
 		Synced:         c.MarkSynced,
 	})
 	if err != nil {
-		glog.Fatalf("creating k8s client: %s", err)
+		logger.Log("op", "startup", "error", err, "msg", "failed to create k8s client")
+		os.Exit(1)
 	}
 
 	c.client = client
-	glog.Fatal(client.Run())
+	if err := client.Run(); err != nil {
+		logger.Log("op", "startup", "error", err, "msg", "failed to run k8s client")
+	}
 }
