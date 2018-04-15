@@ -25,8 +25,11 @@ func String() string {
 	}
 }
 
+// Version returns the version string.
 func Version() string { return version }
 
+// CommitHash returns the commit hash at which the binary was built.
 func CommitHash() string { return gitCommit }
 
+// Branch returns the branch at which the binary was built.
 func Branch() string { return gitBranch }
