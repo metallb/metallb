@@ -16,9 +16,10 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/leaderelection"
+	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -26,7 +27,7 @@ import (
 // Client watches a Kubernetes cluster and translates events into
 // Controller method calls.
 type Client struct {
-	namespace string
+	config Config
 
 	client *kubernetes.Clientset
 	events record.EventRecorder
@@ -45,13 +46,23 @@ type Client struct {
 	elector *leaderelection.LeaderElector
 
 	syncFuncs []cache.InformerSynced
+}
 
-	serviceChanged            func(string, *v1.Service) error
-	serviceOrEndpointsChanged func(string, *v1.Service, *v1.Endpoints) error
-	configChanged             func(*config.Config) error
-	nodeChanged               func(*v1.Node) error
-	leaderChanged             func(bool)
-	synced                    func()
+// Config specifies the configuration of the Kubernetes
+// client/watcher.
+type Config struct {
+	ProcessName   string
+	ConfigMapName string
+	NodeName      string
+
+	MetricsPort   int
+	ReadEndpoints bool
+
+	ServiceChanged func(string, *v1.Service, *v1.Endpoints) error
+	ConfigChanged  func(*config.Config) error
+	NodeChanged    func(*v1.Node) error
+	LeaderChanged  func(bool)
+	Synced         func()
 }
 
 type svcKey string
@@ -64,201 +75,201 @@ type synced string
 //
 // The client uses processName to identify itself to the cluster
 // (e.g. when logging events).
-func New(processName, masterAddr, kubeconfig string) (*Client, error) {
-	k8sConfig, err := clientcmd.BuildConfigFromFlags(masterAddr, kubeconfig)
+func New(cfg *Config) (*Client, error) {
+	k8sConfig, err := rest.InClusterConfig()
 	if err != nil {
 		return nil, fmt.Errorf("building client config: %s", err)
 	}
 	clientset, err := kubernetes.NewForConfig(k8sConfig)
 	if err != nil {
-		return nil, fmt.Errorf("creating kubernetes client: %s", err)
+		return nil, fmt.Errorf("creating Kubernetes client: %s", err)
 	}
 
 	bs, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 	if err != nil {
 		return nil, fmt.Errorf("getting namespace from pod service account data: %s", err)
 	}
+	namespace := string(bs)
 
 	broadcaster := record.NewBroadcaster()
-	broadcaster.StartLogging(glog.Infof)
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(clientset.CoreV1().RESTClient()).Events("")})
-	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: processName})
+	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: cfg.ProcessName})
 
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
-	return &Client{
-		namespace: string(bs),
-		client:    clientset,
-		events:    recorder,
-		queue:     queue,
-	}, nil
-}
-
-// HandleService registers a handler for changes to Service objects.
-func (c *Client) HandleService(handler func(string, *v1.Service) error) {
-	// Note this also gets called internally by
-	// HandleServiceAndEndpoints with a nil handler. Make sure the
-	// code can handle that correctly. When called with a nil handler
-	// it should just set up the indexer/informer and nothing else.
-	if c.serviceChanged != nil {
-		panic("HandleService called twice")
+	c := &Client{
+		config: *cfg,
+		client: clientset,
+		events: recorder,
+		queue:  queue,
 	}
 
-	svcHandlers := cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			if err == nil {
-				c.queue.Add(svcKey(key))
-			}
-		},
-		UpdateFunc: func(old interface{}, new interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(new)
-			if err == nil {
-				c.queue.Add(svcKey(key))
-			}
-		},
-		DeleteFunc: func(obj interface{}) {
-			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			if err == nil {
-				c.queue.Add(svcKey(key))
-			}
-		},
-	}
-	svcWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "services", v1.NamespaceAll, fields.Everything())
-	c.svcIndexer, c.svcInformer = cache.NewIndexerInformer(svcWatcher, &v1.Service{}, 0, svcHandlers, cache.Indexers{})
+	if cfg.ServiceChanged != nil {
+		svcHandlers := cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				key, err := cache.MetaNamespaceKeyFunc(obj)
+				if err == nil {
+					c.queue.Add(svcKey(key))
+				}
+			},
+			UpdateFunc: func(old interface{}, new interface{}) {
+				key, err := cache.MetaNamespaceKeyFunc(new)
+				if err == nil {
+					c.queue.Add(svcKey(key))
+				}
+			},
+			DeleteFunc: func(obj interface{}) {
+				key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+				if err == nil {
+					c.queue.Add(svcKey(key))
+				}
+			},
+		}
+		svcWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "services", v1.NamespaceAll, fields.Everything())
+		c.svcIndexer, c.svcInformer = cache.NewIndexerInformer(svcWatcher, &v1.Service{}, 0, svcHandlers, cache.Indexers{})
 
-	c.serviceChanged = handler
-	c.syncFuncs = append(c.syncFuncs, c.svcInformer.HasSynced)
-}
+		c.syncFuncs = append(c.syncFuncs, c.svcInformer.HasSynced)
 
-// HandleServiceAndEndpoints registers a handler for changes to Service objects
-// and their associated Endpoints.
-func (c *Client) HandleServiceAndEndpoints(handler func(string, *v1.Service, *v1.Endpoints) error) {
-	c.HandleService(nil)
-
-	epHandlers := cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			if err == nil {
-				c.queue.Add(svcKey(key))
+		if cfg.ReadEndpoints {
+			epHandlers := cache.ResourceEventHandlerFuncs{
+				AddFunc: func(obj interface{}) {
+					key, err := cache.MetaNamespaceKeyFunc(obj)
+					if err == nil {
+						c.queue.Add(svcKey(key))
+					}
+				},
+				UpdateFunc: func(old interface{}, new interface{}) {
+					key, err := cache.MetaNamespaceKeyFunc(new)
+					if err == nil {
+						c.queue.Add(svcKey(key))
+					}
+				},
+				DeleteFunc: func(obj interface{}) {
+					key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+					if err == nil {
+						c.queue.Add(svcKey(key))
+					}
+				},
 			}
-		},
-		UpdateFunc: func(old interface{}, new interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(new)
-			if err == nil {
-				c.queue.Add(svcKey(key))
-			}
-		},
-		DeleteFunc: func(obj interface{}) {
-			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			if err == nil {
-				c.queue.Add(svcKey(key))
-			}
-		},
-	}
-	epWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "endpoints", v1.NamespaceAll, fields.Everything())
-	c.epIndexer, c.epInformer = cache.NewIndexerInformer(epWatcher, &v1.Endpoints{}, 0, epHandlers, cache.Indexers{})
+			epWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "endpoints", v1.NamespaceAll, fields.Everything())
+			c.epIndexer, c.epInformer = cache.NewIndexerInformer(epWatcher, &v1.Endpoints{}, 0, epHandlers, cache.Indexers{})
 
-	c.serviceOrEndpointsChanged = handler
-	c.syncFuncs = append(c.syncFuncs, c.epInformer.HasSynced)
-}
-
-// HandleConfig registers a handler for changes to MetalLB's configuration.
-func (c *Client) HandleConfig(configMap string, handler func(*config.Config) error) {
-	if c.configChanged != nil {
-		panic("HandleConfig called twice")
+			c.syncFuncs = append(c.syncFuncs, c.epInformer.HasSynced)
+		}
 	}
 
-	cmHandlers := cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			if err == nil {
-				c.queue.Add(cmKey(key))
-			}
-		},
-		UpdateFunc: func(old interface{}, new interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(new)
-			if err == nil {
-				c.queue.Add(cmKey(key))
-			}
-		},
-		DeleteFunc: func(obj interface{}) {
-			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			if err == nil {
-				c.queue.Add(cmKey(key))
-			}
-		},
-	}
-	cmWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "configmaps", c.namespace, fields.OneTermEqualSelector("metadata.name", configMap))
-	c.cmIndexer, c.cmInformer = cache.NewIndexerInformer(cmWatcher, &v1.ConfigMap{}, 0, cmHandlers, cache.Indexers{})
+	if cfg.ConfigChanged != nil {
+		cmHandlers := cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				key, err := cache.MetaNamespaceKeyFunc(obj)
+				if err == nil {
+					c.queue.Add(cmKey(key))
+				}
+			},
+			UpdateFunc: func(old interface{}, new interface{}) {
+				key, err := cache.MetaNamespaceKeyFunc(new)
+				if err == nil {
+					c.queue.Add(cmKey(key))
+				}
+			},
+			DeleteFunc: func(obj interface{}) {
+				key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+				if err == nil {
+					c.queue.Add(cmKey(key))
+				}
+			},
+		}
+		cmWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "configmaps", namespace, fields.OneTermEqualSelector("metadata.name", cfg.ConfigMapName))
+		c.cmIndexer, c.cmInformer = cache.NewIndexerInformer(cmWatcher, &v1.ConfigMap{}, 0, cmHandlers, cache.Indexers{})
 
-	c.configChanged = handler
-	c.syncFuncs = append(c.syncFuncs, c.cmInformer.HasSynced)
-}
-
-// HandleNode registers a handler for changes to the given Node.
-func (c *Client) HandleNode(nodeName string, handler func(*v1.Node) error) {
-	if c.nodeChanged != nil {
-		panic("HandleMyNode called twice")
+		c.syncFuncs = append(c.syncFuncs, c.cmInformer.HasSynced)
 	}
 
-	handlers := cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(obj)
-			if err == nil {
-				c.queue.Add(nodeKey(key))
-			}
-		},
-		UpdateFunc: func(old interface{}, new interface{}) {
-			key, err := cache.MetaNamespaceKeyFunc(new)
-			if err == nil {
-				c.queue.Add(nodeKey(key))
-			}
-		},
-		DeleteFunc: func(obj interface{}) {
-			key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-			if err == nil {
-				c.queue.Add(nodeKey(key))
-			}
-		},
-	}
-	watcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "nodes", v1.NamespaceAll, fields.OneTermEqualSelector("metadata.name", nodeName))
-	c.nodeIndexer, c.nodeInformer = cache.NewIndexerInformer(watcher, &v1.Node{}, 0, handlers, cache.Indexers{})
+	if cfg.NodeChanged != nil {
+		handlers := cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				key, err := cache.MetaNamespaceKeyFunc(obj)
+				if err == nil {
+					c.queue.Add(nodeKey(key))
+				}
+			},
+			UpdateFunc: func(old interface{}, new interface{}) {
+				key, err := cache.MetaNamespaceKeyFunc(new)
+				if err == nil {
+					c.queue.Add(nodeKey(key))
+				}
+			},
+			DeleteFunc: func(obj interface{}) {
+				key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+				if err == nil {
+					c.queue.Add(nodeKey(key))
+				}
+			},
+		}
+		watcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "nodes", v1.NamespaceAll, fields.OneTermEqualSelector("metadata.name", cfg.NodeName))
+		c.nodeIndexer, c.nodeInformer = cache.NewIndexerInformer(watcher, &v1.Node{}, 0, handlers, cache.Indexers{})
 
-	c.nodeChanged = handler
-	c.syncFuncs = append(c.syncFuncs, c.nodeInformer.HasSynced)
-}
-
-// HandleSynced registers a handler for the "local cache synced" signal.
-func (c *Client) HandleSynced(handler func()) {
-	if c.synced != nil {
-		panic("HandleSynced called twice")
+		c.syncFuncs = append(c.syncFuncs, c.nodeInformer.HasSynced)
 	}
-	c.synced = handler
+
+	if cfg.LeaderChanged != nil {
+		conf := resourcelock.ResourceLockConfig{Identity: cfg.NodeName, EventRecorder: c.events}
+		lock, err := resourcelock.New(resourcelock.EndpointsResourceLock, namespace, "metallb-speaker", c.client.CoreV1(), conf)
+		if err != nil {
+			return nil, fmt.Errorf("creating resource lock for leader election: %s", err)
+		}
+
+		leader.Set(-1)
+
+		lec := leaderelection.LeaderElectionConfig{
+			Lock: lock,
+			// Time before the lock expires and other replicas can try to
+			// become leader.
+			LeaseDuration: 10 * time.Second,
+			// How long we should keep trying to hold the lock before
+			// giving up and deciding we've lost it.
+			RenewDeadline: 9 * time.Second,
+			// Time to wait between refreshing the lock when we are
+			// leader.
+			RetryPeriod: 5 * time.Second,
+			Callbacks: leaderelection.LeaderCallbacks{
+				OnStartedLeading: func(stop <-chan struct{}) {
+					c.queue.Add(electionKey(true))
+				},
+				OnStoppedLeading: func() {
+					c.queue.Add(electionKey(false))
+				},
+			},
+		}
+
+		elector, err := leaderelection.NewLeaderElector(lec)
+		if err != nil {
+			return nil, fmt.Errorf("creating leader elector: %s", err)
+		}
+		c.elector = elector
+	}
+	return c, nil
 }
 
 // Run watches for events on the Kubernetes cluster, and dispatches
 // calls to the Controller.
-func (c *Client) Run(httpPort int) error {
+func (c *Client) Run() error {
 	http.Handle("/metrics", promhttp.Handler())
 	go func() {
-		glog.Fatal(http.ListenAndServe(fmt.Sprintf(":%d", httpPort), nil))
+		http.ListenAndServe(fmt.Sprintf(":%d", c.config.MetricsPort), nil)
 	}()
 
-	stop := make(chan struct{})
-	defer close(stop)
-
 	if c.svcInformer != nil {
-		go c.svcInformer.Run(stop)
+		go c.svcInformer.Run(nil)
 	}
 	if c.epInformer != nil {
-		go c.epInformer.Run(stop)
+		go c.epInformer.Run(nil)
 	}
 	if c.cmInformer != nil {
-		go c.cmInformer.Run(stop)
+		go c.cmInformer.Run(nil)
 	}
 	if c.nodeInformer != nil {
-		go c.nodeInformer.Run(stop)
+		go c.nodeInformer.Run(nil)
 	}
 	if c.elector != nil {
 		go func() {
@@ -270,7 +281,7 @@ func (c *Client) Run(httpPort int) error {
 		}()
 	}
 
-	if !cache.WaitForCacheSync(stop, c.syncFuncs...) {
+	if !cache.WaitForCacheSync(nil, c.syncFuncs...) {
 		return errors.New("timed out waiting for cache sync")
 	}
 
@@ -355,10 +366,7 @@ func (c *Client) sync(key interface{}) error {
 			return fmt.Errorf("get service %q: %s", k, err)
 		}
 		if !exists {
-			if c.serviceChanged != nil {
-				return c.serviceChanged(string(k), nil)
-			}
-			return c.serviceOrEndpointsChanged(string(k), nil, nil)
+			return c.config.ServiceChanged(string(k), nil, nil)
 		}
 
 		var eps *v1.Endpoints
@@ -368,15 +376,12 @@ func (c *Client) sync(key interface{}) error {
 				return fmt.Errorf("get endpoints %q: %s", k, err)
 			}
 			if !exists {
-				return c.serviceOrEndpointsChanged(string(k), nil, nil)
+				return c.config.ServiceChanged(string(k), nil, nil)
 			}
 			eps = epsIntf.(*v1.Endpoints)
 		}
 
-		if c.serviceChanged != nil {
-			return c.serviceChanged(string(k), svc.(*v1.Service))
-		}
-		return c.serviceOrEndpointsChanged(string(k), svc.(*v1.Service), eps)
+		return c.config.ServiceChanged(string(k), svc.(*v1.Service), eps)
 
 	case cmKey:
 		cmi, exists, err := c.cmIndexer.GetByKey(string(k))
@@ -385,7 +390,7 @@ func (c *Client) sync(key interface{}) error {
 		}
 		if !exists {
 			configStale.Set(1)
-			return c.configChanged(nil)
+			return c.config.ConfigChanged(nil)
 		}
 		cm := cmi.(*v1.ConfigMap)
 		cfg, err := config.Parse([]byte(cm.Data["config"]))
@@ -395,7 +400,7 @@ func (c *Client) sync(key interface{}) error {
 			return nil
 		}
 
-		if err := c.configChanged(cfg); err != nil {
+		if err := c.config.ConfigChanged(cfg); err != nil {
 			configStale.Set(1)
 			c.events.Eventf(cm, v1.EventTypeWarning, "InvalidConfig", "%s", err)
 			return nil
@@ -422,21 +427,21 @@ func (c *Client) sync(key interface{}) error {
 			return fmt.Errorf("node %q doesn't exist", k)
 		}
 		node := n.(*v1.Node)
-		return c.nodeChanged(node)
+		return c.config.NodeChanged(node)
 
 	case electionKey:
 		if k {
 			leader.Set(1)
-			c.leaderChanged(true)
+			c.config.LeaderChanged(true)
 		} else {
 			leader.Set(0)
-			c.leaderChanged(false)
+			c.config.LeaderChanged(false)
 		}
 		return nil
 
 	case synced:
-		if c.synced != nil {
-			c.synced()
+		if c.config.Synced != nil {
+			c.config.Synced()
 		}
 		return nil
 
