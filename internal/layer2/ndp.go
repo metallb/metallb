@@ -9,6 +9,7 @@ import (
 )
 
 type ndpResponder struct {
+	intf         string
 	hardwareAddr net.HardwareAddr
 	conn         *ndp.Conn
 	announce     announceFunc
@@ -25,6 +26,7 @@ func newNDPResponder(ifi *net.Interface, ann announceFunc) (*ndpResponder, error
 	}
 
 	ret := &ndpResponder{
+		intf:                ifi.Name,
 		hardwareAddr:        ifi.HardwareAddr,
 		conn:                conn,
 		announce:            ann,
@@ -33,6 +35,8 @@ func newNDPResponder(ifi *net.Interface, ann announceFunc) (*ndpResponder, error
 	go ret.run()
 	return ret, nil
 }
+
+func (n *ndpResponder) Interface() string { return n.intf }
 
 func (n *ndpResponder) Close() error {
 	return n.conn.Close()
