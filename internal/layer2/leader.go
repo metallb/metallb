@@ -2,8 +2,6 @@ package layer2
 
 import (
 	"time"
-
-	"github.com/golang/glog"
 )
 
 // Leader returns true if we are the leader in the daemon set.
@@ -39,7 +37,7 @@ func (a *Announce) spam() {
 
 		for _, ip := range a.ips {
 			if err := a.gratuitous(ip); err != nil {
-				glog.Errorf("Broadcasting gratuitous layer 2 response for %q: %s", ip, err)
+				a.logger.Log("op", "sendGratuitous", "ip", ip, "error", err, "msg", "failed to send gratuitous layer 2 response for IP")
 			}
 		}
 		time.Sleep(1100 * time.Millisecond)
