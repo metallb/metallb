@@ -68,7 +68,8 @@ func main() {
 	}
 
 	if *myNode == "" {
-		glog.Fatalf("Must specify --node-name")
+		logger.Log("op", "startup", "error", "must specify --node-name", "msg", "missing configuration flag")
+		os.Exit(1)
 	}
 
 	// Setup all clients and speakers, config decides what is being done runtime.
@@ -76,7 +77,8 @@ func main() {
 		MyNode: *myNode,
 	})
 	if err != nil {
-		glog.Fatalf("Error getting controller: %s", err)
+		logger.Log("op", "startup", "error", err, "msg", "failed to create MetalLB controller")
+		os.Exit(1)
 	}
 
 	client, err := k8s.New(&k8s.Config{
@@ -94,10 +96,12 @@ func main() {
 		LeaderChanged:  ctrl.SetLeader,
 	})
 	if err != nil {
-		glog.Fatalf("Error getting k8s client: %s", err)
+		logger.Log("op", "startup", "error", err, "msg", "failed to create k8s client")
 	}
 
-	glog.Fatal(client.Run())
+	if err := client.Run(); err != nil {
+		logger.Log("op", "startup", "error", err, "msg", "failed to run k8s client")
+	}
 }
 
 type controller struct {
@@ -195,6 +199,8 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 		return c.deleteBalancer(l, name, "internalError")
 	}
 
+	l = log.With(l, "pool", poolName)
+
 	if proto, ok := c.announced[name]; ok && proto != pool.Protocol {
 		if !c.deleteBalancer(l, name, "protocolChanged") {
 			return false
@@ -207,7 +213,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 		return c.deleteBalancer(l, name, "internalError")
 	}
 	l = log.With(l, "protocol", pool.Protocol)
-	if err := handler.SetBalancer(name, lbIP, pool); err != nil {
+	if err := handler.SetBalancer(l, name, lbIP, pool); err != nil {
 		l.Log("op", "setBalancer", "error", err, "msg", "failed to announce service")
 		return false
 	}
@@ -247,7 +253,7 @@ func (c *controller) deleteBalancer(l log.Logger, name, reason string) bool {
 	delete(c.svcIP, name)
 
 	if ref == 0 {
-		if err := c.protocols[proto].DeleteBalancer(name, reason); err != nil {
+		if err := c.protocols[proto].DeleteBalancer(l, name, reason); err != nil {
 			l.Log("op", "deleteBalancer", "error", err, "msg", "failed to clear balancer state")
 			return false
 		}
@@ -286,7 +292,7 @@ func (c *controller) SetConfig(l log.Logger, cfg *config.Config) bool {
 	}
 
 	for proto, handler := range c.protocols {
-		if err := handler.SetConfig(cfg); err != nil {
+		if err := handler.SetConfig(l, cfg); err != nil {
 			l.Log("op", "setConfig", "protocol", proto, "error", err, "msg", "applying new configuration to protocol handler failed")
 			return false
 		}
@@ -299,13 +305,13 @@ func (c *controller) SetConfig(l log.Logger, cfg *config.Config) bool {
 
 func (c *controller) SetLeader(l log.Logger, isLeader bool) {
 	for _, handler := range c.protocols {
-		handler.SetLeader(isLeader)
+		handler.SetLeader(l, isLeader)
 	}
 }
 
 func (c *controller) SetNode(l log.Logger, node *v1.Node) bool {
 	for proto, handler := range c.protocols {
-		if err := handler.SetNode(node); err != nil {
+		if err := handler.SetNode(l, node); err != nil {
 			l.Log("op", "setNode", "error", err, "protocol", proto, "msg", "failed to propagate node info to protocol handler")
 			return false
 		}
@@ -315,9 +321,9 @@ func (c *controller) SetNode(l log.Logger, node *v1.Node) bool {
 
 // A Protocol can advertise an IP address.
 type Protocol interface {
-	SetConfig(*config.Config) error
-	SetBalancer(name string, lbIP net.IP, pool *config.Pool) error
-	DeleteBalancer(name, reason string) error
-	SetLeader(bool)
-	SetNode(*v1.Node) error
+	SetConfig(log.Logger, *config.Config) error
+	SetBalancer(log.Logger, string, net.IP, *config.Pool) error
+	DeleteBalancer(log.Logger, string, string) error
+	SetLeader(log.Logger, bool)
+	SetNode(log.Logger, *v1.Node) error
 }

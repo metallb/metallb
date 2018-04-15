@@ -17,6 +17,7 @@ package main
 import (
 	"net"
 
+	"github.com/go-kit/kit/log"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/layer2"
 	"k8s.io/api/core/v1"
@@ -26,16 +27,16 @@ type layer2Controller struct {
 	announcer *layer2.Announce
 }
 
-func (c *layer2Controller) SetConfig(*config.Config) error {
+func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
 	return nil
 }
 
-func (c *layer2Controller) SetBalancer(name string, lbIP net.IP, pool *config.Pool) error {
+func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
 	c.announcer.SetBalancer(name, lbIP)
 	return nil
 }
 
-func (c *layer2Controller) DeleteBalancer(name, reason string) error {
+func (c *layer2Controller) DeleteBalancer(l log.Logger, name, reason string) error {
 	if !c.announcer.AnnounceName(name) {
 		return nil
 	}
@@ -43,10 +44,10 @@ func (c *layer2Controller) DeleteBalancer(name, reason string) error {
 	return nil
 }
 
-func (c *layer2Controller) SetLeader(isLeader bool) {
+func (c *layer2Controller) SetLeader(l log.Logger, isLeader bool) {
 	c.announcer.SetLeader(isLeader)
 }
 
-func (c *layer2Controller) SetNode(*v1.Node) error {
+func (c *layer2Controller) SetNode(log.Logger, *v1.Node) error {
 	return nil
 }
