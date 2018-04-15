@@ -38,6 +38,8 @@ func newARPResponder(ifi *net.Interface, ann announceFunc) (*arpResponder, error
 	return ret, nil
 }
 
+func (a *arpResponder) Interface() string { return a.intf }
+
 func (a *arpResponder) Close() error {
 	close(a.closed)
 	return a.conn.Close()
