@@ -74,6 +74,7 @@ func main() {
 	// Setup all clients and speakers, config decides what is being done runtime.
 	ctrl, err := newController(controllerConfig{
 		MyNode: *myNode,
+		Logger: logger,
 	})
 	if err != nil {
 		logger.Log("op", "startup", "error", err, "msg", "failed to create MetalLB controller")
@@ -116,6 +117,7 @@ type controller struct {
 
 type controllerConfig struct {
 	MyNode string
+	Logger log.Logger
 
 	// For testing only, and will be removed in a future release.
 	// See: https://github.com/google/metallb/issues/152.
@@ -125,6 +127,7 @@ type controllerConfig struct {
 func newController(cfg controllerConfig) (*controller, error) {
 	protocols := map[config.Proto]Protocol{
 		config.BGP: &bgpController{
+			logger: cfg.Logger,
 			svcAds: make(map[string][]*bgp.Advertisement),
 		},
 	}
