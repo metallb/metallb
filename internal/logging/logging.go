@@ -12,6 +12,9 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+
+	// For the flags and stuff.
+	_ "github.com/golang/glog"
 )
 
 // Init returns a logger configured with common settings like
