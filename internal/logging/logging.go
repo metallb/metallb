@@ -25,7 +25,7 @@ import (
 // application-specific flag parsing or logging occurs, because it
 // mutates the contents of the flag package as well as os.Stderr.
 func Init() (log.Logger, error) {
-	l := log.NewLogfmtLogger(log.NewSyncWriter(os.Stdout))
+	l := log.NewJSONLogger(log.NewSyncWriter(os.Stdout))
 
 	r, w, err := os.Pipe()
 	if err != nil {
