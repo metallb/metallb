@@ -133,8 +133,8 @@ func TestControllerMutation(t *testing.T) {
 	// For this test, we just set a static config and immediately sync
 	// the controller. The mutations around config setting and syncing
 	// are tested elsewhere.
-	if err := c.SetConfig(l, cfg); err != nil {
-		t.Fatalf("SetConfig: %s", err)
+	if !c.SetConfig(l, cfg) {
+		t.Fatalf("SetConfig failed")
 	}
 	c.MarkSynced(l)
 
@@ -367,8 +367,8 @@ func TestControllerMutation(t *testing.T) {
 			k.reset()
 			// Delete the test balancer, to clean up all state
 
-			if err := c.SetBalancer(l, "test", test.in, nil); err != nil {
-				t.Errorf("%q: SetBalancer returned error: %s", test.desc, err)
+			if !c.SetBalancer(l, "test", test.in, nil) {
+				t.Errorf("%q: SetBalancer returned error", test.desc)
 				continue
 			}
 			if test.wantErr != k.loggedWarning {
@@ -423,8 +423,8 @@ func TestControllerConfig(t *testing.T) {
 			Type: "LoadBalancer",
 		},
 	}
-	if err := c.SetBalancer(l, "test", svc, nil); err != nil {
-		t.Fatalf("SetBalancer failed: %s", err)
+	if !c.SetBalancer(l, "test", svc, nil) {
+		t.Fatalf("SetBalancer failed")
 	}
 
 	gotSvc := k.gotService(svc)
@@ -438,10 +438,10 @@ func TestControllerConfig(t *testing.T) {
 	// Set an empty config. Balancer should still not do anything to
 	// our unallocated service, and return an error to force a
 	// retry after sync is complete.
-	if err := c.SetConfig(l, &config.Config{}); err != nil {
-		t.Fatalf("SetConfig with empty config failed: %s", err)
+	if !c.SetConfig(l, &config.Config{}) {
+		t.Fatalf("SetConfig with empty config failed")
 	}
-	if err := c.SetBalancer(l, "test", svc, nil); err == nil {
+	if c.SetBalancer(l, "test", svc, nil) {
 		t.Fatal("SetBalancer did not fail")
 	}
 
@@ -462,10 +462,10 @@ func TestControllerConfig(t *testing.T) {
 			},
 		},
 	}
-	if err := c.SetConfig(l, cfg); err != nil {
-		t.Fatalf("SetConfig failed: %s", err)
+	if !c.SetConfig(l, cfg) {
+		t.Fatalf("SetConfig failed")
 	}
-	if err := c.SetBalancer(l, "test", svc, nil); err == nil {
+	if c.SetBalancer(l, "test", svc, nil) {
 		t.Fatal("SetBalancer did not fail")
 	}
 
@@ -480,8 +480,8 @@ func TestControllerConfig(t *testing.T) {
 	// Mark synced. Finally, we can allocate.
 	c.MarkSynced(l)
 
-	if err := c.SetBalancer(l, "test", svc, nil); err != nil {
-		t.Fatalf("SetBalancer failed: %s", err)
+	if !c.SetBalancer(l, "test", svc, nil) {
+		t.Fatalf("SetBalancer failed")
 	}
 
 	gotSvc = k.gotService(svc)
@@ -493,12 +493,12 @@ func TestControllerConfig(t *testing.T) {
 	}
 
 	// Now that an IP is allocated, removing the IP pool is not allowed.
-	if err := c.SetConfig(l, &config.Config{}); err == nil {
+	if c.SetConfig(l, &config.Config{}) {
 		t.Fatalf("SetConfig that deletes allocated IPs was accepted")
 	}
 
 	// Deleting the config also makes MetalLB sad.
-	if err := c.SetConfig(l, nil); err == nil {
+	if c.SetConfig(l, nil) {
 		t.Fatalf("SetConfig that deletes the config was accepted")
 	}
 }

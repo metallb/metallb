@@ -15,7 +15,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"net"
@@ -149,66 +148,68 @@ func newController(cfg controllerConfig) (*controller, error) {
 	return ret, nil
 }
 
-func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) error {
+func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) bool {
+	l.Log("event", "startUpdate", "msg", "start of service update")
+	defer l.Log("event", "endUpdate", "msg", "end of service update")
+
 	if svc == nil {
-		return c.deleteBalancer(l, name, "service deleted")
+		return c.deleteBalancer(l, name, "serviceDeleted")
 	}
 
 	if svc.Spec.Type != "LoadBalancer" {
-		return nil
+		return c.deleteBalancer(l, name, "notLoadBalancer")
 	}
 
-	glog.Infof("%s: start update", name)
-	defer glog.Infof("%s: end update", name)
-
 	if c.config == nil {
-		glog.Infof("%s: skipped, waiting for config", name)
-		return nil
+		l.Log("event", "noConfig", "msg", "not processing, still waiting for config")
+		return true
 	}
 
 	if len(svc.Status.LoadBalancer.Ingress) != 1 {
-		glog.Infof("%s: no IP allocated by controller", name)
-		return c.deleteBalancer(l, name, "no IP allocated by controller")
+		return c.deleteBalancer(l, name, "noIPAllocated")
 	}
 
 	// Should we advertise? Yes, if externalTrafficPolicy is Cluster,
 	// or Local && there's a ready local endpoint.
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !k8s.NodeHasHealthyEndpoint(eps, c.myNode) {
-		glog.Infof("%s: externalTrafficPolicy is Local, and no healthy local endpoints", name)
-		return c.deleteBalancer(l, name, "no healthy local endpoints")
+		return c.deleteBalancer(l, name, "noLocalEndpoints")
 	}
 
 	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
 	if lbIP == nil {
-		glog.Errorf("%s: invalid LoadBalancer IP %q", name, svc.Status.LoadBalancer.Ingress[0].IP)
-		return c.deleteBalancer(l, name, "invalid IP allocated by controller")
+		l.Log("op", "setBalancer", "error", fmt.Sprintf("invalid LoadBalancer IP %q", svc.Status.LoadBalancer.Ingress[0].IP), "msg", "invalid IP allocated by controller")
+		return c.deleteBalancer(l, name, "invalidIP")
 	}
+
+	l = log.With(l, "ip", lbIP)
 
 	poolName := poolFor(c.config.Pools, lbIP)
 	if poolName == "" {
-		glog.Errorf("%s: IP %q assigned by controller is not allowed by config", name, lbIP)
-		return c.deleteBalancer(l, name, "invalid IP allocated by controller")
+		l.Log("op", "setBalancer", "error", "assigned IP not allowed by config", "msg", "IP allocated by controller not allowed by config")
+		return c.deleteBalancer(l, name, "ipNotAllowed")
 	}
 
 	pool := c.config.Pools[poolName]
 	if pool == nil {
-		glog.Errorf("%s: could not find pool %q that definitely should exist!", name, poolName)
-		return c.deleteBalancer(l, name, "can't find pool")
+		l.Log("bug", "true", "msg", "internal error: allocated IP has no matching address pool")
+		return c.deleteBalancer(l, name, "internalError")
 	}
 
 	if proto, ok := c.announced[name]; ok && proto != pool.Protocol {
-		if err := c.deleteBalancer(l, name, fmt.Sprintf("protocol changed to %q", pool.Protocol)); err != nil {
-			return fmt.Errorf("deleting balancer %q: %s", name, err)
+		if !c.deleteBalancer(l, name, "protocolChanged") {
+			return false
 		}
 	}
 
 	handler := c.protocols[pool.Protocol]
 	if handler == nil {
-		glog.Errorf("%s: unknown balancer protocol %q. This should not happen, please file a bug!", name, pool.Protocol)
-		return c.deleteBalancer(l, name, "internal error (unknown balancer protocol)")
+		l.Log("bug", "true", "protocol", pool.Protocol, "msg", "internal error: unknown balancer protocol!")
+		return c.deleteBalancer(l, name, "internalError")
 	}
+	l = log.With(l, "protocol", pool.Protocol)
 	if err := handler.SetBalancer(name, lbIP, pool); err != nil {
-		return err
+		l.Log("op", "setBalancer", "error", err, "msg", "failed to announce service")
+		return false
 	}
 
 	if c.announced[name] == "" {
@@ -223,18 +224,16 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 		"node":     c.myNode,
 		"ip":       lbIP.String(),
 	}).Set(1)
-	glog.Infof("%s: announcing IP %s using protocol %q", name, lbIP, string(pool.Protocol))
+	l.Log("event", "serviceAnnounced", "msg", "service has IP, announcing")
 
-	return nil
+	return true
 }
 
-func (c *controller) deleteBalancer(l log.Logger, name, reason string) error {
+func (c *controller) deleteBalancer(l log.Logger, name, reason string) bool {
 	proto, ok := c.announced[name]
 	if !ok {
-		return nil
+		return true
 	}
-
-	glog.Infof("%s: stopping announcements, %s", name, reason)
 
 	c.ipRefcnt[c.svcIP[name].String()]--
 	ref := c.ipRefcnt[c.svcIP[name].String()]
@@ -249,11 +248,14 @@ func (c *controller) deleteBalancer(l log.Logger, name, reason string) error {
 
 	if ref == 0 {
 		if err := c.protocols[proto].DeleteBalancer(name, reason); err != nil {
-			return err
+			l.Log("op", "deleteBalancer", "error", err, "msg", "failed to clear balancer state")
+			return false
 		}
 	}
 
-	return nil
+	l.Log("event", "serviceWithdrawn", "ip", c.svcIP[name], "reason", reason, "msg", "withdrawing service announcement")
+
+	return true
 }
 
 func poolFor(pools map[string]*config.Pool, ip net.IP) string {
@@ -267,32 +269,32 @@ func poolFor(pools map[string]*config.Pool, ip net.IP) string {
 	return ""
 }
 
-func (c *controller) SetConfig(l log.Logger, cfg *config.Config) error {
-	glog.Infof("Start config update")
-	defer glog.Infof("End config update")
+func (c *controller) SetConfig(l log.Logger, cfg *config.Config) bool {
+	l.Log("event", "startUpdate", "msg", "start of config update")
+	defer l.Log("event", "endUpdate", "msg", "end of config update")
 
 	if cfg == nil {
-		glog.Errorf("No MetalLB configuration in cluster")
-		return errors.New("configuration missing")
+		l.Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
+		return false
 	}
 
 	for svc, ip := range c.svcIP {
 		if pool := poolFor(cfg.Pools, ip); pool == "" {
-			glog.Errorf("Applying new configuration failed: service %q has no configuration under new config", svc)
-			return fmt.Errorf("configuration rejected: service %q has no configuration under new config", svc)
+			l.Log("op", "setConfig", "service", svc, "ip", ip, "error", "service has no configuration under new config", "msg", "new configuration rejected")
+			return false
 		}
 	}
 
 	for proto, handler := range c.protocols {
 		if err := handler.SetConfig(cfg); err != nil {
-			glog.Errorf("Applying new configuration to protocol %q failed: %s", proto, err)
-			return fmt.Errorf("configuration rejected: %s", err)
+			l.Log("op", "setConfig", "protocol", proto, "error", err, "msg", "applying new configuration to protocol handler failed")
+			return false
 		}
 	}
 
 	c.config = cfg
 
-	return nil
+	return true
 }
 
 func (c *controller) SetLeader(l log.Logger, isLeader bool) {
@@ -301,13 +303,14 @@ func (c *controller) SetLeader(l log.Logger, isLeader bool) {
 	}
 }
 
-func (c *controller) SetNode(l log.Logger, node *v1.Node) error {
+func (c *controller) SetNode(l log.Logger, node *v1.Node) bool {
 	for proto, handler := range c.protocols {
 		if err := handler.SetNode(node); err != nil {
-			return fmt.Errorf("propagating node info to protocol %q: %s", proto, err)
+			l.Log("op", "setNode", "error", err, "protocol", proto, "msg", "failed to propagate node info to protocol handler")
+			return false
 		}
 	}
-	return nil
+	return true
 }
 
 // A Protocol can advertise an IP address.
