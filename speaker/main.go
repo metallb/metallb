@@ -29,7 +29,6 @@ import (
 	"k8s.io/api/core/v1"
 
 	"github.com/go-kit/kit/log"
-	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -61,7 +60,7 @@ func main() {
 	)
 	flag.Parse()
 
-	glog.Infof("MetalLB speaker %s", version.String())
+	logger.Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "msg", "MetalLB speaker starting "+version.String())
 
 	if *myNode == "" {
 		*myNode = os.Getenv("METALLB_NODE_NAME")
