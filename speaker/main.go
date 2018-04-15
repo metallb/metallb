@@ -155,12 +155,12 @@ func newController(cfg controllerConfig) (*controller, error) {
 }
 
 func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) bool {
-	l.Log("event", "startUpdate", "msg", "start of service update")
-	defer l.Log("event", "endUpdate", "msg", "end of service update")
-
 	if svc == nil {
 		return c.deleteBalancer(l, name, "serviceDeleted")
 	}
+
+	l.Log("event", "startUpdate", "msg", "start of service update")
+	defer l.Log("event", "endUpdate", "msg", "end of service update")
 
 	if svc.Spec.Type != "LoadBalancer" {
 		return c.deleteBalancer(l, name, "notLoadBalancer")
