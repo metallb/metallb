@@ -22,10 +22,18 @@ New features:
   annotations on the Service objects. See
   the
   [IP sharing documentation]({{% relref "usage/_index.md" %}}#ip-address-sharing) for
-  instructions and caveats.
+  instructions and caveats. ([#121](https://github.com/google/metallb/issues/121))
 - Layer 2 mode now listens on all interfaces for ARP and NDP requests,
   not just the interface used for communication by Kubernetes
-  components.
+  components. ([#165](https://github.com/google/metallb/issues/165))
+- MetalLB now uses structured logging instead of Google's glog
+  package. Logging events are written to standard output as a series
+  of JSON objects suitable for collection by centralized logging
+  systems. ([#189](https://github.com/google/metallb/issues/189))
+- MetalLB is now available as a Helm package in the "stable" Helm
+  repository. Note that, due to code review delay, it may take a few
+  days after a release before the Helm package is
+  updated. ([#177](https://github.com/google/metallb/issues/177))
 
 Bugfixes:
 
