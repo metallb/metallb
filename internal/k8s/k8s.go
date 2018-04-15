@@ -9,6 +9,7 @@ import (
 
 	"go.universe.tf/metallb/internal/config"
 
+	"github.com/go-kit/kit/log"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/api/core/v1"
@@ -27,12 +28,11 @@ import (
 // Client watches a Kubernetes cluster and translates events into
 // Controller method calls.
 type Client struct {
-	config Config
+	logger log.Logger
 
 	client *kubernetes.Clientset
 	events record.EventRecorder
-
-	queue workqueue.RateLimitingInterface
+	queue  workqueue.RateLimitingInterface
 
 	svcIndexer   cache.Indexer
 	svcInformer  cache.Controller
@@ -42,10 +42,15 @@ type Client struct {
 	cmInformer   cache.Controller
 	nodeIndexer  cache.Indexer
 	nodeInformer cache.Controller
-
-	elector *leaderelection.LeaderElector
+	elector      *leaderelection.LeaderElector
 
 	syncFuncs []cache.InformerSynced
+
+	serviceChanged func(string, *v1.Service, *v1.Endpoints) error
+	configChanged  func(*config.Config) error
+	nodeChanged    func(*v1.Node) error
+	leaderChanged  func(bool)
+	synced         func()
 }
 
 // Config specifies the configuration of the Kubernetes
@@ -54,9 +59,9 @@ type Config struct {
 	ProcessName   string
 	ConfigMapName string
 	NodeName      string
-
 	MetricsPort   int
 	ReadEndpoints bool
+	Logger        log.Logger
 
 	ServiceChanged func(string, *v1.Service, *v1.Endpoints) error
 	ConfigChanged  func(*config.Config) error
@@ -98,7 +103,7 @@ func New(cfg *Config) (*Client, error) {
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
 	c := &Client{
-		config: *cfg,
+		logger: cfg.Logger,
 		client: clientset,
 		events: recorder,
 		queue:  queue,
@@ -128,6 +133,7 @@ func New(cfg *Config) (*Client, error) {
 		svcWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "services", v1.NamespaceAll, fields.Everything())
 		c.svcIndexer, c.svcInformer = cache.NewIndexerInformer(svcWatcher, &v1.Service{}, 0, svcHandlers, cache.Indexers{})
 
+		c.serviceChanged = cfg.ServiceChanged
 		c.syncFuncs = append(c.syncFuncs, c.svcInformer.HasSynced)
 
 		if cfg.ReadEndpoints {
@@ -182,6 +188,7 @@ func New(cfg *Config) (*Client, error) {
 		cmWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "configmaps", namespace, fields.OneTermEqualSelector("metadata.name", cfg.ConfigMapName))
 		c.cmIndexer, c.cmInformer = cache.NewIndexerInformer(cmWatcher, &v1.ConfigMap{}, 0, cmHandlers, cache.Indexers{})
 
+		c.configChanged = cfg.ConfigChanged
 		c.syncFuncs = append(c.syncFuncs, c.cmInformer.HasSynced)
 	}
 
@@ -209,6 +216,7 @@ func New(cfg *Config) (*Client, error) {
 		watcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "nodes", v1.NamespaceAll, fields.OneTermEqualSelector("metadata.name", cfg.NodeName))
 		c.nodeIndexer, c.nodeInformer = cache.NewIndexerInformer(watcher, &v1.Node{}, 0, handlers, cache.Indexers{})
 
+		c.nodeChanged = cfg.NodeChanged
 		c.syncFuncs = append(c.syncFuncs, c.nodeInformer.HasSynced)
 	}
 
@@ -247,18 +255,20 @@ func New(cfg *Config) (*Client, error) {
 			return nil, fmt.Errorf("creating leader elector: %s", err)
 		}
 		c.elector = elector
+		c.leaderChanged = cfg.LeaderChanged
 	}
+
+	http.Handle("/metrics", promhttp.Handler())
+	go func() {
+		http.ListenAndServe(fmt.Sprintf(":%d", cfg.MetricsPort), nil)
+	}()
+
 	return c, nil
 }
 
 // Run watches for events on the Kubernetes cluster, and dispatches
 // calls to the Controller.
 func (c *Client) Run() error {
-	http.Handle("/metrics", promhttp.Handler())
-	go func() {
-		http.ListenAndServe(fmt.Sprintf(":%d", c.config.MetricsPort), nil)
-	}()
-
 	if c.svcInformer != nil {
 		go c.svcInformer.Run(nil)
 	}
@@ -366,7 +376,7 @@ func (c *Client) sync(key interface{}) error {
 			return fmt.Errorf("get service %q: %s", k, err)
 		}
 		if !exists {
-			return c.config.ServiceChanged(string(k), nil, nil)
+			return c.serviceChanged(string(k), nil, nil)
 		}
 
 		var eps *v1.Endpoints
@@ -376,12 +386,12 @@ func (c *Client) sync(key interface{}) error {
 				return fmt.Errorf("get endpoints %q: %s", k, err)
 			}
 			if !exists {
-				return c.config.ServiceChanged(string(k), nil, nil)
+				return c.serviceChanged(string(k), nil, nil)
 			}
 			eps = epsIntf.(*v1.Endpoints)
 		}
 
-		return c.config.ServiceChanged(string(k), svc.(*v1.Service), eps)
+		return c.serviceChanged(string(k), svc.(*v1.Service), eps)
 
 	case cmKey:
 		cmi, exists, err := c.cmIndexer.GetByKey(string(k))
@@ -390,7 +400,7 @@ func (c *Client) sync(key interface{}) error {
 		}
 		if !exists {
 			configStale.Set(1)
-			return c.config.ConfigChanged(nil)
+			return c.configChanged(nil)
 		}
 		cm := cmi.(*v1.ConfigMap)
 		cfg, err := config.Parse([]byte(cm.Data["config"]))
@@ -400,7 +410,7 @@ func (c *Client) sync(key interface{}) error {
 			return nil
 		}
 
-		if err := c.config.ConfigChanged(cfg); err != nil {
+		if err := c.configChanged(cfg); err != nil {
 			configStale.Set(1)
 			c.events.Eventf(cm, v1.EventTypeWarning, "InvalidConfig", "%s", err)
 			return nil
@@ -427,21 +437,21 @@ func (c *Client) sync(key interface{}) error {
 			return fmt.Errorf("node %q doesn't exist", k)
 		}
 		node := n.(*v1.Node)
-		return c.config.NodeChanged(node)
+		return c.nodeChanged(node)
 
 	case electionKey:
 		if k {
 			leader.Set(1)
-			c.config.LeaderChanged(true)
+			c.leaderChanged(true)
 		} else {
 			leader.Set(0)
-			c.config.LeaderChanged(false)
+			c.leaderChanged(false)
 		}
 		return nil
 
 	case synced:
-		if c.config.Synced != nil {
-			c.config.Synced()
+		if c.synced != nil {
+			c.synced()
 		}
 		return nil
 
