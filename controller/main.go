@@ -27,7 +27,6 @@ import (
 	"go.universe.tf/metallb/internal/version"
 
 	"github.com/go-kit/kit/log"
-	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 )
 
@@ -137,7 +136,7 @@ func main() {
 	)
 	flag.Parse()
 
-	glog.Infof("MetalLB controller %s", version.String())
+	logger.Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "msg", "MetalLB controller starting "+version.String())
 
 	c := &controller{
 		ips: allocator.New(),

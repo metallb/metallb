@@ -24,3 +24,9 @@ func String() string {
 		return "(no version or build info)"
 	}
 }
+
+func Version() string { return version }
+
+func CommitHash() string { return gitCommit }
+
+func Branch() string { return gitBranch }
