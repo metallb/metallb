@@ -107,8 +107,8 @@ type Peer struct {
 	// Only connect to this peer on nodes that match one of these
 	// selectors.
 	NodeSelectors []labels.Selector
-
-	Password  string
+	// Authentication password for routers enforcing TCP MD5 authenticated sessions
+	Password string
 	// TODO: more BGP session settings
 }
 
@@ -288,8 +288,8 @@ func parsePeer(p peer) (*Peer, error) {
 
 	var password string
 	if p.Password != "" {
-              password = p.Password
-        }
+		password = p.Password
+	}
 	return &Peer{
 		MyASN:         p.MyASN,
 		ASN:           p.ASN,
@@ -298,7 +298,7 @@ func parsePeer(p peer) (*Peer, error) {
 		HoldTime:      holdTime,
 		RouterID:      routerID,
 		NodeSelectors: nodeSels,
-		Password:	password,
+		Password:      password,
 	}, nil
 }
 
