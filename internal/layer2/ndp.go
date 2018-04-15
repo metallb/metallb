@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/golang/glog"
+	"github.com/go-kit/kit/log"
 	"github.com/mdlayher/ndp"
 )
 
 type ndpResponder struct {
+	logger       log.Logger
 	intf         string
 	hardwareAddr net.HardwareAddr
 	conn         *ndp.Conn
@@ -18,7 +19,7 @@ type ndpResponder struct {
 	solicitedNodeGroups map[string]int64
 }
 
-func newNDPResponder(ifi *net.Interface, ann announceFunc) (*ndpResponder, error) {
+func newNDPResponder(logger log.Logger, ifi *net.Interface, ann announceFunc) (*ndpResponder, error) {
 	// Use link-local address as the source IPv6 address for NDP communications.
 	conn, _, err := ndp.Dial(ifi, ndp.LinkLocal)
 	if err != nil {
@@ -26,6 +27,7 @@ func newNDPResponder(ifi *net.Interface, ann announceFunc) (*ndpResponder, error
 	}
 
 	ret := &ndpResponder{
+		logger:              logger,
 		intf:                ifi.Name,
 		hardwareAddr:        ifi.HardwareAddr,
 		conn:                conn,
@@ -123,11 +125,10 @@ func (n *ndpResponder) processRequest() dropReason {
 	}
 
 	stats.GotRequest(ns.TargetAddress.String())
-
-	glog.Infof("Request: who-has %s?  tell %s (%s). reply: %s is-at %s", ns.TargetAddress, src, nsLLAddr, ns.TargetAddress, n.hardwareAddr)
+	n.logger.Log("interface", n.intf, "ip", ns.TargetAddress, "senderIP", src, "senderLLAddr", nsLLAddr, "responseMAC", n.hardwareAddr, "msg", "got NDP request for service IP, sending response")
 
 	if err := n.advertise(src, ns.TargetAddress, false); err != nil {
-		glog.Warningf("Failed to write NDP neighbor advertisement for %s: %s", ns.TargetAddress, err)
+		n.logger.Log("op", "arpReply", "interface", n.intf, "ip", ns.TargetAddress, "senderIP", src, "senderLLAddr", nsLLAddr, "responseMAC", n.hardwareAddr, "error", err, "msg", "failed to send ARP reply")
 	} else {
 		stats.SentResponse(ns.TargetAddress.String())
 	}

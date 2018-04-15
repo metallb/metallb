@@ -79,7 +79,7 @@ func (a *Announce) updateInterfaces() {
 		}
 
 		if keepARP[ifi.Index] && a.arps[ifi.Index] == nil {
-			resp, err := newARPResponder(&ifi, a.shouldAnnounce)
+			resp, err := newARPResponder(a.logger, &ifi, a.shouldAnnounce)
 			if err != nil {
 				l.Log("op", "createARPResponder", "error", err, "msg", "failed to create ARP responder")
 				return
@@ -88,7 +88,7 @@ func (a *Announce) updateInterfaces() {
 			l.Log("event", "createARPResponder", "msg", "created ARP responder for interface")
 		}
 		if keepNDP[ifi.Index] && a.ndps[ifi.Index] == nil {
-			resp, err := newNDPResponder(&ifi, a.shouldAnnounce)
+			resp, err := newNDPResponder(a.logger, &ifi, a.shouldAnnounce)
 			if err != nil {
 				l.Log("op", "createNDPResponder", "error", err, "msg", "failed to create NDP responder")
 				return

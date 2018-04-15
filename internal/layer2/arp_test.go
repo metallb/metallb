@@ -6,6 +6,7 @@ import (
 	"net"
 	"testing"
 
+	"github.com/go-kit/kit/log"
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/arp"
 	"github.com/mdlayher/ethernet"
@@ -155,6 +156,7 @@ func newTestARP(t *testing.T, shouldAnnounce announceFunc) (*arpResponder, *net.
 		}
 
 		a = &arpResponder{
+			logger:       log.NewNopLogger(),
 			hardwareAddr: intf.HardwareAddr,
 			conn:         c,
 			closed:       make(chan struct{}),
