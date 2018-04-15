@@ -27,6 +27,7 @@ import (
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/version"
 
+	"github.com/go-kit/kit/log"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 )
@@ -46,12 +47,12 @@ type controller struct {
 	ips    *allocator.Allocator
 }
 
-func (c *controller) SetBalancer(name string, svcRo *v1.Service, _ *v1.Endpoints) error {
+func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ *v1.Endpoints) error {
 	glog.Infof("%s: start update", name)
 	defer glog.Infof("%s: end update", name)
 
 	if svcRo == nil {
-		return c.deleteBalancer(name)
+		return c.deleteBalancer(l, name)
 	}
 
 	if c.config == nil {
@@ -65,7 +66,7 @@ func (c *controller) SetBalancer(name string, svcRo *v1.Service, _ *v1.Endpoints
 	// copy makes the code much easier to follow, and we have a GC for
 	// a reason.
 	svc := svcRo.DeepCopy()
-	if err := c.convergeBalancer(name, svc); err != nil {
+	if err := c.convergeBalancer(l, name, svc); err != nil {
 		return err
 	}
 	if reflect.DeepEqual(svcRo, svc) {
@@ -94,14 +95,14 @@ func (c *controller) SetBalancer(name string, svcRo *v1.Service, _ *v1.Endpoints
 	return nil
 }
 
-func (c *controller) deleteBalancer(name string) error {
+func (c *controller) deleteBalancer(l log.Logger, name string) error {
 	if c.ips.Unassign(name) {
 		glog.Infof("%s: service deleted", name)
 	}
 	return nil
 }
 
-func (c *controller) SetConfig(cfg *config.Config) error {
+func (c *controller) SetConfig(l log.Logger, cfg *config.Config) error {
 	glog.Infof("Start config update")
 	defer glog.Infof("End config update")
 
@@ -118,13 +119,13 @@ func (c *controller) SetConfig(cfg *config.Config) error {
 	return nil
 }
 
-func (c *controller) MarkSynced() {
+func (c *controller) MarkSynced(l log.Logger) {
 	c.synced = true
 	glog.Infof("Controller synced, can allocate IPs now")
 }
 
 func main() {
-	_, err := logging.Init()
+	logger, err := logging.Init()
 	if err != nil {
 		fmt.Printf("failed to initialize logging: %s\n", err)
 		os.Exit(1)
@@ -146,6 +147,7 @@ func main() {
 		ProcessName:   "metallb-controller",
 		ConfigMapName: *config,
 		MetricsPort:   *port,
+		Logger:        logger,
 
 		ServiceChanged: c.SetBalancer,
 		ConfigChanged:  c.SetConfig,

@@ -46,11 +46,11 @@ type Client struct {
 
 	syncFuncs []cache.InformerSynced
 
-	serviceChanged func(string, *v1.Service, *v1.Endpoints) error
-	configChanged  func(*config.Config) error
-	nodeChanged    func(*v1.Node) error
-	leaderChanged  func(bool)
-	synced         func()
+	serviceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) error
+	configChanged  func(log.Logger, *config.Config) error
+	nodeChanged    func(log.Logger, *v1.Node) error
+	leaderChanged  func(log.Logger, bool)
+	synced         func(log.Logger)
 }
 
 // Config specifies the configuration of the Kubernetes
@@ -63,11 +63,11 @@ type Config struct {
 	ReadEndpoints bool
 	Logger        log.Logger
 
-	ServiceChanged func(string, *v1.Service, *v1.Endpoints) error
-	ConfigChanged  func(*config.Config) error
-	NodeChanged    func(*v1.Node) error
-	LeaderChanged  func(bool)
-	Synced         func()
+	ServiceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) error
+	ConfigChanged  func(log.Logger, *config.Config) error
+	NodeChanged    func(log.Logger, *v1.Node) error
+	LeaderChanged  func(log.Logger, bool)
+	Synced         func(log.Logger)
 }
 
 type svcKey string
@@ -376,7 +376,7 @@ func (c *Client) sync(key interface{}) error {
 			return fmt.Errorf("get service %q: %s", k, err)
 		}
 		if !exists {
-			return c.serviceChanged(string(k), nil, nil)
+			return c.serviceChanged(c.logger, string(k), nil, nil)
 		}
 
 		var eps *v1.Endpoints
@@ -386,12 +386,12 @@ func (c *Client) sync(key interface{}) error {
 				return fmt.Errorf("get endpoints %q: %s", k, err)
 			}
 			if !exists {
-				return c.serviceChanged(string(k), nil, nil)
+				return c.serviceChanged(c.logger, string(k), nil, nil)
 			}
 			eps = epsIntf.(*v1.Endpoints)
 		}
 
-		return c.serviceChanged(string(k), svc.(*v1.Service), eps)
+		return c.serviceChanged(c.logger, string(k), svc.(*v1.Service), eps)
 
 	case cmKey:
 		cmi, exists, err := c.cmIndexer.GetByKey(string(k))
@@ -400,7 +400,7 @@ func (c *Client) sync(key interface{}) error {
 		}
 		if !exists {
 			configStale.Set(1)
-			return c.configChanged(nil)
+			return c.configChanged(c.logger, nil)
 		}
 		cm := cmi.(*v1.ConfigMap)
 		cfg, err := config.Parse([]byte(cm.Data["config"]))
@@ -410,7 +410,7 @@ func (c *Client) sync(key interface{}) error {
 			return nil
 		}
 
-		if err := c.configChanged(cfg); err != nil {
+		if err := c.configChanged(c.logger, cfg); err != nil {
 			configStale.Set(1)
 			c.events.Eventf(cm, v1.EventTypeWarning, "InvalidConfig", "%s", err)
 			return nil
@@ -437,21 +437,21 @@ func (c *Client) sync(key interface{}) error {
 			return fmt.Errorf("node %q doesn't exist", k)
 		}
 		node := n.(*v1.Node)
-		return c.nodeChanged(node)
+		return c.nodeChanged(c.logger, node)
 
 	case electionKey:
 		if k {
 			leader.Set(1)
-			c.leaderChanged(true)
+			c.leaderChanged(c.logger, true)
 		} else {
 			leader.Set(0)
-			c.leaderChanged(false)
+			c.leaderChanged(c.logger, false)
 		}
 		return nil
 
 	case synced:
 		if c.synced != nil {
-			c.synced()
+			c.synced(c.logger)
 		}
 		return nil
 
