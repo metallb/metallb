@@ -11,6 +11,7 @@ import (
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
 
+	"github.com/go-kit/kit/log"
 	"github.com/google/go-cmp/cmp"
 	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -721,14 +722,15 @@ func TestBGPSpeaker(t *testing.T) {
 		},
 	}
 
+	l := log.NewNopLogger()
 	for _, test := range tests {
 		if test.config != nil {
-			if err := c.SetConfig(test.config); err != nil {
+			if err := c.SetConfig(l, test.config); err != nil {
 				t.Errorf("%q: SetConfig failed: %s", test.desc, err)
 			}
 		}
 		if test.balancer != "" {
-			if err := c.SetBalancer(test.balancer, test.svc, test.eps); err != nil {
+			if err := c.SetBalancer(l, test.balancer, test.svc, test.eps); err != nil {
 				t.Errorf("%q: SetBalancer failed: %s", test.desc, err)
 			}
 		}
@@ -924,15 +926,16 @@ func TestNodeSelectors(t *testing.T) {
 		},
 	}
 
+	l := log.NewNopLogger()
 	for _, test := range tests {
 		if test.config != nil {
-			if err := c.SetConfig(test.config); err != nil {
+			if err := c.SetConfig(l, test.config); err != nil {
 				t.Errorf("%q: SetConfig failed: %s", test.desc, err)
 			}
 		}
 
 		if test.node != nil {
-			if err := c.SetNode(test.node); err != nil {
+			if err := c.SetNode(l, test.node); err != nil {
 				t.Errorf("%q: SetNode failed: %s", test.desc, err)
 			}
 		}

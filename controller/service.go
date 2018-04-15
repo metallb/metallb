@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/go-kit/kit/log"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 
@@ -26,7 +27,7 @@ import (
 	"go.universe.tf/metallb/internal/config"
 )
 
-func (c *controller) convergeBalancer(key string, svc *v1.Service) error {
+func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service) error {
 	var lbIP net.IP
 
 	// Not a LoadBalancer, early exit. It might have been a balancer

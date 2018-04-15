@@ -29,6 +29,7 @@ import (
 	"go.universe.tf/metallb/internal/version"
 	"k8s.io/api/core/v1"
 
+	"github.com/go-kit/kit/log"
 	"github.com/golang/glog"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -48,7 +49,7 @@ var announcing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 func main() {
 	prometheus.MustRegister(announcing)
 
-	_, err := logging.Init()
+	logger, err := logging.Init()
 	if err != nil {
 		fmt.Printf("failed to initialize logging: %s\n", err)
 		os.Exit(1)
@@ -83,6 +84,7 @@ func main() {
 		ProcessName:   "metallb-speaker",
 		ConfigMapName: *config,
 		NodeName:      *myNode,
+		Logger:        logger,
 
 		MetricsPort:   *port,
 		ReadEndpoints: true,
@@ -147,9 +149,9 @@ func newController(cfg controllerConfig) (*controller, error) {
 	return ret, nil
 }
 
-func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints) error {
+func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) error {
 	if svc == nil {
-		return c.deleteBalancer(name, "service deleted")
+		return c.deleteBalancer(l, name, "service deleted")
 	}
 
 	if svc.Spec.Type != "LoadBalancer" {
@@ -166,36 +168,36 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 
 	if len(svc.Status.LoadBalancer.Ingress) != 1 {
 		glog.Infof("%s: no IP allocated by controller", name)
-		return c.deleteBalancer(name, "no IP allocated by controller")
+		return c.deleteBalancer(l, name, "no IP allocated by controller")
 	}
 
 	// Should we advertise? Yes, if externalTrafficPolicy is Cluster,
 	// or Local && there's a ready local endpoint.
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !k8s.NodeHasHealthyEndpoint(eps, c.myNode) {
 		glog.Infof("%s: externalTrafficPolicy is Local, and no healthy local endpoints", name)
-		return c.deleteBalancer(name, "no healthy local endpoints")
+		return c.deleteBalancer(l, name, "no healthy local endpoints")
 	}
 
 	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
 	if lbIP == nil {
 		glog.Errorf("%s: invalid LoadBalancer IP %q", name, svc.Status.LoadBalancer.Ingress[0].IP)
-		return c.deleteBalancer(name, "invalid IP allocated by controller")
+		return c.deleteBalancer(l, name, "invalid IP allocated by controller")
 	}
 
 	poolName := poolFor(c.config.Pools, lbIP)
 	if poolName == "" {
 		glog.Errorf("%s: IP %q assigned by controller is not allowed by config", name, lbIP)
-		return c.deleteBalancer(name, "invalid IP allocated by controller")
+		return c.deleteBalancer(l, name, "invalid IP allocated by controller")
 	}
 
 	pool := c.config.Pools[poolName]
 	if pool == nil {
 		glog.Errorf("%s: could not find pool %q that definitely should exist!", name, poolName)
-		return c.deleteBalancer(name, "can't find pool")
+		return c.deleteBalancer(l, name, "can't find pool")
 	}
 
 	if proto, ok := c.announced[name]; ok && proto != pool.Protocol {
-		if err := c.deleteBalancer(name, fmt.Sprintf("protocol changed to %q", pool.Protocol)); err != nil {
+		if err := c.deleteBalancer(l, name, fmt.Sprintf("protocol changed to %q", pool.Protocol)); err != nil {
 			return fmt.Errorf("deleting balancer %q: %s", name, err)
 		}
 	}
@@ -203,7 +205,7 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 	handler := c.protocols[pool.Protocol]
 	if handler == nil {
 		glog.Errorf("%s: unknown balancer protocol %q. This should not happen, please file a bug!", name, pool.Protocol)
-		return c.deleteBalancer(name, "internal error (unknown balancer protocol)")
+		return c.deleteBalancer(l, name, "internal error (unknown balancer protocol)")
 	}
 	if err := handler.SetBalancer(name, lbIP, pool); err != nil {
 		return err
@@ -226,7 +228,7 @@ func (c *controller) SetBalancer(name string, svc *v1.Service, eps *v1.Endpoints
 	return nil
 }
 
-func (c *controller) deleteBalancer(name, reason string) error {
+func (c *controller) deleteBalancer(l log.Logger, name, reason string) error {
 	proto, ok := c.announced[name]
 	if !ok {
 		return nil
@@ -265,7 +267,7 @@ func poolFor(pools map[string]*config.Pool, ip net.IP) string {
 	return ""
 }
 
-func (c *controller) SetConfig(cfg *config.Config) error {
+func (c *controller) SetConfig(l log.Logger, cfg *config.Config) error {
 	glog.Infof("Start config update")
 	defer glog.Infof("End config update")
 
@@ -293,13 +295,13 @@ func (c *controller) SetConfig(cfg *config.Config) error {
 	return nil
 }
 
-func (c *controller) SetLeader(isLeader bool) {
+func (c *controller) SetLeader(l log.Logger, isLeader bool) {
 	for _, handler := range c.protocols {
 		handler.SetLeader(isLeader)
 	}
 }
 
-func (c *controller) SetNode(node *v1.Node) error {
+func (c *controller) SetNode(l log.Logger, node *v1.Node) error {
 	for proto, handler := range c.protocols {
 		if err := handler.SetNode(node); err != nil {
 			return fmt.Errorf("propagating node info to protocol %q: %s", proto, err)
