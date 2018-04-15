@@ -536,7 +536,6 @@ func (d *TCPDialer) DialTCP(tcphost string, port int ) (*net.TCPConn, error) {
 	proto := 0
 	fd, err := syscall.Socket(family, sockType, proto)
 	if err != nil {
-	        glog.Errorf(" syscall.socket %s ",  err)
 		return nil, err
 	}
 	fi := os.NewFile(uintptr(fd), "")
