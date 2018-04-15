@@ -132,15 +132,22 @@ func TestSortKeys(t *testing.T) {
 			complex(math.NaN(), math.NaN()): true,
 		},
 		want: []interface{}{
-			math.NaN(), math.NaN(), math.NaN(), math.NaN(),
-			complex(math.NaN(), math.NaN()), complex(math.NaN(), math.NaN()),
-			complex(math.NaN(), 0), complex(math.NaN(), 0), complex(math.NaN(), 0), complex(math.NaN(), 0),
-			complex(0, math.NaN()), complex(0, math.NaN()), complex(0, math.NaN()), complex(0, math.NaN()),
+			math.NaN(),
+			complex(math.NaN(), math.NaN()),
+			complex(math.NaN(), 0),
+			complex(0, math.NaN()),
 		},
 	}}
 
 	for i, tt := range tests {
-		keys := append(reflect.ValueOf(tt.in).MapKeys(), reflect.ValueOf(tt.in).MapKeys()...)
+		// Intentionally pass the map via an unexported field to detect panics.
+		// Unfortunately, we cannot actually test the keys without using unsafe.
+		v := reflect.ValueOf(struct{ x map[interface{}]bool }{tt.in}).Field(0)
+		value.SortKeys(append(v.MapKeys(), v.MapKeys()...))
+
+		// Try again, with keys that have read-write access in reflect.
+		v = reflect.ValueOf(tt.in)
+		keys := append(v.MapKeys(), v.MapKeys()...)
 		var got []interface{}
 		for _, k := range value.SortKeys(keys) {
 			got = append(got, k.Interface())

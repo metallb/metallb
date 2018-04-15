@@ -47,7 +47,7 @@ func TestFormat(t *testing.T) {
 		want: "map[value.key]string{{a: 5, b: \"key\", c: (chan bool)(0x00)}: \"hello\"}",
 	}, {
 		in:   map[io.Reader]string{new(bytes.Reader): "hello"},
-		want: "map[io.Reader]string{0x00: \"hello\"}",
+		want: "map[io.Reader]string{(*bytes.Reader)(0x00): \"hello\"}",
 	}, {
 		in: func() interface{} {
 			var a = []interface{}{nil}
@@ -80,10 +80,12 @@ func TestFormat(t *testing.T) {
 		want: "[2]interface {}{&[2]interface {}{(*[2]interface {})(0x00), interface {}(nil)}, interface {}(nil)}",
 	}}
 
-	formatFakePointers = true
-	defer func() { formatFakePointers = false }()
 	for i, tt := range tests {
-		got := Format(reflect.ValueOf(tt.in), true)
+		// Intentionally retrieve the value through an unexported field to
+		// ensure the format logic does not depend on read-write access
+		// to the reflect.Value.
+		v := reflect.ValueOf(struct{ x interface{} }{tt.in}).Field(0)
+		got := formatAny(v, FormatConfig{UseStringer: true, printType: true, followPointers: true}, nil)
 		if got != tt.want {
 			t.Errorf("test %d, Format():\ngot  %q\nwant %q", i, got, tt.want)
 		}

@@ -24,6 +24,7 @@ import (
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
+	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/version"
 
 	"github.com/golang/glog"
@@ -123,13 +124,11 @@ func (c *controller) MarkSynced() {
 }
 
 func main() {
-	// glog is a hostile package that registers a bunch of flags and
-	// does forced initialization outside of the program's
-	// control. This is a huge workaround to just make it log to
-	// stderr as well as we can, and then hide all the crap it
-	// defined.
-	flag.Set("logtostderr", "true")
-	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	_, err := logging.Init()
+	if err != nil {
+		fmt.Printf("failed to initialize logging: %s\n", err)
+		os.Exit(1)
+	}
 
 	var (
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
