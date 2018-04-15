@@ -258,16 +258,11 @@ func ExampleOption_equalEmpty() {
 // This example is for demonstrative purposes; use cmpopts.SortSlices instead.
 func ExampleOption_sortedSlice() {
 	// This Transformer sorts a []int.
-	// Since the transformer transforms []int into []int, there is problem where
-	// this is recursively applied forever. To prevent this, use a FilterValues
-	// to first check for the condition upon which the transformer ought to apply.
-	trans := cmp.FilterValues(func(x, y []int) bool {
-		return !sort.IntsAreSorted(x) || !sort.IntsAreSorted(y)
-	}, cmp.Transformer("Sort", func(in []int) []int {
+	trans := cmp.Transformer("Sort", func(in []int) []int {
 		out := append([]int(nil), in...) // Copy input to avoid mutating it
 		sort.Ints(out)
 		return out
-	}))
+	})
 
 	x := struct{ Ints []int }{[]int{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}}
 	y := struct{ Ints []int }{[]int{2, 8, 0, 9, 6, 1, 4, 7, 3, 5}}

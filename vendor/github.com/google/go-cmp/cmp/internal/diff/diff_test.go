@@ -228,14 +228,17 @@ func TestDifference(t *testing.T) {
 		y:    " 1234567890",
 		want: "X.........Y",
 	}, {
-		x: "0123456789",
-		y: "9876543210",
+		x:    "0 1 2 3 45 6 7 8 9 ",
+		y:    " 9 8 7 6 54 3 2 1 0",
+		want: "XYXYXYXYX.YXYXYXYXY",
 	}, {
-		x: "0123456789",
-		y: "6725819034",
+		x:    "0 1 2345678 9   ",
+		y:    " 6 72  5  819034",
+		want: "XYXY.XX.XX.Y.YYY",
 	}, {
-		x: "FBQMOIGTLN72X90E4SP651HKRJUDA83CVZW",
-		y: "5WHXO10R9IVKZLCTAJ8P3NSEQM472G6UBDF",
+		x:    "F B Q M O    I G T L       N72X90 E  4S P  651HKRJU DA 83CVZW",
+		y:    " 5 W H XO10R9IV K ZLCTAJ8P3N     SEQM4 7 2G6      UBD F      ",
+		want: "XYXYXYXY.YYYY.YXYXY.YYYYYYY.XXXXXY.YY.XYXYY.XXXXXX.Y.XYXXXXXX",
 	}}
 
 	for _, tt := range tests {
@@ -333,26 +336,17 @@ func generateStrings(n int, px, py, pm float32, seed int64) (string, string) {
 }
 
 func testStrings(t *testing.T, x, y string) EditScript {
-	wantEq := x == y
-	eq, es := Difference(len(x), len(y), func(ix, iy int) Result {
+	es := Difference(len(x), len(y), func(ix, iy int) Result {
 		return compareByte(x[ix], y[iy])
 	})
-	if eq != wantEq {
-		t.Errorf("equality mismatch: got %v, want %v", eq, wantEq)
+	if es.LenX() != len(x) {
+		t.Errorf("es.LenX = %d, want %d", es.LenX(), len(x))
 	}
-	if es != nil {
-		if es.LenX() != len(x) {
-			t.Errorf("es.LenX = %d, want %d", es.LenX(), len(x))
-		}
-		if es.LenY() != len(y) {
-			t.Errorf("es.LenY = %d, want %d", es.LenY(), len(y))
-		}
-		if got := (es.Dist() == 0); got != wantEq {
-			t.Errorf("violation of equality invariant: got %v, want %v", got, wantEq)
-		}
-		if !validateScript(x, y, es) {
-			t.Errorf("invalid edit script: %v", es)
-		}
+	if es.LenY() != len(y) {
+		t.Errorf("es.LenY = %d, want %d", es.LenY(), len(y))
+	}
+	if !validateScript(x, y, es) {
+		t.Errorf("invalid edit script: %v", es)
 	}
 	return es
 }

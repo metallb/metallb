@@ -51,7 +51,7 @@ func equalHeadquarter(x, y Headquarter) bool {
 func equalPoison(x, y Poison) bool {
 	return x.PoisonType() == y.PoisonType() &&
 		x.Expiration().Equal(y.Expiration()) &&
-		x.Manufactuer() == y.Manufactuer() &&
+		x.Manufacturer() == y.Manufacturer() &&
 		x.Potency() == y.Potency()
 }
 */
@@ -125,18 +125,18 @@ func (hq *Headquarter) SetRestrictions(x pb.Restrictions) { hq.restrictions = x 
 func (hq *Headquarter) SetCreationTime(x time.Time)       { hq.creationTime = x }
 
 type Poison struct {
-	poisonType  pb.PoisonType
-	expiration  time.Time
-	manufactuer string
-	potency     int
+	poisonType   pb.PoisonType
+	expiration   time.Time
+	manufacturer string
+	potency      int
 }
 
 func (p Poison) PoisonType() pb.PoisonType { return p.poisonType }
 func (p Poison) Expiration() time.Time     { return p.expiration }
-func (p Poison) Manufactuer() string       { return p.manufactuer }
+func (p Poison) Manufacturer() string      { return p.manufacturer }
 func (p Poison) Potency() int              { return p.potency }
 
 func (p *Poison) SetPoisonType(x pb.PoisonType) { p.poisonType = x }
 func (p *Poison) SetExpiration(x time.Time)     { p.expiration = x }
-func (p *Poison) SetManufactuer(x string)       { p.manufactuer = x }
+func (p *Poison) SetManufacturer(x string)      { p.manufacturer = x }
 func (p *Poison) SetPotency(x int)              { p.potency = x }

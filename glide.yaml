@@ -7,10 +7,8 @@ import:
 - package: github.com/mdlayher/ethernet
 - package: github.com/mdlayher/ndp
   version: 557f9155ccf6e77213da2cd13ad39cc120a34f76
-  # Because k8s is idiotis and holds back pflag to a stupidly ancient version.
 - package: github.com/spf13/cobra
   version: 35136c09d8da66b901337c6e86fd8e88a1a255bd
-  # Because this package author is trash and breaks API compatibility on a widely used package.
 - package: github.com/satori/go.uuid
   version: f58768cc1a7a7e77a3bd49e98cdd21419399b6a3
 - package: github.com/osrg/gobgp
@@ -46,6 +44,10 @@ import:
   - tools/leaderelection/resourcelock
   - tools/record
   - util/workqueue
+- package: github.com/go-kit/kit
+  version: ^0.7.0
+  subpackages:
+  - log
 testImport:
 - package: github.com/google/go-cmp
   version: ^0.1.0
