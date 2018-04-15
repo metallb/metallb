@@ -46,7 +46,7 @@ type controller struct {
 	ips    *allocator.Allocator
 }
 
-func (c *controller) SetBalancer(name string, svcRo *v1.Service) error {
+func (c *controller) SetBalancer(name string, svcRo *v1.Service, _ *v1.Endpoints) error {
 	glog.Infof("%s: start update", name)
 	defer glog.Infof("%s: end update", name)
 
@@ -131,10 +131,8 @@ func main() {
 	}
 
 	var (
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-		master     = flag.String("master", "", "master url")
-		port       = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
-		config     = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
+		port   = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
+		config = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
 	)
 	flag.Parse()
 
@@ -144,15 +142,19 @@ func main() {
 		ips: allocator.New(),
 	}
 
-	client, err := k8s.New("metallb-controller", *master, *kubeconfig)
+	client, err := k8s.New(&k8s.Config{
+		ProcessName:   "metallb-controller",
+		ConfigMapName: *config,
+		MetricsPort:   *port,
+
+		ServiceChanged: c.SetBalancer,
+		ConfigChanged:  c.SetConfig,
+		Synced:         c.MarkSynced,
+	})
 	if err != nil {
-		glog.Fatalf("Error getting k8s client: %s", err)
+		glog.Fatalf("creating k8s client: %s", err)
 	}
-	client.HandleService(c.SetBalancer)
-	client.HandleConfig(*config, c.SetConfig)
-	client.HandleSynced(c.MarkSynced)
 
 	c.client = client
-
-	glog.Fatal(client.Run(*port))
+	glog.Fatal(client.Run())
 }

@@ -55,11 +55,9 @@ func main() {
 	}
 
 	var (
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-		master     = flag.String("master", "", "master url")
-		myNode     = flag.String("node-name", "", "name of this Kubernetes node")
-		port       = flag.Int("port", 80, "HTTP listening port")
-		config     = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
+		myNode = flag.String("node-name", "", "name of this Kubernetes node")
+		port   = flag.Int("port", 80, "HTTP listening port")
+		config = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
 	)
 	flag.Parse()
 
@@ -81,16 +79,24 @@ func main() {
 		glog.Fatalf("Error getting controller: %s", err)
 	}
 
-	client, err := k8s.New("metallb-speaker", *master, *kubeconfig)
+	client, err := k8s.New(&k8s.Config{
+		ProcessName:   "metallb-speaker",
+		ConfigMapName: *config,
+		NodeName:      *myNode,
+
+		MetricsPort:   *port,
+		ReadEndpoints: true,
+
+		ServiceChanged: ctrl.SetBalancer,
+		ConfigChanged:  ctrl.SetConfig,
+		NodeChanged:    ctrl.SetNode,
+		LeaderChanged:  ctrl.SetLeader,
+	})
 	if err != nil {
 		glog.Fatalf("Error getting k8s client: %s", err)
 	}
-	client.HandleServiceAndEndpoints(ctrl.SetBalancer)
-	client.HandleConfig(*config, ctrl.SetConfig)
-	client.HandleLeadership(*myNode, ctrl.SetLeader)
-	client.HandleNode(*myNode, ctrl.SetNode)
 
-	glog.Fatal(client.Run(*port))
+	glog.Fatal(client.Run())
 }
 
 type controller struct {
