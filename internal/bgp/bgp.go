@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/glog"
+	"github.com/go-kit/kit/log"
 )
 
 var errClosed = errors.New("session closed")
@@ -24,6 +24,7 @@ type Session struct {
 	addr     string
 	peerASN  uint32
 	holdTime time.Duration
+	logger   log.Logger
 
 	newHoldTime chan bool
 	backoff     backoff
@@ -46,31 +47,27 @@ func (s *Session) run() {
 			if err == errClosed {
 				return
 			}
-			glog.Errorf("Connecting to %q: %s", s.addr, err)
+			s.logger.Log("op", "connect", "error", err, "msg", "failed to connect to peer")
 			backoff := s.backoff.Duration()
-			glog.Infof("Retrying %q in %s", s.addr, backoff)
 			time.Sleep(backoff)
 			continue
 		}
 		stats.SessionUp(s.addr)
 		s.backoff.Reset()
 
-		glog.Infof("BGP session to %q established", s.addr)
+		s.logger.Log("event", "sessionUp", "msg", "BGP session established")
 
-		if err := s.sendUpdates(); err != nil {
-			if err == errClosed {
-				return
-			}
-			glog.Error(err)
+		if !s.sendUpdates() {
+			return
 		}
 		stats.SessionDown(s.addr)
-		glog.Infof("BGP session to %q down", s.addr)
+		s.logger.Log("event", "sessionDown", "msg", "BGP session down")
 	}
 }
 
 // sendUpdates waits for changes to desired advertisements, and pushes
 // them out to the peer.
-func (s *Session) sendUpdates() error {
+func (s *Session) sendUpdates() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -86,7 +83,8 @@ func (s *Session) sendUpdates() error {
 	for c, adv := range s.advertised {
 		if err := sendUpdate(s.conn, asn, s.defaultNextHop, adv); err != nil {
 			s.abort()
-			return fmt.Errorf("sending update of %q to %q: %s", c, s.addr, err)
+			s.logger.Log("op", "sendUpdate", "ip", c, "error", err, "msg", "failed to send BGP update")
+			return true
 		}
 		stats.UpdateSent(s.addr)
 	}
@@ -98,10 +96,10 @@ func (s *Session) sendUpdates() error {
 		}
 
 		if s.closed {
-			return errClosed
+			return false
 		}
 		if s.conn == nil {
-			return nil
+			return true
 		}
 		if s.new == nil {
 			// nil is "no pending updates", contrast to a non-nil
@@ -118,7 +116,8 @@ func (s *Session) sendUpdates() error {
 
 			if err := sendUpdate(s.conn, asn, s.defaultNextHop, adv); err != nil {
 				s.abort()
-				return fmt.Errorf("sending update of %q to %q: %s", c, s.addr, err)
+				s.logger.Log("op", "sendUpdate", "prefix", c, "error", err, "msg", "failed to send BGP update")
+				return true
 			}
 			stats.UpdateSent(s.addr)
 		}
@@ -132,7 +131,10 @@ func (s *Session) sendUpdates() error {
 		if len(wdr) > 0 {
 			if err := sendWithdraw(s.conn, wdr); err != nil {
 				s.abort()
-				return fmt.Errorf("sending withdraw of %q to %q: %s", wdr, s.addr, err)
+				for _, pfx := range wdr {
+					s.logger.Log("op", "sendWithdraw", "prefix", pfx, "error", err, "msg", "failed to send BGP withdraw")
+				}
+				return true
 			}
 			stats.UpdateSent(s.addr)
 		}
@@ -250,13 +252,10 @@ func (s *Session) sendKeepalives() {
 			}
 
 		case <-ch:
-			if err := s.sendKeepalive(); err != nil {
-				if err == errClosed {
-					// Session has been closed by package caller, we're
-					// done here.
-					return
-				}
-				glog.Error(err)
+			if err := s.sendKeepalive(); err == errClosed {
+				// Session has been closed by package caller, we're
+				// done here.
+				return
 			}
 		}
 	}
@@ -275,6 +274,7 @@ func (s *Session) sendKeepalive() error {
 	}
 	if err := sendKeepalive(s.conn); err != nil {
 		s.abort()
+		s.logger.Log("op", "sendKeepalive", "error", err, "msg", "failed to send keepalive")
 		return fmt.Errorf("sending keepalive to %q: %s", s.addr, err)
 	}
 	return nil
@@ -284,13 +284,14 @@ func (s *Session) sendKeepalive() error {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func New(addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time.Duration) (*Session, error) {
+func New(l log.Logger, addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time.Duration) (*Session, error) {
 	ret := &Session{
 		addr:        addr,
 		asn:         asn,
 		routerID:    routerID.To4(),
 		peerASN:     peerASN,
 		holdTime:    holdTime,
+		logger:      log.With(l, "peer", addr, "localASN", asn, "peerASN", peerASN),
 		newHoldTime: make(chan bool, 1),
 		advertised:  map[string]*Advertisement{},
 	}
@@ -335,7 +336,7 @@ func (s *Session) consumeBGP(conn io.ReadCloser) {
 		if hdr.Type == 3 {
 			// TODO: propagate better than just logging directly.
 			err := readNotification(conn)
-			glog.Errorf("%s", err)
+			s.logger.Log("event", "peerNotification", "error", err, "msg", "peer sent notification, closing session")
 			return
 		}
 		if _, err := io.Copy(ioutil.Discard, io.LimitReader(conn, int64(hdr.Len)-19)); err != nil {

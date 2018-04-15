@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/go-kit/kit/log"
 	"github.com/google/go-cmp/cmp"
 	"github.com/osrg/gobgp/config"
 	gobgp "github.com/osrg/gobgp/server"
@@ -81,7 +82,8 @@ func TestInterop(t *testing.T) {
 		t.Fatalf("starting GoBGP: %s", err)
 	}
 
-	sess, err := New("127.0.0.1:4179", 64543, net.ParseIP("2.3.4.5"), 64543, 10*time.Second)
+	l := log.NewNopLogger()
+	sess, err := New(l, "127.0.0.1:4179", 64543, net.ParseIP("2.3.4.5"), 64543, 10*time.Second)
 	if err != nil {
 		t.Fatalf("starting BGP session to GoBGP: %s", err)
 	}

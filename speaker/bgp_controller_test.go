@@ -93,7 +93,7 @@ type fakeBGP struct {
 	gotAds map[string][]*bgp.Advertisement
 }
 
-func (f *fakeBGP) New(addr string, _ uint32, _ net.IP, _ uint32, _ time.Duration) (session, error) {
+func (f *fakeBGP) New(_ log.Logger, addr string, _ uint32, _ net.IP, _ uint32, _ time.Duration) (session, error) {
 	f.Lock()
 	defer f.Unlock()
 

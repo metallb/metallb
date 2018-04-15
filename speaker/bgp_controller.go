@@ -36,6 +36,7 @@ type peer struct {
 }
 
 type bgpController struct {
+	logger     log.Logger
 	nodeLabels labels.Set
 	peers      []*peer
 	svcAds     map[string][]*bgp.Advertisement
@@ -113,7 +114,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 			if p.cfg.RouterID != nil {
 				routerID = p.cfg.RouterID
 			}
-			s, err := newBGP(fmt.Sprintf("%s:%d", p.cfg.Addr, p.cfg.Port), p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime)
+			s, err := newBGP(c.logger, fmt.Sprintf("%s:%d", p.cfg.Addr, p.cfg.Port), p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime)
 			if err != nil {
 				l.Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
 				errs++
@@ -215,6 +216,6 @@ func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
 	return c.syncPeers(l)
 }
 
-var newBGP = func(addr string, myASN uint32, routerID net.IP, asn uint32, hold time.Duration) (session, error) {
-	return bgp.New(addr, myASN, routerID, asn, hold)
+var newBGP = func(logger log.Logger, addr string, myASN uint32, routerID net.IP, asn uint32, hold time.Duration) (session, error) {
+	return bgp.New(logger, addr, myASN, routerID, asn, hold)
 }
