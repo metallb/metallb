@@ -563,7 +563,7 @@ func (d *TCPDialer) DialTCP(tcphost string, port int, timeout int) (net.Conn, er
 	}
 
 	if timeout != 0 {
-		if err = setsockoptIPTTL(fd, family, int(timeout)); err != nil {
+		if err = setsockoptIPTTL(fd, family, timeout); err != nil {
 			return nil, err
 		}
 	}
