@@ -165,7 +165,7 @@ func (s *Session) connect() error {
 
 	d := TCPDialer{
 		Dialer: net.Dialer{
-			Timeout:  10 * time.Second,
+			Timeout:  10,
 			Deadline: deadline,
 		},
 		AuthPassword: s.password,
@@ -554,6 +554,16 @@ func (d *TCPDialer) DialTCP(tcphost string, port int) (net.Conn, error) {
 	fi := os.NewFile(uintptr(fd), "")
 	defer fi.Close()
 
+	// Borrowed from gobgp
+	if err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_BROADCAST, 1); err != nil {
+		return nil, os.NewSyscallError("setsockopt", err)
+	}
+	// This may have consequences for efficiency, but connection fails without it, not sure of the
+	// underlying cause
+	if err = syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_NODELAY, 1); err != nil {
+		return nil, os.NewSyscallError("setsockopt", err)
+	}
+
 	if d.AuthPassword != "" {
 		if err = setsockoptTCPMD5Sig(fd, tcphost, d.AuthPassword); err != nil {
 			return nil, err
@@ -571,10 +581,58 @@ func (d *TCPDialer) DialTCP(tcphost string, port int) (net.Conn, error) {
 	}
 
 	err = syscall.Connect(fd, ra)
-	if err != nil {
+
+	switch err {
+	case syscall.EINPROGRESS, syscall.EALREADY, syscall.EINTR:
+		// do timeout handling
+		// without handling EINPROGRESS we end up with errors like
+		// "error":"dial XXXXXXXXXXX": connect: operation now in progress","localASN":64787,"msg":"failed to connect to peer"
+	case nil:
+		return net.FileConn(fi)
+	default:
 		return nil, os.NewSyscallError("connect", err)
 	}
-	return net.FileConn(fi)
+
+	// Turns out this is neccessary to handle at least syscall.EINPROGRESS,
+	// again borrowed from gobgp
+	epfd, err := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
+	if err != nil {
+		return nil, err
+	}
+	defer syscall.Close(epfd)
+
+	var event syscall.EpollEvent
+	events := make([]syscall.EpollEvent, 1)
+
+	event.Events = syscall.EPOLLIN | syscall.EPOLLOUT | syscall.EPOLLPRI
+	event.Fd = int32(fd)
+	if err = syscall.EpollCtl(epfd, syscall.EPOLL_CTL_ADD, fd, &event); err != nil {
+		return nil, err
+	}
+
+	for {
+		nevents, err := syscall.EpollWait(epfd, events, int(d.Timeout/1000000) /*msec*/)
+		if err != nil {
+			return nil, err
+		}
+		if nevents == 0 {
+			return nil, fmt.Errorf("timeout")
+		} else if nevents == 1 && events[0].Fd == int32(fd) {
+			nerr, err := syscall.GetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_ERROR)
+			if err != nil {
+				return nil, os.NewSyscallError("getsockopt", err)
+			}
+			switch err := syscall.Errno(nerr); err {
+			case syscall.EINPROGRESS, syscall.EALREADY, syscall.EINTR:
+			case syscall.Errno(0), syscall.EISCONN:
+				return net.FileConn(fi)
+			default:
+				return nil, os.NewSyscallError("getsockopt", err)
+			}
+		} else {
+			return nil, fmt.Errorf("unexpected epoll behavior")
+		}
+	}
 
 }
 
