@@ -167,7 +167,7 @@ func (s *Session) connect() error {
 
 	d := TCPDialer{
 		Dialer: net.Dialer{
-			Timeout:  10,
+			Timeout:  10 * time.Second,
 			Deadline: deadline,
 		},
 		AuthPassword: s.password,
