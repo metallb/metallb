@@ -25,7 +25,7 @@ data:
       # to the node IP address. Generally only useful when you need to peer with
       # another BGP router running on the same machine as MetalLB.
       router-id: 1.2.3.4
-      # (optional) Password for  TCPMD5  authenticated BGP sessions
+      # (optional) Password for TCPMD5 authenticated BGP sessions
       # offered by some peers.
       password: "yourPassword"
       # (optional) The nodes that should connect to this peer. A node

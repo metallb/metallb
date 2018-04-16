@@ -83,7 +83,47 @@ func TestInterop(t *testing.T) {
 	}
 
 	l := log.NewNopLogger()
-	sess, err := New(l, "127.0.0.1:4179", 64543, net.ParseIP("2.3.4.5"), 64543, 10*time.Second)
+	sess, err := New(l, "127.0.0.1:4179", 64543, net.ParseIP("2.3.4.5"), 64543, 10*time.Second, "")
+	if err != nil {
+		t.Fatalf("starting BGP session to GoBGP: %s", err)
+	}
+	defer sess.Close()
+
+	adv := &Advertisement{
+		Prefix:      ipnet("1.2.3.0/24"),
+		NextHop:     net.ParseIP("10.20.30.40"),
+		LocalPref:   42,
+		Communities: []uint32{1234, 2345},
+	}
+
+	if err := sess.Set(adv); err != nil {
+		t.Fatalf("setting advertisement: %s", err)
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			t.Fatalf("test timed out waiting for route")
+		case path := <-ips:
+			if err := checkPath(path, adv); err != nil {
+				t.Fatalf("path did not match expectations: %s", err)
+			}
+			return
+		}
+	}
+}
+
+func TestTCPMD5(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	ips, err := runGoBGP(ctx)
+	if err != nil {
+		t.Fatalf("starting GoBGP: %s", err)
+	}
+
+	l := log.NewNopLogger()
+	sess, err := New(l, "127.0.0.1:4181", 64543, net.ParseIP("2.3.4.6"), 64543, 10*time.Second, "somepassword")
 	if err != nil {
 		t.Fatalf("starting BGP session to GoBGP: %s", err)
 	}

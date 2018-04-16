@@ -160,18 +160,16 @@ func (s *Session) connect() error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-
-	laddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("0.0.0.0", "0"))
+	deadline, _ := ctx.Deadline()
 	var conn net.Conn
+
 	d := TCPDialer{
 		Dialer: net.Dialer{
-			LocalAddr: laddr,
-			Timeout:   10 * time.Second,
+			Timeout:  10 * time.Second,
+			Deadline: deadline,
 		},
 		AuthPassword: s.password,
 	}
-
-	d.TTL = 10
 	tcphost, portstr, err := net.SplitHostPort(s.addr)
 	port, err := strconv.Atoi(portstr)
 	conn, err = d.DialTCP(tcphost, port)
@@ -179,7 +177,7 @@ func (s *Session) connect() error {
 	if err != nil {
 		return fmt.Errorf("dial %q: %s", s.addr, err)
 	}
-	deadline, _ := ctx.Deadline()
+
 	if err = conn.SetDeadline(deadline); err != nil {
 		conn.Close()
 		return fmt.Errorf("setting deadline on conn to %q: %s", s.addr, err)
@@ -490,28 +488,28 @@ type TCPDialer struct {
 
 	// MD5 authentication password.
 	AuthPassword string
-
-	// The TTL value to set outgoing connection.
-	TTL uint8
 }
 
 // DialTCP does the part of creating a connection manually,  including setting the
 // proper TCP MD5 options when the password is not empty. Works by manupulating
 // the low level FD's, skipping the net.Conn API as it has not hooks to set
 // the neccessary sockopts for TCP MD5.
-func (d *TCPDialer) DialTCP(tcphost string, port int) (*net.TCPConn, error) {
-	var family int
-	var ra, la syscall.Sockaddr
-	laddr, err := net.ResolveTCPAddr("tcp", d.LocalAddr.String())
+func (d *TCPDialer) DialTCP(tcphost string, port int) (net.Conn, error) {
+
+	laddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("0.0.0.0", "0"))
+
 	if err != nil {
-		return nil, fmt.Errorf("invalid local address: %s", err)
+		return nil, fmt.Errorf("Error resolving local address: %s ", err)
 	}
 
 	raddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort(tcphost, fmt.Sprintf("%d", port)))
+
 	if err != nil {
 		return nil, fmt.Errorf("invalid remote address: %s ", err)
 	}
 
+	var family int
+	var ra, la syscall.Sockaddr
 	if raddr.IP.To4() != nil {
 		family = syscall.AF_INET
 		rsockaddr := &syscall.SockaddrInet4{Port: port}
@@ -544,8 +542,7 @@ func (d *TCPDialer) DialTCP(tcphost string, port int) (*net.TCPConn, error) {
 	if err != nil {
 		return nil, err
 	}
-	fi := os.NewFile(uintptr(fd), "")
-	defer fi.Close()
+
 	// A new socket was created so we must close it before this
 	// function returns either on failure or success. On success,
 	// net.FileConn() in newTCPConn() increases the refcount of
@@ -554,13 +551,8 @@ func (d *TCPDialer) DialTCP(tcphost string, port int) (*net.TCPConn, error) {
 	// Note that the above os.NewFile() doesn't play with the
 	// refcount.
 
-	if err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_BROADCAST, 1); err != nil {
-		return nil, os.NewSyscallError("setsockopt", err)
-	}
-
-	if err = syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_NODELAY, 1); err != nil {
-		return nil, os.NewSyscallError("setsockopt", err)
-	}
+	fi := os.NewFile(uintptr(fd), "")
+	defer fi.Close()
 
 	if d.AuthPassword != "" {
 		if err = setsockoptTCPMD5Sig(fd, tcphost, d.AuthPassword); err != nil {
@@ -568,8 +560,8 @@ func (d *TCPDialer) DialTCP(tcphost string, port int) (*net.TCPConn, error) {
 		}
 	}
 
-	if d.TTL != 0 {
-		if err = setsockoptIPTTL(fd, family, int(d.TTL)); err != nil {
+	if d.Timeout != 0 {
+		if err = setsockoptIPTTL(fd, family, int(d.Timeout)); err != nil {
 			return nil, err
 		}
 	}
@@ -578,62 +570,12 @@ func (d *TCPDialer) DialTCP(tcphost string, port int) (*net.TCPConn, error) {
 		return nil, os.NewSyscallError("bind", err)
 	}
 
-	newTCPConn := func(fi *os.File) (*net.TCPConn, error) {
-		conn, errs := net.FileConn(fi)
-		if errs != nil {
-			return nil, errs
-		}
-		return conn.(*net.TCPConn), errs
-	}
-
 	err = syscall.Connect(fd, ra)
-	switch err {
-	case syscall.EINPROGRESS, syscall.EALREADY, syscall.EINTR:
-		// do timeout handling
-	case nil, syscall.EISCONN:
-		return newTCPConn(fi)
-	default:
+	if err != nil {
 		return nil, os.NewSyscallError("connect", err)
 	}
+	return net.FileConn(fi)
 
-	epfd, err := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
-	if err != nil {
-		return nil, err
-	}
-	defer syscall.Close(epfd)
-
-	var event syscall.EpollEvent
-	events := make([]syscall.EpollEvent, 1)
-
-	event.Events = syscall.EPOLLIN | syscall.EPOLLOUT | syscall.EPOLLPRI
-	event.Fd = int32(fd)
-	if err = syscall.EpollCtl(epfd, syscall.EPOLL_CTL_ADD, fd, &event); err != nil {
-		return nil, err
-	}
-
-	for {
-		nevents, err := syscall.EpollWait(epfd, events, int(d.Timeout/1000000) /*msec*/)
-		if err != nil {
-			return nil, err
-		}
-		if nevents == 0 {
-			return nil, fmt.Errorf("timeout")
-		} else if nevents == 1 && events[0].Fd == int32(fd) {
-			nerr, err := syscall.GetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_ERROR)
-			if err != nil {
-				return nil, os.NewSyscallError("getsockopt", err)
-			}
-			switch err := syscall.Errno(nerr); err {
-			case syscall.EINPROGRESS, syscall.EALREADY, syscall.EINTR:
-			case syscall.Errno(0), syscall.EISCONN:
-				return newTCPConn(fi)
-			default:
-				return nil, os.NewSyscallError("getsockopt", err)
-			}
-		} else {
-			return nil, fmt.Errorf("unexpected epoll behavior")
-		}
-	}
 }
 
 // Better way may be available in  Go 1.11, see go-review.googlesource.com/c/go/+/72810
