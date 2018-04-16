@@ -161,6 +161,8 @@ func (s *Session) connect() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	deadline, _ := ctx.Deadline()
+	// we need the same length timeout as the ctx.
+	timeout := 10
 	var conn net.Conn
 
 	d := TCPDialer{
@@ -172,7 +174,7 @@ func (s *Session) connect() error {
 	}
 	tcphost, portstr, err := net.SplitHostPort(s.addr)
 	port, err := strconv.Atoi(portstr)
-	conn, err = d.DialTCP(tcphost, port)
+	conn, err = d.DialTCP(tcphost, port, timeout)
 
 	if err != nil {
 		return fmt.Errorf("dial %q: %s", s.addr, err)
@@ -494,7 +496,7 @@ type TCPDialer struct {
 // proper TCP MD5 options when the password is not empty. Works by manupulating
 // the low level FD's, skipping the net.Conn API as it has not hooks to set
 // the neccessary sockopts for TCP MD5.
-func (d *TCPDialer) DialTCP(tcphost string, port int) (net.Conn, error) {
+func (d *TCPDialer) DialTCP(tcphost string, port int, timeout int) (net.Conn, error) {
 
 	laddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("0.0.0.0", "0"))
 
@@ -554,24 +556,14 @@ func (d *TCPDialer) DialTCP(tcphost string, port int) (net.Conn, error) {
 	fi := os.NewFile(uintptr(fd), "")
 	defer fi.Close()
 
-	// Borrowed from gobgp
-	if err = syscall.SetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_BROADCAST, 1); err != nil {
-		return nil, os.NewSyscallError("setsockopt", err)
-	}
-	// This may have consequences for efficiency, but connection fails without it, not sure of the
-	// underlying cause
-	if err = syscall.SetsockoptInt(fd, syscall.IPPROTO_TCP, syscall.TCP_NODELAY, 1); err != nil {
-		return nil, os.NewSyscallError("setsockopt", err)
-	}
-
 	if d.AuthPassword != "" {
 		if err = setsockoptTCPMD5Sig(fd, tcphost, d.AuthPassword); err != nil {
 			return nil, err
 		}
 	}
 
-	if d.Timeout != 0 {
-		if err = setsockoptIPTTL(fd, family, int(d.Timeout)); err != nil {
+	if timeout != 0 {
+		if err = setsockoptIPTTL(fd, family, int(timeout)); err != nil {
 			return nil, err
 		}
 	}
@@ -585,8 +577,6 @@ func (d *TCPDialer) DialTCP(tcphost string, port int) (net.Conn, error) {
 	switch err {
 	case syscall.EINPROGRESS, syscall.EALREADY, syscall.EINTR:
 		// do timeout handling
-		// without handling EINPROGRESS we end up with errors like
-		// "error":"dial XXXXXXXXXXX": connect: operation now in progress","localASN":64787,"msg":"failed to connect to peer"
 	case nil:
 		return net.FileConn(fi)
 	default:
@@ -594,6 +584,8 @@ func (d *TCPDialer) DialTCP(tcphost string, port int) (net.Conn, error) {
 	}
 
 	// Turns out this is neccessary to handle at least syscall.EINPROGRESS,
+	// without handling EINPROGRESS  we end up with errors like
+	// "error":"dial XXXXXXXXXXX": connect: operation now in progress","localASN":64787,"msg":"failed to connect to peer"
 	// again borrowed from gobgp
 	epfd, err := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
 	if err != nil {
