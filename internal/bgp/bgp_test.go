@@ -28,7 +28,7 @@ func ipnet(s string) *net.IPNet {
 	return n
 }
 
-func runGoBGP(ctx context.Context) (chan *table.Path, error) {
+func runGoBGP(ctx context.Context, password string, port int32) (chan *table.Path, error) {
 	s := gobgp.NewBgpServer()
 	go s.Serve()
 
@@ -36,7 +36,7 @@ func runGoBGP(ctx context.Context) (chan *table.Path, error) {
 		Config: config.GlobalConfig{
 			As:       64543,
 			RouterId: "1.2.3.4",
-			Port:     4179,
+			Port:     port,
 		},
 	}
 	if err := s.Start(global); err != nil {
@@ -47,6 +47,7 @@ func runGoBGP(ctx context.Context) (chan *table.Path, error) {
 		Config: config.NeighborConfig{
 			NeighborAddress: "127.0.0.1",
 			PeerAs:          64543,
+			AuthPassword:    password,
 		},
 	}
 	if err := s.AddNeighbor(n); err != nil {
@@ -77,7 +78,7 @@ func TestInterop(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	ips, err := runGoBGP(ctx)
+	ips, err := runGoBGP(ctx, "", 4179)
 	if err != nil {
 		t.Fatalf("starting GoBGP: %s", err)
 	}
@@ -113,56 +114,11 @@ func TestInterop(t *testing.T) {
 	}
 }
 
-func runGoBGPTCPMD5(ctx context.Context) (chan *table.Path, error) {
-	s := gobgp.NewBgpServer()
-	go s.Serve()
-
-	global := &config.Global{
-		Config: config.GlobalConfig{
-			As:       64543,
-			RouterId: "1.2.3.4",
-			Port:     5179,
-		},
-	}
-	if err := s.Start(global); err != nil {
-		return nil, err
-	}
-
-	n := &config.Neighbor{
-		Config: config.NeighborConfig{
-			NeighborAddress: "127.0.0.1",
-			PeerAs:          64543,
-			AuthPassword:    "somepassword",
-		},
-	}
-	if err := s.AddNeighbor(n); err != nil {
-		return nil, err
-	}
-	ips := make(chan *table.Path, 1000)
-	w := s.Watch(gobgp.WatchBestPath(false))
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case ev := <-w.Event():
-				switch msg := ev.(type) {
-				case *gobgp.WatchEventBestPath:
-					for _, path := range msg.PathList {
-						ips <- path
-					}
-				}
-			}
-		}
-	}()
-	return ips, nil
-}
-
 func TestTCPMD5(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 
-	ips, err := runGoBGPTCPMD5(ctx)
+	ips, err := runGoBGP(ctx, "somepassword", 5179)
 	if err != nil {
 		t.Fatalf("starting GoBGP: %s", err)
 	}
