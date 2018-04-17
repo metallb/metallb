@@ -257,6 +257,10 @@ func New(cfg *Config) (*Client, error) {
 		c.leaderChanged = cfg.LeaderChanged
 	}
 
+	if cfg.Synced != nil {
+		c.synced = cfg.Synced
+	}
+
 	http.Handle("/metrics", promhttp.Handler())
 	go func() {
 		http.ListenAndServe(fmt.Sprintf(":%d", cfg.MetricsPort), nil)
