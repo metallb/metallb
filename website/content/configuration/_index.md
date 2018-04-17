@@ -97,7 +97,7 @@ specific than `/24`. So, you need to somehow advertise a `/24` to your
 transit provider, but still have the ability to do per-IP routing
 internally.
 
-Here's a configuration that implemnents this:
+Here's a configuration that implements this:
 
 ```yaml
 apiVersion: v1
@@ -120,7 +120,7 @@ data:
       - aggregation-length: 32
         localpref: 100
         communities:
-        - no-avertise
+        - no-advertise
       - aggregation-length: 24
     bgp-communities:
       no-advertise: 65535:65282

@@ -8,9 +8,13 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
+	"os"
 	"reflect"
+	"strconv"
 	"sync"
+	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/go-kit/kit/log"
 )
@@ -25,6 +29,7 @@ type Session struct {
 	peerASN  uint32
 	holdTime time.Duration
 	logger   log.Logger
+	password string
 
 	newHoldTime chan bool
 	backoff     backoff
@@ -144,6 +149,7 @@ func (s *Session) sendUpdates() bool {
 }
 
 // connect establishes the BGP session with the peer.
+// sets TCP_MD5 sockopt if password is !="",
 func (s *Session) connect() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -154,13 +160,26 @@ func (s *Session) connect() error {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
+	deadline, _ := ctx.Deadline()
+	// we need the same length timeout as the ctx.
+	timeout := 10
+	var conn net.Conn
 
-	var d net.Dialer
-	conn, err := d.DialContext(ctx, "tcp", s.addr)
+	d := TCPDialer{
+		Dialer: net.Dialer{
+			Timeout:  10 * time.Second,
+			Deadline: deadline,
+		},
+		AuthPassword: s.password,
+	}
+	tcphost, portstr, err := net.SplitHostPort(s.addr)
+	port, err := strconv.Atoi(portstr)
+	conn, err = d.DialTCP(tcphost, port, timeout)
+
 	if err != nil {
 		return fmt.Errorf("dial %q: %s", s.addr, err)
 	}
-	deadline, _ := ctx.Deadline()
+
 	if err = conn.SetDeadline(deadline); err != nil {
 		conn.Close()
 		return fmt.Errorf("setting deadline on conn to %q: %s", s.addr, err)
@@ -284,7 +303,7 @@ func (s *Session) sendKeepalive() error {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func New(l log.Logger, addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time.Duration) (*Session, error) {
+func New(l log.Logger, addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time.Duration, password string) (*Session, error) {
 	ret := &Session{
 		addr:        addr,
 		asn:         asn,
@@ -294,6 +313,7 @@ func New(l log.Logger, addr string, asn uint32, routerID net.IP, peerASN uint32,
 		logger:      log.With(l, "peer", addr, "localASN", asn, "peerASN", peerASN),
 		newHoldTime: make(chan bool, 1),
 		advertised:  map[string]*Advertisement{},
+		password:    password,
 	}
 	ret.cond = sync.NewCond(&ret.mu)
 	go ret.sendKeepalives()
@@ -426,4 +446,205 @@ func (a *Advertisement) Equal(b *Advertisement) bool {
 		return false
 	}
 	return reflect.DeepEqual(a.Communities, b.Communities)
+}
+
+const (
+	//tcpMD5SIG TCP MD5 Signature (RFC2385)
+	tcpMD5SIG = 14
+	//ipv6MINHOPCOUNT Generalized TTL Security Mechanism (RFC5082)
+	ipv6MINHOPCOUNT = 73
+)
+
+// This  struct is defined at; linux-kernel: include/uapi/linux/tcp.h,
+// It  must be kept in sync with that definition, see current version:
+// https://github.com/torvalds/linux/blob/v4.16/include/uapi/linux/tcp.h#L253
+// nolint[structcheck]
+type tcpmd5sig struct {
+	ssFamily uint16
+	ss       [126]byte
+	pad1     uint16
+	keylen   uint16
+	pad2     uint32
+	key      [80]byte
+}
+
+func buildTCPMD5Sig(address string, key string) (tcpmd5sig, error) {
+	t := tcpmd5sig{}
+	addr := net.ParseIP(address)
+	if addr.To4() != nil {
+		t.ssFamily = syscall.AF_INET
+		copy(t.ss[2:], addr.To4())
+	} else {
+		t.ssFamily = syscall.AF_INET6
+		copy(t.ss[6:], addr.To16())
+	}
+
+	t.keylen = uint16(len(key))
+	copy(t.key[0:], []byte(key))
+
+	return t, nil
+}
+
+//TCPDialer  represents the connection
+type TCPDialer struct {
+	net.Dialer
+
+	// MD5 authentication password.
+	AuthPassword string
+}
+
+// DialTCP does the part of creating a connection manually,  including setting the
+// proper TCP MD5 options when the password is not empty. Works by manupulating
+// the low level FD's, skipping the net.Conn API as it has not hooks to set
+// the neccessary sockopts for TCP MD5.
+func (d *TCPDialer) DialTCP(tcphost string, port int, timeout int) (net.Conn, error) {
+
+	laddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("0.0.0.0", "0"))
+
+	if err != nil {
+		return nil, fmt.Errorf("Error resolving local address: %s ", err)
+	}
+
+	raddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort(tcphost, fmt.Sprintf("%d", port)))
+
+	if err != nil {
+		return nil, fmt.Errorf("invalid remote address: %s ", err)
+	}
+
+	var family int
+	var ra, la syscall.Sockaddr
+	if raddr.IP.To4() != nil {
+		family = syscall.AF_INET
+		rsockaddr := &syscall.SockaddrInet4{Port: port}
+		copy(rsockaddr.Addr[:], raddr.IP.To4())
+		ra = rsockaddr
+		lsockaddr := &syscall.SockaddrInet4{}
+		copy(lsockaddr.Addr[:], laddr.IP.To4())
+		la = lsockaddr
+	} else {
+		family = syscall.AF_INET6
+		rsockaddr := &syscall.SockaddrInet6{Port: port}
+		copy(rsockaddr.Addr[:], raddr.IP.To16())
+		ra = rsockaddr
+		var zone uint32
+		if laddr.Zone != "" {
+			intf, errs := net.InterfaceByName(laddr.Zone)
+			if errs != nil {
+				return nil, errs
+			}
+			zone = uint32(intf.Index)
+		}
+		lsockaddr := &syscall.SockaddrInet6{ZoneId: zone}
+		copy(lsockaddr.Addr[:], laddr.IP.To16())
+		la = lsockaddr
+	}
+
+	sockType := syscall.SOCK_STREAM | syscall.SOCK_CLOEXEC | syscall.SOCK_NONBLOCK
+	proto := 0
+	fd, err := syscall.Socket(family, sockType, proto)
+	if err != nil {
+		return nil, err
+	}
+
+	// A new socket was created so we must close it before this
+	// function returns either on failure or success. On success,
+	// net.FileConn() in newTCPConn() increases the refcount of
+	// the socket so this fi.Close() doesn't destroy the socket.
+	// The caller must call Close() with the file later.
+	// Note that the above os.NewFile() doesn't play with the
+	// refcount.
+
+	fi := os.NewFile(uintptr(fd), "")
+	defer fi.Close()
+
+	if d.AuthPassword != "" {
+		if err = setsockoptTCPMD5Sig(fd, tcphost, d.AuthPassword); err != nil {
+			return nil, err
+		}
+	}
+
+	if timeout != 0 {
+		if err = setsockoptIPTTL(fd, family, timeout); err != nil {
+			return nil, err
+		}
+	}
+
+	if err = syscall.Bind(fd, la); err != nil {
+		return nil, os.NewSyscallError("bind", err)
+	}
+
+	err = syscall.Connect(fd, ra)
+
+	switch err {
+	case syscall.EINPROGRESS, syscall.EALREADY, syscall.EINTR:
+		// do timeout handling
+	case nil:
+		return net.FileConn(fi)
+	default:
+		return nil, os.NewSyscallError("connect", err)
+	}
+
+	// Turns out this is neccessary to handle at least syscall.EINPROGRESS,
+	// without handling EINPROGRESS  we end up with errors like
+	// "error":"dial XXXXXXXXXXX": connect: operation now in progress","localASN":64787,"msg":"failed to connect to peer"
+	// again borrowed from gobgp
+	epfd, err := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
+	if err != nil {
+		return nil, err
+	}
+	defer syscall.Close(epfd)
+
+	var event syscall.EpollEvent
+	events := make([]syscall.EpollEvent, 1)
+
+	event.Events = syscall.EPOLLIN | syscall.EPOLLOUT | syscall.EPOLLPRI
+	event.Fd = int32(fd)
+	if err = syscall.EpollCtl(epfd, syscall.EPOLL_CTL_ADD, fd, &event); err != nil {
+		return nil, err
+	}
+
+	for {
+		nevents, err := syscall.EpollWait(epfd, events, int(d.Timeout/1000000) /*msec*/)
+		if err != nil {
+			return nil, err
+		}
+		if nevents == 0 {
+			return nil, fmt.Errorf("timeout")
+		} else if nevents == 1 && events[0].Fd == int32(fd) {
+			nerr, err := syscall.GetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_ERROR)
+			if err != nil {
+				return nil, os.NewSyscallError("getsockopt", err)
+			}
+			switch err := syscall.Errno(nerr); err {
+			case syscall.EINPROGRESS, syscall.EALREADY, syscall.EINTR:
+			case syscall.Errno(0), syscall.EISCONN:
+				return net.FileConn(fi)
+			default:
+				return nil, os.NewSyscallError("getsockopt", err)
+			}
+		} else {
+			return nil, fmt.Errorf("unexpected epoll behavior")
+		}
+	}
+
+}
+
+// Better way may be available in  Go 1.11, see go-review.googlesource.com/c/go/+/72810
+func setsockoptTCPMD5Sig(fd int, address string, key string) error {
+	t, err := buildTCPMD5Sig(address, key)
+	if err != nil {
+		return err
+	}
+	b := *(*[unsafe.Sizeof(t)]byte)(unsafe.Pointer(&t))
+	return os.NewSyscallError("setsockopt", syscall.SetsockoptString(fd, syscall.IPPROTO_TCP, tcpMD5SIG, string(b[:])))
+}
+
+func setsockoptIPTTL(fd int, family int, value int) error {
+	level := syscall.IPPROTO_IP
+	name := syscall.IP_TTL
+	if family == syscall.AF_INET6 {
+		level = syscall.IPPROTO_IPV6
+		name = syscall.IPV6_UNICAST_HOPS
+	}
+	return os.NewSyscallError("setsockopt", syscall.SetsockoptInt(fd, level, name, value))
 }
