@@ -515,7 +515,7 @@ func dialMD5(ctx context.Context, addr, password string) (net.Conn, error) {
 		sig := buildTCPMD5Sig(raddr.IP, password)
 		b := *(*[unsafe.Sizeof(sig)]byte)(unsafe.Pointer(&sig))
 		// Better way may be available in  Go 1.11, see go-review.googlesource.com/c/go/+/72810
-		if err := os.NewSyscallError("setsockopt", syscall.SetsockoptString(fd, syscall.IPPROTO_TCP, tcpMD5SIG, string(b[:]))); err != nil {
+		if err = os.NewSyscallError("setsockopt", syscall.SetsockoptString(fd, syscall.IPPROTO_TCP, tcpMD5SIG, string(b[:]))); err != nil {
 			return nil, err
 		}
 	}
@@ -556,7 +556,7 @@ func dialMD5(ctx context.Context, addr, password string) (net.Conn, error) {
 	for {
 		timeout := int(-1)
 		if deadline, ok := ctx.Deadline(); ok {
-			timeout := int(time.Until(deadline).Nanoseconds() / 1000000)
+			timeout = int(time.Until(deadline).Nanoseconds() / 1000000)
 			if timeout <= 0 {
 				return nil, fmt.Errorf("timeout")
 			}
