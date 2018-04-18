@@ -160,18 +160,7 @@ func (s *Session) connect() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	deadline, _ := ctx.Deadline()
-	// we need the same length timeout as the ctx.
-	timeout := 10
-	var conn net.Conn
-
-	d := tcpDialer{
-		Dialer: net.Dialer{
-			Timeout:  10 * time.Second,
-			Deadline: deadline,
-		},
-		AuthPassword: s.password,
-	}
-	conn, err := d.DialTCP(s.addr, timeout)
+	conn, err := dialMD5(ctx, s.addr, s.password)
 	if err != nil {
 		return fmt.Errorf("dial %q: %s", s.addr, err)
 	}
@@ -462,20 +451,12 @@ type tcpmd5sig struct {
 	key      [80]byte
 }
 
-type tcpDialer struct {
-	net.Dialer
-
-	// MD5 authentication password.
-	AuthPassword string
-}
-
 // DialTCP does the part of creating a connection manually,  including setting the
 // proper TCP MD5 options when the password is not empty. Works by manupulating
 // the low level FD's, skipping the net.Conn API as it has not hooks to set
 // the neccessary sockopts for TCP MD5.
-func (d *tcpDialer) DialTCP(addr string, timeout int) (net.Conn, error) {
-
-	laddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("0.0.0.0", "0"))
+func dialMD5(ctx context.Context, addr, password string) (net.Conn, error) {
+	laddr, err := net.ResolveTCPAddr("tcp", "0.0.0.0:0")
 	if err != nil {
 		return nil, fmt.Errorf("Error resolving local address: %s ", err)
 	}
@@ -527,12 +508,14 @@ func (d *tcpDialer) DialTCP(addr string, timeout int) (net.Conn, error) {
 	// The caller must call Close() with the file later.
 	// Note that the above os.NewFile() doesn't play with the
 	// refcount.
-
 	fi := os.NewFile(uintptr(fd), "")
 	defer fi.Close()
 
-	if d.AuthPassword != "" {
-		if err = setsockoptTCPMD5Sig(fd, raddr.IP, d.AuthPassword); err != nil {
+	if password != "" {
+		sig := buildTCPMD5Sig(raddr.IP, password)
+		b := *(*[unsafe.Sizeof(sig)]byte)(unsafe.Pointer(&sig))
+		// Better way may be available in  Go 1.11, see go-review.googlesource.com/c/go/+/72810
+		if err := os.NewSyscallError("setsockopt", syscall.SetsockoptString(fd, syscall.IPPROTO_TCP, tcpMD5SIG, string(b[:]))); err != nil {
 			return nil, err
 		}
 	}
@@ -545,17 +528,16 @@ func (d *tcpDialer) DialTCP(addr string, timeout int) (net.Conn, error) {
 
 	switch err {
 	case syscall.EINPROGRESS, syscall.EALREADY, syscall.EINTR:
-		// do timeout handling
 	case nil:
 		return net.FileConn(fi)
 	default:
 		return nil, os.NewSyscallError("connect", err)
 	}
 
-	// Turns out this is neccessary to handle at least syscall.EINPROGRESS,
-	// without handling EINPROGRESS  we end up with errors like
-	// "error":"dial XXXXXXXXXXX": connect: operation now in progress","localASN":64787,"msg":"failed to connect to peer"
-	// again borrowed from gobgp
+	// With a non-blocking socket, the connection process is
+	// asynchronous, so we need to manually wait with epoll until the
+	// connection succeeds. All of the following is doing that, with
+	// appropriate use of the deadline in the context.
 	epfd, err := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
 	if err != nil {
 		return nil, err
@@ -572,42 +554,39 @@ func (d *tcpDialer) DialTCP(addr string, timeout int) (net.Conn, error) {
 	}
 
 	for {
-		nevents, err := syscall.EpollWait(epfd, events, int(d.Timeout/1000000) /*msec*/)
+		timeout := int(-1)
+		if deadline, ok := ctx.Deadline(); ok {
+			timeout := int(time.Until(deadline).Nanoseconds() / 1000000)
+			if timeout <= 0 {
+				return nil, fmt.Errorf("timeout")
+			}
+		}
+		nevents, err := syscall.EpollWait(epfd, events, timeout)
 		if err != nil {
 			return nil, err
 		}
 		if nevents == 0 {
 			return nil, fmt.Errorf("timeout")
-		} else if nevents == 1 && events[0].Fd == int32(fd) {
-			nerr, err := syscall.GetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_ERROR)
-			if err != nil {
-				return nil, os.NewSyscallError("getsockopt", err)
-			}
-			switch err := syscall.Errno(nerr); err {
-			case syscall.EINPROGRESS, syscall.EALREADY, syscall.EINTR:
-			case syscall.Errno(0), syscall.EISCONN:
-				return net.FileConn(fi)
-			default:
-				return nil, os.NewSyscallError("getsockopt", err)
-			}
-		} else {
+		}
+		if nevents > 1 || events[0].Fd != int32(fd) {
 			return nil, fmt.Errorf("unexpected epoll behavior")
 		}
-	}
 
+		nerr, err := syscall.GetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_ERROR)
+		if err != nil {
+			return nil, os.NewSyscallError("getsockopt", err)
+		}
+		switch err := syscall.Errno(nerr); err {
+		case syscall.EINPROGRESS, syscall.EALREADY, syscall.EINTR:
+		case syscall.Errno(0), syscall.EISCONN:
+			return net.FileConn(fi)
+		default:
+			return nil, os.NewSyscallError("getsockopt", err)
+		}
+	}
 }
 
-// Better way may be available in  Go 1.11, see go-review.googlesource.com/c/go/+/72810
-func setsockoptTCPMD5Sig(fd int, addr net.IP, key string) error {
-	t, err := buildTCPMD5Sig(addr, key)
-	if err != nil {
-		return err
-	}
-	b := *(*[unsafe.Sizeof(t)]byte)(unsafe.Pointer(&t))
-	return os.NewSyscallError("setsockopt", syscall.SetsockoptString(fd, syscall.IPPROTO_TCP, tcpMD5SIG, string(b[:])))
-}
-
-func buildTCPMD5Sig(addr net.IP, key string) (tcpmd5sig, error) {
+func buildTCPMD5Sig(addr net.IP, key string) tcpmd5sig {
 	t := tcpmd5sig{}
 	if addr.To4() != nil {
 		t.ssFamily = syscall.AF_INET
@@ -620,5 +599,5 @@ func buildTCPMD5Sig(addr net.IP, key string) (tcpmd5sig, error) {
 	t.keylen = uint16(len(key))
 	copy(t.key[0:], []byte(key))
 
-	return t, nil
+	return t
 }
