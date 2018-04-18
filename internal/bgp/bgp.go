@@ -165,7 +165,7 @@ func (s *Session) connect() error {
 	timeout := 10
 	var conn net.Conn
 
-	d := TCPDialer{
+	d := tcpDialer{
 		Dialer: net.Dialer{
 			Timeout:  10 * time.Second,
 			Deadline: deadline,
@@ -483,8 +483,7 @@ func buildTCPMD5Sig(address string, key string) (tcpmd5sig, error) {
 	return t, nil
 }
 
-//TCPDialer  represents the connection
-type TCPDialer struct {
+type tcpDialer struct {
 	net.Dialer
 
 	// MD5 authentication password.
@@ -495,7 +494,7 @@ type TCPDialer struct {
 // proper TCP MD5 options when the password is not empty. Works by manupulating
 // the low level FD's, skipping the net.Conn API as it has not hooks to set
 // the neccessary sockopts for TCP MD5.
-func (d *TCPDialer) DialTCP(tcphost string, port int, timeout int) (net.Conn, error) {
+func (d *tcpDialer) DialTCP(tcphost string, port int, timeout int) (net.Conn, error) {
 
 	laddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("0.0.0.0", "0"))
 
