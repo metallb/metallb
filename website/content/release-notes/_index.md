@@ -30,6 +30,8 @@ New features:
   package. Logging events are written to standard output as a series
   of JSON objects suitable for collection by centralized logging
   systems. ([#189](https://github.com/google/metallb/issues/189))
+- BGP connections can now specify a password for TCP MD5 secured BGP
+  sessions. ([#215](https://github.com/google/metallb/issues/215))
 - MetalLB is now available as a Helm package in the "stable" Helm
   repository. Note that, due to code review delay, it may take a few
   days after a release before the Helm package is
@@ -40,9 +42,9 @@ Bugfixes:
 - Correctly use AS_SEQUENCE in eBGP session messages, rather than
   AS_SET ([#225](https://github.com/google/metallb/issues/225))
 
-This release includes contributions from David Anderson, Serguei
-Bezverkhi, Zsombor Welker. Thanks to all of them for making MetalLB
-better!
+This release includes contributions from David Anderson, ghorofamike,
+Serguei Bezverkhi, Zsombor Welker. Thanks to all of them for making
+MetalLB better!
 
 -->
 
