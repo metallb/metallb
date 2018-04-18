@@ -10,7 +10,6 @@ import (
 	"net"
 	"os"
 	"reflect"
-	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -172,10 +171,7 @@ func (s *Session) connect() error {
 		},
 		AuthPassword: s.password,
 	}
-	tcphost, portstr, err := net.SplitHostPort(s.addr)
-	port, err := strconv.Atoi(portstr)
-	conn, err = d.DialTCP(tcphost, port, timeout)
-
+	conn, err := d.DialTCP(s.addr, timeout)
 	if err != nil {
 		return fmt.Errorf("dial %q: %s", s.addr, err)
 	}
@@ -466,23 +462,6 @@ type tcpmd5sig struct {
 	key      [80]byte
 }
 
-func buildTCPMD5Sig(address string, key string) (tcpmd5sig, error) {
-	t := tcpmd5sig{}
-	addr := net.ParseIP(address)
-	if addr.To4() != nil {
-		t.ssFamily = syscall.AF_INET
-		copy(t.ss[2:], addr.To4())
-	} else {
-		t.ssFamily = syscall.AF_INET6
-		copy(t.ss[6:], addr.To16())
-	}
-
-	t.keylen = uint16(len(key))
-	copy(t.key[0:], []byte(key))
-
-	return t, nil
-}
-
 type tcpDialer struct {
 	net.Dialer
 
@@ -494,16 +473,14 @@ type tcpDialer struct {
 // proper TCP MD5 options when the password is not empty. Works by manupulating
 // the low level FD's, skipping the net.Conn API as it has not hooks to set
 // the neccessary sockopts for TCP MD5.
-func (d *tcpDialer) DialTCP(tcphost string, port int, timeout int) (net.Conn, error) {
+func (d *tcpDialer) DialTCP(addr string, timeout int) (net.Conn, error) {
 
 	laddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort("0.0.0.0", "0"))
-
 	if err != nil {
 		return nil, fmt.Errorf("Error resolving local address: %s ", err)
 	}
 
-	raddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort(tcphost, fmt.Sprintf("%d", port)))
-
+	raddr, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid remote address: %s ", err)
 	}
@@ -512,7 +489,7 @@ func (d *tcpDialer) DialTCP(tcphost string, port int, timeout int) (net.Conn, er
 	var ra, la syscall.Sockaddr
 	if raddr.IP.To4() != nil {
 		family = syscall.AF_INET
-		rsockaddr := &syscall.SockaddrInet4{Port: port}
+		rsockaddr := &syscall.SockaddrInet4{Port: raddr.Port}
 		copy(rsockaddr.Addr[:], raddr.IP.To4())
 		ra = rsockaddr
 		lsockaddr := &syscall.SockaddrInet4{}
@@ -520,7 +497,7 @@ func (d *tcpDialer) DialTCP(tcphost string, port int, timeout int) (net.Conn, er
 		la = lsockaddr
 	} else {
 		family = syscall.AF_INET6
-		rsockaddr := &syscall.SockaddrInet6{Port: port}
+		rsockaddr := &syscall.SockaddrInet6{Port: raddr.Port}
 		copy(rsockaddr.Addr[:], raddr.IP.To16())
 		ra = rsockaddr
 		var zone uint32
@@ -555,7 +532,7 @@ func (d *tcpDialer) DialTCP(tcphost string, port int, timeout int) (net.Conn, er
 	defer fi.Close()
 
 	if d.AuthPassword != "" {
-		if err = setsockoptTCPMD5Sig(fd, tcphost, d.AuthPassword); err != nil {
+		if err = setsockoptTCPMD5Sig(fd, raddr.IP, d.AuthPassword); err != nil {
 			return nil, err
 		}
 	}
@@ -621,11 +598,27 @@ func (d *tcpDialer) DialTCP(tcphost string, port int, timeout int) (net.Conn, er
 }
 
 // Better way may be available in  Go 1.11, see go-review.googlesource.com/c/go/+/72810
-func setsockoptTCPMD5Sig(fd int, address string, key string) error {
-	t, err := buildTCPMD5Sig(address, key)
+func setsockoptTCPMD5Sig(fd int, addr net.IP, key string) error {
+	t, err := buildTCPMD5Sig(addr, key)
 	if err != nil {
 		return err
 	}
 	b := *(*[unsafe.Sizeof(t)]byte)(unsafe.Pointer(&t))
 	return os.NewSyscallError("setsockopt", syscall.SetsockoptString(fd, syscall.IPPROTO_TCP, tcpMD5SIG, string(b[:])))
+}
+
+func buildTCPMD5Sig(addr net.IP, key string) (tcpmd5sig, error) {
+	t := tcpmd5sig{}
+	if addr.To4() != nil {
+		t.ssFamily = syscall.AF_INET
+		copy(t.ss[2:], addr.To4())
+	} else {
+		t.ssFamily = syscall.AF_INET6
+		copy(t.ss[6:], addr.To16())
+	}
+
+	t.keylen = uint16(len(key))
+	copy(t.key[0:], []byte(key))
+
+	return t, nil
 }
