@@ -451,8 +451,6 @@ func (a *Advertisement) Equal(b *Advertisement) bool {
 const (
 	//tcpMD5SIG TCP MD5 Signature (RFC2385)
 	tcpMD5SIG = 14
-	//ipv6MINHOPCOUNT Generalized TTL Security Mechanism (RFC5082)
-	ipv6MINHOPCOUNT = 73
 )
 
 // This  struct is defined at; linux-kernel: include/uapi/linux/tcp.h,
@@ -563,12 +561,6 @@ func (d *TCPDialer) DialTCP(tcphost string, port int, timeout int) (net.Conn, er
 		}
 	}
 
-	if timeout != 0 {
-		if err = setsockoptIPTTL(fd, family, timeout); err != nil {
-			return nil, err
-		}
-	}
-
 	if err = syscall.Bind(fd, la); err != nil {
 		return nil, os.NewSyscallError("bind", err)
 	}
@@ -637,14 +629,4 @@ func setsockoptTCPMD5Sig(fd int, address string, key string) error {
 	}
 	b := *(*[unsafe.Sizeof(t)]byte)(unsafe.Pointer(&t))
 	return os.NewSyscallError("setsockopt", syscall.SetsockoptString(fd, syscall.IPPROTO_TCP, tcpMD5SIG, string(b[:])))
-}
-
-func setsockoptIPTTL(fd int, family int, value int) error {
-	level := syscall.IPPROTO_IP
-	name := syscall.IP_TTL
-	if family == syscall.AF_INET6 {
-		level = syscall.IPPROTO_IPV6
-		name = syscall.IPV6_UNICAST_HOPS
-	}
-	return os.NewSyscallError("setsockopt", syscall.SetsockoptInt(fd, level, name, value))
 }
