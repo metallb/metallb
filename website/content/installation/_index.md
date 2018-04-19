@@ -43,6 +43,10 @@ you
 Due to code review turnaround time, it usually takes a few days after
 each MetalLB release before the Helm chart is updated in the stable
 repository.
+
+Currently, the Helm chart is **not** up to date with the latest
+release of MetalLB. If you need to use the latest release, please use
+an alternate installation method.
 {{% /notice %}}
 
 MetalLB maintains a Helm package in the `stable` package
