@@ -3,7 +3,7 @@ title: Release Notes
 weight: 7
 ---
 
-<!--## Version 0.6.0
+## Version 0.6.0
 
 [Documentation for this release](https://metallb.universe.tf)
 
@@ -43,14 +43,12 @@ Bugfixes:
   AS_SET ([#225](https://github.com/google/metallb/issues/225))
 
 This release includes contributions from David Anderson, ghorofamike,
-Serguei Bezverkhi, Zsombor Welker. Thanks to all of them for making
+Serguei Bezverkhi, and Zsombor Welker. Thanks to all of them for making
 MetalLB better!
-
--->
 
 ## Version 0.5.0
 
-[Documentation for this release](https://metallb.universe.tf)
+[Documentation for this release](https://v0-5-0--metallb.netlify.com)
 
 Action required if upgrading from 0.4.x:
 
