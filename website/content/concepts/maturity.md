@@ -45,3 +45,26 @@ confusing in parts.
 If you find shortcomings in the documentation, please file bugs! Your
 perspective is very valuable, and we want to hear about what works and
 what doesn't.
+
+## Developers
+
+While MetalLB's copyright is owned by Google, this is _not_ an
+official Google project. The project have any other form of corporate
+sponsorship, other than GCP credits generously provided by Google to
+run test infrastructure.
+
+The majority of code changes, as well as the overall direction of the
+project, is a personal endeavor of [one person](https://www.dave.tf),
+working on MetalLB in their spare time.
+
+This means that, currently, support and new feature development is
+mostly at the mercy of one person's availability and resources. You
+should set your expectations appropriately.
+
+If you would like to help improve this
+balance,
+[contributions]({{% relref "community/_index.md" %}}#contributing) are
+very welcome! In addition to code contributions, donation of resources
+(hardware, cloud environments...) are also very welcome: the more
+different conditions we can test MetalLB in, the fewer bugs and
+regressions will be introduced!
