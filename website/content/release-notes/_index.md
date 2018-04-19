@@ -33,7 +33,7 @@ New features:
 - BGP connections can now specify a password for TCP MD5 secured BGP
   sessions. ([#215](https://github.com/google/metallb/issues/215))
 - MetalLB is now available as a Helm package in the "stable" Helm
-  repository. Note that, due to code review delay, it may take a few
+  repository. Note that, due to code review delay, it may take several
   days after a release before the Helm package is
   updated. ([#177](https://github.com/google/metallb/issues/177))
 
