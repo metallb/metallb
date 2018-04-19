@@ -251,6 +251,9 @@ func parsePeer(p peer) (*Peer, error) {
 	if ip == nil {
 		return nil, fmt.Errorf("invalid peer IP %q", p.Addr)
 	}
+	if strings.ContainsAny(p.Addr, ":") == true {
+		ip = fmt.Sprintf("[%#s]", p.Addr)
+	}
 	holdTime, err := parseHoldTime(p.HoldTime)
 	if err != nil {
 		return nil, err
