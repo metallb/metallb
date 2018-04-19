@@ -25,6 +25,10 @@ In that sense, layer 2 does not implement a load-balancer. Rather, it
 implements a failover mechanism so that a different node can take over
 should the current leader node fail for some reason.
 
+If the leader node fails for some reason, failover is automatic: the
+old leader's lease times out after 10 seconds, at which point another
+node becomes the leader and takes over ownership of all addresses.
+
 ## Limitations
 
 Layer 2 mode has two main limitations you should be aware of:
