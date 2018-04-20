@@ -3,9 +3,35 @@ title: Release Notes
 weight: 7
 ---
 
-## Version 0.6.0
+<!--## Version 0.7.0
 
 [Documentation for this release](https://metallb.universe.tf)
+
+Action required if updating from 0.6.x:
+
+New features:
+
+Bugfixes:
+
+- Speaker no longer goes into a tight CPU-burning loop when pods are
+  deleted on the
+  node. ([#246](https://github.com/google/metallb/issues/246))
+
+-->
+
+## Version 0.6.1
+
+[Documentation for this release](https://metallb.universe.tf)
+
+Bugfixes:
+
+- Speaker no longer goes into a tight CPU-burning loop when pods are
+  deleted on the
+  node. ([#246](https://github.com/google/metallb/issues/246))
+
+## Version 0.6.0
+
+[Documentation for this release](https://v0-6-0--metallb.netlify.com)
 
 Action required if upgrading from 0.5.x:
 
