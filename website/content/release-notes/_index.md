@@ -3,9 +3,35 @@ title: Release Notes
 weight: 7
 ---
 
-## Version 0.6.0
+<!--## Version 0.7.0
 
 [Documentation for this release](https://metallb.universe.tf)
+
+Action required if updating from 0.6.x:
+
+New features:
+
+Bugfixes:
+
+- Speaker no longer goes into a tight CPU-burning loop when pods are
+  deleted on the
+  node. ([#246](https://github.com/google/metallb/issues/246))
+
+-->
+
+## Version 0.6.1
+
+[Documentation for this release](https://metallb.universe.tf)
+
+Bugfixes:
+
+- Speaker no longer goes into a tight CPU-burning loop when pods are
+  deleted on the
+  node. ([#246](https://github.com/google/metallb/issues/246))
+
+## Version 0.6.0
+
+[Documentation for this release](https://v0-6-0--metallb.netlify.com)
 
 Action required if upgrading from 0.5.x:
 
@@ -183,7 +209,7 @@ New features:
   topologies.
 - MetalLB now has
   a
-  [Helm chart](https://github.com/google/metallb/tree/v0.6.0/helm/metallb). If
+  [Helm chart](https://github.com/google/metallb/tree/v0.6.1/helm/metallb). If
   you use [Helm](https://helm.sh) on your cluster, this should make it
   easier to track and manage your MetalLB installation. The chart will
   be submitted for inclusion in the main Helm stable repository
@@ -241,7 +267,7 @@ Action required if upgrading from 0.2.x:
   ds/bgp-speaker`. This will take down your load-balancers until you
   deploy the new DaemonSet.
 - The
-  [configuration file format](https://raw.githubusercontent.com/google/metallb/v0.6.0/manifests/example-config.yaml) has
+  [configuration file format](https://raw.githubusercontent.com/google/metallb/v0.6.1/manifests/example-config.yaml) has
   changed in a few backwards-incompatible ways. You need to update
   your ConfigMap by hand:
   - Each `address-pool` must now have a `protocol` field, to select
