@@ -2,6 +2,7 @@ package layer2
 
 import (
 	"fmt"
+	"io"
 	"net"
 
 	"github.com/go-kit/kit/log"
@@ -13,6 +14,7 @@ type ndpResponder struct {
 	intf         string
 	hardwareAddr net.HardwareAddr
 	conn         *ndp.Conn
+	closed       chan struct{}
 	announce     announceFunc
 	// Refcount of how many watchers for each solicited node
 	// multicast group.
@@ -31,6 +33,7 @@ func newNDPResponder(logger log.Logger, ifi *net.Interface, ann announceFunc) (*
 		intf:                ifi.Name,
 		hardwareAddr:        ifi.HardwareAddr,
 		conn:                conn,
+		closed:              make(chan struct{}),
 		announce:            ann,
 		solicitedNodeGroups: map[string]int64{},
 	}
@@ -41,6 +44,7 @@ func newNDPResponder(logger log.Logger, ifi *net.Interface, ann announceFunc) (*
 func (n *ndpResponder) Interface() string { return n.intf }
 
 func (n *ndpResponder) Close() error {
+	close(n.closed)
 	return n.conn.Close()
 }
 
@@ -92,6 +96,14 @@ func (n *ndpResponder) run() {
 func (n *ndpResponder) processRequest() dropReason {
 	msg, _, src, err := n.conn.ReadFrom()
 	if err != nil {
+		select {
+		case <-n.closed:
+			return dropReasonClosed
+		default:
+		}
+		if err == io.EOF {
+			return dropReasonClosed
+		}
 		return dropReasonError
 	}
 
