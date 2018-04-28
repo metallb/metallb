@@ -75,6 +75,13 @@ func (s *Session) sendUpdates() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if s.closed {
+		return false
+	}
+	if s.conn == nil {
+		return true
+	}
+
 	asn := s.asn
 	if s.peerASN == s.asn {
 		asn = 0
