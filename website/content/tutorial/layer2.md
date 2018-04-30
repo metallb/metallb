@@ -26,8 +26,7 @@ using `192.168.1.0/24`. The main router is configured to hand out DHCP
 address in the `192.168.1.100—192.168.1.150` range.
 
 We need to allocate another chunk of this IP space for MetalLB
-services. We'll use `192.168.1.240/28` (192.168.1.240 to
-192.168.1.255) for this.
+services. We'll use `192.168.1.240-192.168.1.250` for this.
 
 If your cluster is not using the same addresses, you'll need to
 substitute the appropriate address ranges in the rest of this
@@ -87,7 +86,7 @@ data:
     - name: my-ip-space
       protocol: layer2
       addresses:
-      - 192.168.1.240/28
+      - 192.168.1.240-192.168.1.250
 ```
 
 {{% notice "note" %}}
@@ -101,7 +100,7 @@ information: what IP addresses it's allowed to hand out and which
 protocol to do that with.
 
 In this configuration we tell MetalLB to hand out address from the
-`192.168.1.240/28` range, using layer 2 mode (`protocol:
+`192.168.1.240-192.168.1.250` range, using layer 2 mode (`protocol:
 layer2`). Apply this configuration:
 
 `kubectl apply -f https://raw.githubusercontent.com/google/metallb/master/manifests/example-layer2-config.yaml`
