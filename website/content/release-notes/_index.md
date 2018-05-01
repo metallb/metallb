@@ -19,9 +19,17 @@ Bugfixes:
 
 -->
 
-## Version 0.6.1
+## Version 0.6.2
 
 [Documentation for this release](https://metallb.universe.tf)
+
+Bugfixes:
+
+- Fix nil pointer deref crash on BGP peers that reject MetalLB's OPEN message too promptly ([#250](https://github.com/google/metallb/issues/250))
+
+## Version 0.6.1
+
+[Documentation for this release](https://v0-6-1--metallb.netlify.com)
 
 Bugfixes:
 
