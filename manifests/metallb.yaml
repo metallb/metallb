@@ -173,7 +173,7 @@ spec:
       hostNetwork: true
       containers:
       - name: speaker
-        image: metallb/speaker:v0.6.1
+        image: metallb/speaker:v0.6.2
         imagePullPolicy: IfNotPresent
         args:
         - --port=7472
@@ -230,7 +230,7 @@ spec:
         runAsUser: 65534 # nobody
       containers:
       - name: controller
-        image: metallb/controller:v0.6.1
+        image: metallb/controller:v0.6.2
         imagePullPolicy: IfNotPresent
         args:
         - --port=7472
