@@ -411,13 +411,13 @@ func (c *Client) sync(key interface{}) bool {
 		cm := cmi.(*v1.ConfigMap)
 		cfg, err := config.Parse([]byte(cm.Data["config"]))
 		if err != nil {
-			l.Log("event", "configStale", "msg", "config (re)load failed, config marked stale")
+			l.Log("event", "configStale", "error", err, "msg", "config (re)load failed, config marked stale")
 			configStale.Set(1)
 			return true
 		}
 
 		if !c.configChanged(l, cfg) {
-			l.Log("event", "configStale", "msg", "config (re)load failed, config marked stale")
+			l.Log("event", "configStale", "error", err, "msg", "config (re)load failed, config marked stale")
 			configStale.Set(1)
 			return true
 		}
