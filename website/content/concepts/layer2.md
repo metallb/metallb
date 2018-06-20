@@ -68,3 +68,24 @@ than about 10s),
 please [file a bug](https://github.com/google/metallb/issues/new)! We
 can help you investigate and determine if the issue is with the
 client, or a bug in MetalLB.
+
+## Note: Architectural comparison with other similar solutions 
+
+It may seem that metallb in layer 2 mode is very similar to projects such as 
+KeepAliveD that use layer 2 networking protocols such as Virtual Router Redundancy Protocol (VRRP).
+ Although the high level functionality is similar, the details are quite different. 
+
+Metallb does not rely 
+on VRRP packets on the wire between the nodes implementing the load balancing/ failover. 
+Arbitration and selection of the active node happens completely in the metallb control plane 
+without need for sending/ receiving special layer 2 packets such as VRRP.  As 
+a consequence, the limit of 255 load balanced/ service IPs per network (which exists with VRRP, 
+KeepAliveD and similar approaches) does not apply in case of metallb. There is also no need 
+for additional configuration objects such as Virtual Router IDs as needed by VRRP.
+
+However as mentioned above, the current implementation of metallb (at least as of release v0.6.2) does not support 
+a mechanism for spreading the location of the service IPs to different nodes in a way that different service IPs 
+are active/ primary on different nodes.  Hence (unlike VRRP based approaches) there is no current ability 
+to distribute network traffic for multiple service IPs to different nodes. This limitation may be 
+addressed in a future release of metallb. 
+ 
