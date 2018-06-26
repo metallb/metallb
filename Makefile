@@ -53,15 +53,18 @@ all:
 MANIFESTFILE=manifests/metallb.yaml
 .PHONY: manifest
 manifest:
-	cat manifests/namespace.yaml >$(MANIFESTFILE)
-	cd helm-chart && helm template --namespace metallb-system --set controller.resources.limits.cpu=100m,controller.resources.limits.memory=100Mi,speaker.resources.limits.cpu=100m,speaker.resources.limits.memory=100Mi,prometheus.scrapeAnnotations=true,existingConfigMap=config . >>../$(MANIFESTFILE)
-	sed -i '/heritage: /d' $(MANIFESTFILE)
-	sed -i '/release: /d' $(MANIFESTFILE)
-	sed -i '/chart: /d' $(MANIFESTFILE)
-	sed -i '/^# /d' $(MANIFESTFILE)
-	sed -i 's/RELEASE-NAME-metallb-//g' $(MANIFESTFILE)
-	sed -i 's/RELEASE-NAME-metallb:/metallb-system:/g' $(MANIFESTFILE)
-	perl -p0i -e 's/metadata:\n  name: (?!metallb-system)/metadata:\n  namespace: metallb-system\n  name: /gs' $(MANIFESTFILE)
+	( set -eo pipefail && cat manifests/namespace.yaml && \
+		cd helm-chart && helm template --namespace metallb-system \
+				--set controller.resources.limits.cpu=100m \
+			    --set controller.resources.limits.memory=100Mi \
+			    --set speaker.resources.limits.cpu=100m \
+			    --set speaker.resources.limits.memory=100Mi \
+			    --set prometheus.scrapeAnnotations=true \
+			    --set existingConfigMap=config \
+			    --set manifest=true . \
+			| sed '/^# /d; \
+				s/RELEASE-NAME-metallb-//; \
+				s/RELEASE-NAME-metallb:/metallb-system:/' ) > $(MANIFESTFILE)
 
 .PHONY: build
 build:

@@ -1,11 +1,14 @@
 apiVersion: apps/v1beta2
 kind: DaemonSet
 metadata:
+  namespace: {{ .Release.Namespace }}
   name: {{ template "metallb.fullname" . }}-speaker
   labels:
+    {{- if not .Values.manifest }}
     heritage: {{ .Release.Service | quote }}
     release: {{ .Release.Name | quote }}
     chart: {{ template "metallb.chart" . }}
+    {{- end }}
     app: {{ template "metallb.name" . }}
     component: speaker
 spec:
@@ -13,13 +16,17 @@ spec:
     matchLabels:
       app: {{ template "metallb.name" . }}
       component: speaker
+      {{- if not .Values.manifest }}
       release: {{ .Release.Name | quote }}
+      {{- end }}
   template:
     metadata:
       labels:
+        {{- if not .Values.manifest }}
         heritage: {{ .Release.Service | quote }}
         release: {{ .Release.Name | quote }}
         chart: {{ template "metallb.chart" . }}
+        {{- end }}
         app: {{ template "metallb.name" . }}
         component: speaker
 {{- if .Values.prometheus.scrapeAnnotations }}

@@ -6,9 +6,11 @@ kind: ClusterRole
 metadata:
   name: {{ template "metallb.fullname" . }}:controller
   labels:
+    {{- if not .Values.manifest }}
     heritage: {{ .Release.Service | quote }}
     release: {{ .Release.Name | quote }}
     chart: {{ template "metallb.chart" . }}
+    {{- end }}
     app: {{ template "metallb.name" . }}
 rules:
 - apiGroups: [""]
@@ -26,9 +28,11 @@ kind: ClusterRole
 metadata:
   name: {{ template "metallb.fullname" . }}:speaker
   labels:
+    {{- if not .Values.manifest }}
     heritage: {{ .Release.Service | quote }}
     release: {{ .Release.Name | quote }}
     chart: {{ template "metallb.chart" . }}
+    {{- end }}
     app: {{ template "metallb.name" . }}
 rules:
 - apiGroups: [""]
@@ -38,11 +42,14 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  namespace: {{ .Release.Namespace }}
   name: {{ template "metallb.fullname" . }}-leader-election
   labels:
+    {{- if not .Values.manifest }}
     heritage: {{ .Release.Service | quote }}
     release: {{ .Release.Name | quote }}
     chart: {{ template "metallb.chart" . }}
+    {{- end }}
     app: {{ template "metallb.name" . }}
 rules:
 - apiGroups: [""]
@@ -56,11 +63,14 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
+  namespace: {{ .Release.Namespace }}
   name: {{ template "metallb.fullname" . }}-config-watcher
   labels:
+    {{- if not .Values.manifest }}
     heritage: {{ .Release.Service | quote }}
     release: {{ .Release.Name | quote }}
     chart: {{ template "metallb.chart" . }}
+    {{- end }}
     app: {{ template "metallb.name" . }}
 rules:
 - apiGroups: [""]
@@ -77,9 +87,11 @@ kind: ClusterRoleBinding
 metadata:
   name: {{ template "metallb.fullname" . }}:controller
   labels:
+    {{- if not .Values.manifest }}
     heritage: {{ .Release.Service | quote }}
     release: {{ .Release.Name | quote }}
     chart: {{ template "metallb.chart" . }}
+    {{- end }}
     app: {{ template "metallb.name" . }}
 subjects:
 - kind: ServiceAccount
@@ -95,9 +107,11 @@ kind: ClusterRoleBinding
 metadata:
   name: {{ template "metallb.fullname" . }}:speaker
   labels:
+    {{- if not .Values.manifest }}
     heritage: {{ .Release.Service | quote }}
     release: {{ .Release.Name | quote }}
     chart: {{ template "metallb.chart" . }}
+    {{- end }}
     app: {{ template "metallb.name" . }}
 subjects:
 - kind: ServiceAccount
@@ -111,11 +125,14 @@ roleRef:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  namespace: {{ .Release.Namespace }}
   name: {{ template "metallb.fullname" . }}-config-watcher
   labels:
+    {{- if not .Values.manifest }}
     heritage: {{ .Release.Service | quote }}
     release: {{ .Release.Name | quote }}
     chart: {{ template "metallb.chart" . }}
+    {{- end }}
     app: {{ template "metallb.name" . }}
 subjects:
 - kind: ServiceAccount
@@ -130,11 +147,14 @@ roleRef:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
+  namespace: {{ .Release.Namespace }}
   name: {{ template "metallb.fullname" . }}-leader-election
   labels:
+    {{- if not .Values.manifest }}
     heritage: {{ .Release.Service | quote }}
     release: {{ .Release.Name | quote }}
     chart: {{ template "metallb.chart" . }}
+    {{- end }}
     app: {{ template "metallb.name" . }}
 subjects:
 - kind: ServiceAccount
