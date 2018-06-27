@@ -279,7 +279,7 @@ func readCapabilities(r io.Reader, ret *openResult) error {
 	}
 }
 
-func sendUpdate(w io.Writer, asn uint32, defaultNextHop net.IP, adv *Advertisement) error {
+func sendUpdate(w io.Writer, asn uint32, ibgp bool, defaultNextHop net.IP, adv *Advertisement) error {
 	var b bytes.Buffer
 
 	hdr := struct {
@@ -297,7 +297,7 @@ func sendUpdate(w io.Writer, asn uint32, defaultNextHop net.IP, adv *Advertiseme
 		return err
 	}
 	l := b.Len()
-	if err := encodePathAttrs(&b, asn, defaultNextHop, adv); err != nil {
+	if err := encodePathAttrs(&b, asn, ibgp, defaultNextHop, adv); err != nil {
 		return err
 	}
 	binary.BigEndian.PutUint16(b.Bytes()[21:23], uint16(b.Len()-l))
@@ -325,7 +325,7 @@ func bytesForBits(n int) int {
 	return ((n + 7) &^ 7) / 8
 }
 
-func encodePathAttrs(b *bytes.Buffer, asn uint32, defaultNextHop net.IP, adv *Advertisement) error {
+func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp bool, defaultNextHop net.IP, adv *Advertisement) error {
 	b.Write([]byte{
 		0x40, 1, // mandatory, origin
 		1, // len
@@ -333,7 +333,7 @@ func encodePathAttrs(b *bytes.Buffer, asn uint32, defaultNextHop net.IP, adv *Ad
 
 		0x40, 2, // mandatory, as-path
 	})
-	if asn == 0 {
+	if ibgp {
 		b.WriteByte(0) // empty AS path
 	} else {
 		b.Write([]byte{
@@ -354,12 +354,14 @@ func encodePathAttrs(b *bytes.Buffer, asn uint32, defaultNextHop net.IP, adv *Ad
 	} else {
 		b.Write(defaultNextHop)
 	}
-	b.Write([]byte{
-		0x40, 5, // well-known, localpref
-		4, // len
-	})
-	if err := binary.Write(b, binary.BigEndian, adv.LocalPref); err != nil {
-		return err
+	if ibgp {
+		b.Write([]byte{
+			0x40, 5, // well-known, localpref
+			4, // len
+		})
+		if err := binary.Write(b, binary.BigEndian, adv.LocalPref); err != nil {
+			return err
+		}
 	}
 
 	if len(adv.Communities) > 0 {
