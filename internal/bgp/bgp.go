@@ -82,17 +82,14 @@ func (s *Session) sendUpdates() bool {
 		return true
 	}
 
-	asn := s.asn
-	if s.peerASN == s.asn {
-		asn = 0
-	}
+	ibgp := s.asn == s.peerASN
 
 	if s.new != nil {
 		s.advertised, s.new = s.new, nil
 	}
 
 	for c, adv := range s.advertised {
-		if err := sendUpdate(s.conn, asn, s.defaultNextHop, adv); err != nil {
+		if err := sendUpdate(s.conn, s.asn, ibgp, s.defaultNextHop, adv); err != nil {
 			s.abort()
 			s.logger.Log("op", "sendUpdate", "ip", c, "error", err, "msg", "failed to send BGP update")
 			return true
@@ -125,7 +122,7 @@ func (s *Session) sendUpdates() bool {
 				continue
 			}
 
-			if err := sendUpdate(s.conn, asn, s.defaultNextHop, adv); err != nil {
+			if err := sendUpdate(s.conn, s.asn, ibgp, s.defaultNextHop, adv); err != nil {
 				s.abort()
 				s.logger.Log("op", "sendUpdate", "prefix", c, "error", err, "msg", "failed to send BGP update")
 				return true

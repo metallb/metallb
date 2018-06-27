@@ -13,9 +13,8 @@ New features:
 
 Bugfixes:
 
-- Speaker no longer goes into a tight CPU-burning loop when pods are
-  deleted on the
-  node. ([#246](https://github.com/google/metallb/issues/246))
+- Speaker no longer sends localpref over eBGP sessions
+  ([#266](https://github.com/google/metallb/issues/266))
 
 -->
 
