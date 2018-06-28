@@ -46,9 +46,9 @@ func TestARPResponder(t *testing.T) {
 				if net.IPv4(192, 168, 1, 20).Equal(ip) {
 					return dropReasonNone
 				}
-				return dropReasonNotLeader
+				return dropReasonError
 			},
-			reason: dropReasonNotLeader,
+			reason: dropReasonError,
 		},
 		{
 			name:   "shouldAnnounce allows request",
@@ -57,7 +57,7 @@ func TestARPResponder(t *testing.T) {
 				if net.IPv4(192, 168, 1, 20).Equal(ip) {
 					return dropReasonNone
 				}
-				return dropReasonNotLeader
+				return dropReasonError
 			},
 			reason: dropReasonNone,
 		},

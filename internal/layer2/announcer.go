@@ -13,10 +13,9 @@ type Announce struct {
 	logger log.Logger
 
 	sync.RWMutex
-	arps   map[int]*arpResponder
-	ndps   map[int]*ndpResponder
-	ips    map[string]net.IP // map containing IPs we should announce
-	leader bool
+	arps map[int]*arpResponder
+	ndps map[int]*ndpResponder
+	ips  map[string]net.IP // map containing IPs we should announce
 }
 
 // New returns an initialized Announce.
@@ -139,9 +138,6 @@ func (a *Announce) gratuitous(ip net.IP) error {
 func (a *Announce) shouldAnnounce(ip net.IP) dropReason {
 	a.RLock()
 	defer a.RUnlock()
-	if !a.leader {
-		return dropReasonNotLeader
-	}
 	for _, i := range a.ips {
 		if i.Equal(ip) {
 			return dropReasonNone
@@ -211,5 +207,4 @@ const (
 	dropReasonNoSourceLL
 	dropReasonEthernetDestination
 	dropReasonAnnounceIP
-	dropReasonNotLeader
 )

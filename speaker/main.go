@@ -93,7 +93,6 @@ func main() {
 		ServiceChanged: ctrl.SetBalancer,
 		ConfigChanged:  ctrl.SetConfig,
 		NodeChanged:    ctrl.SetNode,
-		LeaderChanged:  ctrl.SetLeader,
 	})
 	if err != nil {
 		logger.Log("op", "startup", "error", err, "msg", "failed to create k8s client")
@@ -305,12 +304,6 @@ func (c *controller) SetConfig(l log.Logger, cfg *config.Config) bool {
 	return true
 }
 
-func (c *controller) SetLeader(l log.Logger, isLeader bool) {
-	for _, handler := range c.protocols {
-		handler.SetLeader(l, isLeader)
-	}
-}
-
 func (c *controller) SetNode(l log.Logger, node *v1.Node) bool {
 	for proto, handler := range c.protocols {
 		if err := handler.SetNode(l, node); err != nil {
@@ -326,6 +319,5 @@ type Protocol interface {
 	SetConfig(log.Logger, *config.Config) error
 	SetBalancer(log.Logger, string, net.IP, *config.Pool) error
 	DeleteBalancer(log.Logger, string, string) error
-	SetLeader(log.Logger, bool)
 	SetNode(log.Logger, *v1.Node) error
 }

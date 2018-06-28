@@ -44,10 +44,6 @@ func (c *layer2Controller) DeleteBalancer(l log.Logger, name, reason string) err
 	return nil
 }
 
-func (c *layer2Controller) SetLeader(l log.Logger, isLeader bool) {
-	c.announcer.SetLeader(isLeader)
-}
-
 func (c *layer2Controller) SetNode(log.Logger, *v1.Node) error {
 	return nil
 }

@@ -30,13 +30,6 @@ var (
 		Name:      "config_stale_bool",
 		Help:      "1 if running on a stale configuration, because the latest config failed to load.",
 	})
-
-	leader = prometheus.NewGauge(prometheus.GaugeOpts{
-		Namespace: "metallb",
-		Subsystem: "k8s_client",
-		Name:      "leadership_bool",
-		Help:      "1 if leader, 0 if not, -1 if never been a leader.",
-	})
 )
 
 func init() {
@@ -44,5 +37,4 @@ func init() {
 	prometheus.MustRegister(updateErrors)
 	prometheus.MustRegister(configLoaded)
 	prometheus.MustRegister(configStale)
-	prometheus.MustRegister(leader)
 }
