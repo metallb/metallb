@@ -9,6 +9,15 @@ weight: 7
 
 Action required if updating from 0.6.x:
 
+- MetalLB no longer does leader election, so you can delete a number
+  of k8s resources associated with that. This is just a cleanup,
+  nothing bad happens if you leave the resources orphaned in your
+  cluster. Depending on your installation method, some of these may
+  have already been cleaned up for you.
+  - `kubectl delete -nmetallb-system endpoints metallb-speaker`
+  - `kubectl delete -nmetallb-system role leader-election`
+  - `kubectl delete -nmetallb-system rolebinding leader-election`
+
 New features:
 
 Bugfixes:
