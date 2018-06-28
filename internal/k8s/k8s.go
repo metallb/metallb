@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"time"
 
 	"go.universe.tf/metallb/internal/config"
 
@@ -18,8 +17,6 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/leaderelection"
-	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -41,14 +38,12 @@ type Client struct {
 	cmInformer   cache.Controller
 	nodeIndexer  cache.Indexer
 	nodeInformer cache.Controller
-	elector      *leaderelection.LeaderElector
 
 	syncFuncs []cache.InformerSynced
 
 	serviceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) bool
 	configChanged  func(log.Logger, *config.Config) bool
 	nodeChanged    func(log.Logger, *v1.Node) bool
-	leaderChanged  func(log.Logger, bool)
 	synced         func(log.Logger)
 }
 
@@ -65,14 +60,12 @@ type Config struct {
 	ServiceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) bool
 	ConfigChanged  func(log.Logger, *config.Config) bool
 	NodeChanged    func(log.Logger, *v1.Node) bool
-	LeaderChanged  func(log.Logger, bool)
 	Synced         func(log.Logger)
 }
 
 type svcKey string
 type cmKey string
 type nodeKey string
-type electionKey bool
 type synced string
 
 // New connects to masterAddr, using kubeconfig to authenticate.
@@ -219,44 +212,6 @@ func New(cfg *Config) (*Client, error) {
 		c.syncFuncs = append(c.syncFuncs, c.nodeInformer.HasSynced)
 	}
 
-	if cfg.LeaderChanged != nil {
-		conf := resourcelock.ResourceLockConfig{Identity: cfg.NodeName, EventRecorder: c.events}
-		lock, err := resourcelock.New(resourcelock.EndpointsResourceLock, namespace, "metallb-speaker", c.client.CoreV1(), conf)
-		if err != nil {
-			return nil, fmt.Errorf("creating resource lock for leader election: %s", err)
-		}
-
-		leader.Set(-1)
-
-		lec := leaderelection.LeaderElectionConfig{
-			Lock: lock,
-			// Time before the lock expires and other replicas can try to
-			// become leader.
-			LeaseDuration: 10 * time.Second,
-			// How long we should keep trying to hold the lock before
-			// giving up and deciding we've lost it.
-			RenewDeadline: 9 * time.Second,
-			// Time to wait between refreshing the lock when we are
-			// leader.
-			RetryPeriod: 5 * time.Second,
-			Callbacks: leaderelection.LeaderCallbacks{
-				OnStartedLeading: func(stop <-chan struct{}) {
-					c.queue.Add(electionKey(true))
-				},
-				OnStoppedLeading: func() {
-					c.queue.Add(electionKey(false))
-				},
-			},
-		}
-
-		elector, err := leaderelection.NewLeaderElector(lec)
-		if err != nil {
-			return nil, fmt.Errorf("creating leader elector: %s", err)
-		}
-		c.elector = elector
-		c.leaderChanged = cfg.LeaderChanged
-	}
-
 	if cfg.Synced != nil {
 		c.synced = cfg.Synced
 	}
@@ -283,14 +238,6 @@ func (c *Client) Run() error {
 	}
 	if c.nodeInformer != nil {
 		go c.nodeInformer.Run(nil)
-	}
-	if c.elector != nil {
-		go func() {
-			for {
-				c.elector.Run()
-				time.Sleep(10 * time.Second)
-			}
-		}()
 	}
 
 	if !cache.WaitForCacheSync(nil, c.syncFuncs...) {
@@ -447,16 +394,6 @@ func (c *Client) sync(key interface{}) bool {
 		}
 		node := n.(*v1.Node)
 		return c.nodeChanged(c.logger, node)
-
-	case electionKey:
-		if k {
-			leader.Set(1)
-			c.leaderChanged(c.logger, true)
-		} else {
-			leader.Set(0)
-			c.leaderChanged(c.logger, false)
-		}
-		return true
 
 	case synced:
 		if c.synced != nil {
