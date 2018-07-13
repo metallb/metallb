@@ -15,7 +15,10 @@
 package main
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"net"
+	"sort"
 
 	"github.com/go-kit/kit/log"
 	"go.universe.tf/metallb/internal/config"
@@ -25,10 +28,67 @@ import (
 
 type layer2Controller struct {
 	announcer *layer2.Announce
+	myNode    string
 }
 
 func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
 	return nil
+}
+
+// usableNodes returns all nodes that have at least one fully ready
+// endpoint on them.
+func usableNodes(eps *v1.Endpoints) []string {
+	usable := map[string]bool{}
+	for _, subset := range eps.Subsets {
+		for _, ep := range subset.Addresses {
+			if ep.NodeName == nil {
+				continue
+			}
+			if _, ok := usable[*ep.NodeName]; !ok {
+				// Only set true if nothing else has expressed an
+				// opinion. This means that false will take precedence
+				// if there's any unready ports for a given endpoint.
+				usable[*ep.NodeName] = true
+			}
+		}
+
+		for _, ep := range subset.NotReadyAddresses {
+			if ep.NodeName == nil {
+				continue
+			}
+			usable[*ep.NodeName] = false
+		}
+	}
+
+	ret := make([]string, 0, len(usable))
+	for node, ok := range usable {
+		if ok {
+			ret = append(ret, node)
+		}
+	}
+
+	return ret
+}
+
+func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
+	nodes := usableNodes(eps)
+	// Sort the slice by the hash of node + service name. This
+	// produces an ordering of ready nodes that is unique to this
+	// service.
+	sort.Slice(nodes, func(i, j int) bool {
+		hi := sha256.Sum256([]byte(nodes[i] + "#" + name))
+		hj := sha256.Sum256([]byte(nodes[j] + "#" + name))
+
+		return bytes.Compare(hi[:], hj[:]) < 0
+	})
+
+	// Are we first in the list? If so, we win and should announce.
+	if len(nodes) > 0 && nodes[0] == c.myNode {
+		return ""
+	}
+
+	// Either not eligible, or lost the election entirely.
+	return "notOwner"
 }
 
 func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
