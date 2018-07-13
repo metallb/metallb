@@ -20,6 +20,14 @@ Action required if updating from 0.6.x:
 
 New features:
 
+- Layer2 mode now supports `externalTrafficPolicy=Local`, meaning layer2
+  services can see the true client source
+  IP. ([#257](https://github.com/google/metallb/issues/257))
+- Layer2 mode now selects leader nodes on a per-service level, instead of using
+  a single leader node for all services in the cluster. If you have many
+  services, this change spreads the load of handling incoming traffic across
+  more than one machine. ([#195](https://github.com/google/metallb/issues/195))
+
 Bugfixes:
 
 - Speaker no longer sends localpref over eBGP sessions
