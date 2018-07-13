@@ -71,7 +71,7 @@ a load-balanced address.
 ## Configure MetalLB
 
 We have a sample MetalLB configuration in
-[`manifests/example-arp-config.yaml`](https://raw.githubusercontent.com/google/metallb/master/manifests/example-layer2-config.yaml).
+[`manifests/example-layer2-config.yaml`](https://raw.githubusercontent.com/google/metallb/master/manifests/example-layer2-config.yaml).
 Let's take a look at it before applying it:
 
 ```yaml
