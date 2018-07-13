@@ -49,13 +49,12 @@ this: ARP, NDP, or BGP.
 
 ### Layer 2 mode (ARP/NDP)
 
-In layer 2 mode, one machine in the cluster takes ownership of the
-service IPs, and uses standard address discovery protocols
-([ARP](https://en.wikipedia.org/wiki/Address_Resolution_Protocol) for
-IPv4, [NDP](https://en.wikipedia.org/wiki/Neighbor_Discovery_Protocol)
-for IPv6) to make those IPs reachable on the local network. From the
-LAN's point of view, the announcing machine simply has multiple IP
-addresses.
+In layer 2 mode, one machine in the cluster takes ownership of the service, and
+uses standard address discovery protocols
+([ARP](https://en.wikipedia.org/wiki/Address_Resolution_Protocol) for IPv4,
+[NDP](https://en.wikipedia.org/wiki/Neighbor_Discovery_Protocol) for IPv6) to
+make those IPs reachable on the local network. From the LAN's point of view, the
+announcing machine simply has multiple IP addresses.
 
 The [layer 2 mode]({{% relref "layer2.md" %}}) sub-page has more
 details on the behavior and limitations of layer 2 mode.
