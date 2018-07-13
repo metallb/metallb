@@ -44,22 +44,40 @@ spec:
 
 ## Traffic policies
 
-MetalLB understands the service's `externalTrafficPolicy` option, and
-implements different announcements modes depending on the policy and
+MetalLB understands and respects the service's `externalTrafficPolicy` option,
+and implements different announcements modes depending on the policy and
 announcement protocol you select.
 
 ### Layer2
 
-When announcing in layer2 mode, MetalLB forces the traffic policy to
-`Cluster`. In this mode, the elected leader node receives all the
-inbound traffic, and `kube-proxy` load-balances from there to
-individual pods.
+When announcing in layer2 mode, one node in your cluster will attract traffic
+for the service IP. From there, the behavior depends on the selected traffic
+policy.
+
+#### "Cluster" traffic policy
+
+With the default `Cluster` traffic policy, `kube-proxy` on the node that
+received the traffic does load-balancing, and distributes the traffic to all the
+pods in your service.
 
 This policy results in uniform traffic distribution across all pods in
 the service. However, `kube-proxy` will obscure the source IP address
 of the connection when it does load-balancing, so your pod logs will
-show that external traffic appears to be coming from the cluster's
+show that external traffic appears to be coming from the service's
 leader node.
+
+#### "Local" traffic policy
+
+With the `Local` traffic policy, `kube-proxy` on the node that received the
+traffic sends it only to the service's pod(s) that are on the _same_ node. There
+is no "horizontal" traffic flow between nodes.
+
+Because `kube-proxy` doesn't need to send traffic between cluster nodes, your
+pods can see the real source IP address of incoming connections.
+
+The downside of this policy is that incoming traffic only goes to some pods in
+the service. Pods that aren't on the current leader node receive no traffic,
+they are just there as replicas in case a failover is needed.
 
 ### BGP
 
@@ -144,8 +162,8 @@ IP address under the following conditions:
 - They both have the same sharing key.
 - They request the use of different ports (e.g. tcp/80 for one and
   tcp/443 for the other).
-- They both use the `Cluster` external traffic policy, or both have
-  the _exact_ same selector.
+- They both use the `Cluster` external traffic policy, or they both point to the
+  _exact_ same set of pods (i.e. the pod selectors are identical).
 
 If these conditions are satisfied, MetalLB _may_ colocate the two
 services on the same IP, but does not have to. If you want to ensure
