@@ -127,6 +127,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 	protocols := map[config.Proto]Protocol{
 		config.BGP: &bgpController{
 			logger: cfg.Logger,
+			myNode: cfg.MyNode,
 			svcAds: make(map[string][]*bgp.Advertisement),
 		},
 	}
@@ -138,12 +139,11 @@ func newController(cfg controllerConfig) (*controller, error) {
 		}
 		protocols[config.Layer2] = &layer2Controller{
 			announcer: a,
+			myNode:    cfg.MyNode,
 		}
 	}
 
 	ret := &controller{
-		myNode: cfg.MyNode,
-
 		protocols: protocols,
 		announced: map[string]config.Proto{},
 		svcIP:     map[string]net.IP{},
@@ -174,12 +174,6 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 		return c.deleteBalancer(l, name, "noIPAllocated")
 	}
 
-	// Should we advertise? Yes, if externalTrafficPolicy is Cluster,
-	// or Local && there's a ready local endpoint.
-	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !k8s.NodeHasHealthyEndpoint(eps, c.myNode) {
-		return c.deleteBalancer(l, name, "noLocalEndpoints")
-	}
-
 	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
 	if lbIP == nil {
 		l.Log("op", "setBalancer", "error", fmt.Sprintf("invalid LoadBalancer IP %q", svc.Status.LoadBalancer.Ingress[0].IP), "msg", "invalid IP allocated by controller")
@@ -194,13 +188,12 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 		return c.deleteBalancer(l, name, "ipNotAllowed")
 	}
 
+	l = log.With(l, "pool", poolName)
 	pool := c.config.Pools[poolName]
 	if pool == nil {
 		l.Log("bug", "true", "msg", "internal error: allocated IP has no matching address pool")
 		return c.deleteBalancer(l, name, "internalError")
 	}
-
-	l = log.With(l, "pool", poolName)
 
 	if proto, ok := c.announced[name]; ok && proto != pool.Protocol {
 		if !c.deleteBalancer(l, name, "protocolChanged") {
@@ -208,12 +201,17 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 		}
 	}
 
+	l = log.With(l, "protocol", pool.Protocol)
 	handler := c.protocols[pool.Protocol]
 	if handler == nil {
-		l.Log("bug", "true", "protocol", pool.Protocol, "msg", "internal error: unknown balancer protocol!")
+		l.Log("bug", "true", "msg", "internal error: unknown balancer protocol!")
 		return c.deleteBalancer(l, name, "internalError")
 	}
-	l = log.With(l, "protocol", pool.Protocol)
+
+	if deleteReason := handler.ShouldAnnounce(l, name, svc, eps); deleteReason != "" {
+		return c.deleteBalancer(l, name, deleteReason)
+	}
+
 	if err := handler.SetBalancer(l, name, lbIP, pool); err != nil {
 		l.Log("op", "setBalancer", "error", err, "msg", "failed to announce service")
 		return false
@@ -317,6 +315,7 @@ func (c *controller) SetNode(l log.Logger, node *v1.Node) bool {
 // A Protocol can advertise an IP address.
 type Protocol interface {
 	SetConfig(log.Logger, *config.Config) error
+	ShouldAnnounce(log.Logger, string, *v1.Service, *v1.Endpoints) string
 	SetBalancer(log.Logger, string, net.IP, *config.Pool) error
 	DeleteBalancer(log.Logger, string, string) error
 	SetNode(log.Logger, *v1.Node) error
