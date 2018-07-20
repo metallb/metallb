@@ -163,7 +163,7 @@ Start by running `make start-minikube`. This will:
 
 - Create the Minikube sandbox in a local VM
 - Enable the registry addon, so that we can host container images in the sandbox
-- Deploy `test-bgp-router`, which sets up BIRD, Quagga and GoBGP routers as a
+- Deploy `test-bgp-router`, which sets up BIRD, Quagga routers as a
   pod inside the cluster
 - Deploy MetalLB, which will install the `controller` and `speaker`
 - Push a MetalLB configuration that connects MetalLB to the `test-bgp-router`
@@ -172,7 +172,7 @@ At this point, your sandbox is running the precompiled version of
 MetalLB, pulled from [Docker Hub](https://hub.docker.com/u/metallb/).
 
 You can inspect the state of the `test-bgp-router` by running
-`minikube service test-bgp-router-ui`, which will open a browser tab
+`minikube service test-bgp-router-ui -n metallb-system`, which will open a browser tab
 that shows you the current BGP connections and routing state, as seen
 by the test routers.
 
