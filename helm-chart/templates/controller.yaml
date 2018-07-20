@@ -1,11 +1,14 @@
 apiVersion: apps/v1beta2
 kind: Deployment
 metadata:
+  namespace: {{ .Release.Namespace }}
   name: {{ template "metallb.fullname" . }}-controller
   labels:
+    {{- if not .Values.manifest }}
     heritage: {{ .Release.Service | quote }}
     release: {{ .Release.Name | quote }}
     chart: {{ template "metallb.chart" . }}
+    {{- end }}
     app: {{ template "metallb.name" . }}
     component: controller
 spec:
@@ -14,13 +17,17 @@ spec:
     matchLabels:
       app: {{ template "metallb.name" . }}
       component: controller
+      {{- if not .Values.manifest }}
       release: {{ .Release.Name | quote }}
+      {{- end }}
   template:
     metadata:
       labels:
+        {{- if not .Values.manifest }}
         heritage: {{ .Release.Service | quote }}
         release: {{ .Release.Name | quote }}
         chart: {{ template "metallb.chart" . }}
+        {{- end }}
         app: {{ template "metallb.name" . }}
         component: controller
 {{- if .Values.prometheus.scrapeAnnotations }}
