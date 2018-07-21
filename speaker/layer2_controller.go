@@ -60,7 +60,7 @@ func usableNodes(eps *v1.Endpoints) []string {
 		}
 	}
 
-	ret := make([]string, 0, len(usable))
+	var ret []string
 	for node, ok := range usable {
 		if ok {
 			ret = append(ret, node)
