@@ -39,7 +39,7 @@ Bugfixes:
 
 ## Version 0.6.2
 
-[Documentation for this release](https://metallb.universe.tf)
+[Documentation for this release](https://v0-6-2--metallb.netlify.com)
 
 Bugfixes:
 
