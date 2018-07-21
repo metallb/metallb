@@ -9,8 +9,8 @@ metal [Kubernetes](https://kubernetes.io) clusters, using standard
 routing protocols.
 
 {{% notice note %}}
-MetalLB is a young project, so you should treat it as an **alpha**
-system. The [project maturity]({{% relref "concepts/maturity.md" %}}) page
+MetalLB is a young project. You should treat it as a **beta** system.
+The [project maturity]({{% relref "concepts/maturity.md" %}}) page
 explains what that implies.
 {{% /notice %}}
 
