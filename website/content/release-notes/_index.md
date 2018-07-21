@@ -3,20 +3,20 @@ title: Release Notes
 weight: 7
 ---
 
-<!--## Version 0.7.0
+## Version 0.7.0
 
 [Documentation for this release](https://metallb.universe.tf)
 
 Action required if updating from 0.6.x:
 
-- MetalLB no longer does leader election, so you can delete a number
-  of k8s resources associated with that. This is just a cleanup,
-  nothing bad happens if you leave the resources orphaned in your
-  cluster. Depending on your installation method, some of these may
-  have already been cleaned up for you.
+- MetalLB no longer does leader election. After upgrading to 0.7, you
+  can delete a number of k8s resources associated with that. This is
+  just a cleanup, nothing bad happens if you leave the resources
+  orphaned in your cluster. Depending on your installation method,
+  some of these may have already been cleaned up for you.
   - `kubectl delete -nmetallb-system endpoints metallb-speaker`
-  - `kubectl delete -nmetallb-system role leader-election`
   - `kubectl delete -nmetallb-system rolebinding leader-election`
+  - `kubectl delete -nmetallb-system role leader-election`
 
 New features:
 
@@ -27,13 +27,15 @@ New features:
   a single leader node for all services in the cluster. If you have many
   services, this change spreads the load of handling incoming traffic across
   more than one machine. ([#195](https://github.com/google/metallb/issues/195))
+- MetalLB's maturity has upgraded from _alpha_ to _beta_! Mostly this
+  just reflects the increased confidence in the code from the larger
+  userbase, and adds some guarantees around graceful upgrades from one
+  version to the next.
 
 Bugfixes:
 
 - Speaker no longer sends localpref over eBGP sessions
   ([#266](https://github.com/google/metallb/issues/266))
-
--->
 
 ## Version 0.6.2
 
