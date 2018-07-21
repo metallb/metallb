@@ -333,16 +333,15 @@ func TestControllerMutation(t *testing.T) {
 			},
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:                  "LoadBalancer",
-					LoadBalancerIP:        "3.4.5.6",
-					ExternalTrafficPolicy: "Cluster",
+					Type:           "LoadBalancer",
+					LoadBalancerIP: "3.4.5.6",
 				},
 				Status: statusAssigned("3.4.5.6"),
 			},
 		},
 
 		{
-			desc: "Layer2 service with the wrong traffic policy",
+			desc: "Layer2 service with local traffic policy",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
 					Type:                  "LoadBalancer",
@@ -354,7 +353,7 @@ func TestControllerMutation(t *testing.T) {
 				Spec: v1.ServiceSpec{
 					Type:                  "LoadBalancer",
 					LoadBalancerIP:        "3.4.5.6",
-					ExternalTrafficPolicy: "Cluster",
+					ExternalTrafficPolicy: "Local",
 				},
 				Status: statusAssigned("3.4.5.6"),
 			},
