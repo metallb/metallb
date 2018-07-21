@@ -6,7 +6,7 @@ weight: 4
 To configure MetalLB, write a config map to `metallb-system/config`
 
 There is an example configmap in
-[`manifests/example-config.yaml`](https://raw.githubusercontent.com/google/metallb/v0.7.0/manifests/example-config.yaml),
+[`manifests/example-config.yaml`](https://raw.githubusercontent.com/google/metallb/v0.7.1/manifests/example-config.yaml),
 annotated with explanatory comments.
 
 The specific configuration depends on the protocol(s) you want to use
