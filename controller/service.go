@@ -22,7 +22,6 @@ import (
 	"k8s.io/api/core/v1"
 
 	"go.universe.tf/metallb/internal/allocator/k8salloc"
-	"go.universe.tf/metallb/internal/config"
 )
 
 func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service) bool {
@@ -103,15 +102,6 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		c.client.Errorf(svc, "InternalError", "allocated an IP that has no pool")
 		c.clearServiceState(key, svc)
 		return true
-	}
-
-	if c.config.Pools[pool].Protocol == config.Layer2 {
-		// When advertising in Layer2 mode, any node in the cluster could
-		// become the leader in charge of advertising the IP. The
-		// local traffic policy makes no sense for such services, so
-		// we force the service to be load-balanced at the cluster
-		// scope.
-		svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
 	}
 
 	// At this point, we have an IP selected somehow, all that remains
