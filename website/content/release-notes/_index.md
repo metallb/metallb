@@ -3,9 +3,18 @@ title: Release Notes
 weight: 7
 ---
 
-## Version 0.7.0
+## Version 0.7.1
 
 [Documentation for this release](https://metallb.universe.tf)
+
+Bugfixes:
+
+- Actually allow layer2 mode to use the Local traffic
+  policy. Oops. ([#279](https://github.com/google/metallb/issues/279))
+
+## Version 0.7.0
+
+[Documentation for this release](https://v0-7-0--metallb.netlify.com)
 
 Action required if updating from 0.6.x:
 
