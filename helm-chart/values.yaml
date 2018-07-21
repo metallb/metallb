@@ -53,8 +53,8 @@ serviceAccounts:
 controller:
   image:
     repository: metallb/controller
-    tag: master
-    pullPolicy: Always
+    tag: v0.7.0
+    pullPolicy: IfNotPresent
   resources: {}
     # limits:
       # cpu: 100m
@@ -68,8 +68,8 @@ controller:
 speaker:
   image:
     repository: metallb/speaker
-    tag: master
-    pullPolicy: Always
+    tag: v0.7.0
+    pullPolicy: IfNotPresent
   resources: {}
     # limits:
       # cpu: 100m
