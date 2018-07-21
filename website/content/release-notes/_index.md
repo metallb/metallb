@@ -37,6 +37,10 @@ Bugfixes:
 - Speaker no longer sends localpref over eBGP sessions
   ([#266](https://github.com/google/metallb/issues/266))
 
+This release includes contributions from Baul, David Anderson, Ryan
+Roemmich, Sanjeev Rampal, and Steve Sloka. Thanks to all of them for
+making MetalLB better!
+
 ## Version 0.6.2
 
 [Documentation for this release](https://v0-6-2--metallb.netlify.com)
