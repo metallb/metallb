@@ -1,44 +1,67 @@
 package query
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+
+	"github.com/influxdata/influxql"
+)
 
 type IteratorMap interface {
-	Value(tags Tags, buf []interface{}) interface{}
+	Value(row *Row) interface{}
 }
 
-type FieldMap int
+type FieldMap struct {
+	Index int
+	Type  influxql.DataType
+}
 
-func (i FieldMap) Value(tags Tags, buf []interface{}) interface{} { return buf[i] }
+func (f FieldMap) Value(row *Row) interface{} {
+	v := castToType(row.Values[f.Index], f.Type)
+	if v == NullFloat {
+		// If the value is a null float, then convert it back to NaN
+		// so it is treated as a float for eval.
+		v = math.NaN()
+	}
+	return v
+}
 
 type TagMap string
 
-func (s TagMap) Value(tags Tags, buf []interface{}) interface{} { return tags.Value(string(s)) }
+func (s TagMap) Value(row *Row) interface{} { return row.Series.Tags.Value(string(s)) }
 
 type NullMap struct{}
 
-func (NullMap) Value(tags Tags, buf []interface{}) interface{} { return nil }
+func (NullMap) Value(row *Row) interface{} { return nil }
 
-func NewIteratorMapper(itrs []Iterator, driver IteratorMap, fields []IteratorMap, opt IteratorOptions) Iterator {
+func NewIteratorMapper(cur Cursor, driver IteratorMap, fields []IteratorMap, opt IteratorOptions) Iterator {
 	if driver != nil {
 		switch driver := driver.(type) {
 		case FieldMap:
-			switch itrs[int(driver)].(type) {
-			case FloatIterator:
-				return newFloatIteratorMapper(itrs, driver, fields, opt)
-			case IntegerIterator:
-				return newIntegerIteratorMapper(itrs, driver, fields, opt)
-			case StringIterator:
-				return newStringIteratorMapper(itrs, driver, fields, opt)
-			case BooleanIterator:
-				return newBooleanIteratorMapper(itrs, driver, fields, opt)
+			switch driver.Type {
+			case influxql.Float:
+				return newFloatIteratorMapper(cur, driver, fields, opt)
+			case influxql.Integer:
+				return newIntegerIteratorMapper(cur, driver, fields, opt)
+			case influxql.Unsigned:
+				return newUnsignedIteratorMapper(cur, driver, fields, opt)
+			case influxql.String:
+				return newStringIteratorMapper(cur, driver, fields, opt)
+			case influxql.Boolean:
+				return newBooleanIteratorMapper(cur, driver, fields, opt)
 			default:
-				panic(fmt.Sprintf("unable to map iterator type: %T", itrs[int(driver)]))
+				// The driver doesn't appear to to have a valid driver type.
+				// We should close the cursor and return a blank iterator.
+				// We close the cursor because we own it and have a responsibility
+				// to close it once it is passed into this function.
+				cur.Close()
+				return &nilFloatIterator{}
 			}
 		case TagMap:
-			return newStringIteratorMapper(itrs, driver, fields, opt)
+			return newStringIteratorMapper(cur, driver, fields, opt)
 		default:
-			panic(fmt.Sprintf("unable to create iterator mapper with driveression type: %T", driver))
+			panic(fmt.Sprintf("unable to create iterator mapper with driver expression type: %T", driver))
 		}
 	}
-	return newFloatIteratorMapper(itrs, nil, fields, opt)
+	return newFloatIteratorMapper(cur, nil, fields, opt)
 }

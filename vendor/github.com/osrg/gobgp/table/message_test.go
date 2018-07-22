@@ -578,9 +578,7 @@ func TestMergeV4NLRIs(t *testing.T) {
 	for _, msg := range msgs {
 		u := msg.Body.(*bgp.BGPUpdate)
 		assert.Equal(t, len(u.PathAttributes), 3)
-		for _, n := range u.NLRI {
-			l = append(l, n)
-		}
+		l = append(l, u.NLRI...)
 	}
 
 	assert.Equal(t, len(l), nr)
@@ -651,9 +649,7 @@ func TestMergeV4Withdraw(t *testing.T) {
 	for _, msg := range msgs {
 		u := msg.Body.(*bgp.BGPUpdate)
 		assert.Equal(t, len(u.PathAttributes), 0)
-		for _, n := range u.WithdrawnRoutes {
-			l = append(l, n)
-		}
+		l = append(l, u.WithdrawnRoutes...)
 	}
 	assert.Equal(t, len(l), nr)
 	for i, addr := range addrs {

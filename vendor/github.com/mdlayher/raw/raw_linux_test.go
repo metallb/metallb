@@ -10,7 +10,9 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/google/go-cmp/cmp"
 	"golang.org/x/net/bpf"
+	"golang.org/x/sys/unix"
 )
 
 // Test to ensure that socket is bound with correct sockaddr_ll information
@@ -350,14 +352,104 @@ func Test_packetConnSetBPF(t *testing.T) {
 	}
 }
 
+// Test that timeouts are not set when they are disabled.
+
+type setTimeoutSocket struct {
+	setTimeout func(timeout time.Duration) error
+	noopSocket
+}
+
+func (s *setTimeoutSocket) Recvfrom(p []byte, flags int) (int, syscall.Sockaddr, error) {
+	return 0, &syscall.SockaddrLinklayer{
+		Halen: 6,
+	}, nil
+}
+
+func (s *setTimeoutSocket) SetTimeout(timeout time.Duration) error {
+	return s.setTimeout(timeout)
+}
+
+func Test_packetConnNoTimeouts(t *testing.T) {
+	s := &setTimeoutSocket{
+		setTimeout: func(_ time.Duration) error {
+			panic("a timeout was set")
+		},
+	}
+
+	p := &packetConn{
+		s:          s,
+		noTimeouts: true,
+	}
+
+	buf := make([]byte, 64)
+	if _, _, err := p.ReadFrom(buf); err != nil {
+		t.Fatalf("failed to read: %v", err)
+	}
+}
+
+func Test_packetConn_handleStats(t *testing.T) {
+	tests := []struct {
+		name         string
+		noCumulative bool
+		stats        []unix.TpacketStats
+		out          []Stats
+	}{
+		{
+			name:         "no cumulative",
+			noCumulative: true,
+			stats: []unix.TpacketStats{
+				// Expect these exact outputs.
+				{Packets: 1, Drops: 1},
+				{Packets: 2, Drops: 2},
+			},
+			out: []Stats{
+				{Packets: 1, Drops: 1},
+				{Packets: 2, Drops: 2},
+			},
+		},
+		{
+			name: "cumulative",
+			stats: []unix.TpacketStats{
+				// Expect accumulation of structures.
+				{Packets: 1, Drops: 1},
+				{Packets: 2, Drops: 2},
+			},
+			out: []Stats{
+				{Packets: 1, Drops: 1},
+				{Packets: 3, Drops: 3},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := &packetConn{noCumulativeStats: tt.noCumulative}
+
+			if diff := cmp.Diff(len(tt.stats), len(tt.out)); diff != "" {
+				t.Fatalf("unexpected number of test cases (-want +got):\n%s", diff)
+			}
+
+			for i := 0; i < len(tt.stats); i++ {
+				out := *p.handleStats(tt.stats[i])
+
+				if diff := cmp.Diff(tt.out[i], out); diff != "" {
+					t.Fatalf("unexpected Stats[%02d] (-want +got):\n%s", i, diff)
+				}
+			}
+
+		})
+	}
+}
+
 // noopSocket is a socket implementation which noops every operation.  It is
 // the basis for more specific socket implementations.
 type noopSocket struct{}
 
-func (noopSocket) Bind(sa syscall.Sockaddr) error                               { return nil }
-func (noopSocket) Close() error                                                 { return nil }
-func (noopSocket) FD() int                                                      { return 0 }
-func (noopSocket) Recvfrom(p []byte, flags int) (int, syscall.Sockaddr, error)  { return 0, nil, nil }
-func (noopSocket) Sendto(p []byte, flags int, to syscall.Sockaddr) error        { return nil }
-func (noopSocket) SetSockopt(level, name int, v unsafe.Pointer, l uint32) error { return nil }
-func (noopSocket) SetTimeout(timeout time.Duration) error                       { return nil }
+func (noopSocket) Bind(sa syscall.Sockaddr) error                                { return nil }
+func (noopSocket) Close() error                                                  { return nil }
+func (noopSocket) FD() int                                                       { return 0 }
+func (noopSocket) GetSockopt(level, name int, v unsafe.Pointer, l uintptr) error { return nil }
+func (noopSocket) Recvfrom(p []byte, flags int) (int, syscall.Sockaddr, error)   { return 0, nil, nil }
+func (noopSocket) Sendto(p []byte, flags int, to syscall.Sockaddr) error         { return nil }
+func (noopSocket) SetSockopt(level, name int, v unsafe.Pointer, l uint32) error  { return nil }
+func (noopSocket) SetTimeout(timeout time.Duration) error                        { return nil }

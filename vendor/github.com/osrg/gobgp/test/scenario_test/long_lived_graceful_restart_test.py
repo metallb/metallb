@@ -29,6 +29,7 @@ from lib import base
 from lib.base import (
     BGP_FSM_ACTIVE,
     BGP_FSM_ESTABLISHED,
+    LONG_LIVED_GRACEFUL_RESTART_TIME,
 )
 from lib.gobgp import GoBGPContainer
 
@@ -88,7 +89,7 @@ class GoBGPTestBase(unittest.TestCase):
 
         time.sleep(1)
 
-        g2.graceful_restart()
+        g2.stop_gobgp()
         g1.wait_for(expected_state=BGP_FSM_ACTIVE, peer=g2)
 
         time.sleep(1)
@@ -110,8 +111,7 @@ class GoBGPTestBase(unittest.TestCase):
         # withdrawn
         self.assertTrue(len(g4.get_global_rib('10.0.0.0/24')) == 0)
 
-        g2._start_gobgp(graceful_restart=True)
-        time.sleep(2)
+        g2.start_gobgp(graceful_restart=True)
         g2.local('gobgp global rib add 10.0.0.0/24')
         g2.local('gobgp global rib add 10.10.0.0/24')
 
@@ -140,7 +140,7 @@ class GoBGPTestBase(unittest.TestCase):
         self.assertTrue(len(rib) == 1)
         self.assertTrue(g2.asn in rib[0]['paths'][0]['aspath'])
 
-        g2.graceful_restart()
+        g2.stop_gobgp()
         g1.wait_for(expected_state=BGP_FSM_ACTIVE, peer=g2)
 
         time.sleep(1)
@@ -157,7 +157,7 @@ class GoBGPTestBase(unittest.TestCase):
         self.assertTrue(g2.asn in rib[0]['paths'][0]['aspath'])
 
     def test_05_llgr_restart_timer_expire(self):
-        time.sleep(35)
+        time.sleep(LONG_LIVED_GRACEFUL_RESTART_TIME + 5)
         g3 = self.bgpds['g3']
         rib = g3.get_global_rib('10.10.0.0/24')
         self.assertTrue(len(rib) == 0)

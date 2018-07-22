@@ -184,8 +184,8 @@ func (l *WAL) Open() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	l.traceLogger.Info(fmt.Sprintf("tsm1 WAL starting with %d segment size", l.SegmentSize))
-	l.traceLogger.Info(fmt.Sprintf("tsm1 WAL writing to %s", l.path))
+	l.traceLogger.Info("tsm1 WAL starting", zap.Int("segment_size", l.SegmentSize))
+	l.traceLogger.Info("tsm1 WAL writing", zap.String("path", l.path))
 
 	if err := os.MkdirAll(l.path, 0777); err != nil {
 		return err
@@ -212,9 +212,18 @@ func (l *WAL) Open() error {
 		if stat.Size() == 0 {
 			os.Remove(lastSegment)
 			segments = segments[:len(segments)-1]
-		}
-		if err := l.newSegmentFile(); err != nil {
-			return err
+		} else {
+			fd, err := os.OpenFile(lastSegment, os.O_RDWR, 0666)
+			if err != nil {
+				return err
+			}
+			if _, err := fd.Seek(0, io.SeekEnd); err != nil {
+				return err
+			}
+			l.currentSegmentWriter = NewWALSegmentWriter(fd)
+
+			// Reset the current segment size stat
+			atomic.StoreInt64(&l.stats.CurrentBytes, stat.Size())
 		}
 	}
 
@@ -225,9 +234,11 @@ func (l *WAL) Open() error {
 			return err
 		}
 
-		totalOldDiskSize += stat.Size()
-		if stat.ModTime().After(l.lastWriteTime) {
-			l.lastWriteTime = stat.ModTime().UTC()
+		if stat.Size() > 0 {
+			totalOldDiskSize += stat.Size()
+			if stat.ModTime().After(l.lastWriteTime) {
+				l.lastWriteTime = stat.ModTime().UTC()
+			}
 		}
 	}
 	atomic.StoreInt64(&l.stats.OldBytes, totalOldDiskSize)
@@ -348,7 +359,7 @@ func (l *WAL) Remove(files []string) error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	for _, fn := range files {
-		l.traceLogger.Info(fmt.Sprintf("Removing %s", fn))
+		l.traceLogger.Info("Removing WAL file", zap.String("path", fn))
 		os.RemoveAll(fn)
 	}
 
@@ -433,7 +444,7 @@ func (l *WAL) writeToLog(entry WALEntry) (int, error) {
 		// Update stats for current segment size
 		atomic.StoreInt64(&l.stats.CurrentBytes, int64(l.currentSegmentWriter.size))
 
-		l.lastWriteTime = time.Now()
+		l.lastWriteTime = time.Now().UTC()
 
 		return l.currentSegmentID, nil
 
@@ -521,7 +532,7 @@ func (l *WAL) Close() error {
 
 	l.once.Do(func() {
 		// Close, but don't set to nil so future goroutines can still be signaled
-		l.traceLogger.Info(fmt.Sprintf("Closing %s", l.path))
+		l.traceLogger.Info("Closing WAL file", zap.String("path", l.path))
 		close(l.closing)
 
 		if l.currentSegmentWriter != nil {
@@ -562,10 +573,6 @@ func (l *WAL) newSegmentFile() error {
 		return err
 	}
 	l.currentSegmentWriter = NewWALSegmentWriter(fd)
-
-	if stat, err := fd.Stat(); err == nil {
-		l.lastWriteTime = stat.ModTime()
-	}
 
 	// Reset the current segment size stat
 	atomic.StoreInt64(&l.stats.CurrentBytes, 0)
@@ -894,7 +901,14 @@ func (w *DeleteWALEntry) MarshalBinary() ([]byte, error) {
 
 // UnmarshalBinary deserializes the byte slice into w.
 func (w *DeleteWALEntry) UnmarshalBinary(b []byte) error {
-	w.Keys = bytes.Split(b, []byte("\n"))
+	if len(b) == 0 {
+		return nil
+	}
+
+	// b originates from a pool. Copy what needs to be retained.
+	buf := make([]byte, len(b))
+	copy(buf, b)
+	w.Keys = bytes.Split(buf, []byte("\n"))
 	return nil
 }
 
@@ -970,7 +984,11 @@ func (w *DeleteRangeWALEntry) UnmarshalBinary(b []byte) error {
 		if i+sz > len(b) {
 			return ErrWALCorrupt
 		}
-		w.Keys = append(w.Keys, b[i:i+sz])
+
+		// b originates from a pool. Copy what needs to be retained.
+		buf := make([]byte, sz)
+		copy(buf, b[i:i+sz])
+		w.Keys = append(w.Keys, buf)
 		i += sz
 	}
 	return nil
@@ -1027,7 +1045,7 @@ type WALSegmentWriter struct {
 // NewWALSegmentWriter returns a new WALSegmentWriter writing to w.
 func NewWALSegmentWriter(w io.WriteCloser) *WALSegmentWriter {
 	return &WALSegmentWriter{
-		bw: bufio.NewWriter(w),
+		bw: bufio.NewWriterSize(w, 16*1024),
 		w:  w,
 	}
 }

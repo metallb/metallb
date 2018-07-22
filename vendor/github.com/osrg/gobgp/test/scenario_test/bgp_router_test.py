@@ -33,6 +33,7 @@ from lib.base import (
     BGP_ATTR_TYPE_MULTI_EXIT_DISC,
     BGP_ATTR_TYPE_LOCAL_PREF,
     wait_for_completion,
+    assert_several_times,
 )
 from lib.gobgp import (
     GoBGPContainer,
@@ -59,21 +60,17 @@ class GoBGPTestBase(unittest.TestCase):
         qs = [q1, q2, q3]
         ctns = [g1, q1, q2, q3]
 
+        initial_wait_time = max(ctn.run() for ctn in ctns)
+        time.sleep(initial_wait_time)
+
+        for q in qs:
+            g1.add_peer(q, passwd='passwd')
+            q.add_peer(g1, passwd='passwd', passive=True)
+
         # advertise a route from q1, q2, q3
         for idx, q in enumerate(qs):
             route = '10.0.{0}.0/24'.format(idx + 1)
             q.add_route(route)
-
-        initial_wait_time = max(ctn.run() for ctn in ctns)
-
-        time.sleep(initial_wait_time)
-
-        for q in qs:
-            g1.add_peer(q, reload_config=False, passwd='passwd')
-            q.add_peer(g1, passwd='passwd', passive=True)
-
-        g1.create_config()
-        g1.reload_config()
 
         cls.gobgp = g1
         cls.quaggas = {'q1': q1, 'q2': q2, 'q3': q3}
@@ -145,13 +142,13 @@ class GoBGPTestBase(unittest.TestCase):
     def test_05_add_quagga(self):
         q4 = QuaggaBGPContainer(name='q4', asn=65004, router_id='192.168.0.5')
         self.quaggas['q4'] = q4
-
-        q4.add_route('10.0.4.0/24')
-
         initial_wait_time = q4.run()
         time.sleep(initial_wait_time)
+
         self.gobgp.add_peer(q4)
         q4.add_peer(self.gobgp)
+
+        q4.add_route('10.0.4.0/24')
 
         self.gobgp.wait_for(expected_state=BGP_FSM_ESTABLISHED, peer=q4)
 
@@ -316,17 +313,20 @@ class GoBGPTestBase(unittest.TestCase):
         self.test_02_check_gobgp_global_rib()
 
         paths = q1.get_global_rib('20.0.0.0/24')
-        self.assertTrue(len(paths) == 1)
+        self.assertEqual(len(paths), 1)
         n_addrs = [i[1].split('/')[0] for i in self.gobgp.ip_addrs]
-        self.assertTrue(paths[0]['nexthop'] in n_addrs)
+        self.assertIn(paths[0]['nexthop'], n_addrs)
 
         q3.stop()
 
-        time.sleep(3)
+        self.gobgp.wait_for(expected_state=BGP_FSM_ACTIVE, peer=q3)
 
-        paths = q1.get_global_rib('20.0.0.0/24')
-        self.assertTrue(len(paths) == 1)
-        self.assertTrue(paths[0]['nexthop'] in n_addrs)
+        def f():
+            paths = q1.get_global_rib('20.0.0.0/24')
+            self.assertEqual(len(paths), 1)
+            self.assertIn(paths[0]['nexthop'], n_addrs)
+
+        assert_several_times(f)
 
         g1.del_peer(q3)
         del self.quaggas['q3']
@@ -344,19 +344,22 @@ class GoBGPTestBase(unittest.TestCase):
         self.test_02_check_gobgp_global_rib()
 
         paths = g1.get_adj_rib_out(q1, '30.0.0.0/24')
-        self.assertTrue(len(paths) == 1)
-        self.assertTrue('source-id' not in paths[0])
+        self.assertEqual(len(paths), 1)
+        self.assertNotIn('source-id', paths[0])
         paths = g1.get_adj_rib_out(q2, '30.0.0.0/24')
-        self.assertTrue(len(paths) == 1)
-        self.assertTrue('source-id' not in paths[0])
+        self.assertEqual(len(paths), 1)
+        self.assertNotIn('source-id', paths[0])
 
         g1.local('gobgp global rib del 30.0.0.0/24')
 
-        paths = g1.get_adj_rib_out(q1, '30.0.0.0/24')
-        self.assertTrue(len(paths) == 0)
-        paths = g1.get_adj_rib_out(q2, '30.0.0.0/24')
-        self.assertTrue(len(paths) == 1)
-        self.assertTrue(paths[0]['source-id'] == '192.168.0.2')
+        def f():
+            paths = g1.get_adj_rib_out(q1, '30.0.0.0/24')
+            self.assertEqual(len(paths), 0)
+            paths = g1.get_adj_rib_out(q2, '30.0.0.0/24')
+            self.assertEqual(len(paths), 1)
+            self.assertEqual(paths[0]['source-id'], '192.168.0.2')
+
+        assert_several_times(f)
 
     def test_19_check_grpc_add_neighbor(self):
         g1 = self.gobgp

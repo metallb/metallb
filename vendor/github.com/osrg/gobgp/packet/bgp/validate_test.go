@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func bgpupdate() *BGPMessage {
@@ -47,6 +48,7 @@ func Test_Validate_CapV4(t *testing.T) {
 	assert.Error(err)
 
 	res, err = ValidateUpdateMsg(message, map[RouteFamily]BGPAddPathMode{RF_IPv4_UC: BGP_ADD_PATH_BOTH}, false, false)
+	require.NoError(t, err)
 	assert.Equal(true, res)
 }
 
@@ -54,11 +56,12 @@ func Test_Validate_CapV6(t *testing.T) {
 	assert := assert.New(t)
 	message := bgpupdateV6().Body.(*BGPUpdate)
 	res, err := ValidateUpdateMsg(message, map[RouteFamily]BGPAddPathMode{RF_IPv6_UC: BGP_ADD_PATH_BOTH}, false, false)
-	assert.Equal(true, res)
 	assert.NoError(err)
+	assert.True(res)
 
 	res, err = ValidateUpdateMsg(message, map[RouteFamily]BGPAddPathMode{RF_IPv4_UC: BGP_ADD_PATH_BOTH}, false, false)
-	assert.Equal(false, res)
+	assert.Error(err)
+	assert.False(res)
 }
 
 func Test_Validate_OK(t *testing.T) {
@@ -295,12 +298,12 @@ func Test_Validate_unrecognized_well_known(t *testing.T) {
 }
 
 func Test_Validate_aspath(t *testing.T) {
-
 	assert := assert.New(t)
 	message := bgpupdate().Body.(*BGPUpdate)
 
 	// VALID AS_PATH
 	res, err := ValidateUpdateMsg(message, map[RouteFamily]BGPAddPathMode{RF_IPv4_UC: BGP_ADD_PATH_BOTH}, true, false)
+	require.NoError(t, err)
 	assert.Equal(true, res)
 
 	// CONFED_SET
@@ -360,6 +363,7 @@ func Test_Validate_aspath(t *testing.T) {
 	assert.Nil(e.Data)
 
 	res, err = ValidateUpdateMsg(message, map[RouteFamily]BGPAddPathMode{RF_IPv4_UC: BGP_ADD_PATH_BOTH}, true, true)
+	require.NoError(t, err)
 	assert.Equal(true, res)
 }
 

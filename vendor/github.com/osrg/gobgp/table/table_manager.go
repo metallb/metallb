@@ -22,8 +22,9 @@ import (
 	"time"
 
 	farm "github.com/dgryski/go-farm"
-	"github.com/osrg/gobgp/packet/bgp"
 	log "github.com/sirupsen/logrus"
+
+	"github.com/osrg/gobgp/packet/bgp"
 )
 
 const (
@@ -56,9 +57,7 @@ func ProcessMessage(m *bgp.BGPMessage, peerInfo *PeerInfo, timestamp time.Time) 
 			reach = a
 		case *bgp.PathAttributeMpUnreachNLRI:
 			l := make([]bgp.AddrPrefixInterface, 0, len(a.Value))
-			for _, nlri := range a.Value {
-				l = append(l, nlri)
-			}
+			l = append(l, a.Value...)
 			dels = append(dels, l...)
 		default:
 			attrs = append(attrs, attr)
@@ -179,65 +178,50 @@ func (manager *TableManager) DeleteVrf(name string) ([]*Path, error) {
 	return msgs, nil
 }
 
-func (manager *TableManager) calculate(dsts []*Destination) []*Destination {
-	emptyDsts := make([]*Destination, 0, len(dsts))
-	clonedDsts := make([]*Destination, 0, len(dsts))
-
-	for _, dst := range dsts {
-		log.WithFields(log.Fields{
-			"Topic": "table",
-			"Key":   dst.GetNlri().String(),
-		}).Debug("Processing destination")
-
-		clonedDsts = append(clonedDsts, dst.Calculate())
-
-		if len(dst.knownPathList) == 0 {
-			emptyDsts = append(emptyDsts, dst)
-		}
-	}
-
-	for _, dst := range emptyDsts {
-		t := manager.Tables[dst.Family()]
+func (tm *TableManager) update(newPath *Path) *Update {
+	t := tm.Tables[newPath.GetRouteFamily()]
+	t.validatePath(newPath)
+	dst := t.getOrCreateDest(newPath.GetNlri())
+	u := dst.Calculate(newPath)
+	if len(dst.knownPathList) == 0 {
 		t.deleteDest(dst)
 	}
-	return clonedDsts
+	return u
 }
 
-func (manager *TableManager) DeletePathsByPeer(info *PeerInfo, rf bgp.RouteFamily) []*Destination {
+func (manager *TableManager) GetPathListByPeer(info *PeerInfo, rf bgp.RouteFamily) []*Path {
 	if t, ok := manager.Tables[rf]; ok {
-		dsts := t.DeleteDestByPeer(info)
-		return manager.calculate(dsts)
+		pathList := make([]*Path, 0, len(t.destinations))
+		for _, dst := range t.destinations {
+			for _, p := range dst.knownPathList {
+				if p.GetSource().Equal(info) {
+					pathList = append(pathList, p)
+				}
+			}
+		}
+		return pathList
 	}
 	return nil
 }
 
-func (manager *TableManager) ProcessPaths(pathList []*Path) []*Destination {
-	m := make(map[string]bool, len(pathList))
-	dsts := make([]*Destination, 0, len(pathList))
-	for _, path := range pathList {
-		if path == nil || path.IsEOR() {
-			continue
-		}
-		rf := path.GetRouteFamily()
-		if t, ok := manager.Tables[rf]; ok {
-			dst := t.insert(path)
-			key := dst.GetNlri().String()
-			if !m[key] {
-				m[key] = true
-				dsts = append(dsts, dst)
-			}
-			if rf == bgp.RF_EVPN {
-				for _, dst := range manager.handleMacMobility(path) {
-					key := dst.GetNlri().String()
-					if !m[key] {
-						m[key] = true
-						dsts = append(dsts, dst)
-					}
-				}
+func (manager *TableManager) Update(newPath *Path) []*Update {
+	if newPath == nil || newPath.IsEOR() {
+		return nil
+	}
+
+	// Except for a special case with EVPN, we'll have one destination.
+	updates := make([]*Update, 0, 1)
+	family := newPath.GetRouteFamily()
+	if _, ok := manager.Tables[family]; ok {
+		updates = append(updates, manager.update(newPath))
+
+		if family == bgp.RF_EVPN {
+			for _, p := range manager.handleMacMobility(newPath) {
+				updates = append(updates, manager.update(p))
 			}
 		}
 	}
-	return manager.calculate(dsts)
+	return updates
 }
 
 // EVPN MAC MOBILITY HANDLING
@@ -248,17 +232,17 @@ func (manager *TableManager) ProcessPaths(pathList []*Path) []*Destination {
 // different Ethernet segment identifier and a higher sequence number
 // than that which it had previously advertised withdraws its MAC/IP
 // Advertisement route.
-func (manager *TableManager) handleMacMobility(path *Path) []*Destination {
-	dsts := make([]*Destination, 0)
+func (manager *TableManager) handleMacMobility(path *Path) []*Path {
+	pathList := make([]*Path, 0)
 	nlri := path.GetNlri().(*bgp.EVPNNLRI)
 	if path.IsWithdraw || path.IsLocal() || nlri.RouteType != bgp.EVPN_ROUTE_TYPE_MAC_IP_ADVERTISEMENT {
 		return nil
 	}
-	for _, path2 := range manager.GetPathList(GLOBAL_RIB_NAME, []bgp.RouteFamily{bgp.RF_EVPN}) {
+	for _, path2 := range manager.GetPathList(GLOBAL_RIB_NAME, 0, []bgp.RouteFamily{bgp.RF_EVPN}) {
 		if !path2.IsLocal() || path2.GetNlri().(*bgp.EVPNNLRI).RouteType != bgp.EVPN_ROUTE_TYPE_MAC_IP_ADVERTISEMENT {
 			continue
 		}
-		f := func(p *Path) (uint32, net.HardwareAddr, int) {
+		f := func(p *Path) (bgp.EthernetSegmentIdentifier, net.HardwareAddr, int) {
 			nlri := p.GetNlri().(*bgp.EVPNNLRI)
 			d := nlri.RouteTypeData.(*bgp.EVPNMacIPAdvertisementRoute)
 			ecs := p.GetExtCommunities()
@@ -269,16 +253,15 @@ func (manager *TableManager) handleMacMobility(path *Path) []*Destination {
 					break
 				}
 			}
-			return d.ETag, d.MacAddress, seq
+			return d.ESI, d.MacAddress, seq
 		}
 		e1, m1, s1 := f(path)
 		e2, m2, s2 := f(path2)
-		if e1 == e2 && bytes.Equal(m1, m2) && s1 > s2 {
-			path2.IsWithdraw = true
-			dsts = append(dsts, manager.Tables[bgp.RF_EVPN].insert(path2))
+		if bytes.Equal(m1, m2) && !bytes.Equal(e1.Value, e2.Value) && s1 > s2 {
+			pathList = append(pathList, path2.Clone(true))
 		}
 	}
-	return dsts
+	return pathList
 }
 
 func (manager *TableManager) tables(list ...bgp.RouteFamily) []*Table {
@@ -305,16 +288,22 @@ func (manager *TableManager) getDestinationCount(rfList []bgp.RouteFamily) int {
 	return count
 }
 
-func (manager *TableManager) GetBestPathList(id string, rfList []bgp.RouteFamily) []*Path {
+func (manager *TableManager) GetBestPathList(id string, as uint32, rfList []bgp.RouteFamily) []*Path {
+	if SelectionOptions.DisableBestPathSelection {
+		// Note: If best path selection disabled, there is no best path.
+		return nil
+	}
 	paths := make([]*Path, 0, manager.getDestinationCount(rfList))
 	for _, t := range manager.tables(rfList...) {
-		paths = append(paths, t.Bests(id)...)
+		paths = append(paths, t.Bests(id, as)...)
 	}
 	return paths
 }
 
 func (manager *TableManager) GetBestMultiPathList(id string, rfList []bgp.RouteFamily) [][]*Path {
-	if !UseMultiplePaths.Enabled {
+	if !UseMultiplePaths.Enabled || SelectionOptions.DisableBestPathSelection {
+		// Note: If multi path not enabled or best path selection disabled,
+		// there is no best multi path.
 		return nil
 	}
 	paths := make([][]*Path, 0, manager.getDestinationCount(rfList))
@@ -324,10 +313,10 @@ func (manager *TableManager) GetBestMultiPathList(id string, rfList []bgp.RouteF
 	return paths
 }
 
-func (manager *TableManager) GetPathList(id string, rfList []bgp.RouteFamily) []*Path {
+func (manager *TableManager) GetPathList(id string, as uint32, rfList []bgp.RouteFamily) []*Path {
 	paths := make([]*Path, 0, manager.getDestinationCount(rfList))
 	for _, t := range manager.tables(rfList...) {
-		paths = append(paths, t.GetKnownPathList(id)...)
+		paths = append(paths, t.GetKnownPathList(id, as)...)
 	}
 	return paths
 }
@@ -336,7 +325,7 @@ func (manager *TableManager) GetPathListWithNexthop(id string, rfList []bgp.Rout
 	paths := make([]*Path, 0, manager.getDestinationCount(rfList))
 	for _, rf := range rfList {
 		if t, ok := manager.Tables[rf]; ok {
-			for _, path := range t.GetKnownPathList(id) {
+			for _, path := range t.GetKnownPathList(id, 0) {
 				if path.GetNexthop().Equal(nexthop) {
 					paths = append(paths, path)
 				}
@@ -355,13 +344,13 @@ func (manager *TableManager) GetDestination(path *Path) *Destination {
 	if !ok {
 		return nil
 	}
-	return t.GetDestination(path.getPrefix())
+	return t.GetDestination(path.GetNlri())
 }
 
-func (manager *TableManager) TableInfo(id string, family bgp.RouteFamily) (*TableInfo, error) {
+func (manager *TableManager) TableInfo(id string, as uint32, family bgp.RouteFamily) (*TableInfo, error) {
 	t, ok := manager.Tables[family]
 	if !ok {
 		return nil, fmt.Errorf("address family %s is not configured", family)
 	}
-	return t.Info(id), nil
+	return t.Info(id, as), nil
 }

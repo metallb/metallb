@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 	"unsafe"
@@ -24,8 +25,18 @@ var (
 type packetConn struct {
 	ifi *net.Interface
 	s   socket
+	pbe uint16
 
-	// Timeouts set via Set{Read,}Deadline, guarded by mutex
+	// Should timeouts be set at all?
+	noTimeouts bool
+
+	// Should stats be accumulated instead of reset on each call?
+	noCumulativeStats bool
+
+	// Internal storage for cumulative stats.
+	stats Stats
+
+	// Timeouts set via Set{Read,}Deadline, guarded by mutex.
 	timeoutMu sync.RWMutex
 	rtimeout  time.Time
 }
@@ -36,27 +47,22 @@ type socket interface {
 	Bind(syscall.Sockaddr) error
 	Close() error
 	FD() int
+	GetSockopt(level, name int, v unsafe.Pointer, l uintptr) error
 	Recvfrom([]byte, int) (int, syscall.Sockaddr, error)
 	Sendto([]byte, int, syscall.Sockaddr) error
 	SetSockopt(level, name int, v unsafe.Pointer, l uint32) error
 	SetTimeout(time.Duration) error
 }
 
-// sleeper is an interface which enables swapping out an actual time.Sleep
-// call for testing.
-type sleeper interface {
-	Sleep(time.Duration)
-}
-
 // listenPacket creates a net.PacketConn which can be used to send and receive
 // data at the device driver level.
-func listenPacket(ifi *net.Interface, proto uint16, cfg *Config) (*packetConn, error) {
+func listenPacket(ifi *net.Interface, proto uint16, cfg Config) (*packetConn, error) {
 	// Convert proto to big endian.
 	pbe := htons(proto)
 
 	// Enabling overriding the socket type via config.
 	typ := syscall.SOCK_RAW
-	if cfg != nil && cfg.LinuxSockDGRAM {
+	if cfg.LinuxSockDGRAM {
 		typ = syscall.SOCK_DGRAM
 	}
 
@@ -66,14 +72,15 @@ func listenPacket(ifi *net.Interface, proto uint16, cfg *Config) (*packetConn, e
 		return nil, err
 	}
 
-	// Wrap raw socket in socket interface, use actual time package sleeper
-	return newPacketConn(
-		ifi,
-		&sysSocket{
-			fd: sock,
-		},
-		pbe,
-	)
+	// Wrap raw socket in socket interface.
+	pc, err := newPacketConn(ifi, &sysSocket{fd: sock}, pbe)
+	if err != nil {
+		return nil, err
+	}
+
+	pc.noTimeouts = cfg.NoTimeouts
+	pc.noCumulativeStats = cfg.NoCumulativeStats
+	return pc, nil
 }
 
 // newPacketConn creates a net.PacketConn using the specified network
@@ -89,11 +96,15 @@ func newPacketConn(ifi *net.Interface, s socket, pbe uint16) (*packetConn, error
 		Protocol: pbe,
 		Ifindex:  ifi.Index,
 	})
+	if err != nil {
+		return nil, err
+	}
 
 	return &packetConn{
 		ifi: ifi,
 		s:   s,
-	}, err
+		pbe: pbe,
+	}, nil
 }
 
 // ReadFrom implements the net.PacketConn.ReadFrom method.
@@ -102,52 +113,56 @@ func (p *packetConn) ReadFrom(b []byte) (int, net.Addr, error) {
 	deadline := p.rtimeout
 	p.timeoutMu.Unlock()
 
-	// Information returned by syscall.Recvfrom
-	var n int
-	var addr syscall.Sockaddr
+	var (
+		// Information returned by syscall.Recvfrom.
+		n    int
+		addr syscall.Sockaddr
+		err  error
+
+		// Timeout for a single loop iteration.
+		timeout = readTimeout
+	)
 
 	for {
-		var timeout time.Duration
-
-		if deadline.IsZero() {
-			timeout = readTimeout
-		} else {
+		if !deadline.IsZero() {
 			timeout = deadline.Sub(time.Now())
 			if timeout > readTimeout {
 				timeout = readTimeout
 			}
 		}
 
-		err := p.s.SetTimeout(timeout)
-		if err != nil {
-			return 0, nil, err
+		// Set a timeout for this iteration if configured to do so.
+		if !p.noTimeouts {
+			if err := p.s.SetTimeout(timeout); err != nil {
+				return 0, nil, err
+			}
 		}
 
 		// Attempt to receive on socket
 		// The recvfrom sycall will NOT be interrupted by closing of the socket
 		n, addr, err = p.s.Recvfrom(b, 0)
-
-		if err == syscall.EAGAIN {
-			// timeout
+		switch err {
+		case nil:
+			// Got data, break this loop shortly.
+		case syscall.EAGAIN:
+			// Hit a timeout, keep looping.
 			continue
-		}
-		if err != nil {
-			n = 0
-			// Return on error
+		default:
+			// Return on any other error.
 			return n, nil, err
 		}
 
-		// Got data, exit the loop
+		// Got data, exit the loop.
 		break
 	}
 
-	// Retrieve hardware address and other information from addr
+	// Retrieve hardware address and other information from addr.
 	sa, ok := addr.(*syscall.SockaddrLinklayer)
 	if !ok || sa.Halen < 6 {
 		return n, nil, syscall.EINVAL
 	}
 
-	// Use length specified to convert byte array into a hardware address slice
+	// Use length specified to convert byte array into a hardware address slice.
 	mac := make(net.HardwareAddr, sa.Halen)
 	copy(mac, sa.Addr[:])
 
@@ -163,25 +178,27 @@ func (p *packetConn) ReadFrom(b []byte) (int, net.Addr, error) {
 
 // WriteTo implements the net.PacketConn.WriteTo method.
 func (p *packetConn) WriteTo(b []byte, addr net.Addr) (int, error) {
-	// Ensure correct Addr type
+	// Ensure correct Addr type.
 	a, ok := addr.(*Addr)
 	if !ok || a.HardwareAddr == nil || len(a.HardwareAddr) < 6 {
 		return 0, syscall.EINVAL
 	}
 
-	// Convert hardware address back to byte array form
+	// Convert hardware address back to byte array form.
 	var baddr [8]byte
 	copy(baddr[:], a.HardwareAddr)
 
 	// Send message on socket to the specified hardware address from addr
 	// packet(7):
 	//   When you send packets it is enough to specify sll_family, sll_addr,
-	//   sll_halen, sll_ifindex.  The other fields should  be 0.
-	// In this case, sll_family is taken care of automatically by syscall
+	//   sll_halen, sll_ifindex, and sll_protocol. The other fields should
+	//   be 0.
+	// In this case, sll_family is taken care of automatically by syscall.
 	err := p.s.Sendto(b, 0, &syscall.SockaddrLinklayer{
-		Ifindex: p.ifi.Index,
-		Halen:   uint8(len(a.HardwareAddr)),
-		Addr:    baddr,
+		Ifindex:  p.ifi.Index,
+		Halen:    uint8(len(a.HardwareAddr)),
+		Addr:     baddr,
+		Protocol: p.pbe,
 	})
 	return len(b), err
 }
@@ -197,10 +214,6 @@ func (p *packetConn) LocalAddr() net.Addr {
 		HardwareAddr: p.ifi.HardwareAddr,
 	}
 }
-
-// TODO(mdlayher): it is unfortunate that we have to implement deadlines using
-// a context, but it appears that there may not be a better solution until
-// Go 1.6 or later.  See here: https://github.com/golang/go/issues/10565.
 
 // SetDeadline implements the net.PacketConn.SetDeadline method.
 func (p *packetConn) SetDeadline(t time.Time) error {
@@ -256,6 +269,38 @@ func (p *packetConn) SetPromiscuous(b bool) error {
 	return p.s.SetSockopt(unix.SOL_PACKET, membership, unsafe.Pointer(&mreq), unix.SizeofPacketMreq)
 }
 
+// Stats retrieves statistics from the Conn.
+func (p *packetConn) Stats() (*Stats, error) {
+	var s unix.TpacketStats
+	if err := p.s.GetSockopt(unix.SOL_PACKET, unix.PACKET_STATISTICS, unsafe.Pointer(&s), unsafe.Sizeof(s)); err != nil {
+		return nil, err
+	}
+
+	return p.handleStats(s), nil
+}
+
+// handleStats handles creation of Stats structures from raw packet socket stats.
+func (p *packetConn) handleStats(s unix.TpacketStats) *Stats {
+	// Does the caller want instantaneous stats as provided by Linux?  If so,
+	// return the structure directly.
+	if p.noCumulativeStats {
+		return &Stats{
+			Packets: uint64(s.Packets),
+			Drops:   uint64(s.Drops),
+		}
+	}
+
+	// The caller wants cumulative stats.  Add stats with the internal stats
+	// structure and return a copy of the resulting stats.
+	packets := atomic.AddUint64(&p.stats.Packets, uint64(s.Packets))
+	drops := atomic.AddUint64(&p.stats.Drops, uint64(s.Drops))
+
+	return &Stats{
+		Packets: packets,
+		Drops:   drops,
+	}
+}
+
 // sysSocket is the default socket implementation.  It makes use of
 // Linux-specific system calls to handle raw socket functionality.
 type sysSocket struct {
@@ -267,6 +312,13 @@ type sysSocket struct {
 func (s *sysSocket) Bind(sa syscall.Sockaddr) error { return syscall.Bind(s.fd, sa) }
 func (s *sysSocket) Close() error                   { return syscall.Close(s.fd) }
 func (s *sysSocket) FD() int                        { return s.fd }
+func (s *sysSocket) GetSockopt(level, name int, v unsafe.Pointer, l uintptr) error {
+	_, _, err := syscall.Syscall6(syscall.SYS_GETSOCKOPT, uintptr(s.fd), uintptr(level), uintptr(name), uintptr(v), uintptr(unsafe.Pointer(&l)), 0)
+	if err != 0 {
+		return syscall.Errno(err)
+	}
+	return nil
+}
 func (s *sysSocket) Recvfrom(p []byte, flags int) (int, syscall.Sockaddr, error) {
 	return syscall.Recvfrom(s.fd, p, flags)
 }

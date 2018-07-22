@@ -104,6 +104,8 @@ func TestConntrackTableList(t *testing.T) {
 	defer ns.Close()
 	defer runtime.UnlockOSThread()
 
+	setUpF(t, "/proc/sys/net/netfilter/nf_conntrack_acct", "1")
+
 	// Flush the table to start fresh
 	err := h.ConntrackTableFlush(ConntrackTable)
 	CheckErrorFail(t, err)
@@ -123,6 +125,10 @@ func TestConntrackTableList(t *testing.T) {
 			flow.Forward.DstPort == 3000 &&
 			(flow.Forward.SrcPort >= 2000 && flow.Forward.SrcPort <= 2005) {
 			found++
+		}
+
+		if flow.Forward.Bytes == 0 && flow.Forward.Packets == 0 && flow.Reverse.Bytes == 0 && flow.Reverse.Packets == 0 {
+			t.Error("No traffic statistics are collected")
 		}
 	}
 	if found != 5 {

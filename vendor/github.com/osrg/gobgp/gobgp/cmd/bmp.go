@@ -20,9 +20,10 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/spf13/cobra"
+
 	"github.com/osrg/gobgp/config"
 	"github.com/osrg/gobgp/packet/bmp"
-	"github.com/spf13/cobra"
 )
 
 func modBmpServer(cmdType string, args []string) error {
@@ -40,7 +41,9 @@ func modBmpServer(cmdType string, args []string) error {
 		address = args[0]
 	} else {
 		address = host
-		pn, _ := strconv.Atoi(p)
+		// Note: BmpServerConfig.Port is uint32 type, but the TCP/UDP port is
+		// 16-bit length.
+		pn, _ := strconv.ParseUint(p, 10, 16)
 		port = uint32(pn)
 	}
 

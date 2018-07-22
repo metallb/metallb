@@ -17,34 +17,27 @@ package table
 
 import (
 	_ "fmt"
-	"github.com/osrg/gobgp/packet/bgp"
-	log "github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
 	"net"
-	"os"
 	"testing"
 	"time"
+
+	"github.com/osrg/gobgp/packet/bgp"
+	"github.com/stretchr/testify/assert"
 )
 
 // process BGPUpdate message
 // this function processes only BGPUpdate
 func (manager *TableManager) ProcessUpdate(fromPeer *PeerInfo, message *bgp.BGPMessage) ([]*Path, error) {
 	pathList := make([]*Path, 0)
-	for _, d := range manager.ProcessPaths(ProcessMessage(message, fromPeer, time.Now())) {
-		b, _, _ := d.GetChanges(GLOBAL_RIB_NAME, false)
+	dsts := make([]*Update, 0)
+	for _, path := range ProcessMessage(message, fromPeer, time.Now()) {
+		dsts = append(dsts, manager.Update(path)...)
+	}
+	for _, d := range dsts {
+		b, _, _ := d.GetChanges(GLOBAL_RIB_NAME, 0, false)
 		pathList = append(pathList, b)
 	}
 	return pathList, nil
-}
-
-func getLogger(lv log.Level) *log.Logger {
-	var l *log.Logger = &log.Logger{
-		Out:       os.Stderr,
-		Formatter: new(log.JSONFormatter),
-		Hooks:     make(map[log.Level][]log.Hook),
-		Level:     lv,
-	}
-	return l
 }
 
 func peerR1() *PeerInfo {
@@ -2124,12 +2117,12 @@ func TestProcessBGPUpdate_Timestamp(t *testing.T) {
 
 	nlri := []*bgp.IPAddrPrefix{bgp.NewIPAddrPrefix(24, "10.10.10.0")}
 
-	adjRib := NewAdjRib("test", []bgp.RouteFamily{bgp.RF_IPv4_UC, bgp.RF_IPv6_UC})
+	adjRib := NewAdjRib([]bgp.RouteFamily{bgp.RF_IPv4_UC, bgp.RF_IPv6_UC})
 	m1 := bgp.NewBGPUpdateMessage(nil, pathAttributes, nlri)
 	peer := peerR1()
 	pList1 := ProcessMessage(m1, peer, time.Now())
 	path1 := pList1[0]
-	t1 := path1.OriginInfo().timestamp
+	t1 := path1.GetTimestamp()
 	adjRib.Update(pList1)
 
 	m2 := bgp.NewBGPUpdateMessage(nil, pathAttributes, nlri)

@@ -62,26 +62,78 @@ func newCountBatchCursor(cur tsdb.Cursor) tsdb.Cursor {
 	}
 }
 
-func newMultiShardBatchCursor(ctx context.Context, row seriesRow, rr *readRequest) tsdb.Cursor {
-	req := &tsdb.CursorRequest{
-		Measurement: row.measurement,
-		Series:      row.key,
-		Field:       row.field,
-		Ascending:   rr.asc,
-		StartTime:   rr.start,
-		EndTime:     rr.end,
+type cursorContext struct {
+	ctx   context.Context
+	req   *tsdb.CursorRequest
+	itrs  tsdb.CursorIterators
+	limit int64
+	count int64
+	err   error
+}
+
+type multiShardBatchCursors struct {
+	ctx   context.Context
+	limit int64
+	req   tsdb.CursorRequest
+
+	cursors struct {
+		i integerMultiShardBatchCursor
+		f floatMultiShardBatchCursor
+		u unsignedMultiShardBatchCursor
+		b booleanMultiShardBatchCursor
+		s stringMultiShardBatchCursor
 	}
+}
+
+// TODO(sgc): temporary to keep megacheck happy; BatchCursors will be removed in subsequent PR
+var _ = newMultiShardBatchCursors
+
+func newMultiShardBatchCursors(ctx context.Context, rr *readRequest) *multiShardBatchCursors {
+	lim := rr.limit
+	if lim < 0 {
+		lim = 1
+	}
+
+	m := &multiShardBatchCursors{
+		ctx:   ctx,
+		limit: lim,
+		req: tsdb.CursorRequest{
+			Ascending: rr.asc,
+			StartTime: rr.start,
+			EndTime:   rr.end,
+		},
+	}
+
+	cc := cursorContext{
+		ctx:   ctx,
+		limit: lim,
+		req:   &m.req,
+	}
+
+	m.cursors.i.cursorContext = cc
+	m.cursors.f.cursorContext = cc
+	m.cursors.u.cursorContext = cc
+	m.cursors.b.cursorContext = cc
+	m.cursors.s.cursorContext = cc
+
+	return m
+}
+
+func (m *multiShardBatchCursors) createCursor(row seriesRow) tsdb.Cursor {
+	m.req.Name = row.name
+	m.req.Tags = row.stags
+	m.req.Field = row.field.n
 
 	var cond expression
 	if row.valueCond != nil {
 		cond = &astExpr{row.valueCond}
 	}
 
-	var shard *tsdb.Shard
+	var shard tsdb.CursorIterator
 	var cur tsdb.Cursor
-	for cur == nil && len(row.shards) > 0 {
-		shard, row.shards = row.shards[0], row.shards[1:]
-		cur, _ = shard.CreateCursor(ctx, req)
+	for cur == nil && len(row.query) > 0 {
+		shard, row.query = row.query[0], row.query[1:]
+		cur, _ = shard.Next(m.ctx, &m.req)
 	}
 
 	if cur == nil {
@@ -90,16 +142,25 @@ func newMultiShardBatchCursor(ctx context.Context, row seriesRow, rr *readReques
 
 	switch c := cur.(type) {
 	case tsdb.IntegerBatchCursor:
-		return newIntegerMultiShardBatchCursor(ctx, c, rr, req, row.shards, cond)
+		m.cursors.i.reset(c, row.query, cond)
+		return &m.cursors.i
 	case tsdb.FloatBatchCursor:
-		return newFloatMultiShardBatchCursor(ctx, c, rr, req, row.shards, cond)
+		m.cursors.f.reset(c, row.query, cond)
+		return &m.cursors.f
 	case tsdb.UnsignedBatchCursor:
-		return newUnsignedMultiShardBatchCursor(ctx, c, rr, req, row.shards, cond)
+		m.cursors.u.reset(c, row.query, cond)
+		return &m.cursors.u
 	case tsdb.StringBatchCursor:
-		return newStringMultiShardBatchCursor(ctx, c, rr, req, row.shards, cond)
+		m.cursors.s.reset(c, row.query, cond)
+		return &m.cursors.s
 	case tsdb.BooleanBatchCursor:
-		return newBooleanMultiShardBatchCursor(ctx, c, rr, req, row.shards, cond)
+		m.cursors.b.reset(c, row.query, cond)
+		return &m.cursors.b
 	default:
 		panic(fmt.Sprintf("unreachable: %T", cur))
 	}
+}
+
+func (m *multiShardBatchCursors) newAggregateCursor(ctx context.Context, agg *Aggregate, cursor tsdb.Cursor) tsdb.Cursor {
+	return newAggregateBatchCursor(ctx, agg, cursor)
 }

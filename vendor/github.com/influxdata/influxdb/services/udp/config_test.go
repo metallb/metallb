@@ -16,6 +16,7 @@ enabled = true
 bind-address = ":4444"
 database = "awesomedb"
 retention-policy = "awesomerp"
+precision = "s"
 batch-size = 100
 batch-pending = 9
 batch-timeout = "10ms"
@@ -25,7 +26,7 @@ udp-payload-size = 1500
 	}
 
 	// Validate configuration.
-	if c.Enabled != true {
+	if !c.Enabled {
 		t.Fatalf("unexpected enabled: %v", c.Enabled)
 	} else if c.BindAddress != ":4444" {
 		t.Fatalf("unexpected bind address: %s", c.BindAddress)
@@ -33,6 +34,8 @@ udp-payload-size = 1500
 		t.Fatalf("unexpected database: %s", c.Database)
 	} else if c.RetentionPolicy != "awesomerp" {
 		t.Fatalf("unexpected retention policy: %s", c.RetentionPolicy)
+	} else if c.Precision != "s" {
+		t.Fatalf("unexpected precision: %s", c.Precision)
 	} else if c.BatchSize != 100 {
 		t.Fatalf("unexpected batch size: %d", c.BatchSize)
 	} else if c.BatchPending != 9 {

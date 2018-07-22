@@ -90,10 +90,7 @@ func extractTomlFromMarkdown(fileMd string, fileToml string) error {
 	}
 
 	fTomlWriter.Flush()
-	if err := scanner.Err(); err != nil {
-		return err
-	}
-	return nil
+	return scanner.Err()
 }
 
 func TestConfigExample(t *testing.T) {

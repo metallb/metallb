@@ -19,26 +19,22 @@ import (
 	"encoding/hex"
 	"math/rand"
 	"net"
-	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func verifyRTRMessage(t *testing.T, m1 RTRMessage) {
 	buf1, _ := m1.Serialize()
 	m2, err := ParseRTR(buf1)
-	if err != nil {
-		t.Error(err)
-	}
-	buf2, _ := m2.Serialize()
+	require.NoError(t, err)
 
-	if reflect.DeepEqual(buf1, buf2) == true {
-		t.Log("OK")
-	} else {
-		t.Errorf("Something wrong")
-		t.Error(len(buf1), m1, hex.EncodeToString(buf1))
-		t.Error(len(buf2), m2, hex.EncodeToString(buf2))
-	}
+	buf2, err := m2.Serialize()
+	require.NoError(t, err)
+
+	assert.Equal(t, buf1, buf2, "buf1: %v buf2: %v", hex.EncodeToString(buf1), hex.EncodeToString(buf2))
 }
 
 func randUint32() uint32 {

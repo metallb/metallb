@@ -18,7 +18,7 @@ var (
 type packetConn struct{}
 
 // listenPacket is not currently implemented on this platform.
-func listenPacket(ifi *net.Interface, proto uint16) (*packetConn, error) {
+func listenPacket(ifi *net.Interface, proto uint16, cfg *Config) (*packetConn, error) {
 	return nil, ErrNotImplemented
 }
 
@@ -65,4 +65,9 @@ func (p *packetConn) SetBPF(filter []bpf.RawInstruction) error {
 // SetPromisc is not currently implemented on this platform.
 func (p *packetConn) SetPromiscuous(b bool) error {
 	return ErrNotImplemented
+}
+
+// Stats is not currently implemented on this platform.
+func (p *packetConn) Stats() (*Stats, error) {
+	return nil, ErrNotImplemented
 }

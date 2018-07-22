@@ -9,7 +9,7 @@ import (
 	"net"
 )
 
-// A Cursor repesents a movable indicator on a single or multiple
+// A Cursor represents a movable indicator on single or multiple
 // prefixes.
 type Cursor struct {
 	curr, start, end ipv6Int

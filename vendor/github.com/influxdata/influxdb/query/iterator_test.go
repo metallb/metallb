@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"math"
 	"reflect"
 	"strings"
 	"testing"
@@ -770,44 +769,6 @@ func TestLimitIterator_Boolean(t *testing.T) {
 	}
 }
 
-// Ensure auxiliary iterators can be created for auxilary fields.
-func TestFloatAuxIterator(t *testing.T) {
-	itr := query.NewAuxIterator(
-		&FloatIterator{Points: []query.FloatPoint{
-			{Time: 0, Value: 1, Aux: []interface{}{float64(100), float64(200)}},
-			{Time: 1, Value: 2, Aux: []interface{}{float64(500), math.NaN()}},
-		}},
-		query.IteratorOptions{Aux: []influxql.VarRef{{Val: "f0", Type: influxql.Float}, {Val: "f1", Type: influxql.Float}}},
-	)
-
-	itrs := []query.Iterator{
-		itr,
-		itr.Iterator("f0", influxql.Unknown),
-		itr.Iterator("f1", influxql.Unknown),
-		itr.Iterator("f0", influxql.Unknown),
-	}
-	itr.Start()
-
-	if a, err := Iterators(itrs).ReadAll(); err != nil {
-		t.Fatalf("unexpected error: %s", err)
-	} else if !deep.Equal(a, [][]query.Point{
-		{
-			&query.FloatPoint{Time: 0, Value: 1, Aux: []interface{}{float64(100), float64(200)}},
-			&query.FloatPoint{Time: 0, Value: float64(100)},
-			&query.FloatPoint{Time: 0, Value: float64(200)},
-			&query.FloatPoint{Time: 0, Value: float64(100)},
-		},
-		{
-			&query.FloatPoint{Time: 1, Value: 2, Aux: []interface{}{float64(500), math.NaN()}},
-			&query.FloatPoint{Time: 1, Value: float64(500)},
-			&query.FloatPoint{Time: 1, Value: math.NaN()},
-			&query.FloatPoint{Time: 1, Value: float64(500)},
-		},
-	}) {
-		t.Fatalf("unexpected points: %s", spew.Sdump(a))
-	}
-}
-
 // Ensure limit iterator returns a subset of points.
 func TestLimitIterator(t *testing.T) {
 	itr := query.NewLimitIterator(
@@ -1552,40 +1513,14 @@ func TestIterator_EncodeDecode(t *testing.T) {
 	}
 }
 
-// IteratorCreator is a mockable implementation of SelectStatementExecutor.IteratorCreator.
-type IteratorCreator struct {
-	CreateIteratorFn  func(ctx context.Context, m *influxql.Measurement, opt query.IteratorOptions) (query.Iterator, error)
-	FieldDimensionsFn func(m *influxql.Measurement) (fields map[string]influxql.DataType, dimensions map[string]struct{}, err error)
-}
-
-func (ic *IteratorCreator) CreateIterator(ctx context.Context, m *influxql.Measurement, opt query.IteratorOptions) (query.Iterator, error) {
-	return ic.CreateIteratorFn(ctx, m, opt)
-}
-
-func (ic *IteratorCreator) FieldDimensions(m *influxql.Measurement) (fields map[string]influxql.DataType, dimensions map[string]struct{}, err error) {
-	return ic.FieldDimensionsFn(m)
-}
-
-func (ic *IteratorCreator) MapType(m *influxql.Measurement, field string) influxql.DataType {
-	f, d, err := ic.FieldDimensions(m)
-	if err != nil {
-		return influxql.Unknown
-	}
-
-	if typ, ok := f[field]; ok {
-		return typ
-	}
-	if _, ok := d[field]; ok {
-		return influxql.Tag
-	}
-	return influxql.Unknown
-}
-
 // Test implementation of influxql.FloatIterator
 type FloatIterator struct {
-	Points []query.FloatPoint
-	Closed bool
-	stats  query.IteratorStats
+	Context context.Context
+	Points  []query.FloatPoint
+	Closed  bool
+	Delay   time.Duration
+	stats   query.IteratorStats
+	point   query.FloatPoint
 }
 
 func (itr *FloatIterator) Stats() query.IteratorStats { return itr.stats }
@@ -1597,9 +1532,38 @@ func (itr *FloatIterator) Next() (*query.FloatPoint, error) {
 		return nil, nil
 	}
 
+	// If we have asked for a delay, then delay the returning of the point
+	// until either an (optional) context is done or the time has passed.
+	if itr.Delay > 0 {
+		var done <-chan struct{}
+		if itr.Context != nil {
+			done = itr.Context.Done()
+		}
+
+		timer := time.NewTimer(itr.Delay)
+		select {
+		case <-timer.C:
+		case <-done:
+			timer.Stop()
+			return nil, itr.Context.Err()
+		}
+	}
 	v := &itr.Points[0]
 	itr.Points = itr.Points[1:]
-	return v, nil
+
+	// Copy the returned point into a static point that we return.
+	// This actual storage engine returns a point from the same memory location
+	// so we need to test that the query engine does not misuse this memory.
+	itr.point.Name = v.Name
+	itr.point.Tags = v.Tags
+	itr.point.Time = v.Time
+	itr.point.Value = v.Value
+	itr.point.Nil = v.Nil
+	if len(itr.point.Aux) != len(v.Aux) {
+		itr.point.Aux = make([]interface{}, len(v.Aux))
+	}
+	copy(itr.point.Aux, v.Aux)
+	return &itr.point, nil
 }
 
 func FloatIterators(inputs []*FloatIterator) []query.Iterator {
@@ -1615,6 +1579,7 @@ type IntegerIterator struct {
 	Points []query.IntegerPoint
 	Closed bool
 	stats  query.IteratorStats
+	point  query.IntegerPoint
 }
 
 func (itr *IntegerIterator) Stats() query.IteratorStats { return itr.stats }
@@ -1628,7 +1593,20 @@ func (itr *IntegerIterator) Next() (*query.IntegerPoint, error) {
 
 	v := &itr.Points[0]
 	itr.Points = itr.Points[1:]
-	return v, nil
+
+	// Copy the returned point into a static point that we return.
+	// This actual storage engine returns a point from the same memory location
+	// so we need to test that the query engine does not misuse this memory.
+	itr.point.Name = v.Name
+	itr.point.Tags = v.Tags
+	itr.point.Time = v.Time
+	itr.point.Value = v.Value
+	itr.point.Nil = v.Nil
+	if len(itr.point.Aux) != len(v.Aux) {
+		itr.point.Aux = make([]interface{}, len(v.Aux))
+	}
+	copy(itr.point.Aux, v.Aux)
+	return &itr.point, nil
 }
 
 func IntegerIterators(inputs []*IntegerIterator) []query.Iterator {
@@ -1644,6 +1622,7 @@ type UnsignedIterator struct {
 	Points []query.UnsignedPoint
 	Closed bool
 	stats  query.IteratorStats
+	point  query.UnsignedPoint
 }
 
 func (itr *UnsignedIterator) Stats() query.IteratorStats { return itr.stats }
@@ -1657,7 +1636,20 @@ func (itr *UnsignedIterator) Next() (*query.UnsignedPoint, error) {
 
 	v := &itr.Points[0]
 	itr.Points = itr.Points[1:]
-	return v, nil
+
+	// Copy the returned point into a static point that we return.
+	// This actual storage engine returns a point from the same memory location
+	// so we need to test that the query engine does not misuse this memory.
+	itr.point.Name = v.Name
+	itr.point.Tags = v.Tags
+	itr.point.Time = v.Time
+	itr.point.Value = v.Value
+	itr.point.Nil = v.Nil
+	if len(itr.point.Aux) != len(v.Aux) {
+		itr.point.Aux = make([]interface{}, len(v.Aux))
+	}
+	copy(itr.point.Aux, v.Aux)
+	return &itr.point, nil
 }
 
 func UnsignedIterators(inputs []*UnsignedIterator) []query.Iterator {
@@ -1673,6 +1665,7 @@ type StringIterator struct {
 	Points []query.StringPoint
 	Closed bool
 	stats  query.IteratorStats
+	point  query.StringPoint
 }
 
 func (itr *StringIterator) Stats() query.IteratorStats { return itr.stats }
@@ -1686,7 +1679,20 @@ func (itr *StringIterator) Next() (*query.StringPoint, error) {
 
 	v := &itr.Points[0]
 	itr.Points = itr.Points[1:]
-	return v, nil
+
+	// Copy the returned point into a static point that we return.
+	// This actual storage engine returns a point from the same memory location
+	// so we need to test that the query engine does not misuse this memory.
+	itr.point.Name = v.Name
+	itr.point.Tags = v.Tags
+	itr.point.Time = v.Time
+	itr.point.Value = v.Value
+	itr.point.Nil = v.Nil
+	if len(itr.point.Aux) != len(v.Aux) {
+		itr.point.Aux = make([]interface{}, len(v.Aux))
+	}
+	copy(itr.point.Aux, v.Aux)
+	return &itr.point, nil
 }
 
 func StringIterators(inputs []*StringIterator) []query.Iterator {
@@ -1702,6 +1708,7 @@ type BooleanIterator struct {
 	Points []query.BooleanPoint
 	Closed bool
 	stats  query.IteratorStats
+	point  query.BooleanPoint
 }
 
 func (itr *BooleanIterator) Stats() query.IteratorStats { return itr.stats }
@@ -1715,7 +1722,20 @@ func (itr *BooleanIterator) Next() (*query.BooleanPoint, error) {
 
 	v := &itr.Points[0]
 	itr.Points = itr.Points[1:]
-	return v, nil
+
+	// Copy the returned point into a static point that we return.
+	// This actual storage engine returns a point from the same memory location
+	// so we need to test that the query engine does not misuse this memory.
+	itr.point.Name = v.Name
+	itr.point.Tags = v.Tags
+	itr.point.Time = v.Time
+	itr.point.Value = v.Value
+	itr.point.Nil = v.Nil
+	if len(itr.point.Aux) != len(v.Aux) {
+		itr.point.Aux = make([]interface{}, len(v.Aux))
+	}
+	copy(itr.point.Aux, v.Aux)
+	return &itr.point, nil
 }
 
 func BooleanIterators(inputs []*BooleanIterator) []query.Iterator {

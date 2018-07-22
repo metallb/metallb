@@ -314,10 +314,10 @@ func makePeerAndHandler() (*Peer, *FSMHandler) {
 	}
 
 	h := &FSMHandler{
-		fsm:      p.fsm,
-		errorCh:  make(chan FsmStateReason, 2),
-		incoming: channels.NewInfiniteChannel(),
-		outgoing: p.outgoing,
+		fsm:           p.fsm,
+		stateReasonCh: make(chan FsmStateReason, 2),
+		incoming:      channels.NewInfiniteChannel(),
+		outgoing:      p.outgoing,
 	}
 
 	return p, h

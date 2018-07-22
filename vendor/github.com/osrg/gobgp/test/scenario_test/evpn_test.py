@@ -80,7 +80,7 @@ class GoBGPTestBase(unittest.TestCase):
 
     def test_02_add_evpn_route(self):
         self.g1.local('gobgp global rib add '
-                      '-a evpn macadv 11:22:33:44:55:66 10.0.0.1 1000 1000 '
+                      '-a evpn macadv 11:22:33:44:55:66 10.0.0.1 esi AS 1 1 1 etag 1000 label 1000 '
                       'rd 10:10 rt 10:10')
         grib = self.g1.get_global_rib(rf='evpn')
         self.assertTrue(len(grib) == 1)
@@ -111,7 +111,7 @@ class GoBGPTestBase(unittest.TestCase):
 
     def test_03_check_mac_mobility(self):
         self.g2.local('gobgp global rib add '
-                      '-a evpn macadv 11:22:33:44:55:66 10.0.0.1 1000 1000 '
+                      '-a evpn macadv 11:22:33:44:55:66 10.0.0.1 esi AS 2 1 1 etag 1000 label 1000 '
                       'rd 10:20 rt 10:10')
 
         time.sleep(3)
@@ -127,7 +127,7 @@ class GoBGPTestBase(unittest.TestCase):
 
     def test_04_check_mac_mobility_again(self):
         self.g1.local('gobgp global rib add '
-                      '-a evpn macadv 11:22:33:44:55:66 10.0.0.1 1000 1000 '
+                      '-a evpn macadv 11:22:33:44:55:66 10.0.0.1 esi AS 3 1 1 etag 1000 label 1000 '
                       'rd 10:20 rt 10:10')
 
         time.sleep(3)

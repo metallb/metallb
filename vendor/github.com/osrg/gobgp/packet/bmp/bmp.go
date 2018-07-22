@@ -391,8 +391,9 @@ func NewBMPPeerDownNotification(p BMPPeerHeader, reason uint8, notification *bgp
 	switch reason {
 	case BMP_PEER_DOWN_REASON_LOCAL_BGP_NOTIFICATION, BMP_PEER_DOWN_REASON_REMOTE_BGP_NOTIFICATION:
 		b.BGPNotification = notification
-	default:
+	case BMP_PEER_DOWN_REASON_LOCAL_NO_NOTIFICATION:
 		b.Data = data
+	default:
 	}
 	return &BMPMessage{
 		Header: BMPHeader{

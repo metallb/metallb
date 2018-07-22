@@ -72,9 +72,9 @@ const (
 )
 
 const (
-	BGP_ORIGIN_ATTR_TYPE_IGP        = 0
-	BGP_ORIGIN_ATTR_TYPE_EGP        = 1
-	BGP_ORIGIN_ATTR_TYPE_INCOMPLETE = 2
+	BGP_ORIGIN_ATTR_TYPE_IGP        uint8 = 0
+	BGP_ORIGIN_ATTR_TYPE_EGP        uint8 = 1
+	BGP_ORIGIN_ATTR_TYPE_INCOMPLETE uint8 = 2
 )
 
 const (
@@ -170,6 +170,31 @@ const (
 	TUNNEL_TYPE_MPLS_IN_UDP TunnelType = 13
 )
 
+func (p TunnelType) String() string {
+	switch p {
+	case TUNNEL_TYPE_L2TP3:
+		return "l2tp3"
+	case TUNNEL_TYPE_GRE:
+		return "gre"
+	case TUNNEL_TYPE_IP_IN_IP:
+		return "ip-in-ip"
+	case TUNNEL_TYPE_VXLAN:
+		return "vxlan"
+	case TUNNEL_TYPE_NVGRE:
+		return "nvgre"
+	case TUNNEL_TYPE_MPLS:
+		return "mpls"
+	case TUNNEL_TYPE_MPLS_IN_GRE:
+		return "mpls-in-gre"
+	case TUNNEL_TYPE_VXLAN_GRE:
+		return "vxlan-gre"
+	case TUNNEL_TYPE_MPLS_IN_UDP:
+		return "mpls-in-udp"
+	default:
+		return fmt.Sprintf("TunnelType(%d)", uint8(p))
+	}
+}
+
 type PmsiTunnelType uint8
 
 const (
@@ -238,8 +263,8 @@ const (
 	BGP_CAP_FOUR_OCTET_AS_NUMBER        BGPCapabilityCode = 65
 	BGP_CAP_ADD_PATH                    BGPCapabilityCode = 69
 	BGP_CAP_ENHANCED_ROUTE_REFRESH      BGPCapabilityCode = 70
+	BGP_CAP_LONG_LIVED_GRACEFUL_RESTART BGPCapabilityCode = 71
 	BGP_CAP_ROUTE_REFRESH_CISCO         BGPCapabilityCode = 128
-	BGP_CAP_LONG_LIVED_GRACEFUL_RESTART BGPCapabilityCode = 129
 )
 
 var CapNameMap = map[BGPCapabilityCode]string{
@@ -261,6 +286,51 @@ func (c BGPCapabilityCode) String() string {
 	}
 	return fmt.Sprintf("UnknownCapability(%d)", c)
 }
+
+var (
+	// Used parsing RouteDistinguisher
+	_regexpRouteDistinguisher = regexp.MustCompile(`^((\d+)\.(\d+)\.(\d+)\.(\d+)|((\d+)\.)?(\d+)|([\w]+:[\w:]*:[\w]+)):(\d+)$`)
+
+	// Used for operator and value for the FlowSpec numeric type
+	// Example:
+	// re.FindStringSubmatch("&==80")
+	// >>> ["&==80" "&" "==" "80"]
+	_regexpFlowSpecNumericType = regexp.MustCompile(`(&?)(==|=|>|>=|<|<=|!|!=|=!)?(\d+|-\d|true|false)`)
+
+	// - "=!" is used in the old style format of "tcp-flags" and "fragment".
+	// - The value field should be one of the followings:
+	//     * Decimal value (e.g., 80)
+	//     * Combination of the small letters, decimals, "-" and "+"
+	//       (e.g., tcp, ipv4, is-fragment+first-fragment)
+	//     * Capital letters (e.g., SA)
+	_regexpFlowSpecOperator      = regexp.MustCompile(`&|=|>|<|!|[\w\-+]+`)
+	_regexpFlowSpecOperatorValue = regexp.MustCompile(`[\w\-+]+`)
+
+	// Note: "(-*)" and "(.*)" catch the invalid flags
+	// Example: In this case, "Z" is unsupported flag type.
+	// re.FindStringSubmatch("&==-SZU")
+	// >>> ["&==-SZU" "&" "==" "-" "S" "ZU"]
+	_regexpFlowSpecTCPFlag = regexp.MustCompile("(&?)(==|=|!|!=|=!)?(-*)([FSRPAUCE]+)(.*)")
+
+	// Note: "(.*)" catches the invalid flags
+	// re.FindStringSubmatch("&!=+first-fragment+last-fragment+invalid-fragment")
+	// >>> ["&!=+first-fragment+last-fragment+invalid-fragment" "&" "!=" "+first-fragment+last-fragment" "+last-fragment" "+" "last" "+invalid-fragment"]
+	_regexpFlowSpecFragment = regexp.MustCompile(`(&?)(==|=|!|!=|=!)?(((\+)?(dont|is|first|last|not-a)-fragment)+)(.*)`)
+
+	// re.FindStringSubmatch("192.168.0.0/24")
+	// >>> ["192.168.0.0/24" "192.168.0.0" "/24" "24"]
+	// re.FindStringSubmatch("192.168.0.1")
+	// >>> ["192.168.0.1" "192.168.0.1" "" ""]
+	_regexpFindIPv4Prefix = regexp.MustCompile(`^([\d.]+)(/(\d{1,2}))?`)
+
+	// re.FindStringSubmatch("2001:dB8::/64")
+	// >>> ["2001:dB8::/64" "2001:dB8::" "/64" "64" "" ""]
+	// re.FindStringSubmatch("2001:dB8::/64/8")
+	// >>> ["2001:dB8::/64/8" "2001:dB8::" "/64" "64" "/8" "8"]
+	// re.FindStringSubmatch("2001:dB8::1")
+	// >>> ["2001:dB8::1" "2001:dB8::1" "" "" "" ""]
+	_regexpFindIPv6Prefix = regexp.MustCompile(`^([a-fA-F\d:.]+)(/(\d{1,3}))?(/(\d{1,3}))?`)
+)
 
 type ParameterCapabilityInterface interface {
 	DecodeFromBytes([]byte) error
@@ -361,6 +431,14 @@ func NewCapRouteRefresh() *CapRouteRefresh {
 
 type CapCarryingLabelInfo struct {
 	DefaultParameterCapability
+}
+
+func NewCapCarryingLabelInfo() *CapCarryingLabelInfo {
+	return &CapCarryingLabelInfo{
+		DefaultParameterCapability{
+			CapCode: BGP_CAP_CARRYING_LABEL_INFO,
+		},
+	}
 }
 
 type CapExtendedNexthopTuple struct {
@@ -811,6 +889,15 @@ type CapUnknown struct {
 	DefaultParameterCapability
 }
 
+func NewCapUnknown(code BGPCapabilityCode, value []byte) *CapUnknown {
+	return &CapUnknown{
+		DefaultParameterCapability{
+			CapCode:  code,
+			CapValue: value,
+		},
+	}
+}
+
 func DecodeCapability(data []byte) (ParameterCapabilityInterface, error) {
 	if len(data) < 2 {
 		return nil, NewMessageError(BGP_ERROR_OPEN_MESSAGE_ERROR, BGP_ERROR_SUB_UNSUPPORTED_CAPABILITY, nil, "Not all ParameterCapability bytes available")
@@ -917,6 +1004,9 @@ type BGPOpen struct {
 }
 
 func (msg *BGPOpen) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
+	if len(data) < 10 {
+		return NewMessageError(BGP_ERROR_MESSAGE_HEADER_ERROR, BGP_ERROR_SUB_BAD_MESSAGE_LENGTH, nil, "Not all BGP Open message bytes available")
+	}
 	msg.Version = data[0]
 	msg.MyAS = binary.BigEndian.Uint16(data[1:3])
 	msg.HoldTime = binary.BigEndian.Uint16(data[3:5])
@@ -1052,6 +1142,14 @@ func (r *IPAddrPrefixDefault) decodePrefix(data []byte, bitlen uint8, addrlen ui
 	}
 	b := make([]byte, addrlen)
 	copy(b, data[:bytelen])
+	// clear trailing bits in the last byte. rfc doesn't require
+	// this but some bgp implementations need this...
+	rem := bitlen % 8
+	if rem != 0 {
+		mask := 0xff00 >> rem
+		lastByte := b[bytelen-1] & byte(mask)
+		b[bytelen-1] = lastByte
+	}
 	r.Prefix = b
 	return nil
 }
@@ -1060,21 +1158,7 @@ func (r *IPAddrPrefixDefault) serializePrefix(bitLen uint8) ([]byte, error) {
 	byteLen := (int(bitLen) + 7) / 8
 	buf := make([]byte, byteLen)
 	copy(buf, r.Prefix)
-	// clear trailing bits in the last byte. rfc doesn't require
-	// this though.
-	rem := bitLen % 8
-	if rem != 0 {
-		mask := 0xff00 >> rem
-		lastByte := buf[byteLen-1] & byte(mask)
-		buf[byteLen-1] = lastByte
-	}
-	r.Prefix = make([]byte, len(r.Prefix))
-	copy(r.Prefix, buf)
 	return buf, nil
-}
-
-func (r *IPAddrPrefixDefault) Len(options ...*MarshallingOption) int {
-	return 1 + ((int(r.Length) + 7) / 8)
 }
 
 func (r *IPAddrPrefixDefault) String() string {
@@ -1147,14 +1231,19 @@ func (r *IPAddrPrefix) SAFI() uint8 {
 	return SAFI_UNICAST
 }
 
+func (r *IPAddrPrefix) Len(options ...*MarshallingOption) int {
+	return 1 + ((int(r.Length) + 7) / 8)
+}
+
 func NewIPAddrPrefix(length uint8, prefix string) *IPAddrPrefix {
-	return &IPAddrPrefix{
+	p := &IPAddrPrefix{
 		IPAddrPrefixDefault{
 			Length: length,
-			Prefix: net.ParseIP(prefix).To4(),
 		},
 		4,
 	}
+	p.IPAddrPrefixDefault.decodePrefix(net.ParseIP(prefix).To4(), length, 4)
+	return p
 }
 
 func isIPv4MappedIPv6(ip net.IP) bool {
@@ -1178,15 +1267,16 @@ func (r *IPv6AddrPrefix) String() string {
 }
 
 func NewIPv6AddrPrefix(length uint8, prefix string) *IPv6AddrPrefix {
-	return &IPv6AddrPrefix{
+	p := &IPv6AddrPrefix{
 		IPAddrPrefix{
 			IPAddrPrefixDefault{
 				Length: length,
-				Prefix: net.ParseIP(prefix),
 			},
 			16,
 		},
 	}
+	p.IPAddrPrefixDefault.decodePrefix(net.ParseIP(prefix), length, 16)
+	return p
 }
 
 const (
@@ -1204,38 +1294,19 @@ type RouteDistinguisherInterface interface {
 }
 
 type DefaultRouteDistinguisher struct {
-	Type  uint16
-	Value []byte
+	Type uint16
 }
 
-func (rd *DefaultRouteDistinguisher) DecodeFromBytes(data []byte) error {
-	rd.Type = binary.BigEndian.Uint16(data[0:2])
-	rd.Value = data[2:8]
-	return nil
-}
-
-func (rd *DefaultRouteDistinguisher) Serialize() ([]byte, error) {
+func (rd *DefaultRouteDistinguisher) serialize(value []byte) ([]byte, error) {
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint16(buf, rd.Type)
-	copy(buf[2:], rd.Value)
+	copy(buf[2:], value)
 	return buf, nil
 }
 
-func (rd *DefaultRouteDistinguisher) String() string {
-	return fmt.Sprintf("%v", rd.Value)
+func (rd *DefaultRouteDistinguisher) Len() int {
+	return 8
 }
-
-func (rd *DefaultRouteDistinguisher) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Type  uint16 `json:"type"`
-		Value []byte `json:"value"`
-	}{
-		Type:  rd.Type,
-		Value: rd.Value,
-	})
-}
-
-func (rd *DefaultRouteDistinguisher) Len() int { return 8 }
 
 type RouteDistinguisherTwoOctetAS struct {
 	DefaultRouteDistinguisher
@@ -1243,12 +1314,17 @@ type RouteDistinguisherTwoOctetAS struct {
 	Assigned uint32
 }
 
+func (rd *RouteDistinguisherTwoOctetAS) DecodeFromBytes(data []byte) error {
+	rd.Admin = binary.BigEndian.Uint16(data[0:2])
+	rd.Assigned = binary.BigEndian.Uint32(data[2:6])
+	return nil
+}
+
 func (rd *RouteDistinguisherTwoOctetAS) Serialize() ([]byte, error) {
 	buf := make([]byte, 6)
-	binary.BigEndian.PutUint16(buf[0:], rd.Admin)
-	binary.BigEndian.PutUint32(buf[2:], rd.Assigned)
-	rd.Value = buf
-	return rd.DefaultRouteDistinguisher.Serialize()
+	binary.BigEndian.PutUint16(buf[0:2], rd.Admin)
+	binary.BigEndian.PutUint32(buf[2:6], rd.Assigned)
+	return rd.serialize(buf)
 }
 
 func (rd *RouteDistinguisherTwoOctetAS) String() string {
@@ -1283,12 +1359,17 @@ type RouteDistinguisherIPAddressAS struct {
 	Assigned uint16
 }
 
+func (rd *RouteDistinguisherIPAddressAS) DecodeFromBytes(data []byte) error {
+	rd.Admin = data[0:4]
+	rd.Assigned = binary.BigEndian.Uint16(data[4:6])
+	return nil
+}
+
 func (rd *RouteDistinguisherIPAddressAS) Serialize() ([]byte, error) {
 	buf := make([]byte, 6)
-	copy(buf[0:], rd.Admin.To4())
-	binary.BigEndian.PutUint16(buf[4:], rd.Assigned)
-	rd.Value = buf
-	return rd.DefaultRouteDistinguisher.Serialize()
+	copy(buf[0:4], rd.Admin.To4())
+	binary.BigEndian.PutUint16(buf[4:6], rd.Assigned)
+	return rd.serialize(buf)
 }
 
 func (rd *RouteDistinguisherIPAddressAS) String() string {
@@ -1323,12 +1404,17 @@ type RouteDistinguisherFourOctetAS struct {
 	Assigned uint16
 }
 
+func (rd *RouteDistinguisherFourOctetAS) DecodeFromBytes(data []byte) error {
+	rd.Admin = binary.BigEndian.Uint32(data[0:4])
+	rd.Assigned = binary.BigEndian.Uint16(data[4:6])
+	return nil
+}
+
 func (rd *RouteDistinguisherFourOctetAS) Serialize() ([]byte, error) {
 	buf := make([]byte, 6)
-	binary.BigEndian.PutUint32(buf[0:], rd.Admin)
-	binary.BigEndian.PutUint16(buf[4:], rd.Assigned)
-	rd.Value = buf
-	return rd.DefaultRouteDistinguisher.Serialize()
+	binary.BigEndian.PutUint32(buf[0:4], rd.Admin)
+	binary.BigEndian.PutUint16(buf[4:6], rd.Assigned)
+	return rd.serialize(buf)
 }
 
 func (rd *RouteDistinguisherFourOctetAS) String() string {
@@ -1361,11 +1447,35 @@ func NewRouteDistinguisherFourOctetAS(admin uint32, assigned uint16) *RouteDisti
 
 type RouteDistinguisherUnknown struct {
 	DefaultRouteDistinguisher
+	Value []byte
+}
+
+func (rd *RouteDistinguisherUnknown) DecodeFromBytes(data []byte) error {
+	rd.Value = data[0:6]
+	return nil
+}
+
+func (rd *RouteDistinguisherUnknown) Serialize() ([]byte, error) {
+	return rd.DefaultRouteDistinguisher.serialize(rd.Value)
+}
+
+func (rd *RouteDistinguisherUnknown) String() string {
+	return fmt.Sprintf("%v", rd.Value)
+}
+
+func (rd *RouteDistinguisherUnknown) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type  uint16 `json:"type"`
+		Value []byte `json:"value"`
+	}{
+		Type:  rd.Type,
+		Value: rd.Value,
+	})
 }
 
 func GetRouteDistinguisher(data []byte) RouteDistinguisherInterface {
-	rdtype := binary.BigEndian.Uint16(data[0:2])
-	switch rdtype {
+	typ := binary.BigEndian.Uint16(data[0:2])
+	switch typ {
 	case BGP_RD_TWO_OCTET_AS:
 		return NewRouteDistinguisherTwoOctetAS(binary.BigEndian.Uint16(data[2:4]), binary.BigEndian.Uint32(data[4:8]))
 	case BGP_RD_IPV4_ADDRESS:
@@ -1373,14 +1483,16 @@ func GetRouteDistinguisher(data []byte) RouteDistinguisherInterface {
 	case BGP_RD_FOUR_OCTET_AS:
 		return NewRouteDistinguisherFourOctetAS(binary.BigEndian.Uint32(data[2:6]), binary.BigEndian.Uint16(data[6:8]))
 	}
-	rd := &RouteDistinguisherUnknown{}
-	rd.Type = rdtype
+	rd := &RouteDistinguisherUnknown{
+		DefaultRouteDistinguisher: DefaultRouteDistinguisher{
+			Type: typ,
+		},
+	}
 	return rd
 }
 
 func parseRdAndRt(input string) ([]string, error) {
-	exp := regexp.MustCompile("^((\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)|((\\d+)\\.)?(\\d+)|([\\w]+:[\\w:]*:[\\w]+)):(\\d+)$")
-	elems := exp.FindStringSubmatch(input)
+	elems := _regexpRouteDistinguisher.FindStringSubmatch(input)
 	if len(elems) != 11 {
 		return nil, fmt.Errorf("failed to parse")
 	}
@@ -1392,17 +1504,17 @@ func ParseRouteDistinguisher(rd string) (RouteDistinguisherInterface, error) {
 	if err != nil {
 		return nil, err
 	}
-	assigned, _ := strconv.Atoi(elems[10])
+	assigned, _ := strconv.ParseUint(elems[10], 10, 32)
 	ip := net.ParseIP(elems[1])
 	switch {
 	case ip.To4() != nil:
 		return NewRouteDistinguisherIPAddressAS(elems[1], uint16(assigned)), nil
 	case elems[6] == "" && elems[7] == "":
-		asn, _ := strconv.Atoi(elems[8])
+		asn, _ := strconv.ParseUint(elems[8], 10, 16)
 		return NewRouteDistinguisherTwoOctetAS(uint16(asn), uint32(assigned)), nil
 	default:
-		fst, _ := strconv.Atoi(elems[7])
-		snd, _ := strconv.Atoi(elems[8])
+		fst, _ := strconv.ParseUint(elems[7], 10, 16)
+		snd, _ := strconv.ParseUint(elems[8], 10, 16)
 		asn := fst<<16 | snd
 		return NewRouteDistinguisherFourOctetAS(uint32(asn), uint16(assigned)), nil
 	}
@@ -1460,7 +1572,8 @@ func (l *MPLSLabelStack) DecodeFromBytes(data []byte) error {
 			break
 		}
 	}
-	if foundBottom == false {
+
+	if !foundBottom {
 		l.Labels = []uint32{}
 		return nil
 	}
@@ -1514,11 +1627,11 @@ func ParseMPLSLabelStack(buf string) (*MPLSLabelStack, error) {
 		goto ERR
 	}
 	for _, elem := range elems {
-		i, err := strconv.Atoi(elem)
+		i, err := strconv.ParseUint(elem, 10, 32)
 		if err != nil {
 			goto ERR
 		}
-		if i < 0 || i > ((1<<20)-1) {
+		if i > ((1 << 20) - 1) {
 			goto ERR
 		}
 		labels = append(labels, uint32(i))
@@ -1628,6 +1741,14 @@ func (l *LabeledVPNIPAddrPrefix) SAFI() uint8 {
 	return SAFI_MPLS_VPN
 }
 
+func (l *LabeledVPNIPAddrPrefix) IPPrefixLen() uint8 {
+	return l.Length - 8*uint8(l.Labels.Len()+l.RD.Len())
+}
+
+func (l *LabeledVPNIPAddrPrefix) Len(options ...*MarshallingOption) int {
+	return 1 + l.Labels.Len() + l.RD.Len() + int((l.IPPrefixLen()+7)/8)
+}
+
 func (l *LabeledVPNIPAddrPrefix) String() string {
 	return fmt.Sprintf("%s:%s", l.RD, l.IPPrefix())
 }
@@ -1706,6 +1827,14 @@ func (r *LabeledIPAddrPrefix) SAFI() uint8 {
 	return SAFI_MPLS_LABEL
 }
 
+func (l *LabeledIPAddrPrefix) IPPrefixLen() uint8 {
+	return l.Length - 8*uint8(l.Labels.Len())
+}
+
+func (l *LabeledIPAddrPrefix) Len(options ...*MarshallingOption) int {
+	return 1 + l.Labels.Len() + int((l.IPPrefixLen()+7)/8)
+}
+
 func (l *LabeledIPAddrPrefix) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
 	f := RF_IPv4_MPLS
 	if l.addrlen == 16 {
@@ -1721,13 +1850,13 @@ func (l *LabeledIPAddrPrefix) DecodeFromBytes(data []byte, options ...*Marshalli
 	l.Length = uint8(data[0])
 	data = data[1:]
 	l.Labels.DecodeFromBytes(data)
+
 	if int(l.Length)-8*(l.Labels.Len()) < 0 {
 		l.Labels.Labels = []uint32{}
 	}
 	restbits := int(l.Length) - 8*(l.Labels.Len())
 	data = data[l.Labels.Len():]
-	l.decodePrefix(data, uint8(restbits), l.addrlen)
-	return nil
+	return l.decodePrefix(data, uint8(restbits), l.addrlen)
 }
 
 func (l *LabeledIPAddrPrefix) Serialize(options ...*MarshallingOption) ([]byte, error) {
@@ -1827,7 +1956,7 @@ func (n *RouteTargetMembershipNLRI) DecodeFromBytes(data []byte, options ...*Mar
 		return NewMessageError(uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR), uint8(BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST), nil, "prefix misses length field")
 	}
 	n.Length = data[0]
-	data = data[1:]
+	data = data[1 : n.Length/8+1]
 	if len(data) == 0 {
 		return nil
 	} else if len(data) != 12 {
@@ -1856,7 +1985,7 @@ func (n *RouteTargetMembershipNLRI) Serialize(options ...*MarshallingOption) ([]
 	}
 	offset := len(buf)
 	buf = append(buf, make([]byte, 5)...)
-	buf[offset] = 12 * 8
+	buf[offset] = 96
 	binary.BigEndian.PutUint32(buf[offset+1:], n.AS)
 	ebuf, err := n.RouteTarget.Serialize()
 	if err != nil {
@@ -2025,7 +2154,7 @@ func ParseEthernetSegmentIdentifier(args []string) (EthernetSegmentIdentifier, e
 	case "AS":
 		esi.Type = ESI_AS
 	default:
-		typ, err := strconv.Atoi(args[0])
+		typ, err := strconv.ParseUint(args[0], 10, 8)
 		if err != nil {
 			return esi, fmt.Errorf("invalid esi type: %s", args[0])
 		}
@@ -2033,7 +2162,7 @@ func ParseEthernetSegmentIdentifier(args []string) (EthernetSegmentIdentifier, e
 	}
 
 	invalidEsiValuesError := fmt.Errorf("invalid esi values for type %s: %s", esi.Type.String(), args[1:])
-	esi.Value = make([]byte, 9, 9)
+	esi.Value = make([]byte, 9)
 	switch esi.Type {
 	case ESI_LACP:
 		fallthrough
@@ -2048,7 +2177,7 @@ func ParseEthernetSegmentIdentifier(args []string) (EthernetSegmentIdentifier, e
 		}
 		copy(esi.Value[0:6], mac)
 		// Port Key or Bridge Priority
-		i, err := strconv.Atoi(args[2])
+		i, err := strconv.ParseUint(args[2], 10, 16)
 		if err != nil {
 			return esi, invalidEsiValuesError
 		}
@@ -2064,11 +2193,11 @@ func ParseEthernetSegmentIdentifier(args []string) (EthernetSegmentIdentifier, e
 		}
 		copy(esi.Value[0:6], mac)
 		// Local Discriminator
-		i, err := strconv.Atoi(args[2])
+		i, err := strconv.ParseUint(args[2], 10, 32)
 		if err != nil {
 			return esi, invalidEsiValuesError
 		}
-		iBuf := make([]byte, 4, 4)
+		iBuf := make([]byte, 4)
 		binary.BigEndian.PutUint32(iBuf, uint32(i))
 		copy(esi.Value[6:9], iBuf[1:4])
 	case ESI_ROUTERID:
@@ -2082,7 +2211,7 @@ func ParseEthernetSegmentIdentifier(args []string) (EthernetSegmentIdentifier, e
 		}
 		copy(esi.Value[0:4], ip.To4())
 		// Local Discriminator
-		i, err := strconv.Atoi(args[2])
+		i, err := strconv.ParseUint(args[2], 10, 32)
 		if err != nil {
 			return esi, invalidEsiValuesError
 		}
@@ -2092,13 +2221,13 @@ func ParseEthernetSegmentIdentifier(args []string) (EthernetSegmentIdentifier, e
 			return esi, invalidEsiValuesError
 		}
 		// AS
-		as, err := strconv.Atoi(args[1])
+		as, err := strconv.ParseUint(args[1], 10, 32)
 		if err != nil {
 			return esi, invalidEsiValuesError
 		}
 		binary.BigEndian.PutUint32(esi.Value[0:4], uint32(as))
 		// Local Discriminator
-		i, err := strconv.Atoi(args[2])
+		i, err := strconv.ParseUint(args[2], 10, 32)
 		if err != nil {
 			return esi, invalidEsiValuesError
 		}
@@ -2150,7 +2279,7 @@ func labelSerialize(label uint32) ([]byte, error) {
 	if label > 0xffffff {
 		return nil, NewMessageError(BGP_ERROR_UPDATE_MESSAGE_ERROR, BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, fmt.Sprintf("Out of range Label: %d", label))
 	}
-	buf := make([]byte, 3, 3)
+	buf := make([]byte, 3)
 	buf[0] = byte((label >> 16) & 0xff)
 	buf[1] = byte((label >> 8) & 0xff)
 	buf[2] = byte(label & 0xff)
@@ -2162,6 +2291,11 @@ type EVPNEthernetAutoDiscoveryRoute struct {
 	ESI   EthernetSegmentIdentifier
 	ETag  uint32
 	Label uint32
+}
+
+func (er *EVPNEthernetAutoDiscoveryRoute) Len() int {
+	// RD(8) + ESI(10) + ETag(4) + Label(3)
+	return 25
 }
 
 func (er *EVPNEthernetAutoDiscoveryRoute) DecodeFromBytes(data []byte) error {
@@ -2238,6 +2372,15 @@ func (er *EVPNEthernetAutoDiscoveryRoute) rd() RouteDistinguisherInterface {
 	return er.RD
 }
 
+func NewEVPNEthernetAutoDiscoveryRoute(rd RouteDistinguisherInterface, esi EthernetSegmentIdentifier, etag uint32, label uint32) *EVPNNLRI {
+	return NewEVPNNLRI(EVPN_ROUTE_TYPE_ETHERNET_AUTO_DISCOVERY, &EVPNEthernetAutoDiscoveryRoute{
+		RD:    rd,
+		ESI:   esi,
+		ETag:  etag,
+		Label: label,
+	})
+}
+
 type EVPNMacIPAdvertisementRoute struct {
 	RD               RouteDistinguisherInterface
 	ESI              EthernetSegmentIdentifier
@@ -2247,6 +2390,12 @@ type EVPNMacIPAdvertisementRoute struct {
 	IPAddressLength  uint8
 	IPAddress        net.IP
 	Labels           []uint32
+}
+
+func (er *EVPNMacIPAdvertisementRoute) Len() int {
+	// RD(8) + ESI(10) + ETag(4) + MacAddressLength(1) + MacAddress(6)
+	// + IPAddressLength(1) + IPAddress(0, 4 or 16) + Labels(3 or 6)
+	return 30 + int(er.IPAddressLength)/8 + len(er.Labels)*3
 }
 
 func (er *EVPNMacIPAdvertisementRoute) DecodeFromBytes(data []byte) error {
@@ -2310,16 +2459,16 @@ func (er *EVPNMacIPAdvertisementRoute) Serialize() ([]byte, error) {
 	copy(tbuf[1:], er.MacAddress)
 	buf = append(buf, tbuf...)
 
-	if er.IPAddressLength == 0 {
-		buf = append(buf, 0)
-	} else if er.IPAddressLength == 32 || er.IPAddressLength == 128 {
-		buf = append(buf, er.IPAddressLength)
-		if er.IPAddressLength == 32 {
-			er.IPAddress = er.IPAddress.To4()
-		}
-		buf = append(buf, []byte(er.IPAddress)...)
-	} else {
-		return nil, NewMessageError(BGP_ERROR_UPDATE_MESSAGE_ERROR, BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, fmt.Sprintf("Invalid IP address length: %d", er.IPAddressLength))
+	buf = append(buf, er.IPAddressLength)
+	switch er.IPAddressLength {
+	case 0:
+		// IP address omitted
+	case 32:
+		buf = append(buf, []byte(er.IPAddress.To4())...)
+	case 128:
+		buf = append(buf, []byte(er.IPAddress.To16())...)
+	default:
+		return nil, fmt.Errorf("Invalid IP address length: %d", er.IPAddressLength)
 	}
 
 	for _, l := range er.Labels {
@@ -2366,11 +2515,40 @@ func (er *EVPNMacIPAdvertisementRoute) rd() RouteDistinguisherInterface {
 	return er.RD
 }
 
+func NewEVPNMacIPAdvertisementRoute(rd RouteDistinguisherInterface, esi EthernetSegmentIdentifier, etag uint32, macAddress string, ipAddress string, labels []uint32) *EVPNNLRI {
+	mac, _ := net.ParseMAC(macAddress)
+	var ipLen uint8
+	ip := net.ParseIP(ipAddress)
+	if ip != nil {
+		if ipv4 := ip.To4(); ipv4 != nil {
+			ipLen = 32
+			ip = ipv4
+		} else {
+			ipLen = 128
+		}
+	}
+	return NewEVPNNLRI(EVPN_ROUTE_TYPE_MAC_IP_ADVERTISEMENT, &EVPNMacIPAdvertisementRoute{
+		RD:               rd,
+		ESI:              esi,
+		ETag:             etag,
+		MacAddressLength: 6,
+		MacAddress:       mac,
+		IPAddressLength:  ipLen,
+		IPAddress:        ip,
+		Labels:           labels,
+	})
+}
+
 type EVPNMulticastEthernetTagRoute struct {
 	RD              RouteDistinguisherInterface
 	ETag            uint32
 	IPAddressLength uint8
 	IPAddress       net.IP
+}
+
+func (er *EVPNMulticastEthernetTagRoute) Len() int {
+	// RD(8) + ETag(4) + IPAddressLength(1) + IPAddress(4 or 16)
+	return 13 + int(er.IPAddressLength)/8
 }
 
 func (er *EVPNMulticastEthernetTagRoute) DecodeFromBytes(data []byte) error {
@@ -2401,13 +2579,13 @@ func (er *EVPNMulticastEthernetTagRoute) Serialize() ([]byte, error) {
 	tbuf := make([]byte, 4)
 	binary.BigEndian.PutUint32(tbuf, er.ETag)
 	buf = append(buf, tbuf...)
-	if er.IPAddressLength == 32 || er.IPAddressLength == 128 {
-		buf = append(buf, er.IPAddressLength)
-		if er.IPAddressLength == 32 {
-			er.IPAddress = er.IPAddress.To4()
-		}
-		buf = append(buf, []byte(er.IPAddress)...)
-	} else {
+	buf = append(buf, er.IPAddressLength)
+	switch er.IPAddressLength {
+	case 32:
+		buf = append(buf, []byte(er.IPAddress.To4())...)
+	case 128:
+		buf = append(buf, []byte(er.IPAddress.To16())...)
+	default:
 		return nil, fmt.Errorf("Invalid IP address length: %d", er.IPAddressLength)
 	}
 	if err != nil {
@@ -2442,11 +2620,32 @@ func (er *EVPNMulticastEthernetTagRoute) rd() RouteDistinguisherInterface {
 	return er.RD
 }
 
+func NewEVPNMulticastEthernetTagRoute(rd RouteDistinguisherInterface, etag uint32, ipAddress string) *EVPNNLRI {
+	ipLen := uint8(32)
+	ip := net.ParseIP(ipAddress)
+	if ipv4 := ip.To4(); ipv4 != nil {
+		ip = ipv4
+	} else {
+		ipLen = 128
+	}
+	return NewEVPNNLRI(EVPN_INCLUSIVE_MULTICAST_ETHERNET_TAG, &EVPNMulticastEthernetTagRoute{
+		RD:              rd,
+		ETag:            etag,
+		IPAddressLength: ipLen,
+		IPAddress:       ip,
+	})
+}
+
 type EVPNEthernetSegmentRoute struct {
 	RD              RouteDistinguisherInterface
 	ESI             EthernetSegmentIdentifier
 	IPAddressLength uint8
 	IPAddress       net.IP
+}
+
+func (er *EVPNEthernetSegmentRoute) Len() int {
+	// RD(8) + ESI(10) + IPAddressLength(1) + IPAddress(4 or 16)
+	return 19 + int(er.IPAddressLength)/8
 }
 
 func (er *EVPNEthernetSegmentRoute) DecodeFromBytes(data []byte) error {
@@ -2481,12 +2680,12 @@ func (er *EVPNEthernetSegmentRoute) Serialize() ([]byte, error) {
 	}
 	buf = append(buf, tbuf...)
 	buf = append(buf, er.IPAddressLength)
-	if er.IPAddressLength == 32 || er.IPAddressLength == 128 {
-		if er.IPAddressLength == 32 {
-			er.IPAddress = er.IPAddress.To4()
-		}
-		buf = append(buf, []byte(er.IPAddress)...)
-	} else {
+	switch er.IPAddressLength {
+	case 32:
+		buf = append(buf, []byte(er.IPAddress.To4())...)
+	case 128:
+		buf = append(buf, []byte(er.IPAddress.To16())...)
+	default:
 		return nil, fmt.Errorf("Invalid IP address length: %d", er.IPAddressLength)
 	}
 	return buf, nil
@@ -2517,6 +2716,22 @@ func (er *EVPNEthernetSegmentRoute) rd() RouteDistinguisherInterface {
 	return er.RD
 }
 
+func NewEVPNEthernetSegmentRoute(rd RouteDistinguisherInterface, esi EthernetSegmentIdentifier, ipAddress string) *EVPNNLRI {
+	ipLen := uint8(32)
+	ip := net.ParseIP(ipAddress)
+	if ipv4 := ip.To4(); ipv4 != nil {
+		ip = ipv4
+	} else {
+		ipLen = 128
+	}
+	return NewEVPNNLRI(EVPN_ETHERNET_SEGMENT_ROUTE, &EVPNEthernetSegmentRoute{
+		RD:              rd,
+		ESI:             esi,
+		IPAddressLength: ipLen,
+		IPAddress:       ip,
+	})
+}
+
 type EVPNIPPrefixRoute struct {
 	RD             RouteDistinguisherInterface
 	ESI            EthernetSegmentIdentifier
@@ -2525,6 +2740,13 @@ type EVPNIPPrefixRoute struct {
 	IPPrefix       net.IP
 	GWIPAddress    net.IP
 	Label          uint32
+}
+
+func (er *EVPNIPPrefixRoute) Len() int {
+	if er.IPPrefix.To4() != nil {
+		return 34
+	}
+	return 58
 }
 
 func (er *EVPNIPPrefixRoute) DecodeFromBytes(data []byte) error {
@@ -2644,7 +2866,26 @@ func (er *EVPNIPPrefixRoute) rd() RouteDistinguisherInterface {
 	return er.RD
 }
 
+func NewEVPNIPPrefixRoute(rd RouteDistinguisherInterface, esi EthernetSegmentIdentifier, etag uint32, ipPrefixLength uint8, ipPrefix string, gateway string, label uint32) *EVPNNLRI {
+	ip := net.ParseIP(ipPrefix)
+	gw := net.ParseIP(gateway)
+	if ipv4 := ip.To4(); ipv4 != nil {
+		ip = ipv4
+		gw = gw.To4()
+	}
+	return NewEVPNNLRI(EVPN_IP_PREFIX, &EVPNIPPrefixRoute{
+		RD:             rd,
+		ESI:            esi,
+		ETag:           etag,
+		IPPrefixLength: ipPrefixLength,
+		IPPrefix:       ip,
+		GWIPAddress:    gw,
+		Label:          label,
+	})
+}
+
 type EVPNRouteTypeInterface interface {
+	Len() int
 	DecodeFromBytes([]byte) error
 	Serialize() ([]byte, error)
 	String() string
@@ -2721,7 +2962,6 @@ func (n *EVPNNLRI) Serialize(options ...*MarshallingOption) ([]byte, error) {
 	buf = append(buf, make([]byte, 2)...)
 	buf[offset] = n.RouteType
 	tbuf, err := n.RouteTypeData.Serialize()
-	n.Length = uint8(len(tbuf))
 	buf[offset+1] = n.Length
 	if err != nil {
 		return nil, err
@@ -2762,11 +3002,15 @@ func (n *EVPNNLRI) RD() RouteDistinguisherInterface {
 	return n.RouteTypeData.rd()
 }
 
-func NewEVPNNLRI(routetype uint8, length uint8, routetypedata EVPNRouteTypeInterface) *EVPNNLRI {
+func NewEVPNNLRI(routeType uint8, routeTypeData EVPNRouteTypeInterface) *EVPNNLRI {
+	var l uint8
+	if routeTypeData != nil {
+		l = uint8(routeTypeData.Len())
+	}
 	return &EVPNNLRI{
-		RouteType:     routetype,
-		Length:        length,
-		RouteTypeData: routetypedata,
+		RouteType:     routeType,
+		Length:        l,
+		RouteTypeData: routeTypeData,
 	}
 }
 
@@ -2839,6 +3083,10 @@ func (n *EncapNLRI) AFI() uint16 {
 
 func (n *EncapNLRI) SAFI() uint8 {
 	return SAFI_ENCAPSULATION
+}
+
+func (n *EncapNLRI) Len(options ...*MarshallingOption) int {
+	return 1 + len(n.Prefix)
 }
 
 func NewEncapNLRI(endpoint string) *EncapNLRI {
@@ -2956,22 +3204,12 @@ var FlowSpecValueMap = map[string]BGPFlowSpecType{
 // fmt.Printf("%q", normalizeFlowSpecOpValues(args))
 // >>> ["<=80" "tcp" "!=udp" "=!SA" "&=U" "!F" "=is-fragment+last-fragment"]
 func normalizeFlowSpecOpValues(args []string) []string {
-	// Note:
-	// - "=!" is used in the old style format of "tcp-flags" and "fragment".
-	// - The value field should be one of the followings:
-	//     * Decimal value (e.g., 80)
-	//     * Combination of the small letters, decimals, "-" and "+"
-	//       (e.g., tcp, ipv4, is-fragment+first-fragment)
-	//     * Capital letters (e.g., SA)
-	re := regexp.MustCompile("&|=|>|<|!|[\\w\\-+]+")
-	reValue := regexp.MustCompile("[\\w\\-+]+")
-
 	// Extracts keywords from the given args.
 	sub := ""
 	subs := make([]string, 0)
-	for _, s := range re.FindAllString(strings.Join(args, " "), -1) {
+	for _, s := range _regexpFlowSpecOperator.FindAllString(strings.Join(args, " "), -1) {
 		sub += s
-		if reValue.MatchString(s) {
+		if _regexpFlowSpecOperatorValue.MatchString(s) {
 			subs = append(subs, sub)
 			sub = ""
 		}
@@ -3009,12 +3247,8 @@ func parseFlowSpecNumericOperator(submatch []string) (operator uint8, err error)
 func parseFlowSpecNumericOpValues(typ BGPFlowSpecType, args []string, validationFunc func(uint64) error) (FlowSpecComponentInterface, error) {
 	argsLen := len(args)
 	items := make([]*FlowSpecComponentItem, 0, argsLen)
-	re := regexp.MustCompile("(&?)(==|=|>|>=|<|<=|!|!=|=!)?(\\d+|-\\d|true|false)")
 	for idx, arg := range args {
-		// Example:
-		// re.FindStringSubmatch("&==80")
-		// >>> ["&==80" "&" "==" "80"]
-		m := re.FindStringSubmatch(arg)
+		m := _regexpFlowSpecNumericType.FindStringSubmatch(arg)
 		if len(m) < 4 {
 			return nil, fmt.Errorf("invalid argument for %s: %s in %q", typ.String(), arg, args)
 		}
@@ -3112,12 +3346,7 @@ func flowSpecPrefixParser(rf RouteFamily, typ BGPFlowSpecType, args []string) (F
 			return nil, fmt.Errorf("cannot specify offset for ipv4 prefix")
 		}
 		invalidIPv4PrefixError := fmt.Errorf("invalid ipv4 prefix: %s", args[0])
-		re := regexp.MustCompile("^([\\d.]+)(/(\\d{1,2}))?")
-		// re.FindStringSubmatch("192.168.0.0/24")
-		// >>> ["192.168.0.0/24" "192.168.0.0" "/24" "24"]
-		// re.FindStringSubmatch("192.168.0.1")
-		// >>> ["192.168.0.1" "192.168.0.1" "" ""]
-		m := re.FindStringSubmatch(args[0])
+		m := _regexpFindIPv4Prefix.FindStringSubmatch(args[0])
 		if len(m) < 4 {
 			return nil, invalidIPv4PrefixError
 		}
@@ -3145,14 +3374,7 @@ func flowSpecPrefixParser(rf RouteFamily, typ BGPFlowSpecType, args []string) (F
 			return nil, fmt.Errorf("invalid arguments for ipv6 prefix: %q", args)
 		}
 		invalidIPv6PrefixError := fmt.Errorf("invalid ipv6 prefix: %s", args[0])
-		re := regexp.MustCompile("^([a-fA-F\\d:.]+)(/(\\d{1,3}))?(/(\\d{1,3}))?")
-		// re.FindStringSubmatch("2001:dB8::/64")
-		// >>> ["2001:dB8::/64" "2001:dB8::" "/64" "64" "" ""]
-		// re.FindStringSubmatch("2001:dB8::/64/8")
-		// >>> ["2001:dB8::/64/8" "2001:dB8::" "/64" "64" "/8" "8"]
-		// re.FindStringSubmatch("2001:dB8::1")
-		// >>> ["2001:dB8::1" "2001:dB8::1" "" "" "" ""]
-		m := re.FindStringSubmatch(args[0])
+		m := _regexpFindIPv6Prefix.FindStringSubmatch(args[0])
 		if len(m) < 4 {
 			return nil, invalidIPv6PrefixError
 		}
@@ -3233,13 +3455,9 @@ func flowSpecTcpFlagParser(_ RouteFamily, typ BGPFlowSpecType, args []string) (F
 
 	argsLen := len(args)
 	items := make([]*FlowSpecComponentItem, 0, argsLen)
-	// Note: "(-*)" and "(.*)" catch the invalid flags
-	re := regexp.MustCompile("(&?)(==|=|!|!=|=!)?(-*)([FSRPAUCE]+)(.*)")
+
 	for _, arg := range args {
-		// Example: In this case, "Z" is unsupported flag type.
-		// re.FindStringSubmatch("&==-SZU")
-		// >>> ["&==-SZU" "&" "==" "-" "S" "ZU"]
-		m := re.FindStringSubmatch(arg)
+		m := _regexpFlowSpecTCPFlag.FindStringSubmatch(arg)
 		if len(m) < 6 {
 			return nil, fmt.Errorf("invalid argument for %s: %s in %q", typ.String(), arg, args)
 		} else if mLast := m[len(m)-1]; mLast != "" || m[3] != "" {
@@ -3289,13 +3507,9 @@ func flowSpecFragmentParser(_ RouteFamily, typ BGPFlowSpecType, args []string) (
 
 	argsLen := len(args)
 	items := make([]*FlowSpecComponentItem, 0, argsLen)
-	// Note: "(.*)" catches the invalid flags
-	re := regexp.MustCompile("(&?)(==|=|!|!=|=!)?(((\\+)?(dont|is|first|last|not-a)-fragment)+)(.*)")
+
 	for _, arg := range args {
-		// Example:
-		// re.FindStringSubmatch("&!=+first-fragment+last-fragment+invalid-fragment")
-		// >>> ["&!=+first-fragment+last-fragment+invalid-fragment" "&" "!=" "+first-fragment+last-fragment" "+last-fragment" "+" "last" "+invalid-fragment"]
-		m := re.FindStringSubmatch(arg)
+		m := _regexpFlowSpecFragment.FindStringSubmatch(arg)
 		if len(m) < 4 {
 			return nil, fmt.Errorf("invalid argument for %s: %s in %q", typ.String(), arg, args)
 		} else if mLast := m[len(m)-1]; mLast != "" {
@@ -3738,13 +3952,10 @@ func (v *FlowSpecComponentItem) Len() int {
 }
 
 func (v *FlowSpecComponentItem) Serialize() ([]byte, error) {
-	if v.Value < 0 {
-		return nil, fmt.Errorf("invalid value size(too small): %d", v.Value)
-	}
-	if v.Op < 0 || v.Op > math.MaxUint8 {
+	if v.Op > math.MaxUint8 {
 		return nil, fmt.Errorf("invalid op size: %d", v.Op)
-
 	}
+
 	order := uint32(math.Log2(float64(v.Len())))
 	buf := make([]byte, 1+(1<<order))
 	buf[0] = byte(uint32(v.Op) | order<<4)
@@ -3817,13 +4028,7 @@ func (p *FlowSpecComponent) DecodeFromBytes(data []byte, options ...*Marshalling
 
 func (p *FlowSpecComponent) Serialize(options ...*MarshallingOption) ([]byte, error) {
 	buf := []byte{byte(p.Type())}
-	for i, v := range p.Items {
-		//set end-of-list bit
-		if i == (len(p.Items) - 1) {
-			v.Op |= 0x80
-		} else {
-			v.Op &^= 0x80
-		}
+	for _, v := range p.Items {
 		bbuf, err := v.Serialize()
 		if err != nil {
 			return nil, err
@@ -3935,6 +4140,15 @@ func (p *FlowSpecComponent) MarshalJSON() ([]byte, error) {
 }
 
 func NewFlowSpecComponent(typ BGPFlowSpecType, items []*FlowSpecComponentItem) *FlowSpecComponent {
+	// Set end-of-list bit on the last item and unset them on the others.
+	for i, v := range items {
+		if i == len(items)-1 {
+			v.Op |= 0x80
+		} else {
+			v.Op &^= 0x80
+		}
+
+	}
 	return &FlowSpecComponent{
 		Items: items,
 		typ:   typ,
@@ -4569,12 +4783,32 @@ func GetRouteFamily(name string) (RouteFamily, error) {
 	return RouteFamily(0), fmt.Errorf("%s isn't a valid route family name", name)
 }
 
-func NewPrefixFromRouteFamily(afi uint16, safi uint8) (prefix AddrPrefixInterface, err error) {
-	switch AfiSafiToRouteFamily(afi, safi) {
+func NewPrefixFromRouteFamily(afi uint16, safi uint8, prefixStr ...string) (prefix AddrPrefixInterface, err error) {
+	family := AfiSafiToRouteFamily(afi, safi)
+
+	f := func(s string) AddrPrefixInterface {
+		addr, net, _ := net.ParseCIDR(s)
+		len, _ := net.Mask.Size()
+		switch family {
+		case RF_IPv4_UC, RF_IPv4_MC:
+			return NewIPAddrPrefix(uint8(len), addr.String())
+		}
+		return NewIPv6AddrPrefix(uint8(len), addr.String())
+	}
+
+	switch family {
 	case RF_IPv4_UC, RF_IPv4_MC:
-		prefix = NewIPAddrPrefix(0, "")
+		if len(prefixStr) > 0 {
+			prefix = f(prefixStr[0])
+		} else {
+			prefix = NewIPAddrPrefix(0, "")
+		}
 	case RF_IPv6_UC, RF_IPv6_MC:
-		prefix = NewIPv6AddrPrefix(0, "")
+		if len(prefixStr) > 0 {
+			prefix = f(prefixStr[0])
+		} else {
+			prefix = NewIPv6AddrPrefix(0, "")
+		}
 	case RF_IPv4_VPN:
 		prefix = NewLabeledVPNIPAddrPrefix(0, "", *NewMPLSLabelStack(), nil)
 	case RF_IPv6_VPN:
@@ -4584,7 +4818,7 @@ func NewPrefixFromRouteFamily(afi uint16, safi uint8) (prefix AddrPrefixInterfac
 	case RF_IPv6_MPLS:
 		prefix = NewLabeledIPv6AddrPrefix(0, "", *NewMPLSLabelStack())
 	case RF_EVPN:
-		prefix = NewEVPNNLRI(0, 0, nil)
+		prefix = NewEVPNNLRI(0, nil)
 	case RF_RTC_UC:
 		prefix = &RouteTargetMembershipNLRI{}
 	case RF_IPv4_ENCAP:
@@ -4861,6 +5095,16 @@ var PathAttrFlags map[BGPAttrType]BGPAttrFlag = map[BGPAttrType]BGPAttrFlag{
 	BGP_ATTR_TYPE_LARGE_COMMUNITY:          BGP_ATTR_FLAG_TRANSITIVE | BGP_ATTR_FLAG_OPTIONAL,
 }
 
+// getPathAttrFlags returns BGP Path Attribute flags value from its type and
+// length (byte length of value field).
+func getPathAttrFlags(typ BGPAttrType, length int) BGPAttrFlag {
+	flags := PathAttrFlags[typ]
+	if length > 255 {
+		flags |= BGP_ATTR_FLAG_EXTENDED_LENGTH
+	}
+	return flags
+}
+
 type PathAttributeInterface interface {
 	DecodeFromBytes([]byte, ...*MarshallingOption) error
 	Serialize(...*MarshallingOption) ([]byte, error)
@@ -4875,21 +5119,14 @@ type PathAttributeInterface interface {
 type PathAttribute struct {
 	Flags  BGPAttrFlag
 	Type   BGPAttrType
-	Length uint16
-	Value  []byte
+	Length uint16 // length of Value
 }
 
 func (p *PathAttribute) Len(options ...*MarshallingOption) int {
-	if p.Length == 0 {
-		p.Length = uint16(len(p.Value))
-	}
-	l := 2 + p.Length
 	if p.Flags&BGP_ATTR_FLAG_EXTENDED_LENGTH != 0 {
-		l += 2
-	} else {
-		l += 1
+		return 4 + int(p.Length)
 	}
-	return int(l)
+	return 3 + int(p.Length)
 }
 
 func (p *PathAttribute) GetFlags() BGPAttrFlag {
@@ -4900,84 +5137,84 @@ func (p *PathAttribute) GetType() BGPAttrType {
 	return p.Type
 }
 
-func (p *PathAttribute) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	odata := data
+func (p *PathAttribute) DecodeFromBytes(data []byte, options ...*MarshallingOption) (value []byte, err error) {
 	eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
 	eSubCode := uint8(BGP_ERROR_SUB_ATTRIBUTE_LENGTH_ERROR)
 	if len(data) < 2 {
-		return NewMessageError(eCode, eSubCode, data, "attribute header length is short")
+		return nil, NewMessageError(eCode, eSubCode, data, "attribute header length is short")
 	}
 	p.Flags = BGPAttrFlag(data[0])
 	p.Type = BGPAttrType(data[1])
+	if eMsg := validatePathAttributeFlags(p.Type, p.Flags); eMsg != "" {
+		return nil, NewMessageError(eCode, BGP_ERROR_SUB_ATTRIBUTE_FLAGS_ERROR, data, eMsg)
+	}
 
 	if p.Flags&BGP_ATTR_FLAG_EXTENDED_LENGTH != 0 {
 		if len(data) < 4 {
-			return NewMessageError(eCode, eSubCode, data, "attribute header length is short")
+			return nil, NewMessageError(eCode, eSubCode, data, "attribute header length is short")
 		}
 		p.Length = binary.BigEndian.Uint16(data[2:4])
 		data = data[4:]
 	} else {
 		if len(data) < 3 {
-			return NewMessageError(eCode, eSubCode, data, "attribute header length is short")
+			return nil, NewMessageError(eCode, eSubCode, data, "attribute header length is short")
 		}
 		p.Length = uint16(data[2])
 		data = data[3:]
 	}
 	if len(data) < int(p.Length) {
-		return NewMessageError(eCode, eSubCode, data, "attribute value length is short")
-	}
-	if len(data[:p.Length]) > 0 {
-		p.Value = data[:p.Length]
+		return nil, NewMessageError(eCode, eSubCode, data, "attribute value length is short")
 	}
 
-	ok, eMsg := ValidateFlags(p.Type, p.Flags)
-	if !ok {
-		return NewMessageError(eCode, BGP_ERROR_SUB_ATTRIBUTE_FLAGS_ERROR, odata[:p.Len(options...)], eMsg)
-	}
-	return nil
+	return data[:p.Length], nil
 }
 
-func (p *PathAttribute) Serialize(options ...*MarshallingOption) ([]byte, error) {
-	p.Length = uint16(len(p.Value))
-	if p.Length > 255 {
-		p.Flags |= BGP_ATTR_FLAG_EXTENDED_LENGTH
-	} else {
-		p.Flags &^= BGP_ATTR_FLAG_EXTENDED_LENGTH
+func (p *PathAttribute) Serialize(value []byte, options ...*MarshallingOption) ([]byte, error) {
+	// Note: Do not update "p.Flags" and "p.Length" to avoid data race.
+	flags := p.Flags
+	length := uint16(len(value))
+	if flags&BGP_ATTR_FLAG_EXTENDED_LENGTH == 0 && length > 255 {
+		flags |= BGP_ATTR_FLAG_EXTENDED_LENGTH
 	}
-	buf := make([]byte, p.Len(options...))
-	buf[0] = uint8(p.Flags)
+	var buf []byte
+	if flags&BGP_ATTR_FLAG_EXTENDED_LENGTH != 0 {
+		buf = append(make([]byte, 4), value...)
+		binary.BigEndian.PutUint16(buf[2:4], length)
+	} else {
+		buf = append(make([]byte, 3), value...)
+		buf[2] = byte(length)
+	}
+	buf[0] = uint8(flags)
 	buf[1] = uint8(p.Type)
-	if p.Flags&BGP_ATTR_FLAG_EXTENDED_LENGTH != 0 {
-		binary.BigEndian.PutUint16(buf[2:4], p.Length)
-		copy(buf[4:], p.Value)
-	} else {
-		buf[2] = byte(p.Length)
-		copy(buf[3:], p.Value)
-	}
 	return buf, nil
-}
-
-func (p *PathAttribute) String() string {
-	return fmt.Sprintf("%s %s %s", p.Type.String(), p.Flags, []byte(p.Value))
-}
-
-func (p *PathAttribute) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Type  BGPAttrType `json:"type"`
-		Value []byte      `json:"value"`
-	}{
-		Type:  p.GetType(),
-		Value: p.Value,
-	})
 }
 
 type PathAttributeOrigin struct {
 	PathAttribute
+	Value uint8
+}
+
+func (p *PathAttributeOrigin) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
+	value, err := p.PathAttribute.DecodeFromBytes(data, options...)
+	if err != nil {
+		return err
+	}
+	if p.Length != 1 {
+		eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
+		eSubCode := uint8(BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST)
+		return NewMessageError(eCode, eSubCode, nil, "Origin attribute length is incorrect")
+	}
+	p.Value = value[0]
+	return nil
+}
+
+func (p *PathAttributeOrigin) Serialize(options ...*MarshallingOption) ([]byte, error) {
+	return p.PathAttribute.Serialize([]byte{p.Value}, options...)
 }
 
 func (p *PathAttributeOrigin) String() string {
 	typ := "-"
-	switch p.Value[0] {
+	switch p.Value {
 	case BGP_ORIGIN_ATTR_TYPE_IGP:
 		typ = "i"
 	case BGP_ORIGIN_ATTR_TYPE_EGP:
@@ -4994,19 +5231,19 @@ func (p *PathAttributeOrigin) MarshalJSON() ([]byte, error) {
 		Value uint8       `json:"value"`
 	}{
 		Type:  p.GetType(),
-		Value: p.Value[0],
+		Value: p.Value,
 	})
 }
 
 func NewPathAttributeOrigin(value uint8) *PathAttributeOrigin {
 	t := BGP_ATTR_TYPE_ORIGIN
 	return &PathAttributeOrigin{
-
 		PathAttribute: PathAttribute{
-			Flags: PathAttrFlags[t],
-			Type:  t,
-			Value: []byte{byte(value)},
+			Flags:  PathAttrFlags[t],
+			Type:   t,
+			Length: 1,
 		},
+		Value: value,
 	}
 }
 
@@ -5024,6 +5261,8 @@ var asPathParamFormatMap = map[uint8]*AsPathParamFormat{
 }
 
 type AsPathParamInterface interface {
+	GetType() uint8
+	GetAS() []uint32
 	Serialize() ([]byte, error)
 	DecodeFromBytes([]byte) error
 	Len() int
@@ -5036,6 +5275,18 @@ type AsPathParam struct {
 	Type uint8
 	Num  uint8
 	AS   []uint16
+}
+
+func (a *AsPathParam) GetType() uint8 {
+	return a.Type
+}
+
+func (a *AsPathParam) GetAS() []uint32 {
+	nums := make([]uint32, 0, len(a.AS))
+	for _, as := range a.AS {
+		nums = append(nums, uint32(as))
+	}
+	return nums
 }
 
 func (a *AsPathParam) Serialize() ([]byte, error) {
@@ -5125,6 +5376,14 @@ type As4PathParam struct {
 	AS   []uint32
 }
 
+func (a *As4PathParam) GetType() uint8 {
+	return a.Type
+}
+
+func (a *As4PathParam) GetAS() []uint32 {
+	return a.AS
+}
+
 func (a *As4PathParam) Serialize() ([]byte, error) {
 	buf := make([]byte, 2+len(a.AS)*4)
 	buf[0] = a.Type
@@ -5206,92 +5465,38 @@ func NewAs4PathParam(segType uint8, as []uint32) *As4PathParam {
 	}
 }
 
-type DefaultAsPath struct {
-}
-
-func (p *DefaultAsPath) isValidAspath(data []byte) (bool, error) {
-	eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
-	eSubCode := uint8(BGP_ERROR_SUB_MALFORMED_AS_PATH)
-	if len(data)%2 != 0 {
-		return false, NewMessageError(eCode, eSubCode, nil, "AS PATH length is not odd")
-	}
-
-	tryParse := func(data []byte, use4byte bool) (bool, error) {
-		for len(data) > 0 {
-			if len(data) < 2 {
-				return false, NewMessageError(eCode, eSubCode, nil, "AS PATH header is short")
-			}
-			segType := data[0]
-			if segType == 0 || segType > 4 {
-				return false, NewMessageError(eCode, eSubCode, nil, "unknown AS_PATH seg type")
-			}
-			asNum := data[1]
-			data = data[2:]
-			if asNum == 0 || int(asNum) > math.MaxUint8 {
-				return false, NewMessageError(eCode, eSubCode, nil, "AS PATH the number of AS is incorrect")
-			}
-			segLength := int(asNum)
-			if use4byte == true {
-				segLength *= 4
-			} else {
-				segLength *= 2
-			}
-			if int(segLength) > len(data) {
-				return false, NewMessageError(eCode, eSubCode, nil, "seg length is short")
-			}
-			data = data[segLength:]
-		}
-		return true, nil
-	}
-	_, err := tryParse(data, true)
-	if err == nil {
-		return true, nil
-	}
-
-	_, err = tryParse(data, false)
-	if err == nil {
-		return false, nil
-	}
-	return false, NewMessageError(eCode, eSubCode, nil, "can't parse AS_PATH")
-}
-
 type PathAttributeAsPath struct {
-	DefaultAsPath
 	PathAttribute
 	Value []AsPathParamInterface
 }
 
 func (p *PathAttributeAsPath) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	err := p.PathAttribute.DecodeFromBytes(data, options...)
+	value, err := p.PathAttribute.DecodeFromBytes(data, options...)
 	if err != nil {
 		return err
 	}
-	if p.PathAttribute.Length == 0 {
+	if p.Length == 0 {
 		// ibgp or something
 		return nil
 	}
-	as4Bytes, err := p.DefaultAsPath.isValidAspath(p.PathAttribute.Value)
+	isAs4, err := validateAsPathValueBytes(value)
 	if err != nil {
-		err.(*MessageError).Data = data[:p.Len(options...)]
+		err.(*MessageError).Data, _ = p.PathAttribute.Serialize(value, options...)
 		return err
 	}
-	v := p.PathAttribute.Value
-	for len(v) > 0 {
+	for len(value) > 0 {
 		var tuple AsPathParamInterface
-		if as4Bytes == true {
+		if isAs4 {
 			tuple = &As4PathParam{}
 		} else {
 			tuple = &AsPathParam{}
 		}
-		err := tuple.DecodeFromBytes(v)
+		err := tuple.DecodeFromBytes(value)
 		if err != nil {
 			return err
 		}
 		p.Value = append(p.Value, tuple)
-		if tuple.Len() > len(v) {
-
-		}
-		v = v[tuple.Len():]
+		value = value[tuple.Len():]
 	}
 	return nil
 }
@@ -5305,8 +5510,7 @@ func (p *PathAttributeAsPath) Serialize(options ...*MarshallingOption) ([]byte, 
 		}
 		buf = append(buf, vbuf...)
 	}
-	p.PathAttribute.Value = buf
-	return p.PathAttribute.Serialize(options...)
+	return p.PathAttribute.Serialize(buf, options...)
 }
 
 func (p *PathAttributeAsPath) String() string {
@@ -5328,11 +5532,16 @@ func (p *PathAttributeAsPath) MarshalJSON() ([]byte, error) {
 }
 
 func NewPathAttributeAsPath(value []AsPathParamInterface) *PathAttributeAsPath {
+	var l int
+	for _, v := range value {
+		l += v.Len()
+	}
 	t := BGP_ATTR_TYPE_AS_PATH
 	return &PathAttributeAsPath{
 		PathAttribute: PathAttribute{
-			Flags: PathAttrFlags[t],
-			Type:  t,
+			Flags:  getPathAttrFlags(t, l),
+			Type:   t,
+			Length: uint16(l),
 		},
 		Value: value,
 	}
@@ -5344,22 +5553,21 @@ type PathAttributeNextHop struct {
 }
 
 func (p *PathAttributeNextHop) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	err := p.PathAttribute.DecodeFromBytes(data, options...)
+	value, err := p.PathAttribute.DecodeFromBytes(data, options...)
 	if err != nil {
 		return err
 	}
-	if len(p.PathAttribute.Value) != 4 && len(p.PathAttribute.Value) != 16 {
+	if p.Length != 4 && p.Length != 16 {
 		eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
 		eSubCode := uint8(BGP_ERROR_SUB_ATTRIBUTE_LENGTH_ERROR)
 		return NewMessageError(eCode, eSubCode, nil, "nexthop length isn't correct")
 	}
-	p.Value = p.PathAttribute.Value
+	p.Value = value
 	return nil
 }
 
 func (p *PathAttributeNextHop) Serialize(options ...*MarshallingOption) ([]byte, error) {
-	p.PathAttribute.Value = p.Value
-	return p.PathAttribute.Serialize(options...)
+	return p.PathAttribute.Serialize(p.Value, options...)
 }
 
 func (p *PathAttributeNextHop) String() string {
@@ -5384,8 +5592,9 @@ func NewPathAttributeNextHop(value string) *PathAttributeNextHop {
 	t := BGP_ATTR_TYPE_NEXT_HOP
 	return &PathAttributeNextHop{
 		PathAttribute: PathAttribute{
-			Flags: PathAttrFlags[t],
-			Type:  t,
+			Flags:  PathAttrFlags[t],
+			Type:   t,
+			Length: 4,
 		},
 		Value: net.ParseIP(value).To4(),
 	}
@@ -5397,24 +5606,23 @@ type PathAttributeMultiExitDisc struct {
 }
 
 func (p *PathAttributeMultiExitDisc) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	err := p.PathAttribute.DecodeFromBytes(data, options...)
+	value, err := p.PathAttribute.DecodeFromBytes(data, options...)
 	if err != nil {
 		return err
 	}
-	if len(p.PathAttribute.Value) != 4 {
+	if p.Length != 4 {
 		eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
 		eSubCode := uint8(BGP_ERROR_SUB_ATTRIBUTE_LENGTH_ERROR)
 		return NewMessageError(eCode, eSubCode, nil, "med length isn't correct")
 	}
-	p.Value = binary.BigEndian.Uint32(p.PathAttribute.Value)
+	p.Value = binary.BigEndian.Uint32(value)
 	return nil
 }
 
 func (p *PathAttributeMultiExitDisc) Serialize(options ...*MarshallingOption) ([]byte, error) {
 	buf := make([]byte, 4)
 	binary.BigEndian.PutUint32(buf, p.Value)
-	p.PathAttribute.Value = buf
-	return p.PathAttribute.Serialize(options...)
+	return p.PathAttribute.Serialize(buf, options...)
 }
 
 func (p *PathAttributeMultiExitDisc) String() string {
@@ -5435,8 +5643,9 @@ func NewPathAttributeMultiExitDisc(value uint32) *PathAttributeMultiExitDisc {
 	t := BGP_ATTR_TYPE_MULTI_EXIT_DISC
 	return &PathAttributeMultiExitDisc{
 		PathAttribute: PathAttribute{
-			Flags: PathAttrFlags[t],
-			Type:  t,
+			Flags:  PathAttrFlags[t],
+			Type:   t,
+			Length: 4,
 		},
 		Value: value,
 	}
@@ -5448,24 +5657,23 @@ type PathAttributeLocalPref struct {
 }
 
 func (p *PathAttributeLocalPref) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	err := p.PathAttribute.DecodeFromBytes(data, options...)
+	value, err := p.PathAttribute.DecodeFromBytes(data, options...)
 	if err != nil {
 		return err
 	}
-	if len(p.PathAttribute.Value) != 4 {
+	if p.Length != 4 {
 		eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
 		eSubCode := uint8(BGP_ERROR_SUB_ATTRIBUTE_LENGTH_ERROR)
 		return NewMessageError(eCode, eSubCode, nil, "local pref length isn't correct")
 	}
-	p.Value = binary.BigEndian.Uint32(p.PathAttribute.Value)
+	p.Value = binary.BigEndian.Uint32(value)
 	return nil
 }
 
 func (p *PathAttributeLocalPref) Serialize(options ...*MarshallingOption) ([]byte, error) {
 	buf := make([]byte, 4)
 	binary.BigEndian.PutUint32(buf, p.Value)
-	p.PathAttribute.Value = buf
-	return p.PathAttribute.Serialize(options...)
+	return p.PathAttribute.Serialize(buf, options...)
 }
 
 func (p *PathAttributeLocalPref) String() string {
@@ -5486,8 +5694,9 @@ func NewPathAttributeLocalPref(value uint32) *PathAttributeLocalPref {
 	t := BGP_ATTR_TYPE_LOCAL_PREF
 	return &PathAttributeLocalPref{
 		PathAttribute: PathAttribute{
-			Flags: PathAttrFlags[t],
-			Type:  t,
+			Flags:  PathAttrFlags[t],
+			Type:   t,
+			Length: 4,
 		},
 		Value: value,
 	}
@@ -5495,6 +5704,23 @@ func NewPathAttributeLocalPref(value uint32) *PathAttributeLocalPref {
 
 type PathAttributeAtomicAggregate struct {
 	PathAttribute
+}
+
+func (p *PathAttributeAtomicAggregate) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
+	_, err := p.PathAttribute.DecodeFromBytes(data, options...)
+	if err != nil {
+		return err
+	}
+	if p.Length != 0 {
+		eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
+		eSubCode := uint8(BGP_ERROR_SUB_ATTRIBUTE_LENGTH_ERROR)
+		return NewMessageError(eCode, eSubCode, nil, "atomic aggregate should have no value")
+	}
+	return nil
+}
+
+func (p *PathAttributeAtomicAggregate) Serialize(options ...*MarshallingOption) ([]byte, error) {
+	return p.PathAttribute.Serialize(nil, options...)
 }
 
 func (p *PathAttributeAtomicAggregate) String() string {
@@ -5513,8 +5739,9 @@ func NewPathAttributeAtomicAggregate() *PathAttributeAtomicAggregate {
 	t := BGP_ATTR_TYPE_ATOMIC_AGGREGATE
 	return &PathAttributeAtomicAggregate{
 		PathAttribute: PathAttribute{
-			Flags: PathAttrFlags[t],
-			Type:  t,
+			Flags:  PathAttrFlags[t],
+			Type:   t,
+			Length: 0,
 		},
 	}
 }
@@ -5531,23 +5758,23 @@ type PathAttributeAggregator struct {
 }
 
 func (p *PathAttributeAggregator) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	err := p.PathAttribute.DecodeFromBytes(data, options...)
+	value, err := p.PathAttribute.DecodeFromBytes(data, options...)
 	if err != nil {
 		return err
 	}
-	if len(p.PathAttribute.Value) != 6 && len(p.PathAttribute.Value) != 8 {
+	switch p.Length {
+	case 6:
+		p.Value.Askind = reflect.Uint16
+		p.Value.AS = uint32(binary.BigEndian.Uint16(value[0:2]))
+		p.Value.Address = value[2:]
+	case 8:
+		p.Value.Askind = reflect.Uint32
+		p.Value.AS = binary.BigEndian.Uint32(value[0:4])
+		p.Value.Address = value[4:]
+	default:
 		eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
 		eSubCode := uint8(BGP_ERROR_SUB_ATTRIBUTE_LENGTH_ERROR)
 		return NewMessageError(eCode, eSubCode, nil, "aggregator length isn't correct")
-	}
-	if len(p.PathAttribute.Value) == 6 {
-		p.Value.AS = uint32(binary.BigEndian.Uint16(p.PathAttribute.Value[0:2]))
-		p.Value.Address = p.PathAttribute.Value[2:]
-		p.Value.Askind = reflect.Uint16
-	} else {
-		p.Value.AS = binary.BigEndian.Uint32(p.PathAttribute.Value[0:4])
-		p.Value.Address = p.PathAttribute.Value[4:]
-		p.Value.Askind = reflect.Uint32
 	}
 	return nil
 }
@@ -5564,9 +5791,7 @@ func (p *PathAttributeAggregator) Serialize(options ...*MarshallingOption) ([]by
 		binary.BigEndian.PutUint32(buf, p.Value.AS)
 		copy(buf[4:], p.Value.Address)
 	}
-
-	p.PathAttribute.Value = buf
-	return p.PathAttribute.Serialize(options...)
+	return p.PathAttribute.Serialize(buf, options...)
 }
 
 func (p *PathAttributeAggregator) String() string {
@@ -5587,15 +5812,27 @@ func (p *PathAttributeAggregator) MarshalJSON() ([]byte, error) {
 
 func NewPathAttributeAggregator(as interface{}, address string) *PathAttributeAggregator {
 	v := reflect.ValueOf(as)
+	asKind := v.Kind()
+	var l uint16
+	switch asKind {
+	case reflect.Uint16:
+		l = 6
+	case reflect.Uint32:
+		l = 8
+	default:
+		// Invalid type
+		return nil
+	}
 	t := BGP_ATTR_TYPE_AGGREGATOR
 	return &PathAttributeAggregator{
 		PathAttribute: PathAttribute{
-			Flags: PathAttrFlags[t],
-			Type:  t,
+			Flags:  PathAttrFlags[t],
+			Type:   t,
+			Length: l,
 		},
 		Value: PathAttributeAggregatorParam{
 			AS:      uint32(v.Uint()),
-			Askind:  v.Kind(),
+			Askind:  asKind,
 			Address: net.ParseIP(address).To4(),
 		},
 	}
@@ -5607,16 +5844,15 @@ type PathAttributeCommunities struct {
 }
 
 func (p *PathAttributeCommunities) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	err := p.PathAttribute.DecodeFromBytes(data, options...)
+	value, err := p.PathAttribute.DecodeFromBytes(data, options...)
 	if err != nil {
 		return err
 	}
-	if len(p.PathAttribute.Value)%4 != 0 {
+	if p.Length%4 != 0 {
 		eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
 		eSubCode := uint8(BGP_ERROR_SUB_ATTRIBUTE_LENGTH_ERROR)
 		return NewMessageError(eCode, eSubCode, nil, "communities length isn't correct")
 	}
-	value := p.PathAttribute.Value
 	for len(value) >= 4 {
 		p.Value = append(p.Value, binary.BigEndian.Uint32(value))
 		value = value[4:]
@@ -5629,27 +5865,26 @@ func (p *PathAttributeCommunities) Serialize(options ...*MarshallingOption) ([]b
 	for i, v := range p.Value {
 		binary.BigEndian.PutUint32(buf[i*4:], v)
 	}
-	p.PathAttribute.Value = buf
-	return p.PathAttribute.Serialize(options...)
+	return p.PathAttribute.Serialize(buf, options...)
 }
 
 type WellKnownCommunity uint32
 
 const (
 	COMMUNITY_INTERNET                   WellKnownCommunity = 0x00000000
-	COMMUNITY_PLANNED_SHUT                                  = 0xffff0000
-	COMMUNITY_ACCEPT_OWN                                    = 0xffff0001
-	COMMUNITY_ROUTE_FILTER_TRANSLATED_v4                    = 0xffff0002
-	COMMUNITY_ROUTE_FILTER_v4                               = 0xffff0003
-	COMMUNITY_ROUTE_FILTER_TRANSLATED_v6                    = 0xffff0004
-	COMMUNITY_ROUTE_FILTER_v6                               = 0xffff0005
-	COMMUNITY_LLGR_STALE                                    = 0xffff0006
-	COMMUNITY_NO_LLGR                                       = 0xffff0007
-	COMMUNITY_BLACKHOLE                                     = 0xffff029a
-	COMMUNITY_NO_EXPORT                                     = 0xffffff01
-	COMMUNITY_NO_ADVERTISE                                  = 0xffffff02
-	COMMUNITY_NO_EXPORT_SUBCONFED                           = 0xffffff03
-	COMMUNITY_NO_PEER                                       = 0xffffff04
+	COMMUNITY_PLANNED_SHUT               WellKnownCommunity = 0xffff0000
+	COMMUNITY_ACCEPT_OWN                 WellKnownCommunity = 0xffff0001
+	COMMUNITY_ROUTE_FILTER_TRANSLATED_v4 WellKnownCommunity = 0xffff0002
+	COMMUNITY_ROUTE_FILTER_v4            WellKnownCommunity = 0xffff0003
+	COMMUNITY_ROUTE_FILTER_TRANSLATED_v6 WellKnownCommunity = 0xffff0004
+	COMMUNITY_ROUTE_FILTER_v6            WellKnownCommunity = 0xffff0005
+	COMMUNITY_LLGR_STALE                 WellKnownCommunity = 0xffff0006
+	COMMUNITY_NO_LLGR                    WellKnownCommunity = 0xffff0007
+	COMMUNITY_BLACKHOLE                  WellKnownCommunity = 0xffff029a
+	COMMUNITY_NO_EXPORT                  WellKnownCommunity = 0xffffff01
+	COMMUNITY_NO_ADVERTISE               WellKnownCommunity = 0xffffff02
+	COMMUNITY_NO_EXPORT_SUBCONFED        WellKnownCommunity = 0xffffff03
+	COMMUNITY_NO_PEER                    WellKnownCommunity = 0xffffff04
 )
 
 var WellKnownCommunityNameMap = map[WellKnownCommunity]string{
@@ -5710,14 +5945,15 @@ func (p *PathAttributeCommunities) MarshalJSON() ([]byte, error) {
 }
 
 func NewPathAttributeCommunities(value []uint32) *PathAttributeCommunities {
+	l := len(value) * 4
 	t := BGP_ATTR_TYPE_COMMUNITIES
 	return &PathAttributeCommunities{
-		PathAttribute{
-			Flags:  PathAttrFlags[t],
+		PathAttribute: PathAttribute{
+			Flags:  getPathAttrFlags(t, l),
 			Type:   t,
-			Length: 0,
-			Value:  nil},
-		value,
+			Length: uint16(l),
+		},
+		Value: value,
 	}
 }
 
@@ -5727,16 +5963,16 @@ type PathAttributeOriginatorId struct {
 }
 
 func (p *PathAttributeOriginatorId) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	err := p.PathAttribute.DecodeFromBytes(data, options...)
+	value, err := p.PathAttribute.DecodeFromBytes(data, options...)
 	if err != nil {
 		return err
 	}
-	if len(p.PathAttribute.Value) != 4 && len(p.PathAttribute.Value) != 16 {
+	if p.Length != 4 {
 		eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
 		eSubCode := uint8(BGP_ERROR_SUB_ATTRIBUTE_LENGTH_ERROR)
-		return NewMessageError(eCode, eSubCode, nil, "originatorid length isn't correct")
+		return NewMessageError(eCode, eSubCode, nil, "originator id length isn't correct")
 	}
-	p.Value = p.PathAttribute.Value
+	p.Value = value
 	return nil
 }
 
@@ -5757,19 +5993,18 @@ func (p *PathAttributeOriginatorId) MarshalJSON() ([]byte, error) {
 func (p *PathAttributeOriginatorId) Serialize(options ...*MarshallingOption) ([]byte, error) {
 	buf := make([]byte, 4)
 	copy(buf, p.Value)
-	p.PathAttribute.Value = buf
-	return p.PathAttribute.Serialize(options...)
+	return p.PathAttribute.Serialize(buf, options...)
 }
 
 func NewPathAttributeOriginatorId(value string) *PathAttributeOriginatorId {
 	t := BGP_ATTR_TYPE_ORIGINATOR_ID
 	return &PathAttributeOriginatorId{
-		PathAttribute{
+		PathAttribute: PathAttribute{
 			Flags:  PathAttrFlags[t],
 			Type:   t,
-			Length: 0,
-			Value:  nil},
-		net.ParseIP(value).To4(),
+			Length: 4,
+		},
+		Value: net.ParseIP(value).To4(),
 	}
 }
 
@@ -5779,12 +6014,11 @@ type PathAttributeClusterList struct {
 }
 
 func (p *PathAttributeClusterList) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	err := p.PathAttribute.DecodeFromBytes(data, options...)
+	value, err := p.PathAttribute.DecodeFromBytes(data, options...)
 	if err != nil {
 		return err
 	}
-	value := p.PathAttribute.Value
-	if len(p.PathAttribute.Value)%4 != 0 {
+	if p.Length%4 != 0 {
 		eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
 		eSubCode := uint8(BGP_ERROR_SUB_ATTRIBUTE_LENGTH_ERROR)
 		return NewMessageError(eCode, eSubCode, nil, "clusterlist length isn't correct")
@@ -5801,8 +6035,7 @@ func (p *PathAttributeClusterList) Serialize(options ...*MarshallingOption) ([]b
 	for i, v := range p.Value {
 		copy(buf[i*4:], v)
 	}
-	p.PathAttribute.Value = buf
-	return p.PathAttribute.Serialize(options...)
+	return p.PathAttribute.Serialize(buf, options...)
 }
 
 func (p *PathAttributeClusterList) String() string {
@@ -5824,18 +6057,19 @@ func (p *PathAttributeClusterList) MarshalJSON() ([]byte, error) {
 }
 
 func NewPathAttributeClusterList(value []string) *PathAttributeClusterList {
-	l := make([]net.IP, len(value))
+	l := len(value) * 4
+	list := make([]net.IP, len(value))
 	for i, v := range value {
-		l[i] = net.ParseIP(v).To4()
+		list[i] = net.ParseIP(v).To4()
 	}
 	t := BGP_ATTR_TYPE_CLUSTER_LIST
 	return &PathAttributeClusterList{
-		PathAttribute{
-			Flags:  PathAttrFlags[t],
+		PathAttribute: PathAttribute{
+			Flags:  getPathAttrFlags(t, l),
 			Type:   t,
-			Length: 0,
-			Value:  nil},
-		l,
+			Length: uint16(l),
+		},
+		Value: list,
 	}
 }
 
@@ -5849,14 +6083,14 @@ type PathAttributeMpReachNLRI struct {
 }
 
 func (p *PathAttributeMpReachNLRI) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	err := p.PathAttribute.DecodeFromBytes(data, options...)
+	value, err := p.PathAttribute.DecodeFromBytes(data, options...)
 	if err != nil {
 		return err
 	}
 	eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
 	eSubCode := uint8(BGP_ERROR_SUB_ATTRIBUTE_LENGTH_ERROR)
-	value := p.PathAttribute.Value
-	if len(value) < 3 {
+	eData, _ := p.PathAttribute.Serialize(value, options...)
+	if p.Length < 3 {
 		return NewMessageError(eCode, eSubCode, value, "mpreach header length is short")
 	}
 	afi := binary.BigEndian.Uint16(value[0:2])
@@ -5865,7 +6099,7 @@ func (p *PathAttributeMpReachNLRI) DecodeFromBytes(data []byte, options ...*Mars
 	p.SAFI = safi
 	_, err = NewPrefixFromRouteFamily(afi, safi)
 	if err != nil {
-		return NewMessageError(eCode, BGP_ERROR_SUB_ATTRIBUTE_FLAGS_ERROR, data[:p.PathAttribute.Len(options...)], err.Error())
+		return NewMessageError(eCode, BGP_ERROR_SUB_INVALID_NETWORK_FIELD, eData, err.Error())
 	}
 	nexthoplen := int(value[3])
 	if len(value) < 4+nexthoplen {
@@ -5904,7 +6138,7 @@ func (p *PathAttributeMpReachNLRI) DecodeFromBytes(data []byte, options ...*Mars
 	for len(value) > 0 {
 		prefix, err := NewPrefixFromRouteFamily(afi, safi)
 		if err != nil {
-			return NewMessageError(eCode, BGP_ERROR_SUB_ATTRIBUTE_FLAGS_ERROR, data[:p.PathAttribute.Len(options...)], err.Error())
+			return NewMessageError(eCode, BGP_ERROR_SUB_INVALID_NETWORK_FIELD, eData, err.Error())
 		}
 		err = prefix.DecodeFromBytes(value, options...)
 		if err != nil {
@@ -5959,8 +6193,7 @@ func (p *PathAttributeMpReachNLRI) Serialize(options ...*MarshallingOption) ([]b
 		}
 		buf = append(buf, pbuf...)
 	}
-	p.PathAttribute.Value = buf
-	return p.PathAttribute.Serialize(options...)
+	return p.PathAttribute.Serialize(buf, options...)
 }
 
 func (p *PathAttributeMpReachNLRI) MarshalJSON() ([]byte, error) {
@@ -5995,24 +6228,54 @@ func (p *PathAttributeMpReachNLRI) String() string {
 }
 
 func NewPathAttributeMpReachNLRI(nexthop string, nlri []AddrPrefixInterface) *PathAttributeMpReachNLRI {
-	t := BGP_ATTR_TYPE_MP_REACH_NLRI
-	p := &PathAttributeMpReachNLRI{
-		PathAttribute: PathAttribute{
-			Flags: PathAttrFlags[t],
-			Type:  t,
-		},
-		Value: nlri,
-	}
+	// AFI(2) + SAFI(1) + NexthopLength(1) + Nexthop(variable)
+	// + Reserved(1) + NLRI(variable)
+	l := 5
+	var afi uint16
+	var safi uint8
 	if len(nlri) > 0 {
-		p.AFI = nlri[0].AFI()
-		p.SAFI = nlri[0].SAFI()
+		afi = nlri[0].AFI()
+		safi = nlri[0].SAFI()
 	}
 	nh := net.ParseIP(nexthop)
-	if nh.To4() != nil && p.AFI != AFI_IP6 {
+	if nh.To4() != nil && afi != AFI_IP6 {
 		nh = nh.To4()
+		switch safi {
+		case SAFI_MPLS_VPN:
+			l += 12
+		case SAFI_FLOW_SPEC_VPN, SAFI_FLOW_SPEC_UNICAST:
+			// Should not have Nexthop
+		default:
+			l += 4
+		}
+	} else {
+		switch safi {
+		case SAFI_MPLS_VPN:
+			l += 24
+		case SAFI_FLOW_SPEC_VPN, SAFI_FLOW_SPEC_UNICAST:
+			// Should not have Nexthop
+		default:
+			l += 16
+		}
 	}
-	p.Nexthop = nh
-	return p
+	var nlriLen int
+	for _, n := range nlri {
+		l += n.Len()
+		nBuf, _ := n.Serialize()
+		nlriLen += len(nBuf)
+	}
+	t := BGP_ATTR_TYPE_MP_REACH_NLRI
+	return &PathAttributeMpReachNLRI{
+		PathAttribute: PathAttribute{
+			Flags:  getPathAttrFlags(t, l),
+			Type:   t,
+			Length: uint16(l),
+		},
+		Nexthop: nh,
+		AFI:     afi,
+		SAFI:    safi,
+		Value:   nlri,
+	}
 }
 
 type PathAttributeMpUnreachNLRI struct {
@@ -6023,22 +6286,21 @@ type PathAttributeMpUnreachNLRI struct {
 }
 
 func (p *PathAttributeMpUnreachNLRI) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	err := p.PathAttribute.DecodeFromBytes(data, options...)
+	value, err := p.PathAttribute.DecodeFromBytes(data, options...)
 	if err != nil {
 		return err
 	}
 	eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
 	eSubCode := uint8(BGP_ERROR_SUB_ATTRIBUTE_LENGTH_ERROR)
-
-	value := p.PathAttribute.Value
-	if len(value) < 3 {
+	eData, _ := p.PathAttribute.Serialize(value, options...)
+	if p.Length < 3 {
 		return NewMessageError(eCode, eSubCode, value, "unreach header length is incorrect")
 	}
 	afi := binary.BigEndian.Uint16(value[0:2])
 	safi := value[2]
 	_, err = NewPrefixFromRouteFamily(afi, safi)
 	if err != nil {
-		return NewMessageError(eCode, BGP_ERROR_SUB_ATTRIBUTE_FLAGS_ERROR, data[:p.PathAttribute.Len(options...)], err.Error())
+		return NewMessageError(eCode, BGP_ERROR_SUB_INVALID_NETWORK_FIELD, eData, err.Error())
 	}
 	value = value[3:]
 	p.AFI = afi
@@ -6050,14 +6312,14 @@ func (p *PathAttributeMpUnreachNLRI) DecodeFromBytes(data []byte, options ...*Ma
 	for len(value) > 0 {
 		prefix, err := NewPrefixFromRouteFamily(afi, safi)
 		if err != nil {
-			return NewMessageError(eCode, BGP_ERROR_SUB_ATTRIBUTE_FLAGS_ERROR, data[:p.PathAttribute.Len(options...)], err.Error())
+			return NewMessageError(eCode, BGP_ERROR_SUB_INVALID_NETWORK_FIELD, eData, err.Error())
 		}
 		err = prefix.DecodeFromBytes(value, options...)
 		if err != nil {
 			return err
 		}
 		if prefix.Len(options...)+addpathLen > len(value) {
-			return NewMessageError(eCode, eSubCode, data[:p.PathAttribute.Len(options...)], "prefix length is incorrect")
+			return NewMessageError(eCode, eSubCode, eData, "prefix length is incorrect")
 		}
 		value = value[prefix.Len(options...)+addpathLen:]
 		p.Value = append(p.Value, prefix)
@@ -6076,8 +6338,7 @@ func (p *PathAttributeMpUnreachNLRI) Serialize(options ...*MarshallingOption) ([
 		}
 		buf = append(buf, pbuf...)
 	}
-	p.PathAttribute.Value = buf
-	return p.PathAttribute.Serialize(options...)
+	return p.PathAttribute.Serialize(buf, options...)
 }
 
 func (p *PathAttributeMpUnreachNLRI) MarshalJSON() ([]byte, error) {
@@ -6102,20 +6363,28 @@ func (p *PathAttributeMpUnreachNLRI) String() string {
 }
 
 func NewPathAttributeMpUnreachNLRI(nlri []AddrPrefixInterface) *PathAttributeMpUnreachNLRI {
+	// AFI(2) + SAFI(1) + NLRI(variable)
+	l := 3
+	var afi uint16
+	var safi uint8
+	if len(nlri) > 0 {
+		afi = nlri[0].AFI()
+		safi = nlri[0].SAFI()
+	}
+	for _, n := range nlri {
+		l += n.Len()
+	}
 	t := BGP_ATTR_TYPE_MP_UNREACH_NLRI
-	p := &PathAttributeMpUnreachNLRI{
+	return &PathAttributeMpUnreachNLRI{
 		PathAttribute: PathAttribute{
-			Flags:  PathAttrFlags[t],
+			Flags:  getPathAttrFlags(t, l),
 			Type:   t,
-			Length: 0,
+			Length: uint16(l),
 		},
+		AFI:   afi,
+		SAFI:  safi,
 		Value: nlri,
 	}
-	if len(nlri) > 0 {
-		p.AFI = nlri[0].AFI()
-		p.SAFI = nlri[0].SAFI()
-	}
-	return p
 }
 
 type ExtendedCommunityInterface interface {
@@ -6356,29 +6625,26 @@ func NewFourOctetAsSpecificExtended(subtype ExtendedCommunityAttrSubType, as uin
 
 func ParseExtendedCommunity(subtype ExtendedCommunityAttrSubType, com string) (ExtendedCommunityInterface, error) {
 	if subtype == EC_SUBTYPE_ORIGIN_VALIDATION {
-		var value ValidationState
+		var state ValidationState
 		switch com {
 		case VALIDATION_STATE_VALID.String():
-			value = VALIDATION_STATE_VALID
+			state = VALIDATION_STATE_VALID
 		case VALIDATION_STATE_NOT_FOUND.String():
-			value = VALIDATION_STATE_NOT_FOUND
+			state = VALIDATION_STATE_NOT_FOUND
 		case VALIDATION_STATE_INVALID.String():
-			value = VALIDATION_STATE_INVALID
+			state = VALIDATION_STATE_INVALID
 		default:
 			return nil, fmt.Errorf("invalid validation state")
 		}
-		return &OpaqueExtended{
-			SubType: EC_SUBTYPE_ORIGIN_VALIDATION,
-			Value: &ValidationExtended{
-				Value: value,
-			},
+		return &ValidationExtended{
+			State: state,
 		}, nil
 	}
 	elems, err := parseRdAndRt(com)
 	if err != nil {
 		return nil, err
 	}
-	localAdmin, _ := strconv.Atoi(elems[10])
+	localAdmin, _ := strconv.ParseUint(elems[10], 10, 32)
 	ip := net.ParseIP(elems[1])
 	isTransitive := true
 	switch {
@@ -6387,11 +6653,11 @@ func ParseExtendedCommunity(subtype ExtendedCommunityAttrSubType, com string) (E
 	case ip.To16() != nil:
 		return NewIPv6AddressSpecificExtended(subtype, elems[1], uint16(localAdmin), isTransitive), nil
 	case elems[6] == "" && elems[7] == "":
-		asn, _ := strconv.Atoi(elems[8])
+		asn, _ := strconv.ParseUint(elems[8], 10, 16)
 		return NewTwoOctetAsSpecificExtended(subtype, uint16(asn), uint32(localAdmin), isTransitive), nil
 	default:
-		fst, _ := strconv.Atoi(elems[7])
-		snd, _ := strconv.Atoi(elems[8])
+		fst, _ := strconv.ParseUint(elems[7], 10, 16)
+		snd, _ := strconv.ParseUint(elems[8], 10, 16)
 		asn := fst<<16 | snd
 		return NewFourOctetAsSpecificExtended(subtype, uint32(asn), uint16(localAdmin), isTransitive), nil
 	}
@@ -6401,25 +6667,17 @@ func ParseRouteTarget(rt string) (ExtendedCommunityInterface, error) {
 	return ParseExtendedCommunity(EC_SUBTYPE_ROUTE_TARGET, rt)
 }
 
-type OpaqueExtendedValueInterface interface {
-	Serialize() ([]byte, error)
-	String() string
-}
-
-type DefaultOpaqueExtendedValue struct {
-	Value []byte
-}
-
-func (v *DefaultOpaqueExtendedValue) Serialize() ([]byte, error) {
-	v.Value = v.Value[:7]
-	return v.Value[:7], nil
-}
-
-func (v *DefaultOpaqueExtendedValue) String() string {
-	buf := make([]byte, 8)
-	copy(buf[1:], v.Value)
-	d := binary.BigEndian.Uint64(buf)
-	return fmt.Sprintf("%d", d)
+func SerializeExtendedCommunities(comms []ExtendedCommunityInterface) ([][]byte, error) {
+	var bufs [][]byte
+	var err error
+	for _, c := range comms {
+		buf, err := c.Serialize()
+		if err != nil {
+			return nil, err
+		}
+		bufs = append(bufs, buf)
+	}
+	return bufs, err
 }
 
 type ValidationState uint8
@@ -6443,33 +6701,83 @@ func (s ValidationState) String() string {
 }
 
 type ValidationExtended struct {
-	Value ValidationState
+	State ValidationState
 }
 
 func (e *ValidationExtended) Serialize() ([]byte, error) {
-	buf := make([]byte, 7)
-	buf[0] = byte(EC_SUBTYPE_ORIGIN_VALIDATION)
-	buf[6] = byte(e.Value)
+	buf := make([]byte, 8)
+	typ, subType := e.GetTypes()
+	buf[0] = byte(typ)
+	buf[1] = byte(subType)
+	buf[7] = byte(e.State)
 	return buf, nil
 }
 
 func (e *ValidationExtended) String() string {
-	return e.Value.String()
+	return e.State.String()
+}
+
+func (e *ValidationExtended) GetTypes() (ExtendedCommunityAttrType, ExtendedCommunityAttrSubType) {
+	return EC_TYPE_NON_TRANSITIVE_OPAQUE, EC_SUBTYPE_ORIGIN_VALIDATION
+}
+
+func (e *ValidationExtended) MarshalJSON() ([]byte, error) {
+	t, s := e.GetTypes()
+	return json.Marshal(struct {
+		Type    ExtendedCommunityAttrType    `json:"type"`
+		SubType ExtendedCommunityAttrSubType `json:"subtype"`
+		State   ValidationState              `json:"value"`
+	}{
+		Type:    t,
+		SubType: s,
+		State:   e.State,
+	})
+}
+
+func NewValidationExtended(state ValidationState) *ValidationExtended {
+	return &ValidationExtended{
+		State: state,
+	}
 }
 
 type ColorExtended struct {
-	Value uint32
+	Color uint32
 }
 
 func (e *ColorExtended) Serialize() ([]byte, error) {
-	buf := make([]byte, 7)
-	buf[0] = byte(EC_SUBTYPE_COLOR)
-	binary.BigEndian.PutUint32(buf[3:], uint32(e.Value))
+	buf := make([]byte, 8)
+	typ, subType := e.GetTypes()
+	buf[0] = byte(typ)
+	buf[1] = byte(subType)
+	binary.BigEndian.PutUint32(buf[4:8], uint32(e.Color))
 	return buf, nil
 }
 
 func (e *ColorExtended) String() string {
-	return fmt.Sprintf("%d", e.Value)
+	return fmt.Sprintf("%d", e.Color)
+}
+
+func (e *ColorExtended) GetTypes() (ExtendedCommunityAttrType, ExtendedCommunityAttrSubType) {
+	return EC_TYPE_TRANSITIVE_OPAQUE, EC_SUBTYPE_COLOR
+}
+
+func (e *ColorExtended) MarshalJSON() ([]byte, error) {
+	t, s := e.GetTypes()
+	return json.Marshal(struct {
+		Type    ExtendedCommunityAttrType    `json:"type"`
+		SubType ExtendedCommunityAttrSubType `json:"subtype"`
+		Color   uint32                       `json:"color"`
+	}{
+		Type:    t,
+		SubType: s,
+		Color:   e.Color,
+	})
+}
+
+func NewColorExtended(color uint32) *ColorExtended {
+	return &ColorExtended{
+		Color: color,
+	}
 }
 
 type EncapExtended struct {
@@ -6477,9 +6785,11 @@ type EncapExtended struct {
 }
 
 func (e *EncapExtended) Serialize() ([]byte, error) {
-	buf := make([]byte, 7)
-	buf[0] = byte(EC_SUBTYPE_ENCAPSULATION)
-	binary.BigEndian.PutUint16(buf[5:], uint16(e.TunnelType))
+	buf := make([]byte, 8)
+	typ, subType := e.GetTypes()
+	buf[0] = byte(typ)
+	buf[1] = byte(subType)
+	binary.BigEndian.PutUint16(buf[6:8], uint16(e.TunnelType))
 	return buf, nil
 }
 
@@ -6508,12 +6818,37 @@ func (e *EncapExtended) String() string {
 	}
 }
 
+func (e *EncapExtended) GetTypes() (ExtendedCommunityAttrType, ExtendedCommunityAttrSubType) {
+	return EC_TYPE_TRANSITIVE_OPAQUE, EC_SUBTYPE_ENCAPSULATION
+}
+
+func (e *EncapExtended) MarshalJSON() ([]byte, error) {
+	t, s := e.GetTypes()
+	return json.Marshal(struct {
+		Type       ExtendedCommunityAttrType    `json:"type"`
+		SubType    ExtendedCommunityAttrSubType `json:"subtype"`
+		TunnelType TunnelType                   `json:"tunnel_type"`
+	}{
+		Type:       t,
+		SubType:    s,
+		TunnelType: e.TunnelType,
+	})
+}
+
+func NewEncapExtended(tunnelType TunnelType) *EncapExtended {
+	return &EncapExtended{
+		TunnelType: tunnelType,
+	}
+}
+
 type DefaultGatewayExtended struct {
 }
 
 func (e *DefaultGatewayExtended) Serialize() ([]byte, error) {
-	buf := make([]byte, 7)
-	buf[0] = byte(EC_SUBTYPE_DEFAULT_GATEWAY)
+	buf := make([]byte, 8)
+	typ, subType := e.GetTypes()
+	buf[0] = byte(typ)
+	buf[1] = byte(subType)
 	return buf, nil
 }
 
@@ -6521,70 +6856,60 @@ func (e *DefaultGatewayExtended) String() string {
 	return "default-gateway"
 }
 
-type OpaqueExtended struct {
-	IsTransitive bool
-	Value        OpaqueExtendedValueInterface
-	SubType      ExtendedCommunityAttrSubType
+func (e *DefaultGatewayExtended) GetTypes() (ExtendedCommunityAttrType, ExtendedCommunityAttrSubType) {
+	return EC_TYPE_TRANSITIVE_OPAQUE, EC_SUBTYPE_DEFAULT_GATEWAY
 }
 
-func (e *OpaqueExtended) DecodeFromBytes(data []byte) error {
-	if len(data) != 7 {
-		return NewMessageError(BGP_ERROR_UPDATE_MESSAGE_ERROR, BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, fmt.Sprintf("Invalid OpaqueExtended bytes len: %d", len(data)))
-	}
-	e.SubType = ExtendedCommunityAttrSubType(data[0])
+func (e *DefaultGatewayExtended) MarshalJSON() ([]byte, error) {
+	t, s := e.GetTypes()
+	return json.Marshal(struct {
+		Type    ExtendedCommunityAttrType    `json:"type"`
+		SubType ExtendedCommunityAttrSubType `json:"subtype"`
+	}{
+		Type:    t,
+		SubType: s,
+	})
+}
 
-	if e.IsTransitive {
-		switch e.SubType {
-		case EC_SUBTYPE_COLOR:
-			v := binary.BigEndian.Uint32(data[3:7])
-			e.Value = &ColorExtended{
-				Value: v,
-			}
-		case EC_SUBTYPE_ENCAPSULATION:
-			t := TunnelType(binary.BigEndian.Uint16(data[5:7]))
-			e.Value = &EncapExtended{
-				TunnelType: t,
-			}
-		case EC_SUBTYPE_DEFAULT_GATEWAY:
-			e.Value = &DefaultGatewayExtended{}
-		default:
-			e.Value = &DefaultOpaqueExtendedValue{
-				Value: data, //7byte
-			}
-		}
-	} else {
-		switch e.SubType {
-		case EC_SUBTYPE_ORIGIN_VALIDATION:
-			e.Value = &ValidationExtended{
-				Value: ValidationState(data[6]),
-			}
-		default:
-			e.Value = &DefaultOpaqueExtendedValue{
-				Value: data, //7byte
-			}
-		}
-	}
-	return nil
+func NewDefaultGatewayExtended() *DefaultGatewayExtended {
+	return &DefaultGatewayExtended{}
+}
+
+type OpaqueExtended struct {
+	IsTransitive bool
+	Value        []byte
 }
 
 func (e *OpaqueExtended) Serialize() ([]byte, error) {
-	buf := make([]byte, 1, 7)
+	if len(e.Value) != 7 {
+		return nil, fmt.Errorf("invalid value length for opaque extended community: %d", len(e.Value))
+	}
+	buf := make([]byte, 8)
 	if e.IsTransitive {
 		buf[0] = byte(EC_TYPE_TRANSITIVE_OPAQUE)
 	} else {
 		buf[0] = byte(EC_TYPE_NON_TRANSITIVE_OPAQUE)
 	}
-	bbuf, err := e.Value.Serialize()
-	e.SubType = ExtendedCommunityAttrSubType(bbuf[0])
-	if err != nil {
-		return nil, err
-	}
-	buf = append(buf, bbuf...)
+	copy(buf[1:], e.Value)
 	return buf, nil
 }
 
 func (e *OpaqueExtended) String() string {
-	return e.Value.String()
+	buf := make([]byte, 8)
+	copy(buf[1:], e.Value)
+	return fmt.Sprintf("%d", binary.BigEndian.Uint64(buf))
+}
+
+func (e *OpaqueExtended) GetTypes() (ExtendedCommunityAttrType, ExtendedCommunityAttrSubType) {
+	var subType ExtendedCommunityAttrSubType
+	if len(e.Value) > 0 {
+		// Use the first byte of value as the sub type
+		subType = ExtendedCommunityAttrSubType(e.Value[0])
+	}
+	if e.IsTransitive {
+		return EC_TYPE_TRANSITIVE_OPAQUE, subType
+	}
+	return EC_TYPE_NON_TRANSITIVE_OPAQUE, subType
 }
 
 func (e *OpaqueExtended) MarshalJSON() ([]byte, error) {
@@ -6592,7 +6917,7 @@ func (e *OpaqueExtended) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type    ExtendedCommunityAttrType    `json:"type"`
 		Subtype ExtendedCommunityAttrSubType `json:"subtype"`
-		Value   OpaqueExtendedValueInterface `json:"value"`
+		Value   []byte                       `json:"value"`
 	}{
 		Type:    t,
 		Subtype: s,
@@ -6600,18 +6925,50 @@ func (e *OpaqueExtended) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func (e *OpaqueExtended) GetTypes() (ExtendedCommunityAttrType, ExtendedCommunityAttrSubType) {
-	t := EC_TYPE_TRANSITIVE_OPAQUE
-	if !e.IsTransitive {
-		t = EC_TYPE_NON_TRANSITIVE_OPAQUE
-	}
-	return t, e.SubType
-}
-
-func NewOpaqueExtended(isTransitive bool) *OpaqueExtended {
+func NewOpaqueExtended(isTransitive bool, value []byte) *OpaqueExtended {
+	v := make([]byte, 7)
+	copy(v, value)
 	return &OpaqueExtended{
 		IsTransitive: isTransitive,
+		Value:        v,
 	}
+}
+
+func parseOpaqueExtended(data []byte) (ExtendedCommunityInterface, error) {
+	typ := ExtendedCommunityAttrType(data[0])
+	isTransitive := false
+	switch typ {
+	case EC_TYPE_TRANSITIVE_OPAQUE:
+		isTransitive = true
+	case EC_TYPE_NON_TRANSITIVE_OPAQUE:
+		// isTransitive = false
+	default:
+		return nil, NewMessageError(BGP_ERROR_UPDATE_MESSAGE_ERROR, BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, fmt.Sprintf("invalid opaque extended community type: %d", data[0]))
+	}
+	subType := ExtendedCommunityAttrSubType(data[1])
+
+	if isTransitive {
+		switch subType {
+		case EC_SUBTYPE_COLOR:
+			return &ColorExtended{
+				Color: binary.BigEndian.Uint32(data[4:8]),
+			}, nil
+		case EC_SUBTYPE_ENCAPSULATION:
+			return &EncapExtended{
+				TunnelType: TunnelType(binary.BigEndian.Uint16(data[6:8])),
+			}, nil
+		case EC_SUBTYPE_DEFAULT_GATEWAY:
+			return &DefaultGatewayExtended{}, nil
+		}
+	} else {
+		switch subType {
+		case EC_SUBTYPE_ORIGIN_VALIDATION:
+			return &ValidationExtended{
+				State: ValidationState(data[7]),
+			}, nil
+		}
+	}
+	return NewOpaqueExtended(isTransitive, data[1:8]), nil
 }
 
 type ESILabelExtended struct {
@@ -6886,7 +7243,10 @@ func (e *TrafficRateExtended) GetTypes() (ExtendedCommunityAttrType, ExtendedCom
 }
 
 func NewTrafficRateExtended(as uint16, rate float32) *TrafficRateExtended {
-	return &TrafficRateExtended{as, rate}
+	return &TrafficRateExtended{
+		AS:   as,
+		Rate: rate,
+	}
 }
 
 type TrafficActionExtended struct {
@@ -6933,7 +7293,10 @@ func (e *TrafficActionExtended) GetTypes() (ExtendedCommunityAttrType, ExtendedC
 }
 
 func NewTrafficActionExtended(terminal bool, sample bool) *TrafficActionExtended {
-	return &TrafficActionExtended{terminal, sample}
+	return &TrafficActionExtended{
+		Terminal: terminal,
+		Sample:   sample,
+	}
 }
 
 type RedirectTwoOctetAsSpecificExtended struct {
@@ -6997,7 +7360,11 @@ func (e *RedirectIPv4AddressSpecificExtended) GetTypes() (ExtendedCommunityAttrT
 }
 
 func NewRedirectIPv4AddressSpecificExtended(ipv4 string, localAdmin uint16) *RedirectIPv4AddressSpecificExtended {
-	return &RedirectIPv4AddressSpecificExtended{*NewIPv4AddressSpecificExtended(EC_SUBTYPE_ROUTE_TARGET, ipv4, localAdmin, false)}
+	e := NewIPv4AddressSpecificExtended(EC_SUBTYPE_ROUTE_TARGET, ipv4, localAdmin, false)
+	if e == nil {
+		return nil
+	}
+	return &RedirectIPv4AddressSpecificExtended{*e}
 }
 
 type RedirectIPv6AddressSpecificExtended struct {
@@ -7029,7 +7396,11 @@ func (e *RedirectIPv6AddressSpecificExtended) GetTypes() (ExtendedCommunityAttrT
 }
 
 func NewRedirectIPv6AddressSpecificExtended(ipv6 string, localAdmin uint16) *RedirectIPv6AddressSpecificExtended {
-	return &RedirectIPv6AddressSpecificExtended{*NewIPv6AddressSpecificExtended(EC_SUBTYPE_ROUTE_TARGET, ipv6, localAdmin, false)}
+	e := NewIPv6AddressSpecificExtended(EC_SUBTYPE_ROUTE_TARGET, ipv6, localAdmin, false)
+	if e == nil {
+		return nil
+	}
+	return &RedirectIPv6AddressSpecificExtended{*e}
 }
 
 type RedirectFourOctetAsSpecificExtended struct {
@@ -7094,7 +7465,9 @@ func (e *TrafficRemarkExtended) GetTypes() (ExtendedCommunityAttrType, ExtendedC
 }
 
 func NewTrafficRemarkExtended(dscp uint8) *TrafficRemarkExtended {
-	return &TrafficRemarkExtended{dscp}
+	return &TrafficRemarkExtended{
+		DSCP: dscp,
+	}
 }
 
 func parseFlowSpecExtended(data []byte) (ExtendedCommunityInterface, error) {
@@ -7171,18 +7544,19 @@ type UnknownExtended struct {
 }
 
 func (e *UnknownExtended) Serialize() ([]byte, error) {
+	if len(e.Value) != 7 {
+		return nil, fmt.Errorf("invalid value length for unknown extended community: %d", len(e.Value))
+	}
 	buf := make([]byte, 8)
 	buf[0] = uint8(e.Type)
 	copy(buf[1:], e.Value)
-	e.Value = buf[1:]
 	return buf, nil
 }
 
 func (e *UnknownExtended) String() string {
 	buf := make([]byte, 8)
 	copy(buf[1:], e.Value)
-	v := binary.BigEndian.Uint64(buf)
-	return fmt.Sprintf("%d", v)
+	return fmt.Sprintf("%d", binary.BigEndian.Uint64(buf))
 }
 
 func (e *UnknownExtended) MarshalJSON() ([]byte, error) {
@@ -7199,7 +7573,21 @@ func (e *UnknownExtended) MarshalJSON() ([]byte, error) {
 }
 
 func (e *UnknownExtended) GetTypes() (ExtendedCommunityAttrType, ExtendedCommunityAttrSubType) {
-	return ExtendedCommunityAttrType(0xFF), ExtendedCommunityAttrSubType(0xFF)
+	var subType ExtendedCommunityAttrSubType
+	if len(e.Value) > 0 {
+		// Use the first byte of value as the sub type
+		subType = ExtendedCommunityAttrSubType(e.Value[0])
+	}
+	return e.Type, subType
+}
+
+func NewUnknownExtended(typ ExtendedCommunityAttrType, value []byte) *UnknownExtended {
+	v := make([]byte, 7)
+	copy(v, value)
+	return &UnknownExtended{
+		Type:  typ,
+		Value: v,
+	}
 }
 
 type PathAttributeExtendedCommunities struct {
@@ -7240,9 +7628,7 @@ func ParseExtended(data []byte) (ExtendedCommunityInterface, error) {
 		transitive = true
 		fallthrough
 	case EC_TYPE_NON_TRANSITIVE_OPAQUE:
-		e := NewOpaqueExtended(transitive)
-		err := e.DecodeFromBytes(data[1:8])
-		return e, err
+		return parseOpaqueExtended(data)
 	case EC_TYPE_EVPN:
 		return parseEvpnExtended(data)
 	case EC_TYPE_GENERIC_TRANSITIVE_EXPERIMENTAL, EC_TYPE_GENERIC_TRANSITIVE_EXPERIMENTAL2, EC_TYPE_GENERIC_TRANSITIVE_EXPERIMENTAL3:
@@ -7256,16 +7642,15 @@ func ParseExtended(data []byte) (ExtendedCommunityInterface, error) {
 }
 
 func (p *PathAttributeExtendedCommunities) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	err := p.PathAttribute.DecodeFromBytes(data, options...)
+	value, err := p.PathAttribute.DecodeFromBytes(data, options...)
 	if err != nil {
 		return err
 	}
-	if len(p.PathAttribute.Value)%8 != 0 {
+	if p.Length%8 != 0 {
 		eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
 		eSubCode := uint8(BGP_ERROR_SUB_ATTRIBUTE_LENGTH_ERROR)
 		return NewMessageError(eCode, eSubCode, nil, "extendedcommunities length isn't correct")
 	}
-	value := p.PathAttribute.Value
 	for len(value) >= 8 {
 		e, err := ParseExtended(value)
 		if err != nil {
@@ -7286,8 +7671,7 @@ func (p *PathAttributeExtendedCommunities) Serialize(options ...*MarshallingOpti
 		}
 		buf = append(buf, ebuf...)
 	}
-	p.PathAttribute.Value = buf
-	return p.PathAttribute.Serialize(options...)
+	return p.PathAttribute.Serialize(buf, options...)
 }
 
 func (p *PathAttributeExtendedCommunities) String() string {
@@ -7314,11 +7698,13 @@ func (p *PathAttributeExtendedCommunities) MarshalJSON() ([]byte, error) {
 }
 
 func NewPathAttributeExtendedCommunities(value []ExtendedCommunityInterface) *PathAttributeExtendedCommunities {
+	l := len(value) * 8
 	t := BGP_ATTR_TYPE_EXTENDED_COMMUNITIES
 	return &PathAttributeExtendedCommunities{
 		PathAttribute: PathAttribute{
-			Flags: PathAttrFlags[t],
-			Type:  t,
+			Flags:  getPathAttrFlags(t, l),
+			Type:   t,
+			Length: uint16(l),
 		},
 		Value: value,
 	}
@@ -7327,32 +7713,32 @@ func NewPathAttributeExtendedCommunities(value []ExtendedCommunityInterface) *Pa
 type PathAttributeAs4Path struct {
 	PathAttribute
 	Value []*As4PathParam
-	DefaultAsPath
 }
 
 func (p *PathAttributeAs4Path) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	err := p.PathAttribute.DecodeFromBytes(data, options...)
+	value, err := p.PathAttribute.DecodeFromBytes(data, options...)
 	if err != nil {
 		return err
 	}
 	eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
 	eSubCode := uint8(BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST)
-	v := p.PathAttribute.Value
-	as4Bytes, err := p.DefaultAsPath.isValidAspath(p.PathAttribute.Value)
+	isAs4, err := validateAsPathValueBytes(value)
 	if err != nil {
 		return err
 	}
-	if as4Bytes == false {
+
+	if !isAs4 {
 		return NewMessageError(eCode, eSubCode, nil, "AS4 PATH param is malformed")
 	}
-	for len(v) > 0 {
+
+	for len(value) > 0 {
 		tuple := &As4PathParam{}
-		tuple.DecodeFromBytes(v)
+		tuple.DecodeFromBytes(value)
 		p.Value = append(p.Value, tuple)
-		if len(v) < tuple.Len() {
+		if len(value) < tuple.Len() {
 			return NewMessageError(eCode, eSubCode, nil, "AS4 PATH param is malformed")
 		}
-		v = v[tuple.Len():]
+		value = value[tuple.Len():]
 	}
 	return nil
 }
@@ -7366,8 +7752,7 @@ func (p *PathAttributeAs4Path) Serialize(options ...*MarshallingOption) ([]byte,
 		}
 		buf = append(buf, vbuf...)
 	}
-	p.PathAttribute.Value = buf
-	return p.PathAttribute.Serialize(options...)
+	return p.PathAttribute.Serialize(buf, options...)
 }
 
 func (p *PathAttributeAs4Path) String() string {
@@ -7378,12 +7763,27 @@ func (p *PathAttributeAs4Path) String() string {
 	return strings.Join(params, " ")
 }
 
+func (p *PathAttributeAs4Path) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type  BGPAttrType     `json:"type"`
+		Value []*As4PathParam `json:"as_paths"`
+	}{
+		Type:  p.GetType(),
+		Value: p.Value,
+	})
+}
+
 func NewPathAttributeAs4Path(value []*As4PathParam) *PathAttributeAs4Path {
+	var l int
+	for _, v := range value {
+		l += v.Len()
+	}
 	t := BGP_ATTR_TYPE_AS4_PATH
 	return &PathAttributeAs4Path{
 		PathAttribute: PathAttribute{
-			Flags: PathAttrFlags[t],
-			Type:  t,
+			Flags:  getPathAttrFlags(t, l),
+			Type:   t,
+			Length: uint16(l),
 		},
 		Value: value,
 	}
@@ -7395,17 +7795,17 @@ type PathAttributeAs4Aggregator struct {
 }
 
 func (p *PathAttributeAs4Aggregator) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	err := p.PathAttribute.DecodeFromBytes(data, options...)
+	value, err := p.PathAttribute.DecodeFromBytes(data, options...)
 	if err != nil {
 		return err
 	}
-	if len(p.PathAttribute.Value) != 8 {
+	if p.Length != 8 {
 		eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
 		eSubCode := uint8(BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST)
 		return NewMessageError(eCode, eSubCode, nil, "AS4 Aggregator length is incorrect")
 	}
-	p.Value.AS = binary.BigEndian.Uint32(p.PathAttribute.Value[0:4])
-	p.Value.Address = p.PathAttribute.Value[4:]
+	p.Value.AS = binary.BigEndian.Uint32(value[0:4])
+	p.Value.Address = value[4:]
 	return nil
 }
 
@@ -7413,16 +7813,32 @@ func (p *PathAttributeAs4Aggregator) Serialize(options ...*MarshallingOption) ([
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint32(buf[0:], p.Value.AS)
 	copy(buf[4:], p.Value.Address.To4())
-	p.PathAttribute.Value = buf
-	return p.PathAttribute.Serialize(options...)
+	return p.PathAttribute.Serialize(buf, options...)
+}
+
+func (p *PathAttributeAs4Aggregator) String() string {
+	return fmt.Sprintf("{As4Aggregator: {AS: %d, Address: %s}}", p.Value.AS, p.Value.Address)
+}
+
+func (p *PathAttributeAs4Aggregator) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type    BGPAttrType `json:"type"`
+		AS      uint32      `json:"as"`
+		Address string      `json:"address"`
+	}{
+		Type:    p.GetType(),
+		AS:      p.Value.AS,
+		Address: p.Value.Address.String(),
+	})
 }
 
 func NewPathAttributeAs4Aggregator(as uint32, address string) *PathAttributeAs4Aggregator {
 	t := BGP_ATTR_TYPE_AS4_AGGREGATOR
 	return &PathAttributeAs4Aggregator{
 		PathAttribute: PathAttribute{
-			Flags: PathAttrFlags[t],
-			Type:  t,
+			Flags:  PathAttrFlags[t],
+			Type:   t,
+			Length: 8,
 		},
 		Value: PathAttributeAggregatorParam{
 			AS:      as,
@@ -7431,143 +7847,327 @@ func NewPathAttributeAs4Aggregator(as uint32, address string) *PathAttributeAs4A
 	}
 }
 
-type TunnelEncapSubTLVValue interface {
+type TunnelEncapSubTLVInterface interface {
+	Len() int
+	DecodeFromBytes([]byte) error
 	Serialize() ([]byte, error)
+	String() string
+	MarshalJSON() ([]byte, error)
 }
 
-type TunnelEncapSubTLVDefault struct {
+type TunnelEncapSubTLV struct {
+	Type   EncapSubTLVType
+	Length uint16
+}
+
+func (t *TunnelEncapSubTLV) Len() int {
+	if t.Type >= 0x80 {
+		return 3 + int(t.Length)
+	}
+	return 2 + int(t.Length)
+}
+
+func (t *TunnelEncapSubTLV) DecodeFromBytes(data []byte) (value []byte, err error) {
+	t.Type = EncapSubTLVType(data[0])
+	if t.Type >= 0x80 {
+		t.Length = binary.BigEndian.Uint16(data[1:3])
+		data = data[3:]
+	} else {
+		t.Length = uint16(data[1])
+		data = data[2:]
+	}
+	if len(data) < int(t.Length) {
+		return nil, NewMessageError(BGP_ERROR_UPDATE_MESSAGE_ERROR, BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, "Not all TunnelEncapSubTLV bytes available")
+	}
+	return data, nil
+}
+
+func (t *TunnelEncapSubTLV) Serialize(value []byte) (buf []byte, err error) {
+	t.Length = uint16(len(value))
+	if t.Type >= 0x80 {
+		buf = append(make([]byte, 3), value...)
+		binary.BigEndian.PutUint16(buf[1:3], t.Length)
+	} else {
+		buf = append(make([]byte, 2), value...)
+		buf[1] = uint8(t.Length)
+	}
+	buf[0] = uint8(t.Type)
+	return buf, nil
+}
+
+type TunnelEncapSubTLVUnknown struct {
+	TunnelEncapSubTLV
 	Value []byte
 }
 
-func (t *TunnelEncapSubTLVDefault) Serialize() ([]byte, error) {
-	return t.Value, nil
+func (t *TunnelEncapSubTLVUnknown) DecodeFromBytes(data []byte) error {
+	value, err := t.TunnelEncapSubTLV.DecodeFromBytes(data)
+	if err != nil {
+		return err
+	}
+	t.Value = value
+	return nil
+}
+
+func (t *TunnelEncapSubTLVUnknown) Serialize() ([]byte, error) {
+	return t.TunnelEncapSubTLV.Serialize(t.Value)
+}
+
+func (t *TunnelEncapSubTLVUnknown) String() string {
+	return fmt.Sprintf("{Type: %d, Value: %x}", t.Type, t.Value)
+}
+
+func (t *TunnelEncapSubTLVUnknown) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type  EncapSubTLVType `json:"type"`
+		Value []byte          `json:"value"`
+	}{
+		Type:  t.Type,
+		Value: t.Value,
+	})
+}
+
+func NewTunnelEncapSubTLVUnknown(typ EncapSubTLVType, value []byte) *TunnelEncapSubTLVUnknown {
+	return &TunnelEncapSubTLVUnknown{
+		TunnelEncapSubTLV: TunnelEncapSubTLV{
+			Type: typ,
+		},
+		Value: value,
+	}
 }
 
 type TunnelEncapSubTLVEncapsulation struct {
+	TunnelEncapSubTLV
 	Key    uint32 // this represent both SessionID for L2TPv3 case and GRE-key for GRE case (RFC5512 4.)
 	Cookie []byte
+}
+
+func (t *TunnelEncapSubTLVEncapsulation) DecodeFromBytes(data []byte) error {
+	value, err := t.TunnelEncapSubTLV.DecodeFromBytes(data)
+	if err != nil {
+		return err
+	}
+	if t.Length < 4 {
+		return NewMessageError(BGP_ERROR_UPDATE_MESSAGE_ERROR, BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, "Not all TunnelEncapSubTLVEncapsulation bytes available")
+	}
+	t.Key = binary.BigEndian.Uint32(value[0:4])
+	t.Cookie = value[4:]
+	return nil
 }
 
 func (t *TunnelEncapSubTLVEncapsulation) Serialize() ([]byte, error) {
 	buf := make([]byte, 4)
 	binary.BigEndian.PutUint32(buf, t.Key)
-	return append(buf, t.Cookie...), nil
+	buf = append(buf, t.Cookie...)
+	return t.TunnelEncapSubTLV.Serialize(buf)
+}
+
+func (t *TunnelEncapSubTLVEncapsulation) String() string {
+	return fmt.Sprintf("{Key: %d, Cookie: %x}", t.Key, t.Cookie)
+}
+
+func (t *TunnelEncapSubTLVEncapsulation) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type   EncapSubTLVType `json:"type"`
+		Key    uint32          `json:"key"`
+		Cookie []byte          `json:"cookie"`
+	}{
+		Type:   t.Type,
+		Key:    t.Key,
+		Cookie: t.Cookie,
+	})
+}
+
+func NewTunnelEncapSubTLVEncapsulation(key uint32, cookie []byte) *TunnelEncapSubTLVEncapsulation {
+	return &TunnelEncapSubTLVEncapsulation{
+		TunnelEncapSubTLV: TunnelEncapSubTLV{
+			Type: ENCAP_SUBTLV_TYPE_ENCAPSULATION,
+		},
+		Key:    key,
+		Cookie: cookie,
+	}
 }
 
 type TunnelEncapSubTLVProtocol struct {
+	TunnelEncapSubTLV
 	Protocol uint16
+}
+
+func (t *TunnelEncapSubTLVProtocol) DecodeFromBytes(data []byte) error {
+	value, err := t.TunnelEncapSubTLV.DecodeFromBytes(data)
+	if err != nil {
+		return err
+	}
+	if t.Length < 2 {
+		return NewMessageError(BGP_ERROR_UPDATE_MESSAGE_ERROR, BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, "Not all TunnelEncapSubTLVProtocol bytes available")
+	}
+	t.Protocol = binary.BigEndian.Uint16(value[0:2])
+	return nil
 }
 
 func (t *TunnelEncapSubTLVProtocol) Serialize() ([]byte, error) {
 	buf := make([]byte, 2)
 	binary.BigEndian.PutUint16(buf, t.Protocol)
-	return buf, nil
+	return t.TunnelEncapSubTLV.Serialize(buf)
+}
+
+func (t *TunnelEncapSubTLVProtocol) String() string {
+	return fmt.Sprintf("{Protocol: %d}", t.Protocol)
+}
+
+func (t *TunnelEncapSubTLVProtocol) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type     EncapSubTLVType `json:"type"`
+		Protocol uint16          `json:"protocol"`
+	}{
+		Type:     t.Type,
+		Protocol: t.Protocol,
+	})
+}
+
+func NewTunnelEncapSubTLVProtocol(protocol uint16) *TunnelEncapSubTLVProtocol {
+	return &TunnelEncapSubTLVProtocol{
+		TunnelEncapSubTLV: TunnelEncapSubTLV{
+			Type: ENCAP_SUBTLV_TYPE_PROTOCOL,
+		},
+		Protocol: protocol,
+	}
 }
 
 type TunnelEncapSubTLVColor struct {
+	TunnelEncapSubTLV
 	Color uint32
+}
+
+func (t *TunnelEncapSubTLVColor) DecodeFromBytes(data []byte) error {
+	value, err := t.TunnelEncapSubTLV.DecodeFromBytes(data)
+	if err != nil {
+		return err
+	}
+	if t.Length != 8 {
+		return NewMessageError(BGP_ERROR_UPDATE_MESSAGE_ERROR, BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, "Invalid TunnelEncapSubTLVColor length")
+	}
+	t.Color = binary.BigEndian.Uint32(value[4:8])
+	return nil
 }
 
 func (t *TunnelEncapSubTLVColor) Serialize() ([]byte, error) {
 	buf := make([]byte, 8)
 	buf[0] = byte(EC_TYPE_TRANSITIVE_OPAQUE)
 	buf[1] = byte(EC_SUBTYPE_COLOR)
-	binary.BigEndian.PutUint32(buf[4:], t.Color)
-	return buf, nil
+	binary.BigEndian.PutUint32(buf[4:8], t.Color)
+	return t.TunnelEncapSubTLV.Serialize(buf)
 }
 
-type TunnelEncapSubTLV struct {
-	Type  EncapSubTLVType
-	Len   int
-	Value TunnelEncapSubTLVValue
+func (t *TunnelEncapSubTLVColor) String() string {
+	return fmt.Sprintf("{Color: %d}", t.Color)
 }
 
-func (p *TunnelEncapSubTLV) Serialize() ([]byte, error) {
-	buf := make([]byte, 2)
-	bbuf, err := p.Value.Serialize()
-	if err != nil {
-		return nil, err
+func (t *TunnelEncapSubTLVColor) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type  EncapSubTLVType `json:"type"`
+		Color uint32          `json:"color"`
+	}{
+		Type:  t.Type,
+		Color: t.Color,
+	})
+}
+
+func NewTunnelEncapSubTLVColor(color uint32) *TunnelEncapSubTLVColor {
+	return &TunnelEncapSubTLVColor{
+		TunnelEncapSubTLV: TunnelEncapSubTLV{
+			Type: ENCAP_SUBTLV_TYPE_COLOR,
+		},
+		Color: color,
 	}
-	buf = append(buf, bbuf...)
-	buf[0] = byte(p.Type)
-	p.Len = len(buf) - 2
-	buf[1] = byte(p.Len)
-	return buf, nil
-}
-
-func (p *TunnelEncapSubTLV) DecodeFromBytes(data []byte) error {
-	switch p.Type {
-	case ENCAP_SUBTLV_TYPE_ENCAPSULATION:
-		if len(data) < 4 {
-			return NewMessageError(BGP_ERROR_UPDATE_MESSAGE_ERROR, BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, "Not all TunnelEncapSubTLV bytes available")
-		}
-		key := binary.BigEndian.Uint32(data[:4])
-		p.Value = &TunnelEncapSubTLVEncapsulation{
-			Key:    key,
-			Cookie: data[4:],
-		}
-	case ENCAP_SUBTLV_TYPE_PROTOCOL:
-		if len(data) < 2 {
-			return NewMessageError(BGP_ERROR_UPDATE_MESSAGE_ERROR, BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, "Not all TunnelEncapSubTLV bytes available")
-		}
-		protocol := binary.BigEndian.Uint16(data[:2])
-		p.Value = &TunnelEncapSubTLVProtocol{protocol}
-	case ENCAP_SUBTLV_TYPE_COLOR:
-		if len(data) < 8 {
-			return NewMessageError(BGP_ERROR_UPDATE_MESSAGE_ERROR, BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, "Not all TunnelEncapSubTLV bytes available")
-		}
-		color := binary.BigEndian.Uint32(data[4:])
-		p.Value = &TunnelEncapSubTLVColor{color}
-	default:
-		p.Value = &TunnelEncapSubTLVDefault{data}
-	}
-	return nil
 }
 
 type TunnelEncapTLV struct {
-	Type  TunnelType
-	Len   int
-	Value []*TunnelEncapSubTLV
+	Type   TunnelType
+	Length uint16
+	Value  []TunnelEncapSubTLVInterface
+}
+
+func (t *TunnelEncapTLV) Len() int {
+	var l int
+	for _, v := range t.Value {
+		l += v.Len()
+	}
+	return 4 + l // Type(2) + Length(2) + Value(variable)
 }
 
 func (t *TunnelEncapTLV) DecodeFromBytes(data []byte) error {
-	curr := 0
-	for {
-		if len(data) < curr+2 {
-			break
+	t.Type = TunnelType(binary.BigEndian.Uint16(data[0:2]))
+	t.Length = binary.BigEndian.Uint16(data[2:4])
+	data = data[4:]
+	if len(data) < int(t.Length) {
+		return NewMessageError(BGP_ERROR_UPDATE_MESSAGE_ERROR, BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, fmt.Sprintf("Not all TunnelEncapTLV bytes available"))
+	}
+	value := data[:t.Length]
+	for len(value) > 2 {
+		subType := EncapSubTLVType(value[0])
+		var subTlv TunnelEncapSubTLVInterface
+		switch subType {
+		case ENCAP_SUBTLV_TYPE_ENCAPSULATION:
+			subTlv = &TunnelEncapSubTLVEncapsulation{}
+		case ENCAP_SUBTLV_TYPE_PROTOCOL:
+			subTlv = &TunnelEncapSubTLVProtocol{}
+		case ENCAP_SUBTLV_TYPE_COLOR:
+			subTlv = &TunnelEncapSubTLVColor{}
+		default:
+			subTlv = &TunnelEncapSubTLVUnknown{
+				TunnelEncapSubTLV: TunnelEncapSubTLV{
+					Type: subType,
+				},
+			}
 		}
-		subType := EncapSubTLVType(data[curr])
-		l := int(data[curr+1])
-		if len(data) < curr+2+l {
-			return NewMessageError(BGP_ERROR_UPDATE_MESSAGE_ERROR, BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, "Not all TunnelEncapSubTLV bytes available")
-		}
-		v := data[curr+2 : curr+2+l]
-		subTlv := &TunnelEncapSubTLV{
-			Type: subType,
-		}
-		err := subTlv.DecodeFromBytes(v)
+		err := subTlv.DecodeFromBytes(value)
 		if err != nil {
 			return err
 		}
 		t.Value = append(t.Value, subTlv)
-		curr += 2 + l
+		value = value[subTlv.Len():]
 	}
 	return nil
 }
 
 func (p *TunnelEncapTLV) Serialize() ([]byte, error) {
 	buf := make([]byte, 4)
-	for _, s := range p.Value {
-		bbuf, err := s.Serialize()
+	for _, t := range p.Value {
+		tBuf, err := t.Serialize()
 		if err != nil {
 			return nil, err
 		}
-		buf = append(buf, bbuf...)
+		buf = append(buf, tBuf...)
 	}
 	binary.BigEndian.PutUint16(buf, uint16(p.Type))
-	p.Len = len(buf) - 4
-	binary.BigEndian.PutUint16(buf[2:], uint16(p.Len))
+	binary.BigEndian.PutUint16(buf[2:], uint16(len(buf)-4))
 	return buf, nil
+}
+
+func (p *TunnelEncapTLV) String() string {
+	tlvList := make([]string, len(p.Value))
+	for i, v := range p.Value {
+		tlvList[i] = v.String()
+	}
+	return fmt.Sprintf("{%s: %s}", p.Type, strings.Join(tlvList, ", "))
+}
+
+func (p *TunnelEncapTLV) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type  TunnelType                   `json:"type"`
+		Value []TunnelEncapSubTLVInterface `json:"value"`
+	}{
+		Type:  p.Type,
+		Value: p.Value,
+	})
+}
+
+func NewTunnelEncapTLV(typ TunnelType, value []TunnelEncapSubTLVInterface) *TunnelEncapTLV {
+	return &TunnelEncapTLV{
+		Type:  typ,
+		Value: value,
+	}
 }
 
 type PathAttributeTunnelEncap struct {
@@ -7576,32 +8176,18 @@ type PathAttributeTunnelEncap struct {
 }
 
 func (p *PathAttributeTunnelEncap) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	err := p.PathAttribute.DecodeFromBytes(data, options...)
+	value, err := p.PathAttribute.DecodeFromBytes(data, options...)
 	if err != nil {
 		return err
 	}
-	curr := 0
-	for {
-		if len(p.PathAttribute.Value) < curr+4 {
-			break
-		}
-		t := binary.BigEndian.Uint16(p.PathAttribute.Value[curr : curr+2])
-		tunnelType := TunnelType(t)
-		l := int(binary.BigEndian.Uint16(p.PathAttribute.Value[curr+2 : curr+4]))
-		if len(p.PathAttribute.Value) < curr+4+l {
-			return NewMessageError(BGP_ERROR_UPDATE_MESSAGE_ERROR, BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, fmt.Sprintf("Not all TunnelEncapTLV bytes available. %d < %d", len(p.PathAttribute.Value), curr+4+l))
-		}
-		v := p.PathAttribute.Value[curr+4 : curr+4+l]
-		tlv := &TunnelEncapTLV{
-			Type: tunnelType,
-			Len:  l,
-		}
-		err = tlv.DecodeFromBytes(v)
+	for len(value) > 4 {
+		tlv := &TunnelEncapTLV{}
+		err = tlv.DecodeFromBytes(value)
 		if err != nil {
 			return err
 		}
 		p.Value = append(p.Value, tlv)
-		curr += 4 + l
+		value = value[4+tlv.Length:]
 	}
 	return nil
 }
@@ -7615,28 +8201,55 @@ func (p *PathAttributeTunnelEncap) Serialize(options ...*MarshallingOption) ([]b
 		}
 		buf = append(buf, bbuf...)
 	}
-	p.PathAttribute.Value = buf
-	return p.PathAttribute.Serialize(options...)
+	return p.PathAttribute.Serialize(buf, options...)
+}
+
+func (p *PathAttributeTunnelEncap) String() string {
+	tlvList := make([]string, len(p.Value))
+	for i, v := range p.Value {
+		tlvList[i] = v.String()
+	}
+	return fmt.Sprintf("{TunnelEncap: %s}", strings.Join(tlvList, ", "))
+}
+
+func (p *PathAttributeTunnelEncap) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type  BGPAttrType       `json:"type"`
+		Value []*TunnelEncapTLV `json:"value"`
+	}{
+		Type:  p.Type,
+		Value: p.Value,
+	})
 }
 
 func NewPathAttributeTunnelEncap(value []*TunnelEncapTLV) *PathAttributeTunnelEncap {
+	var l int
+	for _, v := range value {
+		l += v.Len()
+	}
 	t := BGP_ATTR_TYPE_TUNNEL_ENCAP
 	return &PathAttributeTunnelEncap{
 		PathAttribute: PathAttribute{
-			Flags: PathAttrFlags[t],
-			Type:  t,
+			Flags:  getPathAttrFlags(t, l),
+			Type:   t,
+			Length: uint16(l),
 		},
 		Value: value,
 	}
 }
 
 type PmsiTunnelIDInterface interface {
+	Len() int
 	Serialize() ([]byte, error)
 	String() string
 }
 
 type DefaultPmsiTunnelID struct {
 	Value []byte
+}
+
+func (i *DefaultPmsiTunnelID) Len() int {
+	return len(i.Value)
 }
 
 func (i *DefaultPmsiTunnelID) Serialize() ([]byte, error) {
@@ -7647,8 +8260,18 @@ func (i *DefaultPmsiTunnelID) String() string {
 	return string(i.Value)
 }
 
+func NewDefaultPmsiTunnelID(value []byte) *DefaultPmsiTunnelID {
+	return &DefaultPmsiTunnelID{
+		Value: value,
+	}
+}
+
 type IngressReplTunnelID struct {
 	Value net.IP
+}
+
+func (i *IngressReplTunnelID) Len() int {
+	return len(i.Value)
 }
 
 func (i *IngressReplTunnelID) Serialize() ([]byte, error) {
@@ -7662,6 +8285,16 @@ func (i *IngressReplTunnelID) String() string {
 	return i.Value.String()
 }
 
+func NewIngressReplTunnelID(value string) *IngressReplTunnelID {
+	ip := net.ParseIP(value)
+	if ip == nil {
+		return nil
+	}
+	return &IngressReplTunnelID{
+		Value: ip,
+	}
+}
+
 type PathAttributePmsiTunnel struct {
 	PathAttribute
 	IsLeafInfoRequired bool
@@ -7671,29 +8304,29 @@ type PathAttributePmsiTunnel struct {
 }
 
 func (p *PathAttributePmsiTunnel) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	err := p.PathAttribute.DecodeFromBytes(data, options...)
+	value, err := p.PathAttribute.DecodeFromBytes(data, options...)
 	if err != nil {
 		return err
 	}
-	if len(p.PathAttribute.Value) < 5 {
+	if p.Length < 5 {
 		eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
 		eSubCode := uint8(BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST)
 		return NewMessageError(eCode, eSubCode, nil, "PMSI Tunnel length is incorrect")
 	}
 
-	if (p.PathAttribute.Value[0] & 0x01) > 0 {
+	if (value[0] & 0x01) > 0 {
 		p.IsLeafInfoRequired = true
 	}
-	p.TunnelType = PmsiTunnelType(p.PathAttribute.Value[1])
-	if p.Label, err = labelDecode(p.PathAttribute.Value[2:5]); err != nil {
+	p.TunnelType = PmsiTunnelType(value[1])
+	if p.Label, err = labelDecode(value[2:5]); err != nil {
 		return err
 	}
 
 	switch p.TunnelType {
 	case PMSI_TUNNEL_TYPE_INGRESS_REPL:
-		p.TunnelID = &IngressReplTunnelID{net.IP(p.PathAttribute.Value[5:])}
+		p.TunnelID = &IngressReplTunnelID{net.IP(value[5:])}
 	default:
-		p.TunnelID = &DefaultPmsiTunnelID{p.PathAttribute.Value[5:]}
+		p.TunnelID = &DefaultPmsiTunnelID{value[5:]}
 	}
 	return nil
 }
@@ -7714,8 +8347,7 @@ func (p *PathAttributePmsiTunnel) Serialize(options ...*MarshallingOption) ([]by
 		return nil, err
 	}
 	buf = append(buf, tbuf...)
-	p.PathAttribute.Value = buf
-	return p.PathAttribute.Serialize(options...)
+	return p.PathAttribute.Serialize(buf, options...)
 }
 
 func (p *PathAttributePmsiTunnel) String() string {
@@ -7745,16 +8377,160 @@ func (p *PathAttributePmsiTunnel) MarshalJSON() ([]byte, error) {
 }
 
 func NewPathAttributePmsiTunnel(typ PmsiTunnelType, isLeafInfoRequired bool, label uint32, id PmsiTunnelIDInterface) *PathAttributePmsiTunnel {
+	// Flags(1) + TunnelType(1) + Label(3) + TunnelID(variable)
+	l := 5 + id.Len()
 	t := BGP_ATTR_TYPE_PMSI_TUNNEL
 	return &PathAttributePmsiTunnel{
 		PathAttribute: PathAttribute{
-			Flags: PathAttrFlags[t],
-			Type:  t,
+			Flags:  getPathAttrFlags(t, l),
+			Type:   t,
+			Length: uint16(l),
 		},
 		IsLeafInfoRequired: isLeafInfoRequired,
 		TunnelType:         typ,
 		Label:              label,
 		TunnelID:           id,
+	}
+}
+
+func ParsePmsiTunnel(args []string) (*PathAttributePmsiTunnel, error) {
+	// Format:
+	// "<type>" ["leaf-info-required"] "<label>" "<tunnel-id>"
+	if len(args) < 3 {
+		return nil, fmt.Errorf("invalid pmsi tunnel arguments: %s", args)
+	}
+
+	pmsi := NewPathAttributePmsiTunnel(0, false, 0, nil)
+
+	switch args[0] {
+	case "ingress-repl":
+		pmsi.TunnelType = PMSI_TUNNEL_TYPE_INGRESS_REPL
+	default:
+		typ, err := strconv.ParseUint(args[0], 10, 8)
+		if err != nil {
+			return nil, fmt.Errorf("invalid pmsi tunnel type: %s", args[0])
+		}
+		pmsi.TunnelType = PmsiTunnelType(typ)
+	}
+
+	indx := 1
+	if args[indx] == "leaf-info-required" {
+		pmsi.IsLeafInfoRequired = true
+		indx++
+	}
+
+	label, err := strconv.ParseUint(args[indx], 10, 32)
+	if err != nil {
+		return nil, fmt.Errorf("invalid pmsi tunnel label: %s", args[indx])
+	}
+	pmsi.Label = uint32(label)
+	indx++
+
+	switch pmsi.TunnelType {
+	case PMSI_TUNNEL_TYPE_INGRESS_REPL:
+		ip := net.ParseIP(args[indx])
+		if ip == nil {
+			return nil, fmt.Errorf("invalid pmsi tunnel identifier: %s", args[indx])
+		}
+		pmsi.TunnelID = &IngressReplTunnelID{Value: ip}
+	default:
+		pmsi.TunnelID = &DefaultPmsiTunnelID{Value: []byte(args[indx])}
+	}
+
+	return pmsi, nil
+}
+
+type PathAttributeIP6ExtendedCommunities struct {
+	PathAttribute
+	Value []ExtendedCommunityInterface
+}
+
+func ParseIP6Extended(data []byte) (ExtendedCommunityInterface, error) {
+	if len(data) < 8 {
+		return nil, NewMessageError(BGP_ERROR_UPDATE_MESSAGE_ERROR, BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, "not all extended community bytes are available")
+	}
+	attrType := ExtendedCommunityAttrType(data[0])
+	subtype := ExtendedCommunityAttrSubType(data[1])
+	transitive := false
+	switch attrType {
+	case EC_TYPE_TRANSITIVE_IP6_SPECIFIC:
+		transitive = true
+		fallthrough
+	case EC_TYPE_NON_TRANSITIVE_IP6_SPECIFIC:
+		ipv6 := net.IP(data[2:18]).String()
+		localAdmin := binary.BigEndian.Uint16(data[18:20])
+		return NewIPv6AddressSpecificExtended(subtype, ipv6, localAdmin, transitive), nil
+	case EC_TYPE_GENERIC_TRANSITIVE_EXPERIMENTAL:
+		return parseIP6FlowSpecExtended(data)
+	default:
+		return &UnknownExtended{
+			Type:  ExtendedCommunityAttrType(data[0]),
+			Value: data[1:8],
+		}, nil
+	}
+}
+
+func (p *PathAttributeIP6ExtendedCommunities) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
+	value, err := p.PathAttribute.DecodeFromBytes(data)
+	if err != nil {
+		return err
+	}
+	if p.Length%20 != 0 {
+		eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
+		eSubCode := uint8(BGP_ERROR_SUB_ATTRIBUTE_LENGTH_ERROR)
+		return NewMessageError(eCode, eSubCode, nil, "extendedcommunities length isn't correct")
+	}
+	for len(value) >= 20 {
+		e, err := ParseIP6Extended(value)
+		if err != nil {
+			return err
+		}
+		p.Value = append(p.Value, e)
+		value = value[20:]
+	}
+	return nil
+}
+
+func (p *PathAttributeIP6ExtendedCommunities) Serialize(options ...*MarshallingOption) ([]byte, error) {
+	buf := make([]byte, 0)
+	for _, p := range p.Value {
+		ebuf, err := p.Serialize()
+		if err != nil {
+			return nil, err
+		}
+		buf = append(buf, ebuf...)
+	}
+	return p.PathAttribute.Serialize(buf, options...)
+}
+
+func (p *PathAttributeIP6ExtendedCommunities) String() string {
+	var buf []string
+	for _, v := range p.Value {
+		buf = append(buf, fmt.Sprintf("[%s]", v.String()))
+	}
+	return fmt.Sprintf("{Extcomms: %s}", strings.Join(buf, ","))
+}
+
+func (p *PathAttributeIP6ExtendedCommunities) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Type  BGPAttrType                  `json:"type"`
+		Value []ExtendedCommunityInterface `json:"value"`
+	}{
+		Type:  p.GetType(),
+		Value: p.Value,
+	})
+}
+
+func NewPathAttributeIP6ExtendedCommunities(value []ExtendedCommunityInterface) *PathAttributeIP6ExtendedCommunities {
+	l := len(value) * 20
+	t := BGP_ATTR_TYPE_IP6_EXTENDED_COMMUNITIES
+	return &PathAttributeIP6ExtendedCommunities{
+		PathAttribute: PathAttribute{
+			Flags:  getPathAttrFlags(t, l),
+			Type:   t,
+			Length: uint16(l),
+		},
+		Value: value,
 	}
 }
 
@@ -7765,11 +8541,12 @@ const (
 	AIGP_TLV_IGP_METRIC
 )
 
-type AigpTLV interface {
+type AigpTLVInterface interface {
 	Serialize() ([]byte, error)
 	String() string
 	MarshalJSON() ([]byte, error)
 	Type() AigpTLVType
+	Len() int
 }
 
 type AigpTLVDefault struct {
@@ -7801,6 +8578,17 @@ func (t *AigpTLVDefault) MarshalJSON() ([]byte, error) {
 
 func (t *AigpTLVDefault) Type() AigpTLVType {
 	return t.typ
+}
+
+func (t *AigpTLVDefault) Len() int {
+	return 3 + len(t.Value) // Type(1) + Length(2) + Value(variable)
+}
+
+func NewAigpTLVDefault(typ AigpTLVType, value []byte) *AigpTLVDefault {
+	return &AigpTLVDefault{
+		typ:   typ,
+		Value: value,
+	}
 }
 
 type AigpTLVIgpMetric struct {
@@ -7839,143 +8627,45 @@ func (t *AigpTLVIgpMetric) Type() AigpTLVType {
 	return AIGP_TLV_IGP_METRIC
 }
 
-type PathAttributeIP6ExtendedCommunities struct {
-	PathAttribute
-	Value []ExtendedCommunityInterface
-}
-
-func ParseIP6Extended(data []byte) (ExtendedCommunityInterface, error) {
-	if len(data) < 8 {
-		return nil, NewMessageError(BGP_ERROR_UPDATE_MESSAGE_ERROR, BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST, nil, "not all extended community bytes are available")
-	}
-	attrType := ExtendedCommunityAttrType(data[0])
-	subtype := ExtendedCommunityAttrSubType(data[1])
-	transitive := false
-	switch attrType {
-	case EC_TYPE_TRANSITIVE_IP6_SPECIFIC:
-		transitive = true
-		fallthrough
-	case EC_TYPE_NON_TRANSITIVE_IP6_SPECIFIC:
-		ipv6 := net.IP(data[2:18]).String()
-		localAdmin := binary.BigEndian.Uint16(data[18:20])
-		return NewIPv6AddressSpecificExtended(subtype, ipv6, localAdmin, transitive), nil
-	case EC_TYPE_GENERIC_TRANSITIVE_EXPERIMENTAL:
-		return parseIP6FlowSpecExtended(data)
-	default:
-		return &UnknownExtended{
-			Type:  ExtendedCommunityAttrType(data[0]),
-			Value: data[1:8],
-		}, nil
-	}
-}
-
-func (p *PathAttributeIP6ExtendedCommunities) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	err := p.PathAttribute.DecodeFromBytes(data)
-	if err != nil {
-		return err
-	}
-	if len(p.PathAttribute.Value)%20 != 0 {
-		eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
-		eSubCode := uint8(BGP_ERROR_SUB_ATTRIBUTE_LENGTH_ERROR)
-		return NewMessageError(eCode, eSubCode, nil, "extendedcommunities length isn't correct")
-	}
-	value := p.PathAttribute.Value
-	for len(value) >= 20 {
-		e, err := ParseIP6Extended(value)
-		if err != nil {
-			return err
-		}
-		p.Value = append(p.Value, e)
-		value = value[20:]
-	}
-	return nil
-}
-
-func (p *PathAttributeIP6ExtendedCommunities) Serialize(options ...*MarshallingOption) ([]byte, error) {
-	buf := make([]byte, 0)
-	for _, p := range p.Value {
-		ebuf, err := p.Serialize()
-		if err != nil {
-			return nil, err
-		}
-		buf = append(buf, ebuf...)
-	}
-	p.PathAttribute.Value = buf
-	return p.PathAttribute.Serialize()
-}
-
-func (p *PathAttributeIP6ExtendedCommunities) String() string {
-	var buf []string
-	for _, v := range p.Value {
-		buf = append(buf, fmt.Sprintf("[%s]", v.String()))
-	}
-	return fmt.Sprintf("{Extcomms: %s}", strings.Join(buf, ","))
-}
-
-func (p *PathAttributeIP6ExtendedCommunities) MarshalJSON() ([]byte, error) {
-	return json.Marshal(struct {
-		Type  BGPAttrType                  `json:"type"`
-		Value []ExtendedCommunityInterface `json:"value"`
-	}{
-		Type:  p.GetType(),
-		Value: p.Value,
-	})
-}
-
-func NewPathAttributeIP6ExtendedCommunities(value []ExtendedCommunityInterface) *PathAttributeIP6ExtendedCommunities {
-	t := BGP_ATTR_TYPE_IP6_EXTENDED_COMMUNITIES
-	return &PathAttributeIP6ExtendedCommunities{
-		PathAttribute: PathAttribute{
-			Flags: PathAttrFlags[t],
-			Type:  t,
-		},
-		Value: value,
-	}
+func (t *AigpTLVIgpMetric) Len() int {
+	return 11
 }
 
 type PathAttributeAigp struct {
 	PathAttribute
-	Values []AigpTLV
+	Values []AigpTLVInterface
 }
 
 func (p *PathAttributeAigp) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	err := p.PathAttribute.DecodeFromBytes(data, options...)
+	value, err := p.PathAttribute.DecodeFromBytes(data, options...)
 	if err != nil {
 		return err
 	}
-
-	rest := p.PathAttribute.Value
-	values := make([]AigpTLV, 0)
-
-	for {
-		if len(rest) < 3 {
+	for len(value) > 3 {
+		typ := value[0]
+		length := binary.BigEndian.Uint16(value[1:3])
+		if len(value) < int(length) {
 			break
 		}
-		typ := rest[0]
-		length := binary.BigEndian.Uint16(rest[1:3])
-		if len(rest) < int(length) {
-			break
-		}
-		v := rest[3:length]
+		v := value[3:length]
 		switch AigpTLVType(typ) {
 		case AIGP_TLV_IGP_METRIC:
 			if len(v) < 8 {
 				break
 			}
 			metric := binary.BigEndian.Uint64(v)
-			values = append(values, NewAigpTLVIgpMetric(metric))
+			p.Values = append(p.Values, NewAigpTLVIgpMetric(metric))
 		default:
-			values = append(values, &AigpTLVDefault{AigpTLVType(typ), v})
+			p.Values = append(p.Values, NewAigpTLVDefault(AigpTLVType(typ), v))
 		}
-		rest = rest[length:]
-		if len(rest) == 0 {
-			p.Values = values
-			return nil
-		}
+		value = value[length:]
 	}
-	eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
-	eSubCode := uint8(BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST)
-	return NewMessageError(eCode, eSubCode, nil, "Aigp length is incorrect")
+	if len(value) != 0 {
+		eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
+		eSubCode := uint8(BGP_ERROR_SUB_MALFORMED_ATTRIBUTE_LIST)
+		return NewMessageError(eCode, eSubCode, nil, "Aigp length is incorrect")
+	}
+	return nil
 }
 
 func (p *PathAttributeAigp) Serialize(options ...*MarshallingOption) ([]byte, error) {
@@ -7987,8 +8677,7 @@ func (p *PathAttributeAigp) Serialize(options ...*MarshallingOption) ([]byte, er
 		}
 		buf = append(buf, bbuf...)
 	}
-	p.PathAttribute.Value = buf
-	return p.PathAttribute.Serialize(options...)
+	return p.PathAttribute.Serialize(buf, options...)
 }
 
 func (p *PathAttributeAigp) String() string {
@@ -8003,20 +8692,25 @@ func (p *PathAttributeAigp) String() string {
 
 func (p *PathAttributeAigp) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
-		Type  BGPAttrType `json:"type"`
-		Value []AigpTLV   `json:"value"`
+		Type  BGPAttrType        `json:"type"`
+		Value []AigpTLVInterface `json:"value"`
 	}{
 		Type:  p.GetType(),
 		Value: p.Values,
 	})
 }
 
-func NewPathAttributeAigp(values []AigpTLV) *PathAttributeAigp {
+func NewPathAttributeAigp(values []AigpTLVInterface) *PathAttributeAigp {
+	var l int
+	for _, v := range values {
+		l += v.Len()
+	}
 	t := BGP_ATTR_TYPE_AIGP
 	return &PathAttributeAigp{
 		PathAttribute: PathAttribute{
-			Flags: PathAttrFlags[t],
-			Type:  t,
+			Flags:  getPathAttrFlags(t, l),
+			Type:   t,
+			Length: uint16(l),
 		},
 		Values: values,
 	}
@@ -8070,33 +8764,28 @@ type PathAttributeLargeCommunities struct {
 }
 
 func (p *PathAttributeLargeCommunities) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
-	err := p.PathAttribute.DecodeFromBytes(data)
+	value, err := p.PathAttribute.DecodeFromBytes(data)
 	if err != nil {
 		return err
 	}
-
-	rest := p.PathAttribute.Value
-
-	if len(rest)%12 != 0 {
+	if p.Length%12 != 0 {
 		eCode := uint8(BGP_ERROR_UPDATE_MESSAGE_ERROR)
 		eSubCode := uint8(BGP_ERROR_SUB_ATTRIBUTE_LENGTH_ERROR)
 		return NewMessageError(eCode, eSubCode, nil, "large communities length isn't correct")
 	}
-
-	p.Values = make([]*LargeCommunity, 0, len(rest)/12)
-
-	for len(rest) >= 12 {
-		asn := binary.BigEndian.Uint32(rest[:4])
-		data1 := binary.BigEndian.Uint32(rest[4:8])
-		data2 := binary.BigEndian.Uint32(rest[8:12])
+	p.Values = make([]*LargeCommunity, 0, p.Length/12)
+	for len(value) >= 12 {
+		asn := binary.BigEndian.Uint32(value[:4])
+		data1 := binary.BigEndian.Uint32(value[4:8])
+		data2 := binary.BigEndian.Uint32(value[8:12])
 		p.Values = append(p.Values, NewLargeCommunity(asn, data1, data2))
-		rest = rest[12:]
+		value = value[12:]
 	}
 	return nil
 }
 
 func (p *PathAttributeLargeCommunities) Serialize(options ...*MarshallingOption) ([]byte, error) {
-	buf := make([]byte, 0)
+	buf := make([]byte, 0, len(p.Values)*12)
 	for _, t := range p.Values {
 		bbuf, err := t.Serialize()
 		if err != nil {
@@ -8104,8 +8793,7 @@ func (p *PathAttributeLargeCommunities) Serialize(options ...*MarshallingOption)
 		}
 		buf = append(buf, bbuf...)
 	}
-	p.PathAttribute.Value = buf
-	return p.PathAttribute.Serialize()
+	return p.PathAttribute.Serialize(buf, options...)
 }
 
 func (p *PathAttributeLargeCommunities) String() string {
@@ -8131,11 +8819,13 @@ func (p *PathAttributeLargeCommunities) MarshalJSON() ([]byte, error) {
 }
 
 func NewPathAttributeLargeCommunities(values []*LargeCommunity) *PathAttributeLargeCommunities {
+	l := len(values) * 12
 	t := BGP_ATTR_TYPE_LARGE_COMMUNITY
 	return &PathAttributeLargeCommunities{
 		PathAttribute: PathAttribute{
-			Flags: PathAttrFlags[t],
-			Type:  t,
+			Flags:  getPathAttrFlags(t, l),
+			Type:   t,
+			Length: uint16(l),
 		},
 		Values: values,
 	}
@@ -8143,6 +8833,51 @@ func NewPathAttributeLargeCommunities(values []*LargeCommunity) *PathAttributeLa
 
 type PathAttributeUnknown struct {
 	PathAttribute
+	Value []byte
+}
+
+func (p *PathAttributeUnknown) DecodeFromBytes(data []byte, options ...*MarshallingOption) error {
+	value, err := p.PathAttribute.DecodeFromBytes(data)
+	if err != nil {
+		return err
+	}
+	p.Value = value
+	return nil
+}
+
+func (p *PathAttributeUnknown) Serialize(options ...*MarshallingOption) ([]byte, error) {
+	return p.PathAttribute.Serialize(p.Value, options...)
+}
+
+func (p *PathAttributeUnknown) String() string {
+	return fmt.Sprintf("{Flags: %s, Type: %s, Value: %s}", p.Flags, p.Type, p.Value)
+}
+
+func (p *PathAttributeUnknown) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Flags BGPAttrFlag `json:"flags"`
+		Type  BGPAttrType `json:"type"`
+		Value []byte      `json:"value"`
+	}{
+		Flags: p.GetFlags(),
+		Type:  p.GetType(),
+		Value: p.Value,
+	})
+}
+
+func NewPathAttributeUnknown(flags BGPAttrFlag, typ BGPAttrType, value []byte) *PathAttributeUnknown {
+	l := len(value)
+	if l > 255 {
+		flags |= BGP_ATTR_FLAG_EXTENDED_LENGTH
+	}
+	return &PathAttributeUnknown{
+		PathAttribute: PathAttribute{
+			Flags:  flags,
+			Type:   typ,
+			Length: uint16(l),
+		},
+		Value: value,
+	}
 }
 
 func GetPathAttribute(data []byte) (PathAttributeInterface, error) {
@@ -8410,9 +9145,8 @@ func NewEndOfRib(family RouteFamily) *BGPMessage {
 		t := BGP_ATTR_TYPE_MP_UNREACH_NLRI
 		unreach := &PathAttributeMpUnreachNLRI{
 			PathAttribute: PathAttribute{
-				Flags:  PathAttrFlags[t],
-				Type:   t,
-				Length: 3,
+				Flags: PathAttrFlags[t],
+				Type:  t,
 			},
 			AFI:  afi,
 			SAFI: safi,
@@ -8524,10 +9258,12 @@ func (msg *BGPHeader) DecodeFromBytes(data []byte, options ...*MarshallingOption
 	if uint16(len(data)) < BGP_HEADER_LENGTH {
 		return NewMessageError(BGP_ERROR_MESSAGE_HEADER_ERROR, BGP_ERROR_SUB_BAD_MESSAGE_LENGTH, nil, "not all BGP message header")
 	}
+
 	msg.Len = binary.BigEndian.Uint16(data[16:18])
 	if int(msg.Len) < BGP_HEADER_LENGTH {
 		return NewMessageError(BGP_ERROR_MESSAGE_HEADER_ERROR, BGP_ERROR_SUB_BAD_MESSAGE_LENGTH, nil, "unknown message type")
 	}
+
 	msg.Type = data[18]
 	return nil
 }
@@ -8577,6 +9313,11 @@ func ParseBGPMessage(data []byte, options ...*MarshallingOption) (*BGPMessage, e
 	if err != nil {
 		return nil, err
 	}
+
+	if int(h.Len) > len(data) {
+		return nil, NewMessageError(BGP_ERROR_MESSAGE_HEADER_ERROR, BGP_ERROR_SUB_BAD_MESSAGE_LENGTH, nil, "unknown message type")
+	}
+
 	return parseBody(h, data[19:h.Len], options...)
 }
 
@@ -8711,10 +9452,23 @@ func (e *TwoOctetAsSpecificExtended) Flat() map[string]string {
 	return map[string]string{}
 }
 
+func (e *ColorExtended) Flat() map[string]string {
+	return map[string]string{}
+}
+
+func (e *EncapExtended) Flat() map[string]string {
+	return map[string]string{"encaspulation": e.TunnelType.String()}
+}
+
+func (e *DefaultGatewayExtended) Flat() map[string]string {
+	return map[string]string{}
+}
+
+func (e *ValidationExtended) Flat() map[string]string {
+	return map[string]string{}
+}
+
 func (e *OpaqueExtended) Flat() map[string]string {
-	if e.SubType == EC_SUBTYPE_ENCAPSULATION {
-		return map[string]string{"encaspulation": e.Value.String()}
-	}
 	return map[string]string{}
 }
 

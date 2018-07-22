@@ -26,7 +26,7 @@ func TestLogFile_AddSeriesList(t *testing.T) {
 
 	f := MustOpenLogFile(sfile.SeriesFile)
 	defer f.Close()
-	seriesSet := tsi1.NewSeriesSet()
+	seriesSet := tsdb.NewSeriesIDSet()
 
 	// Add test data.
 	if err := f.AddSeriesList(seriesSet, [][]byte{
@@ -73,7 +73,7 @@ func TestLogFile_SeriesStoredInOrder(t *testing.T) {
 
 	f := MustOpenLogFile(sfile.SeriesFile)
 	defer f.Close()
-	seriesSet := tsi1.NewSeriesSet()
+	seriesSet := tsdb.NewSeriesIDSet()
 
 	// Generate and add test data
 	tvm := make(map[string]struct{})
@@ -130,7 +130,7 @@ func TestLogFile_DeleteMeasurement(t *testing.T) {
 
 	f := MustOpenLogFile(sfile.SeriesFile)
 	defer f.Close()
-	seriesSet := tsi1.NewSeriesSet()
+	seriesSet := tsdb.NewSeriesIDSet()
 
 	// Add test data.
 	if err := f.AddSeriesList(seriesSet, [][]byte{
@@ -159,6 +159,111 @@ func TestLogFile_DeleteMeasurement(t *testing.T) {
 	} else if e := itr.Next(); e != nil {
 		t.Fatalf("expected eof, got: %#v", e)
 	}
+}
+
+// Ensure log file can recover correctly.
+func TestLogFile_Open(t *testing.T) {
+	t.Run("Truncate", func(t *testing.T) {
+		sfile := MustOpenSeriesFile()
+		defer sfile.Close()
+		seriesSet := tsdb.NewSeriesIDSet()
+
+		f := MustOpenLogFile(sfile.SeriesFile)
+		defer f.Close()
+
+		// Add test data & close.
+		if err := f.AddSeriesList(seriesSet, [][]byte{[]byte("cpu"), []byte("mem")}, []models.Tags{{{}}, {{}}}); err != nil {
+			t.Fatal(err)
+		} else if err := f.LogFile.Close(); err != nil {
+			t.Fatal(err)
+		}
+
+		// Truncate data & reopen.
+		if fi, err := os.Stat(f.LogFile.Path()); err != nil {
+			t.Fatal(err)
+		} else if err := os.Truncate(f.LogFile.Path(), fi.Size()-1); err != nil {
+			t.Fatal(err)
+		} else if err := f.LogFile.Open(); err != nil {
+			t.Fatal(err)
+		}
+
+		// Verify data.
+		itr := f.SeriesIDIterator()
+		if elem, err := itr.Next(); err != nil {
+			t.Fatal(err)
+		} else if name, tags := sfile.Series(elem.SeriesID); string(name) != `cpu` {
+			t.Fatalf("unexpected series: %s,%s", name, tags.String())
+		} else if elem, err := itr.Next(); err != nil {
+			t.Fatal(err)
+		} else if elem.SeriesID != 0 {
+			t.Fatalf("expected eof, got: %#v", elem)
+		}
+
+		// Add more data & reopen.
+		if err := f.AddSeriesList(seriesSet, [][]byte{[]byte("disk")}, []models.Tags{{{}}}); err != nil {
+			t.Fatal(err)
+		} else if err := f.Reopen(); err != nil {
+			t.Fatal(err)
+		}
+
+		// Verify new data.
+		itr = f.SeriesIDIterator()
+		if elem, err := itr.Next(); err != nil {
+			t.Fatal(err)
+		} else if name, tags := sfile.Series(elem.SeriesID); string(name) != `cpu` {
+			t.Fatalf("unexpected series: %s,%s", name, tags.String())
+		} else if elem, err := itr.Next(); err != nil {
+			t.Fatal(err)
+		} else if name, tags := sfile.Series(elem.SeriesID); string(name) != `disk` {
+			t.Fatalf("unexpected series: %s,%s", name, tags.String())
+		} else if elem, err := itr.Next(); err != nil {
+			t.Fatal(err)
+		} else if elem.SeriesID != 0 {
+			t.Fatalf("expected eof, got: %#v", elem)
+		}
+	})
+
+	t.Run("ChecksumMismatch", func(t *testing.T) {
+		sfile := MustOpenSeriesFile()
+		defer sfile.Close()
+		seriesSet := tsdb.NewSeriesIDSet()
+
+		f := MustOpenLogFile(sfile.SeriesFile)
+		defer f.Close()
+
+		// Add test data & close.
+		if err := f.AddSeriesList(seriesSet, [][]byte{[]byte("cpu"), []byte("mem")}, []models.Tags{{{}}, {{}}}); err != nil {
+			t.Fatal(err)
+		} else if err := f.LogFile.Close(); err != nil {
+			t.Fatal(err)
+		}
+
+		// Corrupt last entry.
+		buf, err := ioutil.ReadFile(f.LogFile.Path())
+		if err != nil {
+			t.Fatal(err)
+		}
+		buf[len(buf)-1] = 0
+
+		// Overwrite file with corrupt entry and reopen.
+		if err := ioutil.WriteFile(f.LogFile.Path(), buf, 0666); err != nil {
+			t.Fatal(err)
+		} else if err := f.LogFile.Open(); err != nil {
+			t.Fatal(err)
+		}
+
+		// Verify data.
+		itr := f.SeriesIDIterator()
+		if elem, err := itr.Next(); err != nil {
+			t.Fatal(err)
+		} else if name, tags := sfile.Series(elem.SeriesID); string(name) != `cpu` {
+			t.Fatalf("unexpected series: %s,%s", name, tags.String())
+		} else if elem, err := itr.Next(); err != nil {
+			t.Fatal(err)
+		} else if elem.SeriesID != 0 {
+			t.Fatalf("expected eof, got: %#v", elem)
+		}
+	})
 }
 
 // LogFile is a test wrapper for tsi1.LogFile.
@@ -206,7 +311,7 @@ func (f *LogFile) Reopen() error {
 // CreateLogFile creates a new temporary log file and adds a list of series.
 func CreateLogFile(sfile *tsdb.SeriesFile, series []Series) (*LogFile, error) {
 	f := MustOpenLogFile(sfile)
-	seriesSet := tsi1.NewSeriesSet()
+	seriesSet := tsdb.NewSeriesIDSet()
 	for _, serie := range series {
 		if err := f.AddSeriesList(seriesSet, [][]byte{serie.Name}, []models.Tags{serie.Tags}); err != nil {
 			return nil, err
@@ -221,7 +326,7 @@ func GenerateLogFile(sfile *tsdb.SeriesFile, measurementN, tagN, valueN int) (*L
 	tagValueN := pow(valueN, tagN)
 
 	f := MustOpenLogFile(sfile)
-	seriesSet := tsi1.NewSeriesSet()
+	seriesSet := tsdb.NewSeriesIDSet()
 	for i := 0; i < measurementN; i++ {
 		name := []byte(fmt.Sprintf("measurement%d", i))
 
@@ -241,21 +346,13 @@ func GenerateLogFile(sfile *tsdb.SeriesFile, measurementN, tagN, valueN int) (*L
 	return f, nil
 }
 
-func MustGenerateLogFile(sfile *tsdb.SeriesFile, measurementN, tagN, valueN int) *LogFile {
-	f, err := GenerateLogFile(sfile, measurementN, tagN, valueN)
-	if err != nil {
-		panic(err)
-	}
-	return f
-}
-
 func benchmarkLogFile_AddSeries(b *testing.B, measurementN, seriesKeyN, seriesValueN int) {
 	sfile := MustOpenSeriesFile()
 	defer sfile.Close()
 
 	b.StopTimer()
 	f := MustOpenLogFile(sfile.SeriesFile)
-	seriesSet := tsi1.NewSeriesSet()
+	seriesSet := tsdb.NewSeriesIDSet()
 
 	type Datum struct {
 		Name []byte
@@ -313,7 +410,7 @@ func BenchmarkLogFile_WriteTo(b *testing.B) {
 
 			f := MustOpenLogFile(sfile.SeriesFile)
 			defer f.Close()
-			seriesSet := tsi1.NewSeriesSet()
+			seriesSet := tsdb.NewSeriesIDSet()
 
 			// Estimate bloom filter size.
 			m, k := bloom.Estimate(uint64(seriesN), 0.02)
@@ -340,7 +437,7 @@ func BenchmarkLogFile_WriteTo(b *testing.B) {
 			// Compact log file.
 			for i := 0; i < b.N; i++ {
 				buf := bytes.NewBuffer(make([]byte, 0, 150*seriesN))
-				if _, err := f.CompactTo(buf, m, k); err != nil {
+				if _, err := f.CompactTo(buf, m, k, nil); err != nil {
 					b.Fatal(err)
 				}
 				b.Logf("sz=%db", buf.Len())

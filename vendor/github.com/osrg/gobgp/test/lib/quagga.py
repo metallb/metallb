@@ -14,14 +14,15 @@
 # limitations under the License.
 
 from __future__ import absolute_import
+
 import re
 
 from fabric import colors
 from fabric.utils import indent
-from itertools import chain
 import netaddr
 
 from lib.base import (
+    wait_for_completion,
     BGPContainer,
     OSPFContainer,
     CmdBuffer,
@@ -56,8 +57,26 @@ class QuaggaBGPContainer(BGPContainer):
         # }
         self.bgpd_config = bgpd_config or {}
 
+    def _get_enabled_daemons(self):
+        daemons = ['bgpd']
+        if self.zebra:
+            daemons.append('zebra')
+        return daemons
+
+    def _is_running(self):
+        def f(d):
+            return self.local(
+                'vtysh -d {0} -c "show version"'
+                ' > /dev/null 2>&1; echo $?'.format(d), capture=True) == '0'
+
+        return all([f(d) for d in self._get_enabled_daemons()])
+
+    def _wait_for_boot(self):
+        wait_for_completion(self._is_running)
+
     def run(self):
         super(QuaggaBGPContainer, self).run()
+        self._wait_for_boot()
         return self.WAIT_FOR_BOOT
 
     def get_global_rib(self, prefix='', rf='ipv4'):
@@ -185,6 +204,8 @@ class QuaggaBGPContainer(BGPContainer):
             if version == 6:
                 c << 'no bgp default ipv4-unicast'
             c << 'neighbor {0} remote-as {1}'.format(n_addr, info['remote_as'])
+            # For rapid convergence
+            c << 'neighbor {0} advertisement-interval 1'.format(n_addr)
             if info['is_rs_client']:
                 c << 'neighbor {0} route-server-client'.format(n_addr)
             for typ, p in info['policies'].iteritems():
@@ -198,16 +219,6 @@ class QuaggaBGPContainer(BGPContainer):
                 c << 'address-family ipv6 unicast'
                 c << 'neighbor {0} activate'.format(n_addr)
                 c << 'exit-address-family'
-
-        for route in chain.from_iterable(self.routes.itervalues()):
-            if route['rf'] == 'ipv4':
-                c << 'network {0}'.format(route['prefix'])
-            elif route['rf'] == 'ipv6':
-                c << 'address-family ipv6 unicast'
-                c << 'network {0}'.format(route['prefix'])
-                c << 'exit-address-family'
-            else:
-                raise Exception('unsupported route faily: {0}'.format(route['rf']))
 
         if self.zebra:
             if version == 6:
@@ -243,6 +254,7 @@ class QuaggaBGPContainer(BGPContainer):
         c << 'debug zebra packet'
         c << 'debug zebra kernel'
         c << 'debug zebra rib'
+        c << 'ipv6 forwarding'
         c << ''
 
         with open('{0}/zebra.conf'.format(self.config_dir), 'w') as f:
@@ -260,12 +272,132 @@ class QuaggaBGPContainer(BGPContainer):
             return self.local("vtysh -d bgpd {0}".format(cmd), capture=True)
 
     def reload_config(self):
-        daemon = ['bgpd']
-        if self.zebra:
-            daemon.append('zebra')
-        for d in daemon:
-            cmd = '/usr/bin/pkill {0} -SIGHUP'.format(d)
-            self.local(cmd, capture=True)
+        for daemon in self._get_enabled_daemons():
+            self.local('pkill {0} -SIGHUP'.format(daemon), capture=True)
+        self._wait_for_boot()
+
+    def _vtysh_add_route_map(self, path):
+        supported_attributes = (
+            'next-hop',
+            'as-path',
+            'community',
+            'med',
+            'local-pref',
+            'extended-community',
+        )
+        if not any([path[k] for k in supported_attributes]):
+            return ''
+
+        c = CmdBuffer(' ')
+        route_map_name = 'RM-{0}'.format(path['prefix'])
+        c << "vtysh -c 'configure terminal'"
+        c << "-c 'route-map {0} permit 10'".format(route_map_name)
+        if path['next-hop']:
+            if path['rf'] == 'ipv4':
+                c << "-c 'set ip next-hop {0}'".format(path['next-hop'])
+            elif path['rf'] == 'ipv6':
+                c << "-c 'set ipv6 next-hop {0}'".format(path['next-hop'])
+            else:
+                raise ValueError('Unsupported address family: {0}'.format(path['rf']))
+        if path['as-path']:
+            as_path = ' '.join([str(n) for n in path['as-path']])
+            c << "-c 'set as-path prepend {0}'".format(as_path)
+        if path['community']:
+            comm = ' '.join(path['community'])
+            c << "-c 'set community {0}'".format(comm)
+        if path['med']:
+            c << "-c 'set metric {0}'".format(path['med'])
+        if path['local-pref']:
+            c << "-c 'set local-preference {0}'".format(path['local-pref'])
+        if path['extended-community']:
+            # Note: Currently only RT is supported.
+            extcomm = ' '.join(path['extended-community'])
+            c << "-c 'set extcommunity rt {0}'".format(extcomm)
+        self.local(str(c), capture=True)
+
+        return route_map_name
+
+    def add_route(self, route, rf='ipv4', attribute=None, aspath=None,
+                  community=None, med=None, extendedcommunity=None,
+                  nexthop=None, matchs=None, thens=None,
+                  local_pref=None, identifier=None, reload_config=False):
+        if not self._is_running():
+            raise RuntimeError('Quagga/Zebra is not yet running')
+
+        if rf not in ('ipv4', 'ipv6'):
+            raise ValueError('Unsupported address family: {0}'.format(rf))
+
+        self.routes.setdefault(route, [])
+        path = {
+            'prefix': route,
+            'rf': rf,
+            'next-hop': nexthop,
+            'as-path': aspath,
+            'community': community,
+            'med': med,
+            'local-pref': local_pref,
+            'extended-community': extendedcommunity,
+            # Note: The following settings are not yet supported on this
+            # implementation.
+            'attr': None,
+            'identifier': None,
+            'matchs': None,
+            'thens': None,
+        }
+
+        # Prepare route-map before adding prefix
+        route_map_name = self._vtysh_add_route_map(path)
+        path['route_map'] = route_map_name
+
+        c = CmdBuffer(' ')
+        c << "vtysh -c 'configure terminal'"
+        c << "-c 'router bgp {0}'".format(self.asn)
+        if rf == 'ipv6':
+            c << "-c 'address-family ipv6'"
+        if route_map_name:
+            c << "-c 'network {0} route-map {1}'".format(route, route_map_name)
+        else:
+            c << "-c 'network {0}'".format(route)
+        self.local(str(c), capture=True)
+
+        self.routes[route].append(path)
+
+    def _vtysh_del_route_map(self, path):
+        route_map_name = path.get('route_map', '')
+        if not route_map_name:
+            return
+
+        c = CmdBuffer(' ')
+        c << "vtysh -c 'configure terminal'"
+        c << "-c 'no route-map {0}'".format(route_map_name)
+        self.local(str(c), capture=True)
+
+    def del_route(self, route, identifier=None, reload_config=False):
+        if not self._is_running():
+            raise RuntimeError('Quagga/Zebra is not yet running')
+
+        path = None
+        new_paths = []
+        for p in self.routes.get(route, []):
+            if p['identifier'] != identifier:
+                new_paths.append(p)
+            else:
+                path = p
+        if not path:
+            return
+
+        rf = path['rf']
+        c = CmdBuffer(' ')
+        c << "vtysh -c 'configure terminal'"
+        c << "-c 'router bgp {0}'".format(self.asn)
+        c << "-c 'address-family {0} unicast'".format(rf)
+        c << "-c 'no network {0}'".format(route)
+        self.local(str(c), capture=True)
+
+        # Delete route-map after deleting prefix
+        self._vtysh_del_route_map(path)
+
+        self.routes[route] = new_paths
 
 
 class RawQuaggaBGPContainer(QuaggaBGPContainer):
@@ -356,6 +488,7 @@ class QuaggaOSPFContainer(OSPFContainer):
         c << 'debug zebra packet'
         c << 'debug zebra kernel'
         c << 'debug zebra rib'
+        c << 'ipv6 forwarding'
         c << ''
 
         with open('{0}/zebra.conf'.format(self.config_dir), 'w') as f:

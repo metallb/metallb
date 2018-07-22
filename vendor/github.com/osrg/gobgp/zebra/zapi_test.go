@@ -21,6 +21,8 @@ import (
 	"syscall"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -113,6 +115,8 @@ func Test_InterfaceAddressUpdateBody(t *testing.T) {
 
 	b := &InterfaceAddressUpdateBody{}
 	err := b.DecodeFromBytes(buf, 2)
+	require.NoError(t, err)
+
 	assert.Equal(uint32(0), b.Index)
 	assert.Equal(INTERFACE_ADDRESS_FLAG(1), b.Flags)
 	assert.Equal("192.168.100.1", b.Prefix.String())

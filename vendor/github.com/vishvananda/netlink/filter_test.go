@@ -167,6 +167,27 @@ func TestAdvancedFilterAddDel(t *testing.T) {
 		t.Fatal("Class is the wrong type")
 	}
 
+	htid := MakeHandle(0x0010, 0000)
+	divisor := uint32(1)
+	hashTable := &U32{
+		FilterAttrs: FilterAttrs{
+			LinkIndex: index,
+			Handle:    htid,
+			Parent:    qdiscHandle,
+			Priority:  1,
+			Protocol:  unix.ETH_P_ALL,
+		},
+		Divisor: divisor,
+	}
+	cHashTable := *hashTable
+	if err := FilterAdd(hashTable); err != nil {
+		t.Fatal(err)
+	}
+	// Check if the hash table is identical before and after FilterAdd.
+	if !reflect.DeepEqual(cHashTable, *hashTable) {
+		t.Fatalf("Hash table %v and %v are not equal", cHashTable, *hashTable)
+	}
+
 	u32SelKeys := []TcU32Key{
 		{
 			Mask:    0xff,
@@ -181,9 +202,12 @@ func TestAdvancedFilterAddDel(t *testing.T) {
 			OffMask: 0,
 		},
 	}
+
+	handle := MakeHandle(0x0000, 0001)
 	filter := &U32{
 		FilterAttrs: FilterAttrs{
 			LinkIndex: index,
+			Handle:    handle,
 			Parent:    qdiscHandle,
 			Priority:  1,
 			Protocol:  unix.ETH_P_ALL,
@@ -193,6 +217,7 @@ func TestAdvancedFilterAddDel(t *testing.T) {
 			Flags: TC_U32_TERMINAL,
 		},
 		ClassId: classId,
+		Hash:    htid,
 		Actions: []Action{},
 	}
 	// Copy filter.
@@ -232,8 +257,15 @@ func TestAdvancedFilterAddDel(t *testing.T) {
 			t.Fatal("The endianness of TcU32Key.Val is wrong")
 		}
 	}
+	if u32.Handle != (handle | htid) {
+		t.Fatalf("The handle is wrong. expected %v but actually %v",
+			(handle | htid), u32.Handle)
+	}
+	if u32.Hash != htid {
+		t.Fatal("The hash table ID is wrong")
+	}
 
-	if err := FilterDel(filter); err != nil {
+	if err := FilterDel(u32); err != nil {
 		t.Fatal(err)
 	}
 	filters, err = FilterList(link, qdiscHandle)

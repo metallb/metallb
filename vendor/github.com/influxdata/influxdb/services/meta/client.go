@@ -7,7 +7,6 @@ import (
 	crand "crypto/rand"
 	"crypto/sha256"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -19,9 +18,10 @@ import (
 	"time"
 
 	"github.com/influxdata/influxdb"
+	"github.com/influxdata/influxdb/logger"
+	"github.com/influxdata/influxdb/pkg/file"
 	"github.com/influxdata/influxql"
 	"go.uber.org/zap"
-
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -78,7 +78,7 @@ func NewClient(config *Config) *Client {
 		closing:             make(chan struct{}),
 		changed:             make(chan struct{}),
 		logger:              zap.NewNop(),
-		authCache:           make(map[string]authUser, 0),
+		authCache:           make(map[string]authUser),
 		path:                config.Dir,
 		retentionAutoCreate: config.RetentionAutoCreate,
 	}
@@ -458,11 +458,7 @@ func (c *Client) UpdateUser(name, password string) error {
 
 	delete(c.authCache, name)
 
-	if err := c.commit(data); err != nil {
-		return err
-	}
-
-	return nil
+	return c.commit(data)
 }
 
 // DropUser removes the user with the given name.
@@ -804,16 +800,23 @@ func (c *Client) PrecreateShardGroups(from, to time.Time) error {
 				nextShardGroupTime := g.EndTime.Add(1 * time.Nanosecond)
 				// if it already exists, continue
 				if sg, _ := data.ShardGroupByTimestamp(di.Name, rp.Name, nextShardGroupTime); sg != nil {
-					c.logger.Info(fmt.Sprintf("shard group %d exists for database %s, retention policy %s", sg.ID, di.Name, rp.Name))
+					c.logger.Info("Shard group already exists",
+						logger.ShardGroup(sg.ID),
+						logger.Database(di.Name),
+						logger.RetentionPolicy(rp.Name))
 					continue
 				}
 				newGroup, err := createShardGroup(data, di.Name, rp.Name, nextShardGroupTime)
 				if err != nil {
-					c.logger.Info(fmt.Sprintf("failed to precreate successive shard group for group %d: %s", g.ID, err.Error()))
+					c.logger.Info("Failed to precreate successive shard group",
+						zap.Uint64("group_id", g.ID), zap.Error(err))
 					continue
 				}
 				changed = true
-				c.logger.Info(fmt.Sprintf("new shard group %d successfully precreated for database %s, retention policy %s", newGroup.ID, di.Name, rp.Name))
+				c.logger.Info("New shard group successfully precreated",
+					logger.ShardGroup(newGroup.ID),
+					logger.Database(di.Name),
+					logger.RetentionPolicy(rp.Name))
 			}
 		}
 	}
@@ -997,8 +1000,8 @@ func (c *Client) WithLogger(log *zap.Logger) {
 
 // snapshot saves the current meta data to disk.
 func snapshot(path string, data *Data) error {
-	file := filepath.Join(path, metaFile)
-	tmpFile := file + "tmp"
+	filename := filepath.Join(path, metaFile)
+	tmpFile := filename + "tmp"
 
 	f, err := os.Create(tmpFile)
 	if err != nil {
@@ -1026,7 +1029,7 @@ func snapshot(path string, data *Data) error {
 		return err
 	}
 
-	return renameFile(tmpFile, file)
+	return file.RenameFile(tmpFile, filename)
 }
 
 // Load loads the current meta data from disk.

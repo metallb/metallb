@@ -22,7 +22,7 @@ func TestSeriesFile_Series(t *testing.T) {
 		{Name: []byte("mem"), Tags: models.NewTags(map[string]string{"region": "east"})},
 	}
 	for _, s := range series {
-		if _, err := sfile.CreateSeriesListIfNotExists([][]byte{[]byte(s.Name)}, []models.Tags{s.Tags}, nil); err != nil {
+		if _, err := sfile.CreateSeriesListIfNotExists([][]byte{[]byte(s.Name)}, []models.Tags{s.Tags}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -48,8 +48,12 @@ func TestSeriesFile_Series(t *testing.T) {
 // Ensure series file can be compacted.
 func TestSeriesFileCompactor(t *testing.T) {
 	sfile := MustOpenSeriesFile()
-	sfile.CompactThreshold = 0
 	defer sfile.Close()
+
+	// Disable automatic compactions.
+	for _, p := range sfile.Partitions() {
+		p.CompactThreshold = 0
+	}
 
 	var names [][]byte
 	var tagsSlice []models.Tags
@@ -57,7 +61,7 @@ func TestSeriesFileCompactor(t *testing.T) {
 		names = append(names, []byte(fmt.Sprintf("m%d", i)))
 		tagsSlice = append(tagsSlice, models.NewTags(map[string]string{"foo": "bar"}))
 	}
-	if _, err := sfile.CreateSeriesListIfNotExists(names, tagsSlice, nil); err != nil {
+	if _, err := sfile.CreateSeriesListIfNotExists(names, tagsSlice); err != nil {
 		t.Fatal(err)
 	}
 
@@ -66,10 +70,12 @@ func TestSeriesFileCompactor(t *testing.T) {
 		t.Fatalf("unexpected series count: %d", n)
 	}
 
-	// Compact in-place.
-	compactor := tsdb.NewSeriesFileCompactor()
-	if err := compactor.Compact(sfile.SeriesFile); err != nil {
-		t.Fatal(err)
+	// Compact in-place for each partition.
+	for _, p := range sfile.Partitions() {
+		compactor := tsdb.NewSeriesPartitionCompactor()
+		if err := compactor.Compact(p); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Verify all series exist.

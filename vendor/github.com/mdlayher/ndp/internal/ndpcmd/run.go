@@ -7,16 +7,18 @@ import (
 	"log"
 	"net"
 	"os"
-	"time"
 
 	"github.com/mdlayher/ndp"
 )
 
 // Run runs the ndp utility.
-func Run(ctx context.Context, c *ndp.Conn, ifi *net.Interface, op string) error {
+func Run(ctx context.Context, c *ndp.Conn, ifi *net.Interface, op string, target net.IP) error {
 	switch op {
-	case "listen":
+	// listen is the default when no op is specified..
+	case "listen", "":
 		return listen(ctx, c)
+	case "ns":
+		return sendNS(ctx, c, ifi.HardwareAddr, target)
 	case "rs":
 		return sendRS(ctx, c, ifi.HardwareAddr)
 	default:
@@ -28,43 +30,89 @@ func listen(ctx context.Context, c *ndp.Conn) error {
 	ll := log.New(os.Stderr, "ndp listen> ", 0)
 	ll.Println("listening for messages")
 
-	var recv int
-	for {
-		if err := c.SetReadDeadline(time.Now().Add(1 * time.Second)); err != nil {
+	// Also listen for router solicitations from other hosts, even though we
+	// will never reply to them.
+	if err := c.JoinGroup(net.IPv6linklocalallrouters); err != nil {
+		return err
+	}
+
+	if err := receiveLoop(ctx, c, ll); err != nil {
+		return fmt.Errorf("failed to read message: %v", err)
+	}
+
+	return nil
+}
+
+func sendNS(ctx context.Context, c *ndp.Conn, addr net.HardwareAddr, target net.IP) error {
+	ll := log.New(os.Stderr, "ndp ns> ", 0)
+
+	ll.Printf("neighbor solicitation:\n    - source link-layer address: %s", addr.String())
+
+	// Always multicast the message to the target's solicited-node multicast
+	// group as if we have no knowledge of its MAC address.
+	snm, err := ndp.SolicitedNodeMulticast(target)
+	if err != nil {
+		return fmt.Errorf("failed to determine solicited-node multicast address: %v", err)
+	}
+
+	m := &ndp.NeighborSolicitation{
+		TargetAddress: target,
+		Options: []ndp.Option{
+			&ndp.LinkLayerAddress{
+				Direction: ndp.Source,
+				Addr:      addr,
+			},
+		},
+	}
+
+	// Expect neighbor advertisement messages with the correct target address.
+	check := func(m ndp.Message) bool {
+		na, ok := m.(*ndp.NeighborAdvertisement)
+		if !ok {
+			return false
+		}
+
+		return na.TargetAddress.Equal(target)
+	}
+
+	if err := sendReceiveLoop(ctx, c, ll, m, snm, check); err != nil {
+		if err == context.Canceled {
 			return err
 		}
 
-		m, _, from, err := c.ReadFrom()
-		if err == nil {
-			recv++
-			printMessage(ll, m, from)
-			continue
-		}
-
-		// Was the context canceled already?
-		select {
-		case <-ctx.Done():
-			ll.Printf("received %d message(s)", recv)
-			return ctx.Err()
-		default:
-		}
-
-		// Was the error caused by a read timeout, and should the loop continue?
-		if nerr, ok := err.(net.Error); ok && nerr.Timeout() {
-			continue
-		}
-
-		return fmt.Errorf("failed to read message: %v", err)
+		return fmt.Errorf("failed to send neighbor solicitation: %v", err)
 	}
+
+	return nil
 }
 
-func printMessage(ll *log.Logger, m ndp.Message, from net.IP) {
-	switch m := m.(type) {
-	case *ndp.NeighborAdvertisement:
-		printNA(ll, m, from)
-	case *ndp.RouterAdvertisement:
-		printRA(ll, m, from)
-	default:
-		ll.Printf("%s %#v", from, m)
+func sendRS(ctx context.Context, c *ndp.Conn, addr net.HardwareAddr) error {
+	ll := log.New(os.Stderr, "ndp rs> ", 0)
+
+	ll.Printf("router solicitation:\n    - source link-layer address: %s", addr.String())
+
+	m := &ndp.RouterSolicitation{
+		Options: []ndp.Option{
+			&ndp.LinkLayerAddress{
+				Direction: ndp.Source,
+				Addr:      addr,
+			},
+		},
 	}
+
+	// Expect any router advertisement message.
+	check := func(m ndp.Message) bool {
+		_, ok := m.(*ndp.RouterAdvertisement)
+		return ok
+	}
+
+	if err := sendReceiveLoop(ctx, c, ll, m, net.IPv6linklocalallrouters, check); err != nil {
+		if err == context.Canceled {
+			return err
+		}
+
+		return fmt.Errorf("failed to send router solicitation: %v", err)
+	}
+
+	return nil
 }

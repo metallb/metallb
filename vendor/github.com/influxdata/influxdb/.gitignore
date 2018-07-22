@@ -66,6 +66,7 @@ config.toml
 
 # test data files
 integration/migration_data/
+test-logs/
 
 # man outputs
 man/*.xml
@@ -74,3 +75,9 @@ man/*.1.gz
 
 # test outputs
 /test-results.xml
+
+# profile data
+/prof
+
+# vendored files
+/vendor

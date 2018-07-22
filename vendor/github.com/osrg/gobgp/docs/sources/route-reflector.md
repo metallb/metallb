@@ -4,7 +4,7 @@ This page explains how to set up GoBGP as a route reflector.
 
 ## Prerequisites
 
-Assumed you finished [Getting Started](https://github.com/osrg/gobgp/blob/master/docs/sources/getting-started.md).
+Assumed you finished [Getting Started](getting-started.md).
 
 ## Configuration
 

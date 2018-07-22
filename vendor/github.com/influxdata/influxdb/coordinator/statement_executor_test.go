@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"reflect"
@@ -129,6 +130,91 @@ func TestQueryExecutor_ExecuteQuery_MaxSelectBucketsN(t *testing.T) {
 	}
 }
 
+func TestStatementExecutor_NormalizeStatement(t *testing.T) {
+
+	testCases := []struct {
+		name       string
+		query      string
+		defaultDB  string
+		defaultRP  string
+		expectedDB string
+		expectedRP string
+	}{
+		{
+			name:       "defaults",
+			query:      "SELECT f FROM m",
+			defaultDB:  DefaultDatabase,
+			defaultRP:  "",
+			expectedDB: DefaultDatabase,
+			expectedRP: DefaultRetentionPolicy,
+		},
+		{
+			name:       "alternate database via param",
+			query:      "SELECT f FROM m",
+			defaultDB:  "dbalt",
+			defaultRP:  "",
+			expectedDB: "dbalt",
+			expectedRP: DefaultRetentionPolicy,
+		},
+		{
+			name:       "alternate database via query",
+			query:      fmt.Sprintf("SELECT f FROM dbalt.%s.m", DefaultRetentionPolicy),
+			defaultDB:  DefaultDatabase,
+			defaultRP:  "",
+			expectedDB: "dbalt",
+			expectedRP: DefaultRetentionPolicy,
+		},
+		{
+			name:       "alternate RP via param",
+			query:      "SELECT f FROM m",
+			defaultDB:  DefaultDatabase,
+			defaultRP:  "rpalt",
+			expectedDB: DefaultDatabase,
+			expectedRP: "rpalt",
+		},
+		{
+			name:       "alternate RP via query",
+			query:      fmt.Sprintf("SELECT f FROM %s.rpalt.m", DefaultDatabase),
+			defaultDB:  DefaultDatabase,
+			defaultRP:  "",
+			expectedDB: DefaultDatabase,
+			expectedRP: "rpalt",
+		},
+		{
+			name:       "alternate RP query disagrees with param and query wins",
+			query:      fmt.Sprintf("SELECT f FROM %s.rpquery.m", DefaultDatabase),
+			defaultDB:  DefaultDatabase,
+			defaultRP:  "rpparam",
+			expectedDB: DefaultDatabase,
+			expectedRP: "rpquery",
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			q, err := influxql.ParseQuery(testCase.query)
+			if err != nil {
+				t.Fatalf("unexpected error parsing query: %v", err)
+			}
+
+			stmt := q.Statements[0].(*influxql.SelectStatement)
+
+			err = DefaultQueryExecutor().StatementExecutor.NormalizeStatement(stmt, testCase.defaultDB, testCase.defaultRP)
+			if err != nil {
+				t.Fatalf("unexpected error normalizing statement: %v", err)
+			}
+
+			m := stmt.Sources[0].(*influxql.Measurement)
+			if m.Database != testCase.expectedDB {
+				t.Errorf("database got %v, want %v", m.Database, testCase.expectedDB)
+			}
+			if m.RetentionPolicy != testCase.expectedRP {
+				t.Errorf("retention policy got %v, want %v", m.RetentionPolicy, testCase.expectedRP)
+			}
+		})
+	}
+}
+
 func TestStatementExecutor_NormalizeDropSeries(t *testing.T) {
 	q, err := influxql.ParseQuery("DROP SERIES FROM cpu")
 	if err != nil {
@@ -145,7 +231,7 @@ func TestStatementExecutor_NormalizeDropSeries(t *testing.T) {
 			},
 		},
 	}
-	if err := s.NormalizeStatement(stmt, "foo"); err != nil {
+	if err := s.NormalizeStatement(stmt, "foo", "bar"); err != nil {
 		t.Fatalf("unexpected error normalizing statement: %v", err)
 	}
 
@@ -154,7 +240,7 @@ func TestStatementExecutor_NormalizeDropSeries(t *testing.T) {
 		t.Fatalf("database rewritten when not supposed to: %v", m.Database)
 	}
 	if m.RetentionPolicy != "" {
-		t.Fatalf("database rewritten when not supposed to: %v", m.RetentionPolicy)
+		t.Fatalf("retention policy rewritten when not supposed to: %v", m.RetentionPolicy)
 	}
 
 	if exp, got := "DROP SERIES FROM cpu", q.String(); exp != got {
@@ -178,7 +264,7 @@ func TestStatementExecutor_NormalizeDeleteSeries(t *testing.T) {
 			},
 		},
 	}
-	if err := s.NormalizeStatement(stmt, "foo"); err != nil {
+	if err := s.NormalizeStatement(stmt, "foo", "bar"); err != nil {
 		t.Fatalf("unexpected error normalizing statement: %v", err)
 	}
 
@@ -187,7 +273,7 @@ func TestStatementExecutor_NormalizeDeleteSeries(t *testing.T) {
 		t.Fatalf("database rewritten when not supposed to: %v", m.Database)
 	}
 	if m.RetentionPolicy != "" {
-		t.Fatalf("database rewritten when not supposed to: %v", m.RetentionPolicy)
+		t.Fatalf("retention policy rewritten when not supposed to: %v", m.RetentionPolicy)
 	}
 
 	if exp, got := "DELETE FROM cpu", q.String(); exp != got {
@@ -216,7 +302,7 @@ func (m *mockAuthorizer) AuthorizeSeriesWrite(database string, measurement []byt
 }
 
 func TestQueryExecutor_ExecuteQuery_ShowDatabases(t *testing.T) {
-	qe := query.NewQueryExecutor()
+	qe := query.NewExecutor()
 	qe.StatementExecutor = &coordinator.StatementExecutor{
 		MetaClient: &internal.MetaClientMock{
 			DatabasesFn: func() []meta.DatabaseInfo {
@@ -260,7 +346,7 @@ func TestQueryExecutor_ExecuteQuery_ShowDatabases(t *testing.T) {
 
 // QueryExecutor is a test wrapper for coordinator.QueryExecutor.
 type QueryExecutor struct {
-	*query.QueryExecutor
+	*query.Executor
 
 	MetaClient        MetaClient
 	TSDBStore         *internal.TSDBStoreMock
@@ -268,12 +354,12 @@ type QueryExecutor struct {
 	LogOutput         bytes.Buffer
 }
 
-// NewQueryExecutor returns a new instance of QueryExecutor.
+// NewQueryExecutor returns a new instance of Executor.
 // This query executor always has a node id of 0.
 func NewQueryExecutor() *QueryExecutor {
 	e := &QueryExecutor{
-		QueryExecutor: query.NewQueryExecutor(),
-		TSDBStore:     &internal.TSDBStoreMock{},
+		Executor:  query.NewExecutor(),
+		TSDBStore: &internal.TSDBStoreMock{},
 	}
 
 	e.TSDBStore.CreateShardFn = func(database, policy string, shardID uint64, enabled bool) error {
@@ -296,18 +382,18 @@ func NewQueryExecutor() *QueryExecutor {
 			TSDBStore:  e.TSDBStore,
 		},
 	}
-	e.QueryExecutor.StatementExecutor = e.StatementExecutor
+	e.Executor.StatementExecutor = e.StatementExecutor
 
 	var out io.Writer = &e.LogOutput
 	if testing.Verbose() {
 		out = io.MultiWriter(out, os.Stderr)
 	}
-	e.QueryExecutor.WithLogger(logger.New(out))
+	e.Executor.WithLogger(logger.New(out))
 
 	return e
 }
 
-// DefaultQueryExecutor returns a QueryExecutor with a database (db0) and retention policy (rp0).
+// DefaultQueryExecutor returns a Executor with a database (db0) and retention policy (rp0).
 func DefaultQueryExecutor() *QueryExecutor {
 	e := NewQueryExecutor()
 	e.MetaClient.DatabaseFn = DefaultMetaClientDatabaseFn
@@ -316,18 +402,19 @@ func DefaultQueryExecutor() *QueryExecutor {
 
 // ExecuteQuery parses query and executes against the database.
 func (e *QueryExecutor) ExecuteQuery(q, database string, chunkSize int) <-chan *query.Result {
-	return e.QueryExecutor.ExecuteQuery(MustParseQuery(q), query.ExecutionOptions{
+	return e.Executor.ExecuteQuery(MustParseQuery(q), query.ExecutionOptions{
 		Database:  database,
 		ChunkSize: chunkSize,
 	}, make(chan struct{}))
 }
 
 type MockShard struct {
-	Measurements      []string
-	FieldDimensionsFn func(measurements []string) (fields map[string]influxql.DataType, dimensions map[string]struct{}, err error)
-	CreateIteratorFn  func(ctx context.Context, m *influxql.Measurement, opt query.IteratorOptions) (query.Iterator, error)
-	IteratorCostFn    func(m string, opt query.IteratorOptions) (query.IteratorCost, error)
-	ExpandSourcesFn   func(sources influxql.Sources) (influxql.Sources, error)
+	Measurements             []string
+	FieldDimensionsFn        func(measurements []string) (fields map[string]influxql.DataType, dimensions map[string]struct{}, err error)
+	FieldKeysByMeasurementFn func(name []byte) []string
+	CreateIteratorFn         func(ctx context.Context, m *influxql.Measurement, opt query.IteratorOptions) (query.Iterator, error)
+	IteratorCostFn           func(m string, opt query.IteratorOptions) (query.IteratorCost, error)
+	ExpandSourcesFn          func(sources influxql.Sources) (influxql.Sources, error)
 }
 
 func (sh *MockShard) MeasurementsByRegex(re *regexp.Regexp) []string {
@@ -338,6 +425,10 @@ func (sh *MockShard) MeasurementsByRegex(re *regexp.Regexp) []string {
 		}
 	}
 	return names
+}
+
+func (sh *MockShard) FieldKeysByMeasurement(name []byte) []string {
+	return sh.FieldKeysByMeasurementFn(name)
 }
 
 func (sh *MockShard) FieldDimensions(measurements []string) (fields map[string]influxql.DataType, dimensions map[string]struct{}, err error) {

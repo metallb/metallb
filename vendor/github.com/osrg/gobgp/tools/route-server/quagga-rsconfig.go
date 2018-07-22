@@ -45,8 +45,6 @@ func (qt *QuaggaConfig) Config() *bytes.Buffer {
 }
 
 func create_config_files(nr int, outputDir string) {
-	quaggaConfigList := make([]*QuaggaConfig, 0)
-
 	gobgpConf := config.Bgp{}
 	gobgpConf.Global.Config.As = 65000
 	gobgpConf.Global.Config.RouterId = "192.168.255.1"
@@ -60,21 +58,24 @@ func create_config_files(nr int, outputDir string) {
 
 		gobgpConf.Neighbors = append(gobgpConf.Neighbors, c)
 		q := NewQuaggaConfig(i, &gobgpConf.Global, &c, net.ParseIP("10.0.255.1"))
-		quaggaConfigList = append(quaggaConfigList, q)
-		os.Mkdir(fmt.Sprintf("%s/q%d", outputDir, i), 0755)
-		err := ioutil.WriteFile(fmt.Sprintf("%s/q%d/bgpd.conf", outputDir, i), q.Config().Bytes(), 0644)
-		if err != nil {
+
+		if err := os.Mkdir(fmt.Sprintf("%s/q%d", outputDir, i), 0755); err != nil {
+			log.Fatalf("failed to make directory: %v", err)
+		}
+
+		if err := ioutil.WriteFile(fmt.Sprintf("%s/q%d/bgpd.conf", outputDir, i), q.Config().Bytes(), 0644); err != nil {
 			log.Fatal(err)
 		}
 	}
 
 	var buffer bytes.Buffer
 	encoder := toml.NewEncoder(&buffer)
-	encoder.Encode(gobgpConf)
+	if err := encoder.Encode(gobgpConf); err != nil {
+		log.Fatalf("failed to encode config: %v", err)
+	}
 
-	err := ioutil.WriteFile(fmt.Sprintf("%s/gobgpd.conf", outputDir), buffer.Bytes(), 0644)
-	if err != nil {
-		log.Fatal(err)
+	if err := ioutil.WriteFile(fmt.Sprintf("%s/gobgpd.conf", outputDir), buffer.Bytes(), 0644); err != nil {
+		log.Fatalf("failed to write config file: %v", err)
 	}
 }
 

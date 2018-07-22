@@ -39,19 +39,23 @@ func setsockoptIpTtl(fd int, family int, value int) error {
 
 func setListenTcpTTLSockopt(l *net.TCPListener, ttl int) error {
 	fi, family, err := extractFileAndFamilyFromTCPListener(l)
-	defer fi.Close()
 	if err != nil {
 		return err
 	}
+
+	defer fi.Close()
+
 	return setsockoptIpTtl(int(fi.Fd()), family, ttl)
 }
 
 func setTcpTTLSockopt(conn *net.TCPConn, ttl int) error {
 	fi, family, err := extractFileAndFamilyFromTCPConn(conn)
-	defer fi.Close()
 	if err != nil {
 		return err
 	}
+
+	defer fi.Close()
+
 	return setsockoptIpTtl(int(fi.Fd()), family, ttl)
 }
 

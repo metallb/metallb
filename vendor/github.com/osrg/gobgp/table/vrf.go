@@ -30,10 +30,7 @@ type Vrf struct {
 func (v *Vrf) Clone() *Vrf {
 	f := func(rt []bgp.ExtendedCommunityInterface) []bgp.ExtendedCommunityInterface {
 		l := make([]bgp.ExtendedCommunityInterface, 0, len(rt))
-		for _, v := range rt {
-			l = append(l, v)
-		}
-		return l
+		return append(l, rt...)
 	}
 	return &Vrf{
 		Name:     v.Name,

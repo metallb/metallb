@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"sync"
+	"unsafe"
 
 	"github.com/influxdata/influxdb/pkg/estimator"
 	"github.com/influxdata/influxdb/pkg/estimator/hll"
@@ -17,18 +18,30 @@ type FileSet struct {
 	levels       []CompactionLevel
 	sfile        *tsdb.SeriesFile
 	files        []File
-	database     string
 	manifestSize int64 // Size of the manifest file in bytes.
 }
 
 // NewFileSet returns a new instance of FileSet.
-func NewFileSet(database string, levels []CompactionLevel, sfile *tsdb.SeriesFile, files []File) (*FileSet, error) {
+func NewFileSet(levels []CompactionLevel, sfile *tsdb.SeriesFile, files []File) (*FileSet, error) {
 	return &FileSet{
-		levels:   levels,
-		sfile:    sfile,
-		files:    files,
-		database: database,
+		levels: levels,
+		sfile:  sfile,
+		files:  files,
 	}, nil
+}
+
+// bytes estimates the memory footprint of this FileSet, in bytes.
+func (fs *FileSet) bytes() int {
+	var b int
+	for _, level := range fs.levels {
+		b += int(unsafe.Sizeof(level))
+	}
+	// Do not count SeriesFile because it belongs to the code that constructed this FileSet.
+	for _, file := range fs.files {
+		b += file.bytes()
+	}
+	b += int(unsafe.Sizeof(*fs))
+	return b
 }
 
 // Close closes all the files in the file set.
@@ -63,10 +76,9 @@ func (fs *FileSet) SeriesFile() *tsdb.SeriesFile { return fs.sfile }
 // Filters do not need to be rebuilt because log files have no bloom filter.
 func (fs *FileSet) PrependLogFile(f *LogFile) *FileSet {
 	return &FileSet{
-		database: fs.database,
-		levels:   fs.levels,
-		sfile:    fs.sfile,
-		files:    append([]File{f}, fs.files...),
+		levels: fs.levels,
+		sfile:  fs.sfile,
+		files:  append([]File{f}, fs.files...),
 	}
 }
 
@@ -109,9 +121,8 @@ func (fs *FileSet) MustReplace(oldFiles []File, newFile File) *FileSet {
 
 	// Build new fileset and rebuild changed filters.
 	return &FileSet{
-		levels:   fs.levels,
-		files:    other,
-		database: fs.database,
+		levels: fs.levels,
+		files:  other,
 	}
 }
 
@@ -408,6 +419,19 @@ func (fs *FileSet) MeasurementsSketches() (estimator.Sketch, estimator.Sketch, e
 	return sketch, tsketch, nil
 }
 
+// SeriesSketches returns the merged measurement sketches for the FileSet.
+func (fs *FileSet) SeriesSketches() (estimator.Sketch, estimator.Sketch, error) {
+	sketch, tsketch := hll.NewDefaultPlus(), hll.NewDefaultPlus()
+
+	// Iterate over all the files and merge the sketches into the result.
+	for _, f := range fs.files {
+		if err := f.MergeSeriesSketches(sketch, tsketch); err != nil {
+			return nil, nil, err
+		}
+	}
+	return sketch, tsketch, nil
+}
+
 // File represents a log or index file.
 type File interface {
 	Close() error
@@ -418,6 +442,7 @@ type File interface {
 
 	Measurement(name []byte) MeasurementElem
 	MeasurementIterator() MeasurementIterator
+	MeasurementHasSeries(ss *tsdb.SeriesIDSet, name []byte) bool
 
 	TagKey(name, key []byte) TagKeyElem
 	TagKeyIterator(name []byte) TagKeyIterator
@@ -432,6 +457,11 @@ type File interface {
 
 	// Sketches for cardinality estimation
 	MergeMeasurementsSketches(s, t estimator.Sketch) error
+	MergeSeriesSketches(s, t estimator.Sketch) error
+
+	// Bitmap series existance.
+	SeriesIDSet() (*tsdb.SeriesIDSet, error)
+	TombstoneSeriesIDSet() (*tsdb.SeriesIDSet, error)
 
 	// Reference counting.
 	Retain()
@@ -439,6 +469,9 @@ type File interface {
 
 	// Size of file on disk
 	Size() int64
+
+	// Estimated memory footprint
+	bytes() int
 }
 
 type Files []File
@@ -463,6 +496,9 @@ func newFileSetSeriesIDIterator(fs *FileSet, itr tsdb.SeriesIDIterator) tsdb.Ser
 		fs.Release()
 		return nil
 	}
+	if itr, ok := itr.(tsdb.SeriesIDSetIterator); ok {
+		return &fileSetSeriesIDSetIterator{fs: fs, itr: itr}
+	}
 	return &fileSetSeriesIDIterator{fs: fs, itr: itr}
 }
 
@@ -473,6 +509,26 @@ func (itr *fileSetSeriesIDIterator) Next() (tsdb.SeriesIDElem, error) {
 func (itr *fileSetSeriesIDIterator) Close() error {
 	itr.once.Do(func() { itr.fs.Release() })
 	return itr.itr.Close()
+}
+
+// fileSetSeriesIDSetIterator attaches a fileset to an iterator that is released on close.
+type fileSetSeriesIDSetIterator struct {
+	once sync.Once
+	fs   *FileSet
+	itr  tsdb.SeriesIDSetIterator
+}
+
+func (itr *fileSetSeriesIDSetIterator) Next() (tsdb.SeriesIDElem, error) {
+	return itr.itr.Next()
+}
+
+func (itr *fileSetSeriesIDSetIterator) Close() error {
+	itr.once.Do(func() { itr.fs.Release() })
+	return itr.itr.Close()
+}
+
+func (itr *fileSetSeriesIDSetIterator) SeriesIDSet() *tsdb.SeriesIDSet {
+	return itr.itr.SeriesIDSet()
 }
 
 // fileSetMeasurementIterator attaches a fileset to an iterator that is released on close.

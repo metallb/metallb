@@ -88,7 +88,7 @@ class GoBGPTestBase(unittest.TestCase):
 
         pol0 = {'name': 'pol0', 'statements': [st0]}
 
-        _filename = g1.add_policy(pol0, g3, 'in', 'reject')
+        _filename = g1.add_policy(pol0, g3, 'import', 'reject')
 
         g3.add_route('10.0.10.0/24')
         g3.add_route('10.0.20.0/24')

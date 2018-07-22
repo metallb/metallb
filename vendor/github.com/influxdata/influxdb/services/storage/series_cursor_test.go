@@ -4,15 +4,16 @@ import (
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/influxdata/influxdb/query"
+	"github.com/influxdata/influxdb/models"
+	"github.com/influxdata/influxdb/tsdb"
 	"github.com/influxdata/influxql"
 )
 
 func TestPlannerCondition(t *testing.T) {
-	sitr := &floatIterator{
-		Points: []query.FloatPoint{
-			{Aux: []interface{}{"cpu,host=host1"}},
-			{Aux: []interface{}{"mem,host=host1"}},
+	sqry := &floatIterator{
+		Points: []tsdb.SeriesCursorRow{
+			{Name: []byte("cpu"), Tags: models.ParseTags([]byte("cpu,host=host1"))},
+			{Name: []byte("mem"), Tags: models.ParseTags([]byte("mem,host=host1"))},
 		},
 	}
 
@@ -21,37 +22,45 @@ func TestPlannerCondition(t *testing.T) {
 		t.Fatal("ParseExpr", err)
 	}
 
+	makeFields := func(s ...string) []field {
+		f := make([]field, len(s))
+		for i := range s {
+			f[i].n = s[i]
+			f[i].nb = []byte(s[i])
+		}
+		return f
+	}
+
 	p := &indexSeriesCursor{
-		sitr:            sitr,
-		fields:          []string{"user", "system", "val"},
+		sqry:            sqry,
+		fields:          measurementFields{"cpu": makeFields("system", "user"), "mem": makeFields("val")},
 		cond:            cond,
 		measurementCond: influxql.Reduce(RewriteExprRemoveFieldValue(influxql.CloneExpr(cond)), nil),
 	}
 
-	keys := []string{}
+	var keys []string
 	row := p.Next()
 	for row != nil {
-		keys = append(keys, row.key+" "+row.field)
+		keys = append(keys, string(models.MakeKey(row.name, row.stags))+" "+row.field.n)
 		row = p.Next()
 	}
 
-	exp := []string{"cpu,host=host1 user", "cpu,host=host1 system", "mem,host=host1 user", "mem,host=host1 system", "mem,host=host1 val"}
-	if !cmp.Equal(exp, keys) {
-		t.Errorf("unexpected, %s", cmp.Diff(exp, keys))
+	exp := []string{"cpu,host=host1 system", "cpu,host=host1 user", "mem,host=host1 val"}
+	if !cmp.Equal(keys, exp) {
+		t.Errorf("unexpected -got/+want\n%s", cmp.Diff(keys, exp))
 	}
 }
 
-// FloatIterator is a represents an iterator that reads from a slice.
+// floatIterator is a represents an iterator that reads from a slice.
 type floatIterator struct {
-	Points []query.FloatPoint
-	stats  query.IteratorStats
+	Points []tsdb.SeriesCursorRow
 }
 
-func (itr *floatIterator) Stats() query.IteratorStats { return itr.stats }
-func (itr *floatIterator) Close() error               { return nil }
+func (itr *floatIterator) Close() error {
+	return nil
+}
 
-// Next returns the next value and shifts it off the beginning of the points slice.
-func (itr *floatIterator) Next() (*query.FloatPoint, error) {
+func (itr *floatIterator) Next() (*tsdb.SeriesCursorRow, error) {
 	if len(itr.Points) == 0 {
 		return nil, nil
 	}

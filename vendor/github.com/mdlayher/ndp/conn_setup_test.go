@@ -5,8 +5,6 @@ import (
 	"net"
 	"os"
 	"testing"
-
-	"golang.org/x/net/ipv6"
 )
 
 func testICMPConn(t *testing.T) (*Conn, *Conn, net.IP, func()) {
@@ -25,26 +23,13 @@ func testICMPConn(t *testing.T) (*Conn, *Conn, net.IP, func()) {
 func testUDPConn(t *testing.T) (*Conn, *Conn, net.IP, func()) {
 	ifi := testInterface(t)
 
-	addrs, err := ifi.Addrs()
-	if err != nil {
-		t.Fatalf("failed to get addresses: %v", err)
-	}
-
-	addr, err := chooseAddr(addrs, ifi.Name, LinkLocal)
+	c1, c2, ip, err := TestConns(ifi)
 	if err != nil {
 		// TODO(mdlayher): remove when travis can do IPv6.
-		t.Skipf("failed to choose address, skipping test: %v", err)
+		t.Skipf("failed to create test connections, skipping test: %v", err)
 	}
 
-	// Create two UDPv6 connections and instruct them to communicate
-	// with each other for Conn tests.
-	c1, p1 := udpConn(t, addr, ifi)
-	c2, p2 := udpConn(t, addr, ifi)
-
-	c1.udpTestPort = p2
-	c2.udpTestPort = p1
-
-	return c1, c2, addr.IP, func() {
+	return c1, c2, ip, func() {
 		_ = c1.Close()
 		_ = c2.Close()
 	}
@@ -74,27 +59,6 @@ func icmpConn(t *testing.T, ifi *net.Interface) (*Conn, net.IP) {
 	c.icmpTest = true
 
 	return c, addr
-}
-
-func udpConn(t *testing.T, addr *net.IPAddr, ifi *net.Interface) (*Conn, int) {
-	laddr := &net.UDPAddr{
-		IP:   addr.IP,
-		Zone: addr.Zone,
-	}
-
-	uc, err := net.ListenUDP("udp6", laddr)
-	if err != nil {
-		t.Fatalf("failed to listen UDPv6: %v", err)
-	}
-
-	pc := ipv6.NewPacketConn(uc)
-
-	c, _, err := newConn(pc, addr, ifi)
-	if err != nil {
-		t.Fatalf("failed to create NDP conn: %v", err)
-	}
-
-	return c, uc.LocalAddr().(*net.UDPAddr).Port
 }
 
 func panicf(format string, a ...interface{}) {

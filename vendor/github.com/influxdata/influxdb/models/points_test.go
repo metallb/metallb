@@ -96,6 +96,42 @@ func BenchmarkMarshal(b *testing.B) {
 		tags.HashKey()
 	}
 }
+func TestPoint_Tags(t *testing.T) {
+	examples := []struct {
+		Point string
+		Tags  models.Tags
+	}{
+		{`cpu value=1`, models.Tags{}},
+		{"cpu,tag0=v0 value=1", models.NewTags(map[string]string{"tag0": "v0"})},
+		{"cpu,tag0=v0,tag1=v0 value=1", models.NewTags(map[string]string{"tag0": "v0", "tag1": "v0"})},
+		{`cpu,tag0=v\ 0 value=1`, models.NewTags(map[string]string{"tag0": "v 0"})},
+		{`cpu,tag0=v\ 0\ 1,tag1=v2 value=1`, models.NewTags(map[string]string{"tag0": "v 0 1", "tag1": "v2"})},
+		{`cpu,tag0=\, value=1`, models.NewTags(map[string]string{"tag0": ","})},
+		{`cpu,ta\ g0=\, value=1`, models.NewTags(map[string]string{"ta g0": ","})},
+		{`cpu,tag0=\,1 value=1`, models.NewTags(map[string]string{"tag0": ",1"})},
+		{`cpu,tag0=1\"\",t=k value=1`, models.NewTags(map[string]string{"tag0": `1\"\"`, "t": "k"})},
+	}
+
+	for _, example := range examples {
+		t.Run(example.Point, func(t *testing.T) {
+			pts, err := models.ParsePointsString(example.Point)
+			if err != nil {
+				t.Fatal(err)
+			} else if len(pts) != 1 {
+				t.Fatalf("parsed %d points, expected 1", len(pts))
+			}
+
+			// Repeat to test Tags() caching
+			for i := 0; i < 2; i++ {
+				tags := pts[0].Tags()
+				if !reflect.DeepEqual(tags, example.Tags) {
+					t.Fatalf("got %#v (%s), expected %#v", tags, tags.String(), example.Tags)
+				}
+			}
+
+		})
+	}
+}
 
 func TestPoint_StringSize(t *testing.T) {
 	testPoint_cube(t, func(p models.Point) {
@@ -2352,6 +2388,50 @@ func TestEscapeStringField(t *testing.T) {
 	}
 }
 
+func TestParseKeyBytes(t *testing.T) {
+	testCases := []struct {
+		input        string
+		expectedName string
+		expectedTags map[string]string
+	}{
+		{input: "m,k=v", expectedName: "m", expectedTags: map[string]string{"k": "v"}},
+		{input: "m\\ q,k=v", expectedName: "m q", expectedTags: map[string]string{"k": "v"}},
+		{input: "m,k\\ q=v", expectedName: "m", expectedTags: map[string]string{"k q": "v"}},
+		{input: "m\\ q,k\\ q=v", expectedName: "m q", expectedTags: map[string]string{"k q": "v"}},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.input, func(t *testing.T) {
+			name, tags := models.ParseKeyBytes([]byte(testCase.input))
+			if !bytes.Equal([]byte(testCase.expectedName), name) {
+				t.Errorf("%s produced measurement %s but expected %s", testCase.input, string(name), testCase.expectedName)
+			}
+			if !tags.Equal(models.NewTags(testCase.expectedTags)) {
+				t.Errorf("%s produced tags %s but expected %s", testCase.input, tags.String(), models.NewTags(testCase.expectedTags).String())
+			}
+		})
+	}
+}
+
+func TestParseName(t *testing.T) {
+	testCases := []struct {
+		input        string
+		expectedName string
+	}{
+		{input: "m,k=v", expectedName: "m"},
+		{input: "m\\ q,k=v", expectedName: "m q"},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.input, func(t *testing.T) {
+			name := models.ParseName([]byte(testCase.input))
+			if !bytes.Equal([]byte(testCase.expectedName), name) {
+				t.Errorf("%s produced measurement %s but expected %s", testCase.input, string(name), testCase.expectedName)
+			}
+		})
+	}
+}
+
 func BenchmarkEscapeStringField_Plain(b *testing.B) {
 	s := "nothing special"
 	for i := 0; i < b.N; i++ {
@@ -2385,6 +2465,78 @@ func BenchmarkParseTags(b *testing.B) {
 	tags := []byte("cpu,tag0=value0,tag1=value1,tag2=value2,tag3=value3,tag4=value4,tag5=value5")
 	for i := 0; i < b.N; i++ {
 		models.ParseTags(tags)
+	}
+}
+
+func BenchmarkEscapeMeasurement(b *testing.B) {
+	benchmarks := []struct {
+		m []byte
+	}{
+		{[]byte("this_is_a_test")},
+		{[]byte("this,is,a,test")},
+	}
+
+	for _, bm := range benchmarks {
+		b.Run(string(bm.m), func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				models.EscapeMeasurement(bm.m)
+			}
+		})
+	}
+}
+
+func makeTags(key, val string, n int) models.Tags {
+	tags := make(models.Tags, n)
+	for i := range tags {
+		tags[i].Key = []byte(fmt.Sprintf("%s%03d", key, i))
+		tags[i].Value = []byte(fmt.Sprintf("%s%03d", val, i))
+	}
+	return tags
+}
+
+func BenchmarkTags_HashKey(b *testing.B) {
+	benchmarks := []struct {
+		name string
+		t    models.Tags
+	}{
+		{"5 tags-no esc", makeTags("tag_foo", "val_bar", 5)},
+		{"25 tags-no esc", makeTags("tag_foo", "val_bar", 25)},
+		{"5 tags-esc", makeTags("tag foo", "val bar", 5)},
+		{"25 tags-esc", makeTags("tag foo", "val bar", 25)},
+	}
+	for _, bm := range benchmarks {
+		b.Run(bm.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				bm.t.HashKey()
+			}
+		})
+	}
+}
+
+func BenchmarkMakeKey(b *testing.B) {
+	benchmarks := []struct {
+		m []byte
+		t models.Tags
+	}{
+		{[]byte("this_is_a_test"), nil},
+		{[]byte("this,is,a,test"), nil},
+		{[]byte(`this\ is\ a\ test`), nil},
+
+		{[]byte("this_is_a_test"), makeTags("tag_foo", "val_bar", 8)},
+		{[]byte("this,is,a,test"), makeTags("tag_foo", "val_bar", 8)},
+		{[]byte("this_is_a_test"), makeTags("tag_foo", "val bar", 8)},
+		{[]byte("this,is,a,test"), makeTags("tag_foo", "val bar", 8)},
+	}
+
+	for _, bm := range benchmarks {
+		b.Run(string(bm.m), func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				models.MakeKey(bm.m, bm.t)
+			}
+		})
 	}
 }
 

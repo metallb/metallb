@@ -36,36 +36,37 @@ func showRPKIServer(args []string) error {
 		for _, r := range servers {
 			s := "Down"
 			uptime := "never"
-			if r.State.Up == true {
+			if r.State.Up {
 				s = "Up"
-				uptime = fmt.Sprint(formatTimedelta(int64(time.Now().Sub(time.Unix(r.State.Uptime, 0)).Seconds())))
+				uptime = fmt.Sprint(formatTimedelta(int64(time.Since(time.Unix(r.State.Uptime, 0)).Seconds())))
 			}
 
 			fmt.Printf(format, net.JoinHostPort(r.Config.Address, fmt.Sprintf("%d", r.Config.Port)), s, uptime, fmt.Sprintf("%d/%d", r.State.RecordsV4, r.State.RecordsV6))
 		}
-	} else {
-		for _, r := range servers {
-			if r.Config.Address == args[0] {
-				up := "Down"
-				if r.State.Up == true {
-					up = "Up"
-				}
-				fmt.Printf("Session: %s, State: %s\n", r.Config.Address, up)
-				fmt.Println("  Port:", r.Config.Port)
-				fmt.Println("  Serial:", r.State.SerialNumber)
-				fmt.Printf("  Prefix: %d/%d\n", r.State.PrefixesV4, r.State.PrefixesV6)
-				fmt.Printf("  Record: %d/%d\n", r.State.RecordsV4, r.State.RecordsV6)
-				fmt.Println("  Message statistics:")
-				fmt.Printf("    Receivedv4:    %10d\n", r.State.RpkiMessages.RpkiReceived.Ipv4Prefix)
-				fmt.Printf("    Receivedv6:    %10d\n", r.State.RpkiMessages.RpkiReceived.Ipv4Prefix)
-				fmt.Printf("    SerialNotify:  %10d\n", r.State.RpkiMessages.RpkiReceived.SerialNotify)
-				fmt.Printf("    CacheReset:    %10d\n", r.State.RpkiMessages.RpkiReceived.CacheReset)
-				fmt.Printf("    CacheResponse: %10d\n", r.State.RpkiMessages.RpkiReceived.CacheResponse)
-				fmt.Printf("    EndOfData:     %10d\n", r.State.RpkiMessages.RpkiReceived.EndOfData)
-				fmt.Printf("    Error:         %10d\n", r.State.RpkiMessages.RpkiReceived.Error)
-				fmt.Printf("    SerialQuery:   %10d\n", r.State.RpkiMessages.RpkiSent.SerialQuery)
-				fmt.Printf("    ResetQuery:    %10d\n", r.State.RpkiMessages.RpkiSent.ResetQuery)
+		return nil
+	}
+
+	for _, r := range servers {
+		if r.Config.Address == args[0] {
+			up := "Down"
+			if r.State.Up {
+				up = "Up"
 			}
+			fmt.Printf("Session: %s, State: %s\n", r.Config.Address, up)
+			fmt.Println("  Port:", r.Config.Port)
+			fmt.Println("  Serial:", r.State.SerialNumber)
+			fmt.Printf("  Prefix: %d/%d\n", r.State.PrefixesV4, r.State.PrefixesV6)
+			fmt.Printf("  Record: %d/%d\n", r.State.RecordsV4, r.State.RecordsV6)
+			fmt.Println("  Message statistics:")
+			fmt.Printf("    Receivedv4:    %10d\n", r.State.RpkiMessages.RpkiReceived.Ipv4Prefix)
+			fmt.Printf("    Receivedv6:    %10d\n", r.State.RpkiMessages.RpkiReceived.Ipv4Prefix)
+			fmt.Printf("    SerialNotify:  %10d\n", r.State.RpkiMessages.RpkiReceived.SerialNotify)
+			fmt.Printf("    CacheReset:    %10d\n", r.State.RpkiMessages.RpkiReceived.CacheReset)
+			fmt.Printf("    CacheResponse: %10d\n", r.State.RpkiMessages.RpkiReceived.CacheResponse)
+			fmt.Printf("    EndOfData:     %10d\n", r.State.RpkiMessages.RpkiReceived.EndOfData)
+			fmt.Printf("    Error:         %10d\n", r.State.RpkiMessages.RpkiReceived.Error)
+			fmt.Printf("    SerialQuery:   %10d\n", r.State.RpkiMessages.RpkiSent.SerialQuery)
+			fmt.Printf("    ResetQuery:    %10d\n", r.State.RpkiMessages.RpkiSent.ResetQuery)
 		}
 	}
 	return nil

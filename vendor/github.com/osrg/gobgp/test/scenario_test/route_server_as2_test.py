@@ -53,16 +53,7 @@ class GoBGPTestBase(unittest.TestCase):
             for i in range(4)]
         ctns = [g1] + rs_clients
 
-        # advertise a route from route-server-clients
-        for idx, rs_client in enumerate(rs_clients):
-            route = '10.0.{0}.0/24'.format(idx + 1)
-            rs_client.add_route(route)
-            if idx < 2:
-                route = '10.0.10.0/24'
-            rs_client.add_route(route)
-
         initial_wait_time = max(ctn.run() for ctn in ctns)
-
         time.sleep(initial_wait_time)
 
         for i, rs_client in enumerate(rs_clients):
@@ -71,6 +62,14 @@ class GoBGPTestBase(unittest.TestCase):
             if i > 1:
                 as2 = True
             rs_client.add_peer(g1, as2=as2)
+
+        # advertise a route from route-server-clients
+        for idx, rs_client in enumerate(rs_clients):
+            route = '10.0.{0}.0/24'.format(idx + 1)
+            rs_client.add_route(route)
+            if idx < 2:
+                route = '10.0.10.0/24'
+            rs_client.add_route(route)
 
         cls.gobgp = g1
         cls.quaggas = {x.name: x for x in rs_clients}

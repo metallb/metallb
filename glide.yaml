@@ -1,55 +1,53 @@
 package: go.universe.tf/metallb
 import:
-- package: github.com/golang/glog
-- package: github.com/mikioh/ipaddr
-  version: ef85e35a1b1801b80c891a443c8b68f100095452
-- package: github.com/mdlayher/arp
-- package: github.com/mdlayher/ethernet
-- package: github.com/mdlayher/ndp
-  version: 557f9155ccf6e77213da2cd13ad39cc120a34f76
-- package: github.com/spf13/cobra
-  version: 35136c09d8da66b901337c6e86fd8e88a1a255bd
-- package: github.com/satori/go.uuid
-  version: f58768cc1a7a7e77a3bd49e98cdd21419399b6a3
-- package: github.com/osrg/gobgp
-  version: ^1.27.0
-  subpackages:
-  - api
-  - config
-  - gobgp/cmd
-  - server
-- package: github.com/prometheus/client_golang
-  version: ^0.9.0-pre1
-  subpackages:
-  - prometheus
-  - prometheus/promhttp
-- package: gopkg.in/yaml.v2
-- package: k8s.io/api
-  subpackages:
-  - core/v1
-- package: k8s.io/apimachinery
-  subpackages:
-  - pkg/apis/meta/v1
-  - pkg/fields
-  - pkg/runtime
-- package: k8s.io/client-go
-  version: ^6.0.0
-  subpackages:
-  - kubernetes
-  - kubernetes/scheme
-  - kubernetes/typed/core/v1
-  - tools/cache
-  - tools/clientcmd
-  - tools/leaderelection
-  - tools/leaderelection/resourcelock
-  - tools/record
-  - util/workqueue
 - package: github.com/go-kit/kit
   version: ^0.7.0
   subpackages:
   - log
+- package: github.com/golang/glog
+- package: github.com/mdlayher/arp
+- package: github.com/mdlayher/ethernet
+- package: github.com/mdlayher/ndp
+- package: github.com/mikioh/ipaddr
+- package: github.com/prometheus/client_golang
+  subpackages:
+  - prometheus
+  - prometheus/promhttp
+- package: gopkg.in/yaml.v2
+  version: ^2.2.1
+- package: k8s.io/api
+  subpackages:
+  - core/v1
+- package: k8s.io/apimachinery
+  version: 103fd098999dc9c0c88536f5c9ad2e5da39373ae
+  subpackages:
+  - pkg/apis/meta/v1
+  - pkg/fields
+  - pkg/labels
+- package: golang.org/x/sys
+  version: ac767d655b305d4e9612f5f6e33120b9176c4ad4
+  subpackages:
+  - unix
+- package: github.com/json-iterator/go
+  version: f2b4162afba35581b6d4a50d3b8f34e33c144682
+- package: k8s.io/client-go
+  version: ^8.0.0
+  subpackages:
+  - kubernetes
+  - kubernetes/scheme
+  - kubernetes/typed/core/v1
+  - rest
+  - tools/cache
+  - tools/record
+  - util/workqueue
 testImport:
 - package: github.com/google/go-cmp
-  version: ^0.1.0
+  version: ^0.2.0
   subpackages:
   - cmp
+- package: github.com/osrg/gobgp
+  version: ^1.33.0
+  subpackages:
+  - config
+  - server
+  - table

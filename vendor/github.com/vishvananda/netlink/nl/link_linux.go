@@ -2,35 +2,10 @@ package nl
 
 import (
 	"unsafe"
-
-	"golang.org/x/sys/unix"
 )
 
 const (
 	DEFAULT_CHANGE = 0xFFFFFFFF
-	// doesn't exist in syscall
-	IFLA_VFINFO_LIST = unix.IFLA_IFALIAS + 1 + iota
-	IFLA_STATS64
-	IFLA_VF_PORTS
-	IFLA_PORT_SELF
-	IFLA_AF_SPEC
-	IFLA_GROUP
-	IFLA_NET_NS_FD
-	IFLA_EXT_MASK
-	IFLA_PROMISCUITY
-	IFLA_NUM_TX_QUEUES
-	IFLA_NUM_RX_QUEUES
-	IFLA_CARRIER
-	IFLA_PHYS_PORT_ID
-	IFLA_CARRIER_CHANGES
-	IFLA_PHYS_SWITCH_ID
-	IFLA_LINK_NETNSID
-	IFLA_PHYS_PORT_NAME
-	IFLA_PROTO_DOWN
-	IFLA_GSO_MAX_SEGS
-	IFLA_GSO_MAX_SIZE
-	IFLA_PAD
-	IFLA_XDP
 )
 
 const (
@@ -242,9 +217,11 @@ const (
 	IFLA_VF_RSS_QUERY_EN /* RSS Redirection Table and Hash Key query
 	 * on/off switch
 	 */
-	IFLA_VF_STATS /* network device statistics */
-	IFLA_VF_TRUST /* Trust state of VF */
-	IFLA_VF_MAX   = IFLA_VF_TRUST
+	IFLA_VF_STATS        /* network device statistics */
+	IFLA_VF_TRUST        /* Trust state of VF */
+	IFLA_VF_IB_NODE_GUID /* VF Infiniband node GUID */
+	IFLA_VF_IB_PORT_GUID /* VF Infiniband port GUID */
+	IFLA_VF_MAX          = IFLA_VF_IB_PORT_GUID
 )
 
 const (
@@ -273,6 +250,7 @@ const (
 	SizeofVfLinkState  = 0x08
 	SizeofVfRssQueryEn = 0x08
 	SizeofVfTrust      = 0x08
+	SizeofVfGUID       = 0x10
 )
 
 // struct ifla_vf_mac {
@@ -453,6 +431,30 @@ func DeserializeVfTrust(b []byte) *VfTrust {
 
 func (msg *VfTrust) Serialize() []byte {
 	return (*(*[SizeofVfTrust]byte)(unsafe.Pointer(msg)))[:]
+}
+
+// struct ifla_vf_guid {
+//   __u32 vf;
+//   __u32 rsvd;
+//   __u64 guid;
+// };
+
+type VfGUID struct {
+	Vf   uint32
+	Rsvd uint32
+	GUID uint64
+}
+
+func (msg *VfGUID) Len() int {
+	return SizeofVfGUID
+}
+
+func DeserializeVfGUID(b []byte) *VfGUID {
+	return (*VfGUID)(unsafe.Pointer(&b[0:SizeofVfGUID][0]))
+}
+
+func (msg *VfGUID) Serialize() []byte {
+	return (*(*[SizeofVfGUID]byte)(unsafe.Pointer(msg)))[:]
 }
 
 const (

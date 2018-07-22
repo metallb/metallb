@@ -61,13 +61,7 @@ class GoBGPTestBase(unittest.TestCase):
         qs = [q1, q2, q3]
         ctns = [g1, q1, q2, q3]
 
-        # advertise a route from q1, q2, q3
-        for idx, q in enumerate(qs):
-            route = '10.0.{0}.0/24'.format(idx + 1)
-            q.add_route(route)
-
         initial_wait_time = max(ctn.run() for ctn in ctns)
-
         time.sleep(initial_wait_time)
 
         g1.local('gobgp global policy export add default reject')
@@ -75,6 +69,11 @@ class GoBGPTestBase(unittest.TestCase):
         for q in qs:
             g1.add_peer(q)
             q.add_peer(g1)
+
+        # advertise a route from q1, q2, q3
+        for idx, q in enumerate(qs):
+            route = '10.0.{0}.0/24'.format(idx + 1)
+            q.add_route(route)
 
         cls.gobgp = g1
         cls.quaggas = {'q1': q1, 'q2': q2, 'q3': q3}
@@ -90,10 +89,10 @@ class GoBGPTestBase(unittest.TestCase):
 
     def test_03_add_peer(self):
         q = ExaBGPContainer(name='q4', asn=65004, router_id='192.168.0.5')
-        q.add_route('10.10.0.0/24')
         time.sleep(q.run())
         self.gobgp.add_peer(q)
         q.add_peer(self.gobgp)
+        q.add_route('10.10.0.0/24')
         self.gobgp.wait_for(expected_state=BGP_FSM_ESTABLISHED, peer=q)
         self.quaggas['q4'] = q
         for q in self.quaggas.itervalues():

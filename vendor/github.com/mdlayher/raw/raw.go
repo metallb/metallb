@@ -98,6 +98,22 @@ func (c *Conn) SetPromiscuous(b bool) error {
 	return c.p.SetPromiscuous(b)
 }
 
+// Stats contains statistics about a Conn.
+type Stats struct {
+	// The total number of packets received.
+	Packets uint64
+
+	// The number of packets dropped.
+	Drops uint64
+}
+
+// Stats retrieves statistics from the Conn.
+//
+// Only supported on Linux at this time.
+func (c *Conn) Stats() (*Stats, error) {
+	return c.p.Stats()
+}
+
 // ListenPacket creates a net.PacketConn which can be used to send and receive
 // data at the network interface device driver level.
 //
@@ -112,7 +128,12 @@ func (c *Conn) SetPromiscuous(b bool) error {
 // A nil Config is equivalent to the default configuration: send and receive
 // data at the network interface device driver level (usually raw Ethernet frames).
 func ListenPacket(ifi *net.Interface, proto uint16, cfg *Config) (*Conn, error) {
-	p, err := listenPacket(ifi, proto, cfg)
+	// A nil config is an empty Config.
+	if cfg == nil {
+		cfg = &Config{}
+	}
+
+	p, err := listenPacket(ifi, proto, *cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -127,6 +148,24 @@ type Config struct {
 	// Linux only: call socket(7) with SOCK_DGRAM instead of SOCK_RAW.
 	// Has no effect on other operating systems.
 	LinuxSockDGRAM bool
+
+	// Experimental: Linux only (for now, but can be ported to BSD):
+	// disables repeated socket reads due to internal timeouts, at the expense
+	// of losing the ability to cancel a ReadFrom operation by calling the Close
+	// method of the net.PacketConn.
+	//
+	// Not recommended for programs which may need to open and close multiple
+	// sockets during program runs.  This may save some CPU time by avoiding a
+	// busy loop for programs which do not need timeouts, or programs which keep
+	// a single socket open for the entire duration of the program.
+	NoTimeouts bool
+
+	// Linux only: do not accumulate packet socket statistic counters.  Packet
+	// socket statistics are reset on each call to retrieve them via getsockopt,
+	// but this package's default behavior is to continue accumulating the
+	// statistics internally per Conn.  To use the Linux default behavior of
+	// resetting statistics on each call to Stats, set this value to true.
+	NoCumulativeStats bool
 }
 
 // htons converts a short (uint16) from host-to-network byte order.

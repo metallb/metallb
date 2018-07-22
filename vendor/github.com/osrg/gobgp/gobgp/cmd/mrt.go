@@ -22,9 +22,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/spf13/cobra"
+
+	"github.com/osrg/gobgp/packet/bgp"
 	"github.com/osrg/gobgp/packet/mrt"
 	"github.com/osrg/gobgp/table"
-	"github.com/spf13/cobra"
 )
 
 func injectMrt() error {
@@ -38,7 +40,7 @@ func injectMrt() error {
 		fmt.Println("You should probably specify either --no-ipv4 or --no-ipv6 when overwriting nexthop, unless your dump contains only one type of routes")
 	}
 
-	idx := 0
+	var idx int64
 	if mrtOpts.QueueSize < 1 {
 		return fmt.Errorf("Specified queue size is smaller than 1, refusing to run with unbounded memory usage")
 	}
@@ -116,7 +118,22 @@ func injectMrt() error {
 						ID: peers[e.PeerIndex].BgpId,
 					}
 					t := time.Unix(int64(e.OriginatedTime), 0)
-					paths = append(paths, table.NewPath(source, nlri, false, e.PathAttributes, t, false))
+
+					switch subType {
+					case mrt.RIB_IPV4_UNICAST, mrt.RIB_IPV4_UNICAST_ADDPATH:
+						paths = append(paths, table.NewPath(source, nlri, false, e.PathAttributes, t, false))
+					default:
+						attrs := make([]bgp.PathAttributeInterface, 0, len(e.PathAttributes))
+						for _, attr := range e.PathAttributes {
+							if attr.GetType() != bgp.BGP_ATTR_TYPE_MP_REACH_NLRI {
+								attrs = append(attrs, attr)
+							} else {
+								a := attr.(*bgp.PathAttributeMpReachNLRI)
+								attrs = append(attrs, bgp.NewPathAttributeMpReachNLRI(a.Nexthop.String(), []bgp.AddrPrefixInterface{nlri}))
+							}
+						}
+						paths = append(paths, table.NewPath(source, nlri, false, attrs, t, false))
+					}
 				}
 				if mrtOpts.NextHop != nil {
 					for _, p := range paths {
@@ -125,11 +142,8 @@ func injectMrt() error {
 				}
 
 				if mrtOpts.Best {
-					dst := table.NewDestination(nlri, 0)
-					for _, p := range paths {
-						dst.AddNewPath(p)
-					}
-					best, _, _ := dst.Calculate().GetChanges(table.GLOBAL_RIB_NAME, false)
+					dst := table.NewDestination(nlri, 0, paths[1:]...)
+					best, _, _ := dst.Calculate(paths[0]).GetChanges(table.GLOBAL_RIB_NAME, 0, false)
 					if best == nil {
 						exitWithError(fmt.Errorf("Can't find the best %v", nlri))
 					}
@@ -178,12 +192,12 @@ func NewMrtCmd() *cobra.Command {
 			mrtOpts.Filename = args[0]
 			if len(args) > 1 {
 				var err error
-				mrtOpts.RecordCount, err = strconv.Atoi(args[1])
+				mrtOpts.RecordCount, err = strconv.ParseInt(args[1], 10, 64)
 				if err != nil {
 					exitWithError(fmt.Errorf("invalid count value: %s", args[1]))
 				}
 				if len(args) > 2 {
-					mrtOpts.RecordSkip, err = strconv.Atoi(args[2])
+					mrtOpts.RecordSkip, err = strconv.ParseInt(args[2], 10, 64)
 					if err != nil {
 						exitWithError(fmt.Errorf("invalid skip value: %s", args[2]))
 					}

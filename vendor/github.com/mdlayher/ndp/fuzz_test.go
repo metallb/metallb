@@ -33,6 +33,10 @@ func Test_fuzz(t *testing.T) {
 				"00000000000000000000" +
 				"00000000000000000000",
 		},
+		{
+			name: "rdnss no servers",
+			s:    "\x850000000\x19\x01000000",
+		},
 	}
 
 	for _, tt := range tests {

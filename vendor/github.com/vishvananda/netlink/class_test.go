@@ -3,6 +3,7 @@
 package netlink
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -21,6 +22,33 @@ func SafeQdiscList(link Link) ([]Qdisc, error) {
 		}
 	}
 	return result, nil
+}
+
+func SafeClassList(link Link, handle uint32) ([]Class, error) {
+	classes, err := ClassList(link, handle)
+	if err != nil {
+		return nil, err
+	}
+	result := []Class{}
+	for ind := range classes {
+		double := false
+		for _, class2 := range classes[ind+1:] {
+			if classes[ind].Attrs().Handle == class2.Attrs().Handle {
+				double = true
+			}
+		}
+		if !double {
+			result = append(result, classes[ind])
+		}
+	}
+	return result, nil
+}
+
+func testClassStats(this, that *ClassStatistics, t *testing.T) {
+	ok := reflect.DeepEqual(this, that)
+	if !ok {
+		t.Fatalf("%#v is expected but it actually was %#v", that, this)
+	}
 }
 
 func TestClassAddDel(t *testing.T) {
@@ -98,6 +126,8 @@ func TestClassAddDel(t *testing.T) {
 	if htb.Cbuffer != class.Cbuffer {
 		t.Fatal("Cbuffer doesn't match")
 	}
+
+	testClassStats(htb.ClassAttrs.Statistics, NewClassStatistics(), t)
 
 	qattrs := QdiscAttrs{
 		LinkIndex: link.Attrs().Index,
@@ -249,6 +279,8 @@ func TestHtbClassAddHtbClassChangeDel(t *testing.T) {
 	if !ok {
 		t.Fatal("Class is the wrong type")
 	}
+
+	testClassStats(htb.ClassAttrs.Statistics, NewClassStatistics(), t)
 
 	qattrs := QdiscAttrs{
 		LinkIndex: link.Attrs().Index,
@@ -422,4 +454,214 @@ func TestHtbClassAddHtbClassChangeDel(t *testing.T) {
 	if len(qdiscs) != 0 {
 		t.Fatal("Failed to remove qdisc")
 	}
+}
+
+func TestClassHfsc(t *testing.T) {
+	// New network namespace for tests
+	tearDown := setUpNetlinkTestWithKModule(t, "sch_hfsc")
+	defer tearDown()
+
+	// Set up testing link and check if succeeded
+	if err := LinkAdd(&Ifb{LinkAttrs{Name: "foo"}}); err != nil {
+		t.Fatal(err)
+	}
+	link, err := LinkByName("foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := LinkSetUp(link); err != nil {
+		t.Fatal(err)
+	}
+
+	// Adding HFSC qdisc
+	qdiscAttrs := QdiscAttrs{
+		LinkIndex: link.Attrs().Index,
+		Handle:    MakeHandle(1, 0),
+		Parent:    HANDLE_ROOT,
+	}
+	hfscQdisc := NewHfsc(qdiscAttrs)
+	hfscQdisc.Defcls = 2
+
+	err = QdiscAdd(hfscQdisc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	qdiscs, err := SafeQdiscList(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(qdiscs) != 1 {
+		t.Fatal("Failed to add qdisc")
+	}
+	_, ok := qdiscs[0].(*Hfsc)
+	if !ok {
+		t.Fatal("Qdisc is the wrong type")
+	}
+
+	// Adding some HFSC classes
+	classAttrs := ClassAttrs{
+		LinkIndex: link.Attrs().Index,
+		Parent:    MakeHandle(1, 0),
+		Handle:    MakeHandle(1, 1),
+	}
+	hfscClass := NewHfscClass(classAttrs)
+	hfscClass.SetLS(5e6, 10, 5e6)
+
+	err = ClassAdd(hfscClass)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hfscClass2 := hfscClass
+	hfscClass2.SetLS(0, 0, 0)
+	hfscClass2.Attrs().Parent = MakeHandle(1, 1)
+	hfscClass2.Attrs().Handle = MakeHandle(1, 2)
+	hfscClass2.SetRsc(0, 0, 2e6)
+
+	err = ClassAdd(hfscClass2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hfscClass3 := hfscClass
+	hfscClass3.SetLS(0, 0, 0)
+	hfscClass3.Attrs().Parent = MakeHandle(1, 1)
+	hfscClass3.Attrs().Handle = MakeHandle(1, 3)
+
+	err = ClassAdd(hfscClass3)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check the classes
+	classes, err := SafeClassList(link, MakeHandle(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(classes) != 4 {
+		t.Fatal("Failed to add classes")
+	}
+	for _, c := range classes {
+		class, ok := c.(*HfscClass)
+		if !ok {
+			t.Fatal("Wrong type of class")
+		}
+		if class.ClassAttrs.Handle == hfscClass.ClassAttrs.Handle {
+			if class.Fsc != hfscClass.Fsc {
+				t.Fatal("HfscClass FSC don't match")
+			}
+			if class.Usc != hfscClass.Usc {
+				t.Fatal("HfscClass USC don't match")
+			}
+			if class.Rsc != hfscClass.Rsc {
+				t.Fatal("HfscClass RSC don't match")
+			}
+		}
+		if class.ClassAttrs.Handle == hfscClass2.ClassAttrs.Handle {
+			if class.Fsc != hfscClass2.Fsc {
+				t.Fatal("HfscClass2 FSC don't match")
+			}
+			if class.Usc != hfscClass2.Usc {
+				t.Fatal("HfscClass2 USC don't match")
+			}
+			if class.Rsc != hfscClass2.Rsc {
+				t.Fatal("HfscClass2 RSC don't match")
+			}
+		}
+		if class.ClassAttrs.Handle == hfscClass3.ClassAttrs.Handle {
+			if class.Fsc != hfscClass3.Fsc {
+				t.Fatal("HfscClass3 FSC don't match")
+			}
+			if class.Usc != hfscClass3.Usc {
+				t.Fatal("HfscClass3 USC don't match")
+			}
+			if class.Rsc != hfscClass3.Rsc {
+				t.Fatal("HfscClass3 RSC don't match")
+			}
+		}
+	}
+
+	// Terminating the leafs with fq_codel qdiscs
+	fqcodelAttrs := QdiscAttrs{
+		LinkIndex: link.Attrs().Index,
+		Parent:    MakeHandle(1, 2),
+		Handle:    MakeHandle(2, 0),
+	}
+	fqcodel1 := NewFqCodel(fqcodelAttrs)
+	fqcodel1.ECN = 0
+	fqcodel1.Limit = 1200
+	fqcodel1.Flows = 65535
+	fqcodel1.Target = 5
+
+	err = QdiscAdd(fqcodel1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fqcodel2 := fqcodel1
+	fqcodel2.Attrs().Handle = MakeHandle(3, 0)
+	fqcodel2.Attrs().Parent = MakeHandle(1, 3)
+
+	err = QdiscAdd(fqcodel2)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check the amount of qdiscs
+	qdiscs, err = SafeQdiscList(link)
+	if len(qdiscs) != 3 {
+		t.Fatal("Failed to add qdisc")
+	}
+	for _, q := range qdiscs[1:] {
+		_, ok = q.(*FqCodel)
+		if !ok {
+			t.Fatal("Qdisc is the wrong type")
+		}
+	}
+
+	// removing a class
+	if err := ClassDel(hfscClass3); err != nil {
+		t.Fatal(err)
+	}
+	// Check the classes
+	classes, err = SafeClassList(link, MakeHandle(1, 0))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(classes) != 3 {
+		t.Fatal("Failed to delete classes")
+	}
+	// Check qdisc
+	qdiscs, err = SafeQdiscList(link)
+	if len(qdiscs) != 2 {
+		t.Fatal("Failed to delete qdisc")
+	}
+
+	// Changing a class
+	hfscClass2.SetRsc(0, 0, 0)
+	hfscClass2.SetSC(5e6, 100, 1e6)
+	hfscClass2.SetUL(6e6, 50, 2e6)
+	hfscClass2.Attrs().Handle = MakeHandle(1, 8)
+	if err := ClassChange(hfscClass2); err == nil {
+		t.Fatal("Class change shouldn't work with a different handle")
+	}
+	hfscClass2.Attrs().Handle = MakeHandle(1, 2)
+	if err := ClassChange(hfscClass2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Replacing a class
+	// If the handle doesn't exist, create it
+	hfscClass2.SetSC(6e6, 100, 2e6)
+	hfscClass2.SetUL(8e6, 500, 4e6)
+	hfscClass2.Attrs().Handle = MakeHandle(1, 8)
+	if err := ClassReplace(hfscClass2); err != nil {
+		t.Fatal(err)
+	}
+	// If the handle exists, replace it
+	hfscClass.SetLS(5e6, 200, 1e6)
+	if err := ClassChange(hfscClass); err != nil {
+		t.Fatal(err)
+	}
+
 }

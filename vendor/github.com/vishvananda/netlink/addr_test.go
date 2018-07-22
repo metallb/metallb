@@ -24,7 +24,7 @@ func DoTestAddr(t *testing.T, FunctionUndertest func(Link, *Addr) error) {
 		t.Skipf("Fails in travis with: addr_test.go:68: Address flags not set properly, got=0, expected=128")
 	}
 	// TODO: IFA_F_PERMANENT does not seem to be set by default on older kernels?
-	var address = &net.IPNet{IP: net.IPv4(127, 0, 0, 2), Mask: net.CIDRMask(24, 32)}
+	var address = &net.IPNet{IP: net.IPv4(127, 0, 0, 2), Mask: net.CIDRMask(32, 32)}
 	var peer = &net.IPNet{IP: net.IPv4(127, 0, 0, 3), Mask: net.CIDRMask(24, 32)}
 	var addrTests = []struct {
 		addr     *Addr
@@ -237,6 +237,46 @@ func TestAddrSubscribeWithOptions(t *testing.T) {
 
 	// bring the interface up
 	if err = LinkSetUp(link); err != nil {
+		t.Fatal(err)
+	}
+
+	ip := net.IPv4(127, 0, 0, 1)
+	if !expectAddrUpdate(ch, true, ip) {
+		t.Fatal("Add update not received as expected")
+	}
+}
+
+func TestAddrSubscribeListExisting(t *testing.T) {
+	tearDown := setUpNetlinkTest(t)
+	defer tearDown()
+
+	ch := make(chan AddrUpdate)
+	done := make(chan struct{})
+	defer close(done)
+
+	// get loopback interface
+	link, err := LinkByName("lo")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// bring the interface up
+	if err = LinkSetUp(link); err != nil {
+		t.Fatal(err)
+	}
+
+	var lastError error
+	defer func() {
+		if lastError != nil {
+			t.Fatalf("Fatal error received during subscription: %v", lastError)
+		}
+	}()
+	if err := AddrSubscribeWithOptions(ch, done, AddrSubscribeOptions{
+		ErrorCallback: func(err error) {
+			lastError = err
+		},
+		ListExisting: true,
+	}); err != nil {
 		t.Fatal(err)
 	}
 

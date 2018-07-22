@@ -4,16 +4,16 @@ This page explains how to set up GoBGP as a [route server](https://tools.ietf.or
 
 ## Prerequisites
 
-Assumed that you finished [Getting Started](https://github.com/osrg/gobgp/blob/master/docs/sources/getting-started.md).
+Assumed that you finished [Getting Started](getting-started.md).
 
 ## Configuration
 
-This example uses the following simple configuration file, `gobgpd.conf`. There are three changes from 
-the configuration file used in [Getting Started](https://github.com/osrg/gobgp/blob/master/docs/sources/getting-started.md)
+This example uses the following simple configuration file, `gobgpd.conf`. There are three changes from
+the configuration file used in [Getting Started](getting-started.md)
 
- * Peers are configured as route server clients (of course!).
- * GoBGP doesn't try to connect to peers. It only listens and accepts.
- * MD5 passwords are enabled.
+- Peers are configured as route server clients (of course!).
+- GoBGP doesn't try to connect to peers. It only listens and accepts.
+- MD5 passwords are enabled.
 
 ```toml
 [global.config]
@@ -68,4 +68,4 @@ $ gobgp neighbor 10.0.255.2 local
 *> 10.3.0.1/32        10.0.255.1      [65001]    00:06:12   [{Origin: 0} {Med: 0}]
 ```
 
-Of course, you can also look at the adjacent rib-in and rib-out of each peer as done in [Getting Started](https://github.com/osrg/gobgp/blob/master/docs/sources/getting-started.md).
+Of course, you can also look at the adjacent rib-in and rib-out of each peer as done in [Getting Started](getting-started.md).

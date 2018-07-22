@@ -35,7 +35,7 @@ func main() {
 		log.Fatalf("failed to find interface %q: %v", *ifaceFlag, err)
 	}
 
-	c, err := raw.ListenPacket(ifi, etherType)
+	c, err := raw.ListenPacket(ifi, etherType, nil)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}

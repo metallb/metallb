@@ -166,7 +166,7 @@ func testMetricVec(t *testing.T, vec *GaugeVec) {
 	}
 
 	var total int
-	for _, metrics := range vec.children {
+	for _, metrics := range vec.metricMap.metrics {
 		for _, metric := range metrics {
 			total++
 			copy(pair[:], metric.values)
@@ -201,7 +201,7 @@ func testMetricVec(t *testing.T, vec *GaugeVec) {
 
 	vec.Reset()
 
-	if len(vec.children) > 0 {
+	if len(vec.metricMap.metrics) > 0 {
 		t.Fatalf("reset failed")
 	}
 }
@@ -237,6 +237,229 @@ func TestCounterVecEndToEndWithCollision(t *testing.T) {
 	if got, want := m.GetCounter().GetValue(), 2.; got != want {
 		t.Errorf("got value %f, want %f", got, want)
 	}
+}
+
+func TestCurryVec(t *testing.T) {
+	vec := NewCounterVec(
+		CounterOpts{
+			Name: "test",
+			Help: "helpless",
+		},
+		[]string{"one", "two", "three"},
+	)
+	testCurryVec(t, vec)
+}
+
+func TestCurryVecWithCollisions(t *testing.T) {
+	vec := NewCounterVec(
+		CounterOpts{
+			Name: "test",
+			Help: "helpless",
+		},
+		[]string{"one", "two", "three"},
+	)
+	vec.hashAdd = func(h uint64, s string) uint64 { return 1 }
+	vec.hashAddByte = func(h uint64, b byte) uint64 { return 1 }
+	testCurryVec(t, vec)
+}
+
+func testCurryVec(t *testing.T, vec *CounterVec) {
+
+	assertMetrics := func(t *testing.T) {
+		n := 0
+		for _, m := range vec.metricMap.metrics {
+			n += len(m)
+		}
+		if n != 2 {
+			t.Error("expected two metrics, got", n)
+		}
+		m := &dto.Metric{}
+		c1, err := vec.GetMetricWithLabelValues("1", "2", "3")
+		if err != nil {
+			t.Fatal("unexpected error getting metric:", err)
+		}
+		c1.Write(m)
+		if want, got := 1., m.GetCounter().GetValue(); want != got {
+			t.Errorf("want %f as counter value, got %f", want, got)
+		}
+		m.Reset()
+		c2, err := vec.GetMetricWithLabelValues("11", "22", "33")
+		if err != nil {
+			t.Fatal("unexpected error getting metric:", err)
+		}
+		c2.Write(m)
+		if want, got := 1., m.GetCounter().GetValue(); want != got {
+			t.Errorf("want %f as counter value, got %f", want, got)
+		}
+	}
+
+	assertNoMetric := func(t *testing.T) {
+		if n := len(vec.metricMap.metrics); n != 0 {
+			t.Error("expected no metrics, got", n)
+		}
+	}
+
+	t.Run("zero labels", func(t *testing.T) {
+		c1 := vec.MustCurryWith(nil)
+		c2 := vec.MustCurryWith(nil)
+		c1.WithLabelValues("1", "2", "3").Inc()
+		c2.With(Labels{"one": "11", "two": "22", "three": "33"}).Inc()
+		assertMetrics(t)
+		if !c1.Delete(Labels{"one": "1", "two": "2", "three": "3"}) {
+			t.Error("deletion failed")
+		}
+		if !c2.DeleteLabelValues("11", "22", "33") {
+			t.Error("deletion failed")
+		}
+		assertNoMetric(t)
+	})
+	t.Run("first label", func(t *testing.T) {
+		c1 := vec.MustCurryWith(Labels{"one": "1"})
+		c2 := vec.MustCurryWith(Labels{"one": "11"})
+		c1.WithLabelValues("2", "3").Inc()
+		c2.With(Labels{"two": "22", "three": "33"}).Inc()
+		assertMetrics(t)
+		if c1.Delete(Labels{"two": "22", "three": "33"}) {
+			t.Error("deletion unexpectedly succeeded")
+		}
+		if c2.DeleteLabelValues("2", "3") {
+			t.Error("deletion unexpectedly succeeded")
+		}
+		if !c1.Delete(Labels{"two": "2", "three": "3"}) {
+			t.Error("deletion failed")
+		}
+		if !c2.DeleteLabelValues("22", "33") {
+			t.Error("deletion failed")
+		}
+		assertNoMetric(t)
+	})
+	t.Run("middle label", func(t *testing.T) {
+		c1 := vec.MustCurryWith(Labels{"two": "2"})
+		c2 := vec.MustCurryWith(Labels{"two": "22"})
+		c1.WithLabelValues("1", "3").Inc()
+		c2.With(Labels{"one": "11", "three": "33"}).Inc()
+		assertMetrics(t)
+		if c1.Delete(Labels{"one": "11", "three": "33"}) {
+			t.Error("deletion unexpectedly succeeded")
+		}
+		if c2.DeleteLabelValues("1", "3") {
+			t.Error("deletion unexpectedly succeeded")
+		}
+		if !c1.Delete(Labels{"one": "1", "three": "3"}) {
+			t.Error("deletion failed")
+		}
+		if !c2.DeleteLabelValues("11", "33") {
+			t.Error("deletion failed")
+		}
+		assertNoMetric(t)
+	})
+	t.Run("last label", func(t *testing.T) {
+		c1 := vec.MustCurryWith(Labels{"three": "3"})
+		c2 := vec.MustCurryWith(Labels{"three": "33"})
+		c1.WithLabelValues("1", "2").Inc()
+		c2.With(Labels{"one": "11", "two": "22"}).Inc()
+		assertMetrics(t)
+		if c1.Delete(Labels{"two": "22", "one": "11"}) {
+			t.Error("deletion unexpectedly succeeded")
+		}
+		if c2.DeleteLabelValues("1", "2") {
+			t.Error("deletion unexpectedly succeeded")
+		}
+		if !c1.Delete(Labels{"two": "2", "one": "1"}) {
+			t.Error("deletion failed")
+		}
+		if !c2.DeleteLabelValues("11", "22") {
+			t.Error("deletion failed")
+		}
+		assertNoMetric(t)
+	})
+	t.Run("two labels", func(t *testing.T) {
+		c1 := vec.MustCurryWith(Labels{"three": "3", "one": "1"})
+		c2 := vec.MustCurryWith(Labels{"three": "33", "one": "11"})
+		c1.WithLabelValues("2").Inc()
+		c2.With(Labels{"two": "22"}).Inc()
+		assertMetrics(t)
+		if c1.Delete(Labels{"two": "22"}) {
+			t.Error("deletion unexpectedly succeeded")
+		}
+		if c2.DeleteLabelValues("2") {
+			t.Error("deletion unexpectedly succeeded")
+		}
+		if !c1.Delete(Labels{"two": "2"}) {
+			t.Error("deletion failed")
+		}
+		if !c2.DeleteLabelValues("22") {
+			t.Error("deletion failed")
+		}
+		assertNoMetric(t)
+	})
+	t.Run("all labels", func(t *testing.T) {
+		c1 := vec.MustCurryWith(Labels{"three": "3", "two": "2", "one": "1"})
+		c2 := vec.MustCurryWith(Labels{"three": "33", "one": "11", "two": "22"})
+		c1.WithLabelValues().Inc()
+		c2.With(nil).Inc()
+		assertMetrics(t)
+		if !c1.Delete(Labels{}) {
+			t.Error("deletion failed")
+		}
+		if !c2.DeleteLabelValues() {
+			t.Error("deletion failed")
+		}
+		assertNoMetric(t)
+	})
+	t.Run("double curry", func(t *testing.T) {
+		c1 := vec.MustCurryWith(Labels{"three": "3"}).MustCurryWith(Labels{"one": "1"})
+		c2 := vec.MustCurryWith(Labels{"three": "33"}).MustCurryWith(Labels{"one": "11"})
+		c1.WithLabelValues("2").Inc()
+		c2.With(Labels{"two": "22"}).Inc()
+		assertMetrics(t)
+		if c1.Delete(Labels{"two": "22"}) {
+			t.Error("deletion unexpectedly succeeded")
+		}
+		if c2.DeleteLabelValues("2") {
+			t.Error("deletion unexpectedly succeeded")
+		}
+		if !c1.Delete(Labels{"two": "2"}) {
+			t.Error("deletion failed")
+		}
+		if !c2.DeleteLabelValues("22") {
+			t.Error("deletion failed")
+		}
+		assertNoMetric(t)
+	})
+	t.Run("use already curried label", func(t *testing.T) {
+		c1 := vec.MustCurryWith(Labels{"three": "3"})
+		if _, err := c1.GetMetricWithLabelValues("1", "2", "3"); err == nil {
+			t.Error("expected error when using already curried label")
+		}
+		if _, err := c1.GetMetricWith(Labels{"one": "1", "two": "2", "three": "3"}); err == nil {
+			t.Error("expected error when using already curried label")
+		}
+		assertNoMetric(t)
+		c1.WithLabelValues("1", "2").Inc()
+		if c1.Delete(Labels{"one": "1", "two": "2", "three": "3"}) {
+			t.Error("deletion unexpectedly succeeded")
+		}
+		if !c1.Delete(Labels{"one": "1", "two": "2"}) {
+			t.Error("deletion failed")
+		}
+		assertNoMetric(t)
+	})
+	t.Run("curry already curried label", func(t *testing.T) {
+		if _, err := vec.MustCurryWith(Labels{"three": "3"}).CurryWith(Labels{"three": "33"}); err == nil {
+			t.Error("currying unexpectedly succeeded")
+		} else if err.Error() != `label name "three" is already curried` {
+			t.Error("currying returned unexpected error:", err)
+		}
+
+	})
+	t.Run("unknown label", func(t *testing.T) {
+		if _, err := vec.CurryWith(Labels{"foo": "bar"}); err == nil {
+			t.Error("currying unexpectedly succeeded")
+		} else if err.Error() != "1 unknown label(s) found during currying" {
+			t.Error("currying returned unexpected error:", err)
+		}
+	})
 }
 
 func BenchmarkMetricVecWithLabelValuesBasic(b *testing.B) {

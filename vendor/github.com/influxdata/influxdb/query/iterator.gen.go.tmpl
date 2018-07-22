@@ -490,6 +490,95 @@ type {{$k.name}}SortedMergeHeapItem struct {
 	itr       {{$k.Name}}Iterator
 }
 
+// {{$k.name}}IteratorScanner scans the results of a {{$k.Name}}Iterator into a map.
+type {{$k.name}}IteratorScanner struct {
+	input        *buf{{$k.Name}}Iterator
+	err          error
+	keys         []influxql.VarRef
+	defaultValue interface{}
+}
+
+// new{{$k.Name}}IteratorScanner creates a new IteratorScanner.
+func new{{$k.Name}}IteratorScanner(input {{$k.Name}}Iterator, keys []influxql.VarRef, defaultValue interface{}) *{{$k.name}}IteratorScanner {
+	return &{{$k.name}}IteratorScanner{
+		input: newBuf{{$k.Name}}Iterator(input),
+		keys: keys,
+		defaultValue: defaultValue,
+	}
+}
+
+func (s *{{$k.name}}IteratorScanner) Peek() (int64, string, Tags) {
+	if s.err != nil {
+		return ZeroTime, "", Tags{}
+	}
+
+	p, err := s.input.peek()
+	if err != nil {
+		s.err = err
+		return ZeroTime, "", Tags{}
+	} else if p == nil {
+		return ZeroTime, "", Tags{}
+	}
+	return p.Time, p.Name, p.Tags
+}
+
+func (s *{{$k.name}}IteratorScanner) ScanAt(ts int64, name string, tags Tags, m map[string]interface{}) {
+	if s.err != nil {
+		return
+	}
+
+	p, err := s.input.Next()
+	if err != nil {
+		s.err = err
+		return
+	} else if p == nil {
+		s.useDefaults(m)
+		return
+	} else if p.Time != ts || p.Name != name || !p.Tags.Equals(&tags) {
+		s.useDefaults(m)
+		s.input.unread(p)
+		return
+	}
+
+	if k := s.keys[0]; k.Val != "" {
+		if p.Nil {
+			if s.defaultValue != SkipDefault {
+				m[k.Val] = castToType(s.defaultValue, k.Type)
+			}
+		} else {
+			m[k.Val] = p.Value
+		}
+	}
+	for i, v := range p.Aux {
+		k := s.keys[i+1]
+		switch v.(type) {
+		case float64, int64, uint64, string, bool:
+			m[k.Val] = v
+		default:
+			// Insert the fill value if one was specified.
+			if s.defaultValue != SkipDefault {
+				m[k.Val] = castToType(s.defaultValue, k.Type)
+			}
+		}
+	}
+}
+
+func (s *{{$k.name}}IteratorScanner) useDefaults(m map[string]interface{}) {
+	if s.defaultValue == SkipDefault {
+		return
+	}
+	for _, k := range s.keys {
+		if k.Val == "" {
+		  continue
+		}
+		m[k.Val] = castToType(s.defaultValue, k.Type)
+	}
+}
+
+func (s *{{$k.name}}IteratorScanner) Stats() IteratorStats { return s.input.Stats() }
+func (s *{{$k.name}}IteratorScanner) Err() error { return s.err }
+func (s *{{$k.name}}IteratorScanner) Close() error { return s.input.Close() }
+
 // {{$k.name}}ParallelIterator represents an iterator that pulls data in a separate goroutine.
 type {{$k.name}}ParallelIterator struct {
 	input   {{$k.Name}}Iterator
@@ -689,21 +778,17 @@ func (itr *{{$k.name}}FillIterator) Next() (*{{$k.Name}}Point, error) {
 	}
 
 	// Check if the next point is outside of our window or is nil.
-	for p == nil || p.Name != itr.window.name || p.Tags.ID() != itr.window.tags.ID() {
+	if p == nil || p.Name != itr.window.name || p.Tags.ID() != itr.window.tags.ID() {
 		// If we are inside of an interval, unread the point and continue below to
 		// constructing a new point.
-		if itr.opt.Ascending {
-			if itr.window.time <= itr.endTime {
-				itr.input.unread(p)
-				p = nil
-				break
-			}
-		} else {
-			if itr.window.time >= itr.endTime && itr.endTime != influxql.MinTime {
-				itr.input.unread(p)
-				p = nil
-				break
-			}
+		if itr.opt.Ascending && itr.window.time <= itr.endTime {
+			itr.input.unread(p)
+			p = nil
+			goto CONSTRUCT
+		} else if !itr.opt.Ascending && itr.window.time >= itr.endTime && itr.endTime != influxql.MinTime {
+			itr.input.unread(p)
+			p = nil
+			goto CONSTRUCT
 		}
 
 		// We are *not* in a current interval. If there is no next point,
@@ -722,10 +807,10 @@ func (itr *{{$k.name}}FillIterator) Next() (*{{$k.Name}}Point, error) {
 			_, itr.window.offset = itr.opt.Zone(itr.window.time)
 		}
 		itr.prev = {{$k.Name}}Point{Nil: true}
-		break
 	}
 
 	// Check if the point is our next expected point.
+CONSTRUCT:
 	if p == nil || (itr.opt.Ascending && p.Time > itr.window.time) || (!itr.opt.Ascending && p.Time < itr.window.time) {
 		if p != nil {
 			itr.input.unread(p)
@@ -761,7 +846,7 @@ func (itr *{{$k.name}}FillIterator) Next() (*{{$k.Name}}Point, error) {
 		case influxql.NullFill:
 			p.Nil = true
 		case influxql.NumberFill:
-			p.Value = castTo{{$k.Name}}(itr.opt.FillValue)
+			p.Value, _ = castTo{{$k.Name}}(itr.opt.FillValue)
 		case influxql.PreviousFill:
 			if !itr.prev.Nil {
 				p.Value = itr.prev.Value
@@ -907,170 +992,6 @@ func (itr *{{$k.name}}CloseInterruptIterator) Next() (*{{$k.Name}}Point, error) 
 			return nil, err
 		}
 	}
-	return p, nil
-}
-
-// aux{{$k.Name}}Point represents a combination of a point and an error for the AuxIterator.
-type aux{{$k.Name}}Point struct {
-	point *{{$k.Name}}Point
-	err   error
-}
-
-// {{$k.name}}AuxIterator represents a {{$k.name}} implementation of AuxIterator.
-type {{$k.name}}AuxIterator struct {
-	input      *buf{{$k.Name}}Iterator
-	output     chan aux{{$k.Name}}Point
-	fields     *auxIteratorFields
-	background bool
-	closer     sync.Once
-}
-
-func new{{$k.Name}}AuxIterator(input {{$k.Name}}Iterator, opt IteratorOptions) *{{$k.name}}AuxIterator {
-	return &{{$k.name}}AuxIterator{
-		input:  newBuf{{$k.Name}}Iterator(input),
-		output: make(chan aux{{$k.Name}}Point, 1),
-		fields: newAuxIteratorFields(opt),
-	}
-}
-
-func (itr *{{$k.name}}AuxIterator) Background() {
-	itr.background = true
-	itr.Start()
-	go DrainIterator(itr)
-}
-
-func (itr *{{$k.name}}AuxIterator) Start()                           { go itr.stream() }
-func (itr *{{$k.name}}AuxIterator) Stats() IteratorStats             { return itr.input.Stats() }
-
-func (itr *{{$k.name}}AuxIterator) Close() error {
-	var err error
-	itr.closer.Do(func() { err = itr.input.Close() })
-	return err
-}
-
-func (itr *{{$k.name}}AuxIterator) Next() (*{{$k.Name}}Point, error) {
-	p := <-itr.output
-	return p.point, p.err
-}
-func (itr *{{$k.name}}AuxIterator) Iterator(name string, typ influxql.DataType) Iterator    { return itr.fields.iterator(name, typ) }
-
-func (itr *{{.name}}AuxIterator) stream() {
-	for {
-		// Read next point.
-		p, err := itr.input.Next()
-		if err != nil {
-			itr.output <- aux{{$k.Name}}Point{err: err}
-			itr.fields.sendError(err)
-			break
-		} else if p == nil {
-			break
-		}
-
-		// Send point to output and to each field iterator.
-		itr.output <- aux{{$k.Name}}Point{point: p}
-		if ok := itr.fields.send(p); !ok && itr.background {
-			break
-		}
-	}
-
-	close(itr.output)
-	itr.fields.close()
-}
-
-// {{$k.name}}ChanIterator represents a new instance of {{$k.name}}ChanIterator.
-type {{$k.name}}ChanIterator struct {
-	buf struct {
-		i      int
-		filled bool
-		points [2]{{$k.Name}}Point
-	}
-	err  error
-	cond *sync.Cond
-	done bool
-}
-
-func (itr *{{$k.name}}ChanIterator) Stats() IteratorStats { return IteratorStats{} }
-
-func (itr *{{$k.name}}ChanIterator) Close() error {
-	itr.cond.L.Lock()
-	// Mark the channel iterator as done and signal all waiting goroutines to start again.
-	itr.done = true
-	itr.cond.Broadcast()
-	// Do not defer the unlock so we don't create an unnecessary allocation.
-	itr.cond.L.Unlock()
-	return nil
-}
-
-func (itr *{{$k.name}}ChanIterator) setBuf(name string, tags Tags, time int64, value interface{}) bool {
-	itr.cond.L.Lock()
-	defer itr.cond.L.Unlock()
-
-	// Wait for either the iterator to be done (so we don't have to set the value)
-	// or for the buffer to have been read and ready for another write.
-	for !itr.done && itr.buf.filled {
-		itr.cond.Wait()
-	}
-
-	// Do not set the value and return false to signal that the iterator is closed.
-	// Do this after the above wait as the above for loop may have exited because
-	// the iterator was closed.
-	if itr.done {
-		return false
-	}
-
-	switch v := value.(type) {
-	case {{$k.Type}}:
-		itr.buf.points[itr.buf.i] = {{$k.Name}}Point{Name: name, Tags: tags, Time: time, Value: v}
-{{if eq $k.Name "Float"}}
-	case int64:
-		itr.buf.points[itr.buf.i] = {{$k.Name}}Point{Name: name, Tags: tags, Time: time, Value: float64(v)}
-{{end}}
-	default:
-		itr.buf.points[itr.buf.i] = {{$k.Name}}Point{Name: name, Tags: tags, Time: time, Nil: true}
-	}
-	itr.buf.filled = true
-
-	// Signal to all waiting goroutines that a new value is ready to read.
-	itr.cond.Signal()
-	return true
-}
-
-func (itr *{{$k.name}}ChanIterator) setErr(err error) {
-	itr.cond.L.Lock()
-	defer itr.cond.L.Unlock()
-	itr.err = err
-
-	// Signal to all waiting goroutines that a new value is ready to read.
-	itr.cond.Signal()
-}
-
-func (itr *{{$k.name}}ChanIterator) Next() (*{{$k.Name}}Point, error) {
-	itr.cond.L.Lock()
-	defer itr.cond.L.Unlock()
-
-	// Check for an error and return one if there.
-	if itr.err != nil {
-		return nil, itr.err
-	}
-
-	// Wait until either a value is available in the buffer or
-	// the iterator is closed.
-	for !itr.done && !itr.buf.filled {
-		itr.cond.Wait()
-	}
-
-	// Return nil once the channel is done and the buffer is empty.
-	if itr.done && !itr.buf.filled {
-		return nil, nil
-	}
-
-	// Always read from the buffer if it exists, even if the iterator
-	// is closed. This prevents the last value from being truncated by
-	// the parent iterator.
-	p := &itr.buf.points[itr.buf.i]
-	itr.buf.i = (itr.buf.i + 1) % len(itr.buf.points)
-	itr.buf.filled = false
-	itr.cond.Signal()
 	return p, nil
 }
 
@@ -1350,218 +1271,7 @@ func (itr *{{$k.name}}Stream{{$v.Name}}Iterator) reduce() ([]{{$v.Name}}Point, e
 		return points, nil
 	}
 }
-
-// {{$k.name}}{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}ExprIterator executes a function to modify an existing point
-// for every output of the input iterator.
-type {{$k.name}}{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}ExprIterator struct {
-	left      *buf{{$k.Name}}Iterator
-	right     *buf{{$k.Name}}Iterator
-	fn        {{$k.name}}{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}ExprFunc
-	points    []{{$k.Name}}Point // must be size 2
-	storePrev bool
-}
-
-func new{{$k.Name}}{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}ExprIterator(left, right {{$k.Name}}Iterator, opt IteratorOptions, fn func(a, b {{$k.Type}}) {{$v.Type}}) *{{$k.name}}{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}ExprIterator {
-	var points []{{$k.Name}}Point
-	switch opt.Fill {
-	case influxql.NullFill, influxql.PreviousFill:
-		points = []{{$k.Name}}Point{ {Nil: true}, {Nil: true} }
-	case influxql.NumberFill:
-		value := castTo{{$k.Name}}(opt.FillValue)
-		points = []{{$k.Name}}Point{ {Value: value}, {Value: value} }
-	}
-	return &{{$k.name}}{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}ExprIterator{
-		left:      newBuf{{$k.Name}}Iterator(left),
-		right:     newBuf{{$k.Name}}Iterator(right),
-		points:    points,
-		fn:        fn,
-		storePrev: opt.Fill == influxql.PreviousFill,
-	}
-}
-
-func (itr *{{$k.name}}{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}ExprIterator) Stats() IteratorStats {
-	stats := itr.left.Stats()
-	stats.Add(itr.right.Stats())
-	return stats
-}
-
-func (itr *{{$k.name}}{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}ExprIterator) Close() error {
-	itr.left.Close()
-	itr.right.Close()
-	return nil
-}
-
-func (itr *{{$k.name}}{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}ExprIterator) Next() (*{{$v.Name}}Point, error) {
-	for {
-		a, b, err := itr.next()
-		if err != nil || (a == nil && b == nil) {
-			return nil, err
-		}
-
-		// If any of these are nil and we are using fill(none), skip these points.
-		if (a == nil || a.Nil || b == nil || b.Nil) && itr.points == nil {
-			continue
-		}
-
-		// If one of the two points is nil, we need to fill it with a fake nil
-		// point that has the same name, tags, and time as the other point.
-		// There should never be a time when both of these are nil.
-		if a == nil {
-			p := *b
-			a = &p
-			a.Value = {{$k.Nil}}
-			a.Nil = true
-		} else if b == nil {
-			p := *a
-			b = &p
-			b.Value = {{$k.Nil}}
-			b.Nil = true
-		}
-
-		// If a value is nil, use the fill values if the fill value is non-nil.
-		if a.Nil && !itr.points[0].Nil {
-			a.Value = itr.points[0].Value
-			a.Nil = false
-		}
-		if b.Nil && !itr.points[1].Nil {
-			b.Value = itr.points[1].Value
-			b.Nil = false
-		}
-
-		if itr.storePrev {
-			itr.points[0], itr.points[1] = *a, *b
-		}
-
-{{if eq $k.Name $v.Name}}
-		if a.Nil {
-			return a, nil
-		} else if b.Nil {
-			return b, nil
-		}
-		a.Value = itr.fn(a.Value, b.Value)
-		return a, nil
-{{else}}
-		p := &{{$v.Name}}Point{
-			Name: a.Name,
-			Tags: a.Tags,
-			Time: a.Time,
-			Nil:  a.Nil || b.Nil,
-			Aggregated: a.Aggregated,
-		}
-		if !p.Nil {
-			p.Value = itr.fn(a.Value, b.Value)
-		}
-		return p, nil
 {{end}}
-	}
-}
-
-// next returns the next points within each iterator. If the iterators are
-// uneven, it organizes them so only matching points are returned.
-func (itr *{{$k.name}}{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}ExprIterator) next() (a, b *{{$k.Name}}Point, err error) {
-	// Retrieve the next value for both the left and right.
-	a, err = itr.left.Next()
-	if err != nil {
-		return nil, nil, err
-	}
-	b, err = itr.right.Next()
-	if err != nil {
-		return nil, nil, err
-	}
-
-	// If we have a point from both, make sure that they match each other.
-	if a != nil && b != nil {
-		if a.Name > b.Name {
-			itr.left.unread(a)
-			return nil, b, nil
-		} else if a.Name < b.Name {
-			itr.right.unread(b)
-			return a, nil, nil
-		}
-
-		if ltags, rtags := a.Tags.ID(), b.Tags.ID(); ltags > rtags {
-			itr.left.unread(a)
-			return nil, b, nil
-		} else if ltags < rtags {
-			itr.right.unread(b)
-			return a, nil, nil
-		}
-
-		if a.Time > b.Time {
-			itr.left.unread(a)
-			return nil, b, nil
-		} else if a.Time < b.Time {
-			itr.right.unread(b)
-			return a, nil, nil
-		}
-	}
-	return a, b, nil
-}
-
-// {{$k.name}}{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}ExprFunc creates or modifies a point by combining two
-// points. The point passed in may be modified and returned rather than
-// allocating a new point if possible. One of the points may be nil, but at
-// least one of the points will be non-nil.
-type {{$k.name}}{{if ne $k.Name $v.Name}}{{$v.Name}}{{end}}ExprFunc func(a, b {{$k.Type}}) {{$v.Type}}
-{{end}}
-
-// {{$k.name}}TransformIterator executes a function to modify an existing point for every
-// output of the input iterator.
-type {{$k.name}}TransformIterator struct {
-	input {{$k.Name}}Iterator
-	fn    {{$k.name}}TransformFunc
-}
-
-// Stats returns stats from the input iterator.
-func (itr *{{$k.name}}TransformIterator) Stats() IteratorStats { return itr.input.Stats() }
-
-// Close closes the iterator and all child iterators.
-func (itr *{{$k.name}}TransformIterator) Close() error { return itr.input.Close() }
-
-// Next returns the minimum value for the next available interval.
-func (itr *{{$k.name}}TransformIterator) Next() (*{{$k.Name}}Point, error) {
-	p, err := itr.input.Next()
-	if err != nil {
-		return nil, err
-	} else if p != nil {
-		p = itr.fn(p)
-	}
-	return p, nil
-}
-
-// {{$k.name}}TransformFunc creates or modifies a point.
-// The point passed in may be modified and returned rather than allocating a
-// new point if possible.
-type {{$k.name}}TransformFunc func(p *{{$k.Name}}Point) *{{$k.Name}}Point
-
-// {{$k.name}}BoolTransformIterator executes a function to modify an existing point for every
-// output of the input iterator.
-type {{$k.name}}BoolTransformIterator struct {
-	input {{$k.Name}}Iterator
-	fn    {{$k.name}}BoolTransformFunc
-}
-
-// Stats returns stats from the input iterator.
-func (itr *{{$k.name}}BoolTransformIterator) Stats() IteratorStats { return itr.input.Stats() }
-
-// Close closes the iterator and all child iterators.
-func (itr *{{$k.name}}BoolTransformIterator) Close() error { return itr.input.Close() }
-
-// Next returns the minimum value for the next available interval.
-func (itr *{{$k.name}}BoolTransformIterator) Next() (*BooleanPoint, error) {
-	p, err := itr.input.Next()
-	if err != nil {
-		return nil, err
-	} else if p != nil {
-		return itr.fn(p), nil
-	}
-	return nil, nil
-}
-
-// {{$k.name}}BoolTransformFunc creates or modifies a point.
-// The point passed in may be modified and returned rather than allocating a
-// new point if possible.
-type {{$k.name}}BoolTransformFunc func(p *{{$k.Name}}Point) *BooleanPoint
 
 // {{$k.name}}DedupeIterator only outputs unique points.
 // This differs from the DistinctIterator in that it compares all aux fields too.
@@ -1573,19 +1283,16 @@ type {{$k.name}}DedupeIterator struct {
 }
 
 type {{$k.name}}IteratorMapper struct {
-	e         *Emitter
-	buf       []interface{}
+	cur       Cursor
+	row       Row
 	driver    IteratorMap   // which iterator to use for the primary value, can be nil
 	fields    []IteratorMap // which iterator to use for an aux field
 	point     {{$k.Name}}Point
 }
 
-func new{{$k.Name}}IteratorMapper(itrs []Iterator, driver IteratorMap, fields []IteratorMap, opt IteratorOptions) *{{$k.name}}IteratorMapper {
-	e := NewEmitter(itrs, opt.Ascending, 0)
-	e.OmitTime = true
+func new{{$k.Name}}IteratorMapper(cur Cursor, driver IteratorMap, fields []IteratorMap, opt IteratorOptions) *{{$k.name}}IteratorMapper {
 	return &{{$k.name}}IteratorMapper{
-		e:         e,
-		buf:       make([]interface{}, len(itrs)),
+		cur:       cur,
 		driver:    driver,
 		fields:    fields,
 		point:  {{$k.Name}}Point{
@@ -1595,18 +1302,20 @@ func new{{$k.Name}}IteratorMapper(itrs []Iterator, driver IteratorMap, fields []
 }
 
 func (itr *{{$k.name}}IteratorMapper) Next() (*{{$k.Name}}Point, error) {
-	t, name, tags, err := itr.e.loadBuf()
-	if err != nil || t == ZeroTime {
-		return nil, err
+	if !itr.cur.Scan(&itr.row) {
+		if err := itr.cur.Err(); err != nil {
+			return nil, err
+		}
+		return nil, nil
 	}
-	itr.point.Time = t
-	itr.point.Name = name
-	itr.point.Tags = tags
 
-	itr.e.readInto(t, name, tags, itr.buf)
+	itr.point.Time = itr.row.Time
+	itr.point.Name = itr.row.Series.Name
+	itr.point.Tags = itr.row.Series.Tags
+
 	if itr.driver != nil {
-	if v := itr.driver.Value(tags, itr.buf); v != nil {
-			if v, ok := v.({{$k.Type}}); ok {
+	if v := itr.driver.Value(&itr.row); v != nil {
+			if v, ok := castTo{{$k.Name}}(v); ok {
 				itr.point.Value = v
 				itr.point.Nil = false
 			} else {
@@ -1619,21 +1328,17 @@ func (itr *{{$k.name}}IteratorMapper) Next() (*{{$k.Name}}Point, error) {
 		}
 	}
 	for i, f := range itr.fields {
-		itr.point.Aux[i] = f.Value(tags, itr.buf)
+		itr.point.Aux[i] = f.Value(&itr.row)
 	}
 	return &itr.point, nil
 }
 
 func (itr *{{$k.name}}IteratorMapper) Stats() IteratorStats {
-	stats := IteratorStats{}
-	for _, itr := range itr.e.itrs {
-		stats.Add(itr.Stats())
-	}
-	return stats
+	return itr.cur.Stats()
 }
 
 func (itr *{{$k.name}}IteratorMapper) Close() error {
-	return itr.e.Close()
+	return itr.cur.Close()
 }
 
 type {{$k.name}}FilterIterator struct {

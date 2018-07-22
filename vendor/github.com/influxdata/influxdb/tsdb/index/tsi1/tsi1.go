@@ -3,11 +3,8 @@ package tsi1
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"io"
-	"os"
-	"runtime/debug"
 
 	"github.com/influxdata/influxdb/tsdb"
 )
@@ -498,15 +495,6 @@ func writeUint16To(w io.Writer, v uint16, n *int64) error {
 	return err
 }
 
-// writeUint32To writes write v into w using big endian encoding. Updates n.
-func writeUint32To(w io.Writer, v uint32, n *int64) error {
-	var buf [4]byte
-	binary.BigEndian.PutUint32(buf[:], v)
-	nn, err := w.Write(buf[:])
-	*n += int64(nn)
-	return err
-}
-
 // writeUint64To writes write v into w using big endian encoding. Updates n.
 func writeUint64To(w io.Writer, v uint64, n *int64) error {
 	var buf [8]byte
@@ -524,12 +512,6 @@ func writeUvarintTo(w io.Writer, v uint64, n *int64) error {
 	*n += int64(nn)
 	return err
 }
-
-type uint32Slice []uint32
-
-func (a uint32Slice) Len() int           { return len(a) }
-func (a uint32Slice) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a uint32Slice) Less(i, j int) bool { return a[i] < a[j] }
 
 type uint64Slice []uint64
 
@@ -550,9 +532,23 @@ func assert(condition bool, msg string, v ...interface{}) {
 	}
 }
 
-// hexdump is a helper for dumping binary data to stderr.
-func hexdump(data []byte) { os.Stderr.Write([]byte(hex.Dump(data))) }
-
-func stack() string {
-	return "------------------------\n" + string(debug.Stack()) + "------------------------\n\n"
+// uvarint is a wrapper around binary.Uvarint.
+// Returns a non-nil error when binary.Uvarint returns n <= 0 or n > len(data).
+func uvarint(data []byte) (value uint64, n int, err error) {
+	if len(data) < 1 {
+		err = io.ErrShortBuffer
+	} else if value, n = binary.Uvarint(data); n == 0 || n > len(data) {
+		err = io.ErrShortBuffer
+	} else if n < 0 {
+		err = fmt.Errorf("parsing binary-encoded uint64 value failed; binary.Uvarint() returned %d", n)
+	}
+	return
 }
+
+// hexdump is a helper for dumping binary data to stderr.
+// func hexdump(data []byte) { os.Stderr.Write([]byte(hex.Dump(data))) }
+
+// stack is a helper for dumping a stack trace.
+// func stack() string {
+// 	return "------------------------\n" + string(debug.Stack()) + "------------------------\n\n"
+// }

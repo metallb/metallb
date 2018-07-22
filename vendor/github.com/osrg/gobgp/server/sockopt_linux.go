@@ -32,10 +32,12 @@ const (
 type tcpmd5sig struct {
 	ss_family uint16
 	ss        [126]byte
-	pad1      uint16
-	keylen    uint16
-	pad2      uint32
-	key       [80]byte
+	// padding the struct
+	_      uint16
+	keylen uint16
+	// padding the struct
+	_   uint32
+	key [80]byte
 }
 
 func buildTcpMD5Sig(address string, key string) (tcpmd5sig, error) {
@@ -66,10 +68,11 @@ func setsockoptTcpMD5Sig(fd int, address string, key string) error {
 
 func SetTcpMD5SigSockopt(l *net.TCPListener, address string, key string) error {
 	fi, _, err := extractFileAndFamilyFromTCPListener(l)
-	defer fi.Close()
 	if err != nil {
 		return err
 	}
+	defer fi.Close()
+
 	return setsockoptTcpMD5Sig(int(fi.Fd()), address, key)
 }
 
@@ -85,19 +88,21 @@ func setsockoptIpTtl(fd int, family int, value int) error {
 
 func SetListenTcpTTLSockopt(l *net.TCPListener, ttl int) error {
 	fi, family, err := extractFileAndFamilyFromTCPListener(l)
-	defer fi.Close()
 	if err != nil {
 		return err
 	}
+	defer fi.Close()
+
 	return setsockoptIpTtl(int(fi.Fd()), family, ttl)
 }
 
 func SetTcpTTLSockopt(conn *net.TCPConn, ttl int) error {
 	fi, family, err := extractFileAndFamilyFromTCPConn(conn)
-	defer fi.Close()
 	if err != nil {
 		return err
 	}
+	defer fi.Close()
+
 	return setsockoptIpTtl(int(fi.Fd()), family, ttl)
 }
 
@@ -113,10 +118,11 @@ func setsockoptIpMinTtl(fd int, family int, value int) error {
 
 func SetTcpMinTTLSockopt(conn *net.TCPConn, ttl int) error {
 	fi, family, err := extractFileAndFamilyFromTCPConn(conn)
-	defer fi.Close()
 	if err != nil {
 		return err
 	}
+	defer fi.Close()
+
 	return setsockoptIpMinTtl(int(fi.Fd()), family, ttl)
 }
 

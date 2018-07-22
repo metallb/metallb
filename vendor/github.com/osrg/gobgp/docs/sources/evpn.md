@@ -12,6 +12,8 @@ still very experimental.
   - [Inclusive Multicast Ethernet Tag Route](#inclusive-multicast-ethernet-tag-route)
   - [Ethernet Segment Route](#ethernet-segment-route)
   - [IP Prefix Route](#ip-prefix-route)
+- [Reference](#reference)
+  - [Router's MAC Option](#routers-mac-option)
 - [BaGPipe](#bagpipe)
   - [Configuration](#configuration)
   - [Advertising EVPN route](#advertising-evpn-route)
@@ -149,7 +151,7 @@ $ gobgp global rib -a evpn del macadv aa:bb:cc:dd:ee:ff 10.0.0.1 esi AS 65000 10
 
 ```bash
 # Add a route
-$ gobgp global rib -a evpn add multicast <ip address> etag <etag> rd <rd> [rt <rt>...] [encap <encap type>]
+$ gobgp global rib -a evpn add multicast <ip address> etag <etag> rd <rd> [rt <rt>...] [encap <encap type>] [pmsi <type> [leaf-info-required] <label> <tunnel-id>]
 
 # Show routes
 $ gobgp global rib -a evpn [multicast]
@@ -169,11 +171,10 @@ $ gobgp global rib -a evpn
 $ gobgp global rib -a evpn del multicast 10.0.0.1 etag 100 rd 1.1.1.1:65000
 
 # With optionals
-$ gobgp global rib -a evpn add multicast 10.0.0.1 etag 100 rd 1.1.1.1:65000 rt 65000:200 encap vxlan
+$ gobgp global rib -a evpn add multicast 10.0.0.1 etag 100 rd 1.1.1.1:65000 rt 65000:200 encap vxlan pmsi ingress-repl 100 1.1.1.1
 $ gobgp global rib -a evpn multicast
    Network                                                   Labels     Next Hop             AS_PATH              Age        Attrs
-*> [type:multicast][rd:1.1.1.1:65000][etag:100][ip:10.0.0.1]            0.0.0.0                                   00:00:00   [{Origin: ?} {Extcomms: [65000:200], [VXLAN]}]
-$ gobgp global rib -a evpn del multicast 10.0.0.1 etag 100 rd 1.1.1.1:65000
+*> [type:multicast][rd:1.1.1.1:65000][etag:100][ip:10.0.0.1]            0.0.0.0                                   00:00:00   [{Origin: ?} {Pmsi: type: ingress-repl, label: 100, tunnel-id: 1.1.1.1} {Extcomms: [65000:200], [VXLAN]}]
 ```
 
 ### Ethernet Segment Route
@@ -238,6 +239,75 @@ $ gobgp global rib -a evpn prefix
 $ gobgp global rib -a evpn del prefix 10.0.0.0/24 172.16.0.1 esi MSTP aa:aa:aa:aa:aa:aa 100 etag 200 label 300 rd 1.1.1.1:65000
 ```
 
+## Reference
+
+### Router's MAC Option
+
+The `router-mac` option in `gobgp` CLI allows sending Router's
+MAC Extended Community via BGP EVPN Type 2 and Type 5 advertisements.
+
+As explained in below RFC draft, this community is used to carry the
+MAC address of the VTEP where MAC-IP pair resides.
+
+For example, GoBGP router (R1) peers with Cisco router (R2).
+R1 is used by an orchestraction platform, e.g. OpenStack, Docker Swarm,
+etc., to advertise container MAC-IP bindings. When R1 advertises the
+binding it also sets next hop for the route as the host where the MAC-IP
+binding (i.e. container) resides. When R2 receives the route, it will
+not install it unless Router's MAC Extended Community is present. R2
+will use the MAC address in the community to create an entry in MAC
+address table of R2 pointint to NVE interface.
+
+```bash
+gobgp global rib -a evpn add macadv e9:72:d7:aa:1f:b4 \
+    172.16.100.100 etag 0 label 34567 rd 10.1.1.1:100 \
+    rt 65001:100 encap vxlan nexthop 10.10.10.10 \
+    origin igp router-mac e9:72:d7:aa:1f:b4
+
+gobgp global rib -a evpn add nexthop 10.10.10.10 origin igp \
+    prefix 172.16.100.100/32 esi 0 etag 0 rd 10.1.1.1:100 \
+    rt 65001:100 gw 10.10.10.10 label 34567 encap vxlan \
+    router-mac e9:72:d7:aa:1f:b4
+```
+
+In the above example, a host with IP of `10.10.10.10` runs a
+container connected to an Open vSwitch instance. The container's IP
+address is `172.16.100.100` and MAC address `e9:72:d7:aa:1f:b4`.
+The Open vSwitch is VTEP with `tunnel_key=34567`, i.e. VNID `34567`.
+
+GoBGP (R1) and Cisco (R2) routers are in BGP AS 65001. R1's IP is
+`10.1.1.1`. R2 used RT of `65001:100` to import routes and place
+them into appropriate VRF. In this case the VRF is associated with
+L2VNI from VLAN 300. Upon the receipt of the above BGP EVPN
+Type 2 and Type 5 routes, R2 will create create a MAC address
+entry pointing to it's NVE interface with destination IP address
+of `10.10.10.10`.
+
+```bash
+Legend:
+        * - primary entry, G - Gateway MAC, (R) - Routed MAC, O - Overlay MAC
+        age - seconds since last seen,+ - primary entry using vPC Peer-Link,
+        (T) - True, (F) - False, C - ControlPlane MAC
+   VLAN     MAC Address      Type      age     Secure NTFY Ports
+---------+-----------------+--------+---------+------+----+------------------
+*  300     e972.d7aa.1fb4   static   -         F      F    nve1(10.10.10.10)
+```
+
+The R2 will use the `router-mac e9:72:d7:aa:1f:b4` as the destination MAC
+address of the inner VXLAN packet. For example, an underlay host `20.20.20.20`
+ping the container. The inner VXLAN L2 destination address is
+`e9:72:d7:aa:1f:b4`. The inner VXLAN L2 source address is R2's MAC. The outer
+VXLAN L3 source address, i.e. `10.2.2.2` is R2' NVE address.
+
+```bash
+OUTER VXLAN L2: 10:20:08:d0:ff:23 > b2:0e:19:6a:8d:51
+OUTER VXLAN L3: 10.2.2.2.45532 > 10.10.10.10.4789: VXLAN, flags [I] (0x08), vni 34567
+INNER VXLAN L2: 4e:f4:ca:aa:f6:7b > e9:72:d7:aa:1f:b4
+INNER VXLAN L3: 20.20.20.20 > 172.16.100.100: ICMP echo reply, id 66, seq 1267, length 64
+```
+
+See also: [Integrated Routing and Bridging in EVPN](https://tools.ietf.org/html/draft-ietf-bess-evpn-inter-subnet-forwarding-03#section-6.1)
+
 ## BaGPipe
 
 This example uses [BaGPipe](https://github.com/openstack/networking-bagpipe). GoBGP receives
@@ -254,7 +324,7 @@ Then the following example shows two OSS BGP implementations can interchange EVP
 
 Topology:
 
-```
+```text
            +------------+
            | GoBGP (RR) |
      +-----| AS 65000   |-----+
@@ -430,7 +500,7 @@ with eBGP and GoBGP interchanges EVPN routes from one YABGP peer to another.
 
 Topology:
 
-```
+```text
            +------------+
            | GoBGP      |
      +-----| AS 65254   |-----+
@@ -502,7 +572,7 @@ In the REST request, you need to specify the `Authorization` header is `admin/ad
 
 Request URL for sending UPDATE messages:
 
-```
+```text
 POST http://10.0.0.1:8801/v1/peer/10.0.0.254/send/update
 ```
 
@@ -609,6 +679,7 @@ curl -X POST -u admin:admin -H 'Content-Type: application/json' http://10.0.0.1:
     }
 }'
 ```
+
 EVPN type 4:
 
 ```bash

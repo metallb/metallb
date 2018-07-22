@@ -10,6 +10,7 @@ Dynamic Neighbor enables GoBGP to accept connections from the peers in specific 
 - [Verification](#verification)
 
 ## Prerequisite
+
 Assumed that you finished [Getting Started](getting-started.md) and learned [Peer Group](peer-group.md).
 
 ## Configuration
@@ -44,9 +45,10 @@ and the `sample-group` configuration is used as the configuration of members of 
 Note that GoBGP will be passive mode to members of dynamic neighbors.
 So if both peers listen to each other as dynamic neighbors, the connection will never be established.
 
-# Verification
+## Verification
 
 Dynamic neighbors are not shown by `gobgp neighbor` command until the connection is established.
+
 ```shell
 $ gobgp neighbor
 Peer AS Up/Down State       |#Received  Accepted
@@ -66,7 +68,7 @@ BGP neighbor is 172.40.1.3, remote AS 65002
   BGP OutQ = 0, Flops = 0
   Hold time is 90, keepalive interval is 30 seconds
   Configured hold time is 90, keepalive interval is 30 seconds
-  
+
   Neighbor capabilities:
     multiprotocol:
         ipv4-unicast:	advertised and received

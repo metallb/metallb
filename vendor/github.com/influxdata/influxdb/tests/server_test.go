@@ -1,20 +1,27 @@
 package tests
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"os"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
+	"github.com/golang/snappy"
+	"github.com/google/go-cmp/cmp"
 	"github.com/influxdata/influxdb/coordinator"
 	"github.com/influxdata/influxdb/models"
+	"github.com/influxdata/influxdb/prometheus/remote"
 	"github.com/influxdata/influxdb/tsdb"
 )
 
@@ -24,7 +31,14 @@ var benchServer Server
 func TestMain(m *testing.M) {
 	flag.BoolVar(&verboseServerLogs, "vv", false, "Turn on very verbose server logging.")
 	flag.BoolVar(&cleanupData, "clean", true, "Clean up test data on disk.")
+	flag.Int64Var(&seed, "seed", 0, "Set specific seed controlling randomness.")
 	flag.Parse()
+
+	// Set random seed if not explicitly set.
+	if seed == 0 {
+		seed = time.Now().UnixNano()
+	}
+	rand.Seed(seed)
 
 	var r int
 	for _, indexType = range tsdb.RegisteredIndexes() {
@@ -102,7 +116,7 @@ func TestServer_Query_DropAndRecreateDatabase(t *testing.T) {
 
 	test := tests.load(t, "drop_and_recreate_database")
 
-	if err := s.CreateDatabaseAndRetentionPolicy(test.database(), newRetentionPolicySpec(test.retentionPolicy(), 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy(test.database(), NewRetentionPolicySpec(test.retentionPolicy(), 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -132,10 +146,10 @@ func TestServer_Query_DropDatabaseIsolated(t *testing.T) {
 
 	test := tests.load(t, "drop_database_isolated")
 
-	if err := s.CreateDatabaseAndRetentionPolicy(test.database(), newRetentionPolicySpec(test.retentionPolicy(), 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy(test.database(), NewRetentionPolicySpec(test.retentionPolicy(), 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateDatabaseAndRetentionPolicy("db1", newRetentionPolicySpec("rp1", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db1", NewRetentionPolicySpec("rp1", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -165,7 +179,7 @@ func TestServer_Query_DeleteSeries(t *testing.T) {
 
 	test := tests.load(t, "delete_series_time")
 
-	if err := s.CreateDatabaseAndRetentionPolicy(test.database(), newRetentionPolicySpec(test.retentionPolicy(), 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy(test.database(), NewRetentionPolicySpec(test.retentionPolicy(), 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -194,7 +208,7 @@ func TestServer_Query_DeleteSeries_TagFilter(t *testing.T) {
 
 	test := tests.load(t, "delete_series_time_tag_filter")
 
-	if err := s.CreateDatabaseAndRetentionPolicy(test.database(), newRetentionPolicySpec(test.retentionPolicy(), 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy(test.database(), NewRetentionPolicySpec(test.retentionPolicy(), 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -224,7 +238,7 @@ func TestServer_Query_DropAndRecreateSeries(t *testing.T) {
 
 	test := tests.load(t, "drop_and_recreate_series")
 
-	if err := s.CreateDatabaseAndRetentionPolicy(test.database(), newRetentionPolicySpec(test.retentionPolicy(), 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy(test.database(), NewRetentionPolicySpec(test.retentionPolicy(), 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -275,7 +289,7 @@ func TestServer_Query_DropSeriesFromRegex(t *testing.T) {
 
 	test := tests.load(t, "drop_series_from_regex")
 
-	if err := s.CreateDatabaseAndRetentionPolicy(test.database(), newRetentionPolicySpec(test.retentionPolicy(), 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy(test.database(), NewRetentionPolicySpec(test.retentionPolicy(), 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -567,7 +581,7 @@ func TestServer_Write_FieldTypeConflict(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -618,7 +632,7 @@ func TestServer_Write_LineProtocol_Float(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 1*time.Hour), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 1*time.Hour), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -643,7 +657,7 @@ func TestServer_Write_LineProtocol_Bool(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 1*time.Hour), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 1*time.Hour), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -668,7 +682,7 @@ func TestServer_Write_LineProtocol_String(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 1*time.Hour), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 1*time.Hour), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -693,7 +707,7 @@ func TestServer_Write_LineProtocol_Integer(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 1*time.Hour), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 1*time.Hour), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -718,7 +732,7 @@ func TestServer_Write_LineProtocol_Unsigned(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 1*time.Hour), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 1*time.Hour), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -744,7 +758,7 @@ func TestServer_Write_LineProtocol_Partial(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 1*time.Hour), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 1*time.Hour), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3086,7 +3100,7 @@ func TestServer_Query_MergeMany(t *testing.T) {
 	defer s.Close()
 
 	// set infinite retention policy as we are inserting data in the past and don't want retention policy enforcement to make this test racy
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3147,7 +3161,7 @@ func TestServer_Query_SLimitAndSOffset(t *testing.T) {
 	defer s.Close()
 
 	// set infinite retention policy as we are inserting data in the past and don't want retention policy enforcement to make this test racy
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -3204,7 +3218,7 @@ func TestServer_Query_Regex(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4200,7 +4214,7 @@ func TestServer_Query_Aggregates_Math(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4267,7 +4281,7 @@ func TestServer_Query_AggregateSelectors(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4579,7 +4593,7 @@ func TestServer_Query_ExactTimeRange(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4634,7 +4648,7 @@ func TestServer_Query_Selectors(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4713,7 +4727,7 @@ func TestServer_Query_TopBottomInt(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -4967,7 +4981,7 @@ func TestServer_Query_TopBottomWriteTags(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -5036,7 +5050,7 @@ func TestServer_Query_Aggregates_IdenticalTime(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -5102,7 +5116,7 @@ func TestServer_Query_GroupByTimeCutoffs(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -5182,7 +5196,7 @@ func TestServer_Query_MapType(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -5258,7 +5272,7 @@ func TestServer_Query_Subqueries(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -5419,7 +5433,7 @@ func TestServer_Query_SubqueryWithGroupBy(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -5491,7 +5505,7 @@ func TestServer_Query_SubqueryMath(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -5537,7 +5551,7 @@ func TestServer_Query_PercentileDerivative(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -5562,13 +5576,12 @@ func TestServer_Query_PercentileDerivative(t *testing.T) {
 		},
 	}...)
 
-	for i, query := range test.queries {
+	if err := test.init(s); err != nil {
+		t.Fatalf("test init failed: %s", err)
+	}
+
+	for _, query := range test.queries {
 		t.Run(query.name, func(t *testing.T) {
-			if i == 0 {
-				if err := test.init(s); err != nil {
-					t.Fatalf("test init failed: %s", err)
-				}
-			}
 			if query.skip {
 				t.Skipf("SKIP:: %s", query.name)
 			}
@@ -5586,7 +5599,7 @@ func TestServer_Query_UnderscoreMeasurement(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -5607,13 +5620,12 @@ func TestServer_Query_UnderscoreMeasurement(t *testing.T) {
 		},
 	}...)
 
-	for i, query := range test.queries {
+	if err := test.init(s); err != nil {
+		t.Fatalf("test init failed: %s", err)
+	}
+
+	for _, query := range test.queries {
 		t.Run(query.name, func(t *testing.T) {
-			if i == 0 {
-				if err := test.init(s); err != nil {
-					t.Fatalf("test init failed: %s", err)
-				}
-			}
 			if query.skip {
 				t.Skipf("SKIP:: %s", query.name)
 			}
@@ -5631,7 +5643,7 @@ func TestServer_Write_Precision(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -5746,7 +5758,7 @@ func TestServer_Query_Wildcards(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -5864,7 +5876,7 @@ func TestServer_Query_WildcardExpansion(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -5942,7 +5954,7 @@ func TestServer_Query_AcrossShardsAndFields(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -6014,7 +6026,7 @@ func TestServer_Query_OrderedAcrossShards(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -6082,7 +6094,7 @@ func TestServer_Query_Where_Fields(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -6302,7 +6314,7 @@ func TestServer_Query_Where_With_Tags(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -6383,7 +6395,7 @@ func TestServer_Query_With_EmptyTags(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -6484,7 +6496,7 @@ func TestServer_Query_LimitAndOffset(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -6599,7 +6611,7 @@ func TestServer_Query_Fill(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -6704,7 +6716,7 @@ func TestServer_Query_ImplicitFill(t *testing.T) {
 	s := OpenServer(config)
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -6758,7 +6770,7 @@ func TestServer_Query_TimeZone(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -6854,7 +6866,7 @@ func TestServer_Query_Chunk(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -6906,10 +6918,10 @@ func TestServer_Query_DropAndRecreateMeasurement(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
-	if err := s.CreateDatabaseAndRetentionPolicy("db1", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db1", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -7068,7 +7080,7 @@ func TestServer_Query_ShowQueries_Future(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -7139,7 +7151,7 @@ func TestServer_Query_ShowSeries(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -7274,7 +7286,7 @@ func TestServer_Query_ShowSeriesCardinalityEstimation(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -7344,7 +7356,7 @@ func TestServer_Query_ShowSeriesExactCardinality(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -7480,7 +7492,7 @@ func TestServer_Query_ShowStats(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -7522,7 +7534,7 @@ func TestServer_Query_ShowMeasurements(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -7643,7 +7655,7 @@ func TestServer_Query_ShowMeasurementCardinalityEstimation(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -7712,7 +7724,7 @@ func TestServer_Query_ShowMeasurementExactCardinality(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -7830,7 +7842,7 @@ func TestServer_Query_ShowTagKeys(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -7942,7 +7954,7 @@ func TestServer_Query_ShowTagValues(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -8094,6 +8106,24 @@ func TestServer_Query_ShowTagValues(t *testing.T) {
 			exp:     `{"results":[{"statement_id":0,"series":[{"name":"cpu","columns":["key","value"],"values":[["host","server01"],["host","server02"]]},{"name":"gpu","columns":["key","value"],"values":[["host","server02"],["host","server03"]]}]}]}`,
 			params:  url.Values{"db": []string{"db0"}},
 		},
+		&Query{
+			name:    "show tag values with value filter",
+			command: "SHOW TAG VALUES WITH KEY = host WHERE value = 'server03'",
+			exp:     `{"results":[{"statement_id":0,"series":[{"name":"disk","columns":["key","value"],"values":[["host","server03"]]},{"name":"gpu","columns":["key","value"],"values":[["host","server03"]]}]}]}`,
+			params:  url.Values{"db": []string{"db0"}},
+		},
+		&Query{
+			name:    "show tag values with no matching value filter",
+			command: "SHOW TAG VALUES WITH KEY = host WHERE value = 'no_such_value'",
+			exp:     `{"results":[{"statement_id":0}]}`,
+			params:  url.Values{"db": []string{"db0"}},
+		},
+		&Query{
+			name:    "show tag values with non-string value filter",
+			command: "SHOW TAG VALUES WITH KEY = host WHERE value = 5000",
+			exp:     `{"results":[{"statement_id":0}]}`,
+			params:  url.Values{"db": []string{"db0"}},
+		},
 	}...)
 
 	var once sync.Once
@@ -8121,7 +8151,7 @@ func TestServer_Query_ShowTagKeyCardinality(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -8321,7 +8351,7 @@ func TestServer_Query_ShowFieldKeys(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -8385,7 +8415,7 @@ func TestServer_Query_ShowFieldKeyCardinality(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -8467,7 +8497,7 @@ func TestServer_ContinuousQuery(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -8588,7 +8618,7 @@ func TestServer_ContinuousQuery_Deadlock(t *testing.T) {
 		s.Close()
 	}()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -8659,7 +8689,7 @@ func TestServer_Query_EvilIdentifiers(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -8701,7 +8731,7 @@ func TestServer_Query_OrderByTime(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -8779,7 +8809,7 @@ func TestServer_Query_FieldWithMultiplePeriods(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -8830,7 +8860,7 @@ func TestServer_Query_FieldWithMultiplePeriodsMeasurementPrefixMatch(t *testing.
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -8881,7 +8911,7 @@ func TestServer_Query_IntoTarget(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -8938,7 +8968,7 @@ func TestServer_Query_IntoTarget_Sparse(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -8997,7 +9027,7 @@ func TestServer_Query_DuplicateMeasurements(t *testing.T) {
 	defer s.Close()
 
 	// Create a second database.
-	if err := s.CreateDatabaseAndRetentionPolicy("db1", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db1", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -9098,7 +9128,7 @@ func TestServer_Query_DotProduct(t *testing.T) {
 	defer s.Close()
 
 	// Create a second database.
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -9152,7 +9182,10 @@ func TestServer_ConcurrentPointsWriter_Subscriber(t *testing.T) {
 	}
 	// goroutine to write points
 	done := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		for {
 			select {
 			case <-done:
@@ -9170,6 +9203,7 @@ func TestServer_ConcurrentPointsWriter_Subscriber(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 
 	close(done)
+	wg.Wait()
 }
 
 // Ensure time in where clause is inclusive
@@ -9178,7 +9212,7 @@ func TestServer_WhereTimeInclusive(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -9286,7 +9320,7 @@ func TestServer_Query_ImplicitEndTime(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -9341,7 +9375,7 @@ func TestServer_Query_Sample_Wildcard(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -9386,7 +9420,7 @@ func TestServer_Query_Sample_LimitOffset(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -9446,7 +9480,7 @@ func TestServer_NestedAggregateWithMathPanics(t *testing.T) {
 	s := OpenServer(NewConfig())
 	defer s.Close()
 
-	if err := s.CreateDatabaseAndRetentionPolicy("db0", newRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
 		t.Fatal(err)
 	}
 
@@ -9480,6 +9514,199 @@ func TestServer_NestedAggregateWithMathPanics(t *testing.T) {
 
 	for _, query := range test.queries {
 		t.Run(query.name, func(t *testing.T) {
+			if query.skip {
+				t.Skipf("SKIP:: %s", query.name)
+			}
+			if err := query.Execute(s); err != nil {
+				t.Error(query.Error(err))
+			} else if !query.success() {
+				t.Error(query.failureMessage())
+			}
+		})
+	}
+}
+
+func TestServer_Prometheus_Read(t *testing.T) {
+	t.Parallel()
+	s := OpenServer(NewConfig())
+	defer s.Close()
+
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+		t.Fatal(err)
+	}
+
+	writes := []string{
+		`mem,host=server-1,region=west value=2.34 119000000000`,
+		`mem,host=server-1,region=west value=988.0 119500000000`,
+		`mem,host=server-1,region=south value=121.2 120000000000`,
+		`mem,host=server-2,region=east value=1.1 120000000000`,
+		`cpu,region=south value=200 119000000000`,
+		`mem,host=server-1,region=north value=10.00 121000000000`,
+	}
+
+	test := NewTest("db0", "rp0")
+	test.writes = Writes{
+		&Write{data: strings.Join(writes, "\n")},
+	}
+
+	if err := test.init(s); err != nil {
+		t.Fatalf("test init failed: %s", err)
+	}
+
+	req := &remote.ReadRequest{
+		Queries: []*remote.Query{{
+			Matchers: []*remote.LabelMatcher{
+				{
+					Type:  remote.MatchType_EQUAL,
+					Name:  "__name__",
+					Value: "mem",
+				},
+				// TODO(edd): awaiting negation bugfix in tsdb.IndexSet.
+				// {
+				// 	Type: remote.MatchType_NOT_EQUAL,
+				// 	Name: "host",
+				// 	Value: "server-2",
+				// },
+				{
+					Type:  remote.MatchType_REGEX_MATCH,
+					Name:  "host",
+					Value: "server-1$",
+				},
+				// TODO(edd): awaiting negation bugfix in tsdb.IndexSet.
+				// {
+				// 	Type: remote.MatchType_REGEX_NO_MATCH,
+				// 	Name: "region",
+				// 	Value: "south",
+				// },
+			},
+			StartTimestampMs: 119000,
+			EndTimestampMs:   120010,
+		}},
+	}
+	data, err := proto.Marshal(req)
+	if err != nil {
+		t.Fatal("couldn't marshal prometheus request")
+	}
+	compressed := snappy.Encode(nil, data)
+	b := bytes.NewReader(compressed)
+
+	resp, err := http.Post(s.URL()+"/api/v1/prom/read?db=db0&rp=rp0", "", b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected status: %d. Body: %s", resp.StatusCode, MustReadAll(resp.Body))
+	}
+
+	reqBuf, err := snappy.Decode(nil, MustReadAll(resp.Body))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var promResp remote.ReadResponse
+	if err := proto.Unmarshal(reqBuf, &promResp); err != nil {
+		t.Fatal(err.Error())
+	}
+
+	expResults := []*remote.QueryResult{
+		{
+			Timeseries: []*remote.TimeSeries{
+				{
+					Labels: []*remote.LabelPair{
+						{Name: "host", Value: "server-1"},
+						{Name: "region", Value: "south"},
+					},
+					Samples: []*remote.Sample{
+						{TimestampMs: 120000, Value: 121.2},
+					},
+				},
+				{
+					Labels: []*remote.LabelPair{
+						{Name: "host", Value: "server-1"},
+						{Name: "region", Value: "west"},
+					},
+					Samples: []*remote.Sample{
+						{TimestampMs: 119000, Value: 2.34},
+						{TimestampMs: 119500, Value: 988.00},
+					},
+				},
+			},
+		},
+	}
+
+	if !reflect.DeepEqual(promResp.Results, expResults) {
+		t.Fatalf("Results differ:\n%v", cmp.Diff(expResults, promResp.Results))
+	}
+}
+
+func TestServer_Prometheus_Write(t *testing.T) {
+	t.Parallel()
+	s := OpenServer(NewConfig())
+	defer s.Close()
+
+	if err := s.CreateDatabaseAndRetentionPolicy("db0", NewRetentionPolicySpec("rp0", 1, 0), true); err != nil {
+		t.Fatal(err)
+	}
+
+	test := NewTest("db0", "rp0")
+	now := now().Round(time.Millisecond)
+	test.addQueries(
+		&Query{
+			name:    "selecting the data should return it",
+			command: `SELECT * FROM db0.rp0.cpu`,
+			exp:     fmt.Sprintf(`{"results":[{"statement_id":0,"series":[{"name":"cpu","columns":["time","__name__","host","value"],"values":[["%s","cpu","a",100],["%s","cpu","b",200]]}]}]}`, now.Format(time.RFC3339Nano), now.Add(10*time.Millisecond).Format(time.RFC3339Nano)),
+		},
+	)
+
+	req := &remote.WriteRequest{
+		Timeseries: []*remote.TimeSeries{
+			{
+				Labels: []*remote.LabelPair{
+					{Name: "__name__", Value: "cpu"},
+					{Name: "host", Value: "a"},
+				},
+				Samples: []*remote.Sample{
+					{TimestampMs: now.UnixNano() / int64(time.Millisecond), Value: 100.0},
+				},
+			},
+			{
+				Labels: []*remote.LabelPair{
+					{Name: "__name__", Value: "cpu"},
+					{Name: "host", Value: "b"},
+				},
+				Samples: []*remote.Sample{
+					{TimestampMs: now.UnixNano()/int64(time.Millisecond) + 10, Value: 200.0},
+				},
+			},
+		},
+	}
+
+	data, err := proto.Marshal(req)
+	if err != nil {
+		t.Fatal("couldn't marshal prometheus request")
+	}
+	compressed := snappy.Encode(nil, data)
+	b := bytes.NewReader(compressed)
+
+	resp, err := http.Post(s.URL()+"/api/v1/prom/write?db=db0&rp=rp0", "", b)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusNoContent {
+		t.Fatalf("unexpected status: %d. Body: %s", resp.StatusCode, MustReadAll(resp.Body))
+	}
+
+	for i, query := range test.queries {
+		t.Run(query.name, func(t *testing.T) {
+			if i == 0 {
+				if err := test.init(s); err != nil {
+					t.Fatalf("test init failed: %s", err)
+				}
+			}
 			if query.skip {
 				t.Skipf("SKIP:: %s", query.name)
 			}

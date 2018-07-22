@@ -1,11 +1,11 @@
-# What's this?
+# What's this
 
 This script is a spell checker for GoBGP's source codes.
 
 ## Requirements
 
 - [scspell3k](https://pypi.python.org/pypi/scspell3k): Spell checker for
-source code written in Python.
+  source code written in Python.
 
   ```bash
   pip install scspell3k
@@ -13,7 +13,7 @@ source code written in Python.
 
 ## How to use
 
-Just run `scspell.sh `
+Just run `scspell.sh`.
 
 ```bash
 bash tools/spell-check/scspell.sh

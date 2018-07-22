@@ -18,8 +18,9 @@ package config
 
 import (
 	"fmt"
-	"github.com/vishvananda/netlink"
 	"net"
+
+	"github.com/vishvananda/netlink"
 )
 
 func GetIPv6LinkLocalNeighborAddress(ifname string) (string, error) {
@@ -40,7 +41,7 @@ func GetIPv6LinkLocalNeighborAddress(ifname string) (string, error) {
 		}
 		if neigh.State&netlink.NUD_FAILED == 0 && neigh.IP.IsLinkLocalUnicast() && !local {
 			addr = neigh.IP
-			cnt += 1
+			cnt++
 		}
 	}
 
@@ -51,4 +52,21 @@ func GetIPv6LinkLocalNeighborAddress(ifname string) (string, error) {
 	}
 
 	return fmt.Sprintf("%s%%%s", addr, ifname), nil
+}
+
+func isLocalLinkLocalAddress(ifindex int, addr net.IP) (bool, error) {
+	ifi, err := net.InterfaceByIndex(ifindex)
+	if err != nil {
+		return false, err
+	}
+	addrs, err := ifi.Addrs()
+	if err != nil {
+		return false, err
+	}
+	for _, a := range addrs {
+		if ip, _, _ := net.ParseCIDR(a.String()); addr.Equal(ip) {
+			return true, nil
+		}
+	}
+	return false, nil
 }

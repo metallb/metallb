@@ -37,7 +37,6 @@ var globalOpts struct {
 	CaFile       string
 }
 
-var cmds []string
 var client *cli.Client
 
 func NewRootCmd() *cobra.Command {

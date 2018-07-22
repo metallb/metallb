@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"context"
 	"errors"
 
 	"github.com/influxdata/influxdb/tsdb"
@@ -68,37 +67,27 @@ func (c *{{.name}}FilterBatchCursor) Next() (key []int64, value []{{.Type}}) {
 
 type {{.name}}MultiShardBatchCursor struct {
 	tsdb.{{.Name}}BatchCursor
-	ctx    context.Context
+	cursorContext
 	filter *{{.name}}FilterBatchCursor
-	shards []*tsdb.Shard
-	req    *tsdb.CursorRequest
-	err    error
-	limit  uint64
-	count  uint64
 }
 
-func new{{.Name}}MultiShardBatchCursor(ctx context.Context, cur tsdb.{{.Name}}BatchCursor, rr *readRequest, req *tsdb.CursorRequest, shards []*tsdb.Shard, cond expression) *{{.name}}MultiShardBatchCursor {
-	var filter *{{.name}}FilterBatchCursor
+func (c *{{.name}}MultiShardBatchCursor) reset(cur tsdb.{{.Name}}BatchCursor, itrs tsdb.CursorIterators, cond expression) {
 	if cond != nil {
-		filter = new{{.Name}}FilterBatchCursor(cond)
-		filter.reset(cur)
-		cur = filter
+		if c.filter == nil {
+			c.filter = new{{.Name}}FilterBatchCursor(cond)
+		}
+		c.filter.reset(cur)
+		cur = c.filter
 	}
 
-	c := &{{.name}}MultiShardBatchCursor{
-		{{.Name}}BatchCursor: cur,
-		ctx:    ctx,
-		filter: filter,
-		req:    req,
-		shards: shards,
-		limit:  rr.limit,
-	}
-
-	return c
+	c.{{.Name}}BatchCursor = cur
+	c.itrs = itrs
+	c.err = nil
+	c.count = 0
 }
+
 
 func (c *{{.name}}MultiShardBatchCursor) Err() error        { return c.err }
-func (c *{{.name}}MultiShardBatchCursor) SeriesKey() string { return c.req.Series }
 
 func (c *{{.name}}MultiShardBatchCursor) Next() (key []int64, value []{{.Type}}) {
 	for {
@@ -108,11 +97,11 @@ func (c *{{.name}}MultiShardBatchCursor) Next() (key []int64, value []{{.Type}})
 				continue
 			}
 		}
-		c.count += uint64(len(ks))
+		c.count += int64(len(ks))
 		if c.count > c.limit {
 			diff := c.count - c.limit
 			c.count -= diff
-			rem := uint64(len(ks)) - diff
+			rem := int64(len(ks)) - diff
 			ks = ks[:rem]
 			vs = vs[:rem]
 		}
@@ -121,17 +110,17 @@ func (c *{{.name}}MultiShardBatchCursor) Next() (key []int64, value []{{.Type}})
 }
 
 func (c *{{.name}}MultiShardBatchCursor) nextBatchCursor() bool {
-	if len(c.shards) == 0 {
+	if len(c.itrs) == 0 {
 		return false
 	}
 
 	c.{{.Name}}BatchCursor.Close()
 
-	var shard *tsdb.Shard
+	var itr tsdb.CursorIterator
 	var cur tsdb.Cursor
-	for cur == nil && len(c.shards) > 0 {
-		shard, c.shards = c.shards[0], c.shards[1:]
-		cur, _ = shard.CreateCursor(c.ctx, c.req)
+	for cur == nil && len(c.itrs) > 0 {
+		itr, c.itrs = c.itrs[0], c.itrs[1:]
+		cur, _ = itr.Next(c.ctx, c.req)
 	}
 
 	var ok bool
@@ -141,7 +130,7 @@ func (c *{{.name}}MultiShardBatchCursor) nextBatchCursor() bool {
 		if !ok {
 			cur.Close()
 			next = {{.Name}}EmptyBatchCursor
-			c.shards = nil
+			c.itrs = nil
 			c.err = errors.New("expected {{.name}} cursor")
 		} else {
 			if c.filter != nil {
@@ -161,6 +150,8 @@ func (c *{{.name}}MultiShardBatchCursor) nextBatchCursor() bool {
 
 type {{.name}}SumBatchCursor struct {
 	tsdb.{{.Name}}BatchCursor
+	ts [1]int64
+	vs [1]{{.Type}}
 }
 
 func (c *{{.name}}SumBatchCursor) Next() (key []int64, value []{{.Type}}) {
@@ -178,7 +169,9 @@ func (c *{{.name}}SumBatchCursor) Next() (key []int64, value []{{.Type}}) {
     	}
 		ks, vs = c.{{.Name}}BatchCursor.Next()
     	if len(ks) == 0 {
-    		return []int64{ts}, []{{.Type}}{acc}
+			c.ts[0] = ts
+			c.vs[0] = acc
+			return c.ts[:], c.vs[:]
     	}
 	}
 }
@@ -212,7 +205,6 @@ var {{.Name}}EmptyBatchCursor tsdb.{{.Name}}BatchCursor = &{{.name}}EmptyBatchCu
 
 func (*{{.name}}EmptyBatchCursor) Err() error { return nil }
 func (*{{.name}}EmptyBatchCursor) Close() {}
-func (*{{.name}}EmptyBatchCursor) SeriesKey() string { return "" }
 func (*{{.name}}EmptyBatchCursor) Next() (key []int64, value []{{.Type}}) { return nil, nil }
 
 {{end}}

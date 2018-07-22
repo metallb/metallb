@@ -10,6 +10,8 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     ruby \
     ruby-dev \
     rubygems \
+    autoconf \
+    libtool \
     build-essential \
     rpm \
     zip \
@@ -20,9 +22,9 @@ RUN gem install fpm
 
 # Install go
 ENV GOPATH /root/go
-ENV GO_VERSION 1.9.2
+ENV GO_VERSION 1.10.3
 ENV GO_ARCH 386
-RUN wget https://storage.googleapis.com/golang/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz && \
+RUN wget --no-verbose https://storage.googleapis.com/golang/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz && \
    tar -C /usr/local/ -xf /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz && \
    rm /go${GO_VERSION}.linux-${GO_ARCH}.tar.gz
 ENV PATH /usr/local/go/bin:$PATH

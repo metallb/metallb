@@ -4,15 +4,16 @@ GoBGP supports [BGP Monitoring Protocol (RFC 7854)](https://tools.ietf.org/html/
 
 ## Prerequisites
 
-Assume you finished [Getting Started](https://github.com/osrg/gobgp/blob/master/docs/sources/getting-started.md).
+Assume you finished [Getting Started](getting-started.md).
 
 ## Contents
-- [Configuration](#config)
-- [Verification](#verify)
 
-## <a name="config"> Configuration
+- [Configuration](#configuration)
+- [Verification](#verification)
 
-Add `[bmp-servers]` session to enable BMP. 
+## Configuration
+
+Add `[bmp-servers]` session to enable BMP.
 
 ```toml
 [global.config]
@@ -26,6 +27,7 @@ Add `[bmp-servers]` session to enable BMP.
 ```
 
 The supported route monitoring policy types are:
+
 - pre-policy (Default)
 - post-policy
 - both (Obsoleted)
@@ -75,13 +77,14 @@ Please note this option is mainly for debugging purpose.
     route-mirroring-enabled = true
 ```
 
-## <a name="verify"> Verification
+## Verification
 
 Let's check if BMP works with a bmp server. GoBGP also supports BMP server (currently, just shows received BMP messages in the json format).
 
 ```bash
 $ go get github.com/osrg/gobgp/gobmpd
 $ gobmpd
+...(snip)...
 ```
 
 Once the BMP server accepts a connection from gobgpd, then you see

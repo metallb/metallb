@@ -1,6 +1,6 @@
 language: go
 go:
-  - 1.x
+  - "1.x"
 os:
   - linux
 sudo: required

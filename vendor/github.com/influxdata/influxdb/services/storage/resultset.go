@@ -11,22 +11,37 @@ type readRequest struct {
 	ctx        context.Context
 	start, end int64
 	asc        bool
-	limit      uint64
+	limit      int64
 	aggregate  *Aggregate
 }
 
-type ResultSet struct {
+type multiShardCursors interface {
+	createCursor(row seriesRow) tsdb.Cursor
+	newAggregateCursor(ctx context.Context, agg *Aggregate, cursor tsdb.Cursor) tsdb.Cursor
+}
+
+type resultSet struct {
 	req readRequest
 	cur seriesCursor
 	row seriesRow
+	mb  multiShardCursors
 }
 
-func (r *ResultSet) Close() {
-	r.row.shards = nil
+// Close closes the result set. Close is idempotent.
+func (r *resultSet) Close() {
+	if r == nil {
+		return // Nothing to do.
+	}
+	r.row.query = nil
 	r.cur.Close()
 }
 
-func (r *ResultSet) Next() bool {
+// Next returns true if there are more results available.
+func (r *resultSet) Next() bool {
+	if r == nil {
+		return false
+	}
+
 	row := r.cur.Next()
 	if row == nil {
 		return false
@@ -37,14 +52,14 @@ func (r *ResultSet) Next() bool {
 	return true
 }
 
-func (r *ResultSet) Cursor() tsdb.Cursor {
-	cur := newMultiShardBatchCursor(r.req.ctx, r.row, &r.req)
+func (r *resultSet) Cursor() tsdb.Cursor {
+	cur := r.mb.createCursor(r.row)
 	if r.req.aggregate != nil {
-		cur = newAggregateBatchCursor(r.req.ctx, r.req.aggregate, cur)
+		cur = r.mb.newAggregateCursor(r.req.ctx, r.req.aggregate, cur)
 	}
 	return cur
 }
 
-func (r *ResultSet) Tags() models.Tags {
+func (r *resultSet) Tags() models.Tags {
 	return r.row.tags
 }

@@ -36,7 +36,6 @@ import (
 	"encoding/json"
 	"strings"
 
-	api "github.com/osrg/gobgp/api"
 	"github.com/osrg/gobgp/gobgp/cmd"
 	"github.com/osrg/gobgp/packet/bgp"
 )
@@ -53,18 +52,19 @@ func get_route_family(input *C.char) C.int {
 //export serialize_path
 func serialize_path(rf C.int, input *C.char) *C.path {
 	args := strings.Split(C.GoString(input), " ")
-	pp, err := cmd.ParsePath(bgp.RouteFamily(rf), args)
+	p, err := cmd.ParsePath(bgp.RouteFamily(rf), args)
 	if err != nil {
 		return nil
 	}
 	path := C.new_path()
-	p := api.ToPathApi(pp)
-	if len(p.Nlri) > 0 {
-		path.nlri.len = C.int(len(p.Nlri))
-		path.nlri.value = C.CString(string(p.Nlri))
+	if nlri := p.GetNlri(); nlri != nil {
+		buf, _ := nlri.Serialize()
+		path.nlri.len = C.int(len(buf))
+		path.nlri.value = C.CString(string(buf))
 	}
-	for _, attr := range p.Pattrs {
-		C.append_path_attribute(path, C.int(len(attr)), C.CString(string(attr)))
+	for _, attr := range p.GetPathAttrs() {
+		buf, _ := attr.Serialize()
+		C.append_path_attribute(path, C.int(len(buf)), C.CString(string(buf)))
 	}
 	return path
 }

@@ -74,6 +74,16 @@ func NewLeaderElector(lec LeaderElectionConfig) (*LeaderElector, error) {
 	if lec.RenewDeadline <= time.Duration(JitterFactor*float64(lec.RetryPeriod)) {
 		return nil, fmt.Errorf("renewDeadline must be greater than retryPeriod*JitterFactor")
 	}
+	if lec.LeaseDuration < 1 {
+		return nil, fmt.Errorf("leaseDuration must be greater than zero")
+	}
+	if lec.RenewDeadline < 1 {
+		return nil, fmt.Errorf("renewDeadline must be greater than zero")
+	}
+	if lec.RetryPeriod < 1 {
+		return nil, fmt.Errorf("retryPeriod must be greater than zero")
+	}
+
 	if lec.Lock == nil {
 		return nil, fmt.Errorf("Lock must not be nil.")
 	}
@@ -171,11 +181,11 @@ func (le *LeaderElector) IsLeader() bool {
 // acquire loops calling tryAcquireOrRenew and returns immediately when tryAcquireOrRenew succeeds.
 func (le *LeaderElector) acquire() {
 	stop := make(chan struct{})
-	glog.Infof("attempting to acquire leader lease...")
+	desc := le.config.Lock.Describe()
+	glog.Infof("attempting to acquire leader lease  %v...", desc)
 	wait.JitterUntil(func() {
 		succeeded := le.tryAcquireOrRenew()
 		le.maybeReportTransition()
-		desc := le.config.Lock.Describe()
 		if !succeeded {
 			glog.V(4).Infof("failed to acquire lease %v", desc)
 			return

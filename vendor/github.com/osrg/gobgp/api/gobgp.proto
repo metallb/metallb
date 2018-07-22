@@ -21,6 +21,8 @@
 
 syntax = "proto3";
 
+import "google/protobuf/any.proto";
+
 package gobgpapi;
 
 // Interface exported by the server.
@@ -31,6 +33,7 @@ service GobgpApi {
   rpc GetServer(GetServerRequest) returns (GetServerResponse) {}
   rpc AddNeighbor(AddNeighborRequest) returns (AddNeighborResponse) {}
   rpc DeleteNeighbor(DeleteNeighborRequest) returns (DeleteNeighborResponse) {}
+  rpc UpdateNeighbor(UpdateNeighborRequest) returns (UpdateNeighborResponse) {}
   rpc GetNeighbor(GetNeighborRequest) returns (GetNeighborResponse) {}
   rpc ResetNeighbor(ResetNeighborRequest) returns (ResetNeighborResponse) {}
   rpc SoftResetNeighbor(SoftResetNeighborRequest) returns (SoftResetNeighborResponse) {}
@@ -73,16 +76,23 @@ service GobgpApi {
   rpc AddPolicy(AddPolicyRequest) returns (AddPolicyResponse) {}
   rpc DeletePolicy(DeletePolicyRequest) returns (DeletePolicyResponse) {}
   rpc ReplacePolicy(ReplacePolicyRequest) returns (ReplacePolicyResponse) {}
+  rpc UpdatePolicy(UpdatePolicyRequest) returns (UpdatePolicyResponse) {}
   rpc GetPolicyAssignment(GetPolicyAssignmentRequest) returns (GetPolicyAssignmentResponse) {}
   rpc AddPolicyAssignment(AddPolicyAssignmentRequest) returns (AddPolicyAssignmentResponse) {}
   rpc DeletePolicyAssignment(DeletePolicyAssignmentRequest) returns (DeletePolicyAssignmentResponse) {}
   rpc ReplacePolicyAssignment(ReplacePolicyAssignmentRequest) returns (ReplacePolicyAssignmentResponse) {}
   rpc GetRibInfo(GetRibInfoRequest) returns (GetRibInfoResponse) {}
+  rpc AddPeerGroup(AddPeerGroupRequest) returns (AddPeerGroupResponse) {}
+  rpc DeletePeerGroup(DeletePeerGroupRequest) returns (DeletePeerGroupResponse) {}
+  rpc UpdatePeerGroup(UpdatePeerGroupRequest) returns (UpdatePeerGroupResponse) {}
+  rpc AddDynamicNeighbor(AddDynamicNeighborRequest) returns (AddDynamicNeighborResponse) {}
+  rpc AddCollector(AddCollectorRequest) returns (AddCollectorResponse) {}
+  rpc Shutdown(ShutdownRequest) returns (ShutdownResponse) {}
 }
 
 // Constants for address families
 enum Family {
-  _ = 0;
+  RESERVED = 0;
   IPv4 = 65537;
   IPv6 = 131073;
   IPv4_MC = 65538;
@@ -119,6 +129,7 @@ message Arguments {
   Resource resource = 1;
   uint32 family = 2;
   string name = 3;
+  bool current = 4;
 }
 
 message AddPathRequest {
@@ -154,6 +165,50 @@ message DeleteNeighborRequest {
 }
 
 message DeleteNeighborResponse {
+}
+
+message UpdateNeighborRequest {
+  Peer peer = 1;
+  // Calls SoftResetIn after updating the neighbor configuration if needed.
+  bool do_soft_reset_in = 2;
+}
+
+message UpdateNeighborResponse {
+  // Indicates whether calling SoftResetIn is required due to this update. If
+  // "true" is set, the client should call SoftResetIn manually. If
+  // "do_soft_reset_in = true" is set in the request, always returned with
+  // "false".
+  bool needs_soft_reset_in = 1;
+}
+
+message AddPeerGroupRequest {
+  PeerGroup peer_group = 1;
+}
+
+message AddPeerGroupResponse {
+}
+
+message DeletePeerGroupRequest {
+  PeerGroup peer_group = 1;
+}
+
+message DeletePeerGroupResponse {
+}
+
+message UpdatePeerGroupRequest {
+  PeerGroup peer_group = 1;
+  bool do_soft_reset_in = 2;
+}
+
+message UpdatePeerGroupResponse {
+  bool needs_soft_reset_in = 1;
+}
+
+message AddDynamicNeighborRequest {
+  DynamicNeighbor dynamic_neighbor = 1;
+}
+
+message AddDynamicNeighborResponse {
 }
 
 message ResetNeighborRequest {
@@ -198,6 +253,14 @@ message DisableNeighborRequest {
 }
 
 message DisableNeighborResponse {
+}
+
+message UpdatePolicyRequest {
+  repeated DefinedSet sets = 1;
+  repeated Policy policies = 2;
+}
+
+message UpdatePolicyResponse {
 }
 
 message EnableMrtRequest {
@@ -568,6 +631,24 @@ message Path {
   bool is_nexthop_invalid = 17;
   uint32 identifier = 18;
   uint32 local_identifier = 19;
+  // One of the following defined in "api/attribute.proto":
+  // - IPAddressPrefix
+  // - LabeledIPAddressPrefix
+  // - EncapsulationNLRI
+  // - EVPNEthernetAutoDiscoveryRoute
+  // - EVPNMACIPAdvertisementRoute
+  // - EVPNInclusiveMulticastEthernetTagRoute
+  // - EVPNEthernetSegmentRoute
+  // - EVPNIPPrefixRoute
+  // - LabeledVPNIPAddressPrefix
+  // - RouteTargetMembershipNLRI
+  // - FlowSpecNLRI
+  // - VPNFlowSpecNLRI
+  // - OpaqueNLRI
+  google.protobuf.Any any_nlri = 20;
+  // Each attribute must be one of *Attribute defined in
+  // "api/attribute.proto".
+  repeated google.protobuf.Any any_pattrs = 21;
 }
 
 message Destination {
@@ -640,6 +721,29 @@ message Peer {
   AddPaths add_paths = 12;
 }
 
+message PeerGroup {
+  // Note: Regarding to the consistency with OpenConfig model, a list of
+  // address family should be removed from here, and should be configured with
+  // the list of AfiSafi instead.
+  repeated uint32 families = 1;
+  ApplyPolicy apply_policy = 2;
+  PeerGroupConf conf = 3;
+  EbgpMultihop ebgp_multihop = 4;
+  RouteReflector route_reflector = 5;
+  PeerGroupState info = 6;
+  Timers timers = 7;
+  Transport transport = 8;
+  RouteServer route_server = 9;
+  GracefulRestart graceful_restart = 10;
+  repeated AfiSafi afi_safis = 11;
+  AddPaths add_paths = 12;
+}
+
+message DynamicNeighbor {
+  string prefix = 1;
+  string peer_group = 2;
+}
+
 message ApplyPolicy {
   PolicyAssignment in_policy = 1;
   PolicyAssignment export_policy = 2;
@@ -668,8 +772,10 @@ message PeerConf {
   RemovePrivateAs remove_private_as = 8;
   bool route_flap_damping = 9;
   uint32 send_community = 10;
-  repeated bytes remote_cap = 11;
-  repeated bytes local_cap = 12;
+  // Each attribute must be one of *Capability defined in
+  // "api/capability.proto".
+  repeated google.protobuf.Any remote_cap = 11;
+  repeated google.protobuf.Any local_cap = 12;
   string id = 13;
   // Note: Regarding to the consistency with OpenConfig model, list of
   // PrefixLimit should be removed from here, and list of PrefixLimit in
@@ -680,6 +786,42 @@ message PeerConf {
   string vrf = 17;
   uint32 allow_own_as = 18;
   bool replace_peer_as = 19;
+}
+
+message PeerGroupConf {
+  string auth_password = 1;
+  string description = 2;
+  uint32 local_as = 3;
+  uint32 peer_as = 5;
+  string peer_group_name = 6;
+  uint32 peer_type = 7;
+  enum RemovePrivateAs {
+      NONE = 0;
+      ALL = 1;
+      REPLACE = 2;
+  }
+  RemovePrivateAs remove_private_as = 8;
+  bool route_flap_damping = 9;
+  uint32 send_community = 10;
+}
+
+message PeerGroupState {
+  string auth_password = 1;
+  string description = 2;
+  uint32 local_as = 3;
+  uint32 peer_as = 5;
+  string peer_group_name = 6;
+  uint32 peer_type = 7;
+  enum RemovePrivateAs {
+      NONE = 0;
+      ALL = 1;
+      REPLACE = 2;
+  }
+  RemovePrivateAs remove_private_as = 8;
+  bool route_flap_damping = 9;
+  uint32 send_community = 10;
+  uint32 total_paths = 11;
+  uint32 total_prefixes = 12;
 }
 
 message EbgpMultihop {
@@ -784,6 +926,11 @@ message GracefulRestart {
   uint32 deferral_time = 4;
   bool notification_enabled = 5;
   bool longlived_enabled = 6;
+  uint32 stale_routes_time = 7;
+  uint32 peer_restart_time = 8;
+  bool peer_restarting = 9;
+  bool local_restarting = 10;
+  string mode = 11;
 }
 
 message MpGracefulRestartConfig {
@@ -821,6 +968,7 @@ message RouteSelectionOptionsConfig {
   bool advertise_inactive_routes = 4;
   bool enable_aigp = 5;
   bool ignore_next_hop_igp_metric = 6;
+  bool disable_best_path_selection = 7;
 }
 
 message RouteSelectionOptionsState {
@@ -830,6 +978,7 @@ message RouteSelectionOptionsState {
   bool advertise_inactive_routes = 4;
   bool enable_aigp = 5;
   bool ignore_next_hop_igp_metric = 6;
+  bool disable_best_path_selection = 7;
 }
 
 message RouteSelectionOptions {
@@ -964,6 +1113,7 @@ enum DefinedType {
   COMMUNITY = 4;
   EXT_COMMUNITY = 5;
   LARGE_COMMUNITY = 6;
+  NEXT_HOP = 7;
 }
 
 message DefinedSet {
@@ -1011,6 +1161,8 @@ message Conditions {
   }
   RouteType route_type = 8;
   MatchSet large_community_set = 9;
+  repeated string next_hop_in_list = 10;
+  repeated Family afi_safi_in = 11;
 }
 
 enum RouteAction {
@@ -1091,6 +1243,11 @@ message PolicyAssignment {
   RouteAction default = 5;
 }
 
+message RoutingPolicy {
+  repeated DefinedSet defined_set = 1;
+  repeated Policy policy_definition = 2;
+}
+
 message Roa {
   uint32 as = 1;
   uint32 prefixlen = 2;
@@ -1109,10 +1266,27 @@ message GetRoaResponse {
 
 message Vrf {
   string name = 1;
-  bytes rd = 2;
-  repeated bytes import_rt = 3;
-  repeated bytes export_rt = 4;
+  // Route Distinguisher must be one of
+  // RouteDistinguisherTwoOctetAS,
+  // RouteDistinguisherIPAddressAS,
+  // or RouteDistinguisherFourOctetAS.
+  google.protobuf.Any rd = 2;
+  // List of the Import Route Targets. Each must be one of
+  // TwoOctetAsSpecificExtended,
+  // IPv4AddressSpecificExtended,
+  // or FourOctetAsSpecificExtended.
+  repeated google.protobuf.Any import_rt = 3;
+  // List of the Export Route Targets. Each must be one of
+  // TwoOctetAsSpecificExtended,
+  // IPv4AddressSpecificExtended,
+  // or FourOctetAsSpecificExtended.
+  repeated google.protobuf.Any export_rt = 4;
   uint32 id = 5;
+}
+
+message DefaultRouteDistance {
+  uint32 external_route_distance = 1;
+  uint32 internal_route_distance = 2;
 }
 
 message Global {
@@ -1122,6 +1296,17 @@ message Global {
   repeated string listen_addresses = 4;
   repeated uint32 families = 5;
   bool use_multiple_paths = 6;
+  RouteSelectionOptionsConfig route_selection_options = 7;
+  DefaultRouteDistance default_route_distance = 8;
+  Confederation confederation = 9;
+  GracefulRestart graceful_restart = 10;
+  ApplyPolicy apply_policy = 11;
+}
+
+message Confederation {
+  bool enabled = 1;
+  uint32 identifier = 2;
+  repeated uint32 member_as_list = 3;
 }
 
 message TableInfo {
@@ -1139,4 +1324,19 @@ message GetRibInfoRequest {
 
 message GetRibInfoResponse {
     TableInfo info = 1;
+}
+
+message AddCollectorRequest {
+  string url = 1;
+  string db_name = 2;
+  uint64 table_dump_interval = 3;
+}
+
+message AddCollectorResponse {
+}
+
+message ShutdownRequest{
+}
+
+message ShutdownResponse{
 }

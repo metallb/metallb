@@ -198,8 +198,11 @@ func (cli *Client) DeleteNeighbor(c *config.Neighbor) error {
 	return err
 }
 
-//func (cli *Client) UpdateNeighbor(c *config.Neighbor) (bool, error) {
-//}
+func (cli *Client) UpdateNeighbor(c *config.Neighbor, doSoftResetIn bool) (bool, error) {
+	peer := api.NewPeerFromConfigStruct(c)
+	response, err := cli.cli.UpdateNeighbor(context.Background(), &api.UpdateNeighborRequest{Peer: peer, DoSoftResetIn: doSoftResetIn})
+	return response.NeedsSoftResetIn, err
+}
 
 func (cli *Client) ShutdownNeighbor(addr, communication string) error {
 	_, err := cli.cli.ShutdownNeighbor(context.Background(), &api.ShutdownNeighborRequest{Address: addr, Communication: communication})
@@ -354,7 +357,7 @@ type AddPathByStreamClient struct {
 func (c *AddPathByStreamClient) Send(paths ...*table.Path) error {
 	ps := make([]*api.Path, 0, len(paths))
 	for _, p := range paths {
-		ps = append(ps, api.ToPathApi(p))
+		ps = append(ps, api.ToPathApiInBin(p, nil))
 	}
 	return c.stream.Send(&api.InjectMrtRequest{
 		Resource: api.Resource_GLOBAL,
@@ -385,7 +388,7 @@ func (cli *Client) addPath(vrfID string, pathList []*table.Path) ([]byte, error)
 		r, err := cli.cli.AddPath(context.Background(), &api.AddPathRequest{
 			Resource: resource,
 			VrfId:    vrfID,
-			Path:     api.ToPathApi(path),
+			Path:     api.ToPathApi(path, nil),
 		})
 		if err != nil {
 			return nil, err
@@ -416,21 +419,10 @@ func (cli *Client) deletePath(uuid []byte, f bgp.RouteFamily, vrfID string, path
 	switch {
 	case len(pathList) != 0:
 		for _, path := range pathList {
-			nlri := path.GetNlri()
-			n, err := nlri.Serialize()
-			if err != nil {
-				return err
-			}
-			p := &api.Path{
-				Nlri:            n,
-				Family:          uint32(path.GetRouteFamily()),
-				Identifier:      nlri.PathIdentifier(),
-				LocalIdentifier: nlri.PathLocalIdentifier(),
-			}
 			reqs = append(reqs, &api.DeletePathRequest{
 				Resource: resource,
 				VrfId:    vrfID,
-				Path:     p,
+				Path:     api.ToPathApi(path, nil),
 			})
 		}
 	default:
@@ -469,83 +461,25 @@ func (cli *Client) DeletePathByFamily(family bgp.RouteFamily) error {
 	return cli.deletePath(nil, family, "", nil)
 }
 
-func (cli *Client) GetVRF() ([]*table.Vrf, error) {
+func (cli *Client) GetVRF() ([]*api.Vrf, error) {
 	ret, err := cli.cli.GetVrf(context.Background(), &api.GetVrfRequest{})
 	if err != nil {
 		return nil, err
 	}
-	var vrfs []*table.Vrf
-
-	f := func(bufs [][]byte) ([]bgp.ExtendedCommunityInterface, error) {
-		ret := make([]bgp.ExtendedCommunityInterface, 0, len(bufs))
-		for _, rt := range bufs {
-			r, err := bgp.ParseExtended(rt)
-			if err != nil {
-				return nil, err
-			}
-			ret = append(ret, r)
-		}
-		return ret, nil
-	}
-
-	for _, vrf := range ret.Vrfs {
-		importRT, err := f(vrf.ImportRt)
-		if err != nil {
-			return nil, err
-		}
-		exportRT, err := f(vrf.ExportRt)
-		if err != nil {
-			return nil, err
-		}
-		vrfs = append(vrfs, &table.Vrf{
-			Name:     vrf.Name,
-			Id:       vrf.Id,
-			Rd:       bgp.GetRouteDistinguisher(vrf.Rd),
-			ImportRt: importRT,
-			ExportRt: exportRT,
-		})
-	}
-
-	return vrfs, nil
+	return ret.Vrfs, nil
 }
 
 func (cli *Client) AddVRF(name string, id int, rd bgp.RouteDistinguisherInterface, im, ex []bgp.ExtendedCommunityInterface) error {
-	buf, err := rd.Serialize()
-	if err != nil {
-		return err
-	}
-
-	f := func(comms []bgp.ExtendedCommunityInterface) ([][]byte, error) {
-		var bufs [][]byte
-		for _, c := range comms {
-			buf, err := c.Serialize()
-			if err != nil {
-				return nil, err
-			}
-			bufs = append(bufs, buf)
-		}
-		return bufs, err
-	}
-
-	importRT, err := f(im)
-	if err != nil {
-		return err
-	}
-	exportRT, err := f(ex)
-	if err != nil {
-		return err
-	}
-
 	arg := &api.AddVrfRequest{
 		Vrf: &api.Vrf{
 			Name:     name,
-			Rd:       buf,
+			Rd:       api.MarshalRD(rd),
 			Id:       uint32(id),
-			ImportRt: importRT,
-			ExportRt: exportRT,
+			ImportRt: api.MarshalRTs(im),
+			ExportRt: api.MarshalRTs(ex),
 		},
 	}
-	_, err = cli.cli.AddVrf(context.Background(), arg)
+	_, err := cli.cli.AddVrf(context.Background(), arg)
 	return err
 }
 
@@ -718,8 +652,6 @@ func (cli *Client) ReplacePolicy(t *table.Policy, refer, preserve bool) error {
 func (cli *Client) getPolicyAssignment(name string, dir table.PolicyDirection) (*table.PolicyAssignment, error) {
 	var typ api.PolicyType
 	switch dir {
-	case table.POLICY_DIRECTION_IN:
-		typ = api.PolicyType_IN
 	case table.POLICY_DIRECTION_IMPORT:
 		typ = api.PolicyType_IMPORT
 	case table.POLICY_DIRECTION_EXPORT:
@@ -770,10 +702,6 @@ func (cli *Client) GetExportPolicy() (*table.PolicyAssignment, error) {
 	return cli.getPolicyAssignment("", table.POLICY_DIRECTION_EXPORT)
 }
 
-func (cli *Client) GetRouteServerInPolicy(name string) (*table.PolicyAssignment, error) {
-	return cli.getPolicyAssignment(name, table.POLICY_DIRECTION_IN)
-}
-
 func (cli *Client) GetRouteServerImportPolicy(name string) (*table.PolicyAssignment, error) {
 	return cli.getPolicyAssignment(name, table.POLICY_DIRECTION_IMPORT)
 }
@@ -818,7 +746,9 @@ func (cli *Client) GetRPKI() ([]*config.RpkiServer, error) {
 	}
 	servers := make([]*config.RpkiServer, 0, len(rsp.Servers))
 	for _, s := range rsp.Servers {
-		port, err := strconv.Atoi(s.Conf.RemotePort)
+		// Note: RpkiServerConfig.Port is uint32 type, but the TCP/UDP port is
+		// 16-bit length.
+		port, err := strconv.ParseUint(s.Conf.RemotePort, 10, 16)
 		if err != nil {
 			return nil, err
 		}
@@ -865,7 +795,7 @@ func (cli *Client) GetROA(family bgp.RouteFamily) ([]*table.ROA, error) {
 	if err != nil {
 		return nil, err
 	}
-	return api.NewROAListFromApiStructList(rsp.Roas), nil
+	return api.NewROAListFromApiStructList(rsp.Roas)
 }
 
 func (cli *Client) AddRPKIServer(address string, port, lifetime int) error {
@@ -993,16 +923,10 @@ func (c *MonitorNeighborStateClient) Recv() (*config.Neighbor, error) {
 	return api.NewNeighborFromAPIStruct(p)
 }
 
-func (cli *Client) MonitorNeighborState(names ...string) (*MonitorNeighborStateClient, error) {
-	if len(names) > 1 {
-		return nil, fmt.Errorf("support one name at most: %d", len(names))
-	}
-	name := ""
-	if len(names) > 0 {
-		name = names[0]
-	}
+func (cli *Client) MonitorNeighborState(name string, current bool) (*MonitorNeighborStateClient, error) {
 	stream, err := cli.cli.MonitorPeerState(context.Background(), &api.Arguments{
-		Name: name,
+		Name:    name,
+		Current: current,
 	})
 	if err != nil {
 		return nil, err

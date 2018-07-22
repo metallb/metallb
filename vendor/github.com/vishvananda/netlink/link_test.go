@@ -185,17 +185,20 @@ func testLinkAddDel(t *testing.T, link Link) {
 		}
 	}
 
-	if _, ok := link.(*Gretap); ok {
-		_, ok := result.(*Gretap)
+	if gretap, ok := link.(*Gretap); ok {
+		other, ok := result.(*Gretap)
 		if !ok {
 			t.Fatal("Result of create is not a Gretap")
 		}
+		compareGretap(t, gretap, other)
 	}
-	if _, ok := link.(*Gretun); ok {
-		_, ok := result.(*Gretun)
+
+	if gretun, ok := link.(*Gretun); ok {
+		other, ok := result.(*Gretun)
 		if !ok {
 			t.Fatal("Result of create is not a Gretun")
 		}
+		compareGretun(t, gretun, other)
 	}
 
 	if err = LinkDel(link); err != nil {
@@ -211,6 +214,131 @@ func testLinkAddDel(t *testing.T, link Link) {
 		if l.Attrs().Name == link.Attrs().Name {
 			t.Fatal("Link not removed properly")
 		}
+	}
+}
+
+func compareGretap(t *testing.T, expected, actual *Gretap) {
+	if actual.IKey != expected.IKey {
+		t.Fatal("Gretap.IKey doesn't match")
+	}
+
+	if actual.OKey != expected.OKey {
+		t.Fatal("Gretap.OKey doesn't match")
+	}
+
+	if actual.EncapSport != expected.EncapSport {
+		t.Fatal("Gretap.EncapSport doesn't match")
+	}
+
+	if actual.EncapDport != expected.EncapDport {
+		t.Fatal("Gretap.EncapDport doesn't match")
+	}
+
+	if expected.Local != nil && !actual.Local.Equal(expected.Local) {
+		t.Fatal("Gretap.Local doesn't match")
+	}
+
+	if expected.Remote != nil && !actual.Remote.Equal(expected.Remote) {
+		t.Fatal("Gretap.Remote doesn't match")
+	}
+
+	if actual.IFlags != expected.IFlags {
+		t.Fatal("Gretap.IFlags doesn't match")
+	}
+
+	if actual.OFlags != expected.OFlags {
+		t.Fatal("Gretap.OFlags doesn't match")
+	}
+
+	if actual.PMtuDisc != expected.PMtuDisc {
+		t.Fatal("Gretap.PMtuDisc doesn't match")
+	}
+
+	if actual.Ttl != expected.Ttl {
+		t.Fatal("Gretap.Ttl doesn't match")
+	}
+
+	if actual.Tos != expected.Tos {
+		t.Fatal("Gretap.Tos doesn't match")
+	}
+
+	if actual.EncapType != expected.EncapType {
+		t.Fatal("Gretap.EncapType doesn't match")
+	}
+
+	if actual.EncapFlags != expected.EncapFlags {
+		t.Fatal("Gretap.EncapFlags doesn't match")
+	}
+
+	if actual.Link != expected.Link {
+		t.Fatal("Gretap.Link doesn't match")
+	}
+
+	/*
+		 * NOTE: setting the FlowBased flag doesn't seem to work, but by lack of
+		 * a proper way to debug this, this test is disabled for now
+
+		 if actual.FlowBased != expected.FlowBased {
+			t.Fatal("Gretap.FlowBased doesn't match")
+		 }
+	*/
+}
+
+func compareGretun(t *testing.T, expected, actual *Gretun) {
+	if actual.Link != expected.Link {
+		t.Fatal("Gretun.Link doesn't match")
+	}
+
+	if actual.IFlags != expected.IFlags {
+		t.Fatal("Gretun.IFlags doesn't match")
+	}
+
+	if actual.OFlags != expected.OFlags {
+		t.Fatal("Gretun.OFlags doesn't match")
+	}
+
+	if actual.IKey != expected.IKey {
+		t.Fatal("Gretun.IKey doesn't match")
+	}
+
+	if actual.OKey != expected.OKey {
+		t.Fatal("Gretun.OKey doesn't match")
+	}
+
+	if expected.Local != nil && !actual.Local.Equal(expected.Local) {
+		t.Fatal("Gretun.Local doesn't match")
+	}
+
+	if expected.Remote != nil && !actual.Remote.Equal(expected.Remote) {
+		t.Fatal("Gretun.Remote doesn't match")
+	}
+
+	if actual.Ttl != expected.Ttl {
+		t.Fatal("Gretun.Ttl doesn't match")
+	}
+
+	if actual.Tos != expected.Tos {
+		t.Fatal("Gretun.Tos doesn't match")
+	}
+
+	if actual.PMtuDisc != expected.PMtuDisc {
+		t.Fatal("Gretun.PMtuDisc doesn't match")
+	}
+
+	if actual.EncapType != expected.EncapType {
+		t.Fatal("Gretun.EncapType doesn't match")
+	}
+
+	if actual.EncapFlags != expected.EncapFlags {
+		t.Fatal("Gretun.EncapFlags doesn't match")
+	}
+
+	if actual.EncapSport != expected.EncapSport {
+		t.Fatal("Gretun.EncapSport doesn't match")
+	}
+
+	if actual.EncapDport != expected.EncapDport {
+		t.Fatal("Gretun.EncapDport doesn't match")
 	}
 }
 
@@ -314,12 +442,19 @@ func TestLinkAddDelGretap(t *testing.T) {
 	defer tearDown()
 
 	testLinkAddDel(t, &Gretap{
-		LinkAttrs: LinkAttrs{Name: "foo"},
+		LinkAttrs: LinkAttrs{Name: "foo4"},
 		IKey:      0x101,
 		OKey:      0x101,
 		PMtuDisc:  1,
 		Local:     net.IPv4(127, 0, 0, 1),
 		Remote:    net.IPv4(127, 0, 0, 1)})
+
+	testLinkAddDel(t, &Gretap{
+		LinkAttrs: LinkAttrs{Name: "foo6"},
+		IKey:      0x101,
+		OKey:      0x101,
+		Local:     net.ParseIP("2001:db8:abcd::1"),
+		Remote:    net.ParseIP("2001:db8:ef33::2")})
 }
 
 func TestLinkAddDelGretun(t *testing.T) {
@@ -327,9 +462,14 @@ func TestLinkAddDelGretun(t *testing.T) {
 	defer tearDown()
 
 	testLinkAddDel(t, &Gretun{
-		LinkAttrs: LinkAttrs{Name: "foo"},
+		LinkAttrs: LinkAttrs{Name: "foo4"},
 		Local:     net.IPv4(127, 0, 0, 1),
 		Remote:    net.IPv4(127, 0, 0, 1)})
+
+	testLinkAddDel(t, &Gretun{
+		LinkAttrs: LinkAttrs{Name: "foo6"},
+		Local:     net.ParseIP("2001:db8:abcd::1"),
+		Remote:    net.ParseIP("2001:db8:ef33::2")})
 }
 
 func TestLinkAddDelGretunPointToMultiPoint(t *testing.T) {
@@ -341,10 +481,15 @@ func TestLinkAddDelGretunPointToMultiPoint(t *testing.T) {
 		Local:     net.IPv4(127, 0, 0, 1),
 		IKey:      1234,
 		OKey:      1234})
+
+	testLinkAddDel(t, &Gretun{
+		LinkAttrs: LinkAttrs{Name: "foo6"},
+		Local:     net.ParseIP("2001:db8:1234::4"),
+		IKey:      5678,
+		OKey:      7890})
 }
 
 func TestLinkAddDelGretapFlowBased(t *testing.T) {
-	t.Skip("Fails with \"link_test.go:29: numerical result out of range\". Need to investigate.")
 	minKernelRequired(t, 4, 3)
 
 	tearDown := setUpNetlinkTest(t)
@@ -1173,6 +1318,59 @@ func TestLinkSubscribeAt(t *testing.T) {
 	}
 }
 
+func TestLinkSubscribeListExisting(t *testing.T) {
+	skipUnlessRoot(t)
+
+	// Create an handle on a custom netns
+	newNs, err := netns.New()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer newNs.Close()
+
+	nh, err := NewHandleAt(newNs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer nh.Delete()
+
+	link := &Veth{LinkAttrs{Name: "test", TxQLen: testTxQLen, MTU: 1400}, "bar"}
+	if err := nh.LinkAdd(link); err != nil {
+		t.Fatal(err)
+	}
+
+	// Subscribe for Link events on the custom netns
+	ch := make(chan LinkUpdate)
+	done := make(chan struct{})
+	defer close(done)
+	if err := LinkSubscribeWithOptions(ch, done, LinkSubscribeOptions{
+		Namespace:    &newNs,
+		ListExisting: true},
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	if !expectLinkUpdate(ch, "test", false) {
+		t.Fatal("Add update not received as expected")
+	}
+
+	if err := nh.LinkSetUp(link); err != nil {
+		t.Fatal(err)
+	}
+
+	if !expectLinkUpdate(ch, "test", true) {
+		t.Fatal("Link Up update not received as expected")
+	}
+
+	if err := nh.LinkDel(link); err != nil {
+		t.Fatal(err)
+	}
+
+	if !expectLinkUpdate(ch, "test", false) {
+		t.Fatal("Del update not received as expected")
+	}
+}
+
 func TestLinkStats(t *testing.T) {
 	defer setUpNetlinkTest(t)()
 
@@ -1284,6 +1482,13 @@ func TestLinkAddDelVti(t *testing.T) {
 		OKey:      0x101,
 		Local:     net.IPv4(127, 0, 0, 1),
 		Remote:    net.IPv4(127, 0, 0, 1)})
+
+	testLinkAddDel(t, &Vti{
+		LinkAttrs: LinkAttrs{Name: "vtibar"},
+		IKey:      0x101,
+		OKey:      0x101,
+		Local:     net.IPv6loopback,
+		Remote:    net.IPv6loopback})
 }
 
 func TestBridgeCreationWithMulticastSnooping(t *testing.T) {
@@ -1669,5 +1874,62 @@ func TestLinkSetBondSlave(t *testing.T) {
 
 	if slaveTwoLink.Attrs().MasterIndex != bondLink.Attrs().Index {
 		t.Errorf("For %s expected %s to be master", slaveTwoLink.Attrs().Name, bondLink.Attrs().Name)
+	}
+}
+
+func TestLinkSetAllmulticast(t *testing.T) {
+	tearDown := setUpNetlinkTest(t)
+	defer tearDown()
+
+	iface := &Veth{LinkAttrs: LinkAttrs{Name: "foo"}, PeerName: "bar"}
+	if err := LinkAdd(iface); err != nil {
+		t.Fatal(err)
+	}
+
+	link, err := LinkByName("foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := LinkSetUp(link); err != nil {
+		t.Fatal(err)
+	}
+
+	link, err = LinkByName("foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	rawFlagsStart := link.Attrs().RawFlags
+
+	if err := LinkSetAllmulticastOn(link); err != nil {
+		t.Fatal(err)
+	}
+
+	link, err = LinkByName("foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if link.Attrs().RawFlags&unix.IFF_ALLMULTI != uint32(unix.IFF_ALLMULTI) {
+		t.Fatal("IFF_ALLMULTI was not set!")
+	}
+
+	if err := LinkSetAllmulticastOff(link); err != nil {
+		t.Fatal(err)
+	}
+
+	link, err = LinkByName("foo")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if link.Attrs().RawFlags&unix.IFF_ALLMULTI != 0 {
+		t.Fatal("IFF_ALLMULTI is still set!")
+	}
+
+	rawFlagsEnd := link.Attrs().RawFlags
+	if rawFlagsStart != rawFlagsEnd {
+		t.Fatalf("RawFlags start value:%d differs from end value:%d", rawFlagsStart, rawFlagsEnd)
 	}
 }

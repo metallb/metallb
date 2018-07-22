@@ -52,16 +52,7 @@ class GoBGPIPv6Test(unittest.TestCase):
         v4 = [q1, q2]
         v6 = [q3, q4]
 
-        for idx, q in enumerate(v4):
-            route = '10.0.{0}.0/24'.format(idx + 1)
-            q.add_route(route)
-
-        for idx, q in enumerate(v6):
-            route = '2001:{0}::/96'.format(idx + 1)
-            q.add_route(route, rf='ipv6')
-
         initial_wait_time = max(ctn.run() for ctn in ctns)
-
         time.sleep(initial_wait_time)
 
         for ctn in v4:
@@ -71,6 +62,14 @@ class GoBGPIPv6Test(unittest.TestCase):
         for ctn in v6:
             g1.add_peer(ctn, is_rs_client=True, v6=True)
             ctn.add_peer(g1, v6=True)
+
+        for idx, q in enumerate(v4):
+            route = '10.0.{0}.0/24'.format(idx + 1)
+            q.add_route(route)
+
+        for idx, q in enumerate(v6):
+            route = '2001:{0}::/96'.format(idx + 1)
+            q.add_route(route, rf='ipv6')
 
         cls.gobgp = g1
         cls.quaggas = {'q1': q1, 'q2': q2, 'q3': q3, 'q4': q4}
@@ -144,7 +143,7 @@ class GoBGPIPv6Test(unittest.TestCase):
 
     def test_04_add_in_policy_to_reject_all(self):
         for q in self.gobgp.peers.itervalues():
-            self.gobgp.local('gobgp neighbor {0} policy in set default reject'.format(q['neigh_addr'].split('/')[0]))
+            self.gobgp.local('gobgp neighbor {0} policy import set default reject'.format(q['neigh_addr'].split('/')[0]))
 
     def test_05_check_ipv4_peer_rib(self):
         self.check_gobgp_local_rib(self.ipv4s, 'ipv4')
@@ -160,12 +159,10 @@ class GoBGPIPv6Test(unittest.TestCase):
 
     def test_08_check_rib(self):
         for q in self.ipv4s.itervalues():
-            self.assertTrue(all(p['filtered'] for p in self.gobgp.get_adj_rib_in(q)))
             self.assertTrue(len(self.gobgp.get_adj_rib_out(q)) == 0)
             self.assertTrue(len(q.get_global_rib()) == len(q.routes))
 
         for q in self.ipv6s.itervalues():
-            self.assertTrue(all(p['filtered'] for p in self.gobgp.get_adj_rib_in(q, rf='ipv6')))
             self.assertTrue(len(self.gobgp.get_adj_rib_out(q, rf='ipv6')) == 0)
             self.assertTrue(len(q.get_global_rib(rf='ipv6')) == len(q.routes))
 

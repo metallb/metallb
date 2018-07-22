@@ -246,12 +246,6 @@ func NewDiskIndexWriter(f *os.File) IndexWriter {
 	return &directIndex{fd: f, w: bufio.NewWriterSize(f, 1024*1024)}
 }
 
-// indexBlock represent an index information for a series within a TSM file.
-type indexBlock struct {
-	key     []byte
-	entries *indexEntries
-}
-
 type syncer interface {
 	Name() string
 	Sync() error
@@ -641,6 +635,11 @@ func (t *tsmWriter) Write(key []byte, values Values) error {
 
 	// Increment file position pointer
 	t.n += int64(n)
+
+	if len(t.index.Entries(key)) >= maxIndexEntries {
+		return ErrMaxBlocksExceeded
+	}
+
 	return nil
 }
 
@@ -741,7 +740,14 @@ func (t *tsmWriter) Flush() error {
 }
 
 func (t *tsmWriter) sync() error {
-	if f, ok := t.wrapped.(*os.File); ok {
+	// sync is a minimal interface to make sure we can sync the wrapped
+	// value. we use a minimal interface to be as robust as possible for
+	// syncing these files.
+	type sync interface {
+		Sync() error
+	}
+
+	if f, ok := t.wrapped.(sync); ok {
 		if err := f.Sync(); err != nil {
 			return err
 		}
@@ -770,7 +776,14 @@ func (t *tsmWriter) Remove() error {
 		return err
 	}
 
-	if f, ok := t.wrapped.(*os.File); ok {
+	// nameCloser is the most permissive interface we can close the wrapped
+	// value with.
+	type nameCloser interface {
+		io.Closer
+		Name() string
+	}
+
+	if f, ok := t.wrapped.(nameCloser); ok {
 		// Close the file handle to prevent leaking.  We ignore the error because
 		// we just want to cleanup and remove the file.
 		_ = f.Close()

@@ -10,6 +10,7 @@ With Peer Group, you can set the same configuration to multiple peers.
 - [Verification](#verification)
 
 ## Prerequisite
+
 Assumed that you finished [Getting Started](getting-started.md).
 
 ## Configuration
@@ -58,7 +59,7 @@ BGP neighbor is 172.40.1.3, remote AS 65001
   BGP OutQ = 0, Flops = 0
   Hold time is 99, keepalive interval is 33 seconds
   Configured hold time is 99, keepalive interval is 33 seconds
-  
+
   Neighbor capabilities:
     multiprotocol:
         ipv4-unicast:	advertised and received

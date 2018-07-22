@@ -60,6 +60,7 @@ func TestNodeToExpr(t *testing.T) {
 	cases := []struct {
 		n string
 		r *storage.Node
+		m map[string]string
 		e string
 	}{
 		{
@@ -75,7 +76,7 @@ func TestNodeToExpr(t *testing.T) {
 			e: `host = 'host1'`,
 		},
 		{
-			n: "locical AND with regex",
+			n: "logical AND with regex",
 			r: &storage.Node{
 				NodeType: storage.NodeTypeLogicalExpression,
 				Value:    &storage.Node_Logical_{Logical: storage.LogicalAnd},
@@ -100,14 +101,110 @@ func TestNodeToExpr(t *testing.T) {
 			},
 			e: `host = 'host1' AND region =~ /^us-west/`,
 		},
+		{
+			n: "optimisable regex",
+			r: &storage.Node{
+				NodeType: storage.NodeTypeComparisonExpression,
+				Value:    &storage.Node_Comparison_{Comparison: storage.ComparisonRegex},
+				Children: []*storage.Node{
+					{NodeType: storage.NodeTypeTagRef, Value: &storage.Node_TagRefValue{TagRefValue: "region"}},
+					{NodeType: storage.NodeTypeLiteral, Value: &storage.Node_RegexValue{RegexValue: "^us-east$"}},
+				},
+			},
+			e: `region = 'us-east'`,
+		},
+		{
+			n: "optimisable regex with or",
+			r: &storage.Node{
+				NodeType: storage.NodeTypeComparisonExpression,
+				Value:    &storage.Node_Comparison_{Comparison: storage.ComparisonRegex},
+				Children: []*storage.Node{
+					{NodeType: storage.NodeTypeTagRef, Value: &storage.Node_TagRefValue{TagRefValue: "region"}},
+					{NodeType: storage.NodeTypeLiteral, Value: &storage.Node_RegexValue{RegexValue: "^(us-east|us-west)$"}},
+				},
+			},
+			e: `region = 'us-east' OR region = 'us-west'`,
+		},
+		{
+			n: "remap _measurement -> _name",
+			r: &storage.Node{
+				NodeType: storage.NodeTypeComparisonExpression,
+				Value:    &storage.Node_Comparison_{Comparison: storage.ComparisonEqual},
+				Children: []*storage.Node{
+					{NodeType: storage.NodeTypeTagRef, Value: &storage.Node_TagRefValue{TagRefValue: "_measurement"}},
+					{NodeType: storage.NodeTypeLiteral, Value: &storage.Node_StringValue{StringValue: "foo"}},
+				},
+			},
+			m: map[string]string{"_measurement": "_name"},
+			e: `_name = 'foo'`,
+		},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.n, func(t *testing.T) {
-			expr, err := storage.NodeToExpr(tc.r)
+			expr, err := storage.NodeToExpr(tc.r, tc.m)
 			assert.NoError(t, err)
 			assert.Equal(t, expr.String(), tc.e)
 		})
+	}
+}
+
+func TestHasSingleMeasurementNoOR(t *testing.T) {
+	cases := []struct {
+		expr influxql.Expr
+		name string
+		ok   bool
+	}{
+		{
+			expr: influxql.MustParseExpr(`_name = 'm0'`),
+			name: "m0",
+			ok:   true,
+		},
+		{
+			expr: influxql.MustParseExpr(`_something = 'f' AND _name = 'm0'`),
+			name: "m0",
+			ok:   true,
+		},
+		{
+			expr: influxql.MustParseExpr(`_something = 'f' AND (a =~ /x0/ AND _name = 'm0')`),
+			name: "m0",
+			ok:   true,
+		},
+		{
+			expr: influxql.MustParseExpr(`tag1 != 'foo'`),
+			ok:   false,
+		},
+		{
+			expr: influxql.MustParseExpr(`_name = 'm0' OR tag1 != 'foo'`),
+			ok:   false,
+		},
+		{
+			expr: influxql.MustParseExpr(`_name = 'm0' AND tag1 != 'foo' AND _name = 'other'`),
+			ok:   false,
+		},
+		{
+			expr: influxql.MustParseExpr(`_name = 'm0' AND tag1 != 'foo' OR _name = 'other'`),
+			ok:   false,
+		},
+		{
+			expr: influxql.MustParseExpr(`_name = 'm0' AND (tag1 != 'foo' OR tag2 = 'other')`),
+			ok:   false,
+		},
+		{
+			expr: influxql.MustParseExpr(`(tag1 != 'foo' OR tag2 = 'other') OR _name = 'm0'`),
+			ok:   false,
+		},
+	}
+
+	for _, tc := range cases {
+		name, ok := storage.HasSingleMeasurementNoOR(tc.expr)
+		if ok != tc.ok {
+			t.Fatalf("got %q, %v for expression %q, expected %q, %v", name, ok, tc.expr, tc.name, tc.ok)
+		}
+
+		if ok && name != tc.name {
+			t.Fatalf("got %q, %v for expression %q, expected %q, %v", name, ok, tc.expr, tc.name, tc.ok)
+		}
 	}
 }
 
@@ -143,7 +240,7 @@ func TestRewriteExprRemoveFieldKeyAndValue(t *testing.T) {
 		},
 	}
 
-	expr, err := storage.NodeToExpr(node)
+	expr, err := storage.NodeToExpr(node, nil)
 	assert.NoError(t, err, "NodeToExpr failed")
 	assert.Equal(t, expr.String(), `host = 'host1' AND _field =~ /^us-west/ AND "$" = 0.500`)
 

@@ -1,4 +1,4 @@
-# Configuration example
+# Configuration Example
 
 ```toml
 [global.config]
@@ -29,6 +29,18 @@
         port = 11019
         route-monitoring-policy = "pre-policy"
         statistics-timeout = 3600
+
+[[vrfs]]
+    [vrfs.config]
+        name = "vrf1"
+        # If id is omitted, automatically assigned.
+        id = 1
+        rd = "65000:100"
+        # Each configuration for import and export RTs;
+        # import-rt-list
+        # export-rt-list
+        # are preferred than both-rt-list.
+        both-rt-list = ["65000:100"]
 
 [[mrt-dump]]
     [mrt-dump.config]
@@ -250,6 +262,13 @@
             options = "remove"
             [policy-definitions.statements.actions.bgp-actions.set-ext-community.set-ext-community-method]
                 communities-list = ["soo:500:600", "rt:700:800"]
+    [[policy-definitions.statements]]
+        [policy-definitions.statements.conditions.bgp-conditions]
+            next-hop-in-list = [
+               "10.0.100.1/32"
+            ]
+        [policy-definitions.statements.actions]
+            route-disposition = "accept-route"
 
 [[policy-definitions]]
     name = "route-type-policy"

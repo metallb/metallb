@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
+	"path"
 	"reflect"
 	"strings"
 	"sync"
@@ -150,6 +152,33 @@ func TestClient_Query(t *testing.T) {
 	defer c.Close()
 
 	query := Query{}
+	_, err := c.Query(query)
+	if err != nil {
+		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
+	}
+}
+
+func TestClient_QueryWithRP(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		params := r.URL.Query()
+		if got, exp := params.Get("db"), "db0"; got != exp {
+			t.Errorf("unexpected db query parameter: %s != %s", exp, got)
+		}
+		if got, exp := params.Get("rp"), "rp0"; got != exp {
+			t.Errorf("unexpected rp query parameter: %s != %s", exp, got)
+		}
+		var data Response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(data)
+	}))
+	defer ts.Close()
+
+	config := HTTPConfig{Addr: ts.URL}
+	c, _ := NewHTTPClient(config)
+	defer c.Close()
+
+	query := NewQueryWithRP("SELECT * FROM m0", "db0", "rp0", "")
 	_, err := c.Query(query)
 	if err != nil {
 		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
@@ -824,5 +853,61 @@ func TestBatchPoints_SettersGetters(t *testing.T) {
 	}
 	if bp.WriteConsistency() != "wc2" {
 		t.Errorf("Expected: %s, got %s", bp.WriteConsistency(), "wc2")
+	}
+}
+
+func TestClientConcatURLPath(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.URL.String(), "/influxdbproxy/ping") || strings.Contains(r.URL.String(), "/ping/ping") {
+			t.Errorf("unexpected error.  expected %v contains in %v", "/influxdbproxy/ping", r.URL)
+		}
+		var data Response
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNoContent)
+		_ = json.NewEncoder(w).Encode(data)
+	}))
+	defer ts.Close()
+
+	url, _ := url.Parse(ts.URL)
+	url.Path = path.Join(url.Path, "influxdbproxy")
+
+	fmt.Println("TestClientConcatURLPath: concat with path 'influxdbproxy' result ", url.String())
+
+	c, _ := NewHTTPClient(HTTPConfig{Addr: url.String()})
+	defer c.Close()
+
+	_, _, err := c.Ping(0)
+	if err != nil {
+		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
+	}
+
+	_, _, err = c.Ping(0)
+	if err != nil {
+		t.Errorf("unexpected error.  expected %v, actual %v", nil, err)
+	}
+}
+
+func TestClientProxy(t *testing.T) {
+	pinged := false
+	ts := httptest.NewServer(http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		if got, want := req.URL.String(), "http://example.com:8086/ping"; got != want {
+			t.Errorf("invalid url in request: got=%s want=%s", got, want)
+		}
+		resp.WriteHeader(http.StatusNoContent)
+		pinged = true
+	}))
+	defer ts.Close()
+
+	proxyURL, _ := url.Parse(ts.URL)
+	c, _ := NewHTTPClient(HTTPConfig{
+		Addr:  "http://example.com:8086",
+		Proxy: http.ProxyURL(proxyURL),
+	})
+	if _, _, err := c.Ping(0); err != nil {
+		t.Fatalf("could not ping server: %s", err)
+	}
+
+	if !pinged {
+		t.Fatalf("no http request was received")
 	}
 }

@@ -21,11 +21,12 @@ import (
 	"os"
 	"time"
 
+	log "github.com/sirupsen/logrus"
+
 	"github.com/osrg/gobgp/config"
 	"github.com/osrg/gobgp/packet/bgp"
 	"github.com/osrg/gobgp/packet/mrt"
 	"github.com/osrg/gobgp/table"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -88,6 +89,9 @@ func (m *mrtWriter) loop() error {
 			msg := make([]*mrt.MRTMessage, 0, 1)
 			switch e := ev.(type) {
 			case *WatchEventUpdate:
+				if e.Init {
+					return nil
+				}
 				mp := mrt.NewBGP4MPMessage(e.PeerAS, e.LocalAS, 0, e.PeerAddress.String(), e.LocalAddress.String(), e.FourBytesAs, nil)
 				mp.BGPMessagePayload = e.Payload
 				isAddPath := e.Neighbor.IsAddPathReceiveEnabled(e.PathList[0].GetRouteFamily())
@@ -111,12 +115,16 @@ func (m *mrtWriter) loop() error {
 				}
 			case *WatchEventTable:
 				t := uint32(time.Now().Unix())
-				peers := make([]*mrt.Peer, 0, len(e.Neighbor))
+
+				peers := make([]*mrt.Peer, 1, len(e.Neighbor)+1)
+				// Adding dummy Peer record for locally generated routes
+				peers[0] = mrt.NewPeer("0.0.0.0", "0.0.0.0", 0, true)
 				neighborMap := make(map[string]*config.Neighbor)
 				for _, pconf := range e.Neighbor {
 					peers = append(peers, mrt.NewPeer(pconf.State.RemoteRouterId, pconf.State.NeighborAddress, pconf.Config.PeerAs, true))
 					neighborMap[pconf.State.NeighborAddress] = pconf
 				}
+
 				if bm, err := mrt.NewMRTMessage(t, mrt.TABLE_DUMPv2, mrt.PEER_INDEX_TABLE, mrt.NewPeerIndexTable(e.RouterId, "", peers)); err != nil {
 					log.WithFields(log.Fields{
 						"Topic": "mrt",
@@ -174,11 +182,10 @@ func (m *mrtWriter) loop() error {
 					entries := make([]*mrt.RibEntry, 0, len(pathList))
 					entriesAddPath := make([]*mrt.RibEntry, 0, len(pathList))
 					for _, path := range pathList {
-						if path.IsLocal() {
-							continue
-						}
 						isAddPath := false
-						if neighbor, ok := neighborMap[path.GetSource().Address.String()]; ok {
+						if path.IsLocal() {
+							isAddPath = true
+						} else if neighbor, ok := neighborMap[path.GetSource().Address.String()]; ok {
 							isAddPath = neighbor.IsAddPathReceiveEnabled(path.GetRouteFamily())
 						}
 						if !isAddPath {
@@ -385,12 +392,12 @@ func (m *mrtManager) enable(c *config.MrtConfig) error {
 }
 
 func (m *mrtManager) disable(c *config.MrtConfig) error {
-	if w, ok := m.writer[c.FileName]; !ok {
+	w, ok := m.writer[c.FileName]
+	if !ok {
 		return fmt.Errorf("%s doesn't exists", c.FileName)
-	} else {
-		w.Stop()
-		delete(m.writer, c.FileName)
 	}
+	w.Stop()
+	delete(m.writer, c.FileName)
 	return nil
 }
 

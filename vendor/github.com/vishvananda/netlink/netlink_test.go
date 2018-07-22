@@ -66,21 +66,22 @@ func setUpNetlinkTestWithLoopback(t *testing.T) tearDownNetlinkTest {
 	}
 }
 
+func setUpF(t *testing.T, path, value string) {
+	file, err := os.Create(path)
+	defer file.Close()
+	if err != nil {
+		t.Fatalf("Failed to open %s: %s", path, err)
+	}
+	file.WriteString(value)
+}
+
 func setUpMPLSNetlinkTest(t *testing.T) tearDownNetlinkTest {
 	if _, err := os.Stat("/proc/sys/net/mpls/platform_labels"); err != nil {
 		t.Skip("Test requires MPLS support.")
 	}
 	f := setUpNetlinkTest(t)
-	setUpF := func(path, value string) {
-		file, err := os.Create(path)
-		defer file.Close()
-		if err != nil {
-			t.Fatalf("Failed to open %s: %s", path, err)
-		}
-		file.WriteString(value)
-	}
-	setUpF("/proc/sys/net/mpls/platform_labels", "1024")
-	setUpF("/proc/sys/net/mpls/conf/lo/input", "1")
+	setUpF(t, "/proc/sys/net/mpls/platform_labels", "1024")
+	setUpF(t, "/proc/sys/net/mpls/conf/lo/input", "1")
 	return f
 }
 
@@ -105,12 +106,6 @@ func setUpSEG6NetlinkTest(t *testing.T) tearDownNetlinkTest {
 	key := string("CONFIG_IPV6_SEG6_LWTUNNEL=y")
 	if _, err := grepKey(key, filename); err != nil {
 		msg := "Skipped test because it requires SEG6_LWTUNNEL support."
-		log.Printf(msg)
-		t.Skip(msg)
-	}
-	key = string("CONFIG_IPV6_SEG6_INLINE=y")
-	if _, err := grepKey(key, filename); err != nil {
-		msg := "Skipped test because it requires SEG6_INLINE support."
 		log.Printf(msg)
 		t.Skip(msg)
 	}

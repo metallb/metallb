@@ -1114,7 +1114,7 @@ type ZebraState struct {
 	// Configure url for zebra.
 	Url string `mapstructure:"url" json:"url,omitempty"`
 	// original -> gobgp:redistribute-route-type
-	RedistributeRouteTypeList []InstallProtocolType `mapstructure:"redistribute-route-type-list" json:"redistribute-route-type-list,omitempty"`
+	RedistributeRouteTypeList []string `mapstructure:"redistribute-route-type-list" json:"redistribute-route-type-list,omitempty"`
 	// original -> gobgp:version
 	// Configure version of zebra protocol.  Default is 2. Supported up to 3.
 	Version uint8 `mapstructure:"version" json:"version,omitempty"`
@@ -1135,7 +1135,7 @@ type ZebraConfig struct {
 	// Configure url for zebra.
 	Url string `mapstructure:"url" json:"url,omitempty"`
 	// original -> gobgp:redistribute-route-type
-	RedistributeRouteTypeList []InstallProtocolType `mapstructure:"redistribute-route-type-list" json:"redistribute-route-type-list,omitempty"`
+	RedistributeRouteTypeList []string `mapstructure:"redistribute-route-type-list" json:"redistribute-route-type-list,omitempty"`
 	// original -> gobgp:version
 	// Configure version of zebra protocol.  Default is 2. Supported up to 3.
 	Version uint8 `mapstructure:"version" json:"version,omitempty"`
@@ -1240,6 +1240,112 @@ type Mrt struct {
 }
 
 func (lhs *Mrt) Equal(rhs *Mrt) bool {
+	if lhs == nil || rhs == nil {
+		return false
+	}
+	if !lhs.Config.Equal(&(rhs.Config)) {
+		return false
+	}
+	return true
+}
+
+// struct for container gobgp:state.
+// Configured states of VRF.
+type VrfState struct {
+	// original -> gobgp:name
+	// Unique name among all VRF instances.
+	Name string `mapstructure:"name" json:"name,omitempty"`
+	// original -> gobgp:id
+	// Unique identifier among all VRF instances.
+	Id uint32 `mapstructure:"id" json:"id,omitempty"`
+	// original -> gobgp:rd
+	// Route Distinguisher for this VRF.
+	Rd string `mapstructure:"rd" json:"rd,omitempty"`
+	// original -> gobgp:import-rt
+	// List of import Route Targets for this VRF.
+	ImportRtList []string `mapstructure:"import-rt-list" json:"import-rt-list,omitempty"`
+	// original -> gobgp:export-rt
+	// List of export Route Targets for this VRF.
+	ExportRtList []string `mapstructure:"export-rt-list" json:"export-rt-list,omitempty"`
+}
+
+// struct for container gobgp:config.
+// Configuration parameters for VRF.
+type VrfConfig struct {
+	// original -> gobgp:name
+	// Unique name among all VRF instances.
+	Name string `mapstructure:"name" json:"name,omitempty"`
+	// original -> gobgp:id
+	// Unique identifier among all VRF instances.
+	Id uint32 `mapstructure:"id" json:"id,omitempty"`
+	// original -> gobgp:rd
+	// Route Distinguisher for this VRF.
+	Rd string `mapstructure:"rd" json:"rd,omitempty"`
+	// original -> gobgp:import-rt
+	// List of import Route Targets for this VRF.
+	ImportRtList []string `mapstructure:"import-rt-list" json:"import-rt-list,omitempty"`
+	// original -> gobgp:export-rt
+	// List of export Route Targets for this VRF.
+	ExportRtList []string `mapstructure:"export-rt-list" json:"export-rt-list,omitempty"`
+	// original -> gobgp:both-rt
+	// List of both import and export Route Targets for this VRF. Each
+	// configuration for import and export Route Targets will be preferred.
+	BothRtList []string `mapstructure:"both-rt-list" json:"both-rt-list,omitempty"`
+}
+
+func (lhs *VrfConfig) Equal(rhs *VrfConfig) bool {
+	if lhs == nil || rhs == nil {
+		return false
+	}
+	if lhs.Name != rhs.Name {
+		return false
+	}
+	if lhs.Id != rhs.Id {
+		return false
+	}
+	if lhs.Rd != rhs.Rd {
+		return false
+	}
+	if len(lhs.ImportRtList) != len(rhs.ImportRtList) {
+		return false
+	}
+	for idx, l := range lhs.ImportRtList {
+		if l != rhs.ImportRtList[idx] {
+			return false
+		}
+	}
+	if len(lhs.ExportRtList) != len(rhs.ExportRtList) {
+		return false
+	}
+	for idx, l := range lhs.ExportRtList {
+		if l != rhs.ExportRtList[idx] {
+			return false
+		}
+	}
+	if len(lhs.BothRtList) != len(rhs.BothRtList) {
+		return false
+	}
+	for idx, l := range lhs.BothRtList {
+		if l != rhs.BothRtList[idx] {
+			return false
+		}
+	}
+	return true
+}
+
+// struct for container gobgp:vrf.
+// VRF instance configurations on the local system.
+type Vrf struct {
+	// original -> gobgp:name
+	// original -> gobgp:vrf-config
+	// Configuration parameters for VRF.
+	Config VrfConfig `mapstructure:"config" json:"config,omitempty"`
+	// original -> gobgp:vrf-state
+	// Configured states of VRF.
+	State VrfState `mapstructure:"state" json:"state,omitempty"`
+}
+
+func (lhs *Vrf) Equal(rhs *Vrf) bool {
 	if lhs == nil || rhs == nil {
 		return false
 	}
@@ -4517,6 +4623,10 @@ type RouteSelectionOptionsState struct {
 	// BGP best-path. The default is to select the route for
 	// which the metric to the next-hop is lowest.
 	IgnoreNextHopIgpMetric bool `mapstructure:"ignore-next-hop-igp-metric" json:"ignore-next-hop-igp-metric,omitempty"`
+	// original -> gobgp:disable-best-path-selection
+	// gobgp:disable-best-path-selection's original type is boolean.
+	// Disables best path selection process.
+	DisableBestPathSelection bool `mapstructure:"disable-best-path-selection" json:"disable-best-path-selection,omitempty"`
 }
 
 // struct for container bgp-mp:config.
@@ -4558,6 +4668,10 @@ type RouteSelectionOptionsConfig struct {
 	// BGP best-path. The default is to select the route for
 	// which the metric to the next-hop is lowest.
 	IgnoreNextHopIgpMetric bool `mapstructure:"ignore-next-hop-igp-metric" json:"ignore-next-hop-igp-metric,omitempty"`
+	// original -> gobgp:disable-best-path-selection
+	// gobgp:disable-best-path-selection's original type is boolean.
+	// Disables best path selection process.
+	DisableBestPathSelection bool `mapstructure:"disable-best-path-selection" json:"disable-best-path-selection,omitempty"`
 }
 
 func (lhs *RouteSelectionOptionsConfig) Equal(rhs *RouteSelectionOptionsConfig) bool {
@@ -4580,6 +4694,9 @@ func (lhs *RouteSelectionOptionsConfig) Equal(rhs *RouteSelectionOptionsConfig) 
 		return false
 	}
 	if lhs.IgnoreNextHopIgpMetric != rhs.IgnoreNextHopIgpMetric {
+		return false
+	}
+	if lhs.DisableBestPathSelection != rhs.DisableBestPathSelection {
 		return false
 	}
 	return true
@@ -4774,6 +4891,8 @@ type Bgp struct {
 	RpkiServers []RpkiServer `mapstructure:"rpki-servers" json:"rpki-servers,omitempty"`
 	// original -> gobgp:bmp-servers
 	BmpServers []BmpServer `mapstructure:"bmp-servers" json:"bmp-servers,omitempty"`
+	// original -> gobgp:vrfs
+	Vrfs []Vrf `mapstructure:"vrfs" json:"vrfs,omitempty"`
 	// original -> gobgp:mrt-dump
 	MrtDump []Mrt `mapstructure:"mrt-dump" json:"mrt-dump,omitempty"`
 	// original -> gobgp:zebra
@@ -4849,6 +4968,22 @@ func (lhs *Bgp) Equal(rhs *Bgp) bool {
 		}
 		for i, r := range rhs.BmpServers {
 			if l, y := lmap[mapkey(i, string(r.Config.Address))]; !y {
+				return false
+			} else if !r.Equal(l) {
+				return false
+			}
+		}
+	}
+	if len(lhs.Vrfs) != len(rhs.Vrfs) {
+		return false
+	}
+	{
+		lmap := make(map[string]*Vrf)
+		for i, l := range lhs.Vrfs {
+			lmap[mapkey(i, string(l.Config.Name))] = &lhs.Vrfs[i]
+		}
+		for i, r := range rhs.Vrfs {
+			if l, y := lmap[mapkey(i, string(r.Config.Name))]; !y {
 				return false
 			} else if !r.Equal(l) {
 				return false

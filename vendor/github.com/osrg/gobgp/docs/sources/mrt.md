@@ -4,24 +4,25 @@ This page explains how to play with GoBGP's MRT feature.
 
 ## Prerequisites
 
-Assume you finished [Getting Started](https://github.com/osrg/gobgp/blob/master/docs/sources/getting-started.md).
+Assume you finished [Getting Started](getting-started.md).
 
 ## Contents
-- [Inject routes from MRT table v2 records](#section0)
-- [Dump updates in MRT BGP4MP format](#section1)
-    - [Configuration](#section1.1)
-- [Dump the RIB in MRT TABLE_DUMPv2 format](#section2)
-    - [Configuration](#section2.1)
 
-## <a name="section0"> Inject routes from MRT table v2 records
+- [Inject routes from MRT table v2 records](#inject-routes-from-mrt-table-v2-records)
+- [Dump updates in MRT BGP4MP format](#dump-updates-in-mrt-bgp4mp-format)
+- [Dump the RIB in MRT TABLE_DUMPv2 format](#dump-the-rib-in-mrt-table_dumpv2-format)
+
+## Inject routes from MRT table v2 records
+
 Route injection can be done by
+
 ```bash
 $ gobgp mrt inject global <dumpfile> [<number of prefix to inject>]
 ```
 
-## <a name="section1"> Dump updates in MRT BGP4MP format
+## Dump updates in MRT BGP4MP format
 
-### <a name="section1.1"> Configuration
+### Configuration
 
 With the following configuration, gobgpd continuously dumps BGP update
 messages to `/tmp/updates.dump` file in the BGP4MP format.
@@ -48,14 +49,13 @@ specified in golang's
     rotation-interval = 180
 ```
 
-## <a name="section2"> Dump the RIB in MRT TABLE_DUMPv2 format
+## Dump the RIB in MRT TABLE_DUMPv2 format
 
-### <a name="section2.1"> Configuration
+### Configuration
 
 With the following configuration, gobgpd continuously dumps routes in
 the global rib to `/tmp/table.dump` file in the TABLE_DUMPv2 format
 every 60 seconds.
-
 
 ```toml
 [[mrt-dump]]
@@ -67,7 +67,6 @@ every 60 seconds.
 
 With a route server configuration, gobgpd can dump routes in each
 peer's RIB.
-
 
 ```toml
 [[neighbors]]

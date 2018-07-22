@@ -41,6 +41,18 @@ type LinkAttrs struct {
 	NetNsID      int
 	NumTxQueues  int
 	NumRxQueues  int
+	Vfs          []VfInfo // virtual functions available on link
+}
+
+// VfInfo represents configuration of virtual function
+type VfInfo struct {
+	ID        int
+	Mac       net.HardwareAddr
+	Vlan      int
+	Qos       int
+	TxRate    int
+	Spoofchk  bool
+	LinkState uint32
 }
 
 // LinkOperState represents the values of the IFLA_OPERSTATE link
@@ -290,10 +302,11 @@ type TuntapFlag uint16
 // Tuntap links created via /dev/tun/tap, but can be destroyed via netlink
 type Tuntap struct {
 	LinkAttrs
-	Mode   TuntapMode
-	Flags  TuntapFlag
-	Queues int
-	Fds    []*os.File
+	Mode       TuntapMode
+	Flags      TuntapFlag
+	NonPersist bool
+	Queues     int
+	Fds        []*os.File
 }
 
 func (tuntap *Tuntap) Attrs() *LinkAttrs {
@@ -705,6 +718,9 @@ func (gretap *Gretap) Attrs() *LinkAttrs {
 }
 
 func (gretap *Gretap) Type() string {
+	if gretap.Local.To4() == nil {
+		return "ip6gretap"
+	}
 	return "gretap"
 }
 
@@ -766,7 +782,10 @@ func (vti *Vti) Attrs() *LinkAttrs {
 	return &vti.LinkAttrs
 }
 
-func (iptun *Vti) Type() string {
+func (vti *Vti) Type() string {
+	if vti.Local.To4() == nil {
+		return "vti6"
+	}
 	return "vti"
 }
 
@@ -793,6 +812,9 @@ func (gretun *Gretun) Attrs() *LinkAttrs {
 }
 
 func (gretun *Gretun) Type() string {
+	if gretun.Local.To4() == nil {
+		return "ip6gre"
+	}
 	return "gre"
 }
 
@@ -828,7 +850,7 @@ func (gtp *GTP) Type() string {
 // iproute2 supported devices;
 // vlan | veth | vcan | dummy | ifb | macvlan | macvtap |
 // bridge | bond | ipoib | ip6tnl | ipip | sit | vxlan |
-// gre | gretap | ip6gre | ip6gretap | vti | nlmon |
+// gre | gretap | ip6gre | ip6gretap | vti | vti6 | nlmon |
 // bond_slave | ipvlan
 
 // LinkNotFoundError wraps the various not found errors when

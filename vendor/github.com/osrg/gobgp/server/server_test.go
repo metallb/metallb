@@ -16,16 +16,20 @@
 package server
 
 import (
+	"context"
 	"net"
 	"runtime"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/osrg/gobgp/config"
 	"github.com/osrg/gobgp/packet/bgp"
 	"github.com/osrg/gobgp/table"
-	log "github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestModPolicyAssign(t *testing.T) {
@@ -124,8 +128,10 @@ func TestMonitor(test *testing.T) {
 		}
 	}
 
+	// Test WatchBestPath.
 	w := s.Watch(WatchBestPath(false))
 
+	// Advertises a route.
 	attrs := []bgp.PathAttributeInterface{
 		bgp.NewPathAttributeOrigin(0),
 		bgp.NewPathAttributeNextHop("10.0.0.1"),
@@ -133,27 +139,77 @@ func TestMonitor(test *testing.T) {
 	if _, err := t.AddPath("", []*table.Path{table.NewPath(nil, bgp.NewIPAddrPrefix(24, "10.0.0.0"), false, attrs, time.Now(), false)}); err != nil {
 		log.Fatal(err)
 	}
-
 	ev := <-w.Event()
 	b := ev.(*WatchEventBestPath)
-	assert.Equal(len(b.PathList), 1)
-	assert.Equal(b.PathList[0].GetNlri().String(), "10.0.0.0/24")
-	assert.Equal(b.PathList[0].IsWithdraw, false)
+	assert.Equal(1, len(b.PathList))
+	assert.Equal("10.0.0.0/24", b.PathList[0].GetNlri().String())
+	assert.False(b.PathList[0].IsWithdraw)
 
-	if _, err := t.AddPath("", []*table.Path{table.NewPath(nil, bgp.NewIPAddrPrefix(24, "10.0.0.0"), true, attrs, time.Now(), false)}); err != nil {
+	// Withdraws the previous route.
+	// NOTE: Withdow should not require any path attribute.
+	if _, err := t.AddPath("", []*table.Path{table.NewPath(nil, bgp.NewIPAddrPrefix(24, "10.0.0.0"), true, nil, time.Now(), false)}); err != nil {
 		log.Fatal(err)
 	}
-
 	ev = <-w.Event()
 	b = ev.(*WatchEventBestPath)
-	assert.Equal(len(b.PathList), 1)
-	assert.Equal(b.PathList[0].GetNlri().String(), "10.0.0.0/24")
-	assert.Equal(b.PathList[0].IsWithdraw, true)
+	assert.Equal(1, len(b.PathList))
+	assert.Equal("10.0.0.0/24", b.PathList[0].GetNlri().String())
+	assert.True(b.PathList[0].IsWithdraw)
 
-	if _, err := t.AddPath("", []*table.Path{table.NewPath(nil, bgp.NewIPAddrPrefix(24, "10.0.0.0"), true, attrs, time.Now(), false)}); err != nil {
+	// Stops the watcher still having an item.
+	w.Stop()
+
+	// Prepares an initial route to test WatchUpdate with "current" flag.
+	if _, err := t.AddPath("", []*table.Path{table.NewPath(nil, bgp.NewIPAddrPrefix(24, "10.1.0.0"), false, attrs, time.Now(), false)}); err != nil {
 		log.Fatal(err)
 	}
-	//stop the watcher still having an item.
+	for {
+		// Waits for the initial route will be advertised.
+		rib, _, err := s.GetRib("", bgp.RF_IPv4_UC, nil)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if len(rib.GetKnownPathList("", 0)) > 0 {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	// Test WatchUpdate with "current" flag.
+	w = s.Watch(WatchUpdate(true))
+
+	// Test the initial route.
+	ev = <-w.Event()
+	u := ev.(*WatchEventUpdate)
+	assert.Equal(1, len(u.PathList))
+	assert.Equal("10.1.0.0/24", u.PathList[0].GetNlri().String())
+	assert.False(u.PathList[0].IsWithdraw)
+	ev = <-w.Event()
+	u = ev.(*WatchEventUpdate)
+	assert.Equal(len(u.PathList), 0) // End of RIB
+
+	// Advertises an additional route.
+	if _, err := t.AddPath("", []*table.Path{table.NewPath(nil, bgp.NewIPAddrPrefix(24, "10.2.0.0"), false, attrs, time.Now(), false)}); err != nil {
+		log.Fatal(err)
+	}
+	ev = <-w.Event()
+	u = ev.(*WatchEventUpdate)
+	assert.Equal(1, len(u.PathList))
+	assert.Equal("10.2.0.0/24", u.PathList[0].GetNlri().String())
+	assert.False(u.PathList[0].IsWithdraw)
+
+	// Withdraws the previous route.
+	// NOTE: Withdow should not require any path attribute.
+	if _, err := t.AddPath("", []*table.Path{table.NewPath(nil, bgp.NewIPAddrPrefix(24, "10.2.0.0"), true, nil, time.Now(), false)}); err != nil {
+		log.Fatal(err)
+	}
+	ev = <-w.Event()
+	u = ev.(*WatchEventUpdate)
+	assert.Equal(1, len(u.PathList))
+	assert.Equal("10.2.0.0/24", u.PathList[0].GetNlri().String())
+	assert.True(u.PathList[0].IsWithdraw)
+
+	// Stops the watcher still having an item.
 	w.Stop()
 }
 
@@ -216,18 +272,16 @@ func newPeerandInfo(myAs, as uint32, address string, rib *table.TableManager) (*
 }
 
 func process(rib *table.TableManager, l []*table.Path) (*table.Path, *table.Path) {
-	news, olds, _ := dstsToPaths(table.GLOBAL_RIB_NAME, rib.ProcessPaths(l), false)
+	dsts := make([]*table.Update, 0)
+	for _, path := range l {
+		dsts = append(dsts, rib.Update(path)...)
+	}
+	news, olds, _ := dstsToPaths(table.GLOBAL_RIB_NAME, 0, dsts)
 	if len(news) != 1 {
 		panic("can't handle multiple paths")
 	}
-	for idx, path := range news {
-		var old *table.Path
-		if olds != nil {
-			old = olds[idx]
-		}
-		return path, old
-	}
-	return nil, nil
+
+	return news[0], olds[0]
 }
 
 func TestFilterpathWitheBGP(t *testing.T) {
@@ -244,8 +298,9 @@ func TestFilterpathWitheBGP(t *testing.T) {
 
 	path1 := table.NewPath(pi1, nlri, false, pa1, time.Now(), false)
 	path2 := table.NewPath(pi2, nlri, false, pa2, time.Now(), false)
-
-	new, old := process(rib, []*table.Path{path1, path2})
+	rib.Update(path2)
+	d := rib.Update(path1)
+	new, old, _ := d[0].GetChanges(table.GLOBAL_RIB_NAME, 0, false)
 	assert.Equal(t, new, path1)
 	filterpath(p1, new, old)
 	filterpath(p2, new, old)
@@ -349,7 +404,8 @@ func TestFilterpathWithRejectPolicy(t *testing.T) {
 		path1 := table.NewPath(pi1, nlri, false, pa1, time.Now(), false)
 		new, old := process(rib2, []*table.Path{path1})
 		assert.Equal(t, new, path1)
-		path2 := p2.filterpath(new, old)
+		s := NewBgpServer()
+		path2 := s.filterpath(p2, new, old)
 		if addCommunity {
 			assert.True(t, path2.IsWithdraw)
 		} else {
@@ -538,7 +594,7 @@ func TestGracefulRestartTimerExpired(t *testing.T) {
 		GracefulRestart: config.GracefulRestart{
 			Config: config.GracefulRestartConfig{
 				Enabled:     true,
-				RestartTime: 10,
+				RestartTime: 1,
 			},
 		},
 	}
@@ -554,7 +610,7 @@ func TestGracefulRestartTimerExpired(t *testing.T) {
 			Port:     -1,
 		},
 	})
-	assert.Nil(err)
+	require.NoError(t, err)
 	defer s2.Stop()
 
 	m := &config.Neighbor{
@@ -570,7 +626,7 @@ func TestGracefulRestartTimerExpired(t *testing.T) {
 		GracefulRestart: config.GracefulRestart{
 			Config: config.GracefulRestartConfig{
 				Enabled:     true,
-				RestartTime: 10,
+				RestartTime: 1,
 			},
 		},
 	}
@@ -597,22 +653,55 @@ func TestGracefulRestartTimerExpired(t *testing.T) {
 	// Create dummy session which does NOT send BGP OPEN message in order to
 	// cause Graceful Restart timer expired.
 	var conn net.Conn
-	for {
-		time.Sleep(time.Second)
-		var err error
-		conn, err = net.Dial("tcp", "127.0.0.1:10179")
-		if err != nil {
-			log.Warn("net.Dial:", err)
-		}
-		break
-	}
+
+	conn, err = net.Dial("tcp", "127.0.0.1:10179")
+	require.NoError(t, err)
 	defer conn.Close()
+
+	// this seems to take around 22 seconds... need to address this whole thing
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
 
 	// Waiting for Graceful Restart timer expired and moving on to IDLE state.
 	for {
-		time.Sleep(time.Second)
 		if s1.GetNeighbor("", false)[0].State.SessionState == config.SESSION_STATE_IDLE {
 			break
 		}
+
+		select {
+		case <-time.After(time.Second):
+		case <-ctx.Done():
+			t.Fatalf("failed to enter IDLE state in the deadline")
+			return
+		}
 	}
+}
+
+func TestFamiliesForSoftreset(t *testing.T) {
+	f := func(f bgp.RouteFamily) config.AfiSafi {
+		return config.AfiSafi{
+			State: config.AfiSafiState{
+				Family: f,
+			},
+		}
+	}
+	peer := &Peer{
+		fsm: &FSM{
+			pConf: &config.Neighbor{
+				AfiSafis: []config.AfiSafi{f(bgp.RF_RTC_UC), f(bgp.RF_IPv4_UC), f(bgp.RF_IPv6_UC)},
+			},
+		},
+	}
+
+	families := familiesForSoftreset(peer, bgp.RF_IPv4_UC)
+	assert.Equal(t, len(families), 1)
+	assert.Equal(t, families[0], bgp.RF_IPv4_UC)
+
+	families = familiesForSoftreset(peer, bgp.RF_RTC_UC)
+	assert.Equal(t, len(families), 1)
+	assert.Equal(t, families[0], bgp.RF_RTC_UC)
+
+	families = familiesForSoftreset(peer, bgp.RouteFamily(0))
+	assert.Equal(t, len(families), 2)
+	assert.NotContains(t, families, bgp.RF_RTC_UC)
 }

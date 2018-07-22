@@ -16,11 +16,12 @@
 package cmd
 
 import (
-	"fmt"
-	"github.com/osrg/gobgp/packet/bgp"
-	"github.com/stretchr/testify/assert"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/osrg/gobgp/packet/bgp"
 )
 
 func Test_ParsePath(t *testing.T) {
@@ -29,7 +30,6 @@ func Test_ParsePath(t *testing.T) {
 
 	path, err := ParsePath(bgp.RF_IPv4_UC, strings.Split(buf, " "))
 	assert.Nil(err)
-	fmt.Println(path)
 	i := 0
 	for _, a := range path.GetPathAttrs() {
 		assert.True(i < int(a.GetType()))

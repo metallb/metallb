@@ -26,8 +26,10 @@ import (
 
 	"github.com/osrg/gobgp/config"
 	"github.com/osrg/gobgp/packet/bgp"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPrefixCalcurateNoRange(t *testing.T) {
@@ -498,6 +500,70 @@ func TestAsPathLengthConditionEvaluate(t *testing.T) {
 
 	// test
 	assert.Equal(t, false, c.Evaluate(path, nil))
+}
+
+func TestPolicyMatchAndAcceptNextHop(t *testing.T) {
+	// create path
+	peer := &PeerInfo{AS: 65001, Address: net.ParseIP("10.0.0.1")}
+	origin := bgp.NewPathAttributeOrigin(0)
+	aspathParam := []bgp.AsPathParamInterface{bgp.NewAsPathParam(2, []uint16{65001})}
+	aspath := bgp.NewPathAttributeAsPath(aspathParam)
+	nexthop := bgp.NewPathAttributeNextHop("10.0.0.1")
+	med := bgp.NewPathAttributeMultiExitDisc(0)
+	pathAttributes := []bgp.PathAttributeInterface{origin, aspath, nexthop, med}
+	nlri := []*bgp.IPAddrPrefix{bgp.NewIPAddrPrefix(24, "10.10.0.101")}
+	updateMsg := bgp.NewBGPUpdateMessage(nil, pathAttributes, nlri)
+	path := ProcessMessage(updateMsg, peer, time.Now())[0]
+
+	// create policy
+	ps := createPrefixSet("ps1", "10.10.0.0/16", "21..24")
+	ns := createNeighborSet("ns1", "10.0.0.1")
+	ds := config.DefinedSets{}
+	ds.PrefixSets = []config.PrefixSet{ps}
+	ds.NeighborSets = []config.NeighborSet{ns}
+	s := createStatement("statement1", "ps1", "ns1", true)
+	s.Conditions.BgpConditions.NextHopInList = []string{"10.0.0.1/32"}
+	pd := createPolicyDefinition("pd1", s)
+	pl := createRoutingPolicy(ds, pd)
+
+	r := NewRoutingPolicy()
+	err := r.reload(pl)
+	assert.Nil(t, err)
+	pType, newPath := r.policyMap["pd1"].Apply(path, nil)
+	assert.Equal(t, ROUTE_TYPE_ACCEPT, pType)
+	assert.Equal(t, newPath, path)
+}
+
+func TestPolicyMatchAndRejectNextHop(t *testing.T) {
+	// create path
+	peer := &PeerInfo{AS: 65001, Address: net.ParseIP("10.0.0.1")}
+	origin := bgp.NewPathAttributeOrigin(0)
+	aspathParam := []bgp.AsPathParamInterface{bgp.NewAsPathParam(2, []uint16{65001})}
+	aspath := bgp.NewPathAttributeAsPath(aspathParam)
+	nexthop := bgp.NewPathAttributeNextHop("10.0.0.1")
+	med := bgp.NewPathAttributeMultiExitDisc(0)
+	pathAttributes := []bgp.PathAttributeInterface{origin, aspath, nexthop, med}
+	nlri := []*bgp.IPAddrPrefix{bgp.NewIPAddrPrefix(24, "10.10.0.101")}
+	updateMsg := bgp.NewBGPUpdateMessage(nil, pathAttributes, nlri)
+	path := ProcessMessage(updateMsg, peer, time.Now())[0]
+
+	// create policy
+	ps := createPrefixSet("ps1", "10.10.0.0/16", "21..24")
+	ns := createNeighborSet("ns1", "10.0.0.1")
+	ds := config.DefinedSets{}
+	ds.PrefixSets = []config.PrefixSet{ps}
+	ds.NeighborSets = []config.NeighborSet{ns}
+	s := createStatement("statement1", "ps1", "ns1", true)
+	s.Conditions.BgpConditions.NextHopInList = []string{"10.0.0.12"}
+	pd := createPolicyDefinition("pd1", s)
+	pl := createRoutingPolicy(ds, pd)
+
+	r := NewRoutingPolicy()
+	err := r.reload(pl)
+	assert.Nil(t, err)
+	pType, newPath := r.policyMap["pd1"].Apply(path, nil)
+	assert.Equal(t, ROUTE_TYPE_NONE, pType)
+	assert.Equal(t, newPath, path)
 }
 
 func TestAsPathLengthConditionWithOtherCondition(t *testing.T) {
@@ -2800,9 +2866,9 @@ func createNeighborSet(name string, addr string) config.NeighborSet {
 
 func createAs4Value(s string) uint32 {
 	v := strings.Split(s, ".")
-	upper, _ := strconv.Atoi(v[0])
-	lower, _ := strconv.Atoi(v[1])
-	return uint32(upper)<<16 + uint32(lower)
+	upper, _ := strconv.ParseUint(v[0], 10, 16)
+	lower, _ := strconv.ParseUint(v[1], 10, 16)
+	return uint32(upper<<16 | lower)
 }
 
 func TestPrefixSetOperation(t *testing.T) {
@@ -2991,6 +3057,41 @@ func TestLargeCommunityMatchAction(t *testing.T) {
 	m.set = set
 
 	assert.Equal(t, m.Evaluate(p, nil), true)
+}
+
+func TestAfiSafiInMatchPath(t *testing.T) {
+	condition, err := NewAfiSafiInCondition([]config.AfiSafiType{config.AFI_SAFI_TYPE_L3VPN_IPV4_UNICAST, config.AFI_SAFI_TYPE_L3VPN_IPV6_UNICAST})
+	require.NoError(t, err)
+
+	rtExtCom, err := bgp.ParseExtendedCommunity(bgp.EC_SUBTYPE_ROUTE_TARGET, "100:100")
+	assert.NoError(t, err)
+
+	prefixVPNv4 := bgp.NewLabeledVPNIPAddrPrefix(0, "1.1.1.0/24", *bgp.NewMPLSLabelStack(), bgp.NewRouteDistinguisherTwoOctetAS(100, 100))
+	prefixVPNv6 := bgp.NewLabeledVPNIPv6AddrPrefix(0, "2001:0db8:85a3:0000:0000:8a2e:0370:7334", *bgp.NewMPLSLabelStack(), bgp.NewRouteDistinguisherTwoOctetAS(200, 200))
+	prefixRTC := bgp.NewRouteTargetMembershipNLRI(100, nil)
+	prefixv4 := bgp.NewIPAddrPrefix(0, "1.1.1.0/24")
+	prefixv6 := bgp.NewIPv6AddrPrefix(0, "2001:0db8:85a3:0000:0000:8a2e:0370:7334")
+
+	pathVPNv4 := NewPath(nil, prefixVPNv4, false, []bgp.PathAttributeInterface{bgp.NewPathAttributeExtendedCommunities([]bgp.ExtendedCommunityInterface{rtExtCom})}, time.Time{}, false)
+	pathVPNv6 := NewPath(nil, prefixVPNv6, false, []bgp.PathAttributeInterface{bgp.NewPathAttributeExtendedCommunities([]bgp.ExtendedCommunityInterface{rtExtCom})}, time.Time{}, false)
+	pathv4 := NewPath(nil, prefixv4, false, []bgp.PathAttributeInterface{}, time.Time{}, false)
+	pathv6 := NewPath(nil, prefixv6, false, []bgp.PathAttributeInterface{}, time.Time{}, false)
+	pathRTC := NewPath(nil, prefixRTC, false, []bgp.PathAttributeInterface{}, time.Time{}, false)
+
+	type Entry struct {
+		path        *Path
+		shouldMatch bool
+	}
+
+	for _, entry := range []Entry{
+		{pathVPNv4, true},
+		{pathVPNv6, true},
+		{pathv4, false},
+		{pathv6, false},
+		{pathRTC, false},
+	} {
+		assert.Equal(t, condition.Evaluate(entry.path, nil), entry.shouldMatch)
+	}
 }
 
 func TestMultipleStatementPolicy(t *testing.T) {

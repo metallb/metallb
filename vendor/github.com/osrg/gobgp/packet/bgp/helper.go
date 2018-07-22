@@ -15,10 +15,6 @@
 
 package bgp
 
-import (
-	"net"
-)
-
 func NewTestBGPOpenMessage() *BGPMessage {
 	p1 := NewOptionParameterCapability(
 		[]ParameterCapabilityInterface{NewCapRouteRefresh()})
@@ -65,51 +61,37 @@ func NewTestBGPUpdateMessage() *BGPMessage {
 		NewTwoOctetAsSpecificExtended(EC_SUBTYPE_ROUTE_TARGET, 10003, 3<<20, isTransitive),
 		NewFourOctetAsSpecificExtended(EC_SUBTYPE_ROUTE_TARGET, 1<<20, 300, isTransitive),
 		NewIPv4AddressSpecificExtended(EC_SUBTYPE_ROUTE_TARGET, "192.2.1.2", 3000, isTransitive),
-		&OpaqueExtended{
-			Value: &DefaultOpaqueExtendedValue{[]byte{255, 1, 2, 3, 4, 5, 6, 7}},
-		},
-		&OpaqueExtended{
-			Value: &ValidationExtended{Value: VALIDATION_STATE_INVALID},
-		},
-		&UnknownExtended{Type: 99, Value: []byte{0, 1, 2, 3, 4, 5, 6, 7}},
+		NewOpaqueExtended(false, []byte{1, 2, 3, 4, 5, 6, 7}),
+		NewValidationExtended(VALIDATION_STATE_INVALID),
+		NewUnknownExtended(99, []byte{0, 1, 2, 3, 4, 5, 6, 7}),
 		NewESILabelExtended(1000, true),
 		NewESImportRouteTarget("11:22:33:44:55:66"),
 		NewMacMobilityExtended(123, false),
 	}
 
 	prefixes1 := []AddrPrefixInterface{
-		NewLabeledVPNIPAddrPrefix(20, "192.0.9.0", *NewMPLSLabelStack(1, 2, 3),
+		NewLabeledVPNIPAddrPrefix(24, "192.0.9.0", *NewMPLSLabelStack(1, 2, 3),
 			NewRouteDistinguisherTwoOctetAS(256, 10000)),
-		NewLabeledVPNIPAddrPrefix(26, "192.10.8.192", *NewMPLSLabelStack(5, 6, 7, 8),
+		NewLabeledVPNIPAddrPrefix(24, "192.10.8.0", *NewMPLSLabelStack(5, 6, 7, 8),
 			NewRouteDistinguisherIPAddressAS("10.0.1.1", 10001)),
 	}
 
-	prefixes2 := []AddrPrefixInterface{NewIPv6AddrPrefix(100,
+	prefixes2 := []AddrPrefixInterface{NewIPv6AddrPrefix(128,
 		"fe80:1234:1234:5667:8967:af12:8912:1023")}
 
-	prefixes3 := []AddrPrefixInterface{NewLabeledVPNIPv6AddrPrefix(100,
+	prefixes3 := []AddrPrefixInterface{NewLabeledVPNIPv6AddrPrefix(128,
 		"fe80:1234:1234:5667:8967:af12:1203:33a1", *NewMPLSLabelStack(5, 6),
 		NewRouteDistinguisherFourOctetAS(5, 6))}
 
 	prefixes4 := []AddrPrefixInterface{NewLabeledIPAddrPrefix(25, "192.168.0.0",
 		*NewMPLSLabelStack(5, 6, 7))}
 
-	mac, _ := net.ParseMAC("01:23:45:67:89:ab")
 	prefixes5 := []AddrPrefixInterface{
-		NewEVPNNLRI(EVPN_ROUTE_TYPE_ETHERNET_AUTO_DISCOVERY, 0,
-			&EVPNEthernetAutoDiscoveryRoute{NewRouteDistinguisherFourOctetAS(5, 6),
-				EthernetSegmentIdentifier{ESI_ARBITRARY, make([]byte, 9)}, 2, 2}),
-		NewEVPNNLRI(EVPN_ROUTE_TYPE_MAC_IP_ADVERTISEMENT, 0,
-			&EVPNMacIPAdvertisementRoute{NewRouteDistinguisherFourOctetAS(5, 6),
-				EthernetSegmentIdentifier{ESI_ARBITRARY, make([]byte, 9)}, 3, 48,
-				mac, 32, net.ParseIP("192.2.1.2"),
-				[]uint32{3, 4}}),
-		NewEVPNNLRI(EVPN_INCLUSIVE_MULTICAST_ETHERNET_TAG, 0,
-			&EVPNMulticastEthernetTagRoute{NewRouteDistinguisherFourOctetAS(5, 6), 3, 32, net.ParseIP("192.2.1.2")}),
-		NewEVPNNLRI(EVPN_ETHERNET_SEGMENT_ROUTE, 0,
-			&EVPNEthernetSegmentRoute{NewRouteDistinguisherFourOctetAS(5, 6),
-				EthernetSegmentIdentifier{ESI_ARBITRARY, make([]byte, 9)},
-				32, net.ParseIP("192.2.1.1")}),
+		NewEVPNEthernetAutoDiscoveryRoute(NewRouteDistinguisherFourOctetAS(5, 6), EthernetSegmentIdentifier{ESI_ARBITRARY, make([]byte, 9)}, 2, 2),
+		NewEVPNMacIPAdvertisementRoute(NewRouteDistinguisherFourOctetAS(5, 6), EthernetSegmentIdentifier{ESI_ARBITRARY, make([]byte, 9)}, 3, "01:23:45:67:89:ab", "192.2.1.2", []uint32{3, 4}),
+		NewEVPNMulticastEthernetTagRoute(NewRouteDistinguisherFourOctetAS(5, 6), 3, "192.2.1.2"),
+		NewEVPNEthernetSegmentRoute(NewRouteDistinguisherFourOctetAS(5, 6), EthernetSegmentIdentifier{ESI_ARBITRARY, make([]byte, 9)}, "192.2.1.1"),
+		NewEVPNIPPrefixRoute(NewRouteDistinguisherFourOctetAS(5, 6), EthernetSegmentIdentifier{ESI_ARBITRARY, make([]byte, 9)}, 5, 24, "192.2.1.0", "192.3.1.1", 5),
 	}
 
 	p := []PathAttributeInterface{
@@ -137,13 +119,7 @@ func NewTestBGPUpdateMessage() *BGPMessage {
 		NewPathAttributeMpUnreachNLRI(prefixes1),
 		//NewPathAttributeMpReachNLRI("112.22.2.0", []AddrPrefixInterface{}),
 		//NewPathAttributeMpUnreachNLRI([]AddrPrefixInterface{}),
-		&PathAttributeUnknown{
-			PathAttribute: PathAttribute{
-				Flags: BGP_ATTR_FLAG_TRANSITIVE,
-				Type:  100,
-				Value: []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-			},
-		},
+		NewPathAttributeUnknown(BGP_ATTR_FLAG_TRANSITIVE, 100, []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}),
 	}
 	n := []*IPAddrPrefix{NewIPAddrPrefix(24, "13.2.3.1")}
 	return NewBGPUpdateMessage(w, p, n)

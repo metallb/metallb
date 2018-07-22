@@ -5,14 +5,14 @@ BGP (eBGP) peers are not directly connected and multiple IP hops away.
 
 ## Prerequisites
 
-Assume you finished [Getting Started](https://github.com/osrg/gobgp/blob/master/docs/sources/getting-started.md).
+Assume you finished [Getting Started](getting-started.md).
 
 ## Contents
 
-- [Configuration](#section0)
-- [Verification](#section1)
+- [Configuration](#configuration)
+- [Verification](#verification)
 
-## <a name="section0"> Configuration
+## Configuration
 
 If eBGP neighbor "10.0.0.2" is 2 hops away, you need to configure
 `[neighbors.ebgp-multihop.config]` with `multihop-ttl >= 3` in
@@ -33,15 +33,15 @@ router-id = "10.0.0.1"
 ```
 
 **NOTE:** eBGP Multihop feature is mututally exclusive with
-[TTL Security](https://github.com/osrg/gobgp/blob/master/docs/sources/ttl-security.md).
+[TTL Security](ttl-security.md).
 These features cannot be configured for the same neighbor.
 
-## <a name="section1"> Verification
+## Verification
 
 Without eBGP multihop configuration, the default TTL for eBGP session is 1,
 and GoBGP cannot reach the neighbor on 2 hops away.
 
-```
+```bash
 $ gobgpd -f gobgpd.toml
 {"level":"info","msg":"gobgpd started","time":"YYYY-MM-DDTHH:mm:ss+09:00"}
 {"Topic":"Config","level":"info","msg":"Finished reading the config file","time":"YYYY-MM-DDTHH:mm:ss+09:00"}
@@ -50,7 +50,7 @@ $ gobgpd -f gobgpd.toml
 ...(No connection)...
 ```
 
-```
+```bash
 $ tcpdump -i ethXX tcp -v
 tcpdump: listening on ethXX, link-type EN10MB (Ethernet), capture size 262144 bytes
 hh:mm:ss IP (tos 0x0, ttl 1, id 19110, offset 0, flags [DF], proto TCP (6), length 60)
@@ -65,7 +65,7 @@ hh:mm:ss IP (tos 0x0, ttl 1, id 19112, offset 0, flags [DF], proto TCP (6), leng
 With eBGP multihop configuration, GoBGP will set the given TTL for eBGP
 session and successfully connect to the neighbor on 2 hops away.
 
-```
+```bash
 $ gobgpd -f gobgpd.toml
 {"level":"info","msg":"gobgpd started","time":"YYYY-MM-DDTHH:mm:ss+09:00"}
 {"Topic":"Config","level":"info","msg":"Finished reading the config file","time":"YYYY-MM-DDTHH:mm:ss+09:00"}
@@ -75,7 +75,7 @@ $ gobgpd -f gobgpd.toml
 ...(snip)...
 ```
 
-```
+```bash
 $ tcpdump -i ethXX tcp -v
 tcpdump: listening on ethXX, link-type EN10MB (Ethernet), capture size 262144 bytes
 hh:mm:ss IP (tos 0x0, ttl 3, id 31155, offset 0, flags [DF], proto TCP (6), length 60)

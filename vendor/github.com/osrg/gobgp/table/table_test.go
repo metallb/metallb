@@ -16,10 +16,11 @@
 package table
 
 import (
-	"github.com/osrg/gobgp/packet/bgp"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/osrg/gobgp/packet/bgp"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestTableDeleteDestByNlri(t *testing.T) {
@@ -27,12 +28,10 @@ func TestTableDeleteDestByNlri(t *testing.T) {
 	pathT := TableCreatePath(peerT)
 	ipv4t := NewTable(bgp.RF_IPv4_UC)
 	for _, path := range pathT {
-		tableKey := ipv4t.tableKey(path.GetNlri())
 		dest := NewDestination(path.GetNlri(), 0)
-		ipv4t.setDestination(tableKey, dest)
+		ipv4t.setDestination(dest)
 	}
-	tableKey := ipv4t.tableKey(pathT[0].GetNlri())
-	gdest := ipv4t.GetDestination(tableKey)
+	gdest := ipv4t.GetDestination(pathT[0].GetNlri())
 	rdest := ipv4t.deleteDestByNlri(pathT[0].GetNlri())
 	assert.Equal(t, rdest, gdest)
 }
@@ -42,15 +41,13 @@ func TestTableDeleteDest(t *testing.T) {
 	pathT := TableCreatePath(peerT)
 	ipv4t := NewTable(bgp.RF_IPv4_UC)
 	for _, path := range pathT {
-		tableKey := ipv4t.tableKey(path.GetNlri())
 		dest := NewDestination(path.GetNlri(), 0)
-		ipv4t.setDestination(tableKey, dest)
+		ipv4t.setDestination(dest)
 	}
-	tableKey := ipv4t.tableKey(pathT[0].GetNlri())
 	dest := NewDestination(pathT[0].GetNlri(), 0)
-	ipv4t.setDestination(tableKey, dest)
+	ipv4t.setDestination(dest)
 	ipv4t.deleteDest(dest)
-	gdest := ipv4t.GetDestination(tableKey)
+	gdest := ipv4t.GetDestination(pathT[0].GetNlri())
 	assert.Nil(t, gdest)
 }
 
@@ -87,6 +84,18 @@ func TestTableGetDestinations(t *testing.T) {
 	ipv4t.setDestinations(destinations)
 	ds := ipv4t.GetDestinations()
 	assert.Equal(t, ds, destinations)
+}
+
+func TestTableKey(t *testing.T) {
+	tb := NewTable(bgp.RF_IPv4_UC)
+	n1, _ := bgp.NewPrefixFromRouteFamily(bgp.AFI_IP, bgp.SAFI_UNICAST, "0.0.0.0/0")
+	d1 := NewDestination(n1, 0)
+	n2, _ := bgp.NewPrefixFromRouteFamily(bgp.AFI_IP, bgp.SAFI_UNICAST, "0.0.0.0/1")
+	d2 := NewDestination(n2, 0)
+	assert.Equal(t, len(tb.tableKey(d1.GetNlri())), 5)
+	tb.setDestination(d1)
+	tb.setDestination(d2)
+	assert.Equal(t, len(tb.GetDestinations()), 2)
 }
 
 func TableCreatePeer() []*PeerInfo {

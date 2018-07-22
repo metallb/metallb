@@ -4,11 +4,12 @@ This page explains comprehensive examples of operations via GoBGP CLI.
 
 ## Prerequisites
 
-Assumed that you finished [Getting Started](https://github.com/osrg/gobgp/blob/master/docs/sources/getting-started.md).
+Assumed that you finished [Getting Started](getting-started.md).
 
 ## Configuration
 
-This example starts with the same configuration with [Getting Started](https://github.com/osrg/gobgp/blob/master/docs/sources/getting-started.md)
+This example starts with the same configuration with
+[Getting Started](getting-started.md)
 
 Make sure that all the peers are connected.
 
@@ -113,5 +114,4 @@ $ gobgp neighbor 10.0.255.1 softresetin
 $ gobgp neighbor 10.0.255.1 softresetout
 ```
 
-
-You can know more about gobgp command syntax [here](https://github.com/osrg/gobgp/blob/master/docs/sources/cli-command-syntax.md).
+You can know more about [CLI command syntax](cli-command-syntax.md).

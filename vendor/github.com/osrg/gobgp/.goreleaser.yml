@@ -10,6 +10,7 @@ builds:
       - amd64
       - 386
       - arm
+      - arm64
 
   - main: ./gobgpd/
     binary: gobgpd
@@ -19,6 +20,7 @@ builds:
       - amd64
       - 386
       - arm
+      - arm64
 
 archive:
   files:

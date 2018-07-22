@@ -16,15 +16,17 @@
 package server
 
 import (
-	"github.com/osrg/gobgp/table"
-	"github.com/osrg/gobgp/zebra"
-	"github.com/stretchr/testify/assert"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+
+	"github.com/osrg/gobgp/table"
+	"github.com/osrg/gobgp/zebra"
 )
 
-func Test_createPathFromIPRouteMessage(t *testing.T) {
+func Test_newPathFromIPRouteMessage(t *testing.T) {
 	assert := assert.New(t)
 
 	// IPv4 Route Add
@@ -52,7 +54,7 @@ func Test_createPathFromIPRouteMessage(t *testing.T) {
 	m.Header = *h
 	m.Body = b
 
-	path := createPathFromIPRouteMessage(m)
+	path := newPathFromIPRouteMessage(m)
 	pp := table.NewPath(nil, path.GetNlri(), path.IsWithdraw, path.GetPathAttrs(), time.Now(), false)
 	pp.SetIsFromExternal(path.IsFromExternal())
 	assert.Equal("0.0.0.0", pp.GetNexthop().String())
@@ -66,7 +68,7 @@ func Test_createPathFromIPRouteMessage(t *testing.T) {
 	m.Header = *h
 	m.Body = b
 
-	path = createPathFromIPRouteMessage(m)
+	path = newPathFromIPRouteMessage(m)
 	pp = table.NewPath(nil, path.GetNlri(), path.IsWithdraw, path.GetPathAttrs(), time.Now(), false)
 	pp.SetIsFromExternal(path.IsFromExternal())
 	assert.Equal("0.0.0.0", pp.GetNexthop().String())
@@ -85,7 +87,7 @@ func Test_createPathFromIPRouteMessage(t *testing.T) {
 	m.Header = *h
 	m.Body = b
 
-	path = createPathFromIPRouteMessage(m)
+	path = newPathFromIPRouteMessage(m)
 	pp = table.NewPath(nil, path.GetNlri(), path.IsWithdraw, path.GetPathAttrs(), time.Now(), false)
 	pp.SetIsFromExternal(path.IsFromExternal())
 	assert.Equal("::", pp.GetNexthop().String())
@@ -101,7 +103,7 @@ func Test_createPathFromIPRouteMessage(t *testing.T) {
 	m.Header = *h
 	m.Body = b
 
-	path = createPathFromIPRouteMessage(m)
+	path = newPathFromIPRouteMessage(m)
 	pp = table.NewPath(nil, path.GetNlri(), path.IsWithdraw, path.GetPathAttrs(), time.Now(), false)
 	pp.SetIsFromExternal(path.IsFromExternal())
 	assert.Equal("::", pp.GetNexthop().String())

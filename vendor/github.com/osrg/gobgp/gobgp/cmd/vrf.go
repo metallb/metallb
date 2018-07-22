@@ -18,11 +18,15 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/osrg/gobgp/packet/bgp"
-	"github.com/spf13/cobra"
 	"sort"
 	"strconv"
 	"strings"
+
+	api "github.com/osrg/gobgp/api"
+	"github.com/osrg/gobgp/packet/bgp"
+
+	"github.com/golang/protobuf/ptypes/any"
+	"github.com/spf13/cobra"
 )
 
 func getVrfs() (vrfs, error) {
@@ -54,21 +58,35 @@ func showVrfs() error {
 	lines := make([][]string, 0, len(vrfs))
 	for _, v := range vrfs {
 		name := v.Name
-		rd := v.Rd.String()
+		rd, err := api.UnmarshalRD(v.Rd)
+		if err != nil {
+			return err
+		}
+		rdStr := rd.String()
 
-		f := func(rts []bgp.ExtendedCommunityInterface) (string, error) {
+		f := func(rts []*any.Any) (string, error) {
 			ret := make([]string, 0, len(rts))
-			for _, rt := range rts {
+			for _, an := range rts {
+				rt, err := api.UnmarshalRT(an)
+				if err != nil {
+					return "", err
+				}
 				ret = append(ret, rt.String())
 			}
 			return strings.Join(ret, ", "), nil
 		}
 
-		importRts, _ := f(v.ImportRt)
-		exportRts, _ := f(v.ExportRt)
-		lines = append(lines, []string{name, rd, importRts, exportRts, fmt.Sprintf("%d", v.Id)})
+		importRts, err := f(v.ImportRt)
+		if err != nil {
+			return err
+		}
+		exportRts, err := f(v.ExportRt)
+		if err != nil {
+			return err
+		}
+		lines = append(lines, []string{name, rdStr, importRts, exportRts, fmt.Sprintf("%d", v.Id)})
 
-		for i, v := range []int{len(name), len(rd), len(importRts), len(exportRts)} {
+		for i, v := range []int{len(name), len(rdStr), len(importRts), len(exportRts)} {
 			if v > maxLens[i] {
 				maxLens[i] = v + 4
 			}
@@ -91,8 +109,11 @@ func modVrf(typ string, args []string) error {
 	var err error
 	switch typ {
 	case CMD_ADD:
-		a := extractReserved(args, []string{"rd", "rt", "id"})
-		if len(a[""]) != 1 || len(a["rd"]) != 1 || len(a["rt"]) < 2 || len(a["id"]) > 1 {
+		a, err := extractReserved(args, map[string]int{
+			"rd": PARAM_SINGLE,
+			"rt": PARAM_LIST,
+			"id": PARAM_SINGLE})
+		if err != nil || len(a[""]) != 1 || len(a["rd"]) != 1 || len(a["rt"]) < 2 {
 			return fmt.Errorf("Usage: gobgp vrf add <vrf name> [ id <id> ] rd <rd> rt { import | export | both } <rt>...")
 		}
 		name := a[""][0]
@@ -125,14 +146,16 @@ func modVrf(typ string, args []string) error {
 				return fmt.Errorf("Usage: gobgp vrf add <vrf name> rd <rd> rt { import | export | both } <rt>...")
 			}
 		}
-		vrfId := 0
+		var id uint64
 		if len(a["id"]) > 0 {
-			vrfId, err = strconv.Atoi(a["id"][0])
+			id, err = strconv.ParseUint(a["id"][0], 10, 32)
 			if err != nil {
 				return err
 			}
 		}
-		err = client.AddVRF(name, vrfId, rd, importRt, exportRt)
+		if err := client.AddVRF(name, int(id), rd, importRt, exportRt); err != nil {
+			return err
+		}
 	case CMD_DEL:
 		if len(args) != 1 {
 			return fmt.Errorf("Usage: gobgp vrf del <vrf name>")
@@ -143,7 +166,6 @@ func modVrf(typ string, args []string) error {
 }
 
 func NewVrfCmd() *cobra.Command {
-
 	ribCmd := &cobra.Command{
 		Use: CMD_RIB,
 		Run: func(cmd *cobra.Command, args []string) {

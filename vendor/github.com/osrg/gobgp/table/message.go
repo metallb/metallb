@@ -45,9 +45,10 @@ func UpdatePathAttrs2ByteAs(msg *bgp.BGPUpdate) error {
 	as2Params := make([]bgp.AsPathParamInterface, 0, len(asAttr.Value))
 	mkAs4 := false
 	for _, param := range asAttr.Value {
-		as4Param := param.(*bgp.As4PathParam)
-		as2Path := make([]uint16, 0, len(as4Param.AS))
-		for _, as := range as4Param.AS {
+		segType := param.GetType()
+		asList := param.GetAS()
+		as2Path := make([]uint16, 0, len(asList))
+		for _, as := range asList {
 			if as > (1<<16)-1 {
 				mkAs4 = true
 				as2Path = append(as2Path, bgp.AS_TRANS)
@@ -55,15 +56,20 @@ func UpdatePathAttrs2ByteAs(msg *bgp.BGPUpdate) error {
 				as2Path = append(as2Path, uint16(as))
 			}
 		}
-		as2Params = append(as2Params, bgp.NewAsPathParam(as4Param.Type, as2Path))
+		as2Params = append(as2Params, bgp.NewAsPathParam(segType, as2Path))
 
 		// RFC 6793 4.2.2 Generating Updates
 		//
 		// Whenever the AS path information contains the AS_CONFED_SEQUENCE or
 		// AS_CONFED_SET path segment, the NEW BGP speaker MUST exclude such
 		// path segments from the AS4_PATH attribute being constructed.
-		if as4Param.Type != bgp.BGP_ASPATH_ATTR_TYPE_CONFED_SEQ && as4Param.Type != bgp.BGP_ASPATH_ATTR_TYPE_CONFED_SET {
-			as4Params = append(as4Params, as4Param)
+		switch segType {
+		case bgp.BGP_ASPATH_ATTR_TYPE_CONFED_SEQ, bgp.BGP_ASPATH_ATTR_TYPE_CONFED_SET:
+			// pass
+		default:
+			if as4param, ok := param.(*bgp.As4PathParam); ok {
+				as4Params = append(as4Params, as4param)
+			}
 		}
 	}
 	msg.PathAttributes[idx] = bgp.NewPathAttributeAsPath(as2Params)
@@ -111,21 +117,20 @@ func UpdatePathAttrs4ByteAs(msg *bgp.BGPUpdate) error {
 
 	asLen := 0
 	asConfedLen := 0
-	asParams := make([]*bgp.As4PathParam, 0, len(asAttr.Value))
+	asParams := make([]bgp.AsPathParamInterface, 0, len(asAttr.Value))
 	for _, param := range asAttr.Value {
 		asLen += param.ASLen()
-		p := param.(*bgp.As4PathParam)
-		switch p.Type {
+		switch param.GetType() {
 		case bgp.BGP_ASPATH_ATTR_TYPE_CONFED_SET:
-			asConfedLen += 1
+			asConfedLen++
 		case bgp.BGP_ASPATH_ATTR_TYPE_CONFED_SEQ:
-			asConfedLen += len(p.AS)
+			asConfedLen += len(param.GetAS())
 		}
-		asParams = append(asParams, p)
+		asParams = append(asParams, param)
 	}
 
 	as4Len := 0
-	as4Params := make([]*bgp.As4PathParam, 0, len(as4Attr.Value))
+	as4Params := make([]bgp.AsPathParamInterface, 0, len(as4Attr.Value))
 	if as4Attr != nil {
 		for _, p := range as4Attr.Value {
 			// RFC 6793 6. Error Handling
@@ -162,14 +167,14 @@ func UpdatePathAttrs4ByteAs(msg *bgp.BGPUpdate) error {
 
 	keepNum := asLen + asConfedLen - as4Len
 
-	newParams := make([]*bgp.As4PathParam, 0, len(asAttr.Value))
+	newParams := make([]bgp.AsPathParamInterface, 0, len(asAttr.Value))
 	for _, param := range asParams {
 		if keepNum-param.ASLen() >= 0 {
 			newParams = append(newParams, param)
 			keepNum -= param.ASLen()
 		} else {
 			// only SEQ param reaches here
-			newParams = append(newParams, bgp.NewAs4PathParam(param.Type, param.AS[:keepNum]))
+			newParams = append(newParams, bgp.NewAs4PathParam(param.GetType(), param.GetAS()[:keepNum]))
 			keepNum = 0
 		}
 
@@ -180,12 +185,15 @@ func UpdatePathAttrs4ByteAs(msg *bgp.BGPUpdate) error {
 
 	for _, param := range as4Params {
 		lastParam := newParams[len(newParams)-1]
-		if param.Type == lastParam.Type && param.Type == bgp.BGP_ASPATH_ATTR_TYPE_SEQ {
-			if len(lastParam.AS)+len(param.AS) > 255 {
-				newParams[len(newParams)-1] = bgp.NewAs4PathParam(param.Type, append(lastParam.AS, param.AS[:255-len(lastParam.AS)]...))
-				newParams = append(newParams, bgp.NewAs4PathParam(param.Type, param.AS[255-len(lastParam.AS):]))
+		lastParamAS := lastParam.GetAS()
+		paramType := param.GetType()
+		paramAS := param.GetAS()
+		if paramType == lastParam.GetType() && paramType == bgp.BGP_ASPATH_ATTR_TYPE_SEQ {
+			if len(lastParamAS)+len(paramAS) > 255 {
+				newParams[len(newParams)-1] = bgp.NewAs4PathParam(paramType, append(lastParamAS, paramAS[:255-len(lastParamAS)]...))
+				newParams = append(newParams, bgp.NewAs4PathParam(paramType, paramAS[255-len(lastParamAS):]))
 			} else {
-				newParams[len(newParams)-1] = bgp.NewAs4PathParam(param.Type, append(lastParam.AS, param.AS...))
+				newParams[len(newParams)-1] = bgp.NewAs4PathParam(paramType, append(lastParamAS, paramAS...))
 			}
 		} else {
 			newParams = append(newParams, param)
@@ -193,9 +201,7 @@ func UpdatePathAttrs4ByteAs(msg *bgp.BGPUpdate) error {
 	}
 
 	newIntfParams := make([]bgp.AsPathParamInterface, 0, len(asAttr.Value))
-	for _, p := range newParams {
-		newIntfParams = append(newIntfParams, p)
-	}
+	newIntfParams = append(newIntfParams, newParams...)
 
 	msg.PathAttributes[asAttrPos] = bgp.NewPathAttributeAsPath(newIntfParams)
 	return nil
@@ -376,7 +382,7 @@ func (p *packerV4) add(path *Path) {
 	if cages, y := p.hashmap[key]; y {
 		added := false
 		for _, c := range cages {
-			if bytes.Compare(c.attrsBytes, attrsB.Bytes()) == 0 {
+			if bytes.Equal(c.attrsBytes, attrsB.Bytes()) {
 				c.paths = append(c.paths, path)
 				added = true
 				break

@@ -9,5 +9,6 @@ before_script:
   - sudo modprobe nf_conntrack_netlink
   - sudo modprobe nf_conntrack_ipv4
   - sudo modprobe nf_conntrack_ipv6
+  - sudo modprobe sch_hfsc
 install:
   - go get github.com/vishvananda/netns

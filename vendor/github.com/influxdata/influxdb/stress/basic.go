@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"sync"
 	"time"
@@ -93,14 +92,14 @@ func typeArr(a []string) []interface{} {
 		var t string
 		switch ty {
 		case "float64":
-			t = fmt.Sprintf("%v", rand.Intn(1000))
+			t = fmt.Sprintf("%v", time.Now().Nanosecond()%1000)
 		case "int":
-			t = fmt.Sprintf("%vi", rand.Intn(1000))
+			t = fmt.Sprintf("%vi", time.Now().Nanosecond()%1000)
 		case "bool":
-			b := rand.Intn(2) == 1
+			b := time.Now().Nanosecond()%2 == 1
 			t = fmt.Sprintf("%t", b)
 		default:
-			t = fmt.Sprintf("%v", rand.Intn(1000))
+			t = fmt.Sprintf("%v", time.Now().Nanosecond()%1000)
 		}
 		i[j] = t
 	}
@@ -389,7 +388,7 @@ type BasicQuery struct {
 
 // QueryGenerate returns a Query channel
 func (q *BasicQuery) QueryGenerate(now func() time.Time) (<-chan Query, error) {
-	c := make(chan Query, 0)
+	c := make(chan Query)
 
 	go func(chan Query) {
 		defer close(c)
@@ -406,7 +405,6 @@ func (q *BasicQuery) QueryGenerate(now func() time.Time) (<-chan Query, error) {
 // SetTime sets the internal state of time
 func (q *BasicQuery) SetTime(t time.Time) {
 	q.time = t
-	return
 }
 
 // BasicQueryClient implements the QueryClient interface
@@ -513,11 +511,7 @@ func resetDB(c client.Client, database string) error {
 	_, err = c.Query(client.Query{
 		Command: fmt.Sprintf("CREATE DATABASE %s", database),
 	})
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 // BasicProvisioner implements the Provisioner
@@ -562,7 +556,7 @@ func NewBroadcastChannel() *BroadcastChannel {
 }
 
 func (b *BroadcastChannel) Register(fn responseHandler) {
-	ch := make(chan response, 0)
+	ch := make(chan response)
 
 	b.chs = append(b.chs, ch)
 

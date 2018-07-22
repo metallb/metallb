@@ -1,17 +1,18 @@
 package tsi1_test
 
 import (
+	"fmt"
+	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/influxdata/influxdb/models"
+	"github.com/influxdata/influxdb/tsdb"
 )
 
 // Ensure fileset can return an iterator over all series in the index.
 func TestFileSet_SeriesIDIterator(t *testing.T) {
-	sfile := MustOpenSeriesFile()
-	defer sfile.Close()
-
-	idx := MustOpenIndex(sfile.SeriesFile, 1)
+	idx := MustOpenIndex(1)
 	defer idx.Close()
 
 	// Create initial set of series.
@@ -35,26 +36,12 @@ func TestFileSet_SeriesIDIterator(t *testing.T) {
 		if itr == nil {
 			t.Fatal("expected iterator")
 		}
-
-		if elem, err := itr.Next(); err != nil {
-			t.Fatal(err)
-		} else if name, tags := fs.SeriesFile().Series(elem.SeriesID); string(name) != `cpu` || tags.String() != `[{region east}]` {
-			t.Fatalf("unexpected series: %s/%s", name, tags.String())
-		}
-		if elem, err := itr.Next(); err != nil {
-			t.Fatal(err)
-		} else if name, tags := fs.SeriesFile().Series(elem.SeriesID); string(name) != `cpu` || tags.String() != `[{region west}]` {
-			t.Fatalf("unexpected series: %s/%s", name, tags.String())
-		}
-		if elem, err := itr.Next(); err != nil {
-			t.Fatal(err)
-		} else if name, tags := fs.SeriesFile().Series(elem.SeriesID); string(name) != `mem` || tags.String() != `[{region east}]` {
-			t.Fatalf("unexpected series: %s/%s", name, tags.String())
-		}
-		if elem, err := itr.Next(); err != nil {
-			t.Fatal(err)
-		} else if elem.SeriesID != 0 {
-			t.Fatalf("expected eof, got: %d", elem.SeriesID)
+		if result := MustReadAllSeriesIDIteratorString(fs.SeriesFile(), itr); !reflect.DeepEqual(result, []string{
+			"cpu,[{region east}]",
+			"cpu,[{region west}]",
+			"mem,[{region east}]",
+		}) {
+			t.Fatalf("unexpected keys: %s", result)
 		}
 	})
 
@@ -80,47 +67,21 @@ func TestFileSet_SeriesIDIterator(t *testing.T) {
 			t.Fatal("expected iterator")
 		}
 
-		allexpected := []struct {
-			name   string
-			tagset string
-		}{
-			{`cpu`, `[{region east}]`},
-			{`cpu`, `[{region west}]`},
-			{`mem`, `[{region east}]`},
-			{`disk`, `[]`},
-			{`cpu`, `[{region north}]`},
-		}
-
-		for _, expected := range allexpected {
-			e, err := itr.Next()
-			if err != nil {
-				t.Fatal(err)
-			}
-
-			if name, tags := fs.SeriesFile().Series(e.SeriesID); string(name) != expected.name || tags.String() != expected.tagset {
-				t.Fatalf("unexpected series: %s/%s", name, tags.String())
-			}
-		}
-
-		// Check for end of iterator...
-		e, err := itr.Next()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if e.SeriesID != 0 {
-			name, tags := fs.SeriesFile().Series(e.SeriesID)
-			t.Fatalf("got: %s/%s, but expected EOF", name, tags.String())
+		if result := MustReadAllSeriesIDIteratorString(fs.SeriesFile(), itr); !reflect.DeepEqual(result, []string{
+			"cpu,[{region east}]",
+			"cpu,[{region north}]",
+			"cpu,[{region west}]",
+			"disk,[]",
+			"mem,[{region east}]",
+		}) {
+			t.Fatalf("unexpected keys: %s", result)
 		}
 	})
 }
 
 // Ensure fileset can return an iterator over all series for one measurement.
 func TestFileSet_MeasurementSeriesIDIterator(t *testing.T) {
-	sfile := MustOpenSeriesFile()
-	defer sfile.Close()
-
-	idx := MustOpenIndex(sfile.SeriesFile, 1)
+	idx := MustOpenIndex(1)
 	defer idx.Close()
 
 	// Create initial set of series.
@@ -145,20 +106,11 @@ func TestFileSet_MeasurementSeriesIDIterator(t *testing.T) {
 			t.Fatal("expected iterator")
 		}
 
-		if elem, err := itr.Next(); err != nil {
-			t.Fatal(err)
-		} else if name, tags := fs.SeriesFile().Series(elem.SeriesID); string(name) != `cpu` || tags.String() != `[{region east}]` {
-			t.Fatalf("unexpected series: %s/%s", name, tags.String())
-		}
-		if elem, err := itr.Next(); err != nil {
-			t.Fatal(err)
-		} else if name, tags := fs.SeriesFile().Series(elem.SeriesID); string(name) != `cpu` || tags.String() != `[{region west}]` {
-			t.Fatalf("unexpected series: %s/%s", name, tags.String())
-		}
-		if elem, err := itr.Next(); err != nil {
-			t.Fatal(err)
-		} else if elem.SeriesID != 0 {
-			t.Fatalf("expected eof, got: %d", elem.SeriesID)
+		if result := MustReadAllSeriesIDIteratorString(fs.SeriesFile(), itr); !reflect.DeepEqual(result, []string{
+			"cpu,[{region east}]",
+			"cpu,[{region west}]",
+		}) {
+			t.Fatalf("unexpected keys: %s", result)
 		}
 	})
 
@@ -183,35 +135,19 @@ func TestFileSet_MeasurementSeriesIDIterator(t *testing.T) {
 			t.Fatalf("expected iterator")
 		}
 
-		if elem, err := itr.Next(); err != nil {
-			t.Fatal(err)
-		} else if name, tags := fs.SeriesFile().Series(elem.SeriesID); string(name) != `cpu` || tags.String() != `[{region east}]` {
-			t.Fatalf("unexpected series: %s/%s", name, tags.String())
-		}
-		if elem, err := itr.Next(); err != nil {
-			t.Fatal(err)
-		} else if name, tags := fs.SeriesFile().Series(elem.SeriesID); string(name) != `cpu` || tags.String() != `[{region west}]` {
-			t.Fatalf("unexpected series: %s/%s", name, tags.String())
-		}
-		if elem, err := itr.Next(); err != nil {
-			t.Fatal(err)
-		} else if name, tags := fs.SeriesFile().Series(elem.SeriesID); string(name) != `cpu` || tags.String() != `[{region north}]` {
-			t.Fatalf("unexpected series: %s/%s", name, tags.String())
-		}
-		if elem, err := itr.Next(); err != nil {
-			t.Fatal(err)
-		} else if elem.SeriesID != 0 {
-			t.Fatalf("expected eof, got: %d", elem.SeriesID)
+		if result := MustReadAllSeriesIDIteratorString(fs.SeriesFile(), itr); !reflect.DeepEqual(result, []string{
+			"cpu,[{region east}]",
+			"cpu,[{region north}]",
+			"cpu,[{region west}]",
+		}) {
+			t.Fatalf("unexpected keys: %s", result)
 		}
 	})
 }
 
 // Ensure fileset can return an iterator over all measurements for the index.
 func TestFileSet_MeasurementIterator(t *testing.T) {
-	sfile := MustOpenSeriesFile()
-	defer sfile.Close()
-
-	idx := MustOpenIndex(sfile.SeriesFile, 1)
+	idx := MustOpenIndex(1)
 	defer idx.Close()
 
 	// Create initial set of series.
@@ -235,12 +171,16 @@ func TestFileSet_MeasurementIterator(t *testing.T) {
 			t.Fatal("expected iterator")
 		}
 
-		if e := itr.Next(); string(e.Name()) != `cpu` {
-			t.Fatalf("unexpected measurement: %s", e.Name())
-		} else if e := itr.Next(); string(e.Name()) != `mem` {
-			t.Fatalf("unexpected measurement: %s", e.Name())
-		} else if e := itr.Next(); e != nil {
-			t.Fatalf("expected nil measurement: %s", e.Name())
+		expectedNames := []string{"cpu", "mem", ""} // Empty string implies end
+		for _, name := range expectedNames {
+			e := itr.Next()
+			if name == "" && e != nil {
+				t.Errorf("got measurement %s, expected nil measurement", e.Name())
+			} else if e == nil && name != "" {
+				t.Errorf("got nil measurement, expected %s", name)
+			} else if e != nil && string(e.Name()) != name {
+				t.Errorf("got measurement %s, expected %s", e.Name(), name)
+			}
 		}
 	})
 
@@ -265,24 +205,23 @@ func TestFileSet_MeasurementIterator(t *testing.T) {
 			t.Fatal("expected iterator")
 		}
 
-		if e := itr.Next(); string(e.Name()) != `cpu` {
-			t.Fatalf("unexpected measurement: %s", e.Name())
-		} else if e := itr.Next(); string(e.Name()) != `disk` {
-			t.Fatalf("unexpected measurement: %s", e.Name())
-		} else if e := itr.Next(); string(e.Name()) != `mem` {
-			t.Fatalf("unexpected measurement: %s", e.Name())
-		} else if e := itr.Next(); e != nil {
-			t.Fatalf("expected nil measurement: %s", e.Name())
+		expectedNames := []string{"cpu", "disk", "mem", ""} // Empty string implies end
+		for _, name := range expectedNames {
+			e := itr.Next()
+			if name == "" && e != nil {
+				t.Errorf("got measurement %s, expected nil measurement", e.Name())
+			} else if e == nil && name != "" {
+				t.Errorf("got nil measurement, expected %s", name)
+			} else if e != nil && string(e.Name()) != name {
+				t.Errorf("got measurement %s, expected %s", e.Name(), name)
+			}
 		}
 	})
 }
 
 // Ensure fileset can return an iterator over all keys for one measurement.
 func TestFileSet_TagKeyIterator(t *testing.T) {
-	sfile := MustOpenSeriesFile()
-	defer sfile.Close()
-
-	idx := MustOpenIndex(sfile.SeriesFile, 1)
+	idx := MustOpenIndex(1)
 	defer idx.Close()
 
 	// Create initial set of series.
@@ -347,4 +286,24 @@ func TestFileSet_TagKeyIterator(t *testing.T) {
 			t.Fatalf("expected nil key: %s", e.Key())
 		}
 	})
+}
+
+func MustReadAllSeriesIDIteratorString(sfile *tsdb.SeriesFile, itr tsdb.SeriesIDIterator) []string {
+	// Read all ids.
+	ids, err := tsdb.ReadAllSeriesIDIterator(itr)
+	if err != nil {
+		panic(err)
+	}
+
+	// Convert to keys and sort.
+	keys := sfile.SeriesKeys(ids)
+	sort.Slice(keys, func(i, j int) bool { return tsdb.CompareSeriesKeys(keys[i], keys[j]) == -1 })
+
+	// Convert to strings.
+	a := make([]string, len(keys))
+	for i := range a {
+		name, tags := tsdb.ParseSeriesKey(keys[i])
+		a[i] = fmt.Sprintf("%s,%s", name, tags.String())
+	}
+	return a
 }

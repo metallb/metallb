@@ -11,10 +11,12 @@ import (
 	"io"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -88,7 +90,7 @@ func (c *CommandLine) Run() error {
 
 	// Check if we will be able to prompt for the password later.
 	if promptForPassword && !hasTTY {
-		return errors.New("Unable to prompt for a password with no TTY.")
+		return errors.New("unable to prompt for a password with no TTY")
 	}
 
 	// Read environment variables for username/password.
@@ -164,7 +166,7 @@ func (c *CommandLine) Run() error {
 
 		i := v8.NewImporter(config)
 		if err := i.Import(); err != nil {
-			err = fmt.Errorf("ERROR: %s\n", err)
+			err = fmt.Errorf("ERROR: %s", err)
 			return err
 		}
 		return nil
@@ -198,9 +200,20 @@ func (c *CommandLine) Run() error {
 	c.Version()
 
 	// Only load/write history if HOME environment variable is set.
+	var historyDir string
+	if runtime.GOOS == "windows" {
+		if userDir := os.Getenv("USERPROFILE"); userDir != "" {
+			historyDir = userDir
+		}
+	}
+
 	if homeDir := os.Getenv("HOME"); homeDir != "" {
-		// Attempt to load the history file.
-		c.historyFilePath = filepath.Join(homeDir, ".influx_history")
+		historyDir = homeDir
+	}
+
+	// Attempt to load the history file.
+	if historyDir != "" {
+		c.historyFilePath = filepath.Join(historyDir, ".influx_history")
 		if historyFile, err := os.Open(c.historyFilePath); err == nil {
 			c.Line.ReadHistory(historyFile)
 			historyFile.Close()
@@ -321,6 +334,7 @@ func (c *CommandLine) Connect(cmd string) error {
 	ClientConfig := c.ClientConfig
 	ClientConfig.UserAgent = "InfluxDBShell/" + c.ClientVersion
 	ClientConfig.URL = URL
+	ClientConfig.Proxy = http.ProxyFromEnvironment
 
 	client, err := client.NewClient(ClientConfig)
 	if err != nil {
@@ -692,7 +706,7 @@ func (c *CommandLine) parseInto(stmt string) *client.BatchPoints {
 func (c *CommandLine) parseInsert(stmt string) (*client.BatchPoints, error) {
 	i, point := parseNextIdentifier(stmt)
 	if !strings.EqualFold(i, "insert") {
-		return nil, fmt.Errorf("found %s, expected INSERT\n", i)
+		return nil, fmt.Errorf("found %s, expected INSERT", i)
 	}
 	if i, r := parseNextIdentifier(point); strings.EqualFold(i, "into") {
 		bp := c.parseInto(r)
@@ -730,11 +744,12 @@ func (c *CommandLine) Insert(stmt string) error {
 // query creates a query struct to be used with the client.
 func (c *CommandLine) query(query string) client.Query {
 	return client.Query{
-		Command:   query,
-		Database:  c.Database,
-		Chunked:   c.Chunked,
-		ChunkSize: c.ChunkSize,
-		NodeID:    c.NodeID,
+		Command:         query,
+		Database:        c.Database,
+		RetentionPolicy: c.RetentionPolicy,
+		Chunked:         c.Chunked,
+		ChunkSize:       c.ChunkSize,
+		NodeID:          c.NodeID,
 	}
 }
 
@@ -1054,6 +1069,9 @@ func (c *CommandLine) history() {
 }
 
 func (c *CommandLine) saveHistory() {
+	if c.historyFilePath == "" {
+		return
+	}
 	if historyFile, err := os.Create(c.historyFilePath); err != nil {
 		fmt.Printf("There was an error writing history file: %s\n", err)
 	} else {

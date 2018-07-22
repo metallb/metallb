@@ -125,7 +125,7 @@ class GoBGPTestBase(unittest.TestCase):
         wait_for_completion(lambda: len(self.g5.get_global_rib()) == 1)
 
     def test_06_graceful_restart(self):
-        self.g1.graceful_restart()
+        self.g1.stop_gobgp()
         self.g3.wait_for(expected_state=BGP_FSM_ACTIVE, peer=self.g1)
 
         wait_for_completion(lambda: len(self.g3.get_global_rib(rf="vpnv4")) == 2)

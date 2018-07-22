@@ -1,7 +1,7 @@
 # Unnumbered BGP
 
 BGP is not only for the Internet. Due to proven scalability and configuration
-flexibility, large data center operators are using BGP for thier data center
+flexibility, large data center operators are using BGP for their data center
 networking [[ietf-rtgwg-bgp-routing-large-dc](https://tools.ietf.org/html/rfc7938)].
 
 In typical case, the topology of the network is CLOS network which can offer
@@ -10,11 +10,11 @@ Each ToR switches run BGP daemon and peer to uplink switches connected with
 P2P link.
 
 In this case, since all switches are operated by single administrator and trusted,
-we can skip tedius neighbor configurations like specifing neighbor address or
-neighbor AS number by using unnumberd BGP feature.
+we can skip tedious neighbor configurations like specifying neighbor address or
+neighbor AS number by using unnumbered BGP feature.
 
 Unnumbered BGP utilizes IPv6 link local address to automatically decide who
-to connect. Also, when using unnumberd BGP, you don't need to specify neighbor AS number.
+to connect. Also, when using unnumbered BGP, you don't need to specify neighbor AS number.
 GoBGP will accept any AS number in the neighbor's open message.
 
 ## Prerequisites
@@ -41,7 +41,7 @@ PING ff02::1%eth0 (ff02::1%eth0): 56 data bytes
 round-trip min/avg/max/stddev = 0.312/0.312/0.312/0.000 ms
 ```
 
-More reliable method is to run [radvd](http://www.litech.org/radvd/) or 
+More reliable method is to run [radvd](http://www.litech.org/radvd/) or
 [zebra](http://www.nongnu.org/quagga/) to periodically send router
 advertisement.
 

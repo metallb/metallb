@@ -14,16 +14,21 @@ Ruby, C++, Node.js, and Java. It assumes that you use Ubuntu 16.04 (64bit).
 - [Node.js](#nodejs)
 - [Java](#java)
 
-## <a name="prerequisite"> Prerequisite
-We assumes that you have finished installing `protoc` [protocol buffer](https://github.com/google/protobuf) compiler to generate stub server and client code and "protobuf runtime" for your favorite language.
+## Prerequisite
 
-Please refer to [the official docs of gRPC](http://www.grpc.io/docs/) for details.
+We assumes that you have finished installing `protoc`
+[protocol buffer](https://github.com/google/protobuf) compiler to generate stub
+server and client code and "protobuf runtime" for your favorite language.
 
-## <a name="python"> Python
+Please refer to [the official docs of gRPC](http://www.grpc.io/docs/) for
+details.
+
+## Python
 
 ### Generating Stub Code
 
 We need to generate stub code GoBGP at first.
+
 ```bash
 $ cd $GOPATH/src/github.com/osrg/gobgp/tools/grpc/python
 $ GOBGP_API=$GOPATH/src/github.com/osrg/gobgp/api
@@ -32,7 +37,8 @@ $ protoc  -I $GOBGP_API --python_out=. --grpc_out=. --plugin=protoc-gen-grpc=`wh
 
 ### Get Neighbor
 
-['tools/grpc/python/get_neighbor.py'](https://github.com/osrg/gobgp/blob/master/tools/grpc/python/get_neighbor.py) shows an example for getting neighbor's information.
+['tools/grpc/python/get_neighbor.py'](https://github.com/osrg/gobgp/blob/master/tools/grpc/python/get_neighbor.py)
+shows an example for getting neighbor's information.
 Let's run this script.
 
 ```bash
@@ -47,11 +53,12 @@ BGP neighbor is 10.0.0.2, remote AS 65002
 
 We got the neighbor information successfully.
 
-## <a name="ruby"> Ruby
+## Ruby
 
 ### Generating Stub Code
 
 We need to generate stub code GoBGP at first.
+
 ```bash
 $ cd $GOPATH/src/github.com/osrg/gobgp/tools/grpc/ruby
 $ GOBGP_API=$GOPATH/src/github.com/osrg/gobgp/api
@@ -60,7 +67,8 @@ $ protoc  -I $GOBGP_API --ruby_out=. --grpc_out=. --plugin=protoc-gen-grpc=`whic
 
 ### Get Neighbor
 
-['tools/grpc/ruby/get_neighbor.py'](https://github.com/osrg/gobgp/blob/master/tools/grpc/ruby/get_neighbor.rb) shows an example for getting neighbor's information.
+['tools/grpc/ruby/get_neighbor.py'](https://github.com/osrg/gobgp/blob/master/tools/grpc/ruby/get_neighbor.rb)
+shows an example for getting neighbor's information.
 Let's run this script.
 
 ```bash
@@ -73,22 +81,28 @@ BGP neighbor is 10.0.0.2, remote AS 65002
 	Configured hold time is 90
 ```
 
-## <a name="cpp"> C++
+## C++
 
-We use .so compilation with golang, please use only 1.5 or newer version of Go Lang.
+We use .so compilation with golang, please use only 1.5 or newer version of Go
+Lang.
 
-['tools/grpc/cpp/gobgp_api_client.cc'](https://github.com/osrg/gobgp/blob/master/tools/grpc/cpp/gobgp_api_client.cc) shows an example for getting neighbor's information.
+['tools/grpc/cpp/gobgp_api_client.cc'](https://github.com/osrg/gobgp/blob/master/tools/grpc/cpp/gobgp_api_client.cc)
+shows an example for getting neighbor's information.
 
-We provide ['tools/grpc/cpp/build.sh'](https://github.com/osrg/gobgp/blob/master/tools/grpc/cpp/build.sh) to build this sample code.
+We provide
+['tools/grpc/cpp/build.sh'](https://github.com/osrg/gobgp/blob/master/tools/grpc/cpp/build.sh)
+to build this sample code.
 This script also generates stub codes and builds GoBGP shared library.
 
 Let's build the sample code:
+
 ```bash
 $ cd $GOPATH/src/github.com/osrg/gobgp/tools/grpc/cpp
 $ bash build.sh
 ```
 
-### Let's run it:
+### Let's run it
+
 ```bash
 $ ./gobgp_api_client 172.18.0.2
 BGP neighbor is: 10.0.0.2, remote AS: 1
@@ -105,7 +119,7 @@ BGP neighbor is: 10.0.0.3, remote AS: 1
 	Configured hold time is 90
 ```
 
-## <a name="nodejs"> Node.js
+## Node.js
 
 ### Example
 
@@ -116,10 +130,11 @@ $ cd $GOPATH/src/github.com/osrg/gobgp/tools/grpc/nodejs
 $ ln -s $GOPATH/src/github.com/osrg/gobgp/api/gobgp.proto
 ```
 
-['tools/grpc/nodejs/get_neighbor.js'](https://github.com/osrg/gobgp/blob/master/tools/grpc/nodejs/get_neighbors.js) shows an example to show neighbor information.
+['tools/grpc/nodejs/get_neighbor.js'](https://github.com/osrg/gobgp/blob/master/tools/grpc/nodejs/get_neighbors.js)
+shows an example to show neighbor information.
 Let's run this:
 
-```
+```bash
 $ node get_neighbors.js
 BGP neighbor: 10.0.255.1 , remote AS: 65001
         BGP version 4, remote router ID: 10.0.255.1
@@ -135,17 +150,22 @@ BGP neighbor: 10.0.255.2 , remote AS: 65002
         Configured hold time: 90
 ```
 
-## <a name="java"> Java
+## Java
 
-At the time of this writing, versions of each plugins and tools are as following:
-* ProtocolBuffer: 3.3.0
-* grpc-java: 1.4.0
-* java: 1.8.0_131
+At the time of this writing, versions of each plugins and tools are as
+following:
 
-In proceeding with the following procedure, please substitute versions to the latest.
+- ProtocolBuffer: 3.3.0
+- grpc-java: 1.4.0
+- java: 1.8.0_131
 
-### Install JDK:
+In proceeding with the following procedure, please substitute versions to the
+latest.
+
+### Install JDK
+
 We need to install JDK and we use Oracle JDK8 in this example.
+
 ```bash
 $ sudo add-apt-repository ppa:webupd8team/java
 $ sudo apt-get update
@@ -158,8 +178,10 @@ $ echo "export JAVA_HOME=/usr/lib/jvm/java-8-oracle" >> ~/.bashrc
 $ source ~/.bashrc
 ```
 
-### Create protobuf library for Java:
+### Create protobuf library for Java
+
 We assume you've cloned gRPC repository in your home directory.
+
 ```bash
 $ sudo apt-get install maven
 $ cd ~/grpc/third_party/protobuf/java
@@ -179,6 +201,7 @@ $ ls ./core/target/proto*
 ```
 
 ### Clone grpc-java and get plugins
+
 ```bash
 $ cd ~/work
 $ git clone https://github.com/grpc/grpc-java.git
@@ -190,7 +213,8 @@ $ ls ../compiler/build/binaries/java_pluginExecutable/
 protoc-gen-grpc-java
 ```
 
-### Generate stub classes:
+### Generate stub classes
+
 ```bash
 $ cd $GOPATH/src/github.com/osrg/gobgp/tools/grpc
 $ mkdir -p java/src
@@ -202,11 +226,14 @@ $ ls ./src/gobgpapi/
 Gobgp.java  GobgpApiGrpc.java
 ```
 
-### Build sample client:
+### Build sample client
 
-['tools/grpc/java/src/gobgp/example/GobgpSampleClient.java'](https://github.com/osrg/gobgp/blob/master/tools/grpc/java/src/gobgp/example/GobgpSampleClient.java) is an example to show neighbor information.
+['tools/grpc/java/src/gobgp/example/GobgpSampleClient.java'](https://github.com/osrg/gobgp/blob/master/tools/grpc/java/src/gobgp/example/GobgpSampleClient.java)
+is an example to show neighbor information.
 
-Let's build and run it. However we need to download and copy some dependencies beforehand.
+Let's build and run it. However we need to download and copy some dependencies
+beforehand.
+
 ```bash
 $ cd $GOPATH/src/github.com/osrg/gobgp/tools/grpc/java
 $ mkdir lib
@@ -225,6 +252,7 @@ $ cp ~/work/grpc-java/okhttp/build/libs/grpc-okhttp-1.4.0.jar ./
 ```
 
 We are ready to build and run.
+
 ```bash
 $ cd $GOPATH/src/github.com/osrg/gobgp/tools/grpc/java
 $ mkdir classes

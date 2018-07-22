@@ -5,17 +5,16 @@ This page explains how to use a Resource Public Key Infrastructure
 
 ## Prerequisites
 
-Assume you finished [Getting Started](https://github.com/osrg/gobgp/blob/master/docs/sources/getting-started.md).
+Assume you finished [Getting Started](getting-started.md).
 
 ## Contents
 
-- [Configuration](#section0)
-- [Validation](#section1)
-- [Policy with validation results](#section2)
-- [Force Re-validation](#section3)
-- [Monitoring validation](#section4)
+- [Configuration](#configuration)
+- [Validation](#validation)
+- [Policy with validation results](#policy-with-validation-results)
+- [Force Re-validation](#force-re-validation)
 
-## <a name="section0"> Configuration
+## Configuration
 
 You need to add **[RpkiServers]** section to your configuration
 file. We use the following file. Note that this is for route server
@@ -46,7 +45,7 @@ router-id = "10.0.255.254"
     port = 323
 ```
 
-## <a name="section1"> Validation
+## Validation
 
 You can verify whether gobgpd successfully connects to the RPKI server
 and get the ROA (Route Origin Authorization) information in the
@@ -100,11 +99,9 @@ $ gobgp neighbor 10.0.255.1 adj-in
 As you can see, the first is marked as "V" (Valid), the second as "I"
 (Invalid), and the third as "N" (Not Found).
 
+## Policy with validation results
 
-## <a name="section2"> Policy with validation results
-
-The validation result can be used as [Policy's
-condition](https://github.com/osrg/gobgp/blob/master/docs/sources/policy.md). You
+The validation result can be used as [Policy's condition](policy.md). You
 can do any actions (e.g., drop the route, adding some extended
 community attribute, etc) according to the validation result. As an
 example, this section shows how to drop an invalid route.
@@ -175,9 +172,10 @@ $ gobgp neighbor 10.0.255.2 local
     N*> 192.168.1.0/24   10.0.255.1           65001                00:00:21   [{Origin: i}]
 ```
 
-
 ### Detailed Information about validation
+
 You can get the detailed information about announced routes.
+
 ```bash
 $ gobgp neighbor 10.0.255.1 adj-in 2.1.0.0/16 validation
 Target Prefix: 2.1.0.0/16, AS: 65001
@@ -193,10 +191,11 @@ Target Prefix: 2.1.0.0/16, AS: 65001
   Unmatched Length VRPs:
     No Entry
 ```
+
 From this, we can notice that 2.1.0.0/16 (Origin AS: 65001) is invalid due to its origin AS,
 the origin AS should be 3215.
 
-## <a name="section3"> Force Re-validation
+## Force Re-validation
 
 Validation is executed every time bgp update messages arrive. The
 changes of ROAs doesn't trigger off validation. The following command

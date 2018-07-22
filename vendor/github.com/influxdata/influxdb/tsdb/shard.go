@@ -16,6 +16,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+	"unsafe"
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/influxdata/influxdb/models"
@@ -23,15 +24,12 @@ import (
 	"github.com/influxdata/influxdb/pkg/estimator"
 	"github.com/influxdata/influxdb/pkg/file"
 	"github.com/influxdata/influxdb/pkg/limiter"
+	"github.com/influxdata/influxdb/pkg/slices"
 	"github.com/influxdata/influxdb/query"
 	internal "github.com/influxdata/influxdb/tsdb/internal"
 	"github.com/influxdata/influxql"
 	"go.uber.org/zap"
 )
-
-// monitorStatInterval is the interval at which the shard is inspected
-// for the purpose of determining certain monitoring statistics.
-const monitorStatInterval = 30 * time.Second
 
 const (
 	statWriteReq           = "writeReq"
@@ -71,6 +69,9 @@ var (
 	// ErrUnknownFieldsFormat is returned when the fields index file is not identifiable by
 	// the file's magic number.
 	ErrUnknownFieldsFormat = errors.New("unknown field index format")
+
+	// ErrUnknownFieldType is returned when the type of a field cannot be determined.
+	ErrUnknownFieldType = errors.New("unknown field type")
 
 	// ErrShardNotIdle is returned when an operation requring the shard to be idle/cold is
 	// attempted on a hot shard.
@@ -137,8 +138,6 @@ type Shard struct {
 	mu      sync.RWMutex
 	_engine Engine
 	index   Index
-
-	closing chan struct{}
 	enabled bool
 
 	// expvar-based stats.
@@ -149,12 +148,19 @@ type Shard struct {
 	logger     *zap.Logger
 
 	EnableOnOpen bool
+
+	// CompactionDisabled specifies the shard should not schedule compactions.
+	// This option is intended for offline tooling.
+	CompactionDisabled bool
 }
 
 // NewShard returns a new initialized Shard. walPath doesn't apply to the b1 type index
 func NewShard(id uint64, path string, walPath string, sfile *SeriesFile, opt EngineOptions) *Shard {
 	db, rp := decodeStorePath(path)
 	logger := zap.NewNop()
+	if opt.FieldValidator == nil {
+		opt.FieldValidator = defaultFieldValidator{}
+	}
 
 	s := &Shard{
 		id:      id,
@@ -162,7 +168,6 @@ func NewShard(id uint64, path string, walPath string, sfile *SeriesFile, opt Eng
 		walPath: walPath,
 		sfile:   sfile,
 		options: opt,
-		closing: make(chan struct{}),
 
 		stats: &ShardStatistics{},
 		defaultTags: models.StatisticTags{
@@ -187,7 +192,7 @@ func NewShard(id uint64, path string, walPath string, sfile *SeriesFile, opt Eng
 // WithLogger sets the logger on the shard. It must be called before Open.
 func (s *Shard) WithLogger(log *zap.Logger) {
 	s.baseLogger = log
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err == nil {
 		engine.WithLogger(s.baseLogger)
 		s.index.WithLogger(s.baseLogger)
@@ -201,7 +206,7 @@ func (s *Shard) SetEnabled(enabled bool) {
 	s.mu.Lock()
 	// Prevent writes and queries
 	s.enabled = enabled
-	if s._engine != nil {
+	if s._engine != nil && !s.CompactionDisabled {
 		// Disable background compactions and snapshotting
 		s._engine.SetEnabled(enabled)
 	}
@@ -210,7 +215,7 @@ func (s *Shard) SetEnabled(enabled bool) {
 
 // ScheduleFullCompaction forces a full compaction to be schedule on the shard.
 func (s *Shard) ScheduleFullCompaction() error {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return err
 	}
@@ -247,7 +252,7 @@ type ShardStatistics struct {
 
 // Statistics returns statistics for periodic monitoring.
 func (s *Shard) Statistics(tags map[string]string) []models.Statistic {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return nil
 	}
@@ -295,22 +300,25 @@ func (s *Shard) Open() error {
 			return nil
 		}
 
+		seriesIDSet := NewSeriesIDSet()
+
 		// Initialize underlying index.
 		ipath := filepath.Join(s.path, "index")
-		idx, err := NewIndex(s.id, s.database, ipath, s.sfile, s.options)
+		idx, err := NewIndex(s.id, s.database, ipath, seriesIDSet, s.sfile, s.options)
 		if err != nil {
 			return err
 		}
+
+		idx.WithLogger(s.baseLogger)
 
 		// Open index.
 		if err := idx.Open(); err != nil {
 			return err
 		}
 		s.index = idx
-		idx.WithLogger(s.baseLogger)
 
 		// Initialize underlying engine.
-		e, err := NewEngine(s.id, idx, s.database, s.path, s.walPath, s.sfile, s.options)
+		e, err := NewEngine(s.id, idx, s.path, s.walPath, s.sfile, s.options)
 		if err != nil {
 			return err
 		}
@@ -334,7 +342,7 @@ func (s *Shard) Open() error {
 
 		return nil
 	}(); err != nil {
-		s.close(true)
+		s.close()
 		return NewShardError(s.id, err)
 	}
 
@@ -350,37 +358,14 @@ func (s *Shard) Open() error {
 func (s *Shard) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.close(true)
-}
-
-// CloseFast closes the shard without cleaning up the shard ID or any of the
-// shard's series keys from the index it belongs to.
-//
-// CloseFast can be called when the entire index is being removed, e.g., when
-// the database the shard belongs to is being dropped.
-func (s *Shard) CloseFast() error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.close(false)
+	return s.close()
 }
 
 // close closes the shard an removes reference to the shard from associated
 // indexes, unless clean is false.
-func (s *Shard) close(clean bool) error {
+func (s *Shard) close() error {
 	if s._engine == nil {
 		return nil
-	}
-
-	// Close the closing channel at most once.
-	select {
-	case <-s.closing:
-	default:
-		close(s.closing)
-	}
-
-	if clean {
-		// Don't leak our shard ID and series keys in the index
-		s.index.RemoveShard(s.id)
 	}
 
 	err := s._engine.Close()
@@ -394,18 +379,21 @@ func (s *Shard) close(clean bool) error {
 	return err
 }
 
+// IndexType returns the index version being used for this shard.
+//
+// IndexType returns the empty string if it is called before the shard is opened,
+// since it is only that point that the underlying index type is known.
 func (s *Shard) IndexType() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if err := s.ready(); err != nil {
+	if s._engine == nil || s.index == nil { // Shard not open yet.
 		return ""
 	}
-
 	return s.index.Type()
 }
 
 // ready determines if the Shard is ready for queries or writes.
-// It returns nil if ready, otherwise ErrShardClosed or ErrShardDiabled
+// It returns nil if ready, otherwise ErrShardClosed or ErrShardDisabled
 func (s *Shard) ready() error {
 	var err error
 	if s._engine == nil {
@@ -418,21 +406,11 @@ func (s *Shard) ready() error {
 
 // LastModified returns the time when this shard was last modified.
 func (s *Shard) LastModified() time.Time {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return time.Time{}
 	}
 	return engine.LastModified()
-}
-
-// UnloadIndex removes all references to this shard from the DatabaseIndex
-func (s *Shard) UnloadIndex() {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if err := s.ready(); err != nil {
-		return
-	}
-	s.index.RemoveShard(s.id)
 }
 
 // Index returns a reference to the underlying index. It returns an error if
@@ -446,9 +424,18 @@ func (s *Shard) Index() (Index, error) {
 	return s.index, nil
 }
 
+func (s *Shard) seriesFile() (*SeriesFile, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if err := s.ready(); err != nil {
+		return nil, err
+	}
+	return s.sfile, nil
+}
+
 // IsIdle return true if the shard is not receiving writes and is fully compacted.
 func (s *Shard) IsIdle() bool {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return true
 	}
@@ -456,7 +443,7 @@ func (s *Shard) IsIdle() bool {
 }
 
 func (s *Shard) Free() error {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return err
 	}
@@ -469,7 +456,7 @@ func (s *Shard) Free() error {
 
 // SetCompactionsEnabled enables or disable shard background compactions.
 func (s *Shard) SetCompactionsEnabled(enabled bool) {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return
 	}
@@ -551,17 +538,21 @@ func (s *Shard) validateSeriesAndFields(points []models.Point) ([]models.Point, 
 	names := make([][]byte, len(points))
 	tagsSlice := make([]models.Tags, len(points))
 
-	// Drop any series w/ a "time" tag, these are illegal
 	var j int
 	for i, p := range points {
 		tags := p.Tags()
+
+		// Drop any series w/ a "time" tag, these are illegal
 		if v := tags.Get(timeBytes); v != nil {
 			dropped++
 			if reason == "" {
-				reason = fmt.Sprintf("invalid tag key: input tag \"%s\" on measurement \"%s\" is invalid", "time", string(p.Name()))
+				reason = fmt.Sprintf(
+					"invalid tag key: input tag \"%s\" on measurement \"%s\" is invalid",
+					"time", string(p.Name()))
 			}
 			continue
 		}
+
 		keys[j] = p.Key()
 		names[j] = p.Name()
 		tagsSlice[j] = tags
@@ -579,6 +570,9 @@ func (s *Shard) validateSeriesAndFields(points []models.Point) ([]models.Point, 
 	var droppedKeys [][]byte
 	if err := engine.CreateSeriesListIfNotExists(keys, names, tagsSlice); err != nil {
 		switch err := err.(type) {
+		// TODO(jmw): why is this a *PartialWriteError when everything else is not a pointer?
+		// Maybe we can just change it to be consistent if we change it also in all
+		// the places that construct it.
 		case *PartialWriteError:
 			reason = err.Reason
 			dropped += err.Dropped
@@ -589,16 +583,13 @@ func (s *Shard) validateSeriesAndFields(points []models.Point) ([]models.Point, 
 		}
 	}
 
-	// get the shard mutex for locally defined fields
-	n := 0
-
-	// mfCache is a local cache of MeasurementFields to reduce lock contention when validating
-	// field types.
+	// Create a MeasurementFields cache.
 	mfCache := make(map[string]*MeasurementFields, 16)
+	j = 0
 	for i, p := range points {
-		var skip bool
-		var validField bool
+		// Skip any points with only invalid fields.
 		iter := p.FieldIterator()
+		validField := false
 		for iter.Next() {
 			if bytes.Equal(iter.FieldKey(), timeBytes) {
 				continue
@@ -606,87 +597,81 @@ func (s *Shard) validateSeriesAndFields(points []models.Point) ([]models.Point, 
 			validField = true
 			break
 		}
-
 		if !validField {
-			dropped++
 			if reason == "" {
-				reason = fmt.Sprintf("invalid field name: input field \"%s\" on measurement \"%s\" is invalid", "time", string(p.Name()))
+				reason = fmt.Sprintf(
+					"invalid field name: input field \"%s\" on measurement \"%s\" is invalid",
+					"time", string(p.Name()))
 			}
+			dropped++
 			continue
 		}
 
-		iter.Reset()
-
-		// Skip points if keys have been dropped.
-		// The drop count has already been incremented during series creation.
+		// Skip any points whos keys have been dropped. Dropped has already been incremented for them.
 		if len(droppedKeys) > 0 && bytesutil.Contains(droppedKeys, keys[i]) {
 			continue
 		}
 
+		// Grab the MeasurementFields checking the local cache to avoid lock contention.
 		name := p.Name()
-		// see if the field definitions need to be saved to the shard
 		mf := mfCache[string(name)]
 		if mf == nil {
 			mf = engine.MeasurementFields(name).Clone()
 			mfCache[string(name)] = mf
 		}
-		iter.Reset()
 
-		// validate field types and encode data
-		for iter.Next() {
-
-			// Skip fields name "time", they are illegal
-			if bytes.Equal(iter.FieldKey(), timeBytes) {
-				continue
-			}
-
-			var fieldType influxql.DataType
-			switch iter.Type() {
-			case models.Float:
-				fieldType = influxql.Float
-			case models.Integer:
-				fieldType = influxql.Integer
-			case models.Unsigned:
-				fieldType = influxql.Unsigned
-			case models.Boolean:
-				fieldType = influxql.Boolean
-			case models.String:
-				fieldType = influxql.String
-			default:
-				continue
-			}
-
-			if f := mf.FieldBytes(iter.FieldKey()); f != nil {
-				// Field present in shard metadata, make sure there is no type conflict.
-				if f.Type != fieldType {
-					atomic.AddInt64(&s.stats.WritePointsDropped, 1)
-					dropped++
-					if reason == "" {
-						reason = fmt.Sprintf("%s: input field \"%s\" on measurement \"%s\" is type %s, already exists as type %s", ErrFieldTypeConflict, iter.FieldKey(), name, fieldType, f.Type)
-					}
-					skip = true
-				} else {
-					continue // Field is present, and it's of the same type. Nothing more to do.
+		// Check with the field validator.
+		if err := s.options.FieldValidator.Validate(mf, p); err != nil {
+			switch err := err.(type) {
+			case PartialWriteError:
+				if reason == "" {
+					reason = err.Reason
 				}
+				dropped += err.Dropped
+				atomic.AddInt64(&s.stats.WritePointsDropped, int64(err.Dropped))
+			default:
+				return nil, nil, err
 			}
-
-			if !skip {
-				fieldsToCreate = append(fieldsToCreate, &FieldCreate{p.Name(), &Field{Name: string(iter.FieldKey()), Type: fieldType}})
-			}
+			continue
 		}
 
-		if !skip {
-			points[n] = points[i]
-			n++
+		points[j] = points[i]
+		j++
+
+		// Create any fields that are missing.
+		iter.Reset()
+		for iter.Next() {
+			fieldKey := iter.FieldKey()
+
+			// Skip fields named "time". They are illegal.
+			if bytes.Equal(fieldKey, timeBytes) {
+				continue
+			}
+
+			if mf.FieldBytes(fieldKey) != nil {
+				continue
+			}
+
+			dataType := dataTypeFromModelsFieldType(iter.Type())
+			if dataType == influxql.Unknown {
+				continue
+			}
+
+			fieldsToCreate = append(fieldsToCreate, &FieldCreate{
+				Measurement: name,
+				Field: &Field{
+					Name: string(fieldKey),
+					Type: dataType,
+				},
+			})
 		}
 	}
-	points = points[:n]
 
 	if dropped > 0 {
 		err = PartialWriteError{Reason: reason, Dropped: dropped}
 	}
 
-	return points, fieldsToCreate, err
+	return points[:j], fieldsToCreate, err
 }
 
 func (s *Shard) createFieldsAndMeasurements(fieldsToCreate []*FieldCreate) error {
@@ -717,17 +702,27 @@ func (s *Shard) createFieldsAndMeasurements(fieldsToCreate []*FieldCreate) error
 }
 
 // DeleteSeriesRange deletes all values from for seriesKeys between min and max (inclusive)
-func (s *Shard) DeleteSeriesRange(itr SeriesIterator, min, max int64, removeIndex bool) error {
-	engine, err := s.engine()
+func (s *Shard) DeleteSeriesRange(itr SeriesIterator, min, max int64) error {
+	engine, err := s.Engine()
 	if err != nil {
 		return err
 	}
-	return engine.DeleteSeriesRange(itr, min, max, removeIndex)
+	return engine.DeleteSeriesRange(itr, min, max)
+}
+
+// DeleteSeriesRangeWithPredicate deletes all values from for seriesKeys between min and max (inclusive)
+// for which predicate() returns true. If predicate() is nil, then all values in range are deleted.
+func (s *Shard) DeleteSeriesRangeWithPredicate(itr SeriesIterator, predicate func(name []byte, tags models.Tags) (int64, int64, bool)) error {
+	engine, err := s.Engine()
+	if err != nil {
+		return err
+	}
+	return engine.DeleteSeriesRangeWithPredicate(itr, predicate)
 }
 
 // DeleteMeasurement deletes a measurement and all underlying series.
 func (s *Shard) DeleteMeasurement(name []byte) error {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return err
 	}
@@ -736,16 +731,25 @@ func (s *Shard) DeleteMeasurement(name []byte) error {
 
 // SeriesN returns the unique number of series in the shard.
 func (s *Shard) SeriesN() int64 {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return 0
 	}
 	return engine.SeriesN()
 }
 
+// SeriesSketches returns the measurement sketches for the shard.
+func (s *Shard) SeriesSketches() (estimator.Sketch, estimator.Sketch, error) {
+	engine, err := s.Engine()
+	if err != nil {
+		return nil, nil, err
+	}
+	return engine.SeriesSketches()
+}
+
 // MeasurementsSketches returns the measurement sketches for the shard.
 func (s *Shard) MeasurementsSketches() (estimator.Sketch, estimator.Sketch, error) {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -754,7 +758,7 @@ func (s *Shard) MeasurementsSketches() (estimator.Sketch, estimator.Sketch, erro
 
 // MeasurementNamesByRegex returns names of measurements matching the regular expression.
 func (s *Shard) MeasurementNamesByRegex(re *regexp.Regexp) ([][]byte, error) {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return nil, err
 	}
@@ -763,7 +767,7 @@ func (s *Shard) MeasurementNamesByRegex(re *regexp.Regexp) ([][]byte, error) {
 
 // MeasurementTagKeysByExpr returns all the tag keys for the provided expression.
 func (s *Shard) MeasurementTagKeysByExpr(name []byte, expr influxql.Expr) (map[string]struct{}, error) {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return nil, err
 	}
@@ -785,7 +789,7 @@ func (s *Shard) MeasurementTagKeyValuesByExpr(auth query.Authorizer, name []byte
 // TODO(edd): This method is currently only being called from tests; do we
 // really need it?
 func (s *Shard) MeasurementFields(name []byte) *MeasurementFields {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return nil
 	}
@@ -796,7 +800,7 @@ func (s *Shard) MeasurementFields(name []byte) *MeasurementFields {
 // TODO(edd): This method is currently only being called from tests; do we
 // really need it?
 func (s *Shard) MeasurementExists(name []byte) (bool, error) {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return false, err
 	}
@@ -805,7 +809,7 @@ func (s *Shard) MeasurementExists(name []byte) (bool, error) {
 
 // WriteTo writes the shard's data to w.
 func (s *Shard) WriteTo(w io.Writer) (int64, error) {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return 0, err
 	}
@@ -816,11 +820,10 @@ func (s *Shard) WriteTo(w io.Writer) (int64, error) {
 
 // CreateIterator returns an iterator for the data in the shard.
 func (s *Shard) CreateIterator(ctx context.Context, m *influxql.Measurement, opt query.IteratorOptions) (query.Iterator, error) {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return nil, err
 	}
-
 	switch m.SystemIterator {
 	case "_fieldKeys":
 		return NewFieldKeysIterator(s, opt)
@@ -831,24 +834,38 @@ func (s *Shard) CreateIterator(ctx context.Context, m *influxql.Measurement, opt
 			return nil, err
 		}
 		indexSet := IndexSet{Indexes: []Index{index}, SeriesFile: s.sfile}
-		return NewSeriesPointIterator(indexSet, engine.MeasurementFieldSet(), opt)
+
+		itr, err := NewSeriesPointIterator(indexSet, opt)
+		if err != nil {
+			return nil, err
+		}
+
+		return query.NewInterruptIterator(itr, opt.InterruptCh), nil
 	case "_tagKeys":
 		return NewTagKeysIterator(s, opt)
 	}
 	return engine.CreateIterator(ctx, m.Name, opt)
 }
 
-func (s *Shard) CreateCursor(ctx context.Context, r *CursorRequest) (Cursor, error) {
-	engine, err := s.engine()
+func (s *Shard) CreateSeriesCursor(ctx context.Context, req SeriesCursorRequest, cond influxql.Expr) (SeriesCursor, error) {
+	index, err := s.Index()
 	if err != nil {
 		return nil, err
 	}
-	return engine.CreateCursor(ctx, r)
+	return newSeriesCursor(req, IndexSet{Indexes: []Index{index}, SeriesFile: s.sfile}, cond)
+}
+
+func (s *Shard) CreateCursorIterator(ctx context.Context) (CursorIterator, error) {
+	engine, err := s.Engine()
+	if err != nil {
+		return nil, err
+	}
+	return engine.CreateCursorIterator(ctx)
 }
 
 // FieldDimensions returns unique sets of fields and dimensions across a list of sources.
 func (s *Shard) FieldDimensions(measurements []string) (fields map[string]influxql.DataType, dimensions map[string]struct{}, err error) {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1024,7 +1041,7 @@ func (s *Shard) expandSources(sources influxql.Sources) (influxql.Sources, error
 // Backup backs up the shard by creating a tar archive of all TSM files that
 // have been modified since the provided time. See Engine.Backup for more details.
 func (s *Shard) Backup(w io.Writer, basePath string, since time.Time) error {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return err
 	}
@@ -1032,7 +1049,7 @@ func (s *Shard) Backup(w io.Writer, basePath string, since time.Time) error {
 }
 
 func (s *Shard) Export(w io.Writer, basePath string, start time.Time, end time.Time) error {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return err
 	}
@@ -1087,7 +1104,7 @@ func (s *Shard) Import(r io.Reader, basePath string) error {
 // CreateSnapshot will return a path to a temp directory
 // containing hard links to the underlying shard files.
 func (s *Shard) CreateSnapshot() (string, error) {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return "", err
 	}
@@ -1096,7 +1113,7 @@ func (s *Shard) CreateSnapshot() (string, error) {
 
 // ForEachMeasurementName iterates over each measurement in the shard.
 func (s *Shard) ForEachMeasurementName(fn func(name []byte) error) error {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return err
 	}
@@ -1104,7 +1121,7 @@ func (s *Shard) ForEachMeasurementName(fn func(name []byte) error) error {
 }
 
 func (s *Shard) TagKeyCardinality(name, key []byte) int {
-	engine, err := s.engine()
+	engine, err := s.Engine()
 	if err != nil {
 		return 0
 	}
@@ -1112,16 +1129,16 @@ func (s *Shard) TagKeyCardinality(name, key []byte) int {
 }
 
 // Digest returns a digest of the shard.
-func (s *Shard) Digest() (io.ReadCloser, error) {
-	engine, err := s.engine()
+func (s *Shard) Digest() (io.ReadCloser, int64, error) {
+	engine, err := s.Engine()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	// Make sure the shard is idle/cold. (No use creating a digest of a
 	// hot shard that is rapidly changing.)
 	if !engine.IsIdle() {
-		return nil, ErrShardNotIdle
+		return nil, 0, ErrShardNotIdle
 	}
 
 	return engine.Digest()
@@ -1135,7 +1152,7 @@ func (s *Shard) Digest() (io.ReadCloser, error) {
 //
 // If a caller needs an Engine reference but is already under a lock, then they
 // should use engineNoLock().
-func (s *Shard) engine() (Engine, error) {
+func (s *Shard) Engine() (Engine, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.engineNoLock()
@@ -1152,6 +1169,7 @@ func (s *Shard) engineNoLock() (Engine, error) {
 
 type ShardGroup interface {
 	MeasurementsByRegex(re *regexp.Regexp) []string
+	FieldKeysByMeasurement(name []byte) []string
 	FieldDimensions(measurements []string) (fields map[string]influxql.DataType, dimensions map[string]struct{}, err error)
 	MapType(measurement, field string) influxql.DataType
 	CreateIterator(ctx context.Context, measurement *influxql.Measurement, opt query.IteratorOptions) (query.Iterator, error)
@@ -1202,6 +1220,28 @@ func (a Shards) MeasurementsByRegex(re *regexp.Regexp) []string {
 	return names
 }
 
+// FieldKeysByMeasurement returns a de-duplicated, sorted, set of field keys for
+// the provided measurement name.
+func (a Shards) FieldKeysByMeasurement(name []byte) []string {
+	if len(a) == 1 {
+		mf := a[0].MeasurementFields(name)
+		if mf == nil {
+			return nil
+		}
+		return mf.FieldKeys()
+	}
+
+	all := make([][]string, 0, len(a))
+	for _, shard := range a {
+		mf := shard.MeasurementFields(name)
+		if mf == nil {
+			continue
+		}
+		all = append(all, mf.FieldKeys())
+	}
+	return slices.MergeSortedStrings(all...)
+}
+
 func (a Shards) FieldDimensions(measurements []string) (fields map[string]influxql.DataType, dimensions map[string]struct{}, err error) {
 	fields = make(map[string]influxql.DataType)
 	dimensions = make(map[string]struct{})
@@ -1235,7 +1275,17 @@ func (a Shards) MapType(measurement, field string) influxql.DataType {
 	return typ
 }
 
+func (a Shards) CallType(name string, args []influxql.DataType) (influxql.DataType, error) {
+	typmap := query.CallTypeMapper{}
+	return typmap.CallType(name, args)
+}
+
 func (a Shards) CreateIterator(ctx context.Context, measurement *influxql.Measurement, opt query.IteratorOptions) (query.Iterator, error) {
+	switch measurement.SystemIterator {
+	case "_series":
+		return a.createSeriesIterator(ctx, opt)
+	}
+
 	itrs := make([]query.Iterator, 0, len(a))
 	for _, sh := range a {
 		itr, err := sh.CreateIterator(ctx, measurement, opt)
@@ -1264,6 +1314,28 @@ func (a Shards) CreateIterator(ctx context.Context, measurement *influxql.Measur
 		}
 	}
 	return query.Iterators(itrs).Merge(opt)
+}
+
+func (a Shards) createSeriesIterator(ctx context.Context, opt query.IteratorOptions) (_ query.Iterator, err error) {
+	var (
+		idxs  = make([]Index, 0, len(a))
+		sfile *SeriesFile
+	)
+	for _, sh := range a {
+		var idx Index
+		if idx, err = sh.Index(); err == nil {
+			idxs = append(idxs, idx)
+		}
+		if sfile == nil {
+			sfile, _ = sh.seriesFile()
+		}
+	}
+
+	if sfile == nil {
+		return nil, nil
+	}
+
+	return NewSeriesPointIterator(IndexSet{Indexes: idxs, SeriesFile: sfile}, opt)
 }
 
 func (a Shards) IteratorCost(measurement string, opt query.IteratorOptions) (query.IteratorCost, error) {
@@ -1296,7 +1368,7 @@ func (a Shards) IteratorCost(measurement string, opt query.IteratorOptions) (que
 			defer limit.Release()
 			defer wg.Done()
 
-			engine, err := sh.engine()
+			engine, err := sh.Engine()
 			if err != nil {
 				setErr(err)
 				return
@@ -1315,6 +1387,28 @@ func (a Shards) IteratorCost(measurement string, opt query.IteratorOptions) (que
 	}
 	wg.Wait()
 	return costs, costerr
+}
+
+func (a Shards) CreateSeriesCursor(ctx context.Context, req SeriesCursorRequest, cond influxql.Expr) (_ SeriesCursor, err error) {
+	var (
+		idxs  []Index
+		sfile *SeriesFile
+	)
+	for _, sh := range a {
+		var idx Index
+		if idx, err = sh.Index(); err == nil {
+			idxs = append(idxs, idx)
+		}
+		if sfile == nil {
+			sfile, _ = sh.seriesFile()
+		}
+	}
+
+	if sfile == nil {
+		return nil, errors.New("CreateSeriesCursor: no series file")
+	}
+
+	return newSeriesCursor(req, IndexSet{Indexes: idxs, SeriesFile: sfile}, cond)
 }
 
 func (a Shards) ExpandSources(sources influxql.Sources) (influxql.Sources, error) {
@@ -1379,6 +1473,20 @@ func (m *MeasurementFields) FieldKeys() []string {
 	return a
 }
 
+// bytes estimates the memory footprint of this MeasurementFields, in bytes.
+func (m *MeasurementFields) bytes() int {
+	var b int
+	m.mu.RLock()
+	b += 24 // mu RWMutex is 24 bytes
+	b += int(unsafe.Sizeof(m.fields))
+	for k, v := range m.fields {
+		b += int(unsafe.Sizeof(k)) + len(k)
+		b += int(unsafe.Sizeof(v)+unsafe.Sizeof(*v)) + len(v.Name)
+	}
+	m.mu.RUnlock()
+	return b
+}
+
 // CreateFieldIfNotExists creates a new field with an autoincrementing ID.
 // Returns an error if 255 fields have already been created on the measurement or
 // the fields already exists with a different type.
@@ -1434,6 +1542,9 @@ func (m *MeasurementFields) Field(name string) *Field {
 }
 
 func (m *MeasurementFields) HasField(name string) bool {
+	if m == nil {
+		return false
+	}
 	m.mu.RLock()
 	f := m.fields[name]
 	m.mu.RUnlock()
@@ -1502,14 +1613,37 @@ func NewMeasurementFieldSet(path string) (*MeasurementFieldSet, error) {
 		fields: make(map[string]*MeasurementFields),
 		path:   path,
 	}
-	if err := fs.load(); err != nil {
-		return nil, err
+
+	// If there is a load error, return the error and an empty set so
+	// it can be rebuild manually.
+	return fs, fs.load()
+}
+
+// Bytes estimates the memory footprint of this MeasurementFieldSet, in bytes.
+func (fs *MeasurementFieldSet) Bytes() int {
+	var b int
+	fs.mu.RLock()
+	b += 24 // mu RWMutex is 24 bytes
+	for k, v := range fs.fields {
+		b += int(unsafe.Sizeof(k)) + len(k)
+		b += int(unsafe.Sizeof(v)) + v.bytes()
 	}
-	return fs, nil
+	b += int(unsafe.Sizeof(fs.fields))
+	b += int(unsafe.Sizeof(fs.path)) + len(fs.path)
+	fs.mu.RUnlock()
+	return b
 }
 
 // Fields returns fields for a measurement by name.
-func (fs *MeasurementFieldSet) Fields(name string) *MeasurementFields {
+func (fs *MeasurementFieldSet) Fields(name []byte) *MeasurementFields {
+	fs.mu.RLock()
+	mf := fs.fields[string(name)]
+	fs.mu.RUnlock()
+	return mf
+}
+
+// FieldsByString returns fields for a measurment by name.
+func (fs *MeasurementFieldSet) FieldsByString(name string) *MeasurementFields {
 	fs.mu.RLock()
 	mf := fs.fields[name]
 	fs.mu.RUnlock()
@@ -1622,7 +1756,11 @@ func (fs *MeasurementFieldSet) saveNoLock() error {
 		return err
 	}
 
-	return file.RenameFile(path, fs.path)
+	if err := file.RenameFile(path, fs.path); err != nil {
+		return err
+	}
+
+	return file.SyncDir(filepath.Dir(fs.path))
 }
 
 func (fs *MeasurementFieldSet) load() error {

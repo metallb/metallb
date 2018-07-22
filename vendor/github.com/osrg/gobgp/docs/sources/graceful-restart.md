@@ -9,12 +9,15 @@ to do graceful restart. GoBGP supports both roles.
 
 ## Contents
 
-- [Helper speaker](#helper)
-- [Restarting speaker](#restarting)
-- [Graceful Restart Notification Support](#notification)
-- [Long Lived Graceful Restart](#long-lived)
+- [Helper speaker](#helper-speaker)
+- [Restarting speaker](#restarting-speaker)
+- [Graceful Restart Notification Support](#graceful-restart-notification-support)
+- [Long Lived Graceful Restart](#long-lived-graceful-restart)
+  - [Long Lived Graceful Restart Helper Speaker Configuration](#long-lived-graceful-restart-helper-speaker-configuration)
+  - [Long Lived Graceful Restart Restarting Speaker Configuration](#long-lived-graceful-restart-restarting-speaker-configuration)
+  - [Combination with normal Graceful Restart](#combination-with-normal-graceful-restart)
 
-## <a name="helper"> Helper speaker
+## Helper speaker
 
 Below is the configuration to enable helper speaker behavior.
 
@@ -64,7 +67,7 @@ BGP neighbor is 10.0.255.1, remote AS 65001
     Accepted:               0
 ```
 
-## <a name="restarting"> Restarting speaker
+## Restarting speaker
 
 To support restarting speaker behavior, try the configuration below.
 
@@ -145,7 +148,7 @@ Also, when `gobgpd` doesn't recovered within `restart-time`, the peers will
 withdraw all routes.
 Default value of `restart-time` is equal to `hold-time`.
 
-## <a name="notification"> Graceful Restart Notification Support
+## Graceful Restart Notification Support
 
 [RFC4724](https://tools.ietf.org/html/rfc4724) specifies gracful restart procedures are triggered only when
 the BGP session between graceful restart capable peers turns down without
@@ -168,7 +171,7 @@ To turn on this feature, add `notification-enabled = true` to configuration like
     notification-enabled = true
 ```
 
-## <a name="long-lived"> Long Lived Graceful Restart
+## Long Lived Graceful Restart
 
 ### Long Lived Graceful Restart Helper Speaker Configuration
 
@@ -211,7 +214,7 @@ restart-time as per address family.
         restart-time = 100000
 ```
 
-### Conbination with normal Graceful Restart
+### Combination with normal Graceful Restart
 
 You can also use long lived graceful restart with normal graceful restart.
 

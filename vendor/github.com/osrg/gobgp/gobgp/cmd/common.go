@@ -29,10 +29,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 
+	api "github.com/osrg/gobgp/api"
 	cli "github.com/osrg/gobgp/client"
 	"github.com/osrg/gobgp/config"
 	"github.com/osrg/gobgp/packet/bgp"
-	"github.com/osrg/gobgp/table"
 )
 
 const (
@@ -82,6 +82,12 @@ const (
 	CMD_VALIDATION     = "validation"
 )
 
+const (
+	PARAM_FLAG = iota
+	PARAM_SINGLE
+	PARAM_LIST
+)
+
 var subOpts struct {
 	AddressFamily string `short:"a" long:"address-family" description:"specifying an address family"`
 }
@@ -91,29 +97,12 @@ var neighborsOpts struct {
 	Transport string `short:"t" long:"transport" description:"specifying a transport protocol"`
 }
 
-var conditionOpts struct {
-	Prefix       string `long:"prefix" description:"specifying a prefix set name of policy"`
-	Neighbor     string `long:"neighbor" description:"specifying a neighbor set name of policy"`
-	AsPath       string `long:"aspath" description:"specifying an as set name of policy"`
-	Community    string `long:"community" description:"specifying a community set name of policy"`
-	ExtCommunity string `long:"extcommunity" description:"specifying a extended community set name of policy"`
-	AsPathLength string `long:"aspath-len" description:"specifying an as path length of policy (<operator>,<numeric>)"`
-}
-
-var actionOpts struct {
-	RouteAction         string `long:"route-action" description:"specifying a route action of policy (accept | reject)"`
-	CommunityAction     string `long:"community" description:"specifying a community action of policy"`
-	MedAction           string `long:"med" description:"specifying a med action of policy"`
-	AsPathPrependAction string `long:"as-prepend" description:"specifying a as-prepend action of policy"`
-	NexthopAction       string `long:"next-hop" description:"specifying a next-hop action of policy"`
-}
-
 var mrtOpts struct {
 	OutputDir   string
 	FileFormat  string
 	Filename    string `long:"filename" description:"MRT file name"`
-	RecordCount int    `long:"count" description:"Number of records to inject"`
-	RecordSkip  int    `long:"skip" description:"Number of records to skip before injecting"`
+	RecordCount int64  `long:"count" description:"Number of records to inject"`
+	RecordSkip  int64  `long:"skip" description:"Number of records to skip before injecting"`
 	QueueSize   int    `long:"batch-size" description:"Maximum number of updates to keep queued"`
 	Best        bool   `long:"only-best" description:"only keep best path routes"`
 	SkipV4      bool   `long:"no-ipv4" description:"Skip importing IPv4 routes"`
@@ -136,9 +125,8 @@ func formatTimedelta(d int64) string {
 
 	if days == 0 {
 		return fmt.Sprintf("%02d:%02d:%02d", hours, mins, secs)
-	} else {
-		return fmt.Sprintf("%dd ", days) + fmt.Sprintf("%02d:%02d:%02d", hours, mins, secs)
 	}
+	return fmt.Sprintf("%dd ", days) + fmt.Sprintf("%02d:%02d:%02d", hours, mins, secs)
 }
 
 func cidr2prefix(cidr string) string {
@@ -154,11 +142,11 @@ func cidr2prefix(cidr string) string {
 	return buffer.String()[:ones]
 }
 
-func extractReserved(args, keys []string) map[string][]string {
+func extractReserved(args []string, keys map[string]int) (map[string][]string, error) {
 	m := make(map[string][]string, len(keys))
 	var k string
 	isReserved := func(s string) bool {
-		for _, r := range keys {
+		for r := range keys {
 			if s == r {
 				return true
 			}
@@ -173,7 +161,26 @@ func extractReserved(args, keys []string) map[string][]string {
 			m[k] = append(m[k], arg)
 		}
 	}
-	return m
+	for k, v := range m {
+		if k == "" {
+			continue
+		}
+		switch keys[k] {
+		case PARAM_FLAG:
+			if len(v) != 0 {
+				return nil, fmt.Errorf("%s should not have arguments", k)
+			}
+		case PARAM_SINGLE:
+			if len(v) != 1 {
+				return nil, fmt.Errorf("%s should have one argument", k)
+			}
+		case PARAM_LIST:
+			if len(v) == 0 {
+				return nil, fmt.Errorf("%s should have one or more arguments", k)
+			}
+		}
+	}
+	return m, nil
 }
 
 type neighbors []*config.Neighbor
@@ -192,10 +199,7 @@ func (n neighbors) Less(i, j int) bool {
 	p1Isv4 := !strings.Contains(p1, ":")
 	p2Isv4 := !strings.Contains(p2, ":")
 	if p1Isv4 != p2Isv4 {
-		if p1Isv4 {
-			return true
-		}
-		return false
+		return p1Isv4
 	}
 	addrlen := 128
 	if p1Isv4 {
@@ -220,7 +224,7 @@ func (c capabilities) Less(i, j int) bool {
 	return c[i].Code() < c[j].Code()
 }
 
-type vrfs []*table.Vrf
+type vrfs []*api.Vrf
 
 func (v vrfs) Len() int {
 	return len(v)
@@ -256,7 +260,7 @@ func newClient() *cli.Client {
 	target := net.JoinHostPort(globalOpts.Host, strconv.Itoa(globalOpts.Port))
 	client, err := cli.New(target, grpcOpts...)
 	if err != nil {
-		exitWithError(err)
+		exitWithError(fmt.Errorf("failed to connect to %s over gRPC: %s", target, err))
 	}
 	return client
 }

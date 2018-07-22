@@ -14,14 +14,9 @@ import (
 )
 
 type Store struct {
-	TSDBStore *tsdb.Store
-
-	MetaClient interface {
-		Database(name string) *meta.DatabaseInfo
-		ShardGroupsByTimeRange(database, policy string, min, max time.Time) (a []meta.ShardGroupInfo, err error)
-	}
-
-	Logger *zap.Logger
+	TSDBStore  *tsdb.Store
+	MetaClient StorageMetaClient
+	Logger     *zap.Logger
 }
 
 func NewStore() *Store {
@@ -33,36 +28,7 @@ func (s *Store) WithLogger(log *zap.Logger) {
 	s.Logger = log.With(zap.String("service", "store"))
 }
 
-func (s *Store) Read(ctx context.Context, req *ReadRequest) (*ResultSet, error) {
-	database, rp := req.Database, ""
-
-	if p := strings.IndexByte(database, '/'); p > -1 {
-		database, rp = database[:p], database[p+1:]
-	}
-
-	di := s.MetaClient.Database(database)
-	if di == nil {
-		return nil, errors.New("no database")
-	}
-
-	if rp == "" {
-		rp = di.DefaultRetentionPolicy
-	}
-
-	rpi := di.RetentionPolicy(rp)
-	if rpi == nil {
-		return nil, errors.New("invalid retention policy")
-	}
-
-	var start, end = models.MinNanoTime, models.MaxNanoTime
-	if req.TimestampRange.Start > 0 {
-		start = req.TimestampRange.Start
-	}
-
-	if req.TimestampRange.End > 0 {
-		end = req.TimestampRange.End
-	}
-
+func (s *Store) findShardIDs(database, rp string, desc bool, start, end int64) ([]uint64, error) {
 	groups, err := s.MetaClient.ShardGroupsByTimeRange(database, rp, time.Unix(0, start), time.Unix(0, end))
 	if err != nil {
 		return nil, err
@@ -72,7 +38,7 @@ func (s *Store) Read(ctx context.Context, req *ReadRequest) (*ResultSet, error) 
 		return nil, nil
 	}
 
-	if req.Descending {
+	if desc {
 		sort.Sort(sort.Reverse(meta.ShardGroupInfos(groups)))
 	} else {
 		sort.Sort(meta.ShardGroupInfos(groups))
@@ -84,33 +50,122 @@ func (s *Store) Read(ctx context.Context, req *ReadRequest) (*ResultSet, error) 
 			shardIDs = append(shardIDs, si.ID)
 		}
 	}
+	return shardIDs, nil
+}
 
-	var cur seriesCursor
-	if ic, err := newIndexSeriesCursor(ctx, req, s.TSDBStore.Shards(shardIDs)); err != nil {
-		return nil, err
-	} else if ic == nil {
-		return nil, nil
-	} else {
-		cur = ic
+func (s *Store) validateArgs(database string, start, end int64) (string, string, int64, int64, error) {
+	rp := ""
+	if p := strings.IndexByte(database, '/'); p > -1 {
+		database, rp = database[:p], database[p+1:]
 	}
 
-	if len(req.Grouping) > 0 {
-		cur = newGroupSeriesCursor(ctx, cur, req.Grouping)
+	di := s.MetaClient.Database(database)
+	if di == nil {
+		return "", "", 0, 0, errors.New("no database")
+	}
+
+	if rp == "" {
+		rp = di.DefaultRetentionPolicy
+	}
+
+	rpi := di.RetentionPolicy(rp)
+	if rpi == nil {
+		return "", "", 0, 0, errors.New("invalid retention policy")
+	}
+
+	if start <= 0 {
+		start = models.MinNanoTime
+	}
+	if end <= 0 {
+		end = models.MaxNanoTime
+	}
+	return database, rp, start, end, nil
+}
+
+type Results interface {
+	Close()
+	Next() bool
+	Cursor() tsdb.Cursor
+	Tags() models.Tags
+}
+
+func (s *Store) Read(ctx context.Context, req *ReadRequest) (Results, error) {
+	if len(req.GroupKeys) > 0 {
+		panic("Read: len(Grouping) > 0")
+	}
+
+	database, rp, start, end, err := s.validateArgs(req.Database, req.TimestampRange.Start, req.TimestampRange.End)
+	if err != nil {
+		return nil, err
+	}
+
+	shardIDs, err := s.findShardIDs(database, rp, req.Descending, start, end)
+	if err != nil {
+		return nil, err
+	}
+	if len(shardIDs) == 0 {
+		return (*resultSet)(nil), nil
+	}
+
+	var cur seriesCursor
+	if ic, err := newIndexSeriesCursor(ctx, req.Predicate, s.TSDBStore.Shards(shardIDs)); err != nil {
+		return nil, err
+	} else if ic == nil {
+		return (*resultSet)(nil), nil
+	} else {
+		cur = ic
 	}
 
 	if req.SeriesLimit > 0 || req.SeriesOffset > 0 {
 		cur = newLimitSeriesCursor(ctx, cur, req.SeriesLimit, req.SeriesOffset)
 	}
 
-	return &ResultSet{
-		req: readRequest{
-			ctx:       ctx,
-			start:     start,
-			end:       end,
-			asc:       !req.Descending,
-			limit:     req.PointsLimit,
-			aggregate: req.Aggregate,
-		},
+	rr := readRequest{
+		ctx:       ctx,
+		start:     start,
+		end:       end,
+		asc:       !req.Descending,
+		limit:     req.PointsLimit,
+		aggregate: req.Aggregate,
+	}
+
+	return &resultSet{
+		req: rr,
 		cur: cur,
+		mb:  newMultiShardArrayCursors(ctx, &rr),
 	}, nil
+}
+
+func (s *Store) GroupRead(ctx context.Context, req *ReadRequest) (*groupResultSet, error) {
+	if req.SeriesLimit > 0 || req.SeriesOffset > 0 {
+		return nil, errors.New("GroupRead: SeriesLimit and SeriesOffset not supported when Grouping")
+	}
+
+	database, rp, start, end, err := s.validateArgs(req.Database, req.TimestampRange.Start, req.TimestampRange.End)
+	if err != nil {
+		return nil, err
+	}
+
+	shardIDs, err := s.findShardIDs(database, rp, req.Descending, start, end)
+	if err != nil {
+		return nil, err
+	}
+	if len(shardIDs) == 0 {
+		return nil, nil
+	}
+
+	shards := s.TSDBStore.Shards(shardIDs)
+
+	req.TimestampRange.Start = start
+	req.TimestampRange.End = end
+
+	newCursor := func() (seriesCursor, error) {
+		cur, err := newIndexSeriesCursor(ctx, req.Predicate, shards)
+		if cur == nil || err != nil {
+			return nil, err
+		}
+		return cur, nil
+	}
+
+	return newGroupResultSet(ctx, req, newCursor), nil
 }

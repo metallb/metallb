@@ -3,9 +3,10 @@
 This page explains how to use GoBGP as a Go Native BGP library.
 
 ## Contents
-- [Basic Example](#basic)
 
-## <a name="basic"> Basic Example
+- [Basic Example](#basic-example)
+
+## Basic Example
 
 ```go
 package main

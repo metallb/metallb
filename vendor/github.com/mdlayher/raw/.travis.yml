@@ -1,13 +1,13 @@
 language: go
 go:
-  - 1.x
+  - "1.x.x"
 os:
   - linux
   - osx
 before_install:
   - go get github.com/golang/lint/golint
   - go get honnef.co/go/tools/cmd/staticcheck
-  - go get -d ./...
+  - go get -d -t ./...
 script:
   - go build -tags=gofuzz ./...
   - go vet ./...
