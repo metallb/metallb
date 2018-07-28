@@ -1,8 +1,0 @@
-nose
-toml
-pyyaml
-fabric<2.0.0
-netaddr
-nsenter
-docker-py
-ryu

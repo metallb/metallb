@@ -195,10 +195,6 @@ func qdiscPayload(req *nl.NetlinkRequest, qdisc Qdisc) error {
 		opt.DirectPkts = qdisc.DirectPkts
 		nl.NewRtAttrChild(options, nl.TCA_HTB_INIT, opt.Serialize())
 		// nl.NewRtAttrChild(options, nl.TCA_HTB_DIRECT_QLEN, opt.Serialize())
-	case *Hfsc:
-		opt := nl.TcHfscOpt{}
-		opt.Defcls = qdisc.Defcls
-		options = nl.NewRtAttr(nl.TCA_OPTIONS, opt.Serialize())
 	case *Netem:
 		opt := nl.TcNetemQopt{}
 		opt.Latency = qdisc.Latency
@@ -352,8 +348,6 @@ func (h *Handle) QdiscList(link Link) ([]Qdisc, error) {
 					qdisc = &Htb{}
 				case "fq":
 					qdisc = &Fq{}
-				case "hfsc":
-					qdisc = &Hfsc{}
 				case "fq_codel":
 					qdisc = &FqCodel{}
 				case "netem":
@@ -379,10 +373,6 @@ func (h *Handle) QdiscList(link Link) ([]Qdisc, error) {
 						return nil, err
 					}
 					if err := parseTbfData(qdisc, data); err != nil {
-						return nil, err
-					}
-				case "hfsc":
-					if err := parseHfscData(qdisc, attr.Value); err != nil {
 						return nil, err
 					}
 				case "htb":
@@ -481,13 +471,6 @@ func parseFqCodelData(qdisc Qdisc, data []syscall.NetlinkRouteAttr) error {
 			fqCodel.Quantum = native.Uint32(datum.Value)
 		}
 	}
-	return nil
-}
-
-func parseHfscData(qdisc Qdisc, data []byte) error {
-	Hfsc := qdisc.(*Hfsc)
-	native = nl.NativeEndian()
-	Hfsc.Defcls = native.Uint16(data)
 	return nil
 }
 
