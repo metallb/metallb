@@ -3,6 +3,16 @@ title: Release Notes
 weight: 7
 ---
 
+## Version 0.7.2
+
+[Documentation for this release](https://metallb.universe.tf)
+
+Bugfixes:
+
+- Fix gratuitous ARP and NDP announcements on IP
+  failover. ([#291](https://github.com/google/metallb/issues/291))
+
+
 ## Version 0.7.1
 
 [Documentation for this release](https://metallb.universe.tf)
