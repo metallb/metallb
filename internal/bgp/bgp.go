@@ -16,6 +16,7 @@ import (
 	"unsafe"
 
 	"github.com/go-kit/kit/log"
+	"golang.org/x/sys/unix"
 )
 
 var errClosed = errors.New("session closed")
@@ -471,18 +472,18 @@ func dialMD5(ctx context.Context, addr, password string) (net.Conn, error) {
 	}
 
 	var family int
-	var ra, la syscall.Sockaddr
+	var ra, la unix.Sockaddr
 	if raddr.IP.To4() != nil {
-		family = syscall.AF_INET
-		rsockaddr := &syscall.SockaddrInet4{Port: raddr.Port}
+		family = unix.AF_INET
+		rsockaddr := &unix.SockaddrInet4{Port: raddr.Port}
 		copy(rsockaddr.Addr[:], raddr.IP.To4())
 		ra = rsockaddr
-		lsockaddr := &syscall.SockaddrInet4{}
+		lsockaddr := &unix.SockaddrInet4{}
 		copy(lsockaddr.Addr[:], laddr.IP.To4())
 		la = lsockaddr
 	} else {
-		family = syscall.AF_INET6
-		rsockaddr := &syscall.SockaddrInet6{Port: raddr.Port}
+		family = unix.AF_INET6
+		rsockaddr := &unix.SockaddrInet6{Port: raddr.Port}
 		copy(rsockaddr.Addr[:], raddr.IP.To16())
 		ra = rsockaddr
 		var zone uint32
@@ -493,14 +494,14 @@ func dialMD5(ctx context.Context, addr, password string) (net.Conn, error) {
 			}
 			zone = uint32(intf.Index)
 		}
-		lsockaddr := &syscall.SockaddrInet6{ZoneId: zone}
+		lsockaddr := &unix.SockaddrInet6{ZoneId: zone}
 		copy(lsockaddr.Addr[:], laddr.IP.To16())
 		la = lsockaddr
 	}
 
-	sockType := syscall.SOCK_STREAM | syscall.SOCK_CLOEXEC | syscall.SOCK_NONBLOCK
+	sockType := unix.SOCK_STREAM | unix.SOCK_CLOEXEC | unix.SOCK_NONBLOCK
 	proto := 0
-	fd, err := syscall.Socket(family, sockType, proto)
+	fd, err := unix.Socket(family, sockType, proto)
 	if err != nil {
 		return nil, err
 	}
@@ -519,16 +520,16 @@ func dialMD5(ctx context.Context, addr, password string) (net.Conn, error) {
 		sig := buildTCPMD5Sig(raddr.IP, password)
 		b := *(*[unsafe.Sizeof(sig)]byte)(unsafe.Pointer(&sig))
 		// Better way may be available in  Go 1.11, see go-review.googlesource.com/c/go/+/72810
-		if err = os.NewSyscallError("setsockopt", syscall.SetsockoptString(fd, syscall.IPPROTO_TCP, tcpMD5SIG, string(b[:]))); err != nil {
+		if err = os.NewSyscallError("setsockopt", unix.SetsockoptString(fd, unix.IPPROTO_TCP, tcpMD5SIG, string(b[:]))); err != nil {
 			return nil, err
 		}
 	}
 
-	if err = syscall.Bind(fd, la); err != nil {
+	if err = unix.Bind(fd, la); err != nil {
 		return nil, os.NewSyscallError("bind", err)
 	}
 
-	err = syscall.Connect(fd, ra)
+	err = unix.Connect(fd, ra)
 
 	switch err {
 	case syscall.EINPROGRESS, syscall.EALREADY, syscall.EINTR:
@@ -542,18 +543,18 @@ func dialMD5(ctx context.Context, addr, password string) (net.Conn, error) {
 	// asynchronous, so we need to manually wait with epoll until the
 	// connection succeeds. All of the following is doing that, with
 	// appropriate use of the deadline in the context.
-	epfd, err := syscall.EpollCreate1(syscall.EPOLL_CLOEXEC)
+	epfd, err := unix.EpollCreate1(syscall.EPOLL_CLOEXEC)
 	if err != nil {
 		return nil, err
 	}
-	defer syscall.Close(epfd)
+	defer unix.Close(epfd)
 
-	var event syscall.EpollEvent
-	events := make([]syscall.EpollEvent, 1)
+	var event unix.EpollEvent
+	events := make([]unix.EpollEvent, 1)
 
 	event.Events = syscall.EPOLLIN | syscall.EPOLLOUT | syscall.EPOLLPRI
 	event.Fd = int32(fd)
-	if err = syscall.EpollCtl(epfd, syscall.EPOLL_CTL_ADD, fd, &event); err != nil {
+	if err = unix.EpollCtl(epfd, syscall.EPOLL_CTL_ADD, fd, &event); err != nil {
 		return nil, err
 	}
 
@@ -565,7 +566,7 @@ func dialMD5(ctx context.Context, addr, password string) (net.Conn, error) {
 				return nil, fmt.Errorf("timeout")
 			}
 		}
-		nevents, err := syscall.EpollWait(epfd, events, timeout)
+		nevents, err := unix.EpollWait(epfd, events, timeout)
 		if err != nil {
 			return nil, err
 		}
@@ -576,13 +577,13 @@ func dialMD5(ctx context.Context, addr, password string) (net.Conn, error) {
 			return nil, fmt.Errorf("unexpected epoll behavior")
 		}
 
-		nerr, err := syscall.GetsockoptInt(fd, syscall.SOL_SOCKET, syscall.SO_ERROR)
+		nerr, err := unix.GetsockoptInt(fd, unix.SOL_SOCKET, unix.SO_ERROR)
 		if err != nil {
 			return nil, os.NewSyscallError("getsockopt", err)
 		}
 		switch err := syscall.Errno(nerr); err {
 		case syscall.EINPROGRESS, syscall.EALREADY, syscall.EINTR:
-		case syscall.Errno(0), syscall.EISCONN:
+		case syscall.Errno(0), unix.EISCONN:
 			return net.FileConn(fi)
 		default:
 			return nil, os.NewSyscallError("getsockopt", err)
@@ -593,10 +594,10 @@ func dialMD5(ctx context.Context, addr, password string) (net.Conn, error) {
 func buildTCPMD5Sig(addr net.IP, key string) tcpmd5sig {
 	t := tcpmd5sig{}
 	if addr.To4() != nil {
-		t.ssFamily = syscall.AF_INET
+		t.ssFamily = unix.AF_INET
 		copy(t.ss[2:], addr.To4())
 	} else {
-		t.ssFamily = syscall.AF_INET6
+		t.ssFamily = unix.AF_INET6
 		copy(t.ss[6:], addr.To16())
 	}
 
