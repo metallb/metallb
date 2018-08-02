@@ -3,11 +3,13 @@ title: Configuration
 weight: 4
 ---
 
-To configure MetalLB, write a config map to `metallb-system/config`
+The MetalLB deployment remains idle until configured.  This is accomplished by designing and deploying a configmap into the same namespace (metallb-system) as the deployment.
 
 There is an example configmap in
 [`manifests/example-config.yaml`](https://raw.githubusercontent.com/google/metallb/master/manifests/example-config.yaml),
 annotated with explanatory comments.
+
+If you've named the configmap `config.yaml`, you can deploy the manifest with `kubectl apply -f config.yaml`.
 
 The specific configuration depends on the protocol(s) you want to use
 to announce service IPs. Jump to:
