@@ -115,10 +115,27 @@ func (a *Announce) updateInterfaces() {
 	return
 }
 
-func (a *Announce) gratuitous(ip net.IP) error {
+func (a *Announce) spam(name string) {
+	// TODO: should abort if we lose control of the IP mid-spam.
+	start := time.Now()
+	for time.Since(start) < 5*time.Second {
+		if err := a.gratuitous(name); err != nil {
+			a.logger.Log("op", "gratuitousAnnounce", "error", err, "service", name, "msg", "failed to make gratuitous IP announcement")
+		}
+		time.Sleep(1100 * time.Millisecond)
+	}
+}
+
+func (a *Announce) gratuitous(name string) error {
 	a.Lock()
 	defer a.Unlock()
 
+	ip, ok := a.ips[name]
+	if !ok {
+		// No IP means we've lost control of the IP, someone else is
+		// doing announcements.
+		return nil
+	}
 	if ip.To4() != nil {
 		for _, client := range a.arps {
 			if err := client.Gratuitous(ip); err != nil {
@@ -164,6 +181,7 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 	}
 
 	a.ips[name] = ip
+	go a.spam(name)
 }
 
 // DeleteBalancer deletes an address from the set of addresses we should announce.
