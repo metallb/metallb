@@ -11,7 +11,8 @@ Bugfixes:
 
 - Fix gratuitous ARP and NDP announcements on IP
   failover. ([#291](https://github.com/google/metallb/issues/291))
-
+- Fix BGP dialing on Arm64, by using `x/sys/unix` instead of the
+  `syscall` package. ([#289](https://github.com/google/metallb/issues/289))
 
 ## Version 0.7.1
 
