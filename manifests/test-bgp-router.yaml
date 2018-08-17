@@ -23,7 +23,7 @@ spec:
       automountServiceAccountToken: false
       containers:
       - name: test-bgp-router
-        image: metallb/test-bgp-router:v0.7.2
+        image: metallb/test-bgp-router:v0.7.3
         env:
         - name: METALLB_NODE_IP
           valueFrom:
