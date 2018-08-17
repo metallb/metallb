@@ -111,7 +111,6 @@ type controller struct {
 	protocols map[config.Proto]Protocol
 	announced map[string]config.Proto // service name -> protocol advertising it
 	svcIP     map[string]net.IP       // service name -> assigned IP
-	ipRefcnt  map[string]int          // IP string -> number of consumers
 }
 
 type controllerConfig struct {
@@ -147,7 +146,6 @@ func newController(cfg controllerConfig) (*controller, error) {
 		protocols: protocols,
 		announced: map[string]config.Proto{},
 		svcIP:     map[string]net.IP{},
-		ipRefcnt:  map[string]int{},
 	}
 
 	return ret, nil
@@ -220,7 +218,6 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 	if c.announced[name] == "" {
 		c.announced[name] = pool.Protocol
 		c.svcIP[name] = lbIP
-		c.ipRefcnt[lbIP.String()]++
 	}
 
 	announcing.With(prometheus.Labels{
@@ -240,8 +237,11 @@ func (c *controller) deleteBalancer(l log.Logger, name, reason string) bool {
 		return true
 	}
 
-	c.ipRefcnt[c.svcIP[name].String()]--
-	ref := c.ipRefcnt[c.svcIP[name].String()]
+	if err := c.protocols[proto].DeleteBalancer(l, name, reason); err != nil {
+		l.Log("op", "deleteBalancer", "error", err, "msg", "failed to clear balancer state")
+		return false
+	}
+
 	announcing.Delete(prometheus.Labels{
 		"protocol": string(proto),
 		"service":  name,
@@ -250,13 +250,6 @@ func (c *controller) deleteBalancer(l log.Logger, name, reason string) bool {
 	})
 	delete(c.announced, name)
 	delete(c.svcIP, name)
-
-	if ref == 0 {
-		if err := c.protocols[proto].DeleteBalancer(l, name, reason); err != nil {
-			l.Log("op", "deleteBalancer", "error", err, "msg", "failed to clear balancer state")
-			return false
-		}
-	}
 
 	l.Log("event", "serviceWithdrawn", "ip", c.svcIP[name], "reason", reason, "msg", "withdrawing service announcement")
 
