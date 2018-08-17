@@ -3,9 +3,18 @@ title: Release Notes
 weight: 7
 ---
 
-## Version 0.7.2
+## Version 0.7.3
 
 [Documentation for this release](https://metallb.universe.tf)
+
+Bugfixes:
+
+- Fix BGP announcement refcounting when using shared
+  IPs. ([#295](https://github.com/google/metallb/issues/295))
+
+## Version 0.7.2
+
+[Documentation for this release](https://v0-7-2--metallb.netlify.com)
 
 Bugfixes:
 
@@ -16,7 +25,7 @@ Bugfixes:
 
 ## Version 0.7.1
 
-[Documentation for this release](https://metallb.universe.tf)
+[Documentation for this release](https://v0-7-1--metallb.netlify.com)
 
 Bugfixes:
 
