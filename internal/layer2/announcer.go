@@ -13,18 +13,20 @@ type Announce struct {
 	logger log.Logger
 
 	sync.RWMutex
-	arps map[int]*arpResponder
-	ndps map[int]*ndpResponder
-	ips  map[string]net.IP // map containing IPs we should announce
+	arps     map[int]*arpResponder
+	ndps     map[int]*ndpResponder
+	ips      map[string]net.IP // svcName -> IP
+	ipRefcnt map[string]int    // ip.String() -> number of uses
 }
 
 // New returns an initialized Announce.
 func New(l log.Logger) (*Announce, error) {
 	ret := &Announce{
-		logger: l,
-		arps:   map[int]*arpResponder{},
-		ndps:   map[int]*ndpResponder{},
-		ips:    make(map[string]net.IP),
+		logger:   l,
+		arps:     map[int]*arpResponder{},
+		ndps:     map[int]*ndpResponder{},
+		ips:      map[string]net.IP{},
+		ipRefcnt: map[string]int{},
 	}
 	go ret.interfaceScan()
 
@@ -174,6 +176,13 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 		return
 	}
 
+	a.ipRefcnt[ip.String()]++
+	if a.ipRefcnt[ip.String()] > 1 {
+		// Multiple services are using this IP, so there's nothing
+		// else to do right now.
+		return
+	}
+
 	for _, client := range a.ndps {
 		if err := client.Watch(ip); err != nil {
 			a.logger.Log("op", "watchMulticastGroup", "error", err, "ip", ip, "msg", "failed to watch NDP multicast group for IP, NDP responder will not respond to requests for this address")
@@ -182,6 +191,7 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 
 	a.ips[name] = ip
 	go a.spam(name)
+
 }
 
 // DeleteBalancer deletes an address from the set of addresses we should announce.
@@ -193,6 +203,14 @@ func (a *Announce) DeleteBalancer(name string) {
 	if !ok {
 		return
 	}
+	delete(a.ips, name)
+
+	a.ipRefcnt[ip.String()]--
+	if a.ipRefcnt[ip.String()] > 0 {
+		// Another service is still using this IP, don't touch any
+		// more things.
+		return
+	}
 
 	for _, client := range a.ndps {
 		if err := client.Unwatch(ip); err != nil {
@@ -200,7 +218,6 @@ func (a *Announce) DeleteBalancer(name string) {
 		}
 	}
 
-	delete(a.ips, name)
 }
 
 // AnnounceName returns true when we have an announcement under name.
