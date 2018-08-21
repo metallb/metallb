@@ -1,0 +1,94 @@
+# DebOS configuration to generate a Debian root filesystem, kernel and
+# initrd that boots into a system preloaded with Docker and
+# Kubernetes, ready for integration tests.
+
+architecture: amd64
+
+actions:
+  ## Basic OS setup
+  - action: debootstrap
+    suite: "buster"
+    components:
+      - main
+    mirror: https://deb.debian.org/debian
+    variant: minbase
+
+  - action: apt
+    packages:
+      - openssh-server
+      - ebtables
+      - ethtool
+      - curl
+      - gpg
+      - gpg-agent
+      - software-properties-common
+      - systemd-sysv
+
+  - action: run
+    chroot: true
+    command: echo "root:metallb" | chpasswd
+
+  - action: apt
+    packages:
+      - linux-image-amd64
+
+  - action: run
+    command: cp $ROOTDIR/vmlinuz $ROOTDIR/initrd.img $ARTIFACTDIR
+
+  # - action: run
+  #   chroot: true
+  #   command: apt-get -y purge --autoremove linux-image-amd64
+
+  ## Install docker
+  - action: run
+    chroot: true
+    command: curl -fsSL https://download.docker.com/linux/debian/gpg | apt-key add -
+
+  - action: run
+    chroot: true
+    command: add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/debian buster stable"
+
+  - action: apt
+    packages:
+      - docker-ce
+
+  ## Install k8s
+  - action: run
+    chroot: true
+    command: curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+
+  - action: run
+    chroot: true
+    command: add-apt-repository "deb http://apt.kubernetes.io/ kubernetes-xenial main"
+
+  - action: apt
+    packages:
+      - kubelet
+      - kubeadm
+      - kubectl
+
+  ## Pack it all up into a disk image
+  - action: image-partition
+    imagename: debian.img
+    imagesize: 10GB
+    partitiontype: msdos
+    partitions:
+      - name: root
+        fs: ext4
+        start: 0%
+        end: 100%
+        flags: [ boot ]
+    mountpoints:
+      - mountpoint: /
+        partition: root
+
+  - action: filesystem-deploy
+    
+  - action: run
+    postprocess: true
+    command: qemu-img convert -f raw -O qcow2 -c debian.img debian.qcow2
+
+  - action: run
+    postprocess: true
+    command: rm debian.img
+

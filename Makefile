@@ -146,18 +146,24 @@ gen-image-targets:
 ##
 
 GCP_PROJECT:=metallb-e2e-testing
-CLUSTER_PREFIX:=test
-PROTOCOL:=ipv4
-NETWORK_ADDON:=flannel
-CLUSTER_NAME:=$(CLUSTER_PREFIX)-$(PROTOCOL)-$(NETWORK_ADDON)
 
-.PHONY: e2e-up-cluster
-e2e-up-cluster:
-	(cd e2etest/terraform && terraform apply -state=$(CLUSTER_NAME).tfstate -backup=- -auto-approve -no-color -var=cluster_name=$(CLUSTER_NAME) -var=protocol=$(PROTOCOL) -var=network_addon=$(NETWORK_ADDON) -var=gcp_project=$(GCP_PROJECT))
+.PHONY: e2e-debos-container
+e2e-mk-debos-container:
+	docker build -t debos e2etest/vmimg
 
-.PHONY: e2e-down-cluster
-e2e-down-cluster:
-	(cd e2etest/terraform && terraform destroy -state=$(CLUSTER_NAME).tfstate -backup=- -force -no-color -var=gcp_project=$(GCP_PROJECT))
+.PHONY: e2e-vm-disk
+e2e-vm-disk:
+	docker run -it --privileged -v e2etest/vmimg:/home/debos debos --debug-shell os.yaml
+
+.PHONY: e2e-test-boot
+e2e-test-boot:
+	qemu-system-x86_64 -vga none -nographic -m 1024 -display none -device virtio-net,netdev=net0 -netdev user,id=net0 -device virtio-serial -kernel e2etest/vmimg/vmlinuz -initrd e2etest/vmimg/initrd.img -no-reboot -append "console=ttyS0,115200 panic=-1 acpi=off nosmp ip=dhcp root=/dev/sda1" e2etest/vmimg/debian.qcow2
+
+.PHONY: e2e-upload-vm-disk
+e2e-upload-vm-disk:
+	gsutil cp e2etest/vmimg/vmlinuz gs://$(GCP_PROJECT)/e2etest/
+	gsutil cp e2etest/vmimg/initrd.img gs://$(GCP_PROJECT)/e2etest/
+	gsutil cp e2etest/vmimg/debian.qcow2 gs://$(GCP_PROJECT)/e2etest/
 
 ################################
 ## For CircleCI
