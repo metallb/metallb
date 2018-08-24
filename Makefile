@@ -153,7 +153,7 @@ e2e-mk-debos-container:
 
 .PHONY: e2e-vm-disk
 e2e-vm-disk:
-	docker run -it --privileged -v e2etest/vmimg:/home/debos debos --debug-shell os.yaml
+	docker run -it --privileged -v `pwd`/e2etest/vmimg:/home/debos debos --debug-shell os.yaml
 
 .PHONY: e2e-test-boot
 e2e-test-boot:
