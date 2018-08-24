@@ -4,5 +4,5 @@ Makefile.image-targets
 build/
 website/public
 .envrc
-e2etest/terraform/.terraform
-e2etest/terraform/*.tfstate*
+e2etest/vmcache
+e2etest/vmimg/debian.img

@@ -23,6 +23,7 @@ actions:
       - gpg-agent
       - software-properties-common
       - systemd-sysv
+      - isc-dhcp-client
 
   - action: run
     chroot: true
@@ -35,9 +36,9 @@ actions:
   - action: run
     command: cp $ROOTDIR/vmlinuz $ROOTDIR/initrd.img $ARTIFACTDIR
 
-  # - action: run
-  #   chroot: true
-  #   command: apt-get -y purge --autoremove linux-image-amd64
+  - action: run
+    chroot: true
+    command: apt-get -y purge --autoremove linux-image-amd64
 
   ## Install docker
   - action: run
@@ -83,12 +84,16 @@ actions:
         partition: root
 
   - action: filesystem-deploy
-    
-  - action: run
-    postprocess: true
-    command: qemu-img convert -f raw -O qcow2 -c debian.img debian.qcow2
 
   - action: run
     postprocess: true
-    command: rm debian.img
+    command: mv debian.img /home/debos-out/debian.img
+
+  # - action: run
+  #   postprocess: true
+  #   command: qemu-img convert -f raw -O qcow2 -c $ARTIFACTDIR/debian.img $ARTIFACTDIR/debian.qcow2
+
+  # - action: run
+  #   postprocess: true
+  #   command: rm debian.img
 

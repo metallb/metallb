@@ -25,5 +25,6 @@ RUN apt-get update && \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /go/bin/debos /usr/bin/debos
 VOLUME /home/debos
+VOLUME /home/debos-out
 WORKDIR /home/debos
 ENTRYPOINT ["/usr/bin/debos"]

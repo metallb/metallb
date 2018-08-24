@@ -153,12 +153,12 @@ e2e-mk-debos-container:
 
 .PHONY: e2e-vm-disk
 e2e-vm-disk:
-	docker run -it --privileged -v `pwd`/e2etest/vmimg:/home/debos debos --debug-shell os.yaml
+	docker run -it --privileged -v `pwd`/e2etest/vmcache:/home/debos-out -v `pwd`/e2etest/vmimg:/home/debos debos --artifactdir=/home/debos-out --debug-shell os.yaml
 
 .PHONY: e2e-test-boot
 e2e-test-boot:
-	qemu-system-x86_64 -vga none -nographic -m 1024 -display none -device virtio-net,netdev=net0 -netdev user,id=net0 -device virtio-serial -kernel e2etest/vmimg/vmlinuz -initrd e2etest/vmimg/initrd.img -no-reboot -append "console=ttyS0,115200 panic=-1 acpi=off nosmp ip=dhcp root=/dev/sda1" e2etest/vmimg/debian.qcow2
-
+	qemu-system-x86_64 -enable-kvm -vga none -nographic -m 1024 -display none -device virtio-net,netdev=net0 -netdev user,id=net0 -device virtio-serial -kernel e2etest/vmcache/vmlinuz -initrd e2etest/vmcache/initrd.img -append "console=ttyS0,115200 panic=-1 nosmp root=/dev/sda1" -virtfs local,path=`pwd`/e2etest/vmimg,id=host0,mount_tag=host0,security_model=mapped,readonly e2etest/vmcache/debian.img
+# network-config=\"{version: 1, config: [{type: physical, name: enp0s3, subnets: [{address: 192.168.113.1/24, type: static}]}, {type: physical, name: enp0s2, subnets: [{type: dhcp}]}]}\"" ip=dhcp acpi=off
 .PHONY: e2e-upload-vm-disk
 e2e-upload-vm-disk:
 	gsutil cp e2etest/vmimg/vmlinuz gs://$(GCP_PROJECT)/e2etest/
