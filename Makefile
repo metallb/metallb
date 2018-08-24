@@ -157,8 +157,10 @@ e2e-vm-disk:
 
 .PHONY: e2e-test-boot
 e2e-test-boot:
-	qemu-system-x86_64 -enable-kvm -vga none -nographic -m 1024 -display none -device virtio-net,netdev=net0 -netdev user,id=net0 -device virtio-serial -kernel e2etest/vmcache/vmlinuz -initrd e2etest/vmcache/initrd.img -append "console=ttyS0,115200 panic=-1 nosmp root=/dev/sda1" -virtfs local,path=`pwd`/e2etest/vmimg,id=host0,mount_tag=host0,security_model=mapped,readonly e2etest/vmcache/debian.img
-# network-config=\"{version: 1, config: [{type: physical, name: enp0s3, subnets: [{address: 192.168.113.1/24, type: static}]}, {type: physical, name: enp0s2, subnets: [{type: dhcp}]}]}\"" ip=dhcp acpi=off
+	(cd e2etest/vmimg && genisoimage -output cloudinit.iso -volid cidata -joliet -rock meta-data user-data)
+	qemu-system-x86_64 -enable-kvm -vga none -nographic -m 1024 -display none -nic user,model=virtio-net-pci -nic socket,model=virtio-net-pci,listen=:1234 -drive file=e2etest/vmcache/debian.img,if=virtio -drive file=e2etest/vmimg/cloudinit.iso,if=virtio -device virtio-serial -object rng-random,filename=/dev/urandom,id=rng0 -device virtio-rng-pci,rng=rng0 -kernel e2etest/vmcache/vmlinuz -initrd e2etest/vmcache/initrd.img -append "console=ttyS0,115200 panic=-1 nosmp root=/dev/vda1"
+	rm e2etest/vmimg/cloudinit.iso
+
 .PHONY: e2e-upload-vm-disk
 e2e-upload-vm-disk:
 	gsutil cp e2etest/vmimg/vmlinuz gs://$(GCP_PROJECT)/e2etest/

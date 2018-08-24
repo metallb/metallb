@@ -15,6 +15,7 @@ actions:
 
   - action: apt
     packages:
+      - cloud-init
       - openssh-server
       - ebtables
       - ethtool
@@ -39,6 +40,10 @@ actions:
   - action: run
     chroot: true
     command: apt-get -y purge --autoremove linux-image-amd64
+
+  - action: run
+    chroot: true
+    command: echo "br_netfilter" >>/etc/modules
 
   ## Install docker
   - action: run
