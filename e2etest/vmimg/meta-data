@@ -1,7 +1,2 @@
 instance-id: foo
-network-interfaces: |
-  iface ens2 inet dhcp
-  iface ens3 inet static
-  address 192.168.113.2
-  netmask 255.255.255.0
 hostname: foo

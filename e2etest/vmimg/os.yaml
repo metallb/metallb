@@ -45,6 +45,10 @@ actions:
     chroot: true
     command: echo "br_netfilter" >>/etc/modules
 
+  - action: run
+    chroot: true
+    command: echo "auto ens2\niface ens2 inet dhcp\nsource /etc/network/interfaces.d/*" >/etc/network/interfaces
+
   ## Install docker
   - action: run
     chroot: true

@@ -1,0 +1,9 @@
+version: 1
+config:
+  - type: physical
+    name: ens3
+    subnets:
+      - type: static
+        address: 192.168.166.2
+        netmask: 255.255.255.0
+

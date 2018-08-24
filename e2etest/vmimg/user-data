@@ -1,2 +1,8 @@
 #!/bin/bash
-echo "Hello world!"
+
+NODE=$(cat /proc/cmdline | tr ' ' '\n' | grep k8s | cut -f2 -d'=')
+
+case $NODE in
+    *)
+        ;;
+esac

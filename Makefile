@@ -157,8 +157,8 @@ e2e-vm-disk:
 
 .PHONY: e2e-test-boot
 e2e-test-boot:
-	(cd e2etest/vmimg && genisoimage -output cloudinit.iso -volid cidata -joliet -rock meta-data user-data)
-	qemu-system-x86_64 -enable-kvm -vga none -nographic -m 1024 -display none -nic user,model=virtio-net-pci -nic socket,model=virtio-net-pci,listen=:1234 -drive file=e2etest/vmcache/debian.img,if=virtio -drive file=e2etest/vmimg/cloudinit.iso,if=virtio -device virtio-serial -object rng-random,filename=/dev/urandom,id=rng0 -device virtio-rng-pci,rng=rng0 -kernel e2etest/vmcache/vmlinuz -initrd e2etest/vmcache/initrd.img -append "console=ttyS0,115200 panic=-1 nosmp root=/dev/vda1"
+	(cd e2etest/vmimg && genisoimage -output cloudinit.iso -volid cidata -joliet -rock meta-data user-data network-config)
+	qemu-system-x86_64 -enable-kvm -vga none -nographic -m 1024 -display none -nic user,model=virtio-net-pci -nic socket,model=virtio-net-pci,listen=:1234 -drive file=e2etest/vmcache/debian.img,if=virtio,snapshot=on -drive file=e2etest/vmimg/cloudinit.iso,if=virtio -device virtio-serial -object rng-random,filename=/dev/urandom,id=rng0 -device virtio-rng-pci,rng=rng0 -kernel e2etest/vmcache/vmlinuz -initrd e2etest/vmcache/initrd.img -append "console=ttyS0,115200 panic=-1 nosmp root=/dev/vda1"
 	rm e2etest/vmimg/cloudinit.iso
 
 .PHONY: e2e-upload-vm-disk
