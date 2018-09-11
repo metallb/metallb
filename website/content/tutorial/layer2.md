@@ -110,11 +110,20 @@ following the logs we can see what's going on: `kubectl logs -l
 component=speaker -n metallb-system`:
 
 ```
-I1217 10:18:05.212018       1 leaderelection.go:174] attempting to acquire leader lease...
-I1217 10:18:07.312902       1 bgp_controller.go:176] Start config update
-I1217 10:18:07.403537       1 bgp_controller.go:243] End config update
-I1217 10:18:07.403748       1 arp_controller.go:128] Start config update
-I1217 10:18:07.403883       1 arp_controller.go:143] End config update
+{"branch":"HEAD","caller":"main.go:63","commit":"69a8379e","msg":"MetalLB speaker starting version 0.7.3 (commit 69a8379e, branch HEAD)","ts":"2018-09-11T23:24:25.668134462Z","version":"0.7.3"}
+{"caller":"announcer.go:89","event":"createARPResponder","interface":"eth0","msg":"created ARP responder for interface","ts":"2018-09-11T23:24:25.719365888Z"}
+{"caller":"announcer.go:98","event":"createNDPResponder","interface":"eth0","msg":"created NDP responder for interface","ts":"2018-09-11T23:24:25.721240251Z"}
+{"caller":"announcer.go:89","event":"createARPResponder","interface":"cni0","msg":"created ARP responder for interface","ts":"2018-09-11T23:24:25.849696054Z"}
+{"caller":"announcer.go:98","event":"createNDPResponder","interface":"cni0","msg":"created NDP responder for interface","ts":"2018-09-11T23:24:25.850849849Z"}
+{"caller":"announcer.go:89","event":"createARPResponder","interface":"veth06468c77","msg":"created ARP responder for interface","ts":"2018-09-11T23:40:27.477873613Z"}
+{"caller":"announcer.go:98","event":"createNDPResponder","interface":"veth06468c77","msg":"created NDP responder for interface","ts":"2018-09-11T23:40:27.478660224Z"}
+{"caller":"main.go:271","configmap":"metallb-system/config","event":"startUpdate","msg":"start of config update","ts":"2018-09-11T23:27:08.031692769Z"}
+{"caller":"main.go:295","configmap":"metallb-system/config","event":"endUpdate","msg":"end of config update","ts":"2018-09-11T23:27:08.032103652Z"}
+{"caller":"k8s.go:346","configmap":"metallb-system/config","event":"configLoaded","msg":"config (re)loaded","ts":"2018-09-11T23:27:08.032308547Z"}
+{"caller":"main.go:159","event":"startUpdate","msg":"start of service update","service":"default/kubernetes","ts":"2018-09-11T23:27:08.037989654Z"}
+{"caller":"main.go:163","event":"endUpdate","msg":"end of service update","service":"default/kubernetes","ts":"2018-09-11T23:27:08.038307829Z"}
+{"caller":"main.go:159","event":"startUpdate","msg":"start of service update","service":"kube-system/kube-dns","ts":"2018-09-11T23:27:08.038511995Z"}
+{"caller":"main.go:163","event":"endUpdate","msg":"end of service update","service":"kube-system/kube-dns","ts":"2018-09-11T23:27:08.038682775Z"}
 ```
 
 The speaker has loaded the configuration, but hasn't done anything
@@ -144,17 +153,15 @@ NAME      TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)        AGE
 nginx     LoadBalancer   10.102.30.250   192.168.1.240   80:31517/TCP   1d
 ```
 
-We have an external IP! Looking through the logs of `speaker` we see it happening:
+We have an external IP! Looking through the logs of `speaker` with `kubectl logs -l component=speaker -n metallb-system` we see it happening:
 
 ```
-I1217 10:18:07.409788       1 arp_controller.go:53] default/nginx: start update
-I1217 10:18:07.409867       1 arp_controller.go:96] default/nginx: announcable, making advertisement
-I1217 10:18:07.409977       1 arp_controller.go:107] default/nginx: end update
-...
-I1217 10:19:01.905426       1 leader.go:61] Sending unsolicited ARPs for 1 addresses
-I1217 10:19:05.005671       1 arp.go:96] Request: who-has 192.168.1.240?  tell 192.168.1.1 (b4:75:0e:63:b2:20). reply: 192.168.1.240 is-at b8:27:eb:86:e2:85
-I1217 10:19:05.105780       1 arp.go:96] Request: who-has 192.168.1.240?  tell 192.168.1.1 (b4:75:0e:63:b2:20). reply: 192.168.1.240 is-at b8:27:eb:86:e2:85
-I1217 10:19:05.235623       1 arp.go:96] Request: who-has 192.168.1.240?  tell 192.168.1.1 (b4:75:0e:63:b2:20). reply: 192.168.1.240 is-at b8:27:eb:86:e2:85
+{"caller":"main.go:159","event":"startUpdate","msg":"start of service update","service":"default/nginx","ts":"2018-09-11T23:40:26.697718946Z"}
+{"caller":"main.go:229","event":"serviceAnnounced","ip":"192.168.1.240","msg":"service has IP, announcing","pool":"my-ip-space","protocol":"layer2","service":"default/nginx","ts":"2018-09-11T23:40:26.69818035Z"}
+{"caller":"main.go:231","event":"endUpdate","msg":"end of service update","service":"default/nginx","ts":"2018-09-11T23:40:26.698532015Z"}
+{"caller":"announcer.go:89","event":"createARPResponder","interface":"veth06468c77","msg":"created ARP responder for interface","ts":"2018-09-11T23:40:27.477873613Z"}
+{"caller":"announcer.go:98","event":"createNDPResponder","interface":"veth06468c77","msg":"created NDP responder for interface","ts":"2018-09-11T23:40:27.478660224Z"}
+{"caller":"arp.go:102","interface":"eth0","ip":"192.168.1.240","msg":"got ARP request for service IP, sending response","responseMAC":"ab:cd:ef:ab:cd:ef","senderIP":"192.168.1.1","senderMAC":"12:34:56:78:90:ab","ts":"2018-09-11T23:40:31.63935007Z"}
 ```
 
 MetalLB is sending out replies to ARP requests with the MAC address of
