@@ -185,7 +185,7 @@ pieces of information: who MetalLB should talk to, and what IP
 addresses it's allowed to hand out.
 
 In this configuration, we're setting up a BGP peering with
-`10.96.0.100`, `10.96.0.101`, `10.96.0.102`, which are the addresses
+`10.96.0.100`, `10.96.0.101`, which are the addresses
 of the `test-bgp-router-bird`, and `test-bgp-router-quagga` services
 respectively. And we're giving MetalLB 256 IP addresses to use, from
 198.51.100.0 to 198.51.100.255. The final section gives MetalLB some
