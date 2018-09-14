@@ -120,7 +120,7 @@ func (c *controller) clearServiceState(key string, svc *v1.Service) {
 func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 	// If the user asked for a specific IP, try that.
 	if svc.Spec.LoadBalancerIP != "" {
-		ip := net.ParseIP(svc.Spec.LoadBalancerIP).To4()
+		ip := net.ParseIP(svc.Spec.LoadBalancerIP)
 		if ip == nil {
 			return nil, fmt.Errorf("invalid spec.loadBalancerIP %q", svc.Spec.LoadBalancerIP)
 		}
