@@ -111,11 +111,41 @@ func nodeHasHealthyEndpoint(eps *v1.Endpoints, node string) bool {
 	return false
 }
 
+func healthyEndpointExists(eps *v1.Endpoints) bool {
+	ready := map[string]bool{}
+	for _, subset := range eps.Subsets {
+		for _, ep := range subset.Addresses {
+			if _, ok := ready[ep.IP]; !ok {
+				// Only set true if nothing else has expressed an
+				// opinion. This means that false will take precedence
+				// if there's any unready ports for a given endpoint.
+				ready[ep.IP] = true
+			}
+		}
+		for _, ep := range subset.NotReadyAddresses {
+			ready[ep.IP] = false
+		}
+	}
+
+	for _, r := range ready {
+		if r {
+			// At least one fully healthy endpoint on this machine.
+			return true
+		}
+	}
+	return false
+}
+
 func (c *bgpController) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
-	// Should we advertise? Yes, if externalTrafficPolicy is Cluster,
-	// or Local && there's a ready local endpoint.
+	// Should we advertise?
+	// Yes, if externalTrafficPolicy is
+	//  Cluster && any healthy endpoint exists
+	// or
+	//  Local && there's a ready local endpoint.
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !nodeHasHealthyEndpoint(eps, c.myNode) {
 		return "noLocalEndpoints"
+	} else if !healthyEndpointExists(eps) {
+		return "noEndpoints"
 	}
 	return ""
 }
