@@ -405,6 +405,86 @@ func TestBGPSpeaker(t *testing.T) {
 		},
 
 		{
+			desc:     "Endpoint list is empty",
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: &v1.Endpoints{},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+			},
+		},
+
+		{
+			desc:     "Endpoint list contains only unhealthy endpoints",
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: &v1.Endpoints{
+				Subsets: []v1.EndpointSubset{
+					{
+						NotReadyAddresses: []v1.EndpointAddress{
+							{
+								IP:       "2.3.4.5",
+								NodeName: strptr("iris"),
+							},
+						},
+					},
+				},
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+			},
+		},
+
+		{
+			desc:     "Endpoint list contains some unhealthy endpoints",
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: &v1.Endpoints{
+				Subsets: []v1.EndpointSubset{
+					{
+						Addresses: []v1.EndpointAddress{
+							{
+								IP:       "2.3.4.5",
+								NodeName: strptr("iris"),
+							},
+						},
+						NotReadyAddresses: []v1.EndpointAddress{
+							{
+								IP:       "2.3.4.6",
+								NodeName: strptr("pandora"),
+							},
+						},
+					},
+				},
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
+			},
+		},
+
+		{
 			desc: "Multiple advertisement config",
 			config: &config.Config{
 				Peers: []*config.Peer{
