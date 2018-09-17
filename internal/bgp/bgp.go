@@ -184,8 +184,7 @@ func (s *Session) connect() error {
 
 	routerID := s.routerID
 	if routerID == nil {
-		// Use the connection's source IP as the router ID
-		routerID = s.defaultNextHop.To4()
+		routerID = getRouterID(s.defaultNextHop)
 		if routerID == nil {
 			conn.Close()
 			return fmt.Errorf("cannot automatically derive router ID for IPv6 connection to %q", s.addr)
@@ -233,6 +232,53 @@ func (s *Session) connect() error {
 	}
 
 	s.conn = conn
+	return nil
+}
+
+// Ipv4; Use the address as-is.
+// Ipv6; Pick the first ipv4 address on the same interface as the address
+func getRouterID(addr net.IP) net.IP {
+	if addr.To4() != nil {
+		return addr
+	}
+
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil
+	}
+	for _, i := range ifaces {
+		addrs, err := i.Addrs()
+		if err != nil {
+			continue
+		}
+		for _, a := range addrs {
+			var ip net.IP
+			switch v := a.(type) {
+			case *net.IPNet:
+                ip = v.IP
+			case *net.IPAddr:
+                ip = v.IP
+			}
+			
+			if ip.Equal(addr) {
+				// This is the interface.
+				// Loop through the addresses again and search for ipv4
+				for _, a := range addrs {
+					var ip net.IP
+					switch v := a.(type) {
+					case *net.IPNet:
+						ip = v.IP
+					case *net.IPAddr:
+						ip = v.IP
+					}
+					if ip.To4() != nil {
+						return ip
+					}
+					return nil
+				}
+			}
+		}
+	}
 	return nil
 }
 
@@ -461,7 +507,7 @@ type tcpmd5sig struct {
 // the low level FD's, skipping the net.Conn API as it has not hooks to set
 // the neccessary sockopts for TCP MD5.
 func dialMD5(ctx context.Context, addr, password string) (net.Conn, error) {
-	laddr, err := net.ResolveTCPAddr("tcp", "0.0.0.0:0")
+	laddr, err := net.ResolveTCPAddr("tcp", "[::]:0")
 	if err != nil {
 		return nil, fmt.Errorf("Error resolving local address: %s ", err)
 	}
