@@ -255,11 +255,11 @@ func getRouterID(addr net.IP) net.IP {
 			var ip net.IP
 			switch v := a.(type) {
 			case *net.IPNet:
-                ip = v.IP
+				ip = v.IP
 			case *net.IPAddr:
-                ip = v.IP
+				ip = v.IP
 			}
-			
+
 			if ip.Equal(addr) {
 				// This is the interface.
 				// Loop through the addresses again and search for ipv4
