@@ -34,8 +34,9 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534 # nobody
-    {{- with .Values.controller.nodeSelector }}
       nodeSelector:
+        "beta.kubernetes.io/os": linux
+        {{- with .Values.controller.nodeSelector }}
 {{ toYaml . | indent 8 }}
     {{- end }}
     {{- with .Values.controller.tolerations }}
