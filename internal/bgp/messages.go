@@ -10,6 +10,11 @@ import (
 	"time"
 )
 
+type messageHandler interface {
+	sendUpdate(w io.Writer, asn uint32, ibgp bool, defaultNextHop net.IP, adv *Advertisement) error
+}
+type mhIpv4 int
+
 func sendOpen(w io.Writer, asn uint32, routerID net.IP, holdTime time.Duration) error {
 	if routerID.To4() == nil {
 		panic("non-ipv4 address used as RouterID")
@@ -279,7 +284,7 @@ func readCapabilities(r io.Reader, ret *openResult) error {
 	}
 }
 
-func sendUpdate(w io.Writer, asn uint32, ibgp bool, defaultNextHop net.IP, adv *Advertisement) error {
+func (mh mhIpv4) sendUpdate(w io.Writer, asn uint32, ibgp bool, defaultNextHop net.IP, adv *Advertisement) error {
 	var b bytes.Buffer
 
 	hdr := struct {

@@ -34,6 +34,8 @@ type Session struct {
 	newHoldTime chan bool
 	backoff     backoff
 
+	isIpv6         bool
+	mh             messageHandler
 	mu             sync.Mutex
 	cond           *sync.Cond
 	closed         bool
@@ -90,7 +92,7 @@ func (s *Session) sendUpdates() bool {
 	}
 
 	for c, adv := range s.advertised {
-		if err := sendUpdate(s.conn, s.asn, ibgp, s.defaultNextHop, adv); err != nil {
+		if err := s.mh.sendUpdate(s.conn, s.asn, ibgp, s.defaultNextHop, adv); err != nil {
 			s.abort()
 			s.logger.Log("op", "sendUpdate", "ip", c, "error", err, "msg", "failed to send BGP update")
 			return true
@@ -123,7 +125,7 @@ func (s *Session) sendUpdates() bool {
 				continue
 			}
 
-			if err := sendUpdate(s.conn, s.asn, ibgp, s.defaultNextHop, adv); err != nil {
+			if err := s.mh.sendUpdate(s.conn, s.asn, ibgp, s.defaultNextHop, adv); err != nil {
 				s.abort()
 				s.logger.Log("op", "sendUpdate", "prefix", c, "error", err, "msg", "failed to send BGP update")
 				return true
@@ -351,6 +353,15 @@ func New(l log.Logger, addr string, asn uint32, routerID net.IP, peerASN uint32,
 		advertised:  map[string]*Advertisement{},
 		password:    password,
 	}
+	ret.isIpv6 = false
+	if host, _, err := net.SplitHostPort(addr); err == nil {
+		ret.isIpv6 = net.ParseIP(host).To4() == nil
+	}
+	if ret.isIpv6 {
+		ret.mh = mhIpv6(0)
+	} else {
+		ret.mh = mhIpv4(0)
+	}
 	ret.cond = sync.NewCond(&ret.mu)
 	go ret.sendKeepalives()
 	go ret.run()
@@ -412,12 +423,14 @@ func (s *Session) Set(advs ...*Advertisement) error {
 
 	newAdvs := map[string]*Advertisement{}
 	for _, adv := range advs {
-		if adv.Prefix.IP.To4() == nil {
-			return fmt.Errorf("cannot advertise non-v4 prefix %q", adv.Prefix)
-		}
+		if !s.isIpv6 {
+			if adv.Prefix.IP.To4() == nil {
+				return fmt.Errorf("cannot advertise non-v4 prefix %q", adv.Prefix)
+			}
 
-		if adv.NextHop != nil && adv.NextHop.To4() == nil {
-			return fmt.Errorf("next-hop must be IPv4, got %q", adv.NextHop)
+			if adv.NextHop != nil && adv.NextHop.To4() == nil {
+				return fmt.Errorf("next-hop must be IPv4, got %q", adv.NextHop)
+			}
 		}
 		if len(adv.Communities) > 63 {
 			return fmt.Errorf("max supported communities is 63, got %d", len(adv.Communities))
