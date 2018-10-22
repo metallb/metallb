@@ -12,6 +12,7 @@ import (
 
 type messageHandler interface {
 	sendUpdate(w io.Writer, asn uint32, ibgp bool, defaultNextHop net.IP, adv *Advertisement) error
+	sendWithdraw(w io.Writer, prefixes []*net.IPNet) error
 }
 type mhIpv4 int
 
@@ -386,7 +387,7 @@ func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp bool, defaultNextHop net.
 	return nil
 }
 
-func sendWithdraw(w io.Writer, prefixes []*net.IPNet) error {
+func (mh mhIpv4) sendWithdraw(w io.Writer, prefixes []*net.IPNet) error {
 	var b bytes.Buffer
 
 	hdr := struct {

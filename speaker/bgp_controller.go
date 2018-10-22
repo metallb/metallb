@@ -179,7 +179,12 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 func (c *bgpController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
 	c.svcAds[name] = nil
 	for _, adCfg := range pool.BGPAdvertisements {
-		m := net.CIDRMask(adCfg.AggregationLength, 32)
+		var m net.IPMask
+		if lbIP.To4() != nil {
+			m = net.CIDRMask(adCfg.AggregationLength, 32)
+		} else {
+			m = net.CIDRMask(128, 128)
+		}
 		ad := &bgp.Advertisement{
 			Prefix: &net.IPNet{
 				IP:   lbIP.Mask(m),

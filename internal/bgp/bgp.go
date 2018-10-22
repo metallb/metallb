@@ -140,7 +140,7 @@ func (s *Session) sendUpdates() bool {
 			}
 		}
 		if len(wdr) > 0 {
-			if err := sendWithdraw(s.conn, wdr); err != nil {
+			if err := s.mh.sendWithdraw(s.conn, wdr); err != nil {
 				s.abort()
 				for _, pfx := range wdr {
 					s.logger.Log("op", "sendWithdraw", "prefix", pfx, "error", err, "msg", "failed to send BGP withdraw")
