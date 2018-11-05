@@ -34,7 +34,7 @@ type Session struct {
 	newHoldTime chan bool
 	backoff     backoff
 
-	isIpv6         bool
+	bgp_mp         bool
 	mh             messageHandler
 	mu             sync.Mutex
 	cond           *sync.Cond
@@ -353,14 +353,11 @@ func New(l log.Logger, addr string, asn uint32, routerID net.IP, peerASN uint32,
 		advertised:  map[string]*Advertisement{},
 		password:    password,
 	}
-	ret.isIpv6 = false
-	if host, _, err := net.SplitHostPort(addr); err == nil {
-		ret.isIpv6 = net.ParseIP(host).To4() == nil
-	}
-	if ret.isIpv6 {
-		ret.mh = mhIpv6(0)
+	ret.bgp_mp = os.Getenv("METALLB_BGP_MP") == "yes"
+	if ret.bgp_mp {
+		ret.mh = mhMp(0)
 	} else {
-		ret.mh = mhIpv4(0)
+		ret.mh = mhLegacy(0)
 	}
 	ret.cond = sync.NewCond(&ret.mu)
 	go ret.sendKeepalives()
@@ -423,7 +420,7 @@ func (s *Session) Set(advs ...*Advertisement) error {
 
 	newAdvs := map[string]*Advertisement{}
 	for _, adv := range advs {
-		if !s.isIpv6 {
+		if !s.bgp_mp {
 			if adv.Prefix.IP.To4() == nil {
 				return fmt.Errorf("cannot advertise non-v4 prefix %q", adv.Prefix)
 			}

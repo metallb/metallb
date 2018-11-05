@@ -3,13 +3,14 @@ package bgp
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"io"
 	"net"
 )
 
-type mhIpv6 int
+type mhMp int
 
-func (mh mhIpv6) sendUpdate(w io.Writer, asn uint32, ibgp bool, defaultNextHop net.IP, adv *Advertisement) error {
+func (mh mhMp) sendUpdate(w io.Writer, asn uint32, ibgp bool, defaultNextHop net.IP, adv *Advertisement) error {
 	var b bytes.Buffer
 
 	hdr := struct {
@@ -50,23 +51,44 @@ func (mh mhIpv6) sendUpdate(w io.Writer, asn uint32, ibgp bool, defaultNextHop n
 	}
 
 	o := b.Len() // Save the offset so we can set the length later
-	b.Write([]byte{
-		0x80, 14, // optional, MP_REACH_NLRI
-		0,    // len (filled later)
-		0, 2, // AFI IPv6
-		1,  // SAFI Unicast
-		16, // length of nexthop
-	})
 
-	if adv.NextHop != nil {
-		b.Write(adv.NextHop)
+	if adv.Prefix.IP.To4() != nil {
+		b.Write([]byte{
+			0x80, 14, // optional, MP_REACH_NLRI
+			0,    // len (filled later)
+			0, 1, // AFI IPv4
+			1, // SAFI Unicast
+			4, // length of nexthop
+		})
+
+		if adv.NextHop != nil {
+			b.Write(adv.NextHop)
+		} else {
+			b.Write(defaultNextHop)
+		}
+
+		b.WriteByte(0)  // SNPA
+		b.WriteByte(32) // The advertised address always /32
+		b.Write(adv.Prefix.IP.To4())
 	} else {
-		b.Write(defaultNextHop)
-	}
+		b.Write([]byte{
+			0x80, 14, // optional, MP_REACH_NLRI
+			0,    // len (filled later)
+			0, 2, // AFI IPv6
+			1,  // SAFI Unicast
+			16, // length of nexthop
+		})
 
-	b.WriteByte(0)   // SNPA
-	b.WriteByte(128) // The advertised address always /128
-	b.Write(adv.Prefix.IP.To16())
+		if adv.NextHop != nil {
+			b.Write(adv.NextHop)
+		} else {
+			b.Write(defaultNextHop)
+		}
+
+		b.WriteByte(0)   // SNPA
+		b.WriteByte(128) // The advertised address always /128
+		b.Write(adv.Prefix.IP.To16())
+	}
 
 	b.Bytes()[o+2] = byte(b.Len() - o - 3)
 	binary.BigEndian.PutUint16(b.Bytes()[21:23], uint16(b.Len()-l))
@@ -78,7 +100,7 @@ func (mh mhIpv6) sendUpdate(w io.Writer, asn uint32, ibgp bool, defaultNextHop n
 	return nil
 }
 
-func (mh mhIpv6) sendWithdraw(w io.Writer, prefixes []*net.IPNet) error {
+func (mh mhMp) sendWithdraw(w io.Writer, prefixes []*net.IPNet) error {
 	var b bytes.Buffer
 
 	hdr := struct {
@@ -105,16 +127,45 @@ func (mh mhIpv6) sendWithdraw(w io.Writer, prefixes []*net.IPNet) error {
 	})
 
 	o := b.Len() // Save the offset so we can set the length later
-	b.Write([]byte{
-		0x80, 15, // optional, MP_UNREACH_NLRI
-		0,    // len (filled later)
-		0, 2, // AFI IPv6
-		1, // SAFI Unicast
-	})
 
+	// Make sure all prefixed are ipv4 or ipv6. We can't handle a mix.
+	addressType := 0 // 0 - don't know, 1 - ipv4, 2 - ipv6
 	for _, p := range prefixes {
-		b.WriteByte(128)
-		b.Write(p.IP.To16())
+		if p.IP.To4() != nil {
+			if addressType == 2 {
+				return fmt.Errorf("Mixed ipv4/ipv6 in withdraw")
+			}
+			addressType = 1
+		} else {
+			if addressType == 1 {
+				return fmt.Errorf("Mixed ipv4/ipv6 in withdraw")
+			}
+			addressType = 2
+		}
+	}
+
+	if addressType == 2 {
+		b.Write([]byte{
+			0x80, 15, // optional, MP_UNREACH_NLRI
+			0,    // len (filled later)
+			0, 2, // AFI IPv6
+			1, // SAFI Unicast
+		})
+		for _, p := range prefixes {
+			b.WriteByte(128)
+			b.Write(p.IP.To16())
+		}
+	} else {
+		b.Write([]byte{
+			0x80, 15, // optional, MP_UNREACH_NLRI
+			0,    // len (filled later)
+			0, 1, // AFI IPv4
+			1, // SAFI Unicast
+		})
+		for _, p := range prefixes {
+			b.WriteByte(32)
+			b.Write(p.IP.To4())
+		}
 	}
 
 	b.Bytes()[o+2] = byte(b.Len() - o - 3)
