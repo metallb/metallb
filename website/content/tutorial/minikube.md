@@ -58,7 +58,7 @@ minikube using the `kubeadm` bootstrapper. The older `localkube`
 bootstrapper creates RBAC rules that are incompatible with Helm.
 {{% /notice %}}
 
-## Set up a BGP routers
+## Set up BGP routers
 
 MetalLB exposes load-balanced services using the BGP routing protocol,
 so we need a BGP router to talk to. In a production cluster, this
