@@ -1,10 +1,12 @@
 package bgp // import "go.universe.tf/metallb/internal/bgp"
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"hash/crc32"
 	"io"
 	"io/ioutil"
 	"net"
@@ -25,6 +27,7 @@ var errClosed = errors.New("session closed")
 type Session struct {
 	asn      uint32
 	routerID net.IP // May be nil, meaning "derive from context"
+	myNode   string
 	addr     string
 	peerASN  uint32
 	holdTime time.Duration
@@ -184,11 +187,7 @@ func (s *Session) connect() error {
 
 	routerID := s.routerID
 	if routerID == nil {
-		routerID = getRouterID(s.defaultNextHop)
-		if routerID == nil {
-			conn.Close()
-			return fmt.Errorf("cannot automatically derive router ID for IPv6 connection to %q", s.addr)
-		}
+		routerID = getRouterID(s.defaultNextHop, s.myNode)
 	}
 
 	if err = sendOpen(conn, s.asn, routerID, s.holdTime); err != nil {
@@ -235,16 +234,22 @@ func (s *Session) connect() error {
 	return nil
 }
 
+func hashRouterId(hostname string) net.IP {
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, crc32.ChecksumIEEE([]byte(hostname)))
+	return net.IP(buf.Bytes())
+}
+
 // Ipv4; Use the address as-is.
 // Ipv6; Pick the first ipv4 address on the same interface as the address
-func getRouterID(addr net.IP) net.IP {
+func getRouterID(addr net.IP, myNode string) net.IP {
 	if addr.To4() != nil {
 		return addr
 	}
 
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		return nil
+		return hashRouterId(myNode)
 	}
 	for _, i := range ifaces {
 		addrs, err := i.Addrs()
@@ -274,12 +279,12 @@ func getRouterID(addr net.IP) net.IP {
 					if ip.To4() != nil {
 						return ip
 					}
-					return nil
 				}
+				return hashRouterId(myNode)
 			}
 		}
 	}
-	return nil
+	return hashRouterId(myNode)
 }
 
 // sendKeepalives sends BGP KEEPALIVE packets at the negotiated rate
@@ -339,11 +344,12 @@ func (s *Session) sendKeepalive() error {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func New(l log.Logger, addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time.Duration, password string) (*Session, error) {
+func New(l log.Logger, addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time.Duration, password string, myNode string) (*Session, error) {
 	ret := &Session{
 		addr:        addr,
 		asn:         asn,
 		routerID:    routerID.To4(),
+		myNode:      myNode,
 		peerASN:     peerASN,
 		holdTime:    holdTime,
 		logger:      log.With(l, "peer", addr, "localASN", asn, "peerASN", peerASN),
