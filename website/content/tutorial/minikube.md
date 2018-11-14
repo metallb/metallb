@@ -205,7 +205,7 @@ back). If all went well, you should see happier routers:
 
 Success! The MetalLB BGP speaker connected to our routers. You can
 verify this by looking at the logs for the BGP speaker. Run `kubectl
-logs -n metallb-system -l app=speaker`, and among other log
+logs -n metallb-system -l app=metallb,component=speaker`, and among other log
 entries, you should find something like:
 
 ```
