@@ -121,21 +121,18 @@ var zoneCache = ipv6ZoneCache{
 	toName:  make(map[int]string),
 }
 
-// update refreshes the network interface information if the cache was last
-// updated more than 1 minute ago, or if force is set. It returns whether the
-// cache was updated.
-func (zc *ipv6ZoneCache) update(ift []net.Interface, force bool) (updated bool) {
+func (zc *ipv6ZoneCache) update(ift []net.Interface) {
 	zc.Lock()
 	defer zc.Unlock()
 	now := time.Now()
-	if !force && zc.lastFetched.After(now.Add(-60*time.Second)) {
-		return false
+	if zc.lastFetched.After(now.Add(-60 * time.Second)) {
+		return
 	}
 	zc.lastFetched = now
 	if len(ift) == 0 {
 		var err error
 		if ift, err = net.Interfaces(); err != nil {
-			return false
+			return
 		}
 	}
 	zc.toIndex = make(map[string]int, len(ift))
@@ -146,38 +143,25 @@ func (zc *ipv6ZoneCache) update(ift []net.Interface, force bool) (updated bool) 
 			zc.toName[ifi.Index] = ifi.Name
 		}
 	}
-	return true
 }
 
 func (zc *ipv6ZoneCache) name(zone int) string {
-	updated := zoneCache.update(nil, false)
+	zoneCache.update(nil)
 	zoneCache.RLock()
+	defer zoneCache.RUnlock()
 	name, ok := zoneCache.toName[zone]
-	zoneCache.RUnlock()
-	if !ok && !updated {
-		zoneCache.update(nil, true)
-		zoneCache.RLock()
-		name, ok = zoneCache.toName[zone]
-		zoneCache.RUnlock()
-	}
-	if !ok { // last resort
+	if !ok {
 		name = strconv.Itoa(zone)
 	}
 	return name
 }
 
 func (zc *ipv6ZoneCache) index(zone string) int {
-	updated := zoneCache.update(nil, false)
+	zoneCache.update(nil)
 	zoneCache.RLock()
+	defer zoneCache.RUnlock()
 	index, ok := zoneCache.toIndex[zone]
-	zoneCache.RUnlock()
-	if !ok && !updated {
-		zoneCache.update(nil, true)
-		zoneCache.RLock()
-		index, ok = zoneCache.toIndex[zone]
-		zoneCache.RUnlock()
-	}
-	if !ok { // last resort
+	if !ok {
 		index, _ = strconv.Atoi(zone)
 	}
 	return index
