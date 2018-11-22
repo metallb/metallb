@@ -4,5 +4,7 @@ Makefile.image-targets
 build/
 website/public
 .envrc
-e2etest/vmcache
-e2etest/vmimg/debian.img
+e2etest/vmlinuz
+e2etest/initrd.img
+e2etest/*.qcow2
+e2etest/e2etest

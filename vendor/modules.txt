@@ -138,7 +138,7 @@ github.com/vishvananda/netlink/nl
 github.com/vishvananda/netns
 # golang.org/x/crypto v0.0.0-20181127143415-eb0de9b17e85
 golang.org/x/crypto/ssh/terminal
-# golang.org/x/net v0.0.0-20181201002055-351d144fa1fc
+# golang.org/x/net v0.0.0-20181106065722-10aee1819953
 golang.org/x/net/http2
 golang.org/x/net/icmp
 golang.org/x/net/ipv6
@@ -207,9 +207,9 @@ google.golang.org/grpc/balancer/base
 gopkg.in/inf.v0
 # gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637
 gopkg.in/tomb.v2
-# gopkg.in/yaml.v2 v2.2.2
+# gopkg.in/yaml.v2 v2.2.1
 gopkg.in/yaml.v2
-# k8s.io/api v0.0.0-20181130031204-d04500c8c3dd
+# k8s.io/api v0.0.0-20181121071145-b7bd5f2d334c
 k8s.io/api/core/v1
 k8s.io/api/admissionregistration/v1alpha1
 k8s.io/api/admissionregistration/v1beta1
@@ -241,7 +241,7 @@ k8s.io/api/settings/v1alpha1
 k8s.io/api/storage/v1
 k8s.io/api/storage/v1alpha1
 k8s.io/api/storage/v1beta1
-# k8s.io/apimachinery v0.0.0-20181130031032-af2f90f9922d
+# k8s.io/apimachinery v0.0.0-20181126191516-4a9a8137c0a1
 k8s.io/apimachinery/pkg/labels
 k8s.io/apimachinery/pkg/apis/meta/v1
 k8s.io/apimachinery/pkg/fields
