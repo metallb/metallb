@@ -2,6 +2,7 @@ package layer2
 
 import (
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -61,6 +62,9 @@ func (a *Announce) updateInterfaces() {
 		}
 
 		if ifi.Flags&net.FlagUp == 0 {
+			continue
+		}
+		if _, err := os.Stat("/sys/class/net/" + ifi.Name + "/master"); !os.IsNotExist(err) {
 			continue
 		}
 		if ifi.Flags&net.FlagBroadcast != 0 {
