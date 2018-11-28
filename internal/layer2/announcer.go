@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 )
 
 // Announce is used to "announce" new IPs mapped to the node's MAC address.
@@ -59,8 +61,19 @@ func (a *Announce) updateInterfaces() {
 			l.Log("op", "getAddresses", "error", err, "msg", "couldn't get addresses for interface")
 			return
 		}
+		link, err := netlink.LinkByName(ifi.Name)
+		if err != nil {
+			l.Log("op", "getAttrs", "error", err, "msg", "couldn't get attributes for interface")
+			return
+		}
 
 		if ifi.Flags&net.FlagUp == 0 {
+			continue
+		}
+		if link.Attrs().MasterIndex != 0 {
+			continue
+		}
+		if link.Attrs().RawFlags&unix.IFF_NOARP == uint32(unix.IFF_NOARP) {
 			continue
 		}
 		if ifi.Flags&net.FlagBroadcast != 0 {
