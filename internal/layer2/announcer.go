@@ -1,8 +1,10 @@
 package layer2
 
 import (
+	"io/ioutil"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -65,6 +67,10 @@ func (a *Announce) updateInterfaces() {
 			continue
 		}
 		if _, err := os.Stat("/sys/class/net/" + ifi.Name + "/master"); !os.IsNotExist(err) {
+			continue
+		}
+		// Check for NOARP flag
+		if b, _ := ioutil.ReadFile("/sys/class/net/" + ifi.Name + "/flags"); strings.Contains("89abcdef", string(b[len(b)-3:len(b)-2])) {
 			continue
 		}
 		if ifi.Flags&net.FlagBroadcast != 0 {
