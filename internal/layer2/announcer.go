@@ -69,9 +69,11 @@ func (a *Announce) updateInterfaces() {
 			continue
 		}
 		// Check for NOARP flag
-		flags, _ := ioutil.ReadFile("/sys/class/net/" + ifi.Name + "/flags")
-		if b := flags[len(flags)-3 : len(flags)-2][0]; b >= 56 && b <= 102 {
-			continue
+		flags, err := ioutil.ReadFile("/sys/class/net/" + ifi.Name + "/flags")
+		if err == nil {
+			if b := flags[len(flags)-3 : len(flags)-2][0]; b >= 56 && b <= 102 {
+				continue
+			}
 		}
 		if ifi.Flags&net.FlagBroadcast != 0 {
 			keepARP[ifi.Index] = true
