@@ -4,7 +4,6 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -70,7 +69,8 @@ func (a *Announce) updateInterfaces() {
 			continue
 		}
 		// Check for NOARP flag
-		if b, _ := ioutil.ReadFile("/sys/class/net/" + ifi.Name + "/flags"); strings.Contains("89abcdef", string(b[len(b)-3:len(b)-2])) {
+		flags, _ := ioutil.ReadFile("/sys/class/net/" + ifi.Name + "/flags")
+		if b := flags[len(flags)-3 : len(flags)-2][0]; b >= 56 && b <= 102 {
 			continue
 		}
 		if ifi.Flags&net.FlagBroadcast != 0 {
