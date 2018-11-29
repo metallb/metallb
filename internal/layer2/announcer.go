@@ -69,10 +69,11 @@ func (a *Announce) updateInterfaces() {
 		if _, err := os.Stat("/sys/class/net/" + ifi.Name + "/master"); !os.IsNotExist(err) {
 			continue
 		}
-		// Check for NOARP flag
-		flags, err := ioutil.ReadFile("/sys/class/net/" + ifi.Name + "/flags")
+		f, err := ioutil.ReadFile("/sys/class/net/" + ifi.Name + "/flags")
 		if err == nil {
-			if b, _ := strconv.ParseUint(string(flags)[:len(string(flags))-1], 0, 32); b&0x80 != 0 {
+			flags, _ := strconv.ParseUint(string(f)[:len(string(f))-1], 0, 32)
+			// NOARP flag
+			if flags&0x80 != 0 {
 				continue
 			}
 		}
