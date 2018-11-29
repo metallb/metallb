@@ -168,6 +168,8 @@ spec:
             - all
             add:
             - net_raw
+      nodeSelector:
+        "beta.kubernetes.io/os": linux
 
 ---
 apiVersion: apps/v1beta2
@@ -198,6 +200,8 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534 # nobody
+      nodeSelector:
+        "beta.kubernetes.io/os": linux
       containers:
       - name: controller
         image: metallb/controller:master
