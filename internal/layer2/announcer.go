@@ -66,7 +66,7 @@ func (a *Announce) updateInterfaces() {
 		if ifi.Flags&net.FlagUp == 0 {
 			continue
 		}
-		if _, err := os.Stat("/sys/class/net/" + ifi.Name + "/master"); !os.IsNotExist(err) {
+		if _, err = os.Stat("/sys/class/net/" + ifi.Name + "/master"); !os.IsNotExist(err) {
 			continue
 		}
 		f, err := ioutil.ReadFile("/sys/class/net/" + ifi.Name + "/flags")
