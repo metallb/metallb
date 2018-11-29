@@ -113,6 +113,23 @@ func (fnfe ConfigFileNotFoundError) Error() string {
 	return fmt.Sprintf("Config File %q Not Found in %q", fnfe.name, fnfe.locations)
 }
 
+// A DecoderConfigOption can be passed to viper.Unmarshal to configure
+// mapstructure.DecoderConfig options
+type DecoderConfigOption func(*mapstructure.DecoderConfig)
+
+// DecodeHook returns a DecoderConfigOption which overrides the default
+// DecoderConfig.DecodeHook value, the default is:
+//
+//  mapstructure.ComposeDecodeHookFunc(
+//		mapstructure.StringToTimeDurationHookFunc(),
+//		mapstructure.StringToSliceHookFunc(","),
+//	)
+func DecodeHook(hook mapstructure.DecodeHookFunc) DecoderConfigOption {
+	return func(c *mapstructure.DecoderConfig) {
+		c.DecodeHook = hook
+	}
+}
+
 // Viper is a prioritized configuration registry. It
 // maintains a set of configuration sources, fetches
 // values to populate those, and provides them according
@@ -289,7 +306,9 @@ func (v *Viper) WatchConfig() {
 							if err != nil {
 								log.Println("error:", err)
 							}
-							v.onConfigChange(event)
+							if v.onConfigChange != nil {
+								v.onConfigChange(event)
+							}
 						}
 					}
 				case err := <-watcher.Errors:
@@ -631,8 +650,10 @@ func (v *Viper) Get(key string) interface{} {
 			return cast.ToBool(val)
 		case string:
 			return cast.ToString(val)
-		case int64, int32, int16, int8, int:
+		case int32, int16, int8, int:
 			return cast.ToInt(val)
+		case int64:
+			return cast.ToInt64(val)
 		case float64, float32:
 			return cast.ToFloat64(val)
 		case time.Time:
@@ -680,6 +701,12 @@ func (v *Viper) GetBool(key string) bool {
 func GetInt(key string) int { return v.GetInt(key) }
 func (v *Viper) GetInt(key string) int {
 	return cast.ToInt(v.Get(key))
+}
+
+// GetInt32 returns the value associated with the key as an integer.
+func GetInt32(key string) int32 { return v.GetInt32(key) }
+func (v *Viper) GetInt32(key string) int32 {
+	return cast.ToInt32(v.Get(key))
 }
 
 // GetInt64 returns the value associated with the key as an integer.
@@ -739,9 +766,11 @@ func (v *Viper) GetSizeInBytes(key string) uint {
 }
 
 // UnmarshalKey takes a single key and unmarshals it into a Struct.
-func UnmarshalKey(key string, rawVal interface{}) error { return v.UnmarshalKey(key, rawVal) }
-func (v *Viper) UnmarshalKey(key string, rawVal interface{}) error {
-	err := decode(v.Get(key), defaultDecoderConfig(rawVal))
+func UnmarshalKey(key string, rawVal interface{}, opts ...DecoderConfigOption) error {
+	return v.UnmarshalKey(key, rawVal, opts...)
+}
+func (v *Viper) UnmarshalKey(key string, rawVal interface{}, opts ...DecoderConfigOption) error {
+	err := decode(v.Get(key), defaultDecoderConfig(rawVal, opts...))
 
 	if err != nil {
 		return err
@@ -754,9 +783,11 @@ func (v *Viper) UnmarshalKey(key string, rawVal interface{}) error {
 
 // Unmarshal unmarshals the config into a Struct. Make sure that the tags
 // on the fields of the structure are properly set.
-func Unmarshal(rawVal interface{}) error { return v.Unmarshal(rawVal) }
-func (v *Viper) Unmarshal(rawVal interface{}) error {
-	err := decode(v.AllSettings(), defaultDecoderConfig(rawVal))
+func Unmarshal(rawVal interface{}, opts ...DecoderConfigOption) error {
+	return v.Unmarshal(rawVal, opts...)
+}
+func (v *Viper) Unmarshal(rawVal interface{}, opts ...DecoderConfigOption) error {
+	err := decode(v.AllSettings(), defaultDecoderConfig(rawVal, opts...))
 
 	if err != nil {
 		return err
@@ -769,8 +800,8 @@ func (v *Viper) Unmarshal(rawVal interface{}) error {
 
 // defaultDecoderConfig returns default mapsstructure.DecoderConfig with suppot
 // of time.Duration values & string slices
-func defaultDecoderConfig(output interface{}) *mapstructure.DecoderConfig {
-	return &mapstructure.DecoderConfig{
+func defaultDecoderConfig(output interface{}, opts ...DecoderConfigOption) *mapstructure.DecoderConfig {
+	c := &mapstructure.DecoderConfig{
 		Metadata:         nil,
 		Result:           output,
 		WeaklyTypedInput: true,
@@ -779,6 +810,10 @@ func defaultDecoderConfig(output interface{}) *mapstructure.DecoderConfig {
 			mapstructure.StringToSliceHookFunc(","),
 		),
 	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 // A wrapper around mapstructure.Decode that mimics the WeakDecode functionality
@@ -1108,7 +1143,7 @@ func (v *Viper) SetDefault(key string, value interface{}) {
 	deepestMap[lastKey] = value
 }
 
-// Set sets the value for the key in the override regiser.
+// Set sets the value for the key in the override register.
 // Set is case-insensitive for a key.
 // Will be used instead of values obtained via
 // flags, config file, ENV, default, or key/value store.

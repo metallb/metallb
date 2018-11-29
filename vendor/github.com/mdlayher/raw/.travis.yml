@@ -1,11 +1,11 @@
 language: go
 go:
-  - "1.x.x"
+  - "1.x"
 os:
   - linux
   - osx
 before_install:
-  - go get github.com/golang/lint/golint
+  - go get golang.org/x/lint/golint
   - go get honnef.co/go/tools/cmd/staticcheck
   - go get -d -t ./...
 script:

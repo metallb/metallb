@@ -5,7 +5,7 @@ os:
   - linux
 sudo: required
 before_install:
-  - go get github.com/golang/lint/golint
+  - go get golang.org/x/tools/golint
   - go get honnef.co/go/tools/cmd/staticcheck
   - go get -d ./...
   - ip -6 addr show

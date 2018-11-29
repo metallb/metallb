@@ -433,6 +433,11 @@ func parseOptions(b []byte) ([]Option, error) {
 		t := b[i]
 		l := int(b[i+1]) * 8
 
+		// Verify that we won't advance beyond the end of the byte slice.
+		if l > len(b[i:]) {
+			return nil, io.ErrUnexpectedEOF
+		}
+
 		// Infer the option from its type value and use it for unmarshaling.
 		var o Option
 		switch t {
@@ -446,11 +451,6 @@ func parseOptions(b []byte) ([]Option, error) {
 			o = new(RecursiveDNSServer)
 		default:
 			o = new(RawOption)
-		}
-
-		// Verify that we won't advance beyond the end of the byte slice.
-		if l > len(b[i:]) {
-			return nil, io.ErrUnexpectedEOF
 		}
 
 		// Unmarshal at the current offset, up to the expected length.
