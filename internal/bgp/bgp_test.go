@@ -14,10 +14,10 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/golang/protobuf/ptypes"
 	"github.com/google/go-cmp/cmp"
-	"github.com/osrg/gobgp/config"
-	gobgp "github.com/osrg/gobgp/server"
-	"github.com/osrg/gobgp/table"
+	api "github.com/osrg/gobgp/api"
+	gobgp "github.com/osrg/gobgp/pkg/server"
 )
 
 func ipnet(s string) *net.IPNet {
@@ -28,49 +28,49 @@ func ipnet(s string) *net.IPNet {
 	return n
 }
 
-func runGoBGP(ctx context.Context, password string, port int32) (chan *table.Path, error) {
+func runGoBGP(ctx context.Context, password string, port int32) (chan *api.Path, error) {
 	s := gobgp.NewBgpServer()
 	go s.Serve()
 
-	global := &config.Global{
-		Config: config.GlobalConfig{
-			As:       64543,
-			RouterId: "1.2.3.4",
-			Port:     port,
+	global := &api.StartBgpRequest{
+		Global: &api.Global{
+			As:         64543,
+			RouterId:   "1.2.3.4",
+			ListenPort: port,
 		},
 	}
-	if err := s.Start(global); err != nil {
+	if err := s.StartBgp(context.Background(), global); err != nil {
 		return nil, err
 	}
 
-	n := &config.Neighbor{
-		Config: config.NeighborConfig{
-			NeighborAddress: "127.0.0.1",
-			PeerAs:          64543,
-			AuthPassword:    password,
+	n := &api.AddPeerRequest{
+		Peer: &api.Peer{
+			Conf: &api.PeerConf{
+				NeighborAddress: "127.0.0.1",
+				PeerAs:          64543,
+				AuthPassword:    password,
+			},
+			Transport: &api.Transport{
+				PassiveMode: true,
+			},
 		},
 	}
-	if err := s.AddNeighbor(n); err != nil {
+	if err := s.AddPeer(context.Background(), n); err != nil {
 		return nil, err
 	}
 
-	ips := make(chan *table.Path, 1000)
-	w := s.Watch(gobgp.WatchBestPath(false))
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case ev := <-w.Event():
-				switch msg := ev.(type) {
-				case *gobgp.WatchEventBestPath:
-					for _, path := range msg.PathList {
-						ips <- path
-					}
-				}
-			}
-		}
-	}()
+	ips := make(chan *api.Path, 1000)
+	newPath := func(path *api.Path) {
+		ips <- path
+	}
+	w := &api.MonitorTableRequest{
+		Type:    api.Resource_GLOBAL,
+		Name:    "",
+		Current: true,
+	}
+	if err := s.MonitorTable(context.Background(), w, newPath); err != nil {
+		return nil, err
+	}
 	return ips, nil
 }
 
@@ -154,27 +154,52 @@ func TestTCPMD5(t *testing.T) {
 	}
 }
 
-func checkPath(path *table.Path, adv *Advertisement) error {
-	nlri := path.GetNlri()
-	if nlri.String() != adv.Prefix.String() {
-		return fmt.Errorf("wrong nlri, got %s, want %s", nlri.String(), adv.Prefix.String())
+func checkPath(path *api.Path, adv *Advertisement) error {
+	var nlri api.IPAddressPrefix
+	if err := ptypes.UnmarshalAny(path.Nlri, &nlri); err != nil {
+		return fmt.Errorf("error getting path info: %v", err)
+	}
+	pfx := fmt.Sprintf("%s/%d", nlri.Prefix, nlri.PrefixLen)
+	if pfx != adv.Prefix.String() {
+		return fmt.Errorf("wrong nlri, got %s, want %s", pfx, adv.Prefix.String())
 	}
 
-	if !path.GetNexthop().Equal(adv.NextHop) {
-		return fmt.Errorf("wrong nexthop, got %s, want %s", path.GetNexthop(), adv.NextHop)
+	var (
+		nexthop     string
+		localpref   uint32
+		communities []uint32
+	)
+	for _, attr := range path.Pattrs {
+		switch {
+		case ptypes.Is(attr, &api.NextHopAttribute{}):
+			var nh api.NextHopAttribute
+			if err := ptypes.UnmarshalAny(attr, &nh); err != nil {
+				return err
+			}
+			nexthop = nh.NextHop
+		case ptypes.Is(attr, &api.LocalPrefAttribute{}):
+			var lp api.LocalPrefAttribute
+			if err := ptypes.UnmarshalAny(attr, &lp); err != nil {
+				return err
+			}
+			localpref = lp.LocalPref
+		case ptypes.Is(attr, &api.CommunitiesAttribute{}):
+			var cm api.CommunitiesAttribute
+			if err := ptypes.UnmarshalAny(attr, &cm); err != nil {
+				return err
+			}
+			communities = cm.Communities
+		}
 	}
 
-	lp, err := path.GetLocalPref()
-	if err != nil {
-		return fmt.Errorf("get localpref: %s", err)
+	if nexthop != adv.NextHop.String() {
+		return fmt.Errorf("wrong nexthop, got %s, want %s", nexthop, adv.NextHop)
 	}
-	if lp != adv.LocalPref {
-		return fmt.Errorf("wrong localpref, got %d, want %d", lp, adv.LocalPref)
+	if localpref != adv.LocalPref {
+		return fmt.Errorf("wrong localpref, got %d, want %d", localpref, adv.LocalPref)
 	}
-
-	comms := path.GetCommunities()
-	sort.Slice(comms, func(i, j int) bool { return comms[i] < comms[j] })
-	if diff := cmp.Diff(adv.Communities, comms); diff != "" {
+	sort.Slice(communities, func(i, j int) bool { return communities[i] < communities[j] })
+	if diff := cmp.Diff(adv.Communities, communities); diff != "" {
 		return fmt.Errorf("wrong communities (-want +got)\n%s", diff)
 	}
 

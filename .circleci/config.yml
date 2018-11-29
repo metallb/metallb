@@ -2,24 +2,17 @@
 
 version: 2
 jobs:
-  test-1.9:
+  test-1.11:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
-      - image: circleci/golang:1.9
-    steps:
-      - checkout
-      - run: make ci
-  test-1.10:
-    working_directory: /go/src/go.universe.tf/metallb
-    docker:
-      - image: circleci/golang:1.10
+      - image: circleci/golang:1.11
     steps:
       - checkout
       - run: make ci
   deploy-controller:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
-      - image: circleci/golang:1.9
+      - image: circleci/golang:1.11
     steps:
       - checkout
       - setup_remote_docker
@@ -31,7 +24,7 @@ jobs:
   deploy-speaker:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
-      - image: circleci/golang:1.9
+      - image: circleci/golang:1.11
     steps:
       - checkout
       - setup_remote_docker
@@ -43,7 +36,7 @@ jobs:
   deploy-test-bgp-router:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
-      - image: circleci/golang:1.9
+      - image: circleci/golang:1.11
     steps:
       - checkout
       - setup_remote_docker
@@ -56,11 +49,7 @@ workflows:
   version: 2
   test-and-deploy:
     jobs:
-      - test-1.9:
-          filters:
-            tags:
-              only: /.*/
-      - test-1.10:
+      - test-1.11:
           filters:
             tags:
               only: /.*/
@@ -71,8 +60,7 @@ workflows:
             tags:
               only: /.*/
           requires:
-            - test-1.9
-            - test-1.10
+            - test-1.11
       - deploy-speaker:
           filters:
             branches:
@@ -80,8 +68,7 @@ workflows:
             tags:
               only: /.*/
           requires:
-            - test-1.9
-            - test-1.10
+            - test-1.11
       - deploy-test-bgp-router:
           filters:
             branches:
@@ -89,5 +76,4 @@ workflows:
             tags:
               only: /.*/
           requires:
-            - test-1.9
-            - test-1.10
+            - test-1.11

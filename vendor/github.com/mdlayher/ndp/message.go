@@ -181,7 +181,7 @@ func (ns *NeighborSolicitation) marshal() ([]byte, error) {
 		return nil, err
 	}
 
-	b := make([]byte, naLen)
+	b := make([]byte, nsLen)
 	copy(b[4:], ns.TargetAddress)
 
 	ob, err := marshalOptions(ns.Options)
