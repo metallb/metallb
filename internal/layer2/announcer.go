@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -71,7 +72,7 @@ func (a *Announce) updateInterfaces() {
 		// Check for NOARP flag
 		flags, err := ioutil.ReadFile("/sys/class/net/" + ifi.Name + "/flags")
 		if err == nil {
-			if b := flags[len(flags)-3 : len(flags)-2][0]; b >= 56 && b <= 102 {
+			if b, _ := strconv.ParseUint(string(flags)[:len(string(flags))-1], 0, 32); b&0x80 != 0 {
 				continue
 			}
 		}
