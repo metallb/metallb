@@ -3,7 +3,7 @@
 version: 2
 jobs:
   test-1.11:
-    working_directory: /go/src/go.universe.tf/metallb
+    working_directory: /metallb
     docker:
       - image: circleci/golang:1.11
     steps:

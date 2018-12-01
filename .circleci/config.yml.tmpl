@@ -4,7 +4,7 @@ version: 2
 jobs:
 {{- range .GoVersions }}
   test-{{.}}:
-    working_directory: /go/src/go.universe.tf/metallb
+    working_directory: /metallb
     docker:
       - image: circleci/golang:{{.}}
     steps:
