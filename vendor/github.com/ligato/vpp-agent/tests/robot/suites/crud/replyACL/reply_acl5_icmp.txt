@@ -1,0 +1,38 @@
+{
+    "acl_name": "acl5_ICMP",
+    "interfaces": {
+        "egress": [
+            "",
+            ""
+        ],
+        "ingress": [
+            "",
+            ""
+        ]
+    },
+    "rules": [
+        {
+            "acl_action": 1,
+            "match": {
+                "ip_rule": {
+                    "ip": {
+                        "destination_network": "10.0.0.0/32",
+                        "source_network": "10.0.0.0/32"
+                    },
+                    "udp": {
+                        "destination_port_range": {
+                            "lower_port": 80,
+                            "upper_port": 1000
+                        },
+                        "source_port_range": {
+                            "lower_port": 10,
+                            "upper_port": 2000
+                        },
+                        "tcp_flags_mask": 20,
+                        "tcp_flags_value": 10
+                    }
+                }
+            }
+        }
+    ]
+}

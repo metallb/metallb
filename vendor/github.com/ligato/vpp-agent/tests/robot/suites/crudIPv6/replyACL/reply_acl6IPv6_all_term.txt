@@ -1,0 +1,18 @@
+vl_api_acl_details_t_handler:${API_HANDLER}: acl_index: 0, count: 1
+   tag {acl1_tcp}
+   ipv6 action 1 src fd30:0:0:1:e::/64 dst fd30:0:0:1:e::/64 proto 6 sport 10-2000 dport 80-1000 tcpflags 10 mask 20
+vl_api_acl_details_t_handler:${API_HANDLER}: acl_index: 1, count: 1
+   tag {acl2_tcp}
+   ipv6 action 1 src fd30:0:0:1:e::/64 dst fd30:0:0:1:e::/64 proto 6 sport 20010-20020 dport 2000-2200 tcpflags 10 mask 20
+vl_api_acl_details_t_handler:${API_HANDLER}: acl_index: 2, count: 1
+   tag {acl3_UDP}
+   ipv6 action 1 src fd30:0:0:1:e::/64 dst fd30:0:0:1:e::/64 proto 17 sport 10-2000 dport 80-1000 tcpflags 0 mask 0
+vl_api_acl_details_t_handler:${API_HANDLER}: acl_index: 3, count: 1
+   tag {acl4_UDP}
+   ipv6 action 1 src fd30:0:0:1:e::/64 dst fd30:0:0:1:e::/64 proto 17 sport 10-2000 dport 80-1000 tcpflags 0 mask 0
+vl_api_acl_details_t_handler:${API_HANDLER}: acl_index: 4, count: 1
+   tag {acl5_ICMP}
+   ipv6 action 1 src fd30:0:0:1:e::/64 dst fd30:0:0:1:e::/64 proto 17 sport 10-2000 dport 80-1000 tcpflags 0 mask 0
+vl_api_acl_details_t_handler:${API_HANDLER}: acl_index: 5, count: 1
+   tag {acl6_ICMP}
+   ipv6 action 1 src fd30:0:0:1:e::/64 dst fd30:0:0:1:e::/64 proto 17 sport 10-2000 dport 80-1000 tcpflags 0 mask 0

@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package stn;
+
+message STN {
+    message Rule {
+        string rule_name = 3;   /* unique STN tule identifier */
+        string ip_address = 1;  /* STN IP address (without mask) */
+        string interface = 2;   /* interface name where the rule will be attached */
+    }
+    repeated Rule rules = 1;
+}

@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+// Package bfd provides data model to single-hop UDP transport BFD based on RFC 5880 and RFC 5881.
+package bfd;
+
+message SingleHopBFD {
+    message Session {
+        string interface = 3;                 /* interface to which this session is tied to */
+        string destination_address = 4;       /* peer IP address */
+        string source_address = 5;            /* local IP address */
+        bool enabled = 7;                     /* controls whether this BFD session is administratively enabled or disabled */
+        uint32 desired_min_tx_interval = 8;   /* desired min transmit interval (microseconds) */
+        uint32 required_min_rx_interval = 9;  /* required min receive interval (microseconds) */
+        uint32 detect_multiplier = 10;         /* detect multiplier (# of packets missed before connection goes down) - must be non-zero */
+
+        message Authentication {
+            uint32 key_id = 1;                /* local key ID for this session (ID of the key used for authentication */
+            uint32 advertised_key_id = 2;     /* BFD key ID, as carried in BFD control frames (does not refer to a local key ID) */
+        }
+        Authentication authentication = 11;   /* authentication of the session (if empty, authentication is disabled) */
+    }
+    repeated Session sessions = 1; /* list of single hop BFD sessions */
+
+    message Key {
+        string name = 1;                            /* Unique name to identify this BFD auth key */
+        uint32 auth_key_index = 2;                  /* BFD auth key index */
+        uint32 id = 3;                               /* local key ID, used to uniquely identify this key */
+        enum AuthenticationType {
+            KEYED_SHA1 = 0;
+            METICULOUS_KEYED_SHA1 = 1;
+        };
+        AuthenticationType authentication_type = 4;  /* authentication type */
+        string secret = 5;                           /* shared secret (hex data) */
+    }
+    repeated Key keys = 2; /* list of the available authentication keys */
+
+    message EchoFunction {
+        string name = 1;
+        string echo_source_interface = 2; /* name of the loopback interface that the echo source address will be derived from */
+    }
+    EchoFunction echo_function = 3; /* BFD echo function (optional, disabled if empty) */
+}

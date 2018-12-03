@@ -1,0 +1,22 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kafka-server
+spec:
+  hostNetwork: true
+  containers:
+    - image: spotify/kafka
+      name: kafka
+      ports:
+    - containerPort: 2181
+      hostPort: 2181
+      name: zookeeper
+    - containerPort: 9092
+      hostPort: 9092
+      name: kafka
+  env:
+    - name: ADVERTISED_HOST
+      value: "172.17.0.1"
+    - name: ADVERTISED_PORT
+      value: "9092"

@@ -1,0 +1,11 @@
+{
+  "name": "${name}",
+  "flood": ${flood},
+  "unknown_unicast_flood": ${unicast},
+  "forward": ${forward},
+  "learn": ${learn},
+  "arp_termination": ${arp_term},
+  "interfaces": [
+    ${interfaces}
+  ]
+}

@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+// Package access_security provides basic definition of user and permission group
+package access_security;
+
+message User {
+    string name = 1;
+    string password_hash = 2;
+    repeated string permissions = 3;            // Permission name, user is allowed for more permission groups
+}
+
+message PermissionGroup {
+    string name = 1;
+    message Permissions {
+        string url = 1;                         // URL enabled for the permission
+        repeated string allowed_methods = 2;    // Methods enabled for the URL
+    }
+    repeated Permissions permissions = 2;
+}

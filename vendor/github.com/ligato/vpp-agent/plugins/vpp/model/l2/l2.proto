@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package l2;
+
+// Config
+
+message BridgeDomains {
+    message BridgeDomain {
+        string name = 1;                 /* bridge domain name (can be any string) */
+        bool flood = 2;                  /* enable/disable bcast/mcast flooding in the BD */
+        bool unknown_unicast_flood = 3;  /* enable/disable uknown unicast flood in the BD */
+        bool forward = 4;                /* enable/disable forwarding on all interfaces in the BD */
+        bool learn = 5;                  /* enable/disable learning on all interfaces in the BD */
+        bool arp_termination = 6;        /* enable/disable ARP termination in the BD */
+        uint32 mac_age = 7;              /* MAC aging time in min, 0 for disabled aging */
+
+        message Interfaces {
+            string name = 1;                         /* interface name belonging to this bridge domain */
+            bool bridged_virtual_interface = 2;      /* true if this is a BVI interface */
+            uint32 split_horizon_group = 3;          /* VXLANs in the same BD need the same non-zero SHG */
+        }
+        repeated Interfaces interfaces = 100;        /* list of interfaces */
+
+        message ArpTerminationEntry {
+            string ip_address = 1;               /* IP address */
+            string phys_address = 2;             /* MAC address matching to the IP */
+        }
+        repeated ArpTerminationEntry arp_termination_table = 102; /* list of ARP termination entries */
+    }
+    repeated BridgeDomain bridge_domains = 1;  /* list of all bridge domains */
+}
+
+message FibTable {
+    message FibEntry {
+        string phys_address = 1;                    /* unique destination MAC address */
+        string bridge_domain = 2;                   /* name of bridge domain this FIB table entry belongs to */
+        enum Action {
+            FORWARD = 0;                            /* forward the matching frame */
+            DROP = 1;                               /* drop the matching frame */
+        };
+        Action action = 3;                          /* action to tke on matching frames */
+        string outgoing_interface = 4;              /* outgoing interface for matching frames (interface name as defined in interfaces.proto) */
+        bool static_config = 5;                     /* true if this is a statically configured FIB entry */
+        bool bridged_virtual_interface = 6;         /* the MAC address is a bridge virtual interface MAC */
+    }
+    repeated FibEntry fib_table_entries = 100;   /* List of FIB entries */
+}
+
+message XConnectPairs {
+    message XConnectPair {
+        string receive_interface = 2;               /* receive interface name */
+        string transmit_interface = 3;              /* transmit interface name */
+    }
+    repeated XConnectPair x_connect_pairs = 100;  /* list of interface pairs for L2 xConnect*/
+}
+
+// State
+
+message BridgeDomainState {
+    message BridgeDomain {
+        uint32 index = 1;
+        string internal_name = 2;
+        string bvi_interface = 3;
+        uint32 bvi_interface_index = 4;
+        uint32 interface_count = 5;
+        int64 last_change = 6;
+
+        message L2_params {
+            bool flood = 1;
+            bool unknown_unicast_flood = 2;
+            bool forward = 3;
+            bool learn = 4;
+            bool arp_termination = 5;
+            uint32 mac_age = 6;
+        }
+        L2_params l2_params = 100;
+
+        message Interfaces {
+            string name = 1;
+            uint32 sw_if_index = 2;
+            uint32 split_horizon_group = 3;
+        }
+        repeated Interfaces interfaces = 101;
+
+    }
+    repeated BridgeDomain bridge_domains = 100;
+}
+
+message BridgeDomainErrors {
+    message BridgeDomain {               /* List of bridge domains with errors */
+        string bd_name = 1;
+        message ErrorData {              /* List of errors (if there are more) for every bridge domain */
+            string change_type = 2;
+            string error_message = 3;
+            int64 last_change = 4;
+        }
+        repeated ErrorData error_data = 2;
+    }
+    repeated BridgeDomain bridge_domain = 1;
+}

@@ -1,0 +1,33 @@
+{
+  "label": "dnat1",
+  "st_mappings": [
+    {
+      "vrf_id": 0,
+      "externalInterface": "tap1",
+      "externalIp": "192.168.0.1",
+      "externalPort": 8989,
+      "local_ips": [
+        {
+          "localIp": "172.124.0.2",
+          "localPort": 6500,
+          "probability": 40
+        },
+        {
+          "localIp": "172.124.10.2",
+          "localPort": 4500,
+          "probability": 40
+        }
+      ],
+      "protocol": 1,
+      "twiceNat": false
+    }
+  ],
+  "id_mappings": [
+    {
+      "vrfId": 0,
+      "ipAddress": "192.168.0.1",
+      "port": 8989,
+      "protocol": 0
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+    "acl_name": "acl1_tcp",
+    "interfaces": {
+        "egress": [
+            "IF_AFPIF_VSWITCH_node_2_node2_veth"
+        ],
+        "ingress": [
+            "IF_AFPIF_VSWITCH_node_1_node1_veth"
+        ]
+    },
+    "rules": [
+        {
+<<<<<<< HEAD
+=======
+            "rule_name": "acl1_rule1",
+>>>>>>> d0bb6d88a2425f0aafc8f3bfaf12470c2409c08f
+            "acl_action": 1,
+            "match": {
+                "ip_rule": {
+                    "ip": {
+                        "destination_network": "10.0.0.0/24",
+                        "source_network": "10.0.0.0/24"
+                    },
+                    "tcp": {
+                        "destination_port_range": {
+                            "lower_port": 3000,
+                            "upper_port": 3000
+                        },
+                        "source_port_range": {
+                            "lower_port": 3000,
+                            "upper_port": 3000
+                        },
+                        "tcp_flags_mask": 20,
+                        "tcp_flags_value": 10
+                    }
+                }
+            }
+        }
+    ]
+}

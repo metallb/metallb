@@ -1,0 +1,3 @@
+vl_api_acl_details_t_handler:${API_HANDLER}: acl_index: 0, count: 1
+   tag {acl5_ICMP}
+   ipv4 action 1 src 10.0.0.0/32 dst 10.0.0.0/32 proto 17 sport 10-2000 dport 80-1000 tcpflags 0 mask 0

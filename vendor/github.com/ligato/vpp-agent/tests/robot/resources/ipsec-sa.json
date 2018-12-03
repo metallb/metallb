@@ -1,0 +1,9 @@
+{
+  "name":"${name}",
+  "spi": ${spi},
+  "protocol": 1,
+  "crypto_alg": 1,
+  "crypto_key": "${crypto_key}",
+  "integ_alg": 2,
+  "integ_key": "${integ_key}"
+}

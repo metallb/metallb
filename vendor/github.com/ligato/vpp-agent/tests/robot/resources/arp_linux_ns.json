@@ -1,0 +1,10 @@
+{
+  "name": "${arpname}",
+  "interface": "${interface}",
+  "ip_addr": "${ipv4}",
+  "hw_address": "${MAC}",
+  "namespace": {
+  "name": "${nsname}",
+  "type": "${nstype}"
+ }
+}

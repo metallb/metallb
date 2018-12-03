@@ -1,0 +1,26 @@
+{
+    "acl_name": "acl1",
+    "interfaces": {
+        "egress": [
+            "tap1",
+            "tap2"
+        ],
+        "ingress": [
+            "tap3",
+            "tap4"
+        ]
+    },
+    "rules": [
+        {
+            "acl_action": 1,
+            "match": {
+                "macip_rule": {
+                    "source_address": "192.168.0.1",
+                    "source_address_prefix": 16,
+                    "source_mac_address": "b2:74:8c:12:67:d2",
+                    "source_mac_address_mask": "ff:ff:ff:ff:00:00"
+                }
+            }
+        }
+    ]
+}

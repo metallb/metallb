@@ -1,0 +1,53 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sfc-controller-cfg
+data:
+  etcd.conf: |
+    insecure-transport: true
+    dial-timeout: 1000000000
+    endpoints:
+     - "172.17.0.1:22379"
+
+  sfc.conf: |
+    sfc_controller_config_version: 1
+    description: Demo topology 4
+    host_entities:
+        - name: vswitch
+    sfc_entities:
+        - name: vswitch-vnf1
+          description: vswitch to VNF1 - memif
+          type: 4
+          elements:
+              - container: vswitch
+                port_label: FortyGigabitEthernet89/0/0
+                etcd_vpp_switch_key: vswitch
+                type: 5
+              - container: vnf1
+                port_label: port1
+                etcd_vpp_switch_key: vswitch
+                type: 6
+        - name: vnf1-vswitch
+          description: VNF1 to vswitch - memif
+          type: 4
+          elements:
+              - container: vswitch
+                port_label: FortyGigabitEthernet89/0/1
+                etcd_vpp_switch_key: vswitch
+                type: 5
+              - container: vnf1
+                port_label: port2
+                etcd_vpp_switch_key: vswitch
+                type: 6
+
+  vnf.conf: |
+    vnf_plugin_config_version: 1
+    description: Demo VNF config
+    vnf_entities:
+      - name: vnf1
+        container: vnf1
+        l2xconnects:
+          - port_labels:
+            - port1
+            - port2

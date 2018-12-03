@@ -1,0 +1,6 @@
+vl_api_acl_details_t_handler:${API_HANDLER}: acl_index: 0, count: 1
+   tag {acl1_tcp}
+   ipv4 action 1 src 10.0.0.0/32 dst 10.0.0.0/32 proto 6 sport 10-2000 dport 80-1000 tcpflags 10 mask 20
+vl_api_acl_details_t_handler:${API_HANDLER}: acl_index: 1, count: 1
+   tag {acl2_tcp}
+   ipv4 action 1 src 10.0.0.0/32 dst 10.0.0.0/32 proto 6 sport 20010-20020 dport 2000-2200 tcpflags 10 mask 20

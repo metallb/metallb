@@ -1,0 +1,9 @@
+{
+  "name":"sa10",
+  "spi": 1001,
+  "protocol": 1,
+  "crypto_alg": 1,
+  "crypto_key": "4a506a794f574265564551694d653768",
+  "integ_alg": 2,
+  "integ_key": "4339314b55523947594d6d3547666b45764e6a58"
+}

@@ -1,0 +1,3 @@
+--suite Sfc.East West.Vswitch 1x Vpp 1x Novpp.Vswitch 1x Vpp 1x Novpp
+--suite Sfc.East West.Vswitch 2x Vnf Vpp.Vswitch 2x Vnf Vpp
+--suite Sfc.Test Controller Start.Controller Start

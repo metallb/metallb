@@ -1,0 +1,22 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sfc-controller
+spec:
+  containers:
+    - name: "sfc-controller"
+      image: dev_sfc_controller
+      imagePullPolicy: IfNotPresent
+      command:
+        - /root/go/bin/sfc-controller
+        - -etcd-config=/opt/sfc-controller/dev/etcd.conf
+        - -sfc-config=/opt/sfc-controller/dev/sfc.conf
+        - -vnf-config=/opt/sfc-controller/dev/vnf.conf
+      volumeMounts:
+        - name: controller-config
+          mountPath: /opt/sfc-controller/dev
+  volumes:
+    - name: controller-config
+      configMap:
+        name: sfc-controller-cfg

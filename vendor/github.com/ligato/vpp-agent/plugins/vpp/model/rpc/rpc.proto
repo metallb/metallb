@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+package rpc;
+
+import "github.com/ligato/vpp-agent/plugins/vpp/model/acl/acl.proto";
+import "github.com/ligato/vpp-agent/plugins/vpp/model/bfd/bfd.proto";
+import "github.com/ligato/vpp-agent/plugins/vpp/model/interfaces/interfaces.proto";
+import "github.com/ligato/vpp-agent/plugins/vpp/model/l2/l2.proto";
+import "github.com/ligato/vpp-agent/plugins/vpp/model/l3/l3.proto";
+import "github.com/ligato/vpp-agent/plugins/vpp/model/l4/l4.proto";
+import "github.com/ligato/vpp-agent/plugins/vpp/model/nat/nat.proto";
+import "github.com/ligato/vpp-agent/plugins/vpp/model/stn/stn.proto";
+import "github.com/ligato/vpp-agent/plugins/linux/model/interfaces/interfaces.proto";
+import "github.com/ligato/vpp-agent/plugins/linux/model/l3/l3.proto";
+
+
+// Data change service is a service which submits cumulative request consisting of all
+// configuration types supported in the vpp-agent
+service DataChangeService {
+    // Creates or updates one or multiple configuration items
+    rpc Put(DataRequest) returns (PutResponse);
+    // Removes one or multiple configuration items
+    rpc Del(DataRequest) returns (DelResponse);
+}
+
+// Data resync service is a service which submits data resync to the vpp-agent
+service DataResyncService {
+    // Calls vpp-agent resync
+    rpc Resync (DataRequest) returns (ResyncResponse);
+}
+
+// Notification service streams VPP notifications to connected servers
+service NotificationService {
+    // Get notification stack
+    rpc Get(NotificationRequest) returns (stream NotificationsResponse);
+}
+
+// Data request is an inventory of supported data types with one or multiple
+// items of every type. Universal type for every data change/resync request
+message DataRequest {
+    // vppplugin
+    repeated acl.AccessLists.Acl AccessLists = 10;
+    repeated interfaces.Interfaces.Interface Interfaces = 20;
+    repeated bfd.SingleHopBFD.Session BfdSessions = 30;
+    repeated bfd.SingleHopBFD.Key BfdAuthKeys = 31;
+    bfd.SingleHopBFD.EchoFunction BfdEchoFunction = 32;
+    repeated l2.BridgeDomains.BridgeDomain BridgeDomains = 40;
+    repeated l2.FibTable.FibEntry FIBs= 41;
+    repeated l2.XConnectPairs.XConnectPair XCons = 42;
+    repeated l3.StaticRoutes.Route StaticRoutes = 50;
+    repeated l3.ArpTable.ArpEntry ArpEntries= 51;
+    repeated l3.ProxyArpInterfaces.InterfaceList ProxyArpInterfaces = 52;
+    repeated l3.ProxyArpRanges.RangeList ProxyArpRanges = 53;
+    l4.L4Features L4Feature = 60;
+    repeated l4.AppNamespaces.AppNamespace ApplicationNamespaces = 61;
+    repeated stn.STN.Rule StnRules = 70;
+    nat.Nat44Global NatGlobal = 71;
+    repeated nat.Nat44DNat.DNatConfig DNATs= 72;
+    // Linuxplugin
+    repeated interfaces.LinuxInterfaces.Interface LinuxInterfaces = 80;
+    repeated l3.LinuxStaticArpEntries.ArpEntry LinuxArpEntries = 90;
+    repeated l3.LinuxStaticRoutes.Route LinuxRoutes = 91;
+}
+
+// NotificationRequest represent a notification request which contains index of next required
+// message
+message NotificationRequest {
+    uint32 idx = 1;
+}
+
+// Response to data change 'put'
+message PutResponse {
+}
+
+// Response to data change 'del'
+message DelResponse {
+}
+
+// Response to data resync
+message ResyncResponse {
+}
+
+// Response to notification request 'get'. Returns indexed notification.
+message NotificationsResponse {
+    // Index of following notification
+    uint32 nextIdx = 1;
+    // Notification data
+    interfaces.InterfaceNotification nIf = 2;
+}

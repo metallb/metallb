@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+// Package apitrace provides data model for binary API trace informations.
+package apitrace;
+
+message Trace {
+    message Entry {
+        uint64 index = 1;                       // Entry index. Each message is indexed in the order it is logged.
+        string msg_name = 2;                    // Message name (or any other descriptive string)
+        uint64 start_time = 3;
+        uint64 duration = 4;                    // Duration of message call in nanoseconds
+    }
+    repeated Entry traced_entries = 1;
+
+    message EntryStats {
+        string msg_name = 1;                    // Message name, unique in this list.
+        uint64 average_duration = 2;            // Average time duration per message in nanoseconds
+    }
+    repeated EntryStats entry_stats = 2;
+
+    uint64 overall_duration = 3;                // Overall duration of all measured entries in nanoseconds
+}

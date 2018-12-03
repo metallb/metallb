@@ -1,0 +1,2 @@
+--suite Integration.Restarts.Basic Restarts
+#--suite Integration.Restarts.Scale Restarts

@@ -1,0 +1,23 @@
+{
+    "arp_termination": true,
+    "arp_termination_table": [
+        {
+            "ip_address": "192.168.10.10",
+            "phys_address": "a7:65:f1:b5:dc:f6"
+        },
+        {
+            "ip_address": "10.10.0.1",
+            "phys_address": "59:6C:45:59:8E:BC"
+        }
+    ],
+    "flood": true,
+    "forward": true,
+    "interfaces": [
+        {
+            "name": "tap1"
+        }
+    ],
+    "learn": true,
+    "name": "bd2",
+    "unknown_unicast_flood": true
+}

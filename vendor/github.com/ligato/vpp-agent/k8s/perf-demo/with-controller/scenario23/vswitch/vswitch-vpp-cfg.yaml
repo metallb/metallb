@@ -1,0 +1,25 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vswitch-vpp-cfg
+data:
+  vpp.conf: |
+    unix {
+      nodaemon
+      cli-listen localhost:5002
+    }
+    dpdk {
+      dev default {
+        num-rx-queues 1
+        num-tx-queues 1
+        num-rx-desc 2048
+        num-tx-desc 2048
+      }
+      dev 0000:89:00.0 {
+        workers 0
+      }
+      dev 0000:89:00.1 {
+        workers 0
+      }
+    }

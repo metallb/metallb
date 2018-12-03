@@ -1,0 +1,8 @@
+{
+    "desired_min_tx_interval": 5,
+    "destination_address": "10.10.0.5",
+    "detect_multiplier": 10,
+    "interface": "tap1",
+    "required_min_rx_interval": 6,
+    "source_address": "192.168.1.1"
+}

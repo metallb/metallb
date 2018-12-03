@@ -1,0 +1,14 @@
+{
+    "enabled": true,
+    "mtu": 1500,
+    "ip_addresses": [
+        "192.168.42.1/24"
+    ],
+    "memif": {
+        "id": 1,
+        "master": true,
+        "socket_filename": "/tmp/memif1.sock"
+    },
+    "name": "memif1",
+    "type": 2
+}

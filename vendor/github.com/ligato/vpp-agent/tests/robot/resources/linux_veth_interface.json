@@ -1,0 +1,18 @@
+{
+  "enabled": ${enabled},
+  "mtu": ${mtu},
+  "ip_addresses": [
+    "${ip}/${prefix}"
+  ],
+  "namespace": {
+      "name": "${namespace}",
+      "type": 2
+  },
+  "name": "${name}",
+  "host_if_name": "${host_if_name}",
+  "phys_address": "${mac}",
+  "type": 0,
+  "veth": {
+    "peer_if_name": "${peer}"
+  }
+}

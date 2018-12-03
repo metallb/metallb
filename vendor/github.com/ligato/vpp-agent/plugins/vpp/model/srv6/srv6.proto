@@ -1,0 +1,98 @@
+syntax = "proto3";
+
+package srv6;
+
+message LocalSID {
+    string sid = 1;                      /* segment id (IPv6 Address) */
+    uint32 fib_table_id = 2;             /* ID of FIB table where to install localsid entry */
+
+    /* Configuration for end functions (all end functions are mutually exclusive) */
+    End base_end_function = 3;
+    EndX end_function_X = 4;
+    EndT end_function_T = 5;
+    EndDX2 end_function_DX2 = 6;
+    EndDX4 end_function_DX4 = 7;
+    EndDX6 end_function_DX6 = 8;
+    EndDT4 end_function_DT4 = 9;
+    EndDT6 end_function_DT6 = 10;
+
+    /* End function behavior of simple endpoint */
+    message End {
+        bool psp = 1;                    /* use PSP (penultimate segment POP of the SRH) or by default use USP (Ultimate Segment Pop of the SRH) */
+    }
+
+    /* End function behavior of endpoint with Layer-3 cross-connect*/
+    message EndX {
+        bool psp = 1;                    /* use PSP (penultimate segment POP of the SRH) or by default use USP (Ultimate Segment Pop of the SRH) */
+        string outgoing_interface = 2;   /* name of cross-connected outgoing interface */
+        string next_hop = 3;             /* next hop address for cross-connected link */
+    }
+
+    /* End function behavior of endpoint with specific IPv6 table lookup*/
+    message EndT {
+        bool psp = 1;                    /* use PSP (penultimate segment POP of the SRH) or by default use USP (Ultimate Segment Pop of the SRH) */
+    }
+
+    /* End function nehavior of endpoint with decapsulation and Layer-2 cross-connect (or DX2 with egress VLAN rewrite when VLAN notzero - not supported this variant yet)*/
+    message EndDX2 {
+        uint32 vlan_tag = 1;             /* Outgoing VLAN tag */
+        string outgoing_interface = 2;   /* name of cross-connected outgoing interface */
+        string next_hop = 3;             /* next hop address for cross-connected link */
+    }
+
+    /* End function behavior of endpoint with decapsulation and IPv4 cross-connect*/
+    message EndDX4 {
+        string outgoing_interface = 1;   /* name of cross-connected outgoing interface */
+        string next_hop = 2;             /* next hop address for cross-connected link */
+    }
+
+    /* End function behavior of endpoint with decapsulation and IPv6 cross-connect*/
+    message EndDX6 {
+        string outgoing_interface = 1;   /* name of cross-connected outgoing interface */
+        string next_hop = 2;             /* next hop address for cross-connected link */
+    }
+
+    /* End function behavior of endpoint with decapsulation and specific IPv4 table lookup*/
+    message EndDT4 {
+        // TODO model this end function
+    }
+
+    /* End function behavior of endpoint with decapsulation and specific IPv6 table lookup*/
+    message EndDT6 {
+        // TODO model this end function
+    }
+}
+
+
+/* Model for SRv6 policy (policy without at least one policy segment is only cached in ligato and not written to VPP)*/
+message Policy {
+    string bsid = 1;                     /* binding SID (IPv6 Address) */
+    uint32 fib_table_id = 2;             /* ID of FIB table where to install Policy entry */
+    bool srh_encapsulation = 3;          /* are SR headers handled by encapsulation? (no means insertion of SR headers) */
+    bool spray_behaviour = 4;            /* spray(multicast) to all policy segments? (no means to use PolicySegment.weight to loadbalance traffic)*/
+}
+
+/* Model for segment of SRv6 policy (etcd key for segment has as prefix the etcd key for policy where it belongs) */
+message PolicySegment {
+    string policy_bsid = 1;             /* reference to policy where this policy segment belongs */
+    uint32 weight = 2;                  /* used for loadbalancing in case of multiple policy segments in routing process (ignored in case of spray policies) */
+    repeated string segments = 3;       /* list of sids creating one segmented road */
+}
+
+/* Model for steering traffic to SRv6 policy */
+message Steering {
+    string policy_bsid = 1;              /* BSID identifier for policy to which we want to steer routing into (policyBSID and policyIndex are mutual exclusive) */
+    uint32 policy_index = 2;             /* (vpp-internal)Index identifier for policy to which we want to steer routing into (policyBSID and policyIndex are mutual exclusive) */
+
+    /* Traffic configuration (all traffic messages are mutual exclusive)*/
+    L2Traffic l2_traffic = 3;
+    L3Traffic l3_traffic = 4;
+
+    message L2Traffic {                 /* L2 traffic that should be steered into SR policy */
+        string interface_name = 1;       /* name of interface with incomming traffic that should be steered to SR policy */
+    }
+    message L3Traffic {                 /* L3 traffic that should be steered into SR policy */
+        uint32 fib_table_id = 1;          /* ID of FIB table where to install FIB entry for the BSID */
+        string prefix_address = 2;       /* IPv4/IPv6 prefix address(CIRD format) of traffic destination. All traffic with given destination will be steered to given SR policy */
+    }
+}

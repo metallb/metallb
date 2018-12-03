@@ -1,0 +1,13 @@
+{
+    "desired_min_tx_interval": ${min_tx_interval},
+    "destination_address": "${dest_adr}",
+    "detect_multiplier": ${detect_multiplier},
+    "interface": "${interface}",
+    "required_min_rx_interval": ${min_rx_interval},
+    "source_address": "${source_adr}",
+    "enabled": ${enabled},
+    "Authentication":{
+       "key_id": ${auth_key_id},
+       "advertised_key_id": ${BFD_auth_key_id}
+    }
+}

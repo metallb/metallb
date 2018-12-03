@@ -1,0 +1,26 @@
+{
+    "acl_name": "${acl_name}",
+    "interfaces": {
+        "egress": [
+            "${egr_intf1}",
+            "${egr_intf2}"
+        ],
+        "ingress": [
+            "${ingr_intf1}",
+            "${ingr_intf2}"
+        ]
+    },
+    "rules": [
+        {
+            "acl_action": ${acl_action},
+            "match": {
+                "macip_rule": {
+                    "source_address": "${src_addr}",
+                    "source_address_prefix": "${src_addr_prefix}",
+                    "source_mac_address": "${src_mac_addr}",
+                    "source_mac_address_mask": "${src_mac_addr_mask}"
+                }
+            }
+        }
+    ]
+}

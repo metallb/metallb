@@ -1,0 +1,20 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vnf3-vpp-cfg
+data:
+  vpp.conf: |
+    unix {
+      nodaemon
+      cli-listen 0.0.0.0:5002
+    }
+    cpu {
+      main-core 30
+      corelist-workers 31
+    }
+    plugins {
+      plugin dpdk_plugin.so {
+        disable
+      }
+    }

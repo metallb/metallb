@@ -1,0 +1,38 @@
+{
+    "acl_name": "${acl_name}",
+    "interfaces": {
+        "egress": [
+            "${egr_intf1}",
+            "${egr_intf2}"
+        ],
+        "ingress": [
+            "${ingr_intf1}",
+            "${ingr_intf2}"
+        ]
+    },
+    "rules": [
+        {
+            "acl_action": ${acl_action},
+            "match": {
+                "ip_rule": {
+                    "ip": {
+                        "destination_network": "${dest_ntw}",
+                        "source_network": "${src_ntw}"
+                    },
+                    "udp": {
+                        "destination_port_range": {
+                            "lower_port": ${dest_port_low},
+                            "upper_port": ${dest_port_up}
+                        },
+                        "source_port_range": {
+                            "lower_port": ${src_port_low},
+                            "upper_port": ${src_port_up}
+                        },
+                        "tcp_flags_mask": 20,
+                        "tcp_flags_value": 10
+                    }
+                }
+            }
+        }
+    ]
+}

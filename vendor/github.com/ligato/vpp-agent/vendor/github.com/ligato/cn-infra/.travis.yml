@@ -1,0 +1,30 @@
+---
+dist: trusty
+sudo: required
+language: go
+
+go_import_path: github.com/ligato/cn-infra
+
+git:
+  depth: 1
+
+go:
+  - 1.10.x
+
+before_install:
+  - make get-linkcheck
+  - make get-linters
+  - make get-testtools
+  - go get -v github.com/mattn/goveralls
+
+script:
+  - make yamllint
+  - make check-links || true
+  - make lint
+  - make dep-check
+  - make
+  - make test-cover
+#  - make test-examples # TODO: refactor tests to not check exact log output
+
+after_success:
+  - goveralls -coverprofile=/tmp/coverage.out -service=travis-ci

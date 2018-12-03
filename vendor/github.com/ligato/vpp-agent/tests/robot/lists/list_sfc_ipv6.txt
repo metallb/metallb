@@ -1,0 +1,3 @@
+--suite SfcIPv6.East West.Vswitch 1x Vpp 1x Novpp.Vswitch 1x Vpp 1x NovppIPv6
+--suite SfcIPv6.East West.Vswitch 2x Vnf Vpp.Vswitch 2x Vnf VppIPv6
+--suite SfcIPv6.Test Controller Start.Controller StartIPv6

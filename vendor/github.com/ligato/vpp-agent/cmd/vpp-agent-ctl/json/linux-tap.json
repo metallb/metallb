@@ -1,0 +1,18 @@
+{
+  "name": "tap1",
+  "host_if_name": "linux-tap",
+  "enabled": true,
+  "type": 1,
+  "mtu": 1500,
+  "phys_address": "92:c7:42:67:ab:cc",
+  "namespace": {
+    "type": 2,
+    "name": "ns1"
+  },
+  "ip_addresses": [
+    "172.52.45.127/24"
+  ],
+  "tap": {
+    "temp_if_name": "tap1"
+  }
+}

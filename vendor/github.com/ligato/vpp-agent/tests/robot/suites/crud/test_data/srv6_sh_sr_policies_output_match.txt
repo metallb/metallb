@@ -1,0 +1,5 @@
+[${index}].-	BSID: ${bsid}
+	Behavior: ${behaviour}
+	Type: ${type}
+	FIB table: ${fibtable}
+	Segment Lists:

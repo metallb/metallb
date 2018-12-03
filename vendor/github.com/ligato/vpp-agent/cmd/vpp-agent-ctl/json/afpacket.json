@@ -1,0 +1,13 @@
+{
+    "afpacket": {
+        "host_if_name": "lo"
+    },
+    "enabled": true,
+    "mtu": 1500,
+    "ip_addresses": [
+        "fdcd:f7fb:995c::/48"
+    ],
+    "name": "afpacket1",
+    "phys_address": "b4:e6:1c:a1:0d:31",
+    "type": 4
+}

@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+// Package status provides data model for status information of the agent.
+package status;
+
+enum OperationalState {
+    INIT = 0;
+    OK = 1;
+    ERROR = 2;
+};
+
+message AgentStatus {
+    string build_version = 1;
+    string build_date = 2;
+    OperationalState state = 3;
+    int64 start_time = 4;
+    int64 last_change = 5;  /* last change of the state */
+    int64 last_update = 6;  /* last update of the state by some plugin */
+    InterfaceStats interface_stats = 7;
+    string commit_hash = 8;
+    repeated PluginStatus plugins = 9;
+}
+
+message PluginStatus {
+    string name = 1;
+    OperationalState state = 2;
+    int64 last_change = 3;  /* last change of the state */
+    int64 last_update = 4;  /* last update of the state */
+    string error = 5;       /* last seen error */
+}
+
+message InterfaceStats {
+    message Interface {
+        string internal_name = 1;          /* interface name used in VPP */
+        uint32 index = 3;                  /* sw interface index */
+        string status = 4;                 /* status (UP, DOWN, DELETED, ...) */
+        string ip_address = 5;
+        string mac_address = 6;
+    }
+    repeated Interface interfaces = 1;
+}

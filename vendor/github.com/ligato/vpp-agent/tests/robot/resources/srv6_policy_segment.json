@@ -1,0 +1,9 @@
+{
+  "policy_bsid": "${policyBSID}",
+  "weight":${weight},
+  "segments":[
+    "${segmentlist[0]}",
+    "${segmentlist[1]}",
+    "${segmentlist[2]}"
+  ]
+}

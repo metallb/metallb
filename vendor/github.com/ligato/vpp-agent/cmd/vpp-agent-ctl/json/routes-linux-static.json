@@ -1,0 +1,11 @@
+{
+  "name": "route1",
+  "dst-ip-addr": "10.0.2.0/24",
+  "interface": "veth1",
+  "metric": 100,
+  "namespace": {
+    "name": "ns1",
+    "type": 2
+  }
+}
+

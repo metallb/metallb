@@ -1,0 +1,5 @@
+{
+  "authentication_type": ${auth_type},
+  "id": ${id},
+  "secret": "${secret}"
+}

@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package flight;
+
+enum Status {
+    arrival = 0;
+    departure = 1;
+}
+
+message Info {
+    string airline = 1;
+    uint32 number = 2;
+    Status status = 3;
+    uint32 priority = 4;
+}

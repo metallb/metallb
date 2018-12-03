@@ -1,0 +1,6 @@
+{
+  "interface": "${interface}",
+  "ip_address": "${ipv4}",
+  "phys_address": "${MAC}",
+  "static": ${static}
+}

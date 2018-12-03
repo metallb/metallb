@@ -1,0 +1,148 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vswitch-k8-vpp-cfg
+data:
+  vpp.conf: |
+    unix {
+      nodaemon
+      cli-listen 0.0.0.0:5002
+      cli-listen /run/vpp/cli.sock
+      cli-no-pager
+      log /tmp/vpp.log
+      full-coredump
+    }
+    plugins {
+      plugin dpdk_plugin.so {
+        disable
+      }
+    }
+    api-trace {
+      on
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vswitch-k8-agent-cfg
+data:
+  etcd.conf: |
+    insecure-transport: true
+    dial-timeout: 1000000000
+    endpoints:
+     - "172.17.0.1:22379"
+  govpp.conf: |
+    health-check-probe-interval: 1000000000
+    health-check-reply-timeout: 100000000
+    health-check-threshold: 1
+  defaultplugins.conf: |
+    stopwatch: true
+    status-publishers: [redis]
+  linuxplugin.conf: |
+    stopwatch: true
+  logs.conf: |
+    defaultLevel: trace
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vswitch-k8-supervisord-cfg
+data:
+  supervisord.conf: |
+    [supervisord]
+    logfile=/var/log/supervisord.log
+    loglevel=debug
+    nodaemon=true
+
+    [program:vpp]
+    command=/usr/bin/vpp -c /etc/vpp/vpp.conf
+    autorestart=false
+    redirect_stderr=true
+    priority=1
+
+    [program:agent]
+    command=/bin/vpp-agent --etcd-config=/opt/vpp-agent/dev/etcd.conf --kafka-config=/opt/vpp-agent/dev/kafka.conf --vpp-plugin-config=/opt/vpp-agent/dev/vpp-plugin.conf --linux-plugin-config=/opt/vpp-agent/dev/linuxplugin.conf --logs-config=/opt/vpp-agent/dev/logs.conf
+    autorestart=false
+    redirect_stderr=true
+    priority=2
+
+    ; This event listener waits for event of vpp or agent  exiting. Once received, it kills supervisord process and this makes
+    ; subsequently the exit of docker container. You should also set agent's autorestart=false.
+    [eventlistener:vpp_or_agent_not_running]
+    command=/usr/bin/supervisord_kill.py
+    events=PROCESS_STATE_EXITED
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: vswitch-deployment
+  labels:
+    app: vswitch-vpp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vswitch-vpp
+  template:
+    metadata:
+      labels:
+        app: vswitch-vpp
+    spec:
+      restartPolicy: Always
+      hostPID: true
+      hostNetwork: false
+      terminationGracePeriodSeconds: 3
+      containers:
+        - name: "vswitch"
+          image: ligato/vpp-agent:pantheon-dev
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            privileged: true
+          ports:
+            - containerPort: 5002
+            - containerPort: 9191
+          readinessProbe:
+            httpGet:
+              path: /readiness
+              port: 9191
+            periodSeconds: 1
+          livenessProbe:
+            httpGet:
+              path: /liveness
+              port: 9191
+            periodSeconds: 1
+            initialDelaySeconds: 15
+          env:
+            - name: MICROSERVICE_LABEL
+              value: agent_vpp_vswitch
+            - name: DP_STATUS_PUBLISHERS
+              value: etcd
+          volumeMounts:
+            - name: supervisor-config
+              mountPath: /etc/supervisord
+            - name: vpp-config
+              mountPath: /etc/vpp
+            - name: agent-config
+              mountPath: /opt/vpp-agent/dev
+            - name: memif-sockets
+              mountPath: /tmp
+            - name: veth-pair
+              mountPath: /var/run/docker.sock
+
+      volumes:
+        - name: vpp-config
+          configMap:
+            name: vswitch-k8-vpp-cfg
+        - name: agent-config
+          configMap:
+            name: vswitch-k8-agent-cfg
+        - name: supervisor-config
+          configMap:
+            name: vswitch-k8-supervisord-cfg
+        - name: memif-sockets
+          hostPath:
+            path: /tmp
+        - name: veth-pair
+          hostPath:
+            path: /var/run/docker.sock

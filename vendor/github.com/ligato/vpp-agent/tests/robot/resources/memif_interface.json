@@ -1,0 +1,13 @@
+{
+  "name": "${name}",
+  "type": 2,
+  "enabled": ${enabled},
+  "phys_address": "${mac}",
+  "mtu": ${mtu},
+  "vrf": ${vrf},
+  "memif": {
+    "master": ${master},
+    "id": ${id},
+    "socket_filename": "${socket}"
+  }
+}

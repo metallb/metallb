@@ -1,0 +1,38 @@
+{
+    "acl_name": "acl1",
+    "interfaces": {
+        "egress": [
+            "tap1",
+            "tap2"
+        ],
+        "ingress": [
+            "tap3",
+            "tap4"
+        ]
+    },
+    "rules": [
+        {
+            "acl_action": 1,
+            "match": {
+                "ip_rule": {
+                    "ip": {
+                        "destination_network": "10.20.1.0/24",
+                        "source_network": "192.168.1.2/32"
+                    },
+                    "tcp": {
+                        "destination_port_range": {
+                            "lower_port": 1150,
+                            "upper_port": 1250
+                        },
+                        "source_port_range": {
+                            "lower_port": 150,
+                            "upper_port": 250
+                        },
+                        "tcp_flags_mask": 20,
+                        "tcp_flags_value": 10
+                    }
+                }
+            }
+        }
+    ]
+}

@@ -1,0 +1,6 @@
+{
+  "interface": "tap1",
+  "ip_address": "192.168.10.21",
+  "phys_address": "59:6C:45:59:8E:BD",
+  "static": true
+}

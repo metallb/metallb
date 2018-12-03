@@ -1,0 +1,16 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vnf2-vpp-cfg
+data:
+  vpp.conf: |
+    unix {
+      nodaemon
+      cli-listen 0.0.0.0:5002
+    }
+    plugins {
+      plugin dpdk_plugin.so {
+        disable
+      }
+    }

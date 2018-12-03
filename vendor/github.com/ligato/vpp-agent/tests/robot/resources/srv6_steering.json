@@ -1,0 +1,7 @@
+{
+  "l3_traffic": {
+    "fib_table_id": ${fibtable},
+    "prefix_address": "${prefixAddress}"
+  },
+  "policy_bsid": "${bsid}"
+}

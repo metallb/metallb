@@ -1,0 +1,19 @@
+{
+    "enabled": true,
+    "mtu": 1500,
+    "ip_addresses": [
+        "192.168.22.2/24",
+        "2001:842:0:0:0:ff00:13c7:1245/48"
+    ],
+    "namespace": {
+        "name": "ns2",
+        "type": 2
+    },
+    "name": "veth2",
+    "host_if_name": "veth2Name",
+    "phys_address": "92:c7:42:67:ab:cd",
+    "type": 0,
+    "veth": {
+        "peer_if_name": "veth1"
+    }
+}

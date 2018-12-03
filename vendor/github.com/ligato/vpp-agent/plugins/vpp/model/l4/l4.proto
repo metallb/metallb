@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package l4;
+
+/* Layer 4 VPP features settings */
+message L4Features {
+    bool enabled = 1;             /* enables/disables L4 features on VPP */
+}
+
+/* Application namespaces */
+message AppNamespaces {
+    message AppNamespace {
+        string namespace_id = 1;  /* ID of the namespace */
+        uint64 secret = 2;        /* secret shared between application and VPP */
+        string interface = 3;     /* name of the interface that "supports" the namespace */
+
+        uint32 ipv4_fib_id = 4;   /* ID of IPv4 FIB that "supports" the namespace. Ignored if interface set.  */
+        uint32 ipv6_fib_id = 6;   /* ID of IPv6 FIB that "supports" the namespace. Ignored if interface set.  */
+    }
+    repeated AppNamespace app_namespaces = 100;  /* list of application namespaces */
+}

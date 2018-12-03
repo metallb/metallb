@@ -1,0 +1,8 @@
+{
+  "sid": "${sidAddress}",
+  "fib_table_id": ${fibtable},
+  "end_function_DX6": {
+    "outgoing_interface":"${outinterface}",
+    "next_hop":"${nexthop}"
+  }
+}

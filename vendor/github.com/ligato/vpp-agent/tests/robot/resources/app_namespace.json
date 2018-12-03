@@ -1,0 +1,5 @@
+{
+  "namespace_id": "${id}",
+  "secret": ${secret},
+  "interface": "${interface}"
+}

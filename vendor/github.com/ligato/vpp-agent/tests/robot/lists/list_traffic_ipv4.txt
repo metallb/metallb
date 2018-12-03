@@ -1,0 +1,19 @@
+#--suite Traffic.3X Vpp Traffic.3X Vpp Traffic
+#--suite Traffic.Acl Traffic.Acl Traffic
+--suite Traffic.Bridge Domain.Test Bridge Domain
+--suite Traffic.Ip Route.Test Ip Route
+#--suite Traffic.L2Xconnect Traffic.L2Xconnect Trafic
+#--suite Traffic.Libmemif.Libmemif Master Trafic1
+#--suite Traffic.Libmemif.Libmemif Master Trafic2
+#--suite Traffic.Libmemif.Libmemif Slave Trafic1
+#--suite Traffic.Libmemif.Libmemif Slave Trafic2
+#--suite Traffic.Linux Traffic.1x Vpp 3x Namespaces Traffic
+#--suite Traffic.Physical Int Traffic.Physical Int Traffic
+--suite Traffic.Tap Int Traffic.Tap Int Traffic
+#--suite Traffic.Tap Int Traffic.Tap Int And Route Config Order Traffic
+#--suite Traffic.Tapv2 Int Traffic.Tapv2 Int Traffic
+#--suite Traffic.Tapv2 Int Traffic.Tapv2 Int And Route Config Order Traffic
+--suite Traffic.Veth Af Packet Traffic.Veth Af Packet Traffic
+--suite Traffic.Veth Afpacket Memif Vxlan Traffic.Veth Afpacket Memif Vxlan Traffic
+#--suite Traffic.Veth Afpacket Memif Vxlan Traffic.Veth Afpacket Memif Vxlan Traffic Other Vrf
+#--suite Traffic.Vpp 2Novpp Memif Traffic.Vpp 2Novpp Memif Traffic

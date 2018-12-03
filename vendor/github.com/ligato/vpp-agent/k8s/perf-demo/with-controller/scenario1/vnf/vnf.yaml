@@ -1,0 +1,45 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vnf-vpp
+spec:
+  containers:
+    - name: "vnf"
+      image: ligato/vpp-agent
+      imagePullPolicy: IfNotPresent
+      securityContext:
+        privileged: true
+      ports:
+        - containerPort: 5002
+        - containerPort: 9191
+      readinessProbe:
+        httpGet:
+          path: /readiness
+          port: 9191
+        periodSeconds: 1
+      livenessProbe:
+        httpGet:
+          path: /liveness
+          port: 9191
+        initialDelaySeconds: 15
+      env:
+        - name: MICROSERVICE_LABEL
+          value: vnf1
+      volumeMounts:
+        - name: vpp-config
+          mountPath: /etc/vpp
+        - name: agent-config
+          mountPath: /opt/vpp-agent/dev
+        - name: memif-sockets
+          mountPath: /tmp
+  volumes:
+    - name: vpp-config
+      configMap:
+        name: vnf-vpp-cfg
+    - name: agent-config
+      configMap:
+        name: vnf-agent-cfg
+    - name: memif-sockets
+      hostPath:
+        path: /tmp

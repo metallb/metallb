@@ -1,0 +1,6 @@
+vl_api_acl_details_t_handler:${API_HANDLER}: acl_index: 0, count: 1
+   tag {acl3_UDP}
+   ipv6 action 1 src fd30:0:0:1:e::/64 dst fd30:0:0:1:e::/64 proto 17 sport 10-2000 dport 80-1000 tcpflags 0 mask 0
+vl_api_acl_details_t_handler:${API_HANDLER}: acl_index: 1, count: 1
+   tag {acl4_UDP}
+   ipv6 action 1 src fd30:0:0:1:e::/64 dst fd30:0:0:1:e::/64 proto 17 sport 10-2000 dport 80-1000 tcpflags 0 mask 0

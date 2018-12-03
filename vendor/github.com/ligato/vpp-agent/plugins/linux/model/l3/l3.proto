@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package l3;
+
+/* static ip routes */
+message LinuxStaticRoutes {
+    message Route {
+        string name = 1;                    /* route name */
+        bool default = 2;                   /* route is marked as default*/
+
+        message Namespace {                 /* Linux network namespace to attach the route entry into. */
+            enum NamespaceType {
+                PID_REF_NS = 0;             /* Attach to namespace of a given process. */
+                MICROSERVICE_REF_NS = 1;    /* Attach to namespace of a docker container running given microservice. */
+                NAMED_NS = 2;               /* Attach to named namespace. */
+                FILE_REF_NS = 3;            /* Attach to namespace referenced by a file handle. */
+            }
+            NamespaceType type = 1;
+            uint32 pid = 2;
+            string microservice = 3;
+            string name = 4;
+            string filepath = 5;
+        }
+        Namespace namespace = 3;
+
+        string interface = 5;               /* interface host name */
+        string description = 6;             /* optional description */
+
+        message Scope {                     /* the scope of the area where the link is valid */
+            enum ScopeType {
+                GLOBAL = 0;
+                SITE = 1;
+                LINK = 2;
+                HOST = 3;
+            }
+            ScopeType type = 1;
+        }
+        Scope scope = 7;
+
+        string dst_ip_addr = 8;             /* destination ip address + prefix in format <address>/<prefix> */
+        string src_ip_addr = 9;             /* source ip address  */
+        string gw_addr = 10;                /* gateway address */
+        uint32 metric = 11;                 /* routing metric (weight) */
+        uint32 table = 12;                  /* linux kernel routing table */
+    }
+    repeated Route route = 1;               /* list of IP static routes */
+}
+
+/* static arp entires */
+message LinuxStaticArpEntries {
+    message ArpEntry {
+        string name = 1;                    /* arp entry name */
+
+        message Namespace {                 /* The namespace of the interface ARP is attached to */
+            enum NamespaceType {
+                PID_REF_NS = 0;             /* Attach to namespace of a given process. */
+                MICROSERVICE_REF_NS = 1;    /* Attach to namespace of a docker container running given microservice. */
+                NAMED_NS = 2;               /* Attach to named namespace. */
+                FILE_REF_NS = 3;            /* Attach to namespace referenced by a file handle. */
+            }
+            NamespaceType type = 1;
+            uint32 pid = 2;
+            string microservice = 3;
+            string name = 4;
+            string filepath = 5;
+        }
+        Namespace namespace = 2;
+
+        string interface = 3;               /* interface to which this neighbour is attached */
+
+        message IpFamily {
+            enum Family {
+                IPV4 = 0;
+                IPV6 = 1;
+                ALL = 2;
+                MPLS = 3;
+            }
+            Family family = 1;
+        }
+        IpFamily ip_family = 4;             /* IP family, if not set it will be determined from the ip address */
+
+        message NudState {
+            enum NudStateType {
+                PERMANENT = 0;
+                NOARP = 1;
+                REACHABLE = 2;
+                STALE = 3;
+            }
+            NudStateType type = 1;
+        }
+        NudState state = 5;                 /* state of the neighbour entry */
+
+        string ip_addr = 6;                 /* ip address */
+        string hw_address = 7;              /* mac address */
+    }
+    repeated ArpEntry arp_entry = 1;        /* list of ARP entries */
+}

@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package phonebook;
+
+message Contact {
+    string name = 1;
+    string company = 2;
+    string phonenumber = 3;
+}

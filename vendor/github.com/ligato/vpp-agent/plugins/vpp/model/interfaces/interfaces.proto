@@ -1,0 +1,168 @@
+syntax = "proto3";
+
+package interfaces;
+
+enum InterfaceType {
+    SOFTWARE_LOOPBACK = 0;
+    ETHERNET_CSMACD = 1;
+    MEMORY_INTERFACE = 2;
+    TAP_INTERFACE = 3;
+    AF_PACKET_INTERFACE = 4;
+    VXLAN_TUNNEL = 5;
+};
+
+// from vpp/build-root/install-vpp-native/vpp/include/vnet/interface.h
+enum RxModeType {
+    UNKNOWN = 0;
+    POLLING = 1;
+    INTERRUPT = 2;
+    ADAPTIVE = 3;
+    DEFAULT = 4;
+};
+
+message Interfaces {
+    message Interface {
+        string name = 1;
+        string description = 2;
+        InterfaceType type = 3;
+        bool enabled = 4;
+        string phys_address = 5;
+        uint32 mtu = 6;
+        uint32 vrf = 7;
+        string container_ip_address = 8;
+        bool set_dhcp_client = 9;
+
+        // Required format is "ipAddress/ipPrefix"
+        repeated string ip_addresses = 10;
+
+        message Unnumbered {
+            bool is_unnumbered = 1;
+            string interface_with_ip = 2;
+        }
+        Unnumbered unnumbered = 11;
+
+        message RxModeSettings {
+            RxModeType rx_mode = 1;
+            uint32 queue_id  = 2;
+            uint32 queue_id_valid  = 3;
+        }
+        RxModeSettings rx_mode_settings = 12;
+
+        message RxPlacementSettings {
+            uint32 queue = 1;
+            uint32 worker = 2;
+            bool is_main = 3;
+        }
+        RxPlacementSettings rx_placement_settings = 13;
+
+        message Memif {
+            enum MemifMode {
+                ETHERNET = 0;
+                IP = 1;
+                PUNT_INJECT = 2;
+            }
+            bool master = 1;
+            MemifMode mode = 2;
+            uint32 id = 3;
+            string socket_filename = 4;
+            string secret = 5;
+            uint32 ring_size = 6;
+            uint32 buffer_size = 7;
+            uint32 rx_queues = 8;
+            uint32 tx_queues = 9;
+        }
+        Memif memif = 101;
+
+        message Vxlan {
+            string src_address = 1;  /* source VTEP address */
+            string dst_address = 2;  /* destination VTEP address */
+            uint32 vni = 3;          /* VXLAN Network Identifier */
+            string multicast = 4;    /* multicast interface */
+
+        }
+        Vxlan vxlan = 102; /* VXLAN interface settings */
+
+        message Afpacket {
+            string host_if_name = 1; /* name of the host interface to bind to */
+        }
+        Afpacket afpacket = 103;
+
+        message Tap {
+            uint32 version = 1; /* 1 / unset = use the original TAP interface; 2 = use a fast virtio-based TAP */
+            string host_if_name = 2; /* name of the TAP interface in the host OS */
+            string namespace = 3; /* Linux network namespace in which the host-side of the TAP should be configured; only for TAP v.2 */
+            uint32 rx_ring_size = 4; /* Rx ring buffer size; must be power of 2; default is 256; only for TAP v.2 */
+            uint32 tx_ring_size = 5; /* Tx ring buffer size; must be power of 2; default is 256; only for TAP v.2 */
+        }
+        Tap tap = 104;
+    };
+    repeated Interface interfaces = 1;
+};
+
+
+message InterfacesState {
+    message Interface {
+        enum Status {
+            UNKNOWN_STATUS = 0;
+            UP = 1;
+            DOWN = 2;
+            DELETED = 3;
+        };
+        enum Duplex {
+            UNKNOWN_DUPLEX = 0;
+            HALF = 1;
+            FULL = 2;
+        };
+        string name = 1;
+        string internal_name = 2;
+        InterfaceType type = 3;
+        uint32 if_index = 4;
+        Status admin_status = 5;
+        Status oper_status = 6;
+        int64 last_change = 7;
+        string phys_address = 8;
+        uint64 speed = 9;
+        uint32 mtu = 10;
+        Duplex duplex = 11;
+
+        message Statistics {
+            uint64 in_packets = 1;
+            uint64 in_bytes = 2;
+            uint64 out_packets = 3;
+            uint64 out_bytes = 4;
+            uint64 drop_packets = 5;
+            uint64 punt_packets = 6;
+            uint64 ipv4_packets = 7;
+            uint64 ipv6_packets = 8;
+            uint64 in_nobuf_packets = 9;
+            uint64 in_miss_packets = 10;
+            uint64 in_error_packets = 11;
+            uint64 out_error_packets = 12;
+        }
+        Statistics statistics = 100;
+    }
+    repeated Interface interfaces = 1;
+}
+
+message InterfaceNotification {
+    enum NotifType {                        /* Type of notification */
+        UNKNOWN = 0;                        /* Default type */
+        UPDOWN = 1;                         /* Link UP/DOWN notification */
+        COUNTERS = 2;                       /* Interface state with updated counters */
+    }
+    NotifType Type = 1;                     /* Type of the notification */
+    InterfacesState.Interface state = 2;    /* State of the network interface */
+}
+
+message InterfaceErrors {
+    message Interface {                     /* List of interfaces with errors */
+        string interface_name = 1;
+        message ErrorData {                 /* List of errors (if there are more) for every interface */
+            string change_type = 1;
+            string error_message = 2;
+            int64 last_change = 3;
+        }
+        repeated ErrorData error_data = 2;
+    }
+    repeated Interface interfaces = 1;
+}

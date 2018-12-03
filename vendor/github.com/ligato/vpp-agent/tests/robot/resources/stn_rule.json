@@ -1,0 +1,5 @@
+{
+  "ip_address": "${ip}",
+  "interface": "${interface}",
+  "rule_name": "${rule_name}"
+}

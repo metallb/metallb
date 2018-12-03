@@ -1,0 +1,7 @@
+{
+  "name": "GigabitEthernet0/a/0",
+  "type": 1,
+  "enabled": true,
+  "set_dhcp_client": true,
+  "mtu": 1500
+}

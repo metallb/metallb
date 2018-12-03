@@ -1,0 +1,4 @@
+{
+  "receive_interface": "${rx_if}",
+  "transmit_interface": "${tx_if}"
+}

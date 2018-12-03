@@ -1,0 +1,36 @@
+{
+    "acl_name": "acl1_tcp",
+    "interfaces": {
+        "egress": [
+            ""
+        ],
+        "ingress": [
+            ""
+        ]
+    },
+    "rules": [
+        {
+            "acl_action": 2,
+            "match": {
+                "ip_rule": {
+                    "ip": {
+                        "destination_network": "fd30:0000:0000:0001:000e:0000:0000:0000/64",
+                        "source_network": "fd30:0000:0000:0001:000e:0000:0000:0000/64"
+                    },
+                    "tcp": {
+                        "destination_port_range": {
+                            "lower_port": 80,
+                            "upper_port": 1000
+                        },
+                        "source_port_range": {
+                            "lower_port": 10,
+                            "upper_port": 2000
+                        },
+                        "tcp_flags_mask": 20,
+                        "tcp_flags_value": 10
+                    }
+                }
+            }
+        }
+    ]
+}

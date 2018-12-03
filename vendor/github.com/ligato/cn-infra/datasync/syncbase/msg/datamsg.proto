@@ -1,0 +1,120 @@
+syntax = "proto3";
+
+//import "google/protobuf/timestamp.proto";
+
+package msg;
+
+service DataMsgService {
+    rpc dataChanges (stream DataChangeRequest) returns (stream DataChangeReply) {
+    }
+
+    rpc dataResyncs (DataResyncRequests) returns (DataResyncReplies) {
+    }
+
+    rpc ping (PingRequest) returns (PingReply) {
+    }
+}
+
+message DataMsgRequest {
+    Seq msgId = 1;
+    Seq txn = 2;//TODO remove this
+
+    repeated DataChangeRequest dataChanges = 3;
+    repeated DataResyncRequest dataResyncs = 4;//use max 1
+}
+
+
+message DataResyncRequests {
+    Seq msgId = 1;
+
+    repeated DataResyncRequest dataResyncs = 2;
+}
+
+message DataResyncReplies {
+    Seq msgId = 1;
+    Error error = 2;
+
+    message DataResyncsReplies {
+        repeated DataResyncReply replies = 1;
+    }
+
+    DataResyncsReplies dataResyncs = 3;
+}
+
+message DataMsgReply {
+    Seq msgId = 1;
+    Error error = 2;
+
+    message DataChangesReplies {
+        repeated DataChangeReply replies = 1;
+    }
+
+    message DataResyncsReplies {
+        repeated DataResyncReply replies = 1;
+    }
+
+    DataChangesReplies dataChanges = 3;
+    DataResyncsReplies dataResyncs = 4;
+}
+
+
+message DataChangeRequest {
+    string key = 1;
+    PutDel operationType = 2;
+    bytes content = 3;
+    string content_type = 4;
+}
+
+message DataChangeReply {
+    string key = 2;
+    PutDel operationType = 3;
+
+    // zero means success
+    uint32 result = 4;
+}
+
+message DataResyncRequest {
+    string key = 1;
+    bytes content = 2;
+    string content_type = 3;
+}
+
+message DataResyncReply {
+    Seq resyncId = 1;
+    string key = 2;
+    // zero means success
+    uint32 result = 3;
+}
+
+message ResyncNeededCallback {
+    Seq msgId = 1;
+    // Optional
+    Error error = 2;
+}
+
+message Seq {
+    // The server that generates this seq
+    string originator = 1;
+    // UNIX Timestamp of seqence restart
+    // google.protobuf.Timestamp seqCreated = 2;
+    int64 seqCreatedSec = 2;
+    // Sequence
+    uint32 seq = 4;
+}
+
+message Error {
+    string message = 1;
+}
+
+enum PutDel {
+    PUT = 0;
+    DEL = 1;
+}
+
+message PingRequest {
+    string message = 1;
+}
+
+message PingReply {
+    string message = 1;
+}

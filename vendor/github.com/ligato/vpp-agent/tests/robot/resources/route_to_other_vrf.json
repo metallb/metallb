@@ -1,0 +1,6 @@
+{
+  "type": ${type},
+  "dst_ip_addr": "${ip}/${prefix}",
+  "vrf_id": ${id},
+  "via_vrf_id": ${next_hop_vrf}
+}

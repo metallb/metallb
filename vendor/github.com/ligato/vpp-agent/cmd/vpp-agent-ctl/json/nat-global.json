@@ -1,0 +1,51 @@
+{
+  "forwarding": false,
+  "nat_interfaces": [
+    {
+      "name": "tap1",
+      "isInside": true,
+      "outputFeature": false
+    },
+    {
+      "name": "tap2",
+      "isInside": false,
+      "outputFeature": false
+    },
+    {
+      "name": "tap3",
+      "isInside": false,
+      "outputFeature": true
+    }
+  ],
+  "address_pools": [
+    {
+      "vrfId": 0,
+      "firstSrcAddress": "192.168.0.1",
+      "twiceNat": false
+    },
+    {
+      "vrfId": 0,
+      "firstSrcAddress": "175.124.0.1",
+      "lastSrcAddress": "175.124.0.3",
+      "twiceNat": false
+    },
+    {
+      "vrfId": 0,
+      "firstSrcAddress": "10.10.0.1",
+      "lastSrcAddress": "10.10.0.2",
+      "twiceNat": false
+    }
+  ],
+  "virtual-reassembly-ipv4": {
+    "timeout": 5,
+    "maxReass": 10,
+    "maxFrag": 15,
+    "dropFrag": true
+  },
+  "virtual-reassembly-ipv6": {
+    "timeout": 20,
+    "maxReass": 25,
+    "maxFrag": 30,
+    "dropFrag": false
+  }
+}

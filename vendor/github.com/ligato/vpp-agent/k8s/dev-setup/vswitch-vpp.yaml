@@ -1,0 +1,63 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vswitch-vpp-cfg
+data:
+  vpp.conf: |
+    unix {
+      nodaemon
+      cli-listen 0.0.0.0:5002
+    }
+    dpdk {
+      dev 0000:00:08.0
+      uio-driver igb_uio
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vswitch-agent-cfg
+data:
+  etcd.conf: |
+    insecure-transport: true
+    dial-timeout: 1000000000
+    endpoints:
+     - "172.17.0.1:22379"
+  kafka.conf: |
+    addrs:
+     - "172.17.0.1:9092"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: vswitch-vpp
+spec:
+  containers:
+    - name: "vswitch-vpp"
+      image: dev_vpp_agent
+      imagePullPolicy: IfNotPresent
+      securityContext:
+        privileged: true
+      ports:
+        - containerPort: 5002
+      env:
+        - name: MICROSERVICE_LABEL
+          value: vpp1
+      volumeMounts:
+        - name: vpp-config
+          mountPath: /etc/vpp
+        - name: agent-config
+          mountPath: /opt/vpp-agent/dev
+        - name: memif-sockets
+          mountPath: /tmp
+  volumes:
+    - name: vpp-config
+      configMap:
+        name: vswitch-vpp-cfg
+    - name: agent-config
+      configMap:
+        name: vswitch-agent-cfg
+    - name: memif-sockets
+      hostPath:
+        path: /tmp

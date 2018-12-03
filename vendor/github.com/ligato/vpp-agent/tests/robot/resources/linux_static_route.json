@@ -1,0 +1,12 @@
+{
+  "name": "${routename}",
+  "default": ${isdefault},
+  "namespace": {
+      "name": "${namespace}",
+      "type": 2
+  },
+  "interface": "${interface}",
+  "dst_ip_addr": "${ip}/${prefix}",
+  "gw_addr": "${next_hop}",
+  "metric": ${metric}
+}

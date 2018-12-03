@@ -1,0 +1,16 @@
+{
+  "name": "${name}",
+  "type": 2,
+  "enabled": ${enabled},
+  "phys_address": "${mac}",
+  "memif": {
+    "master": ${master},
+    "id": ${id},
+    "socket_filename": "${socket}"
+  },
+  "mtu": ${mtu},
+  "vrf": ${vrf},
+  "ip_addresses": [
+    "${ip}/${prefix}"
+  ]
+}

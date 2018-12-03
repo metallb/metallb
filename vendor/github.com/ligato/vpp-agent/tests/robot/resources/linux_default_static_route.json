@@ -1,0 +1,11 @@
+{
+  "name": "${routename}",
+  "default": ${isdefault},
+  "namespace": {
+      "name": "${namespace}",
+      "type": 2
+  },
+  "interface": "${interface}",
+  "gw_addr": "${next_hop}",
+  "metric": ${metric}
+}

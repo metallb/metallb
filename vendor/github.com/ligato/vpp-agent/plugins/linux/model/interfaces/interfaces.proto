@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package interfaces;
+
+message LinuxInterfaces {
+    enum InterfaceType {                    /* Available interface types */
+        VETH = 0;
+        AUTO_TAP = 1;
+    };
+
+    message Interface {
+        string name = 1;                    /* Unique name of the interface used the etcd key */
+        string description = 2;
+        InterfaceType type = 3;
+        bool enabled = 4;
+        repeated string ip_addresses = 5;   /* IP address in format <ipAddress>/<ipPrefix> */
+        string phys_address = 6;            /* MAC address */
+        uint32 mtu = 7;                     /* Maximum transmission unit value */
+        string host_if_name = 8;            /* Name of the interface in the host OS. If not set, the host name
+                                               is the same as interface name */
+
+        message Namespace {                 /* Linux network namespace to attach the interface into. */
+            enum NamespaceType {
+                PID_REF_NS = 0;             /* Attach to namespace of a given process. */
+                MICROSERVICE_REF_NS = 1;    /* Attach to namespace of a docker container running given microservice. */
+                NAMED_NS = 2;               /* Attach to named namespace. */
+                FILE_REF_NS = 3;            /* Attach to namespace referenced by a file handle.*/
+            }
+            NamespaceType type = 1;
+            uint32 pid = 2;
+            string microservice = 3;
+            string name = 4;
+            string filepath = 5;
+        }
+        Namespace namespace = 9;
+
+        message Veth {
+            string peer_if_name = 1;         /* Name of the peer (other end of the linux veth) */
+        }
+        Veth veth = 10;
+
+        message Tap {
+            string temp_if_name = 1;         /* Temporary name of the peer */
+        }
+        Tap tap = 11;
+    };
+    repeated Interface interface = 1;
+};

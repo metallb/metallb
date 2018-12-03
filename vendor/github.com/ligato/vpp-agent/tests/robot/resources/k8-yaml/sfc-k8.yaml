@@ -1,0 +1,37 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sfc-controller-cfg
+data:
+  etcd.conf: |
+    insecure-transport: true
+    dial-timeout: 1000000000
+    endpoints:
+     - "172.17.0.1:22379"
+  sfc.conf: |
+    sfc_controller_config_version: 2
+    description: Basic restarts topology
+
+    network_nodes:
+    - metadata:
+        name: agent_vpp_vswitch
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sfc-controller
+spec:
+  containers:
+    - name: "sfc-controller"
+      image: ligato/dev_sfc_controller:latest
+      imagePullPolicy: IfNotPresent
+      securityContext:
+        privileged: true
+      volumeMounts:
+        - name: controller-config
+          mountPath: /opt/sfc-controller/dev
+  volumes:
+    - name: controller-config
+      configMap:
+        name: sfc-controller-cfg

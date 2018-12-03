@@ -1,0 +1,9 @@
+{
+  "name": "${name}",
+  "type": 1,
+  "enabled": ${enabled},
+  "mtu": ${mtu},
+  "ip_addresses": [
+    "${ip}/${prefix}"
+  ]
+}

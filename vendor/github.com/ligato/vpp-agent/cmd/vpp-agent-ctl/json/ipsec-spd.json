@@ -1,0 +1,40 @@
+{
+  "name":"spd1",
+  "interfaces": [
+    { "name": "afp1" }
+  ],
+  "policy_entries": [
+    {
+      "priority": 100,
+      "is_outbound": false,
+      "action": 0,
+      "protocol": 50
+    },
+    {
+      "priority": 100,
+      "is_outbound": true,
+      "action": 0,
+      "protocol": 50
+    },
+    {
+      "priority": 10,
+      "is_outbound": false,
+      "remote_addr_start": "10.0.0.1",
+      "remote_addr_stop": "10.0.0.1",
+      "local_addr_start": "10.0.0.2",
+      "local_addr_stop": "10.0.0.2",
+      "action": 3,
+      "sa": "sa20"
+    },
+    {
+      "priority": 10,
+      "is_outbound": true,
+      "remote_addr_start": "10.0.0.1",
+      "remote_addr_stop": "10.0.0.1",
+      "local_addr_start": "10.0.0.2",
+      "local_addr_stop": "10.0.0.2",
+      "action": 3,
+      "sa": "sa10"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+    "phys_address": "62:89:C6:A3:6D:5C",
+    "bridge_domain": "bd1",
+    "outgoing_interface": "tap1",
+    "static_config": true,
+    "bridged_virtual_interface": false
+}

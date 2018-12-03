@@ -1,0 +1,35 @@
+---
+apiVersion: apps/v1beta1
+kind: StatefulSet
+metadata:
+  name: novpp
+spec:
+  selector:
+    matchLabels:
+      name: ubuntu-service
+  serviceName: "ubuntu-service"
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        name: ubuntu-service
+    spec:
+      terminationGracePeriodSeconds: 3
+      containers:
+        - name: ubuntu
+          image: ligato/dev-cn-infra:latest
+          imagePullPolicy: IfNotPresent
+          command: ["sleep"]
+          args: ["infinity"]
+          volumeMounts:
+            - name: veth-pair
+              mountPath: /var/run/docker.sock
+          env:
+            - name: MICROSERVICE_LABEL
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+      volumes:
+        - name: veth-pair
+          hostPath:
+            path: /var/run/docker.sock

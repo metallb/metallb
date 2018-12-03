@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package etcdexample; /* Generated code will be in the ectd_example package*/
+
+message EtcdExample {
+    string string_val = 1; /* Example of a string value */
+    uint32 uint32_val = 2; /* Example of a uint32 value */
+    bool bool_val = 3; /* Example of a bool value */
+
+    message structExample { /* Example of a structure */
+                            string val1 = 1;
+                            uint32 val2 = 2;
+    }
+}

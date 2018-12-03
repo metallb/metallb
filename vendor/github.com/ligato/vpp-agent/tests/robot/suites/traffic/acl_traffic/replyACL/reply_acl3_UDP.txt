@@ -1,0 +1,42 @@
+{
+    "acl_name": "acl3_UDP",
+    "interfaces": {
+        "egress": [
+            "IF_AFPIF_VSWITCH_node_2_node2_veth",
+            "IF_AFPIF_VSWITCH_node_1_node1_veth"
+        ],
+        "ingress": [
+            "IF_AFPIF_VSWITCH_node_1_node1_veth",
+            "IF_AFPIF_VSWITCH_node_2_node2_veth"
+        ]
+    },
+    "rules": [
+        {
+<<<<<<< HEAD
+=======
+            "rule_name": "acl3_rule1",
+>>>>>>> d0bb6d88a2425f0aafc8f3bfaf12470c2409c08f
+            "acl_action": 1,
+            "match": {
+                "ip_rule": {
+                    "ip": {
+                        "destination_network": "10.0.0.0/24",
+                        "source_network": "10.0.0.0/24"
+                    },
+                    "udp": {
+                        "destination_port_range": {
+                            "lower_port": 3001,
+                            "upper_port": 3001
+                        },
+                        "source_port_range": {
+                            "lower_port": 3001,
+                            "upper_port": 3001
+                        },
+                        "tcp_flags_mask": 20,
+                        "tcp_flags_value": 10
+                    }
+                }
+            }
+        }
+    ]
+}

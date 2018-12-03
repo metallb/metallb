@@ -1,0 +1,13 @@
+{
+    "arp_termination": true,
+    "flood": true,
+    "forward": true,
+    "interfaces": [
+        {
+            "name": "tap1"
+        }
+    ],
+    "learn": true,
+    "name": "bd1",
+    "unknown_unicast_flood": true
+}
