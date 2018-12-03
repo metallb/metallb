@@ -23,7 +23,6 @@ import (
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
-	"go.universe.tf/metallb/internal/layer2"
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/version"
 	"k8s.io/api/core/v1"
@@ -132,14 +131,15 @@ func newController(cfg controllerConfig) (*controller, error) {
 	}
 
 	if !cfg.DisableLayer2 {
-		a, err := layer2.New(cfg.Logger)
-		if err != nil {
-			return nil, fmt.Errorf("making layer2 announcer: %s", err)
-		}
-		protocols[config.Layer2] = &layer2Controller{
-			announcer: a,
-			myNode:    cfg.MyNode,
-		}
+		//a, err := layer2.New(cfg.Logger)
+		//if err != nil {
+		//	return nil, fmt.Errorf("making layer2 announcer: %s", err)
+		//}
+		//protocols[config.Layer2] = &layer2Controller{
+		//	announcer: a,
+		//	myNode:    cfg.MyNode,
+		//}
+		protocols[config.Layer2] = NewVppL2Controller(cfg.Logger, cfg.MyNode)
 	}
 
 	ret := &controller{
