@@ -59,7 +59,7 @@ graph BT
 
 Follow the instructions
 in
-[Romana's documentation](http://docs.romana.io/Content/advanced.html#route-publisher-add-on) to
+[Romana's documentation](https://romana.readthedocs.io/en/latest/Content/advanced.html#route-publisher-add-on) to
 set up the route publisher addon. In `publisher.conf`, add a neighbor
 configuration for MetalLB:
 
