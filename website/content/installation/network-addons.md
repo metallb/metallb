@@ -18,6 +18,7 @@ have information on network addons that aren't listed!
 Network addon | Compatible
 --------------|---------------
 Calico        | Partial (see [known issues]({{% relref "configuration/calico.md" %}}))
+Canal         | Yes
 Cilium        | Yes
 Flannel       | Yes
 Kube-router   | No ([work in progress](https://github.com/google/metallb/issues/160))
