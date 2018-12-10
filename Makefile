@@ -31,7 +31,7 @@ SPACE := $(EMPTY) $(EMPTY)
 COMMA := $(EMPTY),$(EMPTY)
 
 ALL_ARCH:=amd64 arm arm64 ppc64le s390x
-BINARIES:=controller speaker test-bgp-router
+BINARIES:=controller speaker test-bgp-router e2etest-mirror-server
 PLATFORMS:=$(subst $(SPACE),$(COMMA),$(foreach arch,$(ALL_ARCH),linux/$(arch)))
 MK_IMAGE_TARGETS:=Makefile.image-targets
 

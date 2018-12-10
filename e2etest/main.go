@@ -1,36 +1,35 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"log"
 	"os"
-	"os/signal"
-	"time"
 )
 
 func main() {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Hour)
-	defer cancel()
-
-	start := time.Now()
-	c, err := startCluster(ctx)
-	if err != nil {
-		log.Fatal(err)
+	if len(os.Args) != 2 {
+		usage()
 	}
-	fmt.Println("\n\nStarted in", time.Since(start).String())
 
-	defer c.universe.Close()
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, os.Interrupt)
-	go func() {
-		select {
-		case <-stop:
-			cancel()
-		case <-c.universe.Context().Done():
-		}
-	}()
+	var f func() error
+	switch os.Args[1] {
+	case "image":
+		f = buildImage
+	case "build":
+		f = buildUniverse
+	case "run":
+		f = runCluster
+	default:
+		f = usage
+	}
 
-	fmt.Printf("export KUBECONFIG=%s\n", c.cluster.Kubeconfig())
-	<-ctx.Done()
+	if err := f(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+}
+
+func usage() error {
+	fmt.Println("need 1 argument, either 'build' or 'run'")
+	os.Exit(1)
+	panic("unreachable")
 }
