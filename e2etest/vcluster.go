@@ -6,81 +6,173 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strconv"
 
 	vk "go.universe.tf/virtuakube"
 )
 
-type cluster struct {
-	universe *vk.Universe
-	cluster  *vk.Cluster
-	client   *vk.VM
+const cachedUniverse = `e2etest-cached-universe`
+
+func runCluster() error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// Handle ctrl+C by cancelling the context, which will shut down
+	// everything in the universe.
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt)
+	go func() {
+		defer cancel()
+		select {
+		case <-stop:
+		case <-ctx.Done():
+		}
+	}()
+
+	universe, err := vk.Open(cachedUniverse)
+	if err != nil {
+		return fmt.Errorf("opening universe: %v", err)
+	}
+	defer universe.Close()
+
+	fmt.Println("Hit ctrl+C to close.")
+	<-ctx.Done()
+	return nil
 }
 
-func startCluster(ctx context.Context) (*cluster, error) {
-	img, err := getVMImage()
-	if err != nil {
-		return nil, err
+func buildImage() error {
+	_, err := os.Stat(cachedUniverse)
+	if err == nil {
+		if err := os.RemoveAll(cachedUniverse); err != nil {
+			return fmt.Errorf("removing old universe: %v", err)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("checking for the existence of the cached universe: %v", err)
 	}
 
-	u, err := vk.New(ctx)
+	universe, err := vk.Create(cachedUniverse)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("creating universe: %v", err)
 	}
+	defer universe.Close()
 
-	ccfg := &vk.ClusterConfig{
-		NumNodes: 1,
-		VMConfig: &vk.VMConfig{
-			Image:      img,
-			MemoryMiB:  2048,
-			CommandLog: os.Stdout,
+	imageCfg := &vk.ImageConfig{
+		Name: "base",
+		CustomizeFuncs: []vk.ImageCustomizeFunc{
+			vk.CustomizeInstallK8s,
+			func(v *vk.VM) error {
+				return v.RunMultiple(
+					"apt-get install bird",
+					"systemctl enable bird",
+					"systemctl enable bird6",
+				)
+			},
 		},
-		NetworkAddon: "calico",
-		ExtraAddons:  []string{},
+		BuildLog: os.Stdout,
 	}
-	c, err := u.NewCluster(ccfg)
-	if err != nil {
-		u.Close()
-		return nil, err
-	}
-	if err := c.Start(); err != nil {
-		u.Close()
-		return nil, err
+	if _, err := universe.NewImage(imageCfg); err != nil {
+		return fmt.Errorf("creating VM base image: %v", err)
 	}
 
-	vcfg := &vk.VMConfig{
-		Image:      img,
+	if err := universe.Save(); err != nil {
+		return fmt.Errorf("saving universe: %v", err)
+	}
+
+	return nil
+}
+
+func buildUniverse() error {
+	universe, err := vk.Open(cachedUniverse)
+	if err != nil {
+		return fmt.Errorf("opening universe: %v", err)
+	}
+	defer universe.Close()
+
+	vmCfg := &vk.VMConfig{
+		ImageName:  "base",
 		Hostname:   "client",
-		MemoryMiB:  1024,
 		CommandLog: os.Stdout,
 	}
-	v, err := u.NewVM(vcfg)
+
+	clusterCfg := &vk.ClusterConfig{
+		Name:         "cluster",
+		NumNodes:     0,
+		VMConfig:     vmCfg,
+		NetworkAddon: "calico",
+	}
+
+	cluster, err := universe.NewCluster(clusterCfg)
 	if err != nil {
-		u.Close()
-		return nil, err
+		return fmt.Errorf("creating cluster: %v", err)
 	}
-	if err := v.Start(); err != nil {
-		u.Close()
-		return nil, err
+	if err := cluster.Start(); err != nil {
+		return fmt.Errorf("starting cluster: %v", err)
 	}
 
-	ret := &cluster{
-		universe: u,
-		cluster:  c,
-		client:   v,
+	client, err := universe.NewVM(vmCfg)
+	if err != nil {
+		return fmt.Errorf("creating client VM: %v", err)
+	}
+	if err := client.Start(); err != nil {
+		return fmt.Errorf("starting client VM: %v", err)
 	}
 
-	if err := ret.configureBird(); err != nil {
-		u.Close()
-		return nil, err
+	var bird4, bird6 bytes.Buffer
+	fmt.Fprintf(&bird4, birdBaseCfg, client.IPv4())
+	fmt.Fprintf(&bird6, birdBaseCfg, client.IPv4())
+
+	fmt.Fprintf(&bird4, birdPeerCfg, "controller", cluster.Controller().IPv4())
+	fmt.Fprintf(&bird6, birdPeerCfg, "controller", cluster.Controller().IPv6())
+
+	for i, vm := range cluster.Nodes() {
+		fmt.Fprintf(&bird4, birdPeerCfg, "node"+strconv.Itoa(i), vm.IPv4())
+		fmt.Fprintf(&bird6, birdPeerCfg, "node"+strconv.Itoa(i), vm.IPv6())
 	}
 
-	if err := ret.setupMetalLB(); err != nil {
-		u.Close()
-		return nil, err
+	if err := client.WriteFile("/etc/bird/bird.conf", bird4.Bytes()); err != nil {
+		return err
+	}
+	if err := client.WriteFile("/etc/bird/bird6.conf", bird6.Bytes()); err != nil {
+		return err
+	}
+	err = client.RunMultiple(
+		"systemctl restart bird",
+		"systemctl restart bird6",
+	)
+	if err != nil {
+		return err
 	}
 
-	return ret, nil
+	cmd := exec.Command(
+		"make", "push-images",
+		"REGISTRY=localhost:"+strconv.Itoa(cluster.Registry()),
+		"TAG=e2e",
+		"ARCH=amd64",
+		"BINARIES=e2etest-mirror-server",
+	)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("pushing mirror server image: %v", err)
+	}
+
+	cmd = exec.Command("kubectl", "apply", "-f", "-")
+	cmd.Stdin = bytes.NewBufferString(mirrorServerManifest)
+	cmd.Env = []string{"KUBECONFIG=" + cluster.Kubeconfig()}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("starting mirror server daemonset: %v", err)
+	}
+
+	if err := cluster.WaitForAllRunning(context.Background()); err != nil {
+		return fmt.Errorf("waiting for mirror server to start: %v", err)
+	}
+
+	if err := universe.Save(); err != nil {
+		return fmt.Errorf("saving universe: %v", err)
+	}
+
+	return nil
 }
 
 const (
@@ -104,6 +196,7 @@ protocol direct {
   check link;
   import all;
 }`
+
 	birdPeerCfg = `
 protocol bgp %s {
   local as 64513;
@@ -113,51 +206,37 @@ protocol bgp %s {
   import all;
   export none;  
 }`
+	mirrorServerManifest = `
+apiVersion: apps/v1beta2
+kind: DaemonSet
+metadata:
+  namespace: default
+  name: mirror
+  labels:
+    app: mirror
+spec:
+  selector:
+    matchLabels:
+      app: mirror
+  template:
+    metadata:
+      labels:
+        app: mirror
+    spec:
+      containers:
+      - name: mirror
+        image: 127.0.0.1:30000/e2etest-mirror-server:e2e-amd64
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_UID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.uid
+        ports:
+        - name: http
+          containerPort: 8080
+`
 )
-
-func (c *cluster) configureBird() error {
-	var bird4, bird6 bytes.Buffer
-	fmt.Fprintf(&bird4, birdBaseCfg, c.client.IPv4())
-	fmt.Fprintf(&bird6, birdBaseCfg, c.client.IPv4())
-
-	fmt.Fprintf(&bird4, birdPeerCfg, "controller", c.cluster.Controller().IPv4())
-	fmt.Fprintf(&bird6, birdPeerCfg, "controller", c.cluster.Controller().IPv6())
-
-	for i, vm := range c.cluster.Nodes() {
-		fmt.Fprintf(&bird4, birdPeerCfg, "node"+strconv.Itoa(i), vm.IPv4())
-		fmt.Fprintf(&bird6, birdPeerCfg, "node"+strconv.Itoa(i), vm.IPv6())
-	}
-
-	if err := c.client.WriteFile("/etc/bird/bird.conf", bird4.Bytes()); err != nil {
-		return err
-	}
-	if err := c.client.WriteFile("/etc/bird/bird6.conf", bird6.Bytes()); err != nil {
-		return err
-	}
-
-	err := c.client.RunMultiple(
-		"systemctl restart bird",
-		"systemctl restart bird6",
-	)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (c *cluster) setupMetalLB() error {
-	cmd := exec.CommandContext(
-		c.universe.Context(),
-		"make", "push-images",
-		"REGISTRY=localhost:"+strconv.Itoa(c.cluster.Registry()),
-		"TAG=e2e",
-		"ARCH=amd64",
-	)
-	cmd.Stdout = os.Stdout
-	if err := cmd.Run(); err != nil {
-		return err
-	}
-
-	return nil
-}

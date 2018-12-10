@@ -15,13 +15,13 @@ require (
 	github.com/golang/protobuf v1.2.0
 	github.com/google/go-cmp v0.2.0
 	github.com/hashicorp/golang-lru v0.5.0 // indirect
+	github.com/kr/pty v1.1.3 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.1 // indirect
 	github.com/mdlayher/arp v0.0.0-20181025151936-a1263dc4682b
 	github.com/mdlayher/ethernet v0.0.0-20181025151932-d5c0834fe478
 	github.com/mdlayher/ndp v0.0.0-20181019193940-073dd11f06e5
 	github.com/mdlayher/raw v0.0.0-20181016155347-fa5ef3332ca9 // indirect
 	github.com/mikioh/ipaddr v0.0.0-20180707143206-d9961065b564
-	github.com/mitchellh/mapstructure v1.1.2 // indirect
 	github.com/onsi/ginkgo v1.7.0 // indirect
 	github.com/onsi/gomega v1.4.3 // indirect
 	github.com/osrg/gobgp v0.0.0-20181128164521-7ebcb44a51ff
@@ -31,17 +31,20 @@ require (
 	github.com/prometheus/procfs v0.0.0-20181129180645-aa55a523dc0a // indirect
 	github.com/satori/go.uuid v0.0.0-20180103174451-36e9d2ebbde5 // indirect
 	github.com/sirupsen/logrus v1.2.0 // indirect
-	github.com/spf13/cast v1.3.0 // indirect
-	github.com/spf13/viper v1.2.1 // indirect
+	github.com/ugorji/go/codec v0.0.0-20181209151446-772ced7fd4c2 // indirect
 	github.com/vishvananda/netlink v1.0.0 // indirect
 	github.com/vishvananda/netns v0.0.0-20180720170159-13995c7128cc // indirect
-	go.universe.tf/virtuakube v0.0.0-20181201103743-012efa585b01
-	golang.org/x/sys v0.0.0-20181128092732-4ed8d59d0b35
+	go.universe.tf/virtuakube v0.0.0-20181210071814-cdd6a2b6fa3c
+	golang.org/x/net v0.0.0-20181207154023-610586996380 // indirect
+	golang.org/x/oauth2 v0.0.0-20181203162652-d668ce993890 // indirect
+	golang.org/x/sys v0.0.0-20181210030007-2a47403f2ae5
 	google.golang.org/genproto v0.0.0-20181127195345-31ac5d88444a // indirect
 	gopkg.in/tomb.v2 v2.0.0-20161208151619-d5d1b5820637 // indirect
 	gopkg.in/yaml.v2 v2.2.2
 	k8s.io/api v0.0.0-20181130031204-d04500c8c3dd
-	k8s.io/apimachinery v0.0.0-20181130031032-af2f90f9922d
-	k8s.io/client-go v9.0.0+incompatible
+	k8s.io/apimachinery v0.0.0-20181207080347-f1a02064268b
+	k8s.io/client-go v10.0.0+incompatible
 	k8s.io/kube-openapi v0.0.0-20181114233023-0317810137be // indirect
 )
+
+replace go.universe.tf/virtuakube => ../virtuakube
