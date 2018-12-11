@@ -23,6 +23,10 @@ to announce service IPs. Jump to:
 Layer 2 mode is the simplest to configure: in many cases, you don't
 need any protocol-specific configuration, only IP addresses.
 
+Layer 2 mode does not require the IPs to be bound to the network interfaces
+of your worker nodes. It works by _flooding_ your local network with ARP
+requests and hereby announcing the location (mac-address) of an IP.
+
 For example, the following configuration gives MetalLB control over
 IPs from `192.168.1.240` to `192.168.1.250`, and configures Layer 2
 mode:
@@ -40,6 +44,68 @@ data:
       protocol: layer2
       addresses:
       - 192.168.1.240-192.168.1.250
+```
+
+### Troubleshooting
+
+Once you setup a loadbalancer on Kubernetes and it doesn't _seem_ to work right away, here are a few tips to troubleshoot.
+
+SSH into one or more of your nodes and use `arping` and `tcpdump` to verify the ARP requests pass through your network.
+Below assumes you setup a loadbalancer with an IP of `192.167.1.240` and then we show usage of the commands and successful
+requests going back and forth.
+
+TL;DR - We found out that the IP `192.168.1.240` is located at the mac `FA:16:3E:5A:39:4C`.
+
+If these requests fail, your network stack does not allow ARP to pass, therefor - we won't know about MetalLB's
+assignment of the IP and can't connect.
+
+#### arping
+
+In this example, `arping` is used to trigger a request and it should receive a response.
+
+The output should look similar to the following:
+
+```
+$ arping -I ens3 192.168.1.240
+ARPING 192.168.1.240 from 192.168.1.35 ens3
+Unicast reply from 192.168.1.240 [FA:16:3E:5A:39:4C]  1.077ms
+Unicast reply from 192.168.1.240 [FA:16:3E:5A:39:4C]  1.321ms
+Unicast reply from 192.168.1.240 [FA:16:3E:5A:39:4C]  0.883ms
+Unicast reply from 192.168.1.240 [FA:16:3E:5A:39:4C]  0.968ms
+^CSent 4 probes (1 broadcast(s))
+Received 4 response(s)
+```
+
+`192.168.1.35` is the IP of one of the worker nodes and part of the same subnet.
+
+
+#### tcpdump
+
+`tcpdump` can be used on the same worker node or another one in order to verify arp requests go back and forth.
+
+Capture all replies from `192.168.1.240`:
+
+```
+$ tcpdump -n -i ens3 arp src host 192.168.1.240
+tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+listening on ens3, link-type EN10MB (Ethernet), capture size 262144 bytes
+17:04:40.667263 ARP, Reply 192.168.1.240 is-at fa:16:3e:5a:39:4c, length 46
+17:04:41.667485 ARP, Reply 192.168.1.240 is-at fa:16:3e:5a:39:4c, length 46
+17:04:42.667572 ARP, Reply 192.168.1.240 is-at fa:16:3e:5a:39:4c, length 46
+17:04:43.667545 ARP, Reply 192.168.1.240 is-at fa:16:3e:5a:39:4c, length 46
+^C
+4 packets captured
+6 packets received by filter
+0 packets dropped by kernel
+```
+
+#### speaker logs
+
+In addition to the above, make sure to watch the logs of MetalLB's speaker component for ARP requests and responses:
+
+```
+$ kubetail -l component=speaker -n metallb-system
+...
 ```
 
 ## BGP configuration
