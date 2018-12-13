@@ -9,6 +9,9 @@ import (
 	"os/signal"
 	"strconv"
 
+	kerr "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	vk "go.universe.tf/virtuakube"
 )
 
@@ -97,7 +100,7 @@ func buildUniverse() error {
 
 	clusterCfg := &vk.ClusterConfig{
 		Name:         "cluster",
-		NumNodes:     0,
+		NumNodes:     2,
 		VMConfig:     vmCfg,
 		NetworkAddon: "calico",
 	}
@@ -164,7 +167,26 @@ func buildUniverse() error {
 		return fmt.Errorf("starting mirror server daemonset: %v", err)
 	}
 
-	if err := cluster.WaitForAllRunning(context.Background()); err != nil {
+	err = cluster.WaitFor(context.Background(), func() (bool, error) {
+		ds, err := cluster.KubernetesClient().AppsV1().DaemonSets("default").Get("mirror", metav1.GetOptions{})
+		if err != nil {
+			if kerr.IsNotFound(err) {
+				return false, nil
+			}
+			return false, err
+		}
+
+		if int(ds.Status.DesiredNumberScheduled) != clusterCfg.NumNodes+1 {
+			return false, err
+		}
+
+		if ds.Status.NumberAvailable != ds.Status.DesiredNumberScheduled {
+			return false, err
+		}
+
+		return true, nil
+	})
+	if err != nil {
 		return fmt.Errorf("waiting for mirror server to start: %v", err)
 	}
 
