@@ -18,26 +18,28 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"github.com/go-kit/kit/log"
-	cniconfig "github.com/ligato/cn-infra/config"
-	"github.com/ligato/cn-infra/db/keyval"
-	"github.com/ligato/cn-infra/db/keyval/etcd"
-	"github.com/ligato/cn-infra/db/keyval/kvproto"
-	cnilogging "github.com/ligato/cn-infra/logging"
-	"github.com/ligato/vpp-agent/plugins/rest/resturl"
-	ifvppcalls "github.com/ligato/vpp-agent/plugins/vpp/ifplugin/vppcalls"
-	l3vppcalls "github.com/ligato/vpp-agent/plugins/vpp/l3plugin/vppcalls"
-	"github.com/ligato/vpp-agent/plugins/vpp/model/l3"
-	"strings"
-	"sync"
-
-	"go.universe.tf/metallb/internal/config"
 	"io/ioutil"
 	"k8s.io/api/core/v1"
 	"net"
 	"net/http"
 	"os"
+	"strings"
+	"sync"
 	"time"
+
+	"github.com/go-kit/kit/log"
+	"go.universe.tf/metallb/internal/config"
+
+	cniconfig "github.com/ligato/cn-infra/config"
+	"github.com/ligato/cn-infra/datasync"
+	"github.com/ligato/cn-infra/db/keyval"
+	"github.com/ligato/cn-infra/db/keyval/etcd"
+	"github.com/ligato/cn-infra/db/keyval/kvproto"
+	cnilogging "github.com/ligato/cn-infra/logging"
+
+	"github.com/ligato/vpp-agent/plugins/restv2/resturl"
+	ifvppcalls "github.com/ligato/vpp-agent/plugins/vppv2/ifplugin/vppcalls"
+	"github.com/ligato/vpp-agent/plugins/vppv2/model/l3"
 )
 
 var (
@@ -46,10 +48,12 @@ var (
 )
 
 const (
+	proxyArpTTL            = 2 * time.Minute + 30 * time.Second
+	proxyArpUpdateInterval = 1 * time.Minute
+
 	defaultConfigFile = "./etcdv3.conf"
 	defaultAgentPort  = "9999"
 	agentPrefix       = "/vnf-agent/"
-	mlbPrefix         = "mlb"
 )
 
 func init() {
@@ -69,7 +73,6 @@ type vppL2Controller struct {
 	sync.RWMutex
 	ips      map[string]net.IP // svcName -> IP
 	ipRefcnt map[string]int    // ip.String() -> number of uses
-	inSync   bool
 }
 
 func NewVppL2Controller(l log.Logger, myNode string) *vppL2Controller {
@@ -79,13 +82,14 @@ func NewVppL2Controller(l log.Logger, myNode string) *vppL2Controller {
 		ipAddr:   "",
 		ips:      make(map[string]net.IP, 0),
 		ipRefcnt: make(map[string]int, 0),
-		inSync:   true,
 	}
 
 	if ctl.bytesConn, ctl.broker, err = ctl.createEtcdClient(etcdConfig); err != nil {
 		l.Log("op", "startup", "error", "etcd client init failed", "msg", err)
 		os.Exit(1)
 	}
+
+	go ctl.periodicLeaseRenewal(l)
 	return ctl
 }
 
@@ -122,14 +126,8 @@ func (c *vppL2Controller) SetBalancer(l log.Logger, name string, lbIP net.IP, po
 
 	c.ips[name] = lbIP
 
-	if err := c.putProxyArpRange(name, lbIP.String()); err != nil {
-		c.inSync = false
+	if err := c.updateProxyArp(); err != nil {
 		return fmt.Errorf("failed to set proxyarp range %s, error '%s'", name, err)
-	}
-
-	if err := c.putProxyArpInterfaces(name); err != nil {
-		c.inSync = false
-		return fmt.Errorf("failed to set proxyarp interfaces for range %s, error '%s'", name, err)
 	}
 
 	return nil
@@ -157,24 +155,8 @@ func (c *vppL2Controller) DeleteBalancer(l log.Logger, name, reason string) erro
 
 	delete(c.ipRefcnt, ip.String())
 
-	rngKey := c.getRngKeyForName(name)
-	existed, err := c.broker.Delete(rngKey)
-	if err != nil {
+	if err := c.updateProxyArp(); err != nil {
 		l.Log("error", fmt.Sprintf("failed to delete proxyArp range for %s, error %s", name, err))
-		c.inSync = false
-	}
-	if existed {
-		l.Log("msg", fmt.Sprintf("proxyArp range not found for name %s", name))
-	}
-
-	ifcKey := c.getIfcKeyForName(name)
-	existed, err = c.broker.Delete(ifcKey)
-	if err != nil {
-		l.Log("error", fmt.Sprintf("failed to delete proxyArp interface for %s, error %s", name, err))
-		c.inSync = false
-	}
-	if existed {
-		l.Log("msg", fmt.Sprintf("proxyArp interface not found for name %s", name))
 	}
 
 	return nil
@@ -253,59 +235,46 @@ func (c *vppL2Controller) getEthernetInterfaces() error {
 	return nil
 }
 
-// putProxyArpRange stores the VPP proxy ARP range configuration to ETCD
-func (c *vppL2Controller) putProxyArpRange(name string, ip string) error {
-	rl := &l3.ProxyArpRanges_RangeList{
-		Label: name,
-		Ranges: []*l3.ProxyArpRanges_RangeList_Range{
-			{
-				FirstIp: ip,
-				LastIp:  ip,
-			},
-		},
+// updateProxyArp updates the VPP proxy ARP configuration stored in ETCD.
+func (c *vppL2Controller) updateProxyArp() error {
+	if len(c.ips) == 0 {
+		_, err := c.broker.Delete(c.getProxyArpKey())
+		return err
 	}
 
-	key := c.getRngKeyForName(rl.Label)
-	return c.broker.Put(key, rl)
-}
-
-func (c *vppL2Controller) putProxyArpInterfaces(name string) error {
-	ifList := make([]*l3.ProxyArpInterfaces_InterfaceList_Interface, 0)
+	var ifList []*l3.ProxyARP_Interface
 	for _, ifc := range c.ethIfcs {
-		paIfc := &l3.ProxyArpInterfaces_InterfaceList_Interface{Name: ifc}
-		ifList = append(ifList, paIfc)
+		ifList = append(ifList, &l3.ProxyARP_Interface{Name: ifc})
 	}
-
-	ifl := &l3.ProxyArpInterfaces_InterfaceList{
-		Label:      name,
+	var rangeList []*l3.ProxyARP_Range
+	for _, ip := range c.ips {
+		rangeList = append(rangeList, &l3.ProxyARP_Range{
+			FirstIpAddr: ip.String(),
+			LastIpAddr:  ip.String(),
+		})
+	}
+	rl := &l3.ProxyARP{
 		Interfaces: ifList,
+		Ranges:     rangeList,
 	}
 
-	key := c.getIfcKeyForName(name)
-	return c.broker.Put(key, ifl)
+	return c.broker.Put(c.getProxyArpKey(), rl, datasync.WithTTL(proxyArpTTL))
 }
 
-func (c *vppL2Controller) etcdMarkAndSweep(l log.Logger) {
-	c.Lock()
-	defer c.Unlock()
-
-	c.inSync = true
-
-	c.resyncProxyArpRanges(l)
-	c.resyncProxyArpInterfaces(l)
-
-	paRngs := make([]*l3vppcalls.ProxyArpRangesDetails, 0)
-	if err := c.httpRead(resturl.PArpRngs, &paRngs); err != nil {
-		l.Log("failed to  get proxyarp range data, err", err)
-		return
+// periodicLeaseRenewal resets TTL timer for the proxy ARP configuration.
+// Until the proper lease renewal is supported by cn-infra, we simply re-Put
+// the latest configuration.
+func (c *vppL2Controller) periodicLeaseRenewal(l log.Logger) {
+	for {
+		select {
+		case <-time.After(proxyArpUpdateInterval):
+			c.Lock()
+			if err := c.updateProxyArp(); err != nil {
+				l.Log("error", fmt.Sprintf("failed to update proxyArp configuration, error %s", err))
+			}
+			c.Unlock()
+		}
 	}
-
-	paIfcs := make([]*l3vppcalls.ProxyArpInterfaceDetails, 0)
-	if err := c.httpRead(resturl.PArpRngs, &paIfcs); err != nil {
-		l.Log("failed to  get proxyarp interface data, err", err)
-		return
-	}
-
 }
 
 func (c *vppL2Controller) httpRead(id string, data interface{}) error {
@@ -340,97 +309,6 @@ func (c *vppL2Controller) httpRead(id string, data interface{}) error {
 	return nil
 }
 
-func (c *vppL2Controller) resyncProxyArpRanges(l log.Logger) {
-	rngKey := fmt.Sprintf("%s/%s", c.myNode, l3.ProxyARPRangeKey)
-	rngIter, err := c.broker.ListValues(rngKey)
-	if err != nil {
-		l.Log("failed to get etcd data", l3.ProxyARPRangeKey)
-		return
-	}
-
-	rngVals := make(map[string]*l3.ProxyArpRanges_RangeList)
-	for {
-		kv, stop := rngIter.GetNext()
-		if stop {
-			break
-		}
-
-		rl := &l3.ProxyArpRanges_RangeList{}
-		kv.GetValue(rl)
-		rngVals[kv.GetKey()] = rl
-	}
-
-	for name, ip := range c.ips {
-		rngKey := c.getRngKeyForName(name)
-		if rng, ok := rngVals[rngKey]; ok {
-			delete(rngVals, rngKey)
-
-			if (len(rng.Ranges) == 1) &&
-				(ip.String() == rng.Ranges[0].FirstIp) &&
-				(ip.String() == rng.Ranges[0].LastIp) {
-				continue
-			}
-		}
-
-		// Try to fix
-		if err := c.putProxyArpRange(name, ip.String()); err != nil {
-			l.Log("re-sync putProxyArpRange failed", err, "name", name, "ip", ip.String())
-			c.inSync = false
-		}
-	}
-	// delete leftover rngVals from etcd
-	for rngKey := range rngVals {
-		if _, err := c.broker.Delete(rngKey); err != nil {
-			l.Log("re-sync delete %s failed", err, "key", rngKey)
-			c.inSync = false
-		}
-	}
-}
-
-func (c *vppL2Controller) resyncProxyArpInterfaces(l log.Logger) {
-	ifcKey := fmt.Sprintf("%s/%s", c.myNode, l3.ProxyARPInterfaceKey)
-	ifcIter, err := c.broker.ListValues(ifcKey)
-	if err != nil {
-		l.Log("failed to get etcd data", l3.ProxyARPInterfaceKey)
-		return
-	}
-
-	ifcVals := make(map[string]*l3.ProxyArpInterfaces_InterfaceList)
-	for {
-		kv, stop := ifcIter.GetNext()
-		if stop {
-			break
-		}
-
-		ifl := &l3.ProxyArpInterfaces_InterfaceList{}
-		kv.GetValue(ifl)
-		ifcVals[kv.GetKey()] = ifl
-	}
-
-	for name := range c.ips {
-		rngKey := c.getIfcKeyForName(name)
-		if _, ok := ifcVals[rngKey]; ok {
-			delete(ifcVals, rngKey)
-
-			// validate interfaces
-		}
-		// Try to fix
-	}
-	// delete leftover ifcVals from etcd
-	for rngKey := range ifcVals {
-		if _, err := c.broker.Delete(rngKey); err != nil {
-			l.Log("re-sync delete %s failed", err, "key", rngKey)
-			c.inSync = false
-		}
-	}
-}
-
-func (c *vppL2Controller) getRngKeyForName(name string) string {
-	return fmt.Sprintf("%s/%s", c.myNode,
-		l3.ProxyArpRangeKey(fmt.Sprintf("%s-%s", mlbPrefix, name)))
-}
-
-func (c *vppL2Controller) getIfcKeyForName(name string) string {
-	return fmt.Sprintf("%s/%s", c.myNode,
-		l3.ProxyArpInterfaceKey(fmt.Sprintf("%s-%s", mlbPrefix, name)))
+func (c *vppL2Controller) getProxyArpKey() string {
+	return fmt.Sprintf("%s/%s", c.myNode, l3.ProxyARPKey)
 }
