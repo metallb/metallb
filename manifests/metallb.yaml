@@ -137,6 +137,9 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: "7472"
     spec:
+      tolerations:
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
       serviceAccountName: speaker
       terminationGracePeriodSeconds: 0
       hostNetwork: true
