@@ -59,8 +59,8 @@ manifest:
 	sed -i '/release: /d' $(MANIFESTFILE)
 	sed -i '/chart: /d' $(MANIFESTFILE)
 	sed -i '/^# /d' $(MANIFESTFILE)
-	sed -i 's/RELEASE-NAME-metallb-//g' $(MANIFESTFILE)
-	sed -i 's/RELEASE-NAME-metallb:/metallb-system:/g' $(MANIFESTFILE)
+	sed -i 's/release-name-metallb-//g' $(MANIFESTFILE)
+	sed -i 's/release-name-metallb:/metallb-system:/g' $(MANIFESTFILE)
 	perl -p0i -e 's/metadata:\n  name: (?!metallb-system)/metadata:\n  namespace: metallb-system\n  name: /gs' $(MANIFESTFILE)
 
 .PHONY: build
