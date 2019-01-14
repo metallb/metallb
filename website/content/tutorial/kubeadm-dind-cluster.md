@@ -30,9 +30,9 @@ Here is the outline of what we're going to do:
 systems, because the test BGP router container image doesn't work on other
 platforms yet.  {{% /notice %}}
 
-## Set up a kubeadm-dind-cluste cluster
+## Set up a Kubernetes cluster using kubeadm-dind-cluster
 
-If you don't already have a kubeadm-dind-cluste cluster set up, follow the
+If you don't already have a kubeadm-dind-cluster set up, follow the
 [instructions](https://github.com/kubernetes-sigs/kubeadm-dind-cluster/blob/master/README.md)
 on Github to install a Kubernetes multi-node cluster and get your playground
 cluster running. 
