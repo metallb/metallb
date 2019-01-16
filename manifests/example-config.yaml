@@ -20,7 +20,7 @@ data:
       peer-port: 179
       # (optional) The proposed value of the BGP Hold Time timer. Refer to
       # BGP reference material to understand what setting this implies.
-      hold-time: 120
+      hold-time: 120s
       # (optional) The router ID to use when connecting to this peer. Defaults
       # to the node IP address. Generally only useful when you need to peer with
       # another BGP router running on the same machine as MetalLB.
