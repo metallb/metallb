@@ -56,9 +56,9 @@ spec:
           readOnlyRootFilesystem: true
           capabilities:
             drop:
-            - all
+            - ALL
             add:
-            - net_raw
+            - NET_RAW
       nodeSelector:
         "beta.kubernetes.io/os": linux
         {{- with .Values.speaker.nodeSelector }}
