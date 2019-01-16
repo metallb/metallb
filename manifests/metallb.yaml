@@ -5,6 +5,33 @@ metadata:
   labels:
     app: metallb
 ---
+apiVersion: extensions/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  namespace: metallb-system
+  name: speaker
+  labels:
+    app: metallb
+spec:
+  hostNetwork: true
+  hostPorts:
+  - min: 7472
+    max: 7472
+  privileged: true
+  allowPrivilegeEscalation: false
+  allowedCapabilities:
+  - 'NET_RAW'
+  volumes:
+  - '*'
+  fsGroup:
+    rule: RunAsAny
+  runAsUser:
+    rule: RunAsAny
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+---
 
 apiVersion: v1
 kind: ServiceAccount
@@ -50,6 +77,10 @@ rules:
 - apiGroups: [""]
   resources: ["services", "endpoints", "nodes"]
   verbs: ["get", "list", "watch"]
+- apiGroups: ["extensions"]
+  resources: ["podsecuritypolicies"]
+  resourceNames: ["speaker"]
+  verbs: ["use"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -168,9 +199,9 @@ spec:
           readOnlyRootFilesystem: true
           capabilities:
             drop:
-            - all
+            - ALL
             add:
-            - net_raw
+            - NET_RAW
       nodeSelector:
         "beta.kubernetes.io/os": linux
 
