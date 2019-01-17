@@ -58,7 +58,9 @@ spec:
             drop:
             - ALL
             add:
+            - NET_ADMIN
             - NET_RAW
+            - SYS_ADMIN
       nodeSelector:
         "beta.kubernetes.io/os": linux
         {{- with .Values.speaker.nodeSelector }}

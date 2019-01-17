@@ -20,7 +20,9 @@ spec:
   privileged: true
   allowPrivilegeEscalation: false
   allowedCapabilities:
+  - 'NET_ADMIN'
   - 'NET_RAW'
+  - 'SYS_ADMIN'
   volumes:
   - '*'
   fsGroup:
@@ -201,7 +203,9 @@ spec:
             drop:
             - ALL
             add:
+            - NET_ADMIN
             - NET_RAW
+            - SYS_ADMIN
       nodeSelector:
         "beta.kubernetes.io/os": linux
 

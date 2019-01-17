@@ -17,7 +17,9 @@ spec:
   privileged: true
   allowPrivilegeEscalation: false
   allowedCapabilities:
+  - 'NET_ADMIN'
   - 'NET_RAW'
+  - 'SYS_ADMIN'
   volumes:
   - '*'
   fsGroup:
