@@ -45,8 +45,86 @@ jobs:
       - run: make ci-prepare
       - run: make gen-image-targets TAG=${CIRCLE_BRANCH:-${CIRCLE_TAG}} REGISTRY=metallb
       - run: make -f Makefile.image-targets test-bgp-router
+  e2e-dind-test-1.13:
+    working_directory: /go/src/go.universe.tf/metallb
+    docker:
+      - image: ubuntu:16.04
+    environment:
+      DOCKER_VERSION: "17.03.0-ce"
+      DIND_K8S_VERSION: v1.13
+      CNI_PLUGIN: bridge
+      DIND_CRI: docker
+    steps:
+      - checkout
+      - setup_remote_docker:
+          docker_layer_caching: true
+      - run:
+          name: Set up the environment
+          command: |
+            apt-get -qq update
+            apt-get install -y curl ca-certificates git liblz4-tool rsync socat tzdata wget
+            curl -sSL -o "/tmp/docker-${DOCKER_VERSION}.tgz" "https://get.docker.com/builds/Linux/x86_64/docker-${DOCKER_VERSION}.tgz"
+            tar -xz -C /tmp -f "/tmp/docker-${DOCKER_VERSION}.tgz"
+            mv /tmp/docker/* /usr/bin
+            # create a dummy container which will hold a volume with config
+            docker create -v /etc/quagga --name configs alpine:3.4 /bin/true
+            docker cp $PWD/e2etest/kdc-dind/quagga/. configs:/etc/quagga
+            wget https://raw.githubusercontent.com/kubernetes-sigs/kubeadm-dind-cluster/master/build/portforward.sh
+            chmod +x portforward.sh
+            ./portforward.sh start
+      - run:
+          name: Bring up the test scenario
+          command: | 
+            wget https://raw.githubusercontent.com/kubernetes-sigs/kubeadm-dind-cluster/master/fixed/dind-cluster-v1.13.sh
+            export DIND_PORT_FORWARDER_WAIT=1
+            export DIND_PORT_FORWARDER="${PWD}/portforward.sh"
+            chmod +x dind-cluster-v1.13.sh
+            ./dind-cluster-v1.13.sh up
+            docker run --privileged --rm -d --volumes-from configs --net kubeadm-dind-net --ip 10.192.0.201 --name extBGP1 ewindisch/quagga
+            docker run --privileged --rm -d --volumes-from configs --net kubeadm-dind-net --ip 10.192.0.202 --name extBGP2 ewindisch/quagga
+      - run:
+          name: Update PATH and Define Environment Variable at Runtime
+          command: |
+            echo 'export PATH=$HOME/.kubeadm-dind-cluster:$PATH' >> $BASH_ENV
+            source $BASH_ENV
+      - run:
+          name: Install and configure metallb
+          command: |
+            API_SERVER_PORT="$( "${PWD}/dind-cluster-v1.13.sh" apiserver-port )"
+            "${PWD}/portforward.sh" -wait $API_SERVER_PORT
+            kubectl "--server=:${API_SERVER_PORT}" apply -f $PWD/e2etest/kdc-dind/metallb/metallb.yaml
+            kubectl "--server=:${API_SERVER_PORT}" apply -f $PWD/e2etest/kdc-dind/metallb/config.yaml
+            kubectl "--server=:${API_SERVER_PORT}" get pods -n metallb-system -o wide
+            sleep 30
+            kubectl "--server=:${API_SERVER_PORT}" get pods -n metallb-system -o wide
+      - run:
+          name: Deploy a new service
+          command: |
+            API_SERVER_PORT="$( "${PWD}/dind-cluster-v1.13.sh" apiserver-port )"
+            "${PWD}/portforward.sh" -wait $API_SERVER_PORT
+            kubectl "--server=:${API_SERVER_PORT}" apply -f $PWD/e2etest/kdc-dind/metallb/k8s-svc.yaml
+            sleep 30
+            docker exec extBGP1 ip a
+            docker exec extBGP1 ip route
+            docker exec extBGP1 vtysh -c "show ip bgp summary"
+            docker exec extBGP1 vtysh -c "show ip bgp neigh"
+            docker exec extBGP2 ip a
+            docker exec extBGP2 ip route
+            docker exec extBGP2 vtysh -c "show ip bgp summary"
+            docker exec extBGP2 vtysh -c "show ip bgp neigh"
+      - run:
+          name: Shutdown and clean up the environment
+          command: |
+            docker stop extBGP1
+            docker stop extBGP2
+            ./dind-cluster-v1.13.sh down
+            ./dind-cluster-v1.13.sh clean
+
 workflows:
   version: 2
+  test-e2e-dind:
+    jobs:
+      - e2e-dind-test-1.13
   test-and-deploy:
     jobs:
       - test-1.11:
