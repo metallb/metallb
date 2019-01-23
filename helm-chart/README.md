@@ -111,7 +111,7 @@ config:
   address-pools:
   - name: default
     protocol: bgp
-    cidr:
+    addresses:
     - 198.51.100.0/24
 
 $ helm install --name metallb -f values.yaml stable/metallb
