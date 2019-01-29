@@ -9,6 +9,7 @@ jobs:
     steps:
       - checkout
       - run: make ci
+      - run: bash <(curl -s https://codecov.io/bash)
   deploy-controller:
     working_directory: /go/src/go.universe.tf/metallb
     docker:

@@ -190,12 +190,16 @@ ci-prepare:
 	$(GOCMD) get github.com/estesp/manifest-tool
 
 .PHONY: ci
-ci: ci-prepare build test lint
+ci: ci-prepare build test lint cover
 
 .PHONY: test
 test:
 	$(GOCMD) test $$(glide novendor)
 	$(GOCMD) test -race $$(glide novendor)
+
+.PHONY: cover
+cover:
+	./scripts/coverage.sh
 
 .PHONY: lint
 lint:
