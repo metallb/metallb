@@ -28,7 +28,7 @@ How you get IP address pools for MetalLB depends on your
 environment. If you're running a bare metal cluster in a colocation
 facility, your hosting provider probably offers IP addresses for
 lease. In that case, you would lease, say, a /26 of IP space (64
-addresses, and provide that range to MetalLB for cluster services.
+addresses), and provide that range to MetalLB for cluster services.
 
 Alternatively, your cluster might be purely private, providing
 services to a nearby LAN but not exposed to the internet. In that
