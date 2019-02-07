@@ -1,6 +1,6 @@
 ---
 title: Community & Contributing
-weight: 6
+weight: 7
 ---
 
 We would love to hear from you! Here are some places you can find us.

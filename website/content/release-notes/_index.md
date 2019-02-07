@@ -1,6 +1,6 @@
 ---
 title: Release Notes
-weight: 7
+weight: 8
 ---
 
 ## Version 0.7.3
