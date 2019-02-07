@@ -1,5 +1,5 @@
 <!--  Thanks for sending a pull request!  Here are some tips for you:
-1. If this is your first time, read our [contributing guide](https://metallb.universe.tf/hacking)
+1. If this is your first time, read our [contributing guide](https://metallb.universe.tf/community/#contributing)
 2. For non-trivial pull requests, please [file an issue]() first to
  discuss your proposed change and make sure it fits with MetalLB's
  overall goals.
