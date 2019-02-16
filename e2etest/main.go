@@ -3,33 +3,19 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/spf13/cobra"
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		usage()
-	}
-
-	var f func() error
-	switch os.Args[1] {
-	case "image":
-		f = buildImage
-	case "build":
-		f = buildUniverse
-	case "run":
-		f = runCluster
-	default:
-		f = usage
-	}
-
-	if err := f(); err != nil {
+	if err := rootCmd.Execute(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
 }
 
-func usage() error {
-	fmt.Println("need 1 argument, either 'build' or 'run'")
-	os.Exit(1)
-	panic("unreachable")
+// rootCmd represents the base command when called without any subcommands
+var rootCmd = &cobra.Command{
+	Use:   "e2etest",
+	Short: "end to end test helper binary",
 }
