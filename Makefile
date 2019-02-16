@@ -167,6 +167,22 @@ e2e-upload-vm-disk:
 	gsutil cp e2etest/vmimg/initrd.img gs://$(GCP_PROJECT)/e2etest/
 	gsutil cp e2etest/vmimg/debian.qcow2 gs://$(GCP_PROJECT)/e2etest/
 
+.PHONY: e2e-update-manifests
+e2e-update-manifests:
+# Calico
+	curl https://docs.projectcalico.org/v3.3/getting-started/kubernetes/installation/hosted/rbac-kdd.yaml >e2etest/manifests/calico.yaml
+	echo "---" >>e2etest/manifests/calico.yaml
+	curl https://docs.projectcalico.org/v3.3/getting-started/kubernetes/installation/hosted/kubernetes-datastore/calico-networking/1.7/calico.yaml >>e2etest/manifests/calico.yaml
+	perl -pi -e 's#192.168.0.0/16#10.32.0.0/12#g' e2etest/manifests/calico.yaml
+# Weave
+	curl -L 'https://cloud.weave.works/k8s/net?k8s-version=1.13' >e2etest/manifests/weave.yaml
+# Flannel
+	curl -L https://raw.githubusercontent.com/coreos/flannel/bc79dd1505b0c8681ece4de4c0d86c5cd2643275/Documentation/kube-flannel.yml >e2etest/manifests/flannel.yaml
+	perl -pi -e 's#10.244.0.0/16#10.32.0.0/12#g' e2etest/manifests/flannel.yaml
+# TODO: cilium, need to figure out the etcd operator nonsense
+# TODO: romana, it's currently broken on k8s 1.12
+
+
 ################################
 ## For CircleCI
 ##

@@ -1,0 +1,32 @@
+---
+apiVersion: apps/v1beta2
+kind: DaemonSet
+metadata:
+  namespace: default
+  name: mirror
+  labels:
+    app: mirror
+spec:
+  selector:
+    matchLabels:
+      app: mirror
+  template:
+    metadata:
+      labels:
+        app: mirror
+    spec:
+      containers:
+      - name: mirror
+        image: 127.0.0.1:30000/e2etest-mirror-server:e2e-amd64
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_UID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.uid
+        ports:
+        - name: http
+          containerPort: 8080
