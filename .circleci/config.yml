@@ -8,7 +8,15 @@ jobs:
       - image: circleci/golang:1.11
     steps:
       - checkout
-      - run: make ci
+      - run: curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash
+      - run: curl -L https://git.io/vp6lP | sh # gometalinter
+      - run: go test ./...
+      - run: go test -race ./...
+      - run: gometalinter --deadline=5m --disable-all --enable=gofmt --enable=vet --enable=vetshadow --enable=structcheck --enable=unconvert --vendor ./...
+      - run: cp manifests/metallb.yaml manifests/metallb.yaml.prev
+      - run: go run make.go -a helm
+      - run: diff -u manifests/metallb.yaml.prev manifests/metallb.yaml
+      - run: rm manifests/metallb.yaml.prev
   deploy-controller:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
@@ -18,9 +26,8 @@ jobs:
       - setup_remote_docker
       - run: echo $CIRCLE_BRANCH
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
-      - run: make ci-prepare
-      - run: make gen-image-targets TAG=${CIRCLE_BRANCH:-${CIRCLE_TAG}} REGISTRY=metallb
-      - run: make -f Makefile.image-targets controller
+      - run: go get github.com/estesp/manifest-tool
+      - run: go run make.go --action build,image,push --arch all --binary controller --tag ${CIRCLE_BRANCH:-${CIRCLE_TAG}} --registry metallb --multiarch
   deploy-speaker:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
@@ -30,9 +37,8 @@ jobs:
       - setup_remote_docker
       - run: echo $CIRCLE_BRANCH
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
-      - run: make ci-prepare
-      - run: make gen-image-targets TAG=${CIRCLE_BRANCH:-${CIRCLE_TAG}} REGISTRY=metallb
-      - run: make -f Makefile.image-targets speaker
+      - run: go get github.com/estesp/manifest-tool
+      - run: go run make.go --action build,image,push --arch all --binary speaker --tag ${CIRCLE_BRANCH:-${CIRCLE_TAG}} --registry metallb --multiarch
   deploy-test-bgp-router:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
@@ -42,9 +48,8 @@ jobs:
       - setup_remote_docker
       - run: echo $CIRCLE_BRANCH
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
-      - run: make ci-prepare
-      - run: make gen-image-targets TAG=${CIRCLE_BRANCH:-${CIRCLE_TAG}} REGISTRY=metallb
-      - run: make -f Makefile.image-targets test-bgp-router
+      - run: go get github.com/estesp/manifest-tool
+      - run: go run make.go --action build,image,push --arch all --binary test-bgp-router --tag ${CIRCLE_BRANCH:-${CIRCLE_TAG}} --registry metallb --multiarch
 workflows:
   version: 2
   test-and-deploy:
