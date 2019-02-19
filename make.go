@@ -215,8 +215,8 @@ func helm() {
 	lines := []string{}
 processLine:
 	for _, line := range strings.Split(template, "\n") {
-		line = strings.Replace(line, "RELEASE-NAME-metallb-", "", -1)
-		line = strings.Replace(line, "RELEASE-NAME-metallb:", "metallb-system:", -1)
+		line = strings.Replace(line, "release-name-metallb-", "", -1)
+		line = strings.Replace(line, "release-name-metallb:", "metallb-system:", -1)
 
 		clean := strings.TrimSpace(line)
 		for _, skip := range []string{"heritage:", "release:", "chart:", "# ", "  namespace:"} {
