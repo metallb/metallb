@@ -110,6 +110,7 @@ func build() {
 				"GOOS=linux",
 				"GOARCH="+cpu,
 				"GOARM=6",
+				"GO111MODULE=on",
 			)
 			if err := cmd.Run(); err != nil {
 				fatal("Build of %q (%s) failed: %s", bin, cpu, err)
