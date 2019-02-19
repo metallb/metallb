@@ -239,8 +239,8 @@ processLine:
 func circleci() {
 	tmpl := template.Must(template.ParseFiles(".circleci/config.yml.tmpl"))
 	v := map[string][]string{
-		"GoVersions": []string{"1.11"},
-		"Binary":     []string{"controller", "speaker", "test-bgp-router"},
+		"GoVersions": {"1.11"},
+		"Binary":     {"controller", "speaker", "test-bgp-router"},
 	}
 	var b bytes.Buffer
 	if err := tmpl.Execute(&b, v); err != nil {
