@@ -1,4 +1,4 @@
-// +build !race
+// +build disabled
 
 package bgp
 
