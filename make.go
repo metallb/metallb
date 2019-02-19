@@ -16,12 +16,13 @@ import (
 )
 
 var (
-	binary    = pflag.StringSliceP("binary", "b", []string{"controller", "speaker"}, "binaries to act upon")
-	action    = pflag.StringSliceP("action", "a", []string{"build"}, "actions to execute")
-	arch      = pflag.StringSlice("arch", []string{"amd64"}, "CPU architectures to act upon")
-	registry  = pflag.String("registry", "metallb", "docker registry to push to")
-	tag       = pflag.StringP("tag", "t", "", "tag to use when building docker images")
-	multiarch = pflag.Bool("multiarch", false, "push 'fat' multiarch images in addition to per-arch images")
+	binary      = pflag.StringSliceP("binary", "b", []string{"controller", "speaker"}, "binaries to act upon")
+	action      = pflag.StringSliceP("action", "a", []string{"build"}, "actions to execute")
+	arch        = pflag.StringSlice("arch", []string{"amd64"}, "CPU architectures to act upon")
+	registry    = pflag.String("registry", "metallb", "docker registry to push to")
+	oldregistry = pflag.String("oldregistry", "", "registry to retag images from when pushing")
+	tag         = pflag.StringP("tag", "t", "", "tag to use when building docker images")
+	multiarch   = pflag.Bool("multiarch", false, "push 'fat' multiarch images in addition to per-arch images")
 
 	validBinaries = map[string]bool{
 		"controller":            true,
@@ -169,6 +170,12 @@ func push() {
 	for _, bin := range *binary {
 		for _, cpu := range *arch {
 			dockerName := fmt.Sprintf("%s/%s:%s-%s", *registry, bin, *tag, cpu)
+
+			if *oldregistry != "" {
+				oldName := fmt.Sprintf("%s/%s:%s-%s", *oldregistry, bin, *tag, cpu)
+				run("docker", "tag", oldName, dockerName)
+			}
+
 			run("docker", "push", dockerName)
 		}
 
@@ -255,7 +262,15 @@ func e2eManifests() {
 
 	flannel := httpGet("https://raw.githubusercontent.com/coreos/flannel/bc79dd1505b0c8681ece4de4c0d86c5cd2643275/Documentation/kube-flannel.yml")
 	flannel = strings.Replace(flannel, "10.244.0.0/16", "10.32.0.0/12", -1)
-	writeFile("e2etest/manifests/flannel.yaml", flannel)
+	lines := []string{}
+	for _, line := range strings.Split(flannel, "\n") {
+		if strings.Contains(line, "--ip-masq") {
+			iface := strings.Replace(line, "ip-masq", "iface=enp0s5", -1)
+			lines = append(lines, iface)
+		}
+		lines = append(lines, line)
+	}
+	writeFile("e2etest/manifests/flannel.yaml", strings.Join(lines, "\n"))
 
 	// TODO: cilium, romana, canal, kube-router?
 }

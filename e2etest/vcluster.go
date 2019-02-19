@@ -8,6 +8,8 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
+	"testing"
 
 	"github.com/spf13/cobra"
 	kerr "k8s.io/apimachinery/pkg/api/errors"
@@ -16,7 +18,7 @@ import (
 	vk "go.universe.tf/virtuakube"
 )
 
-const cachedUniverse = `e2etest-cached-universe`
+const cachedUniverse = `../e2etest-cached-universe`
 
 var mkUniverseCmd = &cobra.Command{
 	Use:   "mkuniverse",
@@ -35,6 +37,55 @@ var mkUniverseSteps []string
 func init() {
 	rootCmd.AddCommand(mkUniverseCmd)
 	mkUniverseCmd.Flags().StringSliceVar(&mkUniverseSteps, "steps", []string{}, "steps to forcibly regenerate")
+}
+
+func testAll(t *testing.T, f func(t *testing.T, u *vk.Universe)) {
+	for _, base := range []string{"calico", "flannel", "weave"} {
+		t.Run(base, func(t *testing.T) {
+			cfg := &vk.UniverseConfig{
+				CommandLog: os.Stdout,
+			}
+
+			u, err := vk.Open(cachedUniverse, base, cfg)
+			if err != nil {
+				t.Fatalf("Opening universe at snapshot %q: %v", base, err)
+			}
+			defer u.Close()
+
+			c := u.Cluster("cluster")
+
+			err = c.PushImages(
+				"metallb/controller:e2e-amd64",
+				"metallb/speaker:e2e-amd64",
+				"metallb/e2etest-mirror-server:e2e-amd64",
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			bs, err := ioutil.ReadFile("../manifests/metallb.yaml")
+			if err != nil {
+				t.Fatalf("reading metallb manifest: %v", err)
+			}
+			manifest := string(bs)
+			manifest = strings.Replace(manifest, "metallb/speaker:master", "metallb/speaker:e2e-amd64", -1)
+			manifest = strings.Replace(manifest, "metallb/controller:master", "metallb/controller:e2e-amd64", -1)
+			manifest = strings.Replace(manifest, "PullPolicy: Always", "PullPolicy: IfNotPresent", -1)
+			if err := c.ApplyManifest([]byte(manifest)); err != nil {
+				t.Fatalf("applying metallb manifest: %v", err)
+			}
+
+			bs, err = ioutil.ReadFile("manifests/mirror-server.yaml")
+			if err != nil {
+				t.Fatalf("getting registry manifest bytes: %v", err)
+			}
+			if err := c.ApplyManifest(bs); err != nil {
+				t.Fatalf("deploying mirror server: %v", err)
+			}
+
+			f(t, u)
+		})
+	}
 }
 
 func mkUniverse() error {
@@ -59,7 +110,6 @@ func buildStep(basesnap string, do func(*vk.Universe) error, resultsnap string) 
 func buildStepInternal(basesnap string, do func(*vk.Universe) error, resultsnap string) error {
 	cfg := &vk.UniverseConfig{
 		CommandLog: os.Stdout,
-		VMGraphics: true,
 	}
 
 	fmt.Printf("Running build step %q\n", resultsnap)
@@ -147,9 +197,6 @@ func mkCluster(u *vk.Universe) error {
 			Image:     "image",
 			MemoryMiB: 1024,
 			Networks:  []string{"net1", "net2"},
-			PortForwards: map[int]bool{
-				30000: true, // docker registry
-			},
 		},
 	}
 	cluster, err := u.NewCluster(clusterCfg)
@@ -210,7 +257,7 @@ func mkClusterNet(addon string) func(*vk.Universe) error {
 	return func(u *vk.Universe) error {
 		c := u.Cluster("cluster")
 
-		bs, err := ioutil.ReadFile(fmt.Sprintf("e2etest/manifests/%s.yaml", addon))
+		bs, err := ioutil.ReadFile(fmt.Sprintf("manifests/%s.yaml", addon))
 		if err != nil {
 			return fmt.Errorf("getting network addon %q: %v", addon, err)
 		}
@@ -221,38 +268,6 @@ func mkClusterNet(addon string) func(*vk.Universe) error {
 
 		if err := c.WaitFor(context.Background(), c.NodesReady); err != nil {
 			return fmt.Errorf("waiting for nodes to become ready: %v", err)
-		}
-
-		// We only deploy the registry and the MetalLB backend after
-		// installing the network addon, because the pods don't
-		// schedule before that.
-		bs, err = ioutil.ReadFile("e2etest/manifests/registry.yaml")
-		if err != nil {
-			return fmt.Errorf("getting registry manifest bytes: %v", err)
-		}
-		if err := c.ApplyManifest(bs); err != nil {
-			return fmt.Errorf("deploying registry: %v", err)
-		}
-
-		// Build and push the mirror server to the cluster registry.
-		cmd := exec.Command(
-			"make", "push-images",
-			"REGISTRY=localhost:"+strconv.Itoa(c.Controller().ForwardedPort(30000)),
-			"TAG=e2e",
-			"ARCH=amd64",
-			"BINARIES=e2etest-mirror-server",
-		)
-		if err := cmd.Run(); err != nil {
-			return fmt.Errorf("pushing mirror server image: %v", err)
-		}
-
-		// Deploy the mirror server.
-		bs, err = ioutil.ReadFile("e2etest/manifests/mirror-server.yaml")
-		if err != nil {
-			return fmt.Errorf("getting registry manifest bytes: %v", err)
-		}
-		if err := c.ApplyManifest(bs); err != nil {
-			return fmt.Errorf("deploying mirror server: %v", err)
 		}
 
 		return nil

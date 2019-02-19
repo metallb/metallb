@@ -121,6 +121,7 @@ spec:
         command:
         - /opt/bin/flanneld
         args:
+        - --iface=enp0s5
         - --ip-masq
         - --kube-subnet-mgr
         resources:
@@ -199,6 +200,7 @@ spec:
         command:
         - /opt/bin/flanneld
         args:
+        - --iface=enp0s5
         - --ip-masq
         - --kube-subnet-mgr
         resources:
@@ -277,6 +279,7 @@ spec:
         command:
         - /opt/bin/flanneld
         args:
+        - --iface=enp0s5
         - --ip-masq
         - --kube-subnet-mgr
         resources:
@@ -355,6 +358,7 @@ spec:
         command:
         - /opt/bin/flanneld
         args:
+        - --iface=enp0s5
         - --ip-masq
         - --kube-subnet-mgr
         resources:
@@ -433,6 +437,7 @@ spec:
         command:
         - /opt/bin/flanneld
         args:
+        - --iface=enp0s5
         - --ip-masq
         - --kube-subnet-mgr
         resources:
