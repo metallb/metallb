@@ -10,7 +10,7 @@ items:
           {
             "original-request": {
               "url": "/k8s/v1.10/net.yaml?k8s-version=1.13",
-              "date": "Fri Feb 15 2019 06:15:44 GMT+0000 (UTC)"
+              "date": "Tue Feb 19 2019 00:31:29 GMT+0000 (UTC)"
             },
             "email-address": "support@weave.works"
           }
@@ -26,7 +26,7 @@ items:
           {
             "original-request": {
               "url": "/k8s/v1.10/net.yaml?k8s-version=1.13",
-              "date": "Fri Feb 15 2019 06:15:44 GMT+0000 (UTC)"
+              "date": "Tue Feb 19 2019 00:31:29 GMT+0000 (UTC)"
             },
             "email-address": "support@weave.works"
           }
@@ -67,7 +67,7 @@ items:
           {
             "original-request": {
               "url": "/k8s/v1.10/net.yaml?k8s-version=1.13",
-              "date": "Fri Feb 15 2019 06:15:44 GMT+0000 (UTC)"
+              "date": "Tue Feb 19 2019 00:31:29 GMT+0000 (UTC)"
             },
             "email-address": "support@weave.works"
           }
@@ -90,7 +90,7 @@ items:
           {
             "original-request": {
               "url": "/k8s/v1.10/net.yaml?k8s-version=1.13",
-              "date": "Fri Feb 15 2019 06:15:44 GMT+0000 (UTC)"
+              "date": "Tue Feb 19 2019 00:31:29 GMT+0000 (UTC)"
             },
             "email-address": "support@weave.works"
           }
@@ -122,7 +122,7 @@ items:
           {
             "original-request": {
               "url": "/k8s/v1.10/net.yaml?k8s-version=1.13",
-              "date": "Fri Feb 15 2019 06:15:44 GMT+0000 (UTC)"
+              "date": "Tue Feb 19 2019 00:31:29 GMT+0000 (UTC)"
             },
             "email-address": "support@weave.works"
           }
@@ -146,7 +146,7 @@ items:
           {
             "original-request": {
               "url": "/k8s/v1.10/net.yaml?k8s-version=1.13",
-              "date": "Fri Feb 15 2019 06:15:44 GMT+0000 (UTC)"
+              "date": "Tue Feb 19 2019 00:31:29 GMT+0000 (UTC)"
             },
             "email-address": "support@weave.works"
           }

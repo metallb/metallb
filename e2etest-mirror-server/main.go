@@ -9,7 +9,7 @@ import (
 
 func main() {
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "%s\n%s", os.Getenv("NODE_NAME"), os.Getenv("POD_UID"))
+		fmt.Fprintf(w, "%s\n%s\n%s\n", os.Getenv("NODE_NAME"), os.Getenv("POD_UID"), r.RemoteAddr)
 	})
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }

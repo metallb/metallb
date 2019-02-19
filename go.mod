@@ -32,10 +32,11 @@ require (
 	github.com/sirupsen/logrus v1.3.0 // indirect
 	github.com/spf13/afero v1.2.1 // indirect
 	github.com/spf13/cobra v0.0.3
+	github.com/spf13/pflag v1.0.3
 	github.com/stretchr/testify v1.3.0 // indirect
 	github.com/vishvananda/netlink v1.0.0 // indirect
 	github.com/vishvananda/netns v0.0.0-20180720170159-13995c7128cc // indirect
-	go.universe.tf/virtuakube v0.0.0-20190216102144-b0ba41c1c8b1
+	go.universe.tf/virtuakube v0.0.0-20190218014526-3c22c8f788da
 	golang.org/x/crypto v0.0.0-20190211182817-74369b46fc67 // indirect
 	golang.org/x/net v0.0.0-20190213061140-3a22650c66bd // indirect
 	golang.org/x/oauth2 v0.0.0-20190212230446-3e8b2be13635 // indirect
