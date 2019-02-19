@@ -25,9 +25,9 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
-      - run: echo "export GO111MODULE=on" >>$BASH_ENV
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
-      - run: go get github.com/estesp/manifest-tool
+      - run: go get github.com/estesp/manifest-tool # Can't fetch this with modules yet :(
+      - run: echo "export GO111MODULE=on" >>$BASH_ENV
       - run: go run make.go --action build,image,push --arch all --binary controller --tag ${CIRCLE_BRANCH:-${CIRCLE_TAG}} --registry metallb --multiarch
   deploy-speaker:
     working_directory: /go/src/go.universe.tf/metallb
@@ -36,9 +36,9 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
-      - run: echo "export GO111MODULE=on" >>$BASH_ENV
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
-      - run: go get github.com/estesp/manifest-tool
+      - run: go get github.com/estesp/manifest-tool # Can't fetch this with modules yet :(
+      - run: echo "export GO111MODULE=on" >>$BASH_ENV
       - run: go run make.go --action build,image,push --arch all --binary speaker --tag ${CIRCLE_BRANCH:-${CIRCLE_TAG}} --registry metallb --multiarch
   deploy-test-bgp-router:
     working_directory: /go/src/go.universe.tf/metallb
@@ -47,9 +47,9 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
-      - run: echo "export GO111MODULE=on" >>$BASH_ENV
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
-      - run: go get github.com/estesp/manifest-tool
+      - run: go get github.com/estesp/manifest-tool # Can't fetch this with modules yet :(
+      - run: echo "export GO111MODULE=on" >>$BASH_ENV
       - run: go run make.go --action build,image,push --arch all --binary test-bgp-router --tag ${CIRCLE_BRANCH:-${CIRCLE_TAG}} --registry metallb --multiarch
 workflows:
   version: 2
