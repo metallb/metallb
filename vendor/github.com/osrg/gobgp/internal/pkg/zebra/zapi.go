@@ -17,6 +17,7 @@ package zebra
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -33,6 +34,11 @@ const (
 	HEADER_MARKER     = 255
 	FRR_HEADER_MARKER = 254
 	INTERFACE_NAMSIZ  = 20
+)
+
+const (
+	MinZapiVer uint8 = 2
+	MaxZapiVer uint8 = 6
 )
 
 // Internal Interface Status.
@@ -104,7 +110,7 @@ const (
 
 const VRF_DEFAULT = 0
 const MAXPATH_NUM = 64
-const MPLS_MAX_LABLE = 16
+const MPLS_MAX_LABEL = 16
 
 func HeaderSize(version uint8) uint16 {
 	switch version {
@@ -825,7 +831,7 @@ func (t MESSAGE_FLAG) String(version uint8) string {
 		ss = append(ss, "SRCPFX")
 	}
 	if version >= 5 && t&FRR_ZAPI5_MESSAGE_LABEL > 0 {
-		ss = append(ss, "LABLE")
+		ss = append(ss, "LABEL")
 	}
 
 	return strings.Join(ss, "|")
@@ -970,10 +976,10 @@ func NewClient(network, address string, typ ROUTE_TYPE, version uint8) (*Client,
 	}
 	outgoing := make(chan *Message)
 	incoming := make(chan *Message, 64)
-	if version < 2 {
-		version = 2
-	} else if version > 6 {
-		version = 6
+	if version < MinZapiVer {
+		version = MinZapiVer
+	} else if version > MaxZapiVer {
+		version = MaxZapiVer
 	}
 
 	c := &Client{
@@ -1001,7 +1007,8 @@ func NewClient(network, address string, typ ROUTE_TYPE, version uint8) (*Client,
 					log.WithFields(log.Fields{
 						"Topic": "Zebra",
 					}).Errorf("failed to write: %s", err)
-					close(outgoing)
+					ChannelClose(outgoing)
+					return
 				}
 			} else {
 				log.Debug("finish outgoing loop")
@@ -1026,6 +1033,12 @@ func NewClient(network, address string, typ ROUTE_TYPE, version uint8) (*Client,
 
 		hd := &Header{}
 		err = hd.DecodeFromBytes(headerBuf)
+		if c.Version != hd.Version {
+			log.WithFields(log.Fields{
+				"Topic": "Zebra",
+			}).Warnf("ZAPI version mismatch. configured version: %d, version of received message:%d", c.Version, hd.Version)
+			return nil, errors.New("ZAPI version mismatch")
+		}
 		if err != nil {
 			log.WithFields(log.Fields{
 				"Topic": "Zebra",
@@ -1077,7 +1090,7 @@ func NewClient(network, address string, typ ROUTE_TYPE, version uint8) (*Client,
 
 	// Start receive loop only when the first message successfully received.
 	go func() {
-		defer close(incoming)
+		defer ChannelClose(incoming)
 		for {
 			if m, err := receiveSingleMsg(); err != nil {
 				return
@@ -1298,8 +1311,21 @@ func (c *Client) SendNexthopRegister(vrfId uint32, body *NexthopRegisterBody, is
 	return c.SendCommand(command, vrfId, body)
 }
 
+// for avoiding double close
+func ChannelClose(ch chan *Message) bool {
+	select {
+	case _, ok := <-ch:
+		if ok {
+			close(ch)
+			return true
+		}
+	default:
+	}
+	return false
+}
+
 func (c *Client) Close() error {
-	close(c.outgoing)
+	ChannelClose(c.outgoing)
 	return c.conn.Close()
 }
 
@@ -2205,8 +2231,8 @@ func decodeNexthopsFromBytes(nexthops *[]Nexthop, data []byte, family uint8, ver
 		if version >= 5 {
 			nexthop.LabelNum = data[offset]
 			offset += 1
-			if nexthop.LabelNum > MPLS_MAX_LABLE {
-				nexthop.LabelNum = MPLS_MAX_LABLE
+			if nexthop.LabelNum > MPLS_MAX_LABEL {
+				nexthop.LabelNum = MPLS_MAX_LABEL
 			}
 			var n uint8
 			for ; n < nexthop.LabelNum; n++ {

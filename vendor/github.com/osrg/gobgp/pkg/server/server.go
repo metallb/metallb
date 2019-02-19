@@ -1584,14 +1584,14 @@ func (s *BgpServer) EnableZebra(ctx context.Context, r *api.EnableZebraRequest) 
 
 func (s *BgpServer) AddBmp(ctx context.Context, r *api.AddBmpRequest) error {
 	return s.mgmtOperation(func() error {
-		_, ok := api.AddBmpRequest_MonitoringPolicy_name[int32(r.Type)]
+		_, ok := api.AddBmpRequest_MonitoringPolicy_name[int32(r.Policy)]
 		if !ok {
-			return fmt.Errorf("invalid bmp route monitoring policy: %v", r.Type)
+			return fmt.Errorf("invalid bmp route monitoring policy: %v", r.Policy)
 		}
 		return s.bmpManager.addServer(&config.BmpServerConfig{
-			Address: r.Address,
-			Port:    r.Port,
-			RouteMonitoringPolicy: config.IntToBmpRouteMonitoringPolicyTypeMap[int(r.Type)],
+			Address:               r.Address,
+			Port:                  r.Port,
+			RouteMonitoringPolicy: config.IntToBmpRouteMonitoringPolicyTypeMap[int(r.Policy)],
 			StatisticsTimeout:     uint16(r.StatisticsTimeout),
 		})
 	}, true)
@@ -1769,20 +1769,11 @@ func getMacMobilityExtendedCommunity(etag uint32, mac net.HardwareAddr, evpnPath
 }
 
 func (s *BgpServer) fixupApiPath(vrfId string, pathList []*table.Path) error {
-	pi := &table.PeerInfo{
-		AS:      s.bgpConfig.Global.Config.As,
-		LocalID: net.ParseIP(s.bgpConfig.Global.Config.RouterId).To4(),
-	}
-
 	for _, path := range pathList {
 		if !path.IsWithdraw {
 			if _, err := path.GetOrigin(); err != nil {
 				return err
 			}
-		}
-
-		if path.GetSource() == nil {
-			path.SetSource(pi)
 		}
 
 		if vrfId != "" {
@@ -1854,15 +1845,14 @@ func (s *BgpServer) addPathList(vrfId string, pathList []*table.Path) error {
 func (s *BgpServer) AddPath(ctx context.Context, r *api.AddPathRequest) (*api.AddPathResponse, error) {
 	var uuidBytes []byte
 	err := s.mgmtOperation(func() error {
-		pathList, err := api2PathList(r.Resource, []*api.Path{r.Path})
+		path, err := api2Path(r.TableType, r.Path, false)
 		if err != nil {
 			return err
 		}
-		err = s.addPathList(r.VrfId, pathList)
+		err = s.addPathList(r.VrfId, []*table.Path{path})
 		if err != nil {
 			return err
 		}
-		path := pathList[0]
 		id, _ := uuid.NewV4()
 		s.uuidMap[id] = pathTokey(path)
 		uuidBytes = id.Bytes()
@@ -1877,8 +1867,8 @@ func (s *BgpServer) DeletePath(ctx context.Context, r *api.DeletePathRequest) er
 
 		pathList, err := func() ([]*table.Path, error) {
 			if r.Path != nil {
-				r.Path.IsWithdraw = true
-				return api2PathList(r.Resource, []*api.Path{r.Path})
+				path, err := api2Path(r.TableType, r.Path, true)
+				return []*table.Path{path}, err
 			}
 			return []*table.Path{}, nil
 		}()
@@ -2340,18 +2330,18 @@ func (s *BgpServer) ListPath(ctx context.Context, r *api.ListPathRequest, fn fun
 		family = bgp.AfiSafiToRouteFamily(uint16(r.Family.Afi), uint8(r.Family.Safi))
 	}
 	var err error
-	switch r.Type {
-	case api.Resource_LOCAL, api.Resource_GLOBAL:
+	switch r.TableType {
+	case api.TableType_LOCAL, api.TableType_GLOBAL:
 		tbl, v, err = s.getRib(r.Name, family, f())
-	case api.Resource_ADJ_IN:
+	case api.TableType_ADJ_IN:
 		in = true
 		fallthrough
-	case api.Resource_ADJ_OUT:
+	case api.TableType_ADJ_OUT:
 		tbl, v, err = s.getAdjRib(r.Name, family, in, f())
-	case api.Resource_VRF:
+	case api.TableType_VRF:
 		tbl, err = s.getVrfRib(r.Name, family, []*table.LookupPrefix{})
 	default:
-		return fmt.Errorf("unsupported resource type: %v", r.Type)
+		return fmt.Errorf("unsupported resource type: %v", r.TableType)
 	}
 
 	if err != nil {
@@ -2369,8 +2359,8 @@ func (s *BgpServer) ListPath(ctx context.Context, r *api.ListPathRequest, fn fun
 				p := toPathApi(path, getValidation(v, idx))
 				idx++
 				if i == 0 && !table.SelectionOptions.DisableBestPathSelection {
-					switch r.Type {
-					case api.Resource_LOCAL, api.Resource_GLOBAL:
+					switch r.TableType {
+					case api.TableType_LOCAL, api.TableType_GLOBAL:
 						p.Best = true
 					}
 				}
@@ -2443,16 +2433,16 @@ func (s *BgpServer) GetTable(ctx context.Context, r *api.GetTableRequest) (*api.
 	var in bool
 	var err error
 	var info *table.TableInfo
-	switch r.Type {
-	case api.Resource_GLOBAL, api.Resource_LOCAL:
+	switch r.TableType {
+	case api.TableType_GLOBAL, api.TableType_LOCAL:
 		info, err = s.getRibInfo(r.Name, family)
-	case api.Resource_ADJ_IN:
+	case api.TableType_ADJ_IN:
 		in = true
 		fallthrough
-	case api.Resource_ADJ_OUT:
+	case api.TableType_ADJ_OUT:
 		info, err = s.getAdjRibInfo(r.Name, family, in)
 	default:
-		return nil, fmt.Errorf("unsupported resource type: %s", r.Type)
+		return nil, fmt.Errorf("unsupported resource type: %s", r.TableType)
 	}
 
 	if err != nil {
@@ -2484,25 +2474,6 @@ func (s *BgpServer) GetBgp(ctx context.Context, r *api.GetBgpRequest) (*api.GetB
 	return rsp, nil
 }
 
-func (s *BgpServer) getNeighbor(address string, getAdvertised bool) []*config.Neighbor {
-	var l []*config.Neighbor
-	s.mgmtOperation(func() error {
-		l = make([]*config.Neighbor, 0, len(s.neighborMap))
-		for k, peer := range s.neighborMap {
-			peer.fsm.lock.RLock()
-			neighborIface := peer.fsm.pConf.Config.NeighborInterface
-			peer.fsm.lock.RUnlock()
-			if address != "" && address != k && address != neighborIface {
-				continue
-			}
-			// FIXME: should remove toConfig() conversion
-			l = append(l, s.toConfig(peer, getAdvertised))
-		}
-		return nil
-	}, false)
-	return l
-}
-
 func (s *BgpServer) ListPeer(ctx context.Context, r *api.ListPeerRequest, fn func(*api.Peer)) error {
 	var l []*api.Peer
 	s.mgmtOperation(func() error {
@@ -2520,19 +2491,19 @@ func (s *BgpServer) ListPeer(ctx context.Context, r *api.ListPeerRequest, fn fun
 			p := config.NewPeerFromConfigStruct(s.toConfig(peer, getAdvertised))
 			for _, family := range peer.configuredRFlist() {
 				for i, afisafi := range p.AfiSafis {
-					if afisafi.Config.Enabled != true {
+					if !afisafi.Config.Enabled {
 						continue
 					}
 					afi, safi := bgp.RouteFamilyToAfiSafi(family)
 					c := afisafi.Config
 					if c.Family != nil && c.Family.Afi == api.Family_Afi(afi) && c.Family.Safi == api.Family_Safi(safi) {
 						flist := []bgp.RouteFamily{family}
-						received := uint32(peer.adjRibIn.Count(flist))
-						accepted := uint32(peer.adjRibIn.Accepted(flist))
-						advertised := uint32(0)
-						if getAdvertised == true {
+						received := uint64(peer.adjRibIn.Count(flist))
+						accepted := uint64(peer.adjRibIn.Accepted(flist))
+						advertised := uint64(0)
+						if getAdvertised {
 							pathList, _ := s.getBestFromLocal(peer, flist)
-							advertised = uint32(len(pathList))
+							advertised = uint64(len(pathList))
 						}
 						p.AfiSafis[i].State = &api.AfiSafiState{
 							Family:     c.Family,
@@ -3024,7 +2995,7 @@ func (s *BgpServer) ListDefinedSet(ctx context.Context, r *api.ListDefinedSetReq
 	var cd *config.DefinedSets
 	var err error
 	err = s.mgmtOperation(func() error {
-		cd, err = s.policy.GetDefinedSet(table.DefinedType(r.Type), r.Name)
+		cd, err = s.policy.GetDefinedSet(table.DefinedType(r.DefinedType), r.Name)
 		return err
 	}, false)
 
@@ -3043,8 +3014,8 @@ func (s *BgpServer) ListDefinedSet(ctx context.Context, r *api.ListDefinedSetReq
 
 	for _, cs := range cd.PrefixSets {
 		ad := &api.DefinedSet{
-			Type: api.DefinedType_PREFIX,
-			Name: cs.PrefixSetName,
+			DefinedType: api.DefinedType_PREFIX,
+			Name:        cs.PrefixSetName,
 			Prefixes: func() []*api.Prefix {
 				l := make([]*api.Prefix, 0, len(cs.PrefixList))
 				for _, p := range cs.PrefixList {
@@ -3063,9 +3034,9 @@ func (s *BgpServer) ListDefinedSet(ctx context.Context, r *api.ListDefinedSetReq
 	}
 	for _, cs := range cd.NeighborSets {
 		ad := &api.DefinedSet{
-			Type: api.DefinedType_NEIGHBOR,
-			Name: cs.NeighborSetName,
-			List: cs.NeighborInfoList,
+			DefinedType: api.DefinedType_NEIGHBOR,
+			Name:        cs.NeighborSetName,
+			List:        cs.NeighborInfoList,
 		}
 		if exec(ad) {
 			return nil
@@ -3073,9 +3044,9 @@ func (s *BgpServer) ListDefinedSet(ctx context.Context, r *api.ListDefinedSetReq
 	}
 	for _, cs := range cd.BgpDefinedSets.CommunitySets {
 		ad := &api.DefinedSet{
-			Type: api.DefinedType_COMMUNITY,
-			Name: cs.CommunitySetName,
-			List: cs.CommunityList,
+			DefinedType: api.DefinedType_COMMUNITY,
+			Name:        cs.CommunitySetName,
+			List:        cs.CommunityList,
 		}
 		if exec(ad) {
 			return nil
@@ -3083,9 +3054,9 @@ func (s *BgpServer) ListDefinedSet(ctx context.Context, r *api.ListDefinedSetReq
 	}
 	for _, cs := range cd.BgpDefinedSets.ExtCommunitySets {
 		ad := &api.DefinedSet{
-			Type: api.DefinedType_EXT_COMMUNITY,
-			Name: cs.ExtCommunitySetName,
-			List: cs.ExtCommunityList,
+			DefinedType: api.DefinedType_EXT_COMMUNITY,
+			Name:        cs.ExtCommunitySetName,
+			List:        cs.ExtCommunityList,
 		}
 		if exec(ad) {
 			return nil
@@ -3093,9 +3064,9 @@ func (s *BgpServer) ListDefinedSet(ctx context.Context, r *api.ListDefinedSetReq
 	}
 	for _, cs := range cd.BgpDefinedSets.LargeCommunitySets {
 		ad := &api.DefinedSet{
-			Type: api.DefinedType_LARGE_COMMUNITY,
-			Name: cs.LargeCommunitySetName,
-			List: cs.LargeCommunityList,
+			DefinedType: api.DefinedType_LARGE_COMMUNITY,
+			Name:        cs.LargeCommunitySetName,
+			List:        cs.LargeCommunityList,
 		}
 		if exec(ad) {
 			return nil
@@ -3103,9 +3074,9 @@ func (s *BgpServer) ListDefinedSet(ctx context.Context, r *api.ListDefinedSetReq
 	}
 	for _, cs := range cd.BgpDefinedSets.AsPathSets {
 		ad := &api.DefinedSet{
-			Type: api.DefinedType_AS_PATH,
-			Name: cs.AsPathSetName,
-			List: cs.AsPathList,
+			DefinedType: api.DefinedType_AS_PATH,
+			Name:        cs.AsPathSetName,
+			List:        cs.AsPathList,
 		}
 		if exec(ad) {
 			return nil
@@ -3496,16 +3467,16 @@ func (s *BgpServer) MonitorTable(ctx context.Context, r *api.MonitorTableRequest
 		return fmt.Errorf("nil request")
 	}
 	w, err := func() (*watcher, error) {
-		switch r.Type {
-		case api.Resource_GLOBAL:
+		switch r.TableType {
+		case api.TableType_GLOBAL:
 			return s.watch(watchBestPath(r.Current)), nil
-		case api.Resource_ADJ_IN:
+		case api.TableType_ADJ_IN:
 			if r.PostPolicy {
 				return s.watch(watchPostUpdate(r.Current)), nil
 			}
 			return s.watch(watchUpdate(r.Current)), nil
 		default:
-			return nil, fmt.Errorf("unsupported resource type: %v", r.Type)
+			return nil, fmt.Errorf("unsupported resource type: %v", r.TableType)
 		}
 	}()
 	if err != nil {

@@ -16,11 +16,13 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strconv"
 	"time"
 
+	api "github.com/osrg/gobgp/api"
 	"github.com/osrg/gobgp/internal/pkg/config"
 	"github.com/osrg/gobgp/internal/pkg/table"
 	"github.com/osrg/gobgp/pkg/packet/bgp"
@@ -225,14 +227,15 @@ func (b *bmpClient) loop() {
 						}
 					}
 				case <-tickerCh:
-					neighborList := b.s.getNeighbor("", true)
-					for _, n := range neighborList {
-						if n.State.SessionState != config.SESSION_STATE_ESTABLISHED {
-							continue
-						}
-						if err := write(bmpPeerStats(bmp.BMP_PEER_TYPE_GLOBAL, 0, time.Now().Unix(), n)); err != nil {
-							return false
-						}
+					var err error
+					b.s.ListPeer(context.Background(), &api.ListPeerRequest{EnableAdvertised: true},
+						func(peer *api.Peer) {
+							if err == nil && peer.State.SessionState == api.PeerState_ESTABLISHED {
+								err = write(bmpPeerStats(bmp.BMP_PEER_TYPE_GLOBAL, 0, time.Now().Unix(), peer))
+							}
+						})
+					if err != nil {
+						return false
 					}
 				case <-b.dead:
 					term := bmp.NewBMPTermination([]bmp.BMPTermTLVInterface{
@@ -292,16 +295,22 @@ func bmpPeerRoute(t uint8, policy bool, pd uint64, fourBytesAs bool, peeri *tabl
 	return m
 }
 
-func bmpPeerStats(peerType uint8, peerDist uint64, timestamp int64, neighConf *config.Neighbor) *bmp.BMPMessage {
+func bmpPeerStats(peerType uint8, peerDist uint64, timestamp int64, peer *api.Peer) *bmp.BMPMessage {
 	var peerFlags uint8 = 0
-	ph := bmp.NewBMPPeerHeader(peerType, peerFlags, peerDist, neighConf.State.NeighborAddress, neighConf.State.PeerAs, neighConf.State.RemoteRouterId, float64(timestamp))
+	ph := bmp.NewBMPPeerHeader(peerType, peerFlags, peerDist, peer.State.NeighborAddress, peer.State.PeerAs, peer.State.RouterId, float64(timestamp))
+	received := uint64(0)
+	accepted := uint64(0)
+	for _, a := range peer.AfiSafis {
+		received += a.State.Received
+		accepted += a.State.Accepted
+	}
 	return bmp.NewBMPStatisticsReport(
 		*ph,
 		[]bmp.BMPStatsTLVInterface{
-			bmp.NewBMPStatsTLV64(bmp.BMP_STAT_TYPE_ADJ_RIB_IN, uint64(neighConf.State.AdjTable.Accepted)),
-			bmp.NewBMPStatsTLV64(bmp.BMP_STAT_TYPE_LOC_RIB, uint64(neighConf.State.AdjTable.Advertised+neighConf.State.AdjTable.Filtered)),
-			bmp.NewBMPStatsTLV32(bmp.BMP_STAT_TYPE_WITHDRAW_UPDATE, neighConf.State.Messages.Received.WithdrawUpdate),
-			bmp.NewBMPStatsTLV32(bmp.BMP_STAT_TYPE_WITHDRAW_PREFIX, neighConf.State.Messages.Received.WithdrawPrefix),
+			bmp.NewBMPStatsTLV64(bmp.BMP_STAT_TYPE_ADJ_RIB_IN, received),
+			bmp.NewBMPStatsTLV64(bmp.BMP_STAT_TYPE_LOC_RIB, accepted),
+			bmp.NewBMPStatsTLV32(bmp.BMP_STAT_TYPE_WITHDRAW_UPDATE, uint32(peer.State.Messages.Received.WithdrawUpdate)),
+			bmp.NewBMPStatsTLV32(bmp.BMP_STAT_TYPE_WITHDRAW_PREFIX, uint32(peer.State.Messages.Received.WithdrawPrefix)),
 		},
 	)
 }

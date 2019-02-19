@@ -33,12 +33,7 @@ type Message interface {
 	unmarshal(b []byte) error
 }
 
-// MarshalMessage marshals a Message into its binary form and prepends an
-// ICMPv6 message with the correct type.
-//
-// It is assumed that the operating system or caller will calculate and place
-// the ICMPv6 checksum in the result.
-func MarshalMessage(m Message) ([]byte, error) {
+func marshalMessage(m Message, psh []byte) ([]byte, error) {
 	mb, err := m.marshal()
 	if err != nil {
 		return nil, err
@@ -55,8 +50,26 @@ func MarshalMessage(m Message) ([]byte, error) {
 		},
 	}
 
+	return im.Marshal(psh)
+}
+
+// MarshalMessage marshals a Message into its binary form and prepends an
+// ICMPv6 message with the correct type.
+//
+// It is assumed that the operating system or caller will calculate and place
+// the ICMPv6 checksum in the result.
+func MarshalMessage(m Message) ([]byte, error) {
 	// Pseudo-header always nil so checksum is calculated by caller or OS.
-	return im.Marshal(nil)
+	return marshalMessage(m, nil)
+}
+
+// MarshalMessageChecksum marshals a Message into its binary form and prepends
+// an ICMPv6 message with the correct type.
+//
+// The source and destination IP addresses are used to compute an IPv6 pseudo
+// header for checksum calculation.
+func MarshalMessageChecksum(m Message, source, destination net.IP) ([]byte, error) {
+	return marshalMessage(m, icmp.IPv6PseudoHeader(source, destination))
 }
 
 // ParseMessage parses a Message from its binary form after determining its

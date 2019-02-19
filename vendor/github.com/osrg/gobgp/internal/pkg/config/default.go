@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"strconv"
 
+	"github.com/osrg/gobgp/internal/pkg/zebra"
 	"github.com/osrg/gobgp/pkg/packet/bgp"
 	"github.com/osrg/gobgp/pkg/packet/bmp"
 	"github.com/osrg/gobgp/pkg/packet/rtr"
@@ -197,7 +198,7 @@ func setDefaultNeighborConfigValuesWithViper(v *viper.Viper, n *Neighbor, g *Glo
 			}
 			n.AfiSafis[i].MpGracefulRestart.State.Enabled = n.AfiSafis[i].MpGracefulRestart.Config.Enabled
 			if !vv.IsSet("afi-safi.add-paths.config.receive") {
-				if n.AddPaths.Config.Receive == true {
+				if n.AddPaths.Config.Receive {
 					n.AfiSafis[i].AddPaths.Config.Receive = n.AddPaths.Config.Receive
 				}
 			}
@@ -400,10 +401,10 @@ func setDefaultConfigValuesWithViper(v *viper.Viper, b *BgpConfigSet) error {
 	if b.Zebra.Config.Url == "" {
 		b.Zebra.Config.Url = "unix:/var/run/quagga/zserv.api"
 	}
-	if b.Zebra.Config.Version < 2 {
-		b.Zebra.Config.Version = 2
-	} else if b.Zebra.Config.Version > 6 {
-		b.Zebra.Config.Version = 6
+	if b.Zebra.Config.Version < zebra.MinZapiVer {
+		b.Zebra.Config.Version = zebra.MinZapiVer
+	} else if b.Zebra.Config.Version > zebra.MaxZapiVer {
+		b.Zebra.Config.Version = zebra.MaxZapiVer
 	}
 	if !v.IsSet("zebra.config.nexthop-trigger-enable") && !b.Zebra.Config.NexthopTriggerEnable && b.Zebra.Config.Version > 2 {
 		b.Zebra.Config.NexthopTriggerEnable = true
