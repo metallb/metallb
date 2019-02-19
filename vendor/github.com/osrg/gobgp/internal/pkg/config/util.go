@@ -471,13 +471,15 @@ func NewPeerFromConfigStruct(pconf *Neighbor) *api.Peer {
 			AdminState:   api.PeerState_AdminState(s.AdminState.ToInt()),
 			Messages: &api.Messages{
 				Received: &api.Message{
-					Notification: s.Messages.Received.Notification,
-					Update:       s.Messages.Received.Update,
-					Open:         s.Messages.Received.Open,
-					Keepalive:    s.Messages.Received.Keepalive,
-					Refresh:      s.Messages.Received.Refresh,
-					Discarded:    s.Messages.Received.Discarded,
-					Total:        s.Messages.Received.Total,
+					Notification:   s.Messages.Received.Notification,
+					Update:         s.Messages.Received.Update,
+					Open:           s.Messages.Received.Open,
+					Keepalive:      s.Messages.Received.Keepalive,
+					Refresh:        s.Messages.Received.Refresh,
+					Discarded:      s.Messages.Received.Discarded,
+					Total:          s.Messages.Received.Total,
+					WithdrawUpdate: uint64(s.Messages.Received.WithdrawUpdate),
+					WithdrawPrefix: uint64(s.Messages.Received.WithdrawPrefix),
 				},
 				Sent: &api.Message{
 					Notification: s.Messages.Sent.Notification,
@@ -675,50 +677,50 @@ func NewAPIDefinedSetsFromConfigStruct(t *DefinedSets) ([]*api.DefinedSet, error
 			prefixes = append(prefixes, ap)
 		}
 		definedSets = append(definedSets, &api.DefinedSet{
-			Type:     api.DefinedType_PREFIX,
-			Name:     ps.PrefixSetName,
-			Prefixes: prefixes,
+			DefinedType: api.DefinedType_PREFIX,
+			Name:        ps.PrefixSetName,
+			Prefixes:    prefixes,
 		})
 	}
 
 	for _, ns := range t.NeighborSets {
 		definedSets = append(definedSets, &api.DefinedSet{
-			Type: api.DefinedType_NEIGHBOR,
-			Name: ns.NeighborSetName,
-			List: ns.NeighborInfoList,
+			DefinedType: api.DefinedType_NEIGHBOR,
+			Name:        ns.NeighborSetName,
+			List:        ns.NeighborInfoList,
 		})
 	}
 
 	bs := t.BgpDefinedSets
 	for _, cs := range bs.CommunitySets {
 		definedSets = append(definedSets, &api.DefinedSet{
-			Type: api.DefinedType_COMMUNITY,
-			Name: cs.CommunitySetName,
-			List: cs.CommunityList,
+			DefinedType: api.DefinedType_COMMUNITY,
+			Name:        cs.CommunitySetName,
+			List:        cs.CommunityList,
 		})
 	}
 
 	for _, es := range bs.ExtCommunitySets {
 		definedSets = append(definedSets, &api.DefinedSet{
-			Type: api.DefinedType_EXT_COMMUNITY,
-			Name: es.ExtCommunitySetName,
-			List: es.ExtCommunityList,
+			DefinedType: api.DefinedType_EXT_COMMUNITY,
+			Name:        es.ExtCommunitySetName,
+			List:        es.ExtCommunityList,
 		})
 	}
 
 	for _, ls := range bs.LargeCommunitySets {
 		definedSets = append(definedSets, &api.DefinedSet{
-			Type: api.DefinedType_LARGE_COMMUNITY,
-			Name: ls.LargeCommunitySetName,
-			List: ls.LargeCommunityList,
+			DefinedType: api.DefinedType_LARGE_COMMUNITY,
+			Name:        ls.LargeCommunitySetName,
+			List:        ls.LargeCommunityList,
 		})
 	}
 
 	for _, as := range bs.AsPathSets {
 		definedSets = append(definedSets, &api.DefinedSet{
-			Type: api.DefinedType_AS_PATH,
-			Name: as.AsPathSetName,
-			List: as.AsPathList,
+			DefinedType: api.DefinedType_AS_PATH,
+			Name:        as.AsPathSetName,
+			List:        as.AsPathList,
 		})
 	}
 

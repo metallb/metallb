@@ -1,0 +1,7 @@
+MetalLB tests!
+Freezing a VM if you never started it will result in a broken VM on thaw. Unusual case but I should fix it someday.
+Better control over the k8s version - make it consistent with the installed kubelet version automagically
+Errors during resume leave dangling VMs
+Support multiple switches, and more principled switch setup/teardown/resume.
+VM/cluster helper functions to dial targets within the cluster, via the SSH port forward wire protocol.
+Multiple saved states per universe, so I can save an IPv4 cluster, an IPv6 cluster, a calico cluster, a weave cluster, ...

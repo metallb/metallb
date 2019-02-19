@@ -60,7 +60,7 @@ type sadbMsg struct {
 
 func (s *sadbMsg) DecodeFromBytes(data []byte) error {
 	if len(data) < SADB_MSG_SIZE {
-		fmt.Errorf("too short for sadbMsg %d", len(data))
+		return fmt.Errorf("too short for sadbMsg %d", len(data))
 	}
 	s.sadbMsgVersion = data[0]
 	s.sadbMsgType = data[1]
@@ -403,52 +403,24 @@ func setTCPMinTTLSockopt(conn *net.TCPConn, ttl int) error {
 	return setsockOptInt(sc, level, name, ttl)
 }
 
-type tcpDialer struct {
-	net.Dialer
-
-	// MD5 authentication password.
-	AuthPassword string
-
-	// The TTL value to set outgoing connection.
-	TTL uint8
-
-	// The minimum TTL value for incoming packets.
-	TTLMin uint8
-}
-
-func (d *tcpDialer) DialTCP(addr string, port int) (*net.TCPConn, error) {
-	if d.AuthPassword != "" {
+func dialerControl(network, address string, c syscall.RawConn, ttl, minTtl uint8, password string) error {
+	if password != "" {
 		log.WithFields(log.Fields{
 			"Topic": "Peer",
-			"Key":   addr,
+			"Key":   address,
 		}).Warn("setting md5 for active connection is not supported")
 	}
-	if d.TTL != 0 {
+	if ttl != 0 {
 		log.WithFields(log.Fields{
 			"Topic": "Peer",
-			"Key":   addr,
+			"Key":   address,
 		}).Warn("setting ttl for active connection is not supported")
 	}
-	if d.TTLMin != 0 {
+	if minTtl != 0 {
 		log.WithFields(log.Fields{
 			"Topic": "Peer",
-			"Key":   addr,
+			"Key":   address,
 		}).Warn("setting min ttl for active connection is not supported")
 	}
-
-	raddr, err := net.ResolveTCPAddr("tcp", net.JoinHostPort(addr, fmt.Sprintf("%d", port)))
-	if err != nil {
-		return nil, fmt.Errorf("invalid remote address: %s", err)
-	}
-	laddr, err := net.ResolveTCPAddr("tcp", d.LocalAddr.String())
-	if err != nil {
-		return nil, fmt.Errorf("invalid local address: %s", err)
-	}
-
-	dialer := net.Dialer{LocalAddr: laddr, Timeout: d.Timeout}
-	conn, err := dialer.Dial("tcp", raddr.String())
-	if err != nil {
-		return nil, err
-	}
-	return conn.(*net.TCPConn), nil
+	return nil
 }
