@@ -115,6 +115,10 @@ func buildStepInternal(basesnap string, do func(*vk.Universe) error, resultsnap 
 		CommandLog: os.Stdout,
 	}
 
+	if os.Getenv("E2E_USERSPACE") != "" {
+		cfg.NoAcceleration = true
+	}
+
 	fmt.Printf("Running build step %q\n", resultsnap)
 	defer fmt.Printf("Build step %q done\n", resultsnap)
 
