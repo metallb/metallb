@@ -45,6 +45,9 @@ func testAll(t *testing.T, f func(t *testing.T, u *vk.Universe)) {
 			cfg := &vk.UniverseConfig{
 				CommandLog: os.Stdout,
 			}
+			if os.Getenv("E2E_USERSPACE") != "" {
+				cfg.NoAcceleration = true
+			}
 
 			u, err := vk.Open(cachedUniverse, base, cfg)
 			if err != nil {
