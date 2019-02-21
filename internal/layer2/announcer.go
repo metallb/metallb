@@ -189,6 +189,7 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 	if _, ok := a.ips[name]; ok {
 		return
 	}
+	a.ips[name] = ip
 
 	a.ipRefcnt[ip.String()]++
 	if a.ipRefcnt[ip.String()] > 1 {
@@ -203,7 +204,6 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 		}
 	}
 
-	a.ips[name] = ip
 	go a.spam(name)
 
 }
