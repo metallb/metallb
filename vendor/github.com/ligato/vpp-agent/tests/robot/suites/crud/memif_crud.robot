@@ -36,7 +36,7 @@ Show Interfaces Before Setup
 
 Add VPP1_memif1 Interface
     vpp_term: Interface Not Exists    node=agent_vpp_1    mac=${MEMIF11_MAC}
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_1    name=vpp1_memif1    mac=${MEMIF11_MAC}    master=true    id=1    ip=192.168.1.1    prefix=24    socket=default.sock
+    Put Memif Interface With IP    node=agent_vpp_1    name=vpp1_memif1    mac=${MEMIF11_MAC}    master=true    id=1    ip=192.168.1.1    prefix=24    socket=default.sock
 
 
 Check That VPP1_memif1 Is Created But Not Connected
@@ -45,7 +45,7 @@ Check That VPP1_memif1 Is Created But Not Connected
 
 Add VPP2_memif1 Interface
     vpp_term: Interface Not Exists    node=agent_vpp_2    mac=${MEMIF21_MAC}
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_2    name=vpp2_memif1    mac=${MEMIF21_MAC}    master=false    id=1    ip=192.168.1.2    prefix=28    socket=default.sock
+    Put Memif Interface With IP    node=agent_vpp_2    name=vpp2_memif1    mac=${MEMIF21_MAC}    master=false    id=1    ip=192.168.1.2    prefix=28    socket=default.sock
 
 Check That VPP2_memif1 Is Created And Connected With VPP1_memif1
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_2    mac=${MEMIF21_MAC}
@@ -54,7 +54,7 @@ Check That VPP2_memif1 Is Created And Connected With VPP1_memif1
 
 Add VPP1_memif2 Interface
     vpp_term: Interface Not Exists    node=agent_vpp_1    mac=${MEMIF12_MAC}
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_1    name=vpp1_memif2    mac=${MEMIF12_MAC}    master=true    id=2    ip=192.168.2.1    prefix=26    socket=default.sock
+    Put Memif Interface With IP    node=agent_vpp_1    name=vpp1_memif2    mac=${MEMIF12_MAC}    master=true    id=2    ip=192.168.2.1    prefix=26    socket=default.sock
 
 Check That VPP1_memif2 Is Created But Not Connected
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_1    mac=${MEMIF12_MAC}
@@ -62,7 +62,7 @@ Check That VPP1_memif2 Is Created But Not Connected
 
 Add VPP2_memif2 Interface
     vpp_term: Interface Not Exists    node=agent_vpp_2    mac=${MEMIF22_MAC}
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_2    name=vpp2_memif2    mac=${MEMIF22_MAC}    master=false    id=2    ip=192.168.2.2    prefix=28    socket=default.sock
+    Put Memif Interface With IP    node=agent_vpp_2    name=vpp2_memif2    mac=${MEMIF22_MAC}    master=false    id=2    ip=192.168.2.2    prefix=28    socket=default.sock
 
 Check That VPP2_memif2 Is Created And Connected With VPP1_memif2
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_2    mac=${MEMIF22_MAC}
@@ -74,7 +74,7 @@ Check That VPP1_memif1 And VPP2_memif1 Interfaces Are Not Affected By VPP1_memif
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Memif Interface State     agent_vpp_2  vpp2_memif1  mac=${MEMIF21_MAC}  role=slave  id=1  ipv4=192.168.1.2/28  connected=1  enabled=1  socket=${AGENT_VPP_2_MEMIF_SOCKET_FOLDER}/default.sock
 
 Update VPP1_memif1 Interface
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_1    name=vpp1_memif1    mac=${MEMIF11_SEC_MAC}    master=true    id=1    ip=192.168.10.1    prefix=30    socket=default.sock
+    Put Memif Interface With IP    node=agent_vpp_1    name=vpp1_memif1    mac=${MEMIF11_SEC_MAC}    master=true    id=1    ip=192.168.10.1    prefix=30    socket=default.sock
 
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Deleted    node=agent_vpp_1    mac=${MEMIF11_MAC}
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_1    mac=${MEMIF11_SEC_MAC}
@@ -88,7 +88,7 @@ Check That VPP1_memif2 And VPP2_memif2 Are Not Affected By VPP1_memif1 Update
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Memif Interface State     agent_vpp_1  vpp1_memif2  mac=${MEMIF12_MAC}  role=master  id=2  ipv4=192.168.2.1/26  connected=1  enabled=1  socket=${AGENT_VPP_1_MEMIF_SOCKET_FOLDER}/default.sock
 
 Update VPP2_memif1 Interface
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_2    name=vpp2_memif1    mac=${MEMIF21_SEC_MAC}    master=false    id=1    ip=192.168.10.2    prefix=24    socket=default.sock
+    Put Memif Interface With IP    node=agent_vpp_2    name=vpp2_memif1    mac=${MEMIF21_SEC_MAC}    master=false    id=1    ip=192.168.10.2    prefix=24    socket=default.sock
 
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Deleted    node=agent_vpp_2    mac=${MEMIF21_MAC}
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_2    mac=${MEMIF21_SEC_MAC}
@@ -102,7 +102,7 @@ Check That VPP1_memif2 And VPP2_memif2 Are Not Affected By VPP2_memif1 Update
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Memif Interface State     agent_vpp_1  vpp1_memif2  mac=${MEMIF12_MAC}  role=master  id=2  ipv4=192.168.2.1/26  connected=1  enabled=1  socket=${AGENT_VPP_1_MEMIF_SOCKET_FOLDER}/default.sock
 
 Delete VPP1_memif2 Interface
-    vpp_ctl: Delete VPP Interface    node=agent_vpp_1    name=vpp1_memif2
+    Delete VPP Interface    node=agent_vpp_1    name=vpp1_memif2
     vpp_term: Interface Is Deleted    node=agent_vpp_1    mac=${MEMIF12_MAC}
 
 Check That VPP2_memif2 Interface Is Disconnected
@@ -113,7 +113,7 @@ Check That VPP1_memif1 And VPP2_memif1 Are Not Affected By VPP1_memif2 Delete
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Memif Interface State     agent_vpp_2  vpp2_memif1  mac=${MEMIF21_SEC_MAC}  role=slave  id=1  ipv4=192.168.10.2/24  connected=1  enabled=1  socket=${AGENT_VPP_2_MEMIF_SOCKET_FOLDER}/default.sock
 
 Delete VPP2_memif2 Interface
-    vpp_ctl: Delete VPP Interface    node=agent_vpp_2    name=vpp2_memif2
+    Delete VPP Interface    node=agent_vpp_2    name=vpp2_memif2
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Deleted    node=agent_vpp_2    mac=${MEMIF22_MAC}
 
 
@@ -134,7 +134,6 @@ Show Interfaces And Other Objects After Setup
     Write To Machine    agent_vpp_2_term    show err
     vat_term: Interfaces Dump    agent_vpp_1
     vat_term: Interfaces Dump    agent_vpp_2
-    Write To Machine    vpp_agent_ctl    vpp-agent-ctl ${AGENT_VPP_ETCD_CONF_PATH} -ps
     Execute In Container    agent_vpp_1    ip a
     Execute In Container    agent_vpp_2    ip a
 

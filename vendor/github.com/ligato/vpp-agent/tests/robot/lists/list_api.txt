@@ -1,2 +1,0 @@
---suite Api.Management Api.Management Api
---suite Api.BFD.Bfd Api

@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package model;
+
+message ArrayValue {
+    repeated string items = 1;
+}
+
+message StringValue {
+    string value = 1;
+}

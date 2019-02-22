@@ -45,11 +45,10 @@ Configure Environment
 Show Interfaces Before Setup
     vpp_term: Show Interfaces    agent_vpp_1
     vpp_term: Show Interfaces    agent_vpp_2
-    Write To Machine    vpp_agent_ctl    vpp-agent-ctl ${AGENT_VPP_ETCD_CONF_PATH} -ps
 
 Add VPP1_TAP1 Interface
     vpp_term: Interface Not Exists  node=agent_vpp_1    mac=${MAC_VPP1_TAP1}
-    vpp_ctl: Put TAP Interface With IP    node=agent_vpp_1    name=${NAME_VPP1_TAP1}    mac=${MAC_VPP1_TAP1}    ip=${IP_VPP1_TAP1}    prefix=${PREFIX}    host_if_name=linux_${NAME_VPP1_TAP1}
+    Put TAP Interface With IP    node=agent_vpp_1    name=${NAME_VPP1_TAP1}    mac=${MAC_VPP1_TAP1}    ip=${IP_VPP1_TAP1}    prefix=${PREFIX}    host_if_name=linux_${NAME_VPP1_TAP1}
     linux: Set Host TAP Interface    node=agent_vpp_1    host_if_name=linux_${NAME_VPP1_TAP1}    ip=${IP_LINUX_VPP1_TAP1}    prefix=${PREFIX}
 
 Check VPP1_TAP1 Interface Is Created
@@ -63,7 +62,7 @@ Check Ping Between VPP1 and linux_VPP1_TAP1 Interface
 
 Add VPP1_memif1 Interface
     vpp_term: Interface Not Exists    node=agent_vpp_1    mac=${MAC_VPP1_MEMIF1}
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_1    name=${NAME_VPP1_MEMIF1}    mac=${MAC_VPP1_MEMIF1}    master=true    id=1    ip=${IP_VPP1_MEMIF1}    prefix=24    socket=memif.sock
+    Put Memif Interface With IP    node=agent_vpp_1    name=${NAME_VPP1_MEMIF1}    mac=${MAC_VPP1_MEMIF1}    master=true    id=1    ip=${IP_VPP1_MEMIF1}    prefix=24    socket=memif.sock
 
 Check Memif on Agent1 is created
     vpp_term: Interface Is Created    node=agent_vpp_1    mac=${MAC_VPP1_MEMIF1}
@@ -71,7 +70,7 @@ Check Memif on Agent1 is created
 
 Add VPP2_TAP1 Interface
     vpp_term: Interface Not Exists  node=agent_vpp_2    mac=${MAC_VPP2_TAP1}
-    vpp_ctl: Put TAP Interface With IP    node=agent_vpp_2    name=${NAME_VPP2_TAP1}    mac=${MAC_VPP2_TAP1}    ip=${IP_VPP2_TAP1}    prefix=${PREFIX}    host_if_name=linux_${NAME_VPP2_TAP1}
+    Put TAP Interface With IP    node=agent_vpp_2    name=${NAME_VPP2_TAP1}    mac=${MAC_VPP2_TAP1}    ip=${IP_VPP2_TAP1}    prefix=${PREFIX}    host_if_name=linux_${NAME_VPP2_TAP1}
     linux: Set Host TAP Interface    node=agent_vpp_2    host_if_name=linux_${NAME_VPP2_TAP1}    ip=${IP_LINUX_VPP2_TAP1}    prefix=${PREFIX}
 
 Check VPP2_TAP1 Interface Is Created
@@ -85,7 +84,7 @@ Check Ping Between VPP2 And linux_VPP2_TAP1 Interface
 
 Add VPP2_memif1 Interface
     vpp_term: Interface Not Exists    node=agent_vpp_2    mac=${MAC_VPP2_MEMIF1}
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_2    name=${NAME_VPP2_MEMIF1}    mac=${MAC_VPP2_MEMIF1}    master=false    id=1    ip=${IP_VPP2_MEMIF1}    prefix=24    socket=memif.sock
+    Put Memif Interface With IP    node=agent_vpp_2    name=${NAME_VPP2_MEMIF1}    mac=${MAC_VPP2_MEMIF1}    master=false    id=1    ip=${IP_VPP2_MEMIF1}    prefix=24    socket=memif.sock
     vpp_term: Interface Is Created    node=agent_vpp_1    mac=${MAC_VPP1_MEMIF1}
 
 Check Ping From VPP1 To VPP2_memif1
@@ -116,7 +115,15 @@ Add Static Route From VPP2 Linux To VPP1
     linux: Add Route    node=agent_vpp_2    destination_ip=${IP_VPP1_TAP1_NETWORK}    prefix=${PREFIX}    next_hop_ip=${IP_VPP2_TAP1}
 
 Add Static Route From VPP2 To VPP1
-    Create Route On agent_vpp_2 With IP ${IP_VPP2_TAP1_NETWORK}/${PREFIX} With Next Hop ${IP_VPP1_MEMIF1} And Vrf Id 0
+    Create Route On agent_vpp_2 With IP ${IP_VPP1_TAP1_NETWORK}/${PREFIX} With Next Hop ${IP_VPP1_MEMIF1} And Vrf Id 0
+
+Check Interfaces And Fib Table
+    Show Interfaces On agent_vpp_1
+    Show Interfaces Address On agent_vpp_1
+    Show IP6 Fib On agent_vpp_1
+    Show Interfaces On agent_vpp_2
+    Show Interfaces Address On agent_vpp_2
+    Show IP6 Fib On agent_vpp_2
 
 Check Ping From VPP1 Linux To VPP2_TAP1 And LINUX_VPP2_TAP1
     linux: Check Ping    node=agent_vpp_1    ip=${IP_VPP2_TAP1}
@@ -145,9 +152,9 @@ Check Linux Interfaces On VPP1 After Resync
 
 Check Interfaces On VPP1 After Resync
     ${out}=    vpp_term: Show Interfaces    agent_vpp_1
-    ${int}=    vpp_ctl: Get Interface Internal Name    node=agent_vpp_1    interface=${NAME_VPP1_MEMIF1}
+    ${int}=    Get Interface Internal Name    node=agent_vpp_1    interface=${NAME_VPP1_MEMIF1}
     Should Contain    ${out}    ${int}
-    ${int}=    vpp_ctl: Get Interface Internal Name    node=agent_vpp_1    interface=${NAME_VPP1_TAP1}
+    ${int}=    Get Interface Internal Name    node=agent_vpp_1    interface=${NAME_VPP1_TAP1}
     Should Contain    ${out}    ${int}
 
 Check Linux Interfaces On VPP2 After Resync
@@ -156,9 +163,9 @@ Check Linux Interfaces On VPP2 After Resync
 
 Check Interfaces On VPP2 After Resync
     ${out}=    vpp_term: Show Interfaces    agent_vpp_2
-    ${int}=    vpp_ctl: Get Interface Internal Name    node=agent_vpp_2    interface=${NAME_VPP2_MEMIF1}
+    ${int}=    Get Interface Internal Name    node=agent_vpp_2    interface=${NAME_VPP2_MEMIF1}
     Should Contain    ${out}    ${int}
-    ${int}=    vpp_ctl: Get Interface Internal Name    node=agent_vpp_2    interface=${NAME_VPP2_TAP1}
+    ${int}=    Get Interface Internal Name    node=agent_vpp_2    interface=${NAME_VPP2_TAP1}
     Should Contain    ${out}    ${int}
 
 Add Static Route From VPP1 Linux To VPP2 After Resync
@@ -175,7 +182,6 @@ Check Ping From VPP2 Linux To VPP1_TAP1 And LINUX_VPP1_TAP1 After Resync
     linux: Check Ping    node=agent_vpp_2    ip=${IP_VPP1_TAP1}
     linux: Check Ping    node=agent_vpp_2    ip=${IP_LINUX_VPP1_TAP1}
 
-#*** Keywords ***
 *** Keywords ***
 TestSetup
     Make Datastore Snapshots    ${TEST_NAME}_test_setup

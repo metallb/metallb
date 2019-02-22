@@ -16,6 +16,7 @@ package cryptodata
 
 import (
 	"github.com/gogo/protobuf/proto"
+	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/db/keyval"
 )
 
@@ -45,7 +46,7 @@ type ProtoKeyValWrapper struct {
 
 // ProtoWatchRespWrapper wraps keyval.ProtoWatchResp with additional support of reading encrypted data
 type ProtoWatchRespWrapper struct {
-	keyval.ProtoWatchResp
+	datasync.ProtoWatchResp
 	ProtoKeyValWrapper
 }
 
@@ -131,8 +132,8 @@ func (db *ProtoBrokerWrapper) ListValues(key string) (keyval.ProtoKeyValIterator
 // Watch starts subscription for changes associated with the selected keys.
 // Watch events will be delivered to callback (not channel) <respChan>.
 // Channel <closeChan> can be used to close watching on respective key
-func (b *ProtoWatcherWrapper) Watch(respChan func(keyval.ProtoWatchResp), closeChan chan string, keys ...string) error {
-	return b.ProtoWatcher.Watch(func(resp keyval.ProtoWatchResp) {
+func (b *ProtoWatcherWrapper) Watch(respChan func(datasync.ProtoWatchResp), closeChan chan string, keys ...string) error {
+	return b.ProtoWatcher.Watch(func(resp datasync.ProtoWatchResp) {
 		respChan(&ProtoWatchRespWrapper{
 			ProtoWatchResp: resp,
 			ProtoKeyValWrapper: ProtoKeyValWrapper{

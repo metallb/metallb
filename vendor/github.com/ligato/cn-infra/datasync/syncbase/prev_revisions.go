@@ -17,50 +17,34 @@ package syncbase
 import (
 	"sync"
 
-	"github.com/gogo/protobuf/proto"
 	"github.com/ligato/cn-infra/datasync"
 )
+
+// PrevRevisions maintains the map of keys & values with revision.
+type PrevRevisions struct {
+	mu        sync.RWMutex
+	revisions map[string]datasync.KeyVal
+}
 
 // NewLatestRev is a constructor.
 func NewLatestRev() *PrevRevisions {
 	return &PrevRevisions{
-		revisions: make(map[string]datasync.LazyValueWithRev),
+		revisions: make(map[string]datasync.KeyVal),
 	}
 }
 
-// PrevRevisions maintains the map of keys & values with revision.
-type PrevRevisions struct {
-	sync.RWMutex
-	revisions map[string]datasync.LazyValueWithRev
-}
+// Get gets the last proto.Message with it's revision.
+func (r *PrevRevisions) Get(key string) (found bool, value datasync.KeyVal) {
+	r.mu.RLock()
+	prev, found := r.revisions[key]
+	r.mu.RUnlock()
 
-// valWithRev stores the tuple (see the map above).
-type valWithRev struct {
-	val datasync.LazyValue
-	rev int64
-}
-
-// GetValue gets the current value in the data change event.
-// The caller must provide an address of a proto message buffer
-// for each value.
-// returns:
-// - error if value argument can not be properly filled.
-func (d *valWithRev) GetValue(value proto.Message) error {
-	return d.val.GetValue(value)
-}
-
-// GetRevision gets the revision associated with the value in the data change event.
-// The caller must provide an address of a proto message buffer
-// for each value.
-// returns:
-// - revision associated with the latest change in the key-value pair.
-func (d *valWithRev) GetRevision() (rev int64) {
-	return d.rev
+	return found, prev
 }
 
 // Put updates the entry in the revisions and returns previous value.
 func (r *PrevRevisions) Put(key string, val datasync.LazyValue) (
-	found bool, prev datasync.LazyValueWithRev, currRev int64) {
+	found bool, prev datasync.KeyVal, currRev int64) {
 
 	found, prev = r.Get(key)
 	if prev != nil {
@@ -69,16 +53,20 @@ func (r *PrevRevisions) Put(key string, val datasync.LazyValue) (
 		currRev = 0
 	}
 
-	r.Lock()
-	r.revisions[key] = &valWithRev{val, currRev}
-	r.Unlock()
+	r.mu.Lock()
+	r.revisions[key] = &valWithRev{
+		LazyValue: val,
+		key:       key,
+		rev:       currRev,
+	}
+	r.mu.Unlock()
 
 	return found, prev, currRev
 }
 
 // PutWithRevision updates the entry in the revisions and returns previous value.
-func (r *PrevRevisions) PutWithRevision(key string, inCurrent datasync.LazyValueWithRev) (
-	found bool, prev datasync.LazyValueWithRev) {
+func (r *PrevRevisions) PutWithRevision(key string, inCurrent datasync.KeyVal) (
+	found bool, prev datasync.KeyVal) {
 
 	found, prev = r.Get(key)
 
@@ -87,56 +75,74 @@ func (r *PrevRevisions) PutWithRevision(key string, inCurrent datasync.LazyValue
 		currentRev = prev.GetRevision() + 1
 	}
 
-	r.Lock()
-	r.revisions[key] = &valWithRev{inCurrent, currentRev}
-	r.Unlock()
+	r.mu.Lock()
+	r.revisions[key] = &valWithRev{
+		LazyValue: inCurrent,
+		key:       key,
+		rev:       currentRev,
+	}
+	r.mu.Unlock()
 
 	return found, prev
 }
 
 // Del deletes the entry from revisions and returns previous value.
-func (r *PrevRevisions) Del(key string) (found bool, prev datasync.LazyValueWithRev) {
+func (r *PrevRevisions) Del(key string) (found bool, prev datasync.KeyVal) {
 	found, prev = r.Get(key)
 
 	if found {
-		r.Lock()
+		r.mu.Lock()
 		delete(r.revisions, key)
-		r.Unlock()
+		r.mu.Unlock()
 	}
 
 	return found, prev
 }
 
-// Get gets the last proto.Message with it's revision.
-func (r *PrevRevisions) Get(key string) (found bool, value datasync.LazyValueWithRev) {
-	r.RLock()
-	prev, found := r.revisions[key]
-	r.RUnlock()
-
-	if found {
-		return found, prev
-	}
-
-	return found, nil
-}
-
 // ListKeys returns all stored keys.
-func (r *PrevRevisions) ListKeys() []string {
-	var ret []string
-
-	r.RLock()
+func (r *PrevRevisions) ListKeys() (ret []string) {
+	r.mu.RLock()
 	for key := range r.revisions {
 		ret = append(ret, key)
 	}
-	r.RUnlock()
-
+	r.mu.RUnlock()
 	return ret
 }
 
 // Cleanup removes all data from the registry
 func (r *PrevRevisions) Cleanup() {
-	r.Lock()
-	defer r.Unlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
-	r.revisions = map[string]datasync.LazyValueWithRev{}
+	r.revisions = make(map[string]datasync.KeyVal)
+}
+
+// valWithRev stores the tuple (see the map above).
+type valWithRev struct {
+	datasync.LazyValue
+	key string
+	rev int64
+}
+
+// GetKey returns key
+func (d *valWithRev) GetKey() string {
+	return d.key
+}
+
+// GetValue gets the current value in the data change event.
+// The caller must provide an address of a proto message buffer
+// for each value.
+// returns:
+// - error if value argument can not be properly filled.
+/*func (d *valWithRev) GetValue(value proto.Message) error {
+	return d.val.GetValue(value)
+}*/
+
+// GetRevision gets the revision associated with the value in the data change event.
+// The caller must provide an address of a proto message buffer
+// for each value.
+// returns:
+// - revision associated with the latest change in the key-value pair.
+func (d *valWithRev) GetRevision() (rev int64) {
+	return d.rev
 }

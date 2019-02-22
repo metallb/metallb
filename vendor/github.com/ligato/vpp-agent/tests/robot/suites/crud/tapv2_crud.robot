@@ -8,7 +8,7 @@ Resource     ../../variables/${VARIABLES}_variables.robot
 
 Resource     ../../libraries/all_libs.robot
 
-Force Tags        crud     IPv4    ExpectedFailure
+Force Tags        crud     IPv4
 Suite Setup       Testsuite Setup
 Suite Teardown    Testsuite Teardown
 Test Setup        TestSetup
@@ -24,7 +24,7 @@ ${MAC_TAP1_2}=       22:21:21:11:11:11
 ${MAC_TAP2}=         22:21:21:22:22:22
 ${IP_TAP1}=          20.20.1.1
 ${IP_TAP1_2}=        21.20.1.1
-${IP_TAP2}=          20.20.1.2
+${IP_TAP2}=          30.20.1.2
 ${PREFIX}=           24
 ${MTU}=              4800
 ${UP_STATE}=         up
@@ -40,7 +40,7 @@ Show Interfaces Before Setup
 
 Add TAP1v2 Interface
     vpp_term: Interface Not Exists  node=agent_vpp_1    mac=${MAC_TAP1}
-    vpp_ctl: Put TAPv2 Interface With IP    node=agent_vpp_1    name=${NAME_TAP1}    mac=${MAC_TAP1}    ip=${IP_TAP1}    prefix=${PREFIX}    host_if_name=linux_${NAME_TAP1}
+    Put TAPv2 Interface With IP    node=agent_vpp_1    name=${NAME_TAP1}    mac=${MAC_TAP1}    ip=${IP_TAP1}    prefix=${PREFIX}    host_if_name=linux_${NAME_TAP1}
 
 Check TAP1v2 Interface Is Created
     ${interfaces}=       vat_term: Interfaces Dump    node=agent_vpp_1
@@ -49,7 +49,7 @@ Check TAP1v2 Interface Is Created
 
 Add TAP2v2 Interface
     vpp_term: Interface Not Exists  node=agent_vpp_1    mac=${MAC_TAP2}
-    vpp_ctl: Put TAPv2 Interface With IP    node=agent_vpp_1    name=${NAME_TAP2}    mac=${MAC_TAP2}    ip=${IP_TAP2}    prefix=${PREFIX}    host_if_name=linux_${NAME_TAP2}
+    Put TAPv2 Interface With IP    node=agent_vpp_1    name=${NAME_TAP2}    mac=${MAC_TAP2}    ip=${IP_TAP2}    prefix=${PREFIX}    host_if_name=linux_${NAME_TAP2}
 
 Check TAP2v2 Interface Is Created
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_1    mac=${MAC_TAP2}
@@ -59,7 +59,7 @@ Check TAP1v2 Interface Is Still Configured
     ${actual_state}=    vpp_term: Check TAPv2 interface State    agent_vpp_1    ${NAME_TAP1}    mac=${MAC_TAP1}    ipv4=${IP_TAP1}/${PREFIX}    state=${UP_STATE}
 
 Update TAP1v2 Interface
-    vpp_ctl: Put TAPv2 Interface With IP    node=agent_vpp_1    name=${NAME_TAP1}    mac=${MAC_TAP1_2}    ip=${IP_TAP1_2}    prefix=${PREFIX}    host_if_name=linux_${NAME_TAP1}
+    Put TAPv2 Interface With IP    node=agent_vpp_1    name=${NAME_TAP1}    mac=${MAC_TAP1_2}    ip=${IP_TAP1_2}    prefix=${PREFIX}    host_if_name=linux_${NAME_TAP1}
 
 Check TAP1_2v2 Interface Is Created
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_1    mac=${MAC_TAP1_2}
@@ -69,7 +69,7 @@ Check TAP2v2 Interface Has Not Changed
     ${actual_state}=    vpp_term: Check TAPv2 interface State    agent_vpp_1    ${NAME_TAP2}    mac=${MAC_TAP2}    ipv4=${IP_TAP2}/${PREFIX}    state=${UP_STATE}
 
 Delete TAP1_2v2 Interface
-    vpp_ctl: Delete VPP Interface    agent_vpp_1    ${NAME_TAP1}
+    Delete VPP Interface    agent_vpp_1    ${NAME_TAP1}
 
 Check TAP1_2v2 Interface Has Been Deleted
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Not Exists  node=agent_vpp_1    mac=${MAC_TAP1_2}
@@ -86,7 +86,6 @@ Show Interfaces And Other Objects After Setup
     Write To Machine    agent_vpp_1_term    show vxlan tunnel
     Write To Machine    agent_vpp_1_term    show err
     vat_term: Interfaces Dump    agent_vpp_1
-    Write To Machine    vpp_agent_ctl    vpp-agent-ctl ${AGENT_VPP_ETCD_CONF_PATH} -ps
     Execute In Container    agent_vpp_1    ip a
 
 *** Keywords ***

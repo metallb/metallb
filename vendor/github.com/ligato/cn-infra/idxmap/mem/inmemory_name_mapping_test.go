@@ -21,6 +21,7 @@ import (
 	"github.com/ligato/cn-infra/idxmap"
 	"github.com/ligato/cn-infra/logging/logrus"
 	"github.com/onsi/gomega"
+	"strings"
 )
 
 func TestNewNamedMappingMem(t *testing.T) {
@@ -122,40 +123,54 @@ func TestSecondaryIndexes(t *testing.T) {
 	mapping := NewNamedMapping(logrus.DefaultLogger(), "title", func(meta interface{}) map[string][]string {
 		res := map[string][]string{}
 		if str, ok := meta.(string); ok {
-			res[secondaryIx] = []string{str}
+			res[secondaryIx] = []string{str, strings.ToLower(str), strings.ToUpper(str)}
 		}
 		return res
 	})
 
-	mapping.Put("Name1", "value")
+	mapping.Put("Name1", "Value")
 	meta, found := mapping.GetValue("Name1")
 	gomega.Expect(found).To(gomega.BeTrue())
-	gomega.Expect(meta).To(gomega.BeEquivalentTo("value"))
+	gomega.Expect(meta).To(gomega.BeEquivalentTo("Value"))
+	fields := map[string][]string{secondaryIx: {"Value", "value", "VALUE"}}
+	gomega.Expect(mapping.ListFields("Name1")).To(gomega.BeEquivalentTo(fields))
 
-	mapping.Put("Name2", "value")
+	mapping.Put("Name2", "Value")
 	meta, found = mapping.GetValue("Name2")
 	gomega.Expect(found).To(gomega.BeTrue())
-	gomega.Expect(meta).To(gomega.BeEquivalentTo("value"))
+	gomega.Expect(meta).To(gomega.BeEquivalentTo("Value"))
+	gomega.Expect(mapping.ListFields("Name2")).To(gomega.BeEquivalentTo(fields))
 
-	mapping.Put("Name3", "different")
+	mapping.Put("Name3", "Different")
 	meta, found = mapping.GetValue("Name3")
 	gomega.Expect(found).To(gomega.BeTrue())
-	gomega.Expect(meta).To(gomega.BeEquivalentTo("different"))
+	gomega.Expect(meta).To(gomega.BeEquivalentTo("Different"))
+	fields = map[string][]string{secondaryIx: {"Different", "different", "DIFFERENT"}}
+	gomega.Expect(mapping.ListFields("Name3")).To(gomega.BeEquivalentTo(fields))
 
-	names := mapping.ListNames(secondaryIx, "value")
+	names := mapping.ListNames(secondaryIx, "Value")
 	gomega.Expect(names).To(gomega.ContainElement("Name1"))
 	gomega.Expect(names).To(gomega.ContainElement("Name2"))
+	gomega.Expect(names).To(gomega.HaveLen(2))
 
-	names = mapping.ListNames(secondaryIx, "unknown")
+	names = mapping.ListNames(secondaryIx, "different")
+	gomega.Expect(names).To(gomega.ContainElement("Name3"))
+	gomega.Expect(names).To(gomega.HaveLen(1))
+
+	names = mapping.ListNames(secondaryIx, "Unknown")
 	gomega.Expect(names).To(gomega.BeNil())
 	names = mapping.ListNames("Unknown index", "value")
 	gomega.Expect(names).To(gomega.BeNil())
 
-	mapping.Put("Name2", "different")
-	names = mapping.ListNames(secondaryIx, "different")
+	mapping.Put("Name2", "Different")
+	gomega.Expect(mapping.ListFields("Name2")).To(gomega.BeEquivalentTo(fields))
+	names = mapping.ListNames(secondaryIx, "DIFFERENT")
 	gomega.Expect(names).To(gomega.ContainElement("Name2"))
 	gomega.Expect(names).To(gomega.ContainElement("Name3"))
-
+	gomega.Expect(names).To(gomega.HaveLen(2))
+	names = mapping.ListNames(secondaryIx, "value")
+	gomega.Expect(names).To(gomega.ContainElement("Name1"))
+	gomega.Expect(names).To(gomega.HaveLen(1))
 }
 
 func TestNotifications(t *testing.T) {

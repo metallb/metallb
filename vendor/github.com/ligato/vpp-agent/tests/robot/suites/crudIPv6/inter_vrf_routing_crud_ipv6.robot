@@ -102,10 +102,10 @@ Check Inter VRF Routing Again
     IP6 Fib Table 1 On agent_vpp_2 Should Contain Vrf unicast lookup in ipv6-VRF:
 
 Delete Route VRF 1
-    vpp_ctl: Delete Route    agent_vpp_2    1    ${NET1}    64
-    vpp_ctl: Delete Route    agent_vpp_2    1    ${NET2}    64
-    vpp_ctl: Delete Route    agent_vpp_2    0    ${NET3}    64
-    vpp_ctl: Delete Route    agent_vpp_2    2    ${NET3}    64
+    Delete Route    agent_vpp_2    1    ${NET1}    64
+    Delete Route    agent_vpp_2    1    ${NET2}    64
+    Delete Route    agent_vpp_2    0    ${NET3}    64
+    Delete Route    agent_vpp_2    2    ${NET3}    64
 
 Check State After Delete
     Show IP Fib On agent_vpp_1

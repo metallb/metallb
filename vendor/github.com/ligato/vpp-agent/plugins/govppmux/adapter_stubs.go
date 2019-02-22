@@ -22,6 +22,11 @@ import (
 )
 
 // NewVppAdapter returns mock adapter, used for building without vppapiclient library.
-func NewVppAdapter(shmPrefix string) adapter.VppAdapter {
+func NewVppAdapter(shmPrefix string) adapter.VppAPI {
 	return govppmock.NewVppAdapter()
+}
+
+// NewStatsAdapter returns stats vpp api adapter, used for reading statistics with vppapiclient library.
+func NewStatsAdapter(socketName string) adapter.StatsAPI {
+	return govppmock.NewStatsAdapter()
 }

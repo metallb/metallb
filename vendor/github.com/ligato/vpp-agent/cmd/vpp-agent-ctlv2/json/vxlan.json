@@ -1,0 +1,13 @@
+{
+  "vxlan": {
+    "src_address": "192.168.42.1",
+    "dst_address": "192.168.42.2",
+    "vni": 10
+  },
+  "enabled": true,
+  "ip_addresses": [
+    "192.168.25.3/24"
+  ],
+  "name": "vxlan1",
+  "type": "VXLAN_TUNNEL"
+}

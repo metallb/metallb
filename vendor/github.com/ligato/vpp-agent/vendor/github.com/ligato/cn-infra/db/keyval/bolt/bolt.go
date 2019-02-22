@@ -16,9 +16,11 @@ package bolt
 
 import (
 	"bytes"
-	"errors"
+	"context"
 	"fmt"
 	"os"
+	"strings"
+	"sync"
 
 	"github.com/boltdb/bolt"
 	"github.com/ligato/cn-infra/datasync"
@@ -41,6 +43,9 @@ var rootBucket = []byte("root")
 // keyval.CoreBrokerWatcher interface.
 type Client struct {
 	db *bolt.DB
+
+	mu       sync.RWMutex
+	watchers []*prefixWatcher
 }
 
 // NewClient creates new client for Bolt using given config.
@@ -62,26 +67,17 @@ func NewClient(cfg *Config) (client *Client, err error) {
 }
 
 // NewTxn creates new transaction
-func (client *Client) NewTxn() keyval.BytesTxn {
+func (c *Client) NewTxn() keyval.BytesTxn {
 	return &txn{
-		db: client.db,
+		db: c.db,
 	}
 }
 
-// Put stores given data for the key
-func (client *Client) Put(key string, data []byte, opts ...datasync.PutOption) error {
-	boltLogger.Debugf("Put: %q (len=%d)", key, len(data))
-
-	return client.db.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket(rootBucket).Put([]byte(key), data)
-	})
-}
-
 // GetValue returns data for the given key
-func (client *Client) GetValue(key string) (data []byte, found bool, revision int64, err error) {
+func (c *Client) GetValue(key string) (data []byte, found bool, revision int64, err error) {
 	boltLogger.Debugf("GetValue: %q", key)
 
-	err = client.db.View(func(tx *bolt.Tx) error {
+	err = c.db.View(func(tx *bolt.Tx) error {
 		value := tx.Bucket(rootBucket).Get([]byte(key))
 		if value == nil {
 			return fmt.Errorf("value for key %q not found in bucket", key)
@@ -95,30 +91,69 @@ func (client *Client) GetValue(key string) (data []byte, found bool, revision in
 	return data, found, 0, err
 }
 
+// Put stores given data for the key
+func (c *Client) Put(key string, data []byte, opts ...datasync.PutOption) (err error) {
+	boltLogger.Debugf("Put: %q (len=%d)", key, len(data))
+
+	var prevVal []byte
+	if err = c.db.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(rootBucket)
+		byteKey := []byte(key)
+
+		value := bucket.Get(byteKey)
+		if value != nil {
+			prevVal = append([]byte(nil), value...) // value needs to be copied
+		}
+		return bucket.Put(byteKey, data)
+	}); err != nil {
+		return err
+	}
+
+	c.bumpWatchers(&watchEvent{
+		Key:       key,
+		Value:     data,
+		PrevValue: prevVal,
+		Type:      datasync.Put,
+	})
+
+	return nil
+}
+
 // Delete deletes given key
-func (client *Client) Delete(key string, opts ...datasync.DelOption) (existed bool, err error) {
+func (c *Client) Delete(key string, opts ...datasync.DelOption) (existed bool, err error) {
 	boltLogger.Debugf("Delete: %q", key)
 
-	err = client.db.Update(func(tx *bolt.Tx) error {
+	var prevVal []byte
+	err = c.db.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(rootBucket)
+		byteKey := []byte(key)
 
-		if data := bucket.Get([]byte(key)); data != nil {
+		if value := bucket.Get(byteKey); value != nil {
 			existed = true
-			return bucket.Delete([]byte(key))
+			prevVal = append([]byte(nil), value...) // value needs to be copied
+
+			return bucket.Delete(byteKey)
 		}
 
 		return fmt.Errorf("key %q not found in bucket", key)
+	})
+
+	fmt.Printf("del: %v, %q\n", key, prevVal)
+	c.bumpWatchers(&watchEvent{
+		Key:       key,
+		PrevValue: prevVal,
+		Type:      datasync.Delete,
 	})
 
 	return existed, err
 }
 
 // ListKeys returns iterator with keys for given key prefix
-func (client *Client) ListKeys(keyPrefix string) (keyval.BytesKeyIterator, error) {
+func (c *Client) ListKeys(keyPrefix string) (keyval.BytesKeyIterator, error) {
 	boltLogger.Debugf("ListKeys: %q", keyPrefix)
 
 	var keys []string
-	err := client.db.View(func(tx *bolt.Tx) error {
+	err := c.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(rootBucket).Cursor()
 		prefix := []byte(keyPrefix)
 
@@ -134,11 +169,11 @@ func (client *Client) ListKeys(keyPrefix string) (keyval.BytesKeyIterator, error
 }
 
 // ListValues returns iterator with key-value pairs for given key prefix
-func (client *Client) ListValues(keyPrefix string) (keyval.BytesKeyValIterator, error) {
+func (c *Client) ListValues(keyPrefix string) (keyval.BytesKeyValIterator, error) {
 	boltLogger.Debugf("ListValues: %q", keyPrefix)
 
 	var pairs []*kvPair
-	err := client.db.View(func(tx *bolt.Tx) error {
+	err := c.db.View(func(tx *bolt.Tx) error {
 		c := tx.Bucket(rootBucket).Cursor()
 		prefix := []byte(keyPrefix)
 
@@ -157,14 +192,143 @@ func (client *Client) ListValues(keyPrefix string) (keyval.BytesKeyValIterator, 
 	return &bytesKeyValIterator{len: len(pairs), pairs: pairs}, err
 }
 
-// Close closes Bolt database.
-func (client *Client) Close() error {
-	return client.db.Close()
+// Watch watches given list of key prefixes.
+func (c *Client) Watch(resp func(keyval.BytesWatchResp), closeChan chan string, keys ...string) error {
+	boltLogger.Debugf("Watch: %q", keys)
+	for _, k := range keys {
+		if err := c.watch(resp, closeChan, k); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
-// Watch watches given list of key prefixes.
-func (client *Client) Watch(resp func(keyval.BytesWatchResp), closeChan chan string, keys ...string) error {
-	return errors.New("not implemented")
+type watchResp struct {
+	typ              datasync.Op
+	key              string
+	value, prevValue []byte
+	rev              int64
+}
+
+// GetChangeType returns "Put" for BytesWatchPutResp.
+func (resp *watchResp) GetChangeType() datasync.Op {
+	return resp.typ
+}
+
+// GetKey returns the key that the value has been inserted under.
+func (resp *watchResp) GetKey() string {
+	return resp.key
+}
+
+// GetValue returns the value that has been inserted.
+func (resp *watchResp) GetValue() []byte {
+	return resp.value
+}
+
+// GetPrevValue returns the previous value that has been inserted.
+func (resp *watchResp) GetPrevValue() []byte {
+	return resp.prevValue
+}
+
+// GetRevision returns the revision associated with the 'put' operation.
+func (resp *watchResp) GetRevision() int64 {
+	return resp.rev
+}
+
+func (c *Client) watch(resp func(watchResp keyval.BytesWatchResp), closeCh chan string, prefix string) error {
+	boltLogger.Debug("watch:", prefix)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	recvChan := c.watchPrefix(ctx, prefix)
+
+	go func(regPrefix string) {
+		defer cancel()
+		for {
+			select {
+			case ev, ok := <-recvChan:
+				if !ok {
+					boltLogger.WithField("prefix", prefix).
+						Debug("Watch recv chan was closed")
+					return
+				}
+				r := &watchResp{
+					typ:       ev.Type,
+					key:       ev.Key,
+					value:     ev.Value,
+					prevValue: ev.PrevValue,
+					rev:       ev.Revision,
+				}
+				resp(r)
+			case closeVal, ok := <-closeCh:
+				if !ok || closeVal == regPrefix {
+					boltLogger.WithField("prefix", prefix).
+						Debug("Watch ended")
+					return
+				}
+			}
+		}
+	}(prefix)
+
+	return nil
+}
+
+type watchEvent struct {
+	Type      datasync.Op
+	Key       string
+	Value     []byte
+	PrevValue []byte
+	Revision  int64
+}
+
+type prefixWatcher struct {
+	prefix  string
+	watchCh chan *watchEvent
+}
+
+func (c *Client) watchPrefix(ctx context.Context, prefix string) <-chan *watchEvent {
+	boltLogger.Debug("watchPrefix:", prefix)
+
+	ch := make(chan *watchEvent, 1)
+
+	c.mu.Lock()
+	index := len(c.watchers)
+	c.watchers = append(c.watchers, &prefixWatcher{
+		prefix:  prefix,
+		watchCh: ch,
+	})
+	c.mu.Unlock()
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			c.mu.Lock()
+			if len(c.watchers) == index+1 {
+				c.watchers = c.watchers[:index]
+			} else {
+				c.watchers = append(c.watchers[:index], c.watchers[index+1:]...)
+			}
+			c.mu.Unlock()
+		}
+	}()
+
+	return ch
+}
+
+func (c *Client) bumpWatchers(we *watchEvent) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	for _, w := range c.watchers {
+		if strings.HasPrefix(we.Key, w.prefix) {
+			w.watchCh <- we
+		}
+	}
+}
+
+// Close closes Bolt database.
+func (c *Client) Close() error {
+	return c.db.Close()
 }
 
 // NewBroker creates a new instance of a proxy that provides
@@ -172,9 +336,9 @@ func (client *Client) Watch(resp func(keyval.BytesWatchResp), closeChan chan str
 // <prefix> will be prepended to the key argument in all calls from the created
 // BrokerWatcher. To avoid using a prefix, pass keyval. Root constant as
 // an argument.
-func (client *Client) NewBroker(prefix string) keyval.BytesBroker {
+func (c *Client) NewBroker(prefix string) keyval.BytesBroker {
 	return &BrokerWatcher{
-		Client: client,
+		Client: c,
 		prefix: prefix,
 	}
 }
@@ -184,9 +348,9 @@ func (client *Client) NewBroker(prefix string) keyval.BytesBroker {
 // <prefix> will be prepended to the key argument in all calls on created
 // BrokerWatcher. To avoid using a prefix, pass keyval. Root constant as
 // an argument.
-func (client *Client) NewWatcher(prefix string) keyval.BytesWatcher {
+func (c *Client) NewWatcher(prefix string) keyval.BytesWatcher {
 	return &BrokerWatcher{
-		Client: client,
+		Client: c,
 		prefix: prefix,
 	}
 }
@@ -282,5 +446,13 @@ func (pdb *BrokerWatcher) ListValues(keyPrefix string) (keyval.BytesKeyValIterat
 // list. The prefix is removed from the keys returned in watch events.
 // Watch events will be delivered to <resp> callback.
 func (pdb *BrokerWatcher) Watch(resp func(keyval.BytesWatchResp), closeChan chan string, keys ...string) error {
-	return errors.New("not implemented")
+	var prefixedKeys []string
+	for _, key := range keys {
+		prefixedKeys = append(prefixedKeys, pdb.prefixKey(key))
+	}
+	return pdb.Client.Watch(func(origResp keyval.BytesWatchResp) {
+		r := origResp.(*watchResp)
+		r.key = strings.TrimPrefix(r.key, pdb.prefix)
+		resp(r)
+	}, closeChan, prefixedKeys...)
 }

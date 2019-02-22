@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Index</title>
+</head>
+<body>
+<h2>Index:</h2>
+<ul>
+{{range $key, $data := .ItemMap}}
+    <h3>{{$key}}:</h3>
+    {{range $dataEntry := $data}}
+        <li>
+            <a href="{{$dataEntry.Path}}">{{$dataEntry.Name}}</a>
+        </li>
+    {{end}}
+{{end}}
+</ul>
+</body>
+</html>

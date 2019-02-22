@@ -32,8 +32,15 @@ vat_term: Exit VAT Terminal
 
 vat_term: Issue Command
     [Arguments]        ${node}     ${command}    ${delay}=${SSH_READ_DELAY}s
-    ${out}=            Write To Machine Until String    ${node}_vat    ${command}    ${${node}_VPP_VAT_PROMPT}    delay=${delay}
-#    Should Contain     ${out}             ${${node}_VPP_VAT_PROMPT}
+    ${failed_it}=     Create List
+    :FOR    ${it_num}    IN RANGE    1    6
+    \    ${result}    ${out}=    Run Keyword And Ignore Error    Write To Machine Until String    ${node}_vat    ${command}    ${${node}_VPP_VAT_PROMPT}    delay=${delay}
+    \    Run Keyword If      '${result}'=='FAIL'      Append To List    ${failed_it}    ${it_num}
+    \    Run Keyword If      '${result}'=='FAIL'      Log  Warning, no match found #vat console output!	WARN
+    \    Exit For Loop If    '${result}'=='PASS'
+    Run Keyword And Ignore Error  Should Be Empty  ${failed_it}  msg='Fail in this checks ${failed_it}'
+#    ${out}=            Write To Machine Until String    ${node}_vat    ${command}    ${${node}_VPP_VAT_PROMPT}    delay=${delay}
+##    Should Contain     ${out}             ${${node}_VPP_VAT_PROMPT}
     [Return]           ${out}
 
 vat_term: Interfaces Dump
@@ -87,7 +94,7 @@ vat_term: Get Interface Index
 
 vat_term: Check VXLan Interface State
     [Arguments]          ${node}    ${name}    @{desired_state}
-    ${internal_name}=    vpp_ctl: Get Interface Internal Name    ${node}    ${name}
+    ${internal_name}=    Get Interface Internal Name    ${node}    ${name}
     ${internal_index}=   vat_term: Get Interface Index    ${node}    ${internal_name}
     ${vxlan_data}=       vat_term: VXLan Tunnel Dump    ${node}    sw_if_index ${internal_index}
     ${vxlan_data}=       Evaluate    json.loads('''${vxlan_data}''')    json
@@ -103,12 +110,12 @@ vat_term: Check VXLan Interface State
 
 vat_term: Check Afpacket Interface State
     [Arguments]          ${node}    ${name}    @{desired_state}
-    ${internal_name}=    vpp_ctl: Get Interface Internal Name    ${node}    ${name}
+    ${internal_name}=    Get Interface Internal Name    ${node}    ${name}
     ${internal_index}=   vat_term: Get Interface Index    ${node}    ${internal_name}
     ${interfaces}=       vat_term: Interfaces Dump    ${node}
     ${int_state}=        Get Interface State    ${interfaces}    ${internal_index}
     ${ipv4_list}=        vpp_term: Get Interface IPs    ${node}    ${internal_name}
-    ${config}=           vpp_ctl: Get VPP Interface Config As Json    ${node}    ${name}
+    ${config}=           Get VPP Interface Config As Json    ${node}    ${name}
     ${host_int}=         Set Variable    ${config["afpacket"]["host_if_name"]}
     #Should Contain       ${internal_name}    ${host_int}
     ${enabled}=          Set Variable    ${int_state["admin_up_down"]}
@@ -123,7 +130,7 @@ vat_term: Check Afpacket Interface State
 
 vat_term: Check Physical Interface State
     [Arguments]          ${node}    ${name}    @{desired_state}
-    ${internal_name}=    vpp_ctl: Get Interface Internal Name    ${node}    ${name}
+    ${internal_name}=    Get Interface Internal Name    ${node}    ${name}
     ${internal_index}=   vat_term: Get Interface Index    ${node}    ${internal_name}
     ${interfaces}=       vat_term: Interfaces Dump    ${node}
     ${int_state}=        Get Interface State    ${interfaces}    ${internal_index}
@@ -140,7 +147,7 @@ vat_term: Check Physical Interface State
 
 vat_term: Check Loopback Interface State
     [Arguments]          ${node}    ${name}    @{desired_state}
-    ${internal_name}=    vpp_ctl: Get Interface Internal Name    ${node}    ${name}
+    ${internal_name}=    Get Interface Internal Name    ${node}    ${name}
     ${internal_index}=   vat_term: Get Interface Index    ${node}    ${internal_name}
     ${interfaces}=       vat_term: Interfaces Dump    ${node}
     ${int_state}=        Get Interface State    ${interfaces}    ${internal_index}
@@ -160,7 +167,7 @@ vat_term: Check Loopback Interface State
 
 vat_term: Check Memif Interface State
     [Arguments]          ${node}    ${name}    @{desired_state}
-    ${internal_name}=    vpp_ctl: Get Interface Internal Name    ${node}    ${name}
+    ${internal_name}=    Get Interface Internal Name    ${node}    ${name}
     ${memif_info}=       vpp_term: Show Memif    ${node}    ${internal_name}
     ${memif_state}=      Parse Memif Info    ${memif_info}
     ${ipv4_list}=        vpp_term: Get Interface IPs    ${node}    ${internal_name}
@@ -177,7 +184,25 @@ vat_term: Check Memif Interface State
 
 vat_term: Check Bridge Domain State
     [Arguments]          ${node}    ${bd}    @{desired_state}
-    ${bd_id}=            vpp_ctl: Get Bridge Domain ID    ${node}    ${bd}
+    ${bd_id}=            Get Bridge Domain ID    ${node}    ${bd}
+    ${bd_dump}=          vat_term: Bridge Domain Dump    ${node}    ${bd_id}
+    ${bd_json}=          Evaluate    json.loads('''${bd_dump}''')    json
+    ${flood}=            Set Variable    ${bd_json[0]["flood"]}
+    ${forward}=          Set Variable    ${bd_json[0]["forward"]}
+    ${learn}=            Set Variable    ${bd_json[0]["learn"]}
+    ${bd_details}=       vpp_term: Show Bridge-Domain Detail    ${node}    ${bd_id}
+    ${bd_state}=         Parse BD Details    ${bd_details}
+    ${etcd_dump}=        Get ETCD Dump
+    ${etcd_json}=        Convert_ETCD_Dump_To_JSON    ${etcd_dump}
+    ${interfaces}=       Parse BD Interfaces    ${node}    ${bd}    ${etcd_json}    ${bd_dump}
+    ${actual_state}=     Create List    flood=${flood}    forward=${forward}    learn=${learn}
+    Append To List       ${actual_state}    @{bd_state}    @{interfaces}
+    List Should Contain Sub List    ${actual_state}    ${desired_state}
+    [Return]             ${actual_state}
+
+vat_term: Check Bridge Domain State IPv6
+    [Arguments]          ${node}    ${bd}    @{desired_state}
+    ${bd_id}=            Get Bridge Domain ID IPv6    ${node}    ${bd}
     ${bd_dump}=          vat_term: Bridge Domain Dump    ${node}    ${bd_id}
     ${bd_json}=          Evaluate    json.loads('''${bd_dump}''')    json
     ${flood}=            Set Variable    ${bd_json[0]["flood"]}
@@ -213,7 +238,7 @@ vat_term: Check BD Presence
     [Arguments]        ${node}     ${interfaces}    ${status}=${TRUE}
     ${indexes}=    Create List
     :FOR    ${int}    IN    @{interfaces}
-    \    ${sw_if_index}=    vpp_ctl: Get Interface Sw If Index    ${node}    ${int}
+    \    ${sw_if_index}=    Get Interface Sw If Index    ${node}    ${int}
     \    Append To List    ${indexes}    ${sw_if_index}
     ${bd_dump}=        vat_term: Bridge Domain Dump    ${node}
     ${result}=         Check BD Presence    ${bd_dump}    ${indexes}

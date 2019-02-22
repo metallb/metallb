@@ -29,6 +29,9 @@ var (
 	DefaultStartTimeout = time.Second * 15
 	// DefaultStopTimeout is default timeout for stopping agent
 	DefaultStopTimeout = time.Second * 5
+
+	// DumpStackTraceOnTimeout prints stack trace on timeout or agent start/stop
+	DumpStackTraceOnTimeout = os.Getenv("DUMP_STACK_ON_TIMEOUT") != ""
 )
 
 // Options specifies option list for the Agent

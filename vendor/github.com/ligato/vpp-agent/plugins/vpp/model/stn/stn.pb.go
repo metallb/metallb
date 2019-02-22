@@ -19,7 +19,7 @@ var _ = math.Inf
 const _ = proto.GoGoProtoPackageIsVersion2 // please upgrade the proto package
 
 type STN struct {
-	Rules                []*STN_Rule `protobuf:"bytes,1,rep,name=rules" json:"rules,omitempty"`
+	Rules                []*STN_Rule `protobuf:"bytes,1,rep,name=rules,proto3" json:"rules,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}    `json:"-"`
 	XXX_unrecognized     []byte      `json:"-"`
 	XXX_sizecache        int32       `json:"-"`

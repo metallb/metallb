@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package vpp.l2;
+
+option go_package = "github.com/ligato/vpp-agent/api/models/vpp/l2;vpp_l2";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+option (gogoproto.messagename_all) = true;
+
+message XConnectPair {
+    string receive_interface = 1;
+    string transmit_interface = 2;
+}

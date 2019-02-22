@@ -20,64 +20,89 @@ var _ = api.RegisterMessage
 var _ = struc.Pack
 var _ = bytes.NewBuffer
 
+// Services represents VPP binary API services:
+//
+//	"services": {
+//	    "vxlan_tunnel_dump": {
+//	        "reply": "vxlan_tunnel_details",
+//	        "stream": true
+//	    },
+//	    "vxlan_add_del_tunnel": {
+//	        "reply": "vxlan_add_del_tunnel_reply"
+//	    },
+//	    "sw_interface_set_vxlan_bypass": {
+//	        "reply": "sw_interface_set_vxlan_bypass_reply"
+//	    },
+//	    "vxlan_offload_rx": {
+//	        "reply": "vxlan_offload_rx_reply"
+//	    }
+//	},
+//
+type Services interface {
+	DumpVxlanTunnel(*VxlanTunnelDump) ([]*VxlanTunnelDetails, error)
+	SwInterfaceSetVxlanBypass(*SwInterfaceSetVxlanBypass) (*SwInterfaceSetVxlanBypassReply, error)
+	VxlanAddDelTunnel(*VxlanAddDelTunnel) (*VxlanAddDelTunnelReply, error)
+	VxlanOffloadRx(*VxlanOffloadRx) (*VxlanOffloadRxReply, error)
+}
+
 /* Messages */
 
-// VxlanAddDelTunnel represents the VPP binary API message 'vxlan_add_del_tunnel'.
+// VxlanAddDelTunnel represents VPP binary API message 'vxlan_add_del_tunnel':
 //
-//            "vxlan_add_del_tunnel",
-//            [
-//                "u16",
-//                "_vl_msg_id"
-//            ],
-//            [
-//                "u32",
-//                "client_index"
-//            ],
-//            [
-//                "u32",
-//                "context"
-//            ],
-//            [
-//                "u8",
-//                "is_add"
-//            ],
-//            [
-//                "u8",
-//                "is_ipv6"
-//            ],
-//            [
-//                "u32",
-//                "instance"
-//            ],
-//            [
-//                "u8",
-//                "src_address",
-//                16
-//            ],
-//            [
-//                "u8",
-//                "dst_address",
-//                16
-//            ],
-//            [
-//                "u32",
-//                "mcast_sw_if_index"
-//            ],
-//            [
-//                "u32",
-//                "encap_vrf_id"
-//            ],
-//            [
-//                "u32",
-//                "decap_next_index"
-//            ],
-//            [
-//                "u32",
-//                "vni"
-//            ],
-//            {
-//                "crc": "0x00f4bdd0"
-//            }
+//	"vxlan_add_del_tunnel",
+//	[
+//	    "u16",
+//	    "_vl_msg_id"
+//	],
+//	[
+//	    "u32",
+//	    "client_index"
+//	],
+//	[
+//	    "u32",
+//	    "context"
+//	],
+//	[
+//	    "u8",
+//	    "is_add"
+//	],
+//	[
+//	    "u8",
+//	    "is_ipv6"
+//	],
+//	[
+//	    "u32",
+//	    "instance"
+//	],
+//	[
+//	    "u8",
+//	    "src_address",
+//	    16
+//	],
+//	[
+//	    "u8",
+//	    "dst_address",
+//	    16
+//	],
+//	[
+//	    "u32",
+//	    "mcast_sw_if_index"
+//	],
+//	[
+//	    "u32",
+//	    "encap_vrf_id"
+//	],
+//	[
+//	    "u32",
+//	    "decap_next_index"
+//	],
+//	[
+//	    "u32",
+//	    "vni"
+//	],
+//	{
+//	    "crc": "0x00f4bdd0"
+//	}
 //
 type VxlanAddDelTunnel struct {
 	IsAdd          uint8
@@ -101,28 +126,28 @@ func (*VxlanAddDelTunnel) GetMessageType() api.MessageType {
 	return api.RequestMessage
 }
 
-// VxlanAddDelTunnelReply represents the VPP binary API message 'vxlan_add_del_tunnel_reply'.
+// VxlanAddDelTunnelReply represents VPP binary API message 'vxlan_add_del_tunnel_reply':
 //
-//            "vxlan_add_del_tunnel_reply",
-//            [
-//                "u16",
-//                "_vl_msg_id"
-//            ],
-//            [
-//                "u32",
-//                "context"
-//            ],
-//            [
-//                "i32",
-//                "retval"
-//            ],
-//            [
-//                "u32",
-//                "sw_if_index"
-//            ],
-//            {
-//                "crc": "0xfda5941f"
-//            }
+//	"vxlan_add_del_tunnel_reply",
+//	[
+//	    "u16",
+//	    "_vl_msg_id"
+//	],
+//	[
+//	    "u32",
+//	    "context"
+//	],
+//	[
+//	    "i32",
+//	    "retval"
+//	],
+//	[
+//	    "u32",
+//	    "sw_if_index"
+//	],
+//	{
+//	    "crc": "0xfda5941f"
+//	}
 //
 type VxlanAddDelTunnelReply struct {
 	Retval    int32
@@ -139,28 +164,28 @@ func (*VxlanAddDelTunnelReply) GetMessageType() api.MessageType {
 	return api.ReplyMessage
 }
 
-// VxlanTunnelDump represents the VPP binary API message 'vxlan_tunnel_dump'.
+// VxlanTunnelDump represents VPP binary API message 'vxlan_tunnel_dump':
 //
-//            "vxlan_tunnel_dump",
-//            [
-//                "u16",
-//                "_vl_msg_id"
-//            ],
-//            [
-//                "u32",
-//                "client_index"
-//            ],
-//            [
-//                "u32",
-//                "context"
-//            ],
-//            [
-//                "u32",
-//                "sw_if_index"
-//            ],
-//            {
-//                "crc": "0x529cb13f"
-//            }
+//	"vxlan_tunnel_dump",
+//	[
+//	    "u16",
+//	    "_vl_msg_id"
+//	],
+//	[
+//	    "u32",
+//	    "client_index"
+//	],
+//	[
+//	    "u32",
+//	    "context"
+//	],
+//	[
+//	    "u32",
+//	    "sw_if_index"
+//	],
+//	{
+//	    "crc": "0x529cb13f"
+//	}
 //
 type VxlanTunnelDump struct {
 	SwIfIndex uint32
@@ -176,58 +201,58 @@ func (*VxlanTunnelDump) GetMessageType() api.MessageType {
 	return api.RequestMessage
 }
 
-// VxlanTunnelDetails represents the VPP binary API message 'vxlan_tunnel_details'.
+// VxlanTunnelDetails represents VPP binary API message 'vxlan_tunnel_details':
 //
-//            "vxlan_tunnel_details",
-//            [
-//                "u16",
-//                "_vl_msg_id"
-//            ],
-//            [
-//                "u32",
-//                "context"
-//            ],
-//            [
-//                "u32",
-//                "sw_if_index"
-//            ],
-//            [
-//                "u32",
-//                "instance"
-//            ],
-//            [
-//                "u8",
-//                "src_address",
-//                16
-//            ],
-//            [
-//                "u8",
-//                "dst_address",
-//                16
-//            ],
-//            [
-//                "u32",
-//                "mcast_sw_if_index"
-//            ],
-//            [
-//                "u32",
-//                "encap_vrf_id"
-//            ],
-//            [
-//                "u32",
-//                "decap_next_index"
-//            ],
-//            [
-//                "u32",
-//                "vni"
-//            ],
-//            [
-//                "u8",
-//                "is_ipv6"
-//            ],
-//            {
-//                "crc": "0xce38e127"
-//            }
+//	"vxlan_tunnel_details",
+//	[
+//	    "u16",
+//	    "_vl_msg_id"
+//	],
+//	[
+//	    "u32",
+//	    "context"
+//	],
+//	[
+//	    "u32",
+//	    "sw_if_index"
+//	],
+//	[
+//	    "u32",
+//	    "instance"
+//	],
+//	[
+//	    "u8",
+//	    "src_address",
+//	    16
+//	],
+//	[
+//	    "u8",
+//	    "dst_address",
+//	    16
+//	],
+//	[
+//	    "u32",
+//	    "mcast_sw_if_index"
+//	],
+//	[
+//	    "u32",
+//	    "encap_vrf_id"
+//	],
+//	[
+//	    "u32",
+//	    "decap_next_index"
+//	],
+//	[
+//	    "u32",
+//	    "vni"
+//	],
+//	[
+//	    "u8",
+//	    "is_ipv6"
+//	],
+//	{
+//	    "crc": "0xce38e127"
+//	}
 //
 type VxlanTunnelDetails struct {
 	SwIfIndex      uint32
@@ -251,36 +276,36 @@ func (*VxlanTunnelDetails) GetMessageType() api.MessageType {
 	return api.ReplyMessage
 }
 
-// SwInterfaceSetVxlanBypass represents the VPP binary API message 'sw_interface_set_vxlan_bypass'.
+// SwInterfaceSetVxlanBypass represents VPP binary API message 'sw_interface_set_vxlan_bypass':
 //
-//            "sw_interface_set_vxlan_bypass",
-//            [
-//                "u16",
-//                "_vl_msg_id"
-//            ],
-//            [
-//                "u32",
-//                "client_index"
-//            ],
-//            [
-//                "u32",
-//                "context"
-//            ],
-//            [
-//                "u32",
-//                "sw_if_index"
-//            ],
-//            [
-//                "u8",
-//                "is_ipv6"
-//            ],
-//            [
-//                "u8",
-//                "enable"
-//            ],
-//            {
-//                "crc": "0xe74ca095"
-//            }
+//	"sw_interface_set_vxlan_bypass",
+//	[
+//	    "u16",
+//	    "_vl_msg_id"
+//	],
+//	[
+//	    "u32",
+//	    "client_index"
+//	],
+//	[
+//	    "u32",
+//	    "context"
+//	],
+//	[
+//	    "u32",
+//	    "sw_if_index"
+//	],
+//	[
+//	    "u8",
+//	    "is_ipv6"
+//	],
+//	[
+//	    "u8",
+//	    "enable"
+//	],
+//	{
+//	    "crc": "0xe74ca095"
+//	}
 //
 type SwInterfaceSetVxlanBypass struct {
 	SwIfIndex uint32
@@ -298,24 +323,24 @@ func (*SwInterfaceSetVxlanBypass) GetMessageType() api.MessageType {
 	return api.RequestMessage
 }
 
-// SwInterfaceSetVxlanBypassReply represents the VPP binary API message 'sw_interface_set_vxlan_bypass_reply'.
+// SwInterfaceSetVxlanBypassReply represents VPP binary API message 'sw_interface_set_vxlan_bypass_reply':
 //
-//            "sw_interface_set_vxlan_bypass_reply",
-//            [
-//                "u16",
-//                "_vl_msg_id"
-//            ],
-//            [
-//                "u32",
-//                "context"
-//            ],
-//            [
-//                "i32",
-//                "retval"
-//            ],
-//            {
-//                "crc": "0xe8d4e804"
-//            }
+//	"sw_interface_set_vxlan_bypass_reply",
+//	[
+//	    "u16",
+//	    "_vl_msg_id"
+//	],
+//	[
+//	    "u32",
+//	    "context"
+//	],
+//	[
+//	    "i32",
+//	    "retval"
+//	],
+//	{
+//	    "crc": "0xe8d4e804"
+//	}
 //
 type SwInterfaceSetVxlanBypassReply struct {
 	Retval int32
@@ -331,36 +356,36 @@ func (*SwInterfaceSetVxlanBypassReply) GetMessageType() api.MessageType {
 	return api.ReplyMessage
 }
 
-// VxlanOffloadRx represents the VPP binary API message 'vxlan_offload_rx'.
+// VxlanOffloadRx represents VPP binary API message 'vxlan_offload_rx':
 //
-//            "vxlan_offload_rx",
-//            [
-//                "u16",
-//                "_vl_msg_id"
-//            ],
-//            [
-//                "u32",
-//                "client_index"
-//            ],
-//            [
-//                "u32",
-//                "context"
-//            ],
-//            [
-//                "u32",
-//                "hw_if_index"
-//            ],
-//            [
-//                "u32",
-//                "sw_if_index"
-//            ],
-//            [
-//                "u8",
-//                "enable"
-//            ],
-//            {
-//                "crc": "0xf0b08786"
-//            }
+//	"vxlan_offload_rx",
+//	[
+//	    "u16",
+//	    "_vl_msg_id"
+//	],
+//	[
+//	    "u32",
+//	    "client_index"
+//	],
+//	[
+//	    "u32",
+//	    "context"
+//	],
+//	[
+//	    "u32",
+//	    "hw_if_index"
+//	],
+//	[
+//	    "u32",
+//	    "sw_if_index"
+//	],
+//	[
+//	    "u8",
+//	    "enable"
+//	],
+//	{
+//	    "crc": "0xf0b08786"
+//	}
 //
 type VxlanOffloadRx struct {
 	HwIfIndex uint32
@@ -378,24 +403,24 @@ func (*VxlanOffloadRx) GetMessageType() api.MessageType {
 	return api.RequestMessage
 }
 
-// VxlanOffloadRxReply represents the VPP binary API message 'vxlan_offload_rx_reply'.
+// VxlanOffloadRxReply represents VPP binary API message 'vxlan_offload_rx_reply':
 //
-//            "vxlan_offload_rx_reply",
-//            [
-//                "u16",
-//                "_vl_msg_id"
-//            ],
-//            [
-//                "u32",
-//                "context"
-//            ],
-//            [
-//                "i32",
-//                "retval"
-//            ],
-//            {
-//                "crc": "0xe8d4e804"
-//            }
+//	"vxlan_offload_rx_reply",
+//	[
+//	    "u16",
+//	    "_vl_msg_id"
+//	],
+//	[
+//	    "u32",
+//	    "context"
+//	],
+//	[
+//	    "i32",
+//	    "retval"
+//	],
+//	{
+//	    "crc": "0xe8d4e804"
+//	}
 //
 type VxlanOffloadRxReply struct {
 	Retval int32
@@ -409,15 +434,6 @@ func (*VxlanOffloadRxReply) GetCrcString() string {
 }
 func (*VxlanOffloadRxReply) GetMessageType() api.MessageType {
 	return api.ReplyMessage
-}
-
-/* Services */
-
-type Services interface {
-	DumpVxlanTunnel(*VxlanTunnelDump) (*VxlanTunnelDetails, error)
-	SwInterfaceSetVxlanBypass(*SwInterfaceSetVxlanBypass) (*SwInterfaceSetVxlanBypassReply, error)
-	VxlanAddDelTunnel(*VxlanAddDelTunnel) (*VxlanAddDelTunnelReply, error)
-	VxlanOffloadRx(*VxlanOffloadRx) (*VxlanOffloadRxReply, error)
 }
 
 func init() {

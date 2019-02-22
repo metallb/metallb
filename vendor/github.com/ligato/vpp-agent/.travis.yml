@@ -1,0 +1,58 @@
+---
+dist: trusty
+sudo: required
+
+language: go
+go:
+  - "1.11.x"
+
+addons:
+  apt:
+    packages:
+      - npm
+
+go_import_path: github.com/ligato/vpp-agent
+
+git:
+  depth: 10
+  submodules: false
+
+cache:
+  directories:
+    - $HOME/.cache/go-build
+    - $HOME/build-cache
+    - $HOME/.npm
+    - $(npm config get prefix)/lib/node_modules
+
+env:
+  - GO_BUILD_TAGS=mockvpp
+
+before_install:
+  - make travis
+  - make get-linkcheck
+  - make get-linters
+  - make get-dep
+  - go get github.com/mattn/goveralls
+
+script:
+  - make yamllint
+  - make check-links || true
+  - make lint
+  - make dep-check
+  - make verify-binapi
+  - make
+  - make test-cover
+
+after_success:
+  - goveralls -coverprofile=/tmp/coverage.out -service=travis-ci
+
+notifications:
+  slack:
+    rooms:
+      - ligato:xLH4aTwGx1dexPaloAegQ74O
+    on_success: change
+    on_failure: always
+    template:
+      - "Build <%{build_url}|#%{build_number}> of *%{repository_slug}* on branch _%{branch}_ in PR: <%{pull_request_url}|#%{pull_request_number}>"
+      - "> `%{commit_subject}` _by %{author}_ (<%{compare_url}|%{commit}>)"
+      - "*%{message}* (_%{duration}_)"

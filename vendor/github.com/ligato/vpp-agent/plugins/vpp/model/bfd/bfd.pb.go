@@ -46,9 +46,9 @@ func (SingleHopBFD_Key_AuthenticationType) EnumDescriptor() ([]byte, []int) {
 }
 
 type SingleHopBFD struct {
-	Sessions             []*SingleHopBFD_Session    `protobuf:"bytes,1,rep,name=sessions" json:"sessions,omitempty"`
-	Keys                 []*SingleHopBFD_Key        `protobuf:"bytes,2,rep,name=keys" json:"keys,omitempty"`
-	EchoFunction         *SingleHopBFD_EchoFunction `protobuf:"bytes,3,opt,name=echo_function,json=echoFunction" json:"echo_function,omitempty"`
+	Sessions             []*SingleHopBFD_Session    `protobuf:"bytes,1,rep,name=sessions,proto3" json:"sessions,omitempty"`
+	Keys                 []*SingleHopBFD_Key        `protobuf:"bytes,2,rep,name=keys,proto3" json:"keys,omitempty"`
+	EchoFunction         *SingleHopBFD_EchoFunction `protobuf:"bytes,3,opt,name=echo_function,json=echoFunction,proto3" json:"echo_function,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                   `json:"-"`
 	XXX_unrecognized     []byte                     `json:"-"`
 	XXX_sizecache        int32                      `json:"-"`
@@ -107,7 +107,7 @@ type SingleHopBFD_Session struct {
 	DesiredMinTxInterval  uint32                               `protobuf:"varint,8,opt,name=desired_min_tx_interval,json=desiredMinTxInterval,proto3" json:"desired_min_tx_interval,omitempty"`
 	RequiredMinRxInterval uint32                               `protobuf:"varint,9,opt,name=required_min_rx_interval,json=requiredMinRxInterval,proto3" json:"required_min_rx_interval,omitempty"`
 	DetectMultiplier      uint32                               `protobuf:"varint,10,opt,name=detect_multiplier,json=detectMultiplier,proto3" json:"detect_multiplier,omitempty"`
-	Authentication        *SingleHopBFD_Session_Authentication `protobuf:"bytes,11,opt,name=authentication" json:"authentication,omitempty"`
+	Authentication        *SingleHopBFD_Session_Authentication `protobuf:"bytes,11,opt,name=authentication,proto3" json:"authentication,omitempty"`
 	XXX_NoUnkeyedLiteral  struct{}                             `json:"-"`
 	XXX_unrecognized      []byte                               `json:"-"`
 	XXX_sizecache         int32                                `json:"-"`

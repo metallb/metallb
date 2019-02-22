@@ -172,6 +172,14 @@ func TurnOffGoUnrecognizedAll(file *descriptor.FileDescriptorProto) {
 	SetBoolFileOption(gogoproto.E_GoprotoUnrecognizedAll, false)(file)
 }
 
+func TurnOffGoUnkeyedAll(file *descriptor.FileDescriptorProto) {
+	SetBoolFileOption(gogoproto.E_GoprotoUnkeyedAll, false)(file)
+}
+
+func TurnOffGoSizecacheAll(file *descriptor.FileDescriptorProto) {
+	SetBoolFileOption(gogoproto.E_GoprotoSizecacheAll, false)(file)
+}
+
 func TurnOffGogoImport(file *descriptor.FileDescriptorProto) {
 	SetBoolFileOption(gogoproto.E_GogoprotoImport, false)(file)
 }

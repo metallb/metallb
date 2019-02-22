@@ -3,7 +3,7 @@
   "default": ${isdefault},
   "namespace": {
       "name": "${namespace}",
-      "type": 2
+      "type": 1
   },
   "interface": "${interface}",
   "gw_addr": "${next_hop}",

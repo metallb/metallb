@@ -3,7 +3,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:3fa2890ef3ed05d15ce02afff2c464c0f09a6945288fc9f3bc2746191873e988"
+  digest = "1:08eb037bd34c7d0e9b50cbd3d8dff5f16481af15e5d0d440e4daa52772e9a834"
   name = "git.fd.io/govpp.git"
   packages = [
     "adapter",
@@ -16,7 +16,7 @@
     "core",
   ]
   pruneopts = "UT"
-  revision = "62d19032621c7db801b313a1e19e787cfb1fbc3e"
+  revision = "2323d3ffe6e66ea7ffa40be232aa54c1d24c8651"
 
 [[projects]]
   branch = "master"
@@ -336,10 +336,19 @@
   version = "v4.1.0"
 
 [[projects]]
-  digest = "1:9b56c3d59d7899c60a02f4d0e8592fe70b19f3b6b47553849b20fe63a62efe66"
+  digest = "1:3fdbd53962bb796a751552e6be1fb3dbd293d6d5851c0c48f611a82480769d7c"
+  name = "github.com/gogo/googleapis"
+  packages = ["google/rpc"]
+  pruneopts = "UT"
+  revision = "8558fb44d2f1fc223118afc694129d2c2d2924d1"
+  version = "v1.1.0"
+
+[[projects]]
+  digest = "1:f5ccd717b5f093cbabc51ee2e7a5979b92f17d217f9031d6d64f337101c408e4"
   name = "github.com/gogo/protobuf"
   packages = [
     "gogoproto",
+    "jsonpb",
     "plugin/compare",
     "plugin/defaultcheck",
     "plugin/description",
@@ -363,12 +372,22 @@
     "protoc-gen-gogo/generator/internal/remap",
     "protoc-gen-gogo/grpc",
     "protoc-gen-gogo/plugin",
+    "sortkeys",
+    "types",
     "vanity",
     "vanity/command",
   ]
+  pruneopts = "T"
+  revision = "4cbf7e384e768b4e01799441fdf2a706a5635ae7"
+  version = "v1.2.0"
+
+[[projects]]
+  digest = "1:a93379ca78a24c7fad97ff3bffdc7f2285ff61f26dd6beedeab0e1391718e95c"
+  name = "github.com/gogo/status"
+  packages = ["."]
   pruneopts = "UT"
-  revision = "636bf0302bc95575d69441b25a2603156ffdddf1"
-  version = "v1.1.1"
+  revision = "23951469965b0104342ad7b9625586150b6baf5b"
+  version = "v1.0.2"
 
 [[projects]]
   branch = "master"
@@ -457,8 +476,8 @@
   version = "v1.0"
 
 [[projects]]
-  branch = "master"
-  digest = "1:f2ea352b0b7340255d66e7578a5e12bb4e594d3207c0e778327865a73d213119"
+  branch = "dev"
+  digest = "1:d683e93d20eefe52454f6fac3eec057bebf273a925c5cba9b678a938957cfe4b"
   name = "github.com/ligato/cn-infra"
   packages = [
     "agent",
@@ -501,7 +520,7 @@
     "utils/safeclose",
   ]
   pruneopts = "T"
-  revision = "d988900fbcc23fd235cf6a47d403fe12857064e9"
+  revision = "7332c57ac284a7aa1778ace0005ddaf2552698d5"
 
 [[projects]]
   branch = "master"
@@ -962,8 +981,12 @@
     "github.com/fsouza/go-dockerclient",
     "github.com/ghodss/yaml",
     "github.com/go-errors/errors",
+    "github.com/gogo/protobuf/gogoproto",
+    "github.com/gogo/protobuf/jsonpb",
     "github.com/gogo/protobuf/proto",
     "github.com/gogo/protobuf/protoc-gen-gogo",
+    "github.com/gogo/protobuf/types",
+    "github.com/gogo/status",
     "github.com/ligato/cn-infra/agent",
     "github.com/ligato/cn-infra/config",
     "github.com/ligato/cn-infra/datasync",
@@ -971,6 +994,7 @@
     "github.com/ligato/cn-infra/datasync/kvdbsync/local",
     "github.com/ligato/cn-infra/datasync/msgsync",
     "github.com/ligato/cn-infra/datasync/resync",
+    "github.com/ligato/cn-infra/datasync/syncbase",
     "github.com/ligato/cn-infra/db/keyval",
     "github.com/ligato/cn-infra/db/keyval/consul",
     "github.com/ligato/cn-infra/db/keyval/etcd",
@@ -1001,6 +1025,7 @@
     "github.com/namsral/flag",
     "github.com/onsi/gomega",
     "github.com/opencontainers/runc",
+    "github.com/pkg/errors",
     "github.com/prometheus/client_golang/prometheus",
     "github.com/prometheus/client_golang/prometheus/promhttp",
     "github.com/sirupsen/logrus",
@@ -1009,7 +1034,9 @@
     "github.com/vishvananda/netlink",
     "github.com/vishvananda/netns",
     "golang.org/x/net/context",
+    "golang.org/x/sys/unix",
     "google.golang.org/grpc",
+    "google.golang.org/grpc/codes",
   ]
   solver-name = "gps-cdcl"
   solver-version = 1

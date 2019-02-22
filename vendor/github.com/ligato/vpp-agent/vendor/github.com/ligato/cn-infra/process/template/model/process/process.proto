@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+// Package process provides a data model for process manager plugin template
+package process;
+
+message Template {                  /* Template is process definition which can be stored as file and read on plugin
+                                       startup */
+    string name = 1;                /* Serves as a filename for given template */
+    string cmd = 2;                 /* Process command */
+    message pOptions {
+        repeated string args = 1;   /* Arguments process will be started with */
+        int32 restart = 2;          /* Number of automatic restarts, <0> means no restart, <-1> always restart */
+        bool detach = 3;            /* Set to true if process should be detached from parent application on startup */
+        bool run_on_startup = 4;    /* Set to true if process is expected to start right after plugin initialization */
+        bool notify = 5;            /* Create a notification channel (can be obtained via `GetNotification`) where
+                                       all status change events can be watched*/
+        bool auto_terminate = 6;    /* This option ensures that every process which turns zombie/dead is automatically
+                                       released */
+    }
+    pOptions p_options = 3;
+}

@@ -61,7 +61,7 @@ func main() {
 	// Initialize proto decorator.
 	protoBroker := kvproto.NewProtoWrapper(broker)
 
-	respChan := make(chan keyval.ProtoWatchResp, 0)
+	respChan := make(chan datasync.ProtoWatchResp, 0)
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, os.Interrupt)
 

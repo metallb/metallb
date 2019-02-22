@@ -1,0 +1,10 @@
+{
+	"name": "arp1",
+	"interface": "veth1",
+	"ip_addr": "192.168.10.21",
+	"hw_address": "59:6C:45:59:8E:BD",
+	"namespace": {
+		"name": "ns1",
+		"type": 3
+	}
+}

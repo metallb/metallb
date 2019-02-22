@@ -37,22 +37,20 @@ Configure Environment
     Configure Environment 7
 
 Configure Interfaces
-    Write To Machine    vpp_agent_ctl    vpp-agent-ctl ${AGENT_VPP_ETCD_CONF_PATH} -ps
+    Put Veth Interface With IP And Namespace       node=agent_vpp_1    name=node1_veth    namespace=node_1    mac=12:11:11:11:11:11    peer=vpp1_veth1    ip=10.0.0.10
+    Put Veth Interface And Namespace    node=agent_vpp_1    name=vpp1_veth1    namespace=agent_vpp_1     mac=12:12:12:12:12:11    peer=node1_veth
+    Put Afpacket Interface    node=agent_vpp_1    name=vpp1_afpacket1    mac=a2:a1:a1:a1:a1:a1    host_int=vpp1_veth1
 
-    vpp_ctl: Put Veth Interface With IP And Namespace       node=agent_vpp_1    name=node1_veth    namespace=node_1    mac=12:11:11:11:11:11    peer=vpp1_veth1    ip=10.0.0.10
-    vpp_ctl: Put Veth Interface And Namespace    node=agent_vpp_1    name=vpp1_veth1    namespace=agent_vpp_1     mac=12:12:12:12:12:11    peer=node1_veth
-    vpp_ctl: Put Afpacket Interface    node=agent_vpp_1    name=vpp1_afpacket1    mac=a2:a1:a1:a1:a1:a1    host_int=vpp1_veth1
+    Put Veth Interface With IP And Namespace       node=agent_vpp_1    name=node2_veth    namespace=node_2    mac=12:11:11:11:11:12    peer=vpp1_veth2    ip=10.0.0.11
+    Put Veth Interface And Namespace    node=agent_vpp_1    name=vpp1_veth2    namespace=agent_vpp_1     mac=12:12:12:12:12:12    peer=node2_veth
+    Put Afpacket Interface    node=agent_vpp_1    name=vpp1_afpacket2    mac=a2:a1:a1:a1:a1:a2    host_int=vpp1_veth2
 
-    vpp_ctl: Put Veth Interface With IP And Namespace       node=agent_vpp_1    name=node2_veth    namespace=node_2    mac=12:11:11:11:11:12    peer=vpp1_veth2    ip=10.0.0.11
-    vpp_ctl: Put Veth Interface And Namespace    node=agent_vpp_1    name=vpp1_veth2    namespace=agent_vpp_1     mac=12:12:12:12:12:12    peer=node2_veth
-    vpp_ctl: Put Afpacket Interface    node=agent_vpp_1    name=vpp1_afpacket2    mac=a2:a1:a1:a1:a1:a2    host_int=vpp1_veth2
-
-    vpp_ctl: Put Veth Interface With IP And Namespace       node=agent_vpp_1    name=node3_veth    namespace=node_3    mac=12:11:11:11:11:13    peer=vpp1_veth3    ip=10.0.0.12
-    vpp_ctl: Put Veth Interface And Namespace    node=agent_vpp_1    name=vpp1_veth3    namespace=agent_vpp_1     mac=12:12:12:12:12:13    peer=node3_veth
-    vpp_ctl: Put Afpacket Interface    node=agent_vpp_1    name=vpp1_afpacket3    mac=a2:a1:a1:a1:a1:a3    host_int=vpp1_veth3
+    Put Veth Interface With IP And Namespace       node=agent_vpp_1    name=node3_veth    namespace=node_3    mac=12:11:11:11:11:13    peer=vpp1_veth3    ip=10.0.0.12
+    Put Veth Interface And Namespace    node=agent_vpp_1    name=vpp1_veth3    namespace=agent_vpp_1     mac=12:12:12:12:12:13    peer=node3_veth
+    Put Afpacket Interface    node=agent_vpp_1    name=vpp1_afpacket3    mac=a2:a1:a1:a1:a1:a3    host_int=vpp1_veth3
 
     @{ints}=    Create List    vpp1_afpacket1    vpp1_afpacket2    vpp1_afpacket3
-    vpp_ctl: Put Bridge Domain    node=agent_vpp_1    name=east-west-bd    ints=${ints}
+    Put Bridge Domain    node=agent_vpp_1    name=east-west-bd    ints=${ints}
 
     Sleep    ${RESYNC_SLEEP}
     Show Interfaces And Other Objects

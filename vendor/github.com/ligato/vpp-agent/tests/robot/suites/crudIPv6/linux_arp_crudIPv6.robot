@@ -41,12 +41,12 @@ Show Interfaces Before Setup
 
 Add Veth1 Interface
     linux: Interface Not Exists    node=agent_vpp_1    mac=${VETH1_MAC}
-    vpp_ctl: Put Veth Interface With IP    node=agent_vpp_1    name=vpp1_veth1    mac=${VETH1_MAC}    peer=vpp1_veth2    ip=${VETH1_IP}    prefix=${PREFIX}    mtu=1500
+    Put Veth Interface With IP    node=agent_vpp_1    name=vpp1_veth1    mac=${VETH1_MAC}    peer=vpp1_veth2    ip=${VETH1_IP}    prefix=${PREFIX}    mtu=1500
     linux: Interface Not Exists    node=agent_vpp_1    mac=${VETH1_MAC}
 
 Add Veth2 Interface
     linux: Interface Not Exists    node=agent_vpp_1    mac=${VETH2_MAC}
-    vpp_ctl: Put Veth Interface    node=agent_vpp_1    name=vpp1_veth2    mac=${VETH2_MAC}    peer=vpp1_veth1
+    Put Veth Interface    node=agent_vpp_1    name=vpp1_veth2    mac=${VETH2_MAC}    peer=vpp1_veth1
     Show Info
 
 Check That Veth1 And Veth2 Interfaces Are Created
@@ -57,7 +57,7 @@ Check That Veth1 And Veth2 Interfaces Are Created
 
 
 ADD Afpacket Interface
-    vpp_ctl: Put Afpacket Interface    node=agent_vpp_1    name=vpp1_afpacket1    mac=a2:a1:a1:a1:a1:a1    host_int=vpp1_veth2
+    Put Afpacket Interface    node=agent_vpp_1    name=vpp1_afpacket1    mac=a2:a1:a1:a1:a1:a1    host_int=vpp1_veth2
 
 Check AFpacket Interface Created
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_1    mac=a2:a1:a1:a1:a1:a1
@@ -65,43 +65,37 @@ Check AFpacket Interface Created
 
 
 Add ARPs
-    vpp_ctl: Put Linux ARP    agent_vpp_1    vpp1_veth1  veth1_arp  ${ARP_IP1}    32:51:51:51:51:51
-    vpp_ctl: Put Linux ARP    agent_vpp_1    vpp1_veth2  veth2_arp  ${ARP_IP2}    32:51:51:51:51:52
-    vpp_ctl: Put Linux ARP    agent_vpp_1    lo          loopback_arp  ${ARP_IP2}    32:51:51:51:51:52
-    #vpp_ctl: Put Linux ARP    agent_vpp_1    eth0        eth_arp  ${ARP_IP2}    32:51:51:51:51:52
+    Put Linux ARP    agent_vpp_1    vpp1_veth1  veth1_arp  ${ARP_IP1}    32:51:51:51:51:51
+    Put Linux ARP    agent_vpp_1    vpp1_veth2  veth2_arp  ${ARP_IP2}    32:51:51:51:51:52
+    #Put Linux ARP    agent_vpp_1    eth0        eth_arp  ${ARP_IP2}    32:51:51:51:51:52
 
 Check ARPSs
     ${out}=       Execute In Container    agent_vpp_1    ip neigh
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    Should Contain     ${out}    ${ARP_IP2} dev vpp1_veth2 lladdr 32:51:51:51:51:52 PERMANENT
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    Should Contain     ${out}    ${ARP_IP1} dev vpp1_veth1 lladdr 32:51:51:51:51:51 PERMANENT
     #Should Contain     ${out}    ${ARP_IP2} dev eth0 lladdr 32:51:51:51:51:52 PERMANENT
-    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    Should Contain     ${out}    ${ARP_IP2} dev lo lladdr 32:51:51:51:51:52 PERMANENT
 
 Change ARPs
-    vpp_ctl: Put Linux ARP    agent_vpp_1    vpp1_veth1  veth1_arp  ${ARP_IP3}    32:61:51:51:51:51
-    vpp_ctl: Put Linux ARP    agent_vpp_1    vpp1_veth2  veth2_arp  ${ARP_IP4}    32:61:51:51:51:52
-    vpp_ctl: Put Linux ARP    agent_vpp_1    lo          loopback_arp  ${ARP_IP4}    32:61:51:51:51:52
-    #vpp_ctl: Put Linux ARP    agent_vpp_1    eth0        eth_arp  ${ARP_IP4}    32:61:51:51:51:52
+    Put Linux ARP    agent_vpp_1    vpp1_veth1  veth1_arp  ${ARP_IP3}    32:61:51:51:51:51
+    Put Linux ARP    agent_vpp_1    vpp1_veth2  veth2_arp  ${ARP_IP4}    32:61:51:51:51:52
+    #Put Linux ARP    agent_vpp_1    eth0        eth_arp  ${ARP_IP4}    32:61:51:51:51:52
 
 Check ARPSs Again
     ${out}=       Execute In Container    agent_vpp_1    ip neigh
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    Should Contain     ${out}    ${ARP_IP4} dev vpp1_veth2 lladdr 32:61:51:51:51:52 PERMANENT
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    Should Contain     ${out}    ${ARP_IP3} dev vpp1_veth1 lladdr 32:61:51:51:51:51 PERMANENT
     #Should Contain     ${out}    ${ARP_IP4} dev eth0 lladdr 32:61:51:51:51:52 PERMANENT
-    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    Should Contain     ${out}    ${ARP_IP4} dev lo lladdr 32:61:51:51:51:52 PERMANENT
 
 Delete ARPs
-    vpp_ctl: Delete Linux ARP    agent_vpp_1    veth1_arp
-    vpp_ctl: Delete Linux ARP    agent_vpp_1    veth2_arp
-    vpp_ctl: Delete Linux ARP    agent_vpp_1    loopback_arp
-    #vpp_ctl: Delete Linux ARP    agent_vpp_1    eth_arp
+    Delete Linux ARP    agent_vpp_1    veth1_arp
+    Delete Linux ARP    agent_vpp_1    veth2_arp
+    #Delete Linux ARP    agent_vpp_1    eth_arp
 
 Check ARPSs After Delete
     ${out}=       Execute In Container    agent_vpp_1    ip neigh
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    Should Not Contain     ${out}    ${ARP_IP4} dev vpp1_veth2 lladdr 32:61:51:51:51:52 PERMANENT
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    Should Not Contain     ${out}    ${ARP_IP3} dev vpp1_veth1 lladdr 32:61:51:51:51:51 PERMANENT
     #Should Not Contain     ${out}    ${ARP_IP4} dev eth0 lladdr 32:61:51:51:51:52 PERMANENT
-    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    Should Not Contain     ${out}    ${ARP_IP4} dev lo lladdr 32:61:51:51:51:52 PERMANENT
 
 
 *** Keywords ***

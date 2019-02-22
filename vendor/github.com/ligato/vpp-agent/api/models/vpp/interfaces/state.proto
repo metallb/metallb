@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package vpp.interfaces;
+
+option go_package = "github.com/ligato/vpp-agent/api/models/vpp/interfaces;vpp_interfaces";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+option (gogoproto.messagename_all) = true;
+
+import "models/vpp/interfaces/interface.proto";
+
+message InterfaceState {
+    string name = 1;
+    string internal_name = 2;
+    interfaces.Interface.Type type = 3;
+    uint32 if_index = 4;
+
+    enum Status {
+        UNKNOWN_STATUS = 0;
+        UP = 1;
+        DOWN = 2;
+        DELETED = 3;
+    };
+    Status admin_status = 5;
+    Status oper_status = 6;
+
+    int64 last_change = 7;
+    string phys_address = 8;
+    uint64 speed = 9;
+    uint32 mtu = 10;
+
+    enum Duplex {
+        UNKNOWN_DUPLEX = 0;
+        HALF = 1;
+        FULL = 2;
+    };
+    Duplex duplex = 11;
+
+    message Statistics {
+        uint64 in_packets = 1;
+        uint64 in_bytes = 2;
+        uint64 out_packets = 3;
+        uint64 out_bytes = 4;
+        uint64 drop_packets = 5;
+        uint64 punt_packets = 6;
+        uint64 ipv4_packets = 7;
+        uint64 ipv6_packets = 8;
+        uint64 in_nobuf_packets = 9;
+        uint64 in_miss_packets = 10;
+        uint64 in_error_packets = 11;
+        uint64 out_error_packets = 12;
+    }
+    Statistics statistics = 100;
+}
+
+message InterfaceNotification {
+    enum NotifType {
+        UNKNOWN = 0;
+        UPDOWN = 1;
+        COUNTERS = 2;
+    }
+    NotifType type = 1;
+    InterfaceState state = 2;
+}

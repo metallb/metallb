@@ -15,20 +15,22 @@
 package main
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/pem"
+	"io/ioutil"
 	"log"
+
 	"github.com/ligato/cn-infra/agent"
+	"github.com/ligato/cn-infra/datasync"
+	"github.com/ligato/cn-infra/db/cryptodata"
+	"github.com/ligato/cn-infra/db/keyval"
 	"github.com/ligato/cn-infra/db/keyval/etcd"
+	"github.com/ligato/cn-infra/examples/cryptodata-proto-plugin/ipsec"
 	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/servicelabel"
-	"github.com/ligato/cn-infra/db/cryptodata"
-	"io/ioutil"
-	"encoding/pem"
-	"crypto/x509"
-	"crypto/rsa"
 	"github.com/pkg/errors"
-	"encoding/base64"
-	"github.com/ligato/cn-infra/db/keyval"
-	"github.com/ligato/cn-infra/examples/cryptodata-proto-plugin/ipsec"
 )
 
 // PluginName represents name of plugin.
@@ -145,7 +147,6 @@ func (plugin *ExamplePlugin) Init() error {
 	}
 	plugin.Log.Infof("Got value %v", decryptedData)
 
-
 	// List all values from ETCD under key and decrypt them with crypto layer
 	iter, err := broker.ListValues(key)
 	if err != nil {
@@ -171,7 +172,7 @@ func (plugin *ExamplePlugin) Close() error {
 }
 
 // watchChanges is watching for changes in DB
-func (plugin *ExamplePlugin) watchChanges(x keyval.ProtoWatchResp) {
+func (plugin *ExamplePlugin) watchChanges(x datasync.ProtoWatchResp) {
 	message := &ipsec.TunnelInterfaces{}
 	err := x.GetValue(message)
 	if err == nil {

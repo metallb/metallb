@@ -262,6 +262,13 @@ func (g *Generator) GetMapValueField(field, valField *descriptor.FieldDescriptor
 		}
 	}
 
+	wktptr := gogoproto.IsWktPtr(field)
+	if wktptr {
+		if err := proto.SetExtension(valField.Options, gogoproto.E_Wktpointer, &wktptr); err != nil {
+			g.Fail(err.Error())
+		}
+	}
+
 	if valType := gogoproto.GetCastValue(field); len(valType) > 0 {
 		if err := proto.SetExtension(valField.Options, gogoproto.E_Casttype, &valType); err != nil {
 			g.Fail(err.Error())
@@ -339,8 +346,15 @@ func (g *Generator) GeneratePlugin(p Plugin) {
 	}
 }
 
+func (g *Generator) SetFile(filename string) {
+	g.file = g.fileByName(filename)
+}
+
 func (g *Generator) generatePlugin(file *FileDescriptor, p Plugin) {
 	g.writtenImports = make(map[string]bool)
+	g.usedPackages = make(map[GoImportPath]bool)
+	g.packageNames = make(map[GoImportPath]GoPackageName)
+	g.usedPackageNames = make(map[GoPackageName]bool)
 	g.file = file
 
 	// Run the plugins before the imports so we know which imports are necessary.

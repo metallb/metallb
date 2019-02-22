@@ -14,11 +14,51 @@
 
 package resync
 
-import "fmt"
+import "time"
 
-// Registration is an interface that is returned by the Register() call.
-type Registration interface {
-	StatusChan() chan StatusEvent
-	fmt.Stringer
-	//TODO io.Closer
+// registration for Resync (implementation of Registration interface)
+type registration struct {
+	resyncName string
+	statusChan chan StatusEvent
+}
+
+// newRegistration is a constructor.
+func newRegistration(resyncName string, statusChan chan StatusEvent) *registration {
+	return &registration{resyncName: resyncName, statusChan: statusChan}
+}
+
+// StatusChan enables Plugins to get channel for notifications about Resync status.
+func (reg *registration) StatusChan() <-chan StatusEvent {
+	return reg.statusChan
+}
+
+// String returns the name of the registration.
+func (reg *registration) String() string {
+	return reg.resyncName
+}
+
+// newStatusEvent is a constructor.
+func newStatusEvent(status Status) *statusEvent {
+	return &statusEvent{status: status, ackChan: make(chan time.Time)}
+}
+
+// StatusEvent is propagated to Plugins using GOLANG channel.
+type statusEvent struct {
+	status  Status
+	ackChan chan time.Time
+}
+
+// Status gets the status.
+func (event *statusEvent) ResyncStatus() Status {
+	return event.status
+}
+
+// Ack - see the comment in interface chngapi.StatusEvent.Ack().
+func (event *statusEvent) Ack() {
+	event.ackChan <- time.Now()
+}
+
+// ReceiveAck allows waiting until Plugin calls the Ack().
+func (event *statusEvent) ReceiveAck() chan time.Time {
+	return event.ackChan
 }

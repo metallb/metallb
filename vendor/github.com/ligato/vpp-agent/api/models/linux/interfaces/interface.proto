@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package linux.interfaces;
+
+option go_package = "github.com/ligato/vpp-agent/api/models/linux/interfaces;linux_interfaces";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+option (gogoproto.messagename_all) = true;
+
+import "models/linux/namespace/namespace.proto";
+
+message Interface {
+    enum Type {
+        UNDEFINED = 0;
+        VETH = 1;
+        TAP_TO_VPP = 2;                 /* TAP created by VPP to have the Linux-side further configured */
+    };
+
+    string name = 1;                    /* Logical interface name unique across all configured interfaces (mandatory) */
+    Type type = 2;                      /* Interface type (mandatory) */
+
+    linux.namespace.NetNamespace namespace = 3;
+    string host_if_name = 4;            /* Name of the interface in the host OS. If not set, the host name
+                                           is the same as the interface logical name. */
+    bool enabled = 5;
+    repeated string ip_addresses = 6;   /* IP addresses in the format <ipAddress>/<ipPrefix> */
+    string phys_address = 7;            /* MAC address */
+    uint32 mtu = 8;                     /* Maximum transmission unit value */
+
+    oneof link {
+        VethLink veth = 20;             /* VETH-specific configuration */
+        TapLink tap = 21;               /* TAP_TO_VPP-specific configuration */
+    };
+};
+
+message VethLink {
+    string peer_if_name = 1;        /* Name of the VETH peer, i.e. other end of the linux veth (mandatory for VETH) */
+
+    enum ChecksumOffloading {
+        CHKSM_OFFLOAD_DEFAULT = 0;
+        CHKSM_OFFLOAD_ENABLED = 1;
+        CHKSM_OFFLOAD_DISABLED = 2;
+    }
+    ChecksumOffloading rx_checksum_offloading = 2; /* checksum offloading - Rx side (enabled by default) */
+    ChecksumOffloading tx_checksum_offloading = 3; /* checksum offloading - Tx side (enabled by default) */
+};
+
+message TapLink {
+    string vpp_tap_if_name = 1;     /* Logical name of the VPP TAP interface (mandatory for TAP_TO_VPP) */
+};

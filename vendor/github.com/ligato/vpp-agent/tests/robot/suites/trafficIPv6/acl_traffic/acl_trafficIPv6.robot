@@ -24,7 +24,7 @@ ${RESYNC_SLEEP}=     20s
 
 ${AGENT1_VETH_MAC}=    02:00:00:00:00:01
 ${AGENT2_VETH_MAC}=    02:00:00:00:00:02
-${REPLY_DATA_FOLDER}            replyACL
+${REPLY_DATA_FOLDER}            ${CURDIR}/replyACL
 ${VARIABLES}=       common
 ${ENV}=             common
 ${ACL1_NAME}=       acl1_tcp
@@ -143,18 +143,18 @@ Show Tracing
     #Sleep   500s
 
 #Add ACL1_TCP Disable TCP Port
-#    vpp_ctl: Put ACL TCP   agent_vpp_1   ${ACL1_NAME}    ${E_INTF1}    ${I_INTF1}   ${RULE_NM1_1}    ${ACTION_DENY}     ${DEST_NTW}     ${SRC_NTW}   ${TCP_PORT}   ${TCP_PORT}    ${TCP_PORT}   ${TCP_PORT}
+#    Put ACL TCP   agent_vpp_1   ${ACL1_NAME}    ${E_INTF1}    ${I_INTF1}   ${RULE_NM1_1}    ${ACTION_DENY}     ${DEST_NTW}     ${SRC_NTW}   ${TCP_PORT}   ${TCP_PORT}    ${TCP_PORT}   ${TCP_PORT}
 #    Sleep    ${SYNC_SLEEP}
 #
 #Check ACL1_TCP is created
-#    vpp_ctl: Check ACL Reply    agent_vpp_1    ${ACL1_NAME}    ${REPLY_DATA_FOLDER}/reply_acl1_tcp.txt    ${REPLY_DATA_FOLDER}/reply_acl1_tcp_term.txt
+#    Check ACL Reply    agent_vpp_1    ${ACL1_NAME}    ${REPLY_DATA_FOLDER}/reply_acl1_tcp.txt    ${REPLY_DATA_FOLDER}/reply_acl1_tcp_term.txt
 #
 #ADD ACL1_UDP Disable UDP Port
-#    vpp_ctl: Put ACL UDP    agent_vpp_1    ${ACL3_NAME}    ${E_INTF1}   ${I_INTF1}    ${E_INTF2}    ${I_INTF2}    ${RULE_NM3_1}    ${ACTION_DENY}    ${DEST_NTW}     ${SRC_NTW}   ${UDP_PORT}   ${UDP_PORT}    ${UDP_PORT}   ${UDP_PORT}
+#    Put ACL UDP    agent_vpp_1    ${ACL3_NAME}    ${E_INTF1}   ${I_INTF1}    ${E_INTF2}    ${I_INTF2}    ${RULE_NM3_1}    ${ACTION_DENY}    ${DEST_NTW}     ${SRC_NTW}   ${UDP_PORT}   ${UDP_PORT}    ${UDP_PORT}   ${UDP_PORT}
 #    Sleep    ${SYNC_SLEEP}
 #
 #Check ACL1_UDP Is Created
-#    vpp_ctl: Check ACL Reply    agent_vpp_1    ${ACL3_NAME}    ${REPLY_DATA_FOLDER}/reply_acl3_UDP.txt    ${REPLY_DATA_FOLDER}/reply_acl3_UDP_term.txt
+#    Check ACL Reply    agent_vpp_1    ${ACL3_NAME}    ${REPLY_DATA_FOLDER}/reply_acl3_UDP.txt    ${REPLY_DATA_FOLDER}/reply_acl3_UDP_term.txt
 #
 #Show ACLs on VPP
 #    vpp_term: Show ACL      agent_vpp_1
@@ -246,7 +246,6 @@ Show Interfaces And Other Objects
     vpp_term: Show IP Fib Table    agent_vpp_1   0
     vpp_term: Show IP Fib     agent_vpp_1
     vat_term: Interfaces Dump    agent_vpp_1
-    Write To Machine    vpp_agent_ctl    vpp-agent-ctl ${AGENT_VPP_ETCD_CONF_PATH} -ps
     Execute In Container    agent_vpp_1    ip a
     Execute In Container    node_1    ip a
     Execute In Container    node_2    ip a

@@ -75,7 +75,13 @@ func (plugin *Plugin) onResyncEvent(e datasync.ResyncEvent) {
 }
 
 func (plugin *Plugin) onChangeEvent(e datasync.ChangeEvent) {
-	err := plugin.changePropagateRequest(e)
+	var err error
+	for _, dataChng := range e.GetChanges() {
+		chngErr := plugin.changePropagateRequest(dataChng)
+		if chngErr != nil {
+			err = chngErr
+		}
+	}
 	e.Done(err)
 }
 

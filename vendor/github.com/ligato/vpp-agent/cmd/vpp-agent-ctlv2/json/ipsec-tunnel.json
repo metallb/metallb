@@ -1,0 +1,25 @@
+{
+  "link": {
+    "ip_sec": {
+      "Esn": false,
+      "AntiReplay": false,
+      "LocalSpi": 1000,
+      "RemoteSpi": 1001,
+      "LocalIp": "10.0.0.2",
+      "RemoteIp": "10.0.0.1",
+      "CryptoAlg": 1,
+      "LocalCryptoKey": "4a506a794f574265564551694d653768",
+      "RemoteCryptoKey": "4a506a794f574265564551694d653768",
+      "IntegAlg": 2,
+      "LocalIntegKey": "4339314b55523947594d6d3547666b45764e6a58",
+      "RemoteIntegKey": "4339314b55523947594d6d3547666b45764e6a58"
+    }
+  },
+  "enabled": true,
+  "mtu": 1500,
+  "ip_addresses": [
+    "20.0.0.0/24"
+  ],
+  "name": "ipsec1",
+  "type": 8
+}

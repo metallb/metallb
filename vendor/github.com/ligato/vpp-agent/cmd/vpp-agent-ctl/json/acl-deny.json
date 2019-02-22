@@ -1,0 +1,35 @@
+{
+    "acl_name": "acl2",
+    "interfaces": {
+        "egress": [
+            "tap914f9933ca6b905"
+        ],
+        "ingress": [
+        ]
+    },
+    "rules": [
+        {
+            "actions": {
+                "acl_action": 0
+            },
+            "matches": {
+                "ip_rule": {
+                    "ip": {
+                        "destination_network": "",
+                        "source_network": ""
+                    },
+                    "tcp": {
+                        "destination_port_range": {
+                            "lower_port": 0,
+                            "upper_port": 65535
+                        },
+                        "source_port_range": {
+                            "lower_port": 0,
+                            "upper_port": 65535
+                        }
+                    }
+                }
+            }
+        }
+    ]
+}

@@ -22,6 +22,11 @@ import (
 )
 
 // NewVppAdapter returns real vpp api adapter, used for building with vppapiclient library.
-func NewVppAdapter(shmPrefix string) adapter.VppAdapter {
-	return vppapiclient.NewVppAdapter(shmPrefix)
+func NewVppAdapter(shmPrefix string) adapter.VppAPI {
+	return vppapiclient.NewVppClient(shmPrefix)
+}
+
+// NewStatsAdapter returns stats vpp api adapter, used for reading statistics with vppapiclient library.
+func NewStatsAdapter(socketName string) adapter.StatsAPI {
+	return vppapiclient.NewStatClient(socketName)
 }

@@ -27,7 +27,7 @@ import (
 	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/utils/addrs"
 	"github.com/ligato/cn-infra/utils/safeclose"
-	"github.com/ligato/vpp-agent/idxvpp/nametoidx"
+	"github.com/ligato/vpp-agent/pkg/idxvpp/nametoidx"
 	"github.com/ligato/vpp-agent/plugins/govppmux"
 	"github.com/ligato/vpp-agent/plugins/vpp/binapi/dhcp"
 	"github.com/ligato/vpp-agent/plugins/vpp/binapi/interfaces"
@@ -198,6 +198,11 @@ func (c *InterfaceConfigurator) ConfigureVPPInterface(iface *intf.Interfaces_Int
 			c.log.Debugf("Af-packet interface %s cannot be created yet and will be configured later", iface)
 			return nil
 		}
+	case intf.InterfaceType_IPSEC_TUNNEL:
+		c.log.Warnf("Cannot process new IPSec tunnel interface %s, use definition in IPSec plugin instead", iface.Name)
+		return nil
+	default:
+		return errors.Errorf("failed to create interface %s: unsupported type", iface.Name)
 	}
 	if err != nil {
 		return err
@@ -495,6 +500,9 @@ func (c *InterfaceConfigurator) modifyVPPInterface(newConfig, oldConfig *intf.In
 		}
 	case intf.InterfaceType_SOFTWARE_LOOPBACK:
 	case intf.InterfaceType_ETHERNET_CSMACD:
+	case intf.InterfaceType_IPSEC_TUNNEL:
+		c.log.Warnf("Cannot process IPSec tunnel interface %s, use definition in IPSec plugin instead", newConfig.Name)
+		return nil
 	}
 
 	// Rx-mode
@@ -681,6 +689,11 @@ func (c *InterfaceConfigurator) recreateVPPInterface(newConfig *intf.Interfaces_
 // DeleteVPPInterface reacts to a removed NB configuration of a VPP interface.
 // It results in the interface being removed from VPP.
 func (c *InterfaceConfigurator) DeleteVPPInterface(iface *intf.Interfaces_Interface) error {
+	// Skip IPSec tunnels since they are not processed here
+	if iface.Type == intf.InterfaceType_IPSEC_TUNNEL {
+		c.log.Warnf("Cannot delete IPSec tunnel interface %s, use definition in IPSec plugin instead", iface.Name)
+		return nil
+	}
 	// Remove VxLAN from cache if exists
 	if iface.Type == intf.InterfaceType_VXLAN_TUNNEL {
 		if _, ok := c.vxlanMulticastCache[iface.Name]; ok {

@@ -1,11 +1,12 @@
 #!/bin/bash
-# Before run of this script you can set environmental variables
-# IMAGE_TAG, DOCKERFILE, BASE_IMG, GOLANG_OS_ARCH, .. then  export them
-# and to use defined values instead of default ones
 
 cd "$(dirname "$0")"
 
 set -e
+
+# Before run of this script you can set environmental variables
+# IMAGE_TAG, DOCKERFILE, BASE_IMG, GOLANG_OS_ARCH, then  export them
+# and to use defined values instead of default ones
 
 IMAGE_TAG=${IMAGE_TAG:-'dev_vpp_agent'}
 DOCKERFILE=${DOCKERFILE:-'Dockerfile'}
@@ -39,24 +40,26 @@ COMMIT=$(git rev-parse HEAD)
 DATE=$(git log -1 --format="%ct" | xargs -I{} date -d @{} +'%Y-%m-%dT%H:%M%:z')
 
 echo "=============================="
+echo "Building dev image"
+echo "=============================="
+echo " base image: ${BASE_IMG}"
+echo " image tag:  ${IMAGE_TAG}"
+echo " architecture: ${BUILDARCH}"
 echo
+echo "-----------------------------"
 echo "VPP"
 echo "-----------------------------"
 echo " repo URL: ${VPP_REPO_URL}"
 echo " commit:   ${VPP_COMMIT}"
-echo "-----------------------------"
 echo
+echo "-----------------------------"
 echo "Agent"
 echo "-----------------------------"
 echo " version: ${VERSION}"
 echo " commit:  ${COMMIT}"
 echo " date:    ${DATE}"
-echo "-----------------------------"
 echo
-echo "base image: ${BASE_IMG}"
-echo "image tag:  ${IMAGE_TAG}"
-echo "architecture: ${BUILDARCH}"
-echo "=============================="
+echo "-----------------------------"
 
 docker build -f ${DOCKERFILE} \
     --tag ${IMAGE_TAG} \

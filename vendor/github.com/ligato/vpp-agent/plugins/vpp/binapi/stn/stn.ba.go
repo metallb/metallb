@@ -20,43 +20,60 @@ var _ = api.RegisterMessage
 var _ = struc.Pack
 var _ = bytes.NewBuffer
 
+// Services represents VPP binary API services:
+//
+//	"services": {
+//	    "stn_add_del_rule": {
+//	        "reply": "stn_add_del_rule_reply"
+//	    },
+//	    "stn_rules_dump": {
+//	        "reply": "stn_rules_details",
+//	        "stream": true
+//	    }
+//	},
+//
+type Services interface {
+	DumpStnRules(*StnRulesDump) ([]*StnRulesDetails, error)
+	StnAddDelRule(*StnAddDelRule) (*StnAddDelRuleReply, error)
+}
+
 /* Messages */
 
-// StnAddDelRule represents the VPP binary API message 'stn_add_del_rule'.
+// StnAddDelRule represents VPP binary API message 'stn_add_del_rule':
 //
-//            "stn_add_del_rule",
-//            [
-//                "u16",
-//                "_vl_msg_id"
-//            ],
-//            [
-//                "u32",
-//                "client_index"
-//            ],
-//            [
-//                "u32",
-//                "context"
-//            ],
-//            [
-//                "u8",
-//                "is_ip4"
-//            ],
-//            [
-//                "u8",
-//                "ip_address",
-//                16
-//            ],
-//            [
-//                "u32",
-//                "sw_if_index"
-//            ],
-//            [
-//                "u8",
-//                "is_add"
-//            ],
-//            {
-//                "crc": "0x9f0bbe21"
-//            }
+//	"stn_add_del_rule",
+//	[
+//	    "u16",
+//	    "_vl_msg_id"
+//	],
+//	[
+//	    "u32",
+//	    "client_index"
+//	],
+//	[
+//	    "u32",
+//	    "context"
+//	],
+//	[
+//	    "u8",
+//	    "is_ip4"
+//	],
+//	[
+//	    "u8",
+//	    "ip_address",
+//	    16
+//	],
+//	[
+//	    "u32",
+//	    "sw_if_index"
+//	],
+//	[
+//	    "u8",
+//	    "is_add"
+//	],
+//	{
+//	    "crc": "0x9f0bbe21"
+//	}
 //
 type StnAddDelRule struct {
 	IsIP4     uint8
@@ -75,24 +92,24 @@ func (*StnAddDelRule) GetMessageType() api.MessageType {
 	return api.RequestMessage
 }
 
-// StnAddDelRuleReply represents the VPP binary API message 'stn_add_del_rule_reply'.
+// StnAddDelRuleReply represents VPP binary API message 'stn_add_del_rule_reply':
 //
-//            "stn_add_del_rule_reply",
-//            [
-//                "u16",
-//                "_vl_msg_id"
-//            ],
-//            [
-//                "u32",
-//                "context"
-//            ],
-//            [
-//                "i32",
-//                "retval"
-//            ],
-//            {
-//                "crc": "0xe8d4e804"
-//            }
+//	"stn_add_del_rule_reply",
+//	[
+//	    "u16",
+//	    "_vl_msg_id"
+//	],
+//	[
+//	    "u32",
+//	    "context"
+//	],
+//	[
+//	    "i32",
+//	    "retval"
+//	],
+//	{
+//	    "crc": "0xe8d4e804"
+//	}
 //
 type StnAddDelRuleReply struct {
 	Retval int32
@@ -108,24 +125,24 @@ func (*StnAddDelRuleReply) GetMessageType() api.MessageType {
 	return api.ReplyMessage
 }
 
-// StnRulesDump represents the VPP binary API message 'stn_rules_dump'.
+// StnRulesDump represents VPP binary API message 'stn_rules_dump':
 //
-//            "stn_rules_dump",
-//            [
-//                "u16",
-//                "_vl_msg_id"
-//            ],
-//            [
-//                "u32",
-//                "client_index"
-//            ],
-//            [
-//                "u32",
-//                "context"
-//            ],
-//            {
-//                "crc": "0x51077d14"
-//            }
+//	"stn_rules_dump",
+//	[
+//	    "u16",
+//	    "_vl_msg_id"
+//	],
+//	[
+//	    "u32",
+//	    "client_index"
+//	],
+//	[
+//	    "u32",
+//	    "context"
+//	],
+//	{
+//	    "crc": "0x51077d14"
+//	}
 //
 type StnRulesDump struct{}
 
@@ -139,33 +156,33 @@ func (*StnRulesDump) GetMessageType() api.MessageType {
 	return api.RequestMessage
 }
 
-// StnRulesDetails represents the VPP binary API message 'stn_rules_details'.
+// StnRulesDetails represents VPP binary API message 'stn_rules_details':
 //
-//            "stn_rules_details",
-//            [
-//                "u16",
-//                "_vl_msg_id"
-//            ],
-//            [
-//                "u32",
-//                "context"
-//            ],
-//            [
-//                "u8",
-//                "is_ip4"
-//            ],
-//            [
-//                "u8",
-//                "ip_address",
-//                16
-//            ],
-//            [
-//                "u32",
-//                "sw_if_index"
-//            ],
-//            {
-//                "crc": "0x5eafa31e"
-//            }
+//	"stn_rules_details",
+//	[
+//	    "u16",
+//	    "_vl_msg_id"
+//	],
+//	[
+//	    "u32",
+//	    "context"
+//	],
+//	[
+//	    "u8",
+//	    "is_ip4"
+//	],
+//	[
+//	    "u8",
+//	    "ip_address",
+//	    16
+//	],
+//	[
+//	    "u32",
+//	    "sw_if_index"
+//	],
+//	{
+//	    "crc": "0x5eafa31e"
+//	}
 //
 type StnRulesDetails struct {
 	IsIP4     uint8
@@ -181,13 +198,6 @@ func (*StnRulesDetails) GetCrcString() string {
 }
 func (*StnRulesDetails) GetMessageType() api.MessageType {
 	return api.ReplyMessage
-}
-
-/* Services */
-
-type Services interface {
-	DumpStnRules(*StnRulesDump) (*StnRulesDetails, error)
-	StnAddDelRule(*StnAddDelRule) (*StnAddDelRuleReply, error)
 }
 
 func init() {

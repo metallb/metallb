@@ -1,2 +1,0 @@
-#--suite Misc.Errors Handling.Errors Handling
-#--suite Integration.Etcd Clear

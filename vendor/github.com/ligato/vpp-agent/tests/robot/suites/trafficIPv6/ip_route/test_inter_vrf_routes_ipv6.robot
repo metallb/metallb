@@ -57,7 +57,7 @@ Ping From Source Agent 1
     Ping On agent_vpp_1 With IP ${IP_4}, Source memif2/1
 
 Ping From Source Agent 2
-#    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_2    memif0
+#    ${int}=    Get Interface Internal Name    agent_vpp_2    memif0
 #    Ping On agent_vpp_2 With IP 10.1.1.1, Source ${int}
     Ping On agent_vpp_2 With IP ${IP_1}, Source memif1/1
     Ping On agent_vpp_2 With IP ${IP_3}, Source memif2/1

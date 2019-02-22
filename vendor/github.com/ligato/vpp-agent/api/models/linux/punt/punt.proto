@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package linux.punt;
+
+option go_package = "github.com/ligato/vpp-agent/api/models/linux/punt;linux_punt";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+option (gogoproto.messagename_all) = true;
+
+/* Proxy allows to listen on network socket or unix domain socket, and resend to another network/unix domain socket */
+message Proxy {
+    oneof rx {                          /* Socket to listen */
+        PortBased rx_port= 1;
+        SocketBased rx_socket = 2;
+    }
+    oneof tx {                          /* Socket to redirect */
+        PortBased tx_port= 3;
+        SocketBased tx_socket = 4;
+    }
+}
+
+/* Define network socket type */
+message PortBased {
+    enum L4Protocol {           /* L4 protocol */
+        UNDEFINED_L4 = 0;
+        TCP = 6;
+        UDP = 17;
+    }
+    L4Protocol l4_protocol = 1;
+    enum L3Protocol {           /* L3 protocol */
+        UNDEFINED_L3 = 0;
+        IPv4 = 1;
+        IPv6 = 2;
+        ALL = 3;
+    }
+    L3Protocol l3_protocol = 3;
+    uint32 port = 4;
+}
+
+/* Define unix domain socket type for IPC */
+message SocketBased {
+    string path = 1;
+}

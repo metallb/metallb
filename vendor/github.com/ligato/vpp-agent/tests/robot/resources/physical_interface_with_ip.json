@@ -1,6 +1,6 @@
 {
   "name": "${name}",
-  "type": 1,
+  "type": "DPDK",
   "enabled": ${enabled},
   "mtu": ${mtu},
   "ip_addresses": [

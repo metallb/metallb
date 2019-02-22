@@ -1,13 +1,12 @@
 {
   "name": "${name}",
-  "type": 0,
+  "type": "VETH",
   "enabled": ${enabled},
   "phys_address": "${mac}",
   "veth": {
     "peer_if_name": "${peer}"
   },
   "mtu": ${mtu},
-  "vrf": ${vrf},
   "ip_addresses": [
     "${ip}/${prefix}"
   ]

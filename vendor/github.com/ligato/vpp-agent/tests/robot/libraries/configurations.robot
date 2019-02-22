@@ -83,3 +83,10 @@ Configure Environment 7
     Execute On Machine    docker    ${DOCKER_COMMAND} images
     Execute On Machine    docker    ${DOCKER_COMMAND} ps -as
     Sleep    ${SYNC_SLEEP}
+
+Configure Environment 8
+    Add Agent VPP Node With Own Vpp Config    agent_vpp_1    vpp_nat.conf
+    Execute In Container    agent_vpp_1    echo $MICROSERVICE_LABEL
+    Execute In Container    agent_vpp_1    ls -al
+    Execute On Machine    docker    ${DOCKER_COMMAND} images
+    Execute On Machine    docker    ${DOCKER_COMMAND} ps -as

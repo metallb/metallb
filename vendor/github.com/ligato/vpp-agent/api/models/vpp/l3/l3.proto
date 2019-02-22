@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package vpp.l3;
+
+option go_package = "github.com/ligato/vpp-agent/api/models/vpp/l3;vpp_l3";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+option (gogoproto.messagename_all) = true;
+
+message ProxyARP {
+    message Interface {
+        string name = 1;
+    }
+    repeated Interface interfaces = 1;
+
+    message Range {
+        string first_ip_addr = 1;
+        string last_ip_addr = 2;
+    }
+    repeated Range ranges = 2;
+}
+
+message IPScanNeighbor {
+    enum Mode {
+        DISABLED = 0;
+        IPv4 = 1;
+        IPv6 = 2;
+        BOTH = 3;
+    }
+    Mode mode = 1;
+
+    uint32 scan_interval = 2;
+    uint32 max_proc_time = 3;
+    uint32 max_update = 4;
+    uint32 scan_int_delay = 5;
+    uint32 stale_threshold = 6;
+}

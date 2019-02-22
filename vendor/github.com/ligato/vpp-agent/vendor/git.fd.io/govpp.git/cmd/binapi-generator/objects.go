@@ -8,6 +8,7 @@ type Package struct {
 	Enums      []Enum
 	Unions     []Union
 	Types      []Type
+	Aliases    []Alias
 	Messages   []Message
 	Services   []Service
 	RefMap     map[string]string
@@ -35,6 +36,13 @@ type Type struct {
 	Name   string
 	CRC    string
 	Fields []Field
+}
+
+// Alias represents VPP binary API alias
+type Alias struct {
+	Name   string
+	Type   string
+	Length int
 }
 
 // Union represents VPP binary API union
@@ -104,17 +112,4 @@ func (s Service) IsEventService() bool {
 func (s Service) IsRequestService() bool {
 	// some binapi messages might have `null` reply (for example: memclnt)
 	return s.ReplyType != "" && s.ReplyType != "null" // not null
-}
-
-func getSizeOfType(typ *Type) (size int) {
-	for _, field := range typ.Fields {
-		if n := getBinapiTypeSize(field.Type); n > 0 {
-			if field.Length > 0 {
-				size += n * field.Length
-			} else {
-				size += n
-			}
-		}
-	}
-	return size
 }

@@ -14,8 +14,6 @@
 
 package resync
 
-import "github.com/ligato/cn-infra/infra"
-
 // Subscriber is an API used by plugins to register for notifications from the
 // RESYNC Orcherstrator.
 type Subscriber interface {
@@ -25,11 +23,29 @@ type Subscriber interface {
 	Register(resyncName string) Registration
 }
 
-// Reporter is an API for other plugins that need to report to RESYNC Orchestrator.
-// Intent of this API is to have a chance to react on error by triggering
-// RESYNC among registered plugins.
-type Reporter interface {
-	// ReportError is called by Plugins when the binary api call was not successful.
-	// Based on that the Resync Orchestrator starts the Resync.
-	ReportError(name infra.PluginName, err error)
+// Registration is an interface that is returned by the Register() call.
+type Registration interface {
+	StatusChan() <-chan StatusEvent
+	String() string
+	//TODO io.Closer
+}
+
+// Status used in the events.
+type Status string
+
+const (
+	// Started means that the Resync has started.
+	Started Status = "Started"
+	// NotActive means that Resync has not started yet or it has been finished.
+	NotActive = "NotActive"
+)
+
+// StatusEvent is the base type that will be propagated to the channel.
+type StatusEvent interface {
+	// Status() is used by the Plugin if it needs to Start resync.
+	ResyncStatus() Status
+
+	// Ack() is used by the Plugin to acknowledge that it processed this event.
+	// This is supposed to be called after the configuration was applied by the Plugin.
+	Ack()
 }

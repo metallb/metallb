@@ -16,6 +16,7 @@ package kvproto
 
 import (
 	"github.com/gogo/protobuf/proto"
+	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/db/keyval"
 )
 
@@ -33,7 +34,7 @@ type protoWatchResp struct {
 
 // Watch watches for changes in datastore.
 // <resp> callback is used for delivery of watch events.
-func (pdb *protoWatcher) Watch(resp func(keyval.ProtoWatchResp), closeChan chan string, keys ...string) error {
+func (pdb *protoWatcher) Watch(resp func(datasync.ProtoWatchResp), closeChan chan string, keys ...string) error {
 	err := pdb.watcher.Watch(func(msg keyval.BytesWatchResp) {
 		resp(NewWatchResp(pdb.serializer, msg))
 	}, closeChan, keys...)
@@ -44,7 +45,7 @@ func (pdb *protoWatcher) Watch(resp func(keyval.ProtoWatchResp), closeChan chan 
 }
 
 // NewWatchResp initializes proto watch response from raw WatchResponse <resp>.
-func NewWatchResp(serializer keyval.Serializer, resp keyval.BytesWatchResp) keyval.ProtoWatchResp {
+func NewWatchResp(serializer keyval.Serializer, resp keyval.BytesWatchResp) datasync.ProtoWatchResp {
 	return &protoWatchResp{serializer, resp}
 }
 

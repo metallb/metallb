@@ -42,7 +42,7 @@ func (FibTable_FibEntry_Action) EnumDescriptor() ([]byte, []int) {
 }
 
 type BridgeDomains struct {
-	BridgeDomains        []*BridgeDomains_BridgeDomain `protobuf:"bytes,1,rep,name=bridge_domains,json=bridgeDomains" json:"bridge_domains,omitempty"`
+	BridgeDomains        []*BridgeDomains_BridgeDomain `protobuf:"bytes,1,rep,name=bridge_domains,json=bridgeDomains,proto3" json:"bridge_domains,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                      `json:"-"`
 	XXX_unrecognized     []byte                        `json:"-"`
 	XXX_sizecache        int32                         `json:"-"`
@@ -87,8 +87,8 @@ type BridgeDomains_BridgeDomain struct {
 	Learn                bool                                              `protobuf:"varint,5,opt,name=learn,proto3" json:"learn,omitempty"`
 	ArpTermination       bool                                              `protobuf:"varint,6,opt,name=arp_termination,json=arpTermination,proto3" json:"arp_termination,omitempty"`
 	MacAge               uint32                                            `protobuf:"varint,7,opt,name=mac_age,json=macAge,proto3" json:"mac_age,omitempty"`
-	Interfaces           []*BridgeDomains_BridgeDomain_Interfaces          `protobuf:"bytes,100,rep,name=interfaces" json:"interfaces,omitempty"`
-	ArpTerminationTable  []*BridgeDomains_BridgeDomain_ArpTerminationEntry `protobuf:"bytes,102,rep,name=arp_termination_table,json=arpTerminationTable" json:"arp_termination_table,omitempty"`
+	Interfaces           []*BridgeDomains_BridgeDomain_Interfaces          `protobuf:"bytes,100,rep,name=interfaces,proto3" json:"interfaces,omitempty"`
+	ArpTerminationTable  []*BridgeDomains_BridgeDomain_ArpTerminationEntry `protobuf:"bytes,102,rep,name=arp_termination_table,json=arpTerminationTable,proto3" json:"arp_termination_table,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                                          `json:"-"`
 	XXX_unrecognized     []byte                                            `json:"-"`
 	XXX_sizecache        int32                                             `json:"-"`
@@ -286,7 +286,7 @@ func (m *BridgeDomains_BridgeDomain_ArpTerminationEntry) GetPhysAddress() string
 }
 
 type FibTable struct {
-	FibTableEntries      []*FibTable_FibEntry `protobuf:"bytes,100,rep,name=fib_table_entries,json=fibTableEntries" json:"fib_table_entries,omitempty"`
+	FibTableEntries      []*FibTable_FibEntry `protobuf:"bytes,100,rep,name=fib_table_entries,json=fibTableEntries,proto3" json:"fib_table_entries,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
 	XXX_unrecognized     []byte               `json:"-"`
 	XXX_sizecache        int32                `json:"-"`
@@ -402,7 +402,7 @@ func (m *FibTable_FibEntry) GetBridgedVirtualInterface() bool {
 }
 
 type XConnectPairs struct {
-	XConnectPairs        []*XConnectPairs_XConnectPair `protobuf:"bytes,100,rep,name=x_connect_pairs,json=xConnectPairs" json:"x_connect_pairs,omitempty"`
+	XConnectPairs        []*XConnectPairs_XConnectPair `protobuf:"bytes,100,rep,name=x_connect_pairs,json=xConnectPairs,proto3" json:"x_connect_pairs,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                      `json:"-"`
 	XXX_unrecognized     []byte                        `json:"-"`
 	XXX_sizecache        int32                         `json:"-"`
@@ -486,7 +486,7 @@ func (m *XConnectPairs_XConnectPair) GetTransmitInterface() string {
 }
 
 type BridgeDomainState struct {
-	BridgeDomains        []*BridgeDomainState_BridgeDomain `protobuf:"bytes,100,rep,name=bridge_domains,json=bridgeDomains" json:"bridge_domains,omitempty"`
+	BridgeDomains        []*BridgeDomainState_BridgeDomain `protobuf:"bytes,100,rep,name=bridge_domains,json=bridgeDomains,proto3" json:"bridge_domains,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                          `json:"-"`
 	XXX_unrecognized     []byte                            `json:"-"`
 	XXX_sizecache        int32                             `json:"-"`
@@ -530,8 +530,8 @@ type BridgeDomainState_BridgeDomain struct {
 	BviInterfaceIndex    uint32                                       `protobuf:"varint,4,opt,name=bvi_interface_index,json=bviInterfaceIndex,proto3" json:"bvi_interface_index,omitempty"`
 	InterfaceCount       uint32                                       `protobuf:"varint,5,opt,name=interface_count,json=interfaceCount,proto3" json:"interface_count,omitempty"`
 	LastChange           int64                                        `protobuf:"varint,6,opt,name=last_change,json=lastChange,proto3" json:"last_change,omitempty"`
-	L2Params             *BridgeDomainState_BridgeDomain_L2Params     `protobuf:"bytes,100,opt,name=l2_params,json=l2Params" json:"l2_params,omitempty"`
-	Interfaces           []*BridgeDomainState_BridgeDomain_Interfaces `protobuf:"bytes,101,rep,name=interfaces" json:"interfaces,omitempty"`
+	L2Params             *BridgeDomainState_BridgeDomain_L2Params     `protobuf:"bytes,100,opt,name=l2_params,json=l2Params,proto3" json:"l2_params,omitempty"`
+	Interfaces           []*BridgeDomainState_BridgeDomain_Interfaces `protobuf:"bytes,101,rep,name=interfaces,proto3" json:"interfaces,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                                     `json:"-"`
 	XXX_unrecognized     []byte                                       `json:"-"`
 	XXX_sizecache        int32                                        `json:"-"`
@@ -754,7 +754,7 @@ func (m *BridgeDomainState_BridgeDomain_Interfaces) GetSplitHorizonGroup() uint3
 }
 
 type BridgeDomainErrors struct {
-	BridgeDomain         []*BridgeDomainErrors_BridgeDomain `protobuf:"bytes,1,rep,name=bridge_domain,json=bridgeDomain" json:"bridge_domain,omitempty"`
+	BridgeDomain         []*BridgeDomainErrors_BridgeDomain `protobuf:"bytes,1,rep,name=bridge_domain,json=bridgeDomain,proto3" json:"bridge_domain,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                           `json:"-"`
 	XXX_unrecognized     []byte                             `json:"-"`
 	XXX_sizecache        int32                              `json:"-"`
@@ -793,7 +793,7 @@ func (m *BridgeDomainErrors) GetBridgeDomain() []*BridgeDomainErrors_BridgeDomai
 
 type BridgeDomainErrors_BridgeDomain struct {
 	BdName               string                                       `protobuf:"bytes,1,opt,name=bd_name,json=bdName,proto3" json:"bd_name,omitempty"`
-	ErrorData            []*BridgeDomainErrors_BridgeDomain_ErrorData `protobuf:"bytes,2,rep,name=error_data,json=errorData" json:"error_data,omitempty"`
+	ErrorData            []*BridgeDomainErrors_BridgeDomain_ErrorData `protobuf:"bytes,2,rep,name=error_data,json=errorData,proto3" json:"error_data,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                                     `json:"-"`
 	XXX_unrecognized     []byte                                       `json:"-"`
 	XXX_sizecache        int32                                        `json:"-"`

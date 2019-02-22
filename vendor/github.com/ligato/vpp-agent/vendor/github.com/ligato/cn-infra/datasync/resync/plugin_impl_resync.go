@@ -30,33 +30,26 @@ const (
 type Plugin struct {
 	Deps
 
+	mu            sync.Mutex
 	regOrder      []string
-	registrations map[string]Registration
-	access        sync.Mutex
+	registrations map[string]*registration
 }
 
 // Deps groups dependencies injected into the plugin so that they are
 // logically separated from other plugin fields.
 type Deps struct {
-	infra.PluginName // inject
-	Log              logging.PluginLogger
+	infra.PluginName
+	Log logging.PluginLogger
 }
 
 // Init initializes variables.
-func (p *Plugin) Init() (err error) {
-	p.registrations = make(map[string]Registration)
-
-	//p.waingForResync = make(map[core.PluginName]*PluginEvent)
-	//p.waingForResyncChan = make(chan *PluginEvent)
-	//go p.watchWaingForResync()
-
+func (p *Plugin) Init() error {
+	p.registrations = make(map[string]*registration)
 	return nil
 }
 
 // AfterInit method starts the resync.
-func (p *Plugin) AfterInit() (err error) {
-	p.startResync()
-
+func (p *Plugin) AfterInit() error {
 	return nil
 }
 
@@ -65,10 +58,10 @@ func (p *Plugin) AfterInit() (err error) {
 func (p *Plugin) Close() error {
 	//TODO close error report channel
 
-	p.access.Lock()
-	defer p.access.Unlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-	p.registrations = make(map[string]Registration)
+	p.registrations = make(map[string]*registration)
 
 	return nil
 }
@@ -78,8 +71,8 @@ func (p *Plugin) Close() error {
 // The actual CreateNewObjects(), DeleteObsoleteObjects() and ModifyExistingObjects() will be orchestrated
 // to ensure their proper order. If an error occurs during Resync, then new Resync is planned.
 func (p *Plugin) Register(resyncName string) Registration {
-	p.access.Lock()
-	defer p.access.Unlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	if _, found := p.registrations[resyncName]; found {
 		p.Log.WithField("resyncName", resyncName).
@@ -89,7 +82,7 @@ func (p *Plugin) Register(resyncName string) Registration {
 	// ensure that resync is triggered in the same order as the plugins were registered
 	p.regOrder = append(p.regOrder, resyncName)
 
-	reg := NewRegistration(resyncName, make(chan StatusEvent, 0)) /*Zero to have back pressure*/
+	reg := newRegistration(resyncName, make(chan StatusEvent))
 	p.registrations[resyncName] = reg
 
 	return reg
@@ -102,33 +95,35 @@ func (p *Plugin) DoResync() {
 
 // Call callback on plugins to create/delete/modify objects.
 func (p *Plugin) startResync() {
-	p.Log.Info("Resync order", p.regOrder)
+	if len(p.regOrder) == 0 {
+		p.Log.Infof("No registrations, skipping resync")
+		return
+	}
+	p.Log.Infof("Starting resync for: %+v", p.regOrder)
 
-	startResyncTime := time.Now()
+	resyncStart := time.Now()
 
 	for _, regName := range p.regOrder {
 		if reg, found := p.registrations[regName]; found {
-			startPartTime := time.Now()
-
+			t := time.Now()
 			p.startSingleResync(regName, reg)
 
-			took := time.Since(startPartTime)
-			p.Log.WithField("durationInNs", took.Nanoseconds()).
-				Infof("Resync of %v took %v", regName, took)
+			p.Log.Infof("Resync for %v took %v", regName, time.Since(t))
 		}
 	}
 
-	took := time.Since(startResyncTime)
-	p.Log.WithField("durationInNs", took.Nanoseconds()).Info("Resync took ", took)
+	p.Log.Infof("Resync complete (took: %v)", time.Since(resyncStart))
 
 	// TODO check if there ReportError (if not than report) if error occurred even during Resync
 }
-func (p *Plugin) startSingleResync(resyncName string, reg Registration) {
+func (p *Plugin) startSingleResync(resyncName string, reg *registration) {
 	started := newStatusEvent(Started)
-	reg.StatusChan() <- started
+
+	reg.statusChan <- started
 
 	select {
 	case <-started.ReceiveAck():
+		// ack
 	case <-time.After(singleResyncTimeout):
 		p.Log.WithField("regName", resyncName).Warn("Timeout of ACK")
 	}

@@ -48,41 +48,40 @@ Configure Environment
 Show Interfaces Before Setup
     vpp_term: Show Interfaces    agent_vpp_1
     vpp_term: Show Interfaces    agent_vpp_2
-    Write To Machine    vpp_agent_ctl    vpp-agent-ctl ${AGENT_VPP_ETCD_CONF_PATH} -ps
 
 Add VPP1_TAP1 Interface And Check It Was Created
     vpp_term: Interface Not Exists  node=agent_vpp_1    mac=${MAC_VPP1_TAP1}
-    vpp_ctl: Put TAPv2 Interface With IP    node=agent_vpp_1    name=${NAME_VPP1_TAP1}    mac=${MAC_VPP1_TAP1}    ip=${IP_VPP1_TAP1}    prefix=${PREFIX}    host_if_name=linux_${NAME_VPP1_TAP1}
+    Put TAPv2 Interface With IP    node=agent_vpp_1    name=${NAME_VPP1_TAP1}    mac=${MAC_VPP1_TAP1}    ip=${IP_VPP1_TAP1}    prefix=${PREFIX}    host_if_name=linux_${NAME_VPP1_TAP1}
     linux: Set Host TAP Interface    node=agent_vpp_1    host_if_name=linux_${NAME_VPP1_TAP1}    ip=${IP_LINUX_VPP1_TAP1}    prefix=${PREFIX}
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_1    mac=${MAC_VPP1_TAP1}
     ${actual_state}=    vpp_term: Check TAPv2 Interface State    agent_vpp_1    ${NAME_VPP1_TAP1}    mac=${MAC_VPP1_TAP1}    ipv6=${IP_VPP1_TAP1}/${PREFIX}    state=${UP_STATE}
 
 Add VPP1_memif1 Interface
     vpp_term: Interface Not Exists    node=agent_vpp_1    mac=${MAC_VPP1_MEMIF1}
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_1    name=${NAME_VPP1_MEMIF1}    mac=${MAC_VPP1_MEMIF1}    master=true    id=1    ip=${IP_VPP1_MEMIF1}    prefix=24    socket=memif.sock
+    Put Memif Interface With IP    node=agent_vpp_1    name=${NAME_VPP1_MEMIF1}    mac=${MAC_VPP1_MEMIF1}    master=true    id=1    ip=${IP_VPP1_MEMIF1}    prefix=24    socket=memif.sock
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_1    mac=${MAC_VPP1_MEMIF1}
 
 Add VPP2_TAP1 Interface And Check It Was Created
     vpp_term: Interface Not Exists  node=agent_vpp_2    mac=${MAC_VPP2_TAP1}
-    vpp_ctl: Put TAPv2 Interface With IP    node=agent_vpp_2    name=${NAME_VPP2_TAP1}    mac=${MAC_VPP2_TAP1}    ip=${IP_VPP2_TAP1}    prefix=${PREFIX}    host_if_name=linux_${NAME_VPP2_TAP1}
+    Put TAPv2 Interface With IP    node=agent_vpp_2    name=${NAME_VPP2_TAP1}    mac=${MAC_VPP2_TAP1}    ip=${IP_VPP2_TAP1}    prefix=${PREFIX}    host_if_name=linux_${NAME_VPP2_TAP1}
     linux: Set Host TAP Interface    node=agent_vpp_2    host_if_name=linux_${NAME_VPP2_TAP1}    ip=${IP_LINUX_VPP2_TAP1}    prefix=${PREFIX}
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_2    mac=${MAC_VPP2_TAP1}
     ${actual_state}=    vpp_term: Check TAPv2 Interface State    agent_vpp_2    ${NAME_VPP2_TAP1}    mac=${MAC_VPP2_TAP1}    ipv6=${IP_VPP2_TAP1}/${PREFIX}    state=${UP_STATE}
 
 Add VPP2_memif1 Interface
     vpp_term: Interface Not Exists    node=agent_vpp_2    mac=${MAC_VPP2_MEMIF1}
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_2    name=${NAME_VPP2_MEMIF1}    mac=${MAC_VPP2_MEMIF1}    master=false    id=1    ip=${IP_VPP2_MEMIF1}    prefix=24    socket=memif.sock
+    Put Memif Interface With IP    node=agent_vpp_2    name=${NAME_VPP2_MEMIF1}    mac=${MAC_VPP2_MEMIF1}    master=false    id=1    ip=${IP_VPP2_MEMIF1}    prefix=24    socket=memif.sock
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_1    mac=${MAC_VPP1_MEMIF1}
 
 Add Static Route From VPP1 Linux To VPP2
-    vpp_ctl: Put Linux Route    node=agent_vpp_1    namespace=${EMPTY}    interface=${NAME_VPP1_TAP1}    routename=${NAME_VPP1_LINUX_TO_VPP2}    ip=${IP_VPP2_TAP1_NETWORK}    next_hop=${EMPTY}
+    Put Linux Route    node=agent_vpp_1    namespace=${EMPTY}    interface=${NAME_VPP1_TAP1}    routename=${NAME_VPP1_LINUX_TO_VPP2}    ip=${IP_VPP2_TAP1_NETWORK}    next_hop=${EMPTY}
 #    Create Route    node=agent_vpp_1    routename=vpp1linuxtovpp2    ip=${IP_VPP2_TAP1_NETWORK}    interface=${NAME_VPP1_TAP1}
 
 Add Static Route From VPP1 To VPP2
     Create Route On agent_vpp_1 With IP 20.20.1.0/24 With Next Hop 192.168.1.2 And Vrf Id 0
 
 Add Static Route From VPP2 Linux To VPP1
-    vpp_ctl: Put Linux Route    node=agent_vpp_2    namespace=${EMPTY}    interface=${NAME_VPP2_TAP1}    routename=${NAME_VPP2_LINUX_TO_VPP1}    ip=${IP_VPP1_TAP1_NETWORK}    next_hop=${EMPTY}
+    Put Linux Route    node=agent_vpp_2    namespace=${EMPTY}    interface=${NAME_VPP2_TAP1}    routename=${NAME_VPP2_LINUX_TO_VPP1}    ip=${IP_VPP1_TAP1_NETWORK}    next_hop=${EMPTY}
 #    Create Route    node=agent_vpp_2    routename=vpp2linuxtovpp1    ip=${IP_VPP1_TAP1_NETWORK}    interface=${NAME_VPP2_TAP1}
 
 Add Static Route From VPP2 To VPP1
@@ -136,39 +135,39 @@ Show Interfaces Before Setup 2
     Write To Machine    vpp_agent_ctl    vpp-agent-ctl ${AGENT_VPP_ETCD_CONF_PATH} -ps
 
 Add Static Route From VPP1 Linux To VPP2 2
-    vpp_ctl: Put Linux Route    node=agent_vpp_1    namespace=${EMPTY}    interface=${NAME_VPP1_TAP1}    routename=${NAME_VPP1_LINUX_TO_VPP2}    ip=${IP_VPP2_TAP1_NETWORK}    next_hop=${EMPTY}
+    Put Linux Route    node=agent_vpp_1    namespace=${EMPTY}    interface=${NAME_VPP1_TAP1}    routename=${NAME_VPP1_LINUX_TO_VPP2}    ip=${IP_VPP2_TAP1_NETWORK}    next_hop=${EMPTY}
 
 Add Static Route From VPP1 To VPP2 2
     Create Route On agent_vpp_1 With IP 20.20.1.0/24 With Next Hop 192.168.1.2 And Vrf Id 0
 
 Add Static Route From VPP2 Linux To VPP1 2
-    vpp_ctl: Put Linux Route    node=agent_vpp_2    namespace=${EMPTY}    interface=${NAME_VPP2_TAP1}    routename=${NAME_VPP2_LINUX_TO_VPP1}    ip=${IP_VPP1_TAP1_NETWORK}    next_hop=${EMPTY}
+    Put Linux Route    node=agent_vpp_2    namespace=${EMPTY}    interface=${NAME_VPP2_TAP1}    routename=${NAME_VPP2_LINUX_TO_VPP1}    ip=${IP_VPP1_TAP1_NETWORK}    next_hop=${EMPTY}
 
 Add Static Route From VPP2 To VPP1 2
     Create Route On agent_vpp_2 With IP 10.10.1.0/24 With Next Hop 192.168.1.1 And Vrf Id 0
 
 Add VPP1_TAP1 Interface And Check It Was Created 2
     vpp_term: Interface Not Exists  node=agent_vpp_1    mac=${MAC_VPP1_TAP1}
-    vpp_ctl: Put TAPv2 Interface With IP    node=agent_vpp_1    name=${NAME_VPP1_TAP1}    mac=${MAC_VPP1_TAP1}    ip=${IP_VPP1_TAP1}    prefix=${PREFIX}    host_if_name=linux_${NAME_VPP1_TAP1}
+    Put TAPv2 Interface With IP    node=agent_vpp_1    name=${NAME_VPP1_TAP1}    mac=${MAC_VPP1_TAP1}    ip=${IP_VPP1_TAP1}    prefix=${PREFIX}    host_if_name=linux_${NAME_VPP1_TAP1}
     linux: Set Host TAP Interface    node=agent_vpp_1    host_if_name=linux_${NAME_VPP1_TAP1}    ip=${IP_LINUX_VPP1_TAP1}    prefix=${PREFIX}
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_1    mac=${MAC_VPP1_TAP1}
     ${actual_state}=    vpp_term: Check TAPv2 Interface State    agent_vpp_1    ${NAME_VPP1_TAP1}    mac=${MAC_VPP1_TAP1}    ipv6=${IP_VPP1_TAP1}/${PREFIX}    state=${UP_STATE}
 
 Add VPP1_memif1 Interface 2
     vpp_term: Interface Not Exists    node=agent_vpp_1    mac=${MAC_VPP1_MEMIF1}
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_1    name=${NAME_VPP1_MEMIF1}    mac=${MAC_VPP1_MEMIF1}    master=true    id=1    ip=${IP_VPP1_MEMIF1}    prefix=24    socket=memif.sock
+    Put Memif Interface With IP    node=agent_vpp_1    name=${NAME_VPP1_MEMIF1}    mac=${MAC_VPP1_MEMIF1}    master=true    id=1    ip=${IP_VPP1_MEMIF1}    prefix=24    socket=memif.sock
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_1    mac=${MAC_VPP1_MEMIF1}
 
 Add VPP2_TAP1 Interface And Check It Was Created 2
     vpp_term: Interface Not Exists  node=agent_vpp_2    mac=${MAC_VPP2_TAP1}
-    vpp_ctl: Put TAPv2 Interface With IP    node=agent_vpp_2    name=${NAME_VPP2_TAP1}    mac=${MAC_VPP2_TAP1}    ip=${IP_VPP2_TAP1}    prefix=${PREFIX}    host_if_name=linux_${NAME_VPP2_TAP1}
+    Put TAPv2 Interface With IP    node=agent_vpp_2    name=${NAME_VPP2_TAP1}    mac=${MAC_VPP2_TAP1}    ip=${IP_VPP2_TAP1}    prefix=${PREFIX}    host_if_name=linux_${NAME_VPP2_TAP1}
     linux: Set Host TAP Interface    node=agent_vpp_2    host_if_name=linux_${NAME_VPP2_TAP1}    ip=${IP_LINUX_VPP2_TAP1}    prefix=${PREFIX}
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_2    mac=${MAC_VPP2_TAP1}
     ${actual_state}=    vpp_term: Check TAPv2 Interface State    agent_vpp_2    ${NAME_VPP2_TAP1}    mac=${MAC_VPP2_TAP1}    ipv6=${IP_VPP2_TAP1}/${PREFIX}    state=${UP_STATE}
 
 Add VPP2_memif1 Interface 2
     vpp_term: Interface Not Exists    node=agent_vpp_2    mac=${MAC_VPP2_MEMIF1}
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_2    name=${NAME_VPP2_MEMIF1}    mac=${MAC_VPP2_MEMIF1}    master=false    id=1    ip=${IP_VPP2_MEMIF1}    prefix=24    socket=memif.sock
+    Put Memif Interface With IP    node=agent_vpp_2    name=${NAME_VPP2_MEMIF1}    mac=${MAC_VPP2_MEMIF1}    master=false    id=1    ip=${IP_VPP2_MEMIF1}    prefix=24    socket=memif.sock
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_1    mac=${MAC_VPP1_MEMIF1}
 
 Show Routes On VPP1 Linux 2

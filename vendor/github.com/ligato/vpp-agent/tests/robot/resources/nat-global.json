@@ -1,0 +1,33 @@
+{
+  "forwarding": false,
+  "nat_interfaces": [
+    {
+      "name": "${interface_1}",
+      "isInside": true,
+      "outputFeature": false
+    },
+    {
+      "name": "${interface_2}",
+      "isInside": true,
+      "outputFeature": false
+    }
+  ],
+  "address_pool": [
+    {
+      "address": "${int_ip_1}",
+      "vrfId": ${id},
+      "twiceNat": false
+    },
+    {
+      "address": "${int_ip_2}",
+      "vrfId": ${id},
+      "twiceNat": false
+    }
+  ],
+  "virtual_reassembly": {
+    "timeout": 5,
+    "max_reassemblies": 10,
+    "max_fragments": 15,
+    "drop_fragments": true
+  }
+}

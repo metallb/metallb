@@ -1,0 +1,20 @@
+{
+  "label": "${name}",
+  "st_mappings": [
+    {
+      "external_interface": "${ext_int}",
+      "external_ip": "${ext_ip}",
+      "external_port": ${ext_port},
+      "local_ips": [
+        {
+          "vrf_id": ${id},
+          "local_ip": "${local_ip}",
+          "local_port": ${local_port},
+          "probability": 40
+        }
+      ],
+      "protocol": 1,
+      "twiceNat": "DISABLED"
+    }
+  ]
+}

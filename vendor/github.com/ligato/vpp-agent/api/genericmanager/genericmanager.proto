@@ -1,0 +1,158 @@
+syntax = "proto3";
+
+package genericmanager;
+
+option go_package = "github.com/ligato/vpp-agent/api/genericmanager";
+
+import "google/protobuf/any.proto";
+
+// Model represents a model description to for recognizing
+// different item types.
+message Model {
+    // Module describes group of the model.
+    string module = 1;
+    // Version describes concrete version of the model schema.
+    string version = 2;
+    // Type describes name of type described by this model.
+    string type = 3;
+}
+
+// Item represents single instance described by the Model.
+message Item {
+    // ID represents identifier for distinguishing items.
+    message ID {
+        Model model = 1;
+        string name = 2;
+    }
+
+    ID id = 1;
+    Data data = 2;
+}
+
+// Data represents encoded data for an item.
+message Data {
+    google.protobuf.Any any = 1;
+}
+
+// Item status describes status of an item.
+message ItemStatus {
+    string status = 1;
+    string message = 2;
+}
+
+//------------------------------------------------------------------------------
+
+// GenericManager defines the RPC methods for managing config
+// using generic model, allowing extending with custom models.
+service GenericManager {
+    // Capabilities returns information about service capabilities
+    // including list of models supported by the server.
+    rpc Capabilities (CapabilitiesRequest) returns (CapabilitiesResponse);
+
+    // SetConfig is used to update desired configuration.
+    rpc SetConfig (SetConfigRequest) returns (SetConfigResponse);
+
+    // GetConfig is used to readt current configuration.
+    rpc GetConfig (GetConfigRequest) returns (GetConfigResponse);
+
+    // DumpState retrieves the current running state.
+    rpc DumpState (DumpStateRequest) returns (DumpStateResponse);
+
+    // Subscribe is used for subscribing to events.
+    // Notifications are returned by streaming updates.
+    rpc Subscribe (SubscribeRequest) returns (stream SubscribeResponse);
+}
+
+//------------------------------------------------------------------------------
+
+message CapabilitiesRequest {
+    // TODO: query filters
+}
+message CapabilitiesResponse {
+    repeated ModelInfo known_models = 1;
+    repeated string active_modules = 2;
+}
+
+message ModelInfo {
+    Model model = 1;
+    map<string, string> info = 2;
+}
+
+//------------------------------------------------------------------------------
+
+message SetConfigRequest {
+    repeated UpdateItem updates = 1;
+    // The overwrite_all can be set to true to overwrite all other configuration
+    // (this is also known as Full Resync)
+    bool overwrite_all = 2;
+}
+
+message UpdateItem {
+    // The item describes item to be updated.
+    // For a delete operation set fields item.Data to nil.
+    Item item = 1;
+    // The labels can be used to define user-defined labels for item.
+    map<string, string> labels = 2;
+}
+
+message SetConfigResponse {
+    repeated UpdateResult results = 1;
+}
+
+message UpdateResult {
+    enum Operation {
+        UNSPECIFIED = 0;
+        CREATE = 1;
+        UPDATE = 2;
+        DELETE = 3;
+    }
+    Item.ID id = 4;
+    string key = 1;
+    Operation op = 2;
+    ItemStatus status = 3;
+}
+
+//------------------------------------------------------------------------------
+
+message GetConfigRequest {
+    repeated Item.ID ids = 1;
+}
+message GetConfigResponse {
+    message ConfigItem {
+        Item item = 1;
+        ItemStatus status = 2;
+        map<string, string> labels = 3;
+    }
+    repeated ConfigItem items = 1;
+}
+
+//------------------------------------------------------------------------------
+
+message DumpStateRequest {
+    repeated string keys = 1;
+}
+message DumpStateResponse {
+    message StateItem {
+        Item item = 1;
+        map<string, string> metadata = 2;
+    }
+    repeated StateItem states = 1;
+}
+
+//------------------------------------------------------------------------------
+
+message SubscribeRequest {
+    repeated Subscription subscriptions = 1;
+}
+message SubscribeResponse {
+    repeated Notification notifications = 1;
+}
+
+message Subscription {
+    Item.ID id = 1;
+}
+
+message Notification {
+    Item item = 1;
+    ItemStatus status = 2;
+}

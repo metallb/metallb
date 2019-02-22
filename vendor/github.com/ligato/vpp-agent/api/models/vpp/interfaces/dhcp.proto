@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package vpp.interfaces;
+
+option go_package = "github.com/ligato/vpp-agent/api/models/vpp/interfaces;vpp_interfaces";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+option (gogoproto.messagename_all) = true;
+
+/* DHCPLease is a notification, i.e. flows from SB upwards */
+message DHCPLease {
+	string interface_name = 1;
+	string host_name = 2;
+	bool is_ipv6 = 3;
+	string host_phys_address = 4;
+	string host_ip_address = 5;    /* IP addresses in the format <ipAddress>/<ipPrefix> */
+	string router_ip_address = 6;  /* IP addresses in the format <ipAddress>/<ipPrefix> */
+}

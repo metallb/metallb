@@ -21,6 +21,7 @@ RUN apt-get update \
      ipsec-tools \
      python \
      supervisor \
+     netcat \
  && rm -rf /var/lib/apt/lists/*
 
 # install vpp
@@ -48,7 +49,6 @@ COPY --from=devimg \
 COPY \
     etcd.conf \
     kafka.conf \
-    govpp.conf \
     vpp-plugin.conf \
     linux-plugin.conf \
  /opt/vpp-agent/dev/

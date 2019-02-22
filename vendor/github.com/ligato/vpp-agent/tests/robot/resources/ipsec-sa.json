@@ -1,5 +1,5 @@
 {
-  "name":"${name}",
+  "index":"${sa_index}",
   "spi": ${spi},
   "protocol": 1,
   "crypto_alg": 1,

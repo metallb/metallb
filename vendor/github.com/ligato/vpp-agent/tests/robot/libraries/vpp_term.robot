@@ -27,8 +27,15 @@ vpp_term: Open VPP Terminal
 
 vpp_term: Issue Command
     [Arguments]        ${node}     ${command}    ${delay}=${SSH_READ_DELAY}s
-    ${out}=            Write To Machine Until String    ${node}_term    ${command}    ${${node}_VPP_TERM_PROMPT}    delay=${delay}
-#    Should Contain     ${out}             ${${node}_VPP_TERM_PROMPT}
+    ${failed_it}=     Create List
+    :FOR    ${it_num}    IN RANGE    1    6
+    \    ${result}    ${out}=    Run Keyword And Ignore Error    Write To Machine Until String    ${node}_term    ${command}    ${${node}_VPP_TERM_PROMPT}    delay=${delay}
+    \    Run Keyword If      '${result}'=='FAIL'      Append To List    ${failed_it}    ${it_num}
+    \    Run Keyword If      '${result}'=='FAIL'      Log  Warning, no match found #vpp console output!	WARN
+    \    Exit For Loop If    '${result}'=='PASS'
+    Run Keyword And Ignore Error  Should Be Empty  ${failed_it}  msg='Fail in this checks ${failed_it}'
+#    ${out}=            Write To Machine Until String    ${node}_term    ${command}    ${${node}_VPP_TERM_PROMPT}    delay=${delay}
+##    Should Contain     ${out}             ${${node}_VPP_TERM_PROMPT}
     [Return]           ${out}
 
 vpp_term: Exit VPP Terminal
@@ -36,6 +43,18 @@ vpp_term: Exit VPP Terminal
     ${ctrl_d}          Evaluate    chr(int(4))
     ${command}=        Set Variable       ${ctrl_d}
     ${out}=            Write To Machine   ${node}_term    ${command}
+    [Return]           ${out}
+
+vppp_term: Show Vpp Logging
+    [Arguments]        ${node}
+    [Documentation]    Show interfaces through vpp terminal
+    ${out}=            vpp_term: Issue Command  ${node}   sh logging
+    [Return]           ${out}
+
+vpp_term: Show Runtime
+    [Arguments]        ${node}
+    [Documentation]    Show runtime through vpp terminal
+    ${out}=            vpp_term: Issue Command  ${node}   show runtime
     [Return]           ${out}
 
 vpp_term: Show Interfaces
@@ -201,7 +220,7 @@ vpp_term: Show Memif
 vpp_term: Check TAP Interface State
     [Arguments]          ${node}    ${name}    @{desired_state}
     Sleep                 10s    Time to let etcd to get state of newly setup tap interface.
-    ${internal_name}=    vpp_ctl: Get Interface Internal Name    ${node}    ${name}
+    ${internal_name}=    Get Interface Internal Name    ${node}    ${name}
     ${interface}=        vpp_term: Show Interfaces    ${node}    ${internal_name}
     ${state}=            Set Variable    up
     ${status}=           Evaluate     "${state}" in """${interface}"""
@@ -217,7 +236,7 @@ vpp_term: Check TAP IP6 Interface State
     [Arguments]          ${node}    ${name}    @{desired_state}
     [Documentation]    Get operational state of the specified interface and compare with expected state.
     Sleep                 10s    Time to let etcd to get state of newly setup tap interface.
-    ${internal_name}=    vpp_ctl: Get Interface Internal Name    ${node}    ${name}
+    ${internal_name}=    Get Interface Internal Name    ${node}    ${name}
     ${interface}=        vpp_term: Show Interfaces    ${node}    ${internal_name}
     ${state}=            Set Variable    up
     ${status}=           Evaluate     "${state}" in """${interface}"""
@@ -251,7 +270,7 @@ vpp_term: Check ARP
     [Arguments]        ${node}      ${interface}    ${ipv4}     ${MAC}    ${presence}
     [Documentation]    Check ARPs presence on interface
     ${out}=            vpp_term: Show ARP    ${node}
-    ${internal_name}=    vpp_ctl: Get Interface Internal Name    ${node}    ${interface}
+    ${internal_name}=    Get Interface Internal Name    ${node}    ${interface}
     #Should Not Be Equal      ${internal_name}    ${None}
     ${status}=         Run Keyword If     '${internal_name}'!='${None}'  Parse ARP    ${out}   ${internal_name}   ${ipv4}     ${MAC}   ELSE    Set Variable   False
     Should Be Equal As Strings   ${status}   ${presence}
@@ -287,7 +306,7 @@ vpp_term: Show Interface Mode
 vpp_term: Check TAPv2 Interface State
     [Arguments]          ${node}    ${name}    @{desired_state}
     Sleep                 10s    Time to let etcd to get state of newly setup tapv2 interface.
-    ${internal_name}=    vpp_ctl: Get Interface Internal Name    ${node}    ${name}
+    ${internal_name}=    Get Interface Internal Name    ${node}    ${name}
     ${interface}=        vpp_term: Show Interfaces    ${node}    ${internal_name}
     ${state}=            Set Variable    up
     ${status}=           Evaluate     "${state}" in """${interface}"""
@@ -302,7 +321,7 @@ vpp_term: Check TAPv2 Interface State
 vpp_term: Check TAPv2 IP6 Interface State
     [Arguments]          ${node}    ${name}    @{desired_state}
     Sleep                 10s    Time to let etcd to get state of newly setup tapv2 interface.
-    ${internal_name}=    vpp_ctl: Get Interface Internal Name    ${node}    ${name}
+    ${internal_name}=    Get Interface Internal Name    ${node}    ${name}
     ${interface}=        vpp_term: Show Interfaces    ${node}    ${internal_name}
     ${state}=            Set Variable    up
     ${status}=           Evaluate     "${state}" in """${interface}"""
@@ -338,7 +357,7 @@ vpp_term: Check STN Rule State
     [Arguments]        ${node}  ${interface}  ${ip}
     [Documentation]    Check STN Rules
     ${out}=            vpp_term: Show STN Rules    ${node}
-    ${internal_name}=    vpp_ctl: Get Interface Internal Name    ${node}    ${interface}
+    ${internal_name}=    Get Interface Internal Name    ${node}    ${interface}
     ${ip_address}  ${iface}  ${next_node}  Parse STN Rule    ${out}
     Should Be Equal As Strings   ${ip}  ${ip_address}
     Should Be Equal As Strings   ${internal_name}  ${iface}
@@ -347,7 +366,7 @@ vpp_term: Check STN Rule Deleted
     [Arguments]        ${node}  ${interface}  ${ip}
     [Documentation]    Check STN Rules
     ${out}=            vpp_term: Show STN Rules    ${node}
-    ${internal_name}=    vpp_ctl: Get Interface Internal Name    ${node}    ${interface}
+    ${internal_name}=    Get Interface Internal Name    ${node}    ${interface}
     Should Not Contain     ${out}    ${ip}
     Should Not Contain     ${out}    ${internal_name}
 
@@ -398,6 +417,44 @@ vpp_term: Show Local SIDs
     [Arguments]        ${node}
     [Documentation]    Show locasids through vpp terminal
     ${out}=            vpp_term: Issue Command  ${node}   sh sr localsids
+    [Return]           ${out}
+
+vpp_term: Check DNAT exists
+    [Arguments]        ${node}     ${dnat_file}    #${interface}    ${address}
+    [Documentation]    Checking if specified dnat exists
+    ${localsidsStr}=   vpp_term: Show DNAT Static Mapping    ${node}
+    Create File        /tmp/dnat_config_output.txt    ${localsidsStr}   #FIXME remove dirty trick with saving string to file just to be able to match substring in string
+    ${localsidsStr}=   OperatingSystem.Get File    /tmp/dnat_config_output.txt
+    ${localsidsStr}=   Basic_Operations.Replace_Rn_N   ${localsidsStr}    #FIX for BUG with New Line
+    ${localsidsStr}=   Convert To Lowercase    ${localsidsStr}
+    ${matchdata}=      OperatingSystem.Get File    ${CURDIR}/../suites/crud/test_data/${dnat_file}
+    ${matchdata}=      Replace Variables           ${matchdata}
+    ${matchdata}=      Convert To Lowercase    ${matchdata}
+    Should Contain    ${localsidsStr}    ${matchdata}
+
+vpp_term: Show DNAT Static Mapping
+    [Arguments]        ${node}
+    [Documentation]    Show locasids through vpp terminal
+    ${out}=            vpp_term: Issue Command  ${node}   sh nat44 static mappings
+    [Return]           ${out}
+
+vpp_term: Check DNAT Global exists
+    [Arguments]        ${node}     ${dnat_file}    #${interface}    ${address}
+    [Documentation]    Checking if specified dnat exists
+    ${localsidsStr}=   vpp_term: Show DNAT Global Config    ${node}
+    Create File        /tmp/dnat_config_output.txt    ${localsidsStr}   #FIXME remove dirty trick with saving string to file just to be able to match substring in string
+    ${localsidsStr}=   OperatingSystem.Get File    /tmp/dnat_config_output.txt
+    ${localsidsStr}=   Basic_Operations.Replace_Rn_N   ${localsidsStr}    #FIX for BUG with New Line
+    ${localsidsStr}=   Convert To Lowercase    ${localsidsStr}
+    ${matchdata}=      OperatingSystem.Get File    ${CURDIR}/../suites/crud/test_data/${dnat_file}
+    ${matchdata}=      Replace Variables           ${matchdata}
+    ${matchdata}=      Convert To Lowercase    ${matchdata}
+    Should Contain    ${localsidsStr}    ${matchdata}
+
+vpp_term: Show DNAT Global Config
+    [Arguments]        ${node}
+    [Documentation]    Show locasids through vpp terminal
+    ${out}=            vpp_term: Issue Command  ${node}   sh nat44 interfaces
     [Return]           ${out}
 
 vpp_term: Check Local SID Deleted

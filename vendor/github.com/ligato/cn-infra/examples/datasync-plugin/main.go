@@ -8,7 +8,8 @@ import (
 	"github.com/ligato/cn-infra/agent"
 	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/datasync/kvdbsync"
-		"github.com/ligato/cn-infra/db/keyval/etcd"
+	"github.com/ligato/cn-infra/datasync/resync"
+	"github.com/ligato/cn-infra/db/keyval/etcd"
 	"github.com/ligato/cn-infra/examples/model"
 	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/servicelabel"
@@ -35,7 +36,7 @@ func main() {
 		deps.KvPlugin = &etcd.DefaultPlugin
 	}))
 	// Init example plugin dependencies
-	ep := &ExamplePlugin{
+	p := &ExamplePlugin{
 		Deps: Deps{
 			Log:          logging.ForPlugin(PluginName),
 			ServiceLabel: &servicelabel.DefaultPlugin,
@@ -46,8 +47,8 @@ func main() {
 	}
 	// Start Agent with example plugin including dependencies
 	a := agent.NewAgent(
-		agent.AllPlugins(ep),
-		agent.QuitOnClose(ep.exampleFinished),
+		agent.AllPlugins(p),
+		agent.QuitOnClose(p.exampleFinished),
 	)
 	if err := a.Run(); err != nil {
 		log.Fatal(err)
@@ -104,6 +105,17 @@ func (plugin *ExamplePlugin) Init() error {
 	return nil
 }
 
+// AfterInit starts the publisher and prepares for the shutdown.
+func (plugin *ExamplePlugin) AfterInit() error {
+	resync.DefaultPlugin.DoResync()
+
+	go plugin.etcdPublisher()
+
+	go plugin.closeExample()
+
+	return nil
+}
+
 // Close shutdowns both the publisher and the consumer.
 // Channels used to propagate data resync and data change events are closed
 // as well.
@@ -111,12 +123,19 @@ func (plugin *ExamplePlugin) Close() error {
 	return safeclose.Close(plugin.resyncChannel, plugin.changeChannel)
 }
 
-// AfterInit starts the publisher and prepares for the shutdown.
-func (plugin *ExamplePlugin) AfterInit() error {
+// subscribeWatcher subscribes for data change and data resync events.
+// Events are delivered to the consumer via the selected channels.
+// ETCD watcher adapter is used to perform the registration behind the scenes.
+func (plugin *ExamplePlugin) subscribeWatcher() (err error) {
+	prefix := etcdKeyPrefix(plugin.ServiceLabel.GetAgentLabel())
+	plugin.Log.Infof("Prefix: %v", prefix)
+	plugin.watchDataReg, err = plugin.Watcher.
+		Watch("ExamplePlugin", plugin.changeChannel, plugin.resyncChannel, prefix)
+	if err != nil {
+		return err
+	}
 
-	go plugin.etcdPublisher()
-
-	go plugin.closeExample()
+	plugin.Log.Info("KeyValProtoWatcher subscribed")
 
 	return nil
 }
@@ -126,6 +145,7 @@ func (plugin *ExamplePlugin) AfterInit() error {
 func (plugin *ExamplePlugin) etcdPublisher() {
 	// Wait for the consumer to initialize
 	time.Sleep(1 * time.Second)
+
 	plugin.Log.Print("KeyValPublisher started")
 
 	// Convert data into the proto format.
@@ -166,33 +186,37 @@ func (plugin *ExamplePlugin) consumer() {
 	for {
 		select {
 		// WATCH: demonstrate how to receive data change events.
-		case dataChng := <-plugin.changeChannel:
-			plugin.Log.Printf("Received event: %v", dataChng)
+		case dataEv := <-plugin.changeChannel:
+			plugin.Log.Printf("Received event: %v", dataEv)
 			// If event arrives, the key is extracted and used together with
 			// the expected prefix to identify item.
-			key := dataChng.GetKey()
-			if strings.HasPrefix(key, etcdKeyPrefix(plugin.ServiceLabel.GetAgentLabel())) {
-				var value, previousValue etcdexample.EtcdExample
-				// The first return value is diff - boolean flag whether previous value exists or not
-				err := dataChng.GetValue(&value)
-				if err != nil {
-					plugin.Log.Error(err)
-				}
-				diff, err := dataChng.GetPrevValue(&previousValue)
-				if err != nil {
-					plugin.Log.Error(err)
-				}
-				plugin.Log.Infof("Event arrived to etcd eventHandler, key %v, update: %v, change type: %v,",
-					dataChng.GetKey(), diff, dataChng.GetChangeType())
-				// Increase event counter (expecting two events).
-				plugin.eventCounter++
 
-				if plugin.eventCounter == 2 {
-					// After creating/updating data, unregister key
-					plugin.Log.Infof("Unregister key %v", etcdKeyPrefix(plugin.ServiceLabel.GetAgentLabel()))
-					plugin.watchDataReg.Unregister(etcdKeyPrefix(plugin.ServiceLabel.GetAgentLabel()))
+			for _, dataChng := range dataEv.GetChanges() {
+				key := dataChng.GetKey()
+				if strings.HasPrefix(key, etcdKeyPrefix(plugin.ServiceLabel.GetAgentLabel())) {
+					var value, previousValue etcdexample.EtcdExample
+					// The first return value is diff - boolean flag whether previous value exists or not
+					err := dataChng.GetValue(&value)
+					if err != nil {
+						plugin.Log.Error(err)
+					}
+					diff, err := dataChng.GetPrevValue(&previousValue)
+					if err != nil {
+						plugin.Log.Error(err)
+					}
+					plugin.Log.Infof("Event arrived to etcd eventHandler, key %v, update: %v, change type: %v,",
+						dataChng.GetKey(), diff, dataChng.GetChangeType())
+					// Increase event counter (expecting two events).
+					plugin.eventCounter++
+
+					if plugin.eventCounter == 2 {
+						// After creating/updating data, unregister key
+						plugin.Log.Infof("Unregister key %v", etcdKeyPrefix(plugin.ServiceLabel.GetAgentLabel()))
+						plugin.watchDataReg.Unregister(etcdKeyPrefix(plugin.ServiceLabel.GetAgentLabel()))
+					}
 				}
 			}
+
 			// Here you would test for other event types with one if statement
 			// for each key prefix:
 			//
@@ -212,23 +236,6 @@ func (plugin *ExamplePlugin) consumer() {
 			return
 		}
 	}
-}
-
-// subscribeWatcher subscribes for data change and data resync events.
-// Events are delivered to the consumer via the selected channels.
-// ETCD watcher adapter is used to perform the registration behind the scenes.
-func (plugin *ExamplePlugin) subscribeWatcher() (err error) {
-	prefix := etcdKeyPrefix(plugin.ServiceLabel.GetAgentLabel())
-	plugin.Log.Infof("Prefix: %v", prefix)
-	plugin.watchDataReg, err = plugin.Watcher.
-		Watch("Example etcd plugin", plugin.changeChannel, plugin.resyncChannel, prefix)
-	if err != nil {
-		return err
-	}
-
-	plugin.Log.Info("KeyValProtoWatcher subscribed")
-
-	return nil
 }
 
 func (plugin *ExamplePlugin) closeExample() {

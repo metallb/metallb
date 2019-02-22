@@ -71,7 +71,7 @@ func (LinuxInterfaces_Interface_Namespace_NamespaceType) EnumDescriptor() ([]byt
 }
 
 type LinuxInterfaces struct {
-	Interface            []*LinuxInterfaces_Interface `protobuf:"bytes,1,rep,name=interface" json:"interface,omitempty"`
+	Interface            []*LinuxInterfaces_Interface `protobuf:"bytes,1,rep,name=interface,proto3" json:"interface,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                     `json:"-"`
 	XXX_unrecognized     []byte                       `json:"-"`
 	XXX_sizecache        int32                        `json:"-"`
@@ -113,13 +113,13 @@ type LinuxInterfaces_Interface struct {
 	Description          string                               `protobuf:"bytes,2,opt,name=description,proto3" json:"description,omitempty"`
 	Type                 LinuxInterfaces_InterfaceType        `protobuf:"varint,3,opt,name=type,proto3,enum=interfaces.LinuxInterfaces_InterfaceType" json:"type,omitempty"`
 	Enabled              bool                                 `protobuf:"varint,4,opt,name=enabled,proto3" json:"enabled,omitempty"`
-	IpAddresses          []string                             `protobuf:"bytes,5,rep,name=ip_addresses,json=ipAddresses" json:"ip_addresses,omitempty"`
+	IpAddresses          []string                             `protobuf:"bytes,5,rep,name=ip_addresses,json=ipAddresses,proto3" json:"ip_addresses,omitempty"`
 	PhysAddress          string                               `protobuf:"bytes,6,opt,name=phys_address,json=physAddress,proto3" json:"phys_address,omitempty"`
 	Mtu                  uint32                               `protobuf:"varint,7,opt,name=mtu,proto3" json:"mtu,omitempty"`
 	HostIfName           string                               `protobuf:"bytes,8,opt,name=host_if_name,json=hostIfName,proto3" json:"host_if_name,omitempty"`
-	Namespace            *LinuxInterfaces_Interface_Namespace `protobuf:"bytes,9,opt,name=namespace" json:"namespace,omitempty"`
-	Veth                 *LinuxInterfaces_Interface_Veth      `protobuf:"bytes,10,opt,name=veth" json:"veth,omitempty"`
-	Tap                  *LinuxInterfaces_Interface_Tap       `protobuf:"bytes,11,opt,name=tap" json:"tap,omitempty"`
+	Namespace            *LinuxInterfaces_Interface_Namespace `protobuf:"bytes,9,opt,name=namespace,proto3" json:"namespace,omitempty"`
+	Veth                 *LinuxInterfaces_Interface_Veth      `protobuf:"bytes,10,opt,name=veth,proto3" json:"veth,omitempty"`
+	Tap                  *LinuxInterfaces_Interface_Tap       `protobuf:"bytes,11,opt,name=tap,proto3" json:"tap,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                             `json:"-"`
 	XXX_unrecognized     []byte                               `json:"-"`
 	XXX_sizecache        int32                                `json:"-"`

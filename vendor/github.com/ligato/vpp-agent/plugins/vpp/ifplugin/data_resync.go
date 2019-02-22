@@ -69,6 +69,13 @@ func (c *InterfaceConfigurator) Resync(nbIfs []*intf.Interfaces_Interface) error
 			}
 			continue
 		}
+		// Register IPSec tunnel interfaces, but do not resync them (they are resynced in IPSec plugin)
+		if vppIf.Interface.Type == intf.InterfaceType_IPSEC_TUNNEL {
+			if err := c.registerInterface(vppIf.Meta.InternalName, vppIfIdx, vppIf.Interface); err != nil {
+				return errors.Errorf("interface resync error: %v", err)
+			}
+			continue
+		}
 		if vppIf.Interface.Name == "" {
 			// If interface has no name, it is stored as unnamed and resolved later
 			c.log.Debugf("Interface resync: interface %v has no name (tag)", vppIfIdx)

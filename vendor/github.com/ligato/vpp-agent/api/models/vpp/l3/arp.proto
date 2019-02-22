@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package vpp.l3;
+
+option go_package = "github.com/ligato/vpp-agent/api/models/vpp/l3;vpp_l3";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+option (gogoproto.messagename_all) = true;
+
+message ARPEntry {
+    string interface = 1;
+    string ip_address = 2;
+    string phys_address = 3;
+    bool static = 4;
+}

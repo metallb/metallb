@@ -31,7 +31,7 @@ import (
 	"github.com/ligato/vpp-agent/plugins/vpp/model/stn"
 )
 
-func (plugin *Plugin) changePropagateRequest(dataChng datasync.ChangeEvent, callback func(error)) (callbackCalled bool, err error) {
+func (plugin *Plugin) changePropagateRequest(dataChng datasync.ProtoWatchResp, callback func(error)) (callbackCalled bool, err error) {
 	key := dataChng.GetKey()
 
 	// Skip potential changes on error keys
@@ -373,7 +373,7 @@ func (plugin *Plugin) changePropagateRequest(dataChng datasync.ChangeEvent, call
 }
 
 // extractFrom change event <dataChng> current value into <value> and previous value into <prevValue>
-func (plugin *Plugin) extractFrom(dataChng datasync.ChangeEvent, value proto.Message, prevValue proto.Message) (prevValueExist bool, err error) {
+func (plugin *Plugin) extractFrom(dataChng datasync.ProtoWatchResp, value proto.Message, prevValue proto.Message) (prevValueExist bool, err error) {
 	if err := dataChng.GetValue(value); err != nil {
 		return false, err
 	}

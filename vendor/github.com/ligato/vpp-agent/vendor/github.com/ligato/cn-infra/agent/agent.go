@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
 	"strings"
 	"time"
 
@@ -147,6 +148,7 @@ func (a *agent) starter() error {
 				// agent started
 			case <-time.After(timeout):
 				agentLogger.Errorf("Agent failed to start before timeout (%v)", timeout)
+				dumpStacktrace()
 				os.Exit(1)
 			}
 		}()
@@ -253,6 +255,7 @@ func (a *agent) stopper() error {
 				// agent stopped
 			case <-time.After(timeout):
 				agentLogger.Errorf("agent failed to stop before timeout (%v)", timeout)
+				dumpStacktrace()
 				os.Exit(1)
 			}
 		}()
@@ -342,4 +345,20 @@ func (a *agent) Error() error {
 	// If you try to retrieve an error before the agent is started, you will get
 	// an error complaining the agent isn't started.
 	return a.Stop()
+}
+
+func dumpStacktrace() {
+	if !DumpStackTraceOnTimeout {
+		return
+	}
+	buf := make([]byte, 1024)
+	for {
+		n := runtime.Stack(buf, true)
+		if n < len(buf) {
+			buf = buf[:n]
+			break
+		}
+		buf = make([]byte, 2*len(buf))
+	}
+	os.Stderr.Write(buf)
 }

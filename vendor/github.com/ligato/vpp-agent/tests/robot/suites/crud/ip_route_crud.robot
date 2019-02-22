@@ -14,8 +14,8 @@ Suite Setup       Run Keywords    Discard old results
 *** Variables ***
 ${VARIABLES}=          common
 ${ENV}=                common
-${WAIT_TIMEOUT}=     20s
-${SYNC_SLEEP}=       3s
+${WAIT_TIMEOUT}=     30s
+${SYNC_SLEEP}=       5s
 
 *** Test Cases ***
 # CRUD tests for routing
@@ -64,24 +64,24 @@ Add VRF Table In Background While Creating Interface Memif
     Then IP Fib Table 0 On agent_vpp_1 Should Contain Route With IP 192.168.1.1/32
     # this will transfer interface to newly-in-background-created non default vrf table
     Then Create Master memif0 on agent_vpp_1 with VRF 2, IP 192.168.1.1, MAC 02:f1:be:90:00:00, key 1 and m0.sock socket
-    Then IP Fib Table 2 On agent_vpp_1 Should Contain Route With IP 192.168.1.1/32
+    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    IP Fib Table 2 On agent_vpp_1 Should Contain Route With IP 192.168.1.1/32
     Then IP Fib Table 0 On agent_vpp_1 Should Not Contain Route With IP 192.168.1.1/32
     # this will transfer interface to other newly-in-background-created non default vrf table
     Then Create Master memif0 on agent_vpp_1 with VRF 1, IP 192.168.1.1, MAC 02:f1:be:90:00:00, key 1 and m0.sock socket
-    Then IP Fib Table 1 On agent_vpp_1 Should Contain Route With IP 192.168.1.1/32
+    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    IP Fib Table 1 On agent_vpp_1 Should Contain Route With IP 192.168.1.1/32
     Then IP Fib Table 0 On agent_vpp_1 Should Not Contain Route With IP 192.168.1.1/32
     # this will remove non default vrf table in background - N/A
     # Then IP Fib Table 2 On agent_vpp_1 Should Be Empty - N/A
     Then IP Fib Table 2 On agent_vpp_1 Should Not Contain Route With IP 192.168.1.1/32
     # this will transfer interface to existing non default vrf table
     Then Create Master memif0 on agent_vpp_1 with VRF 2, IP 192.168.1.1, MAC 02:f1:be:90:00:00, key 1 and m0.sock socket
-    Then IP Fib Table 2 On agent_vpp_1 Should Contain Route With IP 192.168.1.1/32
+    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    IP Fib Table 2 On agent_vpp_1 Should Contain Route With IP 192.168.1.1/32
     Then IP Fib Table 0 On agent_vpp_1 Should Not Contain Route With IP 192.168.1.1/32
     Then IP Fib Table 1 On agent_vpp_1 Should Not Contain Route With IP 192.168.1.1/32
     # this will transfer interface to default vrf table
     Then Create Master memif0 on agent_vpp_1 with IP 192.168.1.1, MAC 02:f1:be:90:00:00, key 1 and m0.sock socket
     # 10 nov 2017 this will fail for memif - reason is that Create Master memif0 does not transfer interface to the VRF table 0
-    Then IP Fib Table 0 On agent_vpp_1 Should Contain Route With IP 192.168.1.1/32
+    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    IP Fib Table 0 On agent_vpp_1 Should Contain Route With IP 192.168.1.1/32
     Then IP Fib Table 1 On agent_vpp_1 Should Not Contain Route With IP 192.168.1.1/32
     # 10 nov 2017 this will fail for memif - reason is that Create Master memif0 does not transfer interface to the VRF table 0
     Then IP Fib Table 2 On agent_vpp_1 Should Not Contain Route With IP 192.168.1.1/32
@@ -98,23 +98,23 @@ Add VRF Table In Background While Creating Interface Tap
     Then IP Fib Table 0 On agent_vpp_1 Should Contain Route With IP 192.168.1.1/32
     # this will transfer interface to newly-in-background-created non default vrf table
     Then Create Tap Interface tap0 On agent_vpp_1 With Vrf 2, IP 192.168.1.1, MAC 02:f1:be:90:00:00 And HostIfName linux_tap0
-    Then IP Fib Table 2 On agent_vpp_1 Should Contain Route With IP 192.168.1.1/32
+    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    IP Fib Table 2 On agent_vpp_1 Should Contain Route With IP 192.168.1.1/32
     Then IP Fib Table 0 On agent_vpp_1 Should Not Contain Route With IP 192.168.1.1/32
     # this will transfer interface to other newly-in-background-created non default vrf table
     Then Create Tap Interface tap0 On agent_vpp_1 With Vrf 1, IP 192.168.1.1, MAC 02:f1:be:90:00:00 And HostIfName linux_tap0
-    Then IP Fib Table 1 On agent_vpp_1 Should Contain Route With IP 192.168.1.1/32
+    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    IP Fib Table 1 On agent_vpp_1 Should Contain Route With IP 192.168.1.1/32
     Then IP Fib Table 0 On agent_vpp_1 Should Not Contain Route With IP 192.168.1.1/32
     # this will remove non default vrf table in background - N/A
     # Then IP Fib Table 2 On agent_vpp_1 Should Be Empty - N/A
     Then IP Fib Table 2 On agent_vpp_1 Should Not Contain Route With IP 192.168.1.1/32
     # this will transfer interface to existing non default vrf table
     Then Create Tap Interface tap0 On agent_vpp_1 With Vrf 2, IP 192.168.1.1, MAC 02:f1:be:90:00:00 And HostIfName linux_tap0
-    Then IP Fib Table 2 On agent_vpp_1 Should Contain Route With IP 192.168.1.1/32
+    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    IP Fib Table 2 On agent_vpp_1 Should Contain Route With IP 192.168.1.1/32
     Then IP Fib Table 0 On agent_vpp_1 Should Not Contain Route With IP 192.168.1.1/32
     Then IP Fib Table 1 On agent_vpp_1 Should Not Contain Route With IP 192.168.1.1/32
     # this will transfer interface to default vrf table
     Then Create Tap Interface tap0 On agent_vpp_1 With Vrf 0, IP 192.168.1.1, MAC 02:f1:be:90:00:00 And HostIfName linux_tap0
-    Then IP Fib Table 0 On agent_vpp_1 Should Contain Route With IP 192.168.1.1/32
+    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    IP Fib Table 0 On agent_vpp_1 Should Contain Route With IP 192.168.1.1/32
     Then IP Fib Table 1 On agent_vpp_1 Should Not Contain Route With IP 192.168.1.1/32
     Then IP Fib Table 2 On agent_vpp_1 Should Not Contain Route With IP 192.168.1.1/32
 
@@ -125,31 +125,31 @@ Add VRF Table In Background While Creating Interface VXLAN
     Add Agent VPP Node                 agent_vpp_1
     Sleep    10
     # create VXLan interface in default vrf
-    vpp_ctl: Put VXLan Interface    node=agent_vpp_1    name=vpp1_vxlan1    src=192.168.1.1    dst=192.168.1.2    vni=5    vrf=0
+    Put VXLan Interface    node=agent_vpp_1    name=vpp1_vxlan1    src=192.168.1.1    dst=192.168.1.2    vni=5    vrf=0
     Write To Machine    agent_vpp_1_term    show vxlan tunnel
     Show IP Fib On agent_vpp_1
     Show Interfaces Address On agent_vpp_1
     IP Fib Table 0 On agent_vpp_1 Should Contain Route With IP 192.168.1.2/32
     # this will transfer interface to newly-in-background-created non default vrf table
-    vpp_ctl: Put VXLan Interface    node=agent_vpp_1    name=vpp1_vxlan1    src=192.168.1.1    dst=192.168.1.2    vni=5    vrf=2
+    Put VXLan Interface    node=agent_vpp_1    name=vpp1_vxlan1    src=192.168.1.1    dst=192.168.1.2    vni=5    vrf=2
     Write To Machine    agent_vpp_1_term    show vxlan tunnel
     Show IP Fib On agent_vpp_1
     Show Interfaces Address On agent_vpp_1
     IP Fib Table 2 On agent_vpp_1 Should Contain Route With IP 192.168.1.2/32
     # this will transfer interface to other newly-in-background-created non default vrf table
-    vpp_ctl: Put VXLan Interface    node=agent_vpp_1    name=vpp1_vxlan1    src=192.168.1.1    dst=192.168.1.2    vni=5    vrf=1
+    Put VXLan Interface    node=agent_vpp_1    name=vpp1_vxlan1    src=192.168.1.1    dst=192.168.1.2    vni=5    vrf=1
     Write To Machine    agent_vpp_1_term    show vxlan tunnel
     Show IP Fib On agent_vpp_1
     Show Interfaces Address On agent_vpp_1
     IP Fib Table 1 On agent_vpp_1 Should Contain Route With IP 192.168.1.2/32
     # this will transfer interface to existing non default vrf table
-    vpp_ctl: Put VXLan Interface    node=agent_vpp_1    name=vpp1_vxlan1    src=192.168.1.1    dst=192.168.1.2    vni=5    vrf=2
+    Put VXLan Interface    node=agent_vpp_1    name=vpp1_vxlan1    src=192.168.1.1    dst=192.168.1.2    vni=5    vrf=2
     Write To Machine    agent_vpp_1_term    show vxlan tunnel
     Show IP Fib On agent_vpp_1
     Show Interfaces Address On agent_vpp_1
     IP Fib Table 2 On agent_vpp_1 Should Contain Route With IP 192.168.1.2/32
     # this will transfer interface to default vrf table
-    vpp_ctl: Put VXLan Interface    node=agent_vpp_1    name=vpp1_vxlan1    src=192.168.1.1    dst=192.168.1.2    vni=5    vrf=0
+    Put VXLan Interface    node=agent_vpp_1    name=vpp1_vxlan1    src=192.168.1.1    dst=192.168.1.2    vni=5    vrf=0
     Write To Machine    agent_vpp_1_term    show vxlan tunnel
     Show IP Fib On agent_vpp_1
     Show Interfaces Address On agent_vpp_1
@@ -158,8 +158,9 @@ Add VRF Table In Background While Creating Interface VXLAN
 *** Keywords ***
 IP Fib On ${node} Should Not Contain Route With IP ${ip}/${prefix}
     ${out}=    vpp_term: Show IP Fib    ${node}
-    Should Not Match Regexp    ${out}  ${ip}\\/${prefix}\\s*unicast\\-ip4-chain\\s*\\[\\@0\\]:\\ dpo-load-balance:\\ \\[proto:ip4\\ index:\\d+\\ buckets:\\d+\\ uRPF:\\d+\\ to:\\[0:0\\]\\]
+    Should Not Match Regexp    ${out}  ${ip}\/${prefix}\r\r\n\ \ \unicast\-ip4-chain\r\r\n\ \ \
 
 IP Fib On ${node} Should Contain Route With IP ${ip}/${prefix}
     ${out}=    vpp_term: Show IP Fib    ${node}
-    Should Match Regexp        ${out}  ${ip}\\/${prefix}\\s*unicast\\-ip4-chain\\s*\\[\\@0\\]:\\ dpo-load-balance:\\ \\[proto:ip4\\ index:\\d+\\ buckets:\\d+\\ uRPF:\\d+\\ to:\\[0:0\\]\\]
+    Should Match Regexp        ${out}  ${ip}\/${prefix}\r\r\n\ \ \unicast\-ip4-chain\r\r\n\ \ \
+#   Should Match Regexp        ${out}  ${ip}\\/${prefix}\\s*unicast\\-ip4-chain\\s*\\[\\@0\\]:\\ dpo-load-balance:\\ \\[proto:ip4\\ index:\\d+\\ buckets:\\d+\\ uRPF:\\d+\\ to:\\[0:0\\]\\]

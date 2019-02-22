@@ -22,7 +22,7 @@ import (
 	"github.com/ligato/vpp-agent/plugins/linux/model/l3"
 )
 
-func (plugin *Plugin) changePropagateRequest(dataChng datasync.ChangeEvent) error {
+func (plugin *Plugin) changePropagateRequest(dataChng datasync.ProtoWatchResp) error {
 	var err error
 	key := dataChng.GetKey()
 

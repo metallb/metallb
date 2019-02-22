@@ -1,16 +1,11 @@
 package main
 
 import (
-	"reflect"
 	"time"
 
 	"fmt"
 	"strconv"
-	"strings"
 
-	"os"
-
-	"github.com/ligato/cn-infra/config"
 	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/db/keyval"
 	"github.com/ligato/cn-infra/db/keyval/redis"
@@ -20,393 +15,208 @@ import (
 	"github.com/namsral/flag"
 )
 
-var log = logrus.DefaultLogger()
+// SimpleRedis is base structure which holds together all items needed to run the example - logger, redis client,
+// test prefix, channel for redis responses and channel to close the redis watcher
+type SimpleRedis struct {
+	log    *logrus.Logger
+	client redis.Client
 
-var redisConn *redis.BytesConnectionRedis
-var broker keyval.BytesBroker
-var watcher keyval.BytesWatcher
+	prefix string
 
-var prefix string
-var debug bool
-var debugIterator bool
-var redisConfig string
-
-func main() {
-	//generateSampleConfigs()
-
-	cfg := loadConfig()
-	if cfg == nil {
-		return
-	}
-	fmt.Printf("config: %T:\n%v\n", cfg, cfg)
-	fmt.Printf("prefix: %s\n", prefix)
-
-	redisConn = createConnection(cfg)
-	broker = redisConn.NewBroker(prefix)
-	watcher = redisConn.NewWatcher(prefix)
-
-	runSimpleExmple()
+	respChan  chan keyval.BytesWatchResp
+	closeChan chan string
 }
 
-func loadConfig() interface{} {
-	flag.StringVar(&prefix, "prefix", "",
-		"Specifies key prefix")
-	flag.BoolVar(&debug, "debug", false,
-		"Specifies whether to enable debugging; default to false")
-	flag.BoolVar(&debugIterator, "debug-iterator", false,
-		"Specifies whether to enable debugging; default to false")
-	flag.StringVar(&redisConfig, "redis-config", "",
-		"Specifies configuration file path")
+func main() {
+	var debug bool
+	var redisConfigPath string
+
+	// init example flags
+	flag.BoolVar(&debug, "debug", false, "Enable debugging")
+	flag.StringVar(&redisConfigPath, "redis-config", "", "Redis configuration file path")
 	flag.Parse()
 
-	flag.Usage = func() {
-		flag.VisitAll(func(f *flag.Flag) {
-			var format string
-			if f.Name == "redis-config" || f.Name == "prefix" {
-				// put quotes around string
-				format = "  -%s=%q: %s\n"
-			} else {
-				if f.Name != "debug" && f.Name != "debug-iterator" {
-					return
-				}
-				format = "  -%s=%s: %s\n"
-			}
-			fmt.Fprintf(os.Stderr, format, f.Name, f.DefValue, f.Usage)
-		})
-
-	}
-
+	log := logrus.DefaultLogger()
 	if debug {
 		log.SetLevel(logging.DebugLevel)
 	}
-	cfgFlag := flag.Lookup("redis-config")
-	if cfgFlag == nil {
-		flag.Usage()
-		return nil
-	}
-	cfgFile := cfgFlag.Value.String()
-	if cfgFile == "" {
-		flag.Usage()
-		return nil
-	}
-	cfg, err := redis.LoadConfig(cfgFile)
+	// load redis config file
+	redisConfig, err := redis.LoadConfig(redisConfigPath)
 	if err != nil {
-		log.Panicf("LoadConfig(%s) failed: %s", cfgFile, err)
-	}
-	return cfg
-}
-
-func createConnection(cfg interface{}) *redis.BytesConnectionRedis {
-	client, err := redis.ConfigToClient(cfg)
-	if err != nil {
-		log.Panicf("CreateNodeClient() failed: %s", err)
-	}
-	conn, err := redis.NewBytesConnection(client, log)
-	if err != nil {
-		safeclose.Close(client)
-		log.Panicf("NewBytesConnection() failed: %s", err)
-	}
-	return conn
-}
-
-func runSimpleExmple() {
-	var err error
-
-	keyPrefix := "key"
-	keys3 := []string{
-		keyPrefix + "1",
-		keyPrefix + "2",
-		keyPrefix + "3",
-	}
-
-	respChan := make(chan keyval.BytesWatchResp, 10)
-	err = watcher.Watch(keyval.ToChan(respChan), make(chan string), keyPrefix)
-	if err != nil {
-		log.Error(err.Error())
-	}
-	go func() {
-		for {
-			select {
-			case r, ok := <-respChan:
-				if ok {
-					switch r.GetChangeType() {
-					case datasync.Put:
-						log.Infof("KeyValProtoWatcher received %v: %s=%s", r.GetChangeType(), r.GetKey(), string(r.GetValue()))
-					case datasync.Delete:
-						log.Infof("KeyValProtoWatcher received %v: %s", r.GetChangeType(), r.GetKey())
-					}
-				} else {
-					log.Error("Something wrong with respChan... bail out")
-					return
-				}
-			default:
-				break
-			}
-		}
-	}()
-	time.Sleep(2 * time.Second)
-	put(keys3[0], "val 1")
-	put(keys3[1], "val 2")
-	put(keys3[2], "val 3", datasync.WithTTL(time.Second))
-
-	time.Sleep(2 * time.Second)
-	get(keys3[0])
-	get(keys3[1])
-	fmt.Printf("==> NOTE: %s should have expired\n", keys3[2])
-	get(keys3[2]) // key3 should've expired
-	fmt.Printf("==> NOTE: get(%s) should return false\n", keyPrefix)
-	get(keyPrefix) // keyPrefix shouldn't find anything
-	listKeys(keyPrefix)
-	listVal(keyPrefix)
-
-	doKeyInterator()
-	doKeyValInterator()
-
-	del(keyPrefix, datasync.WithPrefix())
-
-	fmt.Println("==> NOTE: All keys should have been deleted")
-	get(keys3[0])
-	get(keys3[1])
-	listKeys(keyPrefix)
-	listVal(keyPrefix)
-
-	txn(keyPrefix)
-
-	log.Info("Sleep for 5 seconds")
-	time.Sleep(5 * time.Second)
-
-	// Done watching.  Close the channel.
-	log.Infof("Closing connection")
-	//close(respChan)
-	safeclose.Close(redisConn)
-
-	fmt.Println("==> NOTE: Call on a closed connection should fail.")
-	del(keyPrefix)
-
-	log.Info("Sleep for 10 seconds")
-	time.Sleep(30 * time.Second)
-}
-
-func put(key, value string, opts ...datasync.PutOption) {
-	err := broker.Put(key, []byte(value), opts...)
-	if err != nil {
-		//log.Panicf(err.Error())
-		log.Error(err.Error())
-	}
-}
-
-func get(key string) {
-	var val []byte
-	var found bool
-	var revision int64
-	var err error
-
-	val, found, revision, err = broker.GetValue(key)
-	if err != nil {
-		log.Error(err.Error())
-	} else if found {
-		log.Infof("GetValue(%s) = %t ; val = %s ; revision = %d", key, found, val, revision)
-	} else {
-		log.Infof("GetValue(%s) = %t", key, found)
-	}
-}
-
-func listKeys(keyPrefix string) {
-	var keys keyval.BytesKeyIterator
-	var err error
-
-	keys, err = broker.ListKeys(keyPrefix)
-	if err != nil {
-		log.Error(err.Error())
-	} else {
-		var count int32
-		for {
-			key, rev, done := keys.GetNext()
-			if done {
-				break
-			}
-			log.Infof("ListKeys(%s):  %s (rev %d)", keyPrefix, key, rev)
-			count++
-		}
-		log.Infof("ListKeys(%s): count = %d", keyPrefix, count)
-	}
-}
-
-func listVal(keyPrefix string) {
-	var keyVals keyval.BytesKeyValIterator
-	var err error
-
-	keyVals, err = broker.ListValues(keyPrefix)
-	if err != nil {
-		log.Error(err.Error())
-	} else {
-		var count int32
-		for {
-			kv, done := keyVals.GetNext()
-			if done {
-				break
-			}
-			log.Infof("ListValues(%s):  %s = %s (rev %d)", keyPrefix, kv.GetKey(), kv.GetValue(), kv.GetRevision())
-			count++
-		}
-		log.Infof("ListValues(%s): count = %d", keyPrefix, count)
-	}
-}
-
-func doKeyInterator() {
-	prefix := "k_iter-"
-	max := 100
-	for i := 1; i <= max; i++ {
-		key := fmt.Sprintf("%s%d", prefix, i)
-		broker.Put(key, []byte(key))
-	}
-	var level logging.LogLevel
-	if debugIterator {
-		level = log.GetLevel()
-		log.SetLevel(logging.DebugLevel)
-	}
-	iterator, err := broker.ListKeys(prefix)
-	if err != nil {
-		log.Error(err.Error())
-	}
-	count := 0
-	for {
-		_, _, last := iterator.GetNext()
-		if last {
-			if count == max {
-				log.Infof("doKeyInterator(): Expected %d keys; Found %d", max, count)
-			} else {
-				log.Errorf("doKeyInterator(): Expected %d keys; Found %d", max, count)
-			}
-			break
-		}
-		if debug || debugIterator {
-			time.Sleep(200 * time.Millisecond)
-		}
-		count++
-	}
-	if debugIterator {
-		log.SetLevel(level)
-	}
-	broker.Delete(prefix, datasync.WithPrefix())
-}
-
-func doKeyValInterator() {
-	prefix := "kv_iter-"
-	max := 100
-	for i := 1; i <= max; i++ {
-		key := fmt.Sprintf("%s%d", prefix, i)
-		broker.Put(key, []byte(key))
-	}
-	var level logging.LogLevel
-	if debugIterator {
-		level = log.GetLevel()
-		log.SetLevel(logging.DebugLevel)
-	}
-	iterator, err := broker.ListValues(prefix)
-	if err != nil {
-		log.Error(err.Error())
-	}
-	count := 0
-	for {
-		_, last := iterator.GetNext()
-		if last {
-			if count == max {
-				log.Infof("doKeyValInterator(): Expected %d keyVals; Found %d", max, count)
-			} else {
-				log.Errorf("doKeyValInterator(): Expected %d keyVals; Found %d", max, count)
-			}
-			break
-		}
-		if debug || debugIterator {
-			time.Sleep(200 * time.Millisecond)
-		}
-		count++
-	}
-	if debugIterator {
-		log.SetLevel(level)
-	}
-	broker.Delete(prefix, datasync.WithPrefix())
-}
-
-func del(keyPrefix string, opt ...datasync.DelOption) {
-	var found bool
-	var err error
-
-	found, err = broker.Delete(keyPrefix, opt...)
-	if err != nil {
-		log.Error(err.Error())
+		log.Errorf("Failed to load Redis config file %s: %v", redisConfigPath, err)
 		return
 	}
-	log.Infof("Delete(%s): found = %t", keyPrefix, found)
+
+	example := &SimpleRedis{
+		log:       log,
+		prefix:    "/redis/test",
+		respChan:  make(chan keyval.BytesWatchResp, 10),
+		closeChan: make(chan string),
+	}
+	doneChan := make(chan struct{})
+	if broker, err := example.init(redisConfig, doneChan); err != nil {
+		example.log.Errorf("simple example error: %v", err)
+	} else {
+		example.start(broker)
+	}
+
+	// wait for watcher
+	log.Info("Waiting for watcher... (if it takes long, please make sure redis watching is enabled with, see readme)")
+	<-doneChan
+
+	log.Info("Example done, closing")
 }
 
-func txn(keyPrefix string) {
-	keys := []string{
-		keyPrefix + "101",
-		keyPrefix + "102",
-		keyPrefix + "103",
-		keyPrefix + "104",
-	}
-	var txn keyval.BytesTxn
+func (sr *SimpleRedis) init(config interface{}, doneChan chan struct{}) (broker keyval.BytesBroker, err error) {
+	sr.log.Info("Simple redis example. If you need more info about what is happening, run example with -debug=true")
 
-	log.Infof("txn(): keys = %v", keys)
-	txn = broker.NewTxn()
-	for i, k := range keys {
-		txn.Put(k, []byte(strconv.Itoa(i+1)))
-	}
-	txn.Delete(keys[0])
-	err := txn.Commit()
+	// prepare client to connect to the redis DB
+	sr.client, err = redis.ConfigToClient(config)
 	if err != nil {
-		log.Errorf("txn(): %s", err)
+		return broker, fmt.Errorf("failed to create redis client: %v", err)
 	}
-	listVal(keyPrefix)
+	connection, err := redis.NewBytesConnection(sr.client, sr.log)
+	if err != nil {
+		return broker, fmt.Errorf("failed to create connection from redis client: %v", err)
+	}
+
+	// start and register the redis watcher
+	go sr.watch(doneChan)
+	bytesWatcher := connection.NewWatcher(sr.prefix)
+	if err := bytesWatcher.Watch(keyval.ToChan(sr.respChan), sr.closeChan, sr.prefix); err != nil {
+		return broker, fmt.Errorf("failed to init redis watcher: %v", err)
+	}
+
+	// prepare the broker in order to put/delete key-value pairs
+	return connection.NewBroker(sr.prefix), nil
 }
 
-func generateSampleConfigs() {
-	clientConfig := redis.ClientConfig{
-		Password:     "",
-		DialTimeout:  0,
-		ReadTimeout:  0,
-		WriteTimeout: 0,
-		Pool: redis.PoolConfig{
-			PoolSize:           0,
-			PoolTimeout:        0,
-			IdleTimeout:        0,
-			IdleCheckFrequency: 0,
-		},
-	}
-	var cfg interface{}
+// watch redis database for all the keys/values put during the example
+func (sr *SimpleRedis) watch(done chan struct{}) {
+	sr.log.Info("==> Redis DB watcher started")
 
-	cfg = redis.NodeConfig{
-		Endpoint: "localhost:6379",
-		DB:       0,
-		EnableReadQueryOnSlave: false,
-		TLS:          redis.TLS{},
-		ClientConfig: clientConfig,
-	}
-	config.SaveConfigToYamlFile(cfg, "./node-client.yaml", 0644, makeTypeHeader(cfg))
+	var count int8
 
-	cfg = redis.SentinelConfig{
-		Endpoints:    []string{"172.17.0.7:26379", "172.17.0.8:26379", "172.17.0.9:26379"},
-		MasterName:   "mymaster",
-		DB:           0,
-		ClientConfig: clientConfig,
+	for {
+		select {
+		case r, ok := <-sr.respChan:
+			count++
+			if !ok {
+				sr.log.Info("==> Redis DB watcher closed")
+				return
+			}
+			switch r.GetChangeType() {
+			case datasync.Put:
+				sr.log.Debugf("==> Redis watcher: received 'put' event: key: %s, value: %s", r.GetKey(), string(r.GetValue()))
+			case datasync.Delete:
+				sr.log.Debugf("==> Redis watcher: received 'delete' event: key: %s", r.GetKey())
+			}
+			if count == 12 {
+				sr.log.Info("All expected events were received by watcher")
+				done <- struct{}{}
+			}
+		}
 	}
-	config.SaveConfigToYamlFile(cfg, "./sentinel-client.yaml", 0644, makeTypeHeader(cfg))
-
-	cfg = redis.ClusterConfig{
-		Endpoints:              []string{"172.17.0.1:6379", "172.17.0.2:6379", "172.17.0.3:6379"},
-		EnableReadQueryOnSlave: true,
-		MaxRedirects:           0,
-		RouteByLatency:         true,
-		ClientConfig:           clientConfig,
-	}
-	config.SaveConfigToYamlFile(cfg, "./cluster-client.yaml", 0644, makeTypeHeader(cfg))
 }
 
-func makeTypeHeader(i interface{}) string {
-	t := reflect.TypeOf(i)
-	tn := t.String()
-	return fmt.Sprintf("# %s#%s", t.PkgPath(), tn[strings.Index(tn, ".")+1:])
+// start the example, testing simple key/value put, put key with TTL and list all present items by key or by value. All
+// changes are also reflected in watcher
+func (sr *SimpleRedis) start(db keyval.BytesBroker) {
+	sr.log.Info("Start putting data to Redis...")
+	time.Sleep(2 * time.Second)
+
+	// basic key-value entry
+	if err := db.Put(sr.prefix+"/key1", []byte("data1")); err != nil {
+		sr.log.Errorf("put key1 failed: %v", err)
+	} else {
+		sr.log.Info("key1 stored in DB")
+	}
+	if data, found, _, err := db.GetValue(sr.prefix + "/key1"); err != nil {
+		sr.log.Errorf("get key1 failed: %v", err)
+	} else if !found {
+		sr.log.Errorf("expected key1 does not exist: %v", err)
+	} else {
+		sr.log.Infof("key1 read from DB (data: %v)", data)
+	}
+
+	// key-value entry with TTL
+	if err := db.Put(sr.prefix+"/key2", []byte("data2"), datasync.WithTTL(2*time.Second)); err != nil {
+		sr.log.Errorf("put key1 failed: %v", err)
+	}
+	if data, found, _, err := db.GetValue(sr.prefix + "/key2"); err != nil {
+		sr.log.Errorf("get key2 failed: %v", err)
+	} else if !found {
+		sr.log.Errorf("expected key2 does not exist: %v", err)
+	} else {
+		sr.log.Infof("key2 read from DB (data: %v)", data)
+	}
+	sr.log.Info("waiting for key2 TTL...")
+	time.Sleep(3 * time.Second)
+	if _, found, _, err := db.GetValue(sr.prefix + "/key2"); err != nil {
+		sr.log.Errorf("get key2 after TTL failed: %v", err)
+	} else if !found {
+		sr.log.Info("key2 does not exist (expired TTL)")
+	} else {
+		sr.log.Error("key2 should not exist")
+	}
+
+	// put several another keys as txn
+	sr.log.Info("Put a few more keys as transaction...")
+	txn := db.NewTxn()
+	for i := 3; i <= 11; i++ {
+		txn.Put(sr.prefix+"/key"+strconv.Itoa(i), []byte("data"+strconv.Itoa(i)))
+	}
+	if err := txn.Commit(); err != nil {
+		sr.log.Errorf("failed to commit transaction: %v", err)
+	}
+	sr.log.Info("... done")
+
+	// list keys
+	sr.log.Info("Listing keys (expected 10 entries)")
+	var count int8
+	keys, err := db.ListKeys(sr.prefix)
+	if err != nil {
+		sr.log.Errorf("failed to list keys: %v", err)
+	} else {
+		for {
+			key, _, done := keys.GetNext()
+			if done {
+				break
+			}
+			sr.log.Debugf("Found key %s", key)
+			count++
+		}
+		if count == 10 {
+			sr.log.Info("all expected keys were found")
+		} else {
+			sr.log.Errorf("failed to get all the keys (expected 10, got %d)", count)
+		}
+	}
+
+	// list keys
+	sr.log.Info("Listing values (expected 10 entries)")
+	count = 0
+	values, err := db.ListValues(sr.prefix)
+	if err != nil {
+		sr.log.Errorf("failed to list values: %v", err)
+	} else {
+		for {
+			kv, done := values.GetNext()
+			if done {
+				break
+			}
+			sr.log.Debugf("Found value %s", string(kv.GetValue()))
+			count++
+		}
+		if count == 10 {
+			sr.log.Info("all expected values were found")
+		} else {
+			sr.log.Errorf("failed to get all the values (expected 10, got %d)", count)
+		}
+	}
+}
+
+// Close close the redis client and watcher channels
+func (sr *SimpleRedis) Close() error {
+	return safeclose.Close(sr.client, sr.respChan, sr.closeChan)
 }

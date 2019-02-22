@@ -1,0 +1,95 @@
+syntax = "proto3";
+
+package configurator;
+
+option go_package = "github.com/ligato/vpp-agent/api/configurator;configurator";
+
+import "models/vpp/vpp.proto";
+import "models/linux/linux.proto";
+
+// Config groups all supported config data into single message.
+message Config {
+    vpp.ConfigData vpp_config = 1;
+    linux.ConfigData linux_config = 2;
+}
+
+// Notification groups all notification data into single message.
+message Notification {
+    oneof notification {
+        vpp.Notification vpp_notification = 1;
+        linux.Notification linux_notification = 2;
+    }
+}
+
+// Configurator provides basic operations for managing configuration
+// and monitoring state.
+service Configurator {
+    // Get is used for listing desired config.
+    rpc Get(GetRequest) returns (GetResponse);
+
+    // Update is used for updating desired config.
+    rpc Update(UpdateRequest) returns (UpdateResponse);
+
+    // Delete is used for deleting desired config.
+    rpc Delete(DeleteRequest) returns (DeleteResponse);
+
+    // Dump is used for dumping running config.
+    rpc Dump(DumpRequest) returns (DumpResponse);
+
+    // Notify is used for subscribing to notifications.
+    rpc Notify(NotificationRequest) returns (stream NotificationResponse);
+}
+
+message UpdateRequest {
+    // Update describes config data to be updated.
+    Config update = 1;
+
+    // The full_resync option can be used
+    // to overwrite all existing data.
+    bool full_resync = 2;
+}
+
+message UpdateResponse {
+
+}
+
+message DeleteRequest {
+    // Delete describes config data to be deleted.
+    Config delete = 1;
+}
+
+message DeleteResponse {
+
+}
+
+message GetRequest {
+
+}
+
+message GetResponse {
+    // Config describes desired config retrieved from agent.
+    Config config = 1;
+}
+
+message DumpRequest {
+
+}
+
+message DumpResponse {
+    // Dump describes running config dumped from southbound.
+    Config dump = 1;
+}
+
+// NotificationRequest represent a notification request which contains
+// index of next required message
+message NotificationRequest {
+    uint32 idx = 1;
+}
+
+// Response to notification request 'get'. Returns indexed notification.
+message NotificationResponse {
+    // Index of following notification
+    uint32 next_idx = 1;
+    // Notification data
+    Notification notification = 2;
+}

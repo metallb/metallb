@@ -39,7 +39,7 @@ import (
 
 	"github.com/ligato/vpp-agent/plugins/restv2/resturl"
 	ifvppcalls "github.com/ligato/vpp-agent/plugins/vppv2/ifplugin/vppcalls"
-	"github.com/ligato/vpp-agent/plugins/vppv2/model/l3"
+	"github.com/ligato/vpp-agent/api/models/vpp/l3"
 )
 
 var (
@@ -242,18 +242,18 @@ func (c *vppL2Controller) updateProxyArp() error {
 		return err
 	}
 
-	var ifList []*l3.ProxyARP_Interface
+	var ifList []*vpp_l3.ProxyARP_Interface
 	for _, ifc := range c.ethIfcs {
-		ifList = append(ifList, &l3.ProxyARP_Interface{Name: ifc})
+		ifList = append(ifList, &vpp_l3.ProxyARP_Interface{Name: ifc})
 	}
-	var rangeList []*l3.ProxyARP_Range
+	var rangeList []*vpp_l3.ProxyARP_Range
 	for _, ip := range c.ips {
-		rangeList = append(rangeList, &l3.ProxyARP_Range{
+		rangeList = append(rangeList, &vpp_l3.ProxyARP_Range{
 			FirstIpAddr: ip.String(),
 			LastIpAddr:  ip.String(),
 		})
 	}
-	rl := &l3.ProxyARP{
+	rl := &vpp_l3.ProxyARP{
 		Interfaces: ifList,
 		Ranges:     rangeList,
 	}
@@ -310,5 +310,5 @@ func (c *vppL2Controller) httpRead(id string, data interface{}) error {
 }
 
 func (c *vppL2Controller) getProxyArpKey() string {
-	return fmt.Sprintf("%s/%s", c.myNode, l3.ProxyARPKey)
+	return fmt.Sprintf("%s/%s", c.myNode, vpp_l3.ProxyARPKey())
 }

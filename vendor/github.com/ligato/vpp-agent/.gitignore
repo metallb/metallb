@@ -1,0 +1,25 @@
+*.pyc
+*.so
+*.test
+*.out
+
+.idea/*
+
+# ignore executables (extensionless files)
+/cmd/**/*
+!/cmd/**/
+!/cmd/**/*.*
+/examples/**/*
+!/examples/**/
+!/examples/**/*.*
+
+# test results
+/tests/perf/log
+/tests/perf/logresult.zip
+/tests/robot/variables/jozo_local_variables.robot
+
+# vpp directory
+/vpp/
+
+# exclude vendor
+!/vendor/**/*

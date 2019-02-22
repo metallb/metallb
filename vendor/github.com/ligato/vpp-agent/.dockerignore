@@ -1,0 +1,13 @@
+.git/
+.gitignore
+.gtm/
+.idea/
+.travis.yml
+*.md
+LICENSE
+docs/
+examples/
+k8s/
+cmd/agentctl/agentctl
+cmd/vpp-agent/vpp-agent
+cmd/vpp-agent-ctl/vpp-agent-ctl

@@ -13,7 +13,7 @@ Resource    vat_term.robot
 Resource    vpp_term.robot
 Resource    lm_term.robot
 Resource    vpp.robot
-Resource    vpp_ctl.robot
+Resource    etcdctl.robot
 Resource    rest_api.robot
 Resource    vxlan.robot
 Resource    linux.robot

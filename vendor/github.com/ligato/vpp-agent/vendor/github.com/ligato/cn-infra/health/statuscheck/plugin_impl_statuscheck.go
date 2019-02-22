@@ -248,7 +248,7 @@ func (p *Plugin) reportInterfaceStateChange(data *status.InterfaceStats_Interfac
 	} else if existingData.Index != data.Index || existingData.Status != data.Status || existingData.MacAddress != data.MacAddress {
 		// updated entry - update only if state really changed
 		p.interfaceStat.Interfaces = append(append(p.interfaceStat.Interfaces[:ifIndex], data), p.interfaceStat.Interfaces[ifIndex+1:]...)
-		p.Log.Debug("Global interface state data updated: %v", data)
+		p.Log.Debugf("Global interface state data updated: %v", data)
 	}
 }
 

@@ -52,26 +52,32 @@ type BytesBrokerWatcherEtcd struct {
 // NewEtcdConnectionWithBytes creates new connection to etcd based on the given
 // config file.
 func NewEtcdConnectionWithBytes(config ClientConfig, log logging.Logger) (*BytesConnectionEtcd, error) {
-	start := time.Now()
+	t := time.Now()
+
+	l := log.WithField("endpoints", config.Endpoints)
+	l.Debugf("Connecting to Etcd..")
+
 	etcdClient, err := clientv3.New(*config.Config)
 	if err != nil {
-		log.Debugf("Unable to connect to ETCD %v, Error: '%s'", config.Endpoints, err)
+		l.Warnf("Failed to connect to Etcd: %v", err)
 		return nil, err
 	}
-	etcdConnectTime := time.Since(start)
-	log.WithField("durationInNs", etcdConnectTime.Nanoseconds()).Info("Connecting to etcd took ", etcdConnectTime)
+
+	l.Infof("Connected to Etcd (took %v)", time.Since(t))
 
 	conn, err := NewEtcdConnectionUsingClient(etcdClient, log)
+	if err != nil {
+		return nil, err
+	}
 	conn.opTimeout = config.OpTimeout
 
-	return conn, err
+	return conn, nil
 }
 
 // NewEtcdConnectionUsingClient creates a new instance of BytesConnectionEtcd
 // using the provided etcd client.
 // This constructor is used primarily for testing.
 func NewEtcdConnectionUsingClient(etcdClient *clientv3.Client, log logging.Logger) (*BytesConnectionEtcd, error) {
-	log.Debug("NewEtcdConnectionWithBytes", etcdClient)
 	conn := BytesConnectionEtcd{
 		Logger:     log,
 		etcdClient: etcdClient,
@@ -217,7 +223,8 @@ func (db *BytesConnectionEtcd) Watch(resp func(keyval.BytesWatchResp), closeChan
 
 // watchInternal starts the watch subscription for the key.
 func watchInternal(log logging.Logger, watcher clientv3.Watcher, closeCh chan string, prefix string, resp func(keyval.BytesWatchResp)) error {
-	recvChan := watcher.Watch(context.Background(), prefix, clientv3.WithPrefix(), clientv3.WithPrevKV())
+	ctx, cancel := context.WithCancel(context.Background())
+	recvChan := watcher.Watch(ctx, prefix, clientv3.WithPrefix(), clientv3.WithPrevKV())
 
 	go func(registeredKey string) {
 		var compactRev int64
@@ -261,6 +268,7 @@ func watchInternal(log logging.Logger, watcher clientv3.Watcher, closeCh chan st
 
 			case closeVal, ok := <-closeCh:
 				if !ok || closeVal == registeredKey {
+					cancel()
 					log.WithField("prefix", prefix).Debug("Watch ended")
 					return
 				}

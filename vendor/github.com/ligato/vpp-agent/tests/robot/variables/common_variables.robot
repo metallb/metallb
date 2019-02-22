@@ -75,7 +75,7 @@ ${AGENT_VPP_4_VPP_VAT_PROMPT}      vat#
 
 # Variables for container with agent and without vpp
 #${AGENT_IMAGE_NAME}                ligato/dev-cn-infra:latest
-${AGENT_IMAGE_NAME}                ligato/vpp-agent:pantheon-dev
+${AGENT_IMAGE_NAME}                ligato/vpp-agent:dev
 ${AGENT_ETCD_CONF_PATH}            /opt/vpp-agent/dev/etcd.conf
 ${AGENT_KAFKA_CONF_PATH}           /opt/vpp-agent/dev/kafka.conf
 
@@ -132,6 +132,8 @@ ${REST_CALL_SLEEP}                 0
 ${SSH_READ_DELAY}                  1
 
 ${EXAMPLE_PLUGIN_NAME}             example_plugin.so
+
+${AGENT_VER}                       v2
 
 # temporary vars
 ${DEV_IMAGE}                       dev_vpp_agent

@@ -35,9 +35,7 @@ type context struct {
 	inputFile  string // input file with VPP API in JSON
 	outputFile string // output file with generated Go package
 
-	inputData []byte        // contents of the input file
-	inputBuff *bytes.Buffer // contents of the input file currently being read
-	inputLine int           // currently processed line in the input file
+	inputData []byte // contents of the input file
 
 	moduleName  string // name of the source VPP module
 	packageName string // name of the Go package being generated
@@ -87,19 +85,33 @@ func generatePackage(ctx *context, w *bufio.Writer) error {
 
 	if *includeAPIVer {
 		const APIVerConstName = "VlAPIVersion"
-		fmt.Fprintf(w, "// %s represents version of the API.\n", APIVerConstName)
+		fmt.Fprintf(w, "// %s represents version of the binary API module.\n", APIVerConstName)
 		fmt.Fprintf(w, "const %s = %v\n", APIVerConstName, ctx.packageData.APIVersion)
 		fmt.Fprintln(w)
 	}
+
+	// generate services
+	if len(ctx.packageData.Services) > 0 {
+		generateServices(ctx, w, ctx.packageData.Services)
+	}
+
+	// TODO: generate implementation for Services interface
 
 	// generate enums
 	if len(ctx.packageData.Enums) > 0 {
 		fmt.Fprintf(w, "/* Enums */\n\n")
 
-		ctx.inputBuff = bytes.NewBuffer(ctx.inputData)
-		ctx.inputLine = 0
 		for _, enum := range ctx.packageData.Enums {
 			generateEnum(ctx, w, &enum)
+		}
+	}
+
+	// generate aliases
+	if len(ctx.packageData.Aliases) > 0 {
+		fmt.Fprintf(w, "/* Aliases */\n\n")
+
+		for _, alias := range ctx.packageData.Aliases {
+			generateAlias(ctx, w, &alias)
 		}
 	}
 
@@ -107,8 +119,6 @@ func generatePackage(ctx *context, w *bufio.Writer) error {
 	if len(ctx.packageData.Types) > 0 {
 		fmt.Fprintf(w, "/* Types */\n\n")
 
-		ctx.inputBuff = bytes.NewBuffer(ctx.inputData)
-		ctx.inputLine = 0
 		for _, typ := range ctx.packageData.Types {
 			generateType(ctx, w, &typ)
 		}
@@ -118,8 +128,6 @@ func generatePackage(ctx *context, w *bufio.Writer) error {
 	if len(ctx.packageData.Unions) > 0 {
 		fmt.Fprintf(w, "/* Unions */\n\n")
 
-		ctx.inputBuff = bytes.NewBuffer(ctx.inputData)
-		ctx.inputLine = 0
 		for _, union := range ctx.packageData.Unions {
 			generateUnion(ctx, w, &union)
 		}
@@ -129,27 +137,10 @@ func generatePackage(ctx *context, w *bufio.Writer) error {
 	if len(ctx.packageData.Messages) > 0 {
 		fmt.Fprintf(w, "/* Messages */\n\n")
 
-		ctx.inputBuff = bytes.NewBuffer(ctx.inputData)
-		ctx.inputLine = 0
 		for _, msg := range ctx.packageData.Messages {
 			generateMessage(ctx, w, &msg)
 		}
 	}
-
-	// generate services
-	if len(ctx.packageData.Services) > 0 {
-		fmt.Fprintf(w, "/* Services */\n\n")
-
-		ctx.inputBuff = bytes.NewBuffer(ctx.inputData)
-		ctx.inputLine = 0
-		fmt.Fprintf(w, "type %s interface {\n", "Services")
-		for _, svc := range ctx.packageData.Services {
-			generateService(ctx, w, &svc)
-		}
-		fmt.Fprintln(w, "}")
-	}
-
-	// TODO: generate implementation for Services interface
 
 	// generate message registrations
 	fmt.Fprintln(w)
@@ -181,13 +172,18 @@ func generateHeader(ctx *context, w io.Writer) {
 	var printObjNum = func(obj string, num int) {
 		if num > 0 {
 			if num > 1 {
-				obj += "s"
+				if strings.HasSuffix(obj, "s") {
+					obj += "es"
+				} else {
+					obj += "s"
+				}
 			}
 			fmt.Fprintf(w, "\t%3d %s\n", num, obj)
 		}
 	}
 	printObjNum("message", len(ctx.packageData.Messages))
 	printObjNum("type", len(ctx.packageData.Types))
+	printObjNum("alias", len(ctx.packageData.Aliases))
 	printObjNum("enum", len(ctx.packageData.Enums))
 	printObjNum("union", len(ctx.packageData.Unions))
 	printObjNum("service", len(ctx.packageData.Services))
@@ -213,42 +209,94 @@ func generateImports(ctx *context, w io.Writer) {
 
 // generateComment writes generated comment for the object into w
 func generateComment(ctx *context, w io.Writer, goName string, vppName string, objKind string) {
-	fmt.Fprintf(w, "// %s represents the VPP binary API %s '%s'.\n", goName, objKind, vppName)
+	if objKind == "service" {
+		fmt.Fprintf(w, "// %s represents VPP binary API services:\n", goName)
+	} else {
+		fmt.Fprintf(w, "// %s represents VPP binary API %s '%s':\n", goName, objKind, vppName)
+	}
 
 	var isNotSpace = func(r rune) bool {
 		return !unicode.IsSpace(r)
 	}
 
 	// print out the source of the generated object
+	mapType := false
 	objFound := false
 	objTitle := fmt.Sprintf(`"%s",`, vppName)
+	switch objKind {
+	case "alias", "service":
+		objTitle = fmt.Sprintf(`"%s": {`, vppName)
+		mapType = true
+	}
+
+	inputBuff := bytes.NewBuffer(ctx.inputData)
+	inputLine := 0
+
+	var trimIndent string
 	var indent int
 	for {
-		line, err := ctx.inputBuff.ReadString('\n')
+		line, err := inputBuff.ReadString('\n')
 		if err != nil {
 			break
 		}
-		ctx.inputLine++
+		inputLine++
 
+		noSpaceAt := strings.IndexFunc(line, isNotSpace)
 		if !objFound {
 			indent = strings.Index(line, objTitle)
 			if indent == -1 {
 				continue
 			}
+			trimIndent = line[:indent]
 			// If no other non-whitespace character then we are at the message header.
 			if trimmed := strings.TrimSpace(line); trimmed == objTitle {
 				objFound = true
 				fmt.Fprintln(w, "//")
 			}
-		} else {
-			if strings.IndexFunc(line, isNotSpace) < indent {
-				break // end of the object definition in JSON
-			}
+		} else if noSpaceAt < indent {
+			break // end of the definition in JSON for array types
+		} else if objFound && mapType && noSpaceAt <= indent {
+			fmt.Fprintf(w, "//\t%s", strings.TrimPrefix(line, trimIndent))
+			break // end of the definition in JSON for map types (aliases, services)
 		}
-		fmt.Fprint(w, "//", line)
+		fmt.Fprintf(w, "//\t%s", strings.TrimPrefix(line, trimIndent))
 	}
 
 	fmt.Fprintln(w, "//")
+}
+
+// generateServices writes generated code for the Services interface into w
+func generateServices(ctx *context, w *bufio.Writer, services []Service) {
+	// generate services comment
+	generateComment(ctx, w, "Services", "services", "service")
+
+	// generate interface
+	fmt.Fprintf(w, "type %s interface {\n", "Services")
+	for _, svc := range ctx.packageData.Services {
+		generateService(ctx, w, &svc)
+	}
+	fmt.Fprintln(w, "}")
+
+	fmt.Fprintln(w)
+}
+
+// generateService writes generated code for the service into w
+func generateService(ctx *context, w io.Writer, svc *Service) {
+	reqTyp := camelCaseName(svc.RequestType)
+
+	// method name is same as parameter type name by default
+	method := svc.MethodName()
+	params := fmt.Sprintf("*%s", reqTyp)
+	returns := "error"
+	if replyType := camelCaseName(svc.ReplyType); replyType != "" {
+		repTyp := fmt.Sprintf("*%s", replyType)
+		if svc.Stream {
+			repTyp = fmt.Sprintf("[]%s", repTyp)
+		}
+		returns = fmt.Sprintf("(%s, error)", repTyp)
+	}
+
+	fmt.Fprintf(w, "\t%s(%s) %s\n", method, params, returns)
 }
 
 // generateEnum writes generated code for the enum into w
@@ -277,37 +325,24 @@ func generateEnum(ctx *context, w io.Writer, enum *Enum) {
 	fmt.Fprintln(w)
 }
 
-// generateType writes generated code for the type into w
-func generateType(ctx *context, w io.Writer, typ *Type) {
-	name := camelCaseName(typ.Name)
+// generateAlias writes generated code for the alias into w
+func generateAlias(ctx *context, w io.Writer, alias *Alias) {
+	name := camelCaseName(alias.Name)
 
-	logf(" writing type %q (%s) with %d fields", typ.Name, name, len(typ.Fields))
+	logf(" writing type %q (%s), length: %d", alias.Name, name, alias.Length)
 
 	// generate struct comment
-	generateComment(ctx, w, name, typ.Name, "type")
+	generateComment(ctx, w, name, alias.Name, "alias")
 
 	// generate struct definition
-	fmt.Fprintf(w, "type %s struct {\n", name)
+	fmt.Fprintf(w, "type %s ", name)
 
-	// generate struct fields
-	for i, field := range typ.Fields {
-		// skip internal fields
-		switch strings.ToLower(field.Name) {
-		case "crc", "_vl_msg_id":
-			continue
-		}
-
-		generateField(ctx, w, typ.Fields, i)
+	if alias.Length > 0 {
+		fmt.Fprintf(w, "[%d]", alias.Length)
 	}
 
-	// generate end of the struct
-	fmt.Fprintln(w, "}")
-
-	// generate name getter
-	generateTypeNameGetter(w, name, typ.Name)
-
-	// generate CRC getter
-	generateCrcGetter(w, name, typ.CRC)
+	dataType := convertToGoType(ctx, alias.Type)
+	fmt.Fprintf(w, "%s\n", dataType)
 
 	fmt.Fprintln(w)
 }
@@ -396,6 +431,41 @@ func (u *%[1]s) Get%[2]s() (a %[3]s) {
 `, structName, getterField, getterStruct)
 }
 
+// generateType writes generated code for the type into w
+func generateType(ctx *context, w io.Writer, typ *Type) {
+	name := camelCaseName(typ.Name)
+
+	logf(" writing type %q (%s) with %d fields", typ.Name, name, len(typ.Fields))
+
+	// generate struct comment
+	generateComment(ctx, w, name, typ.Name, "type")
+
+	// generate struct definition
+	fmt.Fprintf(w, "type %s struct {\n", name)
+
+	// generate struct fields
+	for i, field := range typ.Fields {
+		// skip internal fields
+		switch strings.ToLower(field.Name) {
+		case "crc", "_vl_msg_id":
+			continue
+		}
+
+		generateField(ctx, w, typ.Fields, i)
+	}
+
+	// generate end of the struct
+	fmt.Fprintln(w, "}")
+
+	// generate name getter
+	generateTypeNameGetter(w, name, typ.Name)
+
+	// generate CRC getter
+	generateCrcGetter(w, name, typ.CRC)
+
+	fmt.Fprintln(w)
+}
+
 // generateMessage writes generated code for the message into w
 func generateMessage(ctx *context, w io.Writer, msg *Message) {
 	name := camelCaseName(msg.Name)
@@ -416,7 +486,8 @@ func generateMessage(ctx *context, w io.Writer, msg *Message) {
 	for i, field := range msg.Fields {
 		if i == 1 {
 			if field.Name == "client_index" {
-				// "client_index" as the second member, this might be an event message or a request
+				// "client_index" as the second member,
+				// this might be an event message or a request
 				msgType = eventMessage
 				wasClientIndex = true
 			} else if field.Name == "context" {
@@ -425,7 +496,8 @@ func generateMessage(ctx *context, w io.Writer, msg *Message) {
 			}
 		} else if i == 2 {
 			if wasClientIndex && field.Name == "context" {
-				// request needs "client_index" as the second member and "context" as the third member
+				// request needs "client_index" as the second member
+				// and "context" as the third member
 				msgType = requestMessage
 			}
 		}
@@ -467,6 +539,11 @@ func generateField(ctx *context, w io.Writer, fields []Field, i int) {
 	fieldName := strings.TrimPrefix(field.Name, "_")
 	fieldName = camelCaseName(fieldName)
 
+	// generate length field for strings
+	if field.Type == "string" {
+		fmt.Fprintf(w, "\tXXX_%sLen uint32 `struc:\"sizeof=%s\"`\n", fieldName, fieldName)
+	}
+
 	dataType := convertToGoType(ctx, field.Type)
 
 	fieldType := dataType
@@ -492,21 +569,6 @@ func generateField(ctx *context, w io.Writer, fields []Field, i int) {
 	}
 
 	fmt.Fprintln(w)
-}
-
-// generateService writes generated code for the service into w
-func generateService(ctx *context, w io.Writer, svc *Service) {
-	reqTyp := camelCaseName(svc.RequestType)
-
-	// method name is same as parameter type name by default
-	method := svc.MethodName()
-	params := fmt.Sprintf("*%s", reqTyp)
-	returns := "error"
-	if replyTyp := camelCaseName(svc.ReplyType); replyTyp != "" {
-		returns = fmt.Sprintf("(*%s, error)", replyTyp)
-	}
-
-	fmt.Fprintf(w, "\t%s(%s) %s\n", method, params, returns)
 }
 
 // generateMessageNameGetter generates getter for original VPP message name into the provider writer

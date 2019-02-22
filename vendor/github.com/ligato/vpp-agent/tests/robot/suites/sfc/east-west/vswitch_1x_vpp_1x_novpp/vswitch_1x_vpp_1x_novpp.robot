@@ -127,7 +127,6 @@ Show Interfaces And Other Objects
     Write To Machine    agent_vpp_2_term    show err
     vat_term: Interfaces Dump    agent_vpp_1
     vat_term: Interfaces Dump    agent_vpp_2
-    Write To Machine    vpp_agent_ctl    vpp-agent-ctl ${AGENT_VPP_ETCD_CONF_PATH} -ps
     Execute In Container    agent_vpp_1    ip a
     Execute In Container    agent_vpp_2    ip a
     Execute In Container    agent_1    ip a

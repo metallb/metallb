@@ -1,0 +1,85 @@
+syntax = "proto3";
+
+package api;
+
+enum ValueState {
+    // ValueState_NONEXISTENT is assigned to value that was deleted or has never
+    // existed.
+    NONEXISTENT = 0;
+
+    // ValueState_MISSING is assigned to NB value that was configured but refresh
+    // found it to be missing.
+    MISSING = 1;
+
+    // ValueState_UNIMPLEMENTED marks value received from NB that cannot
+    // be configured because there is no registered descriptor associated
+    // with it.
+    UNIMPLEMENTED = 2;
+
+    // ValueState_REMOVED is assigned to NB value after it was removed or when
+    // it is being re-created. The state is only temporary: for re-create, the
+    // value transits to whatever state the following Add operation produces,
+    // and delete values are removed from the graph (go to the NONEXISTENT state)
+    // immediately after the notification about the state change is sent.
+    REMOVED = 3;
+
+    // ValueState_CONFIGURED marks value defined by NB and successfully configured.
+    CONFIGURED = 4;
+
+    // ValueState_RETRIEVED marks value not managed by NB, instead created
+    // automatically or externally in SB.
+    RETRIEVED = 5;
+
+    // ValueState_FOUND marks NB value that was found (=dumped) by refresh
+    // but not actually configured by the agent.
+    FOUND = 6;
+
+    // ValueState_PENDING represents (NB) value that cannot be configured yet
+    // due to missing dependencies.
+    PENDING = 7;
+
+    // ValueState_INVALID represents (NB) value that will not be configured
+    // because it has a logically invalid content as declared by the Validate
+    // method of the associated descriptor.
+    // The corresponding error and the list of affected fields are stored
+    // in the <InvalidValueDetails> structure available via <details> for invalid
+    // value.
+    INVALID = 8;
+
+    // ValueState_FAILED marks (NB) value for which the last executed operation
+    // returned an error.
+    // The error and the type of the operation which caused the error are stored
+    // in the <FailedValueDetails> structure available via <details> for failed
+    // value.
+    FAILED = 9;
+
+    // ValueState_RETRYING marks unsucessfully applied (NB) value, for which,
+    // however, one or more attempts to fix the error by repeating the last
+    // operation are planned, and only if all the retries fail, the value will
+    // then transit to the FAILED state.
+    RETRYING = 10;
+}
+
+enum TxnOperation {
+    UNDEFINED = 0;
+    VALIDATE = 1;
+    ADD = 2;
+    MODIFY = 3;
+    DELETE = 4;
+}
+
+message ValueStatus {
+    string key = 1;
+    ValueState state = 2;
+    string error = 3; // error returned by the last operation (none if empty string)
+    TxnOperation last_operation = 4;
+
+    // - for invalid value, details is a list of invalid fields
+    // - for pending value, details is a list of missing dependencies (labels)
+    repeated string details = 5;
+}
+
+message BaseValueStatus {
+    ValueStatus value = 1;
+    repeated ValueStatus derived_values = 2;
+}

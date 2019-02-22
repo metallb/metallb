@@ -136,12 +136,24 @@ func (plugin *Plugin) onStatusResyncEvent(e datasync.ResyncEvent) {
 func (plugin *Plugin) onChangeEvent(e datasync.ChangeEvent) {
 	// For asynchronous calls only: if changePropagateRequest ends up without errors,
 	// the dataChng.Done is called in particular vppcall, otherwise the dataChng.Done is called here.
-	callbackCalled, err := plugin.changePropagateRequest(e, e.Done)
-	// When the request propagation is complete, send the error context (even if the error is nil).
-	plugin.errorChannel <- ErrCtx{e, err}
-	if !callbackCalled {
-		e.Done(err)
+
+	var err error
+
+	for _, dataChng := range e.GetChanges() {
+		callback := func(cbErr error) {
+			if cbErr != nil {
+				err = cbErr
+			}
+		}
+		callbackCalled, err := plugin.changePropagateRequest(dataChng, callback)
+		plugin.errorChannel <- ErrCtx{dataChng, err}
+		if !callbackCalled {
+			callback(err)
+		}
 	}
+
+	// When the request propagation is complete, send the error context (even if the error is nil).
+	e.Done(err)
 }
 
 func (plugin *Plugin) onVppIfaceEvent(e ifaceidx.SwIfIdxDto) {

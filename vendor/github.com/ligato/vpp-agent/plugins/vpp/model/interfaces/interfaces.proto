@@ -9,6 +9,7 @@ enum InterfaceType {
     TAP_INTERFACE = 3;
     AF_PACKET_INTERFACE = 4;
     VXLAN_TUNNEL = 5;
+    IPSEC_TUNNEL = 6;           // Serves only as an identifier, IPSec tunnel interfaces are processed in IPSec plugin
 };
 
 // from vpp/build-root/install-vpp-native/vpp/include/vnet/interface.h

@@ -23,10 +23,10 @@ Change Logger Level
     Change Log Level On agent_vpp_1 From debug To info On vpp-plugin
     Change Log Level On agent_vpp_1 From debug To info On vpp-plugin-if-conf
     ${from_now}=  Get Time     epoch
-    vpp_ctl: Put Loopback Interface With IP    agent_vpp_1    loop0   8a:f1:be:90:00:03    10.1.1.1
+    Put Loopback Interface With IP    agent_vpp_1    loop0   8a:f1:be:90:00:03    10.1.1.1
     Sleep     5
     ${out}=      Write To Machine    docker     docker logs --since ${from_now} agent_vpp_1
-    Should Not Contain     ${out}    level=debug msg="Start processing change for key: vpp/config/v1/interface/loop0"
+    Should Not Contain     ${out}    level=debug msg="Start processing change for key: vpp/config/${AGENT_VER}/interface/loop0"
     Should Not Contain     ${out}    level=debug msg="MAC address added" MAC address="8a:f1:be:90:00:03"
     Should Not Contain     ${out}    level=debug msg="IP address added." IPAddress=10.1.1.1
 
@@ -104,7 +104,7 @@ Change API Port From ${old_port} To ${new_port} On ${node}
 
 Get Agent Status For ${node} From ETCD Should be ${expected}
     ${expected}=    Set Variable if    "${expected}"=="OK"    1    0
-    ${out}=   Write To Machine    docker     docker exec -it etcd etcdctl get /vnf-agent/${node}/check/status/v1/agent
+    ${out}=   Write To Machine    docker     docker exec -it etcd etcdctl get /vnf-agent/${node}/check/status/${AGENT_VER}/agent
     Should Contain         ${out}    ${node}
     #Should Match Regexp    ${out}    \\{\\"build_version\\":\\"[a-f0-9]+\\"\\,\\"build_date\\"\\:\\"\\d{4}\\-\\d{2}\\-\\d{2}\\T\\d{2}\\:\\d{2}\\+\\d{2}\\:\\d{2}\\",\\"state\\"\\:${expected},\\"start_time\\":\\d+,\\"last_change\\":\\d+,\\"last_update\\":\\d+\\}
     Should Match Regexp    ${out}     \\"build_version\\":\\"[a-z0-9_.-]+\\"
@@ -115,11 +115,11 @@ Get Agent Status For ${node} From ETCD Should be ${expected}
     Should Match Regexp    ${out}     \\"last_update\\":\\d+
     Should Match Regexp    ${out}     \\"commit_hash\\":\\"[a-f0-9]+\\"
     Sleep    20s
-    ${out2}=    Write To Machine    docker    docker exec -it etcd etcdctl get /vnf-agent/${node}/check/status/v1/agent
+    ${out2}=    Write To Machine    docker    docker exec -it etcd etcdctl get /vnf-agent/${node}/check/status/${AGENT_VER}/agent
     Should Not Be Equal    ${out}    ${out2}
 
 Get ${plugin} Plugin Status For ${node} From ETCD
-    ${out}=     Write To Machine    docker     docker exec -it etcd etcdctl get /vnf-agent/${node}/check/status/v1/plugin/${plugin}
+    ${out}=     Write To Machine    docker     docker exec -it etcd etcdctl get /vnf-agent/${node}/check/status/${AGENT_VER}/plugin/${plugin}
     Should Contain    ${out}    ${node}
 
 

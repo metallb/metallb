@@ -28,8 +28,10 @@ func (helper *CacheHelper) DoWatching(resyncName string, watcher datasync.KeyVal
 			err := helper.DoResync(resyncEv)
 			resyncEv.Done(err)
 		case dataChng := <-changeChan:
-			err := helper.DoChange(dataChng)
-			dataChng.Done(err)
+			for _, change := range dataChng.GetChanges() {
+				err := helper.DoChange(change)
+				dataChng.Done(err)
+			}
 		}
 	}
 }
@@ -37,7 +39,7 @@ func (helper *CacheHelper) DoWatching(resyncName string, watcher datasync.KeyVal
 // DoChange calls:
 // - Put in case of datasync.Put
 // - Delete in case of data.Del
-func (helper *CacheHelper) DoChange(dataChng datasync.ChangeEvent) error {
+func (helper *CacheHelper) DoChange(dataChng datasync.ProtoWatchResp) error {
 	var err error
 	switch dataChng.GetChangeType() {
 	case datasync.Put:

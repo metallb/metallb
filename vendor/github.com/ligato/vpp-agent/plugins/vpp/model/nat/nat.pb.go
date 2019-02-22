@@ -73,10 +73,10 @@ func (TwiceNatMode) EnumDescriptor() ([]byte, []int) {
 // NAT44 global config
 type Nat44Global struct {
 	Forwarding            bool                           `protobuf:"varint,2,opt,name=forwarding,proto3" json:"forwarding,omitempty"`
-	NatInterfaces         []*Nat44Global_NatInterface    `protobuf:"bytes,3,rep,name=nat_interfaces,json=natInterfaces" json:"nat_interfaces,omitempty"`
-	AddressPools          []*Nat44Global_AddressPool     `protobuf:"bytes,5,rep,name=address_pools,json=addressPools" json:"address_pools,omitempty"`
-	VirtualReassemblyIpv4 *Nat44Global_VirtualReassembly `protobuf:"bytes,6,opt,name=virtual_reassembly_ipv4,json=virtualReassemblyIpv4" json:"virtual_reassembly_ipv4,omitempty"`
-	VirtualReassemblyIpv6 *Nat44Global_VirtualReassembly `protobuf:"bytes,7,opt,name=virtual_reassembly_ipv6,json=virtualReassemblyIpv6" json:"virtual_reassembly_ipv6,omitempty"`
+	NatInterfaces         []*Nat44Global_NatInterface    `protobuf:"bytes,3,rep,name=nat_interfaces,json=natInterfaces,proto3" json:"nat_interfaces,omitempty"`
+	AddressPools          []*Nat44Global_AddressPool     `protobuf:"bytes,5,rep,name=address_pools,json=addressPools,proto3" json:"address_pools,omitempty"`
+	VirtualReassemblyIpv4 *Nat44Global_VirtualReassembly `protobuf:"bytes,6,opt,name=virtual_reassembly_ipv4,json=virtualReassemblyIpv4,proto3" json:"virtual_reassembly_ipv4,omitempty"`
+	VirtualReassemblyIpv6 *Nat44Global_VirtualReassembly `protobuf:"bytes,7,opt,name=virtual_reassembly_ipv6,json=virtualReassemblyIpv6,proto3" json:"virtual_reassembly_ipv6,omitempty"`
 	XXX_NoUnkeyedLiteral  struct{}                       `json:"-"`
 	XXX_unrecognized      []byte                         `json:"-"`
 	XXX_sizecache         int32                          `json:"-"`
@@ -321,7 +321,7 @@ func (m *Nat44Global_VirtualReassembly) GetDropFrag() bool {
 
 // Many-to-one (SNAT) setup
 type Nat44SNat struct {
-	SnatConfigs          []*Nat44SNat_SNatConfig `protobuf:"bytes,1,rep,name=snat_configs,json=snatConfigs" json:"snat_configs,omitempty"`
+	SnatConfigs          []*Nat44SNat_SNatConfig `protobuf:"bytes,1,rep,name=snat_configs,json=snatConfigs,proto3" json:"snat_configs,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                `json:"-"`
 	XXX_unrecognized     []byte                  `json:"-"`
 	XXX_sizecache        int32                   `json:"-"`
@@ -398,7 +398,7 @@ func (m *Nat44SNat_SNatConfig) GetLabel() string {
 
 // One-to-many (DNAT) setup
 type Nat44DNat struct {
-	DnatConfigs          []*Nat44DNat_DNatConfig `protobuf:"bytes,1,rep,name=dnat_configs,json=dnatConfigs" json:"dnat_configs,omitempty"`
+	DnatConfigs          []*Nat44DNat_DNatConfig `protobuf:"bytes,1,rep,name=dnat_configs,json=dnatConfigs,proto3" json:"dnat_configs,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                `json:"-"`
 	XXX_unrecognized     []byte                  `json:"-"`
 	XXX_sizecache        int32                   `json:"-"`
@@ -437,8 +437,8 @@ func (m *Nat44DNat) GetDnatConfigs() []*Nat44DNat_DNatConfig {
 
 type Nat44DNat_DNatConfig struct {
 	Label                string                                  `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`
-	StMappings           []*Nat44DNat_DNatConfig_StaticMapping   `protobuf:"bytes,4,rep,name=st_mappings,json=stMappings" json:"st_mappings,omitempty"`
-	IdMappings           []*Nat44DNat_DNatConfig_IdentityMapping `protobuf:"bytes,6,rep,name=id_mappings,json=idMappings" json:"id_mappings,omitempty"`
+	StMappings           []*Nat44DNat_DNatConfig_StaticMapping   `protobuf:"bytes,4,rep,name=st_mappings,json=stMappings,proto3" json:"st_mappings,omitempty"`
+	IdMappings           []*Nat44DNat_DNatConfig_IdentityMapping `protobuf:"bytes,6,rep,name=id_mappings,json=idMappings,proto3" json:"id_mappings,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                                `json:"-"`
 	XXX_unrecognized     []byte                                  `json:"-"`
 	XXX_sizecache        int32                                   `json:"-"`
@@ -493,7 +493,7 @@ type Nat44DNat_DNatConfig_StaticMapping struct {
 	ExternalInterface    string                                        `protobuf:"bytes,2,opt,name=external_interface,json=externalInterface,proto3" json:"external_interface,omitempty"`
 	ExternalIp           string                                        `protobuf:"bytes,3,opt,name=external_ip,json=externalIp,proto3" json:"external_ip,omitempty"`
 	ExternalPort         uint32                                        `protobuf:"varint,4,opt,name=external_port,json=externalPort,proto3" json:"external_port,omitempty"`
-	LocalIps             []*Nat44DNat_DNatConfig_StaticMapping_LocalIP `protobuf:"bytes,5,rep,name=local_ips,json=localIps" json:"local_ips,omitempty"`
+	LocalIps             []*Nat44DNat_DNatConfig_StaticMapping_LocalIP `protobuf:"bytes,5,rep,name=local_ips,json=localIps,proto3" json:"local_ips,omitempty"`
 	Protocol             Protocol                                      `protobuf:"varint,6,opt,name=protocol,proto3,enum=nat.Protocol" json:"protocol,omitempty"`
 	TwiceNat             TwiceNatMode                                  `protobuf:"varint,7,opt,name=twice_nat,json=twiceNat,proto3,enum=nat.TwiceNatMode" json:"twice_nat,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                                      `json:"-"`

@@ -40,11 +40,11 @@ Show Interfaces Before Setup
 
 Add Veth1 Interface
     linux: Interface Not Exists    node=agent_vpp_1    mac=${VETH1_MAC}
-    vpp_ctl: Put Veth Interface With IP    node=agent_vpp_1    name=vpp1_veth1    mac=${VETH1_MAC}    peer=vpp1_veth2    ip=${VETH_IP}    prefix=${PREFIX}    mtu=1500
+    Put Veth Interface With IP    node=agent_vpp_1    name=vpp1_veth1    mac=${VETH1_MAC}    peer=vpp1_veth2    ip=${VETH_IP}    prefix=${PREFIX}    mtu=1500
 
 Add Veth2 Interface
     linux: Interface Not Exists    node=agent_vpp_1    mac=${VETH2_MAC}
-    vpp_ctl: Put Veth Interface    node=agent_vpp_1    name=vpp1_veth2    mac=${VETH2_MAC}    peer=vpp1_veth1
+    Put Veth Interface    node=agent_vpp_1    name=vpp1_veth2    mac=${VETH2_MAC}    peer=vpp1_veth1
 
 Check That Veth1 And Veth2 Interfaces Are Created
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    linux: Interface Is Created    node=agent_vpp_1    mac=${VETH1_MAC}
@@ -53,7 +53,7 @@ Check That Veth1 And Veth2 Interfaces Are Created
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    linux: Check Veth Interface State     agent_vpp_1    vpp1_veth2    mac=${VETH2_MAC}    state=up
 
 Add Memif Interface
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_1    name=vpp1_memif1    mac=62:61:61:61:61:61    master=true    id=1    ip=${MEMIF_IP}    prefix=${PREFIX}   socket=default.sock
+    Put Memif Interface With IP    node=agent_vpp_1    name=vpp1_memif1    mac=62:61:61:61:61:61    master=true    id=1    ip=${MEMIF_IP}    prefix=${PREFIX}   socket=default.sock
 
 Check Memif Interface Created
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_1    mac=62:61:61:61:61:61
@@ -61,28 +61,28 @@ Check Memif Interface Created
 
 
 Add VXLan Interface
-    vpp_ctl: Put VXLan Interface    node=agent_vpp_1    name=vpp1_vxlan1    src=${MEMIF_IP}    dst=${VXLAN_IP}    vni=5
+    Put VXLan Interface    node=agent_vpp_1    name=vpp1_vxlan1    src=${MEMIF_IP}    dst=${VXLAN_IP}    vni=5
 
 Check VXLan Interface Created
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vxlan: Tunnel Is Created    node=agent_vpp_1    src=${MEMIF_IP}    dst=${VXLAN_IP}    vni=5
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check VXLan Interface State    agent_vpp_1    vpp1_vxlan1    enabled=1    src=${MEMIF_IP}    dst=${VXLAN_IP}    vni=5
 
 Add Loopback1 Interface
-    vpp_ctl: Put Loopback Interface With IP    node=agent_vpp_1    name=vpp1_loop1    mac=12:21:21:11:11:11    ip=${LOOPB_IP}   prefix=${PREFIX}   mtu=1400
+    Put Loopback Interface With IP    node=agent_vpp_1    name=vpp1_loop1    mac=12:21:21:11:11:11    ip=${LOOPB_IP}   prefix=${PREFIX}   mtu=1400
 
 Check Loopback1 Interface Created
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_1    mac=12:21:21:11:11:11
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Loopback Interface State    agent_vpp_1    vpp1_loop1    enabled=1     mac=12:21:21:11:11:11    mtu=1400  ipv6=${LOOPB_IP}/${PREFIX}
 
 Add Loopback2 Interface
-    vpp_ctl: Put Loopback Interface With IP    node=agent_vpp_1    name=vpp1_loop2    mac=22:21:21:11:11:11    ip=${LOOPB2_IP}   prefix=${PREFIX}   mtu=1400
+    Put Loopback Interface With IP    node=agent_vpp_1    name=vpp1_loop2    mac=22:21:21:11:11:11    ip=${LOOPB2_IP}   prefix=${PREFIX}   mtu=1400
 
 Check Loopback2 Interface Created
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_1    mac=22:21:21:11:11:11
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Loopback Interface State    agent_vpp_1    vpp1_loop2    enabled=1     mac=22:21:21:11:11:11    mtu=1400  ipv6=${LOOPB2_IP}/${PREFIX}
 
 Add Tap Interface
-    vpp_ctl: Put TAP Interface With IP    node=agent_vpp_1    name=vpp1_tap1    mac=32:21:21:11:11:11    ip=${TAP_IP}   prefix=${PREFIX}      host_if_name=linux_vpp1_tap1
+    Put TAP Interface With IP    node=agent_vpp_1    name=vpp1_tap1    mac=32:21:21:11:11:11    ip=${TAP_IP}   prefix=${PREFIX}      host_if_name=linux_vpp1_tap1
 
 Check TAP Interface Created
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_1    mac=32:21:21:11:11:11
@@ -92,8 +92,8 @@ Check Stuff
     Show Interfaces And Other Objects
 
 Add L2XConnect1 for Memif and Loopback1
-    vpp_ctl: Put L2XConnect  agent_vpp_1    vpp1_memif1    vpp1_loop1
-    vpp_ctl: Put L2XConnect  agent_vpp_1    vpp1_loop1     vpp1_memif1
+    Put L2XConnect  agent_vpp_1    vpp1_memif1    vpp1_loop1
+    Put L2XConnect  agent_vpp_1    vpp1_loop1     vpp1_memif1
 
 Check L2XConnect1 Memif and Loopback1 in XConnect mode
     ${out}=      vpp_term: Show Interface Mode    agent_vpp_1
@@ -101,8 +101,8 @@ Check L2XConnect1 Memif and Loopback1 in XConnect mode
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    Should Contain     ${out}      l2 xconnect loop0 memif1/1
 
 Add L2XConnect2 for Tap and Loopback2
-    vpp_ctl: Put L2XConnect  agent_vpp_1    vpp1_tap1    vpp1_loop2
-    vpp_ctl: Put L2XConnect  agent_vpp_1    vpp1_loop2     vpp1_tap1
+    Put L2XConnect  agent_vpp_1    vpp1_tap1    vpp1_loop2
+    Put L2XConnect  agent_vpp_1    vpp1_loop2     vpp1_tap1
 
 Check L2XConnect2 and L2XConnect1 still configured
     ${out}=      vpp_term: Show Interface Mode    agent_vpp_1
@@ -112,9 +112,9 @@ Check L2XConnect2 and L2XConnect1 still configured
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    Should Contain     ${out}      l2 xconnect loop1 tapcli-0
 
 Modify L2XConnect1
-    vpp_ctl: Delete L2XConnect      agent_vpp_1    vpp1_memif1
-    vpp_ctl: Put L2XConnect  agent_vpp_1    vpp1_vxlan1    vpp1_loop1
-    vpp_ctl: Put L2XConnect  agent_vpp_1    vpp1_loop1     vpp1_vxlan1
+    Delete L2XConnect      agent_vpp_1    vpp1_memif1
+    Put L2XConnect  agent_vpp_1    vpp1_vxlan1    vpp1_loop1
+    Put L2XConnect  agent_vpp_1    vpp1_loop1     vpp1_vxlan1
 
 Check L2XConnect1 Modified and L2XConnect2 still configured
     ${out}=      vpp_term: Show Interface Mode    agent_vpp_1
@@ -125,8 +125,8 @@ Check L2XConnect1 Modified and L2XConnect2 still configured
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    Should Contain     ${out}      l3 memif1/1
 
 Delete L2XConnect1
-    vpp_ctl: Delete L2XConnect      agent_vpp_1    vpp1_vxlan1
-    vpp_ctl: Delete L2XConnect      agent_vpp_1    vpp1_loop1
+    Delete L2XConnect      agent_vpp_1    vpp1_vxlan1
+    Delete L2XConnect      agent_vpp_1    vpp1_loop1
 
 Check L2XConnect1 Deleted and L2XConnect2 still configured
     ${out}=      vpp_term: Show Interface Mode    agent_vpp_1
@@ -138,8 +138,8 @@ Check L2XConnect1 Deleted and L2XConnect2 still configured
 
 
 Delete L2XConnect2
-    vpp_ctl: Delete L2XConnect      agent_vpp_1    vpp1_tap1
-    vpp_ctl: Delete L2XConnect      agent_vpp_1    vpp1_loop2
+    Delete L2XConnect      agent_vpp_1    vpp1_tap1
+    Delete L2XConnect      agent_vpp_1    vpp1_loop2
 
 Check L2XConnect1 and L2XConnect2 Deleted
     ${out}=      vpp_term: Show Interface Mode    agent_vpp_1
@@ -159,7 +159,6 @@ Show Interfaces And Other Objects
     Write To Machine    agent_vpp_1_term    show vxlan tunnel
     Write To Machine    agent_vpp_1_term    show err
     vat_term: Interfaces Dump    agent_vpp_1
-    Write To Machine    vpp_agent_ctl    vpp-agent-ctl ${AGENT_VPP_ETCD_CONF_PATH} -ps
     Execute In Container    agent_vpp_1    ip a
     vpp_term: Show Interface Mode    agent_vpp_1
     Make Datastore Snapshots    before_resync

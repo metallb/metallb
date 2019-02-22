@@ -17,7 +17,7 @@
 package vpp
 
 import (
-	"github.com/ligato/vpp-agent/idxvpp"
+	"github.com/ligato/vpp-agent/pkg/idxvpp"
 	"github.com/ligato/vpp-agent/plugins/vpp/ifplugin/ifaceidx"
 	"github.com/ligato/vpp-agent/plugins/vpp/ipsecplugin/ipsecidx"
 	"github.com/ligato/vpp-agent/plugins/vpp/l2plugin/l2idx"

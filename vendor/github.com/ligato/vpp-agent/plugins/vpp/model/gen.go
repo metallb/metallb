@@ -19,7 +19,7 @@
 //go:generate protoc --proto_path=l2 --gogo_out=l2 l2/l2.proto
 //go:generate protoc --proto_path=l3 --gogo_out=l3 l3/l3.proto
 //go:generate protoc --proto_path=l4 --gogo_out=l4 l4/l4.proto
-//go:generate protoc --proto_path=nat --gogo_out=nat nat.proto
+//go:generate protoc --proto_path=nat --gogo_out=nat nat/nat.proto
 //go:generate protoc --proto_path=rpc --proto_path=$GOPATH/src --gogo_out=plugins=grpc:rpc rpc/rpc.proto
 //go:generate protoc --proto_path=srv6 --gogo_out=srv6 srv6/srv6.proto
 //go:generate protoc --proto_path=stn --gogo_out=stn stn/stn.proto

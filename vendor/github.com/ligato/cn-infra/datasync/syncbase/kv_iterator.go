@@ -27,6 +27,11 @@ type KVIterator struct {
 	index int
 }
 
+// NewKVIterator creates a new instance of KVIterator.
+func NewKVIterator(data []datasync.KeyVal) *KVIterator {
+	return &KVIterator{data: data}
+}
+
 // GetNext TODO
 func (it *KVIterator) GetNext() (kv datasync.KeyVal, allReceived bool) {
 	if it.index >= len(it.data) {
@@ -35,12 +40,8 @@ func (it *KVIterator) GetNext() (kv datasync.KeyVal, allReceived bool) {
 
 	ret := it.data[it.index]
 	it.index++
-	return ret, false
-}
 
-// NewKeyVal creates a new instance of KeyVal.
-func NewKeyVal(key string, value datasync.LazyValue, rev int64) *KeyVal {
-	return &KeyVal{key, value, rev}
+	return ret, false
 }
 
 // KeyVal represents a single key-value pair.
@@ -48,6 +49,11 @@ type KeyVal struct {
 	key string
 	datasync.LazyValue
 	rev int64
+}
+
+// NewKeyVal creates a new instance of KeyVal.
+func NewKeyVal(key string, value datasync.LazyValue, rev int64) *KeyVal {
+	return &KeyVal{key, value, rev}
 }
 
 // GetKey returns the key of the pair.
@@ -72,21 +78,16 @@ func (lazy *lazyProto) GetValue(out proto.Message) error {
 	return nil
 }
 
-// NewKVIterator creates a new instance of KVIterator.
-func NewKVIterator(data []datasync.KeyVal) *KVIterator {
-	return &KVIterator{data: data}
-}
-
-// NewKeyValBytes creates a new instance of KeyValBytes.
-func NewKeyValBytes(key string, value []byte, rev int64) *KeyValBytes {
-	return &KeyValBytes{key, value, rev}
-}
-
 // KeyValBytes represents a single key-value pair.
 type KeyValBytes struct {
 	key   string
 	value []byte
 	rev   int64
+}
+
+// NewKeyValBytes creates a new instance of KeyValBytes.
+func NewKeyValBytes(key string, value []byte, rev int64) *KeyValBytes {
+	return &KeyValBytes{key, value, rev}
 }
 
 // GetKey returns the key of the pair.
@@ -96,8 +97,7 @@ func (kv *KeyValBytes) GetKey() string {
 
 // GetValue returns the value of the pair.
 func (kv *KeyValBytes) GetValue(message proto.Message) error {
-	json.Unmarshal(kv.value, message)
-	return nil
+	return json.Unmarshal(kv.value, message)
 }
 
 // GetRevision returns revision associated with the latest change in the key-value pair.

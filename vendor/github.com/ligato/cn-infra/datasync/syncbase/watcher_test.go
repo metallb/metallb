@@ -16,11 +16,12 @@ package syncbase
 
 import (
 	"context"
+	"testing"
+
 	"github.com/gogo/protobuf/proto"
 	"github.com/ligato/cn-infra/datasync"
 	"github.com/ligato/cn-infra/datasync/syncbase/msg"
 	. "github.com/onsi/gomega"
-	"testing"
 )
 
 // TestDeleteNonExisting verifies that delete operation for key with no
@@ -31,7 +32,7 @@ func TestDeleteNonExisting(t *testing.T) {
 
 	RegisterTestingT(t)
 
-	var changes []datasync.ChangeEvent
+	var changes []datasync.ProtoWatchResp
 
 	ctx, cancelFnc := context.WithCancel(context.Background())
 	changeCh := make(chan datasync.ChangeEvent)
@@ -48,7 +49,7 @@ func TestDeleteNonExisting(t *testing.T) {
 		for {
 			select {
 			case c := <-changeCh:
-				changes = append(changes, c)
+				changes = append(changes, c.GetChanges()...)
 				c.Done(nil)
 			case <-ctx.Done():
 				break
@@ -96,7 +97,7 @@ func TestRuntimeResync(t *testing.T) {
 
 	RegisterTestingT(t)
 
-	var changes []datasync.ChangeEvent
+	var changes []datasync.ProtoWatchResp
 	var resyncChanges []datasync.KeyVal
 	ctx, cancelFnc := context.WithCancel(context.Background())
 
@@ -114,7 +115,7 @@ func TestRuntimeResync(t *testing.T) {
 		for {
 			select {
 			case c := <-changeCh:
-				changes = append(changes, c)
+				changes = append(changes, c.GetChanges()...)
 				c.Done(nil)
 			case r := <-resynCh:
 				for _, v := range r.GetValues() {

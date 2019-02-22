@@ -1,0 +1,5 @@
+{
+  "l3_protocol": "IPv4",
+  "tx_interface": "tap1",
+  "next_hop": "192.168.0.1"
+}

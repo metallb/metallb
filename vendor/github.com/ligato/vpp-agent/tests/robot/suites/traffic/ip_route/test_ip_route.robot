@@ -103,7 +103,7 @@ Start Two Agents And Then Configure One With Non Default VRF
     # try ping
     Ping From agent_vpp_1 To 10.1.1.2
     # this does not work for non default vrf: Ping From agent_vpp_2 To 10.1.1.1
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_2    memif0
+    ${int}=    Get Interface Internal Name    agent_vpp_2    memif0
     Ping On agent_vpp_2 With IP 10.1.1.1, Source ${int}
 
 # Non default VRF table 2 used in Agent VPP Node agent_vpp_2
@@ -151,10 +151,10 @@ Start Three Agents, Then Configure With Interfaces Assigned To Non Default VRF
     Ping From agent_vpp_1 To 10.1.1.2
     Ping From agent_vpp_1 To 20.1.1.2
     #Ping From agent_vpp_2 To 20.1.1.2
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_2    bvi_loop0
+    ${int}=    Get Interface Internal Name    agent_vpp_2    bvi_loop0
     Ping On agent_vpp_2 With IP 20.1.1.2, Source ${int}
     #Ping From agent_vpp_3 To 10.1.1.2
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_3    bvi_loop0
+    ${int}=    Get Interface Internal Name    agent_vpp_3    bvi_loop0
     Ping On agent_vpp_3 With IP 10.1.1.2, Source ${int}
 
 *** Keywords ***

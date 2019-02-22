@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package linux.l3;
+
+option go_package = "github.com/ligato/vpp-agent/api/models/linux/l3;linux_l3";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+option (gogoproto.messagename_all) = true;
+
+message Route {
+    string outgoing_interface = 1; /* outgoing interface logical name (mandatory) */
+
+    enum Scope {
+        UNDEFINED = 0;
+        GLOBAL = 1;
+        SITE = 2;
+        LINK = 3;
+        HOST = 4;
+    }
+    Scope scope = 2;               /* the scope of the area where the link is valid */
+
+    string dst_network = 3;        /* destination network address in the format <address>/<prefix> (mandatory) */
+    string gw_addr = 4;            /* gateway IP address */
+    uint32 metric = 5;             /* routing metric (weight) */
+}

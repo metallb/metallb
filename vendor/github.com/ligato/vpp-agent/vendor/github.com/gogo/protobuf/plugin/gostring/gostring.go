@@ -225,7 +225,7 @@ func (p *gostring) Generate(file *generator.FileDescriptor) {
 				p.P(`s = append(s, "`, fieldname, `: " + `, mapName, `+ ",\n")`)
 				p.Out()
 				p.P(`}`)
-			} else if (field.IsMessage() && !gogoproto.IsCustomType(field) && !gogoproto.IsStdTime(field) && !gogoproto.IsStdDuration(field)) || p.IsGroup(field) {
+			} else if (field.IsMessage() && !gogoproto.IsCustomType(field) && !gogoproto.IsStdType(field)) || p.IsGroup(field) {
 				if nullable || repeated {
 					p.P(`if this.`, fieldname, ` != nil {`)
 					p.In()

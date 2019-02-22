@@ -1,6 +1,5 @@
 {
   "vrf_id": ${id},
-  "description": "Static route",
-  "dst_ip_addr": "${ip}/${prefix}",
+  "dst_network": "${ip}/${prefix}",
   "next_hop_addr": "${next_hop}"
 }

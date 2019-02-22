@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package vpp.l2;
+
+option go_package = "github.com/ligato/vpp-agent/api/models/vpp/l2;vpp_l2";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+option (gogoproto.messagename_all) = true;
+
+message FIBEntry {
+    string phys_address = 1;                    /* unique destination MAC address */
+    string bridge_domain = 2;                   /* name of bridge domain this FIB table entry belongs to */
+    enum Action {
+        FORWARD = 0;                            /* forward the matching frame */
+        DROP = 1;                               /* drop the matching frame */
+    };
+    Action action = 3;                          /* action to tke on matching frames */
+    string outgoing_interface = 4;              /* outgoing interface for matching frames */
+    bool static_config = 5;                     /* true if this is a statically configured FIB entry */
+    bool bridged_virtual_interface = 6;         /* the MAC address is a bridge virtual interface MAC */
+}

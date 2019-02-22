@@ -15,7 +15,7 @@
 package l3idx
 
 import (
-	"github.com/ligato/vpp-agent/idxvpp"
+	"github.com/ligato/vpp-agent/pkg/idxvpp"
 	"github.com/ligato/vpp-agent/plugins/vpp/model/l3"
 )
 

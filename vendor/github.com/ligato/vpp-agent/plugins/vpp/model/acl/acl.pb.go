@@ -47,7 +47,7 @@ func (AclAction) EnumDescriptor() ([]byte, []int) {
 // This is a top level container for Access Control Lists.
 // It can have one or more Access Control Lists.
 type AccessLists struct {
-	Acls                 []*AccessLists_Acl `protobuf:"bytes,1,rep,name=acls" json:"acls,omitempty"`
+	Acls                 []*AccessLists_Acl `protobuf:"bytes,1,rep,name=acls,proto3" json:"acls,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}           `json:"-"`
 	XXX_unrecognized     []byte             `json:"-"`
 	XXX_sizecache        int32              `json:"-"`
@@ -90,9 +90,9 @@ type AccessLists_Acl struct {
 	// and value of this name, possibly spaces and special
 	// characters are not allowed.
 	AclName string                  `protobuf:"bytes,1,opt,name=acl_name,json=aclName,proto3" json:"acl_name,omitempty"`
-	Rules   []*AccessLists_Acl_Rule `protobuf:"bytes,2,rep,name=rules" json:"rules,omitempty"`
+	Rules   []*AccessLists_Acl_Rule `protobuf:"bytes,2,rep,name=rules,proto3" json:"rules,omitempty"`
 	// The set of interfaces that has assigned this ACL on ingres or egress.
-	Interfaces           *AccessLists_Acl_Interfaces `protobuf:"bytes,3,opt,name=interfaces" json:"interfaces,omitempty"`
+	Interfaces           *AccessLists_Acl_Interfaces `protobuf:"bytes,3,opt,name=interfaces,proto3" json:"interfaces,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                    `json:"-"`
 	XXX_unrecognized     []byte                      `json:"-"`
 	XXX_sizecache        int32                       `json:"-"`
@@ -155,7 +155,7 @@ type AccessLists_Acl_Rule struct {
 	RuleName string `protobuf:"bytes,1,opt,name=rule_name,json=ruleName,proto3" json:"rule_name,omitempty"`
 	// Action for this Access List Rule
 	AclAction            AclAction                   `protobuf:"varint,2,opt,name=acl_action,json=aclAction,proto3,enum=acl.AclAction" json:"acl_action,omitempty"`
-	Match                *AccessLists_Acl_Rule_Match `protobuf:"bytes,3,opt,name=match" json:"match,omitempty"`
+	Match                *AccessLists_Acl_Rule_Match `protobuf:"bytes,3,opt,name=match,proto3" json:"match,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                    `json:"-"`
 	XXX_unrecognized     []byte                      `json:"-"`
 	XXX_sizecache        int32                       `json:"-"`
@@ -208,8 +208,8 @@ func (m *AccessLists_Acl_Rule) GetMatch() *AccessLists_Acl_Rule_Match {
 
 // Definitions for match criteria for this Access List Rule
 type AccessLists_Acl_Rule_Match struct {
-	IpRule               *AccessLists_Acl_Rule_Match_IpRule    `protobuf:"bytes,1,opt,name=ip_rule,json=ipRule" json:"ip_rule,omitempty"`
-	MacipRule            *AccessLists_Acl_Rule_Match_MacIpRule `protobuf:"bytes,2,opt,name=macip_rule,json=macipRule" json:"macip_rule,omitempty"`
+	IpRule               *AccessLists_Acl_Rule_Match_IpRule    `protobuf:"bytes,1,opt,name=ip_rule,json=ipRule,proto3" json:"ip_rule,omitempty"`
+	MacipRule            *AccessLists_Acl_Rule_Match_MacIpRule `protobuf:"bytes,2,opt,name=macip_rule,json=macipRule,proto3" json:"macip_rule,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                              `json:"-"`
 	XXX_unrecognized     []byte                                `json:"-"`
 	XXX_sizecache        int32                                 `json:"-"`
@@ -261,10 +261,10 @@ func (m *AccessLists_Acl_Rule_Match) GetMacipRule() *AccessLists_Acl_Rule_Match_
 //   * UDP (port range)
 //   * TCP (port range, flags mask, flags value)
 type AccessLists_Acl_Rule_Match_IpRule struct {
-	Ip                   *AccessLists_Acl_Rule_Match_IpRule_Ip   `protobuf:"bytes,1,opt,name=ip" json:"ip,omitempty"`
-	Icmp                 *AccessLists_Acl_Rule_Match_IpRule_Icmp `protobuf:"bytes,2,opt,name=icmp" json:"icmp,omitempty"`
-	Tcp                  *AccessLists_Acl_Rule_Match_IpRule_Tcp  `protobuf:"bytes,3,opt,name=tcp" json:"tcp,omitempty"`
-	Udp                  *AccessLists_Acl_Rule_Match_IpRule_Udp  `protobuf:"bytes,4,opt,name=udp" json:"udp,omitempty"`
+	Ip                   *AccessLists_Acl_Rule_Match_IpRule_Ip   `protobuf:"bytes,1,opt,name=ip,proto3" json:"ip,omitempty"`
+	Icmp                 *AccessLists_Acl_Rule_Match_IpRule_Icmp `protobuf:"bytes,2,opt,name=icmp,proto3" json:"icmp,omitempty"`
+	Tcp                  *AccessLists_Acl_Rule_Match_IpRule_Tcp  `protobuf:"bytes,3,opt,name=tcp,proto3" json:"tcp,omitempty"`
+	Udp                  *AccessLists_Acl_Rule_Match_IpRule_Udp  `protobuf:"bytes,4,opt,name=udp,proto3" json:"udp,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                                `json:"-"`
 	XXX_unrecognized     []byte                                  `json:"-"`
 	XXX_sizecache        int32                                   `json:"-"`
@@ -375,8 +375,8 @@ type AccessLists_Acl_Rule_Match_IpRule_Icmp struct {
 	// ICMPv6 flag, if false ICMPv4 will be used
 	Icmpv6 bool `protobuf:"varint,1,opt,name=icmpv6,proto3" json:"icmpv6,omitempty"`
 	// Inclusive range representing icmp codes to be used.
-	IcmpCodeRange        *AccessLists_Acl_Rule_Match_IpRule_Icmp_Range `protobuf:"bytes,2,opt,name=icmp_code_range,json=icmpCodeRange" json:"icmp_code_range,omitempty"`
-	IcmpTypeRange        *AccessLists_Acl_Rule_Match_IpRule_Icmp_Range `protobuf:"bytes,3,opt,name=icmp_type_range,json=icmpTypeRange" json:"icmp_type_range,omitempty"`
+	IcmpCodeRange        *AccessLists_Acl_Rule_Match_IpRule_Icmp_Range `protobuf:"bytes,2,opt,name=icmp_code_range,json=icmpCodeRange,proto3" json:"icmp_code_range,omitempty"`
+	IcmpTypeRange        *AccessLists_Acl_Rule_Match_IpRule_Icmp_Range `protobuf:"bytes,3,opt,name=icmp_type_range,json=icmpTypeRange,proto3" json:"icmp_type_range,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                                      `json:"-"`
 	XXX_unrecognized     []byte                                        `json:"-"`
 	XXX_sizecache        int32                                         `json:"-"`
@@ -537,8 +537,8 @@ func (m *AccessLists_Acl_Rule_Match_IpRule_PortRange) GetUpperPort() uint32 {
 }
 
 type AccessLists_Acl_Rule_Match_IpRule_Tcp struct {
-	DestinationPortRange *AccessLists_Acl_Rule_Match_IpRule_PortRange `protobuf:"bytes,1,opt,name=destination_port_range,json=destinationPortRange" json:"destination_port_range,omitempty"`
-	SourcePortRange      *AccessLists_Acl_Rule_Match_IpRule_PortRange `protobuf:"bytes,2,opt,name=source_port_range,json=sourcePortRange" json:"source_port_range,omitempty"`
+	DestinationPortRange *AccessLists_Acl_Rule_Match_IpRule_PortRange `protobuf:"bytes,1,opt,name=destination_port_range,json=destinationPortRange,proto3" json:"destination_port_range,omitempty"`
+	SourcePortRange      *AccessLists_Acl_Rule_Match_IpRule_PortRange `protobuf:"bytes,2,opt,name=source_port_range,json=sourcePortRange,proto3" json:"source_port_range,omitempty"`
 	// Binary mask for tcp flags to match. MSB order (FIN at position 0).
 	// Applied as logical AND to tcp flags field of the packet being matched,
 	// before it is compared with tcp-flags-value.
@@ -605,8 +605,8 @@ func (m *AccessLists_Acl_Rule_Match_IpRule_Tcp) GetTcpFlagsValue() uint32 {
 }
 
 type AccessLists_Acl_Rule_Match_IpRule_Udp struct {
-	DestinationPortRange *AccessLists_Acl_Rule_Match_IpRule_PortRange `protobuf:"bytes,1,opt,name=destination_port_range,json=destinationPortRange" json:"destination_port_range,omitempty"`
-	SourcePortRange      *AccessLists_Acl_Rule_Match_IpRule_PortRange `protobuf:"bytes,2,opt,name=source_port_range,json=sourcePortRange" json:"source_port_range,omitempty"`
+	DestinationPortRange *AccessLists_Acl_Rule_Match_IpRule_PortRange `protobuf:"bytes,1,opt,name=destination_port_range,json=destinationPortRange,proto3" json:"destination_port_range,omitempty"`
+	SourcePortRange      *AccessLists_Acl_Rule_Match_IpRule_PortRange `protobuf:"bytes,2,opt,name=source_port_range,json=sourcePortRange,proto3" json:"source_port_range,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                                     `json:"-"`
 	XXX_unrecognized     []byte                                       `json:"-"`
 	XXX_sizecache        int32                                        `json:"-"`
@@ -721,8 +721,8 @@ func (m *AccessLists_Acl_Rule_Match_MacIpRule) GetSourceMacAddressMask() string 
 }
 
 type AccessLists_Acl_Interfaces struct {
-	Egress               []string `protobuf:"bytes,1,rep,name=egress" json:"egress,omitempty"`
-	Ingress              []string `protobuf:"bytes,2,rep,name=ingress" json:"ingress,omitempty"`
+	Egress               []string `protobuf:"bytes,1,rep,name=egress,proto3" json:"egress,omitempty"`
+	Ingress              []string `protobuf:"bytes,2,rep,name=ingress,proto3" json:"ingress,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`

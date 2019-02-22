@@ -35,6 +35,9 @@ const (
 // Plugin struct holds all plugin-related data.
 type Plugin struct {
 	Deps
+	// NonFatalPlugins is a list of plugin names. Error reported by a plugin
+	// from the list is not propagated into overall agent status.
+	NonFatalPlugins []string
 }
 
 // Deps lists dependencies of REST plugin.
@@ -44,6 +47,15 @@ type Deps struct {
 	StatusCheck  statuscheck.StatusReader // inject
 	HTTP         rest.HTTPHandlers        // inject
 	Prometheus   prom.API                 // inject
+}
+
+// ExposedStatus groups the information exposed via readiness and liveness probe
+type ExposedStatus struct {
+	status.AgentStatus
+	PluginStatus map[string]*status.PluginStatus
+	// NonFatalPlugins is a configured list of plugins whose
+	// errors are not reflected in overall state.
+	NonFatalPlugins []string
 }
 
 // Init does nothing
@@ -86,7 +98,7 @@ func (p *Plugin) Close() error {
 func (p *Plugin) readinessProbeHandler(formatter *render.Render) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
 		ifStat := p.StatusCheck.GetInterfaceStats()
-		agentStat := p.StatusCheck.GetAgentStatus()
+		agentStat := p.getAgentStatus()
 		agentStat.InterfaceStats = &ifStat
 		agentStatJSON, _ := json.Marshal(agentStat)
 		if agentStat.State == status.OperationalState_OK {
@@ -101,8 +113,8 @@ func (p *Plugin) readinessProbeHandler(formatter *render.Render) http.HandlerFun
 // livenessProbeHandler handles k8s liveness probe.
 func (p *Plugin) livenessProbeHandler(formatter *render.Render) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
-		stat := p.StatusCheck.GetAgentStatus()
-		statJSON, _ := json.Marshal(p.StatusCheck.GetAgentStatus())
+		stat := p.getAgentStatus()
+		statJSON, _ := json.Marshal(stat)
 
 		if stat.State == status.OperationalState_INIT || stat.State == status.OperationalState_OK {
 			w.WriteHeader(http.StatusOK)
@@ -112,4 +124,42 @@ func (p *Plugin) livenessProbeHandler(formatter *render.Render) http.HandlerFunc
 			w.Write(statJSON)
 		}
 	}
+}
+
+// getAgentStatus return overall agent status + status of the plugins
+// the method takes into account non-fatal plugin settings
+func (p *Plugin) getAgentStatus() ExposedStatus {
+
+	exposedStatus := ExposedStatus{
+		AgentStatus:     p.StatusCheck.GetAgentStatus(),
+		PluginStatus:    p.StatusCheck.GetAllPluginStatus(),
+		NonFatalPlugins: p.NonFatalPlugins,
+	}
+
+	// check whether error is caused by one of the plugins in NonFatalPlugin list
+	if exposedStatus.AgentStatus.State == status.OperationalState_ERROR && len(p.NonFatalPlugins) > 0 {
+		for k, v := range exposedStatus.PluginStatus {
+			if v.State == status.OperationalState_ERROR {
+				if isInSlice(p.NonFatalPlugins, k) {
+					// treat error reported by this plugin as non fatal
+					exposedStatus.AgentStatus.State = status.OperationalState_OK
+				} else {
+					exposedStatus.AgentStatus.State = status.OperationalState_ERROR
+					break
+				}
+			}
+
+		}
+	}
+
+	return exposedStatus
+}
+
+func isInSlice(haystack []string, needle string) bool {
+	for _, el := range haystack {
+		if el == needle {
+			return true
+		}
+	}
+	return false
 }

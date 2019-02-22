@@ -128,6 +128,10 @@ func (cl *saramaClientMock) Config() *sarama.Config {
 	return nil
 }
 
+func (cl *saramaClientMock) Controller() (*sarama.Broker, error) {
+	return nil, nil
+}
+
 func (cl *saramaClientMock) Brokers() []*sarama.Broker {
 	return nil
 }

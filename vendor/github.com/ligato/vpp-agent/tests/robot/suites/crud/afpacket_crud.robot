@@ -36,12 +36,12 @@ Show Interfaces Before Setup
     vpp_term: Show Interfaces    agent_vpp_1
 
 Add Veth1 And Veth2 Interfaces
-    vpp_ctl: Put Veth Interface With IP    node=agent_vpp_1    name=vpp1_veth1    mac=${VETH1_MAC}    peer=vpp1_veth2    ip=10.10.1.1    prefix=24    mtu=1500
-    vpp_ctl: Put Veth Interface    node=agent_vpp_1    name=vpp1_veth2    mac=${VETH2_MAC}    peer=vpp1_veth1
+    Put Veth Interface With IP    node=agent_vpp_1    name=vpp1_veth1    mac=${VETH1_MAC}    peer=vpp1_veth2    ip=10.10.1.1    prefix=24    mtu=1500
+    Put Veth Interface    node=agent_vpp_1    name=vpp1_veth2    mac=${VETH2_MAC}    peer=vpp1_veth1
 
 Add Afpacket1 Interface
     vpp_term: Interface Not Exists    node=agent_vpp_1    mac=${AFP1_MAC}
-    vpp_ctl: Put Afpacket Interface    node=agent_vpp_1    name=vpp1_afpacket1    mac=${AFP1_MAC}    host_int=vpp1_veth2
+    Put Afpacket Interface    node=agent_vpp_1    name=vpp1_afpacket1    mac=${AFP1_MAC}    host_int=vpp1_veth2
 
 Check That Afpacket1 Interface Is Created
     vpp_term: Interface Is Created    node=agent_vpp_1    mac=${AFP1_MAC}
@@ -55,14 +55,14 @@ Check That Veth1 And Veth2 Interfaces Are Created And Not Affected By Afpacket1 
 
 Add Afpacket2 Interface Before Veth3 And Veth4 Interfaces
     vpp_term: Interface Not Exists    node=agent_vpp_1    mac=${AFP2_MAC}
-    vpp_ctl: Put Afpacket Interface    node=agent_vpp_1    name=vpp1_afpacket2    mac=${AFP2_MAC}    host_int=vpp1_veth3
+    Put Afpacket Interface    node=agent_vpp_1    name=vpp1_afpacket2    mac=${AFP2_MAC}    host_int=vpp1_veth3
 
 Check That Afpacket2 Interface Is Not Created Without Veth3 And Veth4
     vpp_term: Interface Not Exists    node=agent_vpp_1    mac=${AFP2_MAC}
 
 Add Veth3 Interface
     linux: Interface Not Exists    node=agent_vpp_1    mac=${VETH3_MAC}
-    vpp_ctl: Put Veth Interface With IP    node=agent_vpp_1    name=vpp1_veth3    mac=${VETH3_MAC}    peer=vpp1_veth4    ip=20.20.1.1    prefix=24    mtu=1500
+    Put Veth Interface With IP    node=agent_vpp_1    name=vpp1_veth3    mac=${VETH3_MAC}    peer=vpp1_veth4    ip=20.20.1.1    prefix=24    mtu=1500
     linux: Interface Not Exists    node=agent_vpp_1    mac=${VETH3_MAC}
 
 Check That Afpacket2 Is Not Created Without Veth4
@@ -70,7 +70,7 @@ Check That Afpacket2 Is Not Created Without Veth4
 
 Add Veth4 Interface
     linux: Interface Not Exists    node=agent_vpp_1    mac=${VETH4_MAC}
-    vpp_ctl: Put Veth Interface    node=agent_vpp_1    name=vpp1_veth4    mac=${VETH4_MAC}    peer=vpp1_veth3    enabled=false
+    Put Veth Interface    node=agent_vpp_1    name=vpp1_veth4    mac=${VETH4_MAC}    peer=vpp1_veth3    enabled=false
 
 Check That Afpacket2 Interface Is Created
     vpp_term: Interface Is Created    node=agent_vpp_1    mac=${AFP2_MAC}
@@ -86,7 +86,7 @@ Check That Afpacket1 Interface Is Still Configured
     vat_term: Check Afpacket Interface State    agent_vpp_1    vpp1_afpacket1    enabled=1    mac=${AFP1_MAC}
 
 Update Afpacket2 Interface
-    vpp_ctl: Put Afpacket Interface    node=agent_vpp_1    name=vpp1_afpacket2    mac=${AFP2_SEC_MAC}    host_int=vpp1_veth4
+    Put Afpacket Interface    node=agent_vpp_1    name=vpp1_afpacket2    mac=${AFP2_SEC_MAC}    host_int=vpp1_veth4
     vpp_term: Interface Is Deleted    node=agent_vpp_1    mac=${AFP2_MAC}
     vpp_term: Interface Is Created    node=agent_vpp_1    mac=${AFP2_SEC_MAC}
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Afpacket Interface State    agent_vpp_1    vpp1_afpacket2    enabled=1    mac=${AFP2_SEC_MAC}
@@ -99,7 +99,7 @@ Check That Veth3 And Veth4 Interfaces Are Not Affected By Change Of Afpacket2 In
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    linux: Check Veth Interface State     agent_vpp_1    vpp1_veth4    mac=${VETH4_MAC}    state=down
 
 Delete Afpacket1 Interface
-    vpp_ctl: Delete VPP Interface    node=agent_vpp_1    name=vpp1_afpacket1
+    Delete VPP Interface    node=agent_vpp_1    name=vpp1_afpacket1
     vpp_term: Interface Is Deleted    node=agent_vpp_1    mac=${AFP1_MAC}
 
 Check That Afpacket2 Interface Is Still Configured
@@ -110,7 +110,7 @@ Check That Veth1 And Veth2 Interfaces Are Not Affected By Delete Of Afpacket1 In
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    linux: Check Veth Interface State     agent_vpp_1    vpp1_veth2    mac=${VETH2_MAC}    state=up
 
 Delete Veth3 Interface
-    vpp_ctl: Delete Linux Interface    node=agent_vpp_1    name=vpp1_veth3
+    Delete Linux Interface    node=agent_vpp_1    name=vpp1_veth3
     linux: Interface Is Deleted    node=agent_vpp_1    mac=${VETH3_MAC}
     linux: Interface Is Deleted    node=agent_vpp_1    mac=${VETH4_MAC}
 
@@ -134,7 +134,6 @@ Show Interfaces And Other Objects After Setup
     Write To Machine    agent_vpp_2_term    show err
     vat_term: Interfaces Dump    agent_vpp_1
     vat_term: Interfaces Dump    agent_vpp_2
-    Write To Machine    vpp_agent_ctl    vpp-agent-ctl ${AGENT_VPP_ETCD_CONF_PATH} -ps
     Execute In Container    agent_vpp_1    ip a
     Execute In Container    agent_vpp_2    ip a
 

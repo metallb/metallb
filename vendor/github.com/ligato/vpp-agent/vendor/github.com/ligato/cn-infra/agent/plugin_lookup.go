@@ -51,8 +51,9 @@ func findPlugins(val reflect.Value, uniqueness map[infra.Plugin]struct{}, x ...i
 		for i := 0; i < n; i++ {
 			f = "\t" + f
 		}
-		//infraLogger.Debugf(f, a...)
-
+		if printPluginLookupDebugs {
+			infraLogger.Debugf(f, a...)
+		}
 	}
 
 	typ := val.Type()

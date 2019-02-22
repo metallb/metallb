@@ -22,24 +22,24 @@ import (
 	"github.com/ligato/cn-infra/db/keyval"
 )
 
-// BytesTxnItem is used in BytesTxn.
-type BytesTxnItem struct {
-	Data   []byte
-	Delete bool
+// bytesTxnItem is used in BytesTxn.
+type bytesTxnItem struct {
+	data   []byte
+	delete bool
 }
 
 // BytesTxn is just a concurrent map of Bytes messages.
 // The intent is to collect the user data and propagate them when commit happens.
 type BytesTxn struct {
 	access sync.Mutex
-	items  map[string]*BytesTxnItem
+	items  map[string]*bytesTxnItem
 	commit func(map[string]datasync.ChangeValue) error
 }
 
 // NewBytesTxn is a constructor.
 func NewBytesTxn(commit func(map[string]datasync.ChangeValue) error) *BytesTxn {
 	return &BytesTxn{
-		items:  make(map[string]*BytesTxnItem),
+		items:  make(map[string]*bytesTxnItem),
 		commit: commit,
 	}
 }
@@ -49,7 +49,7 @@ func (txn *BytesTxn) Put(key string, data []byte) keyval.BytesTxn {
 	txn.access.Lock()
 	defer txn.access.Unlock()
 
-	txn.items[key] = &BytesTxnItem{Data: data}
+	txn.items[key] = &bytesTxnItem{data: data}
 
 	return txn
 }
@@ -59,7 +59,7 @@ func (txn *BytesTxn) Delete(key string) keyval.BytesTxn {
 	txn.access.Lock()
 	defer txn.access.Unlock()
 
-	txn.items[key] = &BytesTxnItem{Delete: true}
+	txn.items[key] = &bytesTxnItem{delete: true}
 
 	return txn
 }
@@ -72,11 +72,11 @@ func (txn *BytesTxn) Commit() error {
 	kvs := map[string]datasync.ChangeValue{}
 	for key, item := range txn.items {
 		changeType := datasync.Put
-		if item.Delete {
+		if item.delete {
 			changeType = datasync.Delete
 		}
 
-		kvs[key] = syncbase.NewChangeBytes(key, item.Data, 0, changeType)
+		kvs[key] = syncbase.NewChangeBytes(key, item.data, 0, changeType)
 	}
 	return txn.commit(kvs)
 }

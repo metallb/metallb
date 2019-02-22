@@ -19,9 +19,11 @@ import (
 	"sync"
 
 	"github.com/ligato/cn-infra/idxmap"
-	"github.com/ligato/cn-infra/infra"
 	"github.com/ligato/cn-infra/logging"
 )
+
+// IndexFunction should return map field->values for a given item.
+type IndexFunction func(item interface{}) map[string][]string
 
 // mappingItem represents single item stored in mapping.
 type mappingItem struct {
@@ -40,11 +42,11 @@ type memNamedMapping struct {
 	access    sync.RWMutex
 	nameToIdx map[string]*mappingItem
 	// createIndexes is function that computes secondary indexes for a given item.
-	createIndexes func(interface{}) map[string][]string
+	createIndexes IndexFunction
 	// indexes is a register of secondary indexes
-	indexes map[string] /* index name */ map[string] /* index value */ *nameSet
+	indexes map[string]map[string]*nameSet // index name/value
 	// subscribers to whom notifications are delivered
-	subscribers sync.Map //map[core.PluginName]func(idxmap.NamedMappingGenericEvent)
+	subscribers sync.Map //map[string]func(idxmap.NamedMappingGenericEvent)
 	title       string
 }
 
@@ -53,7 +55,7 @@ type memNamedMapping struct {
 // An index function that builds secondary indexes for an item can be defined
 // and passed as <indexFunction>.
 func NewNamedMapping(logger logging.Logger, title string,
-	indexFunction func(interface{}) map[string][]string) idxmap.NamedMappingRW {
+	indexFunction IndexFunction) idxmap.NamedMappingRW {
 	mem := memNamedMapping{}
 	mem.Logger = logger
 	mem.nameToIdx = map[string]*mappingItem{}
@@ -131,6 +133,27 @@ func (mem *memNamedMapping) ListAllNames() (names []string) {
 	return ret
 }
 
+// ListFields returns a map of fields (secondary indexes) and their values
+// currently associated with the item identified by <name>.
+func (mem *memNamedMapping) ListFields(name string) map[string][]string {
+	mem.access.RLock()
+	defer mem.access.RUnlock()
+
+	fields := make(map[string][]string)
+
+	item, found := mem.nameToIdx[name]
+	if found {
+		for field := range item.indexed {
+			fields[field] = []string{}
+			for _, value := range item.indexed[field] {
+				fields[field] = append(fields[field], value)
+			}
+		}
+	}
+
+	return fields
+}
+
 // ListNames looks up the items by secondary indexes. It returns all
 // names matching the selection.
 func (mem *memNamedMapping) ListNames(field string, value string) []string {
@@ -152,7 +175,7 @@ func (mem *memNamedMapping) ListNames(field string, value string) []string {
 
 // Watch allows to subscribe for tracking changes in the mapping.
 // When an item is added or removed, the given <callback> is triggered.
-func (mem *memNamedMapping) Watch(subscriber infra.PluginName, callback func(idxmap.NamedMappingGenericEvent)) error {
+func (mem *memNamedMapping) Watch(subscriber string, callback func(idxmap.NamedMappingGenericEvent)) error {
 	mem.Debug("Watch ", subscriber)
 
 	_, found := mem.subscribers.LoadOrStore(subscriber, callback)
@@ -238,7 +261,7 @@ func (mem *memNamedMapping) putNameToIdxSync(name string, metadata interface{}) 
 
 func (mem *memNamedMapping) publishAddToChannel(name string, value interface{}) {
 	mem.subscribers.Range(func(key, val interface{}) bool {
-		subscriber := key.(infra.PluginName)
+		subscriber := key.(string)
 		clb := val.(func(idxmap.NamedMappingGenericEvent))
 
 		if clb != nil {
@@ -261,7 +284,7 @@ func (mem *memNamedMapping) publishAddToChannel(name string, value interface{}) 
 
 func (mem *memNamedMapping) publishUpdateToChannel(name string, value interface{}) {
 	mem.subscribers.Range(func(key, val interface{}) bool {
-		subscriber := key.(infra.PluginName)
+		subscriber := key.(string)
 		clb := val.(func(idxmap.NamedMappingGenericEvent))
 
 		if clb != nil {
@@ -284,7 +307,7 @@ func (mem *memNamedMapping) publishUpdateToChannel(name string, value interface{
 
 func (mem *memNamedMapping) publishDelToChannel(name string, value interface{}) {
 	mem.subscribers.Range(func(key, val interface{}) bool {
-		subscriber := key.(infra.PluginName)
+		subscriber := key.(string)
 		clb := val.(func(idxmap.NamedMappingGenericEvent))
 
 		if clb != nil {

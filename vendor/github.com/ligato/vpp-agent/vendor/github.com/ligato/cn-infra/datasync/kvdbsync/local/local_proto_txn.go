@@ -23,16 +23,16 @@ import (
 	"github.com/ligato/cn-infra/db/keyval"
 )
 
-// ProtoTxnItem is used in ProtoTxn.
-type ProtoTxnItem struct {
-	Data   proto.Message
-	Delete bool
+// protoTxnItem is used in ProtoTxn.
+type protoTxnItem struct {
+	data   proto.Message
+	delete bool
 }
 
 // GetValue returns the value of the pair.
-func (item *ProtoTxnItem) GetValue(out proto.Message) error {
-	if item.Data != nil {
-		proto.Merge(out, item.Data)
+func (item *protoTxnItem) GetValue(out proto.Message) error {
+	if item.data != nil {
+		proto.Merge(out, item.data)
 	}
 	return nil
 }
@@ -41,14 +41,14 @@ func (item *ProtoTxnItem) GetValue(out proto.Message) error {
 // The intent is to collect the user data and propagate them when commit happens.
 type ProtoTxn struct {
 	access sync.Mutex
-	items  map[string]*ProtoTxnItem
+	items  map[string]*protoTxnItem
 	commit func(map[string]datasync.ChangeValue) error
 }
 
 // NewProtoTxn is a constructor.
 func NewProtoTxn(commit func(map[string]datasync.ChangeValue) error) *ProtoTxn {
 	return &ProtoTxn{
-		items:  make(map[string]*ProtoTxnItem),
+		items:  make(map[string]*protoTxnItem),
 		commit: commit,
 	}
 }
@@ -58,7 +58,7 @@ func (txn *ProtoTxn) Put(key string, data proto.Message) keyval.ProtoTxn {
 	txn.access.Lock()
 	defer txn.access.Unlock()
 
-	txn.items[key] = &ProtoTxnItem{Data: data}
+	txn.items[key] = &protoTxnItem{data: data}
 
 	return txn
 }
@@ -68,7 +68,7 @@ func (txn *ProtoTxn) Delete(key string) keyval.ProtoTxn {
 	txn.access.Lock()
 	defer txn.access.Unlock()
 
-	txn.items[key] = &ProtoTxnItem{Delete: true}
+	txn.items[key] = &protoTxnItem{delete: true}
 
 	return txn
 }
@@ -78,14 +78,16 @@ func (txn *ProtoTxn) Commit() error {
 	txn.access.Lock()
 	defer txn.access.Unlock()
 
-	kvs := map[string]datasync.ChangeValue{}
+	kvs := make(map[string]datasync.ChangeValue, len(txn.items))
+
 	for key, item := range txn.items {
 		changeType := datasync.Put
-		if item.Delete {
+		if item.delete {
 			changeType = datasync.Delete
 		}
 
-		kvs[key] = syncbase.NewChange(key, item.Data, 0, changeType)
+		kvs[key] = syncbase.NewChange(key, item.data, 0, changeType)
 	}
+
 	return txn.commit(kvs)
 }

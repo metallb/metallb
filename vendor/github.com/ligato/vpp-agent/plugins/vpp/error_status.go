@@ -25,7 +25,7 @@ import (
 
 // ErrCtx is an error context struct which stores an event change with object identifier (name, etc.) and returns an error (can be nil).
 type ErrCtx struct {
-	change  datasync.ChangeEvent
+	change  datasync.ProtoWatchResp
 	errInfo error
 }
 
@@ -61,7 +61,7 @@ func (plugin *Plugin) changePropagateError() {
 }
 
 // Process provides error data and adds a new entry.
-func (plugin *Plugin) processError(errInfo error, key string, changeType datasync.Op, change datasync.ChangeEvent) {
+func (plugin *Plugin) processError(errInfo error, key string, changeType datasync.Op, change datasync.ProtoWatchResp) {
 	// Interfaces
 	if strings.HasPrefix(key, interfaces.Prefix) {
 		var err error

@@ -1,13 +1,13 @@
 {
   "name": "${name}",
-  "type": 0,
+  "type": "VETH",
   "enabled": ${enabled},
   "phys_address": "${mac}",
   "veth": {
     "peer_if_name": "${peer}"
   },
   "namespace": {
-      "name": "${namespace}",
-      "type": 1
+      "reference": "${namespace}",
+      "type": 4
   }
 }

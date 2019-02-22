@@ -1,0 +1,66 @@
+{
+    "acl_name": "acl1",
+    "interfaces": {
+        "egress": [
+            "vxlanBVI",
+            "GigabitEthernet0/8/0",
+            "tap-vpp2"
+        ],
+        "ingress": [
+            "vxlanBVI",
+            "GigabitEthernet0/8/0",
+            "tap-vpp2",
+            "tap914f9933ca6b905",
+            "tapa3f7c29efbbbe25"
+        ]
+    },
+    "rules": [
+        {
+            "actions": {
+                "acl_action": 2
+            },
+            "matches": {
+                "ip_rule": {
+                    "ip": {
+                        "destination_network": "",
+                        "source_network": ""
+                    },
+                    "tcp": {
+                        "destination_port_range": {
+                            "lower_port": 0,
+                            "upper_port": 65535
+                        },
+                        "source_port_range": {
+                            "lower_port": 0,
+                            "upper_port": 65535
+                        }
+                    }
+                }
+            }
+        },
+        {
+            "actions": {
+                "acl_action": 2
+            },
+            "matches": {
+                "ip_rule": {
+                    "ip": {
+                        "destination_network": "",
+                        "source_network": ""
+                    },
+                    "udp": {
+                        "destination_port_range": {
+                            "lower_port": 0,
+                            "upper_port": 65535
+                        },
+                        "source_port_range": {
+                            "lower_port": 0,
+                            "upper_port": 65535
+                        }
+                    }
+                }
+            }
+        }
+
+    ]
+}

@@ -53,3 +53,11 @@ func UseDeps(cb func(*Deps)) Option {
 		cb(&p.Deps)
 	}
 }
+
+// WithNonFatalPlugins defines plugins whose errors are effectively ignored
+// in agent's overall status.
+func WithNonFatalPlugins(plugins []string) Option {
+	return func(p *Plugin) {
+		p.NonFatalPlugins = plugins
+	}
+}

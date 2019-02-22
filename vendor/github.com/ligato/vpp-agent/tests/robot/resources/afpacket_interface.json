@@ -1,6 +1,6 @@
 {
   "name": "${name}",
-  "type": 4,
+  "type": "AF_PACKET",
   "enabled": ${enabled},
   "phys_address": "${mac}",
   "mtu": ${mtu},

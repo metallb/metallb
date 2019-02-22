@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package vpp.nat;
+
+option go_package = "github.com/ligato/vpp-agent/api/models/vpp/nat;vpp_nat";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+option (gogoproto.messagename_all) = true;
+
+message Nat44Global {
+    bool forwarding = 1;                        /* Enable/disable forwarding. */
+
+    message Interface {                         /* Local network interfaces enabled for NAT44. */
+        string name = 1;                        /* (logical) Interface name. */
+        bool is_inside = 2;                     /* Distinguish between inside/outside interface. */
+        bool output_feature = 3;                /* Enable/disable output feature. */
+    }
+    repeated Interface nat_interfaces = 2;
+
+    message Address {
+        string address = 1;                     /* IPv4 address. */
+        uint32 vrf_id = 2;                      /* VRF (table) ID. */
+        bool twice_nat = 3;                     /* Enable/disable twice NAT. */
+    }
+    repeated Address address_pool = 3;
+
+    VirtualReassembly virtual_reassembly = 4;   /* Virtual reassembly for IPv4 */
+}
+
+message DNat44 {
+    string label = 1;                        /* Unique identifier for the DNAT configuration. */
+
+    enum Protocol {                          /* Available protocols. */
+        TCP = 0;
+        UDP = 1;
+        ICMP = 2;                            /* ICMP is not permitted for load balanced entries. */
+    };
+
+    message StaticMapping {                  /* A list of static mappings in DNAT. */
+        string external_interface = 1;       /* Interface to use external IP from; preferred over external_ip. */
+        string external_ip = 2;              /* External address.  */
+        uint32 external_port = 3;            /* Port (do not set for address mapping). */
+
+        message LocalIP {
+            uint32 vrf_id = 1;               /* VRF (table) ID. */
+            string local_ip = 2;             /* Local IP address). */
+            uint32 local_port = 3;           /* port (do not set for address mapping). */
+            uint32 probability = 4;          /* Probability mode. */
+        }
+        repeated LocalIP local_ips = 4;      /* List of local IP addresses. If there is more than one entry,
+                                                Load ballancer is enabled. */
+        Protocol protocol = 5;               /* Protocol used for static mapping. */
+
+        enum TwiceNatMode {                  /* Available twice-NAT modes */
+            DISABLED = 0;
+            ENABLED = 1;
+            SELF = 2;
+        };
+        TwiceNatMode twice_nat = 6;          /* Enable/disable (self-)twice NAT. */
+        uint32 session_affinity = 7;         /* Session affinity if 0 disabled, otherwise client
+                                                IP affinity sticky time in seconds */
+    }
+    repeated StaticMapping st_mappings = 2;
+
+    message IdentityMapping {                /* A list of identity mappings in DNAT. */
+        uint32 vrf_id = 1;                   /* VRF (table) ID. */
+        string interface = 2;                /* Name of the interface to use address from; preferred over ip_address. */
+        string ip_address = 3;               /* IP address. */
+        uint32 port = 4;                     /* Port (do not set for address mapping). */
+        Protocol protocol = 5;               /* Protocol used for identity mapping. */
+
+    }
+    repeated IdentityMapping id_mappings = 3;
+}
+
+message VirtualReassembly {                 /* NAT virtual reassembly */
+    uint32 timeout = 1;                     /* Reassembly timeout */
+    uint32 max_reassemblies = 2;            /* Maximum number of concurrent reassemblies */
+    uint32 max_fragments = 3;               /* Maximum number of fragments per reassembly */
+    bool drop_fragments = 4;                /* If set to true fragments are dropped, translated otherwise*/
+}

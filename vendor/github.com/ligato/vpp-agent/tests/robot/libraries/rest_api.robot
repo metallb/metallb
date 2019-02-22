@@ -7,6 +7,7 @@ Library        rest_api.py
 
 rest_api: Get
     [Arguments]      ${node}    ${uri}    ${expected_code}=200
+    #Create Session   ${node}  http://localhost:9191
     ${response}=      Get Request          ${node}    ${uri}
 #    ${pretty}=        Ordered Json         ${response.text}
     Sleep             ${REST_CALL_SLEEP}

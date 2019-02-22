@@ -19,15 +19,14 @@ import (
 	"net/http"
 	"sync"
 
-	access "github.com/ligato/cn-infra/rpc/rest/security/model/access-security"
-
-	"github.com/ligato/vpp-agent/plugins/linux"
-
 	"git.fd.io/govpp.git/api"
 	"github.com/ligato/cn-infra/infra"
 	"github.com/ligato/cn-infra/rpc/rest"
+	access "github.com/ligato/cn-infra/rpc/rest/security/model/access-security"
 	"github.com/ligato/cn-infra/utils/safeclose"
+
 	"github.com/ligato/vpp-agent/plugins/govppmux"
+	"github.com/ligato/vpp-agent/plugins/linux"
 	iflinuxcalls "github.com/ligato/vpp-agent/plugins/linux/ifplugin/linuxcalls"
 	l3linuxcalls "github.com/ligato/vpp-agent/plugins/linux/l3plugin/linuxcalls"
 	"github.com/ligato/vpp-agent/plugins/rest/resturl"
@@ -42,8 +41,8 @@ import (
 
 // REST api methods
 const (
-	GET  = "GET"
-	POST = "POST"
+	GET  = http.MethodGet
+	POST = http.MethodPost
 )
 
 // Plugin registers Rest Plugin
@@ -99,88 +98,94 @@ type indexItem struct {
 }
 
 // Init initializes the Rest Plugin
-func (plugin *Plugin) Init() (err error) {
+func (p *Plugin) Init() (err error) {
 	// Check VPP dependency
-	if plugin.VPP == nil {
+	if p.VPP == nil {
 		return fmt.Errorf("REST plugin requires VPP plugin API")
 	}
+
 	// VPP channels
-	if plugin.vppChan, err = plugin.GoVppmux.NewAPIChannel(); err != nil {
+	if p.vppChan, err = p.GoVppmux.NewAPIChannel(); err != nil {
 		return err
 	}
-	if plugin.dumpChan, err = plugin.GoVppmux.NewAPIChannel(); err != nil {
+	if p.dumpChan, err = p.GoVppmux.NewAPIChannel(); err != nil {
 		return err
-	}
-	// VPP Indexes
-	ifIndexes := plugin.VPP.GetSwIfIndexes()
-	bdIndexes := plugin.VPP.GetBDIndexes()
-	spdIndexes := plugin.VPP.GetIPSecSPDIndexes()
-	// Initialize VPP handlers
-	plugin.aclHandler = aclvppcalls.NewACLVppHandler(plugin.vppChan, plugin.dumpChan)
-	plugin.ifHandler = ifvppcalls.NewIfVppHandler(plugin.vppChan, plugin.Log)
-	plugin.bfdHandler = ifvppcalls.NewBfdVppHandler(plugin.vppChan, ifIndexes, plugin.Log)
-	plugin.natHandler = ifvppcalls.NewNatVppHandler(plugin.vppChan, plugin.dumpChan, ifIndexes, plugin.Log)
-	plugin.stnHandler = ifvppcalls.NewStnVppHandler(plugin.vppChan, ifIndexes, plugin.Log)
-	plugin.ipSecHandler = ipsecvppcalls.NewIPsecVppHandler(plugin.vppChan, ifIndexes, spdIndexes, plugin.Log)
-	plugin.bdHandler = l2vppcalls.NewBridgeDomainVppHandler(plugin.vppChan, ifIndexes, plugin.Log)
-	plugin.fibHandler = l2vppcalls.NewFibVppHandler(plugin.vppChan, plugin.dumpChan, ifIndexes, bdIndexes, plugin.Log)
-	plugin.xcHandler = l2vppcalls.NewXConnectVppHandler(plugin.vppChan, ifIndexes, plugin.Log)
-	plugin.arpHandler = l3vppcalls.NewArpVppHandler(plugin.vppChan, ifIndexes, plugin.Log)
-	plugin.pArpHandler = l3vppcalls.NewProxyArpVppHandler(plugin.vppChan, ifIndexes, plugin.Log)
-	plugin.rtHandler = l3vppcalls.NewRouteVppHandler(plugin.vppChan, ifIndexes, plugin.Log)
-	plugin.l4Handler = l4vppcalls.NewL4VppHandler(plugin.vppChan, plugin.Log)
-	// Linux indexes and handlers
-	if plugin.Linux != nil {
-		linuxIfIndexes := plugin.Linux.GetLinuxIfIndexes()
-		linuxArpIndexes := plugin.Linux.GetLinuxARPIndexes()
-		linuxRtIndexes := plugin.Linux.GetLinuxRouteIndexes()
-		// Initialize Linux handlers
-		linuxNsHandler := plugin.Linux.GetNamespaceHandler()
-		plugin.linuxIfHandler = iflinuxcalls.NewNetLinkHandler(linuxNsHandler, linuxIfIndexes, plugin.Log)
-		plugin.linuxL3Handler = l3linuxcalls.NewNetLinkHandler(linuxNsHandler, linuxIfIndexes, linuxArpIndexes, linuxRtIndexes, plugin.Log)
 	}
 
-	plugin.index = &index{
+	// VPP Indexes
+	ifIndexes := p.VPP.GetSwIfIndexes()
+	bdIndexes := p.VPP.GetBDIndexes()
+	spdIndexes := p.VPP.GetIPSecSPDIndexes()
+
+	// Initialize VPP handlers
+	p.aclHandler = aclvppcalls.NewACLVppHandler(p.vppChan, p.dumpChan)
+	p.ifHandler = ifvppcalls.NewIfVppHandler(p.vppChan, p.Log)
+	p.bfdHandler = ifvppcalls.NewBfdVppHandler(p.vppChan, ifIndexes, p.Log)
+	p.natHandler = ifvppcalls.NewNatVppHandler(p.vppChan, p.dumpChan, ifIndexes, p.Log)
+	p.stnHandler = ifvppcalls.NewStnVppHandler(p.vppChan, ifIndexes, p.Log)
+	p.ipSecHandler = ipsecvppcalls.NewIPsecVppHandler(p.vppChan, ifIndexes, spdIndexes, p.Log)
+	p.bdHandler = l2vppcalls.NewBridgeDomainVppHandler(p.vppChan, ifIndexes, p.Log)
+	p.fibHandler = l2vppcalls.NewFibVppHandler(p.vppChan, p.dumpChan, ifIndexes, bdIndexes, p.Log)
+	p.xcHandler = l2vppcalls.NewXConnectVppHandler(p.vppChan, ifIndexes, p.Log)
+	p.arpHandler = l3vppcalls.NewArpVppHandler(p.vppChan, ifIndexes, p.Log)
+	p.pArpHandler = l3vppcalls.NewProxyArpVppHandler(p.vppChan, ifIndexes, p.Log)
+	p.rtHandler = l3vppcalls.NewRouteVppHandler(p.vppChan, ifIndexes, p.Log)
+	p.l4Handler = l4vppcalls.NewL4VppHandler(p.vppChan, p.Log)
+
+	// Linux indexes and handlers
+	if p.Linux != nil {
+		linuxIfIndexes := p.Linux.GetLinuxIfIndexes()
+		linuxArpIndexes := p.Linux.GetLinuxARPIndexes()
+		linuxRtIndexes := p.Linux.GetLinuxRouteIndexes()
+		// Initialize Linux handlers
+		linuxNsHandler := p.Linux.GetNamespaceHandler()
+		p.linuxIfHandler = iflinuxcalls.NewNetLinkHandler(linuxNsHandler, linuxIfIndexes, p.Log)
+		p.linuxL3Handler = l3linuxcalls.NewNetLinkHandler(linuxNsHandler, linuxIfIndexes, linuxArpIndexes, linuxRtIndexes, p.Log)
+	}
+
+	p.index = &index{
 		ItemMap: getIndexMap(),
 	}
 
 	// Register permission groups, used if REST security is enabled
-	plugin.HTTPHandlers.RegisterPermissionGroup(getPermissionsGroups()...)
+	p.HTTPHandlers.RegisterPermissionGroup(getPermissionsGroups()...)
 
 	return nil
 }
 
 // AfterInit is used to register HTTP handlers
-func (plugin *Plugin) AfterInit() (err error) {
-	plugin.Log.Debug("REST API Plugin is up and running")
+func (p *Plugin) AfterInit() (err error) {
+	p.Log.Debug("REST API Plugin is up and running")
 
 	// VPP handlers
-	plugin.registerAccessListHandlers()
-	plugin.registerInterfaceHandlers()
-	plugin.registerBfdHandlers()
-	plugin.registerNatHandlers()
-	plugin.registerStnHandlers()
-	plugin.registerIPSecHandlers()
-	plugin.registerL2Handlers()
-	plugin.registerL3Handlers()
-	plugin.registerL4Handlers()
+	p.registerAccessListHandlers()
+	p.registerInterfaceHandlers()
+	p.registerBfdHandlers()
+	p.registerNatHandlers()
+	p.registerStnHandlers()
+	p.registerIPSecHandlers()
+	p.registerL2Handlers()
+	p.registerL3Handlers()
+	p.registerL4Handlers()
+
 	// Linux handlers
-	if plugin.Linux != nil {
-		plugin.registerLinuxInterfaceHandlers()
-		plugin.registerLinuxL3Handlers()
+	if p.Linux != nil {
+		p.registerLinuxInterfaceHandlers()
+		p.registerLinuxL3Handlers()
 	}
+
 	// Telemetry, command, index, tracer
-	plugin.registerTracerHandler()
-	plugin.registerTelemetryHandlers()
-	plugin.registerCommandHandler()
-	plugin.registerIndexHandlers()
+	p.registerTracerHandler()
+	p.registerTelemetryHandlers()
+	p.registerCommandHandler()
+	p.registerIndexHandlers()
 
 	return nil
 }
 
 // Close is used to clean up resources used by Plugin
-func (plugin *Plugin) Close() (err error) {
-	return safeclose.Close(plugin.vppChan, plugin.dumpChan)
+func (p *Plugin) Close() (err error) {
+	return safeclose.Close(p.vppChan, p.dumpChan)
 }
 
 // Fill index item lists
@@ -238,45 +243,45 @@ func getPermissionsGroups() []*access.PermissionGroup {
 	tracerPg := &access.PermissionGroup{
 		Name: "tracer",
 		Permissions: []*access.PermissionGroup_Permissions{
-			newPermission(resturl.Index, http.MethodGet),
-			newPermission(resturl.Tracer, http.MethodGet),
+			newPermission(resturl.Index, GET),
+			newPermission(resturl.Tracer, GET),
 		},
 	}
 	telemetryPg := &access.PermissionGroup{
 		Name: "telemetry",
 		Permissions: []*access.PermissionGroup_Permissions{
-			newPermission(resturl.Index, http.MethodGet),
-			newPermission(resturl.Telemetry, http.MethodGet),
-			newPermission(resturl.TMemory, http.MethodGet),
-			newPermission(resturl.TRuntime, http.MethodGet),
-			newPermission(resturl.TNodeCount, http.MethodGet),
+			newPermission(resturl.Index, GET),
+			newPermission(resturl.Telemetry, GET),
+			newPermission(resturl.TMemory, GET),
+			newPermission(resturl.TRuntime, GET),
+			newPermission(resturl.TNodeCount, GET),
 		},
 	}
 	dumpPg := &access.PermissionGroup{
 		Name: "dump",
 		Permissions: []*access.PermissionGroup_Permissions{
-			newPermission(resturl.Index, http.MethodGet),
-			newPermission(resturl.ACLIP, http.MethodGet),
-			newPermission(resturl.ACLMACIP, http.MethodGet),
-			newPermission(resturl.Interface, http.MethodGet),
-			newPermission(resturl.Loopback, http.MethodGet),
-			newPermission(resturl.Ethernet, http.MethodGet),
-			newPermission(resturl.Memif, http.MethodGet),
-			newPermission(resturl.Tap, http.MethodGet),
-			newPermission(resturl.VxLan, http.MethodGet),
-			newPermission(resturl.AfPacket, http.MethodGet),
-			newPermission(resturl.IPSecSpd, http.MethodGet),
-			newPermission(resturl.IPSecSa, http.MethodGet),
-			newPermission(resturl.IPSecTnIf, http.MethodGet),
-			newPermission(resturl.Bd, http.MethodGet),
-			newPermission(resturl.BdID, http.MethodGet),
-			newPermission(resturl.Fib, http.MethodGet),
-			newPermission(resturl.Xc, http.MethodGet),
-			newPermission(resturl.Arps, http.MethodGet),
-			newPermission(resturl.Routes, http.MethodGet),
-			newPermission(resturl.PArpIfs, http.MethodGet),
-			newPermission(resturl.PArpRngs, http.MethodGet),
-			newPermission(resturl.Sessions, http.MethodGet),
+			newPermission(resturl.Index, GET),
+			newPermission(resturl.ACLIP, GET),
+			newPermission(resturl.ACLMACIP, GET),
+			newPermission(resturl.Interface, GET),
+			newPermission(resturl.Loopback, GET),
+			newPermission(resturl.Ethernet, GET),
+			newPermission(resturl.Memif, GET),
+			newPermission(resturl.Tap, GET),
+			newPermission(resturl.VxLan, GET),
+			newPermission(resturl.AfPacket, GET),
+			newPermission(resturl.IPSecSpd, GET),
+			newPermission(resturl.IPSecSa, GET),
+			newPermission(resturl.IPSecTnIf, GET),
+			newPermission(resturl.Bd, GET),
+			newPermission(resturl.BdID, GET),
+			newPermission(resturl.Fib, GET),
+			newPermission(resturl.Xc, GET),
+			newPermission(resturl.Arps, GET),
+			newPermission(resturl.Routes, GET),
+			newPermission(resturl.PArpIfs, GET),
+			newPermission(resturl.PArpRngs, GET),
+			newPermission(resturl.Sessions, GET),
 		},
 	}
 

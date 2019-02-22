@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package vpp.l2;
+
+option go_package = "github.com/ligato/vpp-agent/api/models/vpp/l2;vpp_l2";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+option (gogoproto.messagename_all) = true;
+
+message BridgeDomain {
+    string name = 1;                 /* bridge domain name (can be any string) */
+    bool flood = 2;                  /* enable/disable broadcast/multicast flooding in the BD */
+    bool unknown_unicast_flood = 3;  /* enable/disable unknown unicast flood in the BD */
+    bool forward = 4;                /* enable/disable forwarding on all interfaces in the BD */
+    bool learn = 5;                  /* enable/disable learning on all interfaces in the BD */
+    bool arp_termination = 6;        /* enable/disable ARP termination in the BD */
+    uint32 mac_age = 7;              /* MAC aging time in min, 0 for disabled aging */
+
+    message Interface {
+        string name = 1;                        /* interface name belonging to this bridge domain */
+        bool bridged_virtual_interface = 2;     /* true if this is a BVI interface */
+        uint32 split_horizon_group = 3;         /* VXLANs in the same BD need the same non-zero SHG */
+    }
+    repeated Interface interfaces = 100;        /* list of interfaces */
+
+    message ArpTerminationEntry {
+        string ip_address = 1;               /* IP address */
+        string phys_address = 2;             /* MAC address matching to the IP */
+    }
+    repeated ArpTerminationEntry arp_termination_table = 102; /* list of ARP termination entries */
+}

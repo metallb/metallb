@@ -1,0 +1,6 @@
+{
+  "l3_protocol": "IPv4",
+  "l4_protocol": "UDP",
+  "port": 9000,
+  "socket_path": "/tmp/socket/punt"
+}

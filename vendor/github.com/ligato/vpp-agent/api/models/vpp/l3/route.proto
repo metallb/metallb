@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package vpp.l3;
+
+option go_package = "github.com/ligato/vpp-agent/api/models/vpp/l3;vpp_l3";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+option (gogoproto.messagename_all) = true;
+
+message Route {
+    enum RouteType {
+        INTRA_VRF = 0;                  /* Forwarding is being done in the specified vrf_id only, or according to
+                                           the specified outgoing interface. */
+        INTER_VRF = 1;                  /* Forwarding is being done by lookup into a different VRF,
+                                           specified as via_vrf_id field. In case of these routes, the outgoing
+                                           interface should not be specified. The next hop IP address
+                                           does not have to be specified either, in that case VPP does full
+                                           recursive lookup in the via_vrf_id VRF. */
+        DROP = 2;                       /* Drops the network communication designated for specific IP address */
+    }
+    RouteType type = 10;
+    uint32 vrf_id = 1;                  /* VRF identifier, field required for remote client. This value should be
+                                           consistent with VRF ID in static route key. If it is not, value from
+                                           kley will be preffered and this field will be overriden.  */
+    string dst_network = 3;             /* ip address + prefix in format <address>/<prefix> */
+    string next_hop_addr = 4;           /* next hop address */
+    string outgoing_interface = 5;      /* outgoing interface name */
+    uint32 weight = 6;                  /* weight (used for unequal cost load balncing) */
+    uint32 preference = 7;              /* The preference of the path. Lowest preference is preferred.  */
+    /* Only paths with the best preference contribute to forwarding. */
+    /* (a poor man's primary and backup) */
+    uint32 via_vrf_id = 8;              /* Specifies VRF ID for the next hop lookup / recursive lookup */
+}

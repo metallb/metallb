@@ -37,20 +37,19 @@ Configure Environment
 Show Interfaces Before Setup
     vpp_term: Show Interfaces    agent_vpp_1
     vpp_term: Show Interfaces    agent_vpp_2
-    Write To Machine    vpp_agent_ctl    vpp-agent-ctl ${AGENT_VPP_ETCD_CONF_PATH} -ps
 
 Setup Interfaces
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_1    name=${VPP1_BFD_INTF}    mac=${VPP1_MAC_ADDR}    master=true    id=1    ip=${VPP1_IP4_ADDR}
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_2    name=${VPP2_BFD_INTF}    mac=${VPP2_MAC_ADDR}    master=false   id=1    ip=${VPP2_IP4_ADDR}
+    Put Memif Interface With IP    node=agent_vpp_1    name=${VPP1_BFD_INTF}    mac=${VPP1_MAC_ADDR}    master=true    id=1    ip=${VPP1_IP4_ADDR}
+    Put Memif Interface With IP    node=agent_vpp_2    name=${VPP2_BFD_INTF}    mac=${VPP2_MAC_ADDR}    master=false   id=1    ip=${VPP2_IP4_ADDR}
 
 Check Interfaces On VPP1
     ${out}=    vpp_term: Show Interfaces    agent_vpp_1
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_1    ${VPP1_BFD_INTF}
+    ${int}=    Get Interface Internal Name    agent_vpp_1    ${VPP1_BFD_INTF}
     Should Contain    ${out}    ${int}
 
 Check Interfaces On VPP2
     ${out}=    vpp_term: Show Interfaces    agent_vpp_2
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_2    ${VPP2_BFD_INTF}
+    ${int}=    Get Interface Internal Name    agent_vpp_2    ${VPP2_BFD_INTF}
     Should Contain    ${out}    ${int}
 
 #Show Interfaces And Other Objects After Config
@@ -75,52 +74,52 @@ Check Interfaces On VPP2
 #    Execute In Container    agent_vpp_2    ip a
 
 Setup BFD Authentication Key On VPP1
-    vpp_ctl: Put BFD Authentication Key    agent_vpp_1    ${AUTH_KEY_NAME}    ${METICULOUS_KEYED_SHA1}    1    ${SECRET}
+    Put BFD Authentication Key    agent_vpp_1    ${AUTH_KEY_NAME}    ${METICULOUS_KEYED_SHA1}    1    ${SECRET}
 
 Check BFD Authentication Key On VPP1
-    vpp_ctl: Get BFD Authentication Key As Json    agent_vpp_1    ${AUTH_KEY_NAME}
+    Get BFD Authentication Key As Json    agent_vpp_1    ${AUTH_KEY_NAME}
 
 Setup BFD Authentication Key On VPP2
-    vpp_ctl: Put BFD Authentication Key    agent_vpp_2    ${AUTH_KEY_NAME}  ${METICULOUS_KEYED_SHA1}    1    ${SECRET}
+    Put BFD Authentication Key    agent_vpp_2    ${AUTH_KEY_NAME}  ${METICULOUS_KEYED_SHA1}    1    ${SECRET}
 
 Check BFD Authentication Key On VPP2
-    vpp_ctl: Get BFD Authentication Key As Json    agent_vpp_2    ${AUTH_KEY_NAME}
+    Get BFD Authentication Key As Json    agent_vpp_2    ${AUTH_KEY_NAME}
 
 Setup BFD VPP1 Session Without Authentication
-    vpp_ctl: Put BFD Session    agent_vpp_1    VPP1_BFD_Session1    ${MIN_TX_INTERVAL}    ${VPP2_IP4_ADDR}    ${DETECT_MULTIPLIER}   ${VPP1_BFD_INTF}    ${MIN_RX_INTERVAL}    ${VPP1_IP4_ADDR}    true
+    Put BFD Session    agent_vpp_1    VPP1_BFD_Session1    ${MIN_TX_INTERVAL}    ${VPP2_IP4_ADDR}    ${DETECT_MULTIPLIER}   ${VPP1_BFD_INTF}    ${MIN_RX_INTERVAL}    ${VPP1_IP4_ADDR}    true
 
 Setup BFD VPP2 Session Without Authentication
-    vpp_ctl: Put BFD Session    agent_vpp_2    VPP2_BFD_Session1    ${MIN_TX_INTERVAL}    ${VPP1_IP4_ADDR}    ${DETECT_MULTIPLIER}    ${VPP2_BFD_INTF}    ${MIN_RX_INTERVAL}    ${VPP2_IP4_ADDR}    true
+    Put BFD Session    agent_vpp_2    VPP2_BFD_Session1    ${MIN_TX_INTERVAL}    ${VPP1_IP4_ADDR}    ${DETECT_MULTIPLIER}    ${VPP2_BFD_INTF}    ${MIN_RX_INTERVAL}    ${VPP2_IP4_ADDR}    true
 
 Sleep After Config For Manual Checking
     Sleep   ${CONFIG_SLEEP}
 
 Check BFD VPP1 Session Without Authentication
-    vpp_ctl: Get BFD Session As Json    agent_vpp_1    VPP1_BFD_Session1
+    Get BFD Session As Json    agent_vpp_1    VPP1_BFD_Session1
 
 Check BFD VPP2 Session Without Authentication
-    vpp_ctl: Get BFD Session As Json    agent_vpp_2    VPP2_BFD_Session1
+    Get BFD Session As Json    agent_vpp_2    VPP2_BFD_Session1
 
 Update BFD VPP1 Session With Authentication
-    vpp_ctl: Put BFD Session    agent_vpp_1    VPP1_BFD_Session1    ${MIN_TX_INTERVAL}    ${VPP2_IP4_ADDR}    ${DETECT_MULTIPLIER}   ${VPP1_BFD_INTF}    ${MIN_RX_INTERVAL}    ${VPP1_IP4_ADDR}    true    1    35454545
+    Put BFD Session    agent_vpp_1    VPP1_BFD_Session1    ${MIN_TX_INTERVAL}    ${VPP2_IP4_ADDR}    ${DETECT_MULTIPLIER}   ${VPP1_BFD_INTF}    ${MIN_RX_INTERVAL}    ${VPP1_IP4_ADDR}    true    1    35454545
 
 Update BFD VPP2 Session With Authentication
-    vpp_ctl: Put BFD Session    agent_vpp_2    VPP2_BFD_Session1    ${MIN_TX_INTERVAL}    ${VPP1_IP4_ADDR}    ${DETECT_MULTIPLIER}    ${VPP2_BFD_INTF}    ${MIN_RX_INTERVAL}    ${VPP2_IP4_ADDR}    true    1    35454546
+    Put BFD Session    agent_vpp_2    VPP2_BFD_Session1    ${MIN_TX_INTERVAL}    ${VPP1_IP4_ADDR}    ${DETECT_MULTIPLIER}    ${VPP2_BFD_INTF}    ${MIN_RX_INTERVAL}    ${VPP2_IP4_ADDR}    true    1    35454546
 
 Sleep After Config For Manual Checking
     Sleep   ${CONFIG_SLEEP}
 
 Check BFD VPP1 Session With Authentication
-    vpp_ctl: Get BFD Session As Json    agent_vpp_1    VPP1_BFD_Session1
+    Get BFD Session As Json    agent_vpp_1    VPP1_BFD_Session1
 
 Check BFD VPP2 Session With Authentication
-    vpp_ctl: Get BFD Session As Json    agent_vpp_2    VPP2_BFD_Session1
+    Get BFD Session As Json    agent_vpp_2    VPP2_BFD_Session1
 
 Setup BFD Echo Function On VPP1
-    vpp_ctl: Put BFD Echo Function    agent_vpp_1    BFD_ECHO_FUNCTION1    ${VPP1_BFD_INTF}
+    Put BFD Echo Function    agent_vpp_1    BFD_ECHO_FUNCTION1    ${VPP1_BFD_INTF}
 
 Check BFD Echo Function On VPP1
-    vpp_ctl: Get BFD Echo Function As Json    agent_vpp_1
+    Get BFD Echo Function As Json    agent_vpp_1
 
 Remove VPP Nodes
     Remove All Nodes

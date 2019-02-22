@@ -16,6 +16,7 @@ package datasync
 
 import (
 	"github.com/gogo/protobuf/proto"
+	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/utils/safeclose"
 )
 
@@ -76,7 +77,9 @@ func (ta KVProtoWriters) Put(key string, data proto.Message, opts ...PutOption) 
 // to add the key from that registration only
 func (wa *AggregatedRegistration) Register(resyncName, keyPrefix string) error {
 	for _, registration := range wa.Registrations {
-		registration.Register(resyncName, keyPrefix)
+		if err := registration.Register(resyncName, keyPrefix); err != nil {
+			logging.DefaultLogger.Warnf("aggregated register failed: %v", err)
+		}
 	}
 
 	return nil
@@ -86,7 +89,9 @@ func (wa *AggregatedRegistration) Register(resyncName, keyPrefix string) error {
 // Call Unregister(keyPrefix) on specific registration to remove the key from that registration only
 func (wa *AggregatedRegistration) Unregister(keyPrefix string) error {
 	for _, registration := range wa.Registrations {
-		registration.Unregister(keyPrefix)
+		if err := registration.Unregister(keyPrefix); err != nil {
+			logging.DefaultLogger.Warnf("aggregated unregister failed: %v", err)
+		}
 	}
 
 	return nil

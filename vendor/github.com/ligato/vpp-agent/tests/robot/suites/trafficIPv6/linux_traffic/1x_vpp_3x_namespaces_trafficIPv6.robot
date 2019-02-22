@@ -33,14 +33,13 @@ Configure Environment
 
 Show Interfaces Before Setup
     vpp_term: Show Interfaces    agent_vpp_1
-    Write To Machine    vpp_agent_ctl    vpp-agent-ctl ${AGENT_VPP_ETCD_CONF_PATH} -ps
 
 Setup Interfaces
-    vpp_ctl: Put Veth Interface Via Linux Plugin    node=agent_vpp_1    namespace=ns1    name=ns1_veth1    host_if_name=ns1_veth1_linux    mac=d2:74:8c:12:67:d2    peer=ns2_veth2    ip=192.168.22.1    prefix=30
-    vpp_ctl: Put Veth Interface Via Linux Plugin    node=agent_vpp_1    namespace=ns2    name=ns2_veth2    host_if_name=ns2_veth2_linux    mac=92:c7:42:67:ab:cd    peer=ns1_veth1    ip=${IP_2}    prefix=30
+    Put Veth Interface Via Linux Plugin    node=agent_vpp_1    namespace=ns1    name=ns1_veth1    host_if_name=ns1_veth1_linux    mac=d2:74:8c:12:67:d2    peer=ns2_veth2    ip=192.168.22.1    prefix=30
+    Put Veth Interface Via Linux Plugin    node=agent_vpp_1    namespace=ns2    name=ns2_veth2    host_if_name=ns2_veth2_linux    mac=92:c7:42:67:ab:cd    peer=ns1_veth1    ip=${IP_2}    prefix=30
 
-    vpp_ctl: Put Veth Interface Via Linux Plugin    node=agent_vpp_1    namespace=ns2    name=ns2_veth3    host_if_name=ns2_veth3_linux    mac=92:c7:42:67:ab:cf    peer=ns3_veth3    ip=${IP_3}    prefix=30
-    vpp_ctl: Put Veth Interface Via Linux Plugin    node=agent_vpp_1    namespace=ns3    name=ns3_veth3    host_if_name=ns3_veth3_linux    mac=92:c7:42:67:ab:ce    peer=ns2_veth3    ip=${IP_4}    prefix=30
+    Put Veth Interface Via Linux Plugin    node=agent_vpp_1    namespace=ns2    name=ns2_veth3    host_if_name=ns2_veth3_linux    mac=92:c7:42:67:ab:cf    peer=ns3_veth3    ip=${IP_3}    prefix=30
+    Put Veth Interface Via Linux Plugin    node=agent_vpp_1    namespace=ns3    name=ns3_veth3    host_if_name=ns3_veth3_linux    mac=92:c7:42:67:ab:ce    peer=ns2_veth3    ip=${IP_4}    prefix=30
 
 
 
@@ -66,10 +65,10 @@ Ping6 In Namespaces
 
 Create Linux Defalut Routes
     # this did not work
-    #vpp_ctl: Put Linux Route    node=agent_vpp_1    namespace=ns1    interface=ns1_veth1    routename=innercross1    ip=${IP_3}    prefix=32    next_hop=${IP_1}
-    #vpp_ctl: Put Linux Route    node=agent_vpp_1    namespace=ns3    interface=ns3_veth3    routename=innercross2    ip=${IP_2}    prefix=32    next_hop=${IP_4}
-    vpp_ctl: Put Default Linux Route    node=agent_vpp_1    namespace=ns1    interface=ns1_veth1    routename=innercross1    next_hop=${IP_1}
-    vpp_ctl: Put Default Linux Route    node=agent_vpp_1    namespace=ns3    interface=ns3_veth3    routename=innercross2    next_hop=${IP_4}
+    #Put Linux Route    node=agent_vpp_1    namespace=ns1    interface=ns1_veth1    routename=innercross1    ip=${IP_3}    prefix=32    next_hop=${IP_1}
+    #Put Linux Route    node=agent_vpp_1    namespace=ns3    interface=ns3_veth3    routename=innercross2    ip=${IP_2}    prefix=32    next_hop=${IP_4}
+    Put Default Linux Route    node=agent_vpp_1    namespace=ns1    interface=ns1_veth1    routename=innercross1    next_hop=${IP_1}
+    Put Default Linux Route    node=agent_vpp_1    namespace=ns3    interface=ns3_veth3    routename=innercross2    next_hop=${IP_4}
     Sleep    ${CONFIG_SLEEP}
 
 Check Linux Default Routes
@@ -86,8 +85,8 @@ Ping6 In Namespaces Again
 
 Create Linux Routes2
     #This needs to be fixed  - https://jira.pantheon.sk/browse/ODPM-743
-    vpp_ctl: Put Linux Route Without Interface    node=agent_vpp_1    namespace=ns1    routename=outercross1    ip=${IP_4}    prefix=32    next_hop=${IP_2}
-    vpp_ctl: Put Linux Route Without Interface    node=agent_vpp_1    namespace=ns3    routename=outercross2    ip=${IP_1}    prefix=32    next_hop=${IP_3}
+    Put Linux Route Without Interface    node=agent_vpp_1    namespace=ns1    routename=outercross1    ip=${IP_4}    prefix=32    next_hop=${IP_2}
+    Put Linux Route Without Interface    node=agent_vpp_1    namespace=ns3    routename=outercross2    ip=${IP_1}    prefix=32    next_hop=${IP_3}
 
 
     #temporarily - because previous commands does not work

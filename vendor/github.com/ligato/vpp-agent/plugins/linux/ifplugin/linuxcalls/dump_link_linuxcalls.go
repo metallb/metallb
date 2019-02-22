@@ -49,37 +49,11 @@ func (h *NetLinkHandler) DumpInterfaces() ([]*LinuxInterfaceDetails, error) {
 
 	ctx := nsplugin.NewNamespaceMgmtCtx()
 
-	// Dump all interfaces from the default namespace
-	dNsLinks, err := h.GetLinkList()
-	if err != nil {
-		return nil, errors.Errorf("failed to dump linux interfaces from default namespace: %v", err)
-	}
-	for _, dNsLink := range dNsLinks {
-		ifDetails := &LinuxInterfaceDetails{}
-		if dNsLink == nil || dNsLink.Attrs() == nil {
-			h.log.Warnf("Unable to get link data for interface %s", dNsLink)
-			continue
-		}
-		ifName := dNsLink.Attrs().Name
-		link, linkAddresses, err := h.dumpInterfaceData(ifName, &nsplugin.Namespace{}, ctx)
-		if err != nil {
-			// Do not return error
-			h.log.Errorf("failed to get interface %s data: %v", ifName, err)
-			continue
-		}
-
-		// If the interface exists in mapping, copy the modelled data
-		if _, meta, found := h.ifIndexes.LookupIdx(ifName); found {
-			ifDetails.Interface = meta.Data
-		}
-
-		h.transformAndStore(link, linkAddresses, ifDetails)
-		ifs = append(ifs, ifDetails)
-	}
-
-	// Add all known interfaces in non-default namespace
+	// Vpp-agent should know all the configured interfaces, and all the interfaces from default namespace. Use index
+	// map to iterate over them
 	for _, ifName := range h.ifIndexes.GetMapping().ListNames() {
 		ifDetails := &LinuxInterfaceDetails{}
+
 		_, meta, found := h.ifIndexes.LookupIdx(ifName)
 		if !found {
 			h.log.Warnf("Expected interface %s not found in the mapping", ifName)
@@ -89,16 +63,12 @@ func (h *NetLinkHandler) DumpInterfaces() ([]*LinuxInterfaceDetails, error) {
 			h.log.Warnf("Expected interface %s metadata are missing", ifName)
 			continue
 		}
-		// Skip interfaces in default NS (already processed)
-		if meta.Data.Namespace == nil {
-			continue
-		}
 
 		// Copy base configuration from mapping metadata. Linux specific fields are stored in LinuxInterfaceMeta.
 		ifDetails.Interface = meta.Data
 
 		// Check the interface namespace
-		link, linkAddresses, err := h.dumpInterfaceData(ifName, h.nsHandler.IfNsToGeneric(meta.Data.Namespace), ctx)
+		link, linkAddrs, err := h.dumpInterfaceData(ifName, h.nsHandler.IfNsToGeneric(meta.Data.Namespace), ctx)
 		if err != nil {
 			// Do not return error, read what is possible
 			h.log.Errorf("failed to get interface %s data: %v", ifName, err)
@@ -110,7 +80,34 @@ func (h *NetLinkHandler) DumpInterfaces() ([]*LinuxInterfaceDetails, error) {
 			continue
 		}
 
-		h.transformAndStore(link, linkAddresses, ifDetails)
+		linkAttrs := link.Attrs()
+		// Base fields
+		linuxMeta := &LinuxInterfaceMeta{
+			Index:       linkAttrs.Index,
+			Name:        linkAttrs.Name,
+			Alias:       linkAttrs.Alias,
+			OperState:   linkAttrs.OperState.String(),
+			Flags:       linkAttrs.Flags.String(),
+			Mtu:         linkAttrs.MTU,
+			Type:        linkAttrs.EncapType,
+			NetNsID:     linkAttrs.NetNsID,
+			NumTxQueues: linkAttrs.NumTxQueues,
+			TxQueueLen:  linkAttrs.TxQLen,
+			NumRxQueues: linkAttrs.NumRxQueues,
+		}
+
+		// IP addresses
+		var ipAddrs []string
+		for _, linkAddr := range linkAddrs {
+			ipAddrs = append(ipAddrs, linkAddr.String())
+		}
+
+		// MAC address
+		if linkAttrs.HardwareAddr != nil {
+			linuxMeta.MacAddr = linkAttrs.HardwareAddr.String()
+		}
+
+		ifDetails.Meta = linuxMeta
 		ifs = append(ifs, ifDetails)
 	}
 
@@ -188,40 +185,4 @@ func (h *NetLinkHandler) dumpInterfaceData(ifName string, ns *nsplugin.Namespace
 	}
 
 	return link, linkAddrs, nil
-}
-
-// Transform link type interface to the interface details and store IP addresses to the proto modelled data
-func (h *NetLinkHandler) transformAndStore(link netlink.Link, addr []netlink.Addr, ifDetails *LinuxInterfaceDetails) {
-	// Set IP addresses to model-based data
-	var ipAddrs []string
-	for _, linkAddr := range addr {
-		ipAddrs = append(ipAddrs, linkAddr.String())
-	}
-	if ifDetails.Interface == nil {
-		ifDetails.Interface = &interfaces.LinuxInterfaces_Interface{
-			IpAddresses: ipAddrs,
-		}
-	} else {
-		ifDetails.Interface.IpAddresses = ipAddrs
-	}
-
-	// Metadata fields
-	linkAttrs := link.Attrs()
-	linuxMeta := &LinuxInterfaceMeta{
-		Index:       linkAttrs.Index,
-		Name:        linkAttrs.Name,
-		Alias:       linkAttrs.Alias,
-		OperState:   linkAttrs.OperState.String(),
-		Flags:       linkAttrs.Flags.String(),
-		Mtu:         linkAttrs.MTU,
-		Type:        linkAttrs.EncapType,
-		NetNsID:     linkAttrs.NetNsID,
-		NumTxQueues: linkAttrs.NumTxQueues,
-		TxQueueLen:  linkAttrs.TxQLen,
-		NumRxQueues: linkAttrs.NumRxQueues,
-	}
-	if linkAttrs.HardwareAddr != nil {
-		linuxMeta.MacAddr = linkAttrs.HardwareAddr.String()
-	}
-	ifDetails.Meta = linuxMeta
 }

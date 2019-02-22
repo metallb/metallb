@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package linux.namespace;
+
+option go_package = "github.com/ligato/vpp-agent/api/models/linux/namespace;linux_namespace";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+option (gogoproto.messagename_all) = true;
+
+message NetNamespace {
+    enum ReferenceType {
+        UNDEFINED = 0;
+        NSID = 1;         /* named namespace */
+        PID = 2;          /* namespace of a given process */
+        FD = 3;           /* namespace referenced by a file handle */
+        MICROSERVICE = 4; /* namespace of a docker container running given microservice */
+    }
+    ReferenceType type = 1;
+
+    // Reference defines reference specific
+    // to the namespace type:
+    //  * namespace ID (NSID)
+    //  * PID number (PID)
+    //  * file path (FD)
+    //  * microservice label (MICROSERVICE)
+    string reference = 2;
+};

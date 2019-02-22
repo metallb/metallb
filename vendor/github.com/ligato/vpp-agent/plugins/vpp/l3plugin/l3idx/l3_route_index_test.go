@@ -15,13 +15,14 @@
 package l3idx_test
 
 import (
+	"testing"
+
 	"github.com/ligato/cn-infra/logging/logrus"
-	"github.com/ligato/vpp-agent/idxvpp"
-	"github.com/ligato/vpp-agent/idxvpp/nametoidx"
+	"github.com/ligato/vpp-agent/pkg/idxvpp"
+	"github.com/ligato/vpp-agent/pkg/idxvpp/nametoidx"
 	"github.com/ligato/vpp-agent/plugins/vpp/l3plugin/l3idx"
 	"github.com/ligato/vpp-agent/plugins/vpp/model/l3"
 	. "github.com/onsi/gomega"
-	"testing"
 )
 
 func l3routeIndexTestInitialization(t *testing.T) (idxvpp.NameToIdxRW, l3idx.RouteIndexRW) {

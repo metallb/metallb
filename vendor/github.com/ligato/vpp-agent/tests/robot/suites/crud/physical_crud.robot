@@ -40,14 +40,14 @@ Check That Physical Interfaces Exists And Are Not Configured
     Lists Should Be Equal    ${ipv4_list}    ${EMPTY}
 
 Add Physical1 Interface
-    vpp_ctl: Put Physical Interface With IP    node=agent_vpp_1    name=${DOCKER_PHYSICAL_INT_1_VPP_NAME}    ip=10.11.1.2    prefix=28    mtu=1500
+    Put Physical Interface With IP    node=agent_vpp_1    name=${DOCKER_PHYSICAL_INT_1_VPP_NAME}    ip=10.11.1.2    prefix=28    mtu=1500
 
 Check That Physical1 Interface Is Configured
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Enabled    node=agent_vpp_1    interface=${DOCKER_PHYSICAL_INT_1_VPP_NAME}
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Physical Interface State    agent_vpp_1    ${DOCKER_PHYSICAL_INT_1_VPP_NAME}    enabled=1    mac=${DOCKER_PHYSICAL_INT_1_MAC}    ipv4=10.11.1.2/28    mtu=1500
 
 Add Physical2 Interface
-    vpp_ctl: Put Physical Interface With IP    node=agent_vpp_1    name=${DOCKER_PHYSICAL_INT_2_VPP_NAME}    ip=20.21.2.3    prefix=24    mtu=2500
+    Put Physical Interface With IP    node=agent_vpp_1    name=${DOCKER_PHYSICAL_INT_2_VPP_NAME}    ip=20.21.2.3    prefix=24    mtu=2500
 
 Check That Physical2 Interface Is Configured
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Enabled    node=agent_vpp_1    interface=${DOCKER_PHYSICAL_INT_2_VPP_NAME}
@@ -57,14 +57,14 @@ Check That Physical1 Interface Is Still Configured
     vat_term: Check Physical Interface State    agent_vpp_1    ${DOCKER_PHYSICAL_INT_1_VPP_NAME}    enabled=1    mac=${DOCKER_PHYSICAL_INT_1_MAC}    ipv4=10.11.1.2/28    mtu=1500
 
 Update Physical1 Interface
-    vpp_ctl: Put Physical Interface With IP    node=agent_vpp_1    name=${DOCKER_PHYSICAL_INT_1_VPP_NAME}    ip=30.31.3.3    prefix=26    mtu=1600
+    Put Physical Interface With IP    node=agent_vpp_1    name=${DOCKER_PHYSICAL_INT_1_VPP_NAME}    ip=30.31.3.3    prefix=26    mtu=1600
     vat_term: Check Physical Interface State    agent_vpp_1    ${DOCKER_PHYSICAL_INT_1_VPP_NAME}    enabled=1    mac=${DOCKER_PHYSICAL_INT_1_MAC}    ipv4=30.31.3.3/26    mtu=1600
 
 Check That Physical2 Interface Is Still Configured
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Physical Interface State    agent_vpp_1    ${DOCKER_PHYSICAL_INT_2_VPP_NAME}    enabled=1    mac=${DOCKER_PHYSICAL_INT_2_MAC}    ipv4=20.21.2.3/24    mtu=2500
 
 Delete Physical2 Interface
-    vpp_ctl: Delete VPP Interface    node=agent_vpp_1    name=${DOCKER_PHYSICAL_INT_2_VPP_NAME}
+    Delete VPP Interface    node=agent_vpp_1    name=${DOCKER_PHYSICAL_INT_2_VPP_NAME}
     vpp_term: Interface Is Disabled    node=agent_vpp_1    interface=${DOCKER_PHYSICAL_INT_2_VPP_NAME}
 
 Check That Physical2 Interface Is Unconfigured
@@ -75,7 +75,7 @@ Check That Physical1 Interface Is Not Affected By Delete Physical2
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Physical Interface State    agent_vpp_1    ${DOCKER_PHYSICAL_INT_1_VPP_NAME}    enabled=1    mac=${DOCKER_PHYSICAL_INT_1_MAC}    ipv4=30.31.3.3/26    mtu=1600
 
 Delete Physical1 interface
-    vpp_ctl: Delete VPP Interface    node=agent_vpp_1    name=${DOCKER_PHYSICAL_INT_1_VPP_NAME}
+    Delete VPP Interface    node=agent_vpp_1    name=${DOCKER_PHYSICAL_INT_1_VPP_NAME}
     vpp_term: Interface Is Disabled    node=agent_vpp_1    interface=${DOCKER_PHYSICAL_INT_1_VPP_NAME}
 
 Check That Physical1 Interface Is Unconfigured
@@ -91,7 +91,6 @@ Show Interfaces And Other Objects After Setup
     Write To Machine    agent_vpp_1_term    show vxlan tunnel
     Write To Machine    agent_vpp_1_term    show err
     vat_term: Interfaces Dump    agent_vpp_1
-    Write To Machine    vpp_agent_ctl    vpp-agent-ctl ${AGENT_VPP_ETCD_CONF_PATH} -ps
     Execute In Container    agent_vpp_1    ip a
 
 

@@ -40,7 +40,7 @@ Show Interfaces Before Setup
 
 Add Loopback1 Interface
     vpp_term: Interface Not Exists  node=agent_vpp_1    mac=${MAC_LOOP1}
-    vpp_ctl: Put Loopback Interface With IP    node=agent_vpp_1    name=${NAME_LOOP1}    mac=${MAC_LOOP1}    ip=${IP_LOOP1}    prefix=${PREFIX}    mtu=${MTU}    enabled=true
+    Put Loopback Interface With IP    node=agent_vpp_1    name=${NAME_LOOP1}    mac=${MAC_LOOP1}    ip=${IP_LOOP1}    prefix=${PREFIX}    mtu=${MTU}    enabled=true
 
 Check Loopback1 Is Created
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_1    mac=${MAC_LOOP1}
@@ -48,7 +48,7 @@ Check Loopback1 Is Created
 
 Add Loopback2 Interface
     vpp_term: Interface Not Exists  node=agent_vpp_1    mac=${MAC_LOOP2}
-    vpp_ctl: Put Loopback Interface With IP    node=agent_vpp_1     name=${NAME_LOOP2}    mac=${MAC_LOOP2}    ip=${IP_LOOP2}    prefix=${PREFIX}    mtu=${MTU}    enabled=true
+    Put Loopback Interface With IP    node=agent_vpp_1     name=${NAME_LOOP2}    mac=${MAC_LOOP2}    ip=${IP_LOOP2}    prefix=${PREFIX}    mtu=${MTU}    enabled=true
 
 Check Loopback2 Is Created
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_1    mac=${MAC_LOOP2}
@@ -58,7 +58,7 @@ Check Loopback1 Is Still Configured
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Loopback Interface State    agent_vpp_1    ${NAME_LOOP1}    enabled=1     mac=${MAC_LOOP1}    mtu=${MTU}         ipv6=${IP_LOOP1}/${PREFIX}
 
 Update Loopback1
-    vpp_ctl: Put Loopback Interface With IP    node=agent_vpp_1     name=${NAME_LOOP1}    mac=${MAC_LOOP1_2}    ip=${IP_LOOP1_2}    prefix=${PREFIX}    mtu=${MTU}    enabled=true
+    Put Loopback Interface With IP    node=agent_vpp_1     name=${NAME_LOOP1}    mac=${MAC_LOOP1_2}    ip=${IP_LOOP1_2}    prefix=${PREFIX}    mtu=${MTU}    enabled=true
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Deleted    node=agent_vpp_1    mac=${MAC_LOOP1}
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Created    node=agent_vpp_1    mac=${MAC_LOOP1_2}
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Loopback Interface State    agent_vpp_1    ${NAME_LOOP1}    enabled=1     mac=${MAC_LOOP1_2}    mtu=${MTU}    ipv6=${IP_LOOP1_2}/${PREFIX}
@@ -67,7 +67,7 @@ Check Loopback2 Is Not Changed
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Loopback Interface State    agent_vpp_1    ${NAME_LOOP2}    enabled=1     mac=${MAC_LOOP2}    mtu=${MTU}         ipv6=${IP_LOOP2}/${PREFIX}
 
 Delete Loopback1_2 Interface
-    vpp_ctl: Delete VPP Interface    node=agent_vpp_1    name=${NAME_LOOP1}
+    Delete VPP Interface    node=agent_vpp_1    name=${NAME_LOOP1}
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Interface Is Deleted    node=agent_vpp_1    mac=${MAC_LOOP1_2}
 
 Check Loopback2 Interface Is Still Configured
@@ -82,7 +82,6 @@ Show Interfaces And Other Objects After Setup
     Write To Machine    agent_vpp_1_term    show vxlan tunnel
     Write To Machine    agent_vpp_1_term    show err
     vat_term: Interfaces Dump    agent_vpp_1
-    Write To Machine    vpp_agent_ctl    vpp-agent-ctl ${AGENT_VPP_ETCD_CONF_PATH} -ps
     Execute In Container    agent_vpp_1    ip a
 
 *** Keywords ***

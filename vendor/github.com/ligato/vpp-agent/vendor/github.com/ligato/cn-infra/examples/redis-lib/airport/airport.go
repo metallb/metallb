@@ -1,3 +1,17 @@
+// Copyright (c) 2018 Cisco and/or its affiliates.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //go:generate protoc --proto_path=./model --gogo_out=./model ./model/flight.proto
 package main
 
@@ -7,6 +21,9 @@ import (
 	"os/signal"
 	"sync"
 	"time"
+
+	"github.com/ligato/cn-infra/utils/safeclose"
+	"github.com/pkg/errors"
 
 	"fmt"
 
@@ -23,7 +40,6 @@ import (
 	"github.com/ligato/cn-infra/examples/redis-lib/airport/model"
 	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/logging/logrus"
-	"github.com/ligato/cn-infra/utils/safeclose"
 	"github.com/namsral/flag"
 )
 
@@ -51,203 +67,519 @@ var diagram = `
 
 `
 
-var log = logrus.DefaultLogger()
-
-const (
-	arrival            = "Arrival"
-	departure          = "Departure"
-	runway             = "Runway"
-	hangar             = "Hangar"
-	runwayLength       = 30
-	runwayInterval     = 0.02
-	runwayClearance    = 0.4
-	runwaySpeedBump    = 4.0 / 9.0
-	hangarThreshold    = 1.0 / 2.0
-	hangarSlotCount    = 3
-	hangarDurationLow  = 2
-	hangarDurationHigh = 6
-	flightIDLength     = 5
-	flightSlotCount    = 5
-	flightStatusSize   = 2*flightSlotCount + hangarSlotCount + 1
-	flightIDFormat     = "%s%02d"
-	hangarKeyFormat    = "%2s%02d:%d"
-	columnSep          = "      "
-	redisPause         = 0.1
-)
-
-var motions = []string{" ->", "<- "}
-
 var flightStatusFormat = "\r"
 
-var flightRadar = make(map[string]struct{})
-var flightRadarMutex sync.Mutex
+// Labels
+const (
+	arrival   = "Arrival"
+	departure = "Departure"
+	runway    = "Runway"
+	hangar    = "Hangar"
+)
 
-// priority of the flight
-// For demo clarity, this is the order in which the flights arrive.  But its value
-// can be set to represent other priority, such as fuel level.
-var priority uint32
+// Airport parameters
+const (
+	flightSlots = 5
 
+	runwayLength    = 30
+	runwayInterval  = 20000000
+	runwayClearance = 400000000
+	runwaySpeedBump = 0.5 // speed modifier
+
+	hangarSlots        = 3
+	hangarThreshold    = 0.5
+	hangarDurationLow  = 2000000000
+	hangarDurationHigh = 6000000000
+	hangarKeyTemplate  = "%2s%02d:%d"
+)
+
+// Aircraft parameters
+const (
+	flightIDLength   = 5
+	flightStatusSize = 2*flightSlots + hangarSlots + 1
+	flightIDFormat   = "%s%02d"
+)
+
+// Other
+const (
+	columnSep = "      "
+)
+
+// Priority list of flights
 type priorities []uint32
 
-var arrivalChan = make(chan keyval.ProtoWatchResp, flightSlotCount)
-var departureChan = make(chan keyval.ProtoWatchResp, flightSlotCount)
-var hangarChan = make(chan keyval.ProtoWatchResp, hangarSlotCount)
-var runwayChan = make(chan flight.Info, flightSlotCount)
+// Len method (in order to implement Sorted)
+func (p priorities) Len() int { return len(p) }
 
-var redisConn *redis.BytesConnectionRedis
-var arrivalBroker keyval.ProtoBroker
-var arrivalWatcher keyval.ProtoWatcher
-var departureBroker keyval.ProtoBroker
-var departureWatcher keyval.ProtoWatcher
-var hangarBroker keyval.ProtoBroker
-var hangarWatcher keyval.ProtoWatcher
+// Swap method (in order to implement Sorted)
+func (p priorities) Swap(i, j int) { p[i], p[j] = p[j], p[i] }
 
-var prefix string
-var debug bool
-var redisConfig string
+// Less method (in order to implement Sorted)
+func (p priorities) Less(i, j int) bool { return p[i] < p[j] }
 
+// Airport struct to manage arrivals/departures
+type Airport struct {
+	sync.Mutex
+	log    *logrus.Logger
+	client redis.Client
+
+	connection *redis.BytesConnectionRedis
+
+	// parameters
+	airlines    []string
+	flightRadar map[string]struct{}
+	priority    uint32 // the order in which the flights arrive
+
+	// prefixes
+	arrivalPrefix   string
+	departurePrefix string
+	hangarPrefix    string
+
+	// brokers
+	arrivalBroker   keyval.ProtoBroker
+	departureBroker keyval.ProtoBroker
+	hangarBroker    keyval.ProtoBroker
+
+	// watchers
+	arrivalWatcher   keyval.ProtoWatcher
+	departureWatcher keyval.ProtoWatcher
+	hangarWatcher    keyval.ProtoWatcher
+
+	// watch channels
+	arrivalChan   chan datasync.ProtoWatchResp
+	departureChan chan datasync.ProtoWatchResp
+	hangarChan    chan datasync.ProtoWatchResp
+	runwayChan    chan flight.Info
+
+	// other
+	motions   []string
+	respChan  chan keyval.BytesWatchResp
+	closeChan chan string
+}
+
+// Initialize airport and start serving
 func main() {
-	if setup() {
-		startSimulation()
+	var debug bool
+	var redisConfigPath string
+
+	// init example flags
+	flag.BoolVar(&debug, "debug", false, "Enable debugging")
+	flag.StringVar(&redisConfigPath, "redis-config", "", "Redis configuration file path")
+	flag.Parse()
+
+	log := logrus.DefaultLogger()
+	if debug {
+		log.SetLevel(logging.DebugLevel)
+	}
+	// load redis config file
+	redisConfig, err := redis.LoadConfig(redisConfigPath)
+	if err != nil {
+		log.Errorf("Failed to load Redis config file %s: %v", redisConfigPath, err)
+		return
+	}
+
+	airport := &Airport{
+		log:             log,
+		airlines:        []string{"AA", "DL", "SW", "UA"},
+		flightRadar:     make(map[string]struct{}),
+		arrivalPrefix:   "/redis/airport/arrival",
+		departurePrefix: "/redis/airport/departure",
+		hangarPrefix:    "/redis/airport/hangar",
+		motions:         []string{" ->", "<- "},
+		respChan:        make(chan keyval.BytesWatchResp, 10),
+		closeChan:       make(chan string),
+	}
+	doneChan := make(chan struct{})
+	if err := airport.init(redisConfig, doneChan); err != nil {
+		airport.log.Errorf("airport example error: %v", err)
+	} else {
+		airport.start()
 	}
 }
 
-func setup() bool {
-	rand.Seed(time.Now().UnixNano())
+// Set all required brokers, watchers, prepare redis connection
+func (a *Airport) init(config interface{}, doneChan chan struct{}) (err error) {
+	a.log.Info("Airport redis example. If you need more info about what is happening, run example with -debug=true")
 
-	cfg := loadConfig()
-	if cfg == nil {
-		return false
-	}
+	rand.Seed(time.Now().UnixNano())
 
 	printHeaders()
 	setupFlightStatusFormat()
 
-	redisConn = createConnection(cfg)
-
-	var arrivalProto, departureProto, hangarProto *kvproto.ProtoWrapper
-	arrivalProto = kvproto.NewProtoWrapper(redisConn)
-	departureProto = kvproto.NewProtoWrapper(redisConn)
-	hangarProto = kvproto.NewProtoWrapper(redisConn)
-
-	arrivalBroker = arrivalProto.NewBroker(prefix + arrival)
-	arrivalWatcher = arrivalProto.NewWatcher(prefix + arrival)
-
-	departureBroker = departureProto.NewBroker(prefix + departure)
-	departureWatcher = departureProto.NewWatcher(prefix + departure)
-
-	hangarBroker = hangarProto.NewBroker(prefix + hangar)
-	hangarWatcher = hangarProto.NewWatcher(prefix + hangar)
-
-	cleanup(false)
-
-	arrivalWatcher.Watch(keyval.ToChanProto(arrivalChan), nil, "")
-	departureWatcher.Watch(keyval.ToChanProto(departureChan), nil, "")
-	hangarWatcher.Watch(keyval.ToChanProto(hangarChan), nil, "")
-
-	return true
-}
-
-func loadConfig() interface{} {
-	flag.StringVar(&prefix, "prefix", "",
-		"Specifies key prefix")
-	flag.BoolVar(&debug, "debug", false,
-		"Specifies whether to enable debugging; default to false")
-	flag.StringVar(&redisConfig, "redis-config", "",
-		"Specifies configuration file path")
-	flag.Parse()
-
-	flag.Usage = func() {
-		flag.VisitAll(func(f *flag.Flag) {
-			var format string
-			if f.Name == "redis-config" || f.Name == "prefix" {
-				// put quotes around string
-				format = "  -%s=%q: %s\n"
-			} else {
-				if f.Name != "debug" {
-					return
-				}
-				format = "  -%s=%s: %s\n"
-			}
-			fmt.Fprintf(os.Stderr, format, f.Name, f.DefValue, f.Usage)
-		})
-
-	}
-
-	if debug {
-		log.SetLevel(logging.DebugLevel)
-	}
-	cfgFlag := flag.Lookup("redis-config")
-	if cfgFlag == nil {
-		flag.Usage()
-		return nil
-	}
-	cfgFile := cfgFlag.Value.String()
-	if cfgFile == "" {
-		flag.Usage()
-		return nil
-	}
-	cfg, err := redis.LoadConfig(cfgFile)
+	// prepare client to connect to the redis DB
+	a.client, err = redis.ConfigToClient(config)
 	if err != nil {
-		log.Panicf("LoadConfig(%s) failed: %s", cfgFile, err)
+		return fmt.Errorf("failed to create redis client: %v", err)
 	}
-	return cfg
-}
-
-func createConnection(cfg interface{}) *redis.BytesConnectionRedis {
-	client, err := redis.ConfigToClient(cfg)
+	a.connection, err = redis.NewBytesConnection(a.client, a.log)
 	if err != nil {
-		log.Panicf("CreateNodeClient() failed: %s", err)
+		return fmt.Errorf("failed to create connection from redis client: %v", err)
 	}
-	conn, err := redis.NewBytesConnection(client, log)
-	if err != nil {
-		safeclose.Close(client)
-		log.Panicf("NewBytesConnection() failed: %s", err)
+
+	// prepare all the brokers and watchers in order to simulate airport
+	a.arrivalBroker = kvproto.NewProtoWrapper(a.connection).NewBroker(a.arrivalPrefix)
+	a.arrivalWatcher = kvproto.NewProtoWrapper(a.connection).NewWatcher(a.arrivalPrefix)
+
+	a.departureBroker = kvproto.NewProtoWrapper(a.connection).NewBroker(a.departurePrefix)
+	a.departureWatcher = kvproto.NewProtoWrapper(a.connection).NewWatcher(a.departurePrefix)
+
+	a.hangarBroker = kvproto.NewProtoWrapper(a.connection).NewBroker(a.hangarPrefix)
+	a.hangarWatcher = kvproto.NewProtoWrapper(a.connection).NewWatcher(a.hangarPrefix)
+
+	a.cleanUp(false)
+
+	// start watchers
+	a.arrivalChan = make(chan datasync.ProtoWatchResp, flightSlots)
+	if err := a.arrivalWatcher.Watch(keyval.ToChanProto(a.arrivalChan), nil, ""); err != nil {
+		return fmt.Errorf("failed to start 'arrival' watcher: %v", err)
 	}
-	return conn
+	a.departureChan = make(chan datasync.ProtoWatchResp, flightSlots)
+	if err := a.departureWatcher.Watch(keyval.ToChanProto(a.departureChan), nil, ""); err != nil {
+		return fmt.Errorf("failed to start 'departure' watcher: %v", err)
+	}
+	a.hangarChan = make(chan datasync.ProtoWatchResp, hangarSlots)
+	if err := a.hangarWatcher.Watch(keyval.ToChanProto(a.hangarChan), nil, ""); err != nil {
+		return fmt.Errorf("failed to start 'hangar' watcher: %v", err)
+	}
+	a.runwayChan = make(chan flight.Info, flightSlots)
+
+	return nil
 }
 
-func cleanup(report bool) {
-	if report {
-		fmt.Println("clean up")
-		printFlightCounts()
-	}
-	arrivalBroker.Delete("", datasync.WithPrefix())
-	departureBroker.Delete("", datasync.WithPrefix())
-	hangarBroker.Delete("", datasync.WithPrefix())
-	if report {
-		printFlightCounts()
-	}
-}
+// Start arrivals/departures and exit-on-signal procedure
+func (a *Airport) start() {
+	// start all the airport processors
+	go a.startArrivals()
+	go a.processArrivals()
+	go a.processDepartures()
+	go a.processHangar()
 
-func startSimulation() {
-	runArrivals()
-	runDepartures()
-	runHangar()
-
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt)
+	// quit on os signal
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, os.Interrupt)
 	for {
 		select {
-		case <-sigChan:
-			fmt.Printf("\nReceived %v.\n", os.Interrupt)
-			cleanup(true)
-			safeclose.Close(redisConn)
-			os.Exit(1)
-		case f, ok := <-runwayChan:
-			if ok {
-				processRunway(f)
-				sleep(runwayClearance, runwayClearance)
-			} else {
-				log.Errorf("<-runwayChan returned false")
+		case <-signalChan:
+			a.cleanUp(true)
+			if err := safeclose.Close(a.connection); err != nil {
+				a.log.Error(err)
 			}
+			os.Exit(1)
+		case runway, ok := <-a.runwayChan:
+			if !ok {
+				a.log.Errorf("runway channel closed")
+			}
+			a.processRunway(runway)
+			time.Sleep(randomDuration(runwayClearance, runwayClearance))
+		}
+	}
+}
+
+// Generate 3 arrivals at start, then continue generating with random pause (1-5 seconds) in between
+func (a *Airport) startArrivals() {
+	for i := 0; i < flightSlots/2+1; i++ {
+		if err := a.newArrival(); err != nil {
+			a.log.Error(err)
+		}
+	}
+
+	for {
+		if err := a.newArrival(); err != nil {
+			a.log.Error(err)
+		}
+		time.Sleep(randomDuration(1000000000, 5000000000))
+	}
+}
+
+// Wait for arrivals. Incoming flights are set to 'arrival' status and sent to runway.
+func (a *Airport) processArrivals() {
+	for {
+		arrival, ok := <-a.arrivalChan
+		if !ok {
+			a.log.Errorf("arrival channel closed")
+			return
+		}
+		switch arrival.GetChangeType() {
+		case datasync.Put:
+			fl := flight.Info{}
+			if err := arrival.GetValue(&fl); err != nil {
+				a.log.Errorf("failed to get value for arrival flight: %v", err)
+				continue
+			}
+			fl.Status = flight.Status_arrival
+			a.runwayChan <- fl
+		case datasync.Delete:
+			a.log.Debugf("arrival %s deleted\n", arrival.GetKey())
+		}
+	}
+}
+
+// Wait for departures. Outgoing flights are set to 'departure' and sent to runway
+func (a *Airport) processDepartures() {
+	for {
+		departure, ok := <-a.departureChan
+		if !ok {
+			a.log.Errorf("departure channel closed")
+			return
+		}
+		switch departure.GetChangeType() {
+		case datasync.Put:
+			fl := flight.Info{}
+			if err := departure.GetValue(&fl); err != nil {
+				a.log.Errorf("failed to get value for departure flight: %v", err)
+				continue
+			}
+			fl.Status = flight.Status_departure
+			a.runwayChan <- fl
+		case datasync.Delete:
+			a.log.Debugf("departure %s deleted\n", departure.GetKey())
+		}
+	}
+}
+
+// Wait for hangar. Incoming flights are stored, outgoing are sent to departure.
+func (a *Airport) processHangar() {
+	for {
+		hangar, ok := <-a.hangarChan
+		if !ok {
+			a.log.Errorf("hangar channel closed")
+			return
+		}
+		switch hangar.GetChangeType() {
+		case datasync.Put:
+			a.log.Debugf("hangar %s updated", hangar.GetKey())
+		case datasync.Delete:
+			fl := flight.Info{}
+			if _, err := fmt.Sscanf(hangar.GetKey(), hangarKeyTemplate, &(fl.Airline), &(fl.Number), &(fl.Priority)); err != nil {
+				a.log.Errorf("error creating hangar key: %v", err)
+				continue
+			}
+			if err := a.departureBroker.Put(fmt.Sprintf(flightIDFormat, fl.Airline, fl.Number), &fl); err != nil {
+				a.log.Errorf("failed to put flight to departure broker: %v", err)
+				continue
+			}
+		}
+	}
+}
+
+// Runway can serve one flight at a time. If flight status is 'arrival', the plane lands and is either sent
+// departure or to hangar (random chance)
+func (a *Airport) processRunway(fl flight.Info) {
+	flightID := fmt.Sprintf(flightIDFormat, fl.Airline, fl.Number)
+
+	if fl.Status == flight.Status_arrival {
+		a.log.Debugf("%s%s approaching runway\n", flightID, a.motions[fl.Status])
+		_, err := a.arrivalBroker.Delete(flightID)
+		if err != nil {
+			a.log.Errorf("processRunway(%s) failed: %s", flightID, err)
+		}
+		a.land(fl)
+
+		// send to departure or hangar
+		if rand.Float64() <= hangarThreshold {
+			err = a.hangarBroker.Put(makeHangarKey(fl), &fl, datasync.WithTTL(randomDuration(hangarDurationLow, hangarDurationHigh)))
+		} else {
+			err = a.departureBroker.Put(flightID, &fl)
+		}
+		if err != nil {
+			a.log.Errorf("processRunway(%s) failed: %s", flightID, err)
+		}
+	} else {
+		a.log.Debugf("%s%s approaching runway\n", flightID, a.motions[fl.Status])
+		_, err := a.departureBroker.Delete(flightID)
+		if err != nil {
+			a.log.Errorf("processRunway(%s) failed: %s", flightID, err)
+		}
+		a.takeOff(fl)
+		a.Lock()
+		delete(a.flightRadar, flightID)
+		a.Unlock()
+	}
+}
+
+// Land the flight, calculate steps with decreasing size (imitating landing speed)
+func (a *Airport) land(fl flight.Info) {
+	flightInMotion := fmt.Sprintf(flightIDFormat, fl.Airline, fl.Number) + a.motions[fl.Status]
+	size := len(flightInMotion)
+	steps := runwayLength - size + 1
+	interval := runwayInterval / 2
+	var flightStatus = make([]interface{}, flightStatusSize)
+	for i := 0; i < steps; i++ {
+		flightStatus[flightSlots] = fmt.Sprintf("%*s", size+i, flightInMotion)
+		a.fillArrivalStatus(flightStatus)
+		a.fillDepartureStatus(flightStatus)
+		a.fillHangarStatus(flightStatus)
+		fmt.Printf(flightStatusFormat, flightStatus...)
+		time.Sleep(randomDuration(interval, interval))
+		if i >= int(float64(steps)*runwaySpeedBump) {
+			interval += runwayInterval
+		}
+	}
+}
+
+// Flight takeoff, calculate steps with increasing size (imitating takeoff speed)
+func (a *Airport) takeOff(fl flight.Info) {
+	flightInMotion := a.motions[fl.Status] + fmt.Sprintf(flightIDFormat, fl.Airline, fl.Number)
+	steps := runwayLength - len(flightInMotion) + 1
+	interval := runwayInterval/2 + runwayInterval*math.Floor(float64(steps)*runwaySpeedBump)
+	var flightStatus = make([]interface{}, flightStatusSize)
+	for i := 0; i < steps; i++ {
+		flightStatus[flightSlots] = fmt.Sprintf("%*s", runwayLength-i, flightInMotion)
+		a.fillArrivalStatus(flightStatus)
+		a.fillDepartureStatus(flightStatus)
+		a.fillHangarStatus(flightStatus)
+		fmt.Printf(flightStatusFormat, flightStatus...)
+		time.Sleep(randomDuration(int(interval), int(interval)))
+		if i < int(float64(steps)*runwaySpeedBump) {
+			interval -= runwayInterval
+		}
+	}
+}
+
+// Generate new arrival for one of the airlines with some number (everything is chosen randomly)
+func (a *Airport) newArrival() error {
+	priority := atomic.AddUint32(&a.priority, 1)
+	flightInfo := &flight.Info{
+		Airline:  a.airlines[rand.Int()%len(a.airlines)],
+		Number:   rand.Uint32()%99 + 1,
+		Priority: priority,
+	}
+	var exists bool
+	flightID := fmt.Sprintf(flightIDFormat, flightInfo.Airline, flightInfo.Number)
+
+	a.Lock()
+	// make sure that the generated flight does not exist yet and "show" it on the flight radar
+	if _, exists = a.flightRadar[flightID]; !exists {
+		a.flightRadar[flightID] = struct{}{}
+		if err := a.arrivalBroker.Put(flightID, flightInfo); err != nil {
+			return errors.Errorf("Arrival %s failed: %v", flightID, err)
+		}
+	}
+	a.Unlock()
+
+	return nil
+}
+
+// Auxiliary methods
+
+func (a *Airport) cleanUp(report bool) {
+	if report {
+		a.log.Info("cleaning up airport")
+		a.printFlightCounts()
+	}
+	if _, err := a.arrivalBroker.Delete("", datasync.WithPrefix()); err != nil {
+		a.log.Errorf("failed to clean up arrivals: %v", err)
+	}
+	if _, err := a.departureBroker.Delete("", datasync.WithPrefix()); err != nil {
+		a.log.Errorf("failed to clean up departures: %v", err)
+	}
+	if _, err := a.hangarBroker.Delete("", datasync.WithPrefix()); err != nil {
+		a.log.Errorf("failed to clean up hangar: %v", err)
+	}
+	if report {
+		a.printFlightCounts()
+	}
+}
+
+func (a *Airport) printFlightCounts() {
+	arrivals := countFlights(a.arrivalBroker, arrival)
+	departures := countFlights(a.departureBroker, departure)
+	hangars, err := a.getHangarFlights()
+	if err != nil {
+		a.log.Errorf("printFlightCounts() failed: %s", err)
+	}
+	fmt.Printf("arrivals %d, departures %d, hangars %d\n", arrivals, departures, len(hangars))
+}
+
+func (a *Airport) getHangarFlights() ([]flight.Info, error) {
+	keys, err := a.hangarBroker.ListKeys("")
+	if err != nil {
+		return nil, fmt.Errorf("getHangarFlights() failed: %s", err)
+	}
+
+	var flights []flight.Info
+	for {
+		k, _, last := keys.GetNext()
+		if last {
+			break
+		}
+		f := flight.Info{}
+		if err := scanHangarKey(k, &f); err != nil {
+			a.log.Error(err)
+		}
+		flights = append(flights, f)
+	}
+	return flights, nil
+}
+
+func (a *Airport) fillArrivalStatus(flightStatus []interface{}) {
+	arrivals, err := getSortedFlights(a.arrivalBroker, arrival)
+	if err != nil {
+		a.log.Errorf("fillArrivalStatus() failed: %s", err)
+		return
+	}
+	for i := 0; i < flightSlots; i++ {
+		flightStatus[i] = ""
+	}
+
+	count := len(arrivals)
+	if count > 0 {
+		if count > flightSlots {
+			count = flightSlots
+		}
+		for i := 0; i < count; i++ {
+			flightStatus[flightSlots-1-i] = fmt.Sprintf(flightIDFormat, arrivals[i].Airline, arrivals[i].Number)
+		}
+	}
+}
+
+func (a *Airport) fillDepartureStatus(flightStatus []interface{}) {
+	departures, err := getSortedFlights(a.departureBroker, departure)
+	if err != nil {
+		a.log.Errorf("fillDepartureStatus() failed: %s", err)
+		return
+	}
+
+	for i := flightSlots + 1; i < flightSlots*2+1; i++ {
+		flightStatus[i] = ""
+	}
+
+	count := len(departures)
+	if count > 0 {
+		if count > flightSlots {
+			count = flightSlots
+		}
+		for i := 0; i < count; i++ {
+			flightStatus[flightSlots+1+i] = fmt.Sprintf(flightIDFormat, departures[i].Airline, departures[i].Number)
+		}
+	}
+}
+
+func (a *Airport) fillHangarStatus(flightStatus []interface{}) {
+	hangars, err := a.getHangarFlights()
+	if err != nil {
+		a.log.Errorf("fillHangarStatus() failed: %s", err)
+		return
+	}
+
+	for i := flightSlots*2 + 1; i < flightStatusSize; i++ {
+		flightStatus[i] = ""
+	}
+
+	count := len(hangars)
+	if count > 0 {
+		if count > hangarSlots {
+			count = hangarSlots
+		}
+		for i := 0; i < count; i++ {
+			flightStatus[flightSlots*2+1+i] = fmt.Sprintf(flightIDFormat, hangars[i].Airline, hangars[i].Number)
 		}
 	}
 }
 
 func printHeaders() {
 	fmt.Println()
-	fmt.Println(diagram)
+	fmt.Print(diagram)
 	fmt.Println()
 	fmt.Println()
 
@@ -260,342 +592,47 @@ func printHeaders() {
 		pad2 = pad + 1
 	}
 	fmt.Printf("%*s%s%*s%s%*s%s%-*s%s%s\n",
-		flightIDLength*flightSlotCount, arrival,
+		flightIDLength*flightSlots, arrival,
 		columnSep, pad, "", runway, pad2, "",
-		columnSep, flightIDLength*flightSlotCount, departure,
+		columnSep, flightIDLength*flightSlots, departure,
 		columnSep, hangar)
 	dash60 := "-----------------------------------------------------------"
-	waitingGuide := dash60[0 : flightIDLength*flightSlotCount]
+	waitingGuide := dash60[0 : flightIDLength*flightSlots]
 	runwayGuide := dash60[0:runwayLength]
-	hangarGuide := dash60[0 : flightIDLength*hangarSlotCount]
+	hangarGuide := dash60[0 : flightIDLength*hangarSlots]
 	fmt.Printf("%s%s%s%s%s%s%s\n",
 		waitingGuide, columnSep, runwayGuide, columnSep, waitingGuide, columnSep, hangarGuide)
 }
 
-func printFlightCounts() {
-	arrivals := countFlights(arrivalBroker, arrival)
-	departures := countFlights(departureBroker, departure)
-	hangars, err := getHangarFlights()
-	if err != nil {
-		log.Errorf("printFlightCounts() failed: %s", err)
-	}
-	fmt.Printf("arrivals %d, departures %d, hangars %d\n", arrivals, departures, len(hangars))
-}
-
-func runArrivals() {
-	go func() {
-		for i := 0; i < flightSlotCount/2+1; i++ {
-			newArrival()
-		}
-		pause := 2*(runwayClearance+runwayInterval*float64(runwayLength-flightIDLength)) +
-			9*redisPause
-		low := pause - 0.5*pause
-		high := pause
-		for {
-			newArrival()
-			sleep(low, high)
-		}
-	}()
-
-	go func() {
-		for {
-			r, ok := <-arrivalChan
-			if ok {
-				processArrival(r)
-			} else {
-				log.Errorf("<-arrivalChan returned false")
-			}
-		}
-	}()
-}
-
-func runDepartures() {
-	go func() {
-		for {
-			r, ok := <-departureChan
-			if ok {
-				processDeparture(r)
-			} else {
-				log.Errorf("<-departureChan returned false")
-			}
-		}
-	}()
-}
-
-func runHangar() {
-	go func() {
-		for {
-			r, ok := <-hangarChan
-			if ok {
-				processHangar(r)
-			} else {
-				log.Errorf("<-hangarChan returned false")
-			}
-		}
-	}()
-}
-
 func setupFlightStatusFormat() {
 	size := strconv.Itoa(flightIDLength)
-	for i := 0; i < flightSlotCount; i++ {
+	for i := 0; i < flightSlots; i++ {
 		flightStatusFormat += "%" + size + "s"
 	}
 	flightStatusFormat += columnSep + "%-" + strconv.Itoa(runwayLength) + "s" + columnSep
-	for i := 0; i < flightSlotCount; i++ {
+	for i := 0; i < flightSlots; i++ {
 		flightStatusFormat += "%-" + size + "s"
 	}
 	flightStatusFormat += columnSep
-	for i := 0; i < hangarSlotCount; i++ {
+	for i := 0; i < hangarSlots; i++ {
 		flightStatusFormat += "%-" + size + "s"
-	}
-}
-
-func newArrival() {
-	f := randomFlight()
-	err := arrivalBroker.Put(flightID(f), &f)
-	if err != nil {
-		log.Errorf("newArrival() failed: %s", err)
-	}
-}
-
-func randomFlight() flight.Info {
-	airlines := []string{"AA", "DL", "SW", "UA"}
-	numAirlines := len(airlines)
-
-	p := atomic.AddUint32(&priority, 1)
-	for {
-		f := flight.Info{
-			Airline:  airlines[rand.Int()%numAirlines],
-			Number:   rand.Uint32()%99 + 1,
-			Priority: p,
-		}
-		var exists bool
-		id := flightID(f)
-		flightRadarMutex.Lock()
-		if _, exists = flightRadar[id]; !exists {
-			flightRadar[id] = struct{}{}
-		}
-		flightRadarMutex.Unlock()
-		if !exists {
-			return f
-		}
-	}
-}
-
-func flightID(flight flight.Info) string {
-	return fmt.Sprintf(flightIDFormat, flight.Airline, flight.Number)
-}
-
-func processArrival(r keyval.ProtoWatchResp) {
-	switch r.GetChangeType() {
-	case datasync.Put:
-		go func() {
-			f := flight.Info{}
-			r.GetValue(&f)
-			f.Status = flight.Status_arrival
-			runwayChan <- f
-		}()
-	case datasync.Delete:
-		log.Debugf("%s deleted\n", r.GetKey())
-	}
-}
-
-func processDeparture(r keyval.ProtoWatchResp) {
-	switch r.GetChangeType() {
-	case datasync.Put:
-		go func() {
-			f := flight.Info{}
-			r.GetValue(&f)
-			f.Status = flight.Status_departure
-			runwayChan <- f
-		}()
-	case datasync.Delete:
-		log.Debugf("%s deleted\n", r.GetKey())
-	}
-}
-
-func processHangar(r keyval.ProtoWatchResp) {
-	switch r.GetChangeType() {
-	case datasync.Put:
-		log.Debugf("%s updated\n", r.GetKey())
-	case datasync.Delete:
-		key := r.GetKey()
-		f := flight.Info{}
-		scanHangarKey(key, &f)
-		err := departureBroker.Put(flightID(f), &f)
-		if err != nil {
-			log.Errorf("processHangar() failed: %s", err)
-		}
 	}
 }
 
 func makeHangarKey(f flight.Info) string {
-	return fmt.Sprintf(hangarKeyFormat, f.Airline, f.Number, f.Priority)
+	return fmt.Sprintf(hangarKeyTemplate, f.Airline, f.Number, f.Priority)
 }
 
 func scanHangarKey(key string, f *flight.Info) error {
-	_, err := fmt.Sscanf(key, hangarKeyFormat, &(f.Airline), &(f.Number), &(f.Priority))
-	if err != nil {
+	if _, err := fmt.Sscanf(key, hangarKeyTemplate, &(f.Airline), &(f.Number), &(f.Priority)); err != nil {
 		return err
 	}
 	return nil
 }
 
-func getHangarFlights() ([]flight.Info, error) {
-	keys, err := hangarBroker.ListKeys("")
-	if err != nil {
-		return nil, fmt.Errorf("getHangarFlights() failed: %s", err)
-	}
-
-	flights := []flight.Info{}
-	for {
-		k, _, last := keys.GetNext()
-		if last {
-			break
-		}
-		f := flight.Info{}
-		scanHangarKey(k, &f)
-		flights = append(flights, f)
-	}
-	return flights, nil
-}
-
-func processRunway(f flight.Info) {
-	id := flightID(f)
-
-	if f.Status == flight.Status_arrival {
-		log.Debugf("%s%s approaching runway\n", id, motions[f.Status])
-		_, err := arrivalBroker.Delete(id)
-		if err != nil {
-			log.Errorf("processRunway(%s) failed: %s", id, err)
-		}
-		land(f)
-		if rand.Float64() <= hangarThreshold {
-			err = hangarBroker.Put(makeHangarKey(f), &f, datasync.WithTTL(randomDuration(hangarDurationLow, hangarDurationHigh)))
-		} else {
-			err = departureBroker.Put(id, &f)
-		}
-		if err != nil {
-			log.Errorf("processRunway(%s) failed: %s", id, err)
-		}
-	} else {
-		log.Debugf("%s%s approaching runway\n", id, motions[f.Status])
-		_, err := departureBroker.Delete(id)
-		if err != nil {
-			log.Errorf("processRunway(%s) failed: %s", id, err)
-		}
-		takeOff(f)
-		flightRadarMutex.Lock()
-		delete(flightRadar, id)
-		flightRadarMutex.Unlock()
-	}
-}
-
-func land(f flight.Info) {
-	flightInMotion := flightID(f) + motions[f.Status]
-	size := len(flightInMotion)
-	steps := runwayLength - size + 1
-	interval := runwayInterval / 2
-	var flightStatus = make([]interface{}, flightStatusSize)
-	for i := 0; i < steps; i++ {
-		flightStatus[flightSlotCount] = fmt.Sprintf("%*s", size+i, flightInMotion)
-		fillArrivalStatus(flightStatus)
-		fillDepartureStatus(flightStatus)
-		fillHangarStatus(flightStatus)
-		fmt.Printf(flightStatusFormat, flightStatus...)
-		sleep(interval, interval)
-		if i >= int(float64(steps)*(1-runwaySpeedBump)) {
-			interval += runwayInterval
-		}
-	}
-}
-
-func takeOff(f flight.Info) {
-	flightInMotion := motions[f.Status] + flightID(f)
-	steps := runwayLength - len(flightInMotion) + 1
-	interval := runwayInterval/2 + runwayInterval*math.Floor(float64(steps)*runwaySpeedBump)
-	var flightStatus = make([]interface{}, flightStatusSize)
-	for i := 0; i < steps; i++ {
-		flightStatus[flightSlotCount] = fmt.Sprintf("%*s", runwayLength-i, flightInMotion)
-		fillArrivalStatus(flightStatus)
-		fillDepartureStatus(flightStatus)
-		fillHangarStatus(flightStatus)
-		fmt.Printf(flightStatusFormat, flightStatus...)
-		sleep(interval, interval)
-		if i < int(float64(steps)*runwaySpeedBump) {
-			interval -= runwayInterval
-		}
-	}
-}
-
-func fillArrivalStatus(flightStatus []interface{}) {
-	arrivals, err := getSortedFlights(arrivalBroker, arrival)
-	if err != nil {
-		log.Errorf("fillArrivalStatus() failed: %s", err)
-		return
-	}
-	for i := 0; i < flightSlotCount; i++ {
-		flightStatus[i] = ""
-	}
-
-	count := len(arrivals)
-	if count > 0 {
-		if count > flightSlotCount {
-			count = flightSlotCount
-		}
-		for i := 0; i < count; i++ {
-			flightStatus[flightSlotCount-1-i] = flightID(arrivals[i])
-		}
-	}
-}
-
-func fillDepartureStatus(flightStatus []interface{}) {
-	departures, err := getSortedFlights(departureBroker, departure)
-	if err != nil {
-		log.Errorf("fillDepartureStatus() failed: %s", err)
-		return
-	}
-
-	for i := flightSlotCount + 1; i < flightSlotCount*2+1; i++ {
-		flightStatus[i] = ""
-	}
-
-	count := len(departures)
-	if count > 0 {
-		if count > flightSlotCount {
-			count = flightSlotCount
-		}
-		for i := 0; i < count; i++ {
-			flightStatus[flightSlotCount+1+i] = flightID(departures[i])
-		}
-	}
-}
-
-func fillHangarStatus(flightStatus []interface{}) {
-	hangars, err := getHangarFlights()
-	if err != nil {
-		log.Errorf("fillHangarStatus() failed: %s", err)
-		return
-	}
-
-	for i := flightSlotCount*2 + 1; i < flightStatusSize; i++ {
-		flightStatus[i] = ""
-	}
-
-	count := len(hangars)
-	if count > 0 {
-		if count > hangarSlotCount {
-			count = hangarSlotCount
-		}
-		for i := 0; i < count; i++ {
-			flightStatus[flightSlotCount*2+1+i] = flightID(hangars[i])
-		}
-	}
-}
 func countFlights(broker keyval.ProtoBroker, name string) int {
 	flights, err := getSortedFlights(broker, name)
 	if err != nil {
-		log.Errorf(err.Error())
 		return 0
 	}
 	return len(flights)
@@ -614,10 +651,13 @@ func getSortedFlights(broker keyval.ProtoBroker, name string) ([]flight.Info, er
 			break
 		}
 		f := flight.Info{}
-		kv.GetValue(&f)
+		if err := kv.GetValue(&f); err != nil {
+			continue
+		}
 		priorities = append(priorities, f.Priority)
 		kvMap[f.Priority] = f
 	}
+
 	if len(priorities) == 0 {
 		return []flight.Info{}, nil
 	}
@@ -629,25 +669,9 @@ func getSortedFlights(broker keyval.ProtoBroker, name string) ([]flight.Info, er
 	return flights, nil
 }
 
-func getPrefix(broker keyval.BytesBroker) string {
-	if b, yes := broker.(*redis.BytesBrokerWatcherRedis); yes {
-		return b.GetPrefix()
+func randomDuration(lowSecondsNs, highSecondsNs int) time.Duration {
+	if highSecondsNs != lowSecondsNs {
+		return time.Duration(rand.Intn(highSecondsNs-lowSecondsNs) + lowSecondsNs)
 	}
-	return ""
+	return time.Duration(lowSecondsNs)
 }
-
-func sleep(lowSeconds float64, highSeconds float64) {
-	time.Sleep(randomDuration(lowSeconds, highSeconds))
-}
-
-func randomDuration(lowSeconds float64, highSeconds float64) time.Duration {
-	nanos := lowSeconds * 1e9
-	if highSeconds != lowSeconds {
-		nanos += (highSeconds - lowSeconds) * 1e9 * rand.Float64()
-	}
-	return time.Duration(int64(nanos))
-}
-
-func (p priorities) Len() int           { return len(p) }
-func (p priorities) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-func (p priorities) Less(i, j int) bool { return p[i] < p[j] }

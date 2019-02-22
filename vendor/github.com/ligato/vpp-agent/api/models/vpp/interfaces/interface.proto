@@ -1,0 +1,158 @@
+syntax = "proto3";
+
+package vpp.interfaces;
+
+option go_package = "github.com/ligato/vpp-agent/api/models/vpp/interfaces;vpp_interfaces";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+option (gogoproto.messagename_all) = true;
+
+message Interface {
+    enum Type {
+        UNDEFINED_TYPE = 0;
+        SUB_INTERFACE = 1;
+        SOFTWARE_LOOPBACK = 2;
+        DPDK = 3;
+        MEMIF = 4;
+        TAP = 5;
+        AF_PACKET = 6;
+        VXLAN_TUNNEL = 7;
+        IPSEC_TUNNEL = 8;
+        VMXNET3_INTERFACE = 9;
+    };
+
+    string name = 1;                   /* Logical interface name unique across all configured interfaces (mandatory) */
+    Type type = 2;
+    bool enabled = 3;
+    string phys_address = 4;
+    repeated string ip_addresses = 5;  /* IP addresses in the format <ipAddress>/<ipPrefix> */
+    uint32 vrf = 6;
+    bool set_dhcp_client = 7;
+    uint32 mtu = 8;
+
+    message Unnumbered {
+        string interface_with_ip = 1;
+    }
+    Unnumbered unnumbered = 9;
+
+    message RxModeSettings {
+        // from vpp/build-root/install-vpp-native/vpp/include/vnet/interface.h
+        enum RxModeType {
+            UNKNOWN = 0;
+            POLLING = 1;
+            INTERRUPT = 2;
+            ADAPTIVE = 3;
+            DEFAULT = 4;
+        };
+        RxModeType rx_mode = 1;
+        uint32 queue_id  = 2;
+        uint32 queue_id_valid  = 3;
+    }
+    RxModeSettings rx_mode_settings = 10;
+
+    message RxPlacementSettings {
+        uint32 queue = 1;
+        uint32 worker = 2;
+        bool is_main = 3;
+    }
+    RxPlacementSettings rx_placement_settings = 11;
+
+    oneof link {
+        SubInterface sub = 100;         /* sub-interface configuration */
+        MemifLink memif = 101;          /* memif-specific configuration */
+        AfpacketLink afpacket = 102;    /* AF-packet-specific configuration */
+        TapLink tap = 103;              /* TAP-specific configuration */
+        VxlanLink vxlan = 104;          /* VXLAN-specific configuration */
+        IPSecLink ipsec = 105;          /* IPSec tunnel-specific configuration */
+        VmxNet3Link vmx_net3 = 106;     /* VmxNet3-specific configuration */
+    };
+};
+
+message SubInterface {
+    string parent_name = 1;     /* Name of the parent (super) interface */
+    uint32 sub_id = 2;          /* SubInterface ID, used as VLAN */
+}
+
+message MemifLink {
+    enum MemifMode {
+        ETHERNET = 0;
+        IP = 1;
+        PUNT_INJECT = 2;
+    }
+    MemifMode mode = 1;
+    bool master = 2;
+    uint32 id = 3;              /* 32bit integer used to authenticate and match opposite sides of the connection */
+    string socket_filename = 4; /* filename of the socket used for connection establishment */
+    string secret = 5;
+    uint32 ring_size = 6;       /* the number of entries of RX/TX rings */
+    uint32 buffer_size = 7;     /* size of the buffer allocated for each ring entry */
+    uint32 rx_queues = 8;       /* number of rx queues (only valid for slave) */
+    uint32 tx_queues = 9;       /* number of tx queues (only valid for slave) */
+}
+
+message VxlanLink {
+    string src_address = 1;  /* source VTEP address */
+    string dst_address = 2;  /* destination VTEP address */
+    uint32 vni = 3;          /* VXLAN Network Identifier */
+    string multicast = 4;    /* multicast interface */
+}
+
+message AfpacketLink {
+    string host_if_name = 1; /* name of the host interface to bind to (mandatory) */
+}
+
+message TapLink {
+    uint32 version = 1;         /* 1 / unset = use the original TAP interface; 2 = use a fast virtio-based TAP */
+    string host_if_name = 2;    /* name of the TAP interface in the host OS;
+                                       if empty, it will be auto-generated (suitable for combination with TAP_TO_VPP
+                                       interface from Linux ifplugin, because then this name is only temporary anyway)
+                                     */
+    string to_microservice = 3; /* if TAP connects VPP with microservice, fill this parameter with the target
+                                       microservice name - should match with the namespace reference of the associated
+                                       TAP_TO_VPP interface (it is still moved to the namespace by Linux-ifplugin but
+                                       VPP-ifplugin needs to be aware of this dependency) */
+    uint32 rx_ring_size = 4;    /* Rx ring buffer size; must be power of 2; default is 256; only for TAP v.2 */
+    uint32 tx_ring_size = 5;    /* Tx ring buffer size; must be power of 2; default is 256; only for TAP v.2 */
+}
+
+message IPSecLink {
+    bool esn = 2;                       /* Extended sequence number */
+    bool anti_replay = 3;               /* Anti replay option */
+    string local_ip = 4;                /* Local IP address */
+    string remote_ip = 5;               /* Remote IP address */
+    uint32 local_spi = 6;               /* Local security parameter index */
+    uint32 remote_spi = 7;              /* Remote security parameter index */
+
+    enum CryptoAlg {
+        NONE_CRYPTO = 0;
+        AES_CBC_128 = 1;
+        AES_CBC_192 = 2;
+        AES_CBC_256 = 3;
+    }
+    CryptoAlg crypto_alg = 8;           /* Cryptographic algorithm for encryption */
+    string local_crypto_key = 9;
+    string remote_crypto_key = 10;
+
+    enum IntegAlg {
+        NONE_INTEG = 0;
+        MD5_96 = 1;
+        SHA1_96 = 2;
+        SHA_256_96 = 3;
+        SHA_256_128 = 4;
+        SHA_384_192 = 5;
+        SHA_512_256 = 6;
+    }
+    IntegAlg integ_alg = 11;            /* Cryptographic algorithm for authentication */
+    string local_integ_key = 12;
+    string remote_integ_key = 13;
+    bool enable_udp_encap = 14;         /* Enable UDP encapsulation */
+}
+
+/* PCI address (unsigned 32bit int) is derived from vmxnet3 interface name. It is expected that the interface
+       name is in format "vmxnet3-<d>/<b>/<s>/<f>", where 'd' stands for domain (max ffff), 'b' is bus (max ff),
+       's' is slot (max 1f) and 'f is function' (max 7). All values are base 16 */
+message VmxNet3Link {
+    bool enable_elog = 2;   /* turn on elog */
+    uint32 rxq_size = 3;    /* receive queue size (default is 1024) */
+    uint32 txq_size = 4;    /* transmit queue size (default is 1024) */
+}

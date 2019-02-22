@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package vpp.punt;
+
+option go_package = "github.com/ligato/vpp-agent/api/models/vpp/punt;vpp_punt";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+option (gogoproto.messagename_all) = true;
+
+enum L3Protocol {
+    UNDEFINED_L3 = 0;
+    IPv4 = 4;
+    IPv6 = 6;
+    ALL = 10;
+}
+
+enum L4Protocol {
+    UNDEFINED_L4 = 0;
+    TCP = 6;
+    UDP = 17;
+}
+
+/* IPRedirect allows otherwise dropped packet which destination IP address matching some of the VPP addresses
+to redirect to the defined next hop address via the TX interface */
+message IPRedirect {
+    L3Protocol l3_protocol = 1; /* L3 protocol */
+    string rx_interface = 2;    /* Receive interface name. Optional, only redirect traffic incoming from this interface */
+    string tx_interface = 3;    /* Transmit interface name */
+    string next_hop = 4;        /* Next hop IP where the traffic is redirected */
+}
+
+/* allows otherwise dropped packet which destination IP address matching some of the VPP interface IP addresses to be
+punted to the host. L3 and L4 protocols can be used for filtering */
+message ToHost {
+    L3Protocol l3_protocol = 2;     /* L3 destination protocol a packet has to match in order to be punted */
+    L4Protocol l4_protocol = 3;     /* L4 destination protocol a packet has to match. Currently VPP only supports UDP */
+    uint32 port = 4;                /* Destination port */
+
+    string socket_path = 5;         /* Optional, use unix domain socket to punt packets to the host. */
+}

@@ -31,50 +31,50 @@ Show Interfaces Before Setup
 
 Interface Should Not Be Present
     vpp_term: Interface Not Exists    node=agent_vpp_1    mac=${MAC_GOOD}
-    ${int_key}=    Set Variable    /vnf-agent/agent_vpp_1/vpp/status/v1/interface/vpp1_memif1
-    ${int_error_key}=    Set Variable    /vnf-agent/agent_vpp_1/vpp/status/v1/interface/error/vpp1_memif1
-    ${out}=    vpp_ctl: Read Key    ${int_key}
+    ${int_key}=    Set Variable    /vnf-agent/agent_vpp_1/vpp/status/${AGENT_VER}/interface/vpp1_memif1
+    ${int_error_key}=    Set Variable    /vnf-agent/agent_vpp_1/vpp/status/${AGENT_VER}/interface/error/vpp1_memif1
+    ${out}=    Read Key    ${int_key}
     Should Be Empty    ${out}
-    ${out}=    vpp_ctl: Read Key    ${int_error_key}
+    ${out}=    Read Key    ${int_error_key}
     Should Be Empty    ${out}
 
 Add Memif With Wrong MAC
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_1    name=vpp1_memif1    mac=${MAC_BAD1}    master=true    id=1    ip=192.168.1.1    prefix=24    socket=default.sock
+    Put Memif Interface With IP    node=agent_vpp_1    name=vpp1_memif1    mac=${MAC_BAD1}    master=true    id=1    ip=192.168.1.1    prefix=24    socket=default.sock
     vpp_term: Interface Not Exists    node=agent_vpp_1    mac=${MAC_BAD1}
-    ${int_error_key}=    Set Variable    /vnf-agent/agent_vpp_1/vpp/status/v1/interface/error/vpp1_memif1
-    ${out}=    vpp_ctl: Read Key    ${int_error_key}
+    ${int_error_key}=    Set Variable    /vnf-agent/agent_vpp_1/vpp/status/${AGENT_VER}/interface/error/vpp1_memif1
+    ${out}=    Read Key    ${int_error_key}
     Should Contain    ${out}    error_data
 
 Correct MAC In Memif
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_1    name=vpp1_memif1    mac=${MAC_GOOD}    master=true    id=1    ip=192.168.1.1    prefix=24    socket=default.sock
+    Put Memif Interface With IP    node=agent_vpp_1    name=vpp1_memif1    mac=${MAC_GOOD}    master=true    id=1    ip=192.168.1.1    prefix=24    socket=default.sock
     vpp_term: Interface Is Created    node=agent_vpp_1    mac=${MAC_GOOD}
-    ${int_key}=    Set Variable    /vnf-agent/agent_vpp_1/vpp/status/v1/interface/vpp1_memif1
-    ${int_error_key}=    Set Variable    /vnf-agent/agent_vpp_1/vpp/status/v1/interface/error/vpp1_memif1
-    ${out}=    vpp_ctl: Read Key    ${int_key}
+    ${int_key}=    Set Variable    /vnf-agent/agent_vpp_1/vpp/status/${AGENT_VER}/interface/vpp1_memif1
+    ${int_error_key}=    Set Variable    /vnf-agent/agent_vpp_1/vpp/status/${AGENT_VER}/interface/error/vpp1_memif1
+    ${out}=    Read Key    ${int_key}
     Should Not Be Empty    ${out}
-    ${out}=    vpp_ctl: Read Key    ${int_error_key}
+    ${out}=    Read Key    ${int_error_key}
     Should Contain    ${out}    error_data
 
 Set Wrong MAC To Memif Again
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_1    name=vpp1_memif1    mac=${MAC_BAD2}    master=true    id=1    ip=192.168.1.1    prefix=24    socket=default.sock
+    Put Memif Interface With IP    node=agent_vpp_1    name=vpp1_memif1    mac=${MAC_BAD2}    master=true    id=1    ip=192.168.1.1    prefix=24    socket=default.sock
     vpp_term: Interface Is Deleted    node=agent_vpp_1    mac=${MAC_GOOD}   
-    ${int_key}=    Set Variable    /vnf-agent/agent_vpp_1/vpp/status/v1/interface/vpp1_memif1
-    ${int_error_key}=    Set Variable    /vnf-agent/agent_vpp_1/vpp/status/v1/interface/error/vpp1_memif1
-    ${out}=    vpp_ctl: Read Key    ${int_key}
+    ${int_key}=    Set Variable    /vnf-agent/agent_vpp_1/vpp/status/${AGENT_VER}/interface/vpp1_memif1
+    ${int_error_key}=    Set Variable    /vnf-agent/agent_vpp_1/vpp/status/${AGENT_VER}/interface/error/vpp1_memif1
+    ${out}=    Read Key    ${int_key}
     Should Contain    ${out}    vpp1_memif1
-    ${out}=    vpp_ctl: Read Key    ${int_error_key}
+    ${out}=    Read Key    ${int_error_key}
     Should Contain    ${out}    error_data
     Should Contain    ${out}    ${MAC_BAD1}
     Should Contain    ${out}    ${MAC_BAD2}
 
 Delete Memif
-    vpp_ctl: Delete VPP Interface    node=agent_vpp_1    name=vpp1_memif1
+    Delete VPP Interface    node=agent_vpp_1    name=vpp1_memif1
     Sleep    5s
-    ${int_key}=    Set Variable    /vnf-agent/agent_vpp_1/vpp/status/v1/interface/vpp1_memif1
-    ${int_error_key}=    Set Variable    /vnf-agent/agent_vpp_1/vpp/status/v1/interface/error/vpp1_memif1
-    ${out}=    vpp_ctl: Read Key    ${int_key}
+    ${int_key}=    Set Variable    /vnf-agent/agent_vpp_1/vpp/status/${AGENT_VER}/interface/vpp1_memif1
+    ${int_error_key}=    Set Variable    /vnf-agent/agent_vpp_1/vpp/status/${AGENT_VER}/interface/error/vpp1_memif1
+    ${out}=    Read Key    ${int_key}
     Should Be Empty    ${out}
-    ${out}=    vpp_ctl: Read Key    ${int_error_key}
+    ${out}=    Read Key    ${int_error_key}
     Should Be Empty    ${out}
 
 Show Interfaces And Other Objects After Test
@@ -85,7 +85,6 @@ Show Interfaces And Other Objects After Test
     Write To Machine    agent_vpp_1_term    show memif
     Write To Machine    agent_vpp_1_term    show err
     vat_term: Interfaces Dump    agent_vpp_1
-    Write To Machine    vpp_agent_ctl    vpp-agent-ctl ${AGENT_VPP_ETCD_CONF_PATH} -ps
     Execute In Container    agent_vpp_1    ip a
 
 *** Keywords ***

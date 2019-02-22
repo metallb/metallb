@@ -19,10 +19,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-errors/errors"
-	"github.com/ligato/cn-infra/logging/measure"
-	"github.com/ligato/cn-infra/logging/measure/model/apitrace"
-
 	"git.fd.io/govpp.git/adapter"
 	govppapi "git.fd.io/govpp.git/api"
 	govpp "git.fd.io/govpp.git/core"
@@ -31,17 +27,24 @@ import (
 	"github.com/ligato/cn-infra/infra"
 	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/logging/logrus"
+	"github.com/ligato/cn-infra/logging/measure"
+	"github.com/ligato/cn-infra/logging/measure/model/apitrace"
+	"github.com/pkg/errors"
+
 	"github.com/ligato/vpp-agent/plugins/govppmux/vppcalls"
-	aclvppcalls "github.com/ligato/vpp-agent/plugins/vpp/aclplugin/vppcalls"
 )
+
+// Default path to socket for VPP stats
+const defaultStatsSocket = "/run/vpp/stats.sock"
 
 // Plugin implements the govppmux plugin interface.
 type Plugin struct {
 	Deps
 
-	vppConn    *govpp.Connection
-	vppAdapter adapter.VppAdapter
-	vppConChan chan govpp.ConnectionEvent
+	vppConn      *govpp.Connection
+	vppAdapter   adapter.VppAPI
+	statsAdapter adapter.StatsAPI
+	vppConChan   chan govpp.ConnectionEvent
 
 	lastConnErr error
 
@@ -68,6 +71,7 @@ type Deps struct {
 // Config groups the configurable parameter of GoVpp.
 type Config struct {
 	TraceEnabled             bool          `json:"trace-enabled"`
+	ReconnectResync          bool          `json:"resync-after-reconnect"`
 	HealthCheckProbeInterval time.Duration `json:"health-check-probe-interval"`
 	HealthCheckReplyTimeout  time.Duration `json:"health-check-reply-timeout"`
 	HealthCheckThreshold     int           `json:"health-check-threshold"`
@@ -75,7 +79,7 @@ type Config struct {
 	// The prefix prepended to the name used for shared memory (SHM) segments. If not set,
 	// shared memory segments are created directly in the SHM directory /dev/shm.
 	ShmPrefix       string `json:"shm-prefix"`
-	ReconnectResync bool   `json:"resync-after-reconnect"`
+	StatsSocketName string `json:"stats-socket-name"`
 	// How many times can be request resent in case vpp is suddenly disconnected.
 	RetryRequestCount int `json:"retry-request-count"`
 	// Time between request resend attempts. Default is 500ms.
@@ -85,81 +89,116 @@ type Config struct {
 func defaultConfig() *Config {
 	return &Config{
 		HealthCheckProbeInterval: time.Second,
-		HealthCheckReplyTimeout:  100 * time.Millisecond,
+		HealthCheckReplyTimeout:  250 * time.Millisecond,
 		HealthCheckThreshold:     1,
 		ReplyTimeout:             time.Second,
 		RetryRequestTimeout:      500 * time.Millisecond,
 	}
 }
 
+func (p *Plugin) loadConfig() (*Config, error) {
+	cfg := defaultConfig()
+
+	found, err := p.Cfg.LoadValue(cfg)
+	if err != nil {
+		return nil, err
+	} else if found {
+		p.Log.Debugf("config loaded from file %q", p.Cfg.GetConfigName())
+	} else {
+		p.Log.Debugf("config file %q not found, using default config", p.Cfg.GetConfigName())
+	}
+
+	return cfg, nil
+}
+
 // Init is the entry point called by Agent Core. A single binary-API connection to VPP is established.
-func (plugin *Plugin) Init() error {
+func (p *Plugin) Init() error {
 	var err error
 
-	govppLogger := plugin.Deps.Log.NewLogger("GoVpp")
+	govppLogger := p.Deps.Log.NewLogger("govpp")
 	if govppLogger, ok := govppLogger.(*logrus.Logger); ok {
 		govppLogger.SetLevel(logging.InfoLevel)
 		govpp.SetLogger(govppLogger.StandardLogger())
 	}
 
-	plugin.PluginName = plugin.Deps.PluginName
-
-	plugin.config = defaultConfig()
-	found, err := plugin.Cfg.LoadValue(plugin.config)
-	if err != nil {
+	if p.config, err = p.loadConfig(); err != nil {
 		return err
 	}
-	if found {
-		govpp.HealthCheckProbeInterval = plugin.config.HealthCheckProbeInterval
-		govpp.HealthCheckReplyTimeout = plugin.config.HealthCheckReplyTimeout
-		govpp.HealthCheckThreshold = plugin.config.HealthCheckThreshold
-		if plugin.config.TraceEnabled {
-			plugin.tracer = measure.NewTracer("govpp-mux")
-			plugin.Log.Info("VPP API trace enabled")
-		}
+
+	p.Log.Debugf("config: %+v", p.config)
+	govpp.HealthCheckProbeInterval = p.config.HealthCheckProbeInterval
+	govpp.HealthCheckReplyTimeout = p.config.HealthCheckReplyTimeout
+	govpp.HealthCheckThreshold = p.config.HealthCheckThreshold
+	govpp.DefaultReplyTimeout = p.config.ReplyTimeout
+	if p.config.TraceEnabled {
+		p.tracer = measure.NewTracer("govpp-mux")
+		p.Log.Info("VPP API trace enabled")
 	}
 
-	if plugin.vppAdapter == nil {
-		plugin.vppAdapter = NewVppAdapter(plugin.config.ShmPrefix)
+	if p.vppAdapter == nil {
+		p.vppAdapter = NewVppAdapter(p.config.ShmPrefix)
 	} else {
-		plugin.Log.Info("Reusing existing vppAdapter") //this is used for testing purposes
+		// this is used for testing purposes
+		p.Log.Info("Reusing existing vppAdapter")
 	}
 
 	startTime := time.Now()
-	plugin.vppConn, plugin.vppConChan, err = govpp.AsyncConnect(plugin.vppAdapter)
+	p.vppConn, p.vppConChan, err = govpp.AsyncConnect(p.vppAdapter)
 	if err != nil {
 		return err
 	}
 
 	// TODO: Async connect & automatic reconnect support is not yet implemented in the agent,
 	// so synchronously wait until connected to VPP.
-	status := <-plugin.vppConChan
+	status := <-p.vppConChan
 	if status.State != govpp.Connected {
 		return errors.New("unable to connect to VPP")
 	}
 	vppConnectTime := time.Since(startTime)
-	plugin.Log.Info("Connecting to VPP took ", vppConnectTime)
-	plugin.retrieveVersion()
+	info, err := p.retrieveVpeInfo()
+	if err != nil {
+		p.Log.Errorf("retrieving vpe info failed: %v", err)
+		return err
+	}
+	p.Log.Infof("Connected to VPP [PID:%d] (took %s)",
+		info.PID, vppConnectTime.Truncate(time.Millisecond))
+	p.retrieveVersion()
 
 	// Register providing status reports (push mode)
-	plugin.StatusCheck.Register(plugin.PluginName, nil)
-	plugin.StatusCheck.ReportStateChange(plugin.PluginName, statuscheck.OK, nil)
+	p.StatusCheck.Register(p.PluginName, nil)
+	p.StatusCheck.ReportStateChange(p.PluginName, statuscheck.OK, nil)
 
 	var ctx context.Context
-	ctx, plugin.cancel = context.WithCancel(context.Background())
-	go plugin.handleVPPConnectionEvents(ctx)
+	ctx, p.cancel = context.WithCancel(context.Background())
+	go p.handleVPPConnectionEvents(ctx)
+
+	// Connect to VPP status socket
+	if p.config.StatsSocketName != "" {
+		p.statsAdapter = NewStatsAdapter(p.config.StatsSocketName)
+	} else {
+		p.statsAdapter = NewStatsAdapter(defaultStatsSocket)
+	}
+	if err := p.statsAdapter.Connect(); err != nil {
+		p.Log.Warnf("Unable to connect to VPP statistics socket, %v", err)
+		p.statsAdapter = nil
+	}
 
 	return nil
 }
 
 // Close cleans up the resources allocated by the govppmux plugin.
-func (plugin *Plugin) Close() error {
-	plugin.cancel()
-	plugin.wg.Wait()
+func (p *Plugin) Close() error {
+	p.cancel()
+	p.wg.Wait()
 
 	defer func() {
-		if plugin.vppConn != nil {
-			plugin.vppConn.Disconnect()
+		if p.vppConn != nil {
+			p.vppConn.Disconnect()
+		}
+		if p.statsAdapter != nil {
+			if err := p.statsAdapter.Disconnect(); err != nil {
+				p.Log.Errorf("VPP statistics socket adapter disconnect error: %v", err)
+			}
 		}
 	}()
 
@@ -172,19 +211,16 @@ func (plugin *Plugin) Close() error {
 // Example of binary API call from some plugin using GOVPP:
 //      ch, _ := govpp_mux.NewAPIChannel()
 //      ch.SendRequest(req).ReceiveReply
-func (plugin *Plugin) NewAPIChannel() (govppapi.Channel, error) {
-	ch, err := plugin.vppConn.NewAPIChannel()
+func (p *Plugin) NewAPIChannel() (govppapi.Channel, error) {
+	ch, err := p.vppConn.NewAPIChannel()
 	if err != nil {
 		return nil, err
 	}
-	if plugin.config.ReplyTimeout > 0 {
-		ch.SetReplyTimeout(plugin.config.ReplyTimeout)
-	}
 	retryCfg := retryConfig{
-		plugin.config.RetryRequestCount,
-		plugin.config.RetryRequestTimeout,
+		p.config.RetryRequestCount,
+		p.config.RetryRequestTimeout,
 	}
-	return &goVppChan{ch, retryCfg, plugin.tracer}, nil
+	return &goVppChan{ch, retryCfg, p.tracer}, nil
 }
 
 // NewAPIChannelBuffered returns a new API channel for communication with VPP via govpp core.
@@ -193,53 +229,67 @@ func (plugin *Plugin) NewAPIChannel() (govppapi.Channel, error) {
 // Example of binary API call from some plugin using GOVPP:
 //      ch, _ := govpp_mux.NewAPIChannelBuffered(100, 100)
 //      ch.SendRequest(req).ReceiveReply
-func (plugin *Plugin) NewAPIChannelBuffered(reqChanBufSize, replyChanBufSize int) (govppapi.Channel, error) {
-	ch, err := plugin.vppConn.NewAPIChannelBuffered(reqChanBufSize, replyChanBufSize)
+func (p *Plugin) NewAPIChannelBuffered(reqChanBufSize, replyChanBufSize int) (govppapi.Channel, error) {
+	ch, err := p.vppConn.NewAPIChannelBuffered(reqChanBufSize, replyChanBufSize)
 	if err != nil {
 		return nil, err
 	}
-	if plugin.config.ReplyTimeout > 0 {
-		ch.SetReplyTimeout(plugin.config.ReplyTimeout)
-	}
 	retryCfg := retryConfig{
-		plugin.config.RetryRequestCount,
-		plugin.config.RetryRequestTimeout,
+		p.config.RetryRequestCount,
+		p.config.RetryRequestTimeout,
 	}
-	return &goVppChan{ch, retryCfg, plugin.tracer}, nil
+	return &goVppChan{ch, retryCfg, p.tracer}, nil
 }
 
 // GetTrace returns all trace entries measured so far
-func (plugin *Plugin) GetTrace() *apitrace.Trace {
-	if !plugin.config.TraceEnabled {
-		plugin.Log.Warnf("VPP API trace is disabled")
+func (p *Plugin) GetTrace() *apitrace.Trace {
+	if !p.config.TraceEnabled {
+		p.Log.Warnf("VPP API trace is disabled")
 		return nil
 	}
-	return plugin.tracer.Get()
+	return p.tracer.Get()
+}
+
+// ListStats returns all stats names
+func (p *Plugin) ListStats(prefixes ...string) ([]string, error) {
+	if p.statsAdapter == nil {
+		return nil, nil
+	}
+	return p.statsAdapter.ListStats(prefixes...)
+}
+
+// DumpStats returns all stats with name, type and value
+func (p *Plugin) DumpStats(prefixes ...string) ([]*adapter.StatEntry, error) {
+	if p.statsAdapter == nil {
+		return nil, nil
+	}
+	return p.statsAdapter.DumpStats(prefixes...)
 }
 
 // handleVPPConnectionEvents handles VPP connection events.
-func (plugin *Plugin) handleVPPConnectionEvents(ctx context.Context) {
-	plugin.wg.Add(1)
-	defer plugin.wg.Done()
+func (p *Plugin) handleVPPConnectionEvents(ctx context.Context) {
+	p.wg.Add(1)
+	defer p.wg.Done()
 
 	for {
 		select {
-		case status := <-plugin.vppConChan:
+		case status := <-p.vppConChan:
 			if status.State == govpp.Connected {
-				plugin.retrieveVersion()
-				if plugin.config.ReconnectResync && plugin.lastConnErr != nil {
-					plugin.Log.Info("Starting resync after VPP reconnect")
-					if plugin.Resync != nil {
-						plugin.Resync.DoResync()
-						plugin.lastConnErr = nil
+				p.retrieveVpeInfo()
+				p.retrieveVersion()
+				if p.config.ReconnectResync && p.lastConnErr != nil {
+					p.Log.Info("Starting resync after VPP reconnect")
+					if p.Resync != nil {
+						p.Resync.DoResync()
+						p.lastConnErr = nil
 					} else {
-						plugin.Log.Warn("Expected resync after VPP reconnect could not start because of missing Resync plugin")
+						p.Log.Warn("Expected resync after VPP reconnect could not start because of missing Resync plugin")
 					}
 				}
-				plugin.StatusCheck.ReportStateChange(plugin.PluginName, statuscheck.OK, nil)
+				p.StatusCheck.ReportStateChange(p.PluginName, statuscheck.OK, nil)
 			} else {
-				plugin.lastConnErr = errors.New("VPP disconnected")
-				plugin.StatusCheck.ReportStateChange(plugin.PluginName, statuscheck.Error, plugin.lastConnErr)
+				p.lastConnErr = errors.New("VPP disconnected")
+				p.StatusCheck.ReportStateChange(p.PluginName, statuscheck.Error, p.lastConnErr)
 			}
 
 		case <-ctx.Done():
@@ -248,28 +298,46 @@ func (plugin *Plugin) handleVPPConnectionEvents(ctx context.Context) {
 	}
 }
 
-func (plugin *Plugin) retrieveVersion() {
-	vppAPIChan, err := plugin.vppConn.NewAPIChannel()
+func (p *Plugin) retrieveVpeInfo() (*vppcalls.VpeInfo, error) {
+	vppAPIChan, err := p.vppConn.NewAPIChannel()
 	if err != nil {
-		plugin.Log.Error("getting new api channel failed:", err)
+		p.Log.Error("getting new api channel failed:", err)
+		return nil, err
+	}
+	defer vppAPIChan.Close()
+
+	info, err := vppcalls.GetVpeInfo(vppAPIChan)
+	if err != nil {
+		p.Log.Warn("getting version info failed:", err)
+		return nil, err
+	}
+	p.Log.Debugf("connection info: %+v", info)
+
+	return info, nil
+}
+
+func (p *Plugin) retrieveVersion() {
+	vppAPIChan, err := p.vppConn.NewAPIChannel()
+	if err != nil {
+		p.Log.Error("getting new api channel failed:", err)
 		return
 	}
 	defer vppAPIChan.Close()
 
-	info, err := vppcalls.GetVersionInfo(vppAPIChan)
+	version, err := vppcalls.GetVersionInfo(vppAPIChan)
 	if err != nil {
-		plugin.Log.Warn("getting version info failed:", err)
+		p.Log.Warn("getting version info failed:", err)
 		return
 	}
 
-	plugin.Log.Debugf("version info: %+v", info)
-	plugin.Log.Infof("VPP version: %q (%v)", info.Version, info.BuildDate)
+	p.Log.Debugf("version info: %+v", version)
+	p.Log.Infof("VPP version: %q (%v)", version.Version, version.BuildDate)
 
 	// Get VPP ACL plugin version
 	var aclVersion string
-	if aclVersion, err = aclvppcalls.GetACLPluginVersion(vppAPIChan); err != nil {
-		plugin.Log.Warn("getting acl version info failed:", err)
+	if aclVersion, err = vppcalls.GetACLPluginVersion(vppAPIChan); err != nil {
+		p.Log.Warn("getting acl version info failed:", err)
 		return
 	}
-	plugin.Log.Infof("VPP ACL plugin version: %q", aclVersion)
+	p.Log.Infof("VPP ACL plugin version: %q", aclVersion)
 }

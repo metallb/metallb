@@ -22,6 +22,7 @@ import (
 	"github.com/ligato/cn-infra/datasync/kvdbsync"
 	"github.com/ligato/cn-infra/datasync/resync"
 	"github.com/ligato/cn-infra/db/keyval/etcd"
+	"github.com/ligato/cn-infra/health/probe"
 	"github.com/ligato/cn-infra/health/statuscheck"
 	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/utils/safeclose"
@@ -48,6 +49,7 @@ func main() {
 	p := &ExamplePlugin{
 		Log:             logging.ForPlugin(PluginName),
 		StatusMonitor:   &statuscheck.DefaultPlugin,
+		Probe:           probe.NewPlugin(probe.WithNonFatalPlugins([]string{"etcd"})),
 		exampleFinished: make(chan struct{}),
 	}
 	// Start Agent with example plugin including dependencies
@@ -64,7 +66,7 @@ func main() {
 type ExamplePlugin struct {
 	Log           logging.PluginLogger
 	StatusMonitor statuscheck.StatusReader
-
+	Probe         *probe.Plugin
 	// Fields below are used to properly finish the example.
 	exampleFinished chan struct{}
 }

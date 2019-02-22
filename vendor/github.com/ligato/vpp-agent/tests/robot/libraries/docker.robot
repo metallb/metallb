@@ -70,6 +70,28 @@ Add Agent VPP Node
     ${hostname}=    Execute On Machine    docker    ${DOCKER_COMMAND} exec ${node} bash -c 'echo $HOSTNAME'
     Set Suite Variable    ${${node}_HOSTNAME}    ${hostname}
 
+Add Agent VPP Node With Own Vpp Config
+    [Arguments]    ${node}    ${vpp_conf_file}    ${vswitch}=${FALSE}
+    ${add_params}=    Set Variable If    ${vswitch}    --pid=host -v "/var/run/docker.sock:/var/run/docker.sock"    ${EMPTY}
+    Open SSH Connection    ${node}    ${DOCKER_HOST_IP}    ${DOCKER_HOST_USER}    ${DOCKER_HOST_PSWD}
+    Execute On Machine     ${node}    ${DOCKER_COMMAND} create -e MICROSERVICE_LABEL=${node} -e KAFKA_CONFIG=disabled -e VPP_STATUS_PUBLISHERS=etcd -e INITIAL_LOGLVL=debug --sysctl net.ipv6.conf.all.disable_ipv6=0 -it --privileged -v "${VPP_AGENT_HOST_MEMIF_SOCKET_FOLDER}:${${node}_MEMIF_SOCKET_FOLDER}" -v "${DOCKER_SOCKET_FOLDER}:${${node}_SOCKET_FOLDER}" -p ${${node}_VPP_HOST_PORT}:${${node}_VPP_PORT} -p ${${node}_REST_API_HOST_PORT}:${${node}_REST_API_PORT} --name ${node} ${add_params} ${${node}_DOCKER_IMAGE}
+    ${data}=               OperatingSystem.Get File      ${CURDIR}/../resources/${vpp_conf_file}
+    Create File            ${RESULTS_FOLDER}/vpp-${node}.conf    ${data}
+    Create File            ${RESULTS_FOLDER_SUITE}/vpp-${node}.conf    ${data}
+    Execute On Machine     ${node}    touch ${vpp_conf_file}
+    Execute On Machine     ${node}    ${data}
+    Execute On Machine     ${node}    ${DOCKER_COMMAND} cp ${vpp_conf_file} ${node}:${VPP_CONF_PATH}
+    Execute On Machine     ${node}    rm ${vpp_conf_file}
+    Write To Machine       ${node}    ${DOCKER_COMMAND} start ${node}
+    Append To List    ${NODES}    ${node}
+    Open SSH Connection    ${node}_term    ${DOCKER_HOST_IP}    ${DOCKER_HOST_USER}    ${DOCKER_HOST_PSWD}
+    Open SSH Connection    ${node}_vat    ${DOCKER_HOST_IP}    ${DOCKER_HOST_USER}    ${DOCKER_HOST_PSWD}
+    vpp_term: Open VPP Terminal    ${node}
+    vat_term: Open VAT Terminal    ${node}
+    Create Session    ${node}    http://${DOCKER_HOST_IP}:${${node}_REST_API_HOST_PORT}
+    ${hostname}=    Execute On Machine    docker    ${DOCKER_COMMAND} exec ${node} bash -c 'echo $HOSTNAME'
+    Set Suite Variable    ${${node}_HOSTNAME}    ${hostname}
+
 Add Agent VPP Node With Kafka
     [Arguments]    ${node}    ${vswitch}=${FALSE}
     ${add_params}=    Set Variable If    ${vswitch}    --pid=host -v "/var/run/docker.sock:/var/run/docker.sock"    ${EMPTY}

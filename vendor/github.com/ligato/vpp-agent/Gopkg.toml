@@ -12,7 +12,7 @@ required = [
 # Constraints
 
 [[constraint]]
-  branch = "master"
+  branch = "dev"
   name = "github.com/ligato/cn-infra"
 
 [[constraint]]
@@ -33,7 +33,7 @@ required = [
 
 [[constraint]]
   name = "github.com/gogo/protobuf"
-  version = "1.1.1"
+  version = "1.2.0"
 
 [[constraint]]
   branch = "master"
@@ -75,6 +75,10 @@ required = [
   name = "google.golang.org/grpc"
   version = "1.14.0"
 
+[[constraint]]
+  name = "github.com/opencontainers/runc"
+  version = "v1.0.0-rc5"
+
 # Overrides
 
 [[override]]
@@ -93,10 +97,6 @@ required = [
   name = "github.com/coreos/etcd"
   version = "=3.3.9"
 
-[[constraint]]
-  name = "github.com/opencontainers/runc"
-  version = "v1.0.0-rc5"
-
 # Prunes
 
 [prune]
@@ -105,4 +105,8 @@ required = [
 
   [[prune.project]]
     name = "github.com/ligato/cn-infra"
+    unused-packages = false
+
+  [[prune.project]]
+    name = "github.com/gogo/protobuf"
     unused-packages = false

@@ -15,10 +15,14 @@
 package vppcalls
 
 import (
-	ipsecapi "github.com/ligato/vpp-agent/plugins/vpp/binapi/ipsec"
-	"github.com/ligato/vpp-agent/plugins/vpp/model/ipsec"
+	"encoding/hex"
 	"net"
 	"strconv"
+
+	"github.com/go-errors/errors"
+
+	ipsecapi "github.com/ligato/vpp-agent/plugins/vpp/binapi/ipsec"
+	"github.com/ligato/vpp-agent/plugins/vpp/model/ipsec"
 )
 
 // IPSecSaDetails holds security association with VPP metadata
@@ -73,9 +77,9 @@ func (h *IPSecVppHandler) DumpIPSecSAWithIndex(saID uint32) (saList []*IPSecSaDe
 			Spi:            saData.Spi,
 			Protocol:       ipsec.SecurityAssociations_SA_IPSecProtocol(saData.Protocol),
 			CryptoAlg:      ipsec.CryptoAlgorithm(saData.CryptoAlg),
-			CryptoKey:      string(saData.CryptoKey[:saData.CryptoKeyLen]),
+			CryptoKey:      hex.EncodeToString(saData.CryptoKey[:saData.CryptoKeyLen]),
 			IntegAlg:       ipsec.IntegAlgorithm(saData.IntegAlg),
-			IntegKey:       string(saData.IntegKey[:saData.IntegKeyLen]),
+			IntegKey:       hex.EncodeToString(saData.IntegKey[:saData.IntegKeyLen]),
 			UseEsn:         uintToBool(saData.UseEsn),
 			UseAntiReplay:  uintToBool(saData.UseAntiReplay),
 			TunnelSrcAddr:  tunnelSrcAddrStr,
@@ -120,6 +124,10 @@ func (h *IPSecVppHandler) DumpIPSecTunnelInterfaces() (tun []*IPSecTunnelInterfa
 		return nil, err
 	}
 
+	// Every tunnel interface is returned in two API calls. To reconstruct the correct proto-modelled data,
+	// first appearance is stored, and when the second part arrives, data are completed and stored.
+	tunnelParts := make(map[uint32]*ipsecapi.IpsecSaDetails)
+
 	for _, saData := range saDetails {
 		// Skip non-tunnel security associations
 		if saData.SwIfIndex == ^uint32(0) {
@@ -134,6 +142,14 @@ func (h *IPSecVppHandler) DumpIPSecTunnelInterfaces() (tun []*IPSecTunnelInterfa
 		}
 		if ifData == nil {
 			h.log.Warnf("IPSec SA dump: interface %s has no metadata", ifName)
+			continue
+		}
+
+		// First appearance is stored in the map, the second one is used in configuration.
+		firstSaData, ok := tunnelParts[saData.SwIfIndex]
+		if !ok {
+			tunnelParts[saData.SwIfIndex] = saData
+			h.log.Debugf("first part of IPSec tunnel interface %d (name %s) stored", saData.SwIfIndex, ifName)
 			continue
 		}
 
@@ -155,7 +171,7 @@ func (h *IPSecVppHandler) DumpIPSecTunnelInterfaces() (tun []*IPSecTunnelInterfa
 			LocalIp:     tunnelSrcAddrStr,
 			RemoteIp:    tunnelDstAddrStr,
 			LocalSpi:    saData.Spi,
-			RemoteSpi:   saData.Spi,
+			RemoteSpi:   firstSaData.Spi, // Fill remote SPI from stored SA data
 			CryptoAlg:   ipsec.CryptoAlgorithm(saData.CryptoAlg),
 			IntegAlg:    ipsec.IntegAlgorithm(saData.IntegAlg),
 			Enabled:     ifData.Enabled,
@@ -175,13 +191,9 @@ func (h *IPSecVppHandler) DumpIPSecTunnelInterfaces() (tun []*IPSecTunnelInterfa
 
 // IPSecSpdDetails represents IPSec policy databases with particular metadata
 type IPSecSpdDetails struct {
-	Spd  *ipsec.SecurityPolicyDatabases_SPD
-	Meta *IPSecSpdMeta
-}
-
-// IPSecSpdMeta is map where key is a generated security association name, and value is an SpdMeta object
-type IPSecSpdMeta struct {
-	SpdMeta map[string]*SpdMeta // SA-generated name is a key
+	Spd         *ipsec.SecurityPolicyDatabases_SPD
+	PolicyMeta  map[string]*SpdMeta // SA-generated name is a key
+	NumPolicies uint32
 }
 
 // SpdMeta hold VPP-specific data related to SPD
@@ -195,29 +207,21 @@ type SpdMeta struct {
 
 // DumpIPSecSPD implements IPSec handler.
 func (h *IPSecVppHandler) DumpIPSecSPD() (spdList []*IPSecSpdDetails, err error) {
-	metadata := &IPSecSpdMeta{
-		SpdMeta: make(map[string]*SpdMeta),
-	}
+	metadata := make(map[string]*SpdMeta)
 
-	// TODO IPSec SPD dump request requires SPD ID, otherwise it returns nothing. There is currently no way
-	// to dump all SPDs available on the VPP, so let's dump at least the ones configurator knows about.
-	for _, spdName := range h.spdIndexes.GetMapping().ListNames() {
-		spdIdx, _, found := h.spdIndexes.LookupIdx(spdName)
-		if !found {
-			// Shouldn't happen, call the police or something
-			continue
-		}
+	// Get all VPP SPD indexes
+	spdIndexes, err := h.dumpSpdIndexes()
+	if err != nil {
+		return nil, errors.Errorf("failed to dump SPD indexes: %v", err)
+	}
+	for spdIdx, numPolicies := range spdIndexes {
 		spd := &ipsec.SecurityPolicyDatabases_SPD{}
 
-		// Prepare VPP binapi request
 		req := &ipsecapi.IpsecSpdDump{
 			SpdID: spdIdx,
 			SaID:  ^uint32(0),
 		}
 		requestCtx := h.callsChannel.SendMultiRequest(req)
-
-		// Policy association index, used to generate SA name
-		var paIdx int
 
 		for {
 			spdDetails := &ipsecapi.IpsecSpdDetails{}
@@ -229,9 +233,9 @@ func (h *IPSecVppHandler) DumpIPSecSPD() (spdList []*IPSecSpdDetails, err error)
 				return nil, err
 			}
 
-			// Security association name, to distinguish metadata
-			saGenName := "sa-generated-" + strconv.Itoa(paIdx)
-			paIdx++
+			// Security association name, to distinguish metadata. Generated name points to SA, so the name can be
+			// the same as for other policies.
+			saGenName := "sa-id-" + strconv.Itoa(int(spdDetails.SaID))
 
 			// Addresses
 			var remoteStartAddrStr, remoteStopAddrStr, localStartAddrStr, localStopAddrStr string
@@ -272,16 +276,41 @@ func (h *IPSecVppHandler) DumpIPSecSPD() (spdList []*IPSecSpdDetails, err error)
 				Bytes:   spdDetails.Bytes,
 				Packets: spdDetails.Packets,
 			}
-			metadata.SpdMeta[saGenName] = meta
+			metadata[saGenName] = meta
 		}
-		// Store STD in list
+		// Store SPD in list
 		spdList = append(spdList, &IPSecSpdDetails{
-			Spd:  spd,
-			Meta: metadata,
+			Spd:         spd,
+			PolicyMeta:  metadata,
+			NumPolicies: numPolicies,
 		})
 	}
 
 	return spdList, nil
+}
+
+// Get all indexes of SPD configured on the VPP
+func (h *IPSecVppHandler) dumpSpdIndexes() (map[uint32]uint32, error) {
+	// SPD index to number of policies
+	spdIndexes := make(map[uint32]uint32)
+
+	req := &ipsecapi.IpsecSpdsDump{}
+	reqCtx := h.callsChannel.SendMultiRequest(req)
+
+	for {
+		spdDetails := &ipsecapi.IpsecSpdsDetails{}
+		stop, err := reqCtx.ReceiveReply(spdDetails)
+		if stop {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		spdIndexes[spdDetails.SpdID] = spdDetails.Npolicies
+	}
+
+	return spdIndexes, nil
 }
 
 // Get all security association (used also for tunnel interfaces) in binary api format
@@ -305,7 +334,6 @@ func (h *IPSecVppHandler) dumpSecurityAssociations(saID uint32) (saList []*ipsec
 	}
 
 	return saList, nil
-
 }
 
 func uintToBool(input uint8) bool {

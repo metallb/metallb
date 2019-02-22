@@ -15,9 +15,7 @@
 package consul
 
 import (
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/testutil"
@@ -307,24 +305,17 @@ func TestWatch(t *testing.T) {
 	err := ctx.client.Watch(keyval.ToChan(watchCh), closeCh, watchKey)
 	Expect(err).To(BeNil())
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-
-	go func(expectedKey string) {
-		select {
-		case resp := <-watchCh:
-			Expect(resp).NotTo(BeNil())
-			Expect(resp.GetKey()).To(BeEquivalentTo(expectedKey))
-		case <-time.After(time.Second):
-			t.Error("Watch resp not received")
-			t.FailNow()
-		}
-		close(closeCh)
-		wg.Done()
-	}(watchKey + "val1")
-
 	ctx.client.Put("/something/else/val1", []byte{0, 0, 7})
 	ctx.client.Put(watchKey+"val1", []byte{1, 2, 3})
 
-	wg.Wait()
+	Eventually(func() string {
+		select {
+		case resp := <-watchCh:
+			if resp != nil {
+				return resp.GetKey()
+			}
+		default:
+		}
+		return ""
+	}).Should(Equal(watchKey + "val1"))
 }

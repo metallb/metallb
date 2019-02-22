@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package vpp;
+
+option go_package = "github.com/ligato/vpp-agent/api/models/vpp;vpp";
+
+import "models/vpp/acl/acl.proto";
+import "models/vpp/interfaces/interface.proto";
+import "models/vpp/interfaces/state.proto";
+import "models/vpp/ipsec/ipsec.proto";
+import "models/vpp/l2/bridge-domain.proto";
+import "models/vpp/l2/fib.proto";
+import "models/vpp/l2/xconnect.proto";
+import "models/vpp/l3/arp.proto";
+import "models/vpp/l3/l3.proto";
+import "models/vpp/l3/route.proto";
+import "models/vpp/nat/nat.proto";
+import "models/vpp/punt/punt.proto";
+
+message ConfigData {
+    repeated interfaces.Interface interfaces = 10;
+
+    repeated acl.ACL acls = 20;
+
+    repeated l2.BridgeDomain bridge_domains = 30;
+    repeated l2.FIBEntry fibs = 31;
+    repeated l2.XConnectPair xconnect_pairs = 32;
+
+    repeated l3.Route routes = 40;
+    repeated l3.ARPEntry arps = 41;
+    l3.ProxyARP proxy_arp = 42;
+    l3.IPScanNeighbor ipscan_neighbor = 43;
+
+    nat.Nat44Global nat44_global = 50;
+    repeated nat.DNat44 dnat44s = 51;
+
+    repeated ipsec.SecurityPolicyDatabase ipsec_spds = 60;
+    repeated ipsec.SecurityAssociation ipsec_sas = 61;
+
+    repeated punt.IPRedirect punt_ipredirects = 70;
+    repeated punt.ToHost punt_tohosts = 71;
+}
+
+message Notification {
+    interfaces.InterfaceNotification interface = 1;
+}

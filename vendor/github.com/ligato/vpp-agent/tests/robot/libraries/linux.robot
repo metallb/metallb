@@ -18,7 +18,7 @@ linux: Get Linux Interfaces
 
 linux: Check Veth Interface State
     [Arguments]          ${node}    ${name}    @{desired_state}
-    ${veth_config}=      vpp_ctl: Get Linux Interface Config As Json    ${node}    ${name}
+    ${veth_config}=      Get Linux Interface Config As Json    ${node}    ${name}
     ${peer}=             Set Variable    ${veth_config["veth"]["peer_if_name"]}
     ${ints}=             linux: Get Linux Interfaces    ${node}
     ${actual_state}=     Pick Linux Interface    ${ints}    ${name}\@${peer}

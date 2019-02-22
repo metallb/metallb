@@ -131,7 +131,7 @@ func (swi *pluginStatusMap) castdata(meta interface{}) *status.PluginStatus {
 
 // WatchNameToIdx allows to subscribe for watching changes in pluginStatusMap mapping
 func (swi *pluginStatusMap) WatchNameToIdx(subscriber infra.PluginName, pluginChannel chan PluginStatusEvent) {
-	swi.mapping.Watch(subscriber, func(event idxmap.NamedMappingGenericEvent) {
+	swi.mapping.Watch(string(subscriber), func(event idxmap.NamedMappingGenericEvent) {
 		pluginChannel <- PluginStatusEvent{
 			NamedMappingEvent: event.NamedMappingEvent,
 			Value:             swi.castdata(event.Value),

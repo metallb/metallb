@@ -1,0 +1,5 @@
+nat44 static mappings:
+ udp local 10.0.1.1:80 external 20.0.1.1:8080 vrf 0  out2in-only
+ udp local 10.0.1.1:80 external 21.0.1.1:8080 vrf 0  out2in-only
+ udp local 10.0.1.1:80 external memif1/1:8080 vrf 0
+ udp local 10.0.1.1:80 external memif1/2:8080 vrf 0

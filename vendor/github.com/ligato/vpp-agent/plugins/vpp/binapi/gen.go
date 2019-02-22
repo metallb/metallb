@@ -20,14 +20,17 @@
 //go:generate binapi-generator --input-file=/usr/share/vpp/api/ip.api.json --output-dir=.
 //go:generate binapi-generator --input-file=/usr/share/vpp/api/ipsec.api.json --output-dir=.
 //go:generate binapi-generator --input-file=/usr/share/vpp/api/l2.api.json --output-dir=.
+//go:generate binapi-generator --input-file=/usr/share/vpp/api/memclnt.api.json --output-dir=.
 //go:generate binapi-generator --input-file=/usr/share/vpp/api/memif.api.json --output-dir=.
 //go:generate binapi-generator --input-file=/usr/share/vpp/api/nat.api.json --output-dir=.
+//go:generate binapi-generator --input-file=/usr/share/vpp/api/punt.api.json --output-dir=.
 //go:generate binapi-generator --input-file=/usr/share/vpp/api/session.api.json --output-dir=.
 //go:generate binapi-generator --input-file=/usr/share/vpp/api/sr.api.json --output-dir=.
 //go:generate binapi-generator --input-file=/usr/share/vpp/api/stats.api.json --output-dir=.
 //go:generate binapi-generator --input-file=/usr/share/vpp/api/stn.api.json --output-dir=.
 //go:generate binapi-generator --input-file=/usr/share/vpp/api/tap.api.json --output-dir=.
 //go:generate binapi-generator --input-file=/usr/share/vpp/api/tapv2.api.json --output-dir=.
+//go:generate binapi-generator --input-file=/usr/share/vpp/api/vmxnet3.api.json --output-dir=.
 //go:generate binapi-generator --input-file=/usr/share/vpp/api/vpe.api.json --output-dir=.
 //go:generate binapi-generator --input-file=/usr/share/vpp/api/vxlan.api.json --output-dir=.
 

@@ -65,7 +65,7 @@ func PutEthernet(endpoints []string, label string) {
 // PutLoopback creates a loopback type interface.
 func PutLoopback(endpoints []string, label string) {
 	found, key, ifc, db := utils.GetInterfaceKeyAndValue(endpoints, label, ifCommonFields.Name)
-	processCommonIfFlags(found, interfaces.InterfaceType_SOFTWARE_LOOPBACK, ifc)
+	processCommonIfFlags(found, interfaces.InterfaceType_TAP_INTERFACE, ifc)
 	utils.WriteInterfaceToDb(db, key, ifc)
 }
 

@@ -1,5 +1,5 @@
 {
-    "acl_name": "${acl_name}",
+    "name": "${acl_name}",
     "interfaces": {
         "egress": [
             "${egr_intf1}",
@@ -12,24 +12,22 @@
     },
     "rules": [
         {
-           "acl_action": ${acl_action},
+           "action": ${acl_action},
             },
-            "match": {
-                "ip_rule": {
-                    "ip": {
-                        "destination_network": "${dest_ntw}",
-                        "source_network": "${src_ntw}"
+            "ip_rule": {
+                "ip": {
+                    "destination_network": "${dest_ntw}",
+                    "source_network": "${src_ntw}"
+                },
+                "icmp": {
+                    "icmpv6": ${icmpv6},
+                    "icmp_code_range": {
+                        "first": ${code_range_low},
+                        "last": ${code_range_up}
                     },
-                    "icmp": {
-                        "icmpv6": ${icmpv6},
-                        "icmp_code_range": {
-                            "first": ${code_range_low},
-                            "last": ${code_range_up}
-                        },
-                        "icmp_type_range": {
-                            "first": ${type_range_low},
-                            "last": ${type_range_up}
-                        }
+                    "icmp_type_range": {
+                        "first": ${type_range_low},
+                        "last": ${type_range_up}
                     }
                 }
             }

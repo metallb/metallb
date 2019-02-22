@@ -8,11 +8,32 @@ import (
 type Op string
 
 const (
-	// Put represents Create or Update operation.
+	// InvalidOp is default value
+	// representing invalid operation.
+	InvalidOp Op = ""
+	// Put can represent Create or Update operation.
 	Put Op = "Put"
-	// Delete operation
-	Delete = "Delete"
+	// Delete represents Delete operation
+	Delete Op = "Delete"
 )
+
+// CallbackResult can be used by an event receiver to indicate to the event
+// producer whether an operation was successful (error is nil) or unsuccessful
+// (error is not nil).
+type CallbackResult interface {
+	// Done allows plugins that are processing data change/resync to send
+	// feedback. If there was no error, Done(nil) needs to be called.
+	Done(error)
+}
+
+// ResyncEvent is used to define the data type for the resync channel
+// (<resyncChan> from KeyValProtoWatcher.Watch).
+type ResyncEvent interface {
+	CallbackResult
+	// GetValues returns key-value pairs sorted by key prefixes
+	// (<keyPrefix> variable list from KeyValProtoWatcher.Watch).
+	GetValues() map[string]KeyValIterator
+}
 
 // ChangeEvent is used to define the data type for the change channel
 // (<changeChan> from KeyValProtoWatcher.Watch).
@@ -21,46 +42,41 @@ const (
 // (previous value) and the value *after* the change (current value).
 type ChangeEvent interface {
 	CallbackResult
-	ProtoWatchResp
+	// GetChanges returns list of changes for this change event.
+	GetChanges() []ProtoWatchResp
 }
 
-// ResyncEvent is used to define the data type for the resync channel
-// (<resyncChan> from KeyValProtoWatcher.Watch).
-type ResyncEvent interface {
-	CallbackResult
-
-	// GetValues returns key-value pairs sorted by key prefixes
-	// (<keyPrefix> variable list from KeyValProtoWatcher.Watch).
-	GetValues() map[ /*keyPrefix*/ string]KeyValIterator
-}
-
-// CallbackResult can be used by an event receiver to indicate to the event
-// producer whether an operation was successful (error is nil) or unsuccessful
-// (error is not nil).
-type CallbackResult interface {
-	// Done allows plugins that are processing data change/resync to send
-	// feedback. If there was no error, Done(nil) needs to be called.
-	// Use the noError=nil definition for better readability, for example:
-	//     Done(noError).
-	Done(error)
+// KeyValIterator is an iterator for KeyVal.
+type KeyValIterator interface {
+	// GetNext retrieves the next value from the iterator context. The retrieved
+	// value is unmarshaled and returned as <kv>. The allReceived flag is
+	// set to true on the last KeyVal pair in the context.
+	GetNext() (kv KeyVal, allReceived bool)
 }
 
 // ProtoWatchResp contains changed value.
 type ProtoWatchResp interface {
 	ChangeValue
-	WithKey
 	WithPrevValue
 }
 
 // ChangeValue represents a single propagated change.
 type ChangeValue interface {
-	LazyValueWithRev
 	WithChangeType
+	KeyVal
 }
 
-// LazyValueWithRev defines value that is unmarshaled into proto message
-// on demand with a revision.
-type LazyValueWithRev interface {
+// WithChangeType is a simple helper interface embedded by all interfaces that
+// require access to change type information.
+// The intent is to ensure that the same method declaration is used in different
+// interfaces (composition of interfaces).
+type WithChangeType interface {
+	GetChangeType() Op
+}
+
+// KeyVal represents a single key-value pair.
+type KeyVal interface {
+	WithKey
 	LazyValue
 	WithRevision
 }
@@ -74,21 +90,13 @@ type WithKey interface {
 	GetKey() string
 }
 
-// WithChangeType is a simple helper interface embedded by all interfaces that
-// require access to change type information.
-// The intent is to ensure that the same method declaration is used in different
-// interfaces (composition of interfaces).
-type WithChangeType interface {
-	GetChangeType() Op
-}
-
 // WithRevision is a simple helper interface embedded by all interfaces that
 // require access to the value revision.
 // The intent is to ensure that the same method declaration is used in different
 // interfaces (composition of interfaces).
 type WithRevision interface {
 	// GetRevision gets revision of current value
-	GetRevision() (rev int64)
+	GetRevision() int64
 }
 
 // WithPrevValue is a simple helper interface embedded by all interfaces that
@@ -115,18 +123,4 @@ type LazyValue interface {
 	// returns:
 	// - error if value argument can not be properly filled.
 	GetValue(value proto.Message) error
-}
-
-// KeyValIterator is an iterator for KeyVal.
-type KeyValIterator interface {
-	// GetNext retrieves the next value from the iterator context. The retrieved
-	// value is unmarshaled and returned as <kv>. The allReceived flag is
-	// set to true on the last KeyVal pair in the context.
-	GetNext() (kv KeyVal, allReceived bool)
-}
-
-// KeyVal represents a single key-value pair.
-type KeyVal interface {
-	WithKey
-	LazyValueWithRev
 }

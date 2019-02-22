@@ -141,7 +141,7 @@ func (SecurityAssociations_SA_IPSecProtocol) EnumDescriptor() ([]byte, []int) {
 
 // Tunnel Interfaces
 type TunnelInterfaces struct {
-	Tunnels              []*TunnelInterfaces_Tunnel `protobuf:"bytes,1,rep,name=tunnels" json:"tunnels,omitempty"`
+	Tunnels              []*TunnelInterfaces_Tunnel `protobuf:"bytes,1,rep,name=tunnels,proto3" json:"tunnels,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                   `json:"-"`
 	XXX_unrecognized     []byte                     `json:"-"`
 	XXX_sizecache        int32                      `json:"-"`
@@ -194,7 +194,7 @@ type TunnelInterfaces_Tunnel struct {
 	RemoteIntegKey  string          `protobuf:"bytes,13,opt,name=remote_integ_key,json=remoteIntegKey,proto3" json:"remote_integ_key,omitempty"`
 	// Extra fields related to interface
 	Enabled              bool     `protobuf:"varint,100,opt,name=enabled,proto3" json:"enabled,omitempty"`
-	IpAddresses          []string `protobuf:"bytes,101,rep,name=ip_addresses,json=ipAddresses" json:"ip_addresses,omitempty"`
+	IpAddresses          []string `protobuf:"bytes,101,rep,name=ip_addresses,json=ipAddresses,proto3" json:"ip_addresses,omitempty"`
 	Vrf                  uint32   `protobuf:"varint,102,opt,name=vrf,proto3" json:"vrf,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
@@ -339,7 +339,7 @@ func (m *TunnelInterfaces_Tunnel) GetVrf() uint32 {
 
 // Security Policy Database (SPD)
 type SecurityPolicyDatabases struct {
-	Spds                 []*SecurityPolicyDatabases_SPD `protobuf:"bytes,1,rep,name=spds" json:"spds,omitempty"`
+	Spds                 []*SecurityPolicyDatabases_SPD `protobuf:"bytes,1,rep,name=spds,proto3" json:"spds,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                       `json:"-"`
 	XXX_unrecognized     []byte                         `json:"-"`
 	XXX_sizecache        int32                          `json:"-"`
@@ -378,8 +378,8 @@ func (m *SecurityPolicyDatabases) GetSpds() []*SecurityPolicyDatabases_SPD {
 
 type SecurityPolicyDatabases_SPD struct {
 	Name                 string                                     `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
-	Interfaces           []*SecurityPolicyDatabases_SPD_Interface   `protobuf:"bytes,2,rep,name=interfaces" json:"interfaces,omitempty"`
-	PolicyEntries        []*SecurityPolicyDatabases_SPD_PolicyEntry `protobuf:"bytes,3,rep,name=policy_entries,json=policyEntries" json:"policy_entries,omitempty"`
+	Interfaces           []*SecurityPolicyDatabases_SPD_Interface   `protobuf:"bytes,2,rep,name=interfaces,proto3" json:"interfaces,omitempty"`
+	PolicyEntries        []*SecurityPolicyDatabases_SPD_PolicyEntry `protobuf:"bytes,3,rep,name=policy_entries,json=policyEntries,proto3" json:"policy_entries,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                                   `json:"-"`
 	XXX_unrecognized     []byte                                     `json:"-"`
 	XXX_sizecache        int32                                      `json:"-"`
@@ -608,7 +608,7 @@ func (m *SecurityPolicyDatabases_SPD_PolicyEntry) GetAction() SecurityPolicyData
 
 // Security Association (SA)
 type SecurityAssociations struct {
-	Sas                  []*SecurityAssociations_SA `protobuf:"bytes,1,rep,name=sas" json:"sas,omitempty"`
+	Sas                  []*SecurityAssociations_SA `protobuf:"bytes,1,rep,name=sas,proto3" json:"sas,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                   `json:"-"`
 	XXX_unrecognized     []byte                     `json:"-"`
 	XXX_sizecache        int32                      `json:"-"`
@@ -772,9 +772,9 @@ func (m *SecurityAssociations_SA) GetEnableUdpEncap() bool {
 }
 
 type ResyncRequest struct {
-	Tunnels              []*TunnelInterfaces_Tunnel     `protobuf:"bytes,1,rep,name=tunnels" json:"tunnels,omitempty"`
-	Spds                 []*SecurityPolicyDatabases_SPD `protobuf:"bytes,2,rep,name=spds" json:"spds,omitempty"`
-	Sas                  []*SecurityAssociations_SA     `protobuf:"bytes,3,rep,name=sas" json:"sas,omitempty"`
+	Tunnels              []*TunnelInterfaces_Tunnel     `protobuf:"bytes,1,rep,name=tunnels,proto3" json:"tunnels,omitempty"`
+	Spds                 []*SecurityPolicyDatabases_SPD `protobuf:"bytes,2,rep,name=spds,proto3" json:"spds,omitempty"`
+	Sas                  []*SecurityAssociations_SA     `protobuf:"bytes,3,rep,name=sas,proto3" json:"sas,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                       `json:"-"`
 	XXX_unrecognized     []byte                         `json:"-"`
 	XXX_sizecache        int32                          `json:"-"`

@@ -34,24 +34,24 @@ Show Interfaces Before Setup
 
 Add Veth1 Interface
     linux: Interface Not Exists    node=agent_vpp_1    mac=${VETH1_MAC}
-    vpp_ctl: Put Veth Interface With IP    node=agent_vpp_1    name=vpp1_veth1    mac=${VETH1_MAC}    peer=vpp1_veth2    ip=10.10.1.1    prefix=24    mtu=1500
+    Put Veth Interface With IP    node=agent_vpp_1    name=vpp1_veth1    mac=${VETH1_MAC}    peer=vpp1_veth2    ip=10.10.1.1    prefix=24    mtu=1500
     linux: Interface Not Exists    node=agent_vpp_1    mac=${VETH1_MAC}
 
 Add Veth2 Interface
     linux: Interface Not Exists    node=agent_vpp_1    mac=${VETH2_MAC}
-    vpp_ctl: Put Veth Interface    node=agent_vpp_1    name=vpp1_veth2    mac=${VETH2_MAC}    peer=vpp1_veth1
+    Put Veth Interface    node=agent_vpp_1    name=vpp1_veth2    mac=${VETH2_MAC}    peer=vpp1_veth1
 
 Check That Veth1 And Veth2 Interfaces Are Created
     linux: Interface Is Created    node=agent_vpp_1    mac=${VETH1_MAC}
     linux: Interface Is Created    node=agent_vpp_1    mac=${VETH2_MAC}
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    linux: Check Veth Interface State     agent_vpp_1    vpp1_veth1    mac=${VETH1_MAC}    ipv4=10.10.1.1/24    mtu=1500    state=up
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    linux: Check Veth Interface State     agent_vpp_1    vpp1_veth2    mac=${VETH2_MAC}    state=up
-    vpp_term: Show Interface Mode  agent_vpp_1    vpp1_veth1@vpp1_veth2
-    vpp_term: Show Interface Mode  agent_vpp_1    vpp1_veth2@vpp1_veth1
+    vpp_term: Show Interface Mode  agent_vpp_1
+    vpp_term: Show Interface Mode  agent_vpp_1
 
 
 Add Memif Interface
-    vpp_ctl: Put Memif Interface With IP    node=agent_vpp_1    name=vpp1_memif1    mac=62:61:61:61:61:61    master=true    id=1    ip=192.168.1.1    prefix=24    socket=default.sock
+    Put Memif Interface With IP    node=agent_vpp_1    name=vpp1_memif1    mac=62:61:61:61:61:61    master=true    id=1    ip=192.168.1.1    prefix=24    socket=default.sock
 
 Check Memif Interface Created
     vpp_term: Interface Is Created    node=agent_vpp_1    mac=62:61:61:61:61:61
@@ -59,21 +59,21 @@ Check Memif Interface Created
 
 
 Add VXLan Interface
-    vpp_ctl: Put VXLan Interface    node=agent_vpp_1    name=vpp1_vxlan1    src=192.168.1.1    dst=192.168.1.2    vni=5
+    Put VXLan Interface    node=agent_vpp_1    name=vpp1_vxlan1    src=192.168.1.1    dst=192.168.1.2    vni=5
 
 Check VXLan Interface Created
     vxlan: Tunnel Is Created    node=agent_vpp_1    src=192.168.1.1    dst=192.168.1.2    vni=5
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check VXLan Interface State    agent_vpp_1    vpp1_vxlan1    enabled=1    src=192.168.1.1    dst=192.168.1.2    vni=5
 
 Add Loopback Interface
-    vpp_ctl: Put Loopback Interface With IP    node=agent_vpp_1    name=vpp1_loop1    mac=12:21:21:11:11:11    ip=20.20.1.1   prefix=24   mtu=1400
+    Put Loopback Interface With IP    node=agent_vpp_1    name=vpp1_loop1    mac=12:21:21:11:11:11    ip=20.20.1.1   prefix=24   mtu=1400
 
 Check Loopback Interface Created
     vpp_term: Interface Is Created    node=agent_vpp_1    mac=12:21:21:11:11:11
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Loopback Interface State    agent_vpp_1    vpp1_loop1    enabled=1     mac=12:21:21:11:11:11    mtu=1400  ipv4=20.20.1.1/24
 
 Add Tap Interface
-    vpp_ctl: Put TAP Interface With IP    node=agent_vpp_1    name=vpp1_tap1    mac=32:21:21:11:11:11    ip=30.30.1.1   prefix=24      host_if_name=linux_vpp1_tap1
+    Put TAP Interface With IP    node=agent_vpp_1    name=vpp1_tap1    mac=32:21:21:11:11:11    ip=30.30.1.1   prefix=24      host_if_name=linux_vpp1_tap1
 
 Check TAP Interface Created
     vpp_term: Interface Is Created    node=agent_vpp_1    mac=32:21:21:11:11:11
@@ -83,18 +83,18 @@ Check Stuff
     Show Interfaces And Other Objects
 
 Add ARPs
-    vpp_ctl: Put ARP    agent_vpp_1    vpp1_memif1    155.155.155.155    32:51:51:51:51:51    false
-    vpp_ctl: Put ARP    agent_vpp_1    vpp1_memif1    155.155.155.156    32:51:51:51:51:52    false
-    vpp_ctl: Put ARP    agent_vpp_1    vpp1_veth1    155.155.155.155    32:51:51:51:51:51    false
-    vpp_ctl: Put ARP    agent_vpp_1    vpp1_veth1    155.155.155.150    32:51:51:51:51:5    false
-    vpp_ctl: Put ARP    agent_vpp_1    vpp1_veth2    155.155.155.155    32:51:51:51:51:51    false
-    vpp_ctl: Put ARP    agent_vpp_1    vpp1_veth2    155.155.155.150    32:51:51:51:51:5    false
-    vpp_ctl: Put ARP    agent_vpp_1    vpp1_vxlan1    155.155.155.155    32:51:51:51:51:51    false
-    vpp_ctl: Put ARP    agent_vpp_1    vpp1_vxlan1    155.155.155.154    32:51:51:51:51:53    false
-    vpp_ctl: Put ARP    agent_vpp_1    vpp1_loop1    155.155.155.155   32:51:51:51:51:51    false
-    vpp_ctl: Put ARP    agent_vpp_1    vpp1_loop1    155.155.155.152   32:51:51:51:51:55    false
-    vpp_ctl: Put ARP    agent_vpp_1    vpp1_tap1    155.155.155.155   32:51:51:51:51:51    false
-    vpp_ctl: Put ARP    agent_vpp_1    vpp1_tap1    155.155.155.150   32:51:51:51:51:5    false
+    Put ARP    agent_vpp_1    vpp1_memif1    155.155.155.155    32:51:51:51:51:51    false
+    Put ARP    agent_vpp_1    vpp1_memif1    155.155.155.156    32:51:51:51:51:52    false
+    Put ARP    agent_vpp_1    vpp1_veth1    155.155.155.155    32:51:51:51:51:51    false
+    Put ARP    agent_vpp_1    vpp1_veth1    155.155.155.150    32:51:51:51:51:05    false
+    Put ARP    agent_vpp_1    vpp1_veth2    155.155.155.155    32:51:51:51:51:51    false
+    Put ARP    agent_vpp_1    vpp1_veth2    155.155.155.150    32:51:51:51:51:05    false
+    Put ARP    agent_vpp_1    vpp1_vxlan1    155.155.155.155    32:51:51:51:51:51    false
+    Put ARP    agent_vpp_1    vpp1_vxlan1    155.155.155.154    32:51:51:51:51:53    false
+    Put ARP    agent_vpp_1    vpp1_loop1    155.155.155.155   32:51:51:51:51:51    false
+    Put ARP    agent_vpp_1    vpp1_loop1    155.155.155.152   32:51:51:51:51:55    false
+    Put ARP    agent_vpp_1    vpp1_tap1    155.155.155.155   32:51:51:51:51:51    false
+    Put ARP    agent_vpp_1    vpp1_tap1    155.155.155.150   32:51:51:51:51:05    false
     Sleep    ${SYNC_SLEEP}
 
 Check Memif ARP
@@ -119,10 +119,10 @@ Check Loopback ARP
 
 Check TAP ARP
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Check ARP    agent_vpp_1    vpp1_tap1    155.155.155.155   32:51:51:51:51:51    True
-    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Check ARP    agent_vpp_1    vpp1_tap1    155.155.155.150   32:51:51:51:51:5    True
+    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Check ARP    agent_vpp_1    vpp1_tap1    155.155.155.150   32:51:51:51:51:05    True
 
 ADD Afpacket Interface
-    vpp_ctl: Put Afpacket Interface    node=agent_vpp_1    name=vpp1_afpacket1    mac=a2:a1:a1:a1:a1:a1    host_int=vpp1_veth2
+    Put Afpacket Interface    node=agent_vpp_1    name=vpp1_afpacket1    mac=a2:a1:a1:a1:a1:a1    host_int=vpp1_veth2
 
 Check AFpacket Interface Created
     vpp_term: Interface Is Created    node=agent_vpp_1    mac=a2:a1:a1:a1:a1:a1
@@ -135,21 +135,21 @@ Check Veth1 Veth2 Are Created After Afpacket is created
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    linux: Check Veth Interface State     agent_vpp_1    vpp1_veth2    mac=${VETH2_MAC}    state=up
 
 Add ARP for Afpacket
-    vpp_ctl: Put ARP    agent_vpp_1    host-vpp1_veth2    155.155.155.155   32:51:51:51:51:51    False
-    vpp_ctl: Put ARP    agent_vpp_1    host-vpp1_veth2    155.155.155.150   32:51:51:51:51:5    False
+    Put ARP    agent_vpp_1    vpp1_afpacket1    155.155.155.155   32:51:51:51:51:51    False
+    Put ARP    agent_vpp_1    vpp1_afpacket1    155.155.155.150   32:51:51:51:51:05    False
 
 Check Afpacket ARP
-    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Check ARP    agent_vpp_1    host-vpp1_veth2    155.155.155.155   32:51:51:51:51:51    True
-    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Check ARP    agent_vpp_1    host-vpp1_veth2    155.155.155.150   32:51:51:51:51:5    True
+    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Check ARP    agent_vpp_1    vpp1_afpacket1    155.155.155.155   32:51:51:51:51:51    True
+    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Check ARP    agent_vpp_1    vpp1_afpacket1    155.155.155.150   32:51:51:51:51:05    True
 
 Delete ARPs
-    vpp_ctl: Delete ARP    agent_vpp_1    vpp1_memif1    155.155.155.156
-    vpp_ctl: Delete ARP    agent_vpp_1    vpp1_veth1    155.155.155.150
-    vpp_ctl: Delete ARP    agent_vpp_1    vpp1_veth2    155.155.155.150
-    vpp_ctl: Delete ARP    agent_vpp_1    vpp1_vxlan1    155.155.155.154
-    vpp_ctl: Delete ARP    agent_vpp_1    vpp1_loop1    155.155.155.152
-    vpp_ctl: Delete ARP    agent_vpp_1    vpp1_tap1    155.155.155.150
-    vpp_ctl: Delete ARP    agent_vpp_1    host-vpp1_veth2    155.155.155.150
+    Delete ARP    agent_vpp_1    vpp1_memif1    155.155.155.156
+    Delete ARP    agent_vpp_1    vpp1_veth1    155.155.155.150
+    Delete ARP    agent_vpp_1    vpp1_veth2    155.155.155.150
+    Delete ARP    agent_vpp_1    vpp1_vxlan1    155.155.155.154
+    Delete ARP    agent_vpp_1    vpp1_loop1    155.155.155.152
+    Delete ARP    agent_vpp_1    vpp1_tap1    155.155.155.150
+    Delete ARP    agent_vpp_1    host-vpp1_veth2    155.155.155.150
     vpp_term:Show ARP   agent_vpp_1
     Execute In Container    agent_vpp_1    ip neigh
     Sleep    ${SYNC_SLEEP}
@@ -176,27 +176,27 @@ Check Loopback ARP After Delete
 
 Check TAP ARP After Delete
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Check ARP    agent_vpp_1    vpp1_tap1    155.155.155.155   32:51:51:51:51:51    True
-    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Check ARP    agent_vpp_1    vpp1_tap1    155.155.155.150   32:51:51:51:51:5    False
+    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Check ARP    agent_vpp_1    vpp1_tap1    155.155.155.150   32:51:51:51:51:05    False
 
 Check Afpacket ARP After Delete
-    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Check ARP    agent_vpp_1    host-vpp1_veth2    155.155.155.155   32:51:51:51:51:51    True
-    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Check ARP    agent_vpp_1    host-vpp1_veth2    155.155.155.150   32:51:51:51:51:5    False
+    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Check ARP    agent_vpp_1    vpp1_afpacket1    155.155.155.155   32:51:51:51:51:51    True
+    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Check ARP    agent_vpp_1    vpp1_afpacket1    155.155.155.150   32:51:51:51:51:05    False
 
 Modify ARPs
-    vpp_ctl: Put ARP    agent_vpp_1    vpp1_memif1    155.155.155.155    32:51:51:51:51:58    false
+    Put ARP    agent_vpp_1    vpp1_memif1    155.155.155.155    32:51:51:51:51:58    false
     vpp_term:Show ARP   agent_vpp_1
-#    vpp_ctl: Put ARP    agent_vpp_1    vpp1_veth1    155.155.155.155    32:51:51:51:51:58    false
+#    Put ARP    agent_vpp_1    vpp1_veth1    155.155.155.155    32:51:51:51:51:58    false
 #    vpp_term:Show ARP   agent_vpp_1
-#    vpp_ctl: Put ARP    agent_vpp_1    vpp1_veth2    155.155.155.155    32:51:51:51:51:58    false
+#    Put ARP    agent_vpp_1    vpp1_veth2    155.155.155.155    32:51:51:51:51:58    false
 #    vpp_term:Show ARP   agent_vpp_1
-    vpp_ctl: Put ARP    agent_vpp_1    vpp1_vxlan1    155.155.155.155    32:51:51:51:51:58    false
-    vpp_term:Show ARP   agent_vpp_1    vpp_term:Show ARP   agent_vpp_1
+    Put ARP    agent_vpp_1    vpp1_vxlan1    155.155.155.155    32:51:51:51:51:58    false
+    vpp_term:Show ARP   agent_vpp_1
     Sleep    ${SYNC_SLEEP}
-    vpp_ctl: Put ARP    agent_vpp_1    vpp1_loop1    155.155.155.155   32:51:51:51:51:58    false
+    Put ARP    agent_vpp_1    vpp1_loop1    155.155.155.155   32:51:51:51:51:58    false
     vpp_term:Show ARP   agent_vpp_1
-    vpp_ctl: Put ARP    agent_vpp_1    vpp1_tap1    155.155.155.155   32:51:51:51:51:58    false
+    Put ARP    agent_vpp_1    vpp1_tap1    155.155.155.155   32:51:51:51:51:58    false
     vpp_term:Show ARP   agent_vpp_1
-    vpp_ctl: Put ARP    agent_vpp_1    host-vpp1_veth2    155.155.155.155   32:51:51:51:51:58    False
+    Put ARP    agent_vpp_1    host-vpp1_veth2    155.155.155.155   32:51:51:51:51:58    False
 
 
 Check Memif ARP After Modify
@@ -218,7 +218,7 @@ Check TAP ARP After Modify
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Check ARP    agent_vpp_1    vpp1_tap1    155.155.155.155   32:51:51:51:51:58    True
 
 Check Afpacket ARP After Modify
-    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Check ARP    agent_vpp_1    host-vpp1_veth2    155.155.155.155   32:51:51:51:51:58    True
+    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vpp_term: Check ARP    agent_vpp_1    vpp1_afpacket1    155.155.155.155   32:51:51:51:51:58    True
 
 
 *** Keywords ***
@@ -229,7 +229,6 @@ Show Interfaces And Other Objects
     Write To Machine    agent_vpp_1_term    show br
     Write To Machine    agent_vpp_1_term    show err
     vat_term: Interfaces Dump    agent_vpp_1
-    Write To Machine    vpp_agent_ctl    vpp-agent-ctl ${AGENT_VPP_ETCD_CONF_PATH} -ps
     Execute In Container    agent_vpp_1    ip a
     Execute In Container    node_1    ip a
     Make Datastore Snapshots    before_check stuff

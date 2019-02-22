@@ -60,10 +60,10 @@
 
   Cn-infra 1.5 brought new and better flavors and it would be a shame not to implement it
   in the vpp-agent. The old flavors package was removed and replaced with this new concept,
-  visible in [app package vpp-agent](app/vpp_agent.go). All examples were also updated.
+  visible in [app package vpp-agent](cmd/vpp-agent/app/vpp_agent.go). All examples were also updated.
   
 ## Breaking Changes
-- Flavors were replaced with [new way](app) of managing plugins.
+- Flavors were replaced with [new way](cmd/vpp-agent/app) of managing plugins.
 - REST interface URLs were changed, see [readme](plugins/rest/README.md) for complete list.
 
 ## New Features
@@ -551,7 +551,7 @@ Ability to extend the behavior of the VPP Agent by creating new plugins on top o
 New plugins can access API for configured:
 [VPP Network interfaces](plugins/vpp/ifplugin/ifaceidx),
 [Bridge domains](plugins/vpp/l2plugin/l2idx) and [VETHs](plugins/linux/ifplugin/ifaceidx)
-based on [idxvpp](idxvpp) threadsafe map tailored for VPP data
+based on [idxvpp](pkg/idxvpp) threadsafe map tailored for VPP data
 with advanced features (multiple watchers, secondary indexes).
 
 VPP Agent is embeddable in different software projects and with different systems

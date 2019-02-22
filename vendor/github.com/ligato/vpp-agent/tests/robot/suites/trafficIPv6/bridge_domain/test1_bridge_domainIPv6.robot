@@ -72,24 +72,24 @@ Check Traffic VPP1-VPP2
     Ping6 From agent_vpp_1 To ${IP_2}
     Ping6 From agent_vpp_2 To ${IP_1}
 
-#Create 3. agent and Interfaces
-#    Add Agent VPP Node                 agent_vpp_3
-#    Sleep    ${SYNC_SLEEP}
-#
-#Create Memif2 Interface on Agent1
-#    Create Master memif1 On agent_vpp_1 With MAC ${MAC_MEMIF3}, Key 2 And m2.sock Socket
-#    Sleep    ${SYNC_SLEEP}
-#    vat_term: Check Memif Interface State     agent_vpp_1  memif1  mac=${MAC_MEMIF3}  role=master  id=2   connected=0  enabled=1  socket=${AGENT_VPP_1_MEMIF_SOCKET_FOLDER}/m2.sock
-#
-#Create Loopback Interface on Agent3
-#    Create Loopback Interface bvi_loop0 On agent_vpp_3 With Ip ${IP_3}/64 And Mac ${MAC_LOOP3}
-#    Sleep    ${SYNC_SLEEP}
-#    vat_term: Check Loopback Interface State    agent_vpp_3    bvi_loop0    enabled=1     mac=${MAC_LOOP3}   ipv6=${IP_3}/${PREFIX}
-#
-#Create Memif Interface on Agent3
-#    Create Slave memif0 On agent_vpp_3 With MAC ${MAC_MEMIF4}, Key 2 And m2.sock Socket
-#    Sleep    ${SYNC_SLEEP}
-#    vat_term: Check Memif Interface State     agent_vpp_3  memif0  mac=${MAC_MEMIF4}  role=slave  id=2   connected=1  enabled=1  socket=${AGENT_VPP_1_MEMIF_SOCKET_FOLDER}/m2.sock
+Create 3. agent and Interfaces
+    Add Agent VPP Node                 agent_vpp_3
+    Sleep    ${SYNC_SLEEP}
+
+Create Memif2 Interface on Agent1
+    Create Master memif1 On agent_vpp_1 With MAC ${MAC_MEMIF3}, Key 2 And m2.sock Socket
+    Sleep    ${SYNC_SLEEP}
+    vat_term: Check Memif Interface State     agent_vpp_1  memif1  mac=${MAC_MEMIF3}  role=master  id=2   connected=0  enabled=1  socket=${AGENT_VPP_1_MEMIF_SOCKET_FOLDER}/m2.sock
+
+Create Loopback Interface on Agent3
+    Create Loopback Interface bvi_loop0 On agent_vpp_3 With Ip ${IP_3}/64 And Mac ${MAC_LOOP3}
+    Sleep    ${SYNC_SLEEP}
+    vat_term: Check Loopback Interface State    agent_vpp_3    bvi_loop0    enabled=1     mac=${MAC_LOOP3}   ipv6=${IP_3}/${PREFIX}
+
+Create Memif Interface on Agent3
+    Create Slave memif0 On agent_vpp_3 With MAC ${MAC_MEMIF4}, Key 2 And m2.sock Socket
+    Sleep    ${SYNC_SLEEP}
+    vat_term: Check Memif Interface State     agent_vpp_3  memif0  mac=${MAC_MEMIF4}  role=slave  id=2   connected=1  enabled=1  socket=${AGENT_VPP_1_MEMIF_SOCKET_FOLDER}/m2.sock
 
 
 Create BD on Agent1
@@ -101,13 +101,17 @@ Create BD on Agent3
 Check Created Interfaces Again3
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Loopback Interface State    agent_vpp_1    bvi_loop0    enabled=1     mac=${MAC_LOOP1}   ipv6=${IP_1}/${PREFIX}
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Loopback Interface State    agent_vpp_2    bvi_loop0    enabled=1     mac=${MAC_LOOP2}   ipv6=${IP_2}/${PREFIX}
+    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Loopback Interface State    agent_vpp_3    bvi_loop0    enabled=1     mac=${MAC_LOOP3}   ipv6=${IP_3}/${PREFIX}
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Memif Interface State     agent_vpp_1  memif0  mac=${MAC_MEMIF1}  role=master  id=1   connected=1  enabled=1  socket=${AGENT_VPP_1_MEMIF_SOCKET_FOLDER}/m1.sock
     Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Memif Interface State     agent_vpp_2  memif0  mac=${MAC_MEMIF2}  role=slave  id=1   connected=1  enabled=1  socket=${AGENT_VPP_1_MEMIF_SOCKET_FOLDER}/m1.sock
+    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Memif Interface State     agent_vpp_1  memif1  mac=${MAC_MEMIF3}  role=master  id=2   connected=1  enabled=1  socket=${AGENT_VPP_1_MEMIF_SOCKET_FOLDER}/m2.sock
+    Wait Until Keyword Succeeds   ${WAIT_TIMEOUT}   ${SYNC_SLEEP}    vat_term: Check Memif Interface State     agent_vpp_3  memif0  mac=${MAC_MEMIF4}  role=slave  id=2   connected=1  enabled=1  socket=${AGENT_VPP_1_MEMIF_SOCKET_FOLDER}/m2.sock
 
 
 Check Traffic VPP2-VPP3
     Ping6 From agent_vpp_2 To ${IP_3}
     Ping6 From agent_vpp_3 To ${IP_2}
+    Ping6 From agent_vpp_3 To ${IP_1}
 
 *** Keywords ***
 TestSetup

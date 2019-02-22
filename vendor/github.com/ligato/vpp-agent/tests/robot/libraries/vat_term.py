@@ -149,7 +149,7 @@ def Parse_BD_Interfaces(node, bd, etcd_json, bd_dump):
         bd_sw_if_index =  int["sw_if_index"]
         etcd_name = "none"
         for key_data in etcd_json:
-            if key_data["node"] and key_data["type"] == "status" and "/interface/" in key_data["key"]:
+            if key_data["node"] == node and key_data["type"] == "status" and "/interface/" in key_data["key"]:
                 if "if_index" in key_data["data"]:
                     if key_data["data"]["if_index"] == bd_sw_if_index:
                         etcd_name = key_data["data"]["name"]
@@ -158,7 +158,7 @@ def Parse_BD_Interfaces(node, bd, etcd_json, bd_dump):
         bvi_sw_if_index = bd_dump[0]["bvi_sw_if_index"]
         etcd_name = "none"
         for key_data in etcd_json:
-            if key_data["node"] and key_data["type"] == "status" and "/interface/" in key_data["key"]:
+            if key_data["node"] == node and key_data["type"] == "status" and "/interface/" in key_data["key"]:
                 if "if_index" in key_data["data"]:
                     if key_data["data"]["if_index"] == bvi_sw_if_index:
                         etcd_name = key_data["data"]["name"]

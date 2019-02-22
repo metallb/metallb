@@ -129,8 +129,10 @@ func (g *grpc) GenerateImports(file *generator.FileDescriptor) {
 	if len(file.FileDescriptorProto.Service) == 0 {
 		return
 	}
-	g.P("import ", contextPkg, " ", generator.GoImportPath(path.Join(string(g.gen.ImportPrefix), contextPkgPath)))
-	g.P("import ", grpcPkg, " ", generator.GoImportPath(path.Join(string(g.gen.ImportPrefix), grpcPkgPath)))
+	g.P("import (")
+	g.P(contextPkg, " ", generator.GoImportPath(path.Join(string(g.gen.ImportPrefix), contextPkgPath)))
+	g.P(grpcPkg, " ", generator.GoImportPath(path.Join(string(g.gen.ImportPrefix), grpcPkgPath)))
+	g.P(")")
 	g.P()
 }
 
@@ -158,11 +160,13 @@ func (g *grpc) generateService(file *generator.FileDescriptor, service *pb.Servi
 	deprecated := service.GetOptions().GetDeprecated()
 
 	g.P()
-	g.P("// Client API for ", servName, " service")
-	g.P()
+	g.P(fmt.Sprintf(`// %sClient is the client API for %s service.
+//
+// For semantics around ctx use and closing/ending streaming RPCs, please refer to https://godoc.org/google.golang.org/grpc#ClientConn.NewStream.`, servName, servName))
 
 	// Client interface.
 	if deprecated {
+		g.P("//")
 		g.P(deprecationComment)
 	}
 	g.P("type ", servName, "Client interface {")
@@ -205,14 +209,13 @@ func (g *grpc) generateService(file *generator.FileDescriptor, service *pb.Servi
 		g.generateClientMethod(servName, fullServName, serviceDescVar, method, descExpr)
 	}
 
-	g.P("// Server API for ", servName, " service")
-	g.P()
-
 	// Server interface.
+	serverType := servName + "Server"
+	g.P("// ", serverType, " is the server API for ", servName, " service.")
 	if deprecated {
+		g.P("//")
 		g.P(deprecationComment)
 	}
-	serverType := servName + "Server"
 	g.P("type ", serverType, " interface {")
 	for i, method := range service.Method {
 		g.gen.PrintComments(fmt.Sprintf("%s,2,%d", path, i)) // 2 means method in a service.

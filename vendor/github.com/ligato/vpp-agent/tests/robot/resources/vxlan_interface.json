@@ -1,6 +1,6 @@
 {
   "name": "${name}",
-  "type": 5,
+  "type": "VXLAN_TUNNEL",
   "enabled": ${enabled},
   "vrf": ${vrf},
   "vxlan": {

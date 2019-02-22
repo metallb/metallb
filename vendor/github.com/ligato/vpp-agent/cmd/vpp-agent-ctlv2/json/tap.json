@@ -1,0 +1,13 @@
+{
+    "tap": {
+        "host_if_name": "tap1"
+    },
+    "enabled": true,
+    "mtu": 1500,
+    "ip_addresses": [
+        "192.168.25.3/24"
+    ],
+    "name": "tap1",
+    "phys_address": "7C:4E:E7:8A:63:68",
+    "type": "TAP"
+}

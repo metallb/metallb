@@ -137,6 +137,14 @@ func TurnOffGoUnrecognized(msg *descriptor.DescriptorProto) {
 	SetBoolMessageOption(gogoproto.E_GoprotoUnrecognized, false)(msg)
 }
 
+func TurnOffGoUnkeyed(msg *descriptor.DescriptorProto) {
+	SetBoolMessageOption(gogoproto.E_GoprotoUnkeyed, false)(msg)
+}
+
+func TurnOffGoSizecache(msg *descriptor.DescriptorProto) {
+	SetBoolMessageOption(gogoproto.E_GoprotoSizecache, false)(msg)
+}
+
 func TurnOnCompare(msg *descriptor.DescriptorProto) {
 	SetBoolMessageOption(gogoproto.E_Compare, true)(msg)
 }

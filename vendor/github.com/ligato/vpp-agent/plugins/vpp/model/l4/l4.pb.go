@@ -59,7 +59,7 @@ func (m *L4Features) GetEnabled() bool {
 
 // Application namespaces
 type AppNamespaces struct {
-	AppNamespaces        []*AppNamespaces_AppNamespace `protobuf:"bytes,100,rep,name=app_namespaces,json=appNamespaces" json:"app_namespaces,omitempty"`
+	AppNamespaces        []*AppNamespaces_AppNamespace `protobuf:"bytes,100,rep,name=app_namespaces,json=appNamespaces,proto3" json:"app_namespaces,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                      `json:"-"`
 	XXX_unrecognized     []byte                        `json:"-"`
 	XXX_sizecache        int32                         `json:"-"`

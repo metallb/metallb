@@ -31,15 +31,14 @@ Configure Environment
 Show Interfaces Before Setup
     vpp_term: Show Interfaces    agent_vpp_1
     vpp_term: Show Interfaces    agent_vpp_2
-    Write To Machine    vpp_agent_ctl    vpp-agent-ctl ${AGENT_VPP_ETCD_CONF_PATH} -ps
 
 Setup Interfaces
-    vpp_ctl: Put Veth Interface Via Linux Plugin    node=agent_vpp_1    namespace=ns1    name=ns1_veth1    host_if_name=ns1_veth1_linux    mac=d2:74:8c:12:67:d2    peer=ns2_veth2    ip=192.168.22.1    prefix=30
-    vpp_ctl: Put Veth Interface Via Linux Plugin    node=agent_vpp_1    namespace=ns2    name=ns2_veth2    host_if_name=ns2_veth2_linux    mac=92:c7:42:67:ab:cd    peer=ns1_veth1    ip=192.168.22.2    prefix=30
+    Put Veth Interface Via Linux Plugin    node=agent_vpp_1    namespace=ns1    name=ns1_veth1    host_if_name=ns1_veth1_linux    mac=d2:74:8c:12:67:d2    peer=ns2_veth2    ip=192.168.22.1    prefix=30
+    Put Veth Interface Via Linux Plugin    node=agent_vpp_1    namespace=ns2    name=ns2_veth2    host_if_name=ns2_veth2_linux    mac=92:c7:42:67:ab:cd    peer=ns1_veth1    ip=192.168.22.2    prefix=30
 
-    vpp_ctl: Put Afpacket Interface    node=agent_vpp_1    name=vpp1_afpacket1    mac=a2:a1:a1:a1:a1:a1    host_int=vpp1_veth2
+    Put Afpacket Interface    node=agent_vpp_1    name=vpp1_afpacket1    mac=a2:a1:a1:a1:a1:a1    host_int=vpp1_veth2
     @{ints}=    Create List    vpp1_vxlan1    vpp1_afpacket1
-    vpp_ctl: Put Bridge Domain    node=agent_vpp_1    name=vpp1_bd1    ints=${ints}
+    Put Bridge Domain    node=agent_vpp_1    name=vpp1_bd1    ints=${ints}
 
     Sleep    ${SYNC_SLEEP}
 
@@ -51,15 +50,15 @@ Check Linux Interfaces On VPP1
 
 Check Interfaces On VPP1
     ${out}=    vpp_term: Show Interfaces    agent_vpp_1
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_1    vpp1_memif1
+    ${int}=    Get Interface Internal Name    agent_vpp_1    vpp1_memif1
     Should Contain    ${out}    ${int}
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_1    vpp1_afpacket1
+    ${int}=    Get Interface Internal Name    agent_vpp_1    vpp1_afpacket1
     Should Contain    ${out}    ${int}
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_1    vpp1_vxlan1
+    ${int}=    Get Interface Internal Name    agent_vpp_1    vpp1_vxlan1
     Should Contain    ${out}    ${int}
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_1    vpp1_loop1
+    ${int}=    Get Interface Internal Name    agent_vpp_1    vpp1_loop1
     Should Contain    ${out}    ${int}
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_1    vpp1_tap1
+    ${int}=    Get Interface Internal Name    agent_vpp_1    vpp1_tap1
     Should Contain    ${out}    ${int}
 
 Check Linux Interfaces On VPP2
@@ -70,15 +69,15 @@ Check Linux Interfaces On VPP2
 
 Check Interfaces On VPP2
     ${out}=    vpp_term: Show Interfaces    agent_vpp_2
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_2    vpp2_memif1
+    ${int}=    Get Interface Internal Name    agent_vpp_2    vpp2_memif1
     Should Contain    ${out}    ${int}
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_2    vpp2_afpacket1
+    ${int}=    Get Interface Internal Name    agent_vpp_2    vpp2_afpacket1
     Should Contain    ${out}    ${int}
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_2    vpp2_vxlan1
+    ${int}=    Get Interface Internal Name    agent_vpp_2    vpp2_vxlan1
     Should Contain    ${out}    ${int}
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_2    vpp2_loop1
+    ${int}=    Get Interface Internal Name    agent_vpp_2    vpp2_loop1
     Should Contain    ${out}    ${int}
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_2    vpp2_tap1
+    ${int}=    Get Interface Internal Name    agent_vpp_2    vpp2_tap1
     Should Contain    ${out}    ${int}
 
 Check Bridge Domain On VPP1 Is Created
@@ -135,15 +134,15 @@ Check Linux Interfaces On VPP1 After Resync
 
 Check Interfaces On VPP1 After Resync
     ${out}=    vpp_term: Show Interfaces    agent_vpp_1
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_1    vpp1_memif1
+    ${int}=    Get Interface Internal Name    agent_vpp_1    vpp1_memif1
     Should Contain    ${out}    ${int}
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_1    vpp1_afpacket1
+    ${int}=    Get Interface Internal Name    agent_vpp_1    vpp1_afpacket1
     Should Contain    ${out}    ${int}
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_1    vpp1_vxlan1
+    ${int}=    Get Interface Internal Name    agent_vpp_1    vpp1_vxlan1
     Should Contain    ${out}    ${int}
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_1    vpp1_loop1
+    ${int}=    Get Interface Internal Name    agent_vpp_1    vpp1_loop1
     Should Contain    ${out}    ${int}
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_1    vpp1_tap1
+    ${int}=    Get Interface Internal Name    agent_vpp_1    vpp1_tap1
     Should Contain    ${out}    ${int}
 
 Check Linux Interfaces On VPP2 After Resync
@@ -154,15 +153,15 @@ Check Linux Interfaces On VPP2 After Resync
 
 Check Interfaces On VPP2 After Resync
     ${out}=    vpp_term: Show Interfaces    agent_vpp_2
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_2    vpp2_memif1
+    ${int}=    Get Interface Internal Name    agent_vpp_2    vpp2_memif1
     Should Contain    ${out}    ${int}
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_2    vpp2_afpacket1
+    ${int}=    Get Interface Internal Name    agent_vpp_2    vpp2_afpacket1
     Should Contain    ${out}    ${int}
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_2    vpp2_vxlan1
+    ${int}=    Get Interface Internal Name    agent_vpp_2    vpp2_vxlan1
     Should Contain    ${out}    ${int}
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_2    vpp2_loop1
+    ${int}=    Get Interface Internal Name    agent_vpp_2    vpp2_loop1
     Should Contain    ${out}    ${int}
-    ${int}=    vpp_ctl: Get Interface Internal Name    agent_vpp_2    vpp2_tap1
+    ${int}=    Get Interface Internal Name    agent_vpp_2    vpp2_tap1
     Should Contain    ${out}    ${int}
 
 Check Bridge Domain On VPP1 Is Created After Resync
@@ -188,7 +187,6 @@ Show Interfaces And Other Objects After Resync
     Write To Machine    agent_vpp_2_term    show err
     vat_term: Interfaces Dump    agent_vpp_1
     vat_term: Interfaces Dump    agent_vpp_2
-    Write To Machine    vpp_agent_ctl    vpp-agent-ctl ${AGENT_VPP_ETCD_CONF_PATH} -ps
     Execute In Container    agent_vpp_1    ip a
     Execute In Container    agent_vpp_2    ip a
     Sleep    ${SYNC_SLEEP}

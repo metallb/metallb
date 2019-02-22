@@ -75,7 +75,7 @@ func (IPScanNeighbor_Mode) EnumDescriptor() ([]byte, []int) {
 
 // Static routes
 type StaticRoutes struct {
-	Routes               []*StaticRoutes_Route `protobuf:"bytes,1,rep,name=routes" json:"routes,omitempty"`
+	Routes               []*StaticRoutes_Route `protobuf:"bytes,1,rep,name=routes,proto3" json:"routes,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}              `json:"-"`
 	XXX_unrecognized     []byte                `json:"-"`
 	XXX_sizecache        int32                 `json:"-"`
@@ -217,7 +217,7 @@ func (m *StaticRoutes_Route) GetViaVrfId() uint32 {
 
 // IP ARP entries
 type ArpTable struct {
-	ArpEntries           []*ArpTable_ArpEntry `protobuf:"bytes,1,rep,name=arp_entries,json=arpEntries" json:"arp_entries,omitempty"`
+	ArpEntries           []*ArpTable_ArpEntry `protobuf:"bytes,1,rep,name=arp_entries,json=arpEntries,proto3" json:"arp_entries,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}             `json:"-"`
 	XXX_unrecognized     []byte               `json:"-"`
 	XXX_sizecache        int32                `json:"-"`
@@ -318,7 +318,7 @@ func (m *ArpTable_ArpEntry) GetStatic() bool {
 
 // Proxy ARP ranges
 type ProxyArpRanges struct {
-	RangeLists           []*ProxyArpRanges_RangeList `protobuf:"bytes,1,rep,name=range_lists,json=rangeLists" json:"range_lists,omitempty"`
+	RangeLists           []*ProxyArpRanges_RangeList `protobuf:"bytes,1,rep,name=range_lists,json=rangeLists,proto3" json:"range_lists,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                    `json:"-"`
 	XXX_unrecognized     []byte                      `json:"-"`
 	XXX_sizecache        int32                       `json:"-"`
@@ -357,7 +357,7 @@ func (m *ProxyArpRanges) GetRangeLists() []*ProxyArpRanges_RangeList {
 
 type ProxyArpRanges_RangeList struct {
 	Label                string                            `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`
-	Ranges               []*ProxyArpRanges_RangeList_Range `protobuf:"bytes,2,rep,name=ranges" json:"ranges,omitempty"`
+	Ranges               []*ProxyArpRanges_RangeList_Range `protobuf:"bytes,2,rep,name=ranges,proto3" json:"ranges,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                          `json:"-"`
 	XXX_unrecognized     []byte                            `json:"-"`
 	XXX_sizecache        int32                             `json:"-"`
@@ -449,7 +449,7 @@ func (m *ProxyArpRanges_RangeList_Range) GetLastIp() string {
 
 // Proxy ARP interfaces
 type ProxyArpInterfaces struct {
-	InterfaceLists       []*ProxyArpInterfaces_InterfaceList `protobuf:"bytes,1,rep,name=interface_lists,json=interfaceLists" json:"interface_lists,omitempty"`
+	InterfaceLists       []*ProxyArpInterfaces_InterfaceList `protobuf:"bytes,1,rep,name=interface_lists,json=interfaceLists,proto3" json:"interface_lists,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                            `json:"-"`
 	XXX_unrecognized     []byte                              `json:"-"`
 	XXX_sizecache        int32                               `json:"-"`
@@ -488,7 +488,7 @@ func (m *ProxyArpInterfaces) GetInterfaceLists() []*ProxyArpInterfaces_Interface
 
 type ProxyArpInterfaces_InterfaceList struct {
 	Label                string                                        `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`
-	Interfaces           []*ProxyArpInterfaces_InterfaceList_Interface `protobuf:"bytes,2,rep,name=interfaces" json:"interfaces,omitempty"`
+	Interfaces           []*ProxyArpInterfaces_InterfaceList_Interface `protobuf:"bytes,2,rep,name=interfaces,proto3" json:"interfaces,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                                      `json:"-"`
 	XXX_unrecognized     []byte                                        `json:"-"`
 	XXX_sizecache        int32                                         `json:"-"`
@@ -576,7 +576,7 @@ func (m *ProxyArpInterfaces_InterfaceList_Interface) GetName() string {
 
 // STN (Steal The NIC) feature table
 type STNTable struct {
-	StnEntries           []*STNTable_STNTableEntry `protobuf:"bytes,1,rep,name=stn_entries,json=stnEntries" json:"stn_entries,omitempty"`
+	StnEntries           []*STNTable_STNTableEntry `protobuf:"bytes,1,rep,name=stn_entries,json=stnEntries,proto3" json:"stn_entries,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}                  `json:"-"`
 	XXX_unrecognized     []byte                    `json:"-"`
 	XXX_sizecache        int32                     `json:"-"`

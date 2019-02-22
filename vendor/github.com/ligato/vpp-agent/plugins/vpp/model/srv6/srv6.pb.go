@@ -22,14 +22,14 @@ type LocalSID struct {
 	Sid        string `protobuf:"bytes,1,opt,name=sid,proto3" json:"sid,omitempty"`
 	FibTableId uint32 `protobuf:"varint,2,opt,name=fib_table_id,json=fibTableId,proto3" json:"fib_table_id,omitempty"`
 	// Configuration for end functions (all end functions are mutually exclusive)
-	BaseEndFunction      *LocalSID_End    `protobuf:"bytes,3,opt,name=base_end_function,json=baseEndFunction" json:"base_end_function,omitempty"`
-	EndFunction_X        *LocalSID_EndX   `protobuf:"bytes,4,opt,name=end_function_X,json=endFunctionX" json:"end_function_X,omitempty"`
-	EndFunction_T        *LocalSID_EndT   `protobuf:"bytes,5,opt,name=end_function_T,json=endFunctionT" json:"end_function_T,omitempty"`
-	EndFunction_DX2      *LocalSID_EndDX2 `protobuf:"bytes,6,opt,name=end_function_DX2,json=endFunctionDX2" json:"end_function_DX2,omitempty"`
-	EndFunction_DX4      *LocalSID_EndDX4 `protobuf:"bytes,7,opt,name=end_function_DX4,json=endFunctionDX4" json:"end_function_DX4,omitempty"`
-	EndFunction_DX6      *LocalSID_EndDX6 `protobuf:"bytes,8,opt,name=end_function_DX6,json=endFunctionDX6" json:"end_function_DX6,omitempty"`
-	EndFunction_DT4      *LocalSID_EndDT4 `protobuf:"bytes,9,opt,name=end_function_DT4,json=endFunctionDT4" json:"end_function_DT4,omitempty"`
-	EndFunction_DT6      *LocalSID_EndDT6 `protobuf:"bytes,10,opt,name=end_function_DT6,json=endFunctionDT6" json:"end_function_DT6,omitempty"`
+	BaseEndFunction      *LocalSID_End    `protobuf:"bytes,3,opt,name=base_end_function,json=baseEndFunction,proto3" json:"base_end_function,omitempty"`
+	EndFunction_X        *LocalSID_EndX   `protobuf:"bytes,4,opt,name=end_function_X,json=endFunctionX,proto3" json:"end_function_X,omitempty"`
+	EndFunction_T        *LocalSID_EndT   `protobuf:"bytes,5,opt,name=end_function_T,json=endFunctionT,proto3" json:"end_function_T,omitempty"`
+	EndFunction_DX2      *LocalSID_EndDX2 `protobuf:"bytes,6,opt,name=end_function_DX2,json=endFunctionDX2,proto3" json:"end_function_DX2,omitempty"`
+	EndFunction_DX4      *LocalSID_EndDX4 `protobuf:"bytes,7,opt,name=end_function_DX4,json=endFunctionDX4,proto3" json:"end_function_DX4,omitempty"`
+	EndFunction_DX6      *LocalSID_EndDX6 `protobuf:"bytes,8,opt,name=end_function_DX6,json=endFunctionDX6,proto3" json:"end_function_DX6,omitempty"`
+	EndFunction_DT4      *LocalSID_EndDT4 `protobuf:"bytes,9,opt,name=end_function_DT4,json=endFunctionDT4,proto3" json:"end_function_DT4,omitempty"`
+	EndFunction_DT6      *LocalSID_EndDT6 `protobuf:"bytes,10,opt,name=end_function_DT6,json=endFunctionDT6,proto3" json:"end_function_DT6,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}         `json:"-"`
 	XXX_unrecognized     []byte           `json:"-"`
 	XXX_sizecache        int32            `json:"-"`
@@ -540,7 +540,7 @@ func (m *Policy) GetSprayBehaviour() bool {
 type PolicySegment struct {
 	PolicyBsid           string   `protobuf:"bytes,1,opt,name=policy_bsid,json=policyBsid,proto3" json:"policy_bsid,omitempty"`
 	Weight               uint32   `protobuf:"varint,2,opt,name=weight,proto3" json:"weight,omitempty"`
-	Segments             []string `protobuf:"bytes,3,rep,name=segments" json:"segments,omitempty"`
+	Segments             []string `protobuf:"bytes,3,rep,name=segments,proto3" json:"segments,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -596,8 +596,8 @@ type Steering struct {
 	PolicyBsid  string `protobuf:"bytes,1,opt,name=policy_bsid,json=policyBsid,proto3" json:"policy_bsid,omitempty"`
 	PolicyIndex uint32 `protobuf:"varint,2,opt,name=policy_index,json=policyIndex,proto3" json:"policy_index,omitempty"`
 	// Traffic configuration (all traffic messages are mutual exclusive)
-	L2Traffic            *Steering_L2Traffic `protobuf:"bytes,3,opt,name=l2_traffic,json=l2Traffic" json:"l2_traffic,omitempty"`
-	L3Traffic            *Steering_L3Traffic `protobuf:"bytes,4,opt,name=l3_traffic,json=l3Traffic" json:"l3_traffic,omitempty"`
+	L2Traffic            *Steering_L2Traffic `protobuf:"bytes,3,opt,name=l2_traffic,json=l2Traffic,proto3" json:"l2_traffic,omitempty"`
+	L3Traffic            *Steering_L3Traffic `protobuf:"bytes,4,opt,name=l3_traffic,json=l3Traffic,proto3" json:"l3_traffic,omitempty"`
 	XXX_NoUnkeyedLiteral struct{}            `json:"-"`
 	XXX_unrecognized     []byte              `json:"-"`
 	XXX_sizecache        int32               `json:"-"`

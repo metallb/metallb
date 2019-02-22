@@ -21,8 +21,8 @@ import (
 	"github.com/ligato/cn-infra/logging"
 	"github.com/ligato/cn-infra/utils/addrs"
 	"github.com/ligato/cn-infra/utils/safeclose"
-	"github.com/ligato/vpp-agent/idxvpp"
-	"github.com/ligato/vpp-agent/idxvpp/nametoidx"
+	"github.com/ligato/vpp-agent/pkg/idxvpp"
+	"github.com/ligato/vpp-agent/pkg/idxvpp/nametoidx"
 	"github.com/ligato/vpp-agent/plugins/govppmux"
 	"github.com/ligato/vpp-agent/plugins/vpp/ifplugin/ifaceidx"
 	iface_vppcalls "github.com/ligato/vpp-agent/plugins/vpp/ifplugin/vppcalls"
@@ -215,12 +215,15 @@ func (c *IPSecConfigurator) DeleteSPD(oldSpd *ipsec.SecurityPolicyDatabases_SPD)
 	}
 
 	// remove cache entries related to the SPD
-	for i, entry := range c.spdIfCache {
+	var updatedCache []SPDIfCacheEntry
+	for _, entry := range c.spdIfCache {
 		if entry.spdID == spdID {
-			c.spdIfCache = append(c.spdIfCache[:i], c.spdIfCache[i+1:]...)
 			c.log.Debugf("Removed cache entry for assignment of SPD %q to interface %q", entry.spdID, entry.ifaceName)
+			continue
 		}
+		updatedCache = append(updatedCache, entry)
 	}
+	c.spdIfCache = updatedCache
 
 	c.spdIndexes.UnregisterName(oldSpd.Name)
 	c.log.Debugf("SPD %s unregistered", oldSpd.Name)

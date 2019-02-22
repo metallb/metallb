@@ -1,6 +1,6 @@
 {
   "name": "${name}",
-  "type": 0,
+  "type": "SOFTWARE_LOOPBACK",
   "enabled": ${enabled},
   "phys_address": "${mac}",
   "mtu": ${mtu},

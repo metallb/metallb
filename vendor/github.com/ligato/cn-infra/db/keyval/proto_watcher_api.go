@@ -27,22 +27,14 @@ type ProtoWatcher interface {
 	// Watch starts monitoring changes associated with the keys.
 	// Watch events will be delivered to callback (not channel) <respChan>.
 	// Channel <closeChan> can be used to close watching on respective key
-	Watch(respChan func(ProtoWatchResp), closeChan chan string, key ...string) error
-}
-
-// ProtoWatchResp represents a notification about data change.
-// It is sent through the respChan callback.
-type ProtoWatchResp interface {
-	datasync.ChangeValue
-	datasync.WithPrevValue
-	datasync.WithKey
+	Watch(respChan func(datasync.ProtoWatchResp), closeChan chan string, key ...string) error
 }
 
 // ToChanProto creates a callback that can be passed to the Watch function
 // in order to receive JSON/protobuf-formatted notifications through a channel.
 // If the notification cannot be delivered until timeout, it is dropped.
-func ToChanProto(respCh chan ProtoWatchResp, opts ...interface{}) func(dto ProtoWatchResp) {
-	return func(dto ProtoWatchResp) {
+func ToChanProto(respCh chan datasync.ProtoWatchResp, opts ...interface{}) func(dto datasync.ProtoWatchResp) {
+	return func(dto datasync.ProtoWatchResp) {
 		select {
 		case respCh <- dto:
 			// success

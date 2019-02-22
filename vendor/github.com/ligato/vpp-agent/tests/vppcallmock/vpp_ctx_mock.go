@@ -34,6 +34,7 @@ func init() {
 // It wraps VppAdapter which is used instead of real VPP.
 type TestCtx struct {
 	MockVpp     *mock.VppAdapter
+	MockStats   *mock.StatsAdapter
 	conn        *govpp.Connection
 	channel     govppapi.Channel
 	MockChannel *mockedChannel
@@ -44,7 +45,8 @@ func SetupTestCtx(t *testing.T) *TestCtx {
 	RegisterTestingT(t)
 
 	ctx := &TestCtx{
-		MockVpp: mock.NewVppAdapter(),
+		MockVpp:   mock.NewVppAdapter(),
+		MockStats: mock.NewStatsAdapter(),
 	}
 
 	var err error
@@ -117,7 +119,7 @@ func (ctx *TestCtx) MockReplies(dataList []*HandleReplies) {
 		}
 
 		if request.MsgName == "" {
-			log.DefaultLogger().Fatalf("mockHandler received request (ID: %v) with empty MsgName, check if compatbility check is done before using this request", request.MsgID)
+			log.DefaultLogger().Fatalf("mockHandler received request (ID: %v) with empty MsgName, check if compatibility check is done before using this request", request.MsgID)
 		}
 
 		if sendControlPing {
@@ -139,6 +141,9 @@ func (ctx *TestCtx) MockReplies(dataList []*HandleReplies) {
 					for _, msg := range dataMock.Messages {
 						ctx.MockVpp.MockReply(msg)
 					}
+					return nil, 0, false
+				}
+				if dataMock.Message == nil {
 					return nil, 0, false
 				}
 				msgID, err := ctx.MockVpp.GetMsgID(dataMock.Message.GetMessageName(), dataMock.Message.GetCrcString())

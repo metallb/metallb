@@ -15,8 +15,8 @@
 package ifaceidx
 
 import (
-	"github.com/ligato/vpp-agent/idxvpp"
-	"github.com/ligato/vpp-agent/idxvpp/nametoidx"
+	"github.com/ligato/vpp-agent/pkg/idxvpp"
+	"github.com/ligato/vpp-agent/pkg/idxvpp/nametoidx"
 	intf "github.com/ligato/vpp-agent/plugins/vpp/model/interfaces"
 )
 

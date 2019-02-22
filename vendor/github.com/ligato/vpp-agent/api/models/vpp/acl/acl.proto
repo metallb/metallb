@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package vpp.acl;
+
+option go_package = "github.com/ligato/vpp-agent/api/models/vpp/acl;vpp_acl";
+
+import "github.com/gogo/protobuf/gogoproto/gogo.proto";
+option (gogoproto.messagename_all) = true;
+
+// Access Control List (ACL)
+message ACL {
+    // The name of an access list. A device MAY restrict the length
+    // and value of this name, possibly spaces and special
+    // characters are not allowed.
+    string name = 1;
+
+    // List of access list entries (Rules). Each Access Control Rule has
+    // a list of match criteria and a list of actions.
+    // Access List entry that can define:
+    // - IPv4/IPv6 src ip prefix
+    // - src MAC address mask
+    // - src MAC address value
+    // - can be used only for static ACLs.
+    message Rule {
+        enum Action {
+            DENY = 0;
+            PERMIT = 1;
+            REFLECT = 2;
+        };
+        Action action = 1;
+
+        // Access List entry that can define:
+        // - IPv4/IPv6 src/dst IP prefix
+        // - Internet Protocol number
+        // - selected L4 headers:
+        //   * ICMP (type range)
+        //   * UDP (port range)
+        //   * TCP (port range, flags mask, flags value)
+
+        message IpRule {
+            // IP  used in this Access List Entry.
+            message Ip {
+                // Destination IPv4/IPv6 network address (<ip>/<network>)
+                string destination_network = 1;
+                // Destination IPv4/IPv6 network address (<ip>/<network>)
+                string source_network = 2;
+            }
+            Ip ip = 1;
+
+            message Icmp {
+                // ICMPv6 flag, if false ICMPv4 will be used
+                bool icmpv6 = 1;
+                message Range {
+                    uint32 first = 1;
+                    uint32 last = 2;
+                }
+                // Inclusive range representing icmp codes to be used.
+                Range icmp_code_range = 2;
+                Range icmp_type_range = 3;
+            }
+            Icmp icmp = 2;
+
+            // Inclusive range representing destination ports to be used. When
+            // only lower-port is present, it represents a single port.
+            message PortRange {
+                uint32 lower_port = 1;
+                // If upper port is set, it must
+                // be greater or equal to lower port
+                uint32 upper_port = 2;
+            }
+
+            message Tcp {
+                PortRange destination_port_range = 1;
+                PortRange source_port_range = 2;
+                // Binary mask for tcp flags to match. MSB order (FIN at position 0).
+                // Applied as logical AND to tcp flags field of the packet being matched,
+                // before it is compared with tcp-flags-value.
+                uint32 tcp_flags_mask = 3;
+                // Binary value for tcp flags to match. MSB order (FIN at position 0).
+                // Before tcp-flags-value is compared with tcp flags field of the packet being matched,
+                // tcp-flags-mask is applied to packet field value.
+                uint32 tcp_flags_value = 4;
+            }
+            Tcp tcp = 3;
+
+            message Udp {
+                PortRange destination_port_range = 1;
+                PortRange source_port_range = 2;
+            }
+            Udp udp = 4;
+        }
+        IpRule ip_rule = 2;
+
+        message MacIpRule {
+            string source_address = 1;
+            uint32 source_address_prefix = 2;
+            // Before source-mac-address is compared with source mac address field of the packet
+            // being matched, source-mac-address-mask is applied to packet field value.
+            string source_mac_address = 3;
+            // Source MAC address mask.
+            // Applied as logical AND with source mac address field of the packet being matched,
+            // before it is compared with source-mac-address.
+            string source_mac_address_mask = 4;
+        }
+        MacIpRule macip_rule = 3;
+    }
+    repeated Rule rules = 2;
+
+    // The set of interfaces that has assigned this ACL on ingres or egress.
+    message Interfaces {
+        repeated string egress = 1;
+        repeated string ingress = 2;
+    }
+    Interfaces interfaces = 3;
+}

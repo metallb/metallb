@@ -18,7 +18,7 @@ import (
 	"testing"
 
 	"github.com/ligato/cn-infra/logging/logrus"
-	"github.com/ligato/vpp-agent/idxvpp/nametoidx"
+	"github.com/ligato/vpp-agent/pkg/idxvpp/nametoidx"
 	bin_api "github.com/ligato/vpp-agent/plugins/vpp/binapi/nat"
 	"github.com/ligato/vpp-agent/plugins/vpp/binapi/vpe"
 	"github.com/ligato/vpp-agent/plugins/vpp/ifplugin/ifaceidx"
@@ -87,6 +87,6 @@ func natTestSetup(t *testing.T) (*vppcallmock.TestCtx, vppcalls.NatVppAPI, iface
 	ctx := vppcallmock.SetupTestCtx(t)
 	log := logrus.NewLogger("test-log")
 	swIfIndexes := ifaceidx.NewSwIfIndex(nametoidx.NewNameToIdx(logrus.DefaultLogger(), "test-sw_if_indexes", ifaceidx.IndexMetadata))
-	natHandler := vppcalls.NewNatVppHandler(ctx.MockChannel, ctx.MockChannel, swIfIndexes, log,)
+	natHandler := vppcalls.NewNatVppHandler(ctx.MockChannel, ctx.MockChannel, swIfIndexes, log)
 	return ctx, natHandler, swIfIndexes
 }

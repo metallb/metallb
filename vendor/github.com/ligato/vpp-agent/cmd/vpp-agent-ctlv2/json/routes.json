@@ -1,0 +1,6 @@
+{
+    "dst_ip_addr": "10.1.1.3/32",
+    "next_hop_addr": "192.168.1.13",
+    "outgoing_interface": "tap1",
+    "weight": 6
+}
