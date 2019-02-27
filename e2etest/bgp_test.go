@@ -15,19 +15,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-func TestBGP(t *testing.T) { testAll(t, testBGP) }
-func testBGP(t *testing.T, u *vk.Universe) {
-	configureBGP(t, u)
-
-	cluster := u.Cluster("cluster")
-	client := u.VM("client")
-	kube := cluster.KubernetesClient()
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-	defer cancel()
-
-	// Create a service, and wait for it to get an IP.
-	svc := `
+const bgpService = `
 apiVersion: v1
 kind: Service
 metadata:
@@ -55,60 +43,74 @@ spec:
   type: LoadBalancer
   loadBalancerIP: 10.249.0.2
   externalTrafficPolicy: Local
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mirror-shared1
+  annotations:
+    metallb.universe.tf/allow-shared-ip: mirror
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: mirror
+  type: LoadBalancer
+  loadBalancerIP: 10.249.0.3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mirror-shared2
+  annotations:
+    metallb.universe.tf/allow-shared-ip: mirror
+spec:
+  ports:
+  - port: 81
+    targetPort: 8081
+  selector:
+    app: mirror
+  type: LoadBalancer
+  loadBalancerIP: 10.249.0.3
 `
-	if err := cluster.ApplyManifest([]byte(svc)); err != nil {
+
+func TestBGP(t *testing.T) { testAll(t, testBGP) }
+func testBGP(t *testing.T, u *vk.Universe) {
+	configureBGP(t, u)
+
+	cluster := u.Cluster("cluster")
+	client := u.VM("client")
+	kube := cluster.KubernetesClient()
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	// Create a service, and wait for it to get an IP.
+	if err := cluster.ApplyManifest([]byte(bgpService)); err != nil {
 		t.Fatalf("creating LB service: %v", err)
 	}
 	waitForAllocation(ctx, t, kube, "mirror-cluster", "10.249.0.1", 2)
 	waitForAllocation(ctx, t, kube, "mirror-local", "10.249.0.2", 2)
+	waitForAllocation(ctx, t, kube, "mirror-shared1", "10.249.0.3", 2)
+	waitForAllocation(ctx, t, kube, "mirror-shared2", "10.249.0.3", 2)
 
-	waitFor(ctx, t, func() bool {
-		bs, err := client.Run("birdc show route 10.249.0.1/32")
-		if err != nil {
-			t.Fatal(err)
-		}
-		routes := string(bs)
-		if !strings.Contains(routes, "10.249.0.1/32") {
-			return false
-		}
-		if !strings.Contains(routes, cluster.Controller().IPv4("net1").String()) {
-			return false
-		}
-		for _, node := range cluster.Nodes() {
-			if !strings.Contains(routes, node.IPv4("net1").String()) {
-				return false
-			}
-		}
-		return true
-	})
-	waitFor(ctx, t, func() bool {
-		bs, err := client.Run("birdc show route 10.249.0.2/32")
-		if err != nil {
-			t.Fatal(err)
-		}
-		routes := string(bs)
-		if !strings.Contains(routes, "10.249.0.2/32") {
-			return false
-		}
-		if !strings.Contains(routes, cluster.Controller().IPv4("net1").String()) {
-			return false
-		}
-		for _, node := range cluster.Nodes() {
-			if !strings.Contains(routes, node.IPv4("net1").String()) {
-				return false
-			}
-		}
-		return true
-	})
+	waitForRoutes(ctx, t, client, "10.249.0.1", append(cluster.Nodes(), cluster.Controller()))
+	waitForRoutes(ctx, t, client, "10.249.0.2", append(cluster.Nodes(), cluster.Controller()))
+	waitForRoutes(ctx, t, client, "10.249.0.3", append(cluster.Nodes(), cluster.Controller()))
 
 	// From the client, probe the service IP. We should get a
 	// successful response.
-	waitForService(ctx, t, client, "10.249.0.1")
-	waitForService(ctx, t, client, "10.249.0.2")
+	waitForService(ctx, t, client, "http://10.249.0.1")
+	waitForService(ctx, t, client, "http://10.249.0.2")
+	waitForService(ctx, t, client, "http://10.249.0.3")
+	waitForService(ctx, t, client, "http://10.249.0.3:81")
 
 	// Traffic should be evenly distributed across the 2 backend pods.
-	checkServiceBalance(ctx, t, client, "10.249.0.1")
-	checkServiceBalance(ctx, t, client, "10.249.0.2")
+	checkServiceBalance(ctx, t, client, "http://10.249.0.1")
+	checkServiceBalance(ctx, t, client, "http://10.249.0.2")
+	checkServiceBalance(ctx, t, client, "http://10.249.0.3")
+	checkServiceBalance(ctx, t, client, "http://10.249.0.3:81")
 }
 
 // Helpers
@@ -138,9 +140,31 @@ func waitForAllocation(ctx context.Context, t *testing.T, kube *kubernetes.Clien
 	})
 }
 
+func waitForRoutes(ctx context.Context, t *testing.T, client *vk.VM, ip string, nexthops []*vk.VM) {
+	waitFor(ctx, t, func() bool {
+		bs, err := client.Run(fmt.Sprintf("birdc show route %s/32", ip))
+		if err != nil {
+			t.Fatal(err)
+		}
+		routes := string(bs)
+		if !strings.Contains(routes, ip+"/32") {
+			return false
+		}
+		if strings.Count(routes, "via ") != len(nexthops) {
+			return false
+		}
+		for _, nexthop := range nexthops {
+			if !strings.Contains(routes, nexthop.IPv4("net1").String()) {
+				return false
+			}
+		}
+		return true
+	})
+}
+
 // waitForService tries uses vm to fetch from ip until 10 requests in
 // a row succeed, or the context times out.
-func waitForService(ctx context.Context, t *testing.T, vm *vk.VM, ip string) {
+func waitForService(ctx context.Context, t *testing.T, vm *vk.VM, url string) {
 	transport := &http.Transport{
 		Dial: func(network, addr string) (net.Conn, error) {
 			return vm.Dial(network, addr)
@@ -151,7 +175,7 @@ func waitForService(ctx context.Context, t *testing.T, vm *vk.VM, ip string) {
 		for i := 0; i < 10; i++ {
 			ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 			defer cancel()
-			req, err := http.NewRequest("GET", "http://"+ip, nil)
+			req, err := http.NewRequest("GET", url, nil)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -166,7 +190,7 @@ func waitForService(ctx context.Context, t *testing.T, vm *vk.VM, ip string) {
 	})
 }
 
-func checkServiceBalance(ctx context.Context, t *testing.T, vm *vk.VM, ip string) {
+func checkServiceBalance(ctx context.Context, t *testing.T, vm *vk.VM, url string) {
 	hits := map[string]int{}
 	runs := 200
 	transport := &http.Transport{
@@ -178,7 +202,7 @@ func checkServiceBalance(ctx context.Context, t *testing.T, vm *vk.VM, ip string
 	for i := 0; i < runs; i++ {
 		ctx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
 		defer cancel()
-		req, err := http.NewRequest("GET", "http://"+ip, nil)
+		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

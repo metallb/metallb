@@ -277,6 +277,24 @@ func mkClusterNet(addon string) func(*vk.Universe) error {
 			return fmt.Errorf("waiting for nodes to become ready: %v", err)
 		}
 
+		// Wait for all deployments to schedule, which signals that
+		// the network addon's finished setting up.
+		err = c.WaitFor(context.Background(), func() (bool, error) {
+			deploys, err := c.KubernetesClient().AppsV1().Deployments("").List(metav1.ListOptions{})
+			if err != nil {
+				return false, err
+			}
+			for _, deploy := range deploys.Items {
+				if deploy.Status.AvailableReplicas != deploy.Status.Replicas {
+					return false, nil
+				}
+			}
+			return true, nil
+		})
+		if err != nil {
+			return err
+		}
+
 		return nil
 	}
 }

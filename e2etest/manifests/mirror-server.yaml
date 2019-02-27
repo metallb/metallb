@@ -28,5 +28,9 @@ spec:
             fieldRef:
               fieldPath: metadata.uid
         ports:
-        - name: http
+        - name: http1
           containerPort: 8080
+        - name: http2
+          containerPort: 8081
+        - name: http3
+          containerPort: 8082
