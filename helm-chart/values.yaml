@@ -25,7 +25,6 @@ rbac:
 
 psp:
   # create specifies whether to install and use Pod Security Policies.
-  # This only apples to L2 mode.
   create: true
 
 prometheus:
