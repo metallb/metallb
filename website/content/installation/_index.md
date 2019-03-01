@@ -39,14 +39,13 @@ you
 
 ## Installation with Helm
 
-{{% notice note %}}
-Due to code review turnaround time, it usually takes a few days after
-each MetalLB release before the Helm chart is updated in the stable
-repository.
+{{% notice note %}} Due to code review turnaround time, it usually
+takes a few days after each MetalLB release before the Helm chart is
+updated in the stable repository.
 
-Currently, the Helm chart is **not** up to date with the latest
-release of MetalLB. If you need to use the latest release, please use
-an alternate installation method.
+If you're coming here shortly after a new release, you may end up
+installing an older version of MetalLB if you use Helm. This mismatch
+usually gets fixed within 2-3 days.
 {{% /notice %}}
 
 MetalLB maintains a Helm package in the `stable` package
