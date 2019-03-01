@@ -7,7 +7,7 @@ Once you setup a loadbalancer on Kubernetes and it doesn't _seem_ to work right 
 
 SSH into one or more of your nodes and use `arping` and `tcpdump` to verify the ARP requests pass through your network.
 
-Below assumes you setup a loadbalancer with an IP of `192.167.1.240` and then we show usage of the commands and successful
+Below assumes you setup a loadbalancer with an IP of `192.168.1.240` and then we show usage of the commands and successful
 requests going back and forth.
 
 TL;DR - We found out that the IP `192.168.1.240` is located at the mac `FA:16:3E:5A:39:4C`.
@@ -65,17 +65,3 @@ In addition to the above, make sure to watch the logs of MetalLB's speaker compo
 $ kubetail -l component=speaker -n metallb-system
 ...
 ```
-
-## Platform specifics
-
-### OpenStack
-
-OpenStack rejects ARP requests by default if an IP is not assigned to a VM. To work around that, disable port security (or spoofing detection) on your VMs:
-
-```
-$ neutron port-list
-...
-$ neutron port-update ccbd0ed6-3dfd-4431-af29-4a2d921abb38 --port_security_enabled=False
-```
-
-_`ccbd0ed6-3dfd-4431-af29-4a2d921abb38` being the UUID of the network port of your VM._

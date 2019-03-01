@@ -24,8 +24,8 @@ Layer 2 mode is the simplest to configure: in many cases, you don't
 need any protocol-specific configuration, only IP addresses.
 
 Layer 2 mode does not require the IPs to be bound to the network interfaces
-of your worker nodes. It works by _flooding_ your local network with ARP
-requests and hereby announcing the location (mac-address) of an IP.
+of your worker nodes. It works by responding to ARP requests on your local
+network directly, to give the machine's MAC address to clients.
 
 For example, the following configuration gives MetalLB control over
 IPs from `192.168.1.240` to `192.168.1.250`, and configures Layer 2
