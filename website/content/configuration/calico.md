@@ -211,7 +211,7 @@ especially if you have tips on how to make this work best!
 
 ## Ideas wanted!
 
-None of these workarounds is very satisfying. Until Calico supports
+None of these workarounds are very satisfying. Until Calico supports
 more advanced configuration for BGP peers, we are stuck doing
 acrobatics to integrate the two.
 
