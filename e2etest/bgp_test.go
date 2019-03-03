@@ -138,10 +138,14 @@ func testBGP(t *testing.T, u *vk.Universe) {
 			t.Error(err)
 		}
 
-		// Client source IP assignment is broken in kube-proxy, in
-		// that the masquerade IP is not stable. This is reproducible
-		// with multiple network addons. Therefore we don't verify it
-		// here.
+		testBroken(t, "client-ip-correct", func() {
+			if stats.Clients() != 2 {
+				t.Errorf("want 2 client sending traffic, got %d", stats.Clients())
+			}
+			if err := stats.BalancedByClient(0.2); err != nil {
+				t.Error(err)
+			}
+		})
 	})
 
 	t.Run("local", func(t *testing.T) {
@@ -168,18 +172,15 @@ func testBGP(t *testing.T, u *vk.Universe) {
 		if err := stats.BalancedByNode(0.2); err != nil {
 			t.Error(err)
 		}
-		if t.Name() == "TestBGP/weave/local" {
-			// Weave is broken and masquerades even
-			// externalTrafficPolicy=Local traffic.
-			return
-		}
 
-		if stats.Clients() != 1 {
-			t.Errorf("want 1 client sending traffic, got %d", stats.Clients())
-		}
-		if err := stats.BalancedByClient(0.2); err != nil {
-			t.Error(err)
-		}
+		testBroken(t, "client-ip-correct", func() {
+			if stats.Clients() != 1 {
+				t.Errorf("want 1 client sending traffic, got %d", stats.Clients())
+			}
+			if err := stats.BalancedByClient(0.2); err != nil {
+				t.Error(err)
+			}
+		})
 	})
 
 	t.Run("shared", func(t *testing.T) {
@@ -225,10 +226,20 @@ func testBGP(t *testing.T, u *vk.Universe) {
 			t.Error(err)
 		}
 
-		// Client source IP assignment is broken in kube-proxy, in
-		// that the masquerade IP is not stable. This is reproducible
-		// with multiple network addons. Therefore we don't verify it
-		// here.
+		testBroken(t, "client-ip-correct", func() {
+			if stats1.Clients() != 2 {
+				t.Errorf("want 2 client sending traffic, got %d", stats1.Clients())
+			}
+			if err := stats1.BalancedByClient(0.2); err != nil {
+				t.Error(err)
+			}
+			if stats2.Clients() != 2 {
+				t.Errorf("want 2 client sending traffic, got %d", stats2.Clients())
+			}
+			if err := stats2.BalancedByClient(0.2); err != nil {
+				t.Error(err)
+			}
+		})
 	})
 }
 
