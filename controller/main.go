@@ -98,6 +98,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 func (c *controller) deleteBalancer(l log.Logger, name string) {
 	if c.ips.Unassign(name) {
 		l.Log("event", "serviceDeleted", "msg", "service deleted")
+		c.SetConfig(l, c.config)
 	}
 }
 
