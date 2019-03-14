@@ -3,6 +3,8 @@ title: Concepts
 weight: 1
 ---
 
+# Concepts
+
 MetalLB hooks into your Kubernetes cluster, and provides a network
 load-balancer implementation. In short, it allows you to create
 Kubernetes services of type "LoadBalancer" in clusters that don't run
@@ -59,7 +61,7 @@ announcing machine simply has multiple IP addresses.
 The [layer 2 mode]({{% relref "layer2.md" %}}) sub-page has more
 details on the behavior and limitations of layer 2 mode.
 
-### BGP 
+### BGP
 
 In BGP mode, all machines in the cluster
 establish [BGP](https://en.wikipedia.org/wiki/Border_Gateway_Protocol)
