@@ -168,7 +168,15 @@ func (s *Session) connect() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	deadline, _ := ctx.Deadline()
-	conn, err := dialMD5(ctx, s.addr, s.password)
+
+	laddr := "[::]:0"
+	if (s.routerID.To4() != nil) {
+		laddr = fmt.Sprintf("%s:0", s.routerID.String())
+	} else if (s.routerID.To16() != nil) {
+		laddr = fmt.Sprintf("[%s]:0", s.routerID.String())
+	}
+
+	conn, err := dialMD5(ctx, laddr, s.addr, s.password)
 	if err != nil {
 		return fmt.Errorf("dial %q: %s", s.addr, err)
 	}
@@ -512,13 +520,13 @@ type tcpmd5sig struct {
 // proper TCP MD5 options when the password is not empty. Works by manupulating
 // the low level FD's, skipping the net.Conn API as it has not hooks to set
 // the neccessary sockopts for TCP MD5.
-func dialMD5(ctx context.Context, addr, password string) (net.Conn, error) {
-	laddr, err := net.ResolveTCPAddr("tcp", "[::]:0")
+func dialMD5(ctx context.Context, local string, remote string, password string) (net.Conn, error) {
+	laddr, err := net.ResolveTCPAddr("tcp", local)
 	if err != nil {
 		return nil, fmt.Errorf("Error resolving local address: %s ", err)
 	}
 
-	raddr, err := net.ResolveTCPAddr("tcp", addr)
+	raddr, err := net.ResolveTCPAddr("tcp", remote)
 	if err != nil {
 		return nil, fmt.Errorf("invalid remote address: %s ", err)
 	}
