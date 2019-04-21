@@ -42,8 +42,9 @@ func init() {
 func testAll(t *testing.T, f func(t *testing.T, u *vk.Universe)) {
 	for _, base := range []string{"calico", "flannel", "weave"} {
 		t.Run(base, func(t *testing.T) {
-			cfg := &vk.UniverseConfig{
-				CommandLog: os.Stdout,
+			cfg := &vk.UniverseConfig{}
+			if os.Getenv("E2E_VERBOSE") != "" {
+				cfg.CommandLog = os.Stdout
 			}
 			if os.Getenv("E2E_USERSPACE") != "" {
 				cfg.NoAcceleration = true

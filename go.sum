@@ -167,8 +167,8 @@ github.com/vishvananda/netlink v1.0.0/go.mod h1:+SR5DhBJrl6ZM7CoCKvpw5BKroDKQ+PJ
 github.com/vishvananda/netns v0.0.0-20180720170159-13995c7128cc h1:R83G5ikgLMxrBvLh22JhdfI8K6YXEPHx5P03Uu3DRs4=
 github.com/vishvananda/netns v0.0.0-20180720170159-13995c7128cc/go.mod h1:ZjcWmFBXmLKZu9Nxj3WKYEafiSqer2rnvPr0en9UNpI=
 github.com/xordataexchange/crypt v0.0.3-0.20170626215501-b2862e3d0a77/go.mod h1:aYKd//L2LvnjZzWKhF00oedf4jCCReLcmhLdhm1A27Q=
-go.universe.tf/virtuakube v0.0.0-20190220095524-83d67c0df690 h1:YMTlzArB1JbKtDQUYJammQRNrTSU7p4pFjnITDCMdPQ=
-go.universe.tf/virtuakube v0.0.0-20190220095524-83d67c0df690/go.mod h1:Ng3Vyznt6lFVIR1X4E/tZoIYFSFndflxZc2q6tvcYB8=
+go.universe.tf/virtuakube v0.0.0-20190421203108-952a1c1edc7e h1:AYMWkdeuAk9pQnH+gwLAoprOXx7QERItrqrV9KiJpW4=
+go.universe.tf/virtuakube v0.0.0-20190421203108-952a1c1edc7e/go.mod h1:Ng3Vyznt6lFVIR1X4E/tZoIYFSFndflxZc2q6tvcYB8=
 golang.org/x/crypto v0.0.0-20180904163835-0709b304e793/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=
 golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9 h1:mKdxBk7AujPs8kU4m80U72y/zjbZ3UcXC7dClwKbUI0=
 golang.org/x/crypto v0.0.0-20181203042331-505ab145d0a9/go.mod h1:6SG95UA2DQfeDnfUPMdvaQW0Q7yPrPDi9nlGo2tz2b4=

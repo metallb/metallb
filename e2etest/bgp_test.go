@@ -138,7 +138,7 @@ func testBGP(t *testing.T, u *vk.Universe) {
 			t.Error(err)
 		}
 
-		testBroken(t, "client-ip-correct", func() {
+		testBroken(t, "client-ip-correct", func(t *testing.T) {
 			if stats.Clients() != 2 {
 				t.Errorf("want 2 client sending traffic, got %d", stats.Clients())
 			}
@@ -173,7 +173,7 @@ func testBGP(t *testing.T, u *vk.Universe) {
 			t.Error(err)
 		}
 
-		testBroken(t, "client-ip-correct", func() {
+		testBroken(t, "client-ip-correct", func(t *testing.T) {
 			if stats.Clients() != 1 {
 				t.Errorf("want 1 client sending traffic, got %d", stats.Clients())
 			}
@@ -226,7 +226,7 @@ func testBGP(t *testing.T, u *vk.Universe) {
 			t.Error(err)
 		}
 
-		testBroken(t, "client-ip-correct", func() {
+		testBroken(t, "client-ip-correct", func(t *testing.T) {
 			if stats1.Clients() != 2 {
 				t.Errorf("want 2 client sending traffic, got %d", stats1.Clients())
 			}
@@ -244,28 +244,6 @@ func testBGP(t *testing.T, u *vk.Universe) {
 }
 
 // Helpers
-
-// func waitForRoutes(ctx context.Context, t *testing.T, client *vk.VM, ip string, nexthops []*vk.VM) {
-// 	waitFor(ctx, t, func() bool {
-// 		bs, err := client.Run(fmt.Sprintf("birdc show route %s/32", ip))
-// 		if err != nil {
-// 			t.Fatal(err)
-// 		}
-// 		routes := string(bs)
-// 		if !strings.Contains(routes, ip+"/32") {
-// 			return false
-// 		}
-// 		if strings.Count(routes, "via ") != len(nexthops) {
-// 			return false
-// 		}
-// 		for _, nexthop := range nexthops {
-// 			if !strings.Contains(routes, nexthop.IPv4("net1").String()) {
-// 				return false
-// 			}
-// 		}
-// 		return true
-// 	})
-// }
 
 // configureBGP installs a MetalLB configuration for BGP, and waits
 // for peering to come up on the client.
@@ -297,37 +275,44 @@ data:
 	}
 
 	waitFor(ctx, t, func() error {
-		bs, err := client.Run("birdc show protocol")
-		if err != nil {
-			t.Fatalf("running birdc failed: %v", err)
-		}
+		for ctx.Err() == nil {
+			bs, err := client.Run("birdc show protocol")
+			if err != nil {
+				t.Fatalf("running birdc failed: %v", err)
+			}
 
-		// First 2 lines are a header, skip that. All other protocols
-		// should be in state "up"
-		//
-		// Sample birdc output:
-		//   BIRD 1.6.3 ready.
-		//   name     proto    table    state  since       info
-		//   kernel1  Kernel   master   up     17:53:32
-		//   device1  Device   master   up     17:53:32
-		//   direct1  Direct   master   up     17:53:32
-		//   controller BGP      master   start  17:53:32    Passive
-		//   node0    BGP      master   start  17:53:32    Passive
-		stilldown := []string{}
-		for _, line := range strings.Split(string(bs), "\n")[2:] {
-			if strings.TrimSpace(line) == "" {
+			// First 2 lines are a header, skip that. All other protocols
+			// should be in state "up"
+			//
+			// Sample birdc output:
+			//   BIRD 1.6.3 ready.
+			//   name     proto    table    state  since       info
+			//   kernel1  Kernel   master   up     17:53:32
+			//   device1  Device   master   up     17:53:32
+			//   direct1  Direct   master   up     17:53:32
+			//   controller BGP      master   start  17:53:32    Passive
+			//   node0    BGP      master   start  17:53:32    Passive
+			stilldown := []string{}
+			lines := strings.Split(string(bs), "\n")
+			if len(lines) < 3 {
 				continue
 			}
-			fs := strings.Fields(line)
-			if fs[3] != "up" {
-				stilldown = append(stilldown, fs[0])
+			for _, line := range lines[2:] {
+				if strings.TrimSpace(line) == "" {
+					continue
+				}
+				fs := strings.Fields(line)
+				if fs[3] != "up" {
+					stilldown = append(stilldown, fs[0])
+				}
 			}
-		}
 
-		if len(stilldown) > 0 {
-			return fmt.Errorf("BGP sessions still down: %s", strings.Join(stilldown, ", "))
-		}
+			if len(stilldown) > 0 {
+				return fmt.Errorf("BGP sessions still down: %s", strings.Join(stilldown, ", "))
+			}
 
-		return nil
+			return nil
+		}
+		return ctx.Err()
 	})
 }

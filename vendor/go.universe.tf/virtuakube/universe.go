@@ -56,6 +56,9 @@ type UniverseConfig struct {
 	VMGraphics bool
 	// Make subprocesses immune to ^C, to enable interactive control.
 	Interactive bool
+	// Don't use any privileged hardware acceleration for VMs. Will
+	// run much slower, but 100% in userspace.
+	NoAcceleration bool
 }
 
 // A Universe is a virtual sandbox and its associated resources.

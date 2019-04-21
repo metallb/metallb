@@ -36,7 +36,7 @@ require (
 	github.com/stretchr/testify v1.3.0 // indirect
 	github.com/vishvananda/netlink v1.0.0 // indirect
 	github.com/vishvananda/netns v0.0.0-20180720170159-13995c7128cc // indirect
-	go.universe.tf/virtuakube v0.0.0-20190220095524-83d67c0df690
+	go.universe.tf/virtuakube v0.0.0-20190421203108-952a1c1edc7e
 	golang.org/x/crypto v0.0.0-20190211182817-74369b46fc67 // indirect
 	golang.org/x/net v0.0.0-20190213061140-3a22650c66bd // indirect
 	golang.org/x/oauth2 v0.0.0-20190212230446-3e8b2be13635 // indirect

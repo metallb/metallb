@@ -240,25 +240,26 @@ func (c *Cluster) startController() error {
 	}
 
 	controllerConfig := fmt.Sprintf(`
-apiVersion: kubeadm.k8s.io/v1alpha3
+apiVersion: kubeadm.k8s.io/v1beta1
 kind: InitConfiguration
 bootstrapTokens:
 - token: "000000.0000000000000000"
   ttl: "24h"
-apiEndpoint:
+localAPIEndpoint:
   advertiseAddress: %s
 nodeRegistration:
   kubeletExtraArgs:
     node-ip: %s
 ---
-apiVersion: kubeadm.k8s.io/v1alpha3
+apiVersion: kubeadm.k8s.io/v1beta1
 kind: ClusterConfiguration
 networking:
   podSubnet: "10.32.0.0/12"
-kubernetesVersion: "1.13.0"
+kubernetesVersion: "1.14.0"
 clusterName: "virtuakube"
-apiServerCertSANs:
-- "127.0.0.1"
+apiServer:
+  certSANs:
+  - "127.0.0.1"
 `, c.controller.IPv4(c.controller.Networks()[0]), c.controller.IPv4(c.controller.Networks()[0]))
 	if err := c.controller.WriteFile("/tmp/k8s.conf", []byte(controllerConfig)); err != nil {
 		return err
@@ -291,12 +292,13 @@ func (c *Cluster) startNode(node *VM) error {
 		Port: 6443,
 	}
 	nodeConfig := fmt.Sprintf(`
-apiVersion: kubeadm.k8s.io/v1alpha3
+apiVersion: kubeadm.k8s.io/v1beta1
 kind: JoinConfiguration
-token: "000000.0000000000000000"
-discoveryTokenUnsafeSkipCAVerification: true
-discoveryTokenAPIServers:
-- %s
+discovery:
+  bootstrapToken:
+    token: "000000.0000000000000000"
+    unsafeSkipCAVerification: true
+    apiServerEndpoint: %s
 nodeRegistration:
   kubeletExtraArgs:
     node-ip: %s

@@ -9,8 +9,8 @@ items:
         cloud.weave.works/launcher-info: |-
           {
             "original-request": {
-              "url": "/k8s/v1.10/net.yaml?k8s-version=1.13",
-              "date": "Tue Feb 19 2019 00:31:29 GMT+0000 (UTC)"
+              "url": "/k8s/v1.10/net.yaml?k8s-version=1.14",
+              "date": "Sun Apr 21 2019 22:46:33 GMT+0000 (UTC)"
             },
             "email-address": "support@weave.works"
           }
@@ -25,8 +25,8 @@ items:
         cloud.weave.works/launcher-info: |-
           {
             "original-request": {
-              "url": "/k8s/v1.10/net.yaml?k8s-version=1.13",
-              "date": "Tue Feb 19 2019 00:31:29 GMT+0000 (UTC)"
+              "url": "/k8s/v1.10/net.yaml?k8s-version=1.14",
+              "date": "Sun Apr 21 2019 22:46:33 GMT+0000 (UTC)"
             },
             "email-address": "support@weave.works"
           }
@@ -66,8 +66,8 @@ items:
         cloud.weave.works/launcher-info: |-
           {
             "original-request": {
-              "url": "/k8s/v1.10/net.yaml?k8s-version=1.13",
-              "date": "Tue Feb 19 2019 00:31:29 GMT+0000 (UTC)"
+              "url": "/k8s/v1.10/net.yaml?k8s-version=1.14",
+              "date": "Sun Apr 21 2019 22:46:33 GMT+0000 (UTC)"
             },
             "email-address": "support@weave.works"
           }
@@ -89,8 +89,8 @@ items:
         cloud.weave.works/launcher-info: |-
           {
             "original-request": {
-              "url": "/k8s/v1.10/net.yaml?k8s-version=1.13",
-              "date": "Tue Feb 19 2019 00:31:29 GMT+0000 (UTC)"
+              "url": "/k8s/v1.10/net.yaml?k8s-version=1.14",
+              "date": "Sun Apr 21 2019 22:46:33 GMT+0000 (UTC)"
             },
             "email-address": "support@weave.works"
           }
@@ -121,8 +121,8 @@ items:
         cloud.weave.works/launcher-info: |-
           {
             "original-request": {
-              "url": "/k8s/v1.10/net.yaml?k8s-version=1.13",
-              "date": "Tue Feb 19 2019 00:31:29 GMT+0000 (UTC)"
+              "url": "/k8s/v1.10/net.yaml?k8s-version=1.14",
+              "date": "Sun Apr 21 2019 22:46:33 GMT+0000 (UTC)"
             },
             "email-address": "support@weave.works"
           }
@@ -145,8 +145,8 @@ items:
         cloud.weave.works/launcher-info: |-
           {
             "original-request": {
-              "url": "/k8s/v1.10/net.yaml?k8s-version=1.13",
-              "date": "Tue Feb 19 2019 00:31:29 GMT+0000 (UTC)"
+              "url": "/k8s/v1.10/net.yaml?k8s-version=1.14",
+              "date": "Sun Apr 21 2019 22:46:33 GMT+0000 (UTC)"
             },
             "email-address": "support@weave.works"
           }

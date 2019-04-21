@@ -142,7 +142,7 @@ github.com/vishvananda/netlink
 github.com/vishvananda/netlink/nl
 # github.com/vishvananda/netns v0.0.0-20180720170159-13995c7128cc
 github.com/vishvananda/netns
-# go.universe.tf/virtuakube v0.0.0-20190218014526-3c22c8f788da
+# go.universe.tf/virtuakube v0.0.0-20190421203108-952a1c1edc7e
 go.universe.tf/virtuakube
 go.universe.tf/virtuakube/internal/assets
 go.universe.tf/virtuakube/internal/config

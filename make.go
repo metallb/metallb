@@ -252,16 +252,14 @@ func circleci() {
 }
 
 func e2eManifests() {
-	calico := httpGet("https://docs.projectcalico.org/v3.3/getting-started/kubernetes/installation/hosted/rbac-kdd.yaml")
-	calico += "---\n"
-	calico += httpGet("https://docs.projectcalico.org/v3.3/getting-started/kubernetes/installation/hosted/kubernetes-datastore/calico-networking/1.7/calico.yaml")
+	calico := httpGet("https://docs.projectcalico.org/v3.6/getting-started/kubernetes/installation/hosted/kubernetes-datastore/calico-networking/1.7/calico.yaml")
 	calico = strings.Replace(calico, "192.168.0.0/16", "10.32.0.0/12", -1)
 	writeFile("e2etest/manifests/calico.yaml", calico)
 
-	weave := httpGet("https://cloud.weave.works/k8s/net?k8s-version=1.13")
+	weave := httpGet("https://cloud.weave.works/k8s/net?k8s-version=1.14")
 	writeFile("e2etest/manifests/weave.yaml", weave)
 
-	flannel := httpGet("https://raw.githubusercontent.com/coreos/flannel/bc79dd1505b0c8681ece4de4c0d86c5cd2643275/Documentation/kube-flannel.yml")
+	flannel := httpGet("https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml")
 	flannel = strings.Replace(flannel, "10.244.0.0/16", "10.32.0.0/12", -1)
 	lines := []string{}
 	for _, line := range strings.Split(flannel, "\n") {

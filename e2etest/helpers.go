@@ -43,6 +43,6 @@ func waitFor(ctx context.Context, t *testing.T, test func() error) {
 			count++
 		}
 
-		time.Sleep(10 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}
 }

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -23,7 +24,7 @@ var broken = map[string][]string{
 	},
 }
 
-func testBroken(t *testing.T, featureName string, f func()) {
+func testBroken(t *testing.T, featureName string, f func(t *testing.T)) {
 	testName := t.Name()
 patterns:
 	for _, pattern := range broken[featureName] {
@@ -38,6 +39,10 @@ patterns:
 			}
 		}
 
+		if os.Getenv("E2E_RUNBROKEN") != "" {
+			continue patterns
+		}
+
 		// Pattern matched, don't run the test. Instead run a stub to
 		// mark it skipped.
 		t.Run(featureName, func(t *testing.T) {
@@ -47,5 +52,7 @@ patterns:
 	}
 
 	// No patterns matched, test needs to be run.
-	f()
+	t.Run(featureName, func(t *testing.T) {
+		f(t)
+	})
 }
