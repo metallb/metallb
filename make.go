@@ -232,7 +232,11 @@ processLine:
 		lines = append(lines, line)
 	}
 
-	manifest += strings.Join(lines, "\n") + "\n"
+	manifest += strings.Join(lines, "\n")
+	// Some YAML parsers don't like trailing empty documents.
+	if strings.HasSuffix(manifest, "---") {
+		manifest = strings.TrimSuffix(manifest, "---")
+	}
 
 	writeFile("manifests/metallb.yaml", manifest)
 }
