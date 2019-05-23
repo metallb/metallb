@@ -166,11 +166,11 @@ metadata:
 data:
   config: |
     peers:
-    - my-asn: 64500
-      peer-asn: 64500
+    - my-asn: 64512
+      peer-asn: 64512
       peer-address: 10.96.0.100
-    - my-asn: 64500
-      peer-asn: 64500
+    - my-asn: 64512
+      peer-asn: 64512
       peer-address: 10.96.0.101
     address-pools:
     - name: my-ip-space
