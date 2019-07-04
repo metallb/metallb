@@ -53,6 +53,7 @@ type Config struct {
 	ProcessName   string
 	ConfigMapName string
 	NodeName      string
+	MetricsHost   string
 	MetricsPort   int
 	ReadEndpoints bool
 	Logger        log.Logger
@@ -218,7 +219,7 @@ func New(cfg *Config) (*Client, error) {
 
 	http.Handle("/metrics", promhttp.Handler())
 	go func() {
-		http.ListenAndServe(fmt.Sprintf(":%d", cfg.MetricsPort), nil)
+		http.ListenAndServe(fmt.Sprintf("%s:%d", cfg.MetricsHost, cfg.MetricsPort), nil)
 	}()
 
 	return c, nil
