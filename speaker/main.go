@@ -55,6 +55,7 @@ func main() {
 
 	var (
 		myNode = flag.String("node-name", "", "name of this Kubernetes node")
+		host   = flag.String("host", "", "HTTP host address")
 		port   = flag.Int("port", 80, "HTTP listening port")
 		config = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
 	)
@@ -64,6 +65,10 @@ func main() {
 
 	if *myNode == "" {
 		*myNode = os.Getenv("METALLB_NODE_NAME")
+	}
+
+	if *host == "" {
+		*host = os.Getenv("METALLB_HOST")
 	}
 
 	if *myNode == "" {
@@ -87,6 +92,7 @@ func main() {
 		NodeName:      *myNode,
 		Logger:        logger,
 
+		MetricsHost:   *host,
 		MetricsPort:   *port,
 		ReadEndpoints: true,
 
