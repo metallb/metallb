@@ -40,7 +40,7 @@ as possible.
 MetalLB requires the following to function:
 
 - A [Kubernetes](https://kubernetes.io) cluster, running Kubernetes
-  1.9.0 or later, that does not already have network load-balancing
+  1.13.0 or later, that does not already have network load-balancing
   functionality.
 - A
   [cluster network configuration]({{% relref "installation/network-addons.md" %}}) that
