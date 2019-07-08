@@ -2,22 +2,6 @@
 
 version: 2
 jobs:
-  test-1.11:
-    working_directory: /go/src/go.universe.tf/metallb
-    docker:
-      - image: circleci/golang:1.11
-    steps:
-      - checkout
-      - run: echo "export GO111MODULE=on" >>$BASH_ENV
-      - run: curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash
-      - run: curl -L https://git.io/vp6lP | sh # gometalinter
-      - run: go test -short ./...
-      - run: go test -short -race ./...
-      - run: PATH=./bin:$PATH gometalinter --deadline=5m --disable-all --enable=gofmt --enable=vet --vendor ./...
-      - run: cp manifests/metallb.yaml manifests/metallb.yaml.prev
-      - run: go run make.go -a helm
-      - run: diff -u manifests/metallb.yaml.prev manifests/metallb.yaml
-      - run: rm manifests/metallb.yaml.prev
   test-1.12:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
@@ -71,10 +55,6 @@ workflows:
   version: 2
   test-and-deploy:
     jobs:
-      - test-1.11:
-          filters:
-            tags:
-              only: /.*/
       - test-1.12:
           filters:
             tags:
@@ -86,7 +66,7 @@ workflows:
             tags:
               only: /.*/
           requires:
-            - test-1.11
+            - test-1.12
       - deploy-speaker:
           filters:
             branches:
@@ -94,7 +74,7 @@ workflows:
             tags:
               only: /.*/
           requires:
-            - test-1.11
+            - test-1.12
       - deploy-test-bgp-router:
           filters:
             branches:
@@ -102,4 +82,4 @@ workflows:
             tags:
               only: /.*/
           requires:
-            - test-1.11
+            - test-1.12
