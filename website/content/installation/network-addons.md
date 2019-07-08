@@ -17,13 +17,13 @@ have information on network addons that aren't listed!
 
 Network addon | Compatible
 --------------|---------------
-Calico        | Yes (see [known issues]({{% relref "configuration/calico.md" %}}))
+Calico        | Mostly (see [known issues]({{% relref "configuration/calico.md" %}}))
 Canal         | Yes
 Cilium        | Yes
 Flannel       | Yes
-Kube-router   | No ([work in progress](https://github.com/google/metallb/issues/160))
+Kube-router   | Mostly (see [known issues]({{% relref "configuration/kube-router.md" %}}))
 Romana        | Yes (see [guide]({{% relref "configuration/romana.md" %}}) for advanced integration)
-Weave Net     | Yes
+Weave Net     | Mostly (see [known issues]({{% relref "configuration/weave.md" %}}))
 
 ### IPVS mode in kube-proxy
 

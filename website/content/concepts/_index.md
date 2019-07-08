@@ -58,8 +58,8 @@ uses standard address discovery protocols
 make those IPs reachable on the local network. From the LAN's point of view, the
 announcing machine simply has multiple IP addresses.
 
-The [layer 2 mode]({{% relref "layer2.md" %}}) sub-page has more
-details on the behavior and limitations of layer 2 mode.
+The [layer 2 mode]({{% relref "concepts/layer2.md" %}}) sub-page has
+more details on the behavior and limitations of layer 2 mode.
 
 ### BGP
 
