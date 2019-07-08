@@ -17,7 +17,7 @@ have information on network addons that aren't listed!
 
 Network addon | Compatible
 --------------|---------------
-Calico        | Partial (see [known issues]({{% relref "configuration/calico.md" %}}))
+Calico        | Yes (see [known issues]({{% relref "configuration/calico.md" %}}))
 Canal         | Yes
 Cilium        | Yes
 Flannel       | Yes
