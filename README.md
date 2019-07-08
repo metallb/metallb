@@ -23,8 +23,3 @@ One lightweight way you can contribute is
 to
 [tell us that you're using MetalLB](https://github.com/google/metallb/issues/5),
 which will give us warm fuzzy feelings :).
-
-# Disclaimer
-
-This is not an official Google project, it is just code that happens
-to be owned by Google.
