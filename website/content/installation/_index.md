@@ -37,6 +37,37 @@ until
 you
 [define and deploy a configmap]({{% relref "../configuration/_index.md" %}}).
 
+### Installation with Kubernetes manifests on OpenShift
+There are some changes required to make MetalLB work in OpenShift:
+
+* Modify the `securityContext.runAsUser` from the default one (65534) to let
+OpenShift decided depending on the project.
+
+In OCP every project/namespace has its own user IDs assigned:
+
+```shell
+oc get project metallb-system -o yaml | grep uid-range
+    openshift.io/sa.scc.uid-range: 1000500000/10000
+```
+
+In order to fix it, set it to `null`:
+
+```shell
+oc patch \
+--namespace=metallb-system \
+--patch='{"spec":{"template":{"spec":{"securityContext":{"runAsUser":null}}}}}'\
+--type=merge \
+deploy/controller
+```
+
+* Add privileged SCC to the speaker service account.
+
+The `speaker` daemonset requires some privileges such as `net_raw` and `hostNetwork: true`. To make those available, add the privileged scc to the speaker SA:
+
+```shell
+oc adm policy add-scc-to-user privileged -n metallb-system -z speaker
+```
+
 ## Installation with Helm
 
 {{% notice note %}} Due to code review turnaround time, it usually
