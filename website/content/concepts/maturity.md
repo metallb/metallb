@@ -51,13 +51,13 @@ what doesn't.
 
 ## Developers
 
-While MetalLB's copyright is owned by Google, this is _not_ an official Google
-project. The project doesn't have any other form of corporate sponsorship, other
-than GCP credits generously provided by Google to run test infrastructure.
+MetalLB's copyright was owned by Google, until March 2019. However, it
+was never an official Google project. The project doesn't have any
+form of corporate sponsorship.
 
 The majority of code changes, as well as the overall direction of the project,
 is a personal endeavor of [one person](https://www.dave.tf), working on MetalLB
-in their spare time.
+in their spare time as motivation allows.
 
 This means that, currently, support and new feature development is mostly at the
 mercy of one person's availability and resources. You should set your
