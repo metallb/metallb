@@ -21,7 +21,7 @@ jobs:
   deploy-controller:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
-      - image: circleci/golang:1.11
+      - image: circleci/golang:1.12
     steps:
       - checkout
       - setup_remote_docker
@@ -32,7 +32,7 @@ jobs:
   deploy-speaker:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
-      - image: circleci/golang:1.11
+      - image: circleci/golang:1.12
     steps:
       - checkout
       - setup_remote_docker
@@ -43,7 +43,7 @@ jobs:
   deploy-test-bgp-router:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
-      - image: circleci/golang:1.11
+      - image: circleci/golang:1.12
     steps:
       - checkout
       - setup_remote_docker
