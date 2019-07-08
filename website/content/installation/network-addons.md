@@ -29,8 +29,7 @@ Weave Net     | Yes
 
 Starting in Kubernetes 1.9, `kube-proxy` has beta support for a more
 efficient "IPVS mode", in addition to the default "iptables mode."
-MetalLB is currently **not compatible** with IPVS mode in kube-proxy,
-due to several outstanding bugs with IPVS mode's handling of
-LoadBalancer services. See
-our [tracking bug](https://github.com/google/metallb/issues/153) for
-details.
+MetalLB **might** work with IPVS mode in kube-proxy, in Kubernetes
+1.13 or later. However, it is not explicitly tested yet, so it's at
+your own risk. See our [tracking
+bug](https://github.com/google/metallb/issues/153) for details.
