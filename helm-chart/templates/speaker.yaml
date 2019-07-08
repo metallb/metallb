@@ -53,7 +53,7 @@ spec:
 {{ toYaml .Values.speaker.resources | indent 10 }}
         securityContext:
           allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
+          readOnlyRootFilesystem: false
           capabilities:
             drop:
             - ALL
