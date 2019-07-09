@@ -79,9 +79,9 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		if err != nil {
 			l.Log("op", "allocateIP", "error", err, "msg", "IP allocation failed")
 			c.client.Errorf(svc, "AllocationFailed", "Failed to allocate IP for %q: %s", key, err)
-			// TODO: should retry on pool exhaustion allocation
-			// failures, once we keep track of when pools become
-			// non-full.
+			// The outer controller loop will retry converging this
+			// service when another service gets deleted, so there's
+			// nothing to do here but wait to get called again later.
 			return true
 		}
 		lbIP = ip

@@ -8,6 +8,7 @@ import (
 
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/k8s"
 
 	"github.com/go-kit/kit/log"
 	"github.com/google/go-cmp/cmp"
@@ -133,7 +134,7 @@ func TestControllerMutation(t *testing.T) {
 	// For this test, we just set a static config and immediately sync
 	// the controller. The mutations around config setting and syncing
 	// are tested elsewhere.
-	if !c.SetConfig(l, cfg) {
+	if c.SetConfig(l, cfg) == k8s.SyncStateError {
 		t.Fatalf("SetConfig failed")
 	}
 	c.MarkSynced(l)
@@ -366,7 +367,7 @@ func TestControllerMutation(t *testing.T) {
 			k.reset()
 			// Delete the test balancer, to clean up all state
 
-			if !c.SetBalancer(l, "test", test.in, nil) {
+			if c.SetBalancer(l, "test", test.in, nil) == k8s.SyncStateError {
 				t.Errorf("%q: SetBalancer returned error", test.desc)
 				continue
 			}
@@ -422,7 +423,7 @@ func TestControllerConfig(t *testing.T) {
 			Type: "LoadBalancer",
 		},
 	}
-	if !c.SetBalancer(l, "test", svc, nil) {
+	if c.SetBalancer(l, "test", svc, nil) == k8s.SyncStateError {
 		t.Fatalf("SetBalancer failed")
 	}
 
@@ -437,10 +438,10 @@ func TestControllerConfig(t *testing.T) {
 	// Set an empty config. Balancer should still not do anything to
 	// our unallocated service, and return an error to force a
 	// retry after sync is complete.
-	if !c.SetConfig(l, &config.Config{}) {
+	if c.SetConfig(l, &config.Config{}) == k8s.SyncStateError {
 		t.Fatalf("SetConfig with empty config failed")
 	}
-	if c.SetBalancer(l, "test", svc, nil) {
+	if c.SetBalancer(l, "test", svc, nil) != k8s.SyncStateError {
 		t.Fatal("SetBalancer did not fail")
 	}
 
@@ -461,10 +462,10 @@ func TestControllerConfig(t *testing.T) {
 			},
 		},
 	}
-	if !c.SetConfig(l, cfg) {
+	if c.SetConfig(l, cfg) == k8s.SyncStateError {
 		t.Fatalf("SetConfig failed")
 	}
-	if c.SetBalancer(l, "test", svc, nil) {
+	if c.SetBalancer(l, "test", svc, nil) != k8s.SyncStateError {
 		t.Fatal("SetBalancer did not fail")
 	}
 
@@ -479,7 +480,7 @@ func TestControllerConfig(t *testing.T) {
 	// Mark synced. Finally, we can allocate.
 	c.MarkSynced(l)
 
-	if !c.SetBalancer(l, "test", svc, nil) {
+	if c.SetBalancer(l, "test", svc, nil) == k8s.SyncStateError {
 		t.Fatalf("SetBalancer failed")
 	}
 
@@ -492,12 +493,83 @@ func TestControllerConfig(t *testing.T) {
 	}
 
 	// Now that an IP is allocated, removing the IP pool is not allowed.
-	if c.SetConfig(l, &config.Config{}) {
+	if c.SetConfig(l, &config.Config{}) != k8s.SyncStateError {
 		t.Fatalf("SetConfig that deletes allocated IPs was accepted")
 	}
 
 	// Deleting the config also makes MetalLB sad.
-	if c.SetConfig(l, nil) {
+	if c.SetConfig(l, nil) != k8s.SyncStateError {
 		t.Fatalf("SetConfig that deletes the config was accepted")
+	}
+}
+
+func TestDeleteRecyclesIP(t *testing.T) {
+	k := &testK8S{t: t}
+	c := &controller{
+		ips:    allocator.New(),
+		client: k,
+	}
+
+	l := log.NewNopLogger()
+	cfg := &config.Config{
+		Pools: map[string]*config.Pool{
+			"default": {
+				AutoAssign: true,
+				CIDR:       []*net.IPNet{ipnet("1.2.3.0/32")},
+			},
+		},
+	}
+	if c.SetConfig(l, cfg) == k8s.SyncStateError {
+		t.Fatal("SetConfig failed")
+	}
+	c.MarkSynced(l)
+
+	svc1 := &v1.Service{
+		Spec: v1.ServiceSpec{
+			Type: "LoadBalancer",
+		},
+	}
+	if c.SetBalancer(l, "test", svc1, nil) == k8s.SyncStateError {
+		t.Fatal("SetBalancer svc1 failed")
+	}
+	gotSvc := k.gotService(svc1)
+	if gotSvc == nil {
+		t.Fatal("Didn't get a balancer for svc1")
+	}
+	if len(gotSvc.Status.LoadBalancer.Ingress) == 0 || gotSvc.Status.LoadBalancer.Ingress[0].IP != "1.2.3.0" {
+		t.Fatal("svc1 didn't get an IP")
+	}
+	k.reset()
+
+	// Second service should converge correctly, but not allocate an
+	// IP because we have none left.
+	svc2 := &v1.Service{
+		Spec: v1.ServiceSpec{
+			Type: "LoadBalancer",
+		},
+	}
+	if c.SetBalancer(l, "test2", svc2, nil) == k8s.SyncStateError {
+		t.Fatal("SetBalancer svc2 failed")
+	}
+	if k.gotService(svc2) != nil {
+		t.Fatal("SetBalancer svc2 mutated svc2 even though it should not have allocated")
+	}
+	k.reset()
+
+	// Deleting the first LB should tell us to reprocess all services.
+	if c.SetBalancer(l, "test", nil, nil) != k8s.SyncStateReprocessAll {
+		t.Fatal("SetBalancer with nil LB didn't tell us to reprocess all balancers")
+	}
+
+	// Setting svc2 should now allocate correctly.
+	if c.SetBalancer(l, "test2", svc2, nil) == k8s.SyncStateError {
+		t.Fatal("SetBalancer svc2 failed")
+	}
+	gotSvc = k.gotService(svc2)
+	if gotSvc == nil {
+		t.Fatal("Didn't get a balancer for svc2")
+	}
+	if len(gotSvc.Status.LoadBalancer.Ingress) == 0 || gotSvc.Status.LoadBalancer.Ingress[0].IP != "1.2.3.0" {
+		t.Fatal("svc2 didn't get an IP")
 	}
 }

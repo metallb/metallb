@@ -157,7 +157,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 	return ret, nil
 }
 
-func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) bool {
+func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) k8s.SyncState {
 	if svc == nil {
 		return c.deleteBalancer(l, name, "serviceDeleted")
 	}
@@ -171,7 +171,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 
 	if c.config == nil {
 		l.Log("event", "noConfig", "msg", "not processing, still waiting for config")
-		return true
+		return k8s.SyncStateSuccess
 	}
 
 	if len(svc.Status.LoadBalancer.Ingress) != 1 {
@@ -200,8 +200,8 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 	}
 
 	if proto, ok := c.announced[name]; ok && proto != pool.Protocol {
-		if !c.deleteBalancer(l, name, "protocolChanged") {
-			return false
+		if st := c.deleteBalancer(l, name, "protocolChanged"); st == k8s.SyncStateError {
+			return st
 		}
 	}
 
@@ -218,7 +218,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 
 	if err := handler.SetBalancer(l, name, lbIP, pool); err != nil {
 		l.Log("op", "setBalancer", "error", err, "msg", "failed to announce service")
-		return false
+		return k8s.SyncStateError
 	}
 
 	if c.announced[name] == "" {
@@ -234,18 +234,18 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 	}).Set(1)
 	l.Log("event", "serviceAnnounced", "msg", "service has IP, announcing")
 
-	return true
+	return k8s.SyncStateSuccess
 }
 
-func (c *controller) deleteBalancer(l log.Logger, name, reason string) bool {
+func (c *controller) deleteBalancer(l log.Logger, name, reason string) k8s.SyncState {
 	proto, ok := c.announced[name]
 	if !ok {
-		return true
+		return k8s.SyncStateSuccess
 	}
 
 	if err := c.protocols[proto].DeleteBalancer(l, name, reason); err != nil {
 		l.Log("op", "deleteBalancer", "error", err, "msg", "failed to clear balancer state")
-		return false
+		return k8s.SyncStateError
 	}
 
 	announcing.Delete(prometheus.Labels{
@@ -259,7 +259,7 @@ func (c *controller) deleteBalancer(l log.Logger, name, reason string) bool {
 
 	l.Log("event", "serviceWithdrawn", "ip", c.svcIP[name], "reason", reason, "msg", "withdrawing service announcement")
 
-	return true
+	return k8s.SyncStateSuccess
 }
 
 func poolFor(pools map[string]*config.Pool, ip net.IP) string {
@@ -273,42 +273,42 @@ func poolFor(pools map[string]*config.Pool, ip net.IP) string {
 	return ""
 }
 
-func (c *controller) SetConfig(l log.Logger, cfg *config.Config) bool {
+func (c *controller) SetConfig(l log.Logger, cfg *config.Config) k8s.SyncState {
 	l.Log("event", "startUpdate", "msg", "start of config update")
 	defer l.Log("event", "endUpdate", "msg", "end of config update")
 
 	if cfg == nil {
 		l.Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
-		return false
+		return k8s.SyncStateError
 	}
 
 	for svc, ip := range c.svcIP {
 		if pool := poolFor(cfg.Pools, ip); pool == "" {
 			l.Log("op", "setConfig", "service", svc, "ip", ip, "error", "service has no configuration under new config", "msg", "new configuration rejected")
-			return false
+			return k8s.SyncStateError
 		}
 	}
 
 	for proto, handler := range c.protocols {
 		if err := handler.SetConfig(l, cfg); err != nil {
 			l.Log("op", "setConfig", "protocol", proto, "error", err, "msg", "applying new configuration to protocol handler failed")
-			return false
+			return k8s.SyncStateError
 		}
 	}
 
 	c.config = cfg
 
-	return true
+	return k8s.SyncStateReprocessAll
 }
 
-func (c *controller) SetNode(l log.Logger, node *v1.Node) bool {
+func (c *controller) SetNode(l log.Logger, node *v1.Node) k8s.SyncState {
 	for proto, handler := range c.protocols {
 		if err := handler.SetNode(l, node); err != nil {
 			l.Log("op", "setNode", "error", err, "protocol", proto, "msg", "failed to propagate node info to protocol handler")
-			return false
+			return k8s.SyncStateError
 		}
 	}
-	return true
+	return k8s.SyncStateSuccess
 }
 
 // A Protocol can advertise an IP address.

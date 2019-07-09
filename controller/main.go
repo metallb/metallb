@@ -45,19 +45,22 @@ type controller struct {
 	ips    *allocator.Allocator
 }
 
-func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ *v1.Endpoints) bool {
+func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ *v1.Endpoints) k8s.SyncState {
 	l.Log("event", "startUpdate", "msg", "start of service update")
 	defer l.Log("event", "endUpdate", "msg", "end of service update")
 
 	if svcRo == nil {
 		c.deleteBalancer(l, name)
-		return true
+		// There might be other LBs stuck waiting for an IP, so when
+		// we delete a balancer we should reprocess all of them to
+		// check for newly feasible balancers.
+		return k8s.SyncStateReprocessAll
 	}
 
 	if c.config == nil {
 		// Config hasn't been read, nothing we can do just yet.
 		l.Log("event", "noConfig", "msg", "not processing, still waiting for config")
-		return true
+		return k8s.SyncStateSuccess
 	}
 
 	// Making a copy unconditionally is a bit wasteful, since we don't
@@ -66,11 +69,11 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 	// a reason.
 	svc := svcRo.DeepCopy()
 	if !c.convergeBalancer(l, name, svc) {
-		return false
+		return k8s.SyncStateError
 	}
 	if reflect.DeepEqual(svcRo, svc) {
 		l.Log("event", "noChange", "msg", "service converged, no change")
-		return true
+		return k8s.SyncStateSuccess
 	}
 
 	var err error
@@ -78,7 +81,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		svcRo, err = c.client.Update(svc)
 		if err != nil {
 			l.Log("op", "updateService", "error", err, "msg", "failed to update service")
-			return false
+			return k8s.SyncStateError
 		}
 	}
 	if !reflect.DeepEqual(svcRo.Status, svc.Status) {
@@ -87,12 +90,12 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		svc.Status = st
 		if err = c.client.UpdateStatus(svc); err != nil {
 			l.Log("op", "updateServiceStatus", "error", err, "msg", "failed to update service status")
-			return false
+			return k8s.SyncStateError
 		}
 	}
 	l.Log("event", "serviceUpdated", "msg", "updated service object")
 
-	return true
+	return k8s.SyncStateSuccess
 }
 
 func (c *controller) deleteBalancer(l log.Logger, name string) {
@@ -101,21 +104,21 @@ func (c *controller) deleteBalancer(l log.Logger, name string) {
 	}
 }
 
-func (c *controller) SetConfig(l log.Logger, cfg *config.Config) bool {
+func (c *controller) SetConfig(l log.Logger, cfg *config.Config) k8s.SyncState {
 	l.Log("event", "startUpdate", "msg", "start of config update")
 	defer l.Log("event", "endUpdate", "msg", "end of config update")
 
 	if cfg == nil {
 		l.Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
-		return false
+		return k8s.SyncStateError
 	}
 
 	if err := c.ips.SetPools(cfg.Pools); err != nil {
 		l.Log("op", "setConfig", "error", err, "msg", "applying new configuration failed")
-		return false
+		return k8s.SyncStateError
 	}
 	c.config = cfg
-	return true
+	return k8s.SyncStateReprocessAll
 }
 
 func (c *controller) MarkSynced(l log.Logger) {

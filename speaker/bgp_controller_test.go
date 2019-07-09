@@ -10,6 +10,7 @@ import (
 
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/k8s"
 
 	"github.com/go-kit/kit/log"
 	"github.com/google/go-cmp/cmp"
@@ -805,12 +806,12 @@ func TestBGPSpeaker(t *testing.T) {
 	l := log.NewNopLogger()
 	for _, test := range tests {
 		if test.config != nil {
-			if !c.SetConfig(l, test.config) {
+			if c.SetConfig(l, test.config) == k8s.SyncStateError {
 				t.Errorf("%q: SetConfig failed", test.desc)
 			}
 		}
 		if test.balancer != "" {
-			if !c.SetBalancer(l, test.balancer, test.svc, test.eps) {
+			if c.SetBalancer(l, test.balancer, test.svc, test.eps) == k8s.SyncStateError {
 				t.Errorf("%q: SetBalancer failed", test.desc)
 			}
 		}
@@ -1009,13 +1010,13 @@ func TestNodeSelectors(t *testing.T) {
 	l := log.NewNopLogger()
 	for _, test := range tests {
 		if test.config != nil {
-			if !c.SetConfig(l, test.config) {
+			if c.SetConfig(l, test.config) == k8s.SyncStateError {
 				t.Errorf("%q: SetConfig failed", test.desc)
 			}
 		}
 
 		if test.node != nil {
-			if !c.SetNode(l, test.node) {
+			if c.SetNode(l, test.node) == k8s.SyncStateError {
 				t.Errorf("%q: SetNode failed", test.desc)
 			}
 		}
