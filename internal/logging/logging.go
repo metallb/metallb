@@ -12,9 +12,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-
-	// For the flags and stuff.
-	_ "github.com/golang/glog"
+	"k8s.io/klog"
 )
 
 // Init returns a logger configured with common settings like
@@ -31,18 +29,9 @@ func Init() (log.Logger, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating pipe for glog redirection: %s", err)
 	}
+	klog.InitFlags(flag.NewFlagSet("klog", flag.ExitOnError))
+	klog.SetOutput(w)
 	go collectGlogs(r, l)
-	os.Stderr = w
-
-	// glog registers a bunch of commandline flags, with no choice to
-	// disable them. Since we don't want to offer glog
-	// configurability, what we do here is force the one commandline
-	// flag of interest on (to stop logging to files), and then
-	// replace the commandline wholesale with a fresh one for the
-	// application's use.
-	flag.Set("logtostderr", "true")
-	flag.CommandLine.Parse([]string{})
-	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 
 	return log.With(l, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller), nil
 }
@@ -88,7 +77,6 @@ func deformat(b []byte) (level string, ts time.Time, caller, msg string) {
 
 	ms := logPrefix.FindSubmatch(b)
 	if ms == nil {
-		fmt.Println("NO MATCH")
 		return
 	}
 
