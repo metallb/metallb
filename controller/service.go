@@ -58,6 +58,16 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 			c.clearServiceState(key, svc)
 			lbIP = nil
 		}
+
+		// The user might also have changed the pool annotation, and
+		// requested a different pool than the one that is currently
+		// allocated.
+		desiredPool := svc.Annotations["metallb.universe.tf/address-pool"]
+		if lbIP != nil && desiredPool != "" && c.ips.Pool(key) != desiredPool {
+			l.Log("event", "clearAssignment", "reason", "differentPoolRequested", "msg", "user requested a different pool than the one currently assigned")
+			c.clearServiceState(key, svc)
+			lbIP = nil
+		}
 	}
 
 	// User set or changed the desired LB IP, nuke the
