@@ -148,7 +148,7 @@ roleRef:
   kind: Role
   name: config-watcher
 ---
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   namespace: metallb-system
@@ -210,7 +210,7 @@ spec:
         "beta.kubernetes.io/os": linux
 
 ---
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 kind: Deployment
 metadata:
   namespace: metallb-system
