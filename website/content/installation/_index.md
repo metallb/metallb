@@ -3,11 +3,15 @@ title: Installation
 weight: 3
 ---
 
-Before starting with installation, make sure you meet all
-the [requirements]({{% relref "/_index.md" %}}#requirements). In
-particular, you should pay attention
-to
-[network addon compatibility]({{% relref "installation/network-addons.md" %}}).
+Before starting with installation, make sure you meet all the
+[requirements]({{% relref "/_index.md" %}}#requirements). In
+particular, you should pay attention to [network addon
+compatibility]({{% relref "installation/network-addons.md" %}}).
+
+If you're trying to run MetalLB on a cloud platform, you should also
+look at the [cloud compatibility]({{% relref "installation/clouds.md"
+%}}) page and make sure your cloud platform can work with MetalLB
+(most cannot).
 
 There are two supported ways to install MetalLB: using Kubernetes
 manifests, or using the [Helm](https://helm.sh) package manager.
@@ -36,37 +40,6 @@ file. MetalLB's components will still start, but will remain idle
 until
 you
 [define and deploy a configmap]({{% relref "../configuration/_index.md" %}}).
-
-### Installation with Kubernetes manifests on OpenShift
-There are some changes required to make MetalLB work in OpenShift:
-
-* Modify the `securityContext.runAsUser` from the default one (65534) to let
-OpenShift decided depending on the project.
-
-In OCP every project/namespace has its own user IDs assigned:
-
-```shell
-oc get project metallb-system -o yaml | grep uid-range
-    openshift.io/sa.scc.uid-range: 1000500000/10000
-```
-
-In order to fix it, set it to `null`:
-
-```shell
-oc patch \
---namespace=metallb-system \
---patch='{"spec":{"template":{"spec":{"securityContext":{"runAsUser":null}}}}}'\
---type=merge \
-deploy/controller
-```
-
-* Add privileged SCC to the speaker service account.
-
-The `speaker` daemonset requires some privileges such as `net_raw` and `hostNetwork: true`. To make those available, add the privileged scc to the speaker SA:
-
-```shell
-oc adm policy add-scc-to-user privileged -n metallb-system -z speaker
-```
 
 ## Installation with Helm
 
