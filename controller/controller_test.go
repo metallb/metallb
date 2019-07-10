@@ -250,6 +250,31 @@ func TestControllerMutation(t *testing.T) {
 		},
 
 		{
+			desc: "request IP from different specific pool",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"metallb.universe.tf/address-pool": "pool2",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type: "LoadBalancer",
+				},
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"metallb.universe.tf/address-pool": "pool2",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type: "LoadBalancer",
+				},
+				Status: statusAssigned("3.4.5.6"),
+			},
+		},
+
+		{
 			desc: "unknown pool requested",
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -362,12 +387,20 @@ func TestControllerMutation(t *testing.T) {
 	}
 
 	for i := 0; i < 100; i++ {
+		var prevStatus v1.ServiceStatus
 		for _, test := range tests {
 			t.Logf("Running case %q", test.desc)
 			k.reset()
-			// Delete the test balancer, to clean up all state
 
-			if c.SetBalancer(l, "test", test.in, nil) == k8s.SyncStateError {
+			// Put the previous run's status into the current run's
+			// spec, to make sure the logic can deal with all kinds of
+			// whacky transitions.
+			testIn := test.in.DeepCopy()
+			if testIn != nil {
+				testIn.Status = prevStatus
+			}
+
+			if c.SetBalancer(l, "test", testIn, nil) == k8s.SyncStateError {
 				t.Errorf("%q: SetBalancer returned error", test.desc)
 				continue
 			}
@@ -396,6 +429,12 @@ func TestControllerMutation(t *testing.T) {
 				if !ip.Equal(c.ips.IP("test")) {
 					t.Errorf("%q: controller internal state does not match IP that controller claimed to allocate: want %q, got %q", test.desc, ip, c.ips.IP("test"))
 				}
+			}
+
+			if gotSvc != nil {
+				prevStatus = gotSvc.Status
+			} else {
+				prevStatus = v1.ServiceStatus{}
 			}
 		}
 
