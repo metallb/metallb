@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"sort"
 	"sync"
@@ -166,6 +167,30 @@ func (f *fakeSession) Set(ads ...*bgp.Advertisement) error {
 	return nil
 }
 
+// testK8S implements service by recording what the controller wants
+// to do to k8s.
+type testK8S struct {
+	loggedWarning bool
+	t             *testing.T
+}
+
+func (s *testK8S) Update(svc *v1.Service) (*v1.Service, error) {
+	panic("never called")
+}
+
+func (s *testK8S) UpdateStatus(svc *v1.Service) error {
+	panic("never called")
+}
+
+func (s *testK8S) Infof(_ *v1.Service, evtType string, msg string, args ...interface{}) {
+	s.t.Logf("k8s Info event %q: %s", evtType, fmt.Sprintf(msg, args...))
+}
+
+func (s *testK8S) Errorf(_ *v1.Service, evtType string, msg string, args ...interface{}) {
+	s.t.Logf("k8s Warning event %q: %s", evtType, fmt.Sprintf(msg, args...))
+	s.loggedWarning = true
+}
+
 func TestBGPSpeaker(t *testing.T) {
 	b := &fakeBGP{
 		t:      t,
@@ -179,6 +204,7 @@ func TestBGPSpeaker(t *testing.T) {
 	if err != nil {
 		t.Fatalf("creating controller: %s", err)
 	}
+	c.client = &testK8S{t: t}
 
 	tests := []struct {
 		desc string
@@ -838,6 +864,7 @@ func TestNodeSelectors(t *testing.T) {
 	if err != nil {
 		t.Fatalf("creating controller: %s", err)
 	}
+	c.client = &testK8S{t: t}
 
 	pools := map[string]*config.Pool{
 		"default": {

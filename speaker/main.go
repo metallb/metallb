@@ -44,6 +44,14 @@ var announcing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 	"ip",
 })
 
+// Service offers methods to mutate a Kubernetes service object.
+type service interface {
+	Update(svc *v1.Service) (*v1.Service, error)
+	UpdateStatus(svc *v1.Service) error
+	Infof(svc *v1.Service, desc, msg string, args ...interface{})
+	Errorf(svc *v1.Service, desc, msg string, args ...interface{})
+}
+
 func main() {
 	prometheus.MustRegister(announcing)
 
@@ -103,6 +111,7 @@ func main() {
 	if err != nil {
 		logger.Log("op", "startup", "error", err, "msg", "failed to create k8s client")
 	}
+	ctrl.client = client
 
 	if err := client.Run(); err != nil {
 		logger.Log("op", "startup", "error", err, "msg", "failed to run k8s client")
@@ -113,6 +122,7 @@ type controller struct {
 	myNode string
 
 	config *config.Config
+	client service
 
 	protocols map[config.Proto]Protocol
 	announced map[string]config.Proto // service name -> protocol advertising it
@@ -233,6 +243,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 		"ip":       lbIP.String(),
 	}).Set(1)
 	l.Log("event", "serviceAnnounced", "msg", "service has IP, announcing")
+	c.client.Infof(svc, "nodeAssigned", "announcing from node %q", c.myNode)
 
 	return k8s.SyncStateSuccess
 }
