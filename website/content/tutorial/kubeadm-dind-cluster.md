@@ -1,5 +1,8 @@
---- title: BGP on Kubernetes multi-node cluster ( based on kubeadm and DIND )
-weight: 10 ---
+---
+title: BGP on Kubernetes multi-node cluster ( based on kubeadm and DIND )
+weight: 30
+draft: true
+---
 
 In this tutorial, we'll set up a fully containaraized environment with one
 docker container to run as an external BGP router and a Kubernetes multi-node

@@ -3,8 +3,6 @@ title: Concepts
 weight: 1
 ---
 
-# Concepts
-
 MetalLB hooks into your Kubernetes cluster, and provides a network
 load-balancer implementation. In short, it allows you to create
 Kubernetes services of type "LoadBalancer" in clusters that don't run
