@@ -55,8 +55,8 @@ MetalLB requires the following to function:
 
 The [concepts]({{% relref "concepts/_index.md" %}}) section will give
 you a primer on what MetalLB does in your cluster. When you're ready
-to deploy to a Kubernetes cluster, head to the [installation]({{%
-relref "installation/_index.md" %}}) and [usage]({{% relref
+to deploy to a Kubernetes cluster, head to the
+[installation](/installation/) and [usage]({{% relref
 "usage/_index.md" %}}) guides.
 
 ## Contributing

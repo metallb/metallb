@@ -343,11 +343,10 @@ New features:
 - MetalLB now supports ARP advertisement, enabled by setting
   `protocol: arp` on an address pool. ARP mode does not require any
   special network equipment, and minimal configuration. You can follow
-  the [ARP mode tutorial]({{% relref "tutorial/layer2.md" %}}) to get
-  started. There is also a page about ARP
-  mode's [behavior and tradeoffs]({{% relref "concepts/layer2.md" %}}),
-  and documentation
-  on [configuring ARP mode]({{% relref "configuration/_index.md" %}}).
+  the ARP mode tutorial to get started. There is also a page about ARP
+  mode's [behavior and tradeoffs]({{% relref "concepts/layer2.md"
+  %}}), and documentation on [configuring ARP mode]({{% relref
+  "configuration/_index.md" %}}).
 - The container images are
   now
   [multi-architecture images](https://blog.docker.com/2017/11/multi-arch-all-the-things/). MetalLB
