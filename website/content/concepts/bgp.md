@@ -79,12 +79,13 @@ given packet to a specific next hop by hashing some fields in the
 packet header, and using that hash as an index into the array of
 available backends.
 
-The problem is that the hashes used in routers are not _stable_, so
-whenever the size of the backend set changes (for example when a
-node's BGP session goes down), existing connections will be rehashed
-effectively randomly, which means that the majority of existing
-connections will end up suddenly being forwarded to a different
-backend, one that has no knowledge of the connection in question.
+The problem is that the hashes used in routers are usually not
+_stable_, so whenever the size of the backend set changes (for example
+when a node's BGP session goes down), existing connections will be
+rehashed effectively randomly, which means that the majority of
+existing connections will end up suddenly being forwarded to a
+different backend, one that has no knowledge of the connection in
+question.
 
 The consequence of this is that any time the IP→Node mapping changes
 for your service, you should expect to see a one-time hit where most
@@ -94,6 +95,10 @@ loss or blackholing, just a one-time clean break.
 Depending on what your services do, there are a couple of mitigation
 strategies you can employ:
 
+- Your BGP routers might have an option to use a more stable ECMP
+  hashing algorithm. This is sometimes called "resilient ECMP" or
+  "resilient LAG". Using such an algorithm hugely reduces the number
+  of affected connections when the backend set changes.
 - Pin your service deployments to specific nodes, to minimize the pool
   of nodes that you have to be "careful" about.
 - Schedule changes to your service deployments during "trough", when
