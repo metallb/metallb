@@ -54,15 +54,10 @@ MetalLB requires the following to function:
 ## Usage
 
 The [concepts]({{% relref "concepts/_index.md" %}}) section will give
-you a primer on what MetalLB does in your cluster.
-
-Want to test-drive MetalLB? Follow
-the [tutorial]({{% relref "tutorial/_index.md" %}}) to set up a
-self-contained MetalLB in minikube.
-
-Deploying to a real cluster? Head to
-the [installation]({{% relref "installation/_index.md" %}})
-and [usage]({{% relref "usage/_index.md" %}}) guides.
+you a primer on what MetalLB does in your cluster. When you're ready
+to deploy to a Kubernetes cluster, head to the [installation]({{%
+relref "installation/_index.md" %}}) and [usage]({{% relref
+"usage/_index.md" %}}) guides.
 
 ## Contributing
 

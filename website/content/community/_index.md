@@ -71,13 +71,6 @@ currently have, relative to the top-level directory:
   IP assignment.
 - `speaker` is the per-node daemon that advertises services with
   assigned IPs using various advertising strategies.
-- `test-bgp-router` is a small wrapper around
-  the
-  [BIRD](http://bird.network.cz),
-  [Quagga](http://www.nongnu.org/quagga)
-  and [GoBGP](https://github.com/osrg/gobgp) open-source BGP routers
-  that presents a read-only interface over HTTP. We use it in the
-  tutorial, and during development of MetalLB.
 - `internal/k8s` contains the bowels of the logic to talk to the
   Kubernetes apiserver to get and modify service information. It
   allows most of the rest of the MetalLB code to be ignorant of the
