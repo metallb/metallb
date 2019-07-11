@@ -17,7 +17,7 @@ import (
 
 var (
 	binary      = pflag.StringSliceP("binary", "b", []string{"controller", "speaker"}, "binaries to act upon")
-	action      = pflag.StringSliceP("action", "a", []string{"build"}, "actions to execute")
+	action      = pflag.StringSliceP("action", "a", []string{}, "actions to execute")
 	arch        = pflag.StringSlice("arch", []string{"amd64"}, "CPU architectures to act upon")
 	registry    = pflag.String("registry", "metallb", "docker registry to push to")
 	oldregistry = pflag.String("oldregistry", "", "registry to retag images from when pushing")
@@ -27,7 +27,6 @@ var (
 	validBinaries = map[string]bool{
 		"controller":            true,
 		"speaker":               true,
-		"test-bgp-router":       true,
 		"e2etest-mirror-server": true,
 	}
 	validActions = map[string]func(){
@@ -70,6 +69,7 @@ func main() {
 	}
 	for _, act := range *action {
 		if validActions[act] == nil {
+			listActions()
 			fatal("Unknown action %q", act)
 		}
 	}
@@ -87,8 +87,23 @@ func main() {
 		}
 	}
 
+	if len(*action) == 0 {
+		listActions()
+	}
 	for _, act := range *action {
 		validActions[act]()
+	}
+}
+
+func listActions() {
+	var actions []string
+	for a := range validActions {
+		actions = append(actions, a)
+	}
+	sort.Strings(actions)
+	fmt.Println("Known actions:")
+	for _, a := range actions {
+		fmt.Println(" ", a)
 	}
 }
 
@@ -245,7 +260,7 @@ func circleci() {
 	tmpl := template.Must(template.ParseFiles(".circleci/config.yml.tmpl"))
 	v := map[string][]string{
 		"GoVersions": {"1.12"},
-		"Binary":     {"controller", "speaker", "test-bgp-router"},
+		"Binary":     {"controller", "speaker"},
 	}
 	var b bytes.Buffer
 	if err := tmpl.Execute(&b, v); err != nil {

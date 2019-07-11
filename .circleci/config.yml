@@ -40,17 +40,6 @@ jobs:
       - run: go get github.com/estesp/manifest-tool # Can't fetch this with modules yet :(
       - run: echo "export GO111MODULE=on" >>$BASH_ENV
       - run: go run make.go --action build,image,push --arch all --binary speaker --tag ${CIRCLE_BRANCH:-${CIRCLE_TAG}} --registry metallb --multiarch
-  deploy-test-bgp-router:
-    working_directory: /go/src/go.universe.tf/metallb
-    docker:
-      - image: circleci/golang:1.12
-    steps:
-      - checkout
-      - setup_remote_docker
-      - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
-      - run: go get github.com/estesp/manifest-tool # Can't fetch this with modules yet :(
-      - run: echo "export GO111MODULE=on" >>$BASH_ENV
-      - run: go run make.go --action build,image,push --arch all --binary test-bgp-router --tag ${CIRCLE_BRANCH:-${CIRCLE_TAG}} --registry metallb --multiarch
 workflows:
   version: 2
   test-and-deploy:
@@ -68,14 +57,6 @@ workflows:
           requires:
             - test-1.12
       - deploy-speaker:
-          filters:
-            branches:
-              ignore: /pull\/.*/
-            tags:
-              only: /.*/
-          requires:
-            - test-1.12
-      - deploy-test-bgp-router:
           filters:
             branches:
               ignore: /pull\/.*/
