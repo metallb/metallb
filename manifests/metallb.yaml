@@ -1,161 +1,189 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: metallb-system
   labels:
     app: metallb
+  name: metallb-system
 ---
 apiVersion: extensions/v1beta1
 kind: PodSecurityPolicy
 metadata:
-  namespace: metallb-system
-  name: speaker
   labels:
     app: metallb
+  name: speaker
+  namespace: metallb-system
 spec:
-  hostNetwork: true
-  hostPorts:
-  - min: 7472
-    max: 7472
-  privileged: true
   allowPrivilegeEscalation: false
   allowedCapabilities:
-  - 'NET_ADMIN'
-  - 'NET_RAW'
-  - 'SYS_ADMIN'
-  volumes:
-  - '*'
+  - NET_ADMIN
+  - NET_RAW
+  - SYS_ADMIN
   fsGroup:
     rule: RunAsAny
+  hostNetwork: true
+  hostPorts:
+  - max: 7472
+    min: 7472
+  privileged: true
   runAsUser:
     rule: RunAsAny
   seLinux:
     rule: RunAsAny
   supplementalGroups:
     rule: RunAsAny
+  volumes:
+  - '*'
 ---
-
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  namespace: metallb-system
+  labels:
+    app: metallb
   name: controller
-  labels:
-    app: metallb
+  namespace: metallb-system
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  namespace: metallb-system
+  labels:
+    app: metallb
   name: speaker
-  labels:
-    app: metallb
-
+  namespace: metallb-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
+  labels:
+    app: metallb
   name: metallb-system:controller
-  labels:
-    app: metallb
 rules:
-- apiGroups: [""]
-  resources: ["services"]
-  verbs: ["get", "list", "watch", "update"]
-- apiGroups: [""]
-  resources: ["services/status"]
-  verbs: ["update"]
-- apiGroups: [""]
-  resources: ["events"]
-  verbs: ["create", "patch"]
+- apiGroups:
+  - ''
+  resources:
+  - services
+  verbs:
+  - get
+  - list
+  - watch
+  - update
+- apiGroups:
+  - ''
+  resources:
+  - services/status
+  verbs:
+  - update
+- apiGroups:
+  - ''
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: metallb-system:speaker
   labels:
     app: metallb
+  name: metallb-system:speaker
 rules:
-- apiGroups: [""]
-  resources: ["services", "endpoints", "nodes"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["extensions"]
-  resources: ["podsecuritypolicies"]
-  resourceNames: ["speaker"]
-  verbs: ["use"]
+- apiGroups:
+  - ''
+  resources:
+  - services
+  - endpoints
+  - nodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - extensions
+  resourceNames:
+  - speaker
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  namespace: metallb-system
-  name: config-watcher
   labels:
     app: metallb
+  name: config-watcher
+  namespace: metallb-system
 rules:
-- apiGroups: [""]
-  resources: ["configmaps"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: [""]
-  resources: ["events"]
-  verbs: ["create"]
+- apiGroups:
+  - ''
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ''
+  resources:
+  - events
+  verbs:
+  - create
 ---
-
-## Role bindings
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: metallb-system:controller
   labels:
     app: metallb
+  name: metallb-system:controller
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: metallb-system:controller
 subjects:
 - kind: ServiceAccount
   name: controller
   namespace: metallb-system
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: metallb-system:controller
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: metallb-system:speaker
   labels:
     app: metallb
-subjects:
-- kind: ServiceAccount
-  name: speaker
-  namespace: metallb-system
+  name: metallb-system:speaker
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: metallb-system:speaker
+subjects:
+- kind: ServiceAccount
+  name: speaker
+  namespace: metallb-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  namespace: metallb-system
-  name: config-watcher
   labels:
     app: metallb
+  name: config-watcher
+  namespace: metallb-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: config-watcher
 subjects:
 - kind: ServiceAccount
   name: controller
 - kind: ServiceAccount
   name: speaker
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: config-watcher
 ---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
-  namespace: metallb-system
-  name: speaker
   labels:
     app: metallb
     component: speaker
+  name: speaker
+  namespace: metallb-system
 spec:
   selector:
     matchLabels:
@@ -163,24 +191,15 @@ spec:
       component: speaker
   template:
     metadata:
+      annotations:
+        prometheus.io/port: '7472'
+        prometheus.io/scrape: 'true'
       labels:
         app: metallb
         component: speaker
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "7472"
     spec:
-      tolerations:
-      - key: node-role.kubernetes.io/master
-        effect: NoSchedule
-      serviceAccountName: speaker
-      terminationGracePeriodSeconds: 0
-      hostNetwork: true
       containers:
-      - name: speaker
-        image: metallb/speaker:master
-        imagePullPolicy: Always
-        args:
+      - args:
         - --port=7472
         - --config=config
         env:
@@ -188,36 +207,43 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        image: metallb/speaker:master
+        imagePullPolicy: Always
+        name: speaker
         ports:
-        - name: monitoring
-          containerPort: 7472
+        - containerPort: 7472
+          name: monitoring
         resources:
           limits:
             cpu: 100m
             memory: 100Mi
-          
         securityContext:
           allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
           capabilities:
-            drop:
-            - ALL
             add:
             - NET_ADMIN
             - NET_RAW
             - SYS_ADMIN
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+      hostNetwork: true
       nodeSelector:
-        "beta.kubernetes.io/os": linux
-
+        beta.kubernetes.io/os: linux
+      serviceAccountName: speaker
+      terminationGracePeriodSeconds: 0
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  namespace: metallb-system
-  name: controller
   labels:
     app: metallb
     component: controller
+  name: controller
+  namespace: metallb-system
 spec:
   revisionHistoryLimit: 3
   selector:
@@ -226,39 +252,37 @@ spec:
       component: controller
   template:
     metadata:
+      annotations:
+        prometheus.io/port: '7472'
+        prometheus.io/scrape: 'true'
       labels:
         app: metallb
         component: controller
-      annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "7472"
     spec:
-      serviceAccountName: controller
-      terminationGracePeriodSeconds: 0
-      securityContext:
-        runAsNonRoot: true
-        runAsUser: 65534 # nobody
-      nodeSelector:
-        "beta.kubernetes.io/os": linux
       containers:
-      - name: controller
-        image: metallb/controller:master
-        imagePullPolicy: Always
-        args:
+      - args:
         - --port=7472
         - --config=config
+        image: metallb/controller:master
+        imagePullPolicy: Always
+        name: controller
         ports:
-        - name: monitoring
-          containerPort: 7472
+        - containerPort: 7472
+          name: monitoring
         resources:
           limits:
             cpu: 100m
             memory: 100Mi
-          
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
             drop:
             - all
           readOnlyRootFilesystem: true
-
+      nodeSelector:
+        beta.kubernetes.io/os: linux
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+      serviceAccountName: controller
+      terminationGracePeriodSeconds: 0
