@@ -9,7 +9,7 @@ jobs:
     steps:
       - checkout
       - run: sudo apt-get install python-pip
-      - run: sudo pip install invoke
+      - run: sudo pip install invoke semver pyyaml
       - run: echo "export GO111MODULE=on" >>$BASH_ENV
       - run: curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash
       - run: curl -L https://git.io/vp6lP | sh # gometalinter
@@ -28,7 +28,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: sudo apt-get install python-pip
-      - run: sudo pip install invoke
+      - run: sudo pip install invoke semver pyyaml
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
       - run: go get github.com/estesp/manifest-tool # Can't fetch this with modules yet :(
       - run: echo "export GO111MODULE=on" >>$BASH_ENV
@@ -41,7 +41,7 @@ jobs:
       - checkout
       - setup_remote_docker
       - run: sudo apt-get install python-pip
-      - run: sudo pip install invoke
+      - run: sudo pip install invoke semver pyyaml
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
       - run: go get github.com/estesp/manifest-tool # Can't fetch this with modules yet :(
       - run: echo "export GO111MODULE=on" >>$BASH_ENV
