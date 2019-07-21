@@ -9,6 +9,10 @@ try:
     from io import StringIO
 except ImportError:
     from StringIO import StringIO
+try:
+    from urllib.request import urlopen
+except ImportError:
+    from urllib2 import urlopen
 
 from invoke import run, task
 from invoke.exceptions import Exit
@@ -269,6 +273,24 @@ def helm(ctx):
     with open("manifests/metallb.yaml", "w") as f:
         yaml.dump_all([m for m in manifests if m], f)
 
+@task
+def test_cni_manifests(ctx):
+    """Update CNI manifests for e2e tests."""
+    def _fetch(url):
+        bs = urlopen(url).read()
+        return list(m for m in yaml.safe_load_all(bs) if m)
+    def _write(file, manifest):
+        with open(file, "w") as f:
+            f.write(yaml.dump(manifest))
+
+    calico = _fetch("https://docs.projectcalico.org/v3.6/getting-started/kubernetes/installation/hosted/kubernetes-datastore/calico-networking/1.7/calico.yaml")
+    _write("e2etest/manifests/calico.yaml", calico)
+
+    weave = _fetch("https://cloud.weave.works/k8s/net?k8s-version=1.15&env.NO_MASQ_LOCAL=1")
+    _write("e2etest/manifests/weave.yaml", weave)
+
+    flannel = _fetch("https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml")
+    _write("e2etest/manifests/flannel.yaml", flannel)
 
 @task(help={
     "version": "version of MetalLB to release.",

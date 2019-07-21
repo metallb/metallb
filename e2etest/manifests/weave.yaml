@@ -1,157 +1,132 @@
-apiVersion: v1
-kind: List
-items:
+- apiVersion: v1
+  items:
   - apiVersion: v1
     kind: ServiceAccount
     metadata:
-      name: weave-net
       annotations:
-        cloud.weave.works/launcher-info: |-
-          {
-            "original-request": {
-              "url": "/k8s/v1.10/net.yaml?k8s-version=1.14",
-              "date": "Sun Apr 21 2019 22:46:33 GMT+0000 (UTC)"
-            },
-            "email-address": "support@weave.works"
-          }
+        cloud.weave.works/launcher-info: "{\n  \"original-request\": {\n    \"url\"\
+          : \"/k8s/v1.10/net.yaml?k8s-version=1.15&env.NO_MASQ_LOCAL=1\",\n    \"\
+          date\": \"Sun Jul 21 2019 13:15:12 GMT+0000 (UTC)\"\n  },\n  \"email-address\"\
+          : \"support@weave.works\"\n}"
       labels:
         name: weave-net
+      name: weave-net
       namespace: kube-system
   - apiVersion: rbac.authorization.k8s.io/v1beta1
     kind: ClusterRole
     metadata:
-      name: weave-net
       annotations:
-        cloud.weave.works/launcher-info: |-
-          {
-            "original-request": {
-              "url": "/k8s/v1.10/net.yaml?k8s-version=1.14",
-              "date": "Sun Apr 21 2019 22:46:33 GMT+0000 (UTC)"
-            },
-            "email-address": "support@weave.works"
-          }
+        cloud.weave.works/launcher-info: "{\n  \"original-request\": {\n    \"url\"\
+          : \"/k8s/v1.10/net.yaml?k8s-version=1.15&env.NO_MASQ_LOCAL=1\",\n    \"\
+          date\": \"Sun Jul 21 2019 13:15:12 GMT+0000 (UTC)\"\n  },\n  \"email-address\"\
+          : \"support@weave.works\"\n}"
       labels:
         name: weave-net
+      name: weave-net
     rules:
-      - apiGroups:
-          - ''
-        resources:
-          - pods
-          - namespaces
-          - nodes
-        verbs:
-          - get
-          - list
-          - watch
-      - apiGroups:
-          - networking.k8s.io
-        resources:
-          - networkpolicies
-        verbs:
-          - get
-          - list
-          - watch
-      - apiGroups:
-          - ''
-        resources:
-          - nodes/status
-        verbs:
-          - patch
-          - update
+    - apiGroups:
+      - ''
+      resources:
+      - pods
+      - namespaces
+      - nodes
+      verbs:
+      - get
+      - list
+      - watch
+    - apiGroups:
+      - networking.k8s.io
+      resources:
+      - networkpolicies
+      verbs:
+      - get
+      - list
+      - watch
+    - apiGroups:
+      - ''
+      resources:
+      - nodes/status
+      verbs:
+      - patch
+      - update
   - apiVersion: rbac.authorization.k8s.io/v1beta1
     kind: ClusterRoleBinding
     metadata:
-      name: weave-net
       annotations:
-        cloud.weave.works/launcher-info: |-
-          {
-            "original-request": {
-              "url": "/k8s/v1.10/net.yaml?k8s-version=1.14",
-              "date": "Sun Apr 21 2019 22:46:33 GMT+0000 (UTC)"
-            },
-            "email-address": "support@weave.works"
-          }
+        cloud.weave.works/launcher-info: "{\n  \"original-request\": {\n    \"url\"\
+          : \"/k8s/v1.10/net.yaml?k8s-version=1.15&env.NO_MASQ_LOCAL=1\",\n    \"\
+          date\": \"Sun Jul 21 2019 13:15:12 GMT+0000 (UTC)\"\n  },\n  \"email-address\"\
+          : \"support@weave.works\"\n}"
       labels:
         name: weave-net
+      name: weave-net
     roleRef:
+      apiGroup: rbac.authorization.k8s.io
       kind: ClusterRole
       name: weave-net
-      apiGroup: rbac.authorization.k8s.io
     subjects:
-      - kind: ServiceAccount
-        name: weave-net
-        namespace: kube-system
+    - kind: ServiceAccount
+      name: weave-net
+      namespace: kube-system
   - apiVersion: rbac.authorization.k8s.io/v1beta1
     kind: Role
     metadata:
-      name: weave-net
       annotations:
-        cloud.weave.works/launcher-info: |-
-          {
-            "original-request": {
-              "url": "/k8s/v1.10/net.yaml?k8s-version=1.14",
-              "date": "Sun Apr 21 2019 22:46:33 GMT+0000 (UTC)"
-            },
-            "email-address": "support@weave.works"
-          }
+        cloud.weave.works/launcher-info: "{\n  \"original-request\": {\n    \"url\"\
+          : \"/k8s/v1.10/net.yaml?k8s-version=1.15&env.NO_MASQ_LOCAL=1\",\n    \"\
+          date\": \"Sun Jul 21 2019 13:15:12 GMT+0000 (UTC)\"\n  },\n  \"email-address\"\
+          : \"support@weave.works\"\n}"
       labels:
         name: weave-net
+      name: weave-net
       namespace: kube-system
     rules:
-      - apiGroups:
-          - ''
-        resourceNames:
-          - weave-net
-        resources:
-          - configmaps
-        verbs:
-          - get
-          - update
-      - apiGroups:
-          - ''
-        resources:
-          - configmaps
-        verbs:
-          - create
+    - apiGroups:
+      - ''
+      resourceNames:
+      - weave-net
+      resources:
+      - configmaps
+      verbs:
+      - get
+      - update
+    - apiGroups:
+      - ''
+      resources:
+      - configmaps
+      verbs:
+      - create
   - apiVersion: rbac.authorization.k8s.io/v1beta1
     kind: RoleBinding
     metadata:
-      name: weave-net
       annotations:
-        cloud.weave.works/launcher-info: |-
-          {
-            "original-request": {
-              "url": "/k8s/v1.10/net.yaml?k8s-version=1.14",
-              "date": "Sun Apr 21 2019 22:46:33 GMT+0000 (UTC)"
-            },
-            "email-address": "support@weave.works"
-          }
+        cloud.weave.works/launcher-info: "{\n  \"original-request\": {\n    \"url\"\
+          : \"/k8s/v1.10/net.yaml?k8s-version=1.15&env.NO_MASQ_LOCAL=1\",\n    \"\
+          date\": \"Sun Jul 21 2019 13:15:12 GMT+0000 (UTC)\"\n  },\n  \"email-address\"\
+          : \"support@weave.works\"\n}"
       labels:
         name: weave-net
+      name: weave-net
       namespace: kube-system
     roleRef:
+      apiGroup: rbac.authorization.k8s.io
       kind: Role
       name: weave-net
-      apiGroup: rbac.authorization.k8s.io
     subjects:
-      - kind: ServiceAccount
-        name: weave-net
-        namespace: kube-system
+    - kind: ServiceAccount
+      name: weave-net
+      namespace: kube-system
   - apiVersion: extensions/v1beta1
     kind: DaemonSet
     metadata:
-      name: weave-net
       annotations:
-        cloud.weave.works/launcher-info: |-
-          {
-            "original-request": {
-              "url": "/k8s/v1.10/net.yaml?k8s-version=1.14",
-              "date": "Sun Apr 21 2019 22:46:33 GMT+0000 (UTC)"
-            },
-            "email-address": "support@weave.works"
-          }
+        cloud.weave.works/launcher-info: "{\n  \"original-request\": {\n    \"url\"\
+          : \"/k8s/v1.10/net.yaml?k8s-version=1.15&env.NO_MASQ_LOCAL=1\",\n    \"\
+          date\": \"Sun Jul 21 2019 13:15:12 GMT+0000 (UTC)\"\n  },\n  \"email-address\"\
+          : \"support@weave.works\"\n}"
       labels:
         name: weave-net
+      name: weave-net
       namespace: kube-system
     spec:
       minReadySeconds: 5
@@ -161,57 +136,59 @@ items:
             name: weave-net
         spec:
           containers:
-            - name: weave
-              command:
-                - /home/weave/launch.sh
-              env:
-                - name: HOSTNAME
-                  valueFrom:
-                    fieldRef:
-                      apiVersion: v1
-                      fieldPath: spec.nodeName
-              image: 'docker.io/weaveworks/weave-kube:2.5.1'
-              readinessProbe:
-                httpGet:
-                  host: 127.0.0.1
-                  path: /status
-                  port: 6784
-              resources:
-                requests:
-                  cpu: 10m
-              securityContext:
-                privileged: true
-              volumeMounts:
-                - name: weavedb
-                  mountPath: /weavedb
-                - name: cni-bin
-                  mountPath: /host/opt
-                - name: cni-bin2
-                  mountPath: /host/home
-                - name: cni-conf
-                  mountPath: /host/etc
-                - name: dbus
-                  mountPath: /host/var/lib/dbus
-                - name: lib-modules
-                  mountPath: /lib/modules
-                - name: xtables-lock
-                  mountPath: /run/xtables.lock
-            - name: weave-npc
-              env:
-                - name: HOSTNAME
-                  valueFrom:
-                    fieldRef:
-                      apiVersion: v1
-                      fieldPath: spec.nodeName
-              image: 'docker.io/weaveworks/weave-npc:2.5.1'
-              resources:
-                requests:
-                  cpu: 10m
-              securityContext:
-                privileged: true
-              volumeMounts:
-                - name: xtables-lock
-                  mountPath: /run/xtables.lock
+          - command:
+            - /home/weave/launch.sh
+            env:
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            - name: NO_MASQ_LOCAL
+              value: '1'
+            image: docker.io/weaveworks/weave-kube:2.5.2
+            name: weave
+            readinessProbe:
+              httpGet:
+                host: 127.0.0.1
+                path: /status
+                port: 6784
+            resources:
+              requests:
+                cpu: 10m
+            securityContext:
+              privileged: true
+            volumeMounts:
+            - mountPath: /weavedb
+              name: weavedb
+            - mountPath: /host/opt
+              name: cni-bin
+            - mountPath: /host/home
+              name: cni-bin2
+            - mountPath: /host/etc
+              name: cni-conf
+            - mountPath: /host/var/lib/dbus
+              name: dbus
+            - mountPath: /lib/modules
+              name: lib-modules
+            - mountPath: /run/xtables.lock
+              name: xtables-lock
+          - env:
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: spec.nodeName
+            image: docker.io/weaveworks/weave-npc:2.5.2
+            name: weave-npc
+            resources:
+              requests:
+                cpu: 10m
+            securityContext:
+              privileged: true
+            volumeMounts:
+            - mountPath: /run/xtables.lock
+              name: xtables-lock
           hostNetwork: true
           hostPID: true
           restartPolicy: Always
@@ -219,30 +196,31 @@ items:
             seLinuxOptions: {}
           serviceAccountName: weave-net
           tolerations:
-            - effect: NoSchedule
-              operator: Exists
+          - effect: NoSchedule
+            operator: Exists
           volumes:
-            - name: weavedb
-              hostPath:
-                path: /var/lib/weave
-            - name: cni-bin
-              hostPath:
-                path: /opt
-            - name: cni-bin2
-              hostPath:
-                path: /home
-            - name: cni-conf
-              hostPath:
-                path: /etc
-            - name: dbus
-              hostPath:
-                path: /var/lib/dbus
-            - name: lib-modules
-              hostPath:
-                path: /lib/modules
-            - name: xtables-lock
-              hostPath:
-                path: /run/xtables.lock
-                type: FileOrCreate
+          - hostPath:
+              path: /var/lib/weave
+            name: weavedb
+          - hostPath:
+              path: /opt
+            name: cni-bin
+          - hostPath:
+              path: /home
+            name: cni-bin2
+          - hostPath:
+              path: /etc
+            name: cni-conf
+          - hostPath:
+              path: /var/lib/dbus
+            name: dbus
+          - hostPath:
+              path: /lib/modules
+            name: lib-modules
+          - hostPath:
+              path: /run/xtables.lock
+              type: FileOrCreate
+            name: xtables-lock
       updateStrategy:
         type: RollingUpdate
+  kind: List

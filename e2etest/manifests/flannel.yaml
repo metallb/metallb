@@ -1,536 +1,506 @@
----
-apiVersion: extensions/v1beta1
-kind: PodSecurityPolicy
-metadata:
-  name: psp.flannel.unprivileged
-  annotations:
-    seccomp.security.alpha.kubernetes.io/allowedProfileNames: docker/default
-    seccomp.security.alpha.kubernetes.io/defaultProfileName: docker/default
-    apparmor.security.beta.kubernetes.io/allowedProfileNames: runtime/default
-    apparmor.security.beta.kubernetes.io/defaultProfileName: runtime/default
-spec:
-  privileged: false
-  volumes:
+- apiVersion: extensions/v1beta1
+  kind: PodSecurityPolicy
+  metadata:
+    annotations:
+      apparmor.security.beta.kubernetes.io/allowedProfileNames: runtime/default
+      apparmor.security.beta.kubernetes.io/defaultProfileName: runtime/default
+      seccomp.security.alpha.kubernetes.io/allowedProfileNames: docker/default
+      seccomp.security.alpha.kubernetes.io/defaultProfileName: docker/default
+    name: psp.flannel.unprivileged
+  spec:
+    allowPrivilegeEscalation: false
+    allowedCapabilities:
+    - NET_ADMIN
+    allowedHostPaths:
+    - pathPrefix: /etc/cni/net.d
+    - pathPrefix: /etc/kube-flannel
+    - pathPrefix: /run/flannel
+    defaultAddCapabilities: []
+    defaultAllowPrivilegeEscalation: false
+    fsGroup:
+      rule: RunAsAny
+    hostIPC: false
+    hostNetwork: true
+    hostPID: false
+    hostPorts:
+    - max: 65535
+      min: 0
+    privileged: false
+    readOnlyRootFilesystem: false
+    requiredDropCapabilities: []
+    runAsUser:
+      rule: RunAsAny
+    seLinux:
+      rule: RunAsAny
+    supplementalGroups:
+      rule: RunAsAny
+    volumes:
     - configMap
     - secret
     - emptyDir
     - hostPath
-  allowedHostPaths:
-    - pathPrefix: "/etc/cni/net.d"
-    - pathPrefix: "/etc/kube-flannel"
-    - pathPrefix: "/run/flannel"
-  readOnlyRootFilesystem: false
-  # Users and groups
-  runAsUser:
-    rule: RunAsAny
-  supplementalGroups:
-    rule: RunAsAny
-  fsGroup:
-    rule: RunAsAny
-  # Privilege Escalation
-  allowPrivilegeEscalation: false
-  defaultAllowPrivilegeEscalation: false
-  # Capabilities
-  allowedCapabilities: ['NET_ADMIN']
-  defaultAddCapabilities: []
-  requiredDropCapabilities: []
-  # Host namespaces
-  hostPID: false
-  hostIPC: false
-  hostNetwork: true
-  hostPorts:
-  - min: 0
-    max: 65535
-  # SELinux
-  seLinux:
-    # SELinux is unsed in CaaSP
-    rule: 'RunAsAny'
----
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1beta1
-metadata:
-  name: flannel
-rules:
-  - apiGroups: ['extensions']
-    resources: ['podsecuritypolicies']
-    verbs: ['use']
-    resourceNames: ['psp.flannel.unprivileged']
-  - apiGroups:
-      - ""
-    resources:
-      - pods
-    verbs:
-      - get
-  - apiGroups:
-      - ""
-    resources:
-      - nodes
-    verbs:
-      - list
-      - watch
-  - apiGroups:
-      - ""
-    resources:
-      - nodes/status
-    verbs:
-      - patch
----
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1beta1
-metadata:
-  name: flannel
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
+- apiVersion: rbac.authorization.k8s.io/v1beta1
   kind: ClusterRole
-  name: flannel
-subjects:
-- kind: ServiceAccount
-  name: flannel
-  namespace: kube-system
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: flannel
-  namespace: kube-system
----
-kind: ConfigMap
-apiVersion: v1
-metadata:
-  name: kube-flannel-cfg
-  namespace: kube-system
-  labels:
-    tier: node
-    app: flannel
-data:
-  cni-conf.json: |
-    {
-      "name": "cbr0",
-      "plugins": [
-        {
-          "type": "flannel",
-          "delegate": {
-            "hairpinMode": true,
-            "isDefaultGateway": true
-          }
-        },
-        {
-          "type": "portmap",
-          "capabilities": {
-            "portMappings": true
-          }
-        }
-      ]
-    }
-  net-conf.json: |
-    {
-      "Network": "10.32.0.0/12",
-      "Backend": {
-        "Type": "vxlan"
-      }
-    }
----
-apiVersion: extensions/v1beta1
-kind: DaemonSet
-metadata:
-  name: kube-flannel-ds-amd64
-  namespace: kube-system
-  labels:
-    tier: node
-    app: flannel
-spec:
-  template:
-    metadata:
-      labels:
-        tier: node
-        app: flannel
-    spec:
-      hostNetwork: true
-      nodeSelector:
-        beta.kubernetes.io/arch: amd64
-      tolerations:
-      - operator: Exists
-        effect: NoSchedule
-      serviceAccountName: flannel
-      initContainers:
-      - name: install-cni
-        image: quay.io/coreos/flannel:v0.11.0-amd64
-        command:
-        - cp
-        args:
-        - -f
-        - /etc/kube-flannel/cni-conf.json
-        - /etc/cni/net.d/10-flannel.conflist
-        volumeMounts:
-        - name: cni
-          mountPath: /etc/cni/net.d
-        - name: flannel-cfg
-          mountPath: /etc/kube-flannel/
-      containers:
-      - name: kube-flannel
-        image: quay.io/coreos/flannel:v0.11.0-amd64
-        command:
-        - /opt/bin/flanneld
-        args:
-        - --iface=enp0s5
-        - --ip-masq
-        - --kube-subnet-mgr
-        resources:
-          requests:
-            cpu: "100m"
-            memory: "50Mi"
-          limits:
-            cpu: "100m"
-            memory: "50Mi"
-        securityContext:
-          privileged: false
-          capabilities:
-             add: ["NET_ADMIN"]
-        env:
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        volumeMounts:
-        - name: run
-          mountPath: /run/flannel
-        - name: flannel-cfg
-          mountPath: /etc/kube-flannel/
-      volumes:
-        - name: run
-          hostPath:
+  metadata:
+    name: flannel
+  rules:
+  - apiGroups:
+    - extensions
+    resourceNames:
+    - psp.flannel.unprivileged
+    resources:
+    - podsecuritypolicies
+    verbs:
+    - use
+  - apiGroups:
+    - ''
+    resources:
+    - pods
+    verbs:
+    - get
+  - apiGroups:
+    - ''
+    resources:
+    - nodes
+    verbs:
+    - list
+    - watch
+  - apiGroups:
+    - ''
+    resources:
+    - nodes/status
+    verbs:
+    - patch
+- apiVersion: rbac.authorization.k8s.io/v1beta1
+  kind: ClusterRoleBinding
+  metadata:
+    name: flannel
+  roleRef:
+    apiGroup: rbac.authorization.k8s.io
+    kind: ClusterRole
+    name: flannel
+  subjects:
+  - kind: ServiceAccount
+    name: flannel
+    namespace: kube-system
+- apiVersion: v1
+  kind: ServiceAccount
+  metadata:
+    name: flannel
+    namespace: kube-system
+- apiVersion: v1
+  data:
+    cni-conf.json: "{\n  \"name\": \"cbr0\",\n  \"plugins\": [\n    {\n      \"type\"\
+      : \"flannel\",\n      \"delegate\": {\n        \"hairpinMode\": true,\n    \
+      \    \"isDefaultGateway\": true\n      }\n    },\n    {\n      \"type\": \"\
+      portmap\",\n      \"capabilities\": {\n        \"portMappings\": true\n    \
+      \  }\n    }\n  ]\n}\n"
+    net-conf.json: "{\n  \"Network\": \"10.244.0.0/16\",\n  \"Backend\": {\n    \"\
+      Type\": \"vxlan\"\n  }\n}\n"
+  kind: ConfigMap
+  metadata:
+    labels:
+      app: flannel
+      tier: node
+    name: kube-flannel-cfg
+    namespace: kube-system
+- apiVersion: extensions/v1beta1
+  kind: DaemonSet
+  metadata:
+    labels:
+      app: flannel
+      tier: node
+    name: kube-flannel-ds-amd64
+    namespace: kube-system
+  spec:
+    template:
+      metadata:
+        labels:
+          app: flannel
+          tier: node
+      spec:
+        containers:
+        - args:
+          - --ip-masq
+          - --kube-subnet-mgr
+          command:
+          - /opt/bin/flanneld
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          image: quay.io/coreos/flannel:v0.11.0-amd64
+          name: kube-flannel
+          resources:
+            limits:
+              cpu: 100m
+              memory: 50Mi
+            requests:
+              cpu: 100m
+              memory: 50Mi
+          securityContext:
+            capabilities:
+              add:
+              - NET_ADMIN
+            privileged: false
+          volumeMounts:
+          - mountPath: /run/flannel
+            name: run
+          - mountPath: /etc/kube-flannel/
+            name: flannel-cfg
+        hostNetwork: true
+        initContainers:
+        - args:
+          - -f
+          - /etc/kube-flannel/cni-conf.json
+          - /etc/cni/net.d/10-flannel.conflist
+          command:
+          - cp
+          image: quay.io/coreos/flannel:v0.11.0-amd64
+          name: install-cni
+          volumeMounts:
+          - mountPath: /etc/cni/net.d
+            name: cni
+          - mountPath: /etc/kube-flannel/
+            name: flannel-cfg
+        nodeSelector:
+          beta.kubernetes.io/arch: amd64
+        serviceAccountName: flannel
+        tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        volumes:
+        - hostPath:
             path: /run/flannel
-        - name: cni
-          hostPath:
+          name: run
+        - hostPath:
             path: /etc/cni/net.d
-        - name: flannel-cfg
-          configMap:
+          name: cni
+        - configMap:
             name: kube-flannel-cfg
----
-apiVersion: extensions/v1beta1
-kind: DaemonSet
-metadata:
-  name: kube-flannel-ds-arm64
-  namespace: kube-system
-  labels:
-    tier: node
-    app: flannel
-spec:
-  template:
-    metadata:
-      labels:
-        tier: node
-        app: flannel
-    spec:
-      hostNetwork: true
-      nodeSelector:
-        beta.kubernetes.io/arch: arm64
-      tolerations:
-      - operator: Exists
-        effect: NoSchedule
-      serviceAccountName: flannel
-      initContainers:
-      - name: install-cni
-        image: quay.io/coreos/flannel:v0.11.0-arm64
-        command:
-        - cp
-        args:
-        - -f
-        - /etc/kube-flannel/cni-conf.json
-        - /etc/cni/net.d/10-flannel.conflist
-        volumeMounts:
-        - name: cni
-          mountPath: /etc/cni/net.d
-        - name: flannel-cfg
-          mountPath: /etc/kube-flannel/
-      containers:
-      - name: kube-flannel
-        image: quay.io/coreos/flannel:v0.11.0-arm64
-        command:
-        - /opt/bin/flanneld
-        args:
-        - --iface=enp0s5
-        - --ip-masq
-        - --kube-subnet-mgr
-        resources:
-          requests:
-            cpu: "100m"
-            memory: "50Mi"
-          limits:
-            cpu: "100m"
-            memory: "50Mi"
-        securityContext:
-          privileged: false
-          capabilities:
-             add: ["NET_ADMIN"]
-        env:
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        volumeMounts:
-        - name: run
-          mountPath: /run/flannel
-        - name: flannel-cfg
-          mountPath: /etc/kube-flannel/
-      volumes:
-        - name: run
-          hostPath:
+          name: flannel-cfg
+- apiVersion: extensions/v1beta1
+  kind: DaemonSet
+  metadata:
+    labels:
+      app: flannel
+      tier: node
+    name: kube-flannel-ds-arm64
+    namespace: kube-system
+  spec:
+    template:
+      metadata:
+        labels:
+          app: flannel
+          tier: node
+      spec:
+        containers:
+        - args:
+          - --ip-masq
+          - --kube-subnet-mgr
+          command:
+          - /opt/bin/flanneld
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          image: quay.io/coreos/flannel:v0.11.0-arm64
+          name: kube-flannel
+          resources:
+            limits:
+              cpu: 100m
+              memory: 50Mi
+            requests:
+              cpu: 100m
+              memory: 50Mi
+          securityContext:
+            capabilities:
+              add:
+              - NET_ADMIN
+            privileged: false
+          volumeMounts:
+          - mountPath: /run/flannel
+            name: run
+          - mountPath: /etc/kube-flannel/
+            name: flannel-cfg
+        hostNetwork: true
+        initContainers:
+        - args:
+          - -f
+          - /etc/kube-flannel/cni-conf.json
+          - /etc/cni/net.d/10-flannel.conflist
+          command:
+          - cp
+          image: quay.io/coreos/flannel:v0.11.0-arm64
+          name: install-cni
+          volumeMounts:
+          - mountPath: /etc/cni/net.d
+            name: cni
+          - mountPath: /etc/kube-flannel/
+            name: flannel-cfg
+        nodeSelector:
+          beta.kubernetes.io/arch: arm64
+        serviceAccountName: flannel
+        tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        volumes:
+        - hostPath:
             path: /run/flannel
-        - name: cni
-          hostPath:
+          name: run
+        - hostPath:
             path: /etc/cni/net.d
-        - name: flannel-cfg
-          configMap:
+          name: cni
+        - configMap:
             name: kube-flannel-cfg
----
-apiVersion: extensions/v1beta1
-kind: DaemonSet
-metadata:
-  name: kube-flannel-ds-arm
-  namespace: kube-system
-  labels:
-    tier: node
-    app: flannel
-spec:
-  template:
-    metadata:
-      labels:
-        tier: node
-        app: flannel
-    spec:
-      hostNetwork: true
-      nodeSelector:
-        beta.kubernetes.io/arch: arm
-      tolerations:
-      - operator: Exists
-        effect: NoSchedule
-      serviceAccountName: flannel
-      initContainers:
-      - name: install-cni
-        image: quay.io/coreos/flannel:v0.11.0-arm
-        command:
-        - cp
-        args:
-        - -f
-        - /etc/kube-flannel/cni-conf.json
-        - /etc/cni/net.d/10-flannel.conflist
-        volumeMounts:
-        - name: cni
-          mountPath: /etc/cni/net.d
-        - name: flannel-cfg
-          mountPath: /etc/kube-flannel/
-      containers:
-      - name: kube-flannel
-        image: quay.io/coreos/flannel:v0.11.0-arm
-        command:
-        - /opt/bin/flanneld
-        args:
-        - --iface=enp0s5
-        - --ip-masq
-        - --kube-subnet-mgr
-        resources:
-          requests:
-            cpu: "100m"
-            memory: "50Mi"
-          limits:
-            cpu: "100m"
-            memory: "50Mi"
-        securityContext:
-          privileged: false
-          capabilities:
-             add: ["NET_ADMIN"]
-        env:
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        volumeMounts:
-        - name: run
-          mountPath: /run/flannel
-        - name: flannel-cfg
-          mountPath: /etc/kube-flannel/
-      volumes:
-        - name: run
-          hostPath:
+          name: flannel-cfg
+- apiVersion: extensions/v1beta1
+  kind: DaemonSet
+  metadata:
+    labels:
+      app: flannel
+      tier: node
+    name: kube-flannel-ds-arm
+    namespace: kube-system
+  spec:
+    template:
+      metadata:
+        labels:
+          app: flannel
+          tier: node
+      spec:
+        containers:
+        - args:
+          - --ip-masq
+          - --kube-subnet-mgr
+          command:
+          - /opt/bin/flanneld
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          image: quay.io/coreos/flannel:v0.11.0-arm
+          name: kube-flannel
+          resources:
+            limits:
+              cpu: 100m
+              memory: 50Mi
+            requests:
+              cpu: 100m
+              memory: 50Mi
+          securityContext:
+            capabilities:
+              add:
+              - NET_ADMIN
+            privileged: false
+          volumeMounts:
+          - mountPath: /run/flannel
+            name: run
+          - mountPath: /etc/kube-flannel/
+            name: flannel-cfg
+        hostNetwork: true
+        initContainers:
+        - args:
+          - -f
+          - /etc/kube-flannel/cni-conf.json
+          - /etc/cni/net.d/10-flannel.conflist
+          command:
+          - cp
+          image: quay.io/coreos/flannel:v0.11.0-arm
+          name: install-cni
+          volumeMounts:
+          - mountPath: /etc/cni/net.d
+            name: cni
+          - mountPath: /etc/kube-flannel/
+            name: flannel-cfg
+        nodeSelector:
+          beta.kubernetes.io/arch: arm
+        serviceAccountName: flannel
+        tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        volumes:
+        - hostPath:
             path: /run/flannel
-        - name: cni
-          hostPath:
+          name: run
+        - hostPath:
             path: /etc/cni/net.d
-        - name: flannel-cfg
-          configMap:
+          name: cni
+        - configMap:
             name: kube-flannel-cfg
----
-apiVersion: extensions/v1beta1
-kind: DaemonSet
-metadata:
-  name: kube-flannel-ds-ppc64le
-  namespace: kube-system
-  labels:
-    tier: node
-    app: flannel
-spec:
-  template:
-    metadata:
-      labels:
-        tier: node
-        app: flannel
-    spec:
-      hostNetwork: true
-      nodeSelector:
-        beta.kubernetes.io/arch: ppc64le
-      tolerations:
-      - operator: Exists
-        effect: NoSchedule
-      serviceAccountName: flannel
-      initContainers:
-      - name: install-cni
-        image: quay.io/coreos/flannel:v0.11.0-ppc64le
-        command:
-        - cp
-        args:
-        - -f
-        - /etc/kube-flannel/cni-conf.json
-        - /etc/cni/net.d/10-flannel.conflist
-        volumeMounts:
-        - name: cni
-          mountPath: /etc/cni/net.d
-        - name: flannel-cfg
-          mountPath: /etc/kube-flannel/
-      containers:
-      - name: kube-flannel
-        image: quay.io/coreos/flannel:v0.11.0-ppc64le
-        command:
-        - /opt/bin/flanneld
-        args:
-        - --iface=enp0s5
-        - --ip-masq
-        - --kube-subnet-mgr
-        resources:
-          requests:
-            cpu: "100m"
-            memory: "50Mi"
-          limits:
-            cpu: "100m"
-            memory: "50Mi"
-        securityContext:
-          privileged: false
-          capabilities:
-             add: ["NET_ADMIN"]
-        env:
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        volumeMounts:
-        - name: run
-          mountPath: /run/flannel
-        - name: flannel-cfg
-          mountPath: /etc/kube-flannel/
-      volumes:
-        - name: run
-          hostPath:
+          name: flannel-cfg
+- apiVersion: extensions/v1beta1
+  kind: DaemonSet
+  metadata:
+    labels:
+      app: flannel
+      tier: node
+    name: kube-flannel-ds-ppc64le
+    namespace: kube-system
+  spec:
+    template:
+      metadata:
+        labels:
+          app: flannel
+          tier: node
+      spec:
+        containers:
+        - args:
+          - --ip-masq
+          - --kube-subnet-mgr
+          command:
+          - /opt/bin/flanneld
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          image: quay.io/coreos/flannel:v0.11.0-ppc64le
+          name: kube-flannel
+          resources:
+            limits:
+              cpu: 100m
+              memory: 50Mi
+            requests:
+              cpu: 100m
+              memory: 50Mi
+          securityContext:
+            capabilities:
+              add:
+              - NET_ADMIN
+            privileged: false
+          volumeMounts:
+          - mountPath: /run/flannel
+            name: run
+          - mountPath: /etc/kube-flannel/
+            name: flannel-cfg
+        hostNetwork: true
+        initContainers:
+        - args:
+          - -f
+          - /etc/kube-flannel/cni-conf.json
+          - /etc/cni/net.d/10-flannel.conflist
+          command:
+          - cp
+          image: quay.io/coreos/flannel:v0.11.0-ppc64le
+          name: install-cni
+          volumeMounts:
+          - mountPath: /etc/cni/net.d
+            name: cni
+          - mountPath: /etc/kube-flannel/
+            name: flannel-cfg
+        nodeSelector:
+          beta.kubernetes.io/arch: ppc64le
+        serviceAccountName: flannel
+        tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        volumes:
+        - hostPath:
             path: /run/flannel
-        - name: cni
-          hostPath:
+          name: run
+        - hostPath:
             path: /etc/cni/net.d
-        - name: flannel-cfg
-          configMap:
+          name: cni
+        - configMap:
             name: kube-flannel-cfg
----
-apiVersion: extensions/v1beta1
-kind: DaemonSet
-metadata:
-  name: kube-flannel-ds-s390x
-  namespace: kube-system
-  labels:
-    tier: node
-    app: flannel
-spec:
-  template:
-    metadata:
-      labels:
-        tier: node
-        app: flannel
-    spec:
-      hostNetwork: true
-      nodeSelector:
-        beta.kubernetes.io/arch: s390x
-      tolerations:
-      - operator: Exists
-        effect: NoSchedule
-      serviceAccountName: flannel
-      initContainers:
-      - name: install-cni
-        image: quay.io/coreos/flannel:v0.11.0-s390x
-        command:
-        - cp
-        args:
-        - -f
-        - /etc/kube-flannel/cni-conf.json
-        - /etc/cni/net.d/10-flannel.conflist
-        volumeMounts:
-        - name: cni
-          mountPath: /etc/cni/net.d
-        - name: flannel-cfg
-          mountPath: /etc/kube-flannel/
-      containers:
-      - name: kube-flannel
-        image: quay.io/coreos/flannel:v0.11.0-s390x
-        command:
-        - /opt/bin/flanneld
-        args:
-        - --iface=enp0s5
-        - --ip-masq
-        - --kube-subnet-mgr
-        resources:
-          requests:
-            cpu: "100m"
-            memory: "50Mi"
-          limits:
-            cpu: "100m"
-            memory: "50Mi"
-        securityContext:
-          privileged: false
-          capabilities:
-             add: ["NET_ADMIN"]
-        env:
-        - name: POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: POD_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
-        volumeMounts:
-        - name: run
-          mountPath: /run/flannel
-        - name: flannel-cfg
-          mountPath: /etc/kube-flannel/
-      volumes:
-        - name: run
-          hostPath:
+          name: flannel-cfg
+- apiVersion: extensions/v1beta1
+  kind: DaemonSet
+  metadata:
+    labels:
+      app: flannel
+      tier: node
+    name: kube-flannel-ds-s390x
+    namespace: kube-system
+  spec:
+    template:
+      metadata:
+        labels:
+          app: flannel
+          tier: node
+      spec:
+        containers:
+        - args:
+          - --ip-masq
+          - --kube-subnet-mgr
+          command:
+          - /opt/bin/flanneld
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          image: quay.io/coreos/flannel:v0.11.0-s390x
+          name: kube-flannel
+          resources:
+            limits:
+              cpu: 100m
+              memory: 50Mi
+            requests:
+              cpu: 100m
+              memory: 50Mi
+          securityContext:
+            capabilities:
+              add:
+              - NET_ADMIN
+            privileged: false
+          volumeMounts:
+          - mountPath: /run/flannel
+            name: run
+          - mountPath: /etc/kube-flannel/
+            name: flannel-cfg
+        hostNetwork: true
+        initContainers:
+        - args:
+          - -f
+          - /etc/kube-flannel/cni-conf.json
+          - /etc/cni/net.d/10-flannel.conflist
+          command:
+          - cp
+          image: quay.io/coreos/flannel:v0.11.0-s390x
+          name: install-cni
+          volumeMounts:
+          - mountPath: /etc/cni/net.d
+            name: cni
+          - mountPath: /etc/kube-flannel/
+            name: flannel-cfg
+        nodeSelector:
+          beta.kubernetes.io/arch: s390x
+        serviceAccountName: flannel
+        tolerations:
+        - effect: NoSchedule
+          operator: Exists
+        volumes:
+        - hostPath:
             path: /run/flannel
-        - name: cni
-          hostPath:
+          name: run
+        - hostPath:
             path: /etc/cni/net.d
-        - name: flannel-cfg
-          configMap:
+          name: cni
+        - configMap:
             name: kube-flannel-cfg
+          name: flannel-cfg
