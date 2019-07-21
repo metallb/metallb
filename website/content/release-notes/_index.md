@@ -21,6 +21,11 @@ Action required if updating from 0.7.x:
   allowing the `speaker` DaemonSet to request the elevated privileges
   it needs. If your cluster enforces pod security policies, you should
   review the provided policy before deploying it.
+- The speaker defaults to only offering its Prometheus metrics on the
+  node IP as registered in Kubernetes (i.e. the IP you see in `kubectl
+  get nodes -owide`). To revert to the previous behavior of offering
+  metrics on all interfaces, remove the METALLB_HOST environment
+  variable from the manifest.
 
 New features:
 
