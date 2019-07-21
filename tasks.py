@@ -188,6 +188,12 @@ def kind(ctx, architecture="amd64", name="kind"):
         tmp.write(manifest.encode("utf-8"))
         tmp.flush()
         run("kubectl apply -f {}".format(tmp.name), env={"KUBECONFIG": config}, echo=True)
+    print("""
+
+To access the cluster:
+
+export KUBECONFIG={}
+""".format(config))
 
 @task
 def helm(ctx):
