@@ -4,6 +4,11 @@ import re
 import semver
 import sys
 import yaml
+import tempfile
+try:
+    from io import StringIO
+except ImportError:
+    from StringIO import StringIO
 
 from invoke import run, task
 from invoke.exceptions import Exit
@@ -55,8 +60,15 @@ def _make_build_dirs():
             if not os.path.exists(dir):
                 os.makedirs(dir, mode=0o750)
 
-@task(iterable=["binaries", "architectures"])
+@task(iterable=["binaries", "architectures"],
+      help={
+          "binaries": "binaries to build. One or more of {}, or 'all'".format(", ".join(sorted(all_binaries))),
+          "architectures": "architectures to build. One or more of {}, or 'all'".format(", ".join(sorted(all_architectures))),
+          "tag": "docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'.",
+          "docker-user": "docker user under which to tag the images. Default 'metallb'.",
+      })
 def build(ctx, binaries, architectures, tag="dev", docker_user="metallb"):
+    """Build MetalLB docker images."""
     binaries = _check_binaries(binaries)
     architectures = _check_architectures(architectures)
     _make_build_dirs()
@@ -92,8 +104,15 @@ def build(ctx, binaries, architectures, tag="dev", docker_user="metallb"):
                     arch=arch),
                 echo=True)
 
-@task(iterable=["binaries", "architectures"])
+@task(iterable=["binaries", "architectures"],
+      help={
+          "binaries": "binaries to build. One or more of {}, or 'all'".format(", ".join(sorted(all_binaries))),
+          "architectures": "architectures to build. One or more of {}, or 'all'".format(", ".join(sorted(all_architectures))),
+          "tag": "docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'.",
+          "docker-user": "docker user under which to tag the images. Default 'metallb'.",
+      })
 def push(ctx, binaries, architectures, tag="dev", docker_user="metallb"):
+    """Build and push docker images to registry."""
     binaries = _check_binaries(binaries)
     architectures = _check_architectures(architectures)
 
@@ -107,8 +126,14 @@ def push(ctx, binaries, architectures, tag="dev", docker_user="metallb"):
                 tag=tag),
                 echo=True)
 
-@task(iterable=["binaries"])
+@task(iterable=["binaries"],
+      help={
+          "binaries": "binaries to build. One or more of {}, or 'all'".format(", ".join(sorted(all_binaries))),
+          "tag": "docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'.",
+          "docker-user": "docker user under which to tag the images. Default 'metallb'.",
+      })
 def push_multiarch(ctx, binaries, tag="dev", docker_user="metallb"):
+    """Build and push multi-architecture docker images to registry."""
     binaries = _check_binaries(binaries)
     architectures = _check_architectures(["all"])
     push(ctx, binaries=binaries, architectures=architectures, tag=tag, docker_user=docker_user)
@@ -125,8 +150,48 @@ def push_multiarch(ctx, binaries, tag="dev", docker_user="metallb"):
                 tag=tag),
             echo=True)
 
+@task(help={
+    "architecture": "CPU architecture of the local machine. Default 'amd64'.",
+    "name": "name of the kind cluster to use.",
+})
+def kind(ctx, architecture="amd64", name="kind"):
+    """Build and run MetalLB in a local Kind cluster.
+
+    If the cluster specified by --name (default "kind") doesn't exist,
+    it is created. Then, build MetalLB docker images from the
+    checkout, push them into kind, and deploy manifests/metallb.yaml
+    to run those images.
+    """
+    clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
+    if name not in clusters:
+        config = {
+            "apiVersion": "kind.sigs.k8s.io/v1alpha3",
+            "kind": "Cluster",
+            "nodes": [{"role": "control-plane"},
+                      {"role": "worker"},
+                      {"role": "worker"}],
+        }
+        config = yaml.dump(config).encode("utf-8")
+        with tempfile.NamedTemporaryFile() as tmp:
+            tmp.write(config)
+            tmp.flush()
+            run("kind create cluster --name={} --config={}".format(name, tmp.name), pty=True, echo=True)
+    build(ctx, binaries=["controller", "speaker"], architectures=[architecture])
+    run("kind load docker-image --name={} metallb/controller:dev-{}".format(name, architecture), echo=True)
+    run("kind load docker-image --name={} metallb/speaker:dev-{}".format(name, architecture), echo=True)
+    with open("manifests/metallb.yaml") as f:
+        manifest = f.read()
+    manifest = manifest.replace(":master", ":dev-{}".format(architecture))
+    manifest = manifest.replace("imagePullPolicy: Always", "imagePullPolicy: Never")
+    config = run("kind get kubeconfig-path --name={}".format(name), hide=True).stdout.strip()
+    with tempfile.NamedTemporaryFile() as tmp:
+        tmp.write(manifest.encode("utf-8"))
+        tmp.flush()
+        run("kubectl apply -f {}".format(tmp.name), env={"KUBECONFIG": config}, echo=True)
+
 @task
 def helm(ctx):
+    """Generate manifests/metallb.yaml from the Helm chart."""
     helm_options = {
         "controller.resources.limits.cpu": "100m",
         "controller.resources.limits.memory": "100Mi",
@@ -199,8 +264,12 @@ def helm(ctx):
         yaml.dump_all([m for m in manifests if m], f)
 
 
-@task
+@task(help={
+    "version": "version of MetalLB to release.",
+    "skip-release-notes": "make the release even if there are no release notes.",
+})
 def release(ctx, version, skip_release_notes=False):
+    """Tag a new release."""
     status = run("git status --porcelain", hide=True).stdout.strip()
     if status != "":
         raise Exit(message="git checkout not clean, cannot release")
