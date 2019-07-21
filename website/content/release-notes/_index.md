@@ -7,10 +7,6 @@ weight: 8
 
 [Documentation for this release](https://metallb.universe.tf)
 
-Note that this is a bit of a "catchup" release, following a long
-period without releases. As such, it's more of a "misc. bag of stuff"
-than usual.
-
 Action required if updating from 0.7.x:
 
 - The `speaker` DaemonSet now specifies a toleration to run on
