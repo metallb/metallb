@@ -19,7 +19,7 @@ from invoke.exceptions import Exit
 
 all_binaries = set(["controller",
                     "speaker",
-                    "e2etest-mirror-server"])
+                    "mirror-server"])
 all_architectures = set(["amd64",
                          "arm",
                          "arm64",
@@ -158,7 +158,7 @@ def push_multiarch(ctx, binaries, tag="dev", docker_user="metallb"):
     "architecture": "CPU architecture of the local machine. Default 'amd64'.",
     "name": "name of the kind cluster to use.",
 })
-def kind(ctx, architecture="amd64", name="kind"):
+def kind(ctx, architecture="amd64", name="kind", cni=None):
     """Build and run MetalLB in a local Kind cluster.
 
     If the cluster specified by --name (default "kind") doesn't exist,
@@ -173,25 +173,37 @@ def kind(ctx, architecture="amd64", name="kind"):
             "kind": "Cluster",
             "nodes": [{"role": "control-plane"},
                       {"role": "worker"},
-                      {"role": "worker"}],
+                      {"role": "worker"},
+            ],
         }
+        if cni:
+            config["networking"] = {
+                "disableDefaultCNI": True,
+            }
         config = yaml.dump(config).encode("utf-8")
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(config)
             tmp.flush()
             run("kind create cluster --name={} --config={}".format(name, tmp.name), pty=True, echo=True)
-    build(ctx, binaries=["controller", "speaker"], architectures=[architecture])
+
+    config = run("kind get kubeconfig-path --name={}".format(name), hide=True).stdout.strip()
+    env = {"KUBECONFIG": config}
+    if cni:
+        run("kubectl apply -f e2etest/manifests/{}.yaml".format(cni), echo=True, env=env)
+
+    build(ctx, binaries=["controller", "speaker", "mirror-server"], architectures=[architecture])
     run("kind load docker-image --name={} metallb/controller:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} metallb/speaker:dev-{}".format(name, architecture), echo=True)
+
     with open("manifests/metallb.yaml") as f:
         manifest = f.read()
     manifest = manifest.replace(":master", ":dev-{}".format(architecture))
     manifest = manifest.replace("imagePullPolicy: Always", "imagePullPolicy: Never")
-    config = run("kind get kubeconfig-path --name={}".format(name), hide=True).stdout.strip()
     with tempfile.NamedTemporaryFile() as tmp:
         tmp.write(manifest.encode("utf-8"))
         tmp.flush()
-        run("kubectl apply -f {}".format(tmp.name), env={"KUBECONFIG": config}, echo=True)
+        run("kubectl apply -f {}".format(tmp.name), echo=True, env=env)
+
     print("""
 
 To access the cluster:
@@ -281,9 +293,16 @@ def test_cni_manifests(ctx):
         return list(m for m in yaml.safe_load_all(bs) if m)
     def _write(file, manifest):
         with open(file, "w") as f:
-            f.write(yaml.dump(manifest))
+            f.write(yaml.dump_all(manifest))
 
     calico = _fetch("https://docs.projectcalico.org/v3.6/getting-started/kubernetes/installation/hosted/kubernetes-datastore/calico-networking/1.7/calico.yaml")
+    for manifest in calico:
+        if manifest["kind"] != "DaemonSet":
+            continue
+        manifest["spec"]["template"]["spec"]["containers"][0]["env"].append({
+            "name": "FELIX_IGNORELOOSERPF",
+            "value": "true",
+        })
     _write("e2etest/manifests/calico.yaml", calico)
 
     weave = _fetch("https://cloud.weave.works/k8s/net?k8s-version=1.15&env.NO_MASQ_LOCAL=1")
