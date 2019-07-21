@@ -3,9 +3,95 @@ title: Release Notes
 weight: 8
 ---
 
-## Version 0.7.3
+## Version 0.8.0
 
 [Documentation for this release](https://metallb.universe.tf)
+
+Note that this is a bit of a "catchup" release, following a long
+period without releases. As such, it's more of a "misc. bag of stuff"
+than usual.
+
+Action required if updating from 0.7.x:
+
+- The `speaker` DaemonSet now specifies a toleration to run on
+  Kubernetes control plane nodes that have the standard "master"
+  taint. If you don't want MetalLB to run on control plane nodes, you
+  need to remove that toleration from the manifest.
+- The manifest and Helm chart both now specify a `PodSecurityPolicy`
+  allowing the `speaker` DaemonSet to request the elevated privileges
+  it needs. If your cluster enforces pod security policies, you should
+  review the provided policy before deploying it.
+
+New features:
+
+- The manifest and Helm chart now define a `PodSecurityPolicy` for the
+  MetalLB speaker, granting it the necessary privileges for it to
+  function. This should make MetalLB work out of the box in clusters
+  with pod security policies enforced.
+- On Windows/Linux hybrid Kubernetes clusters, MetalLB constrains
+  itself to run only on linux nodes (via a `nodeSelector`).
+- The MetalLB speaker now tolerates running on Kubernetes control
+  plane nodes. This means that services whose pods run only on control
+  plane nodes (e.g. the Kubernetes dashboard, in some setups) are now
+  reachable.
+- MetalLB withdraws BGP announcements entirely for services with no
+  healthy pods. This enables anycast geo-redundancy by advertising the
+  same IP from multiple Kubernetes
+  clusters. ([#312](https://github.com/google/metallb/issues/312))
+- The speaker only exposes its Prometheus metrics port on the node IP
+  registered with Kubernetes, rather than on all interfaces. This
+  should reduce the risk of exposure for clusters where nodes have
+  separate public and private interfaces.
+- The website has updated compatibility grids for both [Kubernetes
+  network
+  addons](https://metallb.universe.tf/installation/network-addons/)
+  and [cloud
+  providers](https://metallb.universe.tf/installation/cloud/), listing
+  known issues and configuration tips.
+- MetalLB now publishes a Kubernetes event to a service, indicating
+  which nodes are announcing that service. This makes it much easier
+  to determine how traffic is
+  flowing. ([#430](https://github.com/google/metallb/issues/430))
+- The manifest and Helm chart now use the `apps/v1` version of
+  `Deployment` and `DaemonSet`, rather than the obsolete
+  `extensions/v1beta1`.
+
+Bugfixes:
+
+- Fix address allocation in cases where no addresses were available at
+  service creation, but the deletion of another service subsequently
+  makes one
+  available. ([#413](https://github.com/google/metallb/issues/413))
+- Fix allocation not updating when the address pool annotation
+  changes. ([#448](https://github.com/google/metallb/issues/448)).
+- Fix periodic crashes due to `glog` trying to write to disk despite
+  explicit instructions to the
+  contrary. ([#427](https://github.com/google/metallb/issues/427))
+- Fix `spec.loadBalancerIP` validation on IPv6 clusters.
+  ([#301](https://github.com/google/metallb/issues/301))
+- Fix BGP Router ID selection on v6 BGP sessions.
+- Fix handling of IPv6 addresses in the BGP connection establishment
+  logic.
+- Generate deterministically pseudorandom BGP router IDs in IPv6-only
+  clusters.
+- Fix incorrect ARP/NDP responses on bonded interfaces.
+  ([#349](https://github.com/google/metallb/issues/349))
+- Fix ARP/NDP responses sent on interfaces with the NOARP flag.
+  ([#351](https://github.com/google/metallb/issues/351))
+- Update MetalLB logs on the website to the new structured
+  format. ([#275](https://github.com/google/metallb/issues/301))
+
+This release includes contributions from Alex Lovell-Troy, Antonio
+Ojea, aojeagarcia, Ashley Dumaine, Brian, Brian Topping, David
+Anderson, Eduardo Minguez Perez, Elan Hasson, Irit Goihman, Ivan
+Kurnosov, Jeff Kolb, johnl, Jordan Neufeld, kvaps, Lars Ekman, Matt
+Sharpe, Maxime Guyot, Miek Gieben, Niklas Voss, Oilbeater, remche,
+Rodrigo Campos, Sergey Anisimov, Stephan Fudeus, Steven Beverly,
+stokbaek and till. Thanks to all of them for making MetalLB better!
+
+## Version 0.7.3
+
+[Documentation for this release](https://v0-7-3--metallb.netlify.com)
 
 Bugfixes:
 
