@@ -207,6 +207,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        - name: METALLB_HOST
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         image: metallb/speaker:master
         imagePullPolicy: Always
         name: speaker
