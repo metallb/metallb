@@ -1,6 +1,4 @@
 *.pyc
-Makefile.defaults
-Makefile.image-targets
 build/
 website/public
 .envrc
