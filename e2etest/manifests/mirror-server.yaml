@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: mirror
-        image: metallb/e2etest-mirror-server:e2e-amd64
+        image: metallb/mirror-server:master
         env:
         - name: NODE_NAME
           valueFrom:

@@ -194,11 +194,20 @@ def kind(ctx, architecture="amd64", name="kind", cni=None):
     build(ctx, binaries=["controller", "speaker", "mirror-server"], architectures=[architecture])
     run("kind load docker-image --name={} metallb/controller:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} metallb/speaker:dev-{}".format(name, architecture), echo=True)
+    run("kind load docker-image --name={} metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
 
     with open("manifests/metallb.yaml") as f:
         manifest = f.read()
     manifest = manifest.replace(":master", ":dev-{}".format(architecture))
     manifest = manifest.replace("imagePullPolicy: Always", "imagePullPolicy: Never")
+    with tempfile.NamedTemporaryFile() as tmp:
+        tmp.write(manifest.encode("utf-8"))
+        tmp.flush()
+        run("kubectl apply -f {}".format(tmp.name), echo=True, env=env)
+
+    with open("e2etest/manifests/mirror-server.yaml") as f:
+        manifest = f.read()
+    manifest = manifest.replace(":master", ":dev-{}".format(architecture))
     with tempfile.NamedTemporaryFile() as tmp:
         tmp.write(manifest.encode("utf-8"))
         tmp.flush()
