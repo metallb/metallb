@@ -355,26 +355,3 @@ def release(ctx, version, skip_release_notes=False):
     run("git tag v{} -m 'See the release notes for details:\n\nhttps://metallb.universe.tf/release-notes/#version-{}-{}-{}'".format(version, version.major, version.minor, version.patch), echo=True)
     run("git checkout master", echo=True)
 
-# func e2eManifests() {
-# 	calico := httpGet("https://docs.projectcalico.org/v3.6/getting-started/kubernetes/installation/hosted/kubernetes-datastore/calico-networking/1.7/calico.yaml")
-# 	calico = strings.Replace(calico, "192.168.0.0/16", "10.32.0.0/12", -1)
-# 	writeFile("e2etest/manifests/calico.yaml", calico)
-#
-# 	weave := httpGet("https://cloud.weave.works/k8s/net?k8s-version=1.14")
-# 	writeFile("e2etest/manifests/weave.yaml", weave)
-#
-# 	flannel := httpGet("https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml")
-# 	flannel = strings.Replace(flannel, "10.244.0.0/16", "10.32.0.0/12", -1)
-# 	lines := []string{}
-# 	for _, line := range strings.Split(flannel, "\n") {
-# 		if strings.Contains(line, "--ip-masq") {
-# 			iface := strings.Replace(line, "ip-masq", "iface=enp0s5", -1)
-# 			lines = append(lines, iface)
-# 		}
-# 		lines = append(lines, line)
-# 	}
-# 	writeFile("e2etest/manifests/flannel.yaml", strings.Join(lines, "\n"))
-#
-# 	// TODO: cilium, romana, canal, kube-router?
-# }
-    
