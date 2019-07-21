@@ -51,7 +51,9 @@ def _check_binaries(binaries):
 def _make_build_dirs():
     for arch in all_architectures:
         for binary in all_binaries:
-            os.makedirs(os.path.join("build", arch, binary), mode=0o750, exist_ok=True)
+            dir = os.path.join("build", arch, binary)
+            if not os.path.exists(dir):
+                os.makedirs(dir, mode=0o750)
 
 @task(iterable=["binaries", "architectures"])
 def build(ctx, binaries, architectures, tag="dev", docker_user="metallb"):
