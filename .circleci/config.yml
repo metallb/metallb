@@ -8,6 +8,8 @@ jobs:
       - image: circleci/golang:1.12
     steps:
       - checkout
+      - run: sudo apt-get install python-pip
+      - run: sudo pip install invoke
       - run: echo "export GO111MODULE=on" >>$BASH_ENV
       - run: curl https://raw.githubusercontent.com/kubernetes/helm/master/scripts/get | bash
       - run: curl -L https://git.io/vp6lP | sh # gometalinter
@@ -15,7 +17,7 @@ jobs:
       - run: go test -short -race ./...
       - run: PATH=./bin:$PATH gometalinter --deadline=5m --disable-all --enable=gofmt --enable=vet --vendor ./...
       - run: cp manifests/metallb.yaml manifests/metallb.yaml.prev
-      - run: go run make.go -a helm
+      - run: inv helm
       - run: diff -u manifests/metallb.yaml.prev manifests/metallb.yaml
       - run: rm manifests/metallb.yaml.prev
   deploy-controller:
@@ -25,10 +27,12 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
+      - run: sudo apt-get install python-pip
+      - run: sudo pip install invoke
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
       - run: go get github.com/estesp/manifest-tool # Can't fetch this with modules yet :(
       - run: echo "export GO111MODULE=on" >>$BASH_ENV
-      - run: go run make.go --action build,image,push --arch all --binary controller --tag ${CIRCLE_BRANCH:-${CIRCLE_TAG}} --registry metallb --multiarch
+      - run: inv push-multiarch --binaries=controller --tag=${CIRCLE_BRANCH:-${CIRCLE_TAG}} --docker_user=metallb
   deploy-speaker:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
@@ -36,10 +40,12 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
+      - run: sudo apt-get install python-pip
+      - run: sudo pip install invoke
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
       - run: go get github.com/estesp/manifest-tool # Can't fetch this with modules yet :(
       - run: echo "export GO111MODULE=on" >>$BASH_ENV
-      - run: go run make.go --action build,image,push --arch all --binary speaker --tag ${CIRCLE_BRANCH:-${CIRCLE_TAG}} --registry metallb --multiarch
+      - run: inv push-multiarch --binaries=speaker --tag=${CIRCLE_BRANCH:-${CIRCLE_TAG}} --docker_user=metallb
 workflows:
   version: 2
   test-and-deploy:
