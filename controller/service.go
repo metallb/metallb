@@ -26,6 +26,7 @@ import (
 
 func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service) bool {
 	var lbIP net.IP
+	var lbHostname string
 
 	// Not a LoadBalancer, early exit. It might have been a balancer
 	// in the past, so we still need to clear LB state.
@@ -42,6 +43,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	// start converging from a clean slate.
 	if len(svc.Status.LoadBalancer.Ingress) == 1 {
 		lbIP = net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
+		lbHostname = svc.Status.LoadBalancer.Ingress[0].Hostname
 	}
 	if lbIP == nil {
 		c.clearServiceState(key, svc)
@@ -116,7 +118,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 
 	// At this point, we have an IP selected somehow, all that remains
 	// is to program the data plane.
-	svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: lbIP.String()}}
+	svc.Status.LoadBalancer.Ingress = []v1.LoadBalancerIngress{{IP: lbIP.String(), Hostname: lbHostname}}
 	return true
 }
 
