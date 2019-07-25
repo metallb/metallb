@@ -3,9 +3,21 @@ title: Release Notes
 weight: 8
 ---
 
-## Version 0.8.0
+## Version 0.8.1
 
 [Documentation for this release](https://metallb.universe.tf)
+
+Bugfixes:
+- Fix the apiGroup for PodSecurityPolicy, for compatibility with Kubernetes 1.16. ([#458](https://github.com/google/metallb/issues/458)).
+- Fix speaker posting events with an empty string as the announcing node name. ([#456](https://github.com/google/metallb/issues/456)).
+- Fix RBAC permissions on speaker, to allow it to post events to all
+  namespaces. ([#455](https://github.com/google/metallb/issues/455)).
+
+This release includes contributions from David Anderson.
+
+## Version 0.8.0
+
+[Documentation for this release](https://v0-8-0--metallb.netlify.com)
 
 Action required if updating from 0.7.x:
 
