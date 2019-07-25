@@ -5,7 +5,7 @@ metadata:
     app: metallb
   name: metallb-system
 ---
-apiVersion: extensions/v1beta1
+apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
   labels:
