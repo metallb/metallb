@@ -98,6 +98,13 @@ rules:
   - list
   - watch
 - apiGroups:
+  - ''
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
   - extensions
   resourceNames:
   - speaker
@@ -122,12 +129,6 @@ rules:
   - get
   - list
   - watch
-- apiGroups:
-  - ''
-  resources:
-  - events
-  verbs:
-  - create
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
