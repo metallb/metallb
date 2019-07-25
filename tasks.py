@@ -197,6 +197,7 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None):
     run("kind load docker-image --name={} metallb/speaker:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
 
+    run("kubectl delete po -nmetallb-system --all", echo=True)
     with open("manifests/metallb.yaml") as f:
         manifest = f.read()
     manifest = manifest.replace(":master", ":dev-{}".format(architecture))
