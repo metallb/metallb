@@ -158,7 +158,7 @@ def push_multiarch(ctx, binaries, tag="dev", docker_user="metallb"):
     "architecture": "CPU architecture of the local machine. Default 'amd64'.",
     "name": "name of the kind cluster to use.",
 })
-def kind(ctx, architecture="amd64", name="kind", cni=None):
+def dev_env(ctx, architecture="amd64", name="kind", cni=None):
     """Build and run MetalLB in a local Kind cluster.
 
     If the cluster specified by --name (default "kind") doesn't exist,
@@ -167,7 +167,8 @@ def kind(ctx, architecture="amd64", name="kind", cni=None):
     to run those images.
     """
     clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
-    if name not in clusters:
+    mk_cluster = name not in clusters
+    if mk_cluster:
         config = {
             "apiVersion": "kind.sigs.k8s.io/v1alpha3",
             "kind": "Cluster",
@@ -188,7 +189,7 @@ def kind(ctx, architecture="amd64", name="kind", cni=None):
 
     config = run("kind get kubeconfig-path --name={}".format(name), hide=True).stdout.strip()
     env = {"KUBECONFIG": config}
-    if cni:
+    if mk_cluster and cni:
         run("kubectl apply -f e2etest/manifests/{}.yaml".format(cni), echo=True, env=env)
 
     build(ctx, binaries=["controller", "speaker", "mirror-server"], architectures=[architecture])
@@ -219,6 +220,23 @@ To access the cluster:
 
 export KUBECONFIG={}
 """.format(config))
+
+# @task
+# def client_machine(ctx, architecture="amd64", name="kind"):
+#     """Create a virtual client 'machine' in a container."""
+#     run("docker rm -f {}-client".format(name), warn=True, echo=True)
+#     run("docker run -d --name={}-client --rm metallb/traffic-generator:dev-{}".format())
+
+# @task
+# def e2e_create_world(ctx, name="kind", cni=None, architecture="amd64"):
+#     e2e_delete_world(ctx, name=name)
+#     kind(ctx, name=name, cni=cni, architecture=architecture)
+#     run("docker run -d --name={}-client --rm debian:stable /bin/bash -c 'sleep 1200'".format(name), echo=True)
+
+# @task
+# def e2e_delete_world(ctx, name="kind"):
+#     run("kind delete cluster --name={}".format(name), warn=True, echo=True)
+#     run("docker rm -f {}".format(client), warn=True, echo=True)
 
 @task
 def helm(ctx):
