@@ -3,9 +3,21 @@ title: Release Notes
 weight: 8
 ---
 
-## Version 0.8.0
+## Version 0.8.1
 
 [Documentation for this release](https://metallb.universe.tf)
+
+Bugfixes:
+- Fix the apiGroup for PodSecurityPolicy, for compatibility with Kubernetes 1.16. ([#458](https://github.com/google/metallb/issues/458)).
+- Fix speaker posting events with an empty string as the announcing node name. ([#456](https://github.com/google/metallb/issues/456)).
+- Fix RBAC permissions on speaker, to allow it to post events to all
+  namespaces. ([#455](https://github.com/google/metallb/issues/455)).
+
+This release includes contributions from David Anderson.
+
+## Version 0.8.0
+
+[Documentation for this release](https://v0-8-0--metallb.netlify.com)
 
 Action required if updating from 0.7.x:
 
@@ -355,7 +367,7 @@ New features:
   topologies.
 - MetalLB now has
   a
-  [Helm chart](https://github.com/google/metallb/tree/v0.8.0/helm/metallb). If
+  [Helm chart](https://github.com/google/metallb/tree/v0.8.1/helm/metallb). If
   you use [Helm](https://helm.sh) on your cluster, this should make it
   easier to track and manage your MetalLB installation. The chart will
   be submitted for inclusion in the main Helm stable repository
@@ -413,7 +425,7 @@ Action required if upgrading from 0.2.x:
   ds/bgp-speaker`. This will take down your load-balancers until you
   deploy the new DaemonSet.
 - The
-  [configuration file format](https://raw.githubusercontent.com/google/metallb/v0.8.0/manifests/example-config.yaml) has
+  [configuration file format](https://raw.githubusercontent.com/google/metallb/v0.8.1/manifests/example-config.yaml) has
   changed in a few backwards-incompatible ways. You need to update
   your ConfigMap by hand:
   - Each `address-pool` must now have a `protocol` field, to select

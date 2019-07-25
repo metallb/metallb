@@ -21,7 +21,7 @@ manifests, or using the [Helm](https://helm.sh) package manager.
 To install MetalLB, simply apply the manifest:
 
 ```shell
-kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.8.0/manifests/metallb.yaml
+kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.8.1/manifests/metallb.yaml
 ```
 
 This will deploy MetalLB to your cluster, under the `metallb-system`
