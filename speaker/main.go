@@ -159,6 +159,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 	}
 
 	ret := &controller{
+		myNode:    cfg.MyNode,
 		protocols: protocols,
 		announced: map[string]config.Proto{},
 		svcIP:     map[string]net.IP{},
