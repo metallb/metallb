@@ -8,6 +8,7 @@ weight: 8
 [Documentation for this release](https://metallb.universe.tf)
 
 Bugfixes:
+
 - Fix the apiGroup for PodSecurityPolicy, for compatibility with Kubernetes 1.16. ([#458](https://github.com/google/metallb/issues/458)).
 - Fix speaker posting events with an empty string as the announcing node name. ([#456](https://github.com/google/metallb/issues/456)).
 - Fix RBAC permissions on speaker, to allow it to post events to all
