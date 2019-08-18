@@ -308,7 +308,7 @@ func TestPoolAllocation(t *testing.T) {
 			alloc.Unassign(test.svc)
 			continue
 		}
-		ip, err := alloc.AllocateFromPool(test.svc, "test", test.ports, test.sharingKey, "")
+		ip, err := alloc.AllocateFromPool(test.svc, false, "test", test.ports, test.sharingKey, "")
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("%s: should have caused an error, but did not", test.desc)
@@ -325,7 +325,7 @@ func TestPoolAllocation(t *testing.T) {
 	}
 
 	alloc.Unassign("s5")
-	if _, err := alloc.AllocateFromPool("s5", "nonexistentpool", nil, "", ""); err == nil {
+	if _, err := alloc.AllocateFromPool("s5", false, "nonexistentpool", nil, "", ""); err == nil {
 		t.Error("Allocating from non-existent pool succeeded")
 	}
 }
@@ -415,7 +415,7 @@ func TestAllocation(t *testing.T) {
 			alloc.Unassign(test.svc)
 			continue
 		}
-		ip, err := alloc.Allocate(test.svc, test.ports, test.sharingKey, "")
+		ip, err := alloc.Allocate(test.svc, false, test.ports, test.sharingKey, "")
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("%s: should have caused an error, but did not", test.desc)
@@ -482,7 +482,7 @@ func TestBuggyIPs(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		ip, err := alloc.Allocate(test.svc, nil, "", "")
+		ip, err := alloc.Allocate(test.svc, false, nil, "", "")
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("#%d should have caused an error, but did not", i+1)
@@ -693,7 +693,7 @@ func TestAutoAssign(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		ip, err := alloc.Allocate(test.svc, nil, "", "")
+		ip, err := alloc.Allocate(test.svc, false, nil, "", "")
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("#%d should have caused an error, but did not", i+1)

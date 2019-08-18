@@ -211,7 +211,7 @@ func (a *Allocator) Unassign(svc string) bool {
 }
 
 // AllocateFromPool assigns an available IP from pool to service.
-func (a *Allocator) AllocateFromPool(svc, poolName string, ports []Port, sharingKey, backendKey string) (net.IP, error) {
+func (a *Allocator) AllocateFromPool(svc string, isIPv6 bool, poolName string, ports []Port, sharingKey, backendKey string) (net.IP, error) {
 	if alloc := a.allocated[svc]; alloc != nil {
 		if err := a.Assign(svc, alloc.ip, ports, sharingKey, backendKey); err != nil {
 			return nil, err
@@ -244,7 +244,7 @@ func (a *Allocator) AllocateFromPool(svc, poolName string, ports []Port, sharing
 }
 
 // Allocate assigns any available and assignable IP to service.
-func (a *Allocator) Allocate(svc string, ports []Port, sharingKey, backendKey string) (net.IP, error) {
+func (a *Allocator) Allocate(svc string, isIPv6 bool, ports []Port, sharingKey, backendKey string) (net.IP, error) {
 	if alloc := a.allocated[svc]; alloc != nil {
 		if err := a.Assign(svc, alloc.ip, ports, sharingKey, backendKey); err != nil {
 			return nil, err
@@ -256,7 +256,7 @@ func (a *Allocator) Allocate(svc string, ports []Port, sharingKey, backendKey st
 		if !a.pools[poolName].AutoAssign {
 			continue
 		}
-		if ip, err := a.AllocateFromPool(svc, poolName, ports, sharingKey, backendKey); err == nil {
+		if ip, err := a.AllocateFromPool(svc, isIPv6, poolName, ports, sharingKey, backendKey); err == nil {
 			return ip, nil
 		}
 	}
