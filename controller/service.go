@@ -128,6 +128,13 @@ func (c *controller) clearServiceState(key string, svc *v1.Service) {
 }
 
 func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
+	clusterIP := net.ParseIP(svc.Spec.ClusterIP)
+	if clusterIP == nil {
+		// Note: "clusterIP: None" is not allowed for "type: LoadBalancer", so this is a fault
+		return nil, fmt.Errorf("invalid ClusterIP [%s], can't determine family", svc.Spec.ClusterIP)
+	}
+	isIPv6 := clusterIP.To4() == nil
+
 	// If the user asked for a specific IP, try that.
 	if svc.Spec.LoadBalancerIP != "" {
 		ip := net.ParseIP(svc.Spec.LoadBalancerIP)
@@ -143,7 +150,7 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 	// Otherwise, did the user ask for a specific pool?
 	desiredPool := svc.Annotations["metallb.universe.tf/address-pool"]
 	if desiredPool != "" {
-		ip, err := c.ips.AllocateFromPool(key, desiredPool, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
+		ip, err := c.ips.AllocateFromPool(key, isIPv6, desiredPool, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
 		if err != nil {
 			return nil, err
 		}
@@ -151,5 +158,5 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 	}
 
 	// Okay, in that case just bruteforce across all pools.
-	return c.ips.Allocate(key, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
+	return c.ips.Allocate(key, isIPv6, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
 }
