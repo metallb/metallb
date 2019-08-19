@@ -210,6 +210,10 @@ func (a *Allocator) Unassign(svc string) bool {
 	return true
 }
 
+func cidrIsIPv6(cidr *net.IPNet) bool {
+	return cidr.IP.To4() == nil
+}
+
 // AllocateFromPool assigns an available IP from pool to service.
 func (a *Allocator) AllocateFromPool(svc string, isIPv6 bool, poolName string, ports []Port, sharingKey, backendKey string) (net.IP, error) {
 	if alloc := a.allocated[svc]; alloc != nil {
@@ -225,6 +229,10 @@ func (a *Allocator) AllocateFromPool(svc string, isIPv6 bool, poolName string, p
 	}
 
 	for _, cidr := range pool.CIDR {
+		if cidrIsIPv6(cidr) != isIPv6 {
+			// Not the right ip-family
+			continue
+		}
 		c := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})
 		for pos := c.First(); pos != nil; pos = c.Next() {
 			ip := pos.IP
