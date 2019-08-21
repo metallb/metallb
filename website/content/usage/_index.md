@@ -167,7 +167,7 @@ IP address under the following conditions:
 
 If these conditions are satisfied, MetalLB _may_ colocate the two
 services on the same IP, but does not have to. If you want to ensure
-that they share a specific address, use the `spec.LoadBalancerIP`
+that they share a specific address, use the `spec.loadBalancerIP`
 functionality described above.
 
 There are two main reasons to colocate services in this fashion: to
