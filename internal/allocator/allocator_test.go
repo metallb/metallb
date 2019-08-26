@@ -14,12 +14,18 @@ func TestAssignment(t *testing.T) {
 	if err := alloc.SetPools(map[string]*config.Pool{
 		"test": {
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.4/31")},
+			CIDR:       []*net.IPNet{
+				ipnet("1.2.3.4/31"),
+				ipnet("1000::4/127"),
+			},
 		},
 		"test2": {
 			AvoidBuggyIPs: true,
 			AutoAssign:    true,
-			CIDR:          []*net.IPNet{ipnet("1.2.4.0/24")},
+			CIDR:          []*net.IPNet{
+				ipnet("1.2.4.0/24"),
+				ipnet("1000::4:0/120"),
+			},
 		},
 	}); err != nil {
 		t.Fatalf("SetPools: %s", err)
@@ -174,6 +180,138 @@ func TestAssignment(t *testing.T) {
 			desc: "s4 takes s3's former IP",
 			svc:  "s4",
 			ip:   "1.2.4.254",
+		},
+
+		// IPv6 tests (same as ipv4 but with ipv6 addresses)
+		{
+			desc: "ipv6 assign s1",
+			svc:  "s1",
+			ip:   "1000::4",
+		},
+		{
+			desc: "s1 idempotent reassign",
+			svc:  "s1",
+			ip:   "1000::4",
+		},
+		{
+			desc:    "s2 can't grab s1's IP",
+			svc:     "s2",
+			ip:      "1000::4",
+			wantErr: true,
+		},
+		{
+			desc: "s2 can get the other IP",
+			svc:  "s2",
+			ip:   "1000::4:5",
+		},
+		{
+			desc:    "s1 now can't grab s2's IP",
+			svc:     "s1",
+			ip:      "1000::4:5",
+			wantErr: true,
+		},
+		{
+			desc: "s1 frees its IP",
+			svc:  "s1",
+			ip:   "",
+		},
+		{
+			desc: "s2 can grab s1's former IP",
+			svc:  "s2",
+			ip:   "1000::4",
+		},
+		{
+			desc: "s1 can now grab s2's former IP",
+			svc:  "s1",
+			ip:   "1000::4:5",
+		},
+		// (buggy-IP N/A for ipv6)
+		{
+			desc: "s3 can grab another IP in that pool",
+			svc:  "s3",
+			ip:   "1000::4:ff",
+		},
+		{
+			desc:       "s4 takes an IP, with sharing",
+			svc:        "s4",
+			ip:         "1000::4:3",
+			ports:      ports("tcp/80"),
+			sharingKey: "sharing",
+			backendKey: "backend",
+		},
+		{
+			desc:       "s4 changes its sharing key in place",
+			svc:        "s4",
+			ip:         "1000::4:3",
+			ports:      ports("tcp/80"),
+			sharingKey: "share",
+			backendKey: "backend",
+		},
+		{
+			desc:       "s3 can't share with s4 (port conflict)",
+			svc:        "s3",
+			ip:         "1000::4:3",
+			ports:      ports("tcp/80"),
+			sharingKey: "share",
+			backendKey: "backend",
+			wantErr:    true,
+		},
+		{
+			desc:       "s3 can't share with s4 (wrong sharing key)",
+			svc:        "s3",
+			ip:         "1000::4:3",
+			ports:      ports("tcp/443"),
+			sharingKey: "othershare",
+			backendKey: "backend",
+			wantErr:    true,
+		},
+		{
+			desc:       "s3 can't share with s4 (wrong backend key)",
+			svc:        "s3",
+			ip:         "1000::4:3",
+			ports:      ports("tcp/443"),
+			sharingKey: "share",
+			backendKey: "otherbackend",
+			wantErr:    true,
+		},
+		{
+			desc:       "s3 takes the same IP as s4",
+			svc:        "s3",
+			ip:         "1000::4:3",
+			ports:      ports("tcp/443"),
+			sharingKey: "share",
+			backendKey: "backend",
+		},
+		{
+			desc:       "s3 can change its ports while keeping the same IP",
+			svc:        "s3",
+			ip:         "1000::4:3",
+			ports:      ports("udp/53"),
+			sharingKey: "share",
+			backendKey: "backend",
+		},
+		{
+			desc:       "s3 can't change its sharing key while keeping the same IP",
+			svc:        "s3",
+			ip:         "1000::4:3",
+			ports:      ports("tcp/443"),
+			sharingKey: "othershare",
+			backendKey: "backend",
+			wantErr:    true,
+		},
+		{
+			desc:       "s3 can't change its backend key while keeping the same IP",
+			svc:        "s3",
+			ip:         "1000::4:3",
+			ports:      ports("tcp/443"),
+			sharingKey: "share",
+			backendKey: "otherbackend",
+			wantErr:    true,
+		},
+		{
+			desc: "s4 takes s3's former IP",
+			svc:  "s4",
+			ip:   "1000::4:ff",
 		},
 	}
 
