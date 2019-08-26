@@ -213,10 +213,18 @@ func (a *Allocator) Unassign(svc string) bool {
 func cidrIsIPv6(cidr *net.IPNet) bool {
 	return cidr.IP.To4() == nil
 }
+func ipIsIPv6(ip net.IP) bool {
+	return ip.To4() == nil
+}
 
 // AllocateFromPool assigns an available IP from pool to service.
 func (a *Allocator) AllocateFromPool(svc string, isIPv6 bool, poolName string, ports []Port, sharingKey, backendKey string) (net.IP, error) {
 	if alloc := a.allocated[svc]; alloc != nil {
+		// Handle the case where the svc has already been assigned an IP but from the wrong family.
+		// This "should-not-happen" since the "ipFamily" is an immutable field in services.
+		if isIPv6 != ipIsIPv6(alloc.ip) {
+			return nil, fmt.Errorf("IP for wrong family assigned %s", alloc.ip.String())
+		}
 		if err := a.Assign(svc, alloc.ip, ports, sharingKey, backendKey); err != nil {
 			return nil, err
 		}
