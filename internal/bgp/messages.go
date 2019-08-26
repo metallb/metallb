@@ -10,6 +10,15 @@ import (
 	"time"
 )
 
+const (
+	addressFamilyIpv4 uint16 = 1
+	addressFamilyIpv6 uint16 = 2
+	subsequentAddressFamilyUnicast uint8 = 1
+
+	mpReachNLRI = 14
+	mpUnreachNLRI = 15
+)
+
 func sendOpen(w io.Writer, asn uint32, routerID net.IP, holdTime time.Duration) error {
 	if routerID.To4() == nil {
 		panic("non-ipv4 address used as RouterID")
@@ -297,11 +306,18 @@ func sendUpdate(w io.Writer, asn uint32, ibgp bool, defaultNextHop net.IP, adv *
 		return err
 	}
 	l := b.Len()
+	legacyAnnouncements := []*net.IPNet{adv.Prefix}
+	if adv.Prefix.IP == nil {
+	    return nil
+	}
+	if len(adv.Prefix.IP) == net.IPv6len {
+		legacyAnnouncements = []*net.IPNet{}
+	}
 	if err := encodePathAttrs(&b, asn, ibgp, defaultNextHop, adv); err != nil {
 		return err
 	}
 	binary.BigEndian.PutUint16(b.Bytes()[21:23], uint16(b.Len()-l))
-	encodePrefixes(&b, []*net.IPNet{adv.Prefix})
+	encodePrefixes(&b, legacyAnnouncements)
 	binary.BigEndian.PutUint16(b.Bytes()[16:18], uint16(b.Len()))
 
 	if _, err := io.Copy(w, &b); err != nil {
@@ -345,15 +361,40 @@ func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp bool, defaultNextHop net.
 			return err
 		}
 	}
+	isIPv6 := adv.Prefix.IP.To4() == nil
+	o := b.Len()
 	b.Write([]byte{
-		0x40, 3, // mandatory, next-hop
-		4, // len
+		0x80,
+		mpReachNLRI,
+		0,
 	})
+
+	family := addressFamilyIpv6
+	if !isIPv6 {
+		family = addressFamilyIpv4
+	}
+	if err := binary.Write(b, binary.BigEndian, family); err != nil {
+		return err
+	}
+	if err := binary.Write(b, binary.BigEndian, subsequentAddressFamilyUnicast); err != nil {
+		return err
+	}
+	b.WriteByte(16)
 	if adv.NextHop != nil {
-		b.Write(adv.NextHop.To4())
+		b.Write(adv.NextHop.To16())
 	} else {
 		b.Write(defaultNextHop)
 	}
+	b.WriteByte(0)
+	if isIPv6 {
+		b.WriteByte(128)
+		b.Write(adv.Prefix.IP.To16())
+	} else {
+		b.WriteByte(32)
+		b.Write(adv.Prefix.IP.To4())
+	}
+
+	b.Bytes()[o+2] = byte(b.Len() - o - 3)
 	if ibgp {
 		b.Write([]byte{
 			0x40, 5, // well-known, localpref
@@ -382,13 +423,26 @@ func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp bool, defaultNextHop net.
 }
 
 func sendWithdraw(w io.Writer, prefixes []*net.IPNet) error {
+	var legacyAnnouncements []*net.IPNet
+	var mpBGPIPv6Announcements []*net.IPNet
+	for _, p := range prefixes {
+		if len(p.IP) == net.IPv6len {
+			mpBGPIPv6Announcements = append(mpBGPIPv6Announcements, p)
+
+			continue
+		}
+
+		legacyAnnouncements = append(legacyAnnouncements, p)
+	}
+
 	var b bytes.Buffer
 
 	hdr := struct {
-		M1, M2 uint64
-		Len    uint16
-		Type   uint8
-		WdrLen uint16
+		M1, M2  uint64
+		Len     uint16
+		Type    uint8
+		WdrLen  uint16
+		AttrLen uint16
 	}{
 		M1:   uint64(0xffffffffffffffff),
 		M2:   uint64(0xffffffffffffffff),
@@ -398,16 +452,48 @@ func sendWithdraw(w io.Writer, prefixes []*net.IPNet) error {
 		return err
 	}
 	l := b.Len()
-	encodePrefixes(&b, prefixes)
-	binary.BigEndian.PutUint16(b.Bytes()[19:21], uint16(b.Len()-l))
-	if err := binary.Write(&b, binary.BigEndian, uint16(0)); err != nil {
+	if err := encodeUnreach(&b, legacyAnnouncements, addressFamilyIpv4); err != nil {
 		return err
 	}
+	if err := encodeUnreach(&b, mpBGPIPv6Announcements, addressFamilyIpv6); err != nil {
+		return err
+	}
+	// Path attributes length
+	binary.BigEndian.PutUint16(b.Bytes()[21:23], uint16(b.Len()-l))
+	// Update message length
 	binary.BigEndian.PutUint16(b.Bytes()[16:18], uint16(b.Len()))
 
 	if _, err := io.Copy(w, &b); err != nil {
 		return err
 	}
+	return nil
+}
+
+func encodeUnreach(b *bytes.Buffer, prefixes []*net.IPNet, family uint16) error {
+	o := b.Len()
+	b.Write([]byte{
+		0x80,
+		mpUnreachNLRI,
+		0, // Path attribute length
+	})
+	if err := binary.Write(b, binary.BigEndian, family); err != nil {
+		return err
+	}
+	if err := binary.Write(b, binary.BigEndian, subsequentAddressFamilyUnicast); err != nil {
+		return err
+	}
+	for _, p := range prefixes {
+		isIPv6 := p.IP.To4() == nil
+		if isIPv6 {
+			b.WriteByte(128)
+			b.Write(p.IP.To16())
+		} else {
+			b.WriteByte(32)
+			b.Write(p.IP.To4())
+		}
+	}
+	b.Bytes()[o+2] = byte(b.Len() - o - 3)
+
 	return nil
 }
 
