@@ -14,7 +14,7 @@ func TestAssignment(t *testing.T) {
 	if err := alloc.SetPools(map[string]*config.Pool{
 		"test": {
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{
+			CIDR: []*net.IPNet{
 				ipnet("1.2.3.4/31"),
 				ipnet("1000::4/127"),
 			},
@@ -22,7 +22,7 @@ func TestAssignment(t *testing.T) {
 		"test2": {
 			AvoidBuggyIPs: true,
 			AutoAssign:    true,
-			CIDR:          []*net.IPNet{
+			CIDR: []*net.IPNet{
 				ipnet("1.2.4.0/24"),
 				ipnet("1000::4:0/120"),
 			},
@@ -353,25 +353,36 @@ func TestPoolAllocation(t *testing.T) {
 	if err := alloc.SetPools(map[string]*config.Pool{
 		"not_this_one": {
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("192.168.0.0/16")},
+			CIDR:       []*net.IPNet{ipnet("192.168.0.0/16"), ipnet("fc00::1:0/112")},
 		},
 		"test": {
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.4/31"), ipnet("1.2.3.10/31")},
+			CIDR: []*net.IPNet{
+				ipnet("1.2.3.4/31"),
+				ipnet("1.2.3.10/31"),
+				ipnet("1000::/127"),
+				ipnet("2000::/127"),
+			},
 		},
 		"test2": {
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("10.20.30.0/24")},
+			CIDR:       []*net.IPNet{ipnet("10.20.30.0/24"), ipnet("fc00::2:0/120")},
 		},
 	}); err != nil {
 		t.Fatalf("SetPools: %s", err)
 	}
 
-	validIPs := map[string]bool{
+	validIP4s := map[string]bool{
 		"1.2.3.4":  true,
 		"1.2.3.5":  true,
 		"1.2.3.10": true,
 		"1.2.3.11": true,
+	}
+	validIP6s := map[string]bool{
+		"1000::":  true,
+		"1000::1": true,
+		"2000::":  true,
+		"2000::1": true,
 	}
 
 	tests := []struct {
@@ -381,6 +392,7 @@ func TestPoolAllocation(t *testing.T) {
 		sharingKey string
 		unassign   bool
 		wantErr    bool
+		isIPv6     bool
 	}{
 		{
 			desc: "s1 gets an IP",
@@ -439,6 +451,124 @@ func TestPoolAllocation(t *testing.T) {
 			ports:      ports("tcp/443"),
 			sharingKey: "share",
 		},
+
+		// Clear old ipv4 addresses
+		{
+			desc:     "s1 clear old ipv4 address",
+			svc:      "s1",
+			unassign: true,
+		},
+		{
+			desc:     "s2 clear old ipv4 address",
+			svc:      "s2",
+			unassign: true,
+		},
+		{
+			desc:     "s3 clear old ipv4 address",
+			svc:      "s3",
+			unassign: true,
+		},
+		{
+			desc:     "s4 clear old ipv4 address",
+			svc:      "s4",
+			unassign: true,
+		},
+		{
+			desc:     "s5 clear old ipv4 address",
+			svc:      "s5",
+			unassign: true,
+		},
+		{
+			desc:     "s6 clear old ipv4 address",
+			svc:      "s6",
+			unassign: true,
+		},
+
+		// IPv6 tests.
+		{
+			desc:   "s1 gets an IP6",
+			svc:    "s1",
+			isIPv6: true,
+		},
+		{
+			desc:   "s2 gets an IP6",
+			svc:    "s2",
+			isIPv6: true,
+		},
+		{
+			desc:   "s3 gets an IP6",
+			svc:    "s3",
+			isIPv6: true,
+		},
+		{
+			desc:   "s4 gets an IP6",
+			svc:    "s4",
+			isIPv6: true,
+		},
+		{
+			desc:    "s5 can't get an IP6",
+			svc:     "s5",
+			isIPv6:  true,
+			wantErr: true,
+		},
+		{
+			desc:    "s6 can't get an IP6",
+			svc:     "s6",
+			isIPv6:  true,
+			wantErr: true,
+		},
+		{
+			desc:     "s1 releases its IP6",
+			svc:      "s1",
+			unassign: true,
+		},
+		{
+			desc:   "s5 can now grab s1's former IP6",
+			svc:    "s5",
+			isIPv6: true,
+		},
+		{
+			desc:    "s6 still can't get an IP6",
+			svc:     "s6",
+			isIPv6:  true,
+			wantErr: true,
+		},
+		{
+			desc:     "s5 unassigns in prep for enabling IP6 sharing",
+			svc:      "s5",
+			unassign: true,
+		},
+		{
+			desc:       "s5 enables IP6 sharing",
+			svc:        "s5",
+			ports:      ports("tcp/80"),
+			sharingKey: "share",
+			isIPv6:     true,
+		},
+		{
+			desc:       "s6 can get an IP6 now, with sharing",
+			svc:        "s6",
+			ports:      ports("tcp/443"),
+			sharingKey: "share",
+			isIPv6:     true,
+		},
+
+		// Test the "should-not-happen" case where an svc already has a IP from the wrong family
+		{
+			desc:     "s1 clear",
+			svc:      "s1",
+			unassign: true,
+		},
+		{
+			desc: "s1 get an IPv4",
+			svc:  "s1",
+		},
+		{
+			desc:    "s1 get an IPv6",
+			svc:     "s1",
+			isIPv6:  true,
+			wantErr: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -446,7 +576,7 @@ func TestPoolAllocation(t *testing.T) {
 			alloc.Unassign(test.svc)
 			continue
 		}
-		ip, err := alloc.AllocateFromPool(test.svc, false, "test", test.ports, test.sharingKey, "")
+		ip, err := alloc.AllocateFromPool(test.svc, test.isIPv6, "test", test.ports, test.sharingKey, "")
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("%s: should have caused an error, but did not", test.desc)
@@ -456,6 +586,10 @@ func TestPoolAllocation(t *testing.T) {
 		}
 		if err != nil {
 			t.Errorf("%s: AllocateFromPool(%q, \"test\"): %s", test.desc, test.svc, err)
+		}
+		validIPs := validIP4s
+		if test.isIPv6 {
+			validIPs = validIP6s
 		}
 		if !validIPs[ip.String()] {
 			t.Errorf("%s: allocated unexpected IP %q", test.desc, ip)
@@ -473,21 +607,27 @@ func TestAllocation(t *testing.T) {
 	if err := alloc.SetPools(map[string]*config.Pool{
 		"test1": {
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.4/31")},
+			CIDR:       []*net.IPNet{ipnet("1.2.3.4/31"), ipnet("1000::4/127")},
 		},
 		"test2": {
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.10/31")},
+			CIDR:       []*net.IPNet{ipnet("1.2.3.10/31"), ipnet("1000::10/127")},
 		},
 	}); err != nil {
 		t.Fatalf("SetPools: %s", err)
 	}
 
-	validIPs := map[string]bool{
+	validIP4s := map[string]bool{
 		"1.2.3.4":  true,
 		"1.2.3.5":  true,
 		"1.2.3.10": true,
 		"1.2.3.11": true,
+	}
+	validIP6s := map[string]bool{
+		"1000::4":  true,
+		"1000::5":  true,
+		"1000::10": true,
+		"1000::11": true,
 	}
 
 	tests := []struct {
@@ -497,6 +637,7 @@ func TestAllocation(t *testing.T) {
 		sharingKey string
 		unassign   bool
 		wantErr    bool
+		isIPv6     bool
 	}{
 		{
 			desc: "s1 gets an IP",
@@ -546,6 +687,97 @@ func TestAllocation(t *testing.T) {
 			ports:      ports("tcp/443"),
 			sharingKey: "share",
 		},
+
+		// Clear old ipv4 addresses
+		{
+			desc:     "s1 clear old ipv4 address",
+			svc:      "s1",
+			unassign: true,
+		},
+		{
+			desc:     "s2 clear old ipv4 address",
+			svc:      "s2",
+			unassign: true,
+		},
+		{
+			desc:     "s3 clear old ipv4 address",
+			svc:      "s3",
+			unassign: true,
+		},
+		{
+			desc:     "s4 clear old ipv4 address",
+			svc:      "s4",
+			unassign: true,
+		},
+		{
+			desc:     "s5 clear old ipv4 address",
+			svc:      "s5",
+			unassign: true,
+		},
+		{
+			desc:     "s6 clear old ipv4 address",
+			svc:      "s6",
+			unassign: true,
+		},
+
+		// IPv6 tests
+		{
+			desc:   "s1 gets an IP",
+			svc:    "s1",
+			isIPv6: true,
+		},
+		{
+			desc:   "s2 gets an IP",
+			svc:    "s2",
+			isIPv6: true,
+		},
+		{
+			desc:   "s3 gets an IP",
+			svc:    "s3",
+			isIPv6: true,
+		},
+		{
+			desc:   "s4 gets an IP",
+			svc:    "s4",
+			isIPv6: true,
+		},
+		{
+			desc:    "s5 can't get an IP",
+			svc:     "s5",
+			isIPv6:  true,
+			wantErr: true,
+		},
+		{
+			desc:    "s6 can't get an IP",
+			svc:     "s6",
+			isIPv6:  true,
+			wantErr: true,
+		},
+		{
+			desc:     "s1 gives up its IP",
+			svc:      "s1",
+			unassign: true,
+		},
+		{
+			desc:       "s5 can now get an IP",
+			svc:        "s5",
+			ports:      ports("tcp/80"),
+			sharingKey: "share",
+			isIPv6:     true,
+		},
+		{
+			desc:    "s6 still can't get an IP",
+			svc:     "s6",
+			isIPv6:  true,
+			wantErr: true,
+		},
+		{
+			desc:       "s6 can get an IP with sharing",
+			svc:        "s6",
+			ports:      ports("tcp/443"),
+			sharingKey: "share",
+			isIPv6:     true,
+		},
 	}
 
 	for _, test := range tests {
@@ -553,7 +785,7 @@ func TestAllocation(t *testing.T) {
 			alloc.Unassign(test.svc)
 			continue
 		}
-		ip, err := alloc.Allocate(test.svc, false, test.ports, test.sharingKey, "")
+		ip, err := alloc.Allocate(test.svc, test.isIPv6, test.ports, test.sharingKey, "")
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("%s: should have caused an error, but did not", test.desc)
@@ -562,6 +794,10 @@ func TestAllocation(t *testing.T) {
 		}
 		if err != nil {
 			t.Errorf("%s: Allocate(%q, \"test\"): %s", test.desc, test.svc, err)
+		}
+		validIPs := validIP4s
+		if test.isIPv6 {
+			validIPs = validIP6s
 		}
 		if !validIPs[ip.String()] {
 			t.Errorf("%s allocated unexpected IP %q", test.desc, ip)
@@ -643,7 +879,7 @@ func TestConfigReload(t *testing.T) {
 	if err := alloc.SetPools(map[string]*config.Pool{
 		"test": {
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.0/30")},
+			CIDR:       []*net.IPNet{ipnet("1.2.3.0/30"), ipnet("1000::/126")},
 		},
 	}); err != nil {
 		t.Fatalf("SetPools: %s", err)
@@ -651,19 +887,22 @@ func TestConfigReload(t *testing.T) {
 	if err := alloc.Assign("s1", net.ParseIP("1.2.3.0"), nil, "", ""); err != nil {
 		t.Fatalf("Assign(s1, 1.2.3.0): %s", err)
 	}
+	if err := alloc.Assign("s2", net.ParseIP("1000::"), nil, "", ""); err != nil {
+		t.Fatalf("Assign(s1, 1000::): %s", err)
+	}
 
 	tests := []struct {
 		desc    string
 		pools   map[string]*config.Pool
 		wantErr bool
-		pool    string // Pool that 1.2.3.0 should be in
+		pool    string // Pool that 1.2.3.0 and 1000:: should be in
 	}{
 		{
 			desc: "set same config is no-op",
 			pools: map[string]*config.Pool{
 				"test": {
 					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.0/30")},
+					CIDR:       []*net.IPNet{ipnet("1.2.3.0/30"), ipnet("1000::/126")},
 				},
 			},
 			pool: "test",
@@ -673,7 +912,7 @@ func TestConfigReload(t *testing.T) {
 			pools: map[string]*config.Pool{
 				"test": {
 					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+					CIDR:       []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("1000::/120")},
 				},
 			},
 			pool: "test",
@@ -683,7 +922,7 @@ func TestConfigReload(t *testing.T) {
 			pools: map[string]*config.Pool{
 				"test": {
 					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.0/30")},
+					CIDR:       []*net.IPNet{ipnet("1.2.3.0/30"), ipnet("1000::/126")},
 				},
 			},
 			pool: "test",
@@ -693,7 +932,18 @@ func TestConfigReload(t *testing.T) {
 			pools: map[string]*config.Pool{
 				"test": {
 					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.2/31")},
+					CIDR:       []*net.IPNet{ipnet("1.2.3.2/31"), ipnet("1000::0/126")},
+				},
+			},
+			pool:    "test",
+			wantErr: true,
+		},
+		{
+			desc: "can't shrink further ipv6",
+			pools: map[string]*config.Pool{
+				"test": {
+					AutoAssign: true,
+					CIDR:       []*net.IPNet{ipnet("1.2.3.0/30"), ipnet("1000::2/127")},
 				},
 			},
 			pool:    "test",
@@ -704,7 +954,7 @@ func TestConfigReload(t *testing.T) {
 			pools: map[string]*config.Pool{
 				"test2": {
 					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.0/30")},
+					CIDR:       []*net.IPNet{ipnet("1.2.3.0/30"), ipnet("1000::0/126")},
 				},
 			},
 			pool: "test2",
@@ -714,11 +964,11 @@ func TestConfigReload(t *testing.T) {
 			pools: map[string]*config.Pool{
 				"test": {
 					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
+					CIDR:       []*net.IPNet{ipnet("1.2.3.0/31"), ipnet("1000::/127")},
 				},
 				"test2": {
 					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.2/31")},
+					CIDR:       []*net.IPNet{ipnet("1.2.3.2/31"), ipnet("1000::2/127")},
 				},
 			},
 			pool: "test",
@@ -728,11 +978,11 @@ func TestConfigReload(t *testing.T) {
 			pools: map[string]*config.Pool{
 				"test2": {
 					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
+					CIDR:       []*net.IPNet{ipnet("1.2.3.0/31"), ipnet("1000::/127")},
 				},
 				"test": {
 					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.2/31")},
+					CIDR:       []*net.IPNet{ipnet("1.2.3.2/31"), ipnet("1000::2/127")},
 				},
 			},
 			pool: "test2",
@@ -742,7 +992,18 @@ func TestConfigReload(t *testing.T) {
 			pools: map[string]*config.Pool{
 				"test": {
 					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.2/31")},
+					CIDR:       []*net.IPNet{ipnet("1.2.3.2/31"), ipnet("1000::/126")},
+				},
+			},
+			pool:    "test2",
+			wantErr: true,
+		},
+		{
+			desc: "delete used pool ipv6",
+			pools: map[string]*config.Pool{
+				"test": {
+					AutoAssign: true,
+					CIDR:       []*net.IPNet{ipnet("1.2.3.0/30"), ipnet("1000::2/127")},
 				},
 			},
 			pool:    "test2",
@@ -753,7 +1014,7 @@ func TestConfigReload(t *testing.T) {
 			pools: map[string]*config.Pool{
 				"test2": {
 					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
+					CIDR:       []*net.IPNet{ipnet("1.2.3.0/31"), ipnet("1000::/127")},
 				},
 			},
 			pool: "test2",
@@ -764,7 +1025,7 @@ func TestConfigReload(t *testing.T) {
 				"test2": {
 					AutoAssign:    true,
 					AvoidBuggyIPs: true,
-					CIDR:          []*net.IPNet{ipnet("1.2.3.0/31")},
+					CIDR:          []*net.IPNet{ipnet("1.2.3.0/31"), ipnet("1000::/127")},
 				},
 			},
 			pool:    "test2",
@@ -793,26 +1054,34 @@ func TestAutoAssign(t *testing.T) {
 	if err := alloc.SetPools(map[string]*config.Pool{
 		"test1": {
 			AutoAssign: false,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.4/31")},
+			CIDR:       []*net.IPNet{ipnet("1.2.3.4/31"), ipnet("1000::4/127")},
 		},
 		"test2": {
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.10/31")},
+			CIDR:       []*net.IPNet{ipnet("1.2.3.10/31"), ipnet("1000::10/127")},
 		},
 	}); err != nil {
 		t.Fatalf("SetPools: %s", err)
 	}
 
-	validIPs := map[string]bool{
+	validIP4s := map[string]bool{
 		"1.2.3.4":  false,
 		"1.2.3.5":  false,
 		"1.2.3.10": true,
 		"1.2.3.11": true,
 	}
+	validIP6s := map[string]bool{
+		"1000::4":  false,
+		"1000::5":  false,
+		"1000::10": true,
+		"1000::11": true,
+	}
 
 	tests := []struct {
-		svc     string
-		wantErr bool
+		svc      string
+		wantErr  bool
+		isIPv6   bool
+		unassign bool
 	}{
 		{svc: "s1"},
 		{svc: "s2"},
@@ -828,10 +1097,65 @@ func TestAutoAssign(t *testing.T) {
 			svc:     "s5",
 			wantErr: true,
 		},
+
+		// Clear old ipv4 addresses
+		{
+			svc:      "s1",
+			unassign: true,
+		},
+		{
+			svc:      "s2",
+			unassign: true,
+		},
+		{
+			svc:      "s3",
+			unassign: true,
+		},
+		{
+			svc:      "s4",
+			unassign: true,
+		},
+		{
+			svc:      "s5",
+			unassign: true,
+		},
+		{
+			svc:      "s6",
+			unassign: true,
+		},
+
+		// IPv6 tests;
+		{
+			svc:    "s1",
+			isIPv6: true,
+		},
+		{
+			svc:    "s2",
+			isIPv6: true,
+		},
+		{
+			svc:     "s3",
+			isIPv6:  true,
+			wantErr: true,
+		},
+		{
+			svc:     "s4",
+			isIPv6:  true,
+			wantErr: true,
+		},
+		{
+			svc:     "s5",
+			isIPv6:  true,
+			wantErr: true,
+		},
 	}
 
 	for i, test := range tests {
-		ip, err := alloc.Allocate(test.svc, false, nil, "", "")
+		if test.unassign {
+			alloc.Unassign(test.svc)
+			continue
+		}
+		ip, err := alloc.Allocate(test.svc, test.isIPv6, nil, "", "")
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("#%d should have caused an error, but did not", i+1)
@@ -840,6 +1164,10 @@ func TestAutoAssign(t *testing.T) {
 		}
 		if err != nil {
 			t.Errorf("#%d Allocate(%q, \"test\"): %s", i+1, test.svc, err)
+		}
+		validIPs := validIP4s
+		if test.isIPv6 {
+			validIPs = validIP6s
 		}
 		if !validIPs[ip.String()] {
 			t.Errorf("#%d allocated unexpected IP %q", i+1, ip)
