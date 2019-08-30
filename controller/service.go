@@ -37,6 +37,15 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		return true
 	}
 
+	// If the ClusterIP is malformed or not set we can't determine the
+	// ipFamily to use.
+	clusterIP := net.ParseIP(svc.Spec.ClusterIP)
+	if clusterIP == nil {
+		l.Log("event", "clearAssignment", "reason", "notLoadBalancer", "msg", "No ClusterIP")
+		c.clearServiceState(key, svc)
+		return true
+	}
+
 	// The assigned LB IP is the end state of convergence. If there's
 	// none or a malformed one, nuke all controlled state so that we
 	// start converging from a clean slate.
@@ -45,6 +54,13 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	}
 	if lbIP == nil {
 		c.clearServiceState(key, svc)
+	}
+
+	// Clear the lbIP if it has a different ipFamily compared to the clusterIP.
+	// (this should not happen since the "ipFamily" of a service is immutable)
+	if (clusterIP.To4() == nil) != (lbIP.To4() == nil) {
+		c.clearServiceState(key, svc)
+		lbIP = nil
 	}
 
 	// It's possible the config mutated and the IP we have no longer
@@ -130,7 +146,7 @@ func (c *controller) clearServiceState(key string, svc *v1.Service) {
 func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 	clusterIP := net.ParseIP(svc.Spec.ClusterIP)
 	if clusterIP == nil {
-		// Note: "clusterIP: None" is not allowed for "type: LoadBalancer", so this is a fault
+		// (we should never get here)
 		return nil, fmt.Errorf("invalid ClusterIP [%s], can't determine family", svc.Spec.ClusterIP)
 	}
 	isIPv6 := clusterIP.To4() == nil
