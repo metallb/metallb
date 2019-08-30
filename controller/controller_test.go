@@ -166,12 +166,14 @@ func TestControllerMutation(t *testing.T) {
 			desc: "simple LoadBalancer",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type: "LoadBalancer",
+					Type:      "LoadBalancer",
+					ClusterIP: "1.2.3.4",
 				},
 			},
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type: "LoadBalancer",
+					ClusterIP: "1.2.3.4",
+					Type:      "LoadBalancer",
 				},
 				Status: statusAssigned("1.2.3.0"),
 			},
@@ -181,12 +183,14 @@ func TestControllerMutation(t *testing.T) {
 			desc: "request specific IP",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
+					ClusterIP:      "1.2.3.4",
 					Type:           "LoadBalancer",
 					LoadBalancerIP: "1.2.3.1",
 				},
 			},
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
+					ClusterIP:      "1.2.3.4",
 					Type:           "LoadBalancer",
 					LoadBalancerIP: "1.2.3.1",
 				},
@@ -200,6 +204,7 @@ func TestControllerMutation(t *testing.T) {
 				Spec: v1.ServiceSpec{
 					Type:           "LoadBalancer",
 					LoadBalancerIP: "please sir may I have an IP address thank you",
+					ClusterIP:      "1.2.3.4",
 				},
 			},
 			wantErr: true,
@@ -211,6 +216,7 @@ func TestControllerMutation(t *testing.T) {
 				Spec: v1.ServiceSpec{
 					Type:           "LoadBalancer",
 					LoadBalancerIP: "1.2.3.4",
+					ClusterIP:      "1.2.3.4",
 				},
 				Status: statusAssigned("1.2.3.1"),
 			},
@@ -218,6 +224,7 @@ func TestControllerMutation(t *testing.T) {
 				Spec: v1.ServiceSpec{
 					Type:           "LoadBalancer",
 					LoadBalancerIP: "1.2.3.4",
+					ClusterIP:      "1.2.3.4",
 				},
 			},
 			wantErr: true,
@@ -232,7 +239,8 @@ func TestControllerMutation(t *testing.T) {
 					},
 				},
 				Spec: v1.ServiceSpec{
-					Type: "LoadBalancer",
+					Type:      "LoadBalancer",
+					ClusterIP: "1.2.3.4",
 				},
 			},
 			want: &v1.Service{
@@ -242,7 +250,8 @@ func TestControllerMutation(t *testing.T) {
 					},
 				},
 				Spec: v1.ServiceSpec{
-					Type: "LoadBalancer",
+					Type:      "LoadBalancer",
+					ClusterIP: "1.2.3.4",
 				},
 				Status: statusAssigned("1.2.3.0"),
 			},
@@ -257,7 +266,8 @@ func TestControllerMutation(t *testing.T) {
 					},
 				},
 				Spec: v1.ServiceSpec{
-					Type: "LoadBalancer",
+					ClusterIP: "1.2.3.4",
+					Type:      "LoadBalancer",
 				},
 				Status: statusAssigned("1.2.3.0"),
 			},
@@ -268,7 +278,8 @@ func TestControllerMutation(t *testing.T) {
 					},
 				},
 				Spec: v1.ServiceSpec{
-					Type: "LoadBalancer",
+					ClusterIP: "1.2.3.4",
+					Type:      "LoadBalancer",
 				},
 				Status: statusAssigned("3.4.5.6"),
 			},
@@ -283,7 +294,8 @@ func TestControllerMutation(t *testing.T) {
 					},
 				},
 				Spec: v1.ServiceSpec{
-					Type: "LoadBalancer",
+					ClusterIP: "1.2.3.4",
+					Type:      "LoadBalancer",
 				},
 			},
 			wantErr: true,
@@ -293,13 +305,15 @@ func TestControllerMutation(t *testing.T) {
 			desc: "invalid IP assigned",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type: "LoadBalancer",
+					Type:      "LoadBalancer",
+					ClusterIP: "1.2.3.4",
 				},
 				Status: statusAssigned("2.3.4.5"),
 			},
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type: "LoadBalancer",
+					Type:      "LoadBalancer",
+					ClusterIP: "1.2.3.4",
 				},
 				Status: statusAssigned("1.2.3.0"),
 			},
@@ -309,7 +323,8 @@ func TestControllerMutation(t *testing.T) {
 			desc: "invalid ingress state",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type: "LoadBalancer",
+					Type:      "LoadBalancer",
+					ClusterIP: "1.2.3.4",
 				},
 				Status: v1.ServiceStatus{
 					LoadBalancer: v1.LoadBalancerStatus{
@@ -326,7 +341,8 @@ func TestControllerMutation(t *testing.T) {
 			},
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type: "LoadBalancer",
+					Type:      "LoadBalancer",
+					ClusterIP: "1.2.3.4",
 				},
 				Status: statusAssigned("1.2.3.0"),
 			},
@@ -355,12 +371,14 @@ func TestControllerMutation(t *testing.T) {
 				Spec: v1.ServiceSpec{
 					Type:           "LoadBalancer",
 					LoadBalancerIP: "3.4.5.6",
+					ClusterIP:      "1.2.3.4",
 				},
 			},
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
 					Type:           "LoadBalancer",
 					LoadBalancerIP: "3.4.5.6",
+					ClusterIP:      "1.2.3.4",
 				},
 				Status: statusAssigned("3.4.5.6"),
 			},
@@ -373,6 +391,7 @@ func TestControllerMutation(t *testing.T) {
 					Type:                  "LoadBalancer",
 					LoadBalancerIP:        "3.4.5.6",
 					ExternalTrafficPolicy: "Local",
+					ClusterIP:             "1.2.3.4",
 				},
 			},
 			want: &v1.Service{
@@ -380,6 +399,7 @@ func TestControllerMutation(t *testing.T) {
 					Type:                  "LoadBalancer",
 					LoadBalancerIP:        "3.4.5.6",
 					ExternalTrafficPolicy: "Local",
+					ClusterIP:             "1.2.3.4",
 				},
 				Status: statusAssigned("3.4.5.6"),
 			},
@@ -450,7 +470,8 @@ func TestControllerConfig(t *testing.T) {
 	l := log.NewNopLogger()
 	svc := &v1.Service{
 		Spec: v1.ServiceSpec{
-			Type: "LoadBalancer",
+			Type:      "LoadBalancer",
+			ClusterIP: "1.2.3.4",
 		},
 	}
 	if c.SetBalancer(l, "test", svc, nil) == k8s.SyncStateError {
@@ -556,7 +577,8 @@ func TestDeleteRecyclesIP(t *testing.T) {
 
 	svc1 := &v1.Service{
 		Spec: v1.ServiceSpec{
-			Type: "LoadBalancer",
+			Type:      "LoadBalancer",
+			ClusterIP: "1.2.3.4",
 		},
 	}
 	if c.SetBalancer(l, "test", svc1, nil) == k8s.SyncStateError {
@@ -575,7 +597,8 @@ func TestDeleteRecyclesIP(t *testing.T) {
 	// IP because we have none left.
 	svc2 := &v1.Service{
 		Spec: v1.ServiceSpec{
-			Type: "LoadBalancer",
+			Type:      "LoadBalancer",
+			ClusterIP: "1.2.3.4",
 		},
 	}
 	if c.SetBalancer(l, "test2", svc2, nil) == k8s.SyncStateError {
