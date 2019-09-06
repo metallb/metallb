@@ -38,7 +38,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   namespace: metallb-system
-  name: config
+  name: metallb-config
 data:
   config: |
     address-pools:
@@ -67,7 +67,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   namespace: metallb-system
-  name: config
+  name: metallb-config
 data:
   config: |
     peers:
@@ -112,7 +112,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   namespace: metallb-system
-  name: config
+  name: metallb-config
 data:
   config: |
     peers:
