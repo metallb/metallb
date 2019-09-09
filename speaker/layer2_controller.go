@@ -45,18 +45,8 @@ func usableNodes(eps *v1.Endpoints) []string {
 				continue
 			}
 			if _, ok := usable[*ep.NodeName]; !ok {
-				// Only set true if nothing else has expressed an
-				// opinion. This means that false will take precedence
-				// if there's any unready ports for a given endpoint.
 				usable[*ep.NodeName] = true
 			}
-		}
-
-		for _, ep := range subset.NotReadyAddresses {
-			if ep.NodeName == nil {
-				continue
-			}
-			usable[*ep.NodeName] = false
 		}
 	}
 
