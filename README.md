@@ -23,3 +23,12 @@ One lightweight way you can contribute is
 to
 [tell us that you're using MetalLB](https://github.com/google/metallb/issues/5),
 which will give us warm fuzzy feelings :).
+
+# Reporting security issues
+
+You can report security issues in the github issue tracker. If you
+prefer private disclosure, please email dave@natulte.net and we'll
+figure out a remediation timeline.
+
+We aim for initial response to vulnerability reports within 48
+hours. The timeline for fixes depends on the complexity of the issue.
