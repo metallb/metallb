@@ -41,7 +41,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	// ipFamily to use.
 	clusterIP := net.ParseIP(svc.Spec.ClusterIP)
 	if clusterIP == nil {
-		l.Log("event", "clearAssignment", "reason", "notLoadBalancer", "msg", "No ClusterIP")
+		l.Log("event", "clearAssignment", "reason", "noClusterIP", "msg", "No ClusterIP")
 		c.clearServiceState(key, svc)
 		return true
 	}
@@ -146,7 +146,7 @@ func (c *controller) clearServiceState(key string, svc *v1.Service) {
 func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 	clusterIP := net.ParseIP(svc.Spec.ClusterIP)
 	if clusterIP == nil {
-		// (we should never get here)
+		// (we should never get here because the caller ensured that Spec.ClusterIP != nil)
 		return nil, fmt.Errorf("invalid ClusterIP [%s], can't determine family", svc.Spec.ClusterIP)
 	}
 	isIPv6 := clusterIP.To4() == nil
