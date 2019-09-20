@@ -319,6 +319,11 @@ func poolCount(p *config.Pool) int64 {
 	var total int64
 	for _, cidr := range p.CIDR {
 		o, b := cidr.Mask.Size()
+		if b-o >= 62 {
+			// An enormous ipv6 range is allocated which will never run out.
+			// Just return max to avoid any math errors.
+			return math.MaxInt64
+		}
 		sz := int64(math.Pow(2, float64(b-o)))
 
 		cur := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})

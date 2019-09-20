@@ -1,6 +1,7 @@
 package allocator
 
 import (
+	"math"
 	"net"
 	"strconv"
 	"strings"
@@ -1205,6 +1206,15 @@ func TestPoolCount(t *testing.T) {
 				AvoidBuggyIPs: true,
 			},
 			want: 381,
+		},
+		{
+			desc: "BGP a BIG ipv6 range",
+			pool: &config.Pool{
+				Protocol:      config.BGP,
+				CIDR:          []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("2.3.4.128/25"), ipnet("1000::/64")},
+				AvoidBuggyIPs: true,
+			},
+			want: math.MaxInt64,
 		},
 	}
 
