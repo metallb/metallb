@@ -41,6 +41,36 @@ until
 you
 [define and deploy a configmap]({{% relref "../configuration/_index.md" %}}).
 
+## Installation with kustomize
+
+You can install MetalLB with [kustomize](https://github.com/kubernetes-sigs/kustomize) by pointing on the remote kustomization file :
+
+```yaml
+# kustomization.yml
+namespace: metallb-system
+
+resources:
+  - github.com/danderson/metallb//manifests?ref=v0.8.2
+  - configmap.yml 
+```
+If you want to use a [configMapGenerator](https://github.com/kubernetes-sigs/kustomize/blob/master/examples/configGeneration.md) for config file, you want to tell kustomize not to append a hash to the configMap, as MetalLB is waiting for a configMap named `config` (see [https://github.com/kubernetes-sigs/kustomize/blob/master/examples/generatorOptions.md](https://github.com/kubernetes-sigs/kustomize/blob/master/examples/generatorOptions.md)):
+
+```
+# kustomization.yml
+namespace: metallb-system
+
+resources:
+  - github.com/danderson/metallb//manifests?ref=v0.8.2
+
+configMapGenerator:
+- name: config
+  files:
+    - configs/config
+
+generatorOptions:
+ disableNameSuffixHash: true
+```
+
 ## Installation with Helm
 
 {{% notice note %}} Due to code review turnaround time, it usually
