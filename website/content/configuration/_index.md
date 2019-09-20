@@ -3,7 +3,9 @@ title: Configuration
 weight: 4
 ---
 
-The MetalLB deployment remains idle until configured.  This is accomplished by designing and deploying a configmap into the same namespace (metallb-system) as the deployment.
+MetalLB remains idle until configured. This is accomplished by
+creating and deploying a configmap into the same namespace
+(metallb-system) as the deployment.
 
 There is an example configmap in
 [`manifests/example-config.yaml`](https://raw.githubusercontent.com/google/metallb/master/manifests/example-config.yaml),

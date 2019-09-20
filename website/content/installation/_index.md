@@ -73,5 +73,5 @@ to [define and deploy]({{% relref "../configuration/_index.md" %}})
 that configuration.
 
 Alternatively, you can manage the configuration with Helm itself, by
-putting the configuration under the `config.inline` key in your
+putting the configuration under the `configInline` key in your
 `values.yaml`.

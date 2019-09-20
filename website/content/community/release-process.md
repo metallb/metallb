@@ -46,8 +46,8 @@ The release script will abort if the working directory isn't right.
 
 ### Run the release script 
 
-Run `make release VERSION=X.Y.Z`. This will create the appropriate
-branches, commits and tags in your local repository.
+Run `inv release X.Y.Z`. This will create the appropriate branches,
+commits and tags in your local repository.
 
 ### Push the new artifacts
 

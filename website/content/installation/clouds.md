@@ -20,12 +20,13 @@ Azure          | No, use AKS
 DigitalOcean   | No, use DigitalOcean Kubernetes
 Google Cloud   | No, use GKE
 Hetzner        | No, [use alternatives]
-OVH            | No, [use alternatives]
+OVH            | Yes, when using a vRack
 OpenShift OCP  | Yes, see [OpenShift notes]
 OpenStack      | Yes, see [OpenStack notes]
 Packet         | Yes, see [Packet notes]
 Proxmox        | Yes
 VMWare         | Yes
+Vultr          | Yes
 
 [use alternatives]: #alternatives
 [OpenShift notes]: #metallb-on-openshift-ocp
