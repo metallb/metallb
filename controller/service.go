@@ -157,6 +157,9 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 		if ip == nil {
 			return nil, fmt.Errorf("invalid spec.loadBalancerIP %q", svc.Spec.LoadBalancerIP)
 		}
+		if (ip.To4() == nil) != isIPv6 {
+			return nil, fmt.Errorf("invalid ip-family spec.loadBalancerIP %q", svc.Spec.LoadBalancerIP)
+		}
 		if err := c.ips.Assign(key, ip, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 			return nil, err
 		}
