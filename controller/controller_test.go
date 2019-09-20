@@ -126,6 +126,16 @@ func TestControllerMutation(t *testing.T) {
 				AutoAssign: false,
 				CIDR:       []*net.IPNet{ipnet("3.4.5.6/32")},
 			},
+			"pool3": {
+				Protocol:   config.BGP,
+				AutoAssign: true,
+				CIDR:       []*net.IPNet{ipnet("1000::/127")},
+			},
+			"pool4": {
+				Protocol:   config.Layer2,
+				AutoAssign: false,
+				CIDR:       []*net.IPNet{ipnet("2000::1/128")},
+			},
 		},
 	}
 
@@ -402,6 +412,76 @@ func TestControllerMutation(t *testing.T) {
 					ClusterIP:             "1.2.3.4",
 				},
 				Status: statusAssigned("3.4.5.6"),
+			},
+		},
+
+		{
+			desc: "No ClusterIP",
+			in: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type: "LoadBalancer",
+				},
+			},
+			wantErr: false,
+		},
+
+		{
+			desc: "request IP from wrong ip-family (ipv4)",
+			in: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					LoadBalancerIP: "1.2.3.1",
+					ClusterIP:      "3000::1",
+				},
+			},
+			wantErr: true,
+		},
+
+		{
+			desc: "request IP from wrong ip-family (ipv6)",
+			in: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					LoadBalancerIP: "1000::",
+					ClusterIP:      "1.2.3.4",
+				},
+			},
+			wantErr: true,
+		},
+
+		{
+			desc: "IP from wrong ip-family (ipv6) assigned",
+			in: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:      "LoadBalancer",
+					ClusterIP: "1.2.3.4",
+				},
+				Status: statusAssigned("1000::"),
+			},
+			want: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:      "LoadBalancer",
+					ClusterIP: "1.2.3.4",
+				},
+				Status: statusAssigned("1.2.3.0"),
+			},
+		},
+
+		{
+			desc: "IP from wrong ip-family (ipv4) assigned",
+			in: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:      "LoadBalancer",
+					ClusterIP: "3000::1",
+				},
+				Status: statusAssigned("1.2.3.0"),
+			},
+			want: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:      "LoadBalancer",
+					ClusterIP: "3000::1",
+				},
+				Status: statusAssigned("1000::"),
 			},
 		},
 	}
