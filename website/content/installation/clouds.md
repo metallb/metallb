@@ -25,7 +25,7 @@ OpenShift OCP  | Yes, see [OpenShift notes]
 OpenStack      | Yes, see [OpenStack notes]
 Packet         | Yes, see [Packet notes]
 Proxmox        | Yes
-VMWare         | Yes
+VMware         | Yes
 Vultr          | Yes
 
 [use alternatives]: #alternatives
