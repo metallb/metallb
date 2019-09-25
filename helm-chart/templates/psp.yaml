@@ -61,24 +61,40 @@ metadata:
     chart: {{ template "metallb.chart" . }}
     app: {{ template "metallb.name" . }}
 spec:
+  privileged: true
+  # Host namespaces
+  hostPID: false
+  hostIPC: false
   hostNetwork: true
   hostPorts:
   - min: 7472
     max: 7472
-  privileged: true
-  allowPrivilegeEscalation: false
-  allowedCapabilities:
-  - 'NET_ADMIN'
-  - 'NET_RAW'
-  - 'SYS_ADMIN'
+  # Volumes and file systems
   volumes:
-  - '*'
-  fsGroup:
-    rule: RunAsAny
+  - configMap
+  - secret
+  - emptyDir
+  allowedHostPaths: []
+  readOnlyRootFilesystem: true
+  # Users and groups
   runAsUser:
     rule: RunAsAny
-  seLinux:
-    rule: RunAsAny
   supplementalGroups:
+    rule: RunAsAny
+  fsGroup:
+    rule: RunAsAny
+  # Privilege Escalation
+  allowPrivilegeEscalation: false
+  defaultAllowPrivilegeEscalation: false
+  # Capabilities
+  allowedCapabilities:
+  - NET_ADMIN
+  - NET_RAW
+  - SYS_ADMIN
+  defaultAddCapabilities: []
+  requiredDropCapabilities:
+  - ALL
+  # SELinux
+  seLinux:
     rule: RunAsAny
 {{- end -}}
