@@ -323,7 +323,7 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 	for _, cidr := range p.Addresses {
 		nets, err := parseCIDR(cidr)
 		if err != nil {
-			return nil, fmt.Errorf("invalid CIDR %q in pool %q", cidr, p.Name)
+			return nil, fmt.Errorf("invalid CIDR %q in pool %q: %s", cidr, p.Name, err)
 		}
 		ret.CIDR = append(ret.CIDR, nets...)
 	}
