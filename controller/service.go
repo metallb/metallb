@@ -19,7 +19,7 @@ import (
 	"net"
 
 	"github.com/go-kit/kit/log"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 
 	"go.universe.tf/metallb/internal/allocator/k8salloc"
 )
@@ -158,7 +158,7 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 			return nil, fmt.Errorf("invalid spec.loadBalancerIP %q", svc.Spec.LoadBalancerIP)
 		}
 		if (ip.To4() == nil) != isIPv6 {
-			return nil, fmt.Errorf("invalid ip-family spec.loadBalancerIP %q", svc.Spec.LoadBalancerIP)
+			return nil, fmt.Errorf("requested spec.loadBalancerIP %q does not match the ipFamily of the service", svc.Spec.LoadBalancerIP)
 		}
 		if err := c.ips.Assign(key, ip, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 			return nil, err
