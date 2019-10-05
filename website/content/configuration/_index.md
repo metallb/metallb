@@ -13,6 +13,13 @@ annotated with explanatory comments.
 
 If you've named the configmap `config.yaml`, you can deploy the manifest with `kubectl apply -f config.yaml`.
 
+{{% notice note %}}
+If you installed MetalLB with Helm, you will need to change the
+namespace of the ConfigMap to match the namespace in which MetalLB was
+deployed, and change the ConfigMap's name from `config` to
+`metallb-config`.
+{{% /notice %}}
+
 The specific configuration depends on the protocol(s) you want to use
 to announce service IPs. Jump to:
 
