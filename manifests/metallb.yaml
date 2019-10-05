@@ -10,6 +10,48 @@ kind: PodSecurityPolicy
 metadata:
   labels:
     app: metallb
+  name: controller
+  namespace: metallb-system
+spec:
+  allowPrivilegeEscalation: false
+  allowedCapabilities: []
+  allowedHostPaths: []
+  defaultAddCapabilities: []
+  defaultAllowPrivilegeEscalation: false
+  fsGroup:
+    ranges:
+    - max: 65535
+      min: 1
+    rule: MustRunAs
+  hostIPC: false
+  hostNetwork: false
+  hostPID: false
+  privileged: false
+  readOnlyRootFilesystem: true
+  requiredDropCapabilities:
+  - ALL
+  runAsUser:
+    ranges:
+    - max: 65535
+      min: 1
+    rule: MustRunAs
+  seLinux:
+    rule: RunAsAny
+  supplementalGroups:
+    ranges:
+    - max: 65535
+      min: 1
+    rule: MustRunAs
+  volumes:
+  - configMap
+  - secret
+  - emptyDir
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  labels:
+    app: metallb
   name: speaker
   namespace: metallb-system
 spec:
@@ -18,13 +60,21 @@ spec:
   - NET_ADMIN
   - NET_RAW
   - SYS_ADMIN
+  allowedHostPaths: []
+  defaultAddCapabilities: []
+  defaultAllowPrivilegeEscalation: false
   fsGroup:
     rule: RunAsAny
+  hostIPC: false
   hostNetwork: true
+  hostPID: false
   hostPorts:
   - max: 7472
     min: 7472
   privileged: true
+  readOnlyRootFilesystem: true
+  requiredDropCapabilities:
+  - ALL
   runAsUser:
     rule: RunAsAny
   seLinux:
@@ -32,7 +82,9 @@ spec:
   supplementalGroups:
     rule: RunAsAny
   volumes:
-  - '*'
+  - configMap
+  - secret
+  - emptyDir
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -79,6 +131,14 @@ rules:
   verbs:
   - create
   - patch
+- apiGroups:
+  - extensions
+  resourceNames:
+  - controller
+  resources:
+  - podsecuritypolicies
+  verbs:
+  - use
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
