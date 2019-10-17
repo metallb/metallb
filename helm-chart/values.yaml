@@ -57,7 +57,7 @@ serviceAccounts:
 controller:
   image:
     repository: metallb/controller
-    tag: master
+    tag: main
     pullPolicy: Always
   resources: {}
     # limits:
@@ -72,7 +72,7 @@ controller:
 speaker:
   image:
     repository: metallb/speaker
-    tag: master
+    tag: main
     pullPolicy: Always
   resources: {}
     # limits:
