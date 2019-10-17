@@ -1,4 +1,4 @@
-package main
+package e2etest
 
 import (
 	"context"
@@ -6,19 +6,20 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"net/http"
 	"strings"
 	"sync"
 	"time"
 
-	vk "go.universe.tf/virtuakube"
+	"golang.org/x/net/proxy"
 )
 
 type LoadGenerator struct {
-	client    *vk.VM
-	transport *http.Transport
-	targets   map[string]*stats
-	stop      chan struct{}
+	Target    string
+	SocksAddr string
+
+	dialer proxy.ContextDialer
+	stats  stats
+	stop   chan struct{}
 }
 
 type stats struct {
@@ -35,6 +36,14 @@ type Stats struct {
 	HitsPerClient map[string]int64
 	Total         int64
 	Errors        int64
+}
+
+func mkStats() *Stats {
+	return &Stats{
+		HitsPerNode:   map[string]int64{},
+		HitsPerPod:    map[string]int64{},
+		HitsPerClient: map[string]int64{},
+	}
 }
 
 func (s *Stats) Nodes() int {
@@ -79,41 +88,32 @@ func (s *Stats) BalancedByClient(allowedImbalance float64) error {
 	return s.balancedBy("client", s.HitsPerClient, allowedImbalance)
 }
 
-func NewLoadGenerator(client *vk.VM, urls ...string) *LoadGenerator {
-	ret := &LoadGenerator{
-		client: client,
-		transport: &http.Transport{
-			Dial: func(network, addr string) (net.Conn, error) {
-				return client.Dial(network, addr)
-			},
-			DisableKeepAlives: true,
-		},
-		targets: map[string]*stats{},
-		stop:    make(chan struct{}),
+func (l *LoadGenerator) Run() {
+	if l.stop != nil {
+		panic("double start of load-generator")
 	}
-	for _, url := range urls {
-		ret.targets[url] = &stats{
-			start: time.Now(),
-			prev: &Stats{
-				HitsPerNode:   map[string]int64{},
-				HitsPerPod:    map[string]int64{},
-				HitsPerClient: map[string]int64{},
-			},
-			cur: &Stats{
-				HitsPerNode:   map[string]int64{},
-				HitsPerPod:    map[string]int64{},
-				HitsPerClient: map[string]int64{},
-			},
+	l.stop = make(chan struct{})
+	if l.SocksAddr != "" {
+		socks, err := proxy.SOCKS5("tcp", l.SocksAddr, nil, nil)
+		if err != nil {
+			panic("I can't socks")
 		}
-		ret.targets[url].cond = sync.NewCond(&ret.targets[url].mu)
-		go ret.run(url)
+		l.dialer = socks.(proxy.ContextDialer)
+	} else {
+		l.dialer = &net.Dialer{}
 	}
-	return ret
+	l.stats = stats{
+		start: time.Now(),
+		prev:  mkStats(),
+		cur:   mkStats(),
+	}
+	l.stats.cond = sync.NewCond(&l.stats.mu)
+	go l.run()
 }
 
 // Only returns when the state evolves beyond prev.
-func (l *LoadGenerator) Stats(url string, prev *Stats) *Stats {
-	st := l.targets[url]
+func (l *LoadGenerator) Stats(prev *Stats) *Stats {
+	st := l.stats
 	st.mu.Lock()
 	defer st.mu.Unlock()
 
@@ -127,20 +127,6 @@ func (l *LoadGenerator) Stats(url string, prev *Stats) *Stats {
 	return st.prev
 }
 
-func (l *LoadGenerator) AllStats(prev map[string]*Stats) map[string]*Stats {
-	ret := map[string]*Stats{}
-
-	if prev == nil {
-		prev = map[string]*Stats{}
-	}
-
-	for url := range l.targets {
-		ret[url] = l.Stats(url, prev[url])
-	}
-
-	return ret
-}
-
 func (l *LoadGenerator) Close() {
 	select {
 	case <-l.stop:
@@ -149,46 +135,40 @@ func (l *LoadGenerator) Close() {
 	}
 }
 
-func (l *LoadGenerator) run(url string) {
+func (l *LoadGenerator) run() {
 	for {
 		select {
 		case <-l.stop:
 			return
 		default:
 		}
-		l.oneRequest(url)
+		l.oneRequest()
 	}
 }
 
-func (l *LoadGenerator) oneRequest(url string) {
+func (l *LoadGenerator) oneRequest() {
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
 
-	req, err := http.NewRequest("GET", url, nil)
+	conn, err := l.dialer.DialContext(ctx, "tcp", l.Target)
 	if err != nil {
-		panic(err)
+		l.recordError()
 	}
-	req = req.WithContext(ctx)
+	defer conn.Close()
 
-	resp, err := l.transport.RoundTrip(req)
+	bs, err := ioutil.ReadAll(conn)
 	if err != nil {
-		l.recordError(url)
-		return
-	}
-	defer resp.Body.Close()
-	bs, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		l.recordError(url)
+		l.recordError()
 		return
 	}
 
 	fs := strings.Split(string(bs), "\n")
 	node, pod, client := fs[0], fs[1], fs[2]
-	l.recordHit(url, node, pod, client)
+	l.recordHit(node, pod, client)
 }
 
-func (l *LoadGenerator) recordHit(url, node, pod, client string) {
-	st := l.targets[url]
+func (l *LoadGenerator) recordHit(node, pod, client string) {
+	st := l.stats
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	if time.Since(st.start) > time.Second {
@@ -208,8 +188,8 @@ func (l *LoadGenerator) recordHit(url, node, pod, client string) {
 	st.cur.HitsPerClient[client]++
 }
 
-func (l *LoadGenerator) recordError(url string) {
-	st := l.targets[url]
+func (l *LoadGenerator) recordError() {
+	st := l.stats
 	st.mu.Lock()
 	defer st.mu.Unlock()
 	if time.Since(st.start) > time.Second {

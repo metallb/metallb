@@ -19,7 +19,8 @@ from invoke.exceptions import Exit
 
 all_binaries = set(["controller",
                     "speaker",
-                    "mirror-server"])
+                    "e2etest/mirror-server",
+                    "e2etest/bgp-socks"])
 all_architectures = set(["amd64",
                          "arm",
                          "arm64",
@@ -48,7 +49,7 @@ def _check_binaries(binaries):
             out |= all_binaries
         elif binary not in all_binaries:
             print("Unknown binary {}".format(binary))
-            print("Known binaries: {}".format(", ",join(sorted(all_binaries))))
+            print("Known binaries: {}".format(", ".join(sorted(all_binaries))))
             sys.exit(1)
         else:
             out.add(binary)
@@ -89,24 +90,34 @@ def build(ctx, binaries, architectures, tag="dev", docker_user="metallb"):
             "GO111MODULE": "on",
         }
         for bin in binaries:
-            run("go build -v -o build/{arch}/{bin}/{bin} -ldflags "
-                "'-X go.universe.tf/metallb/internal/version.gitCommit={commit} "
-                "-X go.universe.tf/metallb/internal/version.gitBranch={branch}' "
-                "go.universe.tf/metallb/{bin}".format(
+            if bin == "e2etest/bgp-socks":
+                run("docker build -t {user}/{bin}:{tag}-{arch} {bin}".format(
                     arch=arch,
                     bin=bin,
-                    commit=commit,
-                    branch=branch),
-                env=env,
-                echo=True)
-            run("docker build "
-                "-t {user}/{bin}:{tag}-{arch} "
-                "-f {bin}/Dockerfile build/{arch}/{bin}".format(
-                    user=docker_user,
-                    bin=bin,
                     tag=tag,
-                    arch=arch),
-                echo=True)
+                    user=docker_user),
+                    echo=True)
+            else:
+                bin_base = os.path.basename(bin)
+                run("go build -v -o build/{arch}/{bin}/{bin_base} -ldflags "
+                    "'-X go.universe.tf/metallb/internal/version.gitCommit={commit} "
+                    "-X go.universe.tf/metallb/internal/version.gitBranch={branch}' "
+                    "go.universe.tf/metallb/{bin}".format(
+                        arch=arch,
+                        bin=bin,
+                        bin_base=bin_base,
+                        commit=commit,
+                        branch=branch),
+                    env=env,
+                    echo=True)
+                run("docker build "
+                    "-t {user}/{bin}:{tag}-{arch} "
+                    "-f {bin}/Dockerfile build/{arch}/{bin}".format(
+                        user=docker_user,
+                        bin=bin,
+                        tag=tag,
+                        arch=arch),
+                    echo=True)
 
 @task(iterable=["binaries", "architectures"],
       help={
@@ -158,7 +169,7 @@ def push_multiarch(ctx, binaries, tag="dev", docker_user="metallb"):
     "architecture": "CPU architecture of the local machine. Default 'amd64'.",
     "name": "name of the kind cluster to use.",
 })
-def dev_env(ctx, architecture="amd64", name="kind", cni=None):
+def dev_env(ctx, architecture="amd64", name="kind", cni=None, tag="dev"):
     """Build and run MetalLB in a local Kind cluster.
 
     If the cluster specified by --name (default "kind") doesn't exist,
@@ -166,9 +177,12 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None):
     checkout, push them into kind, and deploy manifests/metallb.yaml
     to run those images.
     """
+
+    # Deploy the cluster, if not already deployed.
     clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
     mk_cluster = name not in clusters
     if mk_cluster:
+        print("Creating cluster...")
         config = {
             "apiVersion": "kind.sigs.k8s.io/v1alpha3",
             "kind": "Cluster",
@@ -185,31 +199,90 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None):
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(config)
             tmp.flush()
-            run("kind create cluster --name={} --config={}".format(name, tmp.name), pty=True, echo=True)
+            run("kind create cluster --name={} --config={} --wait=5m".format(name, tmp.name), pty=True, echo=True)
 
     config = run("kind get kubeconfig-path --name={}".format(name), hide=True).stdout.strip()
     env = {"KUBECONFIG": config}
     if mk_cluster and cni:
         run("kubectl apply -f e2etest/manifests/{}.yaml".format(cni), echo=True, env=env)
 
-    build(ctx, binaries=["controller", "speaker", "mirror-server"], architectures=[architecture])
-    run("kind load docker-image --name={} metallb/controller:dev-{}".format(name, architecture), echo=True)
-    run("kind load docker-image --name={} metallb/speaker:dev-{}".format(name, architecture), echo=True)
-    run("kind load docker-image --name={} metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
+    build(ctx, binaries=["controller", "speaker", "e2etest/mirror-server", "e2etest/bgp-socks"], architectures=[architecture], tag=tag)
 
-    run("kubectl delete po -nmetallb-system --all", echo=True)
+    # Create a bunch of empty Docker containers and steal their
+    # IPs. We do this to get uncontested layer 2 addresses that we can
+    # give MetalLB.
+    print("Finding IPs to steal for MetalLB...")
+    ips = []
+    for i in range(10):
+        container_name = "{}-ip-{}".format(name, i)
+        container_id = run("docker ps -f name='^{}$' -q".format(container_name), hide=True).stdout.strip()
+        if not container_id:
+            container_id = run("docker run -d --rm --name={} --label='metallb.kind.cluster={}' --cap-add=NET_ADMIN metallb/e2etest/bgp-socks:{}-{}".format(container_name, name, tag, architecture), hide=True).stdout.strip()
+            ip = run("docker exec {} /bin/bash -c 'ip -br addr show eth0'".format(container_id), hide=True).stdout.strip()
+            ip, pfxlen = ip.split()[2].split('/')
+            run("docker exec {} /bin/bash -c 'echo -n {} >/ip'".format(container_id, ip))
+            run("docker exec {} /bin/bash -c 'ip addr del {}/{} dev eth0'".format(container_id, ip, pfxlen))
+            ips.append(ip)
+        else:
+            ip = run("docker exec {} /bin/bash -c 'cat /ip'".format(container_id), hide=True).stdout.strip()
+            ips.append(ip)
+    ips = list(sorted(ips))
+    print("MetalLB service IPs are {}".format(", ".join(ips)))
+
+    # Run a bgp-socks container for BGP testing.
+    container_name = "{}-bgp".format(name)
+    container_id = run("docker ps -f name='^{}$' -q".format(container_name), hide=True).stdout.strip()
+    if not container_id:
+        container_id = run("docker run -d --rm --name={}-bgp -e RUN_SOCKS=1 -e RUN_BGP=1 -e IPS=\"{}\" --label='metallb.kind.cluster={}' --cap-add=NET_ADMIN metallb/e2etest/bgp-socks:{}-{}".format(name, " ".join(ips), name, tag, architecture), hide=True).stdout.strip()
+    socks_ip = run("docker exec {} /bin/bash -c 'cat /ip'".format(container_id), hide=True).stdout.strip()
+
+    run("kind load docker-image --name={} metallb/controller:{}-{}".format(name, tag, architecture), echo=True)
+    run("kind load docker-image --name={} metallb/speaker:{}-{}".format(name, tag, architecture), echo=True)
+    run("kind load docker-image --name={} metallb/e2etest/mirror-server:{}-{}".format(name, tag, architecture), echo=True)
+
+    run("kubectl delete deploy -nmetallb-system --all", echo=True, env=env)
+    run("kubectl delete ds -nmetallb-system --all", echo=True, env=env)
+    run("kubectl delete po -nmetallb-system --all", echo=True, env=env)
     with open("manifests/metallb.yaml") as f:
         manifest = f.read()
-    manifest = manifest.replace(":main", ":dev-{}".format(architecture))
+    manifest = manifest.replace(":main", ":{}-{}".format(tag, architecture))
     manifest = manifest.replace("imagePullPolicy: Always", "imagePullPolicy: Never")
     with tempfile.NamedTemporaryFile() as tmp:
         tmp.write(manifest.encode("utf-8"))
         tmp.flush()
         run("kubectl apply -f {}".format(tmp.name), echo=True, env=env)
 
-    with open("e2etest/manifests/mirror-server.yaml") as f:
+    with open("e2etest/mirror-server/manifest.yaml") as f:
         manifest = f.read()
-    manifest = manifest.replace(":main", ":dev-{}".format(architecture))
+    manifest = manifest.replace(":main", ":{}-{}".format(tag, architecture))
+    with tempfile.NamedTemporaryFile() as tmp:
+        tmp.write(manifest.encode("utf-8"))
+        tmp.flush()
+        run("kubectl apply -f {}".format(tmp.name), echo=True, env=env)
+
+    manifest = """
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    peers:
+    - peer-address: {}
+      peer-asn: 64512
+      my-asn: 64513
+    address-pools:
+    - name: layer2
+      protocol: layer2
+      addresses:
+      {}
+    - name: bgp
+      protocol: bgp
+      addresses:
+      - 100.64.0.0/24
+"""
+    manifest = manifest.format(socks_ip, "\n      ".join("- {}/32".format(ip) for ip in ips))
     with tempfile.NamedTemporaryFile() as tmp:
         tmp.write(manifest.encode("utf-8"))
         tmp.flush()
@@ -220,24 +293,27 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None):
 To access the cluster:
 
 export KUBECONFIG={}
-""".format(config))
 
-# @task
-# def client_machine(ctx, architecture="amd64", name="kind"):
-#     """Create a virtual client 'machine' in a container."""
-#     run("docker rm -f {}-client".format(name), warn=True, echo=True)
-#     run("docker run -d --name={}-client --rm metallb/traffic-generator:dev-{}".format())
+BGP SOCKS IP: {}
+""".format(config, socks_ip))
 
-# @task
-# def e2e_create_world(ctx, name="kind", cni=None, architecture="amd64"):
-#     e2e_delete_world(ctx, name=name)
-#     kind(ctx, name=name, cni=cni, architecture=architecture)
-#     run("docker run -d --name={}-client --rm debian:stable /bin/bash -c 'sleep 1200'".format(name), echo=True)
+@task(help={
+    "architecture": "CPU architecture of the local machine. Default 'amd64'.",
+    "name": "name of the kind cluster to use.",
+})
+def e2e(ctx, architecture="amd64", name="e2e", cni=None, tag="e2e", cleanup=True):
+    dev_env(ctx, name="e2e", architecture="amd64", cni=cni, tag=tag)
+    if cleanup:
+        dev_env_cleanup(ctx, name=name)
 
-# @task
-# def e2e_delete_world(ctx, name="kind"):
-#     run("kind delete cluster --name={}".format(name), warn=True, echo=True)
-#     run("docker rm -f {}".format(client), warn=True, echo=True)
+@task(help={
+    "architecture": "CPU architecture of the local machine. Default 'amd64'.",
+    "name": "name of the kind cluster to use.",
+})
+def dev_env_cleanup(ctx, name="kind"):
+    """Delete a running MetalLB dev environment"""
+    run("kind delete cluster --name={}".format(name))
+    run("docker ps --filter 'label=metallb.kind.cluster={}' -q | xargs docker kill".format(name), hide=True)
 
 @task
 def helm(ctx):
