@@ -21,7 +21,7 @@ manifests, or using the [Helm](https://helm.sh) package manager.
 To install MetalLB, simply apply the manifest:
 
 ```shell
-kubectl apply -f https://raw.githubusercontent.com/google/metallb/master/manifests/metallb.yaml
+kubectl apply -f https://raw.githubusercontent.com/google/metallb/main/manifests/metallb.yaml
 ```
 
 This will deploy MetalLB to your cluster, under the `metallb-system`
@@ -53,7 +53,7 @@ resources:
   - github.com/danderson/metallb//manifests?ref=v0.8.2
   - configmap.yml 
 ```
-If you want to use a [configMapGenerator](https://github.com/kubernetes-sigs/kustomize/blob/master/examples/configGeneration.md) for config file, you want to tell kustomize not to append a hash to the configMap, as MetalLB is waiting for a configMap named `config` (see [https://github.com/kubernetes-sigs/kustomize/blob/master/examples/generatorOptions.md](https://github.com/kubernetes-sigs/kustomize/blob/master/examples/generatorOptions.md)):
+If you want to use a [configMapGenerator](https://github.com/kubernetes-sigs/kustomize/blob/main/examples/configGeneration.md) for config file, you want to tell kustomize not to append a hash to the configMap, as MetalLB is waiting for a configMap named `config` (see [https://github.com/kubernetes-sigs/kustomize/blob/main/examples/generatorOptions.md](https://github.com/kubernetes-sigs/kustomize/blob/main/examples/generatorOptions.md)):
 
 ```
 # kustomization.yml

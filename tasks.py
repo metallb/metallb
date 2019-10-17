@@ -200,7 +200,7 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None):
     run("kubectl delete po -nmetallb-system --all", echo=True)
     with open("manifests/metallb.yaml") as f:
         manifest = f.read()
-    manifest = manifest.replace(":master", ":dev-{}".format(architecture))
+    manifest = manifest.replace(":main", ":dev-{}".format(architecture))
     manifest = manifest.replace("imagePullPolicy: Always", "imagePullPolicy: Never")
     with tempfile.NamedTemporaryFile() as tmp:
         tmp.write(manifest.encode("utf-8"))
@@ -209,7 +209,7 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None):
 
     with open("e2etest/manifests/mirror-server.yaml") as f:
         manifest = f.read()
-    manifest = manifest.replace(":master", ":dev-{}".format(architecture))
+    manifest = manifest.replace(":main", ":dev-{}".format(architecture))
     with tempfile.NamedTemporaryFile() as tmp:
         tmp.write(manifest.encode("utf-8"))
         tmp.flush()
@@ -353,7 +353,7 @@ def release(ctx, version, skip_release_notes=False):
     is_patch_release = version.patch != 0
 
     # Check that we have release notes for the desired version.
-    run("git checkout master", echo=True)
+    run("git checkout main", echo=True)
     if not skip_release_notes:
         with open("website/content/release-notes/_index.md") as release_notes:
             if "## Version {}".format(version) not in release_notes.read():
@@ -366,16 +366,16 @@ def release(ctx, version, skip_release_notes=False):
     else:
         run("git checkout -b v{}.{}".format(version.major, version.minor), echo=True)
 
-    # Copy over release notes from master.
+    # Copy over release notes from main.
     if not skip_release_notes:
-        run("git checkout master -- website/content/release-notes/_index.md", echo=True)
+        run("git checkout main -- website/content/release-notes/_index.md", echo=True)
 
     # Update links on the website to point to files at the version
     # we're creating.
     if is_patch_release:
         previous_version = "v{}.{}.{}".format(version.major, version.minor, version.patch-1)
     else:
-        previous_version = "master"
+        previous_version = "main"
     def _replace(pattern):
         oldpat = pattern.format(previous_version)
         newpat = pattern.format("v{}").format(version)
@@ -400,5 +400,5 @@ def release(ctx, version, skip_release_notes=False):
 
     run("git commit -a -m 'Automated update for release v{}'".format(version), echo=True)
     run("git tag v{} -m 'See the release notes for details:\n\nhttps://metallb.universe.tf/release-notes/#version-{}-{}-{}'".format(version, version.major, version.minor, version.patch), echo=True)
-    run("git checkout master", echo=True)
+    run("git checkout main", echo=True)
 

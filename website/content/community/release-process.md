@@ -15,7 +15,7 @@ you'll have to either resolve them, or bump to the next version.
 
 ### Finalize release notes
 
-All release notes are always written on the `master` branch, and
+All release notes are always written on the `main` branch, and
 copied into release branches in a later step. Point out all new
 features and actions required by users. If there are very notable
 bugfixes (e.g. security issues, long-term pain point resolved), point
@@ -51,8 +51,8 @@ commits and tags in your local repository.
 
 ### Push the new artifacts
 
-Run `git push --tags origin master vX.Y`. This will push all pending
-changes both in master and the release branch, as well as the new tag
+Run `git push --tags origin main vX.Y`. This will push all pending
+changes both in main and the release branch, as well as the new tag
 for the release.
 
 ### Protect the release branch (skip for patch releases)
@@ -84,7 +84,7 @@ CircleCI that the deploy has completed.
 Clone https://github.com/kubernetes/charts , and overwrite the
 `stable/metallb` directory with the contents of `helm-chart` from the
 release branch. Send as a PR. In the meantime, bump the chart version
-in master for the next time.
+in main for the next time.
 
 ### Repoint the live website
 

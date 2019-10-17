@@ -131,10 +131,10 @@ released version, so that users who don't care about ongoing
 development see documentation that is consistent with the released
 code.
 
-However, there is a version of the website synced to the latest master
+However, there is a version of the website synced to the latest main
 branch
 at
-[https://master--metallb.netlify.com](https://master--metallb.netlify.com). Similarly,
+[https://main--metallb.netlify.com](https://main--metallb.netlify.com). Similarly,
 every branch has a published website at `<branch
 name>--metallb.netlify.com`. So if you want to view the documentation
 for the 0.2 version, regardless of what the currently released version
