@@ -2,10 +2,10 @@
 
 version: 2
 jobs:
-  test-1.12:
+  test-1.13:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.13
     steps:
       - checkout
       - run: sudo apt-get install python-pip
@@ -23,7 +23,7 @@ jobs:
   deploy-controller:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.13
     steps:
       - checkout
       - setup_remote_docker
@@ -36,7 +36,7 @@ jobs:
   deploy-speaker:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
-      - image: circleci/golang:1.12
+      - image: circleci/golang:1.13
     steps:
       - checkout
       - setup_remote_docker
@@ -50,7 +50,7 @@ workflows:
   version: 2
   test-and-deploy:
     jobs:
-      - test-1.12:
+      - test-1.13:
           filters:
             tags:
               only: /.*/
@@ -61,7 +61,7 @@ workflows:
             tags:
               only: /.*/
           requires:
-            - test-1.12
+            - test-1.13
       - deploy-speaker:
           filters:
             branches:
@@ -69,4 +69,4 @@ workflows:
             tags:
               only: /.*/
           requires:
-            - test-1.12
+            - test-1.13
