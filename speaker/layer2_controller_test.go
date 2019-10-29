@@ -193,6 +193,51 @@ func TestShouldAnnounce(t *testing.T) {
 		},
 
 		{
+			desc:     "One service, two endpoints, one host, neither endpoint is ready, no controller should announce",
+			balancer: "test1",
+			config: &config.Config{
+				Pools: map[string]*config.Pool{
+					"default": {
+						Protocol: config.Layer2,
+						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+					},
+				},
+			},
+			svcs: []*v1.Service{
+				{
+					Spec: v1.ServiceSpec{
+						Type:                  "LoadBalancer",
+						ExternalTrafficPolicy: "Cluster",
+					},
+					Status: statusAssigned("10.20.30.1"),
+				},
+			},
+			eps: map[string]*v1.Endpoints{
+				"10.20.30.1" : {
+					Subsets: []v1.EndpointSubset{
+						{
+							NotReadyAddresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris1"),
+								},
+								{
+									IP:       "2.3.4.15",
+									NodeName: strptr("iris1"),
+								},
+							},
+						},
+					},
+				},
+			},
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+		},
+		{
 			desc:     "One service, two endpoints across two hosts, controller2 should announce",
 			balancer: "test1",
 			config: &config.Config{
@@ -235,6 +280,52 @@ func TestShouldAnnounce(t *testing.T) {
 			},
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
+			},
+		},
+
+		{
+			desc:     "One service, two endpoints across two hosts, neither endpoint is ready, no controllers should announce",
+			balancer: "test1",
+			config: &config.Config{
+				Pools: map[string]*config.Pool{
+					"default": {
+						Protocol: config.Layer2,
+						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+					},
+				},
+			},
+			svcs: []*v1.Service{
+				{
+					Spec: v1.ServiceSpec{
+						Type:                  "LoadBalancer",
+						ExternalTrafficPolicy: "Cluster",
+					},
+					Status: statusAssigned("10.20.30.1"),
+				},
+			},
+			eps: map[string]*v1.Endpoints{
+				"10.20.30.1" : {
+					Subsets: []v1.EndpointSubset{
+						{
+							NotReadyAddresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris1"),
+								},
+								{
+									IP:       "2.3.4.15",
+									NodeName: strptr("iris2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
 			},
 		},
 
@@ -502,6 +593,262 @@ func TestShouldAnnounce(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 				"10.20.30.2": "notOwner",
+			},
+		},
+
+		{
+			desc:     "One service with three endpoints across across two hosts, controller 2 hosts two endpoints controller 2 should announce for the service",
+			balancer: "test1",
+			config: &config.Config{
+				Pools: map[string]*config.Pool{
+					"default": {
+						Protocol: config.Layer2,
+						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+					},
+				},
+			},
+			svcs: []*v1.Service{
+				{
+					Spec: v1.ServiceSpec{
+						Type:                  "LoadBalancer",
+						ExternalTrafficPolicy: "Cluster",
+					},
+					Status: statusAssigned("10.20.30.1"),
+				},
+			},
+			eps: map[string]*v1.Endpoints{
+				"10.20.30.1" : {
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris1"),
+								},
+								{
+									IP:       "2.3.4.15",
+									NodeName: strptr("iris2"),
+								},
+								{
+									IP:       "2.3.4.25",
+									NodeName: strptr("iris2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "",
+			},
+		},
+
+		{
+			desc:     "One service with three endpoints across across two hosts, controller 1 hosts two endpoints controller 2 should announce for the service",
+			balancer: "test1",
+			config: &config.Config{
+				Pools: map[string]*config.Pool{
+					"default": {
+						Protocol: config.Layer2,
+						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+					},
+				},
+			},
+			svcs: []*v1.Service{
+				{
+					Spec: v1.ServiceSpec{
+						Type:                  "LoadBalancer",
+						ExternalTrafficPolicy: "Cluster",
+					},
+					Status: statusAssigned("10.20.30.1"),
+				},
+			},
+			eps: map[string]*v1.Endpoints{
+				"10.20.30.1" : {
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris1"),
+								},
+								{
+									IP:       "2.3.4.15",
+									NodeName: strptr("iris2"),
+								},
+								{
+									IP:       "2.3.4.25",
+									NodeName: strptr("iris1"),
+								},
+							},
+						},
+					},
+				},
+			},
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "",
+			},
+		},
+
+		{
+			desc:     "One service with three endpoints across across two hosts, controller 2 hosts two endpoints, one of which is not ready, controller 2 should announce for the service",
+			balancer: "test1",
+			config: &config.Config{
+				Pools: map[string]*config.Pool{
+					"default": {
+						Protocol: config.Layer2,
+						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+					},
+				},
+			},
+			svcs: []*v1.Service{
+				{
+					Spec: v1.ServiceSpec{
+						Type:                  "LoadBalancer",
+						ExternalTrafficPolicy: "Cluster",
+					},
+					Status: statusAssigned("10.20.30.1"),
+				},
+			},
+			eps: map[string]*v1.Endpoints{
+				"10.20.30.1" : {
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris1"),
+								},
+								{
+									IP:       "2.3.4.15",
+									NodeName: strptr("iris2"),
+								},
+							},
+							NotReadyAddresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.25",
+									NodeName: strptr("iris2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "",
+			},
+		},
+
+		{
+			desc:     "One service with three endpoints across across two hosts, controller 1 hosts two endpoints, one of which is not ready, controller 2 should announce for the service",
+			balancer: "test1",
+			config: &config.Config{
+				Pools: map[string]*config.Pool{
+					"default": {
+						Protocol: config.Layer2,
+						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+					},
+				},
+			},
+			svcs: []*v1.Service{
+				{
+					Spec: v1.ServiceSpec{
+						Type:                  "LoadBalancer",
+						ExternalTrafficPolicy: "Cluster",
+					},
+					Status: statusAssigned("10.20.30.1"),
+				},
+			},
+			eps: map[string]*v1.Endpoints{
+				"10.20.30.1" : {
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris1"),
+								},
+								{
+									IP:       "2.3.4.15",
+									NodeName: strptr("iris2"),
+								},
+							},
+							NotReadyAddresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.25",
+									NodeName: strptr("iris1"),
+								},
+							},
+						},
+					},
+				},
+			},
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "",
+			},
+		},
+
+		{
+			desc:     "One service with three endpoints across across two hosts, controller 2 hosts two endpoints, both of which are not ready, controller 1 should announce for the service",
+			balancer: "test1",
+			config: &config.Config{
+				Pools: map[string]*config.Pool{
+					"default": {
+						Protocol: config.Layer2,
+						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+					},
+				},
+			},
+			svcs: []*v1.Service{
+				{
+					Spec: v1.ServiceSpec{
+						Type:                  "LoadBalancer",
+						ExternalTrafficPolicy: "Cluster",
+					},
+					Status: statusAssigned("10.20.30.1"),
+				},
+			},
+			eps: map[string]*v1.Endpoints{
+				"10.20.30.1" : {
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris1"),
+								},
+							},
+							NotReadyAddresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.15",
+									NodeName: strptr("iris2"),
+								},
+								{
+									IP:       "2.3.4.25",
+									NodeName: strptr("iris2"),
+								},
+							},
+						},
+					},
+				},
+			},
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
 			},
 		},
 	}
