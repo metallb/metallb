@@ -2,6 +2,7 @@ package main
 
 import (
 	"net"
+	"os"
 	"sort"
 	"testing"
 
@@ -9,14 +10,14 @@ import (
 	"go.universe.tf/metallb/internal/k8s"
 
 	"github.com/go-kit/kit/log"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 func compareUseableNodesReturnedValue(a, b []string) bool {
 	if &a == &b {
 		return true
 	}
-    if len(a) != len(b) {
+	if len(a) != len(b) {
 		return false
 	}
 	for i, v := range a {
@@ -29,7 +30,8 @@ func compareUseableNodesReturnedValue(a, b []string) bool {
 
 func TestUsableNodes(t *testing.T) {
 	c, err := newController(controllerConfig{
-		MyNode:        "iris1",
+		MyNode: "iris1",
+		Logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
 	})
 	if err != nil {
 		t.Fatalf("creating controller: %s", err)
@@ -39,12 +41,12 @@ func TestUsableNodes(t *testing.T) {
 	tests := []struct {
 		desc string
 
-		eps      *v1.Endpoints
+		eps *v1.Endpoints
 
 		cExpectedResult []string
 	}{
 		{
-			desc:     "Two endpoints, different hosts",
+			desc: "Two endpoints, different hosts",
 			eps: &v1.Endpoints{
 				Subsets: []v1.EndpointSubset{
 					{
@@ -65,7 +67,7 @@ func TestUsableNodes(t *testing.T) {
 		},
 
 		{
-			desc:     "Two endpoints, same host",
+			desc: "Two endpoints, same host",
 			eps: &v1.Endpoints{
 				Subsets: []v1.EndpointSubset{
 					{
@@ -86,7 +88,7 @@ func TestUsableNodes(t *testing.T) {
 		},
 
 		{
-			desc:     "Two endpoints, same host, one is not ready",
+			desc: "Two endpoints, same host, one is not ready",
 			eps: &v1.Endpoints{
 				Subsets: []v1.EndpointSubset{
 					{
@@ -120,7 +122,8 @@ func TestUsableNodes(t *testing.T) {
 
 func TestShouldAnnounce(t *testing.T) {
 	c1, err := newController(controllerConfig{
-		MyNode:        "iris1",
+		MyNode: "iris1",
+		Logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
 	})
 	if err != nil {
 		t.Fatalf("creating controller: %s", err)
@@ -128,7 +131,8 @@ func TestShouldAnnounce(t *testing.T) {
 	c1.client = &testK8S{t: t}
 
 	c2, err := newController(controllerConfig{
-		MyNode:        "iris2",
+		MyNode: "iris2",
+		Logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
 	})
 	if err != nil {
 		t.Fatalf("creating controller: %s", err)
@@ -144,7 +148,7 @@ func TestShouldAnnounce(t *testing.T) {
 		eps      map[string]*v1.Endpoints
 
 		c1ExpectedResult map[string]string
-  		c2ExpectedResult map[string]string
+		c2ExpectedResult map[string]string
 	}{
 		{
 			desc:     "One service, two endpoints, one host, controller 1 should announce",
@@ -167,7 +171,7 @@ func TestShouldAnnounce(t *testing.T) {
 				},
 			},
 			eps: map[string]*v1.Endpoints{
-				"10.20.30.1" : {
+				"10.20.30.1": {
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
@@ -213,7 +217,7 @@ func TestShouldAnnounce(t *testing.T) {
 				},
 			},
 			eps: map[string]*v1.Endpoints{
-				"10.20.30.1" : {
+				"10.20.30.1": {
 					Subsets: []v1.EndpointSubset{
 						{
 							NotReadyAddresses: []v1.EndpointAddress{
@@ -258,7 +262,7 @@ func TestShouldAnnounce(t *testing.T) {
 				},
 			},
 			eps: map[string]*v1.Endpoints{
-				"10.20.30.1" : {
+				"10.20.30.1": {
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
@@ -304,7 +308,7 @@ func TestShouldAnnounce(t *testing.T) {
 				},
 			},
 			eps: map[string]*v1.Endpoints{
-				"10.20.30.1" : {
+				"10.20.30.1": {
 					Subsets: []v1.EndpointSubset{
 						{
 							NotReadyAddresses: []v1.EndpointAddress{
@@ -350,7 +354,7 @@ func TestShouldAnnounce(t *testing.T) {
 				},
 			},
 			eps: map[string]*v1.Endpoints{
-				"10.20.30.1" : {
+				"10.20.30.1": {
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
@@ -405,7 +409,7 @@ func TestShouldAnnounce(t *testing.T) {
 				},
 			},
 			eps: map[string]*v1.Endpoints{
-				"10.20.30.1" : {
+				"10.20.30.1": {
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
@@ -421,7 +425,7 @@ func TestShouldAnnounce(t *testing.T) {
 						},
 					},
 				},
-				"10.20.30.2" : {
+				"10.20.30.2": {
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
@@ -476,7 +480,7 @@ func TestShouldAnnounce(t *testing.T) {
 				},
 			},
 			eps: map[string]*v1.Endpoints{
-				"10.20.30.1" : {
+				"10.20.30.1": {
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
@@ -492,7 +496,7 @@ func TestShouldAnnounce(t *testing.T) {
 						},
 					},
 				},
-				"10.20.30.2" : {
+				"10.20.30.2": {
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
@@ -549,7 +553,7 @@ func TestShouldAnnounce(t *testing.T) {
 				},
 			},
 			eps: map[string]*v1.Endpoints{
-				"10.20.30.1" : {
+				"10.20.30.1": {
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
@@ -567,7 +571,7 @@ func TestShouldAnnounce(t *testing.T) {
 						},
 					},
 				},
-				"10.20.30.2" : {
+				"10.20.30.2": {
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
@@ -617,7 +621,7 @@ func TestShouldAnnounce(t *testing.T) {
 				},
 			},
 			eps: map[string]*v1.Endpoints{
-				"10.20.30.1" : {
+				"10.20.30.1": {
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
@@ -667,7 +671,7 @@ func TestShouldAnnounce(t *testing.T) {
 				},
 			},
 			eps: map[string]*v1.Endpoints{
-				"10.20.30.1" : {
+				"10.20.30.1": {
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
@@ -717,7 +721,7 @@ func TestShouldAnnounce(t *testing.T) {
 				},
 			},
 			eps: map[string]*v1.Endpoints{
-				"10.20.30.1" : {
+				"10.20.30.1": {
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
@@ -769,7 +773,7 @@ func TestShouldAnnounce(t *testing.T) {
 				},
 			},
 			eps: map[string]*v1.Endpoints{
-				"10.20.30.1" : {
+				"10.20.30.1": {
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
@@ -821,7 +825,7 @@ func TestShouldAnnounce(t *testing.T) {
 				},
 			},
 			eps: map[string]*v1.Endpoints{
-				"10.20.30.1" : {
+				"10.20.30.1": {
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
