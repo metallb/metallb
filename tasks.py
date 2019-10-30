@@ -125,79 +125,73 @@ def push_multiarch(ctx, binaries, tag="dev", docker_user="metallb"):
                 tag=tag),
             echo=True)
 
-@task
-def helm(ctx):
-    helm_options = {
-        "controller.resources.limits.cpu": "100m",
-        "controller.resources.limits.memory": "100Mi",
-        "speaker.resources.limits.cpu": "100m",
-        "speaker.resources.limits.memory": "100Mi",
-        "prometheus.scrapeAnnotations": "true",
-        "existingConfigMap": "config",
-    }
-    helm_options = ",".join(k+"="+v for k,v in helm_options.items())
-    manifests = run("helm template --namespace metallb-system --set {} helm-chart".format(helm_options), hide=True).stdout.strip()
-    manifests = list(m for m in yaml.safe_load_all(manifests) if m)
+@task(help={
+    "architecture": "CPU architecture of the local machine. Default 'amd64'.",
+    "name": "name of the kind cluster to use.",
+})
+def dev_env(ctx, architecture="amd64", name="kind", cni=None):
+    """Build and run MetalLB in a local Kind cluster.
 
-    # Add in a namespace definition, which the helm chart doesn't
-    # have.
-    manifests.insert(0, {
-        "apiVersion": "v1",
-        "kind": "Namespace",
-        "metadata": {
-            "name": "metallb-system",
-            "labels": {
-                "app": "metallb",
-            },
-        },
-    })
+    If the cluster specified by --name (default "kind") doesn't exist,
+    it is created. Then, build MetalLB docker images from the
+    checkout, push them into kind, and deploy manifests/metallb.yaml
+    to run those images.
+    """
+    clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
+    mk_cluster = name not in clusters
+    if mk_cluster:
+        config = {
+            "apiVersion": "kind.sigs.k8s.io/v1alpha3",
+            "kind": "Cluster",
+            "nodes": [{"role": "control-plane"},
+                      {"role": "worker"},
+                      {"role": "worker"},
+            ],
+        }
+        if cni:
+            config["networking"] = {
+                "disableDefaultCNI": True,
+            }
+        config = yaml.dump(config).encode("utf-8")
+        with tempfile.NamedTemporaryFile() as tmp:
+            tmp.write(config)
+            tmp.flush()
+            run("kind create cluster --name={} --config={}".format(name, tmp.name), pty=True, echo=True)
 
-    def clean_name(name):
-        name = name.replace("release-name-metallb-", "")
-        return name.replace("release-name-metallb:", "metallb-system:")
+    config = run("kind get kubeconfig-path --name={}".format(name), hide=True).stdout.strip()
+    env = {"KUBECONFIG": config}
+    if mk_cluster and cni:
+        run("kubectl apply -f e2etest/manifests/{}.yaml".format(cni), echo=True, env=env)
 
-    def remove_helm_labels(d):
-        labels = d.get("metadata", {}).get("labels", {})
-        labels.pop("heritage", None)
-        labels.pop("chart", None)
-        labels.pop("release", None)
+    build(ctx, binaries=["controller", "speaker", "mirror-server"], architectures=[architecture])
+    run("kind load docker-image --name={} metallb/controller:dev-{}".format(name, architecture), echo=True)
+    run("kind load docker-image --name={} metallb/speaker:dev-{}".format(name, architecture), echo=True)
+    run("kind load docker-image --name={} metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
 
-    def add_namespace(d):
-        d.get("metadata", {})["namespace"] = "metallb-system"
+    run("kubectl delete po -nmetallb-system --all", echo=True)
+    with open("manifests/metallb.yaml") as f:
+        manifest = f.read()
+    manifest = manifest.replace(":main", ":dev-{}".format(architecture))
+    manifest = manifest.replace("imagePullPolicy: Always", "imagePullPolicy: Never")
+    with tempfile.NamedTemporaryFile() as tmp:
+        tmp.write(manifest.encode("utf-8"))
+        tmp.flush()
+        run("kubectl apply -f {}".format(tmp.name), echo=True, env=env)
 
-    def clean_role_resourcenames(role):
-        for rule in role["rules"]:
-            names = rule.get("resourceNames", [])
-            for i in range(len(names)):
-                names[i] = clean_name(names[i])
+    with open("e2etest/manifests/mirror-server.yaml") as f:
+        manifest = f.read()
+    manifest = manifest.replace(":main", ":dev-{}".format(architecture))
+    with tempfile.NamedTemporaryFile() as tmp:
+        tmp.write(manifest.encode("utf-8"))
+        tmp.flush()
+        run("kubectl apply -f {}".format(tmp.name), echo=True, env=env)
 
-    def clean_binding(binding):
-        binding["roleRef"]["name"] = clean_name(binding["roleRef"]["name"])
-        for subject in binding.get("subjects", []):
-            subject["name"] = clean_name(subject["name"])
+    print("""
 
-    def clean_deployment_or_daemonset(obj):
-        obj["spec"]["selector"]["matchLabels"].pop("release", None)
-        remove_helm_labels(obj["spec"]["template"])
-        obj["spec"]["template"]["spec"]["serviceAccountName"] = clean_name(obj["spec"]["template"]["spec"]["serviceAccountName"])
+To access the cluster:
 
-    for m in manifests:
-        kind = m["kind"]
-        m["metadata"]["name"] = clean_name(m["metadata"]["name"])
-        remove_helm_labels(m)
-
-        if kind not in ("ClusterRole", "ClusterRoleBinding", "Namespace"):
-            add_namespace(m)
-        if kind in ("Role", "ClusterRole"):
-            clean_role_resourcenames(m)
-        if kind in ("RoleBinding", "ClusterRoleBinding"):
-            clean_binding(m)
-        if kind in ("Deployment", "DaemonSet"):
-            clean_deployment_or_daemonset(m)
-
-    with open("manifests/metallb.yaml", "w") as f:
-        yaml.dump_all([m for m in manifests if m], f)
-
+export KUBECONFIG={}
+""".format(config))
 
 @task
 def release(ctx, version, skip_release_notes=False):
@@ -241,12 +235,6 @@ def release(ctx, version, skip_release_notes=False):
     _replace("/google/metallb/tree/{}")
     _replace("/google/metallb/blob/{}")
 
-    # Pin the manifests and Helm charts to the version we're creating.
-    run("perl -pi -e 's/appVersion: .*/appVersion: {}/g' helm-chart/Chart.yaml".format(version), echo=True)
-    run("perl -pi -e 's/tag: .*/tag: v{}/g' helm-chart/values.yaml".format(version), echo=True)
-    run("perl -pi -e 's/pullPolicy: .*/pullPolicy: IfNotPresent/g' helm-chart/values.yaml", echo=True)
-    helm(ctx)
-
     # Update the version listed on the website sidebar
     run("perl -pi -e 's/MetalLB .*/MetalLB v{}/g' website/content/_header.md".format(version), echo=True)
 
@@ -256,28 +244,4 @@ def release(ctx, version, skip_release_notes=False):
 
     run("git commit -a -m 'Automated update for release v{}'".format(version), echo=True)
     run("git tag v{} -m 'See the release notes for details:\n\nhttps://metallb.universe.tf/release-notes/#version-{}-{}-{}'".format(version, version.major, version.minor, version.patch), echo=True)
-    run("git checkout master", echo=True)
-
-# func e2eManifests() {
-# 	calico := httpGet("https://docs.projectcalico.org/v3.6/getting-started/kubernetes/installation/hosted/kubernetes-datastore/calico-networking/1.7/calico.yaml")
-# 	calico = strings.Replace(calico, "192.168.0.0/16", "10.32.0.0/12", -1)
-# 	writeFile("e2etest/manifests/calico.yaml", calico)
-#
-# 	weave := httpGet("https://cloud.weave.works/k8s/net?k8s-version=1.14")
-# 	writeFile("e2etest/manifests/weave.yaml", weave)
-#
-# 	flannel := httpGet("https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml")
-# 	flannel = strings.Replace(flannel, "10.244.0.0/16", "10.32.0.0/12", -1)
-# 	lines := []string{}
-# 	for _, line := range strings.Split(flannel, "\n") {
-# 		if strings.Contains(line, "--ip-masq") {
-# 			iface := strings.Replace(line, "ip-masq", "iface=enp0s5", -1)
-# 			lines = append(lines, iface)
-# 		}
-# 		lines = append(lines, line)
-# 	}
-# 	writeFile("e2etest/manifests/flannel.yaml", strings.Join(lines, "\n"))
-#
-# 	// TODO: cilium, romana, canal, kube-router?
-# }
-    
+    run("git checkout main", echo=True)
