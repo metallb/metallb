@@ -33,7 +33,7 @@ jobs:
       - run: mkdir -p ./bin
       - run: wget -O ./bin/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.0/manifest-tool-linux-amd64 && chmod +x ./bin/manifest-tool
       - run: echo "export GO111MODULE=on" >>$BASH_ENV
-      - run: PATH=./bin inv push-multiarch --binaries=controller --tag=${CIRCLE_BRANCH:-${CIRCLE_TAG}} --docker-user=metallb
+      - run: PATH=./bin:$PATH inv push-multiarch --binaries=controller --tag=${CIRCLE_BRANCH:-${CIRCLE_TAG}} --docker-user=metallb
   deploy-speaker:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
@@ -47,7 +47,7 @@ jobs:
       - run: mkdir -p ./bin
       - run: wget -O ./bin/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.0/manifest-tool-linux-amd64 && chmod +x ./bin/manifest-tool
       - run: echo "export GO111MODULE=on" >>$BASH_ENV
-      - run: PATH=./bin inv push-multiarch --binaries=speaker --tag=${CIRCLE_BRANCH:-${CIRCLE_TAG}} --docker-user=metallb
+      - run: PATH=./bin:$PATH inv push-multiarch --binaries=speaker --tag=${CIRCLE_BRANCH:-${CIRCLE_TAG}} --docker-user=metallb
 workflows:
   version: 2
   test-and-deploy:
