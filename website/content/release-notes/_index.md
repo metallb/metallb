@@ -12,7 +12,7 @@ New features:
 - The manifests directory now has a kustomize file, which allows using
   kustomize to install and configure MetalLB.
 
-This release includes contributions from remche.
+This release includes contributions from Rémi Cailletaud.
 
 ## Version 0.8.2
 
