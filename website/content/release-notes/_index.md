@@ -7,6 +7,11 @@ weight: 8
 
 [Documentation for this release](https://metallb.universe.tf)
 
+Action required:
+
+- The MetalLB Helm chart in the official helm repository is no longer
+  a supported installation method.
+
 Bugfixes:
 
 - Fix layer2 node selection when healthy and unhealthy replicas are colocated on a single node. ([#474](https://github.com/danderson/metallb/issues/474))

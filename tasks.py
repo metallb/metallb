@@ -222,97 +222,6 @@ To access the cluster:
 export KUBECONFIG={}
 """.format(config))
 
-# @task
-# def client_machine(ctx, architecture="amd64", name="kind"):
-#     """Create a virtual client 'machine' in a container."""
-#     run("docker rm -f {}-client".format(name), warn=True, echo=True)
-#     run("docker run -d --name={}-client --rm metallb/traffic-generator:dev-{}".format())
-
-# @task
-# def e2e_create_world(ctx, name="kind", cni=None, architecture="amd64"):
-#     e2e_delete_world(ctx, name=name)
-#     kind(ctx, name=name, cni=cni, architecture=architecture)
-#     run("docker run -d --name={}-client --rm debian:stable /bin/bash -c 'sleep 1200'".format(name), echo=True)
-
-# @task
-# def e2e_delete_world(ctx, name="kind"):
-#     run("kind delete cluster --name={}".format(name), warn=True, echo=True)
-#     run("docker rm -f {}".format(client), warn=True, echo=True)
-
-@task
-def helm(ctx):
-    """Generate manifests/metallb.yaml from the Helm chart."""
-    helm_options = {
-        "controller.resources.limits.cpu": "100m",
-        "controller.resources.limits.memory": "100Mi",
-        "speaker.resources.limits.cpu": "100m",
-        "speaker.resources.limits.memory": "100Mi",
-        "prometheus.scrapeAnnotations": "true",
-        "existingConfigMap": "config",
-    }
-    helm_options = ",".join(k+"="+v for k,v in helm_options.items())
-    manifests = run("helm template --namespace metallb-system --set {} helm-chart".format(helm_options), hide=True).stdout.strip()
-    manifests = list(m for m in yaml.safe_load_all(manifests) if m)
-
-    # Add in a namespace definition, which the helm chart doesn't
-    # have.
-    manifests.insert(0, {
-        "apiVersion": "v1",
-        "kind": "Namespace",
-        "metadata": {
-            "name": "metallb-system",
-            "labels": {
-                "app": "metallb",
-            },
-        },
-    })
-
-    def clean_name(name):
-        name = name.replace("release-name-metallb-", "")
-        return name.replace("release-name-metallb:", "metallb-system:")
-
-    def remove_helm_labels(d):
-        labels = d.get("metadata", {}).get("labels", {})
-        labels.pop("heritage", None)
-        labels.pop("chart", None)
-        labels.pop("release", None)
-
-    def add_namespace(d):
-        d.get("metadata", {})["namespace"] = "metallb-system"
-
-    def clean_role_resourcenames(role):
-        for rule in role["rules"]:
-            names = rule.get("resourceNames", [])
-            for i in range(len(names)):
-                names[i] = clean_name(names[i])
-
-    def clean_binding(binding):
-        binding["roleRef"]["name"] = clean_name(binding["roleRef"]["name"])
-        for subject in binding.get("subjects", []):
-            subject["name"] = clean_name(subject["name"])
-
-    def clean_deployment_or_daemonset(obj):
-        obj["spec"]["selector"]["matchLabels"].pop("release", None)
-        remove_helm_labels(obj["spec"]["template"])
-        obj["spec"]["template"]["spec"]["serviceAccountName"] = clean_name(obj["spec"]["template"]["spec"]["serviceAccountName"])
-
-    for m in manifests:
-        kind = m["kind"]
-        m["metadata"]["name"] = clean_name(m["metadata"]["name"])
-        remove_helm_labels(m)
-
-        if kind not in ("ClusterRole", "ClusterRoleBinding", "Namespace"):
-            add_namespace(m)
-        if kind in ("Role", "ClusterRole"):
-            clean_role_resourcenames(m)
-        if kind in ("RoleBinding", "ClusterRoleBinding"):
-            clean_binding(m)
-        if kind in ("Deployment", "DaemonSet"):
-            clean_deployment_or_daemonset(m)
-
-    with open("manifests/metallb.yaml", "w") as f:
-        yaml.dump_all([m for m in manifests if m], f)
-
 @task
 def test_cni_manifests(ctx):
     """Update CNI manifests for e2e tests."""
@@ -385,12 +294,6 @@ def release(ctx, version, skip_release_notes=False):
     _replace("/google/metallb/tree/{}")
     _replace("/google/metallb/blob/{}")
 
-    # Pin the manifests and Helm charts to the version we're creating.
-    run("perl -pi -e 's/appVersion: .*/appVersion: {}/g' helm-chart/Chart.yaml".format(version), echo=True)
-    run("perl -pi -e 's/tag: .*/tag: v{}/g' helm-chart/values.yaml".format(version), echo=True)
-    run("perl -pi -e 's/pullPolicy: .*/pullPolicy: IfNotPresent/g' helm-chart/values.yaml", echo=True)
-    helm(ctx)
-
     # Update the version listed on the website sidebar
     run("perl -pi -e 's/MetalLB .*/MetalLB v{}/g' website/content/_header.md".format(version), echo=True)
 
@@ -401,4 +304,3 @@ def release(ctx, version, skip_release_notes=False):
     run("git commit -a -m 'Automated update for release v{}'".format(version), echo=True)
     run("git tag v{} -m 'See the release notes for details:\n\nhttps://metallb.universe.tf/release-notes/#version-{}-{}-{}'".format(version, version.major, version.minor, version.patch), echo=True)
     run("git checkout main", echo=True)
-
