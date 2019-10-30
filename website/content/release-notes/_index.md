@@ -3,9 +3,20 @@ title: Release Notes
 weight: 8
 ---
 
-## Version 0.8.2
+## Version 0.8.3
 
 [Documentation for this release](https://metallb.universe.tf)
+
+New features:
+
+- The manifests directory now has a kustomize file, which allows using
+  kustomize to install and configure MetalLB.
+
+This release includes contributions from remche.
+
+## Version 0.8.2
+
+[Documentation for this release](https://v0-8-2--metallb.netlify.com)
 
 Action required:
 
