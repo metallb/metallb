@@ -13,8 +13,10 @@ look at the [cloud compatibility]({{% relref "installation/clouds.md"
 %}}) page and make sure your cloud platform can work with MetalLB
 (most cannot).
 
-There is one supported way to install MetalLB: using Kubernetes
-manifests.
+There is two supported ways to install MetalLB: using plain Kubernetes
+manifests, or using Kustomize.
+
+## Installation by manifest
 
 To install MetalLB, apply the manifest:
 
@@ -38,3 +40,41 @@ file. MetalLB's components will still start, but will remain idle
 until
 you
 [define and deploy a configmap]({{% relref "../configuration/_index.md" %}}).
+
+## Installation with kustomize
+
+You can install MetalLB with
+[kustomize](https://github.com/kubernetes-sigs/kustomize) by pointing
+on the remote kustomization fle :
+
+```yaml
+# kustomization.yml
+namespace: metallb-system
+
+resources:
+  - github.com/danderson/metallb//manifests?ref=v0.8.2
+  - configmap.yml 
+```
+
+If you want to use a
+[configMapGenerator](https://github.com/kubernetes-sigs/kustomize/blob/master/examples/configGeneration.md)
+for config file, you want to tell kustomize not to append a hash to
+the configMap, as MetalLB is waiting for a configMap named `config`
+(see
+[https://github.com/kubernetes-sigs/kustomize/blob/master/examples/generatorOptions.md](https://github.com/kubernetes-sigs/kustomize/blob/master/examples/generatorOptions.md)):
+
+```
+# kustomization.yml
+namespace: metallb-system
+
+resources:
+  - github.com/danderson/metallb//manifests?ref=v0.8.2
+
+configMapGenerator:
+- name: config
+  files:
+    - configs/config
+
+generatorOptions:
+ disableNameSuffixHash: true
+```
