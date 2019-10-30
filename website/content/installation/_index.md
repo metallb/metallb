@@ -21,7 +21,7 @@ manifests, or using Kustomize.
 To install MetalLB, apply the manifest:
 
 ```shell
-kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.8.2/manifests/metallb.yaml
+kubectl apply -f https://raw.githubusercontent.com/google/metallb/v0.8.3/manifests/metallb.yaml
 ```
 
 This will deploy MetalLB to your cluster, under the `metallb-system`
