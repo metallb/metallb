@@ -91,6 +91,8 @@ type openResult struct {
 	holdTime time.Duration
 	mp4      bool
 	mp6      bool
+	// Four-byte ASN supported
+	fbasn bool
 }
 
 var notificationCodes = map[uint16]string{
@@ -202,6 +204,7 @@ func readOpen(r io.Reader) (*openResult, error) {
 	if err := readOptions(lr, ret); err != nil {
 		return nil, err
 	}
+
 	return ret, nil
 }
 
@@ -255,6 +258,7 @@ func readCapabilities(r io.Reader, ret *openResult) error {
 			if err := binary.Read(&lr, binary.BigEndian, &ret.asn); err != nil {
 				return err
 			}
+			ret.fbasn = true
 		case 1:
 			af := struct{ AFI, SAFI uint16 }{}
 			if err := binary.Read(&lr, binary.BigEndian, &af); err != nil {
@@ -279,7 +283,7 @@ func readCapabilities(r io.Reader, ret *openResult) error {
 	}
 }
 
-func sendUpdate(w io.Writer, asn uint32, ibgp bool, defaultNextHop net.IP, adv *Advertisement) error {
+func sendUpdate(w io.Writer, asn uint32, ibgp, fbasn bool, defaultNextHop net.IP, adv *Advertisement) error {
 	var b bytes.Buffer
 
 	hdr := struct {
@@ -297,7 +301,7 @@ func sendUpdate(w io.Writer, asn uint32, ibgp bool, defaultNextHop net.IP, adv *
 		return err
 	}
 	l := b.Len()
-	if err := encodePathAttrs(&b, asn, ibgp, defaultNextHop, adv); err != nil {
+	if err := encodePathAttrs(&b, asn, ibgp, fbasn, defaultNextHop, adv); err != nil {
 		return err
 	}
 	binary.BigEndian.PutUint16(b.Bytes()[21:23], uint16(b.Len()-l))
@@ -325,7 +329,7 @@ func bytesForBits(n int) int {
 	return ((n + 7) &^ 7) / 8
 }
 
-func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp bool, defaultNextHop net.IP, adv *Advertisement) error {
+func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp, fbasn bool, defaultNextHop net.IP, adv *Advertisement) error {
 	b.Write([]byte{
 		0x40, 1, // mandatory, origin
 		1, // len
@@ -336,13 +340,24 @@ func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp bool, defaultNextHop net.
 	if ibgp {
 		b.WriteByte(0) // empty AS path
 	} else {
-		b.Write([]byte{
-			6, // len
-			2, // AS_SEQUENCE
-			1, // len (in number of ASes)
-		})
-		if err := binary.Write(b, binary.BigEndian, asn); err != nil {
-			return err
+		if fbasn {
+			b.Write([]byte{
+				6, // len (1x 4-byte ASN)
+				2, // AS_SEQUENCE
+				1, // len (in number of ASes)
+			})
+			if err := binary.Write(b, binary.BigEndian, asn); err != nil {
+				return err
+			}
+		} else {
+			b.Write([]byte{
+				4, // len (1x 2-byte ASN)
+				2, // AS_SEQUENCE
+				1, // len (in number of ASes)
+			})
+			if err := binary.Write(b, binary.BigEndian, uint16(asn)); err != nil {
+				return err
+			}
 		}
 	}
 	b.Write([]byte{

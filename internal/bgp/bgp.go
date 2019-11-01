@@ -25,14 +25,15 @@ var errClosed = errors.New("session closed")
 
 // Session represents one BGP session to an external router.
 type Session struct {
-	asn      uint32
-	routerID net.IP // May be nil, meaning "derive from context"
-	myNode   string
-	addr     string
-	peerASN  uint32
-	holdTime time.Duration
-	logger   log.Logger
-	password string
+	asn              uint32
+	routerID         net.IP // May be nil, meaning "derive from context"
+	myNode           string
+	addr             string
+	peerASN          uint32
+	peerFBASNSupport bool
+	holdTime         time.Duration
+	logger           log.Logger
+	password         string
 
 	newHoldTime chan bool
 	backoff     backoff
@@ -87,13 +88,14 @@ func (s *Session) sendUpdates() bool {
 	}
 
 	ibgp := s.asn == s.peerASN
+	fbasn := s.peerFBASNSupport
 
 	if s.new != nil {
 		s.advertised, s.new = s.new, nil
 	}
 
 	for c, adv := range s.advertised {
-		if err := sendUpdate(s.conn, s.asn, ibgp, s.defaultNextHop, adv); err != nil {
+		if err := sendUpdate(s.conn, s.asn, ibgp, fbasn, s.defaultNextHop, adv); err != nil {
 			s.abort()
 			s.logger.Log("op", "sendUpdate", "ip", c, "error", err, "msg", "failed to send BGP update")
 			return true
@@ -126,7 +128,7 @@ func (s *Session) sendUpdates() bool {
 				continue
 			}
 
-			if err := sendUpdate(s.conn, s.asn, ibgp, s.defaultNextHop, adv); err != nil {
+			if err := sendUpdate(s.conn, s.asn, ibgp, fbasn, s.defaultNextHop, adv); err != nil {
 				s.abort()
 				s.logger.Log("op", "sendUpdate", "prefix", c, "error", err, "msg", "failed to send BGP update")
 				return true
@@ -203,6 +205,11 @@ func (s *Session) connect() error {
 	if op.asn != s.peerASN {
 		conn.Close()
 		return fmt.Errorf("unexpected peer ASN %d, want %d", op.asn, s.peerASN)
+	}
+	s.peerFBASNSupport = op.fbasn
+	if s.asn > 65536 && !s.peerFBASNSupport {
+		conn.Close()
+		return fmt.Errorf("peer does not support 4-byte ASNs")
 	}
 
 	// BGP session is established, clear the connect timeout deadline.
