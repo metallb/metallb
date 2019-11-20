@@ -22,6 +22,7 @@ type Allocator struct {
 	servicesOnIP    map[string]map[string]bool // ip.String() -> svc -> allocated?
 	poolIPsInUse    map[string]map[string]int  // poolName -> ip.String() -> number of users
 	poolServices    map[string]int             // poolName -> #services
+	nspools         map[string][]string        // namespace -> poolNames
 }
 
 // Port represents one port in use by a service.
@@ -58,6 +59,7 @@ func New() *Allocator {
 		servicesOnIP:    map[string]map[string]bool{},
 		poolIPsInUse:    map[string]map[string]int{},
 		poolServices:    map[string]int{},
+		nspools:         map[string][]string{},
 	}
 }
 
@@ -67,8 +69,18 @@ func (a *Allocator) SetPools(pools map[string]*config.Pool) error {
 	// can be created. For changing the underlying configuration, the
 	// only question we have to answer is: can we fit all allocated
 	// IPs into address pools under the new configuration?
+
+	// Handle pools dedicated for namespaces. We need that information
+	// to check if the new configuration is valid.
+	nspools := make(map[string][]string)
+	for n, p := range pools {
+		if p.Namespace != "" {
+			nspools[p.Namespace] = append(nspools[p.Namespace], n)
+		}
+	}
+
 	for svc, alloc := range a.allocated {
-		if poolFor(pools, alloc.ip) == "" {
+		if poolForSvc(pools, alloc.ip, svc, nspools) == "" {
 			return fmt.Errorf("new config not compatible with assigned IPs: service %q cannot own %q under new config", svc, alloc.ip)
 		}
 	}
@@ -82,6 +94,7 @@ func (a *Allocator) SetPools(pools map[string]*config.Pool) error {
 	}
 
 	a.pools = pools
+	a.nspools = nspools
 
 	// Need to rearrange existing pool mappings and counts
 	for svc, alloc := range a.allocated {
@@ -127,9 +140,9 @@ func (a *Allocator) assign(svc string, alloc *alloc) {
 // Assign assigns the requested ip to svc, if the assignment is
 // permissible by sharingKey and backendKey.
 func (a *Allocator) Assign(svc string, ip net.IP, ports []Port, sharingKey, backendKey string) error {
-	pool := poolFor(a.pools, ip)
+	pool := poolForSvc(a.pools, ip, svc, a.nspools)
 	if pool == "" {
-		return fmt.Errorf("%q is not allowed in config", ip)
+		return fmt.Errorf("%q is not allowed in config for %s", ip, svc)
 	}
 	sk := &key{
 		sharing: sharingKey,
@@ -360,6 +373,40 @@ func poolFor(pools map[string]*config.Pool, ip net.IP) string {
 		}
 		for _, cidr := range p.CIDR {
 			if cidr.Contains(ip) {
+				return pname
+			}
+		}
+	}
+	return ""
+}
+
+// poolForSvc returns the pool that owns the requested IP, or "" if none or if there is a namespace mismatch
+func poolForSvc(pools map[string]*config.Pool, ip net.IP, svc string, nspools map[string][]string) string {
+	for pname, p := range pools {
+		if p.AvoidBuggyIPs && ipConfusesBuggyFirmwares(ip) {
+			continue
+		}
+		for _, cidr := range p.CIDR {
+			if cidr.Contains(ip) {
+				if len(nspools) > 0 {
+					v := strings.Split(svc, "/") // svc format; "namespace/svc-name"
+					if len(v) < 2 {
+						return ""
+					}
+					serviceNamespace := v[0]
+					if p.Namespace != "" {
+						// The pool is dedicated to a namespace.
+						if p.Namespace != serviceNamespace {
+							return ""
+						}
+					} else {
+						// The pool is "global".
+						if _, ok := nspools[serviceNamespace]; ok {
+							// The service has dedicated pools, it may not take a "global" ip.
+							return ""
+						}
+					}
+				}
 				return pname
 			}
 		}
