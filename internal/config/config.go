@@ -61,6 +61,7 @@ type selectorRequirements struct {
 type addressPool struct {
 	Protocol          Proto
 	Name              string
+	Namespace         string
 	Addresses         []string
 	AvoidBuggyIPs     bool               `yaml:"avoid-buggy-ips"`
 	AutoAssign        *bool              `yaml:"auto-assign"`
@@ -129,6 +130,9 @@ type Pool struct {
 	// If false, prevents IP addresses to be automatically assigned
 	// from this pool.
 	AutoAssign bool
+	// If not empty IP addresses from this pool will only be assigned
+	// to services with this namespace.
+	Namespace string
 	// When an IP is allocated from this pool, how should it be
 	// translated into BGP announcements?
 	BGPAdvertisements []*BGPAdvertisement
@@ -311,6 +315,7 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 		Protocol:      p.Protocol,
 		AvoidBuggyIPs: p.AvoidBuggyIPs,
 		AutoAssign:    true,
+		Namespace:     p.Namespace,
 	}
 
 	if p.AutoAssign != nil {
