@@ -85,6 +85,7 @@ address-pools:
   protocol: layer2
   addresses:
   - 40.0.0.0/25
+  - 40.0.0.100 - 40.0.0.120
   - 40.0.0.150-40.0.0.200
 - name: pool4
   protocol: layer2
@@ -147,6 +148,11 @@ address-pools:
 						Protocol: Layer2,
 						CIDR: []*net.IPNet{
 							ipnet("40.0.0.0/25"),
+							ipnet("40.0.0.100/30"),
+							ipnet("40.0.0.104/29"),
+							ipnet("40.0.0.112/29"),
+							ipnet("40.0.0.120/30"),
+							ipnet("40.0.0.124/31"),
 							ipnet("40.0.0.150/31"),
 							ipnet("40.0.0.152/29"),
 							ipnet("40.0.0.160/27"),

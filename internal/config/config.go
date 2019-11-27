@@ -432,11 +432,11 @@ func parseCIDR(cidr string) ([]*net.IPNet, error) {
 	if len(fs) != 2 {
 		return nil, fmt.Errorf("invalid IP range %q", cidr)
 	}
-	start := net.ParseIP(fs[0])
+	start := net.ParseIP(strings.TrimSpace(fs[0]))
 	if start == nil {
 		return nil, fmt.Errorf("invalid IP range %q: invalid start IP %q", cidr, fs[0])
 	}
-	end := net.ParseIP(fs[1])
+	end := net.ParseIP(strings.TrimSpace(fs[1]))
 	if end == nil {
 		return nil, fmt.Errorf("invalid IP range %q: invalid end IP %q", cidr, fs[1])
 	}
