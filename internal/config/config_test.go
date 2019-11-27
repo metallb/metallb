@@ -85,8 +85,8 @@ address-pools:
   protocol: layer2
   addresses:
   - 40.0.0.0/25
-  - 40.0.0.210 - 40.0.0.240
   - 40.0.0.150-40.0.0.200
+  - 40.0.0.210 - 40.0.0.240
 - name: pool4
   protocol: layer2
   addresses:
@@ -152,7 +152,6 @@ address-pools:
 							ipnet("40.0.0.152/29"),
 							ipnet("40.0.0.160/27"),
 							ipnet("40.0.0.192/29"),
-							ipnet("40.0.0.100/30"),
 							ipnet("40.0.0.210/31"),
 							ipnet("40.0.0.212/30"),
 							ipnet("40.0.0.216/29"),
