@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    address-pools:
+    - name: my-ip-space
+      protocol: layer2
+      addresses:
+      - 192.168.5.240/28
+      node-selectors:
+      - match-labels:
+          metallb.universe.tf/rack: test1
+    - name: my-ip-space2
+      protocol: layer2
+      addresses:
+      - 192.168.5.224/28
+      node-selectors:
+      - match-labels:
+          metallb.universe.tf/rack: test2

@@ -65,6 +65,7 @@ type addressPool struct {
 	AvoidBuggyIPs     bool               `yaml:"avoid-buggy-ips"`
 	AutoAssign        *bool              `yaml:"auto-assign"`
 	BGPAdvertisements []bgpAdvertisement `yaml:"bgp-advertisements"`
+	NodeSelectors     []nodeSelector     `yaml:"node-selectors"`
 }
 
 type bgpAdvertisement struct {
@@ -132,6 +133,9 @@ type Pool struct {
 	// When an IP is allocated from this pool, how should it be
 	// translated into BGP announcements?
 	BGPAdvertisements []*BGPAdvertisement
+	// Only assign this pool for nodes that match one of these
+	// selectors.
+	NodeSelectors []labels.Selector
 }
 
 // BGPAdvertisement describes one translation from an IP address to a BGP advertisement.
@@ -327,7 +331,22 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 		}
 		ret.CIDR = append(ret.CIDR, nets...)
 	}
-
+	// We use a non-pointer in the raw json object, so that if the
+	// user doesn't provide a node selector, we end up with an empty,
+	// but non-nil selector, which means "select everything".
+	var nodeSels []labels.Selector
+	if len(p.NodeSelectors) == 0 {
+		nodeSels = []labels.Selector{labels.Everything()}
+	} else {
+		for _, sel := range p.NodeSelectors {
+			nodeSel, err := parseNodeSelector(&sel)
+			if err != nil {
+				return nil, fmt.Errorf("parsing node selector: %s", err)
+			}
+			nodeSels = append(nodeSels, nodeSel)
+		}
+	}
+	ret.NodeSelectors = nodeSels
 	switch ret.Protocol {
 	case Layer2:
 		if len(p.BGPAdvertisements) > 0 {

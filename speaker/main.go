@@ -17,6 +17,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"k8s.io/apimachinery/pkg/labels"
 	"net"
 	"os"
 
@@ -62,10 +63,10 @@ func main() {
 	}
 
 	var (
-		myNode = flag.String("node-name", "", "name of this Kubernetes node")
-		host   = flag.String("host", "", "HTTP host address")
-		port   = flag.Int("port", 80, "HTTP listening port")
-		config = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
+		myNode  = flag.String("node-name", "", "name of this Kubernetes node")
+		host    = flag.String("host", "", "HTTP host address")
+		port    = flag.Int("port", 80, "HTTP listening port")
+		mlbconf = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
 	)
 	flag.Parse()
 
@@ -96,7 +97,7 @@ func main() {
 
 	client, err := k8s.New(&k8s.Config{
 		ProcessName:   "metallb-speaker",
-		ConfigMapName: *config,
+		ConfigMapName: *mlbconf,
 		NodeName:      *myNode,
 		Logger:        logger,
 
@@ -127,6 +128,7 @@ type controller struct {
 	protocols map[config.Proto]Protocol
 	announced map[string]config.Proto // service name -> protocol advertising it
 	svcIP     map[string]net.IP       // service name -> assigned IP
+	nodeLabels labels.Set
 }
 
 type controllerConfig struct {
@@ -208,6 +210,16 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 	if pool == nil {
 		l.Log("bug", "true", "msg", "internal error: allocated IP has no matching address pool")
 		return c.deleteBalancer(l, name, "internalError")
+	}
+	validForNode := false
+	for _,ns := range pool.NodeSelectors {
+		if ns.Matches(c.nodeLabels) {
+			validForNode = true
+		}
+	}
+	if !validForNode {
+		l.Log("op", "setBalancer", "error", "assigned IP not allowed in this node by config")
+		return c.deleteBalancer(l, name, "ipNotAllowed")
 	}
 
 	if proto, ok := c.announced[name]; ok && proto != pool.Protocol {
@@ -314,6 +326,12 @@ func (c *controller) SetConfig(l log.Logger, cfg *config.Config) k8s.SyncState {
 }
 
 func (c *controller) SetNode(l log.Logger, node *v1.Node) k8s.SyncState {
+	nodeLabels := node.Labels
+	if nodeLabels == nil {
+		nodeLabels = map[string]string{}
+	}
+	ns := labels.Set(nodeLabels)
+	c.nodeLabels = ns
 	for proto, handler := range c.protocols {
 		if err := handler.SetNode(l, node); err != nil {
 			l.Log("op", "setNode", "error", err, "protocol", proto, "msg", "failed to propagate node info to protocol handler")
