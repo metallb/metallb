@@ -132,7 +132,7 @@ rules:
   - create
   - patch
 - apiGroups:
-  - extensions
+  - policy
   resourceNames:
   - controller
   resources:
@@ -165,7 +165,7 @@ rules:
   - create
   - patch
 - apiGroups:
-  - extensions
+  - policy
   resourceNames:
   - speaker
   resources:
