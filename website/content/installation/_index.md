@@ -16,6 +16,30 @@ look at the [cloud compatibility]({{% relref "installation/clouds.md"
 There is two supported ways to install MetalLB: using plain Kubernetes
 manifests, or using Kustomize.
 
+## Preparation
+
+If you're using kube-proxy in IPVS mode, since Kubernetes v1.14.2 you have to enable strict ARP mode.
+
+You can achieve this by editing kube-proxy config in current cluster:
+
+```shell
+kubectl edit configmap -n kube-system kube-proxy
+```
+
+and set:
+
+```yaml
+apiVersion: kubeproxy.config.k8s.io/v1alpha1
+kind: KubeProxyConfiguration
+mode: "ipvs"
+ipvs:
+  strictARP: true
+```
+
+You can also add this configuration snippet to your kubeadm-config, just append it with `---` after the main configuration.
+
+Note, you don't need this if you're using kube-router as service-proxy because it is enabling strict arp by default.
+
 ## Installation by manifest
 
 To install MetalLB, apply the manifest:
