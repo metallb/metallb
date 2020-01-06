@@ -106,7 +106,7 @@ To develop MetalLB, you'll need a couple of pieces of software:
 - [Docker](https://www.docker.com/docker-community), the container
   running system
 - [Kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), the Kubernetes commandline interface
-- [Invoke](https://pyinvoke.org) to drive the build system
+- [Invoke](https://www.pyinvoke.org) to drive the build system
 
 ## Building the code
 
