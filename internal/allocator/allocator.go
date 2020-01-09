@@ -120,7 +120,7 @@ func (a *Allocator) assign(svc string, alloc *alloc) {
 	a.poolIPsInUse[alloc.pool][alloc.ip.String()]++
 	a.poolServices[alloc.pool]++
 
-	stats.poolActive.WithLabelValues(alloc.pool).Set(float64(len(a.poolIPsInUse[alloc.pool])))
+	stats.poolCapacity.WithLabelValues(alloc.pool).Set(float64(poolCount(a.pools[alloc.pool])))
 	stats.poolActive.WithLabelValues(alloc.pool).Set(float64(a.poolServices[alloc.pool]))
 }
 
