@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   id="Layer_1"
+   data-name="Layer 1"
+   viewBox="0 0 225.24023 225.24024"
+   version="1.1"
+   sodipodi:docname="metallb.svg"
+   width="225.24023"
+   height="225.24023"
+   inkscape:version="0.92.4 5da689c313, 2019-01-14"
+   inkscape:export-filename="/home/dave/hack/metallb/website/static/images/metallb.png"
+   inkscape:export-xdpi="140.64983"
+   inkscape:export-ydpi="140.64983">
+  <metadata
+     id="metadata31">
+    <rdf:RDF>
+      <cc:Work
+         rdf:about="">
+        <dc:format>image/svg+xml</dc:format>
+        <dc:type
+           rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title>MetalLB</dc:title>
+      </cc:Work>
+    </rdf:RDF>
+  </metadata>
+  <sodipodi:namedview
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1"
+     objecttolerance="10"
+     gridtolerance="10"
+     guidetolerance="10"
+     inkscape:pageopacity="0"
+     inkscape:pageshadow="2"
+     inkscape:window-width="2516"
+     inkscape:window-height="1761"
+     id="namedview29"
+     showgrid="false"
+     fit-margin-top="0"
+     fit-margin-left="0"
+     fit-margin-right="0"
+     fit-margin-bottom="0"
+     inkscape:zoom="4.3164581"
+     inkscape:cx="124.9144"
+     inkscape:cy="77.222535"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="0"
+     inkscape:current-layer="Layer_1" />
+  <defs
+     id="defs4">
+    <style
+       id="style2">.cls-1{fill:#3f51b4;}</style>
+  </defs>
+  <title
+     id="title6">MetalLB</title>
+  <path
+     class="cls-1"
+     d="M 176.58471,173.63144 C 153.10938,160.07197 130.65345,147.10383 108.2002,134.13105 97.83469,128.1422 87.5312,122.04247 77.07548,116.21566 c -2.95034,-1.64419 -3.34962,-3.00828 -1.95463,-6.16294 9.68048,-21.89158 19.09948,-43.89874 28.61751,-65.86225 1.6485,-3.80405 2.94329,-7.85043 8.34787,-7.91766 5.40728,-0.06727 6.7509,3.81515 8.43678,7.7062 q 27.0523,62.43762 54.18152,124.84193 c 0.51577,1.18827 0.9466,2.41343 1.88018,4.8105 z"
+     id="path8"
+     inkscape:connector-curvature="0"
+     style="fill:#3f51b4" />
+  <path
+     class="cls-1"
+     d="m 70.59455,120.46551 c 1.38238,-3.25084 2.49141,-3.7378 5.66991,-1.8078 10.73572,6.51858 21.704,12.65417 33.28651,19.34228 -20.614,11.92227 -40.56,23.45824 -60.76324,35.143"
+     id="path10"
+     inkscape:connector-curvature="0"
+     style="fill:#3f51b4" />
+  <path
+     class="cls-1"
+     d="M 112.62061,225.24024 A 112.62012,112.62012 0 1 1 225.24024,112.61963 v 4.9e-4 A 112.74733,112.74733 0 0 1 112.62061,225.24024 Z m 0,-213.24023 a 100.62012,100.62012 0 1 0 100.61963,100.6206 v -4.9e-4 A 100.73392,100.73392 0 0 0 112.62061,11.99999 Z"
+     id="path12"
+     inkscape:connector-curvature="0"
+     style="fill:#3f51b4" />
+</svg>
