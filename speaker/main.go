@@ -31,7 +31,7 @@ import (
 	"go.universe.tf/metallb/internal/layer2"
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/version"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 
 	gokitlog "github.com/go-kit/kit/log"
 	"github.com/hashicorp/memberlist"
@@ -303,6 +303,12 @@ func (c *controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
 
 	if proto, ok := c.announced[name]; ok && proto != pool.Protocol {
 		if st := c.deleteBalancer(l, name, "protocolChanged"); st == k8s.SyncStateError {
+			return st
+		}
+	}
+
+	if svcIP, ok := c.svcIP[name]; ok && !lbIP.Equal(svcIP) {
+		if st := c.deleteBalancer(l, name, "loadBalancerIPChanged"); st == k8s.SyncStateError {
 			return st
 		}
 	}
