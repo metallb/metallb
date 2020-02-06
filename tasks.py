@@ -187,10 +187,8 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None):
             tmp.flush()
             run("kind create cluster --name={} --config={}".format(name, tmp.name), pty=True, echo=True)
 
-    config = run("kind get kubeconfig-path --name={}".format(name), hide=True).stdout.strip()
-    env = {"KUBECONFIG": config}
     if mk_cluster and cni:
-        run("kubectl apply -f e2etest/manifests/{}.yaml".format(cni), echo=True, env=env)
+        run("kubectl apply -f e2etest/manifests/{}.yaml".format(cni), echo=True)
 
     build(ctx, binaries=["controller", "speaker", "mirror-server"], architectures=[architecture])
     run("kind load docker-image --name={} metallb/controller:dev-{}".format(name, architecture), echo=True)
@@ -205,7 +203,7 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None):
     with tempfile.NamedTemporaryFile() as tmp:
         tmp.write(manifest.encode("utf-8"))
         tmp.flush()
-        run("kubectl apply -f {}".format(tmp.name), echo=True, env=env)
+        run("kubectl apply -f {}".format(tmp.name), echo=True)
 
     with open("e2etest/manifests/mirror-server.yaml") as f:
         manifest = f.read()
@@ -213,14 +211,7 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None):
     with tempfile.NamedTemporaryFile() as tmp:
         tmp.write(manifest.encode("utf-8"))
         tmp.flush()
-        run("kubectl apply -f {}".format(tmp.name), echo=True, env=env)
-
-    print("""
-
-To access the cluster:
-
-export KUBECONFIG={}
-""".format(config))
+        run("kubectl apply -f {}".format(tmp.name), echo=True)
 
 @task
 def test_cni_manifests(ctx):
