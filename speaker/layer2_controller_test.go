@@ -112,7 +112,7 @@ func TestUsableNodes(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		response := usableNodes(test.eps)
+		response := usableNodes(test.eps, nil)
 		sort.Strings(response)
 		if !compareUseableNodesReturnedValue(response, test.cExpectedResult) {
 			t.Errorf("%q: shouldAnnounce for controller returned incorrect result, expected '%s', but received '%s'", test.desc, test.cExpectedResult, response)

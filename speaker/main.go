@@ -15,10 +15,15 @@
 package main
 
 import (
+	"crypto/sha256"
 	"flag"
 	"fmt"
+	golog "log"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
@@ -29,6 +34,7 @@ import (
 	"k8s.io/api/core/v1"
 
 	gokitlog "github.com/go-kit/kit/log"
+	"github.com/hashicorp/memberlist"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -62,32 +68,63 @@ func main() {
 	}
 
 	var (
-		myNode = flag.String("node-name", "", "name of this Kubernetes node")
-		host   = flag.String("host", "", "HTTP host address")
-		port   = flag.Int("port", 80, "HTTP listening port")
-		config = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
+		config      = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
+		host        = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
+		mlBindAddr  = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
+		mlLabels    = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
+		mlNamespace = flag.String("ml-namespace", os.Getenv("METALLB_ML_NAMESPACE"), "Namespace of the speakers (for MemberList / fast dead node detection)")
+		mlSecret    = flag.String("ml-secret-key", os.Getenv("METALLB_ML_SECRET_KEY"), "Secret key for MemberList (fast dead node detection)")
+		myNode      = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
+		port        = flag.Int("port", 80, "HTTP listening port")
 	)
 	flag.Parse()
 
 	logger.Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "msg", "MetalLB speaker starting "+version.String())
 
 	if *myNode == "" {
-		*myNode = os.Getenv("METALLB_NODE_NAME")
-	}
-
-	if *host == "" {
-		*host = os.Getenv("METALLB_HOST")
-	}
-
-	if *myNode == "" {
-		logger.Log("op", "startup", "error", "must specify --node-name", "msg", "missing configuration flag")
+		logger.Log("op", "startup", "error", "must specify --node-name or METALLB_NODE_NAME", "msg", "missing configuration")
 		os.Exit(1)
+	}
+
+	stopCh := make(chan struct{})
+	go func() {
+		c1 := make(chan os.Signal)
+		signal.Notify(c1, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
+		<-c1
+		logger.Log("op", "shutdown", "msg", "starting shutdown")
+		signal.Stop(c1)
+		close(stopCh)
+	}()
+	defer logger.Log("op", "shutdown", "msg", "done")
+
+	var mlist *memberlist.Memberlist
+	var eventCh chan memberlist.NodeEvent
+	if *mlNamespace == "" || *mlLabels == "" || *mlBindAddr == "" {
+		logger.Log("op", "startup", "msg", "Not starting fast dead node detection (MemberList), need ml-bindaddr / ml-labels / ml-namespace config")
+	} else {
+		mconfig := memberlist.DefaultLANConfig()
+		// mconfig.Name MUST be spec.nodeName, as we will match it against Enpoints nodeName in usableNodes()
+		mconfig.Name = *myNode
+		mconfig.BindAddr = *mlBindAddr
+		mconfig.Logger = golog.New(goKitLogWriter{logger}, "", golog.Lshortfile)
+		if *mlSecret != "" {
+			sha := sha256.New()
+			mconfig.SecretKey = sha.Sum([]byte(*mlSecret))[:16]
+		}
+		eventCh = make(chan memberlist.NodeEvent, 16)
+		mconfig.Events = &memberlist.ChannelEventDelegate{eventCh}
+		mlist, err = memberlist.Create(mconfig)
+		if err != nil {
+			logger.Log("op", "startup", "error", err, "msg", "failed to create memberlist")
+			os.Exit(1)
+		}
 	}
 
 	// Setup all clients and speakers, config decides what is being done runtime.
 	ctrl, err := newController(controllerConfig{
 		MyNode: *myNode,
 		Logger: logger,
+		MList:  mlist,
 	})
 	if err != nil {
 		logger.Log("op", "startup", "error", err, "msg", "failed to create MetalLB controller")
@@ -114,9 +151,60 @@ func main() {
 	}
 	ctrl.client = client
 
-	if err := client.Run(); err != nil {
+	if mlist != nil {
+		go watchMemberListEvents(logger, eventCh, stopCh, client)
+
+		iplist, err := client.GetPodsIPs(*mlNamespace, *mlLabels)
+		if err != nil {
+			logger.Log("op", "startup", "error", err, "msg", "failed to get PodsIPs")
+			os.Exit(1)
+		}
+		n, err := mlist.Join(iplist)
+		logger.Log("op", "startup", "msg", "Memberlist join", "nb joigned", n, "error ?", err)
+		defer func() {
+			logger.Log("op", "shutdown", "msg", "leaving MemberList cluster")
+			err = mlist.Leave(time.Second)
+			logger.Log("op", "shutdown", "msg", "left MemberList cluster", "error ?", err)
+			mlist.Shutdown()
+			logger.Log("op", "shutdown", "msg", "MemberList shutdown", "error ?", err)
+		}()
+	}
+
+	if err := client.Run(stopCh); err != nil {
 		logger.Log("op", "startup", "error", err, "msg", "failed to run k8s client")
 	}
+}
+
+func event2String(e memberlist.NodeEventType) string {
+	return [...]string{"NodeJoin", "NodeLeave", "NodeUpdate"}[e]
+}
+
+func watchMemberListEvents(logger gokitlog.Logger, eventCh chan memberlist.NodeEvent, stopCh chan struct{}, client *k8s.Client) {
+	for {
+		select {
+		case e := <-eventCh:
+			logger.Log("msg", "Node event", "node addr", e.Node.Addr, "node name", e.Node.Name, "node event", event2String(e.Event))
+			logger.Log("msg", "Call Force Sync")
+			client.ForceSync()
+		case <-stopCh:
+			return
+		}
+	}
+}
+
+type goKitLogWriter struct {
+	gokitlog.Logger
+}
+
+func (l goKitLogWriter) Write(p []byte) (int, error) {
+	if len(p) > 1 {
+		// last char is '\n'
+		err := l.Log("component", "MemberList", "msg", string(p[:len(p)-1]))
+		if err != nil {
+			return 0, err
+		}
+	}
+	return len(p), nil
 }
 
 type controller struct {
@@ -133,6 +221,7 @@ type controller struct {
 type controllerConfig struct {
 	MyNode string
 	Logger gokitlog.Logger
+	MList  *memberlist.Memberlist
 
 	// For testing only, and will be removed in a future release.
 	// See: https://github.com/google/metallb/issues/152.
@@ -156,6 +245,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 		protocols[config.Layer2] = &layer2Controller{
 			announcer: a,
 			myNode:    cfg.MyNode,
+			mList:     cfg.MList,
 		}
 	}
 
