@@ -161,7 +161,7 @@ func main() {
 	}
 
 	c.client = client
-	if err := client.Run(); err != nil {
+	if err := client.Run(nil); err != nil {
 		logger.Log("op", "startup", "error", err, "msg", "failed to run k8s client")
 	}
 }

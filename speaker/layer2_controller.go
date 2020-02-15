@@ -21,6 +21,7 @@ import (
 	"sort"
 
 	"github.com/go-kit/kit/log"
+	"github.com/hashicorp/memberlist"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/layer2"
 	"k8s.io/api/core/v1"
@@ -29,6 +30,7 @@ import (
 type layer2Controller struct {
 	announcer *layer2.Announce
 	myNode    string
+	mList     *memberlist.Memberlist
 }
 
 func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
@@ -37,12 +39,25 @@ func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
 
 // usableNodes returns all nodes that have at least one fully ready
 // endpoint on them.
-func usableNodes(eps *v1.Endpoints) []string {
+func usableNodes(eps *v1.Endpoints, mList *memberlist.Memberlist) []string {
+	var activeNodes map[string]bool
+	if mList != nil {
+		activeNodes = map[string]bool{}
+		for _, n := range mList.Members() {
+			activeNodes[n.Name] = true
+		}
+	}
+
 	usable := map[string]bool{}
 	for _, subset := range eps.Subsets {
 		for _, ep := range subset.Addresses {
 			if ep.NodeName == nil {
 				continue
+			}
+			if activeNodes != nil {
+				if _, ok := activeNodes[*ep.NodeName]; !ok {
+					continue
+				}
 			}
 			if _, ok := usable[*ep.NodeName]; !ok {
 				usable[*ep.NodeName] = true
@@ -61,7 +76,7 @@ func usableNodes(eps *v1.Endpoints) []string {
 }
 
 func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
-	nodes := usableNodes(eps)
+	nodes := usableNodes(eps, c.mList)
 	// Sort the slice by the hash of node + service name. This
 	// produces an ordering of ready nodes that is unique to this
 	// service.

@@ -11,6 +11,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -239,27 +240,47 @@ func New(cfg *Config) (*Client, error) {
 	return c, nil
 }
 
+// GetPodsIPs get the IPs from all the pods matched by the labels string
+func (c *Client) GetPodsIPs(namespace, labels string) ([]string, error) {
+	pl, err := c.client.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: labels})
+	if err != nil {
+		return nil, err
+	}
+	iplist := []string{}
+	for _, pod := range pl.Items {
+		iplist = append(iplist, pod.Status.PodIP)
+	}
+	return iplist, nil
+}
+
 // Run watches for events on the Kubernetes cluster, and dispatches
 // calls to the Controller.
-func (c *Client) Run() error {
+func (c *Client) Run(stopCh <-chan struct{}) error {
 	if c.svcInformer != nil {
-		go c.svcInformer.Run(nil)
+		go c.svcInformer.Run(stopCh)
 	}
 	if c.epInformer != nil {
-		go c.epInformer.Run(nil)
+		go c.epInformer.Run(stopCh)
 	}
 	if c.cmInformer != nil {
-		go c.cmInformer.Run(nil)
+		go c.cmInformer.Run(stopCh)
 	}
 	if c.nodeInformer != nil {
-		go c.nodeInformer.Run(nil)
+		go c.nodeInformer.Run(stopCh)
 	}
 
-	if !cache.WaitForCacheSync(nil, c.syncFuncs...) {
+	if !cache.WaitForCacheSync(stopCh, c.syncFuncs...) {
 		return errors.New("timed out waiting for cache sync")
 	}
 
 	c.queue.Add(synced(""))
+
+	if stopCh != nil {
+		go func() {
+			<-stopCh
+			c.queue.ShutDown()
+		}()
+	}
 
 	for {
 		key, quit := c.queue.Get()
@@ -276,11 +297,16 @@ func (c *Client) Run() error {
 			c.queue.AddRateLimited(key)
 		case SyncStateReprocessAll:
 			c.queue.Forget(key)
-			if c.svcIndexer != nil {
-				for _, k := range c.svcIndexer.ListKeys() {
-					c.queue.AddRateLimited(svcKey(k))
-				}
-			}
+			c.ForceSync()
+		}
+	}
+}
+
+// ForceSync reprocess all watched services
+func (c *Client) ForceSync() {
+	if c.svcIndexer != nil {
+		for _, k := range c.svcIndexer.ListKeys() {
+			c.queue.AddRateLimited(svcKey(k))
 		}
 	}
 }

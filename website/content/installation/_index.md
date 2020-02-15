@@ -46,6 +46,8 @@ To install MetalLB, apply the manifest:
 
 ```shell
 kubectl apply -f https://raw.githubusercontent.com/google/metallb/main/manifests/metallb.yaml
+# On first install only
+openssl rand -base64 128 | kubectl create secret generic -n metallb-system memberlist --from-literal=secretkey=-
 ```
 
 This will deploy MetalLB to your cluster, under the `metallb-system`
@@ -64,6 +66,7 @@ file. MetalLB's components will still start, but will remain idle
 until
 you
 [define and deploy a configmap]({{% relref "../configuration/_index.md" %}}).
+The `memberlist` secret contains the `secretkey` to encrypt the communication between speakers for the fast dead node detection.
 
 ## Installation with kustomize
 
@@ -78,6 +81,7 @@ namespace: metallb-system
 resources:
   - github.com/danderson/metallb//manifests?ref=v0.8.2
   - configmap.yml 
+  - secret.yml
 ```
 
 If you want to use a
@@ -98,6 +102,11 @@ configMapGenerator:
 - name: config
   files:
     - configs/config
+
+secretGenerator:
+- name: memberlist
+  files:
+    - configs/secretkey
 
 generatorOptions:
  disableNameSuffixHash: true
