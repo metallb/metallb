@@ -110,6 +110,7 @@ func main() {
 	})
 	if err != nil {
 		logger.Log("op", "startup", "error", err, "msg", "failed to create k8s client")
+		os.Exit(1)
 	}
 	ctrl.client = client
 
