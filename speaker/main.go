@@ -28,7 +28,7 @@ import (
 	"go.universe.tf/metallb/internal/version"
 	"k8s.io/api/core/v1"
 
-	"github.com/go-kit/kit/log"
+	gokitlog "github.com/go-kit/kit/log"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -132,7 +132,7 @@ type controller struct {
 
 type controllerConfig struct {
 	MyNode string
-	Logger log.Logger
+	Logger gokitlog.Logger
 
 	// For testing only, and will be removed in a future release.
 	// See: https://github.com/google/metallb/issues/152.
@@ -169,7 +169,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 	return ret, nil
 }
 
-func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) k8s.SyncState {
+func (c *controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps *v1.Endpoints) k8s.SyncState {
 	if svc == nil {
 		return c.deleteBalancer(l, name, "serviceDeleted")
 	}
@@ -196,7 +196,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 		return c.deleteBalancer(l, name, "invalidIP")
 	}
 
-	l = log.With(l, "ip", lbIP)
+	l = gokitlog.With(l, "ip", lbIP)
 
 	poolName := poolFor(c.config.Pools, lbIP)
 	if poolName == "" {
@@ -204,7 +204,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 		return c.deleteBalancer(l, name, "ipNotAllowed")
 	}
 
-	l = log.With(l, "pool", poolName)
+	l = gokitlog.With(l, "pool", poolName)
 	pool := c.config.Pools[poolName]
 	if pool == nil {
 		l.Log("bug", "true", "msg", "internal error: allocated IP has no matching address pool")
@@ -217,7 +217,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 		}
 	}
 
-	l = log.With(l, "protocol", pool.Protocol)
+	l = gokitlog.With(l, "protocol", pool.Protocol)
 	handler := c.protocols[pool.Protocol]
 	if handler == nil {
 		l.Log("bug", "true", "msg", "internal error: unknown balancer protocol!")
@@ -250,7 +250,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 	return k8s.SyncStateSuccess
 }
 
-func (c *controller) deleteBalancer(l log.Logger, name, reason string) k8s.SyncState {
+func (c *controller) deleteBalancer(l gokitlog.Logger, name, reason string) k8s.SyncState {
 	proto, ok := c.announced[name]
 	if !ok {
 		return k8s.SyncStateSuccess
@@ -286,7 +286,7 @@ func poolFor(pools map[string]*config.Pool, ip net.IP) string {
 	return ""
 }
 
-func (c *controller) SetConfig(l log.Logger, cfg *config.Config) k8s.SyncState {
+func (c *controller) SetConfig(l gokitlog.Logger, cfg *config.Config) k8s.SyncState {
 	l.Log("event", "startUpdate", "msg", "start of config update")
 	defer l.Log("event", "endUpdate", "msg", "end of config update")
 
@@ -314,7 +314,7 @@ func (c *controller) SetConfig(l log.Logger, cfg *config.Config) k8s.SyncState {
 	return k8s.SyncStateReprocessAll
 }
 
-func (c *controller) SetNode(l log.Logger, node *v1.Node) k8s.SyncState {
+func (c *controller) SetNode(l gokitlog.Logger, node *v1.Node) k8s.SyncState {
 	for proto, handler := range c.protocols {
 		if err := handler.SetNode(l, node); err != nil {
 			l.Log("op", "setNode", "error", err, "protocol", proto, "msg", "failed to propagate node info to protocol handler")
@@ -326,9 +326,9 @@ func (c *controller) SetNode(l log.Logger, node *v1.Node) k8s.SyncState {
 
 // A Protocol can advertise an IP address.
 type Protocol interface {
-	SetConfig(log.Logger, *config.Config) error
-	ShouldAnnounce(log.Logger, string, *v1.Service, *v1.Endpoints) string
-	SetBalancer(log.Logger, string, net.IP, *config.Pool) error
-	DeleteBalancer(log.Logger, string, string) error
-	SetNode(log.Logger, *v1.Node) error
+	SetConfig(gokitlog.Logger, *config.Config) error
+	ShouldAnnounce(gokitlog.Logger, string, *v1.Service, *v1.Endpoints) string
+	SetBalancer(gokitlog.Logger, string, net.IP, *config.Pool) error
+	DeleteBalancer(gokitlog.Logger, string, string) error
+	SetNode(gokitlog.Logger, *v1.Node) error
 }
