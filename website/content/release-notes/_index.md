@@ -3,7 +3,7 @@ title: Release Notes
 weight: 8
 ---
 
-## Version 0.9.1
+## Version 0.9.2
 [Documentation for this release](https://metallb.universe.tf)
 
 New features:
@@ -42,10 +42,11 @@ Champetier, Gary Richards, Jean-Philippe Evrard, Johan Fleury, k2mahajan, Knic
 Knic, kvaps, Lars Ekman, masa213f, remche, Rickard von Essen, Rui Lopes, Serge
 Bazanski, Spence. Thanks to all of them for making MetalLB better!
 
-## Version 0.9.0
+## Versions 0.9.0 and 0.9.1
 
-0.9.0 was never released, due to a bug that prevented building Docker
-images. 0.9.1 is the first "real" release of the 0.9.x branch.
+0.9.0 and 0.9.1 were never released, due to a bug that prevented
+building Docker images. 0.9.2 is the first "real" release of the 0.9.x
+branch.
 
 ## Version 0.8.3
 
