@@ -112,7 +112,7 @@ func main() {
 			mconfig.SecretKey = sha.Sum([]byte(*mlSecret))[:16]
 		}
 		eventCh = make(chan memberlist.NodeEvent, 16)
-		mconfig.Events = &memberlist.ChannelEventDelegate{eventCh}
+		mconfig.Events = &memberlist.ChannelEventDelegate{Ch: eventCh}
 		mlist, err = memberlist.Create(mconfig)
 		if err != nil {
 			logger.Log("op", "startup", "error", err, "msg", "failed to create memberlist")
