@@ -27,11 +27,16 @@ previous releases point to `vX.Y.Z--metallb.netlify.com`, which is the
 website pinned at that tagged release.
 
 To get a list of contributors to the release, run `git log
---format="%aN" <COMMIT>..HEAD | sort -u`, where `<COMMIT>` is the
-first commit after you branched the previous release. Also think about
-whether there were significant contributions that weren't in the form
-of a commit, and include those people as well. It's better to err on
-the side of being _too_ thankful!
+--format="%aN" $(git merge-base CUR-BRANCH PREV-TAG)..HEAD | sort -u |
+tr '\n' ',' | sed -e 's/,/, /g'`. `CUR-BRANCH` is `main` if you're
+making a minor release (e.g. 0.9.0), or the release branch for the
+current version if you're making a patch release (e.g. `v0.8` if
+you're making `v0.8.4`). `PREV-TAG` is the release tag name for the
+last release (e.g. if you're preparing 0.8.4, `PREV-TAG` is
+`v0.8.3`. Also think about whether there were significant
+contributions that weren't in the form of a commit, and include those
+people as well. It's better to err on the side of being _too_
+thankful!
 
 Commit the finalized release notes.
 
