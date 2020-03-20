@@ -3,9 +3,48 @@ title: Release Notes
 weight: 8
 ---
 
+## Version 0.9.0
+[Documentation for this release](https://metallb.universe.tf)
+
+New features:
+
+- Dramatically reduce dead node detection time when using Layer 2 mode. ([#527](https://github.com/metallb/metallb/pull/527)). Fixes [#298](https://github.com/metallb/metallb/issues/298).
+
+  This is improvement closes the linked long standing issue that has been a
+  common pain point for users using Layer 2 mode. This feature is enabled by
+  default.
+  You can disable it by:
+
+    * Changing the `speaker` `Daemonset` manifest and remove the `METALLB_ML_BIND_ADDR` environment variable
+
+  Also, you can verify the old method is being used by checking the `speaker`
+  log on startup to contain: `Not starting fast dead node detection (MemberList)`.
+  If not shown, the new fast node detection method is being used.
+- Allow spaces in address pool IP ranges. ([#499](https://github.com/metallb/metallb/issues/499))
+
+Action required:
+
+- Layer 2 users by default will use a new algorithm to detect dead nodes (time
+  is significantly reduced). If you want to continue with the old way, see the
+  New features section to see how to opt-out. If you find any problems with the
+  new algorithm, as usual, please open an issue.
+
+Bug fixes:
+
+- Allow kustomize to change namespace MetalLB runs. ([516](https://github.com/metallb/metallb/pull/516))
+- Fix layer2 not sending ARP messages when IP changes. ([#520](https://github.com/metallb/metallb/pull/520)). Fixes [#471](https://github.com/metallb/metallb/issues/471).
+- Fix to properly expose `address_total` Prometheus metric. ([518](https://github.com/metallb/metallb/pull/518))
+- Add note in installation process about `strictARP` when using `kube-proxy` in IPVS mode. ([507](https://github.com/metallb/metallb/pull/507))
+- Support older devices that might not support RFC4893. ([#491](https://github.com/metallb/metallb/pull/491))
+
+This release includes contributions from binoue, David Anderson, dulltz, Etienne
+Champetier, Gary Richards, Jean-Philippe Evrard, Johan Fleury, k2mahajan, Knic
+Knic, kvaps, Lars Ekman, masa213f, remche, Rickard von Essen, Rui Lopes, Serge
+Bazanski, Spence. Thanks to all of them for making MetalLB better!
+
 ## Version 0.8.3
 
-[Documentation for this release](https://metallb.universe.tf)
+[Documentation for this release](https://v0-8-3--metallb.netlify.com)
 
 New features:
 
