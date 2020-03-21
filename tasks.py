@@ -1,7 +1,8 @@
 import glob
-import os.path
+import os
 import re
 import semver
+import shutil
 import sys
 import yaml
 import tempfile
@@ -196,14 +197,22 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None):
     run("kind load docker-image --name={} metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
 
     run("kubectl delete po -nmetallb-system --all", echo=True)
-    with open("manifests/metallb.yaml") as f:
-        manifest = f.read()
-    manifest = manifest.replace(":main", ":dev-{}".format(architecture))
-    manifest = manifest.replace("imagePullPolicy: Always", "imagePullPolicy: Never")
-    with tempfile.NamedTemporaryFile() as tmp:
-        tmp.write(manifest.encode("utf-8"))
-        tmp.flush()
-        run("kubectl apply -f {}".format(tmp.name), echo=True)
+
+    manifests_dir = os.getcwd() + "/manifests"
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Copy namespace manifest.
+        shutil.copy(manifests_dir + "/namespace.yaml", tmpdir)
+
+        with open(manifests_dir + "/metallb.yaml") as f:
+            manifest = f.read()
+        manifest = manifest.replace(":main", ":dev-{}".format(architecture))
+        manifest = manifest.replace("imagePullPolicy: Always", "imagePullPolicy: Never")
+        with open(tmpdir + "/metallb.yaml", "w") as f:
+            f.write(manifest)
+            f.flush()
+
+        run("kubectl apply -f {}/namespace.yaml".format(tmpdir), echo=True)
+        run("kubectl apply -f {}/metallb.yaml".format(tmpdir), echo=True)
 
     with open("e2etest/manifests/mirror-server.yaml") as f:
         manifest = f.read()
