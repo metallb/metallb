@@ -19,7 +19,7 @@ AWS            | No, use EKS
 Azure          | No, use AKS
 DigitalOcean   | No, use DigitalOcean Kubernetes
 Google Cloud   | No, use GKE
-Hetzner        | No, [use alternatives]
+Hetzner        | Yes, see [Hetzner notes](https://community.hetzner.com/tutorials/install-kubernetes-cluster)
 OVH            | Yes, when using a vRack
 OpenShift OCP  | Yes, see [OpenShift notes]
 OpenStack      | Yes, see [OpenStack notes]
