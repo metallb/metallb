@@ -8,18 +8,16 @@ weight: 8
 
 New features:
 
-- Dramatically reduce dead node detection time when using Layer 2 mode. ([#527](https://github.com/metallb/metallb/pull/527)). Fixes [#298](https://github.com/metallb/metallb/issues/298).
+-  Dramatically reduce dead node detection time when using Layer 2 mode ([#527](https://github.com/metallb/metallb/pull/527)).
+   This is improvement closes the long standing issue
+[#298](https://github.com/metallb/metallb/issues/298) that has been a common
+pain point for users using Layer 2 mode. This feature is enabled by default. You
+can disable it by simply changing the `speaker` `Daemonset` manifest and
+remove the `METALLB_ML_BIND_ADDR` environment variable. Also, you can verify
+the old method is being used by checking the `speaker` log on startup to
+contain: `Not starting fast dead node detection (MemberList)`. If not shown,
+the new fast node detection method is being used.
 
-  This is improvement closes the linked long standing issue that has been a
-  common pain point for users using Layer 2 mode. This feature is enabled by
-  default.
-  You can disable it by:
-
-    * Changing the `speaker` `Daemonset` manifest and remove the `METALLB_ML_BIND_ADDR` environment variable
-
-  Also, you can verify the old method is being used by checking the `speaker`
-  log on startup to contain: `Not starting fast dead node detection (MemberList)`.
-  If not shown, the new fast node detection method is being used.
 - Allow spaces in address pool IP ranges. ([#499](https://github.com/metallb/metallb/issues/499))
 
 Action required:
