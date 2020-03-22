@@ -18,7 +18,7 @@ the old method is being used by checking the `speaker` log on startup to
 contain: `Not starting fast dead node detection (MemberList)`. If not shown,
 the new fast node detection method is being used.
 
-- Allow spaces in address pool IP ranges. ([#499](https://github.com/metallb/metallb/issues/499))
+- Allow spaces in address pool IP ranges ([#499](https://github.com/metallb/metallb/issues/499)).
 
 Action required:
 
@@ -29,11 +29,11 @@ Action required:
 
 Bug fixes:
 
-- Allow kustomize to change namespace MetalLB runs. ([516](https://github.com/metallb/metallb/pull/516))
-- Fix layer2 not sending ARP messages when IP changes. ([#520](https://github.com/metallb/metallb/pull/520)). Fixes [#471](https://github.com/metallb/metallb/issues/471).
-- Fix to properly expose `address_total` Prometheus metric. ([518](https://github.com/metallb/metallb/pull/518))
-- Add note in installation process about `strictARP` when using `kube-proxy` in IPVS mode. ([507](https://github.com/metallb/metallb/pull/507))
-- Support older devices that might not support RFC4893. ([#491](https://github.com/metallb/metallb/pull/491))
+- Allow kustomize to change namespace MetalLB runs ([516](https://github.com/metallb/metallb/pull/516)).
+- Fix layer2 not sending ARP messages when IP changes ([#520](https://github.com/metallb/metallb/pull/520)). Fixes [#471](https://github.com/metallb/metallb/issues/471).
+- Fix to properly expose `address_total` Prometheus metric ([518](https://github.com/metallb/metallb/pull/518)).
+- Add note in installation process about `strictARP` when using `kube-proxy` in IPVS mode ([507](https://github.com/metallb/metallb/pull/507)).
+- Support older devices that might not support RFC4893 ([#491](https://github.com/metallb/metallb/pull/491)).
 
 This release includes contributions from binoue, David Anderson, dulltz, Etienne
 Champetier, Gary Richards, Jean-Philippe Evrard, Johan Fleury, k2mahajan, Knic
