@@ -47,7 +47,7 @@ To install MetalLB, apply the manifest:
 ```shell
 kubectl apply -f https://raw.githubusercontent.com/google/metallb/main/manifests/metallb.yaml
 # On first install only
-openssl rand -base64 128 | kubectl create secret generic -n metallb-system memberlist --from-literal=secretkey=-
+kubectl create secret generic -n metallb-system memberlist --from-literal=secretkey="$(openssl rand -base64 128)"
 ```
 
 This will deploy MetalLB to your cluster, under the `metallb-system`
