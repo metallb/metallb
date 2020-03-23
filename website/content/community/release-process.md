@@ -27,7 +27,7 @@ previous releases point to `vX-Y-Z--metallb.netlify.com`, which is the
 website pinned at that tagged release.
 
 To get a list of contributors to the release, run `git log
---format="%aN" $(git merge-base CUR-BRANCH PREV-TAG)..HEAD | sort -u |
+--format="%aN" $(git merge-base CUR-BRANCH PREV-TAG)..CUR-BRANCH | sort -u |
 tr '\n' ',' | sed -e 's/,/, /g'`. `CUR-BRANCH` is `main` if you're
 making a minor release (e.g. 0.9.0), or the release branch for the
 current version if you're making a patch release (e.g. `v0.8` if
