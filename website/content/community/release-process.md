@@ -23,7 +23,7 @@ those out as well.
 
 Also update the documentation link so that the soon-to-be latest
 release's documentation link points to `metallb.universe.tf`, and the
-previous releases point to `vX.Y.Z--metallb.netlify.com`, which is the
+previous releases point to `vX-Y-Z--metallb.netlify.com`, which is the
 website pinned at that tagged release.
 
 To get a list of contributors to the release, run `git log
