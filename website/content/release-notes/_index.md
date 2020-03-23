@@ -3,8 +3,24 @@ title: Release Notes
 weight: 8
 ---
 
-## Version 0.9.2
+## Version 0.9.3
 [Documentation for this release](https://metallb.universe.tf)
+
+Bugfixes:
+
+- Fix manifests to use container image version `v0.9.3` instead of `main`. Users
+  of `v0.9.2` are encouraged to upgrade, as [manifests included in that
+  release](https://raw.githubusercontent.com/google/metallb/v0.9.2/manifests/metallb.yaml)
+  use an incorrect container image version. Those two images happen to match
+  now but, as development continues on `main` branch, they will differ.
+
+- Update installation procedure to create the namespace first ([#557](https://github.com/metallb/metallb/pull/557)).
+
+This release includes contributions from Henry-Kim-Youngwoo, Oleg Mayko and
+Rodrigo Campos. Thanks to all of them for making MetalLB better!
+
+## Version 0.9.2
+[Documentation for this release](https://v0-9-2--metallb.netlify.com)
 
 New features:
 
