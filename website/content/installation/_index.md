@@ -45,8 +45,8 @@ Note, you don't need this if you're using kube-router as service-proxy because i
 To install MetalLB, apply the manifest:
 
 ```shell
-kubectl apply -f https://raw.githubusercontent.com/google/metallb/main/manifests/namespace.yaml
-kubectl apply -f https://raw.githubusercontent.com/google/metallb/main/manifests/metallb.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifests/namespace.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifests/metallb.yaml
 # On first install only
 kubectl create secret generic -n metallb-system memberlist --from-literal=secretkey="$(openssl rand -base64 128)"
 ```
