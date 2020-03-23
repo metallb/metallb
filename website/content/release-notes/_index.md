@@ -29,10 +29,10 @@ Action required:
 
 Bug fixes:
 
-- Allow kustomize to change namespace MetalLB runs ([516](https://github.com/metallb/metallb/pull/516)).
+- Allow kustomize to change namespace MetalLB runs ([#516](https://github.com/metallb/metallb/pull/516)).
 - Fix layer2 not sending ARP messages when IP changes ([#520](https://github.com/metallb/metallb/pull/520)). Fixes [#471](https://github.com/metallb/metallb/issues/471).
-- Fix to properly expose `address_total` Prometheus metric ([518](https://github.com/metallb/metallb/pull/518)).
-- Add note in installation process about `strictARP` when using `kube-proxy` in IPVS mode ([507](https://github.com/metallb/metallb/pull/507)).
+- Fix to properly expose `address_total` Prometheus metric ([#518](https://github.com/metallb/metallb/pull/518)).
+- Add note in installation process about `strictARP` when using `kube-proxy` in IPVS mode ([#507](https://github.com/metallb/metallb/pull/507)).
 - Support older devices that might not support RFC4893 ([#491](https://github.com/metallb/metallb/pull/491)).
 
 This release includes contributions from binoue, David Anderson, dulltz, Etienne
