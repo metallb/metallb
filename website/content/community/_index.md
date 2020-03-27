@@ -105,8 +105,13 @@ To develop MetalLB, you'll need a couple of pieces of software:
   tool)
 - [Docker](https://www.docker.com/docker-community), the container
   running system
+- [kind](https://github.com/kubernetes-sigs/kind), a lightweight Kubernetes cluster running in Docker
 - [Kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), the Kubernetes commandline interface
 - [Invoke](https://www.pyinvoke.org) to drive the build system
+
+>NOTE: The development environment was tested with **kind `v0.7.0`**. Older
+>versions may not work since there have been breaking changes between minor
+>versions.
 
 ## Building the code
 
@@ -115,6 +120,9 @@ https://github.com/danderson/metallb`.
 
 From there, you can use Invoke to build Docker images, push them to
 registries, and so forth. `inv -l` lists the available tasks.
+
+To build and deploy MetalLB to a local development environment using a kind
+cluster, run `inv dev-env`.
 
 For development, fork
 the [github repository](https://github.com/google/metallb), and add
