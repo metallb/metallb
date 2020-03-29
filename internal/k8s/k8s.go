@@ -358,6 +358,7 @@ func (c *Client) sync(key interface{}) SyncState {
 				return SyncStateError
 			}
 			if !exists {
+				l.Log("op", "getEndpoints", "error", "No endpoints for service found", "msg", "run kubectl get endpoints to review service endpoints for service")
 				return c.serviceChanged(l, string(k), nil, nil)
 			}
 			eps = epsIntf.(*v1.Endpoints)
