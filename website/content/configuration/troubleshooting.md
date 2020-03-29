@@ -5,14 +5,17 @@ weight: 20
 
 Once you setup a loadbalancer on Kubernetes and it doesn't _seem_ to work right away, here are a few tips to troubleshoot.
 
-SSH into one or more of your nodes and use `arping` and `tcpdump` to verify the ARP requests pass through your network.
+- Check that the LoadBalancer service has endpoints (`kubectl -n <namespace> get endpoints <service>`) that are not pending - if they are, MetalLB will not respond to ARP requests for that service's external IP
+- SSH into one or more of your nodes and use `arping` and `tcpdump` to verify the ARP requests pass through your network
+
+---
 
 Below assumes you setup a loadbalancer with an IP of `192.168.1.240` and then we show usage of the commands and successful
 requests going back and forth.
 
 TL;DR - We found out that the IP `192.168.1.240` is located at the mac `FA:16:3E:5A:39:4C`.
 
-If these requests fail, your network stack does not allow ARP to pass, therefor - we won't know about MetalLB's
+If these requests fail, your network stack does not allow ARP to pass, therefore - we won't know about MetalLB's
 assignment of the IP and can't connect.
 
 ## Tools
@@ -35,7 +38,6 @@ Received 4 response(s)
 ```
 
 `192.168.1.35` is the IP of one of the worker nodes and part of the same subnet.
-
 
 ### tcpdump
 
