@@ -45,8 +45,8 @@ Note, you don't need this if you're using kube-router as service-proxy because i
 To install MetalLB, apply the manifest:
 
 ```shell
-kubectl apply -f https://raw.githubusercontent.com/google/metallb/main/manifests/namespace.yaml
-kubectl apply -f https://raw.githubusercontent.com/google/metallb/main/manifests/metallb.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifests/namespace.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifests/metallb.yaml
 # On first install only
 kubectl create secret generic -n metallb-system memberlist --from-literal=secretkey="$(openssl rand -base64 128)"
 ```
@@ -80,7 +80,7 @@ on the remote kustomization fle :
 namespace: metallb-system
 
 resources:
-  - github.com/danderson/metallb//manifests?ref=v0.8.2
+  - github.com/metallb/metallb//manifests?ref=v0.8.2
   - configmap.yml 
   - secret.yml
 ```
@@ -97,7 +97,7 @@ the configMap, as MetalLB is waiting for a configMap named `config`
 namespace: metallb-system
 
 resources:
-  - github.com/danderson/metallb//manifests?ref=v0.8.2
+  - github.com/metallb/metallb//manifests?ref=v0.8.2
 
 configMapGenerator:
 - name: config
