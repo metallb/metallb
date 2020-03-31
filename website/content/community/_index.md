@@ -33,7 +33,7 @@ if you don't already have an IRC client.
 ## Issue Tracker
 
 Use the [GitHub issue
-tracker](https://github.com/google/metallb/issues) to file bugs and
+tracker](https://github.com/metallb/metallb/issues) to file bugs and
 features request. If you need support, please send your questions to
 the metallb-users mailing list rather than filing a GitHub issue.
 
@@ -127,7 +127,7 @@ To develop MetalLB, you'll need a couple of pieces of software:
 ## Building and running the code
 
 Start by fetching the MetalLB repository, with `git clone
-https://github.com/danderson/metallb`.
+https://github.com/metallb/metallb`.
 
 From there, you can use Invoke to build Docker images, push them to
 registries, and so forth. `inv -l` lists the available tasks.
@@ -149,7 +149,7 @@ For example:
  metallb$ go run ./speaker/main.go ./speaker/*controller.go -config-ns metallb-system -kubeconfig $KUBECONFIG -node-name node0
 
 For development, fork
-the [github repository](https://github.com/google/metallb), and add
+the [github repository](https://github.com/metallb/metallb), and add
 your fork as a remote in `$GOPATH/src/go.universe.tf/metallb`, with
 `git remote add fork git@github.com:<your-github-user>/metallb.git`.
 

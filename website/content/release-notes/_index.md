@@ -31,7 +31,7 @@ Bugfixes:
 
 - Fix manifests to use container image version `v0.9.3` instead of `main`. Users
   of `v0.9.2` are encouraged to upgrade, as [manifests included in that
-  release](https://raw.githubusercontent.com/google/metallb/v0.9.2/manifests/metallb.yaml)
+  release](https://raw.githubusercontent.com/metallb/metallb/v0.9.2/manifests/metallb.yaml)
   use an incorrect container image version. Those two images happen to match
   now but, as development continues on `main` branch, they will differ.
 
@@ -105,7 +105,7 @@ Action required:
 
 Bugfixes:
 
-- Fix layer2 node selection when healthy and unhealthy replicas are colocated on a single node. ([#474](https://github.com/danderson/metallb/issues/474))
+- Fix layer2 node selection when healthy and unhealthy replicas are colocated on a single node. ([#474](https://github.com/metallb/metallb/issues/474))
 
 This release includes contributions from David Anderson and Gary Richards.
 
@@ -115,10 +115,10 @@ This release includes contributions from David Anderson and Gary Richards.
 
 Bugfixes:
 
-- Fix the apiGroup for PodSecurityPolicy, for compatibility with Kubernetes 1.16. ([#458](https://github.com/google/metallb/issues/458)).
-- Fix speaker posting events with an empty string as the announcing node name. ([#456](https://github.com/google/metallb/issues/456)).
+- Fix the apiGroup for PodSecurityPolicy, for compatibility with Kubernetes 1.16. ([#458](https://github.com/metallb/metallb/issues/458)).
+- Fix speaker posting events with an empty string as the announcing node name. ([#456](https://github.com/metallb/metallb/issues/456)).
 - Fix RBAC permissions on speaker, to allow it to post events to all
-  namespaces. ([#455](https://github.com/google/metallb/issues/455)).
+  namespaces. ([#455](https://github.com/metallb/metallb/issues/455)).
 
 This release includes contributions from David Anderson.
 
@@ -157,7 +157,7 @@ New features:
 - MetalLB withdraws BGP announcements entirely for services with no
   healthy pods. This enables anycast geo-redundancy by advertising the
   same IP from multiple Kubernetes
-  clusters. ([#312](https://github.com/google/metallb/issues/312))
+  clusters. ([#312](https://github.com/metallb/metallb/issues/312))
 - The speaker only exposes its Prometheus metrics port on the node IP
   registered with Kubernetes, rather than on all interfaces. This
   should reduce the risk of exposure for clusters where nodes have
@@ -171,7 +171,7 @@ New features:
 - MetalLB now publishes a Kubernetes event to a service, indicating
   which nodes are announcing that service. This makes it much easier
   to determine how traffic is
-  flowing. ([#430](https://github.com/google/metallb/issues/430))
+  flowing. ([#430](https://github.com/metallb/metallb/issues/430))
 - The manifest and Helm chart now use the `apps/v1` version of
   `Deployment` and `DaemonSet`, rather than the obsolete
   `extensions/v1beta1`.
@@ -181,25 +181,25 @@ Bugfixes:
 - Fix address allocation in cases where no addresses were available at
   service creation, but the deletion of another service subsequently
   makes one
-  available. ([#413](https://github.com/google/metallb/issues/413))
+  available. ([#413](https://github.com/metallb/metallb/issues/413))
 - Fix allocation not updating when the address pool annotation
-  changes. ([#448](https://github.com/google/metallb/issues/448)).
+  changes. ([#448](https://github.com/metallb/metallb/issues/448)).
 - Fix periodic crashes due to `glog` trying to write to disk despite
   explicit instructions to the
-  contrary. ([#427](https://github.com/google/metallb/issues/427))
+  contrary. ([#427](https://github.com/metallb/metallb/issues/427))
 - Fix `spec.loadBalancerIP` validation on IPv6 clusters.
-  ([#301](https://github.com/google/metallb/issues/301))
+  ([#301](https://github.com/metallb/metallb/issues/301))
 - Fix BGP Router ID selection on v6 BGP sessions.
 - Fix handling of IPv6 addresses in the BGP connection establishment
   logic.
 - Generate deterministically pseudorandom BGP router IDs in IPv6-only
   clusters.
 - Fix incorrect ARP/NDP responses on bonded interfaces.
-  ([#349](https://github.com/google/metallb/issues/349))
+  ([#349](https://github.com/metallb/metallb/issues/349))
 - Fix ARP/NDP responses sent on interfaces with the NOARP flag.
-  ([#351](https://github.com/google/metallb/issues/351))
+  ([#351](https://github.com/metallb/metallb/issues/351))
 - Update MetalLB logs on the website to the new structured
-  format. ([#275](https://github.com/google/metallb/issues/301))
+  format. ([#275](https://github.com/metallb/metallb/issues/301))
 
 This release includes contributions from Alex Lovell-Troy, Antonio
 Ojea, aojeagarcia, Ashley Dumaine, Brian, Brian Topping, David
@@ -216,7 +216,7 @@ stokbaek and till. Thanks to all of them for making MetalLB better!
 Bugfixes:
 
 - Fix BGP announcement refcounting when using shared
-  IPs. ([#295](https://github.com/google/metallb/issues/295))
+  IPs. ([#295](https://github.com/metallb/metallb/issues/295))
 
 ## Version 0.7.2
 
@@ -225,9 +225,9 @@ Bugfixes:
 Bugfixes:
 
 - Fix gratuitous ARP and NDP announcements on IP
-  failover. ([#291](https://github.com/google/metallb/issues/291))
+  failover. ([#291](https://github.com/metallb/metallb/issues/291))
 - Fix BGP dialing on Arm64, by using `x/sys/unix` instead of the
-  `syscall` package. ([#289](https://github.com/google/metallb/issues/289))
+  `syscall` package. ([#289](https://github.com/metallb/metallb/issues/289))
 
 ## Version 0.7.1
 
@@ -236,7 +236,7 @@ Bugfixes:
 Bugfixes:
 
 - Actually allow layer2 mode to use the Local traffic
-  policy. Oops. ([#279](https://github.com/google/metallb/issues/279))
+  policy. Oops. ([#279](https://github.com/metallb/metallb/issues/279))
 
 ## Version 0.7.0
 
@@ -257,11 +257,11 @@ New features:
 
 - Layer2 mode now supports `externalTrafficPolicy=Local`, meaning layer2
   services can see the true client source
-  IP. ([#257](https://github.com/google/metallb/issues/257))
+  IP. ([#257](https://github.com/metallb/metallb/issues/257))
 - Layer2 mode now selects leader nodes on a per-service level, instead of using
   a single leader node for all services in the cluster. If you have many
   services, this change spreads the load of handling incoming traffic across
-  more than one machine. ([#195](https://github.com/google/metallb/issues/195))
+  more than one machine. ([#195](https://github.com/metallb/metallb/issues/195))
 - MetalLB's maturity has upgraded from _alpha_ to _beta_! Mostly this
   just reflects the increased confidence in the code from the larger
   userbase, and adds some guarantees around graceful upgrades from one
@@ -270,7 +270,7 @@ New features:
 Bugfixes:
 
 - Speaker no longer sends localpref over eBGP sessions
-  ([#266](https://github.com/google/metallb/issues/266))
+  ([#266](https://github.com/metallb/metallb/issues/266))
 
 This release includes contributions from Baul, David Anderson, Ryan
 Roemmich, Sanjeev Rampal, and Steve Sloka. Thanks to all of them for
@@ -282,7 +282,7 @@ making MetalLB better!
 
 Bugfixes:
 
-- Fix nil pointer deref crash on BGP peers that reject MetalLB's OPEN message too promptly ([#250](https://github.com/google/metallb/issues/250))
+- Fix nil pointer deref crash on BGP peers that reject MetalLB's OPEN message too promptly ([#250](https://github.com/metallb/metallb/issues/250))
 
 ## Version 0.6.1
 
@@ -292,7 +292,7 @@ Bugfixes:
 
 - Speaker no longer goes into a tight CPU-burning loop when pods are
   deleted on the
-  node. ([#246](https://github.com/google/metallb/issues/246))
+  node. ([#246](https://github.com/metallb/metallb/issues/246))
 
 ## Version 0.6.0
 
@@ -313,25 +313,25 @@ New features:
   annotations on the Service objects. See
   the
   [IP sharing documentation]({{% relref "usage/_index.md" %}}#ip-address-sharing) for
-  instructions and caveats. ([#121](https://github.com/google/metallb/issues/121))
+  instructions and caveats. ([#121](https://github.com/metallb/metallb/issues/121))
 - Layer 2 mode now listens on all interfaces for ARP and NDP requests,
   not just the interface used for communication by Kubernetes
-  components. ([#165](https://github.com/google/metallb/issues/165))
+  components. ([#165](https://github.com/metallb/metallb/issues/165))
 - MetalLB now uses structured logging instead of Google's glog
   package. Logging events are written to standard output as a series
   of JSON objects suitable for collection by centralized logging
-  systems. ([#189](https://github.com/google/metallb/issues/189))
+  systems. ([#189](https://github.com/metallb/metallb/issues/189))
 - BGP connections can now specify a password for TCP MD5 secured BGP
-  sessions. ([#215](https://github.com/google/metallb/issues/215))
+  sessions. ([#215](https://github.com/metallb/metallb/issues/215))
 - MetalLB is now available as a Helm package in the "stable" Helm
   repository. Note that, due to code review delay, it may take several
   days after a release before the Helm package is
-  updated. ([#177](https://github.com/google/metallb/issues/177))
+  updated. ([#177](https://github.com/metallb/metallb/issues/177))
 
 Bugfixes:
 
 - Correctly use AS_SEQUENCE in eBGP session messages, rather than
-  AS_SET ([#225](https://github.com/google/metallb/issues/225))
+  AS_SET ([#225](https://github.com/metallb/metallb/issues/225))
 
 This release includes contributions from David Anderson, ghorofamike,
 Serguei Bezverkhi, and Zsombor Welker. Thanks to all of them for making
@@ -376,7 +376,7 @@ New features:
   makes it much easier to allocate IP ranges that don't fall cleanly
   on CIDR prefix boundaries.
 - BGP mode supports nodes with multiple interfaces and IP addresses
-  ([#182](https://github.com/google/metallb/issues/182)). Previously,
+  ([#182](https://github.com/metallb/metallb/issues/182)). Previously,
   MetalLB could only establish working BGP sessions on the node's
   "primary" interface, i.e. the one that owned the IP that Kubernetes
   uses to identify the node. Now, peerings may be established via any
@@ -387,7 +387,7 @@ Bugfixes:
 
 - The NDP
   handler
-  [refcounts its sollicited multicast group memberships](https://github.com/google/metallb/issues/184),
+  [refcounts its sollicited multicast group memberships](https://github.com/metallb/metallb/issues/184),
   to avoid extremely rare cases where it might stop responding for a
   service IP.
 
@@ -397,7 +397,7 @@ Bugfixes:
 
 Bugfixes:
 
-- [Remove the --config-ns flag](https://github.com/google/metallb/issues/193)
+- [Remove the --config-ns flag](https://github.com/metallb/metallb/issues/193)
 
 ## Version 0.4.5
 
@@ -405,7 +405,7 @@ Bugfixes:
 
 Bugfixes:
 
-- [Controller doesn't clean up balancers that change their type away from LoadBalancer](https://github.com/google/metallb/issues/190)
+- [Controller doesn't clean up balancers that change their type away from LoadBalancer](https://github.com/metallb/metallb/issues/190)
 
 ## Version 0.4.4
 
@@ -429,7 +429,7 @@ Changes:
 
 Bugfixes:
 
-- [Speaker doesn't readvertise existing services on sessions added by node label changes](https://github.com/google/metallb/issues/181).
+- [Speaker doesn't readvertise existing services on sessions added by node label changes](https://github.com/metallb/metallb/issues/181).
 
 ## Version 0.4.1
 
@@ -437,7 +437,7 @@ Bugfixes:
 
 Bugfixes:
 
-- [Make speaker not crash on machines with IPv6 disabled](https://github.com/google/metallb/issues/180).
+- [Make speaker not crash on machines with IPv6 disabled](https://github.com/metallb/metallb/issues/180).
 
 ## Version 0.4.0
 
@@ -466,7 +466,7 @@ New features:
   [Neighbor Discovery Protocol](https://en.wikipedia.org/wiki/Neighbor_Discovery_Protocol),
   IPv6's analog to ARP. If you have an IPv6 Kubernetes cluster, please
   try it out
-  and [file bugs](https://github.com/google/metallb/issues/new)!
+  and [file bugs](https://github.com/metallb/metallb/issues/new)!
 - BGP peers now have
   a
   [node selector]({{% relref "configuration/_index.md" %}}#limiting-peers-to-certain-nodes). You
@@ -474,7 +474,7 @@ New features:
   topologies.
 - MetalLB now has
   a
-  [Helm chart](https://github.com/google/metallb/tree/main/helm/metallb). If
+  [Helm chart](https://github.com/metallb/metallb/tree/main/helm/metallb). If
   you use [Helm](https://helm.sh) on your cluster, this should make it
   easier to track and manage your MetalLB installation. The chart will
   be submitted for inclusion in the main Helm stable repository
@@ -485,11 +485,11 @@ Other improvements:
 
 - MetalLB
   now
-  [backs off on failing BGP connections](https://github.com/google/metallb/issues/84),
+  [backs off on failing BGP connections](https://github.com/metallb/metallb/issues/84),
   to avoid flooding logs with failures
 - ARP mode should be a little
   more
-  [interoperable with clients](https://github.com/google/metallb/issues/172),
+  [interoperable with clients](https://github.com/metallb/metallb/issues/172),
   and failover should be a little faster, thanks to tweaks to its
   advertisement logic.
 - ARP and NDP modes export [Prometheus](https://prometheus.io) metrics
@@ -508,7 +508,7 @@ all of them for making MetalLB better!
 [Documentation for this release](https://v0-3-1--metallb.netlify.com)
 
 Fixes a couple
-of [embarrassing bugs](https://github.com/google/metallb/issues/142)
+of [embarrassing bugs](https://github.com/metallb/metallb/issues/142)
 that sneaked into 0.3.
 
 Bugfixes:
@@ -532,7 +532,7 @@ Action required if upgrading from 0.2.x:
   ds/bgp-speaker`. This will take down your load-balancers until you
   deploy the new DaemonSet.
 - The
-  [configuration file format](https://raw.githubusercontent.com/google/metallb/main/manifests/example-config.yaml) has
+  [configuration file format](https://raw.githubusercontent.com/metallb/metallb/main/manifests/example-config.yaml) has
   changed in a few backwards-incompatible ways. You need to update
   your ConfigMap by hand:
   - Each `address-pool` must now have a `protocol` field, to select
@@ -591,7 +591,7 @@ Notable fixes:
 
 - MetalLB unable to start because Kubernetes cannot verify that
   "nobody" is a non-root
-  user ([#85](https://github.com/google/metallb/issues/85))
+  user ([#85](https://github.com/metallb/metallb/issues/85))
 
 ## Version 0.2.0
 
@@ -630,7 +630,7 @@ Notable fixes:
 
 ## Version 0.1.0
 
-[Documentation for this release](https://github.com/google/metallb/tree/v0.1)
+[Documentation for this release](https://github.com/metallb/metallb/tree/v0.1)
 
 This was the first tagged version of MetalLB. Its changelog is
 effectively "MetalLB now exists, where previously it did not."

@@ -396,9 +396,9 @@ def release(ctx, version, skip_release_notes=False):
         newpat = pattern.format("v{}").format(version)
         run("perl -pi -e 's#{}#{}#g' website/content/*.md website/content/*/*.md".format(oldpat, newpat),
             echo=True)
-    _replace("/google/metallb/{}")
-    _replace("/google/metallb/tree/{}")
-    _replace("/google/metallb/blob/{}")
+    _replace("/metallb/metallb/{}")
+    _replace("/metallb/metallb/tree/{}")
+    _replace("/metallb/metallb/blob/{}")
 
     # Update the version listed on the website sidebar
     run("perl -pi -e 's/MetalLB .*/MetalLB v{}/g' website/content/_header.md".format(version), echo=True)
