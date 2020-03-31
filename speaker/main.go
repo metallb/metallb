@@ -156,7 +156,7 @@ type controllerConfig struct {
 	SList  SpeakerList
 
 	// For testing only, and will be removed in a future release.
-	// See: https://github.com/google/metallb/issues/152.
+	// See: https://github.com/metallb/metallb/issues/152.
 	DisableLayer2 bool
 }
 

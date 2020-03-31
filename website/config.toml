@@ -7,7 +7,7 @@ theme = "docdock"
 
 [params]
 	# General information
-    editURL = "https://github.com/google/metallb/edit/main/website/content/"
+    editURL = "https://github.com/metallb/metallb/edit/main/website/content/"
 	description = "MetalLB, bare metal load-balancer for Kubernetes"
     disableNavChevron = true
 
@@ -17,7 +17,7 @@ home = ["HTML", "RSS", "JSON"]
 [[menu.shortcuts]]
 pre = "<hr>"
 name = "<i class='fa fa-github'></i> Github repo"
-url = "https://github.com/google/metallb"
+url = "https://github.com/metallb/metallb"
 weight = 10
 
 [[menu.shortcuts]]
@@ -32,5 +32,5 @@ weight = 30
 
 [[menu.shortcuts]]
 name = "<i class='fa fa-copyright'></i> License"
-url = "https://github.com/google/metallb/blob/main/LICENSE"
+url = "https://github.com/metallb/metallb/blob/main/LICENSE"
 weight = 40

@@ -32,4 +32,4 @@ efficient "IPVS mode", in addition to the default "iptables mode."
 MetalLB **might** work with IPVS mode in kube-proxy, in Kubernetes
 1.13 or later. However, it is not explicitly tested yet, so it's at
 your own risk. See our [tracking
-bug](https://github.com/google/metallb/issues/153) for details.
+bug](https://github.com/metallb/metallb/issues/153) for details.

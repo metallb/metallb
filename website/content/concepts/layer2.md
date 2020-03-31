@@ -63,7 +63,7 @@ During an unplanned failover, the service IPs will be unreachable until the
 buggy clients refresh their cache entries.
 
 If you encounter a situation where layer 2 mode failover is slow (more than
-about 10s), please [file a bug](https://github.com/google/metallb/issues/new)!
+about 10s), please [file a bug](https://github.com/metallb/metallb/issues/new)!
 We can help you investigate and determine if the issue is with the client, or a
 bug in MetalLB.
 
