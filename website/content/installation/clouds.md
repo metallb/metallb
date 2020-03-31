@@ -153,5 +153,5 @@ willing to pay for the resources (servers, IPs, ...) required to test
 the integration, then we could *potentially* add support to MetalLB.
 
 If you think you can help with getting resources for testing, [file a
-bug](https://github.com/danderson/metallb/issues/new) and we can talk
+bug](https://github.com/metallb/metallb/issues/new) and we can talk
 about it!
