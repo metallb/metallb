@@ -146,7 +146,7 @@ In future, MetalLB might be able to overcome the downsides of the
 `Local` traffic policy, in which case it would be unconditionally the
 best mode to use with BGP
 announcements. See
-[issue 1](https://github.com/google/metallb/issues/1) for more
+[issue 1](https://github.com/metallb/metallb/issues/1) for more
 information.
 
 ## IP address sharing

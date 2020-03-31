@@ -206,7 +206,7 @@ graph BT
 While this should theoretically work, it hasn't been demonstrated, and
 setting it up varies wildly based on which routing software/hardware
 you are interfacing with. If you get this working,
-please [let us know](https://github.com/google/metallb/issues/new),
+please [let us know](https://github.com/metallb/metallb/issues/new),
 especially if you have tips on how to make this work best!
 
 ## Ideas wanted!
@@ -217,4 +217,4 @@ acrobatics to integrate the two.
 
 If you have an idea for another workaround that would enable Calico
 and MetalLB to coexist nicely,
-please [tell us](https://github.com/google/metallb/issues/new) !
+please [tell us](https://github.com/metallb/metallb/issues/new) !

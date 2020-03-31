@@ -67,5 +67,5 @@ information.
 
 One lightweight way you can contribute is
 to
-[tell us that you're using MetalLB](https://github.com/google/metallb/issues/5),
+[tell us that you're using MetalLB](https://github.com/metallb/metallb/issues/5),
 which will give us warm fuzzy feelings :).

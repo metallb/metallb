@@ -26,4 +26,4 @@ Yes but by default, OpenStack has anti-spoofing protection enabled which prevent
 
 ## Can I update one pool at a time?
 
-Not yet.  The whole configuration for MetalLB is stored in a ConfigMap called `config` in the metallb-system namespace. We anticipate converting to Custom Resources at some point as described in [Issue 196](https://github.com/google/metallb/issues/196).  Contributions Welcome! 
+Not yet.  The whole configuration for MetalLB is stored in a ConfigMap called `config` in the metallb-system namespace. We anticipate converting to Custom Resources at some point as described in [Issue 196](https://github.com/metallb/metallb/issues/196).  Contributions Welcome! 
