@@ -41,6 +41,7 @@ type peer struct {
 	ASN           uint32         `yaml:"peer-asn"`
 	Addr          string         `yaml:"peer-address"`
 	Port          uint16         `yaml:"peer-port"`
+	SrcIntf       string         `yaml:"source-interface"`
 	HoldTime      string         `yaml:"hold-time"`
 	RouterID      string         `yaml:"router-id"`
 	NodeSelectors []nodeSelector `yaml:"node-selectors"`
@@ -100,6 +101,8 @@ type Peer struct {
 	Addr net.IP
 	// Port to dial when establishing the session.
 	Port uint16
+	// Source interface to establish the BGP session from.
+	SrcIntf string
 	// Requested BGP hold time, per RFC4271.
 	HoldTime time.Duration
 	// BGP router ID to advertise to the peer
@@ -259,6 +262,11 @@ func parsePeer(p peer) (*Peer, error) {
 	if p.Port != 0 {
 		port = p.Port
 	}
+	var srcIntf string
+	if p.SrcIntf != "" {
+		srcIntf = p.SrcIntf
+	}
+
 	// Ideally we would set a default RouterID here, instead of having
 	// to do it elsewhere in the code. Unfortunately, we don't know
 	// the node IP here.
@@ -295,6 +303,7 @@ func parsePeer(p peer) (*Peer, error) {
 		ASN:           p.ASN,
 		Addr:          ip,
 		Port:          port,
+		SrcIntf:       srcIntf,
 		HoldTime:      holdTime,
 		RouterID:      routerID,
 		NodeSelectors: nodeSels,

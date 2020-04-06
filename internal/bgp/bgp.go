@@ -28,6 +28,7 @@ type Session struct {
 	asn              uint32
 	routerID         net.IP // May be nil, meaning "derive from context"
 	myNode           string
+	srcIntf          string // Source interface; empty string means "use any available"
 	addr             string
 	peerASN          uint32
 	peerFBASNSupport bool
@@ -170,7 +171,7 @@ func (s *Session) connect() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	deadline, _ := ctx.Deadline()
-	conn, err := dialMD5(ctx, s.addr, s.password)
+	conn, err := dialMD5(ctx, s.srcIntf, s.addr, s.password)
 	if err != nil {
 		return fmt.Errorf("dial %q: %s", s.addr, err)
 	}
@@ -351,8 +352,9 @@ func (s *Session) sendKeepalive() error {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func New(l log.Logger, addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time.Duration, password string, myNode string) (*Session, error) {
+func New(l log.Logger, srcIntf string, addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time.Duration, password string, myNode string) (*Session, error) {
 	ret := &Session{
+		srcIntf:     srcIntf,
 		addr:        addr,
 		asn:         asn,
 		routerID:    routerID.To4(),
@@ -515,19 +517,63 @@ type tcpmd5sig struct {
 	key      [80]byte
 }
 
+// Given an interface name, this function looks returns a TCPAddr using that
+// interface as a source. If the provided interface name is the empty string,
+// the source IP will be "any" (0.0.0.0 or [::]), generally resulting in using
+// the "nearest" interface (=the egress interface towards the destination address).
+func resolveSourceInterface(intfName string, raddr net.IP) (*net.TCPAddr, error) {
+        if len(intfName) == 0 {
+                return net.ResolveTCPAddr("tcp", "[::]:0")
+        }
+
+        var raddrFamily int
+        if raddr.To4() != nil {
+                raddrFamily = unix.AF_INET
+        } else {
+                raddrFamily = unix.AF_INET6
+        }
+
+        ief, err := net.InterfaceByName(intfName)
+        if err != nil {
+                return nil, fmt.Errorf("Error looking up interface %s: %s", intfName, err)
+        }
+        addrs, err := ief.Addrs()
+        if err != nil {
+                return nil, fmt.Errorf("Error looking up interface %s addresses: %s", intfName, err)
+        }
+
+        var laddr net.IP
+        for _, slice := range addrs {
+                laddr = slice.(*net.IPNet).IP
+
+                // Either both local and remote address must be IPv4, or they must both be IPv6.
+                // If we have a match, return the first one.
+                // TODO: This needs more testing with IPv6. We likely also need to ensure that we
+                //   match the address scope (Link-Local vs. Global -- we can't connect to a global
+                //   peer sourced from a LL address).
+                if ((raddrFamily == unix.AF_INET) && (laddr.To4() != nil)) ||
+                   ((raddrFamily == unix.AF_INET6) && (laddr.To4() == nil)) {
+                        tcpAddr := &net.TCPAddr{IP: laddr}
+                        return tcpAddr, nil
+                }
+        }
+
+        return nil, fmt.Errorf("Error: Interface %s has no addresses that match remote address family", intfName)
+}
+
 // DialTCP does the part of creating a connection manually,  including setting the
 // proper TCP MD5 options when the password is not empty. Works by manupulating
 // the low level FD's, skipping the net.Conn API as it has not hooks to set
 // the neccessary sockopts for TCP MD5.
-func dialMD5(ctx context.Context, addr, password string) (net.Conn, error) {
-	laddr, err := net.ResolveTCPAddr("tcp", "[::]:0")
-	if err != nil {
-		return nil, fmt.Errorf("Error resolving local address: %s ", err)
-	}
-
+func dialMD5(ctx context.Context, intfName, addr, password string) (net.Conn, error) {
 	raddr, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("invalid remote address: %s ", err)
+	}
+
+	laddr, err := resolveSourceInterface(intfName, raddr.IP)
+	if err != nil {
+		return nil, fmt.Errorf("Error resolving local address: %s ", err)
 	}
 
 	var family int
