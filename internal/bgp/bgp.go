@@ -425,13 +425,6 @@ func (s *Session) Set(advs ...*Advertisement) error {
 
 	newAdvs := map[string]*Advertisement{}
 	for _, adv := range advs {
-		if adv.Prefix.IP.To4() == nil {
-			return fmt.Errorf("cannot advertise non-v4 prefix %q", adv.Prefix)
-		}
-
-		if adv.NextHop != nil && adv.NextHop.To4() == nil {
-			return fmt.Errorf("next-hop must be IPv4, got %q", adv.NextHop)
-		}
 		if len(adv.Communities) > 63 {
 			return fmt.Errorf("max supported communities is 63, got %d", len(adv.Communities))
 		}

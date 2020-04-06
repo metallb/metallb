@@ -370,7 +370,7 @@ func parseBGPAdvertisements(ads []bgpAdvertisement, cidrs []*net.IPNet, communit
 		if rawAd.AggregationLength != nil {
 			ad.AggregationLength = *rawAd.AggregationLength
 		}
-		if ad.AggregationLength > 32 {
+		if ad.AggregationLength > 128 {
 			return nil, fmt.Errorf("invalid aggregation length %q", ad.AggregationLength)
 		}
 		for _, cidr := range cidrs {

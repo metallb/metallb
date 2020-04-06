@@ -301,12 +301,22 @@ func sendUpdate(w io.Writer, asn uint32, ibgp, fbasn bool, defaultNextHop net.IP
 		return err
 	}
 	l := b.Len()
-	if err := encodePathAttrs(&b, asn, ibgp, fbasn, defaultNextHop, adv); err != nil {
-		return err
+	if adv.Prefix.IP.To4() != nil {
+        if err := encodePathAttrs(&b, asn, ibgp, fbasn, defaultNextHop, adv); err != nil {
+            return err
+        }
+        binary.BigEndian.PutUint16(b.Bytes()[21:23], uint16(b.Len()-l))
+        encodePrefixes(&b, []*net.IPNet{adv.Prefix})
+        binary.BigEndian.PutUint16(b.Bytes()[16:18], uint16(b.Len()))
+	} else if adv.Prefix.IP.To16() != nil {
+        if err := encodePathAttrsIPv6(&b, asn, ibgp, fbasn, defaultNextHop, adv); err != nil {
+            return err
+        }
+        binary.BigEndian.PutUint16(b.Bytes()[21:23], uint16(b.Len()-l))
+        binary.BigEndian.PutUint16(b.Bytes()[16:18], uint16(b.Len()))
+	} else {
+	    return nil
 	}
-	binary.BigEndian.PutUint16(b.Bytes()[21:23], uint16(b.Len()-l))
-	encodePrefixes(&b, []*net.IPNet{adv.Prefix})
-	binary.BigEndian.PutUint16(b.Bytes()[16:18], uint16(b.Len()))
 
 	if _, err := io.Copy(w, &b); err != nil {
 		return err
@@ -396,29 +406,133 @@ func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp, fbasn bool, defaultNextH
 	return nil
 }
 
+func encodePathAttrsIPv6(b *bytes.Buffer, asn uint32, ibgp, fbasn bool, defaultNextHop net.IP, adv *Advertisement) error {
+    o, _ := adv.Prefix.Mask.Size()
+    b.Write([]byte{
+        0x80, 14, // Multiprotocol Reachable NLRI
+        byte(22+bytesForBits(o)), // len
+        0, 2, 1, // AFI, SAFI
+        16, // next hop len
+    })
+    if adv.NextHop != nil {
+        b.Write(adv.NextHop.To16())
+    } else {
+        b.Write(defaultNextHop)
+    }
+    b.Write([]byte{
+        0, // reserved
+    })
+    b.WriteByte(byte(o))
+    b.Write(adv.Prefix.IP.To16()[:bytesForBits(o)])
+	b.Write([]byte{
+		0x40, 1, // mandatory, origin
+		1, // len
+		2, // incomplete
+
+		0x40, 2, // mandatory, as-path
+	})
+	if ibgp {
+		b.WriteByte(0) // empty AS path
+	} else {
+		if fbasn {
+			b.Write([]byte{
+				6, // len (1x 4-byte ASN)
+				2, // AS_SEQUENCE
+				1, // len (in number of ASes)
+			})
+			if err := binary.Write(b, binary.BigEndian, asn); err != nil {
+				return err
+			}
+		} else {
+			b.Write([]byte{
+				4, // len (1x 2-byte ASN)
+				2, // AS_SEQUENCE
+				1, // len (in number of ASes)
+			})
+			if err := binary.Write(b, binary.BigEndian, uint16(asn)); err != nil {
+				return err
+			}
+		}
+	}
+	if ibgp {
+		b.Write([]byte{
+			0x40, 5, // well-known, localpref
+			4, // len
+		})
+		if err := binary.Write(b, binary.BigEndian, adv.LocalPref); err != nil {
+			return err
+		}
+	}
+
+	if len(adv.Communities) > 0 {
+		b.Write([]byte{
+			0xc0, 8, // optional transitive, communities
+		})
+		if err := binary.Write(b, binary.BigEndian, uint8(len(adv.Communities)*4)); err != nil {
+			return err
+		}
+		for _, c := range adv.Communities {
+			if err := binary.Write(b, binary.BigEndian, c); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func encodePathAttrsIPv6Withdraw(b *bytes.Buffer, prefixes []*net.IPNet) error {
+    var out = bytes.NewBuffer([]byte{
+        0, 2, 1,
+    });
+    for _, pfx := range prefixes {
+        o, _ := pfx.Mask.Size()
+        out.WriteByte(byte(o))
+        out.Write(pfx.IP.To16()[:bytesForBits(o)])
+    }
+    b.Write([]byte{
+        0x80, 15, // Multiprotocol Unreachable NLRI
+        byte(out.Len()),
+    })
+    b.Write(out.Bytes())
+
+	return nil
+}
+
 func sendWithdraw(w io.Writer, prefixes []*net.IPNet) error {
 	var b bytes.Buffer
 
 	hdr := struct {
-		M1, M2 uint64
-		Len    uint16
-		Type   uint8
-		WdrLen uint16
-	}{
-		M1:   uint64(0xffffffffffffffff),
-		M2:   uint64(0xffffffffffffffff),
-		Type: 2,
-	}
+        M1, M2  uint64
+        Len     uint16
+        Type    uint8
+        WdrLen  uint16
+    }{
+        M1:   uint64(0xffffffffffffffff),
+        M2:   uint64(0xffffffffffffffff),
+        Type: 2,
+    }
 	if err := binary.Write(&b, binary.BigEndian, hdr); err != nil {
 		return err
 	}
 	l := b.Len()
-	encodePrefixes(&b, prefixes)
-	binary.BigEndian.PutUint16(b.Bytes()[19:21], uint16(b.Len()-l))
-	if err := binary.Write(&b, binary.BigEndian, uint16(0)); err != nil {
-		return err
-	}
-	binary.BigEndian.PutUint16(b.Bytes()[16:18], uint16(b.Len()))
+	if prefixes[0].IP.To4() != nil {
+        encodePrefixes(&b, prefixes)
+        binary.BigEndian.PutUint16(b.Bytes()[19:21], uint16(b.Len()-l))
+        if err := binary.Write(&b, binary.BigEndian, uint16(0)); err != nil {
+            return err
+        }
+        binary.BigEndian.PutUint16(b.Bytes()[16:18], uint16(b.Len()))
+    } else if prefixes[0].IP.To16() != nil {
+        if err := binary.Write(&b, binary.BigEndian, uint16(0)); err != nil {
+            return err
+        }
+        if err := encodePathAttrsIPv6Withdraw(&b, prefixes); err != nil {
+            return err
+        }
+        binary.BigEndian.PutUint16(b.Bytes()[21:23], uint16(b.Len()-l))
+        binary.BigEndian.PutUint16(b.Bytes()[16:18], uint16(b.Len()))
+    }
 
 	if _, err := io.Copy(w, &b); err != nil {
 		return err
