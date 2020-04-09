@@ -92,7 +92,7 @@ data:
 
 By default, BGP mode advertises each allocated IP to the configured
 peers with no additional BGP attributes. The peer router(s) will
-receive one `/32` route for each service IP, with the BGP localpref
+receive one `/32` (`/128` for IPv6) route for each service IP, with the BGP localpref
 set to zero and no BGP communities.
 
 You can configure more elaborate advertisements by adding a
@@ -100,7 +100,7 @@ You can configure more elaborate advertisements by adding a
 advertisements.
 
 In addition to specifying localpref and communities, you can use this
-to advertise aggregate routes. The `aggregation-length` advertisement
+to advertise aggregate routes. The `aggregation-length` (`aggregation-length-v6` for IPv6) advertisement
 option lets you "roll up" the /32s into a larger prefix. Combined with
 multiple advertisement configurations, this lets you create elaborate
 advertisements that interoperate with the rest of your BGP network.
