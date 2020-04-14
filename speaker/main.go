@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -71,6 +72,7 @@ func main() {
 		config      = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
 		host        = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
 		mlBindAddr  = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
+		mlBindPort  = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
 		mlLabels    = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
 		mlNamespace = flag.String("ml-namespace", os.Getenv("METALLB_ML_NAMESPACE"), "Namespace of the speakers (for MemberList / fast dead node detection)")
 		mlSecret    = flag.String("ml-secret-key", os.Getenv("METALLB_ML_SECRET_KEY"), "Secret key for MemberList (fast dead node detection)")
@@ -106,6 +108,15 @@ func main() {
 		// mconfig.Name MUST be spec.nodeName, as we will match it against Enpoints nodeName in usableNodes()
 		mconfig.Name = *myNode
 		mconfig.BindAddr = *mlBindAddr
+		if *mlBindPort != "" {
+			mlport, err := strconv.Atoi(*mlBindPort)
+			if err != nil {
+				logger.Log("op", "startup", "error", "unable to parse ml-bindport", "msg", err)
+				os.Exit(1)
+			}
+			mconfig.BindPort = mlport
+			mconfig.AdvertisePort = mlport
+		}
 		mconfig.Logger = golog.New(goKitLogWriter{logger}, "", golog.Lshortfile)
 		if *mlSecret != "" {
 			sha := sha256.New()
