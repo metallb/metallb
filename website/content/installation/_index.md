@@ -126,3 +126,17 @@ secretGenerator:
 generatorOptions:
  disableNameSuffixHash: true
 ```
+
+## Upgrade
+
+When upgrading MetalLB, always check the [release notes](https://metallb.universe.tf/release-notes/)
+to see the changes and required actions, if any. Pay special attention to the release notes when
+upgrading to newer major/minor releases.
+
+Unless specified otherwise in the release notes, upgrade MetalLB either using
+[plain manifests](#installation-by-manifest) or using [kustomize](#installation-with-kustomize) as
+described above.
+
+Please take the known limitations for [layer2](https://metallb.universe.tf/concepts/layer2/#limitations)
+and [bgp](https://metallb.universe.tf/concepts/bgp/#limitations) into account when performing an
+upgrade.
