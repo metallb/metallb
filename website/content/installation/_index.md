@@ -114,7 +114,7 @@ generatorOptions:
 ```
 
 ## Upgrade Current Version
-To upgrade current version of metallb to new release, always look at [the release notes](https://metallb.universe.tf/release-notes/) to see the changes and action required.
+To upgrade current version of metallb to new release, always look at [the release notes](https://metallb.universe.tf/release-notes/) to see the changes and action required items. Pay special attention when upgrading major/minor releases.
 
 After that we can install new metallb version by downloading the new manifests and `kubectl apply -f` them. For example we upgrade from metallb v0.8.1 to v0.9.3. By reading [the release notes](https://metallb.universe.tf/release-notes/) we know that newer metallb use new algorithm to detect dead nodes. That algorithm need `secretkey` that we need to create. Here the steps to upgrade metallb v0.8.1 to v0.9.3:
 
