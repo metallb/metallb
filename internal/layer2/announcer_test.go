@@ -9,6 +9,7 @@ func Test_SetBalancer_AddsToAnnouncedServices(t *testing.T) {
 	announce := &Announce{
 		ips:      map[string]net.IP{},
 		ipRefcnt: map[string]int{},
+		spamCh:   make(chan net.IP, 1),
 	}
 
 	services := []struct {
@@ -27,6 +28,8 @@ func Test_SetBalancer_AddsToAnnouncedServices(t *testing.T) {
 
 	for _, service := range services {
 		announce.SetBalancer(service.name, service.ip)
+		// We need to empty spamCh as spamLoop() is not started.
+		<-announce.spamCh
 
 		if !announce.AnnounceName(service.name) {
 			t.Fatalf("service %v is not anounced", service.name)
