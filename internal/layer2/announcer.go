@@ -184,6 +184,9 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 	a.Lock()
 	defer a.Unlock()
 
+	// Always do gratuitous advertisement
+	go a.spam(name)
+
 	// Kubernetes may inform us that we should advertise this address multiple
 	// times, so just no-op any subsequent requests.
 	if _, ok := a.ips[name]; ok {
@@ -203,9 +206,6 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 			a.logger.Log("op", "watchMulticastGroup", "error", err, "ip", ip, "msg", "failed to watch NDP multicast group for IP, NDP responder will not respond to requests for this address")
 		}
 	}
-
-	go a.spam(name)
-
 }
 
 // DeleteBalancer deletes an address from the set of addresses we should announce.
