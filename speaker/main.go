@@ -117,7 +117,8 @@ func main() {
 			mconfig.BindPort = mlport
 			mconfig.AdvertisePort = mlport
 		}
-		mconfig.Logger = golog.New(goKitLogWriter{logger}, "", golog.Lshortfile)
+		loggerout := gokitlog.NewStdlibAdapter(gokitlog.With(logger, "component", "MemberList"))
+		mconfig.Logger = golog.New(loggerout, "", golog.Lshortfile)
 		if *mlSecret != "" {
 			sha := sha256.New()
 			mconfig.SecretKey = sha.Sum([]byte(*mlSecret))[:16]
@@ -201,21 +202,6 @@ func watchMemberListEvents(logger gokitlog.Logger, eventCh chan memberlist.NodeE
 			return
 		}
 	}
-}
-
-type goKitLogWriter struct {
-	gokitlog.Logger
-}
-
-func (l goKitLogWriter) Write(p []byte) (int, error) {
-	if len(p) > 1 {
-		// last char is '\n'
-		err := l.Log("component", "MemberList", "msg", string(p[:len(p)-1]))
-		if err != nil {
-			return 0, err
-		}
-	}
-	return len(p), nil
 }
 
 type controller struct {
