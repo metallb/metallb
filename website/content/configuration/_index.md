@@ -88,6 +88,34 @@ data:
       - 192.168.10.0/24
 ```
 
+By default, BGP speaker will announce IPv4 prefixes as specified in RFC4271. 
+For IPv6 prefixes Multiprotocol extension for BGP-4 (RFC4760) will be used.
+If peer supports Multiprotocol encoding for IPv4 you can allow MetalLB to use it via `allow-mp-bgp-encoding-ipv4` option.
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    peers:
+    - peer-address: 10.0.0.1
+      peer-asn: 64501
+      my-asn: 64500
+      allow-mp-bgp-encoding-ipv4: true
+    - peer-address: 10.0.0.2
+      peer-asn: 64501
+      my-asn: 64500
+      allow-mp-bgp-encoding-ipv4: false
+    address-pools:
+    - name: default
+      protocol: bgp
+      addresses:
+      - 192.168.10.0/24
+```
+
 ### Advertisement configuration
 
 By default, BGP mode advertises each allocated IP to the configured

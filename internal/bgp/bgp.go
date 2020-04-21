@@ -36,9 +36,10 @@ type Session struct {
 	holdTime         time.Duration
 	logger           log.Logger
 	password         string
-
-	newHoldTime chan bool
-	backoff     backoff
+	newHoldTime      chan bool
+	backoff          backoff
+	// allows to use MP BGP encoding for IPv4 if supported by peer
+	allowMPBGPEncodingV4 bool
 
 	mu               sync.Mutex
 	cond             *sync.Cond
@@ -136,7 +137,7 @@ func (s *Session) sendUpdates() bool {
 			}
 		}
 		if len(wdr) > 0 {
-			if err := sendWithdraw(s.conn, s.mpIPv4Support, wdr); err != nil {
+			if err := sendWithdraw(s.conn, s.useMPBGPforV4(), wdr); err != nil {
 				s.abort()
 				for _, pfx := range wdr {
 					s.logger.Log("op", "sendWithdraw", "prefix", pfx, "error", err, "msg", "failed to send BGP withdraw")
@@ -200,8 +201,15 @@ func (s *Session) updateNextHop(adv *Advertisement) {
 	adv.NextHop = s.defaultNextHopV4
 }
 
+// we should use MP BGP encoding in case:
+// - ipv6 announce
+// - if MP BGP encoding enabled for peer via config and peer supports it (sends advertise MP extension for ipv4)
 func (s *Session) useMPBGP(adv *Advertisement) bool {
-	return s.mpIPv4Support || adv.Prefix.IP.To4() == nil
+	return s.useMPBGPforV4() || adv.Prefix.IP.To4() == nil
+}
+
+func (s *Session) useMPBGPforV4() bool {
+	return s.mpIPv4Support && s.allowMPBGPEncodingV4
 }
 
 // connect establishes the BGP session with the peer.
@@ -433,18 +441,20 @@ func (s *Session) sendKeepalive() error {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func New(l log.Logger, addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time.Duration, password string, myNode string) (*Session, error) {
+func New(l log.Logger, addr string, asn uint32, routerID net.IP, peerASN uint32,
+	holdTime time.Duration, password string, myNode string, allowMPBGPEncodingV4 bool) (*Session, error) {
 	ret := &Session{
-		addr:        addr,
-		asn:         asn,
-		routerID:    routerID.To4(),
-		myNode:      myNode,
-		peerASN:     peerASN,
-		holdTime:    holdTime,
-		logger:      log.With(l, "peer", addr, "localASN", asn, "peerASN", peerASN),
-		newHoldTime: make(chan bool, 1),
-		advertised:  map[string]*Advertisement{},
-		password:    password,
+		addr:                 addr,
+		asn:                  asn,
+		routerID:             routerID.To4(),
+		myNode:               myNode,
+		peerASN:              peerASN,
+		holdTime:             holdTime,
+		logger:               log.With(l, "peer", addr, "localASN", asn, "peerASN", peerASN),
+		newHoldTime:          make(chan bool, 1),
+		advertised:           map[string]*Advertisement{},
+		password:             password,
+		allowMPBGPEncodingV4: allowMPBGPEncodingV4,
 	}
 	ret.cond = sync.NewCond(&ret.mu)
 	go ret.sendKeepalives()

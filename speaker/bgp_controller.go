@@ -184,7 +184,9 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 			if p.cfg.RouterID != nil {
 				routerID = p.cfg.RouterID
 			}
-			s, err := newBGP(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.Password, c.myNode)
+			s, err := newBGP(c.logger, net.JoinHostPort(
+				p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.MyASN,
+				routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.Password, c.myNode, p.cfg.AllowMPBGPEncodingV4)
 			if err != nil {
 				l.Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
 				errs++
@@ -288,6 +290,7 @@ func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
 	return c.syncPeers(l)
 }
 
-var newBGP = func(logger log.Logger, addr string, myASN uint32, routerID net.IP, asn uint32, hold time.Duration, password string, myNode string) (session, error) {
-	return bgp.New(logger, addr, myASN, routerID, asn, hold, password, myNode)
+var newBGP = func(logger log.Logger, addr string, myASN uint32, routerID net.IP,
+	asn uint32, hold time.Duration, password string, myNode string, allowMPBGPEncodingV4 bool) (session, error) {
+	return bgp.New(logger, addr, myASN, routerID, asn, hold, password, myNode, allowMPBGPEncodingV4)
 }
