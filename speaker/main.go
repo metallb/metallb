@@ -15,27 +15,23 @@
 package main
 
 import (
-	"crypto/sha256"
 	"flag"
 	"fmt"
-	golog "log"
 	"net"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
-	"time"
 
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/layer2"
 	"go.universe.tf/metallb/internal/logging"
+	"go.universe.tf/metallb/internal/speakerlist"
 	"go.universe.tf/metallb/internal/version"
 	v1 "k8s.io/api/core/v1"
 
 	gokitlog "github.com/go-kit/kit/log"
-	"github.com/hashicorp/memberlist"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -101,44 +97,16 @@ func main() {
 	}()
 	defer logger.Log("op", "shutdown", "msg", "done")
 
-	var mlist *memberlist.Memberlist
-	var eventCh chan memberlist.NodeEvent
-	if *mlNamespace == "" || *mlLabels == "" || *mlBindAddr == "" {
-		logger.Log("op", "startup", "msg", "Not starting fast dead node detection (MemberList), need ml-bindaddr / ml-labels / ml-namespace config")
-	} else {
-		mconfig := memberlist.DefaultLANConfig()
-		// mconfig.Name MUST be spec.nodeName, as we will match it against Enpoints nodeName in usableNodes()
-		mconfig.Name = *myNode
-		mconfig.BindAddr = *mlBindAddr
-		if *mlBindPort != "" {
-			mlport, err := strconv.Atoi(*mlBindPort)
-			if err != nil {
-				logger.Log("op", "startup", "error", "unable to parse ml-bindport", "msg", err)
-				os.Exit(1)
-			}
-			mconfig.BindPort = mlport
-			mconfig.AdvertisePort = mlport
-		}
-		loggerout := gokitlog.NewStdlibAdapter(gokitlog.With(logger, "component", "MemberList"))
-		mconfig.Logger = golog.New(loggerout, "", golog.Lshortfile)
-		if *mlSecret != "" {
-			sha := sha256.New()
-			mconfig.SecretKey = sha.Sum([]byte(*mlSecret))[:16]
-		}
-		eventCh = make(chan memberlist.NodeEvent, 16)
-		mconfig.Events = &memberlist.ChannelEventDelegate{Ch: eventCh}
-		mlist, err = memberlist.Create(mconfig)
-		if err != nil {
-			logger.Log("op", "startup", "error", err, "msg", "failed to create memberlist")
-			os.Exit(1)
-		}
+	sList, err := speakerlist.New(logger, *myNode, *mlBindAddr, *mlBindPort, *mlSecret, *mlNamespace, *mlLabels, stopCh)
+	if err != nil {
+		os.Exit(1)
 	}
 
 	// Setup all clients and speakers, config decides what is being done runtime.
 	ctrl, err := newController(controllerConfig{
 		MyNode: *myNode,
 		Logger: logger,
-		MList:  mlist,
+		SList:  sList,
 	})
 	if err != nil {
 		logger.Log("op", "startup", "error", err, "msg", "failed to create MetalLB controller")
@@ -167,44 +135,14 @@ func main() {
 	}
 	ctrl.client = client
 
-	if mlist != nil {
-		go watchMemberListEvents(logger, eventCh, stopCh, client)
-
-		iplist, err := client.GetPodsIPs(*mlNamespace, *mlLabels)
-		if err != nil {
-			logger.Log("op", "startup", "error", err, "msg", "failed to get PodsIPs")
-			os.Exit(1)
-		}
-		n, err := mlist.Join(iplist)
-		logger.Log("op", "startup", "msg", "Memberlist join", "nb joigned", n, "error ?", err)
-		defer func() {
-			logger.Log("op", "shutdown", "msg", "leaving MemberList cluster")
-			err = mlist.Leave(time.Second)
-			logger.Log("op", "shutdown", "msg", "left MemberList cluster", "error ?", err)
-			mlist.Shutdown()
-			logger.Log("op", "shutdown", "msg", "MemberList shutdown", "error ?", err)
-		}()
+	err = sList.Start(client)
+	if err != nil {
+		os.Exit(1)
 	}
+	defer sList.Stop()
 
 	if err := client.Run(stopCh); err != nil {
 		logger.Log("op", "startup", "error", err, "msg", "failed to run k8s client")
-	}
-}
-
-func event2String(e memberlist.NodeEventType) string {
-	return [...]string{"NodeJoin", "NodeLeave", "NodeUpdate"}[e]
-}
-
-func watchMemberListEvents(logger gokitlog.Logger, eventCh chan memberlist.NodeEvent, stopCh chan struct{}, client *k8s.Client) {
-	for {
-		select {
-		case e := <-eventCh:
-			logger.Log("msg", "Node event", "node addr", e.Node.Addr, "node name", e.Node.Name, "node event", event2String(e.Event))
-			logger.Log("msg", "Call Force Sync")
-			client.ForceSync()
-		case <-stopCh:
-			return
-		}
 	}
 }
 
@@ -222,7 +160,7 @@ type controller struct {
 type controllerConfig struct {
 	MyNode string
 	Logger gokitlog.Logger
-	MList  *memberlist.Memberlist
+	SList  SpeakerList
 
 	// For testing only, and will be removed in a future release.
 	// See: https://github.com/google/metallb/issues/152.
@@ -246,7 +184,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 		protocols[config.Layer2] = &layer2Controller{
 			announcer: a,
 			myNode:    cfg.MyNode,
-			mList:     cfg.MList,
+			sList:     cfg.SList,
 		}
 	}
 
@@ -428,4 +366,9 @@ type Protocol interface {
 	SetBalancer(gokitlog.Logger, string, net.IP, *config.Pool) error
 	DeleteBalancer(gokitlog.Logger, string, string) error
 	SetNode(gokitlog.Logger, *v1.Node) error
+}
+
+// Speakerlist represents a list of healthy speakers.
+type SpeakerList interface {
+	UsableSpeakers() map[string]bool
 }
