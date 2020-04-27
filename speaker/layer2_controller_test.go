@@ -13,6 +13,14 @@ import (
 	v1 "k8s.io/api/core/v1"
 )
 
+type fakeSpeakerList struct {
+	speakers map[string]bool
+}
+
+func (sl *fakeSpeakerList) UsableSpeakers() map[string]bool {
+	return sl.speakers
+}
+
 func compareUseableNodesReturnedValue(a, b []string) bool {
 	if &a == &b {
 		return true
@@ -43,6 +51,8 @@ func TestUsableNodes(t *testing.T) {
 
 		eps *v1.Endpoints
 
+		usableSpeakers map[string]bool
+
 		cExpectedResult []string
 	}{
 		{
@@ -63,6 +73,7 @@ func TestUsableNodes(t *testing.T) {
 					},
 				},
 			},
+			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1", "iris2"},
 		},
 
@@ -84,6 +95,7 @@ func TestUsableNodes(t *testing.T) {
 					},
 				},
 			},
+			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1"},
 		},
 
@@ -107,12 +119,13 @@ func TestUsableNodes(t *testing.T) {
 					},
 				},
 			},
+			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1"},
 		},
 	}
 
 	for _, test := range tests {
-		response := usableNodes(test.eps, nil)
+		response := usableNodes(test.eps, test.usableSpeakers)
 		sort.Strings(response)
 		if !compareUseableNodesReturnedValue(response, test.cExpectedResult) {
 			t.Errorf("%q: shouldAnnounce for controller returned incorrect result, expected '%s', but received '%s'", test.desc, test.cExpectedResult, response)
@@ -121,9 +134,16 @@ func TestUsableNodes(t *testing.T) {
 }
 
 func TestShouldAnnounce(t *testing.T) {
+	fakeSL := &fakeSpeakerList{
+		speakers: map[string]bool{
+			"iris1": true,
+			"iris2": true,
+		},
+	}
 	c1, err := newController(controllerConfig{
 		MyNode: "iris1",
 		Logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		SList:  fakeSL,
 	})
 	if err != nil {
 		t.Fatalf("creating controller: %s", err)
@@ -133,6 +153,7 @@ func TestShouldAnnounce(t *testing.T) {
 	c2, err := newController(controllerConfig{
 		MyNode: "iris2",
 		Logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		SList:  fakeSL,
 	})
 	if err != nil {
 		t.Fatalf("creating controller: %s", err)
