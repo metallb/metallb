@@ -269,8 +269,6 @@ type session interface {
 	Set(advs ...*bgp.Advertisement) error
 }
 
-func (c *bgpController) SetLeader(log.Logger, bool) {}
-
 func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
 	nodeLabels := node.Labels
 	if nodeLabels == nil {
