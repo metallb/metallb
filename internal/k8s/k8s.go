@@ -220,7 +220,7 @@ func New(cfg *Config) (*Client, error) {
 	}
 
 	if cfg.NodeChanged != nil {
-		handlers := cache.ResourceEventHandlerFuncs{
+		nodeHandlers := cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				key, err := cache.MetaNamespaceKeyFunc(obj)
 				if err == nil {
@@ -240,8 +240,8 @@ func New(cfg *Config) (*Client, error) {
 				}
 			},
 		}
-		watcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "nodes", v1.NamespaceAll, fields.OneTermEqualSelector("metadata.name", cfg.NodeName))
-		c.nodeIndexer, c.nodeInformer = cache.NewIndexerInformer(watcher, &v1.Node{}, 0, handlers, cache.Indexers{})
+		nodeWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "nodes", v1.NamespaceAll, fields.OneTermEqualSelector("metadata.name", cfg.NodeName))
+		c.nodeIndexer, c.nodeInformer = cache.NewIndexerInformer(nodeWatcher, &v1.Node{}, 0, nodeHandlers, cache.Indexers{})
 
 		c.nodeChanged = cfg.NodeChanged
 		c.syncFuncs = append(c.syncFuncs, c.nodeInformer.HasSynced)
