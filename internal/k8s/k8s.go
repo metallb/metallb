@@ -47,6 +47,8 @@ type Client struct {
 	nodeIndexer    cache.Indexer
 	nodeInformer   cache.Controller
 
+	resyncSvcCh <-chan struct{}
+
 	syncFuncs []cache.InformerSynced
 
 	serviceChanged func(log.Logger, string, *v1.Service, EpsOrSlices) SyncState
@@ -86,6 +88,8 @@ type Config struct {
 	ConfigChanged  func(log.Logger, *config.Config) SyncState
 	NodeChanged    func(log.Logger, *v1.Node) SyncState
 	Synced         func(log.Logger)
+
+	ResyncSvcCh <-chan struct{}
 }
 
 type svcKey string
@@ -130,10 +134,11 @@ func New(cfg *Config) (*Client, error) {
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
 	c := &Client{
-		logger: cfg.Logger,
-		client: clientset,
-		events: recorder,
-		queue:  queue,
+		logger:      cfg.Logger,
+		client:      clientset,
+		events:      recorder,
+		queue:       queue,
+		resyncSvcCh: cfg.ResyncSvcCh,
 	}
 
 	if cfg.ServiceChanged != nil {
@@ -412,6 +417,19 @@ func (c *Client) Run(stopCh <-chan struct{}) error {
 		}()
 	}
 
+	if c.resyncSvcCh != nil || stopCh != nil {
+		go func() {
+			for {
+				select {
+				case <-stopCh:
+					return
+				case <-c.resyncSvcCh:
+					c.resyncSvc()
+				}
+			}
+		}()
+	}
+
 	for {
 		key, quit := c.queue.Get()
 		if quit {
@@ -427,13 +445,14 @@ func (c *Client) Run(stopCh <-chan struct{}) error {
 			c.queue.AddRateLimited(key)
 		case SyncStateReprocessAll:
 			c.queue.Forget(key)
-			c.ForceSync()
+			c.resyncSvc()
 		}
 	}
 }
 
-// ForceSync reprocess all watched services.
-func (c *Client) ForceSync() {
+// resyncSvc reprocesses all watched services.
+func (c *Client) resyncSvc() {
+	level.Debug(c.logger).Log("op", "resyncSvc")
 	if c.svcIndexer != nil {
 		for _, k := range c.svcIndexer.ListKeys() {
 			c.queue.AddRateLimited(svcKey(k))

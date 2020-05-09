@@ -27,12 +27,12 @@ import (
 
 // SpeakerList represents a list of healthy speakers.
 type SpeakerList struct {
-	l         log.Logger
-	client    *k8s.Client
-	stopCh    chan struct{}
-	namespace string
-	labels    string
-
+	l           log.Logger
+	client      *k8s.Client
+	resyncSvcCh chan struct{}
+	stopCh      chan struct{}
+	namespace   string
+	labels      string
 	// The following fields are nil when memberlist is disabled.
 	mlEventCh chan memberlist.NodeEvent
 	ml        *memberlist.Memberlist
@@ -43,12 +43,13 @@ type SpeakerList struct {
 }
 
 // New creates a new SpeakerList and returns a pointer to it.
-func New(logger log.Logger, nodeName, bindAddr, bindPort, secret, namespace, labels string, stopCh chan struct{}) (*SpeakerList, error) {
+func New(logger log.Logger, nodeName, bindAddr, bindPort, secret, namespace, labels string, stopCh, resyncSvcCh chan struct{}) (*SpeakerList, error) {
 	sl := SpeakerList{
-		l:         logger,
-		stopCh:    stopCh,
-		namespace: namespace,
-		labels:    labels,
+		l:           logger,
+		resyncSvcCh: resyncSvcCh,
+		stopCh:      stopCh,
+		namespace:   namespace,
+		labels:      labels,
 	}
 
 	if labels == "" || bindAddr == "" {
@@ -308,9 +309,20 @@ func (sl *SpeakerList) memberlistWatchEvents() {
 		select {
 		case e := <-sl.mlEventCh:
 			level.Info(sl.l).Log("msg", "node event - forcing sync", "node addr", e.Node.Addr, "node name", e.Node.Name, "node event", event2String(e.Event))
-			sl.client.ForceSync()
+			sl.forceSvcSync()
 		case <-sl.stopCh:
 			return
 		}
+	}
+}
+
+func (sl *SpeakerList) forceSvcSync() {
+	select {
+	case sl.resyncSvcCh <- struct{}{}:
+		level.Debug(sl.l).Log("op", "forceSvcSync", "msg", "Queuing a resync")
+	default:
+		// resyncSvcCh has a capacity of 1, if it's full (it blocks when we try to produce)
+		// there is no need to queue more than 1 resync order, so drop it
+		level.Debug(sl.l).Log("op", "forceSvcSync", "msg", "Resync already queued, dropping")
 	}
 }

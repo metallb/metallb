@@ -108,7 +108,11 @@ func main() {
 	}()
 	defer level.Info(logger).Log("op", "shutdown", "msg", "done")
 
-	sList, err := speakerlist.New(logger, *myNode, *mlBindAddr, *mlBindPort, *mlSecret, *namespace, *mlLabels, stopCh)
+	// Make resyncSvcCh chan buffer 1 event large, so if a resync is ongoing,
+	// we can queue another resync making sure all changes that happened
+	// before we produce to the channel are taken into account.
+	resyncSvcCh := make(chan struct{}, 1)
+	sList, err := speakerlist.New(logger, *myNode, *mlBindAddr, *mlBindPort, *mlSecret, *namespace, *mlLabels, stopCh, resyncSvcCh)
 	if err != nil {
 		os.Exit(1)
 	}
@@ -139,6 +143,8 @@ func main() {
 		ServiceChanged: ctrl.SetBalancer,
 		ConfigChanged:  ctrl.SetConfig,
 		NodeChanged:    ctrl.SetNode,
+
+		ResyncSvcCh: resyncSvcCh,
 	})
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create k8s client")
