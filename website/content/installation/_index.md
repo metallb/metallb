@@ -82,7 +82,7 @@ on the remote kustomization file:
 namespace: metallb-system
 
 resources:
-  - github.com/danderson/metallb//manifests?ref=v0.9.3
+  - github.com/metallb/metallb//manifests?ref=v0.9.3
   - configmap.yml 
   - secret.yml
 ```
@@ -99,7 +99,7 @@ the configMap, as MetalLB is waiting for a configMap named `config`
 namespace: metallb-system
 
 resources:
-  - github.com/danderson/metallb//manifests?ref=v0.9.3
+  - github.com/metallb/metallb//manifests?ref=v0.9.3
 
 configMapGenerator:
 - name: config
