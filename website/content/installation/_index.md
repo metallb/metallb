@@ -71,16 +71,18 @@ The `memberlist` secret contains the `secretkey` to encrypt the communication be
 
 ## Installation with kustomize
 
+> The instructions below works for kustomize version 2.1.0+. In case you have an older version (i.e. the embedded in `kubectl`) use `bases` instead of `resources` to include the kustomization from GitHub (https://github.com/kubernetes-sigs/kustomize/blob/master/docs/v2.1.0.md#resources-expanded-bases-deprecated)
+
 You can install MetalLB with
 [kustomize](https://github.com/kubernetes-sigs/kustomize) by pointing
-on the remote kustomization fle :
+on the remote kustomization file:
 
 ```yaml
 # kustomization.yml
 namespace: metallb-system
 
 resources:
-  - github.com/danderson/metallb//manifests?ref=v0.8.2
+  - github.com/danderson/metallb//manifests?ref=v0.9.3
   - configmap.yml 
   - secret.yml
 ```
@@ -92,12 +94,12 @@ the configMap, as MetalLB is waiting for a configMap named `config`
 (see
 [https://github.com/kubernetes-sigs/kustomize/blob/master/examples/generatorOptions.md](https://github.com/kubernetes-sigs/kustomize/blob/master/examples/generatorOptions.md)):
 
-```
+```yaml
 # kustomization.yml
 namespace: metallb-system
 
 resources:
-  - github.com/danderson/metallb//manifests?ref=v0.8.2
+  - github.com/danderson/metallb//manifests?ref=v0.9.3
 
 configMapGenerator:
 - name: config
@@ -110,5 +112,19 @@ secretGenerator:
     - configs/secretkey
 
 generatorOptions:
- disableNameSuffixHash: true
+  disableNameSuffixHash: true
+```
+
+```yaml
+# configs/config
+address-pools:
+  - name: default
+    protocol: layer2
+    addresses:
+      - 192.168.0.128/25
+```
+
+```
+# configs/secretkey
+secretkey=SZlmcghfKLpoj+rnGKcxAeKQY+H/lwo0t10GJ8M3dI8=
 ```
