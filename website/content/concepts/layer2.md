@@ -25,9 +25,10 @@ In that sense, layer 2 does not implement a load-balancer. Rather, it implements
 a failover mechanism so that a different node can take over should the current
 leader node fail for some reason.
 
-If the leader node fails for some reason, failover is automatic: the old
-leader's lease times out after 10 seconds, at which point another node becomes
-the leader and takes over ownership of the service IP.
+If the leader node fails for some reason, failover is automatic: the failed
+node is detected using [memberlist](https://github.com/hashicorp/memberlist),
+at which point new nodes take over ownership of the IP addresses from the
+failed node.
 
 ## Limitations
 
@@ -77,10 +78,10 @@ Keepalived uses the Virtual Router Redundancy Protocol (VRRP). Instances of
 Keepalived continuously exchange VRRP messages with each other, both to select a
 leader and to notice when that leader goes away.
 
-MetalLB on the other hand relies on Kubernetes to know when pods and nodes go up
-and down. It doesn't need to speak a separate protocol to select leaders,
-instead it just lets Kubernetes do most of the work of deciding which pods are
-healthy, and which nodes are ready.
+MetalLB on the other hand relies on
+[memberlist](https://github.com/hashicorp/memberlist) to know when a Node in
+the cluster is no longer reachable and the service IPs from that node should be
+moved elsewhere.
 
 Keepalived and MetalLB "look" the same from the client's perspective: the
 service IP address seems to migrate from one machine to another when failovers
@@ -93,9 +94,9 @@ doesn't exist in MetalLB. You can have as many load-balanced IPs as you want, as
 long as there are free IPs in your network. MetalLB also requires less
 configuration than VRRP – for example, there are no Virtual Router IDs 
 
-On the flip side, because MetalLB relies on Kubernetes for information instead
-of a standard network protocol, it cannot interoperate with third-party
-VRRP-aware routers and infrastructure. This is working as intended: MetalLB is
-specifically designed to provide load balancing and failover _within_ a
-Kubernetes cluster, and in that scenario interoperability with third-party LB
-software is out of scope.
+On the flip side, because MetalLB relies on
+[memberlist](https://github.com/hashicorp/memberlist) for cluster membership
+information, it cannot interoperate with third-party VRRP-aware routers and
+infrastructure. This is working as intended: MetalLB is specifically designed
+to provide load balancing and failover _within_ a Kubernetes cluster, and in
+that scenario interoperability with third-party LB software is out of scope.
