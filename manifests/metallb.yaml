@@ -339,8 +339,12 @@ spec:
       serviceAccountName: speaker
       terminationGracePeriodSeconds: 2
       tolerations:
-      - effect: NoSchedule
-        key: node-role.kubernetes.io/master
+      - operator: Exists
+        effect: NoSchedule
+      - key: CriticalAddonsOnly
+        operator: Exists
+      - operator: Exists
+        effect: NoExecute
 ---
 apiVersion: apps/v1
 kind: Deployment
