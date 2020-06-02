@@ -55,13 +55,13 @@ MetalLB's copyright was owned by Google, until March 2019. However, it
 was never an official Google project. The project doesn't have any
 form of corporate sponsorship.
 
-The majority of code changes, as well as the overall direction of the project,
-is a personal endeavor of [one person](https://www.dave.tf), working on MetalLB
-in their spare time as motivation allows.
+MetalLB was created by [one person](https://www.dave.tf), working on MetalLB in
+their spare time as motivation allows.  The original author has now been
+empowering a [team of maintainers]({{% relref "community/_index.md"
+%}}#contributing) to assist with moving the project forward.
 
-This means that, currently, support and new feature development is mostly at the
-mercy of one person's availability and resources. You should set your
-expectations appropriately.
+Most support and new feature development is at the mercy of the availability of
+this small group, so you should set your expectations accordingly.
 
 If you would like to help improve this balance, [contributions]({{% relref
 "community/_index.md" %}}#contributing) are very welcome! In addition to code
