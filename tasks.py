@@ -77,7 +77,7 @@ def build(ctx, binaries, architectures, tag="dev", docker_user="metallb"):
     binaries = _check_binaries(binaries)
     architectures = _check_architectures(architectures)
     _make_build_dirs()
-    
+
     commit = run("git describe --dirty --always", hide=True).stdout.strip()
     branch = run("git rev-parse --abbrev-ref HEAD", hide=True).stdout.strip()
 
@@ -142,7 +142,7 @@ def push_multiarch(ctx, binaries, tag="dev", docker_user="metallb"):
     binaries = _check_binaries(binaries)
     architectures = _check_architectures(["all"])
     push(ctx, binaries=binaries, architectures=architectures, tag=tag, docker_user=docker_user)
-    
+
     platforms = ",".join("linux/{}".format(arch) for arch in architectures)
     for bin in binaries:
         run("manifest-tool push from-args "
@@ -272,7 +272,7 @@ def release(ctx, version, skip_release_notes=False):
     status = run("git status --porcelain", hide=True).stdout.strip()
     if status != "":
         raise Exit(message="git checkout not clean, cannot release")
-    
+
     version = semver.parse_version_info(version)
     is_patch_release = version.patch != 0
 
@@ -323,3 +323,8 @@ def release(ctx, version, skip_release_notes=False):
     run("git commit -a -m 'Automated update for release v{}'".format(version), echo=True)
     run("git tag v{} -m 'See the release notes for details:\n\nhttps://metallb.universe.tf/release-notes/#version-{}-{}-{}'".format(version, version.major, version.minor, version.patch), echo=True)
     run("git checkout main", echo=True)
+
+@task()
+def unit(ctx):
+    """Run unit tests."""
+    run("go test -short ./...", echo=True)

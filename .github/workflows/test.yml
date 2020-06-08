@@ -1,0 +1,66 @@
+name: metallb-ci
+
+on:
+  push:
+  pull_request:
+    branches: [ master ]
+
+env:
+  GO_VERSION: 1.13.4
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Go
+      uses: actions/setup-go@v1
+      with:
+        go-version: ${{ env.GO_VERSION }}
+      id: go
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Set up environment
+      run: |
+        export GOPATH=$(go env GOPATH)
+        echo "::set-env name=GOPATH::$GOPATH"
+        export PATH=$GOPATH/bin:$PATH
+        echo "::add-path::$GOPATH/bin"
+
+    - name: Install invoke -- www.pyinvoke.org
+      run: |
+        sudo pip install invoke semver
+
+    - name: Build
+      run: |
+        inv build
+
+  unit:
+    name: Run unit tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Go
+      uses: actions/setup-go@v1
+      with:
+        go-version: ${{ env.GO_VERSION }}
+      id: go
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v2
+
+    - name: Set up environment
+      run: |
+        export GOPATH=$(go env GOPATH)
+        echo "::set-env name=GOPATH::$GOPATH"
+        export PATH=$GOPATH/bin:$PATH
+        echo "::add-path::$GOPATH/bin"
+
+    - name: Install invoke -- www.pyinvoke.org
+      run: |
+        sudo pip install invoke semver
+
+    - name: Run tests
+      run: |
+        inv unit
