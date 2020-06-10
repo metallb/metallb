@@ -207,6 +207,7 @@ func (a *Allocator) Unassign(svc string) bool {
 		delete(a.poolIPsInUse[al.pool], al.ip.String())
 	}
 	a.poolServices[al.pool]--
+	stats.poolActive.WithLabelValues(al.pool).Set(float64(a.poolServices[al.pool]))
 	return true
 }
 
