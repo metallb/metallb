@@ -21,7 +21,6 @@ type Allocator struct {
 	portsInUse      map[string]map[Port]string // ip.String() -> Port -> svc
 	servicesOnIP    map[string]map[string]bool // ip.String() -> svc -> allocated?
 	poolIPsInUse    map[string]map[string]int  // poolName -> ip.String() -> number of users
-	poolServices    map[string]int             // poolName -> #services
 }
 
 // Port represents one port in use by a service.
@@ -57,7 +56,6 @@ func New() *Allocator {
 		portsInUse:      map[string]map[Port]string{},
 		servicesOnIP:    map[string]map[string]bool{},
 		poolIPsInUse:    map[string]map[string]int{},
-		poolServices:    map[string]int{},
 	}
 }
 
@@ -118,10 +116,9 @@ func (a *Allocator) assign(svc string, alloc *alloc) {
 		a.poolIPsInUse[alloc.pool] = map[string]int{}
 	}
 	a.poolIPsInUse[alloc.pool][alloc.ip.String()]++
-	a.poolServices[alloc.pool]++
 
 	stats.poolCapacity.WithLabelValues(alloc.pool).Set(float64(poolCount(a.pools[alloc.pool])))
-	stats.poolActive.WithLabelValues(alloc.pool).Set(float64(a.poolServices[alloc.pool]))
+	stats.poolActive.WithLabelValues(alloc.pool).Set(float64(len(a.poolIPsInUse[alloc.pool])))
 }
 
 // Assign assigns the requested ip to svc, if the assignment is
@@ -206,7 +203,7 @@ func (a *Allocator) Unassign(svc string) bool {
 		// is an accurate count of IPs in use.
 		delete(a.poolIPsInUse[al.pool], al.ip.String())
 	}
-	a.poolServices[al.pool]--
+	stats.poolActive.WithLabelValues(al.pool).Set(float64(len(a.poolIPsInUse[al.pool])))
 	return true
 }
 
