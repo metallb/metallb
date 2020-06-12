@@ -79,8 +79,10 @@ on the remote kustomization fle :
 # kustomization.yml
 namespace: metallb-system
 
+bases:
+  - https://github.com/metallb/metallb/manifests?ref=v0.9.3
+
 resources:
-  - github.com/danderson/metallb//manifests?ref=v0.8.2
   - configmap.yml 
   - secret.yml
 ```
@@ -96,8 +98,8 @@ the configMap, as MetalLB is waiting for a configMap named `config`
 # kustomization.yml
 namespace: metallb-system
 
-resources:
-  - github.com/danderson/metallb//manifests?ref=v0.8.2
+bases:
+  - https://github.com/metallb/metallb/manifests?ref=v0.9.3
 
 configMapGenerator:
 - name: config
