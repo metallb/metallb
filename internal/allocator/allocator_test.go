@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"go.universe.tf/metallb/internal/config"
+
+	ptu "github.com/prometheus/client_golang/prometheus/testutil"
 )
 
 func TestAssignment(t *testing.T) {
@@ -1222,6 +1224,131 @@ func TestPoolCount(t *testing.T) {
 		got := poolCount(test.pool)
 		if test.want != got {
 			t.Errorf("%q: wrong pool count, want %d, got %d", test.desc, test.want, got)
+		}
+	}
+}
+
+func TestPoolMetrics(t *testing.T) {
+	alloc := New()
+	if err := alloc.SetPools(map[string]*config.Pool{
+		"test": {
+			AutoAssign: true,
+			CIDR: []*net.IPNet{
+				ipnet("1.2.3.4/30"),
+				ipnet("1000::4/126"),
+			},
+		},
+	}); err != nil {
+		t.Fatalf("SetPools: %s", err)
+	}
+
+	tests := []struct {
+		desc       string
+		svc        string
+		ip         string
+		ports      []Port
+		sharingKey string
+		backendKey string
+		ipsInUse   float64
+	}{
+		{
+			desc:     "assign s1",
+			svc:      "s1",
+			ip:       "1.2.3.4",
+			ipsInUse: 1,
+		},
+		{
+			desc:     "assign s2",
+			svc:      "s2",
+			ip:       "1.2.3.5",
+			ipsInUse: 2,
+		},
+		{
+			desc:     "unassign s1",
+			svc:      "s1",
+			ipsInUse: 1,
+		},
+		{
+			desc:     "unassign s2",
+			svc:      "s2",
+			ipsInUse: 0,
+		},
+		{
+			desc:       "assign s1 shared",
+			svc:        "s1",
+			ip:         "1.2.3.4",
+			sharingKey: "key",
+			ports:      ports("tcp/80"),
+			ipsInUse:   1,
+		},
+		{
+			desc:       "assign s2 shared",
+			svc:        "s2",
+			ip:         "1.2.3.4",
+			sharingKey: "key",
+			ports:      ports("tcp/443"),
+			ipsInUse:   1,
+		},
+		{
+			desc:       "assign s3 shared",
+			svc:        "s3",
+			ip:         "1.2.3.4",
+			sharingKey: "key",
+			ports:      ports("tcp/23"),
+			ipsInUse:   1,
+		},
+		{
+			desc:     "unassign s1 shared",
+			svc:      "s1",
+			ports:    ports("tcp/80"),
+			ipsInUse: 1,
+		},
+		{
+			desc:     "unassign s2 shared",
+			svc:      "s2",
+			ports:    ports("tcp/443"),
+			ipsInUse: 1,
+		},
+		{
+			desc:     "unassign s3 shared",
+			svc:      "s3",
+			ports:    ports("tcp/23"),
+			ipsInUse: 0,
+		},
+	}
+
+	for _, test := range tests {
+		if test.ip == "" {
+			alloc.Unassign(test.svc)
+			value := ptu.ToFloat64(stats.poolActive.WithLabelValues("test"))
+			if value != test.ipsInUse {
+				t.Errorf("%v; in-use %v. Expected %v", test.desc, value, test.ipsInUse)
+			}
+			continue
+		}
+
+		ip := net.ParseIP(test.ip)
+		if ip == nil {
+			t.Fatalf("invalid IP %q in test %q", test.ip, test.desc)
+		}
+		err := alloc.Assign(test.svc, ip, test.ports, test.sharingKey, test.backendKey)
+
+		if err != nil {
+			t.Errorf("%q: Assign(%q, %q): %v", test.desc, test.svc, test.ip, err)
+		}
+		if a := assigned(alloc, test.svc); a != test.ip {
+			t.Errorf("%q: ran Assign(%q, %q), but allocator has recorded allocation of %q", test.desc, test.svc, test.ip, a)
+		}
+		value := ptu.ToFloat64(stats.poolActive.WithLabelValues("test"))
+		if value != test.ipsInUse {
+			t.Errorf("%v; in-use %v. Expected %v", test.desc, value, test.ipsInUse)
+		}
+
+		// The "test" pool contains two ranges; 1.2.3.4/30, 1000::4/126
+		// All bits can be used for lb-addresses which gives a total capacity of; 4+4=8
+		value = ptu.ToFloat64(stats.poolCapacity.WithLabelValues("test"))
+		if int(value) != 8 {
+			t.Errorf("stats.poolCapacity invalid %f. Expected 8", value)
 		}
 	}
 }
