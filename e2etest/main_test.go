@@ -17,11 +17,9 @@ func TestMain(m *testing.M) {
 	}
 
 	cmd := exec.Command(
-		"go", "run", "make.go",
-		"-a", "build,image",
-		"-b", "controller,speaker,e2etest-mirror-server",
+		"inv", "build",
+		"--binaries", "all",
 		"--tag", "e2e",
-		"--registry", "metallb",
 	)
 	cmd.Dir = ".."
 	cmd.Stdout = os.Stdout
