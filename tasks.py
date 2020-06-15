@@ -49,7 +49,7 @@ def _check_binaries(binaries):
             out |= all_binaries
         elif binary not in all_binaries:
             print("Unknown binary {}".format(binary))
-            print("Known binaries: {}".format(", ",join(sorted(all_binaries))))
+            print("Known binaries: {}".format(", ".join(sorted(all_binaries))))
             sys.exit(1)
         else:
             out.add(binary)
