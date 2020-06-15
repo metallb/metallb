@@ -55,7 +55,9 @@ workflows:
       - deploy-controller:
           filters:
             branches:
-              ignore: /pull\/.*/
+              only:
+                - main
+                - /v.*/
             tags:
               only: /.*/
           requires:
@@ -63,7 +65,9 @@ workflows:
       - deploy-speaker:
           filters:
             branches:
-              ignore: /pull\/.*/
+              only:
+                - main
+                - /v.*/
             tags:
               only: /.*/
           requires:
