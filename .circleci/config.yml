@@ -11,11 +11,18 @@ jobs:
       - run: sudo apt-get install python-pip
       - run: sudo pip install invoke semver pyyaml
       - run: echo "export GO111MODULE=on" >>$BASH_ENV
-      - run: curl -L https://git.io/vp6lP | sh # gometalinter
       - run: go test -short ./...
       - run: go test -short -race ./...
-      - run: PATH=./bin:$PATH gometalinter --deadline=5m --disable-all --enable=gofmt --enable=vet --vendor ./...
       - run: cp manifests/metallb.yaml manifests/metallb.yaml.prev
+  lint-1.13:
+    working_directory: /go/src/go.universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.13
+    steps:
+      - checkout
+      - run: echo "export GO111MODULE=on" >>$BASH_ENV
+      - run: curl -L https://git.io/vp6lP | sh # gometalinter
+      - run: PATH=./bin:$PATH gometalinter --deadline=5m --disable-all --enable=gofmt --enable=vet --vendor ./...
   deploy-controller:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
@@ -52,6 +59,10 @@ workflows:
           filters:
             tags:
               only: /.*/
+      - lint-1.13:
+          filters:
+            tags:
+              only: /.*/
       - deploy-controller:
           filters:
             branches:
@@ -62,6 +73,7 @@ workflows:
               only: /.*/
           requires:
             - test-1.13
+            - lint-1.13
       - deploy-speaker:
           filters:
             branches:
@@ -72,3 +84,4 @@ workflows:
               only: /.*/
           requires:
             - test-1.13
+            - lint-1.13
