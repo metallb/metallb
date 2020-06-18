@@ -1,15 +1,9 @@
-import glob
 import os
-import re
 import semver
 import shutil
 import sys
 import yaml
 import tempfile
-try:
-    from io import StringIO
-except ImportError:
-    from StringIO import StringIO
 try:
     from urllib.request import urlopen
 except ImportError:
