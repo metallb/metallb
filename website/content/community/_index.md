@@ -20,6 +20,9 @@ you're not already logged into the Kubernetes slack organization,
 you'll need to [request an invite](http://slack.k8s.io/) before you
 can join.
 
+Development of MetalLB is discussed in the [#metallb-dev slack channel
+](https://kubernetes.slack.com/messages/metallb-dev/).
+
 ## IRC
 
 If you prefer a more classic chat experience, we're also on `#metallb`
