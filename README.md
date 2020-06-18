@@ -4,7 +4,7 @@ MetalLB is a load-balancer implementation for bare
 metal [Kubernetes](https://kubernetes.io) clusters, using standard
 routing protocols.
 
-[![Project maturity: beta](https://img.shields.io/badge/maturity-beta-orange.svg)](https://metallb.universe.tf/concepts/maturity/) [![license](https://img.shields.io/github/license/google/metallb.svg?maxAge=2592000)](https://github.com/google/metallb/blob/main/LICENSE) [![CircleCI](https://img.shields.io/circleci/project/github/google/metallb.svg)](https://circleci.com/gh/google/metallb) [![Containers](https://img.shields.io/badge/containers-ready-green.svg)](https://hub.docker.com/u/metallb) [![Go report card](https://goreportcard.com/badge/github.com/google/metallb)](https://goreportcard.com/report/github.com/google/metallb)
+[![Project maturity: beta](https://img.shields.io/badge/maturity-beta-orange.svg)](https://metallb.universe.tf/concepts/maturity/) [![license](https://img.shields.io/github/license/metallb/metallb.svg?maxAge=2592000)](https://github.com/metallb/metallb/blob/main/LICENSE) [![CircleCI](https://img.shields.io/circleci/project/github/metallb/metallb.svg)](https://circleci.com/gh/metallb/metallb) [![Containers](https://img.shields.io/badge/containers-ready-green.svg)](https://hub.docker.com/u/metallb) [![Go report card](https://goreportcard.com/badge/github.com/metallb/metallb)](https://goreportcard.com/report/github.com/metallb/metallb)
 
 Check out [MetalLB's website](https://metallb.universe.tf) for more
 information.
@@ -21,7 +21,7 @@ a [code of conduct](https://metallb.universe.tf/community/code-of-conduct/).
 
 One lightweight way you can contribute is
 to
-[tell us that you're using MetalLB](https://github.com/google/metallb/issues/5),
+[tell us that you're using MetalLB](https://github.com/metallb/metallb/issues/5),
 which will give us warm fuzzy feelings :).
 
 # Reporting security issues
