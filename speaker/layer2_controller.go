@@ -101,5 +101,6 @@ func (c *layer2Controller) DeleteBalancer(l log.Logger, name, reason string) err
 }
 
 func (c *layer2Controller) SetNode(log.Logger, *v1.Node) error {
+	c.sList.Rejoin()
 	return nil
 }

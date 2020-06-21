@@ -135,10 +135,7 @@ func main() {
 	}
 	ctrl.client = client
 
-	err = sList.Start(client)
-	if err != nil {
-		os.Exit(1)
-	}
+	sList.Start(client)
 	defer sList.Stop()
 
 	if err := client.Run(stopCh); err != nil {
@@ -371,4 +368,5 @@ type Protocol interface {
 // Speakerlist represents a list of healthy speakers.
 type SpeakerList interface {
 	UsableSpeakers() map[string]bool
+	Rejoin()
 }
