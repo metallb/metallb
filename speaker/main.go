@@ -367,4 +367,5 @@ type Protocol interface {
 // A Speakerlist returns usable speakers.
 type Speakerlist interface {
 	UsableSpeakers() map[string]bool
+	ReJoin()
 }

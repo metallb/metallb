@@ -32,8 +32,10 @@ type SpeakerList struct {
 	namespace string
 	labels    string
 	// following fields are nil when MemberList is disabled
-	mlEventCh chan memberlist.NodeEvent
-	mList     *memberlist.Memberlist
+	mlEventCh    chan memberlist.NodeEvent
+	mList        *memberlist.Memberlist
+	mlJoinCh     chan struct{}
+	mlJoinStopCh chan struct{}
 }
 
 // New creates a new SpeakerList
@@ -71,6 +73,12 @@ func New(logger gokitlog.Logger, nodeName, bindAddr, bindPort, secret, namespace
 		sha := sha256.New()
 		mconfig.SecretKey = sha.Sum([]byte(secret))[:16]
 	}
+
+	// Should not block, so make it 'big'
+	sl.mlJoinCh = make(chan struct{}, 1024)
+
+	sl.mlJoinStopCh = make(chan struct{})
+
 	// ChannelEventDelegate hint that it should not block, so make mlEventCh 'big'
 	sl.mlEventCh = make(chan memberlist.NodeEvent, 1024)
 	mconfig.Events = &memberlist.ChannelEventDelegate{Ch: sl.mlEventCh}
@@ -92,16 +100,58 @@ func (sl *SpeakerList) Start(client *k8s.Client) error {
 	}
 
 	go sl.memberlistWatchEvents()
+	go sl.mlJoinLoop()
 
+	return nil
+}
+
+func (sl *SpeakerList) mlJoinLoop() {
+	ticker := time.NewTicker(5 * time.Minute)
+
+	for {
+		select {
+		case <-sl.mlJoinStopCh:
+			return
+		case <-ticker.C:
+			sl.mlJoin()
+		case <-sl.mlJoinCh:
+			sl.mlJoin()
+		}
+	}
+}
+
+func (sl *SpeakerList) mlJoin() (nr int, err error) {
 	iplist, err := sl.client.GetPodsIPs(sl.namespace, sl.labels)
 	if err != nil {
 		sl.l.Log("op", "startup", "error", err, "msg", "failed to get PodsIPs")
-		return err
+		return 0, err
 	}
-	n, err := sl.mList.Join(iplist)
-	sl.l.Log("op", "startup", "msg", "Memberlist join", "nb joigned", n, "error", err)
 
-	return nil
+	for i := 0; i < 6; i++ {
+		nr, err = sl.mList.Join(iplist)
+		if err != nil || len(iplist) != nr {
+			sl.l.Log("op", "Member detection", "msg", "Memberlist join", "nb joigned", nr, "error", err)
+			time.Sleep(10 * time.Second)
+			break
+		}
+
+		sl.l.Log("op", "Member detection", "msg", "Memberlist join succesfully", "number of other nodes", nr)
+		return
+	}
+
+	return
+}
+
+// ReJoin initiates a discovery and join of all cluster speakers.
+func (sl *SpeakerList) ReJoin() {
+	if sl.mList == nil {
+		return
+	}
+
+	sl.l.Log("op", "Member detection", "msg", "Sending message to re-process cluster members")
+	sl.mlJoinCh <- struct{}{}
+	sl.l.Log("op", "Member detection", "msg", "Sent message to re-process cluster members")
+	return
 }
 
 // UsableSpeakers return a map of usable nodes
@@ -140,6 +190,7 @@ func (sl *SpeakerList) memberlistWatchEvents() {
 			sl.l.Log("msg", "Call Force Sync")
 			sl.client.ForceSync()
 		case <-sl.stopCh:
+			close(sl.mlJoinStopCh)
 			return
 		}
 	}
