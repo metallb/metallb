@@ -93,6 +93,12 @@ func (a *Allocator) SetPools(pools map[string]*config.Pool) error {
 		}
 	}
 
+	// Refresh or initiate stats
+	for n, p := range a.pools {
+		stats.poolCapacity.WithLabelValues(n).Set(float64(poolCount(p)))
+		stats.poolActive.WithLabelValues(n).Set(float64(len(a.poolIPsInUse[n])))
+	}
+
 	return nil
 }
 
