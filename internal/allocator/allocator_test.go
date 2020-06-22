@@ -1317,6 +1317,13 @@ func TestPoolMetrics(t *testing.T) {
 		},
 	}
 
+	// The "test" pool contains two ranges; 1.2.3.4/30, 1000::4/126
+	// All bits can be used for lb-addresses which gives a total capacity of; 4+4=8
+	value := ptu.ToFloat64(stats.poolCapacity.WithLabelValues("test"))
+	if int(value) != 8 {
+		t.Errorf("stats.poolCapacity invalid %f. Expected 8", value)
+	}
+
 	for _, test := range tests {
 		if test.ip == "" {
 			alloc.Unassign(test.svc)
@@ -1342,13 +1349,6 @@ func TestPoolMetrics(t *testing.T) {
 		value := ptu.ToFloat64(stats.poolActive.WithLabelValues("test"))
 		if value != test.ipsInUse {
 			t.Errorf("%v; in-use %v. Expected %v", test.desc, value, test.ipsInUse)
-		}
-
-		// The "test" pool contains two ranges; 1.2.3.4/30, 1000::4/126
-		// All bits can be used for lb-addresses which gives a total capacity of; 4+4=8
-		value = ptu.ToFloat64(stats.poolCapacity.WithLabelValues("test"))
-		if int(value) != 8 {
-			t.Errorf("stats.poolCapacity invalid %f. Expected 8", value)
 		}
 	}
 }
