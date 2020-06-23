@@ -13,7 +13,7 @@ look at the [cloud compatibility]({{% relref "installation/clouds.md"
 %}}) page and make sure your cloud platform can work with MetalLB
 (most cannot).
 
-There is two supported ways to install MetalLB: using plain Kubernetes
+There are two supported ways to install MetalLB: using plain Kubernetes
 manifests, or using Kustomize.
 
 ## Preparation
