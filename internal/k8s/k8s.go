@@ -18,6 +18,7 @@ import (
 	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
 )
@@ -67,11 +68,13 @@ const (
 type Config struct {
 	ProcessName   string
 	ConfigMapName string
+	ConfigMapNS   string
 	NodeName      string
 	MetricsHost   string
 	MetricsPort   int
 	ReadEndpoints bool
 	Logger        log.Logger
+	Kubeconfig    string
 
 	ServiceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) SyncState
 	ConfigChanged  func(log.Logger, *config.Config) SyncState
@@ -89,7 +92,20 @@ type synced string
 // The client uses processName to identify itself to the cluster
 // (e.g. when logging events).
 func New(cfg *Config) (*Client, error) {
-	k8sConfig, err := rest.InClusterConfig()
+	var (
+		k8sConfig *rest.Config
+		err       error
+	)
+
+	if cfg.Kubeconfig == "" {
+		// if the user didn't provide a config file, assume that we're
+		// running inside k8s.
+		k8sConfig, err = rest.InClusterConfig()
+	} else {
+		// the user provided a config file, so use that.  InClusterConfig
+		// would also work in this case but it emits an annoying warning.
+		k8sConfig, err = clientcmd.BuildConfigFromFlags("", cfg.Kubeconfig)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("building client config: %s", err)
 	}
@@ -98,11 +114,14 @@ func New(cfg *Config) (*Client, error) {
 		return nil, fmt.Errorf("creating Kubernetes client: %s", err)
 	}
 
-	bs, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-	if err != nil {
-		return nil, fmt.Errorf("getting namespace from pod service account data: %s", err)
+	namespace := cfg.ConfigMapNS
+	if namespace == "" {
+		bs, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+		if err != nil {
+			return nil, fmt.Errorf("getting namespace from pod service account data: %s", err)
+		}
+		namespace = string(bs)
 	}
-	namespace := string(bs)
 
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(clientset.CoreV1().RESTClient()).Events("")})
