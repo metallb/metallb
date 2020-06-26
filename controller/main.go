@@ -134,8 +134,10 @@ func main() {
 	}
 
 	var (
-		port   = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
-		config = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
+		port       = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
+		config     = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
+		configNS   = flag.String("config-ns", "", "config file namespace (only needed when running outside of k8s)")
+		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
 	)
 	flag.Parse()
 
@@ -148,8 +150,10 @@ func main() {
 	client, err := k8s.New(&k8s.Config{
 		ProcessName:   "metallb-controller",
 		ConfigMapName: *config,
+		ConfigMapNS:   *configNS,
 		MetricsPort:   *port,
 		Logger:        logger,
+		Kubeconfig:    *kubeconfig,
 
 		ServiceChanged: c.SetBalancer,
 		ConfigChanged:  c.SetConfig,

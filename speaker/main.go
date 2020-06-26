@@ -70,6 +70,8 @@ func main() {
 
 	var (
 		config      = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
+		configNS    = flag.String("config-ns", "", "config file namespace (only needed when running outside of k8s)")
+		kubeconfig  = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
 		host        = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
 		mlBindAddr  = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
 		mlBindPort  = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
@@ -146,8 +148,10 @@ func main() {
 	client, err := k8s.New(&k8s.Config{
 		ProcessName:   "metallb-speaker",
 		ConfigMapName: *config,
+		ConfigMapNS:   *configNS,
 		NodeName:      *myNode,
 		Logger:        logger,
+		Kubeconfig:    *kubeconfig,
 
 		MetricsHost:   *host,
 		MetricsPort:   *port,
