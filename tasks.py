@@ -310,6 +310,13 @@ def release(ctx, version, skip_release_notes=False):
     run("perl -pi -e 's,image: metallb/speaker:.*,image: metallb/speaker:v{},g' manifests/metallb.yaml".format(version), echo=True)
     run("perl -pi -e 's,image: metallb/controller:.*,image: metallb/controller:v{},g' manifests/metallb.yaml".format(version), echo=True)
 
+    # Update the version in kustomize instructions
+    #
+    # TODO: Check if kustomize instructions really need the version in the
+    # website or if there is a simpler way. For now, though, we just replace the
+    # only page that mentions the version on release.
+    run("perl -pi -e 's,github.com/metallb/metallb//manifests\?ref=.*,github.com/metallb/metallb//manifests\?ref=v{},g' website/content/installation/_index.md".format(version), echo=True)
+
     # Update the version embedded in the binary
     run("perl -pi -e 's/version\s+=.*/version = \"{}\"/g' internal/version/version.go".format(version), echo=True)
     run("gofmt -w internal/version/version.go", echo=True)
