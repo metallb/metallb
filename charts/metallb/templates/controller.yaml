@@ -1,0 +1,102 @@
+{{- if .Values.controller.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "metallb.fullname" . }}-controller
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+spec:
+  selector:
+    matchLabels:
+      {{- include "metallb.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: controller
+  template:
+    metadata:
+      {{- if or .Values.prometheus.scrapeAnnotations .Values.controller.podAnnotations }}
+      annotations:
+        {{- if .Values.prometheus.scrapeAnnotations }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "7472"
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      labels:
+        {{- include "metallb.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: controller
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ template "metallb.controller.serviceAccountName" . }}
+      terminationGracePeriodSeconds: 0
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534 # nobody
+      containers:
+      - name: controller
+        image: {{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag | default .Chart.AppVersion }}
+        {{- if .Values.controller.image.pullPolicy }}
+        imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
+        {{- end }}
+        args:
+        - --config={{ template "metallb.configMapName" . }}
+        env:
+        {{- if and .Values.speaker.enabled .Values.speaker.memberlist.enabled }}
+        - name: METALLB_ML_SECRET_NAME
+          value: {{ include "metallb.secretName" . }}
+        - name: METALLB_DEPLOYMENT
+          value: {{ template "metallb.fullname" . }}-controller
+        {{- end }}
+        ports:
+        - name: metrics
+          containerPort: 7472
+        {{- if .Values.controller.livenessProbe.enabled }}
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: {{ .Values.controller.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.controller.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.controller.livenessProbe.timeoutSeconds }}
+          successThreshold: {{ .Values.controller.livenessProbe.successThreshold }}
+          failureThreshold: {{ .Values.controller.livenessProbe.failureThreshold }}
+        {{- end }}
+        {{- if .Values.controller.readinessProbe.enabled }}
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: {{ .Values.controller.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.controller.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.controller.readinessProbe.timeoutSeconds }}
+          successThreshold: {{ .Values.controller.readinessProbe.successThreshold }}
+          failureThreshold: {{ .Values.controller.readinessProbe.failureThreshold }}
+        {{- end }}
+        {{- with .Values.controller.resources }}
+        resources:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      nodeSelector:
+        "kubernetes.io/os": linux
+        {{- with .Values.controller.nodeSelector }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.controller.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.controller.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+{{- end }}

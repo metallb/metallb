@@ -1,0 +1,11 @@
+{{- if .Values.configInline }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "metallb.configMapName" . }}
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+data:
+  config: |
+{{- toYaml .Values.configInline | nindent 4 }}
+{{- end }}

@@ -1,0 +1,165 @@
+{{- if .Values.rbac.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "metallb.fullname" . }}:controller
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list", "watch", "update"]
+- apiGroups: [""]
+  resources: ["services/status"]
+  verbs: ["update"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+{{- if .Values.psp.create }}
+- apiGroups: ["policy"]
+  resources: ["podsecuritypolicies"]
+  resourceNames: ["{{ template "metallb.fullname" . }}-controller"]
+  verbs: ["use"]
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ template "metallb.fullname" . }}:speaker
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["services", "endpoints", "nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create", "patch"]
+{{- if .Values.psp.create }}
+- apiGroups: ["policy"]
+  resources: ["podsecuritypolicies"]
+  resourceNames: ["{{ template "metallb.fullname" . }}-speaker"]
+  verbs: ["use"]
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ template "metallb.fullname" . }}-config-watcher
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "metallb.fullname" . }}-pod-lister
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "metallb.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["list"]
+{{- if .Values.speaker.memberlist.enabled }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "metallb.fullname" . }}-controller
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "metallb.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["{{ include "metallb.secretName" . }}"]
+  verbs: ["list"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  resourceNames: ["{{ template "metallb.fullname" . }}-controller"]
+  verbs: ["get"]
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ template "metallb.fullname" . }}:controller
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+subjects:
+- kind: ServiceAccount
+  name: {{ template "metallb.controller.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ template "metallb.fullname" . }}:controller
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ template "metallb.fullname" . }}:speaker
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+subjects:
+- kind: ServiceAccount
+  name: {{ template "metallb.speaker.serviceAccountName" . }}
+  namespace: {{ .Release.Namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ template "metallb.fullname" . }}:speaker
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ template "metallb.fullname" . }}-config-watcher
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+subjects:
+- kind: ServiceAccount
+  name: {{ template "metallb.controller.serviceAccountName" . }}
+- kind: ServiceAccount
+  name: {{ template "metallb.speaker.serviceAccountName" . }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ template "metallb.fullname" . }}-config-watcher
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "metallb.fullname" . }}-pod-lister
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "metallb.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "metallb.fullname" . }}-pod-lister
+subjects:
+- kind: ServiceAccount
+  name: {{ include "metallb.speaker.serviceAccountName" . }}
+{{- if .Values.speaker.memberlist.enabled }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "metallb.fullname" . }}-controller
+  namespace: {{ .Release.Namespace }}
+  labels: {{- include "metallb.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "metallb.fullname" . }}-controller
+subjects:
+- kind: ServiceAccount
+  name: {{ include "metallb.controller.serviceAccountName" . }}
+{{- end -}}
+{{- end -}}
