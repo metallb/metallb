@@ -1,0 +1,63 @@
+{{- if .Values.prometheus.podMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ template "metallb.fullname" . }}-controller
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
+spec:
+  jobLabel: {{ .Values.prometheus.podMonitor.jobLabel | quote }}
+  selector:
+    matchLabels:
+      {{- include "metallb.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: controller
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace }}
+  podMetricsEndpoints:
+  - port: metrics
+    path: /metrics
+    {{- if .Values.prometheus.podMonitor.interval }}
+    interval: {{ .Values.prometheus.podMonitor.interval }}
+    {{- end }}
+{{- if .Values.prometheus.podMonitor.metricRelabelings }}
+    metricRelabelings:
+{{- toYaml .Values.prometheus.podMonitor.metricRelabelings | nindent 4 }}
+{{- end }}
+{{- if .Values.prometheus.podMonitor.relabelings }}
+    relabelings:
+{{- toYaml .Values.prometheus.podMonitor.relabelings | nindent 4 }}
+{{- end }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ template "metallb.fullname" . }}-speaker
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: speaker
+spec:
+  jobLabel: {{ .Values.prometheus.podMonitor.jobLabel | quote }}
+  selector:
+    matchLabels:
+      {{- include "metallb.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: speaker
+  namespaceSelector:
+    matchNames:
+    - {{ .Release.Namespace }}
+  podMetricsEndpoints:
+  - port: metrics
+    path: /metrics
+    {{- if .Values.prometheus.podMonitor.interval }}
+    interval: {{ .Values.prometheus.podMonitor.interval }}
+    {{- end }}
+{{- if .Values.prometheus.podMonitor.metricRelabelings }}
+    metricRelabelings:
+{{- toYaml .Values.prometheus.podMonitor.metricRelabelings | nindent 4 }}
+{{- end }}
+{{- if .Values.prometheus.podMonitor.relabelings }}
+    relabelings:
+{{- toYaml .Values.prometheus.podMonitor.relabelings | nindent 4 }}
+{{- end }}
+{{- end }}

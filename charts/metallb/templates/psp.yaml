@@ -1,0 +1,95 @@
+{{- if .Values.psp.create -}}
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: {{ template "metallb.fullname" . }}-controller
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+spec:
+  privileged: false
+  # Host namespaces
+  hostPID: false
+  hostIPC: false
+  hostNetwork: false
+  hostPorts:
+  - min: 7472
+    max: 7472
+  # Volumes and file systems
+  volumes:
+  - configMap
+  - secret
+  - emptyDir
+  allowedHostPaths: []
+  readOnlyRootFilesystem: true
+  # Users and groups
+  runAsUser:
+    rule: MustRunAsNonRoot
+  supplementalGroups:
+    rule: MustRunAs
+    ranges:
+    - min: 1
+      max: 65535
+  fsGroup:
+    rule: MustRunAs
+    ranges:
+    - min: 1
+      max: 65535
+  # Privilege Escalation
+  allowPrivilegeEscalation: false
+  defaultAllowPrivilegeEscalation: false
+  # Capabilities
+  allowedCapabilities: []
+  defaultAddCapabilities: []
+  requiredDropCapabilities:
+  - ALL
+  # SELinux
+  seLinux:
+    rule: RunAsAny
+---
+apiVersion: policy/v1beta1
+kind: PodSecurityPolicy
+metadata:
+  name: {{ template "metallb.fullname" . }}-speaker
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+spec:
+  privileged: true
+  # Host namespaces
+  hostPID: false
+  hostIPC: false
+  hostNetwork: true
+  hostPorts:
+  - min: 7472
+    max: 7472
+  {{- if .Values.speaker.memberlist.enabled }}
+  - max: {{ .Values.speaker.memberlist.mlBindPort }}
+    min: {{ .Values.speaker.memberlist.mlBindPort }}
+  {{- end }}
+  # Volumes and file systems
+  volumes:
+  - configMap
+  - secret
+  - emptyDir
+  allowedHostPaths: []
+  readOnlyRootFilesystem: true
+  # Users and groups
+  runAsUser:
+    rule: RunAsAny
+  supplementalGroups:
+    rule: RunAsAny
+  fsGroup:
+    rule: RunAsAny
+  # Privilege Escalation
+  allowPrivilegeEscalation: false
+  defaultAllowPrivilegeEscalation: false
+  # Capabilities
+  allowedCapabilities:
+  - NET_RAW
+  defaultAddCapabilities: []
+  requiredDropCapabilities:
+  - ALL
+  # SELinux
+  seLinux:
+    rule: RunAsAny
+{{- end -}}

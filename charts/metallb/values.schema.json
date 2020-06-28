@@ -1,0 +1,245 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Values",
+  "type": "object",
+  "definitions": {
+    "prometheusAlert": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "labels": {
+          "type": "object"
+        }
+      },
+      "required": [ "enabled" ]
+    },
+    "probe": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "failureThreshold": {
+          "type": "integer"
+        },
+        "initialDelaySeconds": {
+          "type": "integer"
+        },
+        "periodSeconds": {
+          "type": "integer"
+        },
+        "successThreshold": {
+          "type": "integer"
+        },
+        "timeoutSeconds": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "failureThreshold",
+        "initialDelaySeconds",
+        "periodSeconds",
+        "successThreshold",
+        "timeoutSeconds"
+      ]
+    },
+    "component": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "type": "object",
+          "properties": {
+            "repository": {
+              "type": "string"
+            },
+            "tag": {
+              "anyOf": [
+                { "type": "string" },
+                { "type": "null" }
+              ]
+            },
+            "pullPolicy": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "enum": [ "Always", "IfNotPresent", "Never" ]
+                }
+              ]
+            }
+          }
+        },
+        "serviceAccount": {
+          "type": "object",
+          "properties": {
+            "create": {
+              "type": "boolean"
+            },
+            "name": {
+              "type": "string"
+            },
+            "annotations": {
+              "type": "object"
+            }
+          }
+        },
+        "resources": {
+          "type": "object"
+        },
+        "nodeSelector": {
+          "type": "object"
+        },
+        "tolerations": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        },
+        "affinity": {
+          "type": "object"
+        },
+        "podAnnotations": {
+          "type": "object"
+        },
+        "livenessProbe": {
+          "$ref": "#/definitions/probe"
+        },
+        "readinessProbe": {
+          "$ref": "#/definitions/probe"
+        }
+      },
+      "required": [
+        "image",
+        "serviceAccount"
+      ]
+    }
+  },
+  "properties": {
+    "imagePullSecrets": {
+      "description": "Secrets used for pulling images",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "nameOverride": {
+      "description": "Override chart name",
+      "type": "string"
+    },
+    "fullNameOverride": {
+      "description": "Override fully qualified app name",
+      "type": "string"
+    },
+    "existingConfigMap": {
+      "description": "Existing config map to use for metallb configs",
+      "type": "string"
+    },
+    "configInLine": {
+      "description": "MetalLB configuration",
+      "type": "object"
+    },
+    "rbac": {
+      "description": "RBAC configuration",
+      "type": "object",
+      "properties": {
+        "create": {
+          "description": "Enable RBAC",
+          "type": "boolean"
+        }
+      }
+    },
+    "psp": {
+      "description": "PSP configuration",
+      "type": "object",
+      "properties": {
+        "create": {
+          "description": "Enable PSP",
+          "type": "boolean"
+        }
+      }
+    },
+    "prometheus": {
+      "description": "Prometheus monitoring config",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "staleConfig": { "$ref": "#/definitions/prometheusAlert" },
+        "configNotLoaded": { "$ref": "#/definitions/prometheusAlert" },
+        "addressPoolExhausted": { "$ref": "#/definitions/prometheusAlert" },
+        "addressPoolUsage": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "thresholds": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "percent": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100
+                  },
+                  "labels": {
+                    "type": "object"
+                  }
+                },
+                "required": [ "percent" ]
+              }
+            }
+          }
+        },
+        "bgpSessionDown": { "$ref": "#/definitions/prometheusAlert" }
+      }
+    },
+    "controller": { 
+      "allOf": [
+        { "$ref": "#/definitions/component" },
+        { "description": "MetalLB Controller" }
+      ]
+    },
+    "speaker": { 
+      "allOf": [
+        { "$ref": "#/definitions/component" },
+        { "description": "MetalLB Controller",
+          "type": "object",
+          "properties": {
+            "tolerateMaster": {
+              "type": "boolean"
+            },
+            "memberlist": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "mlBindPort": {
+                  "type": "integer"
+                }
+              }
+            },
+            "secretName": {
+              "type": "string"
+            }
+          },
+          "required": [ "tolerateMaster" ]
+        }
+      ]
+    }
+  },
+  "required": [
+    "controller",
+    "speaker"
+  ]
+}

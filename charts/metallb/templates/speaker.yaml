@@ -1,0 +1,134 @@
+{{- if .Values.speaker.enabled }}
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: {{ template "metallb.fullname" . }}-speaker
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: speaker
+spec:
+  selector:
+    matchLabels:
+      {{- include "metallb.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: speaker
+  template:
+    metadata:
+      {{- if or .Values.prometheus.scrapeAnnotations .Values.speaker.podAnnotations }}
+      annotations:
+        {{- if .Values.prometheus.scrapeAnnotations }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "7472"
+        {{- end }}
+        {{- with .Values.podAnnotations }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- end }}
+      labels:
+        {{- include "metallb.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: speaker
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ template "metallb.speaker.serviceAccountName" . }}
+      terminationGracePeriodSeconds: 0
+      hostNetwork: true
+      containers:
+      - name: speaker
+        image: {{ .Values.speaker.image.repository }}:{{ .Values.speaker.image.tag | default .Chart.AppVersion }}
+        {{- if .Values.speaker.image.pullPolicy }}
+        imagePullPolicy: {{ .Values.speaker.image.pullPolicy }}
+        {{- end }}
+        args:
+        - --config={{ template "metallb.configMapName" . }}
+        env:
+        - name: METALLB_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: METALLB_HOST
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        {{- if .Values.speaker.memberlist.enabled }}
+        - name: METALLB_ML_BIND_ADDR
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: METALLB_ML_LABELS
+          value: "app.kubernetes.io/name={{ include "metallb.name" . }},app.kubernetes.io/component=speaker"
+        - name: METALLB_ML_BIND_PORT
+          value: "{{ .Values.speaker.memberlist.mlBindPort }}"
+        - name: METALLB_ML_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "metallb.secretName" . }}
+              key: secretkey
+        {{- end }}
+        ports:
+        - name: metrics
+          containerPort: 7472
+        {{- if .Values.speaker.memberlist.enabled }}
+        - name: memberlist-tcp
+          containerPort: {{ .Values.speaker.memberlist.mlBindPort }}
+          protocol: TCP
+        - name: memberlist-udp
+          containerPort: {{ .Values.speaker.memberlist.mlBindPort }}
+          protocol: UDP
+        {{- end }}
+        {{- if .Values.speaker.livenessProbe.enabled }}
+        livenessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: {{ .Values.speaker.livenessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.speaker.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.speaker.livenessProbe.timeoutSeconds }}
+          successThreshold: {{ .Values.speaker.livenessProbe.successThreshold }}
+          failureThreshold: {{ .Values.speaker.livenessProbe.failureThreshold }}
+        {{- end }}
+        {{- if .Values.speaker.readinessProbe.enabled }}
+        readinessProbe:
+          httpGet:
+            path: /metrics
+            port: metrics
+          initialDelaySeconds: {{ .Values.speaker.readinessProbe.initialDelaySeconds }}
+          periodSeconds: {{ .Values.speaker.readinessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.speaker.readinessProbe.timeoutSeconds }}
+          successThreshold: {{ .Values.speaker.readinessProbe.successThreshold }}
+          failureThreshold: {{ .Values.speaker.readinessProbe.failureThreshold }}
+        {{- end }}
+        {{- with .Values.speaker.resources }}
+        resources:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+            add:
+            - NET_RAW
+      nodeSelector:
+        "kubernetes.io/os": linux
+        {{- with .Values.speaker.nodeSelector }}
+          {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.speaker.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if or .Values.speaker.tolerateMaster .Values.speaker.tolerations }}
+      tolerations:
+      {{- if .Values.speaker.tolerateMaster }}
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+        operator: Exists
+      {{- end }}
+      {{- with .Values.speaker.tolerations }}
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+      {{- end }}
+{{- end }}

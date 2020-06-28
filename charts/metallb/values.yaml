@@ -1,0 +1,199 @@
+# Default values for metallb.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# To configure MetalLB, you must specify ONE of the following two
+# options.
+
+# existingConfigMap specifies the name of an externally-defined
+# ConfigMap to use as the configuration. Helm will not manage the
+# contents of this ConfigMap, it is your responsibility to create it.
+existingConfigMap: ""
+
+# configInline specifies MetalLB's configuration directly, in yaml
+# format. When configInline is used, Helm manages MetalLB's
+# configuration ConfigMap as part of the release, and
+# existingConfigMap is ignored.
+#
+# Refer to https://metallb.universe.tf/configuration/ for
+# available options.
+configInline: {}
+
+rbac:
+  # create specifies whether to install and use RBAC rules.
+  create: true
+
+psp:
+  # create specifies whether to install and use Pod Security Policies.
+  create: true
+
+prometheus:
+  # scrape annotations specifies whether to add Prometheus metric
+  # auto-collection annotations to pods. See
+  # https://github.com/prometheus/prometheus/blob/release-2.1/documentation/examples/prometheus-kubernetes.yml
+  # for a corresponding Prometheus configuration. Alternatively, you
+  # may want to use the Prometheus Operator
+  # (https://github.com/coreos/prometheus-operator) for more powerful
+  # monitoring configuration. If you use the Prometheus operator, this
+  # can be left at false.
+  scrapeAnnotations: false
+
+  # Prometheus Operator service monitors
+  podMonitor:
+
+    # enable support for Prometheus Operator
+    enabled: false
+
+    # Job label for scrape target
+    jobLabel: "app.kubernetes.io/name"
+
+    # Scrape interval. If not set, the Prometheus default scrape interval is used.
+    interval: ""
+
+    # 	metric relabel configs to apply to samples before ingestion.
+    metricRelabelings: []
+    # - action: keep
+    #   regex: 'kube_(daemonset|deployment|pod|namespace|node|statefulset).+'
+    #   sourceLabels: [__name__]
+
+    # 	relabel configs to apply to samples before ingestion.
+    relabelings: []
+    # - sourceLabels: [__meta_kubernetes_pod_node_name]
+    #   separator: ;
+    #   regex: ^(.*)$
+    #   target_label: nodename
+    #   replacement: $1
+    #   action: replace
+
+  # Prometheus Operator alertmanager alerts
+  prometheusRule:
+
+    # enable alertmanager alerts
+    enabled: false
+
+    # MetalLBStaleConfig
+    staleConfig:
+      enabled: true
+      labels:
+        severity: warning
+
+    # MetalLBConfigNotLoaded
+    configNotLoaded:
+      enabled: true
+      labels:
+        severity: warning
+
+    # MetalLBAddressPoolExhausted
+    addressPoolExhausted:
+      enabled: true
+      labels:
+        severity: alert
+
+    addressPoolUsage:
+      enabled: true
+      thresholds:
+        - percent: 75
+          labels:
+            severity: warning
+        - percent: 85
+          labels:
+            severity: warning
+        - percent: 95
+          labels:
+            severity: alert
+
+    # MetalLBBGPSessionDown
+    bgpSessionDown:
+      enabled: true
+      labels:
+        severity: alert
+
+    extraAlerts: []
+
+# controller contains configuration specific to the MetalLB cluster
+# controller.
+controller:
+  enabled: true
+  image:
+    repository: quay.io/metallb/controller
+    tag:
+    pullPolicy:
+  serviceAccount:
+    # Specifies whether a ServiceAccount should be created
+    create: true
+    # The name of the ServiceAccount to use. If not set and create is
+    # true, a name is generated using the fullname template
+    name: ""
+    annotations: {}
+  resources: {}
+    # limits:
+      # cpu: 100m
+      # memory: 100Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+  livenessProbe:
+    enabled: true
+    failureThreshold: 3
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    successThreshold: 1
+    timeoutSeconds: 1
+  readinessProbe:
+    enabled: true
+    failureThreshold: 3
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    successThreshold: 1
+    timeoutSeconds: 1
+
+# speaker contains configuration specific to the MetalLB speaker
+# daemonset.
+speaker:
+  enabled: true
+  tolerateMaster: true
+  memberlist:
+    enabled: true
+    mlBindPort: 7946
+  image:
+    repository: quay.io/metallb/speaker
+    tag:
+    pullPolicy:
+  serviceAccount:
+    # Specifies whether a ServiceAccount should be created
+    create: true
+    # The name of the ServiceAccount to use. If not set and create is
+    # true, a name is generated using the fullname template
+    name: ""
+    annotations: {}
+  ## Defines a secret name for the controller to generate a memberlist encryption secret
+  ## By default secretName: {{ "metallb.fullname" }}-memberlist
+  ##
+  # secretName:
+  resources: {}
+    # limits:
+      # cpu: 100m
+      # memory: 100Mi
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+  livenessProbe:
+    enabled: true
+    failureThreshold: 3
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    successThreshold: 1
+    timeoutSeconds: 1
+  readinessProbe:
+    enabled: true
+    failureThreshold: 3
+    initialDelaySeconds: 10
+    periodSeconds: 10
+    successThreshold: 1
+    timeoutSeconds: 1
