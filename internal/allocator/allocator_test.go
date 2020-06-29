@@ -1249,7 +1249,7 @@ func TestPoolMetrics(t *testing.T) {
 		ports      []Port
 		sharingKey string
 		backendKey string
-		ipsInUse   int
+		ipsInUse   float64
 	}{
 		{
 			desc:     "assign s1",
@@ -1328,8 +1328,8 @@ func TestPoolMetrics(t *testing.T) {
 		if test.ip == "" {
 			alloc.Unassign(test.svc)
 			value := ptu.ToFloat64(stats.poolActive.WithLabelValues("test"))
-			if int(value) != test.ipsInUse {
-				t.Errorf("%s; in-use %f. Expected %d", test.desc, value, test.ipsInUse)
+			if value != test.ipsInUse {
+				t.Errorf("%s; in-use %f. Expected %f", test.desc, value, test.ipsInUse)
 			}
 			continue
 		}
@@ -1347,8 +1347,8 @@ func TestPoolMetrics(t *testing.T) {
 			t.Errorf("%q: ran Assign(%q, %q), but allocator has recorded allocation of %q", test.desc, test.svc, test.ip, a)
 		}
 		value := ptu.ToFloat64(stats.poolActive.WithLabelValues("test"))
-		if int(value) != test.ipsInUse {
-			t.Errorf("%s; in-use %f. Expected %d", test.desc, value, test.ipsInUse)
+		if value != test.ipsInUse {
+			t.Errorf("%s; in-use %f. Expected %f", test.desc, value, test.ipsInUse)
 		}
 	}
 }
