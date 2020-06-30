@@ -116,7 +116,7 @@ To develop MetalLB, you'll need a couple of pieces of software:
 >versions may not work since there have been breaking changes between minor
 >versions.
 
-## Building the code
+## Building and running the code
 
 Start by fetching the MetalLB repository, with `git clone
 https://github.com/danderson/metallb`.
@@ -126,6 +126,19 @@ registries, and so forth. `inv -l` lists the available tasks.
 
 To build and deploy MetalLB to a local development environment using a kind
 cluster, run `inv dev-env`.
+
+When you're developing, running components at the command line and
+having them attach to a cluster might be more convenient than
+redeploying them to a cluster over and over.
+
+For the controller, the `-kubeconfig` and `-config-ns` command-line flags
+are needed.  Speakers need those and `-node-name`.
+
+For example:
+
+ metallb$ go run ./controller/main.go ./controller/service.go -config-ns metallb-system -kubeconfig $KUBECONFIG
+
+ metallb$ go run ./speaker/main.go ./speaker/*controller.go -config-ns metallb-system -kubeconfig $KUBECONFIG -node-name node0
 
 For development, fork
 the [github repository](https://github.com/google/metallb), and add
