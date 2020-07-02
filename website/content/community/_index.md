@@ -166,3 +166,8 @@ visit
 When editing the website, you can preview your changes locally by
 installing [Hugo](https://gohugo.io/) and running `hugo server` from
 the `website` directory.
+
+## Maintainers
+
+For information about the current maintainers of MetalLB, see the [maintainers
+page]({{% relref "maintainers.md" %}}).
