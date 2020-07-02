@@ -1,0 +1,12 @@
+# For more information on the syntax of the CODEOWNERS file, see:
+# https://docs.github.com/en/github/creating-cloning-and-archiving-repositories/about-code-owners
+
+# The MetalLB maintainers team
+*   @daxmc99 @johananl @rata
+
+# Emeritus Maintainers
+#
+# The following people were previously members of the maintainers team, but are
+# not currently focused on the project.
+#
+# - danderson  # Creator of MetalLB
