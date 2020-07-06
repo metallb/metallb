@@ -145,6 +145,18 @@ the [github repository](https://github.com/google/metallb), and add
 your fork as a remote in `$GOPATH/src/go.universe.tf/metallb`, with
 `git remote add fork git@github.com:<your-github-user>/metallb.git`.
 
+## Testing a Pull Request
+
+MetalLB has a CI process which publishes Docker images from the latest code
+revision of each open pull request.  If you would like to test out a prebuilt
+image of a PR, make sure the `deploy-speaker` or `deploy-controller` jobs have
+succeeded on the PR, and then you may pull `metallbdev/speaker:pr-<ID>` or
+`metallbdev/controller:pr-<ID>`.
+
+If a new revision of a pull request is posted, the image will be rebuilt.  If
+you want to ensure you’re always running the latest version of a pull request,
+make sure you set `imagePullPolicy` to `Always` in your Pod spec.
+
 ## The website
 
 The website at https://metallb.universe.tf is pinned to the latest
