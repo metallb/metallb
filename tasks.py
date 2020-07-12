@@ -415,6 +415,12 @@ def release(ctx, version, skip_release_notes=False):
     run("perl -pi -e 's,image: metallb/speaker:.*,image: metallb/speaker:v{},g' manifests/metallb.yaml".format(version), echo=True)
     run("perl -pi -e 's,image: metallb/controller:.*,image: metallb/controller:v{},g' manifests/metallb.yaml".format(version), echo=True)
 
+    # Update the versions in the helm chart (version and appVersion are always the same)
+    # helm chart versions follow Semantic Versioning, and thus exclude the leading 'v'
+    run("perl -pi -e 's,^version: .*,version: {},g' charts/metallb/Chart.yaml".format(version), echo=True)
+    run("perl -pi -e 's,^appVersion: .*,appVersion: v{},g' charts/metallb/Chart.yaml".format(version), echo=True)
+    run("perl -pi -e 's,^Current chart version is: .*,Current chart version is: `{}`,g' charts/metallb/README.md".format(version), echo=True)
+
     # Update the version in kustomize instructions
     #
     # TODO: Check if kustomize instructions really need the version in the
