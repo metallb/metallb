@@ -13,8 +13,8 @@ look at the [cloud compatibility]({{% relref "installation/clouds.md"
 %}}) page and make sure your cloud platform can work with MetalLB
 (most cannot).
 
-There are two supported ways to install MetalLB: using plain Kubernetes
-manifests, or using Kustomize.
+There are three supported ways to install MetalLB: using plain Kubernetes
+manifests, using Kustomize, or using Helm.
 
 ## Preparation
 
@@ -118,6 +118,31 @@ generatorOptions:
  disableNameSuffixHash: true
 ```
 
+## Installation with Helm
+
+You can install MetallLB with [helm](https://helm.sh/)
+by using the helm chart repository: https://metallb.github.io/metallb
+
+```yaml
+helm repo add metallb https://metallb.github.io/metallb
+helm install metallb metallb/metallb
+```
+
+A values file may be specified on installation. This is recommended for providing configs in helm values:
+```yaml
+helm install metallb metallb/metallb -f values.yaml
+```
+
+MetalLB configs are set in values.yaml under `configInLine`:
+```yaml
+configInline:
+  address-pools:
+   - name: default
+     protocol: layer2
+     addresses:
+     - 198.51.100.0/24
+```
+
 ## Upgrade
 
 When upgrading MetalLB, always check the [release notes](https://metallb.universe.tf/release-notes/)
@@ -131,3 +156,4 @@ described above.
 Please take the known limitations for [layer2](https://metallb.universe.tf/concepts/layer2/#limitations)
 and [bgp](https://metallb.universe.tf/concepts/bgp/#limitations) into account when performing an
 upgrade.
+=======
