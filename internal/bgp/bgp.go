@@ -29,6 +29,7 @@ type Session struct {
 	routerID         net.IP // May be nil, meaning "derive from context"
 	myNode           string
 	addr             string
+	srcAddr          string
 	peerASN          uint32
 	peerFBASNSupport bool
 	holdTime         time.Duration
@@ -170,7 +171,7 @@ func (s *Session) connect() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	deadline, _ := ctx.Deadline()
-	conn, err := dialMD5(ctx, s.addr, s.password)
+	conn, err := dialMD5(ctx, s.addr, s.srcAddr, s.password)
 	if err != nil {
 		return fmt.Errorf("dial %q: %s", s.addr, err)
 	}
@@ -351,9 +352,10 @@ func (s *Session) sendKeepalive() error {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func New(l log.Logger, addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time.Duration, password string, myNode string) (*Session, error) {
+func New(l log.Logger, addr string, srcAddr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time.Duration, password string, myNode string) (*Session, error) {
 	ret := &Session{
 		addr:        addr,
+		srcAddr:     srcAddr,
 		asn:         asn,
 		routerID:    routerID.To4(),
 		myNode:      myNode,
@@ -519,8 +521,20 @@ type tcpmd5sig struct {
 // proper TCP MD5 options when the password is not empty. Works by manupulating
 // the low level FD's, skipping the net.Conn API as it has not hooks to set
 // the neccessary sockopts for TCP MD5.
-func dialMD5(ctx context.Context, addr, password string) (net.Conn, error) {
-	laddr, err := net.ResolveTCPAddr("tcp", "[::]:0")
+func dialMD5(ctx context.Context, addr string, srcAddr string, password string) (net.Conn, error) {
+	// If srcAddr exists on any of the local network interfaces, use it as the
+	// source address of the TCP socket. Otherwise, use the IPv6 unspecified
+	// address ("::") to let the kernel figure out the source address.
+	// NOTE: On Linux, "::" also includes "0.0.0.0" (all IPv4 addresses).
+	//
+	// When the src-address configuration option isn't set by the user, srcAddr
+	// becomes "<nil>", which makes localAddressExists() return false.
+	a := "[::]"
+	if localAddressExists(srcAddr) {
+		a = srcAddr
+	}
+
+	laddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:0", a))
 	if err != nil {
 		return nil, fmt.Errorf("Error resolving local address: %s ", err)
 	}
@@ -664,4 +678,34 @@ func buildTCPMD5Sig(addr net.IP, key string) tcpmd5sig {
 	copy(t.key[0:], []byte(key))
 
 	return t
+}
+
+// localAddressExists returns true if the provided address exists locally on
+// any of the host's network interfaces. The function doesn't return errors and
+// instead returns false if an error has occurred while looking for the
+// address. This function is safe to call if addr is nil or malformed.
+func localAddressExists(addr string) bool {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return false
+	}
+
+	for _, i := range interfaces {
+		addresses, err := i.Addrs()
+		if err != nil {
+			return false
+		}
+
+		for _, a := range addresses {
+			ip, ok := a.(*net.IPNet)
+			if !ok {
+				return false
+			}
+			if ip.IP.Equal(net.ParseIP(addr)) {
+				return true
+			}
+		}
+	}
+
+	return false
 }
