@@ -41,6 +41,7 @@ type peer struct {
 	MyASN         uint32         `yaml:"my-asn"`
 	ASN           uint32         `yaml:"peer-asn"`
 	Addr          string         `yaml:"peer-address"`
+	SrcAddr       string         `yaml:"source-address"`
 	Port          uint16         `yaml:"peer-port"`
 	HoldTime      string         `yaml:"hold-time"`
 	RouterID      string         `yaml:"router-id"`
@@ -99,6 +100,8 @@ type Peer struct {
 	ASN uint32
 	// Address to dial when establishing the session.
 	Addr net.IP
+	// Source address to use when establishing the session.
+	SrcAddr net.IP
 	// Port to dial when establishing the session.
 	Port uint16
 	// Requested BGP hold time, per RFC4271.
@@ -278,6 +281,10 @@ func parsePeer(p peer) (*Peer, error) {
 			return nil, fmt.Errorf("invalid router ID %q", p.RouterID)
 		}
 	}
+	src := net.ParseIP(p.SrcAddr)
+	if p.SrcAddr != "" && src == nil {
+		return nil, fmt.Errorf("invalid source IP %q", p.SrcAddr)
+	}
 
 	// We use a non-pointer in the raw json object, so that if the
 	// user doesn't provide a node selector, we end up with an empty,
@@ -303,6 +310,7 @@ func parsePeer(p peer) (*Peer, error) {
 		MyASN:         p.MyASN,
 		ASN:           p.ASN,
 		Addr:          ip,
+		SrcAddr:       src,
 		Port:          port,
 		HoldTime:      holdTime,
 		RouterID:      routerID,
