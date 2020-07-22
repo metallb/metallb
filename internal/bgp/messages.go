@@ -121,6 +121,8 @@ var notificationCodes = map[uint16]string{
 	0x030a: "Invalid Network Field",
 	0x030b: "Malformed AS_PATH",
 
+	0x0400: "Hold Timer Expired (unspecific)",
+
 	0x0500: "BGP FSM state error (unspecific)",
 	0x0501: "Receive Unexpected Message in OpenSent State",
 	0x0502: "Receive Unexpected Message in OpenConfirm State",
