@@ -1,0 +1,43 @@
+! -*- bgp -*-
+!
+! BGPd sample configuration file
+!
+! $Id: bgpd.conf.sample,v 1.1 2002/12/13 20:15:29 paul Exp $
+!
+hostname bgpd
+password zebra
+!enable password please-set-at-here
+!
+!
+! NOTE: These NODE_IPs will be substituted with the IP addresses
+! assigned to the kind cluster Nodes if they are different.
+!
+router bgp 64512
+ neighbor NODE0_IP remote-as 64512
+ neighbor NODE0_IP next-hop-self
+ neighbor NODE1_IP remote-as 64512
+ neighbor NODE1_IP next-hop-self
+ neighbor NODE2_IP remote-as 64512
+ neighbor NODE2_IP next-hop-self
+
+!
+!router bgp 7675
+! bgp router-id 10.0.0.1
+! network 10.0.0.0/8
+! neighbor 10.0.0.2 remote-as 7675
+! neighbor 10.0.0.2 ebgp-multihop
+!
+! address-family ipv4 unicast
+!  neighbor 10.0.0.2 route-map set-nexthop out
+!  neighbor 10.0.0.2 next-hop-self
+! exit-address-family
+!
+! access-list all permit any
+!
+!route-map set-nexthop permit 10
+! match ip address all
+! set ip next-hop 10.0.0.1
+!
+!log file /var/log/bgpd.log
+!
+log stdout debugging

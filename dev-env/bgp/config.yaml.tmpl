@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    peers:
+      # NOTE: PEER_ADDRESS will be substituted with the IP address
+      # assigned to the frr container.
+    - peer-address: PEER_ADDRESS
+      peer-asn: 64512
+      my-asn: 64512
+    address-pools:
+    - name: default
+      protocol: bgp
+      addresses:
+      - 192.168.10.0/24
