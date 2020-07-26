@@ -23,6 +23,26 @@ jobs:
       - run: sudo apt-get install python3-pip
       - run: sudo pip3 install invoke semver pyyaml
       - run: inv checkpatch
+  # FIXME: this is pinned to v3.0.0 because subsequent versions of ct pull in new versions of helm, which are subject
+  #        to this bug: https://github.com/helm/helm/issues/8835, specifically for rbac object names with ':' in them
+  helm-lint:
+    working_directory: /repo
+    docker:
+      - image: quay.io/helmpack/chart-testing:v3.0.0
+    steps:
+      - checkout
+      - run: ct lint
+  # FIXME: instrumenta/helm-conftest does not yet support helm v3, v2 causes tests to fail.
+  #        Switch to it once https://github.com/instrumenta/helm-conftest/pull/8 is merged
+  helm-conftest:
+    working_directory: /repo
+    docker:
+      - image: alpine/helm:3.2.4
+    steps:
+      - run: apk add --update --no-cache git curl bash
+      - run: helm plugin install --debug https://github.com/instrumenta/helm-conftest
+      - checkout
+      - run: helm conftest charts/metallb/ -p charts/metallb/policy/ --fail-on-warn
   publish-images:
     docker:
       - image: cimg/go:1.13
@@ -62,6 +82,14 @@ workflows:
             tags:
               only: /.*/
       - lint-1.13:
+          filters:
+            tags:
+              only: /.*/
+      - helm-lint:
+          filters:
+            tags:
+              only: /.*/
+      - helm-conftest:
           filters:
             tags:
               only: /.*/
