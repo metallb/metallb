@@ -13,6 +13,18 @@ Are you actually ready to release? Check the milestone on github and
 verify that all its issues are closed. If there are open issues,
 you'll have to either resolve them, or bump to the next version.
 
+
+### Cherry-pick relevent commits
+
+MetalLB uses release branches to track releases. Relevant commits should be cherry-picked onto the release branch.
+For example:
+
+```
+git checkout v0.9
+git cherry-pick -x f1f86ed658c1e8a6f90f967ed94881d61476b4c0
+git push
+```
+
 ### Finalize release notes
 
 All release notes are always written on the `main` branch, and
@@ -49,7 +61,7 @@ fresh checkout.
 
 The release script will abort if the working directory isn't right.
 
-### Run the release script 
+### Run the release script
 
 Run `inv release X.Y.Z`. This will create the appropriate branches,
 commits and tags in your local repository.
