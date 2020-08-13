@@ -30,6 +30,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
+      - run: exit 1
       - run: sudo apt-get install python-pip
       - run: sudo pip install invoke semver pyyaml
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
@@ -44,6 +45,7 @@ jobs:
     steps:
       - checkout
       - setup_remote_docker
+      - run: exit 1
       - run: sudo apt-get install python-pip
       - run: sudo pip install invoke semver pyyaml
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
