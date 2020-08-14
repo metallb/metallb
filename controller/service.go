@@ -37,6 +37,15 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		return true
 	}
 
+	// Service not handled by this controller
+	if c.config.ControllerName != "" {
+		controllerName := svc.Annotations["metallb.universe.tf/controller-name"]
+		if controllerName != c.config.ControllerName {
+			c.clearServiceState(key, svc)
+			return true
+		}
+	}
+
 	// If the ClusterIP is malformed or not set we can't determine the
 	// ipFamily to use.
 	clusterIP := net.ParseIP(svc.Spec.ClusterIP)
