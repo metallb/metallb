@@ -34,6 +34,7 @@ type configFile struct {
 	Peers          []peer
 	BGPCommunities map[string]string `yaml:"bgp-communities"`
 	Pools          []addressPool     `yaml:"address-pools"`
+	ControllerName string            `yaml:"controller-name"`
 }
 
 type peer struct {
@@ -79,6 +80,8 @@ type Config struct {
 	Peers []*Peer
 	// Address pools from which to allocate load balancer IPs.
 	Pools map[string]*Pool
+	// Controller name used by the service annotation
+	ControllerName string
 }
 
 // Proto holds the protocol we are speaking.
@@ -236,6 +239,8 @@ func Parse(bs []byte) (*Config, error) {
 
 		cfg.Pools[p.Name] = pool
 	}
+
+	cfg.ControllerName = raw.ControllerName
 
 	return cfg, nil
 }
