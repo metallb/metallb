@@ -285,11 +285,7 @@ def bgp_dev_env():
         f.write(bgpd_config)
 
     # Run a BGP router in a container for all of the speakers to peer with.
-    try:
-        run("docker rm -f frr")
-    except Exception:
-        # This will fail if there's no frr container, which is normal.
-        pass
+    run('([ "$(docker ps -a | grep frr)" ] && docker rm -f frr) || /bin/true')
     run("docker run -d --privileged --network kind --rm --name frr --volume %s:/etc/frr "
             "frrouting/frr:latest" % frr_volume_dir, echo=True)
 
@@ -303,6 +299,24 @@ def bgp_dev_env():
     # Apply the MetalLB ConfigMap
     run("kubectl apply -f %s/config.yaml" % dev_env_dir)
 
+
+@task
+def dev_env_cleanup(ctx):
+    """Remove traces of the dev env"""
+    try:
+        run("kind delete cluster")
+    except Exception:
+        # This will fail if there's no cluster.
+        pass
+
+    run('([ "$(docker ps -a | grep frr)" ] && docker rm -f frr) || /bin/true')
+
+    dev_env_dir = os.getcwd() + "/dev-env/bgp"
+    frr_volume_dir = dev_env_dir + "/frr-volume"
+
+    # sudo because past docker runs will have changed ownership of this dir
+    sudo('rm -rf "%s"' % frr_volume_dir)
+    run('rm -f "%s"/config.yaml' % dev_env_dir)
 
 @task
 def test_cni_manifests(ctx):
