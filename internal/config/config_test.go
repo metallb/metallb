@@ -346,6 +346,19 @@ peers:
 		},
 
 		{
+			desc: "duplicate peers",
+			raw: `
+peers:
+- my-asn: 42
+  peer-asn: 42
+  peer-address: 1.2.3.4
+- my-asn: 42
+  peer-asn: 42
+  peer-address: 1.2.3.4
+`,
+		},
+
+		{
 			desc: "no pool name",
 			raw: `
 address-pools:

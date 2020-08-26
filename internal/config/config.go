@@ -18,6 +18,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -199,6 +200,14 @@ func Parse(bs []byte) (*Config, error) {
 		peer, err := parsePeer(p)
 		if err != nil {
 			return nil, fmt.Errorf("parsing peer #%d: %s", i+1, err)
+		}
+		for _, ep := range cfg.Peers {
+			// TODO: Be smarter regarding conflicting peers. For example, two
+			// peers could have a different hold time but they'd still result
+			// in two BGP sessions between the speaker and the remote host.
+			if reflect.DeepEqual(peer, ep) {
+				return nil, fmt.Errorf("peer #%d already exists", i+1)
+			}
 		}
 		cfg.Peers = append(cfg.Peers, peer)
 	}
