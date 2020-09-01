@@ -244,9 +244,10 @@ func newController(cfg controllerConfig) (*controller, error) {
 			return nil, fmt.Errorf("making layer2 announcer: %s", err)
 		}
 		protocols[config.Layer2] = &layer2Controller{
-			announcer: a,
-			myNode:    cfg.MyNode,
-			mList:     cfg.MList,
+			announcer:   a,
+			myNode:      cfg.MyNode,
+			mList:       cfg.MList,
+			activeNodes: make(map[string]map[string]bool),
 		}
 	}
 

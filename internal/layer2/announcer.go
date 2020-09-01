@@ -131,6 +131,15 @@ func (a *Announce) updateInterfaces() {
 	return
 }
 
+// Force a proactive announcement of all IP addresses.
+//
+// Proactively send another round of gratuitious ARP / NDP messages. This may be
+// necessary after recovering from a split in cluster membership to ensure that
+// the current intended owner of the IP address is respected by the network.
+func (a *Announce) ReAnnounce(name string) {
+	go a.spam(name)
+}
+
 func (a *Announce) spam(name string) {
 	// TODO: should abort if we lose control of the IP mid-spam.
 	start := time.Now()
@@ -209,13 +218,15 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 }
 
 // DeleteBalancer deletes an address from the set of addresses we should announce.
-func (a *Announce) DeleteBalancer(name string) {
+//
+// Returns the IP if it is no longer in use.
+func (a *Announce) DeleteBalancer(name string) net.IP {
 	a.Lock()
 	defer a.Unlock()
 
 	ip, ok := a.ips[name]
 	if !ok {
-		return
+		return nil
 	}
 	delete(a.ips, name)
 
@@ -223,7 +234,7 @@ func (a *Announce) DeleteBalancer(name string) {
 	if a.ipRefcnt[ip.String()] > 0 {
 		// Another service is still using this IP, don't touch any
 		// more things.
-		return
+		return nil
 	}
 
 	for _, client := range a.ndps {
@@ -232,6 +243,7 @@ func (a *Announce) DeleteBalancer(name string) {
 		}
 	}
 
+	return ip
 }
 
 // AnnounceName returns true when we have an announcement under name.

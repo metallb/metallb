@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"net"
+	"reflect"
 	"sort"
 
 	"github.com/go-kit/kit/log"
@@ -31,6 +32,13 @@ type layer2Controller struct {
 	announcer *layer2.Announce
 	myNode    string
 	mList     *memberlist.Memberlist
+	// Last known value of the active nodes known via memberlist, per service IP.
+	//
+	// This is used to detect a cluster membership change since the last time we
+	// looked at this service. The outer key is the service IP since we need to
+	// detect changes on a per IP basis. The value is a map of the current
+	// active nodes in the same format as the return of getActiveNodes().
+	activeNodes map[string]map[string]bool
 }
 
 func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
@@ -39,15 +47,7 @@ func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
 
 // usableNodes returns all nodes that have at least one fully ready
 // endpoint on them.
-func usableNodes(eps *v1.Endpoints, mList *memberlist.Memberlist) []string {
-	var activeNodes map[string]bool
-	if mList != nil {
-		activeNodes = map[string]bool{}
-		for _, n := range mList.Members() {
-			activeNodes[n.Name] = true
-		}
-	}
-
+func usableNodes(activeNodes map[string]bool, eps *v1.Endpoints) []string {
 	usable := map[string]bool{}
 	for _, subset := range eps.Subsets {
 		for _, ep := range subset.Addresses {
@@ -75,8 +75,21 @@ func usableNodes(eps *v1.Endpoints, mList *memberlist.Memberlist) []string {
 	return ret
 }
 
+func (c *layer2Controller) getActiveNodes() map[string]bool {
+	var activeNodes map[string]bool
+	if c.mList != nil {
+		activeNodes = map[string]bool{}
+		for _, n := range c.mList.Members() {
+			activeNodes[n.Name] = true
+		}
+	}
+
+	return activeNodes
+}
+
 func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
-	nodes := usableNodes(eps, c.mList)
+	activeNodes := c.getActiveNodes()
+	nodes := usableNodes(activeNodes, eps)
 	// Sort the slice by the hash of node + service name. This
 	// produces an ordering of ready nodes that is unique to this
 	// service.
@@ -97,15 +110,40 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Ser
 }
 
 func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
+	// Determine if the list of active nodes as determined by memberlist has
+	// changed since the last time we checked this service's IP. If so, we kick off
+	// sending gratuitous ARP / NDP for this service IP. This will handle the
+	// case where the cluster membership change is recovering from a network
+	// partition and we need to establish who the real current owner is of each
+	// IP address. This happens asynchronously.
+	var newService bool
+	activeNodes := c.getActiveNodes()
+	if _, ok := c.activeNodes[lbIP.String()]; !ok {
+		// We hadn't seen this service yet, so we shouldn't re-announce
+		newService = true
+		c.activeNodes[lbIP.String()] = activeNodes
+		// We've seen this service before and its active nodes have changed.
+	}
+	if !newService && !reflect.DeepEqual(activeNodes, c.activeNodes[lbIP.String()]) {
+		// We've seen this service before and its active nodes have changed.
+		l.Log("op", "SetBalancer", "msg", "Detected cluster membership change, re-announcing IP",
+			"newActiveNodes", activeNodes, "oldActiveNodes", c.activeNodes[lbIP.String()])
+		c.announcer.ReAnnounce(name)
+		c.activeNodes[lbIP.String()] = activeNodes
+	}
+
 	c.announcer.SetBalancer(name, lbIP)
 	return nil
 }
 
 func (c *layer2Controller) DeleteBalancer(l log.Logger, name, reason string) error {
 	if !c.announcer.AnnounceName(name) {
+		// No longer tracked by the announcer, so nothing else to do.
 		return nil
 	}
-	c.announcer.DeleteBalancer(name)
+	if unusedIP := c.announcer.DeleteBalancer(name); unusedIP != nil {
+		delete(c.activeNodes, unusedIP.String())
+	}
 	return nil
 }
 
