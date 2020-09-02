@@ -266,8 +266,8 @@ pool with the methods described in
 the [usage](/usage/#requesting-specific-ips) section.
 
 {{% notice note %}}
-Please note that if you have a single address pool, you must use `/32`
-CIDR notation (e.g. `42.176.25.64/32`).
+To specify a single IP address in a pool, use `/32` in the CIDR notation
+(e.g. `42.176.25.64/32`).
 {{% /notice %}}
 
 ### Handling buggy networks
