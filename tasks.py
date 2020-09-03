@@ -285,8 +285,9 @@ def bgp_dev_env():
         f.write(bgpd_config)
 
     # Run a BGP router in a container for all of the speakers to peer with.
-    run('([ "$(docker ps -a | grep frr)" ] && docker rm -f frr) || /bin/true',
-            echo=True)
+    run('for frr in $(docker ps -a -f name=frr --format {{.Names}}) ; do '
+        '    docker rm -f $frr ; '
+        'done', echo=True)
     run("docker run -d --privileged --network kind --rm --name frr --volume %s:/etc/frr "
             "frrouting/frr:latest" % frr_volume_dir, echo=True)
 
@@ -310,8 +311,9 @@ def dev_env_cleanup(ctx):
         # This will fail if there's no cluster.
         pass
 
-    run('([ "$(docker ps -a | grep frr)" ] && docker rm -f frr) || /bin/true',
-            echo=True)
+    run('for frr in $(docker ps -a -f name=frr --format {{.Names}}) ; do '
+        '    docker rm -f $frr ; '
+        'done', echo=True)
 
     dev_env_dir = os.getcwd() + "/dev-env/bgp"
     frr_volume_dir = dev_env_dir + "/frr-volume"
