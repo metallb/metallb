@@ -9,7 +9,7 @@ try:
 except ImportError:
     from urllib2 import urlopen
 
-from invoke import run, sudo, task
+from invoke import run, task
 from invoke.exceptions import Exit
 
 all_binaries = set(["controller",
@@ -253,7 +253,7 @@ def bgp_dev_env():
     # router configuration file (bgpd.conf).  Each Node will peer with this
     # router.
     node_ips = run("kubectl get nodes -o jsonpath='{.items[*].status.addresses"
-            "[?(@.type==\"InternalIP\")].address}'", echo=True)
+            "[?(@.type==\"InternalIP\")].address}{\"\\n\"}'", echo=True)
     node_ips = node_ips.stdout.strip().split()
     if len(node_ips) != 3:
         raise Exit(message='Expected 3 nodes, got %d' % len(node_ips))
@@ -261,7 +261,7 @@ def bgp_dev_env():
     # Create a new directory that will be used as the config volume for frr.
     try:
         # sudo because past docker runs will have changed ownership of this dir
-        sudo('rm -rf "%s"' % frr_volume_dir)
+        run('sudo rm -rf "%s"' % frr_volume_dir)
         os.mkdir(frr_volume_dir)
     except FileExistsError:
         pass
@@ -285,7 +285,8 @@ def bgp_dev_env():
         f.write(bgpd_config)
 
     # Run a BGP router in a container for all of the speakers to peer with.
-    run('([ "$(docker ps -a | grep frr)" ] && docker rm -f frr) || /bin/true')
+    run('([ "$(docker ps -a | grep frr)" ] && docker rm -f frr) || /bin/true',
+            echo=True)
     run("docker run -d --privileged --network kind --rm --name frr --volume %s:/etc/frr "
             "frrouting/frr:latest" % frr_volume_dir, echo=True)
 
@@ -309,13 +310,14 @@ def dev_env_cleanup(ctx):
         # This will fail if there's no cluster.
         pass
 
-    run('([ "$(docker ps -a | grep frr)" ] && docker rm -f frr) || /bin/true')
+    run('([ "$(docker ps -a | grep frr)" ] && docker rm -f frr) || /bin/true',
+            echo=True)
 
     dev_env_dir = os.getcwd() + "/dev-env/bgp"
     frr_volume_dir = dev_env_dir + "/frr-volume"
 
     # sudo because past docker runs will have changed ownership of this dir
-    sudo('rm -rf "%s"' % frr_volume_dir)
+    run('sudo rm -rf "%s"' % frr_volume_dir)
     run('rm -f "%s"/config.yaml' % dev_env_dir)
 
 @task
