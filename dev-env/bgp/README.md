@@ -5,9 +5,9 @@ dev-env -p bgp`, which sets up the development environment with some
 configuration and a BGP router for development and testing purposes.
 
 Along with the cluster, there will be a container named `frr` which is the BGP
-router.  Note that this only works in an IPv4 configuration for now.
+router. Note that this only works in an IPv4 configuration for now.
 
-The configuration used for MetalLB can be found in `config.yaml`.  The FRR
+The configuration used for MetalLB can be found in `config.yaml`. The FRR
 configuration is in the `frr/` directory.
 
 Observe that the BGP speakers have peered with our router:

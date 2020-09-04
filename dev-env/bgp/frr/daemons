@@ -64,7 +64,7 @@ vrrpd_options="  -A 127.0.0.1"
 #
 # This is the maximum number of FD's that will be available.
 # Upon startup this is read by the control files and ulimit
-# is called.  Uncomment and use a reasonable value for your
+# is called. Uncomment and use a reasonable value for your
 # setup if you are expecting a large number of peers in
 # say BGP.
 #MAX_FDS=1024
