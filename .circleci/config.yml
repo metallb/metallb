@@ -19,6 +19,10 @@ jobs:
       - checkout
       - run: curl -L https://git.io/vp6lP | sh # gometalinter
       - run: PATH=./bin:$PATH gometalinter --deadline=5m --disable-all --enable=gofmt --enable=vet --vendor ./...
+      - run: sudo apt-get update
+      - run: sudo apt-get install python3-pip
+      - run: sudo pip3 install invoke semver pyyaml
+      - run: inv checkpatch
   publish-images:
     docker:
       - image: cimg/go:1.13

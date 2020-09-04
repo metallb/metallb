@@ -11,7 +11,7 @@ except ImportError:
     from urllib2 import urlopen
 
 from invoke import run, task
-from invoke.exceptions import Exit
+from invoke.exceptions import Exit, UnexpectedExit
 
 all_binaries = set(["controller",
                     "speaker",
@@ -451,3 +451,21 @@ def test(ctx):
     """Run unit tests."""
     run("go test -short ./...")
     run("go test -short -race ./...")
+
+
+@task
+def checkpatch(ctx):
+    # Generate a diff of all changes on this branch from origin/main
+    # and look for any added lines with 2 spaces after a period.
+    try:
+        lines = run("git diff $(diff -u <(git rev-list --first-parent HEAD) "
+                                " <(git rev-list --first-parent origin/main) "
+                                " | sed -ne 's/^ //p' | head -1)..HEAD | "
+                                " grep '+.*\.\  '")
+
+        if len(lines.stdout.strip()) > 0:
+            raise Exit(message="ERROR: Found changed lines with 2 spaces "
+                               "after a period.")
+    except UnexpectedExit:
+        # Will exit non-zero if no double-space-after-period lines are found.
+        pass
