@@ -153,7 +153,7 @@ def push_multiarch(ctx, binaries, tag="dev", docker_user="metallb"):
     "architecture": "CPU architecture of the local machine. Default 'amd64'.",
     "name": "name of the kind cluster to use.",
     "protocol": "Pre-configure MetalLB with the specified protocol. "
-                "Unconfigured by default.  Supported: 'bgp'",
+                "Unconfigured by default. Supported: 'bgp'",
 })
 def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None):
     """Build and run MetalLB in a local Kind cluster.
@@ -240,7 +240,7 @@ stringData:
         print("Leaving MetalLB unconfigured")
 
 
-# Configure MetalLB in the dev-env for BGP testing.  Start an frr based BGP
+# Configure MetalLB in the dev-env for BGP testing. Start an frr based BGP
 # router in a container and configure MetalLB to peer with it.
 # See dev-env/bgp/README.md for some more information.
 def bgp_dev_env():
@@ -250,7 +250,7 @@ def bgp_dev_env():
     # TODO -- The IP address handling will need updates to add support for IPv6
 
     # We need the IPs for each Node in the cluster to place them in the BGP
-    # router configuration file (bgpd.conf).  Each Node will peer with this
+    # router configuration file (bgpd.conf). Each Node will peer with this
     # router.
     node_ips = run("kubectl get nodes -o jsonpath='{.items[*].status.addresses"
             "[?(@.type==\"InternalIP\")].address}{\"\\n\"}'", echo=True)
