@@ -304,7 +304,7 @@ def bgp_dev_env():
 
 @task
 def dev_env_cleanup(ctx):
-    """Remove traces of the dev env"""
+    """Remove traces of the dev env."""
     try:
         run("kind delete cluster")
     except Exception:
