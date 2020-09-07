@@ -29,7 +29,7 @@ Neighbor        V         AS   MsgRcvd   MsgSent   TblVer  InQ OutQ  Up/Down Sta
 Total number of neighbors 3
 ```
 
-Create an `nginx` Deployment and a corresponding Service LoadBalancer:
+Create an `nginx` Deployment and a corresponding Service of type LoadBalancer:
 
 ```
 kubectl apply -f dev-env/testsvc.yaml
