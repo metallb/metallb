@@ -298,11 +298,11 @@ def bgp_dev_env():
         raise Exit(message='Failed to create frr-volume directory: %s'
                    % str(e))
 
-    # These two config files are static, so we just copy them straight in.
-    shutil.copyfile("%s/frr/zebra.conf" % dev_env_dir,
-                    "%s/zebra.conf" % frr_volume_dir)
-    shutil.copyfile("%s/frr/daemons" % dev_env_dir,
-                    "%s/daemons" % frr_volume_dir)
+    # These config files are static, so we copy them straight in.
+    copy_files = ('zebra.conf', 'daemons', 'vtysh.conf')
+    for f in copy_files:
+        shutil.copyfile("%s/frr/%s" % (dev_env_dir, f),
+                        "%s/%s" % (frr_volume_dir, f))
 
     # bgpd.conf is created from a template so that we can include the current
     # Node IPs.
