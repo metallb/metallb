@@ -24,6 +24,9 @@ jobs:
       - image: cimg/go:1.13
     steps:
       - checkout
+      # This job should not run against PRs, but we have seen it run unexpectedly, so
+      # double check and exit early if this is a job against a PR.
+      - run: if [ -n "$CIRCLE_PULL_REQUEST" ]; then circleci-agent step halt; fi
       - setup_remote_docker
       - run: sudo apt-get update && sudo apt-get install -y python-pip
       - run: pip install invoke semver pyyaml
@@ -36,6 +39,9 @@ jobs:
       - image: cimg/go:1.13
     steps:
       - checkout
+      # This job should not run against PRs, but we have seen it run unexpectedly, so
+      # double check and exit early if this is a job against a PR.
+      - run: if [ -n "$CIRCLE_PULL_REQUEST" ]; then circleci-agent step halt; fi
       - setup_remote_docker
       - run: sudo apt-get update && sudo apt-get install -y python-pip
       - run: pip install invoke semver pyyaml
