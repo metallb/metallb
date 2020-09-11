@@ -1,5 +1,6 @@
 import os
 import semver
+import re
 import shutil
 import sys
 import yaml
@@ -149,6 +150,25 @@ def push_multiarch(ctx, binaries, tag="dev", docker_user="metallb"):
                 tag=tag),
             echo=True)
 
+
+def validate_kind_version():
+    """Validate minimum required version of kind."""
+    # If kind is not installed, this first command will raise an UnexpectedExit
+    # exception, and inv will exit at this point making it clear running "kind"
+    # failed.
+    raw_version = run("kind version", echo=True)
+
+    # x.y.z
+    version = re.search("v\d*\.(\d*)\.\d*", raw_version.stdout)
+    try:
+        y = int(version.group(1))
+    except Exception:
+        raise Exit(message="Unexpected output of 'kind version'")
+
+    if y < 8:
+        raise Exit(message="kind version >= 0.8 required")
+
+
 @task(help={
     "architecture": "CPU architecture of the local machine. Default 'amd64'.",
     "name": "name of the kind cluster to use.",
@@ -163,6 +183,9 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None):
     checkout, push them into kind, and deploy manifests/metallb.yaml
     to run those images.
     """
+
+    validate_kind_version()
+
     clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
     mk_cluster = name not in clusters
     if mk_cluster:
