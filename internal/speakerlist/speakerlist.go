@@ -85,8 +85,9 @@ func New(logger gokitlog.Logger, nodeName, bindAddr, bindPort, secret, namespace
 	// while waiting for the join operation to complete.
 	sl.mlJoinCh = make(chan struct{}, 1)
 
-	// ChannelEventDelegate hint that it should not block, so make mlEventCh
+	// ChannelEventDelegate hints that it should not block, so make mlEventCh
 	// 'big'.
+	// TODO: See https://github.com/metallb/metallb/issues/716
 	sl.mlEventCh = make(chan memberlist.NodeEvent, 1024)
 	mconfig.Events = &memberlist.ChannelEventDelegate{Ch: sl.mlEventCh}
 
