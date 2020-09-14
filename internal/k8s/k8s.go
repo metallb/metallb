@@ -259,8 +259,8 @@ func New(cfg *Config) (*Client, error) {
 	return c, nil
 }
 
-// GetPodsIPs get the IPs from all the pods matched by the labels string
-func (c *Client) GetPodsIPs(namespace, labels string) ([]string, error) {
+// PodIPs returns the IPs of all the pods matched by the labels string.
+func (c *Client) PodIPs(namespace, labels string) ([]string, error) {
 	pl, err := c.client.CoreV1().Pods(namespace).List(metav1.ListOptions{LabelSelector: labels})
 	if err != nil {
 		return nil, err
