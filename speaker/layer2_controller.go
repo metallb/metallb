@@ -38,15 +38,18 @@ func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
 
 // usableNodes returns all nodes that have at least one fully ready
 // endpoint on them.
-func usableNodes(eps *v1.Endpoints, usableSpeakers map[string]bool) []string {
+// The speakers parameter is a map with the node name as key and the readiness
+// status as value (true means ready, false means not ready).
+// If the speakers map is nil, it is ignored.
+func usableNodes(eps *v1.Endpoints, speakers map[string]bool) []string {
 	usable := map[string]bool{}
 	for _, subset := range eps.Subsets {
 		for _, ep := range subset.Addresses {
 			if ep.NodeName == nil {
 				continue
 			}
-			if usableSpeakers != nil {
-				if _, ok := usableSpeakers[*ep.NodeName]; !ok {
+			if speakers != nil {
+				if _, ok := speakers[*ep.NodeName]; !ok {
 					continue
 				}
 			}
