@@ -49,7 +49,7 @@ func usableNodes(eps *v1.Endpoints, speakers map[string]bool) []string {
 				continue
 			}
 			if speakers != nil {
-				if _, ok := speakers[*ep.NodeName]; !ok {
+				if ready, ok := speakers[*ep.NodeName]; !ok || !ready {
 					continue
 				}
 			}
