@@ -180,7 +180,7 @@ func (sl *SpeakerList) mlSpeakers() ([]string, error) {
 	// This call blocks until we get a response from the API server.
 	// In the client-go version we are using, there is no way to use a
 	// context. Newer versions of client-go support using a context
-	// in the call sl.client.GetPodsIPs() is using.
+	// in the call sl.client.PodIPs() is using.
 	//
 	// TODO: When updating client-go, this code can be simplified by using a
 	// context in the following way:
@@ -189,7 +189,7 @@ func (sl *SpeakerList) mlSpeakers() ([]string, error) {
 	// this function from mlJoin() with a context (timeout) and use
 	// sl.mlSpeakerIPs on failure. On success, we could update
 	// sl.mlSpeakerIPs with the response and continue to do the join.
-	iplist, err := sl.client.GetPodsIPs(sl.namespace, sl.labels)
+	iplist, err := sl.client.PodIPs(sl.namespace, sl.labels)
 	if err != nil {
 		return nil, err
 	}
