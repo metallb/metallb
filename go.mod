@@ -8,7 +8,6 @@ require (
 	github.com/eapache/channels v1.1.0 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
 	github.com/go-kit/kit v0.9.0
-	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/protobuf v1.3.1
 	github.com/google/go-cmp v0.3.0
 	github.com/googleapis/gnostic v0.2.0 // indirect
@@ -22,11 +21,9 @@ require (
 	github.com/osrg/gobgp v2.0.0+incompatible
 	github.com/prometheus/client_golang v1.0.0
 	github.com/satori/go.uuid v1.2.0 // indirect
-	github.com/spf13/cobra v0.0.5
-	github.com/spf13/pflag v1.0.3
+	github.com/spf13/viper v1.3.2 // indirect
 	github.com/vishvananda/netlink v1.0.0 // indirect
 	github.com/vishvananda/netns v0.0.0-20190625233234-7109fa855b0f // indirect
-	go.universe.tf/virtuakube v0.0.0-20190708182722-512c11153571
 	golang.org/x/sys v0.0.0-20190924154521-2837fb4f24fe
 	golang.org/x/time v0.0.0-20181108054448-85acf8d2951c // indirect
 	google.golang.org/grpc v1.22.0 // indirect
