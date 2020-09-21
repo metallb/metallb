@@ -281,7 +281,7 @@ func mkClusterNet(addon string) func(*vk.Universe) error {
 		// Wait for all deployments to schedule, which signals that
 		// the network addon's finished setting up.
 		err = c.WaitFor(context.Background(), func() (bool, error) {
-			deploys, err := c.KubernetesClient().AppsV1().Deployments("").List(metav1.ListOptions{})
+			deploys, err := c.KubernetesClient().AppsV1().Deployments("").List(context.TODO(), metav1.ListOptions{})
 			if err != nil {
 				return false, err
 			}
@@ -381,7 +381,7 @@ func buildUniverse() error {
 	}
 
 	err = cluster.WaitFor(context.Background(), func() (bool, error) {
-		ds, err := cluster.KubernetesClient().AppsV1().DaemonSets("default").Get("mirror", metav1.GetOptions{})
+		ds, err := cluster.KubernetesClient().AppsV1().DaemonSets("default").Get(context.TODO(), "mirror", metav1.GetOptions{})
 		if err != nil {
 			if kerr.IsNotFound(err) {
 				return false, nil
