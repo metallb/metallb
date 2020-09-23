@@ -192,6 +192,15 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 	a.ips[name] = ip
 
 	a.ipRefcnt[ip.String()]++
+
+	// Send a round of gratuitous ARP/NDP, even if the IP was already in use on
+	// this node. We will end up sending these more often than strictly necessary,
+	// but trying to be too clever could leave more opportunity for an inconsistent
+	// state of the network. Note that SetBalancer() is not only called for a new
+	// Service, it's also called any time key changes are detected, either changes
+	// to the Service or changes in this node's view of cluster membership.
+	go a.spam(name)
+
 	if a.ipRefcnt[ip.String()] > 1 {
 		// Multiple services are using this IP, so there's nothing
 		// else to do right now.
@@ -203,9 +212,6 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 			a.logger.Log("op", "watchMulticastGroup", "error", err, "ip", ip, "msg", "failed to watch NDP multicast group for IP, NDP responder will not respond to requests for this address")
 		}
 	}
-
-	go a.spam(name)
-
 }
 
 // DeleteBalancer deletes an address from the set of addresses we should announce.
