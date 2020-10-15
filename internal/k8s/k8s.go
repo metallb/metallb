@@ -2,6 +2,8 @@ package k8s // import "go.universe.tf/metallb/internal/k8s"
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -248,6 +250,61 @@ func New(cfg *Config) (*Client, error) {
 	}()
 
 	return c, nil
+}
+
+// CreateMlSecret create the memberlist secret.
+func (c *Client) CreateMlSecret(namespace, controllerDeploymentName, secretName string) error {
+	// Use List instead of Get to differentiate between API errors and non existing secret.
+	// Matching error text is prone to future breakage.
+	l, err := c.client.CoreV1().Secrets(namespace).List(context.TODO(), metav1.ListOptions{
+		FieldSelector: fields.OneTermEqualSelector("metadata.name", secretName).String(),
+	})
+	if err != nil {
+		return err
+	}
+	if len(l.Items) > 0 {
+		c.logger.Log("op", "CreateMlSecret", "msg", "secret already exists, nothing to do")
+		return nil
+	}
+
+	// Get the controller Deployment info to set secret ownerReference.
+	d, err := c.client.AppsV1().Deployments(namespace).Get(context.TODO(), controllerDeploymentName, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+
+	// Create the secret key (128 bits).
+	secret := make([]byte, 16)
+	_, err = rand.Read(secret)
+	if err != nil {
+		return err
+	}
+	// base64 encode the secret key as it'll be passed a env variable.
+	secretB64 := make([]byte, base64.RawStdEncoding.EncodedLen(len(secret)))
+	base64.RawStdEncoding.Encode(secretB64, secret)
+
+	// Create the K8S Secret object.
+	_, err = c.client.CoreV1().Secrets(namespace).Create(
+		context.TODO(),
+		&v1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: secretName,
+				OwnerReferences: []metav1.OwnerReference{{
+					// d.APIVersion is empty.
+					APIVersion: "apps/v1",
+					// d.Kind is empty.
+					Kind: "Deployment",
+					Name: d.Name,
+					UID:  d.UID,
+				}},
+			},
+			Data: map[string][]byte{"secretkey": secretB64},
+		},
+		metav1.CreateOptions{})
+	if err == nil {
+		c.logger.Log("op", "CreateMlSecret", "msg", "secret succesfully created")
+	}
+	return err
 }
 
 // PodIPs returns the IPs of all the pods matched by the labels string.

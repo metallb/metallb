@@ -128,8 +128,10 @@ func main() {
 	var (
 		port       = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
 		config     = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
-		namespace  = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file namespace")
+		namespace  = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config / memberlist secret namespace")
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
+		mlSecret   = flag.String("ml-secret-name", os.Getenv("METALLB_ML_SECRET_NAME"), "name of the memberlist secret to create")
+		deployName = flag.String("deployment", os.Getenv("METALLB_DEPLOYMENT"), "name of the MetalLB controller Deployment")
 	)
 	flag.Parse()
 
@@ -163,6 +165,14 @@ func main() {
 	if err != nil {
 		logger.Log("op", "startup", "error", err, "msg", "failed to create k8s client")
 		os.Exit(1)
+	}
+
+	if *mlSecret != "" {
+		err = client.CreateMlSecret(*namespace, *deployName, *mlSecret)
+		if err != nil {
+			logger.Log("op", "startup", "error", err, "msg", "failed to create memberlist secret")
+			os.Exit(1)
+		}
 	}
 
 	c.client = client

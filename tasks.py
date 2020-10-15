@@ -236,22 +236,7 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None):
             f.write(manifest)
             f.flush()
 
-        # Create memberlist secret.
-        secret = """---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: memberlist
-  namespace: metallb-system
-stringData:
-  secretkey: verysecurelol"""
-
-        with open(tmpdir + "/secret.yaml", "w") as f:
-            f.write(secret)
-            f.flush()
-
         run("kubectl apply -f {}/namespace.yaml".format(tmpdir), echo=True)
-        run("kubectl apply -f {}/secret.yaml".format(tmpdir), echo=True)
         run("kubectl apply -f {}/metallb.yaml".format(tmpdir), echo=True)
 
     with open("e2etest/manifests/mirror-server.yaml") as f:
