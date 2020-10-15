@@ -51,8 +51,8 @@ func New(logger gokitlog.Logger, nodeName, bindAddr, bindPort, secret, namespace
 		labels:    labels,
 	}
 
-	if namespace == "" || labels == "" || bindAddr == "" {
-		logger.Log("op", "startup", "msg", "not starting fast dead node detection (memberlist), need ml-bindaddr / ml-labels / ml-namespace config")
+	if labels == "" || bindAddr == "" {
+		logger.Log("op", "startup", "msg", "not starting fast dead node detection (memberlist), need ml-bindaddr / ml-labels config")
 		return &sl, nil
 	}
 
