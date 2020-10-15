@@ -287,6 +287,10 @@ spec:
         - --port=7472
         - --config=config
         env:
+        - name: METALLB_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         - name: METALLB_NODE_NAME
           valueFrom:
             fieldRef:
@@ -304,10 +308,6 @@ spec:
         #  value: "7946"
         - name: METALLB_ML_LABELS
           value: "app=metallb,component=speaker"
-        - name: METALLB_ML_NAMESPACE
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
         - name: METALLB_ML_SECRET_KEY
           valueFrom:
             secretKeyRef:
@@ -369,6 +369,11 @@ spec:
       - args:
         - --port=7472
         - --config=config
+        env:
+        - name: METALLB_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
         image: metallb/controller:main
         imagePullPolicy: Always
         name: controller
