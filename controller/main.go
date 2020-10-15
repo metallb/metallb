@@ -17,6 +17,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"reflect"
 
@@ -127,12 +128,21 @@ func main() {
 	var (
 		port       = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
 		config     = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
-		configNS   = flag.String("config-ns", "", "config file namespace (only needed when running outside of k8s)")
+		namespace  = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file namespace")
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
 	)
 	flag.Parse()
 
 	logger.Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "msg", "MetalLB controller starting "+version.String())
+
+	if *namespace == "" {
+		bs, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+		if err != nil {
+			logger.Log("op", "startup", "msg", "Unable to get namespace from pod service account data, please specify --namespace or METALLB_NAMESPACE", "error", err)
+			os.Exit(1)
+		}
+		*namespace = string(bs)
+	}
 
 	c := &controller{
 		ips: allocator.New(),
@@ -141,7 +151,7 @@ func main() {
 	client, err := k8s.New(&k8s.Config{
 		ProcessName:   "metallb-controller",
 		ConfigMapName: *config,
-		ConfigMapNS:   *configNS,
+		ConfigMapNS:   *namespace,
 		MetricsPort:   *port,
 		Logger:        logger,
 		Kubeconfig:    *kubeconfig,

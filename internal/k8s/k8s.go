@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 
 	"go.universe.tf/metallb/internal/config"
@@ -115,15 +114,6 @@ func New(cfg *Config) (*Client, error) {
 		return nil, fmt.Errorf("creating Kubernetes client: %s", err)
 	}
 
-	namespace := cfg.ConfigMapNS
-	if namespace == "" {
-		bs, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
-		if err != nil {
-			return nil, fmt.Errorf("getting namespace from pod service account data: %s", err)
-		}
-		namespace = string(bs)
-	}
-
 	broadcaster := record.NewBroadcaster()
 	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(clientset.CoreV1().RESTClient()).Events("")})
 	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: cfg.ProcessName})
@@ -213,7 +203,7 @@ func New(cfg *Config) (*Client, error) {
 				}
 			},
 		}
-		cmWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "configmaps", namespace, fields.OneTermEqualSelector("metadata.name", cfg.ConfigMapName))
+		cmWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "configmaps", cfg.ConfigMapNS, fields.OneTermEqualSelector("metadata.name", cfg.ConfigMapName))
 		c.cmIndexer, c.cmInformer = cache.NewIndexerInformer(cmWatcher, &v1.ConfigMap{}, 0, cmHandlers, cache.Indexers{})
 
 		c.configChanged = cfg.ConfigChanged

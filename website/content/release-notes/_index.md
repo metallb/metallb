@@ -12,6 +12,11 @@ Changes in behavior:
   included with MetalLB, but the binary itself previously defaulted to port
   `80`.
 
+- The `config-ns` option of both the `controller` and the `speaker` and the `ml-namespace`
+  option and `METALLB_ML_NAMESPACE` environment variable of the `speaker` are
+  replaced by the `namespace` option or the `METALLB_NAMESPACE` environment
+  variable. If not set the namespace is read from `/var/run/secrets/kubernetes.io/serviceaccount/namespace`.
+
 ## Version 0.9.6
 [Documentation for this release](https://metallb.universe.tf)
 
@@ -667,4 +672,3 @@ Notable fixes:
 
 This was the first tagged version of MetalLB. Its changelog is
 effectively "MetalLB now exists, where previously it did not."
-
