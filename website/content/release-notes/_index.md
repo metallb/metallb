@@ -3,14 +3,35 @@ title: Release Notes
 weight: 8
 ---
 
-## Version 0.9.3
+## Version 0.9.4
 [Documentation for this release](https://metallb.universe.tf)
+
+New features:
+
+- Make Memberlist bind port configurable ([#582](https://github.com/metallb/metallb/pull/582)).
+
+Bugfixes:
+
+- Improve speaker log output ([#587](https://github.com/metallb/metallb/pull/587)).
+- Add "other" exec permission to binaries in Docker images ([#644](https://github.com/metallb/metallb/pull/644)).
+- Fix wrong behavior of the addresses_in_use_total metric under certain conditions ([#627](https://github.com/metallb/metallb/pull/627)).
+- Layer 2: Fix Memberlist convergence following a network partition ([#662](https://github.com/metallb/metallb/pull/662)).
+- Layer 2: Send gratuitous ARP / unsolicited NDP neighbor advertisements following a network partition ([#736](https://github.com/metallb/metallb/pull/736)).
+
+This release includes contributions from Andrew Grosser, Chance Carey, Damien
+TOURDE, Etienne Champetier, Johannes Liebermann, Jumpy Squirrel, Lars Ekman,
+Rodrigo Campos, Russell Bryant, Sebastien Dionne, Steven Follis, sumarsono
+Thorsten Schifferdecker, toby cabot and Yuan Liu. Thanks to all of them for
+making MetalLB better!
+
+## Version 0.9.3
+[Documentation for this release](https://v0-9-3--metallb.netlify.com)
 
 Bugfixes:
 
 - Fix manifests to use container image version `v0.9.3` instead of `main`. Users
   of `v0.9.2` are encouraged to upgrade, as [manifests included in that
-  release](https://raw.githubusercontent.com/google/metallb/v0.9.3/manifests/metallb.yaml)
+  release](https://raw.githubusercontent.com/google/metallb/v0.9.2/manifests/metallb.yaml)
   use an incorrect container image version. Those two images happen to match
   now but, as development continues on `main` branch, they will differ.
 
