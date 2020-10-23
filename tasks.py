@@ -63,10 +63,11 @@ def _make_build_dirs():
       help={
           "binaries": "binaries to build. One or more of {}, or 'all'".format(", ".join(sorted(all_binaries))),
           "architectures": "architectures to build. One or more of {}, or 'all'".format(", ".join(sorted(all_architectures))),
-          "tag": "docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'.",
-          "docker-user": "docker user under which to tag the images. Default 'metallb'.",
+          "registry": "Docker registry under which to tag the images. Default 'docker.io'.",
+          "repo": "Docker repository under which to tag the images. Default 'metallb'.",
+          "tag": "Docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'.",
       })
-def build(ctx, binaries, architectures, tag="dev", docker_user="metallb"):
+def build(ctx, binaries, architectures, registry="docker.io", repo="metallb", tag="dev"):
     """Build MetalLB docker images."""
     binaries = _check_binaries(binaries)
     architectures = _check_architectures(architectures)
@@ -95,9 +96,10 @@ def build(ctx, binaries, architectures, tag="dev", docker_user="metallb"):
                 env=env,
                 echo=True)
             run("docker build "
-                "-t {user}/{bin}:{tag}-{arch} "
+                "-t {registry}/{repo}/{bin}:{tag}-{arch} "
                 "-f {bin}/Dockerfile build/{arch}/{bin}".format(
-                    user=docker_user,
+                    registry=registry,
+                    repo=repo,
                     bin=bin,
                     tag=tag,
                     arch=arch),
@@ -107,19 +109,21 @@ def build(ctx, binaries, architectures, tag="dev", docker_user="metallb"):
       help={
           "binaries": "binaries to build. One or more of {}, or 'all'".format(", ".join(sorted(all_binaries))),
           "architectures": "architectures to build. One or more of {}, or 'all'".format(", ".join(sorted(all_architectures))),
-          "tag": "docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'.",
-          "docker-user": "docker user under which to tag the images. Default 'metallb'.",
+          "registry": "Docker registry under which to tag the images. Default 'docker.io'.",
+          "repo": "Docker repository under which to tag the images. Default 'metallb'.",
+          "tag": "Docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'.",
       })
-def push(ctx, binaries, architectures, tag="dev", docker_user="metallb"):
+def push(ctx, binaries, architectures, registry="docker.io", repo="metallb", tag="dev"):
     """Build and push docker images to registry."""
     binaries = _check_binaries(binaries)
     architectures = _check_architectures(architectures)
 
     for arch in architectures:
         for bin in binaries:
-            build(ctx, binaries=[bin], architectures=[arch], tag=tag, docker_user=docker_user)
-            run("docker push {user}/{bin}:{tag}-{arch}".format(
-                user=docker_user,
+            build(ctx, binaries=[bin], architectures=[arch], registry=registry, repo=repo, tag=tag)
+            run("docker push {registry}/{repo}/{bin}:{tag}-{arch}".format(
+                registry=registry,
+                repo=repo,
                 bin=bin,
                 arch=arch,
                 tag=tag),
@@ -128,23 +132,25 @@ def push(ctx, binaries, architectures, tag="dev", docker_user="metallb"):
 @task(iterable=["binaries"],
       help={
           "binaries": "binaries to build. One or more of {}, or 'all'".format(", ".join(sorted(all_binaries))),
-          "tag": "docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'.",
-          "docker-user": "docker user under which to tag the images. Default 'metallb'.",
+          "registry": "Docker registry under which to tag the images. Default 'docker.io'.",
+          "repo": "Docker repository under which to tag the images. Default 'metallb'.",
+          "tag": "Docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'.",
       })
-def push_multiarch(ctx, binaries, tag="dev", docker_user="metallb"):
+def push_multiarch(ctx, binaries, registry="docker.io", repo="metallb", tag="dev"):
     """Build and push multi-architecture docker images to registry."""
     binaries = _check_binaries(binaries)
     architectures = _check_architectures(["all"])
-    push(ctx, binaries=binaries, architectures=architectures, tag=tag, docker_user=docker_user)
+    push(ctx, binaries=binaries, architectures=architectures, registry=registry, repo=repo, tag=tag)
 
     platforms = ",".join("linux/{}".format(arch) for arch in architectures)
     for bin in binaries:
         run("manifest-tool push from-args "
             "--platforms {platforms} "
-            "--template {user}/{bin}:{tag}-ARCH "
-            "--target {user}/{bin}:{tag}".format(
+            "--template {registry}/{repo}/{bin}:{tag}-ARCH "
+            "--target {registry}/{repo}/{bin}:{tag}".format(
                 platforms=platforms,
-                user=docker_user,
+                registry=registry,
+                repo=repo,
                 bin=bin,
                 tag=tag),
             echo=True)
