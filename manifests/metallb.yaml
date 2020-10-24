@@ -50,9 +50,7 @@ metadata:
 spec:
   allowPrivilegeEscalation: false
   allowedCapabilities:
-  - NET_ADMIN
   - NET_RAW
-  - SYS_ADMIN
   allowedHostPaths: []
   defaultAddCapabilities: []
   defaultAllowPrivilegeEscalation: false
@@ -335,9 +333,7 @@ spec:
           allowPrivilegeEscalation: false
           capabilities:
             add:
-            - NET_ADMIN
             - NET_RAW
-            - SYS_ADMIN
             drop:
             - ALL
           readOnlyRootFilesystem: true
