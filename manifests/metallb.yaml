@@ -324,10 +324,6 @@ spec:
         - containerPort: 7946
           name: memberlist-udp
           protocol: UDP
-        resources:
-          limits:
-            cpu: 100m
-            memory: 100Mi
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -378,10 +374,6 @@ spec:
         ports:
         - containerPort: 7472
           name: monitoring
-        resources:
-          limits:
-            cpu: 100m
-            memory: 100Mi
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
