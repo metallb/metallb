@@ -64,6 +64,8 @@ spec:
   hostPorts:
   - max: 7472
     min: 7472
+  - max: 7946
+    min: 7946
   privileged: true
   readOnlyRootFilesystem: true
   requiredDropCapabilities:
@@ -300,6 +302,8 @@ spec:
             fieldRef:
               fieldPath: status.podIP
         # needed when another software is also using memberlist / port 7946
+        # when changing this default you also need to update the container ports definition
+        # and the PodSecurityPolicy hostPorts definition
         #- name: METALLB_ML_BIND_PORT
         #  value: "7946"
         - name: METALLB_ML_LABELS
@@ -318,6 +322,11 @@ spec:
         ports:
         - containerPort: 7472
           name: monitoring
+        - containerPort: 7946
+          name: memberlist-tcp
+        - containerPort: 7946
+          name: memberlist-udp
+          protocol: UDP
         resources:
           limits:
             cpu: 100m
