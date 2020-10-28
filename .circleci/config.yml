@@ -5,7 +5,7 @@ jobs:
   test-1.13:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
-      - image: circleci/golang:1.13
+      - image: cimg/go:1.13
     steps:
       - checkout
       - run: sudo apt-get install python-pip
@@ -17,7 +17,7 @@ jobs:
   lint-1.13:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
-      - image: circleci/golang:1.13
+      - image: cimg/go:1.13
     steps:
       - checkout
       - run: echo "export GO111MODULE=on" >>$BASH_ENV
@@ -26,12 +26,12 @@ jobs:
   publish-images:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
-      - image: circleci/golang:1.13
+      - image: cimg/go:1.13
     steps:
       - checkout
       - setup_remote_docker
-      - run: sudo apt-get install python-pip
-      - run: sudo pip install invoke semver pyyaml
+      - run: sudo apt-get update && sudo apt-get install -y python-pip
+      - run: pip install invoke semver pyyaml
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
       - run: mkdir -p ./bin
       - run: wget -O ./bin/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.3/manifest-tool-linux-amd64 && chmod +x ./bin/manifest-tool
@@ -40,12 +40,12 @@ jobs:
   publish-images-quay:
     working_directory: /go/src/go.universe.tf/metallb
     docker:
-      - image: circleci/golang:1.13
+      - image: cimg/go:1.13
     steps:
       - checkout
       - setup_remote_docker
-      - run: sudo apt-get install python-pip
-      - run: sudo pip install invoke semver pyyaml
+      - run: sudo apt-get update && sudo apt-get install -y python-pip
+      - run: pip install invoke semver pyyaml
       - run: docker login quay.io -u $QUAY_USER -p $QUAY_PASSWORD
       - run: mkdir -p ./bin
       - run: wget -O ./bin/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.3/manifest-tool-linux-amd64 && chmod +x ./bin/manifest-tool
