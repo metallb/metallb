@@ -3,28 +3,21 @@
 version: 2
 jobs:
   test-1.13:
-    working_directory: /go/src/go.universe.tf/metallb
     docker:
       - image: cimg/go:1.13
     steps:
       - checkout
-      - run: sudo apt-get install python-pip
-      - run: sudo pip install invoke semver pyyaml
-      - run: echo "export GO111MODULE=on" >>$BASH_ENV
       - run: go test -short ./...
       - run: go test -short -race ./...
       - run: cp manifests/metallb.yaml manifests/metallb.yaml.prev
   lint-1.13:
-    working_directory: /go/src/go.universe.tf/metallb
     docker:
       - image: cimg/go:1.13
     steps:
       - checkout
-      - run: echo "export GO111MODULE=on" >>$BASH_ENV
       - run: curl -L https://git.io/vp6lP | sh # gometalinter
       - run: PATH=./bin:$PATH gometalinter --deadline=5m --disable-all --enable=gofmt --enable=vet --vendor ./...
   publish-images:
-    working_directory: /go/src/go.universe.tf/metallb
     docker:
       - image: cimg/go:1.13
     steps:
@@ -35,10 +28,8 @@ jobs:
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
       - run: mkdir -p ./bin
       - run: wget -O ./bin/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.3/manifest-tool-linux-amd64 && chmod +x ./bin/manifest-tool
-      - run: echo "export GO111MODULE=on" >>$BASH_ENV
       - run: PATH=./bin:$PATH inv push-multiarch --binaries=controller --binaries=speaker --registry=docker.io --repo=metallb --tag=${CIRCLE_BRANCH:-${CIRCLE_TAG}}
   publish-images-quay:
-    working_directory: /go/src/go.universe.tf/metallb
     docker:
       - image: cimg/go:1.13
     steps:
@@ -49,7 +40,6 @@ jobs:
       - run: docker login quay.io -u $QUAY_USER -p $QUAY_PASSWORD
       - run: mkdir -p ./bin
       - run: wget -O ./bin/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.3/manifest-tool-linux-amd64 && chmod +x ./bin/manifest-tool
-      - run: echo "export GO111MODULE=on" >>$BASH_ENV
       - run: PATH=./bin:$PATH inv push-multiarch --binaries=controller --binaries=speaker --registry=quay.io --repo=metallb --tag=${CIRCLE_BRANCH:-${CIRCLE_TAG}}
 workflows:
   version: 2
