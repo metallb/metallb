@@ -36,7 +36,21 @@ jobs:
       - run: mkdir -p ./bin
       - run: wget -O ./bin/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.3/manifest-tool-linux-amd64 && chmod +x ./bin/manifest-tool
       - run: echo "export GO111MODULE=on" >>$BASH_ENV
-      - run: PATH=./bin:$PATH inv push-multiarch --binaries=controller --binaries=speaker --tag=${CIRCLE_BRANCH:-${CIRCLE_TAG}} --repo=metallb
+      - run: PATH=./bin:$PATH inv push-multiarch --binaries=controller --binaries=speaker --registry=docker.io --repo=metallb --tag=${CIRCLE_BRANCH:-${CIRCLE_TAG}}
+  publish-images-quay:
+    working_directory: /go/src/go.universe.tf/metallb
+    docker:
+      - image: circleci/golang:1.13
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run: sudo apt-get install python-pip
+      - run: sudo pip install invoke semver pyyaml
+      - run: docker login quay.io -u $QUAY_USER -p $QUAY_PASSWORD
+      - run: mkdir -p ./bin
+      - run: wget -O ./bin/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.3/manifest-tool-linux-amd64 && chmod +x ./bin/manifest-tool
+      - run: echo "export GO111MODULE=on" >>$BASH_ENV
+      - run: PATH=./bin:$PATH inv push-multiarch --binaries=controller --binaries=speaker --registry=quay.io --repo=metallb --tag=${CIRCLE_BRANCH:-${CIRCLE_TAG}}
 workflows:
   version: 2
   test-and-publish:
@@ -50,6 +64,17 @@ workflows:
             tags:
               only: /.*/
       - publish-images:
+          filters:
+            branches:
+              only:
+                - main
+                - /v.*/
+            tags:
+              only: /.*/
+          requires:
+            - test-1.13
+            - lint-1.13
+      - publish-images-quay:
           filters:
             branches:
               only:
