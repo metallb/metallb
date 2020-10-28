@@ -34,7 +34,7 @@ jobs:
       - run: sudo pip install invoke semver pyyaml
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
       - run: mkdir -p ./bin
-      - run: wget -O ./bin/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.0/manifest-tool-linux-amd64 && chmod +x ./bin/manifest-tool
+      - run: wget -O ./bin/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.3/manifest-tool-linux-amd64 && chmod +x ./bin/manifest-tool
       - run: echo "export GO111MODULE=on" >>$BASH_ENV
       - run: PATH=./bin:$PATH inv push-multiarch --binaries=controller --binaries=speaker --tag=${CIRCLE_BRANCH:-${CIRCLE_TAG}} --repo=metallb
 workflows:
