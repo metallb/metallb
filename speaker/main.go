@@ -199,12 +199,12 @@ func (c *controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
 		return c.deleteBalancer(l, name, "serviceDeleted")
 	}
 
-	l.Log("event", "startUpdate", "msg", "start of service update")
-	defer l.Log("event", "endUpdate", "msg", "end of service update")
-
 	if svc.Spec.Type != "LoadBalancer" {
 		return c.deleteBalancer(l, name, "notLoadBalancer")
 	}
+
+	l.Log("event", "startUpdate", "msg", "start of service update")
+	defer l.Log("event", "endUpdate", "msg", "end of service update")
 
 	if c.config == nil {
 		l.Log("event", "noConfig", "msg", "not processing, still waiting for config")
