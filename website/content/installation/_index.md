@@ -91,10 +91,14 @@ on the remote kustomization fle :
 
 ```yaml
 # kustomization.yml
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
 namespace: metallb-system
 
+bases:
+  - github.com/metallb/metallb/manifests?ref=v0.9.4
+
 resources:
-  - github.com/metallb/metallb//manifests?ref=v0.9.3
   - configmap.yml 
   - secret.yml
 ```
