@@ -397,6 +397,6 @@ func ipConfusesBuggyFirmwares(ip net.IP) bool {
 // IsAllowClusterIP returns true if the pool owning the IP allows Cluster IPs	
 func (a *Allocator) IsAllowClusterIP(ip net.IP) bool {
 	poolName := poolFor(a.pools, ip)
-        pool := a.pools[poolName]
-        return pool != nil && pool.AllowClusterIP
+	pool := a.pools[poolName]
+	return pool != nil && pool.AllowClusterIP
 }
