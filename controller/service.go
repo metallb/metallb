@@ -152,8 +152,15 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 	isIPv6 := clusterIP.To4() == nil
 
 	// If the user asked for a specific IP, try that.
-	if svc.Spec.LoadBalancerIP != "" {
-		ip := net.ParseIP(svc.Spec.LoadBalancerIP)
+	if c.ips.IsAllowClusterIP(clusterIP) || svc.Spec.LoadBalancerIP != "" {
+                var ip net.IP
+		if (svc.Spec.LoadBalancerIP != "") {
+			// The user asked for a specific loadBalancer IP, try that.
+			ip = net.ParseIP(svc.Spec.LoadBalancerIP)
+		} else {
+			// The user asked for the cluster IP, try that.
+			ip = clusterIP
+		}
 		if ip == nil {
 			return nil, fmt.Errorf("invalid spec.loadBalancerIP %q", svc.Spec.LoadBalancerIP)
 		}

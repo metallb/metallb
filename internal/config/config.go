@@ -64,6 +64,7 @@ type addressPool struct {
 	Name              string
 	Addresses         []string
 	AvoidBuggyIPs     bool               `yaml:"avoid-buggy-ips"`
+	AllowClusterIP    bool               `yaml:"allow-cluster-ip"`
 	AutoAssign        *bool              `yaml:"auto-assign"`
 	BGPAdvertisements []bgpAdvertisement `yaml:"bgp-advertisements"`
 }
@@ -130,6 +131,8 @@ type Pool struct {
 	// If false, prevents IP addresses to be automatically assigned
 	// from this pool.
 	AutoAssign bool
+	// If true, assign the cluster IP as the external IP.
+	AllowClusterIP bool
 	// When an IP is allocated from this pool, how should it be
 	// translated into BGP announcements?
 	BGPAdvertisements []*BGPAdvertisement
@@ -317,8 +320,9 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 	}
 
 	ret := &Pool{
-		Protocol:      p.Protocol,
-		AvoidBuggyIPs: p.AvoidBuggyIPs,
+		Protocol:       p.Protocol,
+		AvoidBuggyIPs:  p.AvoidBuggyIPs,
+		AllowClusterIP: p.AllowClusterIP,
 		AutoAssign:    true,
 	}
 
