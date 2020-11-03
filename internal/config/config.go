@@ -323,7 +323,7 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 		Protocol:       p.Protocol,
 		AvoidBuggyIPs:  p.AvoidBuggyIPs,
 		AllowClusterIP: p.AllowClusterIP,
-		AutoAssign:    true,
+		AutoAssign:     true,
 	}
 
 	if p.AutoAssign != nil {

@@ -153,8 +153,8 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 
 	// If the user asked for a specific IP, try that.
 	if c.ips.IsAllowClusterIP(clusterIP) || svc.Spec.LoadBalancerIP != "" {
-                var ip net.IP
-		if (svc.Spec.LoadBalancerIP != "") {
+		var ip net.IP
+		if svc.Spec.LoadBalancerIP != "" {
 			// The user asked for a specific loadBalancer IP, try that.
 			ip = net.ParseIP(svc.Spec.LoadBalancerIP)
 		} else {
