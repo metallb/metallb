@@ -3,8 +3,22 @@ title: Release Notes
 weight: 8
 ---
 
-## Version 0.9.4
+## Version 0.9.5
 [Documentation for this release](https://metallb.universe.tf)
+
+New features:
+
+- Update manifests/metallb.yaml for kubernetes v1.19 ([#744](https://github.com/metallb/metallb/pull/744)).
+
+Bugfixes:
+
+- Update repository URLs ([#688](https://github.com/metallb/metallb/pull/688)).
+
+This release includes contributions from Adit Sachde and Jan Krcmar. Thanks for
+making MetalLB better!
+
+## Version 0.9.4
+[Documentation for this release](https://v0-9-4--metallb.netlify.com)
 
 New features:
 
