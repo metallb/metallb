@@ -71,6 +71,16 @@ func usableNodes(eps *v1.Endpoints, speakers map[string]bool) []string {
 
 func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
 	nodes := usableNodes(eps, c.sList.UsableSpeakers())
+
+	// We can use any speaker when ExternalTrafficPolicy is set to Cluster, even if no endpoints are present on a speaker node.
+	// This is usefull when we run speaker on dedicated hosts that don't have endpoint associated.
+	if len(nodes) == 0 && svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeCluster {
+		nodes = []string{}
+		for speaker, _ := range c.sList.UsableSpeakers() {
+			nodes = append(nodes, speaker)
+		}
+	}
+
 	// Sort the slice by the hash of node + service name. This
 	// produces an ordering of ready nodes that is unique to this
 	// service.
