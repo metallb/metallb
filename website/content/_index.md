@@ -46,10 +46,10 @@ MetalLB requires the following to function:
   [cluster network configuration]({{% relref "installation/network-addons.md" %}}) that
   can coexist with MetalLB.
 - Some IPv4 addresses for MetalLB to hand out.
-- Depending on the operating mode, you may need one or more routers
-  capable of
-  speaking
-  [BGP](https://en.wikipedia.org/wiki/Border_Gateway_Protocol).
+- When using the BGP operating mode, you will need one or more routers
+  capable of speaking [BGP](https://en.wikipedia.org/wiki/Border_Gateway_Protocol).
+- Traffic on port 7946 (TCP & UDP) must be allowed between nodes, as required by
+  [memberlist](https://github.com/hashicorp/memberlist).
 
 ## Usage
 
