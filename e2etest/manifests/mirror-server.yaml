@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
       - name: mirror
-        image: metallb/mirror-server:main
+        image: quay.io/metallb/mirror-server:main
         env:
         - name: NODE_NAME
           valueFrom:
