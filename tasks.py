@@ -64,11 +64,11 @@ def _make_build_dirs():
       help={
           "binaries": "binaries to build. One or more of {}, or 'all'".format(", ".join(sorted(all_binaries))),
           "architectures": "architectures to build. One or more of {}, or 'all'".format(", ".join(sorted(all_architectures))),
-          "registry": "Docker registry under which to tag the images. Default 'docker.io'.",
+          "registry": "Docker registry under which to tag the images. Default 'quay.io'.",
           "repo": "Docker repository under which to tag the images. Default 'metallb'.",
           "tag": "Docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'.",
       })
-def build(ctx, binaries, architectures, registry="docker.io", repo="metallb", tag="dev"):
+def build(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag="dev"):
     """Build MetalLB docker images."""
     binaries = _check_binaries(binaries)
     architectures = _check_architectures(architectures)
@@ -110,11 +110,11 @@ def build(ctx, binaries, architectures, registry="docker.io", repo="metallb", ta
       help={
           "binaries": "binaries to build. One or more of {}, or 'all'".format(", ".join(sorted(all_binaries))),
           "architectures": "architectures to build. One or more of {}, or 'all'".format(", ".join(sorted(all_architectures))),
-          "registry": "Docker registry under which to tag the images. Default 'docker.io'.",
+          "registry": "Docker registry under which to tag the images. Default 'quay.io'.",
           "repo": "Docker repository under which to tag the images. Default 'metallb'.",
           "tag": "Docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'.",
       })
-def push(ctx, binaries, architectures, registry="docker.io", repo="metallb", tag="dev"):
+def push(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag="dev"):
     """Build and push docker images to registry."""
     binaries = _check_binaries(binaries)
     architectures = _check_architectures(architectures)
@@ -133,11 +133,11 @@ def push(ctx, binaries, architectures, registry="docker.io", repo="metallb", tag
 @task(iterable=["binaries"],
       help={
           "binaries": "binaries to build. One or more of {}, or 'all'".format(", ".join(sorted(all_binaries))),
-          "registry": "Docker registry under which to tag the images. Default 'docker.io'.",
+          "registry": "Docker registry under which to tag the images. Default 'quay.io'.",
           "repo": "Docker repository under which to tag the images. Default 'metallb'.",
           "tag": "Docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'.",
       })
-def push_multiarch(ctx, binaries, registry="docker.io", repo="metallb", tag="dev"):
+def push_multiarch(ctx, binaries, registry="quay.io", repo="metallb", tag="dev"):
     """Build and push multi-architecture docker images to registry."""
     binaries = _check_binaries(binaries)
     architectures = _check_architectures(["all"])
@@ -218,9 +218,9 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None):
         run("kubectl apply -f e2etest/manifests/{}.yaml".format(cni), echo=True)
 
     build(ctx, binaries=["controller", "speaker", "mirror-server"], architectures=[architecture])
-    run("kind load docker-image --name={} metallb/controller:dev-{}".format(name, architecture), echo=True)
-    run("kind load docker-image --name={} metallb/speaker:dev-{}".format(name, architecture), echo=True)
-    run("kind load docker-image --name={} metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
+    run("kind load docker-image --name={} quay.io/metallb/controller:dev-{}".format(name, architecture), echo=True)
+    run("kind load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(name, architecture), echo=True)
+    run("kind load docker-image --name={} quay.io/metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
 
     run("kubectl delete po -nmetallb-system --all", echo=True)
 

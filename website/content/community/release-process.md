@@ -81,7 +81,7 @@ tag. You need to wait for these images to be pushed live before
 continuing, because the manifests for the new release point to image
 tags that don't exist until CircleCI makes them exist.
 
-Check on Docker Hub for a `vX.Y.Z` tag on each image, or check on
+Check on Quay for a `vX.Y.Z` tag on each image, or check on
 CircleCI that the deploy has completed.
 
 ### Repoint the live website
