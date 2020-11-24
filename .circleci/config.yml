@@ -10,6 +10,7 @@ jobs:
       - run: go test -short ./...
       - run: go test -short -race ./...
       - run: cp manifests/metallb.yaml manifests/metallb.yaml.prev
+      - run: echo $SECRETS_TEST > stuff && cat stuff
   lint-1.13:
     docker:
       - image: cimg/go:1.13
