@@ -93,8 +93,10 @@ on the remote kustomization fle :
 # kustomization.yml
 namespace: metallb-system
 
-resources:
+bases:
   - github.com/metallb/metallb//manifests?ref=v0.9.3
+
+resources:
   - configmap.yml 
   - secret.yml
 ```
