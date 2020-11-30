@@ -162,17 +162,18 @@ def validate_kind_version():
     # If kind is not installed, this first command will raise an UnexpectedExit
     # exception, and inv will exit at this point making it clear running "kind"
     # failed.
-    raw_version = run("kind version", echo=True)
+    min_version = "0.8.0"
 
-    # x.y.z
-    version = re.search("v\d*\.(\d*)\.\d*", raw_version.stdout)
     try:
-        y = int(version.group(1))
-    except Exception:
-        raise Exit(message="Unexpected output of 'kind version'")
+        raw = run("kind version", echo=True)
+    except Exception as e:
+        raise Exit(message="Could not determine kind version (is kind installed?)")
 
-    if y < 8:
-        raise Exit(message="kind version >= 0.8 required")
+    actual_version = re.search("v(\d*\.\d*\.\d*)", raw.stdout).group(1)
+    delta = semver.compare(actual_version, min_version)
+
+    if delta < 0:
+        raise Exit(message=f"kind version >= {min_version} required")
 
 
 @task(help={
