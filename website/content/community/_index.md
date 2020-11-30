@@ -120,7 +120,7 @@ To develop MetalLB, you'll need a couple of pieces of software:
 - [Kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), the Kubernetes commandline interface
 - [Invoke](https://www.pyinvoke.org) to drive the build system
 
->NOTE: The development environment was tested with **kind `v0.7.0`**. Older
+>NOTE: The development environment was tested with **kind `v0.9.0`**. Older
 >versions may not work since there have been breaking changes between minor
 >versions.
 

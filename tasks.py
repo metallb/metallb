@@ -162,7 +162,7 @@ def validate_kind_version():
     # If kind is not installed, this first command will raise an UnexpectedExit
     # exception, and inv will exit at this point making it clear running "kind"
     # failed.
-    min_version = "0.8.0"
+    min_version = "0.9.0"
 
     try:
         raw = run("kind version", echo=True)
@@ -197,7 +197,7 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None):
     mk_cluster = name not in clusters
     if mk_cluster:
         config = {
-            "apiVersion": "kind.sigs.k8s.io/v1alpha3",
+            "apiVersion": "kind.x-k8s.io/v1alpha4",
             "kind": "Cluster",
             "nodes": [{"role": "control-plane"},
                       {"role": "worker"},
