@@ -173,7 +173,7 @@ def validate_kind_version():
     delta = semver.compare(actual_version, min_version)
 
     if delta < 0:
-        raise Exit(message=f"kind version >= {min_version} required")
+        raise Exit(message="kind version >= {} required".format(min_version))
 
 
 @task(help={
