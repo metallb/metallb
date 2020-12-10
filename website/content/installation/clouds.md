@@ -18,12 +18,12 @@ Cloud platform | Supported
 AWS            | No, use EKS
 Azure          | No, use AKS
 DigitalOcean   | No, use DigitalOcean Kubernetes
+Equinix Metal  | Yes, see [Equinix Metal notes]
 Google Cloud   | No, use GKE
 Hetzner        | Yes, see [Hetzner notes](https://community.hetzner.com/tutorials/install-kubernetes-cluster)
 OVH            | Yes, when using a vRack
 OpenShift OCP  | Yes, see [OpenShift notes]
 OpenStack      | Yes, see [OpenStack notes]
-Equinix Metal  | Yes, see [Equinix Metal notes]
 Proxmox        | Yes
 VMware         | Yes
 Vultr          | Yes
