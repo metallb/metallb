@@ -23,7 +23,7 @@ Hetzner        | Yes, see [Hetzner notes](https://community.hetzner.com/tutorial
 OVH            | Yes, when using a vRack
 OpenShift OCP  | Yes, see [OpenShift notes]
 OpenStack      | Yes, see [OpenStack notes]
-Packet         | Yes, see [Packet notes]
+Equinix Metal  | Yes, see [Equinix Metal notes]
 Proxmox        | Yes
 VMware         | Yes
 Vultr          | Yes
@@ -31,7 +31,7 @@ Vultr          | Yes
 [use alternatives]: #alternatives
 [OpenShift notes]: #metallb-on-openshift-ocp
 [OpenStack notes]: #metallb-on-openstack
-[Packet notes]: #metallb-on-packet
+[Equinix Metal notes]: #metallb-on-equinix-metal
 
 ## Why doesn't MetalLB work on (most) cloud platforms?
 
@@ -97,14 +97,14 @@ doesn't know about. There's currently no way to make OpenStack
 cooperate with MetalLB here, so we have to turn off the spoofing
 protection entirely.
 
-### MetalLB on Packet
+### MetalLB on Equinix Metal
 
-[Packet](https://www.packet.com) is an unusually "bare metal" cloud
-platform, and supports using BGP to advertise and route floating IPs
-to machines. As such, MetalLB's BGP mode works great on Packet! There
-is even a [tutorial](https://github.com/packet-labs/kubernetes-bgp)
-written by the folks at Packet, that use MetalLB to integrate
-Kubernetes load-balancers with their BGP infrastructure.
+[Equinix Metal](https://metal.equinix.com) is an unusually "bare metal" cloud
+platform, and supports using BGP to advertise and route floating IPs to
+machines. As such, MetalLB's BGP mode works great on Equinix Metal! There is
+even a [tutorial](https://github.com/packet-labs/kubernetes-bgp) written by the
+folks at Equinix Metal, that use MetalLB to integrate Kubernetes load-balancers
+with their BGP infrastructure.
 
 ## Alternatives
 
