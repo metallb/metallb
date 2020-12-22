@@ -149,6 +149,28 @@ announcements. See
 [issue 1](https://github.com/metallb/metallb/issues/1) for more
 information.
 
+## eBPF and source IP preservation
+
+eBPF allows the CNI to run on the eBPF kernel layer. For our usecase, eBPF
+is an optimal solution to the IP Preservation problem highlighted in the aforementioned
+sections. It allows a CNI to implement a networking layer without having to
+rewrite the source IP of packets, enabling us to preserve the source IP, making
+network communication safer and additionally improving networking efficiency
+close to natively compiled in-kernel code. Please visit the
+[eBPF website](https://ebpf.io/) to read up more on the inner
+workings of eBPF and what other benefits it brings.
+
+### Calio
+
+Calico supports the eBPF dataplane natively. You can read up more about
+Calicos eBPF implementation and details [here](https://docs.projectcalico.org/about/about-ebpf).
+To enable the eBPF dataplane in Calico, follow [this guide](https://docs.projectcalico.org/maintenance/ebpf/enabling-bpf)
+
+### Cilium
+
+A nother CNI that supports the eBPF dataplane is Cilium. You can read up more
+about its implementation and usage in the [Cilium docs](https://docs.cilium.io/en/latest/bpf/)
+
 ## IP address sharing
 
 By default, Services do not share IP addresses. If you have a need to
