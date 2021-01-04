@@ -168,7 +168,7 @@ To enable the eBPF dataplane in Calico, follow [this guide](https://docs.project
 
 ### Cilium
 
-A nother CNI that supports the eBPF dataplane is Cilium. You can read up more
+Another CNI that supports the eBPF dataplane is Cilium. You can read up more
 about its implementation and usage in the [Cilium docs](https://docs.cilium.io/en/latest/bpf/)
 
 ## IP address sharing
