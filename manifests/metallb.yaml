@@ -314,7 +314,6 @@ spec:
               name: memberlist
               key: secretkey
         image: quay.io/metallb/speaker:main
-        imagePullPolicy: Always
         name: speaker
         ports:
         - containerPort: 7472
@@ -370,7 +369,6 @@ spec:
         - --port=7472
         - --config=config
         image: quay.io/metallb/controller:main
-        imagePullPolicy: Always
         name: controller
         ports:
         - containerPort: 7472
