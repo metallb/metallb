@@ -232,7 +232,6 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None):
         with open(manifests_dir + "/metallb.yaml") as f:
             manifest = f.read()
         manifest = manifest.replace(":main", ":dev-{}".format(architecture))
-        manifest = manifest.replace("imagePullPolicy: Always", "imagePullPolicy: Never")
         with open(tmpdir + "/metallb.yaml", "w") as f:
             f.write(manifest)
             f.flush()
