@@ -21,7 +21,7 @@ each set of addresses:
 
 ```yaml
 # Rest of config omitted for brevity
-communities:
+bgp-communities:
   # Our datacenter routers understand a "VPN only" BGP community.
   # Announcements tagged with this community will only be propagated
   # through the corporate VPN tunnel back to developer offices.
