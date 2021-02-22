@@ -40,6 +40,10 @@ type Session struct {
 	backoff          backoff
 	// allows to use MP BGP encoding for IPv4 if supported by peer
 	allowMPBGPEncodingV4 bool
+	// passed from peer config, allows to announce IPv4 prefixes to the peer
+	allowV4Prefixes bool
+	// passed from peer config, allows to announce IPv6 prefixes to the peer
+	allowV6Prefixes bool
 
 	mu               sync.Mutex
 	cond             *sync.Cond
@@ -157,13 +161,23 @@ func (s *Session) handleNewAdvertisements() {
 		return
 	}
 	for c, adv := range s.new {
+		isIPv6 := adv.Prefix.IP.To4() == nil
+		if (isIPv6 && !s.allowV6Prefixes) || (!isIPv6 && !s.allowV4Prefixes) {
+			prefixType := "IPv4"
+			if isIPv6 {
+				prefixType = "IPv6"
+			}
+			s.logger.Log("op", "SetAdvertisement", "prefix", c,
+				"msg", fmt.Sprintf("skip prefix announcement because %s prefixes are not allowed by the peer config", prefixType))
+			delete(s.new, c)
+		}
 		s.updateNextHop(adv)
 		if adv.NextHop == nil {
 			s.logger.Log("op", "SetAdvertisement", "prefix", c,
 				"msg", "skip prefix announcement because there is no next hop for it")
 			delete(s.new, c)
 		}
-		if adv.Prefix.IP.To4() == nil && !s.mpIPv6Support {
+		if isIPv6 && !s.mpIPv6Support {
 			s.logger.Log("op", "SetAdvertisement", "prefix", c,
 				"msg", "skip prefix announcement because MP BGP for IPv6 is not supported by peer")
 			delete(s.new, c)
@@ -442,7 +456,8 @@ func (s *Session) sendKeepalive() error {
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
 func New(l log.Logger, addr string, asn uint32, routerID net.IP, peerASN uint32,
-	holdTime time.Duration, password string, myNode string, allowMPBGPEncodingV4 bool) (*Session, error) {
+	holdTime time.Duration, password string, myNode string,
+	allowMPBGPEncodingV4, allowV4Prefixes, allowV6Prefixes bool) (*Session, error) {
 	ret := &Session{
 		addr:                 addr,
 		asn:                  asn,
@@ -455,6 +470,8 @@ func New(l log.Logger, addr string, asn uint32, routerID net.IP, peerASN uint32,
 		advertised:           map[string]*Advertisement{},
 		password:             password,
 		allowMPBGPEncodingV4: allowMPBGPEncodingV4,
+		allowV4Prefixes:      allowV4Prefixes,
+		allowV6Prefixes:      allowV6Prefixes,
 	}
 	ret.cond = sync.NewCond(&ret.mu)
 	go ret.sendKeepalives()
