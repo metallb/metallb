@@ -168,8 +168,7 @@ To enable the eBPF dataplane in Calico, follow [this guide](https://docs.project
 
 ### Cilium
 
-Another CNI that supports the eBPF dataplane is Cilium. You can read up more
-about its implementation and usage in the [Cilium docs](https://docs.cilium.io/en/latest/bpf/)
+[Cilium](https://cilium.io) is a CNI that provides eBPF-based Networking, Observability, and Security. As part of its kube-proxy replacement implementation, Cilium is able to preserve the source IP when performing load balancing decisions across the cluster through [Direct Server Return (DSR)](https://cilium.io/blog/2020/02/18/cilium-17#kube-proxy-replacement-with-direct-server-return). For more information and guides to deploy Cilium, see the [Cilium Getting Started Guides](https://docs.cilium.io/en/stable/gettingstarted/).
 
 ## IP address sharing
 
