@@ -160,7 +160,7 @@ close to natively compiled in-kernel code. Please visit the
 [eBPF website](https://ebpf.io/) to read up more on the inner
 workings of eBPF and what other benefits it brings.
 
-### Calio
+### Calico
 
 Calico supports the eBPF dataplane natively. You can read up more about
 Calicos eBPF implementation and details [here](https://docs.projectcalico.org/about/about-ebpf).
