@@ -17,9 +17,9 @@ package controller
 import (
 	"reflect"
 
-	"go.universe.tf/metallb/internal/allocator"
-	"go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/k8s/types"
+	"go.universe.tf/metallb/pkg/allocator"
+	"go.universe.tf/metallb/pkg/config"
+	"go.universe.tf/metallb/pkg/k8s/types"
 
 	"github.com/go-kit/kit/log"
 	v1 "k8s.io/api/core/v1"

@@ -21,11 +21,11 @@ import (
 	"os/signal"
 	"syscall"
 
-	"go.universe.tf/metallb/internal/k8s"
-	"go.universe.tf/metallb/internal/logging"
-	"go.universe.tf/metallb/internal/speaker"
-	"go.universe.tf/metallb/internal/speakerlist"
-	"go.universe.tf/metallb/internal/version"
+	"go.universe.tf/metallb/pkg/k8s"
+	"go.universe.tf/metallb/pkg/logging"
+	"go.universe.tf/metallb/pkg/speaker"
+	"go.universe.tf/metallb/pkg/speakerlist"
+	"go.universe.tf/metallb/pkg/version"
 )
 
 func main() {

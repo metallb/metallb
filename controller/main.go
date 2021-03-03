@@ -19,11 +19,11 @@ import (
 	"fmt"
 	"os"
 
-	"go.universe.tf/metallb/internal/allocator"
-	"go.universe.tf/metallb/internal/controller"
-	"go.universe.tf/metallb/internal/k8s"
-	"go.universe.tf/metallb/internal/logging"
-	"go.universe.tf/metallb/internal/version"
+	"go.universe.tf/metallb/pkg/allocator"
+	"go.universe.tf/metallb/pkg/controller"
+	"go.universe.tf/metallb/pkg/k8s"
+	"go.universe.tf/metallb/pkg/logging"
+	"go.universe.tf/metallb/pkg/version"
 )
 
 func main() {

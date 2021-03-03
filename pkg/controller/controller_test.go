@@ -20,9 +20,9 @@ import (
 	"net"
 	"testing"
 
-	"go.universe.tf/metallb/internal/allocator"
-	"go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/k8s"
+	"go.universe.tf/metallb/pkg/allocator"
+	"go.universe.tf/metallb/pkg/config"
+	"go.universe.tf/metallb/pkg/k8s"
 
 	"github.com/go-kit/kit/log"
 	"github.com/google/go-cmp/cmp"

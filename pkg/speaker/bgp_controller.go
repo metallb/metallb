@@ -23,8 +23,9 @@ import (
 	"strconv"
 	"time"
 
-	"go.universe.tf/metallb/internal/bgp"
-	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/pkg/bgp"
+	"go.universe.tf/metallb/pkg/config"
+
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 

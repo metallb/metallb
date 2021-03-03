@@ -1,4 +1,4 @@
-package k8s // import "go.universe.tf/metallb/internal/k8s"
+package k8s // import "go.universe.tf/metallb/pkg/k8s"
 
 import (
 	"context"
@@ -7,8 +7,8 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/k8s/types"
+	"go.universe.tf/metallb/pkg/config"
+	"go.universe.tf/metallb/pkg/k8s/types"
 
 	"github.com/go-kit/kit/log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"

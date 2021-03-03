@@ -87,8 +87,8 @@ def build(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag=
         }
         for bin in binaries:
             run("go build -v -o build/{arch}/{bin}/{bin} -ldflags "
-                "'-X go.universe.tf/metallb/internal/version.gitCommit={commit} "
-                "-X go.universe.tf/metallb/internal/version.gitBranch={branch}' "
+                "'-X go.universe.tf/metallb/pkg/version.gitCommit={commit} "
+                "-X go.universe.tf/metallb/pkg/version.gitBranch={branch}' "
                 "go.universe.tf/metallb/{bin}".format(
                     arch=arch,
                     bin=bin,
