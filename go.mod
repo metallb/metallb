@@ -28,6 +28,3 @@ require (
 	k8s.io/client-go v0.20.2
 	k8s.io/klog v0.3.1
 )
-
-// Force using right version of client-go, as 'go get -u' will pull old one.
-replace k8s.io/client-go => k8s.io/client-go v0.20.2
