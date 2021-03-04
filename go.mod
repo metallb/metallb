@@ -18,10 +18,9 @@ require (
 	github.com/osrg/gobgp v2.0.0+incompatible
 	github.com/prometheus/client_golang v1.0.0
 	github.com/satori/go.uuid v1.2.0 // indirect
-	github.com/spf13/cobra v1.1.1
+	github.com/spf13/viper v1.7.0 // indirect
 	github.com/vishvananda/netlink v1.0.0 // indirect
 	github.com/vishvananda/netns v0.0.0-20190625233234-7109fa855b0f // indirect
-	go.universe.tf/virtuakube v0.0.0-20190708182722-512c11153571
 	golang.org/x/sys v0.0.0-20210124154548-22da62e12c0c
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.20.2
@@ -30,9 +29,5 @@ require (
 	k8s.io/klog v0.3.1
 )
 
-replace (
-	// Use virtuakube from fork for now with k8s dependencies updated to v1.20.x.
-	go.universe.tf/virtuakube => github.com/kinvolk/virtuakube v0.0.0-20210128201638-450bd8087f94
-	// Force using right version of client-go, as 'go get -u' will pull old one.
-	k8s.io/client-go => k8s.io/client-go v0.20.2
-)
+// Force using right version of client-go, as 'go get -u' will pull old one.
+replace k8s.io/client-go => k8s.io/client-go v0.20.2
