@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package speaker
 
 import (
 	"bytes"
@@ -23,16 +23,16 @@ import (
 	"github.com/go-kit/kit/log"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/layer2"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
-type layer2Controller struct {
-	announcer *layer2.Announce
-	myNode    string
-	sList     SpeakerList
+type Layer2Controller struct {
+	Announcer *layer2.Announce
+	MyNode    string
+	SList     SpeakerList
 }
 
-func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
+func (c *Layer2Controller) SetConfig(log.Logger, *config.Config) error {
 	return nil
 }
 
@@ -69,8 +69,8 @@ func usableNodes(eps *v1.Endpoints, speakers map[string]bool) []string {
 	return ret
 }
 
-func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
-	nodes := usableNodes(eps, c.sList.UsableSpeakers())
+func (c *Layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
+	nodes := usableNodes(eps, c.SList.UsableSpeakers())
 	// Sort the slice by the hash of node + service name. This
 	// produces an ordering of ready nodes that is unique to this
 	// service.
@@ -82,7 +82,7 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Ser
 	})
 
 	// Are we first in the list? If so, we win and should announce.
-	if len(nodes) > 0 && nodes[0] == c.myNode {
+	if len(nodes) > 0 && nodes[0] == c.MyNode {
 		return ""
 	}
 
@@ -90,20 +90,20 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Ser
 	return "notOwner"
 }
 
-func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
-	c.announcer.SetBalancer(name, lbIP)
+func (c *Layer2Controller) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
+	c.Announcer.SetBalancer(name, lbIP)
 	return nil
 }
 
-func (c *layer2Controller) DeleteBalancer(l log.Logger, name, reason string) error {
-	if !c.announcer.AnnounceName(name) {
+func (c *Layer2Controller) DeleteBalancer(l log.Logger, name, reason string) error {
+	if !c.Announcer.AnnounceName(name) {
 		return nil
 	}
-	c.announcer.DeleteBalancer(name)
+	c.Announcer.DeleteBalancer(name)
 	return nil
 }
 
-func (c *layer2Controller) SetNode(log.Logger, *v1.Node) error {
-	c.sList.Rejoin()
+func (c *Layer2Controller) SetNode(log.Logger, *v1.Node) error {
+	c.SList.Rejoin()
 	return nil
 }

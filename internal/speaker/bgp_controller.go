@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package main
+package speaker
 
 import (
 	"fmt"
@@ -25,7 +25,7 @@ import (
 
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/go-kit/kit/log"
@@ -36,15 +36,15 @@ type peer struct {
 	bgp session
 }
 
-type bgpController struct {
-	logger     log.Logger
-	myNode     string
+type BGPController struct {
+	Logger     log.Logger
+	MyNode     string
 	nodeLabels labels.Set
 	peers      []*peer
-	svcAds     map[string][]*bgp.Advertisement
+	SvcAds     map[string][]*bgp.Advertisement
 }
 
-func (c *bgpController) SetConfig(l log.Logger, cfg *config.Config) error {
+func (c *BGPController) SetConfig(l log.Logger, cfg *config.Config) error {
 	newPeers := make([]*peer, 0, len(cfg.Peers))
 newPeers:
 	for _, p := range cfg.Peers {
@@ -136,13 +136,13 @@ func healthyEndpointExists(eps *v1.Endpoints) bool {
 	return false
 }
 
-func (c *bgpController) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
+func (c *BGPController) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
 	// Should we advertise?
 	// Yes, if externalTrafficPolicy is
 	//  Cluster && any healthy endpoint exists
 	// or
 	//  Local && there's a ready local endpoint.
-	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !nodeHasHealthyEndpoint(eps, c.myNode) {
+	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !nodeHasHealthyEndpoint(eps, c.MyNode) {
 		return "noLocalEndpoints"
 	} else if !healthyEndpointExists(eps) {
 		return "noEndpoints"
@@ -152,7 +152,7 @@ func (c *bgpController) ShouldAnnounce(l log.Logger, name string, svc *v1.Servic
 
 // Called when either the peer list or node labels have changed,
 // implying that the set of running BGP sessions may need tweaking.
-func (c *bgpController) syncPeers(l log.Logger) error {
+func (c *BGPController) syncPeers(l log.Logger) error {
 	var (
 		errs          int
 		needUpdateAds bool
@@ -184,7 +184,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 			if p.cfg.RouterID != nil {
 				routerID = p.cfg.RouterID
 			}
-			s, err := newBGP(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.Password, c.myNode)
+			s, err := newBGP(c.Logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.Password, c.MyNode)
 			if err != nil {
 				l.Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
 				errs++
@@ -207,8 +207,8 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 	return nil
 }
 
-func (c *bgpController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
-	c.svcAds[name] = nil
+func (c *BGPController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
+	c.SvcAds[name] = nil
 	for _, adCfg := range pool.BGPAdvertisements {
 		m := net.CIDRMask(adCfg.AggregationLength, 32)
 		ad := &bgp.Advertisement{
@@ -222,21 +222,21 @@ func (c *bgpController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool
 			ad.Communities = append(ad.Communities, comm)
 		}
 		sort.Slice(ad.Communities, func(i, j int) bool { return ad.Communities[i] < ad.Communities[j] })
-		c.svcAds[name] = append(c.svcAds[name], ad)
+		c.SvcAds[name] = append(c.SvcAds[name], ad)
 	}
 
 	if err := c.updateAds(); err != nil {
 		return err
 	}
 
-	l.Log("event", "updatedAdvertisements", "numAds", len(c.svcAds[name]), "msg", "making advertisements using BGP")
+	l.Log("event", "updatedAdvertisements", "numAds", len(c.SvcAds[name]), "msg", "making advertisements using BGP")
 
 	return nil
 }
 
-func (c *bgpController) updateAds() error {
+func (c *BGPController) updateAds() error {
 	var allAds []*bgp.Advertisement
-	for _, ads := range c.svcAds {
+	for _, ads := range c.SvcAds {
 		// This list might contain duplicates, but that's fine,
 		// they'll get compacted by the session code when it's
 		// calculating advertisements.
@@ -256,11 +256,11 @@ func (c *bgpController) updateAds() error {
 	return nil
 }
 
-func (c *bgpController) DeleteBalancer(l log.Logger, name, reason string) error {
-	if _, ok := c.svcAds[name]; !ok {
+func (c *BGPController) DeleteBalancer(l log.Logger, name, reason string) error {
+	if _, ok := c.SvcAds[name]; !ok {
 		return nil
 	}
-	delete(c.svcAds, name)
+	delete(c.SvcAds, name)
 	return c.updateAds()
 }
 
@@ -269,7 +269,7 @@ type session interface {
 	Set(advs ...*bgp.Advertisement) error
 }
 
-func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
+func (c *BGPController) SetNode(l log.Logger, node *v1.Node) error {
 	nodeLabels := node.Labels
 	if nodeLabels == nil {
 		nodeLabels = map[string]string{}
