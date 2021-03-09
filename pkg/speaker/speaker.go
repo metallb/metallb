@@ -127,7 +127,7 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
 		return c.deleteBalancer(l, name, "internalError")
 	}
 
-	if deleteReason := handler.ShouldAnnounce(l, name, svc, eps); deleteReason != "" {
+	if deleteReason := handler.ShouldAnnounce(l, name, string(svc.Spec.ExternalTrafficPolicy), eps); deleteReason != "" {
 		return c.deleteBalancer(l, name, deleteReason)
 	}
 
@@ -230,7 +230,7 @@ func (c *Controller) SetNode(l gokitlog.Logger, node *v1.Node) types.SyncState {
 // A Protocol can advertise an IP address.
 type Protocol interface {
 	SetConfig(gokitlog.Logger, *config.Config) error
-	ShouldAnnounce(gokitlog.Logger, string, *v1.Service, *v1.Endpoints) string
+	ShouldAnnounce(gokitlog.Logger, string, string, *v1.Endpoints) string
 	SetBalancer(gokitlog.Logger, string, net.IP, *config.Pool) error
 	DeleteBalancer(gokitlog.Logger, string, string) error
 	SetNode(gokitlog.Logger, *v1.Node) error

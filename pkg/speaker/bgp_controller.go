@@ -137,13 +137,13 @@ func healthyEndpointExists(eps *v1.Endpoints) bool {
 	return false
 }
 
-func (c *BGPController) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
+func (c *BGPController) ShouldAnnounce(l log.Logger, name string, policyType string, eps *v1.Endpoints) string {
 	// Should we advertise?
 	// Yes, if externalTrafficPolicy is
 	//  Cluster && any healthy endpoint exists
 	// or
 	//  Local && there's a ready local endpoint.
-	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !nodeHasHealthyEndpoint(eps, c.MyNode) {
+	if v1.ServiceExternalTrafficPolicyType(policyType) == v1.ServiceExternalTrafficPolicyTypeLocal && !nodeHasHealthyEndpoint(eps, c.MyNode) {
 		return "noLocalEndpoints"
 	} else if !healthyEndpointExists(eps) {
 		return "noEndpoints"
