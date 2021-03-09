@@ -266,12 +266,11 @@ type session interface {
 	Set(advs ...*bgp.Advertisement) error
 }
 
-func (c *BGPController) SetNode(l log.Logger, node *v1.Node) error {
-	nodeLabels := node.Labels
-	if nodeLabels == nil {
-		nodeLabels = map[string]string{}
+func (c *BGPController) SetNodeLabels(l log.Logger, lbls map[string]string) error {
+	if lbls == nil {
+		lbls = map[string]string{}
 	}
-	ns := labels.Set(nodeLabels)
+	ns := labels.Set(lbls)
 	if c.nodeLabels != nil && labels.Equals(c.nodeLabels, ns) {
 		// Node labels unchanged, no action required.
 		return nil

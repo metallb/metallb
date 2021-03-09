@@ -237,8 +237,12 @@ func (c *Controller) SetConfig(l gokitlog.Logger, cfg *config.Config) types.Sync
 }
 
 func (c *Controller) SetNode(l gokitlog.Logger, node *v1.Node) types.SyncState {
+	return c.SetNodeLabels(l, node.Labels)
+}
+
+func (c *Controller) SetNodeLabels(l gokitlog.Logger, labels map[string]string) types.SyncState {
 	for proto, handler := range c.protocols {
-		if err := handler.SetNode(l, node); err != nil {
+		if err := handler.SetNodeLabels(l, labels); err != nil {
 			l.Log("op", "setNode", "error", err, "protocol", proto, "msg", "failed to propagate node info to protocol handler")
 			return types.SyncStateError
 		}
@@ -285,7 +289,7 @@ type Protocol interface {
 	ShouldAnnounce(gokitlog.Logger, string, string, *Endpoints) string
 	SetBalancer(gokitlog.Logger, string, net.IP, *config.Pool) error
 	DeleteBalancer(gokitlog.Logger, string, string) error
-	SetNode(gokitlog.Logger, *v1.Node) error
+	SetNodeLabels(gokitlog.Logger, map[string]string) error
 }
 
 // Speakerlist represents a list of healthy speakers.

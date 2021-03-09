@@ -23,7 +23,6 @@ import (
 	"github.com/go-kit/kit/log"
 	"go.universe.tf/metallb/pkg/config"
 	"go.universe.tf/metallb/pkg/layer2"
-	v1 "k8s.io/api/core/v1"
 )
 
 type Layer2Controller struct {
@@ -101,7 +100,7 @@ func (c *Layer2Controller) DeleteBalancer(l log.Logger, name, reason string) err
 	return nil
 }
 
-func (c *Layer2Controller) SetNode(log.Logger, *v1.Node) error {
+func (c *Layer2Controller) SetNodeLabels(log.Logger, map[string]string) error {
 	c.SList.Rejoin()
 	return nil
 }
