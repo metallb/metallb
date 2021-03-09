@@ -66,12 +66,32 @@ type ControllerConfig struct {
 	DisableLayer2 bool
 }
 
+// Service represents an object containing the minimal representation of a
+// v1.Service object needed for announcements.
+type Service struct {
+	Type          string
+	TrafficPolicy string
+	Ingress       []v1.LoadBalancerIngress
+}
+
 func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps *v1.Endpoints) types.SyncState {
+	s := c.SetService(l, name, &Service{
+		Type:          string(svc.Spec.Type),
+		TrafficPolicy: string(svc.Spec.ExternalTrafficPolicy),
+		Ingress:       svc.Status.LoadBalancer.Ingress,
+	}, eps)
+	if s == types.SyncStateSuccess {
+		c.Client.Infof(svc, "nodeAssigned", "announcing from node %q", c.myNode)
+	}
+	return s
+}
+
+func (c *Controller) SetService(l gokitlog.Logger, name string, svc *Service, eps *v1.Endpoints) types.SyncState {
 	if svc == nil {
 		return c.deleteBalancer(l, name, "serviceDeleted")
 	}
 
-	if svc.Spec.Type != "LoadBalancer" {
+	if svc.Type != "LoadBalancer" {
 		return c.deleteBalancer(l, name, "notLoadBalancer")
 	}
 
@@ -83,13 +103,13 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
 		return types.SyncStateSuccess
 	}
 
-	if len(svc.Status.LoadBalancer.Ingress) != 1 {
+	if len(svc.Ingress) != 1 {
 		return c.deleteBalancer(l, name, "noIPAllocated")
 	}
 
-	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
+	lbIP := net.ParseIP(svc.Ingress[0].IP)
 	if lbIP == nil {
-		l.Log("op", "setBalancer", "error", fmt.Sprintf("invalid LoadBalancer IP %q", svc.Status.LoadBalancer.Ingress[0].IP), "msg", "invalid IP allocated by controller")
+		l.Log("op", "setBalancer", "error", fmt.Sprintf("invalid LoadBalancer IP %q", svc.Ingress[0].IP), "msg", "invalid IP allocated by controller")
 		return c.deleteBalancer(l, name, "invalidIP")
 	}
 
@@ -127,7 +147,7 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
 		return c.deleteBalancer(l, name, "internalError")
 	}
 
-	if deleteReason := handler.ShouldAnnounce(l, name, string(svc.Spec.ExternalTrafficPolicy), eps); deleteReason != "" {
+	if deleteReason := handler.ShouldAnnounce(l, name, svc.TrafficPolicy, eps); deleteReason != "" {
 		return c.deleteBalancer(l, name, deleteReason)
 	}
 
@@ -148,7 +168,6 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
 		"ip":       lbIP.String(),
 	}).Set(1)
 	l.Log("event", "serviceAnnounced", "msg", "service has IP, announcing")
-	c.Client.Infof(svc, "nodeAssigned", "announcing from node %q", c.myNode)
 
 	return types.SyncStateSuccess
 }

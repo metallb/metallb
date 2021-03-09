@@ -40,14 +40,10 @@ func ipnet(s string) *net.IPNet {
 	return n
 }
 
-func statusAssigned(ip string) v1.ServiceStatus {
-	return v1.ServiceStatus{
-		LoadBalancer: v1.LoadBalancerStatus{
-			Ingress: []v1.LoadBalancerIngress{
-				{
-					IP: ip,
-				},
-			},
+func statusAssigned(ip string) []v1.LoadBalancerIngress {
+	return []v1.LoadBalancerIngress{
+		v1.LoadBalancerIngress{
+			IP: ip,
 		},
 	}
 }

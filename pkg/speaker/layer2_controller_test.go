@@ -169,7 +169,7 @@ func TestShouldAnnounce(t *testing.T) {
 
 		balancer string
 		config   *config.Config
-		svcs     []*v1.Service
+		svcs     []*Service
 		eps      map[string]*v1.Endpoints
 
 		c1ExpectedResult map[string]string
@@ -186,13 +186,11 @@ func TestShouldAnnounce(t *testing.T) {
 					},
 				},
 			},
-			svcs: []*v1.Service{
-				{
-					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
-					},
-					Status: statusAssigned("10.20.30.1"),
+			svcs: []*Service{
+				Service{
+					Type:          "LoadBalancer",
+					TrafficPolicy: "Cluster",
+					Ingress:       statusAssigned("10.20.30.1"),
 				},
 			},
 			eps: map[string]*v1.Endpoints{
