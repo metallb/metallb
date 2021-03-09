@@ -84,23 +84,21 @@ newPeers:
 }
 
 // nodeHasHealthyEndpoint return true if this node has at least one healthy endpoint.
-func nodeHasHealthyEndpoint(eps *v1.Endpoints, node string) bool {
+func nodeHasHealthyEndpoint(eps *Endpoints, node string) bool {
 	ready := map[string]bool{}
-	for _, subset := range eps.Subsets {
-		for _, ep := range subset.Addresses {
-			if ep.NodeName == nil || *ep.NodeName != node {
-				continue
-			}
-			if _, ok := ready[ep.IP]; !ok {
-				// Only set true if nothing else has expressed an
-				// opinion. This means that false will take precedence
-				// if there's any unready ports for a given endpoint.
-				ready[ep.IP] = true
-			}
+	for _, ep := range eps.Ready {
+		if ep.NodeName == nil || *ep.NodeName != node {
+			continue
 		}
-		for _, ep := range subset.NotReadyAddresses {
-			ready[ep.IP] = false
+		if _, ok := ready[ep.IP]; !ok {
+			// Only set true if nothing else has expressed an
+			// opinion. This means that false will take precedence
+			// if there's any unready ports for a given endpoint.
+			ready[ep.IP] = true
 		}
+	}
+	for _, ep := range eps.NotReady {
+		ready[ep.IP] = false
 	}
 
 	for _, r := range ready {
@@ -112,20 +110,18 @@ func nodeHasHealthyEndpoint(eps *v1.Endpoints, node string) bool {
 	return false
 }
 
-func healthyEndpointExists(eps *v1.Endpoints) bool {
+func healthyEndpointExists(eps *Endpoints) bool {
 	ready := map[string]bool{}
-	for _, subset := range eps.Subsets {
-		for _, ep := range subset.Addresses {
-			if _, ok := ready[ep.IP]; !ok {
-				// Only set true if nothing else has expressed an
-				// opinion. This means that false will take precedence
-				// if there's any unready ports for a given endpoint.
-				ready[ep.IP] = true
-			}
+	for _, ep := range eps.Ready {
+		if _, ok := ready[ep.IP]; !ok {
+			// Only set true if nothing else has expressed an
+			// opinion. This means that false will take precedence
+			// if there's any unready ports for a given endpoint.
+			ready[ep.IP] = true
 		}
-		for _, ep := range subset.NotReadyAddresses {
-			ready[ep.IP] = false
-		}
+	}
+	for _, ep := range eps.NotReady {
+		ready[ep.IP] = false
 	}
 
 	for _, r := range ready {
@@ -137,7 +133,7 @@ func healthyEndpointExists(eps *v1.Endpoints) bool {
 	return false
 }
 
-func (c *BGPController) ShouldAnnounce(l log.Logger, name string, policyType string, eps *v1.Endpoints) string {
+func (c *BGPController) ShouldAnnounce(l log.Logger, name string, policyType string, eps *Endpoints) string {
 	// Should we advertise?
 	// Yes, if externalTrafficPolicy is
 	//  Cluster && any healthy endpoint exists

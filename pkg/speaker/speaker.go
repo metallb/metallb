@@ -79,14 +79,14 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
 		Type:          string(svc.Spec.Type),
 		TrafficPolicy: string(svc.Spec.ExternalTrafficPolicy),
 		Ingress:       svc.Status.LoadBalancer.Ingress,
-	}, eps)
+	}, toEndpoints(eps))
 	if s == types.SyncStateSuccess {
 		c.Client.Infof(svc, "nodeAssigned", "announcing from node %q", c.myNode)
 	}
 	return s
 }
 
-func (c *Controller) SetService(l gokitlog.Logger, name string, svc *Service, eps *v1.Endpoints) types.SyncState {
+func (c *Controller) SetService(l gokitlog.Logger, name string, svc *Service, eps *Endpoints) types.SyncState {
 	if svc == nil {
 		return c.deleteBalancer(l, name, "serviceDeleted")
 	}
@@ -246,10 +246,43 @@ func (c *Controller) SetNode(l gokitlog.Logger, node *v1.Node) types.SyncState {
 	return types.SyncStateSuccess
 }
 
+// Endpoints represents an object containing the minimal representation of a
+// v1.Endpoints similar to Service.
+type Endpoints struct {
+	Ready, NotReady []Endpoint
+}
+
+func toEndpoints(in *v1.Endpoints) *Endpoints {
+	if in == nil {
+		return nil
+	}
+	out := new(Endpoints)
+	for _, sub := range in.Subsets {
+		for _, ep := range sub.Addresses {
+			out.Ready = append(out.Ready, Endpoint{
+				IP:       ep.IP,
+				NodeName: ep.NodeName,
+			})
+		}
+		for _, ep := range sub.NotReadyAddresses {
+			out.NotReady = append(out.NotReady, Endpoint{
+				IP:       ep.IP,
+				NodeName: ep.NodeName,
+			})
+		}
+	}
+	return out
+}
+
+type Endpoint struct {
+	IP       string
+	NodeName *string
+}
+
 // A Protocol can advertise an IP address.
 type Protocol interface {
 	SetConfig(gokitlog.Logger, *config.Config) error
-	ShouldAnnounce(gokitlog.Logger, string, string, *v1.Endpoints) string
+	ShouldAnnounce(gokitlog.Logger, string, string, *Endpoints) string
 	SetBalancer(gokitlog.Logger, string, net.IP, *config.Pool) error
 	DeleteBalancer(gokitlog.Logger, string, string) error
 	SetNode(gokitlog.Logger, *v1.Node) error
