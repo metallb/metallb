@@ -341,6 +341,7 @@ spec:
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
+        operator: Exists
 ---
 apiVersion: apps/v1
 kind: Deployment
