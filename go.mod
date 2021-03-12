@@ -1,6 +1,6 @@
 module go.universe.tf/metallb
 
-go 1.12
+go 1.16
 
 require (
 	github.com/armon/go-radix v1.0.0 // indirect

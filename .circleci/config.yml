@@ -4,7 +4,7 @@ version: 2
 jobs:
   test-1.13:
     docker:
-      - image: cimg/go:1.13
+      - image: cimg/go:1.16
     steps:
       - checkout
       - run: go test -short ./...
@@ -12,14 +12,14 @@ jobs:
       - run: cp manifests/metallb.yaml manifests/metallb.yaml.prev
   lint-1.13:
     docker:
-      - image: cimg/go:1.13
+      - image: cimg/go:1.16
     steps:
       - checkout
       - run: curl -L https://git.io/vp6lP | sh # gometalinter
       - run: PATH=./bin:$PATH gometalinter --deadline=5m --disable-all --enable=gofmt --enable=vet --vendor ./...
   publish-images:
     docker:
-      - image: cimg/go:1.13
+      - image: cimg/go:1.16
     steps:
       - checkout
       - setup_remote_docker
@@ -31,7 +31,7 @@ jobs:
       - run: PATH=./bin:$PATH inv push-multiarch --binaries=controller --binaries=speaker --registry=docker.io --repo=metallb --tag=${CIRCLE_BRANCH:-${CIRCLE_TAG}}
   publish-images-quay:
     docker:
-      - image: cimg/go:1.13
+      - image: cimg/go:1.16
     steps:
       - checkout
       - setup_remote_docker
