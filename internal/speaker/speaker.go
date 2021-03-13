@@ -6,7 +6,7 @@ import (
 
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/k8s"
+	"go.universe.tf/metallb/internal/k8s/types"
 	"go.universe.tf/metallb/internal/layer2"
 
 	gokitlog "github.com/go-kit/kit/log"
@@ -66,7 +66,7 @@ type ControllerConfig struct {
 	DisableLayer2 bool
 }
 
-func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps *v1.Endpoints) k8s.SyncState {
+func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps *v1.Endpoints) types.SyncState {
 	if svc == nil {
 		return c.deleteBalancer(l, name, "serviceDeleted")
 	}
@@ -80,7 +80,7 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
 
 	if c.config == nil {
 		l.Log("event", "noConfig", "msg", "not processing, still waiting for config")
-		return k8s.SyncStateSuccess
+		return types.SyncStateSuccess
 	}
 
 	if len(svc.Status.LoadBalancer.Ingress) != 1 {
@@ -109,13 +109,13 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
 	}
 
 	if proto, ok := c.announced[name]; ok && proto != pool.Protocol {
-		if st := c.deleteBalancer(l, name, "protocolChanged"); st == k8s.SyncStateError {
+		if st := c.deleteBalancer(l, name, "protocolChanged"); st == types.SyncStateError {
 			return st
 		}
 	}
 
 	if svcIP, ok := c.svcIP[name]; ok && !lbIP.Equal(svcIP) {
-		if st := c.deleteBalancer(l, name, "loadBalancerIPChanged"); st == k8s.SyncStateError {
+		if st := c.deleteBalancer(l, name, "loadBalancerIPChanged"); st == types.SyncStateError {
 			return st
 		}
 	}
@@ -133,7 +133,7 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
 
 	if err := handler.SetBalancer(l, name, lbIP, pool); err != nil {
 		l.Log("op", "setBalancer", "error", err, "msg", "failed to announce service")
-		return k8s.SyncStateError
+		return types.SyncStateError
 	}
 
 	if c.announced[name] == "" {
@@ -150,18 +150,18 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
 	l.Log("event", "serviceAnnounced", "msg", "service has IP, announcing")
 	c.Client.Infof(svc, "nodeAssigned", "announcing from node %q", c.myNode)
 
-	return k8s.SyncStateSuccess
+	return types.SyncStateSuccess
 }
 
-func (c *Controller) deleteBalancer(l gokitlog.Logger, name, reason string) k8s.SyncState {
+func (c *Controller) deleteBalancer(l gokitlog.Logger, name, reason string) types.SyncState {
 	proto, ok := c.announced[name]
 	if !ok {
-		return k8s.SyncStateSuccess
+		return types.SyncStateSuccess
 	}
 
 	if err := c.protocols[proto].DeleteBalancer(l, name, reason); err != nil {
 		l.Log("op", "deleteBalancer", "error", err, "msg", "failed to clear balancer state")
-		return k8s.SyncStateError
+		return types.SyncStateError
 	}
 
 	announcing.Delete(prometheus.Labels{
@@ -175,7 +175,7 @@ func (c *Controller) deleteBalancer(l gokitlog.Logger, name, reason string) k8s.
 
 	l.Log("event", "serviceWithdrawn", "ip", c.svcIP[name], "reason", reason, "msg", "withdrawing service announcement")
 
-	return k8s.SyncStateSuccess
+	return types.SyncStateSuccess
 }
 
 func poolFor(pools map[string]*config.Pool, ip net.IP) string {
@@ -189,42 +189,42 @@ func poolFor(pools map[string]*config.Pool, ip net.IP) string {
 	return ""
 }
 
-func (c *Controller) SetConfig(l gokitlog.Logger, cfg *config.Config) k8s.SyncState {
+func (c *Controller) SetConfig(l gokitlog.Logger, cfg *config.Config) types.SyncState {
 	l.Log("event", "startUpdate", "msg", "start of config update")
 	defer l.Log("event", "endUpdate", "msg", "end of config update")
 
 	if cfg == nil {
 		l.Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
-		return k8s.SyncStateError
+		return types.SyncStateError
 	}
 
 	for svc, ip := range c.svcIP {
 		if pool := poolFor(cfg.Pools, ip); pool == "" {
 			l.Log("op", "setConfig", "service", svc, "ip", ip, "error", "service has no configuration under new config", "msg", "new configuration rejected")
-			return k8s.SyncStateError
+			return types.SyncStateError
 		}
 	}
 
 	for proto, handler := range c.protocols {
 		if err := handler.SetConfig(l, cfg); err != nil {
 			l.Log("op", "setConfig", "protocol", proto, "error", err, "msg", "applying new configuration to protocol handler failed")
-			return k8s.SyncStateError
+			return types.SyncStateError
 		}
 	}
 
 	c.config = cfg
 
-	return k8s.SyncStateReprocessAll
+	return types.SyncStateReprocessAll
 }
 
-func (c *Controller) SetNode(l gokitlog.Logger, node *v1.Node) k8s.SyncState {
+func (c *Controller) SetNode(l gokitlog.Logger, node *v1.Node) types.SyncState {
 	for proto, handler := range c.protocols {
 		if err := handler.SetNode(l, node); err != nil {
 			l.Log("op", "setNode", "error", err, "protocol", proto, "msg", "failed to propagate node info to protocol handler")
-			return k8s.SyncStateError
+			return types.SyncStateError
 		}
 	}
-	return k8s.SyncStateSuccess
+	return types.SyncStateSuccess
 }
 
 // A Protocol can advertise an IP address.
