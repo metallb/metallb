@@ -3,8 +3,18 @@ title: Release Notes
 weight: 8
 ---
 
-## Version 0.9.5
+## Version 0.9.6
 [Documentation for this release](https://metallb.universe.tf)
+
+Bugfixes:
+
+- Fix nodeAssigned event on k8s >= 1.20 ([#812](https://github.com/metallb/metallb/pull/812)).
+
+This release includes contributions from Lars Ekman, Rodrigo Campos, Russell
+Bryant and Stefan Lasiewski. Thanks for making MetalLB better!
+
+## Version 0.9.5
+[Documentation for this release](https://v0-9-5--metallb.netlify.com)
 
 New features:
 
