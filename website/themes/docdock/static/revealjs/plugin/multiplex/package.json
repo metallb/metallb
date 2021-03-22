@@ -1,19 +1,18 @@
 {
-  "name": "reveal-js-multiplex",
-  "version": "1.0.0",
-  "description": "reveal.js multiplex server",
-  "homepage": "http://lab.hakim.se/reveal-js",
+  "name": "reveal-multiplex",
+  "version": "0.1.0",
+  "description": "reveal.js multiplex plugin",
+  "homepage": "https://revealjs.com",
   "scripts": {
     "start": "node index.js"
   },
   "engines": {
-    "node": "~4.1.1"
+    "node": ">=9.0.0"
   },
   "dependencies": {
-    "express": "~4.13.3",
-    "grunt-cli": "~0.1.13",
-    "mustache": "~2.2.1",
-    "socket.io": "~1.3.7"
+    "express": "~4.17.1",
+    "mustache": "~4.0.0",
+    "socket.io": "~2.3.0"
   },
   "license": "MIT"
 }

@@ -1,22 +1,22 @@
-var http        = require('http');
-var express		= require('express');
-var fs			= require('fs');
-var io			= require('socket.io');
-var crypto		= require('crypto');
+let http        = require('http');
+let express		= require('express');
+let fs			= require('fs');
+let io			= require('socket.io');
+let crypto		= require('crypto');
 
-var app       	= express();
-var staticDir 	= express.static;
-var server    	= http.createServer(app);
+let app       	= express();
+let staticDir 	= express.static;
+let server    	= http.createServer(app);
 
 io = io(server);
 
-var opts = {
+let opts = {
 	port: process.env.PORT || 1948,
-	baseDir : __dirname + '/../../'
+	baseDir : process.cwd()
 };
 
-io.on( 'connection', function( socket ) {
-	socket.on('multiplex-statechanged', function(data) {
+io.on( 'connection', socket => {
+	socket.on('multiplex-statechanged', data => {
 		if (typeof data.secret == 'undefined' || data.secret == null || data.secret === '') return;
 		if (createHash(data.secret) === data.socketId) {
 			data.secret = null;
@@ -25,39 +25,37 @@ io.on( 'connection', function( socket ) {
 	});
 });
 
-[ 'css', 'js', 'plugin', 'lib' ].forEach(function(dir) {
-	app.use('/' + dir, staticDir(opts.baseDir + dir));
-});
+app.use( express.static( opts.baseDir ) );
 
-app.get("/", function(req, res) {
+app.get("/", ( req, res ) => {
 	res.writeHead(200, {'Content-Type': 'text/html'});
 
-	var stream = fs.createReadStream(opts.baseDir + '/index.html');
-	stream.on('error', function( error ) {
+	let stream = fs.createReadStream( opts.baseDir + '/index.html' );
+	stream.on('error', error => {
 		res.write('<style>body{font-family: sans-serif;}</style><h2>reveal.js multiplex server.</h2><a href="/token">Generate token</a>');
 		res.end();
 	});
-	stream.on('readable', function() {
-		stream.pipe(res);
+	stream.on('open', () => {
+		stream.pipe( res );
 	});
 });
 
-app.get("/token", function(req,res) {
-	var ts = new Date().getTime();
-	var rand = Math.floor(Math.random()*9999999);
-	var secret = ts.toString() + rand.toString();
+app.get("/token", ( req, res ) => {
+	let ts = new Date().getTime();
+	let rand = Math.floor(Math.random()*9999999);
+	let secret = ts.toString() + rand.toString();
 	res.send({secret: secret, socketId: createHash(secret)});
 });
 
-var createHash = function(secret) {
-	var cipher = crypto.createCipher('blowfish', secret);
-	return(cipher.final('hex'));
+let createHash = secret => {
+	let cipher = crypto.createCipher('blowfish', secret);
+	return cipher.final('hex');
 };
 
 // Actually listen
 server.listen( opts.port || null );
 
-var brown = '\033[33m',
+let brown = '\033[33m',
 	green = '\033[32m',
 	reset = '\033[0m';
 
