@@ -1,6 +1,6 @@
 [build]
   base = "website"
-  publish = "public"
+  publish = "website/public"
   command = "hugo"
 
 [build.environment]
