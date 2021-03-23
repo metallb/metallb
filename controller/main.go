@@ -32,7 +32,6 @@ import (
 
 // Service offers methods to mutate a Kubernetes service object.
 type service interface {
-	Update(svc *v1.Service) (*v1.Service, error)
 	UpdateStatus(svc *v1.Service) error
 	Infof(svc *v1.Service, desc, msg string, args ...interface{})
 	Errorf(svc *v1.Service, desc, msg string, args ...interface{})
@@ -76,19 +75,11 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		return k8s.SyncStateSuccess
 	}
 
-	var err error
-	if !(reflect.DeepEqual(svcRo.Annotations, svc.Annotations) && reflect.DeepEqual(svcRo.Spec, svc.Spec)) {
-		svcRo, err = c.client.Update(svc)
-		if err != nil {
-			l.Log("op", "updateService", "error", err, "msg", "failed to update service")
-			return k8s.SyncStateError
-		}
-	}
 	if !reflect.DeepEqual(svcRo.Status, svc.Status) {
 		var st v1.ServiceStatus
 		st, svc = svc.Status, svcRo.DeepCopy()
 		svc.Status = st
-		if err = c.client.UpdateStatus(svc); err != nil {
+		if err := c.client.UpdateStatus(svc); err != nil {
 			l.Log("op", "updateServiceStatus", "error", err, "msg", "failed to update service status")
 			return k8s.SyncStateError
 		}
