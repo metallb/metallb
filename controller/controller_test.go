@@ -65,11 +65,6 @@ type testK8S struct {
 	t                   *testing.T
 }
 
-func (s *testK8S) Update(svc *v1.Service) (*v1.Service, error) {
-	s.updateService = svc
-	return svc, nil
-}
-
 func (s *testK8S) UpdateStatus(svc *v1.Service) error {
 	s.updateServiceStatus = &svc.Status
 	return nil

@@ -331,13 +331,6 @@ func (c *Client) ForceSync() {
 	}
 }
 
-// Update writes svc back into the Kubernetes cluster. If successful,
-// the updated Service is returned. Note that changes to svc.Status
-// are not propagated, for that you need to call UpdateStatus.
-func (c *Client) Update(svc *v1.Service) (*v1.Service, error) {
-	return c.client.CoreV1().Services(svc.Namespace).Update(context.TODO(), svc, metav1.UpdateOptions{})
-}
-
 // UpdateStatus writes the protected "status" field of svc back into
 // the Kubernetes cluster.
 func (c *Client) UpdateStatus(svc *v1.Service) error {
