@@ -174,10 +174,6 @@ type testK8S struct {
 	t             *testing.T
 }
 
-func (s *testK8S) Update(svc *v1.Service) (*v1.Service, error) {
-	panic("never called")
-}
-
 func (s *testK8S) UpdateStatus(svc *v1.Service) error {
 	panic("never called")
 }

@@ -49,7 +49,6 @@ var announcing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 
 // Service offers methods to mutate a Kubernetes service object.
 type service interface {
-	Update(svc *v1.Service) (*v1.Service, error)
 	UpdateStatus(svc *v1.Service) error
 	Infof(svc *v1.Service, desc, msg string, args ...interface{})
 	Errorf(svc *v1.Service, desc, msg string, args ...interface{})
