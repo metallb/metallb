@@ -7,8 +7,10 @@ jobs:
       - image: cimg/go:1.13
     steps:
       - checkout
-      - run: go test -short ./...
-      - run: go test -short -race ./...
+      - run: sudo apt-get update
+      - run: sudo apt-get install python3-pip
+      - run: sudo pip3 install invoke semver pyyaml
+      - run: inv test
       - run: cp manifests/metallb.yaml manifests/metallb.yaml.prev
   lint-1.13:
     docker:
