@@ -20,7 +20,7 @@ There's no need: MetalLB automatically listens/advertises on all interfaces. Tha
 
 *NOTE* Because of the way layer 2 mode functions, this works with tagged vlans as well.  Specify the network and the ip stack figures out the rest.
 
-## Is MetalLB working on OpenStack?
+## Does MetalLB work on OpenStack?
 
 Yes but by default, OpenStack has anti-spoofing protection enabled which prevents the VMs from using any IP that wasn't configured for them in the OpenStack control plane, such as LoadBalancer IPs from MetalLB. See [openstack port set --allowed-address](https://docs.openstack.org/python-openstackclient/latest/cli/command-objects/port.html).
 
