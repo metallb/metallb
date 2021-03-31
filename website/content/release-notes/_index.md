@@ -3,6 +3,15 @@ title: Release Notes
 weight: 8
 ---
 
+## Version 0.10.0 (Still in development)
+
+Changes in behavior:
+
+- The `port` option to the `speaker`, which is the prometheus metrics port, now
+  defaults to port `7472`. This was already the default in the manifests
+  included with MetalLB, but the binary itself previously defaulted to port
+  `80`.
+
 ## Version 0.9.6
 [Documentation for this release](https://metallb.universe.tf)
 
