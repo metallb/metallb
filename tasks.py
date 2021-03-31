@@ -444,3 +444,16 @@ def release(ctx, version, skip_release_notes=False):
     run("git commit -a -m 'Automated update for release v{}'".format(version), echo=True)
     run("git tag v{} -m 'See the release notes for details:\n\nhttps://metallb.universe.tf/release-notes/#version-{}-{}-{}'".format(version, version.major, version.minor, version.patch), echo=True)
     run("git checkout main", echo=True)
+
+@task
+def unit_tests(ctx):
+    """Run unit tests."""
+    run("go test ./...")
+    run("go test -race ./...")
+
+@task
+def linter(ctx):
+    """Run linter."""
+    # Install "gometalinter" and run linter
+    run("curl -L https://git.io/vp6lP | sh")
+    run("PATH=./bin/$PATH ./bin/gometalinter --deadline=5m --disable-all --enable=gofmt --enable=vet --vendor ./...")
