@@ -1,0 +1,27 @@
+apiVersion: loadbalancer.loadbalancer.operator.io/v1
+kind: MetalLB
+metadata:
+  name: metallb-sample
+  namespace: metallb-system
+spec:
+  peers:
+  - peer-address: 10.0.0.1
+    peer-asn: 64501
+    my-asn: 64500
+    router-id: 10.10.10.10
+    node-selectors:
+    - match-expressions:
+      - key: kubernetes.io/hostname
+        operator: In
+        values: [hostA, hostB]
+  address-pools:
+  - name: default
+    protocol: bgp
+    addresses:
+    - 172.18.255.100/24
+    bgp-advertisements:
+    - aggregation-length: 32
+      localpref: 100
+      communities:
+      - no-advertise
+    - aggregation-length: 24

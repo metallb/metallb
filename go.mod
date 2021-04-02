@@ -29,4 +29,5 @@ require (
 	k8s.io/apimachinery v0.20.2
 	k8s.io/client-go v0.20.2
 	k8s.io/klog v0.3.1
+	sourcegraph.com/sourcegraph/go-template-lint v0.0.0-20150828090223-17cde5e36859 // indirect
 )

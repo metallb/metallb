@@ -1,0 +1,86 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    address-pools:
+    {{ range $entry := .AddressPools -}}
+    - name: {{ $entry.Name }}
+      protocol: {{ $entry.Protocol }}
+      addresses:
+
+      {{ range $a := $entry.Addresses -}}
+      - {{ $a }}
+      {{ end -}}
+
+     {{ $advlen := len $entry.BgpAdvertisements }} {{ if gt $advlen 0 }}
+      bgp-advertisements:
+      {{ range $adv := $entry.BgpAdvertisements -}}
+
+        {{ if ne $adv.AggregationLength 0 }}
+          - aggregation-length: {{ $adv.AggregationLength }}
+        {{ end }}
+
+        {{ if ne $adv.LocalPref 0 }}
+          localpref: {{ $adv.LocalPref }}
+        {{ end }}
+
+        {{ $commlen := len $adv.Communities }} {{ if gt $commlen 0 }}
+          communities:
+          {{ range $comm := $adv.Communities -}}
+            - {{ $comm }}
+          {{ end -}}
+
+        {{ end }}
+
+      {{ end -}}
+    {{ end }}
+    {{ end -}}
+
+    {{ $length := len .Peers }} {{ if gt $length 0 }}
+    peers:
+    {{ range $peer := .Peers -}}
+     - peer-address: {{ $peer.Addr }}
+       peer-asn: {{ $peer.ASN }}
+       my-asn: {{ $peer.MyASN }}
+
+       {{ if ne $peer.Port 0 }}
+          peer-port: {{ $peer.Port }}
+       {{ end }}
+
+       {{ if ne $peer.HoldTime 0 }}
+          hold-time: {{ $peer.HoldTime }}
+       {{ end }}
+
+       {{ if ne $peer.RouterID "" }}
+          router-id: {{ $peer.RouterID }}
+       {{ end }}
+
+       {{ if ne $peer.Password "" }}
+          password: {{ $peer.Password }}
+       {{ end }}
+
+      {{ $sel_len := len $peer.NodeSelectors }} {{ if gt $sel_len 0 }}
+       node-selectors:
+       {{ range $node := $peer.NodeSelectors -}}
+
+         {{ if $node.MatchLabels }}
+          - match-labels:
+         {{ end }}
+
+        {{ if $node.MatchExpressions -}}
+         - match-expressions:
+           {{ range $expression := $node.MatchExpressions -}}
+             - key: {{ $expression.Key }}
+               operator: {{ $expression.Operator }}
+               values: {{ $expression.Values }}
+           {{ end -}}
+
+        {{ end }}
+
+       {{ end -}}
+       {{ end }}
+     {{ end -}}
+    {{ end }}

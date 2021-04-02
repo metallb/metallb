@@ -654,3 +654,5 @@ sigs.k8s.io/structured-merge-diff/v4 v4.0.2/go.mod h1:bJZC9H9iH24zzfZ/41RGcq60oK
 sigs.k8s.io/yaml v1.1.0/go.mod h1:UJmg0vDUVViEyp3mgSv9WPwZCDxu4rQW1olrI1uml+o=
 sigs.k8s.io/yaml v1.2.0 h1:kr/MCeFWJWTwyaHoR9c8EjH9OumOmoF9YGiZd7lFm/Q=
 sigs.k8s.io/yaml v1.2.0/go.mod h1:yfXDCHCao9+ENCvLSE62v9VSji2MKu5jeNfTrofGhJc=
+sourcegraph.com/sourcegraph/go-template-lint v0.0.0-20150828090223-17cde5e36859 h1:2+FWfM/R9/7f+B36JxEZwmiua2yucfZ+ckL+lxu1aVk=
+sourcegraph.com/sourcegraph/go-template-lint v0.0.0-20150828090223-17cde5e36859/go.mod h1:L5Vq596GEUBWAFkPkjUqAfK5IriwCCTxl5oA3rT6d24=

@@ -1,0 +1,28 @@
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - loadbalancer.loadbalancer.operator.io
+  resources:
+  - metallbs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - loadbalancer.loadbalancer.operator.io
+  resources:
+  - metallbs/status
+  verbs:
+  - get
+  - patch
+  - update
