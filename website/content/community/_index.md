@@ -142,7 +142,7 @@ having them attach to a cluster might be more convenient than
 redeploying them to a cluster over and over.
 
 For the controller, the `-kubeconfig` and `-config-ns` command-line flags
-are needed.  Speakers need those and `-node-name`.
+are needed. Speakers need those and `-node-name`.
 
 For example:
 
