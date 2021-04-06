@@ -5,6 +5,14 @@ weight: 8
 
 ## Version 0.10.0 (Still in development)
 
+New Features:
+
+- Version 0.9.x required the creation of a Secret called `memberlist`. This
+  Secret is now automatically created by the MetalLB controller if it does not
+  already exist.
+
+Bug Fixes:
+
 Changes in behavior:
 
 - The `port` option to the `speaker`, which is the prometheus metrics port, now
