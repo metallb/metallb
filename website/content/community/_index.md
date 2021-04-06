@@ -51,8 +51,8 @@ agree to abide by its terms.
 ## Code changes
 
 Before you make significant code changes, please consider opening a pull
-request with a proposed design in the `design/` directory.  That should
-reduce the amount of time required for code review.  If you don't have a full
+request with a proposed design in the `design/` directory. That should
+reduce the amount of time required for code review. If you don't have a full
 design proposal ready, feel free to open an issue to discuss what you would
 like to do.
 
