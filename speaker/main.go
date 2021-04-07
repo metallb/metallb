@@ -131,7 +131,7 @@ func main() {
 	client, err := k8s.New(&k8s.Config{
 		ProcessName:   "metallb-speaker",
 		ConfigMapName: *config,
-		ConfigMapNS:   *namespace,
+		Namespace:     *namespace,
 		NodeName:      *myNode,
 		Logger:        logger,
 		Kubeconfig:    *kubeconfig,
