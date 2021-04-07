@@ -9,7 +9,9 @@ New Features:
 
 - Version 0.9.x required the creation of a Secret called `memberlist`. This
   Secret is now automatically created by the MetalLB controller if it does not
-  already exist.
+  already exist. To use this feature you must set the new `ml-secret-name` and `deployment`
+  options or `METALLB_ML_SECRET_NAME` and `METALLB_DEPLOYMENT` environment variables.
+  This is already done in the manifests provided with this release.
 
 Bug Fixes:
 
