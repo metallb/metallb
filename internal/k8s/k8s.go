@@ -76,7 +76,7 @@ const (
 type Config struct {
 	ProcessName   string
 	ConfigMapName string
-	ConfigMapNS   string
+	Namespace     string
 	NodeName      string
 	MetricsHost   string
 	MetricsPort   int
@@ -267,7 +267,7 @@ func New(cfg *Config) (*Client, error) {
 				}
 			},
 		}
-		cmWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "configmaps", cfg.ConfigMapNS, fields.OneTermEqualSelector("metadata.name", cfg.ConfigMapName))
+		cmWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "configmaps", cfg.Namespace, fields.OneTermEqualSelector("metadata.name", cfg.ConfigMapName))
 		c.cmIndexer, c.cmInformer = cache.NewIndexerInformer(cmWatcher, &v1.ConfigMap{}, 0, cmHandlers, cache.Indexers{})
 
 		c.configChanged = cfg.ConfigChanged
