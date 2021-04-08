@@ -164,6 +164,12 @@ speaker:
     repository: quay.io/metallb/speaker
     tag:
     pullPolicy:
+  # Exclude all interfaces matching this regexp
+  # This doesn't improve security, only performances
+  intfExclude: '^(?:cali[a-z0-9]+|vxlan\.calico)$'
+  # Exclude all interfaces not matching this regexp
+  # This doesn't improve security, only performances
+  intfInclude: ''
   serviceAccount:
     # Specifies whether a ServiceAccount should be created
     create: true

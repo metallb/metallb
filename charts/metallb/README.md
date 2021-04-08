@@ -53,6 +53,8 @@ Source code can be found [here](https://metallb.universe.tf)
 | speaker.image.pullPolicy | string | `"IfNotPresent"` |  |
 | speaker.image.repository | string | `"metallb/speaker"` |  |
 | speaker.image.tag | string | `nil` |  |
+| speaker.intfExclude | string | `'^(?:cali[a-z0-9]+|vxlan\.calico)$'` |  |
+| speaker.intfInclude | string | `''` |  |
 | speaker.livenessProbe.enabled | bool | `true` |  |
 | speaker.livenessProbe.failureThreshold | int | `3` |  |
 | speaker.livenessProbe.initialDelaySeconds | int | `10` |  |

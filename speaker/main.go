@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"regexp"
 	"syscall"
 
 	"go.universe.tf/metallb/internal/bgp"
@@ -69,6 +70,10 @@ func main() {
 		namespace  = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
 		host       = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
+		intfExclS  = flag.String("intf-exclude", os.Getenv("METALLB_INTF_EXCLUDE"), "ignore all interfaces matching this regexp")
+		intfExclR  *regexp.Regexp
+		intfInclS  = flag.String("intf-include", os.Getenv("METALLB_INTF_INCLUDE"), "ignore all interfaces not matching this regexp")
+		intfInclR  *regexp.Regexp
 		mlBindAddr = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
 		mlBindPort = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
 		mlLabels   = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
@@ -94,6 +99,24 @@ func main() {
 		os.Exit(1)
 	}
 
+	if *intfExclS != "" {
+		intfExclR, err = regexp.Compile(*intfExclS)
+		if err != nil {
+			logger.Log("op", "startup", "msg", "Unable to compile --intf-exclude/METALLB_INTF_EXCLUDE regexp ("+*intfExclS+")", "error", err)
+			os.Exit(1)
+		}
+		logger.Log("op", "startup", "msg", "MetalLB will ignore all interfaces matching the following regexp: "+intfExclR.String())
+	}
+
+	if *intfInclS != "" {
+		intfInclR, err = regexp.Compile(*intfInclS)
+		if err != nil {
+			logger.Log("op", "startup", "msg", "Unable to compile --intf-include/METALLB_INTF_INCLUDE regexp ("+*intfInclS+")", "error", err)
+			os.Exit(1)
+		}
+		logger.Log("op", "startup", "msg", "MetalLB will ignore all interfaces not matching the following regexp: "+intfInclR.String())
+	}
+
 	stopCh := make(chan struct{})
 	go func() {
 		c1 := make(chan os.Signal)
@@ -112,9 +135,11 @@ func main() {
 
 	// Setup all clients and speakers, config decides what is being done runtime.
 	ctrl, err := newController(controllerConfig{
-		MyNode: *myNode,
-		Logger: logger,
-		SList:  sList,
+		MyNode:   *myNode,
+		Logger:   logger,
+		SList:    sList,
+		IntfExcl: intfExclR,
+		IntfIncl: intfInclR,
 	})
 	if err != nil {
 		logger.Log("op", "startup", "error", err, "msg", "failed to create MetalLB controller")
@@ -170,6 +195,9 @@ type controllerConfig struct {
 	// For testing only, and will be removed in a future release.
 	// See: https://github.com/metallb/metallb/issues/152.
 	DisableLayer2 bool
+
+	IntfExcl *regexp.Regexp
+	IntfIncl *regexp.Regexp
 }
 
 func newController(cfg controllerConfig) (*controller, error) {
@@ -182,7 +210,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 	}
 
 	if !cfg.DisableLayer2 {
-		a, err := layer2.New(cfg.Logger)
+		a, err := layer2.New(cfg.Logger, cfg.IntfExcl, cfg.IntfIncl)
 		if err != nil {
 			return nil, fmt.Errorf("making layer2 announcer: %s", err)
 		}

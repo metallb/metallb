@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"sync"
 	"time"
@@ -24,10 +25,15 @@ type Announce struct {
 	// This channel can block - do not write to it while holding the mutex
 	// to avoid deadlocking.
 	spamCh chan net.IP
+
+	// When not nil, all interfaces matching this regexp will be excluded
+	intfExcl *regexp.Regexp
+	// When not nil, all interfaces not matching this regexp will be excluded
+	intfIncl *regexp.Regexp
 }
 
 // New returns an initialized Announce.
-func New(l log.Logger) (*Announce, error) {
+func New(l log.Logger, intfExcl, intfIncl *regexp.Regexp) (*Announce, error) {
 	ret := &Announce{
 		logger:   l,
 		arps:     map[int]*arpResponder{},
@@ -35,6 +41,8 @@ func New(l log.Logger) (*Announce, error) {
 		ips:      map[string]net.IP{},
 		ipRefcnt: map[string]int{},
 		spamCh:   make(chan net.IP, 1024),
+		intfExcl: intfExcl,
+		intfIncl: intfIncl,
 	}
 	go ret.interfaceScan()
 	go ret.spamLoop()
@@ -63,6 +71,14 @@ func (a *Announce) updateInterfaces() {
 	for _, intf := range ifs {
 		ifi := intf
 		l := log.With(a.logger, "interface", ifi.Name)
+
+		if a.intfExcl != nil && a.intfExcl.MatchString(ifi.Name) {
+			continue
+		}
+		if a.intfIncl != nil && !a.intfIncl.MatchString(ifi.Name) {
+			continue
+		}
+
 		addrs, err := ifi.Addrs()
 		if err != nil {
 			l.Log("op", "getAddresses", "error", err, "msg", "couldn't get addresses for interface")

@@ -280,6 +280,12 @@
             },
             "secretName": {
               "type": "string"
+            },
+            "intfExclude": {
+              "type": "string"
+            },
+            "intfInclude": {
+              "type": "string"
             }
           },
           "required": [ "tolerateMaster" ]

@@ -66,6 +66,10 @@ spec:
               name: {{ include "metallb.secretName" . }}
               key: secretkey
         {{- end }}
+        - name: METALLB_INTF_EXCLUDE
+          value: '{{ .Values.speaker.intfExclude }}'
+        - name: METALLB_INTF_INCLUDE
+          value: '{{ .Values.speaker.intfInclude }}'
         ports:
         - name: metrics
           containerPort: 7472

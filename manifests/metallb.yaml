@@ -356,6 +356,14 @@ spec:
             secretKeyRef:
               name: memberlist
               key: secretkey
+        # Exclude all interfaces matching this regexp
+        # This doesn't improve security, only performances
+        - name: METALLB_INTF_EXCLUDE
+          value: '^(?:cali[a-z0-9]+|vxlan\.calico)$'
+        # Exclude all interfaces not matching this regexp
+        # This doesn't improve security, only performances
+        #- name: METALLB_INTF_INCLUDE
+        #  value: ''
         image: quay.io/metallb/speaker:main
         name: speaker
         ports:
