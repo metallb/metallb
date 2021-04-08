@@ -203,7 +203,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 	return ret, nil
 }
 
-func (c *controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps *v1.Endpoints) k8s.SyncState {
+func (c *controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps k8s.EpsOrSlices) k8s.SyncState {
 	if svc == nil {
 		return c.deleteBalancer(l, name, "serviceDeleted")
 	}
@@ -367,7 +367,7 @@ func (c *controller) SetNode(l gokitlog.Logger, node *v1.Node) k8s.SyncState {
 // A Protocol can advertise an IP address.
 type Protocol interface {
 	SetConfig(gokitlog.Logger, *config.Config) error
-	ShouldAnnounce(gokitlog.Logger, string, *v1.Service, *v1.Endpoints) string
+	ShouldAnnounce(gokitlog.Logger, string, *v1.Service, k8s.EpsOrSlices) string
 	SetBalancer(gokitlog.Logger, string, net.IP, *config.Pool) error
 	DeleteBalancer(gokitlog.Logger, string, string) error
 	SetNode(gokitlog.Logger, *v1.Node) error

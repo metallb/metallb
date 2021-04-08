@@ -25,7 +25,8 @@ import (
 
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
-	"k8s.io/api/core/v1"
+	"go.universe.tf/metallb/internal/k8s"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/go-kit/kit/log"
@@ -82,23 +83,47 @@ newPeers:
 	return c.syncPeers(l)
 }
 
-// nodeHasHealthyEndpoint return true if this node has at least one healthy endpoint.
-func nodeHasHealthyEndpoint(eps *v1.Endpoints, node string) bool {
+// hasHealthyEndpoint return true if this node has at least one healthy endpoint.
+// It only checks nodes matching the given filterNode function.
+func hasHealthyEndpoint(eps k8s.EpsOrSlices, filterNode func(*string) bool) bool {
 	ready := map[string]bool{}
-	for _, subset := range eps.Subsets {
-		for _, ep := range subset.Addresses {
-			if ep.NodeName == nil || *ep.NodeName != node {
-				continue
+	switch eps.Type {
+	case k8s.Eps:
+		for _, subset := range eps.EpVal.Subsets {
+			for _, ep := range subset.Addresses {
+				if filterNode(ep.NodeName) {
+					continue
+				}
+				if _, ok := ready[ep.IP]; !ok {
+					// Only set true if nothing else has expressed an
+					// opinion. This means that false will take precedence
+					// if there's any unready ports for a given endpoint.
+					ready[ep.IP] = true
+				}
 			}
-			if _, ok := ready[ep.IP]; !ok {
-				// Only set true if nothing else has expressed an
-				// opinion. This means that false will take precedence
-				// if there's any unready ports for a given endpoint.
-				ready[ep.IP] = true
+			for _, ep := range subset.NotReadyAddresses {
+				ready[ep.IP] = false
 			}
 		}
-		for _, ep := range subset.NotReadyAddresses {
-			ready[ep.IP] = false
+	case k8s.Slices:
+		for _, slice := range eps.SlicesVal {
+			for _, ep := range slice.Endpoints {
+				node := ep.Topology["kubernetes.io/hostname"]
+				if filterNode(&node) {
+					continue
+				}
+				for _, addr := range ep.Addresses {
+					if _, ok := ready[addr]; !ok && k8s.IsConditionReady(ep.Conditions) {
+						// Only set true if nothing else has expressed an
+						// opinion. This means that false will take precedence
+						// if there's any unready ports for a given endpoint.
+						ready[addr] = true
+					}
+					if !k8s.IsConditionReady(ep.Conditions) {
+						ready[addr] = false
+					}
+				}
+			}
 		}
 	}
 
@@ -111,40 +136,22 @@ func nodeHasHealthyEndpoint(eps *v1.Endpoints, node string) bool {
 	return false
 }
 
-func healthyEndpointExists(eps *v1.Endpoints) bool {
-	ready := map[string]bool{}
-	for _, subset := range eps.Subsets {
-		for _, ep := range subset.Addresses {
-			if _, ok := ready[ep.IP]; !ok {
-				// Only set true if nothing else has expressed an
-				// opinion. This means that false will take precedence
-				// if there's any unready ports for a given endpoint.
-				ready[ep.IP] = true
-			}
-		}
-		for _, ep := range subset.NotReadyAddresses {
-			ready[ep.IP] = false
-		}
-	}
-
-	for _, r := range ready {
-		if r {
-			// At least one fully healthy endpoint on this machine.
-			return true
-		}
-	}
-	return false
-}
-
-func (c *bgpController) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
+func (c *bgpController) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps k8s.EpsOrSlices) string {
 	// Should we advertise?
 	// Yes, if externalTrafficPolicy is
 	//  Cluster && any healthy endpoint exists
 	// or
 	//  Local && there's a ready local endpoint.
-	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !nodeHasHealthyEndpoint(eps, c.myNode) {
+	filterNode := func(toFilter *string) bool {
+		if toFilter == nil || *toFilter != c.myNode {
+			return true
+		}
+		return false
+	}
+
+	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !hasHealthyEndpoint(eps, filterNode) {
 		return "noLocalEndpoints"
-	} else if !healthyEndpointExists(eps) {
+	} else if !hasHealthyEndpoint(eps, func(toFilter *string) bool { return false }) {
 		return "noEndpoints"
 	}
 	return ""

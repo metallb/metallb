@@ -15,7 +15,8 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/google/go-cmp/cmp"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -208,7 +209,7 @@ func TestBGPSpeaker(t *testing.T) {
 		balancer string
 		config   *config.Config
 		svc      *v1.Service
-		eps      *v1.Endpoints
+		eps      k8s.EpsOrSlices
 
 		wantAds map[string][]*bgp.Advertisement
 	}{
@@ -222,17 +223,20 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: &v1.Endpoints{
-				Subsets: []v1.EndpointSubset{
-					{
-						Addresses: []v1.EndpointAddress{
-							{
-								IP:       "2.3.4.5",
-								NodeName: strptr("iris"),
+			eps: k8s.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris"),
+								},
 							},
 						},
 					},
 				},
+				Type: k8s.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{},
 		},
@@ -272,17 +276,20 @@ func TestBGPSpeaker(t *testing.T) {
 					ExternalTrafficPolicy: "Cluster",
 				},
 			},
-			eps: &v1.Endpoints{
-				Subsets: []v1.EndpointSubset{
-					{
-						Addresses: []v1.EndpointAddress{
-							{
-								IP:       "2.3.4.5",
-								NodeName: strptr("pandora"),
+			eps: k8s.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("pandora"),
+								},
 							},
 						},
 					},
 				},
+				Type: k8s.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -299,17 +306,20 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: &v1.Endpoints{
-				Subsets: []v1.EndpointSubset{
-					{
-						Addresses: []v1.EndpointAddress{
-							{
-								IP:       "2.3.4.5",
-								NodeName: strptr("iris"),
+			eps: k8s.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris"),
+								},
 							},
 						},
 					},
 				},
+				Type: k8s.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -330,17 +340,20 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: &v1.Endpoints{
-				Subsets: []v1.EndpointSubset{
-					{
-						Addresses: []v1.EndpointAddress{
-							{
-								IP:       "2.3.4.5",
-								NodeName: strptr("iris"),
+			eps: k8s.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris"),
+								},
 							},
 						},
 					},
 				},
+				Type: k8s.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -357,21 +370,24 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: &v1.Endpoints{
-				Subsets: []v1.EndpointSubset{
-					{
-						Addresses: []v1.EndpointAddress{
-							{
-								IP:       "2.3.4.5",
-								NodeName: strptr("iris"),
-							},
-							{
-								IP:       "2.3.4.6",
-								NodeName: strptr("pandora"),
+			eps: k8s.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris"),
+								},
+								{
+									IP:       "2.3.4.6",
+									NodeName: strptr("pandora"),
+								},
 							},
 						},
 					},
 				},
+				Type: k8s.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -392,35 +408,38 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: &v1.Endpoints{
-				Subsets: []v1.EndpointSubset{
-					{
-						Addresses: []v1.EndpointAddress{
-							{
-								IP:       "2.3.4.5",
-								NodeName: strptr("iris"),
-							},
-							{
-								IP:       "2.3.4.6",
-								NodeName: strptr("pandora"),
-							},
-						},
-					},
-					{
-						Addresses: []v1.EndpointAddress{
-							{
-								IP:       "2.3.4.5",
-								NodeName: strptr("iris"),
+			eps: k8s.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris"),
+								},
+								{
+									IP:       "2.3.4.6",
+									NodeName: strptr("pandora"),
+								},
 							},
 						},
-						NotReadyAddresses: []v1.EndpointAddress{
-							{
-								IP:       "2.3.4.6",
-								NodeName: strptr("pandora"),
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris"),
+								},
+							},
+							NotReadyAddresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.6",
+									NodeName: strptr("pandora"),
+								},
 							},
 						},
 					},
 				},
+				Type: k8s.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -437,7 +456,7 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: &v1.Endpoints{},
+			eps: k8s.EpsOrSlices{},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
@@ -453,17 +472,20 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: &v1.Endpoints{
-				Subsets: []v1.EndpointSubset{
-					{
-						NotReadyAddresses: []v1.EndpointAddress{
-							{
-								IP:       "2.3.4.5",
-								NodeName: strptr("iris"),
+			eps: k8s.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							NotReadyAddresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris"),
+								},
 							},
 						},
 					},
 				},
+				Type: k8s.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -480,23 +502,26 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: &v1.Endpoints{
-				Subsets: []v1.EndpointSubset{
-					{
-						Addresses: []v1.EndpointAddress{
-							{
-								IP:       "2.3.4.5",
-								NodeName: strptr("iris"),
+			eps: k8s.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris"),
+								},
 							},
-						},
-						NotReadyAddresses: []v1.EndpointAddress{
-							{
-								IP:       "2.3.4.6",
-								NodeName: strptr("pandora"),
+							NotReadyAddresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.6",
+									NodeName: strptr("pandora"),
+								},
 							},
 						},
 					},
 				},
+				Type: k8s.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -542,17 +567,20 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: &v1.Endpoints{
-				Subsets: []v1.EndpointSubset{
-					{
-						Addresses: []v1.EndpointAddress{
-							{
-								IP:       "2.3.4.5",
-								NodeName: strptr("iris"),
+			eps: k8s.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris"),
+								},
 							},
 						},
 					},
 				},
+				Type: k8s.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -602,17 +630,20 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: &v1.Endpoints{
-				Subsets: []v1.EndpointSubset{
-					{
-						Addresses: []v1.EndpointAddress{
-							{
-								IP:       "2.3.4.5",
-								NodeName: strptr("iris"),
+			eps: k8s.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris"),
+								},
 							},
 						},
 					},
 				},
+				Type: k8s.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -637,17 +668,20 @@ func TestBGPSpeaker(t *testing.T) {
 					ExternalTrafficPolicy: "Cluster",
 				},
 			},
-			eps: &v1.Endpoints{
-				Subsets: []v1.EndpointSubset{
-					{
-						Addresses: []v1.EndpointAddress{
-							{
-								IP:       "2.3.4.5",
-								NodeName: strptr("iris"),
+			eps: k8s.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris"),
+								},
 							},
 						},
 					},
 				},
+				Type: k8s.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -673,17 +707,20 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.5"),
 			},
-			eps: &v1.Endpoints{
-				Subsets: []v1.EndpointSubset{
-					{
-						Addresses: []v1.EndpointAddress{
-							{
-								IP:       "2.3.4.5",
-								NodeName: strptr("iris"),
+			eps: k8s.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris"),
+								},
 							},
 						},
 					},
 				},
+				Type: k8s.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -715,17 +752,20 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: &v1.Endpoints{
-				Subsets: []v1.EndpointSubset{
-					{
-						Addresses: []v1.EndpointAddress{
-							{
-								IP:       "2.3.4.5",
-								NodeName: strptr("iris"),
+			eps: k8s.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris"),
+								},
 							},
 						},
 					},
 				},
+				Type: k8s.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -795,17 +835,833 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: &v1.Endpoints{
-				Subsets: []v1.EndpointSubset{
-					{
-						Addresses: []v1.EndpointAddress{
-							{
-								IP:       "2.3.4.5",
-								NodeName: strptr("iris"),
+			eps: k8s.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: strptr("iris"),
+								},
 							},
 						},
 					},
 				},
+				Type: k8s.Eps,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.5:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
+			},
+		},
+
+		{
+			desc:     "Delete second svc",
+			balancer: "test2",
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.5:0": nil,
+			},
+		},
+	}
+
+	l := log.NewNopLogger()
+	for _, test := range tests {
+		if test.config != nil {
+			if c.SetConfig(l, test.config) == k8s.SyncStateError {
+				t.Errorf("%q: SetConfig failed", test.desc)
+			}
+		}
+		if test.balancer != "" {
+			if c.SetBalancer(l, test.balancer, test.svc, test.eps) == k8s.SyncStateError {
+				t.Errorf("%q: SetBalancer failed", test.desc)
+			}
+		}
+
+		gotAds := b.Ads()
+		sortAds(test.wantAds)
+		sortAds(gotAds)
+		if diff := cmp.Diff(test.wantAds, gotAds); diff != "" {
+			t.Errorf("%q: unexpected advertisement state (-want +got)\n%s", test.desc, diff)
+		}
+	}
+}
+
+func TestBGPSpeakerEPSlices(t *testing.T) {
+	b := &fakeBGP{
+		t:      t,
+		gotAds: map[string][]*bgp.Advertisement{},
+	}
+	newBGP = b.New
+	c, err := newController(controllerConfig{
+		MyNode:        "pandora",
+		DisableLayer2: true,
+	})
+	if err != nil {
+		t.Fatalf("creating controller: %s", err)
+	}
+	c.client = &testK8S{t: t}
+
+	tests := []struct {
+		desc string
+
+		balancer string
+		config   *config.Config
+		svc      *v1.Service
+		eps      k8s.EpsOrSlices
+
+		wantAds map[string][]*bgp.Advertisement
+	}{
+		{
+			desc:     "Service ignored, no config",
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: k8s.EpsOrSlices{
+				SlicesVal: []*discovery.EndpointSlice{
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "iris",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(true),
+								},
+							},
+						},
+					},
+				},
+				Type: k8s.Slices,
+			},
+			wantAds: map[string][]*bgp.Advertisement{},
+		},
+		{
+			desc: "One peer, no services",
+			config: &config.Config{
+				Peers: []*config.Peer{
+					{
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+				},
+				Pools: map[string]*config.Pool{
+					"default": {
+						Protocol: config.BGP,
+						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						BGPAdvertisements: []*config.BGPAdvertisement{
+							{
+								AggregationLength: 32,
+							},
+						},
+					},
+				},
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+			},
+		},
+		{
+			desc:     "Add service, not an LB",
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "ClusterIP",
+					ExternalTrafficPolicy: "Cluster",
+				},
+			},
+			eps: k8s.EpsOrSlices{
+				SlicesVal: []*discovery.EndpointSlice{
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "pandora",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(true),
+								},
+							},
+						},
+					},
+				},
+				Type: k8s.Slices,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+			},
+		},
+
+		{
+			desc:     "Add service, it's an LB!",
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: k8s.EpsOrSlices{
+				SlicesVal: []*discovery.EndpointSlice{
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "iris",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(true),
+								},
+							},
+						},
+					},
+				},
+				Type: k8s.Slices,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
+			},
+		},
+
+		{
+			desc:     "LB switches to local traffic policy, endpoint isn't on our node",
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Local",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: k8s.EpsOrSlices{
+				SlicesVal: []*discovery.EndpointSlice{
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "iris",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(true),
+								},
+							},
+						},
+					},
+				},
+				Type: k8s.Slices,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+			},
+		},
+
+		{
+			desc:     "New endpoint, on our node",
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Local",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: k8s.EpsOrSlices{
+				SlicesVal: []*discovery.EndpointSlice{
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "iris",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(true),
+								},
+							},
+						},
+					},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.6",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "pandora",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(true),
+								},
+							},
+						},
+					},
+				},
+				Type: k8s.Slices,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
+			},
+		},
+
+		{
+			desc:     "Endpoint on our node has some unready ports",
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Local",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: k8s.EpsOrSlices{
+				SlicesVal: []*discovery.EndpointSlice{
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "iris",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(true),
+								},
+							},
+						},
+					},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.6",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "pandora",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(false),
+								},
+							},
+						},
+					},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.7",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "iris",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(true),
+								},
+							},
+						},
+					},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.6",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "pandora",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(true),
+								},
+							},
+						},
+					},
+				},
+				Type: k8s.Slices,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+			},
+		},
+
+		{
+			desc:     "Endpoint list is empty",
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: k8s.EpsOrSlices{},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+			},
+		},
+
+		{
+			desc:     "Endpoint list contains only unhealthy endpoints",
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: k8s.EpsOrSlices{
+				SlicesVal: []*discovery.EndpointSlice{
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "iris",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(false),
+								},
+							},
+						},
+					},
+				},
+				Type: k8s.Slices,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+			},
+		},
+
+		{
+			desc:     "Endpoint list contains some unhealthy endpoints",
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: k8s.EpsOrSlices{
+				SlicesVal: []*discovery.EndpointSlice{
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "iris",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(true),
+								},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.6",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "pandora",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(false),
+								},
+							},
+						},
+					},
+				},
+				Type: k8s.Slices,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
+			},
+		},
+
+		{
+			desc: "Multiple advertisement config",
+			config: &config.Config{
+				Peers: []*config.Peer{
+					{
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+				},
+				Pools: map[string]*config.Pool{
+					"default": {
+						Protocol: config.BGP,
+						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						BGPAdvertisements: []*config.BGPAdvertisement{
+							{
+								AggregationLength: 32,
+								LocalPref:         100,
+								Communities:       map[uint32]bool{1234: true, 2345: true},
+							},
+							{
+								AggregationLength: 24,
+								LocalPref:         1000,
+							},
+						},
+					},
+				},
+			},
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: k8s.EpsOrSlices{
+				SlicesVal: []*discovery.EndpointSlice{
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "iris",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(true),
+								},
+							},
+						},
+					},
+				},
+				Type: k8s.Slices,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					{
+						Prefix:      ipnet("10.20.30.1/32"),
+						LocalPref:   100,
+						Communities: []uint32{1234, 2345},
+					},
+					{
+						Prefix:    ipnet("10.20.30.0/24"),
+						LocalPref: 1000,
+					},
+				},
+			},
+		},
+
+		{
+			desc: "Multiple peers",
+			config: &config.Config{
+				Peers: []*config.Peer{
+					{
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+					{
+						Addr:          net.ParseIP("1.2.3.5"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+				},
+				Pools: map[string]*config.Pool{
+					"default": {
+						Protocol: config.BGP,
+						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						BGPAdvertisements: []*config.BGPAdvertisement{
+							{
+								AggregationLength: 32,
+							},
+						},
+					},
+				},
+			},
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: k8s.EpsOrSlices{
+				SlicesVal: []*discovery.EndpointSlice{
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "iris",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(true),
+								},
+							},
+						},
+					},
+				},
+				Type: k8s.Slices,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
+				"1.2.3.5:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
+			},
+		},
+
+		{
+			desc:     "Second balancer, no ingress assigned",
+			balancer: "test2",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+			},
+			eps: k8s.EpsOrSlices{
+				SlicesVal: []*discovery.EndpointSlice{
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "iris",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(true),
+								},
+							},
+						},
+					},
+				},
+				Type: k8s.Slices,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
+				"1.2.3.5:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
+			},
+		},
+
+		{
+			desc:     "Second balancer, ingress gets assigned",
+			balancer: "test2",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.5"),
+			},
+			eps: k8s.EpsOrSlices{
+				SlicesVal: []*discovery.EndpointSlice{
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "iris",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(true),
+								},
+							},
+						},
+					},
+				},
+				Type: k8s.Slices,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+					{
+						Prefix: ipnet("10.20.30.5/32"),
+					},
+				},
+				"1.2.3.5:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+					{
+						Prefix: ipnet("10.20.30.5/32"),
+					},
+				},
+			},
+		},
+
+		{
+			desc:     "Second balancer, ingress shared with first",
+			balancer: "test2",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: k8s.EpsOrSlices{
+				SlicesVal: []*discovery.EndpointSlice{
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "iris",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(true),
+								},
+							},
+						},
+					},
+				},
+				Type: k8s.Slices,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					// Prefixes duplicated because the dedupe happens
+					// inside the real BGP session.
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
+				"1.2.3.5:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
+			},
+		},
+
+		{
+			desc:     "Delete svc",
+			balancer: "test1",
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
+				"1.2.3.5:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
+			},
+		},
+
+		{
+			desc: "Delete peer",
+			config: &config.Config{
+				Peers: []*config.Peer{
+					{
+						Addr:          net.ParseIP("1.2.3.5"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+				},
+				Pools: map[string]*config.Pool{
+					"default": {
+						Protocol: config.BGP,
+						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						BGPAdvertisements: []*config.BGPAdvertisement{
+							{
+								AggregationLength: 32,
+							},
+						},
+					},
+				},
+			},
+			balancer: "test2",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: k8s.EpsOrSlices{
+				SlicesVal: []*discovery.EndpointSlice{
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": "iris",
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: boolPtr(true),
+								},
+							},
+						},
+					},
+				},
+				Type: k8s.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.5:0": {
