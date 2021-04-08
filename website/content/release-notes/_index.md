@@ -17,6 +17,10 @@ New Features:
   options or `METALLB_ML_SECRET_NAME` and `METALLB_DEPLOYMENT` environment variables.
   This is already done in the manifests provided with this release.
 
+- Endpoint Slices support. Endpoint slices are the proposed and more scalable
+  way introduced in k8s to find services endpoints. From this version, MetalLB checks for
+  EndpointSlices availability and uses them, otherwise it backs up to endpoints.
+
 Bug Fixes:
 
 Changes in behavior:

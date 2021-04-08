@@ -7,12 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"go.universe.tf/metallb/internal/config"
 
 	"github.com/go-kit/kit/log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
@@ -34,18 +36,20 @@ type Client struct {
 	events record.EventRecorder
 	queue  workqueue.RateLimitingInterface
 
-	svcIndexer   cache.Indexer
-	svcInformer  cache.Controller
-	epIndexer    cache.Indexer
-	epInformer   cache.Controller
-	cmIndexer    cache.Indexer
-	cmInformer   cache.Controller
-	nodeIndexer  cache.Indexer
-	nodeInformer cache.Controller
+	svcIndexer     cache.Indexer
+	svcInformer    cache.Controller
+	epIndexer      cache.Indexer
+	epInformer     cache.Controller
+	slicesIndexer  cache.Indexer
+	slicesInformer cache.Controller
+	cmIndexer      cache.Indexer
+	cmInformer     cache.Controller
+	nodeIndexer    cache.Indexer
+	nodeInformer   cache.Controller
 
 	syncFuncs []cache.InformerSynced
 
-	serviceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) SyncState
+	serviceChanged func(log.Logger, string, *v1.Service, EpsOrSlices) SyncState
 	configChanged  func(log.Logger, *config.Config) SyncState
 	nodeChanged    func(log.Logger, *v1.Node) SyncState
 	synced         func(log.Logger)
@@ -78,7 +82,7 @@ type Config struct {
 	Logger        log.Logger
 	Kubeconfig    string
 
-	ServiceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) SyncState
+	ServiceChanged func(log.Logger, string, *v1.Service, EpsOrSlices) SyncState
 	ConfigChanged  func(log.Logger, *config.Config) SyncState
 	NodeChanged    func(log.Logger, *v1.Node) SyncState
 	Synced         func(log.Logger)
@@ -88,6 +92,8 @@ type svcKey string
 type cmKey string
 type nodeKey string
 type synced string
+
+const slicesServiceIndexName = "ServiceName"
 
 // New connects to masterAddr, using kubeconfig to authenticate.
 //
@@ -157,30 +163,80 @@ func New(cfg *Config) (*Client, error) {
 		c.syncFuncs = append(c.syncFuncs, c.svcInformer.HasSynced)
 
 		if cfg.ReadEndpoints {
-			epHandlers := cache.ResourceEventHandlerFuncs{
-				AddFunc: func(obj interface{}) {
-					key, err := cache.MetaNamespaceKeyFunc(obj)
-					if err == nil {
-						c.queue.Add(svcKey(key))
-					}
-				},
-				UpdateFunc: func(old interface{}, new interface{}) {
-					key, err := cache.MetaNamespaceKeyFunc(new)
-					if err == nil {
-						c.queue.Add(svcKey(key))
-					}
-				},
-				DeleteFunc: func(obj interface{}) {
-					key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-					if err == nil {
-						c.queue.Add(svcKey(key))
-					}
-				},
-			}
-			epWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "endpoints", v1.NamespaceAll, fields.Everything())
-			c.epIndexer, c.epInformer = cache.NewIndexerInformer(epWatcher, &v1.Endpoints{}, 0, epHandlers, cache.Indexers{})
+			if !UseEndpointSlices(c.client) {
+				epHandlers := cache.ResourceEventHandlerFuncs{
+					AddFunc: func(obj interface{}) {
+						key, err := cache.MetaNamespaceKeyFunc(obj)
+						if err == nil {
+							c.queue.Add(svcKey(key))
+						}
+					},
+					UpdateFunc: func(old interface{}, new interface{}) {
+						key, err := cache.MetaNamespaceKeyFunc(new)
+						if err == nil {
+							c.queue.Add(svcKey(key))
+						}
+					},
+					DeleteFunc: func(obj interface{}) {
+						key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
+						if err == nil {
+							c.queue.Add(svcKey(key))
+						}
+					},
+				}
+				epWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "endpoints", v1.NamespaceAll, fields.Everything())
+				c.epIndexer, c.epInformer = cache.NewIndexerInformer(epWatcher, &v1.Endpoints{}, 0, epHandlers, cache.Indexers{})
 
-			c.syncFuncs = append(c.syncFuncs, c.epInformer.HasSynced)
+				c.syncFuncs = append(c.syncFuncs, c.epInformer.HasSynced)
+			} else {
+				c.logger.Log("op", "New", "msg", "using endpoint slices")
+				slicesHandlers := cache.ResourceEventHandlerFuncs{
+					AddFunc: func(obj interface{}) {
+						slice, ok := obj.(*discovery.EndpointSlice)
+						if !ok {
+							c.logger.Log("op", "SliceAdd", "error", "received a non EndpointSlice item")
+							return
+						}
+
+						key, err := serviceKeyForSlice(slice)
+						if err != nil {
+							return
+						}
+						c.queue.Add(key)
+					},
+					UpdateFunc: func(old interface{}, new interface{}) {
+						slice, ok := new.(*discovery.EndpointSlice)
+						if !ok {
+							c.logger.Log("op", "SliceUpdate", "error", "received a non EndpointSlice item")
+							return
+						}
+						key, err := serviceKeyForSlice(slice)
+						if err != nil {
+							c.logger.Log("op", "SliceUpdate", "error", "failed to get serviceKey for slice", "slice", slice.Name)
+							return
+						}
+						c.queue.Add(key)
+					},
+					DeleteFunc: func(obj interface{}) {
+						slice, ok := obj.(*discovery.EndpointSlice)
+						if !ok {
+							c.logger.Log("op", "SliceDelete", "error", "received a non EndpointSlice item")
+							return
+						}
+						key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(slice)
+						if err != nil {
+							c.logger.Log("op", "SliceDelete", "error", err)
+							return
+						}
+						c.queue.Add(svcKey(key))
+					},
+				}
+				slicesWatcher := cache.NewListWatchFromClient(c.client.DiscoveryV1beta1().RESTClient(), "endpointslices", v1.NamespaceAll, fields.Everything())
+				c.slicesIndexer, c.slicesInformer = cache.NewIndexerInformer(slicesWatcher, &discovery.EndpointSlice{}, 5*time.Second, slicesHandlers, cache.Indexers{
+					slicesServiceIndexName: slicesServiceIndex,
+				})
+				c.syncFuncs = append(c.syncFuncs, c.slicesInformer.HasSynced)
+			}
 		}
 	}
 
@@ -332,6 +388,9 @@ func (c *Client) Run(stopCh <-chan struct{}) error {
 	if c.epInformer != nil {
 		go c.epInformer.Run(stopCh)
 	}
+	if c.slicesInformer != nil {
+		go c.slicesInformer.Run(stopCh)
+	}
 	if c.cmInformer != nil {
 		go c.cmInformer.Run(stopCh)
 	}
@@ -410,10 +469,10 @@ func (c *Client) sync(key interface{}) SyncState {
 			return SyncStateError
 		}
 		if !exists {
-			return c.serviceChanged(l, string(k), nil, nil)
+			return c.serviceChanged(l, string(k), nil, EpsOrSlices{})
 		}
 
-		var eps *v1.Endpoints
+		epsOrSlices := EpsOrSlices{}
 		if c.epIndexer != nil {
 			epsIntf, exists, err := c.epIndexer.GetByKey(string(k))
 			if err != nil {
@@ -421,12 +480,33 @@ func (c *Client) sync(key interface{}) SyncState {
 				return SyncStateError
 			}
 			if !exists {
-				return c.serviceChanged(l, string(k), nil, nil)
+				return c.serviceChanged(l, string(k), nil, EpsOrSlices{})
 			}
-			eps = epsIntf.(*v1.Endpoints)
-		}
 
-		return c.serviceChanged(l, string(k), svc.(*v1.Service), eps)
+			eps := epsIntf.(*v1.Endpoints)
+			epsOrSlices.EpVal = eps.DeepCopy()
+			epsOrSlices.Type = Eps
+		}
+		if c.slicesIndexer != nil {
+			slicesIntf, err := c.slicesIndexer.ByIndex(slicesServiceIndexName, string(k))
+			if err != nil {
+				l.Log("op", "getEndpointSlices", "error", err, "msg", "failed to get endpoints slices")
+				return SyncStateError
+			}
+			if len(slicesIntf) == 0 {
+				return c.serviceChanged(l, string(k), nil, EpsOrSlices{})
+			}
+			epsOrSlices.SlicesVal = make([]*discovery.EndpointSlice, 0)
+			for _, s := range slicesIntf {
+				slice, ok := s.(*discovery.EndpointSlice)
+				if !ok {
+					continue
+				}
+				epsOrSlices.SlicesVal = append(epsOrSlices.SlicesVal, slice.DeepCopy())
+			}
+			epsOrSlices.Type = Slices
+		}
+		return c.serviceChanged(l, string(k), svc.(*v1.Service), epsOrSlices)
 
 	case cmKey:
 		l := log.With(c.logger, "configmap", string(k))
@@ -488,4 +568,47 @@ func (c *Client) sync(key interface{}) SyncState {
 	default:
 		panic(fmt.Errorf("unknown key type for %#v (%T)", key, key))
 	}
+}
+
+func serviceKeyForSlice(endpointSlice *discovery.EndpointSlice) (svcKey, error) {
+	if endpointSlice == nil {
+		return "", fmt.Errorf("nil EndpointSlice")
+	}
+	serviceName, err := serviceNameForSlice(endpointSlice)
+	if err != nil {
+		return "", err
+	}
+	return svcKey(fmt.Sprintf("%s/%s", endpointSlice.Namespace, serviceName)), nil
+}
+
+func slicesServiceIndex(obj interface{}) ([]string, error) {
+	endpointSlice, ok := obj.(*discovery.EndpointSlice)
+	if !ok {
+		return nil, fmt.Errorf("Passed object is not a slice")
+	}
+	serviceKey, err := serviceKeyForSlice(endpointSlice)
+	if err != nil {
+		return nil, err
+	}
+	return []string{string(serviceKey)}, nil
+}
+
+func serviceNameForSlice(endpointSlice *discovery.EndpointSlice) (string, error) {
+	serviceName, ok := endpointSlice.Labels["kubernetes.io/service-name"]
+	if !ok || serviceName == "" {
+		return "", fmt.Errorf("endpointSlice missing %s label", "kubernetes.io/service-name")
+	}
+	return serviceName, nil
+}
+
+// UseEndpointSlices detect if Endpoints Slices are enabled in the cluster
+func UseEndpointSlices(kubeClient kubernetes.Interface) bool {
+	if _, err := kubeClient.Discovery().ServerResourcesForGroupVersion(discovery.SchemeGroupVersion.String()); err != nil {
+		return false
+	}
+	// this is needed to check if ep slices are enabled on the cluster. In 1.17 the resources are there but disabled by default
+	if _, err := kubeClient.DiscoveryV1beta1().EndpointSlices("default").Get(context.Background(), "kubernetes", metav1.GetOptions{}); err != nil {
+		return false
+	}
+	return true
 }
