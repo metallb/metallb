@@ -23,6 +23,11 @@ import (
 
 var errClosed = errors.New("session closed")
 
+type NextHop struct {
+	ipv4 net.IP
+	ipv6 net.IP
+}
+
 // Session represents one BGP session to an external router.
 type Session struct {
 	asn              uint32
@@ -45,15 +50,14 @@ type Session struct {
 	// passed from peer config, allows to announce IPv6 prefixes to the peer
 	allowV6Prefixes bool
 
-	mu               sync.Mutex
-	cond             *sync.Cond
-	closed           bool
-	conn             net.Conn
-	actualHoldTime   time.Duration
-	defaultNextHopV4 net.IP
-	defaultNextHopV6 net.IP
-	advertised       map[string]*Advertisement
-	new              map[string]*Advertisement
+	mu             sync.Mutex
+	cond           *sync.Cond
+	closed         bool
+	conn           net.Conn
+	actualHoldTime time.Duration
+	defaultNextHop NextHop
+	advertised     map[string]*Advertisement
+	new            map[string]*Advertisement
 }
 
 // run tries to stay connected to the peer, and pumps route updates to it.
@@ -171,8 +175,7 @@ func (s *Session) handleNewAdvertisements() {
 				"msg", fmt.Sprintf("skip prefix announcement because %s prefixes are not allowed by the peer config", prefixType))
 			delete(s.new, c)
 		}
-		s.updateNextHop(adv)
-		if adv.NextHop == nil {
+		if !s.hasNextHop(adv) {
 			s.logger.Log("op", "SetAdvertisement", "prefix", c,
 				"msg", "skip prefix announcement because there is no next hop for it")
 			delete(s.new, c)
@@ -190,7 +193,7 @@ func (s *Session) handleNewAdvertisements() {
 }
 
 func (s *Session) sendUpdateForAdvertisement(adv *Advertisement) bool {
-	if err := sendUpdate(s.conn, s.asn, s.isIBGP(), s.peerFBASNSupport, s.useMPBGP(adv), adv); err != nil {
+	if err := sendUpdate(s.conn, s.asn, s.isIBGP(), s.peerFBASNSupport, s.useMPBGP(adv), s.defaultNextHop, adv); err != nil {
 		s.abort()
 		s.logger.Log("op", "sendUpdate", "prefix", adv.Prefix.String(),
 			"error", err, "msg", "failed to send BGP update")
@@ -204,15 +207,14 @@ func (s *Session) isIBGP() bool {
 	return s.asn == s.peerASN
 }
 
-func (s *Session) updateNextHop(adv *Advertisement) {
+func (s *Session) hasNextHop(adv *Advertisement) bool {
 	if adv.NextHop != nil {
-		return
+		return true
 	}
 	if adv.Prefix.IP.To4() == nil {
-		adv.NextHop = s.defaultNextHopV6
-		return
+		return s.defaultNextHop.ipv6 != nil
 	}
-	adv.NextHop = s.defaultNextHopV4
+	return s.defaultNextHop.ipv4 != nil
 }
 
 // we should use MP BGP encoding in case:
@@ -252,7 +254,7 @@ func (s *Session) connect() error {
 	}
 	routerID := s.routerID
 	if routerID == nil {
-		routerID = getRouterID(s.defaultNextHopV4, s.myNode)
+		routerID = getRouterID(s.defaultNextHop.ipv4, s.myNode)
 	}
 
 	if err = sendOpen(conn, s.asn, routerID, s.holdTime); err != nil {
@@ -313,16 +315,16 @@ func (s *Session) getDefaultNextHops(conn net.Conn) error {
 		return fmt.Errorf("error getting local addr for default nexthop to %q", s.addr)
 	}
 	if addr.IP.To4() != nil {
-		s.defaultNextHopV4 = addr.IP
-		s.defaultNextHopV6 = findAltIP(addr.IP)
-		if s.defaultNextHopV6 == nil {
+		s.defaultNextHop.ipv4 = addr.IP
+		s.defaultNextHop.ipv6 = findAltIP(addr.IP)
+		if s.defaultNextHop.ipv6 == nil {
 			s.logger.Log("op", "connect", "msg", "can't find IPv6 address to use as next hop")
 		}
 		return nil
 	}
-	s.defaultNextHopV6 = addr.IP
-	s.defaultNextHopV4 = findAltIP(addr.IP)
-	if s.defaultNextHopV4 == nil {
+	s.defaultNextHop.ipv6 = addr.IP
+	s.defaultNextHop.ipv4 = findAltIP(addr.IP)
+	if s.defaultNextHop.ipv4 == nil {
 		s.logger.Log("op", "connect", "msg", "can't find IPv4 address to use as next hop")
 	}
 	return nil

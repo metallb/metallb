@@ -293,7 +293,7 @@ func readCapabilities(r io.Reader, ret *openResult) error {
 	}
 }
 
-func sendUpdate(w io.Writer, asn uint32, ibgp, fbasn bool, mpBGP bool, adv *Advertisement) error {
+func sendUpdate(w io.Writer, asn uint32, ibgp, fbasn bool, mpBGP bool, defaultNextHop NextHop, adv *Advertisement) error {
 	var b bytes.Buffer
 
 	hdr := struct {
@@ -311,7 +311,7 @@ func sendUpdate(w io.Writer, asn uint32, ibgp, fbasn bool, mpBGP bool, adv *Adve
 		return err
 	}
 	l := b.Len()
-	if err := encodePathAttrs(&b, asn, ibgp, fbasn, mpBGP, adv); err != nil {
+	if err := encodePathAttrs(&b, asn, ibgp, fbasn, mpBGP, defaultNextHop, adv); err != nil {
 		return err
 	}
 	binary.BigEndian.PutUint16(b.Bytes()[21:23], uint16(b.Len()-l))
@@ -345,7 +345,7 @@ func bytesForBits(n int) int {
 	return ((n + 7) &^ 7) / 8
 }
 
-func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp, fbasn, mpBGP bool, adv *Advertisement) error {
+func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp, fbasn, mpBGP bool, defaultNextHop NextHop, adv *Advertisement) error {
 
 	b.Write([]byte{
 		0x40, 1, // mandatory, origin
@@ -383,11 +383,15 @@ func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp, fbasn, mpBGP bool, adv *
 			0x40, 3, // mandatory, next-hop
 			4, // len
 		})
-		b.Write(adv.NextHop.To4())
+		if adv.NextHop != nil {
+			b.Write(adv.NextHop.To4())
+		} else {
+			b.Write(defaultNextHop.ipv4.To4())
+		}
 	}
 
 	if mpBGP {
-		if err := encodeMPReachNLRI(b, adv); err != nil {
+		if err := encodeMPReachNLRI(b, defaultNextHop, adv); err != nil {
 			return err
 		}
 	}
@@ -419,7 +423,7 @@ func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp, fbasn, mpBGP bool, adv *
 	return nil
 }
 
-func encodeMPReachNLRI(b *bytes.Buffer, adv *Advertisement) error {
+func encodeMPReachNLRI(b *bytes.Buffer, defaultNextHop NextHop, adv *Advertisement) error {
 	b.Write([]byte{
 		0x80,
 		mpReachNLRI,
@@ -443,10 +447,18 @@ func encodeMPReachNLRI(b *bytes.Buffer, adv *Advertisement) error {
 	}
 	if isIPv6 {
 		b.WriteByte(16)
-		b.Write(adv.NextHop.To16())
+		if adv.NextHop != nil {
+			b.Write(adv.NextHop.To16())
+		} else {
+			b.Write(defaultNextHop.ipv6.To16())
+		}
 	} else {
 		b.WriteByte(4)
-		b.Write(adv.NextHop.To4())
+		if adv.NextHop != nil {
+			b.Write(adv.NextHop.To4())
+		} else {
+			b.Write(defaultNextHop.ipv4.To4())
+		}
 	}
 	b.WriteByte(0)
 	encodePrefixes(b, []*net.IPNet{adv.Prefix})
