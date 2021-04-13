@@ -7,6 +7,10 @@ weight: 8
 
 New Features:
 
+- Helm Charts are now provided. You should be able to migrate from Bitnami
+  Charts to MetalLB Charts by just changing the repo and upgrading. For more
+  details, see the installation documentation.
+
 - Version 0.9.x required the creation of a Secret called `memberlist`. This
   Secret is now automatically created by the MetalLB controller if it does not
   already exist. To use this feature you must set the new `ml-secret-name` and `deployment`
