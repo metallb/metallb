@@ -2,9 +2,6 @@ name: Release Charts
 
 on:
   push:
-    branches:
-      - main
-      - v*
     tags:
       - v*
 
