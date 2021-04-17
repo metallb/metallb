@@ -1,6 +1,9 @@
 package version
 
-import "fmt"
+import (
+	"fmt"
+	"runtime"
+)
 
 var (
 	version   = ""   // Filled out during release cutting
@@ -33,3 +36,8 @@ func CommitHash() string { return gitCommit }
 
 // Branch returns the branch at which the binary was built.
 func Branch() string { return gitBranch }
+
+// GoString returns the compiler, compiler version and architecture of the build.
+func GoString() string {
+	return fmt.Sprintf("%s / %s / %s", runtime.Compiler, runtime.Version(), runtime.GOARCH)
+}
