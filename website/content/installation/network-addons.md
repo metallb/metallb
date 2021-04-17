@@ -25,11 +25,3 @@ Kube-router   | Mostly (see [known issues]({{% relref "configuration/kube-router
 Romana        | Yes (see [guide]({{% relref "configuration/romana.md" %}}) for advanced integration)
 Weave Net     | Mostly (see [known issues]({{% relref "configuration/weave.md" %}}))
 
-### IPVS mode in kube-proxy
-
-Starting in Kubernetes 1.9, `kube-proxy` has beta support for a more
-efficient "IPVS mode", in addition to the default "iptables mode."
-MetalLB **might** work with IPVS mode in kube-proxy, in Kubernetes
-1.13 or later. However, it is not explicitly tested yet, so it's at
-your own risk. See our [tracking
-bug](https://github.com/metallb/metallb/issues/153) for details.
