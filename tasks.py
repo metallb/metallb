@@ -180,7 +180,7 @@ def validate_kind_version():
     "architecture": "CPU architecture of the local machine. Default 'amd64'.",
     "name": "name of the kind cluster to use.",
     "protocol": "Pre-configure MetalLB with the specified protocol. "
-                "Unconfigured by default. Supported: 'bgp'",
+                "Unconfigured by default. Supported: 'bgp','layer2'",
 })
 def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None):
     """Build and run MetalLB in a local Kind cluster.
@@ -204,6 +204,10 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None):
                       {"role": "worker"},
             ],
         }
+        if protocol == "layer2":
+            config["networking"] = {
+                "podSubnet": "10.240.0.0/17"
+            }
         if cni:
             config["networking"] = {
                 "disableDefaultCNI": True,
@@ -250,9 +254,16 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None):
     if protocol == "bgp":
         print("Configuring MetalLB with a BGP test environment")
         bgp_dev_env()
+    elif protocol == "layer2":
+        print("Configuring MetalLB with a layer 2 test environment")
+        layer2_dev_env()
     else:
         print("Leaving MetalLB unconfigured")
 
+
+def layer2_dev_env():
+    dev_env_dir = os.getcwd() + "/dev-env/layer2"
+    run("kubectl apply -f %s/config.yaml" % dev_env_dir)
 
 # Configure MetalLB in the dev-env for BGP testing. Start an frr based BGP
 # router in a container and configure MetalLB to peer with it.
