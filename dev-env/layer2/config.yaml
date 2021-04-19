@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    address-pools:
+    - name: doug-ip-space
+      protocol: layer2
+      addresses:
+      - 10.240.128.2-10.240.128.20
