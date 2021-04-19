@@ -1,7 +1,7 @@
 # dev-env
 
 This directory contains supporting files for the included MetalLB development
-environment. The environment is run using the following command from the root of your git clone:
+environment. The environment is run using the following command from the root of your git clone, which runs MetalLB in an unconfigured state:
 
 ```
 inv dev-env
@@ -22,12 +22,18 @@ You may also launch a dev environment with layer2, with:
 inv dev-env --protocol layer2
 ```
 
+For more information, see help:
+
+```
+inv dev-env --help
+```
+
 ## Requirements
 
 * Go 1.15+
 * Python 3
 * [KIND - Kubernetes in Docker](https://kind.sigs.k8s.io/docs/user/quick-start/)
-  * And optionally [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/)
+* [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/)
 
 You may install the required python modules using the `requirements.txt` in this directory, with:
 
