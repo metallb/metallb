@@ -10,7 +10,8 @@
           "type": "boolean"
         },
         "labels": {
-          "type": "object"
+          "type": "object",
+          "additionalProperties": { "type": "string" }
         }
       },
       "required": [ "enabled" ]
@@ -169,39 +170,87 @@
       "description": "Prometheus monitoring config",
       "type": "object",
       "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
-        "staleConfig": { "$ref": "#/definitions/prometheusAlert" },
-        "configNotLoaded": { "$ref": "#/definitions/prometheusAlert" },
-        "addressPoolExhausted": { "$ref": "#/definitions/prometheusAlert" },
-        "addressPoolUsage": {
+        "scrapeAnnotations": { "type": "boolean" },
+        "podMonitor": {
+          "description": "Prometheus Operator PodMonitors",
           "type": "object",
           "properties": {
-            "enabled": {
-              "type": "boolean"
+            "enabled": { "type": "boolean" },
+            "jobLabel": { "type": "string" },
+            "interval": {
+              "anyOf": [
+                { "type": "integer" },
+                { "type": "null" }
+              ]
             },
-            "thresholds": {
+            "metricRelabelings": {
               "type": "array",
               "items": {
-                "type": "object",
-                "properties": {
-                  "percent": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 100
-                  },
-                  "labels": {
-                    "type": "object"
-                  }
-                },
-                "required": [ "percent" ]
+                "type": "object"
+              }
+            },
+            "relabelings": {
+              "type": "array",
+              "items": {
+                "type": "object"
               }
             }
           }
         },
-        "bgpSessionDown": { "$ref": "#/definitions/prometheusAlert" }
-      }
+        "prometheusRule": {
+          "description": "Prometheus Operator alertmanager alerts",
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "staleConfig": { "$ref": "#/definitions/prometheusAlert" },
+            "configNotLoaded": { "$ref": "#/definitions/prometheusAlert" },
+            "addressPoolExhausted": { "$ref": "#/definitions/prometheusAlert" },
+            "addressPoolUsage": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "thresholds": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "percent": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100
+                      },
+                      "labels": {
+                        "type": "object",
+                        "additionalProperties": { "type": "string" }
+                      }
+                    },
+                    "required": [ "percent" ]
+                  }
+                }
+              },
+              "required": [ "enabled" ]
+            },
+            "bgpSessionDown": { "$ref": "#/definitions/prometheusAlert" },
+            "extraAlerts": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          },
+          "required": [
+            "enabled",
+            "staleConfig",
+            "configNotLoaded",
+            "addressPoolExhausted",
+            "addressPoolUsage",
+            "bgpSessionDown"
+          ]
+        }
+      },
+      "required": [ "podMonitor", "prometheusRule" ]
     },
     "controller": { 
       "allOf": [
