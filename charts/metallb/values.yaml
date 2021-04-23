@@ -42,6 +42,9 @@ prometheus:
   # can be left at false.
   scrapeAnnotations: false
 
+  # port both controller and speaker will listen on for metrics
+  metricsPort: 7472
+
   # Prometheus Operator PodMonitors
   podMonitor:
 

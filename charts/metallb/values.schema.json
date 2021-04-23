@@ -171,6 +171,7 @@
       "type": "object",
       "properties": {
         "scrapeAnnotations": { "type": "boolean" },
+        "metricsPort": { "type": "integer" },
         "podMonitor": {
           "description": "Prometheus Operator PodMonitors",
           "type": "object",

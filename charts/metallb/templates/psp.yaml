@@ -13,8 +13,8 @@ spec:
   hostIPC: false
   hostNetwork: false
   hostPorts:
-  - min: 7472
-    max: 7472
+  - min: {{ .Values.prometheus.metricsPort }}
+    max: {{ .Values.prometheus.metricsPort }}
   # Volumes and file systems
   volumes:
   - configMap
@@ -60,8 +60,8 @@ spec:
   hostIPC: false
   hostNetwork: true
   hostPorts:
-  - min: 7472
-    max: 7472
+  - min: {{ .Values.prometheus.metricsPort }}
+    max: {{ .Values.prometheus.metricsPort }}
   {{- if .Values.speaker.memberlist.enabled }}
   - max: {{ .Values.speaker.memberlist.mlBindPort }}
     min: {{ .Values.speaker.memberlist.mlBindPort }}
