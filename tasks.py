@@ -316,14 +316,17 @@ def bgp_dev_env():
     run("kubectl apply -f %s/config.yaml" % dev_env_dir)
 
 
-@task
-def dev_env_cleanup(ctx):
+@task(help={
+    "name": "name of the kind cluster to delete.",
+})
+def dev_env_cleanup(ctx, name="kind"):
     """Remove traces of the dev env."""
-    try:
-        run("kind delete cluster")
-    except Exception:
-        # This will fail if there's no cluster.
-        pass
+    validate_kind_version()
+    clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
+    if name in clusters:
+        run("kind delete cluster --name={}".format(name), hide=True)
+    else:
+        raise Exit(message="Unable to find cluster named: {}".format(name))
 
     run('for frr in $(docker ps -a -f name=frr --format {{.Names}}) ; do '
         '    docker rm -f $frr ; '
