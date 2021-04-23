@@ -541,3 +541,34 @@ def lint(ctx, env="container"):
         run("golangci-lint run --timeout 5m0s $(git rev-parse --show-toplevel)/...")
     else:
         raise Exit(message="Unsupported linter environment: {}". format(env))
+
+
+@task(help={
+    "name": "name of the kind cluster to test.",
+})
+def e2etest(ctx, name="kind"):
+    """Run E2E tests against development cluster."""
+    validate_kind_version()
+    clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
+    if name in clusters:
+        kubeconfig = tempfile.NamedTemporaryFile()
+        run("kind export kubeconfig --name={} --kubeconfig={}".format(name, kubeconfig.name), pty=True, echo=True)
+    else:
+        raise Exit(message="Unable to find cluster named: {}".format(name))
+
+    namespaces = ["kube-system", "metallb-system"]
+    for ns in namespaces:
+        run("kubectl -n {} wait --for=condition=Ready --all pods --timeout 300s".format(ns), hide=True)
+
+    try:
+        metallb_config = yaml.load(run("kubectl get configmaps -n metallb-system config -o jsonpath='{.data.config}'", hide=True).stdout)
+        if metallb_config['address-pools'][0]['name'] == "dev-env-layer2":
+            run("cd `git rev-parse --show-toplevel`/e2etest &&"
+                "go test --provider=local -ginkgo.focus=L2 --kubeconfig={}".format(kubeconfig.name))
+        elif metallb_config['address-pools'][0]['name'] == "dev-env-bgp":
+            run("cd `git rev-parse --show-toplevel`/e2etest &&"
+                "go test --provider=local -ginkgo.focus=BGP --kubeconfig={}".format(kubeconfig.name))
+        else:
+            raise
+    except:
+        print("dev-env environment not configured. Try running `inv dev-env -p <layer2/bgp>`")
