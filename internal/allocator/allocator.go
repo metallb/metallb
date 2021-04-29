@@ -370,18 +370,6 @@ func poolFor(pools map[string]*config.Pool, ip net.IP) string {
 	return ""
 }
 
-func portsEqual(a, b []Port) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
 // ipConfusesBuggyFirmwares returns true if ip is an IPv4 address ending in 0 or 255.
 //
 // Such addresses can confuse smurf protection on crappy CPE

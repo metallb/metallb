@@ -96,7 +96,7 @@ func main() {
 
 	stopCh := make(chan struct{})
 	go func() {
-		c1 := make(chan os.Signal)
+		c1 := make(chan os.Signal, 1)
 		signal.Notify(c1, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 		<-c1
 		logger.Log("op", "shutdown", "msg", "starting shutdown")

@@ -21,9 +21,7 @@ func (sl *fakeSpeakerList) UsableSpeakers() map[string]bool {
 	return sl.speakers
 }
 
-func (sl *fakeSpeakerList) Rejoin() {
-	return
-}
+func (sl *fakeSpeakerList) Rejoin() {}
 
 func compareUseableNodesReturnedValue(a, b []string) bool {
 	if &a == &b {
