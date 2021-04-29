@@ -17,12 +17,11 @@ jobs:
       - image: cimg/go:1.16
     steps:
       - checkout
-      - run: curl -L https://git.io/vp6lP | sh # gometalinter
-      - run: PATH=./bin:$PATH gometalinter --deadline=5m --disable-all --enable=gofmt --enable=vet --vendor ./...
       - run: sudo apt-get update
       - run: sudo apt-get install python3-pip
       - run: sudo pip3 install invoke semver pyyaml
       - run: inv checkpatch
+      - run: inv lint -e host
   # FIXME: this is pinned to v3.0.0 because subsequent versions of ct pull in new versions of helm, which are subject
   #        to this bug: https://github.com/helm/helm/issues/8835, specifically for rbac object names with ':' in them
   helm-lint:
