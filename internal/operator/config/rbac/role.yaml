@@ -1,0 +1,68 @@
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - metallb.metallb.io
+  resources:
+  - addresspools
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - metallb.metallb.io
+  resources:
+  - addresspools/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - metallb.metallb.io
+  resources:
+  - bgpcommunities
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - metallb.metallb.io
+  resources:
+  - bgpcommunities/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - metallb.metallb.io
+  resources:
+  - peers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - metallb.metallb.io
+  resources:
+  - peers/status
+  verbs:
+  - get
+  - patch
+  - update

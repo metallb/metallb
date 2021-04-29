@@ -1,0 +1,7 @@
+apiVersion: metallb.metallb.io/v1beta1
+kind: BgpCommunities
+metadata:
+  name: bgpcommunities-sample
+spec:
+  bgp-communities:
+      no-advertise: 65535:65282

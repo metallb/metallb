@@ -1,0 +1,13 @@
+domain: metallb.io
+repo: go.universe.tf/metallb
+resources:
+- group: metallb
+  kind: AddressPools
+  version: v1beta1
+- group: metallb
+  kind: Peers
+  version: v1beta1
+- group: metallb
+  kind: BgpCommunities
+  version: v1beta1
+version: "2"

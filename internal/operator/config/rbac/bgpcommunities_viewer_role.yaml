@@ -1,0 +1,20 @@
+# permissions for end users to view bgpcommunities.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: bgpcommunities-viewer-role
+rules:
+- apiGroups:
+  - metallb.metallb.io
+  resources:
+  - bgpcommunities
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.metallb.io
+  resources:
+  - bgpcommunities/status
+  verbs:
+  - get

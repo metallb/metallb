@@ -1,7 +1,0 @@
-domain: loadbalancer.operator.io
-repo: go.universe.tf/metallb
-resources:
-- group: loadbalancer
-  kind: MetalLB
-  version: v1
-version: "2"

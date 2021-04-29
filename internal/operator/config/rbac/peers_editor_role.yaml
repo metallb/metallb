@@ -1,0 +1,24 @@
+# permissions for end users to edit peers.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: peers-editor-role
+rules:
+- apiGroups:
+  - metallb.metallb.io
+  resources:
+  - peers
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - metallb.metallb.io
+  resources:
+  - peers/status
+  verbs:
+  - get

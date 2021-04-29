@@ -1,0 +1,24 @@
+# permissions for end users to edit bgpcommunities.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: bgpcommunities-editor-role
+rules:
+- apiGroups:
+  - metallb.metallb.io
+  resources:
+  - bgpcommunities
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - metallb.metallb.io
+  resources:
+  - bgpcommunities/status
+  verbs:
+  - get

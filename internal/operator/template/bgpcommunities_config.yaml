@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    bgp-communities:
+    {{ range $entry := .BGPCommunities -}}
+      no-advertise: {{ $entry }}
+    {{ end -}}
