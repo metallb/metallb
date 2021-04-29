@@ -273,8 +273,6 @@ func (sl *SpeakerList) Rejoin() {
 	default:
 		sl.l.Log("op", "memberDiscovery", "msg", "previous discovery in progress - doing nothing")
 	}
-
-	return
 }
 
 // UsableSpeakers returns a map of usable speaker nodes.

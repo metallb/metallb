@@ -245,9 +245,12 @@ func New(cfg *Config) (*Client, error) {
 	}
 
 	http.Handle("/metrics", promhttp.Handler())
-	go func() {
-		http.ListenAndServe(fmt.Sprintf("%s:%d", cfg.MetricsHost, cfg.MetricsPort), nil)
-	}()
+	go func(l log.Logger) {
+		err := http.ListenAndServe(fmt.Sprintf("%s:%d", cfg.MetricsHost, cfg.MetricsPort), nil)
+		if err != nil {
+			l.Log("op", "listenAndServe", "err", err, "msg", "cannot listen and serve", "host", cfg.MetricsHost, "port", cfg.MetricsPort)
+		}
+	}(c.logger)
 
 	return c, nil
 }
