@@ -1,0 +1,14 @@
+reviewers:
+  - russellb
+  - dougbtv
+  - dcbw
+  - squeed
+  - msherif1234
+approvers:
+  - russellb
+  - dougbtv
+  - dcbw
+  - squeed
+  - msherif1234
+component: "Networking"
+subcomponent: "metallb"
