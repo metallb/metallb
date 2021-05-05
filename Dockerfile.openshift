@@ -1,0 +1,18 @@
+FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.16-openshift-4.8 AS rhel8
+
+WORKDIR /metallb
+
+ADD . /metallb
+
+WORKDIR /metallb/controller
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o ./controller
+
+
+WORKDIR /metallb/speaker
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO111MODULE=on go build -o ./speaker
+
+LABEL io.k8s.display-name="Metallb" \
+      io.k8s.description="This is a component of OpenShift Container Platform and provides a metallb plugin." \
+      io.openshift.tags="openshift" \
+      maintainer="Mohamed S. Mahmoud <mmahmoud@redhat.com>"
+
