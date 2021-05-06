@@ -12,6 +12,34 @@ jobs:
       - run: sudo pip3 install invoke semver pyyaml
       - run: inv test
       - run: cp manifests/metallb.yaml manifests/metallb.yaml.prev
+  e2etest-bgp:
+    machine:
+      image: ubuntu-2004:202104-01
+    steps:
+      - checkout
+      - run: sudo apt-get update
+      - run: sudo apt-get install python3-pip
+      - run: sudo pip3 install invoke semver pyyaml
+      - run: GO111MODULE="on" go get sigs.k8s.io/kind@v0.10.0
+      - run: curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+      - run: sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+      - run: inv build
+      - run: inv dev-env -p bgp
+      - run: inv e2etest
+  e2etest-layer2:
+    machine:
+      image: ubuntu-2004:202104-01
+    steps:
+      - checkout
+      - run: sudo apt-get update
+      - run: sudo apt-get install python3-pip
+      - run: sudo pip3 install invoke semver pyyaml
+      - run: GO111MODULE="on" go get sigs.k8s.io/kind@v0.10.0
+      - run: curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+      - run: sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+      - run: inv build
+      - run: inv dev-env -p layer2
+      - run: inv e2etest
   lint-1.16:
     docker:
       - image: cimg/go:1.16
@@ -89,6 +117,14 @@ workflows:
             tags:
               only: /.*/
       - helm-conftest:
+          filters:
+            tags:
+              only: /.*/
+      - e2etest-bgp:
+          filters:
+            tags:
+              only: /.*/
+      - e2etest-layer2:
           filters:
             tags:
               only: /.*/
