@@ -379,7 +379,7 @@ def dev_env_cleanup(ctx, name="kind"):
 
     run('for frr in $(docker ps -a -f name=frr --format {{.Names}}) ; do '
         '    docker rm -f $frr ; '
-        'done', echo=True)
+        'done', hide=True)
 
     # cleanup bgp configs
     dev_env_dir = os.getcwd() + "/dev-env/bgp"
