@@ -352,7 +352,7 @@ def bgp_dev_env():
         '    docker rm -f $frr ; '
         'done', echo=True)
     run("docker run -d --privileged --network kind --rm --name frr --volume %s:/etc/frr "
-            "frrouting/frr:latest" % frr_volume_dir, echo=True)
+            "frrouting/frr:v7.5.1" % frr_volume_dir, echo=True)
 
     peer_address = run('docker inspect -f "{{ '
             'range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" frr', echo=True)
