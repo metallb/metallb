@@ -154,7 +154,7 @@ func (a *Allocator) Assign(svc string, ip net.IP, ports []Port, sharingKey, back
 				}
 			}
 			if len(otherSvcs) > 0 {
-				return fmt.Errorf("can't change sharing key for %q, address also in use by %s", svc, strings.Join(otherSvcs, ","))
+				return fmt.Errorf("can't change sharing key for %q, address also in use by %s: %w", svc, strings.Join(otherSvcs, ","), err)
 			}
 		}
 
