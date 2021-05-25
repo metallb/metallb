@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -65,7 +66,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 		}()
 
-		port := string(svc.Spec.Ports[0].Port)
+		port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
 		ingressIP := e2eservice.GetIngressPoint(
 			&svc.Status.LoadBalancer.Ingress[0])
 
