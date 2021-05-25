@@ -560,15 +560,12 @@ def e2etest(ctx, name="kind"):
     for ns in namespaces:
         run("kubectl -n {} wait --for=condition=Ready --all pods --timeout 300s".format(ns), hide=True)
 
-    try:
-        metallb_config = yaml.load(run("kubectl get configmaps -n metallb-system config -o jsonpath='{.data.config}'", hide=True).stdout)
-        if metallb_config['address-pools'][0]['name'] == "dev-env-layer2":
-            run("cd `git rev-parse --show-toplevel`/e2etest &&"
-                "go test --provider=local -ginkgo.focus=L2 --kubeconfig={}".format(kubeconfig.name))
-        elif metallb_config['address-pools'][0]['name'] == "dev-env-bgp":
-            run("cd `git rev-parse --show-toplevel`/e2etest &&"
-                "go test --provider=local -ginkgo.focus=BGP --kubeconfig={}".format(kubeconfig.name))
-        else:
-            raise
-    except:
+    metallb_config = yaml.load(run("kubectl get configmaps -n metallb-system config -o jsonpath='{.data.config}'", hide=True).stdout)
+    if metallb_config['address-pools'][0]['name'] == "dev-env-layer2":
+        run("cd `git rev-parse --show-toplevel`/e2etest &&"
+            "go test --provider=local -ginkgo.focus=L2 --kubeconfig={}".format(kubeconfig.name))
+    elif metallb_config['address-pools'][0]['name'] == "dev-env-bgp":
+        run("cd `git rev-parse --show-toplevel`/e2etest &&"
+            "go test --provider=local -ginkgo.focus=BGP --kubeconfig={}".format(kubeconfig.name))
+    else:
         print("dev-env environment not configured. Try running `inv dev-env -p <layer2/bgp>`")
