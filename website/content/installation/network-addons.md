@@ -21,6 +21,7 @@ Calico        | Mostly (see [known issues]({{% relref "configuration/calico.md" 
 Canal         | Yes
 Cilium        | Yes
 Flannel       | Yes
+Kube-ovn      | Yes
 Kube-router   | Mostly (see [known issues]({{% relref "configuration/kube-router.md" %}}))
 Romana        | Yes (see [guide]({{% relref "configuration/romana.md" %}}) for advanced integration)
 Weave Net     | Mostly (see [known issues]({{% relref "configuration/weave.md" %}}))
