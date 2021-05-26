@@ -54,10 +54,10 @@ var _ = ginkgo.Describe("L2", func() {
 		serviceName := "external-local-lb"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
 
-		svc, err := jig.CreateLoadBalancerService(loadBalancerCreateTimeout, nil)
+		svc, err := jig.CreateLoadBalancerService(loadBalancerCreateTimeout, tweakServicePort())
 		framework.ExpectNoError(err)
 
-		_, err = jig.Run(nil)
+		_, err = jig.Run(tweakRCPort())
 		framework.ExpectNoError(err)
 
 		defer func() {

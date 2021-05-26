@@ -552,20 +552,33 @@ def lint(ctx, env="container"):
 
 
 @task(help={
-    "name": "name of the kind cluster to test.",
-    "export": "where to export kind logs"
+    "name": "name of the kind cluster to test (only kind uses).",
+    "export": "where to export kind logs.",
+    "kubeconfig": "kubeconfig location. By default, use the kubeconfig from kind.",
+    "system_namespaces": "comma separated list of Kubernetes system namespaces",
+    "service_pod_port": "port number that service pods open.",
+    "skip_docker": "don't use docker command in BGP testing."
 })
-def e2etest(ctx, name="kind", export=None):
+def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False):
     """Run E2E tests against development cluster."""
-    validate_kind_version()
-    clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
-    if name in clusters:
-        kubeconfig = tempfile.NamedTemporaryFile()
-        run("kind export kubeconfig --name={} --kubeconfig={}".format(name, kubeconfig.name), pty=True, echo=True)
+    if skip_docker:
+        opt_skip_docker = "-skip-docker"
     else:
-        raise Exit(message="Unable to find cluster named: {}".format(name))
+        opt_skip_docker = ""
 
-    namespaces = ["kube-system", "metallb-system"]
+    if kubeconfig is None:
+        validate_kind_version()
+        clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
+        if name in clusters:
+            kubeconfig_file = tempfile.NamedTemporaryFile()
+            kubeconfig = kubeconfig_file.name
+            run("kind export kubeconfig --name={} --kubeconfig={}".format(name, kubeconfig), pty=True, echo=True)
+        else:
+            raise Exit(message="Unable to find cluster named: {}".format(name))
+    else:
+        os.environ['KUBECONFIG'] = kubeconfig
+
+    namespaces = system_namespaces.replace(' ', '').split(',')
     for ns in namespaces:
         run("kubectl -n {} wait --for=condition=Ready --all pods --timeout 300s".format(ns), hide=True)
 
@@ -577,10 +590,10 @@ def e2etest(ctx, name="kind", export=None):
 
     if metallb_config['address-pools'][0]['name'] == "dev-env-layer2":
         run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "go test --provider=local -ginkgo.focus=L2 --kubeconfig={}".format(kubeconfig.name))
+            "go test --provider=local -ginkgo.focus=L2 --kubeconfig={} -service-pod-port={}".format(kubeconfig, service_pod_port))
     elif metallb_config['address-pools'][0]['name'] == "dev-env-bgp":
         run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "go test --provider=local -ginkgo.focus=BGP --kubeconfig={}".format(kubeconfig.name))
+            "go test --provider=local -ginkgo.focus=BGP --kubeconfig={} -service-pod-port={} {}".format(kubeconfig, service_pod_port, opt_skip_docker))
     else:
         print("dev-env environment not configured correctly. Try running `inv dev-env -p <layer2/bgp>`")
     

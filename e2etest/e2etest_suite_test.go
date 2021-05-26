@@ -34,11 +34,17 @@ import (
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 )
 
+// use ephemeral port for pod, instead of well-known port (tcp/80)
+var servicePodPort uint
+var skipDockerCmd bool
+
 // handleFlags sets up all flags and parses the command line.
 func handleFlags() {
 	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
 	framework.RegisterCommonFlags(flag.CommandLine)
 	framework.RegisterClusterFlags(flag.CommandLine)
+	flag.UintVar(&servicePodPort, "service-pod-port", 80, "port number that pod opens, default: 80")
+	flag.BoolVar(&skipDockerCmd, "skip-docker", false, "et this to true if the BGP daemon is running on the host instead of in a container")
 	flag.Parse()
 }
 

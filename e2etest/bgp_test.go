@@ -55,10 +55,10 @@ var _ = ginkgo.Describe("BGP", func() {
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
 
 		svc, err := jig.CreateLoadBalancerService(loadBalancerCreateTimeout,
-			nil)
+			tweakServicePort())
 		framework.ExpectNoError(err)
 
-		_, err = jig.Run(nil)
+		_, err = jig.Run(tweakRCPort())
 		framework.ExpectNoError(err)
 
 		defer func() {
@@ -70,11 +70,17 @@ var _ = ginkgo.Describe("BGP", func() {
 		ingressIP := e2eservice.GetIngressPoint(
 			&svc.Status.LoadBalancer.Ingress[0])
 
-		ginkgo.By("checking connectivity to its external VIP")
-
 		hostport := net.JoinHostPort(ingressIP, port)
 		address := fmt.Sprintf("http://%s/", hostport)
-		err = wgetRetry(true, address)
+
+		useDocker := true
+		if skipDockerCmd {
+			ginkgo.By("checking connectivity to its external VIP")
+			useDocker = false
+		} else {
+			ginkgo.By("checking connectivity to its external VIP with docker")
+		}
+		err = wgetRetry(useDocker, address)
 		framework.ExpectNoError(err)
 	})
 
