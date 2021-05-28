@@ -185,14 +185,17 @@ def validate_kind_version():
     "name": "name of the kind cluster to use.",
     "protocol": "Pre-configure MetalLB with the specified protocol. "
                 "Unconfigured by default. Supported: 'bgp','layer2'",
+    "node_img": "Optional node image to use for the kind cluster (e.g. kindest/node:v1.18.19)."
+                "The node image drives the kubernetes version used in kind."
 })
-def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None):
+def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None, node_img=None):
     """Build and run MetalLB in a local Kind cluster.
 
     If the cluster specified by --name (default "kind") doesn't exist,
     it is created. Then, build MetalLB docker images from the
     checkout, push them into kind, and deploy manifests/metallb.yaml
     to run those images.
+    The optional node_img parameter will be used to determine the version of the cluster.
     """
 
     validate_kind_version()
@@ -216,11 +219,14 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None):
             config["networking"] = {
                 "disableDefaultCNI": True,
             }
+        extra_options = ""
+        if node_img != None:
+            extra_options = "--image={}".format(node_img)
         config = yaml.dump(config).encode("utf-8")
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(config)
             tmp.flush()
-            run("kind create cluster --name={} --config={}".format(name, tmp.name), pty=True, echo=True)
+            run("kind create cluster --name={} --config={} {}".format(name, tmp.name, extra_options), pty=True, echo=True)
 
     if mk_cluster and cni:
         run("kubectl apply -f e2etest/manifests/{}.yaml".format(cni), echo=True)
