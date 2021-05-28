@@ -545,8 +545,9 @@ def lint(ctx, env="container"):
 
 @task(help={
     "name": "name of the kind cluster to test.",
+    "export": "where to export kind logs"
 })
-def e2etest(ctx, name="kind"):
+def e2etest(ctx, name="kind", export=None):
     """Run E2E tests against development cluster."""
     validate_kind_version()
     clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
@@ -569,3 +570,6 @@ def e2etest(ctx, name="kind"):
             "go test --provider=local -ginkgo.focus=BGP --kubeconfig={}".format(kubeconfig.name))
     else:
         print("dev-env environment not configured. Try running `inv dev-env -p <layer2/bgp>`")
+    
+    if export != None:
+        run("kind export logs {}".format(export))

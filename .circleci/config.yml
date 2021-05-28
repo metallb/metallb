@@ -31,7 +31,9 @@ jobs:
       - setup_kind
       - run: inv build
       - run: inv dev-env -p bgp
-      - run: inv e2etest
+      - run: inv e2etest -e /tmp/kind_logs
+      - store_artifacts:
+          path: /tmp/kind_logs
   e2etest-layer2:
     machine:
       image: ubuntu-2004:202104-01
@@ -40,7 +42,9 @@ jobs:
       - setup_kind
       - run: inv build
       - run: inv dev-env -p layer2
-      - run: inv e2etest
+      - run: inv e2etest -e /tmp/kind_logs
+      - store_artifacts:
+          path: /tmp/kind_logs
   lint-1-16:
     docker:
       - image: cimg/go:1.16
