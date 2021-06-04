@@ -569,7 +569,12 @@ def e2etest(ctx, name="kind", export=None):
     for ns in namespaces:
         run("kubectl -n {} wait --for=condition=Ready --all pods --timeout 300s".format(ns), hide=True)
 
-    metallb_config = yaml.load(run("kubectl get configmaps -n metallb-system config -o jsonpath='{.data.config}'", hide=True).stdout)
+    try:
+        metallb_config = yaml.load(run("kubectl get configmaps -n metallb-system config -o jsonpath='{.data.config}'", hide=True).stdout)
+    except UnexpectedExit:
+        print("dev-env environment not configured. Try running `inv dev-env -p <layer2/bgp>`")
+        sys.exit(1)
+
     if metallb_config['address-pools'][0]['name'] == "dev-env-layer2":
         run("cd `git rev-parse --show-toplevel`/e2etest &&"
             "go test --provider=local -ginkgo.focus=L2 --kubeconfig={}".format(kubeconfig.name))
@@ -577,7 +582,7 @@ def e2etest(ctx, name="kind", export=None):
         run("cd `git rev-parse --show-toplevel`/e2etest &&"
             "go test --provider=local -ginkgo.focus=BGP --kubeconfig={}".format(kubeconfig.name))
     else:
-        print("dev-env environment not configured. Try running `inv dev-env -p <layer2/bgp>`")
+        print("dev-env environment not configured correctly. Try running `inv dev-env -p <layer2/bgp>`")
     
     if export != None:
         run("kind export logs {}".format(export))
