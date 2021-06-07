@@ -12,20 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package controller
+package main
 
 import (
 	"fmt"
 	"net"
-	"sync/atomic"
 
 	"github.com/go-kit/kit/log"
 	v1 "k8s.io/api/core/v1"
 
-	"go.universe.tf/metallb/pkg/allocator/k8salloc"
+	"go.universe.tf/metallb/internal/allocator/k8salloc"
 )
 
-func (c *Controller) convergeBalancer(l log.Logger, key string, svc *v1.Service) bool {
+func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service) bool {
 	var lbIP net.IP
 
 	// Not a LoadBalancer, early exit. It might have been a balancer
@@ -70,7 +69,7 @@ func (c *Controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	if lbIP != nil {
 		// This assign is idempotent if the config is consistent,
 		// otherwise it'll fail and tell us why.
-		if err := c.IPs.Assign(key, lbIP, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
+		if err := c.ips.Assign(key, lbIP, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 			l.Log("event", "clearAssignment", "reason", "notAllowedByConfig", "msg", "current IP not allowed by config, clearing")
 			c.clearServiceState(key, svc)
 			lbIP = nil
@@ -80,7 +79,7 @@ func (c *Controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		// requested a different pool than the one that is currently
 		// allocated.
 		desiredPool := svc.Annotations["metallb.universe.tf/address-pool"]
-		if lbIP != nil && desiredPool != "" && c.IPs.Pool(key) != desiredPool {
+		if lbIP != nil && desiredPool != "" && c.ips.Pool(key) != desiredPool {
 			l.Log("event", "clearAssignment", "reason", "differentPoolRequested", "msg", "user requested a different pool than the one currently assigned")
 			c.clearServiceState(key, svc)
 			lbIP = nil
@@ -98,14 +97,14 @@ func (c *Controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 
 	// If lbIP is still nil at this point, try to allocate.
 	if lbIP == nil {
-		if atomic.LoadUint32(&c.synced) == 0 {
+		if !c.synced {
 			l.Log("op", "allocateIP", "error", "controller not synced", "msg", "controller not synced yet, cannot allocate IP; will retry after sync")
 			return false
 		}
 		ip, err := c.allocateIP(key, svc)
 		if err != nil {
 			l.Log("op", "allocateIP", "error", err, "msg", "IP allocation failed")
-			c.Client.Errorf(svc, "AllocationFailed", "Failed to allocate IP for %q: %s", key, err)
+			c.client.Errorf(svc, "AllocationFailed", "Failed to allocate IP for %q: %s", key, err)
 			// The outer controller loop will retry converging this
 			// service when another service gets deleted, so there's
 			// nothing to do here but wait to get called again later.
@@ -113,20 +112,20 @@ func (c *Controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		}
 		lbIP = ip
 		l.Log("event", "ipAllocated", "ip", lbIP, "msg", "IP address assigned by controller")
-		c.Client.Infof(svc, "IPAllocated", "Assigned IP %q", lbIP)
+		c.client.Infof(svc, "IPAllocated", "Assigned IP %q", lbIP)
 	}
 
 	if lbIP == nil {
 		l.Log("bug", "true", "msg", "internal error: failed to allocate an IP, but did not exit convergeService early!")
-		c.Client.Errorf(svc, "InternalError", "didn't allocate an IP but also did not fail")
+		c.client.Errorf(svc, "InternalError", "didn't allocate an IP but also did not fail")
 		c.clearServiceState(key, svc)
 		return true
 	}
 
-	pool := c.IPs.Pool(key)
+	pool := c.ips.Pool(key)
 	if pool == "" || c.config.Pools[pool] == nil {
 		l.Log("bug", "true", "ip", lbIP, "msg", "internal error: allocated IP has no matching address pool")
-		c.Client.Errorf(svc, "InternalError", "allocated an IP that has no pool")
+		c.client.Errorf(svc, "InternalError", "allocated an IP that has no pool")
 		c.clearServiceState(key, svc)
 		return true
 	}
@@ -139,12 +138,12 @@ func (c *Controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 
 // clearServiceState clears all fields that are actively managed by
 // this controller.
-func (c *Controller) clearServiceState(key string, svc *v1.Service) {
-	c.IPs.Unassign(key)
+func (c *controller) clearServiceState(key string, svc *v1.Service) {
+	c.ips.Unassign(key)
 	svc.Status.LoadBalancer = v1.LoadBalancerStatus{}
 }
 
-func (c *Controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
+func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 	clusterIP := net.ParseIP(svc.Spec.ClusterIP)
 	if clusterIP == nil {
 		// (we should never get here because the caller ensured that Spec.ClusterIP != nil)
@@ -161,7 +160,7 @@ func (c *Controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 		if (ip.To4() == nil) != isIPv6 {
 			return nil, fmt.Errorf("requested spec.loadBalancerIP %q does not match the ipFamily of the service", svc.Spec.LoadBalancerIP)
 		}
-		if err := c.IPs.Assign(key, ip, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
+		if err := c.ips.Assign(key, ip, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 			return nil, err
 		}
 		return ip, nil
@@ -170,7 +169,7 @@ func (c *Controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 	// Otherwise, did the user ask for a specific pool?
 	desiredPool := svc.Annotations["metallb.universe.tf/address-pool"]
 	if desiredPool != "" {
-		ip, err := c.IPs.AllocateFromPool(key, isIPv6, desiredPool, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
+		ip, err := c.ips.AllocateFromPool(key, isIPv6, desiredPool, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
 		if err != nil {
 			return nil, err
 		}
@@ -178,5 +177,5 @@ func (c *Controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 	}
 
 	// Okay, in that case just bruteforce across all pools.
-	return c.IPs.Allocate(key, isIPv6, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
+	return c.ips.Allocate(key, isIPv6, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
 }

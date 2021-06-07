@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package speaker
+package main
 
 import (
 	"bytes"
@@ -21,17 +21,18 @@ import (
 	"sort"
 
 	"github.com/go-kit/kit/log"
-	"go.universe.tf/metallb/pkg/config"
-	"go.universe.tf/metallb/pkg/layer2"
+	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/layer2"
+	"k8s.io/api/core/v1"
 )
 
-type Layer2Controller struct {
-	Announcer *layer2.Announce
-	MyNode    string
-	SList     SpeakerList
+type layer2Controller struct {
+	announcer *layer2.Announce
+	myNode    string
+	sList     SpeakerList
 }
 
-func (c *Layer2Controller) SetConfig(log.Logger, *config.Config) error {
+func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
 	return nil
 }
 
@@ -40,19 +41,21 @@ func (c *Layer2Controller) SetConfig(log.Logger, *config.Config) error {
 // The speakers parameter is a map with the node name as key and the readiness
 // status as value (true means ready, false means not ready).
 // If the speakers map is nil, it is ignored.
-func usableNodes(eps *Endpoints, speakers map[string]bool) []string {
+func usableNodes(eps *v1.Endpoints, speakers map[string]bool) []string {
 	usable := map[string]bool{}
-	for _, ep := range eps.Ready {
-		if ep.NodeName == nil {
-			continue
-		}
-		if speakers != nil {
-			if ready, ok := speakers[*ep.NodeName]; !ok || !ready {
+	for _, subset := range eps.Subsets {
+		for _, ep := range subset.Addresses {
+			if ep.NodeName == nil {
 				continue
 			}
-		}
-		if _, ok := usable[*ep.NodeName]; !ok {
-			usable[*ep.NodeName] = true
+			if speakers != nil {
+				if ready, ok := speakers[*ep.NodeName]; !ok || !ready {
+					continue
+				}
+			}
+			if _, ok := usable[*ep.NodeName]; !ok {
+				usable[*ep.NodeName] = true
+			}
 		}
 	}
 
@@ -66,8 +69,8 @@ func usableNodes(eps *Endpoints, speakers map[string]bool) []string {
 	return ret
 }
 
-func (c *Layer2Controller) ShouldAnnounce(l log.Logger, name string, _ string, eps *Endpoints) string {
-	nodes := usableNodes(eps, c.SList.UsableSpeakers())
+func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
+	nodes := usableNodes(eps, c.sList.UsableSpeakers())
 	// Sort the slice by the hash of node + service name. This
 	// produces an ordering of ready nodes that is unique to this
 	// service.
@@ -79,7 +82,7 @@ func (c *Layer2Controller) ShouldAnnounce(l log.Logger, name string, _ string, e
 	})
 
 	// Are we first in the list? If so, we win and should announce.
-	if len(nodes) > 0 && nodes[0] == c.MyNode {
+	if len(nodes) > 0 && nodes[0] == c.myNode {
 		return ""
 	}
 
@@ -87,20 +90,20 @@ func (c *Layer2Controller) ShouldAnnounce(l log.Logger, name string, _ string, e
 	return "notOwner"
 }
 
-func (c *Layer2Controller) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
-	c.Announcer.SetBalancer(name, lbIP)
+func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
+	c.announcer.SetBalancer(name, lbIP)
 	return nil
 }
 
-func (c *Layer2Controller) DeleteBalancer(l log.Logger, name, reason string) error {
-	if !c.Announcer.AnnounceName(name) {
+func (c *layer2Controller) DeleteBalancer(l log.Logger, name, reason string) error {
+	if !c.announcer.AnnounceName(name) {
 		return nil
 	}
-	c.Announcer.DeleteBalancer(name)
+	c.announcer.DeleteBalancer(name)
 	return nil
 }
 
-func (c *Layer2Controller) SetNodeLabels(log.Logger, map[string]string) error {
-	c.SList.Rejoin()
+func (c *layer2Controller) SetNode(log.Logger, *v1.Node) error {
+	c.sList.Rejoin()
 	return nil
 }

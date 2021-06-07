@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package speaker
+package main
 
 import (
 	"fmt"
@@ -23,10 +23,9 @@ import (
 	"strconv"
 	"time"
 
-	"go.universe.tf/metallb/pkg/bgp"
-	"go.universe.tf/metallb/pkg/config"
-
-	v1 "k8s.io/api/core/v1"
+	"go.universe.tf/metallb/internal/bgp"
+	"go.universe.tf/metallb/internal/config"
+	"k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/go-kit/kit/log"
@@ -37,15 +36,15 @@ type peer struct {
 	bgp session
 }
 
-type BGPController struct {
-	Logger     log.Logger
-	MyNode     string
+type bgpController struct {
+	logger     log.Logger
+	myNode     string
 	nodeLabels labels.Set
 	peers      []*peer
-	SvcAds     map[string][]*bgp.Advertisement
+	svcAds     map[string][]*bgp.Advertisement
 }
 
-func (c *BGPController) SetConfig(l log.Logger, cfg *config.Config) error {
+func (c *bgpController) SetConfig(l log.Logger, cfg *config.Config) error {
 	newPeers := make([]*peer, 0, len(cfg.Peers))
 newPeers:
 	for _, p := range cfg.Peers {
@@ -84,21 +83,23 @@ newPeers:
 }
 
 // nodeHasHealthyEndpoint return true if this node has at least one healthy endpoint.
-func nodeHasHealthyEndpoint(eps *Endpoints, node string) bool {
+func nodeHasHealthyEndpoint(eps *v1.Endpoints, node string) bool {
 	ready := map[string]bool{}
-	for _, ep := range eps.Ready {
-		if ep.NodeName == nil || *ep.NodeName != node {
-			continue
+	for _, subset := range eps.Subsets {
+		for _, ep := range subset.Addresses {
+			if ep.NodeName == nil || *ep.NodeName != node {
+				continue
+			}
+			if _, ok := ready[ep.IP]; !ok {
+				// Only set true if nothing else has expressed an
+				// opinion. This means that false will take precedence
+				// if there's any unready ports for a given endpoint.
+				ready[ep.IP] = true
+			}
 		}
-		if _, ok := ready[ep.IP]; !ok {
-			// Only set true if nothing else has expressed an
-			// opinion. This means that false will take precedence
-			// if there's any unready ports for a given endpoint.
-			ready[ep.IP] = true
+		for _, ep := range subset.NotReadyAddresses {
+			ready[ep.IP] = false
 		}
-	}
-	for _, ep := range eps.NotReady {
-		ready[ep.IP] = false
 	}
 
 	for _, r := range ready {
@@ -110,18 +111,20 @@ func nodeHasHealthyEndpoint(eps *Endpoints, node string) bool {
 	return false
 }
 
-func healthyEndpointExists(eps *Endpoints) bool {
+func healthyEndpointExists(eps *v1.Endpoints) bool {
 	ready := map[string]bool{}
-	for _, ep := range eps.Ready {
-		if _, ok := ready[ep.IP]; !ok {
-			// Only set true if nothing else has expressed an
-			// opinion. This means that false will take precedence
-			// if there's any unready ports for a given endpoint.
-			ready[ep.IP] = true
+	for _, subset := range eps.Subsets {
+		for _, ep := range subset.Addresses {
+			if _, ok := ready[ep.IP]; !ok {
+				// Only set true if nothing else has expressed an
+				// opinion. This means that false will take precedence
+				// if there's any unready ports for a given endpoint.
+				ready[ep.IP] = true
+			}
 		}
-	}
-	for _, ep := range eps.NotReady {
-		ready[ep.IP] = false
+		for _, ep := range subset.NotReadyAddresses {
+			ready[ep.IP] = false
+		}
 	}
 
 	for _, r := range ready {
@@ -133,13 +136,13 @@ func healthyEndpointExists(eps *Endpoints) bool {
 	return false
 }
 
-func (c *BGPController) ShouldAnnounce(l log.Logger, name string, policyType string, eps *Endpoints) string {
+func (c *bgpController) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
 	// Should we advertise?
 	// Yes, if externalTrafficPolicy is
 	//  Cluster && any healthy endpoint exists
 	// or
 	//  Local && there's a ready local endpoint.
-	if v1.ServiceExternalTrafficPolicyType(policyType) == v1.ServiceExternalTrafficPolicyTypeLocal && !nodeHasHealthyEndpoint(eps, c.MyNode) {
+	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !nodeHasHealthyEndpoint(eps, c.myNode) {
 		return "noLocalEndpoints"
 	} else if !healthyEndpointExists(eps) {
 		return "noEndpoints"
@@ -149,7 +152,7 @@ func (c *BGPController) ShouldAnnounce(l log.Logger, name string, policyType str
 
 // Called when either the peer list or node labels have changed,
 // implying that the set of running BGP sessions may need tweaking.
-func (c *BGPController) syncPeers(l log.Logger) error {
+func (c *bgpController) syncPeers(l log.Logger) error {
 	var (
 		errs          int
 		needUpdateAds bool
@@ -181,7 +184,7 @@ func (c *BGPController) syncPeers(l log.Logger) error {
 			if p.cfg.RouterID != nil {
 				routerID = p.cfg.RouterID
 			}
-			s, err := newBGP(c.Logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.Password, c.MyNode)
+			s, err := newBGP(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.Password, c.myNode)
 			if err != nil {
 				l.Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
 				errs++
@@ -204,8 +207,8 @@ func (c *BGPController) syncPeers(l log.Logger) error {
 	return nil
 }
 
-func (c *BGPController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
-	c.SvcAds[name] = nil
+func (c *bgpController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
+	c.svcAds[name] = nil
 	for _, adCfg := range pool.BGPAdvertisements {
 		m := net.CIDRMask(adCfg.AggregationLength, 32)
 		ad := &bgp.Advertisement{
@@ -219,21 +222,21 @@ func (c *BGPController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool
 			ad.Communities = append(ad.Communities, comm)
 		}
 		sort.Slice(ad.Communities, func(i, j int) bool { return ad.Communities[i] < ad.Communities[j] })
-		c.SvcAds[name] = append(c.SvcAds[name], ad)
+		c.svcAds[name] = append(c.svcAds[name], ad)
 	}
 
 	if err := c.updateAds(); err != nil {
 		return err
 	}
 
-	l.Log("event", "updatedAdvertisements", "numAds", len(c.SvcAds[name]), "msg", "making advertisements using BGP")
+	l.Log("event", "updatedAdvertisements", "numAds", len(c.svcAds[name]), "msg", "making advertisements using BGP")
 
 	return nil
 }
 
-func (c *BGPController) updateAds() error {
+func (c *bgpController) updateAds() error {
 	var allAds []*bgp.Advertisement
-	for _, ads := range c.SvcAds {
+	for _, ads := range c.svcAds {
 		// This list might contain duplicates, but that's fine,
 		// they'll get compacted by the session code when it's
 		// calculating advertisements.
@@ -253,11 +256,11 @@ func (c *BGPController) updateAds() error {
 	return nil
 }
 
-func (c *BGPController) DeleteBalancer(l log.Logger, name, reason string) error {
-	if _, ok := c.SvcAds[name]; !ok {
+func (c *bgpController) DeleteBalancer(l log.Logger, name, reason string) error {
+	if _, ok := c.svcAds[name]; !ok {
 		return nil
 	}
-	delete(c.SvcAds, name)
+	delete(c.svcAds, name)
 	return c.updateAds()
 }
 
@@ -266,11 +269,12 @@ type session interface {
 	Set(advs ...*bgp.Advertisement) error
 }
 
-func (c *BGPController) SetNodeLabels(l log.Logger, lbls map[string]string) error {
-	if lbls == nil {
-		lbls = map[string]string{}
+func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
+	nodeLabels := node.Labels
+	if nodeLabels == nil {
+		nodeLabels = map[string]string{}
 	}
-	ns := labels.Set(lbls)
+	ns := labels.Set(nodeLabels)
 	if c.nodeLabels != nil && labels.Equals(c.nodeLabels, ns) {
 		// Node labels unchanged, no action required.
 		return nil

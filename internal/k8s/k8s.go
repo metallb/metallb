@@ -1,4 +1,4 @@
-package k8s // import "go.universe.tf/metallb/pkg/k8s"
+package k8s // import "go.universe.tf/metallb/internal/k8s"
 
 import (
 	"context"
@@ -7,12 +7,11 @@ import (
 	"io/ioutil"
 	"net/http"
 
-	"go.universe.tf/metallb/pkg/config"
-	"go.universe.tf/metallb/pkg/k8s/types"
+	"go.universe.tf/metallb/internal/config"
 
 	"github.com/go-kit/kit/log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/client-go/kubernetes"
@@ -45,11 +44,25 @@ type Client struct {
 
 	syncFuncs []cache.InformerSynced
 
-	serviceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) types.SyncState
-	configChanged  func(log.Logger, *config.Config) types.SyncState
-	nodeChanged    func(log.Logger, *v1.Node) types.SyncState
+	serviceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) SyncState
+	configChanged  func(log.Logger, *config.Config) SyncState
+	nodeChanged    func(log.Logger, *v1.Node) SyncState
 	synced         func(log.Logger)
 }
+
+// SyncState is the result of calling synchronization callbacks.
+type SyncState int
+
+const (
+	// The update was processed successfully.
+	SyncStateSuccess SyncState = iota
+	// The update caused a transient error, the k8s client should
+	// retry later.
+	SyncStateError
+	// The update was accepted, but requires reprocessing all watched
+	// services.
+	SyncStateReprocessAll
+)
 
 // Config specifies the configuration of the Kubernetes
 // client/watcher.
@@ -64,9 +77,9 @@ type Config struct {
 	Logger        log.Logger
 	Kubeconfig    string
 
-	ServiceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) types.SyncState
-	ConfigChanged  func(log.Logger, *config.Config) types.SyncState
-	NodeChanged    func(log.Logger, *v1.Node) types.SyncState
+	ServiceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) SyncState
+	ConfigChanged  func(log.Logger, *config.Config) SyncState
+	NodeChanged    func(log.Logger, *v1.Node) SyncState
 	Synced         func(log.Logger)
 }
 
@@ -297,12 +310,12 @@ func (c *Client) Run(stopCh <-chan struct{}) error {
 		updates.Inc()
 		st := c.sync(key)
 		switch st {
-		case types.SyncStateSuccess:
+		case SyncStateSuccess:
 			c.queue.Forget(key)
-		case types.SyncStateError:
+		case SyncStateError:
 			updateErrors.Inc()
 			c.queue.AddRateLimited(key)
-		case types.SyncStateReprocessAll:
+		case SyncStateReprocessAll:
 			c.queue.Forget(key)
 			c.ForceSync()
 		}
@@ -335,7 +348,7 @@ func (c *Client) Errorf(svc *v1.Service, kind, msg string, args ...interface{}) 
 	c.events.Eventf(svc, v1.EventTypeWarning, kind, msg, args...)
 }
 
-func (c *Client) sync(key interface{}) types.SyncState {
+func (c *Client) sync(key interface{}) SyncState {
 	defer c.queue.Done(key)
 
 	switch k := key.(type) {
@@ -344,7 +357,7 @@ func (c *Client) sync(key interface{}) types.SyncState {
 		svc, exists, err := c.svcIndexer.GetByKey(string(k))
 		if err != nil {
 			l.Log("op", "getService", "error", err, "msg", "failed to get service")
-			return types.SyncStateError
+			return SyncStateError
 		}
 		if !exists {
 			return c.serviceChanged(l, string(k), nil, nil)
@@ -355,7 +368,7 @@ func (c *Client) sync(key interface{}) types.SyncState {
 			epsIntf, exists, err := c.epIndexer.GetByKey(string(k))
 			if err != nil {
 				l.Log("op", "getEndpoints", "error", err, "msg", "failed to get endpoints")
-				return types.SyncStateError
+				return SyncStateError
 			}
 			if !exists {
 				return c.serviceChanged(l, string(k), nil, nil)
@@ -370,7 +383,7 @@ func (c *Client) sync(key interface{}) types.SyncState {
 		cmi, exists, err := c.cmIndexer.GetByKey(string(k))
 		if err != nil {
 			l.Log("op", "getConfigMap", "error", err, "msg", "failed to get configmap")
-			return types.SyncStateError
+			return SyncStateError
 		}
 		if !exists {
 			configStale.Set(1)
@@ -386,14 +399,14 @@ func (c *Client) sync(key interface{}) types.SyncState {
 		if err != nil {
 			l.Log("event", "configStale", "error", err, "msg", "config (re)load failed, config marked stale")
 			configStale.Set(1)
-			return types.SyncStateSuccess
+			return SyncStateSuccess
 		}
 
 		st := c.configChanged(l, cfg)
-		if st == types.SyncStateError {
+		if st == SyncStateError {
 			l.Log("event", "configStale", "error", err, "msg", "config (re)load failed, config marked stale")
 			configStale.Set(1)
-			return types.SyncStateSuccess
+			return SyncStateSuccess
 		}
 
 		configLoaded.Set(1)
@@ -407,11 +420,11 @@ func (c *Client) sync(key interface{}) types.SyncState {
 		n, exists, err := c.nodeIndexer.GetByKey(string(k))
 		if err != nil {
 			l.Log("op", "getNode", "error", err, "msg", "failed to get node")
-			return types.SyncStateError
+			return SyncStateError
 		}
 		if !exists {
 			l.Log("op", "getNode", "error", "node doesn't exist in k8s, but I'm running on it!")
-			return types.SyncStateError
+			return SyncStateError
 		}
 		node := n.(*v1.Node)
 		return c.nodeChanged(c.logger, node)
@@ -420,7 +433,7 @@ func (c *Client) sync(key interface{}) types.SyncState {
 		if c.synced != nil {
 			c.synced(c.logger)
 		}
-		return types.SyncStateSuccess
+		return SyncStateSuccess
 
 	default:
 		panic(fmt.Errorf("unknown key type for %#v (%T)", key, key))

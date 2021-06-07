@@ -1,4 +1,4 @@
-package speaker
+package main
 
 import (
 	"errors"
@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"go.universe.tf/metallb/pkg/bgp"
-	"go.universe.tf/metallb/pkg/config"
-	"go.universe.tf/metallb/pkg/k8s"
+	"go.universe.tf/metallb/internal/bgp"
+	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/k8s"
 
 	"github.com/go-kit/kit/log"
 	"github.com/google/go-cmp/cmp"
-	v1 "k8s.io/api/core/v1"
+	"k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -40,10 +40,14 @@ func ipnet(s string) *net.IPNet {
 	return n
 }
 
-func statusAssigned(ip string) []v1.LoadBalancerIngress {
-	return []v1.LoadBalancerIngress{
-		v1.LoadBalancerIngress{
-			IP: ip,
+func statusAssigned(ip string) v1.ServiceStatus {
+	return v1.ServiceStatus{
+		LoadBalancer: v1.LoadBalancerStatus{
+			Ingress: []v1.LoadBalancerIngress{
+				{
+					IP: ip,
+				},
+			},
 		},
 	}
 }
