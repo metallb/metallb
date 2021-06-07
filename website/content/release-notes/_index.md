@@ -3,7 +3,7 @@ title: Release Notes
 weight: 8
 ---
 
-## Version 0.10.0 (Still in development)
+## Version 0.10.0
 
 New Features:
 
@@ -21,8 +21,6 @@ New Features:
   way introduced in k8s to find services endpoints. From this version, MetalLB checks for
   EndpointSlices availability and uses them, otherwise it backs up to endpoints.
 
-Bug Fixes:
-
 Changes in behavior:
 
 - The `port` option to the `speaker`, which is the prometheus metrics port, now
@@ -34,6 +32,15 @@ Changes in behavior:
   option and `METALLB_ML_NAMESPACE` environment variable of the `speaker` are
   replaced by the `namespace` option or the `METALLB_NAMESPACE` environment
   variable. If not set the namespace is read from `/var/run/secrets/kubernetes.io/serviceaccount/namespace`.
+
+This release includes contributions from Adit Sachde, Adrian Goins, Andrew
+Grosser, Brian Topping, Chance Carey, Chris Tarazi, Damien TOURDE, David
+Anderson, Dax McDonald, dougbtv, Etienne Champetier, Federico Paolinelli,
+Graeme Lawes, Henry-Kim-Youngwoo, Igal Serban, Jan Krcmar, JinLin Fu, Johannes
+Liebermann, Jumpy Squirrel, Lars Ekman, Leroy Shirto, Mark Gray, NorthFuture,
+Oleg Mayko, Reinier Schoof, Rodrigo Campos, Russell Bryant, Sebastien Dionne,
+Stefan Lasiewski, Steven Follis, sumarsono, Thorsten Schifferdecker, toby
+cabot, Tomofumi Hayashi, Tony Perez, and Yuan Liu. Thank you!
 
 ## Version 0.9.6
 [Documentation for this release](https://metallb.universe.tf)
