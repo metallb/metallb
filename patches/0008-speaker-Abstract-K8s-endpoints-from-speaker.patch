@@ -1,0 +1,759 @@
+From ebad36be82c23ec7aac5464e214b59c9ce3d491d Mon Sep 17 00:00:00 2001
+From: Chris Tarazi <chris@isovalent.com>
+Date: Mon, 8 Mar 2021 21:49:59 -0800
+Subject: [PATCH 08/10] speaker: Abstract K8s endpoints from speaker
+
+Similar to the previous commit, but this time for v1.Endpoints.
+
+Signed-off-by: Chris Tarazi <chris@isovalent.com>
+---
+ pkg/speaker/bgp_controller.go         |  50 ++-
+ pkg/speaker/layer2_controller.go      |  24 +-
+ pkg/speaker/layer2_controller_test.go | 426 +++++++++++---------------
+ pkg/speaker/speaker.go                |  39 ++-
+ 4 files changed, 251 insertions(+), 288 deletions(-)
+
+diff --git a/pkg/speaker/bgp_controller.go b/pkg/speaker/bgp_controller.go
+index 11f94fa7..b16622bb 100644
+--- a/pkg/speaker/bgp_controller.go
++++ b/pkg/speaker/bgp_controller.go
+@@ -84,24 +84,22 @@ newPeers:
+ }
+ 
+ // nodeHasHealthyEndpoint return true if this node has at least one healthy endpoint.
+-func nodeHasHealthyEndpoint(eps *v1.Endpoints, node string) bool {
++func nodeHasHealthyEndpoint(eps *Endpoints, node string) bool {
+ 	ready := map[string]bool{}
+-	for _, subset := range eps.Subsets {
+-		for _, ep := range subset.Addresses {
+-			if ep.NodeName == nil || *ep.NodeName != node {
+-				continue
+-			}
+-			if _, ok := ready[ep.IP]; !ok {
+-				// Only set true if nothing else has expressed an
+-				// opinion. This means that false will take precedence
+-				// if there's any unready ports for a given endpoint.
+-				ready[ep.IP] = true
+-			}
++	for _, ep := range eps.Ready {
++		if ep.NodeName == nil || *ep.NodeName != node {
++			continue
+ 		}
+-		for _, ep := range subset.NotReadyAddresses {
+-			ready[ep.IP] = false
++		if _, ok := ready[ep.IP]; !ok {
++			// Only set true if nothing else has expressed an
++			// opinion. This means that false will take precedence
++			// if there's any unready ports for a given endpoint.
++			ready[ep.IP] = true
+ 		}
+ 	}
++	for _, ep := range eps.NotReady {
++		ready[ep.IP] = false
++	}
+ 
+ 	for _, r := range ready {
+ 		if r {
+@@ -112,21 +110,19 @@ func nodeHasHealthyEndpoint(eps *v1.Endpoints, node string) bool {
+ 	return false
+ }
+ 
+-func healthyEndpointExists(eps *v1.Endpoints) bool {
++func healthyEndpointExists(eps *Endpoints) bool {
+ 	ready := map[string]bool{}
+-	for _, subset := range eps.Subsets {
+-		for _, ep := range subset.Addresses {
+-			if _, ok := ready[ep.IP]; !ok {
+-				// Only set true if nothing else has expressed an
+-				// opinion. This means that false will take precedence
+-				// if there's any unready ports for a given endpoint.
+-				ready[ep.IP] = true
+-			}
+-		}
+-		for _, ep := range subset.NotReadyAddresses {
+-			ready[ep.IP] = false
++	for _, ep := range eps.Ready {
++		if _, ok := ready[ep.IP]; !ok {
++			// Only set true if nothing else has expressed an
++			// opinion. This means that false will take precedence
++			// if there's any unready ports for a given endpoint.
++			ready[ep.IP] = true
+ 		}
+ 	}
++	for _, ep := range eps.NotReady {
++		ready[ep.IP] = false
++	}
+ 
+ 	for _, r := range ready {
+ 		if r {
+@@ -137,7 +133,7 @@ func healthyEndpointExists(eps *v1.Endpoints) bool {
+ 	return false
+ }
+ 
+-func (c *BGPController) ShouldAnnounce(l log.Logger, name string, policyType string, eps *v1.Endpoints) string {
++func (c *BGPController) ShouldAnnounce(l log.Logger, name string, policyType string, eps *Endpoints) string {
+ 	// Should we advertise?
+ 	// Yes, if externalTrafficPolicy is
+ 	//  Cluster && any healthy endpoint exists
+diff --git a/pkg/speaker/layer2_controller.go b/pkg/speaker/layer2_controller.go
+index 86e13b96..037ee641 100644
+--- a/pkg/speaker/layer2_controller.go
++++ b/pkg/speaker/layer2_controller.go
+@@ -41,21 +41,19 @@ func (c *Layer2Controller) SetConfig(log.Logger, *config.Config) error {
+ // The speakers parameter is a map with the node name as key and the readiness
+ // status as value (true means ready, false means not ready).
+ // If the speakers map is nil, it is ignored.
+-func usableNodes(eps *v1.Endpoints, speakers map[string]bool) []string {
++func usableNodes(eps *Endpoints, speakers map[string]bool) []string {
+ 	usable := map[string]bool{}
+-	for _, subset := range eps.Subsets {
+-		for _, ep := range subset.Addresses {
+-			if ep.NodeName == nil {
++	for _, ep := range eps.Ready {
++		if ep.NodeName == nil {
++			continue
++		}
++		if speakers != nil {
++			if ready, ok := speakers[*ep.NodeName]; !ok || !ready {
+ 				continue
+ 			}
+-			if speakers != nil {
+-				if ready, ok := speakers[*ep.NodeName]; !ok || !ready {
+-					continue
+-				}
+-			}
+-			if _, ok := usable[*ep.NodeName]; !ok {
+-				usable[*ep.NodeName] = true
+-			}
++		}
++		if _, ok := usable[*ep.NodeName]; !ok {
++			usable[*ep.NodeName] = true
+ 		}
+ 	}
+ 
+@@ -69,7 +67,7 @@ func usableNodes(eps *v1.Endpoints, speakers map[string]bool) []string {
+ 	return ret
+ }
+ 
+-func (c *Layer2Controller) ShouldAnnounce(l log.Logger, name string, _ string, eps *v1.Endpoints) string {
++func (c *Layer2Controller) ShouldAnnounce(l log.Logger, name string, _ string, eps *Endpoints) string {
+ 	nodes := usableNodes(eps, c.SList.UsableSpeakers())
+ 	// Sort the slice by the hash of node + service name. This
+ 	// produces an ordering of ready nodes that is unique to this
+diff --git a/pkg/speaker/layer2_controller_test.go b/pkg/speaker/layer2_controller_test.go
+index 8d31227c..9ab982c6 100644
+--- a/pkg/speaker/layer2_controller_test.go
++++ b/pkg/speaker/layer2_controller_test.go
+@@ -170,7 +170,7 @@ func TestShouldAnnounce(t *testing.T) {
+ 		balancer string
+ 		config   *config.Config
+ 		svcs     []*Service
+-		eps      map[string]*v1.Endpoints
++		eps      map[string]*Endpoints
+ 
+ 		c1ExpectedResult map[string]string
+ 		c2ExpectedResult map[string]string
+@@ -193,20 +193,16 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Ingress:       statusAssigned("10.20.30.1"),
+ 				},
+ 			},
+-			eps: map[string]*v1.Endpoints{
+-				"10.20.30.1": {
+-					Subsets: []v1.EndpointSubset{
+-						{
+-							Addresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.5",
+-									NodeName: strptr("iris1"),
+-								},
+-								{
+-									IP:       "2.3.4.15",
+-									NodeName: strptr("iris1"),
+-								},
+-							},
++			eps: map[string]*Endpoints{
++				"10.20.30.1": *Endpoints{
++					Ready: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.5",
++							NodeName: strptr("iris1"),
++						},
++						Endpoint{
++							IP:       "2.3.4.15",
++							NodeName: strptr("iris1"),
+ 						},
+ 					},
+ 				},
+@@ -239,20 +235,16 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Status: statusAssigned("10.20.30.1"),
+ 				},
+ 			},
+-			eps: map[string]*v1.Endpoints{
+-				"10.20.30.1": {
+-					Subsets: []v1.EndpointSubset{
+-						{
+-							NotReadyAddresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.5",
+-									NodeName: strptr("iris1"),
+-								},
+-								{
+-									IP:       "2.3.4.15",
+-									NodeName: strptr("iris1"),
+-								},
+-							},
++			eps: map[string]*Endpoints{
++				"10.20.30.1": *Endpoints{
++					NotReady: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.5",
++							NodeName: strptr("iris1"),
++						},
++						Endpoint{
++							IP:       "2.3.4.15",
++							NodeName: strptr("iris1"),
+ 						},
+ 					},
+ 				},
+@@ -284,20 +276,16 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Status: statusAssigned("10.20.30.1"),
+ 				},
+ 			},
+-			eps: map[string]*v1.Endpoints{
+-				"10.20.30.1": {
+-					Subsets: []v1.EndpointSubset{
+-						{
+-							Addresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.5",
+-									NodeName: strptr("iris1"),
+-								},
+-								{
+-									IP:       "2.3.4.15",
+-									NodeName: strptr("iris2"),
+-								},
+-							},
++			eps: map[string]*Endpoints{
++				"10.20.30.1": *Endpoints{
++					Ready: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.5",
++							NodeName: strptr("iris1"),
++						},
++						Endpoint{
++							IP:       "2.3.4.15",
++							NodeName: strptr("iris2"),
+ 						},
+ 					},
+ 				},
+@@ -330,20 +318,16 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Status: statusAssigned("10.20.30.1"),
+ 				},
+ 			},
+-			eps: map[string]*v1.Endpoints{
+-				"10.20.30.1": {
+-					Subsets: []v1.EndpointSubset{
+-						{
+-							NotReadyAddresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.5",
+-									NodeName: strptr("iris1"),
+-								},
+-								{
+-									IP:       "2.3.4.15",
+-									NodeName: strptr("iris2"),
+-								},
+-							},
++			eps: map[string]*Endpoints{
++				"10.20.30.1": *Endpoints{
++					NotReady: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.5",
++							NodeName: strptr("iris1"),
++						},
++						Endpoint{
++							IP:       "2.3.4.15",
++							NodeName: strptr("iris2"),
+ 						},
+ 					},
+ 				},
+@@ -376,22 +360,18 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Status: statusAssigned("10.20.30.1"),
+ 				},
+ 			},
+-			eps: map[string]*v1.Endpoints{
+-				"10.20.30.1": {
+-					Subsets: []v1.EndpointSubset{
+-						{
+-							Addresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.5",
+-									NodeName: strptr("iris1"),
+-								},
+-							},
+-							NotReadyAddresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.15",
+-									NodeName: strptr("iris2"),
+-								},
+-							},
++			eps: map[string]*Endpoints{
++				"10.20.30.1": *Endpoints{
++					Ready: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.5",
++							NodeName: strptr("iris1"),
++						},
++					},
++					NotReady: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.15",
++							NodeName: strptr("iris2"),
+ 						},
+ 					},
+ 				},
+@@ -431,36 +411,28 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Status: statusAssigned("10.20.30.2"),
+ 				},
+ 			},
+-			eps: map[string]*v1.Endpoints{
++			eps: map[string]*Endpoints{
+ 				"10.20.30.1": {
+-					Subsets: []v1.EndpointSubset{
+-						{
+-							Addresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.5",
+-									NodeName: strptr("iris1"),
+-								},
+-								{
+-									IP:       "2.3.4.15",
+-									NodeName: strptr("iris2"),
+-								},
+-							},
++					Ready: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.5",
++							NodeName: strptr("iris1"),
++						},
++						Endpoint{
++							IP:       "2.3.4.15",
++							NodeName: strptr("iris2"),
+ 						},
+ 					},
+ 				},
+ 				"10.20.30.2": {
+-					Subsets: []v1.EndpointSubset{
+-						{
+-							Addresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.25",
+-									NodeName: strptr("iris1"),
+-								},
+-								{
+-									IP:       "2.3.4.35",
+-									NodeName: strptr("iris2"),
+-								},
+-							},
++					NotReady: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.25",
++							NodeName: strptr("iris1"),
++						},
++						Endpoint{
++							IP:       "2.3.4.35",
++							NodeName: strptr("iris2"),
+ 						},
+ 					},
+ 				},
+@@ -502,38 +474,30 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Status: statusAssigned("10.20.30.2"),
+ 				},
+ 			},
+-			eps: map[string]*v1.Endpoints{
++			eps: map[string]*Endpoints{
+ 				"10.20.30.1": {
+-					Subsets: []v1.EndpointSubset{
+-						{
+-							Addresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.5",
+-									NodeName: strptr("iris1"),
+-								},
+-								{
+-									IP:       "2.3.4.15",
+-									NodeName: strptr("iris2"),
+-								},
+-							},
++					Ready: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.5",
++							NodeName: strptr("iris1"),
++						},
++						Endpoint{
++							IP:       "2.3.4.15",
++							NodeName: strptr("iris2"),
+ 						},
+ 					},
+ 				},
+ 				"10.20.30.2": {
+-					Subsets: []v1.EndpointSubset{
+-						{
+-							Addresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.25",
+-									NodeName: strptr("iris1"),
+-								},
+-							},
+-							NotReadyAddresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.35",
+-									NodeName: strptr("iris2"),
+-								},
+-							},
++					Ready: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.25",
++							NodeName: strptr("iris1"),
++						},
++					},
++					NotReady: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.35",
++							NodeName: strptr("iris2"),
+ 						},
+ 					},
+ 				},
+@@ -575,40 +539,32 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Status: statusAssigned("10.20.30.2"),
+ 				},
+ 			},
+-			eps: map[string]*v1.Endpoints{
++			eps: map[string]*Endpoints{
+ 				"10.20.30.1": {
+-					Subsets: []v1.EndpointSubset{
+-						{
+-							Addresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.5",
+-									NodeName: strptr("iris2"),
+-								},
+-							},
+-							NotReadyAddresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.15",
+-									NodeName: strptr("iris1"),
+-								},
+-							},
++					Ready: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.5",
++							NodeName: strptr("iris2"),
++						},
++					},
++					NotReady: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.15",
++							NodeName: strptr("iris1"),
+ 						},
+ 					},
+ 				},
+ 				"10.20.30.2": {
+-					Subsets: []v1.EndpointSubset{
+-						{
+-							Addresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.25",
+-									NodeName: strptr("iris1"),
+-								},
+-							},
+-							NotReadyAddresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.35",
+-									NodeName: strptr("iris2"),
+-								},
+-							},
++					Ready: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.25",
++							NodeName: strptr("iris1"),
++						},
++					},
++					NotReady: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.35",
++							NodeName: strptr("iris2"),
+ 						},
+ 					},
+ 				},
+@@ -643,24 +599,20 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Status: statusAssigned("10.20.30.1"),
+ 				},
+ 			},
+-			eps: map[string]*v1.Endpoints{
++			eps: map[string]*Endpoints{
+ 				"10.20.30.1": {
+-					Subsets: []v1.EndpointSubset{
+-						{
+-							Addresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.5",
+-									NodeName: strptr("iris1"),
+-								},
+-								{
+-									IP:       "2.3.4.15",
+-									NodeName: strptr("iris2"),
+-								},
+-								{
+-									IP:       "2.3.4.25",
+-									NodeName: strptr("iris2"),
+-								},
+-							},
++					Ready: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.5",
++							NodeName: strptr("iris1"),
++						},
++						Endpoint{
++							IP:       "2.3.4.15",
++							NodeName: strptr("iris2"),
++						},
++						Endpoint{
++							IP:       "2.3.4.25",
++							NodeName: strptr("iris2"),
+ 						},
+ 					},
+ 				},
+@@ -693,24 +645,20 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Status: statusAssigned("10.20.30.1"),
+ 				},
+ 			},
+-			eps: map[string]*v1.Endpoints{
++			eps: map[string]*Endpoints{
+ 				"10.20.30.1": {
+-					Subsets: []v1.EndpointSubset{
+-						{
+-							Addresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.5",
+-									NodeName: strptr("iris1"),
+-								},
+-								{
+-									IP:       "2.3.4.15",
+-									NodeName: strptr("iris2"),
+-								},
+-								{
+-									IP:       "2.3.4.25",
+-									NodeName: strptr("iris1"),
+-								},
+-							},
++					Ready: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.5",
++							NodeName: strptr("iris1"),
++						},
++						Endpoint{
++							IP:       "2.3.4.15",
++							NodeName: strptr("iris2"),
++						},
++						Endpoint{
++							IP:       "2.3.4.25",
++							NodeName: strptr("iris1"),
+ 						},
+ 					},
+ 				},
+@@ -743,26 +691,22 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Status: statusAssigned("10.20.30.1"),
+ 				},
+ 			},
+-			eps: map[string]*v1.Endpoints{
++			eps: map[string]*Endpoints{
+ 				"10.20.30.1": {
+-					Subsets: []v1.EndpointSubset{
+-						{
+-							Addresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.5",
+-									NodeName: strptr("iris1"),
+-								},
+-								{
+-									IP:       "2.3.4.15",
+-									NodeName: strptr("iris2"),
+-								},
+-							},
+-							NotReadyAddresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.25",
+-									NodeName: strptr("iris2"),
+-								},
+-							},
++					Ready: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.5",
++							NodeName: strptr("iris1"),
++						},
++						Endpoint{
++							IP:       "2.3.4.15",
++							NodeName: strptr("iris2"),
++						},
++					},
++					NotReady: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.25",
++							NodeName: strptr("iris2"),
+ 						},
+ 					},
+ 				},
+@@ -795,26 +739,22 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Status: statusAssigned("10.20.30.1"),
+ 				},
+ 			},
+-			eps: map[string]*v1.Endpoints{
++			eps: map[string]*Endpoints{
+ 				"10.20.30.1": {
+-					Subsets: []v1.EndpointSubset{
+-						{
+-							Addresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.5",
+-									NodeName: strptr("iris1"),
+-								},
+-								{
+-									IP:       "2.3.4.15",
+-									NodeName: strptr("iris2"),
+-								},
+-							},
+-							NotReadyAddresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.25",
+-									NodeName: strptr("iris1"),
+-								},
+-							},
++					Ready: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.5",
++							NodeName: strptr("iris1"),
++						},
++						Endpoint{
++							IP:       "2.3.4.15",
++							NodeName: strptr("iris2"),
++						},
++					},
++					NotReady: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.25",
++							NodeName: strptr("iris1"),
+ 						},
+ 					},
+ 				},
+@@ -847,26 +787,22 @@ func TestShouldAnnounce(t *testing.T) {
+ 					Status: statusAssigned("10.20.30.1"),
+ 				},
+ 			},
+-			eps: map[string]*v1.Endpoints{
++			eps: map[string]*Endpoints{
+ 				"10.20.30.1": {
+-					Subsets: []v1.EndpointSubset{
+-						{
+-							Addresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.5",
+-									NodeName: strptr("iris1"),
+-								},
+-							},
+-							NotReadyAddresses: []v1.EndpointAddress{
+-								{
+-									IP:       "2.3.4.15",
+-									NodeName: strptr("iris2"),
+-								},
+-								{
+-									IP:       "2.3.4.25",
+-									NodeName: strptr("iris2"),
+-								},
+-							},
++					Ready: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.5",
++							NodeName: strptr("iris1"),
++						},
++					},
++					NotReady: []Endpoint{
++						Endpoint{
++							IP:       "2.3.4.15",
++							NodeName: strptr("iris2"),
++						},
++						Endpoint{
++							IP:       "2.3.4.25",
++							NodeName: strptr("iris2"),
+ 						},
+ 					},
+ 				},
+diff --git a/pkg/speaker/speaker.go b/pkg/speaker/speaker.go
+index 5c06ab15..a34acdd6 100644
+--- a/pkg/speaker/speaker.go
++++ b/pkg/speaker/speaker.go
+@@ -79,14 +79,14 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
+ 		Type:          string(svc.Spec.Type),
+ 		TrafficPolicy: string(svc.Spec.ExternalTrafficPolicy),
+ 		Ingress:       svc.Status.LoadBalancer.Ingress,
+-	}, eps)
++	}, toEndpoints(eps))
+ 	if s == types.SyncStateSuccess {
+ 		c.Client.Infof(svc, "nodeAssigned", "announcing from node %q", c.myNode)
+ 	}
+ 	return s
+ }
+ 
+-func (c *Controller) SetService(l gokitlog.Logger, name string, svc *Service, eps *v1.Endpoints) types.SyncState {
++func (c *Controller) SetService(l gokitlog.Logger, name string, svc *Service, eps *Endpoints) types.SyncState {
+ 	if svc == nil {
+ 		return c.deleteBalancer(l, name, "serviceDeleted")
+ 	}
+@@ -246,10 +246,43 @@ func (c *Controller) SetNode(l gokitlog.Logger, node *v1.Node) types.SyncState {
+ 	return types.SyncStateSuccess
+ }
+ 
++// Endpoints represents an object containing the minimal representation of a
++// v1.Endpoints similar to Service.
++type Endpoints struct {
++	Ready, NotReady []Endpoint
++}
++
++func toEndpoints(in *v1.Endpoints) *Endpoints {
++	if in == nil {
++		return nil
++	}
++	out := new(Endpoints)
++	for _, sub := range in.Subsets {
++		for _, ep := range sub.Addresses {
++			out.Ready = append(out.Ready, Endpoint{
++				IP:       ep.IP,
++				NodeName: ep.NodeName,
++			})
++		}
++		for _, ep := range sub.NotReadyAddresses {
++			out.NotReady = append(out.NotReady, Endpoint{
++				IP:       ep.IP,
++				NodeName: ep.NodeName,
++			})
++		}
++	}
++	return out
++}
++
++type Endpoint struct {
++	IP       string
++	NodeName *string
++}
++
+ // A Protocol can advertise an IP address.
+ type Protocol interface {
+ 	SetConfig(gokitlog.Logger, *config.Config) error
+-	ShouldAnnounce(gokitlog.Logger, string, string, *v1.Endpoints) string
++	ShouldAnnounce(gokitlog.Logger, string, string, *Endpoints) string
+ 	SetBalancer(gokitlog.Logger, string, net.IP, *config.Pool) error
+ 	DeleteBalancer(gokitlog.Logger, string, string) error
+ 	SetNode(gokitlog.Logger, *v1.Node) error
+-- 
+2.31.1
+

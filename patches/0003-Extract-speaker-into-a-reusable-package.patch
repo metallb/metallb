@@ -1,0 +1,860 @@
+From b832cfe60dd80341091a7b9ea6cebfc460de81c7 Mon Sep 17 00:00:00 2001
+From: Chris Tarazi <chris@isovalent.com>
+Date: Thu, 4 Mar 2021 15:30:50 -0800
+Subject: [PATCH 03/10] Extract speaker into a reusable package
+
+Signed-off-by: Chris Tarazi <chris@isovalent.com>
+---
+ .../speaker}/bgp_controller.go                |  42 +--
+ .../speaker}/bgp_controller_test.go           |   4 +-
+ .../speaker}/layer2_controller.go             |  34 +--
+ .../speaker}/layer2_controller_test.go        |   2 +-
+ internal/speaker/speaker.go                   | 266 ++++++++++++++++++
+ speaker/main.go                               | 262 +----------------
+ 6 files changed, 310 insertions(+), 300 deletions(-)
+ rename {speaker => internal/speaker}/bgp_controller.go (88%)
+ rename {speaker => internal/speaker}/bgp_controller_test.go (99%)
+ rename {speaker => internal/speaker}/layer2_controller.go (76%)
+ rename {speaker => internal/speaker}/layer2_controller_test.go (99%)
+ create mode 100644 internal/speaker/speaker.go
+
+diff --git a/speaker/bgp_controller.go b/internal/speaker/bgp_controller.go
+similarity index 88%
+rename from speaker/bgp_controller.go
+rename to internal/speaker/bgp_controller.go
+index 67deb88f..f09d1e2b 100644
+--- a/speaker/bgp_controller.go
++++ b/internal/speaker/bgp_controller.go
+@@ -12,7 +12,7 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ 
+-package main
++package speaker
+ 
+ import (
+ 	"fmt"
+@@ -25,7 +25,7 @@ import (
+ 
+ 	"go.universe.tf/metallb/internal/bgp"
+ 	"go.universe.tf/metallb/internal/config"
+-	"k8s.io/api/core/v1"
++	v1 "k8s.io/api/core/v1"
+ 	"k8s.io/apimachinery/pkg/labels"
+ 
+ 	"github.com/go-kit/kit/log"
+@@ -36,15 +36,15 @@ type peer struct {
+ 	bgp session
+ }
+ 
+-type bgpController struct {
+-	logger     log.Logger
+-	myNode     string
++type BGPController struct {
++	Logger     log.Logger
++	MyNode     string
+ 	nodeLabels labels.Set
+ 	peers      []*peer
+-	svcAds     map[string][]*bgp.Advertisement
++	SvcAds     map[string][]*bgp.Advertisement
+ }
+ 
+-func (c *bgpController) SetConfig(l log.Logger, cfg *config.Config) error {
++func (c *BGPController) SetConfig(l log.Logger, cfg *config.Config) error {
+ 	newPeers := make([]*peer, 0, len(cfg.Peers))
+ newPeers:
+ 	for _, p := range cfg.Peers {
+@@ -136,13 +136,13 @@ func healthyEndpointExists(eps *v1.Endpoints) bool {
+ 	return false
+ }
+ 
+-func (c *bgpController) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
++func (c *BGPController) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
+ 	// Should we advertise?
+ 	// Yes, if externalTrafficPolicy is
+ 	//  Cluster && any healthy endpoint exists
+ 	// or
+ 	//  Local && there's a ready local endpoint.
+-	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !nodeHasHealthyEndpoint(eps, c.myNode) {
++	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !nodeHasHealthyEndpoint(eps, c.MyNode) {
+ 		return "noLocalEndpoints"
+ 	} else if !healthyEndpointExists(eps) {
+ 		return "noEndpoints"
+@@ -152,7 +152,7 @@ func (c *bgpController) ShouldAnnounce(l log.Logger, name string, svc *v1.Servic
+ 
+ // Called when either the peer list or node labels have changed,
+ // implying that the set of running BGP sessions may need tweaking.
+-func (c *bgpController) syncPeers(l log.Logger) error {
++func (c *BGPController) syncPeers(l log.Logger) error {
+ 	var (
+ 		errs          int
+ 		needUpdateAds bool
+@@ -184,7 +184,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
+ 			if p.cfg.RouterID != nil {
+ 				routerID = p.cfg.RouterID
+ 			}
+-			s, err := newBGP(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.Password, c.myNode)
++			s, err := newBGP(c.Logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.Password, c.MyNode)
+ 			if err != nil {
+ 				l.Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
+ 				errs++
+@@ -207,8 +207,8 @@ func (c *bgpController) syncPeers(l log.Logger) error {
+ 	return nil
+ }
+ 
+-func (c *bgpController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
+-	c.svcAds[name] = nil
++func (c *BGPController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
++	c.SvcAds[name] = nil
+ 	for _, adCfg := range pool.BGPAdvertisements {
+ 		m := net.CIDRMask(adCfg.AggregationLength, 32)
+ 		ad := &bgp.Advertisement{
+@@ -222,21 +222,21 @@ func (c *bgpController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool
+ 			ad.Communities = append(ad.Communities, comm)
+ 		}
+ 		sort.Slice(ad.Communities, func(i, j int) bool { return ad.Communities[i] < ad.Communities[j] })
+-		c.svcAds[name] = append(c.svcAds[name], ad)
++		c.SvcAds[name] = append(c.SvcAds[name], ad)
+ 	}
+ 
+ 	if err := c.updateAds(); err != nil {
+ 		return err
+ 	}
+ 
+-	l.Log("event", "updatedAdvertisements", "numAds", len(c.svcAds[name]), "msg", "making advertisements using BGP")
++	l.Log("event", "updatedAdvertisements", "numAds", len(c.SvcAds[name]), "msg", "making advertisements using BGP")
+ 
+ 	return nil
+ }
+ 
+-func (c *bgpController) updateAds() error {
++func (c *BGPController) updateAds() error {
+ 	var allAds []*bgp.Advertisement
+-	for _, ads := range c.svcAds {
++	for _, ads := range c.SvcAds {
+ 		// This list might contain duplicates, but that's fine,
+ 		// they'll get compacted by the session code when it's
+ 		// calculating advertisements.
+@@ -256,11 +256,11 @@ func (c *bgpController) updateAds() error {
+ 	return nil
+ }
+ 
+-func (c *bgpController) DeleteBalancer(l log.Logger, name, reason string) error {
+-	if _, ok := c.svcAds[name]; !ok {
++func (c *BGPController) DeleteBalancer(l log.Logger, name, reason string) error {
++	if _, ok := c.SvcAds[name]; !ok {
+ 		return nil
+ 	}
+-	delete(c.svcAds, name)
++	delete(c.SvcAds, name)
+ 	return c.updateAds()
+ }
+ 
+@@ -269,7 +269,7 @@ type session interface {
+ 	Set(advs ...*bgp.Advertisement) error
+ }
+ 
+-func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
++func (c *BGPController) SetNode(l log.Logger, node *v1.Node) error {
+ 	nodeLabels := node.Labels
+ 	if nodeLabels == nil {
+ 		nodeLabels = map[string]string{}
+diff --git a/speaker/bgp_controller_test.go b/internal/speaker/bgp_controller_test.go
+similarity index 99%
+rename from speaker/bgp_controller_test.go
+rename to internal/speaker/bgp_controller_test.go
+index 05d20fd5..3ca6a5e5 100644
+--- a/speaker/bgp_controller_test.go
++++ b/internal/speaker/bgp_controller_test.go
+@@ -1,4 +1,4 @@
+-package main
++package speaker
+ 
+ import (
+ 	"errors"
+@@ -15,7 +15,7 @@ import (
+ 
+ 	"github.com/go-kit/kit/log"
+ 	"github.com/google/go-cmp/cmp"
+-	"k8s.io/api/core/v1"
++	v1 "k8s.io/api/core/v1"
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	"k8s.io/apimachinery/pkg/labels"
+ )
+diff --git a/speaker/layer2_controller.go b/internal/speaker/layer2_controller.go
+similarity index 76%
+rename from speaker/layer2_controller.go
+rename to internal/speaker/layer2_controller.go
+index 83e3e101..ab0a2fd6 100644
+--- a/speaker/layer2_controller.go
++++ b/internal/speaker/layer2_controller.go
+@@ -12,7 +12,7 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ 
+-package main
++package speaker
+ 
+ import (
+ 	"bytes"
+@@ -23,16 +23,16 @@ import (
+ 	"github.com/go-kit/kit/log"
+ 	"go.universe.tf/metallb/internal/config"
+ 	"go.universe.tf/metallb/internal/layer2"
+-	"k8s.io/api/core/v1"
++	v1 "k8s.io/api/core/v1"
+ )
+ 
+-type layer2Controller struct {
+-	announcer *layer2.Announce
+-	myNode    string
+-	sList     SpeakerList
++type Layer2Controller struct {
++	Announcer *layer2.Announce
++	MyNode    string
++	SList     SpeakerList
+ }
+ 
+-func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
++func (c *Layer2Controller) SetConfig(log.Logger, *config.Config) error {
+ 	return nil
+ }
+ 
+@@ -69,8 +69,8 @@ func usableNodes(eps *v1.Endpoints, speakers map[string]bool) []string {
+ 	return ret
+ }
+ 
+-func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
+-	nodes := usableNodes(eps, c.sList.UsableSpeakers())
++func (c *Layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
++	nodes := usableNodes(eps, c.SList.UsableSpeakers())
+ 	// Sort the slice by the hash of node + service name. This
+ 	// produces an ordering of ready nodes that is unique to this
+ 	// service.
+@@ -82,7 +82,7 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Ser
+ 	})
+ 
+ 	// Are we first in the list? If so, we win and should announce.
+-	if len(nodes) > 0 && nodes[0] == c.myNode {
++	if len(nodes) > 0 && nodes[0] == c.MyNode {
+ 		return ""
+ 	}
+ 
+@@ -90,20 +90,20 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Ser
+ 	return "notOwner"
+ }
+ 
+-func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
+-	c.announcer.SetBalancer(name, lbIP)
++func (c *Layer2Controller) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
++	c.Announcer.SetBalancer(name, lbIP)
+ 	return nil
+ }
+ 
+-func (c *layer2Controller) DeleteBalancer(l log.Logger, name, reason string) error {
+-	if !c.announcer.AnnounceName(name) {
++func (c *Layer2Controller) DeleteBalancer(l log.Logger, name, reason string) error {
++	if !c.Announcer.AnnounceName(name) {
+ 		return nil
+ 	}
+-	c.announcer.DeleteBalancer(name)
++	c.Announcer.DeleteBalancer(name)
+ 	return nil
+ }
+ 
+-func (c *layer2Controller) SetNode(log.Logger, *v1.Node) error {
+-	c.sList.Rejoin()
++func (c *Layer2Controller) SetNode(log.Logger, *v1.Node) error {
++	c.SList.Rejoin()
+ 	return nil
+ }
+diff --git a/speaker/layer2_controller_test.go b/internal/speaker/layer2_controller_test.go
+similarity index 99%
+rename from speaker/layer2_controller_test.go
+rename to internal/speaker/layer2_controller_test.go
+index 48e3acf5..d94dfcdf 100644
+--- a/speaker/layer2_controller_test.go
++++ b/internal/speaker/layer2_controller_test.go
+@@ -1,4 +1,4 @@
+-package main
++package speaker
+ 
+ import (
+ 	"net"
+diff --git a/internal/speaker/speaker.go b/internal/speaker/speaker.go
+new file mode 100644
+index 00000000..97fd0735
+--- /dev/null
++++ b/internal/speaker/speaker.go
+@@ -0,0 +1,266 @@
++package speaker
++
++import (
++	"fmt"
++	"net"
++
++	"go.universe.tf/metallb/internal/bgp"
++	"go.universe.tf/metallb/internal/config"
++	"go.universe.tf/metallb/internal/k8s"
++	"go.universe.tf/metallb/internal/layer2"
++
++	gokitlog "github.com/go-kit/kit/log"
++	"github.com/prometheus/client_golang/prometheus"
++	v1 "k8s.io/api/core/v1"
++)
++
++func NewController(cfg ControllerConfig) (*Controller, error) {
++	protocols := map[config.Proto]Protocol{
++		config.BGP: &BGPController{
++			Logger: cfg.Logger,
++			MyNode: cfg.MyNode,
++			SvcAds: make(map[string][]*bgp.Advertisement),
++		},
++	}
++
++	if !cfg.DisableLayer2 {
++		a, err := layer2.New(cfg.Logger)
++		if err != nil {
++			return nil, fmt.Errorf("making layer2 announcer: %s", err)
++		}
++		protocols[config.Layer2] = &Layer2Controller{
++			Announcer: a,
++			MyNode:    cfg.MyNode,
++			SList:     cfg.SList,
++		}
++	}
++
++	ret := &Controller{
++		myNode:    cfg.MyNode,
++		protocols: protocols,
++		announced: map[string]config.Proto{},
++		svcIP:     map[string]net.IP{},
++	}
++
++	return ret, nil
++}
++
++type Controller struct {
++	myNode string
++
++	config *config.Config
++	Client service
++
++	protocols map[config.Proto]Protocol
++	announced map[string]config.Proto // service name -> protocol advertising it
++	svcIP     map[string]net.IP       // service name -> assigned IP
++}
++
++type ControllerConfig struct {
++	MyNode string
++	Logger gokitlog.Logger
++	SList  SpeakerList
++
++	// For testing only, and will be removed in a future release.
++	// See: https://github.com/metallb/metallb/issues/152.
++	DisableLayer2 bool
++}
++
++func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps *v1.Endpoints) k8s.SyncState {
++	if svc == nil {
++		return c.deleteBalancer(l, name, "serviceDeleted")
++	}
++
++	if svc.Spec.Type != "LoadBalancer" {
++		return c.deleteBalancer(l, name, "notLoadBalancer")
++	}
++
++	l.Log("event", "startUpdate", "msg", "start of service update")
++	defer l.Log("event", "endUpdate", "msg", "end of service update")
++
++	if c.config == nil {
++		l.Log("event", "noConfig", "msg", "not processing, still waiting for config")
++		return k8s.SyncStateSuccess
++	}
++
++	if len(svc.Status.LoadBalancer.Ingress) != 1 {
++		return c.deleteBalancer(l, name, "noIPAllocated")
++	}
++
++	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
++	if lbIP == nil {
++		l.Log("op", "setBalancer", "error", fmt.Sprintf("invalid LoadBalancer IP %q", svc.Status.LoadBalancer.Ingress[0].IP), "msg", "invalid IP allocated by controller")
++		return c.deleteBalancer(l, name, "invalidIP")
++	}
++
++	l = gokitlog.With(l, "ip", lbIP)
++
++	poolName := poolFor(c.config.Pools, lbIP)
++	if poolName == "" {
++		l.Log("op", "setBalancer", "error", "assigned IP not allowed by config", "msg", "IP allocated by controller not allowed by config")
++		return c.deleteBalancer(l, name, "ipNotAllowed")
++	}
++
++	l = gokitlog.With(l, "pool", poolName)
++	pool := c.config.Pools[poolName]
++	if pool == nil {
++		l.Log("bug", "true", "msg", "internal error: allocated IP has no matching address pool")
++		return c.deleteBalancer(l, name, "internalError")
++	}
++
++	if proto, ok := c.announced[name]; ok && proto != pool.Protocol {
++		if st := c.deleteBalancer(l, name, "protocolChanged"); st == k8s.SyncStateError {
++			return st
++		}
++	}
++
++	if svcIP, ok := c.svcIP[name]; ok && !lbIP.Equal(svcIP) {
++		if st := c.deleteBalancer(l, name, "loadBalancerIPChanged"); st == k8s.SyncStateError {
++			return st
++		}
++	}
++
++	l = gokitlog.With(l, "protocol", pool.Protocol)
++	handler := c.protocols[pool.Protocol]
++	if handler == nil {
++		l.Log("bug", "true", "msg", "internal error: unknown balancer protocol!")
++		return c.deleteBalancer(l, name, "internalError")
++	}
++
++	if deleteReason := handler.ShouldAnnounce(l, name, svc, eps); deleteReason != "" {
++		return c.deleteBalancer(l, name, deleteReason)
++	}
++
++	if err := handler.SetBalancer(l, name, lbIP, pool); err != nil {
++		l.Log("op", "setBalancer", "error", err, "msg", "failed to announce service")
++		return k8s.SyncStateError
++	}
++
++	if c.announced[name] == "" {
++		c.announced[name] = pool.Protocol
++		c.svcIP[name] = lbIP
++	}
++
++	announcing.With(prometheus.Labels{
++		"protocol": string(pool.Protocol),
++		"service":  name,
++		"node":     c.myNode,
++		"ip":       lbIP.String(),
++	}).Set(1)
++	l.Log("event", "serviceAnnounced", "msg", "service has IP, announcing")
++	c.Client.Infof(svc, "nodeAssigned", "announcing from node %q", c.myNode)
++
++	return k8s.SyncStateSuccess
++}
++
++func (c *Controller) deleteBalancer(l gokitlog.Logger, name, reason string) k8s.SyncState {
++	proto, ok := c.announced[name]
++	if !ok {
++		return k8s.SyncStateSuccess
++	}
++
++	if err := c.protocols[proto].DeleteBalancer(l, name, reason); err != nil {
++		l.Log("op", "deleteBalancer", "error", err, "msg", "failed to clear balancer state")
++		return k8s.SyncStateError
++	}
++
++	announcing.Delete(prometheus.Labels{
++		"protocol": string(proto),
++		"service":  name,
++		"node":     c.myNode,
++		"ip":       c.svcIP[name].String(),
++	})
++	delete(c.announced, name)
++	delete(c.svcIP, name)
++
++	l.Log("event", "serviceWithdrawn", "ip", c.svcIP[name], "reason", reason, "msg", "withdrawing service announcement")
++
++	return k8s.SyncStateSuccess
++}
++
++func poolFor(pools map[string]*config.Pool, ip net.IP) string {
++	for pname, p := range pools {
++		for _, cidr := range p.CIDR {
++			if cidr.Contains(ip) {
++				return pname
++			}
++		}
++	}
++	return ""
++}
++
++func (c *Controller) SetConfig(l gokitlog.Logger, cfg *config.Config) k8s.SyncState {
++	l.Log("event", "startUpdate", "msg", "start of config update")
++	defer l.Log("event", "endUpdate", "msg", "end of config update")
++
++	if cfg == nil {
++		l.Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
++		return k8s.SyncStateError
++	}
++
++	for svc, ip := range c.svcIP {
++		if pool := poolFor(cfg.Pools, ip); pool == "" {
++			l.Log("op", "setConfig", "service", svc, "ip", ip, "error", "service has no configuration under new config", "msg", "new configuration rejected")
++			return k8s.SyncStateError
++		}
++	}
++
++	for proto, handler := range c.protocols {
++		if err := handler.SetConfig(l, cfg); err != nil {
++			l.Log("op", "setConfig", "protocol", proto, "error", err, "msg", "applying new configuration to protocol handler failed")
++			return k8s.SyncStateError
++		}
++	}
++
++	c.config = cfg
++
++	return k8s.SyncStateReprocessAll
++}
++
++func (c *Controller) SetNode(l gokitlog.Logger, node *v1.Node) k8s.SyncState {
++	for proto, handler := range c.protocols {
++		if err := handler.SetNode(l, node); err != nil {
++			l.Log("op", "setNode", "error", err, "protocol", proto, "msg", "failed to propagate node info to protocol handler")
++			return k8s.SyncStateError
++		}
++	}
++	return k8s.SyncStateSuccess
++}
++
++// A Protocol can advertise an IP address.
++type Protocol interface {
++	SetConfig(gokitlog.Logger, *config.Config) error
++	ShouldAnnounce(gokitlog.Logger, string, *v1.Service, *v1.Endpoints) string
++	SetBalancer(gokitlog.Logger, string, net.IP, *config.Pool) error
++	DeleteBalancer(gokitlog.Logger, string, string) error
++	SetNode(gokitlog.Logger, *v1.Node) error
++}
++
++// Speakerlist represents a list of healthy speakers.
++type SpeakerList interface {
++	UsableSpeakers() map[string]bool
++	Rejoin()
++}
++
++// Service offers methods to mutate a Kubernetes service object.
++type service interface {
++	UpdateStatus(svc *v1.Service) error
++	Infof(svc *v1.Service, desc, msg string, args ...interface{})
++	Errorf(svc *v1.Service, desc, msg string, args ...interface{})
++}
++
++var announcing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
++	Namespace: "metallb",
++	Subsystem: "speaker",
++	Name:      "announced",
++	Help:      "Services being announced from this node. This is desired state, it does not guarantee that the routing protocols have converged.",
++}, []string{
++	"service",
++	"protocol",
++	"node",
++	"ip",
++})
++
++func init() {
++	prometheus.MustRegister(announcing)
++}
+diff --git a/speaker/main.go b/speaker/main.go
+index 8f343d73..f92a44d6 100644
+--- a/speaker/main.go
++++ b/speaker/main.go
+@@ -17,46 +17,18 @@ package main
+ import (
+ 	"flag"
+ 	"fmt"
+-	"net"
+ 	"os"
+ 	"os/signal"
+ 	"syscall"
+ 
+-	"go.universe.tf/metallb/internal/bgp"
+-	"go.universe.tf/metallb/internal/config"
+ 	"go.universe.tf/metallb/internal/k8s"
+-	"go.universe.tf/metallb/internal/layer2"
+ 	"go.universe.tf/metallb/internal/logging"
++	"go.universe.tf/metallb/internal/speaker"
+ 	"go.universe.tf/metallb/internal/speakerlist"
+ 	"go.universe.tf/metallb/internal/version"
+-	v1 "k8s.io/api/core/v1"
+-
+-	gokitlog "github.com/go-kit/kit/log"
+-	"github.com/prometheus/client_golang/prometheus"
+ )
+ 
+-var announcing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+-	Namespace: "metallb",
+-	Subsystem: "speaker",
+-	Name:      "announced",
+-	Help:      "Services being announced from this node. This is desired state, it does not guarantee that the routing protocols have converged.",
+-}, []string{
+-	"service",
+-	"protocol",
+-	"node",
+-	"ip",
+-})
+-
+-// Service offers methods to mutate a Kubernetes service object.
+-type service interface {
+-	UpdateStatus(svc *v1.Service) error
+-	Infof(svc *v1.Service, desc, msg string, args ...interface{})
+-	Errorf(svc *v1.Service, desc, msg string, args ...interface{})
+-}
+-
+ func main() {
+-	prometheus.MustRegister(announcing)
+-
+ 	logger, err := logging.Init()
+ 	if err != nil {
+ 		fmt.Printf("failed to initialize logging: %s\n", err)
+@@ -102,7 +74,7 @@ func main() {
+ 	}
+ 
+ 	// Setup all clients and speakers, config decides what is being done runtime.
+-	ctrl, err := newController(controllerConfig{
++	ctrl, err := speaker.NewController(speaker.ControllerConfig{
+ 		MyNode: *myNode,
+ 		Logger: logger,
+ 		SList:  sList,
+@@ -132,7 +104,7 @@ func main() {
+ 		logger.Log("op", "startup", "error", err, "msg", "failed to create k8s client")
+ 		os.Exit(1)
+ 	}
+-	ctrl.client = client
++	ctrl.Client = client
+ 
+ 	sList.Start(client)
+ 	defer sList.Stop()
+@@ -141,231 +113,3 @@ func main() {
+ 		logger.Log("op", "startup", "error", err, "msg", "failed to run k8s client")
+ 	}
+ }
+-
+-type controller struct {
+-	myNode string
+-
+-	config *config.Config
+-	client service
+-
+-	protocols map[config.Proto]Protocol
+-	announced map[string]config.Proto // service name -> protocol advertising it
+-	svcIP     map[string]net.IP       // service name -> assigned IP
+-}
+-
+-type controllerConfig struct {
+-	MyNode string
+-	Logger gokitlog.Logger
+-	SList  SpeakerList
+-
+-	// For testing only, and will be removed in a future release.
+-	// See: https://github.com/metallb/metallb/issues/152.
+-	DisableLayer2 bool
+-}
+-
+-func newController(cfg controllerConfig) (*controller, error) {
+-	protocols := map[config.Proto]Protocol{
+-		config.BGP: &bgpController{
+-			logger: cfg.Logger,
+-			myNode: cfg.MyNode,
+-			svcAds: make(map[string][]*bgp.Advertisement),
+-		},
+-	}
+-
+-	if !cfg.DisableLayer2 {
+-		a, err := layer2.New(cfg.Logger)
+-		if err != nil {
+-			return nil, fmt.Errorf("making layer2 announcer: %s", err)
+-		}
+-		protocols[config.Layer2] = &layer2Controller{
+-			announcer: a,
+-			myNode:    cfg.MyNode,
+-			sList:     cfg.SList,
+-		}
+-	}
+-
+-	ret := &controller{
+-		myNode:    cfg.MyNode,
+-		protocols: protocols,
+-		announced: map[string]config.Proto{},
+-		svcIP:     map[string]net.IP{},
+-	}
+-
+-	return ret, nil
+-}
+-
+-func (c *controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps *v1.Endpoints) k8s.SyncState {
+-	if svc == nil {
+-		return c.deleteBalancer(l, name, "serviceDeleted")
+-	}
+-
+-	if svc.Spec.Type != "LoadBalancer" {
+-		return c.deleteBalancer(l, name, "notLoadBalancer")
+-	}
+-
+-	l.Log("event", "startUpdate", "msg", "start of service update")
+-	defer l.Log("event", "endUpdate", "msg", "end of service update")
+-
+-	if c.config == nil {
+-		l.Log("event", "noConfig", "msg", "not processing, still waiting for config")
+-		return k8s.SyncStateSuccess
+-	}
+-
+-	if len(svc.Status.LoadBalancer.Ingress) != 1 {
+-		return c.deleteBalancer(l, name, "noIPAllocated")
+-	}
+-
+-	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
+-	if lbIP == nil {
+-		l.Log("op", "setBalancer", "error", fmt.Sprintf("invalid LoadBalancer IP %q", svc.Status.LoadBalancer.Ingress[0].IP), "msg", "invalid IP allocated by controller")
+-		return c.deleteBalancer(l, name, "invalidIP")
+-	}
+-
+-	l = gokitlog.With(l, "ip", lbIP)
+-
+-	poolName := poolFor(c.config.Pools, lbIP)
+-	if poolName == "" {
+-		l.Log("op", "setBalancer", "error", "assigned IP not allowed by config", "msg", "IP allocated by controller not allowed by config")
+-		return c.deleteBalancer(l, name, "ipNotAllowed")
+-	}
+-
+-	l = gokitlog.With(l, "pool", poolName)
+-	pool := c.config.Pools[poolName]
+-	if pool == nil {
+-		l.Log("bug", "true", "msg", "internal error: allocated IP has no matching address pool")
+-		return c.deleteBalancer(l, name, "internalError")
+-	}
+-
+-	if proto, ok := c.announced[name]; ok && proto != pool.Protocol {
+-		if st := c.deleteBalancer(l, name, "protocolChanged"); st == k8s.SyncStateError {
+-			return st
+-		}
+-	}
+-
+-	if svcIP, ok := c.svcIP[name]; ok && !lbIP.Equal(svcIP) {
+-		if st := c.deleteBalancer(l, name, "loadBalancerIPChanged"); st == k8s.SyncStateError {
+-			return st
+-		}
+-	}
+-
+-	l = gokitlog.With(l, "protocol", pool.Protocol)
+-	handler := c.protocols[pool.Protocol]
+-	if handler == nil {
+-		l.Log("bug", "true", "msg", "internal error: unknown balancer protocol!")
+-		return c.deleteBalancer(l, name, "internalError")
+-	}
+-
+-	if deleteReason := handler.ShouldAnnounce(l, name, svc, eps); deleteReason != "" {
+-		return c.deleteBalancer(l, name, deleteReason)
+-	}
+-
+-	if err := handler.SetBalancer(l, name, lbIP, pool); err != nil {
+-		l.Log("op", "setBalancer", "error", err, "msg", "failed to announce service")
+-		return k8s.SyncStateError
+-	}
+-
+-	if c.announced[name] == "" {
+-		c.announced[name] = pool.Protocol
+-		c.svcIP[name] = lbIP
+-	}
+-
+-	announcing.With(prometheus.Labels{
+-		"protocol": string(pool.Protocol),
+-		"service":  name,
+-		"node":     c.myNode,
+-		"ip":       lbIP.String(),
+-	}).Set(1)
+-	l.Log("event", "serviceAnnounced", "msg", "service has IP, announcing")
+-	c.client.Infof(svc, "nodeAssigned", "announcing from node %q", c.myNode)
+-
+-	return k8s.SyncStateSuccess
+-}
+-
+-func (c *controller) deleteBalancer(l gokitlog.Logger, name, reason string) k8s.SyncState {
+-	proto, ok := c.announced[name]
+-	if !ok {
+-		return k8s.SyncStateSuccess
+-	}
+-
+-	if err := c.protocols[proto].DeleteBalancer(l, name, reason); err != nil {
+-		l.Log("op", "deleteBalancer", "error", err, "msg", "failed to clear balancer state")
+-		return k8s.SyncStateError
+-	}
+-
+-	announcing.Delete(prometheus.Labels{
+-		"protocol": string(proto),
+-		"service":  name,
+-		"node":     c.myNode,
+-		"ip":       c.svcIP[name].String(),
+-	})
+-	delete(c.announced, name)
+-	delete(c.svcIP, name)
+-
+-	l.Log("event", "serviceWithdrawn", "ip", c.svcIP[name], "reason", reason, "msg", "withdrawing service announcement")
+-
+-	return k8s.SyncStateSuccess
+-}
+-
+-func poolFor(pools map[string]*config.Pool, ip net.IP) string {
+-	for pname, p := range pools {
+-		for _, cidr := range p.CIDR {
+-			if cidr.Contains(ip) {
+-				return pname
+-			}
+-		}
+-	}
+-	return ""
+-}
+-
+-func (c *controller) SetConfig(l gokitlog.Logger, cfg *config.Config) k8s.SyncState {
+-	l.Log("event", "startUpdate", "msg", "start of config update")
+-	defer l.Log("event", "endUpdate", "msg", "end of config update")
+-
+-	if cfg == nil {
+-		l.Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
+-		return k8s.SyncStateError
+-	}
+-
+-	for svc, ip := range c.svcIP {
+-		if pool := poolFor(cfg.Pools, ip); pool == "" {
+-			l.Log("op", "setConfig", "service", svc, "ip", ip, "error", "service has no configuration under new config", "msg", "new configuration rejected")
+-			return k8s.SyncStateError
+-		}
+-	}
+-
+-	for proto, handler := range c.protocols {
+-		if err := handler.SetConfig(l, cfg); err != nil {
+-			l.Log("op", "setConfig", "protocol", proto, "error", err, "msg", "applying new configuration to protocol handler failed")
+-			return k8s.SyncStateError
+-		}
+-	}
+-
+-	c.config = cfg
+-
+-	return k8s.SyncStateReprocessAll
+-}
+-
+-func (c *controller) SetNode(l gokitlog.Logger, node *v1.Node) k8s.SyncState {
+-	for proto, handler := range c.protocols {
+-		if err := handler.SetNode(l, node); err != nil {
+-			l.Log("op", "setNode", "error", err, "protocol", proto, "msg", "failed to propagate node info to protocol handler")
+-			return k8s.SyncStateError
+-		}
+-	}
+-	return k8s.SyncStateSuccess
+-}
+-
+-// A Protocol can advertise an IP address.
+-type Protocol interface {
+-	SetConfig(gokitlog.Logger, *config.Config) error
+-	ShouldAnnounce(gokitlog.Logger, string, *v1.Service, *v1.Endpoints) string
+-	SetBalancer(gokitlog.Logger, string, net.IP, *config.Pool) error
+-	DeleteBalancer(gokitlog.Logger, string, string) error
+-	SetNode(gokitlog.Logger, *v1.Node) error
+-}
+-
+-// Speakerlist represents a list of healthy speakers.
+-type SpeakerList interface {
+-	UsableSpeakers() map[string]bool
+-	Rejoin()
+-}
+-- 
+2.31.1
+

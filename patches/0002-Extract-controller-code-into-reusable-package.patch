@@ -1,0 +1,424 @@
+From a2831b13c7ac31516230a276e6f882f20ef539d1 Mon Sep 17 00:00:00 2001
+From: Chris Tarazi <chris@isovalent.com>
+Date: Tue, 2 Mar 2021 19:15:49 -0800
+Subject: [PATCH 02/10] Extract controller code into reusable package
+
+Signed-off-by: Chris Tarazi <chris@isovalent.com>
+---
+ controller/main.go                            |  99 +--------------
+ internal/controller/controller.go             | 114 ++++++++++++++++++
+ .../controller}/controller_test.go            |  18 ++-
+ .../controller}/service.go                    |  30 ++---
+ 4 files changed, 149 insertions(+), 112 deletions(-)
+ create mode 100644 internal/controller/controller.go
+ rename {controller => internal/controller}/controller_test.go (96%)
+ rename {controller => internal/controller}/service.go (87%)
+
+diff --git a/controller/main.go b/controller/main.go
+index 865c6d47..da15ef18 100644
+--- a/controller/main.go
++++ b/controller/main.go
+@@ -18,105 +18,14 @@ import (
+ 	"flag"
+ 	"fmt"
+ 	"os"
+-	"reflect"
+ 
+ 	"go.universe.tf/metallb/internal/allocator"
+-	"go.universe.tf/metallb/internal/config"
++	"go.universe.tf/metallb/internal/controller"
+ 	"go.universe.tf/metallb/internal/k8s"
+ 	"go.universe.tf/metallb/internal/logging"
+ 	"go.universe.tf/metallb/internal/version"
+-
+-	"github.com/go-kit/kit/log"
+-	"k8s.io/api/core/v1"
+ )
+ 
+-// Service offers methods to mutate a Kubernetes service object.
+-type service interface {
+-	UpdateStatus(svc *v1.Service) error
+-	Infof(svc *v1.Service, desc, msg string, args ...interface{})
+-	Errorf(svc *v1.Service, desc, msg string, args ...interface{})
+-}
+-
+-type controller struct {
+-	client service
+-	synced bool
+-	config *config.Config
+-	ips    *allocator.Allocator
+-}
+-
+-func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ *v1.Endpoints) k8s.SyncState {
+-	l.Log("event", "startUpdate", "msg", "start of service update")
+-	defer l.Log("event", "endUpdate", "msg", "end of service update")
+-
+-	if svcRo == nil {
+-		c.deleteBalancer(l, name)
+-		// There might be other LBs stuck waiting for an IP, so when
+-		// we delete a balancer we should reprocess all of them to
+-		// check for newly feasible balancers.
+-		return k8s.SyncStateReprocessAll
+-	}
+-
+-	if c.config == nil {
+-		// Config hasn't been read, nothing we can do just yet.
+-		l.Log("event", "noConfig", "msg", "not processing, still waiting for config")
+-		return k8s.SyncStateSuccess
+-	}
+-
+-	// Making a copy unconditionally is a bit wasteful, since we don't
+-	// always need to update the service. But, making an unconditional
+-	// copy makes the code much easier to follow, and we have a GC for
+-	// a reason.
+-	svc := svcRo.DeepCopy()
+-	if !c.convergeBalancer(l, name, svc) {
+-		return k8s.SyncStateError
+-	}
+-	if reflect.DeepEqual(svcRo, svc) {
+-		l.Log("event", "noChange", "msg", "service converged, no change")
+-		return k8s.SyncStateSuccess
+-	}
+-
+-	if !reflect.DeepEqual(svcRo.Status, svc.Status) {
+-		var st v1.ServiceStatus
+-		st, svc = svc.Status, svcRo.DeepCopy()
+-		svc.Status = st
+-		if err := c.client.UpdateStatus(svc); err != nil {
+-			l.Log("op", "updateServiceStatus", "error", err, "msg", "failed to update service status")
+-			return k8s.SyncStateError
+-		}
+-	}
+-	l.Log("event", "serviceUpdated", "msg", "updated service object")
+-
+-	return k8s.SyncStateSuccess
+-}
+-
+-func (c *controller) deleteBalancer(l log.Logger, name string) {
+-	if c.ips.Unassign(name) {
+-		l.Log("event", "serviceDeleted", "msg", "service deleted")
+-	}
+-}
+-
+-func (c *controller) SetConfig(l log.Logger, cfg *config.Config) k8s.SyncState {
+-	l.Log("event", "startUpdate", "msg", "start of config update")
+-	defer l.Log("event", "endUpdate", "msg", "end of config update")
+-
+-	if cfg == nil {
+-		l.Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
+-		return k8s.SyncStateError
+-	}
+-
+-	if err := c.ips.SetPools(cfg.Pools); err != nil {
+-		l.Log("op", "setConfig", "error", err, "msg", "applying new configuration failed")
+-		return k8s.SyncStateError
+-	}
+-	c.config = cfg
+-	return k8s.SyncStateReprocessAll
+-}
+-
+-func (c *controller) MarkSynced(l log.Logger) {
+-	c.synced = true
+-	l.Log("event", "stateSynced", "msg", "controller synced, can allocate IPs now")
+-}
+-
+ func main() {
+ 	logger, err := logging.Init()
+ 	if err != nil {
+@@ -134,8 +43,8 @@ func main() {
+ 
+ 	logger.Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "msg", "MetalLB controller starting "+version.String())
+ 
+-	c := &controller{
+-		ips: allocator.New(),
++	c := &controller.Controller{
++		IPs: allocator.New(),
+ 	}
+ 
+ 	client, err := k8s.New(&k8s.Config{
+@@ -155,7 +64,7 @@ func main() {
+ 		os.Exit(1)
+ 	}
+ 
+-	c.client = client
++	c.Client = client
+ 	if err := client.Run(nil); err != nil {
+ 		logger.Log("op", "startup", "error", err, "msg", "failed to run k8s client")
+ 	}
+diff --git a/internal/controller/controller.go b/internal/controller/controller.go
+new file mode 100644
+index 00000000..efecb812
+--- /dev/null
++++ b/internal/controller/controller.go
+@@ -0,0 +1,114 @@
++// Copyright 2017 Google Inc.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++package controller
++
++import (
++	"reflect"
++
++	"go.universe.tf/metallb/internal/allocator"
++	"go.universe.tf/metallb/internal/config"
++	"go.universe.tf/metallb/internal/k8s"
++
++	"github.com/go-kit/kit/log"
++	v1 "k8s.io/api/core/v1"
++)
++
++type Controller struct {
++	Client service
++	IPs    *allocator.Allocator
++
++	synced bool
++	config *config.Config
++}
++
++func (c *Controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ *v1.Endpoints) k8s.SyncState {
++	l.Log("event", "startUpdate", "msg", "start of service update")
++	defer l.Log("event", "endUpdate", "msg", "end of service update")
++
++	if svcRo == nil {
++		c.deleteBalancer(l, name)
++		// There might be other LBs stuck waiting for an IP, so when
++		// we delete a balancer we should reprocess all of them to
++		// check for newly feasible balancers.
++		return k8s.SyncStateReprocessAll
++	}
++
++	if c.config == nil {
++		// Config hasn't been read, nothing we can do just yet.
++		l.Log("event", "noConfig", "msg", "not processing, still waiting for config")
++		return k8s.SyncStateSuccess
++	}
++
++	// Making a copy unconditionally is a bit wasteful, since we don't
++	// always need to update the service. But, making an unconditional
++	// copy makes the code much easier to follow, and we have a GC for
++	// a reason.
++	svc := svcRo.DeepCopy()
++	if !c.convergeBalancer(l, name, svc) {
++		return k8s.SyncStateError
++	}
++	if reflect.DeepEqual(svcRo, svc) {
++		l.Log("event", "noChange", "msg", "service converged, no change")
++		return k8s.SyncStateSuccess
++	}
++
++	if !reflect.DeepEqual(svcRo.Status, svc.Status) {
++		var st v1.ServiceStatus
++		st, svc = svc.Status, svcRo.DeepCopy()
++		svc.Status = st
++		if err := c.Client.UpdateStatus(svc); err != nil {
++			l.Log("op", "updateServiceStatus", "error", err, "msg", "failed to update service status")
++			return k8s.SyncStateError
++		}
++	}
++	l.Log("event", "serviceUpdated", "msg", "updated service object")
++
++	return k8s.SyncStateSuccess
++}
++
++func (c *Controller) deleteBalancer(l log.Logger, name string) {
++	if c.IPs.Unassign(name) {
++		l.Log("event", "serviceDeleted", "msg", "service deleted")
++	}
++}
++
++func (c *Controller) SetConfig(l log.Logger, cfg *config.Config) k8s.SyncState {
++	l.Log("event", "startUpdate", "msg", "start of config update")
++	defer l.Log("event", "endUpdate", "msg", "end of config update")
++
++	if cfg == nil {
++		l.Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
++		return k8s.SyncStateError
++	}
++
++	if err := c.IPs.SetPools(cfg.Pools); err != nil {
++		l.Log("op", "setConfig", "error", err, "msg", "applying new configuration failed")
++		return k8s.SyncStateError
++	}
++	c.config = cfg
++	return k8s.SyncStateReprocessAll
++}
++
++func (c *Controller) MarkSynced(l log.Logger) {
++	c.synced = true
++	l.Log("event", "stateSynced", "msg", "controller synced, can allocate IPs now")
++}
++
++// Service offers methods to mutate a Kubernetes service object.
++type service interface {
++	UpdateStatus(svc *v1.Service) error
++	Infof(svc *v1.Service, desc, msg string, args ...interface{})
++	Errorf(svc *v1.Service, desc, msg string, args ...interface{})
++}
+diff --git a/controller/controller_test.go b/internal/controller/controller_test.go
+similarity index 96%
+rename from controller/controller_test.go
+rename to internal/controller/controller_test.go
+index c699f9f4..0ce10621 100644
+--- a/controller/controller_test.go
++++ b/internal/controller/controller_test.go
+@@ -1,4 +1,18 @@
+-package main
++// Copyright 2017 Google Inc.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++package controller
+ 
+ import (
+ 	"fmt"
+@@ -12,7 +26,7 @@ import (
+ 
+ 	"github.com/go-kit/kit/log"
+ 	"github.com/google/go-cmp/cmp"
+-	"k8s.io/api/core/v1"
++	v1 "k8s.io/api/core/v1"
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+ )
+ 
+diff --git a/controller/service.go b/internal/controller/service.go
+similarity index 87%
+rename from controller/service.go
+rename to internal/controller/service.go
+index a24c9515..8998a932 100644
+--- a/controller/service.go
++++ b/internal/controller/service.go
+@@ -12,7 +12,7 @@
+ // See the License for the specific language governing permissions and
+ // limitations under the License.
+ 
+-package main
++package controller
+ 
+ import (
+ 	"fmt"
+@@ -24,7 +24,7 @@ import (
+ 	"go.universe.tf/metallb/internal/allocator/k8salloc"
+ )
+ 
+-func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service) bool {
++func (c *Controller) convergeBalancer(l log.Logger, key string, svc *v1.Service) bool {
+ 	var lbIP net.IP
+ 
+ 	// Not a LoadBalancer, early exit. It might have been a balancer
+@@ -69,7 +69,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
+ 	if lbIP != nil {
+ 		// This assign is idempotent if the config is consistent,
+ 		// otherwise it'll fail and tell us why.
+-		if err := c.ips.Assign(key, lbIP, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
++		if err := c.IPs.Assign(key, lbIP, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
+ 			l.Log("event", "clearAssignment", "reason", "notAllowedByConfig", "msg", "current IP not allowed by config, clearing")
+ 			c.clearServiceState(key, svc)
+ 			lbIP = nil
+@@ -79,7 +79,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
+ 		// requested a different pool than the one that is currently
+ 		// allocated.
+ 		desiredPool := svc.Annotations["metallb.universe.tf/address-pool"]
+-		if lbIP != nil && desiredPool != "" && c.ips.Pool(key) != desiredPool {
++		if lbIP != nil && desiredPool != "" && c.IPs.Pool(key) != desiredPool {
+ 			l.Log("event", "clearAssignment", "reason", "differentPoolRequested", "msg", "user requested a different pool than the one currently assigned")
+ 			c.clearServiceState(key, svc)
+ 			lbIP = nil
+@@ -104,7 +104,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
+ 		ip, err := c.allocateIP(key, svc)
+ 		if err != nil {
+ 			l.Log("op", "allocateIP", "error", err, "msg", "IP allocation failed")
+-			c.client.Errorf(svc, "AllocationFailed", "Failed to allocate IP for %q: %s", key, err)
++			c.Client.Errorf(svc, "AllocationFailed", "Failed to allocate IP for %q: %s", key, err)
+ 			// The outer controller loop will retry converging this
+ 			// service when another service gets deleted, so there's
+ 			// nothing to do here but wait to get called again later.
+@@ -112,20 +112,20 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
+ 		}
+ 		lbIP = ip
+ 		l.Log("event", "ipAllocated", "ip", lbIP, "msg", "IP address assigned by controller")
+-		c.client.Infof(svc, "IPAllocated", "Assigned IP %q", lbIP)
++		c.Client.Infof(svc, "IPAllocated", "Assigned IP %q", lbIP)
+ 	}
+ 
+ 	if lbIP == nil {
+ 		l.Log("bug", "true", "msg", "internal error: failed to allocate an IP, but did not exit convergeService early!")
+-		c.client.Errorf(svc, "InternalError", "didn't allocate an IP but also did not fail")
++		c.Client.Errorf(svc, "InternalError", "didn't allocate an IP but also did not fail")
+ 		c.clearServiceState(key, svc)
+ 		return true
+ 	}
+ 
+-	pool := c.ips.Pool(key)
++	pool := c.IPs.Pool(key)
+ 	if pool == "" || c.config.Pools[pool] == nil {
+ 		l.Log("bug", "true", "ip", lbIP, "msg", "internal error: allocated IP has no matching address pool")
+-		c.client.Errorf(svc, "InternalError", "allocated an IP that has no pool")
++		c.Client.Errorf(svc, "InternalError", "allocated an IP that has no pool")
+ 		c.clearServiceState(key, svc)
+ 		return true
+ 	}
+@@ -138,12 +138,12 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
+ 
+ // clearServiceState clears all fields that are actively managed by
+ // this controller.
+-func (c *controller) clearServiceState(key string, svc *v1.Service) {
+-	c.ips.Unassign(key)
++func (c *Controller) clearServiceState(key string, svc *v1.Service) {
++	c.IPs.Unassign(key)
+ 	svc.Status.LoadBalancer = v1.LoadBalancerStatus{}
+ }
+ 
+-func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
++func (c *Controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
+ 	clusterIP := net.ParseIP(svc.Spec.ClusterIP)
+ 	if clusterIP == nil {
+ 		// (we should never get here because the caller ensured that Spec.ClusterIP != nil)
+@@ -160,7 +160,7 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
+ 		if (ip.To4() == nil) != isIPv6 {
+ 			return nil, fmt.Errorf("requested spec.loadBalancerIP %q does not match the ipFamily of the service", svc.Spec.LoadBalancerIP)
+ 		}
+-		if err := c.ips.Assign(key, ip, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
++		if err := c.IPs.Assign(key, ip, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
+ 			return nil, err
+ 		}
+ 		return ip, nil
+@@ -169,7 +169,7 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
+ 	// Otherwise, did the user ask for a specific pool?
+ 	desiredPool := svc.Annotations["metallb.universe.tf/address-pool"]
+ 	if desiredPool != "" {
+-		ip, err := c.ips.AllocateFromPool(key, isIPv6, desiredPool, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
++		ip, err := c.IPs.AllocateFromPool(key, isIPv6, desiredPool, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
+ 		if err != nil {
+ 			return nil, err
+ 		}
+@@ -177,5 +177,5 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
+ 	}
+ 
+ 	// Okay, in that case just bruteforce across all pools.
+-	return c.ips.Allocate(key, isIPv6, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
++	return c.IPs.Allocate(key, isIPv6, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
+ }
+-- 
+2.31.1
+

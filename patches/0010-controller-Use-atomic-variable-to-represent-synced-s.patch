@@ -1,0 +1,76 @@
+From 40d425d20241cb4aa511d195dc6a410fc77c2dde Mon Sep 17 00:00:00 2001
+From: Chris Tarazi <chris@isovalent.com>
+Date: Mon, 17 May 2021 11:53:35 -0700
+Subject: [PATCH 10/10] controller: Use atomic variable to represent synced
+ state
+
+When code calls into the controller package from different goroutines,
+it is possible to have a data race on `synced` between
+(*Controller).MarkSynced() and (*Controller).convergeBalancer().
+
+This commit fixes this by converting `synced` into an atomic variable.
+We don't need to introduce a mutex because `synced` is the only variable
+that is accessed concurrently.
+
+Related: https://github.com/cilium/cilium/issues/16181
+
+Signed-off-by: Chris Tarazi <chris@isovalent.com>
+---
+ pkg/controller/controller.go | 5 +++--
+ pkg/controller/service.go    | 3 ++-
+ 2 files changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/pkg/controller/controller.go b/pkg/controller/controller.go
+index 4796d5a8..6fca933c 100644
+--- a/pkg/controller/controller.go
++++ b/pkg/controller/controller.go
+@@ -16,6 +16,7 @@ package controller
+ 
+ import (
+ 	"reflect"
++	"sync/atomic"
+ 
+ 	"go.universe.tf/metallb/pkg/allocator"
+ 	"go.universe.tf/metallb/pkg/config"
+@@ -29,7 +30,7 @@ type Controller struct {
+ 	Client service
+ 	IPs    *allocator.Allocator
+ 
+-	synced bool
++	synced uint32
+ 	config *config.Config
+ }
+ 
+@@ -102,7 +103,7 @@ func (c *Controller) SetConfig(l log.Logger, cfg *config.Config) types.SyncState
+ }
+ 
+ func (c *Controller) MarkSynced(l log.Logger) {
+-	c.synced = true
++	atomic.StoreUint32(&c.synced, 1)
+ 	l.Log("event", "stateSynced", "msg", "controller synced, can allocate IPs now")
+ }
+ 
+diff --git a/pkg/controller/service.go b/pkg/controller/service.go
+index 459411d2..7639774b 100644
+--- a/pkg/controller/service.go
++++ b/pkg/controller/service.go
+@@ -17,6 +17,7 @@ package controller
+ import (
+ 	"fmt"
+ 	"net"
++	"sync/atomic"
+ 
+ 	"github.com/go-kit/kit/log"
+ 	v1 "k8s.io/api/core/v1"
+@@ -97,7 +98,7 @@ func (c *Controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
+ 
+ 	// If lbIP is still nil at this point, try to allocate.
+ 	if lbIP == nil {
+-		if !c.synced {
++		if atomic.LoadUint32(&c.synced) == 0 {
+ 			l.Log("op", "allocateIP", "error", "controller not synced", "msg", "controller not synced yet, cannot allocate IP; will retry after sync")
+ 			return false
+ 		}
+-- 
+2.31.1
+

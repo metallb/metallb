@@ -1,0 +1,81 @@
+From 85fe65b8b0017c4af27d34d7eb857f9b0b8d46e1 Mon Sep 17 00:00:00 2001
+From: Chris Tarazi <chris@isovalent.com>
+Date: Mon, 8 Mar 2021 18:39:54 -0800
+Subject: [PATCH 06/10] speaker: Refactor ShouldAnnounce()
+
+This commit modifies the Protocol interface to allow ShouldAnnounce() to
+take in a string as the v1.ExternalTrafficPolicy parameter, instead of
+the full v1.Service object.
+
+The motivation is to remove the dependency on the v1 types package from
+the consumer of the interface. Instead, use the most fundamental data
+type possible, in order to allow for more generic higher-level
+functions. This is useful for upcoming commits where an alternative to
+SetBalancer() will be introduced to move away from having to use
+v1.Service type completely.
+
+Signed-off-by: Chris Tarazi <chris@isovalent.com>
+---
+ pkg/speaker/bgp_controller.go    | 4 ++--
+ pkg/speaker/layer2_controller.go | 2 +-
+ pkg/speaker/speaker.go           | 4 ++--
+ 3 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/pkg/speaker/bgp_controller.go b/pkg/speaker/bgp_controller.go
+index dc789991..11f94fa7 100644
+--- a/pkg/speaker/bgp_controller.go
++++ b/pkg/speaker/bgp_controller.go
+@@ -137,13 +137,13 @@ func healthyEndpointExists(eps *v1.Endpoints) bool {
+ 	return false
+ }
+ 
+-func (c *BGPController) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
++func (c *BGPController) ShouldAnnounce(l log.Logger, name string, policyType string, eps *v1.Endpoints) string {
+ 	// Should we advertise?
+ 	// Yes, if externalTrafficPolicy is
+ 	//  Cluster && any healthy endpoint exists
+ 	// or
+ 	//  Local && there's a ready local endpoint.
+-	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !nodeHasHealthyEndpoint(eps, c.MyNode) {
++	if v1.ServiceExternalTrafficPolicyType(policyType) == v1.ServiceExternalTrafficPolicyTypeLocal && !nodeHasHealthyEndpoint(eps, c.MyNode) {
+ 		return "noLocalEndpoints"
+ 	} else if !healthyEndpointExists(eps) {
+ 		return "noEndpoints"
+diff --git a/pkg/speaker/layer2_controller.go b/pkg/speaker/layer2_controller.go
+index a69ec512..86e13b96 100644
+--- a/pkg/speaker/layer2_controller.go
++++ b/pkg/speaker/layer2_controller.go
+@@ -69,7 +69,7 @@ func usableNodes(eps *v1.Endpoints, speakers map[string]bool) []string {
+ 	return ret
+ }
+ 
+-func (c *Layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps *v1.Endpoints) string {
++func (c *Layer2Controller) ShouldAnnounce(l log.Logger, name string, _ string, eps *v1.Endpoints) string {
+ 	nodes := usableNodes(eps, c.SList.UsableSpeakers())
+ 	// Sort the slice by the hash of node + service name. This
+ 	// produces an ordering of ready nodes that is unique to this
+diff --git a/pkg/speaker/speaker.go b/pkg/speaker/speaker.go
+index 1e39032c..62f80a26 100644
+--- a/pkg/speaker/speaker.go
++++ b/pkg/speaker/speaker.go
+@@ -127,7 +127,7 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
+ 		return c.deleteBalancer(l, name, "internalError")
+ 	}
+ 
+-	if deleteReason := handler.ShouldAnnounce(l, name, svc, eps); deleteReason != "" {
++	if deleteReason := handler.ShouldAnnounce(l, name, string(svc.Spec.ExternalTrafficPolicy), eps); deleteReason != "" {
+ 		return c.deleteBalancer(l, name, deleteReason)
+ 	}
+ 
+@@ -230,7 +230,7 @@ func (c *Controller) SetNode(l gokitlog.Logger, node *v1.Node) types.SyncState {
+ // A Protocol can advertise an IP address.
+ type Protocol interface {
+ 	SetConfig(gokitlog.Logger, *config.Config) error
+-	ShouldAnnounce(gokitlog.Logger, string, *v1.Service, *v1.Endpoints) string
++	ShouldAnnounce(gokitlog.Logger, string, string, *v1.Endpoints) string
+ 	SetBalancer(gokitlog.Logger, string, net.IP, *config.Pool) error
+ 	DeleteBalancer(gokitlog.Logger, string, string) error
+ 	SetNode(gokitlog.Logger, *v1.Node) error
+-- 
+2.31.1
+

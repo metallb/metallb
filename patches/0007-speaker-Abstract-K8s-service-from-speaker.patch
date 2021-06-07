@@ -1,0 +1,156 @@
+From c9318794f963b4b24db7a18e46dbab53c46b4113 Mon Sep 17 00:00:00 2001
+From: Chris Tarazi <chris@isovalent.com>
+Date: Mon, 8 Mar 2021 17:34:56 -0800
+Subject: [PATCH 07/10] speaker: Abstract K8s service from speaker
+
+This commit defines a new Service struct which contains the minimal
+fields from a v1.Service, along with a new SetService() method. The new
+struct contains only the fields required to make announcements (as the
+speaker). Along with the new type, a new method provides package
+consumers the ability to have the same speaker functionality, without
+being tied to the v1.Service definition as a dependency. This is to not
+break existing code which relies on the existing interface.
+
+The motivation is to facilitate integration with this package. Outside
+consumers may use optimized K8s type definitions (i.e. slim types) in
+their application, which would be a point of friction when importing
+this package. This commit allows them to use the new type and the new
+method without forcing them to use the K8s v1 types.
+
+Signed-off-by: Chris Tarazi <chris@isovalent.com>
+---
+ pkg/speaker/bgp_controller_test.go    | 12 ++++-------
+ pkg/speaker/layer2_controller_test.go | 14 ++++++------
+ pkg/speaker/speaker.go                | 31 +++++++++++++++++++++------
+ 3 files changed, 35 insertions(+), 22 deletions(-)
+
+diff --git a/pkg/speaker/bgp_controller_test.go b/pkg/speaker/bgp_controller_test.go
+index a96255b2..0b3a7248 100644
+--- a/pkg/speaker/bgp_controller_test.go
++++ b/pkg/speaker/bgp_controller_test.go
+@@ -40,14 +40,10 @@ func ipnet(s string) *net.IPNet {
+ 	return n
+ }
+ 
+-func statusAssigned(ip string) v1.ServiceStatus {
+-	return v1.ServiceStatus{
+-		LoadBalancer: v1.LoadBalancerStatus{
+-			Ingress: []v1.LoadBalancerIngress{
+-				{
+-					IP: ip,
+-				},
+-			},
++func statusAssigned(ip string) []v1.LoadBalancerIngress {
++	return []v1.LoadBalancerIngress{
++		v1.LoadBalancerIngress{
++			IP: ip,
+ 		},
+ 	}
+ }
+diff --git a/pkg/speaker/layer2_controller_test.go b/pkg/speaker/layer2_controller_test.go
+index 3d290039..8d31227c 100644
+--- a/pkg/speaker/layer2_controller_test.go
++++ b/pkg/speaker/layer2_controller_test.go
+@@ -169,7 +169,7 @@ func TestShouldAnnounce(t *testing.T) {
+ 
+ 		balancer string
+ 		config   *config.Config
+-		svcs     []*v1.Service
++		svcs     []*Service
+ 		eps      map[string]*v1.Endpoints
+ 
+ 		c1ExpectedResult map[string]string
+@@ -186,13 +186,11 @@ func TestShouldAnnounce(t *testing.T) {
+ 					},
+ 				},
+ 			},
+-			svcs: []*v1.Service{
+-				{
+-					Spec: v1.ServiceSpec{
+-						Type:                  "LoadBalancer",
+-						ExternalTrafficPolicy: "Cluster",
+-					},
+-					Status: statusAssigned("10.20.30.1"),
++			svcs: []*Service{
++				Service{
++					Type:          "LoadBalancer",
++					TrafficPolicy: "Cluster",
++					Ingress:       statusAssigned("10.20.30.1"),
+ 				},
+ 			},
+ 			eps: map[string]*v1.Endpoints{
+diff --git a/pkg/speaker/speaker.go b/pkg/speaker/speaker.go
+index 62f80a26..5c06ab15 100644
+--- a/pkg/speaker/speaker.go
++++ b/pkg/speaker/speaker.go
+@@ -66,12 +66,32 @@ type ControllerConfig struct {
+ 	DisableLayer2 bool
+ }
+ 
++// Service represents an object containing the minimal representation of a
++// v1.Service object needed for announcements.
++type Service struct {
++	Type          string
++	TrafficPolicy string
++	Ingress       []v1.LoadBalancerIngress
++}
++
+ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps *v1.Endpoints) types.SyncState {
++	s := c.SetService(l, name, &Service{
++		Type:          string(svc.Spec.Type),
++		TrafficPolicy: string(svc.Spec.ExternalTrafficPolicy),
++		Ingress:       svc.Status.LoadBalancer.Ingress,
++	}, eps)
++	if s == types.SyncStateSuccess {
++		c.Client.Infof(svc, "nodeAssigned", "announcing from node %q", c.myNode)
++	}
++	return s
++}
++
++func (c *Controller) SetService(l gokitlog.Logger, name string, svc *Service, eps *v1.Endpoints) types.SyncState {
+ 	if svc == nil {
+ 		return c.deleteBalancer(l, name, "serviceDeleted")
+ 	}
+ 
+-	if svc.Spec.Type != "LoadBalancer" {
++	if svc.Type != "LoadBalancer" {
+ 		return c.deleteBalancer(l, name, "notLoadBalancer")
+ 	}
+ 
+@@ -83,13 +103,13 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
+ 		return types.SyncStateSuccess
+ 	}
+ 
+-	if len(svc.Status.LoadBalancer.Ingress) != 1 {
++	if len(svc.Ingress) != 1 {
+ 		return c.deleteBalancer(l, name, "noIPAllocated")
+ 	}
+ 
+-	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
++	lbIP := net.ParseIP(svc.Ingress[0].IP)
+ 	if lbIP == nil {
+-		l.Log("op", "setBalancer", "error", fmt.Sprintf("invalid LoadBalancer IP %q", svc.Status.LoadBalancer.Ingress[0].IP), "msg", "invalid IP allocated by controller")
++		l.Log("op", "setBalancer", "error", fmt.Sprintf("invalid LoadBalancer IP %q", svc.Ingress[0].IP), "msg", "invalid IP allocated by controller")
+ 		return c.deleteBalancer(l, name, "invalidIP")
+ 	}
+ 
+@@ -127,7 +147,7 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
+ 		return c.deleteBalancer(l, name, "internalError")
+ 	}
+ 
+-	if deleteReason := handler.ShouldAnnounce(l, name, string(svc.Spec.ExternalTrafficPolicy), eps); deleteReason != "" {
++	if deleteReason := handler.ShouldAnnounce(l, name, svc.TrafficPolicy, eps); deleteReason != "" {
+ 		return c.deleteBalancer(l, name, deleteReason)
+ 	}
+ 
+@@ -148,7 +168,6 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
+ 		"ip":       lbIP.String(),
+ 	}).Set(1)
+ 	l.Log("event", "serviceAnnounced", "msg", "service has IP, announcing")
+-	c.Client.Infof(svc, "nodeAssigned", "announcing from node %q", c.myNode)
+ 
+ 	return types.SyncStateSuccess
+ }
+-- 
+2.31.1
+

@@ -1,0 +1,89 @@
+From 310946fff4b47c0bea1fec76c708895d4f243f62 Mon Sep 17 00:00:00 2001
+From: Chris Tarazi <chris@isovalent.com>
+Date: Tue, 9 Mar 2021 15:01:43 -0800
+Subject: [PATCH 09/10] speaker: Provide alternative to SetNode()
+
+SetNode() accepts the full v1.Node type even though it's only interested
+in the node labels. For consumers of this package, this commit eases
+integration similar to the previous commits, as this eliminates the
+dependency on using the v1.Node type definition.
+
+Signed-off-by: Chris Tarazi <chris@isovalent.com>
+---
+ pkg/speaker/bgp_controller.go    | 9 ++++-----
+ pkg/speaker/layer2_controller.go | 3 +--
+ pkg/speaker/speaker.go           | 8 ++++++--
+ 3 files changed, 11 insertions(+), 9 deletions(-)
+
+diff --git a/pkg/speaker/bgp_controller.go b/pkg/speaker/bgp_controller.go
+index b16622bb..987eb424 100644
+--- a/pkg/speaker/bgp_controller.go
++++ b/pkg/speaker/bgp_controller.go
+@@ -266,12 +266,11 @@ type session interface {
+ 	Set(advs ...*bgp.Advertisement) error
+ }
+ 
+-func (c *BGPController) SetNode(l log.Logger, node *v1.Node) error {
+-	nodeLabels := node.Labels
+-	if nodeLabels == nil {
+-		nodeLabels = map[string]string{}
++func (c *BGPController) SetNodeLabels(l log.Logger, lbls map[string]string) error {
++	if lbls == nil {
++		lbls = map[string]string{}
+ 	}
+-	ns := labels.Set(nodeLabels)
++	ns := labels.Set(lbls)
+ 	if c.nodeLabels != nil && labels.Equals(c.nodeLabels, ns) {
+ 		// Node labels unchanged, no action required.
+ 		return nil
+diff --git a/pkg/speaker/layer2_controller.go b/pkg/speaker/layer2_controller.go
+index 037ee641..3ab29fde 100644
+--- a/pkg/speaker/layer2_controller.go
++++ b/pkg/speaker/layer2_controller.go
+@@ -23,7 +23,6 @@ import (
+ 	"github.com/go-kit/kit/log"
+ 	"go.universe.tf/metallb/pkg/config"
+ 	"go.universe.tf/metallb/pkg/layer2"
+-	v1 "k8s.io/api/core/v1"
+ )
+ 
+ type Layer2Controller struct {
+@@ -101,7 +100,7 @@ func (c *Layer2Controller) DeleteBalancer(l log.Logger, name, reason string) err
+ 	return nil
+ }
+ 
+-func (c *Layer2Controller) SetNode(log.Logger, *v1.Node) error {
++func (c *Layer2Controller) SetNodeLabels(log.Logger, map[string]string) error {
+ 	c.SList.Rejoin()
+ 	return nil
+ }
+diff --git a/pkg/speaker/speaker.go b/pkg/speaker/speaker.go
+index a34acdd6..13f7dc87 100644
+--- a/pkg/speaker/speaker.go
++++ b/pkg/speaker/speaker.go
+@@ -237,8 +237,12 @@ func (c *Controller) SetConfig(l gokitlog.Logger, cfg *config.Config) types.Sync
+ }
+ 
+ func (c *Controller) SetNode(l gokitlog.Logger, node *v1.Node) types.SyncState {
++	return c.SetNodeLabels(l, node.Labels)
++}
++
++func (c *Controller) SetNodeLabels(l gokitlog.Logger, labels map[string]string) types.SyncState {
+ 	for proto, handler := range c.protocols {
+-		if err := handler.SetNode(l, node); err != nil {
++		if err := handler.SetNodeLabels(l, labels); err != nil {
+ 			l.Log("op", "setNode", "error", err, "protocol", proto, "msg", "failed to propagate node info to protocol handler")
+ 			return types.SyncStateError
+ 		}
+@@ -285,7 +289,7 @@ type Protocol interface {
+ 	ShouldAnnounce(gokitlog.Logger, string, string, *Endpoints) string
+ 	SetBalancer(gokitlog.Logger, string, net.IP, *config.Pool) error
+ 	DeleteBalancer(gokitlog.Logger, string, string) error
+-	SetNode(gokitlog.Logger, *v1.Node) error
++	SetNodeLabels(gokitlog.Logger, map[string]string) error
+ }
+ 
+ // Speakerlist represents a list of healthy speakers.
+-- 
+2.31.1
+

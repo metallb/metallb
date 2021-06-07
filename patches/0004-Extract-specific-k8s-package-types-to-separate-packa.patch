@@ -1,0 +1,428 @@
+From 0257a8e5d51de10450c733abd822caa4f2d6e87b Mon Sep 17 00:00:00 2001
+From: Chris Tarazi <chris@isovalent.com>
+Date: Fri, 12 Mar 2021 17:28:11 -0800
+Subject: [PATCH 04/10] Extract specific k8s package types to separate package
+
+This reduces the need for consumers to import the entire k8s package
+just to use the SyncState* types. Most consumers are most likely
+uninterested in using the K8s client implemented in the k8s package
+because they likely already have a K8s client implementation.
+
+Signed-off-by: Chris Tarazi <chris@isovalent.com>
+---
+ internal/controller/controller.go | 24 +++++++-------
+ internal/k8s/k8s.go               | 55 ++++++++++++-------------------
+ internal/k8s/types/types.go       | 15 +++++++++
+ internal/speaker/speaker.go       | 38 ++++++++++-----------
+ 4 files changed, 67 insertions(+), 65 deletions(-)
+ create mode 100644 internal/k8s/types/types.go
+
+diff --git a/internal/controller/controller.go b/internal/controller/controller.go
+index efecb812..84afcd61 100644
+--- a/internal/controller/controller.go
++++ b/internal/controller/controller.go
+@@ -19,7 +19,7 @@ import (
+ 
+ 	"go.universe.tf/metallb/internal/allocator"
+ 	"go.universe.tf/metallb/internal/config"
+-	"go.universe.tf/metallb/internal/k8s"
++	"go.universe.tf/metallb/internal/k8s/types"
+ 
+ 	"github.com/go-kit/kit/log"
+ 	v1 "k8s.io/api/core/v1"
+@@ -33,7 +33,7 @@ type Controller struct {
+ 	config *config.Config
+ }
+ 
+-func (c *Controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ *v1.Endpoints) k8s.SyncState {
++func (c *Controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ *v1.Endpoints) types.SyncState {
+ 	l.Log("event", "startUpdate", "msg", "start of service update")
+ 	defer l.Log("event", "endUpdate", "msg", "end of service update")
+ 
+@@ -42,13 +42,13 @@ func (c *Controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
+ 		// There might be other LBs stuck waiting for an IP, so when
+ 		// we delete a balancer we should reprocess all of them to
+ 		// check for newly feasible balancers.
+-		return k8s.SyncStateReprocessAll
++		return types.SyncStateReprocessAll
+ 	}
+ 
+ 	if c.config == nil {
+ 		// Config hasn't been read, nothing we can do just yet.
+ 		l.Log("event", "noConfig", "msg", "not processing, still waiting for config")
+-		return k8s.SyncStateSuccess
++		return types.SyncStateSuccess
+ 	}
+ 
+ 	// Making a copy unconditionally is a bit wasteful, since we don't
+@@ -57,11 +57,11 @@ func (c *Controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
+ 	// a reason.
+ 	svc := svcRo.DeepCopy()
+ 	if !c.convergeBalancer(l, name, svc) {
+-		return k8s.SyncStateError
++		return types.SyncStateError
+ 	}
+ 	if reflect.DeepEqual(svcRo, svc) {
+ 		l.Log("event", "noChange", "msg", "service converged, no change")
+-		return k8s.SyncStateSuccess
++		return types.SyncStateSuccess
+ 	}
+ 
+ 	if !reflect.DeepEqual(svcRo.Status, svc.Status) {
+@@ -70,12 +70,12 @@ func (c *Controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
+ 		svc.Status = st
+ 		if err := c.Client.UpdateStatus(svc); err != nil {
+ 			l.Log("op", "updateServiceStatus", "error", err, "msg", "failed to update service status")
+-			return k8s.SyncStateError
++			return types.SyncStateError
+ 		}
+ 	}
+ 	l.Log("event", "serviceUpdated", "msg", "updated service object")
+ 
+-	return k8s.SyncStateSuccess
++	return types.SyncStateSuccess
+ }
+ 
+ func (c *Controller) deleteBalancer(l log.Logger, name string) {
+@@ -84,21 +84,21 @@ func (c *Controller) deleteBalancer(l log.Logger, name string) {
+ 	}
+ }
+ 
+-func (c *Controller) SetConfig(l log.Logger, cfg *config.Config) k8s.SyncState {
++func (c *Controller) SetConfig(l log.Logger, cfg *config.Config) types.SyncState {
+ 	l.Log("event", "startUpdate", "msg", "start of config update")
+ 	defer l.Log("event", "endUpdate", "msg", "end of config update")
+ 
+ 	if cfg == nil {
+ 		l.Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
+-		return k8s.SyncStateError
++		return types.SyncStateError
+ 	}
+ 
+ 	if err := c.IPs.SetPools(cfg.Pools); err != nil {
+ 		l.Log("op", "setConfig", "error", err, "msg", "applying new configuration failed")
+-		return k8s.SyncStateError
++		return types.SyncStateError
+ 	}
+ 	c.config = cfg
+-	return k8s.SyncStateReprocessAll
++	return types.SyncStateReprocessAll
+ }
+ 
+ func (c *Controller) MarkSynced(l log.Logger) {
+diff --git a/internal/k8s/k8s.go b/internal/k8s/k8s.go
+index 67d9a917..6b236ac2 100644
+--- a/internal/k8s/k8s.go
++++ b/internal/k8s/k8s.go
+@@ -8,10 +8,11 @@ import (
+ 	"net/http"
+ 
+ 	"go.universe.tf/metallb/internal/config"
++	"go.universe.tf/metallb/internal/k8s/types"
+ 
+ 	"github.com/go-kit/kit/log"
+ 	"github.com/prometheus/client_golang/prometheus/promhttp"
+-	"k8s.io/api/core/v1"
++	v1 "k8s.io/api/core/v1"
+ 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+ 	"k8s.io/apimachinery/pkg/fields"
+ 	"k8s.io/client-go/kubernetes"
+@@ -44,26 +45,12 @@ type Client struct {
+ 
+ 	syncFuncs []cache.InformerSynced
+ 
+-	serviceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) SyncState
+-	configChanged  func(log.Logger, *config.Config) SyncState
+-	nodeChanged    func(log.Logger, *v1.Node) SyncState
++	serviceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) types.SyncState
++	configChanged  func(log.Logger, *config.Config) types.SyncState
++	nodeChanged    func(log.Logger, *v1.Node) types.SyncState
+ 	synced         func(log.Logger)
+ }
+ 
+-// SyncState is the result of calling synchronization callbacks.
+-type SyncState int
+-
+-const (
+-	// The update was processed successfully.
+-	SyncStateSuccess SyncState = iota
+-	// The update caused a transient error, the k8s client should
+-	// retry later.
+-	SyncStateError
+-	// The update was accepted, but requires reprocessing all watched
+-	// services.
+-	SyncStateReprocessAll
+-)
+-
+ // Config specifies the configuration of the Kubernetes
+ // client/watcher.
+ type Config struct {
+@@ -77,9 +64,9 @@ type Config struct {
+ 	Logger        log.Logger
+ 	Kubeconfig    string
+ 
+-	ServiceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) SyncState
+-	ConfigChanged  func(log.Logger, *config.Config) SyncState
+-	NodeChanged    func(log.Logger, *v1.Node) SyncState
++	ServiceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) types.SyncState
++	ConfigChanged  func(log.Logger, *config.Config) types.SyncState
++	NodeChanged    func(log.Logger, *v1.Node) types.SyncState
+ 	Synced         func(log.Logger)
+ }
+ 
+@@ -310,12 +297,12 @@ func (c *Client) Run(stopCh <-chan struct{}) error {
+ 		updates.Inc()
+ 		st := c.sync(key)
+ 		switch st {
+-		case SyncStateSuccess:
++		case types.SyncStateSuccess:
+ 			c.queue.Forget(key)
+-		case SyncStateError:
++		case types.SyncStateError:
+ 			updateErrors.Inc()
+ 			c.queue.AddRateLimited(key)
+-		case SyncStateReprocessAll:
++		case types.SyncStateReprocessAll:
+ 			c.queue.Forget(key)
+ 			c.ForceSync()
+ 		}
+@@ -348,7 +335,7 @@ func (c *Client) Errorf(svc *v1.Service, kind, msg string, args ...interface{})
+ 	c.events.Eventf(svc, v1.EventTypeWarning, kind, msg, args...)
+ }
+ 
+-func (c *Client) sync(key interface{}) SyncState {
++func (c *Client) sync(key interface{}) types.SyncState {
+ 	defer c.queue.Done(key)
+ 
+ 	switch k := key.(type) {
+@@ -357,7 +344,7 @@ func (c *Client) sync(key interface{}) SyncState {
+ 		svc, exists, err := c.svcIndexer.GetByKey(string(k))
+ 		if err != nil {
+ 			l.Log("op", "getService", "error", err, "msg", "failed to get service")
+-			return SyncStateError
++			return types.SyncStateError
+ 		}
+ 		if !exists {
+ 			return c.serviceChanged(l, string(k), nil, nil)
+@@ -368,7 +355,7 @@ func (c *Client) sync(key interface{}) SyncState {
+ 			epsIntf, exists, err := c.epIndexer.GetByKey(string(k))
+ 			if err != nil {
+ 				l.Log("op", "getEndpoints", "error", err, "msg", "failed to get endpoints")
+-				return SyncStateError
++				return types.SyncStateError
+ 			}
+ 			if !exists {
+ 				return c.serviceChanged(l, string(k), nil, nil)
+@@ -383,7 +370,7 @@ func (c *Client) sync(key interface{}) SyncState {
+ 		cmi, exists, err := c.cmIndexer.GetByKey(string(k))
+ 		if err != nil {
+ 			l.Log("op", "getConfigMap", "error", err, "msg", "failed to get configmap")
+-			return SyncStateError
++			return types.SyncStateError
+ 		}
+ 		if !exists {
+ 			configStale.Set(1)
+@@ -399,14 +386,14 @@ func (c *Client) sync(key interface{}) SyncState {
+ 		if err != nil {
+ 			l.Log("event", "configStale", "error", err, "msg", "config (re)load failed, config marked stale")
+ 			configStale.Set(1)
+-			return SyncStateSuccess
++			return types.SyncStateSuccess
+ 		}
+ 
+ 		st := c.configChanged(l, cfg)
+-		if st == SyncStateError {
++		if st == types.SyncStateError {
+ 			l.Log("event", "configStale", "error", err, "msg", "config (re)load failed, config marked stale")
+ 			configStale.Set(1)
+-			return SyncStateSuccess
++			return types.SyncStateSuccess
+ 		}
+ 
+ 		configLoaded.Set(1)
+@@ -420,11 +407,11 @@ func (c *Client) sync(key interface{}) SyncState {
+ 		n, exists, err := c.nodeIndexer.GetByKey(string(k))
+ 		if err != nil {
+ 			l.Log("op", "getNode", "error", err, "msg", "failed to get node")
+-			return SyncStateError
++			return types.SyncStateError
+ 		}
+ 		if !exists {
+ 			l.Log("op", "getNode", "error", "node doesn't exist in k8s, but I'm running on it!")
+-			return SyncStateError
++			return types.SyncStateError
+ 		}
+ 		node := n.(*v1.Node)
+ 		return c.nodeChanged(c.logger, node)
+@@ -433,7 +420,7 @@ func (c *Client) sync(key interface{}) SyncState {
+ 		if c.synced != nil {
+ 			c.synced(c.logger)
+ 		}
+-		return SyncStateSuccess
++		return types.SyncStateSuccess
+ 
+ 	default:
+ 		panic(fmt.Errorf("unknown key type for %#v (%T)", key, key))
+diff --git a/internal/k8s/types/types.go b/internal/k8s/types/types.go
+new file mode 100644
+index 00000000..263eb6b1
+--- /dev/null
++++ b/internal/k8s/types/types.go
+@@ -0,0 +1,15 @@
++package types // import "go.universe.tf/metallb/internal/k8s/types"
++
++// SyncState is the result of calling synchronization callbacks.
++type SyncState int
++
++const (
++	// The update was processed successfully.
++	SyncStateSuccess SyncState = iota
++	// The update caused a transient error, the k8s client should
++	// retry later.
++	SyncStateError
++	// The update was accepted, but requires reprocessing all watched
++	// services.
++	SyncStateReprocessAll
++)
+diff --git a/internal/speaker/speaker.go b/internal/speaker/speaker.go
+index 97fd0735..10265675 100644
+--- a/internal/speaker/speaker.go
++++ b/internal/speaker/speaker.go
+@@ -6,7 +6,7 @@ import (
+ 
+ 	"go.universe.tf/metallb/internal/bgp"
+ 	"go.universe.tf/metallb/internal/config"
+-	"go.universe.tf/metallb/internal/k8s"
++	"go.universe.tf/metallb/internal/k8s/types"
+ 	"go.universe.tf/metallb/internal/layer2"
+ 
+ 	gokitlog "github.com/go-kit/kit/log"
+@@ -66,7 +66,7 @@ type ControllerConfig struct {
+ 	DisableLayer2 bool
+ }
+ 
+-func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps *v1.Endpoints) k8s.SyncState {
++func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps *v1.Endpoints) types.SyncState {
+ 	if svc == nil {
+ 		return c.deleteBalancer(l, name, "serviceDeleted")
+ 	}
+@@ -80,7 +80,7 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
+ 
+ 	if c.config == nil {
+ 		l.Log("event", "noConfig", "msg", "not processing, still waiting for config")
+-		return k8s.SyncStateSuccess
++		return types.SyncStateSuccess
+ 	}
+ 
+ 	if len(svc.Status.LoadBalancer.Ingress) != 1 {
+@@ -109,13 +109,13 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
+ 	}
+ 
+ 	if proto, ok := c.announced[name]; ok && proto != pool.Protocol {
+-		if st := c.deleteBalancer(l, name, "protocolChanged"); st == k8s.SyncStateError {
++		if st := c.deleteBalancer(l, name, "protocolChanged"); st == types.SyncStateError {
+ 			return st
+ 		}
+ 	}
+ 
+ 	if svcIP, ok := c.svcIP[name]; ok && !lbIP.Equal(svcIP) {
+-		if st := c.deleteBalancer(l, name, "loadBalancerIPChanged"); st == k8s.SyncStateError {
++		if st := c.deleteBalancer(l, name, "loadBalancerIPChanged"); st == types.SyncStateError {
+ 			return st
+ 		}
+ 	}
+@@ -133,7 +133,7 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
+ 
+ 	if err := handler.SetBalancer(l, name, lbIP, pool); err != nil {
+ 		l.Log("op", "setBalancer", "error", err, "msg", "failed to announce service")
+-		return k8s.SyncStateError
++		return types.SyncStateError
+ 	}
+ 
+ 	if c.announced[name] == "" {
+@@ -150,18 +150,18 @@ func (c *Controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
+ 	l.Log("event", "serviceAnnounced", "msg", "service has IP, announcing")
+ 	c.Client.Infof(svc, "nodeAssigned", "announcing from node %q", c.myNode)
+ 
+-	return k8s.SyncStateSuccess
++	return types.SyncStateSuccess
+ }
+ 
+-func (c *Controller) deleteBalancer(l gokitlog.Logger, name, reason string) k8s.SyncState {
++func (c *Controller) deleteBalancer(l gokitlog.Logger, name, reason string) types.SyncState {
+ 	proto, ok := c.announced[name]
+ 	if !ok {
+-		return k8s.SyncStateSuccess
++		return types.SyncStateSuccess
+ 	}
+ 
+ 	if err := c.protocols[proto].DeleteBalancer(l, name, reason); err != nil {
+ 		l.Log("op", "deleteBalancer", "error", err, "msg", "failed to clear balancer state")
+-		return k8s.SyncStateError
++		return types.SyncStateError
+ 	}
+ 
+ 	announcing.Delete(prometheus.Labels{
+@@ -175,7 +175,7 @@ func (c *Controller) deleteBalancer(l gokitlog.Logger, name, reason string) k8s.
+ 
+ 	l.Log("event", "serviceWithdrawn", "ip", c.svcIP[name], "reason", reason, "msg", "withdrawing service announcement")
+ 
+-	return k8s.SyncStateSuccess
++	return types.SyncStateSuccess
+ }
+ 
+ func poolFor(pools map[string]*config.Pool, ip net.IP) string {
+@@ -189,42 +189,42 @@ func poolFor(pools map[string]*config.Pool, ip net.IP) string {
+ 	return ""
+ }
+ 
+-func (c *Controller) SetConfig(l gokitlog.Logger, cfg *config.Config) k8s.SyncState {
++func (c *Controller) SetConfig(l gokitlog.Logger, cfg *config.Config) types.SyncState {
+ 	l.Log("event", "startUpdate", "msg", "start of config update")
+ 	defer l.Log("event", "endUpdate", "msg", "end of config update")
+ 
+ 	if cfg == nil {
+ 		l.Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
+-		return k8s.SyncStateError
++		return types.SyncStateError
+ 	}
+ 
+ 	for svc, ip := range c.svcIP {
+ 		if pool := poolFor(cfg.Pools, ip); pool == "" {
+ 			l.Log("op", "setConfig", "service", svc, "ip", ip, "error", "service has no configuration under new config", "msg", "new configuration rejected")
+-			return k8s.SyncStateError
++			return types.SyncStateError
+ 		}
+ 	}
+ 
+ 	for proto, handler := range c.protocols {
+ 		if err := handler.SetConfig(l, cfg); err != nil {
+ 			l.Log("op", "setConfig", "protocol", proto, "error", err, "msg", "applying new configuration to protocol handler failed")
+-			return k8s.SyncStateError
++			return types.SyncStateError
+ 		}
+ 	}
+ 
+ 	c.config = cfg
+ 
+-	return k8s.SyncStateReprocessAll
++	return types.SyncStateReprocessAll
+ }
+ 
+-func (c *Controller) SetNode(l gokitlog.Logger, node *v1.Node) k8s.SyncState {
++func (c *Controller) SetNode(l gokitlog.Logger, node *v1.Node) types.SyncState {
+ 	for proto, handler := range c.protocols {
+ 		if err := handler.SetNode(l, node); err != nil {
+ 			l.Log("op", "setNode", "error", err, "protocol", proto, "msg", "failed to propagate node info to protocol handler")
+-			return k8s.SyncStateError
++			return types.SyncStateError
+ 		}
+ 	}
+-	return k8s.SyncStateSuccess
++	return types.SyncStateSuccess
+ }
+ 
+ // A Protocol can advertise an IP address.
+-- 
+2.31.1
+

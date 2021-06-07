@@ -1,0 +1,62 @@
+From fdf6ebeb73d9d934ee8f9817bc5ff88bb5d8d750 Mon Sep 17 00:00:00 2001
+From: Chris Tarazi <chris@isovalent.com>
+Date: Fri, 12 Mar 2021 14:55:04 -0800
+Subject: [PATCH 01/10] Add simple Makefile to build speaker and controller
+
+Signed-off-by: Chris Tarazi <chris@isovalent.com>
+---
+ Makefile            | 12 ++++++++++++
+ controller/Makefile |  7 +++++++
+ speaker/Makefile    |  7 +++++++
+ 3 files changed, 26 insertions(+)
+ create mode 100644 Makefile
+ create mode 100644 controller/Makefile
+ create mode 100644 speaker/Makefile
+
+diff --git a/Makefile b/Makefile
+new file mode 100644
+index 00000000..547f2812
+--- /dev/null
++++ b/Makefile
+@@ -0,0 +1,12 @@
++SUBDIRS := controller speaker
++
++all: $(SUBDIRS)
++build: $(SUBDIRS)
++
++$(SUBDIRS):
++	@ $(MAKE) $(SUBMAKEOPTS) -C $@ all
++
++clean:
++	-$(QUIET) for i in $(SUBDIRS); do $(MAKE) $(SUBMAKEOPTS) -C $$i clean; done
++
++.PHONY: all build $(SUBDIRS) clean
+diff --git a/controller/Makefile b/controller/Makefile
+new file mode 100644
+index 00000000..b0e21138
+--- /dev/null
++++ b/controller/Makefile
+@@ -0,0 +1,7 @@
++all:
++	go build ./
++
++clean:
++	go clean
++
++.PHONY: all
+diff --git a/speaker/Makefile b/speaker/Makefile
+new file mode 100644
+index 00000000..b0e21138
+--- /dev/null
++++ b/speaker/Makefile
+@@ -0,0 +1,7 @@
++all:
++	go build ./
++
++clean:
++	go clean
++
++.PHONY: all
+-- 
+2.31.1
+
