@@ -55,8 +55,7 @@ discussing what services they offer projects on the
 
 - (russellb) Write this proposal.
 - (everyone) Provide feedback on initial proposal, reach consensus.
-- (russellb) If approved, apply through the [proposal
-- form](https://docs.google.com/forms/d/1bJhG1MuM981uQXcnBMv4Mj9yfV5_q5Kwk3qhBCLa_5A/viewform)
+- (russellb) If approved, apply through the [proposal form](https://docs.google.com/forms/d/1bJhG1MuM981uQXcnBMv4Mj9yfV5_q5Kwk3qhBCLa_5A/viewform).
 - (danderson) If accepted, transfer project assets as appropriate to CNCF. This
   includes transferring domains to CNCF, and likely MetalLB trademark
   assignment to the CNCF. See the CNCF [IP
