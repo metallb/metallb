@@ -38,7 +38,7 @@ have to disrupt the core MetalLB project.
 
 - No changes are proposed for the core MetalLB project.
 - This is not intended to replace the end goal of an eventual full CRD based
-  interface in the core MetalLb project, but instead provide a place to
+  interface in the core MetalLB project, but instead provide a place to
   iterate on an interface without any disruption to the project in the short
   term.
 
