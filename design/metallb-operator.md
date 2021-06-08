@@ -23,7 +23,7 @@ discussed creating a CRD based configuration interface for MetalLB. It seems
 that settling on the ideal data model may require some more time and
 experimentation. We can make use of this separate operator repo as a place to
 try out a CRD interface for MetalLB which writes out a ConfigMap and doesn't
-have to disrupt to core MetalLB project.
+have to disrupt the core MetalLB project.
 
 ### Goals
 
