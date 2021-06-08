@@ -32,7 +32,7 @@ coupling to the Kubernetes project, which is also part of the CNCF.
 
 ### Non-Goals
 
-- No changes to the metallb code are in scope of this proposal. This
+- No changes to the MetalLB code are in scope of this proposal. This
   proposal is only about the community future.
 - No changes to committer processes are proposed here. We already have a
   documented [process for adding and removing
