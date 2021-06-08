@@ -30,7 +30,7 @@ have to disrupt the core MetalLB project.
 - Create an operator in a new git repository that makes it easy to deploy
   MetalLB on clusters where operators are the preferred method for managing
   cluster add-ons.
-- Publish the operator on operatorhub.io to make it discoverable
+- Publish the operator on operatorhub.io to make it discoverable.
 - Use the separate operator repository as a place to experiment with a CRD
   interface for configuring MetalLB.
 
