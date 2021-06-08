@@ -26,7 +26,7 @@ coupling to the Kubernetes project, which is also part of the CNCF.
 ### Goals
 
 - Align with other CNCF ecosystem projects in terms of policies and processes.
-- Assets are transferred to a neutral third party (i.e. domains)
+- Transfer assets to a neutral third party (i.e. domains).
 - Gain more visibility in the CNCF ecosystem to attract others who may be
   interested in contributing to MetalLB development and maintenance.
 
