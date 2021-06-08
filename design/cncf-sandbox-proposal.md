@@ -45,7 +45,7 @@ project](https://www.cncf.io/sandbox-projects/).
 
 The [Goals](#goals) section discusses some of the immediate changes we should
 expect, but some of the other services provided by the CNCF may be very
-beneficial to metallb in the future. The CNCF web site does a nice job
+beneficial to MetalLB in the future. The CNCF web site does a nice job
 discussing what services they offer projects on the
 [Services for CNCF Projects](https://www.cncf.io/services-for-projects/) page.
 
