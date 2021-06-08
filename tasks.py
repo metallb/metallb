@@ -477,8 +477,8 @@ def release(ctx, version, skip_release_notes=False):
     run("perl -pi -e 's/MetalLB .*/MetalLB v{}/g' website/content/_header.md".format(version), echo=True)
 
     # Update the manifests with the new version
-    run("perl -pi -e 's,image: metallb/speaker:.*,image: metallb/speaker:v{},g' manifests/metallb.yaml".format(version), echo=True)
-    run("perl -pi -e 's,image: metallb/controller:.*,image: metallb/controller:v{},g' manifests/metallb.yaml".format(version), echo=True)
+    run("perl -pi -e 's,image: quay.io/metallb/speaker:.*,image: quay.io/metallb/speaker:v{},g' manifests/metallb.yaml".format(version), echo=True)
+    run("perl -pi -e 's,image: quay.io/metallb/controller:.*,image: quay.io/metallb/controller:v{},g' manifests/metallb.yaml".format(version), echo=True)
 
     # Update the versions in the helm chart (version and appVersion are always the same)
     # helm chart versions follow Semantic Versioning, and thus exclude the leading 'v'
