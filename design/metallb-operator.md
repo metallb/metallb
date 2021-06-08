@@ -44,7 +44,7 @@ have to disrupt the core MetalLB project.
 
 ## Proposal
 
-* Create github.com/metallb/metallb-operator
+* Create github.com/metallb/metallb-operator.
 * Grant russellb and any other current MetalLB maintainer commit rights to this
   repository. Further metallb-operator specific committers may be added in the
   future based on contributions to the operator and at the approval of the
