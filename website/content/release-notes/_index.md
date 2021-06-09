@@ -3,6 +3,13 @@ title: Release Notes
 weight: 8
 ---
 
+## Version 0.10.1
+
+Bug Fixes:
+
+- Fix the images in `manifests/metallb.yaml` to refer to the images for the
+  release tag instead of the `main` branch. (Issue #874)
+
 ## Version 0.10.0
 
 New Features:
