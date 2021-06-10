@@ -8,7 +8,7 @@ metadata:
 rules:
 - apiGroups: [""]
   resources: ["services"]
-  verbs: ["get", "list", "watch", "update"]
+  verbs: ["get", "list", "watch"]
 - apiGroups: [""]
   resources: ["services/status"]
   verbs: ["update"]
@@ -31,6 +31,9 @@ metadata:
 rules:
 - apiGroups: [""]
   resources: ["services", "endpoints", "nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["discovery.k8s.io"]
+  resources: ["endpointslices"]
   verbs: ["get", "list", "watch"]
 - apiGroups: [""]
   resources: ["events"]
@@ -78,7 +81,7 @@ rules:
   verbs: ["create"]
 - apiGroups: [""]
   resources: ["secrets"]
-  resourceNames: ["{{ include "metallb.secretName" . }}"]
+  resourceNames: [{{ include "metallb.secretName" . | quote }}]
   verbs: ["list"]
 - apiGroups: ["apps"]
   resources: ["deployments"]
