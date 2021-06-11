@@ -3,12 +3,20 @@ title: Release Notes
 weight: 8
 ---
 
+## Version 0.10.2
+
+Bug Fixes:
+
+- Fix a missing RBAC update in the manifests used by the helm chart.
+  ([Issue #878](https://github.com/metallb/metallb/issues/878))
+
 ## Version 0.10.1
 
 Bug Fixes:
 
 - Fix the images in `manifests/metallb.yaml` to refer to the images for the
-  release tag instead of the `main` branch. (Issue #874)
+  release tag instead of the `main` branch.
+  ([Issue #874](https://github.com/metallb/metallb/issues/874))
 
 ## Version 0.10.0
 
