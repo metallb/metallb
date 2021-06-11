@@ -230,8 +230,8 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None, nod
 
     if mk_cluster and cni:
         run("kubectl apply -f e2etest/manifests/{}.yaml".format(cni), echo=True)
-
-    build(ctx, binaries=["controller", "speaker", "mirror-server"], architectures=[architecture])
+    binaries = ["controller", "speaker", "mirror-server"]
+    build(ctx, binaries, architectures=[architecture])
     run("kind load docker-image --name={} quay.io/metallb/controller:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
@@ -245,7 +245,9 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None, nod
 
         with open(manifests_dir + "/metallb.yaml") as f:
             manifest = f.read()
-        manifest = manifest.replace(":main", ":dev-{}".format(architecture))
+        for image in binaries:
+            manifest = re.sub("image: quay.io/metallb/{}:.*".format(image),
+                          "image: quay.io/metallb/{}:dev-{}".format(image, architecture), manifest)
         with open(tmpdir + "/metallb.yaml", "w") as f:
             f.write(manifest)
             f.flush()
