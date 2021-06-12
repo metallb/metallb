@@ -5,6 +5,9 @@ metadata:
   name: {{ template "metallb.fullname" . }}
   labels:
     {{- include "metallb.labels" . | nindent 4 }}
+    {{- if .Values.prometheus.prometheusRule.additionalLabels }}
+{{ toYaml .Values.prometheus.prometheusRule.additionalLabels | indent 4 }}
+    {{- end }}
 spec:
   groups:
   - name: {{ template "metallb.fullname" . }}.rules
