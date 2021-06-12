@@ -51,6 +51,9 @@ prometheus:
     # enable support for Prometheus Operator
     enabled: false
 
+    # optional additionnal labels for podMonitors
+    additionalLabels: {}
+
     # Job label for scrape target
     jobLabel: "app.kubernetes.io/name"
 
@@ -77,6 +80,9 @@ prometheus:
 
     # enable alertmanager alerts
     enabled: false
+
+    # optional additionnal labels for prometheusRules
+    additionalLabels: {}
 
     # MetalLBStaleConfig
     staleConfig:
