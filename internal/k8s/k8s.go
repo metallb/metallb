@@ -6,6 +6,9 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/yl2chen/cidranger"
+	"go.universe.tf/metallb/internal/allocator/k8salloc"
+	"k8s.io/apimachinery/pkg/labels"
 	"net/http"
 
 	"go.universe.tf/metallb/internal/config"
@@ -33,6 +36,7 @@ type Client struct {
 	client *kubernetes.Clientset
 	events record.EventRecorder
 	queue  workqueue.RateLimitingInterface
+	ranger cidranger.Ranger
 
 	svcIndexer   cache.Indexer
 	svcInformer  cache.Controller
@@ -45,10 +49,11 @@ type Client struct {
 
 	syncFuncs []cache.InformerSynced
 
-	serviceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) SyncState
-	configChanged  func(log.Logger, *config.Config) SyncState
-	nodeChanged    func(log.Logger, *v1.Node) SyncState
-	synced         func(log.Logger)
+	serviceChanged  func(log.Logger, string, *v1.Service, *v1.Endpoints) SyncState
+	configChanged   func(log.Logger, *config.Config) SyncState
+	nodeChanged     func(log.Logger, string, *v1.Node) SyncState
+	endpointChanged func(log.Logger, *v1.Endpoints) SyncState
+	synced          func(log.Logger)
 }
 
 // SyncState is the result of calling synchronization callbacks.
@@ -74,19 +79,20 @@ type Config struct {
 	NodeName      string
 	MetricsHost   string
 	MetricsPort   int
-	ReadEndpoints bool
 	Logger        log.Logger
 	Kubeconfig    string
 
-	ServiceChanged func(log.Logger, string, *v1.Service, *v1.Endpoints) SyncState
-	ConfigChanged  func(log.Logger, *config.Config) SyncState
-	NodeChanged    func(log.Logger, *v1.Node) SyncState
-	Synced         func(log.Logger)
+	ServiceChanged  func(log.Logger, string, *v1.Service, *v1.Endpoints) SyncState
+	ConfigChanged   func(log.Logger, *config.Config) SyncState
+	NodeChanged     func(log.Logger, string, *v1.Node) SyncState
+	EndpointChanged func(log.Logger, *v1.Endpoints) SyncState
+	Synced          func(log.Logger)
 }
 
 type svcKey string
 type cmKey string
 type nodeKey string
+type epKey string
 type synced string
 
 // New connects to masterAddr, using kubeconfig to authenticate.
@@ -150,36 +156,86 @@ func New(cfg *Config) (*Client, error) {
 				}
 			},
 		}
+		svcIndexers := cache.Indexers{
+			"bySharingKey": func(obj interface{}) ([]string, error) {
+				svc := obj.(*v1.Service)
+				sk := k8salloc.SharingKey(svc)
+				if sk == "" || svc.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeLocal {
+					return nil, nil
+				}
+				return []string{sk}, nil
+			},
+			"byMetaNamespaceKey": func(obj interface{}) ([]string, error) {
+				svc := obj.(*v1.Service)
+				k, err := cache.MetaNamespaceKeyFunc(obj)
+				if err != nil {
+					c.logger.Log("op", "indexBySharingKey", "err", err, "msg", "error fetching key of service", "key", k)
+					return nil, err
+				}
+				sk := k8salloc.SharingKey(svc)
+				if sk == "" || svc.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeLocal {
+					return nil, nil
+				}
+				return []string{k}, nil
+			},
+		}
+
 		svcWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "services", v1.NamespaceAll, fields.Everything())
-		c.svcIndexer, c.svcInformer = cache.NewIndexerInformer(svcWatcher, &v1.Service{}, 0, svcHandlers, cache.Indexers{})
+		c.svcIndexer, c.svcInformer = cache.NewIndexerInformer(svcWatcher, &v1.Service{}, 0, svcHandlers, svcIndexers)
 
 		c.serviceChanged = cfg.ServiceChanged
 		c.syncFuncs = append(c.syncFuncs, c.svcInformer.HasSynced)
 
-		if cfg.ReadEndpoints {
+		if cfg.EndpointChanged != nil {
 			epHandlers := cache.ResourceEventHandlerFuncs{
 				AddFunc: func(obj interface{}) {
 					key, err := cache.MetaNamespaceKeyFunc(obj)
 					if err == nil {
-						c.queue.Add(svcKey(key))
+						c.queue.Add(epKey(key))
 					}
 				},
 				UpdateFunc: func(old interface{}, new interface{}) {
 					key, err := cache.MetaNamespaceKeyFunc(new)
 					if err == nil {
-						c.queue.Add(svcKey(key))
+						c.queue.Add(epKey(key))
 					}
 				},
 				DeleteFunc: func(obj interface{}) {
 					key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
 					if err == nil {
-						c.queue.Add(svcKey(key))
+						c.queue.Add(epKey(key))
 					}
 				},
 			}
 			epWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "endpoints", v1.NamespaceAll, fields.Everything())
-			c.epIndexer, c.epInformer = cache.NewIndexerInformer(epWatcher, &v1.Endpoints{}, 0, epHandlers, cache.Indexers{})
+			epIndexers := cache.Indexers{
+				"bySharingKey": func(obj interface{}) ([]string, error) {
+					//eps := obj.(*v1.Endpoints)
+					//k := eps.ObjectMeta.Namespace + "/" + eps.ObjectMeta.Name
+					k, err := cache.MetaNamespaceKeyFunc(obj)
+					if err != nil {
+						c.logger.Log("op", "indexBySharingKey", "err", err, "msg", "error fetching key of endpoint", "key", k)
+						return nil, err
+					}
+					svc, exists, err := c.svcIndexer.GetByKey(k)
+					if err != nil {
+						c.logger.Log("op", "indexBySharingKey", "err", err, "msg", "error fetching service", "key", k)
+						return nil, err
+					}
+					if !exists {
+						return nil, nil
+					}
+					service := svc.(*v1.Service)
+					sharingKey := k8salloc.SharingKey(service)
+					if sharingKey == "" || service.Spec.ExternalTrafficPolicy != v1.ServiceExternalTrafficPolicyTypeLocal {
+						return nil, nil
+					}
+					return []string{sharingKey}, nil
+				},
+			}
+			c.epIndexer, c.epInformer = cache.NewIndexerInformer(epWatcher, &v1.Endpoints{}, 0, epHandlers, epIndexers)
 
+			c.endpointChanged = cfg.EndpointChanged
 			c.syncFuncs = append(c.syncFuncs, c.epInformer.HasSynced)
 		}
 	}
@@ -233,8 +289,18 @@ func New(cfg *Config) (*Client, error) {
 				}
 			},
 		}
-		nodeWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "nodes", v1.NamespaceAll, fields.OneTermEqualSelector("metadata.name", cfg.NodeName))
-		c.nodeIndexer, c.nodeInformer = cache.NewIndexerInformer(nodeWatcher, &v1.Node{}, 0, nodeHandlers, cache.Indexers{})
+		nodeWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "nodes", v1.NamespaceAll, fields.Everything()) // fields.OneTermEqualSelector("metadata.name", cfg.NodeName))
+		indexers := cache.Indexers{
+			"byNode": func(obj interface{}) ([]string, error) {
+				k, err := cache.MetaNamespaceKeyFunc(obj)
+				if err != nil {
+					c.logger.Log("op", "indexByNode", "err", err, "msg", "error fetching key of node", "key", k)
+					return nil, err
+				}
+				return []string{k}, nil
+			},
+		}
+		c.nodeIndexer, c.nodeInformer = cache.NewIndexerInformer(nodeWatcher, &v1.Node{}, 0, nodeHandlers, indexers)
 
 		c.nodeChanged = cfg.NodeChanged
 		c.syncFuncs = append(c.syncFuncs, c.nodeInformer.HasSynced)
@@ -388,6 +454,15 @@ func (c *Client) UpdateStatus(svc *v1.Service) error {
 	return err
 }
 
+// UpdateStatus writes the protected "status" field of svc back into
+// the Kubernetes cluster.
+func (c *Client) GetPodsForService(svc *v1.Service) (*v1.PodList, error) {
+	pods, err := c.client.CoreV1().Pods(svc.Namespace).List(context.TODO(), metav1.ListOptions{
+		LabelSelector: labels.Set(svc.Spec.Selector).String(),
+	})
+	return pods, err
+}
+
 // Infof logs an informational event about svc to the Kubernetes cluster.
 func (c *Client) Infof(svc *v1.Service, kind, msg string, args ...interface{}) {
 	c.events.Eventf(svc, v1.EventTypeNormal, kind, msg, args...)
@@ -472,12 +547,30 @@ func (c *Client) sync(key interface{}) SyncState {
 			l.Log("op", "getNode", "error", err, "msg", "failed to get node")
 			return SyncStateError
 		}
-		if !exists {
-			l.Log("op", "getNode", "error", "node doesn't exist in k8s, but I'm running on it!")
+		var node *v1.Node
+		if exists {
+			node = n.(*v1.Node)
+		}
+		return c.nodeChanged(l, string(k), node)
+
+	case epKey:
+		l := log.With(c.logger, "endpoints", string(k))
+		ep, exists, err := c.epIndexer.GetByKey(string(k))
+		if err != nil {
+			l.Log("op", "getEndpoints", "error", err, "msg", "failed to get endpoints")
 			return SyncStateError
 		}
-		node := n.(*v1.Node)
-		return c.nodeChanged(c.logger, node)
+		s, exists, err := c.svcIndexer.GetByKey(string(k))
+		if err != nil || !exists {
+			return SyncStateSuccess
+		}
+		service := s.(*v1.Service)
+		sharingKey := k8salloc.SharingKey(service)
+		if sharingKey == "" {
+			return SyncStateSuccess
+		}
+
+		return c.endpointChanged(l, ep.(*v1.Endpoints))
 
 	case synced:
 		if c.synced != nil {

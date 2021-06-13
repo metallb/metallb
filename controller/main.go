@@ -17,7 +17,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/yl2chen/cidranger"
 	"io/ioutil"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"net"
 	"os"
 	"reflect"
 
@@ -34,6 +37,7 @@ import (
 // Service offers methods to mutate a Kubernetes service object.
 type service interface {
 	UpdateStatus(svc *v1.Service) error
+	GetPodsForService(svc *v1.Service) (*v1.PodList, error)
 	Infof(svc *v1.Service, desc, msg string, args ...interface{})
 	Errorf(svc *v1.Service, desc, msg string, args ...interface{})
 }
@@ -43,6 +47,7 @@ type controller struct {
 	synced bool
 	config *config.Config
 	ips    *allocator.Allocator
+	ranger cidranger.Ranger
 }
 
 func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ *v1.Endpoints) k8s.SyncState {
@@ -118,6 +123,66 @@ func (c *controller) MarkSynced(l log.Logger) {
 	l.Log("event", "stateSynced", "msg", "controller synced, can allocate IPs now")
 }
 
+type localRangerEntry struct {
+	ipNet net.IPNet
+	name string
+}
+
+func (b *localRangerEntry) Network() net.IPNet {
+	return b.ipNet
+}
+
+func (c *controller) SetNode(logger log.Logger, key string, node *v1.Node) k8s.SyncState {
+	if node == nil {
+		return k8s.SyncStateSuccess
+	}
+
+	podCIDRs := node.Spec.PodCIDRs
+	if podCIDRs == nil {
+		podCIDRs = []string{node.Spec.PodCIDR}
+	}
+	for _, cidr := range podCIDRs {
+		_, ipNet, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return k8s.SyncStateError
+		}
+		if node != nil {
+			err = c.ranger.Insert(&localRangerEntry{*ipNet, node.ObjectMeta.Name})
+		} else {
+			_, err = c.ranger.Remove(*ipNet)
+		}
+		if err != nil {
+			return k8s.SyncStateError
+		}
+	}
+	return k8s.SyncStateSuccess
+}
+
+func (c *controller) SetEndpoint(logger log.Logger, endpoints *v1.Endpoints) k8s.SyncState {
+	if endpoints == nil {
+		return k8s.SyncStateSuccess
+	}
+
+	nodes := sets.NewString()
+	for _, subset := range endpoints.Subsets {
+		for _, address := range subset.Addresses {
+			addr := net.ParseIP(address.IP)
+			entries, err := c.ranger.ContainingNetworks(addr)
+			if err != nil {
+				return k8s.SyncStateError
+			}
+			for _, entry := range entries {
+				nodeName := (entry.(*localRangerEntry)).name
+				nodes.Insert(nodeName)
+			}
+		}
+	}
+	if nodes.Len() > 1 {
+		return k8s.SyncStateReprocessAll
+	}
+	return k8s.SyncStateSuccess
+}
+
 func main() {
 	logger, err := logging.Init()
 	if err != nil {
@@ -148,6 +213,7 @@ func main() {
 
 	c := &controller{
 		ips: allocator.New(),
+		ranger: cidranger.NewPCTrieRanger(),
 	}
 
 	client, err := k8s.New(&k8s.Config{
@@ -158,9 +224,11 @@ func main() {
 		Logger:        logger,
 		Kubeconfig:    *kubeconfig,
 
-		ServiceChanged: c.SetBalancer,
-		ConfigChanged:  c.SetConfig,
-		Synced:         c.MarkSynced,
+		ServiceChanged:  c.SetBalancer,
+		ConfigChanged:   c.SetConfig,
+		NodeChanged:     c.SetNode,
+		EndpointChanged: c.SetEndpoint,
+		Synced:          c.MarkSynced,
 	})
 	if err != nil {
 		logger.Log("op", "startup", "error", err, "msg", "failed to create k8s client")

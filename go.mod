@@ -22,6 +22,7 @@ require (
 	github.com/spf13/viper v1.7.0 // indirect
 	github.com/vishvananda/netlink v1.0.0 // indirect
 	github.com/vishvananda/netns v0.0.0-20190625233234-7109fa855b0f // indirect
+	github.com/yl2chen/cidranger v1.0.2
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110 // indirect
 	golang.org/x/sys v0.0.0-20210314195730-07df6a141424
 	gopkg.in/yaml.v2 v2.4.0

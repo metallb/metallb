@@ -21,6 +21,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"go.universe.tf/metallb/internal/bgp"
@@ -131,7 +132,6 @@ func main() {
 
 		MetricsHost:   *host,
 		MetricsPort:   *port,
-		ReadEndpoints: true,
 
 		ServiceChanged: ctrl.SetBalancer,
 		ConfigChanged:  ctrl.SetConfig,
@@ -354,7 +354,11 @@ func (c *controller) SetConfig(l gokitlog.Logger, cfg *config.Config) k8s.SyncSt
 	return k8s.SyncStateReprocessAll
 }
 
-func (c *controller) SetNode(l gokitlog.Logger, node *v1.Node) k8s.SyncState {
+func (c *controller) SetNode(l gokitlog.Logger, key string, node *v1.Node) k8s.SyncState {
+	if node == nil && strings.Split(key, "/")[0] == c.myNode {
+		l.Log("op", "getNode", "error", "node doesn't exist in k8s, but I'm running on it!")
+		return k8s.SyncStateError
+	}
 	for proto, handler := range c.protocols {
 		if err := handler.SetNode(l, node); err != nil {
 			l.Log("op", "setNode", "error", err, "protocol", proto, "msg", "failed to propagate node info to protocol handler")

@@ -16,7 +16,10 @@ package main
 
 import (
 	"fmt"
+	"k8s.io/apimachinery/pkg/labels"
 	"net"
+	"sort"
+	"strings"
 
 	"github.com/go-kit/kit/log"
 	v1 "k8s.io/api/core/v1"
@@ -67,9 +70,14 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	// makes sense. If so, clear it out and give the rest of the logic
 	// a chance to allocate again.
 	if lbIP != nil {
+		backendKey, err := c.BackendKey(svc)
+		if err != nil {
+			l.Log("event", "clearAssignment", "reason", err, "msg", "could not recover backendKey")
+			return false
+		}
 		// This assign is idempotent if the config is consistent,
 		// otherwise it'll fail and tell us why.
-		if err := c.ips.Assign(key, lbIP, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
+		if err := c.ips.Assign(key, lbIP, k8salloc.Ports(svc), k8salloc.SharingKey(svc), backendKey); err != nil {
 			l.Log("event", "clearAssignment", "reason", "notAllowedByConfig", "msg", "current IP not allowed by config, clearing")
 			c.clearServiceState(key, svc)
 			lbIP = nil
@@ -152,6 +160,10 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 	isIPv6 := clusterIP.To4() == nil
 
 	// If the user asked for a specific IP, try that.
+	backendKey, err := c.BackendKey(svc)
+	if err != nil {
+		return nil, err
+	}
 	if svc.Spec.LoadBalancerIP != "" {
 		ip := net.ParseIP(svc.Spec.LoadBalancerIP)
 		if ip == nil {
@@ -160,7 +172,7 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 		if (ip.To4() == nil) != isIPv6 {
 			return nil, fmt.Errorf("requested spec.loadBalancerIP %q does not match the ipFamily of the service", svc.Spec.LoadBalancerIP)
 		}
-		if err := c.ips.Assign(key, ip, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
+		if err := c.ips.Assign(key, ip, k8salloc.Ports(svc), k8salloc.SharingKey(svc), backendKey); err != nil {
 			return nil, err
 		}
 		return ip, nil
@@ -169,7 +181,7 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 	// Otherwise, did the user ask for a specific pool?
 	desiredPool := svc.Annotations["metallb.universe.tf/address-pool"]
 	if desiredPool != "" {
-		ip, err := c.ips.AllocateFromPool(key, isIPv6, desiredPool, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
+		ip, err := c.ips.AllocateFromPool(key, isIPv6, desiredPool, k8salloc.Ports(svc), k8salloc.SharingKey(svc), backendKey)
 		if err != nil {
 			return nil, err
 		}
@@ -177,5 +189,29 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 	}
 
 	// Okay, in that case just bruteforce across all pools.
-	return c.ips.Allocate(key, isIPv6, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
+	return c.ips.Allocate(key, isIPv6, k8salloc.Ports(svc), k8salloc.SharingKey(svc), backendKey)
+}
+
+// BackendKey extracts the backend key for a service.
+func (c *controller) BackendKey(svc *v1.Service) (string, error) {
+	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
+		if k8salloc.SharingKey(svc) == "" {
+			return labels.Set(svc.Spec.Selector).String(), nil
+		} else {
+			pods, err := c.client.GetPodsForService(svc)
+			if err != nil {
+				return "", err
+			}
+
+			result := []string{}
+			for _, pod := range pods.Items {
+				result = append(result, pod.Namespace+"/"+pod.Name)
+			}
+			sort.Strings(result)
+			return strings.Join(result, ","), nil
+
+		}
+	}
+	// Cluster traffic policy can share services regardless of backends.
+	return "", nil
 }
