@@ -74,7 +74,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		hostport := net.JoinHostPort(ingressIP, port)
 		address := fmt.Sprintf("http://%s/", hostport)
-		_, err = runCommand(true, "wget", "-O-", "-q", address, "-T", "60")
+		err = wgetRetry(true, address)
 		framework.ExpectNoError(err)
 	})
 

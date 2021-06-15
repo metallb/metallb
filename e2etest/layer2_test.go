@@ -73,7 +73,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 		hostport := net.JoinHostPort(ingressIP, port)
 		address := fmt.Sprintf("http://%s/", hostport)
-		_, err = runCommand(false, "wget", "-O-", "-q", address, "-T", "60")
+		err = wgetRetry(false, address)
 		framework.ExpectNoError(err)
 	})
 
