@@ -177,6 +177,7 @@
           "type": "object",
           "properties": {
             "enabled": { "type": "boolean" },
+            "additionalMonitors": { "type": "object" },
             "jobLabel": { "type": "string" },
             "interval": {
               "anyOf": [
@@ -203,6 +204,7 @@
           "type": "object",
           "properties": {
             "enabled": { "type": "boolean" },
+            "additionalMonitors": { "type": "object" },
             "staleConfig": { "$ref": "#/definitions/prometheusAlert" },
             "configNotLoaded": { "$ref": "#/definitions/prometheusAlert" },
             "addressPoolExhausted": { "$ref": "#/definitions/prometheusAlert" },
