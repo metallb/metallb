@@ -33,9 +33,10 @@ spec:
       {{- end }}
       serviceAccountName: {{ template "metallb.controller.serviceAccountName" . }}
       terminationGracePeriodSeconds: 0
+{{- if .Values.controller.securityContext }}
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 65534 # nobody
+{{ toYaml .Values.controller.securityContext | indent 8 }}
+{{- end }}
       containers:
       - name: controller
         image: {{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag | default .Chart.AppVersion }}
