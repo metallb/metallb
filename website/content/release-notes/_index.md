@@ -7,6 +7,11 @@ weight: 8
 
 New Features:
 
+- (helm chart) Add support for specifying additional labels for `PodMonitor`
+  and `PrometheusRule` resources. This is needed when using the Prometheus
+  operator and have it configured to use `PodMonitors` and `PrometheusRules`
+  that are using a specific label.
+
 Changes in behavior:
 
 Bug Fixes:
