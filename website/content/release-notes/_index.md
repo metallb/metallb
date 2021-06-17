@@ -16,6 +16,15 @@ Changes in behavior:
 
 Bug Fixes:
 
+## Version 0.10.3
+
+Bug Fixes:
+
+- Add `fsGroup` to the MetalLB controller deployment to address compatibility with Kubernetes 1.21
+  and later. See [Kubernetes issue #70679](https://github.com/kubernetes/kubernetes/issues/70679).
+  This ensures the MetalLB controller can read the service account token volume.
+  ([Issue #890](https://github.com/metallb/metallb/issues/890))
+
 ## Version 0.10.2
 
 Bug Fixes:
