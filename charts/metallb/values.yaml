@@ -138,6 +138,11 @@ controller:
     # true, a name is generated using the fullname template
     name: ""
     annotations: {}
+  securityContext:
+    runAsNonRoot: true
+    # nobody
+    runAsUser: 65534
+    fsGroup: 65534
   resources: {}
     # limits:
       # cpu: 100m
