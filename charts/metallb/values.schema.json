@@ -127,7 +127,14 @@
       "description": "Secrets used for pulling images",
       "type": "array",
       "items": {
-        "type": "string"
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [ "name" ],
+        "additionalProperties": false
       }
     },
     "nameOverride": {
