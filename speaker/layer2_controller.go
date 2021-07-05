@@ -83,6 +83,12 @@ func usableNodes(eps k8s.EpsOrSlices, speakers map[string]bool) []string {
 		}
 	}
 
+
+	if len(usable) == 0 {
+		usable = speakers
+	}
+
+
 	var ret []string
 	for node, ok := range usable {
 		if ok {
