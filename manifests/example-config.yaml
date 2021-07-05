@@ -18,6 +18,9 @@ data:
       # (optional) the TCP port to talk to. Defaults to 179, you shouldn't
       # need to set this in production.
       peer-port: 179
+      # (optional) The source IP address to use when establishing the BGP
+      # session. The address must be configured on a local network interface.
+      source-address: 10.0.0.2
       # (optional) The proposed value of the BGP Hold Time timer. Refer to
       # BGP reference material to understand what setting this implies.
       hold-time: 120s
