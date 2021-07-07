@@ -4,11 +4,11 @@ WORKDIR /metallb
 ADD . /metallb
 
 WORKDIR /metallb/controller
-RUN CGO_ENABLED=0 GO111MODULE=on go build -o ./controller
+RUN CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -o ./controller
 
 
 WORKDIR /metallb/speaker
-RUN CGO_ENABLED=0 GO111MODULE=on go build -o ./speaker
+RUN CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -o ./speaker
 
 FROM registry.ci.openshift.org/ocp/4.8:base
 COPY --from=builder /metallb/controller/controller /metallb/speaker/speaker /
