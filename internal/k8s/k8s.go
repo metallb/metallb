@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"go.universe.tf/metallb/internal/config"
 
@@ -232,7 +231,7 @@ func New(cfg *Config) (*Client, error) {
 					},
 				}
 				slicesWatcher := cache.NewListWatchFromClient(c.client.DiscoveryV1beta1().RESTClient(), "endpointslices", v1.NamespaceAll, fields.Everything())
-				c.slicesIndexer, c.slicesInformer = cache.NewIndexerInformer(slicesWatcher, &discovery.EndpointSlice{}, 5*time.Second, slicesHandlers, cache.Indexers{
+				c.slicesIndexer, c.slicesInformer = cache.NewIndexerInformer(slicesWatcher, &discovery.EndpointSlice{}, 0, slicesHandlers, cache.Indexers{
 					slicesServiceIndexName: slicesServiceIndex,
 				})
 				c.syncFuncs = append(c.syncFuncs, c.slicesInformer.HasSynced)
