@@ -11,7 +11,7 @@ WORKDIR /metallb/speaker
 RUN CGO_ENABLED=0 GO111MODULE=on go build -o ./speaker
 
 FROM registry.ci.openshift.org/ocp/4.8:base
-COPY --from=builder /metallb/controller/controller /metallb/speaker/speaker /usr/bin/
+COPY --from=builder /metallb/controller/controller /metallb/speaker/speaker /
 
 LABEL io.k8s.display-name="Metallb" \
       io.k8s.description="This is a component of OpenShift Container Platform and provides a metallb plugin." \
