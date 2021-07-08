@@ -60,8 +60,6 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
-        - name: METALLB_ML_LABELS
-          value: "app.kubernetes.io/name={{ include "metallb.name" . }},app.kubernetes.io/component=speaker"
         - name: METALLB_SERVICE
           value: "{{ include "metallb.fullname" . }}-speaker-svc"
         - name: METALLB_ML_BIND_PORT
