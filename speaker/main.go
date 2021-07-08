@@ -72,6 +72,7 @@ func main() {
 		myNode     = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
 		port       = flag.Int("port", 7472, "HTTP listening port")
 		logLevel   = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", strings.Join(logging.Levels, ", ")))
+		service    = flag.String("service", os.Getenv("METALLB_SERVICE"), "Service that points to the speakers")
 	)
 	flag.Parse()
 
@@ -94,6 +95,11 @@ func main() {
 
 	if *myNode == "" {
 		level.Error(logger).Log("op", "startup", "error", "must specify --node-name or METALLB_NODE_NAME", "msg", "missing configuration")
+		os.Exit(1)
+	}
+
+	if *service == "" {
+		level.Error(logger).Log("op", "startup", "error", "must specify --service or METALLB_SERVICE", "msg", "missing configuration")
 		os.Exit(1)
 	}
 
@@ -133,6 +139,7 @@ func main() {
 		ConfigMapName: *config,
 		Namespace:     *namespace,
 		NodeName:      *myNode,
+		SpeakerSvc:    *service,
 		Logger:        logger,
 		Kubeconfig:    *kubeconfig,
 
@@ -143,6 +150,7 @@ func main() {
 		ServiceChanged: ctrl.SetBalancer,
 		ConfigChanged:  ctrl.SetConfig,
 		NodeChanged:    ctrl.SetNode,
+		SpeakerChanged: ctrl.SetSpeakers,
 
 		ResyncSvcCh: resyncSvcCh,
 	})
@@ -373,6 +381,16 @@ func (c *controller) SetNode(l log.Logger, node *v1.Node) k8s.SyncState {
 	return k8s.SyncStateSuccess
 }
 
+func (c *controller) SetSpeakers(l log.Logger, eps k8s.EpsOrSlices) k8s.SyncState {
+	for proto, handler := range c.protocols {
+		if err := handler.SetSpeakers(l, eps); err != nil {
+			level.Error(l).Log("op", "SetSpeakers", "error", err, "protocol", proto, "msg", "failed to propagate speaker info to protocol handler")
+			return k8s.SyncStateError
+		}
+	}
+	return k8s.SyncStateSuccess
+}
+
 // A Protocol can advertise an IP address.
 type Protocol interface {
 	SetConfig(log.Logger, *config.Config) error
@@ -380,10 +398,12 @@ type Protocol interface {
 	SetBalancer(log.Logger, string, net.IP, *config.Pool) error
 	DeleteBalancer(log.Logger, string, string) error
 	SetNode(log.Logger, *v1.Node) error
+	SetSpeakers(log.Logger, k8s.EpsOrSlices) error
 }
 
 // Speakerlist represents a list of healthy speakers.
 type SpeakerList interface {
 	UsableSpeakers() map[string]bool
 	Rejoin()
+	SetSpeakers(eps k8s.EpsOrSlices)
 }

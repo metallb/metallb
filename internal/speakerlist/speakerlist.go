@@ -228,6 +228,11 @@ func (sl *SpeakerList) members() map[string]struct{} {
 	return members
 }
 
+// SetSpeakers updates k8sSpeakers.
+func (sl *SpeakerList) SetSpeakers(eps k8s.EpsOrSlices) {
+	// to be implemented
+}
+
 // mlJoin joins speaker pods that are not members of this cluster
 // to the cluster. It performs a memberlist.Join() with the IPs in
 // mlSpeakerIPs that are not members of the cluster.

@@ -51,9 +51,12 @@ type Client struct {
 
 	syncFuncs []cache.InformerSynced
 
+	speakerSvc string
+
 	serviceChanged func(log.Logger, string, *v1.Service, EpsOrSlices) SyncState
 	configChanged  func(log.Logger, *config.Config) SyncState
 	nodeChanged    func(log.Logger, *v1.Node) SyncState
+	speakerChanged func(log.Logger, EpsOrSlices) SyncState
 	synced         func(log.Logger)
 }
 
@@ -78,6 +81,7 @@ type Config struct {
 	ConfigMapName string
 	Namespace     string
 	NodeName      string
+	SpeakerSvc    string // Only used if ServiceChanged is set and ReadEndpoints = true.
 	MetricsHost   string
 	MetricsPort   int
 	ReadEndpoints bool
@@ -87,6 +91,7 @@ type Config struct {
 	ServiceChanged func(log.Logger, string, *v1.Service, EpsOrSlices) SyncState
 	ConfigChanged  func(log.Logger, *config.Config) SyncState
 	NodeChanged    func(log.Logger, *v1.Node) SyncState
+	SpeakerChanged func(log.Logger, EpsOrSlices) SyncState
 	Synced         func(log.Logger)
 
 	ResyncSvcCh <-chan struct{}
@@ -243,6 +248,9 @@ func New(cfg *Config) (*Client, error) {
 				})
 				c.syncFuncs = append(c.syncFuncs, c.slicesInformer.HasSynced)
 			}
+
+			c.speakerSvc = cfg.Namespace + "/" + cfg.SpeakerSvc
+			c.speakerChanged = cfg.SpeakerChanged
 		}
 	}
 
@@ -526,6 +534,11 @@ func (c *Client) sync(key interface{}) SyncState {
 			}
 			epsOrSlices.Type = Slices
 		}
+
+		if string(k) == c.speakerSvc && c.speakerChanged != nil {
+			return c.speakerChanged(c.logger, epsOrSlices)
+		}
+
 		return c.serviceChanged(l, string(k), svc.(*v1.Service), epsOrSlices)
 
 	case cmKey:
