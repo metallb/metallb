@@ -382,7 +382,7 @@ type Protocol interface {
 	SetNode(log.Logger, *v1.Node) error
 }
 
-// Speakerlist represents a list of healthy speakers.
+// SpeakerList returns usable speakers.
 type SpeakerList interface {
 	UsableSpeakers() map[string]bool
 	Rejoin()
