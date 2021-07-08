@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 )
 
 // Announce is used to "announce" new IPs mapped to the node's MAC address.
@@ -52,7 +53,7 @@ func (a *Announce) interfaceScan() {
 func (a *Announce) updateInterfaces() {
 	ifs, err := net.Interfaces()
 	if err != nil {
-		a.logger.Log("op", "getInterfaces", "error", err, "msg", "couldn't list interfaces")
+		level.Error(a.logger).Log("op", "getInterfaces", "error", err, "msg", "couldn't list interfaces")
 		return
 	}
 
@@ -65,7 +66,7 @@ func (a *Announce) updateInterfaces() {
 		l := log.With(a.logger, "interface", ifi.Name)
 		addrs, err := ifi.Addrs()
 		if err != nil {
-			l.Log("op", "getAddresses", "error", err, "msg", "couldn't get addresses for interface")
+			level.Error(l).Log("op", "getAddresses", "error", err, "msg", "couldn't get addresses for interface")
 			return
 		}
 
@@ -102,20 +103,20 @@ func (a *Announce) updateInterfaces() {
 		if keepARP[ifi.Index] && a.arps[ifi.Index] == nil {
 			resp, err := newARPResponder(a.logger, &ifi, a.shouldAnnounce)
 			if err != nil {
-				l.Log("op", "createARPResponder", "error", err, "msg", "failed to create ARP responder")
+				level.Error(l).Log("op", "createARPResponder", "error", err, "msg", "failed to create ARP responder")
 				return
 			}
 			a.arps[ifi.Index] = resp
-			l.Log("event", "createARPResponder", "msg", "created ARP responder for interface")
+			level.Info(l).Log("event", "createARPResponder", "msg", "created ARP responder for interface")
 		}
 		if keepNDP[ifi.Index] && a.ndps[ifi.Index] == nil {
 			resp, err := newNDPResponder(a.logger, &ifi, a.shouldAnnounce)
 			if err != nil {
-				l.Log("op", "createNDPResponder", "error", err, "msg", "failed to create NDP responder")
+				level.Error(l).Log("op", "createNDPResponder", "error", err, "msg", "failed to create NDP responder")
 				return
 			}
 			a.ndps[ifi.Index] = resp
-			l.Log("event", "createNDPResponder", "msg", "created NDP responder for interface")
+			level.Info(l).Log("event", "createNDPResponder", "msg", "created NDP responder for interface")
 		}
 	}
 
@@ -123,14 +124,14 @@ func (a *Announce) updateInterfaces() {
 		if !keepARP[i] {
 			client.Close()
 			delete(a.arps, i)
-			a.logger.Log("interface", client.Interface(), "event", "deleteARPResponder", "msg", "deleted ARP responder for interface")
+			level.Info(a.logger).Log("interface", client.Interface(), "event", "deleteARPResponder", "msg", "deleted ARP responder for interface")
 		}
 	}
 	for i, client := range a.ndps {
 		if !keepNDP[i] {
 			client.Close()
 			delete(a.ndps, i)
-			a.logger.Log("interface", client.Interface(), "event", "deleteNDPResponder", "msg", "deleted NDP responder for interface")
+			level.Info(a.logger).Log("interface", client.Interface(), "event", "deleteNDPResponder", "msg", "deleted NDP responder for interface")
 		}
 	}
 }
@@ -179,7 +180,7 @@ func (a *Announce) doSpam(ip net.IP) {
 
 func (a *Announce) spam(ip net.IP) {
 	if err := a.gratuitous(ip); err != nil {
-		a.logger.Log("op", "gratuitousAnnounce", "error", err, "ip", ip, "msg", "failed to make gratuitous IP announcement")
+		level.Error(a.logger).Log("op", "gratuitousAnnounce", "error", err, "ip", ip, "msg", "failed to make gratuitous IP announcement")
 	}
 }
 
@@ -242,7 +243,7 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 
 	for _, client := range a.ndps {
 		if err := client.Watch(ip); err != nil {
-			a.logger.Log("op", "watchMulticastGroup", "error", err, "ip", ip, "msg", "failed to watch NDP multicast group for IP, NDP responder will not respond to requests for this address")
+			level.Error(a.logger).Log("op", "watchMulticastGroup", "error", err, "ip", ip, "msg", "failed to watch NDP multicast group for IP, NDP responder will not respond to requests for this address")
 		}
 	}
 }
@@ -267,7 +268,7 @@ func (a *Announce) DeleteBalancer(name string) {
 
 	for _, client := range a.ndps {
 		if err := client.Unwatch(ip); err != nil {
-			a.logger.Log("op", "unwatchMulticastGroup", "error", err, "ip", ip, "msg", "failed to unwatch NDP multicast group for IP")
+			level.Error(a.logger).Log("op", "unwatchMulticastGroup", "error", err, "ip", ip, "msg", "failed to unwatch NDP multicast group for IP")
 		}
 	}
 

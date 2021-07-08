@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/mdlayher/ndp"
 )
 
@@ -137,10 +138,10 @@ func (n *ndpResponder) processRequest() dropReason {
 	}
 
 	stats.GotRequest(ns.TargetAddress.String())
-	n.logger.Log("interface", n.intf, "ip", ns.TargetAddress, "senderIP", src, "senderLLAddr", nsLLAddr, "responseMAC", n.hardwareAddr, "msg", "got NDP request for service IP, sending response")
+	level.Debug(n.logger).Log("interface", n.intf, "ip", ns.TargetAddress, "senderIP", src, "senderLLAddr", nsLLAddr, "responseMAC", n.hardwareAddr, "msg", "got NDP request for service IP, sending response")
 
 	if err := n.advertise(src, ns.TargetAddress, false); err != nil {
-		n.logger.Log("op", "arpReply", "interface", n.intf, "ip", ns.TargetAddress, "senderIP", src, "senderLLAddr", nsLLAddr, "responseMAC", n.hardwareAddr, "error", err, "msg", "failed to send ARP reply")
+		level.Error(n.logger).Log("op", "arpReply", "interface", n.intf, "ip", ns.TargetAddress, "senderIP", src, "senderLLAddr", nsLLAddr, "responseMAC", n.hardwareAddr, "error", err, "msg", "failed to send ARP reply")
 	} else {
 		stats.SentResponse(ns.TargetAddress.String())
 	}
