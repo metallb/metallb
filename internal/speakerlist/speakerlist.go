@@ -14,6 +14,7 @@ package speakerlist
 
 import (
 	"crypto/sha256"
+	"reflect"
 	"strconv"
 	"sync"
 	"time"
@@ -30,6 +31,7 @@ type SpeakerList struct {
 	sync.Mutex  // Must be locked while accessing any of the internal SpeakerList maps or arrays.
 	l           log.Logger
 	client      *k8s.Client
+	k8sSpeakers map[string]string
 	resyncSvcCh chan struct{}
 	stopCh      chan struct{}
 	namespace   string
@@ -46,6 +48,7 @@ type SpeakerList struct {
 func New(logger log.Logger, nodeName, bindAddr, bindPort, secret, namespace, labels string, stopCh, resyncSvcCh chan struct{}) (*SpeakerList, error) {
 	sl := SpeakerList{
 		l:           logger,
+		k8sSpeakers: map[string]string{},
 		resyncSvcCh: resyncSvcCh,
 		stopCh:      stopCh,
 		namespace:   namespace,
@@ -230,7 +233,58 @@ func (sl *SpeakerList) members() map[string]struct{} {
 
 // SetSpeakers updates k8sSpeakers.
 func (sl *SpeakerList) SetSpeakers(eps k8s.EpsOrSlices) {
-	// to be implemented
+	newmap := map[string]string{}
+
+	switch eps.Type {
+	case k8s.Eps:
+		for _, subset := range eps.EpVal.Subsets {
+			for _, ep := range subset.Addresses {
+				if ep.NodeName == nil {
+					continue
+				}
+				newmap[*ep.NodeName] = ep.IP
+			}
+		}
+	case k8s.Slices:
+		for _, slice := range eps.SlicesVal {
+			for _, ep := range slice.Endpoints {
+				if !k8s.IsConditionReady(ep.Conditions) {
+					continue
+				}
+				nodeName := ep.Topology["kubernetes.io/hostname"]
+				if nodeName == "" {
+					continue
+				}
+				// (v1beta.Endpoint).Addresses must contain at least one address according to the doc.
+				newmap[nodeName] = ep.Addresses[0]
+			}
+		}
+	}
+
+	sl.Lock()
+	oldmap := sl.k8sSpeakers
+	sl.Unlock()
+	if reflect.DeepEqual(oldmap, newmap) {
+		return
+	}
+
+	added := map[string]string{}
+	removed := map[string]string{}
+	for k, v := range newmap {
+		if _, ok := oldmap[k]; !ok {
+			added[k] = v
+		}
+	}
+	for k, v := range oldmap {
+		if _, ok := newmap[k]; !ok {
+			removed[k] = v
+		}
+	}
+	level.Info(sl.l).Log("op", "SetSpeakers", "msg", "New K8s speakers list set", "added", added, "removed", removed)
+
+	sl.Lock()
+	sl.k8sSpeakers = newmap
+	sl.Unlock()
 }
 
 // mlJoin joins speaker pods that are not members of this cluster
