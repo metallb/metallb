@@ -22,6 +22,8 @@ func (sl *fakeSpeakerList) UsableSpeakers() map[string]bool {
 	return sl.speakers
 }
 
+func (sl *fakeSpeakerList) SetSpeakers(eps k8s.EpsOrSlices) {}
+
 func (sl *fakeSpeakerList) Rejoin() {}
 
 func compareUseableNodesReturnedValue(a, b []string) bool {

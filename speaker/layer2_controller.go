@@ -131,3 +131,8 @@ func (c *layer2Controller) SetNode(log.Logger, *v1.Node) error {
 	c.sList.Rejoin()
 	return nil
 }
+
+func (c *layer2Controller) SetSpeakers(l log.Logger, eps k8s.EpsOrSlices) error {
+	c.sList.SetSpeakers(eps)
+	return nil
+}
