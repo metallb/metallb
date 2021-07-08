@@ -297,6 +297,20 @@ subjects:
 - kind: ServiceAccount
   name: speaker
 ---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: metallb
+    component: speaker
+  name: speaker
+  namespace: metallb-system
+spec:
+  selector:
+    app: metallb
+    component: speaker
+  clusterIP: None
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -359,6 +373,8 @@ spec:
         #  value: "7946"
         - name: METALLB_ML_LABELS
           value: "app=metallb,component=speaker"
+        - name: METALLB_SERVICE
+          value: "speaker"
         - name: METALLB_ML_SECRET_KEY
           valueFrom:
             secretKeyRef:
