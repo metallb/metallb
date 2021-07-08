@@ -67,7 +67,6 @@ func main() {
 		host       = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
 		mlBindAddr = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
 		mlBindPort = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
-		mlLabels   = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
 		mlSecret   = flag.String("ml-secret-key", os.Getenv("METALLB_ML_SECRET_KEY"), "Secret key for MemberList (fast dead node detection)")
 		myNode     = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
 		port       = flag.Int("port", 7472, "HTTP listening port")
@@ -118,10 +117,11 @@ func main() {
 	// we can queue another resync making sure all changes that happened
 	// before we produce to the channel are taken into account.
 	resyncSvcCh := make(chan struct{}, 1)
-	sList, err := speakerlist.New(logger, *myNode, *mlBindAddr, *mlBindPort, *mlSecret, *namespace, *mlLabels, stopCh, resyncSvcCh)
+	sList, err := speakerlist.New(logger, *myNode, *mlBindAddr, *mlBindPort, *mlSecret, resyncSvcCh)
 	if err != nil {
 		os.Exit(1)
 	}
+	defer sList.Stop()
 
 	// Setup all clients and speakers, config decides what is being done runtime.
 	ctrl, err := newController(controllerConfig{
@@ -159,9 +159,6 @@ func main() {
 		os.Exit(1)
 	}
 	ctrl.client = client
-
-	sList.Start(client)
-	defer sList.Stop()
 
 	if err := client.Run(stopCh); err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to run k8s client")
@@ -401,9 +398,8 @@ type Protocol interface {
 	SetSpeakers(log.Logger, k8s.EpsOrSlices) error
 }
 
-// Speakerlist represents a list of healthy speakers.
+// SpeakerList takes speakers from k8s and returns usable speakers.
 type SpeakerList interface {
-	UsableSpeakers() map[string]bool
-	Rejoin()
+	UsableSpeakers() (map[string]bool, error)
 	SetSpeakers(eps k8s.EpsOrSlices)
 }
