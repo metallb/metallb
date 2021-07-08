@@ -380,19 +380,6 @@ func (c *Client) CreateMlSecret(namespace, controllerDeploymentName, secretName 
 	return err
 }
 
-// PodIPs returns the IPs of all the pods matched by the labels string.
-func (c *Client) PodIPs(namespace, labels string) ([]string, error) {
-	pl, err := c.client.CoreV1().Pods(namespace).List(context.TODO(), metav1.ListOptions{LabelSelector: labels})
-	if err != nil {
-		return nil, err
-	}
-	iplist := []string{}
-	for _, pod := range pl.Items {
-		iplist = append(iplist, pod.Status.PodIP)
-	}
-	return iplist, nil
-}
-
 // Run watches for events on the Kubernetes cluster, and dispatches
 // calls to the Controller.
 func (c *Client) Run(stopCh <-chan struct{}) error {
