@@ -37,10 +37,11 @@ type SpeakerList struct {
 	namespace   string
 	labels      string
 	// The following fields are nil when memberlist is disabled.
-	mlEventCh chan memberlist.NodeEvent
-	ml        *memberlist.Memberlist
-	mlMembers map[string]bool // Alive speakers according to memberlist.
-	mlJoinCh  chan struct{}
+	mlEventCh  chan memberlist.NodeEvent
+	ml         *memberlist.Memberlist
+	mlMembers  map[string]bool // Speakers that are alive according to memberlist.
+	mlJoinCh   chan struct{}
+	mlJoinList []string // A list of IPs of the ready speakers not yet members of the memberlist cluster.
 
 	mlSpeakerIPs []string // Speaker pod IPs.
 }
@@ -103,6 +104,7 @@ func New(logger log.Logger, nodeName, bindAddr, bindPort, secret, namespace, lab
 
 	sl.ml = ml
 	sl.mlMembers = map[string]bool{}
+	sl.mlJoinList = []string{}
 
 	return &sl, nil
 }
@@ -233,6 +235,21 @@ func (sl *SpeakerList) members() map[string]struct{} {
 	return members
 }
 
+//nolint:godot
+// updateJoinList updates mlJoinList with the IPs of all the ready speakers
+// (i.e. present in k8sSpeakers) that are not alive members of the memberlist cluster
+// (i.e. not present in mlMembers).
+// Must be called with SpeakerList mutex locked.
+func (sl *SpeakerList) updateJoinList() {
+	joinList := []string{}
+	for name, ip := range sl.k8sSpeakers {
+		if !sl.mlMembers[name] {
+			joinList = append(joinList, ip)
+		}
+	}
+	sl.mlJoinList = joinList
+}
+
 // SetSpeakers updates k8sSpeakers.
 func (sl *SpeakerList) SetSpeakers(eps k8s.EpsOrSlices) {
 	newmap := map[string]string{}
@@ -286,6 +303,9 @@ func (sl *SpeakerList) SetSpeakers(eps k8s.EpsOrSlices) {
 
 	sl.Lock()
 	sl.k8sSpeakers = newmap
+	if sl.ml != nil {
+		sl.updateJoinList()
+	}
 	sl.Unlock()
 }
 
@@ -377,6 +397,7 @@ func (sl *SpeakerList) memberlistWatchEvents() {
 				// If the event is not NodeLeave, the node is alive.
 				sl.mlMembers[e.Node.Name] = true
 			}
+			sl.updateJoinList()
 			sl.Unlock()
 			sl.forceSvcSync()
 		case <-sl.stopCh:
