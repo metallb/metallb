@@ -11,6 +11,7 @@ import (
 	"go.universe.tf/metallb/internal/config"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
@@ -188,12 +189,12 @@ func New(cfg *Config) (*Client, error) {
 
 				c.syncFuncs = append(c.syncFuncs, c.epInformer.HasSynced)
 			} else {
-				c.logger.Log("op", "New", "msg", "using endpoint slices")
+				level.Info(c.logger).Log("op", "New", "msg", "using endpoint slices")
 				slicesHandlers := cache.ResourceEventHandlerFuncs{
 					AddFunc: func(obj interface{}) {
 						slice, ok := obj.(*discovery.EndpointSlice)
 						if !ok {
-							c.logger.Log("op", "SliceAdd", "error", "received a non EndpointSlice item")
+							level.Error(c.logger).Log("op", "SliceAdd", "error", "received a non EndpointSlice item")
 							return
 						}
 
@@ -206,12 +207,12 @@ func New(cfg *Config) (*Client, error) {
 					UpdateFunc: func(old interface{}, new interface{}) {
 						slice, ok := new.(*discovery.EndpointSlice)
 						if !ok {
-							c.logger.Log("op", "SliceUpdate", "error", "received a non EndpointSlice item")
+							level.Error(c.logger).Log("op", "SliceUpdate", "error", "received a non EndpointSlice item")
 							return
 						}
 						key, err := serviceKeyForSlice(slice)
 						if err != nil {
-							c.logger.Log("op", "SliceUpdate", "error", "failed to get serviceKey for slice", "slice", slice.Name)
+							level.Error(c.logger).Log("op", "SliceUpdate", "error", "failed to get serviceKey for slice", "slice", slice.Name)
 							return
 						}
 						c.queue.Add(key)
@@ -219,12 +220,12 @@ func New(cfg *Config) (*Client, error) {
 					DeleteFunc: func(obj interface{}) {
 						slice, ok := obj.(*discovery.EndpointSlice)
 						if !ok {
-							c.logger.Log("op", "SliceDelete", "error", "received a non EndpointSlice item")
+							level.Error(c.logger).Log("op", "SliceDelete", "error", "received a non EndpointSlice item")
 							return
 						}
 						key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(slice)
 						if err != nil {
-							c.logger.Log("op", "SliceDelete", "error", err)
+							level.Error(c.logger).Log("op", "SliceDelete", "error", err)
 							return
 						}
 						c.queue.Add(svcKey(key))
@@ -303,7 +304,7 @@ func New(cfg *Config) (*Client, error) {
 	go func(l log.Logger) {
 		err := http.ListenAndServe(fmt.Sprintf("%s:%d", cfg.MetricsHost, cfg.MetricsPort), nil)
 		if err != nil {
-			l.Log("op", "listenAndServe", "err", err, "msg", "cannot listen and serve", "host", cfg.MetricsHost, "port", cfg.MetricsPort)
+			level.Error(l).Log("op", "listenAndServe", "err", err, "msg", "cannot listen and serve", "host", cfg.MetricsHost, "port", cfg.MetricsPort)
 		}
 	}(c.logger)
 
@@ -321,7 +322,7 @@ func (c *Client) CreateMlSecret(namespace, controllerDeploymentName, secretName 
 		return err
 	}
 	if len(l.Items) > 0 {
-		c.logger.Log("op", "CreateMlSecret", "msg", "secret already exists, nothing to do")
+		level.Debug(c.logger).Log("op", "CreateMlSecret", "msg", "secret already exists, nothing to do")
 		return nil
 	}
 
@@ -360,7 +361,7 @@ func (c *Client) CreateMlSecret(namespace, controllerDeploymentName, secretName 
 		},
 		metav1.CreateOptions{})
 	if err == nil {
-		c.logger.Log("op", "CreateMlSecret", "msg", "secret succesfully created")
+		level.Info(c.logger).Log("op", "CreateMlSecret", "msg", "secret succesfully created")
 	}
 	return err
 }
@@ -464,7 +465,7 @@ func (c *Client) sync(key interface{}) SyncState {
 		l := log.With(c.logger, "service", string(k))
 		svc, exists, err := c.svcIndexer.GetByKey(string(k))
 		if err != nil {
-			l.Log("op", "getService", "error", err, "msg", "failed to get service")
+			level.Error(l).Log("op", "getService", "error", err, "msg", "failed to get service")
 			return SyncStateError
 		}
 		if !exists {
@@ -475,7 +476,7 @@ func (c *Client) sync(key interface{}) SyncState {
 		if c.epIndexer != nil {
 			epsIntf, exists, err := c.epIndexer.GetByKey(string(k))
 			if err != nil {
-				l.Log("op", "getEndpoints", "error", err, "msg", "failed to get endpoints")
+				level.Error(l).Log("op", "getEndpoints", "error", err, "msg", "failed to get endpoints")
 				return SyncStateError
 			}
 			if !exists {
@@ -489,7 +490,7 @@ func (c *Client) sync(key interface{}) SyncState {
 		if c.slicesIndexer != nil {
 			slicesIntf, err := c.slicesIndexer.ByIndex(slicesServiceIndexName, string(k))
 			if err != nil {
-				l.Log("op", "getEndpointSlices", "error", err, "msg", "failed to get endpoints slices")
+				level.Error(l).Log("op", "getEndpointSlices", "error", err, "msg", "failed to get endpoints slices")
 				return SyncStateError
 			}
 			if len(slicesIntf) == 0 {
@@ -511,7 +512,7 @@ func (c *Client) sync(key interface{}) SyncState {
 		l := log.With(c.logger, "configmap", string(k))
 		cmi, exists, err := c.cmIndexer.GetByKey(string(k))
 		if err != nil {
-			l.Log("op", "getConfigMap", "error", err, "msg", "failed to get configmap")
+			level.Error(l).Log("op", "getConfigMap", "error", err, "msg", "failed to get configmap")
 			return SyncStateError
 		}
 		if !exists {
@@ -526,14 +527,14 @@ func (c *Client) sync(key interface{}) SyncState {
 		cm := cmi.(*v1.ConfigMap)
 		cfg, err := config.Parse([]byte(cm.Data["config"]))
 		if err != nil {
-			l.Log("event", "configStale", "error", err, "msg", "config (re)load failed, config marked stale")
+			level.Error(l).Log("event", "configStale", "error", err, "msg", "config (re)load failed, config marked stale")
 			configStale.Set(1)
 			return SyncStateSuccess
 		}
 
 		st := c.configChanged(l, cfg)
 		if st == SyncStateError {
-			l.Log("event", "configStale", "error", err, "msg", "config (re)load failed, config marked stale")
+			level.Error(l).Log("event", "configStale", "error", err, "msg", "config (re)load failed, config marked stale")
 			configStale.Set(1)
 			return SyncStateSuccess
 		}
@@ -541,18 +542,18 @@ func (c *Client) sync(key interface{}) SyncState {
 		configLoaded.Set(1)
 		configStale.Set(0)
 
-		l.Log("event", "configLoaded", "msg", "config (re)loaded")
+		level.Info(l).Log("event", "configLoaded", "msg", "config (re)loaded")
 		return st
 
 	case nodeKey:
 		l := log.With(c.logger, "node", string(k))
 		n, exists, err := c.nodeIndexer.GetByKey(string(k))
 		if err != nil {
-			l.Log("op", "getNode", "error", err, "msg", "failed to get node")
+			level.Error(l).Log("op", "getNode", "error", err, "msg", "failed to get node")
 			return SyncStateError
 		}
 		if !exists {
-			l.Log("op", "getNode", "error", "node doesn't exist in k8s, but I'm running on it!")
+			level.Error(l).Log("op", "getNode", "error", "node doesn't exist in k8s, but I'm running on it!")
 			return SyncStateError
 		}
 		node := n.(*v1.Node)

@@ -43,6 +43,9 @@ spec:
         args:
         - --port={{ .Values.prometheus.metricsPort }}
         - --config={{ template "metallb.configMapName" . }}
+        {{- with .Values.speaker.logLevel }}
+        - --log-level={{ . }}
+        {{- end }}
         env:
         - name: METALLB_NODE_NAME
           valueFrom:
