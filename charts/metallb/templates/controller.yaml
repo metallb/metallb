@@ -46,6 +46,9 @@ spec:
         args:
         - --port={{ .Values.prometheus.metricsPort }}
         - --config={{ template "metallb.configMapName" . }}
+        {{- with .Values.controller.logLevel }}
+        - --log-level={{ . }}
+        {{- end }}
         env:
         {{- if and .Values.speaker.enabled .Values.speaker.memberlist.enabled }}
         - name: METALLB_ML_SECRET_NAME

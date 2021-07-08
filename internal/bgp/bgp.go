@@ -18,6 +18,7 @@ import (
 	"unsafe"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"golang.org/x/sys/unix"
 )
 
@@ -57,7 +58,7 @@ func (s *Session) run() {
 			if err == errClosed {
 				return
 			}
-			s.logger.Log("op", "connect", "error", err, "msg", "failed to connect to peer")
+			level.Error(s.logger).Log("op", "connect", "error", err, "msg", "failed to connect to peer")
 			backoff := s.backoff.Duration()
 			time.Sleep(backoff)
 			continue
@@ -65,13 +66,13 @@ func (s *Session) run() {
 		stats.SessionUp(s.addr)
 		s.backoff.Reset()
 
-		s.logger.Log("event", "sessionUp", "msg", "BGP session established")
+		level.Info(s.logger).Log("event", "sessionUp", "msg", "BGP session established")
 
 		if !s.sendUpdates() {
 			return
 		}
 		stats.SessionDown(s.addr)
-		s.logger.Log("event", "sessionDown", "msg", "BGP session down")
+		level.Warn(s.logger).Log("event", "sessionDown", "msg", "BGP session down")
 	}
 }
 
@@ -98,7 +99,7 @@ func (s *Session) sendUpdates() bool {
 	for c, adv := range s.advertised {
 		if err := sendUpdate(s.conn, s.asn, ibgp, fbasn, s.defaultNextHop, adv); err != nil {
 			s.abort()
-			s.logger.Log("op", "sendUpdate", "ip", c, "error", err, "msg", "failed to send BGP update")
+			level.Error(s.logger).Log("op", "sendUpdate", "ip", c, "error", err, "msg", "failed to send BGP update")
 			return true
 		}
 		stats.UpdateSent(s.addr)
@@ -131,7 +132,7 @@ func (s *Session) sendUpdates() bool {
 
 			if err := sendUpdate(s.conn, s.asn, ibgp, fbasn, s.defaultNextHop, adv); err != nil {
 				s.abort()
-				s.logger.Log("op", "sendUpdate", "prefix", c, "error", err, "msg", "failed to send BGP update")
+				level.Error(s.logger).Log("op", "sendUpdate", "prefix", c, "error", err, "msg", "failed to send BGP update")
 				return true
 			}
 			stats.UpdateSent(s.addr)
@@ -147,7 +148,7 @@ func (s *Session) sendUpdates() bool {
 			if err := sendWithdraw(s.conn, wdr); err != nil {
 				s.abort()
 				for _, pfx := range wdr {
-					s.logger.Log("op", "sendWithdraw", "prefix", pfx, "error", err, "msg", "failed to send BGP withdraw")
+					level.Error(s.logger).Log("op", "sendWithdraw", "prefix", pfx, "error", err, "msg", "failed to send BGP withdraw")
 				}
 				return true
 			}
@@ -348,7 +349,7 @@ func (s *Session) sendKeepalive() error {
 	}
 	if err := sendKeepalive(s.conn); err != nil {
 		s.abort()
-		s.logger.Log("op", "sendKeepalive", "error", err, "msg", "failed to send keepalive")
+		level.Error(s.logger).Log("op", "sendKeepalive", "error", err, "msg", "failed to send keepalive")
 		return fmt.Errorf("sending keepalive to %q: %s", s.addr, err)
 	}
 	return nil
@@ -413,7 +414,7 @@ func (s *Session) consumeBGP(conn io.ReadCloser) {
 		if hdr.Type == 3 {
 			// TODO: propagate better than just logging directly.
 			err := readNotification(conn)
-			s.logger.Log("event", "peerNotification", "error", err, "msg", "peer sent notification, closing session")
+			level.Error(s.logger).Log("event", "peerNotification", "error", err, "msg", "peer sent notification, closing session")
 			return
 		}
 		if _, err := io.Copy(ioutil.Discard, io.LimitReader(conn, int64(hdr.Len)-19)); err != nil {

@@ -14,20 +14,20 @@ package speakerlist
 
 import (
 	"crypto/sha256"
-	golog "log"
 	"strconv"
 	"sync"
 	"time"
 
 	"go.universe.tf/metallb/internal/k8s"
 
-	gokitlog "github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/hashicorp/memberlist"
 )
 
 // SpeakerList represents a list of healthy speakers.
 type SpeakerList struct {
-	l         gokitlog.Logger
+	l         log.Logger
 	client    *k8s.Client
 	stopCh    chan struct{}
 	namespace string
@@ -43,7 +43,7 @@ type SpeakerList struct {
 }
 
 // New creates a new SpeakerList and returns a pointer to it.
-func New(logger gokitlog.Logger, nodeName, bindAddr, bindPort, secret, namespace, labels string, stopCh chan struct{}) (*SpeakerList, error) {
+func New(logger log.Logger, nodeName, bindAddr, bindPort, secret, namespace, labels string, stopCh chan struct{}) (*SpeakerList, error) {
 	sl := SpeakerList{
 		l:         logger,
 		stopCh:    stopCh,
@@ -52,7 +52,7 @@ func New(logger gokitlog.Logger, nodeName, bindAddr, bindPort, secret, namespace
 	}
 
 	if labels == "" || bindAddr == "" {
-		logger.Log("op", "startup", "msg", "not starting fast dead node detection (memberlist), need ml-bindaddr / ml-labels config")
+		level.Info(logger).Log("op", "startup", "msg", "not starting fast dead node detection (memberlist), need ml-bindaddr / ml-labels config")
 		return &sl, nil
 	}
 
@@ -65,16 +65,15 @@ func New(logger gokitlog.Logger, nodeName, bindAddr, bindPort, secret, namespace
 	if bindPort != "" {
 		mlport, err := strconv.Atoi(bindPort)
 		if err != nil {
-			logger.Log("op", "startup", "error", "unable to parse ml-bindport", "msg", err)
+			level.Error(logger).Log("op", "startup", "error", "unable to parse ml-bindport", "msg", err)
 			return nil, err
 		}
 		mconfig.BindPort = mlport
 		mconfig.AdvertisePort = mlport
 	}
-	loggerout := gokitlog.NewStdlibAdapter(gokitlog.With(sl.l, "component", "Memberlist"))
-	mconfig.Logger = golog.New(loggerout, "", golog.Lshortfile)
+	mconfig.Logger = newMemberlistLogger(sl.l)
 	if secret == "" {
-		logger.Log("op", "startup", "warning", "no ml-secret-key set, memberlist traffic will not be encrypted")
+		level.Warn(logger).Log("op", "startup", "warning", "no ml-secret-key set, memberlist traffic will not be encrypted")
 	} else {
 		sha := sha256.New()
 		mconfig.SecretKey = sha.Sum([]byte(secret))[:16]
@@ -93,7 +92,7 @@ func New(logger gokitlog.Logger, nodeName, bindAddr, bindPort, secret, namespace
 
 	ml, err := memberlist.Create(mconfig)
 	if err != nil {
-		logger.Log("op", "startup", "error", err, "msg", "failed to create memberlist")
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create memberlist")
 		return nil, err
 	}
 
@@ -135,7 +134,7 @@ func (sl *SpeakerList) Start(client *k8s.Client) {
 	// Initialize sl.mlSpeakerIPs.
 	iplist, err := sl.mlSpeakers()
 	if err != nil {
-		sl.l.Log("op", "memberDiscovery", "error", err, "msg", "failed to get pod IPs")
+		level.Error(sl.l).Log("op", "memberDiscovery", "error", err, "msg", "failed to get pod IPs")
 		iplist = nil
 	}
 
@@ -166,7 +165,7 @@ func (sl *SpeakerList) updateSpeakerIPs() {
 			// This blocks until the API server responds.
 			iplist, err := sl.mlSpeakers()
 			if err != nil {
-				sl.l.Log("op", "memberDiscovery", "error", err, "msg", "failed to get pod IPs")
+				level.Error(sl.l).Log("op", "memberDiscovery", "error", err, "msg", "failed to get pod IPs")
 				continue
 			}
 
@@ -254,9 +253,9 @@ func (sl *SpeakerList) mlJoin() {
 
 	nr, err := sl.ml.Join(joinIPs)
 	if err != nil || nr != len(joinIPs) {
-		sl.l.Log("op", "memberDiscovery", "msg", "partial join", "joined", nr, "expected", len(joinIPs), "error", err)
+		level.Error(sl.l).Log("op", "memberDiscovery", "msg", "partial join", "joined", nr, "expected", len(joinIPs), "error", err)
 	} else {
-		sl.l.Log("op", "Member detection", "msg", "memberlist join succesfully", "number of other nodes", nr)
+		level.Info(sl.l).Log("op", "Member detection", "msg", "memberlist join succesfully", "number of other nodes", nr)
 	}
 }
 
@@ -269,9 +268,9 @@ func (sl *SpeakerList) Rejoin() {
 
 	select {
 	case sl.mlJoinCh <- struct{}{}:
-		sl.l.Log("op", "memberDiscovery", "msg", "triggering discovery")
+		level.Info(sl.l).Log("op", "memberDiscovery", "msg", "triggering discovery")
 	default:
-		sl.l.Log("op", "memberDiscovery", "msg", "previous discovery in progress - doing nothing")
+		level.Debug(sl.l).Log("op", "memberDiscovery", "msg", "previous discovery in progress - doing nothing")
 	}
 }
 
@@ -293,11 +292,11 @@ func (sl *SpeakerList) Stop() {
 		return
 	}
 
-	sl.l.Log("op", "shutdown", "msg", "leaving memberlist cluster")
+	level.Info(sl.l).Log("op", "shutdown", "msg", "leaving memberlist cluster")
 	err := sl.ml.Leave(time.Second)
-	sl.l.Log("op", "shutdown", "msg", "left memberlist cluster", "error", err)
+	level.Info(sl.l).Log("op", "shutdown", "msg", "left memberlist cluster", "error", err)
 	err = sl.ml.Shutdown()
-	sl.l.Log("op", "shutdown", "msg", "memberlist shutdown", "error", err)
+	level.Info(sl.l).Log("op", "shutdown", "msg", "memberlist shutdown", "error", err)
 }
 
 func event2String(e memberlist.NodeEventType) string {
@@ -308,7 +307,7 @@ func (sl *SpeakerList) memberlistWatchEvents() {
 	for {
 		select {
 		case e := <-sl.mlEventCh:
-			sl.l.Log("msg", "node event - forcing sync", "node addr", e.Node.Addr, "node name", e.Node.Name, "node event", event2String(e.Event))
+			level.Info(sl.l).Log("msg", "node event - forcing sync", "node addr", e.Node.Addr, "node name", e.Node.Name, "node event", event2String(e.Event))
 			sl.client.ForceSync()
 		case <-sl.stopCh:
 			return

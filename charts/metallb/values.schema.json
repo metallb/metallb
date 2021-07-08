@@ -52,6 +52,10 @@
         "enabled": {
           "type": "boolean"
         },
+        "logLevel": {
+          "type": "string",
+          "enum": [ "all", "debug", "info", "warn", "error", "none" ]
+        },
         "image": {
           "type": "object",
           "properties": {

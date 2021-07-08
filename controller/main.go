@@ -20,6 +20,7 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"strings"
 
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/config"
@@ -28,6 +29,7 @@ import (
 	"go.universe.tf/metallb/internal/version"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	v1 "k8s.io/api/core/v1"
 )
 
@@ -46,8 +48,8 @@ type controller struct {
 }
 
 func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ k8s.EpsOrSlices) k8s.SyncState {
-	l.Log("event", "startUpdate", "msg", "start of service update")
-	defer l.Log("event", "endUpdate", "msg", "end of service update")
+	level.Debug(l).Log("event", "startUpdate", "msg", "start of service update")
+	defer level.Debug(l).Log("event", "endUpdate", "msg", "end of service update")
 
 	if svcRo == nil {
 		c.deleteBalancer(l, name)
@@ -59,7 +61,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 
 	if c.config == nil {
 		// Config hasn't been read, nothing we can do just yet.
-		l.Log("event", "noConfig", "msg", "not processing, still waiting for config")
+		level.Debug(l).Log("event", "noConfig", "msg", "not processing, still waiting for config")
 		return k8s.SyncStateSuccess
 	}
 
@@ -72,7 +74,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		return k8s.SyncStateError
 	}
 	if reflect.DeepEqual(svcRo, svc) {
-		l.Log("event", "noChange", "msg", "service converged, no change")
+		level.Debug(l).Log("event", "noChange", "msg", "service converged, no change")
 		return k8s.SyncStateSuccess
 	}
 
@@ -81,32 +83,32 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		st, svc = svc.Status, svcRo.DeepCopy()
 		svc.Status = st
 		if err := c.client.UpdateStatus(svc); err != nil {
-			l.Log("op", "updateServiceStatus", "error", err, "msg", "failed to update service status")
+			level.Error(l).Log("op", "updateServiceStatus", "error", err, "msg", "failed to update service status")
 			return k8s.SyncStateError
 		}
 	}
-	l.Log("event", "serviceUpdated", "msg", "updated service object")
+	level.Info(l).Log("event", "serviceUpdated", "msg", "updated service object")
 
 	return k8s.SyncStateSuccess
 }
 
 func (c *controller) deleteBalancer(l log.Logger, name string) {
 	if c.ips.Unassign(name) {
-		l.Log("event", "serviceDeleted", "msg", "service deleted")
+		level.Info(l).Log("event", "serviceDeleted", "msg", "service deleted")
 	}
 }
 
 func (c *controller) SetConfig(l log.Logger, cfg *config.Config) k8s.SyncState {
-	l.Log("event", "startUpdate", "msg", "start of config update")
-	defer l.Log("event", "endUpdate", "msg", "end of config update")
+	level.Debug(l).Log("event", "startUpdate", "msg", "start of config update")
+	defer level.Debug(l).Log("event", "endUpdate", "msg", "end of config update")
 
 	if cfg == nil {
-		l.Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
+		level.Error(l).Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
 		return k8s.SyncStateError
 	}
 
 	if err := c.ips.SetPools(cfg.Pools); err != nil {
-		l.Log("op", "setConfig", "error", err, "msg", "applying new configuration failed")
+		level.Error(l).Log("op", "setConfig", "error", err, "msg", "applying new configuration failed")
 		return k8s.SyncStateError
 	}
 	c.config = cfg
@@ -115,16 +117,10 @@ func (c *controller) SetConfig(l log.Logger, cfg *config.Config) k8s.SyncState {
 
 func (c *controller) MarkSynced(l log.Logger) {
 	c.synced = true
-	l.Log("event", "stateSynced", "msg", "controller synced, can allocate IPs now")
+	level.Info(l).Log("event", "stateSynced", "msg", "controller synced, can allocate IPs now")
 }
 
 func main() {
-	logger, err := logging.Init()
-	if err != nil {
-		fmt.Printf("failed to initialize logging: %s\n", err)
-		os.Exit(1)
-	}
-
 	var (
 		port       = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
 		config     = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
@@ -132,15 +128,22 @@ func main() {
 		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
 		mlSecret   = flag.String("ml-secret-name", os.Getenv("METALLB_ML_SECRET_NAME"), "name of the memberlist secret to create")
 		deployName = flag.String("deployment", os.Getenv("METALLB_DEPLOYMENT"), "name of the MetalLB controller Deployment")
+		logLevel   = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", strings.Join(logging.Levels, ", ")))
 	)
 	flag.Parse()
 
-	logger.Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "goversion", version.GoString(), "msg", "MetalLB controller starting "+version.String())
+	logger, err := logging.Init(*logLevel)
+	if err != nil {
+		fmt.Printf("failed to initialize logging: %s\n", err)
+		os.Exit(1)
+	}
+
+	level.Info(logger).Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "goversion", version.GoString(), "msg", "MetalLB controller starting "+version.String())
 
 	if *namespace == "" {
 		bs, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 		if err != nil {
-			logger.Log("op", "startup", "msg", "Unable to get namespace from pod service account data, please specify --namespace or METALLB_NAMESPACE", "error", err)
+			level.Error(logger).Log("op", "startup", "msg", "Unable to get namespace from pod service account data, please specify --namespace or METALLB_NAMESPACE", "error", err)
 			os.Exit(1)
 		}
 		*namespace = string(bs)
@@ -163,20 +166,20 @@ func main() {
 		Synced:         c.MarkSynced,
 	})
 	if err != nil {
-		logger.Log("op", "startup", "error", err, "msg", "failed to create k8s client")
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create k8s client")
 		os.Exit(1)
 	}
 
 	if *mlSecret != "" {
 		err = client.CreateMlSecret(*namespace, *deployName, *mlSecret)
 		if err != nil {
-			logger.Log("op", "startup", "error", err, "msg", "failed to create memberlist secret")
+			level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create memberlist secret")
 			os.Exit(1)
 		}
 	}
 
 	c.client = client
 	if err := client.Run(nil); err != nil {
-		logger.Log("op", "startup", "error", err, "msg", "failed to run k8s client")
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to run k8s client")
 	}
 }

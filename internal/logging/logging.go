@@ -12,7 +12,22 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"k8s.io/klog"
+)
+
+const (
+	levelAll   = "all"
+	levelDebug = "debug"
+	levelInfo  = "info"
+	levelWarn  = "warn"
+	levelError = "error"
+	levelNone  = "none"
+)
+
+var (
+	// Levels returns an array of valid log levels
+	Levels = []string{levelAll, levelDebug, levelInfo, levelWarn, levelError, levelNone}
 )
 
 // Init returns a logger configured with common settings like
@@ -22,7 +37,7 @@ import (
 // Init must be called as early as possible in main(), before any
 // application-specific flag parsing or logging occurs, because it
 // mutates the contents of the flag package as well as os.Stderr.
-func Init() (log.Logger, error) {
+func Init(level string) (log.Logger, error) {
 	l := log.NewJSONLogger(log.NewSyncWriter(os.Stdout))
 
 	r, w, err := os.Pipe()
@@ -33,7 +48,12 @@ func Init() (log.Logger, error) {
 	klog.SetOutput(w)
 	go collectGlogs(r, l)
 
-	return log.With(l, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller), nil
+	opt, err := parseLevel(level)
+	if err != nil {
+		return nil, err
+	}
+
+	return level.NewFilter(log.With(l, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller), opt), nil
 }
 
 func collectGlogs(f *os.File, logger log.Logger) {
@@ -57,16 +77,16 @@ func collectGlogs(f *os.File, logger log.Logger) {
 			buf = append(buf, l...)
 		}
 
-		level, ts, caller, msg := deformat(buf)
-		logger.Log("ts", ts.Format(time.RFC3339Nano), "level", level, "caller", caller, "msg", msg)
+		leveledLogger, ts, caller, msg := deformat(logger, buf)
+		leveledLogger.Log("ts", ts.Format(time.RFC3339Nano), "caller", caller, "msg", msg)
 	}
 }
 
 var logPrefix = regexp.MustCompile(`^(.)(\d{2})(\d{2}) (\d{2}):(\d{2}):(\d{2}).(\d{6})\s+\d+ ([^:]+:\d+)] (.*)$`)
 
-func deformat(b []byte) (level string, ts time.Time, caller, msg string) {
+func deformat(logger log.Logger, b []byte) (leveledLogger log.Logger, ts time.Time, caller, msg string) {
 	// Default deconstruction used when anything goes wrong.
-	level = "info"
+	leveledLogger = level.Info(logger)
 	ts = time.Now()
 	caller = ""
 	msg = string(b)
@@ -108,15 +128,34 @@ func deformat(b []byte) (level string, ts time.Time, caller, msg string) {
 
 	switch ms[1][0] {
 	case 'I':
-		level = "info"
+		leveledLogger = level.Info(logger)
 	case 'W':
-		level = "warn"
+		leveledLogger = level.Warn(logger)
 	case 'E', 'F':
-		level = "error"
+		leveledLogger = level.Error(logger)
 	}
 
 	caller = string(ms[8])
 	msg = string(ms[9])
 
 	return
+}
+
+func parseLevel(level string) (level.Option, error) {
+	switch level {
+	case levelAll:
+		return level.AllowAll(), nil
+	case levelDebug:
+		return level.AllowDebug(), nil
+	case levelInfo:
+		return level.AllowInfo(), nil
+	case levelWarn:
+		return level.AllowWarn(), nil
+	case levelError:
+		return level.AllowError(), nil
+	case levelNone:
+		return level.AllowNone(), nil
+	}
+
+	return nil, fmt.Errorf("failed to parse log level: %s", level)
 }
