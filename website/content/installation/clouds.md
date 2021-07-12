@@ -78,7 +78,7 @@ Additionally, you have to grant the `speaker` DaemonSet elevated
 privileges, so that it can do the raw networking required to make
 LoadBalancers work. You can do this with:
 
-```shell
+```bash
 oc adm policy add-scc-to-user privileged -n metallb-system -z speaker
 ```
 
