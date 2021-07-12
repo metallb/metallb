@@ -19,7 +19,7 @@ you'll have to either resolve them, or bump to the next version.
 MetalLB uses release branches to track releases. Relevant commits should be cherry-picked onto the release branch.
 For example:
 
-```
+```bash
 git checkout v0.9
 git cherry-pick -x f1f86ed658c1e8a6f90f967ed94881d61476b4c0
 git push
