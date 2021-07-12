@@ -6,7 +6,8 @@ weight: 6
 ## Can I have several address pools?
 
 Yes, for example:
-```
+
+```yaml
 addresses:
 - 192.168.12.0/24
 - 192.168.144.0/20

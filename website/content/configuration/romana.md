@@ -63,7 +63,7 @@ in
 set up the route publisher addon. In `publisher.conf`, add a neighbor
 configuration for MetalLB:
 
-```
+```ini
 protocol bgp metallb {
   local as 1234;
   neighbor 127.0.0.1 as 2345;
@@ -219,3 +219,4 @@ graph BT
       romanaA("Romana Route<br>Publisher")-- iBGP -->routerA(BGP Router)
     end
 {{< /mermaid >}}
+
