@@ -232,6 +232,48 @@ peers:
       values: [hostA, hostB]
 ```
 
+### Configuring the BGP source address
+
+When a host has multiple network interfaces or multiple IP addresses
+configured on one interface, the host's TCP/IP stack usually selects
+the IP address that is used as the source IP address for outbound
+connections automatically. This is true also for BGP connections.
+
+Sometimes, the automatically-selected address may not be the desired
+one for some reason. In such cases, MetalLB supports explicitly
+specifying the source address to be used when establishing a BGP
+session:
+
+```yaml
+peers:
+- peer-address: 10.0.0.1
+  peer-asn: 64501
+  my-asn: 64500
+  source-address: 10.0.0.2
+  node-selectors:
+  - match-labels:
+      kubernetes.io/hostname: node-1
+```
+
+The configuration above tells the MetalLB speaker to check if the
+address `10.0.0.2` exists locally on one of the host's network
+interfaces, and if so - to use it as the source address when
+establishing BGP sessions. If the address isn't found, the default
+behavior takes place (that is, the kernel selects the source address
+automatically).
+
+{{% notice warning %}}
+In most cases the `source-address` field should only be used with
+**per-node peers**, i.e. peers with node selectors which select only
+one node.
+
+By default, a BGP peer configured under the `peers` configuration
+section runs on **all** speaker nodes. It is likely meaningless to use
+the `source-address` field in a peer configuration that applies to
+more than one node because two nodes in a given network usually
+shouldn't have the same IP address.
+{{% /notice %}}
+
 ## Advanced address pool configuration
 
 ### Controlling automatic address allocation

@@ -12,9 +12,6 @@ spec:
   hostPID: false
   hostIPC: false
   hostNetwork: false
-  hostPorts:
-  - min: {{ .Values.prometheus.metricsPort }}
-    max: {{ .Values.prometheus.metricsPort }}
   # Volumes and file systems
   volumes:
   - configMap

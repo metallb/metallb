@@ -3,7 +3,44 @@ title: Release Notes
 weight: 8
 ---
 
-## Version 0.10.0 (Still in development)
+## Version 0.11.0 (Currently Under Development)
+
+New Features:
+
+- (helm chart) Add support for specifying additional labels for `PodMonitor`
+  and `PrometheusRule` resources. This is needed when using the Prometheus
+  operator and have it configured to use `PodMonitors` and `PrometheusRules`
+  that are using a specific label.
+
+Changes in behavior:
+
+Bug Fixes:
+
+## Version 0.10.3
+
+Bug Fixes:
+
+- Add `fsGroup` to the MetalLB controller deployment to address compatibility with Kubernetes 1.21
+  and later. See [Kubernetes issue #70679](https://github.com/kubernetes/kubernetes/issues/70679).
+  This ensures the MetalLB controller can read the service account token volume.
+  ([Issue #890](https://github.com/metallb/metallb/issues/890))
+
+## Version 0.10.2
+
+Bug Fixes:
+
+- Fix a missing RBAC update in the manifests used by the helm chart.
+  ([Issue #878](https://github.com/metallb/metallb/issues/878))
+
+## Version 0.10.1
+
+Bug Fixes:
+
+- Fix the images in `manifests/metallb.yaml` to refer to the images for the
+  release tag instead of the `main` branch.
+  ([Issue #874](https://github.com/metallb/metallb/issues/874))
+
+## Version 0.10.0
 
 New Features:
 
@@ -17,7 +54,9 @@ New Features:
   options or `METALLB_ML_SECRET_NAME` and `METALLB_DEPLOYMENT` environment variables.
   This is already done in the manifests provided with this release.
 
-Bug Fixes:
+- Endpoint Slices support. Endpoint slices are the proposed and more scalable
+  way introduced in k8s to find services endpoints. From this version, MetalLB checks for
+  EndpointSlices availability and uses them, otherwise it backs up to endpoints.
 
 Changes in behavior:
 
@@ -30,6 +69,15 @@ Changes in behavior:
   option and `METALLB_ML_NAMESPACE` environment variable of the `speaker` are
   replaced by the `namespace` option or the `METALLB_NAMESPACE` environment
   variable. If not set the namespace is read from `/var/run/secrets/kubernetes.io/serviceaccount/namespace`.
+
+This release includes contributions from Adit Sachde, Adrian Goins, Andrew
+Grosser, Brian Topping, Chance Carey, Chris Tarazi, Damien TOURDE, David
+Anderson, Dax McDonald, dougbtv, Etienne Champetier, Federico Paolinelli,
+Graeme Lawes, Henry-Kim-Youngwoo, Igal Serban, Jan Krcmar, JinLin Fu, Johannes
+Liebermann, Jumpy Squirrel, Lars Ekman, Leroy Shirto, Mark Gray, NorthFuture,
+Oleg Mayko, Reinier Schoof, Rodrigo Campos, Russell Bryant, Sebastien Dionne,
+Stefan Lasiewski, Steven Follis, sumarsono, Thorsten Schifferdecker, toby
+cabot, Tomofumi Hayashi, Tony Perez, and Yuan Liu. Thank you!
 
 ## Version 0.9.6
 [Documentation for this release](https://metallb.universe.tf)

@@ -185,14 +185,17 @@ def validate_kind_version():
     "name": "name of the kind cluster to use.",
     "protocol": "Pre-configure MetalLB with the specified protocol. "
                 "Unconfigured by default. Supported: 'bgp','layer2'",
+    "node_img": "Optional node image to use for the kind cluster (e.g. kindest/node:v1.18.19)."
+                "The node image drives the kubernetes version used in kind."
 })
-def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None):
+def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None, node_img=None):
     """Build and run MetalLB in a local Kind cluster.
 
     If the cluster specified by --name (default "kind") doesn't exist,
     it is created. Then, build MetalLB docker images from the
     checkout, push them into kind, and deploy manifests/metallb.yaml
     to run those images.
+    The optional node_img parameter will be used to determine the version of the cluster.
     """
 
     validate_kind_version()
@@ -216,16 +219,19 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None):
             config["networking"] = {
                 "disableDefaultCNI": True,
             }
+        extra_options = ""
+        if node_img != None:
+            extra_options = "--image={}".format(node_img)
         config = yaml.dump(config).encode("utf-8")
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(config)
             tmp.flush()
-            run("kind create cluster --name={} --config={}".format(name, tmp.name), pty=True, echo=True)
+            run("kind create cluster --name={} --config={} {}".format(name, tmp.name, extra_options), pty=True, echo=True)
 
     if mk_cluster and cni:
         run("kubectl apply -f e2etest/manifests/{}.yaml".format(cni), echo=True)
-
-    build(ctx, binaries=["controller", "speaker", "mirror-server"], architectures=[architecture])
+    binaries = ["controller", "speaker", "mirror-server"]
+    build(ctx, binaries, architectures=[architecture])
     run("kind load docker-image --name={} quay.io/metallb/controller:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
@@ -239,7 +245,9 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None):
 
         with open(manifests_dir + "/metallb.yaml") as f:
             manifest = f.read()
-        manifest = manifest.replace(":main", ":dev-{}".format(architecture))
+        for image in binaries:
+            manifest = re.sub("image: quay.io/metallb/{}:.*".format(image),
+                          "image: quay.io/metallb/{}:dev-{}".format(image, architecture), manifest)
         with open(tmpdir + "/metallb.yaml", "w") as f:
             f.write(manifest)
             f.flush()
@@ -352,7 +360,7 @@ def bgp_dev_env():
         '    docker rm -f $frr ; '
         'done', echo=True)
     run("docker run -d --privileged --network kind --rm --name frr --volume %s:/etc/frr "
-            "frrouting/frr:latest" % frr_volume_dir, echo=True)
+            "frrouting/frr:v7.5.1" % frr_volume_dir, echo=True)
 
     peer_address = run('docker inspect -f "{{ '
             'range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" frr', echo=True)
@@ -379,7 +387,7 @@ def dev_env_cleanup(ctx, name="kind"):
 
     run('for frr in $(docker ps -a -f name=frr --format {{.Names}}) ; do '
         '    docker rm -f $frr ; '
-        'done', echo=True)
+        'done', hide=True)
 
     # cleanup bgp configs
     dev_env_dir = os.getcwd() + "/dev-env/bgp"
@@ -471,8 +479,8 @@ def release(ctx, version, skip_release_notes=False):
     run("perl -pi -e 's/MetalLB .*/MetalLB v{}/g' website/content/_header.md".format(version), echo=True)
 
     # Update the manifests with the new version
-    run("perl -pi -e 's,image: metallb/speaker:.*,image: metallb/speaker:v{},g' manifests/metallb.yaml".format(version), echo=True)
-    run("perl -pi -e 's,image: metallb/controller:.*,image: metallb/controller:v{},g' manifests/metallb.yaml".format(version), echo=True)
+    run("perl -pi -e 's,image: quay.io/metallb/speaker:.*,image: quay.io/metallb/speaker:v{},g' manifests/metallb.yaml".format(version), echo=True)
+    run("perl -pi -e 's,image: quay.io/metallb/controller:.*,image: quay.io/metallb/controller:v{},g' manifests/metallb.yaml".format(version), echo=True)
 
     # Update the versions in the helm chart (version and appVersion are always the same)
     # helm chart versions follow Semantic Versioning, and thus exclude the leading 'v'
@@ -519,3 +527,75 @@ def checkpatch(ctx):
     except UnexpectedExit:
         # Will exit non-zero if no double-space-after-period lines are found.
         pass
+
+
+@task(help={
+    "env": "Specify in which environment to run the linter . Default 'container'. Supported: 'container','host'"
+})
+def lint(ctx, env="container"):
+    """Run linter.
+
+    By default, this will run a golangci-lint docker image against the code.
+    However, in some environments (such as the MetalLB CI), it may be more
+    convenient to install the golangci-lint binaries on the host. This can be
+    achieved by running `inv lint --env host`.
+    """
+    version = "1.39.0"
+
+    if env == "container":
+        run("docker run --rm -v $(git rev-parse --show-toplevel):/app -w /app golangci/golangci-lint:v{} golangci-lint run $(git rev-parse --show-toplevel)/...".format(version), echo=True)
+    elif env == "host":
+        run("curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v{}".format(version))
+        run("golangci-lint run --timeout 5m0s $(git rev-parse --show-toplevel)/...")
+    else:
+        raise Exit(message="Unsupported linter environment: {}". format(env))
+
+
+@task(help={
+    "name": "name of the kind cluster to test (only kind uses).",
+    "export": "where to export kind logs.",
+    "kubeconfig": "kubeconfig location. By default, use the kubeconfig from kind.",
+    "system_namespaces": "comma separated list of Kubernetes system namespaces",
+    "service_pod_port": "port number that service pods open.",
+    "skip_docker": "don't use docker command in BGP testing."
+})
+def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False):
+    """Run E2E tests against development cluster."""
+    if skip_docker:
+        opt_skip_docker = "-skip-docker"
+    else:
+        opt_skip_docker = ""
+
+    if kubeconfig is None:
+        validate_kind_version()
+        clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
+        if name in clusters:
+            kubeconfig_file = tempfile.NamedTemporaryFile()
+            kubeconfig = kubeconfig_file.name
+            run("kind export kubeconfig --name={} --kubeconfig={}".format(name, kubeconfig), pty=True, echo=True)
+        else:
+            raise Exit(message="Unable to find cluster named: {}".format(name))
+    else:
+        os.environ['KUBECONFIG'] = kubeconfig
+
+    namespaces = system_namespaces.replace(' ', '').split(',')
+    for ns in namespaces:
+        run("kubectl -n {} wait --for=condition=Ready --all pods --timeout 300s".format(ns), hide=True)
+
+    try:
+        metallb_config = yaml.load(run("kubectl get configmaps -n metallb-system config -o jsonpath='{.data.config}'", hide=True).stdout)
+    except UnexpectedExit:
+        print("dev-env environment not configured. Try running `inv dev-env -p <layer2/bgp>`")
+        sys.exit(1)
+
+    if metallb_config['address-pools'][0]['name'] == "dev-env-layer2":
+        run("cd `git rev-parse --show-toplevel`/e2etest &&"
+            "go test --provider=local -ginkgo.focus=L2 --kubeconfig={} -service-pod-port={}".format(kubeconfig, service_pod_port))
+    elif metallb_config['address-pools'][0]['name'] == "dev-env-bgp":
+        run("cd `git rev-parse --show-toplevel`/e2etest &&"
+            "go test --provider=local -ginkgo.focus=BGP --kubeconfig={} -service-pod-port={} {}".format(kubeconfig, service_pod_port, opt_skip_docker))
+    else:
+        print("dev-env environment not configured correctly. Try running `inv dev-env -p <layer2/bgp>`")
+    
+    if export != None:
+        run("kind export logs {}".format(export))

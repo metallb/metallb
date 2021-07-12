@@ -54,6 +54,7 @@ peers:
   peer-port: 1179
   hold-time: 180s
   router-id: 10.20.30.40
+  source-address: 10.20.30.40
 - my-asn: 100
   peer-asn: 200
   peer-address: 2.3.4.5
@@ -98,6 +99,7 @@ address-pools:
 						MyASN:         42,
 						ASN:           142,
 						Addr:          net.ParseIP("1.2.3.4"),
+						SrcAddr:       net.ParseIP("10.20.30.40"),
 						Port:          1179,
 						HoldTime:      180 * time.Second,
 						RouterID:      net.ParseIP("10.20.30.40"),

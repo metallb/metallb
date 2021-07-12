@@ -12,7 +12,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/google/go-cmp/cmp"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -486,7 +486,7 @@ func TestControllerMutation(t *testing.T) {
 			t.Logf("Running case %q", test.desc)
 			k.reset()
 
-			if c.SetBalancer(l, "test", test.in, nil) == k8s.SyncStateError {
+			if c.SetBalancer(l, "test", test.in, k8s.EpsOrSlices{}) == k8s.SyncStateError {
 				t.Errorf("%q: SetBalancer returned error", test.desc)
 				continue
 			}
@@ -549,7 +549,7 @@ func TestControllerConfig(t *testing.T) {
 			ClusterIP: "1.2.3.4",
 		},
 	}
-	if c.SetBalancer(l, "test", svc, nil) == k8s.SyncStateError {
+	if c.SetBalancer(l, "test", svc, k8s.EpsOrSlices{}) == k8s.SyncStateError {
 		t.Fatalf("SetBalancer failed")
 	}
 
@@ -567,7 +567,7 @@ func TestControllerConfig(t *testing.T) {
 	if c.SetConfig(l, &config.Config{}) == k8s.SyncStateError {
 		t.Fatalf("SetConfig with empty config failed")
 	}
-	if c.SetBalancer(l, "test", svc, nil) != k8s.SyncStateError {
+	if c.SetBalancer(l, "test", svc, k8s.EpsOrSlices{}) != k8s.SyncStateError {
 		t.Fatal("SetBalancer did not fail")
 	}
 
@@ -591,7 +591,7 @@ func TestControllerConfig(t *testing.T) {
 	if c.SetConfig(l, cfg) == k8s.SyncStateError {
 		t.Fatalf("SetConfig failed")
 	}
-	if c.SetBalancer(l, "test", svc, nil) != k8s.SyncStateError {
+	if c.SetBalancer(l, "test", svc, k8s.EpsOrSlices{}) != k8s.SyncStateError {
 		t.Fatal("SetBalancer did not fail")
 	}
 
@@ -606,7 +606,7 @@ func TestControllerConfig(t *testing.T) {
 	// Mark synced. Finally, we can allocate.
 	c.MarkSynced(l)
 
-	if c.SetBalancer(l, "test", svc, nil) == k8s.SyncStateError {
+	if c.SetBalancer(l, "test", svc, k8s.EpsOrSlices{}) == k8s.SyncStateError {
 		t.Fatalf("SetBalancer failed")
 	}
 
@@ -656,7 +656,7 @@ func TestDeleteRecyclesIP(t *testing.T) {
 			ClusterIP: "1.2.3.4",
 		},
 	}
-	if c.SetBalancer(l, "test", svc1, nil) == k8s.SyncStateError {
+	if c.SetBalancer(l, "test", svc1, k8s.EpsOrSlices{}) == k8s.SyncStateError {
 		t.Fatal("SetBalancer svc1 failed")
 	}
 	gotSvc := k.gotService(svc1)
@@ -676,7 +676,7 @@ func TestDeleteRecyclesIP(t *testing.T) {
 			ClusterIP: "1.2.3.4",
 		},
 	}
-	if c.SetBalancer(l, "test2", svc2, nil) == k8s.SyncStateError {
+	if c.SetBalancer(l, "test2", svc2, k8s.EpsOrSlices{}) == k8s.SyncStateError {
 		t.Fatal("SetBalancer svc2 failed")
 	}
 	if k.gotService(svc2) != nil {
@@ -685,12 +685,12 @@ func TestDeleteRecyclesIP(t *testing.T) {
 	k.reset()
 
 	// Deleting the first LB should tell us to reprocess all services.
-	if c.SetBalancer(l, "test", nil, nil) != k8s.SyncStateReprocessAll {
+	if c.SetBalancer(l, "test", nil, k8s.EpsOrSlices{}) != k8s.SyncStateReprocessAll {
 		t.Fatal("SetBalancer with nil LB didn't tell us to reprocess all balancers")
 	}
 
 	// Setting svc2 should now allocate correctly.
-	if c.SetBalancer(l, "test2", svc2, nil) == k8s.SyncStateError {
+	if c.SetBalancer(l, "test2", svc2, k8s.EpsOrSlices{}) == k8s.SyncStateError {
 		t.Fatal("SetBalancer svc2 failed")
 	}
 	gotSvc = k.gotService(svc2)

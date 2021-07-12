@@ -1,28 +1,57 @@
 # -*- mode: yaml -*-
 
-version: 2
-jobs:
-  test-1.16:
-    docker:
-      - image: cimg/go:1.16
+version: 2.1
+commands:
+  setup_ci_image:
+    description: "Install dependencies"
     steps:
       - checkout
       - run: sudo apt-get update
       - run: sudo apt-get install python3-pip
       - run: sudo pip3 install invoke semver pyyaml
+  setup_kind:
+    description: "Install kind"
+    steps:
+      - run: GO111MODULE="on" go get sigs.k8s.io/kind@v0.10.0
+      - run: curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+      - run: sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+jobs:
+  test-1-16:
+    docker:
+      - image: cimg/go:1.16
+    steps:
+      - setup_ci_image
       - run: inv test
       - run: cp manifests/metallb.yaml manifests/metallb.yaml.prev
-  lint-1.16:
+  e2etest-bgp:
+    machine:
+      image: ubuntu-2004:202104-01
+    steps:
+      - setup_ci_image
+      - setup_kind
+      - run: inv build
+      - run: inv dev-env -p bgp
+      - run: inv e2etest -e /tmp/kind_logs
+      - store_artifacts:
+          path: /tmp/kind_logs
+  e2etest-layer2:
+    machine:
+      image: ubuntu-2004:202104-01
+    steps:
+      - setup_ci_image
+      - setup_kind
+      - run: inv build
+      - run: inv dev-env -p layer2
+      - run: inv e2etest -e /tmp/kind_logs
+      - store_artifacts:
+          path: /tmp/kind_logs
+  lint-1-16:
     docker:
       - image: cimg/go:1.16
     steps:
-      - checkout
-      - run: curl -L https://git.io/vp6lP | sh # gometalinter
-      - run: PATH=./bin:$PATH gometalinter --deadline=5m --disable-all --enable=gofmt --enable=vet --vendor ./...
-      - run: sudo apt-get update
-      - run: sudo apt-get install python3-pip
-      - run: sudo pip3 install invoke semver pyyaml
+      - setup_ci_image
       - run: inv checkpatch
+      - run: inv lint -e host
   # FIXME: this is pinned to v3.0.0 because subsequent versions of ct pull in new versions of helm, which are subject
   #        to this bug: https://github.com/helm/helm/issues/8835, specifically for rbac object names with ':' in them
   helm-lint:
@@ -47,13 +76,11 @@ jobs:
     docker:
       - image: cimg/go:1.16
     steps:
-      - checkout
       # This job should not run against PRs, but we have seen it run unexpectedly, so
       # double check and exit early if this is a job against a PR.
       - run: if [ -n "$CIRCLE_PULL_REQUEST" ]; then circleci-agent step halt; fi
+      - setup_ci_image
       - setup_remote_docker
-      - run: sudo apt-get update && sudo apt-get install -y python-pip
-      - run: pip install invoke semver pyyaml
       - run: docker login -u $DOCKER_USER -p $DOCKER_PASSWORD
       - run: mkdir -p ./bin
       - run: wget -O ./bin/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.3/manifest-tool-linux-amd64 && chmod +x ./bin/manifest-tool
@@ -62,13 +89,11 @@ jobs:
     docker:
       - image: cimg/go:1.16
     steps:
-      - checkout
       # This job should not run against PRs, but we have seen it run unexpectedly, so
       # double check and exit early if this is a job against a PR.
       - run: if [ -n "$CIRCLE_PULL_REQUEST" ]; then circleci-agent step halt; fi
+      - setup_ci_image
       - setup_remote_docker
-      - run: sudo apt-get update && sudo apt-get install -y python-pip
-      - run: pip install invoke semver pyyaml
       - run: docker login quay.io -u $QUAY_USER -p $QUAY_PASSWORD
       - run: mkdir -p ./bin
       - run: wget -O ./bin/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.3/manifest-tool-linux-amd64 && chmod +x ./bin/manifest-tool
@@ -77,11 +102,11 @@ workflows:
   version: 2
   test-and-publish:
     jobs:
-      - test-1.16:
+      - test-1-16:
           filters:
             tags:
               only: /.*/
-      - lint-1.16:
+      - lint-1-16:
           filters:
             tags:
               only: /.*/
@@ -90,6 +115,14 @@ workflows:
             tags:
               only: /.*/
       - helm-conftest:
+          filters:
+            tags:
+              only: /.*/
+      - e2etest-bgp:
+          filters:
+            tags:
+              only: /.*/
+      - e2etest-layer2:
           filters:
             tags:
               only: /.*/
@@ -102,8 +135,8 @@ workflows:
             tags:
               only: /.*/
           requires:
-            - test-1.16
-            - lint-1.16
+            - test-1-16
+            - lint-1-16
       - publish-images-quay:
           filters:
             branches:
@@ -113,5 +146,5 @@ workflows:
             tags:
               only: /.*/
           requires:
-            - test-1.16
-            - lint-1.16
+            - test-1-16
+            - lint-1-16

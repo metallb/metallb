@@ -28,7 +28,7 @@ import (
 	"go.universe.tf/metallb/internal/version"
 
 	"github.com/go-kit/kit/log"
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 )
 
 // Service offers methods to mutate a Kubernetes service object.
@@ -45,7 +45,7 @@ type controller struct {
 	ips    *allocator.Allocator
 }
 
-func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ *v1.Endpoints) k8s.SyncState {
+func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ k8s.EpsOrSlices) k8s.SyncState {
 	l.Log("event", "startUpdate", "msg", "start of service update")
 	defer l.Log("event", "endUpdate", "msg", "end of service update")
 
