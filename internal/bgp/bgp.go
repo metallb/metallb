@@ -29,6 +29,7 @@ type Session struct {
 	routerID         net.IP // May be nil, meaning "derive from context"
 	myNode           string
 	addr             string
+	srcAddr          net.IP
 	peerASN          uint32
 	peerFBASNSupport bool
 	holdTime         time.Duration
@@ -170,7 +171,7 @@ func (s *Session) connect() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	deadline, _ := ctx.Deadline()
-	conn, err := dialMD5(ctx, s.addr, s.password)
+	conn, err := dialMD5(ctx, s.addr, s.srcAddr, s.password)
 	if err != nil {
 		return fmt.Errorf("dial %q: %s", s.addr, err)
 	}
@@ -189,7 +190,10 @@ func (s *Session) connect() error {
 
 	routerID := s.routerID
 	if routerID == nil {
-		routerID = getRouterID(s.defaultNextHop, s.myNode)
+		routerID, err = getRouterID(s.defaultNextHop, s.myNode)
+		if err != nil {
+			return err
+		}
 	}
 
 	if err = sendOpen(conn, s.asn, routerID, s.holdTime); err != nil {
@@ -241,17 +245,20 @@ func (s *Session) connect() error {
 	return nil
 }
 
-func hashRouterId(hostname string) net.IP {
+func hashRouterId(hostname string) (net.IP, error) {
 	buf := new(bytes.Buffer)
-	binary.Write(buf, binary.LittleEndian, crc32.ChecksumIEEE([]byte(hostname)))
-	return net.IP(buf.Bytes())
+	err := binary.Write(buf, binary.LittleEndian, crc32.ChecksumIEEE([]byte(hostname)))
+	if err != nil {
+		return nil, err
+	}
+	return net.IP(buf.Bytes()), nil
 }
 
 // Ipv4; Use the address as-is.
 // Ipv6; Pick the first ipv4 address on the same interface as the address
-func getRouterID(addr net.IP, myNode string) net.IP {
+func getRouterID(addr net.IP, myNode string) (net.IP, error) {
 	if addr.To4() != nil {
-		return addr
+		return addr, nil
 	}
 
 	ifaces, err := net.Interfaces()
@@ -284,7 +291,7 @@ func getRouterID(addr net.IP, myNode string) net.IP {
 						ip = v.IP
 					}
 					if ip.To4() != nil {
-						return ip
+						return ip, nil
 					}
 				}
 				return hashRouterId(myNode)
@@ -351,9 +358,10 @@ func (s *Session) sendKeepalive() error {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func New(l log.Logger, addr string, asn uint32, routerID net.IP, peerASN uint32, holdTime time.Duration, password string, myNode string) (*Session, error) {
+func New(l log.Logger, addr string, srcAddr net.IP, asn uint32, routerID net.IP, peerASN uint32, holdTime time.Duration, password string, myNode string) (*Session, error) {
 	ret := &Session{
 		addr:        addr,
+		srcAddr:     srcAddr,
 		asn:         asn,
 		routerID:    routerID.To4(),
 		myNode:      myNode,
@@ -519,8 +527,26 @@ type tcpmd5sig struct {
 // proper TCP MD5 options when the password is not empty. Works by manupulating
 // the low level FD's, skipping the net.Conn API as it has not hooks to set
 // the neccessary sockopts for TCP MD5.
-func dialMD5(ctx context.Context, addr, password string) (net.Conn, error) {
-	laddr, err := net.ResolveTCPAddr("tcp", "[::]:0")
+func dialMD5(ctx context.Context, addr string, srcAddr net.IP, password string) (net.Conn, error) {
+	// If srcAddr exists on any of the local network interfaces, use it as the
+	// source address of the TCP socket. Otherwise, use the IPv6 unspecified
+	// address ("::") to let the kernel figure out the source address.
+	// NOTE: On Linux, "::" also includes "0.0.0.0" (all IPv4 addresses).
+	a := "[::]"
+	if srcAddr != nil {
+		ifs, err := net.Interfaces()
+		if err != nil {
+			return nil, fmt.Errorf("Querying local interfaces: %w", err)
+		}
+
+		if !localAddressExists(ifs, srcAddr) {
+			return nil, fmt.Errorf("Address %q doesn't exist on this host", srcAddr)
+		}
+
+		a = fmt.Sprintf("[%s]", srcAddr.String())
+	}
+
+	laddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:0", a))
 	if err != nil {
 		return nil, fmt.Errorf("Error resolving local address: %s ", err)
 	}
@@ -664,4 +690,27 @@ func buildTCPMD5Sig(addr net.IP, key string) tcpmd5sig {
 	copy(t.key[0:], []byte(key))
 
 	return t
+}
+
+// localAddressExists returns true if the address addr exists on any of the
+// network interfaces in the ifs slice.
+func localAddressExists(ifs []net.Interface, addr net.IP) bool {
+	for _, i := range ifs {
+		addresses, err := i.Addrs()
+		if err != nil {
+			continue
+		}
+
+		for _, a := range addresses {
+			ip, ok := a.(*net.IPNet)
+			if !ok {
+				continue
+			}
+			if ip.IP.Equal(addr) {
+				return true
+			}
+		}
+	}
+
+	return false
 }

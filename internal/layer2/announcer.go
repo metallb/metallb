@@ -133,18 +133,21 @@ func (a *Announce) updateInterfaces() {
 			a.logger.Log("interface", client.Interface(), "event", "deleteNDPResponder", "msg", "deleted NDP responder for interface")
 		}
 	}
-
-	return
 }
 
 func (a *Announce) spamLoop() {
 	// Map IP to spam stop time.
 	m := map[string]time.Time{}
-	// See https://github.com/metallb/metallb/issues/172 for the 1100 choice.
-	ticker := time.NewTicker(1100 * time.Millisecond)
+	// We can't create a stopped ticker, so create one with a big period to avoid ticking for nothing
+	ticker := time.NewTicker(time.Hour)
+	ticker.Stop()
 	for {
 		select {
 		case ip := <-a.spamCh:
+			if len(m) == 0 {
+				// See https://github.com/metallb/metallb/issues/172 for the 1100 choice.
+				ticker.Reset(1100 * time.Millisecond)
+			}
 			ipStr := ip.String()
 			_, ok := m[ipStr]
 			// Set spam stop time to 5 seconds from now.
@@ -162,6 +165,9 @@ func (a *Announce) spamLoop() {
 				} else {
 					a.spam(net.ParseIP(ipStr))
 				}
+			}
+			if len(m) == 0 {
+				ticker.Stop()
 			}
 		}
 	}

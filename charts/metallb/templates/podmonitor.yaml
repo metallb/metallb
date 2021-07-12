@@ -6,6 +6,9 @@ metadata:
   labels:
     {{- include "metallb.labels" . | nindent 4 }}
     app.kubernetes.io/component: controller
+    {{- if .Values.prometheus.podMonitor.additionalLabels }}
+{{ toYaml .Values.prometheus.podMonitor.additionalLabels | indent 4 }}
+    {{- end }}
 spec:
   jobLabel: {{ .Values.prometheus.podMonitor.jobLabel | quote }}
   selector:
@@ -37,6 +40,9 @@ metadata:
   labels:
     {{- include "metallb.labels" . | nindent 4 }}
     app.kubernetes.io/component: speaker
+    {{- if .Values.prometheus.podMonitor.additionalLabels }}
+{{ toYaml .Values.prometheus.podMonitor.additionalLabels | indent 4 }}
+    {{- end }}
 spec:
   jobLabel: {{ .Values.prometheus.podMonitor.jobLabel | quote }}
   selector:
