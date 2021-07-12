@@ -4,11 +4,13 @@ reviewers:
   - dcbw
   - squeed
   - msherif1234
+  - markdgray
 approvers:
   - russellb
   - dougbtv
   - dcbw
   - squeed
   - msherif1234
+  - markdgray
 component: "Networking"
 subcomponent: "metallb"
