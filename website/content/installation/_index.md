@@ -24,7 +24,7 @@ If you're using kube-proxy in IPVS mode, since Kubernetes v1.14.2 you have to en
 
 You can achieve this by editing kube-proxy config in current cluster:
 
-```shell
+```bash
 kubectl edit configmap -n kube-system kube-proxy
 ```
 
@@ -42,7 +42,7 @@ You can also add this configuration snippet to your kubeadm-config, just append 
 
 If you are trying to automate this change, these shell snippets may help you:
 
-```shell
+```bash
 # see what changes would be made, returns nonzero returncode if different
 kubectl get configmap kube-proxy -n kube-system -o yaml | \
 sed -e "s/strictARP: false/strictARP: true/" | \
@@ -58,7 +58,7 @@ kubectl apply -f - -n kube-system
 
 To install MetalLB, apply the manifest:
 
-```shell
+```bash
 kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifests/namespace.yaml
 kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifests/metallb.yaml
 ```
@@ -102,7 +102,7 @@ the configMap, as MetalLB is waiting for a configMap named `config`
 (see
 [https://github.com/kubernetes-sigs/kustomize/blob/master/examples/generatorOptions.md](https://github.com/kubernetes-sigs/kustomize/blob/master/examples/generatorOptions.md)):
 
-```
+```yaml
 # kustomization.yml
 namespace: metallb-system
 
@@ -123,17 +123,19 @@ generatorOptions:
 You can install MetallLB with [helm](https://helm.sh/)
 by using the helm chart repository: https://metallb.github.io/metallb
 
-```yaml
+```bash
 helm repo add metallb https://metallb.github.io/metallb
 helm install metallb metallb/metallb
 ```
 
 A values file may be specified on installation. This is recommended for providing configs in helm values:
-```yaml
+
+```bash
 helm install metallb metallb/metallb -f values.yaml
 ```
 
 MetalLB configs are set in values.yaml under `configInLine`:
+
 ```yaml
 configInline:
   address-pools:

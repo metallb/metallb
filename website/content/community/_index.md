@@ -146,9 +146,11 @@ are needed. Speakers need those and `-node-name`.
 
 For example:
 
- metallb$ go run ./controller/main.go ./controller/service.go -config-ns metallb-system -kubeconfig $KUBECONFIG
+```bash
+metallb$ go run ./controller/main.go ./controller/service.go -config-ns metallb-system -kubeconfig $KUBECONFIG
 
- metallb$ go run ./speaker/main.go ./speaker/*controller.go -config-ns metallb-system -kubeconfig $KUBECONFIG -node-name node0
+metallb$ go run ./speaker/main.go ./speaker/*controller.go -config-ns metallb-system -kubeconfig $KUBECONFIG -node-name node0
+```
 
 For development, fork
 the [github repository](https://github.com/metallb/metallb), and add

@@ -26,7 +26,7 @@ In this example, `arping` is used to trigger a request and it should receive a r
 
 The output should look similar to the following:
 
-```
+```bash
 $ arping -I ens3 192.168.1.240
 ARPING 192.168.1.240 from 192.168.1.35 ens3
 Unicast reply from 192.168.1.240 [FA:16:3E:5A:39:4C]  1.077ms
@@ -45,7 +45,7 @@ Received 4 response(s)
 
 Capture all replies from `192.168.1.240`:
 
-```
+```bash
 $ tcpdump -n -i ens3 arp src host 192.168.1.240
 tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
 listening on ens3, link-type EN10MB (Ethernet), capture size 262144 bytes
@@ -63,7 +63,7 @@ listening on ens3, link-type EN10MB (Ethernet), capture size 262144 bytes
 
 In addition to the above, make sure to watch the logs of MetalLB's speaker component for ARP requests and responses (using [kubetail](https://github.com/johanhaleby/kubetail)):
 
-```
+```bash
 $ kubetail -l component=speaker -n metallb-system
 ...
 ```
