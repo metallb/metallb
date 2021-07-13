@@ -37,7 +37,7 @@ var (
 // Init must be called as early as possible in main(), before any
 // application-specific flag parsing or logging occurs, because it
 // mutates the contents of the flag package as well as os.Stderr.
-func Init(level string) (log.Logger, error) {
+func Init(lvl string) (log.Logger, error) {
 	l := log.NewJSONLogger(log.NewSyncWriter(os.Stdout))
 
 	r, w, err := os.Pipe()
@@ -48,7 +48,7 @@ func Init(level string) (log.Logger, error) {
 	klog.SetOutput(w)
 	go collectGlogs(r, l)
 
-	opt, err := parseLevel(level)
+	opt, err := parseLevel(lvl)
 	if err != nil {
 		return nil, err
 	}
@@ -141,8 +141,8 @@ func deformat(logger log.Logger, b []byte) (leveledLogger log.Logger, ts time.Ti
 	return
 }
 
-func parseLevel(level string) (level.Option, error) {
-	switch level {
+func parseLevel(lvl string) (level.Option, error) {
+	switch lvl {
 	case levelAll:
 		return level.AllowAll(), nil
 	case levelDebug:
@@ -157,5 +157,5 @@ func parseLevel(level string) (level.Option, error) {
 		return level.AllowNone(), nil
 	}
 
-	return nil, fmt.Errorf("failed to parse log level: %s", level)
+	return nil, fmt.Errorf("failed to parse log level: %s", lvl)
 }
