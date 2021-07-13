@@ -5,17 +5,17 @@ weight: 1
 
 MetalLB hooks into your Kubernetes cluster, and provides a network
 load-balancer implementation. In short, it allows you to create
-Kubernetes services of type "LoadBalancer" in clusters that don't run
+Kubernetes services of type `LoadBalancer` in clusters that don't run
 on a cloud provider, and thus cannot simply hook into paid products to
-provide load-balancers.
+provide load balancers.
 
 It has two features that work together to provide this service:
 address allocation, and external announcement.
 
 ## Address allocation
 
-In a cloud-enabled Kubernetes cluster, you request a load-balancer,
-and your cloud platform assigns an IP address to you. In a bare metal
+In a Kubernetes cluster on a cloud provider, you request a load balancer,
+and your cloud platform assigns an IP address to you. In a bare-metal
 cluster, MetalLB is responsible for that allocation.
 
 MetalLB cannot create IP addresses out of thin air, so you do have to
@@ -25,7 +25,7 @@ come and go, but it will only ever hand out IPs that are part of its
 configured pools.
 
 How you get IP address pools for MetalLB depends on your
-environment. If you're running a bare metal cluster in a colocation
+environment. If you're running a bare-metal cluster in a colocation
 facility, your hosting provider probably offers IP addresses for
 lease. In that case, you would lease, say, a /26 of IP space (64
 addresses), and provide that range to MetalLB for cluster services.
@@ -42,7 +42,7 @@ as you want, and doesn't care what "kind" of addresses you give it.
 
 ## External announcement
 
-Once MetalLB has assigned an external IP address to a service, it
+After MetalLB has assigned an external IP address to a service, it
 needs to make the network beyond the cluster aware that the IP "lives"
 in the cluster. MetalLB uses standard routing protocols to achieve
 this: ARP, NDP, or BGP.

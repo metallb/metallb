@@ -51,7 +51,7 @@ what doesn't.
 
 ## Developers
 
-MetalLB's copyright was owned by Google, until March 2019. However, it
+The MetalLB copyright was owned by Google, until March 2019. However, it
 was never an official Google project. The project doesn't have any
 form of corporate sponsorship.
 

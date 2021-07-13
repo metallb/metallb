@@ -4,19 +4,19 @@ weight: 4
 ---
 
 MetalLB remains idle until configured. This is accomplished by
-creating and deploying a configmap into the same namespace
+creating and deploying a config map into the same namespace
 (metallb-system) as the deployment.
 
-There is an example configmap in
+There is an example config map in
 [`manifests/example-config.yaml`](https://raw.githubusercontent.com/metallb/metallb/main/manifests/example-config.yaml),
 annotated with explanatory comments.
 
-If you've named the configmap `config.yaml`, you can deploy the manifest with `kubectl apply -f config.yaml`.
+If you've named the config map `config.yaml`, you can deploy the manifest with `kubectl apply -f config.yaml`.
 
 {{% notice note %}}
 If you installed MetalLB with Helm, you will need to change the
-namespace of the ConfigMap to match the namespace in which MetalLB was
-deployed, and change the ConfigMap's name from `config` to
+namespace of the config map to match the namespace in which MetalLB was
+deployed, and change the name of the config map from `config` to
 `metallb-config`.
 {{% /notice %}}
 
