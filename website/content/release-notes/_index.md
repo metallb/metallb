@@ -629,7 +629,7 @@ Action required if upgrading from 0.2.x:
 - The `bgp-speaker` DaemonSet has been renamed to just
   `speaker`. Before applying the manifest for 0.3.0, delete the old
   daemonset with `kubectl delete -n metallb-system
-  ds/bgp-speaker`. This will take down your load-balancers until you
+  ds/bgp-speaker`. This will take down your load balancers until you
   deploy the new DaemonSet.
 - The
   [configuration file format](https://raw.githubusercontent.com/metallb/metallb/main/manifests/example-config.yaml) has
