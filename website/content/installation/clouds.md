@@ -35,7 +35,7 @@ Vultr          | Yes
 
 ## Why doesn't MetalLB work on (most) cloud platforms?
 
-MetalLB implements load-balancers using standard routing
+MetalLB implements load balancers using standard routing
 protocols. However, in general, cloud platforms don't implement those
 routing protocols in a way that MetalLB can leverage.
 
@@ -65,7 +65,7 @@ doesn't work with those APIs.
 
 ### MetalLB on OpenShift OCP
 
-To run MetalLB on Openshift, two changes are required: changing the
+To run MetalLB on OpenShift, two changes are required: changing the
 pod UIDs, and granting MetalLB additional networking privileges.
 
 Pods get UIDs automatically assigned based on an OpenShift-managed UID
@@ -76,7 +76,7 @@ MetalLB manifests. You can do this by removing the
 
 Additionally, you have to grant the `speaker` DaemonSet elevated
 privileges, so that it can do the raw networking required to make
-LoadBalancers work. You can do this with:
+load balancers work. You can do this with:
 
 ```bash
 oc adm policy add-scc-to-user privileged -n metallb-system -z speaker
@@ -87,7 +87,7 @@ After that, MetalLB should work normally.
 ### MetalLB on OpenStack
 
 You can run a Kubernetes cluster on OpenStack VMs, and use MetalLB as
-the load-balancer. However you have to disable OpenStack's ARP
+the load balancer. However you have to disable OpenStack's ARP
 spoofing protection if you want to use L2 mode. You must disable it on
 all the VMs that are running Kubernetes.
 
@@ -103,7 +103,7 @@ protection entirely.
 platform, and supports using BGP to advertise and route floating IPs to
 machines. As such, MetalLB's BGP mode works great on Equinix Metal! There is
 even a [tutorial](https://github.com/packet-labs/kubernetes-bgp) written by the
-folks at Equinix Metal, that use MetalLB to integrate Kubernetes load-balancers
+folks at Equinix Metal, that use MetalLB to integrate Kubernetes load balancers
 with their BGP infrastructure.
 
 ## Alternatives
@@ -111,7 +111,7 @@ with their BGP infrastructure.
 If MetalLB doesn't work with your cloud platform, you have two main
 alternatives.
 
-### Use the platform's load-balancer
+### Use the platform's load balancer
 
 If your cloud platform has a load-balancer product, you should use
 that. It's probably going to be more featureful and higher performance

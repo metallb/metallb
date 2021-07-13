@@ -14,14 +14,14 @@ IPv4 services, and
 IPv6.
 
 The major advantage of the layer 2 mode is its universality: it will work on any
-ethernet network, with no special hardware required, not even fancy routers.
+Ethernet network, with no special hardware required, not even fancy routers.
 
 ## Load-balancing behavior
 
 In layer 2 mode, all traffic for a service IP goes to one node. From there,
 `kube-proxy` spreads the traffic to all the service's pods.
 
-In that sense, layer 2 does not implement a load-balancer. Rather, it implements
+In that sense, layer 2 does not implement a load balancer. Rather, it implements
 a failover mechanism so that a different node can take over should the current
 leader node fail for some reason.
 
@@ -79,20 +79,20 @@ Keepalived continuously exchange VRRP messages with each other, both to select a
 leader and to notice when that leader goes away.
 
 MetalLB on the other hand relies on
-[memberlist](https://github.com/hashicorp/memberlist) to know when a Node in
+[memberlist](https://github.com/hashicorp/memberlist) to know when a node in
 the cluster is no longer reachable and the service IPs from that node should be
 moved elsewhere.
 
 Keepalived and MetalLB "look" the same from the client's perspective: the
-service IP address seems to migrate from one machine to another when failovers
-happen, and the rest of the time it just looks like machines have more than one
+service IP address seems to migrate from one machine to another when a failover
+occurs, and the rest of the time it just looks like machines have more than one
 IP address.
 
 Because it doesn't use VRRP, MetalLB isn't subject to some of the limitations of
-that protocol. For example, the VRRP limit of 255 load-balancers per network
+that protocol. For example, the VRRP limit of 255 load balancers per network
 doesn't exist in MetalLB. You can have as many load-balanced IPs as you want, as
 long as there are free IPs in your network. MetalLB also requires less
-configuration than VRRP – for example, there are no Virtual Router IDs 
+configuration than VRRP--for example, there are no Virtual Router IDs.
 
 On the flip side, because MetalLB relies on
 [memberlist](https://github.com/hashicorp/memberlist) for cluster membership

@@ -8,18 +8,18 @@ session with your network routers, and uses that peering session to
 advertise the IPs of external cluster services.
 
 Assuming your routers are configured to support multipath, this
-enables true load-balancing: the routes published by MetalLB are
+enables true load balancing: the routes published by MetalLB are
 equivalent to each other, except for their nexthop. This means that
-the routers will use all nexthops together, and load-balance between
+the routers will use all nexthops together, and load balance between
 them.
 
-Once the packets arrive at the node, `kube-proxy` is responsible for
+After the packets arrive at the node, `kube-proxy` is responsible for
 the final hop of traffic routing, to get the packets to one specific
 pod in the service.
 
 ## Load-balancing behavior
 
-The exact behavior of the load-balancing depends on your specific
+The exact behavior of the load balancing depends on your specific
 router model and configuration, but the common behavior is to balance
 _per-connection_, based on a _packet hash_. What does this mean?
 
@@ -39,7 +39,7 @@ cluster nodes would result in poor behavior on several levels:
   decide to route packets for the same connection to different pods,
   which would result in connection failures.
 
-Packet hashing is how high performance routers can statelessly spread
+Packet hashing is how high-performance routers can statelessly spread
 connections across multiple backends. For each packet, they extract
 some of the fields, and use those as a "seed" to deterministically
 pick one of the possible backends. If all the fields are the same, the
@@ -66,15 +66,15 @@ forming.
 
 Using BGP as a load-balancing mechanism has the advantage that you can
 use standard router hardware, rather than bespoke
-load-balancers. However, this comes with downsides as well.
+load balancers. However, this comes with downsides as well.
 
-The biggest is that BGP-based load balancing does not react gracefully
+The biggest downside is that BGP-based load balancing does not react gracefully
 to changes in the _backend set_ for an address. What this means is
 that when a cluster node goes down, you should expect _all_ active
 connections to your service to be broken (users will see "Connection
 reset by peer").
 
-BGP-based routers implement stateless load-balancing. They assign a
+BGP-based routers implement stateless load balancing. They assign a
 given packet to a specific next hop by hashing some fields in the
 packet header, and using that hash as an index into the array of
 available backends.
@@ -108,14 +108,14 @@ strategies you can employ:
   one to the other prior to disrupting the "drained" service.
 - Add transparent retry logic on the client side, to gracefully
   recover from sudden disconnections. This works especially well if
-  your clients are things like mobile apps or rich single page web
+  your clients are things like mobile apps or rich single-page web
   apps.
 - Put your services behind an ingress controller. The ingress
   controller itself can use MetalLB to receive traffic, but having a
   stateful layer between BGP and your services means you can change
   your services without concern. You only have to be careful when
   changing the deployment of the ingress controller itself (e.g. when
-  adding more nginx pods to scale up).
+  adding more NGINX pods to scale up).
 - Accept that there will be occasional bursts of reset
   connections. For low-availability internal services, this may be
   acceptable as-is.
