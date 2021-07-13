@@ -74,6 +74,8 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | speaker.image.pullPolicy | string | `nil` |  |
 | speaker.image.repository | string | `"quay.io/metallb/speaker"` |  |
 | speaker.image.tag | string | `nil` |  |
+| speaker.intfExclude | string | `'^(?:cali[a-z0-9]+|vxlan\.calico)$'` |  |
+| speaker.intfInclude | string | `''` |  |
 | speaker.livenessProbe.enabled | bool | `true` |  |
 | speaker.livenessProbe.failureThreshold | int | `3` |  |
 | speaker.livenessProbe.initialDelaySeconds | int | `10` |  |
