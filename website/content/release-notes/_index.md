@@ -12,7 +12,19 @@ New Features:
   operator and have it configured to use `PodMonitors` and `PrometheusRules`
   that are using a specific label.
 
+- Leveled logging is now supported. You can set `--log-level` flag to one of 
+  `all`, `debug`, `info`, `warn`, `error` or `none` to filter produced logs by level.
+  The default value is set to `info` on both helm charts and k8s manifests.
+
 Changes in behavior:
+
+- With the newly introduced leveled logging support, the default value for the 
+  `--log-level` is set to `info` on both helm charts and k8s manifests.
+  This will produce fewer logs compared to the previous releases, 
+  since many `debug` level logs will be filtered out. You can preserve the old verbosity by 
+  editing the k8s manifests and setting the argument `--log-level=all` for both the controller and 
+  speaker when installing using manifests, or by overriding helm values `controller.logLevel=all` 
+  and `speaker.logLevel=all` when installing with Helm.
 
 Bug Fixes:
 
