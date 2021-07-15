@@ -541,12 +541,13 @@ def lint(ctx, env="container"):
     achieved by running `inv lint --env host`.
     """
     version = "1.39.0"
+    golangci_cmd = "golangci-lint run --timeout 5m0s ./..."
 
     if env == "container":
-        run("docker run --rm -v $(git rev-parse --show-toplevel):/app -w /app golangci/golangci-lint:v{} golangci-lint run $(git rev-parse --show-toplevel)/...".format(version), echo=True)
+        run("docker run --rm -v $(git rev-parse --show-toplevel):/app -w /app golangci/golangci-lint:v{} {}".format(version, golangci_cmd), echo=True)
     elif env == "host":
         run("curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v{}".format(version))
-        run("golangci-lint run --timeout 5m0s $(git rev-parse --show-toplevel)/...")
+        run(golangci_cmd)
     else:
         raise Exit(message="Unsupported linter environment: {}". format(env))
 
