@@ -1,3 +1,9 @@
+linters:
+  enable:
+  - godot
 linters-settings:
   errcheck:
     exclude: .golangci.exclude
+  godot:
+    scope: toplevel
+    capital: true

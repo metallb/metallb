@@ -1353,7 +1353,7 @@ func TestPoolMetrics(t *testing.T) {
 	}
 }
 
-// Some helpers
+// Some helpers.
 
 func assigned(a *Allocator, svc string) string {
 	ip := a.IP(svc)

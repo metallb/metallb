@@ -160,7 +160,7 @@ func (s *Session) sendUpdates() bool {
 }
 
 // connect establishes the BGP session with the peer.
-// sets TCP_MD5 sockopt if password is !="",
+// Sets TCP_MD5 sockopt if password is !="".
 func (s *Session) connect() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -256,7 +256,7 @@ func hashRouterId(hostname string) (net.IP, error) {
 }
 
 // Ipv4; Use the address as-is.
-// Ipv6; Pick the first ipv4 address on the same interface as the address
+// Ipv6; Pick the first ipv4 address on the same interface as the address.
 func getRouterID(addr net.IP, myNode string) (net.IP, error) {
 	if addr.To4() != nil {
 		return addr, nil
@@ -507,7 +507,7 @@ func (a *Advertisement) Equal(b *Advertisement) bool {
 }
 
 const (
-	//tcpMD5SIG TCP MD5 Signature (RFC2385)
+	// TCP MD5 Signature (RFC2385).
 	tcpMD5SIG = 14
 )
 
