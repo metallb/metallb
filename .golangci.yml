@@ -1,6 +1,7 @@
 linters:
   enable:
   - godot
+  - goimports
 linters-settings:
   errcheck:
     exclude: .golangci.exclude
