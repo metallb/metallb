@@ -14,7 +14,7 @@ func newMemberlistLogger(l log.Logger) *golog.Logger {
 
 // memberlistLogWriter is adapted from go-kit's log.StdlibWriter
 // to parse the logs coming from hashicorp/memberlist and
-// extract the level from them to implement leveled logging
+// extract the level from them to implement leveled logging.
 type memberlistLogWriter struct {
 	logger log.Logger
 }
