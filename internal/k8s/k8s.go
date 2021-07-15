@@ -99,6 +99,7 @@ const slicesServiceIndexName = "ServiceName"
 //
 // The client uses processName to identify itself to the cluster
 // (e.g. when logging events).
+//nolint:godot
 func New(cfg *Config) (*Client, error) {
 	var (
 		k8sConfig *rest.Config
@@ -431,7 +432,7 @@ func (c *Client) Run(stopCh <-chan struct{}) error {
 	}
 }
 
-// ForceSync reprocess all watched services
+// ForceSync reprocess all watched services.
 func (c *Client) ForceSync() {
 	if c.svcIndexer != nil {
 		for _, k := range c.svcIndexer.ListKeys() {
@@ -601,7 +602,7 @@ func serviceNameForSlice(endpointSlice *discovery.EndpointSlice) (string, error)
 	return serviceName, nil
 }
 
-// UseEndpointSlices detect if Endpoints Slices are enabled in the cluster
+// UseEndpointSlices detect if Endpoints Slices are enabled in the cluster.
 func UseEndpointSlices(kubeClient kubernetes.Interface) bool {
 	if _, err := kubeClient.Discovery().ServerResourcesForGroupVersion(discovery.SchemeGroupVersion.String()); err != nil {
 		return false

@@ -20,7 +20,7 @@ const (
 )
 
 // IsConditionReady tells if the conditions represent a ready state, interpreting
-// nil ready as ready
+// nil ready as ready.
 func IsConditionReady(conditions discovery.EndpointConditions) bool {
 	if conditions.Ready == nil {
 		return true

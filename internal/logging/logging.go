@@ -26,7 +26,7 @@ const (
 )
 
 var (
-	// Levels returns an array of valid log levels
+	// Levels returns an array of valid log levels.
 	Levels = []string{levelAll, levelDebug, levelInfo, levelWarn, levelError, levelNone}
 )
 
