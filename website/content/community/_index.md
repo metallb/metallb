@@ -23,13 +23,6 @@ can join.
 Development of MetalLB is discussed in the [#metallb-dev slack channel
 ](https://kubernetes.slack.com/messages/metallb-dev/).
 
-## IRC
-
-If you prefer a more classic chat experience, we're also on `#metallb`
-on the Freenode IRC network. You can use Freenode's [web
-client](http://webchat.freenode.net?randomnick=1&channels=%23metallb&uio=d4)
-if you don't already have an IRC client.
-
 ## Issue Tracker
 
 Use the [GitHub issue
