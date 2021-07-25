@@ -10,7 +10,7 @@ We would love to hear from you! Here are some places you can find us.
 Our mailing list is
 [metallb-users@googlegroups.com](https://groups.google.com/forum/#!forum/metallb-users). It's
 for discussions around MetalLB usage, community support, and developer
-discussion (although for the latter we mostly use Github directly).
+discussion (although for the latter we mostly use GitHub directly).
 
 ## Slack
 
