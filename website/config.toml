@@ -16,7 +16,7 @@ home = ["HTML", "RSS", "JSON"]
 
 [[menu.shortcuts]]
 pre = "<hr>"
-name = "<i class='fa fa-github'></i> Github repo"
+name = "<i class='fa fa-github'></i> GitHub repo"
 url = "https://github.com/metallb/metallb"
 weight = 10
 
