@@ -34,6 +34,10 @@ import (
 	"github.com/go-kit/kit/log/level"
 )
 
+const (
+	bgpNativeImpl = "native"
+)
+
 type peer struct {
 	cfg *config.Peer
 	bgp session
@@ -45,6 +49,7 @@ type bgpController struct {
 	nodeLabels labels.Set
 	peers      []*peer
 	svcAds     map[string][]*bgp.Advertisement
+	bgpType    string
 }
 
 func (c *bgpController) SetConfig(l log.Logger, cfg *config.Config) error {
@@ -193,7 +198,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 			if p.cfg.RouterID != nil {
 				routerID = p.cfg.RouterID
 			}
-			s, err := newBGP(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.SrcAddr, p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.Password, c.myNode)
+			s, err := newBGP(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.SrcAddr, p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.Password, c.myNode, c.bgpType)
 			if err != nil {
 				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
 				errs++
@@ -293,6 +298,12 @@ func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
 	return c.syncPeers(l)
 }
 
-var newBGP = func(logger log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, hold time.Duration, password string, myNode string) (session, error) {
-	return native.New(logger, addr, srcAddr, myASN, routerID, asn, hold, password, myNode)
+var newBGP = func(logger log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, hold time.Duration, password string, myNode string, bgpType string) (session, error) {
+	level.Info(logger).Log("op", "startup", "msg", "Starting BGP session", "type", bgpType)
+	switch bgpType {
+	case bgpNativeImpl:
+		return native.New(logger, addr, srcAddr, myASN, routerID, asn, hold, password, myNode)
+	default:
+		panic(fmt.Sprintf("unsupported BGP implementation type: %s", bgpType))
+	}
 }
