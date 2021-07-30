@@ -1,0 +1,12 @@
+
+log stdout 
+hostname 
+
+router bgp 100
+  no bgp default ipv4-unicast
+  bgp router-id 10.1.1.254
+
+  neighbor 10.2.2.254 remote-as 200
+
+
+

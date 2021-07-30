@@ -24,7 +24,8 @@ import (
 	"time"
 
 	"go.universe.tf/metallb/internal/bgp"
-	"go.universe.tf/metallb/internal/bgp/native"
+	"go.universe.tf/metallb/internal/bgp/bgpfrr"
+	"go.universe.tf/metallb/internal/bgp/bgpnative"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 	v1 "k8s.io/api/core/v1"
@@ -36,6 +37,7 @@ import (
 
 const (
 	bgpNativeImpl = "native"
+	bgpFRRImpl = "frr"
 )
 
 type peer struct {
@@ -302,7 +304,9 @@ var newBGP = func(logger log.Logger, addr string, srcAddr net.IP, myASN uint32, 
 	level.Info(logger).Log("op", "startup", "msg", "Starting BGP session", "type", bgpType)
 	switch bgpType {
 	case bgpNativeImpl:
-		return native.New(logger, addr, srcAddr, myASN, routerID, asn, hold, password, myNode)
+		return bgpnative.New(logger, addr, srcAddr, myASN, routerID, asn, hold, password, myNode)
+	case bgpFRRImpl:
+		return bgpfrr.New(logger, addr, srcAddr, myASN, routerID, asn, hold, password, myNode)
 	default:
 		panic(fmt.Sprintf("unsupported BGP implementation type: %s", bgpType))
 	}

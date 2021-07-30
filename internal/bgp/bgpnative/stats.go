@@ -1,4 +1,4 @@
-package native
+package bgpnative
 
 import "github.com/prometheus/client_golang/prometheus"
 

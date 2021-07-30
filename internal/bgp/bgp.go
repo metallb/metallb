@@ -31,3 +31,4 @@ func (a *Advertisement) Equal(b *Advertisement) bool {
 	}
 	return reflect.DeepEqual(a.Communities, b.Communities)
 }
+
