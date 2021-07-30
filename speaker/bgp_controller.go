@@ -24,6 +24,7 @@ import (
 	"time"
 
 	"go.universe.tf/metallb/internal/bgp"
+	"go.universe.tf/metallb/internal/bgp/native"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 	v1 "k8s.io/api/core/v1"
@@ -293,5 +294,5 @@ func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
 }
 
 var newBGP = func(logger log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, hold time.Duration, password string, myNode string) (session, error) {
-	return bgp.New(logger, addr, srcAddr, myASN, routerID, asn, hold, password, myNode)
+	return native.New(logger, addr, srcAddr, myASN, routerID, asn, hold, password, myNode)
 }
