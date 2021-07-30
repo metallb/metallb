@@ -1,3 +1,5 @@
+// SPDX-License-Identifier:Apache-2.0
+
 package native
 
 import (
@@ -424,6 +426,20 @@ func (s *Session) consumeBGP(conn io.ReadCloser) {
 	}
 }
 
+func validate(adv *bgp.Advertisement) error {
+	if adv.Prefix.IP.To4() == nil {
+		return fmt.Errorf("cannot advertise non-v4 prefix %q", adv.Prefix)
+	}
+
+	if adv.NextHop != nil && adv.NextHop.To4() == nil {
+		return fmt.Errorf("next-hop must be IPv4, got %q", adv.NextHop)
+	}
+	if len(adv.Communities) > 63 {
+		return fmt.Errorf("max supported communities is 63, got %d", len(adv.Communities))
+	}
+	return nil
+}
+
 // Set updates the set of Advertisements that this session's peer should receive.
 //
 // Changes are propagated to the peer asynchronously, Set may return
@@ -434,15 +450,9 @@ func (s *Session) Set(advs ...*bgp.Advertisement) error {
 
 	newAdvs := map[string]*bgp.Advertisement{}
 	for _, adv := range advs {
-		if adv.Prefix.IP.To4() == nil {
-			return fmt.Errorf("cannot advertise non-v4 prefix %q", adv.Prefix)
-		}
-
-		if adv.NextHop != nil && adv.NextHop.To4() == nil {
-			return fmt.Errorf("next-hop must be IPv4, got %q", adv.NextHop)
-		}
-		if len(adv.Communities) > 63 {
-			return fmt.Errorf("max supported communities is 63, got %d", len(adv.Communities))
+		err := validate(adv)
+		if err != nil {
+			return err
 		}
 		newAdvs[adv.Prefix.String()] = adv
 	}
@@ -450,10 +460,6 @@ func (s *Session) Set(advs ...*bgp.Advertisement) error {
 	s.new = newAdvs
 	stats.PendingPrefixes(s.addr, len(s.new))
 	s.cond.Broadcast()
-	return nil
-}
-
-func (s *Session) Commit() error {
 	return nil
 }
 

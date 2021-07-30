@@ -98,7 +98,7 @@ type fakeBGP struct {
 	gotAds map[string][]*bgp.Advertisement
 }
 
-func (f *fakeBGP) New(_ log.Logger, addr string, _ net.IP, _ uint32, _ net.IP, _ uint32, _ time.Duration, _, _, _ string) (session, error) {
+func (f *fakeBGP) New(_ log.Logger, addr string, _ net.IP, _ uint32, _ net.IP, _ uint32, _ time.Duration, _, _ string, _ bgpImplementation) (session, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -142,10 +142,6 @@ func (f *fakeBGP) Ads() map[string][]*bgp.Advertisement {
 type fakeSession struct {
 	f    *fakeBGP
 	addr string
-}
-
-func (f *fakeSession) Commit() error {
-	return nil
 }
 
 func (f *fakeSession) Close() error {

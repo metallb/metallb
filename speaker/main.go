@@ -126,7 +126,7 @@ func main() {
 		MyNode:  *myNode,
 		Logger:  logger,
 		SList:   sList,
-		bgpType: bgpType,
+		bgpType: bgpImplementation(bgpType),
 	})
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create MetalLB controller")
@@ -180,7 +180,7 @@ type controllerConfig struct {
 	Logger log.Logger
 	SList  SpeakerList
 
-	bgpType string
+	bgpType bgpImplementation
 
 	// For testing only, and will be removed in a future release.
 	// See: https://github.com/metallb/metallb/issues/152.

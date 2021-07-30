@@ -24,7 +24,8 @@ import (
 	"time"
 
 	"go.universe.tf/metallb/internal/bgp"
-	"go.universe.tf/metallb/internal/bgp/native"
+	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
+	bgpnative "go.universe.tf/metallb/internal/bgp/native"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 	v1 "k8s.io/api/core/v1"
@@ -34,8 +35,11 @@ import (
 	"github.com/go-kit/kit/log/level"
 )
 
+type bgpImplementation string
+
 const (
-	bgpNativeImpl = "native"
+	bgpNative bgpImplementation = "native"
+	bgpFrr    bgpImplementation = "frr"
 )
 
 type peer struct {
@@ -49,7 +53,7 @@ type bgpController struct {
 	nodeLabels labels.Set
 	peers      []*peer
 	svcAds     map[string][]*bgp.Advertisement
-	bgpType    string
+	bgpType    bgpImplementation
 }
 
 func (c *bgpController) SetConfig(l log.Logger, cfg *config.Config) error {
@@ -266,9 +270,6 @@ func (c *bgpController) updateAds() error {
 		if err := peer.bgp.Set(allAds...); err != nil {
 			return err
 		}
-		if err := peer.bgp.Commit(); err != nil {
-			return err
-		}
 	}
 	return nil
 }
@@ -284,7 +285,6 @@ func (c *bgpController) DeleteBalancer(l log.Logger, name, reason string) error 
 type session interface {
 	io.Closer
 	Set(advs ...*bgp.Advertisement) error
-	Commit() error
 }
 
 func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
@@ -302,11 +302,13 @@ func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
 	return c.syncPeers(l)
 }
 
-var newBGP = func(logger log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, hold time.Duration, password string, myNode string, bgpType string) (session, error) {
+var newBGP = func(logger log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, hold time.Duration, password string, myNode string, bgpType bgpImplementation) (session, error) {
 	level.Info(logger).Log("op", "startup", "msg", "Starting BGP session", "type", bgpType)
 	switch bgpType {
-	case bgpNativeImpl:
-		return native.New(logger, addr, srcAddr, myASN, routerID, asn, hold, password, myNode)
+	case bgpNative:
+		return bgpnative.New(logger, addr, srcAddr, myASN, routerID, asn, hold, password, myNode)
+	case bgpFrr:
+		return bgpfrr.New(logger, addr, srcAddr, myASN, routerID, asn, hold, password, myNode)
 	default:
 		panic(fmt.Sprintf("unsupported BGP implementation type: %s", bgpType))
 	}

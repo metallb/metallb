@@ -103,10 +103,6 @@ func TestInterop(t *testing.T) {
 		t.Fatalf("setting advertisement: %s", err)
 	}
 
-	if err = sess.Commit(); err != nil {
-		t.Fatalf("unable to commit")
-	}
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -145,10 +141,6 @@ func TestTCPMD5(t *testing.T) {
 
 	if err := sess.Set(adv); err != nil {
 		t.Fatalf("setting advertisement: %s", err)
-	}
-
-	if err = sess.Commit(); err != nil {
-		t.Fatalf("unable to commit")
 	}
 
 	for {
