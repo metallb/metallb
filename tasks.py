@@ -98,7 +98,8 @@ def build(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag=
                     branch=branch),
                 env=env,
                 echo=True)
-            run("docker build "
+            run("docker buildx build --load "
+                "--platform linux/{arch} "
                 "-t {registry}/{repo}/{bin}:{tag}-{arch} "
                 "-f {bin}/Dockerfile build/{arch}/{bin}".format(
                     registry=registry,
