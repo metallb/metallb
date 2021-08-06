@@ -54,6 +54,16 @@ def _check_binaries(binaries):
         out.add("speaker")
     return list(sorted(out))
 
+def _docker_build_cmd():
+    cmd = os.getenv('DOCKER_BUILD_CMD')
+    if cmd:
+        out = cmd
+    else:
+        out = run("docker buildx ls "
+                  "&& echo 'docker buildx build --load' "
+                  "|| echo 'docker build'", hide=True).stdout.strip()
+    return out
+
 def _make_build_dirs():
     for arch in all_architectures:
         for binary in all_binaries:
@@ -74,6 +84,7 @@ def build(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag=
     """Build MetalLB docker images."""
     binaries = _check_binaries(binaries)
     architectures = _check_architectures(architectures)
+    docker_build_cmd = _docker_build_cmd()
     _make_build_dirs()
 
     commit = run("git describe --dirty --always", hide=True).stdout.strip()
@@ -98,10 +109,11 @@ def build(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag=
                     branch=branch),
                 env=env,
                 echo=True)
-            run("docker buildx build --load "
+            run("{docker_build_cmd} "
                 "--platform linux/{arch} "
                 "-t {registry}/{repo}/{bin}:{tag}-{arch} "
                 "-f {bin}/Dockerfile build/{arch}/{bin}".format(
+                    docker_build_cmd=docker_build_cmd,
                     registry=registry,
                     repo=repo,
                     bin=bin,
