@@ -75,6 +75,8 @@ jobs:
   publish-images:
     docker:
       - image: cimg/go:1.16
+    environment:
+      - DOCKER_BUILD_CMD: "docker buildx build --load"
     steps:
       # This job should not run against PRs, but we have seen it run unexpectedly, so
       # double check and exit early if this is a job against a PR.
@@ -88,6 +90,8 @@ jobs:
   publish-images-quay:
     docker:
       - image: cimg/go:1.16
+    environment:
+      - DOCKER_BUILD_CMD: "docker buildx build --load"
     steps:
       # This job should not run against PRs, but we have seen it run unexpectedly, so
       # double check and exit early if this is a job against a PR.
