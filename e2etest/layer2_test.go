@@ -45,12 +45,31 @@ var _ = ginkgo.Describe("L2", func() {
 	})
 
 	ginkgo.AfterEach(func() {
+		// Clean previous configuration.
+		err := updateConfigMap(cs, configFile{})
+		framework.ExpectNoError(err)
+
 		if ginkgo.CurrentGinkgoTestDescription().Failed {
 			DescribeSvc(f.Namespace.Name)
 		}
 	})
 
 	ginkgo.It("should work for type=Loadbalancer", func() {
+		configData := configFile{
+			Pools: []addressPool{
+				{
+					Name:     "l2-test",
+					Protocol: Layer2,
+					Addresses: []string{
+						ipv4ServiceRange,
+						ipv6ServiceRange,
+					},
+				},
+			},
+		}
+		err := updateConfigMap(cs, configData)
+		framework.ExpectNoError(err)
+
 		namespace := f.Namespace.Name
 		serviceName := "external-local-lb"
 		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
