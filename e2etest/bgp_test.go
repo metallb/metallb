@@ -21,16 +21,20 @@ package e2e
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"strconv"
+	"time"
 
 	"go.universe.tf/metallb/e2etest/pkg/metrics"
+	"go.universe.tf/metallb/e2etest/pkg/routes"
 
 	"github.com/onsi/ginkgo"
+	. "github.com/onsi/gomega"
 	dto "github.com/prometheus/client_model/go"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/frr"
-	"go.universe.tf/metallb/e2etest/pkg/routes"
+	frrconfig "go.universe.tf/metallb/e2etest/pkg/frr/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -40,21 +44,98 @@ import (
 
 const frrContainer = "frr"
 
+var (
+	frrContainerIPv4 string
+	frrContainerIPv6 string
+)
+
 var _ = ginkgo.Describe("BGP", func() {
 	f := framework.NewDefaultFramework("bgp")
 	var cs clientset.Interface
 
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
+
+		var err error
+		// If the FRR container is not running, start it on the local host.
+		if skipDockerCmd {
+			if len(frrTestConfigDir) == 0 {
+				framework.Fail("Missing FRR config directory.")
+			}
+		} else {
+			frrTestConfigDir, err = ioutil.TempDir("", "frr-conf")
+			framework.ExpectNoError(err)
+			err = frr.StartContainer(frrContainer, frrTestConfigDir)
+			framework.ExpectNoError(err)
+		}
+
+		frrContainerIPv4, frrContainerIPv6, err = frr.GetContainerIPs(frrContainer)
+		framework.ExpectNoError(err)
+
+		err = frr.UpdateContainerVolumePermissions(frrContainer)
+		framework.ExpectNoError(err)
 	})
 
 	ginkgo.AfterEach(func() {
+		// Clean previous configuration.
+		err := updateConfigMap(cs, configFile{})
+		framework.ExpectNoError(err)
+
+		if !skipDockerCmd {
+			err = frr.StopContainer(frrContainer, frrTestConfigDir)
+			framework.ExpectNoError(err)
+		}
+
 		if ginkgo.CurrentGinkgoTestDescription().Failed {
 			DescribeSvc(f.Namespace.Name)
 		}
 	})
 
 	ginkgo.It("should work for type=Loadbalancer", func() {
+		configData := configFile{
+			Pools: []addressPool{
+				{
+					Name:     "bgp-test",
+					Protocol: BGP,
+					Addresses: []string{
+						"192.168.10.0/24",
+						"fc00:f853:0ccd:e799::/124",
+					},
+				},
+			},
+			Peers: []peer{
+				{
+					Addr:  frrContainerIPv4,
+					ASN:   64512,
+					MyASN: 64512,
+				},
+			},
+		}
+		err := updateConfigMap(cs, configData)
+		framework.ExpectNoError(err)
+
+		bgpConfig, err := frrconfig.BGPPeersForAllNodes(cs)
+		framework.ExpectNoError(err)
+
+		exc := executor.ForContainer(frrContainer)
+		if skipDockerCmd {
+			exc = executor.Host
+		}
+
+		err = frr.UpdateBGPConfigFile(frrTestConfigDir, bgpConfig, exc)
+		framework.ExpectNoError(err)
+
+		allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("checking all nodes are peered with the frr instance")
+		Eventually(func() error {
+			neighbors, err := frr.NeighborsInfo(exc)
+			framework.ExpectNoError(err)
+			err = frr.NeighborsMatchNodes(allNodes.Items, neighbors)
+			return err
+		}, 2*time.Minute, 1*time.Second).Should(BeNil())
+
 		svc := createServiceWithBackend(cs, f.Namespace.Name)
 
 		defer func() {
@@ -69,28 +150,17 @@ var _ = ginkgo.Describe("BGP", func() {
 		hostport := net.JoinHostPort(ingressIP, port)
 		address := fmt.Sprintf("http://%s/", hostport)
 
-		exc := executor.ForContainer(frrContainer)
 		if skipDockerCmd {
 			ginkgo.By(fmt.Sprintf("checking connectivity to %s", address))
-			exc = executor.Host
 		} else {
 			ginkgo.By(fmt.Sprintf("checking connectivity to %s with docker", address))
 		}
 
-		err := wgetRetry(address, exc)
-		framework.ExpectNoError(err)
-
-		allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+		err = wgetRetry(address, exc)
 		framework.ExpectNoError(err)
 
 		advertised := routes.ForIP(ingressIP, exc)
 		err = routes.MatchNodes(allNodes.Items, advertised)
-		framework.ExpectNoError(err)
-
-		neighbors, err := frr.NeighborsInfo(exc)
-		framework.ExpectNoError(err)
-
-		err = frr.NeighborsMatchNodes(allNodes.Items, neighbors)
 		framework.ExpectNoError(err)
 
 		frrRoutes, _, err := frr.Routes(exc)
@@ -125,8 +195,54 @@ var _ = ginkgo.Describe("BGP", func() {
 		})
 
 		ginkgo.It("should be exposed by the controller", func() {
-			peerAddr := "172.18.0.5:179" // TODO replace this when we create the config locally
-			poolName := "dev-env-bgp"    // TODO replace this when we create the config locally
+			// TODO: The peer address will require update to add support for bgp + IPv6
+			peerAddr := frrContainerIPv4 + ":179"
+			poolName := "bgp-test"
+
+			configData := configFile{
+				Pools: []addressPool{
+					{
+						Name:     poolName,
+						Protocol: BGP,
+						Addresses: []string{
+							"192.168.10.0/24",
+							"fc00:f853:0ccd:e799::/124",
+						},
+					},
+				},
+				Peers: []peer{
+					{
+						Addr:  frrContainerIPv4,
+						ASN:   64512,
+						MyASN: 64512,
+					},
+				},
+			}
+			err := updateConfigMap(cs, configData)
+			framework.ExpectNoError(err)
+
+			exc := executor.ForContainer(frrContainer)
+			if skipDockerCmd {
+				exc = executor.Host
+			}
+
+			bgpConfig, err := frrconfig.BGPPeersForAllNodes(cs)
+			framework.ExpectNoError(err)
+
+			err = frr.UpdateBGPConfigFile(frrTestConfigDir, bgpConfig, exc)
+			framework.ExpectNoError(err)
+
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("checking all nodes are peered with the frr instance")
+			Eventually(func() error {
+				neighbors, err := frr.NeighborsInfo(exc)
+				framework.ExpectNoError(err)
+				err = frr.NeighborsMatchNodes(allNodes.Items, neighbors)
+				return err
+			}, 2*time.Minute, 1*time.Second).Should(BeNil())
+
 			ginkgo.By("checking the metrics when no service is added")
 			controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod)
 			framework.ExpectNoError(err)

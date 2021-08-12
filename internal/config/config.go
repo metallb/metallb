@@ -339,7 +339,7 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 		return nil, errors.New("pool has no prefixes defined")
 	}
 	for _, cidr := range p.Addresses {
-		nets, err := parseCIDR(cidr)
+		nets, err := ParseCIDR(cidr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid CIDR %q in pool %q: %s", cidr, p.Name, err)
 		}
@@ -437,7 +437,7 @@ func parseCommunity(c string) (uint32, error) {
 	return (uint32(a) << 16) + uint32(b), nil
 }
 
-func parseCIDR(cidr string) ([]*net.IPNet, error) {
+func ParseCIDR(cidr string) ([]*net.IPNet, error) {
 	if !strings.Contains(cidr, "-") {
 		_, n, err := net.ParseCIDR(cidr)
 		if err != nil {

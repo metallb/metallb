@@ -389,6 +389,34 @@ def bgp_dev_env():
     # Apply the MetalLB ConfigMap
     run("kubectl apply -f %s/config.yaml" % dev_env_dir)
 
+def get_service_range(ip_family=None):
+    if ip_family is None or (ip_family != 4 and ip_family != 6):
+        raise Exit(message="Please provide network version: 4 or 6.")
+
+    # Get unused v4/v6 range for services
+    network_subnet_list = run('docker network inspect -f "{{ '
+            'range .IPAM.Config}}{{.Subnet}} {{end}}" kind', echo=True).stdout.strip().split(' ')
+    if ip_family == 4:
+        used_list = run('docker network inspect -f '
+            '"{{range .Containers}}{{.IPv4Address}} {{end}}" kind', echo=True).stdout.strip().split(' ')
+    else:
+        used_list = run('docker network inspect -f '
+            '"{{range .Containers}}{{.IPv6Address}} {{end}}" kind', echo=True).stdout.strip().split(' ')
+
+    for i in network_subnet_list:
+        network = ipaddress.ip_network(i)
+        if network.version == ip_family:
+            used_list = sorted(used_list)
+
+            # try to get 10 IP addresses after the last assigned node address in the kind network subnet
+            # if failed, just quit (recreate kind cluster might solve the situation)
+            service_ip_range_start = ipaddress.ip_interface(used_list[-1]) + 1
+            service_ip_range_end = ipaddress.ip_interface(used_list[-1]) + 11
+            if service_ip_range_start not in network:
+                raise Exit(message='network range %s is not in %s' % (service_ip_range_start, network))
+            if service_ip_range_end not in network:
+                raise Exit(message='network range %s is not in %s' % (service_ip_range_end, network))
+            return '%s-%s' % (service_ip_range_start.ip, service_ip_range_end.ip)
 
 @task(help={
     "name": "name of the kind cluster to delete.",
@@ -577,8 +605,10 @@ def lint(ctx, env="container"):
     "service_pod_port": "port number that service pods open.",
     "skip_docker": "don't use docker command in BGP testing.",
     "focus": "the list of arguments to pass into as -ginkgo.focus",
+    "ipv4_service_range": "a range of IPv4 addresses for MetalLB to use when running in layer2 mode.",
+    "ipv6_service_range": "a range of IPv6 addresses for MetalLB to use when running in layer2 mode.",
 })
-def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus=""):
+def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus="", ipv4_service_range=None, ipv6_service_range=None):
     """Run E2E tests against development cluster."""
     if skip_docker:
         opt_skip_docker = "--skip-docker"
@@ -605,8 +635,14 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
     for ns in namespaces:
         run("kubectl -n {} wait --for=condition=Ready --all pods --timeout 300s".format(ns), hide=True)
 
+    if ipv4_service_range is None:
+        ipv4_service_range = get_service_range(4)
+
+    if ipv6_service_range is None:
+        ipv6_service_range = get_service_range(6)
+
     run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "go test {} --provider=local --kubeconfig={} --service-pod-port={} {}".format(ginkgo_focus, kubeconfig, service_pod_port, opt_skip_docker))    
-    
+            "go test {} --provider=local --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {}".format(ginkgo_focus, kubeconfig, service_pod_port, ipv4_service_range, ipv6_service_range, opt_skip_docker))
+
     if export != None:
         run("kind export logs {}".format(export))

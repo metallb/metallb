@@ -19,6 +19,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -29,14 +30,26 @@ import (
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
+	internalconfig "go.universe.tf/metallb/internal/config"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 )
 
-// use ephemeral port for pod, instead of well-known port (tcp/80).
-var servicePodPort uint
-var skipDockerCmd bool
+const defaultTestNameSpace = "metallb-system"
+
+var (
+	// Use ephemeral port for pod, instead of well-known port (tcp/80).
+	servicePodPort   uint
+	skipDockerCmd    bool
+	ipv4ServiceRange string
+	ipv6ServiceRange string
+	testNameSpace    = defaultTestNameSpace
+	frrTestConfigDir string
+)
 
 // handleFlags sets up all flags and parses the command line.
 func handleFlags() {
@@ -45,6 +58,8 @@ func handleFlags() {
 	framework.RegisterClusterFlags(flag.CommandLine)
 	flag.UintVar(&servicePodPort, "service-pod-port", 80, "port number that pod opens, default: 80")
 	flag.BoolVar(&skipDockerCmd, "skip-docker", false, "et this to true if the BGP daemon is running on the host instead of in a container")
+	flag.StringVar(&ipv4ServiceRange, "ipv4-service-range", "0", "a range of IPv4 addresses for MetalLB to use when running in layer2 mode")
+	flag.StringVar(&ipv6ServiceRange, "ipv6-service-range", "0", "a range of IPv6 addresses for MetalLB to use when running in layer2 mode")
 	flag.Parse()
 }
 
@@ -77,3 +92,44 @@ func TestE2E(t *testing.T) {
 	gomega.RegisterFailHandler(framework.Fail)
 	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "E2E Suite", r)
 }
+
+var _ = ginkgo.BeforeSuite(func() {
+	if ns := os.Getenv("OO_INSTALL_NAMESPACE"); len(ns) != 0 {
+		testNameSpace = ns
+	}
+
+	if dir := os.Getenv("FRR_CONFIG_DIR"); len(dir) != 0 {
+		frrTestConfigDir = dir
+	}
+
+	// Validate the IPv4 service range.
+	_, err := internalconfig.ParseCIDR(ipv4ServiceRange)
+	framework.ExpectNoError(err)
+
+	// Validate the IPv6 service range.
+	_, err = internalconfig.ParseCIDR(ipv6ServiceRange)
+	framework.ExpectNoError(err)
+
+	cs, err := framework.LoadClientset()
+	framework.ExpectNoError(err)
+
+	_, err = cs.CoreV1().ConfigMaps(testNameSpace).Get(context.TODO(), "config", metav1.GetOptions{})
+	framework.ExpectEqual(errors.IsNotFound(err), true)
+
+	// Init empty MetalLB ConfigMap.
+	_, err = cs.CoreV1().ConfigMaps(testNameSpace).Create(context.TODO(), &v1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "config",
+			Namespace: testNameSpace,
+		},
+	}, metav1.CreateOptions{})
+	framework.ExpectNoError(err)
+})
+
+var _ = ginkgo.AfterSuite(func() {
+	cs, err := framework.LoadClientset()
+	framework.ExpectNoError(err)
+
+	err = cs.CoreV1().ConfigMaps(testNameSpace).Delete(context.TODO(), "config", metav1.DeleteOptions{})
+	framework.ExpectNoError(err)
+})
