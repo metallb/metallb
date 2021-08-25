@@ -109,6 +109,8 @@ def build(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag=
                     branch=branch),
                 env=env,
                 echo=True)
+            if bin == "speaker":
+                shutil.copy("frr-reloader/frr-reloader.sh","build/{arch}/{bin}/".format(arch=arch,bin=bin))
             run("{docker_build_cmd} "
                 "--platform linux/{arch} "
                 "-t {registry}/{repo}/{bin}:{tag}-{arch} "
