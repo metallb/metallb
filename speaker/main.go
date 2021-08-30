@@ -61,17 +61,18 @@ func main() {
 	prometheus.MustRegister(announcing)
 
 	var (
-		config     = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
-		namespace  = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
-		host       = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
-		mlBindAddr = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
-		mlBindPort = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
-		mlLabels   = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
-		mlSecret   = flag.String("ml-secret-key", os.Getenv("METALLB_ML_SECRET_KEY"), "Secret key for MemberList (fast dead node detection)")
-		myNode     = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
-		port       = flag.Int("port", 7472, "HTTP listening port")
-		logLevel   = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", strings.Join(logging.Levels, ", ")))
+		config          = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
+		namespace       = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
+		kubeconfig      = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
+		host            = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
+		mlBindAddr      = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
+		mlBindPort      = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
+		mlLabels        = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
+		mlSecret        = flag.String("ml-secret-key", os.Getenv("METALLB_ML_SECRET_KEY"), "Secret key for MemberList (fast dead node detection)")
+		myNode          = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
+		port            = flag.Int("port", 7472, "HTTP listening port")
+		logLevel        = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", strings.Join(logging.Levels, ", ")))
+		disableEpSlices = flag.Bool("disable-epslices", false, "Disable the usage of EndpointSlices and default to Endpoints instead of relying on the autodiscovery mechanism")
 	)
 	flag.Parse()
 
@@ -125,12 +126,13 @@ func main() {
 	}
 
 	client, err := k8s.New(&k8s.Config{
-		ProcessName:   "metallb-speaker",
-		ConfigMapName: *config,
-		ConfigMapNS:   *namespace,
-		NodeName:      *myNode,
-		Logger:        logger,
-		Kubeconfig:    *kubeconfig,
+		ProcessName:     "metallb-speaker",
+		ConfigMapName:   *config,
+		ConfigMapNS:     *namespace,
+		NodeName:        *myNode,
+		Logger:          logger,
+		Kubeconfig:      *kubeconfig,
+		DisableEpSlices: *disableEpSlices,
 
 		MetricsHost:   *host,
 		MetricsPort:   *port,

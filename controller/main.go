@@ -122,13 +122,14 @@ func (c *controller) MarkSynced(l log.Logger) {
 
 func main() {
 	var (
-		port       = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
-		config     = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
-		namespace  = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config / memberlist secret namespace")
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
-		mlSecret   = flag.String("ml-secret-name", os.Getenv("METALLB_ML_SECRET_NAME"), "name of the memberlist secret to create")
-		deployName = flag.String("deployment", os.Getenv("METALLB_DEPLOYMENT"), "name of the MetalLB controller Deployment")
-		logLevel   = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", strings.Join(logging.Levels, ", ")))
+		port            = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
+		config          = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
+		namespace       = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config / memberlist secret namespace")
+		kubeconfig      = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
+		mlSecret        = flag.String("ml-secret-name", os.Getenv("METALLB_ML_SECRET_NAME"), "name of the memberlist secret to create")
+		deployName      = flag.String("deployment", os.Getenv("METALLB_DEPLOYMENT"), "name of the MetalLB controller Deployment")
+		logLevel        = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", strings.Join(logging.Levels, ", ")))
+		disableEpSlices = flag.Bool("disable-epslices", false, "Disable the usage of EndpointSlices and default to Endpoints instead of relying on the autodiscovery mechanism")
 	)
 	flag.Parse()
 
@@ -154,12 +155,13 @@ func main() {
 	}
 
 	client, err := k8s.New(&k8s.Config{
-		ProcessName:   "metallb-controller",
-		ConfigMapName: *config,
-		ConfigMapNS:   *namespace,
-		MetricsPort:   *port,
-		Logger:        logger,
-		Kubeconfig:    *kubeconfig,
+		ProcessName:     "metallb-controller",
+		ConfigMapName:   *config,
+		ConfigMapNS:     *namespace,
+		MetricsPort:     *port,
+		Logger:          logger,
+		Kubeconfig:      *kubeconfig,
+		DisableEpSlices: *disableEpSlices,
 
 		ServiceChanged: c.SetBalancer,
 		ConfigChanged:  c.SetConfig,

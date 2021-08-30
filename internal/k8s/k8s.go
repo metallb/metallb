@@ -72,15 +72,16 @@ const (
 // Config specifies the configuration of the Kubernetes
 // client/watcher.
 type Config struct {
-	ProcessName   string
-	ConfigMapName string
-	ConfigMapNS   string
-	NodeName      string
-	MetricsHost   string
-	MetricsPort   int
-	ReadEndpoints bool
-	Logger        log.Logger
-	Kubeconfig    string
+	ProcessName     string
+	ConfigMapName   string
+	ConfigMapNS     string
+	NodeName        string
+	MetricsHost     string
+	MetricsPort     int
+	ReadEndpoints   bool
+	Logger          log.Logger
+	Kubeconfig      string
+	DisableEpSlices bool
 
 	ServiceChanged func(log.Logger, string, *v1.Service, EpsOrSlices) SyncState
 	ConfigChanged  func(log.Logger, *config.Config) SyncState
@@ -164,7 +165,8 @@ func New(cfg *Config) (*Client, error) {
 		c.syncFuncs = append(c.syncFuncs, c.svcInformer.HasSynced)
 
 		if cfg.ReadEndpoints {
-			if !UseEndpointSlices(c.client) {
+			// use DisableEpSlices to skip the autodiscovery mechanism. Useful if EndpointSlices are enabled in the cluster but disabled in kube-proxy
+			if cfg.DisableEpSlices || !UseEndpointSlices(c.client) {
 				epHandlers := cache.ResourceEventHandlerFuncs{
 					AddFunc: func(obj interface{}) {
 						key, err := cache.MetaNamespaceKeyFunc(obj)
