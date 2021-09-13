@@ -294,6 +294,9 @@
                 }
               }
             },
+            "runtimeClassName": {
+              "type": "string"
+            },
             "secretName": {
               "type": "string"
             }

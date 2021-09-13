@@ -27,6 +27,9 @@ spec:
         {{- include "metallb.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: speaker
     spec:
+      {{- if .Values.speaker.runtimeClassName }}
+      runtimeClassName: {{ .Values.speaker.runtimeClassName }}
+      {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
