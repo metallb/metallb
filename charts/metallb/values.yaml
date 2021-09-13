@@ -200,6 +200,8 @@ speaker:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  ## Selects which runtime class will be used by the pod.
+  # runtimeClassName:
   podAnnotations: {}
   livenessProbe:
     enabled: true
