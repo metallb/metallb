@@ -15,6 +15,7 @@
 package config // import "go.universe.tf/metallb/internal/config"
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"net"
@@ -456,6 +457,10 @@ func parseCIDR(cidr string) ([]*net.IPNet, error) {
 	end := net.ParseIP(strings.TrimSpace(fs[1]))
 	if end == nil {
 		return nil, fmt.Errorf("invalid IP range %q: invalid end IP %q", cidr, fs[1])
+	}
+
+	if bytes.Compare(start, end) >= 0 {
+		return nil, fmt.Errorf("invalid IP range %q: start IP %q is after the end IP %q", cidr, start, end)
 	}
 
 	var ret []*net.IPNet
