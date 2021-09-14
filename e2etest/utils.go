@@ -14,7 +14,7 @@ const (
 	retryLimit     = 4
 )
 
-// DescribeSvc logs the output of kubectl describe svc for the given namespace
+// DescribeSvc logs the output of kubectl describe svc for the given namespace.
 func DescribeSvc(ns string) {
 	framework.Logf("\nOutput of kubectl describe svc:\n")
 	desc, _ := framework.RunKubectl(
