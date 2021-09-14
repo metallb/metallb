@@ -34,7 +34,7 @@ import (
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 )
 
-// use ephemeral port for pod, instead of well-known port (tcp/80)
+// use ephemeral port for pod, instead of well-known port (tcp/80).
 var servicePodPort uint
 var skipDockerCmd bool
 
@@ -51,12 +51,19 @@ func handleFlags() {
 func TestMain(m *testing.M) {
 	// Register test flags, then parse flags.
 	handleFlags()
+	if testing.Short() {
+		return
+	}
+
 	framework.AfterReadingAllFlags(&framework.TestContext)
 
 	os.Exit(m.Run())
 }
 
 func TestE2E(t *testing.T) {
+	if testing.Short() {
+		return
+	}
 	// Run tests through the Ginkgo runner with output to console + JUnit for reporting
 	var r []ginkgo.Reporter
 	if framework.TestContext.ReportDir != "" {
