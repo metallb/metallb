@@ -373,7 +373,7 @@ func ipConfusesBuggyFirmwares(ip net.IP) bool {
 	return ip[3] == 0 || ip[3] == 255
 }
 
-// Dual-stack;
+// Dual-stack.
 
 // AssignDual assigns the requested ip's to svc, if the assignment is
 // permissible by sharingKey and backendKey.

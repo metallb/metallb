@@ -186,7 +186,7 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 	return c.ips.Allocate(key, isIPv6, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
 }
 
-// Dual-stack
+// Dual-stack.
 
 func (c *controller) convergeBalancerDual(l log.Logger, key string, svc *v1.Service) bool {
 	var lbIP, lbIP2 net.IP
