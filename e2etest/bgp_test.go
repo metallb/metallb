@@ -75,10 +75,10 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		useDocker := true
 		if skipDockerCmd {
-			ginkgo.By("checking connectivity to its external VIP")
+			ginkgo.By(fmt.Sprintf("checking connectivity to %s", address))
 			useDocker = false
 		} else {
-			ginkgo.By("checking connectivity to its external VIP with docker")
+			ginkgo.By(fmt.Sprintf("checking connectivity to %s with docker", address))
 		}
 		err = wgetRetry(useDocker, address)
 		framework.ExpectNoError(err)
