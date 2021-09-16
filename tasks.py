@@ -199,9 +199,11 @@ def validate_kind_version():
     "protocol": "Pre-configure MetalLB with the specified protocol. "
                 "Unconfigured by default. Supported: 'bgp','layer2'",
     "node_img": "Optional node image to use for the kind cluster (e.g. kindest/node:v1.18.19)."
-                "The node image drives the kubernetes version used in kind."
+                "The node image drives the kubernetes version used in kind.",
+    "ip_family": "Optional ipfamily of the cluster."
+                 "Default: ipv4, supported families are 'ipv6' and 'dual'."
 })
-def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None, node_img=None):
+def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None, node_img=None, ip_family="ipv4"):
     """Build and run MetalLB in a local Kind cluster.
 
     If the cluster specified by --name (default "kind") doesn't exist,
@@ -224,14 +226,18 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None, nod
                       {"role": "worker"},
             ],
         }
+
+        networking_config = {}
         if protocol == "layer2":
-            config["networking"] = {
-                "podSubnet": "10.240.0.0/17"
-            }
+            networking_config["podSubnet"] = "10.240.0.0/17"
         if cni:
-            config["networking"] = {
-                "disableDefaultCNI": True,
-            }
+            networking_config["disableDefaultCNI"] = True
+        if ip_family != "ipv4":
+            networking_config["ipFamily"] = ip_family
+
+        if len(networking_config) > 0:
+            config["networking"] = networking_config
+
         extra_options = ""
         if node_img != None:
             extra_options = "--image={}".format(node_img)
