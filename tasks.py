@@ -228,8 +228,6 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None, nod
         }
 
         networking_config = {}
-        if protocol == "layer2":
-            networking_config["podSubnet"] = "10.240.0.0/17"
         if cni:
             networking_config["disableDefaultCNI"] = True
         if ip_family != "ipv4":
