@@ -159,7 +159,6 @@ func (a *Allocator) Assign(svc string, ip net.IP, ports []Port, sharingKey, back
 		key:   *sk,
 	}
 	for i, port := range ports {
-		port := port
 		alloc.ports[i] = port
 	}
 	a.assign(svc, alloc)
@@ -414,7 +413,6 @@ func (a *Allocator) AssignDual(svc string, ip, ip2 net.IP, ports []Port, sharing
 		key:   *sk,
 	}
 	for i, port := range ports {
-		port := port
 		alloc.ports[i] = port
 	}
 	a.assign(svc, alloc)
@@ -430,7 +428,6 @@ func (a *Allocator) AllocateFromPoolDual(svc string, poolName string, ports []Po
 		return alloc.ip, alloc.ip2, nil
 	}
 
-	fmt.Println("AllocateFromPoolDual", svc, poolName)
 	pool := a.pools[poolName]
 	if pool == nil {
 		return nil, nil, fmt.Errorf("unknown pool %q", poolName)
