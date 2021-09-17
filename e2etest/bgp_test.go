@@ -26,11 +26,14 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
+	"go.universe.tf/metallb/e2etest/pkg/executor"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 )
+
+const frrContainer = "frr"
 
 var _ = ginkgo.Describe("BGP", func() {
 	f := framework.NewDefaultFramework("bgp")
@@ -73,14 +76,14 @@ var _ = ginkgo.Describe("BGP", func() {
 		hostport := net.JoinHostPort(ingressIP, port)
 		address := fmt.Sprintf("http://%s/", hostport)
 
-		useDocker := true
+		exc := executor.ForContainer(frrContainer)
 		if skipDockerCmd {
 			ginkgo.By(fmt.Sprintf("checking connectivity to %s", address))
-			useDocker = false
+			exc = executor.Host
 		} else {
 			ginkgo.By(fmt.Sprintf("checking connectivity to %s with docker", address))
 		}
-		err = wgetRetry(useDocker, address)
+		err = wgetRetry(address, exc)
 		framework.ExpectNoError(err)
 	})
 
