@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo"
+	"go.universe.tf/metallb/e2etest/pkg/executor"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -73,7 +74,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 		hostport := net.JoinHostPort(ingressIP, port)
 		address := fmt.Sprintf("http://%s/", hostport)
-		err = wgetRetry(false, address)
+		err = wgetRetry(address, executor.Host)
 		framework.ExpectNoError(err)
 	})
 
