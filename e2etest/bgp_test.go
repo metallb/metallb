@@ -27,6 +27,8 @@ import (
 
 	"github.com/onsi/ginkgo"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
+	"go.universe.tf/metallb/e2etest/pkg/frr"
+	"go.universe.tf/metallb/e2etest/pkg/routes"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -83,8 +85,29 @@ var _ = ginkgo.Describe("BGP", func() {
 		} else {
 			ginkgo.By(fmt.Sprintf("checking connectivity to %s with docker", address))
 		}
+
 		err = wgetRetry(address, exc)
 		framework.ExpectNoError(err)
-	})
 
+		allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+		framework.ExpectNoError(err)
+
+		advertised := routes.ForIP(ingressIP, exc)
+		err = routes.MatchNodes(allNodes.Items, advertised)
+		framework.ExpectNoError(err)
+
+		neighbors, err := frr.NeighborsInfo(exc)
+		framework.ExpectNoError(err)
+
+		err = frr.NeighborsMatchNodes(allNodes.Items, neighbors)
+		framework.ExpectNoError(err)
+
+		frrRoutes, _, err := frr.Routes(exc)
+		framework.ExpectNoError(err)
+
+		routes, ok := frrRoutes[ingressIP]
+		framework.ExpectEqual(ok, true, ingressIP, "not found in frr routes")
+		err = frr.RoutesMatchNodes(allNodes.Items, routes)
+		framework.ExpectNoError(err)
+	})
 })
