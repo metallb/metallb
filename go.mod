@@ -19,6 +19,7 @@ require (
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.7.0
 	github.com/osrg/gobgp v2.0.0+incompatible
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/prometheus/client_golang v1.7.1
 	github.com/spf13/viper v1.8.1 // indirect
 	golang.org/x/sys v0.0.0-20210510120138-977fb7262007
