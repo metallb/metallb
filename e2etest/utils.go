@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os/exec"
 
+	"go.universe.tf/metallb/e2etest/pkg/executor"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -22,25 +23,14 @@ func DescribeSvc(ns string) {
 	framework.Logf(desc)
 }
 
-func runCommand(bgp bool, name string, args ...string) (string, error) {
-	if bgp {
-		// prepend "docker exec frr"
-		cmd := []string{"exec", "frr", name}
-		name = "docker"
-		args = append(cmd, args...)
-	}
-	out, err := exec.Command(name, args...).CombinedOutput()
-	return string(out), err
-}
-
-func wgetRetry(bgp bool, address string) error {
+func wgetRetry(address string, exc executor.Executor) error {
 	retrycnt := 0
 	code := 0
 	var err error
 
 	// Retry loop to handle wget NetworkFailure errors
 	for {
-		_, err = runCommand(bgp, "wget", "-O-", "-q", address, "-T", "60")
+		_, err = exc.Exec("wget", "-O-", "-q", address, "-T", "60")
 		if exitErr, ok := err.(*exec.ExitError); err != nil && ok {
 			code = exitErr.ExitCode()
 		} else {
