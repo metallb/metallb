@@ -575,15 +575,20 @@ def lint(ctx, env="container"):
     "kubeconfig": "kubeconfig location. By default, use the kubeconfig from kind.",
     "system_namespaces": "comma separated list of Kubernetes system namespaces",
     "service_pod_port": "port number that service pods open.",
-    "skip_docker": "don't use docker command in BGP testing."
+    "skip_docker": "don't use docker command in BGP testing.",
+    "focus": "the list of arguments to pass into as -ginkgo.focus",
 })
-def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False):
+def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus=""):
     """Run E2E tests against development cluster."""
     if skip_docker:
-        opt_skip_docker = "-skip-docker"
+        opt_skip_docker = "--skip-docker"
     else:
         opt_skip_docker = ""
 
+    ginkgo_focus = ""
+    if focus:
+        ginkgo_focus = "--ginkgo.focus="+focus
+    
     if kubeconfig is None:
         validate_kind_version()
         clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
@@ -600,20 +605,8 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
     for ns in namespaces:
         run("kubectl -n {} wait --for=condition=Ready --all pods --timeout 300s".format(ns), hide=True)
 
-    try:
-        metallb_config = yaml.load(run("kubectl get configmaps -n metallb-system config -o jsonpath='{.data.config}'", hide=True).stdout)
-    except UnexpectedExit:
-        print("dev-env environment not configured. Try running `inv dev-env -p <layer2/bgp>`")
-        sys.exit(1)
-
-    if metallb_config['address-pools'][0]['name'] == "dev-env-layer2":
-        run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "go test --provider=local -ginkgo.focus=L2 --kubeconfig={} -service-pod-port={}".format(kubeconfig, service_pod_port))
-    elif metallb_config['address-pools'][0]['name'] == "dev-env-bgp":
-        run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "go test --provider=local -ginkgo.focus=BGP --kubeconfig={} -service-pod-port={} {}".format(kubeconfig, service_pod_port, opt_skip_docker))
-    else:
-        print("dev-env environment not configured correctly. Try running `inv dev-env -p <layer2/bgp>`")
+    run("cd `git rev-parse --show-toplevel`/e2etest &&"
+            "go test {} --provider=local --kubeconfig={} --service-pod-port={} {}".format(ginkgo_focus, kubeconfig, service_pod_port, opt_skip_docker))    
     
     if export != None:
         run("kind export logs {}".format(export))
