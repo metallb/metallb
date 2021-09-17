@@ -23,26 +23,22 @@ jobs:
       - setup_ci_image
       - run: inv test
       - run: cp manifests/metallb.yaml manifests/metallb.yaml.prev
-  e2etest-bgp:
+  e2etest:
+    parameters:
+      ip-family:
+        type: string
+      protocol:
+        type: string
     machine:
       image: ubuntu-2004:202104-01
     steps:
       - setup_ci_image
       - setup_kind
       - run: inv build
-      - run: inv dev-env -p bgp
-      - run: inv e2etest -e /tmp/kind_logs
-      - store_artifacts:
-          path: /tmp/kind_logs
-  e2etest-layer2:
-    machine:
-      image: ubuntu-2004:202104-01
-    steps:
-      - setup_ci_image
-      - setup_kind
-      - run: inv build
-      - run: inv dev-env -p layer2
-      - run: inv e2etest -e /tmp/kind_logs
+      - run: inv dev-env -p << parameters.protocol >> -i  << parameters.ip-family >>
+      - run: |
+          if [ "<< parameters.protocol >>" = "layer2" ]; then FOCUS=L2; else FOCUS=BGP; fi
+          inv e2etest -f $FOCUS -e /tmp/kind_logs
       - store_artifacts:
           path: /tmp/kind_logs
   lint-1-16:
@@ -122,14 +118,17 @@ workflows:
           filters:
             tags:
               only: /.*/
-      - e2etest-bgp:
+      - e2etest:
           filters:
             tags:
               only: /.*/
-      - e2etest-layer2:
-          filters:
-            tags:
-              only: /.*/
+          matrix:
+            parameters:
+              protocol: [layer2, bgp]
+              ip-family: [ipv4, ipv6, dual]
+            exclude:
+              - protocol: bgp
+                ip-family: ipv6
       - publish-images:
           filters:
             branches:
