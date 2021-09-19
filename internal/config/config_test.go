@@ -415,6 +415,16 @@ address-pools:
 		},
 
 		{
+			desc: "invalid pool CIDR, first address of the range is after the second",
+			raw: `
+address-pools:
+- name: pool1
+  addresses:
+  - 1.2.3.10-1.2.3.1
+`,
+		},
+
+		{
 			desc: "simple advertisement",
 			raw: `
 address-pools:
