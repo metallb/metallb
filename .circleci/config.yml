@@ -35,7 +35,7 @@ jobs:
       - setup_ci_image
       - setup_kind
       - run: inv build
-      - run: inv dev-env -p << parameters.protocol >> -i  << parameters.ip-family >>
+      - run: inv dev-env -i  << parameters.ip-family >>
       - run: |
           if [ "<< parameters.protocol >>" = "layer2" ]; then FOCUS=L2; else FOCUS=BGP; fi
           inv e2etest -f $FOCUS -e /tmp/kind_logs
