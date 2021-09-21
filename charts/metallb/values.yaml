@@ -45,6 +45,12 @@ prometheus:
   # port both controller and speaker will listen on for metrics
   metricsPort: 7472
 
+  # the service account used by prometheus
+  serviceAccount: prometheus-k8s
+
+  # the namespace where prometheus is deployed
+  namespace: monitoring
+
   # Prometheus Operator PodMonitors
   podMonitor:
 
