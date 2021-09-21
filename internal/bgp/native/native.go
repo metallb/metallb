@@ -26,12 +26,12 @@ var errClosed = errors.New("session closed")
 
 // Session represents one BGP session to an external router.
 type Session struct {
-	asn              uint32
+	myASN            uint32
 	routerID         net.IP // May be nil, meaning "derive from context"
 	myNode           string
 	addr             string
 	srcAddr          net.IP
-	peerASN          uint32
+	asn              uint32
 	peerFBASNSupport bool
 	holdTime         time.Duration
 	logger           log.Logger
@@ -89,7 +89,7 @@ func (s *Session) sendUpdates() bool {
 		return true
 	}
 
-	ibgp := s.asn == s.peerASN
+	ibgp := s.myASN == s.asn
 	fbasn := s.peerFBASNSupport
 
 	if s.new != nil {
@@ -97,7 +97,7 @@ func (s *Session) sendUpdates() bool {
 	}
 
 	for c, adv := range s.advertised {
-		if err := sendUpdate(s.conn, s.asn, ibgp, fbasn, s.defaultNextHop, adv); err != nil {
+		if err := sendUpdate(s.conn, s.myASN, ibgp, fbasn, s.defaultNextHop, adv); err != nil {
 			s.abort()
 			level.Error(s.logger).Log("op", "sendUpdate", "ip", c, "error", err, "msg", "failed to send BGP update")
 			return true
@@ -130,7 +130,7 @@ func (s *Session) sendUpdates() bool {
 				continue
 			}
 
-			if err := sendUpdate(s.conn, s.asn, ibgp, fbasn, s.defaultNextHop, adv); err != nil {
+			if err := sendUpdate(s.conn, s.myASN, ibgp, fbasn, s.defaultNextHop, adv); err != nil {
 				s.abort()
 				level.Error(s.logger).Log("op", "sendUpdate", "prefix", c, "error", err, "msg", "failed to send BGP update")
 				return true
@@ -197,7 +197,7 @@ func (s *Session) connect() error {
 		}
 	}
 
-	if err = sendOpen(conn, s.asn, routerID, s.holdTime); err != nil {
+	if err = sendOpen(conn, s.myASN, routerID, s.holdTime); err != nil {
 		conn.Close()
 		return fmt.Errorf("send OPEN to %q: %s", s.addr, err)
 	}
@@ -207,12 +207,12 @@ func (s *Session) connect() error {
 		conn.Close()
 		return fmt.Errorf("read OPEN from %q: %s", s.addr, err)
 	}
-	if op.asn != s.peerASN {
+	if op.asn != s.asn {
 		conn.Close()
-		return fmt.Errorf("unexpected peer ASN %d, want %d", op.asn, s.peerASN)
+		return fmt.Errorf("unexpected peer ASN %d, want %d", op.asn, s.asn)
 	}
 	s.peerFBASNSupport = op.fbasn
-	if s.asn > 65536 && !s.peerFBASNSupport {
+	if s.myASN > 65536 && !s.peerFBASNSupport {
 		conn.Close()
 		return fmt.Errorf("peer does not support 4-byte ASNs")
 	}
@@ -359,16 +359,16 @@ func (s *Session) sendKeepalive() error {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func New(l log.Logger, addr string, srcAddr net.IP, asn uint32, routerID net.IP, peerASN uint32, holdTime time.Duration, password string, myNode string) (*Session, error) {
+func New(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime time.Duration, password string, myNode string) (*Session, error) {
 	ret := &Session{
 		addr:        addr,
 		srcAddr:     srcAddr,
-		asn:         asn,
+		myASN:       myASN,
 		routerID:    routerID.To4(),
 		myNode:      myNode,
-		peerASN:     peerASN,
+		asn:         asn,
 		holdTime:    holdTime,
-		logger:      log.With(l, "peer", addr, "localASN", asn, "peerASN", peerASN),
+		logger:      log.With(l, "peer", addr, "localASN", myASN, "peerASN", asn),
 		newHoldTime: make(chan bool, 1),
 		advertised:  map[string]*bgp.Advertisement{},
 		password:    password,
