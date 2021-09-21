@@ -183,6 +183,8 @@
       "properties": {
         "scrapeAnnotations": { "type": "boolean" },
         "metricsPort": { "type": "integer" },
+        "serviceAccount": { "type": "string" },
+        "namespace": { "type": "string" },
         "podMonitor": {
           "description": "Prometheus Operator PodMonitors",
           "type": "object",
