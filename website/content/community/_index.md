@@ -134,15 +134,15 @@ When you're developing, running components at the command line and
 having them attach to a cluster might be more convenient than
 redeploying them to a cluster over and over.
 
-For the controller, the `-kubeconfig` and `-config-ns` command-line flags
+For the controller, the `-kubeconfig` and `-namespace` command-line flags
 are needed. Speakers need those and `-node-name`.
 
 For example:
 
 ```bash
-metallb$ go run ./controller/main.go ./controller/service.go -config-ns metallb-system -kubeconfig $KUBECONFIG
+metallb$ go run ./controller/main.go ./controller/service.go -namespace metallb-system -kubeconfig $KUBECONFIG
 
-metallb$ go run ./speaker/main.go ./speaker/*controller.go -config-ns metallb-system -kubeconfig $KUBECONFIG -node-name node0
+metallb$ go run ./speaker/main.go ./speaker/*controller.go -namespace metallb-system -kubeconfig $KUBECONFIG -node-name node0
 ```
 
 For development, fork
