@@ -441,32 +441,12 @@ func (a *Allocator) AllocateFromPoolDual(svc string, poolName string, ports []Po
 	}
 	for _, cidr := range pool.CIDR {
 		if ip == nil {
-			c := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})
-			for pos := c.First(); pos != nil; pos = c.Next() {
-				if pool.AvoidBuggyIPs && ipConfusesBuggyFirmwares(pos.IP) {
-					continue
-				}
-				if a.checkSharing(svc, pos.IP.String(), ports, sk) != nil {
-					continue
-				}
-				ip = pos.IP
-				break
-			}
+			ip = a.getIPFromCIDR(cidr, pool.AvoidBuggyIPs, svc, ports, sk)
 		} else {
 			if cidrIsIPv6(cidr) == ipIsIPv6(ip) {
 				continue
 			}
-			c := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})
-			for pos := c.First(); pos != nil; pos = c.Next() {
-				if pool.AvoidBuggyIPs && ipConfusesBuggyFirmwares(pos.IP) {
-					continue
-				}
-				if a.checkSharing(svc, pos.IP.String(), ports, sk) != nil {
-					continue
-				}
-				ip2 = pos.IP
-				break
-			}
+			ip2 = a.getIPFromCIDR(cidr, pool.AvoidBuggyIPs, svc, ports, sk)
 		}
 		if ip2 != nil {
 			break
@@ -531,6 +511,20 @@ func (a *Allocator) checkSharing(svc string, ip string, ports []Port, sk *key) e
 				return fmt.Errorf("port %s is already in use on %q", port, ip)
 			}
 		}
+	}
+	return nil
+}
+
+func (a *Allocator) getIPFromCIDR(cidr *net.IPNet, avoidBuggyIPs bool, svc string, ports []Port, sk *key) net.IP {
+	c := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})
+	for pos := c.First(); pos != nil; pos = c.Next() {
+		if avoidBuggyIPs && ipConfusesBuggyFirmwares(pos.IP) {
+			continue
+		}
+		if a.checkSharing(svc, pos.IP.String(), ports, sk) != nil {
+			continue
+		}
+		return pos.IP
 	}
 	return nil
 }
