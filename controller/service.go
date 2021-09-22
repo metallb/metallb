@@ -27,7 +27,7 @@ import (
 )
 
 const (
-	annotationAddressPool = "metallb.universe.tf/address-pool"
+	annotationAddressPool     = "metallb.universe.tf/address-pool"
 	annotationLoadBalancerIPs = "metallb.universe.tf/load-balancer-ips"
 )
 
@@ -237,26 +237,11 @@ func (c *controller) convergeBalancerDual(l log.Logger, key string, svc *v1.Serv
 		l.Log("event", "loadBalancerIP", "reason", "N/A", "msg", "loadBalancerIP ignored for dual-stack")
 	}
 
-	if requestedIPs := svc.Annotations[annotationLoadBalancerIPs]; requestedIPs != "" {
-		// Until a svc.Spec.LoadBalancerIPs exists we use an annotation.
-		// requestedIPs must be a comma-separated list of 2 addresses, one from each family.
-		ips := strings.Split(requestedIPs, ",")
-		if len(ips) != 2 {
-			l.Log("op", "allocateIP", "load-balancer-ips", len(ips), "msg", "Must be two addresses")
-			return true
-		}
-		if lbIP = net.ParseIP(strings.TrimSpace(ips[0])); lbIP == nil {
-			l.Log("op", "allocateIP", "load-balancer-ips", ips[0], "msg", "Invalid addresses")
-			return true
-		}
-		if lbIP2 = net.ParseIP(strings.TrimSpace(ips[1])); lbIP2 == nil {
-			l.Log("op", "allocateIP", "load-balancer-ips", ips[1], "msg", "Invalid addresses")
-			return true
-		}
-		if (lbIP.To4() == nil) == (lbIP2.To4() == nil) {
-			l.Log("op", "allocateIP", "load-balancer-ips", requestedIPs, "msg", "Same family")
-		}
-
+	lbIP, lbIP2, err := parseRequestedIPs(svc.Annotations[annotationLoadBalancerIPs])
+	if err != nil {
+		l.Log("op", "allocateIP", "error", err, "msg", "Can't parse requested IPs")
+		return true
+	} else if lbIP != nil {
 		// Try to assign the requested IPs
 		if err := c.ips.AssignDual(key, lbIP, lbIP2, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 			l.Log("op", "allocateIP", "error", err, "msg", "Can't assign requested IPs")
@@ -318,4 +303,26 @@ func (c *controller) allocateIPDual(key string, svc *v1.Service) (net.IP, net.IP
 
 	// Okay, in that case just bruteforce across all pools.
 	return c.ips.AllocateDual(key, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
+}
+
+func parseRequestedIPs(requestedIPs string) (net.IP, net.IP, error) {
+	if requestedIPs == "" {
+		return nil, nil, nil
+	}
+	var lbIP, lbIP2 net.IP
+	// requestedIPs must be a comma-separated list of 2 addresses, one from each family.
+	ips := strings.Split(requestedIPs, ",")
+	if len(ips) != 2 {
+		return nil, nil, fmt.Errorf("load-balancer-ips: Must be two addresses")
+	}
+	if lbIP = net.ParseIP(strings.TrimSpace(ips[0])); lbIP == nil {
+		return nil, nil, fmt.Errorf("load-balancer-ips: Invalid address %s", ips[0])
+	}
+	if lbIP2 = net.ParseIP(strings.TrimSpace(ips[1])); lbIP2 == nil {
+		return nil, nil, fmt.Errorf("load-balancer-ips: Invalid address %s", ips[1])
+	}
+	if (lbIP.To4() == nil) == (lbIP2.To4() == nil) {
+		return nil, nil, fmt.Errorf("load-balancer-ips: Same family")
+	}
+	return lbIP, lbIP2, nil
 }

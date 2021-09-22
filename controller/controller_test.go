@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"net"
+	"strings"
 	"testing"
 
 	"go.universe.tf/metallb/internal/allocator"
@@ -699,5 +700,44 @@ func TestDeleteRecyclesIP(t *testing.T) {
 	}
 	if len(gotSvc.Status.LoadBalancer.Ingress) == 0 || gotSvc.Status.LoadBalancer.Ingress[0].IP != "1.2.3.0" {
 		t.Fatal("svc2 didn't get an IP")
+	}
+}
+
+func TestRequestedIPs(t *testing.T) {
+	var tests = []struct {
+		testname     string
+		requestedIPs string
+		lbIP, lbIP2  net.IP
+		errContains  string
+	}{
+		{"Empty string", "", nil, nil, ""},
+		{"Ipv4 first", "10.0.0.0,  1000::", net.ParseIP("10.0.0.0"), net.ParseIP("1000::"), ""},
+		{"Ipv6 first", "1000::,10.0.0.0", net.ParseIP("1000::"), net.ParseIP("10.0.0.0"), ""},
+
+		{"Just one", "10.0.0.0", nil, nil, "Must be two addresses"},
+		{"More than two", "10.0.0.0, 1000::, 2000::", nil, nil, "Must be two addresses"},
+		{"Invalid 1", "10.0.0.400, 1000::", nil, nil, "Invalid address"},
+		{"Invalid 2", "10.0.0.0, 1000::2::2", nil, nil, "Invalid address"},
+		{"Same family", "1000::1, 1000::2", nil, nil, "Same family"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.testname, func(t *testing.T) {
+			lbIP, lbIP2, err := parseRequestedIPs(tt.requestedIPs)
+			if (err == nil) != (tt.errContains == "") {
+				t.Errorf("err: Unexpected %v", err)
+			}
+			if err != nil && tt.errContains != "" {
+				if !strings.Contains(err.Error(), tt.errContains) {
+					t.Errorf("err: got %v, should contain %s", err, tt.errContains)
+				}
+			}
+			if !lbIP.Equal(tt.lbIP) {
+				t.Errorf("lbIP: got %v, want %v", lbIP, tt.lbIP)
+			}
+			if !lbIP2.Equal(tt.lbIP2) {
+				t.Errorf("lbIP2: got %v, want %v", lbIP2, tt.lbIP2)
+			}
+		})
 	}
 }
