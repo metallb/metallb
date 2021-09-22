@@ -26,6 +26,11 @@ import (
 	"go.universe.tf/metallb/internal/allocator/k8salloc"
 )
 
+const (
+	annotationAddressPool = "metallb.universe.tf/address-pool"
+	annotationLoadBalancerIPs = "metallb.universe.tf/load-balancer-ips"
+)
+
 func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service) bool {
 	var lbIP net.IP
 
@@ -84,7 +89,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		// The user might also have changed the pool annotation, and
 		// requested a different pool than the one that is currently
 		// allocated.
-		desiredPool := svc.Annotations["metallb.universe.tf/address-pool"]
+		desiredPool := svc.Annotations[annotationAddressPool]
 		if lbIP != nil && desiredPool != "" && c.ips.Pool(key) != desiredPool {
 			level.Info(l).Log("event", "clearAssignment", "reason", "differentPoolRequested", "msg", "user requested a different pool than the one currently assigned")
 			c.clearServiceState(key, svc)
@@ -173,7 +178,7 @@ func (c *controller) allocateIP(key string, svc *v1.Service) (net.IP, error) {
 	}
 
 	// Otherwise, did the user ask for a specific pool?
-	desiredPool := svc.Annotations["metallb.universe.tf/address-pool"]
+	desiredPool := svc.Annotations[annotationAddressPool]
 	if desiredPool != "" {
 		ip, err := c.ips.AllocateFromPool(key, isIPv6, desiredPool, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
 		if err != nil {
@@ -215,7 +220,7 @@ func (c *controller) convergeBalancerDual(l log.Logger, key string, svc *v1.Serv
 			// The user might also have changed the pool annotation, and
 			// requested a different pool than the one that is currently
 			// allocated.
-			desiredPool := svc.Annotations["metallb.universe.tf/address-pool"]
+			desiredPool := svc.Annotations[annotationAddressPool]
 			if desiredPool != "" && c.ips.Pool(key) != desiredPool {
 				l.Log("event", "clearAssignment", "reason", "differentPoolRequested", "msg", "user requested a different pool than the one currently assigned")
 				c.clearServiceState(key, svc)
@@ -232,7 +237,7 @@ func (c *controller) convergeBalancerDual(l log.Logger, key string, svc *v1.Serv
 		l.Log("event", "loadBalancerIP", "reason", "N/A", "msg", "loadBalancerIP ignored for dual-stack")
 	}
 
-	if requestedIPs := svc.Annotations["metallb.universe.tf/load-balancer-ips"]; requestedIPs != "" {
+	if requestedIPs := svc.Annotations[annotationLoadBalancerIPs]; requestedIPs != "" {
 		// Until a svc.Spec.LoadBalancerIPs exists we use an annotation.
 		// requestedIPs must be a comma-separated list of 2 addresses, one from each family.
 		ips := strings.Split(requestedIPs, ",")
@@ -302,7 +307,7 @@ func (c *controller) convergeBalancerDual(l log.Logger, key string, svc *v1.Serv
 }
 
 func (c *controller) allocateIPDual(key string, svc *v1.Service) (net.IP, net.IP, error) {
-	desiredPool := svc.Annotations["metallb.universe.tf/address-pool"]
+	desiredPool := svc.Annotations[annotationAddressPool]
 	if desiredPool != "" {
 		ip, ip2, err := c.ips.AllocateFromPoolDual(key, desiredPool, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
 		if err != nil {
