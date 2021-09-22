@@ -23,12 +23,15 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"time"
+
+	"go.universe.tf/metallb/e2etest/pkg/metrics"
 
 	"github.com/onsi/ginkgo"
+	dto "github.com/prometheus/client_model/go"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/frr"
 	"go.universe.tf/metallb/e2etest/pkg/routes"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -39,13 +42,10 @@ const frrContainer = "frr"
 
 var _ = ginkgo.Describe("BGP", func() {
 	f := framework.NewDefaultFramework("bgp")
-	var loadBalancerCreateTimeout time.Duration
-
 	var cs clientset.Interface
 
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
-		loadBalancerCreateTimeout = e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -55,19 +55,10 @@ var _ = ginkgo.Describe("BGP", func() {
 	})
 
 	ginkgo.It("should work for type=Loadbalancer", func() {
-		namespace := f.Namespace.Name
-		serviceName := "external-local-lb"
-		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
-
-		svc, err := jig.CreateLoadBalancerService(loadBalancerCreateTimeout,
-			tweakServicePort())
-		framework.ExpectNoError(err)
-
-		_, err = jig.Run(tweakRCPort())
-		framework.ExpectNoError(err)
+		svc := createServiceWithBackend(cs, f.Namespace.Name)
 
 		defer func() {
-			err = cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+			err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 			framework.ExpectNoError(err)
 		}()
 
@@ -86,7 +77,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			ginkgo.By(fmt.Sprintf("checking connectivity to %s with docker", address))
 		}
 
-		err = wgetRetry(address, exc)
+		err := wgetRetry(address, exc)
 		framework.ExpectNoError(err)
 
 		allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
@@ -110,4 +101,92 @@ var _ = ginkgo.Describe("BGP", func() {
 		err = frr.RoutesMatchNodes(allNodes.Items, routes)
 		framework.ExpectNoError(err)
 	})
+
+	ginkgo.Context("metrics", func() {
+		var controllerPod *corev1.Pod
+		var speakerPods []*corev1.Pod
+
+		ginkgo.BeforeEach(func() {
+			pods, err := cs.CoreV1().Pods("metallb-system").List(context.Background(), metav1.ListOptions{
+				LabelSelector: "component=controller",
+			})
+			framework.ExpectNoError(err)
+			framework.ExpectEqual(len(pods.Items), 1, "More than one controller found")
+			controllerPod = &pods.Items[0]
+
+			speakers, err := cs.CoreV1().Pods("metallb-system").List(context.Background(), metav1.ListOptions{
+				LabelSelector: "component=speaker",
+			})
+			framework.ExpectNoError(err)
+			speakerPods = make([]*corev1.Pod, 0)
+			for _, item := range speakers.Items {
+				speakerPods = append(speakerPods, &item)
+			}
+		})
+
+		ginkgo.It("should be exposed by the controller", func() {
+			peerAddr := "172.18.0.5:179" // TODO replace this when we create the config locally
+			poolName := "dev-env-bgp"    // TODO replace this when we create the config locally
+			ginkgo.By("checking the metrics when no service is added")
+			controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod)
+			framework.ExpectNoError(err)
+			validateGaugeValue(0, "metallb_allocator_addresses_in_use_total", map[string]string{"pool": poolName}, controllerMetrics)
+			validateGaugeValue(272, "metallb_allocator_addresses_total", map[string]string{"pool": poolName}, controllerMetrics)
+
+			for _, speaker := range speakerPods {
+				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
+
+				speakerMetrics, err := metrics.ForPod(controllerPod, speaker)
+				framework.ExpectNoError(err)
+				validateGaugeValue(1, "metallb_bgp_session_up", map[string]string{"peer": peerAddr}, speakerMetrics)
+				validateGaugeValue(0, "metallb_bgp_announced_prefixes_total", map[string]string{"peer": peerAddr}, speakerMetrics)
+			}
+
+			ginkgo.By("creating a service")
+			svc := createServiceWithBackend(cs, f.Namespace.Name) // Is a sleep required here?
+			defer func() {
+				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+			}()
+
+			ginkgo.By("checking the metrics when a service is added")
+			controllerMetrics, err = metrics.ForPod(controllerPod, controllerPod)
+			framework.ExpectNoError(err)
+			validateGaugeValue(1, "metallb_allocator_addresses_in_use_total", map[string]string{"pool": poolName}, controllerMetrics)
+
+			for _, speaker := range speakerPods {
+				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
+
+				speakerMetrics, err := metrics.ForPod(controllerPod, speaker)
+				framework.ExpectNoError(err)
+				validateGaugeValue(1, "metallb_bgp_session_up", map[string]string{"peer": peerAddr}, speakerMetrics)
+				validateGaugeValue(1, "metallb_bgp_announced_prefixes_total", map[string]string{"peer": peerAddr}, speakerMetrics)
+
+				updatesTotal, err := metrics.CounterForLabels("metallb_bgp_updates_total", map[string]string{"peer": peerAddr}, speakerMetrics)
+				framework.ExpectNoError(err)
+				framework.ExpectEqual(updatesTotal >= 1, true, "expecting ", updatesTotal, "greater than 1")
+
+				validateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": speaker.Spec.NodeName, "protocol": "bgp", "service": fmt.Sprintf("%s/%s", f.Namespace.Name, svc.Name)}, speakerMetrics)
+			}
+		})
+	})
+
 })
+
+func createServiceWithBackend(cs clientset.Interface, namespace string) *corev1.Service {
+	serviceName := "external-local-lb"
+	jig := e2eservice.NewTestJig(cs, namespace, serviceName)
+	timeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
+
+	svc, err := jig.CreateLoadBalancerService(timeout, tweakServicePort())
+	framework.ExpectNoError(err)
+	_, err = jig.Run(tweakRCPort())
+	framework.ExpectNoError(err)
+	return svc
+}
+
+func validateGaugeValue(expectedValue int, metricName string, labels map[string]string, m map[string]*dto.MetricFamily) {
+	value, err := metrics.GaugeForLabels(metricName, labels, m)
+	framework.ExpectNoError(err)
+	framework.ExpectEqual(value, expectedValue, "invalid value for ", metricName, labels)
+}
