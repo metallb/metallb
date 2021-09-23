@@ -37,7 +37,8 @@ func TestParse(t *testing.T) {
 			desc: "empty config",
 			raw:  "",
 			want: &Config{
-				Pools: map[string]*Pool{},
+				Pools:       map[string]*Pool{},
+				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
 
@@ -179,6 +180,7 @@ address-pools:
 						AutoAssign: true,
 					},
 				},
+				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
 
@@ -202,7 +204,8 @@ peers:
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*Pool{},
+				Pools:       map[string]*Pool{},
+				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
 
@@ -286,7 +289,8 @@ peers:
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*Pool{},
+				Pools:       map[string]*Pool{},
+				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
 
@@ -463,6 +467,7 @@ address-pools:
 						},
 					},
 				},
+				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
 
@@ -489,6 +494,7 @@ address-pools:
 						},
 					},
 				},
+				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
 
@@ -642,6 +648,146 @@ address-pools:
   - communities: ["flarb"]
 `,
 		},
+		{
+			desc: "Session with default BFD Profile",
+			raw: `
+address-pools:
+- name: pool1
+  addresses: ["1.2.3.0/24"]
+  protocol: bgp
+bfd-profiles:
+- name: default
+peers:
+- my-asn: 42
+  peer-asn: 42
+  peer-address: 1.2.3.4
+  bfd-profile: default
+`,
+			want: &Config{
+				Peers: []*Peer{
+					{
+						MyASN:         42,
+						ASN:           42,
+						Addr:          net.ParseIP("1.2.3.4"),
+						Port:          179,
+						HoldTime:      90 * time.Second,
+						KeepaliveTime: 30 * time.Second,
+						NodeSelectors: []labels.Selector{labels.Everything()},
+						BFDProfile:    "default",
+					},
+				},
+				Pools: map[string]*Pool{
+					"pool1": {
+						Protocol:   BGP,
+						AutoAssign: true,
+						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[uint32]bool{},
+							},
+						},
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{
+					"default": {
+						Name: "default",
+					},
+				},
+			},
+		},
+		{
+			desc: "Peer with non existing BFD Profile",
+			raw: `
+address-pools:
+- name: pool1
+  addresses: ["1.2.3.0/24"]
+  protocol: bgp
+bfd-profiles:
+- name: default
+peers:
+- my-asn: 42
+  peer-asn: 42
+  peer-address: 1.2.3.4
+  bfd-profile: zzz
+`,
+		},
+		{
+			desc: "Multiple BFD Profiles with the same name",
+			raw: `
+address-pools:
+- name: pool1
+  addresses: ["1.2.3.0/24"]
+  protocol: bgp
+bfd-profiles:
+- name: default
+- name: foo
+- name: foo
+`,
+		},
+		{
+			desc: "Session with nondefault BFD Profile",
+			raw: `
+address-pools:
+- name: pool1
+  addresses: ["1.2.3.0/24"]
+  protocol: bgp
+bfd-profiles:
+- name: nondefault
+  receive-interval: 50
+  transmit-interval: 51
+  detect-multiplier: 52
+  echo-interval: 54
+  echo-mode: true
+  passive-mode: true
+  minimum-ttl: 55
+`,
+			want: &Config{
+				Pools: map[string]*Pool{
+					"pool1": {
+						Protocol:   BGP,
+						AutoAssign: true,
+						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[uint32]bool{},
+							},
+						},
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{
+					"nondefault": {
+						Name:             "nondefault",
+						ReceiveInterval:  uint32Ptr(50),
+						DetectMultiplier: uint32Ptr(52),
+						TransmitInterval: uint32Ptr(51),
+						EchoInterval:     uint32Ptr(54),
+						MinimumTTL:       uint32Ptr(55),
+						EchoMode:         true,
+						PassiveMode:      true,
+					},
+				},
+			},
+		},
+		{
+			desc: "BFD Profile with too low receive interval",
+			raw: `
+bfd-profiles:
+- name: default
+  receive-interval: 2
+`,
+		},
+		{
+			desc: "BFD Profile with too high range receive interval",
+			raw: `
+bfd-profiles:
+- name: default
+  receive-interval: 90000
+`,
+		},
 	}
 
 	for _, test := range tests {
@@ -678,4 +824,8 @@ address-pools:
 			}
 		})
 	}
+}
+
+func uint32Ptr(n uint32) *uint32 {
+	return &n
 }

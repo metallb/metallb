@@ -167,3 +167,17 @@ func ParseRoutes(vtyshRes string) (map[string]Route, error) {
 	}
 	return res, nil
 }
+
+func ParseBFDPeers(vtyshRes string) (map[string]BFDPeer, error) {
+	parseRes := []BFDPeer{}
+	err := json.Unmarshal([]byte(vtyshRes), &parseRes)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse vtysh response")
+	}
+	res := make(map[string]BFDPeer)
+	for _, p := range parseRes {
+		res[p.Peer] = p
+
+	}
+	return res, nil
+}

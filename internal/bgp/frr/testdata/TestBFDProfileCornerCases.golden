@@ -1,0 +1,16 @@
+
+log file /etc/frr/frr.log informational
+log timestamp precision 3
+hostname dummyhostname
+
+
+bfd
+  profile foo
+    receive-interval 60
+    transmit-interval 70
+    detect-multiplier 5
+    echo-mode
+    echo-interval 90
+    passive-mode
+    minimum-ttl 60
+    

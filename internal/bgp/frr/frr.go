@@ -6,17 +6,21 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sort"
 	"strconv"
 	"time"
 
 	"github.com/go-kit/kit/log"
 	"go.universe.tf/metallb/internal/bgp"
+	"go.universe.tf/metallb/internal/config"
 )
 
 // As the MetalLB controller should handle messages synchronously, there should
 // no need to lock this data structure. TODO: confirm this.
+
 type sessionManager struct {
-	sessions map[string]*session
+	sessions    map[string]*session
+	bfdProfiles []BFDProfile
 }
 
 type session struct {
@@ -31,6 +35,7 @@ type session struct {
 	logger         log.Logger
 	password       string
 	advertised     []*bgp.Advertisement
+	bfdProfile     string
 	sessionManager *sessionManager
 }
 
@@ -109,7 +114,7 @@ func (s *session) Close() error {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime time.Duration, keepaliveTime time.Duration, password string, myNode string) (bgp.Session, error) {
+func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime, keepaliveTime time.Duration, password, myNode, bfdProfile string) (bgp.Session, error) {
 	s := &session{
 		myASN:          myASN,
 		routerID:       routerID,
@@ -123,6 +128,7 @@ func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, 
 		password:       password,
 		advertised:     []*bgp.Advertisement{},
 		sessionManager: sm,
+		bfdProfile:     bfdProfile,
 	}
 
 	_ = sm.addSession(s)
@@ -162,6 +168,24 @@ func (sm *sessionManager) deleteSession(s *session) error {
 	return nil
 }
 
+func (sm *sessionManager) SyncBFDProfiles(profiles map[string]*config.BFDProfile) error {
+	sm.bfdProfiles = make([]BFDProfile, 0)
+	for _, p := range profiles {
+		frrProfile := configBFDProfileToFRR(p)
+		sm.bfdProfiles = append(sm.bfdProfiles, *frrProfile)
+	}
+	sort.Slice(sm.bfdProfiles, func(i, j int) bool {
+		return sm.bfdProfiles[i].Name < sm.bfdProfiles[j].Name
+	})
+
+	frrConfig, err := sm.createConfig()
+	if err != nil {
+		return err
+	}
+
+	return generateAndReloadConfigFile(frrConfig)
+}
+
 func (sm *sessionManager) createConfig() (*frrConfig, error) {
 	hostname, err := osHostname()
 	if err != nil {
@@ -169,9 +193,10 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 	}
 
 	config := &frrConfig{
-		Hostname: hostname,
-		Loglevel: "informational",
-		Routers:  make(map[string]*routerConfig),
+		Hostname:    hostname,
+		Loglevel:    "informational",
+		Routers:     make(map[string]*routerConfig),
+		BFDProfiles: sm.bfdProfiles,
 	}
 	frrLogLevel, found := os.LookupEnv("FRR_LOGGING_LEVEL")
 	if found {
@@ -215,6 +240,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				KeepaliveTime:  uint64(s.keepaliveTime / time.Second),
 				Password:       s.password,
 				Advertisements: make([]*advertisementConfig, 0),
+				BFDProfile:     s.bfdProfile,
 			}
 			if s.srcAddr != nil {
 				neighbor.SrcAddr = s.srcAddr.String()
@@ -247,6 +273,20 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 
 func NewSessionManager() *sessionManager {
 	return &sessionManager{
-		sessions: map[string]*session{},
+		sessions:    map[string]*session{},
+		bfdProfiles: []BFDProfile{},
 	}
+}
+
+func configBFDProfileToFRR(p *config.BFDProfile) *BFDProfile {
+	res := &BFDProfile{}
+	res.Name = p.Name
+	res.ReceiveInterval = p.ReceiveInterval
+	res.TransmitInterval = p.TransmitInterval
+	res.DetectMultiplier = p.DetectMultiplier
+	res.EchoInterval = p.EchoInterval
+	res.EchoMode = p.EchoMode
+	res.PassiveMode = p.PassiveMode
+	res.MinimumTTL = p.MinimumTTL
+	return res
 }
