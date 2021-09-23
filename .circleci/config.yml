@@ -1,0 +1,22 @@
+version: 2.1
+
+# CircleCI reports an error if there's no config in this branch,
+# so we include a noop config.
+
+jobs:
+  noop:
+    docker:
+      - image: cimg/go:1.16
+    steps:
+      - checkout
+      - run: echo "noop"
+
+workflows:
+  version: 2
+  noop-workflow:
+    jobs:
+      - noop:
+          filters:
+            branches:
+              only: branchdoesnotexist
+
