@@ -5,12 +5,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
+	"syscall"
 	"text/template"
 )
 
-// TODO configFileName will need to be set to the filename of the FRR configuration
-// file in the container.
-var configFileName = "frr.conf"
+var configFileName = "/etc/frr_reloader/frr.conf"
+var reloaderPidFileName = "/etc/frr_reloader/reloader.pid"
 
 const configTemplate = `
 log stdout {{.Loglevel}}
@@ -94,7 +95,27 @@ func writeConfig(config string, filename string) error {
 // reloadConfig requests that FRR reloads the configuration file. This is
 // called after updating the configuration.
 func reloadConfig() error {
-	// TODO
+	pidFile, found := os.LookupEnv("FRR_RELOADER_PID_FILE")
+	if found {
+		reloaderPidFileName = pidFile
+	}
+
+	pid, err := os.ReadFile(reloaderPidFileName)
+	if err != nil {
+		return err
+	}
+
+	pidInt, err := strconv.Atoi(string(pid))
+	if err != nil {
+		return err
+	}
+
+	// send HUP signal to FRR reloader
+	err = syscall.Kill(pidInt, syscall.SIGHUP)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
