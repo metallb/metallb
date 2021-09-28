@@ -7,10 +7,13 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
+	"syscall"
 	"text/template"
 )
 
-var configFileName = "/etc/frr/frr.conf"
+var configFileName = "/etc/frr_reloader/frr.conf"
+var reloaderPidFileName = "/etc/frr_reloader/reloader.pid"
 
 // TODO: We will probably need to update this template when we start to
 // integrate with FRR. The current template is a reasonable first pass
@@ -103,8 +106,28 @@ func writeConfig(config string, filename string) error {
 
 // reloadConfig requests that FRR reloads the configuration file. This is
 // called after updating the configuration.
-func reloadConfig() error {
-	// TODO
+var reloadConfig = func() error {
+	pidFile, found := os.LookupEnv("FRR_RELOADER_PID_FILE")
+	if found {
+		reloaderPidFileName = pidFile
+	}
+
+	pid, err := os.ReadFile(reloaderPidFileName)
+	if err != nil {
+		return err
+	}
+
+	pidInt, err := strconv.Atoi(string(pid))
+	if err != nil {
+		return err
+	}
+
+	// send HUP signal to FRR reloader
+	err = syscall.Kill(pidInt, syscall.SIGHUP)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
