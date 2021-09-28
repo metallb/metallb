@@ -3,6 +3,7 @@ package bgpfrr
 import (
 	"fmt"
 	"net"
+	"strconv"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -77,9 +78,12 @@ func (s *Session) Set(advs ...*bgp.Advertisement) error {
 	}
 	s.advertised = newAdvs
 
-	err := configFRR(state.createConfig())
+	frrConfig, err := state.createConfig()
+	if err != nil {
+		return err
+	}
 
-	return err
+	return configFRR(frrConfig)
 }
 
 // Close() shuts down the BGP session.
@@ -87,9 +91,12 @@ func (s *Session) Close() error {
 	sessionName := sessionName(s.routerID.String(), s.myASN, s.addr, s.asn)
 	state.deleteSession(sessionName)
 
-	err := configFRR(state.createConfig())
+	frrConfig, err := state.createConfig()
+	if err != nil {
+		return err
+	}
 
-	return err
+	return configFRR(frrConfig)
 }
 
 // New() creates a BGP session using the given session parameters.
@@ -111,9 +118,12 @@ func New(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.I
 	}
 
 	state.addSession(session)
+	frrConfig, err := state.createConfig()
+	if err != nil {
+		return nil, err
+	}
 
-	err := configFRR(state.createConfig())
-
+	err = configFRR(frrConfig)
 	return session, err
 }
 
@@ -126,7 +136,7 @@ func (s *frrState) deleteSession(name string) {
 	delete(s.sessions, name)
 }
 
-func (s *frrState) createConfig() *frrConfig {
+func (s *frrState) createConfig() (*frrConfig, error) {
 	config := &frrConfig{
 		Hostname: "", // TODO.
 		Loglevel: "", // TODO.
@@ -150,9 +160,20 @@ func (s *frrState) createConfig() *frrConfig {
 
 		neighborName := neighborName(session.addr, session.asn)
 		if neighbor, exist = router.Neighbors[neighborName]; !exist {
+			host, port, err := net.SplitHostPort(session.addr)
+			if err != nil {
+				return nil, err
+			}
+
+			portUint, err := strconv.ParseUint(port, 10, 16)
+			if err != nil {
+				return nil, err
+			}
+
 			neighbor = &neighborConfig{
 				ASN:            session.asn,
-				Addr:           session.addr,
+				Addr:           host,
+				Port:           uint16(portUint),
 				Advertisements: make(map[string]*advertisementConfig),
 			}
 			router.Neighbors[neighborName] = neighbor
@@ -174,5 +195,5 @@ func (s *frrState) createConfig() *frrConfig {
 		}
 	}
 
-	return config
+	return config, nil
 }

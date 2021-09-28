@@ -22,6 +22,7 @@ router bgp {{.MyASN}}
   bgp router-id {{.RouterId}}
 {{range .Neighbors }}
   neighbor {{.Addr}} remote-as {{.ASN}}
+  neighbor {{.Addr}} port {{.Port}}
 {{- end }}
 {{range $n := .Neighbors -}}
 {{range .Advertisements }}
@@ -49,6 +50,7 @@ type routerConfig struct {
 type neighborConfig struct {
 	ASN            uint32
 	Addr           string
+	Port           uint16
 	Advertisements map[string]*advertisementConfig
 }
 
