@@ -219,6 +219,10 @@ func (c *bgpController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool
 	c.svcAds[name] = nil
 	for _, adCfg := range pool.BGPAdvertisements {
 		m := net.CIDRMask(adCfg.AggregationLength, 32)
+		isIPv6 := lbIP.To4() == nil
+		if isIPv6 {
+			m = net.CIDRMask(adCfg.AggregationLength, 128)
+		}
 		ad := &bgp.Advertisement{
 			Prefix: &net.IPNet{
 				IP:   lbIP.Mask(m),

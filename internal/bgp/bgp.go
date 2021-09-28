@@ -23,7 +23,10 @@ import (
 )
 
 var errClosed = errors.New("session closed")
-
+type nextHop struct {
+	ipv4 net.IP
+	ipv6 net.IP
+}
 // Session represents one BGP session to an external router.
 type Session struct {
 	asn              uint32
@@ -45,7 +48,7 @@ type Session struct {
 	closed         bool
 	conn           net.Conn
 	actualHoldTime time.Duration
-	defaultNextHop net.IP
+	defaultNextHop nextHop
 	advertised     map[string]*Advertisement
 	new            map[string]*Advertisement
 }
@@ -182,16 +185,13 @@ func (s *Session) connect() error {
 		return fmt.Errorf("setting deadline on conn to %q: %s", s.addr, err)
 	}
 
-	addr, ok := conn.LocalAddr().(*net.TCPAddr)
-	if !ok {
-		conn.Close()
+	if err := s.getDefaultNextHops(conn); err != nil {
 		return fmt.Errorf("getting local addr for default nexthop to %q: %s", s.addr, err)
 	}
-	s.defaultNextHop = addr.IP
 
 	routerID := s.routerID
 	if routerID == nil {
-		routerID, err = getRouterID(s.defaultNextHop, s.myNode)
+		routerID, err = getRouterID(s.defaultNextHop.ipv4, s.myNode)
 		if err != nil {
 			return err
 		}
@@ -246,6 +246,28 @@ func (s *Session) connect() error {
 	return nil
 }
 
+func (s *Session) getDefaultNextHops(conn net.Conn) error {
+	addr, ok := conn.LocalAddr().(*net.TCPAddr)
+	if !ok {
+		conn.Close()
+		return fmt.Errorf("error getting local addr for default nexthop to %q", s.addr)
+	}
+	if addr.IP.To4() != nil {
+		s.defaultNextHop.ipv4 = addr.IP
+		s.defaultNextHop.ipv6 = findAltIP(addr.IP)
+		if s.defaultNextHop.ipv6 == nil {
+			level.Info(s.logger).Log("op", "connect", "msg", "can't find IPv6 address to use as next hop")
+		}
+		return nil
+	}
+	s.defaultNextHop.ipv6 = addr.IP
+	s.defaultNextHop.ipv4 = findAltIP(addr.IP)
+	if s.defaultNextHop.ipv4 == nil {
+		level.Info(s.logger).Log("op", "connect", "msg", "can't find IPv4 address to use as next hop")
+	}
+	return nil
+}
+
 func hashRouterId(hostname string) (net.IP, error) {
 	buf := new(bytes.Buffer)
 	err := binary.Write(buf, binary.LittleEndian, crc32.ChecksumIEEE([]byte(hostname)))
@@ -256,15 +278,25 @@ func hashRouterId(hostname string) (net.IP, error) {
 }
 
 // Ipv4; Use the address as-is.
-// Ipv6; Pick the first ipv4 address on the same interface as the address.
+// hash from hostname value will be used as fallback
 func getRouterID(addr net.IP, myNode string) (net.IP, error) {
 	if addr.To4() != nil {
 		return addr, nil
 	}
 
+	return hashRouterId(myNode)
+}
+
+// if addr is IPv4, will return IPv6 address on the same interface or nil
+// if addr is IPv6, will return IPv4 address on the same interface or nil.
+func findAltIP(addr net.IP) net.IP {
+	var findIPv4 bool
+	if addr.To4() == nil {
+		findIPv4 = true
+	}
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		return hashRouterId(myNode)
+		return nil
 	}
 	for _, i := range ifaces {
 		addrs, err := i.Addrs()
@@ -279,10 +311,9 @@ func getRouterID(addr net.IP, myNode string) (net.IP, error) {
 			case *net.IPAddr:
 				ip = v.IP
 			}
-
 			if ip.Equal(addr) {
 				// This is the interface.
-				// Loop through the addresses again and search for ipv4
+				// Loop through the addresses again and search for IP
 				for _, a := range addrs {
 					var ip net.IP
 					switch v := a.(type) {
@@ -291,15 +322,24 @@ func getRouterID(addr net.IP, myNode string) (net.IP, error) {
 					case *net.IPAddr:
 						ip = v.IP
 					}
-					if ip.To4() != nil {
-						return ip, nil
+					if ip == nil {
+						continue
+					}
+					if findIPv4 {
+						if ip.To4() != nil {
+							return ip
+						}
+					} else {
+						if ip.To4() == nil && ip.IsGlobalUnicast() {
+							return ip
+						}
 					}
 				}
-				return hashRouterId(myNode)
+				return nil
 			}
 		}
 	}
-	return hashRouterId(myNode)
+	return nil
 }
 
 // sendKeepalives sends BGP KEEPALIVE packets at the negotiated rate
@@ -434,13 +474,6 @@ func (s *Session) Set(advs ...*Advertisement) error {
 
 	newAdvs := map[string]*Advertisement{}
 	for _, adv := range advs {
-		if adv.Prefix.IP.To4() == nil {
-			return fmt.Errorf("cannot advertise non-v4 prefix %q", adv.Prefix)
-		}
-
-		if adv.NextHop != nil && adv.NextHop.To4() == nil {
-			return fmt.Errorf("next-hop must be IPv4, got %q", adv.NextHop)
-		}
 		if len(adv.Communities) > 63 {
 			return fmt.Errorf("max supported communities is 63, got %d", len(adv.Communities))
 		}

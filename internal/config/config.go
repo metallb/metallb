@@ -367,10 +367,15 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 }
 
 func parseBGPAdvertisements(ads []bgpAdvertisement, cidrs []*net.IPNet, communities map[string]uint32) ([]*BGPAdvertisement, error) {
+	maxLength := 32
+	if len(cidrs) > 0 && cidrs[0].IP.To4() == nil {
+		maxLength = 128
+	}
+
 	if len(ads) == 0 {
 		return []*BGPAdvertisement{
 			{
-				AggregationLength: 32,
+				AggregationLength: maxLength,
 				LocalPref:         0,
 				Communities:       map[uint32]bool{},
 			},
@@ -380,7 +385,7 @@ func parseBGPAdvertisements(ads []bgpAdvertisement, cidrs []*net.IPNet, communit
 	var ret []*BGPAdvertisement
 	for _, rawAd := range ads {
 		ad := &BGPAdvertisement{
-			AggregationLength: 32,
+			AggregationLength: maxLength,
 			LocalPref:         0,
 			Communities:       map[uint32]bool{},
 		}
@@ -388,7 +393,7 @@ func parseBGPAdvertisements(ads []bgpAdvertisement, cidrs []*net.IPNet, communit
 		if rawAd.AggregationLength != nil {
 			ad.AggregationLength = *rawAd.AggregationLength
 		}
-		if ad.AggregationLength > 32 {
+		if ad.AggregationLength > maxLength {
 			return nil, fmt.Errorf("invalid aggregation length %q", ad.AggregationLength)
 		}
 		for _, cidr := range cidrs {
