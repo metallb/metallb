@@ -19,6 +19,7 @@ hostname {{.Hostname}}
 
 {{range .Routers -}}
 router bgp {{.MyASN}}
+  no bgp network import-check
   no bgp default ipv4-unicast
   bgp router-id {{.RouterId}}
 {{range .Neighbors }}
