@@ -402,31 +402,13 @@ data:
     # or you can use "all_wrap" for all daemons, e.g. to use perf record:
     #   all_wrap="/usr/bin/perf record --call-graph -"
     # the normal daemon command is added to this at the end.
-  vtysh.conf: ""
-  zebra.conf: |+
-    ! -*- zebra -*-
-    !
-    ! zebra sample configuration file
-    !
+  vtysh.conf: |+
+    service integrated-vtysh-config
+  frr.conf: |+
+    frr version 7.5.1
+    frr defaults traditional
     hostname Router
-    password zebra
-    enable password zebra
-    !
-    ! Interface's description.
-    !
-    !interface lo
-    ! description test of desc.
-    !
-    !interface sit0
-    ! multicast
-
-    !
-    ! Static default route sample.
-    !
-    !ip route 0.0.0.0/0 203.181.89.241
-    !
-
-    !log file zebra.log
+    line vty
 
 ---
 apiVersion: apps/v1
