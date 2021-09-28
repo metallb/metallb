@@ -3,6 +3,7 @@ package bgpfrr
 import (
 	"fmt"
 	"net"
+	"os"
 	"strconv"
 	"time"
 
@@ -137,8 +138,13 @@ func (s *frrState) deleteSession(name string) {
 }
 
 func (s *frrState) createConfig() (*frrConfig, error) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		return nil, err
+	}
+
 	config := &frrConfig{
-		Hostname: "", // TODO.
+		Hostname: hostname,
 		Loglevel: "", // TODO.
 		Routers:  make(map[string]*routerConfig),
 	}
