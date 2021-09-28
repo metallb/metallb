@@ -278,7 +278,7 @@ func hashRouterId(hostname string) (net.IP, error) {
 }
 
 // Ipv4; Use the address as-is.
-// hash from hostname value will be used as fallback
+// Hash from hostname value will be used as fallback
 func getRouterID(addr net.IP, myNode string) (net.IP, error) {
 	if addr.To4() != nil {
 		return addr, nil

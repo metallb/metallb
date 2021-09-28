@@ -92,6 +92,13 @@ address-pools:
   protocol: layer2
   addresses:
   - 2001:db8::/64
+- name: pool5
+  protocol: bgp
+  addresses:
+  - 2002:db8::/64
+  bgp-advertisements:
+  - aggregation-length: 128
+    localpref: 200
 `,
 			want: &Config{
 				Peers: []*Peer{
@@ -167,6 +174,18 @@ address-pools:
 						Protocol:   Layer2,
 						CIDR:       []*net.IPNet{ipnet("2001:db8::/64")},
 						AutoAssign: true,
+					},
+					"pool5": {
+						Protocol:   BGP,
+						CIDR:       []*net.IPNet{ipnet("2002:db8::/64")},
+						AutoAssign: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength: 128,
+								LocalPref:         200,
+								Communities:       map[uint32]bool{},
+							},
+						},
 					},
 				},
 			},
