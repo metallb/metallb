@@ -331,6 +331,10 @@ func TestNeighbours(t *testing.T) {
 	if len(nn) != 3 {
 		t.Fatalf("Expected 3 neighbours, got %d", len(nn))
 	}
+	sort.Slice(nn, func(i, j int) bool {
+		return (bytes.Compare(nn[i].ip, nn[j].ip) < 0)
+	})
+
 	if !nn[0].ip.Equal(net.ParseIP("172.18.0.2")) {
 		t.Fatal("neighbour ip not matching")
 	}
@@ -429,7 +433,6 @@ func TestRoutes(t *testing.T) {
 	sort.Slice(ips, func(i, j int) bool {
 		return (bytes.Compare(ips[i], ips[j]) < 0)
 	})
-	fmt.Println(ips)
 	if !ips[0].Equal(net.ParseIP("172.18.0.2")) {
 		t.Fatal("neighbour ip not matching")
 	}
