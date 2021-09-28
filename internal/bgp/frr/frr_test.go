@@ -57,6 +57,8 @@ func testSetup(t *testing.T) {
 	osHostname = testOsHostname
 
 	os.Setenv("FRR_CONFIG_FILE", configFile)
+	// override reloadConfig so it doesn't try to reload it.
+	reloadConfig = func() error { return nil }
 }
 
 func testCheckConfigFile(t *testing.T) {
