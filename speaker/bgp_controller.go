@@ -37,7 +37,7 @@ import (
 
 const (
 	bgpNativeImpl = "native"
-	bgpFRRImpl = "frr"
+	bgpFRRImpl    = "frr"
 )
 
 type peer struct {
