@@ -29,13 +29,17 @@ jobs:
         type: string
       protocol:
         type: string
+      bgp-type:
+        type: string
     machine:
       image: ubuntu-2004:202104-01
     steps:
       - setup_ci_image
       - setup_kind
       - run: inv build
-      - run: inv dev-env -p << parameters.protocol >> -i  << parameters.ip-family >>
+      - run: |
+          if [ "<< parameters.bgp-type >>" = "frr" ]; then BGP_TYPE=frr; else BGP_TYPE=native; fi
+          inv dev-env -p << parameters.protocol >> -b  << parameters.bgp-type >>
       - run: |
           if [ "<< parameters.protocol >>" = "layer2" ]; then FOCUS=L2; else FOCUS=BGP; fi
           inv e2etest -f $FOCUS -e /tmp/kind_logs
@@ -126,9 +130,13 @@ workflows:
             parameters:
               protocol: [layer2, bgp]
               ip-family: [ipv4, ipv6, dual]
+              bgp-type: [native, frr]
             exclude:
               - protocol: bgp
                 ip-family: ipv6
+              - protocol: layer2
+                ip-family: [ipv4, ipv6, dual]
+                bgp-type: frr
       - publish-images:
           filters:
             branches:
