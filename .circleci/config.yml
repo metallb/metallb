@@ -27,18 +27,23 @@ jobs:
     parameters:
       ip-family:
         type: string
+      bgp-type:
+        type: string
     machine:
       image: ubuntu-2004:202104-01
     steps:
       - setup_ci_image
       - setup_kind
       - run: inv build
-      - run: inv dev-env -i  << parameters.ip-family >>
+      - run: inv dev-env -i  << parameters.ip-family >> -b  << parameters.bgp-type >>
       - run: |
-          if [ "<< parameters.ip-family >>" = "ipv4" ]; then SKIP="--skip IPV6"; fi
-          if [ "<< parameters.ip-family >>" = "dual" ]; then SKIP="--skip IPV6"; fi # TODO: until dual stack is supported, we can't run the ipv6 tests against the cluster
-          if [ "<< parameters.ip-family >>" = "ipv6" ]; then SKIP="--skip IPV4\|BGP"; fi # TODO: we are currently skipping BGP for ipv6, re enable when we enable the support
-          inv e2etest $SKIP -e /tmp/kind_logs
+          SKIP="none"
+          if [ "<< parameters.bgp-type >>" = "frr" ]; then SKIP="$SKIP\|metrics"; fi # TODO: enable metrics tests when implementing in FRR
+          if [ "<< parameters.ip-family >>" = "ipv4" ]; then SKIP="$SKIP\|IPV6"; fi
+          if [ "<< parameters.ip-family >>" = "dual" ]; then SKIP="$SKIP\|IPV6"; fi # TODO: until dual stack is supported, we can't run the ipv6 tests against the cluster
+          if [ "<< parameters.ip-family >>" = "ipv6" ]; then SKIP="$SKIP\|IPV4\|BGP"; fi # TODO: we are currently skipping BGP for ipv6, re enable when we enable the support
+          echo "Skipping $SKIP"
+          inv e2etest --skip $SKIP -e /tmp/kind_logs
       - store_artifacts:
           path: /tmp/kind_logs
   lint-1-16:
@@ -126,6 +131,7 @@ workflows:
           matrix:
             parameters:
               ip-family: [ipv4, ipv6, dual]
+              bgp-type: [native, frr]
       - publish-images:
           filters:
             branches:
