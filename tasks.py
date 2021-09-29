@@ -251,9 +251,12 @@ def validate_kind_version():
     "node_img": "Optional node image to use for the kind cluster (e.g. kindest/node:v1.18.19)."
                 "The node image drives the kubernetes version used in kind.",
     "ip_family": "Optional ipfamily of the cluster."
-                 "Default: ipv4, supported families are 'ipv6' and 'dual'."
+                 "Default: ipv4, supported families are 'ipv6' and 'dual'.",
+    "bgp_type": "Type of BGP implementation to use."
+                "Supported: 'native' (default), 'frr'"
 })
-def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None, node_img=None, ip_family="ipv4"):
+def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None,
+        node_img=None, ip_family="ipv4", bgp_type="native"):
     """Build and run MetalLB in a local Kind cluster.
 
     If the cluster specified by --name (default "kind") doesn't exist,
@@ -310,7 +313,10 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None, nod
         # Copy namespace manifest.
         shutil.copy(manifests_dir + "/namespace.yaml", tmpdir)
 
-        with open(manifests_dir + "/metallb.yaml") as f:
+        # FIXME: This is a hack to get the correct manifest file.
+        manifest_filename = "metallb-frr.yaml" if bgp_type == "frr" else "metallb.yaml"
+        # open file and replace the protocol with the one specified by the user
+        with open(manifests_dir + "/" + manifest_filename) as f:
             manifest = f.read()
         for image in binaries:
             manifest = re.sub("image: quay.io/metallb/{}:.*".format(image),
