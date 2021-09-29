@@ -21,7 +21,9 @@ hostname {{.Hostname}}
 router bgp {{.MyASN}}
   no bgp network import-check
   no bgp default ipv4-unicast
+{{ if .RouterId }}
   bgp router-id {{.RouterId}}
+{{- end }}
 {{range .Neighbors }}
   neighbor {{.Addr}} remote-as {{.ASN}}
   neighbor {{.Addr}} port {{.Port}}

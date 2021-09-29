@@ -158,8 +158,10 @@ func (s *frrState) createConfig() (*frrConfig, error) {
 		if router, exist = config.Routers[routerName]; !exist {
 			router = &routerConfig{
 				MyASN:     session.myASN,
-				RouterId:  session.routerID.String(),
 				Neighbors: make(map[string]*neighborConfig),
+			}
+			if session.routerID != nil {
+				router.RouterId = session.routerID.String()
 			}
 			config.Routers[routerName] = router
 		}
