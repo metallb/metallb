@@ -196,13 +196,13 @@ func (a *Announce) gratuitous(ip net.IP) error {
 	if ip.To4() != nil {
 		for _, client := range a.arps {
 			if err := client.Gratuitous(ip); err != nil {
-				return err
+				a.logger.Log("gratuitousAnnounce", "error", err, "ip", ip, "msg", "failed to make gratuitous IP announcement")
 			}
 		}
 	} else {
 		for _, client := range a.ndps {
 			if err := client.Gratuitous(ip); err != nil {
-				return err
+				a.logger.Log("gratuitousAnnounce", "error", err, "ip", ip, "msg", "failed to make gratuitous IP announcement")
 			}
 		}
 	}
