@@ -93,23 +93,23 @@ func usableNodes(eps k8s.EpsOrSlices, speakers map[string]bool) []string {
 	return ret
 }
 
-func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps k8s.EpsOrSlices) string {
+func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce net.IP, svc *v1.Service, eps k8s.EpsOrSlices) string {
 	if !activeEndpointExists(eps) { // no active endpoints, just return
 		return "notOwner"
 	}
-
 	var nodes []string
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
 		nodes = usableNodes(eps, c.sList.UsableSpeakers())
 	} else {
 		nodes = nodesWithActiveSpeakers(c.sList.UsableSpeakers())
 	}
-	// Sort the slice by the hash of node + service name. This
-	// produces an ordering of ready nodes that is unique to this
-	// service.
+	ipString := toAnnounce.String()
+	// Sort the slice by the hash of node + load balancer ips. This
+	// produces an ordering of ready nodes that is unique to all the services
+	// with the same ip.
 	sort.Slice(nodes, func(i, j int) bool {
-		hi := sha256.Sum256([]byte(nodes[i] + "#" + name))
-		hj := sha256.Sum256([]byte(nodes[j] + "#" + name))
+		hi := sha256.Sum256([]byte(nodes[i] + "#" + ipString))
+		hj := sha256.Sum256([]byte(nodes[j] + "#" + ipString))
 
 		return bytes.Compare(hi[:], hj[:]) < 0
 	})
