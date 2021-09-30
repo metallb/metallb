@@ -94,7 +94,16 @@ func usableNodes(eps k8s.EpsOrSlices, speakers map[string]bool) []string {
 }
 
 func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps k8s.EpsOrSlices) string {
-	nodes := usableNodes(eps, c.sList.UsableSpeakers())
+	if !activeEndpointExists(eps) { // no active endpoints, just return
+		return "notOwner"
+	}
+
+	var nodes []string
+	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
+		nodes = usableNodes(eps, c.sList.UsableSpeakers())
+	} else {
+		nodes = nodesWithActiveSpeakers(c.sList.UsableSpeakers())
+	}
 	// Sort the slice by the hash of node + service name. This
 	// produces an ordering of ready nodes that is unique to this
 	// service.
@@ -130,4 +139,37 @@ func (c *layer2Controller) DeleteBalancer(l log.Logger, name, reason string) err
 func (c *layer2Controller) SetNode(log.Logger, *v1.Node) error {
 	c.sList.Rejoin()
 	return nil
+}
+
+// nodesWithActiveSpeakers returns the list of nodes with active speakers.
+func nodesWithActiveSpeakers(speakers map[string]bool) []string {
+	var ret []string
+	for node, ok := range speakers {
+		if ok {
+			ret = append(ret, node)
+		}
+	}
+	return ret
+}
+
+// activeEndpointExists returns true if at least one endpoint is active.
+func activeEndpointExists(eps k8s.EpsOrSlices) bool {
+	switch eps.Type {
+	case k8s.Eps:
+		for _, subset := range eps.EpVal.Subsets {
+			if len(subset.Addresses) > 0 {
+				return true
+			}
+		}
+	case k8s.Slices:
+		for _, slice := range eps.SlicesVal {
+			for _, ep := range slice.Endpoints {
+				if !k8s.IsConditionReady(ep.Conditions) {
+					continue
+				}
+				return true
+			}
+		}
+	}
+	return false
 }
