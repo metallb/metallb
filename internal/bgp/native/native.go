@@ -453,6 +453,10 @@ func (s *Session) Set(advs ...*bgp.Advertisement) error {
 	return nil
 }
 
+func (s *Session) Commit() error {
+	return nil
+}
+
 // abort closes any existing connection, updates stats, and cleans up
 // state ready for another connection attempt.
 func (s *Session) abort() {

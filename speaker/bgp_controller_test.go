@@ -144,6 +144,10 @@ type fakeSession struct {
 	addr string
 }
 
+func (f *fakeSession) Commit() error {
+	return nil
+}
+
 func (f *fakeSession) Close() error {
 	f.f.Lock()
 	defer f.f.Unlock()

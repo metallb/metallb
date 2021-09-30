@@ -266,6 +266,9 @@ func (c *bgpController) updateAds() error {
 		if err := peer.bgp.Set(allAds...); err != nil {
 			return err
 		}
+		if err := peer.bgp.Commit(); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -281,6 +284,7 @@ func (c *bgpController) DeleteBalancer(l log.Logger, name, reason string) error 
 type session interface {
 	io.Closer
 	Set(advs ...*bgp.Advertisement) error
+	Commit() error
 }
 
 func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
