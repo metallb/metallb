@@ -156,7 +156,7 @@ func (a *Announce) spamLoop() {
 			if !ok {
 				// Spam right away to avoid waiting up to 1100 milliseconds even if
 				// it means we call spam() twice in a row in a short amount of time.
-				a.spam(ip)
+				a.gratuitous(ip)
 			}
 		case now := <-ticker.C:
 			for ipStr, until := range m {
@@ -164,7 +164,7 @@ func (a *Announce) spamLoop() {
 					// We have spammed enough - remove the IP from the map.
 					delete(m, ipStr)
 				} else {
-					a.spam(net.ParseIP(ipStr))
+					a.gratuitous(net.ParseIP(ipStr))
 				}
 			}
 			if len(m) == 0 {
@@ -178,35 +178,29 @@ func (a *Announce) doSpam(ip net.IP) {
 	a.spamCh <- ip
 }
 
-func (a *Announce) spam(ip net.IP) {
-	if err := a.gratuitous(ip); err != nil {
-		level.Error(a.logger).Log("op", "gratuitousAnnounce", "error", err, "ip", ip, "msg", "failed to make gratuitous IP announcement")
-	}
-}
-
-func (a *Announce) gratuitous(ip net.IP) error {
+func (a *Announce) gratuitous(ip net.IP) {
 	a.RLock()
 	defer a.RUnlock()
 
 	if a.ipRefcnt[ip.String()] <= 0 {
 		// We've lost control of the IP, someone else is
 		// doing announcements.
-		return nil
+		return
 	}
+
 	if ip.To4() != nil {
 		for _, client := range a.arps {
 			if err := client.Gratuitous(ip); err != nil {
-				return err
+				level.Error(a.logger).Log("op", "gratuitousAnnounce", "error", err, "ip", ip, "msg", "failed to make gratuitous ARP announcement")
 			}
 		}
 	} else {
 		for _, client := range a.ndps {
 			if err := client.Gratuitous(ip); err != nil {
-				return err
+				level.Error(a.logger).Log("op", "gratuitousAnnounce", "error", err, "ip", ip, "msg", "failed to make gratuitous NDP announcement")
 			}
 		}
 	}
-	return nil
 }
 
 func (a *Announce) shouldAnnounce(ip net.IP) dropReason {
