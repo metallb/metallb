@@ -177,6 +177,26 @@ func parseNodeSelector(ns *nodeSelector) (labels.Selector, error) {
 	return metav1.LabelSelectorAsSelector(sel)
 }
 
+// parseNodeSelectors parses the provided nodeSelector slice ns and returns a
+// slice of Selectors which can be used to match against labels. If ns is
+// empty, a "match everything" Selector is returned.
+func parseNodeSelectors(ns []nodeSelector) ([]labels.Selector, error) {
+	if len(ns) == 0 {
+		return []labels.Selector{labels.Everything()}, nil
+	}
+
+	nodeSels := []labels.Selector{}
+	for _, sel := range ns {
+		nodeSel, err := parseNodeSelector(&sel)
+		if err != nil {
+			return nil, fmt.Errorf("parsing node selector: %w", err)
+		}
+		nodeSels = append(nodeSels, nodeSel)
+	}
+
+	return nodeSels, nil
+}
+
 func parseHoldTime(ht string) (time.Duration, error) {
 	if ht == "" {
 		return 90 * time.Second, nil
