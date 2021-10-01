@@ -198,9 +198,6 @@ func parseNodeSelectors(ns []nodeSelector) ([]labels.Selector, error) {
 }
 
 func parseHoldTime(ht string) (time.Duration, error) {
-	if ht == "" {
-		return 90 * time.Second, nil
-	}
 	d, err := time.ParseDuration(ht)
 	if err != nil {
 		return 0, fmt.Errorf("invalid hold time %q: %s", ht, err)
@@ -284,9 +281,13 @@ func parsePeer(p peer) (*Peer, error) {
 	if ip == nil {
 		return nil, fmt.Errorf("invalid peer IP %q", p.Addr)
 	}
-	holdTime, err := parseHoldTime(p.HoldTime)
-	if err != nil {
-		return nil, err
+	holdTime := 90 * time.Second
+	if p.HoldTime != "" {
+		ht, err := parseHoldTime(p.HoldTime)
+		if err != nil {
+			return nil, err
+		}
+		holdTime = ht
 	}
 	port := uint16(179)
 	if p.Port != 0 {
