@@ -12,10 +12,13 @@ import (
 )
 
 type Neighbor struct {
-	Ip        net.IP
-	Connected bool
-	LocalAS   string
-	RemoteAS  string
+	Ip          net.IP
+	Connected   bool
+	LocalAS     string
+	RemoteAS    string
+	UpdatesSent int
+	PrefixSent  int
+	Port        int
 }
 
 type Route struct {
@@ -26,10 +29,17 @@ type Route struct {
 const bgpConnected = "Established"
 
 type FRRNeighbor struct {
-	RemoteAs   int    `json:"remoteAs"`
-	LocalAs    int    `json:"localAs"`
-	BgpVersion int    `json:"bgpVersion"`
-	BgpState   string `json:"bgpState"`
+	RemoteAs     int    `json:"remoteAs"`
+	LocalAs      int    `json:"localAs"`
+	BgpVersion   int    `json:"bgpVersion"`
+	BgpState     string `json:"bgpState"`
+	PortForeign  int    `json:"portForeign"`
+	MessageStats struct {
+		UpdatesSent int `json:"updatesSent"`
+	} `json:"messageStats"`
+	AddressFamilyInfo map[string]struct {
+		SentPrefixCounter int `json:"sentPrefixCounter"`
+	} `json:"addressFamilyInfo"`
 }
 
 type IPInfo struct {
@@ -68,11 +78,18 @@ func ParseNeighbour(vtyshRes string) (*Neighbor, error) {
 		if n.BgpState != bgpConnected {
 			connected = false
 		}
+		prefixSent := 0
+		for _, s := range n.AddressFamilyInfo {
+			prefixSent += s.SentPrefixCounter
+		}
 		return &Neighbor{
-			Ip:        ip,
-			Connected: connected,
-			LocalAS:   strconv.Itoa(n.LocalAs),
-			RemoteAS:  strconv.Itoa(n.RemoteAs),
+			Ip:          ip,
+			Connected:   connected,
+			LocalAS:     strconv.Itoa(n.LocalAs),
+			RemoteAS:    strconv.Itoa(n.RemoteAs),
+			UpdatesSent: n.MessageStats.UpdatesSent,
+			PrefixSent:  prefixSent,
+			Port:        n.PortForeign,
 		}, nil
 	}
 	return nil, errors.New("no peers were returned")
@@ -97,11 +114,18 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 		if n.BgpState != bgpConnected {
 			connected = false
 		}
+		prefixSent := 0
+		for _, s := range n.AddressFamilyInfo {
+			prefixSent += s.SentPrefixCounter
+		}
 		res = append(res, &Neighbor{
-			Ip:        ip,
-			Connected: connected,
-			LocalAS:   strconv.Itoa(n.LocalAs),
-			RemoteAS:  strconv.Itoa(n.RemoteAs),
+			Ip:          ip,
+			Connected:   connected,
+			LocalAS:     strconv.Itoa(n.LocalAs),
+			RemoteAS:    strconv.Itoa(n.RemoteAs),
+			UpdatesSent: n.MessageStats.UpdatesSent,
+			PrefixSent:  prefixSent,
+			Port:        n.PortForeign,
 		})
 	}
 	return res, nil
