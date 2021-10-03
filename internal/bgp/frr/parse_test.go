@@ -112,24 +112,24 @@ func TestNeighbour(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			n, err := parseNeighbour(fmt.Sprintf(sample, tt.neighborIP, tt.remoteAS, tt.localAS, tt.status))
+			n, err := ParseNeighbour(fmt.Sprintf(sample, tt.neighborIP, tt.remoteAS, tt.localAS, tt.status))
 			if err != nil {
 				t.Fatal("Failed to parse ", err)
 			}
-			if !n.ip.Equal(net.ParseIP(tt.neighborIP)) {
-				t.Fatal("Expected neighbour ip", tt.neighborIP, "got", n.ip.String())
+			if !n.Ip.Equal(net.ParseIP(tt.neighborIP)) {
+				t.Fatal("Expected neighbour ip", tt.neighborIP, "got", n.Ip.String())
 			}
-			if n.remoteAS != tt.remoteAS {
-				t.Fatal("Expected remote as", tt.remoteAS, "got", n.remoteAS)
+			if n.RemoteAS != tt.remoteAS {
+				t.Fatal("Expected remote as", tt.remoteAS, "got", n.RemoteAS)
 			}
-			if n.localAS != tt.localAS {
-				t.Fatal("Expected local as", tt.localAS, "got", n.localAS)
+			if n.LocalAS != tt.localAS {
+				t.Fatal("Expected local as", tt.localAS, "got", n.LocalAS)
 			}
-			if tt.status == "Established" && n.connected != true {
-				t.Fatal("Expected connected", true, "got", n.connected)
+			if tt.status == "Established" && n.Connected != true {
+				t.Fatal("Expected connected", true, "got", n.Connected)
 			}
-			if tt.status != "Established" && n.connected == true {
-				t.Fatal("Expected connected", false, "got", n.connected)
+			if tt.status != "Established" && n.Connected == true {
+				t.Fatal("Expected connected", false, "got", n.Connected)
 			}
 		})
 	}
@@ -444,7 +444,7 @@ const threeNeighbours = `
 }`
 
 func TestNeighbours(t *testing.T) {
-	nn, err := parseNeighbours(threeNeighbours)
+	nn, err := ParseNeighbours(threeNeighbours)
 	if err != nil {
 		t.Fatalf("Failed to parse %s", err)
 	}
@@ -452,16 +452,16 @@ func TestNeighbours(t *testing.T) {
 		t.Fatalf("Expected 4 neighbours, got %d", len(nn))
 	}
 	sort.Slice(nn, func(i, j int) bool {
-		return (bytes.Compare(nn[i].ip, nn[j].ip) < 0)
+		return (bytes.Compare(nn[i].Ip, nn[j].Ip) < 0)
 	})
 
-	if !nn[0].ip.Equal(net.ParseIP("172.18.0.2")) {
+	if !nn[0].Ip.Equal(net.ParseIP("172.18.0.2")) {
 		t.Fatal("neighbour ip not matching")
 	}
-	if !nn[1].ip.Equal(net.ParseIP("172.18.0.3")) {
+	if !nn[1].Ip.Equal(net.ParseIP("172.18.0.3")) {
 		t.Fatal("neighbour ip not matching")
 	}
-	if !nn[2].ip.Equal(net.ParseIP("172.18.0.4")) {
+	if !nn[2].Ip.Equal(net.ParseIP("172.18.0.4")) {
 		t.Fatal("neighbour ip not matching")
 	}
 }
@@ -537,7 +537,7 @@ const routes = `{
  ] }  }`
 
 func TestRoutes(t *testing.T) {
-	rr, err := parseRoutes(routes)
+	rr, err := ParseRoutes(routes)
 	if err != nil {
 		t.Fatalf("Failed to parse %s", err)
 	}
