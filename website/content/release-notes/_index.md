@@ -686,7 +686,7 @@ New features:
   more flexible monitoring configurations in a Kubernetes-native way.
 - We've documented how
   to
-  [Integrate with the Romana networking system]({{% relref "configuration/romana.md" %}}),
+  Integrate with the Romana networking system,
   so that you can use MetalLB alongside Romana's BGP route publishing.
 - The website got a makeover, to accommodate the growing amount of
   documentation in a discoverable way.
