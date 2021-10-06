@@ -69,3 +69,6 @@ One lightweight way you can contribute is
 to
 [tell us that you're using MetalLB](https://github.com/metallb/metallb/issues/5),
 which will give us warm fuzzy feelings :).
+
+We are a [Cloud Native Computing Foundation](https://cncf.io/) sandbox project.
+![cncf](/images/cncf-color.png)
