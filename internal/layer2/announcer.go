@@ -155,7 +155,7 @@ func (a *Announce) spamLoop() {
 			m[ipStr] = time.Now().Add(5 * time.Second)
 			if !ok {
 				// Spam right away to avoid waiting up to 1100 milliseconds even if
-				// it means we call spam() twice in a row in a short amount of time.
+				// it means we call gratuitous() twice in a row in a short amount of time.
 				a.gratuitous(ip)
 			}
 		case now := <-ticker.C:
