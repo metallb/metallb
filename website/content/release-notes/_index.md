@@ -28,7 +28,7 @@ Changes in behavior:
 
 Bug Fixes:
 
-## Version 0.10.3 (Under Development)
+## Version 0.10.3
 
 Bug Fixes:
 
@@ -36,6 +36,19 @@ Bug Fixes:
   and later. See [Kubernetes issue #70679](https://github.com/kubernetes/kubernetes/issues/70679).
   This ensures the MetalLB controller can read the service account token volume.
   ([Issue #890](https://github.com/metallb/metallb/issues/890))
+
+- helm: fix validation of imagePullSecrets
+  ([Issue #897](https://github.com/metallb/metallb/issues/897))
+
+- Resolve issue in EndpointSlice support that caused excessive log spam.
+  ([Issue #899](https://github.com/metallb/metallb/issues/899))
+  ([Issue #901](https://github.com/metallb/metallb/issues/901))
+  ([Issue #978](https://github.com/metallb/metallb/issues/978))
+
+- layer2: Fix a race condition when sending gratuitous ARP or NDP messages
+  where an error on a removed interface would cause MetalLB to skip sending the
+  same message out on the rest of the list of interfaces.
+  ([Issue #681](https://github.com/metallb/metallb/issues/681))
 
 ## Version 0.10.2
 
