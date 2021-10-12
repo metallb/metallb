@@ -39,8 +39,7 @@ func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
 
 // usableNodes returns all nodes that have at least one fully ready
 // endpoint on them.
-// The speakers parameter is a map with the node name as key and the readiness
-// status as value (true means ready, false means not ready).
+// The speakers parameter is a map containing all the nodes with active speakers.
 // If the speakers map is nil, it is ignored.
 func usableNodes(eps k8s.EpsOrSlices, speakers map[string]bool) []string {
 	usable := map[string]bool{}
@@ -52,7 +51,7 @@ func usableNodes(eps k8s.EpsOrSlices, speakers map[string]bool) []string {
 					continue
 				}
 				if speakers != nil {
-					if ready, ok := speakers[*ep.NodeName]; !ok || !ready {
+					if hasSpeaker := speakers[*ep.NodeName]; !hasSpeaker {
 						continue
 					}
 				}
@@ -72,7 +71,7 @@ func usableNodes(eps k8s.EpsOrSlices, speakers map[string]bool) []string {
 					continue
 				}
 				if speakers != nil {
-					if ready, ok := speakers[nodeName]; !ok || !ready {
+					if hasSpeaker := speakers[nodeName]; !hasSpeaker {
 						continue
 					}
 				}
@@ -144,10 +143,8 @@ func (c *layer2Controller) SetNode(log.Logger, *v1.Node) error {
 // nodesWithActiveSpeakers returns the list of nodes with active speakers.
 func nodesWithActiveSpeakers(speakers map[string]bool) []string {
 	var ret []string
-	for node, ok := range speakers {
-		if ok {
-			ret = append(ret, node)
-		}
+	for node := range speakers {
+		ret = append(ret, node)
 	}
 	return ret
 }
