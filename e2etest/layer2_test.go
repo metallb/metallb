@@ -23,10 +23,11 @@ import (
 	"fmt"
 	"net"
 	"strconv"
-	"time"
 
 	"github.com/onsi/ginkgo"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
+	"go.universe.tf/metallb/e2etest/pkg/mac"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -35,13 +36,11 @@ import (
 
 var _ = ginkgo.Describe("L2", func() {
 	f := framework.NewDefaultFramework("l2")
-	var loadBalancerCreateTimeout time.Duration
 
 	var cs clientset.Interface
 
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
-		loadBalancerCreateTimeout = e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -54,47 +53,101 @@ var _ = ginkgo.Describe("L2", func() {
 		}
 	})
 
-	ginkgo.It("should work for type=Loadbalancer", func() {
-		configData := configFile{
-			Pools: []addressPool{
-				{
-					Name:     "l2-test",
-					Protocol: Layer2,
-					Addresses: []string{
-						ipv4ServiceRange,
-						ipv6ServiceRange,
+	ginkgo.Context("type=Loadbalancer", func() {
+		ginkgo.BeforeEach(func() {
+			configData := configFile{
+				Pools: []addressPool{
+					{
+						Name:     "l2-test",
+						Protocol: Layer2,
+						Addresses: []string{
+							ipv4ServiceRange,
+							ipv6ServiceRange,
+						},
 					},
 				},
-			},
-		}
-		err := updateConfigMap(cs, configData)
-		framework.ExpectNoError(err)
-
-		namespace := f.Namespace.Name
-		serviceName := "external-local-lb"
-		jig := e2eservice.NewTestJig(cs, namespace, serviceName)
-
-		svc, err := jig.CreateLoadBalancerService(loadBalancerCreateTimeout, tweakServicePort())
-		framework.ExpectNoError(err)
-
-		_, err = jig.Run(tweakRCPort())
-		framework.ExpectNoError(err)
-
-		defer func() {
-			err = cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+			}
+			err := updateConfigMap(cs, configData)
 			framework.ExpectNoError(err)
-		}()
+		})
 
-		port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
-		ingressIP := e2eservice.GetIngressPoint(
-			&svc.Status.LoadBalancer.Ingress[0])
+		ginkgo.AfterEach(func() {
 
-		ginkgo.By("checking connectivity to its external VIP")
+		})
 
-		hostport := net.JoinHostPort(ingressIP, port)
-		address := fmt.Sprintf("http://%s/", hostport)
-		err = wgetRetry(address, executor.Host)
-		framework.ExpectNoError(err)
+		ginkgo.It("should work for ExternalTrafficPolicy=Cluster", func() {
+			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster)
+
+			defer func() {
+				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+			}()
+
+			port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
+			ingressIP := e2eservice.GetIngressPoint(
+				&svc.Status.LoadBalancer.Ingress[0])
+
+			ginkgo.By("checking connectivity to its external VIP")
+
+			hostport := net.JoinHostPort(ingressIP, port)
+			address := fmt.Sprintf("http://%s/", hostport)
+			err := wgetRetry(address, executor.Host)
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("should work for ExternalTrafficPolicy=Local", func() {
+			svc, jig := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeLocal)
+			err := jig.Scale(5)
+			framework.ExpectNoError(err)
+
+			epNodes, err := jig.ListNodesWithEndpoint() // Only nodes with an endpoint could be advertising the IP
+			framework.ExpectNoError(err)
+
+			defer func() {
+				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+			}()
+
+			port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
+			ingressIP := e2eservice.GetIngressPoint(
+				&svc.Status.LoadBalancer.Ingress[0])
+
+			ginkgo.By("checking connectivity to its external VIP")
+
+			hostport := net.JoinHostPort(ingressIP, port)
+			address := fmt.Sprintf("http://%s/", hostport)
+			err = wgetRetry(address, executor.Host)
+			framework.ExpectNoError(err)
+
+			err = mac.UpdateNodeCache(epNodes, executor.Host)
+			framework.ExpectNoError(err)
+
+			macAddr, err := mac.ForIP(ingressIP, executor.Host)
+			framework.ExpectNoError(err)
+
+			advNode, err := mac.MatchNode(epNodes, macAddr, executor.Host)
+			framework.ExpectNoError(err)
+
+			for i := 0; i < 5; i++ {
+				name, err := getEndpointHostName(hostport, executor.Host)
+				framework.ExpectNoError(err)
+
+				pod, err := cs.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				framework.ExpectEqual(pod.Spec.NodeName == advNode.Name, true, "traffic arrived to a pod not from the announcing node")
+			}
+
+		})
+
 	})
-
 })
+
+// Relies on the endpoint being an agnhost netexec pod.
+func getEndpointHostName(ep string, exec executor.Executor) (string, error) {
+	res, err := exec.Exec("wget", "-O-", "-q", fmt.Sprintf("http://%s/hostname", ep))
+	if err != nil {
+		return "", err
+	}
+
+	return res, nil
+}
