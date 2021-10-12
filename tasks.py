@@ -646,3 +646,27 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
 
     if export != None:
         run("kind export logs {}".format(export))
+
+@task
+def bumplicense(ctx):
+    """Bumps the license header on all go files that have it missing"""
+
+    res = run("find . -name '*.go'")
+    for file in res.stdout.splitlines():
+        res = run("grep -q License {}".format(file), warn=True)
+        if not res.ok:
+            run(r"sed -i '1s/^/\/\/ SPDX-License-Identifier:Apache-2.0\n\n/' " + file)
+ 
+@task
+def verifylicense(ctx):
+    """Verifies all files have the corresponding license"""
+    res = run("find . -name '*.go'", hide="out")
+    no_license = False
+    for file in res.stdout.splitlines():
+        res = run("grep -q License {}".format(file), warn=True)
+        if not res.ok:
+            no_license = True
+            print("{} is missing license".format(file))
+    if no_license:
+        raise Exit(message="#### Files with no license found.\n#### Please run ""inv bumplicense"" to add the license header")
+ 
