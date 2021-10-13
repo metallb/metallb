@@ -23,7 +23,9 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"time"
 
+	"github.com/mikioh/ipaddr"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/extensions/table"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
@@ -31,6 +33,7 @@ import (
 	internalconfig "go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -38,11 +41,26 @@ import (
 
 var _ = ginkgo.Describe("L2", func() {
 	f := framework.NewDefaultFramework("l2")
-
+	var loadBalancerCreateTimeout time.Duration
 	var cs clientset.Interface
 
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
+		loadBalancerCreateTimeout = e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
+		configData := configFile{
+			Pools: []addressPool{
+				{
+					Name:     "l2-test",
+					Protocol: Layer2,
+					Addresses: []string{
+						ipv4ServiceRange,
+						ipv6ServiceRange,
+					},
+				},
+			},
+		}
+		err := updateConfigMap(cs, configData)
+		framework.ExpectNoError(err)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -56,27 +74,6 @@ var _ = ginkgo.Describe("L2", func() {
 	})
 
 	ginkgo.Context("type=Loadbalancer", func() {
-		ginkgo.BeforeEach(func() {
-			configData := configFile{
-				Pools: []addressPool{
-					{
-						Name:     "l2-test",
-						Protocol: Layer2,
-						Addresses: []string{
-							ipv4ServiceRange,
-							ipv6ServiceRange,
-						},
-					},
-				},
-			}
-			err := updateConfigMap(cs, configData)
-			framework.ExpectNoError(err)
-		})
-
-		ginkgo.AfterEach(func() {
-
-		})
-
 		ginkgo.It("should work for ExternalTrafficPolicy=Cluster", func() {
 			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster)
 
@@ -144,11 +141,6 @@ var _ = ginkgo.Describe("L2", func() {
 	})
 
 	ginkgo.Context("validate different AddressPools for type=Loadbalancer", func() {
-		ginkgo.AfterEach(func() {
-			// Clean previous configuration.
-			err := updateConfigMap(cs, configFile{})
-			framework.ExpectNoError(err)
-		})
 
 		table.DescribeTable("set different AddressPools ranges modes", func(getAddressPools func() []addressPool) {
 			configData := configFile{
@@ -217,7 +209,80 @@ var _ = ginkgo.Describe("L2", func() {
 			}),
 		)
 	})
+
+	table.DescribeTable("different services sharing the same ip should advertise from the same node", func(ipRange *string) {
+		namespace := f.Namespace.Name
+
+		jig1 := e2eservice.NewTestJig(cs, namespace, "svca")
+
+		ip := firstIPFromRange(*ipRange)
+		svc1, err := jig1.CreateLoadBalancerService(loadBalancerCreateTimeout, func(svc *corev1.Service) {
+			svc.Spec.Ports[0].TargetPort = intstr.FromInt(82)
+			svc.Spec.Ports[0].Port = 82
+			svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
+			svc.Spec.LoadBalancerIP = ip
+		})
+
+		framework.ExpectNoError(err)
+
+		jig2 := e2eservice.NewTestJig(cs, namespace, "svcb")
+		svc2, err := jig2.CreateLoadBalancerService(loadBalancerCreateTimeout, func(svc *corev1.Service) {
+			svc.Spec.Ports[0].TargetPort = intstr.FromInt(83)
+			svc.Spec.Ports[0].Port = 83
+			svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
+			svc.Spec.LoadBalancerIP = ip
+		})
+		framework.ExpectNoError(err)
+		defer func() {
+			err := cs.CoreV1().Services(svc1.Namespace).Delete(context.TODO(), svc1.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+			err = cs.CoreV1().Services(svc2.Namespace).Delete(context.TODO(), svc2.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+		}()
+
+		nodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		_, err = jig1.Run(
+			func(rc *corev1.ReplicationController) {
+				rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", 82), fmt.Sprintf("--udp-port=%d", 82)}
+				rc.Spec.Template.Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Port = intstr.FromInt(82)
+				rc.Spec.Template.Spec.NodeName = nodes.Items[0].Name
+			})
+		framework.ExpectNoError(err)
+		_, err = jig2.Run(
+			func(rc *corev1.ReplicationController) {
+				rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", 83), fmt.Sprintf("--udp-port=%d", 83)}
+				rc.Spec.Template.Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Port = intstr.FromInt(83)
+				rc.Spec.Template.Spec.NodeName = nodes.Items[1].Name
+			})
+		framework.ExpectNoError(err)
+
+		events, err := cs.CoreV1().Events(namespace).List(context.Background(), metav1.ListOptions{FieldSelector: "reason=nodeAssigned"})
+		framework.ExpectNoError(err)
+
+		var service1Announce, service2Announce string
+		for _, e := range events.Items {
+			if e.InvolvedObject.Name == svc1.Name {
+				service1Announce = e.Message
+			}
+			if e.InvolvedObject.Name == svc2.Name {
+				service2Announce = e.Message
+			}
+		}
+		framework.ExpectNotEqual(service1Announce, "")
+		framework.ExpectNotEqual(service2Announce, "")
+		framework.ExpectEqual(service1Announce, service2Announce, "Services with the same IP announced from different nodes")
+	},
+		table.Entry("IPV4", &ipv4ServiceRange),
+		table.Entry("IPV6", &ipv6ServiceRange))
 })
+
+func firstIPFromRange(ipRange string) string {
+	cidr, err := internalconfig.ParseCIDR(ipRange)
+	framework.ExpectNoError(err)
+	c := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr[0])})
+	return c.First().IP.String()
+}
 
 // Relies on the endpoint being an agnhost netexec pod.
 func getEndpointHostName(ep string, exec executor.Executor) (string, error) {
