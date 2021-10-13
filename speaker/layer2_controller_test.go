@@ -3,6 +3,7 @@
 package main
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"sort"
@@ -14,6 +15,7 @@ import (
 	"github.com/go-kit/kit/log"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type fakeSpeakerList struct {
@@ -2116,4 +2118,154 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+func TestClusterPolicy(t *testing.T) {
+	fakeSL := &fakeSpeakerList{
+		speakers: map[string]bool{
+			"iris1": true,
+			"iris2": true,
+		},
+	}
+	c1, err := newController(controllerConfig{
+		MyNode: "iris1",
+		Logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		SList:  fakeSL,
+	})
+	if err != nil {
+		t.Fatalf("creating controller: %s", err)
+	}
+	c1.client = &testK8S{t: t}
+
+	c2, err := newController(controllerConfig{
+		MyNode: "iris2",
+		Logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		SList:  fakeSL,
+	})
+	if err != nil {
+		t.Fatalf("creating controller: %s", err)
+	}
+	c2.client = &testK8S{t: t}
+
+	l := log.NewNopLogger()
+
+	cfg := &config.Config{
+		Pools: map[string]*config.Pool{
+			"default": {
+				Protocol: config.Layer2,
+				CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+			},
+		},
+	}
+
+	if c1.SetConfig(l, cfg) == k8s.SyncStateError {
+		t.Errorf("SetConfig failed")
+	}
+	if c2.SetConfig(l, cfg) == k8s.SyncStateError {
+		t.Errorf("SetConfig failed")
+	}
+
+	eps1 := k8s.EpsOrSlices{
+		SlicesVal: []*discovery.EndpointSlice{
+			{
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses: []string{
+							"2.3.4.5",
+						},
+						Topology: map[string]string{
+							"kubernetes.io/hostname": "iris1",
+						},
+						Conditions: discovery.EndpointConditions{
+							Ready: boolPtr(true),
+						},
+					},
+				},
+			},
+		},
+		Type: k8s.Slices,
+	}
+	eps2 := k8s.EpsOrSlices{
+		SlicesVal: []*discovery.EndpointSlice{
+			{
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses: []string{
+							"2.3.4.5",
+						},
+						Topology: map[string]string{
+							"kubernetes.io/hostname": "iris2",
+						},
+						Conditions: discovery.EndpointConditions{
+							Ready: boolPtr(true),
+						},
+					},
+				},
+			},
+		},
+		Type: k8s.Slices,
+	}
+	c1Found := false
+	c2Found := false
+
+	// Cluster policy doesn't care about the locality of the endpoint, as long as there is
+	// at least one endpoint active. Here we check that the distribution of the service happens
+	// in a way that only a speaker notifies it, and that the assignement is consistent with the
+	// service ip.
+	for i := 1; i < 256; i++ {
+		ip := fmt.Sprintf("10.20.30.%d", i)
+		svc1 := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "svc1",
+			},
+			Spec: v1.ServiceSpec{
+				Type:                  "LoadBalancer",
+				ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+			},
+			Status: statusAssigned(ip),
+		}
+		svc2 := &v1.Service{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: "svc2",
+			},
+			Spec: v1.ServiceSpec{
+				Type:                  "LoadBalancer",
+				ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+			},
+			Status: statusAssigned(ip),
+		}
+
+		lbIP := net.ParseIP(ip)
+		response1svc1 := c1.protocols[config.Layer2].ShouldAnnounce(l, "test1", lbIP, svc1, eps1)
+		response2svc1 := c2.protocols[config.Layer2].ShouldAnnounce(l, "test1", lbIP, svc1, eps1)
+
+		response1svc2 := c1.protocols[config.Layer2].ShouldAnnounce(l, "test1", lbIP, svc2, eps2)
+		response2svc2 := c2.protocols[config.Layer2].ShouldAnnounce(l, "test1", lbIP, svc2, eps2)
+
+		// We check that only one speaker announces the service, so their response must be different
+		if response1svc1 == response2svc1 {
+			t.Fatalf("Expected only one speaker to announce ip %s , got %s from speaker1, %s from speaker2", ip, response1svc1, response2svc1)
+		}
+		// Speakers must announce different services with the same ip as the same way
+		if response1svc1 != response1svc2 {
+			t.Fatalf("Expected both speakers announce svc1 and svc2 with ip %s consistently, got %s from speaker1 for svc1, %s from speaker1 for svc2", ip, response1svc1, response1svc2)
+		}
+		if response2svc1 != response2svc2 {
+			t.Fatalf("Expected both speakers announce svc1 and svc2 with ip %s consistently, got %s from speaker2 for svc1, %s from speaker2 for svc2", ip, response1svc1, response1svc2)
+		}
+
+		// we check that both speaker announce at least one service
+		if response1svc1 == "" {
+			c1Found = true
+		}
+		if response2svc1 == "" {
+			c2Found = true
+		}
+	}
+	if !c1Found {
+		t.Fatalf("All services assigned to speaker2")
+	}
+	if !c2Found {
+		t.Fatalf("All services assigned to speaker1")
+	}
 }
