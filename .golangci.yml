@@ -8,3 +8,5 @@ linters-settings:
   godot:
     scope: toplevel
     capital: true
+    exclude:
+    - 'SPDX-License-Identifier.*'
