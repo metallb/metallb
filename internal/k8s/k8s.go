@@ -1,3 +1,5 @@
+// SPDX-License-Identifier:Apache-2.0
+
 package k8s // import "go.universe.tf/metallb/internal/k8s"
 
 import (

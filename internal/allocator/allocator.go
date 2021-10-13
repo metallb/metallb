@@ -1,3 +1,5 @@
+// SPDX-License-Identifier:Apache-2.0
+
 package allocator // import "go.universe.tf/metallb/internal/allocator"
 
 import (

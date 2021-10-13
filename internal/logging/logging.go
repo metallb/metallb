@@ -1,3 +1,5 @@
+// SPDX-License-Identifier:Apache-2.0
+
 // Package logging sets up structured logging in a uniform way, and
 // redirects glog statements into the structured log.
 package logging
