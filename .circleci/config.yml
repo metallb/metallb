@@ -48,6 +48,7 @@ jobs:
       - setup_ci_image
       - run: inv checkpatch
       - run: inv lint -e host
+      - run: inv verifylicense
   # FIXME: this is pinned to v3.0.0 because subsequent versions of ct pull in new versions of helm, which are subject
   #        to this bug: https://github.com/helm/helm/issues/8835, specifically for rbac object names with ':' in them
   helm-lint:
