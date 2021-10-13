@@ -83,9 +83,7 @@ func TestUsableNodes(t *testing.T) {
 			},
 			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1", "iris2"},
-		},
-
-		{
+		}, {
 			desc: "Two endpoints, same host",
 			eps: k8s.EpsOrSlices{
 				EpVal: &v1.Endpoints{
@@ -108,9 +106,7 @@ func TestUsableNodes(t *testing.T) {
 			},
 			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1"},
-		},
-
-		{
+		}, {
 			desc: "Two endpoints, same host, one is not ready",
 			eps: k8s.EpsOrSlices{
 				EpVal: &v1.Endpoints{
@@ -379,7 +375,7 @@ func TestShouldAnnounce(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -428,7 +424,7 @@ func TestShouldAnnounce(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -476,7 +472,7 @@ func TestShouldAnnounce(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -508,11 +504,8 @@ func TestShouldAnnounce(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 			},
-		},
-
-		{
-			desc:     "One service, two endpoints across two hosts, neither endpoint is ready, no controllers should announce",
-			balancer: "test1",
+		}, {
+			desc: "One service, two endpoints across two hosts, neither endpoint is ready, no controllers should announce",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -525,7 +518,7 @@ func TestShouldAnnounce(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -557,11 +550,8 @@ func TestShouldAnnounce(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "notOwner",
 			},
-		},
-
-		{
-			desc:     "One service, two endpoints across two hosts, controller 2 is not ready, controller 1 should announce",
-			balancer: "test1",
+		}, {
+			desc: "One service, two endpoints across two hosts, controller 2 is not ready, controller 1 should announce",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -574,7 +564,7 @@ func TestShouldAnnounce(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -608,11 +598,8 @@ func TestShouldAnnounce(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "notOwner",
 			},
-		},
-
-		{
-			desc:     "Two services each with two endpoints across across two hosts, controller 2 should announce for both services",
-			balancer: "test1",
+		}, {
+			desc: "Two services each with two endpoints across across two hosts, controller 1 should announce the second, controller 2 the first",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -625,14 +612,14 @@ func TestShouldAnnounce(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.2"),
 				},
@@ -679,17 +666,14 @@ func TestShouldAnnounce(t *testing.T) {
 			},
 			c1ExpectedResult: map[string]string{
 				"10.20.30.1": "notOwner",
-				"10.20.30.2": "notOwner",
+				"10.20.30.2": "",
 			},
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
-				"10.20.30.2": "",
+				"10.20.30.2": "notOwner",
 			},
-		},
-
-		{
-			desc:     "Two services each with two endpoints across across two hosts, one service has an endpoint not ready on controller 2, controller 2 should not announce for the service with the not ready endpoint",
-			balancer: "test1",
+		}, {
+			desc: "Two services each with two endpoints across across two hosts, one service has an endpoint not ready on controller 2, controller 2 should not announce for the service with the not ready endpoint",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -702,14 +686,14 @@ func TestShouldAnnounce(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.2"),
 				},
@@ -764,11 +748,8 @@ func TestShouldAnnounce(t *testing.T) {
 				"10.20.30.1": "",
 				"10.20.30.2": "notOwner",
 			},
-		},
-
-		{
-			desc:     "Two services each with two endpoints across across two hosts, one service has an endpoint not ready on controller 1, the other service has an endpoint not ready on controller 2. Each controller should announce for the service with the ready endpoint on that controller",
-			balancer: "test1",
+		}, {
+			desc: "Two services each with two endpoints across across two hosts, one service has an endpoint not ready on controller 1, the other service has an endpoint not ready on controller 2. Each controller should announce for the service with the ready endpoint on that controller",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -781,14 +762,14 @@ func TestShouldAnnounce(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.2"),
 				},
@@ -845,11 +826,8 @@ func TestShouldAnnounce(t *testing.T) {
 				"10.20.30.1": "",
 				"10.20.30.2": "notOwner",
 			},
-		},
-
-		{
-			desc:     "One service with three endpoints across across two hosts, controller 2 hosts two endpoints controller 2 should announce for the service",
-			balancer: "test1",
+		}, {
+			desc: "One service with three endpoints across across two hosts, controller 2 hosts two endpoints controller 2 should announce for the service",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -862,7 +840,7 @@ func TestShouldAnnounce(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -898,11 +876,8 @@ func TestShouldAnnounce(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 			},
-		},
-
-		{
-			desc:     "One service with three endpoints across across two hosts, controller 1 hosts two endpoints controller 2 should announce for the service",
-			balancer: "test1",
+		}, {
+			desc: "One service with three endpoints across across two hosts, controller 1 hosts two endpoints controller 2 should announce for the service",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -915,7 +890,7 @@ func TestShouldAnnounce(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -951,11 +926,8 @@ func TestShouldAnnounce(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 			},
-		},
-
-		{
-			desc:     "One service with three endpoints across across two hosts, controller 2 hosts two endpoints, one of which is not ready, controller 2 should announce for the service",
-			balancer: "test1",
+		}, {
+			desc: "One service with three endpoints across across two hosts, controller 2 hosts two endpoints, one of which is not ready, controller 1 should announce for the service",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -968,7 +940,7 @@ func TestShouldAnnounce(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -1006,11 +978,8 @@ func TestShouldAnnounce(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 			},
-		},
-
-		{
-			desc:     "One service with three endpoints across across two hosts, controller 1 hosts two endpoints, one of which is not ready, controller 2 should announce for the service",
-			balancer: "test1",
+		}, {
+			desc: "One service with three endpoints across across two hosts, controller 1 hosts two endpoints, one of which is not ready, controller 2 should announce for the service",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -1023,7 +992,7 @@ func TestShouldAnnounce(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -1061,11 +1030,8 @@ func TestShouldAnnounce(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 			},
-		},
-
-		{
-			desc:     "One service with three endpoints across across two hosts, controller 2 hosts two endpoints, both of which are not ready, controller 1 should announce for the service",
-			balancer: "test1",
+		}, {
+			desc: "One service with three endpoints across across two hosts, controller 2 hosts two endpoints, both of which are not ready, controller 1 should announce for the service",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -1078,7 +1044,7 @@ func TestShouldAnnounce(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -1134,8 +1100,8 @@ func TestShouldAnnounce(t *testing.T) {
 			lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
 			lbIP_s := lbIP.String()
 			pool := c1.config.Pools[poolFor(c1.config.Pools, lbIP)]
-			response1 := c1.protocols[pool.Protocol].ShouldAnnounce(l, test.balancer, svc, test.eps[lbIP_s])
-			response2 := c2.protocols[pool.Protocol].ShouldAnnounce(l, test.balancer, svc, test.eps[lbIP_s])
+			response1 := c1.protocols[pool.Protocol].ShouldAnnounce(l, "balancer", lbIP, svc, test.eps[lbIP_s])
+			response2 := c2.protocols[pool.Protocol].ShouldAnnounce(l, "balancer", lbIP, svc, test.eps[lbIP_s])
 			if response1 != test.c1ExpectedResult[lbIP_s] {
 				t.Errorf("%q: shouldAnnounce for controller 1 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIP_s, test.c1ExpectedResult[lbIP_s], response1)
 			}
@@ -1199,7 +1165,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -1243,11 +1209,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "notOwner",
 			},
-		},
-
-		{
-			desc:     "One service, two endpoints, one host, neither endpoint is ready, no controller should announce",
-			balancer: "test1",
+		}, {
+			desc: "One service, two endpoints, one host, neither endpoint is ready, no controller should announce",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -1260,7 +1223,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -1304,10 +1267,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "notOwner",
 			},
-		},
-		{
-			desc:     "One service, two endpoints across two hosts, controller2 should announce",
-			balancer: "test1",
+		}, {
+			desc: "One service, two endpoints across two hosts, controller2 should announce",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -1320,7 +1281,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -1364,11 +1325,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 			},
-		},
-
-		{
-			desc:     "One service, two endpoints across two hosts, neither endpoint is ready, no controllers should announce",
-			balancer: "test1",
+		}, {
+			desc: "One service, two endpoints across two hosts, neither endpoint is ready, no controllers should announce",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -1381,7 +1339,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -1425,11 +1383,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "notOwner",
 			},
-		},
-
-		{
-			desc:     "One service, two endpoints across two hosts, controller 2 is not ready, controller 1 should announce",
-			balancer: "test1",
+		}, {
+			desc: "One service, two endpoints across two hosts, controller 2 is not ready, controller 1 should announce",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -1442,7 +1397,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -1486,11 +1441,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "notOwner",
 			},
-		},
-
-		{
-			desc:     "Two services each with two endpoints across across two hosts, controller 2 should announce for both services",
-			balancer: "test1",
+		}, {
+			desc: "Two services each with two endpoints across across two hosts, each controller should announce one service",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -1503,14 +1455,14 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.2"),
 				},
@@ -1581,17 +1533,14 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			},
 			c1ExpectedResult: map[string]string{
 				"10.20.30.1": "notOwner",
-				"10.20.30.2": "notOwner",
+				"10.20.30.2": "",
 			},
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
-				"10.20.30.2": "",
+				"10.20.30.2": "notOwner",
 			},
-		},
-
-		{
-			desc:     "Two services each with two endpoints across across two hosts, one service has an endpoint not ready on controller 2, controller 2 should not announce for the service with the not ready endpoint",
-			balancer: "test1",
+		}, {
+			desc: "Two services each with two endpoints across across two hosts, one service has an endpoint not ready on controller 2, each controller should announce one service",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -1604,14 +1553,14 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.2"),
 				},
@@ -1688,11 +1637,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				"10.20.30.1": "",
 				"10.20.30.2": "notOwner",
 			},
-		},
-
-		{
-			desc:     "Two services each with two endpoints across across two hosts, one service has an endpoint not ready on controller 1, the other service has an endpoint not ready on controller 2. Each controller should announce for the service with the ready endpoint on that controller",
-			balancer: "test1",
+		}, {
+			desc: "Two services each with two endpoints across across two hosts, one service has an endpoint not ready on controller 1, the other service has an endpoint not ready on controller 2. Each controller should announce for the service with the ready endpoint on that controller",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -1705,14 +1651,14 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.2"),
 				},
@@ -1789,11 +1735,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				"10.20.30.1": "",
 				"10.20.30.2": "notOwner",
 			},
-		},
-
-		{
-			desc:     "One service with three endpoints across across two hosts, controller 2 hosts two endpoints controller 2 should announce for the service",
-			balancer: "test1",
+		}, {
+			desc: "One service with three endpoints across across two hosts, controller 2 hosts two endpoints controller 2 should announce for the service",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -1806,7 +1749,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -1865,11 +1808,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 			},
-		},
-
-		{
-			desc:     "One service with three endpoints across across two hosts, controller 1 hosts two endpoints controller 2 should announce for the service",
-			balancer: "test1",
+		}, {
+			desc: "One service with three endpoints across across two hosts, controller 1 hosts two endpoints controller 2 should announce for the service",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -1882,7 +1822,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -1937,11 +1877,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 			},
-		},
-
-		{
-			desc:     "One service with three endpoints across across two hosts, controller 2 hosts two endpoints, one of which is not ready, controller 2 should announce for the service",
-			balancer: "test1",
+		}, {
+			desc: "One service with three endpoints across across two hosts, controller 2 hosts two endpoints, one of which is not ready, controller 2 should announce for the service",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -1954,7 +1891,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -2009,11 +1946,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 			},
-		},
-
-		{
-			desc:     "One service with three endpoints across across two hosts, controller 1 hosts two endpoints, one of which is not ready, controller 2 should announce for the service",
-			balancer: "test1",
+		}, {
+			desc: "One service with three endpoints across across two hosts, controller 1 hosts two endpoints, one of which is not ready, controller 1 should announce for the service",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -2026,7 +1960,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -2081,11 +2015,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 			},
-		},
-
-		{
-			desc:     "One service with three endpoints across across two hosts, controller 2 hosts two endpoints, both of which are not ready, controller 1 should announce for the service",
-			balancer: "test1",
+		}, {
+			desc: "One service with three endpoints across across two hosts, controller 2 hosts two endpoints, both of which are not ready, controller 1 should announce for the service",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
@@ -2098,7 +2029,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 				{
 					Spec: v1.ServiceSpec{
 						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: "Cluster",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
 					},
 					Status: statusAssigned("10.20.30.1"),
 				},
@@ -2171,8 +2102,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
 			lbIP_s := lbIP.String()
 			pool := c1.config.Pools[poolFor(c1.config.Pools, lbIP)]
-			response1 := c1.protocols[pool.Protocol].ShouldAnnounce(l, test.balancer, svc, test.eps[lbIP_s])
-			response2 := c2.protocols[pool.Protocol].ShouldAnnounce(l, test.balancer, svc, test.eps[lbIP_s])
+			response1 := c1.protocols[pool.Protocol].ShouldAnnounce(l, "test1", lbIP, svc, test.eps[lbIP_s])
+			response2 := c2.protocols[pool.Protocol].ShouldAnnounce(l, "test1", lbIP, svc, test.eps[lbIP_s])
 			if response1 != test.c1ExpectedResult[lbIP_s] {
 				t.Errorf("%q: shouldAnnounce for controller 1 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIP_s, test.c1ExpectedResult[lbIP_s], response1)
 			}
