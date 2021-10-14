@@ -16,6 +16,11 @@ New Features:
   `all`, `debug`, `info`, `warn`, `error` or `none` to filter produced logs by level.
   The default value is set to `info` on both helm charts and k8s manifests.
 
+- MetalLB previously required the speaker to run on the same node as a pod backing a 
+  LoadBalancer, even when the ExternalTrafficPolicy was set to cluster. You may now
+  run the MetalLB speaker on a subset of nodes, and the LoadBalancer will work for
+  the cluster policy, regardless of where the endpoints are located.
+
 Changes in behavior:
 
 - With the newly introduced leveled logging support, the default value for the 
@@ -25,8 +30,17 @@ Changes in behavior:
   editing the k8s manifests and setting the argument `--log-level=all` for both the controller and 
   speaker when installing using manifests, or by overriding helm values `controller.logLevel=all` 
   and `speaker.logLevel=all` when installing with Helm.
+- The L2 node allocation logic is now using the LoadBalancer IP and not the service name. This
+  means that the node associated to a given service may change across releases. This
+  would affect established connections as a new GARP will sent out to announce the IP belonging
+  to the new node.
 
 Bug Fixes:
+
+- L2 mode now allows to announce from nodes where the speaker is not running from
+  in case of ExternalTrafficPolicy = Cluster. The association of the node to the 
+  service is done via the LoadBalancerIP, avoiding scenarios where two services
+  sharing the same IP are announced from different nodes.
 
 ## Version 0.10.3
 
