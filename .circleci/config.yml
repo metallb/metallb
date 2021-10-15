@@ -27,8 +27,6 @@ jobs:
     parameters:
       ip-family:
         type: string
-      protocol:
-        type: string
     machine:
       image: ubuntu-2004:202104-01
     steps:
@@ -37,8 +35,10 @@ jobs:
       - run: inv build
       - run: inv dev-env -i  << parameters.ip-family >>
       - run: |
-          if [ "<< parameters.protocol >>" = "layer2" ]; then FOCUS=L2; else FOCUS=BGP; fi
-          inv e2etest -f $FOCUS -e /tmp/kind_logs
+          if [ "<< parameters.ip-family >>" = "ipv4" ]; then SKIP="--skip IPV6"; fi
+          if [ "<< parameters.ip-family >>" = "dual" ]; then SKIP="--skip IPV6"; fi # TODO: until dual stack is supported, we can't run the ipv6 tests against the cluster
+          if [ "<< parameters.ip-family >>" = "ipv6" ]; then SKIP="--skip IPV4\|BGP"; fi # TODO: we are currently skipping BGP for ipv6, re enable when we enable the support
+          inv e2etest $SKIP -e /tmp/kind_logs
       - store_artifacts:
           path: /tmp/kind_logs
   lint-1-16:
@@ -125,11 +125,7 @@ workflows:
               only: /.*/
           matrix:
             parameters:
-              protocol: [layer2, bgp]
               ip-family: [ipv4, ipv6, dual]
-            exclude:
-              - protocol: bgp
-                ip-family: ipv6
       - publish-images:
           filters:
             branches:
