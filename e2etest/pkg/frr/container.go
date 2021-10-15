@@ -96,21 +96,22 @@ func StopContainer(containerName string, testDirName string) error {
 // Change volume permissions.
 // Allows deleting the test directory or updating the files in the volume.
 func UpdateContainerVolumePermissions(containerName string) error {
-	// Get local host UID and GID
-	out, err := exec.Command("id", "-u").CombinedOutput()
-	if err != nil {
-		return errors.Wrapf(err, "Failed to get UID")
-	}
-	uid := strings.TrimSuffix(string(out), "\n")
+	var uid, gid int
 
-	out, err = exec.Command("id", "-g").CombinedOutput()
-	if err != nil {
-		return errors.Wrapf(err, "Failed to get GID")
+	if isPodman() {
+		// Rootless Podman containers run as non-root user.
+		// Volumes are mapped container UID:GID <-> host user UID:GID.
+		uid = 0
+		gid = 0
+	} else {
+		// Rootful Docker containers run as host root user.
+		// Volumes are mapped container UID:GID <-> host *root* UID:GID.
+		uid = os.Getuid()
+		gid = os.Getgid()
 	}
-	gid := strings.TrimSuffix(string(out), "\n")
 
-	cmd := fmt.Sprintf("chown -R %s:%s %s", uid, gid, frrMountPath)
-	out, err = exec.Command("docker", "exec", containerName, "sh", "-c", cmd).CombinedOutput()
+	cmd := fmt.Sprintf("chown -R %d:%d %s", uid, gid, frrMountPath)
+	out, err := exec.Command("docker", "exec", containerName, "sh", "-c", cmd).CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "Failed to change %s container volume permissions. %s", containerName, string(out))
 	}
@@ -135,4 +136,11 @@ func reloadFRRConfig(configFile string, exec executor.Executor) error {
 	}
 
 	return nil
+}
+
+// Returns true if docker is a symlink to podman.
+func isPodman() bool {
+	dockerPath, _ := exec.LookPath("docker")
+	symLink, _ := os.Readlink(dockerPath)
+	return strings.Contains(symLink, "podman")
 }
