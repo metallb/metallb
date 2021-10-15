@@ -621,15 +621,20 @@ def lint(ctx, env="container"):
     "service_pod_port": "port number that service pods open.",
     "skip_docker": "don't use docker command in BGP testing.",
     "focus": "the list of arguments to pass into as -ginkgo.focus",
+    "skip": "the list of arguments to pass into as -ginkgo.skip",
     "ipv4_service_range": "a range of IPv4 addresses for MetalLB to use when running in layer2 mode.",
     "ipv6_service_range": "a range of IPv6 addresses for MetalLB to use when running in layer2 mode.",
 })
-def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus="", ipv4_service_range=None, ipv6_service_range=None):
+def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None):
     """Run E2E tests against development cluster."""
     if skip_docker:
         opt_skip_docker = "--skip-docker"
     else:
         opt_skip_docker = ""
+
+    ginkgo_skip = ""
+    if skip:
+        ginkgo_skip = "--ginkgo.skip="+skip
 
     ginkgo_focus = ""
     if focus:
@@ -658,7 +663,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
         ipv6_service_range = get_service_range(6)
 
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "go test {} --provider=local --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {}".format(ginkgo_focus, kubeconfig, service_pod_port, ipv4_service_range, ipv6_service_range, opt_skip_docker), warn="True")
+            "go test {} {} --provider=local --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {}".format(ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range, ipv6_service_range, opt_skip_docker), warn="True")
 
     if export != None:
         run("kind export logs {}".format(export))
