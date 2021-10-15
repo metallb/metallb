@@ -55,6 +55,30 @@ type FRRRoute struct {
 	} `json:"nexthops"`
 }
 
+type BFDPeer struct {
+	Multihop               bool   `json:"multihop"`
+	Peer                   string `json:"peer"`
+	Local                  string `json:"local"`
+	Vrf                    string `json:"vrf"`
+	Interface              string `json:"interface"`
+	ID                     int    `json:"id"`
+	RemoteID               int64  `json:"remote-id"`
+	PassiveMode            bool   `json:"passive-mode"`
+	Status                 string `json:"status"`
+	Uptime                 int    `json:"uptime"`
+	Diagnostic             string `json:"diagnostic"`
+	RemoteDiagnostic       string `json:"remote-diagnostic"`
+	ReceiveInterval        int    `json:"receive-interval"`
+	TransmitInterval       int    `json:"transmit-interval"`
+	EchoReceiveInterval    int    `json:"echo-receive-interval"`
+	EchoTransmitInterval   int    `json:"echo-transmit-interval"`
+	DetectMultiplier       int    `json:"detect-multiplier"`
+	RemoteReceiveInterval  int    `json:"remote-receive-interval"`
+	RemoteTransmitInterval int    `json:"remote-transmit-interval"`
+	RemoteEchoInterval     int    `json:"remote-echo-interval"`
+	RemoteDetectMultiplier int    `json:"remote-detect-multiplier"`
+}
+
 // parseNeighbour takes the result of a show bgp neighbor x.y.w.z
 // and parses the informations related to the neighbour.
 func ParseNeighbour(vtyshRes string) (*Neighbor, error) {

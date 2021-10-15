@@ -27,6 +27,7 @@ type configFile struct {
 	Peers          []peer            `yaml:"peers,omitempty"`
 	BGPCommunities map[string]string `yaml:"bgp-communities,omitempty"`
 	Pools          []addressPool     `yaml:"address-pools,omitempty"`
+	BFDProfiles    []bfdProfile      `yaml:"bfd-profiles"`
 }
 
 type peer struct {
@@ -39,6 +40,7 @@ type peer struct {
 	RouterID      string         `yaml:"router-id,omitempty"`
 	NodeSelectors []nodeSelector `yaml:"node-selectors,omitempty"`
 	Password      string         `yaml:"password,omitempty"`
+	BFDProfile    string         `yaml:"bfd-profile,omitempty"`
 }
 
 type nodeSelector struct {
@@ -67,6 +69,17 @@ type bgpAdvertisement struct {
 	Communities       []string `yaml:"communities,omitempty"`
 }
 
+type bfdProfile struct {
+	Name             string  `yaml:"name"`
+	ReceiveInterval  *uint32 `yaml:"receive-interval,omitempty"`
+	TransmitInterval *uint32 `yaml:"transmit-interval,omitempty"`
+	DetectMultiplier *uint32 `yaml:"detect-multiplier,omitempty"`
+	EchoInterval     *uint32 `yaml:"echo-interval,omitempty"`
+	EchoMode         *bool   `yaml:"echo-mode,omitempty"`
+	PassiveMode      *bool   `yaml:"passive-mode,omitempty"`
+	MinimumTTL       *uint32 `yaml:"minimum-ttl,omitempty"`
+}
+
 func updateConfigMap(cs clientset.Interface, data configFile) error {
 	resData, err := yaml.Marshal(data)
 	if err != nil {
@@ -85,4 +98,24 @@ func updateConfigMap(cs clientset.Interface, data configFile) error {
 	}
 
 	return nil
+}
+
+func BFDProfileWithDefaults(profile bfdProfile) bfdProfile {
+	res := bfdProfile{}
+	res.Name = profile.Name
+	res.ReceiveInterval = valueWithDefault(profile.ReceiveInterval, 300)
+	res.TransmitInterval = valueWithDefault(profile.TransmitInterval, 300)
+	res.DetectMultiplier = valueWithDefault(profile.DetectMultiplier, 3)
+	res.EchoInterval = valueWithDefault(profile.EchoInterval, 50)
+	res.MinimumTTL = valueWithDefault(profile.MinimumTTL, 254)
+	res.EchoMode = profile.EchoMode
+	res.PassiveMode = profile.PassiveMode
+	return res
+}
+
+func valueWithDefault(v *uint32, def uint32) *uint32 {
+	if v != nil {
+		return v
+	}
+	return &def
 }
