@@ -165,7 +165,8 @@ func main() {
 }
 
 type controller struct {
-	myNode string
+	myNode  string
+	bgpType bgpImplementation
 
 	config *config.Config
 	client service
@@ -212,6 +213,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 
 	ret := &controller{
 		myNode:    cfg.MyNode,
+		bgpType:   cfg.bgpType,
 		protocols: protocols,
 		announced: map[string]config.Proto{},
 		svcIP:     map[string]net.IP{},
@@ -343,12 +345,30 @@ func poolFor(pools map[string]*config.Pool, ip net.IP) string {
 	return ""
 }
 
+func (c *controller) bgpImplementationSupportAggrLenV6Cfg(pools map[string]*config.Pool) bool {
+	if c.bgpType == bgpNative {
+		for _, p := range pools {
+			for _, adCfg := range p.BGPAdvertisements {
+				if adCfg.AggregationLengthV6 != 0 {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
 func (c *controller) SetConfig(l log.Logger, cfg *config.Config) k8s.SyncState {
 	level.Debug(l).Log("event", "startUpdate", "msg", "start of config update")
 	defer level.Debug(l).Log("event", "endUpdate", "msg", "end of config update")
 
 	if cfg == nil {
 		level.Error(l).Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
+		return k8s.SyncStateError
+	}
+
+	if !c.bgpImplementationSupportAggrLenV6Cfg(cfg.Pools) {
+		level.Error(l).Log("op", "setConfig", "error", "unsupported configuration", "msg", "configuration is missing, MetalLB will not function")
 		return k8s.SyncStateError
 	}
 
