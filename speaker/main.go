@@ -165,7 +165,8 @@ func main() {
 }
 
 type controller struct {
-	myNode string
+	myNode  string
+	bgpType bgpImplementation
 
 	config *config.Config
 	client service
@@ -212,6 +213,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 
 	ret := &controller{
 		myNode:    cfg.MyNode,
+		bgpType:   cfg.bgpType,
 		protocols: protocols,
 		announced: map[string]config.Proto{},
 		svcIP:     map[string]net.IP{},
