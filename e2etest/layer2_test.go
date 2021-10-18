@@ -25,8 +25,10 @@ import (
 	"strconv"
 
 	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/extensions/table"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/mac"
+	internalconfig "go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -139,6 +141,81 @@ var _ = ginkgo.Describe("L2", func() {
 
 		})
 
+	})
+
+	ginkgo.Context("validate different AddressPools for type=Loadbalancer", func() {
+		ginkgo.AfterEach(func() {
+			// Clean previous configuration.
+			err := updateConfigMap(cs, configFile{})
+			framework.ExpectNoError(err)
+		})
+
+		table.DescribeTable("set different AddressPools ranges modes", func(getAddressPools func() []addressPool) {
+			configData := configFile{
+				Pools: getAddressPools(),
+			}
+			err := updateConfigMap(cs, configData)
+			framework.ExpectNoError(err)
+
+			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster)
+
+			defer func() {
+				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+			}()
+
+			port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
+			ingressIP := e2eservice.GetIngressPoint(
+				&svc.Status.LoadBalancer.Ingress[0])
+
+			ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
+			err = validateIPInRange(getAddressPools(), ingressIP)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("checking connectivity to its external VIP")
+
+			hostport := net.JoinHostPort(ingressIP, port)
+			address := fmt.Sprintf("http://%s/", hostport)
+			err = wgetRetry(address, executor.Host)
+			framework.ExpectNoError(err)
+		},
+			table.Entry("AddressPool defined by address range", func() []addressPool {
+				return []addressPool{
+					{
+						Name:     "l2-test",
+						Protocol: Layer2,
+						Addresses: []string{
+							ipv4ServiceRange,
+							ipv6ServiceRange,
+						},
+					},
+				}
+			}),
+			table.Entry("AddressPool defined by network prefix", func() []addressPool {
+				var ipv4AddressesByCIDR []string
+				var ipv6AddressesByCIDR []string
+
+				cidrs, err := internalconfig.ParseCIDR(ipv4ServiceRange)
+				framework.ExpectNoError(err)
+				for _, cidr := range cidrs {
+					ipv4AddressesByCIDR = append(ipv4AddressesByCIDR, cidr.String())
+				}
+
+				cidrs, err = internalconfig.ParseCIDR(ipv6ServiceRange)
+				framework.ExpectNoError(err)
+				for _, cidr := range cidrs {
+					ipv6AddressesByCIDR = append(ipv6AddressesByCIDR, cidr.String())
+				}
+
+				return []addressPool{
+					{
+						Name:      "l2-test",
+						Protocol:  Layer2,
+						Addresses: append(ipv4AddressesByCIDR, ipv6AddressesByCIDR...),
+					},
+				}
+			}),
+		)
 	})
 })
 
