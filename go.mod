@@ -18,6 +18,7 @@ require (
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/onsi/ginkgo v1.11.0
 	github.com/onsi/gomega v1.7.0
+	github.com/ory/dockertest/v3 v3.8.0 // indirect
 	github.com/osrg/gobgp v2.0.0+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
