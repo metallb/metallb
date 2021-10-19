@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -68,6 +69,12 @@ func testCheckConfigFile(t *testing.T) {
 		testUpdateGoldenFile(t, configFile, goldenFile)
 	}
 	testCompareFiles(t, configFile, goldenFile)
+	if !strings.Contains(configFile, "Invalid") {
+		err := testFileIsValid(configFile)
+		if err != nil {
+			t.Fatalf("Failed to verify the file %s", err)
+		}
+	}
 }
 
 func TestSingleSession(t *testing.T) {
