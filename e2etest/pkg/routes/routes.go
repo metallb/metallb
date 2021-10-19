@@ -14,13 +14,13 @@ import (
 )
 
 var (
-	ipv4Re *regexp.Regexp
-	ipv6Re *regexp.Regexp
+	Ipv4Re *regexp.Regexp
+	Ipv6Re *regexp.Regexp
 )
 
 func init() {
-	ipv4Re = regexp.MustCompile(`(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|)){4})`)
-	ipv6Re = regexp.MustCompile(`(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))`)
+	Ipv4Re = regexp.MustCompile(`(((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.|)){4})`)
+	Ipv6Re = regexp.MustCompile(`(([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])).`)
 }
 
 // For IP returns the list of routes in the given container
@@ -34,16 +34,24 @@ func ForIP(target string, exec executor.Executor) []net.IP {
 	dst := net.ParseIP(target)
 	framework.ExpectNotEqual(dst, nil, "Failed to convert", target, "to ip")
 
-	re := ipv4Re
+	re := Ipv4Re
 	if dst.To4() == nil { // assuming it's an ipv6 address
-		re = ipv6Re
+		re = Ipv6Re
 	}
 	rows := strings.Split(res, "\n")
+	// The output for a route with a single nexthop looks like: x.x.x.x via x.x.x.x dev x proto bgp metric x
+	// Route with multiple nexthops:
+	/*
+		x.x.x.x proto bgp metric x
+		    nexthop via x.x.x.x dev x weight 1
+		    nexthop via x.x.x.x dev x weight 1
+	*/
 	for _, r := range rows {
-		if !strings.Contains(r, "nexthop via") {
+		if !strings.Contains(r, "via") {
 			continue
 		}
-		ip := re.FindString(r)
+		via := strings.Split(r, "via")[1] // The IP should be after via
+		ip := re.FindString(via)
 		if ip == "" {
 			continue
 		}
