@@ -5,7 +5,7 @@ weight: 20
 
 Once you setup a loadbalancer on Kubernetes and it doesn't _seem_ to work right away, here are a few tips to troubleshoot.
 
-- Check that the LoadBalancer service has endpoints (`kubectl -n <namespace> get endpoints <service>`) that are not pending - if they are, MetalLB will not respond to ARP requests for that service's external IP
+- Check that the LoadBalancer service has endpoints (`kubectl -n <namespace> get endpoints <service>`) that are not pending - if they are, MetalLB will not respond to ARP requests for that service's external IP. That means if you have only one pod for your service and you lost the node hosting it, MetalLB will stop responding to ARP request until the replicaset will schedule the pod on another reachable node.
 - SSH into one or more of your nodes and use `arping` and `tcpdump` to verify the ARP requests pass through your network
 
 ---
