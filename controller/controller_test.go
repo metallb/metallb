@@ -45,16 +45,16 @@ func ipnet(s string) *net.IPNet {
 	return n
 }
 
-func statusAssigned(ip string) v1.ServiceStatus {
-	return v1.ServiceStatus{
+func statusAssigned(ips ...string) v1.ServiceStatus {
+	s := v1.ServiceStatus{
 		LoadBalancer: v1.LoadBalancerStatus{
-			Ingress: []v1.LoadBalancerIngress{
-				{
-					IP: ip,
-				},
-			},
+			Ingress: []v1.LoadBalancerIngress{},
 		},
 	}
+	for _, ip := range ips {
+		s.LoadBalancer.Ingress = append(s.LoadBalancer.Ingress, v1.LoadBalancerIngress{IP: ip})
+	}
+	return s
 }
 
 // testK8S implements service by recording what the controller wants
@@ -131,6 +131,11 @@ func TestControllerMutation(t *testing.T) {
 				Protocol:   config.Layer2,
 				AutoAssign: false,
 				CIDR:       []*net.IPNet{ipnet("2000::1/128")},
+			},
+			"pool5": {
+				Protocol:   config.Layer2,
+				AutoAssign: false,
+				CIDR:       []*net.IPNet{ipnet("3010::/127"), ipnet("3.1.0.0/31")},
 			},
 		},
 	}
@@ -478,6 +483,100 @@ func TestControllerMutation(t *testing.T) {
 					ClusterIP: "3000::1",
 				},
 				Status: statusAssigned("1000::"),
+			},
+		},
+
+		{
+			desc: "Dual-stack basic",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"metallb.universe.tf/address-pool": "pool5",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:       "LoadBalancer",
+					ClusterIP:  "3000::1",
+					ClusterIPs: []string{"3000::1", "30.0.0.0"},
+				},
+				Status: statusAssigned("1.2.3.0", "2000::1"),
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"metallb.universe.tf/address-pool": "pool5",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:       "LoadBalancer",
+					ClusterIP:  "3000::1",
+					ClusterIPs: []string{"3000::1", "30.0.0.0"},
+				},
+				Status: statusAssigned("3010::", "3.1.0.0"),
+			},
+		},
+
+		{
+			desc: "Dual-stack but LoadBalancerIP requested",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"metallb.universe.tf/address-pool": "pool5",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					LoadBalancerIP: "3.1.0.0",
+					ClusterIP:      "30.0.0.0",
+					ClusterIPs:     []string{"30.0.0.0", "3000::1"},
+				},
+				Status: statusAssigned("1.2.3.0", "2000::1"),
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"metallb.universe.tf/address-pool": "pool5",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					LoadBalancerIP: "3.1.0.0",
+					ClusterIP:      "30.0.0.0",
+					ClusterIPs:     []string{"30.0.0.0", "3000::1"},
+				},
+				Status: statusAssigned("3.1.0.0"),
+			},
+		},
+
+		{
+			desc: "Dual-stack requested addresses with annotation",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"metallb.universe.tf/address-pool":      "pool5",
+						"metallb.universe.tf/load-balancer-ips": "3.1.0.1, 3010::1",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:       "LoadBalancer",
+					ClusterIP:  "30.0.0.0",
+					ClusterIPs: []string{"30.0.0.0", "3000::1"},
+				},
+				Status: statusAssigned("1.2.3.0", "2000::1"),
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						"metallb.universe.tf/address-pool":      "pool5",
+						"metallb.universe.tf/load-balancer-ips": "3.1.0.1, 3010::1",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:       "LoadBalancer",
+					ClusterIP:  "30.0.0.0",
+					ClusterIPs: []string{"30.0.0.0", "3000::1"},
+				},
+				Status: statusAssigned("3.1.0.1", "3010::1"),
 			},
 		},
 	}
