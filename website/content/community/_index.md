@@ -150,6 +150,14 @@ the [github repository](https://github.com/metallb/metallb), and add
 your fork as a remote in `$GOPATH/src/go.universe.tf/metallb`, with
 `git remote add fork git@github.com:<your-github-user>/metallb.git`.
 
+## Commit Messages
+
+The following are our commit message guidelines:
+
+* Line wrap the body at 72 characters
+* For a more complete discussion of good git commit message practices, see
+  https://chris.beams.io/posts/git-commit/.
+
 ## The website
 
 The website at https://metallb.universe.tf is pinned to the latest
