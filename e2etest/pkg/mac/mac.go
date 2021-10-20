@@ -1,3 +1,5 @@
+// SPDX-License-Identifier:Apache-2.0
+
 package mac
 
 import (
@@ -54,6 +56,13 @@ func MatchNode(nodes []corev1.Node, mac net.HardwareAddr, exec executor.Executor
 	}
 
 	rows := strings.Split(res, "\n")
+	// The output of ip neigh show looks like:
+	/*
+		...
+		172.18.0.4 dev br-97bb56038aab lladdr 02:42:ac:12:00:04 REACHABLE
+		fe80::42:acff:fe12:3 dev br-97bb56038aab lladdr 02:42:ac:12:00:03 router REACHABLE
+		...
+	*/
 	for _, r := range rows {
 		if !strings.Contains(r, mac.String()) {
 			continue
