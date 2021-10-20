@@ -53,7 +53,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		return true
 	}
 
-	if svc.Spec.ClusterIPs != nil && len(svc.Spec.ClusterIPs) > 1 {
+	if len(svc.Spec.ClusterIPs) > 1 && svc.Spec.LoadBalancerIP == "" {
 		return c.convergeBalancerDual(l, key, svc)
 	}
 
@@ -230,11 +230,6 @@ func (c *controller) convergeBalancerDual(l log.Logger, key string, svc *v1.Serv
 	} else {
 		c.clearServiceState(key, svc)
 		lbIP = nil
-	}
-
-	// The (singular) svc.Spec.LoadBalancerIP is ignored for dual-stack
-	if svc.Spec.LoadBalancerIP != "" {
-		l.Log("event", "loadBalancerIP", "reason", "N/A", "msg", "loadBalancerIP ignored for dual-stack")
 	}
 
 	lbIP, lbIP2, err := parseRequestedIPs(svc.Annotations[annotationLoadBalancerIPs])
