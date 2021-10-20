@@ -1,3 +1,5 @@
+// SPDX-License-Identifier:Apache-2.0
+
 package mac
 
 import (
@@ -7,7 +9,6 @@ import (
 	"strings"
 
 	"go.universe.tf/metallb/e2etest/pkg/executor"
-	"go.universe.tf/metallb/e2etest/pkg/routes"
 
 	corev1 "k8s.io/api/core/v1"
 )
@@ -54,19 +55,19 @@ func MatchNode(nodes []corev1.Node, mac net.HardwareAddr, exec executor.Executor
 	}
 
 	rows := strings.Split(res, "\n")
+	// The output of ip neigh show looks like:
+	/*
+		...
+		172.18.0.4 dev br-97bb56038aab lladdr 02:42:ac:12:00:04 REACHABLE
+		fe80::42:acff:fe12:3 dev br-97bb56038aab lladdr 02:42:ac:12:00:03 router REACHABLE
+		...
+	*/
 	for _, r := range rows {
 		if !strings.Contains(r, mac.String()) {
 			continue
 		}
 
-		ip := routes.Ipv4Re.FindString(r)
-		if ip == "" {
-			ip = routes.Ipv6Re.FindString(r)
-		}
-
-		if ip == "" {
-			continue
-		}
+		ip := strings.Split(r, " ")[0]
 
 		netIP := net.ParseIP(ip)
 		if netIP == nil {
