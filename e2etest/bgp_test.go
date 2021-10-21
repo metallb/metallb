@@ -94,7 +94,6 @@ var _ = ginkgo.Describe("BGP", func() {
 
 	ginkgo.Context("type=Loadbalancer", func() {
 		var allNodes *corev1.NodeList
-		var exc executor.Executor
 		ginkgo.BeforeEach(func() {
 			configData := configFile{
 				Pools: []addressPool{
@@ -118,27 +117,10 @@ var _ = ginkgo.Describe("BGP", func() {
 			err := updateConfigMap(cs, configData)
 			framework.ExpectNoError(err)
 
-			bgpConfig, err := frrconfig.BGPPeersForAllNodes(cs)
-			framework.ExpectNoError(err)
-
-			exc = executor.ForContainer(frrContainer)
-			if skipDockerCmd {
-				exc = executor.Host
-			}
-
-			err = frr.UpdateBGPConfigFile(frrTestConfigDir, bgpConfig, exc)
-			framework.ExpectNoError(err)
+			pairExternalFRRWithNodes(cs)
 
 			allNodes, err = cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
-
-			ginkgo.By("checking all nodes are peered with the frr instance")
-			Eventually(func() error {
-				neighbors, err := frr.NeighborsInfo(exc)
-				framework.ExpectNoError(err)
-				err = frr.NeighborsMatchNodes(allNodes.Items, neighbors)
-				return err
-			}, 2*time.Minute, 1*time.Second).Should(BeNil())
 		})
 
 		ginkgo.It("should work for ExternalTrafficPolicy=Cluster", func() {
@@ -149,33 +131,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				framework.ExpectNoError(err)
 			}()
 
-			port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
-			ingressIP := e2eservice.GetIngressPoint(
-				&svc.Status.LoadBalancer.Ingress[0])
-
-			hostport := net.JoinHostPort(ingressIP, port)
-			address := fmt.Sprintf("http://%s/", hostport)
-
-			if skipDockerCmd {
-				ginkgo.By(fmt.Sprintf("checking connectivity to %s", address))
-			} else {
-				ginkgo.By(fmt.Sprintf("checking connectivity to %s with docker", address))
-			}
-
-			err := wgetRetry(address, exc)
-			framework.ExpectNoError(err)
-
-			advertised := routes.ForIP(ingressIP, exc)
-			err = routes.MatchNodes(allNodes.Items, advertised)
-			framework.ExpectNoError(err)
-
-			frrRoutes, _, err := frr.Routes(exc)
-			framework.ExpectNoError(err)
-
-			routes, ok := frrRoutes[ingressIP]
-			framework.ExpectEqual(ok, true, ingressIP, "not found in frr routes")
-			err = frr.RoutesMatchNodes(allNodes.Items, routes)
-			framework.ExpectNoError(err)
+			validateService(cs, svc, allNodes.Items)
 		})
 
 		ginkgo.It("should work for ExternalTrafficPolicy=Local", func() {
@@ -191,33 +147,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				framework.ExpectNoError(err)
 			}()
 
-			port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
-			ingressIP := e2eservice.GetIngressPoint(
-				&svc.Status.LoadBalancer.Ingress[0])
-
-			hostport := net.JoinHostPort(ingressIP, port)
-			address := fmt.Sprintf("http://%s/", hostport)
-
-			if skipDockerCmd {
-				ginkgo.By(fmt.Sprintf("checking connectivity to %s", address))
-			} else {
-				ginkgo.By(fmt.Sprintf("checking connectivity to %s with docker", address))
-			}
-
-			err = wgetRetry(address, exc)
-			framework.ExpectNoError(err)
-
-			advertised := routes.ForIP(ingressIP, exc)
-			err = routes.MatchNodes(epNodes, advertised)
-			framework.ExpectNoError(err)
-
-			frrRoutes, _, err := frr.Routes(exc)
-			framework.ExpectNoError(err)
-
-			routes, ok := frrRoutes[ingressIP]
-			framework.ExpectEqual(ok, true, ingressIP, "not found in frr routes")
-			err = frr.RoutesMatchNodes(epNodes, routes)
-			framework.ExpectNoError(err)
+			validateService(cs, svc, epNodes)
 		})
 	})
 
@@ -270,27 +200,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			err := updateConfigMap(cs, configData)
 			framework.ExpectNoError(err)
 
-			exc := executor.ForContainer(frrContainer)
-			if skipDockerCmd {
-				exc = executor.Host
-			}
-
-			bgpConfig, err := frrconfig.BGPPeersForAllNodes(cs)
-			framework.ExpectNoError(err)
-
-			err = frr.UpdateBGPConfigFile(frrTestConfigDir, bgpConfig, exc)
-			framework.ExpectNoError(err)
-
-			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
-
-			ginkgo.By("checking all nodes are peered with the frr instance")
-			Eventually(func() error {
-				neighbors, err := frr.NeighborsInfo(exc)
-				framework.ExpectNoError(err)
-				err = frr.NeighborsMatchNodes(allNodes.Items, neighbors)
-				return err
-			}, 2*time.Minute, 1*time.Second).Should(BeNil())
+			pairExternalFRRWithNodes(cs)
 
 			ginkgo.By("checking the metrics when no service is added")
 			controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod)
@@ -357,27 +267,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			err := updateConfigMap(cs, configData)
 			framework.ExpectNoError(err)
 
-			bgpConfig, err := frrconfig.BGPPeersForAllNodes(cs)
-			framework.ExpectNoError(err)
-
-			exc := executor.ForContainer(frrContainer)
-			if skipDockerCmd {
-				exc = executor.Host
-			}
-
-			err = frr.UpdateBGPConfigFile(frrTestConfigDir, bgpConfig, exc)
-			framework.ExpectNoError(err)
-
-			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
-
-			ginkgo.By("checking all nodes are peered with the frr instance")
-			Eventually(func() error {
-				neighbors, err := frr.NeighborsInfo(exc)
-				framework.ExpectNoError(err)
-				err = frr.NeighborsMatchNodes(allNodes.Items, neighbors)
-				return err
-			}, 2*time.Minute, 1*time.Second).Should(BeNil())
+			pairExternalFRRWithNodes(cs)
 
 			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster)
 
@@ -386,7 +276,6 @@ var _ = ginkgo.Describe("BGP", func() {
 				framework.ExpectNoError(err)
 			}()
 
-			port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
 			ingressIP := e2eservice.GetIngressPoint(
 				&svc.Status.LoadBalancer.Ingress[0])
 
@@ -394,29 +283,10 @@ var _ = ginkgo.Describe("BGP", func() {
 			err = validateIPInRange(addressPools, ingressIP)
 			framework.ExpectNoError(err)
 
-			hostport := net.JoinHostPort(ingressIP, port)
-			address := fmt.Sprintf("http://%s/", hostport)
-
-			if skipDockerCmd {
-				ginkgo.By(fmt.Sprintf("checking connectivity to %s", address))
-			} else {
-				ginkgo.By(fmt.Sprintf("checking connectivity to %s with docker", address))
-			}
-
-			err = wgetRetry(address, exc)
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
 
-			advertised := routes.ForIP(ingressIP, exc)
-			err = routes.MatchNodes(allNodes.Items, advertised)
-			framework.ExpectNoError(err)
-
-			frrRoutes, _, err := frr.Routes(exc)
-			framework.ExpectNoError(err)
-
-			routes, ok := frrRoutes[ingressIP]
-			framework.ExpectEqual(ok, true, ingressIP, "not found in frr routes")
-			err = frr.RoutesMatchNodes(allNodes.Items, routes)
-			framework.ExpectNoError(err)
+			validateService(cs, svc, allNodes.Items)
 		},
 			table.Entry("AddressPool defined by network prefix", []addressPool{
 				{
@@ -466,4 +336,72 @@ func validateGaugeValue(expectedValue int, metricName string, labels map[string]
 	value, err := metrics.GaugeForLabels(metricName, labels, m)
 	framework.ExpectNoError(err)
 	framework.ExpectEqual(value, expectedValue, "invalid value for ", metricName, labels)
+}
+
+func pairExternalFRRWithNodes(cs clientset.Interface) {
+	bgpConfig, err := frrconfig.BGPPeersForAllNodes(cs)
+	framework.ExpectNoError(err)
+
+	exc := executor.ForContainer(frrContainer)
+	if skipDockerCmd {
+		exc = executor.Host
+	}
+
+	err = frr.UpdateBGPConfigFile(frrTestConfigDir, bgpConfig, exc)
+	framework.ExpectNoError(err)
+
+	validateFRRPeeredWithNodes(cs)
+}
+
+func validateFRRPeeredWithNodes(cs clientset.Interface) {
+	exc := executor.ForContainer(frrContainer)
+	if skipDockerCmd {
+		exc = executor.Host
+	}
+
+	allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+	framework.ExpectNoError(err)
+
+	ginkgo.By("checking all nodes are peered with the frr instance")
+	Eventually(func() error {
+		neighbors, err := frr.NeighborsInfo(exc)
+		framework.ExpectNoError(err)
+		err = frr.NeighborsMatchNodes(allNodes.Items, neighbors)
+		return err
+	}, 2*time.Minute, 1*time.Second).Should(BeNil())
+}
+
+func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1.Node) {
+	port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
+	ingressIP := e2eservice.GetIngressPoint(
+		&svc.Status.LoadBalancer.Ingress[0])
+
+	hostport := net.JoinHostPort(ingressIP, port)
+	address := fmt.Sprintf("http://%s/", hostport)
+
+	if skipDockerCmd {
+		ginkgo.By(fmt.Sprintf("checking connectivity to %s", address))
+	} else {
+		ginkgo.By(fmt.Sprintf("checking connectivity to %s with docker", address))
+	}
+
+	exc := executor.ForContainer(frrContainer)
+	if skipDockerCmd {
+		exc = executor.Host
+	}
+
+	err := wgetRetry(address, exc)
+	framework.ExpectNoError(err)
+
+	advertised := routes.ForIP(ingressIP, exc)
+	err = routes.MatchNodes(nodes, advertised)
+	framework.ExpectNoError(err)
+
+	frrRoutes, _, err := frr.Routes(exc)
+	framework.ExpectNoError(err)
+
+	routes, ok := frrRoutes[ingressIP]
+	framework.ExpectEqual(ok, true, ingressIP, "not found in frr routes")
+	err = frr.RoutesMatchNodes(nodes, routes)
+	framework.ExpectNoError(err)
 }
