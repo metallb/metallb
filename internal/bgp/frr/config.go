@@ -38,7 +38,16 @@ router bgp {{.MyASN}}
   neighbor {{.Addr}} port {{.Port}}
 {{- end }}
 {{range $n := .Neighbors -}}
-{{range .Advertisements }}
+{{/* no bgp default ipv4-unicast prevents peering if no address families are defined. We declare an ipv4 one for the peer to make the pairing happen */}}
+{{- if eq (len .Advertisements) 0}}
+  address-family ipv4 unicast
+    neighbor {{$n.Addr}} activate
+  exit-address-family
+  address-family ipv6 unicast
+    neighbor {{$n.Addr}} activate
+  exit-address-family
+{{- end}}
+{{- range .Advertisements }}
   address-family {{.Version}} unicast
     neighbor {{$n.Addr}} activate
     network {{.Prefix}}
