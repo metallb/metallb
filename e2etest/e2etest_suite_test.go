@@ -40,20 +40,20 @@ import (
 )
 
 const (
-	defaultTestNameSpace    = "metallb-system"
-	defaultContainerNetwork = "kind"
+	defaultTestNameSpace     = "metallb-system"
+	defaultContainersNetwork = "kind"
 )
 
 var (
 	// Use ephemeral port for pod, instead of well-known port (tcp/80).
-	servicePodPort   uint
-	skipDockerCmd    bool
-	ipv4ServiceRange string
-	ipv6ServiceRange string
-	testNameSpace    = defaultTestNameSpace
-	containerNetwork = defaultContainerNetwork
-	hostIPv4         string
-	hostIPv6         string
+	servicePodPort    uint
+	skipDockerCmd     bool
+	ipv4ServiceRange  string
+	ipv6ServiceRange  string
+	testNameSpace     = defaultTestNameSpace
+	containersNetwork = defaultContainersNetwork
+	hostIPv4          string
+	hostIPv6          string
 )
 
 // handleFlags sets up all flags and parses the command line.
@@ -104,7 +104,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	}
 
 	if _, res := os.LookupEnv("RUN_FRR_CONTAINER_ON_HOST_NETWORK"); res == true {
-		containerNetwork = "host"
+		containersNetwork = "host"
 	}
 
 	if ip := os.Getenv("PROVISIONING_HOST_EXTERNAL_IPV4"); len(ip) != 0 {
