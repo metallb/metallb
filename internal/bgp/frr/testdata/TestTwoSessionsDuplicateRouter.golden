@@ -13,6 +13,18 @@ router bgp 100
   neighbor 10.4.4.254 remote-as 400
   neighbor 10.4.4.254 port 179
 
+  address-family ipv4 unicast
+    neighbor 10.2.2.254 activate
+  exit-address-family
+  address-family ipv6 unicast
+    neighbor 10.2.2.254 activate
+  exit-address-family
 
+  address-family ipv4 unicast
+    neighbor 10.4.4.254 activate
+  exit-address-family
+  address-family ipv6 unicast
+    neighbor 10.4.4.254 activate
+  exit-address-family
 
 
