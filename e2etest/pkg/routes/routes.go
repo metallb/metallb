@@ -82,7 +82,7 @@ func MatchNodes(nodes []v1.Node, ips []net.IP) error {
 		delete(nodesIPs, ip.String())
 	}
 	if len(nodesIPs) != 0 { // some leftover, meaning more nodes than routes
-		return fmt.Errorf("IP %v found in nodes but not in routes", nodesIPs)
+		return fmt.Errorf("IP %v found in nodes but not in routes. Routes %v", nodesIPs, ips)
 	}
 	return nil
 }
