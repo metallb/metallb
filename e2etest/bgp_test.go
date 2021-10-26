@@ -390,18 +390,32 @@ func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1
 		exc = executor.Host
 	}
 
-	err := wgetRetry(address, exc)
-	framework.ExpectNoError(err)
+	Eventually(func() error {
+		err := wgetRetry(address, exc)
+		if err != nil {
+			return err
+		}
 
-	advertised := routes.ForIP(ingressIP, exc)
-	err = routes.MatchNodes(nodes, advertised)
-	framework.ExpectNoError(err)
+		advertised := routes.ForIP(ingressIP, exc)
+		err = routes.MatchNodes(nodes, advertised)
+		if err != nil {
+			return err
+		}
 
-	frrRoutes, _, err := frr.Routes(exc)
-	framework.ExpectNoError(err)
+		frrRoutes, _, err := frr.Routes(exc)
+		if err != nil {
+			return err
+		}
 
-	routes, ok := frrRoutes[ingressIP]
-	framework.ExpectEqual(ok, true, ingressIP, "not found in frr routes")
-	err = frr.RoutesMatchNodes(nodes, routes)
-	framework.ExpectNoError(err)
+		routes, ok := frrRoutes[ingressIP]
+		if !ok {
+			return fmt.Errorf("%s not found in frr routes %v", ingressIP, frrRoutes)
+		}
+
+		err = frr.RoutesMatchNodes(nodes, routes)
+		if err != nil {
+			return err
+		}
+		return nil
+	}, 2*time.Minute, 1*time.Second).Should(BeNil())
 }
