@@ -8,7 +8,6 @@ commands:
     description: "Install dependencies"
     steps:
       - checkout
-      - build-tools/merge-with-parent
       - run: sudo apt-get update
       - run: sudo apt-get install python3-pip
       - run: sudo pip3 install invoke semver pyyaml
@@ -24,6 +23,8 @@ jobs:
       - image: cimg/go:1.16
     steps:
       - setup_ci_image
+      - build-tools/merge-with-parent:
+          parent: main
       - run: inv test
       - run: cp manifests/metallb.yaml manifests/metallb.yaml.prev
   e2etest:
@@ -36,6 +37,8 @@ jobs:
       image: ubuntu-2004:202104-01
     steps:
       - setup_ci_image
+      - build-tools/merge-with-parent:
+          parent: main
       - setup_kind
       - run: inv build
       - run: inv dev-env -i  << parameters.ip-family >>
@@ -49,6 +52,8 @@ jobs:
       - image: cimg/go:1.16
     steps:
       - setup_ci_image
+      - build-tools/merge-with-parent:
+          parent: main
       - run: inv checkpatch
       - run: inv lint -e host
       - run: inv verifylicense
@@ -60,7 +65,8 @@ jobs:
       - image: quay.io/helmpack/chart-testing:v3.0.0
     steps:
       - checkout
-      - build-tools/merge-with-parent
+      - build-tools/merge-with-parent:
+          parent: main
       - run: ct lint
   # FIXME: instrumenta/helm-conftest does not yet support helm v3, v2 causes tests to fail.
   #        Switch to it once https://github.com/instrumenta/helm-conftest/pull/8 is merged
@@ -72,7 +78,8 @@ jobs:
       - run: apk add --update --no-cache git curl bash
       - run: helm plugin install --debug https://github.com/instrumenta/helm-conftest
       - checkout
-      - build-tools/merge-with-parent
+      - build-tools/merge-with-parent:
+          parent: main
       - run: helm conftest charts/metallb/ -p charts/metallb/policy/ --fail-on-warn
   publish-images:
     docker:
