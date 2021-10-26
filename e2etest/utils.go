@@ -4,9 +4,11 @@ package e2e
 
 import (
 	"fmt"
+	"net"
 	"os/exec"
 
 	"go.universe.tf/metallb/e2etest/pkg/executor"
+	internalconfig "go.universe.tf/metallb/internal/config"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -61,4 +63,20 @@ func tweakRCPort(rc *v1.ReplicationController) {
 		rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", servicePodPort), fmt.Sprintf("--udp-port=%d", servicePodPort)}
 		rc.Spec.Template.Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Port = intstr.FromInt(int(servicePodPort))
 	}
+}
+
+func validateIPInRange(addressPools []addressPool, ip string) error {
+	input := net.ParseIP(ip)
+	for _, addressPool := range addressPools {
+		for _, address := range addressPool.Addresses {
+			cidrs, err := internalconfig.ParseCIDR(address)
+			framework.ExpectNoError(err)
+			for _, cidr := range cidrs {
+				if cidr.Contains(input) {
+					return nil
+				}
+			}
+		}
+	}
+	return fmt.Errorf("ip %s is not in AddressPool range", ip)
 }
