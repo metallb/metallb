@@ -1,14 +1,11 @@
 # -*- mode: yaml -*-
 
 version: 2.1
-orbs:
-  build-tools: circleci/build-tools@3.0.0
 commands:
   setup_ci_image:
     description: "Install dependencies"
     steps:
       - checkout
-      - build-tools/merge-with-parent
       - run: sudo apt-get update
       - run: sudo apt-get install python3-pip
       - run: sudo pip3 install invoke semver pyyaml
@@ -60,7 +57,6 @@ jobs:
       - image: quay.io/helmpack/chart-testing:v3.0.0
     steps:
       - checkout
-      - build-tools/merge-with-parent
       - run: ct lint
   # FIXME: instrumenta/helm-conftest does not yet support helm v3, v2 causes tests to fail.
   #        Switch to it once https://github.com/instrumenta/helm-conftest/pull/8 is merged
@@ -72,7 +68,6 @@ jobs:
       - run: apk add --update --no-cache git curl bash
       - run: helm plugin install --debug https://github.com/instrumenta/helm-conftest
       - checkout
-      - build-tools/merge-with-parent
       - run: helm conftest charts/metallb/ -p charts/metallb/policy/ --fail-on-warn
   publish-images:
     docker:
