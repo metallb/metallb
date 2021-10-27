@@ -121,7 +121,7 @@ generatorOptions:
 ## Installation with Helm
 
 You can install MetallLB with [Helm](https://helm.sh/)
-by using the Helm chart repository: <https://metallb.github.io/metallb>
+by using the Helm chart repository: `https://metallb.github.io/metallb`
 
 ```bash
 helm repo add metallb https://metallb.github.io/metallb
