@@ -32,7 +32,7 @@ func StartContainer(containerName string, testDirName string, network string) er
 	}
 
 	volume := fmt.Sprintf("%s:%s", testDirName, frrMountPath)
-	out, err := exec.Command("docker", "run", "-d", "--privileged", "--network", network, "--rm", "--name", containerName,
+	out, err := exec.Command(executor.ContainerRuntime, "run", "-d", "--privileged", "--network", network, "--rm", "--name", containerName,
 		"--volume", volume, frrImage).CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "Failed to start %s container. %s", containerName, out)
@@ -41,9 +41,10 @@ func StartContainer(containerName string, testDirName string, network string) er
 	return nil
 }
 
+// todo: improve error handling, especially check that containerIPv4 and containerIPv6 are not empty
 // Returns the IPv4 and IPv6 addresses of the container.
 func GetContainerIPs(containerName string) (ipv4 string, ipv6 string, err error) {
-	containerIP, err := exec.Command("docker", "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
+	containerIP, err := exec.Command(executor.ContainerRuntime, "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
 		containerName).CombinedOutput()
 	if err != nil {
 		return "", "", errors.Wrapf(err, "Failed to get FRR IPv4 address")
@@ -51,7 +52,7 @@ func GetContainerIPs(containerName string) (ipv4 string, ipv6 string, err error)
 
 	containerIPv4 := strings.TrimSuffix(string(containerIP), "\n")
 
-	containerIP, err = exec.Command("docker", "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.GlobalIPv6Address}}{{end}}",
+	containerIP, err = exec.Command(executor.ContainerRuntime, "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.GlobalIPv6Address}}{{end}}",
 		containerName).CombinedOutput()
 	if err != nil {
 		return "", "", errors.Wrapf(err, "Failed to get FRR IPv6 address")
@@ -84,7 +85,7 @@ func UpdateBGPConfigFile(testDirName string, bgpConfig string, exec executor.Exe
 // Delete the BGP router container configuration.
 func StopContainer(containerName string, testDirName string) error {
 	// Kill the BGP router container.
-	out, err := exec.Command("docker", "kill", containerName).CombinedOutput()
+	out, err := exec.Command(executor.ContainerRuntime, "kill", containerName).CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "Failed to kill %s container. %s", containerName, out)
 	}
@@ -115,7 +116,7 @@ func UpdateContainerVolumePermissions(containerName string) error {
 	}
 
 	cmd := fmt.Sprintf("chown -R %d:%d %s", uid, gid, frrMountPath)
-	out, err := exec.Command("docker", "exec", containerName, "sh", "-c", cmd).CombinedOutput()
+	out, err := exec.Command(executor.ContainerRuntime, "exec", containerName, "sh", "-c", cmd).CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "Failed to change %s container volume permissions. %s", containerName, string(out))
 	}
