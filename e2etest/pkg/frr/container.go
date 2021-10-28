@@ -24,7 +24,7 @@ const (
 )
 
 // Run a BGP router in a container.
-func StartContainer(containerName string, testDirName string) error {
+func StartContainer(containerName string, testDirName string, network string) error {
 	srcFiles := fmt.Sprintf("%s/.", frrConfigDir)
 	res, err := exec.Command("cp", "-r", srcFiles, testDirName).CombinedOutput()
 	if err != nil {
@@ -32,7 +32,7 @@ func StartContainer(containerName string, testDirName string) error {
 	}
 
 	volume := fmt.Sprintf("%s:%s", testDirName, frrMountPath)
-	out, err := exec.Command("docker", "run", "-d", "--privileged", "--network", "kind", "--rm", "--name", containerName,
+	out, err := exec.Command("docker", "run", "-d", "--privileged", "--network", network, "--rm", "--name", containerName,
 		"--volume", volume, frrImage).CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "Failed to start %s container. %s", containerName, out)
