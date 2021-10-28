@@ -2,7 +2,7 @@
 # https://docs.github.com/en/github/creating-cloning-and-archiving-repositories/about-code-owners
 
 # The MetalLB maintainers team
-*   @daxmc99 @fedepaol @johananl @rata @russellb
+*   @fedepaol @johananl @rata @russellb
 
 # Emeritus Maintainers
 #
@@ -10,3 +10,4 @@
 # not currently focused on the project.
 #
 # - danderson  # Creator of MetalLB
+# - daxmc99
