@@ -19,6 +19,9 @@ router bgp 64000
  neighbor NODE0_IP remote-as 64512
  neighbor NODE1_IP remote-as 64512
  neighbor NODE2_IP remote-as 64512
+ neighbor NODE0_IP password test123
+ neighbor NODE1_IP password test123
+ neighbor NODE2_IP password test123
  address-family PROTOCOL unicast
   neighbor NODE0_IP activate
   neighbor NODE1_IP activate

@@ -33,6 +33,9 @@ router bgp {{.MyASN}}
   {{ if .HoldTime }}
   neighbor {{.Addr}} timers 30 {{.HoldTime}}
   {{end}}
+  {{ if .Password }}
+  neighbor {{.Addr}} password {{.Password}}
+  {{end}}
 {{- end }}
 {{range $n := .Neighbors -}}
 {{range .Advertisements }}
@@ -62,6 +65,7 @@ type neighborConfig struct {
 	Addr           string
 	Port           uint16
 	HoldTime       uint64
+	Password       string
 	Advertisements map[string]*advertisementConfig
 }
 

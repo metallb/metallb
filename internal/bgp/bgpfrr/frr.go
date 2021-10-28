@@ -183,6 +183,7 @@ func (s *frrState) createConfig() (*frrConfig, error) {
 				Addr:           host,
 				Port:           uint16(portUint),
 				HoldTime:       uint64(session.holdTime/time.Second),
+				Password:       session.password,
 				Advertisements: make(map[string]*advertisementConfig),
 			}
 			router.Neighbors[neighborName] = neighbor
