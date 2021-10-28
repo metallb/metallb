@@ -145,7 +145,7 @@ func (s *frrState) createConfig() (*frrConfig, error) {
 
 	config := &frrConfig{
 		Hostname: hostname,
-		Loglevel: "", // TODO.
+		Loglevel: "informational", // TODO.
 		Routers:  make(map[string]*routerConfig),
 	}
 
@@ -182,6 +182,7 @@ func (s *frrState) createConfig() (*frrConfig, error) {
 				ASN:            session.asn,
 				Addr:           host,
 				Port:           uint16(portUint),
+				HoldTime:       uint64(session.holdTime/time.Second),
 				Advertisements: make(map[string]*advertisementConfig),
 			}
 			router.Neighbors[neighborName] = neighbor

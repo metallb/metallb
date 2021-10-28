@@ -13,8 +13,7 @@ password zebra
 ! assigned to the kind cluster Nodes if they are different.
 ! PROTOCOL will be substituted with either ipv4 or ipv6.
 !
-ipv6 forwarding
-router bgp 64512
+router bgp 64000
  no bgp default ipv4-unicast
  no bgp network import-check
  neighbor NODE0_IP remote-as 64512
@@ -43,6 +42,7 @@ router bgp 64512
 ! match ip address all
 ! set ip next-hop 10.0.0.1
 !
-!log file /var/log/bgpd.log
+log file /etc/frr/frr.log informational
+log timestamp precision 3
 !
-log stdout debugging
+!log stdout debugging

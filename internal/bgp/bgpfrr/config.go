@@ -14,7 +14,8 @@ var configFileName = "/etc/frr_reloader/frr.conf"
 var reloaderPidFileName = "/etc/frr_reloader/reloader.pid"
 
 const configTemplate = `
-log stdout {{.Loglevel}}
+log file /etc/frr/frr.log {{.Loglevel}}
+log timestamp precision 3
 hostname {{.Hostname}}
 
 {{range .Routers -}}
@@ -26,7 +27,12 @@ router bgp {{.MyASN}}
 {{- end }}
 {{range .Neighbors }}
   neighbor {{.Addr}} remote-as {{.ASN}}
+  {{ if .Port }}
   neighbor {{.Addr}} port {{.Port}}
+  {{end}}
+  {{ if .HoldTime }}
+  neighbor {{.Addr}} timers 30 {{.HoldTime}}
+  {{end}}
 {{- end }}
 {{range $n := .Neighbors -}}
 {{range .Advertisements }}
@@ -55,6 +61,7 @@ type neighborConfig struct {
 	ASN            uint32
 	Addr           string
 	Port           uint16
+	HoldTime       uint64
 	Advertisements map[string]*advertisementConfig
 }
 
