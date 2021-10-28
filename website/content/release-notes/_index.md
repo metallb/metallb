@@ -3,23 +3,38 @@ title: Release Notes
 weight: 8
 ---
 
-## Version 0.11.0 (Currently Under Development)
+## Version 0.11.0
 
 New Features:
-
-- (helm chart) Add support for specifying additional labels for `PodMonitor`
-  and `PrometheusRule` resources. This is needed when using the Prometheus
-  operator and have it configured to use `PodMonitors` and `PrometheusRules`
-  that are using a specific label.
 
 - Leveled logging is now supported. You can set `--log-level` flag to one of 
   `all`, `debug`, `info`, `warn`, `error` or `none` to filter produced logs by level.
   The default value is set to `info` on both helm charts and k8s manifests.
+  ([PR #895](https://github.com/metallb/metallb/pull/895))
 
 - MetalLB previously required the speaker to run on the same node as a pod backing a 
   LoadBalancer, even when the ExternalTrafficPolicy was set to cluster. You may now
   run the MetalLB speaker on a subset of nodes, and the LoadBalancer will work for
   the cluster policy, regardless of where the endpoints are located.
+  ([PR #976](https://github.com/metallb/metallb/pull/976))
+
+- It is now possible to configure the source address used for BGP sessions.
+  ([PR #902](https://github.com/metallb/metallb/pull/902))
+
+- A new config flag has been added to allow disabling the use of Kubernetes
+  EndpointSlices.
+  ([PR #937](https://github.com/metallb/metallb/pull/937))
+
+- A new manifest, `prometheus-operator.yaml` is now included with MetalLB to
+  help set up the resources necessary to allow Prometheus to gather metrics
+  from the MetalLB services.
+  ([PR #960](https://github.com/metallb/metallb/pull/960))
+
+- (helm chart) Add support for specifying additional labels for `PodMonitor`
+  and `PrometheusRule` resources. This is needed when using the Prometheus
+  operator and have it configured to use `PodMonitors` and `PrometheusRules`
+  that are using a specific label.
+  ([PR #886](https://github.com/metallb/metallb/pull/886))
 
 Changes in behavior:
 
@@ -30,10 +45,13 @@ Changes in behavior:
   editing the k8s manifests and setting the argument `--log-level=all` for both the controller and 
   speaker when installing using manifests, or by overriding helm values `controller.logLevel=all` 
   and `speaker.logLevel=all` when installing with Helm.
+  ([PR #895](https://github.com/metallb/metallb/pull/886))
+
 - The L2 node allocation logic is now using the LoadBalancer IP and not the service name. This
   means that the node associated to a given service may change across releases. This
   would affect established connections as a new GARP will sent out to announce the IP belonging
   to the new node.
+  ([PR #976](https://github.com/metallb/metallb/pull/976))
 
 Bug Fixes:
 
@@ -41,6 +59,15 @@ Bug Fixes:
   in case of ExternalTrafficPolicy = Cluster. The association of the node to the 
   service is done via the LoadBalancerIP, avoiding scenarios where two services
   sharing the same IP are announced from different nodes.
+  ([Issue #968](https://github.com/metallb/metallb/issues/968))
+  ([Issue #558](https://github.com/metallb/metallb/issues/558))
+  ([Issue #315](https://github.com/metallb/metallb/issues/315))
+
+- Multi-arch images have been fixed to ensure the included busybox is based on
+  the target platform architecture instead of the build platform architecture.
+  Previously this made debugging these running containers more difficult as the
+  included tools were not usable.
+  ([Issue #618](https://github.com/metallb/metallb/issues/618))
 
 ## Version 0.10.3
 
