@@ -59,8 +59,8 @@ kubectl apply -f - -n kube-system
 To install MetalLB, apply the manifest:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifests/namespace.yaml
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifests/metallb.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.11.0/manifests/namespace.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.11.0/manifests/metallb.yaml
 ```
 
 This will deploy MetalLB to your cluster, under the `metallb-system`
@@ -91,7 +91,7 @@ at the remote kustomization file :
 namespace: metallb-system
 
 resources:
-  - github.com/metallb/metallb//manifests?ref=v0.9.3
+  - github.com/metallb/metallb//manifests?ref=v0.11.0
   - configmap.yml 
 ```
 
@@ -107,7 +107,7 @@ the config map, as MetalLB is waiting for a config map named `config`
 namespace: metallb-system
 
 resources:
-  - github.com/metallb/metallb//manifests?ref=v0.9.3
+  - github.com/metallb/metallb//manifests?ref=v0.11.0
 
 configMapGenerator:
 - name: config
