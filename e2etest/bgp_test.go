@@ -267,20 +267,42 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 
 			ginkgo.By("checking the metrics when no service is added")
-			controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod)
-			framework.ExpectNoError(err)
-			validateGaugeValue(0, "metallb_allocator_addresses_in_use_total", map[string]string{"pool": poolName}, controllerMetrics)
-			validateGaugeValue(272, "metallb_allocator_addresses_total", map[string]string{"pool": poolName}, controllerMetrics)
+			Eventually(func() error {
+				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod)
+				if err != nil {
+					return err
+				}
+				err = validateGaugeValue(0, "metallb_allocator_addresses_in_use_total", map[string]string{"pool": poolName}, controllerMetrics)
+				if err != nil {
+					return err
+				}
+				err = validateGaugeValue(272, "metallb_allocator_addresses_total", map[string]string{"pool": poolName}, controllerMetrics)
+				if err != nil {
+					return err
+				}
+				return nil
+			}, 2*time.Minute, 1*time.Second).Should(BeNil())
 
 			for _, speaker := range speakerPods {
 				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
 
-				speakerMetrics, err := metrics.ForPod(controllerPod, speaker)
-				framework.ExpectNoError(err)
-				for _, addr := range peerAddrs {
-					validateGaugeValue(1, "metallb_bgp_session_up", map[string]string{"peer": addr}, speakerMetrics)
-					validateGaugeValue(0, "metallb_bgp_announced_prefixes_total", map[string]string{"peer": addr}, speakerMetrics)
-				}
+				Eventually(func() error {
+					speakerMetrics, err := metrics.ForPod(controllerPod, speaker)
+					if err != nil {
+						return err
+					}
+					for _, addr := range peerAddrs {
+						err = validateGaugeValue(1, "metallb_bgp_session_up", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+						err = validateGaugeValue(0, "metallb_bgp_announced_prefixes_total", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+					}
+					return nil
+				}, 2*time.Minute, 1*time.Second).Should(BeNil())
 			}
 
 			ginkgo.By("creating a service")
@@ -291,23 +313,49 @@ var _ = ginkgo.Describe("BGP", func() {
 			}()
 
 			ginkgo.By("checking the metrics when a service is added")
-			controllerMetrics, err = metrics.ForPod(controllerPod, controllerPod)
-			framework.ExpectNoError(err)
-			validateGaugeValue(1, "metallb_allocator_addresses_in_use_total", map[string]string{"pool": poolName}, controllerMetrics)
+			Eventually(func() error {
+				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod)
+				if err != nil {
+					return err
+				}
+				err = validateGaugeValue(1, "metallb_allocator_addresses_in_use_total", map[string]string{"pool": poolName}, controllerMetrics)
+				if err != nil {
+					return err
+				}
+				return nil
+			}, 2*time.Minute, 1*time.Second).Should(BeNil())
 
 			for _, speaker := range speakerPods {
 				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
 
-				speakerMetrics, err := metrics.ForPod(controllerPod, speaker)
-				framework.ExpectNoError(err)
-				for _, addr := range peerAddrs {
-					validateGaugeValue(1, "metallb_bgp_session_up", map[string]string{"peer": addr}, speakerMetrics)
-					validateGaugeValue(1, "metallb_bgp_announced_prefixes_total", map[string]string{"peer": addr}, speakerMetrics)
+				Eventually(func() error {
+					speakerMetrics, err := metrics.ForPod(controllerPod, speaker)
+					if err != nil {
+						return err
+					}
+					for _, addr := range peerAddrs {
+						err = validateGaugeValue(1, "metallb_bgp_session_up", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
 
-					validateCounterValue(1, "metallb_bgp_updates_total", map[string]string{"peer": addr}, speakerMetrics)
-				}
+						err = validateGaugeValue(1, "metallb_bgp_announced_prefixes_total", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
 
-				validateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": speaker.Spec.NodeName, "protocol": "bgp", "service": fmt.Sprintf("%s/%s", f.Namespace.Name, svc.Name)}, speakerMetrics)
+						err = validateCounterValue(1, "metallb_bgp_updates_total", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+					}
+
+					err = validateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": speaker.Spec.NodeName, "protocol": "bgp", "service": fmt.Sprintf("%s/%s", f.Namespace.Name, svc.Name)}, speakerMetrics)
+					if err != nil {
+						return err
+					}
+					return nil
+				}, 2*time.Minute, 1*time.Second).Should(BeNil())
 			}
 		})
 	})
@@ -412,25 +460,27 @@ func createServiceWithBackend(cs clientset.Interface, namespace string, policy c
 	return svc, jig
 }
 
-func validateGaugeValue(expectedValue int, metricName string, labels map[string]string, allMetrics []map[string]*dto.MetricFamily) {
-	var err error
-	var value int
+func validateGaugeValue(expectedValue int, metricName string, labels map[string]string, allMetrics []map[string]*dto.MetricFamily) error {
 	found := false
 	for _, m := range allMetrics {
-		value, err = metrics.GaugeForLabels(metricName, labels, m)
+		value, err := metrics.GaugeForLabels(metricName, labels, m)
 		if err != nil {
 			continue
 		}
+		if value != expectedValue {
+			return fmt.Errorf("invalid value %d for %s, expecting %d", value, metricName, expectedValue)
+		}
 		found = true
-		framework.ExpectEqual(value, expectedValue, "invalid value for ", metricName, labels)
 	}
 
 	if !found {
-		framework.Fail(err.Error())
+		return fmt.Errorf("metric %s not found", metricName)
 	}
+	return nil
+
 }
 
-func validateCounterValue(expectedValue int, metricName string, labels map[string]string, allMetrics []map[string]*dto.MetricFamily) {
+func validateCounterValue(expectedMax int, metricName string, labels map[string]string, allMetrics []map[string]*dto.MetricFamily) error {
 	var err error
 	var value int
 	found := false
@@ -440,12 +490,15 @@ func validateCounterValue(expectedValue int, metricName string, labels map[strin
 			continue
 		}
 		found = true
-		framework.ExpectEqual(value >= expectedValue, true, "expecting ", value, "greater than", expectedValue)
+		if value < expectedMax {
+			return fmt.Errorf("invalid value %d for %s, expecting more than %d", value, metricName, expectedMax)
+		}
 	}
 
 	if !found {
-		framework.Fail(err.Error())
+		return fmt.Errorf("metric %s not found", metricName)
 	}
+	return nil
 }
 
 func pairExternalFRRWithNodes(cs clientset.Interface, c *frrcontainer.FRR) {
