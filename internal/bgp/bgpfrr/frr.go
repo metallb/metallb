@@ -64,7 +64,7 @@ func validate(adv *bgp.Advertisement) error {
 }
 
 func (s *Session) Set(advs ...*bgp.Advertisement) error {
-	sessionName := sessionName(s.srcAddr.String(), s.myASN, s.addr, s.asn)
+	sessionName := sessionName(s.routerID.String(), s.myASN, s.addr, s.asn)
 	if _, found := state.sessions[sessionName]; !found {
 		return fmt.Errorf("session not established before advertisement")
 	}

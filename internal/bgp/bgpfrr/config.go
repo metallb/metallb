@@ -19,7 +19,7 @@ log timestamp precision 3
 hostname {{.Hostname}}
 
 {{range .Routers -}}
-router bgp {{.MyASN}}
+router bgp {{.MyASN}} view {{.MyASN}}
   no bgp network import-check
   no bgp default ipv4-unicast
 {{ if .RouterId }}
