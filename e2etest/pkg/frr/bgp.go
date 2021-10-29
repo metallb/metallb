@@ -63,3 +63,15 @@ func Routes(exec executor.Executor) (map[string]Route, map[string]Route, error) 
 	}
 	return v4Routes, v6Routes, nil
 }
+
+// RawDump dumps all the low leven info as a single string.
+// To be used for debugging in order to print the status of the frr instance.
+func RawDump(exec executor.Executor) (string, error) {
+	res, err := exec.Exec("vtysh", "-c", "show bgp neighbor")
+
+	if err != nil {
+		return "", errors.Wrapf(err, "Failed exec show bgp neighbor %s", res)
+	}
+	// TODO: concatenate extra info (i.e. BFD) when needed
+	return res, nil
+}

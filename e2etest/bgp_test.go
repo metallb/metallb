@@ -100,16 +100,24 @@ var _ = ginkgo.Describe("BGP", func() {
 	})
 
 	ginkgo.AfterEach(func() {
+		if ginkgo.CurrentGinkgoTestDescription().Failed {
+			exc := executor.ForContainer(frrContainer)
+			if skipDockerCmd {
+				exc = executor.Host
+			}
+			dump, err := frr.RawDump(exc)
+			framework.Logf("External frr dump %s %v", dump, err)
+			DescribeSvc(f.Namespace.Name)
+		}
+	})
+
+	ginkgo.AfterEach(func() {
 		// Clean previous configuration.
 		err := updateConfigMap(cs, configFile{})
 		framework.ExpectNoError(err)
 
 		err = stopFRRContainers(frrContainers)
 		framework.ExpectNoError(err)
-
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
-			DescribeSvc(f.Namespace.Name)
-		}
 	})
 
 	ginkgo.Context("type=Loadbalancer", func() {

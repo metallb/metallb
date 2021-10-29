@@ -8,11 +8,14 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
+	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/frr/config"
 	"go.universe.tf/metallb/e2etest/pkg/frr/consts"
+	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -150,6 +153,11 @@ func (c *FRR) Stop() error {
 	if err != nil {
 		return errors.Wrapf(err, "Failed to kill %s container. %s", c.Name, out)
 	}
+	Eventually(func() string {
+		out, err := exec.Command("docker", "ps", "-q", "-f", fmt.Sprintf("name=%s", containerName)).CombinedOutput()
+		framework.ExpectNoError(err)
+		return string(out)
+	}, 5*time.Second, 1*time.Second).Should(Equal(""), "container did not stop")
 
 	err = os.RemoveAll(c.configDir)
 	if err != nil {
