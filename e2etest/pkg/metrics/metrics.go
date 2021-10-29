@@ -18,7 +18,7 @@ import (
 )
 
 // MetricsForPod returns the parsed metrics for the given pod, scraping them
-// from the executor pod.
+// from the source pod.
 func ForPod(source, target *corev1.Pod, namespace string) ([]map[string]*dto.MetricFamily, error) {
 	ports := make([]int, 0)
 	allMetrics := make([]map[string]*dto.MetricFamily, 0)
@@ -30,9 +30,9 @@ func ForPod(source, target *corev1.Pod, namespace string) ([]map[string]*dto.Met
 		}
 	}
 
+	podExecutor := executor.ForPod(namespace, source.Name, source.Spec.Containers[0].Name)
 	for _, p := range ports {
 		metricsUrl := path.Join(net.JoinHostPort(target.Status.PodIP, strconv.Itoa(p)), "metrics")
-		podExecutor := executor.ForPod(namespace, source.Name, source.Spec.Containers[0].Name)
 		metrics, err := podExecutor.Exec("wget", "-qO-", metricsUrl)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to scrape metrics for %s", target.Name)
