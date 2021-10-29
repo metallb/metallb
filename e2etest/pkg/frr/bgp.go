@@ -75,3 +75,39 @@ func NeighborConnected(neighborJson string) (bool, error) {
 	}
 	return n.Connected, nil
 }
+
+// RawDump dumps all the low level info as a single string.
+// To be used for debugging in order to print the status of the frr instance.
+func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
+	res := "####### Show running config\n"
+	out, err := exec.Exec("vtysh", "-c", "show running-config")
+	if err != nil {
+		return "", errors.Wrapf(err, "Failed exec show bgp neighbor %s", res)
+	}
+	res = res + out
+
+	for _, file := range filesToDump {
+		res = res + fmt.Sprintf("####### Dumping file %s\n", file)
+		out, err = exec.Exec("cat", file)
+		if err != nil {
+			return "", errors.Wrapf(err, "Failed to cat %s file %s", file, res)
+		}
+		res = res + out
+	}
+
+	res = res + "####### BGP Neighbors\n"
+	out, err = exec.Exec("vtysh", "-c", "show bgp neighbor")
+	if err != nil {
+		return "", errors.Wrapf(err, "Failed exec show bgp neighbor %s", res)
+	}
+	res = res + out
+
+	res = res + "####### BFD Peers\n"
+	out, err = exec.Exec("vtysh", "-c", "show bfd peer")
+	if err != nil {
+		return "", errors.Wrapf(err, "Failed exec show bfd peer %s", res)
+	}
+	res = res + out
+
+	return res, nil
+}
