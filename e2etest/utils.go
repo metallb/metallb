@@ -7,6 +7,7 @@ import (
 	"net"
 	"os/exec"
 
+	"github.com/pkg/errors"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	internalconfig "go.universe.tf/metallb/internal/config"
 	v1 "k8s.io/api/core/v1"
@@ -31,10 +32,11 @@ func wgetRetry(address string, exc executor.Executor) error {
 	retrycnt := 0
 	code := 0
 	var err error
+	var reason string
 
 	// Retry loop to handle wget NetworkFailure errors
 	for {
-		_, err = exc.Exec("wget", "-O-", "-q", address, "-T", "60")
+		reason, err = exc.Exec("wget", "-O-", "-q", address, "-T", "60")
 		if exitErr, ok := err.(*exec.ExitError); err != nil && ok {
 			code = exitErr.ExitCode()
 		} else {
@@ -47,7 +49,10 @@ func wgetRetry(address string, exc executor.Executor) error {
 			break
 		}
 	}
-	return err
+	if err != nil {
+		return errors.Wrapf(err, "wget failed for %s", reason)
+	}
+	return nil
 }
 
 func tweakServicePort(svc *v1.Service) {
