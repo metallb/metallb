@@ -69,6 +69,13 @@ Bug Fixes:
   included tools were not usable.
   ([Issue #618](https://github.com/metallb/metallb/issues/618))
 
+This release includes contributions from bootjp / Yoshiaki Ueda, Brandon B.
+Jozsa, Carlos Goncalves, Christoph Raab, claudex, David Anderson, Dax McDonald,
+Etienne Champetier, Federico Paolinelli, Graeme Lawes, jlclx, Johannes
+Liebermann, Mark Gray, Maxim Makarov, Mike McKiernan, Mohamed Mahmoud, Ori
+Braunshtein, Rodrigo Campos, Russell Bryant, Sabina Aledort, t0b3, Till Adam,
+Tomofumi Hayashi, Trey Dockendorf, Utku Ozdemir, and Yves Mettier. Thank you!
+
 ## Version 0.10.3
 
 Bug Fixes:
