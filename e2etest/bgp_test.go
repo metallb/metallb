@@ -68,8 +68,8 @@ type containerConfig struct {
 }
 
 var _ = ginkgo.Describe("BGP", func() {
-	f := framework.NewDefaultFramework("bgp")
 	var cs clientset.Interface
+	var f *framework.Framework
 	containersConf := []containerConfig{
 		{
 			name: frrIBGP,
@@ -96,6 +96,36 @@ var _ = ginkgo.Describe("BGP", func() {
 			},
 		},
 	}
+
+	ginkgo.AfterEach(func() {
+		if ginkgo.CurrentGinkgoTestDescription().Failed {
+			for _, c := range frrContainers {
+				dump, err := frr.RawDump(c, "/etc/frr/bgpd.conf", "/tmp/frr.log")
+				framework.Logf("External frr dump for %s:\n%s %v", c.Name, dump, err)
+			}
+
+			speakerPods := getSpeakerPods(cs)
+			for _, pod := range speakerPods {
+				podExec := executor.ForPod(pod.Namespace, pod.Name, "frr")
+				dump, err := frr.RawDump(podExec, "/etc/frr/frr.conf", "/etc/frr/frr.log")
+				framework.Logf("External frr dump for pod %s\n%s %v", pod.Name, dump, err)
+			}
+			DescribeSvc(f.Namespace.Name)
+		}
+	})
+
+	ginkgo.AfterEach(func() {
+		ginkgo.By("Clearing the previous configuration")
+		// Clean previous configuration.
+		err := updateConfigMap(cs, configFile{})
+		framework.ExpectNoError(err)
+
+		err = stopFRRContainers(frrContainers)
+		framework.ExpectNoError(err)
+	})
+
+	f = framework.NewDefaultFramework("bgp")
+
 	ginkgo.BeforeEach(func() {
 		var err error
 		if containersNetwork == "host" {
@@ -109,20 +139,6 @@ var _ = ginkgo.Describe("BGP", func() {
 		cs = f.ClientSet
 		frrContainers, err = createFRRContainers(containersConf)
 		framework.ExpectNoError(err)
-
-	})
-
-	ginkgo.AfterEach(func() {
-		// Clean previous configuration.
-		err := updateConfigMap(cs, configFile{})
-		framework.ExpectNoError(err)
-
-		err = stopFRRContainers(frrContainers)
-		framework.ExpectNoError(err)
-
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
-			DescribeSvc(f.Namespace.Name)
-		}
 	})
 
 	table.DescribeTable("A service of protocol load balancer should work with", func(ipFamily, setProtocoltest, poolAddress string) {
@@ -210,16 +226,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(pods.Items), 1, "More than one controller found")
 			controllerPod = &pods.Items[0]
-
-			speakers, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: "component=speaker",
-			})
-			framework.ExpectNoError(err)
-			speakerPods = make([]*corev1.Pod, 0)
-			for _, item := range speakers.Items {
-				i := item
-				speakerPods = append(speakerPods, &i)
-			}
+			speakerPods = getSpeakerPods(cs)
 		})
 
 		table.DescribeTable("should be exposed by the controller", func(ipFamily, poolAddress string, addressTotal int) {
@@ -689,12 +696,13 @@ func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily str
 		LabelSelector: "component=speaker",
 	})
 	framework.ExpectNoError(err)
+	podExecutor := executor.ForPod(testNameSpace, pods.Items[0].Name, "frr")
+
 	Eventually(func() error {
 		address := n.Ipv4
 		if ipFamily == "ipv6" {
 			address = n.Ipv6
 		}
-		podExecutor := executor.ForPod(testNameSpace, pods.Items[0].Name, "frr")
 		toParse, err := podExecutor.Exec("vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", address))
 		if err != nil {
 			return err
@@ -786,6 +794,19 @@ func checkBFDConfigPropagated(nodeConfig bfdProfile, peerConfig bgpfrr.BFDPeer) 
 		return fmt.Errorf("EchoInterval: expecting %d, got %d", *nodeConfig.EchoInterval, peerConfig.RemoteEchoInterval)
 	}
 	return nil
+}
+
+func getSpeakerPods(cs clientset.Interface) []*corev1.Pod {
+	speakers, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: "component=speaker",
+	})
+	framework.ExpectNoError(err)
+	speakerPods := make([]*corev1.Pod, 0)
+	for _, item := range speakers.Items {
+		i := item
+		speakerPods = append(speakerPods, &i)
+	}
+	return speakerPods
 }
 
 func uint32Ptr(n uint32) *uint32 {
