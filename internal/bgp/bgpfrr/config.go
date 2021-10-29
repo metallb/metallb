@@ -22,7 +22,7 @@ hostname {{.Hostname}}
 router bgp {{.MyASN}} view {{.MyASN}}
   no bgp network import-check
   no bgp default ipv4-unicast
-{{ if .RouterId }}
+{{ if ne .RouterId "" }}
   bgp router-id {{.RouterId}}
 {{- end }}
 {{range .Neighbors }}
@@ -35,6 +35,9 @@ router bgp {{.MyASN}} view {{.MyASN}}
   {{end}}
   {{ if .Password }}
   neighbor {{.Addr}} password {{.Password}}
+  {{end}}
+  {{ if ne .SrcAddr "" }}
+  neighbor {{.Addr}} update-source {{.SrcAddr}}
   {{end}}
 {{- end }}
 {{range $n := .Neighbors -}}
@@ -63,6 +66,7 @@ type routerConfig struct {
 type neighborConfig struct {
 	ASN            uint32
 	Addr           string
+	SrcAddr        string
 	Port           uint16
 	HoldTime       uint64
 	Password       string

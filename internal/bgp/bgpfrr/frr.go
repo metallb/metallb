@@ -186,6 +186,9 @@ func (s *frrState) createConfig() (*frrConfig, error) {
 				Password:       session.password,
 				Advertisements: make(map[string]*advertisementConfig),
 			}
+			if session.srcAddr != nil {
+				neighbor.SrcAddr = session.srcAddr.String()
+			}
 			router.Neighbors[neighborName] = neighbor
 		}
 
