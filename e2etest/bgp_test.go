@@ -127,7 +127,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			configData := configFile{
 				Pools: []addressPool{
 					{
-						Name:     "bgp-test",
+						Name:     "generic-pool",
 						Protocol: BGP,
 						Addresses: []string{
 							"192.168.10.0/24",
@@ -153,7 +153,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		})
 
 		ginkgo.It("should work for ExternalTrafficPolicy=Cluster", func() {
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster)
+			svc, _ := createServiceWithBackend(cs, "clusterpolicy", f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster)
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
@@ -166,7 +166,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		})
 
 		ginkgo.It("should work for ExternalTrafficPolicy=Local", func() {
-			svc, jig := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeLocal)
+			svc, jig := createServiceWithBackend(cs, "externalpolicy", f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeLocal)
 			err := jig.Scale(2)
 			framework.ExpectNoError(err)
 
@@ -215,7 +215,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		ginkgo.It("should be exposed by the controller", func() {
 			// TODO: The peer address will require update to add support for bgp + IPv6
-			poolName := "bgp-test"
+			poolName := "metrics-pool"
 
 			var peers []peer
 			var peerAddrs []string
@@ -271,7 +271,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 
 			ginkgo.By("creating a service")
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster) // Is a sleep required here?
+			svc, _ := createServiceWithBackend(cs, "metricsservice", f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster) // Is a sleep required here?
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
@@ -331,7 +331,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				validateFRRPeeredWithNodes(cs, c)
 			}
 
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster)
+			svc, _ := createServiceWithBackend(cs, "range", f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster)
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
@@ -354,7 +354,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		},
 			table.Entry("AddressPool defined by network prefix", []addressPool{
 				{
-					Name:     "bgp-test",
+					Name:     "network-prefix",
 					Protocol: BGP,
 					Addresses: []string{
 						"192.168.10.0/24",
@@ -364,7 +364,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			}),
 			table.Entry("AddressPool defined by address range", []addressPool{
 				{
-					Name:     "bgp-test",
+					Name:     "range-pool",
 					Protocol: BGP,
 					Addresses: []string{
 						"192.168.10.0-192.168.10.18",
@@ -376,12 +376,11 @@ var _ = ginkgo.Describe("BGP", func() {
 	})
 })
 
-func createServiceWithBackend(cs clientset.Interface, namespace string, policy corev1.ServiceExternalTrafficPolicyType) (*corev1.Service, *e2eservice.TestJig) {
+func createServiceWithBackend(cs clientset.Interface, name, namespace string, policy corev1.ServiceExternalTrafficPolicyType) (*corev1.Service, *e2eservice.TestJig) {
 	var svc *corev1.Service
 	var err error
 
-	serviceName := "external-local-lb"
-	jig := e2eservice.NewTestJig(cs, namespace, serviceName)
+	jig := e2eservice.NewTestJig(cs, namespace, name)
 	timeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
 	svc, err = jig.CreateLoadBalancerService(timeout, func(svc *corev1.Service) {
 		tweakServicePort(svc)

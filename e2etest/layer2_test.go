@@ -50,7 +50,7 @@ var _ = ginkgo.Describe("L2", func() {
 		configData := configFile{
 			Pools: []addressPool{
 				{
-					Name:     "l2-test",
+					Name:     "l2-pool",
 					Protocol: Layer2,
 					Addresses: []string{
 						ipv4ServiceRange,
@@ -75,7 +75,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 	ginkgo.Context("type=Loadbalancer", func() {
 		ginkgo.It("should work for ExternalTrafficPolicy=Cluster", func() {
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster)
+			svc, _ := createServiceWithBackend(cs, "clusterpolicy", f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster)
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
@@ -95,7 +95,7 @@ var _ = ginkgo.Describe("L2", func() {
 		})
 
 		ginkgo.It("should work for ExternalTrafficPolicy=Local", func() {
-			svc, jig := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeLocal)
+			svc, jig := createServiceWithBackend(cs, "localpolicy", f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeLocal)
 			err := jig.Scale(5)
 			framework.ExpectNoError(err)
 
@@ -149,7 +149,7 @@ var _ = ginkgo.Describe("L2", func() {
 			err := updateConfigMap(cs, configData)
 			framework.ExpectNoError(err)
 
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster)
+			svc, _ := createServiceWithBackend(cs, "ranges", f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster)
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
@@ -174,7 +174,7 @@ var _ = ginkgo.Describe("L2", func() {
 			table.Entry("AddressPool defined by address range", func() []addressPool {
 				return []addressPool{
 					{
-						Name:     "l2-test",
+						Name:     "range",
 						Protocol: Layer2,
 						Addresses: []string{
 							ipv4ServiceRange,
@@ -201,7 +201,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 				return []addressPool{
 					{
-						Name:      "l2-test",
+						Name:      "networkprefix",
 						Protocol:  Layer2,
 						Addresses: append(ipv4AddressesByCIDR, ipv6AddressesByCIDR...),
 					},
