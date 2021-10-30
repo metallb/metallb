@@ -145,6 +145,9 @@ def build(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag=
             "GOARM": "6",
             "GO111MODULE": "on",
         }
+        if "speaker" in binaries:
+            shutil.copy("frr-reloader/frr-reloader.sh","build/{arch}/speaker/".format(arch=arch))
+
         for bin in binaries:
             run("go build -v -o build/{arch}/{bin}/{bin} -ldflags "
                 "'-X go.universe.tf/metallb/internal/version.gitCommit={commit} "
