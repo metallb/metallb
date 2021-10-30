@@ -16,14 +16,14 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"net"
 	"reflect"
 	"sort"
 	"strconv"
-	"time"
 
 	"go.universe.tf/metallb/internal/bgp"
+	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
+	bgpnative "go.universe.tf/metallb/internal/bgp/native"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 	v1 "k8s.io/api/core/v1"
@@ -33,17 +33,26 @@ import (
 	"github.com/go-kit/kit/log/level"
 )
 
+type bgpImplementation string
+
+const (
+	bgpNative bgpImplementation = "native"
+	bgpFrr    bgpImplementation = "frr"
+)
+
 type peer struct {
-	cfg *config.Peer
-	bgp session
+	cfg     *config.Peer
+	session bgp.Session
 }
 
 type bgpController struct {
-	logger     log.Logger
-	myNode     string
-	nodeLabels labels.Set
-	peers      []*peer
-	svcAds     map[string][]*bgp.Advertisement
+	logger         log.Logger
+	myNode         string
+	nodeLabels     labels.Set
+	peers          []*peer
+	svcAds         map[string][]*bgp.Advertisement
+	bgpType        bgpImplementation
+	sessionManager bgp.SessionManager
 }
 
 func (c *bgpController) SetConfig(l log.Logger, cfg *config.Config) error {
@@ -74,8 +83,8 @@ newPeers:
 			continue
 		}
 		level.Info(l).Log("event", "peerRemoved", "peer", p.cfg.Addr, "reason", "removedFromConfig", "msg", "peer deconfigured, closing BGP session")
-		if p.bgp != nil {
-			if err := p.bgp.Close(); err != nil {
+		if p.session != nil {
+			if err := p.session.Close(); err != nil {
 				level.Error(l).Log("op", "setConfig", "error", err, "peer", p.cfg.Addr, "msg", "failed to shut down BGP session")
 			}
 		}
@@ -177,14 +186,14 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 		}
 
 		// Now, compare current state to intended state, and correct.
-		if p.bgp != nil && !shouldRun {
+		if p.session != nil && !shouldRun {
 			// Oops, session is running but shouldn't be. Shut it down.
 			level.Info(l).Log("event", "peerRemoved", "peer", p.cfg.Addr, "reason", "filteredByNodeSelector", "msg", "peer deconfigured, closing BGP session")
-			if err := p.bgp.Close(); err != nil {
+			if err := p.session.Close(); err != nil {
 				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to shut down BGP session")
 			}
-			p.bgp = nil
-		} else if p.bgp == nil && shouldRun {
+			p.session = nil
+		} else if p.session == nil && shouldRun {
 			// Session doesn't exist, but should be running. Create
 			// it.
 			level.Info(l).Log("event", "peerAdded", "peer", p.cfg.Addr, "msg", "peer configured, starting BGP session")
@@ -192,12 +201,12 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 			if p.cfg.RouterID != nil {
 				routerID = p.cfg.RouterID
 			}
-			s, err := newBGP(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.SrcAddr, p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.Password, c.myNode)
+			s, err := c.sessionManager.NewSession(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.SrcAddr, p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.Password, c.myNode)
 			if err != nil {
 				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
 				errs++
 			} else {
-				p.bgp = s
+				p.session = s
 				needUpdateAds = true
 			}
 		}
@@ -254,10 +263,10 @@ func (c *bgpController) updateAds() error {
 		allAds = append(allAds, ads...)
 	}
 	for _, peer := range c.peers {
-		if peer.bgp == nil {
+		if peer.session == nil {
 			continue
 		}
-		if err := peer.bgp.Set(allAds...); err != nil {
+		if err := peer.session.Set(allAds...); err != nil {
 			return err
 		}
 	}
@@ -270,11 +279,6 @@ func (c *bgpController) DeleteBalancer(l log.Logger, name, reason string) error 
 	}
 	delete(c.svcAds, name)
 	return c.updateAds()
-}
-
-type session interface {
-	io.Closer
-	Set(advs ...*bgp.Advertisement) error
 }
 
 func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
@@ -292,6 +296,14 @@ func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
 	return c.syncPeers(l)
 }
 
-var newBGP = func(logger log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, hold time.Duration, password string, myNode string) (session, error) {
-	return bgp.New(logger, addr, srcAddr, myASN, routerID, asn, hold, password, myNode)
+// Create a new 'bgp.SessionManager' of type 'bgpType'.
+var newBGP = func(bgpType bgpImplementation) bgp.SessionManager {
+	switch bgpType {
+	case bgpNative:
+		return bgpnative.NewSessionManager()
+	case bgpFrr:
+		return bgpfrr.NewSessionManager()
+	default:
+		panic(fmt.Sprintf("unsupported BGP implementation type: %s", bgpType))
+	}
 }

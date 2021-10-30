@@ -1,0 +1,25 @@
+
+log stdout 
+hostname dummyhostname
+
+router bgp 100
+  no bgp network import-check
+  no bgp default ipv4-unicast
+
+  bgp router-id 10.1.1.254
+
+  neighbor 10.2.2.254 remote-as 200
+  neighbor 10.2.2.254 port 179
+
+
+router bgp 300
+  no bgp network import-check
+  no bgp default ipv4-unicast
+
+  bgp router-id 10.3.3.254
+
+  neighbor 10.4.4.254 remote-as 400
+  neighbor 10.4.4.254 port 179
+
+
+

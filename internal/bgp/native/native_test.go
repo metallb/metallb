@@ -2,7 +2,7 @@
 
 // +build disabled
 
-package bgp
+package native
 
 // This test is disabled when using the race detector, because of
 // https://github.com/osrg/gobgp/issues/1530.
