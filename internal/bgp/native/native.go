@@ -26,8 +26,8 @@ import (
 
 var errClosed = errors.New("session closed")
 
-// Session represents one BGP session to an external router.
-type Session struct {
+// session represents one BGP session to an external router.
+type session struct {
 	myASN            uint32
 	routerID         net.IP // May be nil, meaning "derive from context"
 	myNode           string
@@ -52,8 +52,44 @@ type Session struct {
 	new            map[string]*bgp.Advertisement
 }
 
+// The 'Native' implementation does not require a session manager .
+type sessionManager struct {
+}
+
+func NewSessionManager() *sessionManager {
+	return &sessionManager{}
+}
+
+// NewSession() creates a BGP session using the given session parameters.
+//
+// The session will immediately try to connect and synchronize its
+// local state with the peer.
+func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime time.Duration, password string, myNode string) (bgp.Session, error) {
+	ret := &session{
+		addr:        addr,
+		srcAddr:     srcAddr,
+		myASN:       myASN,
+		routerID:    routerID.To4(),
+		myNode:      myNode,
+		asn:         asn,
+		holdTime:    holdTime,
+		logger:      log.With(l, "peer", addr, "localASN", myASN, "peerASN", asn),
+		newHoldTime: make(chan bool, 1),
+		advertised:  map[string]*bgp.Advertisement{},
+		password:    password,
+	}
+	ret.cond = sync.NewCond(&ret.mu)
+	go ret.sendKeepalives()
+	go ret.run()
+
+	stats.sessionUp.WithLabelValues(ret.addr).Set(0)
+	stats.prefixes.WithLabelValues(ret.addr).Set(0)
+
+	return ret, nil
+}
+
 // run tries to stay connected to the peer, and pumps route updates to it.
-func (s *Session) run() {
+func (s *session) run() {
 	defer stats.DeleteSession(s.addr)
 	for {
 		if err := s.connect(); err != nil {
@@ -80,7 +116,7 @@ func (s *Session) run() {
 
 // sendUpdates waits for changes to desired advertisements, and pushes
 // them out to the peer.
-func (s *Session) sendUpdates() bool {
+func (s *session) sendUpdates() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -163,7 +199,7 @@ func (s *Session) sendUpdates() bool {
 
 // connect establishes the BGP session with the peer.
 // Sets TCP_MD5 sockopt if password is !="".
-func (s *Session) connect() error {
+func (s *session) connect() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -306,7 +342,7 @@ func getRouterID(addr net.IP, myNode string) (net.IP, error) {
 
 // sendKeepalives sends BGP KEEPALIVE packets at the negotiated rate
 // whenever the session is connected.
-func (s *Session) sendKeepalives() {
+func (s *session) sendKeepalives() {
 	var (
 		t  *time.Ticker
 		ch <-chan time.Time
@@ -339,7 +375,7 @@ func (s *Session) sendKeepalives() {
 }
 
 // sendKeepalive sends a single BGP KEEPALIVE packet.
-func (s *Session) sendKeepalive() error {
+func (s *session) sendKeepalive() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.closed {
@@ -357,38 +393,10 @@ func (s *Session) sendKeepalive() error {
 	return nil
 }
 
-// New creates a BGP session using the given session parameters.
-//
-// The session will immediately try to connect and synchronize its
-// local state with the peer.
-func New(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime time.Duration, password string, myNode string) (*Session, error) {
-	ret := &Session{
-		addr:        addr,
-		srcAddr:     srcAddr,
-		myASN:       myASN,
-		routerID:    routerID.To4(),
-		myNode:      myNode,
-		asn:         asn,
-		holdTime:    holdTime,
-		logger:      log.With(l, "peer", addr, "localASN", myASN, "peerASN", asn),
-		newHoldTime: make(chan bool, 1),
-		advertised:  map[string]*bgp.Advertisement{},
-		password:    password,
-	}
-	ret.cond = sync.NewCond(&ret.mu)
-	go ret.sendKeepalives()
-	go ret.run()
-
-	stats.sessionUp.WithLabelValues(ret.addr).Set(0)
-	stats.prefixes.WithLabelValues(ret.addr).Set(0)
-
-	return ret, nil
-}
-
 // consumeBGP receives BGP messages from the peer, and ignores
 // them. It does minimal checks for the well-formedness of messages,
 // and terminates the connection if something looks wrong.
-func (s *Session) consumeBGP(conn io.ReadCloser) {
+func (s *session) consumeBGP(conn io.ReadCloser) {
 	defer func() {
 		s.mu.Lock()
 		defer s.mu.Unlock()
@@ -444,7 +452,7 @@ func validate(adv *bgp.Advertisement) error {
 //
 // Changes are propagated to the peer asynchronously, Set may return
 // before the peer learns about the changes.
-func (s *Session) Set(advs ...*bgp.Advertisement) error {
+func (s *session) Set(advs ...*bgp.Advertisement) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -465,7 +473,7 @@ func (s *Session) Set(advs ...*bgp.Advertisement) error {
 
 // abort closes any existing connection, updates stats, and cleans up
 // state ready for another connection attempt.
-func (s *Session) abort() {
+func (s *session) abort() {
 	if s.conn != nil {
 		s.conn.Close()
 		s.conn = nil
@@ -481,7 +489,7 @@ func (s *Session) abort() {
 }
 
 // Close shuts down the BGP session.
-func (s *Session) Close() error {
+func (s *session) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.closed = true

@@ -190,10 +190,11 @@ type controllerConfig struct {
 func newController(cfg controllerConfig) (*controller, error) {
 	protocols := map[config.Proto]Protocol{
 		config.BGP: &bgpController{
-			logger:  cfg.Logger,
-			myNode:  cfg.MyNode,
-			svcAds:  make(map[string][]*bgp.Advertisement),
-			bgpType: cfg.bgpType,
+			logger:         cfg.Logger,
+			myNode:         cfg.MyNode,
+			svcAds:         make(map[string][]*bgp.Advertisement),
+			bgpType:        cfg.bgpType,
+			sessionManager: newBGP(cfg.bgpType),
 		},
 	}
 

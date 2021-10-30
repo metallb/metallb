@@ -15,29 +15,22 @@ import (
 
 // As the MetalLB controller should handle messages synchronously, there should
 // no need to lock this data structure. TODO: confirm this.
-type frrState struct {
-	sessions map[string]*Session
+type sessionManager struct {
+	sessions map[string]*session
 }
 
-var state *frrState
-
-func init() {
-	state = &frrState{
-		sessions: map[string]*Session{},
-	}
-}
-
-type Session struct {
-	myASN      uint32
-	routerID   net.IP // May be nil, meaning "derive from context"
-	myNode     string
-	addr       string
-	srcAddr    net.IP
-	asn        uint32
-	holdTime   time.Duration
-	logger     log.Logger
-	password   string
-	advertised []*bgp.Advertisement
+type session struct {
+	myASN          uint32
+	routerID       net.IP // May be nil, meaning "derive from context"
+	myNode         string
+	addr           string
+	srcAddr        net.IP
+	asn            uint32
+	holdTime       time.Duration
+	logger         log.Logger
+	password       string
+	advertised     []*bgp.Advertisement
+	sessionManager *sessionManager
 }
 
 // Create a variable for os.Hostname() in order to make it easy to mock out
@@ -69,9 +62,9 @@ func validate(adv *bgp.Advertisement) error {
 	return nil
 }
 
-func (s *Session) Set(advs ...*bgp.Advertisement) error {
+func (s *session) Set(advs ...*bgp.Advertisement) error {
 	sessionName := sessionName(s.srcAddr.String(), s.myASN, s.addr, s.asn)
-	if _, found := state.sessions[sessionName]; !found {
+	if _, found := s.sessionManager.sessions[sessionName]; !found {
 		return fmt.Errorf("session not established before advertisement")
 	}
 
@@ -87,7 +80,7 @@ func (s *Session) Set(advs ...*bgp.Advertisement) error {
 	s.advertised = newAdvs
 
 	// Attempt to create a config
-	config, err := state.createConfig()
+	config, err := s.sessionManager.createConfig()
 	if err != nil {
 		s.advertised = oldAdvs
 		return err
@@ -97,13 +90,13 @@ func (s *Session) Set(advs ...*bgp.Advertisement) error {
 }
 
 // Close() shuts down the BGP session.
-func (s *Session) Close() error {
-	err := state.deleteSession(s)
+func (s *session) Close() error {
+	err := s.sessionManager.deleteSession(s)
 	if err != nil {
 		return err
 	}
 
-	frrConfig, err := state.createConfig()
+	frrConfig, err := s.sessionManager.createConfig()
 	if err != nil {
 		return err
 	}
@@ -111,62 +104,63 @@ func (s *Session) Close() error {
 	return generateAndReloadConfigFile(frrConfig)
 }
 
-// New() creates a BGP session using the given session parameters.
+// NewSession() creates a BGP session using the given session parameters.
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func New(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime time.Duration, password string, myNode string) (*Session, error) {
-	session := &Session{
-		myASN:      myASN,
-		routerID:   routerID,
-		myNode:     myNode,
-		addr:       addr,
-		srcAddr:    srcAddr,
-		asn:        asn,
-		holdTime:   holdTime,
-		logger:     log.With(l, "peer", addr, "localASN", myASN, "peerASN", asn),
-		password:   password,
-		advertised: []*bgp.Advertisement{},
+func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime time.Duration, password string, myNode string) (bgp.Session, error) {
+	s := &session{
+		myASN:          myASN,
+		routerID:       routerID,
+		myNode:         myNode,
+		addr:           addr,
+		srcAddr:        srcAddr,
+		asn:            asn,
+		holdTime:       holdTime,
+		logger:         log.With(l, "peer", addr, "localASN", myASN, "peerASN", asn),
+		password:       password,
+		advertised:     []*bgp.Advertisement{},
+		sessionManager: sm,
 	}
 
-	_ = state.addSession(session)
+	_ = sm.addSession(s)
 
-	frrConfig, err := state.createConfig()
+	frrConfig, err := sm.createConfig()
 	if err != nil {
-		_ = state.deleteSession(session)
+		_ = sm.deleteSession(s)
 		return nil, err
 	}
 
 	err = generateAndReloadConfigFile(frrConfig)
 	if err != nil {
-		_ = state.deleteSession(session)
+		_ = sm.deleteSession(s)
 		return nil, err
 	}
 
-	return session, err
+	return s, err
 }
 
-func (state *frrState) addSession(session *Session) error {
-	if session == nil {
+func (sm *sessionManager) addSession(s *session) error {
+	if s == nil {
 		return fmt.Errorf("invalid session")
 	}
-	sessionName := sessionName(session.srcAddr.String(), session.myASN, session.addr, session.asn)
-	state.sessions[sessionName] = session
+	sessionName := sessionName(s.srcAddr.String(), s.myASN, s.addr, s.asn)
+	sm.sessions[sessionName] = s
 
 	return nil
 }
 
-func (state *frrState) deleteSession(session *Session) error {
-	if session == nil {
+func (sm *sessionManager) deleteSession(s *session) error {
+	if s == nil {
 		return fmt.Errorf("invalid session")
 	}
-	sessionName := sessionName(session.srcAddr.String(), session.myASN, session.addr, session.asn)
-	delete(state.sessions, sessionName)
+	sessionName := sessionName(s.srcAddr.String(), s.myASN, s.addr, s.asn)
+	delete(sm.sessions, sessionName)
 
 	return nil
 }
 
-func (s *frrState) createConfig() (*frrConfig, error) {
+func (sm *sessionManager) createConfig() (*frrConfig, error) {
 	hostname, err := osHostname()
 	if err != nil {
 		return nil, err
@@ -178,26 +172,26 @@ func (s *frrState) createConfig() (*frrConfig, error) {
 		Routers:  make(map[string]*routerConfig),
 	}
 
-	for _, session := range s.sessions {
+	for _, s := range sm.sessions {
 		var router *routerConfig
 		var neighbor *neighborConfig
 		var exist bool
 
-		routerName := routerName(session.routerID.String(), session.myASN)
+		routerName := routerName(s.routerID.String(), s.myASN)
 		if router, exist = config.Routers[routerName]; !exist {
 			router = &routerConfig{
-				MyASN:     session.myASN,
+				MyASN:     s.myASN,
 				Neighbors: make(map[string]*neighborConfig),
 			}
-			if session.routerID != nil {
-				router.RouterId = session.routerID.String()
+			if s.routerID != nil {
+				router.RouterId = s.routerID.String()
 			}
 			config.Routers[routerName] = router
 		}
 
-		neighborName := neighborName(session.addr, session.asn)
+		neighborName := neighborName(s.addr, s.asn)
 		if neighbor, exist = router.Neighbors[neighborName]; !exist {
-			host, port, err := net.SplitHostPort(session.addr)
+			host, port, err := net.SplitHostPort(s.addr)
 			if err != nil {
 				return nil, err
 			}
@@ -208,7 +202,7 @@ func (s *frrState) createConfig() (*frrConfig, error) {
 			}
 
 			neighbor = &neighborConfig{
-				ASN:            session.asn,
+				ASN:            s.asn,
 				Addr:           host,
 				Port:           uint16(portUint),
 				Advertisements: make([]*advertisementConfig, 0),
@@ -219,7 +213,7 @@ func (s *frrState) createConfig() (*frrConfig, error) {
 		/* As 'session.advertised' is a map, we can be sure there are no
 		   duplicate prefixes and can, therefore, just add them to the
 		   'neighbor.Advertisements' list. */
-		for _, adv := range session.advertised {
+		for _, adv := range s.advertised {
 			var version string
 			if adv.Prefix.IP.To4() != nil {
 				version = "ipv4"
@@ -237,4 +231,10 @@ func (s *frrState) createConfig() (*frrConfig, error) {
 	}
 
 	return config, nil
+}
+
+func NewSessionManager() *sessionManager {
+	return &sessionManager{
+		sessions: map[string]*session{},
+	}
 }

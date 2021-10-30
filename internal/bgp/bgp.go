@@ -3,8 +3,12 @@
 package bgp // import "go.universe.tf/metallb/internal/bgp"
 
 import (
+	"io"
 	"net"
 	"reflect"
+	"time"
+
+	"github.com/go-kit/kit/log"
 )
 
 // Advertisement represents one network path and its BGP attributes.
@@ -32,4 +36,13 @@ func (a *Advertisement) Equal(b *Advertisement) bool {
 		return false
 	}
 	return reflect.DeepEqual(a.Communities, b.Communities)
+}
+
+type Session interface {
+	io.Closer
+	Set(advs ...*Advertisement) error
+}
+
+type SessionManager interface {
+	NewSession(logger log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, hold time.Duration, password string, myNode string) (Session, error)
 }
