@@ -44,5 +44,5 @@ type Session interface {
 }
 
 type SessionManager interface {
-	NewSession(logger log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, hold time.Duration, password string, myNode string) (Session, error)
+	NewSession(logger log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, hold time.Duration, keepalive time.Duration, password string, myNode string) (Session, error)
 }

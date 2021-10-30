@@ -8,7 +8,7 @@ router bgp 100
   bgp router-id 10.1.1.254
 
   neighbor 10.2.2.254 remote-as 200
-  neighbor 10.2.2.254 timers 0 1
+  neighbor 10.2.2.254 timers 1 1
   neighbor 10.2.2.254 password password
   neighbor 10.2.2.254 update-source 10.1.1.254
 
