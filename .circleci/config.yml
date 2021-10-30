@@ -17,8 +17,8 @@ commands:
       - run: sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 jobs:
   test-1-16:
-    docker:
-      - image: cimg/go:1.16
+    machine:
+      image: ubuntu-2004:202104-01
     steps:
       - setup_ci_image
       - run: inv test
