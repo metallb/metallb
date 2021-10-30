@@ -91,6 +91,18 @@ func sortAds(ads map[string][]*bgp.Advertisement) {
 }
 
 type fakeBGP struct {
+	t              *testing.T
+	sessionManager fakeBGPSessionManager
+}
+
+func (f *fakeBGP) NewSessionManager(_ bgpImplementation) bgp.SessionManager {
+	f.sessionManager.t = f.t
+	f.sessionManager.gotAds = make(map[string][]*bgp.Advertisement)
+
+	return &f.sessionManager
+}
+
+type fakeBGPSessionManager struct {
 	t *testing.T
 
 	sync.Mutex
@@ -98,7 +110,7 @@ type fakeBGP struct {
 	gotAds map[string][]*bgp.Advertisement
 }
 
-func (f *fakeBGP) New(_ log.Logger, addr string, _ net.IP, _ uint32, _ net.IP, _ uint32, _ time.Duration, _, _ string) (session, error) {
+func (f *fakeBGPSessionManager) NewSession(_ log.Logger, addr string, _ net.IP, _ uint32, _ net.IP, _ uint32, _ time.Duration, _, _ string) (bgp.Session, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -115,7 +127,7 @@ func (f *fakeBGP) New(_ log.Logger, addr string, _ net.IP, _ uint32, _ net.IP, _
 	}, nil
 }
 
-func (f *fakeBGP) Ads() map[string][]*bgp.Advertisement {
+func (f *fakeBGPSessionManager) Ads() map[string][]*bgp.Advertisement {
 	ret := map[string][]*bgp.Advertisement{}
 
 	f.Lock()
@@ -140,7 +152,7 @@ func (f *fakeBGP) Ads() map[string][]*bgp.Advertisement {
 }
 
 type fakeSession struct {
-	f    *fakeBGP
+	f    *fakeBGPSessionManager
 	addr string
 }
 
@@ -192,10 +204,9 @@ func (s *testK8S) Errorf(_ *v1.Service, evtType string, msg string, args ...inte
 
 func TestBGPSpeaker(t *testing.T) {
 	b := &fakeBGP{
-		t:      t,
-		gotAds: map[string][]*bgp.Advertisement{},
+		t: t,
 	}
-	newBGP = b.New
+	newBGP = b.NewSessionManager
 	c, err := newController(controllerConfig{
 		MyNode:        "pandora",
 		DisableLayer2: true,
@@ -883,7 +894,7 @@ func TestBGPSpeaker(t *testing.T) {
 			}
 		}
 
-		gotAds := b.Ads()
+		gotAds := b.sessionManager.Ads()
 		sortAds(test.wantAds)
 		sortAds(gotAds)
 		if diff := cmp.Diff(test.wantAds, gotAds); diff != "" {
@@ -894,10 +905,9 @@ func TestBGPSpeaker(t *testing.T) {
 
 func TestBGPSpeakerEPSlices(t *testing.T) {
 	b := &fakeBGP{
-		t:      t,
-		gotAds: map[string][]*bgp.Advertisement{},
+		t: t,
 	}
-	newBGP = b.New
+	newBGP = b.NewSessionManager
 	c, err := newController(controllerConfig{
 		MyNode:        "pandora",
 		DisableLayer2: true,
@@ -1696,7 +1706,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			}
 		}
 
-		gotAds := b.Ads()
+		gotAds := b.sessionManager.Ads()
 		sortAds(test.wantAds)
 		sortAds(gotAds)
 		if diff := cmp.Diff(test.wantAds, gotAds); diff != "" {
@@ -1707,10 +1717,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 
 func TestNodeSelectors(t *testing.T) {
 	b := &fakeBGP{
-		t:      t,
-		gotAds: map[string][]*bgp.Advertisement{},
+		t: t,
 	}
-	newBGP = b.New
+	newBGP = b.NewSessionManager
 	c, err := newController(controllerConfig{
 		MyNode:        "pandora",
 		DisableLayer2: true,
@@ -1902,7 +1911,7 @@ func TestNodeSelectors(t *testing.T) {
 			}
 		}
 
-		gotAds := b.Ads()
+		gotAds := b.sessionManager.Ads()
 		sortAds(test.wantAds)
 		sortAds(gotAds)
 		if diff := cmp.Diff(test.wantAds, gotAds); diff != "" {

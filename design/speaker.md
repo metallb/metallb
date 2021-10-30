@@ -98,9 +98,9 @@ New() method which are currently:
 
 * **addr**: IP address and port of peer
 * **srcAddr**: Source IP address
-* **asn**: Local ASN
+* **myASN**: Local ASN
 * **routerID**: Specify the BGP Router ID of the session
-* **peerASN**: ASN of the router that we are connecting to
+* **asn**: ASN of the router that we are connecting to
 * **holdTime**: BGP Hold Time specifies how long to maintain sessions for
 * **Password**: TCP MD5 sock option for connection
 * **myNode**

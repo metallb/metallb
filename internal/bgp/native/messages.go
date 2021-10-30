@@ -1,6 +1,6 @@
 // SPDX-License-Identifier:Apache-2.0
 
-package bgp
+package native
 
 import (
 	"bytes"
@@ -10,6 +10,8 @@ import (
 	"io/ioutil"
 	"net"
 	"time"
+
+	"go.universe.tf/metallb/internal/bgp"
 )
 
 func sendOpen(w io.Writer, asn uint32, routerID net.IP, holdTime time.Duration) error {
@@ -287,7 +289,7 @@ func readCapabilities(r io.Reader, ret *openResult) error {
 	}
 }
 
-func sendUpdate(w io.Writer, asn uint32, ibgp, fbasn bool, defaultNextHop net.IP, adv *Advertisement) error {
+func sendUpdate(w io.Writer, asn uint32, ibgp, fbasn bool, defaultNextHop net.IP, adv *bgp.Advertisement) error {
 	var b bytes.Buffer
 
 	hdr := struct {
@@ -333,7 +335,7 @@ func bytesForBits(n int) int {
 	return ((n + 7) &^ 7) / 8
 }
 
-func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp, fbasn bool, defaultNextHop net.IP, adv *Advertisement) error {
+func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp, fbasn bool, defaultNextHop net.IP, adv *bgp.Advertisement) error {
 	b.Write([]byte{
 		0x40, 1, // mandatory, origin
 		1, // len

@@ -76,6 +76,13 @@ func main() {
 	)
 	flag.Parse()
 
+	// Note: Changing the MetalLB BGP implementation type should be considered
+	//       experimental.
+	bgpType, present := os.LookupEnv("METALLB_BGP_TYPE")
+	if !present {
+		bgpType = "native"
+	}
+
 	logger, err := logging.Init(*logLevel)
 	if err != nil {
 		fmt.Printf("failed to initialize logging: %s\n", err)
@@ -116,9 +123,10 @@ func main() {
 
 	// Setup all clients and speakers, config decides what is being done runtime.
 	ctrl, err := newController(controllerConfig{
-		MyNode: *myNode,
-		Logger: logger,
-		SList:  sList,
+		MyNode:  *myNode,
+		Logger:  logger,
+		SList:   sList,
+		bgpType: bgpImplementation(bgpType),
 	})
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create MetalLB controller")
@@ -172,6 +180,8 @@ type controllerConfig struct {
 	Logger log.Logger
 	SList  SpeakerList
 
+	bgpType bgpImplementation
+
 	// For testing only, and will be removed in a future release.
 	// See: https://github.com/metallb/metallb/issues/152.
 	DisableLayer2 bool
@@ -180,9 +190,11 @@ type controllerConfig struct {
 func newController(cfg controllerConfig) (*controller, error) {
 	protocols := map[config.Proto]Protocol{
 		config.BGP: &bgpController{
-			logger: cfg.Logger,
-			myNode: cfg.MyNode,
-			svcAds: make(map[string][]*bgp.Advertisement),
+			logger:         cfg.Logger,
+			myNode:         cfg.MyNode,
+			svcAds:         make(map[string][]*bgp.Advertisement),
+			bgpType:        cfg.bgpType,
+			sessionManager: newBGP(cfg.bgpType),
 		},
 	}
 
