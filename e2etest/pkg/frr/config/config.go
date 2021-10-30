@@ -22,6 +22,9 @@ router bgp {{.ASN}}
 {{range .Neighbors }}
   neighbor {{.Addr}} remote-as {{.ASN}}
   neighbor {{.Addr}} next-hop-self
+  {{ if .Password -}}
+  neighbor {{.Addr}} password {{.Password}}
+  {{- end }}
 {{- end }}
 `
 
@@ -29,11 +32,15 @@ type RouterConfig struct {
 	ASN       uint32
 	Neighbors []*NeighborConfig
 	BGPPort   uint16
+	RouterID  string
+	Password  string
+	HoldTime  string
 }
 
 type NeighborConfig struct {
-	ASN  uint32
-	Addr string
+	ASN      uint32
+	Addr     string
+	Password string
 }
 
 // Set the IP of each node in the cluster in the BGP router configuration.
