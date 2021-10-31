@@ -90,6 +90,7 @@ address-pools:
   - 40.0.0.0/25
   - 40.0.0.150-40.0.0.200
   - 40.0.0.210 - 40.0.0.240
+  - 40.0.0.250 - 40.0.0.250
 - name: pool4
   protocol: layer2
   addresses:
@@ -162,6 +163,7 @@ address-pools:
 							ipnet("40.0.0.216/29"),
 							ipnet("40.0.0.224/28"),
 							ipnet("40.0.0.240/32"),
+							ipnet("40.0.0.250/32"),
 						},
 						AutoAssign: true,
 					},
@@ -401,6 +403,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
+  protocol: bgp
   addresses:
   - 100.200.300.400/24
 `,
@@ -411,6 +414,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
+  protocol: bgp
   addresses:
   - 1.2.3.0/33
 `,
@@ -421,6 +425,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
+  protocol: bgp
   addresses:
   - 1.2.3.10-1.2.3.1
 `,
