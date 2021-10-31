@@ -46,7 +46,7 @@ func GetContainerIPs(containerName string) (ipv4 string, ipv6 string, err error)
 	containerIP, err := exec.Command("docker", "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
 		containerName).CombinedOutput()
 	if err != nil {
-		return "", "", errors.Wrapf(err, "Failed to get FRR IP address")
+		return "", "", errors.Wrapf(err, "Failed to get FRR IPv4 address")
 	}
 
 	containerIPv4 := strings.TrimSuffix(string(containerIP), "\n")
@@ -54,10 +54,14 @@ func GetContainerIPs(containerName string) (ipv4 string, ipv6 string, err error)
 	containerIP, err = exec.Command("docker", "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.GlobalIPv6Address}}{{end}}",
 		containerName).CombinedOutput()
 	if err != nil {
-		return "", "", errors.Wrapf(err, "Failed to get FRR IP address")
+		return "", "", errors.Wrapf(err, "Failed to get FRR IPv6 address")
 	}
 
 	containerIPv6 := strings.TrimSuffix(string(containerIP), "\n")
+
+	if containerIPv4 == "" && containerIPv6 == "" {
+		return "", "", errors.Errorf("Failed to get FRR IP addresses")
+	}
 
 	return containerIPv4, containerIPv6, nil
 }
