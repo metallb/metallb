@@ -459,7 +459,7 @@ func ParseCIDR(cidr string) ([]*net.IPNet, error) {
 		return nil, fmt.Errorf("invalid IP range %q: invalid end IP %q", cidr, fs[1])
 	}
 
-	if bytes.Compare(start, end) >= 0 {
+	if bytes.Compare(start, end) > 0 {
 		return nil, fmt.Errorf("invalid IP range %q: start IP %q is after the end IP %q", cidr, start, end)
 	}
 
