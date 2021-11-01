@@ -30,7 +30,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"

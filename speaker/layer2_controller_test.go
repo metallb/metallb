@@ -17,7 +17,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -177,9 +177,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris1",
-								},
+								NodeName: stringPtr("iris1"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -192,9 +190,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.15",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris2",
-								},
+								NodeName: stringPtr("iris2"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -217,9 +213,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris1",
-								},
+								NodeName: stringPtr("iris1"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -228,9 +222,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.15",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris2",
-								},
+								NodeName: stringPtr("iris2"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -253,9 +245,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris1",
-								},
+								NodeName: stringPtr("iris1"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -264,9 +254,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.15",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris1",
-								},
+								NodeName: stringPtr("iris1"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -290,9 +278,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris1",
-								},
+								NodeName: stringPtr("iris1"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -301,9 +287,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.15",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris1",
-								},
+								NodeName: stringPtr("iris1"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(false),
 								},
@@ -617,7 +601,8 @@ func TestShouldAnnounce(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "notOwner",
 			},
-		}, {
+		},
+		{
 			desc: "One service, two endpoints across two hosts, controller 2 is not ready, controller 1 should announce",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
@@ -665,7 +650,8 @@ func TestShouldAnnounce(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "notOwner",
 			},
-		}, {
+		},
+		{
 			desc: "Two services each with two endpoints across across two hosts, controller 1 should announce the second, controller 2 the first",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
@@ -739,7 +725,8 @@ func TestShouldAnnounce(t *testing.T) {
 				"10.20.30.1": "",
 				"10.20.30.2": "notOwner",
 			},
-		}, {
+		},
+		{
 			desc: "Two services each with two endpoints across across two hosts, one service has an endpoint not ready on controller 2, controller 2 should not announce for the service with the not ready endpoint",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
@@ -815,7 +802,8 @@ func TestShouldAnnounce(t *testing.T) {
 				"10.20.30.1": "",
 				"10.20.30.2": "notOwner",
 			},
-		}, {
+		},
+		{
 			desc: "Two services each with two endpoints across across two hosts, one service has an endpoint not ready on controller 1, the other service has an endpoint not ready on controller 2. Each controller should announce for the service with the ready endpoint on that controller",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
@@ -893,7 +881,8 @@ func TestShouldAnnounce(t *testing.T) {
 				"10.20.30.1": "",
 				"10.20.30.2": "notOwner",
 			},
-		}, {
+		},
+		{
 			desc: "One service with three endpoints across across two hosts, controller 2 hosts two endpoints controller 2 should announce for the service",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
@@ -943,7 +932,8 @@ func TestShouldAnnounce(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 			},
-		}, {
+		},
+		{
 			desc: "One service with three endpoints across across two hosts, controller 1 hosts two endpoints controller 2 should announce for the service",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
@@ -993,7 +983,8 @@ func TestShouldAnnounce(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 			},
-		}, {
+		},
+		{
 			desc: "One service with three endpoints across across two hosts, controller 2 hosts two endpoints, one of which is not ready, controller 1 should announce for the service",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
@@ -1045,7 +1036,8 @@ func TestShouldAnnounce(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 			},
-		}, {
+		},
+		{
 			desc: "One service with three endpoints across across two hosts, controller 1 hosts two endpoints, one of which is not ready, controller 2 should announce for the service",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
@@ -1097,7 +1089,8 @@ func TestShouldAnnounce(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 			},
-		}, {
+		},
+		{
 			desc: "One service with three endpoints across across two hosts, controller 2 hosts two endpoints, both of which are not ready, controller 1 should announce for the service",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
@@ -1253,9 +1246,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.5",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1264,9 +1255,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.15",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1311,9 +1300,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.5",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(false),
 									},
@@ -1322,9 +1309,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.15",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(false),
 									},
@@ -1369,9 +1354,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.5",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1380,9 +1363,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.15",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
+									NodeName: stringPtr("iris2"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1427,9 +1408,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.5",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(false),
 									},
@@ -1438,9 +1417,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.15",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
+									NodeName: stringPtr("iris2"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(false),
 									},
@@ -1485,9 +1462,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.5",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1496,9 +1471,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.15",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
+									NodeName: stringPtr("iris2"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(false),
 									},
@@ -1550,9 +1523,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.5",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1561,9 +1532,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.15",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
+									NodeName: stringPtr("iris2"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1581,9 +1550,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.25",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1592,9 +1559,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.35",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
+									NodeName: stringPtr("iris2"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1648,9 +1613,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.5",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1659,9 +1622,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.15",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
+									NodeName: stringPtr("iris2"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1679,9 +1640,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.25",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1690,9 +1649,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.35",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
+									NodeName: stringPtr("iris2"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(false),
 									},
@@ -1746,9 +1703,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.5",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
+									NodeName: stringPtr("iris2"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1757,9 +1712,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.15",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(false),
 									},
@@ -1777,9 +1730,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.25",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1788,9 +1739,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.35",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
+									NodeName: stringPtr("iris2"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(false),
 									},
@@ -1837,9 +1786,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.5",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1848,9 +1795,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.15",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
+									NodeName: stringPtr("iris2"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1863,9 +1808,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.25",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
+									NodeName: stringPtr("iris2"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1910,9 +1853,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.5",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1921,9 +1862,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.15",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
+									NodeName: stringPtr("iris2"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1932,9 +1871,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.25",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1979,9 +1916,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.5",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -1990,9 +1925,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.15",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
+									NodeName: stringPtr("iris2"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -2001,9 +1934,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.25",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
+									NodeName: stringPtr("iris2"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -2048,9 +1979,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.5",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -2059,9 +1988,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.15",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
+									NodeName: stringPtr("iris2"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -2070,9 +1997,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.25",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(false),
 									},
@@ -2117,9 +2042,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.5",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris1",
-									},
+									NodeName: stringPtr("iris1"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(true),
 									},
@@ -2128,9 +2051,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.15",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
+									NodeName: stringPtr("iris2"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(false),
 									},
@@ -2139,9 +2060,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									Addresses: []string{
 										"2.3.4.25",
 									},
-									Topology: map[string]string{
-										"kubernetes.io/hostname": "iris2",
-									},
+									NodeName: stringPtr("iris2"),
 									Conditions: discovery.EndpointConditions{
 										Ready: pointer.BoolPtr(false),
 									},
@@ -2262,9 +2181,7 @@ func TestShouldAnnounceNodeSelector(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							Topology: map[string]string{
-								"kubernetes.io/hostname": "iris1",
-							},
+							NodeName: pointer.StrPtr("iris1"),
 							Conditions: discovery.EndpointConditions{
 								Ready: pointer.BoolPtr(true),
 							},
@@ -2273,9 +2190,7 @@ func TestShouldAnnounceNodeSelector(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.15",
 							},
-							Topology: map[string]string{
-								"kubernetes.io/hostname": "iris2",
-							},
+							NodeName: pointer.StrPtr("iris2"),
 							Conditions: discovery.EndpointConditions{
 								Ready: pointer.BoolPtr(true),
 							},
@@ -2297,9 +2212,7 @@ func TestShouldAnnounceNodeSelector(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": node,
-								},
+								NodeName: pointer.StrPtr(node),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -2429,6 +2342,10 @@ func TestShouldAnnounceNodeSelector(t *testing.T) {
 	}
 }
 
+func stringPtr(s string) *string {
+	return &s
+}
+
 func TestClusterPolicy(t *testing.T) {
 	fakeSL := &fakeSpeakerList{
 		speakers: map[string]bool{
@@ -2489,9 +2406,7 @@ func TestClusterPolicy(t *testing.T) {
 						Addresses: []string{
 							"2.3.4.5",
 						},
-						Topology: map[string]string{
-							"kubernetes.io/hostname": "iris1",
-						},
+						NodeName: stringPtr("iris1"),
 						Conditions: discovery.EndpointConditions{
 							Ready: pointer.BoolPtr(true),
 						},
@@ -2509,9 +2424,7 @@ func TestClusterPolicy(t *testing.T) {
 						Addresses: []string{
 							"2.3.4.5",
 						},
-						Topology: map[string]string{
-							"kubernetes.io/hostname": "iris2",
-						},
+						NodeName: stringPtr("iris2"),
 						Conditions: discovery.EndpointConditions{
 							Ready: pointer.BoolPtr(true),
 						},
