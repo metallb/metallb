@@ -21,7 +21,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -1118,9 +1118,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1174,9 +1172,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "pandora",
-								},
+								NodeName: stringPtr("pandora"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1209,9 +1205,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1248,9 +1242,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1283,9 +1275,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1298,9 +1288,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.6",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "pandora",
-								},
+								NodeName: stringPtr("pandora"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1337,9 +1325,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1352,9 +1338,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.6",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "pandora",
-								},
+								NodeName: stringPtr("pandora"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(false),
 								},
@@ -1367,9 +1351,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.7",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1382,9 +1364,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.6",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "pandora",
-								},
+								NodeName: stringPtr("pandora"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1433,9 +1413,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(false),
 								},
@@ -1468,9 +1446,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1479,9 +1455,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.6",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "pandora",
-								},
+								NodeName: stringPtr("pandora"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(false),
 								},
@@ -1544,9 +1518,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1612,9 +1584,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1655,9 +1625,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1699,9 +1667,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1749,9 +1715,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1837,9 +1801,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
