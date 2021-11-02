@@ -11,9 +11,16 @@ import (
 	"github.com/pkg/errors"
 )
 
+type ConnectStatus string
+
+const (
+	Disconnected ConnectStatus = "disconnected"
+	Connected    ConnectStatus = "connected"
+)
+
 type Neighbor struct {
 	ip        net.IP
-	connected bool
+	connected ConnectStatus
 	localAS   string
 	remoteAS  string
 }
@@ -63,9 +70,9 @@ func parseNeighbour(vtyshRes string) (*Neighbor, error) {
 		if ip == nil {
 			return nil, fmt.Errorf("failed to parse %s as ip", ip)
 		}
-		connected := true
+		connected := Connected
 		if n.BgpState != bgpConnected {
-			connected = false
+			connected = Disconnected
 		}
 		return &Neighbor{
 			ip:        ip,
@@ -92,9 +99,9 @@ func parseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 		if ip == nil {
 			return nil, fmt.Errorf("failed to parse %s as ip", ip)
 		}
-		connected := true
+		connected := Connected
 		if n.BgpState != bgpConnected {
-			connected = false
+			connected = Disconnected
 		}
 		res = append(res, &Neighbor{
 			ip:        ip,
@@ -147,5 +154,5 @@ func NeighborConnected(neighborJson string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	return n.connected, nil
+	return n.connected == Connected, nil
 }

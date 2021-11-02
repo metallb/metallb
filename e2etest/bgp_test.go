@@ -62,7 +62,6 @@ type containerConfig struct {
 }
 
 var _ = ginkgo.Describe("BGP", func() {
-	f := framework.NewDefaultFramework("bgp")
 	var cs clientset.Interface
 	containersConf := []containerConfig{
 		{
@@ -86,6 +85,30 @@ var _ = ginkgo.Describe("BGP", func() {
 			},
 		},
 	}
+	var f *framework.Framework
+
+	ginkgo.AfterEach(func() {
+		if ginkgo.CurrentGinkgoTestDescription().Failed {
+			for _, container := range frrContainers {
+				dump, err := frr.RawDump(container.Executor)
+				framework.Logf("External frr dump %s %v", dump, err)
+			}
+			DescribeSvc(f.Namespace.Name)
+		}
+	})
+
+	ginkgo.AfterEach(func() {
+		// Clean previous configuration.
+		err := updateConfigMap(cs, configFile{})
+		framework.ExpectNoError(err)
+		waitFRRNotPeered(cs, frrContainers)
+
+		err = stopFRRContainers(frrContainers)
+		framework.ExpectNoError(err)
+	})
+
+	f = framework.NewDefaultFramework("bgp")
+
 	ginkgo.BeforeEach(func() {
 		var err error
 		// TODO: When adding support for bgp + IPv6 need to validate hostIPv6 as well
@@ -96,27 +119,6 @@ var _ = ginkgo.Describe("BGP", func() {
 		}
 		cs = f.ClientSet
 		frrContainers, err = createFRRContainers(containersConf)
-		framework.ExpectNoError(err)
-	})
-
-	ginkgo.AfterEach(func() {
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
-			exc := executor.ForContainer(frrContainer)
-			if skipDockerCmd {
-				exc = executor.Host
-			}
-			dump, err := frr.RawDump(exc)
-			framework.Logf("External frr dump %s %v", dump, err)
-			DescribeSvc(f.Namespace.Name)
-		}
-	})
-
-	ginkgo.AfterEach(func() {
-		// Clean previous configuration.
-		err := updateConfigMap(cs, configFile{})
-		framework.ExpectNoError(err)
-
-		err = stopFRRContainers(frrContainers)
 		framework.ExpectNoError(err)
 	})
 
@@ -349,12 +351,6 @@ var _ = ginkgo.Describe("BGP", func() {
 	})
 
 	ginkgo.Context("validate different AddressPools for type=Loadbalancer", func() {
-		ginkgo.AfterEach(func() {
-			// Clean previous configuration.
-			err := updateConfigMap(cs, configFile{})
-			framework.ExpectNoError(err)
-		})
-
 		table.DescribeTable("set different AddressPools ranges modes", func(addressPools []addressPool) {
 			var peers []peer
 			for _, c := range frrContainers {
@@ -502,8 +498,31 @@ func validateFRRPeeredWithNodes(cs clientset.Interface, c *frrcontainer.FRR) {
 		neighbors, err := frr.NeighborsInfo(c)
 		framework.ExpectNoError(err)
 		err = frr.NeighborsMatchNodes(allNodes.Items, neighbors)
+		if err != nil {
+			return err
+		}
+		err = frr.CheckAllNeighborsState(neighbors, frr.Connected)
+		if err != nil {
+			return err
+		}
 		return err
 	}, 2*time.Minute, 1*time.Second).Should(BeNil())
+}
+
+func waitFRRNotPeered(cs clientset.Interface, containers []*frrcontainer.FRR) {
+
+	ginkgo.By("checking all the frr neighbors are not peered")
+	Eventually(func() error {
+		for _, container := range frrContainers {
+			neighbors, err := frr.NeighborsInfo(container.Executor)
+			framework.ExpectNoError(err)
+			err = frr.CheckAllNeighborsState(neighbors, frr.Disconnected)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
 
 func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1.Node, c *frrcontainer.FRR) {

@@ -26,13 +26,19 @@ func NeighborsMatchNodes(nodes []v1.Node, neighbors []*Neighbor) error {
 		if _, ok := nodesIPs[n.ip.String()]; !ok { // skipping neighbors that are not nodes
 			continue
 		}
-		if !n.connected {
-			return fmt.Errorf("node %s BGP session not established", n.ip.String())
-		}
 		delete(nodesIPs, n.ip.String())
 	}
 	if len(nodesIPs) != 0 { // some leftover, meaning more nodes than neighbors
 		return fmt.Errorf("IP %v found in nodes but not in neighbors", nodesIPs)
+	}
+	return nil
+}
+
+func CheckAllNeighborsState(neighbors []*Neighbor, checkConnected ConnectStatus) error {
+	for _, n := range neighbors {
+		if n.connected != checkConnected {
+			return fmt.Errorf("neighbor %s not %s", n.ip.String(), string(checkConnected))
+		}
 	}
 	return nil
 }

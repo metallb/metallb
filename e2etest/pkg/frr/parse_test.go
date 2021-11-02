@@ -125,10 +125,10 @@ func TestNeighbour(t *testing.T) {
 			if n.localAS != tt.localAS {
 				t.Fatal("Expected local as", tt.localAS, "got", n.localAS)
 			}
-			if tt.status == "Established" && n.connected != true {
+			if tt.status == "Established" && n.connected != Connected {
 				t.Fatal("Expected connected", true, "got", n.connected)
 			}
-			if tt.status != "Established" && n.connected == true {
+			if tt.status != "Established" && n.connected == Connected {
 				t.Fatal("Expected connected", false, "got", n.connected)
 			}
 		})
