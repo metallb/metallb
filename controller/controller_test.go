@@ -621,12 +621,12 @@ func TestControllerConfig(t *testing.T) {
 	}
 
 	// Now that an IP is allocated, removing the IP pool is not allowed.
-	if c.SetConfig(l, &config.Config{}) != k8s.SyncStateError {
+	if c.SetConfig(l, &config.Config{}) != k8s.SyncStateErrorNoRetry {
 		t.Fatalf("SetConfig that deletes allocated IPs was accepted")
 	}
 
 	// Deleting the config also makes MetalLB sad.
-	if c.SetConfig(l, nil) != k8s.SyncStateError {
+	if c.SetConfig(l, nil) != k8s.SyncStateErrorNoRetry {
 		t.Fatalf("SetConfig that deletes the config was accepted")
 	}
 }
