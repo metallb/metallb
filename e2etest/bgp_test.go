@@ -149,6 +149,11 @@ var _ = ginkgo.Describe("BGP", func() {
 
 			validateService(cs, svc, epNodes)
 		})
+
+		ginkgo.It("would check that FRR is running in the speaker", func() {
+			paired := frrIsPairedOnPods(cs, frrContainerIPv4)
+			framework.ExpectEqual(paired, true)
+		})
 	})
 
 	ginkgo.Context("metrics", func() {
@@ -446,4 +451,16 @@ func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1
 		}
 		return nil
 	}, 2*time.Minute, 1*time.Second).Should(BeNil())
+}
+
+func frrIsPairedOnPods(cs clientset.Interface, neighbor string) bool {
+	pods, err := cs.CoreV1().Pods("metallb-system").List(context.Background(), metav1.ListOptions{
+		LabelSelector: "component=speaker",
+	})
+	framework.ExpectNoError(err)
+	toParse, err := framework.RunKubectl("metallb-system", "exec", pods.Items[0].Name, "-c", "frr", "--", "vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", neighbor))
+	framework.ExpectNoError(err)
+	res, err := frr.NeighborConnected(toParse)
+	framework.ExpectNoError(err)
+	return res
 }

@@ -139,3 +139,13 @@ func parseRoutes(vtyshRes string) (map[string]Route, error) {
 	}
 	return res, nil
 }
+
+// NeighborConnected tells if the neighbor in the given
+// json format is connected.
+func NeighborConnected(neighborJson string) (bool, error) {
+	n, err := parseNeighbour(neighborJson)
+	if err != nil {
+		return false, err
+	}
+	return n.connected, nil
+}
