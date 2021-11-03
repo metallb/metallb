@@ -25,8 +25,15 @@ func init() {
 
 // For IP returns the list of routes in the given container
 // (or in the current host) to reach the service ip.
-func ForIP(target string, exec executor.Executor) []net.IP {
-	res, err := exec.Exec("ip", []string{"route", "show", target}...)
+func ForIP(target string, exec executor.Executor, ipFamily string) []net.IP {
+	var res string
+	var err error
+
+	if ipFamily == "ipv4" {
+		res, err = exec.Exec("ip", []string{"route", "show", target}...)
+	} else {
+		res, err = exec.Exec("ip", []string{"-6", "route", "show", target}...)
+	}
 	framework.ExpectNoError(err)
 
 	routes := make([]net.IP, 0)

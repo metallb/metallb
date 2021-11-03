@@ -322,6 +322,124 @@ const threeNeighbours = `
     "nextConnectTimerDueInMsecs":107000,
     "readThread":"off",
     "writeThread":"off"
+  },
+  "fc00:f853:ccd:e793::4":{
+    "remoteAs":64512,
+    "localAs":64513,
+    "nbrExternalLink":true,
+    "hostname":"kind-control-plane",
+    "bgpVersion":4,
+    "remoteRouterId":"11.11.11.11",
+    "localRouterId":"172.18.0.5",
+    "bgpState":"Established",
+    "bgpTimerUpMsec":0,
+    "bgpTimerUpString":"00:00:00",
+    "bgpTimerUpEstablishedEpoch":1636386709,
+    "bgpTimerLastRead":4000,
+    "bgpTimerLastWrite":0,
+    "bgpInUpdateElapsedTimeMsecs":78272000,
+    "bgpTimerHoldTimeMsecs":90000,
+    "bgpTimerKeepAliveIntervalMsecs":30000,
+    "neighborCapabilities":{
+      "4byteAs":"advertisedAndReceived",
+      "extendedMessage":"advertisedAndReceived",
+      "addPath":{
+        "ipv6Unicast":{
+          "rxAdvertisedAndReceived":true
+        }
+      },
+      "routeRefresh":"advertisedAndReceivedOldNew",
+      "enhancedRouteRefresh":"advertisedAndReceived",
+      "multiprotocolExtensions":{
+        "ipv4Unicast":{
+          "received":true
+        },
+        "ipv6Unicast":{
+          "advertisedAndReceived":true
+        }
+      },
+      "hostName":{
+        "advHostName":"85e811e29230",
+        "advDomainName":"n\/a",
+        "rcvHostName":"kind-control-plane",
+        "rcvDomainName":"n\/a"
+      },
+      "gracefulRestart":"advertisedAndReceived",
+      "gracefulRestartRemoteTimerMsecs":120000,
+      "addressFamiliesByPeer":"none"
+    },
+    "gracefulRestartInfo":{
+      "endOfRibSend":{
+        "ipv6Unicast":true
+      },
+      "endOfRibRecv":{
+      },
+      "localGrMode":"Helper*",
+      "remoteGrMode":"Helper",
+      "rBit":true,
+      "timers":{
+        "configuredRestartTimer":120,
+        "receivedRestartTimer":120
+      },
+      "ipv6Unicast":{
+        "fBit":false,
+        "endOfRibStatus":{
+          "endOfRibSend":true,
+          "endOfRibSentAfterUpdate":true,
+          "endOfRibRecv":false
+        },
+        "timers":{
+          "stalePathTimer":360
+        }
+      }
+    },
+    "messageStats":{
+      "depthInq":0,
+      "depthOutq":0,
+      "opensSent":1,
+      "opensRecv":1,
+      "notificationsSent":0,
+      "notificationsRecv":0,
+      "updatesSent":1,
+      "updatesRecv":0,
+      "keepalivesSent":1,
+      "keepalivesRecv":1,
+      "routeRefreshSent":0,
+      "routeRefreshRecv":0,
+      "capabilitySent":0,
+      "capabilityRecv":0,
+      "totalSent":3,
+      "totalRecv":2
+    },
+    "minBtwnAdvertisementRunsTimerMsecs":0,
+    "addressFamilyInfo":{
+      "ipv6Unicast":{
+        "updateGroupId":1,
+        "subGroupId":1,
+        "packetQueueLength":0,
+        "routerAlwaysNextHop":true,
+        "commAttriSentToNbr":"extendedAndStandard",
+        "acceptedPrefixCounter":0,
+        "sentPrefixCounter":0
+      }
+    },
+    "connectionsEstablished":1,
+    "connectionsDropped":0,
+    "lastResetTimerMsecs":4000,
+    "lastResetDueTo":"No AFI\/SAFI activated for peer",
+    "lastResetCode":30,
+    "hostLocal":"fc00:f853:ccd:e793::5",
+    "portLocal":180,
+    "hostForeign":"fc00:f853:ccd:e793::4",
+    "portForeign":53568,
+    "nexthop":"172.18.0.5",
+    "nexthopGlobal":"fc00:f853:ccd:e793::5",
+    "nexthopLocal":"fe80::42:acff:fe12:5",
+    "bgpConnection":"sharedNetwork",
+    "connectRetryTimer":120,
+    "authenticationEnabled":1,
+    "readThread":"on",
+    "writeThread":"on"
   }
 }`
 
@@ -330,8 +448,8 @@ func TestNeighbours(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to parse %s", err)
 	}
-	if len(nn) != 3 {
-		t.Fatalf("Expected 3 neighbours, got %d", len(nn))
+	if len(nn) != 4 {
+		t.Fatalf("Expected 4 neighbours, got %d", len(nn))
 	}
 	sort.Slice(nn, func(i, j int) bool {
 		return (bytes.Compare(nn[i].ip, nn[j].ip) < 0)

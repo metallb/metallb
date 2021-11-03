@@ -95,10 +95,12 @@ var _ = ginkgo.Describe("BGP", func() {
 	}
 	ginkgo.BeforeEach(func() {
 		var err error
-		// TODO: When adding support for bgp + IPv6 need to validate hostIPv6 as well
 		if containersNetwork == "host" {
 			if net.ParseIP(hostIPv4) == nil {
 				framework.Fail("Invalid hostIPv4")
+			}
+			if net.ParseIP(hostIPv6) == nil {
+				framework.Fail("Invalid hostIPv6")
 			}
 		}
 		cs = f.ClientSet
@@ -119,50 +121,56 @@ var _ = ginkgo.Describe("BGP", func() {
 		}
 	})
 
-	ginkgo.Context("type=Loadbalancer", func() {
+	table.DescribeTable("A service of protocol load balancer should work with", func(ipFamily string, setProtocoltest string) {
 		var allNodes *corev1.NodeList
-		ginkgo.BeforeEach(func() {
-			var peers []peer
-			for _, c := range frrContainers {
-				peers = append(peers, peer{
-					Addr:     c.Ipv4,
-					ASN:      c.RouterConfig.ASN,
-					MyASN:    c.NeighborConfig.ASN,
-					Port:     c.RouterConfig.BGPPort,
-					RouterID: c.RouterConfig.RouterID,
-					Password: c.RouterConfig.Password,
-					HoldTime: c.RouterConfig.HoldTime,
-				})
+		var peers []peer
+		var address string
+		for _, c := range frrContainers {
+			c.RouterConfig.IPFamily = ipFamily
+			c.NeighborConfig.IPFamily = ipFamily
+			if ipFamily == "ipv4" {
+				address = c.Ipv4
+			} else {
+				address = c.Ipv6
 			}
-			configData := configFile{
-				Pools: []addressPool{
-					{
-						Name:     "bgp-test",
-						Protocol: BGP,
-						Addresses: []string{
-							"192.168.10.0/24",
-							"fc00:f853:0ccd:e799::/124",
-						},
+			peers = append(peers, peer{
+				Addr:     address,
+				ASN:      c.RouterConfig.ASN,
+				MyASN:    c.NeighborConfig.ASN,
+				Port:     c.RouterConfig.BGPPort,
+				RouterID: c.RouterConfig.RouterID,
+				Password: c.RouterConfig.Password,
+				HoldTime: c.RouterConfig.HoldTime,
+			})
+		}
+		configData := configFile{
+			Pools: []addressPool{
+				{
+					Name:     "bgp-test",
+					Protocol: BGP,
+					Addresses: []string{
+						"192.168.10.0/24",
+						"fc00:f853:0ccd:e799::/124",
 					},
 				},
-				Peers: peers,
-			}
-			for _, c := range frrContainers {
-				pairExternalFRRWithNodes(cs, c)
-			}
+			},
+			Peers: peers,
+		}
+		for _, c := range frrContainers {
+			pairExternalFRRWithNodes(cs, c)
+		}
 
-			err := updateConfigMap(cs, configData)
-			framework.ExpectNoError(err)
+		err := updateConfigMap(cs, configData)
+		framework.ExpectNoError(err)
 
-			for _, c := range frrContainers {
-				validateFRRPeeredWithNodes(cs, c)
-			}
+		for _, c := range frrContainers {
+			validateFRRPeeredWithNodes(cs, c)
+		}
 
-			allNodes, err = cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
-		})
+		allNodes, err = cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+		framework.ExpectNoError(err)
 
-		ginkgo.It("should work for ExternalTrafficPolicy=Cluster", func() {
+		if setProtocoltest == "ExternalTrafficPolicyCluster" {
 			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster)
 
 			defer func() {
@@ -171,13 +179,13 @@ var _ = ginkgo.Describe("BGP", func() {
 			}()
 
 			for _, c := range frrContainers {
-				validateService(cs, svc, allNodes.Items, c)
+				validateService(cs, svc, allNodes.Items, c, ipFamily)
 			}
-		})
+		}
 
-		ginkgo.It("should work for ExternalTrafficPolicy=Local", func() {
+		if setProtocoltest == "ExternalTrafficPolicyLocal" {
 			svc, jig := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeLocal)
-			err := jig.Scale(2)
+			err = jig.Scale(2)
 			framework.ExpectNoError(err)
 
 			epNodes, err := jig.ListNodesWithEndpoint() // Only nodes with an endpoint should be advertising the IP
@@ -189,17 +197,23 @@ var _ = ginkgo.Describe("BGP", func() {
 			}()
 
 			for _, c := range frrContainers {
-				validateService(cs, svc, epNodes, c)
+				validateService(cs, svc, epNodes, c, ipFamily)
 			}
-		})
+		}
 
-		ginkgo.It("would check that FRR is running in the speaker", func() {
+		if setProtocoltest == "CheckSpeakerFRRPodRunning" {
 			for _, c := range frrContainers {
-				paired := frrIsPairedOnPods(cs, c)
+				paired := frrIsPairedOnPods(cs, c, ipFamily)
 				framework.ExpectEqual(paired, true)
 			}
-		})
-	})
+		}
+	},
+		table.Entry("IPV4 - ExternalTrafficPolicyCluster", "ipv4", "ExternalTrafficPolicyCluster"),
+		table.Entry("IPV4 - ExternalTrafficPolicyLocal", "ipv4", "ExternalTrafficPolicyLocal"),
+		table.Entry("IPV4 - FRR running in the speaker POD", "ipv4", "CheckSpeakerFRRPodRunning"),
+		table.Entry("IPV6 - ExternalTrafficPolicyCluster", "ipv6", "ExternalTrafficPolicyCluster"),
+		table.Entry("IPV6 - ExternalTrafficPolicyLocal", "ipv6", "ExternalTrafficPolicyLocal"),
+		table.Entry("IPV6 - FRR running in the speaker POD", "ipv6", "CheckSpeakerFRRPodRunning"))
 
 	ginkgo.Context("metrics", func() {
 		var controllerPod *corev1.Pod
@@ -223,15 +237,23 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 		})
 
-		ginkgo.It("should be exposed by the controller", func() {
-			// TODO: The peer address will require update to add support for bgp + IPv6
+		table.DescribeTable("should be exposed by the controller", func(ipFamily string) {
 			poolName := "bgp-test"
 
 			var peers []peer
 			var peerAddrs []string
+			var address string
+
 			for _, c := range frrContainers {
+				c.RouterConfig.IPFamily = ipFamily
+				c.NeighborConfig.IPFamily = ipFamily
+				if ipFamily == "ipv4" {
+					address = c.Ipv4
+				} else {
+					address = c.Ipv6
+				}
 				peers = append(peers, peer{
-					Addr:     c.Ipv4,
+					Addr:     address,
 					ASN:      c.RouterConfig.ASN,
 					MyASN:    c.NeighborConfig.ASN,
 					Port:     c.RouterConfig.BGPPort,
@@ -239,7 +261,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					Password: c.RouterConfig.Password,
 					HoldTime: c.RouterConfig.HoldTime,
 				})
-				peerAddrs = append(peerAddrs, c.Ipv4+fmt.Sprintf(":%d", c.RouterConfig.BGPPort))
+				peerAddrs = append(peerAddrs, address+fmt.Sprintf(":%d", c.RouterConfig.BGPPort))
 			}
 
 			configData := configFile{
@@ -309,7 +331,9 @@ var _ = ginkgo.Describe("BGP", func() {
 
 				validateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": speaker.Spec.NodeName, "protocol": "bgp", "service": fmt.Sprintf("%s/%s", f.Namespace.Name, svc.Name)}, speakerMetrics)
 			}
-		})
+		},
+			table.Entry("IPV4 - Checking service", "ipv4"),
+			table.Entry("IPV6 - Checking service", "ipv6"))
 	})
 
 	ginkgo.Context("validate different AddressPools for type=Loadbalancer", func() {
@@ -319,11 +343,20 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 		})
 
-		table.DescribeTable("set different AddressPools ranges modes", func(addressPools []addressPool) {
+		table.DescribeTable("set different AddressPools ranges modes", func(addressPools []addressPool, ipFamily string) {
 			var peers []peer
+			var address string
+
 			for _, c := range frrContainers {
+				c.RouterConfig.IPFamily = ipFamily
+				c.NeighborConfig.IPFamily = ipFamily
+				if ipFamily == "ipv4" {
+					address = c.Ipv4
+				} else {
+					address = c.Ipv6
+				}
 				peers = append(peers, peer{
-					Addr:     c.Ipv4,
+					Addr:     address,
 					ASN:      c.RouterConfig.ASN,
 					MyASN:    c.NeighborConfig.ASN,
 					Port:     c.RouterConfig.BGPPort,
@@ -365,10 +398,10 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 
 			for _, c := range frrContainers {
-				validateService(cs, svc, allNodes.Items, c)
+				validateService(cs, svc, allNodes.Items, c, ipFamily)
 			}
 		},
-			table.Entry("AddressPool defined by network prefix", []addressPool{
+			table.Entry("IPV4 - test AddressPool defined by network prefix", []addressPool{
 				{
 					Name:     "bgp-test",
 					Protocol: BGP,
@@ -376,9 +409,9 @@ var _ = ginkgo.Describe("BGP", func() {
 						"192.168.10.0/24",
 						"fc00:f853:0ccd:e799::/124",
 					},
-				},
-			}),
-			table.Entry("AddressPool defined by address range", []addressPool{
+				}}, "ipv4",
+			),
+			table.Entry("IPV6 - test AddressPool defined by address range", []addressPool{
 				{
 					Name:     "bgp-test",
 					Protocol: BGP,
@@ -386,8 +419,8 @@ var _ = ginkgo.Describe("BGP", func() {
 						"192.168.10.0-192.168.10.18",
 						"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
 					},
-				},
-			}),
+				}}, "ipv6",
+			),
 		)
 	})
 })
@@ -469,7 +502,9 @@ func validateFRRPeeredWithNodes(cs clientset.Interface, c *frrcontainer.FRR) {
 	}, 2*time.Minute, 1*time.Second).Should(BeNil())
 }
 
-func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1.Node, c *frrcontainer.FRR) {
+func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1.Node, c *frrcontainer.FRR, ipFamily string) {
+	var iProutes frr.Route
+	var ok bool
 	port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
 	ingressIP := e2eservice.GetIngressPoint(
 		&svc.Status.LoadBalancer.Ingress[0])
@@ -483,23 +518,26 @@ func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1
 			return err
 		}
 
-		advertised := routes.ForIP(ingressIP, c)
+		advertised := routes.ForIP(ingressIP, c, ipFamily)
 		err = routes.MatchNodes(nodes, advertised)
 		if err != nil {
 			return err
 		}
 
-		frrRoutes, _, err := frr.Routes(c)
+		frrRoutes, frrRoutesV6, err := frr.Routes(c)
 		if err != nil {
 			return err
 		}
-
-		routes, ok := frrRoutes[ingressIP]
+		if ipFamily == "ipv4" {
+			iProutes, ok = frrRoutes[ingressIP]
+		} else {
+			iProutes, ok = frrRoutesV6[ingressIP]
+		}
 		if !ok {
 			return fmt.Errorf("%s not found in frr routes %v", ingressIP, frrRoutes)
 		}
 
-		err = frr.RoutesMatchNodes(nodes, routes)
+		err = frr.RoutesMatchNodes(nodes, iProutes)
 		if err != nil {
 			return err
 		}
@@ -507,12 +545,18 @@ func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1
 	}, 2*time.Minute, 1*time.Second).Should(BeNil())
 }
 
-func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR) bool {
+func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily string) bool {
+	var toParse string
 	pods, err := cs.CoreV1().Pods("metallb-system").List(context.Background(), metav1.ListOptions{
 		LabelSelector: "component=speaker",
 	})
 	framework.ExpectNoError(err)
-	toParse, err := framework.RunKubectl("metallb-system", "exec", pods.Items[0].Name, "-c", "frr", "--", "vtysh", "-c", fmt.Sprintf("show bgp view %d neighbor %s json", n.NeighborConfig.ASN, n.Ipv4))
+	if ipFamily == "ipv4" {
+		toParse, err = framework.RunKubectl("metallb-system", "exec", pods.Items[0].Name, "-c", "frr", "--", "vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", n.Ipv4))
+	} else {
+		toParse, err = framework.RunKubectl("metallb-system", "exec", pods.Items[0].Name, "-c", "frr", "--", "vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", n.Ipv6))
+
+	}
 	framework.ExpectNoError(err)
 	res, err := frr.NeighborConnected(toParse)
 	framework.ExpectNoError(err)
