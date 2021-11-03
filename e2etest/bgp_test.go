@@ -237,9 +237,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				validateGaugeValue(1, "metallb_bgp_session_up", map[string]string{"peer": peerAddr}, speakerMetrics)
 				validateGaugeValue(1, "metallb_bgp_announced_prefixes_total", map[string]string{"peer": peerAddr}, speakerMetrics)
 
-				updatesTotal, err := metrics.CounterForLabels("metallb_bgp_updates_total", map[string]string{"peer": peerAddr}, speakerMetrics)
-				framework.ExpectNoError(err)
-				framework.ExpectEqual(updatesTotal >= 1, true, "expecting ", updatesTotal, "greater than 1")
+				validateCounterValue(1, "metallb_bgp_updates_total", map[string]string{"peer": peerAddr}, speakerMetrics)
 
 				validateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": speaker.Spec.NodeName, "protocol": "bgp", "service": fmt.Sprintf("%s/%s", f.Namespace.Name, svc.Name)}, speakerMetrics)
 			}
@@ -332,10 +330,40 @@ func createServiceWithBackend(cs clientset.Interface, namespace string, policy c
 	return svc, jig
 }
 
-func validateGaugeValue(expectedValue int, metricName string, labels map[string]string, m map[string]*dto.MetricFamily) {
-	value, err := metrics.GaugeForLabels(metricName, labels, m)
-	framework.ExpectNoError(err)
-	framework.ExpectEqual(value, expectedValue, "invalid value for ", metricName, labels)
+func validateGaugeValue(expectedValue int, metricName string, labels map[string]string, allMetrics []map[string]*dto.MetricFamily) {
+	var err error
+	var value int
+	found := false
+	for _, m := range allMetrics {
+		value, err = metrics.GaugeForLabels(metricName, labels, m)
+		if err != nil {
+			continue
+		}
+		found = true
+		framework.ExpectEqual(value, expectedValue, "invalid value for ", metricName, labels)
+	}
+
+	if !found {
+		framework.Fail(err.Error())
+	}
+}
+
+func validateCounterValue(expectedValue int, metricName string, labels map[string]string, allMetrics []map[string]*dto.MetricFamily) {
+	var err error
+	var value int
+	found := false
+	for _, m := range allMetrics {
+		value, err = metrics.CounterForLabels(metricName, labels, m)
+		if err != nil {
+			continue
+		}
+		found = true
+		framework.ExpectEqual(value >= expectedValue, true, "expecting ", value, "greater than", expectedValue)
+	}
+
+	if !found {
+		framework.Fail(err.Error())
+	}
 }
 
 func pairExternalFRRWithNodes(cs clientset.Interface) {
