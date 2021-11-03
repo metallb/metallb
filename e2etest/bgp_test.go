@@ -194,9 +194,8 @@ var _ = ginkgo.Describe("BGP", func() {
 		})
 
 		ginkgo.It("would check that FRR is running in the speaker", func() {
-			for _, c := range frrContainers {
-				paired := frrIsPairedOnPods(cs, c)
-				framework.ExpectEqual(paired, true)
+			for _, container := range frrContainers {
+				frrIsPairedOnPods(cs, container)
 			}
 		})
 	})
@@ -276,7 +275,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					return err
 				}
 				return nil
-			}, 2*time.Minute, 1*time.Second).Should(BeNil())
+			}, 4*time.Minute, 1*time.Second).Should(BeNil())
 
 			for _, speaker := range speakerPods {
 				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
@@ -295,7 +294,7 @@ var _ = ginkgo.Describe("BGP", func() {
 						}
 					}
 					return nil
-				}, 2*time.Minute, 1*time.Second).Should(BeNil())
+				}, 4*time.Minute, 1*time.Second).Should(BeNil())
 			}
 
 			ginkgo.By("creating a service")
@@ -314,7 +313,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					return err
 				}
 				return nil
-			}, 2*time.Minute, 1*time.Second).Should(BeNil())
+			}, 4*time.Minute, 1*time.Second).Should(BeNil())
 
 			for _, speaker := range speakerPods {
 				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
@@ -345,7 +344,7 @@ var _ = ginkgo.Describe("BGP", func() {
 						return err
 					}
 					return nil
-				}, 2*time.Minute, 1*time.Second).Should(BeNil())
+				}, 4*time.Minute, 1*time.Second).Should(BeNil())
 			}
 		})
 	})
@@ -506,7 +505,7 @@ func validateFRRPeeredWithNodes(cs clientset.Interface, c *frrcontainer.FRR) {
 			return err
 		}
 		return err
-	}, 2*time.Minute, 1*time.Second).Should(BeNil())
+	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
 
 func waitFRRNotPeered(cs clientset.Interface, containers []*frrcontainer.FRR) {
@@ -560,19 +559,29 @@ func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1
 			return err
 		}
 		return nil
-	}, 2*time.Minute, 1*time.Second).Should(BeNil())
+	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
 
-func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR) bool {
+func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR) {
 	pods, err := cs.CoreV1().Pods("metallb-system").List(context.Background(), metav1.ListOptions{
 		LabelSelector: "component=speaker",
 	})
 	framework.ExpectNoError(err)
-	toParse, err := framework.RunKubectl("metallb-system", "exec", pods.Items[0].Name, "-c", "frr", "--", "vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", n.Ipv4))
-	framework.ExpectNoError(err)
-	res, err := frr.NeighborConnected(toParse)
-	framework.ExpectNoError(err)
-	return res
+
+	Eventually(func() error {
+		toParse, err := framework.RunKubectl("metallb-system", "exec", pods.Items[0].Name, "-c", "frr", "--", "vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", n.Ipv4))
+		if err != nil {
+			return err
+		}
+		res, err := frr.NeighborConnected(toParse)
+		if err != nil {
+			return err
+		}
+		if res != true {
+			return fmt.Errorf("expecting neighbor %s to be connected", n.Ipv4)
+		}
+		return nil
+	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
 
 func createFRRContainers(c []containerConfig) ([]*frrcontainer.FRR, error) {
