@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"path"
+	"strconv"
 	"strings"
 
 	dto "github.com/prometheus/client_model/go"
@@ -18,17 +19,31 @@ import (
 
 // MetricsForPod returns the parsed metrics for the given pod, scraping them
 // from the executor pod.
-func ForPod(executor, target *corev1.Pod) (map[string]*dto.MetricFamily, error) {
-	metricsUrl := path.Join(net.JoinHostPort(target.Status.PodIP, "7472"), "metrics")
-	metrics, err := framework.RunKubectl("metallb-system", "exec", executor.Name, "--", "wget", "-qO-", metricsUrl)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to scrape metrics for %s", target.Name)
+func ForPod(executor, target *corev1.Pod) ([]map[string]*dto.MetricFamily, error) {
+	ports := make([]int, 0)
+	allMetrics := make([]map[string]*dto.MetricFamily, 0)
+	for _, c := range target.Spec.Containers {
+		for _, p := range c.Ports {
+			if p.Name == "monitoring" {
+				ports = append(ports, int(p.ContainerPort))
+			}
+		}
 	}
-	res, err := metricsFromString(metrics)
-	if err != nil {
-		return nil, err
+
+	for _, p := range ports {
+		metricsUrl := path.Join(net.JoinHostPort(target.Status.PodIP, strconv.Itoa(p)), "metrics")
+		metrics, err := framework.RunKubectl("metallb-system", "exec", executor.Name, "--", "wget", "-qO-", metricsUrl)
+		if err != nil {
+			return nil, errors.Wrapf(err, "failed to scrape metrics for %s", target.Name)
+		}
+		res, err := metricsFromString(metrics)
+		if err != nil {
+			return nil, err
+		}
+		allMetrics = append(allMetrics, res)
 	}
-	return res, nil
+
+	return allMetrics, nil
 }
 
 // GaugeForLabels retrieves the value of the Gauge matching the given set of labels.
