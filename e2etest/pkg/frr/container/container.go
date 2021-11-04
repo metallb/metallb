@@ -1,16 +1,17 @@
 // SPDX-License-Identifier:Apache-2.0
 
-package frr
+package container
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
 
 	"github.com/pkg/errors"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
-	config "go.universe.tf/metallb/e2etest/pkg/frr/config"
+	"go.universe.tf/metallb/e2etest/pkg/frr/config"
 	"go.universe.tf/metallb/e2etest/pkg/frr/consts"
 )
 
@@ -19,16 +20,74 @@ const (
 	frrConfigDir = "config/frr"
 	// FRR routing image.
 	frrImage = "frrouting/frr:v7.5.1"
+	// Host network name.
+	hostNetwork = "host"
 	// FRR container mount destination path.
 	frrMountPath = "/etc/frr"
 )
 
+type FRR struct {
+	executor.Executor
+	Name           string
+	configDir      string
+	NeighborConfig config.NeighborConfig
+	RouterConfig   config.RouterConfig
+	Ipv4           string
+	Ipv6           string
+}
+
+// Start creates a new FRR container on the host and returns the corresponding *FRR.
+// A situation where a non-nil container and an error are returned is possible.
+func Start(name string, nc config.NeighborConfig, rc config.RouterConfig, network string, hostipv4 string, hostipv6 string) (*FRR, error) {
+	configDir, err := ioutil.TempDir("", "frr-conf")
+	if err != nil {
+		return nil, err
+	}
+
+	err = startContainer(name, configDir, rc, network)
+	if err != nil {
+		return nil, err
+	}
+
+	exc := executor.ForContainer(name)
+
+	frr := &FRR{
+		Executor:       exc,
+		Name:           name,
+		configDir:      configDir,
+		NeighborConfig: nc,
+		RouterConfig:   rc,
+	}
+
+	if network == hostNetwork {
+		frr.Ipv4 = hostipv4
+		frr.Ipv6 = hostipv6
+	} else {
+		err = frr.updateIPS()
+		if err != nil {
+			return frr, err
+		}
+	}
+
+	err = frr.updateVolumePermissions()
+	if err != nil {
+		return frr, err
+	}
+
+	return frr, nil
+}
+
 // Run a BGP router in a container.
-func StartContainer(containerName string, testDirName string, network string) error {
+func startContainer(containerName string, testDirName string, rc config.RouterConfig, network string) error {
 	srcFiles := fmt.Sprintf("%s/.", frrConfigDir)
 	res, err := exec.Command("cp", "-r", srcFiles, testDirName).CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "Failed to copy FRR config directory. %s", string(res))
+	}
+
+	err = config.SetDaemonsConfig(testDirName, rc)
+	if err != nil {
+		return err
 	}
 
 	volume := fmt.Sprintf("%s:%s", testDirName, frrMountPath)
@@ -41,40 +100,42 @@ func StartContainer(containerName string, testDirName string, network string) er
 	return nil
 }
 
+// Sets the IPv4 and IPv6 addresses of the *FRR.
 // todo: improve error handling, especially check that containerIPv4 and containerIPv6 are not empty
-// Returns the IPv4 and IPv6 addresses of the container.
-func GetContainerIPs(containerName string) (ipv4 string, ipv6 string, err error) {
+func (c *FRR) updateIPS() (err error) {
 	containerIP, err := exec.Command(executor.ContainerRuntime, "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
-		containerName).CombinedOutput()
+		c.Name).CombinedOutput()
 	if err != nil {
-		return "", "", errors.Wrapf(err, "Failed to get FRR IPv4 address")
+		return errors.Wrapf(err, "Failed to get FRR IPv4 address")
 	}
 
 	containerIPv4 := strings.TrimSuffix(string(containerIP), "\n")
 
 	containerIP, err = exec.Command(executor.ContainerRuntime, "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.GlobalIPv6Address}}{{end}}",
-		containerName).CombinedOutput()
+		c.Name).CombinedOutput()
 	if err != nil {
-		return "", "", errors.Wrapf(err, "Failed to get FRR IPv6 address")
+		return errors.Wrapf(err, "Failed to get FRR IPv6 address")
 	}
 
 	containerIPv6 := strings.TrimSuffix(string(containerIP), "\n")
 
 	if containerIPv4 == "" && containerIPv6 == "" {
-		return "", "", errors.Errorf("Failed to get FRR IP addresses")
+		return errors.Errorf("Failed to get FRR IP addresses")
 	}
+	c.Ipv4 = containerIPv4
+	c.Ipv6 = containerIPv6
 
-	return containerIPv4, containerIPv6, nil
+	return nil
 }
 
 // Updating the BGP config file.
-func UpdateBGPConfigFile(testDirName string, bgpConfig string, exec executor.Executor) error {
-	err := config.SetBGPConfig(testDirName, bgpConfig)
+func (c *FRR) UpdateBGPConfigFile(bgpConfig string) error {
+	err := config.SetBGPConfig(c.configDir, bgpConfig)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to update BGP config file")
 	}
 
-	err = reloadFRRConfig(consts.BGPConfigFile, exec)
+	err = reloadFRRConfig(consts.BGPConfigFile, c)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to reload BGP config file")
 	}
@@ -83,14 +144,14 @@ func UpdateBGPConfigFile(testDirName string, bgpConfig string, exec executor.Exe
 }
 
 // Delete the BGP router container configuration.
-func StopContainer(containerName string, testDirName string) error {
+func (c *FRR) Stop() error {
 	// Kill the BGP router container.
-	out, err := exec.Command(executor.ContainerRuntime, "kill", containerName).CombinedOutput()
+	out, err := exec.Command(executor.ContainerRuntime, "kill", c.Name).CombinedOutput()
 	if err != nil {
-		return errors.Wrapf(err, "Failed to kill %s container. %s", containerName, out)
+		return errors.Wrapf(err, "Failed to kill %s container. %s", c.Name, out)
 	}
 
-	err = os.RemoveAll(testDirName)
+	err = os.RemoveAll(c.configDir)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to delete FRR config directory.")
 	}
@@ -100,7 +161,7 @@ func StopContainer(containerName string, testDirName string) error {
 
 // Change volume permissions.
 // Allows deleting the test directory or updating the files in the volume.
-func UpdateContainerVolumePermissions(containerName string) error {
+func (c *FRR) updateVolumePermissions() error {
 	var uid, gid int
 
 	if isPodman() {
@@ -116,9 +177,9 @@ func UpdateContainerVolumePermissions(containerName string) error {
 	}
 
 	cmd := fmt.Sprintf("chown -R %d:%d %s", uid, gid, frrMountPath)
-	out, err := exec.Command(executor.ContainerRuntime, "exec", containerName, "sh", "-c", cmd).CombinedOutput()
+	out, err := exec.Command(executor.ContainerRuntime, "exec", c.Name, "sh", "-c", cmd).CombinedOutput()
 	if err != nil {
-		return errors.Wrapf(err, "Failed to change %s container volume permissions. %s", containerName, string(out))
+		return errors.Wrapf(err, "Failed to change %s container volume permissions. %s", c.Name, string(out))
 	}
 
 	return nil

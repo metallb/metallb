@@ -18,30 +18,30 @@ import (
 // BGP router config.
 const bgpConfigTemplate = `
 router bgp {{.ASN}}
+  no bgp ebgp-requires-policy
 {{range .Neighbors }}
   neighbor {{.Addr}} remote-as {{.ASN}}
   neighbor {{.Addr}} next-hop-self
 {{- end }}
 `
 
-type routerConfig struct {
+type RouterConfig struct {
 	ASN       uint32
-	Neighbors []*neighborConfig
+	Neighbors []*NeighborConfig
+	BGPPort   uint16
 }
 
-type neighborConfig struct {
+type NeighborConfig struct {
 	ASN  uint32
 	Addr string
 }
 
 // Set the IP of each node in the cluster in the BGP router configuration.
 // Each node will peer with the BGP router.
-func BGPPeersForAllNodes(cs clientset.Interface) (string, error) {
-	router := &routerConfig{
-		ASN: 64512,
-	}
+func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterConfig) (string, error) {
+	router := rc
 
-	router.Neighbors = make([]*neighborConfig, 0)
+	router.Neighbors = make([]*NeighborConfig, 0)
 
 	nodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
@@ -52,11 +52,9 @@ func BGPPeersForAllNodes(cs clientset.Interface) (string, error) {
 	for _, node := range nodes.Items {
 		for i := range node.Status.Addresses {
 			if node.Status.Addresses[i].Type == "InternalIP" {
-				neighbor := &neighborConfig{
-					ASN:  64512,
-					Addr: node.Status.Addresses[i].Address,
-				}
-				router.Neighbors = append(router.Neighbors, neighbor)
+				neighbor := nc
+				neighbor.Addr = node.Status.Addresses[i].Address
+				router.Neighbors = append(router.Neighbors, &neighbor)
 			}
 		}
 	}
@@ -96,6 +94,37 @@ func SetBGPConfig(testDirName string, config string) error {
 
 	info := Template{
 		BGPConfig: config,
+	}
+
+	err = tpl.Execute(f, info)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to update %s", path)
+	}
+
+	return nil
+}
+
+// Set daemons config file.
+func SetDaemonsConfig(testDirName string, rc RouterConfig) error {
+	path := fmt.Sprintf("%s/%s", testDirName, consts.DaemonsConfigFile)
+	tpl, err := template.ParseFiles(path)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to parse %s", path)
+	}
+
+	f, err := os.Create(path)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to open file %s", path)
+	}
+
+	defer f.Close()
+
+	type Template struct {
+		BGPPort uint16
+	}
+
+	info := Template{
+		BGPPort: rc.BGPPort,
 	}
 
 	err = tpl.Execute(f, info)
