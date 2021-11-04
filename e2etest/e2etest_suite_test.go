@@ -39,7 +39,10 @@ import (
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 )
 
-const defaultTestNameSpace = "metallb-system"
+const (
+	defaultTestNameSpace    = "metallb-system"
+	defaultContainerNetwork = "kind"
+)
 
 var (
 	// Use ephemeral port for pod, instead of well-known port (tcp/80).
@@ -48,7 +51,9 @@ var (
 	ipv4ServiceRange string
 	ipv6ServiceRange string
 	testNameSpace    = defaultTestNameSpace
-	frrTestConfigDir string
+	containerNetwork = defaultContainerNetwork
+	hostIPv4         string
+	hostIPv6         string
 )
 
 // handleFlags sets up all flags and parses the command line.
@@ -98,8 +103,15 @@ var _ = ginkgo.BeforeSuite(func() {
 		testNameSpace = ns
 	}
 
-	if dir := os.Getenv("FRR_CONFIG_DIR"); len(dir) != 0 {
-		frrTestConfigDir = dir
+	if _, res := os.LookupEnv("RUN_FRR_CONTAINER_ON_HOST_NETWORK"); res == true {
+		containerNetwork = "host"
+	}
+
+	if ip := os.Getenv("PROVISIONING_HOST_EXTERNAL_IPV4"); len(ip) != 0 {
+		hostIPv4 = ip
+	}
+	if ip := os.Getenv("PROVISIONING_HOST_EXTERNAL_IPV6"); len(ip) != 0 {
+		hostIPv6 = ip
 	}
 
 	// Validate the IPv4 service range.

@@ -48,6 +48,7 @@ const frrContainer = "frr"
 var (
 	frrContainerIPv4 string
 	frrContainerIPv6 string
+	frrTestConfigDir string
 )
 
 var _ = ginkgo.Describe("BGP", func() {
@@ -58,20 +59,23 @@ var _ = ginkgo.Describe("BGP", func() {
 		cs = f.ClientSet
 
 		var err error
-		// If the FRR container is not running, start it on the local host.
-		if skipDockerCmd {
-			if len(frrTestConfigDir) == 0 {
-				framework.Fail("Missing FRR config directory.")
-			}
-		} else {
-			frrTestConfigDir, err = ioutil.TempDir("", "frr-conf")
-			framework.ExpectNoError(err)
-			err = frr.StartContainer(frrContainer, frrTestConfigDir)
+		frrTestConfigDir, err = ioutil.TempDir("", "frr-conf")
+		framework.ExpectNoError(err)
+		err = frr.StartContainer(frrContainer, frrTestConfigDir, containerNetwork)
+		framework.ExpectNoError(err)
+
+		frrContainerIPv4 = hostIPv4
+		frrContainerIPv6 = hostIPv6
+
+		if containerNetwork != "host" {
+			frrContainerIPv4, frrContainerIPv6, err = frr.GetContainerIPs(frrContainer)
 			framework.ExpectNoError(err)
 		}
 
-		frrContainerIPv4, frrContainerIPv6, err = frr.GetContainerIPs(frrContainer)
-		framework.ExpectNoError(err)
+		// TODO: When adding support for bgp + IPv6 need to validate frrContainerIPv6 as well
+		if net.ParseIP(frrContainerIPv4) == nil {
+			framework.Fail("Invalid frrContainerIPv4")
+		}
 
 		err = frr.UpdateContainerVolumePermissions(frrContainer)
 		framework.ExpectNoError(err)
@@ -82,10 +86,8 @@ var _ = ginkgo.Describe("BGP", func() {
 		err := updateConfigMap(cs, configFile{})
 		framework.ExpectNoError(err)
 
-		if !skipDockerCmd {
-			err = frr.StopContainer(frrContainer, frrTestConfigDir)
-			framework.ExpectNoError(err)
-		}
+		err = frr.StopContainer(frrContainer, frrTestConfigDir)
+		framework.ExpectNoError(err)
 
 		if ginkgo.CurrentGinkgoTestDescription().Failed {
 			DescribeSvc(f.Namespace.Name)
@@ -376,9 +378,6 @@ func pairExternalFRRWithNodes(cs clientset.Interface) {
 	framework.ExpectNoError(err)
 
 	exc := executor.ForContainer(frrContainer)
-	if skipDockerCmd {
-		exc = executor.Host
-	}
 
 	err = frr.UpdateBGPConfigFile(frrTestConfigDir, bgpConfig, exc)
 	framework.ExpectNoError(err)
@@ -388,9 +387,6 @@ func pairExternalFRRWithNodes(cs clientset.Interface) {
 
 func validateFRRPeeredWithNodes(cs clientset.Interface) {
 	exc := executor.ForContainer(frrContainer)
-	if skipDockerCmd {
-		exc = executor.Host
-	}
 
 	allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	framework.ExpectNoError(err)
@@ -419,9 +415,6 @@ func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1
 	}
 
 	exc := executor.ForContainer(frrContainer)
-	if skipDockerCmd {
-		exc = executor.Host
-	}
 
 	Eventually(func() error {
 		err := wgetRetry(address, exc)
