@@ -25,6 +25,7 @@ require (
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.10.0
 	github.com/spf13/viper v1.8.1 // indirect
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20210510120138-977fb7262007
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.20.2

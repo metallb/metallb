@@ -28,6 +28,7 @@ hostname {{.Hostname}}
 
 {{range .Routers -}}
 router bgp {{.MyASN}}
+  no bgp ebgp-requires-policy
   no bgp network import-check
   no bgp default ipv4-unicast
 {{ if .RouterId }}
