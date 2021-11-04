@@ -3,6 +3,7 @@ log stdout
 hostname dummyhostname
 
 router bgp 100
+  no bgp ebgp-requires-policy
   no bgp network import-check
   no bgp default ipv4-unicast
 
@@ -19,6 +20,7 @@ router bgp 100
   exit-address-family
 
 router bgp 300
+  no bgp ebgp-requires-policy
   no bgp network import-check
   no bgp default ipv4-unicast
 
