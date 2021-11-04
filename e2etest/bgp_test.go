@@ -645,7 +645,9 @@ func validateFRRPeeredWithNodes(cs clientset.Interface, c *frrcontainer.FRR) {
 	ginkgo.By(fmt.Sprintf("checking all nodes are peered with the frr instance %s", c.Name))
 	Eventually(func() error {
 		neighbors, err := frr.NeighborsInfo(c)
-		framework.ExpectNoError(err)
+		if err != nil {
+			return err
+		}
 		err = frr.NeighborsMatchNodes(allNodes.Items, neighbors)
 		return err
 	}, 4*time.Minute, 1*time.Second).Should(BeNil())
