@@ -67,11 +67,22 @@ func Routes(exec executor.Executor) (map[string]Route, map[string]Route, error) 
 // RawDump dumps all the low leven info as a single string.
 // To be used for debugging in order to print the status of the frr instance.
 func RawDump(exec executor.Executor) (string, error) {
-	res, err := exec.Exec("vtysh", "-c", "show bgp neighbor")
-
+	res := ""
+	out, err := exec.Exec("vtysh", "-c", "show bgp neighbor")
 	if err != nil {
 		return "", errors.Wrapf(err, "Failed exec show bgp neighbor %s", res)
 	}
+	res = out
+	out, err = exec.Exec("vtysh", "-c", "show running-config")
+	if err != nil {
+		return "", errors.Wrapf(err, "Failed exec show bgp neighbor %s", res)
+	}
+	res = res + out
+	out, err = exec.Exec("cat", "/etc/frr/bgpd.conf")
+	if err != nil {
+		return "", errors.Wrapf(err, "Failed to cat bgpd.conf file %s", res)
+	}
+	res = res + out
 	// TODO: concatenate extra info (i.e. BFD) when needed
 	return res, nil
 }

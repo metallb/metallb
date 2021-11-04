@@ -98,9 +98,12 @@ var _ = ginkgo.Describe("BGP", func() {
 	})
 
 	ginkgo.AfterEach(func() {
+		ginkgo.By("Clearing the previous configuration")
 		// Clean previous configuration.
 		err := updateConfigMap(cs, configFile{})
 		framework.ExpectNoError(err)
+
+		ginkgo.By("Waiting for neighbour to disconnect")
 		waitFRRNotPeered(cs, frrContainers)
 
 		err = stopFRRContainers(frrContainers)
@@ -506,7 +509,7 @@ func validateFRRPeeredWithNodes(cs clientset.Interface, c *frrcontainer.FRR) {
 		if err != nil {
 			return err
 		}
-		return err
+		return nil
 	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
 
