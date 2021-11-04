@@ -672,7 +672,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
         ipv6_service_range = get_service_range(6)
 
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "go test {} {} --provider=local --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {}".format(ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range, ipv6_service_range, opt_skip_docker), warn="True")
+            "go test -timeout 30m {} {} --provider=local --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {}".format(ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range, ipv6_service_range, opt_skip_docker), warn="True")
 
     if export != None:
         run("kind export logs {}".format(export))
