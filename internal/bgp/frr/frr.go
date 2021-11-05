@@ -168,7 +168,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 
 	config := &frrConfig{
 		Hostname: hostname,
-		Loglevel: "", // TODO.
+		Loglevel: "informational", // TODO - make loglevel configurable via envvar.
 		Routers:  make(map[string]*routerConfig),
 	}
 
@@ -205,7 +205,13 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				ASN:            s.asn,
 				Addr:           host,
 				Port:           uint16(portUint),
+				HoldTime:       uint64(s.holdTime / time.Second),
+				KeepaliveTime:  uint64(s.holdTime / (3 * time.Second)), // TODO use 1/3 of holdtime till we can configure it.
+				Password:       s.password,
 				Advertisements: make([]*advertisementConfig, 0),
+			}
+			if s.srcAddr != nil {
+				neighbor.SrcAddr = s.srcAddr.String()
 			}
 			router.Neighbors[neighborName] = neighbor
 		}
