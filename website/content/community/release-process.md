@@ -96,6 +96,13 @@ tags that don't exist until CircleCI makes them exist.
 Check on Quay for a `vX.Y.Z` tag on each image, or check on
 CircleCI that the deploy has completed.
 
+### Publish a helm chart update
+
+This is a manual step until some future time when we build an appropriate CI
+job that can do it for us. See
+[issue #873](https://github.com/metallb/metallb/issues/873) for more details on
+how to manually publish the helm chart update.
+
 ### Repoint the live website
 
 Move the `live-website` branch to the newly created tag with `git
@@ -103,6 +110,10 @@ branch -f live-website vX.Y.Z`, then force-push the branch with `git
 push -f origin live-website`. This will trigger Netlify to
 redeploy [metallb.universe.tf](https://metallb.universe.tf) with
 updated documentation for the new version.
+
+### Update Slack
+
+Update the topic in `#metallb` on Kubernetes slack.
 
 ### Brag about new release
 
