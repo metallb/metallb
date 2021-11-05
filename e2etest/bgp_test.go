@@ -68,21 +68,28 @@ var _ = ginkgo.Describe("BGP", func() {
 		{
 			name: frrIBGP,
 			nc: frrconfig.NeighborConfig{
-				ASN: IBGPAsn,
+				ASN:      IBGPAsn,
+				Password: "ibgp-test",
 			},
 			rc: frrconfig.RouterConfig{
-				ASN:     IBGPAsn,
-				BGPPort: 179,
+				ASN:      IBGPAsn,
+				BGPPort:  179,
+				RouterID: "10.10.10.10",
+				Password: "ibgp-test",
+				HoldTime: "180s",
 			},
 		},
 		{
 			name: frrEBGP,
 			nc: frrconfig.NeighborConfig{
-				ASN: EBGPAsn,
+				ASN:      EBGPAsn,
+				Password: "ebgp-test",
 			},
 			rc: frrconfig.RouterConfig{
-				ASN:     IBGPAsn,
-				BGPPort: 180,
+				ASN:      IBGPAsn,
+				BGPPort:  180,
+				RouterID: "11.11.11.11",
+				Password: "ebgp-test",
 			},
 		},
 	}
@@ -118,10 +125,13 @@ var _ = ginkgo.Describe("BGP", func() {
 			var peers []peer
 			for _, c := range frrContainers {
 				peers = append(peers, peer{
-					Addr:  c.Ipv4,
-					ASN:   c.RouterConfig.ASN,
-					MyASN: c.NeighborConfig.ASN,
-					Port:  c.RouterConfig.BGPPort,
+					Addr:     c.Ipv4,
+					ASN:      c.RouterConfig.ASN,
+					MyASN:    c.NeighborConfig.ASN,
+					Port:     c.RouterConfig.BGPPort,
+					RouterID: c.RouterConfig.RouterID,
+					Password: c.RouterConfig.Password,
+					HoldTime: c.RouterConfig.HoldTime,
 				})
 			}
 			configData := configFile{
@@ -221,10 +231,13 @@ var _ = ginkgo.Describe("BGP", func() {
 			var peerAddrs []string
 			for _, c := range frrContainers {
 				peers = append(peers, peer{
-					Addr:  c.Ipv4,
-					ASN:   c.RouterConfig.ASN,
-					MyASN: c.NeighborConfig.ASN,
-					Port:  c.RouterConfig.BGPPort,
+					Addr:     c.Ipv4,
+					ASN:      c.RouterConfig.ASN,
+					MyASN:    c.NeighborConfig.ASN,
+					Port:     c.RouterConfig.BGPPort,
+					RouterID: c.RouterConfig.RouterID,
+					Password: c.RouterConfig.Password,
+					HoldTime: c.RouterConfig.HoldTime,
 				})
 				peerAddrs = append(peerAddrs, c.Ipv4+fmt.Sprintf(":%d", c.RouterConfig.BGPPort))
 			}
@@ -310,10 +323,13 @@ var _ = ginkgo.Describe("BGP", func() {
 			var peers []peer
 			for _, c := range frrContainers {
 				peers = append(peers, peer{
-					Addr:  c.Ipv4,
-					ASN:   c.RouterConfig.ASN,
-					MyASN: c.NeighborConfig.ASN,
-					Port:  c.RouterConfig.BGPPort,
+					Addr:     c.Ipv4,
+					ASN:      c.RouterConfig.ASN,
+					MyASN:    c.NeighborConfig.ASN,
+					Port:     c.RouterConfig.BGPPort,
+					RouterID: c.RouterConfig.RouterID,
+					Password: c.RouterConfig.Password,
+					HoldTime: c.RouterConfig.HoldTime,
 				})
 			}
 			configData := configFile{
@@ -496,7 +512,7 @@ func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR) bool {
 		LabelSelector: "component=speaker",
 	})
 	framework.ExpectNoError(err)
-	toParse, err := framework.RunKubectl("metallb-system", "exec", pods.Items[0].Name, "-c", "frr", "--", "vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", n.Ipv4))
+	toParse, err := framework.RunKubectl("metallb-system", "exec", pods.Items[0].Name, "-c", "frr", "--", "vtysh", "-c", fmt.Sprintf("show bgp view %d neighbor %s json", n.NeighborConfig.ASN, n.Ipv4))
 	framework.ExpectNoError(err)
 	res, err := frr.NeighborConnected(toParse)
 	framework.ExpectNoError(err)

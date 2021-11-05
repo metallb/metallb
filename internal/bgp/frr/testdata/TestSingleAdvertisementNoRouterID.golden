@@ -1,8 +1,9 @@
 
-log stdout 
+log file /etc/frr/frr.log informational
+log timestamp precision 3
 hostname dummyhostname
 
-router bgp 100
+router bgp 100 view 100
   no bgp ebgp-requires-policy
   no bgp network import-check
   no bgp default ipv4-unicast
@@ -10,6 +11,9 @@ router bgp 100
 
   neighbor 10.2.2.254 remote-as 200
   neighbor 10.2.2.254 port 179
+  neighbor 10.2.2.254 timers 0 1
+  neighbor 10.2.2.254 password password
+  neighbor 10.2.2.254 update-source 10.1.1.254
 
   address-family ipv4 unicast
     neighbor 10.2.2.254 activate

@@ -23,11 +23,12 @@ var reloaderPidFileName = "/etc/frr_reloader/reloader.pid"
 // (https://pkg.go.dev/text/template#hdr-Nested_template_definitions), this
 // should also be considered.
 const configTemplate = `
-log stdout {{.Loglevel}}
+log file /etc/frr/frr.log {{.Loglevel}}
+log timestamp precision 3
 hostname {{.Hostname}}
 
 {{range .Routers -}}
-router bgp {{.MyASN}}
+router bgp {{.MyASN}} view {{.MyASN}}
   no bgp ebgp-requires-policy
   no bgp network import-check
   no bgp default ipv4-unicast
@@ -36,7 +37,16 @@ router bgp {{.MyASN}}
 {{- end }}
 {{range .Neighbors }}
   neighbor {{.Addr}} remote-as {{.ASN}}
+  {{ if .Port -}}
   neighbor {{.Addr}} port {{.Port}}
+  {{- end }}
+  neighbor {{.Addr}} timers {{.KeepaliveTime}} {{.HoldTime}}
+  {{ if .Password -}}
+  neighbor {{.Addr}} password {{.Password}}
+  {{- end }}
+  {{ if .SrcAddr -}}
+  neighbor {{.Addr}} update-source {{.SrcAddr}}
+  {{- end }}
 {{- end }}
 {{range $n := .Neighbors -}}
 {{/* no bgp default ipv4-unicast prevents peering if no address families are defined. We declare an ipv4 one for the peer to make the pairing happen */}}
@@ -73,7 +83,11 @@ type routerConfig struct {
 type neighborConfig struct {
 	ASN            uint32
 	Addr           string
+	SrcAddr        string
 	Port           uint16
+	HoldTime       uint64
+	KeepaliveTime  uint64
+	Password       string
 	Advertisements []*advertisementConfig
 }
 
