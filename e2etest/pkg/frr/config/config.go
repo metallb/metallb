@@ -45,14 +45,11 @@ log stdout debugging
 `
 
 type RouterConfig struct {
-	ASN           uint32
-	Neighbors     []*NeighborConfig
-	BGPPort       uint16
-	RouterID      string
-	Password      string
-	HoldTime      string
-	KeepaliveTime string
-	IPFamily      string
+	ASN       uint32
+	Neighbors []*NeighborConfig
+	BGPPort   uint16
+	Password  string
+	IPFamily  string
 }
 
 type NeighborConfig struct {

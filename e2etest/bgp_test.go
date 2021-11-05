@@ -45,10 +45,11 @@ import (
 )
 
 const (
-	frrIBGP = "frr-iBGP"
-	frrEBGP = "frr-eBGP"
-	IBGPAsn = 64512
-	EBGPAsn = 64513
+	frrIBGP      = "frr-iBGP"
+	frrEBGP      = "frr-eBGP"
+	IBGPAsn      = 64512
+	EBGPAsn      = 64513
+	baseRouterID = "10.10.10.%d"
 )
 
 var (
@@ -74,9 +75,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			rc: frrconfig.RouterConfig{
 				ASN:      IBGPAsn,
 				BGPPort:  179,
-				RouterID: "10.10.10.10",
 				Password: "ibgp-test",
-				HoldTime: "180s",
 			},
 		},
 		{
@@ -88,7 +87,6 @@ var _ = ginkgo.Describe("BGP", func() {
 			rc: frrconfig.RouterConfig{
 				ASN:      EBGPAsn,
 				BGPPort:  180,
-				RouterID: "11.11.11.11",
 				Password: "ebgp-test",
 			},
 		},
@@ -123,24 +121,24 @@ var _ = ginkgo.Describe("BGP", func() {
 
 	table.DescribeTable("A service of protocol load balancer should work with", func(ipFamily string, setProtocoltest string) {
 		var allNodes *corev1.NodeList
-		var peers []peer
-		for _, c := range frrContainers {
-			c.RouterConfig.IPFamily = ipFamily
-			c.NeighborConfig.IPFamily = ipFamily
-			address := c.Ipv4
-			if ipFamily == "ipv6" {
-				address = c.Ipv6
+		ginkgo.BeforeEach(func() {
+			var peers []peer
+			for _, c := range frrContainers {
+				c.RouterConfig.IPFamily = ipFamily
+				c.NeighborConfig.IPFamily = ipFamily
+				address := c.Ipv4
+				if ipFamily == "ipv6" {
+					address = c.Ipv6
+				}
+				peers = append(peers, peer{
+					Addr:     c.Ipv4,
+					ASN:      c.RouterConfig.ASN,
+					MyASN:    c.NeighborConfig.ASN,
+					Port:     c.RouterConfig.BGPPort,
+					Password: c.RouterConfig.Password,
+				})
 			}
-			peers = append(peers, peer{
-				Addr:     address,
-				ASN:      c.RouterConfig.ASN,
-				MyASN:    c.NeighborConfig.ASN,
-				Port:     c.RouterConfig.BGPPort,
-				RouterID: c.RouterConfig.RouterID,
-				Password: c.RouterConfig.Password,
-				HoldTime: c.RouterConfig.HoldTime,
-			})
-		}
+		})
 		configData := configFile{
 			Pools: []addressPool{
 				{
@@ -230,8 +228,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 			speakerPods = make([]*corev1.Pod, 0)
 			for _, item := range speakers.Items {
-				i := item
-				speakerPods = append(speakerPods, &i)
+				speakerPods = append(speakerPods, &item)
 			}
 		})
 
@@ -248,14 +245,18 @@ var _ = ginkgo.Describe("BGP", func() {
 				if ipFamily == "ipv6" {
 					address = c.Ipv6
 				}
+				holdTime := ""
+				if i > 0 {
+					holdTime = fmt.Sprintf("%ds", i*180)
+				}
 				peers = append(peers, peer{
 					Addr:     address,
 					ASN:      c.RouterConfig.ASN,
 					MyASN:    c.NeighborConfig.ASN,
 					Port:     c.RouterConfig.BGPPort,
-					RouterID: c.RouterConfig.RouterID,
+					RouterID: fmt.Sprintf(baseRouterID, i),
 					Password: c.RouterConfig.Password,
-					HoldTime: c.RouterConfig.HoldTime,
+					HoldTime: holdTime,
 				})
 				peerAddrs = append(peerAddrs, address+fmt.Sprintf(":%d", c.RouterConfig.BGPPort))
 			}
@@ -397,14 +398,18 @@ var _ = ginkgo.Describe("BGP", func() {
 				if ipFamily == "ipv6" {
 					address = c.Ipv6
 				}
+				holdTime := ""
+				if i > 0 {
+					holdTime = fmt.Sprintf("%ds", i*180)
+				}
 				peers = append(peers, peer{
 					Addr:     address,
 					ASN:      c.RouterConfig.ASN,
 					MyASN:    c.NeighborConfig.ASN,
 					Port:     c.RouterConfig.BGPPort,
-					RouterID: c.RouterConfig.RouterID,
+					RouterID: fmt.Sprintf(baseRouterID, i),
 					Password: c.RouterConfig.Password,
-					HoldTime: c.RouterConfig.HoldTime,
+					HoldTime: holdTime,
 				})
 			}
 			configData := configFile{
