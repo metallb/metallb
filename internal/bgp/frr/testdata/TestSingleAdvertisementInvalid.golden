@@ -3,7 +3,7 @@ log file /etc/frr/frr.log informational
 log timestamp precision 3
 hostname
 
-router bgp 100 view 100
+router bgp 100
   no bgp default ipv4-unicast
   bgp router-id 10.1.1.254
 
