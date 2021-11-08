@@ -82,11 +82,11 @@ var _ = ginkgo.Describe("BGP", func() {
 		{
 			name: frrEBGP,
 			nc: frrconfig.NeighborConfig{
-				ASN:      EBGPAsn,
+				ASN:      IBGPAsn,
 				Password: "ebgp-test",
 			},
 			rc: frrconfig.RouterConfig{
-				ASN:      IBGPAsn,
+				ASN:      EBGPAsn,
 				BGPPort:  180,
 				RouterID: "11.11.11.11",
 				Password: "ebgp-test",
