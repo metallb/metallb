@@ -203,8 +203,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		if setProtocoltest == "CheckSpeakerFRRPodRunning" {
 			for _, c := range frrContainers {
-				paired := frrIsPairedOnPods(cs, c, ipFamily)
-				framework.ExpectEqual(paired, true)
+				frrIsPairedOnPods(cs, c, ipFamily)
 			}
 		}
 	},
@@ -545,22 +544,30 @@ func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1
 	}, 2*time.Minute, 1*time.Second).Should(BeNil())
 }
 
-func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily string) bool {
-	var toParse string
+func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily string) {
 	pods, err := cs.CoreV1().Pods("metallb-system").List(context.Background(), metav1.ListOptions{
 		LabelSelector: "component=speaker",
 	})
 	framework.ExpectNoError(err)
-	if ipFamily == "ipv4" {
-		toParse, err = framework.RunKubectl("metallb-system", "exec", pods.Items[0].Name, "-c", "frr", "--", "vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", n.Ipv4))
-	} else {
-		toParse, err = framework.RunKubectl("metallb-system", "exec", pods.Items[0].Name, "-c", "frr", "--", "vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", n.Ipv6))
 
-	}
-	framework.ExpectNoError(err)
-	res, err := frr.NeighborConnected(toParse)
-	framework.ExpectNoError(err)
-	return res
+	Eventually(func() error {
+		address := n.Ipv4
+		if ipFamily == "ipv6" {
+			address = n.Ipv6
+		}
+		toParse, err := framework.RunKubectl("metallb-system", "exec", pods.Items[0].Name, "-c", "frr", "--", "vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", address))
+		if err != nil {
+			return err
+		}
+		res, err := frr.NeighborConnected(toParse)
+		if err != nil {
+			return err
+		}
+		if res != true {
+			return fmt.Errorf("expecting neighbor %s to be connected", n.Ipv4)
+		}
+		return nil
+	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
 
 func createFRRContainers(c []containerConfig) ([]*frrcontainer.FRR, error) {

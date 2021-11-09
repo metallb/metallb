@@ -40,7 +40,8 @@ type FRRRoute struct {
 	Valid    bool   `json:"valid"`
 	PeerID   string `json:"peerId"`
 	Nexthops []struct {
-		IP string `json:"ip"`
+		IP    string `json:"ip"`
+		Scope string `json:"scope"`
 	} `json:"nexthops"`
 }
 
@@ -128,6 +129,9 @@ func parseRoutes(vtyshRes string) (map[string]Route, error) {
 		}
 		for _, n := range frrRoutes {
 			for _, h := range n.Nexthops {
+				if h.Scope == "link-local" {
+					continue
+				}
 				ip := net.ParseIP(h.IP)
 				if ip == nil {
 					return nil, fmt.Errorf("failed to parse ip %s", h.IP)
