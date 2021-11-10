@@ -219,8 +219,8 @@ var _ = ginkgo.Describe("L2", func() {
 
 		ip := firstIPFromRange(*ipRange)
 		svc1, err := jig1.CreateLoadBalancerService(loadBalancerCreateTimeout, func(svc *corev1.Service) {
-			svc.Spec.Ports[0].TargetPort = intstr.FromInt(82)
-			svc.Spec.Ports[0].Port = 82
+			svc.Spec.Ports[0].TargetPort = intstr.FromInt(servicePodPort)
+			svc.Spec.Ports[0].Port = int32(servicePodPort)
 			svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
 			svc.Spec.LoadBalancerIP = ip
 		})
@@ -229,8 +229,8 @@ var _ = ginkgo.Describe("L2", func() {
 
 		jig2 := e2eservice.NewTestJig(cs, namespace, "svcb")
 		svc2, err := jig2.CreateLoadBalancerService(loadBalancerCreateTimeout, func(svc *corev1.Service) {
-			svc.Spec.Ports[0].TargetPort = intstr.FromInt(83)
-			svc.Spec.Ports[0].Port = 83
+			svc.Spec.Ports[0].TargetPort = intstr.FromInt(servicePodPort + 1)
+			svc.Spec.Ports[0].Port = int32(servicePodPort + 1)
 			svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
 			svc.Spec.LoadBalancerIP = ip
 		})
@@ -246,15 +246,15 @@ var _ = ginkgo.Describe("L2", func() {
 		framework.ExpectNoError(err)
 		_, err = jig1.Run(
 			func(rc *corev1.ReplicationController) {
-				rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", 82), fmt.Sprintf("--udp-port=%d", 82)}
-				rc.Spec.Template.Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Port = intstr.FromInt(82)
+				rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", servicePodPort), fmt.Sprintf("--udp-port=%d", servicePodPort)}
+				rc.Spec.Template.Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Port = intstr.FromInt(servicePodPort)
 				rc.Spec.Template.Spec.NodeName = nodes.Items[0].Name
 			})
 		framework.ExpectNoError(err)
 		_, err = jig2.Run(
 			func(rc *corev1.ReplicationController) {
-				rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", 83), fmt.Sprintf("--udp-port=%d", 83)}
-				rc.Spec.Template.Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Port = intstr.FromInt(83)
+				rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", servicePodPort+1), fmt.Sprintf("--udp-port=%d", servicePodPort+1)}
+				rc.Spec.Template.Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Port = intstr.FromInt(servicePodPort + 1)
 				rc.Spec.Template.Spec.NodeName = nodes.Items[1].Name
 			})
 		framework.ExpectNoError(err)
