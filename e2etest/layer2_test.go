@@ -20,6 +20,7 @@ package e2e
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -28,6 +29,7 @@ import (
 	"github.com/mikioh/ipaddr"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/extensions/table"
+	"github.com/onsi/gomega"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/mac"
 	internalconfig "go.universe.tf/metallb/internal/config"
@@ -257,21 +259,33 @@ var _ = ginkgo.Describe("L2", func() {
 			})
 		framework.ExpectNoError(err)
 
-		events, err := cs.CoreV1().Events(namespace).List(context.Background(), metav1.ListOptions{FieldSelector: "reason=nodeAssigned"})
-		framework.ExpectNoError(err)
+		gomega.Eventually(func() error {
+			events, err := cs.CoreV1().Events(namespace).List(context.Background(), metav1.ListOptions{FieldSelector: "reason=nodeAssigned"})
+			if err != nil {
+				return err
+			}
 
-		var service1Announce, service2Announce string
-		for _, e := range events.Items {
-			if e.InvolvedObject.Name == svc1.Name {
-				service1Announce = e.Message
+			var service1Announce, service2Announce string
+			for _, e := range events.Items {
+				if e.InvolvedObject.Name == svc1.Name {
+					service1Announce = e.Message
+				}
+				if e.InvolvedObject.Name == svc2.Name {
+					service2Announce = e.Message
+				}
 			}
-			if e.InvolvedObject.Name == svc2.Name {
-				service2Announce = e.Message
+			if service1Announce == "" {
+				return errors.New("service1 not announced")
 			}
-		}
-		framework.ExpectNotEqual(service1Announce, "")
-		framework.ExpectNotEqual(service2Announce, "")
-		framework.ExpectEqual(service1Announce, service2Announce, "Services with the same IP announced from different nodes")
+			if service2Announce == "" {
+				return errors.New("service2 not announced")
+			}
+			if service1Announce != service2Announce {
+				return fmt.Errorf("Service announced from different nodes %s %s", service1Announce, service2Announce)
+			}
+			return nil
+		}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
+
 	},
 		table.Entry("IPV4", &ipv4ServiceRange),
 		table.Entry("IPV6", &ipv6ServiceRange))
