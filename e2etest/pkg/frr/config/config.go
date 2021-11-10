@@ -17,15 +17,26 @@ import (
 
 // BGP router config.
 const bgpConfigTemplate = `
+route-map RMAP permit 10
+set ipv6 next-hop prefer-global
 router bgp {{.ASN}}
   no bgp ebgp-requires-policy
+  no bgp default ipv4-unicast
 {{range .Neighbors }}
   neighbor {{.Addr}} remote-as {{.ASN}}
-  neighbor {{.Addr}} next-hop-self
   {{ if .Password -}}
   neighbor {{.Addr}} password {{.Password}}
   {{- end }}
 {{- end }}
+  address-family {{.IPFamily}} unicast
+{{range .Neighbors }}
+    neighbor {{.Addr}} next-hop-self
+    neighbor {{.Addr}} activate
+    {{ if eq .IPFamily "ipv6" -}}
+    neighbor {{.Addr}} route-map RMAP in
+    {{- end }}
+{{- end }}
+  exit-address-family
 `
 
 type RouterConfig struct {
@@ -35,12 +46,14 @@ type RouterConfig struct {
 	RouterID  string
 	Password  string
 	HoldTime  string
+	IPFamily  string
 }
 
 type NeighborConfig struct {
 	ASN      uint32
 	Addr     string
 	Password string
+	IPFamily string
 }
 
 // Set the IP of each node in the cluster in the BGP router configuration.
@@ -55,7 +68,7 @@ func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterCon
 		return "", errors.Wrapf(err, "Failed to get cluster nodes")
 	}
 
-	// TODO: The IP address handling will need updates to add support for IPv6.
+	// TODO: The IP address handling will need updates to add support for dual stack
 	for _, node := range nodes.Items {
 		for i := range node.Status.Addresses {
 			if node.Status.Addresses[i].Type == "InternalIP" {

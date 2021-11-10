@@ -71,9 +71,10 @@ type addressPool struct {
 }
 
 type bgpAdvertisement struct {
-	AggregationLength *int `yaml:"aggregation-length"`
-	LocalPref         *uint32
-	Communities       []string
+	AggregationLength   *int `yaml:"aggregation-length"`
+	AggregationLengthV6 *int `yaml:"aggregation-length-v6"`
+	LocalPref           *uint32
+	Communities         []string
 }
 
 // Config is a parsed MetalLB configuration.
@@ -145,6 +146,9 @@ type BGPAdvertisement struct {
 	// length. Optional, defaults to 32 (i.e. no aggregation) if not
 	// specified.
 	AggregationLength int
+	// Optional, defaults to 128 (i.e. no aggregation) if not
+	// specified.
+	AggregationLengthV6 int
 	// Value of the LOCAL_PREF BGP path attribute. Used only when
 	// advertising to IBGP peers (i.e. Peer.MyASN == Peer.ASN).
 	LocalPref uint32
@@ -370,9 +374,10 @@ func parseBGPAdvertisements(ads []bgpAdvertisement, cidrs []*net.IPNet, communit
 	if len(ads) == 0 {
 		return []*BGPAdvertisement{
 			{
-				AggregationLength: 32,
-				LocalPref:         0,
-				Communities:       map[uint32]bool{},
+				AggregationLength:   32,
+				AggregationLengthV6: 128,
+				LocalPref:           0,
+				Communities:         map[uint32]bool{},
 			},
 		}, nil
 	}
@@ -380,21 +385,34 @@ func parseBGPAdvertisements(ads []bgpAdvertisement, cidrs []*net.IPNet, communit
 	var ret []*BGPAdvertisement
 	for _, rawAd := range ads {
 		ad := &BGPAdvertisement{
-			AggregationLength: 32,
-			LocalPref:         0,
-			Communities:       map[uint32]bool{},
+			AggregationLength:   32,
+			AggregationLengthV6: 128,
+			LocalPref:           0,
+			Communities:         map[uint32]bool{},
 		}
 
 		if rawAd.AggregationLength != nil {
 			ad.AggregationLength = *rawAd.AggregationLength
 		}
 		if ad.AggregationLength > 32 {
-			return nil, fmt.Errorf("invalid aggregation length %q", ad.AggregationLength)
+			return nil, fmt.Errorf("invalid aggregation length %q for IPv4", ad.AggregationLength)
 		}
+		if rawAd.AggregationLengthV6 != nil {
+			ad.AggregationLengthV6 = *rawAd.AggregationLengthV6
+			if ad.AggregationLengthV6 > 128 {
+				return nil, fmt.Errorf("invalid aggregation length %q for IPv6", ad.AggregationLengthV6)
+			}
+		}
+
 		for _, cidr := range cidrs {
 			o, _ := cidr.Mask.Size()
-			if ad.AggregationLength < o {
-				return nil, fmt.Errorf("invalid aggregation length %d: prefix %q in this pool is more specific than the aggregation length", ad.AggregationLength, cidr)
+			maxLength := ad.AggregationLength
+			if cidr.IP.To4() == nil {
+				maxLength = ad.AggregationLengthV6
+			}
+			if maxLength < o {
+				return nil, fmt.Errorf("invalid aggregation length %d: prefix %q in "+
+					"this pool is more specific than the aggregation length", ad.AggregationLength, cidr)
 			}
 		}
 
