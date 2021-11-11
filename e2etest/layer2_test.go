@@ -81,7 +81,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 	ginkgo.Context("type=Loadbalancer", func() {
 		ginkgo.It("should work for ExternalTrafficPolicy=Cluster", func() {
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, testservice.TrafficPolicyCluster)
+			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
@@ -101,7 +101,7 @@ var _ = ginkgo.Describe("L2", func() {
 		})
 
 		ginkgo.It("should work for ExternalTrafficPolicy=Local", func() {
-			svc, jig := createServiceWithBackend(cs, f.Namespace.Name, testservice.TrafficPolicyLocal)
+			svc, jig := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyLocal)
 			err := jig.Scale(5)
 			framework.ExpectNoError(err)
 
@@ -149,7 +149,7 @@ var _ = ginkgo.Describe("L2", func() {
 			err := updateConfigMap(cs, configData)
 			framework.ExpectNoError(err)
 
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, testservice.TrafficPolicyCluster)
+			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
@@ -353,7 +353,7 @@ var _ = ginkgo.Describe("L2", func() {
 			}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
 
 			ginkgo.By("creating a service")
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, testservice.TrafficPolicyCluster)
+			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
