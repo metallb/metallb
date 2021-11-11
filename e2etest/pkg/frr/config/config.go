@@ -17,6 +17,9 @@ import (
 
 // BGP router config.
 const bgpConfigTemplate = `
+hostname bgpd
+#password zebra
+
 route-map RMAP permit 10
 set ipv6 next-hop prefer-global
 router bgp {{.ASN}}
@@ -37,6 +40,8 @@ router bgp {{.ASN}}
     {{- end }}
 {{- end }}
   exit-address-family
+
+log stdout debugging
 `
 
 type RouterConfig struct {
@@ -96,31 +101,16 @@ func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterCon
 // Set BGP configuration file in the test directory.
 func SetBGPConfig(testDirName string, config string) error {
 	path := fmt.Sprintf("%s/%s", testDirName, consts.BGPConfigFile)
-	tpl, err := template.ParseFiles(path)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to parse %s", path)
-	}
-
 	f, err := os.Create(path)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to open file %s", path)
 	}
-
 	defer f.Close()
 
-	type Template struct {
-		BGPConfig string
-	}
-
-	info := Template{
-		BGPConfig: config,
-	}
-
-	err = tpl.Execute(f, info)
+	_, err = f.WriteString(config)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to update %s", path)
+		return errors.Wrapf(err, "Failed to write to file %s", path)
 	}
-
 	return nil
 }
 
