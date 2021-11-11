@@ -36,7 +36,10 @@ func TestBFDProfileNoSessions(t *testing.T) {
 			MinimumTTL:       uint32Ptr(60),
 		},
 	}
-	sessionManager := NewSessionManager()
+	l := log.NewNopLogger()
+	sessionManager := NewSessionManager(l)
+	defer close(sessionManager.reloadConfig)
+
 	err := sessionManager.SyncBFDProfiles(pp)
 	if err != nil {
 		t.Fatalf("Failed to sync bfd profiles: %s", err)
@@ -65,7 +68,10 @@ func TestBFDProfileCornerCases(t *testing.T) {
 		},
 	}
 
-	sessionManager := NewSessionManager()
+	l := log.NewNopLogger()
+	sessionManager := NewSessionManager(l)
+	defer close(sessionManager.reloadConfig)
+
 	err := sessionManager.SyncBFDProfiles(pp)
 	if err != nil {
 		t.Fatalf("Failed to sync bfd profiles: %s", err)
@@ -104,13 +110,15 @@ func TestBFDWithSession(t *testing.T) {
 		},
 	}
 
-	sessionManager := NewSessionManager()
+	l := log.NewNopLogger()
+	sessionManager := NewSessionManager(l)
+	defer close(sessionManager.reloadConfig)
+
 	err := sessionManager.SyncBFDProfiles(pp)
 	if err != nil {
 		t.Fatalf("Failed to sync bfd profiles %s", err)
 	}
 
-	l := log.NewNopLogger()
 	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, 2*time.Second, "password", "hostname", "foo")
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
@@ -143,7 +151,10 @@ func TestBFDProfileAllDefault(t *testing.T) {
 		},
 	}
 
-	sessionManager := NewSessionManager()
+	l := log.NewNopLogger()
+	sessionManager := NewSessionManager(l)
+	defer close(sessionManager.reloadConfig)
+
 	err := sessionManager.SyncBFDProfiles(pp)
 	if err != nil {
 		t.Fatalf("Failed to sync bfd profiles %s", err)

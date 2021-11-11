@@ -313,12 +313,12 @@ func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
 }
 
 // Create a new 'bgp.SessionManager' of type 'bgpType'.
-var newBGP = func(bgpType bgpImplementation) bgp.SessionManager {
+var newBGP = func(bgpType bgpImplementation, l log.Logger) bgp.SessionManager {
 	switch bgpType {
 	case bgpNative:
-		return bgpnative.NewSessionManager()
+		return bgpnative.NewSessionManager(l)
 	case bgpFrr:
-		return bgpfrr.NewSessionManager()
+		return bgpfrr.NewSessionManager(l)
 	default:
 		panic(fmt.Sprintf("unsupported BGP implementation type: %s", bgpType))
 	}

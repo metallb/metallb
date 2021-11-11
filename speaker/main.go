@@ -202,7 +202,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 			myNode:         cfg.MyNode,
 			svcAds:         make(map[string][]*bgp.Advertisement),
 			bgpType:        cfg.bgpType,
-			sessionManager: newBGP(cfg.bgpType),
+			sessionManager: newBGP(cfg.bgpType, cfg.Logger),
 		},
 	}
 

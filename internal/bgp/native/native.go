@@ -58,7 +58,7 @@ type session struct {
 type sessionManager struct {
 }
 
-func NewSessionManager() *sessionManager {
+func NewSessionManager(l log.Logger) *sessionManager {
 	return &sessionManager{}
 }
 

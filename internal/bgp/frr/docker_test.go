@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/ory/dockertest/v3"
 	"github.com/pkg/errors"
@@ -61,6 +62,10 @@ func TestMain(m *testing.M) {
 	if err != nil || resCode != 0 {
 		log.Fatalf("failed to move vtysh.conf inside the container - res %d %s %s", resCode, err, buf.String())
 	}
+
+	// override reloadConfig so it doesn't try to reload it.
+	debounceTimeout = time.Millisecond
+	reloadConfig = func() error { return nil }
 
 	retCode := m.Run()
 	// You can't defer this because os.Exit doesn't care for defer

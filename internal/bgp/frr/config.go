@@ -10,6 +10,10 @@ import (
 	"strconv"
 	"syscall"
 	"text/template"
+	"time"
+
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 )
 
 var configFileName = "/etc/frr_reloader/frr.conf"
@@ -200,7 +204,7 @@ var reloadConfig = func() error {
 // generateAndReloadConfigFile takes a 'struct frrConfig' and, using a template,
 // generates and writes a valid FRR configuration file. If this completes
 // successfully it will also force FRR to reload that configuration file.
-func generateAndReloadConfigFile(config *frrConfig) error {
+func generateAndReloadConfigFile(config *frrConfig, l log.Logger) {
 	filename, found := os.LookupEnv("FRR_CONFIG_FILE")
 	if found {
 		configFileName = filename
@@ -208,17 +212,49 @@ func generateAndReloadConfigFile(config *frrConfig) error {
 
 	configString, err := templateConfig(config)
 	if err != nil {
-		return err
+		level.Error(l).Log("op", "reload", "error", err, "cause", "template", "config", config)
+		return
 	}
 	err = writeConfig(configString, configFileName)
 	if err != nil {
-		return err
+		level.Error(l).Log("op", "reload", "error", err, "cause", "writeConfig", "config", config)
+		return
 	}
 
 	err = reloadConfig()
 	if err != nil {
-		return err
+		level.Error(l).Log("op", "reload", "error", err, "cause", "reload", "config", config)
+		return
 	}
 
-	return nil
+	level.Info(l).Log("op", "reload", "success", "reloaded config")
+}
+
+// debouncer takes a function that processes an frrConfig, a channel where
+// the update requests are sent, and squashes any requests coming in a given timeframe
+// as a single request.
+func debouncer(body func(config *frrConfig),
+	reload <-chan *frrConfig,
+	reloadInterval time.Duration) {
+	go func() {
+		var config *frrConfig
+		var timeOut <-chan time.Time
+		timerSet := false
+		for {
+			select {
+			case newCfg, ok := <-reload:
+				if !ok { // the channel was closed
+					return
+				}
+				config = newCfg
+				if !timerSet {
+					timeOut = time.After(reloadInterval)
+					timerSet = true
+				}
+			case <-timeOut:
+				body(config)
+				timerSet = false
+			}
+		}
+	}()
 }
