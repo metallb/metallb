@@ -19,8 +19,9 @@ import (
 // no need to lock this data structure. TODO: confirm this.
 
 type sessionManager struct {
-	sessions    map[string]*session
-	bfdProfiles []BFDProfile
+	sessions     map[string]*session
+	bfdProfiles  []BFDProfile
+	reloadConfig chan *frrConfig
 }
 
 type session struct {
@@ -92,7 +93,8 @@ func (s *session) Set(advs ...*bgp.Advertisement) error {
 		return err
 	}
 
-	return generateAndReloadConfigFile(config)
+	s.sessionManager.reloadConfig <- config
+	return nil
 }
 
 // Close() shuts down the BGP session.
@@ -107,7 +109,8 @@ func (s *session) Close() error {
 		return err
 	}
 
-	return generateAndReloadConfigFile(frrConfig)
+	s.sessionManager.reloadConfig <- frrConfig
+	return nil
 }
 
 // NewSession() creates a BGP session using the given session parameters.
@@ -139,13 +142,8 @@ func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, 
 		return nil, err
 	}
 
-	err = generateAndReloadConfigFile(frrConfig)
-	if err != nil {
-		_ = sm.deleteSession(s)
-		return nil, err
-	}
-
-	return s, err
+	sm.reloadConfig <- frrConfig
+	return s, nil
 }
 
 func (sm *sessionManager) addSession(s *session) error {
@@ -183,7 +181,8 @@ func (sm *sessionManager) SyncBFDProfiles(profiles map[string]*config.BFDProfile
 		return err
 	}
 
-	return generateAndReloadConfigFile(frrConfig)
+	sm.reloadConfig <- frrConfig
+	return nil
 }
 
 func (sm *sessionManager) createConfig() (*frrConfig, error) {
@@ -271,11 +270,20 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 	return config, nil
 }
 
-func NewSessionManager() *sessionManager {
-	return &sessionManager{
-		sessions:    map[string]*session{},
-		bfdProfiles: []BFDProfile{},
+var debounceTimeout = 500 * time.Millisecond
+
+func NewSessionManager(l log.Logger) *sessionManager {
+	res := &sessionManager{
+		sessions:     map[string]*session{},
+		bfdProfiles:  []BFDProfile{},
+		reloadConfig: make(chan *frrConfig),
 	}
+	reload := func(config *frrConfig) {
+		generateAndReloadConfigFile(config, l)
+	}
+	debouncer(reload, res.reloadConfig, debounceTimeout)
+
+	return res
 }
 
 func configBFDProfileToFRR(p *config.BFDProfile) *BFDProfile {
