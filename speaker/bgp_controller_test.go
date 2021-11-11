@@ -95,7 +95,7 @@ type fakeBGP struct {
 	sessionManager fakeBGPSessionManager
 }
 
-func (f *fakeBGP) NewSessionManager(_ bgpImplementation) bgp.SessionManager {
+func (f *fakeBGP) NewSessionManager(_ bgpImplementation, _ log.Logger) bgp.SessionManager {
 	f.sessionManager.t = f.t
 	f.sessionManager.gotAds = make(map[string][]*bgp.Advertisement)
 
