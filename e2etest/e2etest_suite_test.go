@@ -46,7 +46,7 @@ const (
 
 var (
 	// Use ephemeral port for pod, instead of well-known port (tcp/80).
-	servicePodPort    uint
+	servicePodPort    int
 	skipDockerCmd     bool
 	ipv4ServiceRange  string
 	ipv6ServiceRange  string
@@ -61,7 +61,7 @@ func handleFlags() {
 	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
 	framework.RegisterCommonFlags(flag.CommandLine)
 	framework.RegisterClusterFlags(flag.CommandLine)
-	flag.UintVar(&servicePodPort, "service-pod-port", 80, "port number that pod opens, default: 80")
+	flag.IntVar(&servicePodPort, "service-pod-port", 80, "port number that pod opens, default: 80")
 	flag.BoolVar(&skipDockerCmd, "skip-docker", false, "set this to true if the BGP daemon is running on the host instead of in a container")
 	flag.StringVar(&ipv4ServiceRange, "ipv4-service-range", "0", "a range of IPv4 addresses for MetalLB to use when running in layer2 mode")
 	flag.StringVar(&ipv6ServiceRange, "ipv6-service-range", "0", "a range of IPv6 addresses for MetalLB to use when running in layer2 mode")
