@@ -168,8 +168,12 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 
 	config := &frrConfig{
 		Hostname: hostname,
-		Loglevel: "informational", // TODO - make loglevel configurable via envvar.
+		Loglevel: "informational",
 		Routers:  make(map[string]*routerConfig),
+	}
+	frrLogLevel, found := os.LookupEnv("FRR_LOGGING_LEVEL")
+	if found {
+		config.Loglevel = frrLogLevel
 	}
 
 	for _, s := range sm.sessions {
