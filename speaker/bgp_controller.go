@@ -63,6 +63,10 @@ newPeers:
 			if ep == nil {
 				continue
 			}
+			if ep.cfg.KeepaliveTime != 0 && c.bgpType == bgpNative {
+				level.Error(l).Log("op", "setConfig", "peer", ep.cfg.Addr, "configuration ignored", "keep alive time configuration is not supported")
+				continue
+			}
 			if reflect.DeepEqual(p, ep.cfg) {
 				newPeers = append(newPeers, ep)
 				c.peers[i] = nil
@@ -201,7 +205,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 			if p.cfg.RouterID != nil {
 				routerID = p.cfg.RouterID
 			}
-			s, err := c.sessionManager.NewSession(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.SrcAddr, p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.Password, c.myNode)
+			s, err := c.sessionManager.NewSession(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.SrcAddr, p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.KeepaliveTime, p.cfg.Password, c.myNode)
 			if err != nil {
 				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
 				errs++

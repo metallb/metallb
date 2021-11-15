@@ -45,6 +45,7 @@ type peer struct {
 	SrcAddr       string         `yaml:"source-address"`
 	Port          uint16         `yaml:"peer-port"`
 	HoldTime      string         `yaml:"hold-time"`
+	KeepaliveTime string         `yaml:"keepalive-time"`
 	RouterID      string         `yaml:"router-id"`
 	NodeSelectors []nodeSelector `yaml:"node-selectors"`
 	Password      string         `yaml:"password"`
@@ -108,6 +109,8 @@ type Peer struct {
 	Port uint16
 	// Requested BGP hold time, per RFC4271.
 	HoldTime time.Duration
+	// Requested BGP keepalive time, per RFC4271.
+	KeepaliveTime time.Duration
 	// BGP router ID to advertise to the peer
 	RouterID net.IP
 	// Only connect to this peer on nodes that match one of these
@@ -196,6 +199,19 @@ func parseHoldTime(ht string) (time.Duration, error) {
 	return rounded, nil
 }
 
+func parseKeepaliveTime(ht time.Duration, ka string) (time.Duration, error) {
+	// If keepalive time not set lets use 1/3 of holdtime.
+	if ka == "" {
+		return ht / 3, nil
+	}
+	d, err := time.ParseDuration(ka)
+	if err != nil {
+		return 0, fmt.Errorf("invalid keepalive time %q: %s", ka, err)
+	}
+	rounded := time.Duration(int(d.Seconds())) * time.Second
+	return rounded, nil
+}
+
 // Parse loads and validates a Config from bs.
 func Parse(bs []byte) (*Config, error) {
 	var raw configFile
@@ -272,6 +288,14 @@ func parsePeer(p peer) (*Peer, error) {
 	if err != nil {
 		return nil, err
 	}
+	keepaliveTime, err := parseKeepaliveTime(holdTime, p.KeepaliveTime)
+	if err != nil {
+		return nil, err
+	}
+	// keepalive must be lower than holdtime
+	if keepaliveTime > holdTime {
+		return nil, fmt.Errorf("invalid keepaliveTime %q", p.KeepaliveTime)
+	}
 	port := uint16(179)
 	if p.Port != 0 {
 		port = p.Port
@@ -318,6 +342,7 @@ func parsePeer(p peer) (*Peer, error) {
 		SrcAddr:       src,
 		Port:          port,
 		HoldTime:      holdTime,
+		KeepaliveTime: keepaliveTime,
 		RouterID:      routerID,
 		NodeSelectors: nodeSels,
 		Password:      password,

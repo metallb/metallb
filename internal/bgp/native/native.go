@@ -36,6 +36,7 @@ type session struct {
 	asn              uint32
 	peerFBASNSupport bool
 	holdTime         time.Duration
+	keepaliveTime    time.Duration
 	logger           log.Logger
 	password         string
 
@@ -64,19 +65,20 @@ func NewSessionManager() *sessionManager {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime time.Duration, password string, myNode string) (bgp.Session, error) {
+func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime time.Duration, keepaliveTime time.Duration, password string, myNode string) (bgp.Session, error) {
 	ret := &session{
-		addr:        addr,
-		srcAddr:     srcAddr,
-		myASN:       myASN,
-		routerID:    routerID.To4(),
-		myNode:      myNode,
-		asn:         asn,
-		holdTime:    holdTime,
-		logger:      log.With(l, "peer", addr, "localASN", myASN, "peerASN", asn),
-		newHoldTime: make(chan bool, 1),
-		advertised:  map[string]*bgp.Advertisement{},
-		password:    password,
+		addr:          addr,
+		srcAddr:       srcAddr,
+		myASN:         myASN,
+		routerID:      routerID.To4(),
+		myNode:        myNode,
+		asn:           asn,
+		holdTime:      holdTime,
+		keepaliveTime: keepaliveTime,
+		logger:        log.With(l, "peer", addr, "localASN", myASN, "peerASN", asn),
+		newHoldTime:   make(chan bool, 1),
+		advertised:    map[string]*bgp.Advertisement{},
+		password:      password,
 	}
 	ret.cond = sync.NewCond(&ret.mu)
 	go ret.sendKeepalives()
