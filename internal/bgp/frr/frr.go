@@ -27,6 +27,7 @@ type session struct {
 	srcAddr        net.IP
 	asn            uint32
 	holdTime       time.Duration
+	keepaliveTime  time.Duration
 	logger         log.Logger
 	password       string
 	advertised     []*bgp.Advertisement
@@ -108,7 +109,7 @@ func (s *session) Close() error {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime time.Duration, password string, myNode string) (bgp.Session, error) {
+func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime time.Duration, keepaliveTime time.Duration, password string, myNode string) (bgp.Session, error) {
 	s := &session{
 		myASN:          myASN,
 		routerID:       routerID,
@@ -117,6 +118,7 @@ func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, 
 		srcAddr:        srcAddr,
 		asn:            asn,
 		holdTime:       holdTime,
+		keepaliveTime:  keepaliveTime,
 		logger:         log.With(l, "peer", addr, "localASN", myASN, "peerASN", asn),
 		password:       password,
 		advertised:     []*bgp.Advertisement{},
@@ -210,7 +212,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				Addr:           host,
 				Port:           uint16(portUint),
 				HoldTime:       uint64(s.holdTime / time.Second),
-				KeepaliveTime:  uint64(s.holdTime / (3 * time.Second)), // TODO use 1/3 of holdtime till we can configure it.
+				KeepaliveTime:  uint64(s.keepaliveTime / time.Second),
 				Password:       s.password,
 				Advertisements: make([]*advertisementConfig, 0),
 			}

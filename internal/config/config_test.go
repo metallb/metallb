@@ -106,6 +106,7 @@ address-pools:
 						SrcAddr:       net.ParseIP("10.20.30.40"),
 						Port:          1179,
 						HoldTime:      180 * time.Second,
+						KeepaliveTime: 60 * time.Second,
 						RouterID:      net.ParseIP("10.20.30.40"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
@@ -115,6 +116,7 @@ address-pools:
 						Addr:          net.ParseIP("2.3.4.5"),
 						Port:          179,
 						HoldTime:      90 * time.Second,
+						KeepaliveTime: 30 * time.Second,
 						NodeSelectors: []labels.Selector{selector("bar in (quux),foo=bar")},
 					},
 				},
@@ -196,6 +198,7 @@ peers:
 						Addr:          net.ParseIP("1.2.3.4"),
 						Port:          179,
 						HoldTime:      90 * time.Second,
+						KeepaliveTime: 30 * time.Second,
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
@@ -252,7 +255,6 @@ peers:
   hold-time: 1s
 `,
 		},
-
 		{
 			desc: "invalid router ID",
 			raw: `
@@ -280,6 +282,7 @@ peers:
 						Addr:          net.ParseIP("1.2.3.4"),
 						Port:          179,
 						HoldTime:      90 * time.Second,
+						KeepaliveTime: 30 * time.Second,
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
