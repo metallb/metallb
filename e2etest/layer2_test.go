@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"strconv"
 	"time"
@@ -32,6 +33,7 @@ import (
 	"github.com/onsi/gomega"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/mac"
+	"go.universe.tf/metallb/e2etest/pkg/metrics"
 	internalconfig "go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -120,13 +122,7 @@ var _ = ginkgo.Describe("L2", func() {
 			err = wgetRetry(address, executor.Host)
 			framework.ExpectNoError(err)
 
-			err = mac.UpdateNodeCache(epNodes, executor.Host)
-			framework.ExpectNoError(err)
-
-			macAddr, err := mac.ForIP(ingressIP, executor.Host)
-			framework.ExpectNoError(err)
-
-			advNode, err := mac.MatchNode(epNodes, macAddr, executor.Host)
+			advNode, err := advertisingNodeFromMAC(epNodes, ingressIP, executor.Host)
 			framework.ExpectNoError(err)
 
 			for i := 0; i < 5; i++ {
@@ -289,6 +285,145 @@ var _ = ginkgo.Describe("L2", func() {
 	},
 		table.Entry("IPV4", &ipv4ServiceRange),
 		table.Entry("IPV6", &ipv6ServiceRange))
+
+	ginkgo.Context("metrics", func() {
+		// TODO: validate gratuitous_sent metric
+		var controllerPod *corev1.Pod
+		var speakerPods map[string]*corev1.Pod
+
+		ginkgo.BeforeEach(func() {
+			pods, err := cs.CoreV1().Pods("metallb-system").List(context.Background(), metav1.ListOptions{
+				LabelSelector: "component=controller",
+			})
+			framework.ExpectNoError(err)
+			framework.ExpectEqual(len(pods.Items), 1, "More than one controller found")
+			controllerPod = &pods.Items[0]
+
+			speakers, err := cs.CoreV1().Pods("metallb-system").List(context.Background(), metav1.ListOptions{
+				LabelSelector: "component=speaker",
+			})
+			framework.ExpectNoError(err)
+			speakerPods = map[string]*corev1.Pod{}
+			for _, item := range speakers.Items {
+				i := item
+				speakerPods[i.Spec.NodeName] = &i
+			}
+		})
+
+		table.DescribeTable("should be exposed by the controller", func(ipFamily string) {
+			poolName := "l2-metrics-test"
+
+			configData := configFile{
+				Pools: []addressPool{
+					{
+						Name:     poolName,
+						Protocol: Layer2,
+						Addresses: []string{
+							ipv4ServiceRange,
+							ipv6ServiceRange,
+						},
+					},
+				},
+			}
+			poolCount, err := poolCount(configData.Pools[0])
+			framework.ExpectNoError(err)
+
+			err = updateConfigMap(cs, configData)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("checking the metrics when no service is added")
+			gomega.Eventually(func() error {
+				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod)
+				if err != nil {
+					return err
+				}
+				err = validateGaugeValue(0, "metallb_allocator_addresses_in_use_total", map[string]string{"pool": poolName}, controllerMetrics)
+				if err != nil {
+					return err
+				}
+				err = validateGaugeValue(int(poolCount), "metallb_allocator_addresses_total", map[string]string{"pool": poolName}, controllerMetrics)
+				if err != nil {
+					return err
+				}
+				return nil
+			}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
+
+			ginkgo.By("creating a service")
+			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster)
+			defer func() {
+				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+			}()
+
+			ginkgo.By("checking the metrics when a service is added")
+			gomega.Eventually(func() error {
+				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod)
+				if err != nil {
+					return err
+				}
+				err = validateGaugeValue(1, "metallb_allocator_addresses_in_use_total", map[string]string{"pool": poolName}, controllerMetrics)
+				if err != nil {
+					return err
+				}
+				return nil
+			}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
+
+			port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
+			ingressIP := e2eservice.GetIngressPoint(
+				&svc.Status.LoadBalancer.Ingress[0])
+
+			ginkgo.By("checking connectivity to its external VIP")
+			hostport := net.JoinHostPort(ingressIP, port)
+			address := fmt.Sprintf("http://%s/", hostport)
+			err = wgetRetry(address, executor.Host)
+			framework.ExpectNoError(err)
+
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			framework.ExpectNoError(err)
+
+			advNode, err := advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
+			framework.ExpectNoError(err)
+			advSpeaker, ok := speakerPods[advNode.Name]
+			framework.ExpectEqual(ok, true, fmt.Sprintf("could not find speaker pod on announcing node %s", advNode.Name))
+			delete(speakerPods, advSpeaker.Spec.NodeName)
+
+			gomega.Eventually(func() error {
+				speakerMetrics, err := metrics.ForPod(controllerPod, advSpeaker)
+				if err != nil {
+					return err
+				}
+
+				err = validateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": advSpeaker.Spec.NodeName, "protocol": "layer2", "service": fmt.Sprintf("%s/%s", f.Namespace.Name, svc.Name)}, speakerMetrics)
+				if err != nil {
+					return err
+				}
+
+				err = validateCounterValue(1, "metallb_layer2_requests_received", map[string]string{"ip": ingressIP}, speakerMetrics)
+				if err != nil {
+					return err
+				}
+
+				err = validateCounterValue(1, "metallb_layer2_responses_sent", map[string]string{"ip": ingressIP}, speakerMetrics)
+				if err != nil {
+					return err
+				}
+
+				return nil
+			}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
+
+			// Negative - validate that the other speakers don't publish layer2 metrics
+			for _, p := range speakerPods {
+				speakerMetrics, err := metrics.ForPod(controllerPod, p)
+				framework.ExpectNoError(err)
+
+				err = validateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": p.Spec.NodeName, "protocol": "layer2", "service": fmt.Sprintf("%s/%s", f.Namespace.Name, svc.Name)}, speakerMetrics)
+				framework.ExpectError(err, fmt.Sprintf("metallb_speaker_announced present in node: %s", p.Spec.NodeName))
+			}
+
+		},
+			table.Entry("IPV4 - Checking service", "ipv4"),
+			table.Entry("IPV6 - Checking service", "ipv6"))
+	})
 })
 
 func firstIPFromRange(ipRange string) string {
@@ -306,4 +441,81 @@ func getEndpointHostName(ep string, exec executor.Executor) (string, error) {
 	}
 
 	return res, nil
+}
+
+// TODO: The tests find the announcing node in multiple ways (MAC/Events).
+// We should have a test that verifies that they all return the same node.
+func advertisingNodeFromMAC(nodes []corev1.Node, ip string, exc executor.Executor) (*corev1.Node, error) {
+	err := mac.UpdateNodeCache(nodes, exc)
+	if err != nil {
+		return nil, err
+	}
+
+	macAddr, err := mac.ForIP(ip, exc)
+	if err != nil {
+		return nil, err
+	}
+
+	advNode, err := mac.MatchNode(nodes, macAddr, exc)
+	if err != nil {
+		return nil, err
+	}
+
+	return advNode, err
+}
+
+// taken from internal: poolCount returns the number of addresses in the pool.
+// TODO: find a better place for this func.
+func poolCount(p addressPool) (int64, error) {
+	var total int64
+	for _, r := range p.Addresses {
+		cidrs, err := internalconfig.ParseCIDR(r)
+		if err != nil {
+			return 0, err
+		}
+		for _, cidr := range cidrs {
+			o, b := cidr.Mask.Size()
+			if b-o >= 62 {
+				// An enormous ipv6 range is allocated which will never run out.
+				// Just return max to avoid any math errors.
+				return math.MaxInt64, nil
+			}
+			sz := int64(math.Pow(2, float64(b-o)))
+
+			cur := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})
+			firstIP := cur.First().IP
+			lastIP := cur.Last().IP
+
+			if p.AvoidBuggyIPs {
+				if o <= 24 {
+					// A pair of buggy IPs occur for each /24 present in the range.
+					buggies := int64(math.Pow(2, float64(24-o))) * 2
+					sz -= buggies
+				} else {
+					// Ranges smaller than /24 contain 1 buggy IP if they
+					// start/end on a /24 boundary, otherwise they contain
+					// none.
+					if ipConfusesBuggyFirmwares(firstIP) {
+						sz--
+					}
+					if ipConfusesBuggyFirmwares(lastIP) {
+						sz--
+					}
+				}
+			}
+
+			total += sz
+		}
+	}
+	return total, nil
+}
+
+// taken from internal: ipConfusesBuggyFirmwares returns true if ip is an IPv4 address ending in 0 or 255.
+// TODO: find a better place for this func.
+func ipConfusesBuggyFirmwares(ip net.IP) bool {
+	ip = ip.To4()
+	if ip == nil {
+		return false
+	}
+	return ip[3] == 0 || ip[3] == 255
 }

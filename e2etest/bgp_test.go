@@ -230,7 +230,8 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 			speakerPods = make([]*corev1.Pod, 0)
 			for _, item := range speakers.Items {
-				speakerPods = append(speakerPods, &item)
+				i := item
+				speakerPods = append(speakerPods, &i)
 			}
 		})
 
