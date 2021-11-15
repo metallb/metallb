@@ -38,7 +38,6 @@ jobs:
       - run: inv dev-env -i  << parameters.ip-family >> -b  << parameters.bgp-type >>
       - run: |
           SKIP="none"
-          if [ "<< parameters.bgp-type >>" = "frr" ]; then SKIP="$SKIP\|metrics"; fi # TODO: enable metrics tests when implementing in FRR
           if [ "<< parameters.bgp-type >>" = "native" ]; then SKIP="$SKIP\|FRR"; fi
           if [ "<< parameters.ip-family >>" = "ipv4" ]; then SKIP="$SKIP\|IPV6"; fi
           if [ "<< parameters.ip-family >>" = "dual" ]; then SKIP="$SKIP\|IPV6"; fi # TODO: until dual stack is supported, we can't run the ipv6 tests against the cluster
