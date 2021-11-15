@@ -6,13 +6,15 @@ import (
 	"fmt"
 
 	v1 "k8s.io/api/core/v1"
+
+	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
 )
 
 // NeighborsMatchNodes tells if ALL the given nodes are peered with the
 // frr instance. We only care about established connections, as the
 // frr instance may be configured with more nodes than are currently
 // paired.
-func NeighborsMatchNodes(nodes []v1.Node, neighbors []*Neighbor) error {
+func NeighborsMatchNodes(nodes []v1.Node, neighbors []*bgpfrr.Neighbor) error {
 	nodesIPs := map[string]struct{}{}
 
 	for _, n := range nodes {
@@ -23,13 +25,13 @@ func NeighborsMatchNodes(nodes []v1.Node, neighbors []*Neighbor) error {
 		}
 	}
 	for _, n := range neighbors {
-		if _, ok := nodesIPs[n.ip.String()]; !ok { // skipping neighbors that are not nodes
+		if _, ok := nodesIPs[n.Ip.String()]; !ok { // skipping neighbors that are not nodes
 			continue
 		}
-		if !n.connected {
-			return fmt.Errorf("node %s BGP session not established", n.ip.String())
+		if !n.Connected {
+			return fmt.Errorf("node %s BGP session not established", n.Ip.String())
 		}
-		delete(nodesIPs, n.ip.String())
+		delete(nodesIPs, n.Ip.String())
 	}
 	if len(nodesIPs) != 0 { // some leftover, meaning more nodes than neighbors
 		return fmt.Errorf("IP %v found in nodes but not in neighbors", nodesIPs)
@@ -39,7 +41,7 @@ func NeighborsMatchNodes(nodes []v1.Node, neighbors []*Neighbor) error {
 
 // RoutesMatchNodes tells if ALL the given nodes are exposed as
 // destinations for the given address.
-func RoutesMatchNodes(nodes []v1.Node, route Route) error {
+func RoutesMatchNodes(nodes []v1.Node, route bgpfrr.Route) error {
 	nodesIPs := map[string]struct{}{}
 
 	for _, n := range nodes {

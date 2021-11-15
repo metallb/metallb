@@ -426,7 +426,6 @@ spec:
   template:
     metadata:
       annotations:
-        prometheus.io/port: '7472'
         prometheus.io/scrape: 'true'
       labels:
         app: metallb
@@ -441,6 +440,8 @@ spec:
         - name: frr-conf
           emptyDir: {}
         - name: reloader
+          emptyDir: {}
+        - name: metrics
           emptyDir: {}
       initContainers:
         # Copies the initial config files with the right permissions to the shared volume.
@@ -462,6 +463,13 @@ spec:
           volumeMounts:
             - name: reloader
               mountPath: /etc/frr_reloader
+        # Copies the metrics exporter
+        - name: cp-metrics
+          image: quay.io/metallb/speaker:main
+          command: ["/bin/sh", "-c", "cp -f /frr-metrics /etc/frr_metrics/"]
+          volumeMounts:
+            - name: metrics
+              mountPath: /etc/frr_metrics
       containers:
         - name: frr
           securityContext:
@@ -486,6 +494,21 @@ spec:
               mountPath: /etc/frr
             - name: reloader
               mountPath: /etc/frr_reloader
+        - name: frr-metrics
+          image: frrouting/frr:v7.5.1
+          command: ["/etc/frr_metrics/frr-metrics"]
+          args:
+            - --metrics-port=7473
+          ports:
+            - containerPort: 7473
+              name: monitoring
+          volumeMounts:
+            - name: frr-sockets
+              mountPath: /var/run/frr
+            - name: frr-conf
+              mountPath: /etc/frr
+            - name: metrics
+              mountPath: /etc/frr_metrics
         - args:
             - --port=7472
             - --config=config

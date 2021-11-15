@@ -147,6 +147,16 @@ def build(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag=
         }
         if "speaker" in binaries:
             shutil.copy("frr-reloader/frr-reloader.sh","build/{arch}/speaker/".format(arch=arch))
+            run("go build -v -o build/{arch}/speaker/frr-metrics -ldflags "
+                "'-X go.universe.tf/metallb/internal/version.gitCommit={commit} "
+                "-X go.universe.tf/metallb/internal/version.gitBranch={branch}' "
+                "frr-metrics/exporter.go".format(
+                    arch=arch,
+                    commit=commit,
+                    branch=branch),
+                    env=env,
+                    echo=True,
+                )
 
         for bin in binaries:
             run("go build -v -o build/{arch}/{bin}/{bin} -ldflags "

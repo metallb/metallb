@@ -45,7 +45,7 @@ func TestNeighbour(t *testing.T) {
         "opensRecv":0,
         "notificationsSent":0,
         "notificationsRecv":0,
-        "updatesSent":0,
+        "updatesSent":%d,
         "updatesRecv":0,
         "keepalivesSent":0,
         "keepalivesRecv":0,
@@ -61,7 +61,14 @@ func TestNeighbour(t *testing.T) {
         "ipv4Unicast":{
           "routerAlwaysNextHop":true,
           "commAttriSentToNbr":"extendedAndStandard",
-          "acceptedPrefixCounter":0
+          "acceptedPrefixCounter":0,
+          "sentPrefixCounter":%d
+        },
+        "ipv6Unicast":{
+          "routerAlwaysNextHop":true,
+          "commAttriSentToNbr":"extendedAndStandard",
+          "acceptedPrefixCounter":0,
+          "sentPrefixCounter":%d
         }
       },
       "connectionsEstablished":0,
@@ -69,6 +76,7 @@ func TestNeighbour(t *testing.T) {
       "lastResetTimerMsecs":253000,
       "lastResetDueTo":"Waiting for peer OPEN",
       "lastResetCode":32,
+      "portForeign":%d,
       "connectRetryTimer":120,
       "nextConnectTimerDueInMsecs":107000,
       "readThread":"off",
@@ -77,12 +85,16 @@ func TestNeighbour(t *testing.T) {
   }`
 
 	tests := []struct {
-		name          string
-		neighborIP    string
-		remoteAS      string
-		localAS       string
-		status        string
-		expectedError string
+		name           string
+		neighborIP     string
+		remoteAS       string
+		localAS        string
+		status         string
+		updatesSent    int
+		ipv4PrefixSent int
+		ipv6PrefixSent int
+		port           int
+		expectedError  string
 	}{
 		{
 			"ipv4, connected",
@@ -90,6 +102,10 @@ func TestNeighbour(t *testing.T) {
 			"64512",
 			"64512",
 			"Established",
+			1,
+			1,
+			0,
+			179,
 			"",
 		},
 		{
@@ -98,6 +114,10 @@ func TestNeighbour(t *testing.T) {
 			"64512",
 			"64512",
 			"Active",
+			0,
+			0,
+			0,
+			180,
 			"",
 		},
 		{
@@ -106,30 +126,43 @@ func TestNeighbour(t *testing.T) {
 			"64512",
 			"64512",
 			"Established",
+			2,
+			1,
+			1,
+			181,
 			"",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			n, err := parseNeighbour(fmt.Sprintf(sample, tt.neighborIP, tt.remoteAS, tt.localAS, tt.status))
+			n, err := ParseNeighbour(fmt.Sprintf(sample, tt.neighborIP, tt.remoteAS, tt.localAS, tt.status, tt.updatesSent, tt.ipv4PrefixSent, tt.ipv6PrefixSent, tt.port))
 			if err != nil {
 				t.Fatal("Failed to parse ", err)
 			}
-			if !n.ip.Equal(net.ParseIP(tt.neighborIP)) {
-				t.Fatal("Expected neighbour ip", tt.neighborIP, "got", n.ip.String())
+			if !n.Ip.Equal(net.ParseIP(tt.neighborIP)) {
+				t.Fatal("Expected neighbour ip", tt.neighborIP, "got", n.Ip.String())
 			}
-			if n.remoteAS != tt.remoteAS {
-				t.Fatal("Expected remote as", tt.remoteAS, "got", n.remoteAS)
+			if n.RemoteAS != tt.remoteAS {
+				t.Fatal("Expected remote as", tt.remoteAS, "got", n.RemoteAS)
 			}
-			if n.localAS != tt.localAS {
-				t.Fatal("Expected local as", tt.localAS, "got", n.localAS)
+			if n.LocalAS != tt.localAS {
+				t.Fatal("Expected local as", tt.localAS, "got", n.LocalAS)
 			}
-			if tt.status == "Established" && n.connected != true {
-				t.Fatal("Expected connected", true, "got", n.connected)
+			if tt.status == "Established" && n.Connected != true {
+				t.Fatal("Expected connected", true, "got", n.Connected)
 			}
-			if tt.status != "Established" && n.connected == true {
-				t.Fatal("Expected connected", false, "got", n.connected)
+			if tt.status != "Established" && n.Connected == true {
+				t.Fatal("Expected connected", false, "got", n.Connected)
+			}
+			if tt.updatesSent != n.UpdatesSent {
+				t.Fatal("Expected updates sent", tt.updatesSent, "got", n.UpdatesSent)
+			}
+			if tt.ipv4PrefixSent+tt.ipv6PrefixSent != n.PrefixSent {
+				t.Fatal("Expected prefix sent", tt.ipv4PrefixSent+tt.ipv6PrefixSent, "got", n.PrefixSent)
+			}
+			if tt.port != n.Port {
+				t.Fatal("Expected port", tt.port, "got", n.Port)
 			}
 		})
 	}
@@ -444,7 +477,7 @@ const threeNeighbours = `
 }`
 
 func TestNeighbours(t *testing.T) {
-	nn, err := parseNeighbours(threeNeighbours)
+	nn, err := ParseNeighbours(threeNeighbours)
 	if err != nil {
 		t.Fatalf("Failed to parse %s", err)
 	}
@@ -452,16 +485,16 @@ func TestNeighbours(t *testing.T) {
 		t.Fatalf("Expected 4 neighbours, got %d", len(nn))
 	}
 	sort.Slice(nn, func(i, j int) bool {
-		return (bytes.Compare(nn[i].ip, nn[j].ip) < 0)
+		return (bytes.Compare(nn[i].Ip, nn[j].Ip) < 0)
 	})
 
-	if !nn[0].ip.Equal(net.ParseIP("172.18.0.2")) {
+	if !nn[0].Ip.Equal(net.ParseIP("172.18.0.2")) {
 		t.Fatal("neighbour ip not matching")
 	}
-	if !nn[1].ip.Equal(net.ParseIP("172.18.0.3")) {
+	if !nn[1].Ip.Equal(net.ParseIP("172.18.0.3")) {
 		t.Fatal("neighbour ip not matching")
 	}
-	if !nn[2].ip.Equal(net.ParseIP("172.18.0.4")) {
+	if !nn[2].Ip.Equal(net.ParseIP("172.18.0.4")) {
 		t.Fatal("neighbour ip not matching")
 	}
 }
@@ -537,7 +570,7 @@ const routes = `{
  ] }  }`
 
 func TestRoutes(t *testing.T) {
-	rr, err := parseRoutes(routes)
+	rr, err := ParseRoutes(routes)
 	if err != nil {
 		t.Fatalf("Failed to parse %s", err)
 	}
