@@ -19,7 +19,7 @@ import (
 
 // MetricsForPod returns the parsed metrics for the given pod, scraping them
 // from the executor pod.
-func ForPod(executor, target *corev1.Pod) ([]map[string]*dto.MetricFamily, error) {
+func ForPod(executor, target *corev1.Pod, namespace string) ([]map[string]*dto.MetricFamily, error) {
 	ports := make([]int, 0)
 	allMetrics := make([]map[string]*dto.MetricFamily, 0)
 	for _, c := range target.Spec.Containers {
@@ -32,7 +32,7 @@ func ForPod(executor, target *corev1.Pod) ([]map[string]*dto.MetricFamily, error
 
 	for _, p := range ports {
 		metricsUrl := path.Join(net.JoinHostPort(target.Status.PodIP, strconv.Itoa(p)), "metrics")
-		metrics, err := framework.RunKubectl("metallb-system", "exec", executor.Name, "--", "wget", "-qO-", metricsUrl)
+		metrics, err := framework.RunKubectl(namespace, "exec", executor.Name, "--", "wget", "-qO-", metricsUrl)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to scrape metrics for %s", target.Name)
 		}

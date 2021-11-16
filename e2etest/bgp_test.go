@@ -202,14 +202,14 @@ var _ = ginkgo.Describe("BGP", func() {
 		var speakerPods []*corev1.Pod
 
 		ginkgo.BeforeEach(func() {
-			pods, err := cs.CoreV1().Pods("metallb-system").List(context.Background(), metav1.ListOptions{
+			pods, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
 				LabelSelector: "component=controller",
 			})
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(pods.Items), 1, "More than one controller found")
 			controllerPod = &pods.Items[0]
 
-			speakers, err := cs.CoreV1().Pods("metallb-system").List(context.Background(), metav1.ListOptions{
+			speakers, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
 				LabelSelector: "component=speaker",
 			})
 			framework.ExpectNoError(err)
@@ -260,7 +260,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 			ginkgo.By("checking the metrics when no service is added")
 			Eventually(func() error {
-				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod)
+				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod, testNameSpace)
 				if err != nil {
 					return err
 				}
@@ -279,7 +279,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
 
 				Eventually(func() error {
-					speakerMetrics, err := metrics.ForPod(controllerPod, speaker)
+					speakerMetrics, err := metrics.ForPod(controllerPod, speaker, testNameSpace)
 					if err != nil {
 						return err
 					}
@@ -306,7 +306,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 			ginkgo.By("checking the metrics when a service is added")
 			Eventually(func() error {
-				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod)
+				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod, testNameSpace)
 				if err != nil {
 					return err
 				}
@@ -321,7 +321,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
 
 				Eventually(func() error {
-					speakerMetrics, err := metrics.ForPod(controllerPod, speaker)
+					speakerMetrics, err := metrics.ForPod(controllerPod, speaker, testNameSpace)
 					if err != nil {
 						return err
 					}
@@ -671,7 +671,7 @@ func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1
 }
 
 func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily string) {
-	pods, err := cs.CoreV1().Pods("metallb-system").List(context.Background(), metav1.ListOptions{
+	pods, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
 		LabelSelector: "component=speaker",
 	})
 	framework.ExpectNoError(err)
@@ -680,7 +680,7 @@ func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily str
 		if ipFamily == "ipv6" {
 			address = n.Ipv6
 		}
-		toParse, err := framework.RunKubectl("metallb-system", "exec", pods.Items[0].Name, "-c", "frr", "--", "vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", address))
+		toParse, err := framework.RunKubectl(testNameSpace, "exec", pods.Items[0].Name, "-c", "frr", "--", "vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", address))
 		if err != nil {
 			return err
 		}
