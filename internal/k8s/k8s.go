@@ -54,6 +54,7 @@ type Client struct {
 
 	serviceChanged func(log.Logger, string, *v1.Service, EpsOrSlices) SyncState
 	configChanged  func(log.Logger, *config.Config) SyncState
+	validateConfig config.Validate
 	nodeChanged    func(log.Logger, *v1.Node) SyncState
 	synced         func(log.Logger)
 }
@@ -91,6 +92,7 @@ type Config struct {
 
 	ServiceChanged func(log.Logger, string, *v1.Service, EpsOrSlices) SyncState
 	ConfigChanged  func(log.Logger, *config.Config) SyncState
+	ValidateConfig config.Validate
 	NodeChanged    func(log.Logger, *v1.Node) SyncState
 	Synced         func(log.Logger)
 }
@@ -137,10 +139,11 @@ func New(cfg *Config) (*Client, error) {
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
 	c := &Client{
-		logger: cfg.Logger,
-		client: clientset,
-		events: recorder,
-		queue:  queue,
+		logger:         cfg.Logger,
+		client:         clientset,
+		events:         recorder,
+		queue:          queue,
+		validateConfig: cfg.ValidateConfig,
 	}
 
 	if cfg.ServiceChanged != nil {
@@ -535,7 +538,7 @@ func (c *Client) sync(key interface{}) SyncState {
 		// config is not going to parse any better until the k8s
 		// object changes to fix the issue.
 		cm := cmi.(*v1.ConfigMap)
-		cfg, err := config.Parse([]byte(cm.Data["config"]))
+		cfg, err := config.Parse([]byte(cm.Data["config"]), c.validateConfig)
 		if err != nil {
 			level.Error(l).Log("event", "configStale", "error", err, "msg", "config (re)load failed, config marked stale")
 			configStale.Set(1)

@@ -64,10 +64,6 @@ newPeers:
 			if ep == nil {
 				continue
 			}
-			if ep.cfg.KeepaliveTime != 0 && c.bgpType == bgpNative {
-				level.Error(l).Log("op", "setConfig", "peer", ep.cfg.Addr, "configuration ignored", "keep alive time configuration is not supported")
-				continue
-			}
 			if reflect.DeepEqual(p, ep.cfg) {
 				newPeers = append(newPeers, ep)
 				c.peers[i] = nil

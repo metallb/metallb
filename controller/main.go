@@ -24,6 +24,7 @@ import (
 
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/config"
+	metallbcfg "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/version"
@@ -165,6 +166,7 @@ func main() {
 
 		ServiceChanged: c.SetBalancer,
 		ConfigChanged:  c.SetConfig,
+		ValidateConfig: metallbcfg.DontValidate, // the controller is not aware of the mode, we defer the validation to the speaker
 		Synced:         c.MarkSynced,
 	})
 	if err != nil {

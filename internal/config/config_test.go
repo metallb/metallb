@@ -792,7 +792,7 @@ bfd-profiles:
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			got, err := Parse([]byte(test.raw))
+			got, err := Parse([]byte(test.raw), DontValidate)
 			if err != nil && test.want != nil {
 				t.Errorf("%q: parse failed: %s", test.desc, err)
 				return
