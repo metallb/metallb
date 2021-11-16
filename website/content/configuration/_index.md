@@ -17,7 +17,7 @@ If you've named the config map `config.yaml`, you can deploy the manifest with `
 If you installed MetalLB with Helm, you will need to change the
 namespace of the config map to match the namespace in which MetalLB was
 deployed, and change the name of the config map from `config` to
-`metallb-config`.
+`metallb`.
 {{% /notice %}}
 
 The specific configuration depends on the protocol(s) you want to use
