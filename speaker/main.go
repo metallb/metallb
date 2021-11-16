@@ -26,6 +26,7 @@ import (
 
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
+	metallbcfg "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/layer2"
 	"go.universe.tf/metallb/internal/logging"
@@ -133,6 +134,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	validateConfig := metallbcfg.DontValidate
+	if bgpType == "native" {
+		validateConfig = metallbcfg.DiscardFRROnly
+	}
+
 	client, err := k8s.New(&k8s.Config{
 		ProcessName:     "metallb-speaker",
 		ConfigMapName:   *config,
@@ -148,6 +154,7 @@ func main() {
 
 		ServiceChanged: ctrl.SetBalancer,
 		ConfigChanged:  ctrl.SetConfig,
+		ValidateConfig: validateConfig,
 		NodeChanged:    ctrl.SetNode,
 	})
 	if err != nil {
@@ -353,14 +360,6 @@ func (c *controller) SetConfig(l log.Logger, cfg *config.Config) k8s.SyncState {
 	if cfg == nil {
 		level.Error(l).Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
 		return k8s.SyncStateErrorNoRetry
-	}
-
-	if c.bgpType == bgpNative {
-		err := validateFRROnlyConfiguration(cfg)
-		if err != nil {
-			level.Error(l).Log("op", "setConfig", "error", err)
-			return k8s.SyncStateError
-		}
 	}
 
 	for svc, ip := range c.svcIP {
