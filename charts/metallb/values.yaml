@@ -46,10 +46,12 @@ prometheus:
   metricsPort: 7472
 
   # the service account used by prometheus
-  serviceAccount: prometheus-k8s
+  # required when .Values.prometheus.podMonitor.enabled == true
+  serviceAccount: ""
 
   # the namespace where prometheus is deployed
-  namespace: monitoring
+  # required when .Values.prometheus.podMonitor.enabled == true
+  namespace: ""
 
   # Prometheus Operator PodMonitors
   podMonitor:
