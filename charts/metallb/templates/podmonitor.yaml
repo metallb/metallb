@@ -91,6 +91,6 @@ roleRef:
   name: {{ template "metallb.fullname" . }}-prometheus
 subjects:
   - kind: ServiceAccount
-    name: {{ .Values.prometheus.serviceAccount }}
-    namespace: {{ .Values.prometheus.namespace }}
+    name: {{ required ".Values.prometheus.serviceAccount must be defined when .Values.prometheus.podMonitor.enabled == true" .Values.prometheus.serviceAccount }}
+    namespace: {{ required ".Values.prometheus.namespace must be defined when .Values.prometheus.podMonitor.enabled == true" .Values.prometheus.namespace }}
 {{- end }}
