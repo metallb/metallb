@@ -42,6 +42,7 @@ import (
 const (
 	defaultTestNameSpace     = "metallb-system"
 	defaultContainersNetwork = "kind"
+	defaultConfigMapName     = "config"
 )
 
 var (
@@ -51,6 +52,7 @@ var (
 	ipv4ServiceRange  string
 	ipv6ServiceRange  string
 	testNameSpace     = defaultTestNameSpace
+	configMapName     = defaultConfigMapName
 	containersNetwork = defaultContainersNetwork
 	hostIPv4          string
 	hostIPv6          string
@@ -103,6 +105,10 @@ var _ = ginkgo.BeforeSuite(func() {
 		testNameSpace = ns
 	}
 
+	if name := os.Getenv("CONFIGMAP_NAME"); len(name) != 0 {
+		configMapName = name
+	}
+
 	if _, res := os.LookupEnv("RUN_FRR_CONTAINER_ON_HOST_NETWORK"); res == true {
 		containersNetwork = "host"
 	}
@@ -125,13 +131,13 @@ var _ = ginkgo.BeforeSuite(func() {
 	cs, err := framework.LoadClientset()
 	framework.ExpectNoError(err)
 
-	_, err = cs.CoreV1().ConfigMaps(testNameSpace).Get(context.TODO(), "config", metav1.GetOptions{})
+	_, err = cs.CoreV1().ConfigMaps(testNameSpace).Get(context.TODO(), configMapName, metav1.GetOptions{})
 	framework.ExpectEqual(errors.IsNotFound(err), true)
 
 	// Init empty MetalLB ConfigMap.
 	_, err = cs.CoreV1().ConfigMaps(testNameSpace).Create(context.TODO(), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "config",
+			Name:      configMapName,
 			Namespace: testNameSpace,
 		},
 	}, metav1.CreateOptions{})
@@ -142,6 +148,6 @@ var _ = ginkgo.AfterSuite(func() {
 	cs, err := framework.LoadClientset()
 	framework.ExpectNoError(err)
 
-	err = cs.CoreV1().ConfigMaps(testNameSpace).Delete(context.TODO(), "config", metav1.DeleteOptions{})
+	err = cs.CoreV1().ConfigMaps(testNameSpace).Delete(context.TODO(), configMapName, metav1.DeleteOptions{})
 	framework.ExpectNoError(err)
 })

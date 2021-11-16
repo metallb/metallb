@@ -88,7 +88,7 @@ func updateConfigMap(cs clientset.Interface, data configFile) error {
 
 	_, err = cs.CoreV1().ConfigMaps(testNameSpace).Update(context.TODO(), &v1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "config",
+			Name:      configMapName,
 			Namespace: testNameSpace,
 		},
 		Data: map[string]string{"config": string(resData)},
