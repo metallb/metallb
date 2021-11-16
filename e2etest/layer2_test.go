@@ -292,14 +292,14 @@ var _ = ginkgo.Describe("L2", func() {
 		var speakerPods map[string]*corev1.Pod
 
 		ginkgo.BeforeEach(func() {
-			pods, err := cs.CoreV1().Pods("metallb-system").List(context.Background(), metav1.ListOptions{
+			pods, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
 				LabelSelector: "component=controller",
 			})
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(pods.Items), 1, "More than one controller found")
 			controllerPod = &pods.Items[0]
 
-			speakers, err := cs.CoreV1().Pods("metallb-system").List(context.Background(), metav1.ListOptions{
+			speakers, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
 				LabelSelector: "component=speaker",
 			})
 			framework.ExpectNoError(err)
@@ -333,7 +333,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("checking the metrics when no service is added")
 			gomega.Eventually(func() error {
-				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod)
+				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod, testNameSpace)
 				if err != nil {
 					return err
 				}
@@ -357,7 +357,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("checking the metrics when a service is added")
 			gomega.Eventually(func() error {
-				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod)
+				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod, testNameSpace)
 				if err != nil {
 					return err
 				}
@@ -388,7 +388,7 @@ var _ = ginkgo.Describe("L2", func() {
 			delete(speakerPods, advSpeaker.Spec.NodeName)
 
 			gomega.Eventually(func() error {
-				speakerMetrics, err := metrics.ForPod(controllerPod, advSpeaker)
+				speakerMetrics, err := metrics.ForPod(controllerPod, advSpeaker, testNameSpace)
 				if err != nil {
 					return err
 				}
@@ -413,7 +413,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 			// Negative - validate that the other speakers don't publish layer2 metrics
 			for _, p := range speakerPods {
-				speakerMetrics, err := metrics.ForPod(controllerPod, p)
+				speakerMetrics, err := metrics.ForPod(controllerPod, p, testNameSpace)
 				framework.ExpectNoError(err)
 
 				err = validateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": p.Spec.NodeName, "protocol": "layer2", "service": fmt.Sprintf("%s/%s", f.Namespace.Name, svc.Name)}, speakerMetrics)
