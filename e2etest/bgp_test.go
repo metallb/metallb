@@ -224,7 +224,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				LabelSelector: "component=controller",
 			})
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(len(pods.Items), 1, "More than one controller found")
+			framework.ExpectEqual(len(pods.Items), 1, "Expected one controller pod")
 			controllerPod = &pods.Items[0]
 			speakerPods = getSpeakerPods(cs)
 		})
