@@ -263,10 +263,12 @@ def validate_kind_version():
     "ip_family": "Optional ipfamily of the cluster."
                  "Default: ipv4, supported families are 'ipv6' and 'dual'.",
     "bgp_type": "Type of BGP implementation to use."
-                "Supported: 'native' (default), 'frr'"
+                "Supported: 'native' (default), 'frr'",
+    "log_level": "Log level for the controller and the speaker."
+                "Default: info, Supported: 'all', 'debug', 'info', 'warn', 'error' or 'none'"
 })
 def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None,
-        node_img=None, ip_family="ipv4", bgp_type="native"):
+        node_img=None, ip_family="ipv4", bgp_type="native", log_level="info"):
     """Build and run MetalLB in a local Kind cluster.
 
     If the cluster specified by --name (default "kind") doesn't exist,
@@ -331,6 +333,7 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None,
         for image in binaries:
             manifest = re.sub("image: quay.io/metallb/{}:.*".format(image),
                           "image: quay.io/metallb/{}:dev-{}".format(image, architecture), manifest)
+            manifest = re.sub("--log-level=info", "--log-level={}".format(log_level), manifest)
         with open(tmpdir + "/metallb.yaml", "w") as f:
             f.write(manifest)
             f.flush()
