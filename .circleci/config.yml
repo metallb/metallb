@@ -35,7 +35,7 @@ jobs:
       - setup_ci_image
       - setup_kind
       - run: inv build
-      - run: inv dev-env -i  << parameters.ip-family >> -b  << parameters.bgp-type >>
+      - run: inv dev-env -i  << parameters.ip-family >> -b  << parameters.bgp-type >> -l all
       - run: |
           SKIP="none"
           if [ "<< parameters.bgp-type >>" = "native" ]; then SKIP="$SKIP\|FRR\|BFD"; fi
