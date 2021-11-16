@@ -71,7 +71,6 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: {{ template "metallb.fullname" . }}-prometheus
-  namespace: {{ .Release.Namespace }}
 rules:
   - apiGroups:
       - ""
@@ -86,13 +85,12 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: {{ template "metallb.fullname" . }}-prometheus
-  namespace: {{ .Release.Namespace }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
   name: {{ template "metallb.fullname" . }}-prometheus
 subjects:
   - kind: ServiceAccount
-    name: {{ .Values.prometheus.serviceAccount }}
-    namespace: {{ .Values.prometheus.namespace }}
+    name: {{ required ".Values.prometheus.serviceAccount must be defined when .Values.prometheus.podMonitor.enabled == true" .Values.prometheus.serviceAccount }}
+    namespace: {{ required ".Values.prometheus.namespace must be defined when .Values.prometheus.podMonitor.enabled == true" .Values.prometheus.namespace }}
 {{- end }}
