@@ -302,6 +302,8 @@ var _ = ginkgo.Describe("L2", func() {
 				LabelSelector: "component=speaker",
 			})
 			framework.ExpectNoError(err)
+			framework.ExpectNotEqual(len(speakers.Items), 0, "No speaker pods found")
+
 			speakerPods = map[string]*corev1.Pod{}
 			for _, item := range speakers.Items {
 				i := item

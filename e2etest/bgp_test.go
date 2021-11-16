@@ -696,6 +696,7 @@ func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily str
 		LabelSelector: "component=speaker",
 	})
 	framework.ExpectNoError(err)
+	framework.ExpectNotEqual(len(pods.Items), 0, "No speaker pods found")
 	podExecutor := executor.ForPod(testNameSpace, pods.Items[0].Name, "frr")
 
 	Eventually(func() error {
@@ -801,6 +802,7 @@ func getSpeakerPods(cs clientset.Interface) []*corev1.Pod {
 		LabelSelector: "component=speaker",
 	})
 	framework.ExpectNoError(err)
+	framework.ExpectNotEqual(len(speakers.Items), 0, "No speaker pods found")
 	speakerPods := make([]*corev1.Pod, 0)
 	for _, item := range speakers.Items {
 		i := item
