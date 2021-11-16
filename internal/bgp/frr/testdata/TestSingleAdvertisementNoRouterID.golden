@@ -19,5 +19,3 @@ router bgp 100
     neighbor 10.2.2.254 activate
     network 172.16.1.10/24
   exit-address-family
-
-

@@ -596,3 +596,92 @@ func TestRoutes(t *testing.T) {
 		t.Fatal("neighbour ip not matching")
 	}
 }
+
+const bfdPeers = `[
+   {
+      "multihop":false,
+      "peer":"172.18.0.4",
+      "local":"172.18.0.5",
+      "vrf":"default",
+      "interface":"eth0",
+      "id":632314921,
+      "remote-id":2999817552,
+      "passive-mode":false,
+      "status":"up",
+      "uptime":52,
+      "diagnostic":"ok",
+      "remote-diagnostic":"ok",
+      "receive-interval":300,
+      "transmit-interval":300,
+      "echo-receive-interval":50,
+      "echo-transmit-interval":0,
+      "detect-multiplier":3,
+      "remote-receive-interval":300,
+      "remote-transmit-interval":300,
+      "remote-echo-receive-interval":50,
+      "remote-detect-multiplier":3
+   },
+   {
+      "multihop":false,
+      "peer":"172.18.0.2",
+      "local":"172.18.0.5",
+      "vrf":"default",
+      "interface":"eth0",
+      "id":3048501273,
+      "remote-id":2977557242,
+      "passive-mode":false,
+      "status":"up",
+      "uptime":52,
+      "diagnostic":"ok",
+      "remote-diagnostic":"ok",
+      "receive-interval":300,
+      "transmit-interval":300,
+      "echo-receive-interval":50,
+      "echo-transmit-interval":0,
+      "detect-multiplier":3,
+      "remote-receive-interval":300,
+      "remote-transmit-interval":300,
+      "remote-echo-receive-interval":50,
+      "remote-detect-multiplier":3
+   },
+   {
+      "multihop":false,
+      "peer":"172.18.0.3",
+      "local":"172.18.0.5",
+      "vrf":"default",
+      "interface":"eth0",
+      "id":2114932580,
+      "remote-id":493597049,
+      "passive-mode":false,
+      "status":"up",
+      "uptime":52,
+      "diagnostic":"ok",
+      "remote-diagnostic":"ok",
+      "receive-interval":300,
+      "transmit-interval":300,
+      "echo-receive-interval":50,
+      "echo-transmit-interval":0,
+      "detect-multiplier":3,
+      "remote-receive-interval":300,
+      "remote-transmit-interval":300,
+      "remote-echo-interval":50,
+      "remote-detect-multiplier":3
+   }
+]`
+
+func TestBFDPeers(t *testing.T) {
+	peers, err := ParseBFDPeers(bfdPeers)
+	if err != nil {
+		t.Fatalf("Failed to parse %s", err)
+	}
+	p, ok := peers["172.18.0.3"]
+	if !ok {
+		t.Fatal("Peer not found")
+	}
+	if p.Status != "up" {
+		t.Fatal("wrong status")
+	}
+	if p.RemoteEchoInterval != 50 {
+		t.Fatal("wrong echo interval")
+	}
+}

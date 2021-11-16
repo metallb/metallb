@@ -30,6 +30,9 @@ router bgp {{.ASN}}
   {{ if .Password -}}
   neighbor {{.Addr}} password {{.Password}}
   {{- end }}
+{{- if .BFDEnabled }} 
+  neighbor {{.Addr}} bfd
+{{- end -}}
 {{- end }}
   address-family {{.IPFamily}} unicast
 {{range .Neighbors }}
@@ -45,21 +48,19 @@ log stdout debugging
 `
 
 type RouterConfig struct {
-	ASN           uint32
-	Neighbors     []*NeighborConfig
-	BGPPort       uint16
-	RouterID      string
-	Password      string
-	HoldTime      string
-	KeepaliveTime string
-	IPFamily      string
+	ASN       uint32
+	Neighbors []*NeighborConfig
+	BGPPort   uint16
+	Password  string
+	IPFamily  string
 }
 
 type NeighborConfig struct {
-	ASN      uint32
-	Addr     string
-	Password string
-	IPFamily string
+	ASN        uint32
+	Addr       string
+	Password   string
+	IPFamily   string
+	BFDEnabled bool
 }
 
 // Set the IP of each node in the cluster in the BGP router configuration.
@@ -84,7 +85,6 @@ func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterCon
 			}
 		}
 	}
-
 	t, err := template.New("bgp Config Template").Parse(bgpConfigTemplate)
 	if err != nil {
 		return "", errors.Wrapf(err, "Failed to create bgp template")

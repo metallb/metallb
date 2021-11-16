@@ -350,7 +350,7 @@ data:
     babeld=no
     sharpd=no
     pbrd=no
-    bfdd=no
+    bfdd=yes
     fabricd=no
     vrrpd=no
 

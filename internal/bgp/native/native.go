@@ -21,6 +21,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	"go.universe.tf/metallb/internal/bgp"
+	"go.universe.tf/metallb/internal/config"
 	"golang.org/x/sys/unix"
 )
 
@@ -65,7 +66,7 @@ func NewSessionManager() *sessionManager {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime time.Duration, keepaliveTime time.Duration, password string, myNode string) (bgp.Session, error) {
+func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime, keepaliveTime time.Duration, password, myNode, bfdProfile string) (bgp.Session, error) {
 	ret := &session{
 		addr:          addr,
 		srcAddr:       srcAddr,
@@ -88,6 +89,10 @@ func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, 
 	stats.prefixes.WithLabelValues(ret.addr).Set(0)
 
 	return ret, nil
+}
+
+func (sm *sessionManager) SyncBFDProfiles(profiles map[string]*config.BFDProfile) error {
+	return errors.New("bfd profiles not supported in native mode")
 }
 
 // run tries to stay connected to the peer, and pumps route updates to it.

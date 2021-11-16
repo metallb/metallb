@@ -3,4 +3,3 @@ log file /etc/frr/frr.log informational
 log timestamp precision 3
 hostname dummyhostname
 
-
