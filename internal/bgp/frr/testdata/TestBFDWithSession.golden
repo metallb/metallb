@@ -12,15 +12,30 @@ router bgp 100
 
   neighbor 10.2.2.254 remote-as 200
   neighbor 10.2.2.254 port 179
-  neighbor 10.2.2.254 timers 1 1
+  neighbor 10.2.2.254 timers 2 1
   neighbor 10.2.2.254 password password
-  neighbor 10.2.2.254 update-source 10.1.1.254
+  neighbor 10.2.2.254 update-source 10.1.1.254 
+  neighbor 10.2.2.254 bfd profile foo
 
   address-family ipv4 unicast
     neighbor 10.2.2.254 activate
-    network 172.16.1.10/24
   exit-address-family
-  address-family ipv4 unicast
+  address-family ipv6 unicast
     neighbor 10.2.2.254 activate
-    network 172.16.1.11/24
   exit-address-family
+
+bfd
+  profile bar
+    receive-interval 60
+    transmit-interval 70
+    detect-multiplier 5
+    echo-interval 90
+    minimum-ttl 60
+    
+  profile foo
+    receive-interval 60
+    transmit-interval 70
+    detect-multiplier 5
+    echo-interval 90
+    minimum-ttl 60
+    

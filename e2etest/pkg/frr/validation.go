@@ -63,3 +63,28 @@ func RoutesMatchNodes(nodes []v1.Node, route bgpfrr.Route) error {
 	}
 	return nil
 }
+
+func BFDPeersMatchNodes(nodes []v1.Node, peers map[string]bgpfrr.BFDPeer) error {
+	nodesIPs := map[string]struct{}{}
+
+	for _, n := range nodes {
+		for _, a := range n.Status.Addresses {
+			if a.Type == v1.NodeInternalIP {
+				nodesIPs[a.Address] = struct{}{}
+				if _, ok := peers[a.Address]; !ok {
+					return fmt.Errorf("address %s not found in peers", a.Address)
+				}
+			}
+		}
+	}
+	for k := range peers {
+		if _, ok := nodesIPs[k]; !ok { // skipping neighbors that are not nodes
+			return fmt.Errorf("%s not found in nodes ips", k)
+		}
+		delete(nodesIPs, k)
+	}
+	if len(nodesIPs) != 0 { // some leftover, meaning more nodes than routes
+		return fmt.Errorf("IP %v found in nodes but not in bfd peers", nodesIPs)
+	}
+	return nil
+}

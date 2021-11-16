@@ -47,6 +47,9 @@ router bgp {{.MyASN}}
   {{ if .SrcAddr -}}
   neighbor {{.Addr}} update-source {{.SrcAddr}}
   {{- end }}
+{{- if ne .BFDProfile ""}} 
+  neighbor {{.Addr}} bfd profile {{.BFDProfile}}
+{{- end -}}
 {{- end }}
 {{range $n := .Neighbors -}}
 {{/* no bgp default ipv4-unicast prevents peering if no address families are defined. We declare an ipv4 one for the peer to make the pairing happen */}}
@@ -64,20 +67,58 @@ router bgp {{.MyASN}}
     network {{.Prefix}}
   exit-address-family
 {{- end}}
-{{end}}
-{{end}}
-`
+{{end -}}
+{{end }}
+{{- if gt (len .BFDProfiles) 0}}
+bfd
+{{- range .BFDProfiles }}
+  profile {{.Name}}
+    {{ if .ReceiveInterval -}}
+    receive-interval {{.ReceiveInterval}}
+    {{end -}}
+    {{ if .TransmitInterval -}}
+    transmit-interval {{.TransmitInterval}}
+    {{end -}}
+    {{ if .DetectMultiplier -}}
+    detect-multiplier {{.DetectMultiplier}}
+    {{end -}}
+    {{ if .EchoMode -}}
+    echo-mode
+    {{end -}}
+    {{ if .EchoInterval -}}
+    echo-interval {{.EchoInterval}}
+    {{end -}}
+    {{ if .PassiveMode -}}
+    passive-mode
+    {{end -}}
+    {{ if .MinimumTTL -}}
+    minimum-ttl {{ .MinimumTTL }}
+    {{end -}}
+{{ end }}
+{{ end }}`
 
 type frrConfig struct {
-	Loglevel string
-	Hostname string
-	Routers  map[string]*routerConfig
+	Loglevel    string
+	Hostname    string
+	Routers     map[string]*routerConfig
+	BFDProfiles []BFDProfile
 }
 
 type routerConfig struct {
 	MyASN     uint32
 	RouterId  string
 	Neighbors map[string]*neighborConfig
+}
+
+type BFDProfile struct {
+	Name             string
+	ReceiveInterval  *uint32
+	TransmitInterval *uint32
+	DetectMultiplier *uint32
+	EchoInterval     *uint32
+	EchoMode         bool
+	PassiveMode      bool
+	MinimumTTL       *uint32
 }
 
 type neighborConfig struct {
@@ -89,6 +130,7 @@ type neighborConfig struct {
 	KeepaliveTime  uint64
 	Password       string
 	Advertisements []*advertisementConfig
+	BFDProfile     string
 }
 
 type advertisementConfig struct {
@@ -168,7 +210,6 @@ func generateAndReloadConfigFile(config *frrConfig) error {
 	if err != nil {
 		return err
 	}
-
 	err = writeConfig(configString, configFileName)
 	if err != nil {
 		return err

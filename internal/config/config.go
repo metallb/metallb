@@ -16,7 +16,6 @@ package config // import "go.universe.tf/metallb/internal/config"
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"net"
 	"reflect"
@@ -25,6 +24,7 @@ import (
 	"time"
 
 	"github.com/mikioh/ipaddr"
+	"github.com/pkg/errors"
 	yaml "gopkg.in/yaml.v2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -36,6 +36,7 @@ type configFile struct {
 	Peers          []peer
 	BGPCommunities map[string]string `yaml:"bgp-communities"`
 	Pools          []addressPool     `yaml:"address-pools"`
+	BFDProfiles    []bfdProfile      `yaml:"bfd-profiles"`
 }
 
 type peer struct {
@@ -49,6 +50,7 @@ type peer struct {
 	RouterID      string         `yaml:"router-id"`
 	NodeSelectors []nodeSelector `yaml:"node-selectors"`
 	Password      string         `yaml:"password"`
+	BFDProfile    string         `yaml:"bfd-profile"`
 }
 
 type nodeSelector struct {
@@ -78,12 +80,25 @@ type bgpAdvertisement struct {
 	Communities         []string
 }
 
+type bfdProfile struct {
+	Name             string  `yaml:"name"`
+	ReceiveInterval  *uint32 `yaml:"receive-interval"`
+	TransmitInterval *uint32 `yaml:"transmit-interval"`
+	DetectMultiplier *uint32 `yaml:"detect-multiplier"`
+	EchoInterval     *uint32 `yaml:"echo-interval"`
+	EchoMode         bool    `yaml:"echo-mode"`
+	PassiveMode      bool    `yaml:"passive-mode"`
+	MinimumTTL       *uint32 `yaml:"minimum-ttl"`
+}
+
 // Config is a parsed MetalLB configuration.
 type Config struct {
 	// Routers that MetalLB should peer with.
 	Peers []*Peer
 	// Address pools from which to allocate load balancer IPs.
 	Pools map[string]*Pool
+	// BFD profiles that can be used by peers.
+	BFDProfiles map[string]*BFDProfile
 }
 
 // Proto holds the protocol we are speaking.
@@ -118,6 +133,8 @@ type Peer struct {
 	NodeSelectors []labels.Selector
 	// Authentication password for routers enforcing TCP MD5 authenticated sessions
 	Password string
+	// The optional BFD profile to be used for this BGP session
+	BFDProfile string
 	// TODO: more BGP session settings
 }
 
@@ -157,6 +174,18 @@ type BGPAdvertisement struct {
 	LocalPref uint32
 	// Value of the COMMUNITIES path attribute.
 	Communities map[uint32]bool
+}
+
+// BFDProfile describes a BFD profile to be applied to a set of peers.
+type BFDProfile struct {
+	Name             string
+	ReceiveInterval  *uint32
+	TransmitInterval *uint32
+	DetectMultiplier *uint32
+	EchoInterval     *uint32
+	EchoMode         bool
+	PassiveMode      bool
+	MinimumTTL       *uint32
 }
 
 func parseNodeSelector(ns *nodeSelector) (labels.Selector, error) {
@@ -219,11 +248,31 @@ func Parse(bs []byte) (*Config, error) {
 		return nil, fmt.Errorf("could not parse config: %s", err)
 	}
 
-	cfg := &Config{Pools: map[string]*Pool{}}
+	cfg := &Config{
+		Pools:       map[string]*Pool{},
+		BFDProfiles: map[string]*BFDProfile{},
+	}
+
+	for i, bfd := range raw.BFDProfiles {
+		parsed, err := parseBFDProfile(bfd)
+		if err != nil {
+			return nil, fmt.Errorf("parsing bfd profile #%d: %s", i+1, err)
+		}
+		if _, ok := cfg.BFDProfiles[parsed.Name]; ok {
+			return nil, fmt.Errorf("found duplicate bfd profile name %s", parsed.Name)
+		}
+		cfg.BFDProfiles[bfd.Name] = parsed
+	}
+
 	for i, p := range raw.Peers {
 		peer, err := parsePeer(p)
 		if err != nil {
 			return nil, fmt.Errorf("parsing peer #%d: %s", i+1, err)
+		}
+		if peer.BFDProfile != "" {
+			if _, ok := cfg.BFDProfiles[peer.BFDProfile]; !ok {
+				return nil, fmt.Errorf("peer #%d referencing non existing bfd profile %s", i+1, peer.BFDProfile)
+			}
 		}
 		for _, ep := range cfg.Peers {
 			// TODO: Be smarter regarding conflicting peers. For example, two
@@ -232,6 +281,7 @@ func Parse(bs []byte) (*Config, error) {
 			if reflect.DeepEqual(peer, ep) {
 				return nil, fmt.Errorf("peer #%d already exists", i+1)
 			}
+
 		}
 		cfg.Peers = append(cfg.Peers, peer)
 	}
@@ -335,6 +385,7 @@ func parsePeer(p peer) (*Peer, error) {
 	if p.Password != "" {
 		password = p.Password
 	}
+
 	return &Peer{
 		MyASN:         p.MyASN,
 		ASN:           p.ASN,
@@ -346,6 +397,7 @@ func parsePeer(p peer) (*Peer, error) {
 		RouterID:      routerID,
 		NodeSelectors: nodeSels,
 		Password:      password,
+		BFDProfile:    p.BFDProfile,
 	}, nil
 }
 
@@ -393,6 +445,39 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 	}
 
 	return ret, nil
+}
+
+func parseBFDProfile(p bfdProfile) (*BFDProfile, error) {
+	if p.Name == "" {
+		return nil, fmt.Errorf("missing bfd profile name")
+	}
+	res := &BFDProfile{}
+	res.Name = p.Name
+	var err error
+	res.DetectMultiplier, err = bfdIntFromConfig(p.DetectMultiplier, 2, 255)
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid detect multiplier value")
+	}
+	res.ReceiveInterval, err = bfdIntFromConfig(p.ReceiveInterval, 10, 60000)
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid receive interval value")
+	}
+	res.TransmitInterval, err = bfdIntFromConfig(p.TransmitInterval, 10, 60000)
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid transmit interval value")
+	}
+	res.MinimumTTL, err = bfdIntFromConfig(p.MinimumTTL, 1, 254)
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid minimum ttl value")
+	}
+	res.EchoInterval, err = bfdIntFromConfig(p.EchoInterval, 10, 60000)
+	if err != nil {
+		return nil, errors.Wrap(err, "invalid minimum ttl value")
+	}
+	res.EchoMode = p.EchoMode
+	res.PassiveMode = p.PassiveMode
+
+	return res, nil
 }
 
 func parseBGPAdvertisements(ads []bgpAdvertisement, cidrs []*net.IPNet, communities map[string]uint32) ([]*BGPAdvertisement, error) {
@@ -531,4 +616,14 @@ func cidrContainsCIDR(outer, inner *net.IPNet) bool {
 		return true
 	}
 	return false
+}
+
+func bfdIntFromConfig(value *uint32, min, max uint32) (*uint32, error) {
+	if value == nil {
+		return nil, nil
+	}
+	if *value < min || *value > max {
+		return nil, fmt.Errorf("invalid value %d, must be in %d-%d range", *value, min, max)
+	}
+	return value, nil
 }

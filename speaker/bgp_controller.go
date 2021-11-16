@@ -31,6 +31,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/pkg/errors"
 )
 
 type bgpImplementation string
@@ -94,6 +95,10 @@ newPeers:
 		}
 	}
 
+	err := c.syncBFDProfiles(cfg.BFDProfiles)
+	if err != nil {
+		return errors.Wrap(err, "failed to sync bfd profiles")
+	}
 	return c.syncPeers(l)
 }
 
@@ -205,7 +210,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 			if p.cfg.RouterID != nil {
 				routerID = p.cfg.RouterID
 			}
-			s, err := c.sessionManager.NewSession(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.SrcAddr, p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.KeepaliveTime, p.cfg.Password, c.myNode)
+			s, err := c.sessionManager.NewSession(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.SrcAddr, p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.KeepaliveTime, p.cfg.Password, c.myNode, p.cfg.BFDProfile)
 			if err != nil {
 				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
 				errs++
@@ -226,6 +231,14 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 		return fmt.Errorf("%d BGP sessions failed to start", errs)
 	}
 	return nil
+}
+
+func (c *bgpController) syncBFDProfiles(profiles map[string]*config.BFDProfile) error {
+	if len(profiles) == 0 {
+		return nil
+	}
+
+	return c.sessionManager.SyncBFDProfiles(profiles)
 }
 
 func (c *bgpController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {

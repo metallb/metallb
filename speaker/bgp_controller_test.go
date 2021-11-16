@@ -110,7 +110,7 @@ type fakeBGPSessionManager struct {
 	gotAds map[string][]*bgp.Advertisement
 }
 
-func (f *fakeBGPSessionManager) NewSession(_ log.Logger, addr string, _ net.IP, _ uint32, _ net.IP, _ uint32, _ time.Duration, _ time.Duration, _ string, _ string) (bgp.Session, error) {
+func (f *fakeBGPSessionManager) NewSession(_ log.Logger, addr string, _ net.IP, _ uint32, _ net.IP, _ uint32, _ time.Duration, _ time.Duration, _, _, _ string) (bgp.Session, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -125,6 +125,10 @@ func (f *fakeBGPSessionManager) NewSession(_ log.Logger, addr string, _ net.IP, 
 		f:    f,
 		addr: addr,
 	}, nil
+}
+
+func (f *fakeBGPSessionManager) SyncBFDProfiles(profiles map[string]*config.BFDProfile) error {
+	return nil
 }
 
 func (f *fakeBGPSessionManager) Ads() map[string][]*bgp.Advertisement {

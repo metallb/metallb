@@ -346,12 +346,21 @@ func poolFor(pools map[string]*config.Pool, ip net.IP) string {
 }
 
 func (c *controller) SetConfig(l log.Logger, cfg *config.Config) k8s.SyncState {
+
 	level.Debug(l).Log("event", "startUpdate", "msg", "start of config update")
 	defer level.Debug(l).Log("event", "endUpdate", "msg", "end of config update")
 
 	if cfg == nil {
 		level.Error(l).Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
 		return k8s.SyncStateErrorNoRetry
+	}
+
+	if c.bgpType == bgpNative {
+		err := validateFRROnlyConfiguration(cfg)
+		if err != nil {
+			level.Error(l).Log("op", "setConfig", "error", err)
+			return k8s.SyncStateError
+		}
 	}
 
 	for svc, ip := range c.svcIP {

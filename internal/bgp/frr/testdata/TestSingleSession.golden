@@ -22,5 +22,3 @@ router bgp 100
   address-family ipv6 unicast
     neighbor 10.2.2.254 activate
   exit-address-family
-
-
