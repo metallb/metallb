@@ -47,11 +47,13 @@ import (
 )
 
 const (
-	frrIBGP      = "frr-iBGP"
-	frrEBGP      = "frr-eBGP"
-	IBGPAsn      = 64512
-	EBGPAsn      = 64513
-	baseRouterID = "10.10.10.%d"
+	frrIBGP         = "frr-iBGP"
+	frrEBGP         = "frr-eBGP"
+	IBGPAsn         = 64512
+	EBGPAsn         = 64513
+	baseRouterID    = "10.10.10.%d"
+	v4PoolAddresses = "192.168.10.0/24"
+	v6PoolAddresses = "fc00:f853:0ccd:e799::/124"
 )
 
 var (
@@ -122,7 +124,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		}
 	})
 
-	table.DescribeTable("A service of protocol load balancer should work with", func(ipFamily string, setProtocoltest string) {
+	table.DescribeTable("A service of protocol load balancer should work with", func(ipFamily, setProtocoltest, poolAddress string) {
 		var allNodes *corev1.NodeList
 		configData := configFile{
 			Pools: []addressPool{
@@ -130,8 +132,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					Name:     "bgp-test",
 					Protocol: BGP,
 					Addresses: []string{
-						"192.168.10.0/24",
-						"fc00:f853:0ccd:e799::/124",
+						poolAddress,
 					},
 				},
 			},
@@ -190,12 +191,12 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 		}
 	},
-		table.Entry("IPV4 - ExternalTrafficPolicyCluster", "ipv4", "ExternalTrafficPolicyCluster"),
-		table.Entry("IPV4 - ExternalTrafficPolicyLocal", "ipv4", "ExternalTrafficPolicyLocal"),
-		table.Entry("IPV4 - FRR running in the speaker POD", "ipv4", "CheckSpeakerFRRPodRunning"),
-		table.Entry("IPV6 - ExternalTrafficPolicyCluster", "ipv6", "ExternalTrafficPolicyCluster"),
-		table.Entry("IPV6 - ExternalTrafficPolicyLocal", "ipv6", "ExternalTrafficPolicyLocal"),
-		table.Entry("IPV6 - FRR running in the speaker POD", "ipv6", "CheckSpeakerFRRPodRunning"))
+		table.Entry("IPV4 - ExternalTrafficPolicyCluster", "ipv4", "ExternalTrafficPolicyCluster", v4PoolAddresses),
+		table.Entry("IPV4 - ExternalTrafficPolicyLocal", "ipv4", "ExternalTrafficPolicyLocal", v4PoolAddresses),
+		table.Entry("IPV4 - FRR running in the speaker POD", "ipv4", "CheckSpeakerFRRPodRunning", v4PoolAddresses),
+		table.Entry("IPV6 - ExternalTrafficPolicyCluster", "ipv6", "ExternalTrafficPolicyCluster", v6PoolAddresses),
+		table.Entry("IPV6 - ExternalTrafficPolicyLocal", "ipv6", "ExternalTrafficPolicyLocal", v6PoolAddresses),
+		table.Entry("IPV6 - FRR running in the speaker POD", "ipv6", "CheckSpeakerFRRPodRunning", v6PoolAddresses))
 
 	ginkgo.Context("metrics", func() {
 		var controllerPod *corev1.Pod
@@ -220,7 +221,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 		})
 
-		table.DescribeTable("should be exposed by the controller", func(ipFamily string) {
+		table.DescribeTable("should be exposed by the controller", func(ipFamily, poolAddress string, addressTotal int) {
 			poolName := "bgp-test"
 
 			var peerAddrs []string
@@ -237,12 +238,9 @@ var _ = ginkgo.Describe("BGP", func() {
 			configData := configFile{
 				Pools: []addressPool{
 					{
-						Name:     poolName,
-						Protocol: BGP,
-						Addresses: []string{
-							"192.168.10.0/24",
-							"fc00:f853:0ccd:e799::/124",
-						},
+						Name:      poolName,
+						Protocol:  BGP,
+						Addresses: []string{poolAddress},
 					},
 				},
 				Peers: peersForContainers(frrContainers, ipFamily),
@@ -268,7 +266,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				if err != nil {
 					return err
 				}
-				err = validateGaugeValue(272, "metallb_allocator_addresses_total", map[string]string{"pool": poolName}, controllerMetrics)
+				err = validateGaugeValue(addressTotal, "metallb_allocator_addresses_total", map[string]string{"pool": poolName}, controllerMetrics)
 				if err != nil {
 					return err
 				}
@@ -350,8 +348,8 @@ var _ = ginkgo.Describe("BGP", func() {
 				}, 2*time.Minute, 1*time.Second).Should(BeNil())
 			}
 		},
-			table.Entry("IPV4 - Checking service", "ipv4"),
-			table.Entry("IPV6 - Checking service", "ipv6"))
+			table.Entry("IPV4 - Checking service", "ipv4", v4PoolAddresses, 256),
+			table.Entry("IPV6 - Checking service", "ipv6", v6PoolAddresses, 16))
 	})
 
 	ginkgo.Context("validate different AddressPools for type=Loadbalancer", func() {
@@ -402,13 +400,21 @@ var _ = ginkgo.Describe("BGP", func() {
 				validateService(cs, svc, allNodes.Items, c, ipFamily)
 			}
 		},
+			table.Entry("IPV4 - test AddressPool defined by address range", []addressPool{
+				{
+					Name:     "bgp-test",
+					Protocol: BGP,
+					Addresses: []string{
+						"192.168.10.0-192.168.10.18",
+					},
+				}}, "ipv4",
+			),
 			table.Entry("IPV4 - test AddressPool defined by network prefix", []addressPool{
 				{
 					Name:     "bgp-test",
 					Protocol: BGP,
 					Addresses: []string{
 						"192.168.10.0/24",
-						"fc00:f853:0ccd:e799::/124",
 					},
 				}}, "ipv4",
 			),
@@ -417,8 +423,16 @@ var _ = ginkgo.Describe("BGP", func() {
 					Name:     "bgp-test",
 					Protocol: BGP,
 					Addresses: []string{
-						"192.168.10.0-192.168.10.18",
 						"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
+					},
+				}}, "ipv6",
+			),
+			table.Entry("IPV6 - test AddressPool defined by network prefix", []addressPool{
+				{
+					Name:     "bgp-test",
+					Protocol: BGP,
+					Addresses: []string{
+						"fc00:f853:0ccd:e799::/124",
 					},
 				}}, "ipv6",
 			),
@@ -426,15 +440,14 @@ var _ = ginkgo.Describe("BGP", func() {
 	})
 
 	ginkgo.Context("BFD", func() {
-		table.DescribeTable("should work with the given bfd profile", func(bfd bfdProfile, ipFamily string) {
+		table.DescribeTable("should work with the given bfd profile", func(bfd bfdProfile, ipFamily, poolAddress string) {
 			configData := configFile{
 				Pools: []addressPool{
 					{
 						Name:     "bfd-test",
 						Protocol: BGP,
 						Addresses: []string{
-							"192.168.10.0/24",
-							"fc00:f853:0ccd:e799::/124",
+							poolAddress,
 						},
 					},
 				},
@@ -495,7 +508,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			table.Entry("IPV4 - default",
 				bfdProfile{
 					Name: "bar",
-				}, "ipv4"),
+				}, "ipv4", v4PoolAddresses),
 			table.Entry("IPV4 - full params",
 				bfdProfile{
 					Name:             "full1",
@@ -505,7 +518,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					EchoMode:         boolPtr(false),
 					PassiveMode:      boolPtr(false),
 					MinimumTTL:       uint32Ptr(254),
-				}, "ipv4"),
+				}, "ipv4", v4PoolAddresses),
 			table.Entry("IPV4 - echo mode enabled",
 				bfdProfile{
 					Name:             "echo",
@@ -515,11 +528,11 @@ var _ = ginkgo.Describe("BGP", func() {
 					EchoMode:         boolPtr(true),
 					PassiveMode:      boolPtr(false),
 					MinimumTTL:       uint32Ptr(254),
-				}, "ipv4"),
+				}, "ipv4", v4PoolAddresses),
 			table.Entry("IPV6 - default",
 				bfdProfile{
 					Name: "bar",
-				}, "ipv6"),
+				}, "ipv6", v6PoolAddresses),
 			table.Entry("IPV6 - full params",
 				bfdProfile{
 					Name:             "full1",
@@ -529,7 +542,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					EchoMode:         boolPtr(false),
 					PassiveMode:      boolPtr(false),
 					MinimumTTL:       uint32Ptr(254),
-				}, "ipv6"),
+				}, "ipv6", v6PoolAddresses),
 			table.Entry("IPV6 - echo mode enabled",
 				bfdProfile{
 					Name:             "echo",
@@ -539,7 +552,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					EchoMode:         boolPtr(true),
 					PassiveMode:      boolPtr(false),
 					MinimumTTL:       uint32Ptr(254),
-				}, "ipv6"),
+				}, "ipv6", v6PoolAddresses),
 		)
 	})
 })
