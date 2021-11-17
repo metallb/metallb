@@ -5,6 +5,7 @@ metal [Kubernetes](https://kubernetes.io) clusters, using standard
 routing protocols.
 
 [![Project maturity: beta](https://img.shields.io/badge/maturity-beta-orange.svg)](https://metallb.universe.tf/concepts/maturity/) [![license](https://img.shields.io/github/license/metallb/metallb.svg?maxAge=2592000)](https://github.com/metallb/metallb/blob/main/LICENSE) [![CircleCI](https://img.shields.io/circleci/project/github/metallb/metallb.svg)](https://circleci.com/gh/metallb/metallb) [![Containers](https://img.shields.io/badge/containers-ready-green.svg)](https://hub.docker.com/u/metallb) [![Go report card](https://goreportcard.com/badge/github.com/metallb/metallb)](https://goreportcard.com/report/github.com/metallb/metallb)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmetallb%2Fmetallb.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fmetallb%2Fmetallb?ref=badge_shield)
 
 Check out [MetalLB's website](https://metallb.universe.tf) for more
 information.
