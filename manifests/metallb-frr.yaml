@@ -404,10 +404,13 @@ data:
   vtysh.conf: |+
     service integrated-vtysh-config
   frr.conf: |+
+    ! This file gets overriden the first time the speaker renders a config.
+    ! So anything configured here is only temporary.
     frr version 7.5.1
     frr defaults traditional
     hostname Router
     line vty
+    log file /etc/frr/frr.log informational
 
 ---
 apiVersion: apps/v1
@@ -484,6 +487,20 @@ spec:
               mountPath: /var/run/frr
             - name: frr-conf
               mountPath: /etc/frr
+          # The command is FRR's default entrypoint & waiting for the log file to appear and tailing it.
+          # If the log file isn't created in 60 seconds the tail fails and the container is restarted.
+          # This workaround is needed to have the frr logs as part of kubectl logs -c frr < speaker_pod_name >.
+          command:
+            - /bin/sh
+            - -c
+            - |
+              /sbin/tini -- /usr/lib/frr/docker-start &
+              attempts=0
+              until [[ -f /etc/frr/frr.log || $attempts -eq 60 ]]; do
+                sleep 1
+                attempts=$(( $attempts + 1 ))
+              done
+              tail -f /etc/frr/frr.log
         - name: reloader
           image: frrouting/frr:v7.5.1
           command: ["/etc/frr_reloader/frr-reloader.sh"]
