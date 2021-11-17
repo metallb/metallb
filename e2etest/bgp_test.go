@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"time"
 
+	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/metrics"
 	"go.universe.tf/metallb/e2etest/pkg/routes"
 
@@ -693,7 +694,8 @@ func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily str
 		if ipFamily == "ipv6" {
 			address = n.Ipv6
 		}
-		toParse, err := framework.RunKubectl(testNameSpace, "exec", pods.Items[0].Name, "-c", "frr", "--", "vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", address))
+		podExecutor := executor.ForPod(testNameSpace, pods.Items[0].Name, "frr")
+		toParse, err := podExecutor.Exec("vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", address))
 		if err != nil {
 			return err
 		}
