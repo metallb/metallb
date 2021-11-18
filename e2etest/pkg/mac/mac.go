@@ -3,16 +3,27 @@
 package mac
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"regexp"
 	"strings"
 
+	"github.com/pkg/errors"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/routes"
 
 	corev1 "k8s.io/api/core/v1"
 )
+
+type ipIface struct {
+	Ifname   string `json:"ifname"`
+	Address  string `json:"address"`
+	AddrInfo []struct {
+		Local     string `json:"local"`
+		Prefixlen int    `json:"prefixlen"`
+	} `json:"addr_info"`
+}
 
 // ForIP returns the MAC address of a given IP.
 func ForIP(ip string, exec executor.Executor) (net.HardwareAddr, error) {
@@ -104,4 +115,62 @@ func UpdateNodeCache(nodes []corev1.Node, exec executor.Executor) error {
 	}
 
 	return nil
+}
+
+// RequestAddressResolution does an ARP/NS request for the given IP.
+func RequestAddressResolution(ip string, exc executor.Executor) error {
+	netIP := net.ParseIP(ip)
+	if netIP == nil {
+		return fmt.Errorf("failed to convert %s to net.IP", ip)
+	}
+
+	iface, err := ifaceForIPNetwork(netIP, exc)
+	if err != nil {
+		return err
+	}
+
+	var cmd string
+	var args []string
+	if netIP.To4() != nil {
+		cmd = "arping"
+		args = []string{"-c", "1", "-I", iface, netIP.String()}
+	} else {
+		cmd = "ndisc6"
+		args = []string{netIP.String(), iface}
+	}
+
+	out, err := exc.Exec(cmd, args...)
+	if err != nil {
+		return errors.Wrapf(err, out)
+	}
+
+	return nil
+}
+
+// ifaceForIPNetwork returns the interface name that is in the same network as the IP.
+func ifaceForIPNetwork(ip net.IP, exec executor.Executor) (string, error) {
+	ifaces := []ipIface{}
+	res, err := exec.Exec("ip", "--json", "address", "show")
+	if err != nil {
+		return "", errors.Wrapf(err, "Failed to list interfaces")
+	}
+
+	err = json.Unmarshal([]byte(res), &ifaces)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to parse interfaces")
+	}
+
+	for _, intf := range ifaces {
+		for _, addr := range intf.AddrInfo {
+			_, ipnet, err := net.ParseCIDR(fmt.Sprintf("%s/%d", addr.Local, addr.Prefixlen))
+			if err != nil {
+				return "", errors.Wrap(err, fmt.Sprintf("failed to parse CIDR from interface %s %s", intf.Ifname, fmt.Sprintf("%s/%d", addr.Local, addr.Prefixlen)))
+			}
+			if ipnet.Contains(ip) {
+				return intf.Ifname, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no interface found in %s network", ip)
 }

@@ -287,7 +287,6 @@ var _ = ginkgo.Describe("L2", func() {
 		table.Entry("IPV6", &ipv6ServiceRange))
 
 	ginkgo.Context("metrics", func() {
-		// TODO: validate gratuitous_sent metric
 		var controllerPod *corev1.Pod
 		var speakerPods map[string]*corev1.Pod
 
@@ -372,6 +371,9 @@ var _ = ginkgo.Describe("L2", func() {
 			ingressIP := e2eservice.GetIngressPoint(
 				&svc.Status.LoadBalancer.Ingress[0])
 
+			err = mac.RequestAddressResolution(ingressIP, executor.Host)
+			framework.ExpectNoError(err)
+
 			ginkgo.By("checking connectivity to its external VIP")
 			hostport := net.JoinHostPort(ingressIP, port)
 			address := fmt.Sprintf("http://%s/", hostport)
@@ -404,6 +406,11 @@ var _ = ginkgo.Describe("L2", func() {
 				}
 
 				err = validateCounterValue(1, "metallb_layer2_responses_sent", map[string]string{"ip": ingressIP}, speakerMetrics)
+				if err != nil {
+					return err
+				}
+
+				err = validateCounterValue(1, "metallb_layer2_gratuitous_sent", map[string]string{"ip": ingressIP}, speakerMetrics)
 				if err != nil {
 					return err
 				}
