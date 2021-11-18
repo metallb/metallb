@@ -7,7 +7,7 @@ commands:
     steps:
       - checkout
       - run: sudo apt-get update
-      - run: sudo apt-get install python3-pip
+      - run: sudo apt-get install python3-pip arping ndisc6
       - run: sudo pip3 install invoke semver pyyaml
   setup_kind:
     description: "Install kind"
@@ -44,7 +44,9 @@ jobs:
           if [ "<< parameters.ip-family >>" = "ipv6" ]; then SKIP="$SKIP\|IPV4"; fi
           if [ "<< parameters.ip-family >>" = "ipv6" ] && [ "<< parameters.bgp-type >>" = "native" ]; then SKIP="$SKIP\|BGP"; fi # we are skipping BGP for ipv6 for native bgp stack
           echo "Skipping $SKIP"
-          inv e2etest --skip $SKIP -e /tmp/kind_logs
+          # `-E env "PATH=$PATH"` bypasses commands not found under sudo, `sudo` needed because arping requires CAP_NET_RAW
+          sudo -E env "PATH=$PATH" inv e2etest --skip $SKIP -e /tmp/kind_logs
+      - run: sudo chmod -R o+r /tmp/kind_logs # logs are exported under root (sudo), chmod required to upload the artifacts.
       - store_artifacts:
           path: /tmp/kind_logs
   lint-1-16:
