@@ -28,8 +28,12 @@ which will give us warm fuzzy feelings :).
 # Reporting security issues
 
 You can report security issues in the github issue tracker. If you
-prefer private disclosure, please email dave@natulte.net and we'll
-figure out a remediation timeline.
+prefer private disclosure, please email to one of the maintainers:
+
+- fpaoline@redhat.com
+- rbryant@redhat.com
+- rodrigo@kinvolk.com
+- jliebermann@microsoft.com
 
 We aim for initial response to vulnerability reports within 48
 hours. The timeline for fixes depends on the complexity of the issue.
