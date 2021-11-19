@@ -92,7 +92,7 @@ func usableNodes(eps k8s.EpsOrSlices, speakers map[string]bool) []string {
 	return ret
 }
 
-func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce net.IP, svc *v1.Service, eps k8s.EpsOrSlices) string {
+func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce []net.IP, svc *v1.Service, eps k8s.EpsOrSlices) string {
 	if !activeEndpointExists(eps) { // no active endpoints, just return
 		return "notOwner"
 	}
@@ -102,7 +102,8 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 	} else {
 		nodes = nodesWithActiveSpeakers(c.sList.UsableSpeakers())
 	}
-	ipString := toAnnounce.String()
+	// Using the first IP should work for both single and dual stack.
+	ipString := toAnnounce[0].String()
 	// Sort the slice by the hash of node + load balancer ips. This
 	// produces an ordering of ready nodes that is unique to all the services
 	// with the same ip.
@@ -122,8 +123,10 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 	return "notOwner"
 }
 
-func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
-	c.announcer.SetBalancer(name, lbIP)
+func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIPs []net.IP, pool *config.Pool) error {
+	for _, lbIP := range lbIPs {
+		c.announcer.SetBalancer(name, lbIP)
+	}
 	return nil
 }
 

@@ -151,7 +151,7 @@ func hasHealthyEndpoint(eps k8s.EpsOrSlices, filterNode func(*string) bool) bool
 	return false
 }
 
-func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ net.IP, svc *v1.Service, eps k8s.EpsOrSlices) string {
+func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, svc *v1.Service, eps k8s.EpsOrSlices) string {
 	// Should we advertise?
 	// Yes, if externalTrafficPolicy is
 	//  Cluster && any healthy endpoint exists
@@ -237,25 +237,27 @@ func (c *bgpController) syncBFDProfiles(profiles map[string]*config.BFDProfile) 
 	return c.sessionManager.SyncBFDProfiles(profiles)
 }
 
-func (c *bgpController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
+func (c *bgpController) SetBalancer(l log.Logger, name string, lbIPs []net.IP, pool *config.Pool) error {
 	c.svcAds[name] = nil
-	for _, adCfg := range pool.BGPAdvertisements {
-		m := net.CIDRMask(adCfg.AggregationLength, 32)
-		if lbIP.To4() == nil {
-			m = net.CIDRMask(adCfg.AggregationLengthV6, 128)
+	for _, lbIP := range lbIPs {
+		for _, adCfg := range pool.BGPAdvertisements {
+			m := net.CIDRMask(adCfg.AggregationLength, 32)
+			if lbIP.To4() == nil {
+				m = net.CIDRMask(adCfg.AggregationLengthV6, 128)
+			}
+			ad := &bgp.Advertisement{
+				Prefix: &net.IPNet{
+					IP:   lbIP.Mask(m),
+					Mask: m,
+				},
+				LocalPref: adCfg.LocalPref,
+			}
+			for comm := range adCfg.Communities {
+				ad.Communities = append(ad.Communities, comm)
+			}
+			sort.Slice(ad.Communities, func(i, j int) bool { return ad.Communities[i] < ad.Communities[j] })
+			c.svcAds[name] = append(c.svcAds[name], ad)
 		}
-		ad := &bgp.Advertisement{
-			Prefix: &net.IPNet{
-				IP:   lbIP.Mask(m),
-				Mask: m,
-			},
-			LocalPref: adCfg.LocalPref,
-		}
-		for comm := range adCfg.Communities {
-			ad.Communities = append(ad.Communities, comm)
-		}
-		sort.Slice(ad.Communities, func(i, j int) bool { return ad.Communities[i] < ad.Communities[j] })
-		c.svcAds[name] = append(c.svcAds[name], ad)
 	}
 
 	if err := c.updateAds(); err != nil {
@@ -263,7 +265,6 @@ func (c *bgpController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool
 	}
 
 	level.Info(l).Log("event", "updatedAdvertisements", "numAds", len(c.svcAds[name]), "msg", "making advertisements using BGP")
-
 	return nil
 }
 
