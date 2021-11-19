@@ -17,7 +17,6 @@ import (
 
 // BGP router config.
 const bgpConfigTemplate = `
-hostname bgpd
 password zebra
 
 log file /tmp/frr.log debugging
@@ -47,7 +46,6 @@ router bgp {{.ASN}}
 {{- end }}
   exit-address-family
 
-log stdout debugging
 `
 
 type RouterConfig struct {
