@@ -18,9 +18,9 @@ import (
 // BGP router config.
 const bgpConfigTemplate = `
 hostname bgpd
-#password zebra
+password zebra
 
-log file /tmp/frr.log informational
+log file /tmp/frr.log debugging
 log timestamp precision 3
 
 route-map RMAP permit 10
