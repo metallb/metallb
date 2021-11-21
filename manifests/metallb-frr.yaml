@@ -418,21 +418,21 @@ kind: DaemonSet
 metadata:
   labels:
     app: metallb
-    component: speaker
+    app.kubernetes.io/component: speaker
   name: speaker
   namespace: metallb-system
 spec:
   selector:
     matchLabels:
       app: metallb
-      component: speaker
+      app.kubernetes.io/component: speaker
   template:
     metadata:
       annotations:
         prometheus.io/scrape: 'true'
       labels:
         app: metallb
-        component: speaker
+        app.kubernetes.io/component: speaker
     spec:
       volumes:
         - name: frr-sockets
@@ -560,7 +560,7 @@ spec:
             #- name: METALLB_ML_BIND_PORT
             #  value: "7946"
             - name: METALLB_ML_LABELS
-              value: "app=metallb,component=speaker"
+              value: "app=metallb,app.kubernetes.io/component=speaker"
             - name: METALLB_ML_SECRET_KEY
               valueFrom:
                 secretKeyRef:
@@ -621,7 +621,7 @@ kind: Deployment
 metadata:
   labels:
     app: metallb
-    component: controller
+    app.kubernetes.io/component: controller
   name: controller
   namespace: metallb-system
 spec:
@@ -629,7 +629,7 @@ spec:
   selector:
     matchLabels:
       app: metallb
-      component: controller
+      app.kubernetes.io/component: controller
   template:
     metadata:
       annotations:
@@ -637,7 +637,7 @@ spec:
         prometheus.io/scrape: 'true'
       labels:
         app: metallb
-        component: controller
+        app.kubernetes.io/component: controller
     spec:
       containers:
       - args:
