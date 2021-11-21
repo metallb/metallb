@@ -692,12 +692,8 @@ func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1
 }
 
 func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily string) {
-	pods, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
-		LabelSelector: "component=speaker",
-	})
-	framework.ExpectNoError(err)
-	framework.ExpectNotEqual(len(pods.Items), 0, "No speaker pods found")
-	podExecutor := executor.ForPod(testNameSpace, pods.Items[0].Name, "frr")
+	pods := getSpeakerPods(cs)
+	podExecutor := executor.ForPod(testNameSpace, pods[0].Name, "frr")
 
 	Eventually(func() error {
 		address := n.Ipv4
