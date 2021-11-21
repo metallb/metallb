@@ -19,7 +19,7 @@ spec:
     matchNames:
     - {{ .Release.Namespace }}
   podMetricsEndpoints:
-  - port: metrics
+  - port: monitoring
     path: /metrics
     {{- if .Values.prometheus.podMonitor.interval }}
     interval: {{ .Values.prometheus.podMonitor.interval }}
@@ -53,7 +53,7 @@ spec:
     matchNames:
     - {{ .Release.Namespace }}
   podMetricsEndpoints:
-  - port: metrics
+  - port: monitoring
     path: /metrics
     {{- if .Values.prometheus.podMonitor.interval }}
     interval: {{ .Values.prometheus.podMonitor.interval }}

@@ -74,7 +74,7 @@ spec:
               key: secretkey
         {{- end }}
         ports:
-        - name: metrics
+        - name: monitoring
           containerPort: {{ .Values.prometheus.metricsPort }}
         {{- if .Values.speaker.memberlist.enabled }}
         - name: memberlist-tcp
@@ -88,7 +88,7 @@ spec:
         livenessProbe:
           httpGet:
             path: /metrics
-            port: metrics
+            port: monitoring
           initialDelaySeconds: {{ .Values.speaker.livenessProbe.initialDelaySeconds }}
           periodSeconds: {{ .Values.speaker.livenessProbe.periodSeconds }}
           timeoutSeconds: {{ .Values.speaker.livenessProbe.timeoutSeconds }}
@@ -99,7 +99,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /metrics
-            port: metrics
+            port: monitoring
           initialDelaySeconds: {{ .Values.speaker.readinessProbe.initialDelaySeconds }}
           periodSeconds: {{ .Values.speaker.readinessProbe.periodSeconds }}
           timeoutSeconds: {{ .Values.speaker.readinessProbe.timeoutSeconds }}
