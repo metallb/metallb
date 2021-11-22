@@ -295,13 +295,15 @@ var _ = ginkgo.Describe("L2", func() {
 				LabelSelector: "component=controller",
 			})
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(len(pods.Items), 1, "More than one controller found")
+			framework.ExpectEqual(len(pods.Items), 1, "Expected one controller pod")
 			controllerPod = &pods.Items[0]
 
 			speakers, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
 				LabelSelector: "component=speaker",
 			})
 			framework.ExpectNoError(err)
+			framework.ExpectNotEqual(len(speakers.Items), 0, "No speaker pods found")
+
 			speakerPods = map[string]*corev1.Pod{}
 			for _, item := range speakers.Items {
 				i := item

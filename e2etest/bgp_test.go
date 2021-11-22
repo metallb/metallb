@@ -224,7 +224,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				LabelSelector: "component=controller",
 			})
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(len(pods.Items), 1, "More than one controller found")
+			framework.ExpectEqual(len(pods.Items), 1, "Expected one controller pod")
 			controllerPod = &pods.Items[0]
 			speakerPods = getSpeakerPods(cs)
 		})
@@ -692,11 +692,8 @@ func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1
 }
 
 func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily string) {
-	pods, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
-		LabelSelector: "component=speaker",
-	})
-	framework.ExpectNoError(err)
-	podExecutor := executor.ForPod(testNameSpace, pods.Items[0].Name, "frr")
+	pods := getSpeakerPods(cs)
+	podExecutor := executor.ForPod(testNameSpace, pods[0].Name, "frr")
 
 	Eventually(func() error {
 		address := n.Ipv4
@@ -801,6 +798,7 @@ func getSpeakerPods(cs clientset.Interface) []*corev1.Pod {
 		LabelSelector: "component=speaker",
 	})
 	framework.ExpectNoError(err)
+	framework.ExpectNotEqual(len(speakers.Items), 0, "No speaker pods found")
 	speakerPods := make([]*corev1.Pod, 0)
 	for _, item := range speakers.Items {
 		i := item
