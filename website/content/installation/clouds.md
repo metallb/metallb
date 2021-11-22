@@ -73,6 +73,9 @@ range, so you have to remove the hardcoded unprivileged UID from the
 MetalLB manifests. You can do this by removing the
 `spec.template.spec.securityContext.runAsUser` field from both the
 `controller` Deployment and the `speaker` DaemonSet.
+Also, as the allowed group ID range in Openshift is 5000 through 5999,
+you have to remove `spec.template.spec.securityContext.fsGroup` field
+as well.
 
 Additionally, you have to grant the `speaker` DaemonSet elevated
 privileges, so that it can do the raw networking required to make
