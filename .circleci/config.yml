@@ -46,7 +46,10 @@ jobs:
           echo "Skipping $SKIP"
           # `-E env "PATH=$PATH"` bypasses commands not found under sudo, `sudo` needed because arping requires CAP_NET_RAW
           sudo -E env "PATH=$PATH" inv e2etest --skip $SKIP -e /tmp/kind_logs
-      - run: sudo chmod -R o+r /tmp/kind_logs # logs are exported under root (sudo), chmod required to upload the artifacts.
+      - run:
+          name: Change permissions for kind logs
+          command: sudo chmod -R o+r /tmp/kind_logs # logs are exported under root (sudo), chmod required to upload the artifacts.
+          when: always
       - store_artifacts:
           path: /tmp/kind_logs
   lint-1-16:
