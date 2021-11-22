@@ -31,6 +31,19 @@ log file /etc/frr/frr.log {{.Loglevel}}
 log timestamp precision 3
 hostname {{.Hostname}}
 
+{{- range .Routers }}
+{{- range $n := .Neighbors }}
+{{- range $a := .Advertisements }}
+{{- if gt (len $a.Communities) 0}}
+route-map {{$n.Addr}}-map permit 10
+{{- range $c := $a.Communities }}
+  set community {{$c}} additive
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+
 {{range .Routers -}}
 router bgp {{.MyASN}}
   no bgp ebgp-requires-policy
@@ -69,6 +82,9 @@ router bgp {{.MyASN}}
   address-family {{.Version}} unicast
     neighbor {{$n.Addr}} activate
     network {{.Prefix}}
+	{{- if gt (len .Communities) 0}}
+    neighbor {{$n.Addr}} route-map {{$n.Addr}}-map out
+    {{- end}}
   exit-address-family
 {{- end}}
 {{end -}}
@@ -138,8 +154,9 @@ type neighborConfig struct {
 }
 
 type advertisementConfig struct {
-	Version string
-	Prefix  string
+	Version     string
+	Prefix      string
+	Communities []string
 }
 
 // routerName() defines the format of the key of the "Routers" map in the
