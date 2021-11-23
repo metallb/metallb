@@ -39,6 +39,7 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/frr"
 	frrconfig "go.universe.tf/metallb/e2etest/pkg/frr/config"
 	frrcontainer "go.universe.tf/metallb/e2etest/pkg/frr/container"
+	testservice "go.universe.tf/metallb/e2etest/pkg/service"
 	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -141,23 +142,21 @@ var _ = ginkgo.Describe("BGP", func() {
 		framework.ExpectNoError(err)
 	})
 
-	table.DescribeTable("A service of protocol load balancer should work with", func(ipFamily, setProtocoltest, poolAddress string) {
+	table.DescribeTable("A service of protocol load balancer should work with", func(pairingIPFamily, setProtocoltest string, poolAddresses []string, tweak testservice.Tweak) {
 		var allNodes *corev1.NodeList
 		configData := configFile{
 			Pools: []addressPool{
 				{
-					Name:     "bgp-test",
-					Protocol: BGP,
-					Addresses: []string{
-						poolAddress,
-					},
+					Name:      "bgp-test",
+					Protocol:  BGP,
+					Addresses: poolAddresses,
 				},
 			},
-			Peers: peersForContainers(frrContainers, ipFamily),
+			Peers: peersForContainers(frrContainers, pairingIPFamily),
 		}
 		for _, c := range frrContainers {
-			c.RouterConfig.IPFamily = ipFamily
-			c.NeighborConfig.IPFamily = ipFamily
+			c.RouterConfig.IPFamily = pairingIPFamily
+			c.NeighborConfig.IPFamily = pairingIPFamily
 			pairExternalFRRWithNodes(cs, c)
 		}
 
@@ -172,7 +171,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		framework.ExpectNoError(err)
 
 		if setProtocoltest == "ExternalTrafficPolicyCluster" {
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster)
+			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, tweak)
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
@@ -180,12 +179,12 @@ var _ = ginkgo.Describe("BGP", func() {
 			}()
 
 			for _, c := range frrContainers {
-				validateService(cs, svc, allNodes.Items, c, ipFamily)
+				validateService(cs, svc, allNodes.Items, c)
 			}
 		}
 
 		if setProtocoltest == "ExternalTrafficPolicyLocal" {
-			svc, jig := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeLocal)
+			svc, jig := createServiceWithBackend(cs, f.Namespace.Name, tweak)
 			err = jig.Scale(2)
 			framework.ExpectNoError(err)
 
@@ -198,22 +197,43 @@ var _ = ginkgo.Describe("BGP", func() {
 			}()
 
 			for _, c := range frrContainers {
-				validateService(cs, svc, epNodes, c, ipFamily)
+				validateService(cs, svc, epNodes, c)
 			}
 		}
 
 		if setProtocoltest == "CheckSpeakerFRRPodRunning" {
 			for _, c := range frrContainers {
-				frrIsPairedOnPods(cs, c, ipFamily)
+				frrIsPairedOnPods(cs, c, pairingIPFamily)
 			}
 		}
 	},
-		table.Entry("IPV4 - ExternalTrafficPolicyCluster", "ipv4", "ExternalTrafficPolicyCluster", v4PoolAddresses),
-		table.Entry("IPV4 - ExternalTrafficPolicyLocal", "ipv4", "ExternalTrafficPolicyLocal", v4PoolAddresses),
-		table.Entry("IPV4 - FRR running in the speaker POD", "ipv4", "CheckSpeakerFRRPodRunning", v4PoolAddresses),
-		table.Entry("IPV6 - ExternalTrafficPolicyCluster", "ipv6", "ExternalTrafficPolicyCluster", v6PoolAddresses),
-		table.Entry("IPV6 - ExternalTrafficPolicyLocal", "ipv6", "ExternalTrafficPolicyLocal", v6PoolAddresses),
-		table.Entry("IPV6 - FRR running in the speaker POD", "ipv6", "CheckSpeakerFRRPodRunning", v6PoolAddresses))
+		table.Entry("IPV4 - ExternalTrafficPolicyCluster", "ipv4", "ExternalTrafficPolicyCluster", []string{v4PoolAddresses}, testservice.TrafficPolicyCluster),
+		table.Entry("IPV4 - ExternalTrafficPolicyLocal", "ipv4", "ExternalTrafficPolicyLocal", []string{v4PoolAddresses}, testservice.TrafficPolicyLocal),
+		table.Entry("IPV4 - FRR running in the speaker POD", "ipv4", "CheckSpeakerFRRPodRunning", []string{v4PoolAddresses}, testservice.TrafficPolicyLocal),
+		table.Entry("IPV6 - ExternalTrafficPolicyCluster", "ipv6", "ExternalTrafficPolicyCluster", []string{v6PoolAddresses}, testservice.TrafficPolicyCluster),
+		table.Entry("IPV6 - ExternalTrafficPolicyLocal", "ipv6", "ExternalTrafficPolicyLocal", []string{v6PoolAddresses}, testservice.TrafficPolicyLocal),
+		table.Entry("IPV6 - FRR running in the speaker POD", "ipv6", "CheckSpeakerFRRPodRunning", []string{v6PoolAddresses}, testservice.TrafficPolicyLocal),
+		table.Entry("DUALSTACK - ExternalTrafficPolicyCluster", "ipv4", "ExternalTrafficPolicyCluster", []string{v4PoolAddresses},
+			func(svc *corev1.Service) {
+				testservice.TrafficPolicyCluster(svc)
+				testservice.DualStack(svc)
+			}),
+		table.Entry("DUALSTACK - ExternalTrafficPolicyLocal", "ipv4", "ExternalTrafficPolicyCluster", []string{v4PoolAddresses},
+			func(svc *corev1.Service) {
+				testservice.TrafficPolicyLocal(svc)
+				testservice.DualStack(svc)
+			}),
+		table.Entry("DUALSTACK - ExternalTrafficPolicyLocal - ipv6 pairing", "ipv6", "ExternalTrafficPolicyLocal", []string{v4PoolAddresses},
+			func(svc *corev1.Service) {
+				testservice.TrafficPolicyLocal(svc)
+				testservice.DualStack(svc)
+			}),
+		table.Entry("DUALSTACK - ExternalTrafficPolicyCluster - force V6 only", "ipv4", "ExternalTrafficPolicyCluster", []string{v4PoolAddresses},
+			func(svc *corev1.Service) {
+				testservice.TrafficPolicyLocal(svc)
+				testservice.ForceV6(svc)
+			}),
+	)
 
 	ginkgo.Context("metrics", func() {
 		var controllerPod *corev1.Pod
@@ -304,7 +324,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 
 			ginkgo.By("creating a service")
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster) // Is a sleep required here?
+			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, testservice.TrafficPolicyCluster) // Is a sleep required here?
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
@@ -367,13 +387,13 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 		})
 
-		table.DescribeTable("set different AddressPools ranges modes", func(addressPools []addressPool, ipFamily string) {
+		table.DescribeTable("set different AddressPools ranges modes", func(addressPools []addressPool, pairingFamily string, tweak testservice.Tweak) {
 			for _, c := range frrContainers {
-				c.RouterConfig.IPFamily = ipFamily
-				c.NeighborConfig.IPFamily = ipFamily
+				c.RouterConfig.IPFamily = pairingFamily
+				c.NeighborConfig.IPFamily = pairingFamily
 			}
 			configData := configFile{
-				Peers: peersForContainers(frrContainers, ipFamily),
+				Peers: peersForContainers(frrContainers, pairingFamily),
 				Pools: addressPools,
 			}
 			for _, c := range frrContainers {
@@ -387,25 +407,25 @@ var _ = ginkgo.Describe("BGP", func() {
 				validateFRRPeeredWithNodes(cs, c)
 			}
 
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster)
+			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, tweak)
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
 			}()
 
-			ingressIP := e2eservice.GetIngressPoint(
-				&svc.Status.LoadBalancer.Ingress[0])
-
-			ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
-			err = validateIPInRange(addressPools, ingressIP)
-			framework.ExpectNoError(err)
+			for _, i := range svc.Status.LoadBalancer.Ingress {
+				ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
+				ingressIP := e2eservice.GetIngressPoint(&i)
+				err = validateIPInRange(addressPools, ingressIP)
+				framework.ExpectNoError(err)
+			}
 
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
 
 			for _, c := range frrContainers {
-				validateService(cs, svc, allNodes.Items, c, ipFamily)
+				validateService(cs, svc, allNodes.Items, c)
 			}
 		},
 			table.Entry("IPV4 - test AddressPool defined by address range", []addressPool{
@@ -415,7 +435,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					Addresses: []string{
 						"192.168.10.0-192.168.10.18",
 					},
-				}}, "ipv4",
+				}}, "ipv4", testservice.TrafficPolicyCluster,
 			),
 			table.Entry("IPV4 - test AddressPool defined by network prefix", []addressPool{
 				{
@@ -424,7 +444,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					Addresses: []string{
 						"192.168.10.0/24",
 					},
-				}}, "ipv4",
+				}}, "ipv4", testservice.TrafficPolicyCluster,
 			),
 			table.Entry("IPV6 - test AddressPool defined by address range", []addressPool{
 				{
@@ -433,7 +453,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					Addresses: []string{
 						"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
 					},
-				}}, "ipv6",
+				}}, "ipv6", testservice.TrafficPolicyCluster,
 			),
 			table.Entry("IPV6 - test AddressPool defined by network prefix", []addressPool{
 				{
@@ -442,38 +462,56 @@ var _ = ginkgo.Describe("BGP", func() {
 					Addresses: []string{
 						"fc00:f853:0ccd:e799::/124",
 					},
-				}}, "ipv6",
+				}}, "ipv6", testservice.TrafficPolicyCluster,
+			),
+			table.Entry("DUALSTACK - test AddressPool defined by address range", []addressPool{
+				{
+					Name:     "bgp-test",
+					Protocol: BGP,
+					Addresses: []string{
+						"192.168.10.0-192.168.10.18",
+						"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
+					},
+				}}, "ipv4", testservice.TrafficPolicyCluster,
+			),
+			table.Entry("DUALSTACK - test AddressPool defined by network prefix", []addressPool{
+				{
+					Name:     "bgp-test",
+					Protocol: BGP,
+					Addresses: []string{
+						"192.168.10.0/24",
+						"fc00:f853:0ccd:e799::/124",
+					},
+				}}, "ipv4", testservice.TrafficPolicyCluster,
 			),
 		)
 	})
 
 	ginkgo.Context("BFD", func() {
-		table.DescribeTable("should work with the given bfd profile", func(bfd bfdProfile, ipFamily, poolAddress string) {
+		table.DescribeTable("should work with the given bfd profile", func(bfd bfdProfile, pairingFamily string, poolAddresses []string, tweak testservice.Tweak) {
 			configData := configFile{
 				Pools: []addressPool{
 					{
-						Name:     "bfd-test",
-						Protocol: BGP,
-						Addresses: []string{
-							poolAddress,
-						},
+						Name:      "bfd-test",
+						Protocol:  BGP,
+						Addresses: poolAddresses,
 					},
 				},
-				Peers:       withBFD(peersForContainers(frrContainers, ipFamily), bfd.Name),
+				Peers:       withBFD(peersForContainers(frrContainers, pairingFamily), bfd.Name),
 				BFDProfiles: []bfdProfile{bfd},
 			}
 			err := updateConfigMap(cs, configData)
 			framework.ExpectNoError(err)
 
 			for _, c := range frrContainers {
-				c.RouterConfig.IPFamily = ipFamily
-				c.NeighborConfig.IPFamily = ipFamily
+				c.RouterConfig.IPFamily = pairingFamily
+				c.NeighborConfig.IPFamily = pairingFamily
 				pairExternalFRRWithNodes(cs, c, func(container *frrcontainer.FRR) {
 					container.NeighborConfig.BFDEnabled = true
 				})
 			}
 
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, corev1.ServiceExternalTrafficPolicyTypeCluster)
+			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, tweak)
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
@@ -487,7 +525,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 
 			for _, c := range frrContainers {
-				validateService(cs, svc, allNodes.Items, c, ipFamily)
+				validateService(cs, svc, allNodes.Items, c)
 			}
 
 			Eventually(func() error {
@@ -516,7 +554,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			table.Entry("IPV4 - default",
 				bfdProfile{
 					Name: "bar",
-				}, "ipv4", v4PoolAddresses),
+				}, "ipv4", []string{v4PoolAddresses}, testservice.TrafficPolicyCluster),
 			table.Entry("IPV4 - full params",
 				bfdProfile{
 					Name:             "full1",
@@ -526,7 +564,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					EchoMode:         boolPtr(false),
 					PassiveMode:      boolPtr(false),
 					MinimumTTL:       uint32Ptr(254),
-				}, "ipv4", v4PoolAddresses),
+				}, "ipv4", []string{v4PoolAddresses}, testservice.TrafficPolicyCluster),
 			table.Entry("IPV4 - echo mode enabled",
 				bfdProfile{
 					Name:             "echo",
@@ -536,11 +574,11 @@ var _ = ginkgo.Describe("BGP", func() {
 					EchoMode:         boolPtr(true),
 					PassiveMode:      boolPtr(false),
 					MinimumTTL:       uint32Ptr(254),
-				}, "ipv4", v4PoolAddresses),
+				}, "ipv4", []string{v4PoolAddresses}, testservice.TrafficPolicyCluster),
 			table.Entry("IPV6 - default",
 				bfdProfile{
 					Name: "bar",
-				}, "ipv6", v6PoolAddresses),
+				}, "ipv6", []string{v6PoolAddresses}, testservice.TrafficPolicyCluster),
 			table.Entry("IPV6 - full params",
 				bfdProfile{
 					Name:             "full1",
@@ -550,7 +588,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					EchoMode:         boolPtr(false),
 					PassiveMode:      boolPtr(false),
 					MinimumTTL:       uint32Ptr(254),
-				}, "ipv6", v6PoolAddresses),
+				}, "ipv6", []string{v6PoolAddresses}, testservice.TrafficPolicyCluster),
 			table.Entry("IPV6 - echo mode enabled",
 				bfdProfile{
 					Name:             "echo",
@@ -560,12 +598,25 @@ var _ = ginkgo.Describe("BGP", func() {
 					EchoMode:         boolPtr(true),
 					PassiveMode:      boolPtr(false),
 					MinimumTTL:       uint32Ptr(254),
-				}, "ipv6", v6PoolAddresses),
+				}, "ipv6", []string{v6PoolAddresses}, testservice.TrafficPolicyCluster),
+			table.Entry("DUALSTACK - full params",
+				bfdProfile{
+					Name:             "full1",
+					ReceiveInterval:  uint32Ptr(60),
+					TransmitInterval: uint32Ptr(61),
+					EchoInterval:     uint32Ptr(62),
+					EchoMode:         boolPtr(false),
+					PassiveMode:      boolPtr(false),
+					MinimumTTL:       uint32Ptr(254),
+				}, "ipv4", []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
+					testservice.TrafficPolicyCluster(svc)
+					testservice.DualStack(svc)
+				}),
 		)
 	})
 })
 
-func createServiceWithBackend(cs clientset.Interface, namespace string, policy corev1.ServiceExternalTrafficPolicyType) (*corev1.Service, *e2eservice.TestJig) {
+func createServiceWithBackend(cs clientset.Interface, namespace string, tweak ...func(svc *corev1.Service)) (*corev1.Service, *e2eservice.TestJig) {
 	var svc *corev1.Service
 	var err error
 
@@ -574,7 +625,9 @@ func createServiceWithBackend(cs clientset.Interface, namespace string, policy c
 	timeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
 	svc, err = jig.CreateLoadBalancerService(timeout, func(svc *corev1.Service) {
 		tweakServicePort(svc)
-		svc.Spec.ExternalTrafficPolicy = policy
+		for _, f := range tweak {
+			f(svc)
+		}
 	})
 
 	framework.ExpectNoError(err)
@@ -651,44 +704,50 @@ func validateFRRPeeredWithNodes(cs clientset.Interface, c *frrcontainer.FRR) {
 	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
 
-func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1.Node, c *frrcontainer.FRR, ipFamily string) {
+func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1.Node, c *frrcontainer.FRR) {
 	port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
-	ingressIP := e2eservice.GetIngressPoint(
-		&svc.Status.LoadBalancer.Ingress[0])
 
-	hostport := net.JoinHostPort(ingressIP, port)
-	address := fmt.Sprintf("http://%s/", hostport)
+	if len(svc.Status.LoadBalancer.Ingress) == 2 {
+		ip1 := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
+		ip2 := net.ParseIP(svc.Status.LoadBalancer.Ingress[1].IP)
+		framework.ExpectNotEqual(ip1.To4(), ip2.To4())
+	}
+	for _, ip := range svc.Status.LoadBalancer.Ingress {
+		ingressIP := e2eservice.GetIngressPoint(&ip)
+		hostport := net.JoinHostPort(ingressIP, port)
+		address := fmt.Sprintf("http://%s/", hostport)
 
-	Eventually(func() error {
-		err := wgetRetry(address, c)
-		if err != nil {
-			return err
-		}
+		Eventually(func() error {
+			err := wgetRetry(address, c)
+			if err != nil {
+				return err
+			}
 
-		advertised := routes.ForIP(ingressIP, c, ipFamily)
-		err = routes.MatchNodes(nodes, advertised)
-		if err != nil {
-			return err
-		}
+			advertised := routes.ForIP(ingressIP, c)
+			err = routes.MatchNodes(nodes, advertised)
+			if err != nil {
+				return err
+			}
 
-		frrRoutes, frrRoutesV6, err := frr.Routes(c)
-		if err != nil {
-			return err
-		}
-		routes, ok := frrRoutes[ingressIP]
-		if ipFamily == "ipv6" {
-			routes, ok = frrRoutesV6[ingressIP]
-		}
-		if !ok {
-			return fmt.Errorf("%s not found in frr routes %v", ingressIP, routes)
-		}
+			frrRoutes, frrRoutesV6, err := frr.Routes(c)
+			if err != nil {
+				return err
+			}
+			routes, ok := frrRoutes[ingressIP]
+			if !ok {
+				routes, ok = frrRoutesV6[ingressIP]
+			}
+			if !ok {
+				return fmt.Errorf("%s not found in frr routes %v %v", ingressIP, frrRoutes, frrRoutesV6)
+			}
 
-		err = frr.RoutesMatchNodes(nodes, routes)
-		if err != nil {
-			return err
-		}
-		return nil
-	}, 4*time.Minute, 1*time.Second).Should(BeNil())
+			err = frr.RoutesMatchNodes(nodes, routes)
+			if err != nil {
+				return err
+			}
+			return nil
+		}, 4*time.Minute, 1*time.Second).Should(BeNil())
+	}
 }
 
 func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily string) {
