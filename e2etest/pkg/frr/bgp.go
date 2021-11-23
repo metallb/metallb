@@ -109,5 +109,11 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 	}
 	res = res + out
 
+	res = res + "####### Daemons \n"
+	out, err = exec.Exec("vtysh", "-c", "show daemons")
+	if err != nil {
+		return "", errors.Wrapf(err, "Failed exec show daemons %s", res)
+	}
+	res = res + out
 	return res, nil
 }
