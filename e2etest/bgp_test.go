@@ -110,6 +110,9 @@ var _ = ginkgo.Describe("BGP", func() {
 
 			speakerPods := getSpeakerPods(cs)
 			for _, pod := range speakerPods {
+				if len(pod.Spec.Containers) == 1 { // we bump only in case of frr
+					continue
+				}
 				podExec := executor.ForPod(pod.Namespace, pod.Name, "frr")
 				dump, err := frr.RawDump(podExec, "/etc/frr/frr.conf", "/etc/frr/frr.log")
 				framework.Logf("External frr dump for pod %s\n%s %v", pod.Name, dump, err)
