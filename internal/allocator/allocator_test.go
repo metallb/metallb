@@ -5,11 +5,13 @@ package allocator
 import (
 	"math"
 	"net"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
 
 	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/ipfamily"
 
 	ptu "github.com/prometheus/client_golang/prometheus/testutil"
 )
@@ -39,7 +41,7 @@ func TestAssignment(t *testing.T) {
 	tests := []struct {
 		desc       string
 		svc        string
-		ip         string
+		ips        []string
 		ports      []Port
 		sharingKey string
 		backendKey string
@@ -48,66 +50,66 @@ func TestAssignment(t *testing.T) {
 		{
 			desc: "assign s1",
 			svc:  "s1",
-			ip:   "1.2.3.4",
+			ips:  []string{"1.2.3.4"},
 		},
 		{
 			desc: "s1 idempotent reassign",
 			svc:  "s1",
-			ip:   "1.2.3.4",
+			ips:  []string{"1.2.3.4"},
 		},
 		{
 			desc:    "s2 can't grab s1's IP",
 			svc:     "s2",
-			ip:      "1.2.3.4",
+			ips:     []string{"1.2.3.4"},
 			wantErr: true,
 		},
 		{
 			desc: "s2 can get the other IP",
 			svc:  "s2",
-			ip:   "1.2.3.5",
+			ips:  []string{"1.2.3.5"},
 		},
 		{
 			desc:    "s1 now can't grab s2's IP",
 			svc:     "s1",
-			ip:      "1.2.3.5",
+			ips:     []string{"1.2.3.5"},
 			wantErr: true,
 		},
 		{
 			desc: "s1 frees its IP",
 			svc:  "s1",
-			ip:   "",
+			ips:  []string{},
 		},
 		{
 			desc: "s2 can grab s1's former IP",
 			svc:  "s2",
-			ip:   "1.2.3.4",
+			ips:  []string{"1.2.3.4"},
 		},
 		{
 			desc: "s1 can now grab s2's former IP",
 			svc:  "s1",
-			ip:   "1.2.3.5",
+			ips:  []string{"1.2.3.5"},
 		},
 		{
 			desc:    "s3 cannot grab a 0 buggy IP",
 			svc:     "s3",
-			ip:      "1.2.4.0",
+			ips:     []string{"1.2.4.0"},
 			wantErr: true,
 		},
 		{
 			desc:    "s3 cannot grab a 255 buggy IP",
 			svc:     "s3",
-			ip:      "1.2.4.255",
+			ips:     []string{"1.2.4.255"},
 			wantErr: true,
 		},
 		{
 			desc: "s3 can grab another IP in that pool",
 			svc:  "s3",
-			ip:   "1.2.4.254",
+			ips:  []string{"1.2.4.254"},
 		},
 		{
 			desc:       "s4 takes an IP, with sharing",
 			svc:        "s4",
-			ip:         "1.2.4.3",
+			ips:        []string{"1.2.4.3"},
 			ports:      ports("tcp/80"),
 			sharingKey: "sharing",
 			backendKey: "backend",
@@ -115,7 +117,7 @@ func TestAssignment(t *testing.T) {
 		{
 			desc:       "s4 changes its sharing key in place",
 			svc:        "s4",
-			ip:         "1.2.4.3",
+			ips:        []string{"1.2.4.3"},
 			ports:      ports("tcp/80"),
 			sharingKey: "share",
 			backendKey: "backend",
@@ -123,7 +125,7 @@ func TestAssignment(t *testing.T) {
 		{
 			desc:       "s3 can't share with s4 (port conflict)",
 			svc:        "s3",
-			ip:         "1.2.4.3",
+			ips:        []string{"1.2.4.3"},
 			ports:      ports("tcp/80"),
 			sharingKey: "share",
 			backendKey: "backend",
@@ -132,7 +134,7 @@ func TestAssignment(t *testing.T) {
 		{
 			desc:       "s3 can't share with s4 (wrong sharing key)",
 			svc:        "s3",
-			ip:         "1.2.4.3",
+			ips:        []string{"1.2.4.3"},
 			ports:      ports("tcp/443"),
 			sharingKey: "othershare",
 			backendKey: "backend",
@@ -141,7 +143,7 @@ func TestAssignment(t *testing.T) {
 		{
 			desc:       "s3 can't share with s4 (wrong backend key)",
 			svc:        "s3",
-			ip:         "1.2.4.3",
+			ips:        []string{"1.2.4.3"},
 			ports:      ports("tcp/443"),
 			sharingKey: "share",
 			backendKey: "otherbackend",
@@ -150,7 +152,7 @@ func TestAssignment(t *testing.T) {
 		{
 			desc:       "s3 takes the same IP as s4",
 			svc:        "s3",
-			ip:         "1.2.4.3",
+			ips:        []string{"1.2.4.3"},
 			ports:      ports("tcp/443"),
 			sharingKey: "share",
 			backendKey: "backend",
@@ -158,7 +160,7 @@ func TestAssignment(t *testing.T) {
 		{
 			desc:       "s3 can change its ports while keeping the same IP",
 			svc:        "s3",
-			ip:         "1.2.4.3",
+			ips:        []string{"1.2.4.3"},
 			ports:      ports("udp/53"),
 			sharingKey: "share",
 			backendKey: "backend",
@@ -166,7 +168,7 @@ func TestAssignment(t *testing.T) {
 		{
 			desc:       "s3 can't change its sharing key while keeping the same IP",
 			svc:        "s3",
-			ip:         "1.2.4.3",
+			ips:        []string{"1.2.4.3"},
 			ports:      ports("tcp/443"),
 			sharingKey: "othershare",
 			backendKey: "backend",
@@ -175,7 +177,7 @@ func TestAssignment(t *testing.T) {
 		{
 			desc:       "s3 can't change its backend key while keeping the same IP",
 			svc:        "s3",
-			ip:         "1.2.4.3",
+			ips:        []string{"1.2.4.3"},
 			ports:      ports("tcp/443"),
 			sharingKey: "share",
 			backendKey: "otherbackend",
@@ -184,62 +186,62 @@ func TestAssignment(t *testing.T) {
 		{
 			desc: "s4 takes s3's former IP",
 			svc:  "s4",
-			ip:   "1.2.4.254",
+			ips:  []string{"1.2.4.254"},
 		},
 
 		// IPv6 tests (same as ipv4 but with ipv6 addresses)
 		{
 			desc: "ipv6 assign s1",
 			svc:  "s1",
-			ip:   "1000::4",
+			ips:  []string{"1000::4"},
 		},
 		{
 			desc: "s1 idempotent reassign",
 			svc:  "s1",
-			ip:   "1000::4",
+			ips:  []string{"1000::4"},
 		},
 		{
 			desc:    "s2 can't grab s1's IP",
 			svc:     "s2",
-			ip:      "1000::4",
+			ips:     []string{"1000::4"},
 			wantErr: true,
 		},
 		{
 			desc: "s2 can get the other IP",
 			svc:  "s2",
-			ip:   "1000::4:5",
+			ips:  []string{"1000::4:5"},
 		},
 		{
 			desc:    "s1 now can't grab s2's IP",
 			svc:     "s1",
-			ip:      "1000::4:5",
+			ips:     []string{"1000::4:5"},
 			wantErr: true,
 		},
 		{
 			desc: "s1 frees its IP",
 			svc:  "s1",
-			ip:   "",
+			ips:  []string{},
 		},
 		{
 			desc: "s2 can grab s1's former IP",
 			svc:  "s2",
-			ip:   "1000::4",
+			ips:  []string{"1000::4"},
 		},
 		{
 			desc: "s1 can now grab s2's former IP",
 			svc:  "s1",
-			ip:   "1000::4:5",
+			ips:  []string{"1000::4:5"},
 		},
 		// (buggy-IP N/A for ipv6)
 		{
 			desc: "s3 can grab another IP in that pool",
 			svc:  "s3",
-			ip:   "1000::4:ff",
+			ips:  []string{"1000::4:ff"},
 		},
 		{
 			desc:       "s4 takes an IP, with sharing",
 			svc:        "s4",
-			ip:         "1000::4:3",
+			ips:        []string{"1000::4:3"},
 			ports:      ports("tcp/80"),
 			sharingKey: "sharing",
 			backendKey: "backend",
@@ -247,7 +249,7 @@ func TestAssignment(t *testing.T) {
 		{
 			desc:       "s4 changes its sharing key in place",
 			svc:        "s4",
-			ip:         "1000::4:3",
+			ips:        []string{"1000::4:3"},
 			ports:      ports("tcp/80"),
 			sharingKey: "share",
 			backendKey: "backend",
@@ -255,7 +257,7 @@ func TestAssignment(t *testing.T) {
 		{
 			desc:       "s3 can't share with s4 (port conflict)",
 			svc:        "s3",
-			ip:         "1000::4:3",
+			ips:        []string{"1000::4:3"},
 			ports:      ports("tcp/80"),
 			sharingKey: "share",
 			backendKey: "backend",
@@ -264,7 +266,7 @@ func TestAssignment(t *testing.T) {
 		{
 			desc:       "s3 can't share with s4 (wrong sharing key)",
 			svc:        "s3",
-			ip:         "1000::4:3",
+			ips:        []string{"1000::4:3"},
 			ports:      ports("tcp/443"),
 			sharingKey: "othershare",
 			backendKey: "backend",
@@ -273,7 +275,7 @@ func TestAssignment(t *testing.T) {
 		{
 			desc:       "s3 can't share with s4 (wrong backend key)",
 			svc:        "s3",
-			ip:         "1000::4:3",
+			ips:        []string{"1000::4:3"},
 			ports:      ports("tcp/443"),
 			sharingKey: "share",
 			backendKey: "otherbackend",
@@ -282,7 +284,7 @@ func TestAssignment(t *testing.T) {
 		{
 			desc:       "s3 takes the same IP as s4",
 			svc:        "s3",
-			ip:         "1000::4:3",
+			ips:        []string{"1000::4:3"},
 			ports:      ports("tcp/443"),
 			sharingKey: "share",
 			backendKey: "backend",
@@ -290,7 +292,7 @@ func TestAssignment(t *testing.T) {
 		{
 			desc:       "s3 can change its ports while keeping the same IP",
 			svc:        "s3",
-			ip:         "1000::4:3",
+			ips:        []string{"1000::4:3"},
 			ports:      ports("udp/53"),
 			sharingKey: "share",
 			backendKey: "backend",
@@ -298,7 +300,7 @@ func TestAssignment(t *testing.T) {
 		{
 			desc:       "s3 can't change its sharing key while keeping the same IP",
 			svc:        "s3",
-			ip:         "1000::4:3",
+			ips:        []string{"1000::4:3"},
 			ports:      ports("tcp/443"),
 			sharingKey: "othershare",
 			backendKey: "backend",
@@ -307,7 +309,7 @@ func TestAssignment(t *testing.T) {
 		{
 			desc:       "s3 can't change its backend key while keeping the same IP",
 			svc:        "s3",
-			ip:         "1000::4:3",
+			ips:        []string{"1000::4:3"},
 			ports:      ports("tcp/443"),
 			sharingKey: "share",
 			backendKey: "otherbackend",
@@ -316,36 +318,56 @@ func TestAssignment(t *testing.T) {
 		{
 			desc: "s4 takes s3's former IP",
 			svc:  "s4",
-			ip:   "1000::4:ff",
+			ips:  []string{"1000::4:ff"},
+		},
+		// IP dual-stack test
+		{
+			desc: "s2 frees its IP",
+			svc:  "s2",
+			ips:  []string{},
+		},
+		{
+			desc: "ip dual-stack assign s1",
+			svc:  "s1",
+			ips:  []string{"1.2.3.4", "1000::4"},
+		},
+		{
+			desc:    "ip dual-stack assign s1 from different pools",
+			svc:     "s1",
+			ips:     []string{"1.2.4.5", "1000::4"},
+			wantErr: true,
 		},
 	}
 
 	for _, test := range tests {
-		if test.ip == "" {
+		if len(test.ips) == 0 {
 			alloc.Unassign(test.svc)
 			continue
 		}
-		ip := net.ParseIP(test.ip)
-		if ip == nil {
-			t.Fatalf("invalid IP %q in test %q", test.ip, test.desc)
+		ips := []net.IP{}
+		for _, ip := range test.ips {
+			ips = append(ips, net.ParseIP(ip))
 		}
-		alreadyHasIP := assigned(alloc, test.svc) == test.ip
-		err := alloc.Assign(test.svc, ip, test.ports, test.sharingKey, test.backendKey)
+		if len(ips) == 0 {
+			t.Fatalf("invalid IPs %q in test %q", ips, test.desc)
+		}
+		alreadyHasIPs := reflect.DeepEqual(assigned(alloc, test.svc), test.ips)
+		err := alloc.Assign(test.svc, ips, test.ports, test.sharingKey, test.backendKey)
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("%q should have caused an error, but did not", test.desc)
-			} else if a := assigned(alloc, test.svc); !alreadyHasIP && a == test.ip {
-				t.Errorf("%q: Assign(%q, %q) failed, but allocator did record allocation", test.desc, test.svc, test.ip)
+			} else if a := assigned(alloc, test.svc); !alreadyHasIPs && reflect.DeepEqual(a, test.ips) {
+				t.Errorf("%q: Assign(%q, %q) failed, but allocator did record allocation", test.desc, test.svc, test.ips)
 			}
 
 			continue
 		}
 
 		if err != nil {
-			t.Errorf("%q: Assign(%q, %q): %s", test.desc, test.svc, test.ip, err)
+			t.Errorf("%q: Assign(%q, %q): %s", test.desc, test.svc, test.ips, err)
 		}
-		if a := assigned(alloc, test.svc); a != test.ip {
-			t.Errorf("%q: ran Assign(%q, %q), but allocator has recorded allocation of %q", test.desc, test.svc, test.ip, a)
+		if a := assigned(alloc, test.svc); !reflect.DeepEqual(a, test.ips) {
+			t.Errorf("%q: ran Assign(%q, %q), but allocator has recorded allocation of %q", test.desc, test.svc, test.ips, a)
 		}
 	}
 }
@@ -389,6 +411,16 @@ func TestPoolAllocation(t *testing.T) {
 		"2000::":  true,
 		"2000::1": true,
 	}
+	validIPDualStacks := map[string]bool{
+		"1.2.3.4":  true,
+		"1.2.3.5":  true,
+		"1.2.3.10": true,
+		"1.2.3.11": true,
+		"1000::":   true,
+		"1000::1":  true,
+		"2000::":   true,
+		"2000::1":  true,
+	}
 
 	tests := []struct {
 		desc       string
@@ -397,64 +429,76 @@ func TestPoolAllocation(t *testing.T) {
 		sharingKey string
 		unassign   bool
 		wantErr    bool
-		isIPv6     bool
+		ipFamily   ipfamily.Family
 	}{
 		{
-			desc: "s1 gets an IP",
-			svc:  "s1",
+			desc:     "s1 gets an IPv4",
+			svc:      "s1",
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc: "s2 gets an IP",
-			svc:  "s2",
+			desc:     "s2 gets an IPv4",
+			svc:      "s2",
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc: "s3 gets an IP",
-			svc:  "s3",
+			desc:     "s3 gets an IPv4",
+			svc:      "s3",
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc: "s4 gets an IP",
-			svc:  "s4",
+			desc:     "s4 gets an IPv4",
+			svc:      "s4",
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc:    "s5 can't get an IP",
-			svc:     "s5",
-			wantErr: true,
+			desc:     "s5 can't get an IPv4",
+			svc:      "s5",
+			wantErr:  true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc:    "s6 can't get an IP",
-			svc:     "s6",
-			wantErr: true,
+			desc:     "s6 can't get an IPv4",
+			svc:      "s6",
+			wantErr:  true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc:     "s1 releases its IP",
+			desc:     "s1 releases its IPv4",
 			svc:      "s1",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc: "s5 can now grab s1's former IP",
-			svc:  "s5",
+			desc:     "s5 can now grab s1's former IPv4",
+			svc:      "s5",
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc:    "s6 still can't get an IP",
-			svc:     "s6",
-			wantErr: true,
+			desc:     "s6 still can't get an IPv4",
+			svc:      "s6",
+			wantErr:  true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc:     "s5 unassigns in prep for enabling IP sharing",
+			desc:     "s5 unassigns in prep for enabling IPv4 sharing",
 			svc:      "s5",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc:       "s5 enables IP sharing",
+			desc:       "s5 enables IPv4 sharing",
 			svc:        "s5",
 			ports:      ports("tcp/80"),
 			sharingKey: "share",
+			ipFamily:   ipfamily.IPv4,
 		},
 		{
-			desc:       "s6 can get an IP now, with sharing",
+			desc:       "s6 can get an IPv4 now, with sharing",
 			svc:        "s6",
 			ports:      ports("tcp/443"),
 			sharingKey: "share",
+			ipFamily:   ipfamily.IPv4,
 		},
 
 		// Clear old ipv4 addresses
@@ -462,100 +506,108 @@ func TestPoolAllocation(t *testing.T) {
 			desc:     "s1 clear old ipv4 address",
 			svc:      "s1",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
 			desc:     "s2 clear old ipv4 address",
 			svc:      "s2",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
 			desc:     "s3 clear old ipv4 address",
 			svc:      "s3",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
 			desc:     "s4 clear old ipv4 address",
 			svc:      "s4",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
 			desc:     "s5 clear old ipv4 address",
 			svc:      "s5",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
 			desc:     "s6 clear old ipv4 address",
 			svc:      "s6",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 
 		// IPv6 tests.
 		{
-			desc:   "s1 gets an IP6",
-			svc:    "s1",
-			isIPv6: true,
+			desc:     "s1 gets an IP6",
+			svc:      "s1",
+			ipFamily: ipfamily.IPv6,
 		},
 		{
-			desc:   "s2 gets an IP6",
-			svc:    "s2",
-			isIPv6: true,
+			desc:     "s2 gets an IP6",
+			svc:      "s2",
+			ipFamily: ipfamily.IPv6,
 		},
 		{
-			desc:   "s3 gets an IP6",
-			svc:    "s3",
-			isIPv6: true,
+			desc:     "s3 gets an IP6",
+			svc:      "s3",
+			ipFamily: ipfamily.IPv6,
 		},
 		{
-			desc:   "s4 gets an IP6",
-			svc:    "s4",
-			isIPv6: true,
+			desc:     "s4 gets an IP6",
+			svc:      "s4",
+			ipFamily: ipfamily.IPv6,
 		},
 		{
-			desc:    "s5 can't get an IP6",
-			svc:     "s5",
-			isIPv6:  true,
-			wantErr: true,
+			desc:     "s5 can't get an IP6",
+			svc:      "s5",
+			ipFamily: ipfamily.IPv6,
+			wantErr:  true,
 		},
 		{
-			desc:    "s6 can't get an IP6",
-			svc:     "s6",
-			isIPv6:  true,
-			wantErr: true,
+			desc:     "s6 can't get an IP6",
+			svc:      "s6",
+			ipFamily: ipfamily.IPv6,
+			wantErr:  true,
 		},
 		{
 			desc:     "s1 releases its IP6",
 			svc:      "s1",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc:   "s5 can now grab s1's former IP6",
-			svc:    "s5",
-			isIPv6: true,
+			desc:     "s5 can now grab s1's former IP6",
+			svc:      "s5",
+			ipFamily: ipfamily.IPv6,
 		},
 		{
-			desc:    "s6 still can't get an IP6",
-			svc:     "s6",
-			isIPv6:  true,
-			wantErr: true,
+			desc:     "s6 still can't get an IP6",
+			svc:      "s6",
+			ipFamily: ipfamily.IPv6,
+			wantErr:  true,
 		},
 		{
 			desc:     "s5 unassigns in prep for enabling IP6 sharing",
 			svc:      "s5",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
 			desc:       "s5 enables IP6 sharing",
 			svc:        "s5",
 			ports:      ports("tcp/80"),
 			sharingKey: "share",
-			isIPv6:     true,
+			ipFamily:   ipfamily.IPv6,
 		},
 		{
 			desc:       "s6 can get an IP6 now, with sharing",
 			svc:        "s6",
 			ports:      ports("tcp/443"),
 			sharingKey: "share",
-			isIPv6:     true,
+			ipFamily:   ipfamily.IPv6,
 		},
 
 		// Test the "should-not-happen" case where an svc already has a IP from the wrong family
@@ -563,16 +615,126 @@ func TestPoolAllocation(t *testing.T) {
 			desc:     "s1 clear",
 			svc:      "s1",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc: "s1 get an IPv4",
-			svc:  "s1",
+			desc:     "s1 get an IPv4",
+			svc:      "s1",
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc:    "s1 get an IPv6",
-			svc:     "s1",
-			isIPv6:  true,
-			wantErr: true,
+			desc:     "s1 get an IPv6",
+			svc:      "s1",
+			ipFamily: ipfamily.IPv6,
+			wantErr:  true,
+		},
+		// Clear old ipv6 addresses
+		{
+			desc:     "s1 clear old ipv6 address",
+			svc:      "s1",
+			unassign: true,
+			ipFamily: ipfamily.IPv6,
+		},
+		{
+			desc:     "s2 clear old ipv6 address",
+			svc:      "s2",
+			unassign: true,
+			ipFamily: ipfamily.IPv6,
+		},
+		{
+			desc:     "s3 clear old ipv6 address",
+			svc:      "s3",
+			unassign: true,
+			ipFamily: ipfamily.IPv6,
+		},
+		{
+			desc:     "s4 clear old ipv6 address",
+			svc:      "s4",
+			unassign: true,
+			ipFamily: ipfamily.IPv6,
+		},
+		{
+			desc:     "s5 clear old ipv6 address",
+			svc:      "s5",
+			unassign: true,
+			ipFamily: ipfamily.IPv6,
+		},
+		{
+			desc:     "s6 clear old ipv6 address",
+			svc:      "s6",
+			unassign: true,
+			ipFamily: ipfamily.IPv6,
+		},
+
+		// Dual-stack tests.
+		{
+			desc:     "s1 gets dual-stack IPs",
+			svc:      "s1",
+			ipFamily: ipfamily.DualStack,
+		},
+		{
+			desc:     "s2 gets dual-stack IPs",
+			svc:      "s2",
+			ipFamily: ipfamily.DualStack,
+		},
+		{
+			desc:     "s3 gets dual-stack IPs",
+			svc:      "s3",
+			ipFamily: ipfamily.DualStack,
+		},
+		{
+			desc:     "s4 gets dual-stack IPs",
+			svc:      "s4",
+			ipFamily: ipfamily.DualStack,
+		},
+		{
+			desc:     "s5 can't get dual-stack IPs",
+			svc:      "s5",
+			ipFamily: ipfamily.DualStack,
+			wantErr:  true,
+		},
+		{
+			desc:     "s6 can't get dual-stack IPs",
+			svc:      "s6",
+			ipFamily: ipfamily.DualStack,
+			wantErr:  true,
+		},
+		{
+			desc:     "s1 releases its dual-stack IPs",
+			svc:      "s1",
+			unassign: true,
+			ipFamily: ipfamily.DualStack,
+		},
+		{
+			desc:     "s5 can now grab s1's former dual-stack IPs",
+			svc:      "s5",
+			ipFamily: ipfamily.DualStack,
+		},
+		{
+			desc:     "s6 still can't get dual-stack IPs",
+			svc:      "s6",
+			ipFamily: ipfamily.DualStack,
+			wantErr:  true,
+		},
+		{
+			desc:     "s5 unassigns in prep for enabling dual-stack IPs sharing",
+			svc:      "s5",
+			unassign: true,
+			ipFamily: ipfamily.DualStack,
+		},
+		{
+			desc:       "s5 enables dual-stack IP sharing",
+			svc:        "s5",
+			ports:      ports("tcp/80"),
+			sharingKey: "share",
+			ipFamily:   ipfamily.DualStack,
+		},
+		{
+			desc:       "s6 can get an dual-stack IPs now, with sharing",
+			svc:        "s6",
+			ports:      ports("tcp/443"),
+			sharingKey: "share",
+			ipFamily:   ipfamily.DualStack,
 		},
 	}
 
@@ -581,7 +743,7 @@ func TestPoolAllocation(t *testing.T) {
 			alloc.Unassign(test.svc)
 			continue
 		}
-		ip, err := alloc.AllocateFromPool(test.svc, test.isIPv6, "test", test.ports, test.sharingKey, "")
+		ips, err := alloc.AllocateFromPool(test.svc, test.ipFamily, "test", test.ports, test.sharingKey, "")
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("%s: should have caused an error, but did not", test.desc)
@@ -593,16 +755,20 @@ func TestPoolAllocation(t *testing.T) {
 			t.Errorf("%s: AllocateFromPool(%q, \"test\"): %s", test.desc, test.svc, err)
 		}
 		validIPs := validIP4s
-		if test.isIPv6 {
+		if test.ipFamily == ipfamily.IPv6 {
 			validIPs = validIP6s
+		} else if test.ipFamily == ipfamily.DualStack {
+			validIPs = validIPDualStacks
 		}
-		if !validIPs[ip.String()] {
-			t.Errorf("%s: allocated unexpected IP %q", test.desc, ip)
+		for _, ip := range ips {
+			if !validIPs[ip.String()] {
+				t.Errorf("%s: allocated unexpected IP %q", test.desc, ip)
+			}
 		}
 	}
 
 	alloc.Unassign("s5")
-	if _, err := alloc.AllocateFromPool("s5", false, "nonexistentpool", nil, "", ""); err == nil {
+	if _, err := alloc.AllocateFromPool("s5", ipfamily.IPv4, "nonexistentpool", nil, "", ""); err == nil {
 		t.Error("Allocating from non-existent pool succeeded")
 	}
 }
@@ -634,7 +800,16 @@ func TestAllocation(t *testing.T) {
 		"1000::10": true,
 		"1000::11": true,
 	}
-
+	validIPDualStacks := map[string]bool{
+		"1.2.3.4":  true,
+		"1.2.3.5":  true,
+		"1.2.3.10": true,
+		"1.2.3.11": true,
+		"1000::4":  true,
+		"1000::5":  true,
+		"1000::10": true,
+		"1000::11": true,
+	}
 	tests := []struct {
 		desc       string
 		svc        string
@@ -642,55 +817,65 @@ func TestAllocation(t *testing.T) {
 		sharingKey string
 		unassign   bool
 		wantErr    bool
-		isIPv6     bool
+		ipFamily   ipfamily.Family
 	}{
 		{
-			desc: "s1 gets an IP",
-			svc:  "s1",
+			desc:     "s1 gets an IPv4",
+			svc:      "s1",
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc: "s2 gets an IP",
-			svc:  "s2",
+			desc:     "s2 gets an IPv4",
+			svc:      "s2",
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc: "s3 gets an IP",
-			svc:  "s3",
+			desc:     "s3 gets an IPv4",
+			svc:      "s3",
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc: "s4 gets an IP",
-			svc:  "s4",
+			desc:     "s4 gets an IPv4",
+			svc:      "s4",
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc:    "s5 can't get an IP",
-			svc:     "s5",
-			wantErr: true,
+			desc:     "s5 can't get an IPv4",
+			svc:      "s5",
+			wantErr:  true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc:    "s6 can't get an IP",
-			svc:     "s6",
-			wantErr: true,
+			desc:     "s6 can't get an IPv4",
+			svc:      "s6",
+			wantErr:  true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc:     "s1 gives up its IP",
+			desc:     "s1 gives up its IPv4",
 			svc:      "s1",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc:       "s5 can now get an IP",
+			desc:       "s5 can now get an IPv4",
 			svc:        "s5",
 			ports:      ports("tcp/80"),
 			sharingKey: "share",
+			ipFamily:   ipfamily.IPv4,
 		},
 		{
-			desc:    "s6 still can't get an IP",
-			svc:     "s6",
-			wantErr: true,
+			desc:     "s6 still can't get an IPv4",
+			svc:      "s6",
+			wantErr:  true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			desc:       "s6 can get an IP with sharing",
+			desc:       "s6 can get an IPv4 with sharing",
 			svc:        "s6",
 			ports:      ports("tcp/443"),
 			sharingKey: "share",
+			ipFamily:   ipfamily.IPv4,
 		},
 
 		// Clear old ipv4 addresses
@@ -698,90 +883,191 @@ func TestAllocation(t *testing.T) {
 			desc:     "s1 clear old ipv4 address",
 			svc:      "s1",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
 			desc:     "s2 clear old ipv4 address",
 			svc:      "s2",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
 			desc:     "s3 clear old ipv4 address",
 			svc:      "s3",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
 			desc:     "s4 clear old ipv4 address",
 			svc:      "s4",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
 			desc:     "s5 clear old ipv4 address",
 			svc:      "s5",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
 			desc:     "s6 clear old ipv4 address",
 			svc:      "s6",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 
 		// IPv6 tests
 		{
-			desc:   "s1 gets an IP",
-			svc:    "s1",
-			isIPv6: true,
+			desc:     "s1 gets an IPv6",
+			svc:      "s1",
+			ipFamily: ipfamily.IPv6,
 		},
 		{
-			desc:   "s2 gets an IP",
-			svc:    "s2",
-			isIPv6: true,
+			desc:     "s2 gets an IPv6",
+			svc:      "s2",
+			ipFamily: ipfamily.IPv6,
 		},
 		{
-			desc:   "s3 gets an IP",
-			svc:    "s3",
-			isIPv6: true,
+			desc:     "s3 gets an IPv6",
+			svc:      "s3",
+			ipFamily: ipfamily.IPv6,
 		},
 		{
-			desc:   "s4 gets an IP",
-			svc:    "s4",
-			isIPv6: true,
+			desc:     "s4 gets an IPv6",
+			svc:      "s4",
+			ipFamily: ipfamily.IPv6,
 		},
 		{
-			desc:    "s5 can't get an IP",
-			svc:     "s5",
-			isIPv6:  true,
-			wantErr: true,
+			desc:     "s5 can't get an IPv6",
+			svc:      "s5",
+			ipFamily: ipfamily.IPv6,
+			wantErr:  true,
 		},
 		{
-			desc:    "s6 can't get an IP",
-			svc:     "s6",
-			isIPv6:  true,
-			wantErr: true,
+			desc:     "s6 can't get an IPv6",
+			svc:      "s6",
+			ipFamily: ipfamily.IPv6,
+			wantErr:  true,
 		},
 		{
-			desc:     "s1 gives up its IP",
+			desc:     "s1 gives up its IPv6",
 			svc:      "s1",
 			unassign: true,
 		},
 		{
-			desc:       "s5 can now get an IP",
+			desc:       "s5 can now get an IPv6",
 			svc:        "s5",
 			ports:      ports("tcp/80"),
 			sharingKey: "share",
-			isIPv6:     true,
+			ipFamily:   ipfamily.IPv6,
 		},
 		{
-			desc:    "s6 still can't get an IP",
-			svc:     "s6",
-			isIPv6:  true,
-			wantErr: true,
+			desc:     "s6 still can't get an IPv6",
+			svc:      "s6",
+			ipFamily: ipfamily.IPv6,
+			wantErr:  true,
 		},
 		{
-			desc:       "s6 can get an IP with sharing",
+			desc:       "s6 can get an IPv6 with sharing",
 			svc:        "s6",
 			ports:      ports("tcp/443"),
 			sharingKey: "share",
-			isIPv6:     true,
+			ipFamily:   ipfamily.IPv6,
+		},
+		// Clear old ipv6 addresses
+		{
+			desc:     "s1 clear old ipv6 address",
+			svc:      "s1",
+			unassign: true,
+			ipFamily: ipfamily.IPv6,
+		},
+		{
+			desc:     "s2 clear old ipv6 address",
+			svc:      "s2",
+			unassign: true,
+			ipFamily: ipfamily.IPv6,
+		},
+		{
+			desc:     "s3 clear old ipv6 address",
+			svc:      "s3",
+			unassign: true,
+			ipFamily: ipfamily.IPv6,
+		},
+		{
+			desc:     "s4 clear old ipv6 address",
+			svc:      "s4",
+			unassign: true,
+			ipFamily: ipfamily.IPv6,
+		},
+		{
+			desc:     "s5 clear old ipv6 address",
+			svc:      "s5",
+			unassign: true,
+			ipFamily: ipfamily.IPv6,
+		},
+		{
+			desc:     "s6 clear old ipv6 address",
+			svc:      "s6",
+			unassign: true,
+			ipFamily: ipfamily.IPv6,
+		},
+		//Dual-stack test cases
+		{
+			desc:     "s1 gets dual-stack IPs",
+			svc:      "s1",
+			ipFamily: ipfamily.DualStack,
+		},
+		{
+			desc:     "s2 gets dual-stack IPs",
+			svc:      "s2",
+			ipFamily: ipfamily.DualStack,
+		},
+		{
+			desc:     "s3 gets dual-stack IPs",
+			svc:      "s3",
+			ipFamily: ipfamily.DualStack,
+		},
+		{
+			desc:     "s4 gets dual-stack IPs",
+			svc:      "s4",
+			ipFamily: ipfamily.DualStack,
+		},
+		{
+			desc:     "s5 can't get dual-stack IPs",
+			svc:      "s5",
+			ipFamily: ipfamily.DualStack,
+			wantErr:  true,
+		},
+		{
+			desc:     "s6 can't get dual-stack IPs",
+			svc:      "s6",
+			ipFamily: ipfamily.DualStack,
+			wantErr:  true,
+		},
+		{
+			desc:     "s1 gives up its IPs",
+			svc:      "s1",
+			unassign: true,
+		},
+		{
+			desc:       "s5 can now get dual-stack IPs",
+			svc:        "s5",
+			ports:      ports("tcp/80"),
+			sharingKey: "share",
+			ipFamily:   ipfamily.DualStack,
+		},
+		{
+			desc:     "s6 still can't get dual-stack IPs",
+			svc:      "s6",
+			ipFamily: ipfamily.DualStack,
+			wantErr:  true,
+		},
+		{
+			desc:       "s6 can get dual-stack IPs with sharing",
+			svc:        "s6",
+			ports:      ports("tcp/443"),
+			sharingKey: "share",
+			ipFamily:   ipfamily.DualStack,
 		},
 	}
 
@@ -790,7 +1076,7 @@ func TestAllocation(t *testing.T) {
 			alloc.Unassign(test.svc)
 			continue
 		}
-		ip, err := alloc.Allocate(test.svc, test.isIPv6, test.ports, test.sharingKey, "")
+		ips, err := alloc.Allocate(test.svc, test.ipFamily, test.ports, test.sharingKey, "")
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("%s: should have caused an error, but did not", test.desc)
@@ -800,12 +1086,17 @@ func TestAllocation(t *testing.T) {
 		if err != nil {
 			t.Errorf("%s: Allocate(%q, \"test\"): %s", test.desc, test.svc, err)
 		}
+
 		validIPs := validIP4s
-		if test.isIPv6 {
+		if test.ipFamily == ipfamily.IPv6 {
 			validIPs = validIP6s
+		} else if test.ipFamily == ipfamily.DualStack {
+			validIPs = validIPDualStacks
 		}
-		if !validIPs[ip.String()] {
-			t.Errorf("%s allocated unexpected IP %q", test.desc, ip)
+		for _, ip := range ips {
+			if !validIPs[ip.String()] {
+				t.Errorf("%s allocated unexpected IP %q", test.desc, ip)
+			}
 		}
 	}
 }
@@ -861,7 +1152,7 @@ func TestBuggyIPs(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		ip, err := alloc.Allocate(test.svc, false, nil, "", "")
+		ips, err := alloc.Allocate(test.svc, ipfamily.IPv4, nil, "", "")
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("#%d should have caused an error, but did not", i+1)
@@ -872,8 +1163,10 @@ func TestBuggyIPs(t *testing.T) {
 		if err != nil {
 			t.Errorf("#%d Allocate(%q, \"test\"): %s", i+1, test.svc, err)
 		}
-		if !validIPs[ip.String()] {
-			t.Errorf("#%d allocated unexpected IP %q", i+1, ip)
+		for _, ip := range ips {
+			if !validIPs[ip.String()] {
+				t.Errorf("#%d allocated unexpected IP %q", i+1, ip)
+			}
 		}
 	}
 
@@ -889,13 +1182,12 @@ func TestConfigReload(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("SetPools: %s", err)
 	}
-	if err := alloc.Assign("s1", net.ParseIP("1.2.3.0"), nil, "", ""); err != nil {
+	if err := alloc.Assign("s1", []net.IP{net.ParseIP("1.2.3.0")}, nil, "", ""); err != nil {
 		t.Fatalf("Assign(s1, 1.2.3.0): %s", err)
 	}
-	if err := alloc.Assign("s2", net.ParseIP("1000::"), nil, "", ""); err != nil {
-		t.Fatalf("Assign(s1, 1000::): %s", err)
+	if err := alloc.Assign("s2", []net.IP{net.ParseIP("1000::")}, nil, "", ""); err != nil {
+		t.Fatalf("Assign(s2, 1000::): %s", err)
 	}
-
 	tests := []struct {
 		desc    string
 		pools   map[string]*config.Pool
@@ -1081,77 +1373,125 @@ func TestAutoAssign(t *testing.T) {
 		"1000::10": true,
 		"1000::11": true,
 	}
-
+	validIPDualStacks := map[string]bool{
+		"1.2.3.4":  false,
+		"1.2.3.5":  false,
+		"1.2.3.10": true,
+		"1.2.3.11": true,
+		"1000::4":  false,
+		"1000::5":  false,
+		"1000::10": true,
+		"1000::11": true,
+	}
 	tests := []struct {
 		svc      string
 		wantErr  bool
-		isIPv6   bool
+		ipFamily ipfamily.Family
 		unassign bool
 	}{
-		{svc: "s1"},
-		{svc: "s2"},
 		{
-			svc:     "s3",
-			wantErr: true,
+			svc:      "s1",
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			svc:     "s4",
-			wantErr: true,
+			svc:      "s2",
+			ipFamily: ipfamily.IPv4,
 		},
 		{
-			svc:     "s5",
-			wantErr: true,
+			svc:      "s3",
+			wantErr:  true,
+			ipFamily: ipfamily.IPv4,
+		},
+		{
+			svc:      "s4",
+			wantErr:  true,
+			ipFamily: ipfamily.IPv4,
+		},
+		{
+			svc:      "s5",
+			wantErr:  true,
+			ipFamily: ipfamily.IPv4,
 		},
 
 		// Clear old ipv4 addresses
 		{
 			svc:      "s1",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
 			svc:      "s2",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
 			svc:      "s3",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
 			svc:      "s4",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
 			svc:      "s5",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 		{
 			svc:      "s6",
 			unassign: true,
+			ipFamily: ipfamily.IPv4,
 		},
 
 		// IPv6 tests;
 		{
-			svc:    "s1",
-			isIPv6: true,
+			svc:      "s1",
+			ipFamily: ipfamily.IPv6,
 		},
 		{
-			svc:    "s2",
-			isIPv6: true,
+			svc:      "s2",
+			ipFamily: ipfamily.IPv6,
 		},
 		{
-			svc:     "s3",
-			isIPv6:  true,
-			wantErr: true,
+			svc:      "s3",
+			ipFamily: ipfamily.IPv6,
+			wantErr:  true,
 		},
 		{
-			svc:     "s4",
-			isIPv6:  true,
-			wantErr: true,
+			svc:      "s4",
+			ipFamily: ipfamily.IPv6,
+			wantErr:  true,
 		},
 		{
-			svc:     "s5",
-			isIPv6:  true,
-			wantErr: true,
+			svc:      "s5",
+			ipFamily: ipfamily.IPv6,
+			wantErr:  true,
+		},
+		// Dual-stack tests;
+		{
+			svc:      "s1",
+			ipFamily: ipfamily.DualStack,
+		},
+		{
+			svc:      "s2",
+			ipFamily: ipfamily.DualStack,
+		},
+		{
+			svc:      "s3",
+			wantErr:  true,
+			ipFamily: ipfamily.DualStack,
+		},
+		{
+			svc:      "s4",
+			wantErr:  true,
+			ipFamily: ipfamily.DualStack,
+		},
+		{
+			svc:      "s5",
+			wantErr:  true,
+			ipFamily: ipfamily.DualStack,
 		},
 	}
 
@@ -1160,7 +1500,7 @@ func TestAutoAssign(t *testing.T) {
 			alloc.Unassign(test.svc)
 			continue
 		}
-		ip, err := alloc.Allocate(test.svc, test.isIPv6, nil, "", "")
+		ips, err := alloc.Allocate(test.svc, test.ipFamily, nil, "", "")
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("#%d should have caused an error, but did not", i+1)
@@ -1171,11 +1511,15 @@ func TestAutoAssign(t *testing.T) {
 			t.Errorf("#%d Allocate(%q, \"test\"): %s", i+1, test.svc, err)
 		}
 		validIPs := validIP4s
-		if test.isIPv6 {
+		if test.ipFamily == ipfamily.IPv6 {
 			validIPs = validIP6s
+		} else if test.ipFamily == ipfamily.DualStack {
+			validIPs = validIPDualStacks
 		}
-		if !validIPs[ip.String()] {
-			t.Errorf("#%d allocated unexpected IP %q", i+1, ip)
+		for _, ip := range ips {
+			if !validIPs[ip.String()] {
+				t.Errorf("#%d allocated unexpected IP %q", i+1, ip)
+			}
 		}
 	}
 }
@@ -1247,7 +1591,7 @@ func TestPoolMetrics(t *testing.T) {
 	tests := []struct {
 		desc       string
 		svc        string
-		ip         string
+		ips        []string
 		ports      []Port
 		sharingKey string
 		backendKey string
@@ -1256,13 +1600,13 @@ func TestPoolMetrics(t *testing.T) {
 		{
 			desc:     "assign s1",
 			svc:      "s1",
-			ip:       "1.2.3.4",
+			ips:      []string{"1.2.3.4"},
 			ipsInUse: 1,
 		},
 		{
 			desc:     "assign s2",
 			svc:      "s2",
-			ip:       "1.2.3.5",
+			ips:      []string{"1.2.3.5"},
 			ipsInUse: 2,
 		},
 		{
@@ -1278,7 +1622,7 @@ func TestPoolMetrics(t *testing.T) {
 		{
 			desc:       "assign s1 shared",
 			svc:        "s1",
-			ip:         "1.2.3.4",
+			ips:        []string{"1.2.3.4"},
 			sharingKey: "key",
 			ports:      ports("tcp/80"),
 			ipsInUse:   1,
@@ -1286,7 +1630,7 @@ func TestPoolMetrics(t *testing.T) {
 		{
 			desc:       "assign s2 shared",
 			svc:        "s2",
-			ip:         "1.2.3.4",
+			ips:        []string{"1.2.3.4"},
 			sharingKey: "key",
 			ports:      ports("tcp/443"),
 			ipsInUse:   1,
@@ -1294,7 +1638,7 @@ func TestPoolMetrics(t *testing.T) {
 		{
 			desc:       "assign s3 shared",
 			svc:        "s3",
-			ip:         "1.2.3.4",
+			ips:        []string{"1.2.3.4"},
 			sharingKey: "key",
 			ports:      ports("tcp/23"),
 			ipsInUse:   1,
@@ -1319,7 +1663,7 @@ func TestPoolMetrics(t *testing.T) {
 		},
 	}
 
-	// The "test" pool contains two ranges; 1.2.3.4/30, 1000::4/126
+	// The "test1" pool contains two ranges; 1.2.3.4/30, 1000::4/126
 	// All bits can be used for lb-addresses which gives a total capacity of; 4+4=8
 	value := ptu.ToFloat64(stats.poolCapacity.WithLabelValues("test"))
 	if int(value) != 8 {
@@ -1327,7 +1671,7 @@ func TestPoolMetrics(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		if test.ip == "" {
+		if len(test.ips) == 0 {
 			alloc.Unassign(test.svc)
 			value := ptu.ToFloat64(stats.poolActive.WithLabelValues("test"))
 			if value != test.ipsInUse {
@@ -1336,17 +1680,19 @@ func TestPoolMetrics(t *testing.T) {
 			continue
 		}
 
-		ip := net.ParseIP(test.ip)
-		if ip == nil {
-			t.Fatalf("invalid IP %q in test %q", test.ip, test.desc)
+		ips := make([]net.IP, 0)
+		for _, ip := range test.ips {
+			ips = append(ips, net.ParseIP(ip))
 		}
-		err := alloc.Assign(test.svc, ip, test.ports, test.sharingKey, test.backendKey)
-
+		if len(ips) == 0 {
+			t.Fatalf("invalid IP %q in test %q", test.ips, test.desc)
+		}
+		err := alloc.Assign(test.svc, ips, test.ports, test.sharingKey, test.backendKey)
 		if err != nil {
-			t.Errorf("%q: Assign(%q, %q): %v", test.desc, test.svc, test.ip, err)
+			t.Errorf("%q: Assign(%q, %q): %v", test.desc, test.svc, test.ips, err)
 		}
-		if a := assigned(alloc, test.svc); a != test.ip {
-			t.Errorf("%q: ran Assign(%q, %q), but allocator has recorded allocation of %q", test.desc, test.svc, test.ip, a)
+		if a := assigned(alloc, test.svc); !compareIPs(a, test.ips) {
+			t.Errorf("%q: ran Assign(%q, %q), but allocator has recorded allocation of %q", test.desc, test.svc, test.ips, a)
 		}
 		value := ptu.ToFloat64(stats.poolActive.WithLabelValues("test"))
 		if value != test.ipsInUse {
@@ -1357,12 +1703,17 @@ func TestPoolMetrics(t *testing.T) {
 
 // Some helpers.
 
-func assigned(a *Allocator, svc string) string {
-	ip := a.IP(svc)
-	if ip == nil {
-		return ""
+func assigned(a *Allocator, svc string) []string {
+	res := []string{}
+	if alloc := a.allocated[svc]; alloc != nil {
+		for _, ip := range alloc.ips {
+			if ip == nil {
+				return nil
+			}
+			res = append(res, ip.String())
+		}
 	}
-	return ip.String()
+	return res
 }
 
 func ipnet(s string) *net.IPNet {
@@ -1384,4 +1735,24 @@ func ports(ports ...string) []Port {
 		ret = append(ret, Port{fs[0], p})
 	}
 	return ret
+}
+
+func compareIPs(ips1, ips2 []string) bool {
+	if len(ips1) != len(ips2) {
+		return false
+	}
+
+	for _, ip1 := range ips1 {
+		found := false
+		for _, ip2 := range ips2 {
+			if net.ParseIP(ip1).Equal(net.ParseIP(ip2)) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }

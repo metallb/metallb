@@ -21,8 +21,8 @@ type Announce struct {
 	sync.RWMutex
 	arps     map[int]*arpResponder
 	ndps     map[int]*ndpResponder
-	ips      map[string]net.IP // svcName -> IP
-	ipRefcnt map[string]int    // ip.String() -> number of uses
+	ips      map[string][]net.IP // svcName -> IPs
+	ipRefcnt map[string]int      // ip.String() -> number of uses
 
 	// This channel can block - do not write to it while holding the mutex
 	// to avoid deadlocking.
@@ -35,7 +35,7 @@ func New(l log.Logger) (*Announce, error) {
 		logger:   l,
 		arps:     map[int]*arpResponder{},
 		ndps:     map[int]*ndpResponder{},
-		ips:      map[string]net.IP{},
+		ips:      map[string][]net.IP{},
 		ipRefcnt: map[string]int{},
 		spamCh:   make(chan net.IP, 1024),
 	}
@@ -208,9 +208,11 @@ func (a *Announce) gratuitous(ip net.IP) {
 func (a *Announce) shouldAnnounce(ip net.IP) dropReason {
 	a.RLock()
 	defer a.RUnlock()
-	for _, i := range a.ips {
-		if i.Equal(ip) {
-			return dropReasonNone
+	for _, ips := range a.ips {
+		for _, i := range ips {
+			if i.Equal(ip) {
+				return dropReasonNone
+			}
 		}
 	}
 	return dropReasonAnnounceIP
@@ -225,10 +227,15 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 
 	// Kubernetes may inform us that we should advertise this address multiple
 	// times, so just no-op any subsequent requests.
-	if _, ok := a.ips[name]; ok {
-		return
+	if ips, ok := a.ips[name]; ok {
+		for i, ip := range ips {
+			if ip.Equal(a.ips[name][i]) {
+				continue
+			}
+		}
 	}
-	a.ips[name] = ip
+
+	a.ips[name] = append(a.ips[name], ip)
 
 	a.ipRefcnt[ip.String()]++
 	if a.ipRefcnt[ip.String()] > 1 {
@@ -249,22 +256,23 @@ func (a *Announce) DeleteBalancer(name string) {
 	a.Lock()
 	defer a.Unlock()
 
-	ip, ok := a.ips[name]
+	ips, ok := a.ips[name]
 	if !ok {
 		return
 	}
 	delete(a.ips, name)
+	for _, ip := range ips {
+		a.ipRefcnt[ip.String()]--
+		if a.ipRefcnt[ip.String()] > 0 {
+			// Another service is still using this IP, don't touch any
+			// more things.
+			return
+		}
 
-	a.ipRefcnt[ip.String()]--
-	if a.ipRefcnt[ip.String()] > 0 {
-		// Another service is still using this IP, don't touch any
-		// more things.
-		return
-	}
-
-	for _, client := range a.ndps {
-		if err := client.Unwatch(ip); err != nil {
-			level.Error(a.logger).Log("op", "unwatchMulticastGroup", "error", err, "ip", ip, "msg", "failed to unwatch NDP multicast group for IP")
+		for _, client := range a.ndps {
+			if err := client.Unwatch(ip); err != nil {
+				level.Error(a.logger).Log("op", "unwatchMulticastGroup", "error", err, "ip", ip, "msg", "failed to unwatch NDP multicast group for IP")
+			}
 		}
 	}
 

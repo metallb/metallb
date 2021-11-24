@@ -180,7 +180,7 @@ type controller struct {
 
 	protocols map[config.Proto]Protocol
 	announced map[string]config.Proto // service name -> protocol advertising it
-	svcIP     map[string]net.IP       // service name -> assigned IP
+	svcIPs    map[string][]net.IP     // service name -> assigned IPs
 }
 
 type controllerConfig struct {
@@ -223,7 +223,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 		bgpType:   cfg.bgpType,
 		protocols: protocols,
 		announced: map[string]config.Proto{},
-		svcIP:     map[string]net.IP{},
+		svcIPs:    map[string][]net.IP{},
 	}
 
 	return ret, nil
@@ -246,19 +246,23 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 		return k8s.SyncStateSuccess
 	}
 
-	if len(svc.Status.LoadBalancer.Ingress) != 1 {
+	if len(svc.Status.LoadBalancer.Ingress) == 0 {
 		return c.deleteBalancer(l, name, "noIPAllocated")
 	}
 
-	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
-	if lbIP == nil {
-		level.Error(l).Log("op", "setBalancer", "error", fmt.Sprintf("invalid LoadBalancer IP %q", svc.Status.LoadBalancer.Ingress[0].IP), "msg", "invalid IP allocated by controller")
-		return c.deleteBalancer(l, name, "invalidIP")
+	lbIPs := []net.IP{}
+	for i := range svc.Status.LoadBalancer.Ingress {
+		lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[i].IP)
+		if lbIP == nil {
+			level.Error(l).Log("op", "setBalancer", "error", fmt.Sprintf("invalid LoadBalancer IP %q", svc.Status.LoadBalancer.Ingress[i].IP), "msg", "invalid IP allocated by controller")
+			return c.deleteBalancer(l, name, "invalidIP")
+		}
+		lbIPs = append(lbIPs, lbIP)
 	}
 
-	l = log.With(l, "ip", lbIP)
+	l = log.With(l, "ips", lbIPs)
 
-	poolName := poolFor(c.config.Pools, lbIP)
+	poolName := poolFor(c.config.Pools, lbIPs)
 	if poolName == "" {
 		level.Error(l).Log("op", "setBalancer", "error", "assigned IP not allowed by config", "msg", "IP allocated by controller not allowed by config")
 		return c.deleteBalancer(l, name, "ipNotAllowed")
@@ -277,7 +281,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 		}
 	}
 
-	if svcIP, ok := c.svcIP[name]; ok && !lbIP.Equal(svcIP) {
+	if svcIPs, ok := c.svcIPs[name]; ok && !compareIPs(lbIPs, svcIPs) {
 		if st := c.deleteBalancer(l, name, "loadBalancerIPChanged"); st == k8s.SyncStateError {
 			return st
 		}
@@ -290,26 +294,28 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 		return c.deleteBalancer(l, name, "internalError")
 	}
 
-	if deleteReason := handler.ShouldAnnounce(l, name, lbIP, svc, eps); deleteReason != "" {
+	if deleteReason := handler.ShouldAnnounce(l, name, lbIPs, svc, eps); deleteReason != "" {
 		return c.deleteBalancer(l, name, deleteReason)
 	}
 
-	if err := handler.SetBalancer(l, name, lbIP, pool); err != nil {
+	if err := handler.SetBalancer(l, name, lbIPs, pool); err != nil {
 		level.Error(l).Log("op", "setBalancer", "error", err, "msg", "failed to announce service")
 		return k8s.SyncStateError
 	}
 
 	if c.announced[name] == "" {
 		c.announced[name] = pool.Protocol
-		c.svcIP[name] = lbIP
+		c.svcIPs[name] = lbIPs
 	}
 
-	announcing.With(prometheus.Labels{
-		"protocol": string(pool.Protocol),
-		"service":  name,
-		"node":     c.myNode,
-		"ip":       lbIP.String(),
-	}).Set(1)
+	for _, ip := range lbIPs {
+		announcing.With(prometheus.Labels{
+			"protocol": string(pool.Protocol),
+			"service":  name,
+			"node":     c.myNode,
+			"ip":       ip.String(),
+		}).Set(1)
+	}
 	level.Info(l).Log("event", "serviceAnnounced", "msg", "service has IP, announcing")
 	c.client.Infof(svc, "nodeAssigned", "announcing from node %q", c.myNode)
 
@@ -327,29 +333,58 @@ func (c *controller) deleteBalancer(l log.Logger, name, reason string) k8s.SyncS
 		return k8s.SyncStateError
 	}
 
-	announcing.Delete(prometheus.Labels{
-		"protocol": string(proto),
-		"service":  name,
-		"node":     c.myNode,
-		"ip":       c.svcIP[name].String(),
-	})
+	for _, ip := range c.svcIPs[name] {
+		announcing.Delete(prometheus.Labels{
+			"protocol": string(proto),
+			"service":  name,
+			"node":     c.myNode,
+			"ips":      ip.String(),
+		})
+	}
 	delete(c.announced, name)
-	delete(c.svcIP, name)
+	delete(c.svcIPs, name)
 
-	level.Info(l).Log("event", "serviceWithdrawn", "ip", c.svcIP[name], "reason", reason, "msg", "withdrawing service announcement")
+	level.Info(l).Log("event", "serviceWithdrawn", "ip", c.svcIPs[name], "reason", reason, "msg", "withdrawing service announcement")
 
 	return k8s.SyncStateSuccess
 }
 
-func poolFor(pools map[string]*config.Pool, ip net.IP) string {
+func poolFor(pools map[string]*config.Pool, ips []net.IP) string {
 	for pname, p := range pools {
-		for _, cidr := range p.CIDR {
-			if cidr.Contains(ip) {
+		cnt := 0
+		for _, ip := range ips {
+			for _, cidr := range p.CIDR {
+				if cidr.Contains(ip) {
+					cnt++
+					break
+				}
+			}
+			if cnt == len(ips) {
 				return pname
 			}
 		}
 	}
 	return ""
+}
+
+func compareIPs(ips1, ips2 []net.IP) bool {
+	if len(ips1) != len(ips2) {
+		return false
+	}
+
+	for _, ip1 := range ips1 {
+		found := false
+		for _, ip2 := range ips2 {
+			if ip1.Equal(ip2) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 func (c *controller) SetConfig(l log.Logger, cfg *config.Config) k8s.SyncState {
@@ -362,7 +397,7 @@ func (c *controller) SetConfig(l log.Logger, cfg *config.Config) k8s.SyncState {
 		return k8s.SyncStateErrorNoRetry
 	}
 
-	for svc, ip := range c.svcIP {
+	for svc, ip := range c.svcIPs {
 		if pool := poolFor(cfg.Pools, ip); pool == "" {
 			level.Error(l).Log("op", "setConfig", "service", svc, "ip", ip, "error", "service has no configuration under new config", "msg", "new configuration rejected")
 			return k8s.SyncStateError
@@ -394,8 +429,8 @@ func (c *controller) SetNode(l log.Logger, node *v1.Node) k8s.SyncState {
 // A Protocol can advertise an IP address.
 type Protocol interface {
 	SetConfig(log.Logger, *config.Config) error
-	ShouldAnnounce(log.Logger, string, net.IP, *v1.Service, k8s.EpsOrSlices) string
-	SetBalancer(log.Logger, string, net.IP, *config.Pool) error
+	ShouldAnnounce(log.Logger, string, []net.IP, *v1.Service, k8s.EpsOrSlices) string
+	SetBalancer(log.Logger, string, []net.IP, *config.Pool) error
 	DeleteBalancer(log.Logger, string, string) error
 	SetNode(log.Logger, *v1.Node) error
 }
