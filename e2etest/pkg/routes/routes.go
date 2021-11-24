@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"go.universe.tf/metallb/e2etest/pkg/executor"
+	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -68,15 +69,12 @@ func ForIP(target string, exec executor.Executor) []net.IP {
 
 // MatchNodes tells whether the given list of destination ips
 // matches the expected list of nodes.
-func MatchNodes(nodes []v1.Node, ips []net.IP) error {
+func MatchNodes(nodes []v1.Node, ips []net.IP, ipFamily string) error {
 	nodesIPs := map[string]struct{}{}
 
-	for _, n := range nodes {
-		for _, a := range n.Status.Addresses {
-			if a.Type == v1.NodeInternalIP {
-				nodesIPs[a.Address] = struct{}{}
-			}
-		}
+	ii := k8s.NodeIPsForFamily(nodes, ipFamily)
+	for _, ip := range ii {
+		nodesIPs[ip] = struct{}{}
 	}
 	for _, ip := range ips {
 		if _, ok := nodesIPs[ip.String()]; !ok {

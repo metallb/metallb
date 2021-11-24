@@ -159,6 +159,17 @@ func (c *FRR) Stop() error {
 	return nil
 }
 
+func (c *FRR) AddressesForFamily(ipFamily string) []string {
+	addresses := []string{c.Ipv4}
+	switch ipFamily {
+	case "ipv6":
+		addresses = []string{c.Ipv6}
+	case "dual":
+		addresses = []string{c.Ipv4, c.Ipv6}
+	}
+	return addresses
+}
+
 // Change volume permissions.
 // Allows deleting the test directory or updating the files in the volume.
 func (c *FRR) updateVolumePermissions() error {
