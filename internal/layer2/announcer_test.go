@@ -9,7 +9,7 @@ import (
 
 func Test_SetBalancer_AddsToAnnouncedServices(t *testing.T) {
 	announce := &Announce{
-		ips:      map[string]net.IP{},
+		ips:      map[string][]net.IP{},
 		ipRefcnt: map[string]int{},
 		spamCh:   make(chan net.IP, 1),
 	}
@@ -21,6 +21,10 @@ func Test_SetBalancer_AddsToAnnouncedServices(t *testing.T) {
 		{
 			name: "foo",
 			ip:   net.IPv4(192, 168, 1, 20),
+		},
+		{
+			name: "foo",
+			ip:   net.ParseIP("1000::1"),
 		},
 		{
 			name: "bar",
