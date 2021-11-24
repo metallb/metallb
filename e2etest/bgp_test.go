@@ -27,7 +27,7 @@ import (
 
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/metrics"
-	"go.universe.tf/metallb/e2etest/pkg/routes"
+	testroutes "go.universe.tf/metallb/e2etest/pkg/routes"
 
 	"golang.org/x/sync/errgroup"
 
@@ -228,7 +228,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				testservice.TrafficPolicyLocal(svc)
 				testservice.DualStack(svc)
 			}),
-		table.Entry("DUALSTACK - ExternalTrafficPolicyCluster - force V6 only", "ipv4", "ExternalTrafficPolicyCluster", []string{v4PoolAddresses},
+		table.Entry("DUALSTACK - ExternalTrafficPolicyCluster - force V6 only", "ipv4", "ExternalTrafficPolicyCluster", []string{v6PoolAddresses},
 			func(svc *corev1.Service) {
 				testservice.TrafficPolicyLocal(svc)
 				testservice.ForceV6(svc)
@@ -699,7 +699,7 @@ func validateFRRPeeredWithNodes(cs clientset.Interface, c *frrcontainer.FRR) {
 	Eventually(func() error {
 		neighbors, err := frr.NeighborsInfo(c)
 		framework.ExpectNoError(err)
-		err = frr.NeighborsMatchNodes(allNodes.Items, neighbors)
+		err = frr.NeighborsMatchNodes(allNodes.Items, neighbors, c.NeighborConfig.IPFamily)
 		return err
 	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
@@ -723,28 +723,31 @@ func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1
 				return err
 			}
 
-			advertised := routes.ForIP(ingressIP, c)
-			err = routes.MatchNodes(nodes, advertised)
-			if err != nil {
-				return err
-			}
-
 			frrRoutes, frrRoutesV6, err := frr.Routes(c)
 			if err != nil {
 				return err
 			}
 			routes, ok := frrRoutes[ingressIP]
+			ipFamily := "ipv4"
 			if !ok {
 				routes, ok = frrRoutesV6[ingressIP]
+				ipFamily = "ipv6"
 			}
 			if !ok {
 				return fmt.Errorf("%s not found in frr routes %v %v", ingressIP, frrRoutes, frrRoutesV6)
 			}
 
-			err = frr.RoutesMatchNodes(nodes, routes)
+			err = frr.RoutesMatchNodes(nodes, routes, ipFamily)
 			if err != nil {
 				return err
 			}
+
+			advertised := testroutes.ForIP(ingressIP, c)
+			err = testroutes.MatchNodes(nodes, advertised, ipFamily)
+			if err != nil {
+				return err
+			}
+
 			return nil
 		}, 4*time.Minute, 1*time.Second).Should(BeNil())
 	}

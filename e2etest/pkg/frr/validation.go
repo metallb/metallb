@@ -7,6 +7,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 
+	"go.universe.tf/metallb/e2etest/pkg/frr/config"
 	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
 )
 
@@ -14,16 +15,25 @@ import (
 // frr instance. We only care about established connections, as the
 // frr instance may be configured with more nodes than are currently
 // paired.
-func NeighborsMatchNodes(nodes []v1.Node, neighbors []*bgpfrr.Neighbor) error {
+func NeighborsMatchNodes(nodes []v1.Node, neighbors []*bgpfrr.Neighbor, ipFamily string) error {
 	nodesIPs := map[string]struct{}{}
 
 	for _, n := range nodes {
 		for _, a := range n.Status.Addresses {
 			if a.Type == v1.NodeInternalIP {
+				matches, err := config.MatchesIPFamily(a.Address, ipFamily)
+				if err != nil {
+					return err
+				}
+				if !matches {
+					continue
+				}
+
 				nodesIPs[a.Address] = struct{}{}
 			}
 		}
 	}
+
 	for _, n := range neighbors {
 		if _, ok := nodesIPs[n.Ip.String()]; !ok { // skipping neighbors that are not nodes
 			continue
@@ -41,12 +51,19 @@ func NeighborsMatchNodes(nodes []v1.Node, neighbors []*bgpfrr.Neighbor) error {
 
 // RoutesMatchNodes tells if ALL the given nodes are exposed as
 // destinations for the given address.
-func RoutesMatchNodes(nodes []v1.Node, route bgpfrr.Route) error {
+func RoutesMatchNodes(nodes []v1.Node, route bgpfrr.Route, ipFamily string) error {
 	nodesIPs := map[string]struct{}{}
 
 	for _, n := range nodes {
 		for _, a := range n.Status.Addresses {
 			if a.Type == v1.NodeInternalIP {
+				matches, err := config.MatchesIPFamily(a.Address, ipFamily)
+				if err != nil {
+					return err
+				}
+				if !matches {
+					continue
+				}
 				nodesIPs[a.Address] = struct{}{}
 			}
 		}

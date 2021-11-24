@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"text/template"
 
@@ -31,6 +32,7 @@ router bgp {{.ASN}}
   neighbor {{.Addr}} remote-as {{.ASN}}
   {{ if .Password -}}
   neighbor {{.Addr}} password {{.Password}}
+  neighbor {{.Addr}} capability extended-nexthop
   {{- end }}
 {{- if .BFDEnabled }} 
   neighbor {{.Addr}} bfd
@@ -80,6 +82,13 @@ func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterCon
 	for _, node := range nodes.Items {
 		for i := range node.Status.Addresses {
 			if node.Status.Addresses[i].Type == "InternalIP" {
+				matches, err := MatchesIPFamily(node.Status.Addresses[i].Address, nc.IPFamily)
+				if err != nil {
+					return "", err
+				}
+				if !matches {
+					continue
+				}
 				neighbor := nc
 				neighbor.Addr = node.Status.Addresses[i].Address
 				router.Neighbors = append(router.Neighbors, &neighbor)
@@ -145,4 +154,18 @@ func SetDaemonsConfig(testDirName string, rc RouterConfig) error {
 	}
 
 	return nil
+}
+
+func MatchesIPFamily(ip, ipFamily string) (bool, error) {
+	ipNet := net.ParseIP(ip)
+	if ipNet == nil {
+		return false, fmt.Errorf("Failed to parse ip %s", ip)
+	}
+	if ipNet.To4() == nil && ipFamily == "ipv4" {
+		return false, nil
+	}
+	if ipNet.To4() != nil && ipFamily == "ipv6" {
+		return false, nil
+	}
+	return true, nil
 }
