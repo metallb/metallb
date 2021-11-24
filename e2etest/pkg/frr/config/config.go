@@ -11,6 +11,7 @@ import (
 
 	"github.com/pkg/errors"
 	consts "go.universe.tf/metallb/e2etest/pkg/frr/consts"
+	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
@@ -36,24 +37,33 @@ router bgp {{.ASN}}
   neighbor {{.Addr}} bfd
 {{- end -}}
 {{- end }}
-  address-family {{.IPFamily}} unicast
-{{range .Neighbors }}
+{{- if ne (len .V4Neighbors) 0}}
+  address-family ipv4 unicast
+{{range .V4Neighbors }}
     neighbor {{.Addr}} next-hop-self
     neighbor {{.Addr}} activate
-    {{ if eq .IPFamily "ipv6" -}}
-    neighbor {{.Addr}} route-map RMAP in
-    {{- end }}
 {{- end }}
   exit-address-family
+{{- end }}
+{{- if ne (len .V6Neighbors) 0}}
+  address-family ipv6 unicast
+{{range .V6Neighbors }}
+    neighbor {{.Addr}} next-hop-self
+    neighbor {{.Addr}} activate
+    neighbor {{.Addr}} route-map RMAP in
+{{- end }}
+exit-address-family
+{{- end }}
 
 `
 
 type RouterConfig struct {
-	ASN       uint32
-	Neighbors []*NeighborConfig
-	BGPPort   uint16
-	Password  string
-	IPFamily  string
+	ASN         uint32
+	Neighbors   []*NeighborConfig
+	V4Neighbors []*NeighborConfig
+	V6Neighbors []*NeighborConfig
+	BGPPort     uint16
+	Password    string
 }
 
 type NeighborConfig struct {
@@ -66,9 +76,11 @@ type NeighborConfig struct {
 
 // Set the IP of each node in the cluster in the BGP router configuration.
 // Each node will peer with the BGP router.
-func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterConfig) (string, error) {
+func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterConfig, ipFamily string) (string, error) {
 	router := rc
 
+	router.V4Neighbors = make([]*NeighborConfig, 0)
+	router.V6Neighbors = make([]*NeighborConfig, 0)
 	router.Neighbors = make([]*NeighborConfig, 0)
 
 	nodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
@@ -76,16 +88,20 @@ func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterCon
 		return "", errors.Wrapf(err, "Failed to get cluster nodes")
 	}
 
-	// TODO: The IP address handling will need updates to add support for dual stack
-	for _, node := range nodes.Items {
-		for i := range node.Status.Addresses {
-			if node.Status.Addresses[i].Type == "InternalIP" {
-				neighbor := nc
-				neighbor.Addr = node.Status.Addresses[i].Address
-				router.Neighbors = append(router.Neighbors, &neighbor)
-			}
+	ips := k8s.NodeIPsForFamily(nodes.Items, ipFamily)
+	for _, ip := range ips {
+		neighbor := nc
+		neighbor.Addr = ip
+		nc.IPFamily = k8s.IPFamilyForAddress(ip)
+
+		if nc.IPFamily == "ipv4" {
+			router.V4Neighbors = append(router.V4Neighbors, &neighbor)
+		} else {
+			router.V6Neighbors = append(router.V6Neighbors, &neighbor)
 		}
+		router.Neighbors = append(router.Neighbors, &neighbor)
 	}
+
 	t, err := template.New("bgp Config Template").Parse(bgpConfigTemplate)
 	if err != nil {
 		return "", errors.Wrapf(err, "Failed to create bgp template")
