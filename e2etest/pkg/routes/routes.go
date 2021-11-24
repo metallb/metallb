@@ -25,23 +25,22 @@ func init() {
 
 // For IP returns the list of routes in the given container
 // (or in the current host) to reach the service ip.
-func ForIP(target string, exec executor.Executor, ipFamily string) []net.IP {
+func ForIP(target string, exec executor.Executor) []net.IP {
+	dst := net.ParseIP(target)
+	framework.ExpectNotEqual(dst, nil, "Failed to convert", target, "to ip")
 
+	re := Ipv4Re
 	res, err := exec.Exec("ip", []string{"route", "show", target}...)
-	if ipFamily == "ipv6" {
+	framework.ExpectNoError(err)
+
+	if dst.To4() == nil { // assuming it's an ipv6 address
+		re = Ipv6Re
 		res, err = exec.Exec("ip", []string{"-6", "route", "show", target}...)
 	}
 	framework.ExpectNoError(err)
 
 	routes := make([]net.IP, 0)
 
-	dst := net.ParseIP(target)
-	framework.ExpectNotEqual(dst, nil, "Failed to convert", target, "to ip")
-
-	re := Ipv4Re
-	if dst.To4() == nil { // assuming it's an ipv6 address
-		re = Ipv6Re
-	}
 	rows := strings.Split(res, "\n")
 	// The output for a route with a single nexthop looks like: x.x.x.x via x.x.x.x dev x proto bgp metric x
 	// Route with multiple nexthops:

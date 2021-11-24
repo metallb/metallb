@@ -38,10 +38,10 @@ jobs:
       - run: inv dev-env -i  << parameters.ip-family >> -b  << parameters.bgp-type >> -l all
       - run: |
           SKIP="none"
-          if [ "<< parameters.bgp-type >>" = "native" ]; then SKIP="$SKIP\|FRR\|BFD"; fi
-          if [ "<< parameters.ip-family >>" = "ipv4" ]; then SKIP="$SKIP\|IPV6"; fi
-          if [ "<< parameters.ip-family >>" = "dual" ]; then SKIP="$SKIP\|IPV6"; fi # TODO: until dual stack is supported, we can't run the ipv6 tests against the cluster
-          if [ "<< parameters.ip-family >>" = "ipv6" ]; then SKIP="$SKIP\|IPV4"; fi
+          if [ "<< parameters.bgp-type >>" = "native" ]; then SKIP="$SKIP\|FRR\|BFD\|DUALSTACK"; fi
+          if [ "<< parameters.ip-family >>" = "ipv4" ]; then SKIP="$SKIP\|IPV6\|DUALSTACK"; fi
+          if [ "<< parameters.ip-family >>" = "dual" ]; then SKIP="$SKIP\|IPV6\|DUALSTACK"; fi # TODO: until DUALSTACK stack is supported, we can't run the ipv6 / dual stack tests against the cluster
+          if [ "<< parameters.ip-family >>" = "ipv6" ]; then SKIP="$SKIP\|IPV4\|DUALSTACK"; fi
           if [ "<< parameters.ip-family >>" = "ipv6" ] && [ "<< parameters.bgp-type >>" = "native" ]; then SKIP="$SKIP\|BGP"; fi # we are skipping BGP for ipv6 for native bgp stack
           echo "Skipping $SKIP"
           # `-E env "PATH=$PATH"` bypasses commands not found under sudo, `sudo` needed because arping requires CAP_NET_RAW
