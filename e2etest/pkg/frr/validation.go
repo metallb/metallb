@@ -7,6 +7,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 
+	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
 )
 
@@ -14,15 +15,12 @@ import (
 // frr instance. We only care about established connections, as the
 // frr instance may be configured with more nodes than are currently
 // paired.
-func NeighborsMatchNodes(nodes []v1.Node, neighbors []*bgpfrr.Neighbor) error {
+func NeighborsMatchNodes(nodes []v1.Node, neighbors []*bgpfrr.Neighbor, ipFamily string) error {
 	nodesIPs := map[string]struct{}{}
 
-	for _, n := range nodes {
-		for _, a := range n.Status.Addresses {
-			if a.Type == v1.NodeInternalIP {
-				nodesIPs[a.Address] = struct{}{}
-			}
-		}
+	ips := k8s.NodeIPsForFamily(nodes, ipFamily)
+	for _, ip := range ips {
+		nodesIPs[ip] = struct{}{}
 	}
 	for _, n := range neighbors {
 		if _, ok := nodesIPs[n.Ip.String()]; !ok { // skipping neighbors that are not nodes
@@ -41,15 +39,12 @@ func NeighborsMatchNodes(nodes []v1.Node, neighbors []*bgpfrr.Neighbor) error {
 
 // RoutesMatchNodes tells if ALL the given nodes are exposed as
 // destinations for the given address.
-func RoutesMatchNodes(nodes []v1.Node, route bgpfrr.Route) error {
+func RoutesMatchNodes(nodes []v1.Node, route bgpfrr.Route, ipFamily string) error {
 	nodesIPs := map[string]struct{}{}
 
-	for _, n := range nodes {
-		for _, a := range n.Status.Addresses {
-			if a.Type == v1.NodeInternalIP {
-				nodesIPs[a.Address] = struct{}{}
-			}
-		}
+	ips := k8s.NodeIPsForFamily(nodes, ipFamily)
+	for _, ip := range ips {
+		nodesIPs[ip] = struct{}{}
 	}
 	for _, h := range route.NextHops {
 		if _, ok := nodesIPs[h.String()]; !ok { // skipping neighbors that are not nodes
@@ -64,19 +59,16 @@ func RoutesMatchNodes(nodes []v1.Node, route bgpfrr.Route) error {
 	return nil
 }
 
-func BFDPeersMatchNodes(nodes []v1.Node, peers map[string]bgpfrr.BFDPeer) error {
+func BFDPeersMatchNodes(nodes []v1.Node, peers map[string]bgpfrr.BFDPeer, ipFamily string) error {
 	nodesIPs := map[string]struct{}{}
-
-	for _, n := range nodes {
-		for _, a := range n.Status.Addresses {
-			if a.Type == v1.NodeInternalIP {
-				nodesIPs[a.Address] = struct{}{}
-				if _, ok := peers[a.Address]; !ok {
-					return fmt.Errorf("address %s not found in peers", a.Address)
-				}
-			}
+	ips := k8s.NodeIPsForFamily(nodes, ipFamily)
+	for _, ip := range ips {
+		nodesIPs[ip] = struct{}{}
+		if _, ok := peers[ip]; !ok {
+			return fmt.Errorf("address %s not found in peers", ip)
 		}
 	}
+
 	for k := range peers {
 		if _, ok := nodesIPs[k]; !ok { // skipping neighbors that are not nodes
 			return fmt.Errorf("%s not found in nodes ips", k)

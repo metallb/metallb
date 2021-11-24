@@ -155,16 +155,14 @@ var _ = ginkgo.Describe("BGP", func() {
 			Peers: peersForContainers(frrContainers, pairingIPFamily),
 		}
 		for _, c := range frrContainers {
-			c.RouterConfig.IPFamily = pairingIPFamily
-			c.NeighborConfig.IPFamily = pairingIPFamily
-			pairExternalFRRWithNodes(cs, c)
+			pairExternalFRRWithNodes(cs, c, pairingIPFamily)
 		}
 
 		err := updateConfigMap(cs, configData)
 		framework.ExpectNoError(err)
 
 		for _, c := range frrContainers {
-			validateFRRPeeredWithNodes(cs, c)
+			validateFRRPeeredWithNodes(cs, c, pairingIPFamily)
 		}
 
 		allNodes, err = cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
@@ -213,24 +211,19 @@ var _ = ginkgo.Describe("BGP", func() {
 		table.Entry("IPV6 - ExternalTrafficPolicyCluster", "ipv6", "ExternalTrafficPolicyCluster", []string{v6PoolAddresses}, testservice.TrafficPolicyCluster),
 		table.Entry("IPV6 - ExternalTrafficPolicyLocal", "ipv6", "ExternalTrafficPolicyLocal", []string{v6PoolAddresses}, testservice.TrafficPolicyLocal),
 		table.Entry("IPV6 - FRR running in the speaker POD", "ipv6", "CheckSpeakerFRRPodRunning", []string{v6PoolAddresses}, testservice.TrafficPolicyLocal),
-		table.Entry("DUALSTACK - ExternalTrafficPolicyCluster", "ipv4", "ExternalTrafficPolicyCluster", []string{v4PoolAddresses},
+		table.Entry("DUALSTACK - ExternalTrafficPolicyCluster", "dual", "ExternalTrafficPolicyCluster", []string{v4PoolAddresses, v6PoolAddresses},
 			func(svc *corev1.Service) {
 				testservice.TrafficPolicyCluster(svc)
 				testservice.DualStack(svc)
 			}),
-		table.Entry("DUALSTACK - ExternalTrafficPolicyLocal", "ipv4", "ExternalTrafficPolicyCluster", []string{v4PoolAddresses},
+		table.Entry("DUALSTACK - ExternalTrafficPolicyLocal", "dual", "ExternalTrafficPolicyLocal", []string{v4PoolAddresses, v6PoolAddresses},
 			func(svc *corev1.Service) {
 				testservice.TrafficPolicyLocal(svc)
 				testservice.DualStack(svc)
 			}),
-		table.Entry("DUALSTACK - ExternalTrafficPolicyLocal - ipv6 pairing", "ipv6", "ExternalTrafficPolicyLocal", []string{v4PoolAddresses},
+		table.Entry("DUALSTACK - ExternalTrafficPolicyCluster - force V6 only", "dual", "ExternalTrafficPolicyCluster", []string{v4PoolAddresses, v6PoolAddresses},
 			func(svc *corev1.Service) {
-				testservice.TrafficPolicyLocal(svc)
-				testservice.DualStack(svc)
-			}),
-		table.Entry("DUALSTACK - ExternalTrafficPolicyCluster - force V6 only", "ipv4", "ExternalTrafficPolicyCluster", []string{v4PoolAddresses},
-			func(svc *corev1.Service) {
-				testservice.TrafficPolicyLocal(svc)
+				testservice.TrafficPolicyCluster(svc)
 				testservice.ForceV6(svc)
 			}),
 	)
@@ -254,8 +247,6 @@ var _ = ginkgo.Describe("BGP", func() {
 
 			var peerAddrs []string
 			for _, c := range frrContainers {
-				c.RouterConfig.IPFamily = ipFamily
-				c.NeighborConfig.IPFamily = ipFamily
 				address := c.Ipv4
 				if ipFamily == "ipv6" {
 					address = c.Ipv6
@@ -274,14 +265,14 @@ var _ = ginkgo.Describe("BGP", func() {
 				Peers: peersForContainers(frrContainers, ipFamily),
 			}
 			for _, c := range frrContainers {
-				pairExternalFRRWithNodes(cs, c)
+				pairExternalFRRWithNodes(cs, c, ipFamily)
 			}
 
 			err := updateConfigMap(cs, configData)
 			framework.ExpectNoError(err)
 
 			for _, c := range frrContainers {
-				validateFRRPeeredWithNodes(cs, c)
+				validateFRRPeeredWithNodes(cs, c, ipFamily)
 			}
 
 			ginkgo.By("checking the metrics when no service is added")
@@ -388,23 +379,19 @@ var _ = ginkgo.Describe("BGP", func() {
 		})
 
 		table.DescribeTable("set different AddressPools ranges modes", func(addressPools []addressPool, pairingFamily string, tweak testservice.Tweak) {
-			for _, c := range frrContainers {
-				c.RouterConfig.IPFamily = pairingFamily
-				c.NeighborConfig.IPFamily = pairingFamily
-			}
 			configData := configFile{
 				Peers: peersForContainers(frrContainers, pairingFamily),
 				Pools: addressPools,
 			}
 			for _, c := range frrContainers {
-				pairExternalFRRWithNodes(cs, c)
+				pairExternalFRRWithNodes(cs, c, pairingFamily)
 			}
 
 			err := updateConfigMap(cs, configData)
 			framework.ExpectNoError(err)
 
 			for _, c := range frrContainers {
-				validateFRRPeeredWithNodes(cs, c)
+				validateFRRPeeredWithNodes(cs, c, pairingFamily)
 			}
 
 			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, tweak)
@@ -472,7 +459,7 @@ var _ = ginkgo.Describe("BGP", func() {
 						"192.168.10.0-192.168.10.18",
 						"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
 					},
-				}}, "ipv4", testservice.TrafficPolicyCluster,
+				}}, "dual", testservice.TrafficPolicyCluster,
 			),
 			table.Entry("DUALSTACK - test AddressPool defined by network prefix", []addressPool{
 				{
@@ -482,7 +469,7 @@ var _ = ginkgo.Describe("BGP", func() {
 						"192.168.10.0/24",
 						"fc00:f853:0ccd:e799::/124",
 					},
-				}}, "ipv4", testservice.TrafficPolicyCluster,
+				}}, "dual", testservice.TrafficPolicyCluster,
 			),
 		)
 	})
@@ -504,9 +491,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 
 			for _, c := range frrContainers {
-				c.RouterConfig.IPFamily = pairingFamily
-				c.NeighborConfig.IPFamily = pairingFamily
-				pairExternalFRRWithNodes(cs, c, func(container *frrcontainer.FRR) {
+				pairExternalFRRWithNodes(cs, c, pairingFamily, func(container *frrcontainer.FRR) {
 					container.NeighborConfig.BFDEnabled = true
 				})
 			}
@@ -521,9 +506,8 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 
 			for _, c := range frrContainers {
-				validateFRRPeeredWithNodes(cs, c)
+				validateFRRPeeredWithNodes(cs, c, pairingFamily)
 			}
-
 			for _, c := range frrContainers {
 				validateService(cs, svc, allNodes.Items, c)
 			}
@@ -535,7 +519,7 @@ var _ = ginkgo.Describe("BGP", func() {
 						return err
 					}
 					toCompare := BFDProfileWithDefaults(bfd)
-					err = frr.BFDPeersMatchNodes(allNodes.Items, bfdPeers)
+					err = frr.BFDPeersMatchNodes(allNodes.Items, bfdPeers, pairingFamily)
 					if err != nil {
 						return err
 					}
@@ -608,7 +592,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					EchoMode:         boolPtr(false),
 					PassiveMode:      boolPtr(false),
 					MinimumTTL:       uint32Ptr(254),
-				}, "ipv4", []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
+				}, "dual", []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
 					testservice.TrafficPolicyCluster(svc)
 					testservice.DualStack(svc)
 				}),
@@ -679,19 +663,19 @@ func validateCounterValue(expectedMax int, metricName string, labels map[string]
 	return nil
 }
 
-func pairExternalFRRWithNodes(cs clientset.Interface, c *frrcontainer.FRR, modifiers ...func(c *frrcontainer.FRR)) {
+func pairExternalFRRWithNodes(cs clientset.Interface, c *frrcontainer.FRR, ipFamily string, modifiers ...func(c *frrcontainer.FRR)) {
 	config := *c
 	for _, m := range modifiers {
 		m(&config)
 	}
-	bgpConfig, err := frrconfig.BGPPeersForAllNodes(cs, config.NeighborConfig, config.RouterConfig)
+	bgpConfig, err := frrconfig.BGPPeersForAllNodes(cs, config.NeighborConfig, config.RouterConfig, ipFamily)
 	framework.ExpectNoError(err)
 
 	err = c.UpdateBGPConfigFile(bgpConfig)
 	framework.ExpectNoError(err)
 }
 
-func validateFRRPeeredWithNodes(cs clientset.Interface, c *frrcontainer.FRR) {
+func validateFRRPeeredWithNodes(cs clientset.Interface, c *frrcontainer.FRR, ipFamily string) {
 	allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	framework.ExpectNoError(err)
 
@@ -699,7 +683,7 @@ func validateFRRPeeredWithNodes(cs clientset.Interface, c *frrcontainer.FRR) {
 	Eventually(func() error {
 		neighbors, err := frr.NeighborsInfo(c)
 		framework.ExpectNoError(err)
-		err = frr.NeighborsMatchNodes(allNodes.Items, neighbors)
+		err = frr.NeighborsMatchNodes(allNodes.Items, neighbors, ipFamily)
 		return err
 	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
@@ -713,6 +697,7 @@ func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1
 		framework.ExpectNotEqual(ip1.To4(), ip2.To4())
 	}
 	for _, ip := range svc.Status.LoadBalancer.Ingress {
+
 		ingressIP := e2eservice.GetIngressPoint(&ip)
 		hostport := net.JoinHostPort(ingressIP, port)
 		address := fmt.Sprintf("http://%s/", hostport)
@@ -723,28 +708,31 @@ func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1
 				return err
 			}
 
+			frrRoutesV4, frrRoutesV6, err := frr.Routes(c)
+			if err != nil {
+				return err
+			}
+			serviceIPFamily := "ipv4"
+			frrRoutes, ok := frrRoutesV4[ingressIP]
+			if !ok {
+				frrRoutes, ok = frrRoutesV6[ingressIP]
+				serviceIPFamily = "ipv6"
+			}
+			if !ok {
+				return fmt.Errorf("%s not found in frr routes %v %v", ingressIP, frrRoutesV4, frrRoutesV6)
+			}
+
+			err = frr.RoutesMatchNodes(nodes, frrRoutes, serviceIPFamily)
+			if err != nil {
+				return err
+			}
+
 			advertised := routes.ForIP(ingressIP, c)
-			err = routes.MatchNodes(nodes, advertised)
+			err = routes.MatchNodes(nodes, advertised, serviceIPFamily)
 			if err != nil {
 				return err
 			}
 
-			frrRoutes, frrRoutesV6, err := frr.Routes(c)
-			if err != nil {
-				return err
-			}
-			routes, ok := frrRoutes[ingressIP]
-			if !ok {
-				routes, ok = frrRoutesV6[ingressIP]
-			}
-			if !ok {
-				return fmt.Errorf("%s not found in frr routes %v %v", ingressIP, frrRoutes, frrRoutesV6)
-			}
-
-			err = frr.RoutesMatchNodes(nodes, routes)
-			if err != nil {
-				return err
-			}
 			return nil
 		}, 4*time.Minute, 1*time.Second).Should(BeNil())
 	}
@@ -755,20 +743,19 @@ func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily str
 	podExecutor := executor.ForPod(testNameSpace, pods[0].Name, "frr")
 
 	Eventually(func() error {
-		address := n.Ipv4
-		if ipFamily == "ipv6" {
-			address = n.Ipv6
-		}
-		toParse, err := podExecutor.Exec("vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", address))
-		if err != nil {
-			return err
-		}
-		res, err := frr.NeighborConnected(toParse)
-		if err != nil {
-			return err
-		}
-		if res != true {
-			return fmt.Errorf("expecting neighbor %s to be connected", n.Ipv4)
+		addresses := n.AddressesForFamily(ipFamily)
+		for _, address := range addresses {
+			toParse, err := podExecutor.Exec("vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", address))
+			if err != nil {
+				return err
+			}
+			res, err := frr.NeighborConnected(toParse)
+			if err != nil {
+				return err
+			}
+			if res != true {
+				return fmt.Errorf("expecting neighbor %s to be connected", n.Ipv4)
+			}
 		}
 		return nil
 	}, 4*time.Minute, 1*time.Second).Should(BeNil())
@@ -807,24 +794,24 @@ func stopFRRContainers(containers []*frrcontainer.FRR) error {
 
 func peersForContainers(containers []*frrcontainer.FRR, ipFamily string) []peer {
 	var peers []peer
+
 	for i, c := range frrContainers {
-		address := c.Ipv4
-		if ipFamily == "ipv6" {
-			address = c.Ipv6
-		}
+		addresses := c.AddressesForFamily(ipFamily)
 		holdTime := ""
 		if i > 0 {
 			holdTime = fmt.Sprintf("%ds", i*180)
 		}
-		peers = append(peers, peer{
-			Addr:     address,
-			ASN:      c.RouterConfig.ASN,
-			MyASN:    c.NeighborConfig.ASN,
-			Port:     c.RouterConfig.BGPPort,
-			RouterID: fmt.Sprintf(baseRouterID, i),
-			Password: c.RouterConfig.Password,
-			HoldTime: holdTime,
-		})
+		for _, address := range addresses {
+			peers = append(peers, peer{
+				Addr:     address,
+				ASN:      c.RouterConfig.ASN,
+				MyASN:    c.NeighborConfig.ASN,
+				Port:     c.RouterConfig.BGPPort,
+				RouterID: fmt.Sprintf(baseRouterID, i),
+				Password: c.RouterConfig.Password,
+				HoldTime: holdTime,
+			})
+		}
 	}
 	return peers
 }
