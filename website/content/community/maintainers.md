@@ -40,10 +40,13 @@ maintainers should support the addition of the new person, and no single
 maintainer should object to adding the new maintainer.
 
 When adding a new maintainer, we should:
-* Add to CODEOWNERS in the metallb repo
-* Open a PR to github.com/cncf/foundation adding the maintainer there. You can
-  use [this PR](https://github.com/cncf/foundation/pull/258/files) as an example
-  of what needs to be done
+
+* Add to CODEOWNERS in the metallb repo.
+
+* Open a PR to [github.com/cncf/foundation](https://github.com/cncf/foundation/)
+  adding the maintainer there. You can use [this PR](https://github.com/cncf/foundation/pull/258/files)
+  as an example of what needs to be done.
+
 * The new maintainer should subscribe to the CNCF maintainers mailing list. For
   this, send an email to cncf-MetalLB-maintainers+subscribe@lists.cncf.io and
   link the merged PR that added you to the metallb CODEOWNERS.
