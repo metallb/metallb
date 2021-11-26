@@ -8,11 +8,13 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/frr/config"
 	"go.universe.tf/metallb/e2etest/pkg/frr/consts"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const (
@@ -150,12 +152,30 @@ func (c *FRR) Stop() error {
 	if err != nil {
 		return errors.Wrapf(err, "Failed to kill %s container. %s", c.Name, out)
 	}
+	err = wait.PollImmediate(2*time.Minute, time.Second, func() (bool, error) {
+		out, err := exec.Command(executor.ContainerRuntime, "ps", "-q", "--filter", fmt.Sprintf("name=%s", c.Name)).CombinedOutput()
+		if err != nil {
+			return false, err
+		}
+		if string(out) != "" {
+			return false, nil
+		}
+		return true, nil
+	})
+	if err != nil {
+		return errors.Wrapf(err, "Failed to wait for container %s to stop", c.Name)
+	}
 
 	err = os.RemoveAll(c.configDir)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to delete FRR config directory.")
 	}
 
+	out, err = exec.Command(executor.ContainerRuntime, "ps").CombinedOutput()
+	if err != nil {
+		return err
+	}
+	fmt.Println("DEBUG STOP", string(out))
 	return nil
 }
 
