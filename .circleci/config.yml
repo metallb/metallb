@@ -12,7 +12,7 @@ commands:
   setup_kind:
     description: "Install kind"
     steps:
-      - run: GO111MODULE="on" go get sigs.k8s.io/kind@v0.10.0
+      - run: GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
       - run: curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
       - run: sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 jobs:
