@@ -31,6 +31,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/extensions/table"
 	"github.com/onsi/gomega"
+	pkgerrors "github.com/pkg/errors"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/mac"
 	"go.universe.tf/metallb/e2etest/pkg/metrics"
@@ -80,7 +81,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 	ginkgo.Context("type=Loadbalancer", func() {
 		ginkgo.It("should work for ExternalTrafficPolicy=Cluster", func() {
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, testservice.TrafficPolicyCluster)
+			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
@@ -100,7 +101,7 @@ var _ = ginkgo.Describe("L2", func() {
 		})
 
 		ginkgo.It("should work for ExternalTrafficPolicy=Local", func() {
-			svc, jig := createServiceWithBackend(cs, f.Namespace.Name, testservice.TrafficPolicyLocal)
+			svc, jig := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyLocal)
 			err := jig.Scale(5)
 			framework.ExpectNoError(err)
 
@@ -148,7 +149,7 @@ var _ = ginkgo.Describe("L2", func() {
 			err := updateConfigMap(cs, configData)
 			framework.ExpectNoError(err)
 
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, testservice.TrafficPolicyCluster)
+			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
@@ -214,7 +215,8 @@ var _ = ginkgo.Describe("L2", func() {
 
 		jig1 := e2eservice.NewTestJig(cs, namespace, "svca")
 
-		ip := firstIPFromRange(*ipRange)
+		ip, err := getIPFromRangeByIndex(*ipRange, 0)
+		framework.ExpectNoError(err)
 		svc1, err := jig1.CreateLoadBalancerService(loadBalancerCreateTimeout, func(svc *corev1.Service) {
 			svc.Spec.Ports[0].TargetPort = intstr.FromInt(servicePodPort)
 			svc.Spec.Ports[0].Port = int32(servicePodPort)
@@ -351,7 +353,7 @@ var _ = ginkgo.Describe("L2", func() {
 			}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
 
 			ginkgo.By("creating a service")
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, testservice.TrafficPolicyCluster)
+			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
@@ -434,13 +436,100 @@ var _ = ginkgo.Describe("L2", func() {
 			table.Entry("IPV4 - Checking service", "ipv4"),
 			table.Entry("IPV6 - Checking service", "ipv6"))
 	})
+
+	table.DescribeTable("validate requesting a specific address pool for Loadbalancer service", func(ipRange *string) {
+		var services []*corev1.Service
+		var servicesIngressIP []string
+		var pools []addressPool
+
+		namspace := f.Namespace.Name
+
+		for i := 0; i < 2; i++ {
+			ginkgo.By(fmt.Sprintf("configure addresspool number %d", i+1))
+			ip, err := getIPFromRangeByIndex(*ipRange, i)
+			framework.ExpectNoError(err)
+			addressesRange := fmt.Sprintf("%s-%s", ip, ip)
+			pool := addressPool{
+				Name:     fmt.Sprintf("test-addresspool%d", i+1),
+				Protocol: Layer2,
+				Addresses: []string{
+					addressesRange,
+				},
+			}
+			pools = append(pools, pool)
+
+			configData := configFile{
+				Pools: pools,
+			}
+			err = updateConfigMap(cs, configData)
+			framework.ExpectNoError(err)
+
+			ginkgo.By(fmt.Sprintf("configure service number %d", i+1))
+			jig := e2eservice.NewTestJig(cs, namspace, fmt.Sprintf("test-service%d", i+1))
+			timeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
+			svc, err := jig.CreateLoadBalancerService(timeout, func(svc *corev1.Service) {
+				tweakServicePort(svc)
+				svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeCluster
+				svc.Annotations = map[string]string{"metallb.universe.tf/address-pool": fmt.Sprintf("test-addresspool%d", i+1)}
+			})
+			framework.ExpectNoError(err)
+
+			_, err = jig.Run(func(rc *corev1.ReplicationController) {
+				tweakRCPort(rc)
+			})
+			framework.ExpectNoError(err)
+
+			defer func() {
+				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+			}()
+
+			ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
+			ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+			err = validateIPInRange([]addressPool{pool}, ingressIP)
+			framework.ExpectNoError(err)
+
+			services = append(services, svc)
+			servicesIngressIP = append(servicesIngressIP, ingressIP)
+
+			for j := 0; j <= i; j++ {
+				ginkgo.By(fmt.Sprintf("validate service %d IP didn't change", j+1))
+				ip := e2eservice.GetIngressPoint(&services[j].Status.LoadBalancer.Ingress[0])
+				framework.ExpectEqual(ip, servicesIngressIP[j])
+
+				ginkgo.By(fmt.Sprintf("checking connectivity of service %d to its external VIP", j+1))
+				port := strconv.Itoa(int(services[j].Spec.Ports[0].Port))
+				hostport := net.JoinHostPort(ip, port)
+				address := fmt.Sprintf("http://%s/", hostport)
+				err = wgetRetry(address, executor.Host)
+				framework.ExpectNoError(err)
+			}
+		}
+	},
+		table.Entry("IPV4", &ipv4ServiceRange),
+		table.Entry("IPV6", &ipv6ServiceRange))
 })
 
-func firstIPFromRange(ipRange string) string {
-	cidr, err := internalconfig.ParseCIDR(ipRange)
-	framework.ExpectNoError(err)
-	c := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr[0])})
-	return c.First().IP.String()
+func getIPFromRangeByIndex(ipRange string, index int) (string, error) {
+	cidrs, err := internalconfig.ParseCIDR(ipRange)
+	if err != nil {
+		return "", pkgerrors.Wrapf(err, "Failed to parse CIDR while getting IP from range by index")
+	}
+
+	i := 0
+	var c *ipaddr.Cursor
+	for _, cidr := range cidrs {
+		c = ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})
+		for i < index && c.Next() != nil {
+			i++
+		}
+		if i == index {
+			return c.Pos().IP.String(), nil
+		}
+		i++
+	}
+
+	return "", fmt.Errorf("failed to get IP in index %d from range %s", index, ipRange)
 }
 
 // Relies on the endpoint being an agnhost netexec pod.

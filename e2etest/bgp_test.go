@@ -169,7 +169,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		framework.ExpectNoError(err)
 
 		if setProtocoltest == "ExternalTrafficPolicyCluster" {
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, tweak)
+			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
@@ -182,7 +182,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		}
 
 		if setProtocoltest == "ExternalTrafficPolicyLocal" {
-			svc, jig := createServiceWithBackend(cs, f.Namespace.Name, tweak)
+			svc, jig := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
 			err = jig.Scale(2)
 			framework.ExpectNoError(err)
 
@@ -315,7 +315,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 
 			ginkgo.By("creating a service")
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, testservice.TrafficPolicyCluster) // Is a sleep required here?
+			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster) // Is a sleep required here?
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
@@ -394,7 +394,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				validateFRRPeeredWithNodes(cs, c, pairingFamily)
 			}
 
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, tweak)
+			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
@@ -496,7 +496,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				})
 			}
 
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, tweak)
+			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
@@ -598,14 +598,116 @@ var _ = ginkgo.Describe("BGP", func() {
 				}),
 		)
 	})
+
+	ginkgo.Context("validate configuration changes", func() {
+		table.DescribeTable("should work after subsequent configuration updates", func(addressRange string, ipFamily string) {
+			var services []*corev1.Service
+			var servicesIngressIP []string
+			var pools []addressPool
+
+			for _, c := range frrContainers {
+				c.RouterConfig.IPFamily = ipFamily
+				c.NeighborConfig.IPFamily = ipFamily
+			}
+
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			framework.ExpectNoError(err)
+
+			for i := 0; i < 2; i++ {
+				ginkgo.By(fmt.Sprintf("configure addresspool number %d", i+1))
+				firstIP, err := getIPFromRangeByIndex(addressRange, i*10+1)
+				framework.ExpectNoError(err)
+				lastIP, err := getIPFromRangeByIndex(addressRange, i*10+10)
+				framework.ExpectNoError(err)
+				addressesRange := fmt.Sprintf("%s-%s", firstIP, lastIP)
+				pool := addressPool{
+					Name:     fmt.Sprintf("test-addresspool%d", i+1),
+					Protocol: BGP,
+					Addresses: []string{
+						addressesRange,
+					},
+				}
+				pools = append(pools, pool)
+
+				configData := configFile{
+					Pools: pools,
+					Peers: peersForContainers(frrContainers, ipFamily),
+				}
+
+				for _, c := range frrContainers {
+					pairExternalFRRWithNodes(cs, c)
+				}
+
+				err = updateConfigMap(cs, configData)
+				framework.ExpectNoError(err)
+
+				for _, c := range frrContainers {
+					validateFRRPeeredWithNodes(cs, c)
+				}
+
+				ginkgo.By(fmt.Sprintf("configure service number %d", i+1))
+				svc, _ := createServiceWithBackend(cs, f.Namespace.Name, fmt.Sprintf("svc%d", i+1), testservice.TrafficPolicyCluster, func(svc *corev1.Service) {
+					svc.Annotations = map[string]string{"metallb.universe.tf/address-pool": fmt.Sprintf("test-addresspool%d", i+1)}
+				})
+
+				defer func() {
+					err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+					framework.ExpectNoError(err)
+				}()
+
+				ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
+				ingressIP := e2eservice.GetIngressPoint(
+					&svc.Status.LoadBalancer.Ingress[0])
+				err = validateIPInRange([]addressPool{pool}, ingressIP)
+				framework.ExpectNoError(err)
+
+				services = append(services, svc)
+				servicesIngressIP = append(servicesIngressIP, ingressIP)
+
+				for j := 0; j <= i; j++ {
+					ginkgo.By(fmt.Sprintf("validate service %d IP didn't change", j+1))
+					ip := e2eservice.GetIngressPoint(&services[j].Status.LoadBalancer.Ingress[0])
+					framework.ExpectEqual(ip, servicesIngressIP[j])
+
+					ginkgo.By(fmt.Sprintf("checking connectivity of service %d to its external VIP", j+1))
+					for _, c := range frrContainers {
+						validateService(cs, svc, allNodes.Items, c)
+					}
+				}
+			}
+		},
+			table.Entry("IPV4", "192.168.10.0/24", "ipv4"),
+			table.Entry("IPV6", "fc00:f853:0ccd:e799::/116", "ipv6"))
+
+		table.DescribeTable("configure peers one by one and validate FRR paired with nodes", func(ipFamily string) {
+			for i, c := range frrContainers {
+				ginkgo.By("configure peer")
+				c.RouterConfig.IPFamily = ipFamily
+				c.NeighborConfig.IPFamily = ipFamily
+
+				configData := configFile{
+					Peers: peersForContainers([]*frrcontainer.FRR{c}, ipFamily),
+				}
+				err := updateConfigMap(cs, configData)
+				framework.ExpectNoError(err)
+
+				pairExternalFRRWithNodes(cs, c)
+
+				for j := 0; j <= i; j++ {
+					validateFRRPeeredWithNodes(cs, frrContainers[j])
+				}
+			}
+		},
+			table.Entry("IPV4", "ipv4"),
+			table.Entry("IPV6", "ipv6"))
+	})
 })
 
-func createServiceWithBackend(cs clientset.Interface, namespace string, tweak ...func(svc *corev1.Service)) (*corev1.Service, *e2eservice.TestJig) {
+func createServiceWithBackend(cs clientset.Interface, namespace string, jigName string, tweak ...func(svc *corev1.Service)) (*corev1.Service, *e2eservice.TestJig) {
 	var svc *corev1.Service
 	var err error
 
-	serviceName := "external-local-lb"
-	jig := e2eservice.NewTestJig(cs, namespace, serviceName)
+	jig := e2eservice.NewTestJig(cs, namespace, jigName)
 	timeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
 	svc, err = jig.CreateLoadBalancerService(timeout, func(svc *corev1.Service) {
 		tweakServicePort(svc)
