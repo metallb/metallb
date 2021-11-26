@@ -605,11 +605,6 @@ var _ = ginkgo.Describe("BGP", func() {
 			var servicesIngressIP []string
 			var pools []addressPool
 
-			for _, c := range frrContainers {
-				c.RouterConfig.IPFamily = ipFamily
-				c.NeighborConfig.IPFamily = ipFamily
-			}
-
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
 
@@ -635,14 +630,14 @@ var _ = ginkgo.Describe("BGP", func() {
 				}
 
 				for _, c := range frrContainers {
-					pairExternalFRRWithNodes(cs, c)
+					pairExternalFRRWithNodes(cs, c, ipFamily)
 				}
 
 				err = updateConfigMap(cs, configData)
 				framework.ExpectNoError(err)
 
 				for _, c := range frrContainers {
-					validateFRRPeeredWithNodes(cs, c)
+					validateFRRPeeredWithNodes(cs, c, ipFamily)
 				}
 
 				ginkgo.By(fmt.Sprintf("configure service number %d", i+1))
@@ -682,8 +677,6 @@ var _ = ginkgo.Describe("BGP", func() {
 		table.DescribeTable("configure peers one by one and validate FRR paired with nodes", func(ipFamily string) {
 			for i, c := range frrContainers {
 				ginkgo.By("configure peer")
-				c.RouterConfig.IPFamily = ipFamily
-				c.NeighborConfig.IPFamily = ipFamily
 
 				configData := configFile{
 					Peers: peersForContainers([]*frrcontainer.FRR{c}, ipFamily),
@@ -691,10 +684,10 @@ var _ = ginkgo.Describe("BGP", func() {
 				err := updateConfigMap(cs, configData)
 				framework.ExpectNoError(err)
 
-				pairExternalFRRWithNodes(cs, c)
+				pairExternalFRRWithNodes(cs, c, ipFamily)
 
 				for j := 0; j <= i; j++ {
-					validateFRRPeeredWithNodes(cs, frrContainers[j])
+					validateFRRPeeredWithNodes(cs, frrContainers[j], ipFamily)
 				}
 			}
 		},
