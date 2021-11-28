@@ -4,7 +4,6 @@ package collector
 
 import (
 	"fmt"
-	"os/exec"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -84,10 +83,4 @@ func getBGPNeighbors(frrCli func(args ...string) (string, error)) ([]*bgpfrr.Nei
 	}
 
 	return bgpfrr.ParseNeighbours(res)
-}
-
-func runVtysh(args ...string) (string, error) {
-	newArgs := append([]string{"-c"}, args...)
-	out, err := exec.Command("/usr/bin/vtysh", newArgs...).CombinedOutput()
-	return string(out), err
 }
