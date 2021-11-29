@@ -424,7 +424,7 @@ def bgp_dev_env(ip_family):
         '    docker rm -f $frr ; '
         'done', echo=True)
     run("docker run -d --privileged --network kind --rm --name frr --volume %s:/etc/frr "
-            "frrouting/frr:v7.5.1" % frr_volume_dir, echo=True)
+            "quay.io/frrouting/frr:stable_7.5" % frr_volume_dir, echo=True)
 
     if ip_family == "ipv4":
         peer_address = run('docker inspect -f "{{ '
