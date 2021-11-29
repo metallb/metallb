@@ -24,6 +24,8 @@ import (
 	"strings"
 	"syscall"
 
+	v1 "k8s.io/api/core/v1"
+
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
 	metallbcfg "go.universe.tf/metallb/internal/config"
@@ -32,7 +34,6 @@ import (
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/speakerlist"
 	"go.universe.tf/metallb/internal/version"
-	v1 "k8s.io/api/core/v1"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -56,6 +57,7 @@ type service interface {
 	UpdateStatus(svc *v1.Service) error
 	Infof(svc *v1.Service, desc, msg string, args ...interface{})
 	Errorf(svc *v1.Service, desc, msg string, args ...interface{})
+	HasExcludeLBLabel(nodeName string) (bool, error)
 }
 
 func main() {
@@ -162,6 +164,9 @@ func main() {
 		os.Exit(1)
 	}
 	ctrl.client = client
+	for _, ctrlImpl := range ctrl.protocols {
+		ctrlImpl.setService(client)
+	}
 
 	sList.Start(client)
 	defer sList.Stop()
@@ -433,6 +438,7 @@ type Protocol interface {
 	SetBalancer(log.Logger, string, []net.IP, *config.Pool) error
 	DeleteBalancer(log.Logger, string, string) error
 	SetNode(log.Logger, *v1.Node) error
+	setService(service)
 }
 
 // Speakerlist represents a list of healthy speakers.

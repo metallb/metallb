@@ -54,6 +54,11 @@ type bgpController struct {
 	svcAds         map[string][]*bgp.Advertisement
 	bgpType        bgpImplementation
 	sessionManager bgp.SessionManager
+	service        service
+}
+
+func (c *bgpController) setService(svc service) {
+	c.service = svc
 }
 
 func (c *bgpController) SetConfig(l log.Logger, cfg *config.Config) error {
@@ -183,10 +188,12 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 		// First, determine if the peering should be active for this
 		// node.
 		shouldRun := false
-		for _, ns := range p.cfg.NodeSelectors {
-			if ns.Matches(c.nodeLabels) {
-				shouldRun = true
-				break
+		if ok, _ := c.service.HasExcludeLBLabel(c.myNode); !ok {
+			for _, ns := range p.cfg.NodeSelectors {
+				if ns.Matches(c.nodeLabels) {
+					shouldRun = true
+					break
+				}
 			}
 		}
 

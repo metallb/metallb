@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"time"
 
 	"go.universe.tf/metallb/internal/config"
 
@@ -28,6 +29,10 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
 	"k8s.io/client-go/util/workqueue"
+)
+
+const (
+	LabelNodeExcludeBalancers = "node.kubernetes.io/exclude-from-external-load-balancers"
 )
 
 // Client watches a Kubernetes cluster and translates events into
@@ -581,6 +586,22 @@ func (c *Client) sync(key interface{}) SyncState {
 	default:
 		panic(fmt.Errorf("unknown key type for %#v (%T)", key, key))
 	}
+}
+
+func (c *Client) HasExcludeLBLabel(nodeName string) (bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	node, err := c.client.CoreV1().Nodes().Get(ctx, nodeName, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+
+	if _, ok := node.Labels[LabelNodeExcludeBalancers]; ok {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func serviceKeyForSlice(endpointSlice *discovery.EndpointSlice) (svcKey, error) {

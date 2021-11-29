@@ -197,6 +197,10 @@ func (s *testK8S) UpdateStatus(svc *v1.Service) error {
 	panic("never called")
 }
 
+func (s *testK8S) HasExcludeLBLabel(nodeName string) (bool, error) {
+	return false, nil
+}
+
 func (s *testK8S) Infof(_ *v1.Service, evtType string, msg string, args ...interface{}) {
 	s.t.Logf("k8s Info event %q: %s", evtType, fmt.Sprintf(msg, args...))
 }

@@ -31,6 +31,11 @@ type layer2Controller struct {
 	announcer *layer2.Announce
 	myNode    string
 	sList     SpeakerList
+	service   service
+}
+
+func (c *layer2Controller) setService(svc service) {
+	c.service = svc
 }
 
 func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
