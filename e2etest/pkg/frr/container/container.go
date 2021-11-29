@@ -142,11 +142,13 @@ func (c *FRR) UpdateBGPConfigFile(bgpConfig string) error {
 		return errors.Wrapf(err, "Failed to reload BGP config file")
 	}
 
-	out, err := c.Exec("vtysh", "-c", "show running-config")
-	if err != nil {
-		errors.Wrapf(err, "Failed exec show running config %s", out)
-	}
-	fmt.Println("DEBUG", out)
+	/*
+		out, err := c.Exec("vtysh", "-c", "show running-config")
+		if err != nil {
+			errors.Wrapf(err, "Failed exec show running config %s", out)
+		}
+		fmt.Println("DEBUG", out)
+	*/
 
 	return nil
 }
