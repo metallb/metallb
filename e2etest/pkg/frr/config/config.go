@@ -20,6 +20,8 @@ import (
 const bgpConfigTemplate = `
 password zebra
 
+frr version 7.5.1
+
 debug bgp updates
 debug bgp neighbor
 
