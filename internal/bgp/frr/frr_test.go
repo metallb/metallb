@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"go.universe.tf/metallb/internal/bgp"
+	"go.universe.tf/metallb/internal/config"
 )
 
 const testData = "testdata/"
@@ -180,10 +181,15 @@ func TestSingleAdvertisement(t *testing.T) {
 		IP:   net.ParseIP("172.16.1.10"),
 		Mask: classCMask,
 	}
-
+	communities := []uint32{}
+	community, _ := config.ParseCommunity("1111:2222")
+	communities = append(communities, community)
+	community, _ = config.ParseCommunity("3333:4444")
+	communities = append(communities, community)
 	adv := &bgp.Advertisement{
-		Prefix:  prefix,
-		NextHop: net.ParseIP("10.1.1.1"),
+		Prefix:      prefix,
+		NextHop:     net.ParseIP("10.1.1.1"),
+		Communities: communities,
 	}
 
 	err = session.Set(adv)
@@ -392,10 +398,13 @@ func TestTwoAdvertisements(t *testing.T) {
 		IP:   net.ParseIP("172.16.1.10"),
 		Mask: classCMask,
 	}
-
+	communities := []uint32{}
+	community, _ := config.ParseCommunity("1111:2222")
+	communities = append(communities, community)
 	adv1 := &bgp.Advertisement{
-		Prefix:  prefix1,
-		NextHop: net.ParseIP("10.1.1.1"),
+		Prefix:      prefix1,
+		NextHop:     net.ParseIP("10.1.1.1"),
+		Communities: communities,
 	}
 
 	prefix2 := &net.IPNet{

@@ -293,7 +293,7 @@ func Parse(bs []byte, validate Validate) (*Config, error) {
 
 	communities := map[string]uint32{}
 	for n, v := range raw.BGPCommunities {
-		c, err := parseCommunity(v)
+		c, err := ParseCommunity(v)
 		if err != nil {
 			return nil, fmt.Errorf("parsing community %q: %s", n, err)
 		}
@@ -539,7 +539,7 @@ func parseBGPAdvertisements(ads []bgpAdvertisement, cidrs []*net.IPNet, communit
 			if v, ok := communities[c]; ok {
 				ad.Communities[v] = true
 			} else {
-				v, err := parseCommunity(c)
+				v, err := ParseCommunity(c)
 				if err != nil {
 					return nil, fmt.Errorf("invalid community %q in BGP advertisement: %s", c, err)
 				}
@@ -553,7 +553,7 @@ func parseBGPAdvertisements(ads []bgpAdvertisement, cidrs []*net.IPNet, communit
 	return ret, nil
 }
 
-func parseCommunity(c string) (uint32, error) {
+func ParseCommunity(c string) (uint32, error) {
 	fs := strings.Split(c, ":")
 	if len(fs) != 2 {
 		return 0, fmt.Errorf("invalid community string %q", c)
@@ -568,6 +568,12 @@ func parseCommunity(c string) (uint32, error) {
 	}
 
 	return (uint32(a) << 16) + uint32(b), nil
+}
+
+func CommunityToString(c uint32) string {
+	upperVal := c >> 16
+	lowerVal := c & 0xFFFF
+	return fmt.Sprintf("%d:%d", upperVal, lowerVal)
 }
 
 func ParseCIDR(cidr string) ([]*net.IPNet, error) {
