@@ -20,11 +20,11 @@ manifests, using Kustomize, or using Helm.
 
 If you're using kube-proxy in IPVS mode, since Kubernetes v1.14.2 you have to enable strict ARP mode.
 
-*Note, you don't need this if you're using kube-router as service-proxy because it is enabling strict arp by default.*
+*Note, you don't need this if you're using kube-router as service-proxy because it is enabling strict ARP by default.*
 
 You can achieve this by editing kube-proxy config in current cluster:
 
-```shell
+```bash
 kubectl edit configmap -n kube-system kube-proxy
 ```
 
@@ -42,7 +42,7 @@ You can also add this configuration snippet to your kubeadm-config, just append 
 
 If you are trying to automate this change, these shell snippets may help you:
 
-```shell
+```bash
 # see what changes would be made, returns nonzero returncode if different
 kubectl get configmap kube-proxy -n kube-system -o yaml | \
 sed -e "s/strictARP: false/strictARP: true/" | \
@@ -58,7 +58,7 @@ kubectl apply -f - -n kube-system
 
 To install MetalLB, apply the manifest:
 
-```shell
+```bash
 kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifests/namespace.yaml
 kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifests/metallb.yaml
 ```
@@ -83,8 +83,8 @@ you
 ## Installation with kustomize
 
 You can install MetalLB with
-[kustomize](https://github.com/kubernetes-sigs/kustomize) by pointing
-on the remote kustomization fle :
+[Kustomize](https://github.com/kubernetes-sigs/kustomize) by pointing
+at the remote kustomization file :
 
 ```yaml
 # kustomization.yml
@@ -97,12 +97,12 @@ resources:
 
 If you want to use a
 [configMapGenerator](https://github.com/kubernetes-sigs/kustomize/blob/master/examples/configGeneration.md)
-for config file, you want to tell kustomize not to append a hash to
-the configMap, as MetalLB is waiting for a configMap named `config`
+for config file, you want to tell Kustomize not to append a hash to
+the config map, as MetalLB is waiting for a config map named `config`
 (see
-[https://github.com/kubernetes-sigs/kustomize/blob/master/examples/generatorOptions.md](https://github.com/kubernetes-sigs/kustomize/blob/master/examples/generatorOptions.md)):
+<https://github.com/kubernetes-sigs/kustomize/blob/master/examples/generatorOptions.md>):
 
-```
+```yaml
 # kustomization.yml
 namespace: metallb-system
 
@@ -120,20 +120,22 @@ generatorOptions:
 
 ## Installation with Helm
 
-You can install MetallLB with [helm](https://helm.sh/)
-by using the helm chart repository: https://metallb.github.io/metallb
+You can install MetallLB with [Helm](https://helm.sh/)
+by using the Helm chart repository: `https://metallb.github.io/metallb`
 
-```yaml
+```bash
 helm repo add metallb https://metallb.github.io/metallb
 helm install metallb metallb/metallb
 ```
 
-A values file may be specified on installation. This is recommended for providing configs in helm values:
-```yaml
+A values file may be specified on installation. This is recommended for providing configs in Helm values:
+
+```bash
 helm install metallb metallb/metallb -f values.yaml
 ```
 
-MetalLB configs are set in values.yaml under `configInLine`:
+MetalLB configs are set in `values.yaml` under `configInLine`:
+
 ```yaml
 configInline:
   address-pools:
@@ -150,7 +152,7 @@ to see the changes and required actions, if any. Pay special attention to the re
 upgrading to newer major/minor releases.
 
 Unless specified otherwise in the release notes, upgrade MetalLB either using
-[plain manifests](#installation-by-manifest) or using [kustomize](#installation-with-kustomize) as
+[plain manifests](#installation-by-manifest) or using [Kustomize](#installation-with-kustomize) as
 described above.
 
 Please take the known limitations for [layer2](https://metallb.universe.tf/concepts/layer2/#limitations)

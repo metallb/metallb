@@ -1,3 +1,5 @@
+// SPDX-License-Identifier:Apache-2.0
+
 package config
 
 import (
@@ -35,7 +37,8 @@ func TestParse(t *testing.T) {
 			desc: "empty config",
 			raw:  "",
 			want: &Config{
-				Pools: map[string]*Pool{},
+				Pools:       map[string]*Pool{},
+				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
 
@@ -78,6 +81,7 @@ address-pools:
     localpref: 100
     communities: ["bar", "1234:2345"]
   - aggregation-length: 24
+    aggregation-length-v6: 64
 - name: pool2
   protocol: bgp
   addresses:
@@ -88,6 +92,7 @@ address-pools:
   - 40.0.0.0/25
   - 40.0.0.150-40.0.0.200
   - 40.0.0.210 - 40.0.0.240
+  - 40.0.0.250 - 40.0.0.250
 - name: pool4
   protocol: layer2
   addresses:
@@ -102,6 +107,7 @@ address-pools:
 						SrcAddr:       net.ParseIP("10.20.30.40"),
 						Port:          1179,
 						HoldTime:      180 * time.Second,
+						KeepaliveTime: 60 * time.Second,
 						RouterID:      net.ParseIP("10.20.30.40"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
@@ -111,6 +117,7 @@ address-pools:
 						Addr:          net.ParseIP("2.3.4.5"),
 						Port:          179,
 						HoldTime:      90 * time.Second,
+						KeepaliveTime: 30 * time.Second,
 						NodeSelectors: []labels.Selector{selector("bar in (quux),foo=bar")},
 					},
 				},
@@ -122,16 +129,18 @@ address-pools:
 						AutoAssign:    false,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
-								AggregationLength: 32,
-								LocalPref:         100,
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           100,
 								Communities: map[uint32]bool{
 									0xfc0004d2: true,
 									0x04D20929: true,
 								},
 							},
 							{
-								AggregationLength: 24,
-								Communities:       map[uint32]bool{},
+								AggregationLength:   24,
+								AggregationLengthV6: 64,
+								Communities:         map[uint32]bool{},
 							},
 						},
 					},
@@ -141,8 +150,9 @@ address-pools:
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
-								AggregationLength: 32,
-								Communities:       map[uint32]bool{},
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[uint32]bool{},
 							},
 						},
 					},
@@ -160,6 +170,7 @@ address-pools:
 							ipnet("40.0.0.216/29"),
 							ipnet("40.0.0.224/28"),
 							ipnet("40.0.0.240/32"),
+							ipnet("40.0.0.250/32"),
 						},
 						AutoAssign: true,
 					},
@@ -169,6 +180,7 @@ address-pools:
 						AutoAssign: true,
 					},
 				},
+				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
 
@@ -188,10 +200,12 @@ peers:
 						Addr:          net.ParseIP("1.2.3.4"),
 						Port:          179,
 						HoldTime:      90 * time.Second,
+						KeepaliveTime: 30 * time.Second,
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*Pool{},
+				Pools:       map[string]*Pool{},
+				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
 
@@ -244,7 +258,6 @@ peers:
   hold-time: 1s
 `,
 		},
-
 		{
 			desc: "invalid router ID",
 			raw: `
@@ -272,10 +285,12 @@ peers:
 						Addr:          net.ParseIP("1.2.3.4"),
 						Port:          179,
 						HoldTime:      90 * time.Second,
+						KeepaliveTime: 30 * time.Second,
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*Pool{},
+				Pools:       map[string]*Pool{},
+				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
 
@@ -399,6 +414,7 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
+  protocol: bgp
   addresses:
   - 100.200.300.400/24
 `,
@@ -409,8 +425,20 @@ address-pools:
 			raw: `
 address-pools:
 - name: pool1
+  protocol: bgp
   addresses:
   - 1.2.3.0/33
+`,
+		},
+
+		{
+			desc: "invalid pool CIDR, first address of the range is after the second",
+			raw: `
+address-pools:
+- name: pool1
+  protocol: bgp
+  addresses:
+  - 1.2.3.10-1.2.3.1
 `,
 		},
 
@@ -432,12 +460,14 @@ address-pools:
 						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
-								AggregationLength: 32,
-								Communities:       map[uint32]bool{},
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[uint32]bool{},
 							},
 						},
 					},
 				},
+				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
 
@@ -457,12 +487,14 @@ address-pools:
 						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
-								AggregationLength: 32,
-								Communities:       map[uint32]bool{},
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[uint32]bool{},
 							},
 						},
 					},
 				},
+				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
 
@@ -616,11 +648,151 @@ address-pools:
   - communities: ["flarb"]
 `,
 		},
+		{
+			desc: "Session with default BFD Profile",
+			raw: `
+address-pools:
+- name: pool1
+  addresses: ["1.2.3.0/24"]
+  protocol: bgp
+bfd-profiles:
+- name: default
+peers:
+- my-asn: 42
+  peer-asn: 42
+  peer-address: 1.2.3.4
+  bfd-profile: default
+`,
+			want: &Config{
+				Peers: []*Peer{
+					{
+						MyASN:         42,
+						ASN:           42,
+						Addr:          net.ParseIP("1.2.3.4"),
+						Port:          179,
+						HoldTime:      90 * time.Second,
+						KeepaliveTime: 30 * time.Second,
+						NodeSelectors: []labels.Selector{labels.Everything()},
+						BFDProfile:    "default",
+					},
+				},
+				Pools: map[string]*Pool{
+					"pool1": {
+						Protocol:   BGP,
+						AutoAssign: true,
+						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[uint32]bool{},
+							},
+						},
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{
+					"default": {
+						Name: "default",
+					},
+				},
+			},
+		},
+		{
+			desc: "Peer with non existing BFD Profile",
+			raw: `
+address-pools:
+- name: pool1
+  addresses: ["1.2.3.0/24"]
+  protocol: bgp
+bfd-profiles:
+- name: default
+peers:
+- my-asn: 42
+  peer-asn: 42
+  peer-address: 1.2.3.4
+  bfd-profile: zzz
+`,
+		},
+		{
+			desc: "Multiple BFD Profiles with the same name",
+			raw: `
+address-pools:
+- name: pool1
+  addresses: ["1.2.3.0/24"]
+  protocol: bgp
+bfd-profiles:
+- name: default
+- name: foo
+- name: foo
+`,
+		},
+		{
+			desc: "Session with nondefault BFD Profile",
+			raw: `
+address-pools:
+- name: pool1
+  addresses: ["1.2.3.0/24"]
+  protocol: bgp
+bfd-profiles:
+- name: nondefault
+  receive-interval: 50
+  transmit-interval: 51
+  detect-multiplier: 52
+  echo-interval: 54
+  echo-mode: true
+  passive-mode: true
+  minimum-ttl: 55
+`,
+			want: &Config{
+				Pools: map[string]*Pool{
+					"pool1": {
+						Protocol:   BGP,
+						AutoAssign: true,
+						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[uint32]bool{},
+							},
+						},
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{
+					"nondefault": {
+						Name:             "nondefault",
+						ReceiveInterval:  uint32Ptr(50),
+						DetectMultiplier: uint32Ptr(52),
+						TransmitInterval: uint32Ptr(51),
+						EchoInterval:     uint32Ptr(54),
+						MinimumTTL:       uint32Ptr(55),
+						EchoMode:         true,
+						PassiveMode:      true,
+					},
+				},
+			},
+		},
+		{
+			desc: "BFD Profile with too low receive interval",
+			raw: `
+bfd-profiles:
+- name: default
+  receive-interval: 2
+`,
+		},
+		{
+			desc: "BFD Profile with too high range receive interval",
+			raw: `
+bfd-profiles:
+- name: default
+  receive-interval: 90000
+`,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			got, err := Parse([]byte(test.raw))
+			got, err := Parse([]byte(test.raw), DontValidate)
 			if err != nil && test.want != nil {
 				t.Errorf("%q: parse failed: %s", test.desc, err)
 				return
@@ -652,4 +824,8 @@ address-pools:
 			}
 		})
 	}
+}
+
+func uint32Ptr(n uint32) *uint32 {
+	return &n
 }

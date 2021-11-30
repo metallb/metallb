@@ -1,3 +1,5 @@
+// SPDX-License-Identifier:Apache-2.0
+
 package layer2
 
 import (
@@ -9,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 )
 
 // Announce is used to "announce" new IPs mapped to the node's MAC address.
@@ -18,8 +21,8 @@ type Announce struct {
 	sync.RWMutex
 	arps     map[int]*arpResponder
 	ndps     map[int]*ndpResponder
-	ips      map[string]net.IP // svcName -> IP
-	ipRefcnt map[string]int    // ip.String() -> number of uses
+	ips      map[string][]net.IP // svcName -> IPs
+	ipRefcnt map[string]int      // ip.String() -> number of uses
 
 	// This channel can block - do not write to it while holding the mutex
 	// to avoid deadlocking.
@@ -32,7 +35,7 @@ func New(l log.Logger) (*Announce, error) {
 		logger:   l,
 		arps:     map[int]*arpResponder{},
 		ndps:     map[int]*ndpResponder{},
-		ips:      map[string]net.IP{},
+		ips:      map[string][]net.IP{},
 		ipRefcnt: map[string]int{},
 		spamCh:   make(chan net.IP, 1024),
 	}
@@ -52,7 +55,7 @@ func (a *Announce) interfaceScan() {
 func (a *Announce) updateInterfaces() {
 	ifs, err := net.Interfaces()
 	if err != nil {
-		a.logger.Log("op", "getInterfaces", "error", err, "msg", "couldn't list interfaces")
+		level.Error(a.logger).Log("op", "getInterfaces", "error", err, "msg", "couldn't list interfaces")
 		return
 	}
 
@@ -65,7 +68,7 @@ func (a *Announce) updateInterfaces() {
 		l := log.With(a.logger, "interface", ifi.Name)
 		addrs, err := ifi.Addrs()
 		if err != nil {
-			l.Log("op", "getAddresses", "error", err, "msg", "couldn't get addresses for interface")
+			level.Error(l).Log("op", "getAddresses", "error", err, "msg", "couldn't get addresses for interface")
 			return
 		}
 
@@ -102,20 +105,20 @@ func (a *Announce) updateInterfaces() {
 		if keepARP[ifi.Index] && a.arps[ifi.Index] == nil {
 			resp, err := newARPResponder(a.logger, &ifi, a.shouldAnnounce)
 			if err != nil {
-				l.Log("op", "createARPResponder", "error", err, "msg", "failed to create ARP responder")
+				level.Error(l).Log("op", "createARPResponder", "error", err, "msg", "failed to create ARP responder")
 				return
 			}
 			a.arps[ifi.Index] = resp
-			l.Log("event", "createARPResponder", "msg", "created ARP responder for interface")
+			level.Info(l).Log("event", "createARPResponder", "msg", "created ARP responder for interface")
 		}
 		if keepNDP[ifi.Index] && a.ndps[ifi.Index] == nil {
 			resp, err := newNDPResponder(a.logger, &ifi, a.shouldAnnounce)
 			if err != nil {
-				l.Log("op", "createNDPResponder", "error", err, "msg", "failed to create NDP responder")
+				level.Error(l).Log("op", "createNDPResponder", "error", err, "msg", "failed to create NDP responder")
 				return
 			}
 			a.ndps[ifi.Index] = resp
-			l.Log("event", "createNDPResponder", "msg", "created NDP responder for interface")
+			level.Info(l).Log("event", "createNDPResponder", "msg", "created NDP responder for interface")
 		}
 	}
 
@@ -123,14 +126,14 @@ func (a *Announce) updateInterfaces() {
 		if !keepARP[i] {
 			client.Close()
 			delete(a.arps, i)
-			a.logger.Log("interface", client.Interface(), "event", "deleteARPResponder", "msg", "deleted ARP responder for interface")
+			level.Info(a.logger).Log("interface", client.Interface(), "event", "deleteARPResponder", "msg", "deleted ARP responder for interface")
 		}
 	}
 	for i, client := range a.ndps {
 		if !keepNDP[i] {
 			client.Close()
 			delete(a.ndps, i)
-			a.logger.Log("interface", client.Interface(), "event", "deleteNDPResponder", "msg", "deleted NDP responder for interface")
+			level.Info(a.logger).Log("interface", client.Interface(), "event", "deleteNDPResponder", "msg", "deleted NDP responder for interface")
 		}
 	}
 }
@@ -154,8 +157,8 @@ func (a *Announce) spamLoop() {
 			m[ipStr] = time.Now().Add(5 * time.Second)
 			if !ok {
 				// Spam right away to avoid waiting up to 1100 milliseconds even if
-				// it means we call spam() twice in a row in a short amount of time.
-				a.spam(ip)
+				// it means we call gratuitous() twice in a row in a short amount of time.
+				a.gratuitous(ip)
 			}
 		case now := <-ticker.C:
 			for ipStr, until := range m {
@@ -163,7 +166,7 @@ func (a *Announce) spamLoop() {
 					// We have spammed enough - remove the IP from the map.
 					delete(m, ipStr)
 				} else {
-					a.spam(net.ParseIP(ipStr))
+					a.gratuitous(net.ParseIP(ipStr))
 				}
 			}
 			if len(m) == 0 {
@@ -177,43 +180,39 @@ func (a *Announce) doSpam(ip net.IP) {
 	a.spamCh <- ip
 }
 
-func (a *Announce) spam(ip net.IP) {
-	if err := a.gratuitous(ip); err != nil {
-		a.logger.Log("op", "gratuitousAnnounce", "error", err, "ip", ip, "msg", "failed to make gratuitous IP announcement")
-	}
-}
-
-func (a *Announce) gratuitous(ip net.IP) error {
+func (a *Announce) gratuitous(ip net.IP) {
 	a.RLock()
 	defer a.RUnlock()
 
 	if a.ipRefcnt[ip.String()] <= 0 {
 		// We've lost control of the IP, someone else is
 		// doing announcements.
-		return nil
+		return
 	}
+
 	if ip.To4() != nil {
 		for _, client := range a.arps {
 			if err := client.Gratuitous(ip); err != nil {
-				return err
+				level.Error(a.logger).Log("op", "gratuitousAnnounce", "error", err, "ip", ip, "msg", "failed to make gratuitous ARP announcement")
 			}
 		}
 	} else {
 		for _, client := range a.ndps {
 			if err := client.Gratuitous(ip); err != nil {
-				return err
+				level.Error(a.logger).Log("op", "gratuitousAnnounce", "error", err, "ip", ip, "msg", "failed to make gratuitous NDP announcement")
 			}
 		}
 	}
-	return nil
 }
 
 func (a *Announce) shouldAnnounce(ip net.IP) dropReason {
 	a.RLock()
 	defer a.RUnlock()
-	for _, i := range a.ips {
-		if i.Equal(ip) {
-			return dropReasonNone
+	for _, ips := range a.ips {
+		for _, i := range ips {
+			if i.Equal(ip) {
+				return dropReasonNone
+			}
 		}
 	}
 	return dropReasonAnnounceIP
@@ -228,10 +227,15 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 
 	// Kubernetes may inform us that we should advertise this address multiple
 	// times, so just no-op any subsequent requests.
-	if _, ok := a.ips[name]; ok {
-		return
+	if ips, ok := a.ips[name]; ok {
+		for i, ip := range ips {
+			if ip.Equal(a.ips[name][i]) {
+				continue
+			}
+		}
 	}
-	a.ips[name] = ip
+
+	a.ips[name] = append(a.ips[name], ip)
 
 	a.ipRefcnt[ip.String()]++
 	if a.ipRefcnt[ip.String()] > 1 {
@@ -242,7 +246,7 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 
 	for _, client := range a.ndps {
 		if err := client.Watch(ip); err != nil {
-			a.logger.Log("op", "watchMulticastGroup", "error", err, "ip", ip, "msg", "failed to watch NDP multicast group for IP, NDP responder will not respond to requests for this address")
+			level.Error(a.logger).Log("op", "watchMulticastGroup", "error", err, "ip", ip, "msg", "failed to watch NDP multicast group for IP, NDP responder will not respond to requests for this address")
 		}
 	}
 }
@@ -252,22 +256,23 @@ func (a *Announce) DeleteBalancer(name string) {
 	a.Lock()
 	defer a.Unlock()
 
-	ip, ok := a.ips[name]
+	ips, ok := a.ips[name]
 	if !ok {
 		return
 	}
 	delete(a.ips, name)
+	for _, ip := range ips {
+		a.ipRefcnt[ip.String()]--
+		if a.ipRefcnt[ip.String()] > 0 {
+			// Another service is still using this IP, don't touch any
+			// more things.
+			return
+		}
 
-	a.ipRefcnt[ip.String()]--
-	if a.ipRefcnt[ip.String()] > 0 {
-		// Another service is still using this IP, don't touch any
-		// more things.
-		return
-	}
-
-	for _, client := range a.ndps {
-		if err := client.Unwatch(ip); err != nil {
-			a.logger.Log("op", "unwatchMulticastGroup", "error", err, "ip", ip, "msg", "failed to unwatch NDP multicast group for IP")
+		for _, client := range a.ndps {
+			if err := client.Unwatch(ip); err != nil {
+				level.Error(a.logger).Log("op", "unwatchMulticastGroup", "error", err, "ip", ip, "msg", "failed to unwatch NDP multicast group for IP")
+			}
 		}
 	}
 

@@ -338,6 +338,7 @@ spec:
       - args:
         - --port=7472
         - --config=config
+        - --log-level=info
         env:
         - name: METALLB_NODE_NAME
           valueFrom:
@@ -418,6 +419,7 @@ spec:
       - args:
         - --port=7472
         - --config=config
+        - --log-level=info
         env:
         - name: METALLB_ML_SECRET_NAME
           value: memberlist

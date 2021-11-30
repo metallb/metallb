@@ -16,33 +16,44 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"net"
 	"reflect"
 	"sort"
 	"strconv"
-	"time"
 
 	"go.universe.tf/metallb/internal/bgp"
+	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
+	bgpnative "go.universe.tf/metallb/internal/bgp/native"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
+	"github.com/pkg/errors"
+)
+
+type bgpImplementation string
+
+const (
+	bgpNative bgpImplementation = "native"
+	bgpFrr    bgpImplementation = "frr"
 )
 
 type peer struct {
-	cfg *config.Peer
-	bgp session
+	cfg     *config.Peer
+	session bgp.Session
 }
 
 type bgpController struct {
-	logger     log.Logger
-	myNode     string
-	nodeLabels labels.Set
-	peers      []*peer
-	svcAds     map[string][]*bgp.Advertisement
+	logger         log.Logger
+	myNode         string
+	nodeLabels     labels.Set
+	peers          []*peer
+	svcAds         map[string][]*bgp.Advertisement
+	bgpType        bgpImplementation
+	sessionManager bgp.SessionManager
 }
 
 func (c *bgpController) SetConfig(l log.Logger, cfg *config.Config) error {
@@ -72,14 +83,18 @@ newPeers:
 		if p == nil {
 			continue
 		}
-		l.Log("event", "peerRemoved", "peer", p.cfg.Addr, "reason", "removedFromConfig", "msg", "peer deconfigured, closing BGP session")
-		if p.bgp != nil {
-			if err := p.bgp.Close(); err != nil {
-				l.Log("op", "setConfig", "error", err, "peer", p.cfg.Addr, "msg", "failed to shut down BGP session")
+		level.Info(l).Log("event", "peerRemoved", "peer", p.cfg.Addr, "reason", "removedFromConfig", "msg", "peer deconfigured, closing BGP session")
+		if p.session != nil {
+			if err := p.session.Close(); err != nil {
+				level.Error(l).Log("op", "setConfig", "error", err, "peer", p.cfg.Addr, "msg", "failed to shut down BGP session")
 			}
 		}
 	}
 
+	err := c.syncBFDProfiles(cfg.BFDProfiles)
+	if err != nil {
+		return errors.Wrap(err, "failed to sync bfd profiles")
+	}
 	return c.syncPeers(l)
 }
 
@@ -136,7 +151,7 @@ func hasHealthyEndpoint(eps k8s.EpsOrSlices, filterNode func(*string) bool) bool
 	return false
 }
 
-func (c *bgpController) ShouldAnnounce(l log.Logger, name string, svc *v1.Service, eps k8s.EpsOrSlices) string {
+func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, svc *v1.Service, eps k8s.EpsOrSlices) string {
 	// Should we advertise?
 	// Yes, if externalTrafficPolicy is
 	//  Cluster && any healthy endpoint exists
@@ -176,27 +191,27 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 		}
 
 		// Now, compare current state to intended state, and correct.
-		if p.bgp != nil && !shouldRun {
+		if p.session != nil && !shouldRun {
 			// Oops, session is running but shouldn't be. Shut it down.
-			l.Log("event", "peerRemoved", "peer", p.cfg.Addr, "reason", "filteredByNodeSelector", "msg", "peer deconfigured, closing BGP session")
-			if err := p.bgp.Close(); err != nil {
-				l.Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to shut down BGP session")
+			level.Info(l).Log("event", "peerRemoved", "peer", p.cfg.Addr, "reason", "filteredByNodeSelector", "msg", "peer deconfigured, closing BGP session")
+			if err := p.session.Close(); err != nil {
+				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to shut down BGP session")
 			}
-			p.bgp = nil
-		} else if p.bgp == nil && shouldRun {
+			p.session = nil
+		} else if p.session == nil && shouldRun {
 			// Session doesn't exist, but should be running. Create
 			// it.
-			l.Log("event", "peerAdded", "peer", p.cfg.Addr, "msg", "peer configured, starting BGP session")
+			level.Info(l).Log("event", "peerAdded", "peer", p.cfg.Addr, "msg", "peer configured, starting BGP session")
 			var routerID net.IP
 			if p.cfg.RouterID != nil {
 				routerID = p.cfg.RouterID
 			}
-			s, err := newBGP(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.SrcAddr, p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.Password, c.myNode)
+			s, err := c.sessionManager.NewSession(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.SrcAddr, p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.KeepaliveTime, p.cfg.Password, c.myNode, p.cfg.BFDProfile)
 			if err != nil {
-				l.Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
+				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
 				errs++
 			} else {
-				p.bgp = s
+				p.session = s
 				needUpdateAds = true
 			}
 		}
@@ -204,7 +219,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 	if needUpdateAds {
 		// Some new sessions came up, resync advertisement state.
 		if err := c.updateAds(); err != nil {
-			l.Log("op", "updateAds", "error", err, "msg", "failed to update BGP advertisements")
+			level.Error(l).Log("op", "updateAds", "error", err, "msg", "failed to update BGP advertisements")
 			return err
 		}
 	}
@@ -214,30 +229,42 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 	return nil
 }
 
-func (c *bgpController) SetBalancer(l log.Logger, name string, lbIP net.IP, pool *config.Pool) error {
+func (c *bgpController) syncBFDProfiles(profiles map[string]*config.BFDProfile) error {
+	if len(profiles) == 0 {
+		return nil
+	}
+
+	return c.sessionManager.SyncBFDProfiles(profiles)
+}
+
+func (c *bgpController) SetBalancer(l log.Logger, name string, lbIPs []net.IP, pool *config.Pool) error {
 	c.svcAds[name] = nil
-	for _, adCfg := range pool.BGPAdvertisements {
-		m := net.CIDRMask(adCfg.AggregationLength, 32)
-		ad := &bgp.Advertisement{
-			Prefix: &net.IPNet{
-				IP:   lbIP.Mask(m),
-				Mask: m,
-			},
-			LocalPref: adCfg.LocalPref,
+	for _, lbIP := range lbIPs {
+		for _, adCfg := range pool.BGPAdvertisements {
+			m := net.CIDRMask(adCfg.AggregationLength, 32)
+			if lbIP.To4() == nil {
+				m = net.CIDRMask(adCfg.AggregationLengthV6, 128)
+			}
+			ad := &bgp.Advertisement{
+				Prefix: &net.IPNet{
+					IP:   lbIP.Mask(m),
+					Mask: m,
+				},
+				LocalPref: adCfg.LocalPref,
+			}
+			for comm := range adCfg.Communities {
+				ad.Communities = append(ad.Communities, comm)
+			}
+			sort.Slice(ad.Communities, func(i, j int) bool { return ad.Communities[i] < ad.Communities[j] })
+			c.svcAds[name] = append(c.svcAds[name], ad)
 		}
-		for comm := range adCfg.Communities {
-			ad.Communities = append(ad.Communities, comm)
-		}
-		sort.Slice(ad.Communities, func(i, j int) bool { return ad.Communities[i] < ad.Communities[j] })
-		c.svcAds[name] = append(c.svcAds[name], ad)
 	}
 
 	if err := c.updateAds(); err != nil {
 		return err
 	}
 
-	l.Log("event", "updatedAdvertisements", "numAds", len(c.svcAds[name]), "msg", "making advertisements using BGP")
-
+	level.Info(l).Log("event", "updatedAdvertisements", "numAds", len(c.svcAds[name]), "msg", "making advertisements using BGP")
 	return nil
 }
 
@@ -253,10 +280,10 @@ func (c *bgpController) updateAds() error {
 		allAds = append(allAds, ads...)
 	}
 	for _, peer := range c.peers {
-		if peer.bgp == nil {
+		if peer.session == nil {
 			continue
 		}
-		if err := peer.bgp.Set(allAds...); err != nil {
+		if err := peer.session.Set(allAds...); err != nil {
 			return err
 		}
 	}
@@ -271,11 +298,6 @@ func (c *bgpController) DeleteBalancer(l log.Logger, name, reason string) error 
 	return c.updateAds()
 }
 
-type session interface {
-	io.Closer
-	Set(advs ...*bgp.Advertisement) error
-}
-
 func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
 	nodeLabels := node.Labels
 	if nodeLabels == nil {
@@ -287,10 +309,18 @@ func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
 		return nil
 	}
 	c.nodeLabels = ns
-	l.Log("event", "nodeLabelsChanged", "msg", "Node labels changed, resyncing BGP peers")
+	level.Info(l).Log("event", "nodeLabelsChanged", "msg", "Node labels changed, resyncing BGP peers")
 	return c.syncPeers(l)
 }
 
-var newBGP = func(logger log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, hold time.Duration, password string, myNode string) (session, error) {
-	return bgp.New(logger, addr, srcAddr, myASN, routerID, asn, hold, password, myNode)
+// Create a new 'bgp.SessionManager' of type 'bgpType'.
+var newBGP = func(bgpType bgpImplementation, l log.Logger) bgp.SessionManager {
+	switch bgpType {
+	case bgpNative:
+		return bgpnative.NewSessionManager(l)
+	case bgpFrr:
+		return bgpfrr.NewSessionManager(l)
+	default:
+		panic(fmt.Sprintf("unsupported BGP implementation type: %s", bgpType))
+	}
 }

@@ -1,9 +1,14 @@
+// SPDX-License-Identifier:Apache-2.0
+
 package e2e
 
 import (
 	"fmt"
+	"net"
 	"os/exec"
 
+	"go.universe.tf/metallb/e2etest/pkg/executor"
+	internalconfig "go.universe.tf/metallb/internal/config"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -14,7 +19,7 @@ const (
 	retryLimit     = 4
 )
 
-// DescribeSvc logs the output of kubectl describe svc for the given namespace
+// DescribeSvc logs the output of kubectl describe svc for the given namespace.
 func DescribeSvc(ns string) {
 	framework.Logf("\nOutput of kubectl describe svc:\n")
 	desc, _ := framework.RunKubectl(
@@ -22,25 +27,14 @@ func DescribeSvc(ns string) {
 	framework.Logf(desc)
 }
 
-func runCommand(bgp bool, name string, args ...string) (string, error) {
-	if bgp {
-		// prepend "docker exec frr"
-		cmd := []string{"exec", "frr", name}
-		name = "docker"
-		args = append(cmd, args...)
-	}
-	out, err := exec.Command(name, args...).CombinedOutput()
-	return string(out), err
-}
-
-func wgetRetry(bgp bool, address string) error {
+func wgetRetry(address string, exc executor.Executor) error {
 	retrycnt := 0
 	code := 0
 	var err error
 
 	// Retry loop to handle wget NetworkFailure errors
 	for {
-		_, err = runCommand(bgp, "wget", "-O-", "-q", address, "-T", "60")
+		_, err = exc.Exec("wget", "-O-", "-q", address, "-T", "60")
 		if exitErr, ok := err.(*exec.ExitError); err != nil && ok {
 			code = exitErr.ExitCode()
 		} else {
@@ -56,23 +50,33 @@ func wgetRetry(bgp bool, address string) error {
 	return err
 }
 
-func tweakServicePort() func(svc *v1.Service) {
+func tweakServicePort(svc *v1.Service) {
 	if servicePodPort != 80 {
 		// if servicePodPort is non default, then change service spec.
-		return func(svc *v1.Service) {
-			svc.Spec.Ports[0].TargetPort = intstr.FromInt(int(servicePodPort))
-		}
+		svc.Spec.Ports[0].TargetPort = intstr.FromInt(int(servicePodPort))
 	}
-	return nil
 }
 
-func tweakRCPort() func(rc *v1.ReplicationController) {
+func tweakRCPort(rc *v1.ReplicationController) {
 	if servicePodPort != 80 {
-		return func(rc *v1.ReplicationController) {
-			// if servicePodPort is non default, then change pod's spec
-			rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", servicePodPort), fmt.Sprintf("--udp-port=%d", servicePodPort)}
-			rc.Spec.Template.Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Port = intstr.FromInt(int(servicePodPort))
+		// if servicePodPort is non default, then change pod's spec
+		rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", servicePodPort), fmt.Sprintf("--udp-port=%d", servicePodPort)}
+		rc.Spec.Template.Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Port = intstr.FromInt(int(servicePodPort))
+	}
+}
+
+func validateIPInRange(addressPools []addressPool, ip string) error {
+	input := net.ParseIP(ip)
+	for _, addressPool := range addressPools {
+		for _, address := range addressPool.Addresses {
+			cidrs, err := internalconfig.ParseCIDR(address)
+			framework.ExpectNoError(err)
+			for _, cidr := range cidrs {
+				if cidr.Contains(input) {
+					return nil
+				}
+			}
 		}
 	}
-	return nil
+	return fmt.Errorf("ip %s is not in AddressPool range", ip)
 }

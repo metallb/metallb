@@ -52,6 +52,10 @@
         "enabled": {
           "type": "boolean"
         },
+        "logLevel": {
+          "type": "string",
+          "enum": [ "all", "debug", "info", "warn", "error", "none" ]
+        },
         "image": {
           "type": "object",
           "properties": {
@@ -179,6 +183,8 @@
       "properties": {
         "scrapeAnnotations": { "type": "boolean" },
         "metricsPort": { "type": "integer" },
+        "serviceAccount": { "type": "string" },
+        "namespace": { "type": "string" },
         "podMonitor": {
           "description": "Prometheus Operator PodMonitors",
           "type": "object",
@@ -287,6 +293,9 @@
                   "type": "integer"
                 }
               }
+            },
+            "runtimeClassName": {
+              "type": "string"
             },
             "secretName": {
               "type": "string"

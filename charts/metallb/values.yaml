@@ -45,6 +45,14 @@ prometheus:
   # port both controller and speaker will listen on for metrics
   metricsPort: 7472
 
+  # the service account used by prometheus
+  # required when .Values.prometheus.podMonitor.enabled == true
+  serviceAccount: ""
+
+  # the namespace where prometheus is deployed
+  # required when .Values.prometheus.podMonitor.enabled == true
+  namespace: ""
+
   # Prometheus Operator PodMonitors
   podMonitor:
 
@@ -127,6 +135,8 @@ prometheus:
 # controller.
 controller:
   enabled: true
+  # -- Controller log level. Must be one of: `all`, `debug`, `info`, `warn`, `error` or `none`
+  logLevel: info
   image:
     repository: quay.io/metallb/controller
     tag:
@@ -170,6 +180,8 @@ controller:
 # daemonset.
 speaker:
   enabled: true
+  # -- Speaker log level. Must be one of: `all`, `debug`, `info`, `warn`, `error` or `none`
+  logLevel: info
   tolerateMaster: true
   memberlist:
     enabled: true
@@ -196,6 +208,8 @@ speaker:
   nodeSelector: {}
   tolerations: []
   affinity: {}
+  ## Selects which runtime class will be used by the pod.
+  # runtimeClassName:
   podAnnotations: {}
   livenessProbe:
     enabled: true

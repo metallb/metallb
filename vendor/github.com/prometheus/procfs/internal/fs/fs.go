@@ -25,6 +25,9 @@ const (
 
 	// DefaultSysMountPoint is the common mount point of the sys filesystem.
 	DefaultSysMountPoint = "/sys"
+
+	// DefaultConfigfsMountPoint is the common mount point of the configfs
+	DefaultConfigfsMountPoint = "/sys/kernel/config"
 )
 
 // FS represents a pseudo-filesystem, normally /proc or /sys, which provides an
@@ -36,10 +39,10 @@ type FS string
 func NewFS(mountPoint string) (FS, error) {
 	info, err := os.Stat(mountPoint)
 	if err != nil {
-		return "", fmt.Errorf("could not read %s: %s", mountPoint, err)
+		return "", fmt.Errorf("could not read %q: %w", mountPoint, err)
 	}
 	if !info.IsDir() {
-		return "", fmt.Errorf("mount point %s is not a directory", mountPoint)
+		return "", fmt.Errorf("mount point %q is not a directory", mountPoint)
 	}
 
 	return FS(mountPoint), nil

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier:Apache-2.0
+
 package layer2
 
 import "github.com/prometheus/client_golang/prometheus"

@@ -21,10 +21,12 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
+	metallbcfg "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/layer2"
 	"go.universe.tf/metallb/internal/logging"
@@ -32,7 +34,8 @@ import (
 	"go.universe.tf/metallb/internal/version"
 	v1 "k8s.io/api/core/v1"
 
-	gokitlog "github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -58,39 +61,48 @@ type service interface {
 func main() {
 	prometheus.MustRegister(announcing)
 
-	logger, err := logging.Init()
+	var (
+		config          = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
+		namespace       = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
+		kubeconfig      = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
+		host            = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
+		mlBindAddr      = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
+		mlBindPort      = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
+		mlLabels        = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
+		mlSecret        = flag.String("ml-secret-key", os.Getenv("METALLB_ML_SECRET_KEY"), "Secret key for MemberList (fast dead node detection)")
+		myNode          = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
+		port            = flag.Int("port", 7472, "HTTP listening port")
+		logLevel        = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", strings.Join(logging.Levels, ", ")))
+		disableEpSlices = flag.Bool("disable-epslices", false, "Disable the usage of EndpointSlices and default to Endpoints instead of relying on the autodiscovery mechanism")
+	)
+	flag.Parse()
+
+	// Note: Changing the MetalLB BGP implementation type should be considered
+	//       experimental.
+	bgpType, present := os.LookupEnv("METALLB_BGP_TYPE")
+	if !present {
+		bgpType = "native"
+	}
+
+	logger, err := logging.Init(*logLevel)
 	if err != nil {
 		fmt.Printf("failed to initialize logging: %s\n", err)
 		os.Exit(1)
 	}
 
-	var (
-		config     = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
-		namespace  = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
-		kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
-		host       = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
-		mlBindAddr = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
-		mlBindPort = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
-		mlLabels   = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
-		mlSecret   = flag.String("ml-secret-key", os.Getenv("METALLB_ML_SECRET_KEY"), "Secret key for MemberList (fast dead node detection)")
-		myNode     = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
-		port       = flag.Int("port", 7472, "HTTP listening port")
-	)
-	flag.Parse()
-
-	logger.Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "goversion", version.GoString(), "msg", "MetalLB speaker starting "+version.String())
+	level.Info(logger).Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "goversion", version.GoString(), "msg", "MetalLB speaker starting "+version.String())
 
 	if *namespace == "" {
 		bs, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 		if err != nil {
-			logger.Log("op", "startup", "msg", "Unable to get namespace from pod service account data, please specify --namespace or METALLB_NAMESPACE", "error", err)
+			level.Error(logger).Log("op", "startup", "msg", "Unable to get namespace from pod service account data, please specify --namespace or METALLB_NAMESPACE", "error", err)
 			os.Exit(1)
 		}
 		*namespace = string(bs)
 	}
 
 	if *myNode == "" {
-		logger.Log("op", "startup", "error", "must specify --node-name or METALLB_NODE_NAME", "msg", "missing configuration")
+		level.Error(logger).Log("op", "startup", "error", "must specify --node-name or METALLB_NODE_NAME", "msg", "missing configuration")
 		os.Exit(1)
 	}
 
@@ -99,11 +111,11 @@ func main() {
 		c1 := make(chan os.Signal, 1)
 		signal.Notify(c1, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGTERM)
 		<-c1
-		logger.Log("op", "shutdown", "msg", "starting shutdown")
+		level.Info(logger).Log("op", "shutdown", "msg", "starting shutdown")
 		signal.Stop(c1)
 		close(stopCh)
 	}()
-	defer logger.Log("op", "shutdown", "msg", "done")
+	defer level.Info(logger).Log("op", "shutdown", "msg", "done")
 
 	sList, err := speakerlist.New(logger, *myNode, *mlBindAddr, *mlBindPort, *mlSecret, *namespace, *mlLabels, stopCh)
 	if err != nil {
@@ -112,22 +124,29 @@ func main() {
 
 	// Setup all clients and speakers, config decides what is being done runtime.
 	ctrl, err := newController(controllerConfig{
-		MyNode: *myNode,
-		Logger: logger,
-		SList:  sList,
+		MyNode:  *myNode,
+		Logger:  logger,
+		SList:   sList,
+		bgpType: bgpImplementation(bgpType),
 	})
 	if err != nil {
-		logger.Log("op", "startup", "error", err, "msg", "failed to create MetalLB controller")
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create MetalLB controller")
 		os.Exit(1)
 	}
 
+	validateConfig := metallbcfg.DontValidate
+	if bgpType == "native" {
+		validateConfig = metallbcfg.DiscardFRROnly
+	}
+
 	client, err := k8s.New(&k8s.Config{
-		ProcessName:   "metallb-speaker",
-		ConfigMapName: *config,
-		ConfigMapNS:   *namespace,
-		NodeName:      *myNode,
-		Logger:        logger,
-		Kubeconfig:    *kubeconfig,
+		ProcessName:     "metallb-speaker",
+		ConfigMapName:   *config,
+		ConfigMapNS:     *namespace,
+		NodeName:        *myNode,
+		Logger:          logger,
+		Kubeconfig:      *kubeconfig,
+		DisableEpSlices: *disableEpSlices,
 
 		MetricsHost:   *host,
 		MetricsPort:   *port,
@@ -135,10 +154,11 @@ func main() {
 
 		ServiceChanged: ctrl.SetBalancer,
 		ConfigChanged:  ctrl.SetConfig,
+		ValidateConfig: validateConfig,
 		NodeChanged:    ctrl.SetNode,
 	})
 	if err != nil {
-		logger.Log("op", "startup", "error", err, "msg", "failed to create k8s client")
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create k8s client")
 		os.Exit(1)
 	}
 	ctrl.client = client
@@ -147,25 +167,28 @@ func main() {
 	defer sList.Stop()
 
 	if err := client.Run(stopCh); err != nil {
-		logger.Log("op", "startup", "error", err, "msg", "failed to run k8s client")
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to run k8s client")
 	}
 }
 
 type controller struct {
-	myNode string
+	myNode  string
+	bgpType bgpImplementation
 
 	config *config.Config
 	client service
 
 	protocols map[config.Proto]Protocol
 	announced map[string]config.Proto // service name -> protocol advertising it
-	svcIP     map[string]net.IP       // service name -> assigned IP
+	svcIPs    map[string][]net.IP     // service name -> assigned IPs
 }
 
 type controllerConfig struct {
 	MyNode string
-	Logger gokitlog.Logger
+	Logger log.Logger
 	SList  SpeakerList
+
+	bgpType bgpImplementation
 
 	// For testing only, and will be removed in a future release.
 	// See: https://github.com/metallb/metallb/issues/152.
@@ -175,9 +198,11 @@ type controllerConfig struct {
 func newController(cfg controllerConfig) (*controller, error) {
 	protocols := map[config.Proto]Protocol{
 		config.BGP: &bgpController{
-			logger: cfg.Logger,
-			myNode: cfg.MyNode,
-			svcAds: make(map[string][]*bgp.Advertisement),
+			logger:         cfg.Logger,
+			myNode:         cfg.MyNode,
+			svcAds:         make(map[string][]*bgp.Advertisement),
+			bgpType:        cfg.bgpType,
+			sessionManager: newBGP(cfg.bgpType, cfg.Logger),
 		},
 	}
 
@@ -195,15 +220,16 @@ func newController(cfg controllerConfig) (*controller, error) {
 
 	ret := &controller{
 		myNode:    cfg.MyNode,
+		bgpType:   cfg.bgpType,
 		protocols: protocols,
 		announced: map[string]config.Proto{},
-		svcIP:     map[string]net.IP{},
+		svcIPs:    map[string][]net.IP{},
 	}
 
 	return ret, nil
 }
 
-func (c *controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service, eps k8s.EpsOrSlices) k8s.SyncState {
+func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps k8s.EpsOrSlices) k8s.SyncState {
 	if svc == nil {
 		return c.deleteBalancer(l, name, "serviceDeleted")
 	}
@@ -212,36 +238,40 @@ func (c *controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
 		return c.deleteBalancer(l, name, "notLoadBalancer")
 	}
 
-	l.Log("event", "startUpdate", "msg", "start of service update")
-	defer l.Log("event", "endUpdate", "msg", "end of service update")
+	level.Debug(l).Log("event", "startUpdate", "msg", "start of service update")
+	defer level.Debug(l).Log("event", "endUpdate", "msg", "end of service update")
 
 	if c.config == nil {
-		l.Log("event", "noConfig", "msg", "not processing, still waiting for config")
+		level.Debug(l).Log("event", "noConfig", "msg", "not processing, still waiting for config")
 		return k8s.SyncStateSuccess
 	}
 
-	if len(svc.Status.LoadBalancer.Ingress) != 1 {
+	if len(svc.Status.LoadBalancer.Ingress) == 0 {
 		return c.deleteBalancer(l, name, "noIPAllocated")
 	}
 
-	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
-	if lbIP == nil {
-		l.Log("op", "setBalancer", "error", fmt.Sprintf("invalid LoadBalancer IP %q", svc.Status.LoadBalancer.Ingress[0].IP), "msg", "invalid IP allocated by controller")
-		return c.deleteBalancer(l, name, "invalidIP")
+	lbIPs := []net.IP{}
+	for i := range svc.Status.LoadBalancer.Ingress {
+		lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[i].IP)
+		if lbIP == nil {
+			level.Error(l).Log("op", "setBalancer", "error", fmt.Sprintf("invalid LoadBalancer IP %q", svc.Status.LoadBalancer.Ingress[i].IP), "msg", "invalid IP allocated by controller")
+			return c.deleteBalancer(l, name, "invalidIP")
+		}
+		lbIPs = append(lbIPs, lbIP)
 	}
 
-	l = gokitlog.With(l, "ip", lbIP)
+	l = log.With(l, "ips", lbIPs)
 
-	poolName := poolFor(c.config.Pools, lbIP)
+	poolName := poolFor(c.config.Pools, lbIPs)
 	if poolName == "" {
-		l.Log("op", "setBalancer", "error", "assigned IP not allowed by config", "msg", "IP allocated by controller not allowed by config")
+		level.Error(l).Log("op", "setBalancer", "error", "assigned IP not allowed by config", "msg", "IP allocated by controller not allowed by config")
 		return c.deleteBalancer(l, name, "ipNotAllowed")
 	}
 
-	l = gokitlog.With(l, "pool", poolName)
+	l = log.With(l, "pool", poolName)
 	pool := c.config.Pools[poolName]
 	if pool == nil {
-		l.Log("bug", "true", "msg", "internal error: allocated IP has no matching address pool")
+		level.Error(l).Log("bug", "true", "msg", "internal error: allocated IP has no matching address pool")
 		return c.deleteBalancer(l, name, "internalError")
 	}
 
@@ -251,74 +281,85 @@ func (c *controller) SetBalancer(l gokitlog.Logger, name string, svc *v1.Service
 		}
 	}
 
-	if svcIP, ok := c.svcIP[name]; ok && !lbIP.Equal(svcIP) {
+	if svcIPs, ok := c.svcIPs[name]; ok && !compareIPs(lbIPs, svcIPs) {
 		if st := c.deleteBalancer(l, name, "loadBalancerIPChanged"); st == k8s.SyncStateError {
 			return st
 		}
 	}
 
-	l = gokitlog.With(l, "protocol", pool.Protocol)
+	l = log.With(l, "protocol", pool.Protocol)
 	handler := c.protocols[pool.Protocol]
 	if handler == nil {
-		l.Log("bug", "true", "msg", "internal error: unknown balancer protocol!")
+		level.Error(l).Log("bug", "true", "msg", "internal error: unknown balancer protocol!")
 		return c.deleteBalancer(l, name, "internalError")
 	}
 
-	if deleteReason := handler.ShouldAnnounce(l, name, svc, eps); deleteReason != "" {
+	if deleteReason := handler.ShouldAnnounce(l, name, lbIPs, svc, eps); deleteReason != "" {
 		return c.deleteBalancer(l, name, deleteReason)
 	}
 
-	if err := handler.SetBalancer(l, name, lbIP, pool); err != nil {
-		l.Log("op", "setBalancer", "error", err, "msg", "failed to announce service")
+	if err := handler.SetBalancer(l, name, lbIPs, pool); err != nil {
+		level.Error(l).Log("op", "setBalancer", "error", err, "msg", "failed to announce service")
 		return k8s.SyncStateError
 	}
 
 	if c.announced[name] == "" {
 		c.announced[name] = pool.Protocol
-		c.svcIP[name] = lbIP
+		c.svcIPs[name] = lbIPs
 	}
 
-	announcing.With(prometheus.Labels{
-		"protocol": string(pool.Protocol),
-		"service":  name,
-		"node":     c.myNode,
-		"ip":       lbIP.String(),
-	}).Set(1)
-	l.Log("event", "serviceAnnounced", "msg", "service has IP, announcing")
+	for _, ip := range lbIPs {
+		announcing.With(prometheus.Labels{
+			"protocol": string(pool.Protocol),
+			"service":  name,
+			"node":     c.myNode,
+			"ip":       ip.String(),
+		}).Set(1)
+	}
+	level.Info(l).Log("event", "serviceAnnounced", "msg", "service has IP, announcing")
 	c.client.Infof(svc, "nodeAssigned", "announcing from node %q", c.myNode)
 
 	return k8s.SyncStateSuccess
 }
 
-func (c *controller) deleteBalancer(l gokitlog.Logger, name, reason string) k8s.SyncState {
+func (c *controller) deleteBalancer(l log.Logger, name, reason string) k8s.SyncState {
 	proto, ok := c.announced[name]
 	if !ok {
 		return k8s.SyncStateSuccess
 	}
 
 	if err := c.protocols[proto].DeleteBalancer(l, name, reason); err != nil {
-		l.Log("op", "deleteBalancer", "error", err, "msg", "failed to clear balancer state")
+		level.Error(l).Log("op", "deleteBalancer", "error", err, "msg", "failed to clear balancer state")
 		return k8s.SyncStateError
 	}
 
-	announcing.Delete(prometheus.Labels{
-		"protocol": string(proto),
-		"service":  name,
-		"node":     c.myNode,
-		"ip":       c.svcIP[name].String(),
-	})
+	for _, ip := range c.svcIPs[name] {
+		announcing.Delete(prometheus.Labels{
+			"protocol": string(proto),
+			"service":  name,
+			"node":     c.myNode,
+			"ips":      ip.String(),
+		})
+	}
 	delete(c.announced, name)
-	delete(c.svcIP, name)
+	delete(c.svcIPs, name)
 
-	l.Log("event", "serviceWithdrawn", "ip", c.svcIP[name], "reason", reason, "msg", "withdrawing service announcement")
+	level.Info(l).Log("event", "serviceWithdrawn", "ip", c.svcIPs[name], "reason", reason, "msg", "withdrawing service announcement")
 
 	return k8s.SyncStateSuccess
 }
 
-func poolFor(pools map[string]*config.Pool, ip net.IP) string {
+func poolFor(pools map[string]*config.Pool, ips []net.IP) string {
 	for pname, p := range pools {
-		for _, cidr := range p.CIDR {
-			if cidr.Contains(ip) {
+		cnt := 0
+		for _, ip := range ips {
+			for _, cidr := range p.CIDR {
+				if cidr.Contains(ip) {
+					cnt++
+					break
+				}
+			}
+			if cnt == len(ips) {
 				return pname
 			}
 		}
@@ -326,26 +367,47 @@ func poolFor(pools map[string]*config.Pool, ip net.IP) string {
 	return ""
 }
 
-func (c *controller) SetConfig(l gokitlog.Logger, cfg *config.Config) k8s.SyncState {
-	l.Log("event", "startUpdate", "msg", "start of config update")
-	defer l.Log("event", "endUpdate", "msg", "end of config update")
-
-	if cfg == nil {
-		l.Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
-		return k8s.SyncStateError
+func compareIPs(ips1, ips2 []net.IP) bool {
+	if len(ips1) != len(ips2) {
+		return false
 	}
 
-	for svc, ip := range c.svcIP {
+	for _, ip1 := range ips1 {
+		found := false
+		for _, ip2 := range ips2 {
+			if ip1.Equal(ip2) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
+}
+
+func (c *controller) SetConfig(l log.Logger, cfg *config.Config) k8s.SyncState {
+
+	level.Debug(l).Log("event", "startUpdate", "msg", "start of config update")
+	defer level.Debug(l).Log("event", "endUpdate", "msg", "end of config update")
+
+	if cfg == nil {
+		level.Error(l).Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
+		return k8s.SyncStateErrorNoRetry
+	}
+
+	for svc, ip := range c.svcIPs {
 		if pool := poolFor(cfg.Pools, ip); pool == "" {
-			l.Log("op", "setConfig", "service", svc, "ip", ip, "error", "service has no configuration under new config", "msg", "new configuration rejected")
+			level.Error(l).Log("op", "setConfig", "service", svc, "ip", ip, "error", "service has no configuration under new config", "msg", "new configuration rejected")
 			return k8s.SyncStateError
 		}
 	}
 
 	for proto, handler := range c.protocols {
 		if err := handler.SetConfig(l, cfg); err != nil {
-			l.Log("op", "setConfig", "protocol", proto, "error", err, "msg", "applying new configuration to protocol handler failed")
-			return k8s.SyncStateError
+			level.Error(l).Log("op", "setConfig", "protocol", proto, "error", err, "msg", "applying new configuration to protocol handler failed")
+			return k8s.SyncStateErrorNoRetry
 		}
 	}
 
@@ -354,10 +416,10 @@ func (c *controller) SetConfig(l gokitlog.Logger, cfg *config.Config) k8s.SyncSt
 	return k8s.SyncStateReprocessAll
 }
 
-func (c *controller) SetNode(l gokitlog.Logger, node *v1.Node) k8s.SyncState {
+func (c *controller) SetNode(l log.Logger, node *v1.Node) k8s.SyncState {
 	for proto, handler := range c.protocols {
 		if err := handler.SetNode(l, node); err != nil {
-			l.Log("op", "setNode", "error", err, "protocol", proto, "msg", "failed to propagate node info to protocol handler")
+			level.Error(l).Log("op", "setNode", "error", err, "protocol", proto, "msg", "failed to propagate node info to protocol handler")
 			return k8s.SyncStateError
 		}
 	}
@@ -366,11 +428,11 @@ func (c *controller) SetNode(l gokitlog.Logger, node *v1.Node) k8s.SyncState {
 
 // A Protocol can advertise an IP address.
 type Protocol interface {
-	SetConfig(gokitlog.Logger, *config.Config) error
-	ShouldAnnounce(gokitlog.Logger, string, *v1.Service, k8s.EpsOrSlices) string
-	SetBalancer(gokitlog.Logger, string, net.IP, *config.Pool) error
-	DeleteBalancer(gokitlog.Logger, string, string) error
-	SetNode(gokitlog.Logger, *v1.Node) error
+	SetConfig(log.Logger, *config.Config) error
+	ShouldAnnounce(log.Logger, string, []net.IP, *v1.Service, k8s.EpsOrSlices) string
+	SetBalancer(log.Logger, string, []net.IP, *config.Pool) error
+	DeleteBalancer(log.Logger, string, string) error
+	SetNode(log.Logger, *v1.Node) error
 }
 
 // Speakerlist represents a list of healthy speakers.

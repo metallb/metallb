@@ -26,6 +26,7 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | controller.livenessProbe.periodSeconds | int | `10` |  |
 | controller.livenessProbe.successThreshold | int | `1` |  |
 | controller.livenessProbe.timeoutSeconds | int | `1` |  |
+| controller.logLevel | string | `"info"` | Controller log level. Must be one of: `all`, `debug`, `info`, `warn`, `error` or `none` |
 | controller.nodeSelector | object | `{}` |  |
 | controller.podAnnotations | object | `{}` |  |
 | controller.readinessProbe.enabled | bool | `true` |  |
@@ -35,6 +36,9 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | controller.readinessProbe.successThreshold | int | `1` |  |
 | controller.readinessProbe.timeoutSeconds | int | `1` |  |
 | controller.resources | object | `{}` |  |
+| controller.securityContext.fsGroup | int | `65534` |  |
+| controller.securityContext.runAsNonRoot | bool | `true` |  |
+| controller.securityContext.runAsUser | int | `65534` |  |
 | controller.serviceAccount.annotations | object | `{}` |  |
 | controller.serviceAccount.create | bool | `true` |  |
 | controller.serviceAccount.name | string | `""` |  |
@@ -44,11 +48,13 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | imagePullSecrets | list | `[]` |  |
 | nameOverride | string | `""` |  |
 | prometheus.metricsPort | int | `7472` |  |
+| prometheus.podMonitor.additionalLabels | object | `{}` |  |
 | prometheus.podMonitor.enabled | bool | `false` |  |
 | prometheus.podMonitor.interval | string | `nil` |  |
 | prometheus.podMonitor.jobLabel | string | `"app.kubernetes.io/name"` |  |
 | prometheus.podMonitor.metricRelabelings | list | `[]` |  |
 | prometheus.podMonitor.relabelings | list | `[]` |  |
+| prometheus.prometheusRule.additionalLabels | object | `{}` |  |
 | prometheus.prometheusRule.addressPoolExhausted.enabled | bool | `true` |  |
 | prometheus.prometheusRule.addressPoolExhausted.labels.severity | string | `"alert"` |  |
 | prometheus.prometheusRule.addressPoolUsage.enabled | bool | `true` |  |
@@ -80,6 +86,7 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | speaker.livenessProbe.periodSeconds | int | `10` |  |
 | speaker.livenessProbe.successThreshold | int | `1` |  |
 | speaker.livenessProbe.timeoutSeconds | int | `1` |  |
+| speaker.logLevel | string | `"info"` | Speaker log level. Must be one of: `all`, `debug`, `info`, `warn`, `error` or `none` |
 | speaker.memberlist.enabled | bool | `true` |  |
 | speaker.memberlist.mlBindPort | int | `7946` |  |
 | speaker.nodeSelector | object | `{}` |  |

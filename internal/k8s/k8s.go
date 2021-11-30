@@ -1,3 +1,5 @@
+// SPDX-License-Identifier:Apache-2.0
+
 package k8s // import "go.universe.tf/metallb/internal/k8s"
 
 import (
@@ -6,11 +8,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 
 	"go.universe.tf/metallb/internal/config"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
@@ -50,6 +54,7 @@ type Client struct {
 
 	serviceChanged func(log.Logger, string, *v1.Service, EpsOrSlices) SyncState
 	configChanged  func(log.Logger, *config.Config) SyncState
+	validateConfig config.Validate
 	nodeChanged    func(log.Logger, *v1.Node) SyncState
 	synced         func(log.Logger)
 }
@@ -66,23 +71,28 @@ const (
 	// The update was accepted, but requires reprocessing all watched
 	// services.
 	SyncStateReprocessAll
+	// The update caused a non transient error, the k8s client should
+	// just report and giveup.
+	SyncStateErrorNoRetry
 )
 
 // Config specifies the configuration of the Kubernetes
 // client/watcher.
 type Config struct {
-	ProcessName   string
-	ConfigMapName string
-	ConfigMapNS   string
-	NodeName      string
-	MetricsHost   string
-	MetricsPort   int
-	ReadEndpoints bool
-	Logger        log.Logger
-	Kubeconfig    string
+	ProcessName     string
+	ConfigMapName   string
+	ConfigMapNS     string
+	NodeName        string
+	MetricsHost     string
+	MetricsPort     int
+	ReadEndpoints   bool
+	Logger          log.Logger
+	Kubeconfig      string
+	DisableEpSlices bool
 
 	ServiceChanged func(log.Logger, string, *v1.Service, EpsOrSlices) SyncState
 	ConfigChanged  func(log.Logger, *config.Config) SyncState
+	ValidateConfig config.Validate
 	NodeChanged    func(log.Logger, *v1.Node) SyncState
 	Synced         func(log.Logger)
 }
@@ -98,6 +108,7 @@ const slicesServiceIndexName = "ServiceName"
 //
 // The client uses processName to identify itself to the cluster
 // (e.g. when logging events).
+//nolint:godot
 func New(cfg *Config) (*Client, error) {
 	var (
 		k8sConfig *rest.Config
@@ -128,10 +139,11 @@ func New(cfg *Config) (*Client, error) {
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
 	c := &Client{
-		logger: cfg.Logger,
-		client: clientset,
-		events: recorder,
-		queue:  queue,
+		logger:         cfg.Logger,
+		client:         clientset,
+		events:         recorder,
+		queue:          queue,
+		validateConfig: cfg.ValidateConfig,
 	}
 
 	if cfg.ServiceChanged != nil {
@@ -162,7 +174,8 @@ func New(cfg *Config) (*Client, error) {
 		c.syncFuncs = append(c.syncFuncs, c.svcInformer.HasSynced)
 
 		if cfg.ReadEndpoints {
-			if !UseEndpointSlices(c.client) {
+			// use DisableEpSlices to skip the autodiscovery mechanism. Useful if EndpointSlices are enabled in the cluster but disabled in kube-proxy
+			if cfg.DisableEpSlices || !UseEndpointSlices(c.client) {
 				epHandlers := cache.ResourceEventHandlerFuncs{
 					AddFunc: func(obj interface{}) {
 						key, err := cache.MetaNamespaceKeyFunc(obj)
@@ -188,12 +201,12 @@ func New(cfg *Config) (*Client, error) {
 
 				c.syncFuncs = append(c.syncFuncs, c.epInformer.HasSynced)
 			} else {
-				c.logger.Log("op", "New", "msg", "using endpoint slices")
+				level.Info(c.logger).Log("op", "New", "msg", "using endpoint slices")
 				slicesHandlers := cache.ResourceEventHandlerFuncs{
 					AddFunc: func(obj interface{}) {
 						slice, ok := obj.(*discovery.EndpointSlice)
 						if !ok {
-							c.logger.Log("op", "SliceAdd", "error", "received a non EndpointSlice item")
+							level.Error(c.logger).Log("op", "SliceAdd", "error", "received a non EndpointSlice item")
 							return
 						}
 
@@ -206,12 +219,12 @@ func New(cfg *Config) (*Client, error) {
 					UpdateFunc: func(old interface{}, new interface{}) {
 						slice, ok := new.(*discovery.EndpointSlice)
 						if !ok {
-							c.logger.Log("op", "SliceUpdate", "error", "received a non EndpointSlice item")
+							level.Error(c.logger).Log("op", "SliceUpdate", "error", "received a non EndpointSlice item")
 							return
 						}
 						key, err := serviceKeyForSlice(slice)
 						if err != nil {
-							c.logger.Log("op", "SliceUpdate", "error", "failed to get serviceKey for slice", "slice", slice.Name)
+							level.Error(c.logger).Log("op", "SliceUpdate", "error", "failed to get serviceKey for slice", "slice", slice.Name)
 							return
 						}
 						c.queue.Add(key)
@@ -219,12 +232,12 @@ func New(cfg *Config) (*Client, error) {
 					DeleteFunc: func(obj interface{}) {
 						slice, ok := obj.(*discovery.EndpointSlice)
 						if !ok {
-							c.logger.Log("op", "SliceDelete", "error", "received a non EndpointSlice item")
+							level.Error(c.logger).Log("op", "SliceDelete", "error", "received a non EndpointSlice item")
 							return
 						}
 						key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(slice)
 						if err != nil {
-							c.logger.Log("op", "SliceDelete", "error", err)
+							level.Error(c.logger).Log("op", "SliceDelete", "error", err)
 							return
 						}
 						c.queue.Add(svcKey(key))
@@ -301,9 +314,9 @@ func New(cfg *Config) (*Client, error) {
 
 	http.Handle("/metrics", promhttp.Handler())
 	go func(l log.Logger) {
-		err := http.ListenAndServe(fmt.Sprintf("%s:%d", cfg.MetricsHost, cfg.MetricsPort), nil)
+		err := http.ListenAndServe(net.JoinHostPort(cfg.MetricsHost, fmt.Sprint(cfg.MetricsPort)), nil)
 		if err != nil {
-			l.Log("op", "listenAndServe", "err", err, "msg", "cannot listen and serve", "host", cfg.MetricsHost, "port", cfg.MetricsPort)
+			level.Error(l).Log("op", "listenAndServe", "err", err, "msg", "cannot listen and serve", "host", cfg.MetricsHost, "port", cfg.MetricsPort)
 		}
 	}(c.logger)
 
@@ -321,7 +334,7 @@ func (c *Client) CreateMlSecret(namespace, controllerDeploymentName, secretName 
 		return err
 	}
 	if len(l.Items) > 0 {
-		c.logger.Log("op", "CreateMlSecret", "msg", "secret already exists, nothing to do")
+		level.Debug(c.logger).Log("op", "CreateMlSecret", "msg", "secret already exists, nothing to do")
 		return nil
 	}
 
@@ -360,7 +373,7 @@ func (c *Client) CreateMlSecret(namespace, controllerDeploymentName, secretName 
 		},
 		metav1.CreateOptions{})
 	if err == nil {
-		c.logger.Log("op", "CreateMlSecret", "msg", "secret succesfully created")
+		level.Info(c.logger).Log("op", "CreateMlSecret", "msg", "secret succesfully created")
 	}
 	return err
 }
@@ -419,6 +432,7 @@ func (c *Client) Run(stopCh <-chan struct{}) error {
 		st := c.sync(key)
 		switch st {
 		case SyncStateSuccess:
+		case SyncStateErrorNoRetry:
 			c.queue.Forget(key)
 		case SyncStateError:
 			updateErrors.Inc()
@@ -430,7 +444,7 @@ func (c *Client) Run(stopCh <-chan struct{}) error {
 	}
 }
 
-// ForceSync reprocess all watched services
+// ForceSync reprocess all watched services.
 func (c *Client) ForceSync() {
 	if c.svcIndexer != nil {
 		for _, k := range c.svcIndexer.ListKeys() {
@@ -464,7 +478,7 @@ func (c *Client) sync(key interface{}) SyncState {
 		l := log.With(c.logger, "service", string(k))
 		svc, exists, err := c.svcIndexer.GetByKey(string(k))
 		if err != nil {
-			l.Log("op", "getService", "error", err, "msg", "failed to get service")
+			level.Error(l).Log("op", "getService", "error", err, "msg", "failed to get service")
 			return SyncStateError
 		}
 		if !exists {
@@ -475,7 +489,7 @@ func (c *Client) sync(key interface{}) SyncState {
 		if c.epIndexer != nil {
 			epsIntf, exists, err := c.epIndexer.GetByKey(string(k))
 			if err != nil {
-				l.Log("op", "getEndpoints", "error", err, "msg", "failed to get endpoints")
+				level.Error(l).Log("op", "getEndpoints", "error", err, "msg", "failed to get endpoints")
 				return SyncStateError
 			}
 			if !exists {
@@ -489,7 +503,7 @@ func (c *Client) sync(key interface{}) SyncState {
 		if c.slicesIndexer != nil {
 			slicesIntf, err := c.slicesIndexer.ByIndex(slicesServiceIndexName, string(k))
 			if err != nil {
-				l.Log("op", "getEndpointSlices", "error", err, "msg", "failed to get endpoints slices")
+				level.Error(l).Log("op", "getEndpointSlices", "error", err, "msg", "failed to get endpoints slices")
 				return SyncStateError
 			}
 			if len(slicesIntf) == 0 {
@@ -511,7 +525,7 @@ func (c *Client) sync(key interface{}) SyncState {
 		l := log.With(c.logger, "configmap", string(k))
 		cmi, exists, err := c.cmIndexer.GetByKey(string(k))
 		if err != nil {
-			l.Log("op", "getConfigMap", "error", err, "msg", "failed to get configmap")
+			level.Error(l).Log("op", "getConfigMap", "error", err, "msg", "failed to get configmap")
 			return SyncStateError
 		}
 		if !exists {
@@ -524,35 +538,35 @@ func (c *Client) sync(key interface{}) SyncState {
 		// config is not going to parse any better until the k8s
 		// object changes to fix the issue.
 		cm := cmi.(*v1.ConfigMap)
-		cfg, err := config.Parse([]byte(cm.Data["config"]))
+		cfg, err := config.Parse([]byte(cm.Data["config"]), c.validateConfig)
 		if err != nil {
-			l.Log("event", "configStale", "error", err, "msg", "config (re)load failed, config marked stale")
+			level.Error(l).Log("event", "configStale", "error", err, "msg", "config (re)load failed, config marked stale")
 			configStale.Set(1)
 			return SyncStateSuccess
 		}
 
 		st := c.configChanged(l, cfg)
-		if st == SyncStateError {
-			l.Log("event", "configStale", "error", err, "msg", "config (re)load failed, config marked stale")
+		if st == SyncStateErrorNoRetry || st == SyncStateError {
+			level.Error(l).Log("event", "configStale", "error", err, "msg", "config (re)load failed, config marked stale")
 			configStale.Set(1)
-			return SyncStateSuccess
+			return st
 		}
 
 		configLoaded.Set(1)
 		configStale.Set(0)
 
-		l.Log("event", "configLoaded", "msg", "config (re)loaded")
+		level.Info(l).Log("event", "configLoaded", "msg", "config (re)loaded")
 		return st
 
 	case nodeKey:
 		l := log.With(c.logger, "node", string(k))
 		n, exists, err := c.nodeIndexer.GetByKey(string(k))
 		if err != nil {
-			l.Log("op", "getNode", "error", err, "msg", "failed to get node")
+			level.Error(l).Log("op", "getNode", "error", err, "msg", "failed to get node")
 			return SyncStateError
 		}
 		if !exists {
-			l.Log("op", "getNode", "error", "node doesn't exist in k8s, but I'm running on it!")
+			level.Error(l).Log("op", "getNode", "error", "node doesn't exist in k8s, but I'm running on it!")
 			return SyncStateError
 		}
 		node := n.(*v1.Node)
@@ -600,7 +614,7 @@ func serviceNameForSlice(endpointSlice *discovery.EndpointSlice) (string, error)
 	return serviceName, nil
 }
 
-// UseEndpointSlices detect if Endpoints Slices are enabled in the cluster
+// UseEndpointSlices detect if Endpoints Slices are enabled in the cluster.
 func UseEndpointSlices(kubeClient kubernetes.Interface) bool {
 	if _, err := kubeClient.Discovery().ServerResourcesForGroupVersion(discovery.SchemeGroupVersion.String()); err != nil {
 		return false

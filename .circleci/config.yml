@@ -7,42 +7,49 @@ commands:
     steps:
       - checkout
       - run: sudo apt-get update
-      - run: sudo apt-get install python3-pip
+      - run: sudo apt-get install python3-pip arping ndisc6
       - run: sudo pip3 install invoke semver pyyaml
   setup_kind:
     description: "Install kind"
     steps:
-      - run: GO111MODULE="on" go get sigs.k8s.io/kind@v0.10.0
+      - run: GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
       - run: curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
       - run: sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 jobs:
   test-1-16:
-    docker:
-      - image: cimg/go:1.16
+    machine:
+      image: ubuntu-2004:202104-01
     steps:
       - setup_ci_image
       - run: inv test
       - run: cp manifests/metallb.yaml manifests/metallb.yaml.prev
-  e2etest-bgp:
+  e2etest:
+    parameters:
+      ip-family:
+        type: string
+      bgp-type:
+        type: string
     machine:
       image: ubuntu-2004:202104-01
     steps:
       - setup_ci_image
       - setup_kind
       - run: inv build
-      - run: inv dev-env -p bgp
-      - run: inv e2etest -e /tmp/kind_logs
-      - store_artifacts:
-          path: /tmp/kind_logs
-  e2etest-layer2:
-    machine:
-      image: ubuntu-2004:202104-01
-    steps:
-      - setup_ci_image
-      - setup_kind
-      - run: inv build
-      - run: inv dev-env -p layer2
-      - run: inv e2etest -e /tmp/kind_logs
+      - run: inv dev-env -i  << parameters.ip-family >> -b  << parameters.bgp-type >> -l all
+      - run: |
+          SKIP="none"
+          if [ "<< parameters.bgp-type >>" = "native" ]; then SKIP="$SKIP\|FRR\|BFD\|DUALSTACK"; fi
+          if [ "<< parameters.ip-family >>" = "ipv4" ]; then SKIP="$SKIP\|IPV6\|DUALSTACK"; fi
+          if [ "<< parameters.ip-family >>" = "dual" ]; then SKIP="$SKIP\|IPV6"; fi
+          if [ "<< parameters.ip-family >>" = "ipv6" ]; then SKIP="$SKIP\|IPV4\|DUALSTACK"; fi
+          if [ "<< parameters.ip-family >>" = "ipv6" ] && [ "<< parameters.bgp-type >>" = "native" ]; then SKIP="$SKIP\|BGP"; fi # we are skipping BGP for ipv6 for native bgp stack
+          echo "Skipping $SKIP"
+          # `-E env "PATH=$PATH"` bypasses commands not found under sudo, `sudo` needed because arping requires CAP_NET_RAW
+          sudo -E env "PATH=$PATH" inv e2etest --skip $SKIP -e /tmp/kind_logs
+      - run:
+          name: Change permissions for kind logs
+          command: sudo chmod -R o+r /tmp/kind_logs # logs are exported under root (sudo), chmod required to upload the artifacts.
+          when: always
       - store_artifacts:
           path: /tmp/kind_logs
   lint-1-16:
@@ -52,6 +59,7 @@ jobs:
       - setup_ci_image
       - run: inv checkpatch
       - run: inv lint -e host
+      - run: inv verifylicense
   # FIXME: this is pinned to v3.0.0 because subsequent versions of ct pull in new versions of helm, which are subject
   #        to this bug: https://github.com/helm/helm/issues/8835, specifically for rbac object names with ':' in them
   helm-lint:
@@ -75,6 +83,8 @@ jobs:
   publish-images:
     docker:
       - image: cimg/go:1.16
+    environment:
+      - DOCKER_BUILD_CMD: "docker buildx build --load"
     steps:
       # This job should not run against PRs, but we have seen it run unexpectedly, so
       # double check and exit early if this is a job against a PR.
@@ -88,6 +98,8 @@ jobs:
   publish-images-quay:
     docker:
       - image: cimg/go:1.16
+    environment:
+      - DOCKER_BUILD_CMD: "docker buildx build --load"
     steps:
       # This job should not run against PRs, but we have seen it run unexpectedly, so
       # double check and exit early if this is a job against a PR.
@@ -118,14 +130,14 @@ workflows:
           filters:
             tags:
               only: /.*/
-      - e2etest-bgp:
+      - e2etest:
           filters:
             tags:
               only: /.*/
-      - e2etest-layer2:
-          filters:
-            tags:
-              only: /.*/
+          matrix:
+            parameters:
+              ip-family: [ipv4, ipv6, dual]
+              bgp-type: [native, frr]
       - publish-images:
           filters:
             branches:

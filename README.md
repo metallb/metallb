@@ -5,6 +5,7 @@ metal [Kubernetes](https://kubernetes.io) clusters, using standard
 routing protocols.
 
 [![Project maturity: beta](https://img.shields.io/badge/maturity-beta-orange.svg)](https://metallb.universe.tf/concepts/maturity/) [![license](https://img.shields.io/github/license/metallb/metallb.svg?maxAge=2592000)](https://github.com/metallb/metallb/blob/main/LICENSE) [![CircleCI](https://img.shields.io/circleci/project/github/metallb/metallb.svg)](https://circleci.com/gh/metallb/metallb) [![Containers](https://img.shields.io/badge/containers-ready-green.svg)](https://hub.docker.com/u/metallb) [![Go report card](https://goreportcard.com/badge/github.com/metallb/metallb)](https://goreportcard.com/report/github.com/metallb/metallb)
+[![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/5391/badge)](https://bestpractices.coreinfrastructure.org/projects/5391)
 
 Check out [MetalLB's website](https://metallb.universe.tf) for more
 information.
@@ -27,8 +28,12 @@ which will give us warm fuzzy feelings :).
 # Reporting security issues
 
 You can report security issues in the github issue tracker. If you
-prefer private disclosure, please email dave@natulte.net and we'll
-figure out a remediation timeline.
+prefer private disclosure, please email to one of the maintainers:
+
+- fpaoline@redhat.com
+- rbryant@redhat.com
+- rodrigo@kinvolk.com
+- jliebermann@microsoft.com
 
 We aim for initial response to vulnerability reports within 48
 hours. The timeline for fixes depends on the complexity of the issue.

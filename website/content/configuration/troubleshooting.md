@@ -5,7 +5,7 @@ weight: 20
 
 Once you setup a loadbalancer on Kubernetes and it doesn't _seem_ to work right away, here are a few tips to troubleshoot.
 
-- Check that the LoadBalancer service has endpoints (`kubectl -n <namespace> get endpoints <service>`) that are not pending - if they are, MetalLB will not respond to ARP requests for that service's external IP
+- Check that the LoadBalancer service has endpoints (`kubectl -n <namespace> get endpoints <service>`) that are not pending - if they are, MetalLB will not respond to ARP requests for that service's external IP. That means if you have only one pod for your service and you lost the node hosting it, MetalLB will stop responding to ARP request until the replicaset will schedule the pod on another reachable node.
 - SSH into one or more of your nodes and use `arping` and `tcpdump` to verify the ARP requests pass through your network
 
 ---
@@ -26,7 +26,7 @@ In this example, `arping` is used to trigger a request and it should receive a r
 
 The output should look similar to the following:
 
-```
+```bash
 $ arping -I ens3 192.168.1.240
 ARPING 192.168.1.240 from 192.168.1.35 ens3
 Unicast reply from 192.168.1.240 [FA:16:3E:5A:39:4C]  1.077ms
@@ -45,7 +45,7 @@ Received 4 response(s)
 
 Capture all replies from `192.168.1.240`:
 
-```
+```bash
 $ tcpdump -n -i ens3 arp src host 192.168.1.240
 tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
 listening on ens3, link-type EN10MB (Ethernet), capture size 262144 bytes
@@ -63,7 +63,7 @@ listening on ens3, link-type EN10MB (Ethernet), capture size 262144 bytes
 
 In addition to the above, make sure to watch the logs of MetalLB's speaker component for ARP requests and responses (using [kubetail](https://github.com/johanhaleby/kubetail)):
 
-```
+```bash
 $ kubetail -l component=speaker -n metallb-system
 ...
 ```

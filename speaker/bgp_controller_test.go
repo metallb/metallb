@@ -1,3 +1,5 @@
+// SPDX-License-Identifier:Apache-2.0
+
 package main
 
 import (
@@ -89,6 +91,18 @@ func sortAds(ads map[string][]*bgp.Advertisement) {
 }
 
 type fakeBGP struct {
+	t              *testing.T
+	sessionManager fakeBGPSessionManager
+}
+
+func (f *fakeBGP) NewSessionManager(_ bgpImplementation, _ log.Logger) bgp.SessionManager {
+	f.sessionManager.t = f.t
+	f.sessionManager.gotAds = make(map[string][]*bgp.Advertisement)
+
+	return &f.sessionManager
+}
+
+type fakeBGPSessionManager struct {
 	t *testing.T
 
 	sync.Mutex
@@ -96,7 +110,7 @@ type fakeBGP struct {
 	gotAds map[string][]*bgp.Advertisement
 }
 
-func (f *fakeBGP) New(_ log.Logger, addr string, _ net.IP, _ uint32, _ net.IP, _ uint32, _ time.Duration, _, _ string) (session, error) {
+func (f *fakeBGPSessionManager) NewSession(_ log.Logger, addr string, _ net.IP, _ uint32, _ net.IP, _ uint32, _ time.Duration, _ time.Duration, _, _, _ string) (bgp.Session, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -113,7 +127,11 @@ func (f *fakeBGP) New(_ log.Logger, addr string, _ net.IP, _ uint32, _ net.IP, _
 	}, nil
 }
 
-func (f *fakeBGP) Ads() map[string][]*bgp.Advertisement {
+func (f *fakeBGPSessionManager) SyncBFDProfiles(profiles map[string]*config.BFDProfile) error {
+	return nil
+}
+
+func (f *fakeBGPSessionManager) Ads() map[string][]*bgp.Advertisement {
 	ret := map[string][]*bgp.Advertisement{}
 
 	f.Lock()
@@ -138,7 +156,7 @@ func (f *fakeBGP) Ads() map[string][]*bgp.Advertisement {
 }
 
 type fakeSession struct {
-	f    *fakeBGP
+	f    *fakeBGPSessionManager
 	addr string
 }
 
@@ -190,13 +208,13 @@ func (s *testK8S) Errorf(_ *v1.Service, evtType string, msg string, args ...inte
 
 func TestBGPSpeaker(t *testing.T) {
 	b := &fakeBGP{
-		t:      t,
-		gotAds: map[string][]*bgp.Advertisement{},
+		t: t,
 	}
-	newBGP = b.New
+	newBGP = b.NewSessionManager
 	c, err := newController(controllerConfig{
 		MyNode:        "pandora",
 		DisableLayer2: true,
+		bgpType:       bgpNative,
 	})
 	if err != nil {
 		t.Fatalf("creating controller: %s", err)
@@ -211,7 +229,9 @@ func TestBGPSpeaker(t *testing.T) {
 		svc      *v1.Service
 		eps      k8s.EpsOrSlices
 
-		wantAds map[string][]*bgp.Advertisement
+		wantAds        map[string][]*bgp.Advertisement
+		expectedCfgRet k8s.SyncState
+		expectedLBRet  k8s.SyncState
 	}{
 		{
 			desc:     "Service ignored, no config",
@@ -238,7 +258,9 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Type: k8s.Eps,
 			},
-			wantAds: map[string][]*bgp.Advertisement{},
+			wantAds:        map[string][]*bgp.Advertisement{},
+			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedLBRet:  k8s.SyncStateSuccess,
 		},
 
 		{
@@ -265,6 +287,7 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
+			expectedCfgRet: k8s.SyncStateReprocessAll,
 		},
 
 		{
@@ -294,6 +317,8 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
+			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedLBRet:  k8s.SyncStateSuccess,
 		},
 
 		{
@@ -328,6 +353,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
+			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedLBRet:  k8s.SyncStateSuccess,
 		},
 
 		{
@@ -358,6 +385,8 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
+			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedLBRet:  k8s.SyncStateSuccess,
 		},
 
 		{
@@ -396,6 +425,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
+			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedLBRet:  k8s.SyncStateSuccess,
 		},
 
 		{
@@ -444,6 +475,8 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
+			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedLBRet:  k8s.SyncStateSuccess,
 		},
 
 		{
@@ -460,6 +493,8 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
+			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedLBRet:  k8s.SyncStateSuccess,
 		},
 
 		{
@@ -490,6 +525,8 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
+			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedLBRet:  k8s.SyncStateSuccess,
 		},
 
 		{
@@ -530,6 +567,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
+			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedLBRet:  k8s.SyncStateSuccess,
 		},
 
 		{
@@ -595,6 +634,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
+			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedLBRet:  k8s.SyncStateSuccess,
 		},
 
 		{
@@ -657,6 +698,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
+			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedLBRet:  k8s.SyncStateSuccess,
 		},
 
 		{
@@ -695,6 +738,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
+			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedLBRet:  k8s.SyncStateSuccess,
 		},
 
 		{
@@ -740,6 +785,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
+			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedLBRet:  k8s.SyncStateSuccess,
 		},
 
 		{
@@ -787,6 +834,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
+			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedLBRet:  k8s.SyncStateSuccess,
 		},
 
 		{
@@ -804,6 +853,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
+			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedLBRet:  k8s.SyncStateSuccess,
 		},
 
 		{
@@ -857,6 +908,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
+			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedLBRet:  k8s.SyncStateSuccess,
 		},
 
 		{
@@ -865,23 +918,24 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.5:0": nil,
 			},
+			expectedCfgRet: k8s.SyncStateReprocessAll,
 		},
 	}
 
 	l := log.NewNopLogger()
 	for _, test := range tests {
 		if test.config != nil {
-			if c.SetConfig(l, test.config) == k8s.SyncStateError {
+			if c.SetConfig(l, test.config) != test.expectedCfgRet {
 				t.Errorf("%q: SetConfig failed", test.desc)
 			}
 		}
 		if test.balancer != "" {
-			if c.SetBalancer(l, test.balancer, test.svc, test.eps) == k8s.SyncStateError {
+			if c.SetBalancer(l, test.balancer, test.svc, test.eps) != test.expectedLBRet {
 				t.Errorf("%q: SetBalancer failed", test.desc)
 			}
 		}
 
-		gotAds := b.Ads()
+		gotAds := b.sessionManager.Ads()
 		sortAds(test.wantAds)
 		sortAds(gotAds)
 		if diff := cmp.Diff(test.wantAds, gotAds); diff != "" {
@@ -892,13 +946,13 @@ func TestBGPSpeaker(t *testing.T) {
 
 func TestBGPSpeakerEPSlices(t *testing.T) {
 	b := &fakeBGP{
-		t:      t,
-		gotAds: map[string][]*bgp.Advertisement{},
+		t: t,
 	}
-	newBGP = b.New
+	newBGP = b.NewSessionManager
 	c, err := newController(controllerConfig{
 		MyNode:        "pandora",
 		DisableLayer2: true,
+		bgpType:       bgpNative,
 	})
 	if err != nil {
 		t.Fatalf("creating controller: %s", err)
@@ -1694,7 +1748,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			}
 		}
 
-		gotAds := b.Ads()
+		gotAds := b.sessionManager.Ads()
 		sortAds(test.wantAds)
 		sortAds(gotAds)
 		if diff := cmp.Diff(test.wantAds, gotAds); diff != "" {
@@ -1705,13 +1759,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 
 func TestNodeSelectors(t *testing.T) {
 	b := &fakeBGP{
-		t:      t,
-		gotAds: map[string][]*bgp.Advertisement{},
+		t: t,
 	}
-	newBGP = b.New
+	newBGP = b.NewSessionManager
 	c, err := newController(controllerConfig{
 		MyNode:        "pandora",
 		DisableLayer2: true,
+		bgpType:       bgpNative,
 	})
 	if err != nil {
 		t.Fatalf("creating controller: %s", err)
@@ -1900,7 +1954,7 @@ func TestNodeSelectors(t *testing.T) {
 			}
 		}
 
-		gotAds := b.Ads()
+		gotAds := b.sessionManager.Ads()
 		sortAds(test.wantAds)
 		sortAds(gotAds)
 		if diff := cmp.Diff(test.wantAds, gotAds); diff != "" {

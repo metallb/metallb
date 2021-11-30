@@ -11,14 +11,23 @@ password zebra
 !
 ! NOTE: These NODE_IPs will be substituted with the IP addresses
 ! assigned to the kind cluster Nodes if they are different.
+! PROTOCOL will be substituted with either ipv4 or ipv6.
 !
 router bgp 64512
+ no bgp default ipv4-unicast
+ no bgp network import-check
  neighbor NODE0_IP remote-as 64512
- neighbor NODE0_IP next-hop-self
  neighbor NODE1_IP remote-as 64512
- neighbor NODE1_IP next-hop-self
  neighbor NODE2_IP remote-as 64512
- neighbor NODE2_IP next-hop-self
+
+ address-family PROTOCOL unicast
+  neighbor NODE0_IP activate
+  neighbor NODE0_IP next-hop-self
+  neighbor NODE1_IP activate
+  neighbor NODE1_IP next-hop-self
+  neighbor NODE2_IP activate
+  neighbor NODE2_IP next-hop-self
+ exit-address-family
 
 !
 !router bgp 7675
