@@ -37,7 +37,7 @@ jobs:
       - run: inv build
       - run: inv dev-env -i  << parameters.ip-family >> -b  << parameters.bgp-type >> -l all
       - run: |
-          SKIP="none"
+          SKIP="none\|BFD"
           if [ "<< parameters.bgp-type >>" = "native" ]; then SKIP="$SKIP\|FRR\|BFD\|DUALSTACK"; fi
           if [ "<< parameters.ip-family >>" = "ipv4" ]; then SKIP="$SKIP\|IPV6\|DUALSTACK"; fi
           if [ "<< parameters.ip-family >>" = "dual" ]; then SKIP="$SKIP\|IPV6"; fi
