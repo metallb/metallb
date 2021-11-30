@@ -12,7 +12,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"go.universe.tf/metallb/internal/bgp"
-	"go.universe.tf/metallb/internal/config"
+	metallbconfig "go.universe.tf/metallb/internal/config"
 )
 
 // As the MetalLB controller should handle messages synchronously, there should
@@ -166,7 +166,7 @@ func (sm *sessionManager) deleteSession(s *session) error {
 	return nil
 }
 
-func (sm *sessionManager) SyncBFDProfiles(profiles map[string]*config.BFDProfile) error {
+func (sm *sessionManager) SyncBFDProfiles(profiles map[string]*metallbconfig.BFDProfile) error {
 	sm.bfdProfiles = make([]BFDProfile, 0)
 	for _, p := range profiles {
 		frrProfile := configBFDProfileToFRR(p)
@@ -252,17 +252,21 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 		   'neighbor.Advertisements' list. */
 		for _, adv := range s.advertised {
 			var version string
+			communities := make([]string, 0)
 			if adv.Prefix.IP.To4() != nil {
 				version = "ipv4"
 			} else if adv.Prefix.IP.To16() != nil {
 				version = "ipv6"
 			}
-
-			advConfig := advertisementConfig{
-				Version: version,
-				Prefix:  adv.Prefix.String(),
+			// Convert community 32bits value to : format
+			for _, c := range adv.Communities {
+				communities = append(communities, metallbconfig.CommunityToString(c))
 			}
-
+			advConfig := advertisementConfig{
+				Version:     version,
+				Prefix:      adv.Prefix.String(),
+				Communities: communities,
+			}
 			neighbor.Advertisements = append(neighbor.Advertisements, &advConfig)
 		}
 	}
@@ -286,7 +290,7 @@ func NewSessionManager(l log.Logger) *sessionManager {
 	return res
 }
 
-func configBFDProfileToFRR(p *config.BFDProfile) *BFDProfile {
+func configBFDProfileToFRR(p *metallbconfig.BFDProfile) *BFDProfile {
 	res := &BFDProfile{}
 	res.Name = p.Name
 	res.ReceiveInterval = p.ReceiveInterval
