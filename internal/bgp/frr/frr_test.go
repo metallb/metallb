@@ -13,8 +13,10 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/pkg/errors"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
+	"k8s.io/apimachinery/pkg/util/wait"
 )
 
 const testData = "testdata/"
@@ -51,18 +53,26 @@ func testGenerateFileNames(t *testing.T) (string, string) {
 func testSetup(t *testing.T) {
 	configFile, _ := testGenerateFileNames(t)
 	os.Setenv("FRR_CONFIG_FILE", configFile)
-	_, err := os.Create(configFile)
-	if err != nil {
-		t.Fatalf("cannot create config file %s: %s", configFile, err)
-	}
-
+	_ = os.Remove(configFile) // removing leftovers from previous runs
 	osHostname = testOsHostname
 }
 
 func testCheckConfigFile(t *testing.T) {
-	time.Sleep(10 * time.Millisecond) // give time to the debouncer to write the file
 	configFile, goldenFile := testGenerateFileNames(t)
+	err := wait.PollImmediate(10*time.Millisecond, 2*time.Second, func() (bool, error) {
+		_, err := os.Stat(configFile)
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return true, nil
+	})
 
+	if err != nil {
+		t.Fatalf("Failed to wait for configfile %s, err %v", configFile, err)
+	}
 	if *update {
 		testUpdateGoldenFile(t, configFile, goldenFile)
 	}
@@ -269,7 +279,7 @@ func TestSingleAdvertisementInvalidNoPort(t *testing.T) {
 		t.Fatalf("Should not be able to create session")
 	}
 
-	testCheckConfigFile(t)
+	// Not checking the file since this test won't create it
 }
 
 func TestSingleAdvertisementInvalidNextHop(t *testing.T) {
