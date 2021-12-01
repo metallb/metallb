@@ -4,6 +4,7 @@ package frr
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
@@ -110,4 +111,16 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 	res = res + out
 
 	return res, nil
+}
+
+// ContainsCommunity check if the passed in community string exists in show bgp community.
+func ContainsCommunity(exec executor.Executor, community string) error {
+	res, err := exec.Exec("vtysh", "-c", "show bgp community-info")
+	if err != nil {
+		return err
+	}
+	if !strings.Contains(res, community) {
+		return errors.Wrapf(err, "show community %s doesn't include %s", res, community)
+	}
+	return nil
 }

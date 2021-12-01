@@ -56,6 +56,7 @@ const (
 	baseRouterID    = "10.10.10.%d"
 	v4PoolAddresses = "192.168.10.0/24"
 	v6PoolAddresses = "fc00:f853:0ccd:e799::/124"
+	CommunityNoAdv  = "65535:65282" // 0xFFFFFF02: NO_ADVERTISE
 )
 
 var (
@@ -693,6 +694,78 @@ var _ = ginkgo.Describe("BGP", func() {
 		},
 			table.Entry("IPV4", "ipv4"),
 			table.Entry("IPV6", "ipv6"))
+
+		table.DescribeTable("configure bgp community and verify it gets propagated",
+			func(addressPools []addressPool, ipFamily string) {
+				configData := configFile{
+					Peers: peersForContainers(frrContainers, ipFamily),
+					Pools: addressPools,
+				}
+				for _, c := range frrContainers {
+					pairExternalFRRWithNodes(cs, c, ipFamily)
+				}
+
+				err := updateConfigMap(cs, configData)
+				framework.ExpectNoError(err)
+
+				for _, c := range frrContainers {
+					validateFRRPeeredWithNodes(cs, c, ipFamily)
+				}
+
+				svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster) // Is a sleep required here?
+
+				defer func() {
+					err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+					framework.ExpectNoError(err)
+				}()
+
+				for _, i := range svc.Status.LoadBalancer.Ingress {
+					ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
+					ingressIP := e2eservice.GetIngressPoint(&i)
+					err = validateIPInRange(addressPools, ingressIP)
+					framework.ExpectNoError(err)
+				}
+
+				allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+				framework.ExpectNoError(err)
+
+				for _, c := range frrContainers {
+					validateService(cs, svc, allNodes.Items, c)
+					Eventually(func() error {
+						return frr.ContainsCommunity(c, "no-advertise")
+					}, 4*time.Minute, 1*time.Second).Should(BeNil())
+				}
+			},
+			table.Entry("IPV4", []addressPool{
+				{
+					Name:     "bgp-test",
+					Protocol: BGP,
+					Addresses: []string{
+						"192.168.10.0/24",
+					},
+					BGPAdvertisements: []bgpAdvertisement{
+						{
+							Communities: []string{
+								CommunityNoAdv,
+							},
+						},
+					},
+				}}, "ipv4"),
+			table.Entry("IPV6", []addressPool{
+				{
+					Name:     "bgp-test",
+					Protocol: BGP,
+					Addresses: []string{
+						"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
+					},
+					BGPAdvertisements: []bgpAdvertisement{
+						{
+							Communities: []string{
+								CommunityNoAdv,
+							},
+						},
+					},
+				}}, "ipv6"))
 	})
 })
 
