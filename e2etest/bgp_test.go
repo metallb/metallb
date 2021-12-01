@@ -51,8 +51,8 @@ import (
 const (
 	frrIBGP         = "frr-iBGP"
 	frrEBGP         = "frr-eBGP"
-	IBGPAsn         = 64512
-	EBGPAsn         = 64513
+	MetalLBASN      = 64512
+	ExternalASN     = 64513
 	baseRouterID    = "10.10.10.%d"
 	v4PoolAddresses = "192.168.10.0/24"
 	v6PoolAddresses = "fc00:f853:0ccd:e799::/124"
@@ -75,11 +75,11 @@ var _ = ginkgo.Describe("BGP", func() {
 	ibgpContainerConfig := containerConfig{
 		name: frrIBGP,
 		nc: frrconfig.NeighborConfig{
-			ASN:      IBGPAsn,
+			ASN:      MetalLBASN,
 			Password: "ibgp-test",
 		},
 		rc: frrconfig.RouterConfig{
-			ASN:      IBGPAsn,
+			ASN:      MetalLBASN,
 			BGPPort:  179,
 			Password: "ibgp-test",
 		},
@@ -87,11 +87,11 @@ var _ = ginkgo.Describe("BGP", func() {
 	ebgpContainerConfig := containerConfig{
 		name: frrEBGP,
 		nc: frrconfig.NeighborConfig{
-			ASN:      IBGPAsn,
+			ASN:      MetalLBASN,
 			Password: "ebgp-test",
 		},
 		rc: frrconfig.RouterConfig{
-			ASN:      EBGPAsn,
+			ASN:      ExternalASN,
 			BGPPort:  180,
 			Password: "ebgp-test",
 		},
