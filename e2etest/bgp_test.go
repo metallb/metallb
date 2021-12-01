@@ -72,30 +72,28 @@ type containerConfig struct {
 var _ = ginkgo.Describe("BGP", func() {
 	var cs clientset.Interface
 	var f *framework.Framework
-	containersConf := []containerConfig{
-		{
-			name: frrIBGP,
-			nc: frrconfig.NeighborConfig{
-				ASN:      IBGPAsn,
-				Password: "ibgp-test",
-			},
-			rc: frrconfig.RouterConfig{
-				ASN:      IBGPAsn,
-				BGPPort:  179,
-				Password: "ibgp-test",
-			},
+	ibgpContainerConfig := containerConfig{
+		name: frrIBGP,
+		nc: frrconfig.NeighborConfig{
+			ASN:      IBGPAsn,
+			Password: "ibgp-test",
 		},
-		{
-			name: frrEBGP,
-			nc: frrconfig.NeighborConfig{
-				ASN:      IBGPAsn,
-				Password: "ebgp-test",
-			},
-			rc: frrconfig.RouterConfig{
-				ASN:      EBGPAsn,
-				BGPPort:  180,
-				Password: "ebgp-test",
-			},
+		rc: frrconfig.RouterConfig{
+			ASN:      IBGPAsn,
+			BGPPort:  179,
+			Password: "ibgp-test",
+		},
+	}
+	ebgpContainerConfig := containerConfig{
+		name: frrEBGP,
+		nc: frrconfig.NeighborConfig{
+			ASN:      IBGPAsn,
+			Password: "ebgp-test",
+		},
+		rc: frrconfig.RouterConfig{
+			ASN:      EBGPAsn,
+			BGPPort:  180,
+			Password: "ebgp-test",
 		},
 	}
 
@@ -137,10 +135,12 @@ var _ = ginkgo.Describe("BGP", func() {
 			if net.ParseIP(hostIPv6) == nil {
 				framework.Fail("Invalid hostIPv6")
 			}
+			frrContainers, err = createFRRContainers(ibgpContainerConfig)
+		} else {
+			frrContainers, err = createFRRContainers(ibgpContainerConfig, ebgpContainerConfig)
 		}
-		cs = f.ClientSet
-		frrContainers, err = createFRRContainers(containersConf)
 		framework.ExpectNoError(err)
+		cs = f.ClientSet
 	})
 
 	table.DescribeTable("A service of protocol load balancer should work with", func(pairingIPFamily, setProtocoltest string, poolAddresses []string, tweak testservice.Tweak) {
@@ -929,7 +929,7 @@ func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily str
 	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
 
-func createFRRContainers(c []containerConfig) ([]*frrcontainer.FRR, error) {
+func createFRRContainers(c ...containerConfig) ([]*frrcontainer.FRR, error) {
 	frrContainers = make([]*frrcontainer.FRR, 0)
 	g := new(errgroup.Group)
 	for _, conf := range c {
