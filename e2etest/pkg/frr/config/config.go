@@ -20,6 +20,11 @@ import (
 const bgpConfigTemplate = `
 password zebra
 
+debug bgp updates
+debug bgp neighbor
+debug zebra nht
+debug bgp nht
+
 log file /tmp/frr.log debugging
 log timestamp precision 3
 
