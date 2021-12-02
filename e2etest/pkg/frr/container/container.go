@@ -69,6 +69,9 @@ func Start(name string, nc config.NeighborConfig, rc config.RouterConfig, networ
 		}
 	}
 
+	// setting routerid after calculating ips
+	frr.RouterConfig.RouterID = frr.Ipv4
+
 	err = frr.updateVolumePermissions()
 	if err != nil {
 		return frr, err

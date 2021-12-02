@@ -31,6 +31,7 @@ log timestamp precision 3
 route-map RMAP permit 10
 set ipv6 next-hop prefer-global
 router bgp {{.ASN}}
+  bgp router-id {{.RouterID}}
   no bgp ebgp-requires-policy
   no bgp default ipv4-unicast
 {{range .Neighbors }}
@@ -63,6 +64,7 @@ exit-address-family
 `
 
 type RouterConfig struct {
+	RouterID    string
 	ASN         uint32
 	Neighbors   []*NeighborConfig
 	V4Neighbors []*NeighborConfig
