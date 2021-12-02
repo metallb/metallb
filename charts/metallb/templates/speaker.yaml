@@ -138,4 +138,7 @@ spec:
         {{- toYaml . | nindent 6 }}
       {{- end }}
       {{- end }}
+      {{- with .Values.speaker.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
 {{- end }}
