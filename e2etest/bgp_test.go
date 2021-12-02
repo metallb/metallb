@@ -102,7 +102,7 @@ var _ = ginkgo.Describe("BGP", func() {
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentGinkgoTestDescription().Failed {
 			for _, c := range frrContainers {
-				dump, err := frr.RawDump(c, "/etc/frr/bgpd.conf", "/tmp/frr.log")
+				dump, err := frr.RawDump(c, "/etc/frr/bgpd.conf", "/tmp/frr.log", "/etc/frr/daemons")
 				framework.Logf("External frr dump for %s:\n%s %v", c.Name, dump, err)
 			}
 
