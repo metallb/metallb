@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"time"
 
+	"go.universe.tf/metallb/e2etest/pkg/config"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/metrics"
 	"go.universe.tf/metallb/e2etest/pkg/routes"
@@ -70,6 +71,7 @@ type containerConfig struct {
 }
 
 var _ = ginkgo.Describe("BGP", func() {
+	var configUpdater config.Updater
 	var cs clientset.Interface
 	var f *framework.Framework
 	ibgpContainerConfig := containerConfig{
@@ -117,7 +119,7 @@ var _ = ginkgo.Describe("BGP", func() {
 	ginkgo.AfterEach(func() {
 		ginkgo.By("Clearing the previous configuration")
 		// Clean previous configuration.
-		err := updateConfigMap(cs, configFile{})
+		err := configUpdater.Clean()
 		framework.ExpectNoError(err)
 
 		err = stopFRRContainers(frrContainers)
@@ -141,15 +143,21 @@ var _ = ginkgo.Describe("BGP", func() {
 		}
 		framework.ExpectNoError(err)
 		cs = f.ClientSet
+		configUpdater = config.UpdaterForConfigMap(cs, testNameSpace)
+		if useOperator {
+			clientconfig := f.ClientConfig()
+			configUpdater, err = config.UpdaterForOperator(clientconfig, testNameSpace)
+			framework.ExpectNoError(err)
+		}
 	})
 
 	table.DescribeTable("A service of protocol load balancer should work with", func(pairingIPFamily, setProtocoltest string, poolAddresses []string, tweak testservice.Tweak) {
 		var allNodes *corev1.NodeList
-		configData := configFile{
-			Pools: []addressPool{
+		configData := config.File{
+			Pools: []config.AddressPool{
 				{
 					Name:      "bgp-test",
-					Protocol:  BGP,
+					Protocol:  config.BGP,
 					Addresses: poolAddresses,
 				},
 			},
@@ -159,7 +167,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			pairExternalFRRWithNodes(cs, c, pairingIPFamily)
 		}
 
-		err := updateConfigMap(cs, configData)
+		err := configUpdater.Update(configData)
 		framework.ExpectNoError(err)
 
 		for _, c := range frrContainers {
@@ -255,11 +263,11 @@ var _ = ginkgo.Describe("BGP", func() {
 				peerAddrs = append(peerAddrs, address+fmt.Sprintf(":%d", c.RouterConfig.BGPPort))
 			}
 
-			configData := configFile{
-				Pools: []addressPool{
+			configData := config.File{
+				Pools: []config.AddressPool{
 					{
 						Name:      poolName,
-						Protocol:  BGP,
+						Protocol:  config.BGP,
 						Addresses: []string{poolAddress},
 					},
 				},
@@ -269,7 +277,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				pairExternalFRRWithNodes(cs, c, ipFamily)
 			}
 
-			err := updateConfigMap(cs, configData)
+			err := configUpdater.Update(configData)
 			framework.ExpectNoError(err)
 
 			for _, c := range frrContainers {
@@ -375,12 +383,12 @@ var _ = ginkgo.Describe("BGP", func() {
 	ginkgo.Context("validate different AddressPools for type=Loadbalancer", func() {
 		ginkgo.AfterEach(func() {
 			// Clean previous configuration.
-			err := updateConfigMap(cs, configFile{})
+			err := configUpdater.Clean()
 			framework.ExpectNoError(err)
 		})
 
-		table.DescribeTable("set different AddressPools ranges modes", func(addressPools []addressPool, pairingFamily string, tweak testservice.Tweak) {
-			configData := configFile{
+		table.DescribeTable("set different AddressPools ranges modes", func(addressPools []config.AddressPool, pairingFamily string, tweak testservice.Tweak) {
+			configData := config.File{
 				Peers: peersForContainers(frrContainers, pairingFamily),
 				Pools: addressPools,
 			}
@@ -388,7 +396,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				pairExternalFRRWithNodes(cs, c, pairingFamily)
 			}
 
-			err := updateConfigMap(cs, configData)
+			err := configUpdater.Update(configData)
 			framework.ExpectNoError(err)
 
 			for _, c := range frrContainers {
@@ -416,56 +424,56 @@ var _ = ginkgo.Describe("BGP", func() {
 				validateService(cs, svc, allNodes.Items, c)
 			}
 		},
-			table.Entry("IPV4 - test AddressPool defined by address range", []addressPool{
+			table.Entry("IPV4 - test AddressPool defined by address range", []config.AddressPool{
 				{
 					Name:     "bgp-test",
-					Protocol: BGP,
+					Protocol: config.BGP,
 					Addresses: []string{
 						"192.168.10.0-192.168.10.18",
 					},
 				}}, "ipv4", testservice.TrafficPolicyCluster,
 			),
-			table.Entry("IPV4 - test AddressPool defined by network prefix", []addressPool{
+			table.Entry("IPV4 - test AddressPool defined by network prefix", []config.AddressPool{
 				{
 					Name:     "bgp-test",
-					Protocol: BGP,
+					Protocol: config.BGP,
 					Addresses: []string{
 						"192.168.10.0/24",
 					},
 				}}, "ipv4", testservice.TrafficPolicyCluster,
 			),
-			table.Entry("IPV6 - test AddressPool defined by address range", []addressPool{
+			table.Entry("IPV6 - test AddressPool defined by address range", []config.AddressPool{
 				{
 					Name:     "bgp-test",
-					Protocol: BGP,
+					Protocol: config.BGP,
 					Addresses: []string{
 						"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
 					},
 				}}, "ipv6", testservice.TrafficPolicyCluster,
 			),
-			table.Entry("IPV6 - test AddressPool defined by network prefix", []addressPool{
+			table.Entry("IPV6 - test AddressPool defined by network prefix", []config.AddressPool{
 				{
 					Name:     "bgp-test",
-					Protocol: BGP,
+					Protocol: config.BGP,
 					Addresses: []string{
 						"fc00:f853:0ccd:e799::/124",
 					},
 				}}, "ipv6", testservice.TrafficPolicyCluster,
 			),
-			table.Entry("DUALSTACK - test AddressPool defined by address range", []addressPool{
+			table.Entry("DUALSTACK - test AddressPool defined by address range", []config.AddressPool{
 				{
 					Name:     "bgp-test",
-					Protocol: BGP,
+					Protocol: config.BGP,
 					Addresses: []string{
 						"192.168.10.0-192.168.10.18",
 						"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
 					},
 				}}, "dual", testservice.TrafficPolicyCluster,
 			),
-			table.Entry("DUALSTACK - test AddressPool defined by network prefix", []addressPool{
+			table.Entry("DUALSTACK - test AddressPool defined by network prefix", []config.AddressPool{
 				{
 					Name:     "bgp-test",
-					Protocol: BGP,
+					Protocol: config.BGP,
 					Addresses: []string{
 						"192.168.10.0/24",
 						"fc00:f853:0ccd:e799::/124",
@@ -476,19 +484,19 @@ var _ = ginkgo.Describe("BGP", func() {
 	})
 
 	ginkgo.Context("BFD", func() {
-		table.DescribeTable("should work with the given bfd profile", func(bfd bfdProfile, pairingFamily string, poolAddresses []string, tweak testservice.Tweak) {
-			configData := configFile{
-				Pools: []addressPool{
+		table.DescribeTable("should work with the given bfd profile", func(bfd config.BfdProfile, pairingFamily string, poolAddresses []string, tweak testservice.Tweak) {
+			configData := config.File{
+				Pools: []config.AddressPool{
 					{
 						Name:      "bfd-test",
-						Protocol:  BGP,
+						Protocol:  config.BGP,
 						Addresses: poolAddresses,
 					},
 				},
 				Peers:       withBFD(peersForContainers(frrContainers, pairingFamily), bfd.Name),
-				BFDProfiles: []bfdProfile{bfd},
+				BFDProfiles: []config.BfdProfile{bfd},
 			}
-			err := updateConfigMap(cs, configData)
+			err := configUpdater.Update(configData)
 			framework.ExpectNoError(err)
 
 			for _, c := range frrContainers {
@@ -519,7 +527,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					if err != nil {
 						return err
 					}
-					toCompare := BFDProfileWithDefaults(bfd)
+					toCompare := config.BFDProfileWithDefaults(bfd)
 					err = frr.BFDPeersMatchNodes(allNodes.Items, bfdPeers, pairingFamily)
 					if err != nil {
 						return err
@@ -537,11 +545,11 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		},
 			table.Entry("IPV4 - default",
-				bfdProfile{
+				config.BfdProfile{
 					Name: "bar",
 				}, "ipv4", []string{v4PoolAddresses}, testservice.TrafficPolicyCluster),
 			table.Entry("IPV4 - full params",
-				bfdProfile{
+				config.BfdProfile{
 					Name:             "full1",
 					ReceiveInterval:  uint32Ptr(60),
 					TransmitInterval: uint32Ptr(61),
@@ -551,7 +559,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					MinimumTTL:       uint32Ptr(254),
 				}, "ipv4", []string{v4PoolAddresses}, testservice.TrafficPolicyCluster),
 			table.Entry("IPV4 - echo mode enabled",
-				bfdProfile{
+				config.BfdProfile{
 					Name:             "echo",
 					ReceiveInterval:  uint32Ptr(80),
 					TransmitInterval: uint32Ptr(81),
@@ -561,11 +569,11 @@ var _ = ginkgo.Describe("BGP", func() {
 					MinimumTTL:       uint32Ptr(254),
 				}, "ipv4", []string{v4PoolAddresses}, testservice.TrafficPolicyCluster),
 			table.Entry("IPV6 - default",
-				bfdProfile{
+				config.BfdProfile{
 					Name: "bar",
 				}, "ipv6", []string{v6PoolAddresses}, testservice.TrafficPolicyCluster),
 			table.Entry("IPV6 - full params",
-				bfdProfile{
+				config.BfdProfile{
 					Name:             "full1",
 					ReceiveInterval:  uint32Ptr(60),
 					TransmitInterval: uint32Ptr(61),
@@ -575,7 +583,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					MinimumTTL:       uint32Ptr(254),
 				}, "ipv6", []string{v6PoolAddresses}, testservice.TrafficPolicyCluster),
 			table.Entry("IPV6 - echo mode enabled",
-				bfdProfile{
+				config.BfdProfile{
 					Name:             "echo",
 					ReceiveInterval:  uint32Ptr(80),
 					TransmitInterval: uint32Ptr(81),
@@ -585,7 +593,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					MinimumTTL:       uint32Ptr(254),
 				}, "ipv6", []string{v6PoolAddresses}, testservice.TrafficPolicyCluster),
 			table.Entry("DUALSTACK - full params",
-				bfdProfile{
+				config.BfdProfile{
 					Name:             "full1",
 					ReceiveInterval:  uint32Ptr(60),
 					TransmitInterval: uint32Ptr(61),
@@ -599,19 +607,19 @@ var _ = ginkgo.Describe("BGP", func() {
 				}),
 		)
 
-		table.DescribeTable("metrics", func(bfd bfdProfile, pairingFamily string, poolAddresses []string) {
-			configData := configFile{
-				Pools: []addressPool{
+		table.DescribeTable("metrics", func(bfd config.BfdProfile, pairingFamily string, poolAddresses []string) {
+			configData := config.File{
+				Pools: []config.AddressPool{
 					{
 						Name:      "bfd-test",
-						Protocol:  BGP,
+						Protocol:  config.BGP,
 						Addresses: poolAddresses,
 					},
 				},
 				Peers:       withBFD(peersForContainers(frrContainers, pairingFamily), bfd.Name),
-				BFDProfiles: []bfdProfile{bfd},
+				BFDProfiles: []config.BfdProfile{bfd},
 			}
-			err := updateConfigMap(cs, configData)
+			err := configUpdater.Update(configData)
 			framework.ExpectNoError(err)
 
 			for _, c := range frrContainers {
@@ -731,11 +739,11 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 		},
 			table.Entry("IPV4 - default",
-				bfdProfile{
+				config.BfdProfile{
 					Name: "bar",
 				}, "ipv4", []string{v4PoolAddresses}),
 			table.Entry("IPV4 - echo mode enabled",
-				bfdProfile{
+				config.BfdProfile{
 					Name:             "echo",
 					ReceiveInterval:  uint32Ptr(80),
 					TransmitInterval: uint32Ptr(81),
@@ -745,11 +753,11 @@ var _ = ginkgo.Describe("BGP", func() {
 					MinimumTTL:       uint32Ptr(254),
 				}, "ipv4", []string{v4PoolAddresses}),
 			table.Entry("IPV6 - default",
-				bfdProfile{
+				config.BfdProfile{
 					Name: "bar",
 				}, "ipv6", []string{v6PoolAddresses}),
 			table.Entry("IPV6 - echo mode enabled",
-				bfdProfile{
+				config.BfdProfile{
 					Name:             "echo",
 					ReceiveInterval:  uint32Ptr(80),
 					TransmitInterval: uint32Ptr(81),
@@ -759,7 +767,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					MinimumTTL:       uint32Ptr(254),
 				}, "ipv6", []string{v6PoolAddresses}),
 			table.Entry("DUALSTACK - full params",
-				bfdProfile{
+				config.BfdProfile{
 					Name:             "full1",
 					ReceiveInterval:  uint32Ptr(60),
 					TransmitInterval: uint32Ptr(61),
@@ -775,7 +783,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		table.DescribeTable("should work after subsequent configuration updates", func(addressRange string, ipFamily string) {
 			var services []*corev1.Service
 			var servicesIngressIP []string
-			var pools []addressPool
+			var pools []config.AddressPool
 
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
@@ -787,16 +795,16 @@ var _ = ginkgo.Describe("BGP", func() {
 				lastIP, err := getIPFromRangeByIndex(addressRange, i*10+10)
 				framework.ExpectNoError(err)
 				addressesRange := fmt.Sprintf("%s-%s", firstIP, lastIP)
-				pool := addressPool{
+				pool := config.AddressPool{
 					Name:     fmt.Sprintf("test-addresspool%d", i+1),
-					Protocol: BGP,
+					Protocol: config.BGP,
 					Addresses: []string{
 						addressesRange,
 					},
 				}
 				pools = append(pools, pool)
 
-				configData := configFile{
+				configData := config.File{
 					Pools: pools,
 					Peers: peersForContainers(frrContainers, ipFamily),
 				}
@@ -805,7 +813,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					pairExternalFRRWithNodes(cs, c, ipFamily)
 				}
 
-				err = updateConfigMap(cs, configData)
+				err = configUpdater.Update(configData)
 				framework.ExpectNoError(err)
 
 				for _, c := range frrContainers {
@@ -825,7 +833,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
 				ingressIP := e2eservice.GetIngressPoint(
 					&svc.Status.LoadBalancer.Ingress[0])
-				err = validateIPInRange([]addressPool{pool}, ingressIP)
+				err = validateIPInRange([]config.AddressPool{pool}, ingressIP)
 				framework.ExpectNoError(err)
 
 				services = append(services, svc)
@@ -850,10 +858,10 @@ var _ = ginkgo.Describe("BGP", func() {
 			for i, c := range frrContainers {
 				ginkgo.By("configure peer")
 
-				configData := configFile{
+				configData := config.File{
 					Peers: peersForContainers([]*frrcontainer.FRR{c}, ipFamily),
 				}
-				err := updateConfigMap(cs, configData)
+				err := configUpdater.Update(configData)
 				framework.ExpectNoError(err)
 
 				pairExternalFRRWithNodes(cs, c, ipFamily)
@@ -867,8 +875,8 @@ var _ = ginkgo.Describe("BGP", func() {
 			table.Entry("IPV6", "ipv6"))
 
 		table.DescribeTable("configure bgp community and verify it gets propagated",
-			func(addressPools []addressPool, ipFamily string) {
-				configData := configFile{
+			func(addressPools []config.AddressPool, ipFamily string) {
+				configData := config.File{
 					Peers: peersForContainers(frrContainers, ipFamily),
 					Pools: addressPools,
 				}
@@ -876,7 +884,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					pairExternalFRRWithNodes(cs, c, ipFamily)
 				}
 
-				err := updateConfigMap(cs, configData)
+				err := configUpdater.Update(configData)
 				framework.ExpectNoError(err)
 
 				for _, c := range frrContainers {
@@ -907,14 +915,14 @@ var _ = ginkgo.Describe("BGP", func() {
 					}, 4*time.Minute, 1*time.Second).Should(BeNil())
 				}
 			},
-			table.Entry("IPV4", []addressPool{
+			table.Entry("IPV4", []config.AddressPool{
 				{
 					Name:     "bgp-test",
-					Protocol: BGP,
+					Protocol: config.BGP,
 					Addresses: []string{
 						"192.168.10.0/24",
 					},
-					BGPAdvertisements: []bgpAdvertisement{
+					BGPAdvertisements: []config.BgpAdvertisement{
 						{
 							Communities: []string{
 								CommunityNoAdv,
@@ -922,14 +930,14 @@ var _ = ginkgo.Describe("BGP", func() {
 						},
 					},
 				}}, "ipv4"),
-			table.Entry("IPV6", []addressPool{
+			table.Entry("IPV6", []config.AddressPool{
 				{
 					Name:     "bgp-test",
-					Protocol: BGP,
+					Protocol: config.BGP,
 					Addresses: []string{
 						"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
 					},
-					BGPAdvertisements: []bgpAdvertisement{
+					BGPAdvertisements: []config.BgpAdvertisement{
 						{
 							Communities: []string{
 								CommunityNoAdv,
@@ -1131,8 +1139,8 @@ func stopFRRContainers(containers []*frrcontainer.FRR) error {
 	return g.Wait()
 }
 
-func peersForContainers(containers []*frrcontainer.FRR, ipFamily string) []peer {
-	var peers []peer
+func peersForContainers(containers []*frrcontainer.FRR, ipFamily string) []config.Peer {
+	var peers []config.Peer
 
 	for i, c := range frrContainers {
 		addresses := c.AddressesForFamily(ipFamily)
@@ -1141,7 +1149,7 @@ func peersForContainers(containers []*frrcontainer.FRR, ipFamily string) []peer 
 			holdTime = fmt.Sprintf("%ds", i*180)
 		}
 		for _, address := range addresses {
-			peers = append(peers, peer{
+			peers = append(peers, config.Peer{
 				Addr:     address,
 				ASN:      c.RouterConfig.ASN,
 				MyASN:    c.NeighborConfig.ASN,
@@ -1155,14 +1163,14 @@ func peersForContainers(containers []*frrcontainer.FRR, ipFamily string) []peer 
 	return peers
 }
 
-func withBFD(peers []peer, bfdProfile string) []peer {
+func withBFD(peers []config.Peer, bfdProfile string) []config.Peer {
 	for i := range peers {
 		peers[i].BFDProfile = bfdProfile
 	}
 	return peers
 }
 
-func checkBFDConfigPropagated(nodeConfig bfdProfile, peerConfig bgpfrr.BFDPeer) error {
+func checkBFDConfigPropagated(nodeConfig config.BfdProfile, peerConfig bgpfrr.BFDPeer) error {
 	if peerConfig.Status != "up" {
 		return fmt.Errorf("Peer status not up")
 	}
