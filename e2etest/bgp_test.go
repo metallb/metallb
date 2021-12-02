@@ -598,6 +598,177 @@ var _ = ginkgo.Describe("BGP", func() {
 					testservice.DualStack(svc)
 				}),
 		)
+
+		table.DescribeTable("metrics", func(bfd bfdProfile, pairingFamily string, poolAddresses []string) {
+			configData := configFile{
+				Pools: []addressPool{
+					{
+						Name:      "bfd-test",
+						Protocol:  BGP,
+						Addresses: poolAddresses,
+					},
+				},
+				Peers:       withBFD(peersForContainers(frrContainers, pairingFamily), bfd.Name),
+				BFDProfiles: []bfdProfile{bfd},
+			}
+			err := updateConfigMap(cs, configData)
+			framework.ExpectNoError(err)
+
+			for _, c := range frrContainers {
+				pairExternalFRRWithNodes(cs, c, pairingFamily, func(container *frrcontainer.FRR) {
+					container.NeighborConfig.BFDEnabled = true
+				})
+			}
+
+			for _, c := range frrContainers {
+				validateFRRPeeredWithNodes(cs, c, pairingFamily)
+			}
+
+			ginkgo.By("checking metrics")
+			pods, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
+				LabelSelector: "component=controller",
+			})
+			framework.ExpectNoError(err)
+			framework.ExpectEqual(len(pods.Items), 1, "Expected one controller pod")
+			controllerPod := &pods.Items[0]
+			speakerPods := getSpeakerPods(cs)
+
+			var peerAddrs []string
+			for _, c := range frrContainers {
+				address := c.Ipv4
+				if pairingFamily == "ipv6" {
+					address = c.Ipv6
+				}
+				peerAddrs = append(peerAddrs, address)
+			}
+
+			for _, speaker := range speakerPods {
+				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
+
+				Eventually(func() error {
+					speakerMetrics, err := metrics.ForPod(controllerPod, speaker, testNameSpace)
+					if err != nil {
+						return err
+					}
+
+					for _, addr := range peerAddrs {
+						err = validateGaugeValue(1, "metallb_bfd_session_up", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = validateCounterValue(1, "metallb_bfd_control_packet_input", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = validateCounterValue(1, "metallb_bfd_control_packet_output", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = validateGaugeValue(0, "metallb_bfd_session_down_events", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = validateCounterValue(1, "metallb_bfd_session_up_events", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = validateCounterValue(1, "metallb_bfd_zebra_notifications", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						if bfd.EchoMode != nil && *bfd.EchoMode {
+							err = validateCounterValue(1, "metallb_bfd_echo_packet_input", map[string]string{"peer": addr}, speakerMetrics)
+							if err != nil {
+								return err
+							}
+
+							err = validateCounterValue(1, "metallb_bfd_echo_packet_output", map[string]string{"peer": addr}, speakerMetrics)
+							if err != nil {
+								return err
+							}
+						}
+					}
+					return nil
+				}, 2*time.Minute, 1*time.Second).Should(BeNil())
+			}
+
+			ginkgo.By("disabling BFD in external FRR containers")
+			for _, c := range frrContainers {
+				pairExternalFRRWithNodes(cs, c, pairingFamily, func(container *frrcontainer.FRR) {
+					container.NeighborConfig.BFDEnabled = false
+				})
+			}
+
+			ginkgo.By("validating session down metrics")
+			for _, speaker := range speakerPods {
+				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
+
+				Eventually(func() error {
+					speakerMetrics, err := metrics.ForPod(controllerPod, speaker, testNameSpace)
+					if err != nil {
+						return err
+					}
+
+					for _, addr := range peerAddrs {
+						err = validateGaugeValue(0, "metallb_bfd_session_up", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = validateCounterValue(1, "metallb_bfd_session_down_events", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+					}
+					return nil
+				}, 2*time.Minute, 1*time.Second).Should(BeNil())
+			}
+		},
+			table.Entry("IPV4 - default",
+				bfdProfile{
+					Name: "bar",
+				}, "ipv4", []string{v4PoolAddresses}),
+			table.Entry("IPV4 - echo mode enabled",
+				bfdProfile{
+					Name:             "echo",
+					ReceiveInterval:  uint32Ptr(80),
+					TransmitInterval: uint32Ptr(81),
+					EchoInterval:     uint32Ptr(82),
+					EchoMode:         boolPtr(true),
+					PassiveMode:      boolPtr(false),
+					MinimumTTL:       uint32Ptr(254),
+				}, "ipv4", []string{v4PoolAddresses}),
+			table.Entry("IPV6 - default",
+				bfdProfile{
+					Name: "bar",
+				}, "ipv6", []string{v6PoolAddresses}),
+			table.Entry("IPV6 - echo mode enabled",
+				bfdProfile{
+					Name:             "echo",
+					ReceiveInterval:  uint32Ptr(80),
+					TransmitInterval: uint32Ptr(81),
+					EchoInterval:     uint32Ptr(82),
+					EchoMode:         boolPtr(true),
+					PassiveMode:      boolPtr(false),
+					MinimumTTL:       uint32Ptr(254),
+				}, "ipv6", []string{v6PoolAddresses}),
+			table.Entry("DUALSTACK - full params",
+				bfdProfile{
+					Name:             "full1",
+					ReceiveInterval:  uint32Ptr(60),
+					TransmitInterval: uint32Ptr(61),
+					EchoInterval:     uint32Ptr(62),
+					EchoMode:         boolPtr(false),
+					PassiveMode:      boolPtr(false),
+					MinimumTTL:       uint32Ptr(254),
+				}, "dual", []string{v4PoolAddresses, v6PoolAddresses}),
+		)
 	})
 
 	ginkgo.Context("validate configuration changes", func() {
