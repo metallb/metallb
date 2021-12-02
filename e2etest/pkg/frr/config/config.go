@@ -36,6 +36,7 @@ router bgp {{.ASN}}
   no bgp default ipv4-unicast
 {{range .Neighbors }}
   neighbor {{.Addr}} remote-as {{.ASN}}
+  neighbor {{.Addr}} passive
   {{ if .Password -}}
   neighbor {{.Addr}} password {{.Password}}
   {{- end }}
