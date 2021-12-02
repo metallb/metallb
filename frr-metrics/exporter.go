@@ -28,9 +28,11 @@ var (
 
 func metricsHandler(logger log.Logger) http.Handler {
 	BGPCollector := collector.NewBGP(logger)
+	BFDCollector := collector.NewBFD(logger)
 
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(BGPCollector)
+	registry.MustRegister(BFDCollector)
 
 	gatherers := prometheus.Gatherers{
 		prometheus.DefaultGatherer,
