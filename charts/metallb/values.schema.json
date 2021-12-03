@@ -107,6 +107,9 @@
             "type": "object"
           }
         },
+        "priorityClassName": {
+          "type":"string"
+        },
         "affinity": {
           "type": "object"
         },
