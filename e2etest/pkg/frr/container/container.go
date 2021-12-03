@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
@@ -99,6 +100,7 @@ func startContainer(containerName string, testDirName string, rc config.RouterCo
 	if err != nil {
 		return errors.Wrapf(err, "Failed to start %s container. %s", containerName, out)
 	}
+	time.Sleep(time.Minute)
 
 	return nil
 }
