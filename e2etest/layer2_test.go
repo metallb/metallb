@@ -53,20 +53,6 @@ var _ = ginkgo.Describe("L2", func() {
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
 		loadBalancerCreateTimeout = e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
-		configData := configFile{
-			Pools: []addressPool{
-				{
-					Name:     "l2-test",
-					Protocol: Layer2,
-					Addresses: []string{
-						ipv4ServiceRange,
-						ipv6ServiceRange,
-					},
-				},
-			},
-		}
-		err := updateConfigMap(cs, configData)
-		framework.ExpectNoError(err)
 	})
 
 	ginkgo.AfterEach(func() {
@@ -80,6 +66,23 @@ var _ = ginkgo.Describe("L2", func() {
 	})
 
 	ginkgo.Context("type=Loadbalancer", func() {
+		ginkgo.BeforeEach(func() {
+			configData := configFile{
+				Pools: []addressPool{
+					{
+						Name:     "l2-test",
+						Protocol: Layer2,
+						Addresses: []string{
+							ipv4ServiceRange,
+							ipv6ServiceRange,
+						},
+					},
+				},
+			}
+			err := updateConfigMap(cs, configData)
+			framework.ExpectNoError(err)
+		})
+
 		ginkgo.It("should work for ExternalTrafficPolicy=Cluster", func() {
 			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
 
@@ -211,6 +214,20 @@ var _ = ginkgo.Describe("L2", func() {
 	})
 
 	table.DescribeTable("different services sharing the same ip should advertise from the same node", func(ipRange *string) {
+		configData := configFile{
+			Pools: []addressPool{
+				{
+					Name:     "l2-services-same-ip-test",
+					Protocol: Layer2,
+					Addresses: []string{
+						ipv4ServiceRange,
+						ipv6ServiceRange,
+					},
+				},
+			},
+		}
+		err := updateConfigMap(cs, configData)
+		framework.ExpectNoError(err)
 		namespace := f.Namespace.Name
 
 		jig1 := e2eservice.NewTestJig(cs, namespace, "svca")

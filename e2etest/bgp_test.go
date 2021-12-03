@@ -51,8 +51,8 @@ import (
 const (
 	frrIBGP         = "frr-iBGP"
 	frrEBGP         = "frr-eBGP"
-	IBGPAsn         = 64512
-	EBGPAsn         = 64513
+	MetalLBASN      = 64512
+	ExternalASN     = 64513
 	baseRouterID    = "10.10.10.%d"
 	v4PoolAddresses = "192.168.10.0/24"
 	v6PoolAddresses = "fc00:f853:0ccd:e799::/124"
@@ -72,37 +72,35 @@ type containerConfig struct {
 var _ = ginkgo.Describe("BGP", func() {
 	var cs clientset.Interface
 	var f *framework.Framework
-	containersConf := []containerConfig{
-		{
-			name: frrIBGP,
-			nc: frrconfig.NeighborConfig{
-				ASN:      IBGPAsn,
-				Password: "ibgp-test",
-			},
-			rc: frrconfig.RouterConfig{
-				ASN:      IBGPAsn,
-				BGPPort:  179,
-				Password: "ibgp-test",
-			},
+	ibgpContainerConfig := containerConfig{
+		name: frrIBGP,
+		nc: frrconfig.NeighborConfig{
+			ASN:      MetalLBASN,
+			Password: "ibgp-test",
 		},
-		{
-			name: frrEBGP,
-			nc: frrconfig.NeighborConfig{
-				ASN:      IBGPAsn,
-				Password: "ebgp-test",
-			},
-			rc: frrconfig.RouterConfig{
-				ASN:      EBGPAsn,
-				BGPPort:  180,
-				Password: "ebgp-test",
-			},
+		rc: frrconfig.RouterConfig{
+			ASN:      MetalLBASN,
+			BGPPort:  179,
+			Password: "ibgp-test",
+		},
+	}
+	ebgpContainerConfig := containerConfig{
+		name: frrEBGP,
+		nc: frrconfig.NeighborConfig{
+			ASN:      MetalLBASN,
+			Password: "ebgp-test",
+		},
+		rc: frrconfig.RouterConfig{
+			ASN:      ExternalASN,
+			BGPPort:  180,
+			Password: "ebgp-test",
 		},
 	}
 
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentGinkgoTestDescription().Failed {
 			for _, c := range frrContainers {
-				dump, err := frr.RawDump(c, "/etc/frr/bgpd.conf", "/tmp/frr.log")
+				dump, err := frr.RawDump(c, "/etc/frr/bgpd.conf", "/tmp/frr.log", "/etc/frr/daemons")
 				framework.Logf("External frr dump for %s:\n%s %v", c.Name, dump, err)
 			}
 
@@ -137,10 +135,12 @@ var _ = ginkgo.Describe("BGP", func() {
 			if net.ParseIP(hostIPv6) == nil {
 				framework.Fail("Invalid hostIPv6")
 			}
+			frrContainers, err = createFRRContainers(ibgpContainerConfig)
+		} else {
+			frrContainers, err = createFRRContainers(ibgpContainerConfig, ebgpContainerConfig)
 		}
-		cs = f.ClientSet
-		frrContainers, err = createFRRContainers(containersConf)
 		framework.ExpectNoError(err)
+		cs = f.ClientSet
 	})
 
 	table.DescribeTable("A service of protocol load balancer should work with", func(pairingIPFamily, setProtocoltest string, poolAddresses []string, tweak testservice.Tweak) {
@@ -598,6 +598,177 @@ var _ = ginkgo.Describe("BGP", func() {
 					testservice.DualStack(svc)
 				}),
 		)
+
+		table.DescribeTable("metrics", func(bfd bfdProfile, pairingFamily string, poolAddresses []string) {
+			configData := configFile{
+				Pools: []addressPool{
+					{
+						Name:      "bfd-test",
+						Protocol:  BGP,
+						Addresses: poolAddresses,
+					},
+				},
+				Peers:       withBFD(peersForContainers(frrContainers, pairingFamily), bfd.Name),
+				BFDProfiles: []bfdProfile{bfd},
+			}
+			err := updateConfigMap(cs, configData)
+			framework.ExpectNoError(err)
+
+			for _, c := range frrContainers {
+				pairExternalFRRWithNodes(cs, c, pairingFamily, func(container *frrcontainer.FRR) {
+					container.NeighborConfig.BFDEnabled = true
+				})
+			}
+
+			for _, c := range frrContainers {
+				validateFRRPeeredWithNodes(cs, c, pairingFamily)
+			}
+
+			ginkgo.By("checking metrics")
+			pods, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
+				LabelSelector: "component=controller",
+			})
+			framework.ExpectNoError(err)
+			framework.ExpectEqual(len(pods.Items), 1, "Expected one controller pod")
+			controllerPod := &pods.Items[0]
+			speakerPods := getSpeakerPods(cs)
+
+			var peerAddrs []string
+			for _, c := range frrContainers {
+				address := c.Ipv4
+				if pairingFamily == "ipv6" {
+					address = c.Ipv6
+				}
+				peerAddrs = append(peerAddrs, address)
+			}
+
+			for _, speaker := range speakerPods {
+				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
+
+				Eventually(func() error {
+					speakerMetrics, err := metrics.ForPod(controllerPod, speaker, testNameSpace)
+					if err != nil {
+						return err
+					}
+
+					for _, addr := range peerAddrs {
+						err = validateGaugeValue(1, "metallb_bfd_session_up", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = validateCounterValue(1, "metallb_bfd_control_packet_input", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = validateCounterValue(1, "metallb_bfd_control_packet_output", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = validateGaugeValue(0, "metallb_bfd_session_down_events", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = validateCounterValue(1, "metallb_bfd_session_up_events", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = validateCounterValue(1, "metallb_bfd_zebra_notifications", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						if bfd.EchoMode != nil && *bfd.EchoMode {
+							err = validateCounterValue(1, "metallb_bfd_echo_packet_input", map[string]string{"peer": addr}, speakerMetrics)
+							if err != nil {
+								return err
+							}
+
+							err = validateCounterValue(1, "metallb_bfd_echo_packet_output", map[string]string{"peer": addr}, speakerMetrics)
+							if err != nil {
+								return err
+							}
+						}
+					}
+					return nil
+				}, 2*time.Minute, 1*time.Second).Should(BeNil())
+			}
+
+			ginkgo.By("disabling BFD in external FRR containers")
+			for _, c := range frrContainers {
+				pairExternalFRRWithNodes(cs, c, pairingFamily, func(container *frrcontainer.FRR) {
+					container.NeighborConfig.BFDEnabled = false
+				})
+			}
+
+			ginkgo.By("validating session down metrics")
+			for _, speaker := range speakerPods {
+				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
+
+				Eventually(func() error {
+					speakerMetrics, err := metrics.ForPod(controllerPod, speaker, testNameSpace)
+					if err != nil {
+						return err
+					}
+
+					for _, addr := range peerAddrs {
+						err = validateGaugeValue(0, "metallb_bfd_session_up", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = validateCounterValue(1, "metallb_bfd_session_down_events", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+					}
+					return nil
+				}, 2*time.Minute, 1*time.Second).Should(BeNil())
+			}
+		},
+			table.Entry("IPV4 - default",
+				bfdProfile{
+					Name: "bar",
+				}, "ipv4", []string{v4PoolAddresses}),
+			table.Entry("IPV4 - echo mode enabled",
+				bfdProfile{
+					Name:             "echo",
+					ReceiveInterval:  uint32Ptr(80),
+					TransmitInterval: uint32Ptr(81),
+					EchoInterval:     uint32Ptr(82),
+					EchoMode:         boolPtr(true),
+					PassiveMode:      boolPtr(false),
+					MinimumTTL:       uint32Ptr(254),
+				}, "ipv4", []string{v4PoolAddresses}),
+			table.Entry("IPV6 - default",
+				bfdProfile{
+					Name: "bar",
+				}, "ipv6", []string{v6PoolAddresses}),
+			table.Entry("IPV6 - echo mode enabled",
+				bfdProfile{
+					Name:             "echo",
+					ReceiveInterval:  uint32Ptr(80),
+					TransmitInterval: uint32Ptr(81),
+					EchoInterval:     uint32Ptr(82),
+					EchoMode:         boolPtr(true),
+					PassiveMode:      boolPtr(false),
+					MinimumTTL:       uint32Ptr(254),
+				}, "ipv6", []string{v6PoolAddresses}),
+			table.Entry("DUALSTACK - full params",
+				bfdProfile{
+					Name:             "full1",
+					ReceiveInterval:  uint32Ptr(60),
+					TransmitInterval: uint32Ptr(61),
+					EchoInterval:     uint32Ptr(62),
+					EchoMode:         boolPtr(false),
+					PassiveMode:      boolPtr(false),
+					MinimumTTL:       uint32Ptr(254),
+				}, "dual", []string{v4PoolAddresses, v6PoolAddresses}),
+		)
 	})
 
 	ginkgo.Context("validate configuration changes", func() {
@@ -929,7 +1100,7 @@ func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily str
 	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
 
-func createFRRContainers(c []containerConfig) ([]*frrcontainer.FRR, error) {
+func createFRRContainers(c ...containerConfig) ([]*frrcontainer.FRR, error) {
 	frrContainers = make([]*frrcontainer.FRR, 0)
 	g := new(errgroup.Group)
 	for _, conf := range c {
