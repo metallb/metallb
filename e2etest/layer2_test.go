@@ -32,6 +32,7 @@ import (
 	"github.com/onsi/ginkgo/extensions/table"
 	"github.com/onsi/gomega"
 	pkgerrors "github.com/pkg/errors"
+	"go.universe.tf/metallb/e2etest/pkg/config"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/mac"
 	"go.universe.tf/metallb/e2etest/pkg/metrics"
@@ -48,16 +49,24 @@ import (
 var _ = ginkgo.Describe("L2", func() {
 	f := framework.NewDefaultFramework("l2")
 	var loadBalancerCreateTimeout time.Duration
+	var configUpdater config.Updater
 	var cs clientset.Interface
+	var err error
 
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
 		loadBalancerCreateTimeout = e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
+		configUpdater = config.UpdaterForConfigMap(cs, testNameSpace)
+		if useOperator {
+			clientconfig := f.ClientConfig()
+			configUpdater, err = config.UpdaterForOperator(clientconfig, testNameSpace)
+			framework.ExpectNoError(err)
+		}
 	})
 
 	ginkgo.AfterEach(func() {
 		// Clean previous configuration.
-		err := updateConfigMap(cs, configFile{})
+		err := configUpdater.Clean()
 		framework.ExpectNoError(err)
 
 		if ginkgo.CurrentGinkgoTestDescription().Failed {
@@ -67,11 +76,11 @@ var _ = ginkgo.Describe("L2", func() {
 
 	ginkgo.Context("type=Loadbalancer", func() {
 		ginkgo.BeforeEach(func() {
-			configData := configFile{
-				Pools: []addressPool{
+			configData := config.File{
+				Pools: []config.AddressPool{
 					{
 						Name:     "l2-test",
-						Protocol: Layer2,
+						Protocol: config.Layer2,
 						Addresses: []string{
 							ipv4ServiceRange,
 							ipv6ServiceRange,
@@ -79,7 +88,7 @@ var _ = ginkgo.Describe("L2", func() {
 					},
 				},
 			}
-			err := updateConfigMap(cs, configData)
+			err := configUpdater.Update(configData)
 			framework.ExpectNoError(err)
 		})
 
@@ -145,11 +154,11 @@ var _ = ginkgo.Describe("L2", func() {
 
 	ginkgo.Context("validate different AddressPools for type=Loadbalancer", func() {
 
-		table.DescribeTable("set different AddressPools ranges modes", func(getAddressPools func() []addressPool) {
-			configData := configFile{
+		table.DescribeTable("set different AddressPools ranges modes", func(getAddressPools func() []config.AddressPool) {
+			configData := config.File{
 				Pools: getAddressPools(),
 			}
-			err := updateConfigMap(cs, configData)
+			err := configUpdater.Update(configData)
 			framework.ExpectNoError(err)
 
 			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
@@ -174,11 +183,11 @@ var _ = ginkgo.Describe("L2", func() {
 			err = wgetRetry(address, executor.Host)
 			framework.ExpectNoError(err)
 		},
-			table.Entry("AddressPool defined by address range", func() []addressPool {
-				return []addressPool{
+			table.Entry("AddressPool defined by address range", func() []config.AddressPool {
+				return []config.AddressPool{
 					{
 						Name:     "l2-test",
-						Protocol: Layer2,
+						Protocol: config.Layer2,
 						Addresses: []string{
 							ipv4ServiceRange,
 							ipv6ServiceRange,
@@ -186,7 +195,7 @@ var _ = ginkgo.Describe("L2", func() {
 					},
 				}
 			}),
-			table.Entry("AddressPool defined by network prefix", func() []addressPool {
+			table.Entry("AddressPool defined by network prefix", func() []config.AddressPool {
 				var ipv4AddressesByCIDR []string
 				var ipv6AddressesByCIDR []string
 
@@ -202,10 +211,10 @@ var _ = ginkgo.Describe("L2", func() {
 					ipv6AddressesByCIDR = append(ipv6AddressesByCIDR, cidr.String())
 				}
 
-				return []addressPool{
+				return []config.AddressPool{
 					{
 						Name:      "l2-test",
-						Protocol:  Layer2,
+						Protocol:  config.Layer2,
 						Addresses: append(ipv4AddressesByCIDR, ipv6AddressesByCIDR...),
 					},
 				}
@@ -214,11 +223,11 @@ var _ = ginkgo.Describe("L2", func() {
 	})
 
 	table.DescribeTable("different services sharing the same ip should advertise from the same node", func(ipRange *string) {
-		configData := configFile{
-			Pools: []addressPool{
+		configData := config.File{
+			Pools: []config.AddressPool{
 				{
 					Name:     "l2-services-same-ip-test",
-					Protocol: Layer2,
+					Protocol: config.Layer2,
 					Addresses: []string{
 						ipv4ServiceRange,
 						ipv6ServiceRange,
@@ -226,7 +235,7 @@ var _ = ginkgo.Describe("L2", func() {
 				},
 			},
 		}
-		err := updateConfigMap(cs, configData)
+		err := configUpdater.Update(configData)
 		framework.ExpectNoError(err)
 		namespace := f.Namespace.Name
 
@@ -334,11 +343,11 @@ var _ = ginkgo.Describe("L2", func() {
 		table.DescribeTable("should be exposed by the controller", func(ipFamily string) {
 			poolName := "l2-metrics-test"
 
-			configData := configFile{
-				Pools: []addressPool{
+			configData := config.File{
+				Pools: []config.AddressPool{
 					{
 						Name:     poolName,
-						Protocol: Layer2,
+						Protocol: config.Layer2,
 						Addresses: []string{
 							ipv4ServiceRange,
 							ipv6ServiceRange,
@@ -349,7 +358,7 @@ var _ = ginkgo.Describe("L2", func() {
 			poolCount, err := poolCount(configData.Pools[0])
 			framework.ExpectNoError(err)
 
-			err = updateConfigMap(cs, configData)
+			err = configUpdater.Update(configData)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("checking the metrics when no service is added")
@@ -457,7 +466,7 @@ var _ = ginkgo.Describe("L2", func() {
 	table.DescribeTable("validate requesting a specific address pool for Loadbalancer service", func(ipRange *string) {
 		var services []*corev1.Service
 		var servicesIngressIP []string
-		var pools []addressPool
+		var pools []config.AddressPool
 
 		namspace := f.Namespace.Name
 
@@ -466,19 +475,19 @@ var _ = ginkgo.Describe("L2", func() {
 			ip, err := getIPFromRangeByIndex(*ipRange, i)
 			framework.ExpectNoError(err)
 			addressesRange := fmt.Sprintf("%s-%s", ip, ip)
-			pool := addressPool{
+			pool := config.AddressPool{
 				Name:     fmt.Sprintf("test-addresspool%d", i+1),
-				Protocol: Layer2,
+				Protocol: config.Layer2,
 				Addresses: []string{
 					addressesRange,
 				},
 			}
 			pools = append(pools, pool)
 
-			configData := configFile{
+			configData := config.File{
 				Pools: pools,
 			}
-			err = updateConfigMap(cs, configData)
+			err = configUpdater.Update(configData)
 			framework.ExpectNoError(err)
 
 			ginkgo.By(fmt.Sprintf("configure service number %d", i+1))
@@ -503,7 +512,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
 			ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
-			err = validateIPInRange([]addressPool{pool}, ingressIP)
+			err = validateIPInRange([]config.AddressPool{pool}, ingressIP)
 			framework.ExpectNoError(err)
 
 			services = append(services, svc)
@@ -582,7 +591,7 @@ func advertisingNodeFromMAC(nodes []corev1.Node, ip string, exc executor.Executo
 
 // taken from internal: poolCount returns the number of addresses in the pool.
 // TODO: find a better place for this func.
-func poolCount(p addressPool) (int64, error) {
+func poolCount(p config.AddressPool) (int64, error) {
 	var total int64
 	for _, r := range p.Addresses {
 		cidrs, err := internalconfig.ParseCIDR(r)
