@@ -35,10 +35,11 @@ hostname {{.Hostname}}
 {{- range $n := .Neighbors }}
 {{- range $a := .Advertisements }}
 {{- if gt (len $a.Communities) 0}}
-route-map {{$n.Addr}}-map permit 10
+route-map {{$n.Addr}}-out permit 10
 {{- range $c := $a.Communities }}
   set community {{$c}} additive
 {{- end }}
+route-map {{$n.Addr}}-in deny 20
 {{- end }}
 {{- end }}
 {{- end }}
@@ -66,24 +67,27 @@ router bgp {{.MyASN}}
   {{- end }}
 {{- if ne .BFDProfile ""}} 
   neighbor {{.Addr}} bfd profile {{.BFDProfile}}
-{{- end -}}
+{{- end }}
 {{- end }}
 {{range $n := .Neighbors -}}
 {{/* no bgp default ipv4-unicast prevents peering if no address families are defined. We declare an ipv4 one for the peer to make the pairing happen */}}
 {{- if eq (len .Advertisements) 0}}
   address-family ipv4 unicast
     neighbor {{$n.Addr}} activate
+    neighbor {{$n.Addr}} route-map {{$n.Addr}}-in in
   exit-address-family
   address-family ipv6 unicast
     neighbor {{$n.Addr}} activate
+    neighbor {{$n.Addr}} route-map {{$n.Addr}}-in in
   exit-address-family
 {{- end}}
 {{- range .Advertisements }}
   address-family {{.Version}} unicast
     neighbor {{$n.Addr}} activate
+    neighbor {{$n.Addr}} route-map {{$n.Addr}}-in in
     network {{.Prefix}}
 	{{- if gt (len .Communities) 0}}
-    neighbor {{$n.Addr}} route-map {{$n.Addr}}-map out
+    neighbor {{$n.Addr}} route-map {{$n.Addr}}-out out
     {{- end}}
   exit-address-family
 {{- end}}
