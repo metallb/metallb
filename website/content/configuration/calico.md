@@ -3,17 +3,33 @@ title: Issues with Calico
 weight: 20
 ---
 
-Simple setups with [Calico](https://docs.projectcalico.org/) don't
-require anything special, you can just install and configure MetalLB
-as usual and enjoy.
+## The easy way
 
-However, if you are using
-Calico's
-[external BGP peering capability](https://docs.projectcalico.org/v3.0/usage/configuration/bgp) to
-advertise your cluster prefixes over BGP, and also want to use BGP in
-MetalLB, you will need to jump through some hoops.
+As of Calico 3.18 (from early 2021), Calico now supports limited
+integration with MetalLB. Calico can be configured to announce
+LoadBalancer IPs itself via BGP. Simply run MetalLB *without* the
+speaker pods, and then configure the IP range(s) that you want Calico
+to announce.
 
-## The problem
+See the [official Calico docs](https://projectcalico.docs.tigera.io/networking/advertise-service-ips)
+for reference.
+
+Example:
+
+```bash
+calicoctl patch BGPConfig default --patch '{"spec": {"serviceLoadBalancerIPs": [{"cidr": "10.11.0.0/16"},{"cidr":"10.1.5.0/24"}]}}'
+```
+
+Be aware that Calico announces the entire CIDR block provided, not
+individual LoadBalancer IPs. If you need to announce more specific
+routes, then explicitly list them in `serviceLoadBalancerIPs`.
+
+## The hard way
+
+If you can't use a newer version of Calico, or missing features make
+it unusable, then there are a number of older workarounds.
+
+### The problem
 
 BGP only allows one session to be established per pair of nodes. So,
 if Calico has a session established with your BGP router, MetalLB
@@ -44,7 +60,7 @@ are
 Calico to add these extension points, but in the meantime, we can only
 offer some hacky workarounds.
 
-## Workaround: Peer with spine routers
+### Workaround: Peer with spine routers
 
 If you are deploying to a cluster using a traditional "rack and spine"
 router architecture, you can work around the limitation imposed by BGP
@@ -170,7 +186,7 @@ graph BT
     metallbA-->spine
 {{< /mermaid >}}
 
-## Workaround: Router VRFs
+### Workaround: Router VRFs
 
 If your networking hardware supports VRFs (Virtual Routing and
 Forwarding), you may be able to "split" your router in two, and peer
@@ -209,11 +225,7 @@ you are interfacing with. If you get this working,
 please [let us know](https://github.com/metallb/metallb/issues/new),
 especially if you have tips on how to make this work best!
 
-## Ideas wanted!
-
-None of these workarounds are very satisfying. Until Calico supports
-more advanced configuration for BGP peers, we are stuck doing
-acrobatics to integrate the two.
+## Ideas wanted
 
 If you have an idea for another workaround that would enable Calico
 and MetalLB to coexist nicely,
