@@ -142,6 +142,12 @@ func (c *FRR) UpdateBGPConfigFile(bgpConfig string) error {
 	if err != nil {
 		return errors.Wrapf(err, "Failed to reload BGP config file")
 	}
+	res, err := c.Exec("vtysh", "-c", "show watchfrr")
+	if err != nil {
+		return errors.Wrapf(err, "Failed to run show watchfrr")
+	}
+	fmt.Println("DEBUG SHOW FRR")
+	fmt.Println(res)
 
 	return nil
 }
