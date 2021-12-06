@@ -128,26 +128,39 @@ var _ = ginkgo.Describe("L2", func() {
 			port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
 			ingressIP := e2eservice.GetIngressPoint(
 				&svc.Status.LoadBalancer.Ingress[0])
-
-			ginkgo.By("checking connectivity to its external VIP")
-
 			hostport := net.JoinHostPort(ingressIP, port)
 			address := fmt.Sprintf("http://%s/", hostport)
+
+			ginkgo.By(fmt.Sprintf("checking connectivity to its external VIP %s", hostport))
 			err = wgetRetry(address, executor.Host)
 			framework.ExpectNoError(err)
 
-			advNode, err := advertisingNodeFromMAC(epNodes, ingressIP, executor.Host)
-			framework.ExpectNoError(err)
+			// Give the speakers enough time to settle and for the announcer to complete its gratuitous.
+			gomega.Eventually(func() error {
+				advNode, err := advertisingNodeFromMAC(epNodes, ingressIP, executor.Host)
+				if err != nil {
+					return err
+				}
 
-			for i := 0; i < 5; i++ {
-				name, err := getEndpointHostName(hostport, executor.Host)
-				framework.ExpectNoError(err)
+				for i := 0; i < 5; i++ {
+					name, err := getEndpointHostName(hostport, executor.Host)
+					if err != nil {
+						return err
+					}
 
-				pod, err := cs.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), name, metav1.GetOptions{})
-				framework.ExpectNoError(err)
-				framework.ExpectEqual(pod.Spec.NodeName == advNode.Name, true, "traffic arrived to a pod not from the announcing node")
-			}
+					ginkgo.By(fmt.Sprintf("checking that pod %s is on node %s", name, advNode.Name))
+					pod, err := cs.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), name, metav1.GetOptions{})
+					if err != nil {
+						return err
+					}
 
+					if pod.Spec.NodeName != advNode.Name {
+						return fmt.Errorf("traffic arrived to a pod on node %s which is not the announcing node %s", pod.Spec.NodeName, advNode.Name)
+					}
+				}
+
+				return nil
+			}, 5*time.Second, 1*time.Second).Should(gomega.BeNil())
 		})
 
 	})
