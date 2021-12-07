@@ -32,6 +32,7 @@ route-map RMAP permit 10
 set ipv6 next-hop prefer-global
 router bgp {{.ASN}}
   bgp router-id {{.RouterID}}
+  no bgp network import-check
   no bgp ebgp-requires-policy
   no bgp default ipv4-unicast
 {{range .Neighbors }}
@@ -48,6 +49,9 @@ router bgp {{.ASN}}
 {{range .V4Neighbors }}
     neighbor {{.Addr}} next-hop-self
     neighbor {{.Addr}} activate
+    {{- if .ToAdvertise}}
+    network {{.ToAdvertise}}
+    {{- end }}
 {{- end }}
   exit-address-family
 {{- end }}
@@ -57,6 +61,9 @@ router bgp {{.ASN}}
     neighbor {{.Addr}} next-hop-self
     neighbor {{.Addr}} activate
     neighbor {{.Addr}} route-map RMAP in
+    {{- if .ToAdvertise}}
+    network {{.ToAdvertise}}
+    {{- end }}
 {{- end }}
 exit-address-family
 {{- end }}
@@ -74,11 +81,12 @@ type RouterConfig struct {
 }
 
 type NeighborConfig struct {
-	ASN        uint32
-	Addr       string
-	Password   string
-	IPFamily   string
-	BFDEnabled bool
+	ASN         uint32
+	Addr        string
+	Password    string
+	IPFamily    string
+	BFDEnabled  bool
+	ToAdvertise string
 }
 
 // Set the IP of each node in the cluster in the BGP router configuration.

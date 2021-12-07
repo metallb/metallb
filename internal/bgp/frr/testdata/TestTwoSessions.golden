@@ -18,9 +18,11 @@ router bgp 100
 
   address-family ipv4 unicast
     neighbor 10.2.2.254 activate
+    neighbor 10.2.2.254 route-map 10.2.2.254-in in
   exit-address-family
   address-family ipv6 unicast
     neighbor 10.2.2.254 activate
+    neighbor 10.2.2.254 route-map 10.2.2.254-in in
   exit-address-family
 router bgp 300
   no bgp ebgp-requires-policy
@@ -37,7 +39,9 @@ router bgp 300
 
   address-family ipv4 unicast
     neighbor 10.4.4.254 activate
+    neighbor 10.4.4.254 route-map 10.4.4.254-in in
   exit-address-family
   address-family ipv6 unicast
     neighbor 10.4.4.254 activate
+    neighbor 10.4.4.254 route-map 10.4.4.254-in in
   exit-address-family
