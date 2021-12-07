@@ -143,7 +143,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		}
 		framework.ExpectNoError(err)
 		cs = f.ClientSet
-		configUpdater = config.UpdaterForConfigMap(cs, testNameSpace)
+		configUpdater = config.UpdaterForConfigMap(cs, configMapName, testNameSpace)
 		if useOperator {
 			clientconfig := f.ClientConfig()
 			configUpdater, err = config.UpdaterForOperator(clientconfig, testNameSpace)

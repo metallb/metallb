@@ -30,10 +30,10 @@ type configmapUpdater struct {
 	namespace string
 }
 
-func UpdaterForConfigMap(c clientset.Interface, ns string) *configmapUpdater {
+func UpdaterForConfigMap(c clientset.Interface, cmName string, ns string) *configmapUpdater {
 	return &configmapUpdater{
 		Interface: c,
-		name:      "config",
+		name:      cmName,
 		namespace: ns,
 	}
 }
