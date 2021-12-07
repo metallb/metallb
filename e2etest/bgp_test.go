@@ -946,6 +946,66 @@ var _ = ginkgo.Describe("BGP", func() {
 					},
 				}}, "ipv6"))
 	})
+
+	table.DescribeTable("MetalLB FRR rejects any routes advertised by any neighbor", func(addressesRange, pairingIPFamily, toInject string) {
+		configData := config.File{
+			Pools: []config.AddressPool{
+				{
+					Name:     "bgp-test",
+					Protocol: config.BGP,
+					Addresses: []string{
+						addressesRange,
+					},
+				},
+			},
+			Peers: peersForContainers(frrContainers, pairingIPFamily),
+		}
+		neighborAnnounce := func(frr *frrcontainer.FRR) {
+			frr.NeighborConfig.ToAdvertise = toInject
+		}
+
+		for _, c := range frrContainers {
+			pairExternalFRRWithNodes(cs, c, pairingIPFamily, neighborAnnounce)
+		}
+
+		err := configUpdater.Update(configData)
+		framework.ExpectNoError(err)
+
+		for _, c := range frrContainers {
+			validateFRRPeeredWithNodes(cs, c, pairingIPFamily)
+		}
+		svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb")
+
+		defer func() {
+			err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+		}()
+
+		speakerPods := getSpeakerPods(cs)
+		Consistently(func() error {
+			for _, pod := range speakerPods {
+				podExec := executor.ForPod(pod.Namespace, pod.Name, "frr")
+				routes, frrRoutesV6, err := frr.Routes(podExec)
+				framework.ExpectNoError(err)
+
+				if pairingIPFamily == "ipv6" {
+					routes = frrRoutesV6
+				}
+
+				for _, route := range routes {
+					if route.Destination.String() == toInject {
+						return fmt.Errorf("Found %s in %s routes", toInject, pod.Name)
+					}
+				}
+			}
+			return nil
+		}, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
+
+	},
+		table.Entry("IPV4", "192.168.10.0/24", "ipv4", "172.16.1.10/32"),
+		table.Entry("IPV6", "fc00:f853:0ccd:e799::/116", "ipv6", "fc00:f853:ccd:e800::1/128"),
+	)
+
 })
 
 func createServiceWithBackend(cs clientset.Interface, namespace string, jigName string, tweak ...func(svc *corev1.Service)) (*corev1.Service, *e2eservice.TestJig) {
