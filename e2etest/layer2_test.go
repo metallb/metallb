@@ -56,7 +56,7 @@ var _ = ginkgo.Describe("L2", func() {
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
 		loadBalancerCreateTimeout = e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
-		configUpdater = config.UpdaterForConfigMap(cs, testNameSpace)
+		configUpdater = config.UpdaterForConfigMap(cs, configMapName, testNameSpace)
 		if useOperator {
 			clientconfig := f.ClientConfig()
 			configUpdater, err = config.UpdaterForOperator(clientconfig, testNameSpace)
