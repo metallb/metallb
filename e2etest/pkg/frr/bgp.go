@@ -110,6 +110,12 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 	}
 	res = res + out
 
+	res = res + "####### Watchfrr \n"
+	out, err = exec.Exec("vtysh", "-c", "show watchfrr")
+	if err != nil {
+		return "", errors.Wrapf(err, "Failed exec show watchfrr %s", res)
+	}
+	res = res + out
 	return res, nil
 }
 

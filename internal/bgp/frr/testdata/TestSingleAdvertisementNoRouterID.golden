@@ -17,5 +17,6 @@ router bgp 100
 
   address-family ipv4 unicast
     neighbor 10.2.2.254 activate
+    neighbor 10.2.2.254 route-map 10.2.2.254-in in
     network 172.16.1.10/24
   exit-address-family

@@ -2,9 +2,10 @@
 log file /etc/frr/frr.log informational
 log timestamp precision 3
 hostname dummyhostname
-route-map 10.2.2.254-map permit 10
+route-map 10.2.2.254-out permit 10
   set community 1111:2222 additive
   set community 3333:4444 additive
+route-map 10.2.2.254-in deny 20
 
 router bgp 100
   no bgp ebgp-requires-policy
@@ -21,6 +22,7 @@ router bgp 100
 
   address-family ipv4 unicast
     neighbor 10.2.2.254 activate
+    neighbor 10.2.2.254 route-map 10.2.2.254-in in
     network 172.16.1.10/24
-    neighbor 10.2.2.254 route-map 10.2.2.254-map out
+    neighbor 10.2.2.254 route-map 10.2.2.254-out out
   exit-address-family
