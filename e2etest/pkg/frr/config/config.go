@@ -24,6 +24,7 @@ debug bgp updates
 debug bgp neighbor
 debug zebra nht
 debug bgp nht
+debug bfd peer
 
 log file /tmp/frr.log debugging
 log timestamp precision 3
