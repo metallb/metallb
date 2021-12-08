@@ -701,7 +701,10 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
             "KUBECONFIG={} go test -timeout 30m {} {} --provider=local --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range, ipv6_service_range, opt_skip_docker, opt_use_operator), warn="True")
 
     if export != None:
-        run("kind export logs {}".format(export))
+        kindexport = run("kind export logs {}".format(export), warn="True")
+        if kindexport.failed:
+            ns = os.getenv('OO_INSTALL_NAMESPACE', "metallb-system")
+            dump_ns(ns, export)
 
     if testrun.failed:
         raise Exit(message="E2E tests failed", code=testrun.return_code)
@@ -728,4 +731,12 @@ def verifylicense(ctx):
             print("{} is missing license".format(file))
     if no_license:
         raise Exit(message="#### Files with no license found.\n#### Please run ""inv bumplicense"" to add the license header")
- 
+
+def dump_ns(ns=None,dir=None):
+    """Dumps all pods specs/logs in a given namespace"""
+    if ns is None or dir is None:
+        raise Exit(message="Namespace and directory must be specified.")
+
+    run("kubectl -n {} get pods -oyaml > {}/pods_specs.log".format(ns, dir))
+    run("kubectl logs -n {} --selector component=speaker --all-containers=true --prefix=true > {}/speakers.log".format(ns, dir))
+    run("kubectl logs -n {} --selector component=speaker --all-containers=true --prefix=true > {}/controller.log".format(ns, dir))
