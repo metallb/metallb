@@ -34,6 +34,7 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
@@ -56,17 +57,27 @@ var (
 	containersNetwork = defaultContainersNetwork
 	hostIPv4          string
 	hostIPv6          string
+	useOperator       bool
 )
 
 // handleFlags sets up all flags and parses the command line.
 func handleFlags() {
 	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
 	framework.RegisterCommonFlags(flag.CommandLine)
-	framework.RegisterClusterFlags(flag.CommandLine)
+	/*
+		Using framework.RegisterClusterFlags(flag.CommandLine) results in a panic:
+		"flag redefined: kubeconfig".
+		This happens because controller-runtime registers the kubeconfig flag as well.
+		To solve this we set the framework's kubeconfig directly via the KUBECONFIG env var
+		instead of letting it call the flag. Since we also use the provider flag it is handled manually.
+	*/
+	flag.StringVar(&framework.TestContext.Provider, "provider", "", "The name of the Kubernetes provider (gce, gke, local, skeleton (the fallback if not set), etc.)")
+	framework.TestContext.KubeConfig = os.Getenv(clientcmd.RecommendedConfigPathEnvVar)
 	flag.IntVar(&servicePodPort, "service-pod-port", 80, "port number that pod opens, default: 80")
 	flag.BoolVar(&skipDockerCmd, "skip-docker", false, "set this to true if the BGP daemon is running on the host instead of in a container")
 	flag.StringVar(&ipv4ServiceRange, "ipv4-service-range", "0", "a range of IPv4 addresses for MetalLB to use when running in layer2 mode")
 	flag.StringVar(&ipv6ServiceRange, "ipv6-service-range", "0", "a range of IPv6 addresses for MetalLB to use when running in layer2 mode")
+	flag.BoolVar(&useOperator, "use-operator", false, "set this to true to run the tests using operator custom resources")
 	flag.Parse()
 }
 
@@ -101,6 +112,9 @@ func TestE2E(t *testing.T) {
 }
 
 var _ = ginkgo.BeforeSuite(func() {
+	// Make sure the framework's kubeconfig is set.
+	framework.ExpectNotEqual(framework.TestContext.KubeConfig, "", fmt.Sprintf("%s env var not set", clientcmd.RecommendedConfigPathEnvVar))
+
 	if ns := os.Getenv("OO_INSTALL_NAMESPACE"); len(ns) != 0 {
 		testNameSpace = ns
 	}

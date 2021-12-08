@@ -104,4 +104,7 @@ spec:
       tolerations:
         {{- toYaml . | nindent 6 }}
       {{- end }}
+      {{- with .Values.controller.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
 {{- end }}

@@ -7,6 +7,7 @@ import (
 	"net"
 	"os/exec"
 
+	"go.universe.tf/metallb/e2etest/pkg/config"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	internalconfig "go.universe.tf/metallb/internal/config"
 	v1 "k8s.io/api/core/v1"
@@ -65,7 +66,7 @@ func tweakRCPort(rc *v1.ReplicationController) {
 	}
 }
 
-func validateIPInRange(addressPools []addressPool, ip string) error {
+func validateIPInRange(addressPools []config.AddressPool, ip string) error {
 	input := net.ParseIP(ip)
 	for _, addressPool := range addressPools {
 		for _, address := range addressPool.Addresses {
