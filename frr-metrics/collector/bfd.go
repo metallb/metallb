@@ -126,7 +126,7 @@ func (c *bfd) Collect(ch chan<- prometheus.Metric) {
 func updatePeersMetrics(ch chan<- prometheus.Metric, peers map[string]bgpfrr.BFDPeer) {
 	for _, p := range peers {
 		sessionUp := 1
-		if p.Status == "down" {
+		if p.Status != "up" {
 			sessionUp = 0
 		}
 
