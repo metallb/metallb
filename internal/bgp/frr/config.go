@@ -30,6 +30,8 @@ const configTemplate = `
 log file /etc/frr/frr.log {{.Loglevel}}
 log timestamp precision 3
 hostname {{.Hostname}}
+ip nht resolve-via-default
+ipv6 nht resolve-via-default
 
 {{- range .Routers }}
 {{- range $n := .Neighbors }}
