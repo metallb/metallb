@@ -267,7 +267,7 @@ def validate_kind_version():
     "log_level": "Log level for the controller and the speaker."
                 "Default: info, Supported: 'all', 'debug', 'info', 'warn', 'error' or 'none'"
 })
-def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None,
+def dev_env(ctx, architecture="amd64", name="kind", protocol=None,
         node_img=None, ip_family="ipv4", bgp_type="native", log_level="info"):
     """Build and run MetalLB in a local Kind cluster.
 
@@ -293,8 +293,6 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None,
         }
 
         networking_config = {}
-        if cni:
-            networking_config["disableDefaultCNI"] = True
         if ip_family != "ipv4":
             networking_config["ipFamily"] = ip_family
 
@@ -310,8 +308,6 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None,
             tmp.flush()
             run("kind create cluster --name={} --config={} {}".format(name, tmp.name, extra_options), pty=True, echo=True)
 
-    if mk_cluster and cni:
-        run("kubectl apply -f e2etest/manifests/{}.yaml".format(cni), echo=True)
     binaries = ["controller", "speaker", "mirror-server"]
     build(ctx, binaries, architectures=[architecture])
     run("kind load docker-image --name={} quay.io/metallb/controller:dev-{}".format(name, architecture), echo=True)
@@ -491,33 +487,6 @@ def dev_env_cleanup(ctx, name="kind"):
     # cleanup layer2 configs
     dev_env_dir = os.getcwd() + "/dev-env/layer2"
     run('rm -f "%s"/config.yaml' % dev_env_dir)
-
-
-@task
-def test_cni_manifests(ctx):
-    """Update CNI manifests for e2e tests."""
-    def _fetch(url):
-        bs = urlopen(url).read()
-        return list(m for m in yaml.safe_load_all(bs) if m)
-    def _write(file, manifest):
-        with open(file, "w") as f:
-            f.write(yaml.dump_all(manifest))
-
-    calico = _fetch("https://docs.projectcalico.org/v3.6/getting-started/kubernetes/installation/hosted/kubernetes-datastore/calico-networking/1.7/calico.yaml")
-    for manifest in calico:
-        if manifest["kind"] != "DaemonSet":
-            continue
-        manifest["spec"]["template"]["spec"]["containers"][0]["env"].append({
-            "name": "FELIX_IGNORELOOSERPF",
-            "value": "true",
-        })
-    _write("e2etest/manifests/calico.yaml", calico)
-
-    weave = _fetch("https://cloud.weave.works/k8s/net?k8s-version=1.15&env.NO_MASQ_LOCAL=1")
-    _write("e2etest/manifests/weave.yaml", weave)
-
-    flannel = _fetch("https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml")
-    _write("e2etest/manifests/flannel.yaml", flannel)
 
 
 @task(help={
