@@ -36,10 +36,13 @@ ipv6 nht resolve-via-default
 {{- range .Routers }}
 {{- range $n := .Neighbors }}
 {{- range $a := .Advertisements }}
-{{- if gt (len $a.Communities) 0}}
+{{- if or (gt (len $a.Communities) 0) (ne $a.LocalPref 0) }}
 route-map {{$n.Addr}}-out permit 10
 {{- range $c := $a.Communities }}
   set community {{$c}} additive
+{{- end }}
+{{- if ne $a.LocalPref 0 }}
+  set local-preference {{$a.LocalPref}}
 {{- end }}
 route-map {{$n.Addr}}-in deny 20
 {{- end }}
@@ -88,7 +91,7 @@ router bgp {{.MyASN}}
     neighbor {{$n.Addr}} activate
     neighbor {{$n.Addr}} route-map {{$n.Addr}}-in in
     network {{.Prefix}}
-	{{- if gt (len .Communities) 0}}
+    {{- if or (gt (len .Communities) 0) (ne .LocalPref 0) }}
     neighbor {{$n.Addr}} route-map {{$n.Addr}}-out out
     {{- end}}
   exit-address-family
@@ -163,6 +166,7 @@ type advertisementConfig struct {
 	Version     string
 	Prefix      string
 	Communities []string
+	LocalPref   uint32
 }
 
 // routerName() defines the format of the key of the "Routers" map in the
