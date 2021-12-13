@@ -866,9 +866,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 				pairExternalFRRWithNodes(cs, c, ipFamily)
 
-				for j := 0; j <= i; j++ {
-					validateFRRPeeredWithNodes(cs, frrContainers[j], ipFamily)
-				}
+				validateFRRPeeredWithNodes(cs, frrContainers[i], ipFamily)
 			}
 		},
 			table.Entry("IPV4", "ipv4"),
@@ -1202,7 +1200,7 @@ func stopFRRContainers(containers []*frrcontainer.FRR) error {
 func peersForContainers(containers []*frrcontainer.FRR, ipFamily string) []config.Peer {
 	var peers []config.Peer
 
-	for i, c := range frrContainers {
+	for i, c := range containers {
 		addresses := c.AddressesForFamily(ipFamily)
 		holdTime := ""
 		if i > 0 {
