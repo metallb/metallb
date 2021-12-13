@@ -241,7 +241,6 @@ func TestSingleAdvertisement(t *testing.T) {
 	communities = append(communities, community)
 	adv := &bgp.Advertisement{
 		Prefix:      prefix,
-		NextHop:     net.ParseIP("10.1.1.1"),
 		Communities: communities,
 		LocalPref:   300,
 	}
@@ -272,40 +271,12 @@ func TestSingleAdvertisementNoRouterID(t *testing.T) {
 	}
 
 	adv := &bgp.Advertisement{
-		Prefix:  prefix,
-		NextHop: net.ParseIP("10.1.1.1"),
+		Prefix: prefix,
 	}
 
 	err = session.Set(adv)
 	if err != nil {
 		t.Fatalf("Could not advertise prefix: %s", err)
-	}
-
-	testCheckConfigFile(t)
-}
-
-func TestSingleAdvertisementInvalidPrefix(t *testing.T) {
-	testSetup(t)
-
-	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
-
-	prefix := &net.IPNet{}
-
-	adv := &bgp.Advertisement{
-		Prefix:  prefix,
-		NextHop: net.ParseIP("10.1.1.1"),
-	}
-
-	err = session.Set(adv)
-	if err == nil {
-		t.Fatalf("Set should return error")
 	}
 
 	testCheckConfigFile(t)
@@ -326,36 +297,6 @@ func TestSingleAdvertisementInvalidNoPort(t *testing.T) {
 	// Not checking the file since this test won't create it
 }
 
-func TestSingleAdvertisementInvalidNextHop(t *testing.T) {
-	t.Skip("TODO: bgp.Validate() incorrectly(?) returns err == nil")
-	testSetup(t)
-
-	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
-
-	prefix := &net.IPNet{
-		IP:   net.ParseIP("172.16.1.10"),
-		Mask: classCMask,
-	}
-
-	adv := &bgp.Advertisement{
-		Prefix: prefix,
-	}
-
-	err = session.Set(adv)
-	if err != nil {
-		t.Fatalf("Could not advertise prefix: %s", err)
-	}
-
-	testCheckConfigFile(t)
-}
-
 func TestSingleAdvertisementStop(t *testing.T) {
 	testSetup(t)
 
@@ -374,8 +315,7 @@ func TestSingleAdvertisementStop(t *testing.T) {
 	}
 
 	adv := &bgp.Advertisement{
-		Prefix:  prefix,
-		NextHop: net.ParseIP("10.1.1.1"),
+		Prefix: prefix,
 	}
 
 	err = session.Set(adv)
@@ -409,8 +349,7 @@ func TestSingleAdvertisementChange(t *testing.T) {
 	}
 
 	adv := &bgp.Advertisement{
-		Prefix:  prefix,
-		NextHop: net.ParseIP("10.1.1.1"),
+		Prefix: prefix,
 	}
 
 	err = session.Set(adv)
@@ -424,8 +363,7 @@ func TestSingleAdvertisementChange(t *testing.T) {
 	}
 
 	adv = &bgp.Advertisement{
-		Prefix:  prefix,
-		NextHop: net.ParseIP("10.1.1.1"),
+		Prefix: prefix,
 	}
 
 	err = session.Set(adv)
@@ -457,7 +395,6 @@ func TestTwoAdvertisements(t *testing.T) {
 	communities = append(communities, community)
 	adv1 := &bgp.Advertisement{
 		Prefix:      prefix1,
-		NextHop:     net.ParseIP("10.1.1.1"),
 		Communities: communities,
 	}
 
@@ -467,8 +404,7 @@ func TestTwoAdvertisements(t *testing.T) {
 	}
 
 	adv2 := &bgp.Advertisement{
-		Prefix:  prefix2,
-		NextHop: net.ParseIP("10.1.1.1"),
+		Prefix: prefix2,
 	}
 
 	err = session.Set(adv1, adv2)
@@ -506,7 +442,6 @@ func TestTwoAdvertisementsTwoSessions(t *testing.T) {
 	communities = append(communities, community)
 	adv1 := &bgp.Advertisement{
 		Prefix:      prefix1,
-		NextHop:     net.ParseIP("10.1.1.1"),
 		Communities: communities,
 	}
 
@@ -517,7 +452,6 @@ func TestTwoAdvertisementsTwoSessions(t *testing.T) {
 
 	adv2 := &bgp.Advertisement{
 		Prefix:      prefix2,
-		NextHop:     net.ParseIP("10.1.1.2"),
 		Communities: communities,
 		LocalPref:   2,
 	}
