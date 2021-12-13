@@ -158,6 +158,8 @@ var _ = ginkgo.BeforeSuite(func() {
 		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 	}
+
+	frrContainers = setupContainers()
 })
 
 var _ = ginkgo.AfterSuite(func() {
@@ -166,4 +168,6 @@ var _ = ginkgo.AfterSuite(func() {
 
 	err = cs.CoreV1().ConfigMaps(testNameSpace).Delete(context.TODO(), configMapName, metav1.DeleteOptions{})
 	framework.ExpectNoError(err)
+
+	tearDownContainers(frrContainers)
 })

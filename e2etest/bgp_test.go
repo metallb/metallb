@@ -71,10 +71,7 @@ type containerConfig struct {
 	rc   frrconfig.RouterConfig
 }
 
-var _ = ginkgo.Describe("BGP", func() {
-	var configUpdater config.Updater
-	var cs clientset.Interface
-	var f *framework.Framework
+func setupContainers() []*frrcontainer.FRR {
 	ibgpContainerConfig := containerConfig{
 		name: frrIBGP,
 		nc: frrconfig.NeighborConfig{
@@ -100,6 +97,33 @@ var _ = ginkgo.Describe("BGP", func() {
 		},
 	}
 
+	var res []*frrcontainer.FRR
+	var err error
+	if containersNetwork == "host" {
+		if net.ParseIP(hostIPv4) == nil {
+			framework.Fail("Invalid hostIPv4")
+		}
+		if net.ParseIP(hostIPv6) == nil {
+			framework.Fail("Invalid hostIPv6")
+		}
+		res, err = createFRRContainers(ibgpContainerConfig)
+	} else {
+		res, err = createFRRContainers(ibgpContainerConfig, ebgpContainerConfig)
+	}
+	framework.ExpectNoError(err)
+	return res
+}
+
+func tearDownContainers(containers []*frrcontainer.FRR) {
+	err := stopFRRContainers(containers)
+	framework.ExpectNoError(err)
+}
+
+var _ = ginkgo.Describe("BGP", func() {
+	var configUpdater config.Updater
+	var cs clientset.Interface
+	var f *framework.Framework
+
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentGinkgoTestDescription().Failed {
 			for _, c := range frrContainers {
@@ -123,30 +147,20 @@ var _ = ginkgo.Describe("BGP", func() {
 		err := configUpdater.Clean()
 		framework.ExpectNoError(err)
 
-		err = stopFRRContainers(frrContainers)
-		framework.ExpectNoError(err)
+		for _, c := range frrContainers {
+			err := c.UpdateBGPConfigFile(frrconfig.Empty)
+			framework.ExpectNoError(err)
+		}
 	})
 
 	f = framework.NewDefaultFramework("bgp")
 
 	ginkgo.BeforeEach(func() {
-		var err error
-		if containersNetwork == "host" {
-			if net.ParseIP(hostIPv4) == nil {
-				framework.Fail("Invalid hostIPv4")
-			}
-			if net.ParseIP(hostIPv6) == nil {
-				framework.Fail("Invalid hostIPv6")
-			}
-			frrContainers, err = createFRRContainers(ibgpContainerConfig)
-		} else {
-			frrContainers, err = createFRRContainers(ibgpContainerConfig, ebgpContainerConfig)
-		}
-		framework.ExpectNoError(err)
 		cs = f.ClientSet
 		configUpdater = config.UpdaterForConfigMap(cs, configMapName, testNameSpace)
 		if useOperator {
 			clientconfig := f.ClientConfig()
+			var err error
 			configUpdater, err = config.UpdaterForOperator(clientconfig, testNameSpace)
 			framework.ExpectNoError(err)
 		}
