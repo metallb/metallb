@@ -1,0 +1,127 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - 'main'
+  pull_request:
+    branches:
+      - 'main'
+  workflow_dispatch:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install python3-pip arping ndisc6
+          sudo pip3 install invoke semver pyyaml
+      
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '1.16'
+
+      - name: Unit Tests
+        run: |
+          inv test
+          cp manifests/metallb.yaml manifests/metallb.yaml.prev
+
+      - name: Lint
+        run: |
+          inv checkpatch
+          inv lint -e host
+          inv verifylicense
+
+  helm:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: "0"
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v1
+        with:
+          version: v3.7.1
+
+
+## ct v3.4.0, which in turn uses helm v3.5.4
+      - name: Lint
+        uses: docker://quay.io/helmpack/chart-testing:v3.4.0
+        with:
+          args: ct lint
+
+## TODO: Can't pass flags to the conftest GHA in order to use --fail-on-warn
+##       Should be fixed when https://github.com/instrumenta/conftest-action/issues/3
+##       is resolved
+##
+#      - name: Conftest
+#        uses: instrumenta/conftest-action/helm@master
+#        with:
+#          chart: charts/metallb/
+#          policy: charts/metallb/policy
+
+      - name: Conftest
+        run: |
+          helm plugin install --debug https://github.com/instrumenta/helm-conftest
+          helm conftest charts/metallb/ -p charts/metallb/policy/ --fail-on-warn
+
+  e2e:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+      matrix:
+        ip-family: [ipv4, ipv6, dual]
+        bgp-type: [native, frr]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '1.16.3'
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install python3-pip arping ndisc6
+          sudo pip3 install invoke semver pyyaml
+          GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
+
+      - name: Build MetalLB
+        run: |
+          inv build
+          inv dev-env -i ${{ matrix.ip-family }} -b ${{ matrix.bgp-type }} -l all
+
+      - name: E2E
+        run: |
+          SKIP="none"
+          if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP\|FRR\|BFD\|DUALSTACK"; fi
+          if [ "${{ matrix.ip-family }}" == "ipv4" ]; then SKIP="$SKIP\|IPV6\|DUALSTACK"; fi
+          if [ "${{ matrix.ip-family }}" == "dual" ]; then SKIP="$SKIP\|IPV6"; fi
+          if [ "${{ matrix.ip-family }}" == "ipv6" ]; then SKIP="$SKIP\|IPV4\|DUALSTACK"; fi
+          if [ "${{ matrix.ip-family }}" == "ipv6" ] && [ ${{ matrix.bgp-type }} == "native" ]; then SKIP="$SKIP\|BGP"; fi
+          echo "Skipping $SKIP"
+          sudo -E env "PATH=$PATH" inv e2etest --skip $SKIP -e /tmp/kind_logs
+      
+      - name: Log permissions
+        if: ${{ always() }}
+        run: |
+          sudo chmod -R o+r /tmp/kind_logs
+
+      - name: Upload logs
+        uses: actions/upload-artifact@v2
+        if: ${{ always() }}
+        with:
+          name: kind-logs-${{ matrix.ip-family }}-${{ matrix.bgp-type }}
+          path: /tmp/kind_logs/
