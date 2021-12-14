@@ -7,6 +7,7 @@ ipv6 nht resolve-via-default
 route-map 10.2.2.254-out permit 10
   set community 1111:2222 additive
   set community 3333:4444 additive
+  set local-preference 300
 route-map 10.2.2.254-in deny 20
 
 router bgp 100
