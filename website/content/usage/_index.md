@@ -174,7 +174,7 @@ There are two main reasons to colocate services in this fashion: to
 work around a Kubernetes limitation, and to work with limited IP
 addresses.
 
-Example configuration for two services you want to share the same ip address.
+Here is an example configuration of two services that share the same ip address:
 
 ```yaml
 apiVersion: v1
