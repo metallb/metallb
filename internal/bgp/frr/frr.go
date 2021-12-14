@@ -266,6 +266,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				Version:     version,
 				Prefix:      adv.Prefix.String(),
 				Communities: communities,
+				LocalPref:   adv.LocalPref,
 			}
 			neighbor.Advertisements = append(neighbor.Advertisements, &advConfig)
 		}
