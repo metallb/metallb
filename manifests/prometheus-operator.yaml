@@ -5,7 +5,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      component: controller
+      app.kubernetes.io/component: controller
   namespaceSelector:
     matchNames:
       - metallb-system
@@ -20,7 +20,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      component: speaker
+      app.kubernetes.io/component: speaker
   namespaceSelector:
     matchNames:
       - metallb-system

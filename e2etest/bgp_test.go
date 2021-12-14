@@ -244,7 +244,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		ginkgo.BeforeEach(func() {
 			pods, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: "component=controller",
+				LabelSelector: "app.kubernetes.io/component=controller",
 			})
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(pods.Items), 1, "Expected one controller pod")
@@ -635,7 +635,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 			ginkgo.By("checking metrics")
 			pods, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: "component=controller",
+				LabelSelector: "app.kubernetes.io/component=controller",
 			})
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(pods.Items), 1, "Expected one controller pod")
@@ -1300,7 +1300,7 @@ func checkBFDConfigPropagated(nodeConfig config.BfdProfile, peerConfig bgpfrr.BF
 
 func getSpeakerPods(cs clientset.Interface) []*corev1.Pod {
 	speakers, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
-		LabelSelector: "component=speaker",
+		LabelSelector: "app.kubernetes.io/component=speaker",
 	})
 	framework.ExpectNoError(err)
 	framework.ExpectNotEqual(len(speakers.Items), 0, "No speaker pods found")

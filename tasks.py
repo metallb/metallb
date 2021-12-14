@@ -265,10 +265,13 @@ def validate_kind_version():
     "bgp_type": "Type of BGP implementation to use."
                 "Supported: 'native' (default), 'frr'",
     "log_level": "Log level for the controller and the speaker."
-                "Default: info, Supported: 'all', 'debug', 'info', 'warn', 'error' or 'none'"
+                "Default: info, Supported: 'all', 'debug', 'info', 'warn', 'error' or 'none'",
+    "helm_install": "Optional install MetalLB via helm chart instead of manifests."
+                "Default: False."
 })
 def dev_env(ctx, architecture="amd64", name="kind", protocol=None,
-        node_img=None, ip_family="ipv4", bgp_type="native", log_level="info"):
+        node_img=None, ip_family="ipv4", bgp_type="native", log_level="info",
+        helm_install=False):
     """Build and run MetalLB in a local Kind cluster.
 
     If the cluster specified by --name (default "kind") doesn't exist,
@@ -314,28 +317,33 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None,
     run("kind load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
 
-    run("kubectl delete po -nmetallb-system --all", echo=True)
+    if helm_install:
+        run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
+                "--set speaker.image.tag=dev-{} --set speaker.frr.enabled={}".format(architecture,
+                architecture, "true" if bgp_type == "frr" else "false"), echo=True)
+    else:
+        run("kubectl delete po -nmetallb-system --all", echo=True)
 
-    manifests_dir = os.getcwd() + "/manifests"
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Copy namespace manifest.
-        shutil.copy(manifests_dir + "/namespace.yaml", tmpdir)
+        manifests_dir = os.getcwd() + "/manifests"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Copy namespace manifest.
+            shutil.copy(manifests_dir + "/namespace.yaml", tmpdir)
 
-        # FIXME: This is a hack to get the correct manifest file.
-        manifest_filename = "metallb-frr.yaml" if bgp_type == "frr" else "metallb.yaml"
-        # open file and replace the protocol with the one specified by the user
-        with open(manifests_dir + "/" + manifest_filename) as f:
-            manifest = f.read()
-        for image in binaries:
-            manifest = re.sub("image: quay.io/metallb/{}:.*".format(image),
-                          "image: quay.io/metallb/{}:dev-{}".format(image, architecture), manifest)
-            manifest = re.sub("--log-level=info", "--log-level={}".format(log_level), manifest)
-        with open(tmpdir + "/metallb.yaml", "w") as f:
-            f.write(manifest)
-            f.flush()
+            # FIXME: This is a hack to get the correct manifest file.
+            manifest_filename = "metallb-frr.yaml" if bgp_type == "frr" else "metallb.yaml"
+            # open file and replace the protocol with the one specified by the user
+            with open(manifests_dir + "/" + manifest_filename) as f:
+                manifest = f.read()
+            for image in binaries:
+                manifest = re.sub("image: quay.io/metallb/{}:.*".format(image),
+                            "image: quay.io/metallb/{}:dev-{}".format(image, architecture), manifest)
+                manifest = re.sub("--log-level=info", "--log-level={}".format(log_level), manifest)
+            with open(tmpdir + "/metallb.yaml", "w") as f:
+                f.write(manifest)
+                f.flush()
 
-        run("kubectl apply -f {}/namespace.yaml".format(tmpdir), echo=True)
-        run("kubectl apply -f {}/metallb.yaml".format(tmpdir), echo=True)
+            run("kubectl apply -f {}/namespace.yaml".format(tmpdir), echo=True)
+            run("kubectl apply -f {}/metallb.yaml".format(tmpdir), echo=True)
 
     with open("e2etest/manifests/mirror-server.yaml") as f:
         manifest = f.read()
