@@ -200,6 +200,7 @@ func TestSingleAdvertisement(t *testing.T) {
 		Prefix:      prefix,
 		NextHop:     net.ParseIP("10.1.1.1"),
 		Communities: communities,
+		LocalPref:   300,
 	}
 
 	err = session.Set(adv)
