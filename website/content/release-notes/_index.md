@@ -622,7 +622,7 @@ Action required if upgrading from 0.3.x:
   to Kubernetes best practices. If you were using a label match on
   `app: controller` or `app: speaker` Kubernetes labels to find
   MetalLB objects, you should now match on a combination of `app:
-  metallb`, `component: controller` or `component: speaker`, depending
+  metallb`, `app.kubernetes.io/component: controller` or `app.kubernetes.io/component: speaker`, depending
   on what objects you want to select.
 - RBAC rules have changed, and now allow the MetalLB speaker to list
   and watch Node objects. If you are not installing MetalLB via the
