@@ -50,16 +50,19 @@ route-map {{$n.Addr}}-in deny 20
 {{- end }}
 {{- end }}
 
-{{range .Routers -}}
-router bgp {{.MyASN}}
+{{range $r := .Routers -}}
+router bgp {{$r.MyASN}}
   no bgp ebgp-requires-policy
   no bgp network import-check
   no bgp default ipv4-unicast
-{{ if .RouterId }}
-  bgp router-id {{.RouterId}}
+{{ if $r.RouterId }}
+  bgp router-id {{$r.RouterId}}
 {{- end }}
 {{range .Neighbors }}
   neighbor {{.Addr}} remote-as {{.ASN}}
+  {{- if .EBGPMultiHop }}
+  neighbor {{.Addr}} ebgp-multihop
+  {{- end }}
   {{ if .Port -}}
   neighbor {{.Addr}} port {{.Port}}
   {{- end }}
@@ -160,6 +163,7 @@ type neighborConfig struct {
 	Password       string
 	Advertisements []*advertisementConfig
 	BFDProfile     string
+	EBGPMultiHop   bool
 }
 
 type advertisementConfig struct {

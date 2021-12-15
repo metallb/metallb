@@ -1,0 +1,29 @@
+
+log file /etc/frr/frr.log informational
+log timestamp precision 3
+hostname dummyhostname
+ip nht resolve-via-default
+ipv6 nht resolve-via-default
+route-map 127.0.0.2-in deny 20
+
+router bgp 100
+  no bgp ebgp-requires-policy
+  no bgp network import-check
+  no bgp default ipv4-unicast
+
+  bgp router-id 10.1.1.254
+
+  neighbor 127.0.0.2 remote-as 200
+  neighbor 127.0.0.2 port 179
+  neighbor 127.0.0.2 timers 1 1
+  neighbor 127.0.0.2 password password
+  neighbor 127.0.0.2 update-source 10.1.1.254
+
+  address-family ipv4 unicast
+    neighbor 127.0.0.2 activate
+    neighbor 127.0.0.2 route-map 127.0.0.2-in in
+  exit-address-family
+  address-family ipv6 unicast
+    neighbor 127.0.0.2 activate
+    neighbor 127.0.0.2 route-map 127.0.0.2-in in
+  exit-address-family
