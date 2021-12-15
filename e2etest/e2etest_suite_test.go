@@ -145,17 +145,19 @@ var _ = ginkgo.BeforeSuite(func() {
 	cs, err := framework.LoadClientset()
 	framework.ExpectNoError(err)
 
-	_, err = cs.CoreV1().ConfigMaps(testNameSpace).Get(context.TODO(), configMapName, metav1.GetOptions{})
-	framework.ExpectEqual(errors.IsNotFound(err), true)
+	if !useOperator {
+		_, err = cs.CoreV1().ConfigMaps(testNameSpace).Get(context.TODO(), configMapName, metav1.GetOptions{})
+		framework.ExpectEqual(errors.IsNotFound(err), true)
 
-	// Init empty MetalLB ConfigMap.
-	_, err = cs.CoreV1().ConfigMaps(testNameSpace).Create(context.TODO(), &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      configMapName,
-			Namespace: testNameSpace,
-		},
-	}, metav1.CreateOptions{})
-	framework.ExpectNoError(err)
+		// Init empty MetalLB ConfigMap.
+		_, err = cs.CoreV1().ConfigMaps(testNameSpace).Create(context.TODO(), &v1.ConfigMap{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      configMapName,
+				Namespace: testNameSpace,
+			},
+		}, metav1.CreateOptions{})
+		framework.ExpectNoError(err)
+	}
 })
 
 var _ = ginkgo.AfterSuite(func() {
