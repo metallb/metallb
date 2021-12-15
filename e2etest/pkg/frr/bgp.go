@@ -124,3 +124,27 @@ func ContainsCommunity(exec executor.Executor, community string) error {
 	}
 	return nil
 }
+
+// RoutesMatchLocalPref check if routes match specific local preference value.
+func RoutesMatchLocalPref(exec executor.Executor, ipFamily string, localPref uint32) error {
+	v4Routes, v6Routes, err := Routes(exec)
+	if err != nil {
+		return err
+	}
+	switch ipFamily {
+	case "ipv4":
+		return allRoutesMatchLocalPref(v4Routes, localPref)
+	case "ipv6":
+		return allRoutesMatchLocalPref(v6Routes, localPref)
+	}
+	return nil
+}
+
+func allRoutesMatchLocalPref(routes map[string]bgpfrr.Route, localPref uint32) error {
+	for _, route := range routes {
+		if route.LocalPref != localPref {
+			return fmt.Errorf("ip route doesn't match local-preference, expected %d got %d", localPref, route.LocalPref)
+		}
+	}
+	return nil
+}

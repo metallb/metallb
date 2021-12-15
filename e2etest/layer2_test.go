@@ -334,14 +334,14 @@ var _ = ginkgo.Describe("L2", func() {
 
 		ginkgo.BeforeEach(func() {
 			pods, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: "component=controller",
+				LabelSelector: "app.kubernetes.io/component=controller",
 			})
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(pods.Items), 1, "Expected one controller pod")
 			controllerPod = &pods.Items[0]
 
 			speakers, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: "component=speaker",
+				LabelSelector: "app.kubernetes.io/component=speaker",
 			})
 			framework.ExpectNoError(err)
 			framework.ExpectNotEqual(len(speakers.Items), 0, "No speaker pods found")

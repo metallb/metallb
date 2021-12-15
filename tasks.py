@@ -265,10 +265,13 @@ def validate_kind_version():
     "bgp_type": "Type of BGP implementation to use."
                 "Supported: 'native' (default), 'frr'",
     "log_level": "Log level for the controller and the speaker."
-                "Default: info, Supported: 'all', 'debug', 'info', 'warn', 'error' or 'none'"
+                "Default: info, Supported: 'all', 'debug', 'info', 'warn', 'error' or 'none'",
+    "helm_install": "Optional install MetalLB via helm chart instead of manifests."
+                "Default: False."
 })
-def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None,
-        node_img=None, ip_family="ipv4", bgp_type="native", log_level="info"):
+def dev_env(ctx, architecture="amd64", name="kind", protocol=None,
+        node_img=None, ip_family="ipv4", bgp_type="native", log_level="info",
+        helm_install=False):
     """Build and run MetalLB in a local Kind cluster.
 
     If the cluster specified by --name (default "kind") doesn't exist,
@@ -293,8 +296,6 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None,
         }
 
         networking_config = {}
-        if cni:
-            networking_config["disableDefaultCNI"] = True
         if ip_family != "ipv4":
             networking_config["ipFamily"] = ip_family
 
@@ -310,36 +311,39 @@ def dev_env(ctx, architecture="amd64", name="kind", cni=None, protocol=None,
             tmp.flush()
             run("kind create cluster --name={} --config={} {}".format(name, tmp.name, extra_options), pty=True, echo=True)
 
-    if mk_cluster and cni:
-        run("kubectl apply -f e2etest/manifests/{}.yaml".format(cni), echo=True)
     binaries = ["controller", "speaker", "mirror-server"]
     build(ctx, binaries, architectures=[architecture])
     run("kind load docker-image --name={} quay.io/metallb/controller:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
 
-    run("kubectl delete po -nmetallb-system --all", echo=True)
+    if helm_install:
+        run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
+                "--set speaker.image.tag=dev-{} --set speaker.frr.enabled={}".format(architecture,
+                architecture, "true" if bgp_type == "frr" else "false"), echo=True)
+    else:
+        run("kubectl delete po -nmetallb-system --all", echo=True)
 
-    manifests_dir = os.getcwd() + "/manifests"
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Copy namespace manifest.
-        shutil.copy(manifests_dir + "/namespace.yaml", tmpdir)
+        manifests_dir = os.getcwd() + "/manifests"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            # Copy namespace manifest.
+            shutil.copy(manifests_dir + "/namespace.yaml", tmpdir)
 
-        # FIXME: This is a hack to get the correct manifest file.
-        manifest_filename = "metallb-frr.yaml" if bgp_type == "frr" else "metallb.yaml"
-        # open file and replace the protocol with the one specified by the user
-        with open(manifests_dir + "/" + manifest_filename) as f:
-            manifest = f.read()
-        for image in binaries:
-            manifest = re.sub("image: quay.io/metallb/{}:.*".format(image),
-                          "image: quay.io/metallb/{}:dev-{}".format(image, architecture), manifest)
-            manifest = re.sub("--log-level=info", "--log-level={}".format(log_level), manifest)
-        with open(tmpdir + "/metallb.yaml", "w") as f:
-            f.write(manifest)
-            f.flush()
+            # FIXME: This is a hack to get the correct manifest file.
+            manifest_filename = "metallb-frr.yaml" if bgp_type == "frr" else "metallb.yaml"
+            # open file and replace the protocol with the one specified by the user
+            with open(manifests_dir + "/" + manifest_filename) as f:
+                manifest = f.read()
+            for image in binaries:
+                manifest = re.sub("image: quay.io/metallb/{}:.*".format(image),
+                            "image: quay.io/metallb/{}:dev-{}".format(image, architecture), manifest)
+                manifest = re.sub("--log-level=info", "--log-level={}".format(log_level), manifest)
+            with open(tmpdir + "/metallb.yaml", "w") as f:
+                f.write(manifest)
+                f.flush()
 
-        run("kubectl apply -f {}/namespace.yaml".format(tmpdir), echo=True)
-        run("kubectl apply -f {}/metallb.yaml".format(tmpdir), echo=True)
+            run("kubectl apply -f {}/namespace.yaml".format(tmpdir), echo=True)
+            run("kubectl apply -f {}/metallb.yaml".format(tmpdir), echo=True)
 
     with open("e2etest/manifests/mirror-server.yaml") as f:
         manifest = f.read()
@@ -491,33 +495,6 @@ def dev_env_cleanup(ctx, name="kind"):
     # cleanup layer2 configs
     dev_env_dir = os.getcwd() + "/dev-env/layer2"
     run('rm -f "%s"/config.yaml' % dev_env_dir)
-
-
-@task
-def test_cni_manifests(ctx):
-    """Update CNI manifests for e2e tests."""
-    def _fetch(url):
-        bs = urlopen(url).read()
-        return list(m for m in yaml.safe_load_all(bs) if m)
-    def _write(file, manifest):
-        with open(file, "w") as f:
-            f.write(yaml.dump_all(manifest))
-
-    calico = _fetch("https://docs.projectcalico.org/v3.6/getting-started/kubernetes/installation/hosted/kubernetes-datastore/calico-networking/1.7/calico.yaml")
-    for manifest in calico:
-        if manifest["kind"] != "DaemonSet":
-            continue
-        manifest["spec"]["template"]["spec"]["containers"][0]["env"].append({
-            "name": "FELIX_IGNORELOOSERPF",
-            "value": "true",
-        })
-    _write("e2etest/manifests/calico.yaml", calico)
-
-    weave = _fetch("https://cloud.weave.works/k8s/net?k8s-version=1.15&env.NO_MASQ_LOCAL=1")
-    _write("e2etest/manifests/weave.yaml", weave)
-
-    flannel = _fetch("https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml")
-    _write("e2etest/manifests/flannel.yaml", flannel)
 
 
 @task(help={
@@ -698,7 +675,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
         ipv6_service_range = get_service_range(6)
 
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "KUBECONFIG={} go test -timeout 30m {} {} --provider=local --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range, ipv6_service_range, opt_skip_docker, opt_use_operator), warn="True")
+            "KUBECONFIG={} go test -timeout 40m {} {} --provider=local --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range, ipv6_service_range, opt_skip_docker, opt_use_operator), warn="True")
 
     if export != None:
         run("kind export logs {}".format(export))

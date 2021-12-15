@@ -57,13 +57,13 @@ spec:
           value: {{ template "metallb.fullname" . }}-controller
         {{- end }}
         ports:
-        - name: metrics
+        - name: monitoring
           containerPort: {{ .Values.prometheus.metricsPort }}
         {{- if .Values.controller.livenessProbe.enabled }}
         livenessProbe:
           httpGet:
             path: /metrics
-            port: metrics
+            port: monitoring
           initialDelaySeconds: {{ .Values.controller.livenessProbe.initialDelaySeconds }}
           periodSeconds: {{ .Values.controller.livenessProbe.periodSeconds }}
           timeoutSeconds: {{ .Values.controller.livenessProbe.timeoutSeconds }}
@@ -74,7 +74,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /metrics
-            port: metrics
+            port: monitoring
           initialDelaySeconds: {{ .Values.controller.readinessProbe.initialDelaySeconds }}
           periodSeconds: {{ .Values.controller.readinessProbe.periodSeconds }}
           timeoutSeconds: {{ .Values.controller.readinessProbe.timeoutSeconds }}

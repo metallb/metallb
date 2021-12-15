@@ -58,6 +58,7 @@ const (
 	v4PoolAddresses = "192.168.10.0/24"
 	v6PoolAddresses = "fc00:f853:0ccd:e799::/124"
 	CommunityNoAdv  = "65535:65282" // 0xFFFFFF02: NO_ADVERTISE
+	IPLocalPref     = uint32(300)
 )
 
 var (
@@ -243,7 +244,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		ginkgo.BeforeEach(func() {
 			pods, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: "component=controller",
+				LabelSelector: "app.kubernetes.io/component=controller",
 			})
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(pods.Items), 1, "Expected one controller pod")
@@ -634,7 +635,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 			ginkgo.By("checking metrics")
 			pods, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: "component=controller",
+				LabelSelector: "app.kubernetes.io/component=controller",
 			})
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(len(pods.Items), 1, "Expected one controller pod")
@@ -866,9 +867,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 				pairExternalFRRWithNodes(cs, c, ipFamily)
 
-				for j := 0; j <= i; j++ {
-					validateFRRPeeredWithNodes(cs, frrContainers[j], ipFamily)
-				}
+				validateFRRPeeredWithNodes(cs, frrContainers[i], ipFamily)
 			}
 		},
 			table.Entry("IPV4", "ipv4"),
@@ -891,7 +890,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					validateFRRPeeredWithNodes(cs, c, ipFamily)
 				}
 
-				svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster) // Is a sleep required here?
+				svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
 
 				defer func() {
 					err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
@@ -945,6 +944,59 @@ var _ = ginkgo.Describe("BGP", func() {
 						},
 					},
 				}}, "ipv6"))
+
+		table.DescribeTable("configure bgp local-preference and verify it gets propagated",
+			func(poolAddresses []string, ipFamily string, localPref uint32) {
+				configData := config.File{
+					Pools: []config.AddressPool{
+						{
+							Name:      "bgp-test",
+							Protocol:  config.BGP,
+							Addresses: poolAddresses,
+							BGPAdvertisements: []config.BgpAdvertisement{
+								{
+									LocalPref: uint32Ptr(localPref),
+								},
+							},
+						},
+					},
+					Peers: peersForContainers(frrContainers, ipFamily),
+				}
+				for _, c := range frrContainers {
+					pairExternalFRRWithNodes(cs, c, ipFamily)
+				}
+
+				err := configUpdater.Update(configData)
+				framework.ExpectNoError(err)
+
+				for _, c := range frrContainers {
+					validateFRRPeeredWithNodes(cs, c, ipFamily)
+				}
+
+				svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
+
+				defer func() {
+					err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+					framework.ExpectNoError(err)
+				}()
+
+				allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+				framework.ExpectNoError(err)
+
+				for _, c := range frrContainers {
+					validateService(cs, svc, allNodes.Items, c)
+				}
+				// LocalPref check is only valid for iBGP sessions
+				for _, c := range frrContainers {
+					if c.Name == "frrIBGP" {
+						Eventually(func() error {
+							return frr.RoutesMatchLocalPref(c, ipFamily, localPref)
+						}, 4*time.Minute, 1*time.Second).Should(BeNil())
+					}
+				}
+			},
+			table.Entry("IPV4", []string{v4PoolAddresses}, "ipv4", IPLocalPref),
+			table.Entry("IPV6", []string{v6PoolAddresses}, "ipv6", IPLocalPref))
 	})
 
 	table.DescribeTable("MetalLB FRR rejects any routes advertised by any neighbor", func(addressesRange, pairingIPFamily, toInject string) {
@@ -1202,7 +1254,7 @@ func stopFRRContainers(containers []*frrcontainer.FRR) error {
 func peersForContainers(containers []*frrcontainer.FRR, ipFamily string) []config.Peer {
 	var peers []config.Peer
 
-	for i, c := range frrContainers {
+	for i, c := range containers {
 		addresses := c.AddressesForFamily(ipFamily)
 		holdTime := ""
 		if i > 0 {
@@ -1248,7 +1300,7 @@ func checkBFDConfigPropagated(nodeConfig config.BfdProfile, peerConfig bgpfrr.BF
 
 func getSpeakerPods(cs clientset.Interface) []*corev1.Pod {
 	speakers, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
-		LabelSelector: "component=speaker",
+		LabelSelector: "app.kubernetes.io/component=speaker",
 	})
 	framework.ExpectNoError(err)
 	framework.ExpectNotEqual(len(speakers.Items), 0, "No speaker pods found")

@@ -302,6 +302,21 @@
             },
             "secretName": {
               "type": "string"
+            },
+            "frr": {
+              "description": "Install FRR container in speaker deployment",
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                },
+                "logLevel": {
+                  "type": "string",
+                  "enum": [ "informational", "warning", "errors", "debugging" ]
+                },
+                "image": { "$ref": "#/definitions/component/properties/image" }
+              },
+              "required": [ "enabled" ]
             }
           },
           "required": [ "tolerateMaster" ]

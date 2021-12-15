@@ -15,6 +15,12 @@ commands:
       - run: GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
       - run: curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
       - run: sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
+  install_helm:
+    description: "Install helm"
+    steps:
+      - run: curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+      - run: chmod 700 get_helm.sh
+      - run: ./get_helm.sh
 jobs:
   test-1-16:
     machine:
@@ -29,23 +35,31 @@ jobs:
         type: string
       bgp-type:
         type: string
+      deployment-method:
+        type: string
     machine:
       image: ubuntu-2004:202104-01
     steps:
       - setup_ci_image
       - setup_kind
+      - install_helm
       - run: inv build
-      - run: inv dev-env -i  << parameters.ip-family >> -b  << parameters.bgp-type >> -l all
+      - run: |
+          FLAGS=""
+          if [ "<< parameters.deployment-method >>" = "helm" ]; then FLAGS="--helm-install"; fi
+          inv dev-env -i  << parameters.ip-family >> -b  << parameters.bgp-type >> -l all $FLAGS
       - run: |
           SKIP="none"
+          FLAGS=""
           if [ "<< parameters.bgp-type >>" = "native" ]; then SKIP="$SKIP\|FRR\|BFD\|DUALSTACK"; fi
           if [ "<< parameters.ip-family >>" = "ipv4" ]; then SKIP="$SKIP\|IPV6\|DUALSTACK"; fi
           if [ "<< parameters.ip-family >>" = "dual" ]; then SKIP="$SKIP\|IPV6"; fi
           if [ "<< parameters.ip-family >>" = "ipv6" ]; then SKIP="$SKIP\|IPV4\|DUALSTACK"; fi
           if [ "<< parameters.ip-family >>" = "ipv6" ] && [ "<< parameters.bgp-type >>" = "native" ]; then SKIP="$SKIP\|BGP"; fi # we are skipping BGP for ipv6 for native bgp stack
+          if [ "<< parameters.deployment-method >>" = "helm" ]; then FLAGS="--system-namespaces=default" && export OO_INSTALL_NAMESPACE=default && export CONFIGMAP_NAME=metallb; fi
           echo "Skipping $SKIP"
           # `-E env "PATH=$PATH"` bypasses commands not found under sudo, `sudo` needed because arping requires CAP_NET_RAW
-          sudo -E env "PATH=$PATH" inv e2etest --skip $SKIP -e /tmp/kind_logs
+          sudo -E env "PATH=$PATH" inv e2etest --skip $SKIP $FLAGS -e /tmp/kind_logs
       - run:
           name: Change permissions for kind logs
           command: sudo chmod -R o+r /tmp/kind_logs # logs are exported under root (sudo), chmod required to upload the artifacts.
@@ -138,6 +152,7 @@ workflows:
             parameters:
               ip-family: [ipv4, ipv6, dual]
               bgp-type: [native, frr]
+              deployment-method: [manifests, helm]
       - publish-images:
           filters:
             branches:

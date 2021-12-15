@@ -64,6 +64,6 @@ listening on ens3, link-type EN10MB (Ethernet), capture size 262144 bytes
 In addition to the above, make sure to watch the logs of MetalLB's speaker component for ARP requests and responses (using [kubetail](https://github.com/johanhaleby/kubetail)):
 
 ```bash
-$ kubetail -l component=speaker -n metallb-system
+$ kubetail -l app.kubernetes.io/component=speaker -n metallb-system
 ...
 ```
