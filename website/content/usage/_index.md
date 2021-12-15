@@ -174,6 +174,46 @@ There are two main reasons to colocate services in this fashion: to
 work around a Kubernetes limitation, and to work with limited IP
 addresses.
 
+Here is an example configuration of two services that share the same ip address:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: dns-service-tcp
+  namespace: default
+  annotations:
+    metallb.universe.tf/allow-shared-ip: "key-to-share-1.2.3.4"
+spec:
+  type: LoadBalancer
+  loadBalancerIP: 1.2.3.4
+  ports:
+    - name: dnstcp
+      protocol: TCP
+      port: 53
+      targetPort: 53
+  selector:
+    app: dns
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dns-service-udp
+  namespace: default
+  annotations:
+    metallb.universe.tf/allow-shared-ip: "key-to-share-1.2.3.4"
+spec:
+  type: LoadBalancer
+  loadBalancerIP: 1.2.3.4
+  ports:
+    - name: dnsudp
+      protocol: UDP
+      port: 53
+      targetPort: 53
+  selector:
+    app: dns
+```
+
 [Kubernetes does not currently allow multiprotocol LoadBalancer services](https://github.com/kubernetes/kubernetes/issues/23880). This
 would normally make it impossible to run services like DNS, because
 they have to listen on both TCP and UDP. To work around this
