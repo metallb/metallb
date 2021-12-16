@@ -5,6 +5,7 @@ package container
 import (
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"os/exec"
 	"strings"
@@ -36,32 +37,50 @@ type FRR struct {
 	Ipv6           string
 }
 
+type Config struct {
+	Name        string
+	Neighbor    config.NeighborConfig
+	Router      config.RouterConfig
+	HostIPv4    string
+	HostIPv6    string
+	IPv4Address string
+	IPv6Address string
+	Network     string
+}
+
 // Start creates a new FRR container on the host and returns the corresponding *FRR.
 // A situation where a non-nil container and an error are returned is possible.
-func Start(name string, nc config.NeighborConfig, rc config.RouterConfig, network string, hostipv4 string, hostipv6 string) (*FRR, error) {
+func Start(cfg Config) (*FRR, error) {
 	configDir, err := ioutil.TempDir("", "frr-conf")
 	if err != nil {
 		return nil, err
 	}
 
-	err = startContainer(name, configDir, rc, network)
+	err = startContainer(cfg, configDir)
 	if err != nil {
 		return nil, err
 	}
 
-	exc := executor.ForContainer(name)
+	exc := executor.ForContainer(cfg.Name)
 
 	frr := &FRR{
 		Executor:       exc,
-		Name:           name,
+		Name:           cfg.Name,
 		configDir:      configDir,
-		NeighborConfig: nc,
-		RouterConfig:   rc,
+		NeighborConfig: cfg.Neighbor,
+		RouterConfig:   cfg.Router,
 	}
 
-	if network == hostNetwork {
-		frr.Ipv4 = hostipv4
-		frr.Ipv6 = hostipv6
+	if cfg.Network == hostNetwork {
+		if net.ParseIP(cfg.HostIPv4) == nil {
+			return nil, errors.New("Invalid hostIPv4")
+		}
+		if net.ParseIP(cfg.HostIPv6) == nil {
+			return nil, errors.New("Invalid hostIPv6")
+		}
+
+		frr.Ipv4 = cfg.HostIPv4
+		frr.Ipv6 = cfg.HostIPv6
 	} else {
 		err = frr.updateIPS()
 		if err != nil {
@@ -81,23 +100,29 @@ func Start(name string, nc config.NeighborConfig, rc config.RouterConfig, networ
 }
 
 // Run a BGP router in a container.
-func startContainer(containerName string, testDirName string, rc config.RouterConfig, network string) error {
+func startContainer(cfg Config, testDirName string) error {
 	srcFiles := fmt.Sprintf("%s/.", frrConfigDir)
 	res, err := exec.Command("cp", "-r", srcFiles, testDirName).CombinedOutput()
 	if err != nil {
 		return errors.Wrapf(err, "Failed to copy FRR config directory. %s", string(res))
 	}
 
-	err = config.SetDaemonsConfig(testDirName, rc)
+	err = config.SetDaemonsConfig(testDirName, cfg.Router)
 	if err != nil {
 		return err
 	}
 
 	volume := fmt.Sprintf("%s:%s", testDirName, frrMountPath)
-	out, err := exec.Command(executor.ContainerRuntime, "run", "-d", "--privileged", "--network", network, "--rm", "--name", containerName,
-		"--volume", volume, frrImage).CombinedOutput()
+	args := []string{"run", "-d", "--privileged", "--network", cfg.Network, "--rm", "--name", cfg.Name, "--volume", volume, frrImage}
+	if cfg.IPv4Address != "" {
+		args = append(args, "--ip", cfg.IPv4Address)
+	}
+	if cfg.IPv6Address != "" {
+		args = append(args, "--ip", cfg.IPv6Address)
+	}
+	out, err := exec.Command(executor.ContainerRuntime, args...).CombinedOutput()
 	if err != nil {
-		return errors.Wrapf(err, "Failed to start %s container. %s", containerName, out)
+		return errors.Wrapf(err, "Failed to start %s container. %s", cfg.Name, out)
 	}
 
 	return nil

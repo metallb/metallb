@@ -16,6 +16,10 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
+const Empty = `password zebra
+log stdout debugging
+log file /tmp/frr.log debugging`
+
 // BGP router config.
 const bgpConfigTemplate = `
 password zebra

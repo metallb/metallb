@@ -65,40 +65,66 @@ var (
 	frrContainers []*frrcontainer.FRR
 )
 
-type containerConfig struct {
-	name string
-	nc   frrconfig.NeighborConfig
-	rc   frrconfig.RouterConfig
+func setupContainers(ipv4Addresses, ipv6Addresses []string) []*frrcontainer.FRR {
+
+	ibgpContainerConfig := frrcontainer.Config{
+		Name: frrIBGP,
+		Neighbor: frrconfig.NeighborConfig{
+			ASN:      MetalLBASN,
+			Password: "ibgp-test",
+		},
+		Router: frrconfig.RouterConfig{
+			ASN:      MetalLBASN,
+			BGPPort:  179,
+			Password: "ibgp-test",
+		},
+		Network:  containersNetwork,
+		HostIPv4: hostIPv4,
+		HostIPv6: hostIPv6,
+	}
+	ebgpContainerConfig := frrcontainer.Config{
+		Name: frrEBGP,
+		Neighbor: frrconfig.NeighborConfig{
+			ASN:      MetalLBASN,
+			Password: "ebgp-test",
+		},
+		Router: frrconfig.RouterConfig{
+			ASN:      ExternalASN,
+			BGPPort:  180,
+			Password: "ebgp-test",
+		},
+		Network:  containersNetwork,
+		HostIPv4: hostIPv4,
+		HostIPv6: hostIPv6,
+	}
+
+	var res []*frrcontainer.FRR
+	var err error
+	if containersNetwork == "host" {
+		res, err = createFRRContainers(ibgpContainerConfig)
+	} else {
+		Expect(len(ipv4Addresses)).Should(BeNumerically(">=", 2))
+		Expect(len(ipv6Addresses)).Should(BeNumerically(">=", 2))
+
+		ibgpContainerConfig.IPv4Address = ipv4Addresses[0]
+		ibgpContainerConfig.IPv6Address = ipv6Addresses[0]
+		ebgpContainerConfig.IPv4Address = ipv4Addresses[1]
+		ebgpContainerConfig.IPv6Address = ipv6Addresses[1]
+		res, err = createFRRContainers(ibgpContainerConfig, ebgpContainerConfig)
+	}
+	framework.ExpectNoError(err)
+	return res
+}
+
+func tearDownContainers(containers []*frrcontainer.FRR) {
+	err := stopFRRContainers(containers)
+	framework.ExpectNoError(err)
 }
 
 var _ = ginkgo.Describe("BGP", func() {
 	var configUpdater config.Updater
 	var cs clientset.Interface
 	var f *framework.Framework
-	ibgpContainerConfig := containerConfig{
-		name: frrIBGP,
-		nc: frrconfig.NeighborConfig{
-			ASN:      MetalLBASN,
-			Password: "ibgp-test",
-		},
-		rc: frrconfig.RouterConfig{
-			ASN:      MetalLBASN,
-			BGPPort:  179,
-			Password: "ibgp-test",
-		},
-	}
-	ebgpContainerConfig := containerConfig{
-		name: frrEBGP,
-		nc: frrconfig.NeighborConfig{
-			ASN:      MetalLBASN,
-			Password: "ebgp-test",
-		},
-		rc: frrconfig.RouterConfig{
-			ASN:      ExternalASN,
-			BGPPort:  180,
-			Password: "ebgp-test",
-		},
-	}
 
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentGinkgoTestDescription().Failed {
@@ -123,30 +149,20 @@ var _ = ginkgo.Describe("BGP", func() {
 		err := configUpdater.Clean()
 		framework.ExpectNoError(err)
 
-		err = stopFRRContainers(frrContainers)
-		framework.ExpectNoError(err)
+		for _, c := range frrContainers {
+			err := c.UpdateBGPConfigFile(frrconfig.Empty)
+			framework.ExpectNoError(err)
+		}
 	})
 
 	f = framework.NewDefaultFramework("bgp")
 
 	ginkgo.BeforeEach(func() {
-		var err error
-		if containersNetwork == "host" {
-			if net.ParseIP(hostIPv4) == nil {
-				framework.Fail("Invalid hostIPv4")
-			}
-			if net.ParseIP(hostIPv6) == nil {
-				framework.Fail("Invalid hostIPv6")
-			}
-			frrContainers, err = createFRRContainers(ibgpContainerConfig)
-		} else {
-			frrContainers, err = createFRRContainers(ibgpContainerConfig, ebgpContainerConfig)
-		}
-		framework.ExpectNoError(err)
 		cs = f.ClientSet
 		configUpdater = config.UpdaterForConfigMap(cs, configMapName, testNameSpace)
 		if useOperator {
 			clientconfig := f.ClientConfig()
+			var err error
 			configUpdater, err = config.UpdaterForOperator(clientconfig, testNameSpace)
 			framework.ExpectNoError(err)
 		}
@@ -1220,13 +1236,13 @@ func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily str
 	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
 
-func createFRRContainers(c ...containerConfig) ([]*frrcontainer.FRR, error) {
+func createFRRContainers(c ...frrcontainer.Config) ([]*frrcontainer.FRR, error) {
 	frrContainers = make([]*frrcontainer.FRR, 0)
 	g := new(errgroup.Group)
 	for _, conf := range c {
 		conf := conf
 		g.Go(func() error {
-			c, err := frrcontainer.Start(conf.name, conf.nc, conf.rc, containersNetwork, hostIPv4, hostIPv6)
+			c, err := frrcontainer.Start(conf)
 			if c != nil {
 				frrContainers = append(frrContainers, c)
 			}

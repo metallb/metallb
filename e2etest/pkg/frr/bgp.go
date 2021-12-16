@@ -89,7 +89,8 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 
 	for _, file := range filesToDump {
 		res = res + fmt.Sprintf("####### Dumping file %s\n", file)
-		out, err = exec.Exec("cat", file)
+		// limiting the output to 500 lines:
+		out, err = exec.Exec("bash", "-c", fmt.Sprintf("cat %s | tail -n 500", file))
 		if err != nil {
 			return "", errors.Wrapf(err, "Failed to cat %s file %s", file, res)
 		}

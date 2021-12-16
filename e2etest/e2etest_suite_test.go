@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"strings"
 	"testing"
 
 	"github.com/onsi/ginkgo"
@@ -52,6 +53,8 @@ var (
 	skipDockerCmd     bool
 	ipv4ServiceRange  string
 	ipv6ServiceRange  string
+	ipv4ForContainers string
+	ipv6ForContainers string
 	testNameSpace     = defaultTestNameSpace
 	configMapName     = defaultConfigMapName
 	containersNetwork = defaultContainersNetwork
@@ -77,6 +80,8 @@ func handleFlags() {
 	flag.BoolVar(&skipDockerCmd, "skip-docker", false, "set this to true if the BGP daemon is running on the host instead of in a container")
 	flag.StringVar(&ipv4ServiceRange, "ipv4-service-range", "0", "a range of IPv4 addresses for MetalLB to use when running in layer2 mode")
 	flag.StringVar(&ipv6ServiceRange, "ipv6-service-range", "0", "a range of IPv6 addresses for MetalLB to use when running in layer2 mode")
+	flag.StringVar(&ipv4ForContainers, "ips-for-containers-v4", "0", "a comma separated list of IPv4 addresses available for containers")
+	flag.StringVar(&ipv6ForContainers, "ips-for-containers-v6", "0", "a comma separated list of IPv6 addresses available for containers")
 	flag.BoolVar(&useOperator, "use-operator", false, "set this to true to run the tests using operator custom resources")
 	flag.Parse()
 }
@@ -158,6 +163,11 @@ var _ = ginkgo.BeforeSuite(func() {
 		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
 	}
+
+	framework.ExpectNoError(err)
+	v4Addresses := strings.Split(ipv4ForContainers, ",")
+	v6Addresses := strings.Split(ipv6ForContainers, ",")
+	frrContainers = setupContainers(v4Addresses, v6Addresses)
 })
 
 var _ = ginkgo.AfterSuite(func() {
@@ -166,4 +176,6 @@ var _ = ginkgo.AfterSuite(func() {
 
 	err = cs.CoreV1().ConfigMaps(testNameSpace).Delete(context.TODO(), configMapName, metav1.DeleteOptions{})
 	framework.ExpectNoError(err)
+
+	tearDownContainers(frrContainers)
 })
