@@ -113,7 +113,7 @@ func startContainer(cfg Config, testDirName string) error {
 	}
 
 	volume := fmt.Sprintf("%s:%s", testDirName, frrMountPath)
-	args := []string{"run", "-d", "--privileged", "--network", cfg.Network, "--rm", "--name", cfg.Name, "--volume", volume, frrImage}
+	args := []string{"run", "-d", "--privileged", "--network", cfg.Network, "--rm", "--ulimit", "core=-1", "--name", cfg.Name, "--volume", volume, frrImage}
 	if cfg.IPv4Address != "" {
 		args = append(args, "--ip", cfg.IPv4Address)
 	}
