@@ -448,25 +448,32 @@ def bgp_dev_env(ip_family):
     run("kubectl apply -f %s/config.yaml" % dev_env_dir)
 
 
-def get_service_range(ip_family=None):
+def get_available_ips(ip_family=None):
     if ip_family is None or (ip_family != 4 and ip_family != 6):
         raise Exit(message="Please provide network version: 4 or 6.")
 
     v4, v6 = _get_subnets_allocated_ips()
+
     for i in _get_network_subnets():
         network = ipaddress.ip_network(i)
         if network.version == ip_family:
             used_list = v4 if ip_family == 4 else v6
+            last_used = ipaddress.ip_interface(used_list[-1])
+
+            for_containers = []
+            for i in range(2):
+                last_used = last_used + 1
+                for_containers.append(str(last_used))
 
             # try to get 10 IP addresses after the last assigned node address in the kind network subnet
             # if failed, just quit (recreate kind cluster might solve the situation)
-            service_ip_range_start = ipaddress.ip_interface(used_list[-1]) + 1
-            service_ip_range_end = ipaddress.ip_interface(used_list[-1]) + 11
+            service_ip_range_start = last_used + 1
+            service_ip_range_end = last_used + 11
             if service_ip_range_start not in network:
                 raise Exit(message='network range %s is not in %s' % (service_ip_range_start, network))
             if service_ip_range_end not in network:
                 raise Exit(message='network range %s is not in %s' % (service_ip_range_end, network))
-            return '%s-%s' % (service_ip_range_start.ip, service_ip_range_end.ip)
+            return '%s-%s' % (service_ip_range_start.ip, service_ip_range_end.ip), ','.join(for_containers)
 
 @task(help={
     "name": "name of the kind cluster to delete.",
@@ -669,13 +676,13 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
         run("kubectl -n {} wait --for=condition=Ready --all pods --timeout 300s".format(ns), hide=True)
 
     if ipv4_service_range is None:
-        ipv4_service_range = get_service_range(4)
+        ipv4_service_range, ips_for_containers_v4 = get_available_ips(4)
 
     if ipv6_service_range is None:
-        ipv6_service_range = get_service_range(6)
+        ipv6_service_range, ips_for_containers_v6 = get_available_ips(6)
 
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "KUBECONFIG={} go test -timeout 40m {} {} --provider=local --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range, ipv6_service_range, opt_skip_docker, opt_use_operator), warn="True")
+            "KUBECONFIG={} go test -timeout 40m {} {} --provider=local --kubeconfig={} --service-pod-port={} -ips-for-containers-v4={} -ips-for-containers-v6={} -ipv4-service-range={} -ipv6-service-range={} {} {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker, opt_use_operator), warn="True")
 
     if export != None:
         run("kind export logs {}".format(export))
