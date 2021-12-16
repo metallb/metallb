@@ -23,6 +23,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"sync"
 	"time"
 
 	"go.universe.tf/metallb/e2etest/pkg/config"
@@ -35,6 +36,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
+	"github.com/pkg/errors"
 
 	dto "github.com/prometheus/client_model/go"
 	"go.universe.tf/metallb/e2etest/pkg/frr"
@@ -44,6 +46,7 @@ import (
 	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -1237,16 +1240,41 @@ func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily str
 }
 
 func createFRRContainers(c ...frrcontainer.Config) ([]*frrcontainer.FRR, error) {
+	m := sync.Mutex{}
 	frrContainers = make([]*frrcontainer.FRR, 0)
 	g := new(errgroup.Group)
 	for _, conf := range c {
 		conf := conf
 		g.Go(func() error {
+			toFind := map[string]bool{
+				"zebra":    true,
+				"watchfrr": true,
+				"bgpd":     true,
+				"bfdd":     true,
+			}
 			c, err := frrcontainer.Start(conf)
 			if c != nil {
+				err = wait.PollImmediate(time.Second, 5*time.Minute, func() (bool, error) {
+					daemons, err := frr.Daemons(c)
+					if err != nil {
+						return false, err
+					}
+					for _, d := range daemons {
+						delete(toFind, d)
+					}
+					if len(toFind) > 0 {
+						return false, nil
+					}
+					return true, nil
+				})
+				m.Lock()
+				defer m.Unlock()
 				frrContainers = append(frrContainers, c)
 			}
-			return err
+			if err != nil {
+				return errors.Wrapf(err, "Failed to wait for daemons %v", toFind)
+			}
+			return nil
 		})
 	}
 	err := g.Wait()
