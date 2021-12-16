@@ -239,7 +239,6 @@ func reloadFRRConfig(configFile string, exec executor.Executor) error {
 	if err != nil {
 		return errors.Wrapf(err, "Failed to apply configuration file. %s", string(out))
 	}
-	fmt.Println("DEBUG RELOAD", out)
 
 	return nil
 }
