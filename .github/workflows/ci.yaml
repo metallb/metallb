@@ -105,6 +105,7 @@ jobs:
 
       - name: E2E
         run: |
+          echo '/etc/frr/core-%e.%p.%h.%t' | sudo tee /proc/sys/kernel/core_pattern
           SKIP="none"
           if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP\|FRR\|BFD\|DUALSTACK"; fi
           if [ "${{ matrix.ip-family }}" == "ipv4" ]; then SKIP="$SKIP\|IPV6\|DUALSTACK"; fi
