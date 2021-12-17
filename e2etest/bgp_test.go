@@ -1301,18 +1301,21 @@ func peersForContainers(containers []*frrcontainer.FRR, ipFamily string) []confi
 	for i, c := range containers {
 		addresses := c.AddressesForFamily(ipFamily)
 		holdTime := ""
+		keepaliveTime := ""
 		if i > 0 {
 			holdTime = fmt.Sprintf("%ds", i*180)
+			keepaliveTime = fmt.Sprintf("%ds", i*180)
 		}
 		for _, address := range addresses {
 			peers = append(peers, config.Peer{
-				Addr:     address,
-				ASN:      c.RouterConfig.ASN,
-				MyASN:    c.NeighborConfig.ASN,
-				Port:     c.RouterConfig.BGPPort,
-				RouterID: fmt.Sprintf(baseRouterID, i),
-				Password: c.RouterConfig.Password,
-				HoldTime: holdTime,
+				Addr:          address,
+				ASN:           c.RouterConfig.ASN,
+				MyASN:         c.NeighborConfig.ASN,
+				Port:          c.RouterConfig.BGPPort,
+				RouterID:      fmt.Sprintf(baseRouterID, i),
+				Password:      c.RouterConfig.Password,
+				HoldTime:      holdTime,
+				KeepaliveTime: keepaliveTime,
 			})
 		}
 	}

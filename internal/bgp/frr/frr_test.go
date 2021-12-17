@@ -91,7 +91,7 @@ func TestSingleSession(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "")
+	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, 180*time.Second, 180*time.Second, "password", "hostname", "")
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}

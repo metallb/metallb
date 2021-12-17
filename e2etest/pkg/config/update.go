@@ -205,6 +205,7 @@ func (o operatorUpdater) createPeer(p Peer) error {
 
 func (o operatorUpdater) peerToOperator(p Peer) (*operatorv1beta1.BGPPeer, error) {
 	var holdtime time.Duration
+	var keepalivetime time.Duration
 	var err error
 	if p.HoldTime != "" {
 		holdtime, err = time.ParseDuration(p.HoldTime)
@@ -213,6 +214,12 @@ func (o operatorUpdater) peerToOperator(p Peer) (*operatorv1beta1.BGPPeer, error
 		}
 	}
 
+	if p.KeepaliveTime != "" {
+		keepalivetime, err = time.ParseDuration(p.KeepaliveTime)
+		if err != nil {
+			return nil, err
+		}
+	}
 	nodeselectors := make([]operatorv1beta1.NodeSelector, len(p.NodeSelectors))
 	for _, ns := range p.NodeSelectors {
 		n := operatorv1beta1.NodeSelector{
@@ -243,6 +250,7 @@ func (o operatorUpdater) peerToOperator(p Peer) (*operatorv1beta1.BGPPeer, error
 			SrcAddress:    p.SrcAddr,
 			Port:          p.Port,
 			HoldTime:      metav1.Duration{Duration: holdtime},
+			KeepaliveTime: metav1.Duration{Duration: keepalivetime},
 			RouterID:      p.RouterID,
 			NodeSelectors: nodeselectors,
 			Password:      p.Password,
