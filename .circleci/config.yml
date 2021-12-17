@@ -49,6 +49,7 @@ jobs:
           if [ "<< parameters.deployment-method >>" = "helm" ]; then FLAGS="--helm-install"; fi
           inv dev-env -i  << parameters.ip-family >> -b  << parameters.bgp-type >> -l all $FLAGS
       - run: |
+          echo '/etc/frr/core-%e.%p.%h.%t' | sudo tee /proc/sys/kernel/core_pattern
           SKIP="none"
           FLAGS=""
           if [ "<< parameters.bgp-type >>" = "native" ]; then SKIP="$SKIP\|FRR\|BFD\|DUALSTACK"; fi

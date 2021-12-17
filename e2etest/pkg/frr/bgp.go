@@ -111,6 +111,15 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 	}
 	res = res + out
 
+	res = res + "####### Check for any crashinfo files\n"
+	if crashInfo, err := exec.Exec("bash", "-c", "ls /var/tmp/frr/bgpd.*/crashlog | head -n 1"); err == nil {
+		crashInfo = strings.TrimSuffix(crashInfo, "\n")
+		out, err = exec.Exec("bash", "-c", fmt.Sprintf("cat %s", crashInfo))
+		if err != nil {
+			return "", errors.Wrapf(err, "Failed to cat bgpd crashinfo file %s, err %s", crashInfo, err)
+		}
+		res = res + out
+	}
 	return res, nil
 }
 

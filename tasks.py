@@ -427,7 +427,7 @@ def bgp_dev_env(ip_family):
     run('for frr in $(docker ps -a -f name=frr --format {{.Names}}) ; do '
         '    docker rm -f $frr ; '
         'done', echo=True)
-    run("docker run -d --privileged --network kind --rm --name frr --volume %s:/etc/frr "
+    run("docker run -d --privileged --network kind --rm --ulimit core=-1 --name frr --volume %s:/etc/frr "
             "quay.io/frrouting/frr:stable_7.5" % frr_volume_dir, echo=True)
 
     if ip_family == "ipv4":
