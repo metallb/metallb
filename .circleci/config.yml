@@ -9,18 +9,6 @@ commands:
       - run: sudo apt-get update
       - run: sudo apt-get install python3-pip arping ndisc6
       - run: sudo pip3 install invoke semver pyyaml
-  setup_kind:
-    description: "Install kind"
-    steps:
-      - run: GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
-      - run: curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
-      - run: sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
-  install_helm:
-    description: "Install helm"
-    steps:
-      - run: curl -fsSL -o get_helm.sh https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
-      - run: chmod 700 get_helm.sh
-      - run: ./get_helm.sh
 jobs:
   test-1-16:
     machine:
@@ -29,44 +17,6 @@ jobs:
       - setup_ci_image
       - run: inv test
       - run: cp manifests/metallb.yaml manifests/metallb.yaml.prev
-  e2etest:
-    parameters:
-      ip-family:
-        type: string
-      bgp-type:
-        type: string
-      deployment-method:
-        type: string
-    machine:
-      image: ubuntu-2004:202104-01
-    steps:
-      - setup_ci_image
-      - setup_kind
-      - install_helm
-      - run: inv build
-      - run: |
-          FLAGS=""
-          if [ "<< parameters.deployment-method >>" = "helm" ]; then FLAGS="--helm-install"; fi
-          inv dev-env -i  << parameters.ip-family >> -b  << parameters.bgp-type >> -l all $FLAGS
-      - run: |
-          echo '/etc/frr/core-%e.%p.%h.%t' | sudo tee /proc/sys/kernel/core_pattern
-          SKIP="none"
-          FLAGS=""
-          if [ "<< parameters.bgp-type >>" = "native" ]; then SKIP="$SKIP\|FRR\|BFD\|DUALSTACK"; fi
-          if [ "<< parameters.ip-family >>" = "ipv4" ]; then SKIP="$SKIP\|IPV6\|DUALSTACK"; fi
-          if [ "<< parameters.ip-family >>" = "dual" ]; then SKIP="$SKIP\|IPV6"; fi
-          if [ "<< parameters.ip-family >>" = "ipv6" ]; then SKIP="$SKIP\|IPV4\|DUALSTACK"; fi
-          if [ "<< parameters.ip-family >>" = "ipv6" ] && [ "<< parameters.bgp-type >>" = "native" ]; then SKIP="$SKIP\|BGP"; fi # we are skipping BGP for ipv6 for native bgp stack
-          if [ "<< parameters.deployment-method >>" = "helm" ]; then FLAGS="--system-namespaces=default" && export OO_INSTALL_NAMESPACE=default && export CONFIGMAP_NAME=metallb; fi
-          echo "Skipping $SKIP"
-          # `-E env "PATH=$PATH"` bypasses commands not found under sudo, `sudo` needed because arping requires CAP_NET_RAW
-          sudo -E env "PATH=$PATH" inv e2etest --skip $SKIP $FLAGS -e /tmp/kind_logs
-      - run:
-          name: Change permissions for kind logs
-          command: sudo chmod -R o+r /tmp/kind_logs # logs are exported under root (sudo), chmod required to upload the artifacts.
-          when: always
-      - store_artifacts:
-          path: /tmp/kind_logs
   lint-1-16:
     docker:
       - image: cimg/go:1.16
@@ -75,26 +25,6 @@ jobs:
       - run: inv checkpatch
       - run: inv lint -e host
       - run: inv verifylicense
-  # FIXME: this is pinned to v3.0.0 because subsequent versions of ct pull in new versions of helm, which are subject
-  #        to this bug: https://github.com/helm/helm/issues/8835, specifically for rbac object names with ':' in them
-  helm-lint:
-    working_directory: /repo
-    docker:
-      - image: quay.io/helmpack/chart-testing:v3.0.0
-    steps:
-      - checkout
-      - run: ct lint
-  # FIXME: instrumenta/helm-conftest does not yet support helm v3, v2 causes tests to fail.
-  #        Switch to it once https://github.com/instrumenta/helm-conftest/pull/8 is merged
-  helm-conftest:
-    working_directory: /repo
-    docker:
-      - image: alpine/helm:3.2.4
-    steps:
-      - run: apk add --update --no-cache git curl bash
-      - run: helm plugin install --debug https://github.com/instrumenta/helm-conftest
-      - checkout
-      - run: helm conftest charts/metallb/ -p charts/metallb/policy/ --fail-on-warn
   publish-images:
     docker:
       - image: cimg/go:1.16
@@ -137,23 +67,6 @@ workflows:
           filters:
             tags:
               only: /.*/
-      - helm-lint:
-          filters:
-            tags:
-              only: /.*/
-      - helm-conftest:
-          filters:
-            tags:
-              only: /.*/
-      - e2etest:
-          filters:
-            tags:
-              only: /.*/
-          matrix:
-            parameters:
-              ip-family: [ipv4, ipv6, dual]
-              bgp-type: [native, frr]
-              deployment-method: [manifests, helm]
       - publish-images:
           filters:
             branches:
