@@ -81,6 +81,7 @@ jobs:
       matrix:
         ip-family: [ipv4, ipv6, dual]
         bgp-type: [native, frr]
+        deployment: [manifests, helm]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -101,11 +102,15 @@ jobs:
       - name: Build MetalLB
         run: |
           inv build
-          inv dev-env -i ${{ matrix.ip-family }} -b ${{ matrix.bgp-type }} -l all
+          HELM_FLAGS=""
+          if [ ${{ matrix.deployment }} = "helm" ]; then HELM_FLAGS="--helm-install"; fi
+          inv dev-env -i ${{ matrix.ip-family }} -b ${{ matrix.bgp-type }} -l all $HELM_FLAGS
 
       - name: E2E
         run: |
+          HELM_FLAGS=""
           echo '/etc/frr/core-%e.%p.%h.%t' | sudo tee /proc/sys/kernel/core_pattern
+          if [ ${{ matrix.deployment }} = "helm" ]; then HELM_FLAGS="--system-namespaces=default" && export OO_INSTALL_NAMESPACE=default && export CONFIGMAP_NAME=metallb; fi
           SKIP="none"
           if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP\|FRR\|BFD\|DUALSTACK"; fi
           if [ "${{ matrix.ip-family }}" == "ipv4" ]; then SKIP="$SKIP\|IPV6\|DUALSTACK"; fi
@@ -113,7 +118,7 @@ jobs:
           if [ "${{ matrix.ip-family }}" == "ipv6" ]; then SKIP="$SKIP\|IPV4\|DUALSTACK"; fi
           if [ "${{ matrix.ip-family }}" == "ipv6" ] && [ ${{ matrix.bgp-type }} == "native" ]; then SKIP="$SKIP\|BGP"; fi
           echo "Skipping $SKIP"
-          sudo -E env "PATH=$PATH" inv e2etest --skip $SKIP -e /tmp/kind_logs
+          sudo -E env "PATH=$PATH" inv e2etest --skip $SKIP -e /tmp/kind_logs $HELM_FLAGS
       
       - name: Log permissions
         if: ${{ always() }}
