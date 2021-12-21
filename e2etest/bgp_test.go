@@ -133,7 +133,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		if ginkgo.CurrentGinkgoTestDescription().Failed {
 			for _, c := range frrContainers {
 				dump, err := frr.RawDump(c, "/etc/frr/bgpd.conf", "/tmp/frr.log", "/etc/frr/daemons")
-				framework.Logf("External frr dump for %s:\n%s %v", c.Name, dump, err)
+				framework.Logf("External frr dump for %s:\n%s\nerrors:%v", c.Name, dump, err)
 			}
 
 			speakerPods := getSpeakerPods(cs)
