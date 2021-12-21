@@ -44,9 +44,9 @@ route-map {{$n.Addr}}-out permit 10
 {{- if ne $a.LocalPref 0 }}
   set local-preference {{$a.LocalPref}}
 {{- end }}
+{{- end }}
+{{- end }}
 route-map {{$n.Addr}}-in deny 20
-{{- end }}
-{{- end }}
 {{- end }}
 {{- end }}
 
