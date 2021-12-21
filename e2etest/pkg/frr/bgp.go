@@ -89,7 +89,8 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 
 	for _, file := range filesToDump {
 		res = res + fmt.Sprintf("####### Dumping file %s\n", file)
-		out, err = exec.Exec("cat", file)
+		// limiting the output to 500 lines:
+		out, err = exec.Exec("bash", "-c", fmt.Sprintf("cat %s | tail -n 500", file))
 		if err != nil {
 			return "", errors.Wrapf(err, "Failed to cat %s file %s", file, res)
 		}
@@ -110,6 +111,19 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 	}
 	res = res + out
 
+	res = res + "####### Check for any crashinfo files\n"
+	if crashInfo, err := exec.Exec("bash", "-c", "ls /var/tmp/frr/bgpd.*/crashlog"); err == nil {
+		crashInfo = strings.TrimSuffix(crashInfo, "\n")
+		files := strings.Split(crashInfo, "\n")
+		for _, file := range files {
+			res = res + fmt.Sprintf("####### Dumping crash file %s\n", file)
+			out, err = exec.Exec("bash", "-c", fmt.Sprintf("cat %s", file))
+			if err != nil {
+				return "", errors.Wrapf(err, "Failed to cat bgpd crashinfo file %s, err %s, %s", crashInfo, err, res)
+			}
+			res = res + out
+		}
+	}
 	return res, nil
 }
 
