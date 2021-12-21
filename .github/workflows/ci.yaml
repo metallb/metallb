@@ -129,5 +129,5 @@ jobs:
         uses: actions/upload-artifact@v2
         if: ${{ always() }}
         with:
-          name: kind-logs-${{ matrix.ip-family }}-${{ matrix.bgp-type }}
+          name: kind-logs-${{ matrix.ip-family }}-${{ matrix.bgp-type }}-${{ matrix.deployment}}
           path: /tmp/kind_logs/
