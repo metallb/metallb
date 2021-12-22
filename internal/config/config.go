@@ -424,21 +424,23 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 	if len(p.Addresses) == 0 {
 		return nil, errors.New("pool has no prefixes defined")
 	}
+
+	cidrsPerAddresses := map[string][]*net.IPNet{}
 	for _, cidr := range p.Addresses {
 		nets, err := ParseCIDR(cidr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid CIDR %q in pool %q: %s", cidr, p.Name, err)
 		}
 		ret.CIDR = append(ret.CIDR, nets...)
+		cidrsPerAddresses[cidr] = nets
 	}
-
 	switch ret.Protocol {
 	case Layer2:
 		if len(p.BGPAdvertisements) > 0 {
 			return nil, errors.New("cannot have bgp-advertisements configuration element in a layer2 address pool")
 		}
 	case BGP:
-		ads, err := parseBGPAdvertisements(p.BGPAdvertisements, ret.CIDR, bgpCommunities)
+		ads, err := parseBGPAdvertisements(p.BGPAdvertisements, cidrsPerAddresses, bgpCommunities)
 		if err != nil {
 			return nil, fmt.Errorf("parsing BGP communities: %s", err)
 		}
@@ -485,7 +487,7 @@ func parseBFDProfile(p bfdProfile) (*BFDProfile, error) {
 	return res, nil
 }
 
-func parseBGPAdvertisements(ads []bgpAdvertisement, cidrs []*net.IPNet, communities map[string]uint32) ([]*BGPAdvertisement, error) {
+func parseBGPAdvertisements(ads []bgpAdvertisement, cidrsPerAddresses map[string][]*net.IPNet, communities map[string]uint32) ([]*BGPAdvertisement, error) {
 	if len(ads) == 0 {
 		return []*BGPAdvertisement{
 			{
@@ -519,15 +521,21 @@ func parseBGPAdvertisements(ads []bgpAdvertisement, cidrs []*net.IPNet, communit
 			}
 		}
 
-		for _, cidr := range cidrs {
-			o, _ := cidr.Mask.Size()
+		for addr, cidrs := range cidrsPerAddresses {
+			if len(cidrs) == 0 {
+				continue
+			}
 			maxLength := ad.AggregationLength
-			if cidr.IP.To4() == nil {
+			if cidrs[0].IP.To4() == nil {
 				maxLength = ad.AggregationLengthV6
 			}
-			if maxLength < o {
+
+			// in case of range format, we may have a set of cidrs associated to a given address.
+			// We reject if none of the cidrs are compatible with the aggregation length.
+			lowest := lowestMask(cidrs)
+			if maxLength < lowest {
 				return nil, fmt.Errorf("invalid aggregation length %d: prefix %q in "+
-					"this pool is more specific than the aggregation length", ad.AggregationLength, cidr)
+					"this pool is more specific than the aggregation length for addresses %s", ad.AggregationLength, lowest, addr)
 			}
 		}
 
@@ -627,6 +635,20 @@ func cidrContainsCIDR(outer, inner *net.IPNet) bool {
 		return true
 	}
 	return false
+}
+
+func lowestMask(cidrs []*net.IPNet) int {
+	if len(cidrs) == 0 {
+		return 0
+	}
+	lowest, _ := cidrs[0].Mask.Size()
+	for _, c := range cidrs {
+		s, _ := c.Mask.Size()
+		if lowest > s {
+			lowest = s
+		}
+	}
+	return lowest
 }
 
 func bfdIntFromConfig(value *uint32, min, max uint32) (*uint32, error) {
