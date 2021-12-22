@@ -524,6 +524,63 @@ address-pools:
 		},
 
 		{
+			desc: "aggregation length by range",
+			raw: `
+address-pools:
+- name: pool1
+  protocol: bgp
+  addresses:
+  - 3.3.3.2-3.3.3.254
+  bgp-advertisements:
+  - aggregation-length: 26
+`,
+			want: &Config{
+				Pools: map[string]*Pool{
+					"pool1": {
+						Protocol:   BGP,
+						AutoAssign: true,
+						CIDR: []*net.IPNet{
+							ipnet("3.3.3.2/31"),
+							ipnet("3.3.3.4/30"),
+							ipnet("3.3.3.8/29"),
+							ipnet("3.3.3.16/28"),
+							ipnet("3.3.3.32/27"),
+							ipnet("3.3.3.64/26"),
+							ipnet("3.3.3.128/26"),
+							ipnet("3.3.3.192/27"),
+							ipnet("3.3.3.224/28"),
+							ipnet("3.3.3.240/29"),
+							ipnet("3.3.3.248/30"),
+							ipnet("3.3.3.252/31"),
+							ipnet("3.3.3.254/32"),
+						},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   26,
+								AggregationLengthV6: 128,
+								Communities:         map[uint32]bool{},
+							},
+						},
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+
+		{
+			desc: "aggregation length by range, too wide",
+			raw: `
+address-pools:
+- name: pool1
+  protocol: bgp
+  addresses:
+  - 3.3.3.2-3.3.3.254
+  bgp-advertisements:
+  - aggregation-length: 24
+`,
+		},
+
+		{
 			desc: "bad community literal (wrong format)",
 			raw: `
 address-pools:
