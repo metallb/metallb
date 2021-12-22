@@ -126,7 +126,7 @@ func TestTwoSessions(t *testing.T) {
 		t.Fatalf("Could not create session: %s", err)
 	}
 	defer session1.Close()
-	session2, err := sessionManager.NewSession(l, "10.4.4.254:179", net.ParseIP("10.3.3.254"), 300, net.ParseIP("10.3.3.254"), 400, time.Second, time.Second, "password", "hostname", "")
+	session2, err := sessionManager.NewSession(l, "10.4.4.255:179", net.ParseIP("10.3.3.254"), 300, net.ParseIP("10.3.3.254"), 400, time.Second, time.Second, "password", "hostname", "")
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -166,7 +166,7 @@ func TestTwoSessionsDuplicateRouter(t *testing.T) {
 		t.Fatalf("Could not create session: %s", err)
 	}
 	defer session1.Close()
-	session2, err := sessionManager.NewSession(l, "10.4.4.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 400, time.Second, time.Second, "password", "hostname", "")
+	session2, err := sessionManager.NewSession(l, "10.4.4.255:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 400, time.Second, time.Second, "password", "hostname", "")
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}

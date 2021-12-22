@@ -1045,15 +1045,8 @@ var _ = ginkgo.Describe("BGP", func() {
 		for _, c := range frrContainers {
 			validateFRRPeeredWithNodes(cs, c, pairingIPFamily)
 		}
-		svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb")
-
-		defer func() {
-			err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
-		}()
-
 		speakerPods := getSpeakerPods(cs)
-		Consistently(func() error {
+		checkRoutesInjected := func() error {
 			for _, pod := range speakerPods {
 				podExec := executor.ForPod(pod.Namespace, pod.Name, "frr")
 				routes, frrRoutesV6, err := frr.Routes(podExec)
@@ -1070,7 +1063,17 @@ var _ = ginkgo.Describe("BGP", func() {
 				}
 			}
 			return nil
-		}, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
+		}
+
+		Consistently(checkRoutesInjected, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
+		svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb")
+
+		defer func() {
+			err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+		}()
+
+		Consistently(checkRoutesInjected, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
 
 	},
 		table.Entry("IPV4", "192.168.10.0/24", "ipv4", "172.16.1.10/32"),
