@@ -4,6 +4,7 @@ log timestamp precision 3
 hostname dummyhostname
 ip nht resolve-via-default
 ipv6 nht resolve-via-default
+route-map 10.2.2.254-in deny 20
 
 router bgp 100
   no bgp ebgp-requires-policy
