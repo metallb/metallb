@@ -649,7 +649,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
 
     ginkgo_skip = ""
     if skip:
-        ginkgo_skip = "--ginkgo.skip="+skip
+        ginkgo_skip = "--ginkgo.skip=\"" + skip + "\""
 
     opt_use_operator = ""
     if use_operator:
@@ -657,7 +657,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
 
     ginkgo_focus = ""
     if focus:
-        ginkgo_focus = "--ginkgo.focus="+focus
+        ginkgo_focus = "--ginkgo.focus=\"" + focus + "\""
     
     if kubeconfig is None:
         validate_kind_version()
