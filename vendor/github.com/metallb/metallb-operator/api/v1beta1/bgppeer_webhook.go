@@ -111,16 +111,16 @@ func (bgpPeer *BGPPeer) validateBGPPeersKeepaliveTime(existingBGPPeersList *BGPP
 	keepaliveTime := bgpPeer.Spec.KeepaliveTime
 
 	// Keepalivetime is not set we can't do any validation, return without doing keepalive validation
-	if keepaliveTime == 0 {
+	if keepaliveTime.Duration == 0 {
 		return nil
 	}
 	// If we come here then user configured KeepaliveTime and we need to make sure holdTime is also configured
-	if holdTime == 0 {
+	if holdTime.Duration == 0 {
 		return field.Invalid(field.NewPath("spec").Child("HoldTime"), holdTime,
 			fmt.Sprintf("Missing to configure HoldTime when changing KeepaliveTime to %s", keepaliveTime))
 	}
 	// keepalive must be lower than holdtime by RFC4271 Keepalive Timer algorithm
-	if keepaliveTime > holdTime {
+	if keepaliveTime.Duration > holdTime.Duration {
 		return field.Invalid(field.NewPath("spec").Child("KeepaliveTime"), keepaliveTime,
 			fmt.Sprintf("Invalid keepalive time %s higher than holdtime %s", keepaliveTime, holdTime))
 	}
@@ -143,7 +143,7 @@ func (bgpPeer *BGPPeer) validateBGPPeersRouterID(existingBGPPeersList *BGPPeerLi
 func (bgpPeer *BGPPeer) validateBGPPeersMyASN(existingBGPPeersList *BGPPeerList) *field.Error {
 	myASN := bgpPeer.Spec.MyASN
 	for _, BGPPeer := range existingBGPPeersList.Items {
-		if myASN != BGPPeer.Spec.MyASN {
+		if bgpPeer.Name != BGPPeer.Name && myASN != BGPPeer.Spec.MyASN {
 			return field.Invalid(field.NewPath("spec").Child("MyASN"), myASN,
 				fmt.Sprintf("Multiple local ASN not supported in FRR mode, myASN %d existing myASN %d",
 					myASN, BGPPeer.Spec.MyASN))
@@ -158,6 +158,7 @@ func (bgpPeer *BGPPeer) validateBGPPeerConfig(existingBGPPeersList *BGPPeerList)
 	myASN := bgpPeer.Spec.MyASN
 	address := bgpPeer.Spec.Address
 	srcAddr := bgpPeer.Spec.SrcAddress
+	eBGPMultiHop := bgpPeer.Spec.EBGPMultiHop
 
 	if net.ParseIP(address) == nil {
 		return field.Invalid(field.NewPath("spec").Child("Address"), address,
@@ -169,8 +170,13 @@ func (bgpPeer *BGPPeer) validateBGPPeerConfig(existingBGPPeersList *BGPPeerList)
 			fmt.Sprintf("Invalid BGPPeer source address %s", srcAddr))
 	}
 
+	if remoteASN == myASN && eBGPMultiHop {
+		return field.Invalid(field.NewPath("spec").Child("EBGPMultiHop"), eBGPMultiHop,
+			fmt.Sprintf("Invalid EBGPMultiHop parameter set for an ibgp peer %v", eBGPMultiHop))
+	}
+
 	for _, BGPPeer := range existingBGPPeersList.Items {
-		if remoteASN == BGPPeer.Spec.ASN && address == BGPPeer.Spec.Address && myASN == BGPPeer.Spec.MyASN {
+		if bgpPeer.Name != BGPPeer.Name && remoteASN == BGPPeer.Spec.ASN && address == BGPPeer.Spec.Address && myASN == BGPPeer.Spec.MyASN {
 			return field.Invalid(field.NewPath("spec").Child("Address"), address,
 				fmt.Sprintf("Duplicate BGPPeer %s ASN %d in the same BGP instance",
 					address, remoteASN))

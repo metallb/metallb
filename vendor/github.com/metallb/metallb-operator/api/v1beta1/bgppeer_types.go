@@ -17,8 +17,6 @@ limitations under the License.
 package v1beta1
 
 import (
-	"time"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -64,11 +62,11 @@ type BGPPeerSpec struct {
 
 	// Requested BGP hold time, per RFC4271.
 	// +optional
-	HoldTime time.Duration `json:"holdTime,omitempty" yaml:"hold-time,omitempty"`
+	HoldTime metav1.Duration `json:"holdTime,omitempty" yaml:"hold-time,omitempty"`
 
 	// Requested BGP keepalive time, per RFC4271.
 	// +optional
-	KeepaliveTime time.Duration `json:"keepaliveTime,omitempty" yaml:"keepalive-time,omitempty"`
+	KeepaliveTime metav1.Duration `json:"keepaliveTime,omitempty" yaml:"keepalive-time,omitempty"`
 
 	// BGP router ID to advertise to the peer
 	// +optional
@@ -84,6 +82,9 @@ type BGPPeerSpec struct {
 	Password string `json:"password,omitempty" yaml:"password,omitempty"`
 
 	BFDProfile string `json:"bfdProfile,omitempty" yaml:"bfdprofile,omitempty"`
+
+	// EBGP peer is multi-hops away
+	EBGPMultiHop bool `json:"ebgpMultiHop,omitempty" yaml:"ebgp-multihop,omitempty"`
 	// Add future BGP configuration here
 }
 
