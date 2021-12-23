@@ -525,10 +525,10 @@ github.com/mdlayher/raw v0.0.0-20190313224157-43dbcdd7739d/go.mod h1:r1fbeITl2xL
 github.com/mdlayher/raw v0.0.0-20190606142536-fef19f00fc18/go.mod h1:7EpbotpCmVZcu+KCX4g9WaRNuu11uyhiW7+Le1dKawg=
 github.com/mdlayher/raw v0.0.0-20191009151244-50f2db8cc065 h1:aFkJ6lx4FPip+S+Uw4aTegFMct9shDvP+79PsSxpm3w=
 github.com/mdlayher/raw v0.0.0-20191009151244-50f2db8cc065/go.mod h1:7EpbotpCmVZcu+KCX4g9WaRNuu11uyhiW7+Le1dKawg=
-github.com/metallb/metallb-operator v0.0.0-20211130125940-1fa9bd1b26e6 h1:SnlhuUWaybz321LlQrY+h3Hwfl3vdOtUniCMKttbHSk=
-github.com/metallb/metallb-operator v0.0.0-20211130125940-1fa9bd1b26e6/go.mod h1:OklSBaSeVcigNS4wtnHABJJlpSype7HZ7xg1gWDffh4=
 github.com/metallb/metallb-operator v0.0.0-20211214200449-6cf52753e656 h1:k4Iwe+5GyO2aVGDDLxgGA/s6oNqn9xjsdq6CUsKlGu4=
 github.com/metallb/metallb-operator v0.0.0-20211214200449-6cf52753e656/go.mod h1:OklSBaSeVcigNS4wtnHABJJlpSype7HZ7xg1gWDffh4=
+github.com/metallb/metallb-operator v0.0.0-20211223114020-a8fc2e0875fc h1:6Y+M1nN1CR3VDSJtqjAbwwY6DHMI9QfUhHHqa/Od7JQ=
+github.com/metallb/metallb-operator v0.0.0-20211223114020-a8fc2e0875fc/go.mod h1:OklSBaSeVcigNS4wtnHABJJlpSype7HZ7xg1gWDffh4=
 github.com/mholt/certmagic v0.6.2-0.20190624175158-6a42ef9fe8c2/go.mod h1:g4cOPxcjV0oFq3qwpjSA30LReKD8AoIfwAY9VvG35NY=
 github.com/miekg/dns v1.0.14/go.mod h1:W1PPwlIAgtquWBMBEV9nkV9Cazfe8ScdGz/Lj7v3Nrg=
 github.com/miekg/dns v1.1.3/go.mod h1:W1PPwlIAgtquWBMBEV9nkV9Cazfe8ScdGz/Lj7v3Nrg=

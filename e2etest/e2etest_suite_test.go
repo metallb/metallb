@@ -31,6 +31,8 @@ import (
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
+	"go.universe.tf/metallb/e2etest/pkg/container"
+	"go.universe.tf/metallb/e2etest/pkg/executor"
 	internalconfig "go.universe.tf/metallb/internal/config"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -167,7 +169,24 @@ var _ = ginkgo.BeforeSuite(func() {
 	framework.ExpectNoError(err)
 	v4Addresses := strings.Split(ipv4ForContainers, ",")
 	v6Addresses := strings.Split(ipv6ForContainers, ",")
-	frrContainers = setupContainers(v4Addresses, v6Addresses)
+	frrContainers, err = setupContainers(v4Addresses, v6Addresses)
+	framework.ExpectNoError(err)
+
+	// Allow the speaker nodes to reach the multi-hop network containers.
+	if containersNetwork != "host" {
+		/*
+			When "host" network is not specified we assume that the tests
+			run on a kind cluster, where all the nodes are actually containers
+			on our pc. This allows us to create containerExecutors for the speakers
+			nodes, and edit their routes without any added privileges.
+		*/
+		speakerPods := getSpeakerPods(cs)
+		for _, pod := range speakerPods {
+			nodeExec := executor.ForContainer(pod.Spec.NodeName)
+			err = container.AddMultiHop(nodeExec, containersNetwork, multiHopNetwork, multiHopRoutes)
+			framework.ExpectNoError(err)
+		}
+	}
 })
 
 var _ = ginkgo.AfterSuite(func() {
@@ -177,5 +196,16 @@ var _ = ginkgo.AfterSuite(func() {
 	err = cs.CoreV1().ConfigMaps(testNameSpace).Delete(context.TODO(), configMapName, metav1.DeleteOptions{})
 	framework.ExpectNoError(err)
 
-	tearDownContainers(frrContainers)
+	err = tearDownContainers(frrContainers)
+	framework.ExpectNoError(err)
+
+	// Remove static routes from speaker nodes.
+	if containersNetwork != "host" {
+		speakerPods := getSpeakerPods(cs)
+		for _, pod := range speakerPods {
+			nodeExec := executor.ForContainer(pod.Spec.NodeName)
+			err = container.DeleteMultiHop(nodeExec, containersNetwork, multiHopNetwork, multiHopRoutes)
+			framework.ExpectNoError(err)
+		}
+	}
 })

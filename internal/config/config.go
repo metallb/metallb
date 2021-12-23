@@ -51,6 +51,7 @@ type peer struct {
 	NodeSelectors []nodeSelector `yaml:"node-selectors"`
 	Password      string         `yaml:"password"`
 	BFDProfile    string         `yaml:"bfd-profile"`
+	EBGPMultiHop  bool           `yaml:"ebgp-multihop"`
 }
 
 type nodeSelector struct {
@@ -135,6 +136,8 @@ type Peer struct {
 	Password string
 	// The optional BFD profile to be used for this BGP session
 	BFDProfile string
+	// Optional ebgp peer is multi-hops away.
+	EBGPMultiHop bool
 	// TODO: more BGP session settings
 }
 
@@ -335,6 +338,9 @@ func parsePeer(p peer) (*Peer, error) {
 	if p.ASN == 0 {
 		return nil, errors.New("missing peer ASN")
 	}
+	if p.ASN == p.MyASN && p.EBGPMultiHop {
+		return nil, errors.New("invalid ebgp-multihop parameter set for an ibgp peer")
+	}
 	ip := net.ParseIP(p.Addr)
 	if ip == nil {
 		return nil, fmt.Errorf("invalid peer IP %q", p.Addr)
@@ -403,6 +409,7 @@ func parsePeer(p peer) (*Peer, error) {
 		NodeSelectors: nodeSels,
 		Password:      password,
 		BFDProfile:    p.BFDProfile,
+		EBGPMultiHop:  p.EBGPMultiHop,
 	}, nil
 }
 

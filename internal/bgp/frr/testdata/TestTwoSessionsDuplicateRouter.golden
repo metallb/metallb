@@ -15,11 +15,13 @@ router bgp 100
   bgp router-id 10.1.1.254
 
   neighbor 10.2.2.254 remote-as 200
+  neighbor 10.2.2.254 ebgp-multihop
   neighbor 10.2.2.254 port 179
   neighbor 10.2.2.254 timers 1 1
   neighbor 10.2.2.254 password password
   neighbor 10.2.2.254 update-source 10.1.1.254
   neighbor 10.4.4.255 remote-as 400
+  neighbor 10.4.4.255 ebgp-multihop
   neighbor 10.4.4.255 port 179
   neighbor 10.4.4.255 timers 1 1
   neighbor 10.4.4.255 password password
