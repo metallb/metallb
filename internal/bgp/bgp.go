@@ -45,6 +45,6 @@ type Session interface {
 }
 
 type SessionManager interface {
-	NewSession(logger log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, hold, keepalive time.Duration, password, myNode, bfdProfile string) (Session, error)
+	NewSession(logger log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, hold, keepalive time.Duration, password, myNode, bfdProfile string, ebgpMultiHop bool) (Session, error)
 	SyncBFDProfiles(profiles map[string]*config.BFDProfile) error
 }

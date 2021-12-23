@@ -85,13 +85,43 @@ func testCheckConfigFile(t *testing.T) {
 	}
 }
 
-func TestSingleSession(t *testing.T) {
+func TestSingleEBGPSessionMultiHop(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "")
+	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	testCheckConfigFile(t)
+}
+
+func TestSingleEBGPSessionOneHop(t *testing.T) {
+	testSetup(t)
+
+	l := log.NewNopLogger()
+	sessionManager := NewSessionManager(l)
+	defer close(sessionManager.reloadConfig)
+	session, err := sessionManager.NewSession(l, "127.0.0.2:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", false)
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	testCheckConfigFile(t)
+}
+
+func TestSingleIBGPSession(t *testing.T) {
+	testSetup(t)
+
+	l := log.NewNopLogger()
+	sessionManager := NewSessionManager(l)
+	defer close(sessionManager.reloadConfig)
+	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 100, time.Second, time.Second, "password", "hostname", "", false)
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -107,7 +137,7 @@ func TestSingleSessionClose(t *testing.T) {
 	sessionManager := NewSessionManager(l)
 	defer close(sessionManager.reloadConfig)
 
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "")
+	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -121,12 +151,12 @@ func TestTwoSessions(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l)
 	defer close(sessionManager.reloadConfig)
-	session1, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "")
+	session1, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
 	defer session1.Close()
-	session2, err := sessionManager.NewSession(l, "10.4.4.255:179", net.ParseIP("10.3.3.254"), 300, net.ParseIP("10.3.3.254"), 400, time.Second, time.Second, "password", "hostname", "")
+	session2, err := sessionManager.NewSession(l, "10.4.4.255:179", net.ParseIP("10.3.3.254"), 300, net.ParseIP("10.3.3.254"), 400, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -141,12 +171,12 @@ func TestTwoSessionsDuplicate(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l)
 	defer close(sessionManager.reloadConfig)
-	session1, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "")
+	session1, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
 	defer session1.Close()
-	session2, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "")
+	session2, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -161,12 +191,12 @@ func TestTwoSessionsDuplicateRouter(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l)
 	defer close(sessionManager.reloadConfig)
-	session1, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "")
+	session1, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
 	defer session1.Close()
-	session2, err := sessionManager.NewSession(l, "10.4.4.255:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 400, time.Second, time.Second, "password", "hostname", "")
+	session2, err := sessionManager.NewSession(l, "10.4.4.255:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 400, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -181,7 +211,7 @@ func TestSingleAdvertisement(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "")
+	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -217,7 +247,7 @@ func TestSingleAdvertisementNoRouterID(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, nil, 200, time.Second, time.Second, "password", "hostname", "")
+	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, nil, 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -247,7 +277,7 @@ func TestSingleAdvertisementInvalidPrefix(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "")
+	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -274,7 +304,7 @@ func TestSingleAdvertisementInvalidNoPort(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "")
+	session, err := sessionManager.NewSession(l, "10.2.2.254", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err == nil {
 		session.Close()
 		t.Fatalf("Should not be able to create session")
@@ -290,7 +320,7 @@ func TestSingleAdvertisementInvalidNextHop(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "")
+	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -319,7 +349,7 @@ func TestSingleAdvertisementStop(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "")
+	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -354,7 +384,7 @@ func TestSingleAdvertisementChange(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "")
+	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -399,7 +429,7 @@ func TestTwoAdvertisements(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "")
+	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}

@@ -37,6 +37,7 @@ type session struct {
 	password       string
 	advertised     []*bgp.Advertisement
 	bfdProfile     string
+	ebgpMultiHop   bool
 	sessionManager *sessionManager
 }
 
@@ -117,7 +118,7 @@ func (s *session) Close() error {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime, keepaliveTime time.Duration, password, myNode, bfdProfile string) (bgp.Session, error) {
+func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime, keepaliveTime time.Duration, password, myNode, bfdProfile string, ebgpMultiHop bool) (bgp.Session, error) {
 	s := &session{
 		myASN:          myASN,
 		routerID:       routerID,
@@ -132,6 +133,7 @@ func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, 
 		advertised:     []*bgp.Advertisement{},
 		sessionManager: sm,
 		bfdProfile:     bfdProfile,
+		ebgpMultiHop:   ebgpMultiHop,
 	}
 
 	_ = sm.addSession(s)
@@ -240,6 +242,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				Password:       s.password,
 				Advertisements: make([]*advertisementConfig, 0),
 				BFDProfile:     s.bfdProfile,
+				EBGPMultiHop:   s.ebgpMultiHop,
 			}
 			if s.srcAddr != nil {
 				neighbor.SrcAddr = s.srcAddr.String()
