@@ -27,6 +27,7 @@ import (
 	"time"
 
 	"go.universe.tf/metallb/e2etest/pkg/config"
+	"go.universe.tf/metallb/e2etest/pkg/container"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/metrics"
 	"go.universe.tf/metallb/e2etest/pkg/routes"
@@ -53,8 +54,7 @@ import (
 )
 
 const (
-	frrIBGP         = "frr-iBGP"
-	frrEBGP         = "frr-eBGP"
+	multiHopNetwork = "multi-hop-net"
 	MetalLBASN      = 64512
 	ExternalASN     = 64513
 	baseRouterID    = "10.10.10.%d"
@@ -65,16 +65,34 @@ const (
 )
 
 var (
-	frrContainers []*frrcontainer.FRR
+	frrContainers  []*frrcontainer.FRR
+	multiHopRoutes map[string]container.NetworkSettings
 )
 
-func setupContainers(ipv4Addresses, ipv6Addresses []string) []*frrcontainer.FRR {
+func setupContainers(ipv4Addresses, ipv6Addresses []string) ([]*frrcontainer.FRR, error) {
+	/*
+		We have 2 ways in which we setup the containers for the tests:
+		1 - The user requested the containers to use the 'host' network
+		so we spin up only one ibgp container.
+		2 - The user specified (or didn't at all) a container network that
+		is not 'host'. In that case he needs to supply 2 IPs for the containers.
+		Then we spin up a total of 4 containers:
+		  * ibgp container that uses the first IP, a single-hop away from our speakers (1st).
+		  * ebgp container that uses the second IP, a single-hop away from our speakers,
+		    and is connected to another containers network "multi-hop-net" (2nd).
+		  * two ibgp/ebgp containers connected to the "multi-hop-net", multi-hops away
+		    from our speakers (3rd,4th).
+		We then wire these networks by adding static routes to both the speaker nodes
+		containers (we're using kind) and the ibgp/ebgp containers connected to multi-hop-net,
+		using the 2nd container as a gateway.
+	*/
 
-	ibgpContainerConfig := frrcontainer.Config{
-		Name: frrIBGP,
+	ibgpSingleHopContainerConfig := frrcontainer.Config{
+		Name: "ibgp-single-hop",
 		Neighbor: frrconfig.NeighborConfig{
 			ASN:      MetalLBASN,
 			Password: "ibgp-test",
+			MultiHop: false,
 		},
 		Router: frrconfig.RouterConfig{
 			ASN:      MetalLBASN,
@@ -85,43 +103,112 @@ func setupContainers(ipv4Addresses, ipv6Addresses []string) []*frrcontainer.FRR 
 		HostIPv4: hostIPv4,
 		HostIPv6: hostIPv6,
 	}
-	ebgpContainerConfig := frrcontainer.Config{
-		Name: frrEBGP,
+	ibgpMultiHopContainerConfig := frrcontainer.Config{
+		Name: "ibgp-multi-hop",
+		Neighbor: frrconfig.NeighborConfig{
+			ASN:      MetalLBASN,
+			Password: "ibgp-test",
+			MultiHop: true,
+		},
+		Router: frrconfig.RouterConfig{
+			ASN:      MetalLBASN,
+			BGPPort:  180,
+			Password: "ibgp-test",
+		},
+		Network:  multiHopNetwork,
+		HostIPv4: hostIPv4,
+		HostIPv6: hostIPv6,
+	}
+	ebgpMultiHopContainerConfig := frrcontainer.Config{
+		Name: "ebgp-multi-hop",
 		Neighbor: frrconfig.NeighborConfig{
 			ASN:      MetalLBASN,
 			Password: "ebgp-test",
+			MultiHop: true,
 		},
 		Router: frrconfig.RouterConfig{
 			ASN:      ExternalASN,
 			BGPPort:  180,
 			Password: "ebgp-test",
 		},
-		Network:  containersNetwork,
+		Network:  multiHopNetwork,
 		HostIPv4: hostIPv4,
 		HostIPv6: hostIPv6,
+	}
+	ebgpSingleHopContainerConfig := frrcontainer.Config{
+		Name:    "ebgp-single-hop",
+		Network: containersNetwork,
+		Neighbor: frrconfig.NeighborConfig{
+			ASN:      MetalLBASN,
+			MultiHop: false,
+		},
+		Router: frrconfig.RouterConfig{
+			ASN:     ExternalASN,
+			BGPPort: 179,
+		},
 	}
 
 	var res []*frrcontainer.FRR
 	var err error
 	if containersNetwork == "host" {
-		res, err = createFRRContainers(ibgpContainerConfig)
+		res, err = createFRRContainers(ibgpSingleHopContainerConfig)
 	} else {
 		Expect(len(ipv4Addresses)).Should(BeNumerically(">=", 2))
 		Expect(len(ipv6Addresses)).Should(BeNumerically(">=", 2))
 
-		ibgpContainerConfig.IPv4Address = ipv4Addresses[0]
-		ibgpContainerConfig.IPv6Address = ipv6Addresses[0]
-		ebgpContainerConfig.IPv4Address = ipv4Addresses[1]
-		ebgpContainerConfig.IPv6Address = ipv6Addresses[1]
-		res, err = createFRRContainers(ibgpContainerConfig, ebgpContainerConfig)
+		ibgpSingleHopContainerConfig.IPv4Address = ipv4Addresses[0]
+		ibgpSingleHopContainerConfig.IPv6Address = ipv6Addresses[0]
+		ebgpSingleHopContainerConfig.IPv4Address = ipv4Addresses[1]
+		ebgpSingleHopContainerConfig.IPv6Address = ipv6Addresses[1]
+
+		var out string
+		out, err = executor.Host.Exec(executor.ContainerRuntime, "network", "create", multiHopNetwork, "--ipv6",
+			"--driver=bridge", "--subnet=172.30.0.0/16", "--subnet=fc00:f853:ccd:e798::/64")
+		if err != nil {
+			return res, errors.Wrapf(err, "failed to create %s: %s", multiHopNetwork, out)
+		}
+
+		res, err = createFRRContainers(ibgpSingleHopContainerConfig, ibgpMultiHopContainerConfig,
+			ebgpMultiHopContainerConfig, ebgpSingleHopContainerConfig)
+		if err != nil {
+			return res, err
+		}
+
+		out, err = executor.Host.Exec(executor.ContainerRuntime, "network", "connect",
+			multiHopNetwork, ebgpSingleHopContainerConfig.Name)
+		if err != nil {
+			return res, errors.Wrapf(err, "failed to connect %s to %s: %s", ebgpSingleHopContainerConfig.Name, multiHopNetwork, out)
+		}
+
+		multiHopRoutes, err = container.Networks(ebgpSingleHopContainerConfig.Name)
+		if err != nil {
+			return res, err
+		}
+
+		for _, c := range res {
+			if c.Network == multiHopNetwork {
+				err = container.AddMultiHop(c, c.Network, containersNetwork, multiHopRoutes)
+				if err != nil {
+					return res, err
+				}
+			}
+		}
 	}
-	framework.ExpectNoError(err)
-	return res
+	return res, err
 }
 
-func tearDownContainers(containers []*frrcontainer.FRR) {
+func tearDownContainers(containers []*frrcontainer.FRR) error {
 	err := stopFRRContainers(containers)
-	framework.ExpectNoError(err)
+	if err != nil {
+		return err
+	}
+
+	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "rm", multiHopNetwork)
+	if err != nil {
+		return errors.Wrapf(err, "failed to remove %s: %s", multiHopNetwork, out)
+	}
+
+	return nil
 }
 
 var _ = ginkgo.Describe("BGP", func() {
@@ -547,12 +634,12 @@ var _ = ginkgo.Describe("BGP", func() {
 					if err != nil {
 						return err
 					}
-					toCompare := config.BFDProfileWithDefaults(bfd)
 					err = frr.BFDPeersMatchNodes(allNodes.Items, bfdPeers, pairingFamily)
 					if err != nil {
 						return err
 					}
 					for _, peerConfig := range bfdPeers {
+						toCompare := config.BFDProfileWithDefaults(bfd, peerConfig.Multihop)
 						ginkgo.By(fmt.Sprintf("Checking bfd parameters on %s", peerConfig.Peer))
 						err := checkBFDConfigPropagated(toCompare, peerConfig)
 						if err != nil {
@@ -661,13 +748,25 @@ var _ = ginkgo.Describe("BGP", func() {
 			controllerPod := &pods.Items[0]
 			speakerPods := getSpeakerPods(cs)
 
-			var peerAddrs []string
+			var peers []struct {
+				addr     string
+				multihop bool
+			}
+
 			for _, c := range frrContainers {
 				address := c.Ipv4
 				if pairingFamily == "ipv6" {
 					address = c.Ipv6
 				}
-				peerAddrs = append(peerAddrs, address)
+
+				peers = append(peers, struct {
+					addr     string
+					multihop bool
+				}{
+					address,
+					c.NeighborConfig.MultiHop,
+				},
+				)
 			}
 
 			for _, speaker := range speakerPods {
@@ -679,44 +778,48 @@ var _ = ginkgo.Describe("BGP", func() {
 						return err
 					}
 
-					for _, addr := range peerAddrs {
-						err = validateGaugeValue(1, "metallb_bfd_session_up", map[string]string{"peer": addr}, speakerMetrics)
+					for _, peer := range peers {
+						err = validateGaugeValue(1, "metallb_bfd_session_up", map[string]string{"peer": peer.addr}, speakerMetrics)
 						if err != nil {
 							return err
 						}
 
-						err = validateCounterValue(1, "metallb_bfd_control_packet_input", map[string]string{"peer": addr}, speakerMetrics)
+						err = validateCounterValue(1, "metallb_bfd_control_packet_input", map[string]string{"peer": peer.addr}, speakerMetrics)
 						if err != nil {
 							return err
 						}
 
-						err = validateCounterValue(1, "metallb_bfd_control_packet_output", map[string]string{"peer": addr}, speakerMetrics)
+						err = validateCounterValue(1, "metallb_bfd_control_packet_output", map[string]string{"peer": peer.addr}, speakerMetrics)
 						if err != nil {
 							return err
 						}
 
-						err = validateGaugeValue(0, "metallb_bfd_session_down_events", map[string]string{"peer": addr}, speakerMetrics)
+						err = validateGaugeValue(0, "metallb_bfd_session_down_events", map[string]string{"peer": peer.addr}, speakerMetrics)
 						if err != nil {
 							return err
 						}
 
-						err = validateCounterValue(1, "metallb_bfd_session_up_events", map[string]string{"peer": addr}, speakerMetrics)
+						err = validateCounterValue(1, "metallb_bfd_session_up_events", map[string]string{"peer": peer.addr}, speakerMetrics)
 						if err != nil {
 							return err
 						}
 
-						err = validateCounterValue(1, "metallb_bfd_zebra_notifications", map[string]string{"peer": addr}, speakerMetrics)
+						err = validateCounterValue(1, "metallb_bfd_zebra_notifications", map[string]string{"peer": peer.addr}, speakerMetrics)
 						if err != nil {
 							return err
 						}
 
 						if bfd.EchoMode != nil && *bfd.EchoMode {
-							err = validateCounterValue(1, "metallb_bfd_echo_packet_input", map[string]string{"peer": addr}, speakerMetrics)
+							echoVal := 1
+							if peer.multihop {
+								echoVal = 0
+							}
+							err = validateCounterValue(echoVal, "metallb_bfd_echo_packet_input", map[string]string{"peer": peer.addr}, speakerMetrics)
 							if err != nil {
 								return err
 							}
 
-							err = validateCounterValue(1, "metallb_bfd_echo_packet_output", map[string]string{"peer": addr}, speakerMetrics)
+							err = validateCounterValue(echoVal, "metallb_bfd_echo_packet_output", map[string]string{"peer": peer.addr}, speakerMetrics)
 							if err != nil {
 								return err
 							}
@@ -743,13 +846,13 @@ var _ = ginkgo.Describe("BGP", func() {
 						return err
 					}
 
-					for _, addr := range peerAddrs {
-						err = validateGaugeValue(0, "metallb_bfd_session_up", map[string]string{"peer": addr}, speakerMetrics)
+					for _, peer := range peers {
+						err = validateGaugeValue(0, "metallb_bfd_session_up", map[string]string{"peer": peer.addr}, speakerMetrics)
 						if err != nil {
 							return err
 						}
 
-						err = validateCounterValue(1, "metallb_bfd_session_down_events", map[string]string{"peer": addr}, speakerMetrics)
+						err = validateCounterValue(1, "metallb_bfd_session_down_events", map[string]string{"peer": peer.addr}, speakerMetrics)
 						if err != nil {
 							return err
 						}
@@ -1208,10 +1311,13 @@ func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1
 				return err
 			}
 
-			advertised := routes.ForIP(ingressIP, c)
-			err = routes.MatchNodes(nodes, advertised, serviceIPFamily)
-			if err != nil {
-				return err
+			// The BGP routes will not match the nodes if static routes were added.
+			if !(c.Network == multiHopNetwork) {
+				advertised := routes.ForIP(ingressIP, c)
+				err = routes.MatchNodes(nodes, advertised, serviceIPFamily)
+				if err != nil {
+					return err
+				}
 			}
 
 			return nil
@@ -1277,6 +1383,7 @@ func createFRRContainers(c ...frrcontainer.Config) ([]*frrcontainer.FRR, error) 
 			if err != nil {
 				return errors.Wrapf(err, "Failed to wait for daemons %v", toFind)
 			}
+
 			return nil
 		})
 	}
@@ -1307,15 +1414,20 @@ func peersForContainers(containers []*frrcontainer.FRR, ipFamily string) []confi
 		if i > 0 {
 			holdTime = fmt.Sprintf("%ds", i*180)
 		}
+		ebgpMultihop := false
+		if c.NeighborConfig.MultiHop && c.NeighborConfig.ASN != c.RouterConfig.ASN {
+			ebgpMultihop = true
+		}
 		for _, address := range addresses {
 			peers = append(peers, config.Peer{
-				Addr:     address,
-				ASN:      c.RouterConfig.ASN,
-				MyASN:    c.NeighborConfig.ASN,
-				Port:     c.RouterConfig.BGPPort,
-				RouterID: fmt.Sprintf(baseRouterID, i),
-				Password: c.RouterConfig.Password,
-				HoldTime: holdTime,
+				Addr:         address,
+				ASN:          c.RouterConfig.ASN,
+				MyASN:        c.NeighborConfig.ASN,
+				Port:         c.RouterConfig.BGPPort,
+				RouterID:     fmt.Sprintf(baseRouterID, i),
+				Password:     c.RouterConfig.Password,
+				HoldTime:     holdTime,
+				EBGPMultiHop: ebgpMultihop,
 			})
 		}
 	}

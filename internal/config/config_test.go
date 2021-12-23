@@ -58,9 +58,11 @@ peers:
   hold-time: 180s
   router-id: 10.20.30.40
   source-address: 10.20.30.40
+  ebgp-multihop: true
 - my-asn: 100
   peer-asn: 200
   peer-address: 2.3.4.5
+  ebgp-multihop: false
   node-selectors:
   - match-labels:
       foo: bar
@@ -110,6 +112,7 @@ address-pools:
 						KeepaliveTime: 60 * time.Second,
 						RouterID:      net.ParseIP("10.20.30.40"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
+						EBGPMultiHop:  true,
 					},
 					{
 						MyASN:         100,
@@ -119,6 +122,7 @@ address-pools:
 						HoldTime:      90 * time.Second,
 						KeepaliveTime: 30 * time.Second,
 						NodeSelectors: []labels.Selector{selector("bar in (quux),foo=bar")},
+						EBGPMultiHop:  false,
 					},
 				},
 				Pools: map[string]*Pool{
@@ -202,6 +206,7 @@ peers:
 						HoldTime:      90 * time.Second,
 						KeepaliveTime: 30 * time.Second,
 						NodeSelectors: []labels.Selector{labels.Everything()},
+						EBGPMultiHop:  false,
 					},
 				},
 				Pools:       map[string]*Pool{},
@@ -234,6 +239,17 @@ peers:
 peers:
 - my-asn: 42
   peer-address: 1.2.3.4
+`,
+		},
+
+		{
+			desc: "invalid ebgp-multihop",
+			raw: `
+peers:
+- my-asn: 42
+  peer-asn: 42
+  peer-address: 1.2.3.4
+  ebgp-multihop: true
 `,
 		},
 

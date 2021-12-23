@@ -29,19 +29,25 @@ debug bgp neighbor
 debug zebra nht
 debug bgp nht
 debug bfd peer
+ip nht resolve-via-default
+ipv6 nht resolve-via-default
 
 log file /tmp/frr.log debugging
 log timestamp precision 3
 
 route-map RMAP permit 10
 set ipv6 next-hop prefer-global
-router bgp {{.ASN}}
+{{$ROUTERASN:=.ASN}}
+router bgp {{$ROUTERASN}}
   bgp router-id {{.RouterID}}
   no bgp network import-check
   no bgp ebgp-requires-policy
   no bgp default ipv4-unicast
 {{range .Neighbors }}
   neighbor {{.Addr}} remote-as {{.ASN}}
+  {{- if and (ne .ASN $ROUTERASN) (.MultiHop) }}
+  neighbor {{.Addr}} ebgp-multihop
+  {{- end }}
   {{ if .Password -}}
   neighbor {{.Addr}} password {{.Password}}
   {{- end }}
@@ -92,6 +98,7 @@ type NeighborConfig struct {
 	IPFamily    string
 	BFDEnabled  bool
 	ToAdvertise string
+	MultiHop    bool
 }
 
 // Set the IP of each node in the cluster in the BGP router configuration.
