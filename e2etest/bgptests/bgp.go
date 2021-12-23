@@ -121,12 +121,9 @@ var _ = ginkgo.Describe("BGP", func() {
 		framework.ExpectNoError(err)
 
 		if setProtocoltest == "ExternalTrafficPolicyCluster" {
-			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
 
-			defer func() {
-				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
-			}()
+			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
+			defer testservice.Delete(cs, svc)
 
 			for _, c := range FRRContainers {
 				validateService(cs, svc, allNodes.Items, c)
@@ -141,10 +138,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			epNodes, err := jig.ListNodesWithEndpoint() // Only nodes with an endpoint should be advertising the IP
 			framework.ExpectNoError(err)
 
-			defer func() {
-				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
-			}()
+			defer testservice.Delete(cs, svc)
 
 			for _, c := range FRRContainers {
 				validateService(cs, svc, epNodes, c)
@@ -267,10 +261,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 			ginkgo.By("creating a service")
 			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster) // Is a sleep required here?
-			defer func() {
-				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
-			}()
+			defer testservice.Delete(cs, svc)
 
 			ginkgo.By("checking the metrics when a service is added")
 			Eventually(func() error {
@@ -347,11 +338,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 
 			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
-
-			defer func() {
-				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
-			}()
+			defer testservice.Delete(cs, svc)
 
 			for _, i := range svc.Status.LoadBalancer.Ingress {
 				ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
@@ -450,10 +437,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 
 			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
-			defer func() {
-				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
-			}()
+			defer testservice.Delete(cs, svc)
 
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
@@ -784,11 +768,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, fmt.Sprintf("svc%d", i+1), testservice.TrafficPolicyCluster, func(svc *corev1.Service) {
 					svc.Annotations = map[string]string{"metallb.universe.tf/address-pool": fmt.Sprintf("test-addresspool%d", i+1)}
 				})
-
-				defer func() {
-					err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-					framework.ExpectNoError(err)
-				}()
+				defer testservice.Delete(cs, svc)
 
 				ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
 				ingressIP := e2eservice.GetIngressPoint(
@@ -852,11 +832,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				}
 
 				svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
-
-				defer func() {
-					err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-					framework.ExpectNoError(err)
-				}()
+				defer testservice.Delete(cs, svc)
 
 				for _, i := range svc.Status.LoadBalancer.Ingress {
 					ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
@@ -936,11 +912,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				}
 
 				svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
-
-				defer func() {
-					err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-					framework.ExpectNoError(err)
-				}()
+				defer testservice.Delete(cs, svc)
 
 				allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 				framework.ExpectNoError(err)
@@ -1013,11 +985,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		Consistently(checkRoutesInjected, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
 		svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb")
-
-		defer func() {
-			err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
-		}()
+		defer testservice.Delete(cs, svc)
 
 		Consistently(checkRoutesInjected, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
 
