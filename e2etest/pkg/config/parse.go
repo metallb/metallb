@@ -31,6 +31,7 @@ type Peer struct {
 	NodeSelectors []NodeSelector `yaml:"node-selectors,omitempty"`
 	Password      string         `yaml:"password,omitempty"`
 	BFDProfile    string         `yaml:"bfd-profile,omitempty"`
+	EBGPMultiHop  bool           `yaml:"ebgp-multihop,omitempty"`
 }
 
 type NodeSelector struct {
@@ -70,7 +71,7 @@ type BfdProfile struct {
 	MinimumTTL       *uint32 `yaml:"minimum-ttl,omitempty"`
 }
 
-func BFDProfileWithDefaults(profile BfdProfile) BfdProfile {
+func BFDProfileWithDefaults(profile BfdProfile, multiHop bool) BfdProfile {
 	res := BfdProfile{}
 	res.Name = profile.Name
 	res.ReceiveInterval = valueWithDefault(profile.ReceiveInterval, 300)
@@ -80,6 +81,12 @@ func BFDProfileWithDefaults(profile BfdProfile) BfdProfile {
 	res.MinimumTTL = valueWithDefault(profile.MinimumTTL, 254)
 	res.EchoMode = profile.EchoMode
 	res.PassiveMode = profile.PassiveMode
+
+	if multiHop {
+		res.EchoMode = boolPtr(false)
+		res.EchoInterval = uint32Ptr(50)
+	}
+
 	return res
 }
 
@@ -88,4 +95,12 @@ func valueWithDefault(v *uint32, def uint32) *uint32 {
 		return v
 	}
 	return &def
+}
+
+func uint32Ptr(n uint32) *uint32 {
+	return &n
+}
+
+func boolPtr(b bool) *bool {
+	return &b
 }

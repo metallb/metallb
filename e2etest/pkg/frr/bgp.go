@@ -80,18 +80,21 @@ func NeighborConnected(neighborJson string) (bool, error) {
 // RawDump dumps all the low level info as a single string.
 // To be used for debugging in order to print the status of the frr instance.
 func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
+	allerrs := errors.New("")
+
 	res := "####### Show running config\n"
 	out, err := exec.Exec("vtysh", "-c", "show running-config")
 	if err != nil {
-		return "", errors.Wrapf(err, "Failed exec show bgp neighbor %s", res)
+		allerrs = errors.Wrapf(allerrs, "\nFailed exec show bgp neighbor: %v", err)
 	}
 	res = res + out
 
 	for _, file := range filesToDump {
 		res = res + fmt.Sprintf("####### Dumping file %s\n", file)
-		out, err = exec.Exec("cat", file)
+		// limiting the output to 500 lines:
+		out, err = exec.Exec("bash", "-c", fmt.Sprintf("cat %s | tail -n 500", file))
 		if err != nil {
-			return "", errors.Wrapf(err, "Failed to cat %s file %s", file, res)
+			allerrs = errors.Wrapf(allerrs, "\nFailed to cat file %s: %v", file, err)
 		}
 		res = res + out
 	}
@@ -99,18 +102,36 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 	res = res + "####### BGP Neighbors\n"
 	out, err = exec.Exec("vtysh", "-c", "show bgp neighbor")
 	if err != nil {
-		return "", errors.Wrapf(err, "Failed exec show bgp neighbor %s", res)
+		allerrs = errors.Wrapf(allerrs, "\nFailed exec show bgp neighbor: %v", err)
 	}
 	res = res + out
 
 	res = res + "####### BFD Peers\n"
 	out, err = exec.Exec("vtysh", "-c", "show bfd peer")
 	if err != nil {
-		return "", errors.Wrapf(err, "Failed exec show bfd peer %s", res)
+		allerrs = errors.Wrapf(allerrs, "\nFailed exec show bfd peer: %v", err)
 	}
 	res = res + out
 
-	return res, nil
+	res = res + "####### Check for any crashinfo files\n"
+	if crashInfo, err := exec.Exec("bash", "-c", "ls /var/tmp/frr/bgpd.*/crashlog"); err == nil {
+		crashInfo = strings.TrimSuffix(crashInfo, "\n")
+		files := strings.Split(crashInfo, "\n")
+		for _, file := range files {
+			res = res + fmt.Sprintf("####### Dumping crash file %s\n", file)
+			out, err = exec.Exec("bash", "-c", fmt.Sprintf("cat %s", file))
+			if err != nil {
+				allerrs = errors.Wrapf(allerrs, "\nFailed to cat bgpd crashinfo file %s: %v", file, err)
+			}
+			res = res + out
+		}
+	}
+
+	if allerrs.Error() == "" {
+		allerrs = nil
+	}
+
+	return res, allerrs
 }
 
 // ContainsCommunity check if the passed in community string exists in show bgp community.

@@ -159,7 +159,7 @@ github.com/mdlayher/ndp
 # github.com/mdlayher/raw v0.0.0-20191009151244-50f2db8cc065
 ## explicit
 github.com/mdlayher/raw
-# github.com/metallb/metallb-operator v0.0.0-20211130125940-1fa9bd1b26e6
+# github.com/metallb/metallb-operator v0.0.0-20211223114020-a8fc2e0875fc
 ## explicit
 github.com/metallb/metallb-operator/api/v1beta1
 # github.com/miekg/dns v1.1.26
