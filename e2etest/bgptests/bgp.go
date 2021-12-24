@@ -21,6 +21,7 @@ package bgptests
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.universe.tf/metallb/e2etest/pkg/config"
@@ -994,6 +995,72 @@ var _ = ginkgo.Describe("BGP", func() {
 		table.Entry("IPV6", "fc00:f853:0ccd:e799::/116", "ipv6", "fc00:f853:ccd:e800::1/128"),
 	)
 
+	ginkgo.Context("validate FRR running configuration", func() {
+		ginkgo.It("Full BFD profile", func() {
+			bfdProfile := config.BfdProfile{
+				Name:             "fullBFDProfile1",
+				ReceiveInterval:  uint32Ptr(93),
+				TransmitInterval: uint32Ptr(95),
+				EchoInterval:     uint32Ptr(97),
+				EchoMode:         boolPtr(true),
+				PassiveMode:      boolPtr(true),
+				MinimumTTL:       uint32Ptr(253),
+			}
+
+			configData := config.File{
+				Pools: []config.AddressPool{
+					{
+						Name:      "bgp-test",
+						Protocol:  config.BGP,
+						Addresses: []string{v4PoolAddresses},
+					},
+				},
+				Peers:       metallb.PeersForContainers(FRRContainers, "ipv4"),
+				BFDProfiles: []config.BfdProfile{bfdProfile},
+			}
+
+			configData.Peers = metallb.WithBFD(configData.Peers, bfdProfile.Name)
+
+			for i := range configData.Peers {
+				configData.Peers[i].KeepaliveTime = "13s"
+				configData.Peers[i].HoldTime = "57s"
+			}
+
+			err := ConfigUpdater.Update(configData)
+			framework.ExpectNoError(err)
+
+			speakerPods, err := metallb.SpeakerPods(cs)
+			framework.ExpectNoError(err)
+
+			for _, pod := range speakerPods {
+				podExecutor := executor.ForPod(pod.Namespace, pod.Name, "frr")
+
+				Eventually(func() string {
+					// We need to assert against the output of the command as a bare string, as
+					// there is no json version of the command.
+					cfgStr, err := podExecutor.Exec("vtysh", "-c", "show running-config")
+					if err != nil {
+						return err.Error()
+					}
+
+					return cfgStr
+				}, 1*time.Minute).Should(
+					And(
+						ContainSubstring("log file /etc/frr/frr.log informational"),
+						WithTransform(substringCount("\n profile fullBFDProfile1"), Equal(1)),
+						ContainSubstring("receive-interval 93"),
+						ContainSubstring("transmit-interval 95"),
+						ContainSubstring("echo-interval 97"),
+						ContainSubstring("minimum-ttl 253"),
+						ContainSubstring("passive-mode"),
+						ContainSubstring("echo-mode"),
+						ContainSubstring("timers 13 57"),
+					),
+				)
+			}
+		})
+	})
+
 })
 
 func uint32Ptr(n uint32) *uint32 {
@@ -1002,4 +1069,12 @@ func uint32Ptr(n uint32) *uint32 {
 
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+// substringCount creates a Gomega transform function that
+// counts the number of occurrences in the subject string.
+func substringCount(substr string) interface{} {
+	return func(action string) int {
+		return strings.Count(action, substr)
+	}
 }
