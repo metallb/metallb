@@ -675,14 +675,18 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
     for ns in namespaces:
         run("kubectl -n {} wait --for=condition=Ready --all pods --timeout 300s".format(ns), hide=True)
 
+    ips_for_containers_v4 = ""
     if ipv4_service_range is None:
-        ipv4_service_range, ips_for_containers_v4 = get_available_ips(4)
+        ipv4_service_range, ips = get_available_ips(4)
+        ips_for_containers_v4 = "--ips-for-containers-v4=" + ips
 
+    ips_for_containers_v6 = ""
     if ipv6_service_range is None:
-        ipv6_service_range, ips_for_containers_v6 = get_available_ips(6)
+        ipv6_service_range, ips = get_available_ips(6)
+        ips_for_containers_v6 = "--ips-for-containers-v6=" + ips
 
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "KUBECONFIG={} go test -timeout 40m {} {} --provider=local --kubeconfig={} --service-pod-port={} -ips-for-containers-v4={} -ips-for-containers-v6={} -ipv4-service-range={} -ipv6-service-range={} {} {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker, opt_use_operator), warn="True")
+            "KUBECONFIG={} go test -timeout 40m {} {} --provider=local --kubeconfig={} --service-pod-port={} {} {} -ipv4-service-range={} -ipv6-service-range={} {} {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker, opt_use_operator), warn="True")
 
     if export != None:
         run("kind export logs {}".format(export))
