@@ -203,9 +203,11 @@ func tearDownContainers(containers []*frrcontainer.FRR) error {
 		return err
 	}
 
-	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "rm", multiHopNetwork)
-	if err != nil {
-		return errors.Wrapf(err, "failed to remove %s: %s", multiHopNetwork, out)
+	if containersNetwork != "host" {
+		out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "rm", multiHopNetwork)
+		if err != nil {
+			return errors.Wrapf(err, "failed to remove %s: %s", multiHopNetwork, out)
+		}
 	}
 
 	return nil
