@@ -6,12 +6,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net"
 	"os"
 	"text/template"
 
 	"github.com/pkg/errors"
 	consts "go.universe.tf/metallb/e2etest/pkg/frr/consts"
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
+	"go.universe.tf/metallb/internal/ipfamily"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
@@ -95,7 +97,7 @@ type NeighborConfig struct {
 	ASN         uint32
 	Addr        string
 	Password    string
-	IPFamily    string
+	IPFamily    ipfamily.Family
 	BFDEnabled  bool
 	ToAdvertise string
 	MultiHop    bool
@@ -103,7 +105,7 @@ type NeighborConfig struct {
 
 // Set the IP of each node in the cluster in the BGP router configuration.
 // Each node will peer with the BGP router.
-func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterConfig, ipFamily string) (string, error) {
+func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterConfig, ipFamily ipfamily.Family) (string, error) {
 	router := rc
 
 	router.V4Neighbors = make([]*NeighborConfig, 0)
@@ -119,9 +121,9 @@ func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterCon
 	for _, ip := range ips {
 		neighbor := nc
 		neighbor.Addr = ip
-		nc.IPFamily = k8s.IPFamilyForAddress(ip)
+		nc.IPFamily = ipfamily.ForAddress(net.ParseIP(ip))
 
-		if nc.IPFamily == "ipv4" {
+		if nc.IPFamily == ipfamily.IPv4 {
 			router.V4Neighbors = append(router.V4Neighbors, &neighbor)
 		} else {
 			router.V6Neighbors = append(router.V6Neighbors, &neighbor)
