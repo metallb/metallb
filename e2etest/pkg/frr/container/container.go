@@ -9,11 +9,18 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/pkg/errors"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
+	"go.universe.tf/metallb/e2etest/pkg/frr"
 	"go.universe.tf/metallb/e2etest/pkg/frr/config"
+	frrconfig "go.universe.tf/metallb/e2etest/pkg/frr/config"
 	"go.universe.tf/metallb/e2etest/pkg/frr/consts"
+	"golang.org/x/sync/errgroup"
+	"k8s.io/apimachinery/pkg/util/wait"
+	clientset "k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -49,9 +56,85 @@ type Config struct {
 	Network     string
 }
 
-// Start creates a new FRR container on the host and returns the corresponding *FRR.
+// Create creates a set of frr containers corresponding to the given configurations.
+func Create(c ...Config) ([]*FRR, error) {
+	m := sync.Mutex{}
+	frrContainers := make([]*FRR, 0)
+	g := new(errgroup.Group)
+	for _, conf := range c {
+		conf := conf
+		g.Go(func() error {
+			toFind := map[string]bool{
+				"zebra":    true,
+				"watchfrr": true,
+				"bgpd":     true,
+				"bfdd":     true,
+			}
+			c, err := start(conf)
+			if c != nil {
+				err = wait.PollImmediate(time.Second, 5*time.Minute, func() (bool, error) {
+					daemons, err := frr.Daemons(c)
+					if err != nil {
+						return false, err
+					}
+					for _, d := range daemons {
+						delete(toFind, d)
+					}
+					if len(toFind) > 0 {
+						return false, nil
+					}
+					return true, nil
+				})
+				m.Lock()
+				defer m.Unlock()
+				frrContainers = append(frrContainers, c)
+			}
+			if err != nil {
+				return errors.Wrapf(err, "Failed to wait for daemons %v", toFind)
+			}
+
+			return nil
+		})
+	}
+	err := g.Wait()
+
+	return frrContainers, err
+}
+
+func Stop(containers []*FRR) error {
+	g := new(errgroup.Group)
+	for _, c := range containers {
+		c := c
+		g.Go(func() error {
+			err := c.stop()
+			return err
+		})
+	}
+
+	return g.Wait()
+}
+
+// PairWithNodes pairs the given frr instance with all the cluster nodes.
+func PairWithNodes(cs clientset.Interface, c *FRR, ipFamily string, modifiers ...func(c *FRR)) error {
+	config := *c
+	for _, m := range modifiers {
+		m(&config)
+	}
+	bgpConfig, err := frrconfig.BGPPeersForAllNodes(cs, config.NeighborConfig, config.RouterConfig, ipFamily)
+	if err != nil {
+		return err
+	}
+
+	err = c.UpdateBGPConfigFile(bgpConfig)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// start creates a new FRR container on the host and returns the corresponding *FRR.
 // A situation where a non-nil container and an error are returned is possible.
-func Start(cfg Config) (*FRR, error) {
+func start(cfg Config) (*FRR, error) {
 	configDir, err := ioutil.TempDir("", "frr-conf")
 	if err != nil {
 		return nil, err
@@ -174,7 +257,7 @@ func (c *FRR) UpdateBGPConfigFile(bgpConfig string) error {
 }
 
 // Delete the BGP router container configuration.
-func (c *FRR) Stop() error {
+func (c *FRR) stop() error {
 	// Kill the BGP router container.
 	out, err := exec.Command(executor.ContainerRuntime, "kill", c.Name).CombinedOutput()
 	if err != nil {
