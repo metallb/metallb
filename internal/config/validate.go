@@ -52,3 +52,14 @@ func DiscardFRROnly(c *configFile) error {
 func DontValidate(c *configFile) error {
 	return nil
 }
+
+// DiscardNativeOnly returns an error if the current configFile contains
+// any options that are available only in the native implementation.
+func DiscardNativeOnly(c *configFile) error {
+	for _, p := range c.Peers {
+		if p.RouterID != "" {
+			return fmt.Errorf("peer %s has routerid set on frr mode", p.Addr)
+		}
+	}
+	return nil
+}

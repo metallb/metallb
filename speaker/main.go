@@ -138,6 +138,8 @@ func main() {
 	validateConfig := metallbcfg.DontValidate
 	if bgpType == "native" {
 		validateConfig = metallbcfg.DiscardFRROnly
+	} else {
+		validateConfig = metallbcfg.DiscardNativeOnly
 	}
 
 	client, err := k8s.New(&k8s.Config{
