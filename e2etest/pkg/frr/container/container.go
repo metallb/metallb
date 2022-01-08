@@ -35,6 +35,7 @@ type FRR struct {
 	RouterConfig   config.RouterConfig
 	Ipv4           string
 	Ipv6           string
+	Network        string
 }
 
 type Config struct {
@@ -69,6 +70,7 @@ func Start(cfg Config) (*FRR, error) {
 		configDir:      configDir,
 		NeighborConfig: cfg.Neighbor,
 		RouterConfig:   cfg.Router,
+		Network:        cfg.Network,
 	}
 
 	if cfg.Network == hostNetwork {

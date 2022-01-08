@@ -74,6 +74,7 @@ func main() {
 		port            = flag.Int("port", 7472, "HTTP listening port")
 		logLevel        = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", strings.Join(logging.Levels, ", ")))
 		disableEpSlices = flag.Bool("disable-epslices", false, "Disable the usage of EndpointSlices and default to Endpoints instead of relying on the autodiscovery mechanism")
+		enablePprof     = flag.Bool("enable-pprof", false, "Enable pprof profiling")
 	)
 	flag.Parse()
 
@@ -150,6 +151,7 @@ func main() {
 
 		MetricsHost:   *host,
 		MetricsPort:   *port,
+		EnablePprof:   *enablePprof,
 		ReadEndpoints: true,
 
 		ServiceChanged: ctrl.SetBalancer,

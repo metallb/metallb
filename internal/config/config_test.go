@@ -58,9 +58,11 @@ peers:
   hold-time: 180s
   router-id: 10.20.30.40
   source-address: 10.20.30.40
+  ebgp-multihop: true
 - my-asn: 100
   peer-asn: 200
   peer-address: 2.3.4.5
+  ebgp-multihop: false
   node-selectors:
   - match-labels:
       foo: bar
@@ -110,6 +112,7 @@ address-pools:
 						KeepaliveTime: 60 * time.Second,
 						RouterID:      net.ParseIP("10.20.30.40"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
+						EBGPMultiHop:  true,
 					},
 					{
 						MyASN:         100,
@@ -119,6 +122,7 @@ address-pools:
 						HoldTime:      90 * time.Second,
 						KeepaliveTime: 30 * time.Second,
 						NodeSelectors: []labels.Selector{selector("bar in (quux),foo=bar")},
+						EBGPMultiHop:  false,
 					},
 				},
 				Pools: map[string]*Pool{
@@ -202,6 +206,7 @@ peers:
 						HoldTime:      90 * time.Second,
 						KeepaliveTime: 30 * time.Second,
 						NodeSelectors: []labels.Selector{labels.Everything()},
+						EBGPMultiHop:  false,
 					},
 				},
 				Pools:       map[string]*Pool{},
@@ -234,6 +239,17 @@ peers:
 peers:
 - my-asn: 42
   peer-address: 1.2.3.4
+`,
+		},
+
+		{
+			desc: "invalid ebgp-multihop",
+			raw: `
+peers:
+- my-asn: 42
+  peer-asn: 42
+  peer-address: 1.2.3.4
+  ebgp-multihop: true
 `,
 		},
 
@@ -520,6 +536,63 @@ address-pools:
   - 1.2.3.0/28
   bgp-advertisements:
   - aggregation-length: 26
+`,
+		},
+
+		{
+			desc: "aggregation length by range",
+			raw: `
+address-pools:
+- name: pool1
+  protocol: bgp
+  addresses:
+  - 3.3.3.2-3.3.3.254
+  bgp-advertisements:
+  - aggregation-length: 26
+`,
+			want: &Config{
+				Pools: map[string]*Pool{
+					"pool1": {
+						Protocol:   BGP,
+						AutoAssign: true,
+						CIDR: []*net.IPNet{
+							ipnet("3.3.3.2/31"),
+							ipnet("3.3.3.4/30"),
+							ipnet("3.3.3.8/29"),
+							ipnet("3.3.3.16/28"),
+							ipnet("3.3.3.32/27"),
+							ipnet("3.3.3.64/26"),
+							ipnet("3.3.3.128/26"),
+							ipnet("3.3.3.192/27"),
+							ipnet("3.3.3.224/28"),
+							ipnet("3.3.3.240/29"),
+							ipnet("3.3.3.248/30"),
+							ipnet("3.3.3.252/31"),
+							ipnet("3.3.3.254/32"),
+						},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   26,
+								AggregationLengthV6: 128,
+								Communities:         map[uint32]bool{},
+							},
+						},
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+
+		{
+			desc: "aggregation length by range, too wide",
+			raw: `
+address-pools:
+- name: pool1
+  protocol: bgp
+  addresses:
+  - 3.3.3.2-3.3.3.254
+  bgp-advertisements:
+  - aggregation-length: 24
 `,
 		},
 

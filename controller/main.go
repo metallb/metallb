@@ -131,6 +131,7 @@ func main() {
 		deployName      = flag.String("deployment", os.Getenv("METALLB_DEPLOYMENT"), "name of the MetalLB controller Deployment")
 		logLevel        = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", strings.Join(logging.Levels, ", ")))
 		disableEpSlices = flag.Bool("disable-epslices", false, "Disable the usage of EndpointSlices and default to Endpoints instead of relying on the autodiscovery mechanism")
+		enablePprof     = flag.Bool("enable-pprof", false, "Enable pprof profiling")
 	)
 	flag.Parse()
 
@@ -160,6 +161,7 @@ func main() {
 		ConfigMapName:   *config,
 		ConfigMapNS:     *namespace,
 		MetricsPort:     *port,
+		EnablePprof:     *enablePprof,
 		Logger:          logger,
 		Kubeconfig:      *kubeconfig,
 		DisableEpSlices: *disableEpSlices,
