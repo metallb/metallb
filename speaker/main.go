@@ -135,7 +135,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	validateConfig := metallbcfg.DontValidate
+	var validateConfig metallbcfg.Validate
 	if bgpType == "native" {
 		validateConfig = metallbcfg.DiscardFRROnly
 	} else {

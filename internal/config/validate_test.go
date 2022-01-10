@@ -138,6 +138,45 @@ func TestValidateFRR(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc: "myAsn set, all equals",
+			config: &configFile{
+				Peers: []peer{
+					{
+						Addr:  "1.2.3.4",
+						MyASN: 123,
+					},
+					{
+						Addr:  "1.2.3.5",
+						MyASN: 123,
+					},
+					{
+						Addr:  "1.2.3.6",
+						MyASN: 123,
+					},
+				},
+			},
+		},
+		{
+			desc: "myAsn set, one different",
+			config: &configFile{
+				Peers: []peer{
+					{
+						Addr:  "1.2.3.4",
+						MyASN: 123,
+					},
+					{
+						Addr:  "1.2.3.5",
+						MyASN: 123,
+					},
+					{
+						Addr:  "1.2.3.6",
+						MyASN: 125,
+					},
+				},
+			},
+			mustFail: true,
+		},
 	}
 
 	for _, test := range tests {
