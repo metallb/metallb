@@ -31,8 +31,11 @@ import (
 	"github.com/onsi/ginkgo/config"
 	"github.com/onsi/ginkgo/reporters"
 	"github.com/onsi/gomega"
-	"go.universe.tf/metallb/e2etest/pkg/container"
-	"go.universe.tf/metallb/e2etest/pkg/executor"
+	"go.universe.tf/metallb/e2etest/bgptests"
+	"go.universe.tf/metallb/e2etest/l2tests"
+	testsconfig "go.universe.tf/metallb/e2etest/pkg/config"
+	"go.universe.tf/metallb/e2etest/pkg/metallb"
+	"go.universe.tf/metallb/e2etest/pkg/service"
 	internalconfig "go.universe.tf/metallb/internal/config"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -43,25 +46,10 @@ import (
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 )
 
-const (
-	defaultTestNameSpace     = "metallb-system"
-	defaultContainersNetwork = "kind"
-	defaultConfigMapName     = "config"
-)
-
 var (
-	// Use ephemeral port for pod, instead of well-known port (tcp/80).
-	servicePodPort    int
 	skipDockerCmd     bool
-	ipv4ServiceRange  string
-	ipv6ServiceRange  string
 	ipv4ForContainers string
 	ipv6ForContainers string
-	testNameSpace     = defaultTestNameSpace
-	configMapName     = defaultConfigMapName
-	containersNetwork = defaultContainersNetwork
-	hostIPv4          string
-	hostIPv6          string
 	useOperator       bool
 )
 
@@ -78,12 +66,12 @@ func handleFlags() {
 	*/
 	flag.StringVar(&framework.TestContext.Provider, "provider", "", "The name of the Kubernetes provider (gce, gke, local, skeleton (the fallback if not set), etc.)")
 	framework.TestContext.KubeConfig = os.Getenv(clientcmd.RecommendedConfigPathEnvVar)
-	flag.IntVar(&servicePodPort, "service-pod-port", 80, "port number that pod opens, default: 80")
+	flag.IntVar(&service.TestServicePort, "service-pod-port", 80, "port number that pod opens, default: 80")
 	flag.BoolVar(&skipDockerCmd, "skip-docker", false, "set this to true if the BGP daemon is running on the host instead of in a container")
-	flag.StringVar(&ipv4ServiceRange, "ipv4-service-range", "0", "a range of IPv4 addresses for MetalLB to use when running in layer2 mode")
-	flag.StringVar(&ipv6ServiceRange, "ipv6-service-range", "0", "a range of IPv6 addresses for MetalLB to use when running in layer2 mode")
 	flag.StringVar(&ipv4ForContainers, "ips-for-containers-v4", "0", "a comma separated list of IPv4 addresses available for containers")
 	flag.StringVar(&ipv6ForContainers, "ips-for-containers-v6", "0", "a comma separated list of IPv6 addresses available for containers")
+	flag.StringVar(&l2tests.IPV4ServiceRange, "ipv4-service-range", "0", "a range of IPv4 addresses for MetalLB to use when running in layer2 mode")
+	flag.StringVar(&l2tests.IPV6ServiceRange, "ipv6-service-range", "0", "a range of IPv6 addresses for MetalLB to use when running in layer2 mode")
 	flag.BoolVar(&useOperator, "use-operator", false, "set this to true to run the tests using operator custom resources")
 	flag.Parse()
 }
@@ -122,45 +110,26 @@ var _ = ginkgo.BeforeSuite(func() {
 	// Make sure the framework's kubeconfig is set.
 	framework.ExpectNotEqual(framework.TestContext.KubeConfig, "", fmt.Sprintf("%s env var not set", clientcmd.RecommendedConfigPathEnvVar))
 
-	if ns := os.Getenv("OO_INSTALL_NAMESPACE"); len(ns) != 0 {
-		testNameSpace = ns
-	}
-
-	if name := os.Getenv("CONFIGMAP_NAME"); len(name) != 0 {
-		configMapName = name
-	}
-
-	if _, res := os.LookupEnv("RUN_FRR_CONTAINER_ON_HOST_NETWORK"); res == true {
-		containersNetwork = "host"
-	}
-
-	if ip := os.Getenv("PROVISIONING_HOST_EXTERNAL_IPV4"); len(ip) != 0 {
-		hostIPv4 = ip
-	}
-	if ip := os.Getenv("PROVISIONING_HOST_EXTERNAL_IPV6"); len(ip) != 0 {
-		hostIPv6 = ip
-	}
-
 	// Validate the IPv4 service range.
-	_, err := internalconfig.ParseCIDR(ipv4ServiceRange)
+	_, err := internalconfig.ParseCIDR(l2tests.IPV4ServiceRange)
 	framework.ExpectNoError(err)
 
 	// Validate the IPv6 service range.
-	_, err = internalconfig.ParseCIDR(ipv6ServiceRange)
+	_, err = internalconfig.ParseCIDR(l2tests.IPV6ServiceRange)
 	framework.ExpectNoError(err)
 
 	cs, err := framework.LoadClientset()
 	framework.ExpectNoError(err)
 
 	if !useOperator {
-		_, err = cs.CoreV1().ConfigMaps(testNameSpace).Get(context.TODO(), configMapName, metav1.GetOptions{})
+		_, err = cs.CoreV1().ConfigMaps(metallb.Namespace).Get(context.TODO(), metallb.ConfigMapName, metav1.GetOptions{})
 		framework.ExpectEqual(errors.IsNotFound(err), true)
 
 		// Init empty MetalLB ConfigMap.
-		_, err = cs.CoreV1().ConfigMaps(testNameSpace).Create(context.TODO(), &v1.ConfigMap{
+		_, err = cs.CoreV1().ConfigMaps(metallb.Namespace).Create(context.TODO(), &v1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      configMapName,
-				Namespace: testNameSpace,
+				Name:      metallb.ConfigMapName,
+				Namespace: metallb.Namespace,
 			},
 		}, metav1.CreateOptions{})
 		framework.ExpectNoError(err)
@@ -169,43 +138,29 @@ var _ = ginkgo.BeforeSuite(func() {
 	framework.ExpectNoError(err)
 	v4Addresses := strings.Split(ipv4ForContainers, ",")
 	v6Addresses := strings.Split(ipv6ForContainers, ",")
-	frrContainers, err = setupContainers(v4Addresses, v6Addresses)
+	bgptests.FRRContainers, err = bgptests.InfraSetup(v4Addresses, v6Addresses, cs)
 	framework.ExpectNoError(err)
 
-	// Allow the speaker nodes to reach the multi-hop network containers.
-	if containersNetwork != "host" {
-		/*
-			When "host" network is not specified we assume that the tests
-			run on a kind cluster, where all the nodes are actually containers
-			on our pc. This allows us to create containerExecutors for the speakers
-			nodes, and edit their routes without any added privileges.
-		*/
-		speakerPods := getSpeakerPods(cs)
-		for _, pod := range speakerPods {
-			nodeExec := executor.ForContainer(pod.Spec.NodeName)
-			err = container.AddMultiHop(nodeExec, containersNetwork, multiHopNetwork, multiHopRoutes)
-			framework.ExpectNoError(err)
-		}
+	var updater testsconfig.Updater
+	updater = testsconfig.UpdaterForConfigMap(cs, metallb.ConfigMapName, metallb.Namespace)
+	if useOperator {
+		f := framework.NewDefaultFramework("suite")
+		clientconfig := f.ClientConfig()
+		var err error
+		updater, err = testsconfig.UpdaterForOperator(clientconfig, metallb.Namespace)
+		framework.ExpectNoError(err)
 	}
+	bgptests.ConfigUpdater = updater
+	l2tests.ConfigUpdater = updater
 })
 
 var _ = ginkgo.AfterSuite(func() {
 	cs, err := framework.LoadClientset()
 	framework.ExpectNoError(err)
 
-	err = cs.CoreV1().ConfigMaps(testNameSpace).Delete(context.TODO(), configMapName, metav1.DeleteOptions{})
+	err = cs.CoreV1().ConfigMaps(metallb.Namespace).Delete(context.TODO(), metallb.ConfigMapName, metav1.DeleteOptions{})
 	framework.ExpectNoError(err)
 
-	err = tearDownContainers(frrContainers)
+	err = bgptests.InfraTearDown(bgptests.FRRContainers, cs)
 	framework.ExpectNoError(err)
-
-	// Remove static routes from speaker nodes.
-	if containersNetwork != "host" {
-		speakerPods := getSpeakerPods(cs)
-		for _, pod := range speakerPods {
-			nodeExec := executor.ForContainer(pod.Spec.NodeName)
-			err = container.DeleteMultiHop(nodeExec, containersNetwork, multiHopNetwork, multiHopRoutes)
-			framework.ExpectNoError(err)
-		}
-	}
 })

@@ -54,6 +54,49 @@ func GaugeForLabels(metricName string, labels map[string]string, metrics map[str
 	})
 }
 
+// ValidateGaugeValue checks that the value corresponing to the given metric is the same as expected value.
+func ValidateGaugeValue(expectedValue int, metricName string, labels map[string]string, allMetrics []map[string]*dto.MetricFamily) error {
+	found := false
+	for _, m := range allMetrics {
+		value, err := GaugeForLabels(metricName, labels, m)
+		if err != nil {
+			continue
+		}
+		if value != expectedValue {
+			return fmt.Errorf("invalid value %d for %s, expecting %d", value, metricName, expectedValue)
+		}
+		found = true
+	}
+
+	if !found {
+		return fmt.Errorf("metric %s not found", metricName)
+	}
+	return nil
+
+}
+
+// ValidateCounterValue checks that the value related to the given metric is at most the expectedMax value.
+func ValidateCounterValue(expectedMax int, metricName string, labels map[string]string, allMetrics []map[string]*dto.MetricFamily) error {
+	var err error
+	var value int
+	found := false
+	for _, m := range allMetrics {
+		value, err = CounterForLabels(metricName, labels, m)
+		if err != nil {
+			continue
+		}
+		found = true
+		if value < expectedMax {
+			return fmt.Errorf("invalid value %d for %s, expecting more than %d", value, metricName, expectedMax)
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("metric %s not found", metricName)
+	}
+	return nil
+}
+
 // CounterForLabels retrieves the value of the Counter matching the given set of labels.
 func CounterForLabels(metricName string, labels map[string]string, metrics map[string]*dto.MetricFamily) (int, error) {
 	return metricForLabels(metricName, labels, metrics, func(m *dto.Metric) int {
