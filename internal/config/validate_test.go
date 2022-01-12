@@ -105,6 +105,93 @@ func TestValidate(t *testing.T) {
 	}
 }
 
+func TestValidateFRR(t *testing.T) {
+	tests := []struct {
+		desc     string
+		config   *configFile
+		mustFail bool
+	}{
+		{
+			desc: "peer with routerid",
+			config: &configFile{
+				Peers: []peer{
+					{
+						Addr:     "1.2.3.4",
+						RouterID: "1.2.3.4",
+					},
+				},
+			},
+			mustFail: true,
+		},
+		{
+			desc: "bfd profile set",
+			config: &configFile{
+				Peers: []peer{
+					{
+						Addr: "1.2.3.4",
+					},
+				},
+				BFDProfiles: []bfdProfile{
+					{
+						Name: "default",
+					},
+				},
+			},
+		},
+		{
+			desc: "myAsn set, all equals",
+			config: &configFile{
+				Peers: []peer{
+					{
+						Addr:  "1.2.3.4",
+						MyASN: 123,
+					},
+					{
+						Addr:  "1.2.3.5",
+						MyASN: 123,
+					},
+					{
+						Addr:  "1.2.3.6",
+						MyASN: 123,
+					},
+				},
+			},
+		},
+		{
+			desc: "myAsn set, one different",
+			config: &configFile{
+				Peers: []peer{
+					{
+						Addr:  "1.2.3.4",
+						MyASN: 123,
+					},
+					{
+						Addr:  "1.2.3.5",
+						MyASN: 123,
+					},
+					{
+						Addr:  "1.2.3.6",
+						MyASN: 125,
+					},
+				},
+			},
+			mustFail: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.desc, func(t *testing.T) {
+			err := DiscardNativeOnly(test.config)
+			if test.mustFail && err == nil {
+				t.Fatalf("Expected error for %s", test.desc)
+			}
+			if !test.mustFail && err != nil {
+				t.Fatalf("Not expected error %s for %s", err, test.desc)
+			}
+		})
+	}
+}
+
 func intPtr(i int) *int {
 	return &i
 }
