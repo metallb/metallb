@@ -14,7 +14,6 @@ import (
 const (
 	defaultNameSpace     = "metallb-system"
 	defaultConfigMapName = "config"
-	baseRouterID         = "10.10.10.%d"
 )
 
 var Namespace = defaultNameSpace
@@ -50,7 +49,6 @@ func PeersForContainers(containers []*frrcontainer.FRR, ipFamily ipfamily.Family
 				ASN:          c.RouterConfig.ASN,
 				MyASN:        c.NeighborConfig.ASN,
 				Port:         c.RouterConfig.BGPPort,
-				RouterID:     fmt.Sprintf(baseRouterID, i),
 				Password:     c.RouterConfig.Password,
 				HoldTime:     holdTime,
 				EBGPMultiHop: ebgpMultihop,

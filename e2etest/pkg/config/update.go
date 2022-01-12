@@ -243,7 +243,6 @@ func (o operatorUpdater) peerToOperator(p Peer) (*operatorv1beta1.BGPPeer, error
 			SrcAddress:    p.SrcAddr,
 			Port:          p.Port,
 			HoldTime:      metav1.Duration{Duration: holdtime},
-			RouterID:      p.RouterID,
 			NodeSelectors: nodeselectors,
 			Password:      p.Password,
 			BFDProfile:    p.BFDProfile,
