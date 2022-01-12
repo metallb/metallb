@@ -21,6 +21,7 @@ package bgptests
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.universe.tf/metallb/e2etest/pkg/config"
@@ -121,12 +122,9 @@ var _ = ginkgo.Describe("BGP", func() {
 		framework.ExpectNoError(err)
 
 		if setProtocoltest == "ExternalTrafficPolicyCluster" {
-			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
 
-			defer func() {
-				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
-			}()
+			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
+			defer testservice.Delete(cs, svc)
 
 			for _, c := range FRRContainers {
 				validateService(cs, svc, allNodes.Items, c)
@@ -141,10 +139,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			epNodes, err := jig.ListNodesWithEndpoint() // Only nodes with an endpoint should be advertising the IP
 			framework.ExpectNoError(err)
 
-			defer func() {
-				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
-			}()
+			defer testservice.Delete(cs, svc)
 
 			for _, c := range FRRContainers {
 				validateService(cs, svc, epNodes, c)
@@ -267,10 +262,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 			ginkgo.By("creating a service")
 			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster) // Is a sleep required here?
-			defer func() {
-				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
-			}()
+			defer testservice.Delete(cs, svc)
 
 			ginkgo.By("checking the metrics when a service is added")
 			Eventually(func() error {
@@ -347,11 +339,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 
 			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
-
-			defer func() {
-				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
-			}()
+			defer testservice.Delete(cs, svc)
 
 			for _, i := range svc.Status.LoadBalancer.Ingress {
 				ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
@@ -450,10 +438,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 
 			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
-			defer func() {
-				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
-			}()
+			defer testservice.Delete(cs, svc)
 
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
@@ -784,11 +769,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, fmt.Sprintf("svc%d", i+1), testservice.TrafficPolicyCluster, func(svc *corev1.Service) {
 					svc.Annotations = map[string]string{"metallb.universe.tf/address-pool": fmt.Sprintf("test-addresspool%d", i+1)}
 				})
-
-				defer func() {
-					err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-					framework.ExpectNoError(err)
-				}()
+				defer testservice.Delete(cs, svc)
 
 				ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
 				ingressIP := e2eservice.GetIngressPoint(
@@ -852,11 +833,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				}
 
 				svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
-
-				defer func() {
-					err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-					framework.ExpectNoError(err)
-				}()
+				defer testservice.Delete(cs, svc)
 
 				for _, i := range svc.Status.LoadBalancer.Ingress {
 					ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
@@ -936,11 +913,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				}
 
 				svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
-
-				defer func() {
-					err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-					framework.ExpectNoError(err)
-				}()
+				defer testservice.Delete(cs, svc)
 
 				allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 				framework.ExpectNoError(err)
@@ -1013,11 +986,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		Consistently(checkRoutesInjected, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
 		svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb")
-
-		defer func() {
-			err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-			framework.ExpectNoError(err)
-		}()
+		defer testservice.Delete(cs, svc)
 
 		Consistently(checkRoutesInjected, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
 
@@ -1025,6 +994,72 @@ var _ = ginkgo.Describe("BGP", func() {
 		table.Entry("IPV4", "192.168.10.0/24", "ipv4", "172.16.1.10/32"),
 		table.Entry("IPV6", "fc00:f853:0ccd:e799::/116", "ipv6", "fc00:f853:ccd:e800::1/128"),
 	)
+
+	ginkgo.Context("validate FRR running configuration", func() {
+		ginkgo.It("Full BFD profile", func() {
+			bfdProfile := config.BfdProfile{
+				Name:             "fullBFDProfile1",
+				ReceiveInterval:  uint32Ptr(93),
+				TransmitInterval: uint32Ptr(95),
+				EchoInterval:     uint32Ptr(97),
+				EchoMode:         boolPtr(true),
+				PassiveMode:      boolPtr(true),
+				MinimumTTL:       uint32Ptr(253),
+			}
+
+			configData := config.File{
+				Pools: []config.AddressPool{
+					{
+						Name:      "bgp-test",
+						Protocol:  config.BGP,
+						Addresses: []string{v4PoolAddresses},
+					},
+				},
+				Peers:       metallb.PeersForContainers(FRRContainers, "ipv4"),
+				BFDProfiles: []config.BfdProfile{bfdProfile},
+			}
+
+			configData.Peers = metallb.WithBFD(configData.Peers, bfdProfile.Name)
+
+			for i := range configData.Peers {
+				configData.Peers[i].KeepaliveTime = "13s"
+				configData.Peers[i].HoldTime = "57s"
+			}
+
+			err := ConfigUpdater.Update(configData)
+			framework.ExpectNoError(err)
+
+			speakerPods, err := metallb.SpeakerPods(cs)
+			framework.ExpectNoError(err)
+
+			for _, pod := range speakerPods {
+				podExecutor := executor.ForPod(pod.Namespace, pod.Name, "frr")
+
+				Eventually(func() string {
+					// We need to assert against the output of the command as a bare string, as
+					// there is no json version of the command.
+					cfgStr, err := podExecutor.Exec("vtysh", "-c", "show running-config")
+					if err != nil {
+						return err.Error()
+					}
+
+					return cfgStr
+				}, 1*time.Minute).Should(
+					And(
+						ContainSubstring("log file /etc/frr/frr.log informational"),
+						WithTransform(substringCount("\n profile fullBFDProfile1"), Equal(1)),
+						ContainSubstring("receive-interval 93"),
+						ContainSubstring("transmit-interval 95"),
+						ContainSubstring("echo-interval 97"),
+						ContainSubstring("minimum-ttl 253"),
+						ContainSubstring("passive-mode"),
+						ContainSubstring("echo-mode"),
+						ContainSubstring("timers 13 57"),
+					),
+				)
+			}
+		})
+	})
 
 })
 
@@ -1034,4 +1069,12 @@ func uint32Ptr(n uint32) *uint32 {
 
 func boolPtr(b bool) *bool {
 	return &b
+}
+
+// substringCount creates a Gomega transform function that
+// counts the number of occurrences in the subject string.
+func substringCount(substr string) interface{} {
+	return func(action string) int {
+		return strings.Count(action, substr)
+	}
 }
