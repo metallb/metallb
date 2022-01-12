@@ -27,7 +27,6 @@ type Peer struct {
 	SrcAddr       string         `yaml:"source-address,omitempty"`
 	Port          uint16         `yaml:"peer-port,omitempty"`
 	HoldTime      string         `yaml:"hold-time,omitempty"`
-	RouterID      string         `yaml:"router-id,omitempty"`
 	NodeSelectors []NodeSelector `yaml:"node-selectors,omitempty"`
 	Password      string         `yaml:"password,omitempty"`
 	BFDProfile    string         `yaml:"bfd-profile,omitempty"`
