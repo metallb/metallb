@@ -3,10 +3,12 @@
 package service
 
 import (
+	"context"
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -34,6 +36,11 @@ func CreateWithBackend(cs clientset.Interface, namespace string, jigName string,
 	})
 	framework.ExpectNoError(err)
 	return svc, jig
+}
+
+func Delete(cs clientset.Interface, svc *corev1.Service) {
+	err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+	framework.ExpectNoError(err)
 }
 
 func tweakServicePort(svc *v1.Service) {
