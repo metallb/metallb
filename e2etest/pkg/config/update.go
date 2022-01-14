@@ -246,6 +246,7 @@ func (o operatorUpdater) peerToOperator(p Peer) (*operatorv1beta1.BGPPeer, error
 			NodeSelectors: nodeselectors,
 			Password:      p.Password,
 			BFDProfile:    p.BFDProfile,
+			RouterID:      p.RouterID,
 			EBGPMultiHop:  p.EBGPMultiHop,
 		},
 	}, nil
