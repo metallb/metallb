@@ -6,6 +6,8 @@ ip nht resolve-via-default
 ipv6 nht resolve-via-default
 route-map 127.0.0.2-in deny 20
 
+route-map 127.0.0.2-out permit 1
+
 router bgp 100
   no bgp ebgp-requires-policy
   no bgp network import-check

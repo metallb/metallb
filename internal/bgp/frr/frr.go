@@ -13,6 +13,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"go.universe.tf/metallb/internal/bgp"
 	metallbconfig "go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/ipfamily"
 )
 
 // As the MetalLB controller should handle messages synchronously, there should
@@ -194,10 +195,14 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 	}
 
 	config := &frrConfig{
-		Hostname:    hostname,
-		Loglevel:    "informational",
-		Routers:     make(map[string]*routerConfig),
-		BFDProfiles: sm.bfdProfiles,
+		Hostname:               hostname,
+		Loglevel:               "informational",
+		Routers:                make(map[string]*routerConfig),
+		BFDProfiles:            sm.bfdProfiles,
+		PrefixesV4ForCommunity: make(map[string]stringSet),
+		PrefixesV6ForCommunity: make(map[string]stringSet),
+		PrefixesV4ForLocalPref: map[uint32]stringSet{},
+		PrefixesV6ForLocalPref: map[uint32]stringSet{},
 	}
 	frrLogLevel, found := os.LookupEnv("FRR_LOGGING_LEVEL")
 	if found {
@@ -254,28 +259,63 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 		   duplicate prefixes and can, therefore, just add them to the
 		   'neighbor.Advertisements' list. */
 		for _, adv := range s.advertised {
-			var version string
+			family := ipfamily.ForAddress(adv.Prefix.IP)
 			communities := make([]string, 0)
-			if adv.Prefix.IP.To4() != nil {
-				version = "ipv4"
-			} else if adv.Prefix.IP.To16() != nil {
-				version = "ipv6"
-			}
+
 			// Convert community 32bits value to : format
 			for _, c := range adv.Communities {
-				communities = append(communities, metallbconfig.CommunityToString(c))
+				community := metallbconfig.CommunityToString(c)
+				communities = append(communities, community)
+				addPrefixForCommunity(config, adv.Prefix.String(), family, community)
 			}
 			advConfig := advertisementConfig{
-				Version:     version,
+				IPFamily:    family,
 				Prefix:      adv.Prefix.String(),
 				Communities: communities,
 				LocalPref:   adv.LocalPref,
 			}
+			if adv.LocalPref != 0 {
+				addPrefixForLocalPref(config, adv.Prefix.String(), family, adv.LocalPref)
+			}
+
 			neighbor.Advertisements = append(neighbor.Advertisements, &advConfig)
 		}
 	}
 
 	return config, nil
+}
+
+func addPrefixForLocalPref(config *frrConfig, prefix string, family ipfamily.Family, localPref uint32) {
+	if family == ipfamily.IPv4 {
+		_, ok := config.PrefixesV4ForLocalPref[localPref]
+		if !ok {
+			config.PrefixesV4ForLocalPref[localPref] = newStringSet()
+		}
+		config.PrefixesV4ForLocalPref[localPref].Add(prefix)
+		return
+	}
+	_, ok := config.PrefixesV6ForLocalPref[localPref]
+	if !ok {
+		config.PrefixesV6ForLocalPref[localPref] = newStringSet()
+	}
+	config.PrefixesV6ForLocalPref[localPref].Add(prefix)
+}
+
+func addPrefixForCommunity(config *frrConfig, prefix string, family ipfamily.Family, community string) {
+	if family == ipfamily.IPv4 {
+		_, ok := config.PrefixesV4ForCommunity[community]
+		if !ok {
+			config.PrefixesV4ForCommunity[community] = newStringSet()
+		}
+		config.PrefixesV4ForCommunity[community].Add(prefix)
+		return
+
+	}
+	_, ok := config.PrefixesV6ForCommunity[community]
+	if !ok {
+		config.PrefixesV6ForCommunity[community] = newStringSet()
+	}
+	config.PrefixesV6ForCommunity[community].Add(prefix)
 }
 
 var debounceTimeout = 500 * time.Millisecond
