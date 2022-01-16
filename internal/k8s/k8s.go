@@ -443,8 +443,7 @@ func (c *Client) Run(stopCh <-chan struct{}) error {
 		updates.Inc()
 		st := c.sync(key)
 		switch st {
-		case SyncStateSuccess:
-		case SyncStateErrorNoRetry:
+		case SyncStateErrorNoRetry, SyncStateSuccess:
 			c.queue.Forget(key)
 		case SyncStateError:
 			updateErrors.Inc()
