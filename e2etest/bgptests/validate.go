@@ -254,3 +254,59 @@ func getIngressIPs(ingresses []corev1.LoadBalancerIngress) []string {
 	}
 	return ips
 }
+
+func validateServiceNotAdvertised(svc *corev1.Service, frrContainers []*frrcontainer.FRR, advertised string, ipFamily ipfamily.Family) {
+	for _, c := range frrContainers {
+		if c.Name != advertised {
+			for _, ip := range svc.Status.LoadBalancer.Ingress {
+				ingressIP := e2eservice.GetIngressPoint(&ip)
+
+				Eventually(func() bool {
+					frrRoutesV4, frrRoutesV6, err := frr.Routes(c)
+					if err != nil {
+						framework.ExpectNoError(err)
+					}
+
+					_, ok := frrRoutesV4[ingressIP]
+					if ipFamily == ipfamily.IPv6 {
+						_, ok = frrRoutesV6[ingressIP]
+					}
+
+					return ok
+				}, 4*time.Minute, 1*time.Second).Should(Equal(false))
+			}
+		}
+	}
+}
+
+func validateServiceInRoutesForCommunity(c *frrcontainer.FRR, community string, family ipfamily.Family, svc *corev1.Service) {
+	Eventually(func() error {
+		routes, err := frr.RoutesForCommunity(c, community, family)
+		if err != nil {
+			return err
+		}
+		for _, ip := range svc.Status.LoadBalancer.Ingress {
+			ingressIP := e2eservice.GetIngressPoint(&ip)
+			if _, ok := routes[ingressIP]; !ok {
+				return fmt.Errorf("service IP %s not in routes", ingressIP)
+			}
+		}
+		return nil
+	}, 4*time.Minute, 1*time.Second).Should(Not(HaveOccurred()))
+}
+
+func validateServiceNotInRoutesForCommunity(c *frrcontainer.FRR, community string, family ipfamily.Family, svc *corev1.Service) {
+	Eventually(func() error {
+		routes, err := frr.RoutesForCommunity(c, community, family)
+		if err != nil {
+			return err
+		}
+		for _, ip := range svc.Status.LoadBalancer.Ingress {
+			ingressIP := e2eservice.GetIngressPoint(&ip)
+			if _, ok := routes[ingressIP]; !ok {
+				return fmt.Errorf("service IP %s not in routes", ingressIP)
+			}
+		}
+		return nil
+	}, 4*time.Minute, 1*time.Second).Should(MatchError(ContainSubstring("not in routes")))
+}
