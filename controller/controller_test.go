@@ -708,7 +708,7 @@ func TestControllerConfig(t *testing.T) {
 	}
 
 	// Now that an IP is allocated, removing the IP pool is not allowed.
-	if c.SetConfig(l, &config.Config{}) != k8s.SyncStateErrorNoRetry {
+	if c.SetConfig(l, &config.Config{}) != k8s.SyncStateError {
 		t.Fatalf("SetConfig that deletes allocated IPs was accepted")
 	}
 
@@ -874,7 +874,7 @@ func TestControllerDualStackConfig(t *testing.T) {
 	}
 
 	// Now that an IP is allocated, removing the IP pool is not allowed.
-	if c.SetConfig(l, &config.Config{}) != k8s.SyncStateErrorNoRetry {
+	if c.SetConfig(l, &config.Config{}) != k8s.SyncStateError {
 		t.Fatalf("SetConfig that deletes allocated IPs was accepted")
 	}
 
