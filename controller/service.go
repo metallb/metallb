@@ -115,7 +115,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 				c.client.Errorf(svc, "LoadBalancerFailed", "Failed loadbalancer IP for dual-stack")
 				return true
 			}
-			if svc.Spec.LoadBalancerIP != lbIPs[0].String() {
+			if len(lbIPs) != 0 && svc.Spec.LoadBalancerIP != lbIPs[0].String() {
 				level.Info(l).Log("event", "clearAssignment", "reason", "differentIPRequested", "msg", "user requested a different IP than the one currently assigned")
 				c.clearServiceState(key, svc)
 				lbIPs = []net.IP{}
