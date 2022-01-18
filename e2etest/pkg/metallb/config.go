@@ -8,6 +8,7 @@ import (
 
 	"go.universe.tf/metallb/e2etest/pkg/config"
 	frrcontainer "go.universe.tf/metallb/e2etest/pkg/frr/container"
+	"go.universe.tf/metallb/internal/ipfamily"
 )
 
 const (
@@ -29,7 +30,7 @@ func init() {
 }
 
 // PeersForContainers returns the metallb config peers related to the given containers.
-func PeersForContainers(containers []*frrcontainer.FRR, ipFamily string) []config.Peer {
+func PeersForContainers(containers []*frrcontainer.FRR, ipFamily ipfamily.Family) []config.Peer {
 	var peers []config.Peer
 
 	for i, c := range containers {

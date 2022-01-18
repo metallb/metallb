@@ -9,13 +9,14 @@ import (
 
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
+	"go.universe.tf/metallb/internal/ipfamily"
 )
 
 // NeighborsMatchNodes tells if ALL the given nodes are peered with the
 // frr instance. We only care about established connections, as the
 // frr instance may be configured with more nodes than are currently
 // paired.
-func NeighborsMatchNodes(nodes []v1.Node, neighbors []*bgpfrr.Neighbor, ipFamily string) error {
+func NeighborsMatchNodes(nodes []v1.Node, neighbors []*bgpfrr.Neighbor, ipFamily ipfamily.Family) error {
 	nodesIPs := map[string]struct{}{}
 
 	ips := k8s.NodeIPsForFamily(nodes, ipFamily)
@@ -39,7 +40,7 @@ func NeighborsMatchNodes(nodes []v1.Node, neighbors []*bgpfrr.Neighbor, ipFamily
 
 // RoutesMatchNodes tells if ALL the given nodes are exposed as
 // destinations for the given address.
-func RoutesMatchNodes(nodes []v1.Node, route bgpfrr.Route, ipFamily string) error {
+func RoutesMatchNodes(nodes []v1.Node, route bgpfrr.Route, ipFamily ipfamily.Family) error {
 	nodesIPs := map[string]struct{}{}
 
 	ips := k8s.NodeIPsForFamily(nodes, ipFamily)
@@ -59,7 +60,7 @@ func RoutesMatchNodes(nodes []v1.Node, route bgpfrr.Route, ipFamily string) erro
 	return nil
 }
 
-func BFDPeersMatchNodes(nodes []v1.Node, peers map[string]bgpfrr.BFDPeer, ipFamily string) error {
+func BFDPeersMatchNodes(nodes []v1.Node, peers map[string]bgpfrr.BFDPeer, ipFamily ipfamily.Family) error {
 	nodesIPs := map[string]struct{}{}
 	ips := k8s.NodeIPsForFamily(nodes, ipFamily)
 	for _, ip := range ips {

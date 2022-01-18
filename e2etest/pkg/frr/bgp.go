@@ -10,6 +10,7 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 
 	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
+	"go.universe.tf/metallb/internal/ipfamily"
 )
 
 // TODO: Leaving this package "test unaware" on purpose, since we may find it
@@ -147,15 +148,15 @@ func ContainsCommunity(exec executor.Executor, community string) error {
 }
 
 // RoutesMatchLocalPref check if routes match specific local preference value.
-func RoutesMatchLocalPref(exec executor.Executor, ipFamily string, localPref uint32) error {
+func RoutesMatchLocalPref(exec executor.Executor, ipFamily ipfamily.Family, localPref uint32) error {
 	v4Routes, v6Routes, err := Routes(exec)
 	if err != nil {
 		return err
 	}
 	switch ipFamily {
-	case "ipv4":
+	case ipfamily.IPv4:
 		return allRoutesMatchLocalPref(v4Routes, localPref)
-	case "ipv6":
+	case ipfamily.IPv6:
 		return allRoutesMatchLocalPref(v6Routes, localPref)
 	}
 	return nil
