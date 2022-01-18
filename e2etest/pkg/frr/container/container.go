@@ -18,6 +18,7 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/frr/config"
 	frrconfig "go.universe.tf/metallb/e2etest/pkg/frr/config"
 	"go.universe.tf/metallb/e2etest/pkg/frr/consts"
+	"go.universe.tf/metallb/internal/ipfamily"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -115,7 +116,7 @@ func Stop(containers []*FRR) error {
 }
 
 // PairWithNodes pairs the given frr instance with all the cluster nodes.
-func PairWithNodes(cs clientset.Interface, c *FRR, ipFamily string, modifiers ...func(c *FRR)) error {
+func PairWithNodes(cs clientset.Interface, c *FRR, ipFamily ipfamily.Family, modifiers ...func(c *FRR)) error {
 	config := *c
 	for _, m := range modifiers {
 		m(&config)
@@ -272,12 +273,12 @@ func (c *FRR) stop() error {
 	return nil
 }
 
-func (c *FRR) AddressesForFamily(ipFamily string) []string {
+func (c *FRR) AddressesForFamily(ipFamily ipfamily.Family) []string {
 	addresses := []string{c.Ipv4}
 	switch ipFamily {
-	case "ipv6":
+	case ipfamily.IPv6:
 		addresses = []string{c.Ipv6}
-	case "dual":
+	case ipfamily.DualStack:
 		addresses = []string{c.Ipv4, c.Ipv6}
 	}
 	return addresses

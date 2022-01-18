@@ -19,6 +19,7 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/routes"
 	"go.universe.tf/metallb/e2etest/pkg/wget"
 	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
+	"go.universe.tf/metallb/internal/ipfamily"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -26,7 +27,7 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 )
 
-func validateFRRPeeredWithNodes(cs clientset.Interface, c *frrcontainer.FRR, ipFamily string) {
+func validateFRRPeeredWithNodes(cs clientset.Interface, c *frrcontainer.FRR, ipFamily ipfamily.Family) {
 	allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	framework.ExpectNoError(err)
 
@@ -63,11 +64,11 @@ func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1
 			if err != nil {
 				return err
 			}
-			serviceIPFamily := "ipv4"
+			serviceIPFamily := ipfamily.IPv4
 			frrRoutes, ok := frrRoutesV4[ingressIP]
 			if !ok {
 				frrRoutes, ok = frrRoutesV6[ingressIP]
-				serviceIPFamily = "ipv6"
+				serviceIPFamily = ipfamily.IPv6
 			}
 			if !ok {
 				return fmt.Errorf("%s not found in frr routes %v %v", ingressIP, frrRoutesV4, frrRoutesV6)
@@ -92,7 +93,7 @@ func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1
 	}
 }
 
-func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily string) {
+func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily ipfamily.Family) {
 	pods, err := metallb.SpeakerPods(cs)
 	framework.ExpectNoError(err)
 	podExecutor := executor.ForPod(metallb.Namespace, pods[0].Name, "frr")
