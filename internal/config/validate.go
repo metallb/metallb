@@ -58,9 +58,10 @@ func DontValidate(c *configFile) error {
 func DiscardNativeOnly(c *configFile) error {
 	if len(c.Peers) > 0 {
 		myAsn := c.Peers[0].MyASN
+		routerID := c.Peers[0].RouterID
 		for _, p := range c.Peers {
-			if p.RouterID != "" {
-				return fmt.Errorf("peer %s has routerid set on frr mode", p.Addr)
+			if p.RouterID != routerID {
+				return fmt.Errorf("peer %s has RouterID different from %s, in FRR mode all RouterID must be equal", p.RouterID, c.Peers[0].RouterID)
 			}
 			if p.MyASN != myAsn {
 				return fmt.Errorf("peer %s has myAsn different from %s, in FRR mode all myAsn must be equal", p.Addr, c.Peers[0].Addr)

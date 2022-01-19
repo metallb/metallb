@@ -414,6 +414,31 @@ var _ = ginkgo.Describe("BGP", func() {
 			),
 		)
 	})
+	table.DescribeTable("configure peers with routerid and validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
+		ginkgo.By("configure peer")
+
+		configData := config.File{
+			Peers: metallb.WithRouterID(metallb.PeersForContainers(FRRContainers, ipFamily), "10.10.10.1"),
+		}
+		err := ConfigUpdater.Update(configData)
+		framework.ExpectNoError(err)
+
+		for _, c := range FRRContainers {
+			err = frrcontainer.PairWithNodes(cs, c, ipFamily)
+			framework.ExpectNoError(err)
+		}
+
+		for _, c := range FRRContainers {
+			validateFRRPeeredWithNodes(cs, c, ipFamily)
+			neighbors, err := frr.NeighborsInfo(c)
+			framework.ExpectNoError(err)
+			for _, n := range neighbors {
+				framework.ExpectEqual(n.RemoteRouterID, "10.10.10.1")
+			}
+		}
+	},
+		table.Entry("IPV4", ipfamily.IPv4),
+		table.Entry("IPV6", ipfamily.IPv6))
 
 	ginkgo.Context("BFD", func() {
 		table.DescribeTable("should work with the given bfd profile", func(bfd config.BfdProfile, pairingFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {

@@ -121,6 +121,44 @@ func TestValidateFRR(t *testing.T) {
 					},
 				},
 			},
+		},
+		{
+			desc: "routerid set, one different",
+			config: &configFile{
+				Peers: []peer{
+					{
+						Addr:     "1.2.3.4",
+						RouterID: "1.2.3.4",
+					},
+					{
+						Addr:     "1.2.3.5",
+						RouterID: "1.2.3.4",
+					},
+					{
+						Addr:     "1.2.3.6",
+						RouterID: "1.2.3.5",
+					},
+				},
+			},
+			mustFail: true,
+		},
+		{
+			desc: "routerid set, one not set",
+			config: &configFile{
+				Peers: []peer{
+					{
+						Addr:     "1.2.3.4",
+						RouterID: "1.2.3.4",
+					},
+					{
+						Addr:     "1.2.3.5",
+						RouterID: "1.2.3.4",
+					},
+					{
+						Addr: "1.2.3.6",
+					},
+				},
+			},
 			mustFail: true,
 		},
 		{

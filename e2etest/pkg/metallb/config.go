@@ -65,3 +65,11 @@ func WithBFD(peers []config.Peer, bfdProfile string) []config.Peer {
 	}
 	return peers
 }
+
+// WithRouterID sets the given routerID to the peers.
+func WithRouterID(peers []config.Peer, routerID string) []config.Peer {
+	for i := range peers {
+		peers[i].RouterID = routerID
+	}
+	return peers
+}
