@@ -14,16 +14,19 @@ reload_frr() {
   echo "Checking the configuration file syntax"
   if ! python3 /usr/lib/frr/frr-reload.py --test --stdout "$FILE_TO_RELOAD" ; then
     echo "Syntax error spotted: aborting.."
+    echo -n "$(date +%s) failure"  > "$STATUSFILE"
     return
   fi
 
   echo "Applying the configuration file"
   if ! python3 /usr/lib/frr/frr-reload.py --reload --overwrite --stdout "$FILE_TO_RELOAD" ; then
     echo "Failed to fully apply configuration file"
+    echo -n "$(date +%s) failure"  > "$STATUSFILE"
     return
   fi
   
   echo "FRR reloaded successfully!"
+  echo -n "$(date +%s) success"  > "$STATUSFILE"
 } 200<"$LOCKFILE"
 
 kill_sleep() {
@@ -44,6 +47,7 @@ SHARED_VOLUME="${SHARED_VOLUME:-/etc/frr_reloader}"
 PIDFILE="$SHARED_VOLUME/reloader.pid"
 FILE_TO_RELOAD="$SHARED_VOLUME/frr.conf"
 LOCKFILE="$SHARED_VOLUME/lock"
+STATUSFILE="$SHARED_VOLUME/.status"
 
 clean_files
 echo "PID is: $$, writing to $PIDFILE"

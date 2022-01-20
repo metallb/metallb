@@ -8,9 +8,11 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log/level"
 	"go.universe.tf/metallb/internal/bgp"
 	metallbconfig "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/ipfamily"
@@ -368,9 +370,57 @@ func NewSessionManager(l log.Logger, logLevel logging.Level) *sessionManager {
 	reload := func(config *frrConfig) {
 		generateAndReloadConfigFile(config, l)
 	}
+
 	debouncer(reload, res.reloadConfig, debounceTimeout)
 
+	reloadValidator(l)
+
 	return res
+}
+
+func reloadValidator(l log.Logger) {
+	var tickerIntervals = 30 * time.Second
+	var prevReloadTimeStamp string
+
+	ticker := time.NewTicker(tickerIntervals)
+	go func() {
+		for range ticker.C {
+			validateReload(l, &prevReloadTimeStamp)
+		}
+	}()
+}
+
+const statusFileName = "/etc/frr_reloader/.status"
+
+func validateReload(l log.Logger, prevReloadTimeStamp *string) {
+	bytes, err := os.ReadFile(statusFileName)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			_ = level.Error(l).Log("op", "reload-validate", "error", err, "cause", "readFile", "fileName", statusFileName)
+		}
+		return
+	}
+
+	lastReloadStatus := strings.Fields(string(bytes))
+	if len(lastReloadStatus) != 2 {
+		_ = level.Error(l).Log("op", "reload-validate", "error", err, "cause", "Fields", "bytes", string(bytes))
+		return
+	}
+
+	timeStamp, status := lastReloadStatus[0], lastReloadStatus[1]
+	if timeStamp == *prevReloadTimeStamp {
+		return
+	}
+
+	*prevReloadTimeStamp = timeStamp
+
+	if strings.Compare(status, "failure") == 0 {
+		_ = level.Error(l).Log("op", "reload-validate", "error", fmt.Errorf("reload failure"),
+			"cause", "frr reload failed", "status", status)
+		return
+	}
+
+	_ = level.Info(l).Log("op", "reload-validate", "success", "reloaded config")
 }
 
 func configBFDProfileToFRR(p *metallbconfig.BFDProfile) *BFDProfile {
