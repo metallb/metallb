@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/logging"
 )
 
 func TestBFDProfileNoSessions(t *testing.T) {
@@ -37,7 +38,7 @@ func TestBFDProfileNoSessions(t *testing.T) {
 		},
 	}
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 
 	err := sessionManager.SyncBFDProfiles(pp)
@@ -69,7 +70,7 @@ func TestBFDProfileCornerCases(t *testing.T) {
 	}
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 
 	err := sessionManager.SyncBFDProfiles(pp)
@@ -111,7 +112,7 @@ func TestBFDWithSession(t *testing.T) {
 	}
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 
 	err := sessionManager.SyncBFDProfiles(pp)
@@ -152,7 +153,7 @@ func TestBFDProfileAllDefault(t *testing.T) {
 	}
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 
 	err := sessionManager.SyncBFDProfiles(pp)
