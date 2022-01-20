@@ -144,9 +144,9 @@ var _ = ginkgo.BeforeSuite(func() {
 	var updater testsconfig.Updater
 	updater = testsconfig.UpdaterForConfigMap(cs, metallb.ConfigMapName, metallb.Namespace)
 	if useOperator {
-		f := framework.NewDefaultFramework("suite")
-		clientconfig := f.ClientConfig()
-		var err error
+		clientconfig, err := framework.LoadConfig()
+		framework.ExpectNoError(err)
+
 		updater, err = testsconfig.UpdaterForOperator(clientconfig, metallb.Namespace)
 		framework.ExpectNoError(err)
 	}
