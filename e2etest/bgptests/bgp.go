@@ -1024,7 +1024,7 @@ var _ = ginkgo.Describe("BGP", func() {
 	ginkgo.Context("validate FRR running configuration", func() {
 		ginkgo.It("Full BFD profile", func() {
 			bfdProfile := config.BfdProfile{
-				Name:             "fullBFDProfile1",
+				Name:             "fullbfdprofile1",
 				ReceiveInterval:  uint32Ptr(93),
 				TransmitInterval: uint32Ptr(95),
 				EchoInterval:     uint32Ptr(97),
@@ -1073,7 +1073,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				}, 1*time.Minute).Should(
 					And(
 						ContainSubstring("log file /etc/frr/frr.log informational"),
-						WithTransform(substringCount("\n profile fullBFDProfile1"), Equal(1)),
+						WithTransform(substringCount("\n profile fullbfdprofile1"), Equal(1)),
 						ContainSubstring("receive-interval 93"),
 						ContainSubstring("transmit-interval 95"),
 						ContainSubstring("echo-interval 97"),
