@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -131,4 +132,20 @@ func checkBFDConfigPropagated(nodeConfig config.BfdProfile, peerConfig bgpfrr.BF
 		return fmt.Errorf("EchoInterval: expecting %d, got %d", *nodeConfig.EchoInterval, peerConfig.RemoteEchoInterval)
 	}
 	return nil
+}
+
+func validateDesiredLB(svc *corev1.Service) {
+	desiredLbIPs := svc.Annotations["metallb.universe.tf/loadBalancerIPs"]
+	if desiredLbIPs == "" {
+		return
+	}
+	framework.ExpectEqual(desiredLbIPs, strings.Join(getIngressIPs(svc.Status.LoadBalancer.Ingress), ","))
+}
+
+func getIngressIPs(ingresses []corev1.LoadBalancerIngress) []string {
+	var ips []string
+	for _, ingress := range ingresses {
+		ips = append(ips, ingress.IP)
+	}
+	return ips
 }
