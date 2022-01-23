@@ -4,9 +4,13 @@ log timestamp precision 3
 hostname dummyhostname
 ip nht resolve-via-default
 ipv6 nht resolve-via-default
-route-map 10.2.2.254-out permit 10
-  set community 1111:2222 additive
+ip prefix-list 1111:2222-v4prefixes permit 172.16.1.10/24
 route-map 10.2.2.254-in deny 20
+
+route-map 10.2.2.254-out permit 1
+  match ip address prefix-list 1111:2222-v4prefixes
+  set community 1111:2222 additive
+route-map 10.2.2.254-out permit 2
 
 router bgp 100
   no bgp ebgp-requires-policy
