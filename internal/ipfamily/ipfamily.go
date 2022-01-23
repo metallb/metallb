@@ -10,6 +10,10 @@ import (
 // IP family helps identifying single stack IPv4/IPv6 vs Dual-stack ["IPv4", "IPv6"] or ["IPv6", "Ipv4"].
 type Family string
 
+func (f Family) String() string {
+	return string(f)
+}
+
 const (
 	IPv4      Family = "ipv4"
 	IPv6      Family = "ipv6"

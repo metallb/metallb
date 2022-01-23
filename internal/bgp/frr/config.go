@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"go.universe.tf/metallb/internal/ipfamily"
 )
 
 var configFileName = "/etc/frr_reloader/frr.conf"
@@ -33,20 +34,53 @@ hostname {{.Hostname}}
 ip nht resolve-via-default
 ipv6 nht resolve-via-default
 
+{{- range $community, $prefixes := .PrefixesV4ForCommunity }}
+{{- range $p := $prefixes.Elements }}
+ip prefix-list {{$community}}-v4prefixes permit {{$p}}
+{{- end}}
+{{- end}}
+{{- range $community, $prefixes := .PrefixesV6ForCommunity }}
+{{- range $p := $prefixes.Elements }}
+ip prefix-list {{$community}}-v6prefixes permit {{$p}}
+{{- end}}
+{{- end}}
+{{- range $localPref, $prefixes := .PrefixesV4ForLocalPref }}
+{{- range $p := $prefixes.Elements }}
+ip prefix-list {{$localPref}}-v4localpref-prefixes permit {{$p}}
+{{- end}}
+{{- end}}
+{{- range $localPref, $prefixes := .PrefixesV6ForLocalPref }}
+{{- range $p := $prefixes.Elements }}
+ip prefix-list {{$localPref}}-v6localpref-prefixes permit {{$p}}
+{{- end}}
+{{- end}}
+
 {{- range .Routers }}
 {{- range $n := .Neighbors }}
-{{- range $a := .Advertisements }}
-{{- if or (gt (len $a.Communities) 0) (ne $a.LocalPref 0) }}
-route-map {{$n.Addr}}-out permit 10
-{{- range $c := $a.Communities }}
-  set community {{$c}} additive
-{{- end }}
-{{- if ne $a.LocalPref 0 }}
-  set local-preference {{$a.LocalPref}}
-{{- end }}
-{{- end }}
-{{- end }}
 route-map {{$n.Addr}}-in deny 20
+{{/* NOTE: it's possible to have global routes only because all the neighbors
+receive the same advertisements. Once that changes, we'll need prefix lists per neighbor */}}
+{{- range $localPref, $prefixes := $.PrefixesV4ForLocalPref }}
+route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
+  match ip address prefix-list {{$localPref}}-v4localpref-prefixes
+  set local-preference {{$localPref}}
+{{- end }}
+{{- range $localPref, $prefixes := $.PrefixesV6ForLocalPref }}
+route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
+  match ipv6 address prefix-list {{$localPref}}-v6localpref-prefixes
+  set local-preference {{$localPref}}
+{{- end }}
+{{- range $community, $prefixes := $.PrefixesV4ForCommunity }}
+route-map {{$n.Addr}}-out permit {{ counter $n.Addr }}
+  match ip address prefix-list {{$community}}-v4prefixes
+  set community {{$community}} additive
+{{- end }}
+{{- range $community, $prefixes := $.PrefixesV6ForCommunity }}
+route-map {{$n.Addr}}-out permit {{ counter $n.Addr }}
+  match ipv6 address prefix-list {{$community}}-v6prefixes
+  set community {{$community}} additive
+{{- end }}
+route-map {{$n.Addr}}-out permit {{ counter $n.Addr }}
 {{- end }}
 {{- end }}
 
@@ -90,7 +124,7 @@ router bgp {{$r.MyASN}}
   exit-address-family
 {{- end}}
 {{- range .Advertisements }}
-  address-family {{.Version}} unicast
+  address-family {{.IPFamily.String}} unicast
     neighbor {{$n.Addr}} activate
     neighbor {{$n.Addr}} route-map {{$n.Addr}}-in in
     network {{.Prefix}}
@@ -130,11 +164,18 @@ bfd
 {{ end }}`
 
 type frrConfig struct {
-	Loglevel    string
-	Hostname    string
-	Routers     map[string]*routerConfig
-	BFDProfiles []BFDProfile
+	Loglevel               string
+	Hostname               string
+	Routers                map[string]*routerConfig
+	BFDProfiles            []BFDProfile
+	PrefixesV4ForCommunity map[string]stringSet // prefix-list to be associated to the community
+	PrefixesV6ForCommunity map[string]stringSet
+	PrefixesV4ForLocalPref map[uint32]stringSet // prefix-list to be associated to the aggregation length
+	PrefixesV6ForLocalPref map[uint32]stringSet // prefix-list to be associated to the aggregation length
 }
+
+// TODO: having global prefix lists works only because we advertise all the addresses
+// to all the neighbors. Once this constraint is changed, we may need prefix-lists per neighbor.
 
 type routerConfig struct {
 	MyASN     uint32
@@ -167,7 +208,7 @@ type neighborConfig struct {
 }
 
 type advertisementConfig struct {
-	Version     string
+	IPFamily    ipfamily.Family
 	Prefix      string
 	Communities []string
 	LocalPref   uint32
@@ -188,7 +229,17 @@ func neighborName(peerAddr string, ASN uint32) string {
 // templateConfig uses the template library to template
 // 'globalConfigTemplate' using 'data'.
 func templateConfig(data interface{}) (string, error) {
-	t, err := template.New("FRR Config Template").Parse(configTemplate)
+	i := 0
+	currentCounterName := ""
+	t, err := template.New("FRR Config Template").Funcs(
+		template.FuncMap{"counter": func(counterName string) int {
+			if currentCounterName != counterName {
+				currentCounterName = counterName
+				i = 0
+			}
+			i++
+			return i
+		}}).Parse(configTemplate)
 	if err != nil {
 		return "", err
 	}
@@ -288,4 +339,22 @@ func debouncer(body func(config *frrConfig),
 			}
 		}
 	}()
+}
+
+type stringSet map[string]struct{}
+
+func newStringSet() stringSet {
+	return map[string]struct{}{}
+}
+
+func (s stringSet) Add(item string) {
+	s[item] = struct{}{}
+}
+
+func (s stringSet) Elements() []string {
+	res := []string{}
+	for k := range s {
+		res = append(res, k)
+	}
+	return res
 }
