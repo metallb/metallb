@@ -204,15 +204,6 @@ func (o operatorUpdater) createPeer(p Peer) error {
 }
 
 func (o operatorUpdater) peerToOperator(p Peer) (*operatorv1beta1.BGPPeer, error) {
-	var holdtime time.Duration
-	var err error
-	if p.HoldTime != "" {
-		holdtime, err = time.ParseDuration(p.HoldTime)
-		if err != nil {
-			return nil, err
-		}
-	}
-
 	nodeselectors := make([]operatorv1beta1.NodeSelector, len(p.NodeSelectors))
 	for _, ns := range p.NodeSelectors {
 		n := operatorv1beta1.NodeSelector{
@@ -231,6 +222,14 @@ func (o operatorUpdater) peerToOperator(p Peer) (*operatorv1beta1.BGPPeer, error
 		nodeselectors = append(nodeselectors, n)
 	}
 
+	holdTime, err := stringToDuration(p.HoldTime)
+	if err != nil {
+		return nil, err
+	}
+	keepAliveTime, err := stringToDuration(p.KeepaliveTime)
+	if err != nil {
+		return nil, err
+	}
 	return &operatorv1beta1.BGPPeer{
 		ObjectMeta: metav1.ObjectMeta{
 			GenerateName: "testpeer-",
@@ -242,7 +241,8 @@ func (o operatorUpdater) peerToOperator(p Peer) (*operatorv1beta1.BGPPeer, error
 			Address:       p.Addr,
 			SrcAddress:    p.SrcAddr,
 			Port:          p.Port,
-			HoldTime:      metav1.Duration{Duration: holdtime},
+			HoldTime:      holdTime,
+			KeepaliveTime: keepAliveTime,
 			NodeSelectors: nodeselectors,
 			Password:      p.Password,
 			BFDProfile:    p.BFDProfile,
@@ -285,4 +285,15 @@ func (o operatorUpdater) bfdProfileToOperator(bp BfdProfile) *operatorv1beta1.BF
 			MinimumTTL:       bp.MinimumTTL,
 		},
 	}
+}
+
+func stringToDuration(duration string) (metav1.Duration, error) {
+	if duration == "" {
+		return metav1.Duration{}, nil
+	}
+	d, err := time.ParseDuration(duration)
+	if err != nil {
+		return metav1.Duration{}, err
+	}
+	return metav1.Duration{Duration: d}, nil
 }
