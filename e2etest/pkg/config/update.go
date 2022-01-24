@@ -164,7 +164,7 @@ func (o operatorUpdater) poolToOperator(a AddressPool) *operatorv1beta1.AddressP
 	addrs := make([]string, len(a.Addresses))
 	copy(addrs, a.Addresses)
 
-	bgppadvs := make([]operatorv1beta1.BgpAdvertisement, len(a.BGPAdvertisements))
+	bgppadvs := make([]operatorv1beta1.BgpAdvertisement, 0)
 	for _, b := range a.BGPAdvertisements {
 		adv := operatorv1beta1.BgpAdvertisement{}
 		if b.AggregationLength != nil {
@@ -174,6 +174,7 @@ func (o operatorUpdater) poolToOperator(a AddressPool) *operatorv1beta1.AddressP
 		if b.LocalPref != nil {
 			adv.LocalPref = *b.LocalPref
 		}
+		adv.Communities = make([]string, len(b.Communities))
 		copy(adv.Communities, b.Communities)
 		bgppadvs = append(bgppadvs, adv)
 	}
