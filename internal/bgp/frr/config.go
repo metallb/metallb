@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"sort"
 	"strconv"
 	"syscall"
 	"text/template"
@@ -34,51 +35,50 @@ hostname {{.Hostname}}
 ip nht resolve-via-default
 ipv6 nht resolve-via-default
 
-{{- range $community, $prefixes := .PrefixesV4ForCommunity }}
-{{- range $p := $prefixes.Elements }}
-ip prefix-list {{$community}}-v4prefixes permit {{$p}}
+{{- range $pc := .PrefixesV4ForCommunity }}
+{{- range $p := $pc.Prefixes }}
+ip prefix-list {{$pc.Community}}-v4prefixes permit {{$p}}
 {{- end}}
 {{- end}}
-{{- range $community, $prefixes := .PrefixesV6ForCommunity }}
-{{- range $p := $prefixes.Elements }}
-ip prefix-list {{$community}}-v6prefixes permit {{$p}}
+{{- range $pc := .PrefixesV6ForCommunity }}
+{{- range $p := $pc.Prefixes }}
+ip prefix-list {{$pc.Community}}-v6prefixes permit {{$p}}
 {{- end}}
 {{- end}}
-{{- range $localPref, $prefixes := .PrefixesV4ForLocalPref }}
-{{- range $p := $prefixes.Elements }}
-ip prefix-list {{$localPref}}-v4localpref-prefixes permit {{$p}}
+{{- range $pl := .PrefixesV4ForLocalPref }}
+{{- range $p := $pl.Prefixes }}
+ip prefix-list {{$pl.LocalPreference}}-v4localpref-prefixes permit {{$p}}
 {{- end}}
 {{- end}}
-{{- range $localPref, $prefixes := .PrefixesV6ForLocalPref }}
-{{- range $p := $prefixes.Elements }}
-ip prefix-list {{$localPref}}-v6localpref-prefixes permit {{$p}}
+{{- range $pl := .PrefixesV6ForLocalPref }}
+{{- range $p := $pl.Prefixes }}
+ip prefix-list {{$pl.LocalPreference}}-v6localpref-prefixes permit {{$p}}
 {{- end}}
 {{- end}}
-
 {{- range .Routers }}
 {{- range $n := .Neighbors }}
 route-map {{$n.Addr}}-in deny 20
 {{/* NOTE: it's possible to have global routes only because all the neighbors
 receive the same advertisements. Once that changes, we'll need prefix lists per neighbor */}}
-{{- range $localPref, $prefixes := $.PrefixesV4ForLocalPref }}
+{{- range $.PrefixesV4ForLocalPref }}
 route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
-  match ip address prefix-list {{$localPref}}-v4localpref-prefixes
-  set local-preference {{$localPref}}
+  match ip address prefix-list {{.LocalPreference}}-v4localpref-prefixes
+  set local-preference {{.LocalPreference}}
 {{- end }}
-{{- range $localPref, $prefixes := $.PrefixesV6ForLocalPref }}
+{{- range $.PrefixesV6ForLocalPref }}
 route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
-  match ipv6 address prefix-list {{$localPref}}-v6localpref-prefixes
-  set local-preference {{$localPref}}
+  match ipv6 address prefix-list {{.LocalPreference}}-v6localpref-prefixes
+  set local-preference {{.LocalPreference}}
 {{- end }}
-{{- range $community, $prefixes := $.PrefixesV4ForCommunity }}
+{{- range $.PrefixesV4ForCommunity }}
 route-map {{$n.Addr}}-out permit {{ counter $n.Addr }}
-  match ip address prefix-list {{$community}}-v4prefixes
-  set community {{$community}} additive
+  match ip address prefix-list {{.Community}}-v4prefixes
+  set community {{.Community}} additive
 {{- end }}
-{{- range $community, $prefixes := $.PrefixesV6ForCommunity }}
+{{- range $.PrefixesV6ForCommunity }}
 route-map {{$n.Addr}}-out permit {{ counter $n.Addr }}
-  match ipv6 address prefix-list {{$community}}-v6prefixes
-  set community {{$community}} additive
+  match ipv6 address prefix-list {{.Community}}-v6prefixes
+  set community {{.Community}} additive
 {{- end }}
 route-map {{$n.Addr}}-out permit {{ counter $n.Addr }}
 {{- end }}
@@ -163,15 +163,25 @@ bfd
 {{ end }}
 {{ end }}`
 
+type communityPrefixes struct {
+	Community string
+	Prefixes  []string
+}
+
+type localPrefPrefixes struct {
+	LocalPreference uint32
+	Prefixes        []string
+}
+
 type frrConfig struct {
 	Loglevel               string
 	Hostname               string
 	Routers                map[string]*routerConfig
 	BFDProfiles            []BFDProfile
-	PrefixesV4ForCommunity map[string]stringSet // prefix-list to be associated to the community
-	PrefixesV6ForCommunity map[string]stringSet
-	PrefixesV4ForLocalPref map[uint32]stringSet // prefix-list to be associated to the aggregation length
-	PrefixesV6ForLocalPref map[uint32]stringSet // prefix-list to be associated to the aggregation length
+	PrefixesV4ForCommunity []communityPrefixes // prefix-list to be associated to the community
+	PrefixesV6ForCommunity []communityPrefixes
+	PrefixesV4ForLocalPref []localPrefPrefixes // prefix-list to be associated to the aggregation length
+	PrefixesV6ForLocalPref []localPrefPrefixes // prefix-list to be associated to the aggregation length
 }
 
 // TODO: having global prefix lists works only because we advertise all the addresses
@@ -351,10 +361,12 @@ func (s stringSet) Add(item string) {
 	s[item] = struct{}{}
 }
 
+// Elements returns the sorted slice of elements in the set.
 func (s stringSet) Elements() []string {
 	res := []string{}
 	for k := range s {
 		res = append(res, k)
 	}
+	sort.Strings(res)
 	return res
 }
