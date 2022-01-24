@@ -589,7 +589,7 @@ func ParseCommunity(c string) (uint32, error) {
 	}
 	b, err := strconv.ParseUint(fs[1], 10, 16)
 	if err != nil {
-		return 0, fmt.Errorf("invalid second section of community %q: %s", fs[0], err)
+		return 0, fmt.Errorf("invalid second section of community %q: %s", fs[1], err)
 	}
 
 	return (uint32(a) << 16) + uint32(b), nil
