@@ -5,6 +5,7 @@ package metallb
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
@@ -12,10 +13,25 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
+var (
+	controllerLabelSelector = "app.kubernetes.io/component=controller"
+	speakerLabelgSelector   = "app.kubernetes.io/component=speaker"
+)
+
+func init() {
+	if v, ok := os.LookupEnv("CONTROLLER_SELECTOR"); ok {
+		controllerLabelSelector = v
+	}
+
+	if v, ok := os.LookupEnv("SPEAKER_SELECTOR"); ok {
+		speakerLabelgSelector = v
+	}
+}
+
 // SpeakerPods returns the set of pods running the speakers.
 func SpeakerPods(cs clientset.Interface) ([]*corev1.Pod, error) {
 	speakers, err := cs.CoreV1().Pods(Namespace).List(context.Background(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/component=speaker",
+		LabelSelector: speakerLabelgSelector,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to fetch speaker pods")
@@ -34,7 +50,7 @@ func SpeakerPods(cs clientset.Interface) ([]*corev1.Pod, error) {
 // ControllerPod returns the metallb controller pod.
 func ControllerPod(cs clientset.Interface) (*corev1.Pod, error) {
 	pods, err := cs.CoreV1().Pods(Namespace).List(context.Background(), metav1.ListOptions{
-		LabelSelector: "app.kubernetes.io/component=controller",
+		LabelSelector: controllerLabelSelector,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to fetch speaker pods")
@@ -43,5 +59,4 @@ func ControllerPod(cs clientset.Interface) (*corev1.Pod, error) {
 		return nil, fmt.Errorf("Expected one controller pod, found %d", len(pods.Items))
 	}
 	return &pods.Items[0], nil
-
 }
