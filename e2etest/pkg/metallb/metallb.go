@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	controllerLabelSelector = "app.kubernetes.io/component=controller"
-	speakerLabelgSelector   = "app.kubernetes.io/component=speaker"
+	controllerLabelSelector = "component=controller"
+	speakerLabelgSelector   = "component=speaker"
 )
 
 func init() {
