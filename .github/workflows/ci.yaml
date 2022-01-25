@@ -110,7 +110,7 @@ jobs:
         run: |
           HELM_FLAGS=""
           echo '/etc/frr/core-%e.%p.%h.%t' | sudo tee /proc/sys/kernel/core_pattern
-          if [ ${{ matrix.deployment }} = "helm" ]; then HELM_FLAGS="--system-namespaces=default" && export OO_INSTALL_NAMESPACE=default && export CONFIGMAP_NAME=metallb; fi
+          if [ ${{ matrix.deployment }} = "helm" ]; then HELM_FLAGS="--system-namespaces=default" && export OO_INSTALL_NAMESPACE=default && export CONFIGMAP_NAME=metallb && export SPEAKER_SELECTOR="app.kubernetes.io/component=speaker" && export CONTROLLER_SELECTOR="app.kubernetes.io/component=controller"; fi
           SKIP="none"
           if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|BFD|DUALSTACK"; fi
           if [ "${{ matrix.ip-family }}" == "ipv4" ]; then SKIP="$SKIP|IPV6|DUALSTACK"; fi
