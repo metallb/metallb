@@ -68,6 +68,19 @@ func Routes(exec executor.Executor) (map[string]bgpfrr.Route, map[string]bgpfrr.
 	return v4Routes, v6Routes, nil
 }
 
+// RoutesForCommunity returns informations about routes in the given executor related to the given community.
+func RoutesForCommunity(exec executor.Executor, community, family ipfamily.Family) (map[string]bgpfrr.Route, error) {
+	res, err := exec.Exec("vtysh", "-c", fmt.Sprintf("show bgp %s community %s json", family, community))
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to query routes")
+	}
+	routes, err := bgpfrr.ParseRoutes(res)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to parse routes %s", res)
+	}
+	return routes, nil
+}
+
 // NeighborConnected tells if the neighbor in the given
 // json format is connected.
 func NeighborConnected(neighborJson string) (bool, error) {
@@ -147,26 +160,18 @@ func ContainsCommunity(exec executor.Executor, community string) error {
 	return nil
 }
 
-// RoutesMatchLocalPref check if routes match specific local preference value.
-func RoutesMatchLocalPref(exec executor.Executor, ipFamily ipfamily.Family, localPref uint32) error {
-	v4Routes, v6Routes, err := Routes(exec)
+// LocalPrefForPrefix returns the localPref value for the given prefix.
+func LocalPrefForPrefix(exec executor.Executor, prefix string, family ipfamily.Family) (uint32, error) {
+	routes, v6Routes, err := Routes(exec)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	switch ipFamily {
-	case ipfamily.IPv4:
-		return allRoutesMatchLocalPref(v4Routes, localPref)
-	case ipfamily.IPv6:
-		return allRoutesMatchLocalPref(v6Routes, localPref)
+	if family == ipfamily.IPv6 {
+		routes = v6Routes
 	}
-	return nil
-}
-
-func allRoutesMatchLocalPref(routes map[string]bgpfrr.Route, localPref uint32) error {
-	for _, route := range routes {
-		if route.LocalPref != localPref {
-			return fmt.Errorf("ip route doesn't match local-preference, expected %d got %d", localPref, route.LocalPref)
-		}
+	route, ok := routes[prefix]
+	if !ok {
+		return 0, fmt.Errorf("prefix %s not found in routes", prefix)
 	}
-	return nil
+	return route.LocalPref, nil
 }
