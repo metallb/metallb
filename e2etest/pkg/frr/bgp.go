@@ -69,7 +69,7 @@ func Routes(exec executor.Executor) (map[string]bgpfrr.Route, map[string]bgpfrr.
 }
 
 // RoutesForCommunity returns informations about routes in the given executor related to the given community.
-func RoutesForCommunity(exec executor.Executor, community, family ipfamily.Family) (map[string]bgpfrr.Route, error) {
+func RoutesForCommunity(exec executor.Executor, community string, family ipfamily.Family) (map[string]bgpfrr.Route, error) {
 	res, err := exec.Exec("vtysh", "-c", fmt.Sprintf("show bgp %s community %s json", family, community))
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to query routes")

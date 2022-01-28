@@ -12,18 +12,22 @@ route-map 10.2.2.254-in deny 20
 route-map 10.2.2.254-out permit 1
   match ip address prefix-list 2-v4localpref-prefixes
   set local-preference 2
+  on-match next
 route-map 10.2.2.254-out permit 2
   match ip address prefix-list 1111:2222-v4prefixes
   set community 1111:2222 additive
+  on-match next
 route-map 10.2.2.254-out permit 3
 route-map 10.2.2.255-in deny 20
 
 route-map 10.2.2.255-out permit 1
   match ip address prefix-list 2-v4localpref-prefixes
   set local-preference 2
+  on-match next
 route-map 10.2.2.255-out permit 2
   match ip address prefix-list 1111:2222-v4prefixes
   set community 1111:2222 additive
+  on-match next
 route-map 10.2.2.255-out permit 3
 
 router bgp 100
