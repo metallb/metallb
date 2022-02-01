@@ -202,6 +202,12 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 		})
 
+		ginkgo.AfterEach(func() {
+			// Clean previous configuration.
+			err := ConfigUpdater.Clean()
+			framework.ExpectNoError(err)
+		})
+
 		table.DescribeTable("should be exposed by the controller", func(ipFamily ipfamily.Family, poolAddress string, addressTotal int) {
 			poolName := "bgp-test"
 
