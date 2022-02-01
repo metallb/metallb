@@ -20,7 +20,7 @@ assignment of the IP and can't connect.
 
 ## Tools
 
-### arping
+### `arping`
 
 In this example, `arping` is used to trigger a request and it should receive a response.
 
@@ -39,9 +39,11 @@ Received 4 response(s)
 
 `192.168.1.35` is the IP of one of the worker nodes and part of the same subnet.
 
-### tcpdump
+> Make sure to use `arping` on a node which is not homing the `metallb-speaker` that ARPs for the address. ARP requests from the same host will be ignored. 
 
-`tcpdump` can be used on the same worker node or another one in order to verify arp requests go back and forth.
+### `tcpdump`
+
+`tcpdump` can be used on the same worker node or another one in order to verify ARP requests go back and forth.
 
 Capture all replies from `192.168.1.240`:
 
@@ -67,3 +69,8 @@ In addition to the above, make sure to watch the logs of MetalLB's speaker compo
 $ kubetail -l app.kubernetes.io/component=speaker -n metallb-system
 ...
 ```
+
+{{% notice note %}}
+Pinging the loadbalancer IP will not work! Since the IP is not owned by an host interface, the OS will not respond to ICMP packets. The service might be reachable with `curl` even if you cannot ping the loadbalancer IP. 
+{{% /notice %}}
+
