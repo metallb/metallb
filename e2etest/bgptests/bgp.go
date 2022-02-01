@@ -63,8 +63,13 @@ var _ = ginkgo.Describe("BGP", func() {
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentGinkgoTestDescription().Failed {
 			for _, c := range FRRContainers {
+				address := c.Ipv4
+				if address == "" {
+					address = c.Ipv6
+				}
+				peerAddr := address + fmt.Sprintf(":%d", c.RouterConfig.BGPPort)
 				dump, err := frr.RawDump(c, "/etc/frr/bgpd.conf", "/tmp/frr.log", "/etc/frr/daemons")
-				framework.Logf("External frr dump for %s:\n%s\nerrors:%v", c.Name, dump, err)
+				framework.Logf("External frr dump for %s:%s\n%s\nerrors:%v", c.Name, peerAddr, dump, err)
 			}
 
 			speakerPods, err := metallb.SpeakerPods(cs)
@@ -202,22 +207,17 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.AfterEach(func() {
-			// Clean previous configuration.
-			err := ConfigUpdater.Clean()
-			framework.ExpectNoError(err)
-		})
-
 		table.DescribeTable("should be exposed by the controller", func(ipFamily ipfamily.Family, poolAddress string, addressTotal int) {
 			poolName := "bgp-test"
 
-			var peerAddrs []string
+			peerAddrToName := make(map[string]string)
 			for _, c := range FRRContainers {
 				address := c.Ipv4
 				if ipFamily == ipfamily.IPv6 {
 					address = c.Ipv6
 				}
-				peerAddrs = append(peerAddrs, address+fmt.Sprintf(":%d", c.RouterConfig.BGPPort))
+				peerAddr := address + fmt.Sprintf(":%d", c.RouterConfig.BGPPort)
+				peerAddrToName[peerAddr] = c.Name
 			}
 
 			configData := config.File{
@@ -267,12 +267,13 @@ var _ = ginkgo.Describe("BGP", func() {
 					if err != nil {
 						return err
 					}
-					for _, addr := range peerAddrs {
-						err = metrics.ValidateGaugeValue(1, "metallb_bgp_session_up", map[string]string{"peer": addr}, speakerMetrics)
+					for peerAddr, peerName := range peerAddrToName {
+						err = metrics.ValidateGaugeValue(1, "metallb_bgp_session_up", map[string]string{"peer": peerAddr}, speakerMetrics)
 						if err != nil {
+							framework.Logf("frr metrics: %q, neighbor: %s-%s, speaker: %s", speakerMetrics, peerName, peerAddr, speaker.Namespace+"/"+speaker.Name)
 							return err
 						}
-						err = metrics.ValidateGaugeValue(0, "metallb_bgp_announced_prefixes_total", map[string]string{"peer": addr}, speakerMetrics)
+						err = metrics.ValidateGaugeValue(0, "metallb_bgp_announced_prefixes_total", map[string]string{"peer": peerAddr}, speakerMetrics)
 						if err != nil {
 							return err
 						}
@@ -306,7 +307,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					if err != nil {
 						return err
 					}
-					for _, addr := range peerAddrs {
+					for addr := range peerAddrToName {
 						err = metrics.ValidateGaugeValue(1, "metallb_bgp_session_up", map[string]string{"peer": addr}, speakerMetrics)
 						if err != nil {
 							return err
