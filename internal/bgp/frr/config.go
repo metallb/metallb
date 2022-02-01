@@ -64,21 +64,25 @@ receive the same advertisements. Once that changes, we'll need prefix lists per 
 route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
   match ip address prefix-list {{.LocalPreference}}-v4localpref-prefixes
   set local-preference {{.LocalPreference}}
+  on-match next
 {{- end }}
 {{- range $.PrefixesV6ForLocalPref }}
 route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
   match ipv6 address prefix-list {{.LocalPreference}}-v6localpref-prefixes
   set local-preference {{.LocalPreference}}
+  on-match next
 {{- end }}
 {{- range $.PrefixesV4ForCommunity }}
 route-map {{$n.Addr}}-out permit {{ counter $n.Addr }}
   match ip address prefix-list {{.Community}}-v4prefixes
   set community {{.Community}} additive
+  on-match next
 {{- end }}
 {{- range $.PrefixesV6ForCommunity }}
 route-map {{$n.Addr}}-out permit {{ counter $n.Addr }}
   match ipv6 address prefix-list {{.Community}}-v6prefixes
   set community {{.Community}} additive
+  on-match next
 {{- end }}
 route-map {{$n.Addr}}-out permit {{ counter $n.Addr }}
 {{- end }}
