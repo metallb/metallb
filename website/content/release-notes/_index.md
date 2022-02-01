@@ -3,16 +3,63 @@ title: Release Notes
 weight: 8
 ---
 
+## Version 0.12.0
+
+New Features:
+
+- Experimental FRR mode is now available. In this mode, the BGP stack is handled
+  by a FRR container in place of the native BGP implementation. This offers additional capabilities such as
+  IPv6 BGP announcement and BFD support. See the installation section on how
+  to enable it.
+  ([PR #832](https://github.com/metallb/metallb/pull/832), [PR #935](https://github.com/metallb/metallb/pull/935), [PR #958](https://github.com/metallb/metallb/pull/958), [PR #1014](https://github.com/metallb/metallb/pull/1014) and others)
+
+- Dual stack services are now supported. L2 works out of the box, BGP requires
+  the FRR mode because of missing IPv6 support in the native implementation.
+  ([PR #1065](https://github.com/metallb/metallb/pull/1065))
+
+- In FRR mode, it is possible to have a BGP session paired with a BFD session
+  for quicker path failure detection.
+  ([PR #927](https://github.com/metallb/metallb/pull/927))
+  ([PR #967](https://github.com/metallb/metallb/pull/967))
+
+- A new manifest (`manifests/metallb-frr.yaml`) is available to deploy metallb in FRR mode
+  ([PR #1014](https://github.com/metallb/metallb/pull/1014))
+
+- (helm chart) Add support for deploying MetalLB in FRR mode.
+  ([PR #1073](https://github.com/metallb/metallb/pull/1073))
+
+- (helm chart) Allow specification of priorityClassName for speaker and controller.
+  ([PR #1099](https://github.com/metallb/metallb/pull/1099))
+
+Changes in behavior:
+
+- The new FRR mode comes with limitations, compared to the native implementation. The most notable are:
+
+  - It is not allowed to have different peers sharing the same ip address but different ports
+  - It is not allowed to have different routerID or different myAsn for different peers. It is allowed to override the routerID and/or myAsn, but the value must be the same for all the peers.
+  - In case the BGP peer is multiple hops away from the nodes, the new ebgp-multihop flag must be set.
+
+- When switching to FRR mode, the FRR image will required to be downloaded, which may require a longer rollout time than usual. Also, please note
+that the migration path from native BGP to FRR was not explicitly tested.
+
+Bug Fixes:
+
+- If a configmap is marked as stale because removing an pool used by a service, metallb tries to reprocess it periodically until the service is deleted or changed.
+  ([PR #1028](https://github.com/metallb/metallb/pull/1028), [PR #1166](https://github.com/metallb/metallb/pull/1166]))
+
+- Controller panic when updating the address pool of a service and specifying spec.loadBalancerIP from the new address pool
+  ([PR #1168](https://github.com/metallb/metallb/pull/1168))
+
 ## Version 0.11.0
 
 New Features:
 
-- Leveled logging is now supported. You can set `--log-level` flag to one of 
+- Leveled logging is now supported. You can set `--log-level` flag to one of
   `all`, `debug`, `info`, `warn`, `error` or `none` to filter produced logs by level.
   The default value is set to `info` on both helm charts and k8s manifests.
   ([PR #895](https://github.com/metallb/metallb/pull/895))
 
-- MetalLB previously required the speaker to run on the same node as a pod backing a 
+- MetalLB previously required the speaker to run on the same node as a pod backing a
   LoadBalancer, even when the ExternalTrafficPolicy was set to cluster. You may now
   run the MetalLB speaker on a subset of nodes, and the LoadBalancer will work for
   the cluster policy, regardless of where the endpoints are located.
@@ -38,12 +85,12 @@ New Features:
 
 Changes in behavior:
 
-- With the newly introduced leveled logging support, the default value for the 
+- With the newly introduced leveled logging support, the default value for the
   `--log-level` is set to `info` on both helm charts and k8s manifests.
-  This will produce fewer logs compared to the previous releases, 
-  since many `debug` level logs will be filtered out. You can preserve the old verbosity by 
-  editing the k8s manifests and setting the argument `--log-level=all` for both the controller and 
-  speaker when installing using manifests, or by overriding helm values `controller.logLevel=all` 
+  This will produce fewer logs compared to the previous releases,
+  since many `debug` level logs will be filtered out. You can preserve the old verbosity by
+  editing the k8s manifests and setting the argument `--log-level=all` for both the controller and
+  speaker when installing using manifests, or by overriding helm values `controller.logLevel=all`
   and `speaker.logLevel=all` when installing with Helm.
   ([PR #895](https://github.com/metallb/metallb/pull/886))
 
@@ -56,7 +103,7 @@ Changes in behavior:
 Bug Fixes:
 
 - L2 mode now allows to announce from nodes where the speaker is not running from
-  in case of ExternalTrafficPolicy = Cluster. The association of the node to the 
+  in case of ExternalTrafficPolicy = Cluster. The association of the node to the
   service is done via the LoadBalancerIP, avoiding scenarios where two services
   sharing the same IP are announced from different nodes.
   ([Issue #968](https://github.com/metallb/metallb/issues/968))
@@ -69,12 +116,7 @@ Bug Fixes:
   included tools were not usable.
   ([Issue #618](https://github.com/metallb/metallb/issues/618))
 
-This release includes contributions from bootjp / Yoshiaki Ueda, Brandon B.
-Jozsa, Carlos Goncalves, Christoph Raab, claudex, David Anderson, Dax McDonald,
-Etienne Champetier, Federico Paolinelli, Graeme Lawes, jlclx, Johannes
-Liebermann, Mark Gray, Maxim Makarov, Mike McKiernan, Mohamed Mahmoud, Ori
-Braunshtein, Rodrigo Campos, Russell Bryant, Sabina Aledort, t0b3, Till Adam,
-Tomofumi Hayashi, Trey Dockendorf, Utku Ozdemir, and Yves Mettier. Thank you!
+This release includes contributions from alphabet5, Andrea Panattoni, Brian_P, Carlos Goncalves, Federico Paolinelli, Graeme Lawes, HeroCC, Ian Roberts, Lior Noy, Marco Geri, Mark Gray, Mohamed S. Mahmoud, Ori Braunshtein, Pumba98, rata, Russell Bryant, Sabina Aledort, Shivamani Patil and Tyler Auerbeck. Thank you!
 
 ## Version 0.10.3
 
@@ -153,6 +195,7 @@ Stefan Lasiewski, Steven Follis, sumarsono, Thorsten Schifferdecker, toby
 cabot, Tomofumi Hayashi, Tony Perez, and Yuan Liu. Thank you!
 
 ## Version 0.9.6
+
 [Documentation for this release](https://metallb.universe.tf)
 
 Bugfixes:
@@ -163,6 +206,7 @@ This release includes contributions from Lars Ekman, Rodrigo Campos, Russell
 Bryant and Stefan Lasiewski. Thanks for making MetalLB better!
 
 ## Version 0.9.5
+
 [Documentation for this release](https://v0-9-5--metallb.netlify.com)
 
 New features:
@@ -177,6 +221,7 @@ This release includes contributions from Adit Sachde and Jan Krcmar. Thanks for
 making MetalLB better!
 
 ## Version 0.9.4
+
 [Documentation for this release](https://v0-9-4--metallb.netlify.com)
 
 New features:
@@ -198,6 +243,7 @@ Thorsten Schifferdecker, toby cabot and Yuan Liu. Thanks to all of them for
 making MetalLB better!
 
 ## Version 0.9.3
+
 [Documentation for this release](https://v0-9-3--metallb.netlify.com)
 
 Bugfixes:
@@ -214,11 +260,12 @@ This release includes contributions from Henry-Kim-Youngwoo, Oleg Mayko and
 Rodrigo Campos. Thanks to all of them for making MetalLB better!
 
 ## Version 0.9.2
+
 [Documentation for this release](https://v0-9-2--metallb.netlify.com)
 
 New features:
 
--  Dramatically reduce dead node detection time when using Layer 2 mode ([#527](https://github.com/metallb/metallb/pull/527)).
+- Dramatically reduce dead node detection time when using Layer 2 mode ([#527](https://github.com/metallb/metallb/pull/527)).
    This is improvement closes the long standing issue
 [#298](https://github.com/metallb/metallb/issues/298) that has been a common
 pain point for users using Layer 2 mode. This feature is enabled by default. You
@@ -775,7 +822,7 @@ vastly increased test coverage, and improved documentation structure
 and accessibility.
 
 Notable features:
- 
+
 - This website! It replaces a loose set of markdown files, and
   hopefully makes MetalLB more accessible.
 - The BGP speaker now speaks Multiprotocol BGP

@@ -24,6 +24,9 @@ data:
       # (optional) The proposed value of the BGP Hold Time timer. Refer to
       # BGP reference material to understand what setting this implies.
       hold-time: 120s
+      # (optional) The keepalive interval to be used in the BGP session.
+      # By default it is set to hold-time / 3
+      keepalive-time: 30s
       # (optional) The router ID to use when connecting to this peer. Defaults
       # to the node IP address. Generally only useful when you need to peer with
       # another BGP router running on the same machine as MetalLB.
@@ -31,6 +34,12 @@ data:
       # (optional) Password for TCPMD5 authenticated BGP sessions
       # offered by some peers.
       password: "yourPassword"
+      # (optional) A reference to a BFD profile defined in the bfd-profiles section.
+      # BFD is supported only with the experimental FRR mode.
+      bfdProfile: "bfdProfile1"
+      # (optional) Whether eBGP multihop is permitted. Note that it is always
+      # on in the native BGP mode
+      ebgp-multihop: true
       # (optional) The nodes that should connect to this peer. A node
       # matches if at least one of the node selectors matches. Within
       # one selector, a node matches if all the matchers are
@@ -93,6 +102,13 @@ data:
         # default of 32, which advertises the entire IP address
         # unmodified.
         aggregation-length: 32
+        # (optional) How much you want to aggregate up the IPv6 address
+        # before advertising. For example, advertising 2001:0db8:85a3:0000:0000:8a2e:0370:7334
+        # with aggregation-length-v6=64 would end up advertising 2001:0db8:85a3:0000:0000:0000:0000:0000/64.
+        # For the majority of setups, you'll want to keep this at the
+        # default of 128, which advertises the entire IP address
+        # unmodified.
+        aggregation-length-v6: 64
         # (optional) The value of the BGP "local preference" attribute
         # for this advertisement. Only used with IBGP peers,
         # i.e. peers where peer-asn is the same as my-asn.
@@ -114,3 +130,33 @@ data:
       # re-advertisement outside of the immediate autonomous system,
       # but people don't usually recognize its numerical value. :)
       no-export: 65535:65281
+    bfd-profiles:
+    # The unique name to associate the BFD profile to, and to reference it
+    # from a peer entry. BFD is only available in FRR mode.
+    - name: bfdprofilename
+      # (optional) the minimum interval that this system is capable of 
+      # receiving control packets in milliseconds. The default value is 300 milliseconds
+      receive-interval: 280
+      # (optional) The minimum transmission interval (less jitter) 
+      # that this system wants to use to send BFD control packets in
+      # milliseconds. Defaults to 300ms
+      transmit-interval: 270
+      # (optional) Configures the minimal echo receive transmission
+      # interval that this system is capable of handling in milliseconds.
+      # Defaults to 50ms
+      echo-interval: 62
+      # (optional) enables or disables the echo transmission mode. 
+      # This mode is disabled by default, and not supported on multi
+      # hops setups.
+      echo-mode: false
+      # (optional) Mark session as passive: a passive session will not
+      # attempt to start the connection and will wait for control packets
+      # from peer before it begins replying.
+      passive-mode: false
+      # (optional) For multi hop sessions only: configure the minimum 
+      # expected TTL for an incoming BFD control packet.
+      minimum-ttl: 254
+      # (optional) Configures the detection multiplier to determine 
+      # packet loss. The remote transmission interval will be multiplied 
+      # by this value to determine the connection loss detection timer.
+      detect-multiplier: 200
