@@ -840,30 +840,24 @@ var _ = ginkgo.Describe("BGP", func() {
 			table.Entry("IPV4", ipfamily.IPv4),
 			table.Entry("IPV6", ipfamily.IPv6))
 
-		table.DescribeTable("configure bgp community and verify it gets propagated",
-			func(rangeWithCommunity string, rangeWithoutCommunity string, ipFamily ipfamily.Family) {
+		table.DescribeTable("configure bgp advertisement and verify it gets propagated",
+			func(rangeWithAdvertisement string, rangeWithoutAdvertisement string, advertisement config.BgpAdvertisement, ipFamily ipfamily.Family) {
 				configData := config.File{
 					Peers: metallb.PeersForContainers(FRRContainers, ipFamily),
 					Pools: []config.AddressPool{
 						{
-							Name:     "bgp-with-community",
+							Name:     "bgp-with-advertisement",
 							Protocol: config.BGP,
 							Addresses: []string{
-								rangeWithCommunity,
+								rangeWithAdvertisement,
 							},
-							BGPAdvertisements: []config.BgpAdvertisement{
-								{
-									Communities: []string{
-										CommunityNoAdv,
-									},
-								},
-							},
+							BGPAdvertisements: []config.BgpAdvertisement{advertisement},
 						},
 						{
-							Name:     "bgp-with-no-community",
+							Name:     "bgp-with-no-advertisement",
 							Protocol: config.BGP,
 							Addresses: []string{
-								rangeWithoutCommunity,
+								rangeWithoutAdvertisement,
 							},
 						}},
 				}
@@ -879,145 +873,130 @@ var _ = ginkgo.Describe("BGP", func() {
 					validateFRRPeeredWithNodes(cs, c, ipFamily)
 				}
 
-				ipWithCommunity, err := config.GetIPFromRangeByIndex(rangeWithCommunity, 0)
+				ipWithAdvertisement, err := config.GetIPFromRangeByIndex(rangeWithAdvertisement, 0)
 				framework.ExpectNoError(err)
-				ipWithCommunity1, err := config.GetIPFromRangeByIndex(rangeWithCommunity, 1)
+				ipWithAdvertisement1, err := config.GetIPFromRangeByIndex(rangeWithAdvertisement, 1)
 				framework.ExpectNoError(err)
-				ipNoCommunity, err := config.GetIPFromRangeByIndex(rangeWithoutCommunity, 0)
+				ipNoAdvertisement, err := config.GetIPFromRangeByIndex(rangeWithoutAdvertisement, 0)
 				framework.ExpectNoError(err)
 
-				svcCommunity, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "service-with-community",
+				svcAdvertisement, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "service-with-adv",
 					func(s *corev1.Service) {
-						s.Spec.LoadBalancerIP = ipWithCommunity
+						s.Spec.LoadBalancerIP = ipWithAdvertisement
 					},
 					testservice.TrafficPolicyCluster)
-				defer testservice.Delete(cs, svcCommunity)
-				svcCommunity1, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "service-with-community1",
+				defer testservice.Delete(cs, svcAdvertisement)
+				svcAdvertisement1, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "service-with-adv1",
 					func(s *corev1.Service) {
-						s.Spec.LoadBalancerIP = ipWithCommunity1
+						s.Spec.LoadBalancerIP = ipWithAdvertisement1
 					},
 					testservice.TrafficPolicyCluster)
-				defer testservice.Delete(cs, svcCommunity1)
-				svcNoCommunity, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "service-no-community",
+				defer testservice.Delete(cs, svcAdvertisement1)
+				svcNoAdvertisement, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "service-no-adv",
 					func(s *corev1.Service) {
-						s.Spec.LoadBalancerIP = ipNoCommunity
+						s.Spec.LoadBalancerIP = ipNoAdvertisement
 					},
 					testservice.TrafficPolicyCluster)
-				defer testservice.Delete(cs, svcNoCommunity)
+				defer testservice.Delete(cs, svcNoAdvertisement)
 
 				allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 				framework.ExpectNoError(err)
 
 				for _, c := range FRRContainers {
-					validateService(cs, svcCommunity, allNodes.Items, c)
-					validateService(cs, svcCommunity1, allNodes.Items, c)
-					validateService(cs, svcNoCommunity, allNodes.Items, c)
-					routes, err := frr.RoutesForCommunity(c, "no-advertise", ipFamily)
-					framework.ExpectNoError(err)
-					if _, ok := routes[ipNoCommunity]; ok {
-						framework.Failf("found %s route for community no-advertise", ipNoCommunity)
-					}
-					if _, ok := routes[ipWithCommunity1]; !ok {
-						framework.Failf("%s route not found for community no-advertise", ipWithCommunity1)
-					}
-					if _, ok := routes[ipWithCommunity]; !ok {
-						framework.Failf("%s route not found for community no-advertise", ipWithCommunity)
-					}
+					validateService(cs, svcAdvertisement, allNodes.Items, c)
+					validateService(cs, svcAdvertisement1, allNodes.Items, c)
+					validateService(cs, svcNoAdvertisement, allNodes.Items, c)
+					Eventually(func() error {
+						for _, community := range advertisement.Communities {
+							routes, err := frr.RoutesForCommunity(c, community, ipFamily)
+							if err != nil {
+								return err
+							}
+							if _, ok := routes[ipNoAdvertisement]; ok {
+								return fmt.Errorf("found %s route for community %s", community, ipNoAdvertisement)
+							}
+							if _, ok := routes[ipWithAdvertisement1]; !ok {
+								return fmt.Errorf("%s route not found for community %s", community, ipWithAdvertisement1)
+							}
+							if _, ok := routes[ipWithAdvertisement]; !ok {
+								return fmt.Errorf("%s route not found for community %s", community, ipWithAdvertisement)
+							}
+						}
+						// LocalPref check is only valid for iBGP sessions
+						if advertisement.LocalPref != nil && strings.Contains(c.Name, "ibgp") {
+							localPrefix, err := frr.LocalPrefForPrefix(c, ipWithAdvertisement, ipFamily)
+							if err != nil {
+								return err
+							}
+							if localPrefix != *advertisement.LocalPref {
+								return fmt.Errorf("%s %s not matching local pref", c.Name, ipWithAdvertisement)
+							}
+							localPrefix, err = frr.LocalPrefForPrefix(c, ipWithAdvertisement1, ipFamily)
+							if err != nil {
+								return err
+							}
+							if localPrefix != *advertisement.LocalPref {
+								return fmt.Errorf("%s %s not matching local pref", c.Name, ipWithAdvertisement1)
+							}
+							localPrefix, err = frr.LocalPrefForPrefix(c, ipNoAdvertisement, ipFamily)
+							if err != nil {
+								return err
+							}
+							if localPrefix == *advertisement.LocalPref {
+								return fmt.Errorf("%s %s matching local pref", c.Name, ipNoAdvertisement)
+							}
+
+						}
+						return nil
+					}, 1*time.Minute, 1*time.Second).Should(BeNil())
 				}
+
 			},
-			table.Entry("IPV4",
+			table.Entry("IPV4 - community and localpref",
 				"192.168.10.0/24",
-				"192.168.16.0/24", ipfamily.IPv4),
-			table.Entry("IPV6",
+				"192.168.16.0/24",
+				config.BgpAdvertisement{
+					Communities: []string{CommunityNoAdv},
+					LocalPref:   uint32Ptr(50),
+				},
+				ipfamily.IPv4),
+			table.Entry("IPV4 - localpref",
+				"192.168.10.0/24",
+				"192.168.16.0/24",
+				config.BgpAdvertisement{
+					LocalPref: uint32Ptr(50),
+				},
+				ipfamily.IPv4),
+			table.Entry("IPV4 - community",
+				"192.168.10.0/24",
+				"192.168.16.0/24",
+				config.BgpAdvertisement{
+					Communities: []string{CommunityNoAdv},
+				},
+				ipfamily.IPv4),
+			table.Entry("IPV6 - community and localpref",
 				"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
-				"fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26", ipfamily.IPv6))
+				"fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26",
+				config.BgpAdvertisement{
+					Communities: []string{CommunityNoAdv},
+					LocalPref:   uint32Ptr(50),
+				},
+				ipfamily.IPv6),
+			table.Entry("IPV6 - community",
+				"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
+				"fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26",
+				config.BgpAdvertisement{
+					Communities: []string{CommunityNoAdv},
+				},
+				ipfamily.IPv6),
+			table.Entry("IPV6 - localpref",
+				"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
+				"fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26",
+				config.BgpAdvertisement{
+					LocalPref: uint32Ptr(50),
+				},
+				ipfamily.IPv6))
 
-		table.DescribeTable("configure bgp local-preference and verify it gets propagated",
-			func(rangeWithPref, rangeNoPref string, family ipfamily.Family, localPref uint32) {
-				configData := config.File{
-					Pools: []config.AddressPool{
-						{
-							Name:      "pool-localpref",
-							Protocol:  config.BGP,
-							Addresses: []string{rangeWithPref},
-							BGPAdvertisements: []config.BgpAdvertisement{
-								{
-									LocalPref: uint32Ptr(localPref),
-								},
-							},
-						}, {
-							Name:      "pool-nolocalpref",
-							Protocol:  config.BGP,
-							Addresses: []string{rangeNoPref},
-						},
-					},
-					Peers: metallb.PeersForContainers(FRRContainers, family),
-				}
-				for _, c := range FRRContainers {
-					err := frrcontainer.PairWithNodes(cs, c, family)
-					framework.ExpectNoError(err)
-				}
-
-				err := ConfigUpdater.Update(configData)
-				framework.ExpectNoError(err)
-
-				for _, c := range FRRContainers {
-					validateFRRPeeredWithNodes(cs, c, family)
-				}
-
-				ipWithLocalPref, err := config.GetIPFromRangeByIndex(rangeWithPref, 0)
-				framework.ExpectNoError(err)
-				ipWithLocalPref1, err := config.GetIPFromRangeByIndex(rangeWithPref, 1)
-				framework.ExpectNoError(err)
-				ipNoLocalPref, err := config.GetIPFromRangeByIndex(rangeNoPref, 0)
-				framework.ExpectNoError(err)
-				svcLocalPref, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "svc-local-pref",
-					func(s *corev1.Service) {
-						s.Spec.LoadBalancerIP = ipWithLocalPref
-					},
-					testservice.TrafficPolicyCluster)
-				defer testservice.Delete(cs, svcLocalPref)
-
-				svcLocalPref1, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "svc-local-pref1",
-					func(s *corev1.Service) {
-						s.Spec.LoadBalancerIP = ipWithLocalPref1
-					},
-					testservice.TrafficPolicyCluster)
-				defer testservice.Delete(cs, svcLocalPref1)
-
-				svcNoLocalPref, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "svc-no-local-pref",
-					func(s *corev1.Service) {
-						s.Spec.LoadBalancerIP = ipNoLocalPref
-					},
-					testservice.TrafficPolicyCluster)
-				defer testservice.Delete(cs, svcNoLocalPref)
-
-				allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-				framework.ExpectNoError(err)
-
-				for _, c := range FRRContainers {
-					validateService(cs, svcLocalPref, allNodes.Items, c)
-					validateService(cs, svcLocalPref1, allNodes.Items, c)
-					validateService(cs, svcNoLocalPref, allNodes.Items, c)
-				}
-
-				// LocalPref check is only valid for iBGP sessions
-				for _, c := range FRRContainers {
-					if strings.Contains(c.Name, "ibgp") {
-						localPrefix, err := frr.LocalPrefForPrefix(c, ipWithLocalPref, family)
-						framework.ExpectNoError(err)
-						framework.ExpectEqual(localPrefix, localPref, c.Name, ipWithLocalPref, "not matching local pref")
-						localPrefix, err = frr.LocalPrefForPrefix(c, ipWithLocalPref1, family)
-						framework.ExpectNoError(err)
-						framework.ExpectEqual(localPrefix, localPref, c.Name, ipWithLocalPref1, "not matching local pref")
-						localPrefix, err = frr.LocalPrefForPrefix(c, ipNoLocalPref, family)
-						framework.ExpectNoError(err)
-						framework.ExpectNotEqual(localPrefix, localPref, c.Name, ipNoLocalPref, "matching default local pref")
-					}
-				}
-			},
-			table.Entry("IPV4", v4PoolAddresses, "192.168.11.0/24", ipfamily.IPv4, IPLocalPref),
-			table.Entry("IPV6", v6PoolAddresses, "fc00:f853:ccd:e800::/124", ipfamily.IPv6, IPLocalPref))
 	})
 
 	table.DescribeTable("MetalLB FRR rejects any routes advertised by any neighbor", func(addressesRange, toInject string, pairingIPFamily ipfamily.Family) {
