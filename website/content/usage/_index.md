@@ -20,6 +20,12 @@ address, or if the address is already in use by another service,
 assignment will fail and MetalLB will log a warning event visible in
 `kubectl describe service <service name>`.
 
+MetalLB supports `spec.loadBalancerIP` and a custom `metallb.universe.tf/loadBalancerIPs`
+annotation. The annotation also supports a comma separated list of IPs to be used in case of
+Dual Stack services.
+
+Please note that `spec.LoadBalancerIP` is planned to be deprecated in [k8s apis](https://github.com/kubernetes/kubernetes/pull/107235).
+
 MetalLB also supports requesting a specific address pool, if you want
 a certain kind of address but don't care which one exactly. To request
 assignment from a specific pool, add the
