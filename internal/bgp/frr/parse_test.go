@@ -164,6 +164,9 @@ func TestNeighbour(t *testing.T) {
 			if tt.port != n.Port {
 				t.Fatal("Expected port", tt.port, "got", n.Port)
 			}
+			if n.RemoteRouterID != "0.0.0.0" {
+				t.Fatal("Expected remote routerid 0.0.0.0")
+			}
 		})
 	}
 }

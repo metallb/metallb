@@ -55,6 +55,23 @@ data:
       - 192.168.1.240-192.168.1.250
 ```
 
+{{% notice note %}}
+If you installed MetalLB with the `MetalLB Operator`, the addresspool configuration happens via the `AddressPool` CRD:
+
+```yaml
+apiVersion: metallb.io/v1beta1
+kind: AddressPool
+metadata:
+  name: addresspool-sample1
+  namespace: metallb-system
+spec:
+  protocol: layer2
+  addresses:
+    - 172.18.0.100-172.18.0.255
+```
+
+{{% /notice %}}
+
 ## BGP configuration
 
 For a basic configuration featuring one BGP router and one IP address
@@ -86,6 +103,58 @@ data:
       protocol: bgp
       addresses:
       - 192.168.10.0/24
+```
+
+{{% notice note %}}
+If you installed MetalLB with the `MetalLB Operator`, the peers configuration happens via the `BGPPeer` CRD:
+
+```yaml
+apiVersion: metallb.io/v1beta1
+kind: BGPPeer
+metadata:
+  name: peer-sample1
+  namespace: metallb-system
+spec:
+  peerAddress: 10.0.0.1
+  peerASN: 64501
+  myASN: 64500
+  routerID: 10.10.10.10
+  peerPort: 1
+  holdTime: "180s"
+  keepaliveTime: "180s"
+  sourceAddress: "1.1.1.1"
+  password: "test"
+  nodeSelectors:
+  - matchExpressions:
+    - key: kubernetes.io/hostname
+      operator: In
+      values: [hostA, hostB]
+```
+
+{{% /notice %}}
+
+### Enabling BFD support for BGP sessions
+
+With the experimental FRR mode, BGP sessions can be backed up by BFD sessions in order to provide a quicker path failure detection than BGP alone provides.
+
+In order to enable BFD, a BFD profile must be added and referenced by a given peer:
+
+```yaml
+    peers:
+    - my-asn: 64512
+      peer-asn: 64513
+      peer-address: 172.18.0.7
+      peer-port: 179
+      bfd-profile: full1
+    bfd-profiles:
+    - name: full1
+      receive-interval: 179
+      transmit-interval: 180
+      echo-interval: 62
+      echo-mode: false
+      passive-mode: false
+      minimum-ttl: 254
+
 ```
 
 ### Advertisement configuration
@@ -322,3 +391,9 @@ misguided
 If you encounter this issue with your users or networks, you can set
 `avoid-buggy-ips: true` on an address pool to mark `.0` and `.255`
 addresses as unusable.
+
+## Configuring via the MetalLB Operator
+
+The MetalLB Operator allows to configure MetalLB via CRDs.
+
+The CRDs are mapped to the current MetalLB ConfigMap structure.

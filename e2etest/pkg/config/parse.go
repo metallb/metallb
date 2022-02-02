@@ -27,11 +27,12 @@ type Peer struct {
 	SrcAddr       string         `yaml:"source-address,omitempty"`
 	Port          uint16         `yaml:"peer-port,omitempty"`
 	HoldTime      string         `yaml:"hold-time,omitempty"`
-	RouterID      string         `yaml:"router-id,omitempty"`
+	KeepaliveTime string         `yaml:"keepalive-time,omitempty"`
 	NodeSelectors []NodeSelector `yaml:"node-selectors,omitempty"`
 	Password      string         `yaml:"password,omitempty"`
 	BFDProfile    string         `yaml:"bfd-profile,omitempty"`
 	EBGPMultiHop  bool           `yaml:"ebgp-multihop,omitempty"`
+	RouterID      string         `yaml:"router-id,omitempty"`
 }
 
 type NodeSelector struct {

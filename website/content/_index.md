@@ -59,6 +59,12 @@ to deploy to a Kubernetes cluster, head to the
 [installation](/installation/) and [usage]({{% relref
 "usage/_index.md" %}}) guides.
 
+## FRR Mode
+
+MetalLB implements an experimental FRR Mode that uses an [FRR](https://frrouting.org/) container as the backend for handling BGP sessions. It provides features that are not available with the native BGP implementation, such as pairing BGP sessions with BFD sessions, and advertising IPV6 addresses.
+
+The FRR mode is considered to be experimental, please see the [installation](https://metallb.universe.tf/installation/) section for instructions on how to enable it.
+
 ## Contributing
 
 We welcome contributions in all forms. Please check out

@@ -16,27 +16,28 @@ limitations under the License.
 */
 // https://github.com/kubernetes/kubernetes/blob/92aff21558831b829fbc8cbca3d52edc80c01aa3/test/e2e/network/loadbalancer.go#L878
 
-package e2e
+package l2tests
 
 import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"net"
 	"strconv"
 	"time"
 
-	"github.com/mikioh/ipaddr"
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/extensions/table"
 	"github.com/onsi/gomega"
-	pkgerrors "github.com/pkg/errors"
 	"go.universe.tf/metallb/e2etest/pkg/config"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
+	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/mac"
+	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	"go.universe.tf/metallb/e2etest/pkg/metrics"
+	"go.universe.tf/metallb/e2etest/pkg/service"
 	testservice "go.universe.tf/metallb/e2etest/pkg/service"
+	"go.universe.tf/metallb/e2etest/pkg/wget"
 	internalconfig "go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -46,31 +47,29 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 )
 
+var (
+	ConfigUpdater    config.Updater
+	IPV4ServiceRange string
+	IPV6ServiceRange string
+)
+
 var _ = ginkgo.Describe("L2", func() {
 	f := framework.NewDefaultFramework("l2")
 	var loadBalancerCreateTimeout time.Duration
-	var configUpdater config.Updater
 	var cs clientset.Interface
-	var err error
 
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
 		loadBalancerCreateTimeout = e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
-		configUpdater = config.UpdaterForConfigMap(cs, configMapName, testNameSpace)
-		if useOperator {
-			clientconfig := f.ClientConfig()
-			configUpdater, err = config.UpdaterForOperator(clientconfig, testNameSpace)
-			framework.ExpectNoError(err)
-		}
 	})
 
 	ginkgo.AfterEach(func() {
 		// Clean previous configuration.
-		err := configUpdater.Clean()
+		err := ConfigUpdater.Clean()
 		framework.ExpectNoError(err)
 
 		if ginkgo.CurrentGinkgoTestDescription().Failed {
-			DescribeSvc(f.Namespace.Name)
+			k8s.DescribeSvc(f.Namespace.Name)
 		}
 	})
 
@@ -82,18 +81,18 @@ var _ = ginkgo.Describe("L2", func() {
 						Name:     "l2-test",
 						Protocol: config.Layer2,
 						Addresses: []string{
-							ipv4ServiceRange,
-							ipv6ServiceRange,
+							IPV4ServiceRange,
+							IPV6ServiceRange,
 						},
 					},
 				},
 			}
-			err := configUpdater.Update(configData)
+			err := ConfigUpdater.Update(configData)
 			framework.ExpectNoError(err)
 		})
 
 		ginkgo.It("should work for ExternalTrafficPolicy=Cluster", func() {
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
+			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
@@ -108,12 +107,12 @@ var _ = ginkgo.Describe("L2", func() {
 
 			hostport := net.JoinHostPort(ingressIP, port)
 			address := fmt.Sprintf("http://%s/", hostport)
-			err := wgetRetry(address, executor.Host)
+			err := wget.Do(address, executor.Host)
 			framework.ExpectNoError(err)
 		})
 
 		ginkgo.It("should work for ExternalTrafficPolicy=Local", func() {
-			svc, jig := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyLocal)
+			svc, jig := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyLocal)
 			err := jig.Scale(5)
 			framework.ExpectNoError(err)
 
@@ -132,7 +131,7 @@ var _ = ginkgo.Describe("L2", func() {
 			address := fmt.Sprintf("http://%s/", hostport)
 
 			ginkgo.By(fmt.Sprintf("checking connectivity to its external VIP %s", hostport))
-			err = wgetRetry(address, executor.Host)
+			err = wget.Do(address, executor.Host)
 			framework.ExpectNoError(err)
 
 			// Give the speakers enough time to settle and for the announcer to complete its gratuitous.
@@ -143,7 +142,7 @@ var _ = ginkgo.Describe("L2", func() {
 				}
 
 				for i := 0; i < 5; i++ {
-					name, err := getEndpointHostName(hostport, executor.Host)
+					name, err := service.GetEndpointHostName(hostport, executor.Host)
 					if err != nil {
 						return err
 					}
@@ -171,10 +170,10 @@ var _ = ginkgo.Describe("L2", func() {
 			configData := config.File{
 				Pools: getAddressPools(),
 			}
-			err := configUpdater.Update(configData)
+			err := ConfigUpdater.Update(configData)
 			framework.ExpectNoError(err)
 
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
+			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
@@ -186,14 +185,14 @@ var _ = ginkgo.Describe("L2", func() {
 				&svc.Status.LoadBalancer.Ingress[0])
 
 			ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
-			err = validateIPInRange(getAddressPools(), ingressIP)
+			err = config.ValidateIPInRange(getAddressPools(), ingressIP)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("checking connectivity to its external VIP")
 
 			hostport := net.JoinHostPort(ingressIP, port)
 			address := fmt.Sprintf("http://%s/", hostport)
-			err = wgetRetry(address, executor.Host)
+			err = wget.Do(address, executor.Host)
 			framework.ExpectNoError(err)
 		},
 			table.Entry("AddressPool defined by address range", func() []config.AddressPool {
@@ -202,8 +201,8 @@ var _ = ginkgo.Describe("L2", func() {
 						Name:     "l2-test",
 						Protocol: config.Layer2,
 						Addresses: []string{
-							ipv4ServiceRange,
-							ipv6ServiceRange,
+							IPV4ServiceRange,
+							IPV6ServiceRange,
 						},
 					},
 				}
@@ -212,13 +211,13 @@ var _ = ginkgo.Describe("L2", func() {
 				var ipv4AddressesByCIDR []string
 				var ipv6AddressesByCIDR []string
 
-				cidrs, err := internalconfig.ParseCIDR(ipv4ServiceRange)
+				cidrs, err := internalconfig.ParseCIDR(IPV4ServiceRange)
 				framework.ExpectNoError(err)
 				for _, cidr := range cidrs {
 					ipv4AddressesByCIDR = append(ipv4AddressesByCIDR, cidr.String())
 				}
 
-				cidrs, err = internalconfig.ParseCIDR(ipv6ServiceRange)
+				cidrs, err = internalconfig.ParseCIDR(IPV6ServiceRange)
 				framework.ExpectNoError(err)
 				for _, cidr := range cidrs {
 					ipv6AddressesByCIDR = append(ipv6AddressesByCIDR, cidr.String())
@@ -242,23 +241,23 @@ var _ = ginkgo.Describe("L2", func() {
 					Name:     "l2-services-same-ip-test",
 					Protocol: config.Layer2,
 					Addresses: []string{
-						ipv4ServiceRange,
-						ipv6ServiceRange,
+						IPV4ServiceRange,
+						IPV6ServiceRange,
 					},
 				},
 			},
 		}
-		err := configUpdater.Update(configData)
+		err := ConfigUpdater.Update(configData)
 		framework.ExpectNoError(err)
 		namespace := f.Namespace.Name
 
 		jig1 := e2eservice.NewTestJig(cs, namespace, "svca")
 
-		ip, err := getIPFromRangeByIndex(*ipRange, 0)
+		ip, err := config.GetIPFromRangeByIndex(*ipRange, 0)
 		framework.ExpectNoError(err)
 		svc1, err := jig1.CreateLoadBalancerService(loadBalancerCreateTimeout, func(svc *corev1.Service) {
-			svc.Spec.Ports[0].TargetPort = intstr.FromInt(servicePodPort)
-			svc.Spec.Ports[0].Port = int32(servicePodPort)
+			svc.Spec.Ports[0].TargetPort = intstr.FromInt(service.TestServicePort)
+			svc.Spec.Ports[0].Port = int32(service.TestServicePort)
 			svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
 			svc.Spec.LoadBalancerIP = ip
 		})
@@ -267,8 +266,8 @@ var _ = ginkgo.Describe("L2", func() {
 
 		jig2 := e2eservice.NewTestJig(cs, namespace, "svcb")
 		svc2, err := jig2.CreateLoadBalancerService(loadBalancerCreateTimeout, func(svc *corev1.Service) {
-			svc.Spec.Ports[0].TargetPort = intstr.FromInt(servicePodPort + 1)
-			svc.Spec.Ports[0].Port = int32(servicePodPort + 1)
+			svc.Spec.Ports[0].TargetPort = intstr.FromInt(service.TestServicePort + 1)
+			svc.Spec.Ports[0].Port = int32(service.TestServicePort + 1)
 			svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
 			svc.Spec.LoadBalancerIP = ip
 		})
@@ -284,15 +283,15 @@ var _ = ginkgo.Describe("L2", func() {
 		framework.ExpectNoError(err)
 		_, err = jig1.Run(
 			func(rc *corev1.ReplicationController) {
-				rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", servicePodPort), fmt.Sprintf("--udp-port=%d", servicePodPort)}
-				rc.Spec.Template.Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Port = intstr.FromInt(servicePodPort)
+				rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", service.TestServicePort), fmt.Sprintf("--udp-port=%d", service.TestServicePort)}
+				rc.Spec.Template.Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Port = intstr.FromInt(service.TestServicePort)
 				rc.Spec.Template.Spec.NodeName = nodes.Items[0].Name
 			})
 		framework.ExpectNoError(err)
 		_, err = jig2.Run(
 			func(rc *corev1.ReplicationController) {
-				rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", servicePodPort+1), fmt.Sprintf("--udp-port=%d", servicePodPort+1)}
-				rc.Spec.Template.Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Port = intstr.FromInt(servicePodPort + 1)
+				rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", service.TestServicePort+1), fmt.Sprintf("--udp-port=%d", service.TestServicePort+1)}
+				rc.Spec.Template.Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Port = intstr.FromInt(service.TestServicePort + 1)
 				rc.Spec.Template.Spec.NodeName = nodes.Items[1].Name
 			})
 		framework.ExpectNoError(err)
@@ -325,31 +324,25 @@ var _ = ginkgo.Describe("L2", func() {
 		}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
 
 	},
-		table.Entry("IPV4", &ipv4ServiceRange),
-		table.Entry("IPV6", &ipv6ServiceRange))
+		table.Entry("IPV4", &IPV4ServiceRange),
+		table.Entry("IPV6", &IPV6ServiceRange))
 
 	ginkgo.Context("metrics", func() {
 		var controllerPod *corev1.Pod
 		var speakerPods map[string]*corev1.Pod
 
 		ginkgo.BeforeEach(func() {
-			pods, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: "app.kubernetes.io/component=controller",
-			})
+			var err error
+			controllerPod, err = metallb.ControllerPod(cs)
 			framework.ExpectNoError(err)
-			framework.ExpectEqual(len(pods.Items), 1, "Expected one controller pod")
-			controllerPod = &pods.Items[0]
 
-			speakers, err := cs.CoreV1().Pods(testNameSpace).List(context.Background(), metav1.ListOptions{
-				LabelSelector: "app.kubernetes.io/component=speaker",
-			})
+			speakers, err := metallb.SpeakerPods(cs)
 			framework.ExpectNoError(err)
-			framework.ExpectNotEqual(len(speakers.Items), 0, "No speaker pods found")
 
 			speakerPods = map[string]*corev1.Pod{}
-			for _, item := range speakers.Items {
+			for _, item := range speakers {
 				i := item
-				speakerPods[i.Spec.NodeName] = &i
+				speakerPods[i.Spec.NodeName] = i
 			}
 		})
 
@@ -362,29 +355,29 @@ var _ = ginkgo.Describe("L2", func() {
 						Name:     poolName,
 						Protocol: config.Layer2,
 						Addresses: []string{
-							ipv4ServiceRange,
-							ipv6ServiceRange,
+							IPV4ServiceRange,
+							IPV6ServiceRange,
 						},
 					},
 				},
 			}
-			poolCount, err := poolCount(configData.Pools[0])
+			poolCount, err := config.PoolCount(configData.Pools[0])
 			framework.ExpectNoError(err)
 
-			err = configUpdater.Update(configData)
+			err = ConfigUpdater.Update(configData)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("checking the metrics when no service is added")
 			gomega.Eventually(func() error {
-				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod, testNameSpace)
+				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod, metallb.Namespace)
 				if err != nil {
 					return err
 				}
-				err = validateGaugeValue(0, "metallb_allocator_addresses_in_use_total", map[string]string{"pool": poolName}, controllerMetrics)
+				err = metrics.ValidateGaugeValue(0, "metallb_allocator_addresses_in_use_total", map[string]string{"pool": poolName}, controllerMetrics)
 				if err != nil {
 					return err
 				}
-				err = validateGaugeValue(int(poolCount), "metallb_allocator_addresses_total", map[string]string{"pool": poolName}, controllerMetrics)
+				err = metrics.ValidateGaugeValue(int(poolCount), "metallb_allocator_addresses_total", map[string]string{"pool": poolName}, controllerMetrics)
 				if err != nil {
 					return err
 				}
@@ -392,7 +385,7 @@ var _ = ginkgo.Describe("L2", func() {
 			}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
 
 			ginkgo.By("creating a service")
-			svc, _ := createServiceWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
+			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
@@ -400,11 +393,11 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("checking the metrics when a service is added")
 			gomega.Eventually(func() error {
-				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod, testNameSpace)
+				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod, metallb.Namespace)
 				if err != nil {
 					return err
 				}
-				err = validateGaugeValue(1, "metallb_allocator_addresses_in_use_total", map[string]string{"pool": poolName}, controllerMetrics)
+				err = metrics.ValidateGaugeValue(1, "metallb_allocator_addresses_in_use_total", map[string]string{"pool": poolName}, controllerMetrics)
 				if err != nil {
 					return err
 				}
@@ -421,7 +414,7 @@ var _ = ginkgo.Describe("L2", func() {
 			ginkgo.By("checking connectivity to its external VIP")
 			hostport := net.JoinHostPort(ingressIP, port)
 			address := fmt.Sprintf("http://%s/", hostport)
-			err = wgetRetry(address, executor.Host)
+			err = wget.Do(address, executor.Host)
 			framework.ExpectNoError(err)
 
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
@@ -434,27 +427,27 @@ var _ = ginkgo.Describe("L2", func() {
 			delete(speakerPods, advSpeaker.Spec.NodeName)
 
 			gomega.Eventually(func() error {
-				speakerMetrics, err := metrics.ForPod(controllerPod, advSpeaker, testNameSpace)
+				speakerMetrics, err := metrics.ForPod(controllerPod, advSpeaker, metallb.Namespace)
 				if err != nil {
 					return err
 				}
 
-				err = validateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": advSpeaker.Spec.NodeName, "protocol": "layer2", "service": fmt.Sprintf("%s/%s", f.Namespace.Name, svc.Name)}, speakerMetrics)
+				err = metrics.ValidateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": advSpeaker.Spec.NodeName, "protocol": "layer2", "service": fmt.Sprintf("%s/%s", f.Namespace.Name, svc.Name)}, speakerMetrics)
 				if err != nil {
 					return err
 				}
 
-				err = validateCounterValue(1, "metallb_layer2_requests_received", map[string]string{"ip": ingressIP}, speakerMetrics)
+				err = metrics.ValidateCounterValue(1, "metallb_layer2_requests_received", map[string]string{"ip": ingressIP}, speakerMetrics)
 				if err != nil {
 					return err
 				}
 
-				err = validateCounterValue(1, "metallb_layer2_responses_sent", map[string]string{"ip": ingressIP}, speakerMetrics)
+				err = metrics.ValidateCounterValue(1, "metallb_layer2_responses_sent", map[string]string{"ip": ingressIP}, speakerMetrics)
 				if err != nil {
 					return err
 				}
 
-				err = validateCounterValue(1, "metallb_layer2_gratuitous_sent", map[string]string{"ip": ingressIP}, speakerMetrics)
+				err = metrics.ValidateCounterValue(1, "metallb_layer2_gratuitous_sent", map[string]string{"ip": ingressIP}, speakerMetrics)
 				if err != nil {
 					return err
 				}
@@ -464,10 +457,10 @@ var _ = ginkgo.Describe("L2", func() {
 
 			// Negative - validate that the other speakers don't publish layer2 metrics
 			for _, p := range speakerPods {
-				speakerMetrics, err := metrics.ForPod(controllerPod, p, testNameSpace)
+				speakerMetrics, err := metrics.ForPod(controllerPod, p, metallb.Namespace)
 				framework.ExpectNoError(err)
 
-				err = validateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": p.Spec.NodeName, "protocol": "layer2", "service": fmt.Sprintf("%s/%s", f.Namespace.Name, svc.Name)}, speakerMetrics)
+				err = metrics.ValidateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": p.Spec.NodeName, "protocol": "layer2", "service": fmt.Sprintf("%s/%s", f.Namespace.Name, svc.Name)}, speakerMetrics)
 				framework.ExpectError(err, fmt.Sprintf("metallb_speaker_announced present in node: %s", p.Spec.NodeName))
 			}
 
@@ -481,11 +474,11 @@ var _ = ginkgo.Describe("L2", func() {
 		var servicesIngressIP []string
 		var pools []config.AddressPool
 
-		namspace := f.Namespace.Name
+		namespace := f.Namespace.Name
 
 		for i := 0; i < 2; i++ {
 			ginkgo.By(fmt.Sprintf("configure addresspool number %d", i+1))
-			ip, err := getIPFromRangeByIndex(*ipRange, i)
+			ip, err := config.GetIPFromRangeByIndex(*ipRange, i)
 			framework.ExpectNoError(err)
 			addressesRange := fmt.Sprintf("%s-%s", ip, ip)
 			pool := config.AddressPool{
@@ -500,23 +493,15 @@ var _ = ginkgo.Describe("L2", func() {
 			configData := config.File{
 				Pools: pools,
 			}
-			err = configUpdater.Update(configData)
+			err = ConfigUpdater.Update(configData)
 			framework.ExpectNoError(err)
 
 			ginkgo.By(fmt.Sprintf("configure service number %d", i+1))
-			jig := e2eservice.NewTestJig(cs, namspace, fmt.Sprintf("test-service%d", i+1))
-			timeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
-			svc, err := jig.CreateLoadBalancerService(timeout, func(svc *corev1.Service) {
-				tweakServicePort(svc)
-				svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeCluster
-				svc.Annotations = map[string]string{"metallb.universe.tf/address-pool": fmt.Sprintf("test-addresspool%d", i+1)}
-			})
-			framework.ExpectNoError(err)
-
-			_, err = jig.Run(func(rc *corev1.ReplicationController) {
-				tweakRCPort(rc)
-			})
-			framework.ExpectNoError(err)
+			svc, _ := testservice.CreateWithBackend(cs, namespace, fmt.Sprintf("test-service%d", i+1),
+				func(svc *corev1.Service) {
+					svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeCluster
+					svc.Annotations = map[string]string{"metallb.universe.tf/address-pool": fmt.Sprintf("test-addresspool%d", i+1)}
+				})
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
@@ -525,7 +510,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
 			ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
-			err = validateIPInRange([]config.AddressPool{pool}, ingressIP)
+			err = config.ValidateIPInRange([]config.AddressPool{pool}, ingressIP)
 			framework.ExpectNoError(err)
 
 			services = append(services, svc)
@@ -540,46 +525,14 @@ var _ = ginkgo.Describe("L2", func() {
 				port := strconv.Itoa(int(services[j].Spec.Ports[0].Port))
 				hostport := net.JoinHostPort(ip, port)
 				address := fmt.Sprintf("http://%s/", hostport)
-				err = wgetRetry(address, executor.Host)
+				err = wget.Do(address, executor.Host)
 				framework.ExpectNoError(err)
 			}
 		}
 	},
-		table.Entry("IPV4", &ipv4ServiceRange),
-		table.Entry("IPV6", &ipv6ServiceRange))
+		table.Entry("IPV4", &IPV4ServiceRange),
+		table.Entry("IPV6", &IPV6ServiceRange))
 })
-
-func getIPFromRangeByIndex(ipRange string, index int) (string, error) {
-	cidrs, err := internalconfig.ParseCIDR(ipRange)
-	if err != nil {
-		return "", pkgerrors.Wrapf(err, "Failed to parse CIDR while getting IP from range by index")
-	}
-
-	i := 0
-	var c *ipaddr.Cursor
-	for _, cidr := range cidrs {
-		c = ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})
-		for i < index && c.Next() != nil {
-			i++
-		}
-		if i == index {
-			return c.Pos().IP.String(), nil
-		}
-		i++
-	}
-
-	return "", fmt.Errorf("failed to get IP in index %d from range %s", index, ipRange)
-}
-
-// Relies on the endpoint being an agnhost netexec pod.
-func getEndpointHostName(ep string, exec executor.Executor) (string, error) {
-	res, err := exec.Exec("wget", "-O-", "-q", fmt.Sprintf("http://%s/hostname", ep))
-	if err != nil {
-		return "", err
-	}
-
-	return res, nil
-}
 
 // TODO: The tests find the announcing node in multiple ways (MAC/Events).
 // We should have a test that verifies that they all return the same node.
@@ -600,60 +553,4 @@ func advertisingNodeFromMAC(nodes []corev1.Node, ip string, exc executor.Executo
 	}
 
 	return advNode, err
-}
-
-// taken from internal: poolCount returns the number of addresses in the pool.
-// TODO: find a better place for this func.
-func poolCount(p config.AddressPool) (int64, error) {
-	var total int64
-	for _, r := range p.Addresses {
-		cidrs, err := internalconfig.ParseCIDR(r)
-		if err != nil {
-			return 0, err
-		}
-		for _, cidr := range cidrs {
-			o, b := cidr.Mask.Size()
-			if b-o >= 62 {
-				// An enormous ipv6 range is allocated which will never run out.
-				// Just return max to avoid any math errors.
-				return math.MaxInt64, nil
-			}
-			sz := int64(math.Pow(2, float64(b-o)))
-
-			cur := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})
-			firstIP := cur.First().IP
-			lastIP := cur.Last().IP
-
-			if p.AvoidBuggyIPs {
-				if o <= 24 {
-					// A pair of buggy IPs occur for each /24 present in the range.
-					buggies := int64(math.Pow(2, float64(24-o))) * 2
-					sz -= buggies
-				} else {
-					// Ranges smaller than /24 contain 1 buggy IP if they
-					// start/end on a /24 boundary, otherwise they contain
-					// none.
-					if ipConfusesBuggyFirmwares(firstIP) {
-						sz--
-					}
-					if ipConfusesBuggyFirmwares(lastIP) {
-						sz--
-					}
-				}
-			}
-
-			total += sz
-		}
-	}
-	return total, nil
-}
-
-// taken from internal: ipConfusesBuggyFirmwares returns true if ip is an IPv4 address ending in 0 or 255.
-// TODO: find a better place for this func.
-func ipConfusesBuggyFirmwares(ip net.IP) bool {
-	ip = ip.To4()
-	if ip == nil {
-		return false
-	}
-	return ip[3] == 0 || ip[3] == 255
 }

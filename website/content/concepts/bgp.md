@@ -119,3 +119,26 @@ strategies you can employ:
 - Accept that there will be occasional bursts of reset
   connections. For low-availability internal services, this may be
   acceptable as-is.
+
+## FRR Mode
+
+MetalLB provides an experimental mode using FRR as a backend for the BGP
+layer.
+
+When the FRR mode is enabled, the following additional features are available:
+
+- BGP sessions with [BFD support](https://metallb.universe.tf/concepts/bgp/#limitations)
+- IPv6 Support for BGP and BFD
+
+### Limitations of the FRR Mode
+
+Compared to the native implementation, the FRR mode has the following limitations:
+
+- The RouterID field of the BGPAdvertisement can be overridden, but it must be the same for all
+the advertisements (there can't be different advertisements with different RouterIDs).
+
+- The myAsn field of the BGPAdvertisement can be overridden, but it must be the same for all
+the advertisements (there can't be different advertisements with different myAsn).
+
+- In case a eBGP Peer is multiple hops away from the nodes, the ebgp-multihop flag must be set
+to true.

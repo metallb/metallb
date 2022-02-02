@@ -63,6 +63,18 @@ kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifest
 kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifests/metallb.yaml
 ```
 
+{{% notice note %}}
+If you want to deploy MetalLB using the [experimental FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions), apply the manifests:
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifests/namespace.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifests/metallb-frr.yaml
+```
+
+Please do note that these manifests deploy MetalLB from the main development branch. We highly encourage cloud operators to deploy a stable released version of MetalLB on production environments!
+
+{{% /notice %}}
+
 This will deploy MetalLB to your cluster, under the `metallb-system`
 namespace. The components in the manifest are:
 
@@ -84,14 +96,16 @@ you
 
 You can install MetalLB with
 [Kustomize](https://github.com/kubernetes-sigs/kustomize) by pointing
-at the remote kustomization file :
+at the remote kustomization file.
+
+In the following example, we are deploying the v0.11.0 version of MetalLB :
 
 ```yaml
 # kustomization.yml
 namespace: metallb-system
 
 resources:
-  - github.com/metallb/metallb//manifests?ref=v0.9.3
+  - github.com/metallb/metallb/manifests?ref=v0.11.0
   - configmap.yml 
 ```
 
@@ -107,7 +121,7 @@ the config map, as MetalLB is waiting for a config map named `config`
 namespace: metallb-system
 
 resources:
-  - github.com/metallb/metallb//manifests?ref=v0.9.3
+  - github.com/metallb/metallb//manifests?ref=v0.11.0
 
 configMapGenerator:
 - name: config
@@ -143,6 +157,36 @@ configInline:
      protocol: layer2
      addresses:
      - 198.51.100.0/24
+```
+
+{{% notice note %}}
+If you want to deploy MetalLB using the [experimental FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions), the following value must be set:
+
+```yaml
+speaker:
+  frr:
+    enabled: true
+```
+
+{{% /notice %}}
+
+## Using the MetalLB Operator
+
+The MetalLB Operator is available on OperatorHub at [operatorhub.io/operator/metallb-operator](https://operatorhub.io/operator/metallb-operator). It eases the deployment and life-cycle of MetalLB in a cluster and allows configuring MetalLB via CRDs.
+
+{{% notice note %}}
+If you want to deploy MetalLB using the [experimental FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions), you must edit the ClusterServiceVersion resource
+named `metallb-operator`:
+
+```bash
+kubectl edit csv metallb-operator
+```
+
+and change the `BGP_TYPE` environment variable of the `manager` container to `frr`:
+
+```yaml
+- name: METALLB_BGP_TYPE
+  value: frr
 ```
 
 ## Upgrade
