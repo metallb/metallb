@@ -211,12 +211,88 @@ func TestControllerMutation(t *testing.T) {
 		},
 
 		{
+			desc: "request specific IP via custom annotation",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationLoadBalancerIPs: "1.2.3.1",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"1.2.3.4"},
+					Type:       "LoadBalancer",
+				},
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationLoadBalancerIPs: "1.2.3.1",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"1.2.3.4"},
+					Type:       "LoadBalancer",
+				},
+				Status: statusAssigned([]string{"1.2.3.1"}),
+			},
+		},
+
+		{
+			desc: "request IP from both svc.spec.LoadBalancerIP and custom annotation",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationLoadBalancerIPs: "1.2.3.1",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIPs:     []string{"1.2.3.4"},
+					Type:           "LoadBalancer",
+					LoadBalancerIP: "1.2.3.2",
+				},
+			},
+			wantErr: true,
+		},
+
+		{
 			desc: "request invalid IP",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
 					Type:           "LoadBalancer",
 					LoadBalancerIP: "please sir may I have an IP address thank you",
 					ClusterIPs:     []string{"1.2.3.4"},
+				},
+			},
+			wantErr: true,
+		},
+
+		{
+			desc: "request invalid IP via custom annotation",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationLoadBalancerIPs: "please sir may I have an IP address thank you",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"1.2.3.4"},
+					Type:       "LoadBalancer",
+				},
+			},
+			wantErr: true,
+		},
+
+		{
+			desc: "request two IPs from same ip family via custom annotation",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationLoadBalancerIPs: "1.2.3.1,1.2.3.2",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"1.2.3.4"},
+					Type:       "LoadBalancer",
 				},
 			},
 			wantErr: true,
@@ -440,12 +516,44 @@ func TestControllerMutation(t *testing.T) {
 		},
 
 		{
+			desc: "request IP from wrong ip-family (ipv4) via custom annotation",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationLoadBalancerIPs: "1.2.3.1",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"3000::1"},
+					Type:       "LoadBalancer",
+				},
+			},
+			wantErr: true,
+		},
+
+		{
 			desc: "request IP from wrong ip-family (ipv6)",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
 					Type:           "LoadBalancer",
 					LoadBalancerIP: "1000::",
 					ClusterIPs:     []string{"1.2.3.4"},
+				},
+			},
+			wantErr: true,
+		},
+
+		{
+			desc: "request IP from wrong ip-family (ipv6) via custom annotation",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationLoadBalancerIPs: "1000::",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"1.2.3.4"},
+					Type:       "LoadBalancer",
 				},
 			},
 			wantErr: true,
@@ -542,6 +650,47 @@ func TestControllerMutation(t *testing.T) {
 				},
 			},
 			wantErr: true,
+		},
+		{
+			desc: "request specific loadbalancer IPv4 address via custom annotation for dual-stack config",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationLoadBalancerIPs: "1.2.3.1",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"1.2.3.4", "3000::1"},
+					Type:       "LoadBalancer",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			desc: "request dual-stack loadbalancer IPs via custom annotation",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationLoadBalancerIPs: "1.2.3.0,1000::",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"1.2.3.4", "3000::1"},
+					Type:       "LoadBalancer",
+				},
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationLoadBalancerIPs: "1.2.3.0,1000::",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:       "LoadBalancer",
+					ClusterIPs: []string{"1.2.3.4", "3000::1"},
+				},
+				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
+			},
 		},
 		{
 			desc: "request dual-stack loadbalancer with invalid ingress",
