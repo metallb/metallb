@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller-manager
+  namespace: system
+spec:
+  template:
+    spec:
+      containers:
+        - name: manager
+          env:
+            - name: SPEAKER_IMAGE
+              value: "quay.io/metallb/speaker:main"
+            - name: CONTROLLER_IMAGE
+              value: "quay.io/metallb/controller:main"
+            - name: METALLB_BGP_TYPE
+              value: "frr"
+            - name: FRR_IMAGE
+              value: "quay.io/frrouting/frr:stable_7.5"
