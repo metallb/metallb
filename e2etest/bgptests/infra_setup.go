@@ -62,6 +62,8 @@ func InfraSetup(ipv4Addresses, ipv6Addresses []string, cs *clientset.Clientset) 
 		We then wire these networks by adding static routes to both the speaker nodes
 		containers (we're using kind) and the ibgp/ebgp containers connected to multi-hop-net,
 		using the 2nd container as a gateway.
+
+		See `e2etest/README.md` for more details.
 	*/
 
 	ibgpSingleHopContainerConfig := frrcontainer.Config{
