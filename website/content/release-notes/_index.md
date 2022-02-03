@@ -52,6 +52,8 @@ Bug Fixes:
 
 ## Version 0.11.0
 
+[Documentation for this release](https://v0-11-0--metallb.netlify.com)
+
 New Features:
 
 - Leveled logging is now supported. You can set `--log-level` flag to one of
@@ -120,6 +122,8 @@ This release includes contributions from alphabet5, Andrea Panattoni, Brian_P, C
 
 ## Version 0.10.3
 
+[Documentation for this release](https://v0-10-3--metallb.netlify.com)
+
 Bug Fixes:
 
 - Add `fsGroup` to the MetalLB controller deployment to address compatibility with Kubernetes 1.21
@@ -142,12 +146,16 @@ Bug Fixes:
 
 ## Version 0.10.2
 
+[Documentation for this release](https://v0-10-2--metallb.netlify.com)
+
 Bug Fixes:
 
 - Fix a missing RBAC update in the manifests used by the helm chart.
   ([Issue #878](https://github.com/metallb/metallb/issues/878))
 
 ## Version 0.10.1
+
+[Documentation for this release](https://v0-10-1--metallb.netlify.com)
 
 Bug Fixes:
 
@@ -156,6 +164,8 @@ Bug Fixes:
   ([Issue #874](https://github.com/metallb/metallb/issues/874))
 
 ## Version 0.10.0
+
+[Documentation for this release](https://v0-10-0--metallb.netlify.com)
 
 New Features:
 
@@ -196,7 +206,7 @@ cabot, Tomofumi Hayashi, Tony Perez, and Yuan Liu. Thank you!
 
 ## Version 0.9.6
 
-[Documentation for this release](https://metallb.universe.tf)
+[Documentation for this release](https://v0-9-6--metallb.netlify.com)
 
 Bugfixes:
 
