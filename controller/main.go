@@ -20,7 +20,6 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
-	"strings"
 
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/config"
@@ -129,7 +128,7 @@ func main() {
 		kubeconfig      = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
 		mlSecret        = flag.String("ml-secret-name", os.Getenv("METALLB_ML_SECRET_NAME"), "name of the memberlist secret to create")
 		deployName      = flag.String("deployment", os.Getenv("METALLB_DEPLOYMENT"), "name of the MetalLB controller Deployment")
-		logLevel        = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", strings.Join(logging.Levels, ", ")))
+		logLevel        = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
 		disableEpSlices = flag.Bool("disable-epslices", false, "Disable the usage of EndpointSlices and default to Endpoints instead of relying on the autodiscovery mechanism")
 		enablePprof     = flag.Bool("enable-pprof", false, "Enable pprof profiling")
 	)
