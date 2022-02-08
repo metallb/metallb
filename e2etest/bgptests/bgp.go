@@ -1136,6 +1136,43 @@ var _ = ginkgo.Describe("BGP", func() {
 					),
 				)
 			}
+
+			ginkgo.By("validating speakers running-config is updated after deleting the BFD profile")
+			configData.BFDProfiles = nil
+			for i := range configData.Peers {
+				configData.Peers[i].BFDProfile = ""
+			}
+
+			err = ConfigUpdater.Update(configData)
+			framework.ExpectNoError(err)
+
+			for _, pod := range speakerPods {
+				podExecutor := executor.ForPod(pod.Namespace, pod.Name, "frr")
+
+				Eventually(func() string {
+					// We need to assert against the output of the command as a bare string, as
+					// there is no json version of the command.
+					cfgStr, err := podExecutor.Exec("vtysh", "-c", "show running-config")
+					if err != nil {
+						return err.Error()
+					}
+
+					return cfgStr
+				}, 1*time.Minute).Should(
+					And(
+						ContainSubstring("log file /etc/frr/frr.log informational"),
+						WithTransform(substringCount("\n profile fullbfdprofile1"), Equal(0)),
+						WithTransform(func(cfgStr string) bool {
+							for _, c := range FRRContainers {
+								if strings.Contains(cfgStr, fmt.Sprintf("neighbor %s bfd", c.Ipv4)) {
+									return true
+								}
+							}
+							return false
+						}, Equal(false)),
+					), "Failed to update speakers after deleting the BFD profile",
+				)
+			}
 		})
 	})
 
