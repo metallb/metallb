@@ -36,7 +36,6 @@ ipv6 nht resolve-via-default
 
 log file /tmp/frr.log debugging
 log timestamp precision 3
-
 route-map RMAP permit 10
 set ipv6 next-hop prefer-global
 {{$ROUTERASN:=.ASN}}

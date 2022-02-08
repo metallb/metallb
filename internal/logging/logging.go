@@ -11,6 +11,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -19,18 +20,29 @@ import (
 )
 
 const (
-	levelAll   = "all"
-	levelDebug = "debug"
-	levelInfo  = "info"
-	levelWarn  = "warn"
-	levelError = "error"
-	levelNone  = "none"
+	LevelAll   = "all"
+	LevelDebug = "debug"
+	LevelInfo  = "info"
+	LevelWarn  = "warn"
+	LevelError = "error"
+	LevelNone  = "none"
 )
+
+type Level string
+type levelSlice []Level
 
 var (
 	// Levels returns an array of valid log levels.
-	Levels = []string{levelAll, levelDebug, levelInfo, levelWarn, levelError, levelNone}
+	Levels = levelSlice{LevelAll, LevelDebug, LevelInfo, LevelWarn, LevelError, LevelNone}
 )
+
+func (l levelSlice) String() string {
+	strs := make([]string, len(l))
+	for i, v := range l {
+		strs[i] = string(v)
+	}
+	return strings.Join(strs, ", ")
+}
 
 // Init returns a logger configured with common settings like
 // timestamping and source code locations. Both the stdlib logger and
@@ -145,17 +157,17 @@ func deformat(logger log.Logger, b []byte) (leveledLogger log.Logger, ts time.Ti
 
 func parseLevel(lvl string) (level.Option, error) {
 	switch lvl {
-	case levelAll:
+	case LevelAll:
 		return level.AllowAll(), nil
-	case levelDebug:
+	case LevelDebug:
 		return level.AllowDebug(), nil
-	case levelInfo:
+	case LevelInfo:
 		return level.AllowInfo(), nil
-	case levelWarn:
+	case LevelWarn:
 		return level.AllowWarn(), nil
-	case levelError:
+	case LevelError:
 		return level.AllowError(), nil
-	case levelNone:
+	case LevelNone:
 		return level.AllowNone(), nil
 	}
 
