@@ -77,9 +77,9 @@ var _ = ginkgo.Describe("BGP", func() {
 		}
 	})
 
-	ginkgo.AfterEach(func() {
-		ginkgo.By("Clearing the previous configuration")
-		// Clean previous configuration.
+	ginkgo.BeforeEach(func() {
+		ginkgo.By("Clearing any previous configuration")
+
 		err := ConfigUpdater.Clean()
 		framework.ExpectNoError(err)
 
@@ -836,7 +836,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		table.DescribeTable("configure peers one by one and validate FRR paired with nodes", func(ipFamily ipfamily.Family) {
 			for i, c := range FRRContainers {
-				ginkgo.By("configure peer")
+				ginkgo.By(fmt.Sprintf("configure FRR peer [%s]", c.Name))
 
 				configData := config.File{
 					Peers: metallb.PeersForContainers([]*frrcontainer.FRR{c}, ipFamily),
