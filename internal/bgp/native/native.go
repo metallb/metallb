@@ -92,7 +92,11 @@ func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, 
 }
 
 func (sm *sessionManager) SyncBFDProfiles(profiles map[string]*config.BFDProfile) error {
-	return errors.New("bfd profiles not supported in native mode")
+	if len(profiles) > 0 {
+		return errors.New("bfd profiles not supported in native mode")
+	}
+
+	return nil
 }
 
 // run tries to stay connected to the peer, and pumps route updates to it.
