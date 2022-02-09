@@ -3,7 +3,7 @@ package version
 import "fmt"
 
 var (
-	version   = "0.9.6"
+	version   = "0.9.7"
 	gitCommit string // Provided by ldflags during build
 	gitBranch string // Provided by ldflags during build
 )
