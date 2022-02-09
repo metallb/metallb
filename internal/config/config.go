@@ -506,8 +506,18 @@ func parseBGPAdvertisements(ads []bgpAdvertisement, cidrsPerAddresses map[string
 		}, nil
 	}
 
+	err := validateDuplicateAdvertisements(ads)
+	if err != nil {
+		return nil, err
+	}
+
 	var ret []*BGPAdvertisement
 	for _, rawAd := range ads {
+		err := validateDuplicateCommunities(rawAd.Communities)
+		if err != nil {
+			return nil, err
+		}
+
 		ad := &BGPAdvertisement{
 			AggregationLength:   32,
 			AggregationLengthV6: 128,
@@ -579,7 +589,7 @@ func ParseCommunity(c string) (uint32, error) {
 	}
 	b, err := strconv.ParseUint(fs[1], 10, 16)
 	if err != nil {
-		return 0, fmt.Errorf("invalid second section of community %q: %s", fs[0], err)
+		return 0, fmt.Errorf("invalid second section of community %q: %s", fs[1], err)
 	}
 
 	return (uint32(a) << 16) + uint32(b), nil
@@ -666,4 +676,26 @@ func bfdIntFromConfig(value *uint32, min, max uint32) (*uint32, error) {
 		return nil, fmt.Errorf("invalid value %d, must be in %d-%d range", *value, min, max)
 	}
 	return value, nil
+}
+
+func validateDuplicateAdvertisements(ads []bgpAdvertisement) error {
+	for i := 0; i < len(ads); i++ {
+		for j := i + 1; j < len(ads); j++ {
+			if reflect.DeepEqual(ads[i], ads[j]) {
+				return fmt.Errorf("duplicate definition of bgpadvertisements. advertisement %d and %d are equal", i+1, j+1)
+			}
+		}
+	}
+	return nil
+}
+
+func validateDuplicateCommunities(communities []string) error {
+	for i := 0; i < len(communities); i++ {
+		for j := i + 1; j < len(communities); j++ {
+			if communities[i] == communities[j] {
+				return fmt.Errorf("duplicate definition of community %q", communities[i])
+			}
+		}
+	}
+	return nil
 }
