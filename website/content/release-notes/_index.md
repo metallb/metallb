@@ -3,6 +3,13 @@ title: Release Notes
 weight: 8
 ---
 
+## Version 0.9.7
+
+Bugfixes:
+
+- No MetalLB code changes. Rebuild to include alpine fixes.
+([#1215](https://github.com/metallb/metallb/issues/1215))
+
 ## Version 0.9.6
 [Documentation for this release](https://metallb.universe.tf)
 
