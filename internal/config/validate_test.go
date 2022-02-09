@@ -215,6 +215,20 @@ func TestValidateFRR(t *testing.T) {
 			},
 			mustFail: true,
 		},
+		{
+			desc: "duplicate BGPPeer address",
+			config: &configFile{
+				Peers: []peer{
+					{
+						Addr: "1.2.3.4",
+					},
+					{
+						Addr: "1.2.3.4",
+					},
+				},
+			},
+			mustFail: true,
+		},
 	}
 
 	for _, test := range tests {
