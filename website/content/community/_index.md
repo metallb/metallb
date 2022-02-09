@@ -81,9 +81,12 @@ currently have, relative to the top-level directory:
 - `internal/config` parses and validates the MetalLB configmap.
 - `internal/allocator` is the IP address manager. Given pools from the
   MetalLB configmap, it can allocate addresses on demand.
-- `internal/bgp` is a _very_ stripped down implementation of BGP. It
+- `internal/bgp/native` is a _very_ stripped down implementation of BGP. It
   speaks just enough of the protocol to keep peering sessions up, and
   to push routes to the peer.
+- `internal/bgp/frr` contains the code for translating the MetalLB configuration
+   to the FRR configuration that is applied to the FRR container, when running
+   MetalLB in FRR mode.
 - `internal/layer2` is an implementation of an ARP and NDP responder.
 - `internal/logging` is a logging shim that redirects both
   Kubernetes's `klog` and Go's standard library `log` output to
@@ -154,13 +157,18 @@ your fork as a remote in `$GOPATH/src/go.universe.tf/metallb`, with
 
 The following are our commit message guidelines:
 
-* Line wrap the body at 72 characters
-* For a more complete discussion of good git commit message practices, see
-  https://chris.beams.io/posts/git-commit/.
+- Line wrap the body at 72 characters
+- For a more complete discussion of good git commit message practices, see
+  <https://chris.beams.io/posts/git-commit/>.
+
+## Extending the end to end test suite
+
+When adding a new feature, or modifying a current one, consider adding a new test
+to the test suite located in `/e2etest`.
 
 ## The website
 
-The website at https://metallb.universe.tf is pinned to the latest
+The website at <https://metallb.universe.tf> is pinned to the latest
 released version, so that users who don't care about ongoing
 development see documentation that is consistent with the released
 code.

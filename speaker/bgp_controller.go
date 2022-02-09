@@ -26,6 +26,7 @@ import (
 	bgpnative "go.universe.tf/metallb/internal/bgp/native"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
+	"go.universe.tf/metallb/internal/logging"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -314,12 +315,12 @@ func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
 }
 
 // Create a new 'bgp.SessionManager' of type 'bgpType'.
-var newBGP = func(bgpType bgpImplementation, l log.Logger) bgp.SessionManager {
+var newBGP = func(bgpType bgpImplementation, l log.Logger, logLevel logging.Level) bgp.SessionManager {
 	switch bgpType {
 	case bgpNative:
 		return bgpnative.NewSessionManager(l)
 	case bgpFrr:
-		return bgpfrr.NewSessionManager(l)
+		return bgpfrr.NewSessionManager(l, logLevel)
 	default:
 		panic(fmt.Sprintf("unsupported BGP implementation type: %s", bgpType))
 	}

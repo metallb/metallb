@@ -861,6 +861,33 @@ bfd-profiles:
   receive-interval: 90000
 `,
 		},
+		{
+			desc: "Duplicate bgp advertisment definition",
+			raw: `
+address-pools:
+- name: pool1
+  protocol: bgp
+  addresses:
+  - 10.20.0.0/16
+  bgp-advertisements:
+  - aggregation-length: 26
+  - aggregation-length: 26
+`,
+		},
+		{
+			desc: "Duplicate communities definition",
+			raw: `
+bgp-communities:
+  bar: 64512:1234
+address-pools:
+- name: pool1
+  protocol: bgp
+  addresses:
+  - 10.20.0.0/16
+  bgp-advertisements:
+  - communities: ["bar", "bar"]
+`,
+		},
 	}
 
 	for _, test := range tests {

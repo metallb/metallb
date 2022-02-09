@@ -20,6 +20,12 @@ address, or if the address is already in use by another service,
 assignment will fail and MetalLB will log a warning event visible in
 `kubectl describe service <service name>`.
 
+MetalLB supports `spec.loadBalancerIP` and a custom `metallb.universe.tf/loadBalancerIPs`
+annotation. The annotation also supports a comma separated list of IPs to be used in case of
+Dual Stack services.
+
+Please note that `spec.LoadBalancerIP` is planned to be deprecated in [k8s apis](https://github.com/kubernetes/kubernetes/pull/107235).
+
 MetalLB also supports requesting a specific address pool, if you want
 a certain kind of address but don't care which one exactly. To request
 assignment from a specific pool, add the
@@ -148,6 +154,20 @@ best mode to use with BGP
 announcements. See
 [issue 1](https://github.com/metallb/metallb/issues/1) for more
 information.
+
+## IPv6 and dual stack services
+
+IPv6 and dual stack services are supported in L2 mode, and in BGP mode only
+via the experimental FRR mode.
+
+In order for MetalLB to allocate IPs to a dual stack service, there must be
+at least one address pool having both addresses of version v4 and v6.
+
+Note that in case of dual stack services, it is not possible to use
+`spec.loadBalancerIP` as it does not allow to request for multiple IPs.
+
+This problem will be solved by using a custom service annotation in one
+of the next releases.
 
 ## IP address sharing
 

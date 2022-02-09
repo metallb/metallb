@@ -14,6 +14,7 @@ import (
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
+	"go.universe.tf/metallb/internal/logging"
 
 	"github.com/go-kit/kit/log"
 	"github.com/google/go-cmp/cmp"
@@ -95,7 +96,7 @@ type fakeBGP struct {
 	sessionManager fakeBGPSessionManager
 }
 
-func (f *fakeBGP) NewSessionManager(_ bgpImplementation, _ log.Logger) bgp.SessionManager {
+func (f *fakeBGP) NewSessionManager(_ bgpImplementation, _ log.Logger, _ logging.Level) bgp.SessionManager {
 	f.sessionManager.t = f.t
 	f.sessionManager.gotAds = make(map[string][]*bgp.Advertisement)
 
