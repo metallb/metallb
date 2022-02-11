@@ -48,7 +48,7 @@ MetalLB requires the following to function:
 - Some IPv4 addresses for MetalLB to hand out.
 - When using the BGP operating mode, you will need one or more routers
   capable of speaking [BGP](https://en.wikipedia.org/wiki/Border_Gateway_Protocol).
-- Traffic on port 7946 (TCP & UDP) must be allowed between nodes, as required by
+- When using the L2 operating mode, traffic on port 7946 (TCP & UDP, other port can be configured) must be allowed between nodes, as required by
   [memberlist](https://github.com/hashicorp/memberlist).
 
 ## Usage

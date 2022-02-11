@@ -4,6 +4,7 @@ package frr
 
 import (
 	"flag"
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -13,7 +14,6 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/pkg/errors"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/logging"
@@ -31,15 +31,38 @@ func testOsHostname() (string, error) {
 }
 
 func testCompareFiles(t *testing.T, configFile, goldenFile string) {
-	cmd := exec.Command("diff", configFile, goldenFile)
-	output, err := cmd.Output()
+
+	var lastError error
+
+	// Try comparing files multiple times because tests can generate more than one configuration
+	err := wait.PollImmediate(10*time.Millisecond, 2*time.Second, func() (bool, error) {
+		lastError = nil
+		cmd := exec.Command("diff", configFile, goldenFile)
+		output, err := cmd.Output()
+
+		if err != nil {
+			lastError = fmt.Errorf("command %s returned error: %s\n%s", cmd.String(), err, output)
+			return false, nil
+		}
+
+		return true, nil
+	})
+
+	// err can only be a ErrWaitTimeout, as the check function always return nil errors.
+	// So lastError is always set
 	if err != nil {
-		t.Fatalf("command %s returned error: %s\n%s", cmd.String(), err, output)
+		t.Fatalf("failed to compare configfiles %s, %s using poll interval\nlast error: %v", configFile, goldenFile, lastError)
 	}
 }
 
 func testUpdateGoldenFile(t *testing.T, configFile, goldenFile string) {
 	t.Log("update golden file")
+
+	// Sleep to be sure the sessionManager has produced all configuration the test
+	// has triggered and no config is still waiting in the debouncer() local variables.
+	// No other conditions can be checked, so sleeping is our best option.
+	time.Sleep(100 * time.Millisecond)
+
 	cmd := exec.Command("cp", "-a", configFile, goldenFile)
 	output, err := cmd.Output()
 	if err != nil {
@@ -60,24 +83,13 @@ func testSetup(t *testing.T) {
 
 func testCheckConfigFile(t *testing.T) {
 	configFile, goldenFile := testGenerateFileNames(t)
-	err := wait.PollImmediate(10*time.Millisecond, 2*time.Second, func() (bool, error) {
-		_, err := os.Stat(configFile)
-		if errors.Is(err, os.ErrNotExist) {
-			return false, nil
-		}
-		if err != nil {
-			return false, err
-		}
-		return true, nil
-	})
 
-	if err != nil {
-		t.Fatalf("Failed to wait for configfile %s, err %v", configFile, err)
-	}
 	if *update {
 		testUpdateGoldenFile(t, configFile, goldenFile)
 	}
+
 	testCompareFiles(t, configFile, goldenFile)
+
 	if !strings.Contains(configFile, "Invalid") {
 		err := testFileIsValid(configFile)
 		if err != nil {
