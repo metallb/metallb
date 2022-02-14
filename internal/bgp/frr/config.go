@@ -337,8 +337,6 @@ func generateAndReloadConfigFile(config *frrConfig, l log.Logger) {
 		level.Error(l).Log("op", "reload", "error", err, "cause", "reload", "config", config)
 		return
 	}
-
-	level.Info(l).Log("op", "reload", "success", "reloaded config")
 }
 
 // debouncer takes a function that processes an frrConfig, a channel where
