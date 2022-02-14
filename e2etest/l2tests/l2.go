@@ -61,6 +61,11 @@ var _ = ginkgo.Describe("L2", func() {
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
 		loadBalancerCreateTimeout = e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
+
+		ginkgo.By("Clearing any previous configuration")
+
+		err := ConfigUpdater.Clean()
+		framework.ExpectNoError(err)
 	})
 
 	ginkgo.AfterEach(func() {
