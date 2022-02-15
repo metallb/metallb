@@ -116,7 +116,7 @@ Bug Fixes:
   included tools were not usable.
   ([Issue #618](https://github.com/metallb/metallb/issues/618))
 
-This release includes contributions from alphabet5, Andrea Panattoni, Brian_P, Carlos Goncalves, Federico Paolinelli, Graeme Lawes, HeroCC, Ian Roberts, Lior Noy, Marco Geri, Mark Gray, Mohamed S. Mahmoud, Ori Braunshtein, Pumba98, rata, Russell Bryant, Sabina Aledort, Shivamani Patil and Tyler Auerbeck. Thank you!
+This release includes contributions from alphabet5, Andrea Panattoni, Brian_P, Carlos Goncalves, Federico Paolinelli, Graeme Lawes, HeroCC, Ian Roberts, Lior Noy, Marco Geri, Mark Gray, Matthias Linhuber, Mohamed S. Mahmoud, Ori Braunshtein, Periyasamy Palanisamy, Pumba98, rata, Russell Bryant, Sabina Aledort, Shivamani Patil, Tyler Auerbeck, Viktor Oreshkin. Thank you!
 
 ## Version 0.10.3
 
