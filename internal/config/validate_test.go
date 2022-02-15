@@ -64,22 +64,6 @@ func TestValidate(t *testing.T) {
 			mustFail: true,
 		},
 		{
-			desc: "aggregation v6",
-			config: &configFile{
-				Pools: []addressPool{
-					{
-						Name: "foo",
-						BGPAdvertisements: []bgpAdvertisement{
-							{
-								AggregationLengthV6: intPtr(47),
-							},
-						},
-					},
-				},
-			},
-			mustFail: true,
-		},
-		{
 			desc: "should pass",
 			config: &configFile{
 				Peers: []peer{
@@ -242,8 +226,4 @@ func TestValidateFRR(t *testing.T) {
 			}
 		})
 	}
-}
-
-func intPtr(i int) *int {
-	return &i
 }
