@@ -25,11 +25,6 @@ func DiscardFRROnly(c *configFile) error {
 		return errors.New("bfd profiles section set")
 	}
 	for _, p := range c.Pools {
-		for _, a := range p.BGPAdvertisements {
-			if a.AggregationLengthV6 != nil {
-				return fmt.Errorf("pool %s has aggregation-lenght-v6 set on native bgp mode", p.Name)
-			}
-		}
 		if p.Protocol == BGP {
 			for _, cidr := range p.Addresses {
 				nets, err := ParseCIDR(cidr)
