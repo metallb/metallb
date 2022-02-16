@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	version   = "0.12.0"
+	version   = "0.12.1"
 	gitCommit string // Provided by ldflags during build
 	gitBranch string // Provided by ldflags during build
 )
