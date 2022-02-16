@@ -3,6 +3,13 @@ title: Release Notes
 weight: 8
 ---
 
+## Version 0.12.1
+
+Bug Fixes:
+
+- (helm chart) FRR mode disabled by default as the FRR mode is still experimental (can be optionally enabled).
+  ([PR #1222](https://github.com/metallb/metallb/pull/1222))
+
 ## Version 0.12.0
 
 New Features:
