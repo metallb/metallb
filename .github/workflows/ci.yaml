@@ -13,6 +13,11 @@ jobs:
   unit-tests:
     runs-on: ubuntu-20.04
     steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.9.1
+        with:
+          access_token: ${{ github.token }}
+
       - name: Checkout
         uses: actions/checkout@v2
         with:
@@ -83,6 +88,11 @@ jobs:
         bgp-type: [native, frr]
         deployment: [manifests, helm]
     steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.9.1
+        with:
+          access_token: ${{ github.token }}
+
       - name: Checkout
         uses: actions/checkout@v2
         with:
@@ -141,6 +151,11 @@ jobs:
     strategy:
       fail-fast: false
     steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.9.1
+        with:
+          access_token: ${{ github.token }}
+
       - name: Checkout Metal LB Operator
         uses: actions/checkout@v2
         with:
