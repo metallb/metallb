@@ -28,7 +28,7 @@ which will give us warm fuzzy feelings :).
 # Reporting security issues
 
 You can report security issues in the github issue tracker. If you
-prefer private disclosure, please email to one of the maintainers:
+prefer private disclosure, please email to all of the maintainers:
 
 - fpaoline@redhat.com
 - rbryant@redhat.com
