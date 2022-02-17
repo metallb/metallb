@@ -62,6 +62,8 @@ func New() *Allocator {
 	}
 }
 
+var ErrCannotShareKey = errors.New("services can't share key")
+
 // SetPools updates the set of address pools that the allocator owns.
 func (a *Allocator) SetPools(pools map[string]*config.Pool) error {
 	// All the fancy sharing stuff only influences how new allocations
@@ -417,7 +419,7 @@ func (a *Allocator) checkSharing(svc string, ip string, ports []Port, sk *key) e
 				}
 			}
 			if len(otherSvcs) > 0 {
-				return fmt.Errorf("can't change sharing key for %q, address also in use by %s", svc, strings.Join(otherSvcs, ","))
+				return fmt.Errorf("can't change sharing key for %q, address also in use by %s: %w", svc, strings.Join(otherSvcs, ","), ErrCannotShareKey)
 			}
 		}
 
