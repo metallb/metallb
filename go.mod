@@ -10,12 +10,11 @@ require (
 	github.com/go-kit/kit v0.9.0
 	github.com/go-kit/log v0.2.0
 	github.com/golang/protobuf v1.5.2
-	github.com/google/go-cmp v0.5.5
+	github.com/google/go-cmp v0.5.7
 	github.com/hashicorp/memberlist v0.1.7
-	github.com/mdlayher/arp v0.0.0-20191213142603-f72070a231fc
-	github.com/mdlayher/ethernet v0.0.0-20190606142754-0394541c37b7
+	github.com/mdlayher/arp v0.0.0-20220221190821-c37aaafac7f9
+	github.com/mdlayher/ethernet v0.0.0-20220221185849-529eae5b6118
 	github.com/mdlayher/ndp v0.0.0-20200602162440-17ab9e3e5567
-	github.com/mdlayher/raw v0.0.0-20191009151244-50f2db8cc065 // indirect
 	github.com/metallb/metallb-operator v0.0.0-20211223114020-a8fc2e0875fc
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/onsi/ginkgo v1.14.1
@@ -29,7 +28,7 @@ require (
 	github.com/prometheus/exporter-toolkit v0.6.1
 	github.com/spf13/viper v1.8.1 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1
+	golang.org/x/sys v0.0.0-20220209214540-3681064d5158
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.20.4
 	k8s.io/apimachinery v0.20.4
