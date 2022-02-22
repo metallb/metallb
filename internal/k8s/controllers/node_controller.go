@@ -51,7 +51,7 @@ func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	res := r.Handler(r.Logger, &n)
 	switch res {
 	case SyncStateError:
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, retryError
 	case SyncStateReprocessAll:
 		level.Error(r.Logger).Log("controller", "NodeReconciler", "error", "unexpected result reprocess all")
 		return ctrl.Result{}, nil

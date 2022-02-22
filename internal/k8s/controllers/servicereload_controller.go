@@ -18,7 +18,6 @@ package controllers
 
 import (
 	"context"
-	"errors"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-kit/kit/log"
@@ -106,7 +105,7 @@ func (r *ServiceReloadReconciler) reprocessAllServices(ctx context.Context) (ctr
 		// in case we want to retry, we return an error to trigger the exponential backoff mechanism so that
 		// this controller won't loop at full speed
 		level.Info(r.Log).Log("controller", "ConfigReconciler", "event", "force service reload")
-		return ctrl.Result{}, errors.New("retry error")
+		return ctrl.Result{}, retryError
 	}
 	return ctrl.Result{}, nil
 }
