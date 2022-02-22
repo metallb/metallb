@@ -13,7 +13,8 @@ import (
 
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/k8s"
+	"go.universe.tf/metallb/internal/k8s/controllers"
+	"go.universe.tf/metallb/internal/k8s/epslices"
 	"go.universe.tf/metallb/internal/logging"
 
 	"github.com/go-kit/kit/log"
@@ -228,11 +229,11 @@ func TestBGPSpeaker(t *testing.T) {
 		balancer string
 		config   *config.Config
 		svc      *v1.Service
-		eps      k8s.EpsOrSlices
+		eps      epslices.EpsOrSlices
 
 		wantAds        map[string][]*bgp.Advertisement
-		expectedCfgRet k8s.SyncState
-		expectedLBRet  k8s.SyncState
+		expectedCfgRet controllers.SyncState
+		expectedLBRet  controllers.SyncState
 	}{
 		{
 			desc:     "Service ignored, no config",
@@ -244,7 +245,7 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
@@ -257,11 +258,11 @@ func TestBGPSpeaker(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds:        map[string][]*bgp.Advertisement{},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -288,7 +289,7 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
 		},
 
 		{
@@ -300,7 +301,7 @@ func TestBGPSpeaker(t *testing.T) {
 					ExternalTrafficPolicy: "Cluster",
 				},
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
@@ -313,13 +314,13 @@ func TestBGPSpeaker(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -332,7 +333,7 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
@@ -345,7 +346,7 @@ func TestBGPSpeaker(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -354,8 +355,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -368,7 +369,7 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
@@ -381,13 +382,13 @@ func TestBGPSpeaker(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -400,7 +401,7 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
@@ -417,7 +418,7 @@ func TestBGPSpeaker(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -426,8 +427,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -440,7 +441,7 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
@@ -471,13 +472,13 @@ func TestBGPSpeaker(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -490,12 +491,12 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{},
+			eps: epslices.EpsOrSlices{},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -508,7 +509,7 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
@@ -521,13 +522,13 @@ func TestBGPSpeaker(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -540,7 +541,7 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
@@ -559,7 +560,7 @@ func TestBGPSpeaker(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -568,8 +569,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -607,7 +608,7 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
@@ -620,7 +621,7 @@ func TestBGPSpeaker(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -635,8 +636,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -672,7 +673,7 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
@@ -685,7 +686,7 @@ func TestBGPSpeaker(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -699,8 +700,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -712,7 +713,7 @@ func TestBGPSpeaker(t *testing.T) {
 					ExternalTrafficPolicy: "Cluster",
 				},
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
@@ -725,7 +726,7 @@ func TestBGPSpeaker(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -739,8 +740,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -753,7 +754,7 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.5"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
@@ -766,7 +767,7 @@ func TestBGPSpeaker(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -786,8 +787,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -800,7 +801,7 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
@@ -813,7 +814,7 @@ func TestBGPSpeaker(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -835,8 +836,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -854,8 +855,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -887,7 +888,7 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
@@ -900,7 +901,7 @@ func TestBGPSpeaker(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.5:0": {
@@ -909,8 +910,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -919,7 +920,7 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.5:0": nil,
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
 		},
 	}
 
@@ -966,7 +967,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 		balancer string
 		config   *config.Config
 		svc      *v1.Service
-		eps      k8s.EpsOrSlices
+		eps      epslices.EpsOrSlices
 
 		wantAds map[string][]*bgp.Advertisement
 	}{
@@ -980,8 +981,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -998,7 +999,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{},
 		},
@@ -1036,8 +1037,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 					ExternalTrafficPolicy: "Cluster",
 				},
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1054,7 +1055,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -1071,8 +1072,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1089,7 +1090,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -1110,8 +1111,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1128,7 +1129,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -1145,8 +1146,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1178,7 +1179,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -1199,8 +1200,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1262,7 +1263,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -1279,7 +1280,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{},
+			eps: epslices.EpsOrSlices{},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
@@ -1295,8 +1296,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1313,7 +1314,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -1330,8 +1331,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1359,7 +1360,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -1405,8 +1406,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1423,7 +1424,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -1473,8 +1474,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1491,7 +1492,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -1516,8 +1517,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 					ExternalTrafficPolicy: "Cluster",
 				},
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1534,7 +1535,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -1560,8 +1561,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.5"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1578,7 +1579,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -1610,8 +1611,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1628,7 +1629,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -1698,8 +1699,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1716,7 +1717,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.5:0": {
@@ -1739,12 +1740,12 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 	l := log.NewNopLogger()
 	for _, test := range tests {
 		if test.config != nil {
-			if c.SetConfig(l, test.config) == k8s.SyncStateError {
+			if c.SetConfig(l, test.config) == controllers.SyncStateError {
 				t.Errorf("%q: SetConfig failed", test.desc)
 			}
 		}
 		if test.balancer != "" {
-			if c.SetBalancer(l, test.balancer, test.svc, test.eps) == k8s.SyncStateError {
+			if c.SetBalancer(l, test.balancer, test.svc, test.eps) == controllers.SyncStateError {
 				t.Errorf("%q: SetBalancer failed", test.desc)
 			}
 		}
@@ -1944,13 +1945,13 @@ func TestNodeSelectors(t *testing.T) {
 	l := log.NewNopLogger()
 	for _, test := range tests {
 		if test.config != nil {
-			if c.SetConfig(l, test.config) == k8s.SyncStateError {
+			if c.SetConfig(l, test.config) == controllers.SyncStateError {
 				t.Errorf("%q: SetConfig failed", test.desc)
 			}
 		}
 
 		if test.node != nil {
-			if c.SetNode(l, test.node) == k8s.SyncStateError {
+			if c.SetNode(l, test.node) == controllers.SyncStateError {
 				t.Errorf("%q: SetNode failed", test.desc)
 			}
 		}
