@@ -8,7 +8,10 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"go.universe.tf/metallb/api/v1beta1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/utils/pointer"
 )
 
 func selector(s string) labels.Selector {
@@ -30,12 +33,12 @@ func ipnet(s string) *net.IPNet {
 func TestParse(t *testing.T) {
 	tests := []struct {
 		desc string
-		raw  string
+		crs  ClusterResources
 		want *Config
 	}{
 		{
 			desc: "empty config",
-			raw:  "",
+			crs:  ClusterResources{},
 			want: &Config{
 				Pools:       map[string]*Pool{},
 				BFDProfiles: map[string]*BFDProfile{},
@@ -43,63 +46,111 @@ func TestParse(t *testing.T) {
 		},
 
 		{
-			desc: "invalid yaml",
-			raw:  "foo:<>$@$2r24j90",
-		},
-
-		{
+			// TODO CRD Add communities
+			//			bgp-communities:
+			//  bar: 64512:1234
 			desc: "config using all features",
-			raw: `
-peers:
-- my-asn: 42
-  peer-asn: 142
-  peer-address: 1.2.3.4
-  peer-port: 1179
-  hold-time: 180s
-  router-id: 10.20.30.40
-  source-address: 10.20.30.40
-  ebgp-multihop: true
-- my-asn: 100
-  peer-asn: 200
-  peer-address: 2.3.4.5
-  ebgp-multihop: false
-  node-selectors:
-  - match-labels:
-      foo: bar
-    match-expressions:
-      - {key: bar, operator: In, values: [quux]}
-bgp-communities:
-  bar: 64512:1234
-address-pools:
-- name: pool1
-  protocol: bgp
-  addresses:
-  - 10.20.0.0/16
-  - 10.50.0.0/24
-  avoid-buggy-ips: true
-  auto-assign: false
-  bgp-advertisements:
-  - aggregation-length: 32
-    localpref: 100
-    communities: ["bar", "1234:2345"]
-  - aggregation-length: 24
-    aggregation-length-v6: 64
-- name: pool2
-  protocol: bgp
-  addresses:
-  - 30.0.0.0/8
-- name: pool3
-  protocol: layer2
-  addresses:
-  - 40.0.0.0/25
-  - 40.0.0.150-40.0.0.200
-  - 40.0.0.210 - 40.0.0.240
-  - 40.0.0.250 - 40.0.0.250
-- name: pool4
-  protocol: layer2
-  addresses:
-  - 2001:db8::/64
-`,
+			crs: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
+					{
+						Spec: v1beta1.BGPPeerSpec{
+							MyASN:        42,
+							ASN:          142,
+							Address:      "1.2.3.4",
+							Port:         1179,
+							HoldTime:     v1.Duration{Duration: 180 * time.Second},
+							RouterID:     "10.20.30.40",
+							SrcAddress:   "10.20.30.40",
+							EBGPMultiHop: true,
+						},
+					},
+					{
+						Spec: v1beta1.BGPPeerSpec{
+							MyASN:        100,
+							ASN:          200,
+							Address:      "2.3.4.5",
+							EBGPMultiHop: false,
+							NodeSelectors: []v1beta1.NodeSelector{
+								{
+									MatchLabels: map[string]string{
+										"foo": "bar",
+									},
+									MatchExpressions: []v1beta1.MatchExpression{
+										{
+											Key:      "bar",
+											Operator: "In",
+											Values:   []string{"quux"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								"10.20.0.0/16",
+								"10.50.0.0/24",
+							},
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
+							BGPAdvertisements: []v1beta1.BgpAdvertisement{
+								{
+									AggregationLength: pointer.Int32Ptr(32),
+									LocalPref:         uint32(100),
+									Communities:       []string{ /* TODO CRD Add communities"bar", */ "1234:2345"},
+								},
+								{
+									AggregationLength:   pointer.Int32Ptr(24),
+									AggregationLengthV6: pointer.Int32Ptr(64),
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool2",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								"30.0.0.0/8",
+							},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool3",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "layer2",
+							Addresses: []string{
+								"40.0.0.0/25",
+								"40.0.0.150-40.0.0.200",
+								"40.0.0.210 - 40.0.0.240",
+								"40.0.0.250 - 40.0.0.250",
+							},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool4",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "layer2",
+							Addresses: []string{
+								"2001:db8::/64",
+							},
+						},
+					},
+				},
+			},
 			want: &Config{
 				Peers: []*Peer{
 					{
@@ -137,7 +188,7 @@ address-pools:
 								AggregationLengthV6: 128,
 								LocalPref:           100,
 								Communities: map[uint32]bool{
-									0xfc0004d2: true,
+									//0xfc0004d2: true,
 									0x04D20929: true,
 								},
 							},
@@ -190,12 +241,17 @@ address-pools:
 
 		{
 			desc: "peer-only",
-			raw: `
-peers:
-- my-asn: 42
-  peer-asn: 42
-  peer-address: 1.2.3.4
-`,
+			crs: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
+					{
+						Spec: v1beta1.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "1.2.3.4",
+						},
+					},
+				},
+			},
 			want: &Config{
 				Peers: []*Peer{
 					{
@@ -216,83 +272,103 @@ peers:
 
 		{
 			desc: "invalid peer-address",
-			raw: `
-peers:
-- my-asn: 42
-  peer-asn: 42
-  peer-address: 1.2.3.400
-`,
+			crs: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
+					{
+						Spec: v1beta1.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "1.2.3.400",
+						},
+					},
+				},
+			},
 		},
 
 		{
 			desc: "invalid my-asn",
-			raw: `
-peers:
-- peer-asn: 42
-  peer-address: 1.2.3.4
-`,
+			crs: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
+					{
+						Spec: v1beta1.BGPPeerSpec{
+							ASN:     42,
+							Address: "1.2.3.4",
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "invalid peer-asn",
-			raw: `
-peers:
-- my-asn: 42
-  peer-address: 1.2.3.4
-`,
+			crs: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
+					{
+						Spec: v1beta1.BGPPeerSpec{
+							MyASN:   42,
+							Address: "1.2.3.4",
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "invalid ebgp-multihop",
-			raw: `
-peers:
-- my-asn: 42
-  peer-asn: 42
-  peer-address: 1.2.3.4
-  ebgp-multihop: true
-`,
+			crs: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
+					{
+						Spec: v1beta1.BGPPeerSpec{
+							MyASN:        42,
+							ASN:          42,
+							Address:      "1.2.3.4",
+							EBGPMultiHop: true,
+						},
+					},
+				},
+			},
 		},
-
-		{
-			desc: "invalid hold time (wrong format)",
-			raw: `
-peers:
-- my-asn: 42
-  peer-asn: 42
-  peer-address: 1.2.3.4
-  hold-time: foo
-`,
-		},
-
 		{
 			desc: "invalid hold time (too short)",
-			raw: `
-peers:
-- my-asn: 42
-  peer-asn: 42
-  peer-address: 1.2.3.4
-  hold-time: 1s
-`,
+			crs: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
+					{
+						Spec: v1beta1.BGPPeerSpec{
+							MyASN:    42,
+							ASN:      42,
+							Address:  "1.2.3.4",
+							HoldTime: v1.Duration{Duration: time.Second},
+						},
+					},
+				},
+			},
 		},
 		{
-			desc: "invalid router ID",
-			raw: `
-peers:
-- my-asn: 42
-  peer-asn: 42
-  peer-address: 1.2.3.4
-  router-id: oh god how do I BGP
-`,
+			desc: "invalid RouterID",
+			crs: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
+					{
+						Spec: v1beta1.BGPPeerSpec{
+							MyASN:    42,
+							ASN:      42,
+							Address:  "1.2.3.4",
+							RouterID: "oh god how do I BGP",
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "empty node selector (select everything)",
-			raw: `
-peers:
-- my-asn: 42
-  peer-asn: 42
-  peer-address: 1.2.3.4
-`,
+			crs: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
+					{
+						Spec: v1beta1.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "1.2.3.4",
+						},
+					},
+				},
+			},
 			want: &Config{
 				Peers: []*Peer{
 					{
@@ -309,165 +385,208 @@ peers:
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
-
-		{
-			desc: "invalid label node selector shape",
-			raw: `
-peers:
-- my-asn: 42
-  peer-asn: 42
-  peer-address: 1.2.3.4
-  node-selectors:
-  - match-labels:
-      foo:
-        bar: baz
-`,
-		},
-
 		{
 			desc: "invalid expression node selector (missing key)",
-			raw: `
-peers:
-- my-asn: 42
-  peer-asn: 42
-  peer-address: 1.2.3.4
-  node-selectors:
-  - match-expressions:
-    - operator: In
-      values: [foo, bar]
-`,
+			crs: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
+					{
+						Spec: v1beta1.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "1.2.3.4",
+							NodeSelectors: []v1beta1.NodeSelector{
+								{
+									MatchExpressions: []v1beta1.MatchExpression{
+										{
+											Operator: "In",
+											Values:   []string{"foo", "bar"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "invalid expression node selector (missing operator)",
-			raw: `
-peers:
-- my-asn: 42
-  peer-asn: 42
-  peer-address: 1.2.3.4
-  node-selectors:
-  - match-expressions:
-    - key: foo
-      values: [foo, bar]
-`,
+			crs: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
+					{
+						Spec: v1beta1.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "1.2.3.4",
+							NodeSelectors: []v1beta1.NodeSelector{
+								{
+									MatchExpressions: []v1beta1.MatchExpression{
+										{
+											Key:    "foo",
+											Values: []string{"foo", "bar"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "invalid expression node selector (invalid operator)",
-			raw: `
-peers:
-- my-asn: 42
-  peer-asn: 42
-  peer-address: 1.2.3.4
-  node-selectors:
-  - match-expressions:
-    - key: foo
-      operator: Surrounds
-      values: [foo, bar]
-`,
+			crs: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
+					{
+						Spec: v1beta1.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "1.2.3.4",
+							NodeSelectors: []v1beta1.NodeSelector{
+								{
+									MatchExpressions: []v1beta1.MatchExpression{
+										{
+											Key:      "foo",
+											Operator: "surrounds",
+											Values:   []string{"foo", "bar"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
-
-		{
-			desc: "invalid router ID",
-			raw: `
-peers:
-- my-asn: 42
-  peer-asn: 42
-  peer-address: 1.2.3.4
-  router-id: oh god how do I BGP
-`,
-		},
-
 		{
 			desc: "duplicate peers",
-			raw: `
-peers:
-- my-asn: 42
-  peer-asn: 42
-  peer-address: 1.2.3.4
-- my-asn: 42
-  peer-asn: 42
-  peer-address: 1.2.3.4
-`,
+			crs: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
+					{
+						Spec: v1beta1.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "1.2.3.4",
+						},
+					},
+					{
+						Spec: v1beta1.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "1.2.3.4",
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "no pool name",
-			raw: `
-address-pools:
--
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{},
+				},
+			},
 		},
-
 		{
-			desc: "address pool with no addresses",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: bgp
-`,
+			desc: "address pool with no address",
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "address pool with no protocol",
-			raw: `
-address-pools:
-- name: pool1
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "address pool with unknown protocol",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: babel
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "babel",
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "invalid pool CIDR",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: bgp
-  addresses:
-  - 100.200.300.400/24
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								"100.200.300.400/24",
+							},
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "invalid pool CIDR prefix length",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: bgp
-  addresses:
-  - 1.2.3.0/33
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								"1.2.3.0/33",
+							},
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "invalid pool CIDR, first address of the range is after the second",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: bgp
-  addresses:
-  - 1.2.3.10-1.2.3.1
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								"1.2.3.10-1.2.3.1",
+							},
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "simple advertisement",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: bgp
-  addresses: ["1.2.3.0/24"]
-  bgp-advertisements:
-  -
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								"1.2.3.0/24",
+							},
+							BGPAdvertisements: []v1beta1.BgpAdvertisement{{}},
+						},
+					},
+				},
+			},
 			want: &Config{
 				Pools: map[string]*Pool{
 					"pool1": {
@@ -486,15 +605,21 @@ address-pools:
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
-
 		{
 			desc: "advertisement with default BGP settings",
-			raw: `
-address-pools:
-- name: pool1
-  addresses: ["1.2.3.0/24"]
-  protocol: bgp
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								"1.2.3.0/24",
+							},
+						},
+					},
+				},
+			},
 			want: &Config{
 				Pools: map[string]*Pool{
 					"pool1": {
@@ -513,43 +638,66 @@ address-pools:
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
-
 		{
 			desc: "bad aggregation length (too long)",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: bgp
-  bgp-advertisements:
-  - aggregation-length: 33
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								"1.2.3.10-1.2.3.1",
+							},
+							BGPAdvertisements: []v1beta1.BgpAdvertisement{
+								{
+									AggregationLength: pointer.Int32Ptr(26),
+								}},
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "bad aggregation length (incompatible with CIDR)",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: bgp
-  addresses:
-  - 10.20.30.40/24
-  - 1.2.3.0/28
-  bgp-advertisements:
-  - aggregation-length: 26
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								"10.20.30.40/24",
+								"1.2.3.0/28",
+							},
+							BGPAdvertisements: []v1beta1.BgpAdvertisement{
+								{
+									AggregationLength: pointer.Int32Ptr(26),
+								}},
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "aggregation length by range",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: bgp
-  addresses:
-  - 3.3.3.2-3.3.3.254
-  bgp-advertisements:
-  - aggregation-length: 26
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								"3.3.3.2-3.3.3.254",
+							},
+							BGPAdvertisements: []v1beta1.BgpAdvertisement{
+								{
+									AggregationLength: pointer.Int32Ptr(26),
+								}},
+						},
+					},
+				},
+			},
 			want: &Config{
 				Pools: map[string]*Pool{
 					"pool1": {
@@ -582,160 +730,238 @@ address-pools:
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
-
 		{
 			desc: "aggregation length by range, too wide",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: bgp
-  addresses:
-  - 3.3.3.2-3.3.3.254
-  bgp-advertisements:
-  - aggregation-length: 24
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								"3.3.3.2-3.3.3.254",
+							},
+							BGPAdvertisements: []v1beta1.BgpAdvertisement{
+								{
+									AggregationLength: pointer.Int32Ptr(24),
+								}},
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "bad community literal (wrong format)",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: bgp
-  bgp-advertisements:
-  - communities: ["1234"]
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							BGPAdvertisements: []v1beta1.BgpAdvertisement{
+								{
+									Communities: []string{
+										"1234",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "bad community literal (asn part doesn't fit)",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: bgp
-  bgp-advertisements:
-  - communities: ["99999999:1"]
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							BGPAdvertisements: []v1beta1.BgpAdvertisement{
+								{
+									Communities: []string{
+										"99999999:1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "bad community literal (community# part doesn't fit)",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: bgp
-  bgp-advertisements:
-  - communities: ["1:99999999"]
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							BGPAdvertisements: []v1beta1.BgpAdvertisement{
+								{
+									Communities: []string{
+										"1:99999999",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
-
 		{
-			desc: "bad community ref (unknown ref)",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: bgp
-  bgp-advertisements:
-  - communities: ["flarb"]
-`,
+			desc: "bad community literal (community# part doesn't fit)",
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							BGPAdvertisements: []v1beta1.BgpAdvertisement{
+								{
+									Communities: []string{
+										"1:99999999",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
-
-		{
-			desc: "bad community ref (ref asn doesn't fit)",
-			raw: `
-bgp-communities:
-  flarb: 99999999:1
-address-pools:
-- name: pool1
-  protocol: bgp
-  bgp-advertisements:
-  - communities: ["flarb"]
-`,
-		},
-
-		{
-			desc: "bad community ref (ref community# doesn't fit)",
-			raw: `
-bgp-communities:
-  flarb: 1:99999999
-address-pools:
-- name: pool1
-  protocol: bgp
-  bgp-advertisements:
-  - communities: ["flarb"]
-`,
-		},
-
 		{
 			desc: "duplicate pool definition",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: bgp
-- name: pool1
-  protocol: bgp
-- name: pool2
-  protocol: bgp
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool2"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "duplicate CIDRs",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: bgp
-  addresses:
-  - 10.0.0.0/8
-- name: pool2
-  protocol: bgp
-  addresses:
-  - 10.0.0.0/8
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								" 10.0.0.0/8",
+							},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool2"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								" 10.0.0.0/8",
+							},
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "overlapping CIDRs",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: bgp
-  addresses:
-  - 10.0.0.0/8
-- name: pool2
-  protocol: bgp
-  addresses:
-  - 10.0.0.0/16
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								" 10.0.0.0/8",
+							},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool2"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								"10.0.0.0/16",
+							},
+						},
+					},
+				},
+			},
 		},
-
 		{
 			desc: "BGP advertisements in layer2 pool",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: layer2
-  addresses:
-  - 10.0.0.0/16
-  bgp-advertisements:
-  - communities: ["flarb"]
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "layer2",
+							Addresses: []string{
+								"10.0.0.0/16",
+							},
+							BGPAdvertisements: []v1beta1.BgpAdvertisement{
+								{
+									Communities: []string{
+										"flarb",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			desc: "Session with default BFD Profile",
-			raw: `
-address-pools:
-- name: pool1
-  addresses: ["1.2.3.0/24"]
-  protocol: bgp
-bfd-profiles:
-- name: default
-peers:
-- my-asn: 42
-  peer-asn: 42
-  peer-address: 1.2.3.4
-  bfd-profile: default
-`,
+			crs: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
+					{
+						Spec: v1beta1.BGPPeerSpec{
+							MyASN:      42,
+							ASN:        42,
+							Address:    "1.2.3.4",
+							BFDProfile: "default",
+						},
+					},
+				},
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								"1.2.3.0/24",
+							},
+						},
+					},
+				},
+				BFDProfiles: []v1beta1.BFDProfile{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "default",
+						},
+					},
+				},
+			},
 			want: &Config{
 				Peers: []*Peer{
 					{
@@ -772,50 +998,100 @@ peers:
 		},
 		{
 			desc: "Peer with non existing BFD Profile",
-			raw: `
-address-pools:
-- name: pool1
-  addresses: ["1.2.3.0/24"]
-  protocol: bgp
-bfd-profiles:
-- name: default
-peers:
-- my-asn: 42
-  peer-asn: 42
-  peer-address: 1.2.3.4
-  bfd-profile: zzz
-`,
+			crs: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
+					{
+						Spec: v1beta1.BGPPeerSpec{
+							MyASN:      42,
+							ASN:        42,
+							Address:    "1.2.3.4",
+							BFDProfile: "default",
+						},
+					},
+				},
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								"1.2.3.0/24",
+							},
+						},
+					},
+				},
+			},
 		},
 		{
 			desc: "Multiple BFD Profiles with the same name",
-			raw: `
-address-pools:
-- name: pool1
-  addresses: ["1.2.3.0/24"]
-  protocol: bgp
-bfd-profiles:
-- name: default
-- name: foo
-- name: foo
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								"1.2.3.0/24",
+							},
+						},
+					},
+				},
+				BFDProfiles: []v1beta1.BFDProfile{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "default",
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "foo",
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "foo",
+						},
+					},
+				},
+			},
 		},
 		{
 			desc: "Session with nondefault BFD Profile",
-			raw: `
-address-pools:
-- name: pool1
-  addresses: ["1.2.3.0/24"]
-  protocol: bgp
-bfd-profiles:
-- name: nondefault
-  receive-interval: 50
-  transmit-interval: 51
-  detect-multiplier: 52
-  echo-interval: 54
-  echo-mode: true
-  passive-mode: true
-  minimum-ttl: 55
-`,
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								"1.2.3.0/24",
+							},
+						},
+					},
+				},
+				BFDProfiles: []v1beta1.BFDProfile{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "nondefault",
+						},
+						Spec: v1beta1.BFDProfileSpec{
+							ReceiveInterval:  uint32Ptr(50),
+							TransmitInterval: uint32Ptr(51),
+							DetectMultiplier: uint32Ptr(52),
+							EchoInterval:     uint32Ptr(54),
+							EchoMode:         pointer.BoolPtr(true),
+							PassiveMode:      pointer.BoolPtr(true),
+							MinimumTTL:       uint32Ptr(55),
+						},
+					},
+				},
+			},
 			want: &Config{
 				Pools: map[string]*Pool{
 					"pool1": {
@@ -847,52 +1123,66 @@ bfd-profiles:
 		},
 		{
 			desc: "BFD Profile with too low receive interval",
-			raw: `
-bfd-profiles:
-- name: default
-  receive-interval: 2
-`,
+			crs: ClusterResources{
+
+				BFDProfiles: []v1beta1.BFDProfile{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "default",
+						},
+						Spec: v1beta1.BFDProfileSpec{
+							ReceiveInterval: uint32Ptr(2),
+						},
+					},
+				},
+			},
 		},
 		{
-			desc: "BFD Profile with too high range receive interval",
-			raw: `
-bfd-profiles:
-- name: default
-  receive-interval: 90000
-`,
+			desc: "BFD Profile with too high receive interval",
+			crs: ClusterResources{
+
+				BFDProfiles: []v1beta1.BFDProfile{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "default",
+						},
+						Spec: v1beta1.BFDProfileSpec{
+							ReceiveInterval: uint32Ptr(90000),
+						},
+					},
+				},
+			},
 		},
-		{
-			desc: "Duplicate bgp advertisment definition",
-			raw: `
-address-pools:
-- name: pool1
-  protocol: bgp
-  addresses:
-  - 10.20.0.0/16
-  bgp-advertisements:
-  - aggregation-length: 26
-  - aggregation-length: 26
-`,
-		},
+		/* TODO Add communities CRD
 		{
 			desc: "Duplicate communities definition",
-			raw: `
-bgp-communities:
-  bar: 64512:1234
-address-pools:
-- name: pool1
-  protocol: bgp
-  addresses:
-  - 10.20.0.0/16
-  bgp-advertisements:
-  - communities: ["bar", "bar"]
-`,
-		},
+			crs: ClusterResources{
+				Pools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol: "bgp",
+							Addresses: []string{
+								"10.20.0.0/16",
+							},
+							BGPAdvertisements: []v1beta1.BgpAdvertisement{
+								{
+									AggregationLength: pointer.Int32Ptr(26),
+								},
+								{
+									AggregationLength: pointer.Int32Ptr(26),
+								},
+							},
+						},
+					},
+				},
+			},
+		},*/
 	}
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			got, err := Parse([]byte(test.raw), DontValidate)
+			got, err := For(test.crs, DontValidate)
 			if err != nil && test.want != nil {
 				t.Errorf("%q: parse failed: %s", test.desc, err)
 				return
