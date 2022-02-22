@@ -10,3 +10,4 @@ linters-settings:
     capital: true
     exclude:
     - 'SPDX-License-Identifier.*'
+    - '\+groupName.*'
