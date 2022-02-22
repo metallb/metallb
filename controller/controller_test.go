@@ -720,6 +720,21 @@ func TestControllerMutation(t *testing.T) {
 				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
 			},
 		},
+		{
+			desc: "request dual-stack loadbalancer IPs via custom annotation in a single stack cluster",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationLoadBalancerIPs: "1.2.3.0,1000::",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIP: "1.2.3.4",
+					Type:      "LoadBalancer",
+				},
+			},
+			wantErr: true,
+		},
 	}
 
 	for i := 0; i < 100; i++ {

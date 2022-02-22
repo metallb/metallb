@@ -5,6 +5,8 @@ package ipfamily // import "go.universe.tf/metallb/internal/ipfamily"
 import (
 	"fmt"
 	"net"
+
+	v1 "k8s.io/api/core/v1"
 )
 
 // IP family helps identifying single stack IPv4/IPv6 vs Dual-stack ["IPv4", "IPv6"] or ["IPv6", "Ipv4"].
@@ -70,4 +72,14 @@ func ForAddress(ip net.IP) Family {
 		return IPv6
 	}
 	return IPv4
+}
+
+// ForService returns the address family of a given service.
+func ForService(svc *v1.Service) (Family, error) {
+	if len(svc.Spec.ClusterIPs) > 0 {
+		return ForAddresses(svc.Spec.ClusterIPs)
+	}
+	// fallback to clusterip if clusterips are not set
+	addresses := []string{svc.Spec.ClusterIP}
+	return ForAddresses(addresses)
 }
