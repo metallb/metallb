@@ -7,14 +7,10 @@ import (
 	"time"
 
 	operatorv1beta1 "github.com/metallb/metallb-operator/api/v1beta1"
-	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
-	v1 "k8s.io/api/core/v1"
 	apierr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -24,51 +20,12 @@ type Updater interface {
 	Clean() error
 }
 
-type configmapUpdater struct {
-	clientset.Interface
-	name      string
-	namespace string
-}
-
-func UpdaterForConfigMap(c clientset.Interface, cmName string, ns string) *configmapUpdater {
-	return &configmapUpdater{
-		Interface: c,
-		name:      cmName,
-		namespace: ns,
-	}
-}
-
-func (c configmapUpdater) Update(f File) error {
-	resData, err := yaml.Marshal(f)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to marshal MetalLB ConfigMap data")
-	}
-
-	_, err = c.CoreV1().ConfigMaps(c.namespace).Update(context.TODO(), &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.name,
-			Namespace: c.namespace,
-		},
-		Data: map[string]string{"config": string(resData)},
-	}, metav1.UpdateOptions{})
-
-	if err != nil {
-		return errors.Wrapf(err, "Failed to update MetalLB ConfigMap")
-	}
-
-	return nil
-}
-
-func (c configmapUpdater) Clean() error {
-	return c.Update(File{})
-}
-
-type operatorUpdater struct {
+type beta1Updater struct {
 	client.Client
 	namespace string
 }
 
-func UpdaterForOperator(r *rest.Config, ns string) (*operatorUpdater, error) {
+func UpdaterForCRs(r *rest.Config, ns string) (*beta1Updater, error) {
 	myScheme := runtime.NewScheme()
 
 	if err := operatorv1beta1.AddToScheme(myScheme); err != nil {
@@ -83,13 +40,13 @@ func UpdaterForOperator(r *rest.Config, ns string) (*operatorUpdater, error) {
 		return nil, err
 	}
 
-	return &operatorUpdater{
+	return &beta1Updater{
 		Client:    cl,
 		namespace: ns,
 	}, nil
 }
 
-func (o operatorUpdater) Update(f File) error {
+func (o beta1Updater) Update(f File) error {
 	for _, a := range f.Pools {
 		err := o.createPool(a)
 		if err != nil {
@@ -125,7 +82,7 @@ func (o operatorUpdater) Update(f File) error {
 	return nil
 }
 
-func (o operatorUpdater) Clean() error {
+func (o beta1Updater) Clean() error {
 	err := o.DeleteAllOf(context.Background(), &operatorv1beta1.AddressPool{}, client.InNamespace(o.namespace))
 	if err != nil {
 		return err
@@ -144,8 +101,8 @@ func (o operatorUpdater) Clean() error {
 	return nil
 }
 
-func (o operatorUpdater) createPool(a AddressPool) error {
-	pool := o.poolToOperator(a)
+func (o beta1Updater) createPool(a AddressPool) error {
+	pool := o.poolToCR(a)
 	existing := &operatorv1beta1.AddressPool{}
 	err := o.Client.Get(context.TODO(), types.NamespacedName{Name: pool.Name, Namespace: pool.Namespace}, existing)
 
@@ -160,7 +117,7 @@ func (o operatorUpdater) createPool(a AddressPool) error {
 	return o.Client.Update(context.TODO(), pool)
 }
 
-func (o operatorUpdater) poolToOperator(a AddressPool) *operatorv1beta1.AddressPool {
+func (o beta1Updater) poolToCR(a AddressPool) *operatorv1beta1.AddressPool {
 	addrs := make([]string, len(a.Addresses))
 	copy(addrs, a.Addresses)
 
@@ -194,8 +151,8 @@ func (o operatorUpdater) poolToOperator(a AddressPool) *operatorv1beta1.AddressP
 	}
 }
 
-func (o operatorUpdater) createPeer(p Peer) error {
-	peer, err := o.peerToOperator(p)
+func (o beta1Updater) createPeer(p Peer) error {
+	peer, err := o.peerToCR(p)
 	if err != nil {
 		return err
 	}
@@ -204,7 +161,7 @@ func (o operatorUpdater) createPeer(p Peer) error {
 	return o.Client.Create(context.TODO(), peer)
 }
 
-func (o operatorUpdater) peerToOperator(p Peer) (*operatorv1beta1.BGPPeer, error) {
+func (o beta1Updater) peerToCR(p Peer) (*operatorv1beta1.BGPPeer, error) {
 	nodeselectors := make([]operatorv1beta1.NodeSelector, len(p.NodeSelectors))
 	for _, ns := range p.NodeSelectors {
 		n := operatorv1beta1.NodeSelector{
@@ -254,8 +211,8 @@ func (o operatorUpdater) peerToOperator(p Peer) (*operatorv1beta1.BGPPeer, error
 
 }
 
-func (o operatorUpdater) createBFDProfile(bp BfdProfile) error {
-	bfdprofile := o.bfdProfileToOperator(bp)
+func (o beta1Updater) createBFDProfile(bp BfdProfile) error {
+	bfdprofile := o.bfdProfileToCR(bp)
 	existing := &operatorv1beta1.BFDProfile{}
 	err := o.Client.Get(context.TODO(), types.NamespacedName{Name: bfdprofile.Name, Namespace: bfdprofile.Namespace}, existing)
 
@@ -270,7 +227,7 @@ func (o operatorUpdater) createBFDProfile(bp BfdProfile) error {
 	return o.Client.Update(context.TODO(), bfdprofile)
 }
 
-func (o operatorUpdater) bfdProfileToOperator(bp BfdProfile) *operatorv1beta1.BFDProfile {
+func (o beta1Updater) bfdProfileToCR(bp BfdProfile) *operatorv1beta1.BFDProfile {
 	return &operatorv1beta1.BFDProfile{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      bp.Name,
