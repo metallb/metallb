@@ -25,7 +25,7 @@ import (
 	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
 	bgpnative "go.universe.tf/metallb/internal/bgp/native"
 	"go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/k8s"
+	"go.universe.tf/metallb/internal/k8s/epslices"
 	"go.universe.tf/metallb/internal/logging"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -101,10 +101,10 @@ newPeers:
 
 // hasHealthyEndpoint return true if this node has at least one healthy endpoint.
 // It only checks nodes matching the given filterNode function.
-func hasHealthyEndpoint(eps k8s.EpsOrSlices, filterNode func(*string) bool) bool {
+func hasHealthyEndpoint(eps epslices.EpsOrSlices, filterNode func(*string) bool) bool {
 	ready := map[string]bool{}
 	switch eps.Type {
-	case k8s.Eps:
+	case epslices.Eps:
 		for _, subset := range eps.EpVal.Subsets {
 			for _, ep := range subset.Addresses {
 				if filterNode(ep.NodeName) {
@@ -121,7 +121,7 @@ func hasHealthyEndpoint(eps k8s.EpsOrSlices, filterNode func(*string) bool) bool
 				ready[ep.IP] = false
 			}
 		}
-	case k8s.Slices:
+	case epslices.Slices:
 		for _, slice := range eps.SlicesVal {
 			for _, ep := range slice.Endpoints {
 				node := ep.Topology["kubernetes.io/hostname"]
@@ -129,13 +129,13 @@ func hasHealthyEndpoint(eps k8s.EpsOrSlices, filterNode func(*string) bool) bool
 					continue
 				}
 				for _, addr := range ep.Addresses {
-					if _, ok := ready[addr]; !ok && k8s.IsConditionReady(ep.Conditions) {
+					if _, ok := ready[addr]; !ok && epslices.IsConditionReady(ep.Conditions) {
 						// Only set true if nothing else has expressed an
 						// opinion. This means that false will take precedence
 						// if there's any unready ports for a given endpoint.
 						ready[addr] = true
 					}
-					if !k8s.IsConditionReady(ep.Conditions) {
+					if !epslices.IsConditionReady(ep.Conditions) {
 						ready[addr] = false
 					}
 				}
@@ -152,7 +152,7 @@ func hasHealthyEndpoint(eps k8s.EpsOrSlices, filterNode func(*string) bool) bool
 	return false
 }
 
-func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, svc *v1.Service, eps k8s.EpsOrSlices) string {
+func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, svc *v1.Service, eps epslices.EpsOrSlices) string {
 	// Should we advertise?
 	// Yes, if externalTrafficPolicy is
 	//  Cluster && any healthy endpoint exists
