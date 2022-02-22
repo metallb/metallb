@@ -40,6 +40,7 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/wget"
 	internalconfig "go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
+	pkgerr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
@@ -393,7 +394,9 @@ var _ = ginkgo.Describe("L2", func() {
 			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
+				if !pkgerr.IsNotFound(err) {
+					framework.ExpectNoError(err)
+				}
 			}()
 
 			ginkgo.By("checking the metrics when a service is added")
@@ -469,6 +472,23 @@ var _ = ginkgo.Describe("L2", func() {
 				framework.ExpectError(err, fmt.Sprintf("metallb_speaker_announced present in node: %s", p.Spec.NodeName))
 			}
 
+			ginkgo.By("validating the speaker doesn't publish layer2 metrics after deleting the service")
+			err = cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+
+			gomega.Eventually(func() error {
+				speakerMetrics, err := metrics.ForPod(controllerPod, advSpeaker, metallb.Namespace)
+				if err != nil {
+					return err
+				}
+
+				err = metrics.ValidateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": advSpeaker.Spec.NodeName, "protocol": "layer2", "service": fmt.Sprintf("%s/%s", f.Namespace.Name, svc.Name)}, speakerMetrics)
+				if err == nil {
+					return fmt.Errorf("metallb_speaker_announced present in node: %s", advSpeaker.Spec.NodeName)
+				}
+
+				return nil
+			}, 1*time.Minute, 1*time.Second).Should(gomega.BeNil())
 		},
 			table.Entry("IPV4 - Checking service", "ipv4"),
 			table.Entry("IPV6 - Checking service", "ipv6"))

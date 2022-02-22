@@ -47,10 +47,11 @@ import (
 )
 
 const (
-	v4PoolAddresses = "192.168.10.0/24"
-	v6PoolAddresses = "fc00:f853:0ccd:e799::/124"
-	CommunityNoAdv  = "65535:65282" // 0xFFFFFF02: NO_ADVERTISE
-	IPLocalPref     = uint32(300)
+	v4PoolAddresses      = "192.168.10.0/24"
+	v6PoolAddresses      = "fc00:f853:0ccd:e799::/124"
+	CommunityNoAdv       = "65535:65282" // 0xFFFFFF02: NO_ADVERTISE
+	IPLocalPref          = uint32(300)
+	SpeakerContainerName = "speaker"
 )
 
 var ConfigUpdater config.Updater
@@ -1073,6 +1074,43 @@ var _ = ginkgo.Describe("BGP", func() {
 		table.Entry("IPV6", "fc00:f853:0ccd:e799::/116", "fc00:f853:ccd:e800::1/128", ipfamily.IPv6),
 	)
 
+	ginkgo.Context("FRR validate reload feedback", func() {
+		ginkgo.It("should update MetalLB config and log reload-validate success", func() {
+			configData := config.File{
+				Pools: []config.AddressPool{
+					{
+						Name:      "new-config",
+						Protocol:  config.BGP,
+						Addresses: []string{v4PoolAddresses},
+					},
+				},
+				Peers: metallb.PeersForContainers(FRRContainers, ipfamily.IPv4),
+			}
+
+			beforeUpdateTime := metav1.Now()
+
+			err := ConfigUpdater.Update(configData)
+			framework.ExpectNoError(err)
+
+			speakerPods, err := metallb.SpeakerPods(cs)
+			framework.ExpectNoError(err)
+
+			for _, pod := range speakerPods {
+				Eventually(func() string {
+					logs, err := k8s.PodLogsSinceTime(cs, pod, SpeakerContainerName, &beforeUpdateTime)
+					framework.ExpectNoError(err)
+
+					return logs
+				}, 2*time.Minute, 1*time.Second).Should(
+					And(
+						ContainSubstring("reload-validate"),
+						ContainSubstring("success"),
+					),
+				)
+			}
+		})
+	})
+
 	ginkgo.Context("validate FRR running configuration", func() {
 		ginkgo.It("Full BFD profile", func() {
 			bfdProfile := config.BfdProfile{
@@ -1093,7 +1131,7 @@ var _ = ginkgo.Describe("BGP", func() {
 						Addresses: []string{v4PoolAddresses},
 					},
 				},
-				Peers:       metallb.PeersForContainers(FRRContainers, "ipv4"),
+				Peers:       metallb.PeersForContainers(FRRContainers, ipfamily.IPv4),
 				BFDProfiles: []config.BfdProfile{bfdProfile},
 			}
 
