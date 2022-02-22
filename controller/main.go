@@ -25,6 +25,8 @@ import (
 	"go.universe.tf/metallb/internal/config"
 	metallbcfg "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
+	"go.universe.tf/metallb/internal/k8s/controllers"
+	"go.universe.tf/metallb/internal/k8s/epslices"
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/version"
 
@@ -42,12 +44,11 @@ type service interface {
 
 type controller struct {
 	client service
-	synced bool
 	config *config.Config
 	ips    *allocator.Allocator
 }
 
-func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ k8s.EpsOrSlices) k8s.SyncState {
+func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ epslices.EpsOrSlices) controllers.SyncState {
 	level.Debug(l).Log("event", "startUpdate", "msg", "start of service update")
 	defer level.Debug(l).Log("event", "endUpdate", "msg", "end of service update")
 
@@ -56,13 +57,13 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		// There might be other LBs stuck waiting for an IP, so when
 		// we delete a balancer we should reprocess all of them to
 		// check for newly feasible balancers.
-		return k8s.SyncStateReprocessAll
+		return controllers.SyncStateReprocessAll
 	}
 
 	if c.config == nil {
 		// Config hasn't been read, nothing we can do just yet.
 		level.Debug(l).Log("event", "noConfig", "msg", "not processing, still waiting for config")
-		return k8s.SyncStateSuccess
+		return controllers.SyncStateSuccess
 	}
 
 	// Making a copy unconditionally is a bit wasteful, since we don't
@@ -71,11 +72,11 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 	// a reason.
 	svc := svcRo.DeepCopy()
 	if !c.convergeBalancer(l, name, svc) {
-		return k8s.SyncStateError
+		return controllers.SyncStateError
 	}
 	if reflect.DeepEqual(svcRo, svc) {
 		level.Debug(l).Log("event", "noChange", "msg", "service converged, no change")
-		return k8s.SyncStateSuccess
+		return controllers.SyncStateSuccess
 	}
 
 	if !reflect.DeepEqual(svcRo.Status, svc.Status) {
@@ -84,12 +85,12 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		svc.Status = st
 		if err := c.client.UpdateStatus(svc); err != nil {
 			level.Error(l).Log("op", "updateServiceStatus", "error", err, "msg", "failed to update service status")
-			return k8s.SyncStateError
+			return controllers.SyncStateError
 		}
 	}
 	level.Info(l).Log("event", "serviceUpdated", "msg", "updated service object")
 
-	return k8s.SyncStateSuccess
+	return controllers.SyncStateSuccess
 }
 
 func (c *controller) deleteBalancer(l log.Logger, name string) {
@@ -98,34 +99,27 @@ func (c *controller) deleteBalancer(l log.Logger, name string) {
 	}
 }
 
-func (c *controller) SetConfig(l log.Logger, cfg *config.Config) k8s.SyncState {
+func (c *controller) SetConfig(l log.Logger, cfg *config.Config) controllers.SyncState {
 	level.Debug(l).Log("event", "startUpdate", "msg", "start of config update")
 	defer level.Debug(l).Log("event", "endUpdate", "msg", "end of config update")
 
 	if cfg == nil {
 		level.Error(l).Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
-		return k8s.SyncStateErrorNoRetry
+		return controllers.SyncStateErrorNoRetry
 	}
 
 	if err := c.ips.SetPools(cfg.Pools); err != nil {
 		level.Error(l).Log("op", "setConfig", "error", err, "msg", "applying new configuration failed")
-		return k8s.SyncStateError
+		return controllers.SyncStateError
 	}
 	c.config = cfg
-	return k8s.SyncStateReprocessAll
-}
-
-func (c *controller) MarkSynced(l log.Logger) {
-	c.synced = true
-	level.Info(l).Log("event", "stateSynced", "msg", "controller synced, can allocate IPs now")
+	return controllers.SyncStateReprocessAll
 }
 
 func main() {
 	var (
 		port            = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
-		config          = flag.String("config", "config", "Kubernetes ConfigMap containing MetalLB's configuration")
 		namespace       = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config / memberlist secret namespace")
-		kubeconfig      = flag.String("kubeconfig", "", "absolute path to the kubeconfig file (only needed when running outside of k8s)")
 		mlSecret        = flag.String("ml-secret-name", os.Getenv("METALLB_ML_SECRET_NAME"), "name of the memberlist secret to create")
 		deployName      = flag.String("deployment", os.Getenv("METALLB_DEPLOYMENT"), "name of the MetalLB controller Deployment")
 		logLevel        = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
@@ -157,18 +151,15 @@ func main() {
 
 	client, err := k8s.New(&k8s.Config{
 		ProcessName:     "metallb-controller",
-		ConfigMapName:   *config,
-		ConfigMapNS:     *namespace,
 		MetricsPort:     *port,
 		EnablePprof:     *enablePprof,
 		Logger:          logger,
-		Kubeconfig:      *kubeconfig,
 		DisableEpSlices: *disableEpSlices,
 
+		Namespace:      *namespace,
 		ServiceChanged: c.SetBalancer,
 		ConfigChanged:  c.SetConfig,
 		ValidateConfig: metallbcfg.DontValidate, // the controller is not aware of the mode, we defer the validation to the speaker
-		Synced:         c.MarkSynced,
 	})
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create k8s client")

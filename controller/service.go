@@ -135,10 +135,6 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 
 	// If lbIP is still nil at this point, try to allocate.
 	if len(lbIPs) == 0 {
-		if !c.synced {
-			level.Error(l).Log("op", "allocateIPs", "error", "controller not synced", "msg", "controller not synced yet, cannot allocate IP; will retry after sync")
-			return false
-		}
 		lbIPs, err = c.allocateIPs(key, svc)
 		if err != nil {
 			level.Error(l).Log("op", "allocateIPs", "error", err, "msg", "IP allocation failed")
