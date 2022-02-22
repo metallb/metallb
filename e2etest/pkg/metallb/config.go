@@ -12,20 +12,14 @@ import (
 )
 
 const (
-	defaultNameSpace     = "metallb-system"
-	defaultConfigMapName = "config"
+	defaultNameSpace = "metallb-system"
 )
 
 var Namespace = defaultNameSpace
-var ConfigMapName = defaultConfigMapName
 
 func init() {
 	if ns := os.Getenv("OO_INSTALL_NAMESPACE"); len(ns) != 0 {
 		Namespace = ns
-	}
-
-	if name := os.Getenv("CONFIGMAP_NAME"); len(name) != 0 {
-		ConfigMapName = name
 	}
 }
 
