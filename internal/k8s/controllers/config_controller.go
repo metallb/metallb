@@ -93,7 +93,7 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	switch res {
 	case SyncStateError:
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs", spew.Sdump(metallbCRs), "event", "reload failed, retry")
-		return ctrl.Result{RequeueAfter: RetryPeriod}, nil
+		return ctrl.Result{}, retryError
 	case SyncStateReprocessAll:
 		level.Info(r.Logger).Log("controller", "ConfigReconciler", "event", "force service reload")
 		r.ForceReload()

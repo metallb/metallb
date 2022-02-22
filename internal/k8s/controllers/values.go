@@ -2,6 +2,8 @@
 
 package controllers
 
+import "errors"
+
 // SyncState is the result of calling synchronization callbacks.
 type SyncState int
 
@@ -26,3 +28,5 @@ const (
 	Endpoints
 	EndpointSlices
 )
+
+var retryError = errors.New("event handling failed, retrying")
