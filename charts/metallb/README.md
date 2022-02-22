@@ -14,7 +14,6 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| configInline | object | `{}` |  |
 | controller.affinity | object | `{}` |  |
 | controller.enabled | bool | `true` |  |
 | controller.image.pullPolicy | string | `nil` |  |

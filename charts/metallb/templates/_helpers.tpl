@@ -74,13 +74,6 @@ Create the name of the speaker service account to use
 {{- end }}
 
 {{/*
-Create the name of the settings ConfigMap to use.
-*/}}
-{{- define "metallb.configMapName" -}}
-{{ default ( printf "%s" (include "metallb.fullname" .) ) .Values.existingConfigMap | trunc 63 | trimSuffix "-" }}
-{{- end -}}
-
-{{/*
 Create the name of the settings Secret to use.
 */}}
 {{- define "metallb.secretName" -}}
