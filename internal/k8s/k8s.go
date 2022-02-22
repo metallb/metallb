@@ -6,105 +6,97 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
 	"net/http/pprof"
+	"os"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	metallbv1alpha1 "go.universe.tf/metallb/api/v1alpha1"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/k8s/controllers"
+	"go.universe.tf/metallb/internal/k8s/epslices"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/kubernetes/scheme"
-	v1core "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/cache"
-	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/record"
-	"k8s.io/client-go/util/workqueue"
+	policyv1beta1 "k8s.io/kubernetes/pkg/apis/policy/v1beta1"
+
+	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
+	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	rbacv1 "k8s.io/kubernetes/pkg/apis/rbac/v1"
+
+	"k8s.io/apimachinery/pkg/runtime"
+
+	ctrl "sigs.k8s.io/controller-runtime"
 )
+
+var (
+	scheme   = runtime.NewScheme()
+	setupLog = ctrl.Log.WithName("setup")
+)
+
+func init() {
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+
+	utilruntime.Must(metallbv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(metallbv1beta1.AddToScheme(scheme))
+	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(appsv1.AddToScheme(scheme))
+	utilruntime.Must(policyv1beta1.AddToScheme(scheme))
+	utilruntime.Must(rbacv1.AddToScheme(scheme))
+	utilruntime.Must(apiext.AddToScheme(scheme))
+	utilruntime.Must(discovery.AddToScheme(scheme))
+
+	// +kubebuilder:scaffold:scheme
+}
 
 // Client watches a Kubernetes cluster and translates events into
 // Controller method calls.
 type Client struct {
 	logger log.Logger
 
-	client *kubernetes.Clientset
-	events record.EventRecorder
-	queue  workqueue.RateLimitingInterface
-
-	svcIndexer     cache.Indexer
-	svcInformer    cache.Controller
-	epIndexer      cache.Indexer
-	epInformer     cache.Controller
-	slicesIndexer  cache.Indexer
-	slicesInformer cache.Controller
-	cmIndexer      cache.Indexer
-	cmInformer     cache.Controller
-	nodeIndexer    cache.Indexer
-	nodeInformer   cache.Controller
-
-	syncFuncs []cache.InformerSynced
-
-	serviceChanged func(log.Logger, string, *v1.Service, EpsOrSlices) SyncState
-	configChanged  func(log.Logger, *config.Config) SyncState
+	client         *kubernetes.Clientset
+	events         record.EventRecorder
+	mgr            manager.Manager
+	reloader       *controllers.ServiceReloadReconciler
 	validateConfig config.Validate
-	nodeChanged    func(log.Logger, *v1.Node) SyncState
-	synced         func(log.Logger)
+	ForceSync      func()
 }
-
-// SyncState is the result of calling synchronization callbacks.
-type SyncState int
-
-const (
-	// The update was processed successfully.
-	SyncStateSuccess SyncState = iota
-	// The update caused a transient error, the k8s client should
-	// retry later.
-	SyncStateError
-	// The update was accepted, but requires reprocessing all watched
-	// services.
-	SyncStateReprocessAll
-	// The update caused a non transient error, the k8s client should
-	// just report and giveup.
-	SyncStateErrorNoRetry
-)
 
 // Config specifies the configuration of the Kubernetes
 // client/watcher.
 type Config struct {
 	ProcessName     string
-	ConfigMapName   string
-	ConfigMapNS     string
 	NodeName        string
 	MetricsHost     string
 	MetricsPort     int
 	EnablePprof     bool
 	ReadEndpoints   bool
 	Logger          log.Logger
-	Kubeconfig      string
 	DisableEpSlices bool
+	Namespace       string
 
-	ServiceChanged func(log.Logger, string, *v1.Service, EpsOrSlices) SyncState
-	ConfigChanged  func(log.Logger, *config.Config) SyncState
+	ServiceChanged func(log.Logger, string, *v1.Service, epslices.EpsOrSlices) controllers.SyncState
+	ConfigChanged  func(log.Logger, *config.Config) controllers.SyncState
 	ValidateConfig config.Validate
-	NodeChanged    func(log.Logger, *v1.Node) SyncState
-	Synced         func(log.Logger)
+	NodeChanged    func(log.Logger, *v1.Node) controllers.SyncState
 }
-
-type svcKey string
-type cmKey string
-type nodeKey string
-type synced string
-
-const slicesServiceIndexName = "ServiceName"
 
 // New connects to masterAddr, using kubeconfig to authenticate.
 //
@@ -112,206 +104,119 @@ const slicesServiceIndexName = "ServiceName"
 // (e.g. when logging events).
 //nolint:godot
 func New(cfg *Config) (*Client, error) {
-	var (
-		k8sConfig *rest.Config
-		err       error
-	)
-
-	if cfg.Kubeconfig == "" {
-		// if the user didn't provide a config file, assume that we're
-		// running inside k8s.
-		k8sConfig, err = rest.InClusterConfig()
-	} else {
-		// the user provided a config file, so use that.  InClusterConfig
-		// would also work in this case but it emits an annoying warning.
-		k8sConfig, err = clientcmd.BuildConfigFromFlags("", cfg.Kubeconfig)
-	}
+	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+		Scheme:         scheme,
+		Port:           9443, // TODO port only with controller, for webhooks
+		LeaderElection: false,
+	})
 	if err != nil {
-		return nil, fmt.Errorf("building client config: %s", err)
+		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
 	}
-	clientset, err := kubernetes.NewForConfig(k8sConfig)
+	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		return nil, fmt.Errorf("creating Kubernetes client: %s", err)
 	}
 
-	broadcaster := record.NewBroadcaster()
-	broadcaster.StartRecordingToSink(&v1core.EventSinkImpl{Interface: v1core.New(clientset.CoreV1().RESTClient()).Events("")})
-	recorder := broadcaster.NewRecorder(scheme.Scheme, v1.EventSource{Component: cfg.ProcessName})
+	recorder := mgr.GetEventRecorderFor(cfg.ProcessName)
 
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	reloadChan := make(chan event.GenericEvent)
+	reload := func() {
+		reloadChan <- controllers.NewReloadEvent()
+	}
 
 	c := &Client{
 		logger:         cfg.Logger,
 		client:         clientset,
 		events:         recorder,
-		queue:          queue,
+		mgr:            mgr,
 		validateConfig: cfg.ValidateConfig,
-	}
-
-	if cfg.ServiceChanged != nil {
-		svcHandlers := cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				key, err := cache.MetaNamespaceKeyFunc(obj)
-				if err == nil {
-					c.queue.Add(svcKey(key))
-				}
-			},
-			UpdateFunc: func(old interface{}, new interface{}) {
-				key, err := cache.MetaNamespaceKeyFunc(new)
-				if err == nil {
-					c.queue.Add(svcKey(key))
-				}
-			},
-			DeleteFunc: func(obj interface{}) {
-				key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-				if err == nil {
-					c.queue.Add(svcKey(key))
-				}
-			},
-		}
-		svcWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "services", v1.NamespaceAll, fields.Everything())
-		c.svcIndexer, c.svcInformer = cache.NewIndexerInformer(svcWatcher, &v1.Service{}, 0, svcHandlers, cache.Indexers{})
-
-		c.serviceChanged = cfg.ServiceChanged
-		c.syncFuncs = append(c.syncFuncs, c.svcInformer.HasSynced)
-
-		if cfg.ReadEndpoints {
-			// use DisableEpSlices to skip the autodiscovery mechanism. Useful if EndpointSlices are enabled in the cluster but disabled in kube-proxy
-			if cfg.DisableEpSlices || !UseEndpointSlices(c.client) {
-				epHandlers := cache.ResourceEventHandlerFuncs{
-					AddFunc: func(obj interface{}) {
-						key, err := cache.MetaNamespaceKeyFunc(obj)
-						if err == nil {
-							c.queue.Add(svcKey(key))
-						}
-					},
-					UpdateFunc: func(old interface{}, new interface{}) {
-						key, err := cache.MetaNamespaceKeyFunc(new)
-						if err == nil {
-							c.queue.Add(svcKey(key))
-						}
-					},
-					DeleteFunc: func(obj interface{}) {
-						key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-						if err == nil {
-							c.queue.Add(svcKey(key))
-						}
-					},
-				}
-				epWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "endpoints", v1.NamespaceAll, fields.Everything())
-				c.epIndexer, c.epInformer = cache.NewIndexerInformer(epWatcher, &v1.Endpoints{}, 0, epHandlers, cache.Indexers{})
-
-				c.syncFuncs = append(c.syncFuncs, c.epInformer.HasSynced)
-			} else {
-				level.Info(c.logger).Log("op", "New", "msg", "using endpoint slices")
-				slicesHandlers := cache.ResourceEventHandlerFuncs{
-					AddFunc: func(obj interface{}) {
-						slice, ok := obj.(*discovery.EndpointSlice)
-						if !ok {
-							level.Error(c.logger).Log("op", "SliceAdd", "error", "received a non EndpointSlice item")
-							return
-						}
-
-						key, err := serviceKeyForSlice(slice)
-						if err != nil {
-							return
-						}
-						c.queue.Add(key)
-					},
-					UpdateFunc: func(old interface{}, new interface{}) {
-						slice, ok := new.(*discovery.EndpointSlice)
-						if !ok {
-							level.Error(c.logger).Log("op", "SliceUpdate", "error", "received a non EndpointSlice item")
-							return
-						}
-						key, err := serviceKeyForSlice(slice)
-						if err != nil {
-							level.Error(c.logger).Log("op", "SliceUpdate", "error", "failed to get serviceKey for slice", "slice", slice.Name)
-							return
-						}
-						c.queue.Add(key)
-					},
-					DeleteFunc: func(obj interface{}) {
-						slice, ok := obj.(*discovery.EndpointSlice)
-						if !ok {
-							level.Error(c.logger).Log("op", "SliceDelete", "error", "received a non EndpointSlice item")
-							return
-						}
-						key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(slice)
-						if err != nil {
-							level.Error(c.logger).Log("op", "SliceDelete", "error", err)
-							return
-						}
-						c.queue.Add(svcKey(key))
-					},
-				}
-				slicesWatcher := cache.NewListWatchFromClient(c.client.DiscoveryV1beta1().RESTClient(), "endpointslices", v1.NamespaceAll, fields.Everything())
-				c.slicesIndexer, c.slicesInformer = cache.NewIndexerInformer(slicesWatcher, &discovery.EndpointSlice{}, 0, slicesHandlers, cache.Indexers{
-					slicesServiceIndexName: slicesServiceIndex,
-				})
-				c.syncFuncs = append(c.syncFuncs, c.slicesInformer.HasSynced)
-			}
-		}
+		ForceSync:      reload,
 	}
 
 	if cfg.ConfigChanged != nil {
-		cmHandlers := cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				key, err := cache.MetaNamespaceKeyFunc(obj)
-				if err == nil {
-					c.queue.Add(cmKey(key))
-				}
-			},
-			UpdateFunc: func(old interface{}, new interface{}) {
-				key, err := cache.MetaNamespaceKeyFunc(new)
-				if err == nil {
-					c.queue.Add(cmKey(key))
-				}
-			},
-			DeleteFunc: func(obj interface{}) {
-				key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-				if err == nil {
-					c.queue.Add(cmKey(key))
-				}
-			},
+		if err = (&controllers.ConfigReconciler{
+			Client:         mgr.GetClient(),
+			Logger:         cfg.Logger,
+			Scheme:         mgr.GetScheme(),
+			Namespace:      cfg.Namespace,
+			ValidateConfig: cfg.ValidateConfig,
+			Handler:        cfg.ConfigChanged,
+			ForceReload:    reload,
+		}).SetupWithManager(mgr); err != nil {
+			level.Error(c.logger).Log("error", err, "unable to create controller", "config")
+			return nil, errors.Wrap(err, "failed to create config reconciler")
 		}
-		cmWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "configmaps", cfg.ConfigMapNS, fields.OneTermEqualSelector("metadata.name", cfg.ConfigMapName))
-		c.cmIndexer, c.cmInformer = cache.NewIndexerInformer(cmWatcher, &v1.ConfigMap{}, 0, cmHandlers, cache.Indexers{})
-
-		c.configChanged = cfg.ConfigChanged
-		c.syncFuncs = append(c.syncFuncs, c.cmInformer.HasSynced)
 	}
 
 	if cfg.NodeChanged != nil {
-		nodeHandlers := cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				key, err := cache.MetaNamespaceKeyFunc(obj)
-				if err == nil {
-					c.queue.Add(nodeKey(key))
-				}
-			},
-			UpdateFunc: func(old interface{}, new interface{}) {
-				key, err := cache.MetaNamespaceKeyFunc(new)
-				if err == nil {
-					c.queue.Add(nodeKey(key))
-				}
-			},
-			DeleteFunc: func(obj interface{}) {
-				key, err := cache.DeletionHandlingMetaNamespaceKeyFunc(obj)
-				if err == nil {
-					c.queue.Add(nodeKey(key))
-				}
-			},
+		if err = (&controllers.NodeReconciler{
+			Client:  mgr.GetClient(),
+			Logger:  cfg.Logger,
+			Scheme:  mgr.GetScheme(),
+			Handler: cfg.NodeChanged,
+		}).SetupWithManager(mgr); err != nil {
+			level.Error(c.logger).Log("error", err, "unable to create controller", "node")
+			return nil, errors.Wrap(err, "failed to create node reconciler")
 		}
-		nodeWatcher := cache.NewListWatchFromClient(c.client.CoreV1().RESTClient(), "nodes", v1.NamespaceAll, fields.OneTermEqualSelector("metadata.name", cfg.NodeName))
-		c.nodeIndexer, c.nodeInformer = cache.NewIndexerInformer(nodeWatcher, &v1.Node{}, 0, nodeHandlers, cache.Indexers{})
-
-		c.nodeChanged = cfg.NodeChanged
-		c.syncFuncs = append(c.syncFuncs, c.nodeInformer.HasSynced)
 	}
 
-	if cfg.Synced != nil {
-		c.synced = cfg.Synced
+	// use DisableEpSlices to skip the autodiscovery mechanism. Useful if EndpointSlices are enabled in the cluster but disabled in kube-proxy
+	useSlices := UseEndpointSlices(c.client) && !cfg.DisableEpSlices
+
+	var needEndpoints controllers.NeedEndPoints
+	switch {
+	case !cfg.ReadEndpoints:
+		needEndpoints = controllers.NoNeed
+	case useSlices:
+		needEndpoints = controllers.EndpointSlices
+	default:
+		needEndpoints = controllers.Endpoints
+	}
+
+	if needEndpoints == controllers.EndpointSlices {
+		// Set a field indexer so we can retrieve all the endpoints for a given service.
+		if err := mgr.GetFieldIndexer().IndexField(context.Background(), &discovery.EndpointSlice{}, epslices.SlicesServiceIndexName, func(rawObj client.Object) []string {
+			epSlice, ok := rawObj.(*discovery.EndpointSlice)
+			if epSlice == nil {
+				level.Error(c.logger).Log("controller", "fieldindexer", "error", "received nil epslice")
+				return nil
+			}
+			if !ok {
+				level.Error(c.logger).Log("controller", "fieldindexer", "error", "received object that is not epslice", "object", rawObj.GetObjectKind().GroupVersionKind().Kind)
+				return nil
+			}
+			serviceKey, err := epslices.ServiceKeyForSlice(epSlice)
+			if err != nil {
+				level.Error(c.logger).Log("controller", "ServiceReconciler", "error", "failed to get service from epslices", "epslice", epSlice.Name, "error", err)
+			}
+			return []string{serviceKey.String()}
+		}); err != nil {
+			return nil, err
+		}
+	}
+
+	if cfg.ServiceChanged != nil {
+		if err = (&controllers.ServiceReconciler{
+			Client:      mgr.GetClient(),
+			Logger:      cfg.Logger,
+			Scheme:      mgr.GetScheme(),
+			Handler:     cfg.ServiceChanged,
+			Endpoints:   needEndpoints,
+			ForceReload: reload,
+		}).SetupWithManager(mgr); err != nil {
+			level.Error(c.logger).Log("error", err, "unable to create controller", "service")
+			return nil, errors.Wrap(err, "failed to create service reconciler")
+		}
+	}
+
+	c.reloader = &controllers.ServiceReloadReconciler{
+		Client:    mgr.GetClient(),
+		Log:       cfg.Logger,
+		Scheme:    mgr.GetScheme(),
+		Handler:   cfg.ServiceChanged,
+		Endpoints: needEndpoints,
+		Reload:    reloadChan,
 	}
 
 	mux := http.NewServeMux()
@@ -406,62 +311,19 @@ func (c *Client) PodIPs(namespace, labels string) ([]string, error) {
 // Run watches for events on the Kubernetes cluster, and dispatches
 // calls to the Controller.
 func (c *Client) Run(stopCh <-chan struct{}) error {
-	if c.svcInformer != nil {
-		go c.svcInformer.Run(stopCh)
+	ctx := ctrl.SetupSignalHandler()
+
+	level.Info(c.logger).Log("Starting Reloader")
+	if err := c.reloader.Start(ctx, c.mgr); err != nil {
+		level.Error(c.logger).Log("error", err, "unable to start", "reloader")
+		return errors.Wrap(err, "failed to start reloader")
 	}
-	if c.epInformer != nil {
-		go c.epInformer.Run(stopCh)
-	}
-	if c.slicesInformer != nil {
-		go c.slicesInformer.Run(stopCh)
-	}
-	if c.cmInformer != nil {
-		go c.cmInformer.Run(stopCh)
-	}
-	if c.nodeInformer != nil {
-		go c.nodeInformer.Run(stopCh)
+	level.Info(c.logger).Log("Starting Manager")
+	if err := c.mgr.Start(ctx); err != nil {
+		return err
 	}
 
-	if !cache.WaitForCacheSync(stopCh, c.syncFuncs...) {
-		return errors.New("timed out waiting for cache sync")
-	}
-
-	c.queue.Add(synced(""))
-
-	if stopCh != nil {
-		go func() {
-			<-stopCh
-			c.queue.ShutDown()
-		}()
-	}
-
-	for {
-		key, quit := c.queue.Get()
-		if quit {
-			return nil
-		}
-		updates.Inc()
-		st := c.sync(key)
-		switch st {
-		case SyncStateErrorNoRetry, SyncStateSuccess:
-			c.queue.Forget(key)
-		case SyncStateError:
-			updateErrors.Inc()
-			c.queue.AddRateLimited(key)
-		case SyncStateReprocessAll:
-			c.queue.Forget(key)
-			c.ForceSync()
-		}
-	}
-}
-
-// ForceSync reprocess all watched services.
-func (c *Client) ForceSync() {
-	if c.svcIndexer != nil {
-		for _, k := range c.svcIndexer.ListKeys() {
-			c.queue.AddRateLimited(svcKey(k))
-		}
-	}
+	return nil
 }
 
 // UpdateStatus writes the protected "status" field of svc back into
@@ -479,150 +341,6 @@ func (c *Client) Infof(svc *v1.Service, kind, msg string, args ...interface{}) {
 // Errorf logs an error event about svc to the Kubernetes cluster.
 func (c *Client) Errorf(svc *v1.Service, kind, msg string, args ...interface{}) {
 	c.events.Eventf(svc, v1.EventTypeWarning, kind, msg, args...)
-}
-
-func (c *Client) sync(key interface{}) SyncState {
-	defer c.queue.Done(key)
-
-	switch k := key.(type) {
-	case svcKey:
-		l := log.With(c.logger, "service", string(k))
-		svc, exists, err := c.svcIndexer.GetByKey(string(k))
-		if err != nil {
-			level.Error(l).Log("op", "getService", "error", err, "msg", "failed to get service")
-			return SyncStateError
-		}
-		if !exists {
-			return c.serviceChanged(l, string(k), nil, EpsOrSlices{})
-		}
-
-		epsOrSlices := EpsOrSlices{}
-		if c.epIndexer != nil {
-			epsIntf, exists, err := c.epIndexer.GetByKey(string(k))
-			if err != nil {
-				level.Error(l).Log("op", "getEndpoints", "error", err, "msg", "failed to get endpoints")
-				return SyncStateError
-			}
-			if !exists {
-				return c.serviceChanged(l, string(k), nil, EpsOrSlices{})
-			}
-
-			eps := epsIntf.(*v1.Endpoints)
-			epsOrSlices.EpVal = eps.DeepCopy()
-			epsOrSlices.Type = Eps
-		}
-		if c.slicesIndexer != nil {
-			slicesIntf, err := c.slicesIndexer.ByIndex(slicesServiceIndexName, string(k))
-			if err != nil {
-				level.Error(l).Log("op", "getEndpointSlices", "error", err, "msg", "failed to get endpoints slices")
-				return SyncStateError
-			}
-			if len(slicesIntf) == 0 {
-				return c.serviceChanged(l, string(k), nil, EpsOrSlices{})
-			}
-			epsOrSlices.SlicesVal = make([]*discovery.EndpointSlice, 0)
-			for _, s := range slicesIntf {
-				slice, ok := s.(*discovery.EndpointSlice)
-				if !ok {
-					continue
-				}
-				epsOrSlices.SlicesVal = append(epsOrSlices.SlicesVal, slice.DeepCopy())
-			}
-			epsOrSlices.Type = Slices
-		}
-		return c.serviceChanged(l, string(k), svc.(*v1.Service), epsOrSlices)
-
-	case cmKey:
-		l := log.With(c.logger, "configmap", string(k))
-		cmi, exists, err := c.cmIndexer.GetByKey(string(k))
-		if err != nil {
-			level.Error(l).Log("op", "getConfigMap", "error", err, "msg", "failed to get configmap")
-			return SyncStateError
-		}
-		if !exists {
-			configStale.Set(1)
-			return c.configChanged(l, nil)
-		}
-
-		// Note that configs that we can read, but that fail parsing
-		// or validation, result in a "synced" state, because the
-		// config is not going to parse any better until the k8s
-		// object changes to fix the issue.
-		cm := cmi.(*v1.ConfigMap)
-		cfg, err := config.Parse([]byte(cm.Data["config"]), c.validateConfig)
-		if err != nil {
-			level.Error(l).Log("event", "configStale", "error", err, "msg", "config (re)load failed, config marked stale")
-			configStale.Set(1)
-			return SyncStateSuccess
-		}
-
-		st := c.configChanged(l, cfg)
-		if st == SyncStateErrorNoRetry || st == SyncStateError {
-			level.Error(l).Log("event", "configStale", "error", err, "msg", "config (re)load failed, config marked stale")
-			configStale.Set(1)
-			return st
-		}
-
-		configLoaded.Set(1)
-		configStale.Set(0)
-
-		level.Info(l).Log("event", "configLoaded", "msg", "config (re)loaded")
-		return st
-
-	case nodeKey:
-		l := log.With(c.logger, "node", string(k))
-		n, exists, err := c.nodeIndexer.GetByKey(string(k))
-		if err != nil {
-			level.Error(l).Log("op", "getNode", "error", err, "msg", "failed to get node")
-			return SyncStateError
-		}
-		if !exists {
-			level.Error(l).Log("op", "getNode", "error", "node doesn't exist in k8s, but I'm running on it!")
-			return SyncStateError
-		}
-		node := n.(*v1.Node)
-		return c.nodeChanged(c.logger, node)
-
-	case synced:
-		if c.synced != nil {
-			c.synced(c.logger)
-		}
-		return SyncStateSuccess
-
-	default:
-		panic(fmt.Errorf("unknown key type for %#v (%T)", key, key))
-	}
-}
-
-func serviceKeyForSlice(endpointSlice *discovery.EndpointSlice) (svcKey, error) {
-	if endpointSlice == nil {
-		return "", fmt.Errorf("nil EndpointSlice")
-	}
-	serviceName, err := serviceNameForSlice(endpointSlice)
-	if err != nil {
-		return "", err
-	}
-	return svcKey(fmt.Sprintf("%s/%s", endpointSlice.Namespace, serviceName)), nil
-}
-
-func slicesServiceIndex(obj interface{}) ([]string, error) {
-	endpointSlice, ok := obj.(*discovery.EndpointSlice)
-	if !ok {
-		return nil, fmt.Errorf("Passed object is not a slice")
-	}
-	serviceKey, err := serviceKeyForSlice(endpointSlice)
-	if err != nil {
-		return nil, err
-	}
-	return []string{string(serviceKey)}, nil
-}
-
-func serviceNameForSlice(endpointSlice *discovery.EndpointSlice) (string, error) {
-	serviceName, ok := endpointSlice.Labels["kubernetes.io/service-name"]
-	if !ok || serviceName == "" {
-		return "", fmt.Errorf("endpointSlice missing %s label", "kubernetes.io/service-name")
-	}
-	return serviceName, nil
 }
 
 // UseEndpointSlices detect if Endpoints Slices are enabled in the cluster.
