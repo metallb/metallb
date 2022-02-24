@@ -321,7 +321,8 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
 
     if helm_install:
         run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
-                "--set speaker.image.tag=dev-{} --set speaker.frr.enabled={}".format(architecture,
+                "--set speaker.image.tag=dev-{} --set speaker.frr.enabled={} --set speaker.logLevel=debug "
+                "--set controller.logLevel=debug".format(architecture,
                 architecture, "true" if bgp_type == "frr" else "false"), echo=True)
     else:
         run("kubectl delete po -nmetallb-system --all", echo=True)
@@ -340,6 +341,8 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
                 manifest = re.sub("image: quay.io/metallb/{}:.*".format(image),
                             "image: quay.io/metallb/{}:dev-{}".format(image, architecture), manifest)
                 manifest = re.sub("--log-level=info", "--log-level={}".format(log_level), manifest)
+            manifest.replace("--log-level=info", "--log-level=debug")
+
             with open(tmpdir + "/metallb.yaml", "w") as f:
                 f.write(manifest)
                 f.flush()
