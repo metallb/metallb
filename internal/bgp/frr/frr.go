@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/go-kit/kit/log"
@@ -27,6 +28,7 @@ type sessionManager struct {
 	bfdProfiles  []BFDProfile
 	reloadConfig chan *frrConfig
 	logLevel     string
+	sync.Mutex
 }
 
 type session struct {
@@ -64,6 +66,8 @@ func validate(adv *bgp.Advertisement) error {
 }
 
 func (s *session) Set(advs ...*bgp.Advertisement) error {
+	s.sessionManager.Lock()
+	defer s.sessionManager.Unlock()
 	sessionName := sessionName(s.srcAddr.String(), s.myASN, s.addr, s.asn)
 	if _, found := s.sessionManager.sessions[sessionName]; !found {
 		return fmt.Errorf("session not established before advertisement")
@@ -93,6 +97,8 @@ func (s *session) Set(advs ...*bgp.Advertisement) error {
 
 // Close() shuts down the BGP session.
 func (s *session) Close() error {
+	s.sessionManager.Lock()
+	defer s.sessionManager.Unlock()
 	err := s.sessionManager.deleteSession(s)
 	if err != nil {
 		return err
@@ -112,6 +118,8 @@ func (s *session) Close() error {
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
 func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime, keepaliveTime time.Duration, password, myNode, bfdProfile string, ebgpMultiHop bool) (bgp.Session, error) {
+	sm.Lock()
+	defer sm.Unlock()
 	s := &session{
 		myASN:          myASN,
 		routerID:       routerID,
@@ -162,6 +170,8 @@ func (sm *sessionManager) deleteSession(s *session) error {
 }
 
 func (sm *sessionManager) SyncBFDProfiles(profiles map[string]*metallbconfig.BFDProfile) error {
+	sm.Lock()
+	defer sm.Unlock()
 	sm.bfdProfiles = make([]BFDProfile, 0)
 	for _, p := range profiles {
 		frrProfile := configBFDProfileToFRR(p)
