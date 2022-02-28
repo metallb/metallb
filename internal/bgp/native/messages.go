@@ -339,7 +339,7 @@ func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp, fbasn bool, nextHop net.
 	b.Write([]byte{
 		0x40, 1, // mandatory, origin
 		1, // len
-		2, // incomplete
+		0, // igb
 
 		0x40, 2, // mandatory, as-path
 	})
