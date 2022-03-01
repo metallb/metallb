@@ -155,10 +155,12 @@ func main() {
 		ReadEndpoints: true,
 		Namespace:     *namespace,
 
-		ServiceChanged: ctrl.SetBalancer,
-		ConfigChanged:  ctrl.SetConfig,
+		Listener: k8s.Listener{
+			ServiceChanged: ctrl.SetBalancer,
+			ConfigChanged:  ctrl.SetConfig,
+			NodeChanged:    ctrl.SetNode,
+		},
 		ValidateConfig: validateConfig,
-		NodeChanged:    ctrl.SetNode,
 	})
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create k8s client")

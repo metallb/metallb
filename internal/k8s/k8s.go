@@ -91,11 +91,9 @@ type Config struct {
 	Logger          log.Logger
 	DisableEpSlices bool
 	Namespace       string
+	ValidateConfig  config.Validate
 
-	ServiceChanged func(log.Logger, string, *v1.Service, epslices.EpsOrSlices) controllers.SyncState
-	ConfigChanged  func(log.Logger, *config.Config) controllers.SyncState
-	ValidateConfig config.Validate
-	NodeChanged    func(log.Logger, *v1.Node) controllers.SyncState
+	Listener
 }
 
 // New connects to masterAddr, using kubeconfig to authenticate.
@@ -141,7 +139,7 @@ func New(cfg *Config) (*Client, error) {
 			Scheme:         mgr.GetScheme(),
 			Namespace:      cfg.Namespace,
 			ValidateConfig: cfg.ValidateConfig,
-			Handler:        cfg.ConfigChanged,
+			Handler:        cfg.ConfigHandler,
 			ForceReload:    reload,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "config")
@@ -154,7 +152,7 @@ func New(cfg *Config) (*Client, error) {
 			Client:  mgr.GetClient(),
 			Logger:  cfg.Logger,
 			Scheme:  mgr.GetScheme(),
-			Handler: cfg.NodeChanged,
+			Handler: cfg.NodeHandler,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "node")
 			return nil, errors.Wrap(err, "failed to create node reconciler")
@@ -201,7 +199,7 @@ func New(cfg *Config) (*Client, error) {
 			Client:      mgr.GetClient(),
 			Logger:      cfg.Logger,
 			Scheme:      mgr.GetScheme(),
-			Handler:     cfg.ServiceChanged,
+			Handler:     cfg.ServiceHandler,
 			Endpoints:   needEndpoints,
 			ForceReload: reload,
 		}).SetupWithManager(mgr); err != nil {
@@ -214,7 +212,7 @@ func New(cfg *Config) (*Client, error) {
 		Client:    mgr.GetClient(),
 		Log:       cfg.Logger,
 		Scheme:    mgr.GetScheme(),
-		Handler:   cfg.ServiceChanged,
+		Handler:   cfg.ServiceHandler,
 		Endpoints: needEndpoints,
 		Reload:    reloadChan,
 	}
