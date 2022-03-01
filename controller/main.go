@@ -156,9 +156,11 @@ func main() {
 		Logger:          logger,
 		DisableEpSlices: *disableEpSlices,
 
-		Namespace:      *namespace,
-		ServiceChanged: c.SetBalancer,
-		ConfigChanged:  c.SetConfig,
+		Namespace: *namespace,
+		Listener: k8s.Listener{
+			ServiceChanged: c.SetBalancer,
+			ConfigChanged:  c.SetConfig,
+		},
 		ValidateConfig: metallbcfg.DontValidate, // the controller is not aware of the mode, we defer the validation to the speaker
 	})
 	if err != nil {
