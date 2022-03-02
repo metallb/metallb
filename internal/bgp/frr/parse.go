@@ -26,6 +26,7 @@ type Route struct {
 	Destination *net.IPNet
 	NextHops    []net.IP
 	LocalPref   uint32
+	Origin      string
 }
 
 const bgpConnected = "Established"
@@ -53,6 +54,7 @@ type FRRRoute struct {
 	Valid     bool   `json:"valid"`
 	PeerID    string `json:"peerId"`
 	LocalPref uint32 `json:"locPrf"`
+	Origin    string `json:"origin"`
 	Nexthops  []struct {
 		IP    string `json:"ip"`
 		Scope string `json:"scope"`
@@ -183,6 +185,7 @@ func ParseRoutes(vtyshRes string) (map[string]Route, error) {
 		}
 		for _, n := range frrRoutes {
 			r.LocalPref = n.LocalPref
+			r.Origin = n.Origin
 			for _, h := range n.Nexthops {
 				ip := net.ParseIP(h.IP)
 				if ip == nil {

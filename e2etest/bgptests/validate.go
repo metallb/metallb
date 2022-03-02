@@ -74,6 +74,9 @@ func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1
 			if !ok {
 				return fmt.Errorf("%s not found in frr routes %v %v", ingressIP, frrRoutesV4, frrRoutesV6)
 			}
+			if !strings.EqualFold(frrRoutes.Origin, "IGP") {
+				return fmt.Errorf("route for %s not set with igp origin", ingressIP)
+			}
 
 			err = frr.RoutesMatchNodes(nodes, frrRoutes, serviceIPFamily)
 			if err != nil {
