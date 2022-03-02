@@ -4,6 +4,7 @@ package frr
 
 import (
 	"flag"
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -13,9 +14,9 @@ import (
 	"time"
 
 	"github.com/go-kit/kit/log"
-	"github.com/pkg/errors"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/logging"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -30,15 +31,38 @@ func testOsHostname() (string, error) {
 }
 
 func testCompareFiles(t *testing.T, configFile, goldenFile string) {
-	cmd := exec.Command("diff", configFile, goldenFile)
-	output, err := cmd.Output()
+
+	var lastError error
+
+	// Try comparing files multiple times because tests can generate more than one configuration
+	err := wait.PollImmediate(10*time.Millisecond, 2*time.Second, func() (bool, error) {
+		lastError = nil
+		cmd := exec.Command("diff", configFile, goldenFile)
+		output, err := cmd.Output()
+
+		if err != nil {
+			lastError = fmt.Errorf("command %s returned error: %s\n%s", cmd.String(), err, output)
+			return false, nil
+		}
+
+		return true, nil
+	})
+
+	// err can only be a ErrWaitTimeout, as the check function always return nil errors.
+	// So lastError is always set
 	if err != nil {
-		t.Fatalf("command %s returned error: %s\n%s", cmd.String(), err, output)
+		t.Fatalf("failed to compare configfiles %s, %s using poll interval\nlast error: %v", configFile, goldenFile, lastError)
 	}
 }
 
 func testUpdateGoldenFile(t *testing.T, configFile, goldenFile string) {
 	t.Log("update golden file")
+
+	// Sleep to be sure the sessionManager has produced all configuration the test
+	// has triggered and no config is still waiting in the debouncer() local variables.
+	// No other conditions can be checked, so sleeping is our best option.
+	time.Sleep(100 * time.Millisecond)
+
 	cmd := exec.Command("cp", "-a", configFile, goldenFile)
 	output, err := cmd.Output()
 	if err != nil {
@@ -59,24 +83,13 @@ func testSetup(t *testing.T) {
 
 func testCheckConfigFile(t *testing.T) {
 	configFile, goldenFile := testGenerateFileNames(t)
-	err := wait.PollImmediate(10*time.Millisecond, 2*time.Second, func() (bool, error) {
-		_, err := os.Stat(configFile)
-		if errors.Is(err, os.ErrNotExist) {
-			return false, nil
-		}
-		if err != nil {
-			return false, err
-		}
-		return true, nil
-	})
 
-	if err != nil {
-		t.Fatalf("Failed to wait for configfile %s, err %v", configFile, err)
-	}
 	if *update {
 		testUpdateGoldenFile(t, configFile, goldenFile)
 	}
+
 	testCompareFiles(t, configFile, goldenFile)
+
 	if !strings.Contains(configFile, "Invalid") {
 		err := testFileIsValid(configFile)
 		if err != nil {
@@ -89,7 +102,7 @@ func TestSingleEBGPSessionMultiHop(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
@@ -104,7 +117,7 @@ func TestSingleEBGPSessionOneHop(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l, "127.0.0.2:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", false)
 	if err != nil {
@@ -119,7 +132,7 @@ func TestSingleIBGPSession(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 100, time.Second, time.Second, "password", "hostname", "", false)
 	if err != nil {
@@ -134,7 +147,7 @@ func TestSingleSessionClose(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 
 	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
@@ -149,7 +162,7 @@ func TestTwoSessions(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 	session1, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
@@ -169,7 +182,7 @@ func TestTwoSessionsDuplicate(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 	session1, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
@@ -189,7 +202,7 @@ func TestTwoSessionsDuplicateRouter(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 	session1, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
@@ -209,7 +222,7 @@ func TestSingleAdvertisement(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
@@ -245,7 +258,7 @@ func TestSingleAdvertisementNoRouterID(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, nil, 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
@@ -275,7 +288,7 @@ func TestSingleAdvertisementInvalidPrefix(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
@@ -302,7 +315,7 @@ func TestSingleAdvertisementInvalidNoPort(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l, "10.2.2.254", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err == nil {
@@ -318,7 +331,7 @@ func TestSingleAdvertisementInvalidNextHop(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
@@ -347,7 +360,7 @@ func TestSingleAdvertisementStop(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
@@ -382,7 +395,7 @@ func TestSingleAdvertisementChange(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
@@ -427,7 +440,7 @@ func TestTwoAdvertisements(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
@@ -470,7 +483,7 @@ func TestTwoAdvertisementsTwoSessions(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
-	sessionManager := NewSessionManager(l)
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true)
 	if err != nil {
@@ -518,5 +531,57 @@ func TestTwoAdvertisementsTwoSessions(t *testing.T) {
 		t.Fatalf("Could not advertise prefix: %s", err)
 	}
 
+	testCheckConfigFile(t)
+}
+
+func TestLoggingConfiguration(t *testing.T) {
+	testSetup(t)
+
+	l := log.NewNopLogger()
+	sessionManager := NewSessionManager(l, logging.LevelWarn)
+	defer close(sessionManager.reloadConfig)
+
+	config, err := sessionManager.createConfig()
+	if err != nil {
+		t.Fatalf("Error while creating configuration: %s", err)
+	}
+
+	sessionManager.reloadConfig <- config
+	testCheckConfigFile(t)
+}
+
+func TestLoggingConfigurationDebug(t *testing.T) {
+	testSetup(t)
+
+	l := log.NewNopLogger()
+	sessionManager := NewSessionManager(l, logging.LevelDebug)
+	defer close(sessionManager.reloadConfig)
+
+	config, err := sessionManager.createConfig()
+	if err != nil {
+		t.Fatalf("Error while creating configuration: %s", err)
+	}
+
+	sessionManager.reloadConfig <- config
+	testCheckConfigFile(t)
+}
+
+func TestLoggingConfigurationOverrideByEnvironmentVar(t *testing.T) {
+	testSetup(t)
+
+	orig := os.Getenv("FRR_LOGGING_LEVEL")
+	os.Setenv("FRR_LOGGING_LEVEL", "alerts")
+	t.Cleanup(func() { os.Setenv("FRR_LOGGING_LEVEL", orig) })
+
+	l := log.NewNopLogger()
+	sessionManager := NewSessionManager(l, logging.LevelDebug)
+	defer close(sessionManager.reloadConfig)
+
+	config, err := sessionManager.createConfig()
+	if err != nil {
+		t.Fatalf("Error while creating configuration: %s", err)
+	}
+
+	sessionManager.reloadConfig <- config
 	testCheckConfigFile(t)
 }

@@ -8,12 +8,15 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log/level"
 	"go.universe.tf/metallb/internal/bgp"
 	metallbconfig "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/ipfamily"
+	"go.universe.tf/metallb/internal/logging"
 )
 
 // As the MetalLB controller should handle messages synchronously, there should
@@ -23,6 +26,7 @@ type sessionManager struct {
 	sessions     map[string]*session
 	bfdProfiles  []BFDProfile
 	reloadConfig chan *frrConfig
+	logLevel     string
 }
 
 type session struct {
@@ -196,7 +200,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 
 	config := &frrConfig{
 		Hostname:               hostname,
-		Loglevel:               "informational",
+		Loglevel:               sm.logLevel,
 		Routers:                make(map[string]*routerConfig),
 		BFDProfiles:            sm.bfdProfiles,
 		PrefixesV4ForCommunity: make([]communityPrefixes, 0),
@@ -204,6 +208,8 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 		PrefixesV4ForLocalPref: make([]localPrefPrefixes, 0),
 		PrefixesV6ForLocalPref: make([]localPrefPrefixes, 0),
 	}
+
+	// leave it for backward compatibility
 	frrLogLevel, found := os.LookupEnv("FRR_LOGGING_LEVEL")
 	if found {
 		config.Loglevel = frrLogLevel
@@ -354,18 +360,67 @@ func mapToCommunityPrefixes(m map[string]stringSet) []communityPrefixes {
 
 var debounceTimeout = 500 * time.Millisecond
 
-func NewSessionManager(l log.Logger) *sessionManager {
+func NewSessionManager(l log.Logger, logLevel logging.Level) *sessionManager {
 	res := &sessionManager{
 		sessions:     map[string]*session{},
 		bfdProfiles:  []BFDProfile{},
 		reloadConfig: make(chan *frrConfig),
+		logLevel:     logLevelToFRR(logLevel),
 	}
 	reload := func(config *frrConfig) {
 		generateAndReloadConfigFile(config, l)
 	}
+
 	debouncer(reload, res.reloadConfig, debounceTimeout)
 
+	reloadValidator(l)
+
 	return res
+}
+
+func reloadValidator(l log.Logger) {
+	var tickerIntervals = 30 * time.Second
+	var prevReloadTimeStamp string
+
+	ticker := time.NewTicker(tickerIntervals)
+	go func() {
+		for range ticker.C {
+			validateReload(l, &prevReloadTimeStamp)
+		}
+	}()
+}
+
+const statusFileName = "/etc/frr_reloader/.status"
+
+func validateReload(l log.Logger, prevReloadTimeStamp *string) {
+	bytes, err := os.ReadFile(statusFileName)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			_ = level.Error(l).Log("op", "reload-validate", "error", err, "cause", "readFile", "fileName", statusFileName)
+		}
+		return
+	}
+
+	lastReloadStatus := strings.Fields(string(bytes))
+	if len(lastReloadStatus) != 2 {
+		_ = level.Error(l).Log("op", "reload-validate", "error", err, "cause", "Fields", "bytes", string(bytes))
+		return
+	}
+
+	timeStamp, status := lastReloadStatus[0], lastReloadStatus[1]
+	if timeStamp == *prevReloadTimeStamp {
+		return
+	}
+
+	*prevReloadTimeStamp = timeStamp
+
+	if strings.Compare(status, "failure") == 0 {
+		_ = level.Error(l).Log("op", "reload-validate", "error", fmt.Errorf("reload failure"),
+			"cause", "frr reload failed", "status", status)
+		return
+	}
+
+	_ = level.Info(l).Log("op", "reload-validate", "success", "reloaded config")
 }
 
 func configBFDProfileToFRR(p *metallbconfig.BFDProfile) *BFDProfile {
@@ -379,4 +434,23 @@ func configBFDProfileToFRR(p *metallbconfig.BFDProfile) *BFDProfile {
 	res.PassiveMode = p.PassiveMode
 	res.MinimumTTL = p.MinimumTTL
 	return res
+}
+
+func logLevelToFRR(level logging.Level) string {
+	// Allowed frr log levels are: emergencies, alerts, critical,
+	// 		errors, warnings, notifications, informational, or debugging
+	switch level {
+	case logging.LevelAll, logging.LevelDebug:
+		return "debugging"
+	case logging.LevelInfo:
+		return "informational"
+	case logging.LevelWarn:
+		return "warnings"
+	case logging.LevelError:
+		return "error"
+	case logging.LevelNone:
+		return "emergencies"
+	}
+
+	return "informational"
 }
