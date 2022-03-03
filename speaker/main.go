@@ -183,9 +183,11 @@ type controller struct {
 	config *config.Config
 	client service
 
-	protocols map[config.Proto]Protocol
-	announced map[string]config.Proto // service name -> protocol advertising it
-	svcIPs    map[string][]net.IP     // service name -> assigned IPs
+	protocolHandlers map[config.Proto]Protocol
+	announced        map[config.Proto]map[string]bool // for each protocol, says if we are advertising the given service
+	svcIPs           map[string][]net.IP              // service name -> assigned IPs
+
+	protocols []config.Proto
 }
 
 type controllerConfig struct {
@@ -198,11 +200,12 @@ type controllerConfig struct {
 
 	// For testing only, and will be removed in a future release.
 	// See: https://github.com/metallb/metallb/issues/152.
-	DisableLayer2 bool
+	DisableLayer2      bool
+	SupportedProtocols []config.Proto
 }
 
 func newController(cfg controllerConfig) (*controller, error) {
-	protocols := map[config.Proto]Protocol{
+	handlers := map[config.Proto]Protocol{
 		config.BGP: &bgpController{
 			logger:         cfg.Logger,
 			myNode:         cfg.MyNode,
@@ -211,26 +214,31 @@ func newController(cfg controllerConfig) (*controller, error) {
 			sessionManager: newBGP(cfg.bgpType, cfg.Logger, cfg.LogLevel),
 		},
 	}
+	protocols := []config.Proto{config.BGP}
 
 	if !cfg.DisableLayer2 {
 		a, err := layer2.New(cfg.Logger)
 		if err != nil {
 			return nil, fmt.Errorf("making layer2 announcer: %s", err)
 		}
-		protocols[config.Layer2] = &layer2Controller{
+		handlers[config.Layer2] = &layer2Controller{
 			announcer: a,
 			myNode:    cfg.MyNode,
 			sList:     cfg.SList,
 		}
+		protocols = append(protocols, config.Layer2)
 	}
 
 	ret := &controller{
-		myNode:    cfg.MyNode,
-		bgpType:   cfg.bgpType,
-		protocols: protocols,
-		announced: map[string]config.Proto{},
-		svcIPs:    map[string][]net.IP{},
+		myNode:           cfg.MyNode,
+		bgpType:          cfg.bgpType,
+		protocolHandlers: handlers,
+		announced:        map[config.Proto]map[string]bool{},
+		svcIPs:           map[string][]net.IP{},
+		protocols:        protocols,
 	}
+	ret.announced[config.BGP] = map[string]bool{}
+	ret.announced[config.Layer2] = map[string]bool{}
 
 	return ret, nil
 }
@@ -281,27 +289,44 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 		return c.deleteBalancer(l, name, "internalError")
 	}
 
-	if proto, ok := c.announced[name]; ok && proto != pool.Protocol {
-		if st := c.deleteBalancer(l, name, "protocolChanged"); st == controllers.SyncStateError {
-			return st
-		}
-	}
-
 	if svcIPs, ok := c.svcIPs[name]; ok && !compareIPs(lbIPs, svcIPs) {
 		if st := c.deleteBalancer(l, name, "loadBalancerIPChanged"); st == controllers.SyncStateError {
 			return st
 		}
 	}
 
-	l = log.With(l, "protocol", pool.Protocol)
-	handler := c.protocols[pool.Protocol]
+	for _, protocol := range c.protocols {
+		if st := c.handleService(l, name, lbIPs, svc, pool, eps, protocol); st == controllers.SyncStateError {
+			return st
+		}
+	}
+
+	return controllers.SyncStateSuccess
+}
+
+func (c *controller) handleService(l log.Logger,
+	name string,
+	lbIPs []net.IP,
+	svc *v1.Service, pool *config.Pool,
+	eps epslices.EpsOrSlices,
+	protocol config.Proto) controllers.SyncState {
+
+	l = log.With(l, "protocol", protocol)
+	handler := c.protocolHandlers[protocol]
 	if handler == nil {
 		level.Error(l).Log("bug", "true", "msg", "internal error: unknown balancer protocol!")
-		return c.deleteBalancer(l, name, "internalError")
+		return c.deleteBalancerProtocol(l, protocol, name, "internalError")
+	}
+
+	if !handler.PoolEnabledForProtocol(pool) {
+		if c.announced[protocol][name] {
+			return c.deleteBalancerProtocol(l, protocol, name, "protocol disabled")
+		}
+		return controllers.SyncStateSuccess
 	}
 
 	if deleteReason := handler.ShouldAnnounce(l, name, lbIPs, svc, eps); deleteReason != "" {
-		return c.deleteBalancer(l, name, deleteReason)
+		return c.deleteBalancerProtocol(l, protocol, name, deleteReason)
 	}
 
 	if err := handler.SetBalancer(l, name, lbIPs, pool); err != nil {
@@ -309,50 +334,64 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 		return controllers.SyncStateError
 	}
 
-	if c.announced[name] == "" {
-		c.announced[name] = pool.Protocol
+	if !c.announced[protocol][name] {
+		c.announced[protocol][name] = true
 		c.svcIPs[name] = lbIPs
 	}
 
 	for _, ip := range lbIPs {
 		announcing.With(prometheus.Labels{
-			"protocol": string(pool.Protocol),
+			"protocol": string(protocol),
 			"service":  name,
 			"node":     c.myNode,
 			"ip":       ip.String(),
 		}).Set(1)
 	}
-	level.Info(l).Log("event", "serviceAnnounced", "msg", "service has IP, announcing")
-	c.client.Infof(svc, "nodeAssigned", "announcing from node %q", c.myNode)
-
+	level.Info(l).Log("event", "serviceAnnounced", "msg", "service has IP, announcing", "protocol", protocol)
+	c.client.Infof(svc, "nodeAssigned", "announcing from node %q with protocol %q", c.myNode, protocol)
 	return controllers.SyncStateSuccess
 }
 
 func (c *controller) deleteBalancer(l log.Logger, name, reason string) controllers.SyncState {
-	proto, ok := c.announced[name]
-	if !ok {
+	for _, protocol := range c.protocols {
+		if st := c.deleteBalancerProtocol(l, protocol, name, reason); st == controllers.SyncStateError {
+			return st
+		}
+	}
+	return controllers.SyncStateSuccess
+}
+
+func (c *controller) deleteBalancerProtocol(l log.Logger, protocol config.Proto, name, reason string) controllers.SyncState {
+	announced := c.announced[protocol][name]
+	if !announced {
 		return controllers.SyncStateSuccess
 	}
 
-	if err := c.protocols[proto].DeleteBalancer(l, name, reason); err != nil {
-		level.Error(l).Log("op", "deleteBalancer", "error", err, "msg", "failed to clear balancer state")
+	if err := c.protocolHandlers[protocol].DeleteBalancer(l, name, reason); err != nil {
+		level.Error(l).Log("op", "deleteBalancer", "error", err, "msg", "failed to clear balancer state", "protocol", protocol)
 		return controllers.SyncStateError
 	}
 
 	for _, ip := range c.svcIPs[name] {
 		ok := announcing.Delete(prometheus.Labels{
-			"protocol": string(proto),
+			"protocol": string(protocol),
 			"service":  name,
 			"node":     c.myNode,
 			"ip":       ip.String(),
 		})
 		if !ok {
-			level.Error(l).Log("op", "deleteBalancer", "error", "failed to delete service metric", "service", name, "ip", ip.String())
+			level.Error(l).Log("op", "deleteBalancer", "error", "failed to delete service metric", "service", name, "protocol", protocol, "ip", ip.String())
 		}
 	}
-	delete(c.announced, name)
-	delete(c.svcIPs, name)
+	delete(c.announced[protocol], name)
 
+	// we withdraw the service only if we are removing it from the last protocol
+	for _, p := range c.protocols {
+		if c.announced[p][name] {
+			return controllers.SyncStateSuccess
+		}
+	}
+	delete(c.svcIPs, name)
 	level.Info(l).Log("event", "serviceWithdrawn", "ip", c.svcIPs[name], "reason", reason, "msg", "withdrawing service announcement")
 
 	return controllers.SyncStateSuccess
@@ -413,7 +452,7 @@ func (c *controller) SetConfig(l log.Logger, cfg *config.Config) controllers.Syn
 		}
 	}
 
-	for proto, handler := range c.protocols {
+	for proto, handler := range c.protocolHandlers {
 		if err := handler.SetConfig(l, cfg); err != nil {
 			level.Error(l).Log("op", "setConfig", "protocol", proto, "error", err, "msg", "applying new configuration to protocol handler failed")
 			return controllers.SyncStateErrorNoRetry
@@ -426,7 +465,7 @@ func (c *controller) SetConfig(l log.Logger, cfg *config.Config) controllers.Syn
 }
 
 func (c *controller) SetNode(l log.Logger, node *v1.Node) controllers.SyncState {
-	for proto, handler := range c.protocols {
+	for proto, handler := range c.protocolHandlers {
 		if err := handler.SetNode(l, node); err != nil {
 			level.Error(l).Log("op", "setNode", "error", err, "protocol", proto, "msg", "failed to propagate node info to protocol handler")
 			return controllers.SyncStateError
@@ -442,6 +481,7 @@ type Protocol interface {
 	SetBalancer(log.Logger, string, []net.IP, *config.Pool) error
 	DeleteBalancer(log.Logger, string, string) error
 	SetNode(log.Logger, *v1.Node) error
+	PoolEnabledForProtocol(pool *config.Pool) bool
 }
 
 // Speakerlist represents a list of healthy speakers.

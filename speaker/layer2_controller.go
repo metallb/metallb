@@ -143,6 +143,10 @@ func (c *layer2Controller) SetNode(log.Logger, *v1.Node) error {
 	return nil
 }
 
+func (c *layer2Controller) PoolEnabledForProtocol(pool *config.Pool) bool {
+	return len(pool.L2Advertisements) > 0
+}
+
 // nodesWithActiveSpeakers returns the list of nodes with active speakers.
 func nodesWithActiveSpeakers(speakers map[string]bool) []string {
 	var ret []string

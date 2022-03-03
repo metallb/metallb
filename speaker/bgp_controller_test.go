@@ -273,8 +273,7 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.BGP,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -581,8 +580,7 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.BGP,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -652,8 +650,7 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.BGP,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -867,8 +864,7 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.BGP,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -1011,8 +1007,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.BGP,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -1379,8 +1374,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.BGP,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -1453,8 +1447,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.BGP,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -1678,8 +1671,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.BGP,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
@@ -1773,8 +1765,7 @@ func TestNodeSelectors(t *testing.T) {
 
 	pools := map[string]*config.Pool{
 		"default": {
-			Protocol: config.BGP,
-			CIDR:     []*net.IPNet{ipnet("1.2.3.0/24")},
+			CIDR: []*net.IPNet{ipnet("1.2.3.0/24")},
 			BGPAdvertisements: []*config.BGPAdvertisement{
 				{
 					AggregationLength: 32,
