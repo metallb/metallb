@@ -184,6 +184,9 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 		// First, determine if the peering should be active for this
 		// node.
 		shouldRun := false
+		if len(p.cfg.NodeSelectors) == 0 {
+			shouldRun = true
+		}
 		for _, ns := range p.cfg.NodeSelectors {
 			if ns.Matches(c.nodeLabels) {
 				shouldRun = true
@@ -312,6 +315,10 @@ func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
 	c.nodeLabels = ns
 	level.Info(l).Log("event", "nodeLabelsChanged", "msg", "Node labels changed, resyncing BGP peers")
 	return c.syncPeers(l)
+}
+
+func (c *bgpController) PoolEnabledForProtocol(pool *config.Pool) bool {
+	return len(pool.BGPAdvertisements) > 0
 }
 
 // Create a new 'bgp.SessionManager' of type 'bgpType'.

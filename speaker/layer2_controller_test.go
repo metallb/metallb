@@ -369,8 +369,7 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -418,8 +417,7 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -466,8 +464,7 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -512,8 +509,7 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -558,8 +554,7 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -606,8 +601,7 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -680,8 +674,7 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -756,8 +749,7 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -834,8 +826,7 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -884,8 +875,7 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -934,8 +924,7 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -986,8 +975,7 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -1038,8 +1026,7 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -1102,9 +1089,8 @@ func TestShouldAnnounce(t *testing.T) {
 		for _, svc := range test.svcs {
 			lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
 			lbIP_s := lbIP.String()
-			pool := c1.config.Pools[poolFor(c1.config.Pools, []net.IP{lbIP})]
-			response1 := c1.protocols[pool.Protocol].ShouldAnnounce(l, "balancer", []net.IP{lbIP}, svc, test.eps[lbIP_s])
-			response2 := c2.protocols[pool.Protocol].ShouldAnnounce(l, "balancer", []net.IP{lbIP}, svc, test.eps[lbIP_s])
+			response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "balancer", []net.IP{lbIP}, svc, test.eps[lbIP_s])
+			response2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "balancer", []net.IP{lbIP}, svc, test.eps[lbIP_s])
 			if response1 != test.c1ExpectedResult[lbIP_s] {
 				t.Errorf("%q: shouldAnnounce for controller 1 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIP_s, test.c1ExpectedResult[lbIP_s], response1)
 			}
@@ -1159,8 +1145,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -1217,8 +1202,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -1275,8 +1259,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -1333,8 +1316,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -1391,8 +1373,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -1449,8 +1430,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -1547,8 +1527,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -1645,8 +1624,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -1743,8 +1721,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -1816,8 +1793,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -1885,8 +1861,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -1954,8 +1929,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -2023,8 +1997,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.Layer2,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 					},
 				},
 			},
@@ -2104,9 +2077,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 		for _, svc := range test.svcs {
 			lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
 			lbIP_s := lbIP.String()
-			pool := c1.config.Pools[poolFor(c1.config.Pools, []net.IP{lbIP})]
-			response1 := c1.protocols[pool.Protocol].ShouldAnnounce(l, "test1", []net.IP{lbIP}, svc, test.eps[lbIP_s])
-			response2 := c2.protocols[pool.Protocol].ShouldAnnounce(l, "test1", []net.IP{lbIP}, svc, test.eps[lbIP_s])
+			response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, svc, test.eps[lbIP_s])
+			response2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, svc, test.eps[lbIP_s])
 			if response1 != test.c1ExpectedResult[lbIP_s] {
 				t.Errorf("%q: shouldAnnounce for controller 1 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIP_s, test.c1ExpectedResult[lbIP_s], response1)
 			}
@@ -2153,8 +2125,7 @@ func TestClusterPolicy(t *testing.T) {
 	cfg := &config.Config{
 		Pools: map[string]*config.Pool{
 			"default": {
-				Protocol: config.Layer2,
-				CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+				CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 			},
 		},
 	}
@@ -2237,11 +2208,11 @@ func TestClusterPolicy(t *testing.T) {
 		}
 
 		lbIP := net.ParseIP(ip)
-		response1svc1 := c1.protocols[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, svc1, eps1)
-		response2svc1 := c2.protocols[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, svc1, eps1)
+		response1svc1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, svc1, eps1)
+		response2svc1 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, svc1, eps1)
 
-		response1svc2 := c1.protocols[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, svc2, eps2)
-		response2svc2 := c2.protocols[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, svc2, eps2)
+		response1svc2 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, svc2, eps2)
+		response2svc2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, svc2, eps2)
 
 		// We check that only one speaker announces the service, so their response must be different
 		if response1svc1 == response2svc1 {
