@@ -26,14 +26,18 @@ import (
 	"github.com/mikioh/ipaddr"
 	"github.com/pkg/errors"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 type ClusterResources struct {
-	Pools       []metallbv1beta1.AddressPool
-	Peers       []metallbv1beta1.BGPPeer
+	Pools       []metallbv1beta1.IPPool
+	Peers       []metallbv1beta2.BGPPeer
 	BFDProfiles []metallbv1beta1.BFDProfile
+	BGPAdvs     []metallbv1beta1.BGPAdvertisement
+	L2Advs      []metallbv1beta1.L2Advertisement
 }
 
 // Config is a parsed MetalLB configuration.
@@ -54,6 +58,10 @@ const (
 	BGP    Proto = "bgp"
 	Layer2 Proto = "layer2"
 )
+
+var Protocols = []Proto{
+	BGP, Layer2,
+}
 
 // Peer is the configuration of a BGP peering session.
 type Peer struct {
@@ -87,8 +95,6 @@ type Peer struct {
 
 // Pool is the configuration of an IP address pool.
 type Pool struct {
-	// Protocol for this pool.
-	Protocol Proto
 	// The addresses that are part of this pool, expressed as CIDR
 	// prefixes. config.Parse guarantees that these are
 	// non-overlapping, both within and between pools.
@@ -102,9 +108,14 @@ type Pool struct {
 	// If false, prevents IP addresses to be automatically assigned
 	// from this pool.
 	AutoAssign bool
-	// When an IP is allocated from this pool, how should it be
-	// translated into BGP announcements?
+
+	// The list of BGPAdvertisements associated with this address pool.
 	BGPAdvertisements []*BGPAdvertisement
+
+	// The list of L2Advertisements associated with this address pool.
+	L2Advertisements []*L2Advertisement
+
+	cidrsPerAddresses map[string][]*net.IPNet
 }
 
 // BGPAdvertisement describes one translation from an IP address to a BGP advertisement.
@@ -123,6 +134,9 @@ type BGPAdvertisement struct {
 	Communities map[uint32]bool
 }
 
+type L2Advertisement struct {
+}
+
 // BFDProfile describes a BFD profile to be applied to a set of peers.
 type BFDProfile struct {
 	Name             string
@@ -133,39 +147,6 @@ type BFDProfile struct {
 	EchoMode         bool
 	PassiveMode      bool
 	MinimumTTL       *uint32
-}
-
-func parseNodeSelector(ns metallbv1beta1.NodeSelector) (labels.Selector, error) {
-	if len(ns.MatchLabels)+len(ns.MatchExpressions) == 0 {
-		return labels.Everything(), nil
-	}
-
-	// Convert to a metav1.LabelSelector so we can use the fancy
-	// parsing function to create a Selector.
-	//
-	// Why not use metav1.LabelSelector in the raw config object?
-	// Because metav1.LabelSelector doesn't have yaml tag
-	// specifications.
-	sel := &metav1.LabelSelector{
-		MatchLabels: ns.MatchLabels,
-	}
-	for _, req := range ns.MatchExpressions {
-		sel.MatchExpressions = append(sel.MatchExpressions, metav1.LabelSelectorRequirement{
-			Key:      req.Key,
-			Operator: metav1.LabelSelectorOperator(req.Operator),
-			Values:   req.Values,
-		})
-	}
-
-	return metav1.LabelSelectorAsSelector(sel)
-}
-
-func validateHoldTime(ht time.Duration) error {
-	rounded := time.Duration(int(ht.Seconds())) * time.Second
-	if rounded != 0 && rounded < 3*time.Second {
-		return fmt.Errorf("invalid hold time %q: must be 0 or >=3s", ht)
-	}
-	return nil
 }
 
 // Parse loads and validates a Config from bs.
@@ -250,10 +231,58 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 		cfg.Pools[p.Name] = pool
 	}
 
+	for _, l2Adv := range resources.L2Advs {
+		adv := l2AdvertisementFromCR(l2Adv)
+		// No pool selector means select all pools
+		if len(l2Adv.Spec.IPPools) == 0 {
+			for _, pool := range cfg.Pools {
+				pool.L2Advertisements = append(pool.L2Advertisements, adv)
+			}
+			continue
+		}
+		for _, poolName := range l2Adv.Spec.IPPools {
+			if pool, ok := cfg.Pools[poolName]; ok {
+				pool.L2Advertisements = append(pool.L2Advertisements, adv)
+			}
+		}
+	}
+
+	err = validateDuplicateBGPAdvertisements(resources.BGPAdvs)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, bgpAdv := range resources.BGPAdvs {
+		adv, err := bgpAdvertisementFromCR(bgpAdv, communities)
+		if err != nil {
+			return nil, err
+		}
+		// No pool selector means select all pools
+		if len(bgpAdv.Spec.IPPools) == 0 {
+			for _, pool := range cfg.Pools {
+				err := validateBGPAdvPerPool(adv, pool)
+				if err != nil {
+					return nil, err
+				}
+				pool.BGPAdvertisements = append(pool.BGPAdvertisements, adv)
+			}
+			continue
+		}
+		for _, poolName := range bgpAdv.Spec.IPPools {
+			if pool, ok := cfg.Pools[poolName]; ok {
+				err := validateBGPAdvPerPool(adv, pool)
+				if err != nil {
+					return nil, err
+				}
+				pool.BGPAdvertisements = append(pool.BGPAdvertisements, adv)
+			}
+		}
+	}
+
 	return cfg, nil
 }
 
-func peerFromCR(p metallbv1beta1.BGPPeer) (*Peer, error) {
+func peerFromCR(p metallbv1beta2.BGPPeer) (*Peer, error) {
 	if p.Spec.MyASN == 0 {
 		return nil, errors.New("missing local ASN")
 	}
@@ -284,10 +313,7 @@ func peerFromCR(p metallbv1beta1.BGPPeer) (*Peer, error) {
 	if keepaliveTime > holdTime {
 		return nil, fmt.Errorf("invalid keepaliveTime %q", p.Spec.KeepaliveTime)
 	}
-	port := uint16(179)
-	if p.Spec.Port != 0 {
-		port = p.Spec.Port
-	}
+
 	// Ideally we would set a default RouterID here, instead of having
 	// to do it elsewhere in the code. Unfortunately, we don't know
 	// the node IP here.
@@ -303,20 +329,16 @@ func peerFromCR(p metallbv1beta1.BGPPeer) (*Peer, error) {
 		return nil, fmt.Errorf("invalid source IP %q", p.Spec.SrcAddress)
 	}
 
-	// We use a non-pointer in the raw json object, so that if the
-	// user doesn't provide a node selector, we end up with an empty,
-	// but non-nil selector, which means "select everything".
 	var nodeSels []labels.Selector
-	if len(p.Spec.NodeSelectors) == 0 {
-		nodeSels = []labels.Selector{labels.Everything()}
-	} else {
-		for _, sel := range p.Spec.NodeSelectors {
-			nodeSel, err := parseNodeSelector(sel)
-			if err != nil {
-				return nil, fmt.Errorf("parsing node selector: %s", err)
-			}
-			nodeSels = append(nodeSels, nodeSel)
+	for _, s := range p.Spec.NodeSelectors {
+		labelSelector, err := metav1.LabelSelectorAsSelector(&s)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Failed to convert peer %s node selector", p.Name)
 		}
+		nodeSels = append(nodeSels, labelSelector)
+	}
+	if len(nodeSels) == 0 {
+		nodeSels = []labels.Selector{labels.Everything()}
 	}
 
 	var password string
@@ -329,7 +351,7 @@ func peerFromCR(p metallbv1beta1.BGPPeer) (*Peer, error) {
 		ASN:           p.Spec.ASN,
 		Addr:          ip,
 		SrcAddr:       src,
-		Port:          port,
+		Port:          p.Spec.Port,
 		HoldTime:      holdTime,
 		KeepaliveTime: keepaliveTime,
 		RouterID:      routerID,
@@ -340,13 +362,12 @@ func peerFromCR(p metallbv1beta1.BGPPeer) (*Peer, error) {
 	}, nil
 }
 
-func addressPoolFromCR(p metallbv1beta1.AddressPool, bgpCommunities map[string]uint32) (*Pool, error) {
+func addressPoolFromCR(p metallbv1beta1.IPPool, bgpCommunities map[string]uint32) (*Pool, error) {
 	if p.Name == "" {
 		return nil, errors.New("missing pool name")
 	}
 
 	ret := &Pool{
-		Protocol:      Proto(p.Spec.Protocol),
 		AvoidBuggyIPs: p.Spec.AvoidBuggyIPs,
 		AutoAssign:    true,
 	}
@@ -359,30 +380,14 @@ func addressPoolFromCR(p metallbv1beta1.AddressPool, bgpCommunities map[string]u
 		return nil, errors.New("pool has no prefixes defined")
 	}
 
-	cidrsPerAddresses := map[string][]*net.IPNet{}
+	ret.cidrsPerAddresses = map[string][]*net.IPNet{}
 	for _, cidr := range p.Spec.Addresses {
 		nets, err := ParseCIDR(cidr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid CIDR %q in pool %q: %s", cidr, p.Name, err)
 		}
 		ret.CIDR = append(ret.CIDR, nets...)
-		cidrsPerAddresses[cidr] = nets
-	}
-	switch ret.Protocol {
-	case Layer2:
-		if len(p.Spec.BGPAdvertisements) > 0 {
-			return nil, errors.New("cannot have bgp-advertisements configuration element in a layer2 address pool")
-		}
-	case BGP:
-		ads, err := bgpAdvertisementsFromCR(p.Spec.BGPAdvertisements, cidrsPerAddresses, bgpCommunities)
-		if err != nil {
-			return nil, fmt.Errorf("parsing BGP communities: %s", err)
-		}
-		ret.BGPAdvertisements = ads
-	case "":
-		return nil, errors.New("address pool is missing the protocol field")
-	default:
-		return nil, fmt.Errorf("unknown protocol %q", ret.Protocol)
+		ret.cidrsPerAddresses[cidr] = nets
 	}
 
 	return ret, nil
@@ -413,7 +418,7 @@ func bfdProfileFromCR(p metallbv1beta1.BFDProfile) (*BFDProfile, error) {
 	}
 	res.EchoInterval, err = bfdIntFromConfig(p.Spec.EchoInterval, 10, 60000)
 	if err != nil {
-		return nil, errors.Wrap(err, "invalid echo interval value")
+		return nil, errors.Wrap(err, "invalid minimum ttl value")
 	}
 	if p.Spec.EchoMode != nil {
 		res.EchoMode = *p.Spec.EchoMode
@@ -425,86 +430,79 @@ func bfdProfileFromCR(p metallbv1beta1.BFDProfile) (*BFDProfile, error) {
 	return res, nil
 }
 
-func bgpAdvertisementsFromCR(ads []metallbv1beta1.BgpAdvertisement, cidrsPerAddresses map[string][]*net.IPNet, communities map[string]uint32) ([]*BGPAdvertisement, error) {
-	if len(ads) == 0 {
-		return []*BGPAdvertisement{
-			{
-				AggregationLength:   32,
-				AggregationLengthV6: 128,
-				LocalPref:           0,
-				Communities:         map[uint32]bool{},
-			},
-		}, nil
-	}
+func l2AdvertisementFromCR(crdAd metallbv1beta1.L2Advertisement) *L2Advertisement {
+	return &L2Advertisement{}
+}
 
-	err := validateDuplicateAdvertisements(ads)
+func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities map[string]uint32) (*BGPAdvertisement, error) {
+	err := validateDuplicateCommunities(crdAd.Spec.Communities)
 	if err != nil {
 		return nil, err
 	}
 
-	var ret []*BGPAdvertisement
-	for _, crdAd := range ads {
-		err := validateDuplicateCommunities(crdAd.Communities)
-		if err != nil {
-			return nil, err
-		}
-
-		ad := &BGPAdvertisement{
-			AggregationLength:   32,
-			AggregationLengthV6: 128,
-			LocalPref:           0,
-			Communities:         map[uint32]bool{},
-		}
-
-		if crdAd.AggregationLength != nil {
-			ad.AggregationLength = int(*crdAd.AggregationLength)
-		}
-		if ad.AggregationLength > 32 {
-			return nil, fmt.Errorf("invalid aggregation length %q for IPv4", ad.AggregationLength)
-		}
-		if crdAd.AggregationLengthV6 != nil {
-			ad.AggregationLengthV6 = int(*crdAd.AggregationLengthV6)
-			if ad.AggregationLengthV6 > 128 {
-				return nil, fmt.Errorf("invalid aggregation length %q for IPv6", ad.AggregationLengthV6)
-			}
-		}
-
-		for addr, cidrs := range cidrsPerAddresses {
-			if len(cidrs) == 0 {
-				continue
-			}
-			maxLength := ad.AggregationLength
-			if cidrs[0].IP.To4() == nil {
-				maxLength = ad.AggregationLengthV6
-			}
-
-			// in case of range format, we may have a set of cidrs associated to a given address.
-			// We reject if none of the cidrs are compatible with the aggregation length.
-			lowest := lowestMask(cidrs)
-			if maxLength < lowest {
-				return nil, fmt.Errorf("invalid aggregation length %d: prefix %q in "+
-					"this pool is more specific than the aggregation length for addresses %s", ad.AggregationLength, lowest, addr)
-			}
-		}
-
-		ad.LocalPref = crdAd.LocalPref
-
-		for _, c := range crdAd.Communities {
-			if v, ok := communities[c]; ok {
-				ad.Communities[v] = true
-			} else {
-				v, err := ParseCommunity(c)
-				if err != nil {
-					return nil, fmt.Errorf("invalid community %q in BGP advertisement: %s", c, err)
-				}
-				ad.Communities[v] = true
-			}
-		}
-
-		ret = append(ret, ad)
+	ad := &BGPAdvertisement{
+		AggregationLength:   32,
+		AggregationLengthV6: 128,
+		LocalPref:           0,
+		Communities:         map[uint32]bool{},
 	}
 
-	return ret, nil
+	if crdAd.Spec.AggregationLength != nil {
+		ad.AggregationLength = int(*crdAd.Spec.AggregationLength) // TODO CRD cast
+	}
+	if ad.AggregationLength > 32 {
+		return nil, fmt.Errorf("invalid aggregation length %q for IPv4", ad.AggregationLength)
+	}
+	if crdAd.Spec.AggregationLengthV6 != nil {
+		ad.AggregationLengthV6 = int(*crdAd.Spec.AggregationLengthV6) // TODO CRD cast
+		if ad.AggregationLengthV6 > 128 {
+			return nil, fmt.Errorf("invalid aggregation length %q for IPv6", ad.AggregationLengthV6)
+		}
+	}
+
+	ad.LocalPref = crdAd.Spec.LocalPref
+
+	for _, c := range crdAd.Spec.Communities {
+		if v, ok := communities[c]; ok {
+			ad.Communities[v] = true
+		} else {
+			v, err := ParseCommunity(c)
+			if err != nil {
+				return nil, fmt.Errorf("invalid community %q in BGP advertisement: %s", c, err)
+			}
+			ad.Communities[v] = true
+		}
+	}
+	return ad, nil
+}
+
+func validateHoldTime(ht time.Duration) error {
+	rounded := time.Duration(int(ht.Seconds())) * time.Second
+	if rounded != 0 && rounded < 3*time.Second {
+		return fmt.Errorf("invalid hold time %q: must be 0 or >=3s", ht)
+	}
+	return nil
+}
+
+func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
+	for addr, cidrs := range pool.cidrsPerAddresses {
+		if len(cidrs) == 0 {
+			continue
+		}
+		maxLength := adv.AggregationLength
+		if cidrs[0].IP.To4() == nil {
+			maxLength = adv.AggregationLengthV6
+		}
+
+		// in case of range format, we may have a set of cidrs associated to a given address.
+		// We reject if none of the cidrs are compatible with the aggregation length.
+		lowest := lowestMask(cidrs)
+		if maxLength < lowest {
+			return fmt.Errorf("invalid aggregation length %d: prefix %q in "+
+				"this pool is more specific than the aggregation length for addresses %s", adv.AggregationLength, lowest, addr)
+		}
+	}
+	return nil
 }
 
 func ParseCommunity(c string) (uint32, error) {
@@ -607,7 +605,7 @@ func bfdIntFromConfig(value *uint32, min, max uint32) (*uint32, error) {
 	return value, nil
 }
 
-func validateDuplicateAdvertisements(ads []metallbv1beta1.BgpAdvertisement) error {
+func validateDuplicateBGPAdvertisements(ads []metallbv1beta1.BGPAdvertisement) error {
 	for i := 0; i < len(ads); i++ {
 		for j := i + 1; j < len(ads); j++ {
 			if reflect.DeepEqual(ads[i], ads[j]) {
