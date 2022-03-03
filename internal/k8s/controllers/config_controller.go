@@ -18,12 +18,12 @@ package controllers
 
 import (
 	"context"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/config"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -34,8 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
-
-const RetryPeriod = 10 * time.Second
 
 type ConfigReconciler struct {
 	client.Client
@@ -48,8 +46,10 @@ type ConfigReconciler struct {
 }
 
 //+kubebuilder:rbac:groups=metallb.io,resources=bgppeers,verbs=get;list;watch;
-//+kubebuilder:rbac:groups=metallb.io,resources=addresspools,verbs=get;list;watch;create;
-//+kubebuilder:rbac:groups=metallb.io,resources=bfdprofiles,verbs=get;list;watch;create;
+//+kubebuilder:rbac:groups=metallb.io,resources=addresspools,verbs=get;list;watch;
+//+kubebuilder:rbac:groups=metallb.io,resources=bfdprofiles,verbs=get;list;watch;
+//+kubebuilder:rbac:groups=metallb.io,resources=bgpadvertisement,verbs=get;list;watch;
+//+kubebuilder:rbac:groups=metallb.io,resources=l2advertisement,verbs=get;list;watch;
 
 func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	level.Info(r.Logger).Log("controller", "ConfigReconciler", "start reconcile", req.NamespacedName.String())
@@ -61,7 +61,13 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	var bgpPeers metallbv1beta1.BGPPeerList
+	var ipPools metallbv1beta1.IPPoolList
+	if err := r.List(ctx, &ipPools, client.InNamespace(r.Namespace)); err != nil {
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to get addresspools", "error", err)
+		return ctrl.Result{}, err
+	}
+
+	var bgpPeers metallbv1beta2.BGPPeerList
 	if err := r.List(ctx, &bgpPeers, client.InNamespace(r.Namespace)); err != nil {
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to get bgppeers", "error", err)
 		return ctrl.Result{}, err
@@ -73,10 +79,24 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
+	var l2Advertisements metallbv1beta1.L2AdvertisementList
+	if err := r.List(ctx, &l2Advertisements, client.InNamespace(r.Namespace)); err != nil {
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to get l2 advertisements", "error", err)
+		return ctrl.Result{}, err
+	}
+
+	var bgpAdvertisements metallbv1beta1.BGPAdvertisementList
+	if err := r.List(ctx, &bgpAdvertisements, client.InNamespace(r.Namespace)); err != nil {
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to get bgp advertisements", "error", err)
+		return ctrl.Result{}, err
+	}
+
 	metallbCRs := config.ClusterResources{
-		Pools:       addressPools.Items,
+		Pools:       ipPools.Items,
 		Peers:       bgpPeers.Items,
 		BFDProfiles: bfdProfiles.Items,
+		L2Advs:      l2Advertisements.Items,
+		BGPAdvs:     bgpAdvertisements.Items,
 	}
 
 	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs", spew.Sdump(metallbCRs))
@@ -125,8 +145,10 @@ func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		},
 	}
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&metallbv1beta1.BGPPeer{}, builder.WithPredicates(p)).
-		Watches(&source.Kind{Type: &metallbv1beta1.AddressPool{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(p)).
+		For(&metallbv1beta2.BGPPeer{}, builder.WithPredicates(p)).
+		Watches(&source.Kind{Type: &metallbv1beta1.IPPool{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(p)).
+		Watches(&source.Kind{Type: &metallbv1beta1.BGPAdvertisement{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(p)).
+		Watches(&source.Kind{Type: &metallbv1beta1.L2Advertisement{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(p)).
 		Watches(&source.Kind{Type: &metallbv1beta1.BFDProfile{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(p)).
 		Complete(r)
 }

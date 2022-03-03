@@ -24,17 +24,20 @@ func DiscardFRROnly(c ClusterResources) error {
 	if len(c.BFDProfiles) > 0 {
 		return errors.New("bfd profiles section set")
 	}
+	if len(c.BGPAdvs) == 0 {
+		return nil
+	}
+	// we check for ipv6 addresses if we have at least one bgp advertisement, as it's
+	// not supported in native mode.
 	for _, p := range c.Pools {
-		if p.Spec.Protocol == string(BGP) {
-			for _, cidr := range p.Spec.Addresses {
-				nets, err := ParseCIDR(cidr)
-				if err != nil {
-					return fmt.Errorf("invalid CIDR %q in pool %q: %s", cidr, p.Name, err)
-				}
-				for _, n := range nets {
-					if n.IP.To4() == nil {
-						return fmt.Errorf("pool %q has ipv6 CIDR %s, native bgp mode does not support ipv6", p.Name, n)
-					}
+		for _, cidr := range p.Spec.Addresses {
+			nets, err := ParseCIDR(cidr)
+			if err != nil {
+				return fmt.Errorf("invalid CIDR %q in pool %q: %s", cidr, p.Name, err)
+			}
+			for _, n := range nets {
+				if n.IP.To4() == nil {
+					return fmt.Errorf("pool %q has ipv6 CIDR %s, native bgp mode does not support ipv6", p.Name, n)
 				}
 			}
 		}
