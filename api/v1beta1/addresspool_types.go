@@ -20,7 +20,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type BgpAdvertisement struct {
+type LegacyBgpAdvertisement struct {
 	// The aggregation-length advertisement option lets you “roll up” the /32s into a larger prefix.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=32
@@ -68,7 +68,7 @@ type AddressPoolSpec struct {
 	// When an IP is allocated from this pool, how should it be
 	// translated into BGP announcements?
 	// +optional
-	BGPAdvertisements []BgpAdvertisement `json:"bgpAdvertisements,omitempty" yaml:"bgp-advertisements,omitempty"`
+	BGPAdvertisements []LegacyBgpAdvertisement `json:"bgpAdvertisements,omitempty" yaml:"bgp-advertisements,omitempty"`
 }
 
 // AddressPoolStatus defines the observed state of AddressPool.
