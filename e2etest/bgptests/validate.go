@@ -12,7 +12,7 @@ import (
 
 	"github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
-	"go.universe.tf/metallb/e2etest/pkg/config"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/frr"
 	frrcontainer "go.universe.tf/metallb/e2etest/pkg/frr/container"
@@ -121,18 +121,18 @@ func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily ipf
 	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
 
-func checkBFDConfigPropagated(nodeConfig config.BfdProfile, peerConfig bgpfrr.BFDPeer) error {
+func checkBFDConfigPropagated(nodeConfig metallbv1beta1.BFDProfile, peerConfig bgpfrr.BFDPeer) error {
 	if peerConfig.Status != "up" {
 		return fmt.Errorf("Peer status not up")
 	}
-	if peerConfig.RemoteReceiveInterval != int(*nodeConfig.ReceiveInterval) {
-		return fmt.Errorf("RemoteReceiveInterval: expecting %d, got %d", *nodeConfig.ReceiveInterval, peerConfig.RemoteReceiveInterval)
+	if peerConfig.RemoteReceiveInterval != int(*nodeConfig.Spec.ReceiveInterval) {
+		return fmt.Errorf("RemoteReceiveInterval: expecting %d, got %d", *nodeConfig.Spec.ReceiveInterval, peerConfig.RemoteReceiveInterval)
 	}
-	if peerConfig.RemoteTransmitInterval != int(*nodeConfig.TransmitInterval) {
-		return fmt.Errorf("RemoteTransmitInterval: expecting %d, got %d", *nodeConfig.TransmitInterval, peerConfig.RemoteTransmitInterval)
+	if peerConfig.RemoteTransmitInterval != int(*nodeConfig.Spec.TransmitInterval) {
+		return fmt.Errorf("RemoteTransmitInterval: expecting %d, got %d", *nodeConfig.Spec.TransmitInterval, peerConfig.RemoteTransmitInterval)
 	}
-	if peerConfig.RemoteEchoInterval != int(*nodeConfig.EchoInterval) {
-		return fmt.Errorf("EchoInterval: expecting %d, got %d", *nodeConfig.EchoInterval, peerConfig.RemoteEchoInterval)
+	if peerConfig.RemoteEchoInterval != int(*nodeConfig.Spec.EchoInterval) {
+		return fmt.Errorf("EchoInterval: expecting %d, got %d", *nodeConfig.Spec.EchoInterval, peerConfig.RemoteEchoInterval)
 	}
 	return nil
 }

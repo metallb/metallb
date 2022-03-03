@@ -4,19 +4,18 @@ package config
 
 import (
 	"context"
-	"time"
 
-	operatorv1beta1 "github.com/metallb/metallb-operator/api/v1beta1"
-	apierr "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
+	"go.universe.tf/metallb/internal/config"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 type Updater interface {
-	Update(f File) error
+	Update(r config.ClusterResources) error
 	Clean() error
 }
 
@@ -28,7 +27,11 @@ type beta1Updater struct {
 func UpdaterForCRs(r *rest.Config, ns string) (*beta1Updater, error) {
 	myScheme := runtime.NewScheme()
 
-	if err := operatorv1beta1.AddToScheme(myScheme); err != nil {
+	if err := metallbv1beta1.AddToScheme(myScheme); err != nil {
+		return nil, err
+	}
+
+	if err := metallbv1beta2.AddToScheme(myScheme); err != nil {
 		return nil, err
 	}
 
@@ -46,212 +49,70 @@ func UpdaterForCRs(r *rest.Config, ns string) (*beta1Updater, error) {
 	}, nil
 }
 
-func (o beta1Updater) Update(f File) error {
-	for _, a := range f.Pools {
-		err := o.createPool(a)
+func (o beta1Updater) Update(r config.ClusterResources) error {
+	// we fill a map of objects to keep the order we add the resources random, as
+	// it would happen by throwing a set of manifests against a cluster, hoping to
+	// find corner cases that we would not find by adding them always in the same
+	// order.
+	objects := map[int]client.Object{}
+	key := 0
+	for _, pool := range r.Pools {
+		objects[key] = pool.DeepCopy()
+		key = key + 1
+	}
+
+	for _, peer := range r.Peers {
+		objects[key] = peer.DeepCopy()
+		key = key + 1
+	}
+
+	for _, bfdProfile := range r.BFDProfiles {
+		objects[key] = bfdProfile.DeepCopy()
+		key = key + 1
+	}
+
+	for _, bgpAdv := range r.BGPAdvs {
+		objects[key] = bgpAdv.DeepCopy()
+		key = key + 1
+	}
+
+	for _, l2Adv := range r.L2Advs {
+		objects[key] = l2Adv.DeepCopy()
+		key = key + 1
+	}
+
+	// Iterating over the map will return the items in a random order.
+	for _, obj := range objects {
+		obj.SetNamespace(o.namespace)
+		_, err := controllerutil.CreateOrUpdate(context.Background(), o.Client, obj, func() error { return nil })
 		if err != nil {
 			return err
 		}
 	}
-
-	for _, bp := range f.BFDProfiles {
-		err := o.createBFDProfile(bp)
-		if err != nil {
-			return err
-		}
-	}
-
-	/*
-		Since a peer doesn't have a name we need to clean them before creating.
-		Without this the webhook fails the request because we are trying to create
-		a BGPPeer with the same configuration under a different (generated) name.
-		TODO: is there a better way to handle this?
-	*/
-	err := o.DeleteAllOf(context.Background(), &operatorv1beta1.BGPPeer{}, client.InNamespace(o.namespace))
-	if err != nil {
-		return err
-	}
-
-	for _, p := range f.Peers {
-		err := o.createPeer(p)
-		if err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
 func (o beta1Updater) Clean() error {
-	err := o.DeleteAllOf(context.Background(), &operatorv1beta1.AddressPool{}, client.InNamespace(o.namespace))
+	err := o.DeleteAllOf(context.Background(), &metallbv1beta1.IPPool{}, client.InNamespace(o.namespace))
 	if err != nil {
 		return err
 	}
-
-	err = o.DeleteAllOf(context.Background(), &operatorv1beta1.BFDProfile{}, client.InNamespace(o.namespace))
+	err = o.DeleteAllOf(context.Background(), &metallbv1beta2.BGPPeer{}, client.InNamespace(o.namespace))
 	if err != nil {
 		return err
 	}
-
-	err = o.DeleteAllOf(context.Background(), &operatorv1beta1.BGPPeer{}, client.InNamespace(o.namespace))
+	err = o.DeleteAllOf(context.Background(), &metallbv1beta1.BFDProfile{}, client.InNamespace(o.namespace))
+	if err != nil {
+		return err
+	}
+	err = o.DeleteAllOf(context.Background(), &metallbv1beta1.BGPAdvertisement{}, client.InNamespace(o.namespace))
+	if err != nil {
+		return err
+	}
+	err = o.DeleteAllOf(context.Background(), &metallbv1beta1.L2Advertisement{}, client.InNamespace(o.namespace))
 	if err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func (o beta1Updater) createPool(a AddressPool) error {
-	pool := o.poolToCR(a)
-	existing := &operatorv1beta1.AddressPool{}
-	err := o.Client.Get(context.TODO(), types.NamespacedName{Name: pool.Name, Namespace: pool.Namespace}, existing)
-
-	if err != nil {
-		if apierr.IsNotFound(err) {
-			return o.Client.Create(context.TODO(), pool)
-		}
-		return err
-	}
-
-	pool.ResourceVersion = existing.ResourceVersion
-	return o.Client.Update(context.TODO(), pool)
-}
-
-func (o beta1Updater) poolToCR(a AddressPool) *operatorv1beta1.AddressPool {
-	addrs := make([]string, len(a.Addresses))
-	copy(addrs, a.Addresses)
-
-	bgppadvs := make([]operatorv1beta1.BgpAdvertisement, 0)
-	for _, b := range a.BGPAdvertisements {
-		adv := operatorv1beta1.BgpAdvertisement{}
-		if b.AggregationLength != nil {
-			al := int32(*b.AggregationLength)
-			adv.AggregationLength = &al
-		}
-		if b.LocalPref != nil {
-			adv.LocalPref = *b.LocalPref
-		}
-		adv.Communities = make([]string, len(b.Communities))
-		copy(adv.Communities, b.Communities)
-		bgppadvs = append(bgppadvs, adv)
-	}
-
-	return &operatorv1beta1.AddressPool{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      a.Name,
-			Namespace: o.namespace,
-		},
-		Spec: operatorv1beta1.AddressPoolSpec{
-			Protocol:  string(a.Protocol),
-			Addresses: addrs,
-			// AvoidBuggyIPs missing from operator
-			AutoAssign:        a.AutoAssign,
-			BGPAdvertisements: bgppadvs,
-		},
-	}
-}
-
-func (o beta1Updater) createPeer(p Peer) error {
-	peer, err := o.peerToCR(p)
-	if err != nil {
-		return err
-	}
-
-	// peer's name is autogenerated, will not hit a name conflict here.
-	return o.Client.Create(context.TODO(), peer)
-}
-
-func (o beta1Updater) peerToCR(p Peer) (*operatorv1beta1.BGPPeer, error) {
-	nodeselectors := make([]operatorv1beta1.NodeSelector, len(p.NodeSelectors))
-	for _, ns := range p.NodeSelectors {
-		n := operatorv1beta1.NodeSelector{
-			MatchLabels: ns.MatchLabels,
-		}
-		for _, e := range ns.MatchExpressions {
-			vals := make([]string, len(e.Values))
-			copy(vals, e.Values)
-			expr := operatorv1beta1.MatchExpression{
-				Key:      e.Key,
-				Operator: e.Operator,
-				Values:   vals,
-			}
-			n.MatchExpressions = append(n.MatchExpressions, expr)
-		}
-		nodeselectors = append(nodeselectors, n)
-	}
-
-	holdTime, err := stringToDuration(p.HoldTime)
-	if err != nil {
-		return nil, err
-	}
-	keepAliveTime, err := stringToDuration(p.KeepaliveTime)
-	if err != nil {
-		return nil, err
-	}
-	return &operatorv1beta1.BGPPeer{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "testpeer-",
-			Namespace:    o.namespace,
-		},
-		Spec: operatorv1beta1.BGPPeerSpec{
-			MyASN:         p.MyASN,
-			ASN:           p.ASN,
-			Address:       p.Addr,
-			SrcAddress:    p.SrcAddr,
-			Port:          p.Port,
-			HoldTime:      holdTime,
-			KeepaliveTime: keepAliveTime,
-			NodeSelectors: nodeselectors,
-			Password:      p.Password,
-			BFDProfile:    p.BFDProfile,
-			RouterID:      p.RouterID,
-			EBGPMultiHop:  p.EBGPMultiHop,
-		},
-	}, nil
-
-}
-
-func (o beta1Updater) createBFDProfile(bp BfdProfile) error {
-	bfdprofile := o.bfdProfileToCR(bp)
-	existing := &operatorv1beta1.BFDProfile{}
-	err := o.Client.Get(context.TODO(), types.NamespacedName{Name: bfdprofile.Name, Namespace: bfdprofile.Namespace}, existing)
-
-	if err != nil {
-		if apierr.IsNotFound(err) {
-			return o.Client.Create(context.TODO(), bfdprofile)
-		}
-		return err
-	}
-
-	bfdprofile.ResourceVersion = existing.ResourceVersion
-	return o.Client.Update(context.TODO(), bfdprofile)
-}
-
-func (o beta1Updater) bfdProfileToCR(bp BfdProfile) *operatorv1beta1.BFDProfile {
-	return &operatorv1beta1.BFDProfile{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      bp.Name,
-			Namespace: o.namespace,
-		},
-		Spec: operatorv1beta1.BFDProfileSpec{
-			ReceiveInterval:  bp.ReceiveInterval,
-			TransmitInterval: bp.TransmitInterval,
-			DetectMultiplier: bp.DetectMultiplier,
-			EchoInterval:     bp.EchoInterval,
-			EchoMode:         bp.EchoMode,
-			PassiveMode:      bp.PassiveMode,
-			MinimumTTL:       bp.MinimumTTL,
-		},
-	}
-}
-
-func stringToDuration(duration string) (metav1.Duration, error) {
-	if duration == "" {
-		return metav1.Duration{}, nil
-	}
-	d, err := time.ParseDuration(duration)
-	if err != nil {
-		return metav1.Duration{}, err
-	}
-	return metav1.Duration{Duration: d}, nil
 }
