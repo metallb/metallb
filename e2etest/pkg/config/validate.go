@@ -9,14 +9,15 @@ import (
 
 	"github.com/mikioh/ipaddr"
 	"github.com/pkg/errors"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	internalconfig "go.universe.tf/metallb/internal/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-func ValidateIPInRange(addressPools []AddressPool, ip string) error {
+func ValidateIPInRange(addressPools []metallbv1beta1.IPPool, ip string) error {
 	input := net.ParseIP(ip)
 	for _, addressPool := range addressPools {
-		for _, address := range addressPool.Addresses {
+		for _, address := range addressPool.Spec.Addresses {
 			cidrs, err := internalconfig.ParseCIDR(address)
 			framework.ExpectNoError(err)
 			for _, cidr := range cidrs {
@@ -52,9 +53,9 @@ func GetIPFromRangeByIndex(ipRange string, index int) (string, error) {
 }
 
 // PoolCount returns the number of addresses in a given Pool.
-func PoolCount(p AddressPool) (int64, error) {
+func PoolCount(p metallbv1beta1.IPPool) (int64, error) {
 	var total int64
-	for _, r := range p.Addresses {
+	for _, r := range p.Spec.Addresses {
 		cidrs, err := internalconfig.ParseCIDR(r)
 		if err != nil {
 			return 0, err
@@ -72,7 +73,7 @@ func PoolCount(p AddressPool) (int64, error) {
 			firstIP := cur.First().IP
 			lastIP := cur.Last().IP
 
-			if p.AvoidBuggyIPs {
+			if p.Spec.AvoidBuggyIPs {
 				if o <= 24 {
 					// A pair of buggy IPs occur for each /24 present in the range.
 					buggies := int64(math.Pow(2, float64(24-o))) * 2

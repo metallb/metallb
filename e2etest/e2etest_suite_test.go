@@ -53,15 +53,8 @@ var (
 func handleFlags() {
 	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
 	framework.RegisterCommonFlags(flag.CommandLine)
-	/*
-		Using framework.RegisterClusterFlags(flag.CommandLine) results in a panic:
-		"flag redefined: kubeconfig".
-		This happens because controller-runtime registers the kubeconfig flag as well.
-		To solve this we set the framework's kubeconfig directly via the KUBECONFIG env var
-		instead of letting it call the flag. Since we also use the provider flag it is handled manually.
-	*/
-	flag.StringVar(&framework.TestContext.Provider, "provider", "", "The name of the Kubernetes provider (gce, gke, local, skeleton (the fallback if not set), etc.)")
-	framework.TestContext.KubeConfig = os.Getenv(clientcmd.RecommendedConfigPathEnvVar)
+	framework.RegisterClusterFlags(flag.CommandLine)
+
 	flag.IntVar(&service.TestServicePort, "service-pod-port", 80, "port number that pod opens, default: 80")
 	flag.BoolVar(&skipDockerCmd, "skip-docker", false, "set this to true if the BGP daemon is running on the host instead of in a container")
 	flag.StringVar(&ipv4ForContainers, "ips-for-containers-v4", "0", "a comma separated list of IPv4 addresses available for containers")
