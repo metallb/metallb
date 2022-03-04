@@ -73,9 +73,6 @@ func sortAds(ads map[string][]*bgp.Advertisement) {
 			if a.LocalPref != b.LocalPref {
 				return a.LocalPref < b.LocalPref
 			}
-			if a.NextHop.String() != b.NextHop.String() {
-				return a.NextHop.String() < b.NextHop.String()
-			}
 			if len(a.Communities) != len(b.Communities) {
 				return len(a.Communities) < len(b.Communities)
 			}

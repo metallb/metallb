@@ -57,18 +57,6 @@ func sessionName(myAddr string, myAsn uint32, addr string, asn uint32) string {
 }
 
 func validate(adv *bgp.Advertisement) error {
-	if adv.Prefix.IP.To4() != nil {
-		if adv.NextHop != nil && adv.NextHop.To4() == nil {
-			return fmt.Errorf("next-hop must be IPv4, got %q", adv.NextHop)
-		}
-	} else if adv.Prefix.IP.To16() != nil {
-		if adv.NextHop != nil && adv.NextHop.To16() == nil {
-			return fmt.Errorf("next-hop must be IPv6, got %q", adv.NextHop)
-		}
-	} else {
-		return fmt.Errorf("unable to validate IP address")
-	}
-
 	if len(adv.Communities) > 63 {
 		return fmt.Errorf("max supported communities is 63, got %d", len(adv.Communities))
 	}
