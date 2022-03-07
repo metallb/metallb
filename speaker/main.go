@@ -339,12 +339,15 @@ func (c *controller) deleteBalancer(l log.Logger, name, reason string) k8s.SyncS
 	}
 
 	for _, ip := range c.svcIPs[name] {
-		announcing.Delete(prometheus.Labels{
+		ok := announcing.Delete(prometheus.Labels{
 			"protocol": string(proto),
 			"service":  name,
 			"node":     c.myNode,
-			"ips":      ip.String(),
+			"ip":       ip.String(),
 		})
+		if !ok {
+			level.Error(l).Log("op", "deleteBalancer", "error", "failed to delete service metric", "service", name, "ip", ip.String())
+		}
 	}
 	delete(c.announced, name)
 	delete(c.svcIPs, name)

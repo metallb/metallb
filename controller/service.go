@@ -15,6 +15,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"reflect"
@@ -25,6 +26,7 @@ import (
 	"github.com/go-kit/kit/log/level"
 	v1 "k8s.io/api/core/v1"
 
+	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/allocator/k8salloc"
 	"go.universe.tf/metallb/internal/ipfamily"
 )
@@ -49,7 +51,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 
 	// If the ClusterIPs is malformed or not set we can't determine the
 	// ipFamily to use.
-	if len(svc.Spec.ClusterIPs) == 0 {
+	if len(svc.Spec.ClusterIPs) == 0 && svc.Spec.ClusterIP == "" {
 		level.Info(l).Log("event", "clearAssignment", "reason", "noClusterIPs", "msg", "No ClusterIPs")
 		c.clearServiceState(key, svc)
 		return true
@@ -73,10 +75,10 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 			c.client.Errorf(svc, "nolbIPsIPFamily", "Failed to retrieve LBIPs IPFamily for %q: %s", lbIPs, err)
 			return true
 		}
-		clusterIPsIPFamily, err := ipfamily.ForAddresses(svc.Spec.ClusterIPs)
+		clusterIPsIPFamily, err := ipfamily.ForService(svc)
 		if err != nil {
 			level.Error(l).Log("event", "clearAssignment", "reason", "noclusterIPsIPFamily", "msg", "Failed to retrieve clusterIPs family")
-			c.client.Errorf(svc, "noclusterIPsIPFamily", "Failed to retrieve ClusterIPs IPFamily for %q: %s", svc.Spec.ClusterIPs, err)
+			c.client.Errorf(svc, "noclusterIPsIPFamily", "Failed to retrieve ClusterIPs IPFamily for %q %s: %s", svc.Spec.ClusterIPs, svc.Spec.ClusterIP, err)
 			return true
 		}
 		// Clear the lbIP if it has a different ipFamily compared to the clusterIP.
@@ -96,6 +98,13 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		if err = c.ips.Assign(key, lbIPs, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 			level.Info(l).Log("event", "clearAssignment", "error", err, "msg", "current IP not allowed by config, clearing")
 			c.clearServiceState(key, svc)
+			// Check if we cannot assign IP because services were sharing IP using
+			// "allow-shared-ip" annotation and one of them changed so instead of allocating
+			// new service IP we fail.
+			if errors.Is(err, allocator.ErrCannotShareKey) {
+				c.client.Errorf(svc, "svcCannotShareKey", "current IP not allowed by config:%s", err)
+				return false
+			}
 			lbIPs = []net.IP{}
 		}
 
@@ -176,12 +185,12 @@ func (c *controller) clearServiceState(key string, svc *v1.Service) {
 }
 
 func (c *controller) allocateIPs(key string, svc *v1.Service) ([]net.IP, error) {
-	if len(svc.Spec.ClusterIPs) == 0 {
+	if len(svc.Spec.ClusterIPs) == 0 && svc.Spec.ClusterIP == "" {
 		// (we should never get here because the caller ensured that Spec.ClusterIP != nil)
-		return nil, fmt.Errorf("invalid ClusterIP [%s], can't determine family", svc.Spec.ClusterIP)
+		return nil, fmt.Errorf("invalid ClusterIPs [%v] [%s], can't determine family", svc.Spec.ClusterIPs, svc.Spec.ClusterIP)
 	}
 
-	serviceIPFamily, err := ipfamily.ForAddresses(svc.Spec.ClusterIPs)
+	serviceIPFamily, err := ipfamily.ForService(svc)
 	if err != nil {
 		return nil, err
 	}

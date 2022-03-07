@@ -49,7 +49,7 @@ type session struct {
 	closed         bool
 	conn           net.Conn
 	actualHoldTime time.Duration
-	defaultNextHop net.IP
+	nextHop        net.IP
 	advertised     map[string]*bgp.Advertisement
 	new            map[string]*bgp.Advertisement
 }
@@ -142,7 +142,7 @@ func (s *session) sendUpdates() bool {
 	}
 
 	for c, adv := range s.advertised {
-		if err := sendUpdate(s.conn, s.myASN, ibgp, fbasn, s.defaultNextHop, adv); err != nil {
+		if err := sendUpdate(s.conn, s.myASN, ibgp, fbasn, s.nextHop, adv); err != nil {
 			s.abort()
 			level.Error(s.logger).Log("op", "sendUpdate", "ip", c, "error", err, "msg", "failed to send BGP update")
 			return true
@@ -175,7 +175,7 @@ func (s *session) sendUpdates() bool {
 				continue
 			}
 
-			if err := sendUpdate(s.conn, s.myASN, ibgp, fbasn, s.defaultNextHop, adv); err != nil {
+			if err := sendUpdate(s.conn, s.myASN, ibgp, fbasn, s.nextHop, adv); err != nil {
 				s.abort()
 				level.Error(s.logger).Log("op", "sendUpdate", "prefix", c, "error", err, "msg", "failed to send BGP update")
 				return true
@@ -232,11 +232,11 @@ func (s *session) connect() error {
 		conn.Close()
 		return fmt.Errorf("getting local addr for default nexthop to %q: %s", s.addr, err)
 	}
-	s.defaultNextHop = addr.IP
+	s.nextHop = addr.IP
 
 	routerID := s.routerID
 	if routerID == nil {
-		routerID, err = getRouterID(s.defaultNextHop, s.myNode)
+		routerID, err = getRouterID(s.nextHop, s.myNode)
 		if err != nil {
 			return err
 		}
@@ -446,9 +446,6 @@ func validate(adv *bgp.Advertisement) error {
 		return fmt.Errorf("cannot advertise non-v4 prefix %q", adv.Prefix)
 	}
 
-	if adv.NextHop != nil && adv.NextHop.To4() == nil {
-		return fmt.Errorf("next-hop must be IPv4, got %q", adv.NextHop)
-	}
 	if len(adv.Communities) > 63 {
 		return fmt.Errorf("max supported communities is 63, got %d", len(adv.Communities))
 	}

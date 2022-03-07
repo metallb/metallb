@@ -720,6 +720,21 @@ func TestControllerMutation(t *testing.T) {
 				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
 			},
 		},
+		{
+			desc: "request dual-stack loadbalancer IPs via custom annotation in a single stack cluster",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationLoadBalancerIPs: "1.2.3.0,1000::",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIP: "1.2.3.4",
+					Type:      "LoadBalancer",
+				},
+			},
+			wantErr: true,
+		},
 	}
 
 	for i := 0; i < 100; i++ {
@@ -1030,5 +1045,75 @@ func TestControllerDualStackConfig(t *testing.T) {
 	// Deleting the config also makes MetalLB sad.
 	if c.SetConfig(l, nil) != k8s.SyncStateErrorNoRetry {
 		t.Fatalf("SetConfig that deletes the config was accepted")
+	}
+}
+
+func TestControllerSvcAdddressSharing(t *testing.T) {
+	k := &testK8S{t: t}
+	c := &controller{
+		ips:    allocator.New(),
+		client: k,
+	}
+	l := log.NewNopLogger()
+
+	// Set a config with some IPs. Still no allocation, not synced.
+	cfg := &config.Config{
+		Pools: map[string]*config.Pool{
+			"default": {
+				AutoAssign: true,
+				CIDR:       []*net.IPNet{ipnet("4.5.6.0/24")},
+			},
+		},
+	}
+	if c.SetConfig(l, cfg) == k8s.SyncStateError {
+		t.Fatalf("SetConfig failed")
+	}
+	c.MarkSynced(l)
+
+	// Configure svc1
+	svc1 := &v1.Service{
+		Spec: v1.ServiceSpec{
+			Type:                  "LoadBalancer",
+			ClusterIPs:            []string{"4.5.6.1"},
+			ExternalTrafficPolicy: "Local",
+			Ports: []v1.ServicePort{
+				{
+					Protocol: v1.ProtocolTCP,
+					Port:     3000,
+				},
+			},
+		},
+	}
+
+	if c.SetBalancer(l, "test1", svc1, k8s.EpsOrSlices{}) == k8s.SyncStateError {
+		t.Fatalf("SetBalancer failed")
+	}
+	gotSvc1 := k.gotService(svc1)
+	if len(gotSvc1.Status.LoadBalancer.Ingress) == 0 || gotSvc1.Status.LoadBalancer.Ingress[0].IP != "4.5.6.0" {
+		t.Fatal("svc1 didn't get an IP")
+	}
+	k.reset()
+	// Configure svc2 with IP sharing with svc1 and different port/protocol/ETP
+	svc2 := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{
+				"metallb.universe.tf/allow-shared-ip": "share",
+			},
+		},
+		Spec: v1.ServiceSpec{
+			Type:                  "LoadBalancer",
+			ClusterIPs:            []string{"4.5.6.1"},
+			ExternalTrafficPolicy: "Cluster",
+			Ports: []v1.ServicePort{
+				{
+					Protocol: v1.ProtocolUDP,
+					Port:     1000,
+				},
+			},
+		},
+		Status: statusAssigned([]string{"4.5.6.0"}),
+	}
+	if c.SetBalancer(l, "test2", svc2, k8s.EpsOrSlices{}) != k8s.SyncStateError {
+		t.Fatalf("SetBalancer did not fail")
 	}
 }
