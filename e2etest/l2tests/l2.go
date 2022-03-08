@@ -428,13 +428,21 @@ var _ = ginkgo.Describe("L2", func() {
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
 
-			advNode, err := advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
-			framework.ExpectNoError(err)
-			advSpeaker, ok := speakerPods[advNode.Name]
-			framework.ExpectEqual(ok, true, fmt.Sprintf("could not find speaker pod on announcing node %s", advNode.Name))
-			delete(speakerPods, advSpeaker.Spec.NodeName)
-
+			var advNode *corev1.Node
+			var advSpeaker *corev1.Pod
 			gomega.Eventually(func() error {
+				var ok bool
+
+				advNode, err = advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
+				if err != nil {
+					return err
+				}
+
+				advSpeaker, ok = speakerPods[advNode.Name]
+				if !ok {
+					return fmt.Errorf("could not find speaker pod on announcing node %s", advNode.Name)
+				}
+
 				speakerMetrics, err := metrics.ForPod(controllerPod, advSpeaker, metallb.Namespace)
 				if err != nil {
 					return err
@@ -464,6 +472,8 @@ var _ = ginkgo.Describe("L2", func() {
 			}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
 
 			// Negative - validate that the other speakers don't publish layer2 metrics
+			delete(speakerPods, advSpeaker.Spec.NodeName)
+
 			for _, p := range speakerPods {
 				speakerMetrics, err := metrics.ForPod(controllerPod, p, metallb.Namespace)
 				framework.ExpectNoError(err)

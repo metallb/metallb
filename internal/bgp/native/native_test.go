@@ -1,5 +1,6 @@
 // SPDX-License-Identifier:Apache-2.0
 
+//go:build disabled
 // +build disabled
 
 package native
@@ -94,7 +95,6 @@ func TestInterop(t *testing.T) {
 
 	adv := &Advertisement{
 		Prefix:      ipnet("1.2.3.0/24"),
-		NextHop:     net.ParseIP("10.20.30.40"),
 		LocalPref:   42,
 		Communities: []uint32{1234, 2345},
 	}
@@ -134,7 +134,6 @@ func TestTCPMD5(t *testing.T) {
 
 	adv := &Advertisement{
 		Prefix:      ipnet("1.2.3.0/24"),
-		NextHop:     net.ParseIP("10.20.30.40"),
 		LocalPref:   42,
 		Communities: []uint32{1234, 2345},
 	}
@@ -178,7 +177,6 @@ func checkPath(path *api.Path, adv *Advertisement) error {
 			if err := ptypes.UnmarshalAny(attr, &nh); err != nil {
 				return err
 			}
-			nexthop = nh.NextHop
 		case ptypes.Is(attr, &api.LocalPrefAttribute{}):
 			var lp api.LocalPrefAttribute
 			if err := ptypes.UnmarshalAny(attr, &lp); err != nil {
@@ -194,9 +192,6 @@ func checkPath(path *api.Path, adv *Advertisement) error {
 		}
 	}
 
-	if nexthop != adv.NextHop.String() {
-		return fmt.Errorf("wrong nexthop, got %s, want %s", nexthop, adv.NextHop)
-	}
 	if localpref != adv.LocalPref {
 		return fmt.Errorf("wrong localpref, got %d, want %d", localpref, adv.LocalPref)
 	}
