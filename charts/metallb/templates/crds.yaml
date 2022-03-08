@@ -14,181 +14,202 @@ spec:
     singular: addresspool
   scope: Namespaced
   versions:
-  - name: v1alpha1
-    schema:
-      openAPIV3Schema:
-        description: AddressPool is the Schema for the addresspools API
-        properties:
-          apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-            type: string
-          kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-            type: string
-          metadata:
-            type: object
-          spec:
-            description: AddressPoolSpec defines the desired state of AddressPool
-            properties:
-              addresses:
-                description: A list of IP address ranges over which MetalLB has authority.
-                  You can list multiple ranges in a single pool, they will all share
-                  the same settings. Each range can be either a CIDR prefix, or an
-                  explicit start-end range of IPs.
-                items:
+    - deprecated: true
+      deprecationWarning: metallbio.io v1alpha1 AddressPool is deprecated
+      name: v1alpha1
+      schema:
+        openAPIV3Schema:
+          description: AddressPool is the Schema for the addresspools API.
+          properties:
+            apiVersion:
+              description:
+                "APIVersion defines the versioned schema of this representation
+                of an object. Servers should convert recognized schemas to the latest
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources"
+              type: string
+            kind:
+              description:
+                "Kind is a string value representing the REST resource this
+                object represents. Servers may infer this from the endpoint the client
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: AddressPoolSpec defines the desired state of AddressPool.
+              properties:
+                addresses:
+                  description:
+                    A list of IP address ranges over which MetalLB has authority.
+                    You can list multiple ranges in a single pool, they will all share
+                    the same settings. Each range can be either a CIDR prefix, or an
+                    explicit start-end range of IPs.
+                  items:
+                    type: string
+                  type: array
+                autoAssign:
+                  default: true
+                  description:
+                    AutoAssign flag used to prevent MetallB from automatic
+                    allocation for a pool.
+                  type: boolean
+                bgpAdvertisements:
+                  description:
+                    When an IP is allocated from this pool, how should it
+                    be translated into BGP announcements?
+                  items:
+                    properties:
+                      aggregationLength:
+                        default: 32
+                        description:
+                          The aggregation-length advertisement option lets
+                          you “roll up” the /32s into a larger prefix.
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      aggregationLengthV6:
+                        default: 128
+                        description:
+                          Optional, defaults to 128 (i.e. no aggregation)
+                          if not specified.
+                        format: int32
+                        type: integer
+                      communities:
+                        description: BGP communities
+                        items:
+                          type: string
+                        type: array
+                      localPref:
+                        description:
+                          BGP LOCAL_PREF attribute which is used by BGP best
+                          path algorithm, Path with higher localpref is preferred over
+                          one with lower localpref.
+                        format: int32
+                        type: integer
+                    type: object
+                  type: array
+                protocol:
+                  description:
+                    Protocol can be used to select how the announcement is
+                    done.
+                  enum:
+                    - layer2
+                    - bgp
                   type: string
-                type: array
-              autoAssign:
-                default: true
-                description: AutoAssign flag used to prevent MetallB from automatic
-                  allocation for a pool.
-                type: boolean
-              bgpAdvertisements:
-                description: When an IP is allocated from this pool, how should it
-                  be translated into BGP announcements?
-                items:
-                  properties:
-                    aggregationLength:
-                      default: 32
-                      description: The aggregation-length advertisement option lets
-                        you “roll up” the /32s into a larger prefix.
-                      format: int32
-                      minimum: 1
-                      type: integer
-                    aggregationLengthV6:
-                      default: 128
-                      description: Optional, defaults to 128 (i.e. no aggregation)
-                        if not specified.
-                      format: int32
-                      type: integer
-                    communities:
-                      description: BGP communities
-                      items:
-                        type: string
-                      type: array
-                    localPref:
-                      description: BGP LOCAL_PREF attribute which is used by BGP best
-                        path algorithm, Path with higher localpref is preferred over
-                        one with lower localpref.
-                      format: int32
-                      type: integer
-                  type: object
-                type: array
-              protocol:
-                description: Protocol can be used to select how the announcement is
-                  done,
-                enum:
-                - layer2
-                - bgp
-                type: string
-            required:
-            - addresses
-            - protocol
-            type: object
-          status:
-            description: AddressPoolStatus defines the observed state of AddressPool
-            type: object
-        required:
-        - spec
-        type: object
-    served: true
-    storage: false
-    subresources:
-      status: {}
-  - name: v1beta1
-    schema:
-      openAPIV3Schema:
-        description: AddressPool is the Schema for the addresspools API
-        properties:
-          apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-            type: string
-          kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-            type: string
-          metadata:
-            type: object
-          spec:
-            description: AddressPoolSpec defines the desired state of AddressPool
-            properties:
-              addresses:
-                description: A list of IP address ranges over which MetalLB has authority.
-                  You can list multiple ranges in a single pool, they will all share
-                  the same settings. Each range can be either a CIDR prefix, or an
-                  explicit start-end range of IPs.
-                items:
+              required:
+                - addresses
+                - protocol
+              type: object
+            status:
+              description: AddressPoolStatus defines the observed state of AddressPool.
+              type: object
+          required:
+            - spec
+          type: object
+      served: true
+      storage: false
+      subresources:
+        status: {}
+    - name: v1beta1
+      schema:
+        openAPIV3Schema:
+          description: AddressPool is the Schema for the addresspools API.
+          properties:
+            apiVersion:
+              description:
+                "APIVersion defines the versioned schema of this representation
+                of an object. Servers should convert recognized schemas to the latest
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources"
+              type: string
+            kind:
+              description:
+                "Kind is a string value representing the REST resource this
+                object represents. Servers may infer this from the endpoint the client
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: AddressPoolSpec defines the desired state of AddressPool.
+              properties:
+                addresses:
+                  description:
+                    A list of IP address ranges over which MetalLB has authority.
+                    You can list multiple ranges in a single pool, they will all share
+                    the same settings. Each range can be either a CIDR prefix, or an
+                    explicit start-end range of IPs.
+                  items:
+                    type: string
+                  type: array
+                autoAssign:
+                  default: true
+                  description:
+                    AutoAssign flag used to prevent MetallB from automatic
+                    allocation for a pool.
+                  type: boolean
+                avoidBuggyIPs:
+                  default: false
+                  description:
+                    AvoidBuggyIPs prevents addresses ending with .0 and .255
+                    to be used by a pool.
+                  type: boolean
+                bgpAdvertisements:
+                  description:
+                    When an IP is allocated from this pool, how should it
+                    be translated into BGP announcements?
+                  items:
+                    properties:
+                      aggregationLength:
+                        default: 32
+                        description:
+                          The aggregation-length advertisement option lets
+                          you “roll up” the /32s into a larger prefix.
+                        format: int32
+                        minimum: 1
+                        type: integer
+                      aggregationLengthV6:
+                        default: 128
+                        description:
+                          Optional, defaults to 128 (i.e. no aggregation)
+                          if not specified.
+                        format: int32
+                        type: integer
+                      communities:
+                        description: BGP communities
+                        items:
+                          type: string
+                        type: array
+                      localPref:
+                        description:
+                          BGP LOCAL_PREF attribute which is used by BGP best
+                          path algorithm, Path with higher localpref is preferred over
+                          one with lower localpref.
+                        format: int32
+                        type: integer
+                    type: object
+                  type: array
+                protocol:
+                  description:
+                    Protocol can be used to select how the announcement is
+                    done.
+                  enum:
+                    - layer2
+                    - bgp
                   type: string
-                type: array
-              autoAssign:
-                default: true
-                description: AutoAssign flag used to prevent MetallB from automatic
-                  allocation for a pool.
-                type: boolean
-              avoidBuggyIPs:
-                default: false
-                description: AvoidBuggyIPs prevents addresses ending with .0 and .255
-                  to be used by a pool.
-                type: boolean
-              bgpAdvertisements:
-                description: When an IP is allocated from this pool, how should it
-                  be translated into BGP announcements?
-                items:
-                  properties:
-                    aggregationLength:
-                      default: 32
-                      description: The aggregation-length advertisement option lets
-                        you “roll up” the /32s into a larger prefix.
-                      format: int32
-                      minimum: 1
-                      type: integer
-                    aggregationLengthV6:
-                      default: 128
-                      description: Optional, defaults to 128 (i.e. no aggregation)
-                        if not specified.
-                      format: int32
-                      type: integer
-                    communities:
-                      description: BGP communities
-                      items:
-                        type: string
-                      type: array
-                    localPref:
-                      description: BGP LOCAL_PREF attribute which is used by BGP best
-                        path algorithm, Path with higher localpref is preferred over
-                        one with lower localpref.
-                      format: int32
-                      type: integer
-                  type: object
-                type: array
-              protocol:
-                description: Protocol can be used to select how the announcement is
-                  done,
-                enum:
-                - layer2
-                - bgp
-                type: string
-            required:
-            - addresses
-            - protocol
-            type: object
-          status:
-            description: AddressPoolStatus defines the observed state of AddressPool
-            type: object
-        required:
-        - spec
-        type: object
-    served: true
-    storage: true
-    subresources:
-      status: {}
+              required:
+                - addresses
+                - protocol
+              type: object
+            status:
+              description: AddressPoolStatus defines the observed state of AddressPool.
+              type: object
+          required:
+            - spec
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}
 status:
   acceptedNames:
     kind: ""
@@ -212,10 +233,93 @@ spec:
     singular: bfdprofile
   scope: Namespaced
   versions:
+    - name: v1beta1
+      schema:
+        openAPIV3Schema:
+          description: BFDProfile is the Schema for the bfdprofiles API.
+          properties:
+            apiVersion:
+              description:
+                "APIVersion defines the versioned schema of this representation
+                of an object. Servers should convert recognized schemas to the latest
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources"
+              type: string
+            kind:
+              description:
+                "Kind is a string value representing the REST resource this
+                object represents. Servers may infer this from the endpoint the client
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: BFDProfileSpec defines the desired state of BFDProfile.
+              properties:
+                detectMultiplier:
+                  format: int32
+                  maximum: 255
+                  minimum: 2
+                  type: integer
+                echoInterval:
+                  format: int32
+                  maximum: 60000
+                  minimum: 10
+                  type: integer
+                echoMode:
+                  type: boolean
+                minimumTtl:
+                  format: int32
+                  maximum: 254
+                  minimum: 1
+                  type: integer
+                passiveMode:
+                  type: boolean
+                receiveInterval:
+                  format: int32
+                  maximum: 60000
+                  minimum: 10
+                  type: integer
+                transmitInterval:
+                  format: int32
+                  maximum: 60000
+                  minimum: 10
+                  type: integer
+              type: object
+            status:
+              description: BFDProfileStatus defines the observed state of BFDProfile.
+              type: object
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: bgpadvertisements.metallb.io
+spec:
+  group: metallb.io
+  names:
+    kind: BGPAdvertisement
+    listKind: BGPAdvertisementList
+    plural: bgpadvertisements
+    singular: bgpadvertisement
+  scope: Namespaced
+  versions:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: BFDProfile is the Schema for the bfdprofiles API
+        description: BGPAdvertisement is the Schema for the bgpadvertisements API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -230,40 +334,41 @@ spec:
           metadata:
             type: object
           spec:
-            description: BFDProfileSpec defines the desired state of BFDProfile
+            description: BGPAdvertisementSpec defines the desired state of BGPAdvertisement.
             properties:
-              detectMultiplier:
+              aggregationLength:
+                default: 32
+                description: The aggregation-length advertisement option lets you
+                  “roll up” the /32s into a larger prefix.
                 format: int32
-                maximum: 255
-                minimum: 2
-                type: integer
-              echoInterval:
-                format: int32
-                maximum: 60000
-                minimum: 10
-                type: integer
-              echoMode:
-                type: boolean
-              minimumTtl:
-                format: int32
-                maximum: 254
                 minimum: 1
                 type: integer
-              passiveMode:
-                type: boolean
-              receiveInterval:
+              aggregationLengthV6:
+                default: 128
+                description: Optional, defaults to 128 (i.e. no aggregation) if not
+                  specified.
                 format: int32
-                maximum: 60000
-                minimum: 10
                 type: integer
-              transmitInterval:
+              communities:
+                description: BGP communities
+                items:
+                  type: string
+                type: array
+              ipPools:
+                description: IPPools is the list of ippools to advertise via this
+                  advertisement.
+                items:
+                  type: string
+                type: array
+              localPref:
+                description: BGP LOCAL_PREF attribute which is used by BGP best path
+                  algorithm, Path with higher localpref is preferred over one with
+                  lower localpref.
                 format: int32
-                maximum: 60000
-                minimum: 10
                 type: integer
             type: object
           status:
-            description: BFDProfileStatus defines the observed state of BFDProfile
+            description: BGPAdvertisementStatus defines the observed state of BGPAdvertisement.
             type: object
         type: object
     served: true
@@ -296,7 +401,7 @@ spec:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: BGPPeer is the Schema for the peers API
+        description: BGPPeer is the Schema for the peers API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -311,7 +416,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: BGPPeerSpec defines the desired state of Peer
+            description: BGPPeerSpec defines the desired state of Peer.
             properties:
               bfdProfile:
                 type: string
@@ -389,7 +494,269 @@ spec:
             - peerAddress
             type: object
           status:
-            description: BGPPeerStatus defines the observed state of Peer
+            description: BGPPeerStatus defines the observed state of Peer.
+            type: object
+        type: object
+    served: true
+    storage: false
+    subresources:
+      status: {}
+  - name: v1beta2
+    schema:
+      openAPIV3Schema:
+        description: BGPPeer is the Schema for the peers API.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: BGPPeerSpec defines the desired state of Peer.
+            properties:
+              bfdProfile:
+                type: string
+              ebgpMultiHop:
+                description: EBGP peer is multi-hops away
+                type: boolean
+              holdTime:
+                description: Requested BGP hold time, per RFC4271.
+                type: string
+              keepaliveTime:
+                description: Requested BGP keepalive time, per RFC4271.
+                type: string
+              myASN:
+                description: AS number to use for the local end of the session.
+                format: int32
+                maximum: 65535
+                minimum: 0
+                type: integer
+              nodeSelectors:
+                description: Only connect to this peer on nodes that match one of
+                  these selectors.
+                items:
+                  description: A label selector is a label query over a set of resources.
+                    The result of matchLabels and matchExpressions are ANDed. An empty
+                    label selector matches all objects. A null label selector matches
+                    no objects.
+                  properties:
+                    matchExpressions:
+                      description: matchExpressions is a list of label selector requirements.
+                        The requirements are ANDed.
+                      items:
+                        description: A label selector requirement is a selector that
+                          contains values, a key, and an operator that relates the
+                          key and values.
+                        properties:
+                          key:
+                            description: key is the label key that the selector applies
+                              to.
+                            type: string
+                          operator:
+                            description: operator represents a key's relationship
+                              to a set of values. Valid operators are In, NotIn, Exists
+                              and DoesNotExist.
+                            type: string
+                          values:
+                            description: values is an array of string values. If the
+                              operator is In or NotIn, the values array must be non-empty.
+                              If the operator is Exists or DoesNotExist, the values
+                              array must be empty. This array is replaced during a
+                              strategic merge patch.
+                            items:
+                              type: string
+                            type: array
+                        required:
+                        - key
+                        - operator
+                        type: object
+                      type: array
+                    matchLabels:
+                      additionalProperties:
+                        type: string
+                      description: matchLabels is a map of {key,value} pairs. A single
+                        {key,value} in the matchLabels map is equivalent to an element
+                        of matchExpressions, whose key field is "key", the operator
+                        is "In", and the values array contains only "value". The requirements
+                        are ANDed.
+                      type: object
+                  type: object
+                type: array
+              password:
+                description: Authentication password for routers enforcing TCP MD5
+                  authenticated sessions
+                type: string
+              peerASN:
+                description: AS number to expect from the remote end of the session.
+                format: int32
+                maximum: 65535
+                minimum: 0
+                type: integer
+              peerAddress:
+                description: Address to dial when establishing the session.
+                type: string
+              peerPort:
+                default: 179
+                maximum: 16384
+                minimum: 0
+                type: integer
+              routerID:
+                description: BGP router ID to advertise to the peer
+                type: string
+              sourceAddress:
+                description: Source address to use when establishing the session.
+                type: string
+            required:
+            - myASN
+            - peerASN
+            - peerAddress
+            type: object
+          status:
+            description: BGPPeerStatus defines the observed state of Peer.
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: ippools.metallb.io
+spec:
+  group: metallb.io
+  names:
+    kind: IPPool
+    listKind: IPPoolList
+    plural: ippools
+    singular: ippool
+  scope: Namespaced
+  versions:
+    - name: v1beta1
+      schema:
+        openAPIV3Schema:
+          description: IPPool is the Schema for the IPPools API.
+          properties:
+            apiVersion:
+              description:
+                "APIVersion defines the versioned schema of this representation
+                of an object. Servers should convert recognized schemas to the latest
+                internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources"
+              type: string
+            kind:
+              description:
+                "Kind is a string value representing the REST resource this
+                object represents. Servers may infer this from the endpoint the client
+                submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds"
+              type: string
+            metadata:
+              type: object
+            spec:
+              description: IPPoolSpec defines the desired state of IPPool.
+              properties:
+                addresses:
+                  description:
+                    A list of IP address ranges over which MetalLB has authority.
+                    You can list multiple ranges in a single pool, they will all share
+                    the same settings. Each range can be either a CIDR prefix, or an
+                    explicit start-end range of IPs.
+                  items:
+                    type: string
+                  type: array
+                autoAssign:
+                  default: true
+                  description:
+                    AutoAssign flag used to prevent MetallB from automatic
+                    allocation for a pool.
+                  type: boolean
+                avoidBuggyIPs:
+                  default: false
+                  description:
+                    AvoidBuggyIPs prevents addresses ending with .0 and .255
+                    to be used by a pool.
+                  type: boolean
+              required:
+                - addresses
+              type: object
+            status:
+              description: IPPoolStatus defines the observed state of IPPool.
+              type: object
+          required:
+            - spec
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: l2advertisements.metallb.io
+spec:
+  group: metallb.io
+  names:
+    kind: L2Advertisement
+    listKind: L2AdvertisementList
+    plural: l2advertisements
+    singular: l2advertisement
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: L2Advertisement is the Schema for the l2advertisements API.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: L2AdvertisementSpec defines the desired state of L2Advertisement.
+            properties:
+              ipPools:
+                description: IPPools is the list of ippools to advertise via this
+                  advertisement.
+                items:
+                  type: string
+                type: array
+            type: object
+          status:
+            description: L2AdvertisementStatus defines the observed state of L2Advertisement.
             type: object
         type: object
     served: true
