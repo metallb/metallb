@@ -6,7 +6,7 @@ defined in MetalLB's configuration:
 config:
 {{ toYaml .Values.configInline | indent 2 }}
 
-To see IP assignments, try `kubectl get services`.
+To see IP assignments, try `kubectl get services --all-namespaces`.
 {{- else }}
 WARNING: you specified a ConfigMap that isn't managed by
 Helm. LoadBalancer services will not function until you add that
