@@ -50,6 +50,7 @@ type ConfigReconciler struct {
 //+kubebuilder:rbac:groups=metallb.io,resources=bfdprofiles,verbs=get;list;watch;
 //+kubebuilder:rbac:groups=metallb.io,resources=bgpadvertisement,verbs=get;list;watch;
 //+kubebuilder:rbac:groups=metallb.io,resources=l2advertisement,verbs=get;list;watch;
+//+kubebuilder:rbac:groups=metallb.io,resources=ippools,verbs=get;list;watch;
 
 func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	level.Info(r.Logger).Log("controller", "ConfigReconciler", "start reconcile", req.NamespacedName.String())
@@ -63,7 +64,7 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	var ipPools metallbv1beta1.IPPoolList
 	if err := r.List(ctx, &ipPools, client.InNamespace(r.Namespace)); err != nil {
-		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to get addresspools", "error", err)
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to get ippools", "error", err)
 		return ctrl.Result{}, err
 	}
 
@@ -92,11 +93,12 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	metallbCRs := config.ClusterResources{
-		Pools:       ipPools.Items,
-		Peers:       bgpPeers.Items,
-		BFDProfiles: bfdProfiles.Items,
-		L2Advs:      l2Advertisements.Items,
-		BGPAdvs:     bgpAdvertisements.Items,
+		Pools:              ipPools.Items,
+		Peers:              bgpPeers.Items,
+		BFDProfiles:        bfdProfiles.Items,
+		L2Advs:             l2Advertisements.Items,
+		BGPAdvs:            bgpAdvertisements.Items,
+		LegacyAddressPools: addressPools.Items,
 	}
 
 	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs", spew.Sdump(metallbCRs))
@@ -150,5 +152,6 @@ func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&source.Kind{Type: &metallbv1beta1.BGPAdvertisement{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(p)).
 		Watches(&source.Kind{Type: &metallbv1beta1.L2Advertisement{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(p)).
 		Watches(&source.Kind{Type: &metallbv1beta1.BFDProfile{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(p)).
+		Watches(&source.Kind{Type: &metallbv1beta1.AddressPool{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(p)).
 		Complete(r)
 }
