@@ -4,7 +4,6 @@ package config
 
 import (
 	"net"
-	"strings"
 	"testing"
 	"time"
 
@@ -168,6 +167,21 @@ func TestParse(t *testing.T) {
 						},
 					},
 				},
+				L2Advs: []v1beta1.L2Advertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "l2adv1",
+						},
+						Spec: v1beta1.L2AdvertisementSpec{
+							IPPools: []string{"pool3"},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "l2adv2",
+						},
+					},
+				},
 			},
 			want: &Config{
 				Peers: []*Peer{
@@ -187,7 +201,6 @@ func TestParse(t *testing.T) {
 						MyASN:         100,
 						ASN:           200,
 						Addr:          net.ParseIP("2.3.4.5"),
-						Port:          179,
 						HoldTime:      90 * time.Second,
 						KeepaliveTime: 30 * time.Second,
 						NodeSelectors: []labels.Selector{selector("bar in (quux),foo=bar")},
@@ -215,6 +228,7 @@ func TestParse(t *testing.T) {
 								Communities:         map[uint32]bool{},
 							},
 						},
+						L2Advertisements: []*L2Advertisement{&L2Advertisement{}},
 					},
 					"pool2": {
 						CIDR:       []*net.IPNet{ipnet("30.0.0.0/8")},
@@ -226,6 +240,7 @@ func TestParse(t *testing.T) {
 								Communities:         map[uint32]bool{},
 							},
 						},
+						L2Advertisements: []*L2Advertisement{&L2Advertisement{}},
 					},
 					"pool3": {
 						CIDR: []*net.IPNet{
@@ -242,11 +257,13 @@ func TestParse(t *testing.T) {
 							ipnet("40.0.0.240/32"),
 							ipnet("40.0.0.250/32"),
 						},
-						AutoAssign: true,
+						L2Advertisements: []*L2Advertisement{&L2Advertisement{}},
+						AutoAssign:       true,
 					},
 					"pool4": {
-						CIDR:       []*net.IPNet{ipnet("2001:db8::/64")},
-						AutoAssign: true,
+						CIDR:             []*net.IPNet{ipnet("2001:db8::/64")},
+						L2Advertisements: []*L2Advertisement{&L2Advertisement{}},
+						AutoAssign:       true,
 					},
 				},
 				BFDProfiles: map[string]*BFDProfile{},
@@ -272,7 +289,6 @@ func TestParse(t *testing.T) {
 						MyASN:         42,
 						ASN:           42,
 						Addr:          net.ParseIP("1.2.3.4"),
-						Port:          179,
 						HoldTime:      90 * time.Second,
 						KeepaliveTime: 30 * time.Second,
 						NodeSelectors: []labels.Selector{labels.Everything()},
@@ -389,7 +405,6 @@ func TestParse(t *testing.T) {
 						MyASN:         42,
 						ASN:           42,
 						Addr:          net.ParseIP("1.2.3.4"),
-						Port:          179,
 						HoldTime:      90 * time.Second,
 						KeepaliveTime: 30 * time.Second,
 						NodeSelectors: []labels.Selector{labels.Everything()},
@@ -924,7 +939,6 @@ func TestParse(t *testing.T) {
 						MyASN:         42,
 						ASN:           42,
 						Addr:          net.ParseIP("1.2.3.4"),
-						Port:          179,
 						HoldTime:      90 * time.Second,
 						KeepaliveTime: 30 * time.Second,
 						NodeSelectors: []labels.Selector{labels.Everything()},
@@ -1118,6 +1132,192 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc: "config mixing legacy pools with IP pools",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:        42,
+							ASN:          142,
+							Address:      "1.2.3.4",
+							Port:         1179,
+							HoldTime:     v1.Duration{Duration: 180 * time.Second},
+							RouterID:     "10.20.30.40",
+							SrcAddress:   "10.20.30.40",
+							EBGPMultiHop: true,
+						},
+					},
+				},
+				Pools: []v1beta1.IPPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+								"10.50.0.0/24",
+							},
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
+						},
+					},
+				},
+				LegacyAddressPools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "legacyl2pool1",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Addresses: []string{
+								"10.21.0.0/16",
+								"10.51.0.0/24",
+							},
+							Protocol:      string(Layer2),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "legacybgppool1",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Addresses: []string{
+								"10.40.0.0/16",
+								"10.60.0.0/24",
+							},
+							Protocol:      string(BGP),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
+							BGPAdvertisements: []v1beta1.LegacyBgpAdvertisement{
+								{
+									AggregationLength: pointer.Int32Ptr(32),
+									LocalPref:         uint32(100),
+									Communities:       []string{"1234:2345"},
+								},
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv1",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength: pointer.Int32Ptr(32),
+							LocalPref:         uint32(100),
+							Communities:       []string{"1234:2345"},
+							IPPools:           []string{"pool1"},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Peers: []*Peer{
+					{
+						MyASN:         42,
+						ASN:           142,
+						Addr:          net.ParseIP("1.2.3.4"),
+						SrcAddr:       net.ParseIP("10.20.30.40"),
+						Port:          1179,
+						HoldTime:      180 * time.Second,
+						KeepaliveTime: 60 * time.Second,
+						RouterID:      net.ParseIP("10.20.30.40"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+						EBGPMultiHop:  true,
+					},
+				},
+				Pools: map[string]*Pool{
+					"pool1": {
+						CIDR:          []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
+						AvoidBuggyIPs: true,
+						AutoAssign:    false,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           100,
+								Communities: map[uint32]bool{
+									0x04D20929: true,
+								},
+							},
+						},
+					},
+					"legacybgppool1": {
+						CIDR:          []*net.IPNet{ipnet("10.40.0.0/16"), ipnet("10.60.0.0/24")},
+						AvoidBuggyIPs: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           100,
+								Communities: map[uint32]bool{
+									0x04D20929: true,
+								},
+							},
+						},
+					},
+					"legacyl2pool1": {
+						CIDR:             []*net.IPNet{ipnet("10.21.0.0/16"), ipnet("10.51.0.0/24")},
+						AvoidBuggyIPs:    true,
+						L2Advertisements: []*L2Advertisement{{}},
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+
+		{
+			desc: "config mixing legacy pools with IP pools with overlapping ips",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+								"10.50.0.0/24",
+							},
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
+						},
+					},
+				},
+				LegacyAddressPools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "legacyl2pool1",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+								"10.51.0.0/24",
+							},
+							Protocol:      string(Layer2),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "legacybgppool1",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Addresses: []string{
+								"10.40.0.0/16",
+								"10.60.0.0/24",
+							},
+							Protocol: string(BGP),
+						},
+					},
+				},
+			},
+		},
 		/* TODO Add communities CRD
 		{
 			desc: "Duplicate communities definition",
@@ -1147,9 +1347,6 @@ func TestParse(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			if !strings.Contains(test.desc, "bad aggregation length") {
-				return
-			}
 			got, err := For(test.crs, DontValidate)
 			if err != nil && test.want != nil {
 				t.Errorf("%q: parse failed: %s", test.desc, err)

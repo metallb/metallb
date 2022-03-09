@@ -1053,7 +1053,8 @@ func TestControllerSvcAddressSharing(t *testing.T) {
 			ExternalTrafficPolicy: "Local",
 			Ports: []v1.ServicePort{
 				{
-					Port: 3000,
+					Port:     3000,
+					Protocol: v1.ProtocolTCP,
 				},
 			},
 		},
@@ -1080,7 +1081,8 @@ func TestControllerSvcAddressSharing(t *testing.T) {
 			ExternalTrafficPolicy: "Cluster",
 			Ports: []v1.ServicePort{
 				{
-					Port: 1000,
+					Port:     1000,
+					Protocol: v1.ProtocolUDP,
 				},
 			},
 		},
