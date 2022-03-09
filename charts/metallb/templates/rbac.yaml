@@ -15,6 +15,9 @@ rules:
 - apiGroups: [""]
   resources: ["events"]
   verbs: ["create", "patch"]
+- apiGroups: ["metallb.io"]
+  resources: ["communities"]
+  verbs: ["get", "list", "watch"]
 {{- if .Values.psp.create }}
 - apiGroups: ["policy"]
   resources: ["podsecuritypolicies"]
@@ -38,6 +41,9 @@ rules:
 - apiGroups: [""]
   resources: ["events"]
   verbs: ["create", "patch"]
+- apiGroups: ["metallb.io"]
+  resources: ["communities"]
+  verbs: ["get", "list", "watch"]
 {{- if .Values.psp.create }}
 - apiGroups: ["policy"]
   resources: ["podsecuritypolicies"]
