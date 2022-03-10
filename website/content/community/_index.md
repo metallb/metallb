@@ -99,8 +99,8 @@ currently have, relative to the top-level directory:
 In addition to code, there's deployment configuration and
 documentation:
 
-- `manifests` contains a variety of Kubernetes manifests. The most
-  important one is `manifests/metallb.yaml`, which specifies how to
+- `config/manifests` contains a variety of Kubernetes manifests. The most
+  important one is `config/manifests/metallb-native.yaml`, which specifies how to
   deploy MetalLB onto a cluster.
 - `website` contains the website for MetalLB. The `website/content`
   subdirectory is where all the pages live, in Markdown format.
