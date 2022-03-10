@@ -110,6 +110,7 @@ jobs:
           sudo apt-get install python3-pip arping ndisc6
           sudo pip3 install invoke semver pyyaml
           GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
+          go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0
 
       - name: Build MetalLB
         run: |
