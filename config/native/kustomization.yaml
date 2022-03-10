@@ -1,0 +1,10 @@
+# Adds namespace to all resources.
+namespace: metallb-system
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ns.yaml
+- ../crd
+- ../rbac
+- ../controllers
