@@ -252,6 +252,33 @@ def validate_kind_version():
     if delta < 0:
         raise Exit(message="kind version >= {} required".format(min_version))
 
+@task(help={
+    "controller_gen": "KubeBuilder CLI."
+                    "Default: controller_gen (version v0.7.0).",
+    "crd_options": "CRD Options."
+                    "Default: crd:crdVersions=v1.",
+    "kustomize_cli": "YAML files customization CLI."
+                    "Default: kustomize (version v4.4.0).",
+    "bgp_type": "Type of BGP implementation to use."
+                    "Supported: 'native' (default), 'frr'",
+    "namespace": "MetalLB deployment namespace."
+                    "Default: 'metallb-system'.",
+    "output": "Optional output file name for generated manifest.",
+})
+def generate_manifest(ctx, controller_gen="controller-gen", crd_options="crd:crdVersions=v1",
+        kustomize_cli="kustomize", bgp_type="native", namespace="metallb-system", output=None):
+    res = run("{} {} rbac:roleName=manager-role webhook paths=\"./api/...\" output:crd:artifacts:config=config/crd/bases".format(controller_gen, crd_options))
+    if not res.ok:
+        raise Exit(message="Failed to generate manifests")
+
+    res = run("cd config/{} && {} edit set namespace {}".format(bgp_type, kustomize_cli, namespace))
+    if not res.ok:
+        raise Exit(message="Failed to set manifests namespace")
+
+    if output:
+        res = run("kubectl kustomize config/{} > {}".format(bgp_type, output))
+        if not res.ok:
+            raise Exit(message="Failed to kustomize manifests")
 
 @task(help={
     "architecture": "CPU architecture of the local machine. Default 'amd64'.",
@@ -278,8 +305,8 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
 
     If the cluster specified by --name (default "kind") doesn't exist,
     it is created. Then, build MetalLB docker images from the
-    checkout, push them into kind, and deploy manifests/metallb.yaml
-    to run those images.
+    checkout, push them into kind, and deploy MetalLB through manifests
+    or helm to run those images.
     The optional node_img parameter will be used to determine the version of the cluster.
     """
 
@@ -327,15 +354,13 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
     else:
         run("kubectl delete po -nmetallb-system --all", echo=True)
 
-        manifests_dir = os.getcwd() + "/manifests"
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Copy namespace manifest.
-            shutil.copy(manifests_dir + "/namespace.yaml", tmpdir)
+            manifest_file = tmpdir + "/metallb.yaml"
 
-            # FIXME: This is a hack to get the correct manifest file.
-            manifest_filename = "metallb-frr.yaml" if bgp_type == "frr" else "metallb.yaml"
-            # open file and replace the protocol with the one specified by the user
-            with open(manifests_dir + "/" + manifest_filename) as f:
+            generate_manifest(ctx, bgp_type=bgp_type, output=manifest_file)
+
+            # open file and replace the images with the newely built MetalLB docker images
+            with open(manifest_file) as f:
                 manifest = f.read()
             for image in binaries:
                 manifest = re.sub("image: quay.io/metallb/{}:.*".format(image),
@@ -343,12 +368,11 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
                 manifest = re.sub("--log-level=info", "--log-level={}".format(log_level), manifest)
             manifest.replace("--log-level=info", "--log-level=debug")
 
-            with open(tmpdir + "/metallb.yaml", "w") as f:
+            with open(manifest_file, "w") as f:
                 f.write(manifest)
                 f.flush()
 
-            run("kubectl apply -f {}/namespace.yaml".format(tmpdir), echo=True)
-            run("kubectl apply -f {}/metallb.yaml".format(tmpdir), echo=True)
+            run("kubectl apply -f {}".format(manifest_file), echo=True)
 
     with open("e2etest/manifests/mirror-server.yaml") as f:
         manifest = f.read()
@@ -563,8 +587,8 @@ def release(ctx, version, skip_release_notes=False):
     run("perl -pi -e 's/MetalLB .*/MetalLB v{}/g' website/content/_header.md".format(version), echo=True)
 
     # Update the manifests with the new version
-    run("perl -pi -e 's,image: quay.io/metallb/speaker:.*,image: quay.io/metallb/speaker:v{},g' manifests/metallb.yaml".format(version), echo=True)
-    run("perl -pi -e 's,image: quay.io/metallb/controller:.*,image: quay.io/metallb/controller:v{},g' manifests/metallb.yaml".format(version), echo=True)
+    run("perl -pi -e 's,image: quay.io/metallb/speaker:.*,image: quay.io/metallb/speaker:v{},g' config/controllers/speaker.yaml".format(version), echo=True)
+    run("perl -pi -e 's,image: quay.io/metallb/controller:.*,image: quay.io/metallb/controller:v{},g' config/controllers/controller.yaml".format(version), echo=True)
 
     # Update the versions in the helm chart (version and appVersion are always the same)
     # helm chart versions follow Semantic Versioning, and thus exclude the leading 'v'
@@ -720,4 +744,3 @@ def verifylicense(ctx):
             print("{} is missing license".format(file))
     if no_license:
         raise Exit(message="#### Files with no license found.\n#### Please run ""inv bumplicense"" to add the license header")
- 
