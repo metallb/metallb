@@ -1,0 +1,201 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: addresspools.metallb.io
+spec:
+  group: metallb.io
+  names:
+    kind: AddressPool
+    listKind: AddressPoolList
+    plural: addresspools
+    singular: addresspool
+  scope: Namespaced
+  versions:
+  - deprecated: true
+    deprecationWarning: metallbio.io v1alpha1 AddressPool is deprecated
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: AddressPool is the Schema for the addresspools API.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: AddressPoolSpec defines the desired state of AddressPool.
+            properties:
+              addresses:
+                description: A list of IP address ranges over which MetalLB has authority.
+                  You can list multiple ranges in a single pool, they will all share
+                  the same settings. Each range can be either a CIDR prefix, or an
+                  explicit start-end range of IPs.
+                items:
+                  type: string
+                type: array
+              autoAssign:
+                default: true
+                description: AutoAssign flag used to prevent MetallB from automatic
+                  allocation for a pool.
+                type: boolean
+              bgpAdvertisements:
+                description: When an IP is allocated from this pool, how should it
+                  be translated into BGP announcements?
+                items:
+                  properties:
+                    aggregationLength:
+                      default: 32
+                      description: The aggregation-length advertisement option lets
+                        you “roll up” the /32s into a larger prefix.
+                      format: int32
+                      minimum: 1
+                      type: integer
+                    aggregationLengthV6:
+                      default: 128
+                      description: Optional, defaults to 128 (i.e. no aggregation)
+                        if not specified.
+                      format: int32
+                      type: integer
+                    communities:
+                      description: BGP communities
+                      items:
+                        type: string
+                      type: array
+                    localPref:
+                      description: BGP LOCAL_PREF attribute which is used by BGP best
+                        path algorithm, Path with higher localpref is preferred over
+                        one with lower localpref.
+                      format: int32
+                      type: integer
+                  type: object
+                type: array
+              protocol:
+                description: Protocol can be used to select how the announcement is
+                  done.
+                enum:
+                - layer2
+                - bgp
+                type: string
+            required:
+            - addresses
+            - protocol
+            type: object
+          status:
+            description: AddressPoolStatus defines the observed state of AddressPool.
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: false
+    subresources:
+      status: {}
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: AddressPool is the Schema for the addresspools API.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: AddressPoolSpec defines the desired state of AddressPool.
+            properties:
+              addresses:
+                description: A list of IP address ranges over which MetalLB has authority.
+                  You can list multiple ranges in a single pool, they will all share
+                  the same settings. Each range can be either a CIDR prefix, or an
+                  explicit start-end range of IPs.
+                items:
+                  type: string
+                type: array
+              autoAssign:
+                default: true
+                description: AutoAssign flag used to prevent MetallB from automatic
+                  allocation for a pool.
+                type: boolean
+              avoidBuggyIPs:
+                default: false
+                description: AvoidBuggyIPs prevents addresses ending with .0 and .255
+                  to be used by a pool.
+                type: boolean
+              bgpAdvertisements:
+                description: When an IP is allocated from this pool, how should it
+                  be translated into BGP announcements?
+                items:
+                  properties:
+                    aggregationLength:
+                      default: 32
+                      description: The aggregation-length advertisement option lets
+                        you “roll up” the /32s into a larger prefix.
+                      format: int32
+                      minimum: 1
+                      type: integer
+                    aggregationLengthV6:
+                      default: 128
+                      description: Optional, defaults to 128 (i.e. no aggregation)
+                        if not specified.
+                      format: int32
+                      type: integer
+                    communities:
+                      description: BGP communities
+                      items:
+                        type: string
+                      type: array
+                    localPref:
+                      description: BGP LOCAL_PREF attribute which is used by BGP best
+                        path algorithm, Path with higher localpref is preferred over
+                        one with lower localpref.
+                      format: int32
+                      type: integer
+                  type: object
+                type: array
+              protocol:
+                description: Protocol can be used to select how the announcement is
+                  done.
+                enum:
+                - layer2
+                - bgp
+                type: string
+            required:
+            - addresses
+            - protocol
+            type: object
+          status:
+            description: AddressPoolStatus defines the observed state of AddressPool.
+            type: object
+        required:
+        - spec
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

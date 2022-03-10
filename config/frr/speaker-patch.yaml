@@ -1,0 +1,122 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: speaker
+spec:
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: 'true'
+      labels:
+        app: metallb
+        component: speaker
+    spec:
+      volumes:
+        - name: frr-sockets
+          emptyDir: {}
+        - name: frr-startup
+          configMap:
+            name: frr-startup
+        - name: frr-conf
+          emptyDir: {}
+        - name: reloader
+          emptyDir: {}
+        - name: metrics
+          emptyDir: {}
+      initContainers:
+        # Copies the initial config files with the right permissions to the shared volume.
+        - name: cp-frr-files
+          securityContext:
+            runAsUser: 100
+            runAsGroup: 101
+          image: quay.io/frrouting/frr:stable_7.5
+          command: ["/bin/sh", "-c", "cp -rLf /tmp/frr/* /etc/frr/"]
+          volumeMounts:
+            - name: frr-startup
+              mountPath: /tmp/frr
+            - name: frr-conf
+              mountPath: /etc/frr
+        # Copies the reloader to the shared volume between the speaker and reloader.
+        - name: cp-reloader
+          image: quay.io/metallb/speaker:main
+          command: ["/bin/sh", "-c", "cp -f /frr-reloader.sh /etc/frr_reloader/"]
+          volumeMounts:
+            - name: reloader
+              mountPath: /etc/frr_reloader
+        # Copies the metrics exporter
+        - name: cp-metrics
+          image: quay.io/metallb/speaker:main
+          command: ["/bin/sh", "-c", "cp -f /frr-metrics /etc/frr_metrics/"]
+          volumeMounts:
+            - name: metrics
+              mountPath: /etc/frr_metrics
+      containers:
+        - name: frr
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN", "NET_RAW", "SYS_ADMIN", "NET_BIND_SERVICE"]
+          image: quay.io/frrouting/frr:stable_7.5
+          env:
+            - name: TINI_SUBREAPER
+              value: "true"
+          volumeMounts:
+            - name: frr-sockets
+              mountPath: /var/run/frr
+            - name: frr-conf
+              mountPath: /etc/frr
+          # The command is FRR's default entrypoint & waiting for the log file to appear and tailing it.
+          # If the log file isn't created in 60 seconds the tail fails and the container is restarted.
+          # This workaround is needed to have the frr logs as part of kubectl logs -c frr < speaker_pod_name >.
+          command:
+            - /bin/sh
+            - -c
+            - |
+              /sbin/tini -- /usr/lib/frr/docker-start &
+              attempts=0
+              until [[ -f /etc/frr/frr.log || $attempts -eq 60 ]]; do
+                sleep 1
+                attempts=$(( $attempts + 1 ))
+              done
+              tail -f /etc/frr/frr.log
+        - name: reloader
+          image: quay.io/frrouting/frr:stable_7.5
+          command: ["/etc/frr_reloader/frr-reloader.sh"]
+          volumeMounts:
+            - name: frr-sockets
+              mountPath: /var/run/frr
+            - name: frr-conf
+              mountPath: /etc/frr
+            - name: reloader
+              mountPath: /etc/frr_reloader
+        - name: frr-metrics
+          image: quay.io/frrouting/frr:stable_7.5
+          command: ["/etc/frr_metrics/frr-metrics"]
+          args:
+            - --metrics-port=7473
+          ports:
+            - containerPort: 7473
+              name: monitoring
+          volumeMounts:
+            - name: frr-sockets
+              mountPath: /var/run/frr
+            - name: frr-conf
+              mountPath: /etc/frr
+            - name: metrics
+              mountPath: /etc/frr_metrics
+        - name: speaker
+          env:
+            - name: FRR_CONFIG_FILE
+              value: /etc/frr_reloader/frr.conf
+            - name: FRR_RELOADER_PID_FILE
+              value: /etc/frr_reloader/reloader.pid
+            - name: METALLB_BGP_TYPE
+              value: frr
+            # FRR_LOGGING_LEVEL used to set logging level for all running frr processes.
+            # Possible settings are :-
+            #  informational, warning, errors and debugging.
+            - name: FRR_LOGGING_LEVEL
+              value: informational
+          volumeMounts:
+            - name: reloader
+              mountPath: /etc/frr_reloader
+      shareProcessNamespace: true
