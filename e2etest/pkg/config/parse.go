@@ -2,7 +2,11 @@
 
 package config
 
-import metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+import (
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	"go.universe.tf/metallb/internal/config"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
 
 func BFDProfileWithDefaults(profile metallbv1beta1.BFDProfile, multiHop bool) metallbv1beta1.BFDProfile {
 	res := metallbv1beta1.BFDProfile{}
@@ -20,6 +24,35 @@ func BFDProfileWithDefaults(profile metallbv1beta1.BFDProfile, multiHop bool) me
 		res.Spec.EchoInterval = uint32Ptr(50)
 	}
 
+	return res
+}
+
+// IPPoolToLegacy converts the given IPPool to the legacy addresspool.
+func IPPoolToLegacy(ippool metallbv1beta1.IPPool, protocol config.Proto, bgpAdv []metallbv1beta1.BGPAdvertisement) metallbv1beta1.AddressPool {
+	res := metallbv1beta1.AddressPool{
+		ObjectMeta: v1.ObjectMeta{
+			Name: ippool.Name,
+		},
+		Spec: metallbv1beta1.AddressPoolSpec{
+			Protocol:          string(protocol),
+			Addresses:         make([]string, 0),
+			AutoAssign:        ippool.Spec.AutoAssign,
+			AvoidBuggyIPs:     ippool.Spec.AvoidBuggyIPs,
+			BGPAdvertisements: make([]metallbv1beta1.LegacyBgpAdvertisement, 0),
+		},
+	}
+	res.Spec.Addresses = append(res.Spec.Addresses, ippool.Spec.Addresses...)
+
+	for _, adv := range bgpAdv {
+		legacy := metallbv1beta1.LegacyBgpAdvertisement{
+			AggregationLength:   adv.Spec.AggregationLength,
+			AggregationLengthV6: adv.Spec.AggregationLengthV6,
+			LocalPref:           adv.Spec.LocalPref,
+			Communities:         make([]string, 0),
+		}
+		legacy.Communities = append(legacy.Communities, adv.Spec.Communities...)
+		res.Spec.BGPAdvertisements = append(res.Spec.BGPAdvertisements, legacy)
+	}
 	return res
 }
 

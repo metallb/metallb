@@ -81,6 +81,11 @@ func (o beta1Updater) Update(r config.ClusterResources) error {
 		key = key + 1
 	}
 
+	for _, legacyPool := range r.LegacyAddressPools {
+		objects[key] = legacyPool.DeepCopy()
+		key = key + 1
+	}
+
 	// Iterating over the map will return the items in a random order.
 	for _, obj := range objects {
 		obj.SetNamespace(o.namespace)
@@ -113,6 +118,9 @@ func (o beta1Updater) Clean() error {
 	if err != nil {
 		return err
 	}
-
+	err = o.DeleteAllOf(context.Background(), &metallbv1beta1.AddressPool{}, client.InNamespace(o.namespace))
+	if err != nil {
+		return err
+	}
 	return nil
 }
