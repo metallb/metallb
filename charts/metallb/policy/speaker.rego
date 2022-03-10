@@ -8,14 +8,6 @@ deny[msg] {
   msg = sprintf("speaker serviceAccountName '%s' does not match expected value", [serviceAccountName])
 }
 
-# validate config map name in container args
-deny[msg] {
-  input.kind == "DaemonSet"
-  configArg := input.spec.template.spec.containers[0].args[1]
-  not configArg == "--config=RELEASE-NAME-metallb"
-  msg = sprintf("speaker ConfigMap arg '%s' does not match expected value", [configArg])
-}
-
 # validate METALLB_ML_SECRET_KEY (memberlist)
 deny[msg] {
 	input.kind == "DaemonSet"

@@ -25,71 +25,15 @@ import (
 
 	"github.com/mikioh/ipaddr"
 	"github.com/pkg/errors"
-	yaml "gopkg.in/yaml.v2"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-// configFile is the configuration as parsed out of the ConfigMap,
-// without validation or useful high level types.
-type configFile struct {
-	Peers          []peer
-	BGPCommunities map[string]string `yaml:"bgp-communities"`
-	Pools          []addressPool     `yaml:"address-pools"`
-	BFDProfiles    []bfdProfile      `yaml:"bfd-profiles"`
-}
-
-type peer struct {
-	MyASN         uint32         `yaml:"my-asn"`
-	ASN           uint32         `yaml:"peer-asn"`
-	Addr          string         `yaml:"peer-address"`
-	SrcAddr       string         `yaml:"source-address"`
-	Port          uint16         `yaml:"peer-port"`
-	HoldTime      string         `yaml:"hold-time"`
-	KeepaliveTime string         `yaml:"keepalive-time"`
-	RouterID      string         `yaml:"router-id"`
-	NodeSelectors []nodeSelector `yaml:"node-selectors"`
-	Password      string         `yaml:"password"`
-	BFDProfile    string         `yaml:"bfd-profile"`
-	EBGPMultiHop  bool           `yaml:"ebgp-multihop"`
-}
-
-type nodeSelector struct {
-	MatchLabels      map[string]string      `yaml:"match-labels"`
-	MatchExpressions []selectorRequirements `yaml:"match-expressions"`
-}
-
-type selectorRequirements struct {
-	Key      string   `yaml:"key"`
-	Operator string   `yaml:"operator"`
-	Values   []string `yaml:"values"`
-}
-
-type addressPool struct {
-	Protocol          Proto
-	Name              string
-	Addresses         []string
-	AvoidBuggyIPs     bool               `yaml:"avoid-buggy-ips"`
-	AutoAssign        *bool              `yaml:"auto-assign"`
-	BGPAdvertisements []bgpAdvertisement `yaml:"bgp-advertisements"`
-}
-
-type bgpAdvertisement struct {
-	AggregationLength   *int `yaml:"aggregation-length"`
-	AggregationLengthV6 *int `yaml:"aggregation-length-v6"`
-	LocalPref           *uint32
-	Communities         []string
-}
-
-type bfdProfile struct {
-	Name             string  `yaml:"name"`
-	ReceiveInterval  *uint32 `yaml:"receive-interval"`
-	TransmitInterval *uint32 `yaml:"transmit-interval"`
-	DetectMultiplier *uint32 `yaml:"detect-multiplier"`
-	EchoInterval     *uint32 `yaml:"echo-interval"`
-	EchoMode         bool    `yaml:"echo-mode"`
-	PassiveMode      bool    `yaml:"passive-mode"`
-	MinimumTTL       *uint32 `yaml:"minimum-ttl"`
+type ClusterResources struct {
+	Pools       []metallbv1beta1.AddressPool
+	Peers       []metallbv1beta1.BGPPeer
+	BFDProfiles []metallbv1beta1.BFDProfile
 }
 
 // Config is a parsed MetalLB configuration.
@@ -191,7 +135,7 @@ type BFDProfile struct {
 	MinimumTTL       *uint32
 }
 
-func parseNodeSelector(ns *nodeSelector) (labels.Selector, error) {
+func parseNodeSelector(ns metallbv1beta1.NodeSelector) (labels.Selector, error) {
 	if len(ns.MatchLabels)+len(ns.MatchExpressions) == 0 {
 		return labels.Everything(), nil
 	}
@@ -216,42 +160,17 @@ func parseNodeSelector(ns *nodeSelector) (labels.Selector, error) {
 	return metav1.LabelSelectorAsSelector(sel)
 }
 
-func parseHoldTime(ht string) (time.Duration, error) {
-	if ht == "" {
-		return 90 * time.Second, nil
-	}
-	d, err := time.ParseDuration(ht)
-	if err != nil {
-		return 0, fmt.Errorf("invalid hold time %q: %s", ht, err)
-	}
-	rounded := time.Duration(int(d.Seconds())) * time.Second
+func validateHoldTime(ht time.Duration) error {
+	rounded := time.Duration(int(ht.Seconds())) * time.Second
 	if rounded != 0 && rounded < 3*time.Second {
-		return 0, fmt.Errorf("invalid hold time %q: must be 0 or >=3s", ht)
+		return fmt.Errorf("invalid hold time %q: must be 0 or >=3s", ht)
 	}
-	return rounded, nil
-}
-
-func parseKeepaliveTime(ht time.Duration, ka string) (time.Duration, error) {
-	// If keepalive time not set lets use 1/3 of holdtime.
-	if ka == "" {
-		return ht / 3, nil
-	}
-	d, err := time.ParseDuration(ka)
-	if err != nil {
-		return 0, fmt.Errorf("invalid keepalive time %q: %s", ka, err)
-	}
-	rounded := time.Duration(int(d.Seconds())) * time.Second
-	return rounded, nil
+	return nil
 }
 
 // Parse loads and validates a Config from bs.
-func Parse(bs []byte, validate Validate) (*Config, error) {
-	var raw configFile
-	if err := yaml.UnmarshalStrict(bs, &raw); err != nil {
-		return nil, fmt.Errorf("could not parse config: %s", err)
-	}
-
-	err := validate(&raw)
+func For(resources ClusterResources, validate Validate) (*Config, error) {
+	err := validate(resources)
 	if err != nil {
 		return nil, err
 	}
@@ -261,8 +180,8 @@ func Parse(bs []byte, validate Validate) (*Config, error) {
 		BFDProfiles: map[string]*BFDProfile{},
 	}
 
-	for i, bfd := range raw.BFDProfiles {
-		parsed, err := parseBFDProfile(bfd)
+	for i, bfd := range resources.BFDProfiles {
+		parsed, err := bfdProfileFromCR(bfd)
 		if err != nil {
 			return nil, fmt.Errorf("parsing bfd profile #%d: %s", i+1, err)
 		}
@@ -272,8 +191,8 @@ func Parse(bs []byte, validate Validate) (*Config, error) {
 		cfg.BFDProfiles[bfd.Name] = parsed
 	}
 
-	for i, p := range raw.Peers {
-		peer, err := parsePeer(p)
+	for i, p := range resources.Peers {
+		peer, err := peerFromCR(p)
 		if err != nil {
 			return nil, fmt.Errorf("parsing peer #%d: %s", i+1, err)
 		}
@@ -295,17 +214,20 @@ func Parse(bs []byte, validate Validate) (*Config, error) {
 	}
 
 	communities := map[string]uint32{}
-	for n, v := range raw.BGPCommunities {
-		c, err := ParseCommunity(v)
-		if err != nil {
-			return nil, fmt.Errorf("parsing community %q: %s", n, err)
+	// TODO CRDs add a CRD for communities
+	/*
+		for n, v := range rawConfig.BGPCommunities {
+			c, err := ParseCommunity(v)
+			if err != nil {
+				return nil, fmt.Errorf("parsing community %q: %s", n, err)
+			}
+			communities[n] = c
 		}
-		communities[n] = c
-	}
+	*/
 
 	var allCIDRs []*net.IPNet
-	for i, p := range raw.Pools {
-		pool, err := parseAddressPool(p, communities)
+	for i, p := range resources.Pools {
+		pool, err := addressPoolFromCR(p, communities)
 		if err != nil {
 			return nil, fmt.Errorf("parsing address pool #%d: %s", i+1, err)
 		}
@@ -331,60 +253,65 @@ func Parse(bs []byte, validate Validate) (*Config, error) {
 	return cfg, nil
 }
 
-func parsePeer(p peer) (*Peer, error) {
-	if p.MyASN == 0 {
+func peerFromCR(p metallbv1beta1.BGPPeer) (*Peer, error) {
+	if p.Spec.MyASN == 0 {
 		return nil, errors.New("missing local ASN")
 	}
-	if p.ASN == 0 {
+	if p.Spec.ASN == 0 {
 		return nil, errors.New("missing peer ASN")
 	}
-	if p.ASN == p.MyASN && p.EBGPMultiHop {
+	if p.Spec.ASN == p.Spec.MyASN && p.Spec.EBGPMultiHop {
 		return nil, errors.New("invalid ebgp-multihop parameter set for an ibgp peer")
 	}
-	ip := net.ParseIP(p.Addr)
+	ip := net.ParseIP(p.Spec.Address)
 	if ip == nil {
-		return nil, fmt.Errorf("invalid peer IP %q", p.Addr)
+		return nil, fmt.Errorf("invalid peer IP %q", p.Spec.Address)
 	}
-	holdTime, err := parseHoldTime(p.HoldTime)
+	holdTime := p.Spec.HoldTime.Duration
+	if holdTime == 0 { // TODO move the defaults at CRD level if they are not already
+		holdTime = 90 * time.Second
+	}
+	err := validateHoldTime(holdTime)
 	if err != nil {
 		return nil, err
 	}
-	keepaliveTime, err := parseKeepaliveTime(holdTime, p.KeepaliveTime)
-	if err != nil {
-		return nil, err
+	keepaliveTime := p.Spec.KeepaliveTime.Duration
+	if keepaliveTime == 0 {
+		keepaliveTime = holdTime / 3
 	}
+
 	// keepalive must be lower than holdtime
 	if keepaliveTime > holdTime {
-		return nil, fmt.Errorf("invalid keepaliveTime %q", p.KeepaliveTime)
+		return nil, fmt.Errorf("invalid keepaliveTime %q", p.Spec.KeepaliveTime)
 	}
 	port := uint16(179)
-	if p.Port != 0 {
-		port = p.Port
+	if p.Spec.Port != 0 {
+		port = p.Spec.Port
 	}
 	// Ideally we would set a default RouterID here, instead of having
 	// to do it elsewhere in the code. Unfortunately, we don't know
 	// the node IP here.
 	var routerID net.IP
-	if p.RouterID != "" {
-		routerID = net.ParseIP(p.RouterID)
+	if p.Spec.RouterID != "" {
+		routerID = net.ParseIP(p.Spec.RouterID)
 		if routerID == nil {
-			return nil, fmt.Errorf("invalid router ID %q", p.RouterID)
+			return nil, fmt.Errorf("invalid router ID %q", p.Spec.RouterID)
 		}
 	}
-	src := net.ParseIP(p.SrcAddr)
-	if p.SrcAddr != "" && src == nil {
-		return nil, fmt.Errorf("invalid source IP %q", p.SrcAddr)
+	src := net.ParseIP(p.Spec.SrcAddress)
+	if p.Spec.SrcAddress != "" && src == nil {
+		return nil, fmt.Errorf("invalid source IP %q", p.Spec.SrcAddress)
 	}
 
 	// We use a non-pointer in the raw json object, so that if the
 	// user doesn't provide a node selector, we end up with an empty,
 	// but non-nil selector, which means "select everything".
 	var nodeSels []labels.Selector
-	if len(p.NodeSelectors) == 0 {
+	if len(p.Spec.NodeSelectors) == 0 {
 		nodeSels = []labels.Selector{labels.Everything()}
 	} else {
-		for _, sel := range p.NodeSelectors {
-			nodeSel, err := parseNodeSelector(&sel)
+		for _, sel := range p.Spec.NodeSelectors {
+			nodeSel, err := parseNodeSelector(sel)
 			if err != nil {
 				return nil, fmt.Errorf("parsing node selector: %s", err)
 			}
@@ -393,13 +320,13 @@ func parsePeer(p peer) (*Peer, error) {
 	}
 
 	var password string
-	if p.Password != "" {
-		password = p.Password
+	if p.Spec.Password != "" {
+		password = p.Spec.Password
 	}
 
 	return &Peer{
-		MyASN:         p.MyASN,
-		ASN:           p.ASN,
+		MyASN:         p.Spec.MyASN,
+		ASN:           p.Spec.ASN,
 		Addr:          ip,
 		SrcAddr:       src,
 		Port:          port,
@@ -408,32 +335,32 @@ func parsePeer(p peer) (*Peer, error) {
 		RouterID:      routerID,
 		NodeSelectors: nodeSels,
 		Password:      password,
-		BFDProfile:    p.BFDProfile,
-		EBGPMultiHop:  p.EBGPMultiHop,
+		BFDProfile:    p.Spec.BFDProfile,
+		EBGPMultiHop:  p.Spec.EBGPMultiHop,
 	}, nil
 }
 
-func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, error) {
+func addressPoolFromCR(p metallbv1beta1.AddressPool, bgpCommunities map[string]uint32) (*Pool, error) {
 	if p.Name == "" {
 		return nil, errors.New("missing pool name")
 	}
 
 	ret := &Pool{
-		Protocol:      p.Protocol,
-		AvoidBuggyIPs: p.AvoidBuggyIPs,
+		Protocol:      Proto(p.Spec.Protocol),
+		AvoidBuggyIPs: p.Spec.AvoidBuggyIPs,
 		AutoAssign:    true,
 	}
 
-	if p.AutoAssign != nil {
-		ret.AutoAssign = *p.AutoAssign
+	if p.Spec.AutoAssign != nil {
+		ret.AutoAssign = *p.Spec.AutoAssign
 	}
 
-	if len(p.Addresses) == 0 {
+	if len(p.Spec.Addresses) == 0 {
 		return nil, errors.New("pool has no prefixes defined")
 	}
 
 	cidrsPerAddresses := map[string][]*net.IPNet{}
-	for _, cidr := range p.Addresses {
+	for _, cidr := range p.Spec.Addresses {
 		nets, err := ParseCIDR(cidr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid CIDR %q in pool %q: %s", cidr, p.Name, err)
@@ -443,11 +370,11 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 	}
 	switch ret.Protocol {
 	case Layer2:
-		if len(p.BGPAdvertisements) > 0 {
+		if len(p.Spec.BGPAdvertisements) > 0 {
 			return nil, errors.New("cannot have bgp-advertisements configuration element in a layer2 address pool")
 		}
 	case BGP:
-		ads, err := parseBGPAdvertisements(p.BGPAdvertisements, cidrsPerAddresses, bgpCommunities)
+		ads, err := bgpAdvertisementsFromCR(p.Spec.BGPAdvertisements, cidrsPerAddresses, bgpCommunities)
 		if err != nil {
 			return nil, fmt.Errorf("parsing BGP communities: %s", err)
 		}
@@ -461,40 +388,44 @@ func parseAddressPool(p addressPool, bgpCommunities map[string]uint32) (*Pool, e
 	return ret, nil
 }
 
-func parseBFDProfile(p bfdProfile) (*BFDProfile, error) {
+func bfdProfileFromCR(p metallbv1beta1.BFDProfile) (*BFDProfile, error) {
 	if p.Name == "" {
 		return nil, fmt.Errorf("missing bfd profile name")
 	}
 	res := &BFDProfile{}
 	res.Name = p.Name
 	var err error
-	res.DetectMultiplier, err = bfdIntFromConfig(p.DetectMultiplier, 2, 255)
+	res.DetectMultiplier, err = bfdIntFromConfig(p.Spec.DetectMultiplier, 2, 255)
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid detect multiplier value")
 	}
-	res.ReceiveInterval, err = bfdIntFromConfig(p.ReceiveInterval, 10, 60000)
+	res.ReceiveInterval, err = bfdIntFromConfig(p.Spec.ReceiveInterval, 10, 60000)
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid receive interval value")
 	}
-	res.TransmitInterval, err = bfdIntFromConfig(p.TransmitInterval, 10, 60000)
+	res.TransmitInterval, err = bfdIntFromConfig(p.Spec.TransmitInterval, 10, 60000)
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid transmit interval value")
 	}
-	res.MinimumTTL, err = bfdIntFromConfig(p.MinimumTTL, 1, 254)
+	res.MinimumTTL, err = bfdIntFromConfig(p.Spec.MinimumTTL, 1, 254)
 	if err != nil {
 		return nil, errors.Wrap(err, "invalid minimum ttl value")
 	}
-	res.EchoInterval, err = bfdIntFromConfig(p.EchoInterval, 10, 60000)
+	res.EchoInterval, err = bfdIntFromConfig(p.Spec.EchoInterval, 10, 60000)
 	if err != nil {
-		return nil, errors.Wrap(err, "invalid minimum ttl value")
+		return nil, errors.Wrap(err, "invalid echo interval value")
 	}
-	res.EchoMode = p.EchoMode
-	res.PassiveMode = p.PassiveMode
+	if p.Spec.EchoMode != nil {
+		res.EchoMode = *p.Spec.EchoMode
+	}
+	if p.Spec.PassiveMode != nil {
+		res.PassiveMode = *p.Spec.PassiveMode
+	}
 
 	return res, nil
 }
 
-func parseBGPAdvertisements(ads []bgpAdvertisement, cidrsPerAddresses map[string][]*net.IPNet, communities map[string]uint32) ([]*BGPAdvertisement, error) {
+func bgpAdvertisementsFromCR(ads []metallbv1beta1.BgpAdvertisement, cidrsPerAddresses map[string][]*net.IPNet, communities map[string]uint32) ([]*BGPAdvertisement, error) {
 	if len(ads) == 0 {
 		return []*BGPAdvertisement{
 			{
@@ -512,8 +443,8 @@ func parseBGPAdvertisements(ads []bgpAdvertisement, cidrsPerAddresses map[string
 	}
 
 	var ret []*BGPAdvertisement
-	for _, rawAd := range ads {
-		err := validateDuplicateCommunities(rawAd.Communities)
+	for _, crdAd := range ads {
+		err := validateDuplicateCommunities(crdAd.Communities)
 		if err != nil {
 			return nil, err
 		}
@@ -525,14 +456,14 @@ func parseBGPAdvertisements(ads []bgpAdvertisement, cidrsPerAddresses map[string
 			Communities:         map[uint32]bool{},
 		}
 
-		if rawAd.AggregationLength != nil {
-			ad.AggregationLength = *rawAd.AggregationLength
+		if crdAd.AggregationLength != nil {
+			ad.AggregationLength = int(*crdAd.AggregationLength)
 		}
 		if ad.AggregationLength > 32 {
 			return nil, fmt.Errorf("invalid aggregation length %q for IPv4", ad.AggregationLength)
 		}
-		if rawAd.AggregationLengthV6 != nil {
-			ad.AggregationLengthV6 = *rawAd.AggregationLengthV6
+		if crdAd.AggregationLengthV6 != nil {
+			ad.AggregationLengthV6 = int(*crdAd.AggregationLengthV6)
 			if ad.AggregationLengthV6 > 128 {
 				return nil, fmt.Errorf("invalid aggregation length %q for IPv6", ad.AggregationLengthV6)
 			}
@@ -556,11 +487,9 @@ func parseBGPAdvertisements(ads []bgpAdvertisement, cidrsPerAddresses map[string
 			}
 		}
 
-		if rawAd.LocalPref != nil {
-			ad.LocalPref = *rawAd.LocalPref
-		}
+		ad.LocalPref = crdAd.LocalPref
 
-		for _, c := range rawAd.Communities {
+		for _, c := range crdAd.Communities {
 			if v, ok := communities[c]; ok {
 				ad.Communities[v] = true
 			} else {
@@ -678,7 +607,7 @@ func bfdIntFromConfig(value *uint32, min, max uint32) (*uint32, error) {
 	return value, nil
 }
 
-func validateDuplicateAdvertisements(ads []bgpAdvertisement) error {
+func validateDuplicateAdvertisements(ads []metallbv1beta1.BgpAdvertisement) error {
 	for i := 0; i < len(ads); i++ {
 		for j := i + 1; j < len(ads); j++ {
 			if reflect.DeepEqual(ads[i], ads[j]) {

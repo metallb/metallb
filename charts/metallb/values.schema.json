@@ -152,10 +152,6 @@
       "description": "Override fully qualified app name",
       "type": "string"
     },
-    "existingConfigMap": {
-      "description": "Existing config map to use for metallb configs",
-      "type": "string"
-    },
     "configInLine": {
       "description": "MetalLB configuration",
       "type": "object"
