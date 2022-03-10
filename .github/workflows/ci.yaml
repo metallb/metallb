@@ -38,7 +38,6 @@ jobs:
       - name: Unit Tests
         run: |
           inv test
-          cp manifests/metallb.yaml manifests/metallb.yaml.prev
 
       - name: Lint
         run: |

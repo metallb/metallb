@@ -16,7 +16,6 @@ jobs:
     steps:
       - setup_ci_image
       - run: inv test
-      - run: cp manifests/metallb.yaml manifests/metallb.yaml.prev
   lint-1-16:
     docker:
       - image: cimg/go:1.16
