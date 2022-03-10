@@ -8,7 +8,7 @@ creating and deploying a config map into the same namespace
 (metallb-system) as the deployment.
 
 There is an example config map in
-[`manifests/example-config.yaml`](https://raw.githubusercontent.com/metallb/metallb/main/manifests/example-config.yaml),
+[`config/samples/example-config.yaml`](https://raw.githubusercontent.com/metallb/metallb/main/config/samples/example-config.yaml),
 annotated with explanatory comments.
 
 If you've named the config map `config.yaml`, you can deploy the manifest with `kubectl apply -f config.yaml`.
