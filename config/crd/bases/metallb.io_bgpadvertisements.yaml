@@ -1,0 +1,83 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: bgpadvertisements.metallb.io
+spec:
+  group: metallb.io
+  names:
+    kind: BGPAdvertisement
+    listKind: BGPAdvertisementList
+    plural: bgpadvertisements
+    singular: bgpadvertisement
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: BGPAdvertisement is the Schema for the bgpadvertisements API.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: BGPAdvertisementSpec defines the desired state of BGPAdvertisement.
+            properties:
+              aggregationLength:
+                default: 32
+                description: The aggregation-length advertisement option lets you
+                  “roll up” the /32s into a larger prefix.
+                format: int32
+                minimum: 1
+                type: integer
+              aggregationLengthV6:
+                default: 128
+                description: Optional, defaults to 128 (i.e. no aggregation) if not
+                  specified.
+                format: int32
+                type: integer
+              communities:
+                description: BGP communities
+                items:
+                  type: string
+                type: array
+              ipPools:
+                description: IPPools is the list of ippools to advertise via this
+                  advertisement.
+                items:
+                  type: string
+                type: array
+              localPref:
+                description: BGP LOCAL_PREF attribute which is used by BGP best path
+                  algorithm, Path with higher localpref is preferred over one with
+                  lower localpref.
+                format: int32
+                type: integer
+            type: object
+          status:
+            description: BGPAdvertisementStatus defines the observed state of BGPAdvertisement.
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
