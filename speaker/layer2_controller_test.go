@@ -10,7 +10,8 @@ import (
 	"testing"
 
 	"go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/k8s"
+	"go.universe.tf/metallb/internal/k8s/controllers"
+	"go.universe.tf/metallb/internal/k8s/epslices"
 
 	"github.com/go-kit/kit/log"
 	v1 "k8s.io/api/core/v1"
@@ -56,7 +57,7 @@ func TestUsableNodes(t *testing.T) {
 	tests := []struct {
 		desc string
 
-		eps k8s.EpsOrSlices
+		eps epslices.EpsOrSlices
 
 		usableSpeakers map[string]bool
 
@@ -64,7 +65,7 @@ func TestUsableNodes(t *testing.T) {
 	}{
 		{
 			desc: "Two endpoints, different hosts",
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
@@ -81,13 +82,13 @@ func TestUsableNodes(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1", "iris2"},
 		}, {
 			desc: "Two endpoints, same host",
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
@@ -104,13 +105,13 @@ func TestUsableNodes(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1"},
 		}, {
 			desc: "Two endpoints, same host, one is not ready",
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
@@ -129,7 +130,7 @@ func TestUsableNodes(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1"},
@@ -158,7 +159,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 	tests := []struct {
 		desc string
 
-		eps k8s.EpsOrSlices
+		eps epslices.EpsOrSlices
 
 		usableSpeakers map[string]bool
 
@@ -166,8 +167,8 @@ func TestUsableNodesEPSlices(t *testing.T) {
 	}{
 		{
 			desc: "Two endpoints, different hosts, multi slice",
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -199,15 +200,15 @@ func TestUsableNodesEPSlices(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1", "iris2"},
 		},
 		{
 			desc: "Two endpoints, different hosts",
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -235,15 +236,15 @@ func TestUsableNodesEPSlices(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1", "iris2"},
 		},
 		{
 			desc: "Two endpoints, same host",
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -271,7 +272,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1"},
@@ -279,8 +280,8 @@ func TestUsableNodesEPSlices(t *testing.T) {
 
 		{
 			desc: "Two endpoints, same host, one is not ready",
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -308,7 +309,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1"},
@@ -357,7 +358,7 @@ func TestShouldAnnounce(t *testing.T) {
 		balancer string
 		config   *config.Config
 		svcs     []*v1.Service
-		eps      map[string]k8s.EpsOrSlices
+		eps      map[string]epslices.EpsOrSlices
 
 		c1ExpectedResult map[string]string
 		c2ExpectedResult map[string]string
@@ -382,7 +383,7 @@ func TestShouldAnnounce(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
 					EpVal: &v1.Endpoints{
 						Subsets: []v1.EndpointSubset{
@@ -400,7 +401,7 @@ func TestShouldAnnounce(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Eps,
+					Type: epslices.Eps,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -431,7 +432,7 @@ func TestShouldAnnounce(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
 					EpVal: &v1.Endpoints{
 						Subsets: []v1.EndpointSubset{
@@ -449,7 +450,7 @@ func TestShouldAnnounce(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Eps,
+					Type: epslices.Eps,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -479,7 +480,7 @@ func TestShouldAnnounce(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
 					EpVal: &v1.Endpoints{
 						Subsets: []v1.EndpointSubset{
@@ -497,7 +498,7 @@ func TestShouldAnnounce(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Eps,
+					Type: epslices.Eps,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -525,7 +526,7 @@ func TestShouldAnnounce(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
 					EpVal: &v1.Endpoints{
 						Subsets: []v1.EndpointSubset{
@@ -543,7 +544,7 @@ func TestShouldAnnounce(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Eps,
+					Type: epslices.Eps,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -571,7 +572,7 @@ func TestShouldAnnounce(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
 					EpVal: &v1.Endpoints{
 						Subsets: []v1.EndpointSubset{
@@ -591,7 +592,7 @@ func TestShouldAnnounce(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Eps,
+					Type: epslices.Eps,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -626,7 +627,7 @@ func TestShouldAnnounce(t *testing.T) {
 					Status: statusAssigned("10.20.30.2"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
 					EpVal: &v1.Endpoints{
 						Subsets: []v1.EndpointSubset{
@@ -644,7 +645,7 @@ func TestShouldAnnounce(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Eps,
+					Type: epslices.Eps,
 				},
 				"10.20.30.2": {
 					EpVal: &v1.Endpoints{
@@ -663,7 +664,7 @@ func TestShouldAnnounce(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Eps,
+					Type: epslices.Eps,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -700,7 +701,7 @@ func TestShouldAnnounce(t *testing.T) {
 					Status: statusAssigned("10.20.30.2"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
 					EpVal: &v1.Endpoints{
 						Subsets: []v1.EndpointSubset{
@@ -718,7 +719,7 @@ func TestShouldAnnounce(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Eps,
+					Type: epslices.Eps,
 				},
 				"10.20.30.2": {
 					EpVal: &v1.Endpoints{
@@ -739,7 +740,7 @@ func TestShouldAnnounce(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Eps,
+					Type: epslices.Eps,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -776,7 +777,7 @@ func TestShouldAnnounce(t *testing.T) {
 					Status: statusAssigned("10.20.30.2"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
 					EpVal: &v1.Endpoints{
 						Subsets: []v1.EndpointSubset{
@@ -796,7 +797,7 @@ func TestShouldAnnounce(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Eps,
+					Type: epslices.Eps,
 				},
 				"10.20.30.2": {
 					EpVal: &v1.Endpoints{
@@ -817,7 +818,7 @@ func TestShouldAnnounce(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Eps,
+					Type: epslices.Eps,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -847,7 +848,7 @@ func TestShouldAnnounce(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
 					EpVal: &v1.Endpoints{
 						Subsets: []v1.EndpointSubset{
@@ -869,7 +870,7 @@ func TestShouldAnnounce(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Eps,
+					Type: epslices.Eps,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -897,7 +898,7 @@ func TestShouldAnnounce(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
 					EpVal: &v1.Endpoints{
 						Subsets: []v1.EndpointSubset{
@@ -919,7 +920,7 @@ func TestShouldAnnounce(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Eps,
+					Type: epslices.Eps,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -947,7 +948,7 @@ func TestShouldAnnounce(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
 					EpVal: &v1.Endpoints{
 						Subsets: []v1.EndpointSubset{
@@ -971,7 +972,7 @@ func TestShouldAnnounce(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Eps,
+					Type: epslices.Eps,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -999,7 +1000,7 @@ func TestShouldAnnounce(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
 					EpVal: &v1.Endpoints{
 						Subsets: []v1.EndpointSubset{
@@ -1023,7 +1024,7 @@ func TestShouldAnnounce(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Eps,
+					Type: epslices.Eps,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1051,7 +1052,7 @@ func TestShouldAnnounce(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
 					EpVal: &v1.Endpoints{
 						Subsets: []v1.EndpointSubset{
@@ -1075,7 +1076,7 @@ func TestShouldAnnounce(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Eps,
+					Type: epslices.Eps,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1090,10 +1091,10 @@ func TestShouldAnnounce(t *testing.T) {
 	l := log.NewNopLogger()
 	for _, test := range tests {
 		if test.config != nil {
-			if c1.SetConfig(l, test.config) == k8s.SyncStateError {
+			if c1.SetConfig(l, test.config) == controllers.SyncStateError {
 				t.Errorf("%q: SetConfig failed", test.desc)
 			}
-			if c2.SetConfig(l, test.config) == k8s.SyncStateError {
+			if c2.SetConfig(l, test.config) == controllers.SyncStateError {
 				t.Errorf("%q: SetConfig failed", test.desc)
 			}
 		}
@@ -1147,7 +1148,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 		balancer string
 		config   *config.Config
 		svcs     []*v1.Service
-		eps      map[string]k8s.EpsOrSlices
+		eps      map[string]epslices.EpsOrSlices
 
 		c1ExpectedResult map[string]string
 		c2ExpectedResult map[string]string
@@ -1172,9 +1173,9 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
+					SlicesVal: []discovery.EndpointSlice{
 						{
 							Endpoints: []discovery.Endpoint{
 								{
@@ -1202,7 +1203,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Slices,
+					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1230,9 +1231,9 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
+					SlicesVal: []discovery.EndpointSlice{
 						{
 							Endpoints: []discovery.Endpoint{
 								{
@@ -1260,7 +1261,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Slices,
+					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1288,9 +1289,9 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
+					SlicesVal: []discovery.EndpointSlice{
 						{
 							Endpoints: []discovery.Endpoint{
 								{
@@ -1318,7 +1319,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Slices,
+					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1346,9 +1347,9 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
+					SlicesVal: []discovery.EndpointSlice{
 						{
 							Endpoints: []discovery.Endpoint{
 								{
@@ -1376,7 +1377,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Slices,
+					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1404,9 +1405,9 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
+					SlicesVal: []discovery.EndpointSlice{
 						{
 							Endpoints: []discovery.Endpoint{
 								{
@@ -1434,7 +1435,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Slices,
+					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1469,9 +1470,9 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.2"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
+					SlicesVal: []discovery.EndpointSlice{
 						{
 							Endpoints: []discovery.Endpoint{
 								{
@@ -1499,10 +1500,10 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Slices,
+					Type: epslices.Slices,
 				},
 				"10.20.30.2": {
-					SlicesVal: []*discovery.EndpointSlice{
+					SlicesVal: []discovery.EndpointSlice{
 						{
 							Endpoints: []discovery.Endpoint{
 								{
@@ -1530,7 +1531,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Slices,
+					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1567,9 +1568,9 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.2"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
+					SlicesVal: []discovery.EndpointSlice{
 						{
 							Endpoints: []discovery.Endpoint{
 								{
@@ -1597,10 +1598,10 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Slices,
+					Type: epslices.Slices,
 				},
 				"10.20.30.2": {
-					SlicesVal: []*discovery.EndpointSlice{
+					SlicesVal: []discovery.EndpointSlice{
 						{
 							Endpoints: []discovery.Endpoint{
 								{
@@ -1628,7 +1629,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Slices,
+					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1665,9 +1666,9 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.2"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
+					SlicesVal: []discovery.EndpointSlice{
 						{
 							Endpoints: []discovery.Endpoint{
 								{
@@ -1695,10 +1696,10 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Slices,
+					Type: epslices.Slices,
 				},
 				"10.20.30.2": {
-					SlicesVal: []*discovery.EndpointSlice{
+					SlicesVal: []discovery.EndpointSlice{
 						{
 							Endpoints: []discovery.Endpoint{
 								{
@@ -1726,7 +1727,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Slices,
+					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1756,9 +1757,9 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
+					SlicesVal: []discovery.EndpointSlice{
 						{
 							Endpoints: []discovery.Endpoint{
 								{
@@ -1801,7 +1802,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Slices,
+					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1829,9 +1830,9 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
+					SlicesVal: []discovery.EndpointSlice{
 						{
 							Endpoints: []discovery.Endpoint{
 								{
@@ -1870,7 +1871,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Slices,
+					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1898,9 +1899,9 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
+					SlicesVal: []discovery.EndpointSlice{
 						{
 							Endpoints: []discovery.Endpoint{
 								{
@@ -1939,7 +1940,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Slices,
+					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1967,9 +1968,9 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
+					SlicesVal: []discovery.EndpointSlice{
 						{
 							Endpoints: []discovery.Endpoint{
 								{
@@ -2008,7 +2009,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Slices,
+					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -2036,9 +2037,9 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]k8s.EpsOrSlices{
+			eps: map[string]epslices.EpsOrSlices{
 				"10.20.30.1": {
-					SlicesVal: []*discovery.EndpointSlice{
+					SlicesVal: []discovery.EndpointSlice{
 						{
 							Endpoints: []discovery.Endpoint{
 								{
@@ -2077,7 +2078,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 							},
 						},
 					},
-					Type: k8s.Slices,
+					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -2092,10 +2093,10 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 	l := log.NewNopLogger()
 	for _, test := range tests {
 		if test.config != nil {
-			if c1.SetConfig(l, test.config) == k8s.SyncStateError {
+			if c1.SetConfig(l, test.config) == controllers.SyncStateError {
 				t.Errorf("%q: SetConfig failed", test.desc)
 			}
-			if c2.SetConfig(l, test.config) == k8s.SyncStateError {
+			if c2.SetConfig(l, test.config) == controllers.SyncStateError {
 				t.Errorf("%q: SetConfig failed", test.desc)
 			}
 		}
@@ -2158,15 +2159,15 @@ func TestClusterPolicy(t *testing.T) {
 		},
 	}
 
-	if c1.SetConfig(l, cfg) == k8s.SyncStateError {
+	if c1.SetConfig(l, cfg) == controllers.SyncStateError {
 		t.Errorf("SetConfig failed")
 	}
-	if c2.SetConfig(l, cfg) == k8s.SyncStateError {
+	if c2.SetConfig(l, cfg) == controllers.SyncStateError {
 		t.Errorf("SetConfig failed")
 	}
 
-	eps1 := k8s.EpsOrSlices{
-		SlicesVal: []*discovery.EndpointSlice{
+	eps1 := epslices.EpsOrSlices{
+		SlicesVal: []discovery.EndpointSlice{
 			{
 				Endpoints: []discovery.Endpoint{
 					{
@@ -2183,10 +2184,10 @@ func TestClusterPolicy(t *testing.T) {
 				},
 			},
 		},
-		Type: k8s.Slices,
+		Type: epslices.Slices,
 	}
-	eps2 := k8s.EpsOrSlices{
-		SlicesVal: []*discovery.EndpointSlice{
+	eps2 := epslices.EpsOrSlices{
+		SlicesVal: []discovery.EndpointSlice{
 			{
 				Endpoints: []discovery.Endpoint{
 					{
@@ -2203,7 +2204,7 @@ func TestClusterPolicy(t *testing.T) {
 				},
 			},
 		},
-		Type: k8s.Slices,
+		Type: epslices.Slices,
 	}
 	c1Found := false
 	c2Found := false
