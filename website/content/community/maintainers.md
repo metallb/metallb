@@ -41,15 +41,26 @@ maintainer should object to adding the new maintainer.
 
 When adding a new maintainer, we should:
 
-* Add to CODEOWNERS in the metallb repo.
+* Add to CODEOWNERS in MetalLB relevant repos (e.g. metallb and metallb-operator)
+  and to the MetalLB github org itself.
 
 * Open a PR to [github.com/cncf/foundation](https://github.com/cncf/foundation/)
   adding the maintainer there. You can use [this PR](https://github.com/cncf/foundation/pull/258/files)
   as an example of what needs to be done.
 
-* The new maintainer should subscribe to the CNCF maintainers mailing list. For
-  this, send an email to cncf-MetalLB-maintainers+subscribe@lists.cncf.io and
+* Create an account for CNCF service desk (TODO: check how to do this and
+  document it here!).
+
+* Grant permissions on quay.io (TODO: check how to do this and document it
+  here!) and bot accounts.
+
+* The new maintainer should subscribe to:
+
+- The CNCF maintainers mailing list. For this, send an email to cncf-MetalLB-maintainers+subscribe@lists.cncf.io and
   link the merged PR that added you to the metallb CODEOWNERS.
+
+- [MetalLB users mailing list](https://groups.google.com/g/metallb-users) and
+  their membership role should be marked as owner by current maintainers.
 
 ## Removing Maintainers
 
@@ -64,4 +75,5 @@ maintainers should first work to resolve the conflict. If absolutely
 necessary, a maintainer may be removed by a majority vote of existing
 maintainers.
 
-Please see all the places that a maintainer was added, to remove them.
+Please see all the places that a maintainer was added, to remove them. Consider
+rotating any shared password if needed.
