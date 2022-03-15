@@ -54,7 +54,7 @@ When adding a new maintainer, we should:
 * Grant permissions on quay.io (TODO: check how to do this and document it
   here!) and bot accounts.
 
-* The new maintainer should subscribe to:
+The new maintainer should subscribe to:
 
 - The CNCF maintainers mailing list. For this, send an email to cncf-MetalLB-maintainers+subscribe@lists.cncf.io and
   link the merged PR that added you to the metallb CODEOWNERS.
