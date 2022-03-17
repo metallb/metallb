@@ -19,7 +19,7 @@ import (
 
 // NeighborForContainer returns informations for the given neighbor in the given
 // executor.
-func NeighborInfo(neighborName, exec executor.Executor) (*bgpfrr.Neighbor, error) {
+func NeighborInfo(neighborName string, exec executor.Executor) (*bgpfrr.Neighbor, error) {
 	res, err := exec.Exec("vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", neighborName))
 
 	if err != nil {
