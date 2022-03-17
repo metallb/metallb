@@ -25,6 +25,7 @@ import (
 	"time"
 
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/e2etest/pkg/config"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
@@ -43,6 +44,7 @@ import (
 	"go.universe.tf/metallb/internal/ipfamily"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
@@ -1313,6 +1315,17 @@ var _ = ginkgo.Describe("BGP", func() {
 				},
 			}
 
+			resources.Peers = append(resources.Peers, metallbv1beta2.BGPPeer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "defaultport",
+				},
+				Spec: metallbv1beta2.BGPPeerSpec{
+					ASN:     metalLBASN,
+					MyASN:   metalLBASN,
+					Address: "192.168.1.1",
+				},
+			})
+
 			for i := range resources.Peers {
 				resources.Peers[i].Spec.KeepaliveTime = metav1.Duration{Duration: 13 * time.Second}
 				resources.Peers[i].Spec.HoldTime = metav1.Duration{Duration: 57 * time.Second}
@@ -1350,6 +1363,12 @@ var _ = ginkgo.Describe("BGP", func() {
 					),
 				)
 			}
+
+			ginkgo.By("Checking the default value on the bgppeer crds is set")
+			peer := metallbv1beta2.BGPPeer{}
+			err = ConfigUpdater.Client().Get(context.Background(), types.NamespacedName{Name: "defaultport", Namespace: metallb.Namespace}, &peer)
+			framework.ExpectNoError(err)
+			framework.ExpectEqual(peer.Spec.Port, uint16(179))
 		})
 	})
 
