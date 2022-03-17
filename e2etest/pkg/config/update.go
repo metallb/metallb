@@ -17,10 +17,11 @@ import (
 type Updater interface {
 	Update(r config.ClusterResources) error
 	Clean() error
+	Client() client.Client
 }
 
 type beta1Updater struct {
-	client.Client
+	cli       client.Client
 	namespace string
 }
 
@@ -44,7 +45,7 @@ func UpdaterForCRs(r *rest.Config, ns string) (*beta1Updater, error) {
 	}
 
 	return &beta1Updater{
-		Client:    cl,
+		cli:       cl,
 		namespace: ns,
 	}, nil
 }
@@ -89,7 +90,7 @@ func (o beta1Updater) Update(r config.ClusterResources) error {
 	// Iterating over the map will return the items in a random order.
 	for _, obj := range objects {
 		obj.SetNamespace(o.namespace)
-		_, err := controllerutil.CreateOrUpdate(context.Background(), o.Client, obj, func() error { return nil })
+		_, err := controllerutil.CreateOrUpdate(context.Background(), o.cli, obj, func() error { return nil })
 		if err != nil {
 			return err
 		}
@@ -98,29 +99,33 @@ func (o beta1Updater) Update(r config.ClusterResources) error {
 }
 
 func (o beta1Updater) Clean() error {
-	err := o.DeleteAllOf(context.Background(), &metallbv1beta1.IPPool{}, client.InNamespace(o.namespace))
+	err := o.cli.DeleteAllOf(context.Background(), &metallbv1beta1.IPPool{}, client.InNamespace(o.namespace))
 	if err != nil {
 		return err
 	}
-	err = o.DeleteAllOf(context.Background(), &metallbv1beta2.BGPPeer{}, client.InNamespace(o.namespace))
+	err = o.cli.DeleteAllOf(context.Background(), &metallbv1beta2.BGPPeer{}, client.InNamespace(o.namespace))
 	if err != nil {
 		return err
 	}
-	err = o.DeleteAllOf(context.Background(), &metallbv1beta1.BFDProfile{}, client.InNamespace(o.namespace))
+	err = o.cli.DeleteAllOf(context.Background(), &metallbv1beta1.BFDProfile{}, client.InNamespace(o.namespace))
 	if err != nil {
 		return err
 	}
-	err = o.DeleteAllOf(context.Background(), &metallbv1beta1.BGPAdvertisement{}, client.InNamespace(o.namespace))
+	err = o.cli.DeleteAllOf(context.Background(), &metallbv1beta1.BGPAdvertisement{}, client.InNamespace(o.namespace))
 	if err != nil {
 		return err
 	}
-	err = o.DeleteAllOf(context.Background(), &metallbv1beta1.L2Advertisement{}, client.InNamespace(o.namespace))
+	err = o.cli.DeleteAllOf(context.Background(), &metallbv1beta1.L2Advertisement{}, client.InNamespace(o.namespace))
 	if err != nil {
 		return err
 	}
-	err = o.DeleteAllOf(context.Background(), &metallbv1beta1.AddressPool{}, client.InNamespace(o.namespace))
+	err = o.cli.DeleteAllOf(context.Background(), &metallbv1beta1.AddressPool{}, client.InNamespace(o.namespace))
 	if err != nil {
 		return err
 	}
 	return nil
+}
+
+func (o beta1Updater) Client() client.Client {
+	return o.cli
 }
