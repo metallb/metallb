@@ -1,6 +1,8 @@
 apiVersion: v1
 kind: Namespace
 metadata:
+  labels:
+    app: metallb
   name: metallb-system
 ---
 apiVersion: apiextensions.k8s.io/v1
@@ -577,19 +579,6 @@ spec:
                 description: Authentication password for routers enforcing TCP MD5
                   authenticated sessions
                 type: string
-              passwordSecret:
-                description: passwordSecret is name of the authentication secret for
-                  BGP Peer
-                properties:
-                  name:
-                    description: Name is unique within a namespace to reference a
-                      secret resource.
-                    type: string
-                  namespace:
-                    description: Namespace defines the space within which the secret
-                      name must be unique.
-                    type: string
-                type: object
               peerASN:
                 description: AS number to expect from the remote end of the session.
                 format: int32
@@ -871,9 +860,6 @@ rules:
   - secrets
   verbs:
   - create
-  - get
-  - list
-  - watch
 - apiGroups:
   - ""
   resourceNames:
@@ -890,56 +876,6 @@ rules:
   - deployments
   verbs:
   - get
-- apiGroups:
-  - metallb.io
-  resources:
-  - addresspools
-  verbs:
-  - create
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - bfdprofiles
-  verbs:
-  - create
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - bgppeers
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - l2advertisements
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - bgpadvertisements
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - ippools
-  verbs:
-  - get
-  - list
-  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -955,10 +891,54 @@ rules:
   - pods
   verbs:
   - list
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
 - apiGroups:
   - ""
   resources:
-  - secrets
+  - endpoints
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - events
+  verbs:
+  - create
+  - patch
+- apiGroups:
+  - ""
+  resources:
+  - node
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - service
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - service/status
+  verbs:
+  - update
+- apiGroups:
+  - discovery.k8s.io
+  resources:
+  - endpointslices
   verbs:
   - get
   - list
@@ -968,6 +948,7 @@ rules:
   resources:
   - addresspools
   verbs:
+  - create
   - get
   - list
   - watch
@@ -976,6 +957,7 @@ rules:
   resources:
   - bfdprofiles
   verbs:
+  - create
   - get
   - list
   - watch
@@ -983,30 +965,6 @@ rules:
   - metallb.io
   resources:
   - bgppeers
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - l2advertisements
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - bgpadvertisements
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - ippools
   verbs:
   - get
   - list
@@ -1048,6 +1006,56 @@ rules:
   - podsecuritypolicies
   verbs:
   - use
+- apiGroups:
+  - metallb.io
+  resources:
+  - addresspools
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - bfdprofiles
+  verbs:
+  - create
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - bgppeers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - l2advertisements
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - bgpadvertisements
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - ippools
+  verbs:
+  - get
+  - list
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -1089,6 +1097,54 @@ rules:
   - podsecuritypolicies
   verbs:
   - use
+- apiGroups:
+  - metallb.io
+  resources:
+  - addresspools
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - bfdprofiles
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - bgppeers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - l2advertisements
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - bgpadvertisements
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - ippools
+  verbs:
+  - get
+  - list
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -1153,102 +1209,16 @@ subjects:
   namespace: metallb-system
 ---
 apiVersion: v1
-data:
-  daemons: |
-    # This file tells the frr package which daemons to start.
-    #
-    # Sample configurations for these daemons can be found in
-    # /usr/share/doc/frr/examples/.
-    #
-    # ATTENTION:
-    #
-    # When activating a daemon for the first time, a config file, even if it is
-    # empty, has to be present *and* be owned by the user and group "frr", else
-    # the daemon will not be started by /etc/init.d/frr. The permissions should
-    # be u=rw,g=r,o=.
-    # When using "vtysh" such a config file is also needed. It should be owned by
-    # group "frrvty" and set to ug=rw,o= though. Check /etc/pam.d/frr, too.
-    #
-    # The watchfrr and zebra daemons are always started.
-    #
-    bgpd=yes
-    ospfd=no
-    ospf6d=no
-    ripd=no
-    ripngd=no
-    isisd=no
-    pimd=no
-    ldpd=no
-    nhrpd=no
-    eigrpd=no
-    babeld=no
-    sharpd=no
-    pbrd=no
-    bfdd=yes
-    fabricd=no
-    vrrpd=no
-
-    #
-    # If this option is set the /etc/init.d/frr script automatically loads
-    # the config via "vtysh -b" when the servers are started.
-    # Check /etc/pam.d/frr if you intend to use "vtysh"!
-    #
-    vtysh_enable=yes
-    zebra_options="  -A 127.0.0.1 -s 90000000"
-    bgpd_options="   -A 127.0.0.1 -p 0"
-    ospfd_options="  -A 127.0.0.1"
-    ospf6d_options=" -A ::1"
-    ripd_options="   -A 127.0.0.1"
-    ripngd_options=" -A ::1"
-    isisd_options="  -A 127.0.0.1"
-    pimd_options="   -A 127.0.0.1"
-    ldpd_options="   -A 127.0.0.1"
-    nhrpd_options="  -A 127.0.0.1"
-    eigrpd_options=" -A 127.0.0.1"
-    babeld_options=" -A 127.0.0.1"
-    sharpd_options=" -A 127.0.0.1"
-    pbrd_options="   -A 127.0.0.1"
-    staticd_options="-A 127.0.0.1"
-    bfdd_options="   -A 127.0.0.1"
-    fabricd_options="-A 127.0.0.1"
-    vrrpd_options="  -A 127.0.0.1"
-
-    # configuration profile
-    #
-    #frr_profile="traditional"
-    #frr_profile="datacenter"
-
-    #
-    # This is the maximum number of FD's that will be available.
-    # Upon startup this is read by the control files and ulimit
-    # is called. Uncomment and use a reasonable value for your
-    # setup if you are expecting a large number of peers in
-    # say BGP.
-    #MAX_FDS=1024
-
-    # The list of daemons to watch is automatically generated by the init script.
-    #watchfrr_options=""
-
-    # for debugging purposes, you can specify a "wrap" command to start instead
-    # of starting the daemon directly, e.g. to use valgrind on ospfd:
-    #   ospfd_wrap="/usr/bin/valgrind"
-    # or you can use "all_wrap" for all daemons, e.g. to use perf record:
-    #   all_wrap="/usr/bin/perf record --call-graph -"
-    # the normal daemon command is added to this at the end.
-  frr.conf: |
-    ! This file gets overriden the first time the speaker renders a config.
-    ! So anything configured here is only temporary.
-    frr version 7.5.1
-    frr defaults traditional
-    hostname Router
-    line vty
-    log file /etc/frr/frr.log informational
-  vtysh.conf: |
-    service integrated-vtysh-config
-kind: ConfigMap
+kind: Service
 metadata:
-  name: frr-startup
+  name: webhook-service
   namespace: metallb-system
+spec:
+  ports:
+  - port: 443
+    targetPort: 9443
+  selector:
+    component: controller
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -1278,8 +1248,8 @@ spec:
         - --port=7472
         - --log-level=info
         env:
-        - name: METALLB_BGP_TYPE
-          value: frr
+        - name: ENABLE_OPERATOR_WEBHOOK
+          value: "true"
         - name: METALLB_ML_SECRET_NAME
           value: memberlist
         - name: METALLB_DEPLOYMENT
@@ -1296,6 +1266,9 @@ spec:
           timeoutSeconds: 1
         name: controller
         ports:
+        - containerPort: 9443
+          name: webhook-server
+          protocol: TCP
         - containerPort: 7472
           name: monitoring
         readinessProbe:
@@ -1313,6 +1286,10 @@ spec:
             drop:
             - all
           readOnlyRootFilesystem: true
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert
+          readOnly: true
       nodeSelector:
         kubernetes.io/os: linux
       securityContext:
@@ -1321,6 +1298,11 @@ spec:
         runAsUser: 65534
       serviceAccountName: controller
       terminationGracePeriodSeconds: 0
+      volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: webhook-server-cert
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -1345,73 +1327,10 @@ spec:
         component: speaker
     spec:
       containers:
-      - command:
-        - /bin/sh
-        - -c
-        - |
-          /sbin/tini -- /usr/lib/frr/docker-start &
-          attempts=0
-          until [[ -f /etc/frr/frr.log || $attempts -eq 60 ]]; do
-            sleep 1
-            attempts=$(( $attempts + 1 ))
-          done
-          tail -f /etc/frr/frr.log
-        env:
-        - name: TINI_SUBREAPER
-          value: "true"
-        image: quay.io/frrouting/frr:stable_7.5
-        name: frr
-        securityContext:
-          capabilities:
-            add:
-            - NET_ADMIN
-            - NET_RAW
-            - SYS_ADMIN
-            - NET_BIND_SERVICE
-        volumeMounts:
-        - mountPath: /var/run/frr
-          name: frr-sockets
-        - mountPath: /etc/frr
-          name: frr-conf
-      - command:
-        - /etc/frr_reloader/frr-reloader.sh
-        image: quay.io/frrouting/frr:stable_7.5
-        name: reloader
-        volumeMounts:
-        - mountPath: /var/run/frr
-          name: frr-sockets
-        - mountPath: /etc/frr
-          name: frr-conf
-        - mountPath: /etc/frr_reloader
-          name: reloader
-      - args:
-        - --metrics-port=7473
-        command:
-        - /etc/frr_metrics/frr-metrics
-        image: quay.io/frrouting/frr:stable_7.5
-        name: frr-metrics
-        ports:
-        - containerPort: 7473
-          name: monitoring
-        volumeMounts:
-        - mountPath: /var/run/frr
-          name: frr-sockets
-        - mountPath: /etc/frr
-          name: frr-conf
-        - mountPath: /etc/frr_metrics
-          name: metrics
       - args:
         - --port=7472
         - --log-level=info
         env:
-        - name: FRR_CONFIG_FILE
-          value: /etc/frr_reloader/frr.conf
-        - name: FRR_RELOADER_PID_FILE
-          value: /etc/frr_reloader/reloader.pid
-        - name: METALLB_BGP_TYPE
-          value: frr
-        - name: FRR_LOGGING_LEVEL
-          value: informational
         - name: METALLB_NODE_NAME
           valueFrom:
             fieldRef:
@@ -1467,61 +1386,122 @@ spec:
             drop:
             - ALL
           readOnlyRootFilesystem: true
-        volumeMounts:
-        - mountPath: /etc/frr_reloader
-          name: reloader
       hostNetwork: true
-      initContainers:
-      - command:
-        - /bin/sh
-        - -c
-        - cp -rLf /tmp/frr/* /etc/frr/
-        image: quay.io/frrouting/frr:stable_7.5
-        name: cp-frr-files
-        securityContext:
-          runAsGroup: 101
-          runAsUser: 100
-        volumeMounts:
-        - mountPath: /tmp/frr
-          name: frr-startup
-        - mountPath: /etc/frr
-          name: frr-conf
-      - command:
-        - /bin/sh
-        - -c
-        - cp -f /frr-reloader.sh /etc/frr_reloader/
-        image: quay.io/metallb/speaker:main
-        name: cp-reloader
-        volumeMounts:
-        - mountPath: /etc/frr_reloader
-          name: reloader
-      - command:
-        - /bin/sh
-        - -c
-        - cp -f /frr-metrics /etc/frr_metrics/
-        image: quay.io/metallb/speaker:main
-        name: cp-metrics
-        volumeMounts:
-        - mountPath: /etc/frr_metrics
-          name: metrics
       nodeSelector:
         kubernetes.io/os: linux
       serviceAccountName: speaker
-      shareProcessNamespace: true
       terminationGracePeriodSeconds: 2
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
         operator: Exists
-      volumes:
-      - emptyDir: {}
-        name: frr-sockets
-      - configMap:
-          name: frr-startup
-        name: frr-startup
-      - emptyDir: {}
-        name: frr-conf
-      - emptyDir: {}
-        name: reloader
-      - emptyDir: {}
-        name: metrics
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: serving-cert
+  namespace: metallb-system
+spec:
+  dnsNames:
+  - webhook-service.metallb-system.svc
+  - webhook-service.metallb-system.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: selfsigned-issuer
+  secretName: webhook-server-cert
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned-issuer
+  namespace: metallb-system
+spec:
+  selfSigned: {}
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  annotations:
+    cert-manager.io/inject-ca-from: metallb-system/serving-cert
+  name: validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: metallb-system
+      path: /validate-metallb-io-v1beta1-addresspool
+  failurePolicy: Fail
+  name: addresspoolvalidationwebhook.metallb.io
+  rules:
+  - apiGroups:
+    - metallb.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - addresspools
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: metallb-system
+      path: /validate-metallb-io-v1beta1-bgpadvertisement
+  failurePolicy: Fail
+  name: bgpadvertisementvalidationwebhook.metallb.io
+  rules:
+  - apiGroups:
+    - metallb.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - bgpadvertisements
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: metallb-system
+      path: /validate-metallb-io-v1beta2-bgppeer
+  failurePolicy: Fail
+  name: bgppeervalidationwebhook.metallb.io
+  rules:
+  - apiGroups:
+    - metallb.io
+    apiVersions:
+    - v1beta2
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - bgppeers
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: metallb-system
+      path: /validate-metallb-io-v1beta1-ippool
+  failurePolicy: Fail
+  name: ippoolvalidationwebhook.metallb.io
+  rules:
+  - apiGroups:
+    - metallb.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - ippools
+  sideEffects: None
