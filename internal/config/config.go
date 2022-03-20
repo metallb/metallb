@@ -178,11 +178,11 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 	for i, p := range resources.Peers {
 		peer, err := peerFromCR(p, resources.PasswordSecrets)
 		if err != nil {
-			return nil, fmt.Errorf("parsing peer #%d: %s", i+1, err)
+			return nil, errors.Wrapf(err, "parsing peer %s", p.Name)
 		}
 		if peer.BFDProfile != "" {
 			if _, ok := cfg.BFDProfiles[peer.BFDProfile]; !ok {
-				return nil, fmt.Errorf("peer #%d referencing non existing bfd profile %s", i+1, peer.BFDProfile)
+				return nil, TransientError{fmt.Sprintf("peer %s referencing non existing bfd profile %s", p.Name, peer.BFDProfile)}
 			}
 		}
 		for _, ep := range cfg.Peers {
@@ -404,7 +404,7 @@ func passwordForPeer(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1
 	} else if p.Spec.PasswordSecret.Name != "" {
 		secret, ok := passwordSecrets[p.Spec.PasswordSecret.Name]
 		if !ok {
-			return "", fmt.Errorf("secret ref not found for peer config %q/%q", p.Namespace, p.Name)
+			return "", TransientError{Message: fmt.Sprintf("secret ref not found for peer config %q/%q", p.Namespace, p.Name)}
 		}
 		if secret.Type != corev1.SecretTypeBasicAuth {
 			return "", fmt.Errorf("secret type mismatch on %q/%q, type %q is expected ", secret.Namespace,
