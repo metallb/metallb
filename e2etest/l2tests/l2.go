@@ -234,13 +234,13 @@ var _ = ginkgo.Describe("L2", func() {
 					var ipv4AddressesByCIDR []string
 					var ipv6AddressesByCIDR []string
 
-					cidrs, err := internalconfig.ParseCIDR(IPV4ServiceRange)
+					cidrs, err := metallbv1beta1.ParseCIDR(IPV4ServiceRange)
 					framework.ExpectNoError(err)
 					for _, cidr := range cidrs {
 						ipv4AddressesByCIDR = append(ipv4AddressesByCIDR, cidr.String())
 					}
 
-					cidrs, err = internalconfig.ParseCIDR(IPV6ServiceRange)
+					cidrs, err = metallbv1beta1.ParseCIDR(IPV6ServiceRange)
 					framework.ExpectNoError(err)
 					for _, cidr := range cidrs {
 						ipv6AddressesByCIDR = append(ipv6AddressesByCIDR, cidr.String())

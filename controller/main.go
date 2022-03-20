@@ -21,6 +21,8 @@ import (
 	"os"
 	"reflect"
 
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/config"
 	metallbcfg "go.universe.tf/metallb/internal/config"
@@ -33,6 +35,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 	v1 "k8s.io/api/core/v1"
+	ctrlruntime "sigs.k8s.io/controller-runtime"
 )
 
 // Service offers methods to mutate a Kubernetes service object.
@@ -149,6 +152,21 @@ func main() {
 		ips: allocator.New(),
 	}
 
+	mgr, err := ctrlruntime.NewManager(ctrlruntime.GetConfigOrDie(), ctrlruntime.Options{
+		Scheme:         k8s.Scheme,
+		Port:           9443,
+		LeaderElection: false,
+	})
+	if err != nil {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to start manager")
+		os.Exit(1)
+	}
+
+	bgpType, present := os.LookupEnv("METALLB_BGP_TYPE")
+	if !present {
+		bgpType = "native"
+	}
+
 	client, err := k8s.New(&k8s.Config{
 		ProcessName:     "metallb-controller",
 		MetricsPort:     *port,
@@ -162,7 +180,7 @@ func main() {
 			ConfigChanged:  c.SetConfig,
 		},
 		ValidateConfig: metallbcfg.DontValidate, // the controller is not aware of the mode, we defer the validation to the speaker
-	})
+	}, mgr, bgpType)
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create k8s client")
 		os.Exit(1)
@@ -172,6 +190,33 @@ func main() {
 		err = client.CreateMlSecret(*namespace, *deployName, *mlSecret)
 		if err != nil {
 			level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create memberlist secret")
+			os.Exit(1)
+		}
+	}
+
+	if os.Getenv("ENABLE_OPERATOR_WEBHOOK") == "true" {
+		if err = (&metallbv1beta1.AddressPool{}).SetupWebhookWithManager(mgr); err != nil {
+			level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "AddressPool")
+			os.Exit(1)
+		}
+
+		if err = (&metallbv1beta1.IPPool{}).SetupWebhookWithManager(mgr); err != nil {
+			level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "IPPool")
+			os.Exit(1)
+		}
+
+		if err = (&metallbv1beta1.BGPPeer{}).SetupWebhookWithManager(mgr, bgpType); err != nil {
+			level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "BGPPeer v1beta1")
+			os.Exit(1)
+		}
+
+		if err = (&metallbv1beta2.BGPPeer{}).SetupWebhookWithManager(mgr, bgpType); err != nil {
+			level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "BGPPeer v1beta2")
+			os.Exit(1)
+		}
+
+		if err = (&metallbv1beta1.BGPAdvertisement{}).SetupWebhookWithManager(mgr); err != nil {
+			level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "BGPAdvertisement")
 			os.Exit(1)
 		}
 	}

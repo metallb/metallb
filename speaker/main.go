@@ -23,22 +23,21 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
+	metallbcfg "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/k8s/controllers"
-	v1 "k8s.io/api/core/v1"
-
-	metallbcfg "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	"go.universe.tf/metallb/internal/layer2"
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/speakerlist"
 	"go.universe.tf/metallb/internal/version"
-
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
-	"github.com/prometheus/client_golang/prometheus"
+	v1 "k8s.io/api/core/v1"
+	ctrlruntime "sigs.k8s.io/controller-runtime"
 )
 
 var announcing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -143,6 +142,15 @@ func main() {
 		validateConfig = metallbcfg.DiscardNativeOnly
 	}
 
+	mgr, err := ctrlruntime.NewManager(ctrlruntime.GetConfigOrDie(), ctrlruntime.Options{
+		Scheme:         k8s.Scheme,
+		LeaderElection: false,
+	})
+	if err != nil {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to start manager")
+		os.Exit(1)
+	}
+
 	client, err := k8s.New(&k8s.Config{
 		ProcessName:     "metallb-speaker",
 		NodeName:        *myNode,
@@ -161,7 +169,7 @@ func main() {
 			NodeChanged:    ctrl.SetNode,
 		},
 		ValidateConfig: validateConfig,
-	})
+	}, mgr, bgpType)
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create k8s client")
 		os.Exit(1)

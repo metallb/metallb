@@ -10,7 +10,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/pprof"
-	"os"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -49,23 +48,22 @@ import (
 )
 
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	Scheme = runtime.NewScheme()
 )
 
 func init() {
-	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
+	utilruntime.Must(clientgoscheme.AddToScheme(Scheme))
 
-	utilruntime.Must(metallbv1alpha1.AddToScheme(scheme))
-	utilruntime.Must(metallbv1beta1.AddToScheme(scheme))
-	utilruntime.Must(metallbv1beta2.AddToScheme(scheme))
+	utilruntime.Must(metallbv1alpha1.AddToScheme(Scheme))
+	utilruntime.Must(metallbv1beta1.AddToScheme(Scheme))
+	utilruntime.Must(metallbv1beta2.AddToScheme(Scheme))
 
-	utilruntime.Must(corev1.AddToScheme(scheme))
-	utilruntime.Must(appsv1.AddToScheme(scheme))
-	utilruntime.Must(policyv1beta1.AddToScheme(scheme))
-	utilruntime.Must(rbacv1.AddToScheme(scheme))
-	utilruntime.Must(apiext.AddToScheme(scheme))
-	utilruntime.Must(discovery.AddToScheme(scheme))
+	utilruntime.Must(corev1.AddToScheme(Scheme))
+	utilruntime.Must(appsv1.AddToScheme(Scheme))
+	utilruntime.Must(policyv1beta1.AddToScheme(Scheme))
+	utilruntime.Must(rbacv1.AddToScheme(Scheme))
+	utilruntime.Must(apiext.AddToScheme(Scheme))
+	utilruntime.Must(discovery.AddToScheme(Scheme))
 
 	// +kubebuilder:scaffold:scheme
 }
@@ -96,6 +94,7 @@ type Config struct {
 	DisableEpSlices bool
 	Namespace       string
 	ValidateConfig  config.Validate
+	BGPType         string
 
 	Listener
 }
@@ -105,16 +104,7 @@ type Config struct {
 // The client uses processName to identify itself to the cluster
 // (e.g. when logging events).
 //nolint:godot
-func New(cfg *Config) (*Client, error) {
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:         scheme,
-		Port:           9443, // TODO port only with controller, for webhooks
-		LeaderElection: false,
-	})
-	if err != nil {
-		setupLog.Error(err, "unable to start manager")
-		os.Exit(1)
-	}
+func New(cfg *Config, mgr manager.Manager, bgpType string) (*Client, error) {
 	clientset, err := kubernetes.NewForConfig(mgr.GetConfig())
 	if err != nil {
 		return nil, fmt.Errorf("creating Kubernetes client: %s", err)
@@ -145,6 +135,7 @@ func New(cfg *Config) (*Client, error) {
 			ValidateConfig: cfg.ValidateConfig,
 			Handler:        cfg.ConfigHandler,
 			ForceReload:    reload,
+			BGPType:        bgpType,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "config")
 			return nil, errors.Wrap(err, "failed to create config reconciler")

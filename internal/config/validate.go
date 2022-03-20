@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 )
 
 type Validate func(ClusterResources) error
@@ -31,7 +32,7 @@ func DiscardFRROnly(c ClusterResources) error {
 	// not supported in native mode.
 	for _, p := range c.Pools {
 		for _, cidr := range p.Spec.Addresses {
-			nets, err := ParseCIDR(cidr)
+			nets, err := metallbv1beta1.ParseCIDR(cidr)
 			if err != nil {
 				return fmt.Errorf("invalid CIDR %q in pool %q: %s", cidr, p.Name, err)
 			}

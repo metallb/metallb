@@ -43,6 +43,7 @@ type ConfigReconciler struct {
 	Handler        func(log.Logger, *config.Config) SyncState
 	ValidateConfig config.Validate
 	ForceReload    func()
+	BGPType        string
 }
 
 //+kubebuilder:rbac:groups=metallb.io,resources=bgppeers,verbs=get;list;watch;
@@ -103,7 +104,7 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs", spew.Sdump(metallbCRs))
 
-	cfg, err := config.For(metallbCRs, r.ValidateConfig)
+	cfg, err := config.For(metallbCRs, r.ValidateConfig, r.BGPType)
 	if err != nil {
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to parse the configuration", "error", err)
 		return ctrl.Result{}, nil

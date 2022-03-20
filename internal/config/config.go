@@ -15,7 +15,6 @@
 package config // import "go.universe.tf/metallb/internal/config"
 
 import (
-	"bytes"
 	"fmt"
 	"net"
 	"reflect"
@@ -23,7 +22,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mikioh/ipaddr"
 	"github.com/pkg/errors"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
@@ -151,7 +149,7 @@ type BFDProfile struct {
 }
 
 // Parse loads and validates a Config from bs.
-func For(resources ClusterResources, validate Validate) (*Config, error) {
+func For(resources ClusterResources, validate Validate, bgpType string) (*Config, error) {
 	err := validate(resources)
 	if err != nil {
 		return nil, err
@@ -174,6 +172,10 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 	}
 
 	for i, p := range resources.Peers {
+		err := p.ValidateBGPPeer(resources.Peers, bgpType == "frr")
+		if err != nil {
+			return nil, err
+		}
 		peer, err := peerFromCR(p)
 		if err != nil {
 			return nil, fmt.Errorf("parsing peer #%d: %s", i+1, err)
@@ -207,26 +209,20 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 		}
 	*/
 
-	var allCIDRs []*net.IPNet
 	for i, p := range resources.Pools {
-		pool, err := addressPoolFromCR(p, communities)
-		if err != nil {
-			return nil, fmt.Errorf("parsing address pool #%d: %s", i+1, err)
-		}
-
 		// Check that the pool isn't already defined
 		if cfg.Pools[p.Name] != nil {
 			return nil, fmt.Errorf("duplicate definition of pool %q", p.Name)
 		}
 
-		// Check that all specified CIDR ranges are non-overlapping.
-		for _, cidr := range pool.CIDR {
-			for _, m := range allCIDRs {
-				if cidrsOverlap(cidr, m) {
-					return nil, fmt.Errorf("CIDR %q in pool %q overlaps with already defined CIDR %q", cidr, p.Name, m)
-				}
-			}
-			allCIDRs = append(allCIDRs, cidr)
+		err = p.ValidateIPPool(false, resources.Pools, resources.LegacyAddressPools)
+		if err != nil {
+			return nil, err
+		}
+
+		pool, err := addressPoolFromCR(p, communities)
+		if err != nil {
+			return nil, fmt.Errorf("parsing address pool #%d: %s", i+1, err)
 		}
 
 		cfg.Pools[p.Name] = pool
@@ -258,6 +254,11 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 	}
 
 	for _, bgpAdv := range resources.BGPAdvs {
+		err = bgpAdv.ValidateBGPAdv(false, resources.BGPAdvs, resources.Pools)
+		if err != nil {
+			return nil, err
+		}
+
 		adv, err := bgpAdvertisementFromCR(bgpAdv, communities)
 		if err != nil {
 			return nil, err
@@ -265,44 +266,31 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 		// No pool selector means select all pools
 		if len(bgpAdv.Spec.IPPools) == 0 {
 			for _, pool := range cfg.Pools {
-				err := validateBGPAdvPerPool(adv, pool)
-				if err != nil {
-					return nil, err
-				}
 				pool.BGPAdvertisements = append(pool.BGPAdvertisements, adv)
 			}
 			continue
 		}
 		for _, poolName := range bgpAdv.Spec.IPPools {
 			if pool, ok := cfg.Pools[poolName]; ok {
-				err := validateBGPAdvPerPool(adv, pool)
-				if err != nil {
-					return nil, err
-				}
 				pool.BGPAdvertisements = append(pool.BGPAdvertisements, adv)
 			}
 		}
 	}
 
 	for i, p := range resources.LegacyAddressPools {
-		pool, err := addressPoolFromLegacyCR(p, communities)
-		if err != nil {
-			return nil, fmt.Errorf("parsing address pool #%d: %s", i+1, err)
-		}
-
 		// Check that the pool isn't already defined
 		if cfg.Pools[p.Name] != nil {
 			return nil, fmt.Errorf("duplicate definition of pool %q", p.Name)
 		}
 
-		// Check that all specified CIDR ranges are non-overlapping.
-		for _, cidr := range pool.CIDR {
-			for _, m := range allCIDRs {
-				if cidrsOverlap(cidr, m) {
-					return nil, fmt.Errorf("CIDR %q in pool %q overlaps with already defined CIDR %q", cidr, p.Name, m)
-				}
-			}
-			allCIDRs = append(allCIDRs, cidr)
+		err = p.ValidateAddressPool(false, resources.LegacyAddressPools, resources.Pools)
+		if err != nil {
+			return nil, err
+		}
+
+		pool, err := addressPoolFromLegacyCR(p, communities)
+		if err != nil {
+			return nil, fmt.Errorf("parsing address pool #%d: %s", i+1, err)
 		}
 
 		cfg.Pools[p.Name] = pool
@@ -312,35 +300,14 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 }
 
 func peerFromCR(p metallbv1beta2.BGPPeer) (*Peer, error) {
-	if p.Spec.MyASN == 0 {
-		return nil, errors.New("missing local ASN")
-	}
-	if p.Spec.ASN == 0 {
-		return nil, errors.New("missing peer ASN")
-	}
-	if p.Spec.ASN == p.Spec.MyASN && p.Spec.EBGPMultiHop {
-		return nil, errors.New("invalid ebgp-multihop parameter set for an ibgp peer")
-	}
 	ip := net.ParseIP(p.Spec.Address)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid peer IP %q", p.Spec.Address)
-	}
 	holdTime := p.Spec.HoldTime.Duration
 	if holdTime == 0 {
 		holdTime = 90 * time.Second
 	}
-	err := validateHoldTime(holdTime)
-	if err != nil {
-		return nil, err
-	}
 	keepaliveTime := p.Spec.KeepaliveTime.Duration
 	if keepaliveTime == 0 {
 		keepaliveTime = holdTime / 3
-	}
-
-	// keepalive must be lower than holdtime
-	if keepaliveTime > holdTime {
-		return nil, fmt.Errorf("invalid keepaliveTime %q", p.Spec.KeepaliveTime)
 	}
 
 	// Ideally we would set a default RouterID here, instead of having
@@ -349,13 +316,10 @@ func peerFromCR(p metallbv1beta2.BGPPeer) (*Peer, error) {
 	var routerID net.IP
 	if p.Spec.RouterID != "" {
 		routerID = net.ParseIP(p.Spec.RouterID)
-		if routerID == nil {
-			return nil, fmt.Errorf("invalid router ID %q", p.Spec.RouterID)
-		}
 	}
-	src := net.ParseIP(p.Spec.SrcAddress)
-	if p.Spec.SrcAddress != "" && src == nil {
-		return nil, fmt.Errorf("invalid source IP %q", p.Spec.SrcAddress)
+	var src net.IP
+	if p.Spec.SrcAddress != "" {
+		src = net.ParseIP(p.Spec.SrcAddress)
 	}
 
 	var nodeSels []labels.Selector
@@ -392,10 +356,6 @@ func peerFromCR(p metallbv1beta2.BGPPeer) (*Peer, error) {
 }
 
 func addressPoolFromCR(p metallbv1beta1.IPPool, bgpCommunities map[string]uint32) (*Pool, error) {
-	if p.Name == "" {
-		return nil, errors.New("missing pool name")
-	}
-
 	ret := &Pool{
 		AvoidBuggyIPs: p.Spec.AvoidBuggyIPs,
 		AutoAssign:    true,
@@ -405,13 +365,9 @@ func addressPoolFromCR(p metallbv1beta1.IPPool, bgpCommunities map[string]uint32
 		ret.AutoAssign = *p.Spec.AutoAssign
 	}
 
-	if len(p.Spec.Addresses) == 0 {
-		return nil, errors.New("pool has no prefixes defined")
-	}
-
 	ret.cidrsPerAddresses = map[string][]*net.IPNet{}
 	for _, cidr := range p.Spec.Addresses {
-		nets, err := ParseCIDR(cidr)
+		nets, err := metallbv1beta1.ParseCIDR(cidr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid CIDR %q in pool %q: %s", cidr, p.Name, err)
 		}
@@ -423,10 +379,6 @@ func addressPoolFromCR(p metallbv1beta1.IPPool, bgpCommunities map[string]uint32
 }
 
 func addressPoolFromLegacyCR(p metallbv1beta1.AddressPool, bgpCommunities map[string]uint32) (*Pool, error) {
-	if p.Name == "" {
-		return nil, errors.New("missing pool name")
-	}
-
 	ret := &Pool{
 		AvoidBuggyIPs: p.Spec.AvoidBuggyIPs,
 		AutoAssign:    true,
@@ -436,13 +388,9 @@ func addressPoolFromLegacyCR(p metallbv1beta1.AddressPool, bgpCommunities map[st
 		ret.AutoAssign = *p.Spec.AutoAssign
 	}
 
-	if len(p.Spec.Addresses) == 0 {
-		return nil, errors.New("pool has no prefixes defined")
-	}
-
 	cidrsPerAddresses := map[string][]*net.IPNet{}
 	for _, cidr := range p.Spec.Addresses {
-		nets, err := ParseCIDR(cidr)
+		nets, err := metallbv1beta1.ParseCIDR(cidr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid CIDR %q in pool %q: %s", cidr, p.Name, err)
 		}
@@ -451,9 +399,6 @@ func addressPoolFromLegacyCR(p metallbv1beta1.AddressPool, bgpCommunities map[st
 	}
 	switch Proto(p.Spec.Protocol) {
 	case Layer2:
-		if len(p.Spec.BGPAdvertisements) > 0 {
-			return nil, errors.New("cannot have bgp-advertisements configuration element in a layer2 address pool")
-		}
 		ret.L2Advertisements = []*L2Advertisement{{}}
 	case BGP:
 		ads, err := bgpAdvertisementsFromLegacyCR(p.Spec.BGPAdvertisements, cidrsPerAddresses, bgpCommunities)
@@ -464,10 +409,6 @@ func addressPoolFromLegacyCR(p metallbv1beta1.AddressPool, bgpCommunities map[st
 		if len(ads) == 0 { // Fill an empty bgpadvertisement to declare we want to advertise this pool
 			ret.BGPAdvertisements = []*BGPAdvertisement{{}}
 		}
-	case "":
-		return nil, errors.New("address pool is missing the protocol field")
-	default:
-		return nil, fmt.Errorf("unknown protocol %q", p.Spec.Protocol)
 	}
 
 	return ret, nil
@@ -515,11 +456,6 @@ func l2AdvertisementFromCR(crdAd metallbv1beta1.L2Advertisement) *L2Advertisemen
 }
 
 func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities map[string]uint32) (*BGPAdvertisement, error) {
-	err := validateDuplicateCommunities(crdAd.Spec.Communities)
-	if err != nil {
-		return nil, err
-	}
-
 	ad := &BGPAdvertisement{
 		AggregationLength:   32,
 		AggregationLengthV6: 128,
@@ -530,14 +466,9 @@ func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities m
 	if crdAd.Spec.AggregationLength != nil {
 		ad.AggregationLength = int(*crdAd.Spec.AggregationLength) // TODO CRD cast
 	}
-	if ad.AggregationLength > 32 {
-		return nil, fmt.Errorf("invalid aggregation length %q for IPv4", ad.AggregationLength)
-	}
+
 	if crdAd.Spec.AggregationLengthV6 != nil {
 		ad.AggregationLengthV6 = int(*crdAd.Spec.AggregationLengthV6) // TODO CRD cast
-		if ad.AggregationLengthV6 > 128 {
-			return nil, fmt.Errorf("invalid aggregation length %q for IPv6", ad.AggregationLengthV6)
-		}
 	}
 
 	ad.LocalPref = crdAd.Spec.LocalPref
@@ -570,11 +501,6 @@ func bgpAdvertisementsFromLegacyCR(ads []metallbv1beta1.LegacyBgpAdvertisement, 
 
 	var ret []*BGPAdvertisement
 	for _, crdAd := range ads {
-		err := validateDuplicateCommunities(crdAd.Communities)
-		if err != nil {
-			return nil, err
-		}
-
 		ad := &BGPAdvertisement{
 			AggregationLength:   32,
 			AggregationLengthV6: 128,
@@ -585,32 +511,8 @@ func bgpAdvertisementsFromLegacyCR(ads []metallbv1beta1.LegacyBgpAdvertisement, 
 		if crdAd.AggregationLength != nil {
 			ad.AggregationLength = int(*crdAd.AggregationLength)
 		}
-		if ad.AggregationLength > 32 {
-			return nil, fmt.Errorf("invalid aggregation length %q for IPv4", ad.AggregationLength)
-		}
 		if crdAd.AggregationLengthV6 != nil {
 			ad.AggregationLengthV6 = int(*crdAd.AggregationLengthV6)
-			if ad.AggregationLengthV6 > 128 {
-				return nil, fmt.Errorf("invalid aggregation length %q for IPv6", ad.AggregationLengthV6)
-			}
-		}
-
-		for addr, cidrs := range cidrsPerAddresses {
-			if len(cidrs) == 0 {
-				continue
-			}
-			maxLength := ad.AggregationLength
-			if cidrs[0].IP.To4() == nil {
-				maxLength = ad.AggregationLengthV6
-			}
-
-			// in case of range format, we may have a set of cidrs associated to a given address.
-			// We reject if none of the cidrs are compatible with the aggregation length.
-			lowest := lowestMask(cidrs)
-			if maxLength < lowest {
-				return nil, fmt.Errorf("invalid aggregation length %d: prefix %q in "+
-					"this pool is more specific than the aggregation length for addresses %s", ad.AggregationLength, lowest, addr)
-			}
 		}
 
 		ad.LocalPref = crdAd.LocalPref
@@ -631,35 +533,6 @@ func bgpAdvertisementsFromLegacyCR(ads []metallbv1beta1.LegacyBgpAdvertisement, 
 	}
 
 	return ret, nil
-}
-
-func validateHoldTime(ht time.Duration) error {
-	rounded := time.Duration(int(ht.Seconds())) * time.Second
-	if rounded != 0 && rounded < 3*time.Second {
-		return fmt.Errorf("invalid hold time %q: must be 0 or >=3s", ht)
-	}
-	return nil
-}
-
-func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
-	for addr, cidrs := range pool.cidrsPerAddresses {
-		if len(cidrs) == 0 {
-			continue
-		}
-		maxLength := adv.AggregationLength
-		if cidrs[0].IP.To4() == nil {
-			maxLength = adv.AggregationLengthV6
-		}
-
-		// in case of range format, we may have a set of cidrs associated to a given address.
-		// We reject if none of the cidrs are compatible with the aggregation length.
-		lowest := lowestMask(cidrs)
-		if maxLength < lowest {
-			return fmt.Errorf("invalid aggregation length %d: prefix %q in "+
-				"this pool is more specific than the aggregation length for addresses %s", adv.AggregationLength, lowest, addr)
-		}
-	}
-	return nil
 }
 
 func ParseCommunity(c string) (uint32, error) {
@@ -685,73 +558,6 @@ func CommunityToString(c uint32) string {
 	return fmt.Sprintf("%d:%d", upperVal, lowerVal)
 }
 
-func ParseCIDR(cidr string) ([]*net.IPNet, error) {
-	if !strings.Contains(cidr, "-") {
-		_, n, err := net.ParseCIDR(cidr)
-		if err != nil {
-			return nil, fmt.Errorf("invalid CIDR %q", cidr)
-		}
-		return []*net.IPNet{n}, nil
-	}
-
-	fs := strings.SplitN(cidr, "-", 2)
-	if len(fs) != 2 {
-		return nil, fmt.Errorf("invalid IP range %q", cidr)
-	}
-	start := net.ParseIP(strings.TrimSpace(fs[0]))
-	if start == nil {
-		return nil, fmt.Errorf("invalid IP range %q: invalid start IP %q", cidr, fs[0])
-	}
-	end := net.ParseIP(strings.TrimSpace(fs[1]))
-	if end == nil {
-		return nil, fmt.Errorf("invalid IP range %q: invalid end IP %q", cidr, fs[1])
-	}
-
-	if bytes.Compare(start, end) > 0 {
-		return nil, fmt.Errorf("invalid IP range %q: start IP %q is after the end IP %q", cidr, start, end)
-	}
-
-	var ret []*net.IPNet
-	for _, pfx := range ipaddr.Summarize(start, end) {
-		n := &net.IPNet{
-			IP:   pfx.IP,
-			Mask: pfx.Mask,
-		}
-		ret = append(ret, n)
-	}
-	return ret, nil
-}
-
-func cidrsOverlap(a, b *net.IPNet) bool {
-	return cidrContainsCIDR(a, b) || cidrContainsCIDR(b, a)
-}
-
-func cidrContainsCIDR(outer, inner *net.IPNet) bool {
-	ol, _ := outer.Mask.Size()
-	il, _ := inner.Mask.Size()
-	if ol == il && outer.IP.Equal(inner.IP) {
-		return true
-	}
-	if ol < il && outer.Contains(inner.IP) {
-		return true
-	}
-	return false
-}
-
-func lowestMask(cidrs []*net.IPNet) int {
-	if len(cidrs) == 0 {
-		return 0
-	}
-	lowest, _ := cidrs[0].Mask.Size()
-	for _, c := range cidrs {
-		s, _ := c.Mask.Size()
-		if lowest > s {
-			lowest = s
-		}
-	}
-	return lowest
-}
-
 func bfdIntFromConfig(value *uint32, min, max uint32) (*uint32, error) {
 	if value == nil {
 		return nil, nil
@@ -767,17 +573,6 @@ func validateDuplicateBGPAdvertisements(ads []metallbv1beta1.BGPAdvertisement) e
 		for j := i + 1; j < len(ads); j++ {
 			if reflect.DeepEqual(ads[i], ads[j]) {
 				return fmt.Errorf("duplicate definition of bgpadvertisements. advertisement %d and %d are equal", i+1, j+1)
-			}
-		}
-	}
-	return nil
-}
-
-func validateDuplicateCommunities(communities []string) error {
-	for i := 0; i < len(communities); i++ {
-		for j := i + 1; j < len(communities); j++ {
-			if communities[i] == communities[j] {
-				return fmt.Errorf("duplicate definition of community %q", communities[i])
 			}
 		}
 	}

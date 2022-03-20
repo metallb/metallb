@@ -682,6 +682,9 @@ func TestParse(t *testing.T) {
 				},
 				BGPAdvs: []v1beta1.BGPAdvertisement{
 					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv",
+						},
 						Spec: v1beta1.BGPAdvertisementSpec{
 							AggregationLength: pointer.Int32Ptr(34),
 						},
@@ -705,6 +708,9 @@ func TestParse(t *testing.T) {
 				},
 				BGPAdvs: []v1beta1.BGPAdvertisement{
 					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv",
+						},
 						Spec: v1beta1.BGPAdvertisementSpec{
 							AggregationLength: pointer.Int32Ptr(26),
 						},
@@ -727,6 +733,9 @@ func TestParse(t *testing.T) {
 				},
 				BGPAdvs: []v1beta1.BGPAdvertisement{
 					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv",
+						},
 						Spec: v1beta1.BGPAdvertisementSpec{
 							AggregationLength: pointer.Int32Ptr(26),
 						},
@@ -779,7 +788,9 @@ func TestParse(t *testing.T) {
 				},
 				BGPAdvs: []v1beta1.BGPAdvertisement{
 					{
-						Spec: v1beta1.BGPAdvertisementSpec{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv",
+						}, Spec: v1beta1.BGPAdvertisementSpec{
 							AggregationLength: pointer.Int32Ptr(24),
 						},
 					},
@@ -791,7 +802,9 @@ func TestParse(t *testing.T) {
 			crs: ClusterResources{
 				BGPAdvs: []v1beta1.BGPAdvertisement{
 					{
-						Spec: v1beta1.BGPAdvertisementSpec{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv",
+						}, Spec: v1beta1.BGPAdvertisementSpec{
 							Communities: []string{
 								"1234",
 							},
@@ -805,7 +818,9 @@ func TestParse(t *testing.T) {
 			crs: ClusterResources{
 				BGPAdvs: []v1beta1.BGPAdvertisement{
 					{
-						Spec: v1beta1.BGPAdvertisementSpec{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv",
+						}, Spec: v1beta1.BGPAdvertisementSpec{
 							Communities: []string{
 								"99999999:1",
 							},
@@ -819,6 +834,9 @@ func TestParse(t *testing.T) {
 			crs: ClusterResources{
 				BGPAdvs: []v1beta1.BGPAdvertisement{
 					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv",
+						},
 						Spec: v1beta1.BGPAdvertisementSpec{
 							Communities: []string{
 								"1:99999999",
@@ -1347,7 +1365,7 @@ func TestParse(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			got, err := For(test.crs, DontValidate)
+			got, err := For(test.crs, DontValidate, "frr")
 			if err != nil && test.want != nil {
 				t.Errorf("%q: parse failed: %s", test.desc, err)
 				return

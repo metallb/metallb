@@ -10,7 +10,6 @@ import (
 	"github.com/mikioh/ipaddr"
 	"github.com/pkg/errors"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
-	internalconfig "go.universe.tf/metallb/internal/config"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
@@ -18,7 +17,7 @@ func ValidateIPInRange(addressPools []metallbv1beta1.IPPool, ip string) error {
 	input := net.ParseIP(ip)
 	for _, addressPool := range addressPools {
 		for _, address := range addressPool.Spec.Addresses {
-			cidrs, err := internalconfig.ParseCIDR(address)
+			cidrs, err := metallbv1beta1.ParseCIDR(address)
 			framework.ExpectNoError(err)
 			for _, cidr := range cidrs {
 				if cidr.Contains(input) {
@@ -31,7 +30,7 @@ func ValidateIPInRange(addressPools []metallbv1beta1.IPPool, ip string) error {
 }
 
 func GetIPFromRangeByIndex(ipRange string, index int) (string, error) {
-	cidrs, err := internalconfig.ParseCIDR(ipRange)
+	cidrs, err := metallbv1beta1.ParseCIDR(ipRange)
 	if err != nil {
 		return "", errors.Wrapf(err, "Failed to parse CIDR while getting IP from range by index")
 	}
@@ -56,7 +55,7 @@ func GetIPFromRangeByIndex(ipRange string, index int) (string, error) {
 func PoolCount(p metallbv1beta1.IPPool) (int64, error) {
 	var total int64
 	for _, r := range p.Spec.Addresses {
-		cidrs, err := internalconfig.ParseCIDR(r)
+		cidrs, err := metallbv1beta1.ParseCIDR(r)
 		if err != nil {
 			return 0, err
 		}
