@@ -6,6 +6,7 @@ import shutil
 import sys
 import yaml
 import tempfile
+import time
 try:
     from urllib.request import urlopen
 except ImportError:
@@ -253,7 +254,35 @@ def validate_kind_version():
         raise Exit(message="kind version >= {} required".format(min_version))
 
 @task(help={
-    "controller_gen": "KubeBuilder CLI."
+    "version": "version of cert-manager to install."
+                "Default: v1.5.4",
+})
+def install_cert_manager(ctx, version="v1.5.4"):
+    res = run("kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/{}/cert-manager.yaml".format(version))
+    if not res.ok:
+        raise Exit(message="Failed to install cert-manager")
+    
+    # wait for cert-manager to be ready
+    attempts = 0
+    max_attempts = 60
+    cert_manager_ready = False
+    while not cert_manager_ready and attempts != max_attempts:
+        print("Waiting for cert-manager to be ready attempt: {}".format(attempts))
+        try:
+            res = run("kubectl apply -f config/certmanager/self-signed-cert.yaml")
+        except Exception as e:
+            print("Failed, retrying")
+            time.sleep(5)
+        else:
+            print("cert-manager is ready")
+            cert_manager_ready = True
+            res = run("kubectl delete -f config/certmanager/self-signed-cert.yaml")
+        attempts += 1
+    if not cert_manager_ready:
+        raise Exit(message="Timed out waiting for cert-manage to be ready")
+
+@task(help={
+       "controller_gen": "KubeBuilder CLI."
                     "Default: controller_gen (version v0.7.0).",
     "crd_options": "CRD Options."
                     "Default: crd:crdVersions=v1.",
