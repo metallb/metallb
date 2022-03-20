@@ -1,8 +1,6 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  labels:
-    app: metallb
   name: metallb-system
 ---
 apiVersion: apiextensions.k8s.io/v1
@@ -579,6 +577,19 @@ spec:
                 description: Authentication password for routers enforcing TCP MD5
                   authenticated sessions
                 type: string
+              passwordSecret:
+                description: passwordSecret is name of the authentication secret for
+                  BGP Peer
+                properties:
+                  name:
+                    description: Name is unique within a namespace to reference a
+                      secret resource.
+                    type: string
+                  namespace:
+                    description: Namespace defines the space within which the secret
+                      name must be unique.
+                    type: string
+                type: object
               peerASN:
                 description: AS number to expect from the remote end of the session.
                 format: int32
@@ -860,6 +871,9 @@ rules:
   - secrets
   verbs:
   - create
+  - get
+  - list
+  - watch
 - apiGroups:
   - ""
   resourceNames:
@@ -876,73 +890,6 @@ rules:
   - deployments
   verbs:
   - get
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  labels:
-    app: metallb
-  name: pod-lister
-  namespace: metallb-system
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - pods
-  verbs:
-  - list
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  creationTimestamp: null
-  name: manager-role
-rules:
-- apiGroups:
-  - ""
-  resources:
-  - endpoints
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - events
-  verbs:
-  - create
-  - patch
-- apiGroups:
-  - ""
-  resources:
-  - node
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - service
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - ""
-  resources:
-  - service/status
-  verbs:
-  - update
-- apiGroups:
-  - discovery.k8s.io
-  resources:
-  - endpointslices
-  verbs:
-  - get
-  - list
-  - watch
 - apiGroups:
   - metallb.io
   resources:
@@ -965,6 +912,101 @@ rules:
   - metallb.io
   resources:
   - bgppeers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - l2advertisements
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - bgpadvertisements
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - ippools
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  labels:
+    app: metallb
+  name: pod-lister
+  namespace: metallb-system
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - pods
+  verbs:
+  - list
+- apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - addresspools
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - bfdprofiles
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - bgppeers
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - l2advertisements
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - bgpadvertisements
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
+  - ippools
   verbs:
   - get
   - list
@@ -1006,56 +1048,6 @@ rules:
   - podsecuritypolicies
   verbs:
   - use
-- apiGroups:
-  - metallb.io
-  resources:
-  - addresspools
-  verbs:
-  - create
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - bfdprofiles
-  verbs:
-  - create
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - bgppeers
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - l2advertisements
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - bgpadvertisements
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - ippools
-  verbs:
-  - get
-  - list
-  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -1097,54 +1089,6 @@ rules:
   - podsecuritypolicies
   verbs:
   - use
-- apiGroups:
-  - metallb.io
-  resources:
-  - addresspools
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - bfdprofiles
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - bgppeers
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - l2advertisements
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - bgpadvertisements
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - ippools
-  verbs:
-  - get
-  - list
-  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -1343,11 +1287,10 @@ spec:
     spec:
       containers:
       - args:
+        - --enable-webhook
         - --port=7472
         - --log-level=info
         env:
-        - name: ENABLE_OPERATOR_WEBHOOK
-          value: "true"
         - name: METALLB_BGP_TYPE
           value: frr
         - name: METALLB_ML_SECRET_NAME
@@ -1683,26 +1626,6 @@ webhooks:
     service:
       name: webhook-service
       namespace: metallb-system
-      path: /validate-metallb-io-v1beta2-bgppeer
-  failurePolicy: Fail
-  name: bgppeervalidationwebhook.metallb.io
-  rules:
-  - apiGroups:
-    - metallb.io
-    apiVersions:
-    - v1beta2
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - bgppeers
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: metallb-system
       path: /validate-metallb-io-v1beta1-ippool
   failurePolicy: Fail
   name: ippoolvalidationwebhook.metallb.io
@@ -1716,4 +1639,24 @@ webhooks:
     - UPDATE
     resources:
     - ippools
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: metallb-system
+      path: /validate-metallb-io-v1beta2-bgppeer
+  failurePolicy: Fail
+  name: bgppeersvalidationwebhook.metallb.io
+  rules:
+  - apiGroups:
+    - metallb.io
+    apiVersions:
+    - v1beta2
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - bgppeers
   sideEffects: None
