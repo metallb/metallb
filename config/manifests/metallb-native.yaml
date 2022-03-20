@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Namespace
 metadata:
   labels:
-    control-plane: controller-manager
+    app: metallb
   name: metallb-system
 ---
 apiVersion: apiextensions.k8s.io/v1
@@ -1240,6 +1240,8 @@ spec:
           value: memberlist
         - name: METALLB_DEPLOYMENT
           value: controller
+        - name: ENABLE_OPERATOR_WEBHOOK
+          value: "false"
         image: quay.io/metallb/controller:main
         livenessProbe:
           failureThreshold: 3

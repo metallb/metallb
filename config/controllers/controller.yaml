@@ -1,6 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  namespace: system
   labels:
     app: metallb
     component: controller
@@ -29,6 +30,8 @@ spec:
           value: memberlist
         - name: METALLB_DEPLOYMENT
           value: controller
+        - name: ENABLE_OPERATOR_WEBHOOK
+          value: "false"
         image: quay.io/metallb/controller:main
         name: controller
         ports:
