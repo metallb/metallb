@@ -23,7 +23,6 @@ import (
 
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/config"
-	metallbcfg "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/k8s/epslices"
@@ -125,6 +124,7 @@ func main() {
 		logLevel        = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
 		disableEpSlices = flag.Bool("disable-epslices", false, "Disable the usage of EndpointSlices and default to Endpoints instead of relying on the autodiscovery mechanism")
 		enablePprof     = flag.Bool("enable-pprof", false, "Enable pprof profiling")
+		enableWebhook   = flag.Bool("enable-webhook", false, "Enable validation webhook")
 	)
 	flag.Parse()
 
@@ -149,6 +149,13 @@ func main() {
 		ips: allocator.New(),
 	}
 
+	bgpType, present := os.LookupEnv("METALLB_BGP_TYPE")
+	if !present {
+		bgpType = "native"
+	}
+
+	validation := config.ValidationFor(bgpType)
+
 	client, err := k8s.New(&k8s.Config{
 		ProcessName:     "metallb-controller",
 		MetricsPort:     *port,
@@ -161,7 +168,8 @@ func main() {
 			ServiceChanged: c.SetBalancer,
 			ConfigChanged:  c.SetConfig,
 		},
-		ValidateConfig: metallbcfg.DontValidate, // the controller is not aware of the mode, we defer the validation to the speaker
+		ValidateConfig: validation,
+		EnableWebhook:  *enableWebhook,
 	})
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create k8s client")

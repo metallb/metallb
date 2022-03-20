@@ -10,6 +10,16 @@ import (
 
 type Validate func(ClusterResources) error
 
+func ValidationFor(bgpImpl string) Validate {
+	switch bgpImpl {
+	case "frr":
+		return DiscardNativeOnly
+	case "native":
+		return DiscardFRROnly
+	}
+	return DontValidate
+}
+
 // DiscardFRROnly returns an error if the current configFile contains
 // any options that are available only in the FRR implementation.
 func DiscardFRROnly(c ClusterResources) error {

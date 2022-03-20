@@ -41,6 +41,7 @@ type ConfigReconciler struct {
 	Handler        func(log.Logger, *config.Config) SyncState
 	ValidateConfig config.Validate
 	ForceReload    func()
+	BGPType        string
 }
 
 func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
