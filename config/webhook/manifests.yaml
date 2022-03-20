@@ -1,0 +1,88 @@
+
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  creationTimestamp: null
+  name: validating-webhook-configuration
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-metallb-io-v1beta1-addresspool
+  failurePolicy: Fail
+  name: addresspoolvalidationwebhook.metallb.io
+  rules:
+  - apiGroups:
+    - metallb.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - addresspools
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-metallb-io-v1beta1-bgpadvertisement
+  failurePolicy: Fail
+  name: bgpadvertisementvalidationwebhook.metallb.io
+  rules:
+  - apiGroups:
+    - metallb.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - bgpadvertisements
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-metallb-io-v1beta1-ippool
+  failurePolicy: Fail
+  name: ippoolvalidationwebhook.metallb.io
+  rules:
+  - apiGroups:
+    - metallb.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - ippools
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-metallb-io-v1beta2-bgppeer
+  failurePolicy: Fail
+  name: bgppeersvalidationwebhook.metallb.io
+  rules:
+  - apiGroups:
+    - metallb.io
+    apiVersions:
+    - v1beta2
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - bgppeers
+  sideEffects: None
