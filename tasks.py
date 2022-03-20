@@ -282,7 +282,7 @@ def install_cert_manager(ctx, version="v1.5.4"):
         raise Exit(message="Timed out waiting for cert-manage to be ready")
 
 @task(help={
-       "controller_gen": "KubeBuilder CLI."
+    "controller_gen": "KubeBuilder CLI."
                     "Default: controller_gen (version v0.7.0).",
     "crd_options": "CRD Options."
                     "Default: crd:crdVersions=v1.",
@@ -293,19 +293,24 @@ def install_cert_manager(ctx, version="v1.5.4"):
     "namespace": "MetalLB deployment namespace."
                     "Default: 'metallb-system'.",
     "output": "Optional output file name for generated manifest.",
+    "enable_webhooks": "Optional enable MetalLB webhooks."
+                    "Default: False.",
 })
 def generate_manifest(ctx, controller_gen="controller-gen", crd_options="crd:crdVersions=v1",
-        kustomize_cli="kustomize", bgp_type="native", namespace="metallb-system", output=None):
+        kustomize_cli="kustomize", bgp_type="native", namespace="metallb-system", output=None,
+        enable_webhooks=False):
     res = run("{} {} rbac:roleName=manager-role webhook paths=\"./api/...\" output:crd:artifacts:config=config/crd/bases".format(controller_gen, crd_options))
     if not res.ok:
         raise Exit(message="Failed to generate manifests")
 
-    res = run("cd config/{} && {} edit set namespace {}".format(bgp_type, kustomize_cli, namespace))
+    manifests = "{}{}".format(bgp_type, "-with-webhook" if enable_webhooks else "")
+
+    res = run("cd config/{} && {} edit set namespace {}".format(manifests, kustomize_cli, namespace))
     if not res.ok:
         raise Exit(message="Failed to set manifests namespace")
 
     if output:
-        res = run("kubectl kustomize config/{} > {}".format(bgp_type, output))
+        res = run("kubectl kustomize config/{} > {}".format(manifests, output))
         if not res.ok:
             raise Exit(message="Failed to kustomize manifests")
 
@@ -325,11 +330,13 @@ def generate_manifest(ctx, controller_gen="controller-gen", crd_options="crd:crd
     "log_level": "Log level for the controller and the speaker."
                 "Default: info, Supported: 'all', 'debug', 'info', 'warn', 'error' or 'none'",
     "helm_install": "Optional install MetalLB via helm chart instead of manifests."
-                "Default: False."
+                "Default: False.",
+    "enable_webhooks": "Optional enable MetalLB webhooks."
+                "Default: False.",
 })
 def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_dir="",
         node_img=None, ip_family="ipv4", bgp_type="native", log_level="info",
-        helm_install=False):
+        helm_install=False, enable_webhooks=False):
     """Build and run MetalLB in a local Kind cluster.
 
     If the cluster specified by --name (default "kind") doesn't exist,
@@ -375,6 +382,9 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
     run("kind load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
 
+    if enable_webhooks:
+        install_cert_manager(ctx)
+
     if helm_install:
         run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
                 "--set speaker.image.tag=dev-{} --set speaker.frr.enabled={} --set speaker.logLevel=debug "
@@ -386,7 +396,7 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest_file = tmpdir + "/metallb.yaml"
 
-            generate_manifest(ctx, bgp_type=bgp_type, output=manifest_file)
+            generate_manifest(ctx, bgp_type=bgp_type, output=manifest_file, enable_webhooks=enable_webhooks)
 
             # open file and replace the images with the newely built MetalLB docker images
             with open(manifest_file) as f:
