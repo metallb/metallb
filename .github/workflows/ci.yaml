@@ -121,7 +121,7 @@ jobs:
           inv build
           HELM_FLAGS=""
           if [ ${{ matrix.deployment }} = "helm" ]; then HELM_FLAGS="--helm-install"; fi
-          inv dev-env -i ${{ matrix.ip-family }} -b ${{ matrix.bgp-type }} -l all $HELM_FLAGS
+          inv dev-env -i ${{ matrix.ip-family }} -b ${{ matrix.bgp-type }} -l all $HELM_FLAGS --enable-webhooks
 
       - name: E2E
         run: |
