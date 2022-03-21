@@ -313,14 +313,14 @@ var _ = ginkgo.Describe("L2", func() {
 		_, err = jig1.Run(
 			func(rc *corev1.ReplicationController) {
 				rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", service.TestServicePort), fmt.Sprintf("--udp-port=%d", service.TestServicePort)}
-				rc.Spec.Template.Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Port = intstr.FromInt(service.TestServicePort)
+				rc.Spec.Template.Spec.Containers[0].ReadinessProbe.HTTPGet.Port = intstr.FromInt(service.TestServicePort)
 				rc.Spec.Template.Spec.NodeName = nodes.Items[0].Name
 			})
 		framework.ExpectNoError(err)
 		_, err = jig2.Run(
 			func(rc *corev1.ReplicationController) {
 				rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", service.TestServicePort+1), fmt.Sprintf("--udp-port=%d", service.TestServicePort+1)}
-				rc.Spec.Template.Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Port = intstr.FromInt(service.TestServicePort + 1)
+				rc.Spec.Template.Spec.Containers[0].ReadinessProbe.HTTPGet.Port = intstr.FromInt(service.TestServicePort + 1)
 				rc.Spec.Template.Spec.NodeName = nodes.Items[1].Name
 			})
 		framework.ExpectNoError(err)
