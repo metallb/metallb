@@ -10,15 +10,19 @@ commands:
       - run: sudo apt-get install python3-pip arping ndisc6
       - run: sudo pip3 install invoke semver pyyaml
 jobs:
-  test-1-16:
+  test-1-17:
     machine:
       image: ubuntu-2004:202104-01
     steps:
+      - run: |
+          curl -o /tmp/go1.17.1.linux-amd64.tar.gz https://dl.google.com/go/go1.17.1.linux-amd64.tar.gz
+          sudo rm -rf /usr/local/go
+          sudo tar -C /usr/local -xzf /tmp/go1.17.1.linux-amd64.tar.gz
       - setup_ci_image
       - run: inv test
-  lint-1-16:
+  lint-1-17:
     docker:
-      - image: cimg/go:1.16
+      - image: cimg/go:1.17.1
     steps:
       - setup_ci_image
       - run: inv checkpatch
@@ -26,7 +30,7 @@ jobs:
       - run: inv verifylicense
   publish-images:
     docker:
-      - image: cimg/go:1.16
+      - image: cimg/go:1.17.1
     environment:
       - DOCKER_BUILD_CMD: "docker buildx build --load"
     steps:
@@ -41,7 +45,7 @@ jobs:
       - run: PATH=./bin:$PATH inv push-multiarch --binaries=controller --binaries=speaker --registry=docker.io --repo=metallb --tag=${CIRCLE_BRANCH:-${CIRCLE_TAG}}
   publish-images-quay:
     docker:
-      - image: cimg/go:1.16
+      - image: cimg/go:1.17.1
     environment:
       - DOCKER_BUILD_CMD: "docker buildx build --load"
     steps:
@@ -58,11 +62,11 @@ workflows:
   version: 2
   test-and-publish:
     jobs:
-      - test-1-16:
+      - test-1-17:
           filters:
             tags:
               only: /.*/
-      - lint-1-16:
+      - lint-1-17:
           filters:
             tags:
               only: /.*/
@@ -75,8 +79,8 @@ workflows:
             tags:
               only: /.*/
           requires:
-            - test-1-16
-            - lint-1-16
+            - test-1-17
+            - lint-1-17
       - publish-images-quay:
           filters:
             branches:
@@ -86,5 +90,5 @@ workflows:
             tags:
               only: /.*/
           requires:
-            - test-1-16
-            - lint-1-16
+            - test-1-17
+            - lint-1-17
