@@ -4,21 +4,27 @@ package config
 
 import (
 	"testing"
+	"time"
+
+	"go.universe.tf/metallb/api/v1beta1"
+	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestValidate(t *testing.T) {
 	tests := []struct {
 		desc     string
-		config   *configFile
+		config   ClusterResources
 		mustFail bool
 	}{
 		{
 			desc: "peer with bfd profile",
-			config: &configFile{
-				Peers: []peer{
+			config: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
 					{
-						Addr:       "1.2.3.4",
-						BFDProfile: "foo",
+						Spec: v1beta1.BGPPeerSpec{
+							Address:    "1.2.3.4",
+							BFDProfile: "foo",
+						},
 					},
 				},
 			},
@@ -26,15 +32,17 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			desc: "bfd profile set",
-			config: &configFile{
-				Peers: []peer{
+			config: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
 					{
-						Addr: "1.2.3.4",
+						Spec: v1beta1.BGPPeerSpec{
+							Address: "1.2.3.4",
+						},
 					},
 				},
-				BFDProfiles: []bfdProfile{
+				BFDProfiles: []v1beta1.BFDProfile{
 					{
-						Name: "default",
+						ObjectMeta: v1.ObjectMeta{Name: "foo"},
 					},
 				},
 			},
@@ -42,11 +50,13 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			desc: "v6 address",
-			config: &configFile{
-				Pools: []addressPool{
+			config: ClusterResources{
+				Pools: []v1beta1.AddressPool{
 					{
-						Protocol:  BGP,
-						Addresses: []string{"2001:db8::/64"},
+						Spec: v1beta1.AddressPoolSpec{
+							Protocol:  "bgp",
+							Addresses: []string{"2001:db8::/64"},
+						},
 					},
 				},
 			},
@@ -54,10 +64,12 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			desc: "keepalive time",
-			config: &configFile{
-				Peers: []peer{
+			config: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
 					{
-						KeepaliveTime: "1s",
+						Spec: v1beta1.BGPPeerSpec{
+							KeepaliveTime: v1.Duration{Duration: time.Second},
+						},
 					},
 				},
 			},
@@ -65,14 +77,15 @@ func TestValidate(t *testing.T) {
 		},
 		{
 			desc: "should pass",
-			config: &configFile{
-				Peers: []peer{
+			config: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
 					{
-						Addr: "1.2.3.4",
+						Spec: v1beta1.BGPPeerSpec{
+							Address: "1.2.3.4",
+						},
 					},
 				},
 			},
-			mustFail: false,
 		},
 	}
 
@@ -92,35 +105,43 @@ func TestValidate(t *testing.T) {
 func TestValidateFRR(t *testing.T) {
 	tests := []struct {
 		desc     string
-		config   *configFile
+		config   ClusterResources
 		mustFail bool
 	}{
 		{
 			desc: "peer with routerid",
-			config: &configFile{
-				Peers: []peer{
+			config: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
 					{
-						Addr:     "1.2.3.4",
-						RouterID: "1.2.3.4",
+						Spec: v1beta1.BGPPeerSpec{
+							Address:  "1.2.3.4",
+							RouterID: "1.2.3.4",
+						},
 					},
 				},
 			},
 		},
 		{
 			desc: "routerid set, one different",
-			config: &configFile{
-				Peers: []peer{
+			config: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
 					{
-						Addr:     "1.2.3.4",
-						RouterID: "1.2.3.4",
+						Spec: v1beta1.BGPPeerSpec{
+							Address:  "1.2.3.4",
+							RouterID: "1.2.3.4",
+						},
 					},
 					{
-						Addr:     "1.2.3.5",
-						RouterID: "1.2.3.4",
+						Spec: v1beta1.BGPPeerSpec{
+							Address:  "1.2.3.5",
+							RouterID: "1.2.3.4",
+						},
 					},
 					{
-						Addr:     "1.2.3.6",
-						RouterID: "1.2.3.5",
+						Spec: v1beta1.BGPPeerSpec{
+							Address:  "1.2.3.6",
+							RouterID: "1.2.3.5",
+						},
 					},
 				},
 			},
@@ -128,18 +149,24 @@ func TestValidateFRR(t *testing.T) {
 		},
 		{
 			desc: "routerid set, one not set",
-			config: &configFile{
-				Peers: []peer{
+			config: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
 					{
-						Addr:     "1.2.3.4",
-						RouterID: "1.2.3.4",
+						Spec: v1beta1.BGPPeerSpec{
+							Address:  "1.2.3.4",
+							RouterID: "1.2.3.4",
+						},
 					},
 					{
-						Addr:     "1.2.3.5",
-						RouterID: "1.2.3.4",
+						Spec: v1beta1.BGPPeerSpec{
+							Address:  "1.2.3.5",
+							RouterID: "1.2.3.4",
+						},
 					},
 					{
-						Addr: "1.2.3.6",
+						Spec: v1beta1.BGPPeerSpec{
+							Address: "1.2.3.6",
+						},
 					},
 				},
 			},
@@ -147,67 +174,88 @@ func TestValidateFRR(t *testing.T) {
 		},
 		{
 			desc: "bfd profile set",
-			config: &configFile{
-				Peers: []peer{
+			config: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
 					{
-						Addr: "1.2.3.4",
+						Spec: v1beta1.BGPPeerSpec{
+							Address:  "1.2.3.4",
+							RouterID: "1.2.3.4",
+						},
 					},
 				},
-				BFDProfiles: []bfdProfile{
+				BFDProfiles: []v1beta1.BFDProfile{
 					{
-						Name: "default",
+						ObjectMeta: v1.ObjectMeta{
+							Name: "foo",
+						},
 					},
 				},
 			},
 		},
 		{
 			desc: "myAsn set, all equals",
-			config: &configFile{
-				Peers: []peer{
+			config: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
 					{
-						Addr:  "1.2.3.4",
-						MyASN: 123,
+						Spec: v1beta1.BGPPeerSpec{
+							Address: "1.2.3.4",
+							MyASN:   123,
+						},
 					},
 					{
-						Addr:  "1.2.3.5",
-						MyASN: 123,
+						Spec: v1beta1.BGPPeerSpec{
+							Address: "1.2.3.5",
+							MyASN:   123,
+						},
 					},
 					{
-						Addr:  "1.2.3.6",
-						MyASN: 123,
+						Spec: v1beta1.BGPPeerSpec{
+							Address: "1.2.3.6",
+							MyASN:   123,
+						},
 					},
 				},
 			},
 		},
 		{
 			desc: "myAsn set, one different",
-			config: &configFile{
-				Peers: []peer{
+			config: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
 					{
-						Addr:  "1.2.3.4",
-						MyASN: 123,
+						Spec: v1beta1.BGPPeerSpec{
+							Address: "1.2.3.4",
+							MyASN:   123,
+						},
 					},
 					{
-						Addr:  "1.2.3.5",
-						MyASN: 123,
+						Spec: v1beta1.BGPPeerSpec{
+							Address: "1.2.3.5",
+							MyASN:   123,
+						},
 					},
 					{
-						Addr:  "1.2.3.6",
-						MyASN: 125,
+						Spec: v1beta1.BGPPeerSpec{
+							Address: "1.2.3.6",
+							MyASN:   124,
+						},
 					},
 				},
 			},
 			mustFail: true,
 		},
 		{
-			desc: "duplicate BGPPeer address",
-			config: &configFile{
-				Peers: []peer{
+			desc: "duplicate bgp address",
+			config: ClusterResources{
+				Peers: []v1beta1.BGPPeer{
 					{
-						Addr: "1.2.3.4",
+						Spec: v1beta1.BGPPeerSpec{
+							Address: "1.2.3.4",
+						},
 					},
 					{
-						Addr: "1.2.3.4",
+						Spec: v1beta1.BGPPeerSpec{
+							Address: "1.2.3.4",
+						},
 					},
 				},
 			},

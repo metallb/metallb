@@ -19,7 +19,6 @@ limitations under the License.
 package e2e
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -37,9 +36,6 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	"go.universe.tf/metallb/e2etest/pkg/service"
 	internalconfig "go.universe.tf/metallb/internal/config"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -121,44 +117,24 @@ var _ = ginkgo.BeforeSuite(func() {
 	cs, err := framework.LoadClientset()
 	framework.ExpectNoError(err)
 
-	if !useOperator {
-		_, err = cs.CoreV1().ConfigMaps(metallb.Namespace).Get(context.TODO(), metallb.ConfigMapName, metav1.GetOptions{})
-		framework.ExpectEqual(errors.IsNotFound(err), true)
-
-		// Init empty MetalLB ConfigMap.
-		_, err = cs.CoreV1().ConfigMaps(metallb.Namespace).Create(context.TODO(), &v1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      metallb.ConfigMapName,
-				Namespace: metallb.Namespace,
-			},
-		}, metav1.CreateOptions{})
-		framework.ExpectNoError(err)
-	}
-
 	framework.ExpectNoError(err)
 	v4Addresses := strings.Split(ipv4ForContainers, ",")
 	v6Addresses := strings.Split(ipv6ForContainers, ",")
 	bgptests.FRRContainers, err = bgptests.InfraSetup(v4Addresses, v6Addresses, cs)
 	framework.ExpectNoError(err)
 
-	var updater testsconfig.Updater
-	updater = testsconfig.UpdaterForConfigMap(cs, metallb.ConfigMapName, metallb.Namespace)
-	if useOperator {
-		clientconfig, err := framework.LoadConfig()
-		framework.ExpectNoError(err)
+	clientconfig, err := framework.LoadConfig()
+	framework.ExpectNoError(err)
 
-		updater, err = testsconfig.UpdaterForOperator(clientconfig, metallb.Namespace)
-		framework.ExpectNoError(err)
-	}
+	updater, err := testsconfig.UpdaterForCRs(clientconfig, metallb.Namespace)
+	framework.ExpectNoError(err)
+
 	bgptests.ConfigUpdater = updater
 	l2tests.ConfigUpdater = updater
 })
 
 var _ = ginkgo.AfterSuite(func() {
 	cs, err := framework.LoadClientset()
-	framework.ExpectNoError(err)
-
-	err = cs.CoreV1().ConfigMaps(metallb.Namespace).Delete(context.TODO(), metallb.ConfigMapName, metav1.DeleteOptions{})
 	framework.ExpectNoError(err)
 
 	err = bgptests.InfraTearDown(bgptests.FRRContainers, cs)

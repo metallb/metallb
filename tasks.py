@@ -647,9 +647,8 @@ def lint(ctx, env="container"):
     "skip": "the list of arguments to pass into as -ginkgo.skip",
     "ipv4_service_range": "a range of IPv4 addresses for MetalLB to use when running in layer2 mode.",
     "ipv6_service_range": "a range of IPv6 addresses for MetalLB to use when running in layer2 mode.",
-    "use_operator": "use operator to update MetalLB configuration",
 })
-def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None, use_operator=False):
+def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None):
     """Run E2E tests against development cluster."""
     if skip_docker:
         opt_skip_docker = "--skip-docker"
@@ -659,10 +658,6 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
     ginkgo_skip = ""
     if skip:
         ginkgo_skip = "--ginkgo.skip=\"" + skip + "\""
-
-    opt_use_operator = ""
-    if use_operator:
-        opt_use_operator = "--use-operator"
 
     ginkgo_focus = ""
     if focus:
@@ -695,7 +690,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
         ips_for_containers_v6 = "--ips-for-containers-v6=" + ips
 
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "KUBECONFIG={} go test -timeout 1h {} {} --provider=local --kubeconfig={} --service-pod-port={} {} {} -ipv4-service-range={} -ipv6-service-range={} {} {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker, opt_use_operator), warn="True")
+            "KUBECONFIG={} go test -timeout 1h {} {} --provider=local --kubeconfig={} --service-pod-port={} {} {} -ipv4-service-range={} -ipv6-service-range={} {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker), warn="True")
 
     if export != None:
         run("kind export logs {}".format(export))

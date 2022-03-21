@@ -22,7 +22,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/k8s"
+	"go.universe.tf/metallb/internal/k8s/epslices"
 	"go.universe.tf/metallb/internal/layer2"
 	v1 "k8s.io/api/core/v1"
 )
@@ -41,10 +41,10 @@ func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
 // endpoint on them.
 // The speakers parameter is a map containing all the nodes with active speakers.
 // If the speakers map is nil, it is ignored.
-func usableNodes(eps k8s.EpsOrSlices, speakers map[string]bool) []string {
+func usableNodes(eps epslices.EpsOrSlices, speakers map[string]bool) []string {
 	usable := map[string]bool{}
 	switch eps.Type {
-	case k8s.Eps:
+	case epslices.Eps:
 		for _, subset := range eps.EpVal.Subsets {
 			for _, ep := range subset.Addresses {
 				if ep.NodeName == nil {
@@ -60,10 +60,10 @@ func usableNodes(eps k8s.EpsOrSlices, speakers map[string]bool) []string {
 				}
 			}
 		}
-	case k8s.Slices:
+	case epslices.Slices:
 		for _, slice := range eps.SlicesVal {
 			for _, ep := range slice.Endpoints {
-				if !k8s.IsConditionReady(ep.Conditions) {
+				if !epslices.IsConditionReady(ep.Conditions) {
 					continue
 				}
 				nodeName := ep.Topology["kubernetes.io/hostname"]
@@ -92,7 +92,7 @@ func usableNodes(eps k8s.EpsOrSlices, speakers map[string]bool) []string {
 	return ret
 }
 
-func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce []net.IP, svc *v1.Service, eps k8s.EpsOrSlices) string {
+func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce []net.IP, svc *v1.Service, eps epslices.EpsOrSlices) string {
 	if !activeEndpointExists(eps) { // no active endpoints, just return
 		return "notOwner"
 	}
@@ -153,18 +153,18 @@ func nodesWithActiveSpeakers(speakers map[string]bool) []string {
 }
 
 // activeEndpointExists returns true if at least one endpoint is active.
-func activeEndpointExists(eps k8s.EpsOrSlices) bool {
+func activeEndpointExists(eps epslices.EpsOrSlices) bool {
 	switch eps.Type {
-	case k8s.Eps:
+	case epslices.Eps:
 		for _, subset := range eps.EpVal.Subsets {
 			if len(subset.Addresses) > 0 {
 				return true
 			}
 		}
-	case k8s.Slices:
+	case epslices.Slices:
 		for _, slice := range eps.SlicesVal {
 			for _, ep := range slice.Endpoints {
-				if !k8s.IsConditionReady(ep.Conditions) {
+				if !epslices.IsConditionReady(ep.Conditions) {
 					continue
 				}
 				return true

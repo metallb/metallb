@@ -8,25 +8,25 @@ import (
 	"github.com/pkg/errors"
 )
 
-type Validate func(*configFile) error
+type Validate func(ClusterResources) error
 
 // DiscardFRROnly returns an error if the current configFile contains
 // any options that are available only in the FRR implementation.
-func DiscardFRROnly(c *configFile) error {
+func DiscardFRROnly(c ClusterResources) error {
 	for _, p := range c.Peers {
-		if p.BFDProfile != "" {
-			return fmt.Errorf("peer %s has bfd-profile set on native bgp mode", p.Addr)
+		if p.Spec.BFDProfile != "" {
+			return fmt.Errorf("peer %s has bfd-profile set on native bgp mode", p.Spec.Address)
 		}
-		if p.KeepaliveTime != "" {
-			return fmt.Errorf("peer %s has keepalive-time set on native bgp mode", p.Addr)
+		if p.Spec.KeepaliveTime.Duration != 0 {
+			return fmt.Errorf("peer %s has keepalive-time set on native bgp mode", p.Spec.Address)
 		}
 	}
 	if len(c.BFDProfiles) > 0 {
 		return errors.New("bfd profiles section set")
 	}
 	for _, p := range c.Pools {
-		if p.Protocol == BGP {
-			for _, cidr := range p.Addresses {
+		if p.Spec.Protocol == string(BGP) {
+			for _, cidr := range p.Spec.Addresses {
 				nets, err := ParseCIDR(cidr)
 				if err != nil {
 					return fmt.Errorf("invalid CIDR %q in pool %q: %s", cidr, p.Name, err)
@@ -44,29 +44,29 @@ func DiscardFRROnly(c *configFile) error {
 
 // DontValidate is a Validate function that always returns
 // success.
-func DontValidate(c *configFile) error {
+func DontValidate(c ClusterResources) error {
 	return nil
 }
 
 // DiscardNativeOnly returns an error if the current configFile contains
 // any options that are available only in the native implementation.
-func DiscardNativeOnly(c *configFile) error {
+func DiscardNativeOnly(c ClusterResources) error {
 	if len(c.Peers) > 1 {
 		peerAddr := make(map[string]bool)
-		myAsn := c.Peers[0].MyASN
-		routerID := c.Peers[0].RouterID
-		peerAddr[c.Peers[0].Addr] = true
+		myAsn := c.Peers[0].Spec.MyASN
+		routerID := c.Peers[0].Spec.RouterID
+		peerAddr[c.Peers[0].Spec.Address] = true
 		for _, p := range c.Peers[1:] {
-			if p.RouterID != routerID {
-				return fmt.Errorf("peer %s has RouterID different from %s, in FRR mode all RouterID must be equal", p.RouterID, c.Peers[0].RouterID)
+			if p.Spec.RouterID != routerID {
+				return fmt.Errorf("peer %s has RouterID different from %s, in FRR mode all RouterID must be equal", p.Spec.RouterID, c.Peers[0].Spec.RouterID)
 			}
-			if p.MyASN != myAsn {
-				return fmt.Errorf("peer %s has myAsn different from %s, in FRR mode all myAsn must be equal", p.Addr, c.Peers[0].Addr)
+			if p.Spec.MyASN != myAsn {
+				return fmt.Errorf("peer %s has myAsn different from %s, in FRR mode all myAsn must be equal", p.Spec.Address, c.Peers[0].Spec.Address)
 			}
-			if _, ok := peerAddr[p.Addr]; ok {
-				return fmt.Errorf("peer %s already exists, FRR mode doesn't support duplicate BGPPeers", p.Addr)
+			if _, ok := peerAddr[p.Spec.Address]; ok {
+				return fmt.Errorf("peer %s already exists, FRR mode doesn't support duplicate BGPPeers", p.Spec.Address)
 			}
-			peerAddr[p.Addr] = true
+			peerAddr[p.Spec.Address] = true
 		}
 	}
 	return nil
