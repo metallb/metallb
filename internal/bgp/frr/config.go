@@ -31,6 +31,21 @@ var reloaderPidFileName = "/etc/frr_reloader/reloader.pid"
 const configTemplate = `
 log file /etc/frr/frr.log {{.Loglevel}}
 log timestamp precision 3
+{{- if eq .Loglevel "debugging" }}
+debug zebra events
+debug zebra nht
+debug zebra kernel
+debug zebra rib
+debug zebra nexthop
+debug bgp neighbor-events
+debug bgp updates
+debug bgp keepalives
+debug bgp nht
+debug bgp zebra
+debug bfd network
+debug bfd peer
+debug bfd zebra
+{{- end }}
 hostname {{.Hostname}}
 ip nht resolve-via-default
 ipv6 nht resolve-via-default

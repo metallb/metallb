@@ -21,7 +21,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"go.universe.tf/metallb/internal/bgp"
@@ -72,7 +71,7 @@ func main() {
 		mlSecret        = flag.String("ml-secret-key", os.Getenv("METALLB_ML_SECRET_KEY"), "Secret key for MemberList (fast dead node detection)")
 		myNode          = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
 		port            = flag.Int("port", 7472, "HTTP listening port")
-		logLevel        = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", strings.Join(logging.Levels, ", ")))
+		logLevel        = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
 		disableEpSlices = flag.Bool("disable-epslices", false, "Disable the usage of EndpointSlices and default to Endpoints instead of relying on the autodiscovery mechanism")
 		enablePprof     = flag.Bool("enable-pprof", false, "Enable pprof profiling")
 	)
@@ -125,10 +124,11 @@ func main() {
 
 	// Setup all clients and speakers, config decides what is being done runtime.
 	ctrl, err := newController(controllerConfig{
-		MyNode:  *myNode,
-		Logger:  logger,
-		SList:   sList,
-		bgpType: bgpImplementation(bgpType),
+		MyNode:   *myNode,
+		Logger:   logger,
+		LogLevel: logging.Level(*logLevel),
+		SList:    sList,
+		bgpType:  bgpImplementation(bgpType),
 	})
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create MetalLB controller")
@@ -188,9 +188,10 @@ type controller struct {
 }
 
 type controllerConfig struct {
-	MyNode string
-	Logger log.Logger
-	SList  SpeakerList
+	MyNode   string
+	Logger   log.Logger
+	LogLevel logging.Level
+	SList    SpeakerList
 
 	bgpType bgpImplementation
 
@@ -206,7 +207,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 			myNode:         cfg.MyNode,
 			svcAds:         make(map[string][]*bgp.Advertisement),
 			bgpType:        cfg.bgpType,
-			sessionManager: newBGP(cfg.bgpType, cfg.Logger),
+			sessionManager: newBGP(cfg.bgpType, cfg.Logger, cfg.LogLevel),
 		},
 	}
 
