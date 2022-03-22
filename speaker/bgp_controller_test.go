@@ -16,6 +16,7 @@ import (
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	"go.universe.tf/metallb/internal/logging"
+	"go.universe.tf/metallb/internal/pointer"
 
 	"github.com/go-kit/kit/log"
 	"github.com/google/go-cmp/cmp"
@@ -24,10 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
-
-func strptr(s string) *string {
-	return &s
-}
 
 func mustSelector(s string) labels.Selector {
 	res, err := labels.Parse(s)
@@ -249,7 +246,7 @@ func TestBGPSpeaker(t *testing.T) {
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
@@ -304,7 +301,7 @@ func TestBGPSpeaker(t *testing.T) {
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("pandora"),
+									NodeName: pointer.StrPtr("pandora"),
 								},
 							},
 						},
@@ -336,7 +333,7 @@ func TestBGPSpeaker(t *testing.T) {
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
@@ -372,7 +369,7 @@ func TestBGPSpeaker(t *testing.T) {
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
@@ -404,11 +401,11 @@ func TestBGPSpeaker(t *testing.T) {
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 								{
 									IP:       "2.3.4.6",
-									NodeName: strptr("pandora"),
+									NodeName: pointer.StrPtr("pandora"),
 								},
 							},
 						},
@@ -444,11 +441,11 @@ func TestBGPSpeaker(t *testing.T) {
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 								{
 									IP:       "2.3.4.6",
-									NodeName: strptr("pandora"),
+									NodeName: pointer.StrPtr("pandora"),
 								},
 							},
 						},
@@ -456,13 +453,13 @@ func TestBGPSpeaker(t *testing.T) {
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 							NotReadyAddresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.6",
-									NodeName: strptr("pandora"),
+									NodeName: pointer.StrPtr("pandora"),
 								},
 							},
 						},
@@ -512,7 +509,7 @@ func TestBGPSpeaker(t *testing.T) {
 							NotReadyAddresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
@@ -544,13 +541,13 @@ func TestBGPSpeaker(t *testing.T) {
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 							NotReadyAddresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.6",
-									NodeName: strptr("pandora"),
+									NodeName: pointer.StrPtr("pandora"),
 								},
 							},
 						},
@@ -610,7 +607,7 @@ func TestBGPSpeaker(t *testing.T) {
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
@@ -674,7 +671,7 @@ func TestBGPSpeaker(t *testing.T) {
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
@@ -714,7 +711,7 @@ func TestBGPSpeaker(t *testing.T) {
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
@@ -755,7 +752,7 @@ func TestBGPSpeaker(t *testing.T) {
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
@@ -802,7 +799,7 @@ func TestBGPSpeaker(t *testing.T) {
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
@@ -888,7 +885,7 @@ func TestBGPSpeaker(t *testing.T) {
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
@@ -986,7 +983,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -1041,7 +1038,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "pandora",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -1076,7 +1073,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -1115,7 +1112,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -1150,7 +1147,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -1165,7 +1162,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "pandora",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -1204,7 +1201,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -1219,7 +1216,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "pandora",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(false),
+									Ready: pointer.BoolPtr(false),
 								},
 							},
 						},
@@ -1234,7 +1231,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -1249,7 +1246,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "pandora",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -1300,7 +1297,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(false),
+									Ready: pointer.BoolPtr(false),
 								},
 							},
 						},
@@ -1335,7 +1332,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 							{
@@ -1346,7 +1343,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "pandora",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(false),
+									Ready: pointer.BoolPtr(false),
 								},
 							},
 						},
@@ -1409,7 +1406,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -1476,7 +1473,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -1519,7 +1516,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -1563,7 +1560,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -1613,7 +1610,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -1700,7 +1697,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},

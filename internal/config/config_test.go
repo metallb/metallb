@@ -10,9 +10,9 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/api/v1beta2"
+	"go.universe.tf/metallb/internal/pointer"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	"k8s.io/utils/pointer"
 )
 
 func selector(s string) labels.Selector {
@@ -1054,13 +1054,13 @@ func TestParse(t *testing.T) {
 							Name: "nondefault",
 						},
 						Spec: v1beta1.BFDProfileSpec{
-							ReceiveInterval:  uint32Ptr(50),
-							TransmitInterval: uint32Ptr(51),
-							DetectMultiplier: uint32Ptr(52),
-							EchoInterval:     uint32Ptr(54),
+							ReceiveInterval:  pointer.Uint32Ptr(50),
+							TransmitInterval: pointer.Uint32Ptr(51),
+							DetectMultiplier: pointer.Uint32Ptr(52),
+							EchoInterval:     pointer.Uint32Ptr(54),
 							EchoMode:         pointer.BoolPtr(true),
 							PassiveMode:      pointer.BoolPtr(true),
-							MinimumTTL:       uint32Ptr(55),
+							MinimumTTL:       pointer.Uint32Ptr(55),
 						},
 					},
 				},
@@ -1089,11 +1089,11 @@ func TestParse(t *testing.T) {
 				BFDProfiles: map[string]*BFDProfile{
 					"nondefault": {
 						Name:             "nondefault",
-						ReceiveInterval:  uint32Ptr(50),
-						DetectMultiplier: uint32Ptr(52),
-						TransmitInterval: uint32Ptr(51),
-						EchoInterval:     uint32Ptr(54),
-						MinimumTTL:       uint32Ptr(55),
+						ReceiveInterval:  pointer.Uint32Ptr(50),
+						DetectMultiplier: pointer.Uint32Ptr(52),
+						TransmitInterval: pointer.Uint32Ptr(51),
+						EchoInterval:     pointer.Uint32Ptr(54),
+						MinimumTTL:       pointer.Uint32Ptr(55),
 						EchoMode:         true,
 						PassiveMode:      true,
 					},
@@ -1110,7 +1110,7 @@ func TestParse(t *testing.T) {
 							Name: "default",
 						},
 						Spec: v1beta1.BFDProfileSpec{
-							ReceiveInterval: uint32Ptr(2),
+							ReceiveInterval: pointer.Uint32Ptr(2),
 						},
 					},
 				},
@@ -1126,7 +1126,7 @@ func TestParse(t *testing.T) {
 							Name: "default",
 						},
 						Spec: v1beta1.BFDProfileSpec{
-							ReceiveInterval: uint32Ptr(90000),
+							ReceiveInterval: pointer.Uint32Ptr(90000),
 						},
 					},
 				},
@@ -1384,8 +1384,4 @@ func TestParse(t *testing.T) {
 			}
 		})
 	}
-}
-
-func uint32Ptr(n uint32) *uint32 {
-	return &n
 }

@@ -32,6 +32,7 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	"go.universe.tf/metallb/e2etest/pkg/metrics"
 	metallbconfig "go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/pointer"
 
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/extensions/table"
@@ -563,12 +564,12 @@ var _ = ginkgo.Describe("BGP", func() {
 						Name: "full1",
 					},
 					Spec: metallbv1beta1.BFDProfileSpec{
-						ReceiveInterval:  uint32Ptr(60),
-						TransmitInterval: uint32Ptr(61),
-						EchoInterval:     uint32Ptr(62),
-						EchoMode:         boolPtr(false),
-						PassiveMode:      boolPtr(false),
-						MinimumTTL:       uint32Ptr(254),
+						ReceiveInterval:  pointer.Uint32Ptr(60),
+						TransmitInterval: pointer.Uint32Ptr(61),
+						EchoInterval:     pointer.Uint32Ptr(62),
+						EchoMode:         pointer.BoolPtr(false),
+						PassiveMode:      pointer.BoolPtr(false),
+						MinimumTTL:       pointer.Uint32Ptr(254),
 					},
 				}, ipfamily.IPv4, []string{v4PoolAddresses}, testservice.TrafficPolicyCluster),
 			table.Entry("IPV4 - echo mode enabled",
@@ -577,12 +578,12 @@ var _ = ginkgo.Describe("BGP", func() {
 						Name: "echo",
 					},
 					Spec: metallbv1beta1.BFDProfileSpec{
-						ReceiveInterval:  uint32Ptr(80),
-						TransmitInterval: uint32Ptr(81),
-						EchoInterval:     uint32Ptr(82),
-						EchoMode:         boolPtr(true),
-						PassiveMode:      boolPtr(false),
-						MinimumTTL:       uint32Ptr(254),
+						ReceiveInterval:  pointer.Uint32Ptr(80),
+						TransmitInterval: pointer.Uint32Ptr(81),
+						EchoInterval:     pointer.Uint32Ptr(82),
+						EchoMode:         pointer.BoolPtr(true),
+						PassiveMode:      pointer.BoolPtr(false),
+						MinimumTTL:       pointer.Uint32Ptr(254),
 					},
 				}, ipfamily.IPv4, []string{v4PoolAddresses}, testservice.TrafficPolicyCluster),
 			table.Entry("IPV6 - default",
@@ -597,12 +598,12 @@ var _ = ginkgo.Describe("BGP", func() {
 						Name: "full1",
 					},
 					Spec: metallbv1beta1.BFDProfileSpec{
-						ReceiveInterval:  uint32Ptr(60),
-						TransmitInterval: uint32Ptr(61),
-						EchoInterval:     uint32Ptr(62),
-						EchoMode:         boolPtr(false),
-						PassiveMode:      boolPtr(false),
-						MinimumTTL:       uint32Ptr(254),
+						ReceiveInterval:  pointer.Uint32Ptr(60),
+						TransmitInterval: pointer.Uint32Ptr(61),
+						EchoInterval:     pointer.Uint32Ptr(62),
+						EchoMode:         pointer.BoolPtr(false),
+						PassiveMode:      pointer.BoolPtr(false),
+						MinimumTTL:       pointer.Uint32Ptr(254),
 					},
 				}, ipfamily.IPv6, []string{v6PoolAddresses}, testservice.TrafficPolicyCluster),
 			table.Entry("IPV6 - echo mode enabled",
@@ -611,12 +612,12 @@ var _ = ginkgo.Describe("BGP", func() {
 						Name: "echo",
 					},
 					Spec: metallbv1beta1.BFDProfileSpec{
-						ReceiveInterval:  uint32Ptr(80),
-						TransmitInterval: uint32Ptr(81),
-						EchoInterval:     uint32Ptr(82),
-						EchoMode:         boolPtr(true),
-						PassiveMode:      boolPtr(false),
-						MinimumTTL:       uint32Ptr(254),
+						ReceiveInterval:  pointer.Uint32Ptr(80),
+						TransmitInterval: pointer.Uint32Ptr(81),
+						EchoInterval:     pointer.Uint32Ptr(82),
+						EchoMode:         pointer.BoolPtr(true),
+						PassiveMode:      pointer.BoolPtr(false),
+						MinimumTTL:       pointer.Uint32Ptr(254),
 					},
 				}, ipfamily.IPv6, []string{v6PoolAddresses}, testservice.TrafficPolicyCluster),
 			table.Entry("DUALSTACK - full params",
@@ -625,12 +626,12 @@ var _ = ginkgo.Describe("BGP", func() {
 						Name: "full1",
 					},
 					Spec: metallbv1beta1.BFDProfileSpec{
-						ReceiveInterval:  uint32Ptr(60),
-						TransmitInterval: uint32Ptr(61),
-						EchoInterval:     uint32Ptr(62),
-						EchoMode:         boolPtr(false),
-						PassiveMode:      boolPtr(false),
-						MinimumTTL:       uint32Ptr(254),
+						ReceiveInterval:  pointer.Uint32Ptr(60),
+						TransmitInterval: pointer.Uint32Ptr(61),
+						EchoInterval:     pointer.Uint32Ptr(62),
+						EchoMode:         pointer.BoolPtr(false),
+						PassiveMode:      pointer.BoolPtr(false),
+						MinimumTTL:       pointer.Uint32Ptr(254),
 					},
 				}, ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
 					testservice.TrafficPolicyCluster(svc)
@@ -801,12 +802,12 @@ var _ = ginkgo.Describe("BGP", func() {
 						Name: "echo",
 					},
 					Spec: metallbv1beta1.BFDProfileSpec{
-						ReceiveInterval:  uint32Ptr(80),
-						TransmitInterval: uint32Ptr(81),
-						EchoInterval:     uint32Ptr(82),
-						EchoMode:         boolPtr(true),
-						PassiveMode:      boolPtr(false),
-						MinimumTTL:       uint32Ptr(254),
+						ReceiveInterval:  pointer.Uint32Ptr(80),
+						TransmitInterval: pointer.Uint32Ptr(81),
+						EchoInterval:     pointer.Uint32Ptr(82),
+						EchoMode:         pointer.BoolPtr(true),
+						PassiveMode:      pointer.BoolPtr(false),
+						MinimumTTL:       pointer.Uint32Ptr(254),
 					},
 				}, ipfamily.IPv4, []string{v4PoolAddresses}),
 			table.Entry("IPV6 - default",
@@ -821,12 +822,12 @@ var _ = ginkgo.Describe("BGP", func() {
 						Name: "echo",
 					},
 					Spec: metallbv1beta1.BFDProfileSpec{
-						ReceiveInterval:  uint32Ptr(80),
-						TransmitInterval: uint32Ptr(81),
-						EchoInterval:     uint32Ptr(82),
-						EchoMode:         boolPtr(true),
-						PassiveMode:      boolPtr(false),
-						MinimumTTL:       uint32Ptr(254),
+						ReceiveInterval:  pointer.Uint32Ptr(80),
+						TransmitInterval: pointer.Uint32Ptr(81),
+						EchoInterval:     pointer.Uint32Ptr(82),
+						EchoMode:         pointer.BoolPtr(true),
+						PassiveMode:      pointer.BoolPtr(false),
+						MinimumTTL:       pointer.Uint32Ptr(254),
 					},
 				}, ipfamily.IPv6, []string{v6PoolAddresses}),
 			table.Entry("DUALSTACK - full params",
@@ -835,12 +836,12 @@ var _ = ginkgo.Describe("BGP", func() {
 						Name: "full1",
 					},
 					Spec: metallbv1beta1.BFDProfileSpec{
-						ReceiveInterval:  uint32Ptr(60),
-						TransmitInterval: uint32Ptr(61),
-						EchoInterval:     uint32Ptr(62),
-						EchoMode:         boolPtr(false),
-						PassiveMode:      boolPtr(false),
-						MinimumTTL:       uint32Ptr(254),
+						ReceiveInterval:  pointer.Uint32Ptr(60),
+						TransmitInterval: pointer.Uint32Ptr(61),
+						EchoInterval:     pointer.Uint32Ptr(62),
+						EchoMode:         pointer.BoolPtr(false),
+						PassiveMode:      pointer.BoolPtr(false),
+						MinimumTTL:       pointer.Uint32Ptr(254),
 					},
 				}, ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses}),
 		)
@@ -1304,12 +1305,12 @@ var _ = ginkgo.Describe("BGP", func() {
 					{
 						ObjectMeta: metav1.ObjectMeta{Name: "fullbfdprofile1"},
 						Spec: metallbv1beta1.BFDProfileSpec{
-							ReceiveInterval:  uint32Ptr(93),
-							TransmitInterval: uint32Ptr(95),
-							EchoInterval:     uint32Ptr(97),
-							EchoMode:         boolPtr(true),
-							PassiveMode:      boolPtr(true),
-							MinimumTTL:       uint32Ptr(253),
+							ReceiveInterval:  pointer.Uint32Ptr(93),
+							TransmitInterval: pointer.Uint32Ptr(95),
+							EchoInterval:     pointer.Uint32Ptr(97),
+							EchoMode:         pointer.BoolPtr(true),
+							PassiveMode:      pointer.BoolPtr(true),
+							MinimumTTL:       pointer.Uint32Ptr(253),
 						},
 					},
 				},
@@ -1373,14 +1374,6 @@ var _ = ginkgo.Describe("BGP", func() {
 	})
 
 })
-
-func uint32Ptr(n uint32) *uint32 {
-	return &n
-}
-
-func boolPtr(b bool) *bool {
-	return &b
-}
 
 // substringCount creates a Gomega transform function that
 // counts the number of occurrences in the subject string.
