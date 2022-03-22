@@ -36,6 +36,7 @@ import (
 	testsconfig "go.universe.tf/metallb/e2etest/pkg/config"
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	"go.universe.tf/metallb/e2etest/pkg/service"
+	"go.universe.tf/metallb/e2etest/webhookstests"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -124,6 +125,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	bgptests.ConfigUpdater = updater
 	l2tests.ConfigUpdater = updater
+	webhookstests.ConfigUpdater = updater
 })
 
 var _ = ginkgo.AfterSuite(func() {
