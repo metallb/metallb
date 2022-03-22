@@ -5,6 +5,7 @@ package config
 import (
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/pointer"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -20,8 +21,8 @@ func BFDProfileWithDefaults(profile metallbv1beta1.BFDProfile, multiHop bool) me
 	res.Spec.PassiveMode = profile.Spec.PassiveMode
 
 	if multiHop {
-		res.Spec.EchoMode = boolPtr(false)
-		res.Spec.EchoInterval = uint32Ptr(50)
+		res.Spec.EchoMode = pointer.BoolPtr(false)
+		res.Spec.EchoInterval = pointer.Uint32Ptr(50)
 	}
 
 	return res
@@ -61,12 +62,4 @@ func valueWithDefault(v *uint32, def uint32) *uint32 {
 		return v
 	}
 	return &def
-}
-
-func uint32Ptr(n uint32) *uint32 {
-	return &n
-}
-
-func boolPtr(b bool) *bool {
-	return &b
 }

@@ -12,6 +12,7 @@ import (
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/k8s/epslices"
+	"go.universe.tf/metallb/internal/pointer"
 
 	"github.com/go-kit/kit/log"
 	v1 "k8s.io/api/core/v1"
@@ -72,11 +73,11 @@ func TestUsableNodes(t *testing.T) {
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris1"),
+									NodeName: pointer.StrPtr("iris1"),
 								},
 								{
 									IP:       "2.3.4.15",
-									NodeName: strptr("iris2"),
+									NodeName: pointer.StrPtr("iris2"),
 								},
 							},
 						},
@@ -95,11 +96,11 @@ func TestUsableNodes(t *testing.T) {
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris1"),
+									NodeName: pointer.StrPtr("iris1"),
 								},
 								{
 									IP:       "2.3.4.15",
-									NodeName: strptr("iris1"),
+									NodeName: pointer.StrPtr("iris1"),
 								},
 							},
 						},
@@ -118,13 +119,13 @@ func TestUsableNodes(t *testing.T) {
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris1"),
+									NodeName: pointer.StrPtr("iris1"),
 								},
 							},
 							NotReadyAddresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.15",
-									NodeName: strptr("iris1"),
+									NodeName: pointer.StrPtr("iris1"),
 								},
 							},
 						},
@@ -179,7 +180,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris1",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -194,7 +195,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris2",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -219,7 +220,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris1",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 							{
@@ -230,7 +231,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris2",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -255,7 +256,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris1",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 							{
@@ -266,7 +267,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris1",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -292,7 +293,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris1",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 							{
@@ -303,7 +304,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris1",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(false),
+									Ready: pointer.BoolPtr(false),
 								},
 							},
 						},
@@ -390,11 +391,11 @@ func TestShouldAnnounce(t *testing.T) {
 								Addresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.5",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 									{
 										IP:       "2.3.4.15",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 								},
 							},
@@ -438,11 +439,11 @@ func TestShouldAnnounce(t *testing.T) {
 								NotReadyAddresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.5",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 									{
 										IP:       "2.3.4.15",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 								},
 							},
@@ -485,11 +486,11 @@ func TestShouldAnnounce(t *testing.T) {
 								Addresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.5",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 									{
 										IP:       "2.3.4.15",
-										NodeName: strptr("iris2"),
+										NodeName: pointer.StrPtr("iris2"),
 									},
 								},
 							},
@@ -530,11 +531,11 @@ func TestShouldAnnounce(t *testing.T) {
 								NotReadyAddresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.5",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 									{
 										IP:       "2.3.4.15",
-										NodeName: strptr("iris2"),
+										NodeName: pointer.StrPtr("iris2"),
 									},
 								},
 							},
@@ -575,13 +576,13 @@ func TestShouldAnnounce(t *testing.T) {
 								Addresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.5",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 								},
 								NotReadyAddresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.15",
-										NodeName: strptr("iris2"),
+										NodeName: pointer.StrPtr("iris2"),
 									},
 								},
 							},
@@ -629,11 +630,11 @@ func TestShouldAnnounce(t *testing.T) {
 								Addresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.5",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 									{
 										IP:       "2.3.4.15",
-										NodeName: strptr("iris2"),
+										NodeName: pointer.StrPtr("iris2"),
 									},
 								},
 							},
@@ -648,11 +649,11 @@ func TestShouldAnnounce(t *testing.T) {
 								Addresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.25",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 									{
 										IP:       "2.3.4.35",
-										NodeName: strptr("iris2"),
+										NodeName: pointer.StrPtr("iris2"),
 									},
 								},
 							},
@@ -702,11 +703,11 @@ func TestShouldAnnounce(t *testing.T) {
 								Addresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.5",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 									{
 										IP:       "2.3.4.15",
-										NodeName: strptr("iris2"),
+										NodeName: pointer.StrPtr("iris2"),
 									},
 								},
 							},
@@ -721,13 +722,13 @@ func TestShouldAnnounce(t *testing.T) {
 								Addresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.25",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 								},
 								NotReadyAddresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.35",
-										NodeName: strptr("iris2"),
+										NodeName: pointer.StrPtr("iris2"),
 									},
 								},
 							},
@@ -777,13 +778,13 @@ func TestShouldAnnounce(t *testing.T) {
 								Addresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.5",
-										NodeName: strptr("iris2"),
+										NodeName: pointer.StrPtr("iris2"),
 									},
 								},
 								NotReadyAddresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.15",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 								},
 							},
@@ -798,13 +799,13 @@ func TestShouldAnnounce(t *testing.T) {
 								Addresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.25",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 								},
 								NotReadyAddresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.35",
-										NodeName: strptr("iris2"),
+										NodeName: pointer.StrPtr("iris2"),
 									},
 								},
 							},
@@ -847,15 +848,15 @@ func TestShouldAnnounce(t *testing.T) {
 								Addresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.5",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 									{
 										IP:       "2.3.4.15",
-										NodeName: strptr("iris2"),
+										NodeName: pointer.StrPtr("iris2"),
 									},
 									{
 										IP:       "2.3.4.25",
-										NodeName: strptr("iris2"),
+										NodeName: pointer.StrPtr("iris2"),
 									},
 								},
 							},
@@ -896,15 +897,15 @@ func TestShouldAnnounce(t *testing.T) {
 								Addresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.5",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 									{
 										IP:       "2.3.4.15",
-										NodeName: strptr("iris2"),
+										NodeName: pointer.StrPtr("iris2"),
 									},
 									{
 										IP:       "2.3.4.25",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 								},
 							},
@@ -945,17 +946,17 @@ func TestShouldAnnounce(t *testing.T) {
 								Addresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.5",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 									{
 										IP:       "2.3.4.15",
-										NodeName: strptr("iris2"),
+										NodeName: pointer.StrPtr("iris2"),
 									},
 								},
 								NotReadyAddresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.25",
-										NodeName: strptr("iris2"),
+										NodeName: pointer.StrPtr("iris2"),
 									},
 								},
 							},
@@ -996,17 +997,17 @@ func TestShouldAnnounce(t *testing.T) {
 								Addresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.5",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 									{
 										IP:       "2.3.4.15",
-										NodeName: strptr("iris2"),
+										NodeName: pointer.StrPtr("iris2"),
 									},
 								},
 								NotReadyAddresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.25",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 								},
 							},
@@ -1047,17 +1048,17 @@ func TestShouldAnnounce(t *testing.T) {
 								Addresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.5",
-										NodeName: strptr("iris1"),
+										NodeName: pointer.StrPtr("iris1"),
 									},
 								},
 								NotReadyAddresses: []v1.EndpointAddress{
 									{
 										IP:       "2.3.4.15",
-										NodeName: strptr("iris2"),
+										NodeName: pointer.StrPtr("iris2"),
 									},
 									{
 										IP:       "2.3.4.25",
-										NodeName: strptr("iris2"),
+										NodeName: pointer.StrPtr("iris2"),
 									},
 								},
 							},
@@ -1171,7 +1172,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 								{
@@ -1182,7 +1183,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 							},
@@ -1228,7 +1229,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
+										Ready: pointer.BoolPtr(false),
 									},
 								},
 								{
@@ -1239,7 +1240,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
+										Ready: pointer.BoolPtr(false),
 									},
 								},
 							},
@@ -1285,7 +1286,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 								{
@@ -1296,7 +1297,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris2",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 							},
@@ -1342,7 +1343,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
+										Ready: pointer.BoolPtr(false),
 									},
 								},
 								{
@@ -1353,7 +1354,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris2",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
+										Ready: pointer.BoolPtr(false),
 									},
 								},
 							},
@@ -1399,7 +1400,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 								{
@@ -1410,7 +1411,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris2",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
+										Ready: pointer.BoolPtr(false),
 									},
 								},
 							},
@@ -1463,7 +1464,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 								{
@@ -1474,7 +1475,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris2",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 							},
@@ -1494,7 +1495,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 								{
@@ -1505,7 +1506,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris2",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 							},
@@ -1560,7 +1561,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 								{
@@ -1571,7 +1572,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris2",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 							},
@@ -1591,7 +1592,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 								{
@@ -1602,7 +1603,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris2",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
+										Ready: pointer.BoolPtr(false),
 									},
 								},
 							},
@@ -1657,7 +1658,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris2",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 								{
@@ -1668,7 +1669,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
+										Ready: pointer.BoolPtr(false),
 									},
 								},
 							},
@@ -1688,7 +1689,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 								{
@@ -1699,7 +1700,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris2",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
+										Ready: pointer.BoolPtr(false),
 									},
 								},
 							},
@@ -1747,7 +1748,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 								{
@@ -1758,7 +1759,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris2",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 							},
@@ -1773,7 +1774,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris2",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 							},
@@ -1819,7 +1820,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 								{
@@ -1830,7 +1831,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris2",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 								{
@@ -1841,7 +1842,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 							},
@@ -1887,7 +1888,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 								{
@@ -1898,7 +1899,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris2",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 								{
@@ -1909,7 +1910,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris2",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 							},
@@ -1955,7 +1956,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 								{
@@ -1966,7 +1967,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris2",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 								{
@@ -1977,7 +1978,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
+										Ready: pointer.BoolPtr(false),
 									},
 								},
 							},
@@ -2023,7 +2024,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris1",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(true),
+										Ready: pointer.BoolPtr(true),
 									},
 								},
 								{
@@ -2034,7 +2035,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris2",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
+										Ready: pointer.BoolPtr(false),
 									},
 								},
 								{
@@ -2045,7 +2046,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 										"kubernetes.io/hostname": "iris2",
 									},
 									Conditions: discovery.EndpointConditions{
-										Ready: boolPtr(false),
+										Ready: pointer.BoolPtr(false),
 									},
 								},
 							},
@@ -2087,10 +2088,6 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			}
 		}
 	}
-}
-
-func boolPtr(b bool) *bool {
-	return &b
 }
 
 func TestClusterPolicy(t *testing.T) {
@@ -2149,7 +2146,7 @@ func TestClusterPolicy(t *testing.T) {
 							"kubernetes.io/hostname": "iris1",
 						},
 						Conditions: discovery.EndpointConditions{
-							Ready: boolPtr(true),
+							Ready: pointer.BoolPtr(true),
 						},
 					},
 				},
@@ -2169,7 +2166,7 @@ func TestClusterPolicy(t *testing.T) {
 							"kubernetes.io/hostname": "iris2",
 						},
 						Conditions: discovery.EndpointConditions{
-							Ready: boolPtr(true),
+							Ready: pointer.BoolPtr(true),
 						},
 					},
 				},
