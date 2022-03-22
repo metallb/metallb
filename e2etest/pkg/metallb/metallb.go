@@ -53,7 +53,7 @@ func ControllerPod(cs clientset.Interface) (*corev1.Pod, error) {
 		LabelSelector: controllerLabelSelector,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to fetch speaker pods")
+		return nil, errors.Wrap(err, "Failed to fetch controller pods")
 	}
 	if len(pods.Items) != 1 {
 		return nil, fmt.Errorf("Expected one controller pod, found %d", len(pods.Items))
