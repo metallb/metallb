@@ -14,13 +14,13 @@ import (
 )
 
 var (
-	controllerLabelSelector = "component=controller"
+	ControllerLabelSelector = "component=controller"
 	speakerLabelgSelector   = "component=speaker"
 )
 
 func init() {
 	if v, ok := os.LookupEnv("CONTROLLER_SELECTOR"); ok {
-		controllerLabelSelector = v
+		ControllerLabelSelector = v
 	}
 
 	if v, ok := os.LookupEnv("SPEAKER_SELECTOR"); ok {
@@ -50,7 +50,7 @@ func SpeakerPods(cs clientset.Interface) ([]*corev1.Pod, error) {
 // ControllerPod returns the metallb controller pod.
 func ControllerPod(cs clientset.Interface) (*corev1.Pod, error) {
 	pods, err := cs.CoreV1().Pods(Namespace).List(context.Background(), metav1.ListOptions{
-		LabelSelector: controllerLabelSelector,
+		LabelSelector: ControllerLabelSelector,
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to fetch controller pods")
