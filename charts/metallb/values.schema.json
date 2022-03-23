@@ -270,7 +270,14 @@
     "controller": { 
       "allOf": [
         { "$ref": "#/definitions/component" },
-        { "description": "MetalLB Controller" }
+        { "description": "MetalLB Controller",
+          "type": "object",
+          "properties": { 
+            "enableWebhooks": {
+              "type": "boolean"
+            }
+          }
+        }
       ]
     },
     "speaker": { 

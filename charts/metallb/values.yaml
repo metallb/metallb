@@ -162,6 +162,7 @@ controller:
     periodSeconds: 10
     successThreshold: 1
     timeoutSeconds: 1
+  enableWebhooks: true
 
 # speaker contains configuration specific to the MetalLB speaker
 # daemonset.

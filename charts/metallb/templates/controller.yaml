@@ -55,9 +55,24 @@ spec:
         - name: METALLB_DEPLOYMENT
           value: {{ template "metallb.fullname" . }}-controller
         {{- end }}
+        - name: ENABLE_OPERATOR_WEBHOOK
+          value: {{ .Values.controller.enableWebhooks | quote }}
+        {{- if .Values.speaker.frr.enabled }}
+        - name: METALLB_BGP_TYPE
+          value: frr
+        {{- end }}
         ports:
         - name: monitoring
           containerPort: {{ .Values.prometheus.metricsPort }}
+        {{- if .Values.controller.enableWebhooks }}
+        - containerPort: 9443
+          name: webhook-server
+          protocol: TCP
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert
+          readOnly: true
+        {{- end }}
         {{- if .Values.controller.livenessProbe.enabled }}
         livenessProbe:
           httpGet:
@@ -105,5 +120,12 @@ spec:
       {{- end }}
       {{- with .Values.controller.priorityClassName }}
       priorityClassName: {{ . | quote }}
+      {{- end }}
+      {{- if .Values.controller.enableWebhooks }}
+      volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: webhook-server-cert
       {{- end }}
 {{- end }}
