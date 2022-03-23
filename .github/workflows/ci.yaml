@@ -44,6 +44,8 @@ jobs:
           inv checkpatch
           inv lint -e host
           inv verifylicense
+          inv gomodtidy
+          inv checkchanges
 
   helm:
     runs-on: ubuntu-20.04

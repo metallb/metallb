@@ -744,3 +744,19 @@ def verifylicense(ctx):
             print("{} is missing license".format(file))
     if no_license:
         raise Exit(message="#### Files with no license found.\n#### Please run ""inv bumplicense"" to add the license header")
+
+@task
+def checkchanges(ctx):
+    """Verifies no uncommitted files are available"""
+    res = run("git status --porcelain", hide="out")
+    if res != "":
+        print("{} must be committed".format(res))
+        raise Exit(message="#### Uncommitted files found, you may need to run inv gomodtidy ####\n")
+
+@task
+def gomodtidy(ctx):
+    """Runs go mod tidy"""
+    res = run("go mod tidy", hide="out")
+    if not res.ok:
+        raise Exit(message="go mod tidy failed")
+
