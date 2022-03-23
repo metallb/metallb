@@ -25,7 +25,7 @@ require (
 	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/prometheus/common v0.32.1
-	github.com/prometheus/exporter-toolkit v0.6.1
+	github.com/prometheus/exporter-toolkit v0.7.1
 	github.com/spf13/viper v1.8.1 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20220209214540-3681064d5158
