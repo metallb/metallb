@@ -368,8 +368,8 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
     if helm_install:
         run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
                 "--set speaker.image.tag=dev-{} --set speaker.frr.enabled={} --set speaker.logLevel=debug "
-                "--set controller.logLevel=debug".format(architecture,
-                architecture, "true" if bgp_type == "frr" else "false"), echo=True)
+                "--set controller.logLevel=debug --set webhooks.enable={}".format(architecture,
+                architecture, "true" if bgp_type == "frr" else "false", "true" if enable_webhooks else "false"), echo=True)
     else:
         run("kubectl delete po -nmetallb-system --all", echo=True)
 
