@@ -55,7 +55,6 @@ const (
 	v4PoolAddresses      = "192.168.10.0/24"
 	v6PoolAddresses      = "fc00:f853:0ccd:e799::/124"
 	CommunityNoAdv       = "65535:65282" // 0xFFFFFF02: NO_ADVERTISE
-	IPLocalPref          = uint32(300)
 	SpeakerContainerName = "speaker"
 )
 
