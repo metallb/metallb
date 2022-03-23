@@ -1,0 +1,128 @@
+{{- if .Values.webhooks.enable -}}
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: {{ template "metallb.fullname" . }}-validating-webhook-configuration
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+  annotations:
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ template "metallb.fullname" . }}-serving-cert
+webhooks:
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ template "metallb.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validate-metallb-io-v1beta1-addresspool
+  failurePolicy: Fail
+  name: addresspoolvalidationwebhook.metallb.io
+  rules:
+  - apiGroups:
+    - metallb.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - addresspools
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ template "metallb.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validate-metallb-io-v1beta2-bgppeer
+  failurePolicy: Fail
+  name: bgppeervalidationwebhook.metallb.io
+  rules:
+  - apiGroups:
+    - metallb.io
+    apiVersions:
+    - v1beta2
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - bgppeers
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ template "metallb.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validate-metallb-io-v1beta1-ippool
+  failurePolicy: Fail
+  name: ippoolvalidationwebhook.metallb.io
+  rules:
+  - apiGroups:
+    - metallb.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - ippools
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ template "metallb.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validate-metallb-io-v1beta1-bgpadvertisement
+  failurePolicy: Fail
+  name: bgpadvertisementvalidationwebhook.metallb.io
+  rules:
+  - apiGroups:
+    - metallb.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - bgpadvertisements
+  sideEffects: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "metallb.fullname" . }}-webhook-service
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+spec:
+  ports:
+  - port: 443
+    targetPort: 9443
+  selector:
+    app.kubernetes.io/component: controller
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ template "metallb.fullname" . }}-serving-cert
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+spec:
+  dnsNames:
+  - {{ template "metallb.fullname" . }}-webhook-service.{{ .Release.Namespace }}.svc
+  - {{ template "metallb.fullname" . }}-webhook-service.{{ .Release.Namespace }}.svc.cluster.local
+  issuerRef:
+    kind: Issuer
+    name: {{ template "metallb.fullname" . }}-selfsigned-issuer
+  secretName: webhook-server-cert
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ template "metallb.fullname" . }}-selfsigned-issuer
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+spec:
+  selfSigned: {}
+{{- end -}}
