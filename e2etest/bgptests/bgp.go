@@ -492,6 +492,31 @@ var _ = ginkgo.Describe("BGP", func() {
 		table.Entry("IPV4", ipfamily.IPv4),
 		table.Entry("IPV6", ipfamily.IPv6))
 
+	table.DescribeTable("validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
+		ginkgo.By("configure peer")
+
+		resources := metallbconfig.ClusterResources{
+			Peers: metallb.PeersForContainers(FRRContainers, ipFamily, func(p *metallbv1beta2.BGPPeer) {
+				p.Spec.PasswordSecret = corev1.SecretReference{Name: metallb.GetBGPPeerSecretName(p.Spec.ASN, p.Spec.Port)}
+				p.Spec.Password = ""
+			}),
+			PasswordSecrets: metallb.BGPPeerSecretReferences(FRRContainers),
+		}
+		err := ConfigUpdater.Update(resources)
+		framework.ExpectNoError(err)
+
+		for _, c := range FRRContainers {
+			err = frrcontainer.PairWithNodes(cs, c, ipFamily)
+			framework.ExpectNoError(err)
+		}
+
+		for _, c := range FRRContainers {
+			validateFRRPeeredWithNodes(cs, c, ipFamily)
+		}
+	},
+		table.Entry("IPV4 with Secret Ref set for BGPPeer CR", ipfamily.IPv4),
+		table.Entry("IPV6 with Secret Ref set for BGPPeer CR", ipfamily.IPv6))
+
 	ginkgo.Context("BFD", func() {
 		table.DescribeTable("should work with the given bfd profile", func(bfd metallbv1beta1.BFDProfile, pairingFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
 			resources := metallbconfig.ClusterResources{
