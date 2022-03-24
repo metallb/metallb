@@ -746,17 +746,31 @@ def verifylicense(ctx):
         raise Exit(message="#### Files with no license found.\n#### Please run ""inv bumplicense"" to add the license header")
 
 @task
-def checkchanges(ctx):
-    """Verifies no uncommitted files are available"""
-    res = run("git status --porcelain", hide="out")
-    if res != "":
-        print("{} must be committed".format(res))
-        raise Exit(message="#### Uncommitted files found, you may need to run inv gomodtidy ####\n")
-
-@task
 def gomodtidy(ctx):
     """Runs go mod tidy"""
     res = run("go mod tidy", hide="out")
     if not res.ok:
         raise Exit(message="go mod tidy failed")
+
+@task(help={
+    "controller_gen": "KubeBuilder CLI."
+                    "Default: controller_gen (version v0.7.0).",
+    "kustomize_cli": "YAML files customization CLI."
+                    "Default: kustomize (version v4.4.0).",
+})  
+def generatemanifests(ctx, controller_gen="controller-gen", kustomize_cli="kustomize"):
+    """ Re-generates the all-in-one manifests under config/manifests"""
+    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="frr", namespace="metallb-system", output="config/manifests/metallb-frr.yaml")
+    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="native", namespace="metallb-system", output="config/manifests/metallb-native.yaml")
+
+
+@task(help={
+    "action": "The action to take to fix the uncommitted changes",
+    })
+def checkchanges(ctx, action="check uncommitted files"):
+    """Verifies no uncommitted files are available"""
+    res = run("git status --porcelain", hide="out")
+    if res != "":
+        print("{} must be committed".format(res))
+        raise Exit(message="#### Uncommitted files found, you may need to {} ####\n".format(action))
 
