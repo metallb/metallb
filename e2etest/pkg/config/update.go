@@ -8,6 +8,7 @@ import (
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/config"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -36,6 +37,10 @@ func UpdaterForCRs(r *rest.Config, ns string) (*beta1Updater, error) {
 		return nil, err
 	}
 
+	if err := corev1.AddToScheme(myScheme); err != nil {
+		return nil, err
+	}
+
 	cl, err := client.New(r, client.Options{
 		Scheme: myScheme,
 	})
@@ -59,6 +64,11 @@ func (o beta1Updater) Update(r config.ClusterResources) error {
 	key := 0
 	for _, pool := range r.Pools {
 		objects[key] = pool.DeepCopy()
+		key = key + 1
+	}
+
+	for _, secret := range r.PasswordSecrets {
+		objects[key] = secret.DeepCopy()
 		key = key + 1
 	}
 
