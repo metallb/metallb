@@ -211,6 +211,19 @@ spec:
                 description: Authentication password for routers enforcing TCP MD5
                   authenticated sessions
                 type: string
+              passwordSecret:
+                description: passwordSecret is name of the authentication secret for
+                  BGP Peer
+                properties:
+                  name:
+                    description: Name is unique within a namespace to reference a
+                      secret resource.
+                    type: string
+                  namespace:
+                    description: Namespace defines the space within which the secret
+                      name must be unique.
+                    type: string
+                type: object
               peerASN:
                 description: AS number to expect from the remote end of the session.
                 format: int32
