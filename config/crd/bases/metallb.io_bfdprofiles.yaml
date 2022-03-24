@@ -1,0 +1,82 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.7.0
+  creationTimestamp: null
+  name: bfdprofiles.metallb.io
+spec:
+  group: metallb.io
+  names:
+    kind: BFDProfile
+    listKind: BFDProfileList
+    plural: bfdprofiles
+    singular: bfdprofile
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: BFDProfile is the Schema for the bfdprofiles API.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: BFDProfileSpec defines the desired state of BFDProfile.
+            properties:
+              detectMultiplier:
+                format: int32
+                maximum: 255
+                minimum: 2
+                type: integer
+              echoInterval:
+                format: int32
+                maximum: 60000
+                minimum: 10
+                type: integer
+              echoMode:
+                type: boolean
+              minimumTtl:
+                format: int32
+                maximum: 254
+                minimum: 1
+                type: integer
+              passiveMode:
+                type: boolean
+              receiveInterval:
+                format: int32
+                maximum: 60000
+                minimum: 10
+                type: integer
+              transmitInterval:
+                format: int32
+                maximum: 60000
+                minimum: 10
+                type: integer
+            type: object
+          status:
+            description: BFDProfileStatus defines the observed state of BFDProfile.
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

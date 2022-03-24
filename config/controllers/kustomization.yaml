@@ -1,0 +1,8 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - speaker.yaml
+  - controller.yaml
+  - psp.yaml
+  - service-accounts.yaml
+  - rbac.yaml
