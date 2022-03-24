@@ -252,28 +252,11 @@ def validate_kind_version():
     if delta < 0:
         raise Exit(message="kind version >= {} required".format(min_version))
 
-@task(help={
-    "controller_gen": "KubeBuilder CLI."
-                    "Default: controller_gen (version v0.7.0).",
-    "crd_options": "CRD Options."
-                    "Default: crd:crdVersions=v1.",
-    "kustomize_cli": "YAML files customization CLI."
-                    "Default: kustomize (version v4.4.0).",
-    "bgp_type": "Type of BGP implementation to use."
-                    "Supported: 'native' (default), 'frr'",
-    "namespace": "MetalLB deployment namespace."
-                    "Default: 'metallb-system'.",
-    "output": "Optional output file name for generated manifest.",
-})
 def generate_manifest(ctx, controller_gen="controller-gen", crd_options="crd:crdVersions=v1",
-        kustomize_cli="kustomize", bgp_type="native", namespace="metallb-system", output=None):
+        kustomize_cli="kustomize", bgp_type="native", output=None):
     res = run("{} {} rbac:roleName=manager-role webhook paths=\"./api/...\" output:crd:artifacts:config=config/crd/bases".format(controller_gen, crd_options))
     if not res.ok:
         raise Exit(message="Failed to generate manifests")
-
-    res = run("cd config/{} && {} edit set namespace {}".format(bgp_type, kustomize_cli, namespace))
-    if not res.ok:
-        raise Exit(message="Failed to set manifests namespace")
 
     if output:
         res = run("kubectl kustomize config/{} > {}".format(bgp_type, output))
@@ -760,8 +743,8 @@ def gomodtidy(ctx):
 })  
 def generatemanifests(ctx, controller_gen="controller-gen", kustomize_cli="kustomize"):
     """ Re-generates the all-in-one manifests under config/manifests"""
-    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="frr", namespace="metallb-system", output="config/manifests/metallb-frr.yaml")
-    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="native", namespace="metallb-system", output="config/manifests/metallb-native.yaml")
+    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="frr", output="config/manifests/metallb-frr.yaml")
+    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="native", output="config/manifests/metallb-native.yaml")
 
 
 @task(help={
