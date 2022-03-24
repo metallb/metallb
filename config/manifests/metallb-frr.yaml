@@ -1012,6 +1012,7 @@ rules:
   - ""
   resources:
   - services
+  - secrets
   verbs:
   - get
   - list
@@ -1051,6 +1052,7 @@ rules:
   - services
   - endpoints
   - nodes
+  - secrets
   verbs:
   - get
   - list

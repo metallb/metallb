@@ -27,6 +27,7 @@ import (
 	"github.com/pkg/errors"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"k8s.io/apimachinery/pkg/labels"
@@ -39,6 +40,7 @@ type ClusterResources struct {
 	BGPAdvs            []metallbv1beta1.BGPAdvertisement
 	L2Advs             []metallbv1beta1.L2Advertisement
 	LegacyAddressPools []metallbv1beta1.AddressPool
+	PasswordSecrets    map[string]corev1.Secret
 }
 
 // Config is a parsed MetalLB configuration.
@@ -174,7 +176,7 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 	}
 
 	for i, p := range resources.Peers {
-		peer, err := peerFromCR(p)
+		peer, err := peerFromCR(p, resources.PasswordSecrets)
 		if err != nil {
 			return nil, fmt.Errorf("parsing peer #%d: %s", i+1, err)
 		}
@@ -311,7 +313,7 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 	return cfg, nil
 }
 
-func peerFromCR(p metallbv1beta2.BGPPeer) (*Peer, error) {
+func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secret) (*Peer, error) {
 	if p.Spec.MyASN == 0 {
 		return nil, errors.New("missing local ASN")
 	}
@@ -370,9 +372,9 @@ func peerFromCR(p metallbv1beta2.BGPPeer) (*Peer, error) {
 		nodeSels = []labels.Selector{labels.Everything()}
 	}
 
-	var password string
-	if p.Spec.Password != "" {
-		password = p.Spec.Password
+	password, err := passwordForPeer(p, passwordSecrets)
+	if err != nil {
+		return nil, err
 	}
 
 	return &Peer{
@@ -389,6 +391,32 @@ func peerFromCR(p metallbv1beta2.BGPPeer) (*Peer, error) {
 		BFDProfile:    p.Spec.BFDProfile,
 		EBGPMultiHop:  p.Spec.EBGPMultiHop,
 	}, nil
+}
+
+func passwordForPeer(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secret) (string, error) {
+	if p.Spec.Password != "" && p.Spec.PasswordSecret.Name != "" {
+		return "", fmt.Errorf("can not have both password and secret ref set in peer config %q/%q", p.Namespace,
+			p.Name)
+	}
+	var password string
+	if p.Spec.Password != "" {
+		password = p.Spec.Password
+	} else if p.Spec.PasswordSecret.Name != "" {
+		secret, ok := passwordSecrets[p.Spec.PasswordSecret.Name]
+		if !ok {
+			return "", fmt.Errorf("secret ref not found for peer config %q/%q", p.Namespace, p.Name)
+		}
+		if secret.Type != corev1.SecretTypeBasicAuth {
+			return "", fmt.Errorf("secret type mismatch on %q/%q, type %q is expected ", secret.Namespace,
+				secret.Name, corev1.SecretTypeBasicAuth)
+		}
+		srcPass, ok := secret.Data["password"]
+		if !ok {
+			return "", fmt.Errorf("password not specified in the secret %q/%q", secret.Namespace, secret.Name)
+		}
+		password = string(srcPass)
+	}
+	return password, nil
 }
 
 func addressPoolFromCR(p metallbv1beta1.IPPool, bgpCommunities map[string]uint32) (*Pool, error) {
