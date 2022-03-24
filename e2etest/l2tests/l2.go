@@ -120,16 +120,11 @@ var _ = ginkgo.Describe("L2", func() {
 				framework.ExpectNoError(err)
 			}()
 
-			port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
-			ingressIP := e2eservice.GetIngressPoint(
-				&svc.Status.LoadBalancer.Ingress[0])
-
 			ginkgo.By("checking connectivity to its external VIP")
 
-			hostport := net.JoinHostPort(ingressIP, port)
-			address := fmt.Sprintf("http://%s/", hostport)
-			err := wget.Do(address, executor.Host)
-			framework.ExpectNoError(err)
+			gomega.Eventually(func() error {
+				return service.ValidateL2(svc)
+			}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
 		})
 
 		ginkgo.It("should work for ExternalTrafficPolicy=Local", func() {
@@ -203,7 +198,6 @@ var _ = ginkgo.Describe("L2", func() {
 				framework.ExpectNoError(err)
 			}()
 
-			port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
 			ingressIP := e2eservice.GetIngressPoint(
 				&svc.Status.LoadBalancer.Ingress[0])
 
@@ -213,10 +207,9 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("checking connectivity to its external VIP")
 
-			hostport := net.JoinHostPort(ingressIP, port)
-			address := fmt.Sprintf("http://%s/", hostport)
-			err = wget.Do(address, executor.Host)
-			framework.ExpectNoError(err)
+			gomega.Eventually(func() error {
+				return service.ValidateL2(svc)
+			}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
 		},
 			table.Entry("AddressPool defined by address range", func() []metallbv1beta1.IPAddressPool {
 				return []metallbv1beta1.IPAddressPool{
@@ -442,7 +435,6 @@ var _ = ginkgo.Describe("L2", func() {
 				return nil
 			}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
 
-			port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
 			ingressIP := e2eservice.GetIngressPoint(
 				&svc.Status.LoadBalancer.Ingress[0])
 
@@ -451,10 +443,10 @@ var _ = ginkgo.Describe("L2", func() {
 			}, 2*time.Minute, 1*time.Second).Should(gomega.Not(gomega.HaveOccurred()))
 
 			ginkgo.By("checking connectivity to its external VIP")
-			hostport := net.JoinHostPort(ingressIP, port)
-			address := fmt.Sprintf("http://%s/", hostport)
-			err = wget.Do(address, executor.Host)
-			framework.ExpectNoError(err)
+
+			gomega.Eventually(func() error {
+				return service.ValidateL2(svc)
+			}, 2*time.Minute, 1*time.Second).Should(gomega.Not(gomega.HaveOccurred()))
 
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
@@ -591,11 +583,9 @@ var _ = ginkgo.Describe("L2", func() {
 				framework.ExpectEqual(ip, servicesIngressIP[j])
 
 				ginkgo.By(fmt.Sprintf("checking connectivity of service %d to its external VIP", j+1))
-				port := strconv.Itoa(int(services[j].Spec.Ports[0].Port))
-				hostport := net.JoinHostPort(ip, port)
-				address := fmt.Sprintf("http://%s/", hostport)
-				err = wget.Do(address, executor.Host)
-				framework.ExpectNoError(err)
+				gomega.Eventually(func() error {
+					return service.ValidateL2(services[j])
+				}, 2*time.Minute, 1*time.Second).Should(gomega.Not(gomega.HaveOccurred()))
 			}
 		}
 	},
