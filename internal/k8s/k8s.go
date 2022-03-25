@@ -12,6 +12,7 @@ import (
 	"net/http/pprof"
 	"os"
 
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -106,10 +107,26 @@ type Config struct {
 // (e.g. when logging events).
 //nolint:godot
 func New(cfg *Config) (*Client, error) {
+	namespaceSelector := cache.ObjectSelector{
+		Field: fields.ParseSelectorOrDie(fmt.Sprintf("metadata.namespace=%s", cfg.Namespace)),
+	}
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:         scheme,
 		Port:           9443, // TODO port only with controller, for webhooks
 		LeaderElection: false,
+		NewCache: cache.BuilderWithOptions(cache.Options{
+			SelectorsByObject: map[client.Object]cache.ObjectSelector{
+				&metallbv1alpha1.AddressPool{}:     namespaceSelector,
+				&metallbv1beta1.AddressPool{}:      namespaceSelector,
+				&metallbv1beta1.BFDProfile{}:       namespaceSelector,
+				&metallbv1beta1.BGPAdvertisement{}: namespaceSelector,
+				&metallbv1beta1.BGPPeer{}:          namespaceSelector,
+				&metallbv1beta1.IPPool{}:           namespaceSelector,
+				&metallbv1beta1.L2Advertisement{}:  namespaceSelector,
+				&metallbv1beta2.BGPPeer{}:          namespaceSelector,
+			},
+		}),
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
