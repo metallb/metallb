@@ -36,8 +36,6 @@ type NodeReconciler struct {
 	Handler   func(log.Logger, *v1.Node) SyncState
 }
 
-//+kubebuilder:rbac:groups="",resources=node,verbs=get;list;watch;
-
 func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	level.Info(r.Logger).Log("controller", "NodeReconciler", "start reconcile", req.NamespacedName.String())
 	defer level.Info(r.Logger).Log("controller", "NodeReconciler", "end reconcile", req.NamespacedName.String())
