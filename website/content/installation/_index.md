@@ -96,56 +96,25 @@ You can install MetalLB with
 [Kustomize](https://github.com/kubernetes-sigs/kustomize) by pointing
 at the remote kustomization file.
 
-In the following example, we are deploying the v0.11.0 version of MetalLB :
+In the following example, we are deploying MetalLB with the native bgp implementation :
 
 ```yaml
 # kustomization.yml
 namespace: metallb-system
 
 resources:
-  - github.com/metallb/metallb/config/manifests?ref=v0.11.0
-  - configmap.yml 
+  - github.com/metallb/metallb/config/native?ref=main
 ```
 
-If you want to use a
-[configMapGenerator](https://github.com/kubernetes-sigs/kustomize/blob/master/examples/configGeneration.md)
-for config file, you want to tell Kustomize not to append a hash to
-the config map, as MetalLB is waiting for a config map named `config`
-(see
-<https://github.com/kubernetes-sigs/kustomize/blob/master/examples/generatorOptions.md>):
+
+In order to deploy the [experimental FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions):
 
 ```yaml
 # kustomization.yml
 namespace: metallb-system
 
 resources:
-  - github.com/metallb/metallb/config/manifests?ref=v0.11.0
-
-configMapGenerator:
-- name: config
-  files:
-    - configs/config
-
-generatorOptions:
- disableNameSuffixHash: true
-```
-
-If you want to build the manifests:
-
-```bash
-kustomize build config/native
-```
-
-If you want to set the namespace:
-
-```bash
-cd config/native && kustomize edit set namespace metallb-system
-```
-
-If you want to build the manifests with the [experimental FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions):
-
-```bash
-kustomize build config/frr
+  - github.com/metallb/metallb/config/frr?ref=main
 ```
 
 ## Installation with Helm
