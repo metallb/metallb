@@ -753,7 +753,7 @@ def generatemanifests(ctx, controller_gen="controller-gen", kustomize_cli="kusto
 def checkchanges(ctx, action="check uncommitted files"):
     """Verifies no uncommitted files are available"""
     res = run("git status --porcelain", hide="out")
-    if res != "":
+    if res.stdout != "":
         print("{} must be committed".format(res))
         raise Exit(message="#### Uncommitted files found, you may need to {} ####\n".format(action))
 
