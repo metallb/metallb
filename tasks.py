@@ -579,12 +579,16 @@ def release(ctx, version, skip_release_notes=False):
     run("perl -pi -e 's,^appVersion: .*,appVersion: v{},g' charts/metallb/Chart.yaml".format(version), echo=True)
     run("perl -pi -e 's,^Current chart version is: .*,Current chart version is: `{}`,g' charts/metallb/README.md".format(version), echo=True)
 
+    # Generate the manifests with the new version of the images
+    generate_manifests(ctx)
+
     # Update the version in kustomize instructions
     #
     # TODO: Check if kustomize instructions really need the version in the
     # website or if there is a simpler way. For now, though, we just replace the
     # only page that mentions the version on release.
-    run("perl -pi -e 's,github.com/metallb/metallb//manifests\?ref=.*,github.com/metallb/metallb//manifests\?ref=v{},g' website/content/installation/_index.md".format(version), echo=True)
+    run("sed -i 's/github.com\/metallb\/metallb\/config\/native?ref=main/github.com\/metallb\/metallb\/config\/native?ref={}/g' website/content/installation/_index.md".format(version))
+    run("sed -i 's/github.com\/metallb\/metallb\/config\/native?ref=main/github.com\/metallb\/metallb\/config\/frr?ref={}/g' website/content/installation/_index.md".format(version))
 
     # Update the version embedded in the binary
     run("perl -pi -e 's/version\s+=.*/version = \"{}\"/g' internal/version/version.go".format(version), echo=True)
