@@ -4,5 +4,3 @@ resources:
   - speaker.yaml
   - controller.yaml
   - psp.yaml
-  - service-accounts.yaml
-  - rbac.yaml
