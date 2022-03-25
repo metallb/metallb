@@ -24,17 +24,18 @@ jobs:
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '1.17.1'
       
       - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install python3-pip arping ndisc6
           sudo pip3 install invoke semver pyyaml
+          go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0
       
-      - uses: actions/setup-go@v2
-        with:
-          go-version: '1.17.1'
-
       - name: Unit Tests
         run: |
           inv test
@@ -45,7 +46,9 @@ jobs:
           inv lint -e host
           inv verifylicense
           inv gomodtidy
-          inv checkchanges
+          inv checkchanges --action="run inv gomodtidy"
+          inv generatemanifests
+          inv checkchanges --action="run inv generatemanifests"
 
   helm:
     runs-on: ubuntu-20.04
