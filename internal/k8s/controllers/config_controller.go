@@ -45,13 +45,6 @@ type ConfigReconciler struct {
 	ForceReload    func()
 }
 
-//+kubebuilder:rbac:groups=metallb.io,resources=bgppeers,verbs=get;list;watch;
-//+kubebuilder:rbac:groups=metallb.io,resources=addresspools,verbs=get;list;watch;
-//+kubebuilder:rbac:groups=metallb.io,resources=bfdprofiles,verbs=get;list;watch;
-//+kubebuilder:rbac:groups=metallb.io,resources=bgpadvertisement,verbs=get;list;watch;
-//+kubebuilder:rbac:groups=metallb.io,resources=l2advertisement,verbs=get;list;watch;
-//+kubebuilder:rbac:groups=metallb.io,resources=ippools,verbs=get;list;watch;
-
 func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	level.Info(r.Logger).Log("controller", "ConfigReconciler", "start reconcile", req.NamespacedName.String())
 	defer level.Info(r.Logger).Log("controller", "ConfigReconciler", "end reconcile", req.NamespacedName.String())

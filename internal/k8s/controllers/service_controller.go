@@ -47,12 +47,6 @@ type ServiceReconciler struct {
 	ForceReload func()
 }
 
-//+kubebuilder:rbac:groups="",resources=service,verbs=get;list;watch;
-//+kubebuilder:rbac:groups="",resources=service/status,verbs=update;
-//+kubebuilder:rbac:groups="",resources=endpoints,verbs=get;list;watch;
-//+kubebuilder:rbac:groups=discovery.k8s.io,resources=endpointslices,verbs=get;list;watch;
-//+kubebuilder:rbac:groups="",resources=events,verbs=create;patch;
-
 func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	level.Info(r.Logger).Log("controller", "ServiceReconciler", "start reconcile", req.NamespacedName.String())
 	defer level.Info(r.Logger).Log("controller", "ServiceReconciler", "end reconcile", req.NamespacedName.String())
