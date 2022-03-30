@@ -214,25 +214,36 @@ var _ = ginkgo.Describe("L2", func() {
 			err = wget.Do(address, executor.Host)
 			framework.ExpectNoError(err)
 		},
-			table.Entry("AddressPool defined by address range", func() []metallbv1beta1.IPPool {
+			table.Entry("IPV4 - AddressPool defined by address range", func() []metallbv1beta1.IPPool {
 				return []metallbv1beta1.IPPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "l2-test",
 						},
 						Spec: metallbv1beta1.IPPoolSpec{
-							Addresses: []string{
-								IPV4ServiceRange,
-								IPV6ServiceRange},
+							Addresses: []string{IPV4ServiceRange},
 						},
 					},
 				}
 			}),
-			table.Entry("AddressPool defined by network prefix",
+
+			table.Entry("IPV6 - AddressPool defined by address range", func() []metallbv1beta1.IPPool {
+				return []metallbv1beta1.IPPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "l2-test",
+						},
+						Spec: metallbv1beta1.IPPoolSpec{
+							Addresses: []string{IPV6ServiceRange},
+						},
+					},
+				}
+			}),
+
+			table.Entry("IPV4 - AddressPool defined by network prefix",
 
 				func() []metallbv1beta1.IPPool {
 					var ipv4AddressesByCIDR []string
-					var ipv6AddressesByCIDR []string
 
 					cidrs, err := internalconfig.ParseCIDR(IPV4ServiceRange)
 					framework.ExpectNoError(err)
@@ -240,7 +251,24 @@ var _ = ginkgo.Describe("L2", func() {
 						ipv4AddressesByCIDR = append(ipv4AddressesByCIDR, cidr.String())
 					}
 
-					cidrs, err = internalconfig.ParseCIDR(IPV6ServiceRange)
+					return []metallbv1beta1.IPPool{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "l2-test",
+							},
+							Spec: metallbv1beta1.IPPoolSpec{
+								Addresses: ipv4AddressesByCIDR,
+							},
+						},
+					}
+				}),
+
+			table.Entry("IPV6 - AddressPool defined by network prefix",
+
+				func() []metallbv1beta1.IPPool {
+					var ipv6AddressesByCIDR []string
+
+					cidrs, err := internalconfig.ParseCIDR(IPV6ServiceRange)
 					framework.ExpectNoError(err)
 					for _, cidr := range cidrs {
 						ipv6AddressesByCIDR = append(ipv6AddressesByCIDR, cidr.String())
@@ -251,7 +279,7 @@ var _ = ginkgo.Describe("L2", func() {
 								Name: "l2-test",
 							},
 							Spec: metallbv1beta1.IPPoolSpec{
-								Addresses: append(ipv4AddressesByCIDR, ipv6AddressesByCIDR...),
+								Addresses: ipv6AddressesByCIDR,
 							},
 						},
 					}
