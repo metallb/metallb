@@ -121,7 +121,7 @@ func TestBFDWithSession(t *testing.T) {
 		t.Fatalf("Failed to sync bfd profiles %s", err)
 	}
 
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, 2*time.Second, "password", "hostname", "foo", true)
+	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, 2*time.Second, "password", "hostname", "foo", true, "test-peer")
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}

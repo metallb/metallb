@@ -29,6 +29,7 @@ var errClosed = errors.New("session closed")
 
 // session represents one BGP session to an external router.
 type session struct {
+	name             string
 	myASN            uint32
 	routerID         net.IP // May be nil, meaning "derive from context"
 	myNode           string
@@ -66,8 +67,9 @@ func NewSessionManager(l log.Logger) *sessionManager {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime, keepaliveTime time.Duration, password, myNode, bfdProfile string, ebgpMultiHop bool) (bgp.Session, error) {
+func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime, keepaliveTime time.Duration, password, myNode, bfdProfile string, ebgpMultiHop bool, name string) (bgp.Session, error) {
 	ret := &session{
+		name:          name,
 		addr:          addr,
 		srcAddr:       srcAddr,
 		myASN:         myASN,
@@ -462,6 +464,9 @@ func (s *session) Set(advs ...*bgp.Advertisement) error {
 
 	newAdvs := map[string]*bgp.Advertisement{}
 	for _, adv := range advs {
+		if !adv.MatchesPeer(s.name) {
+			continue
+		}
 		err := validate(adv)
 		if err != nil {
 			return err
@@ -472,6 +477,7 @@ func (s *session) Set(advs ...*bgp.Advertisement) error {
 	s.new = newAdvs
 	stats.PendingPrefixes(s.addr, len(s.new))
 	s.cond.Broadcast()
+
 	return nil
 }
 

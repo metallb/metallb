@@ -69,6 +69,8 @@ var Protocols = []Proto{
 
 // Peer is the configuration of a BGP peering session.
 type Peer struct {
+	// Peer name.
+	Name string
 	// AS number to use for the local end of the session.
 	MyASN uint32
 	// AS number to expect from the remote end of the session.
@@ -138,6 +140,9 @@ type BGPAdvertisement struct {
 	Communities map[uint32]bool
 	// The map of nodes allowed for this advertisement
 	Nodes map[string]bool
+	// Used to declare the intent of announcing IPs
+	// only to the BGPPeers in this list.
+	Peers []string
 }
 
 type L2Advertisement struct {
@@ -390,6 +395,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 	}
 
 	return &Peer{
+		Name:          p.Name,
 		MyASN:         p.Spec.MyASN,
 		ASN:           p.Spec.ASN,
 		Addr:          ip,
@@ -587,6 +593,11 @@ func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities m
 	}
 
 	ad.LocalPref = crdAd.Spec.LocalPref
+
+	if len(crdAd.Spec.Peers) > 0 {
+		ad.Peers = make([]string, 0, len(crdAd.Spec.Peers))
+		ad.Peers = append(ad.Peers, crdAd.Spec.Peers...)
+	}
 
 	for _, c := range crdAd.Spec.Communities {
 		if v, ok := communities[c]; ok {
