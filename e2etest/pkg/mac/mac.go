@@ -133,7 +133,7 @@ func RequestAddressResolution(ip string, exc executor.Executor) error {
 	var args []string
 	if netIP.To4() != nil {
 		cmd = "arping"
-		args = []string{"-c", "1", "-I", iface, netIP.String()}
+		args = []string{"-c", "1", "-w", "2", "-I", iface, netIP.String()}
 	} else {
 		cmd = "ndisc6"
 		args = []string{netIP.String(), iface}
