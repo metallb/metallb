@@ -61,46 +61,79 @@ func (o beta1Updater) Update(r config.ClusterResources) error {
 	// find corner cases that we would not find by adding them always in the same
 	// order.
 	objects := map[int]client.Object{}
+	oldValues := map[int]client.Object{}
 	key := 0
 	for _, pool := range r.Pools {
 		objects[key] = pool.DeepCopy()
+		oldValues[key] = pool.DeepCopy()
 		key = key + 1
 	}
 
 	for _, secret := range r.PasswordSecrets {
 		objects[key] = secret.DeepCopy()
+		oldValues[key] = secret.DeepCopy()
 		key = key + 1
 	}
 
 	for _, peer := range r.Peers {
 		objects[key] = peer.DeepCopy()
+		oldValues[key] = peer.DeepCopy()
 		key = key + 1
 	}
 
 	for _, bfdProfile := range r.BFDProfiles {
 		objects[key] = bfdProfile.DeepCopy()
+		oldValues[key] = bfdProfile.DeepCopy()
 		key = key + 1
 	}
 
 	for _, bgpAdv := range r.BGPAdvs {
 		objects[key] = bgpAdv.DeepCopy()
+		oldValues[key] = bgpAdv.DeepCopy()
 		key = key + 1
 	}
 
 	for _, l2Adv := range r.L2Advs {
 		objects[key] = l2Adv.DeepCopy()
+		oldValues[key] = l2Adv.DeepCopy()
 		key = key + 1
 	}
 
 	for _, legacyPool := range r.LegacyAddressPools {
 		objects[key] = legacyPool.DeepCopy()
+		oldValues[key] = legacyPool.DeepCopy()
 		key = key + 1
 	}
 
 	// Iterating over the map will return the items in a random order.
-	for _, obj := range objects {
+	for i, obj := range objects {
 		obj.SetNamespace(o.namespace)
-		_, err := controllerutil.CreateOrUpdate(context.Background(), o.cli, obj, func() error { return nil })
+		_, err := controllerutil.CreateOrUpdate(context.Background(), o.cli, obj, func() error {
+			// the mutate function is expected to change the object when updating.
+			// we always override with the old version, and we change only the spec part.
+			switch toChange := obj.(type) {
+			case *metallbv1beta1.IPPool:
+				old := oldValues[i].(*metallbv1beta1.IPPool)
+				toChange.Spec = *old.Spec.DeepCopy()
+			case *metallbv1beta1.AddressPool:
+				old := oldValues[i].(*metallbv1beta1.AddressPool)
+				toChange.Spec = *old.Spec.DeepCopy()
+			case *metallbv1beta1.BFDProfile:
+				old := oldValues[i].(*metallbv1beta1.BFDProfile)
+				toChange.Spec = *old.Spec.DeepCopy()
+			case *metallbv1beta2.BGPPeer:
+				old := oldValues[i].(*metallbv1beta2.BGPPeer)
+				toChange.Spec = *old.Spec.DeepCopy()
+			case *metallbv1beta1.BGPAdvertisement:
+				old := oldValues[i].(*metallbv1beta1.BGPAdvertisement)
+				toChange.Spec = *old.Spec.DeepCopy()
+			case *metallbv1beta1.L2Advertisement:
+				old := oldValues[i].(*metallbv1beta1.L2Advertisement)
+				toChange.Spec = *old.Spec.DeepCopy()
+			}
+
+			return nil
+		})
 		if err != nil {
 			return err
 		}
