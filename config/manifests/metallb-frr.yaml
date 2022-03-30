@@ -401,6 +401,12 @@ spec:
                       type: object
                   type: object
                 type: array
+              peers:
+                description: Peers are used to declare the intent of announcing the
+                  IPs of IPPools only to the Peers in this list.
+                items:
+                  type: string
+                type: array
             type: object
           status:
             description: BGPAdvertisementStatus defines the observed state of BGPAdvertisement.
