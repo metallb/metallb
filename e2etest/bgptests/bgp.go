@@ -135,12 +135,12 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 		}
 
-		err := ConfigUpdater.Update(resources)
-		framework.ExpectNoError(err)
-
 		for _, c := range FRRContainers {
 			validateFRRPeeredWithNodes(cs, c, pairingIPFamily)
 		}
+
+		err := ConfigUpdater.Update(resources)
+		framework.ExpectNoError(err)
 
 		allNodes, err = cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
@@ -257,12 +257,12 @@ var _ = ginkgo.Describe("BGP", func() {
 				framework.ExpectNoError(err)
 			}
 
-			err := ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
-
 			for _, c := range FRRContainers {
 				validateFRRPeeredWithNodes(cs, c, ipFamily)
 			}
+
+			err := ConfigUpdater.Update(resources)
+			framework.ExpectNoError(err)
 
 			ginkgo.By("checking the metrics when no service is added")
 			Eventually(func() error {
@@ -377,12 +377,12 @@ var _ = ginkgo.Describe("BGP", func() {
 				framework.ExpectNoError(err)
 			}
 
-			err := ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
-
 			for _, c := range FRRContainers {
 				validateFRRPeeredWithNodes(cs, c, pairingFamily)
 			}
+
+			err := ConfigUpdater.Update(resources)
+			framework.ExpectNoError(err)
 
 			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
 			defer testservice.Delete(cs, svc)
@@ -519,15 +519,16 @@ var _ = ginkgo.Describe("BGP", func() {
 				framework.ExpectNoError(err)
 			}
 
+			for _, c := range FRRContainers {
+				validateFRRPeeredWithNodes(cs, c, pairingFamily)
+			}
+
 			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
 			defer testservice.Delete(cs, svc)
 
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
 
-			for _, c := range FRRContainers {
-				validateFRRPeeredWithNodes(cs, c, pairingFamily)
-			}
 			for _, c := range FRRContainers {
 				validateService(cs, svc, allNodes.Items, c)
 			}
@@ -887,12 +888,12 @@ var _ = ginkgo.Describe("BGP", func() {
 					framework.ExpectNoError(err)
 				}
 
-				err = ConfigUpdater.Update(resources)
-				framework.ExpectNoError(err)
-
 				for _, c := range FRRContainers {
 					validateFRRPeeredWithNodes(cs, c, ipFamily)
 				}
+
+				err = ConfigUpdater.Update(resources)
+				framework.ExpectNoError(err)
 
 				ginkgo.By(fmt.Sprintf("configure service number %d", i+1))
 				svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, fmt.Sprintf("svc%d", i+1), testservice.TrafficPolicyCluster, func(svc *corev1.Service) {
@@ -992,12 +993,12 @@ var _ = ginkgo.Describe("BGP", func() {
 					framework.ExpectNoError(err)
 				}
 
-				err := ConfigUpdater.Update(resources)
-				framework.ExpectNoError(err)
-
 				for _, c := range FRRContainers {
 					validateFRRPeeredWithNodes(cs, c, ipFamily)
 				}
+
+				err := ConfigUpdater.Update(resources)
+				framework.ExpectNoError(err)
 
 				ipWithAdvertisement, err := config.GetIPFromRangeByIndex(rangeWithAdvertisement, 0)
 				framework.ExpectNoError(err)
@@ -1207,12 +1208,13 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 		}
 
-		err := ConfigUpdater.Update(resources)
-		framework.ExpectNoError(err)
-
 		for _, c := range FRRContainers {
 			validateFRRPeeredWithNodes(cs, c, pairingIPFamily)
 		}
+
+		err := ConfigUpdater.Update(resources)
+		framework.ExpectNoError(err)
+
 		speakerPods, err := metallb.SpeakerPods(cs)
 		framework.ExpectNoError(err)
 
