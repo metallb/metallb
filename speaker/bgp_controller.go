@@ -216,7 +216,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 			if p.cfg.RouterID != nil {
 				routerID = p.cfg.RouterID
 			}
-			s, err := c.sessionManager.NewSession(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.SrcAddr, p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.KeepaliveTime, p.cfg.Password, c.myNode, p.cfg.BFDProfile, p.cfg.EBGPMultiHop)
+			s, err := c.sessionManager.NewSession(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.SrcAddr, p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.KeepaliveTime, p.cfg.Password, c.myNode, p.cfg.BFDProfile, p.cfg.EBGPMultiHop, p.cfg.Name)
 			if err != nil {
 				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
 				errs++
@@ -265,6 +265,10 @@ func (c *bgpController) SetBalancer(l log.Logger, name string, lbIPs []net.IP, p
 					Mask: m,
 				},
 				LocalPref: adCfg.LocalPref,
+			}
+			if len(adCfg.Peers) > 0 {
+				ad.Peers = make([]string, 0, len(adCfg.Peers))
+				ad.Peers = append(ad.Peers, adCfg.Peers...)
 			}
 			for comm := range adCfg.Communities {
 				ad.Communities = append(ad.Communities, comm)

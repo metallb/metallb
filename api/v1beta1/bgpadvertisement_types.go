@@ -49,6 +49,10 @@ type BGPAdvertisementSpec struct {
 
 	// NodeSelectors is a selector on the node we should perform this advertisement from.
 	NodeSelectors []metav1.LabelSelector `json:"nodeSelectors,omitempty" yaml:"node-selectors,omitempty"`
+
+	// Peers are used to declare the intent of announcing the IPs of
+	// IPPools only to the Peers in this list.
+	Peers []string `json:"peers,omitempty"`
 }
 
 // BGPAdvertisementStatus defines the observed state of BGPAdvertisement.
