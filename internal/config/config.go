@@ -175,7 +175,7 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 		cfg.BFDProfiles[bfd.Name] = parsed
 	}
 
-	for i, p := range resources.Peers {
+	for _, p := range resources.Peers {
 		peer, err := peerFromCR(p, resources.PasswordSecrets)
 		if err != nil {
 			return nil, errors.Wrapf(err, "parsing peer %s", p.Name)
@@ -190,7 +190,7 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 			// peers could have a different hold time but they'd still result
 			// in two BGP sessions between the speaker and the remote host.
 			if reflect.DeepEqual(peer, ep) {
-				return nil, fmt.Errorf("peer #%d already exists", i+1)
+				return nil, fmt.Errorf("peer %s already exists", p.Name)
 			}
 
 		}
@@ -210,10 +210,10 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 	*/
 
 	var allCIDRs []*net.IPNet
-	for i, p := range resources.Pools {
+	for _, p := range resources.Pools {
 		pool, err := addressPoolFromCR(p, communities)
 		if err != nil {
-			return nil, fmt.Errorf("parsing address pool #%d: %s", i+1, err)
+			return nil, fmt.Errorf("parsing address pool %s: %s", p.Name, err)
 		}
 
 		// Check that the pool isn't already defined
@@ -286,10 +286,10 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 		}
 	}
 
-	for i, p := range resources.LegacyAddressPools {
+	for _, p := range resources.LegacyAddressPools {
 		pool, err := addressPoolFromLegacyCR(p, communities)
 		if err != nil {
-			return nil, fmt.Errorf("parsing address pool #%d: %s", i+1, err)
+			return nil, fmt.Errorf("parsing address pool %s: %s", p.Name, err)
 		}
 
 		// Check that the pool isn't already defined
@@ -325,7 +325,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 	}
 	ip := net.ParseIP(p.Spec.Address)
 	if ip == nil {
-		return nil, fmt.Errorf("invalid peer IP %q", p.Spec.Address)
+		return nil, fmt.Errorf("invalid BGPPeer address %q", p.Spec.Address)
 	}
 	holdTime := p.Spec.HoldTime.Duration
 	if holdTime == 0 {
@@ -636,7 +636,7 @@ func bgpAdvertisementsFromLegacyCR(ads []metallbv1beta1.LegacyBgpAdvertisement, 
 			// We reject if none of the cidrs are compatible with the aggregation length.
 			lowest := lowestMask(cidrs)
 			if maxLength < lowest {
-				return nil, fmt.Errorf("invalid aggregation length %d: prefix %q in "+
+				return nil, fmt.Errorf("invalid aggregation length %d: prefix %d in "+
 					"this pool is more specific than the aggregation length for addresses %s", ad.AggregationLength, lowest, addr)
 			}
 		}
@@ -683,7 +683,7 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 		// We reject if none of the cidrs are compatible with the aggregation length.
 		lowest := lowestMask(cidrs)
 		if maxLength < lowest {
-			return fmt.Errorf("invalid aggregation length %d: prefix %q in "+
+			return fmt.Errorf("invalid aggregation length %d: prefix %d in "+
 				"this pool is more specific than the aggregation length for addresses %s", adv.AggregationLength, lowest, addr)
 		}
 	}
