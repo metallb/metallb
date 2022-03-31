@@ -508,8 +508,9 @@ const (
 
 // This  struct is defined at; linux-kernel: include/uapi/linux/tcp.h,
 // It  must be kept in sync with that definition, see current version:
-// https://github.com/torvalds/linux/blob/v4.16/include/uapi/linux/tcp.h#L253
-// nolint[structcheck]
+// https://github.com/torvalds/linux/blob/v4.16/include/uapi/linux/tcp.h#L253.
+
+//nolint:structcheck
 type tcpmd5sig struct {
 	ssFamily uint16
 	ss       [126]byte
