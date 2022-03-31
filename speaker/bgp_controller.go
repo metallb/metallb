@@ -85,11 +85,13 @@ newPeers:
 			continue
 		}
 		level.Info(l).Log("event", "peerRemoved", "peer", p.cfg.Addr, "reason", "removedFromConfig", "msg", "peer deconfigured, closing BGP session")
+
 		if p.session != nil {
 			if err := p.session.Close(); err != nil {
 				level.Error(l).Log("op", "setConfig", "error", err, "peer", p.cfg.Addr, "msg", "failed to shut down BGP session")
 			}
 		}
+		level.Debug(l).Log("event", "peerRemoved", "peer", p.cfg.Addr, "reason", "removedFromConfig", "msg", "peer deconfigured, BGP session closed")
 	}
 
 	err := c.syncBFDProfiles(cfg.BFDProfiles)
