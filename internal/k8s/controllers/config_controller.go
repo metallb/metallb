@@ -27,11 +27,8 @@ import (
 	"go.universe.tf/metallb/internal/config"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
@@ -122,29 +119,12 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	p := predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			return e.Object.GetNamespace() == r.Namespace
-		},
-
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			return e.ObjectNew.GetNamespace() == r.Namespace
-		},
-
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			return e.Object.GetNamespace() == r.Namespace
-		},
-
-		GenericFunc: func(e event.GenericEvent) bool {
-			return e.Object.GetNamespace() == r.Namespace
-		},
-	}
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&metallbv1beta2.BGPPeer{}, builder.WithPredicates(p)).
-		Watches(&source.Kind{Type: &metallbv1beta1.IPPool{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(p)).
-		Watches(&source.Kind{Type: &metallbv1beta1.BGPAdvertisement{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(p)).
-		Watches(&source.Kind{Type: &metallbv1beta1.L2Advertisement{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(p)).
-		Watches(&source.Kind{Type: &metallbv1beta1.BFDProfile{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(p)).
-		Watches(&source.Kind{Type: &metallbv1beta1.AddressPool{}}, &handler.EnqueueRequestForObject{}, builder.WithPredicates(p)).
+		For(&metallbv1beta2.BGPPeer{}).
+		Watches(&source.Kind{Type: &metallbv1beta1.IPPool{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&source.Kind{Type: &metallbv1beta1.BGPAdvertisement{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&source.Kind{Type: &metallbv1beta1.L2Advertisement{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&source.Kind{Type: &metallbv1beta1.BFDProfile{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&source.Kind{Type: &metallbv1beta1.AddressPool{}}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
 }
