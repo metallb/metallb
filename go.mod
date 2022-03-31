@@ -12,7 +12,7 @@ require (
 	github.com/go-kit/log v0.2.0
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-cmp v0.5.7
-	github.com/hashicorp/memberlist v0.1.7
+	github.com/hashicorp/memberlist v0.3.1
 	github.com/mdlayher/arp v0.0.0-20220221190821-c37aaafac7f9
 	github.com/mdlayher/ethernet v0.0.0-20220221185849-529eae5b6118
 	github.com/mdlayher/ndp v0.0.0-20200602162440-17ab9e3e5567
