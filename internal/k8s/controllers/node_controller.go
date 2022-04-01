@@ -26,12 +26,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 type NodeReconciler struct {
 	client.Client
 	Logger    log.Logger
 	Scheme    *runtime.Scheme
+	NodeName  string
 	Namespace string
 	Handler   func(log.Logger, *v1.Node) SyncState
 }
@@ -60,7 +62,18 @@ func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 }
 
 func (r *NodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	p := predicate.NewPredicateFuncs(
+		func(obj client.Object) bool {
+			node, ok := obj.(*v1.Node)
+			if !ok {
+				level.Error(r.Logger).Log("controller", "NodeReconciler", "error", "object is not node", "name", obj.GetName())
+				return false
+			}
+			return node.Name == r.NodeName
+		})
+
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.Node{}).
+		WithEventFilter(p).
 		Complete(r)
 }
