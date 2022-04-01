@@ -54,13 +54,13 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	service, err := r.serviceFor(ctx, req.NamespacedName)
 	if err != nil {
-		level.Error(r.Logger).Log("controller", "ServiceReconciler", "error", "failed to get service", "service", req.NamespacedName, "error", err)
+		level.Error(r.Logger).Log("controller", "ServiceReconciler", "message", "failed to get service", "service", req.NamespacedName, "error", err)
 		return ctrl.Result{}, err
 	}
 
 	epSlices, err := epsOrSlicesForServices(ctx, r, req.NamespacedName, r.Endpoints)
 	if err != nil {
-		level.Error(r.Logger).Log("controller", "ServiceReconciler", "error", "failed to get endpoints", "service", req.NamespacedName, "error", err)
+		level.Error(r.Logger).Log("controller", "ServiceReconciler", "message", "failed to get endpoints", "service", req.NamespacedName, "error", err)
 		return ctrl.Result{}, err
 	}
 	if service != nil {
@@ -98,7 +98,7 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					}
 					serviceName, err := epslices.ServiceKeyForSlice(epSlice)
 					if err != nil {
-						level.Error(r.Logger).Log("controller", "ServiceReconciler", "error", "failed to get serviceName for slice", "error", err, "epslice", epSlice.Name)
+						level.Error(r.Logger).Log("controller", "ServiceReconciler", "message", "failed to get serviceName for slice", "error", err, "epslice", epSlice.Name)
 						return []reconcile.Request{}
 					}
 					level.Debug(r.Logger).Log("controller", "ServiceReconciler", "enqueueing", serviceName, "epslice", dumpResource(epSlice))
