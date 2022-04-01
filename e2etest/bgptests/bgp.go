@@ -504,6 +504,12 @@ var _ = ginkgo.Describe("BGP", func() {
 		}
 		err := ConfigUpdater.Update(resources)
 		framework.ExpectNoError(err)
+		defer func() {
+			for _, s := range resources.PasswordSecrets {
+				err := cs.CoreV1().Secrets(metallb.Namespace).Delete(context.Background(), s.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+			}
+		}()
 
 		for _, c := range FRRContainers {
 			err = frrcontainer.PairWithNodes(cs, c, ipFamily)
