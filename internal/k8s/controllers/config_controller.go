@@ -50,7 +50,7 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	var addressPools metallbv1beta1.AddressPoolList
 	if err := r.List(ctx, &addressPools, client.InNamespace(r.Namespace)); err != nil {
-		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to get addresspools", "error", err)
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "message", "failed to get addresspools", "error", err)
 		return ctrl.Result{}, err
 	}
 
@@ -62,25 +62,25 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	var bgpPeers metallbv1beta2.BGPPeerList
 	if err := r.List(ctx, &bgpPeers, client.InNamespace(r.Namespace)); err != nil {
-		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to get bgppeers", "error", err)
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "message", "failed to get bgppeers", "error", err)
 		return ctrl.Result{}, err
 	}
 
 	var bfdProfiles metallbv1beta1.BFDProfileList
 	if err := r.List(ctx, &bfdProfiles, client.InNamespace(r.Namespace)); err != nil {
-		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to get bfdprofiles", "error", err)
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "message", "failed to get bfdprofiles", "error", err)
 		return ctrl.Result{}, err
 	}
 
 	var l2Advertisements metallbv1beta1.L2AdvertisementList
 	if err := r.List(ctx, &l2Advertisements, client.InNamespace(r.Namespace)); err != nil {
-		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to get l2 advertisements", "error", err)
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "message", "failed to get l2 advertisements", "error", err)
 		return ctrl.Result{}, err
 	}
 
 	var bgpAdvertisements metallbv1beta1.BGPAdvertisementList
 	if err := r.List(ctx, &bgpAdvertisements, client.InNamespace(r.Namespace)); err != nil {
-		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to get bgp advertisements", "error", err)
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "message", "failed to get bgp advertisements", "error", err)
 		return ctrl.Result{}, err
 	}
 
