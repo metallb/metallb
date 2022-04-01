@@ -643,8 +643,8 @@ def lint(ctx, env="container"):
     convenient to install the golangci-lint binaries on the host. This can be
     achieved by running `inv lint --env host`.
     """
-    version = "1.39.0"
-    golangci_cmd = "golangci-lint run --timeout 5m0s ./..."
+    version = "1.45.2"
+    golangci_cmd = "golangci-lint run --timeout 10m0s ./..."
 
     if env == "container":
         run("docker run --rm -v $(git rev-parse --show-toplevel):/app -w /app golangci/golangci-lint:v{} {}".format(version, golangci_cmd), echo=True)
