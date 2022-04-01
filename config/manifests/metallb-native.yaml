@@ -871,6 +871,9 @@ rules:
   - secrets
   verbs:
   - create
+  - get
+  - list
+  - watch
 - apiGroups:
   - ""
   resourceNames:
@@ -953,6 +956,14 @@ rules:
   verbs:
   - list
 - apiGroups:
+  - ""
+  resources:
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - metallb.io
   resources:
   - addresspools
@@ -1012,7 +1023,6 @@ rules:
   - ""
   resources:
   - services
-  - secrets
   verbs:
   - get
   - list
@@ -1052,7 +1062,6 @@ rules:
   - services
   - endpoints
   - nodes
-  - secrets
   verbs:
   - get
   - list
