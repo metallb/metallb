@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"sort"
+	"strings"
 	"testing"
 
 	"go.universe.tf/metallb/internal/config"
@@ -352,6 +353,14 @@ func TestShouldAnnounce(t *testing.T) {
 		t.Fatalf("creating controller: %s", err)
 	}
 	c2.client = &testK8S{t: t}
+	advertisementsForNode := []*config.L2Advertisement{
+		{
+			Nodes: map[string]bool{
+				"iris1": true,
+				"iris2": true,
+			},
+		},
+	}
 
 	tests := []struct {
 		desc string
@@ -370,7 +379,8 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -418,7 +428,8 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -465,7 +476,8 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -505,12 +517,67 @@ func TestShouldAnnounce(t *testing.T) {
 			c2ExpectedResult: map[string]string{
 				"10.20.30.1": "",
 			},
+		},
+		{
+			desc:     "One service, two endpoints across two hosts, advertisement only on node 1, controller1 should announce",
+			balancer: "test1",
+			config: &config.Config{
+				Pools: map[string]*config.Pool{
+					"default": {
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: []*config.L2Advertisement{
+							{
+								Nodes: map[string]bool{
+									"iris1": true,
+								},
+							},
+						},
+					},
+				},
+			},
+			svcs: []*v1.Service{
+				{
+					Spec: v1.ServiceSpec{
+						Type:                  "LoadBalancer",
+						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+					},
+					Status: statusAssigned("10.20.30.1"),
+				},
+			},
+			eps: map[string]epslices.EpsOrSlices{
+				"10.20.30.1": {
+					EpVal: &v1.Endpoints{
+						Subsets: []v1.EndpointSubset{
+							{
+								Addresses: []v1.EndpointAddress{
+									{
+										IP:       "2.3.4.5",
+										NodeName: pointer.StrPtr("iris1"),
+									},
+									{
+										IP:       "2.3.4.15",
+										NodeName: pointer.StrPtr("iris2"),
+									},
+								},
+							},
+						},
+					},
+					Type: epslices.Eps,
+				},
+			},
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
 		}, {
 			desc: "One service, two endpoints across two hosts, neither endpoint is ready, no controllers should announce",
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -555,7 +622,8 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -602,7 +670,8 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -675,7 +744,8 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -750,7 +820,8 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -827,7 +898,8 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -876,7 +948,8 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -925,7 +998,8 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -976,7 +1050,8 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -1027,7 +1102,8 @@ func TestShouldAnnounce(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -1090,8 +1166,8 @@ func TestShouldAnnounce(t *testing.T) {
 		for _, svc := range test.svcs {
 			lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
 			lbIP_s := lbIP.String()
-			response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "balancer", []net.IP{lbIP}, svc, test.eps[lbIP_s])
-			response2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "balancer", []net.IP{lbIP}, svc, test.eps[lbIP_s])
+			response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "balancer", []net.IP{lbIP}, test.config.Pools["default"], svc, test.eps[lbIP_s])
+			response2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "balancer", []net.IP{lbIP}, test.config.Pools["default"], svc, test.eps[lbIP_s])
 			if response1 != test.c1ExpectedResult[lbIP_s] {
 				t.Errorf("%q: shouldAnnounce for controller 1 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIP_s, test.c1ExpectedResult[lbIP_s], response1)
 			}
@@ -1128,6 +1204,14 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 		t.Fatalf("creating controller: %s", err)
 	}
 	c2.client = &testK8S{t: t}
+	advertisementsForNode := []*config.L2Advertisement{
+		{
+			Nodes: map[string]bool{
+				"iris1": true,
+				"iris2": true,
+			},
+		},
+	}
 
 	tests := []struct {
 		desc string
@@ -1146,7 +1230,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -1203,7 +1288,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -1260,7 +1346,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -1317,7 +1404,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -1374,7 +1462,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -1431,7 +1520,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -1528,7 +1618,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -1625,7 +1716,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -1722,7 +1814,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -1794,7 +1887,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -1862,7 +1956,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -1930,7 +2025,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -1998,7 +2094,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 			config: &config.Config{
 				Pools: map[string]*config.Pool{
 					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+						L2Advertisements: advertisementsForNode,
 					},
 				},
 			},
@@ -2078,14 +2175,256 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 		for _, svc := range test.svcs {
 			lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
 			lbIP_s := lbIP.String()
-			response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, svc, test.eps[lbIP_s])
-			response2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, svc, test.eps[lbIP_s])
+			response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, test.config.Pools["default"], svc, test.eps[lbIP_s])
+			response2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, test.config.Pools["default"], svc, test.eps[lbIP_s])
 			if response1 != test.c1ExpectedResult[lbIP_s] {
 				t.Errorf("%q: shouldAnnounce for controller 1 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIP_s, test.c1ExpectedResult[lbIP_s], response1)
 			}
 			if response2 != test.c2ExpectedResult[lbIP_s] {
 				t.Errorf("%q: shouldAnnounce for controller 2 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIP_s, test.c2ExpectedResult[lbIP_s], response2)
 			}
+		}
+	}
+}
+
+func TestShouldAnnounceNodeSelector(t *testing.T) {
+	fakeSL := &fakeSpeakerList{
+		speakers: map[string]bool{
+			"iris1": true,
+			"iris2": true,
+		},
+	}
+	c1, err := newController(controllerConfig{
+		MyNode:  "iris1",
+		Logger:  log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		SList:   fakeSL,
+		bgpType: bgpNative,
+	})
+	if err != nil {
+		t.Fatalf("creating controller: %s", err)
+	}
+	c1.client = &testK8S{t: t}
+
+	c2, err := newController(controllerConfig{
+		MyNode:  "iris2",
+		Logger:  log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		SList:   fakeSL,
+		bgpType: bgpNative,
+	})
+	if err != nil {
+		t.Fatalf("creating controller: %s", err)
+	}
+	c2.client = &testK8S{t: t}
+	advertisementsForBoth := []*config.L2Advertisement{
+		{
+			Nodes: map[string]bool{
+				"iris1": true,
+				"iris2": true,
+			},
+		},
+	}
+
+	advertisementOnIris1 := []*config.L2Advertisement{
+		{
+			Nodes: map[string]bool{
+				"iris1": true,
+			},
+		},
+	}
+
+	advertisementSplit := []*config.L2Advertisement{
+		{
+			Nodes: map[string]bool{
+				"iris1": true,
+			},
+		},
+		{
+			Nodes: map[string]bool{
+				"iris2": true,
+			},
+		},
+	}
+
+	advertisementOnIris2 := []*config.L2Advertisement{
+		{
+			Nodes: map[string]bool{
+				"iris2": true,
+			},
+		},
+	}
+
+	epsOnBothNodes := map[string]epslices.EpsOrSlices{
+		"10.20.30.1": {
+			SlicesVal: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{
+								"2.3.4.5",
+							},
+							Topology: map[string]string{
+								"kubernetes.io/hostname": "iris1",
+							},
+							Conditions: discovery.EndpointConditions{
+								Ready: pointer.BoolPtr(true),
+							},
+						},
+						{
+							Addresses: []string{
+								"2.3.4.15",
+							},
+							Topology: map[string]string{
+								"kubernetes.io/hostname": "iris2",
+							},
+							Conditions: discovery.EndpointConditions{
+								Ready: pointer.BoolPtr(true),
+							},
+						},
+					},
+				},
+			},
+			Type: epslices.Slices,
+		},
+	}
+
+	epsOn := func(node string) map[string]epslices.EpsOrSlices {
+		return map[string]epslices.EpsOrSlices{
+			"10.20.30.1": {
+				SlicesVal: []discovery.EndpointSlice{
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
+								},
+								Topology: map[string]string{
+									"kubernetes.io/hostname": node,
+								},
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
+								},
+							},
+						},
+					},
+				},
+				Type: epslices.Slices,
+			},
+		}
+	}
+
+	tests := []struct {
+		desc string
+
+		balancer         string
+		L2Advertisements []*config.L2Advertisement
+		eps              map[string]epslices.EpsOrSlices
+		trafficPolicy    v1.ServiceExternalTrafficPolicyType
+		c1ExpectedResult map[string]string
+		c2ExpectedResult map[string]string
+	}{
+		{
+			desc:             "One service, endpoint on iris1, selector on iris1, c1 should announce",
+			balancer:         "test1",
+			eps:              epsOn("iris1"),
+			L2Advertisements: advertisementOnIris1,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeCluster,
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+		},
+		{
+			desc:             "One service, etp local, endpoint on iris1, selector on both(split), c2 should announce",
+			balancer:         "test1",
+			eps:              epsOn("iris2"),
+			L2Advertisements: advertisementSplit,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeLocal,
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+		},
+		{
+			desc:             "One service, endpoint on iris1, selector on both, c2 should announce",
+			balancer:         "test1",
+			eps:              epsOn("iris1"),
+			L2Advertisements: advertisementsForBoth,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeCluster,
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "",
+			},
+		},
+		{
+			desc:             "One service, endpoint on both nodes, advertisement on iris1, c1 should announce",
+			balancer:         "test1",
+			eps:              epsOnBothNodes,
+			L2Advertisements: advertisementOnIris1,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeCluster,
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+		},
+		{
+			desc:             "One service, ltp endpoint on iris1, advertisement on iris2, no one should announce",
+			balancer:         "test1",
+			eps:              epsOn("iris1"),
+			L2Advertisements: advertisementOnIris2,
+			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeLocal,
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "notOwner",
+			},
+		},
+	}
+	l := log.NewNopLogger()
+	for _, test := range tests {
+		if !strings.Contains(test.desc, "ltp") {
+			continue
+		}
+
+		cfg := config.Config{
+			Pools: map[string]*config.Pool{
+				"default": {
+					CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+					L2Advertisements: test.L2Advertisements,
+				},
+			},
+		}
+		if c1.SetConfig(l, &cfg) == controllers.SyncStateError {
+			t.Errorf("%q: SetConfig failed", test.desc)
+		}
+		if c2.SetConfig(l, &cfg) == controllers.SyncStateError {
+			t.Errorf("%q: SetConfig failed", test.desc)
+		}
+		svc := v1.Service{
+			Spec: v1.ServiceSpec{
+				Type:                  "LoadBalancer",
+				ExternalTrafficPolicy: test.trafficPolicy,
+			},
+			Status: statusAssigned("10.20.30.1"),
+		}
+
+		lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
+		lbIP_s := lbIP.String()
+		response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools["default"], &svc, test.eps[lbIP_s])
+		response2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools["default"], &svc, test.eps[lbIP_s])
+		if response1 != test.c1ExpectedResult[lbIP_s] {
+			t.Errorf("%q: shouldAnnounce for controller 1 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIP_s, test.c1ExpectedResult[lbIP_s], response1)
+		}
+		if response2 != test.c2ExpectedResult[lbIP_s] {
+			t.Errorf("%q: shouldAnnounce for controller 2 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIP_s, test.c2ExpectedResult[lbIP_s], response2)
 		}
 	}
 }
@@ -2123,6 +2462,14 @@ func TestClusterPolicy(t *testing.T) {
 		Pools: map[string]*config.Pool{
 			"default": {
 				CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+				L2Advertisements: []*config.L2Advertisement{
+					{
+						Nodes: map[string]bool{
+							"iris1": true,
+							"iris2": true,
+						},
+					},
+				},
 			},
 		},
 	}
@@ -2205,11 +2552,11 @@ func TestClusterPolicy(t *testing.T) {
 		}
 
 		lbIP := net.ParseIP(ip)
-		response1svc1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, svc1, eps1)
-		response2svc1 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, svc1, eps1)
+		response1svc1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools["default"], svc1, eps1)
+		response2svc1 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools["default"], svc1, eps1)
 
-		response1svc2 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, svc2, eps2)
-		response2svc2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, svc2, eps2)
+		response1svc2 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools["default"], svc2, eps2)
+		response2svc2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools["default"], svc2, eps2)
 
 		// We check that only one speaker announces the service, so their response must be different
 		if response1svc1 == response2svc1 {

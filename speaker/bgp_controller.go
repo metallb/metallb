@@ -154,7 +154,11 @@ func hasHealthyEndpoint(eps epslices.EpsOrSlices, filterNode func(*string) bool)
 	return false
 }
 
-func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, svc *v1.Service, eps epslices.EpsOrSlices) string {
+func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, pool *config.Pool, svc *v1.Service, eps epslices.EpsOrSlices) string {
+	if !poolMatchesNodeBGP(pool, c.myNode) {
+		level.Debug(l).Log("event", "skipping should announce bgp", "service", name, "reason", "pool not matching my node")
+		return "notOwner"
+	}
 	// Should we advertise?
 	// Yes, if externalTrafficPolicy is
 	//  Cluster && any healthy endpoint exists
@@ -247,6 +251,10 @@ func (c *bgpController) SetBalancer(l log.Logger, name string, lbIPs []net.IP, p
 	c.svcAds[name] = nil
 	for _, lbIP := range lbIPs {
 		for _, adCfg := range pool.BGPAdvertisements {
+			// skipping if this node is not enabled for this advertisement
+			if !adCfg.Nodes[c.myNode] {
+				continue
+			}
 			m := net.CIDRMask(adCfg.AggregationLength, 32)
 			if lbIP.To4() == nil {
 				m = net.CIDRMask(adCfg.AggregationLengthV6, 128)
@@ -319,10 +327,6 @@ func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
 	return c.syncPeers(l)
 }
 
-func (c *bgpController) PoolEnabledForProtocol(pool *config.Pool) bool {
-	return len(pool.BGPAdvertisements) > 0
-}
-
 // Create a new 'bgp.SessionManager' of type 'bgpType'.
 var newBGP = func(bgpType bgpImplementation, l log.Logger, logLevel logging.Level) bgp.SessionManager {
 	switch bgpType {
@@ -333,4 +337,13 @@ var newBGP = func(bgpType bgpImplementation, l log.Logger, logLevel logging.Leve
 	default:
 		panic(fmt.Sprintf("unsupported BGP implementation type: %s", bgpType))
 	}
+}
+
+func poolMatchesNodeBGP(pool *config.Pool, node string) bool {
+	for _, adv := range pool.BGPAdvertisements {
+		if adv.Nodes[node] {
+			return true
+		}
+	}
+	return false
 }

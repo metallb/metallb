@@ -37,13 +37,11 @@ func NewController(l2Handler *MockProtocol, bgpHandler *MockProtocol, t *testing
 func TestLoadBalancerCreation(t *testing.T) {
 	var l2MockHandler = &MockProtocol{
 		protocol:       config.Layer2,
-		enabled:        true,
 		shouldAnnounce: true,
 	}
 
 	var bgpMockHandler = &MockProtocol{
 		protocol:       config.BGP,
-		enabled:        true,
 		shouldAnnounce: true,
 	}
 	c := NewController(l2MockHandler, bgpMockHandler, t)
@@ -98,8 +96,8 @@ func TestLoadBalancerCreation(t *testing.T) {
 
 	l2MockHandler.reset()
 	bgpMockHandler.reset()
+	l2MockHandler.shouldAnnounce = false
 
-	l2MockHandler.enabled = false
 	// the config changed, the l2 handler is not advertising the ip anymore, we check l2 cancels the lb
 	state = c.SetBalancer(logger,
 		"testsvc",
@@ -130,8 +128,8 @@ func TestLoadBalancerCreation(t *testing.T) {
 
 	l2MockHandler.reset()
 	bgpMockHandler.reset()
-	l2MockHandler.enabled = false
-	bgpMockHandler.enabled = false
+	l2MockHandler.shouldAnnounce = false
+	bgpMockHandler.shouldAnnounce = false
 
 	// the config changed, no handler is advertising the ip, we check bgp cancels
 	state = c.SetBalancer(logger,
@@ -164,7 +162,6 @@ func TestLoadBalancerCreation(t *testing.T) {
 type MockProtocol struct {
 	config               *config.Config
 	protocol             config.Proto
-	enabled              bool
 	shouldAnnounce       bool
 	setBalancerCalled    bool
 	deleteBalancerCalled bool
@@ -175,7 +172,7 @@ func (m *MockProtocol) SetConfig(l log.Logger, c *config.Config) error {
 	return nil
 }
 
-func (m *MockProtocol) ShouldAnnounce(_ log.Logger, _ string, _ []net.IP, _ *v1.Service, _ epslices.EpsOrSlices) string {
+func (m *MockProtocol) ShouldAnnounce(_ log.Logger, _ string, _ []net.IP, _ *config.Pool, _ *v1.Service, _ epslices.EpsOrSlices) string {
 	if m.shouldAnnounce {
 		return ""
 	}
@@ -194,10 +191,6 @@ func (m *MockProtocol) DeleteBalancer(_ log.Logger, _ string, _ string) error {
 
 func (m *MockProtocol) SetNode(_ log.Logger, _ *v1.Node) error {
 	panic("not implemented") // TODO: Implement
-}
-
-func (m *MockProtocol) PoolEnabledForProtocol(pool *config.Pool) bool {
-	return m.enabled
 }
 
 func (m *MockProtocol) reset() {
