@@ -12,6 +12,7 @@ import (
 	"go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/pointer"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -222,14 +223,18 @@ func TestParse(t *testing.T) {
 									//0xfc0004d2: true,
 									0x04D20929: true,
 								},
+								Nodes: map[string]bool{},
 							},
 							{
 								AggregationLength:   24,
 								AggregationLengthV6: 64,
 								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
 							},
 						},
-						L2Advertisements: []*L2Advertisement{&L2Advertisement{}},
+						L2Advertisements: []*L2Advertisement{&L2Advertisement{
+							Nodes: map[string]bool{},
+						}},
 					},
 					"pool2": {
 						CIDR:       []*net.IPNet{ipnet("30.0.0.0/8")},
@@ -239,9 +244,12 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
 							},
 						},
-						L2Advertisements: []*L2Advertisement{&L2Advertisement{}},
+						L2Advertisements: []*L2Advertisement{&L2Advertisement{
+							Nodes: map[string]bool{},
+						}},
 					},
 					"pool3": {
 						CIDR: []*net.IPNet{
@@ -258,13 +266,17 @@ func TestParse(t *testing.T) {
 							ipnet("40.0.0.240/32"),
 							ipnet("40.0.0.250/32"),
 						},
-						L2Advertisements: []*L2Advertisement{&L2Advertisement{}},
-						AutoAssign:       true,
+						L2Advertisements: []*L2Advertisement{&L2Advertisement{
+							Nodes: map[string]bool{},
+						}},
+						AutoAssign: true,
 					},
 					"pool4": {
-						CIDR:             []*net.IPNet{ipnet("2001:db8::/64")},
-						L2Advertisements: []*L2Advertisement{&L2Advertisement{}},
-						AutoAssign:       true,
+						CIDR: []*net.IPNet{ipnet("2001:db8::/64")},
+						L2Advertisements: []*L2Advertisement{&L2Advertisement{
+							Nodes: map[string]bool{},
+						}},
+						AutoAssign: true,
 					},
 				},
 				BFDProfiles: map[string]*BFDProfile{},
@@ -623,6 +635,7 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
 							},
 						},
 					},
@@ -661,6 +674,7 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
 							},
 						},
 					},
@@ -758,6 +772,7 @@ func TestParse(t *testing.T) {
 								AggregationLength:   26,
 								AggregationLengthV6: 128,
 								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
 							},
 						},
 					},
@@ -955,6 +970,7 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
 							},
 						},
 					},
@@ -1192,6 +1208,7 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
 							},
 						},
 					},
@@ -1353,6 +1370,7 @@ func TestParse(t *testing.T) {
 								Communities: map[uint32]bool{
 									0x04D20929: true,
 								},
+								Nodes: map[string]bool{},
 							},
 						},
 					},
@@ -1367,13 +1385,16 @@ func TestParse(t *testing.T) {
 								Communities: map[uint32]bool{
 									0x04D20929: true,
 								},
+								Nodes: map[string]bool{},
 							},
 						},
 					},
 					"legacyl2pool1": {
-						CIDR:             []*net.IPNet{ipnet("10.21.0.0/16"), ipnet("10.51.0.0/24")},
-						AvoidBuggyIPs:    true,
-						L2Advertisements: []*L2Advertisement{{}},
+						CIDR:          []*net.IPNet{ipnet("10.21.0.0/16"), ipnet("10.51.0.0/24")},
+						AvoidBuggyIPs: true,
+						L2Advertisements: []*L2Advertisement{{
+							Nodes: map[string]bool{},
+						}},
 					},
 				},
 				BFDProfiles: map[string]*BFDProfile{},
@@ -1426,6 +1447,265 @@ func TestParse(t *testing.T) {
 						},
 					},
 				},
+			},
+		},
+		{
+			desc: "use node selectors",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+							},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool2",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"30.0.0.0/16",
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv1",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPools: []string{"pool1"},
+							NodeSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"second": "true",
+									},
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv2",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPools: []string{"pool2"},
+							NodeSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"first": "true",
+									},
+								},
+							},
+						},
+					},
+				},
+				L2Advs: []v1beta1.L2Advertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "l2adv1",
+						},
+						Spec: v1beta1.L2AdvertisementSpec{
+							NodeSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"first": "true",
+									},
+								},
+							},
+							IPAddressPools: []string{"pool1"},
+						},
+					},
+				},
+				LegacyAddressPools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "legacyl2pool1",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Addresses: []string{
+								"10.21.0.0/16",
+								"10.51.0.0/24",
+							},
+							Protocol:      string(Layer2),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "legacybgppool1",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Addresses: []string{
+								"10.40.0.0/16",
+								"10.60.0.0/24",
+							},
+							Protocol:      string(BGP),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
+						},
+					},
+				},
+				Nodes: []corev1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "first",
+							Labels: map[string]string{
+								"first": "true",
+							},
+						},
+					}, {
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "second",
+							Labels: map[string]string{
+								"second": "true",
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: map[string]*Pool{
+					"legacybgppool1": {
+						CIDR:          []*net.IPNet{ipnet("10.40.0.0/16"), ipnet("10.60.0.0/24")},
+						AvoidBuggyIPs: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[uint32]bool{},
+								Nodes: map[string]bool{
+									"first":  true,
+									"second": true,
+								},
+							},
+						},
+					},
+
+					"legacyl2pool1": {
+						CIDR:          []*net.IPNet{ipnet("10.21.0.0/16"), ipnet("10.51.0.0/24")},
+						AvoidBuggyIPs: true,
+						L2Advertisements: []*L2Advertisement{{
+							Nodes: map[string]bool{
+								"first":  true,
+								"second": true,
+							},
+						}},
+					},
+
+					"pool1": {
+						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
+						AutoAssign: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{"second": true},
+							},
+						},
+						L2Advertisements: []*L2Advertisement{&L2Advertisement{
+							Nodes: map[string]bool{
+								"first": true,
+							},
+						}},
+					},
+					"pool2": {
+						CIDR:       []*net.IPNet{ipnet("30.0.0.0/16")},
+						AutoAssign: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{"first": true},
+							},
+						},
+						L2Advertisements: nil,
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
+			desc: "no nodes means all nodes",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv1",
+						},
+					},
+				},
+				L2Advs: []v1beta1.L2Advertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "l2adv1",
+						},
+					},
+				},
+				Nodes: []corev1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "first",
+							Labels: map[string]string{
+								"first": "true",
+							},
+						},
+					}, {
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "second",
+							Labels: map[string]string{
+								"second": "true",
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: map[string]*Pool{
+					"pool1": {
+						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
+						AutoAssign: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[uint32]bool{},
+								Nodes: map[string]bool{
+									"first":  true,
+									"second": true,
+								},
+							},
+						},
+						L2Advertisements: []*L2Advertisement{&L2Advertisement{
+							Nodes: map[string]bool{
+								"first":  true,
+								"second": true,
+							},
+						}},
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
 		/* TODO Add communities CRD

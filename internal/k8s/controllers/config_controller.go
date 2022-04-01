@@ -89,6 +89,12 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
+	var nodes corev1.NodeList
+	if err := r.List(ctx, &nodes); err != nil {
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "message", "failed to get nodes", "error", err)
+		return ctrl.Result{}, err
+	}
+
 	resources := config.ClusterResources{
 		Pools:              ipAddressPools.Items,
 		Peers:              bgpPeers.Items,
@@ -97,6 +103,7 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		BGPAdvs:            bgpAdvertisements.Items,
 		LegacyAddressPools: addressPools.Items,
 		PasswordSecrets:    secrets,
+		Nodes:              nodes.Items,
 	}
 
 	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources))
@@ -130,6 +137,7 @@ func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metallbv1beta2.BGPPeer{}).
 		Watches(&source.Kind{Type: &metallbv1beta1.IPAddressPool{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&source.Kind{Type: &corev1.Node{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &metallbv1beta1.BGPAdvertisement{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &metallbv1beta1.L2Advertisement{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &metallbv1beta1.BFDProfile{}}, &handler.EnqueueRequestForObject{}).

@@ -41,6 +41,7 @@ type ClusterResources struct {
 	L2Advs             []metallbv1beta1.L2Advertisement  `json:"l2advertisements"`
 	LegacyAddressPools []metallbv1beta1.AddressPool      `json:"legacyaddresspools"`
 	PasswordSecrets    map[string]corev1.Secret          `json:"passwordsecrets"`
+	Nodes              []corev1.Node                     `json:"nodes"`
 }
 
 // Config is a parsed MetalLB configuration.
@@ -135,9 +136,13 @@ type BGPAdvertisement struct {
 	LocalPref uint32
 	// Value of the COMMUNITIES path attribute.
 	Communities map[uint32]bool
+	// The map of nodes allowed for this advertisement
+	Nodes map[string]bool
 }
 
 type L2Advertisement struct {
+	// The map of nodes allowed for this advertisement
+	Nodes map[string]bool
 }
 
 // BFDProfile describes a BFD profile to be applied to a set of peers.
@@ -235,7 +240,10 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 	}
 
 	for _, l2Adv := range resources.L2Advs {
-		adv := l2AdvertisementFromCR(l2Adv)
+		adv, err := l2AdvertisementFromCR(l2Adv, resources.Nodes)
+		if err != nil {
+			return nil, err
+		}
 		// No pool selector means select all pools
 		if len(l2Adv.Spec.IPAddressPools) == 0 {
 			for _, pool := range cfg.Pools {
@@ -260,7 +268,7 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 	}
 
 	for _, bgpAdv := range resources.BGPAdvs {
-		adv, err := bgpAdvertisementFromCR(bgpAdv, communities)
+		adv, err := bgpAdvertisementFromCR(bgpAdv, communities, resources.Nodes)
 		if err != nil {
 			return nil, err
 		}
@@ -287,7 +295,11 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 	}
 
 	for _, p := range resources.LegacyAddressPools {
-		pool, err := addressPoolFromLegacyCR(p, communities)
+		allNodes, err := selectedNodes(resources.Nodes, nil)
+		if err != nil {
+			return nil, err
+		}
+		pool, err := addressPoolFromLegacyCR(p, communities, allNodes)
 		if err != nil {
 			return nil, fmt.Errorf("parsing address pool %s: %s", p.Name, err)
 		}
@@ -450,7 +462,7 @@ func addressPoolFromCR(p metallbv1beta1.IPAddressPool, bgpCommunities map[string
 	return ret, nil
 }
 
-func addressPoolFromLegacyCR(p metallbv1beta1.AddressPool, bgpCommunities map[string]uint32) (*Pool, error) {
+func addressPoolFromLegacyCR(p metallbv1beta1.AddressPool, bgpCommunities map[string]uint32, allNodes map[string]bool) (*Pool, error) {
 	if p.Name == "" {
 		return nil, errors.New("missing pool name")
 	}
@@ -482,9 +494,9 @@ func addressPoolFromLegacyCR(p metallbv1beta1.AddressPool, bgpCommunities map[st
 		if len(p.Spec.BGPAdvertisements) > 0 {
 			return nil, errors.New("cannot have bgp-advertisements configuration element in a layer2 address pool")
 		}
-		ret.L2Advertisements = []*L2Advertisement{{}}
+		ret.L2Advertisements = []*L2Advertisement{{Nodes: allNodes}}
 	case BGP:
-		ads, err := bgpAdvertisementsFromLegacyCR(p.Spec.BGPAdvertisements, cidrsPerAddresses, bgpCommunities)
+		ads, err := bgpAdvertisementsFromLegacyCR(p.Spec.BGPAdvertisements, cidrsPerAddresses, bgpCommunities, allNodes)
 		if err != nil {
 			return nil, errors.Wrapf(err, "parsing BGP advertisements for %s", p.Name)
 		}
@@ -538,11 +550,17 @@ func bfdProfileFromCR(p metallbv1beta1.BFDProfile) (*BFDProfile, error) {
 	return res, nil
 }
 
-func l2AdvertisementFromCR(crdAd metallbv1beta1.L2Advertisement) *L2Advertisement {
-	return &L2Advertisement{}
+func l2AdvertisementFromCR(crdAd metallbv1beta1.L2Advertisement, nodes []corev1.Node) (*L2Advertisement, error) {
+	selected, err := selectedNodes(nodes, crdAd.Spec.NodeSelectors)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to parse node selector for %s", crdAd.Name)
+	}
+	return &L2Advertisement{
+		Nodes: selected,
+	}, nil
 }
 
-func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities map[string]uint32) (*BGPAdvertisement, error) {
+func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities map[string]uint32, nodes []corev1.Node) (*BGPAdvertisement, error) {
 	err := validateDuplicateCommunities(crdAd.Spec.Communities)
 	if err != nil {
 		return nil, err
@@ -581,10 +599,16 @@ func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities m
 			ad.Communities[v] = true
 		}
 	}
+
+	selected, err := selectedNodes(nodes, crdAd.Spec.NodeSelectors)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to parse node selector for ls %s", crdAd.Name)
+	}
+	ad.Nodes = selected
 	return ad, nil
 }
 
-func bgpAdvertisementsFromLegacyCR(ads []metallbv1beta1.LegacyBgpAdvertisement, cidrsPerAddresses map[string][]*net.IPNet, communities map[string]uint32) ([]*BGPAdvertisement, error) {
+func bgpAdvertisementsFromLegacyCR(ads []metallbv1beta1.LegacyBgpAdvertisement, cidrsPerAddresses map[string][]*net.IPNet, communities map[string]uint32, allNodes map[string]bool) ([]*BGPAdvertisement, error) {
 	if len(ads) == 0 {
 		return []*BGPAdvertisement{
 			{
@@ -592,6 +616,7 @@ func bgpAdvertisementsFromLegacyCR(ads []metallbv1beta1.LegacyBgpAdvertisement, 
 				AggregationLengthV6: 128,
 				LocalPref:           0,
 				Communities:         map[uint32]bool{},
+				Nodes:               allNodes,
 			},
 		}, nil
 	}
@@ -608,6 +633,7 @@ func bgpAdvertisementsFromLegacyCR(ads []metallbv1beta1.LegacyBgpAdvertisement, 
 			AggregationLengthV6: 128,
 			LocalPref:           0,
 			Communities:         map[uint32]bool{},
+			Nodes:               allNodes,
 		}
 
 		if crdAd.AggregationLength != nil {
@@ -812,13 +838,40 @@ func validateDuplicateCommunities(communities []string) error {
 	return nil
 }
 
-// TODO: Currently there are no fields in the L2Advertisement, so it is enough to check
-// if the list is not empty. This must be extended if we are going to add new fields to the l2 advertisements.
 func containsAdvertisement(advs []*L2Advertisement, toCheck *L2Advertisement) bool {
 	for _, adv := range advs {
-		if *adv == *toCheck {
+		if reflect.DeepEqual(adv.Nodes, toCheck.Nodes) {
 			return true
 		}
 	}
 	return false
+}
+
+func selectedNodes(nodes []corev1.Node, selectors []metav1.LabelSelector) (map[string]bool, error) {
+	labelSelectors := []labels.Selector{}
+	for _, selector := range selectors {
+		l, err := metav1.LabelSelectorAsSelector(&selector)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Invalid label selector %v", selector)
+		}
+		labelSelectors = append(labelSelectors, l)
+	}
+
+	res := make(map[string]bool)
+OUTER:
+	for _, node := range nodes {
+		if len(labelSelectors) == 0 { // no selector mean all nodes are valid
+			res[node.Name] = true
+		}
+		for _, s := range labelSelectors {
+			nodeLabels := labels.Set(node.Labels)
+			if s.Matches(nodeLabels) {
+				res[node.Name] = true
+				continue OUTER
+			}
+		}
+
+	}
+	return res, nil
+
 }
