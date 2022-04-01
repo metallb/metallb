@@ -27,6 +27,8 @@ import (
 type L2AdvertisementSpec struct {
 	// IPAddressPools is the list of ipaddresspools to advertise via this advertisement.
 	IPAddressPools []string `json:"ipAddressPools,omitempty"`
+	// NodeSelectors is a selector on the node we should perform this advertisement from.
+	NodeSelectors []metav1.LabelSelector `json:"nodeSelectors,omitempty" yaml:"node-selectors,omitempty"`
 }
 
 // L2AdvertisementStatus defines the observed state of L2Advertisement.

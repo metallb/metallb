@@ -46,6 +46,9 @@ type BGPAdvertisementSpec struct {
 
 	// IPAddressPools is the list of ipaddresspools to advertise via this advertisement.
 	IPAddressPools []string `json:"ipAddressPools,omitempty"`
+
+	// NodeSelectors is a selector on the node we should perform this advertisement from.
+	NodeSelectors []metav1.LabelSelector `json:"nodeSelectors,omitempty" yaml:"node-selectors,omitempty"`
 }
 
 // BGPAdvertisementStatus defines the observed state of BGPAdvertisement.
