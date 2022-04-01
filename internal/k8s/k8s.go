@@ -171,10 +171,11 @@ func New(cfg *Config) (*Client, error) {
 
 	if cfg.NodeChanged != nil {
 		if err = (&controllers.NodeReconciler{
-			Client:  mgr.GetClient(),
-			Logger:  cfg.Logger,
-			Scheme:  mgr.GetScheme(),
-			Handler: cfg.NodeHandler,
+			Client:   mgr.GetClient(),
+			Logger:   cfg.Logger,
+			Scheme:   mgr.GetScheme(),
+			Handler:  cfg.NodeHandler,
+			NodeName: cfg.NodeName,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "node")
 			return nil, errors.Wrap(err, "failed to create node reconciler")
