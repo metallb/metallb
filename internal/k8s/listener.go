@@ -24,6 +24,7 @@ func (l *Listener) ServiceHandler(logger log.Logger, serviceName string, svc *v1
 	defer l.Unlock()
 	return l.ServiceChanged(logger, serviceName, svc, endpointsOrSlices)
 }
+
 func (l *Listener) ConfigHandler(logger log.Logger, config *config.Config) controllers.SyncState {
 	l.Lock()
 	defer l.Unlock()
