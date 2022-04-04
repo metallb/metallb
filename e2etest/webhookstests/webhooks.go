@@ -41,7 +41,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.Context("For AddressPool", func() {
+	ginkgo.Context("For IPPool", func() {
 		ginkgo.AfterEach(func() {
 			// Clean previous configuration.
 			err := ConfigUpdater.Clean()
@@ -49,7 +49,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 		})
 
 		ginkgo.It("Should recognize overlapping addresses in two AddressPools", func() {
-			ginkgo.By("Creating first AddressPool")
+			ginkgo.By("Creating first IPPool")
 			resources := metallbconfig.ClusterResources{
 				Pools: []metallbv1beta1.IPPool{
 					{
@@ -67,7 +67,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 			err := ConfigUpdater.Update(resources)
 			framework.ExpectNoError(err)
 
-			ginkgo.By("Creating second AddressPool with overlapping addresses defined by address range")
+			ginkgo.By("Creating second IPPool with overlapping addresses defined by address range")
 			resources.Pools = append(resources.Pools, metallbv1beta1.IPPool{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "webhooks-test2",
@@ -82,13 +82,71 @@ var _ = ginkgo.Describe("Webhooks", func() {
 			framework.ExpectError(err)
 			Expect(err.Error()).To(ContainSubstring("overlaps with already defined CIDR"))
 
-			ginkgo.By("Creating second valid AddressPool")
+			ginkgo.By("Creating second valid IPPool")
 			resources.Pools[1].Spec.Addresses = []string{"1.1.1.101-1.1.1.200"}
 			err = ConfigUpdater.Update(resources)
 			framework.ExpectNoError(err)
 
-			ginkgo.By("Updating second AddressPool addresses to overlapping addresses defined by network prefix")
+			ginkgo.By("Updating second IPPool addresses to overlapping addresses defined by network prefix")
 			resources.Pools[1].Spec.Addresses = []string{"1.1.1.0/24"}
+			err = ConfigUpdater.Update(resources)
+			framework.ExpectError(err)
+			Expect(err.Error()).To(ContainSubstring("overlaps with already defined CIDR"))
+		})
+	})
+
+	ginkgo.Context("for Legacy AddressPool", func() {
+		ginkgo.AfterEach(func() {
+			// Clean previous configuration.
+			err := ConfigUpdater.Clean()
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("Should recognize overlapping addresses in two AddressPools", func() {
+			ginkgo.By("Creating first AddrssPool")
+			resources := metallbconfig.ClusterResources{
+				LegacyAddressPools: []metallbv1beta1.AddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "webhooks-test1",
+						},
+						Spec: metallbv1beta1.AddressPoolSpec{
+							Addresses: []string{
+								"1.1.1.1-1.1.1.100",
+							},
+							Protocol: string(metallbconfig.Layer2),
+						},
+					},
+				},
+			}
+			err := ConfigUpdater.Update(resources)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Creating second AddressPool with overlapping addresses defined by address range")
+			resources.LegacyAddressPools = append(resources.LegacyAddressPools,
+				metallbv1beta1.AddressPool{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "webhooks-test2",
+					},
+					Spec: metallbv1beta1.AddressPoolSpec{
+						Addresses: []string{
+							"1.1.1.15-1.1.1.20",
+						},
+						Protocol: string(metallbconfig.Layer2),
+					},
+				},
+			)
+			err = ConfigUpdater.Update(resources)
+			framework.ExpectError(err)
+			Expect(err.Error()).To(ContainSubstring("overlaps with already defined CIDR"))
+
+			ginkgo.By("Creating second valid AddressPool")
+			resources.LegacyAddressPools[1].Spec.Addresses = []string{"1.1.1.101-1.1.1.200"}
+			err = ConfigUpdater.Update(resources)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Updating second AddressPool addresses to overlapping addresses defined by network prefix")
+			resources.LegacyAddressPools[1].Spec.Addresses = []string{"1.1.1.0/24"}
 			err = ConfigUpdater.Update(resources)
 			framework.ExpectError(err)
 			Expect(err.Error()).To(ContainSubstring("overlaps with already defined CIDR"))
