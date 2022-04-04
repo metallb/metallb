@@ -34,13 +34,13 @@ import (
 )
 
 type ClusterResources struct {
-	Pools              []metallbv1beta1.IPPool
-	Peers              []metallbv1beta2.BGPPeer
-	BFDProfiles        []metallbv1beta1.BFDProfile
-	BGPAdvs            []metallbv1beta1.BGPAdvertisement
-	L2Advs             []metallbv1beta1.L2Advertisement
-	LegacyAddressPools []metallbv1beta1.AddressPool
-	PasswordSecrets    map[string]corev1.Secret
+	Pools              []metallbv1beta1.IPPool           `json:"ippools"`
+	Peers              []metallbv1beta2.BGPPeer          `json:"bgppeers"`
+	BFDProfiles        []metallbv1beta1.BFDProfile       `json:"bfdprofiles"`
+	BGPAdvs            []metallbv1beta1.BGPAdvertisement `json:"bgpadvertisements"`
+	L2Advs             []metallbv1beta1.L2Advertisement  `json:"l2advertisements"`
+	LegacyAddressPools []metallbv1beta1.AddressPool      `json:"legacyaddresspools"`
+	PasswordSecrets    map[string]corev1.Secret          `json:"passwordsecrets"`
 }
 
 // Config is a parsed MetalLB configuration.
