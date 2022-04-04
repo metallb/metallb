@@ -99,7 +99,7 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		PasswordSecrets:    secrets,
 	}
 
-	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", spew.Sdump(resources))
+	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources))
 
 	cfg, err := config.For(resources, r.ValidateConfig)
 	if err != nil {
@@ -112,13 +112,13 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	res := r.Handler(r.Logger, cfg)
 	switch res {
 	case SyncStateError:
-		level.Error(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", spew.Sdump(resources), "event", "reload failed, retry")
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, retry")
 		return ctrl.Result{}, retryError
 	case SyncStateReprocessAll:
 		level.Info(r.Logger).Log("controller", "ConfigReconciler", "event", "force service reload")
 		r.ForceReload()
 	case SyncStateErrorNoRetry:
-		level.Error(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", spew.Sdump(resources), "event", "reload failed, no retry")
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, no retry")
 		return ctrl.Result{}, nil
 	}
 
