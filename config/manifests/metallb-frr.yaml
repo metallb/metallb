@@ -1125,6 +1125,7 @@ rules:
   - ""
   resources:
   - services
+  - nodes
   verbs:
   - get
   - list
