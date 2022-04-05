@@ -3,6 +3,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.7.0
+{{- if .Values.webhooks.enable }}
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ template "metallb.fullname" . }}-serving-cert    
+{{- end }}    
   creationTimestamp: null
   name: addresspools.metallb.io
 spec:
@@ -13,6 +16,20 @@ spec:
     plural: addresspools
     singular: addresspool
   scope: Namespaced
+{{- if .Values.webhooks.enable}}
+  conversion:
+    strategy: Webhook
+    webhook:
+      conversionReviewVersions: ["v1alpha1", "v1beta1"]
+      clientConfig:
+        # this is "\n" used as a placeholder, otherwise it will be rejected by the apiserver for being blank,
+        # but we're going to set it later using the cert-manager (or potentially a patch if not using cert-manager)
+        caBundle: Cg==
+        service:
+          namespace: system
+          name: webhook-service
+          path: /convert
+  {{- end }}
   versions:
     - deprecated: true
       deprecationWarning: metallbio.io v1alpha1 AddressPool is deprecated
@@ -387,6 +404,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.7.0
+{{- if .Values.webhooks.enable }}
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ template "metallb.fullname" . }}-serving-cert    
+{{- end }}
   creationTimestamp: null
   name: bgppeers.metallb.io
 spec:
@@ -397,6 +417,20 @@ spec:
     plural: bgppeers
     singular: bgppeer
   scope: Namespaced
+  {{- if .Values.webhooks.enable }}
+  conversion:
+    strategy: Webhook
+    webhook:
+      conversionReviewVersions: ["v1beta1", "v1beta2"]
+      clientConfig:
+        # this is "\n" used as a placeholder, otherwise it will be rejected by the apiserver for being blank,
+        # but we're going to set it later using the cert-manager (or potentially a patch if not using cert-manager)
+        caBundle: Cg==
+        service:
+          namespace: system-metallb
+          name: webhook-service
+          path: /convert
+  {{- end }}
   versions:
   - name: v1beta1
     schema:
