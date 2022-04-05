@@ -16,6 +16,7 @@ type Listener struct {
 	sync.Mutex
 	ServiceChanged func(log.Logger, string, *v1.Service, epslices.EpsOrSlices) controllers.SyncState
 	ConfigChanged  func(log.Logger, *config.Config) controllers.SyncState
+	PoolChanged    func(log.Logger, map[string]*config.Pool) controllers.SyncState
 	NodeChanged    func(log.Logger, *v1.Node) controllers.SyncState
 }
 
@@ -35,4 +36,10 @@ func (l *Listener) NodeHandler(logger log.Logger, node *v1.Node) controllers.Syn
 	l.Lock()
 	defer l.Unlock()
 	return l.NodeChanged(logger, node)
+}
+
+func (l *Listener) PoolHandler(logger log.Logger, pools map[string]*config.Pool) controllers.SyncState {
+	l.Lock()
+	defer l.Unlock()
+	return l.PoolChanged(logger, pools)
 }
