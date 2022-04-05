@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
@@ -79,7 +80,7 @@ func (bgpPeer *BGPPeer) ValidateDelete() error {
 
 var getExistingBGPPeers = func() (*BGPPeerList, error) {
 	existingBGPPeerslList := &BGPPeerList{}
-	err := WebhookClient.List(context.Background(), existingBGPPeerslList)
+	err := WebhookClient.List(context.Background(), existingBGPPeerslList, &client.ListOptions{Namespace: MetalLBNamespace})
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to get existing BGPPeer objects")
 	}

@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
@@ -87,7 +88,7 @@ func (ipPool *IPPool) ValidateDelete() error {
 
 var getExistingIPPools = func() (*IPPoolList, error) {
 	existingIPPoolList := &IPPoolList{}
-	err := WebhookClient.List(context.Background(), existingIPPoolList)
+	err := WebhookClient.List(context.Background(), existingIPPoolList, &client.ListOptions{Namespace: MetalLBNamespace})
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to get existing IPPool objects")
 	}

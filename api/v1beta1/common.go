@@ -11,7 +11,8 @@ import (
 
 // log is for logging addresspool-webhook.
 var (
-	Logger        log.Logger
-	WebhookClient client.Client
-	Validator     validate.ClusterObjects
+	Logger           log.Logger
+	WebhookClient    client.Reader
+	Validator        validate.ClusterObjects
+	MetalLBNamespace string
 )
