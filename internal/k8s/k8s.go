@@ -169,6 +169,21 @@ func New(cfg *Config) (*Client, error) {
 		}
 	}
 
+	if cfg.PoolChanged != nil {
+		if err = (&controllers.PoolReconciler{
+			Client:         mgr.GetClient(),
+			Logger:         cfg.Logger,
+			Scheme:         mgr.GetScheme(),
+			Namespace:      cfg.Namespace,
+			ValidateConfig: cfg.ValidateConfig,
+			Handler:        cfg.PoolHandler,
+			ForceReload:    reload,
+		}).SetupWithManager(mgr); err != nil {
+			level.Error(c.logger).Log("error", err, "unable to create controller", "config")
+			return nil, errors.Wrap(err, "failed to create config reconciler")
+		}
+	}
+
 	if cfg.NodeChanged != nil {
 		if err = (&controllers.NodeReconciler{
 			Client:   mgr.GetClient(),

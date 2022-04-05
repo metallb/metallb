@@ -995,33 +995,22 @@ rules:
 - apiGroups:
   - metallb.io
   resources:
-  - addresspools
-  verbs:
-  - create
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - bfdprofiles
-  verbs:
-  - create
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
   - bgppeers
   verbs:
   - get
   - list
+- apiGroups:
+  - metallb.io
+  resources:
+  - addresspools
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - metallb.io
   resources:
-  - l2advertisements
+  - ipaddresspools
   verbs:
   - get
   - list
@@ -1037,7 +1026,7 @@ rules:
 - apiGroups:
   - metallb.io
   resources:
-  - ipaddresspools
+  - l2advertisements
   verbs:
   - get
   - list
@@ -1125,7 +1114,6 @@ rules:
   - ""
   resources:
   - services
-  - nodes
   verbs:
   - get
   - list

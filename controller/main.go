@@ -43,7 +43,7 @@ type service interface {
 
 type controller struct {
 	client service
-	config *config.Config
+	pools  map[string]*config.Pool
 	ips    *allocator.Allocator
 }
 
@@ -59,7 +59,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		return controllers.SyncStateReprocessAll
 	}
 
-	if c.config == nil {
+	if c.pools == nil {
 		// Config hasn't been read, nothing we can do just yet.
 		level.Debug(l).Log("event", "noConfig", "msg", "not processing, still waiting for config")
 		return controllers.SyncStateSuccess
@@ -98,20 +98,20 @@ func (c *controller) deleteBalancer(l log.Logger, name string) {
 	}
 }
 
-func (c *controller) SetConfig(l log.Logger, cfg *config.Config) controllers.SyncState {
+func (c *controller) SetPools(l log.Logger, pools map[string]*config.Pool) controllers.SyncState {
 	level.Debug(l).Log("event", "startUpdate", "msg", "start of config update")
 	defer level.Debug(l).Log("event", "endUpdate", "msg", "end of config update")
 
-	if cfg == nil {
+	if len(pools) == 0 {
 		level.Error(l).Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
 		return controllers.SyncStateErrorNoRetry
 	}
 
-	if err := c.ips.SetPools(cfg.Pools); err != nil {
+	if err := c.ips.SetPools(pools); err != nil {
 		level.Error(l).Log("op", "setConfig", "error", err, "msg", "applying new configuration failed")
 		return controllers.SyncStateError
 	}
-	c.config = cfg
+	c.pools = pools
 	return controllers.SyncStateReprocessAll
 }
 
@@ -166,7 +166,7 @@ func main() {
 		Namespace: *namespace,
 		Listener: k8s.Listener{
 			ServiceChanged: c.SetBalancer,
-			ConfigChanged:  c.SetConfig,
+			PoolChanged:    c.SetPools,
 		},
 		ValidateConfig: validation,
 		EnableWebhook:  *enableWebhook,

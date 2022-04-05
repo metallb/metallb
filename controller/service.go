@@ -156,7 +156,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	}
 
 	pool := c.ips.Pool(key)
-	if pool == "" || c.config.Pools[pool] == nil {
+	if pool == "" || c.pools[pool] == nil {
 		level.Error(l).Log("bug", "true", "ip", lbIPs, "msg", "internal error: allocated IP has no matching address pool")
 		c.client.Errorf(svc, "InternalError", "allocated an IP that has no pool")
 		c.clearServiceState(key, svc)
