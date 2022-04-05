@@ -12,6 +12,26 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
+      path: /validate-metallb-io-v1beta2-bgppeer
+  failurePolicy: Fail
+  name: bgppeersvalidationwebhook.metallb.io
+  rules:
+  - apiGroups:
+    - metallb.io
+    apiVersions:
+    - v1beta2
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - bgppeers
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
       path: /validate-metallb-io-v1beta1-addresspool
   failurePolicy: Fail
   name: addresspoolvalidationwebhook.metallb.io
@@ -65,24 +85,4 @@ webhooks:
     - UPDATE
     resources:
     - ippools
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
-      path: /validate-metallb-io-v1beta2-bgppeer
-  failurePolicy: Fail
-  name: bgppeersvalidationwebhook.metallb.io
-  rules:
-  - apiGroups:
-    - metallb.io
-    apiVersions:
-    - v1beta2
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - bgppeers
   sideEffects: None

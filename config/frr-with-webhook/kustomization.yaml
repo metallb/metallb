@@ -8,6 +8,8 @@ resources:
 patchesStrategicMerge:
 - controller-webhook-patch.yaml
 - webhookcainjection-patch.yaml
+- crd-conversion-patch.yaml
+- crdcainjection-patch.yaml
 
 # the following config is for teaching kustomize how to do var substitution
 # [CERTMANAGER] To enable cert-manager, uncomment all sections with 'CERTMANAGER' prefix.
