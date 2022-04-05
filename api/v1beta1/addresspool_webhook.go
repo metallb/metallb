@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
@@ -87,7 +88,7 @@ func (addressPool *AddressPool) ValidateDelete() error {
 
 var getExistingAddressPools = func() (*AddressPoolList, error) {
 	existingAddressPoolList := &AddressPoolList{}
-	err := WebhookClient.List(context.Background(), existingAddressPoolList)
+	err := WebhookClient.List(context.Background(), existingAddressPoolList, &client.ListOptions{Namespace: MetalLBNamespace})
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to get existing AddressPool objects")
 	}

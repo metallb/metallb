@@ -240,7 +240,7 @@ func New(cfg *Config) (*Client, error) {
 	}
 
 	if cfg.EnableWebhook {
-		err := enableWebhook(mgr, cfg.ValidateConfig, cfg.Logger)
+		err := enableWebhook(mgr, cfg.ValidateConfig, cfg.Namespace, cfg.Logger)
 		if err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create", "webhooks")
 			return nil, err
@@ -268,14 +268,16 @@ func New(cfg *Config) (*Client, error) {
 	return c, nil
 }
 
-func enableWebhook(mgr manager.Manager, validate config.Validate, logger log.Logger) error {
+func enableWebhook(mgr manager.Manager, validate config.Validate, namespace string, logger log.Logger) error {
 	level.Info(logger).Log("op", "startup", "action", "webhooks enabled")
 
 	// Used by all the webhooks
+	metallbv1beta1.MetalLBNamespace = namespace
+	metallbv1beta2.MetalLBNamespace = namespace
 	metallbv1beta1.Logger = logger
 	metallbv1beta2.Logger = logger
-	metallbv1beta1.WebhookClient = mgr.GetClient()
-	metallbv1beta2.WebhookClient = mgr.GetClient()
+	metallbv1beta1.WebhookClient = mgr.GetAPIReader()
+	metallbv1beta2.WebhookClient = mgr.GetAPIReader()
 	metallbv1beta1.Validator = config.NewValidator(validate)
 	metallbv1beta2.Validator = config.NewValidator(validate)
 
