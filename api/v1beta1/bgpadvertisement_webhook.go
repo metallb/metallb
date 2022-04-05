@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 )
 
@@ -99,7 +100,7 @@ func (bgpAdv *BGPAdvertisement) ValidateDelete() error {
 
 var getExistingBGPAdvs = func() (*BGPAdvertisementList, error) {
 	existingBGPAdvList := &BGPAdvertisementList{}
-	err := WebhookClient.List(context.Background(), existingBGPAdvList)
+	err := WebhookClient.List(context.Background(), existingBGPAdvList, &client.ListOptions{Namespace: MetalLBNamespace})
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to get existing BGPAdvertisement objects")
 	}
