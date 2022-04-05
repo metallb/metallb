@@ -7,7 +7,7 @@ metadata:
     {{- include "metallb.labels" . | nindent 4 }}
 rules:
 - apiGroups: [""]
-  resources: ["services, nodes"]
+  resources: ["services"]
   verbs: ["get", "list", "watch"]
 - apiGroups: [""]
   resources: ["services/status"]
@@ -98,20 +98,17 @@ rules:
   resources: ["addresspools"]
   verbs: ["get", "list", "watch"]
 - apiGroups: ["metallb.io"]
-  resources: ["bfdprofiles"]
+  resources: ["ipaddresspools"]
   verbs: ["get", "list", "watch"]
 - apiGroups: ["metallb.io"]
   resources: ["bgppeers"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["metallb.io"]
-  resources: ["l2advertisements"]
-  verbs: ["get", "list", "watch"]
+  verbs: ["get", "list"]
 - apiGroups: ["metallb.io"]
   resources: ["bgpadvertisements"]
-  verbs: ["get", "list", "watch"]
+  verbs: ["get", "list"]
 - apiGroups: ["metallb.io"]
-  resources: ["ipaddresspools"]
-  verbs: ["get", "list", "watch"]
+  resources: ["l2advertisements"]
+  verbs: ["get", "list"]
 {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1

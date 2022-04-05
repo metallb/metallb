@@ -112,28 +112,26 @@ func TestControllerMutation(t *testing.T) {
 		ips:    allocator.New(),
 		client: k,
 	}
-	cfg := &config.Config{
-		Pools: map[string]*config.Pool{
-			"pool1": {
-				AutoAssign: true,
-				CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
-			},
-			"pool2": {
-				AutoAssign: false,
-				CIDR:       []*net.IPNet{ipnet("3.4.5.6/32")},
-			},
-			"pool3": {
-				AutoAssign: true,
-				CIDR:       []*net.IPNet{ipnet("1000::/127")},
-			},
-			"pool4": {
-				AutoAssign: false,
-				CIDR:       []*net.IPNet{ipnet("2000::1/128")},
-			},
-			"pool5": {
-				AutoAssign: true,
-				CIDR:       []*net.IPNet{ipnet("1.2.3.0/31"), ipnet("1000::/127")},
-			},
+	pools := map[string]*config.Pool{
+		"pool1": {
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
+		},
+		"pool2": {
+			AutoAssign: false,
+			CIDR:       []*net.IPNet{ipnet("3.4.5.6/32")},
+		},
+		"pool3": {
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("1000::/127")},
+		},
+		"pool4": {
+			AutoAssign: false,
+			CIDR:       []*net.IPNet{ipnet("2000::1/128")},
+		},
+		"pool5": {
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("1.2.3.0/31"), ipnet("1000::/127")},
 		},
 	}
 
@@ -142,8 +140,8 @@ func TestControllerMutation(t *testing.T) {
 	// For this test, we just set a static config and immediately sync
 	// the controller. The mutations around config setting and syncing
 	// are tested elsewhere.
-	if c.SetConfig(l, cfg) == controllers.SyncStateError {
-		t.Fatalf("SetConfig failed")
+	if c.SetPools(l, pools) == controllers.SyncStateError {
+		t.Fatalf("SetPools failed")
 	}
 
 	// In steady state, every input below should be equivalent to a
@@ -812,8 +810,8 @@ func TestControllerConfig(t *testing.T) {
 	// Set an empty config. Balancer should still not do anything to
 	// our unallocated service, and return an error to force a
 	// retry after sync is complete.
-	if c.SetConfig(l, &config.Config{}) == controllers.SyncStateError {
-		t.Fatalf("SetConfig with empty config failed")
+	if c.SetPools(l, map[string]*config.Pool{}) == controllers.SyncStateError {
+		t.Fatalf("SetPools with empty config failed")
 	}
 
 	gotSvc = k.gotService(svc)
@@ -825,16 +823,14 @@ func TestControllerConfig(t *testing.T) {
 	}
 
 	// Set a config with some IPs. Still no allocation, not synced.
-	cfg := &config.Config{
-		Pools: map[string]*config.Pool{
-			"default": {
-				AutoAssign: true,
-				CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
-			},
+	pools := map[string]*config.Pool{
+		"default": {
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
 		},
 	}
-	if c.SetConfig(l, cfg) == controllers.SyncStateError {
-		t.Fatalf("SetConfig failed")
+	if c.SetPools(l, pools) == controllers.SyncStateError {
+		t.Fatalf("SetPools failed")
 	}
 
 	gotSvc = k.gotService(svc)
@@ -858,13 +854,13 @@ func TestControllerConfig(t *testing.T) {
 	}
 
 	// Now that an IP is allocated, removing the IP pool is not allowed.
-	if c.SetConfig(l, &config.Config{}) != controllers.SyncStateError {
-		t.Fatalf("SetConfig that deletes allocated IPs was accepted")
+	if c.SetPools(l, map[string]*config.Pool{}) == controllers.SyncStateError {
+		t.Fatalf("SetPools that deletes allocated IPs was accepted")
 	}
 
 	// Deleting the config also makes MetalLB sad.
-	if c.SetConfig(l, nil) != controllers.SyncStateErrorNoRetry {
-		t.Fatalf("SetConfig that deletes the config was accepted")
+	if c.SetPools(l, nil) != controllers.SyncStateErrorNoRetry {
+		t.Fatalf("SetPools that deletes the config was accepted")
 	}
 }
 
@@ -876,16 +872,14 @@ func TestDeleteRecyclesIP(t *testing.T) {
 	}
 
 	l := log.NewNopLogger()
-	cfg := &config.Config{
-		Pools: map[string]*config.Pool{
-			"default": {
-				AutoAssign: true,
-				CIDR:       []*net.IPNet{ipnet("1.2.3.0/32")},
-			},
+	pools := map[string]*config.Pool{
+		"default": {
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("1.2.3.0/32")},
 		},
 	}
-	if c.SetConfig(l, cfg) == controllers.SyncStateError {
-		t.Fatal("SetConfig failed")
+	if c.SetPools(l, pools) == controllers.SyncStateError {
+		t.Fatal("SetPools failed")
 	}
 
 	svc1 := &v1.Service{
@@ -968,8 +962,8 @@ func TestControllerDualStackConfig(t *testing.T) {
 	// Set an empty config. Balancer should still not do anything to
 	// our unallocated service, and return an error to force a
 	// retry after sync is complete.
-	if c.SetConfig(l, &config.Config{}) == controllers.SyncStateError {
-		t.Fatalf("SetConfig with empty config failed")
+	if c.SetPools(l, map[string]*config.Pool{}) == controllers.SyncStateError {
+		t.Fatalf("SetPools with empty config failed")
 	}
 
 	gotSvc = k.gotService(svc)
@@ -981,16 +975,15 @@ func TestControllerDualStackConfig(t *testing.T) {
 	}
 
 	// Set a config with some IPs. Still no allocation, not synced.
-	cfg := &config.Config{
-		Pools: map[string]*config.Pool{
-			"default": {
-				AutoAssign: true,
-				CIDR:       []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("1000::1/127")},
-			},
+	pools := map[string]*config.Pool{
+		"default": {
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("1000::1/127")},
 		},
 	}
-	if c.SetConfig(l, cfg) == controllers.SyncStateError {
-		t.Fatalf("SetConfig failed")
+
+	if c.SetPools(l, pools) == controllers.SyncStateError {
+		t.Fatalf("SetPools failed")
 	}
 
 	gotSvc = k.gotService(svc)
@@ -1014,13 +1007,13 @@ func TestControllerDualStackConfig(t *testing.T) {
 	}
 
 	// Now that an IP is allocated, removing the IP pool is not allowed.
-	if c.SetConfig(l, &config.Config{}) != controllers.SyncStateError {
-		t.Fatalf("SetConfig that deletes allocated IPs was accepted")
+	if c.SetPools(l, map[string]*config.Pool{}) != controllers.SyncStateErrorNoRetry {
+		t.Fatalf("SetPools that deletes allocated IPs was accepted")
 	}
 
 	// Deleting the config also makes MetalLB sad.
-	if c.SetConfig(l, nil) != controllers.SyncStateErrorNoRetry {
-		t.Fatalf("SetConfig that deletes the config was accepted")
+	if c.SetPools(l, nil) != controllers.SyncStateErrorNoRetry {
+		t.Fatalf("SetPools that deletes the config was accepted")
 	}
 }
 
@@ -1033,16 +1026,14 @@ func TestControllerSvcAddressSharing(t *testing.T) {
 	l := log.NewNopLogger()
 
 	// Set a config with some IPs. Still no allocation, not synced.
-	cfg := &config.Config{
-		Pools: map[string]*config.Pool{
-			"default": {
-				AutoAssign: true,
-				CIDR:       []*net.IPNet{ipnet("4.5.6.0/24")},
-			},
+	pool := map[string]*config.Pool{
+		"default": {
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("4.5.6.0/24")},
 		},
 	}
-	if c.SetConfig(l, cfg) == controllers.SyncStateError {
-		t.Fatalf("SetConfig failed")
+	if c.SetPools(l, pool) == controllers.SyncStateError {
+		t.Fatalf("SetPools failed")
 	}
 
 	// Configure svc1
