@@ -5,8 +5,10 @@ hostname dummyhostname
 ip nht resolve-via-default
 ipv6 nht resolve-via-default
 route-map 10.2.2.254-in deny 20
-
 route-map 10.2.2.254-out permit 1
+  match ip address prefix-list 10.2.2.254-pl-ipv4
+  on-match next
+ip prefix-list 10.2.2.254-pl-ipv4 deny any
 
 router bgp 100
   no bgp ebgp-requires-policy
@@ -25,8 +27,10 @@ router bgp 100
   address-family ipv4 unicast
     neighbor 10.2.2.254 activate
     neighbor 10.2.2.254 route-map 10.2.2.254-in in
+	neighbor 10.2.2.254 route-map 10.2.2.254-out out
   exit-address-family
   address-family ipv6 unicast
     neighbor 10.2.2.254 activate
     neighbor 10.2.2.254 route-map 10.2.2.254-in in
+	neighbor 10.2.2.254 route-map 10.2.2.254-out out
   exit-address-family
