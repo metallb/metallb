@@ -5,8 +5,10 @@ hostname dummyhostname
 ip nht resolve-via-default
 ipv6 nht resolve-via-default
 route-map 127.0.0.2-in deny 20
-
 route-map 127.0.0.2-out permit 1
+  match ip address prefix-list 127.0.0.2-pl-ipv4
+  on-match next
+ip prefix-list 127.0.0.2-pl-ipv4 deny any
 
 router bgp 100
   no bgp ebgp-requires-policy
@@ -24,8 +26,10 @@ router bgp 100
   address-family ipv4 unicast
     neighbor 127.0.0.2 activate
     neighbor 127.0.0.2 route-map 127.0.0.2-in in
+	neighbor 127.0.0.2 route-map 127.0.0.2-out out
   exit-address-family
   address-family ipv6 unicast
     neighbor 127.0.0.2 activate
     neighbor 127.0.0.2 route-map 127.0.0.2-in in
+	neighbor 127.0.0.2 route-map 127.0.0.2-out out
   exit-address-family
