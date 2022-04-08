@@ -68,17 +68,13 @@ func (r *ServiceReloadReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	level.Info(r.Log).Log("controller", "ServiceReloadReconciler", "start reconcile", req.NamespacedName.String())
 	defer level.Info(r.Log).Log("controller", "ServiceReloadReconciler", "end reconcile", req.NamespacedName.String())
 
-	return r.reprocessAllServices(ctx)
-}
-
-func (r *ServiceReloadReconciler) reprocessAllServices(ctx context.Context) (ctrl.Result, error) {
 	var services v1.ServiceList
 	if err := r.List(ctx, &services); err != nil {
 		level.Error(r.Log).Log("controller", "ServiceReloadReconciler", "error", "failed to list the services", "error", err)
 		return ctrl.Result{}, err
 	}
 
-	retry := true
+	retry := false
 	for _, service := range services.Items {
 		serviceName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 		eps, err := epsOrSlicesForServices(ctx, r, serviceName, r.Endpoints)
