@@ -16,6 +16,7 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/frr"
 	frrcontainer "go.universe.tf/metallb/e2etest/pkg/frr/container"
+	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	"go.universe.tf/metallb/e2etest/pkg/routes"
 	"go.universe.tf/metallb/e2etest/pkg/wget"
@@ -28,20 +29,41 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 )
 
-func validateFRRPeeredWithNodes(cs clientset.Interface, c *frrcontainer.FRR, ipFamily ipfamily.Family) {
+func validateFRRPeeredWithAllNodes(cs clientset.Interface, c *frrcontainer.FRR, ipFamily ipfamily.Family) {
 	allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	framework.ExpectNoError(err)
+	validateFRRPeeredWithNodes(cs, allNodes.Items, c, ipFamily)
+}
 
-	ginkgo.By(fmt.Sprintf("checking all nodes are peered with the frr instance %s", c.Name))
+func validateFRRNotPeeredWithNodes(cs clientset.Interface, nodes []corev1.Node, c *frrcontainer.FRR, ipFamily ipfamily.Family) {
+	for _, node := range nodes {
+		ginkgo.By(fmt.Sprintf("checking node %s is not peered with the frr instance %s", node.Name, c.Name))
+		Eventually(func() error {
+			neighbors, err := frr.NeighborsInfo(c)
+			framework.ExpectNoError(err)
+			err = frr.NeighborsMatchNodes([]corev1.Node{node}, neighbors, ipFamily)
+			return err
+		}, 4*time.Minute, 1*time.Second).Should(MatchError(ContainSubstring("not established")))
+	}
+}
+
+func validateFRRPeeredWithNodes(cs clientset.Interface, nodes []corev1.Node, c *frrcontainer.FRR, ipFamily ipfamily.Family) {
+	ginkgo.By(fmt.Sprintf("checking nodes are peered with the frr instance %s", c.Name))
 	Eventually(func() error {
 		neighbors, err := frr.NeighborsInfo(c)
 		framework.ExpectNoError(err)
-		err = frr.NeighborsMatchNodes(allNodes.Items, neighbors, ipFamily)
+		err = frr.NeighborsMatchNodes(nodes, neighbors, ipFamily)
 		return err
 	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
 
 func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1.Node, c *frrcontainer.FRR) {
+	Eventually(func() error {
+		return validateServiceNoWait(cs, svc, nodes, c)
+	}, 4*time.Minute, 1*time.Second).Should(BeNil())
+}
+
+func validateServiceNoWait(cs clientset.Interface, svc *corev1.Service, nodes []corev1.Node, c *frrcontainer.FRR) error {
 	port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
 
 	if len(svc.Status.LoadBalancer.Ingress) == 2 {
@@ -55,46 +77,43 @@ func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1
 		hostport := net.JoinHostPort(ingressIP, port)
 		address := fmt.Sprintf("http://%s/", hostport)
 
-		Eventually(func() error {
-			err := wget.Do(address, c)
+		err := wget.Do(address, c)
+		if err != nil {
+			return err
+		}
+
+		frrRoutesV4, frrRoutesV6, err := frr.Routes(c)
+		if err != nil {
+			return err
+		}
+		serviceIPFamily := ipfamily.IPv4
+		frrRoutes, ok := frrRoutesV4[ingressIP]
+		if !ok {
+			frrRoutes, ok = frrRoutesV6[ingressIP]
+			serviceIPFamily = ipfamily.IPv6
+		}
+		if !ok {
+			return fmt.Errorf("%s not found in frr routes %v %v", ingressIP, frrRoutesV4, frrRoutesV6)
+		}
+		if !strings.EqualFold(frrRoutes.Origin, "IGP") {
+			return fmt.Errorf("route for %s not set with igp origin", ingressIP)
+		}
+
+		err = frr.RoutesMatchNodes(nodes, frrRoutes, serviceIPFamily)
+		if err != nil {
+			return err
+		}
+
+		// The BGP routes will not match the nodes if static routes were added.
+		if !(c.Network == multiHopNetwork) {
+			advertised := routes.ForIP(ingressIP, c)
+			err = routes.MatchNodes(nodes, advertised, serviceIPFamily)
 			if err != nil {
 				return err
 			}
-
-			frrRoutesV4, frrRoutesV6, err := frr.Routes(c)
-			if err != nil {
-				return err
-			}
-			serviceIPFamily := ipfamily.IPv4
-			frrRoutes, ok := frrRoutesV4[ingressIP]
-			if !ok {
-				frrRoutes, ok = frrRoutesV6[ingressIP]
-				serviceIPFamily = ipfamily.IPv6
-			}
-			if !ok {
-				return fmt.Errorf("%s not found in frr routes %v %v", ingressIP, frrRoutesV4, frrRoutesV6)
-			}
-			if !strings.EqualFold(frrRoutes.Origin, "IGP") {
-				return fmt.Errorf("route for %s not set with igp origin", ingressIP)
-			}
-
-			err = frr.RoutesMatchNodes(nodes, frrRoutes, serviceIPFamily)
-			if err != nil {
-				return err
-			}
-
-			// The BGP routes will not match the nodes if static routes were added.
-			if !(c.Network == multiHopNetwork) {
-				advertised := routes.ForIP(ingressIP, c)
-				err = routes.MatchNodes(nodes, advertised, serviceIPFamily)
-				if err != nil {
-					return err
-				}
-			}
-
-			return nil
-		}, 4*time.Minute, 1*time.Second).Should(BeNil())
+		}
 	}
+	return nil
 }
 
 func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily ipfamily.Family) {
@@ -143,6 +162,89 @@ func validateDesiredLB(svc *corev1.Service) {
 		return
 	}
 	framework.ExpectEqual(desiredLbIPs, strings.Join(getIngressIPs(svc.Status.LoadBalancer.Ingress), ","))
+}
+
+func checkServiceOnlyOnNodes(cs clientset.Interface, svc *corev1.Service, expectedNodes []corev1.Node, ipFamily ipfamily.Family) {
+	if len(expectedNodes) == 0 {
+		return
+	}
+	ip := svc.Status.LoadBalancer.Ingress[0].IP
+	nodeIps := k8s.NodeIPsForFamily(expectedNodes, ipFamily)
+
+	for _, c := range FRRContainers {
+		validateService(cs, svc, expectedNodes, c)
+		Eventually(func() error {
+			routes, err := frr.RoutesForFamily(c, ipFamily)
+			if len(routes[ip].NextHops) != len(nodeIps) {
+				return fmt.Errorf("%s: invalid number of routes for %s: expecting %d got %d", c.Name, ip, len(nodeIps), len(routes[ip].NextHops))
+			}
+
+		OUTER:
+			for _, n := range routes[ip].NextHops {
+				for _, ip := range nodeIps {
+					if n.String() == ip {
+						continue OUTER
+					}
+				}
+				return fmt.Errorf("UnexpectedIP found %s, nodes %s in container %s for service %s", n.String(), nodeIps, c.Name, ip)
+			}
+			return err
+		}, time.Minute, time.Second).Should(Not(HaveOccurred()))
+	}
+}
+
+func checkCommunitiesOnlyOnNodes(cs clientset.Interface, svc *corev1.Service, community string, expectedNodes []corev1.Node, ipFamily ipfamily.Family) {
+	if len(expectedNodes) == 0 {
+		return
+	}
+	ip := svc.Status.LoadBalancer.Ingress[0].IP
+	nodeIps := k8s.NodeIPsForFamily(expectedNodes, ipFamily)
+
+	for _, c := range FRRContainers {
+		Eventually(func() error {
+			routes, err := frr.RoutesForCommunity(c, community, ipFamily)
+			if len(routes[ip].NextHops) != len(nodeIps) {
+				return fmt.Errorf("%s: invalid number of routes for %s: expecting %d got %d", c.Name, ip, len(nodeIps), len(routes[ip].NextHops))
+			}
+
+		OUTER:
+			for _, n := range routes[ip].NextHops {
+				for _, ip := range nodeIps {
+					if n.String() == ip {
+						continue OUTER
+					}
+				}
+				return fmt.Errorf("UnexpectedIP found %s, nodes %s in container %s for service %s", n.String(), nodeIps, c.Name, ip)
+			}
+			return err
+		}, 10*time.Minute, time.Second).Should(Not(HaveOccurred()))
+	}
+}
+
+func nodesForSelection(nodes []corev1.Node, selected []int) []corev1.Node {
+	selectedNodes := []corev1.Node{}
+	for _, i := range selected {
+		if i >= len(nodes) {
+			ginkgo.Skip("Not enough nodes")
+		}
+		selectedNodes = append(selectedNodes, nodes[i])
+	}
+	return selectedNodes
+}
+
+func nodesNotSelected(nodes []corev1.Node, selected []int) []corev1.Node {
+	nonSelectedNodes := []corev1.Node{}
+OUTER:
+	for i, n := range nodes {
+		for _, j := range selected {
+			if i == j {
+				continue OUTER
+			}
+		}
+		nonSelectedNodes = append(nonSelectedNodes, n)
+	}
+
+	return nonSelectedNodes
 }
 
 func getIngressIPs(ingresses []corev1.LoadBalancerIngress) []string {
