@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 
@@ -88,23 +87,23 @@ func (r *ServiceReloadReconciler) reprocessAllServices(ctx context.Context) (ctr
 			return ctrl.Result{}, err
 		}
 
-		level.Debug(r.Log).Log("controller", "ServiceReloadReconciler", "reprocessing service", spew.Sdump(service))
+		level.Debug(r.Log).Log("controller", "ServiceReloadReconciler", "reprocessing service", dumpResource(service))
 
 		res := r.Handler(r.Log, serviceName.String(), &service, eps)
 		switch res {
 		case SyncStateError:
-			level.Error(r.Log).Log("controller", "ServiceReloadReconciler", "name", serviceName, "service", spew.Sdump(service), "endpoints", spew.Sdump(eps), "event", "failed to handle service, retry")
+			level.Error(r.Log).Log("controller", "ServiceReloadReconciler", "name", serviceName, "service", dumpResource(service), "endpoints", dumpResource(eps), "event", "failed to handle service, retry")
 			retry = true
 		case SyncStateReprocessAll:
 			retry = true
 		case SyncStateErrorNoRetry:
-			level.Error(r.Log).Log("controller", "ServiceReloadReconciler", "name", serviceName, "service", spew.Sdump(service), "endpoints", spew.Sdump(eps), "event", "failed to handle service, no retry")
+			level.Error(r.Log).Log("controller", "ServiceReloadReconciler", "name", serviceName, "service", dumpResource(service), "endpoints", dumpResource(eps), "event", "failed to handle service, no retry")
 		}
 	}
 	if retry {
 		// in case we want to retry, we return an error to trigger the exponential backoff mechanism so that
 		// this controller won't loop at full speed
-		level.Info(r.Log).Log("controller", "ConfigReconciler", "event", "force service reload")
+		level.Info(r.Log).Log("controller", "ServiceReloadReconciler", "event", "force service reload")
 		return ctrl.Result{}, retryError
 	}
 	return ctrl.Result{}, nil

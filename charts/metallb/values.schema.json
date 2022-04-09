@@ -166,6 +166,16 @@
         }
       }
     },
+    "webhooks": {
+      "description": "webhooks configuration",
+      "type": "object",
+      "properties": {
+        "enable": {
+          "description": "Enables webhooks",
+          "type": "boolean"
+        }
+      }
+    },
     "psp": {
       "description": "PSP configuration",
       "type": "object",
@@ -266,12 +276,6 @@
         }
       },
       "required": [ "podMonitor", "prometheusRule" ]
-    },
-    "controller": { 
-      "allOf": [
-        { "$ref": "#/definitions/component" },
-        { "description": "MetalLB Controller" }
-      ]
     },
     "speaker": { 
       "allOf": [

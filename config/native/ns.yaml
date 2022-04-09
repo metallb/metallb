@@ -1,6 +1,4 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  labels:
-    control-plane: controller-manager
-  name: system
+  name: metallb-system

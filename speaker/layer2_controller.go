@@ -21,6 +21,7 @@ import (
 	"sort"
 
 	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	"go.universe.tf/metallb/internal/layer2"
@@ -94,6 +95,7 @@ func usableNodes(eps epslices.EpsOrSlices, speakers map[string]bool) []string {
 
 func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce []net.IP, svc *v1.Service, eps epslices.EpsOrSlices) string {
 	if !activeEndpointExists(eps) { // no active endpoints, just return
+		level.Debug(l).Log("event", "shouldannounce", "protocol", "l2", "message", "failed no active endpoints", "service", name)
 		return "notOwner"
 	}
 	var nodes []string

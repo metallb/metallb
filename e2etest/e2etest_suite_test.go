@@ -35,6 +35,7 @@ import (
 	testsconfig "go.universe.tf/metallb/e2etest/pkg/config"
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	"go.universe.tf/metallb/e2etest/pkg/service"
+	"go.universe.tf/metallb/e2etest/webhookstests"
 	internalconfig "go.universe.tf/metallb/internal/config"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
@@ -53,7 +54,15 @@ var (
 func handleFlags() {
 	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
 	framework.RegisterCommonFlags(flag.CommandLine)
-	framework.RegisterClusterFlags(flag.CommandLine)
+	/*
+		Using framework.RegisterClusterFlags(flag.CommandLine) results in a panic:
+		"flag redefined: kubeconfig".
+		This happens because controller-runtime registers the kubeconfig flag as well.
+		To solve this we set the framework's kubeconfig directly via the KUBECONFIG env var
+		instead of letting it call the flag. Since we also use the provider flag it is handled manually.
+	*/
+	flag.StringVar(&framework.TestContext.Provider, "provider", "", "The name of the Kubernetes provider (gce, gke, local, skeleton (the fallback if not set), etc.)")
+	framework.TestContext.KubeConfig = os.Getenv(clientcmd.RecommendedConfigPathEnvVar)
 
 	flag.IntVar(&service.TestServicePort, "service-pod-port", 80, "port number that pod opens, default: 80")
 	flag.BoolVar(&skipDockerCmd, "skip-docker", false, "set this to true if the BGP daemon is running on the host instead of in a container")
@@ -124,6 +133,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	bgptests.ConfigUpdater = updater
 	l2tests.ConfigUpdater = updater
+	webhookstests.ConfigUpdater = updater
 })
 
 var _ = ginkgo.AfterSuite(func() {

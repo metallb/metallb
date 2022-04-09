@@ -11,6 +11,7 @@ import (
 	"go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/pointer"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -961,6 +962,115 @@ func TestParse(t *testing.T) {
 				BFDProfiles: map[string]*BFDProfile{
 					"default": {
 						Name: "default",
+					},
+				},
+			},
+		},
+		{
+			desc: "BGP Peer with both password and secret ref set",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:    42,
+							ASN:      42,
+							Address:  "1.2.3.4",
+							Password: "nopass",
+							PasswordSecret: corev1.SecretReference{Name: "nosecret",
+								Namespace: "metallb-system"},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "BGP Peer with invalid secret type",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "1.2.3.4",
+							PasswordSecret: corev1.SecretReference{Name: "bgpsecret",
+								Namespace: "metallb-system"},
+						},
+					},
+				},
+				PasswordSecrets: map[string]corev1.Secret{
+					"bgpsecret": {Type: corev1.SecretTypeOpaque, ObjectMeta: v1.ObjectMeta{Name: "bgpsecret", Namespace: "metallb-system"}},
+				},
+			},
+		},
+		{
+			desc: "BGP Peer without password set in the secret",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "1.2.3.4",
+							PasswordSecret: corev1.SecretReference{Name: "bgpsecret",
+								Namespace: "metallb-system"},
+						},
+					},
+				},
+				PasswordSecrets: map[string]corev1.Secret{
+					"bgpsecret": {Type: corev1.SecretTypeBasicAuth, ObjectMeta: v1.ObjectMeta{Name: "bgpsecret", Namespace: "metallb-system"}},
+				},
+			},
+		},
+		{
+			desc: "BGP Peer with a valid secret",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Port:    179,
+							Address: "1.2.3.4",
+							PasswordSecret: corev1.SecretReference{Name: "bgpsecret",
+								Namespace: "metallb-system"},
+						},
+					},
+				},
+				PasswordSecrets: map[string]corev1.Secret{
+					"bgpsecret": {Type: corev1.SecretTypeBasicAuth, ObjectMeta: v1.ObjectMeta{Name: "bgpsecret", Namespace: "metallb-system"},
+						Data: map[string][]byte{"password": []byte([]byte("nopass"))}},
+				},
+			},
+			want: &Config{
+				Peers: []*Peer{
+					{
+						MyASN:         42,
+						ASN:           42,
+						Addr:          net.ParseIP("1.2.3.4"),
+						Port:          179,
+						HoldTime:      90 * time.Second,
+						KeepaliveTime: 30 * time.Second,
+						NodeSelectors: []labels.Selector{labels.Everything()},
+						BFDProfile:    "",
+						Password:      "nopass",
+					},
+				},
+				Pools:       map[string]*Pool{},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
+			desc: "BGP Peer with unavailable secret ref",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "1.2.3.4",
+							PasswordSecret: corev1.SecretReference{Name: "nosecret",
+								Namespace: "metallb-system"},
+						},
 					},
 				},
 			},
