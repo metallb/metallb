@@ -52,11 +52,12 @@ import (
 )
 
 const (
-	v4PoolAddresses      = "192.168.10.0/24"
-	v6PoolAddresses      = "fc00:f853:0ccd:e799::/124"
-	CommunityNoAdv       = "65535:65282" // 0xFFFFFF02: NO_ADVERTISE
-	IPLocalPref          = uint32(300)
-	SpeakerContainerName = "speaker"
+	v4PoolAddresses       = "192.168.10.0/24"
+	v6PoolAddresses       = "fc00:f853:0ccd:e799::/124"
+	CommunityNoAdv        = "65535:65282" // 0xFFFFFF02: NO_ADVERTISE
+	CommunityGracefulShut = "65535:0"     // GRACEFUL_SHUTDOWN
+	IPLocalPref           = uint32(300)
+	SpeakerContainerName  = "speaker"
 )
 
 var ConfigUpdater config.Updater
@@ -72,27 +73,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentGinkgoTestDescription().Failed {
-			for _, c := range FRRContainers {
-				address := c.Ipv4
-				if address == "" {
-					address = c.Ipv6
-				}
-				peerAddr := address + fmt.Sprintf(":%d", c.RouterConfig.BGPPort)
-				dump, err := frr.RawDump(c, "/etc/frr/bgpd.conf", "/tmp/frr.log", "/etc/frr/daemons")
-				framework.Logf("External frr dump for %s:%s\n%s\nerrors:%v", c.Name, peerAddr, dump, err)
-			}
-
-			speakerPods, err := metallb.SpeakerPods(cs)
-			framework.ExpectNoError(err)
-			for _, pod := range speakerPods {
-				if len(pod.Spec.Containers) == 1 { // we dump only in case of frr
-					break
-				}
-				podExec := executor.ForPod(pod.Namespace, pod.Name, "frr")
-				dump, err := frr.RawDump(podExec, "/etc/frr/frr.conf", "/etc/frr/frr.log")
-				framework.Logf("External frr dump for pod %s\n%s %v", pod.Name, dump, err)
-			}
-			k8s.DescribeSvc(f.Namespace.Name)
+			dumpBGPInfo(cs, f)
 		}
 	})
 
@@ -139,7 +120,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		framework.ExpectNoError(err)
 
 		for _, c := range FRRContainers {
-			validateFRRPeeredWithNodes(cs, c, pairingIPFamily)
+			validateFRRPeeredWithAllNodes(cs, c, pairingIPFamily)
 		}
 
 		allNodes, err = cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
@@ -261,7 +242,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 
 			for _, c := range FRRContainers {
-				validateFRRPeeredWithNodes(cs, c, ipFamily)
+				validateFRRPeeredWithAllNodes(cs, c, ipFamily)
 			}
 
 			ginkgo.By("checking the metrics when no service is added")
@@ -381,7 +362,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 
 			for _, c := range FRRContainers {
-				validateFRRPeeredWithNodes(cs, c, pairingFamily)
+				validateFRRPeeredWithAllNodes(cs, c, pairingFamily)
 			}
 
 			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
@@ -481,7 +462,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		}
 
 		for _, c := range FRRContainers {
-			validateFRRPeeredWithNodes(cs, c, ipFamily)
+			validateFRRPeeredWithAllNodes(cs, c, ipFamily)
 			neighbors, err := frr.NeighborsInfo(c)
 			framework.ExpectNoError(err)
 			for _, n := range neighbors {
@@ -517,7 +498,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		}
 
 		for _, c := range FRRContainers {
-			validateFRRPeeredWithNodes(cs, c, ipFamily)
+			validateFRRPeeredWithAllNodes(cs, c, ipFamily)
 		}
 	},
 		table.Entry("IPV4 with Secret Ref set for BGPPeer CR", ipfamily.IPv4),
@@ -557,7 +538,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 
 			for _, c := range FRRContainers {
-				validateFRRPeeredWithNodes(cs, c, pairingFamily)
+				validateFRRPeeredWithAllNodes(cs, c, pairingFamily)
 			}
 			for _, c := range FRRContainers {
 				validateService(cs, svc, allNodes.Items, c)
@@ -701,7 +682,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 
 			for _, c := range FRRContainers {
-				validateFRRPeeredWithNodes(cs, c, pairingFamily)
+				validateFRRPeeredWithAllNodes(cs, c, pairingFamily)
 			}
 
 			ginkgo.By("checking metrics")
@@ -922,7 +903,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				framework.ExpectNoError(err)
 
 				for _, c := range FRRContainers {
-					validateFRRPeeredWithNodes(cs, c, ipFamily)
+					validateFRRPeeredWithAllNodes(cs, c, ipFamily)
 				}
 
 				ginkgo.By(fmt.Sprintf("configure service number %d", i+1))
@@ -969,7 +950,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				err = frrcontainer.PairWithNodes(cs, c, ipFamily)
 				framework.ExpectNoError(err)
 
-				validateFRRPeeredWithNodes(cs, FRRContainers[i], ipFamily)
+				validateFRRPeeredWithAllNodes(cs, FRRContainers[i], ipFamily)
 			}
 		},
 			table.Entry("IPV4", ipfamily.IPv4),
@@ -1027,7 +1008,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				framework.ExpectNoError(err)
 
 				for _, c := range FRRContainers {
-					validateFRRPeeredWithNodes(cs, c, ipFamily)
+					validateFRRPeeredWithAllNodes(cs, c, ipFamily)
 				}
 
 				ipWithAdvertisement, err := config.GetIPFromRangeByIndex(rangeWithAdvertisement, 0)
@@ -1242,7 +1223,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		framework.ExpectNoError(err)
 
 		for _, c := range FRRContainers {
-			validateFRRPeeredWithNodes(cs, c, pairingIPFamily)
+			validateFRRPeeredWithAllNodes(cs, c, pairingIPFamily)
 		}
 		speakerPods, err := metallb.SpeakerPods(cs)
 		framework.ExpectNoError(err)
