@@ -442,8 +442,9 @@ var _ = ginkgo.Describe("L2", func() {
 			ingressIP := e2eservice.GetIngressPoint(
 				&svc.Status.LoadBalancer.Ingress[0])
 
-			err = mac.RequestAddressResolution(ingressIP, executor.Host)
-			framework.ExpectNoError(err)
+			gomega.Eventually(func() error {
+				return mac.RequestAddressResolution(ingressIP, executor.Host)
+			}, 2*time.Minute, 1*time.Second).Should(gomega.Not(gomega.HaveOccurred()))
 
 			ginkgo.By("checking connectivity to its external VIP")
 			hostport := net.JoinHostPort(ingressIP, port)

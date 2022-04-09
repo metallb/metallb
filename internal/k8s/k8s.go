@@ -97,7 +97,7 @@ type Config struct {
 	DisableEpSlices bool
 	Namespace       string
 	ValidateConfig  config.Validate
-
+	EnableWebhook   bool
 	Listener
 }
 
@@ -125,6 +125,7 @@ func New(cfg *Config) (*Client, error) {
 				&metallbv1beta1.IPPool{}:           namespaceSelector,
 				&metallbv1beta1.L2Advertisement{}:  namespaceSelector,
 				&metallbv1beta2.BGPPeer{}:          namespaceSelector,
+				&corev1.Secret{}:                   namespaceSelector,
 			},
 		}),
 	})
@@ -238,6 +239,14 @@ func New(cfg *Config) (*Client, error) {
 		Reload:    reloadChan,
 	}
 
+	if cfg.EnableWebhook {
+		err := enableWebhook(mgr, cfg.ValidateConfig, cfg.Namespace, cfg.Logger)
+		if err != nil {
+			level.Error(c.logger).Log("error", err, "unable to create", "webhooks")
+			return nil, err
+		}
+	}
+
 	mux := http.NewServeMux()
 	mux.Handle("/metrics", promhttp.Handler())
 
@@ -257,6 +266,42 @@ func New(cfg *Config) (*Client, error) {
 	}(c.logger)
 
 	return c, nil
+}
+
+func enableWebhook(mgr manager.Manager, validate config.Validate, namespace string, logger log.Logger) error {
+	level.Info(logger).Log("op", "startup", "action", "webhooks enabled")
+
+	// Used by all the webhooks
+	metallbv1beta1.MetalLBNamespace = namespace
+	metallbv1beta2.MetalLBNamespace = namespace
+	metallbv1beta1.Logger = logger
+	metallbv1beta2.Logger = logger
+	metallbv1beta1.WebhookClient = mgr.GetAPIReader()
+	metallbv1beta2.WebhookClient = mgr.GetAPIReader()
+	metallbv1beta1.Validator = config.NewValidator(validate)
+	metallbv1beta2.Validator = config.NewValidator(validate)
+
+	if err := (&metallbv1beta1.AddressPool{}).SetupWebhookWithManager(mgr); err != nil {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "AddressPool")
+		return err
+	}
+
+	if err := (&metallbv1beta1.IPPool{}).SetupWebhookWithManager(mgr); err != nil {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "IPPool")
+		return err
+	}
+
+	if err := (&metallbv1beta2.BGPPeer{}).SetupWebhookWithManager(mgr); err != nil {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "BGPPeer v1beta2")
+		return err
+	}
+
+	if err := (&metallbv1beta1.BGPAdvertisement{}).SetupWebhookWithManager(mgr); err != nil {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "BGPAdvertisement")
+		return err
+	}
+
+	return nil
 }
 
 // CreateMlSecret create the memberlist secret.

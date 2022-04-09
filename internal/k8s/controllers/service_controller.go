@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
 
@@ -65,7 +64,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 	if service != nil {
-		level.Debug(r.Logger).Log("controller", "ServiceReconciler", "processing service", spew.Sdump(service))
+		level.Debug(r.Logger).Log("controller", "ServiceReconciler", "processing service", dumpResource(service))
 	} else {
 		level.Debug(r.Logger).Log("controller", "ServiceReconciler", "processing deletion on service", req.NamespacedName.String())
 	}
@@ -73,7 +72,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	res := r.Handler(r.Logger, req.NamespacedName.String(), service, epSlices)
 	switch res {
 	case SyncStateError:
-		level.Error(r.Logger).Log("controller", "ServiceReconciler", "name", req.NamespacedName.String(), "service", spew.Sdump(service), "endpoints", spew.Sdump(epSlices), "event", "failed to handle service")
+		level.Error(r.Logger).Log("controller", "ServiceReconciler", "name", req.NamespacedName.String(), "service", dumpResource(service), "endpoints", dumpResource(epSlices), "event", "failed to handle service")
 		return ctrl.Result{}, nil
 	case SyncStateReprocessAll:
 		level.Info(r.Logger).Log("controller", "ServiceReconciler", "event", "force service reload")
@@ -101,6 +100,7 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 						level.Error(r.Logger).Log("controller", "ServiceReconciler", "error", "failed to get serviceName for slice", "error", err, "epslice", epSlice.Name)
 						return []reconcile.Request{}
 					}
+					level.Debug(r.Logger).Log("controller", "ServiceReconciler", "enqueueing", serviceName, "epslice", dumpResource(epSlice))
 					return []reconcile.Request{{NamespacedName: serviceName}}
 				})).
 			Complete(r)
@@ -115,7 +115,9 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 						level.Error(r.Logger).Log("controller", "ServiceReconciler", "error", "received an object that is not an endpoint")
 						return []reconcile.Request{}
 					}
-					return []reconcile.Request{{NamespacedName: types.NamespacedName{Name: endpoints.Name, Namespace: endpoints.Namespace}}}
+					name := types.NamespacedName{Name: endpoints.Name, Namespace: endpoints.Namespace}
+					level.Debug(r.Logger).Log("controller", "ServiceReconciler", "enqueueing", name, "endpoints", dumpResource(endpoints))
+					return []reconcile.Request{{NamespacedName: name}}
 				})).
 			Complete(r)
 

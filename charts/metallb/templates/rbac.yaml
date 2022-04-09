@@ -54,6 +54,9 @@ rules:
 - apiGroups: [""]
   resources: ["pods"]
   verbs: ["list"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch"]
 - apiGroups: ["metallb.io"]
   resources: ["addresspools"]
   verbs: ["get", "list", "watch"]
@@ -82,7 +85,7 @@ metadata:
 rules:
 - apiGroups: [""]
   resources: ["secrets"]
-  verbs: ["create"]
+  verbs: ["create", "get", "list", "watch"]
 - apiGroups: [""]
   resources: ["secrets"]
   resourceNames: [{{ include "metallb.secretName" . | quote }}]
