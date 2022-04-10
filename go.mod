@@ -33,7 +33,7 @@ require (
 	k8s.io/apiextensions-apiserver v0.23.0
 	k8s.io/apimachinery v0.23.0
 	k8s.io/client-go v0.23.0
-	k8s.io/klog v0.3.1
+	k8s.io/klog v1.0.0
 	k8s.io/kubernetes v1.21.23
 	sigs.k8s.io/controller-runtime v0.11.1
 )
