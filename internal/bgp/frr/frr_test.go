@@ -374,6 +374,78 @@ func TestSingleAdvertisementChange(t *testing.T) {
 	testCheckConfigFile(t)
 }
 
+func TestSingleAdvertisementWithPeerSelector(t *testing.T) {
+	testSetup(t)
+
+	l := log.NewNopLogger()
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
+	defer close(sessionManager.reloadConfig)
+	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer")
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	prefix := &net.IPNet{
+		IP:   net.ParseIP("172.16.1.10"),
+		Mask: classCMask,
+	}
+	communities := []uint32{}
+	community, _ := config.ParseCommunity("1111:2222")
+	communities = append(communities, community)
+	community, _ = config.ParseCommunity("3333:4444")
+	communities = append(communities, community)
+	adv := &bgp.Advertisement{
+		Prefix:      prefix,
+		Communities: communities,
+		LocalPref:   300,
+		Peers:       []string{"test-peer"},
+	}
+
+	err = session.Set(adv)
+	if err != nil {
+		t.Fatalf("Could not advertise prefix: %s", err)
+	}
+
+	testCheckConfigFile(t)
+}
+
+func TestSingleAdvertisementNonExistingPeer(t *testing.T) {
+	testSetup(t)
+
+	l := log.NewNopLogger()
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
+	defer close(sessionManager.reloadConfig)
+	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer")
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	prefix := &net.IPNet{
+		IP:   net.ParseIP("172.16.1.10"),
+		Mask: classCMask,
+	}
+	communities := []uint32{}
+	community, _ := config.ParseCommunity("1111:2222")
+	communities = append(communities, community)
+	community, _ = config.ParseCommunity("3333:4444")
+	communities = append(communities, community)
+	adv := &bgp.Advertisement{
+		Prefix:      prefix,
+		Communities: communities,
+		LocalPref:   300,
+		Peers:       []string{"peer1"},
+	}
+
+	err = session.Set(adv)
+	if err != nil {
+		t.Fatalf("Could not advertise prefix: %s", err)
+	}
+
+	testCheckConfigFile(t)
+}
+
 func TestTwoAdvertisements(t *testing.T) {
 	testSetup(t)
 
@@ -443,6 +515,60 @@ func TestTwoAdvertisementsTwoSessions(t *testing.T) {
 	adv1 := &bgp.Advertisement{
 		Prefix:      prefix1,
 		Communities: communities,
+	}
+
+	prefix2 := &net.IPNet{
+		IP:   net.ParseIP("172.16.1.11"),
+		Mask: classCMask,
+	}
+
+	adv2 := &bgp.Advertisement{
+		Prefix:      prefix2,
+		Communities: communities,
+		LocalPref:   2,
+	}
+
+	err = session.Set(adv1, adv2)
+	if err != nil {
+		t.Fatalf("Could not advertise prefix: %s", err)
+	}
+	err = session1.Set(adv1, adv2)
+	if err != nil {
+		t.Fatalf("Could not advertise prefix: %s", err)
+	}
+
+	testCheckConfigFile(t)
+}
+
+func TestTwoAdvertisementsTwoSessionsOneWithPeerSelector(t *testing.T) {
+	testSetup(t)
+
+	l := log.NewNopLogger()
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
+	defer close(sessionManager.reloadConfig)
+	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer")
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	session1, err := sessionManager.NewSession(l, "10.2.2.255:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer1")
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session1.Close()
+
+	prefix1 := &net.IPNet{
+		IP:   net.ParseIP("172.16.1.10"),
+		Mask: classCMask,
+	}
+	communities := []uint32{}
+	community, _ := config.ParseCommunity("1111:2222")
+	communities = append(communities, community)
+	adv1 := &bgp.Advertisement{
+		Prefix:      prefix1,
+		Communities: communities,
+		Peers:       []string{"test-peer"},
 	}
 
 	prefix2 := &net.IPNet{
