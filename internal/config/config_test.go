@@ -56,6 +56,9 @@ func TestParse(t *testing.T) {
 			crs: ClusterResources{
 				Peers: []v1beta2.BGPPeer{
 					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "peer1",
+						},
 						Spec: v1beta2.BGPPeerSpec{
 							MyASN:        42,
 							ASN:          142,
@@ -68,6 +71,9 @@ func TestParse(t *testing.T) {
 						},
 					},
 					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "peer2",
+						},
 						Spec: v1beta2.BGPPeerSpec{
 							MyASN:        100,
 							ASN:          200,
@@ -148,6 +154,7 @@ func TestParse(t *testing.T) {
 							LocalPref:         uint32(100),
 							Communities:       []string{ /* TODO CRD Add communities"bar", */ "1234:2345"},
 							IPAddressPools:    []string{"pool1"},
+							Peers:             []string{"peer1"},
 						},
 					},
 					{
@@ -188,6 +195,7 @@ func TestParse(t *testing.T) {
 			want: &Config{
 				Peers: []*Peer{
 					{
+						Name:          "peer1",
 						MyASN:         42,
 						ASN:           142,
 						Addr:          net.ParseIP("1.2.3.4"),
@@ -200,6 +208,7 @@ func TestParse(t *testing.T) {
 						EBGPMultiHop:  true,
 					},
 					{
+						Name:          "peer2",
 						MyASN:         100,
 						ASN:           200,
 						Addr:          net.ParseIP("2.3.4.5"),
@@ -224,6 +233,7 @@ func TestParse(t *testing.T) {
 									0x04D20929: true,
 								},
 								Nodes: map[string]bool{},
+								Peers: []string{"peer1"},
 							},
 							{
 								AggregationLength:   24,
@@ -1703,6 +1713,79 @@ func TestParse(t *testing.T) {
 								"second": true,
 							},
 						}},
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
+			desc: "advertisement with peer selector",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"1.2.3.0/24",
+							},
+						},
+					},
+				},
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "peer1",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "1.2.3.4",
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv1",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength: pointer.Int32Ptr(32),
+							LocalPref:         uint32(100),
+							IPAddressPools:    []string{"pool1"},
+							Peers:             []string{"peer1"},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Peers: []*Peer{
+					{
+						Name:          "peer1",
+						MyASN:         42,
+						ASN:           42,
+						Addr:          net.ParseIP("1.2.3.4"),
+						HoldTime:      90 * time.Second,
+						KeepaliveTime: 30 * time.Second,
+						NodeSelectors: []labels.Selector{labels.Everything()},
+						EBGPMultiHop:  false,
+					},
+				},
+				Pools: map[string]*Pool{
+					"pool1": {
+						AutoAssign: true,
+						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           100,
+								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
+								Peers:               []string{"peer1"},
+							},
+						},
 					},
 				},
 				BFDProfiles: map[string]*BFDProfile{},

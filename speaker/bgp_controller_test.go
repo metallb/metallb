@@ -699,6 +699,77 @@ func TestBGPSpeaker(t *testing.T) {
 		},
 
 		{
+			desc: "Multiple advertisement config, one with peer selector",
+			config: &config.Config{
+				Peers: []*config.Peer{
+					{
+						Name:          "peer1",
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+				},
+				Pools: map[string]*config.Pool{
+					"default": {
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						BGPAdvertisements: []*config.BGPAdvertisement{
+							{
+								AggregationLength: 32,
+								LocalPref:         100,
+								Communities:       map[uint32]bool{1234: true, 2345: true},
+								Peers:             []string{"peer1"},
+								Nodes:             map[string]bool{"pandora": true},
+							},
+							{
+								AggregationLength: 24,
+								LocalPref:         1000,
+								Nodes:             map[string]bool{"pandora": true},
+							},
+						},
+					},
+				},
+			},
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: epslices.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: pointer.StrPtr("iris"),
+								},
+							},
+						},
+					},
+				},
+				Type: epslices.Eps,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					{
+						Prefix:      ipnet("10.20.30.1/32"),
+						LocalPref:   100,
+						Communities: []uint32{1234, 2345},
+						Peers:       []string{"peer1"},
+					},
+					{
+						Prefix:    ipnet("10.20.30.0/24"),
+						LocalPref: 1000,
+					},
+				},
+			},
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
+		},
+
+		{
 			desc: "Multiple peers",
 			config: &config.Config{
 				Peers: []*config.Peer{
