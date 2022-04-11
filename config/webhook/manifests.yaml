@@ -72,9 +72,9 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-metallb-io-v1beta1-ippool
+      path: /validate-metallb-io-v1beta1-ipaddresspool
   failurePolicy: Fail
-  name: ippoolvalidationwebhook.metallb.io
+  name: ipaddresspoolvalidationwebhook.metallb.io
   rules:
   - apiGroups:
     - metallb.io
@@ -84,5 +84,5 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - ippools
+    - ipaddresspools
   sideEffects: None

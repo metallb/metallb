@@ -36,9 +36,9 @@ spec:
           spec:
             description: L2AdvertisementSpec defines the desired state of L2Advertisement.
             properties:
-              ipPools:
-                description: IPPools is the list of ippools to advertise via this
-                  advertisement.
+              ipAddressPools:
+                description: IPAddressPools is the list of ipaddresspools to advertise
+                  via this advertisement.
                 items:
                   type: string
                 type: array
