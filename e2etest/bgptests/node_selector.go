@@ -5,7 +5,11 @@ package bgptests
 import (
 	"context"
 
+	"fmt"
+	"strings"
+
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	testservice "go.universe.tf/metallb/e2etest/pkg/service"
@@ -19,6 +23,7 @@ import (
 	frrconfig "go.universe.tf/metallb/e2etest/pkg/frr/config"
 	frrcontainer "go.universe.tf/metallb/e2etest/pkg/frr/container"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -183,4 +188,72 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 		table.Entry("IPV4 - zero on first, two on second", ipfamily.IPv4, "192.168.10.0/24", []int{}, []int{0, 1}),
 		table.Entry("IPV6 - one on first, two on second", ipfamily.IPv6, "fc00:f853:0ccd:e799::/116", []int{0}, []int{1, 2}),
 	)
+
+	ginkgo.Context("Peer selector", func() {
+		// nodeForPeers is a map between container index and the indexes of the nodes we want to peer it with.
+		// we cant use strings to avoid making assumptions on the names of the containers / nodes.
+		table.DescribeTable("IPV4 Should work with a limited set of nodes", func(nodesForPeers map[int][]int) {
+			var allNodes *corev1.NodeList
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			framework.ExpectNoError(err)
+
+			resources := metallbconfig.ClusterResources{
+				Pools: []metallbv1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pool",
+						},
+						Spec: metallbv1beta1.IPAddressPoolSpec{
+							Addresses: []string{"192.168.10.0/24"},
+						},
+					},
+				},
+				Peers: metallb.PeersForContainers(FRRContainers, ipfamily.IPv4,
+					func(p *metallbv1beta2.BGPPeer) {
+						for containerIndx, nodesIndexes := range nodesForPeers {
+							if containerIndx >= len(FRRContainers) {
+								ginkgo.Skip(fmt.Sprintf("Asking for container %d, not enough containers %d", containerIndx, len(FRRContainers)))
+							}
+							if !strings.Contains(p.Name, FRRContainers[containerIndx].Name) {
+								continue
+							}
+							nodes := nodesForSelection(allNodes.Items, nodesIndexes)
+							p.Spec.NodeSelectors = k8s.SelectorsForNodes(nodes)
+							return
+						}
+						p.Spec.NodeSelectors = k8s.SelectorsForNodes([]v1.Node{})
+					}),
+			}
+			err = ConfigUpdater.Update(resources)
+			framework.ExpectNoError(err)
+
+			for _, c := range FRRContainers {
+				err := frrcontainer.PairWithNodes(cs, c, ipfamily.IPv4)
+				framework.ExpectNoError(err)
+			}
+
+			for i, c := range FRRContainers {
+				selected := nodesForSelection(allNodes.Items, nodesForPeers[i])
+				nonSelected := nodesNotSelected(allNodes.Items, nodesForPeers[i])
+				validateFRRPeeredWithNodes(cs, selected, c, ipfamily.IPv4)
+				validateFRRNotPeeredWithNodes(cs, nonSelected, c, ipfamily.IPv4)
+			}
+
+		},
+			table.Entry("First to one, second to two", map[int][]int{
+				0: []int{0},
+				1: []int{1, 2},
+			}),
+			table.Entry("First to one, second to one, third to three", map[int][]int{
+				0: []int{0},
+				1: []int{1},
+				2: []int{0, 1, 2},
+			}),
+			table.Entry("First to one, second to one, third to same as first", map[int][]int{
+				0: []int{0},
+				1: []int{1},
+				2: []int{0},
+			}),
+		)
+	})
 })
