@@ -122,7 +122,7 @@ func New(cfg *Config) (*Client, error) {
 				&metallbv1beta1.BFDProfile{}:       namespaceSelector,
 				&metallbv1beta1.BGPAdvertisement{}: namespaceSelector,
 				&metallbv1beta1.BGPPeer{}:          namespaceSelector,
-				&metallbv1beta1.IPPool{}:           namespaceSelector,
+				&metallbv1beta1.IPAddressPool{}:    namespaceSelector,
 				&metallbv1beta1.L2Advertisement{}:  namespaceSelector,
 				&metallbv1beta2.BGPPeer{}:          namespaceSelector,
 				&corev1.Secret{}:                   namespaceSelector,
@@ -286,8 +286,8 @@ func enableWebhook(mgr manager.Manager, validate config.Validate, namespace stri
 		return err
 	}
 
-	if err := (&metallbv1beta1.IPPool{}).SetupWebhookWithManager(mgr); err != nil {
-		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "IPPool")
+	if err := (&metallbv1beta1.IPAddressPool{}).SetupWebhookWithManager(mgr); err != nil {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "IPAddressPool")
 		return err
 	}
 

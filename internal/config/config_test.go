@@ -89,12 +89,12 @@ func TestParse(t *testing.T) {
 						},
 					},
 				},
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool1",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"10.20.0.0/16",
 								"10.50.0.0/24",
@@ -107,7 +107,7 @@ func TestParse(t *testing.T) {
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool2",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"30.0.0.0/8",
 							},
@@ -117,7 +117,7 @@ func TestParse(t *testing.T) {
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool3",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"40.0.0.0/25",
 								"40.0.0.150-40.0.0.200",
@@ -130,7 +130,7 @@ func TestParse(t *testing.T) {
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool4",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"2001:db8::/64",
 							},
@@ -146,7 +146,7 @@ func TestParse(t *testing.T) {
 							AggregationLength: pointer.Int32Ptr(32),
 							LocalPref:         uint32(100),
 							Communities:       []string{ /* TODO CRD Add communities"bar", */ "1234:2345"},
-							IPPools:           []string{"pool1"},
+							IPAddressPools:    []string{"pool1"},
 						},
 					},
 					{
@@ -156,7 +156,7 @@ func TestParse(t *testing.T) {
 						Spec: v1beta1.BGPAdvertisementSpec{
 							AggregationLength:   pointer.Int32Ptr(24),
 							AggregationLengthV6: pointer.Int32Ptr(64),
-							IPPools:             []string{"pool1"},
+							IPAddressPools:      []string{"pool1"},
 						},
 					},
 					{
@@ -164,7 +164,7 @@ func TestParse(t *testing.T) {
 							Name: "adv3",
 						},
 						Spec: v1beta1.BGPAdvertisementSpec{
-							IPPools: []string{"pool2"},
+							IPAddressPools: []string{"pool2"},
 						},
 					},
 				},
@@ -174,7 +174,7 @@ func TestParse(t *testing.T) {
 							Name: "l2adv1",
 						},
 						Spec: v1beta1.L2AdvertisementSpec{
-							IPPools: []string{"pool3"},
+							IPAddressPools: []string{"pool3"},
 						},
 					},
 					{
@@ -521,7 +521,7 @@ func TestParse(t *testing.T) {
 		{
 			desc: "no pool name",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{},
 				},
 			},
@@ -529,10 +529,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "address pool with no address",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec:       v1beta1.IPPoolSpec{},
+						Spec:       v1beta1.IPAddressPoolSpec{},
 					},
 				},
 			},
@@ -540,7 +540,7 @@ func TestParse(t *testing.T) {
 		{
 			desc: "address pool with no protocol",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
 					},
@@ -550,10 +550,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "invalid pool CIDR",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"100.200.300.400/24",
 							},
@@ -565,10 +565,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "invalid pool CIDR prefix length",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"1.2.3.0/33",
 							},
@@ -580,10 +580,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "invalid pool CIDR, first address of the range is after the second",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"1.2.3.10-1.2.3.1",
 							},
@@ -595,10 +595,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "simple advertisement",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"1.2.3.0/24",
 							},
@@ -633,10 +633,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "advertisement with default BGP settings",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"1.2.3.0/24",
 							},
@@ -671,10 +671,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "bad aggregation length (too long)",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"1.2.3.10-1.2.3.1",
 							},
@@ -693,10 +693,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "bad aggregation length (incompatible with CIDR)",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"10.20.30.40/24",
 								"1.2.3.0/28",
@@ -716,10 +716,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "aggregation length by range",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"3.3.3.2-3.3.3.254",
 							},
@@ -768,10 +768,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "aggregation length by range, too wide",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"3.3.3.2-3.3.3.254",
 							},
@@ -832,18 +832,18 @@ func TestParse(t *testing.T) {
 		{
 			desc: "duplicate pool definition",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec:       v1beta1.IPPoolSpec{},
+						Spec:       v1beta1.IPAddressPoolSpec{},
 					},
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool2"},
-						Spec:       v1beta1.IPPoolSpec{},
+						Spec:       v1beta1.IPAddressPoolSpec{},
 					},
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec:       v1beta1.IPPoolSpec{},
+						Spec:       v1beta1.IPAddressPoolSpec{},
 					},
 				},
 			},
@@ -851,10 +851,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "duplicate CIDRs",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								" 10.0.0.0/8",
 							},
@@ -862,7 +862,7 @@ func TestParse(t *testing.T) {
 					},
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool2"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								" 10.0.0.0/8",
 							},
@@ -874,10 +874,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "overlapping CIDRs",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								" 10.0.0.0/8",
 							},
@@ -885,7 +885,7 @@ func TestParse(t *testing.T) {
 					},
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool2"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"10.0.0.0/16",
 							},
@@ -907,12 +907,12 @@ func TestParse(t *testing.T) {
 						},
 					},
 				},
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool1",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"1.2.3.0/24",
 							},
@@ -1088,12 +1088,12 @@ func TestParse(t *testing.T) {
 						},
 					},
 				},
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool1",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"1.2.3.0/24",
 							},
@@ -1112,12 +1112,12 @@ func TestParse(t *testing.T) {
 		{
 			desc: "Multiple BFD Profiles with the same name",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool1",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"1.2.3.0/24",
 							},
@@ -1146,12 +1146,12 @@ func TestParse(t *testing.T) {
 		{
 			desc: "Session with nondefault BFD Profile",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool1",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"1.2.3.0/24",
 							},
@@ -1259,12 +1259,12 @@ func TestParse(t *testing.T) {
 						},
 					},
 				},
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool1",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"10.20.0.0/16",
 								"10.50.0.0/24",
@@ -1320,7 +1320,7 @@ func TestParse(t *testing.T) {
 							AggregationLength: pointer.Int32Ptr(32),
 							LocalPref:         uint32(100),
 							Communities:       []string{"1234:2345"},
-							IPPools:           []string{"pool1"},
+							IPAddressPools:    []string{"pool1"},
 						},
 					},
 				},
@@ -1383,12 +1383,12 @@ func TestParse(t *testing.T) {
 		{
 			desc: "config mixing legacy pools with IP pools with overlapping ips",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool1",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"10.20.0.0/16",
 								"10.50.0.0/24",
@@ -1432,10 +1432,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "Duplicate communities definition",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Protocol: "bgp",
 							Addresses: []string{
 								"10.20.0.0/16",

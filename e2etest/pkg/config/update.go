@@ -112,8 +112,8 @@ func (o beta1Updater) Update(r config.ClusterResources) error {
 			// the mutate function is expected to change the object when updating.
 			// we always override with the old version, and we change only the spec part.
 			switch toChange := obj.(type) {
-			case *metallbv1beta1.IPPool:
-				old := oldValues[i].(*metallbv1beta1.IPPool)
+			case *metallbv1beta1.IPAddressPool:
+				old := oldValues[i].(*metallbv1beta1.IPAddressPool)
 				toChange.Spec = *old.Spec.DeepCopy()
 			case *metallbv1beta1.AddressPool:
 				old := oldValues[i].(*metallbv1beta1.AddressPool)
@@ -142,7 +142,7 @@ func (o beta1Updater) Update(r config.ClusterResources) error {
 }
 
 func (o beta1Updater) Clean() error {
-	err := o.cli.DeleteAllOf(context.Background(), &metallbv1beta1.IPPool{}, client.InNamespace(o.namespace))
+	err := o.cli.DeleteAllOf(context.Background(), &metallbv1beta1.IPAddressPool{}, client.InNamespace(o.namespace))
 	if err != nil {
 		return err
 	}

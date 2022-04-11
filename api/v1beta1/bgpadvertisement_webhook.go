@@ -51,13 +51,13 @@ func (bgpAdv *BGPAdvertisement) ValidateCreate() error {
 		return err
 	}
 
-	ipPools, err := getExistingIPPools()
+	ipAddressPools, err := getExistingIPAddressPools()
 	if err != nil {
 		return err
 	}
 
 	toValidate := bgpAdvListWithUpdate(existingBGPAdvList, bgpAdv)
-	err = Validator.Validate(toValidate, addressPools, ipPools)
+	err = Validator.Validate(toValidate, addressPools, ipAddressPools)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "bgpadvertisement", "action", "create", "name", bgpAdv.Name, "namespace", bgpAdv.Namespace, "error", err)
 		return err
@@ -79,13 +79,13 @@ func (bgpAdv *BGPAdvertisement) ValidateUpdate(old runtime.Object) error {
 		return err
 	}
 
-	ipPools, err := getExistingIPPools()
+	ipAddressPools, err := getExistingIPAddressPools()
 	if err != nil {
 		return err
 	}
 
 	toValidate := bgpAdvListWithUpdate(bgpAdvs, bgpAdv)
-	err = Validator.Validate(toValidate, addressPools, ipPools)
+	err = Validator.Validate(toValidate, addressPools, ipAddressPools)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "bgpadvertisement", "action", "create", "name", bgpAdv.Name, "namespace", bgpAdv.Namespace, "error", err)
 		return err

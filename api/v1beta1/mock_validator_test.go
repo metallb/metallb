@@ -8,10 +8,10 @@ import (
 )
 
 type mockValidator struct {
-	pools      *AddressPoolList
-	ipPools    *IPPoolList
-	bgpAdvs    *BGPAdvertisementList
-	forceError bool
+	pools          *AddressPoolList
+	ipAddressPools *IPAddressPoolList
+	bgpAdvs        *BGPAdvertisementList
+	forceError     bool
 }
 
 func (m *mockValidator) Validate(objects ...client.ObjectList) error {
@@ -21,8 +21,8 @@ func (m *mockValidator) Validate(objects ...client.ObjectList) error {
 			m.pools = list
 		case *BGPAdvertisementList:
 			m.bgpAdvs = list
-		case *IPPoolList:
-			m.ipPools = list
+		case *IPAddressPoolList:
+			m.ipAddressPools = list
 		default:
 			panic("unexpected type")
 		}

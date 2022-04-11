@@ -29,7 +29,7 @@ type validator struct {
 
 func (v *validator) Validate(resources ...client.ObjectList) error {
 	clusterResources := ClusterResources{
-		Pools:              make([]metallbv1beta1.IPPool, 0),
+		Pools:              make([]metallbv1beta1.IPAddressPool, 0),
 		Peers:              make([]metallbv1beta2.BGPPeer, 0),
 		BFDProfiles:        make([]metallbv1beta1.BFDProfile, 0),
 		BGPAdvs:            make([]metallbv1beta1.BGPAdvertisement, 0),
@@ -38,7 +38,7 @@ func (v *validator) Validate(resources ...client.ObjectList) error {
 	}
 	for _, list := range resources {
 		switch list := list.(type) {
-		case *metallbv1beta1.IPPoolList:
+		case *metallbv1beta1.IPAddressPoolList:
 			clusterResources.Pools = append(clusterResources.Pools, list.Items...)
 		case *metallbv1beta2.BGPPeerList:
 			clusterResources.Peers = append(clusterResources.Peers, list.Items...)

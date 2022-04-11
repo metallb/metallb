@@ -10,8 +10,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestValidateIPPool(t *testing.T) {
-	ipPool := IPPool{
+func TestValidateIPAddressPool(t *testing.T) {
+	ipAddressPool := IPAddressPool{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-ippool",
 			Namespace: MetalLBTestNameSpace,
@@ -23,38 +23,38 @@ func TestValidateIPPool(t *testing.T) {
 	getExistingAddressPools = func() (*AddressPoolList, error) {
 		return &AddressPoolList{}, nil
 	}
-	toRestoreIPpools := getExistingIPPools
-	getExistingIPPools = func() (*IPPoolList, error) {
-		return &IPPoolList{
-			Items: []IPPool{
-				ipPool,
+	toRestoreIPAddressPools := getExistingIPAddressPools
+	getExistingIPAddressPools = func() (*IPAddressPoolList, error) {
+		return &IPAddressPoolList{
+			Items: []IPAddressPool{
+				ipAddressPool,
 			},
 		}, nil
 	}
 
 	defer func() {
 		getExistingAddressPools = toRestoreAddresspools
-		getExistingIPPools = toRestoreIPpools
+		getExistingIPAddressPools = toRestoreIPAddressPools
 	}()
 
 	tests := []struct {
-		desc         string
-		ipPool       *IPPool
-		isNew        bool
-		failValidate bool
-		expected     *IPPoolList
+		desc          string
+		ipAddressPool *IPAddressPool
+		isNew         bool
+		failValidate  bool
+		expected      *IPAddressPoolList
 	}{
 		{
-			desc: "Second IPPool",
-			ipPool: &IPPool{
+			desc: "Second IPAddressPool",
+			ipAddressPool: &IPAddressPool{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-ippool1",
 					Namespace: MetalLBTestNameSpace,
 				},
 			},
 			isNew: true,
-			expected: &IPPoolList{
-				Items: []IPPool{
+			expected: &IPAddressPoolList{
+				Items: []IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "test-ippool",
@@ -71,16 +71,16 @@ func TestValidateIPPool(t *testing.T) {
 			},
 		},
 		{
-			desc: "Same IPPool, update",
-			ipPool: &IPPool{
+			desc: "Same IPAddressPool, update",
+			ipAddressPool: &IPAddressPool{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-ippool",
 					Namespace: MetalLBTestNameSpace,
 				},
 			},
 			isNew: false,
-			expected: &IPPoolList{
-				Items: []IPPool{
+			expected: &IPAddressPoolList{
+				Items: []IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "test-ippool",
@@ -92,15 +92,15 @@ func TestValidateIPPool(t *testing.T) {
 		},
 		{
 			desc: "Validation fails",
-			ipPool: &IPPool{
+			ipAddressPool: &IPAddressPool{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-ippool",
 					Namespace: MetalLBTestNameSpace,
 				},
 			},
 			isNew: false,
-			expected: &IPPoolList{
-				Items: []IPPool{
+			expected: &IPAddressPoolList{
+				Items: []IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "test-ippool",
@@ -120,15 +120,15 @@ func TestValidateIPPool(t *testing.T) {
 		mock.forceError = test.failValidate
 
 		if test.isNew {
-			err = test.ipPool.ValidateCreate()
+			err = test.ipAddressPool.ValidateCreate()
 		} else {
-			err = test.ipPool.ValidateUpdate(nil)
+			err = test.ipAddressPool.ValidateUpdate(nil)
 		}
 		if test.failValidate && err == nil {
 			t.Fatalf("test %s failed, expecting error", test.desc)
 		}
-		if !cmp.Equal(test.expected, mock.ipPools) {
-			t.Fatalf("test %s failed, %s", test.desc, cmp.Diff(test.expected, mock.ipPools))
+		if !cmp.Equal(test.expected, mock.ipAddressPools) {
+			t.Fatalf("test %s failed, %s", test.desc, cmp.Diff(test.expected, mock.ipAddressPools))
 		}
 	}
 }

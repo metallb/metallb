@@ -350,9 +350,9 @@ spec:
                 items:
                   type: string
                 type: array
-              ipPools:
-                description: IPPools is the list of ippools to advertise via this
-                  advertisement.
+              ipAddressPools:
+                description: IPAddressPools is the list of ipaddresspools to advertise
+                  via this advertisement.
                 items:
                   type: string
                 type: array
@@ -660,20 +660,20 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.7.0
   creationTimestamp: null
-  name: ippools.metallb.io
+  name: ipaddresspools.metallb.io
 spec:
   group: metallb.io
   names:
-    kind: IPPool
-    listKind: IPPoolList
-    plural: ippools
-    singular: ippool
+    kind: IPAddressPool
+    listKind: IPAddressPoolList
+    plural: ipaddresspools
+    singular: ipaddresspool
   scope: Namespaced
   versions:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: IPPool is the Schema for the IPPools API.
+        description: IPAddressPool is the Schema for the IPAddressPools API.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -688,7 +688,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: IPPoolSpec defines the desired state of IPPool.
+            description: IPAddressPoolSpec defines the desired state of IPAddressPool.
             properties:
               addresses:
                 description: A list of IP address ranges over which MetalLB has authority.
@@ -712,7 +712,7 @@ spec:
             - addresses
             type: object
           status:
-            description: IPPoolStatus defines the observed state of IPPool.
+            description: IPAddressPoolStatus defines the observed state of IPAddressPool.
             type: object
         required:
         - spec
@@ -764,9 +764,9 @@ spec:
           spec:
             description: L2AdvertisementSpec defines the desired state of L2Advertisement.
             properties:
-              ipPools:
-                description: IPPools is the list of ippools to advertise via this
-                  advertisement.
+              ipAddressPools:
+                description: IPAddressPools is the list of ipaddresspools to advertise
+                  via this advertisement.
                 items:
                   type: string
                 type: array
@@ -959,7 +959,7 @@ rules:
 - apiGroups:
   - metallb.io
   resources:
-  - ippools
+  - ipaddresspools
   verbs:
   - get
   - list
@@ -1030,7 +1030,7 @@ rules:
 - apiGroups:
   - metallb.io
   resources:
-  - ippools
+  - ipaddresspools
   verbs:
   - get
   - list
@@ -1670,9 +1670,9 @@ webhooks:
     service:
       name: webhook-service
       namespace: metallb-system
-      path: /validate-metallb-io-v1beta1-ippool
+      path: /validate-metallb-io-v1beta1-ipaddresspool
   failurePolicy: Fail
-  name: ippoolvalidationwebhook.metallb.io
+  name: ipaddresspoolvalidationwebhook.metallb.io
   rules:
   - apiGroups:
     - metallb.io
@@ -1682,5 +1682,5 @@ webhooks:
     - CREATE
     - UPDATE
     resources:
-    - ippools
+    - ipaddresspools
   sideEffects: None
