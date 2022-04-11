@@ -54,9 +54,9 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
-	var ipPools metallbv1beta1.IPPoolList
-	if err := r.List(ctx, &ipPools, client.InNamespace(r.Namespace)); err != nil {
-		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to get ippools", "error", err)
+	var ipAddressPools metallbv1beta1.IPAddressPoolList
+	if err := r.List(ctx, &ipAddressPools, client.InNamespace(r.Namespace)); err != nil {
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to get ipaddresspools", "error", err)
 		return ctrl.Result{}, err
 	}
 
@@ -90,7 +90,7 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	resources := config.ClusterResources{
-		Pools:              ipPools.Items,
+		Pools:              ipAddressPools.Items,
 		Peers:              bgpPeers.Items,
 		BFDProfiles:        bfdProfiles.Items,
 		L2Advs:             l2Advertisements.Items,
@@ -129,7 +129,7 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metallbv1beta2.BGPPeer{}).
-		Watches(&source.Kind{Type: &metallbv1beta1.IPPool{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&source.Kind{Type: &metallbv1beta1.IPAddressPool{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &metallbv1beta1.BGPAdvertisement{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &metallbv1beta1.L2Advertisement{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &metallbv1beta1.BFDProfile{}}, &handler.EnqueueRequestForObject{}).

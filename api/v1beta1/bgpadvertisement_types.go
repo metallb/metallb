@@ -44,8 +44,8 @@ type BGPAdvertisementSpec struct {
 	// BGP communities
 	Communities []string `json:"communities,omitempty"`
 
-	// IPPools is the list of ippools to advertise via this advertisement.
-	IPPools []string `json:"ipPools,omitempty"`
+	// IPAddressPools is the list of ipaddresspools to advertise via this advertisement.
+	IPAddressPools []string `json:"ipAddressPools,omitempty"`
 }
 
 // BGPAdvertisementStatus defines the observed state of BGPAdvertisement.

@@ -34,7 +34,7 @@ import (
 )
 
 type ClusterResources struct {
-	Pools              []metallbv1beta1.IPPool           `json:"ippools"`
+	Pools              []metallbv1beta1.IPAddressPool    `json:"ipaddresspools"`
 	Peers              []metallbv1beta2.BGPPeer          `json:"bgppeers"`
 	BFDProfiles        []metallbv1beta1.BFDProfile       `json:"bfdprofiles"`
 	BGPAdvs            []metallbv1beta1.BGPAdvertisement `json:"bgpadvertisements"`
@@ -237,7 +237,7 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 	for _, l2Adv := range resources.L2Advs {
 		adv := l2AdvertisementFromCR(l2Adv)
 		// No pool selector means select all pools
-		if len(l2Adv.Spec.IPPools) == 0 {
+		if len(l2Adv.Spec.IPAddressPools) == 0 {
 			for _, pool := range cfg.Pools {
 				if !containsAdvertisement(pool.L2Advertisements, adv) {
 					pool.L2Advertisements = append(pool.L2Advertisements, adv)
@@ -245,7 +245,7 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 			}
 			continue
 		}
-		for _, poolName := range l2Adv.Spec.IPPools {
+		for _, poolName := range l2Adv.Spec.IPAddressPools {
 			if pool, ok := cfg.Pools[poolName]; ok {
 				if !containsAdvertisement(pool.L2Advertisements, adv) {
 					pool.L2Advertisements = append(pool.L2Advertisements, adv)
@@ -265,7 +265,7 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 			return nil, err
 		}
 		// No pool selector means select all pools
-		if len(bgpAdv.Spec.IPPools) == 0 {
+		if len(bgpAdv.Spec.IPAddressPools) == 0 {
 			for _, pool := range cfg.Pools {
 				err := validateBGPAdvPerPool(adv, pool)
 				if err != nil {
@@ -275,7 +275,7 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 			}
 			continue
 		}
-		for _, poolName := range bgpAdv.Spec.IPPools {
+		for _, poolName := range bgpAdv.Spec.IPAddressPools {
 			if pool, ok := cfg.Pools[poolName]; ok {
 				err := validateBGPAdvPerPool(adv, pool)
 				if err != nil {
@@ -419,7 +419,7 @@ func passwordForPeer(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1
 	return password, nil
 }
 
-func addressPoolFromCR(p metallbv1beta1.IPPool, bgpCommunities map[string]uint32) (*Pool, error) {
+func addressPoolFromCR(p metallbv1beta1.IPAddressPool, bgpCommunities map[string]uint32) (*Pool, error) {
 	if p.Name == "" {
 		return nil, errors.New("missing pool name")
 	}

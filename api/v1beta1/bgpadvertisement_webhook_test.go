@@ -32,15 +32,15 @@ func TestValidateBGPAdvertisement(t *testing.T) {
 	getExistingAddressPools = func() (*AddressPoolList, error) {
 		return &AddressPoolList{}, nil
 	}
-	toRestoreIPpools := getExistingIPPools
-	getExistingIPPools = func() (*IPPoolList, error) {
-		return &IPPoolList{}, nil
+	toRestoreIPAddressPools := getExistingIPAddressPools
+	getExistingIPAddressPools = func() (*IPAddressPoolList, error) {
+		return &IPAddressPoolList{}, nil
 	}
 
 	defer func() {
 		getExistingBGPAdvs = toRestore
 		getExistingAddressPools = toRestoreAddresspools
-		getExistingIPPools = toRestoreIPpools
+		getExistingIPAddressPools = toRestoreIPAddressPools
 	}()
 
 	tests := []struct {

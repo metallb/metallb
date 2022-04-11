@@ -31,14 +31,14 @@ func TestValidateAddressPool(t *testing.T) {
 			},
 		}, nil
 	}
-	toRestoreIPpools := getExistingIPPools
-	getExistingIPPools = func() (*IPPoolList, error) {
-		return &IPPoolList{}, nil
+	toRestoreIPAddressPools := getExistingIPAddressPools
+	getExistingIPAddressPools = func() (*IPAddressPoolList, error) {
+		return &IPAddressPoolList{}, nil
 	}
 
 	defer func() {
 		getExistingAddressPools = toRestoreAddresspools
-		getExistingIPPools = toRestoreIPpools
+		getExistingIPAddressPools = toRestoreIPAddressPools
 	}()
 
 	tests := []struct {

@@ -89,12 +89,12 @@ var _ = ginkgo.Describe("L2", func() {
 	ginkgo.Context("type=Loadbalancer", func() {
 		ginkgo.BeforeEach(func() {
 			resources := internalconfig.ClusterResources{
-				Pools: []metallbv1beta1.IPPool{
+				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "l2-test",
 						},
-						Spec: metallbv1beta1.IPPoolSpec{
+						Spec: metallbv1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								IPV4ServiceRange,
 								IPV6ServiceRange},
@@ -183,7 +183,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 	ginkgo.Context("validate different AddressPools for type=Loadbalancer", func() {
 
-		table.DescribeTable("set different AddressPools ranges modes", func(getAddressPools func() []metallbv1beta1.IPPool) {
+		table.DescribeTable("set different AddressPools ranges modes", func(getAddressPools func() []metallbv1beta1.IPAddressPool) {
 			resources := internalconfig.ClusterResources{
 				Pools:  getAddressPools(),
 				L2Advs: []metallbv1beta1.L2Advertisement{emptyL2Advertisement},
@@ -214,13 +214,13 @@ var _ = ginkgo.Describe("L2", func() {
 			err = wget.Do(address, executor.Host)
 			framework.ExpectNoError(err)
 		},
-			table.Entry("AddressPool defined by address range", func() []metallbv1beta1.IPPool {
-				return []metallbv1beta1.IPPool{
+			table.Entry("AddressPool defined by address range", func() []metallbv1beta1.IPAddressPool {
+				return []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: "l2-test",
 						},
-						Spec: metallbv1beta1.IPPoolSpec{
+						Spec: metallbv1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								IPV4ServiceRange,
 								IPV6ServiceRange},
@@ -230,7 +230,7 @@ var _ = ginkgo.Describe("L2", func() {
 			}),
 			table.Entry("AddressPool defined by network prefix",
 
-				func() []metallbv1beta1.IPPool {
+				func() []metallbv1beta1.IPAddressPool {
 					var ipv4AddressesByCIDR []string
 					var ipv6AddressesByCIDR []string
 
@@ -245,12 +245,12 @@ var _ = ginkgo.Describe("L2", func() {
 					for _, cidr := range cidrs {
 						ipv6AddressesByCIDR = append(ipv6AddressesByCIDR, cidr.String())
 					}
-					return []metallbv1beta1.IPPool{
+					return []metallbv1beta1.IPAddressPool{
 						{
 							ObjectMeta: metav1.ObjectMeta{
 								Name: "l2-test",
 							},
-							Spec: metallbv1beta1.IPPoolSpec{
+							Spec: metallbv1beta1.IPAddressPoolSpec{
 								Addresses: append(ipv4AddressesByCIDR, ipv6AddressesByCIDR...),
 							},
 						},
@@ -261,12 +261,12 @@ var _ = ginkgo.Describe("L2", func() {
 
 	table.DescribeTable("different services sharing the same ip should advertise from the same node", func(ipRange *string) {
 		resources := internalconfig.ClusterResources{
-			Pools: []metallbv1beta1.IPPool{
+			Pools: []metallbv1beta1.IPAddressPool{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "l2-services-same-ip-test",
 					},
-					Spec: metallbv1beta1.IPPoolSpec{
+					Spec: metallbv1beta1.IPAddressPoolSpec{
 						Addresses: []string{
 							IPV4ServiceRange,
 							IPV6ServiceRange},
@@ -378,12 +378,12 @@ var _ = ginkgo.Describe("L2", func() {
 		table.DescribeTable("should be exposed by the controller", func(ipFamily string) {
 			poolName := "l2-metrics-test"
 			resources := internalconfig.ClusterResources{
-				Pools: []metallbv1beta1.IPPool{
+				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name: poolName,
 						},
-						Spec: metallbv1beta1.IPPoolSpec{
+						Spec: metallbv1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								IPV4ServiceRange,
 								IPV6ServiceRange},
@@ -534,7 +534,7 @@ var _ = ginkgo.Describe("L2", func() {
 	table.DescribeTable("validate requesting a specific address pool for Loadbalancer service", func(ipRange *string) {
 		var services []*corev1.Service
 		var servicesIngressIP []string
-		var pools []metallbv1beta1.IPPool
+		var pools []metallbv1beta1.IPAddressPool
 
 		namespace := f.Namespace.Name
 
@@ -543,11 +543,11 @@ var _ = ginkgo.Describe("L2", func() {
 			ip, err := config.GetIPFromRangeByIndex(*ipRange, i)
 			framework.ExpectNoError(err)
 			addressesRange := fmt.Sprintf("%s-%s", ip, ip)
-			pool := metallbv1beta1.IPPool{
+			pool := metallbv1beta1.IPAddressPool{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: fmt.Sprintf("test-addresspool%d", i+1),
 				},
-				Spec: metallbv1beta1.IPPoolSpec{
+				Spec: metallbv1beta1.IPAddressPoolSpec{
 					Addresses: []string{addressesRange},
 				},
 			}
@@ -575,7 +575,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
 			ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
-			err = config.ValidateIPInRange([]metallbv1beta1.IPPool{pool}, ingressIP)
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool}, ingressIP)
 			framework.ExpectNoError(err)
 
 			services = append(services, svc)

@@ -25,8 +25,8 @@ import (
 
 // L2AdvertisementSpec defines the desired state of L2Advertisement.
 type L2AdvertisementSpec struct {
-	// IPPools is the list of ippools to advertise via this advertisement.
-	IPPools []string `json:"ipPools,omitempty"`
+	// IPAddressPools is the list of ipaddresspools to advertise via this advertisement.
+	IPAddressPools []string `json:"ipAddressPools,omitempty"`
 }
 
 // L2AdvertisementStatus defines the observed state of L2Advertisement.
