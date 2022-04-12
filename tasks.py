@@ -745,7 +745,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
         ips_for_containers_v6 = "--ips-for-containers-v6=" + ips
 
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "KUBECONFIG={} go test -timeout 1h {} {} --provider=local --kubeconfig={} --service-pod-port={} {} {} -ipv4-service-range={} -ipv6-service-range={} {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker), warn="True")
+            "KUBECONFIG={} go test -timeout 2h {} {} --provider=local --kubeconfig={} --service-pod-port={} {} {} -ipv4-service-range={} -ipv6-service-range={} {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker), warn="True")
 
     if export != None:
         run("kind export logs {}".format(export))
