@@ -46,12 +46,12 @@ func (addressPool *AddressPool) ValidateCreate() error {
 		return err
 	}
 
-	existingIPPoolList, err := getExistingIPPools()
+	existingIPAddressPoolList, err := getExistingIPAddressPools()
 	if err != nil {
 		return err
 	}
 	addressPoolList := listWithUpdate(existingAddressPoolList, addressPool)
-	err = Validator.Validate(addressPoolList, existingIPPoolList)
+	err = Validator.Validate(addressPoolList, existingIPAddressPoolList)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "addressPool", "action", "create", "name", addressPool.Name, "namespace", addressPool.Namespace, "error", err)
 		return err
@@ -68,12 +68,12 @@ func (addressPool *AddressPool) ValidateUpdate(old runtime.Object) error {
 		return err
 	}
 
-	existingIPPoolList, err := getExistingIPPools()
+	existingIPAddressPoolList, err := getExistingIPAddressPools()
 	if err != nil {
 		return err
 	}
 	addressPoolList := listWithUpdate(existingAddressPoolList, addressPool)
-	err = Validator.Validate(addressPoolList, existingIPPoolList)
+	err = Validator.Validate(addressPoolList, existingIPAddressPoolList)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "addressPool", "action", "update", "name", addressPool.Name, "namespace", addressPool.Namespace, "error", err)
 		return err

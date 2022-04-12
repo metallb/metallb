@@ -20,8 +20,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// IPPoolSpec defines the desired state of IPPool.
-type IPPoolSpec struct {
+// IPAddressPoolSpec defines the desired state of IPAddressPool.
+type IPAddressPoolSpec struct {
 	// A list of IP address ranges over which MetalLB has authority.
 	// You can list multiple ranges in a single pool, they will all share the
 	// same settings. Each range can be either a CIDR prefix, or an explicit
@@ -41,8 +41,8 @@ type IPPoolSpec struct {
 	AvoidBuggyIPs bool `json:"avoidBuggyIPs,omitempty"`
 }
 
-// IPPoolStatus defines the observed state of IPPool.
-type IPPoolStatus struct {
+// IPAddressPoolStatus defines the observed state of IPAddressPool.
+type IPAddressPoolStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
@@ -51,24 +51,24 @@ type IPPoolStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion
 
-// IPPool is the Schema for the IPPools API.
-type IPPool struct {
+// IPAddressPool is the Schema for the IPAddressPools API.
+type IPAddressPool struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   IPPoolSpec   `json:"spec"`
-	Status IPPoolStatus `json:"status,omitempty"`
+	Spec   IPAddressPoolSpec   `json:"spec"`
+	Status IPAddressPoolStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// IPPoolList contains a list of IPPool.
-type IPPoolList struct {
+// IPAddressPoolList contains a list of IPAddressPool.
+type IPAddressPoolList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []IPPool `json:"items"`
+	Items           []IPAddressPool `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&IPPool{}, &IPPoolList{})
+	SchemeBuilder.Register(&IPAddressPool{}, &IPAddressPoolList{})
 }
