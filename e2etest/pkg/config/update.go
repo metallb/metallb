@@ -105,6 +105,12 @@ func (o beta1Updater) Update(r config.ClusterResources) error {
 		key = key + 1
 	}
 
+	for _, community := range r.Communities {
+		objects[key] = community.DeepCopy()
+		oldValues[key] = community.DeepCopy()
+		key = key + 1
+	}
+
 	// Iterating over the map will return the items in a random order.
 	for i, obj := range objects {
 		obj.SetNamespace(o.namespace)
@@ -129,6 +135,9 @@ func (o beta1Updater) Update(r config.ClusterResources) error {
 				toChange.Spec = *old.Spec.DeepCopy()
 			case *metallbv1beta1.L2Advertisement:
 				old := oldValues[i].(*metallbv1beta1.L2Advertisement)
+				toChange.Spec = *old.Spec.DeepCopy()
+			case *metallbv1beta1.Community:
+				old := oldValues[i].(*metallbv1beta1.Community)
 				toChange.Spec = *old.Spec.DeepCopy()
 			}
 
@@ -163,6 +172,10 @@ func (o beta1Updater) Clean() error {
 		return err
 	}
 	err = o.cli.DeleteAllOf(context.Background(), &metallbv1beta1.AddressPool{}, client.InNamespace(o.namespace))
+	if err != nil {
+		return err
+	}
+	err = o.cli.DeleteAllOf(context.Background(), &metallbv1beta1.Community{}, client.InNamespace(o.namespace))
 	if err != nil {
 		return err
 	}

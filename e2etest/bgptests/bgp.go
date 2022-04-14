@@ -56,7 +56,6 @@ const (
 	v6PoolAddresses       = "fc00:f853:0ccd:e799::/124"
 	CommunityNoAdv        = "65535:65282" // 0xFFFFFF02: NO_ADVERTISE
 	CommunityGracefulShut = "65535:0"     // GRACEFUL_SHUTDOWN
-	IPLocalPref           = uint32(300)
 	SpeakerContainerName  = "speaker"
 )
 
@@ -68,6 +67,17 @@ var _ = ginkgo.Describe("BGP", func() {
 	emptyBGPAdvertisement := metallbv1beta1.BGPAdvertisement{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "empty",
+		},
+	}
+	noAdvCommunity := metallbv1beta1.Community{
+		ObjectMeta: metav1.ObjectMeta{Name: "community1"},
+		Spec: metallbv1beta1.CommunitySpec{
+			Communities: []metallbv1beta1.CommunityAlias{
+				{
+					Name:  "NO_ADVERTISE",
+					Value: CommunityNoAdv,
+				},
+			},
 		},
 	}
 
@@ -957,7 +967,8 @@ var _ = ginkgo.Describe("BGP", func() {
 			table.Entry("IPV6", ipfamily.IPv6))
 
 		table.DescribeTable("configure bgp advertisement and verify it gets propagated",
-			func(rangeWithAdvertisement string, rangeWithoutAdvertisement string, advertisement metallbv1beta1.BGPAdvertisement, legacy bool, ipFamily ipfamily.Family) {
+			func(rangeWithAdvertisement string, rangeWithoutAdvertisement string, advertisement metallbv1beta1.BGPAdvertisement, legacy bool,
+				ipFamily ipfamily.Family, communities []metallbv1beta1.Community) {
 				emptyAdvertisement := metallbv1beta1.BGPAdvertisement{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "empty",
@@ -985,7 +996,8 @@ var _ = ginkgo.Describe("BGP", func() {
 				}
 
 				resources := metallbconfig.ClusterResources{
-					Peers: metallb.PeersForContainers(FRRContainers, ipFamily),
+					Peers:       metallb.PeersForContainers(FRRContainers, ipFamily),
+					Communities: communities,
 				}
 
 				if !legacy {
@@ -1046,7 +1058,12 @@ var _ = ginkgo.Describe("BGP", func() {
 					validateService(cs, svcNoAdvertisement, allNodes.Items, c)
 					Eventually(func() error {
 						for _, community := range advertisement.Spec.Communities {
-							routes, err := frr.RoutesForCommunity(c, community, ipFamily)
+							// Get community value for test cases with Community CRD.
+							communityValue, err := communityForAlias(community, communities)
+							if err != nil {
+								communityValue = community
+							}
+							routes, err := frr.RoutesForCommunity(c, communityValue, ipFamily)
 							if err != nil {
 								return err
 							}
@@ -1102,7 +1119,8 @@ var _ = ginkgo.Describe("BGP", func() {
 					},
 				},
 				false,
-				ipfamily.IPv4),
+				ipfamily.IPv4,
+				[]metallbv1beta1.Community{}),
 			table.Entry("IPV4 - localpref",
 				"192.168.10.0/24",
 				"192.168.16.0/24",
@@ -1114,7 +1132,8 @@ var _ = ginkgo.Describe("BGP", func() {
 					},
 				},
 				false,
-				ipfamily.IPv4),
+				ipfamily.IPv4,
+				[]metallbv1beta1.Community{}),
 			table.Entry("IPV4 - community",
 				"192.168.10.0/24",
 				"192.168.16.0/24",
@@ -1126,7 +1145,22 @@ var _ = ginkgo.Describe("BGP", func() {
 					},
 				},
 				false,
-				ipfamily.IPv4),
+				ipfamily.IPv4,
+				[]metallbv1beta1.Community{}),
+			table.Entry("IPV4 - community from CRD",
+				"192.168.10.0/24",
+				"192.168.16.0/24",
+				metallbv1beta1.BGPAdvertisement{
+					ObjectMeta: metav1.ObjectMeta{Name: "advertisement"},
+					Spec: metallbv1beta1.BGPAdvertisementSpec{
+						Communities:    []string{"NO_ADVERTISE"},
+						LocalPref:      50,
+						IPAddressPools: []string{"bgp-with-advertisement"},
+					},
+				},
+				false,
+				ipfamily.IPv4,
+				[]metallbv1beta1.Community{noAdvCommunity}),
 			table.Entry("IPV4 - community and localpref - legacy",
 				"192.168.10.0/24",
 				"192.168.16.0/24",
@@ -1139,7 +1173,21 @@ var _ = ginkgo.Describe("BGP", func() {
 					},
 				},
 				true,
-				ipfamily.IPv4),
+				ipfamily.IPv4,
+				[]metallbv1beta1.Community{}),
+			table.Entry("IPV4 - community from CRD - legacy",
+				"192.168.10.0/24",
+				"192.168.16.0/24",
+				metallbv1beta1.BGPAdvertisement{
+					ObjectMeta: metav1.ObjectMeta{Name: "advertisement"},
+					Spec: metallbv1beta1.BGPAdvertisementSpec{
+						Communities:    []string{"NO_ADVERTISE"},
+						IPAddressPools: []string{"bgp-with-advertisement"},
+					},
+				},
+				true,
+				ipfamily.IPv4,
+				[]metallbv1beta1.Community{noAdvCommunity}),
 			table.Entry("IPV4 - localpref - legacy",
 				"192.168.10.0/24",
 				"192.168.16.0/24",
@@ -1151,7 +1199,8 @@ var _ = ginkgo.Describe("BGP", func() {
 					},
 				},
 				true,
-				ipfamily.IPv4),
+				ipfamily.IPv4,
+				[]metallbv1beta1.Community{}),
 			table.Entry("IPV6 - community and localpref",
 				"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
 				"fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26",
@@ -1164,7 +1213,8 @@ var _ = ginkgo.Describe("BGP", func() {
 					},
 				},
 				false,
-				ipfamily.IPv6),
+				ipfamily.IPv6,
+				[]metallbv1beta1.Community{}),
 			table.Entry("IPV6 - community",
 				"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
 				"fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26",
@@ -1176,7 +1226,34 @@ var _ = ginkgo.Describe("BGP", func() {
 					},
 				},
 				false,
-				ipfamily.IPv6),
+				ipfamily.IPv6,
+				[]metallbv1beta1.Community{}),
+			table.Entry("IPV6 - community from CRD",
+				"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
+				"fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26",
+				metallbv1beta1.BGPAdvertisement{
+					ObjectMeta: metav1.ObjectMeta{Name: "advertisement"},
+					Spec: metallbv1beta1.BGPAdvertisementSpec{
+						Communities:    []string{"NO_ADVERTISE"},
+						IPAddressPools: []string{"bgp-with-advertisement"},
+					},
+				},
+				false,
+				ipfamily.IPv6,
+				[]metallbv1beta1.Community{noAdvCommunity}),
+			table.Entry("IPV6 - community from CRD - legacy",
+				"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
+				"fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26",
+				metallbv1beta1.BGPAdvertisement{
+					ObjectMeta: metav1.ObjectMeta{Name: "advertisement"},
+					Spec: metallbv1beta1.BGPAdvertisementSpec{
+						Communities:    []string{"NO_ADVERTISE"},
+						IPAddressPools: []string{"bgp-with-advertisement"},
+					},
+				},
+				true,
+				ipfamily.IPv6,
+				[]metallbv1beta1.Community{noAdvCommunity}),
 			table.Entry("IPV6 - localpref",
 				"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
 				"fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26",
@@ -1188,7 +1265,8 @@ var _ = ginkgo.Describe("BGP", func() {
 					},
 				},
 				false,
-				ipfamily.IPv6))
+				ipfamily.IPv6,
+				[]metallbv1beta1.Community{}))
 
 	})
 
@@ -1396,4 +1474,17 @@ func substringCount(substr string) interface{} {
 	return func(action string) int {
 		return strings.Count(action, substr)
 	}
+}
+
+// communityForAlias checks if the given community name exists in the community crs,
+// and if so, returns the value of the matching community.
+func communityForAlias(communityName string, cs []metallbv1beta1.Community) (string, error) {
+	for _, c := range cs {
+		for _, communityAlias := range c.Spec.Communities {
+			if communityName == communityAlias.Name {
+				return communityAlias.Value, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("community name %s not found in Community CRs", communityName)
 }
