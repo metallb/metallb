@@ -75,6 +75,9 @@ rules:
 - apiGroups: ["metallb.io"]
   resources: ["ipaddresspools"]
   verbs: ["get", "list", "watch"]
+- apiGroups: ["metallb.io"]
+  resources: ["communities"]
+  verbs: ["get", "list", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -109,6 +112,9 @@ rules:
   verbs: ["get", "list"]
 - apiGroups: ["metallb.io"]
   resources: ["l2advertisements"]
+  verbs: ["get", "list"]
+- apiGroups: ["metallb.io"]
+  resources: ["communities"]
   verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
