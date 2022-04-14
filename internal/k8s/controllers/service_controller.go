@@ -27,10 +27,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	v1 "k8s.io/api/core/v1"
+
 	discovery "k8s.io/api/discovery/v1beta1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
@@ -38,15 +40,22 @@ import (
 
 type ServiceReconciler struct {
 	client.Client
-	Logger      log.Logger
-	Scheme      *runtime.Scheme
-	Namespace   string
-	Handler     func(log.Logger, string, *v1.Service, epslices.EpsOrSlices) SyncState
-	Endpoints   NeedEndPoints
-	ForceReload func()
+	Logger    log.Logger
+	Scheme    *runtime.Scheme
+	Namespace string
+	Handler   func(log.Logger, string, *v1.Service, epslices.EpsOrSlices) SyncState
+	Endpoints NeedEndPoints
+	Reload    chan event.GenericEvent
 }
 
 func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	if !isReloadReq(req) {
+		return r.reconcileService(ctx, req)
+	}
+	return r.reprocessAll(ctx, req)
+}
+
+func (r *ServiceReconciler) reconcileService(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	level.Info(r.Logger).Log("controller", "ServiceReconciler", "start reconcile", req.NamespacedName.String())
 	defer level.Info(r.Logger).Log("controller", "ServiceReconciler", "end reconcile", req.NamespacedName.String())
 
@@ -76,7 +85,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, retryError
 	case SyncStateReprocessAll:
 		level.Info(r.Logger).Log("controller", "ServiceReconciler", "event", "force service reload")
-		r.ForceReload()
+		r.forceReload()
 		return ctrl.Result{}, nil
 	case SyncStateErrorNoRetry:
 		level.Error(r.Logger).Log("controller", "ServiceReconciler", "name", req.NamespacedName.String(), "service", dumpResource(service), "endpoints", dumpResource(epSlices), "event", "failed to handle service")
@@ -104,6 +113,7 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					level.Debug(r.Logger).Log("controller", "ServiceReconciler", "enqueueing", serviceName, "epslice", dumpResource(epSlice))
 					return []reconcile.Request{{NamespacedName: serviceName}}
 				})).
+			Watches(&source.Channel{Source: r.Reload}, &handler.EnqueueRequestForObject{}).
 			Complete(r)
 	}
 	if r.Endpoints == Endpoints {
@@ -120,12 +130,14 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					level.Debug(r.Logger).Log("controller", "ServiceReconciler", "enqueueing", name, "endpoints", dumpResource(endpoints))
 					return []reconcile.Request{{NamespacedName: name}}
 				})).
+			Watches(&source.Channel{Source: r.Reload}, &handler.EnqueueRequestForObject{}).
 			Complete(r)
 
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.Service{}).
+		Watches(&source.Channel{Source: r.Reload}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
 }
 

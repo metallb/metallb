@@ -77,7 +77,6 @@ type Client struct {
 	client         *kubernetes.Clientset
 	events         record.EventRecorder
 	mgr            manager.Manager
-	reloader       *controllers.ServiceReloadReconciler
 	validateConfig config.Validate
 	ForceSync      func()
 }
@@ -232,25 +231,16 @@ func New(cfg *Config) (*Client, error) {
 
 	if cfg.ServiceChanged != nil {
 		if err = (&controllers.ServiceReconciler{
-			Client:      mgr.GetClient(),
-			Logger:      cfg.Logger,
-			Scheme:      mgr.GetScheme(),
-			Handler:     cfg.ServiceHandler,
-			Endpoints:   needEndpoints,
-			ForceReload: reload,
+			Client:    mgr.GetClient(),
+			Logger:    cfg.Logger,
+			Scheme:    mgr.GetScheme(),
+			Handler:   cfg.ServiceHandler,
+			Endpoints: needEndpoints,
+			Reload:    reloadChan,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "service")
 			return nil, errors.Wrap(err, "failed to create service reconciler")
 		}
-	}
-
-	c.reloader = &controllers.ServiceReloadReconciler{
-		Client:    mgr.GetClient(),
-		Log:       cfg.Logger,
-		Scheme:    mgr.GetScheme(),
-		Handler:   cfg.ServiceHandler,
-		Endpoints: needEndpoints,
-		Reload:    reloadChan,
 	}
 
 	if cfg.EnableWebhook {
@@ -396,11 +386,6 @@ func (c *Client) PodIPs(namespace, labels string) ([]string, error) {
 func (c *Client) Run(stopCh <-chan struct{}) error {
 	ctx := ctrl.SetupSignalHandler()
 
-	level.Info(c.logger).Log("Starting Reloader")
-	if err := c.reloader.Start(ctx, c.mgr); err != nil {
-		level.Error(c.logger).Log("error", err, "unable to start", "reloader")
-		return errors.Wrap(err, "failed to start reloader")
-	}
 	level.Info(c.logger).Log("Starting Manager")
 	if err := c.mgr.Start(ctx); err != nil {
 		return err
