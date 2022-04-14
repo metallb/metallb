@@ -57,9 +57,16 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, err
 	}
 
+	var communities metallbv1beta1.CommunityList
+	if err := r.List(ctx, &communities, client.InNamespace(r.Namespace)); err != nil {
+		level.Error(r.Logger).Log("controller", "PoolReconciler", "message", "failed to get communities", "error", err)
+		return ctrl.Result{}, err
+	}
+
 	resources := config.ClusterResources{
 		Pools:              ipAddressPools.Items,
 		LegacyAddressPools: addressPools.Items,
+		Communities:        communities.Items,
 	}
 
 	level.Debug(r.Logger).Log("controller", "PoolReconciler", "metallb CRs", spew.Sdump(resources))
@@ -93,5 +100,6 @@ func (r *PoolReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metallbv1beta1.IPAddressPool{}).
 		Watches(&source.Kind{Type: &metallbv1beta1.AddressPool{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&source.Kind{Type: &metallbv1beta1.Community{}}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
 }

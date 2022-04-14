@@ -18,6 +18,7 @@ func dumpClusterResources(c *config.ClusterResources) string {
 		L2Advs:             c.L2Advs,
 		BGPAdvs:            c.BGPAdvs,
 		LegacyAddressPools: c.LegacyAddressPools,
+		Communities:        c.Communities,
 	}
 	withNoSecret.PasswordSecrets = make(map[string]corev1.Secret)
 	for k, s := range c.PasswordSecrets {

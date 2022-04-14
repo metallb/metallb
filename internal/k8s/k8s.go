@@ -125,6 +125,7 @@ func New(cfg *Config) (*Client, error) {
 				&metallbv1beta1.IPAddressPool{}:    namespaceSelector,
 				&metallbv1beta1.L2Advertisement{}:  namespaceSelector,
 				&metallbv1beta2.BGPPeer{}:          namespaceSelector,
+				&metallbv1beta1.Community{}:        namespaceSelector,
 				&corev1.Secret{}:                   namespaceSelector,
 			},
 		}),
