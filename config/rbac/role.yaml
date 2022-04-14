@@ -144,7 +144,14 @@ rules:
       - get
       - list
       - watch
-
+  - apiGroups:
+      - metallb.io
+    resources:
+      - communities
+    verbs:
+      - get
+      - list
+      - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -213,6 +220,14 @@ rules:
       - metallb.io
     resources:
       - l2advertisements
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - metallb.io
+    resources:
+      - communities
     verbs:
       - get
       - list
