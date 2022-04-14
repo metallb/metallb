@@ -7,3 +7,4 @@ resources:
   - bases/metallb.io_bfdprofiles.yaml
   - bases/metallb.io_bgpadvertisements.yaml
   - bases/metallb.io_l2advertisements.yaml
+  - bases/metallb.io_communities.yaml
