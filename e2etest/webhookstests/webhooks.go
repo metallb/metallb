@@ -41,13 +41,13 @@ var _ = ginkgo.Describe("Webhooks", func() {
 		framework.ExpectNoError(err)
 	})
 
-	ginkgo.Context("For IPAddressPool", func() {
-		ginkgo.AfterEach(func() {
-			// Clean previous configuration.
-			err := ConfigUpdater.Clean()
-			framework.ExpectNoError(err)
-		})
+	ginkgo.AfterEach(func() {
+		// Clean previous configuration.
+		err := ConfigUpdater.Clean()
+		framework.ExpectNoError(err)
+	})
 
+	ginkgo.Context("For IPAddressPool", func() {
 		ginkgo.It("Should recognize overlapping addresses in two AddressPools", func() {
 			ginkgo.By("Creating first IPAddressPool")
 			resources := metallbconfig.ClusterResources{
@@ -96,12 +96,6 @@ var _ = ginkgo.Describe("Webhooks", func() {
 	})
 
 	ginkgo.Context("for Legacy AddressPool", func() {
-		ginkgo.AfterEach(func() {
-			// Clean previous configuration.
-			err := ConfigUpdater.Clean()
-			framework.ExpectNoError(err)
-		})
-
 		ginkgo.It("Should recognize overlapping addresses in two AddressPools", func() {
 			ginkgo.By("Creating first AddrssPool")
 			resources := metallbconfig.ClusterResources{
@@ -154,13 +148,6 @@ var _ = ginkgo.Describe("Webhooks", func() {
 	})
 
 	ginkgo.Context("for BGPAdvertisement", func() {
-		ginkgo.AfterEach(func() {
-			ginkgo.By("Clearing any previous configuration")
-
-			err := ConfigUpdater.Clean()
-			framework.ExpectNoError(err)
-		})
-
 		ginkgo.It("Should recognize invalid AggregationLength", func() {
 			ginkgo.By("Creating AddressPool")
 			resources := metallbconfig.ClusterResources{
@@ -199,13 +186,6 @@ var _ = ginkgo.Describe("Webhooks", func() {
 	})
 
 	ginkgo.Context("For BGPPeer", func() {
-		ginkgo.AfterEach(func() {
-			ginkgo.By("Clearing any previous configuration")
-
-			err := ConfigUpdater.Clean()
-			framework.ExpectNoError(err)
-		})
-
 		ginkgo.It("Should reject invalid BGPPeer IP address", func() {
 			ginkgo.By("Creating BGPPeer")
 			resources := metallbconfig.ClusterResources{
@@ -225,6 +205,123 @@ var _ = ginkgo.Describe("Webhooks", func() {
 			err := ConfigUpdater.Update(resources)
 			framework.ExpectError(err)
 			Expect(err.Error()).To(ContainSubstring("invalid BGPPeer address"))
+		})
+	})
+
+	ginkgo.Context("For Community", func() {
+		ginkgo.It("Should reject a new invalid Community", func() {
+			ginkgo.By("Creating invalid Community")
+			resources := metallbconfig.ClusterResources{
+				Communities: []metallbv1beta1.Community{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "community-webhooks-test",
+						},
+						Spec: metallbv1beta1.CommunitySpec{
+							Communities: []metallbv1beta1.CommunityAlias{
+								{
+									Name:  "INVALID_COMMUNITY",
+									Value: "99999999:1",
+								},
+							},
+						},
+					},
+				},
+			}
+			err := ConfigUpdater.Update(resources)
+			framework.ExpectError(err)
+			Expect(err.Error()).To(ContainSubstring("invalid first section of community"))
+		})
+
+		ginkgo.It("Should reject an update to an invalid Community", func() {
+			ginkgo.By("Creating Community")
+			resources := metallbconfig.ClusterResources{
+				Communities: []metallbv1beta1.Community{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "community-webhooks-test",
+						},
+					},
+				},
+			}
+			err := ConfigUpdater.Update(resources)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Updating community")
+			resources.Communities[0].Spec = metallbv1beta1.CommunitySpec{
+				Communities: []metallbv1beta1.CommunityAlias{
+					{
+						Name:  "INVALID_COMMUNITY",
+						Value: "99999999:1",
+					},
+				},
+			}
+			err = ConfigUpdater.Update(resources)
+			framework.ExpectError(err)
+			Expect(err.Error()).To(ContainSubstring("invalid first section of community"))
+		})
+
+		ginkgo.It("Should reject Community duplications", func() {
+			ginkgo.By("Creating duplicates in the same Community")
+			resources := metallbconfig.ClusterResources{
+				Communities: []metallbv1beta1.Community{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "community-webhooks-test",
+						},
+						Spec: metallbv1beta1.CommunitySpec{
+							Communities: []metallbv1beta1.CommunityAlias{
+								{
+									Name:  "DUP_COMMUNITY",
+									Value: "1111:2222",
+								},
+								{
+									Name:  "DUP_COMMUNITY",
+									Value: "1111:2222",
+								},
+							},
+						},
+					},
+				},
+			}
+			err := ConfigUpdater.Update(resources)
+			framework.ExpectError(err)
+			Expect(err.Error()).To(ContainSubstring("duplicate definition of community"))
+
+			ginkgo.By("Creating duplicates across two different Communities")
+			resources = metallbconfig.ClusterResources{
+				Communities: []metallbv1beta1.Community{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "community-webhooks-test1",
+						},
+						Spec: metallbv1beta1.CommunitySpec{
+							Communities: []metallbv1beta1.CommunityAlias{
+								{
+									Name:  "DUP_COMMUNITY",
+									Value: "1111:2222",
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "community-webhooks-test2",
+						},
+						Spec: metallbv1beta1.CommunitySpec{
+							Communities: []metallbv1beta1.CommunityAlias{
+								{
+									Name:  "DUP_COMMUNITY",
+									Value: "1111:2222",
+								},
+							},
+						},
+					},
+				},
+			}
+			err = ConfigUpdater.Update(resources)
+			framework.ExpectError(err)
+			Expect(err.Error()).To(ContainSubstring("duplicate definition of community"))
 		})
 	})
 })
