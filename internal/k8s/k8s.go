@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	metallbv1alpha1 "go.universe.tf/metallb/api/v1alpha1"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 
@@ -57,7 +56,6 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(metallbv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(metallbv1beta1.AddToScheme(scheme))
 	utilruntime.Must(metallbv1beta2.AddToScheme(scheme))
 
@@ -117,7 +115,6 @@ func New(cfg *Config) (*Client, error) {
 		LeaderElection: false,
 		NewCache: cache.BuilderWithOptions(cache.Options{
 			SelectorsByObject: map[client.Object]cache.ObjectSelector{
-				&metallbv1alpha1.AddressPool{}:     namespaceSelector,
 				&metallbv1beta1.AddressPool{}:      namespaceSelector,
 				&metallbv1beta1.BFDProfile{}:       namespaceSelector,
 				&metallbv1beta1.BGPAdvertisement{}: namespaceSelector,
