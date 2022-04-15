@@ -34,6 +34,16 @@ func ipnet(s string) *net.IPNet {
 }
 
 func TestParse(t *testing.T) {
+	testAdvName := "testAdv"
+	testPoolName := "testPool"
+	testPool := v1beta1.IPAddressPool{
+		ObjectMeta: v1.ObjectMeta{Name: testPoolName},
+		Spec: v1beta1.IPAddressPoolSpec{
+			Addresses: []string{
+				"10.20.0.0/16",
+			},
+		},
+	}
 	tests := []struct {
 		desc string
 		crs  ClusterResources
@@ -49,9 +59,6 @@ func TestParse(t *testing.T) {
 		},
 
 		{
-			// TODO CRD Add communities
-			//			bgp-communities:
-			//  bar: 64512:1234
 			desc: "config using all features",
 			crs: ClusterResources{
 				Peers: []v1beta2.BGPPeer{
@@ -152,7 +159,7 @@ func TestParse(t *testing.T) {
 						Spec: v1beta1.BGPAdvertisementSpec{
 							AggregationLength: pointer.Int32Ptr(32),
 							LocalPref:         uint32(100),
-							Communities:       []string{ /* TODO CRD Add communities"bar", */ "1234:2345"},
+							Communities:       []string{"bar"},
 							IPAddressPools:    []string{"pool1"},
 							Peers:             []string{"peer1"},
 						},
@@ -188,6 +195,21 @@ func TestParse(t *testing.T) {
 					{
 						ObjectMeta: v1.ObjectMeta{
 							Name: "l2adv2",
+						},
+					},
+				},
+				Communities: []v1beta1.Community{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "community",
+						},
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Name:  "bar",
+									Value: "64512:1234",
+								},
+							},
 						},
 					},
 				},
@@ -229,8 +251,7 @@ func TestParse(t *testing.T) {
 								AggregationLengthV6: 128,
 								LocalPref:           100,
 								Communities: map[uint32]bool{
-									//0xfc0004d2: true,
-									0x04D20929: true,
+									0xfc0004d2: true,
 								},
 								Nodes: map[string]bool{},
 								Peers: []string{"peer1"},
@@ -813,13 +834,94 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			desc: "bad community literal (wrong format)",
+			desc: "bad community literal (wrong format) - in BGP adv",
 			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{testPool},
 				BGPAdvs: []v1beta1.BGPAdvertisement{
 					{
+						ObjectMeta: v1.ObjectMeta{Name: testAdvName},
 						Spec: v1beta1.BGPAdvertisementSpec{
-							Communities: []string{
-								"1234",
+							Communities:    []string{"1234"},
+							IPAddressPools: []string{testPoolName},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "bad community literal (asn part doesn't fit) - in BGP adv",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{testPool},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: testAdvName},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							Communities:    []string{"99999999:1"},
+							IPAddressPools: []string{testPoolName},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "bad community literal (community# part doesn't fit) - in BGP adv",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{testPool},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: testAdvName},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							Communities:    []string{"1:99999999"},
+							IPAddressPools: []string{testPoolName},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "bad community ref (unknown ref) - in BGP adv",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{testPool},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: testAdvName},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							Communities:    []string{"community"},
+							IPAddressPools: []string{testPoolName},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "duplicate community literal - in BGP adv",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{testPool},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: testAdvName},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							Communities:    []string{"1234:5678", "1234:5678"},
+							IPAddressPools: []string{testPoolName},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "bad community literal (wrong format) - in the community CR",
+			crs: ClusterResources{
+				Communities: []v1beta1.Community{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "community",
+						},
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Name:  "bar",
+									Value: "1234",
+								},
 							},
 						},
 					},
@@ -827,13 +929,19 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			desc: "bad community literal (asn part doesn't fit)",
+			desc: "bad community literal (asn part doesn't fit) - in the community CR",
 			crs: ClusterResources{
-				BGPAdvs: []v1beta1.BGPAdvertisement{
+				Communities: []v1beta1.Community{
 					{
-						Spec: v1beta1.BGPAdvertisementSpec{
-							Communities: []string{
-								"99999999:1",
+						ObjectMeta: v1.ObjectMeta{
+							Name: "community",
+						},
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Name:  "bar",
+									Value: "99999999:1",
+								},
 							},
 						},
 					},
@@ -841,13 +949,76 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			desc: "bad community literal (community# part doesn't fit)",
+			desc: "bad community literal (community# part doesn't fit) - in the community CR",
 			crs: ClusterResources{
-				BGPAdvs: []v1beta1.BGPAdvertisement{
+				Communities: []v1beta1.Community{
 					{
-						Spec: v1beta1.BGPAdvertisementSpec{
-							Communities: []string{
-								"1:99999999",
+						ObjectMeta: v1.ObjectMeta{
+							Name: "community",
+						},
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Name:  "bar",
+									Value: "1:99999999",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "duplicate communities definition (in 2 different crs)",
+			crs: ClusterResources{
+				Communities: []v1beta1.Community{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "community1",
+						},
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Name:  "bar",
+									Value: "1234:5678",
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "community2",
+						},
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Name:  "bar",
+									Value: "1234:5678",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "duplicate communities definition (in the same cr)",
+			crs: ClusterResources{
+				Communities: []v1beta1.Community{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "community",
+						},
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Name:  "bar",
+									Value: "1234:5678",
+								},
+								{
+									Name:  "bar",
+									Value: "1234:5678",
+								},
 							},
 						},
 					},
@@ -1412,6 +1583,69 @@ func TestParse(t *testing.T) {
 		},
 
 		{
+			desc: "config legacy pool with bgp communities crd",
+			crs: ClusterResources{
+				LegacyAddressPools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "legacybgppool1",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Addresses: []string{
+								"10.40.0.0/16",
+								"10.60.0.0/24",
+							},
+							Protocol:      string(BGP),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
+							BGPAdvertisements: []v1beta1.LegacyBgpAdvertisement{
+								{
+									AggregationLength: pointer.Int32Ptr(32),
+									LocalPref:         uint32(100),
+									Communities:       []string{"bar"},
+								},
+							},
+						},
+					},
+				},
+				Communities: []v1beta1.Community{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "community",
+						},
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Name:  "bar",
+									Value: "64512:1234",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: map[string]*Pool{
+					"legacybgppool1": {
+						CIDR:          []*net.IPNet{ipnet("10.40.0.0/16"), ipnet("10.60.0.0/24")},
+						AvoidBuggyIPs: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           100,
+								Communities: map[uint32]bool{
+									0xfc0004d2: true,
+								},
+								Nodes: map[string]bool{},
+							},
+						},
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
 			desc: "config mixing legacy pools with IP pools with overlapping ips",
 			crs: ClusterResources{
 				Pools: []v1beta1.IPAddressPool{
@@ -1791,31 +2025,34 @@ func TestParse(t *testing.T) {
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
-		/* TODO Add communities CRD
 		{
-			desc: "Duplicate communities definition",
+			desc: "config legacy pool with invalid community",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPAddressPool{
+				LegacyAddressPools: []v1beta1.AddressPool{
 					{
-						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPAddressPoolSpec{
-							Protocol: "bgp",
+						ObjectMeta: v1.ObjectMeta{
+							Name: "legacybgppool1",
+						},
+						Spec: v1beta1.AddressPoolSpec{
 							Addresses: []string{
-								"10.20.0.0/16",
+								"10.40.0.0/16",
+								"10.60.0.0/24",
 							},
-							BGPAdvertisements: []v1beta1.BgpAdvertisement{
+							Protocol:      string(BGP),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
+							BGPAdvertisements: []v1beta1.LegacyBgpAdvertisement{
 								{
-									AggregationLength: pointer.Int32Ptr(26),
-								},
-								{
-									AggregationLength: pointer.Int32Ptr(26),
+									AggregationLength: pointer.Int32Ptr(32),
+									LocalPref:         uint32(100),
+									Communities:       []string{"1234"},
 								},
 							},
 						},
 					},
 				},
 			},
-		},*/
+		},
 	}
 
 	for _, test := range tests {
