@@ -315,6 +315,11 @@ func enableWebhook(mgr manager.Manager, validate config.Validate, namespace stri
 		return err
 	}
 
+	if err := (&metallbv1beta1.Community{}).SetupWebhookWithManager(mgr); err != nil {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "Community")
+		return err
+	}
+
 	return nil
 }
 

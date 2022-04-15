@@ -35,6 +35,7 @@ func (v *validator) Validate(resources ...client.ObjectList) error {
 		BGPAdvs:            make([]metallbv1beta1.BGPAdvertisement, 0),
 		L2Advs:             make([]metallbv1beta1.L2Advertisement, 0),
 		LegacyAddressPools: make([]metallbv1beta1.AddressPool, 0),
+		Communities:        make([]metallbv1beta1.Community, 0),
 	}
 	for _, list := range resources {
 		switch list := list.(type) {
@@ -50,6 +51,8 @@ func (v *validator) Validate(resources ...client.ObjectList) error {
 			clusterResources.L2Advs = append(clusterResources.L2Advs, list.Items...)
 		case *metallbv1beta1.AddressPoolList:
 			clusterResources.LegacyAddressPools = append(clusterResources.LegacyAddressPools, list.Items...)
+		case *metallbv1beta1.CommunityList:
+			clusterResources.Communities = append(clusterResources.Communities, list.Items...)
 		}
 	}
 	_, err := For(clusterResources, v.validate)
