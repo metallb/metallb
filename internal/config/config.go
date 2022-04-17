@@ -475,7 +475,7 @@ func addressPoolFromLegacyCR(p metallbv1beta1.AddressPool, bgpCommunities map[st
 	case BGP:
 		ads, err := bgpAdvertisementsFromLegacyCR(p.Spec.BGPAdvertisements, cidrsPerAddresses, bgpCommunities, allNodes)
 		if err != nil {
-			return nil, errors.Wrapf(err, "parsing BGP advertisements for %s", p.Name)
+			return nil, errors.Wrapf(err, "parsing BGP advertisements")
 		}
 		ret.BGPAdvertisements = ads
 		if len(ads) == 0 { // Fill an empty bgpadvertisement to declare we want to advertise this pool
