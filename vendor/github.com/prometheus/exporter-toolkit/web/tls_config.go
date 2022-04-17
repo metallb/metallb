@@ -59,7 +59,8 @@ func (t *TLSStruct) SetDirectory(dir string) {
 }
 
 type HTTPStruct struct {
-	HTTP2 bool `yaml:"http2"`
+	HTTP2  bool              `yaml:"http2"`
+	Header map[string]string `yaml:"headers,omitempty"`
 }
 
 func getConfig(configPath string) (*Config, error) {
@@ -76,6 +77,9 @@ func getConfig(configPath string) (*Config, error) {
 		HTTPConfig: HTTPStruct{HTTP2: true},
 	}
 	err = yaml.UnmarshalStrict(content, c)
+	if err == nil {
+		err = validateHeaderConfig(c.HTTPConfig.Header)
+	}
 	c.TLSConfig.SetDirectory(filepath.Dir(configPath))
 	return c, err
 }
@@ -207,7 +211,7 @@ func Serve(l net.Listener, server *http.Server, tlsConfigPath string, logger log
 		return err
 	}
 
-	server.Handler = &userAuthRoundtrip{
+	server.Handler = &webHandler{
 		tlsConfigPath: tlsConfigPath,
 		logger:        logger,
 		handler:       handler,
@@ -236,7 +240,12 @@ func Serve(l net.Listener, server *http.Server, tlsConfigPath string, logger log
 	// Set the GetConfigForClient method of the HTTPS server so that the config
 	// and certs are reloaded on new connections.
 	server.TLSConfig.GetConfigForClient = func(*tls.ClientHelloInfo) (*tls.Config, error) {
-		return getTLSConfig(tlsConfigPath)
+		config, err := getTLSConfig(tlsConfigPath)
+		if err != nil {
+			return nil, err
+		}
+		config.NextProtos = server.TLSConfig.NextProtos
+		return config, nil
 	}
 	return server.ServeTLS(l, "", "")
 }

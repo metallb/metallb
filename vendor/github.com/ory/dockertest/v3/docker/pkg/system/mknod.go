@@ -1,4 +1,5 @@
 // +build !windows
+// +build !freebsd
 
 package system // import "github.com/ory/dockertest/v3/docker/pkg/system"
 

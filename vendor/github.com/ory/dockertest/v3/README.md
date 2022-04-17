@@ -3,7 +3,7 @@
 [![Build Status](https://travis-ci.org/ory/dockertest.svg)](https://travis-ci.org/ory/dockertest?branch=master)
 [![Coverage Status](https://coveralls.io/repos/github/ory/dockertest/badge.svg?branch=v3)](https://coveralls.io/github/ory/dockertest?branch=v3)
 
-Use Docker to run your Go language integration tests against third party services on **Microsoft Windows, Mac OSX and Linux**!
+Use Docker to run your Golang integration tests against third party services on **Microsoft Windows, Mac OSX and Linux**!
 
 <!-- START doctoc generated TOC please keep comment here to allow auto update -->
 <!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
@@ -83,7 +83,7 @@ func TestMain(m *testing.M) {
 		}
 		return db.Ping()
 	}); err != nil {
-		log.Fatalf("Could not connect to docker: %s", err)
+		log.Fatalf("Could not connect to database: %s", err)
 	}
 
 	code := m.Run()
@@ -206,4 +206,4 @@ func getHostPort(resource *dockertest.Resource, id string) string {
 }
 ```
 
-It will return the remote docker host concatenated with the allocated port in case `DOCKER_HOST` env is defined. Otherwise, it will fall back to embedded behavior.
+It will return the remote docker host concatenated with the allocated port in case `DOCKER_HOST` env is defined. Otherwise, it will fall back to the embedded behavior.

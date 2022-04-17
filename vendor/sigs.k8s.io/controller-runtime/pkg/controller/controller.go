@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	"k8s.io/client-go/util/workqueue"
@@ -31,7 +32,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-// Options are the arguments for creating a new Controller
+// Options are the arguments for creating a new Controller.
 type Options struct {
 	// MaxConcurrentReconciles is the maximum number of concurrent Reconciles which can be run. Defaults to 1.
 	MaxConcurrentReconciles int
@@ -47,6 +48,13 @@ type Options struct {
 	// Log is the logger used for this controller and passed to each reconciliation
 	// request via the context field.
 	Log logr.Logger
+
+	// CacheSyncTimeout refers to the time limit set to wait for syncing caches.
+	// Defaults to 2 minutes if not set.
+	CacheSyncTimeout time.Duration
+
+	// RecoverPanic indicates whether the panic caused by reconcile should be recovered.
+	RecoverPanic bool
 }
 
 // Controller implements a Kubernetes API.  A Controller manages a work queue fed reconcile.Requests
@@ -96,12 +104,16 @@ func NewUnmanaged(name string, mgr manager.Manager, options Options) (Controller
 		return nil, fmt.Errorf("must specify Name for Controller")
 	}
 
-	if options.Log == nil {
+	if options.Log.GetSink() == nil {
 		options.Log = mgr.GetLogger()
 	}
 
 	if options.MaxConcurrentReconciles <= 0 {
 		options.MaxConcurrentReconciles = 1
+	}
+
+	if options.CacheSyncTimeout == 0 {
+		options.CacheSyncTimeout = 2 * time.Minute
 	}
 
 	if options.RateLimiter == nil {
@@ -120,8 +132,10 @@ func NewUnmanaged(name string, mgr manager.Manager, options Options) (Controller
 			return workqueue.NewNamedRateLimitingQueue(options.RateLimiter, name)
 		},
 		MaxConcurrentReconciles: options.MaxConcurrentReconciles,
+		CacheSyncTimeout:        options.CacheSyncTimeout,
 		SetFields:               mgr.SetFields,
 		Name:                    name,
 		Log:                     options.Log.WithName("controller").WithName(name),
+		RecoverPanic:            options.RecoverPanic,
 	}, nil
 }

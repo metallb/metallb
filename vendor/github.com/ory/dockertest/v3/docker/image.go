@@ -475,6 +475,7 @@ type BuildImageOptions struct {
 	CgroupParent        string             `qs:"cgroupparent"`
 	SecurityOpt         []string           `qs:"securityopt"`
 	Target              string             `gs:"target"`
+	Platform            string             `qs:"platform"`
 	Context             context.Context
 }
 
