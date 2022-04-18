@@ -93,7 +93,8 @@ func labelsToLegacySelector(selectors []metav1.LabelSelector) ([]NodeSelector, e
 	res := []NodeSelector{}
 	for _, sel := range selectors {
 		toAdd := NodeSelector{
-			MatchLabels: make(map[string]string),
+			MatchLabels:      make(map[string]string),
+			MatchExpressions: make([]MatchExpression, 0),
 		}
 		for k, v := range sel.MatchLabels {
 			toAdd.MatchLabels[k] = v
@@ -105,6 +106,7 @@ func labelsToLegacySelector(selectors []metav1.LabelSelector) ([]NodeSelector, e
 				Values:   make([]string, len(e.Values)),
 			}
 			copy(m.Values, e.Values)
+			toAdd.MatchExpressions = append(toAdd.MatchExpressions, m)
 		}
 		res = append(res, toAdd)
 	}
