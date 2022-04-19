@@ -238,27 +238,9 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 		cfg.Pools[p.Name] = pool
 	}
 
-	for _, l2Adv := range resources.L2Advs {
-		adv, err := l2AdvertisementFromCR(l2Adv, resources.Nodes)
-		if err != nil {
-			return nil, err
-		}
-		// No pool selector means select all pools
-		if len(l2Adv.Spec.IPAddressPools) == 0 {
-			for _, pool := range cfg.Pools {
-				if !containsAdvertisement(pool.L2Advertisements, adv) {
-					pool.L2Advertisements = append(pool.L2Advertisements, adv)
-				}
-			}
-			continue
-		}
-		for _, poolName := range l2Adv.Spec.IPAddressPools {
-			if pool, ok := cfg.Pools[poolName]; ok {
-				if !containsAdvertisement(pool.L2Advertisements, adv) {
-					pool.L2Advertisements = append(pool.L2Advertisements, adv)
-				}
-			}
-		}
+	err = setL2AdvertisementsToPools(resources.Pools, resources.L2Advs, resources.Nodes, cfg.Pools)
+	if err != nil {
+		return nil, err
 	}
 
 	err = validateDuplicateBGPAdvertisements(resources.BGPAdvs)
@@ -266,31 +248,9 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 		return nil, err
 	}
 
-	for _, bgpAdv := range resources.BGPAdvs {
-		adv, err := bgpAdvertisementFromCR(bgpAdv, communities, resources.Nodes)
-		if err != nil {
-			return nil, err
-		}
-		// No pool selector means select all pools
-		if len(bgpAdv.Spec.IPAddressPools) == 0 {
-			for _, pool := range cfg.Pools {
-				err := validateBGPAdvPerPool(adv, pool)
-				if err != nil {
-					return nil, err
-				}
-				pool.BGPAdvertisements = append(pool.BGPAdvertisements, adv)
-			}
-			continue
-		}
-		for _, poolName := range bgpAdv.Spec.IPAddressPools {
-			if pool, ok := cfg.Pools[poolName]; ok {
-				err := validateBGPAdvPerPool(adv, pool)
-				if err != nil {
-					return nil, err
-				}
-				pool.BGPAdvertisements = append(pool.BGPAdvertisements, adv)
-			}
-		}
+	err = setBGPAdvertisementsToPools(resources.Pools, resources.BGPAdvs, resources.Nodes, cfg.Pools, communities)
+	if err != nil {
+		return nil, err
 	}
 
 	for _, p := range resources.LegacyAddressPools {
@@ -565,6 +525,72 @@ func bfdProfileFromCR(p metallbv1beta1.BFDProfile) (*BFDProfile, error) {
 	}
 
 	return res, nil
+}
+
+func setL2AdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, l2Advs []metallbv1beta1.L2Advertisement,
+	nodes []corev1.Node, ipPoolMap map[string]*Pool) error {
+	for _, l2Adv := range l2Advs {
+		adv, err := l2AdvertisementFromCR(l2Adv, nodes)
+		if err != nil {
+			return err
+		}
+		ipPoolsSelected, err := selectedPools(ipPools, l2Adv.Spec.IPAddressPoolSelectors)
+		if err != nil {
+			return err
+		}
+		// No pool selector means select all pools
+		if len(l2Adv.Spec.IPAddressPools) == 0 && len(l2Adv.Spec.IPAddressPoolSelectors) == 0 {
+			for _, pool := range ipPoolMap {
+				if !containsAdvertisement(pool.L2Advertisements, adv) {
+					pool.L2Advertisements = append(pool.L2Advertisements, adv)
+				}
+			}
+			continue
+		}
+		for _, poolName := range append(l2Adv.Spec.IPAddressPools, ipPoolsSelected...) {
+			if pool, ok := ipPoolMap[poolName]; ok {
+				if !containsAdvertisement(pool.L2Advertisements, adv) {
+					pool.L2Advertisements = append(pool.L2Advertisements, adv)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func setBGPAdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, bgpAdvs []metallbv1beta1.BGPAdvertisement,
+	nodes []corev1.Node, ipPoolMap map[string]*Pool, communities map[string]uint32) error {
+	for _, bgpAdv := range bgpAdvs {
+		adv, err := bgpAdvertisementFromCR(bgpAdv, communities, nodes)
+		if err != nil {
+			return err
+		}
+		ipPoolsSelected, err := selectedPools(ipPools, bgpAdv.Spec.IPAddressPoolSelectors)
+		if err != nil {
+			return err
+		}
+		// No pool selector means select all pools
+		if len(bgpAdv.Spec.IPAddressPools) == 0 && len(bgpAdv.Spec.IPAddressPoolSelectors) == 0 {
+			for _, pool := range ipPoolMap {
+				err := validateBGPAdvPerPool(adv, pool)
+				if err != nil {
+					return err
+				}
+				pool.BGPAdvertisements = append(pool.BGPAdvertisements, adv)
+			}
+			continue
+		}
+		for _, poolName := range append(bgpAdv.Spec.IPAddressPools, ipPoolsSelected...) {
+			if pool, ok := ipPoolMap[poolName]; ok {
+				err := validateBGPAdvPerPool(adv, pool)
+				if err != nil {
+					return err
+				}
+				pool.BGPAdvertisements = append(pool.BGPAdvertisements, adv)
+			}
+		}
+	}
+	return nil
 }
 
 func l2AdvertisementFromCR(crdAd metallbv1beta1.L2Advertisement, nodes []corev1.Node) (*L2Advertisement, error) {
@@ -909,4 +935,27 @@ OUTER:
 	}
 	return res, nil
 
+}
+
+func selectedPools(pools []metallbv1beta1.IPAddressPool, selectors []metav1.LabelSelector) ([]string, error) {
+	labelSelectors := []labels.Selector{}
+	for _, selector := range selectors {
+		l, err := metav1.LabelSelectorAsSelector(&selector)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Invalid label selector %v", selector)
+		}
+		labelSelectors = append(labelSelectors, l)
+	}
+	var ipPools []string
+OUTER:
+	for _, pool := range pools {
+		for _, s := range labelSelectors {
+			poolLabels := labels.Set(pool.Labels)
+			if s.Matches(poolLabels) {
+				ipPools = append(ipPools, pool.Name)
+				continue OUTER
+			}
+		}
+	}
+	return ipPools, nil
 }
