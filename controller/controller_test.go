@@ -854,7 +854,7 @@ func TestControllerConfig(t *testing.T) {
 	}
 
 	// Now that an IP is allocated, removing the IP pool is not allowed.
-	if c.SetPools(l, map[string]*config.Pool{}) == controllers.SyncStateError {
+	if c.SetPools(l, map[string]*config.Pool{}) != controllers.SyncStateError {
 		t.Fatalf("SetPools that deletes allocated IPs was accepted")
 	}
 
@@ -1007,7 +1007,7 @@ func TestControllerDualStackConfig(t *testing.T) {
 	}
 
 	// Now that an IP is allocated, removing the IP pool is not allowed.
-	if c.SetPools(l, map[string]*config.Pool{}) != controllers.SyncStateErrorNoRetry {
+	if c.SetPools(l, map[string]*config.Pool{}) != controllers.SyncStateError {
 		t.Fatalf("SetPools that deletes allocated IPs was accepted")
 	}
 
