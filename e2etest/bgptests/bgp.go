@@ -1045,7 +1045,8 @@ var _ = ginkgo.Describe("BGP", func() {
 
 				poolWithAdvertisement := metallbv1beta1.IPAddressPool{
 					ObjectMeta: metav1.ObjectMeta{
-						Name: "bgp-with-advertisement",
+						Name:   "bgp-with-advertisement",
+						Labels: map[string]string{"test": "bgp-with-advertisement"},
 					},
 					Spec: metallbv1beta1.IPAddressPoolSpec{
 						Addresses: []string{rangeWithAdvertisement},
@@ -1264,6 +1265,26 @@ var _ = ginkgo.Describe("BGP", func() {
 					},
 				},
 				true,
+				ipfamily.IPv4,
+				[]metallbv1beta1.Community{}),
+			table.Entry("IPV4 - ip pool selector",
+				"192.168.10.0/24",
+				"192.168.16.0/24",
+				metallbv1beta1.BGPAdvertisement{
+					ObjectMeta: metav1.ObjectMeta{Name: "advertisement"},
+					Spec: metallbv1beta1.BGPAdvertisementSpec{
+						Communities: []string{CommunityNoAdv},
+						LocalPref:   50,
+						IPAddressPoolSelectors: []metav1.LabelSelector{
+							{
+								MatchLabels: map[string]string{
+									"test": "bgp-with-advertisement",
+								},
+							},
+						},
+					},
+				},
+				false,
 				ipfamily.IPv4,
 				[]metallbv1beta1.Community{}),
 			table.Entry("IPV6 - community and localpref",

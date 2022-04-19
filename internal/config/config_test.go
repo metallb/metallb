@@ -1694,6 +1694,216 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			desc: "use ip pool selectors",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "pool1",
+							Labels: map[string]string{"test": "pool1"},
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+							},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "pool2",
+							Labels: map[string]string{"test": "pool2"},
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"30.0.0.0/16",
+							},
+						},
+					},
+				},
+				L2Advs: []v1beta1.L2Advertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "l2adv1",
+						},
+						Spec: v1beta1.L2AdvertisementSpec{
+							IPAddressPoolSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"test": "pool1",
+									},
+								},
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv1",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength: pointer.Int32Ptr(32),
+							LocalPref:         uint32(100),
+							IPAddressPoolSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"test": "pool1",
+									},
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv2",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength: pointer.Int32Ptr(32),
+							LocalPref:         uint32(200),
+							IPAddressPoolSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"test": "pool2",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: map[string]*Pool{
+					"pool1": {
+						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
+						AutoAssign: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           100,
+								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
+							},
+						},
+						L2Advertisements: []*L2Advertisement{{
+							Nodes: map[string]bool{},
+						}},
+					},
+					"pool2": {
+						CIDR:       []*net.IPNet{ipnet("30.0.0.0/16")},
+						AutoAssign: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           200,
+								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
+							},
+						},
+						L2Advertisements: nil,
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
+			desc: "use non existent label for ip pool selectors",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "pool1",
+							Labels: map[string]string{"test": "pool1"},
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+							},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "pool2",
+							Labels: map[string]string{"test": "pool2"},
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"30.0.0.0/16",
+							},
+						},
+					},
+				},
+				L2Advs: []v1beta1.L2Advertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "l2adv1",
+						},
+						Spec: v1beta1.L2AdvertisementSpec{
+							IPAddressPoolSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"test": "do-not-select-pool",
+									},
+								},
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv1",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength: pointer.Int32Ptr(32),
+							LocalPref:         uint32(100),
+							IPAddressPoolSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"test": "do-not-select-pool",
+									},
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv2",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength: pointer.Int32Ptr(32),
+							LocalPref:         uint32(200),
+							IPAddressPoolSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"test": "do-not-select-pool",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: map[string]*Pool{
+					"pool1": {
+						CIDR:              []*net.IPNet{ipnet("10.20.0.0/16")},
+						AutoAssign:        true,
+						BGPAdvertisements: nil,
+						L2Advertisements:  nil,
+					},
+					"pool2": {
+						CIDR:              []*net.IPNet{ipnet("30.0.0.0/16")},
+						AutoAssign:        true,
+						BGPAdvertisements: nil,
+						L2Advertisements:  nil,
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
 			desc: "use node selectors",
 			crs: ClusterResources{
 				Pools: []v1beta1.IPAddressPool{
