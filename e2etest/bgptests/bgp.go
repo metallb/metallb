@@ -119,15 +119,30 @@ var _ = ginkgo.Describe("BGP", func() {
 					},
 				},
 			},
-			Peers:   metallb.PeersForContainers(FRRContainers, pairingIPFamily),
-			BGPAdvs: []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement},
 		}
+
+		err := ConfigUpdater.Update(resources)
+		framework.ExpectNoError(err)
+
+		svc, jig := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
+		defer testservice.Delete(cs, svc)
+
+		for _, i := range svc.Status.LoadBalancer.Ingress {
+			ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
+			ingressIP := e2eservice.GetIngressPoint(&i)
+			err = config.ValidateIPInRange(resources.Pools, ingressIP)
+			framework.ExpectNoError(err)
+		}
+
+		resources.BGPAdvs = []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement}
+		resources.Peers = metallb.PeersForContainers(FRRContainers, pairingIPFamily)
+
 		for _, c := range FRRContainers {
 			err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily)
 			framework.ExpectNoError(err)
 		}
 
-		err := ConfigUpdater.Update(resources)
+		err = ConfigUpdater.Update(resources)
 		framework.ExpectNoError(err)
 
 		for _, c := range FRRContainers {
@@ -139,9 +154,6 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		if setProtocoltest == "ExternalTrafficPolicyCluster" {
 
-			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
-			defer testservice.Delete(cs, svc)
-
 			validateDesiredLB(svc)
 
 			for _, c := range FRRContainers {
@@ -150,14 +162,11 @@ var _ = ginkgo.Describe("BGP", func() {
 		}
 
 		if setProtocoltest == "ExternalTrafficPolicyLocal" {
-			svc, jig := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
 			err = jig.Scale(2)
 			framework.ExpectNoError(err)
 
 			epNodes, err := jig.ListNodesWithEndpoint() // Only nodes with an endpoint should be advertising the IP
 			framework.ExpectNoError(err)
-
-			defer testservice.Delete(cs, svc)
 
 			for _, c := range FRRContainers {
 				validateService(cs, svc, epNodes, c)
