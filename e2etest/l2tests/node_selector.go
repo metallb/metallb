@@ -121,7 +121,7 @@ var _ = ginkgo.Describe("L2", func() {
 			}
 		})
 
-		ginkgo.It("should with multiple node selectors", func() {
+		ginkgo.It("should work with multiple node selectors", func() {
 			// ETP = local, pin the endpoint to node0, have two l2 advertisements, one for
 			// all and one for node1, check node0 is advertised.
 			jig := e2eservice.NewTestJig(cs, f.Namespace.Name, "svca")
