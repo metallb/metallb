@@ -17,7 +17,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	metallbv1alpha1 "go.universe.tf/metallb/api/v1alpha1"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 
@@ -57,7 +56,6 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(metallbv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(metallbv1beta1.AddToScheme(scheme))
 	utilruntime.Must(metallbv1beta2.AddToScheme(scheme))
 
@@ -79,7 +77,6 @@ type Client struct {
 	client         *kubernetes.Clientset
 	events         record.EventRecorder
 	mgr            manager.Manager
-	reloader       *controllers.ServiceReloadReconciler
 	validateConfig config.Validate
 	ForceSync      func()
 }
@@ -117,7 +114,6 @@ func New(cfg *Config) (*Client, error) {
 		LeaderElection: false,
 		NewCache: cache.BuilderWithOptions(cache.Options{
 			SelectorsByObject: map[client.Object]cache.ObjectSelector{
-				&metallbv1alpha1.AddressPool{}:     namespaceSelector,
 				&metallbv1beta1.AddressPool{}:      namespaceSelector,
 				&metallbv1beta1.BFDProfile{}:       namespaceSelector,
 				&metallbv1beta1.BGPAdvertisement{}: namespaceSelector,
@@ -125,6 +121,7 @@ func New(cfg *Config) (*Client, error) {
 				&metallbv1beta1.IPAddressPool{}:    namespaceSelector,
 				&metallbv1beta1.L2Advertisement{}:  namespaceSelector,
 				&metallbv1beta2.BGPPeer{}:          namespaceSelector,
+				&metallbv1beta1.Community{}:        namespaceSelector,
 				&corev1.Secret{}:                   namespaceSelector,
 			},
 		}),
@@ -234,25 +231,16 @@ func New(cfg *Config) (*Client, error) {
 
 	if cfg.ServiceChanged != nil {
 		if err = (&controllers.ServiceReconciler{
-			Client:      mgr.GetClient(),
-			Logger:      cfg.Logger,
-			Scheme:      mgr.GetScheme(),
-			Handler:     cfg.ServiceHandler,
-			Endpoints:   needEndpoints,
-			ForceReload: reload,
+			Client:    mgr.GetClient(),
+			Logger:    cfg.Logger,
+			Scheme:    mgr.GetScheme(),
+			Handler:   cfg.ServiceHandler,
+			Endpoints: needEndpoints,
+			Reload:    reloadChan,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "service")
 			return nil, errors.Wrap(err, "failed to create service reconciler")
 		}
-	}
-
-	c.reloader = &controllers.ServiceReloadReconciler{
-		Client:    mgr.GetClient(),
-		Log:       cfg.Logger,
-		Scheme:    mgr.GetScheme(),
-		Handler:   cfg.ServiceHandler,
-		Endpoints: needEndpoints,
-		Reload:    reloadChan,
 	}
 
 	if cfg.EnableWebhook {
@@ -314,6 +302,11 @@ func enableWebhook(mgr manager.Manager, validate config.Validate, namespace stri
 
 	if err := (&metallbv1beta1.BGPAdvertisement{}).SetupWebhookWithManager(mgr); err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "BGPAdvertisement")
+		return err
+	}
+
+	if err := (&metallbv1beta1.Community{}).SetupWebhookWithManager(mgr); err != nil {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "Community")
 		return err
 	}
 
@@ -393,11 +386,6 @@ func (c *Client) PodIPs(namespace, labels string) ([]string, error) {
 func (c *Client) Run(stopCh <-chan struct{}) error {
 	ctx := ctrl.SetupSignalHandler()
 
-	level.Info(c.logger).Log("Starting Reloader")
-	if err := c.reloader.Start(ctx, c.mgr); err != nil {
-		level.Error(c.logger).Log("error", err, "unable to start", "reloader")
-		return errors.Wrap(err, "failed to start reloader")
-	}
 	level.Info(c.logger).Log("Starting Manager")
 	if err := c.mgr.Start(ctx); err != nil {
 		return err
