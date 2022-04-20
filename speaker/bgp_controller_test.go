@@ -13,8 +13,10 @@ import (
 
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/k8s"
+	"go.universe.tf/metallb/internal/k8s/controllers"
+	"go.universe.tf/metallb/internal/k8s/epslices"
 	"go.universe.tf/metallb/internal/logging"
+	"go.universe.tf/metallb/internal/pointer"
 
 	"github.com/go-kit/kit/log"
 	"github.com/google/go-cmp/cmp"
@@ -23,10 +25,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
-
-func strptr(s string) *string {
-	return &s
-}
 
 func mustSelector(s string) labels.Selector {
 	res, err := labels.Parse(s)
@@ -73,9 +71,6 @@ func sortAds(ads map[string][]*bgp.Advertisement) {
 			if a.LocalPref != b.LocalPref {
 				return a.LocalPref < b.LocalPref
 			}
-			if a.NextHop.String() != b.NextHop.String() {
-				return a.NextHop.String() < b.NextHop.String()
-			}
 			if len(a.Communities) != len(b.Communities) {
 				return len(a.Communities) < len(b.Communities)
 			}
@@ -111,7 +106,7 @@ type fakeBGPSessionManager struct {
 	gotAds map[string][]*bgp.Advertisement
 }
 
-func (f *fakeBGPSessionManager) NewSession(_ log.Logger, addr string, _ net.IP, _ uint32, _ net.IP, _ uint32, _ time.Duration, _ time.Duration, _, _, _ string, _ bool) (bgp.Session, error) {
+func (f *fakeBGPSessionManager) NewSession(_ log.Logger, addr string, _ net.IP, _ uint32, _ net.IP, _ uint32, _ time.Duration, _ time.Duration, _, _, _ string, _ bool, name string) (bgp.Session, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -228,11 +223,11 @@ func TestBGPSpeaker(t *testing.T) {
 		balancer string
 		config   *config.Config
 		svc      *v1.Service
-		eps      k8s.EpsOrSlices
+		eps      epslices.EpsOrSlices
 
 		wantAds        map[string][]*bgp.Advertisement
-		expectedCfgRet k8s.SyncState
-		expectedLBRet  k8s.SyncState
+		expectedCfgRet controllers.SyncState
+		expectedLBRet  controllers.SyncState
 	}{
 		{
 			desc:     "Service ignored, no config",
@@ -244,24 +239,24 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds:        map[string][]*bgp.Advertisement{},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -275,11 +270,11 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.BGP,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
 							},
 						},
 					},
@@ -288,7 +283,7 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
 		},
 
 		{
@@ -300,26 +295,26 @@ func TestBGPSpeaker(t *testing.T) {
 					ExternalTrafficPolicy: "Cluster",
 				},
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("pandora"),
+									NodeName: pointer.StrPtr("pandora"),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -332,20 +327,20 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -354,8 +349,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -368,26 +363,26 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -400,24 +395,24 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 								{
 									IP:       "2.3.4.6",
-									NodeName: strptr("pandora"),
+									NodeName: pointer.StrPtr("pandora"),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -426,8 +421,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -440,18 +435,18 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 								{
 									IP:       "2.3.4.6",
-									NodeName: strptr("pandora"),
+									NodeName: pointer.StrPtr("pandora"),
 								},
 							},
 						},
@@ -459,25 +454,25 @@ func TestBGPSpeaker(t *testing.T) {
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 							NotReadyAddresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.6",
-									NodeName: strptr("pandora"),
+									NodeName: pointer.StrPtr("pandora"),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -490,12 +485,12 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{},
+			eps: epslices.EpsOrSlices{},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -508,26 +503,26 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
 							NotReadyAddresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -540,26 +535,26 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 							NotReadyAddresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.6",
-									NodeName: strptr("pandora"),
+									NodeName: pointer.StrPtr("pandora"),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -568,8 +563,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -583,17 +578,18 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.BGP,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
 								LocalPref:         100,
 								Communities:       map[uint32]bool{1234: true, 2345: true},
+								Nodes:             map[string]bool{"pandora": true},
 							},
 							{
 								AggregationLength: 24,
 								LocalPref:         1000,
+								Nodes:             map[string]bool{"pandora": true},
 							},
 						},
 					},
@@ -607,20 +603,20 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -635,8 +631,142 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
+		},
+		{
+			desc: "Multiple advertisement config, one only for my node",
+			config: &config.Config{
+				Peers: []*config.Peer{
+					{
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+				},
+				Pools: map[string]*config.Pool{
+					"default": {
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						BGPAdvertisements: []*config.BGPAdvertisement{
+							{
+								AggregationLength: 32,
+								LocalPref:         100,
+								Communities:       map[uint32]bool{1234: true, 2345: true},
+								Nodes:             map[string]bool{"pandora": true},
+							},
+							{
+								AggregationLength: 24,
+								LocalPref:         1000,
+								Nodes:             map[string]bool{"iris": true},
+							},
+						},
+					},
+				},
+			},
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: epslices.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: pointer.StrPtr("iris"),
+								},
+							},
+						},
+					},
+				},
+				Type: epslices.Eps,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					{
+						Prefix:      ipnet("10.20.30.1/32"),
+						LocalPref:   100,
+						Communities: []uint32{1234, 2345},
+					},
+				},
+			},
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
+		},
+
+		{
+			desc: "Multiple advertisement config, one with peer selector",
+			config: &config.Config{
+				Peers: []*config.Peer{
+					{
+						Name:          "peer1",
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+				},
+				Pools: map[string]*config.Pool{
+					"default": {
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						BGPAdvertisements: []*config.BGPAdvertisement{
+							{
+								AggregationLength: 32,
+								LocalPref:         100,
+								Communities:       map[uint32]bool{1234: true, 2345: true},
+								Peers:             []string{"peer1"},
+								Nodes:             map[string]bool{"pandora": true},
+							},
+							{
+								AggregationLength: 24,
+								LocalPref:         1000,
+								Nodes:             map[string]bool{"pandora": true},
+							},
+						},
+					},
+				},
+			},
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: epslices.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: pointer.StrPtr("iris"),
+								},
+							},
+						},
+					},
+				},
+				Type: epslices.Eps,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					{
+						Prefix:      ipnet("10.20.30.1/32"),
+						LocalPref:   100,
+						Communities: []uint32{1234, 2345},
+						Peers:       []string{"peer1"},
+					},
+					{
+						Prefix:    ipnet("10.20.30.0/24"),
+						LocalPref: 1000,
+					},
+				},
+			},
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -654,11 +784,11 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.BGP,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
 							},
 						},
 					},
@@ -672,20 +802,20 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -699,8 +829,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -712,20 +842,20 @@ func TestBGPSpeaker(t *testing.T) {
 					ExternalTrafficPolicy: "Cluster",
 				},
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -739,8 +869,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -753,20 +883,20 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.5"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -786,8 +916,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -800,20 +930,20 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -835,8 +965,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -854,8 +984,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -869,11 +999,11 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.BGP,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
 							},
 						},
 					},
@@ -887,20 +1017,20 @@ func TestBGPSpeaker(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
+			eps: epslices.EpsOrSlices{
 				EpVal: &v1.Endpoints{
 					Subsets: []v1.EndpointSubset{
 						{
 							Addresses: []v1.EndpointAddress{
 								{
 									IP:       "2.3.4.5",
-									NodeName: strptr("iris"),
+									NodeName: pointer.StrPtr("iris"),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Eps,
+				Type: epslices.Eps,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.5:0": {
@@ -909,8 +1039,8 @@ func TestBGPSpeaker(t *testing.T) {
 					},
 				},
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
-			expectedLBRet:  k8s.SyncStateSuccess,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
 		},
 
 		{
@@ -919,7 +1049,7 @@ func TestBGPSpeaker(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.5:0": nil,
 			},
-			expectedCfgRet: k8s.SyncStateReprocessAll,
+			expectedCfgRet: controllers.SyncStateReprocessAll,
 		},
 	}
 
@@ -966,7 +1096,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 		balancer string
 		config   *config.Config
 		svc      *v1.Service
-		eps      k8s.EpsOrSlices
+		eps      epslices.EpsOrSlices
 
 		wantAds map[string][]*bgp.Advertisement
 	}{
@@ -980,8 +1110,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -992,13 +1122,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{},
 		},
@@ -1013,11 +1143,11 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.BGP,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
 							},
 						},
 					},
@@ -1036,8 +1166,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 					ExternalTrafficPolicy: "Cluster",
 				},
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1048,13 +1178,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "pandora",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -1071,8 +1201,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1083,13 +1213,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -1110,8 +1240,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1122,13 +1252,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -1145,8 +1275,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1157,7 +1287,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -1172,13 +1302,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "pandora",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -1199,8 +1329,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1211,7 +1341,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -1226,7 +1356,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "pandora",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(false),
+									Ready: pointer.BoolPtr(false),
 								},
 							},
 						},
@@ -1241,7 +1371,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
@@ -1256,13 +1386,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "pandora",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -1279,7 +1409,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{},
+			eps: epslices.EpsOrSlices{},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
@@ -1295,8 +1425,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1307,13 +1437,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(false),
+									Ready: pointer.BoolPtr(false),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -1330,8 +1460,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1342,7 +1472,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 							{
@@ -1353,13 +1483,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "pandora",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(false),
+									Ready: pointer.BoolPtr(false),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -1381,17 +1511,18 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.BGP,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
 								LocalPref:         100,
 								Communities:       map[uint32]bool{1234: true, 2345: true},
+								Nodes:             map[string]bool{"pandora": true},
 							},
 							{
 								AggregationLength: 24,
 								LocalPref:         1000,
+								Nodes:             map[string]bool{"pandora": true},
 							},
 						},
 					},
@@ -1405,8 +1536,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1417,13 +1548,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -1455,11 +1586,11 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.BGP,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
 							},
 						},
 					},
@@ -1473,8 +1604,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1485,13 +1616,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -1516,8 +1647,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 					ExternalTrafficPolicy: "Cluster",
 				},
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1528,13 +1659,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -1560,8 +1691,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.5"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1572,13 +1703,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -1610,8 +1741,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1622,13 +1753,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": {
@@ -1680,11 +1811,11 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Pools: map[string]*config.Pool{
 					"default": {
-						Protocol: config.BGP,
-						CIDR:     []*net.IPNet{ipnet("10.20.30.0/24")},
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
 							},
 						},
 					},
@@ -1698,8 +1829,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 				Status: statusAssigned("10.20.30.1"),
 			},
-			eps: k8s.EpsOrSlices{
-				SlicesVal: []*discovery.EndpointSlice{
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
 					{
 						Endpoints: []discovery.Endpoint{
 							{
@@ -1710,13 +1841,13 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 									"kubernetes.io/hostname": "iris",
 								},
 								Conditions: discovery.EndpointConditions{
-									Ready: boolPtr(true),
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
 				},
-				Type: k8s.Slices,
+				Type: epslices.Slices,
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.5:0": {
@@ -1739,12 +1870,12 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 	l := log.NewNopLogger()
 	for _, test := range tests {
 		if test.config != nil {
-			if c.SetConfig(l, test.config) == k8s.SyncStateError {
+			if c.SetConfig(l, test.config) == controllers.SyncStateError {
 				t.Errorf("%q: SetConfig failed", test.desc)
 			}
 		}
 		if test.balancer != "" {
-			if c.SetBalancer(l, test.balancer, test.svc, test.eps) == k8s.SyncStateError {
+			if c.SetBalancer(l, test.balancer, test.svc, test.eps) == controllers.SyncStateError {
 				t.Errorf("%q: SetBalancer failed", test.desc)
 			}
 		}
@@ -1775,11 +1906,11 @@ func TestNodeSelectors(t *testing.T) {
 
 	pools := map[string]*config.Pool{
 		"default": {
-			Protocol: config.BGP,
-			CIDR:     []*net.IPNet{ipnet("1.2.3.0/24")},
+			CIDR: []*net.IPNet{ipnet("1.2.3.0/24")},
 			BGPAdvertisements: []*config.BGPAdvertisement{
 				{
 					AggregationLength: 32,
+					Nodes:             map[string]bool{"pandora": true},
 				},
 			},
 		},
@@ -1944,13 +2075,13 @@ func TestNodeSelectors(t *testing.T) {
 	l := log.NewNopLogger()
 	for _, test := range tests {
 		if test.config != nil {
-			if c.SetConfig(l, test.config) == k8s.SyncStateError {
+			if c.SetConfig(l, test.config) == controllers.SyncStateError {
 				t.Errorf("%q: SetConfig failed", test.desc)
 			}
 		}
 
 		if test.node != nil {
-			if c.SetNode(l, test.node) == k8s.SyncStateError {
+			if c.SetNode(l, test.node) == controllers.SyncStateError {
 				t.Errorf("%q: SetNode failed", test.desc)
 			}
 		}

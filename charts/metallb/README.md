@@ -14,7 +14,6 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| configInline | object | `{}` |  |
 | controller.affinity | object | `{}` |  |
 | controller.enabled | bool | `true` |  |
 | controller.image.pullPolicy | string | `nil` |  |
@@ -43,6 +42,7 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | controller.serviceAccount.create | bool | `true` |  |
 | controller.serviceAccount.name | string | `""` |  |
 | controller.tolerations | list | `[]` |  |
+| webhooks.enable | bool | `false` |  |
 | existingConfigMap | string | `""` |  |
 | fullnameOverride | string | `""` |  |
 | imagePullSecrets | list | `[]` |  |

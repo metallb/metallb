@@ -193,7 +193,6 @@ spec:
         {{- end }}
         args:
         - --port={{ .Values.prometheus.metricsPort }}
-        - --config={{ template "metallb.configMapName" . }}
         {{- with .Values.speaker.logLevel }}
         - --log-level={{ . }}
         {{- end }}

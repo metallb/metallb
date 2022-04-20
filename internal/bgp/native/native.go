@@ -29,6 +29,7 @@ var errClosed = errors.New("session closed")
 
 // session represents one BGP session to an external router.
 type session struct {
+	name             string
 	myASN            uint32
 	routerID         net.IP // May be nil, meaning "derive from context"
 	myNode           string
@@ -49,7 +50,7 @@ type session struct {
 	closed         bool
 	conn           net.Conn
 	actualHoldTime time.Duration
-	defaultNextHop net.IP
+	nextHop        net.IP
 	advertised     map[string]*bgp.Advertisement
 	new            map[string]*bgp.Advertisement
 }
@@ -66,8 +67,9 @@ func NewSessionManager(l log.Logger) *sessionManager {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime, keepaliveTime time.Duration, password, myNode, bfdProfile string, ebgpMultiHop bool) (bgp.Session, error) {
+func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime, keepaliveTime time.Duration, password, myNode, bfdProfile string, ebgpMultiHop bool, name string) (bgp.Session, error) {
 	ret := &session{
+		name:          name,
 		addr:          addr,
 		srcAddr:       srcAddr,
 		myASN:         myASN,
@@ -142,7 +144,7 @@ func (s *session) sendUpdates() bool {
 	}
 
 	for c, adv := range s.advertised {
-		if err := sendUpdate(s.conn, s.myASN, ibgp, fbasn, s.defaultNextHop, adv); err != nil {
+		if err := sendUpdate(s.conn, s.myASN, ibgp, fbasn, s.nextHop, adv); err != nil {
 			s.abort()
 			level.Error(s.logger).Log("op", "sendUpdate", "ip", c, "error", err, "msg", "failed to send BGP update")
 			return true
@@ -175,7 +177,7 @@ func (s *session) sendUpdates() bool {
 				continue
 			}
 
-			if err := sendUpdate(s.conn, s.myASN, ibgp, fbasn, s.defaultNextHop, adv); err != nil {
+			if err := sendUpdate(s.conn, s.myASN, ibgp, fbasn, s.nextHop, adv); err != nil {
 				s.abort()
 				level.Error(s.logger).Log("op", "sendUpdate", "prefix", c, "error", err, "msg", "failed to send BGP update")
 				return true
@@ -232,11 +234,11 @@ func (s *session) connect() error {
 		conn.Close()
 		return fmt.Errorf("getting local addr for default nexthop to %q: %s", s.addr, err)
 	}
-	s.defaultNextHop = addr.IP
+	s.nextHop = addr.IP
 
 	routerID := s.routerID
 	if routerID == nil {
-		routerID, err = getRouterID(s.defaultNextHop, s.myNode)
+		routerID, err = getRouterID(s.nextHop, s.myNode)
 		if err != nil {
 			return err
 		}
@@ -446,9 +448,6 @@ func validate(adv *bgp.Advertisement) error {
 		return fmt.Errorf("cannot advertise non-v4 prefix %q", adv.Prefix)
 	}
 
-	if adv.NextHop != nil && adv.NextHop.To4() == nil {
-		return fmt.Errorf("next-hop must be IPv4, got %q", adv.NextHop)
-	}
 	if len(adv.Communities) > 63 {
 		return fmt.Errorf("max supported communities is 63, got %d", len(adv.Communities))
 	}
@@ -465,6 +464,9 @@ func (s *session) Set(advs ...*bgp.Advertisement) error {
 
 	newAdvs := map[string]*bgp.Advertisement{}
 	for _, adv := range advs {
+		if !adv.MatchesPeer(s.name) {
+			continue
+		}
 		err := validate(adv)
 		if err != nil {
 			return err
@@ -475,6 +477,7 @@ func (s *session) Set(advs ...*bgp.Advertisement) error {
 	s.new = newAdvs
 	stats.PendingPrefixes(s.addr, len(s.new))
 	s.cond.Broadcast()
+
 	return nil
 }
 
@@ -511,8 +514,9 @@ const (
 
 // This  struct is defined at; linux-kernel: include/uapi/linux/tcp.h,
 // It  must be kept in sync with that definition, see current version:
-// https://github.com/torvalds/linux/blob/v4.16/include/uapi/linux/tcp.h#L253
-// nolint[structcheck]
+// https://github.com/torvalds/linux/blob/v4.16/include/uapi/linux/tcp.h#L253.
+
+//nolint:structcheck
 type tcpmd5sig struct {
 	ssFamily uint16
 	ss       [126]byte

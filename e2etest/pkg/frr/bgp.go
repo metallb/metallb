@@ -19,7 +19,7 @@ import (
 
 // NeighborForContainer returns informations for the given neighbor in the given
 // executor.
-func NeighborInfo(neighborName, exec executor.Executor) (*bgpfrr.Neighbor, error) {
+func NeighborInfo(neighborName string, exec executor.Executor) (*bgpfrr.Neighbor, error) {
 	res, err := exec.Exec("vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", neighborName))
 
 	if err != nil {
@@ -66,6 +66,20 @@ func Routes(exec executor.Executor) (map[string]bgpfrr.Route, map[string]bgpfrr.
 		return nil, nil, errors.Wrapf(err, "Failed to parse routes %s", res)
 	}
 	return v4Routes, v6Routes, nil
+}
+
+func RoutesForFamily(exec executor.Executor, family ipfamily.Family) (map[string]bgpfrr.Route, error) {
+	v4, v6, err := Routes(exec)
+	if err != nil {
+		return nil, err
+	}
+	switch family {
+	case ipfamily.IPv4:
+		return v4, nil
+	case ipfamily.IPv6:
+		return v6, nil
+	}
+	return nil, fmt.Errorf("unsupported ipfamily %v", family)
 }
 
 // RoutesForCommunity returns informations about routes in the given executor related to the given community.

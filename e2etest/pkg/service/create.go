@@ -54,6 +54,6 @@ func tweakRCPort(rc *v1.ReplicationController) {
 	if TestServicePort != 80 {
 		// if TestServicePort is non default, then change pod's spec
 		rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", TestServicePort), fmt.Sprintf("--udp-port=%d", TestServicePort)}
-		rc.Spec.Template.Spec.Containers[0].ReadinessProbe.Handler.HTTPGet.Port = intstr.FromInt(int(TestServicePort))
+		rc.Spec.Template.Spec.Containers[0].ReadinessProbe.HTTPGet.Port = intstr.FromInt(int(TestServicePort))
 	}
 }

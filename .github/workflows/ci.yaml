@@ -3,41 +3,52 @@ name: CI
 on:
   push:
     branches:
-      - 'main'
+      - "main"
+      - "v**"
   pull_request:
     branches:
-      - 'main'
+      - "main"
+      - "v**"
   workflow_dispatch:
 
 jobs:
   unit-tests:
     runs-on: ubuntu-20.04
     steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.9.1
+        with:
+          access_token: ${{ github.token }}
+
       - name: Checkout
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "1.17.1"
+
       - name: Install Dependencies
         run: |
           sudo apt-get update
           sudo apt-get install python3-pip arping ndisc6
           sudo pip3 install invoke semver pyyaml
-      
-      - uses: actions/setup-go@v2
-        with:
-          go-version: '1.16'
+          go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0
 
       - name: Unit Tests
         run: |
           inv test
-          cp manifests/metallb.yaml manifests/metallb.yaml.prev
 
       - name: Lint
         run: |
           inv checkpatch
           inv lint -e host
           inv verifylicense
+          inv gomodtidy
+          inv checkchanges --action="run inv gomodtidy"
+          inv generatemanifests
+          inv checkchanges --action="run inv generatemanifests"
 
   helm:
     runs-on: ubuntu-20.04
@@ -52,22 +63,21 @@ jobs:
         with:
           version: v3.7.1
 
-
-## ct v3.4.0, which in turn uses helm v3.5.4
+      ## ct v3.4.0, which in turn uses helm v3.5.4
       - name: Lint
         uses: docker://quay.io/helmpack/chart-testing:v3.4.0
         with:
           args: ct lint
 
-## TODO: Can't pass flags to the conftest GHA in order to use --fail-on-warn
-##       Should be fixed when https://github.com/instrumenta/conftest-action/issues/3
-##       is resolved
-##
-#      - name: Conftest
-#        uses: instrumenta/conftest-action/helm@master
-#        with:
-#          chart: charts/metallb/
-#          policy: charts/metallb/policy
+      ## TODO: Can't pass flags to the conftest GHA in order to use --fail-on-warn
+      ##       Should be fixed when https://github.com/instrumenta/conftest-action/issues/3
+      ##       is resolved
+      ##
+      #      - name: Conftest
+      #        uses: instrumenta/conftest-action/helm@master
+      #        with:
+      #          chart: charts/metallb/
+      #          policy: charts/metallb/policy
 
       - name: Conftest
         run: |
@@ -83,6 +93,11 @@ jobs:
         bgp-type: [native, frr]
         deployment: [manifests, helm]
     steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.9.1
+        with:
+          access_token: ${{ github.token }}
+
       - name: Checkout
         uses: actions/checkout@v2
         with:
@@ -90,7 +105,7 @@ jobs:
 
       - uses: actions/setup-go@v2
         with:
-          go-version: '1.16.3'
+          go-version: "1.17.1"
 
       - name: Install Dependencies
         run: |
@@ -98,28 +113,29 @@ jobs:
           sudo apt-get install python3-pip arping ndisc6
           sudo pip3 install invoke semver pyyaml
           GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
+          go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0
 
       - name: Build MetalLB
         run: |
           inv build
           HELM_FLAGS=""
           if [ ${{ matrix.deployment }} = "helm" ]; then HELM_FLAGS="--helm-install"; fi
-          inv dev-env -i ${{ matrix.ip-family }} -b ${{ matrix.bgp-type }} -l all $HELM_FLAGS
+          inv dev-env -i ${{ matrix.ip-family }} -b ${{ matrix.bgp-type }} -l all $HELM_FLAGS --enable-webhooks
 
       - name: E2E
         run: |
           HELM_FLAGS=""
           echo '/etc/frr/core-%e.%p.%h.%t' | sudo tee /proc/sys/kernel/core_pattern
-          if [ ${{ matrix.deployment }} = "helm" ]; then HELM_FLAGS="--system-namespaces=default" && export OO_INSTALL_NAMESPACE=default && export CONFIGMAP_NAME=metallb && export SPEAKER_SELECTOR="app.kubernetes.io/component=speaker" && export CONTROLLER_SELECTOR="app.kubernetes.io/component=controller"; fi
+          if [ ${{ matrix.deployment }} = "helm" ]; then HELM_FLAGS="--system-namespaces=default" && export OO_INSTALL_NAMESPACE=default && export SPEAKER_SELECTOR="app.kubernetes.io/component=speaker" && export CONTROLLER_SELECTOR="app.kubernetes.io/component=controller"; fi
           SKIP="none"
-          if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP\|FRR\|BFD\|DUALSTACK"; fi
-          if [ "${{ matrix.ip-family }}" == "ipv4" ]; then SKIP="$SKIP\|IPV6\|DUALSTACK"; fi
-          if [ "${{ matrix.ip-family }}" == "dual" ]; then SKIP="$SKIP\|IPV6"; fi
-          if [ "${{ matrix.ip-family }}" == "ipv6" ]; then SKIP="$SKIP\|IPV4\|DUALSTACK"; fi
-          if [ "${{ matrix.ip-family }}" == "ipv6" ] && [ ${{ matrix.bgp-type }} == "native" ]; then SKIP="$SKIP\|BGP"; fi
+          if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|BFD|DUALSTACK"; fi
+          if [ "${{ matrix.ip-family }}" == "ipv4" ]; then SKIP="$SKIP|IPV6|DUALSTACK"; fi
+          if [ "${{ matrix.ip-family }}" == "dual" ]; then SKIP="$SKIP|IPV6"; fi
+          if [ "${{ matrix.ip-family }}" == "ipv6" ]; then SKIP="$SKIP|IPV4|DUALSTACK"; fi
+          if [ "${{ matrix.ip-family }}" == "ipv6" ] && [ ${{ matrix.bgp-type }} == "native" ]; then SKIP="$SKIP|BGP"; fi
           echo "Skipping $SKIP"
           sudo -E env "PATH=$PATH" inv e2etest --skip $SKIP -e /tmp/kind_logs $HELM_FLAGS
-      
+
       - name: Log permissions
         if: ${{ always() }}
         run: |
@@ -131,3 +147,143 @@ jobs:
         with:
           name: kind-logs-${{ matrix.ip-family }}-${{ matrix.bgp-type }}-${{ matrix.deployment}}
           path: /tmp/kind_logs/
+  # This lane checks if conversion webhooks work and if metallb is compatible with the CRDs
+  # in the operator. We deploy a v4-frr lane, clone the v0.12.1 version of metallb and run CI
+  # in operator mode. We run few significative tests that cover all the crds.
+  backward_compatible:
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.9.1
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: "0"
+          path: metallb-v0.12.1
+          ref: v0.12.1
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: "1.17.1"
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install python3-pip arping ndisc6
+          sudo pip3 install invoke semver pyyaml
+          GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
+          go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0
+
+      - name: Build MetalLB
+        run: |
+          inv build
+          inv dev-env -b frr --enable-webhooks
+
+      - name: E2E
+        run: |
+          cat <<EOF | kubectl apply -f -
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            namespace: metallb-system
+            name: config
+          EOF
+          rm -rf e2etest # we want to make sure we are not running current e2e by mistake
+          cd metallb-v0.12.1
+          FOCUS="L2.*should work for ExternalTrafficPolicy=Cluster|BGP.*A service of protocol load balancer should work with.*IPV4 - ExternalTrafficPolicyCluster$|validate FRR running configuration"
+          sudo -E env "PATH=$PATH" inv e2etest --use-operator --focus "$FOCUS" -e /tmp/kind_logs
+
+      - name: Log permissions
+        if: ${{ always() }}
+        run: |
+          sudo chmod -R o+r /tmp/kind_logs
+
+      - name: Upload logs
+        uses: actions/upload-artifact@v2
+        if: ${{ always() }}
+        with:
+          name: kind-logs-backward-compatible
+          path: /tmp/kind_logs/
+#  e2e-use-operator:
+#    runs-on: ubuntu-20.04
+#    defaults:
+#      run:
+#        shell: bash
+#        working-directory: metallb
+#    strategy:
+#      fail-fast: false
+#    steps:
+#      - name: Cancel Previous Runs
+#        uses: styfle/cancel-workflow-action@0.9.1
+#        with:
+#          access_token: ${{ github.token }}
+#
+#      - name: Checkout Metal LB Operator
+#        uses: actions/checkout@v2
+#        with:
+#          repository: metallb/metallb-operator
+#          path: metallboperator
+#          ref: e84470bf3644e6444169abb65483bb1a60c957af
+#
+#      - uses: actions/setup-go@v2
+#        with:
+#          go-version: '1.17.1'
+#
+#      - name: Checkout MetalLB
+#        uses: actions/checkout@v2
+#        with:
+#          path: metallb
+#          fetch-depth: 0
+#
+#      - name: Install Dependencies
+#        run: |
+#          sudo apt-get update
+#          sudo apt-get install python3-pip arping ndisc6
+#          sudo pip3 install -r ./dev-env/requirements.txt
+#          GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
+#
+#      - name: Build MetalLB Images
+#        run: |
+#          inv build
+#
+#      - name: Create multi-node K8s Kind Cluster
+#        run: |
+#          cd ${GITHUB_WORKSPACE}/metallboperator
+#          ./hack/kind-multi-node-cluster-without-registry.sh
+#          kind load docker-image quay.io/metallb/speaker:dev-amd64
+#          kind load docker-image quay.io/metallb/controller:dev-amd64
+#          export KUBECONFIG=${HOME}/.kube/config
+#
+#      - name: Deploy Metal LB Operator
+#        run: |
+#          cd ${GITHUB_WORKSPACE}/metallboperator
+#          sed -i 's/quay.io\/metallb\/speaker:main/quay.io\/metallb\/speaker:dev-amd64/g' bin/metallb-operator-with-webhooks.yaml
+#          sed -i 's/quay.io\/metallb\/controller:main/quay.io\/metallb\/controller:dev-amd64/g' bin/metallb-operator-with-webhooks.yaml
+#          sed -i 's/native/frr/g' bin/metallb-operator-with-webhooks.yaml
+#          make deploy-cert-manager
+#          kubectl apply -f bin/metallb-operator-with-webhooks.yaml
+#
+#      - name: MetalLB E2E Tests with Operator Deployment
+#        run: |
+#          kubectl apply -f ${GITHUB_WORKSPACE}/metallboperator/config/samples/metallb.yaml
+#          sudo -E env "PATH=$PATH" inv e2etest --skip "IPV6|DUALSTACK" -e /tmp/kind_logs --use-operator
+#
+#      - name: Change permissions for kind logs
+#        if: ${{ failure() }}
+#        run: |
+#          sudo chmod -R o+r /tmp/kind_logs
+#
+#      - name: Archive kind logs
+#        if: ${{ failure() }}
+#        uses: actions/upload-artifact@v2
+#        with:
+#          name: kind_logs_use_operator
+#          path: /tmp/kind_logs

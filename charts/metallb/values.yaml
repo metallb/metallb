@@ -9,20 +9,6 @@ fullnameOverride: ""
 # To configure MetalLB, you must specify ONE of the following two
 # options.
 
-# existingConfigMap specifies the name of an externally-defined
-# ConfigMap to use as the configuration. Helm will not manage the
-# contents of this ConfigMap, it is your responsibility to create it.
-existingConfigMap: ""
-
-# configInline specifies MetalLB's configuration directly, in yaml
-# format. When configInline is used, Helm manages MetalLB's
-# configuration ConfigMap as part of the release, and
-# existingConfigMap is ignored.
-#
-# Refer to https://metallb.universe.tf/configuration/ for
-# available options.
-configInline: {}
-
 rbac:
   # create specifies whether to install and use RBAC rules.
   create: true
@@ -30,6 +16,9 @@ rbac:
 psp:
   # create specifies whether to install and use Pod Security Policies.
   create: true
+
+webhooks:
+  enable: false
 
 prometheus:
   # scrape annotations specifies whether to add Prometheus metric
@@ -230,7 +219,7 @@ speaker:
   # frr contains configuration specific to the MetalLB FRR container,
   # for speaker running alongside FRR.
   frr:
-    enabled: true
+    enabled: false
     # FRR_LOGGING_LEVEL used to set logging level for all running frr processes.
     # Possible settings are :-
     #  informational, warning, errors and debugging.

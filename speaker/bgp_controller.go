@@ -25,7 +25,7 @@ import (
 	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
 	bgpnative "go.universe.tf/metallb/internal/bgp/native"
 	"go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/k8s"
+	"go.universe.tf/metallb/internal/k8s/epslices"
 	"go.universe.tf/metallb/internal/logging"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -85,11 +85,13 @@ newPeers:
 			continue
 		}
 		level.Info(l).Log("event", "peerRemoved", "peer", p.cfg.Addr, "reason", "removedFromConfig", "msg", "peer deconfigured, closing BGP session")
+
 		if p.session != nil {
 			if err := p.session.Close(); err != nil {
 				level.Error(l).Log("op", "setConfig", "error", err, "peer", p.cfg.Addr, "msg", "failed to shut down BGP session")
 			}
 		}
+		level.Debug(l).Log("event", "peerRemoved", "peer", p.cfg.Addr, "reason", "removedFromConfig", "msg", "peer deconfigured, BGP session closed")
 	}
 
 	err := c.syncBFDProfiles(cfg.BFDProfiles)
@@ -101,10 +103,10 @@ newPeers:
 
 // hasHealthyEndpoint return true if this node has at least one healthy endpoint.
 // It only checks nodes matching the given filterNode function.
-func hasHealthyEndpoint(eps k8s.EpsOrSlices, filterNode func(*string) bool) bool {
+func hasHealthyEndpoint(eps epslices.EpsOrSlices, filterNode func(*string) bool) bool {
 	ready := map[string]bool{}
 	switch eps.Type {
-	case k8s.Eps:
+	case epslices.Eps:
 		for _, subset := range eps.EpVal.Subsets {
 			for _, ep := range subset.Addresses {
 				if filterNode(ep.NodeName) {
@@ -121,7 +123,7 @@ func hasHealthyEndpoint(eps k8s.EpsOrSlices, filterNode func(*string) bool) bool
 				ready[ep.IP] = false
 			}
 		}
-	case k8s.Slices:
+	case epslices.Slices:
 		for _, slice := range eps.SlicesVal {
 			for _, ep := range slice.Endpoints {
 				node := ep.Topology["kubernetes.io/hostname"]
@@ -129,13 +131,13 @@ func hasHealthyEndpoint(eps k8s.EpsOrSlices, filterNode func(*string) bool) bool
 					continue
 				}
 				for _, addr := range ep.Addresses {
-					if _, ok := ready[addr]; !ok && k8s.IsConditionReady(ep.Conditions) {
+					if _, ok := ready[addr]; !ok && epslices.IsConditionReady(ep.Conditions) {
 						// Only set true if nothing else has expressed an
 						// opinion. This means that false will take precedence
 						// if there's any unready ports for a given endpoint.
 						ready[addr] = true
 					}
-					if !k8s.IsConditionReady(ep.Conditions) {
+					if !epslices.IsConditionReady(ep.Conditions) {
 						ready[addr] = false
 					}
 				}
@@ -152,7 +154,11 @@ func hasHealthyEndpoint(eps k8s.EpsOrSlices, filterNode func(*string) bool) bool
 	return false
 }
 
-func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, svc *v1.Service, eps k8s.EpsOrSlices) string {
+func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, pool *config.Pool, svc *v1.Service, eps epslices.EpsOrSlices) string {
+	if !poolMatchesNodeBGP(pool, c.myNode) {
+		level.Debug(l).Log("event", "skipping should announce bgp", "service", name, "reason", "pool not matching my node")
+		return "notOwner"
+	}
 	// Should we advertise?
 	// Yes, if externalTrafficPolicy is
 	//  Cluster && any healthy endpoint exists
@@ -184,6 +190,9 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 		// First, determine if the peering should be active for this
 		// node.
 		shouldRun := false
+		if len(p.cfg.NodeSelectors) == 0 {
+			shouldRun = true
+		}
 		for _, ns := range p.cfg.NodeSelectors {
 			if ns.Matches(c.nodeLabels) {
 				shouldRun = true
@@ -207,7 +216,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 			if p.cfg.RouterID != nil {
 				routerID = p.cfg.RouterID
 			}
-			s, err := c.sessionManager.NewSession(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.SrcAddr, p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.KeepaliveTime, p.cfg.Password, c.myNode, p.cfg.BFDProfile, p.cfg.EBGPMultiHop)
+			s, err := c.sessionManager.NewSession(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.SrcAddr, p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.KeepaliveTime, p.cfg.Password, c.myNode, p.cfg.BFDProfile, p.cfg.EBGPMultiHop, p.cfg.Name)
 			if err != nil {
 				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
 				errs++
@@ -242,6 +251,10 @@ func (c *bgpController) SetBalancer(l log.Logger, name string, lbIPs []net.IP, p
 	c.svcAds[name] = nil
 	for _, lbIP := range lbIPs {
 		for _, adCfg := range pool.BGPAdvertisements {
+			// skipping if this node is not enabled for this advertisement
+			if !adCfg.Nodes[c.myNode] {
+				continue
+			}
 			m := net.CIDRMask(adCfg.AggregationLength, 32)
 			if lbIP.To4() == nil {
 				m = net.CIDRMask(adCfg.AggregationLengthV6, 128)
@@ -252,6 +265,10 @@ func (c *bgpController) SetBalancer(l log.Logger, name string, lbIPs []net.IP, p
 					Mask: m,
 				},
 				LocalPref: adCfg.LocalPref,
+			}
+			if len(adCfg.Peers) > 0 {
+				ad.Peers = make([]string, 0, len(adCfg.Peers))
+				ad.Peers = append(ad.Peers, adCfg.Peers...)
 			}
 			for comm := range adCfg.Communities {
 				ad.Communities = append(ad.Communities, comm)
@@ -324,4 +341,13 @@ var newBGP = func(bgpType bgpImplementation, l log.Logger, logLevel logging.Leve
 	default:
 		panic(fmt.Sprintf("unsupported BGP implementation type: %s", bgpType))
 	}
+}
+
+func poolMatchesNodeBGP(pool *config.Pool, node string) bool {
+	for _, adv := range pool.BGPAdvertisements {
+		if adv.Nodes[node] {
+			return true
+		}
+	}
+	return false
 }

@@ -2,7 +2,11 @@
 
 package service
 
-import corev1 "k8s.io/api/core/v1"
+import (
+	"strings"
+
+	corev1 "k8s.io/api/core/v1"
+)
 
 type Tweak func(svc *corev1.Service)
 
@@ -24,4 +28,21 @@ func DualStack(svc *corev1.Service) {
 
 func TrafficPolicyCluster(svc *corev1.Service) {
 	svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeCluster
+}
+
+func WithSpecificIPs(svc *corev1.Service, ips ...string) {
+	if len(ips) == 0 {
+		return
+	}
+	svc.Annotations = map[string]string{
+		"metallb.universe.tf/loadBalancerIPs": strings.Join(ips, ","),
+	}
+}
+
+func WithSpecificPool(poolName string) func(*corev1.Service) {
+	return func(svc *corev1.Service) {
+		svc.Annotations = map[string]string{
+			"metallb.universe.tf/address-pool": poolName,
+		}
+	}
 }

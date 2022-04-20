@@ -4,74 +4,40 @@ package config
 
 import (
 	"context"
-	"time"
 
-	operatorv1beta1 "github.com/metallb/metallb-operator/api/v1beta1"
-	"github.com/pkg/errors"
-	"gopkg.in/yaml.v2"
-	v1 "k8s.io/api/core/v1"
-	apierr "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
+	"go.universe.tf/metallb/internal/config"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
-	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 type Updater interface {
-	Update(f File) error
+	Update(r config.ClusterResources) error
 	Clean() error
+	Client() client.Client
 }
 
-type configmapUpdater struct {
-	clientset.Interface
-	name      string
+type beta1Updater struct {
+	cli       client.Client
 	namespace string
 }
 
-func UpdaterForConfigMap(c clientset.Interface, cmName string, ns string) *configmapUpdater {
-	return &configmapUpdater{
-		Interface: c,
-		name:      cmName,
-		namespace: ns,
-	}
-}
-
-func (c configmapUpdater) Update(f File) error {
-	resData, err := yaml.Marshal(f)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to marshal MetalLB ConfigMap data")
-	}
-
-	_, err = c.CoreV1().ConfigMaps(c.namespace).Update(context.TODO(), &v1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      c.name,
-			Namespace: c.namespace,
-		},
-		Data: map[string]string{"config": string(resData)},
-	}, metav1.UpdateOptions{})
-
-	if err != nil {
-		return errors.Wrapf(err, "Failed to update MetalLB ConfigMap")
-	}
-
-	return nil
-}
-
-func (c configmapUpdater) Clean() error {
-	return c.Update(File{})
-}
-
-type operatorUpdater struct {
-	client.Client
-	namespace string
-}
-
-func UpdaterForOperator(r *rest.Config, ns string) (*operatorUpdater, error) {
+func UpdaterForCRs(r *rest.Config, ns string) (*beta1Updater, error) {
 	myScheme := runtime.NewScheme()
 
-	if err := operatorv1beta1.AddToScheme(myScheme); err != nil {
+	if err := metallbv1beta1.AddToScheme(myScheme); err != nil {
+		return nil, err
+	}
+
+	if err := metallbv1beta2.AddToScheme(myScheme); err != nil {
+		return nil, err
+	}
+
+	if err := corev1.AddToScheme(myScheme); err != nil {
 		return nil, err
 	}
 
@@ -83,218 +49,126 @@ func UpdaterForOperator(r *rest.Config, ns string) (*operatorUpdater, error) {
 		return nil, err
 	}
 
-	return &operatorUpdater{
-		Client:    cl,
+	return &beta1Updater{
+		cli:       cl,
 		namespace: ns,
 	}, nil
 }
 
-func (o operatorUpdater) Update(f File) error {
-	for _, a := range f.Pools {
-		err := o.createPool(a)
-		if err != nil {
-			return err
-		}
+func (o beta1Updater) Update(r config.ClusterResources) error {
+	// we fill a map of objects to keep the order we add the resources random, as
+	// it would happen by throwing a set of manifests against a cluster, hoping to
+	// find corner cases that we would not find by adding them always in the same
+	// order.
+	objects := map[int]client.Object{}
+	oldValues := map[int]client.Object{}
+	key := 0
+	for _, pool := range r.Pools {
+		objects[key] = pool.DeepCopy()
+		oldValues[key] = pool.DeepCopy()
+		key = key + 1
 	}
 
-	for _, bp := range f.BFDProfiles {
-		err := o.createBFDProfile(bp)
-		if err != nil {
-			return err
-		}
+	for _, secret := range r.PasswordSecrets {
+		objects[key] = secret.DeepCopy()
+		oldValues[key] = secret.DeepCopy()
+		key = key + 1
 	}
 
-	/*
-		Since a peer doesn't have a name we need to clean them before creating.
-		Without this the webhook fails the request because we are trying to create
-		a BGPPeer with the same configuration under a different (generated) name.
-		TODO: is there a better way to handle this?
-	*/
-	err := o.DeleteAllOf(context.Background(), &operatorv1beta1.BGPPeer{}, client.InNamespace(o.namespace))
-	if err != nil {
-		return err
+	for _, peer := range r.Peers {
+		objects[key] = peer.DeepCopy()
+		oldValues[key] = peer.DeepCopy()
+		key = key + 1
 	}
 
-	for _, p := range f.Peers {
-		err := o.createPeer(p)
-		if err != nil {
-			return err
-		}
+	for _, bfdProfile := range r.BFDProfiles {
+		objects[key] = bfdProfile.DeepCopy()
+		oldValues[key] = bfdProfile.DeepCopy()
+		key = key + 1
 	}
 
-	return nil
-}
-
-func (o operatorUpdater) Clean() error {
-	err := o.DeleteAllOf(context.Background(), &operatorv1beta1.AddressPool{}, client.InNamespace(o.namespace))
-	if err != nil {
-		return err
+	for _, bgpAdv := range r.BGPAdvs {
+		objects[key] = bgpAdv.DeepCopy()
+		oldValues[key] = bgpAdv.DeepCopy()
+		key = key + 1
 	}
 
-	err = o.DeleteAllOf(context.Background(), &operatorv1beta1.BFDProfile{}, client.InNamespace(o.namespace))
-	if err != nil {
-		return err
+	for _, l2Adv := range r.L2Advs {
+		objects[key] = l2Adv.DeepCopy()
+		oldValues[key] = l2Adv.DeepCopy()
+		key = key + 1
 	}
 
-	err = o.DeleteAllOf(context.Background(), &operatorv1beta1.BGPPeer{}, client.InNamespace(o.namespace))
-	if err != nil {
-		return err
+	for _, legacyPool := range r.LegacyAddressPools {
+		objects[key] = legacyPool.DeepCopy()
+		oldValues[key] = legacyPool.DeepCopy()
+		key = key + 1
 	}
 
-	return nil
-}
-
-func (o operatorUpdater) createPool(a AddressPool) error {
-	pool := o.poolToOperator(a)
-	existing := &operatorv1beta1.AddressPool{}
-	err := o.Client.Get(context.TODO(), types.NamespacedName{Name: pool.Name, Namespace: pool.Namespace}, existing)
-
-	if err != nil {
-		if apierr.IsNotFound(err) {
-			return o.Client.Create(context.TODO(), pool)
-		}
-		return err
-	}
-
-	pool.ResourceVersion = existing.ResourceVersion
-	return o.Client.Update(context.TODO(), pool)
-}
-
-func (o operatorUpdater) poolToOperator(a AddressPool) *operatorv1beta1.AddressPool {
-	addrs := make([]string, len(a.Addresses))
-	copy(addrs, a.Addresses)
-
-	bgppadvs := make([]operatorv1beta1.BgpAdvertisement, 0)
-	for _, b := range a.BGPAdvertisements {
-		adv := operatorv1beta1.BgpAdvertisement{}
-		if b.AggregationLength != nil {
-			al := int32(*b.AggregationLength)
-			adv.AggregationLength = &al
-		}
-		if b.LocalPref != nil {
-			adv.LocalPref = *b.LocalPref
-		}
-		adv.Communities = make([]string, len(b.Communities))
-		copy(adv.Communities, b.Communities)
-		bgppadvs = append(bgppadvs, adv)
-	}
-
-	return &operatorv1beta1.AddressPool{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      a.Name,
-			Namespace: o.namespace,
-		},
-		Spec: operatorv1beta1.AddressPoolSpec{
-			Protocol:  string(a.Protocol),
-			Addresses: addrs,
-			// AvoidBuggyIPs missing from operator
-			AutoAssign:        a.AutoAssign,
-			BGPAdvertisements: bgppadvs,
-		},
-	}
-}
-
-func (o operatorUpdater) createPeer(p Peer) error {
-	peer, err := o.peerToOperator(p)
-	if err != nil {
-		return err
-	}
-
-	// peer's name is autogenerated, will not hit a name conflict here.
-	return o.Client.Create(context.TODO(), peer)
-}
-
-func (o operatorUpdater) peerToOperator(p Peer) (*operatorv1beta1.BGPPeer, error) {
-	nodeselectors := make([]operatorv1beta1.NodeSelector, len(p.NodeSelectors))
-	for _, ns := range p.NodeSelectors {
-		n := operatorv1beta1.NodeSelector{
-			MatchLabels: ns.MatchLabels,
-		}
-		for _, e := range ns.MatchExpressions {
-			vals := make([]string, len(e.Values))
-			copy(vals, e.Values)
-			expr := operatorv1beta1.MatchExpression{
-				Key:      e.Key,
-				Operator: e.Operator,
-				Values:   vals,
+	// Iterating over the map will return the items in a random order.
+	for i, obj := range objects {
+		obj.SetNamespace(o.namespace)
+		_, err := controllerutil.CreateOrUpdate(context.Background(), o.cli, obj, func() error {
+			// the mutate function is expected to change the object when updating.
+			// we always override with the old version, and we change only the spec part.
+			switch toChange := obj.(type) {
+			case *metallbv1beta1.IPAddressPool:
+				old := oldValues[i].(*metallbv1beta1.IPAddressPool)
+				toChange.Spec = *old.Spec.DeepCopy()
+			case *metallbv1beta1.AddressPool:
+				old := oldValues[i].(*metallbv1beta1.AddressPool)
+				toChange.Spec = *old.Spec.DeepCopy()
+			case *metallbv1beta1.BFDProfile:
+				old := oldValues[i].(*metallbv1beta1.BFDProfile)
+				toChange.Spec = *old.Spec.DeepCopy()
+			case *metallbv1beta2.BGPPeer:
+				old := oldValues[i].(*metallbv1beta2.BGPPeer)
+				toChange.Spec = *old.Spec.DeepCopy()
+			case *metallbv1beta1.BGPAdvertisement:
+				old := oldValues[i].(*metallbv1beta1.BGPAdvertisement)
+				toChange.Spec = *old.Spec.DeepCopy()
+			case *metallbv1beta1.L2Advertisement:
+				old := oldValues[i].(*metallbv1beta1.L2Advertisement)
+				toChange.Spec = *old.Spec.DeepCopy()
 			}
-			n.MatchExpressions = append(n.MatchExpressions, expr)
+
+			return nil
+		})
+		if err != nil {
+			return err
 		}
-		nodeselectors = append(nodeselectors, n)
 	}
-
-	holdTime, err := stringToDuration(p.HoldTime)
-	if err != nil {
-		return nil, err
-	}
-	keepAliveTime, err := stringToDuration(p.KeepaliveTime)
-	if err != nil {
-		return nil, err
-	}
-	return &operatorv1beta1.BGPPeer{
-		ObjectMeta: metav1.ObjectMeta{
-			GenerateName: "testpeer-",
-			Namespace:    o.namespace,
-		},
-		Spec: operatorv1beta1.BGPPeerSpec{
-			MyASN:         p.MyASN,
-			ASN:           p.ASN,
-			Address:       p.Addr,
-			SrcAddress:    p.SrcAddr,
-			Port:          p.Port,
-			HoldTime:      holdTime,
-			KeepaliveTime: keepAliveTime,
-			NodeSelectors: nodeselectors,
-			Password:      p.Password,
-			BFDProfile:    p.BFDProfile,
-			RouterID:      p.RouterID,
-			EBGPMultiHop:  p.EBGPMultiHop,
-		},
-	}, nil
-
+	return nil
 }
 
-func (o operatorUpdater) createBFDProfile(bp BfdProfile) error {
-	bfdprofile := o.bfdProfileToOperator(bp)
-	existing := &operatorv1beta1.BFDProfile{}
-	err := o.Client.Get(context.TODO(), types.NamespacedName{Name: bfdprofile.Name, Namespace: bfdprofile.Namespace}, existing)
-
+func (o beta1Updater) Clean() error {
+	err := o.cli.DeleteAllOf(context.Background(), &metallbv1beta1.IPAddressPool{}, client.InNamespace(o.namespace))
 	if err != nil {
-		if apierr.IsNotFound(err) {
-			return o.Client.Create(context.TODO(), bfdprofile)
-		}
 		return err
 	}
-
-	bfdprofile.ResourceVersion = existing.ResourceVersion
-	return o.Client.Update(context.TODO(), bfdprofile)
-}
-
-func (o operatorUpdater) bfdProfileToOperator(bp BfdProfile) *operatorv1beta1.BFDProfile {
-	return &operatorv1beta1.BFDProfile{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      bp.Name,
-			Namespace: o.namespace,
-		},
-		Spec: operatorv1beta1.BFDProfileSpec{
-			ReceiveInterval:  bp.ReceiveInterval,
-			TransmitInterval: bp.TransmitInterval,
-			DetectMultiplier: bp.DetectMultiplier,
-			EchoInterval:     bp.EchoInterval,
-			EchoMode:         bp.EchoMode,
-			PassiveMode:      bp.PassiveMode,
-			MinimumTTL:       bp.MinimumTTL,
-		},
-	}
-}
-
-func stringToDuration(duration string) (metav1.Duration, error) {
-	if duration == "" {
-		return metav1.Duration{}, nil
-	}
-	d, err := time.ParseDuration(duration)
+	err = o.cli.DeleteAllOf(context.Background(), &metallbv1beta2.BGPPeer{}, client.InNamespace(o.namespace))
 	if err != nil {
-		return metav1.Duration{}, err
+		return err
 	}
-	return metav1.Duration{Duration: d}, nil
+	err = o.cli.DeleteAllOf(context.Background(), &metallbv1beta1.BFDProfile{}, client.InNamespace(o.namespace))
+	if err != nil {
+		return err
+	}
+	err = o.cli.DeleteAllOf(context.Background(), &metallbv1beta1.BGPAdvertisement{}, client.InNamespace(o.namespace))
+	if err != nil {
+		return err
+	}
+	err = o.cli.DeleteAllOf(context.Background(), &metallbv1beta1.L2Advertisement{}, client.InNamespace(o.namespace))
+	if err != nil {
+		return err
+	}
+	err = o.cli.DeleteAllOf(context.Background(), &metallbv1beta1.AddressPool{}, client.InNamespace(o.namespace))
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (o beta1Updater) Client() client.Client {
+	return o.cli
 }

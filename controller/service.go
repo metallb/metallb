@@ -18,6 +18,9 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"reflect"
+	"sort"
+	"strings"
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
@@ -29,7 +32,8 @@ import (
 )
 
 const (
-	annotationAddressPool = "metallb.universe.tf/address-pool"
+	annotationAddressPool     = "metallb.universe.tf/address-pool"
+	annotationLoadBalancerIPs = "metallb.universe.tf/loadBalancerIPs"
 )
 
 func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service) bool {
@@ -47,7 +51,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 
 	// If the ClusterIPs is malformed or not set we can't determine the
 	// ipFamily to use.
-	if len(svc.Spec.ClusterIPs) == 0 {
+	if len(svc.Spec.ClusterIPs) == 0 && svc.Spec.ClusterIP == "" {
 		level.Info(l).Log("event", "clearAssignment", "reason", "noClusterIPs", "msg", "No ClusterIPs")
 		c.clearServiceState(key, svc)
 		return true
@@ -62,21 +66,19 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 			lbIPs = append(lbIPs, net.ParseIP(ip))
 		}
 	}
-
-	lbIPsIPFamily := ipfamily.Unknown
 	if len(lbIPs) == 0 {
 		c.clearServiceState(key, svc)
 	} else {
-		lbIPsIPFamily, err = ipfamily.ForAddressesIPs(lbIPs)
+		lbIPsIPFamily, err := ipfamily.ForAddressesIPs(lbIPs)
 		if err != nil {
 			level.Error(l).Log("event", "clearAssignment", "reason", "nolbIPsIPFamily", "msg", "Failed to retrieve lbIPs family")
 			c.client.Errorf(svc, "nolbIPsIPFamily", "Failed to retrieve LBIPs IPFamily for %q: %s", lbIPs, err)
 			return true
 		}
-		clusterIPsIPFamily, err := ipfamily.ForAddresses(svc.Spec.ClusterIPs)
+		clusterIPsIPFamily, err := ipfamily.ForService(svc)
 		if err != nil {
 			level.Error(l).Log("event", "clearAssignment", "reason", "noclusterIPsIPFamily", "msg", "Failed to retrieve clusterIPs family")
-			c.client.Errorf(svc, "noclusterIPsIPFamily", "Failed to retrieve ClusterIPs IPFamily for %q: %s", svc.Spec.ClusterIPs, err)
+			c.client.Errorf(svc, "noclusterIPsIPFamily", "Failed to retrieve ClusterIPs IPFamily for %q %s: %s", svc.Spec.ClusterIPs, svc.Spec.ClusterIP, err)
 			return true
 		}
 		// Clear the lbIP if it has a different ipFamily compared to the clusterIP.
@@ -115,29 +117,24 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 			c.clearServiceState(key, svc)
 			lbIPs = []net.IP{}
 		}
-		// User set or changed the desired LB IP, nuke the
-		// state. allocateIP will pay attention to LoadBalancerIP and try
+		// User set or changed the desired LB IP(s), nuke the
+		// state. allocateIP will pay attention to LoadBalancerIP(s) and try
 		// to meet the user's demands.
-		if svc.Spec.LoadBalancerIP != "" {
-			if lbIPsIPFamily == ipfamily.DualStack {
-				level.Error(l).Log("event", "loadbalancerIP", "error", "DualStack", "msg", "user requested loadbalancer IP for dualstack address family")
-				c.client.Errorf(svc, "LoadBalancerFailed", "Failed loadbalancer IP for dual-stack")
-				return true
-			}
-			if len(lbIPs) != 0 && svc.Spec.LoadBalancerIP != lbIPs[0].String() {
-				level.Info(l).Log("event", "clearAssignment", "reason", "differentIPRequested", "msg", "user requested a different IP than the one currently assigned")
-				c.clearServiceState(key, svc)
-				lbIPs = []net.IP{}
-			}
+		desiredLbIPs, _, err := getDesiredLbIPs(svc)
+		if err != nil {
+			level.Error(l).Log("event", "loadbalancerIP", "error", err, "msg", "invalid requested loadbalancer IPs")
+			c.client.Errorf(svc, "LoadBalancerFailed", "invalid requested loadbalancer IPs: %s", err)
+			return true
+		}
+		if len(desiredLbIPs) > 0 && !isEqualIPs(lbIPs, desiredLbIPs) {
+			level.Info(l).Log("event", "clearAssignment", "reason", "differentIPRequested", "msg", "user requested a different IP than the one currently assigned")
+			c.clearServiceState(key, svc)
+			lbIPs = []net.IP{}
 		}
 	}
 
 	// If lbIP is still nil at this point, try to allocate.
 	if len(lbIPs) == 0 {
-		if !c.synced {
-			level.Error(l).Log("op", "allocateIPs", "error", "controller not synced", "msg", "controller not synced yet, cannot allocate IP; will retry after sync")
-			return false
-		}
 		lbIPs, err = c.allocateIPs(key, svc)
 		if err != nil {
 			level.Error(l).Log("op", "allocateIPs", "error", err, "msg", "IP allocation failed")
@@ -159,7 +156,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	}
 
 	pool := c.ips.Pool(key)
-	if pool == "" || c.config.Pools[pool] == nil {
+	if pool == "" || c.pools[pool] == nil {
 		level.Error(l).Log("bug", "true", "ip", lbIPs, "msg", "internal error: allocated IP has no matching address pool")
 		c.client.Errorf(svc, "InternalError", "allocated an IP that has no pool")
 		c.clearServiceState(key, svc)
@@ -184,31 +181,30 @@ func (c *controller) clearServiceState(key string, svc *v1.Service) {
 }
 
 func (c *controller) allocateIPs(key string, svc *v1.Service) ([]net.IP, error) {
-	if len(svc.Spec.ClusterIPs) == 0 {
+	if len(svc.Spec.ClusterIPs) == 0 && svc.Spec.ClusterIP == "" {
 		// (we should never get here because the caller ensured that Spec.ClusterIP != nil)
-		return nil, fmt.Errorf("invalid ClusterIP [%s], can't determine family", svc.Spec.ClusterIP)
+		return nil, fmt.Errorf("invalid ClusterIPs [%v] [%s], can't determine family", svc.Spec.ClusterIPs, svc.Spec.ClusterIP)
 	}
 
-	serviceIPFamily, err := ipfamily.ForAddresses(svc.Spec.ClusterIPs)
+	serviceIPFamily, err := ipfamily.ForService(svc)
 	if err != nil {
 		return nil, err
 	}
 
-	// If the user asked for a specific IP, try that.
-	if svc.Spec.LoadBalancerIP != "" {
-		ip := net.ParseIP(svc.Spec.LoadBalancerIP)
-		if ip == nil {
-			return nil, fmt.Errorf("invalid spec.loadBalancerIP %q", svc.Spec.LoadBalancerIP)
+	desiredLbIPs, desiredLbIPFamily, err := getDesiredLbIPs(svc)
+	if err != nil {
+		return nil, err
+	}
+
+	// If the user asked for a specific IPs, try that.
+	if len(desiredLbIPs) > 0 {
+		if serviceIPFamily != desiredLbIPFamily {
+			return nil, fmt.Errorf("requested loadBalancer IP(s) %q does not match the ipFamily of the service", desiredLbIPs)
 		}
-		lbipFamily := ipfamily.ForAddress(ip)
-		if serviceIPFamily != lbipFamily {
-			return nil, fmt.Errorf("requested spec.loadBalancerIP %q does not match the ipFamily of the service", svc.Spec.LoadBalancerIP)
-		}
-		lbIPs := []net.IP{ip}
-		if err := c.ips.Assign(key, lbIPs, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
+		if err := c.ips.Assign(key, desiredLbIPs, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 			return nil, err
 		}
-		return lbIPs, nil
+		return desiredLbIPs, nil
 	}
 	// Otherwise, did the user ask for a specific pool?
 	desiredPool := svc.Annotations[annotationAddressPool]
@@ -222,4 +218,50 @@ func (c *controller) allocateIPs(key string, svc *v1.Service) ([]net.IP, error) 
 
 	// Okay, in that case just bruteforce across all pools.
 	return c.ips.Allocate(key, serviceIPFamily, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
+}
+
+func getDesiredLbIPs(svc *v1.Service) ([]net.IP, ipfamily.Family, error) {
+	var desiredLbIPs []net.IP
+	desiredLbIPsStr := svc.Annotations[annotationLoadBalancerIPs]
+
+	if desiredLbIPsStr == "" && svc.Spec.LoadBalancerIP == "" {
+		return nil, "", nil
+	} else if desiredLbIPsStr != "" && svc.Spec.LoadBalancerIP != "" {
+		return nil, "", fmt.Errorf("service can not have both %s and svc.Spec.LoadBalancerIP", annotationLoadBalancerIPs)
+	}
+
+	if desiredLbIPsStr != "" {
+		desiredLbIPsSlice := strings.Split(desiredLbIPsStr, ",")
+		for _, desiredLbIPStr := range desiredLbIPsSlice {
+			desiredLbIP := net.ParseIP(strings.TrimSpace(desiredLbIPStr))
+			if desiredLbIP == nil {
+				return nil, "", fmt.Errorf("invalid %s: %q", annotationLoadBalancerIPs, desiredLbIPsStr)
+			}
+			desiredLbIPs = append(desiredLbIPs, desiredLbIP)
+		}
+		desiredLbIPFamily, err := ipfamily.ForAddressesIPs(desiredLbIPs)
+		if err != nil {
+			return nil, "", err
+		}
+		return desiredLbIPs, desiredLbIPFamily, nil
+	}
+
+	desiredLbIP := net.ParseIP(svc.Spec.LoadBalancerIP)
+	if desiredLbIP == nil {
+		return nil, "", fmt.Errorf("invalid spec.loadBalancerIP %q", svc.Spec.LoadBalancerIP)
+	}
+	desiredLbIPs = append(desiredLbIPs, desiredLbIP)
+	desiredLbIPFamily := ipfamily.ForAddress(desiredLbIP)
+
+	return desiredLbIPs, desiredLbIPFamily, nil
+}
+
+func isEqualIPs(ipsA, ipsB []net.IP) bool {
+	sort.Slice(ipsA, func(i, j int) bool {
+		return ipsA[i].String() < ipsA[j].String()
+	})
+	sort.Slice(ipsB, func(i, j int) bool {
+		return ipsB[i].String() < ipsB[j].String()
+	})
+	return reflect.DeepEqual(ipsA, ipsB)
 }
