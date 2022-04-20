@@ -44,8 +44,8 @@ as you want, and doesn't care what "kind" of addresses you give it.
 
 After MetalLB has assigned an external IP address to a service, it
 needs to make the network beyond the cluster aware that the IP "lives"
-in the cluster. MetalLB uses standard networking protocols to achieve
-this: ARP, NDP, or BGP.
+in the cluster. MetalLB uses standard networking or routing protocols to achieve
+this, depending on which mode is used: ARP, NDP, or BGP.
 
 ### Layer 2 mode (ARP/NDP)
 
