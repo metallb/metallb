@@ -31,6 +31,7 @@ import (
 var _ = ginkgo.Describe("L2", func() {
 	f := framework.NewDefaultFramework("l2")
 	var cs clientset.Interface
+	var nodeToLabel *v1.Node
 
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
@@ -42,6 +43,10 @@ var _ = ginkgo.Describe("L2", func() {
 	})
 
 	ginkgo.AfterEach(func() {
+		if nodeToLabel != nil {
+			k8s.RemoveLabelFromNode(nodeToLabel.Name, "bgp-node-selector-test", cs)
+		}
+
 		// Clean previous configuration.
 		err := ConfigUpdater.Clean()
 		framework.ExpectNoError(err)
@@ -195,6 +200,71 @@ var _ = ginkgo.Describe("L2", func() {
 				}
 				return advNode.Name
 			}, 2*time.Minute, time.Second).Should(gomega.Equal(allNodes.Items[0].Name))
+		})
+
+		ginkgo.It("should work when adding nodes", func() {
+			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", service.TrafficPolicyCluster)
+			defer func() {
+				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+			}()
+
+			ingressIP := e2eservice.GetIngressPoint(
+				&svc.Status.LoadBalancer.Ingress[0])
+
+			l2Advertisement := metallbv1beta1.L2Advertisement{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "with-selector",
+				},
+				Spec: metallbv1beta1.L2AdvertisementSpec{
+					NodeSelectors: []metav1.LabelSelector{
+						{
+							MatchLabels: map[string]string{
+								"l2-node-selector-test": "true",
+							},
+						},
+					},
+				},
+			}
+
+			ginkgo.By("Setting advertisement with node selector (no matching nodes)")
+			resources := internalconfig.ClusterResources{
+				L2Advs: []metallbv1beta1.L2Advertisement{l2Advertisement},
+			}
+
+			err := ConfigUpdater.Update(resources)
+			framework.ExpectNoError(err)
+
+			port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
+			hostport := net.JoinHostPort(ingressIP, port)
+			address := fmt.Sprintf("http://%s/", hostport)
+
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Validating service IP not advertised")
+			gomega.Eventually(func() error {
+				return mac.RequestAddressResolution(ingressIP, executor.Host)
+			}, 2*time.Minute, time.Second).Should(gomega.HaveOccurred())
+
+			nodeToLabel = &allNodes.Items[0]
+			ginkgo.By(fmt.Sprintf("Adding advertisement label to node %s", nodeToLabel.Name))
+			k8s.AddLabelToNode(nodeToLabel.Name, "l2-node-selector-test", "true", cs)
+
+			ginkgo.By(fmt.Sprintf("Validating service IP advertised by %s", nodeToLabel.Name))
+			gomega.Eventually(func() error {
+				return mac.RequestAddressResolution(ingressIP, executor.Host)
+			}, 2*time.Minute, time.Second).Should(gomega.Not(gomega.HaveOccurred()))
+
+			gomega.Eventually(func() string {
+				err = wget.Do(address, executor.Host)
+				framework.ExpectNoError(err)
+				advNode, err := advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
+				if err != nil {
+					return err.Error()
+				}
+				return advNode.Name
+			}, 2*time.Minute, time.Second).Should(gomega.Equal(nodeToLabel.Name))
 		})
 	})
 })
