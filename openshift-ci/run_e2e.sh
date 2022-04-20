@@ -3,6 +3,9 @@
 metallb_dir="$(dirname $(readlink -f $0))"
 source ${metallb_dir}/common.sh
 
+METALLB_REPO=${METALLB_REPO:-"https://github.com/openshift/metallb.git"}
+BACKWARD_COMPATIBLE_RELEASE=${BACKWARD_COMPATIBLE_RELEASE:-"release-4.10"}
+
 # add firewalld rules
 sudo firewall-cmd --zone=libvirt --permanent --add-port=179/tcp
 sudo firewall-cmd --zone=libvirt --add-port=179/tcp
@@ -44,3 +47,22 @@ inv e2etest --kubeconfig=$(readlink -f ../../ocp/ostest/auth/kubeconfig) \
 	--service-pod-port=8080 --system-namespaces="metallb-system" --skip-docker \
 	--ipv4-service-range=192.168.10.0/24 --ipv6-service-range=fc00:f853:0ccd:e799::/124 \
 	--skip="${SKIP}"
+
+# This checks if conversion webhooks work and if metallb is compatible with the CRDs
+# in the operator. We clone the 4.10 version of metallb and run the E2E tests in
+# operator mode. We run few significative tests that cover all the crds.
+cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+EOF
+rm -rf e2etest # we want to make sure we are not running current e2e by mistake
+git clone -b ${BACKWARD_COMPATIBLE_RELEASE} ${METALLB_REPO}
+cd metallb
+FOCUS="\"L2.*should work for ExternalTrafficPolicy=Cluster\"\|\"BGP.*A service of protocol load balancer should work with.*IPV4 - ExternalTrafficPolicyCluster$\"\|\"validate FRR running configuration\""
+inv e2etest --kubeconfig=$(readlink -f ../../../ocp/ostest/auth/kubeconfig) \
+	--service-pod-port=8080 --system-namespaces="metallb-system" --skip-docker \
+	--ipv4-service-range=192.168.10.0/24 --ipv6-service-range=fc00:f853:0ccd:e799::/124 \
+	 --focus="${FOCUS}" --use-operator
