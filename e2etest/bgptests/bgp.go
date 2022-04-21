@@ -38,6 +38,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
+	"github.com/openshift-kni/k8sreporter"
 
 	"go.universe.tf/metallb/e2etest/pkg/frr"
 	frrconfig "go.universe.tf/metallb/e2etest/pkg/frr/config"
@@ -60,7 +61,11 @@ const (
 	SpeakerContainerName  = "speaker"
 )
 
-var ConfigUpdater config.Updater
+var (
+	ConfigUpdater config.Updater
+	Reporter      *k8sreporter.KubernetesReporter
+	ReportPath    string
+)
 
 var _ = ginkgo.Describe("BGP", func() {
 	var cs clientset.Interface
@@ -84,7 +89,8 @@ var _ = ginkgo.Describe("BGP", func() {
 
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentGinkgoTestDescription().Failed {
-			dumpBGPInfo(cs, f)
+			dumpBGPInfo(ReportPath, ginkgo.CurrentGinkgoTestDescription().TestText, cs, f)
+			k8s.DumpInfo(Reporter, ginkgo.CurrentGinkgoTestDescription().TestText)
 		}
 	})
 

@@ -29,6 +29,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/extensions/table"
 	"github.com/onsi/gomega"
+	"github.com/openshift-kni/k8sreporter"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/e2etest/pkg/config"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
@@ -51,12 +52,13 @@ import (
 
 var (
 	ConfigUpdater    config.Updater
+	Reporter         *k8sreporter.KubernetesReporter
 	IPV4ServiceRange string
 	IPV6ServiceRange string
 )
 
 var _ = ginkgo.Describe("L2", func() {
-	f := framework.NewDefaultFramework("l2")
+	var f *framework.Framework
 	var loadBalancerCreateTimeout time.Duration
 	var cs clientset.Interface
 
@@ -66,6 +68,18 @@ var _ = ginkgo.Describe("L2", func() {
 		},
 	}
 
+	ginkgo.AfterEach(func() {
+		// Clean previous configuration.
+		err := ConfigUpdater.Clean()
+		framework.ExpectNoError(err)
+
+		if ginkgo.CurrentGinkgoTestDescription().Failed {
+			k8s.DumpInfo(Reporter, ginkgo.CurrentGinkgoTestDescription().TestText)
+		}
+	})
+
+	f = framework.NewDefaultFramework("l2")
+
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
 		loadBalancerCreateTimeout = e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
@@ -74,16 +88,6 @@ var _ = ginkgo.Describe("L2", func() {
 
 		err := ConfigUpdater.Clean()
 		framework.ExpectNoError(err)
-	})
-
-	ginkgo.AfterEach(func() {
-		// Clean previous configuration.
-		err := ConfigUpdater.Clean()
-		framework.ExpectNoError(err)
-
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
-			k8s.DescribeSvc(f.Namespace.Name)
-		}
 	})
 
 	ginkgo.Context("type=Loadbalancer", func() {
