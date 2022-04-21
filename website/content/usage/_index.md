@@ -164,10 +164,8 @@ In order for MetalLB to allocate IPs to a dual stack service, there must be
 at least one address pool having both addresses of version v4 and v6.
 
 Note that in case of dual stack services, it is not possible to use
-`spec.loadBalancerIP` as it does not allow to request for multiple IPs.
-
-This problem will be solved by using a custom service annotation in one
-of the next releases.
+`spec.loadBalancerIP` as it does not allow to request for multiple IPs,
+so the annotation `metallb.universe.tf/loadBalancerIPs` must be used.
 
 ## IP address sharing
 
