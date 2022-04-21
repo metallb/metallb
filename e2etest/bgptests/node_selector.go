@@ -39,7 +39,8 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 		}
 
 		if ginkgo.CurrentGinkgoTestDescription().Failed {
-			dumpBGPInfo(cs, f)
+			dumpBGPInfo(ReportPath, ginkgo.CurrentGinkgoTestDescription().TestText, cs, f)
+			k8s.DumpInfo(Reporter, ginkgo.CurrentGinkgoTestDescription().TestText)
 		}
 	})
 
