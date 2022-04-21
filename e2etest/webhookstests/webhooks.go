@@ -20,9 +20,11 @@ package webhookstests
 
 import (
 	"go.universe.tf/metallb/e2etest/pkg/config"
+	"go.universe.tf/metallb/e2etest/pkg/k8s"
 
 	"github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
+	"github.com/openshift-kni/k8sreporter"
 
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
@@ -32,7 +34,10 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-var ConfigUpdater config.Updater
+var (
+	ConfigUpdater config.Updater
+	Reporter      *k8sreporter.KubernetesReporter
+)
 
 var _ = ginkgo.Describe("Webhooks", func() {
 	ginkgo.BeforeEach(func() {
@@ -42,6 +47,10 @@ var _ = ginkgo.Describe("Webhooks", func() {
 	})
 
 	ginkgo.AfterEach(func() {
+		if ginkgo.CurrentGinkgoTestDescription().Failed {
+			k8s.DumpInfo(Reporter, ginkgo.CurrentGinkgoTestDescription().TestText)
+		}
+
 		// Clean previous configuration.
 		err := ConfigUpdater.Clean()
 		framework.ExpectNoError(err)
