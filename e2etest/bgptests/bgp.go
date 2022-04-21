@@ -31,6 +31,7 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	"go.universe.tf/metallb/e2etest/pkg/metrics"
+	"go.universe.tf/metallb/e2etest/pkg/service"
 	metallbconfig "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/pointer"
 
@@ -201,6 +202,70 @@ var _ = ginkgo.Describe("BGP", func() {
 				testservice.DualStack(svc)
 				testservice.WithSpecificIPs(svc, "192.168.10.100", "fc00:f853:ccd:e799::")
 			}),
+	)
+
+	table.DescribeTable("A load balancer service should work with overlapping IPs", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
+		var allNodes *corev1.NodeList
+		resources := metallbconfig.ClusterResources{
+			Pools: []metallbv1beta1.IPAddressPool{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "bgp-test",
+					},
+					Spec: metallbv1beta1.IPAddressPoolSpec{
+						Addresses: poolAddresses,
+					},
+				},
+			},
+			Peers:   metallb.PeersForContainers(FRRContainers, pairingIPFamily),
+			BGPAdvs: []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement},
+		}
+
+		for _, c := range FRRContainers {
+			err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily)
+			framework.ExpectNoError(err)
+		}
+
+		err := ConfigUpdater.Update(resources)
+		framework.ExpectNoError(err)
+
+		for _, c := range FRRContainers {
+			validateFRRPeeredWithAllNodes(cs, c, pairingIPFamily)
+		}
+
+		allNodes, err = cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+		framework.ExpectNoError(err)
+
+		serviceIP, err := config.GetIPFromRangeByIndex(poolAddresses[0], 1)
+		framework.ExpectNoError(err)
+
+		svc, _ := testservice.CreateWithBackendPort(cs, f.Namespace.Name, "first-service",
+			service.TestServicePort,
+			func(svc *corev1.Service) {
+				svc.Spec.LoadBalancerIP = serviceIP
+				svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
+				svc.Spec.Ports[0].Port = int32(service.TestServicePort)
+			})
+		defer testservice.Delete(cs, svc)
+		svc1, _ := testservice.CreateWithBackendPort(cs, f.Namespace.Name, "second-service",
+			service.TestServicePort+1,
+			func(svc *corev1.Service) {
+				svc.Spec.LoadBalancerIP = serviceIP
+				svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
+				svc.Spec.Ports[0].Port = int32(service.TestServicePort + 1)
+			})
+		defer testservice.Delete(cs, svc1)
+
+		validateDesiredLB(svc)
+		validateDesiredLB(svc1)
+
+		for _, c := range FRRContainers {
+			validateService(cs, svc, allNodes.Items, c)
+			validateService(cs, svc1, allNodes.Items, c)
+		}
+	},
+		table.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}),
+		table.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}),
 	)
 
 	ginkgo.Context("metrics", func() {
