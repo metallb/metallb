@@ -9,7 +9,7 @@ require (
 	github.com/eapache/channels v1.1.0 // indirect
 	github.com/eapache/queue v1.1.0 // indirect
 	github.com/go-kit/kit v0.9.0
-	github.com/go-kit/log v0.2.0 // indirect
+	github.com/go-kit/log v0.2.0
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-cmp v0.5.7
 	github.com/hashicorp/memberlist v0.3.1
