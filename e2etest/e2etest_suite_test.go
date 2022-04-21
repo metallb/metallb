@@ -14,7 +14,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-// https://github.com/ovn-org/ovn-kubernetes/blob/a99cc892576be4f15caceca62a87557572e0a447/test/e2e/e2e_suite_test.go
 
 package e2e
 
