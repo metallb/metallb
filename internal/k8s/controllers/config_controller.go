@@ -84,6 +84,12 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
+	var communities metallbv1beta1.CommunityList
+	if err := r.List(ctx, &communities, client.InNamespace(r.Namespace)); err != nil {
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to get communities", "error", err)
+		return ctrl.Result{}, err
+	}
+
 	secrets, err := r.getSecrets(ctx)
 	if err != nil {
 		return ctrl.Result{}, err
@@ -102,6 +108,7 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		L2Advs:             l2Advertisements.Items,
 		BGPAdvs:            bgpAdvertisements.Items,
 		LegacyAddressPools: addressPools.Items,
+		Communities:        communities.Items,
 		PasswordSecrets:    secrets,
 		Nodes:              nodes.Items,
 	}
@@ -142,6 +149,7 @@ func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&source.Kind{Type: &metallbv1beta1.L2Advertisement{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &metallbv1beta1.BFDProfile{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &metallbv1beta1.AddressPool{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&source.Kind{Type: &metallbv1beta1.Community{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
 }

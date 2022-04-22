@@ -121,6 +121,7 @@ func New(cfg *Config) (*Client, error) {
 				&metallbv1beta1.IPAddressPool{}:    namespaceSelector,
 				&metallbv1beta1.L2Advertisement{}:  namespaceSelector,
 				&metallbv1beta2.BGPPeer{}:          namespaceSelector,
+				&metallbv1beta1.Community{}:        namespaceSelector,
 				&corev1.Secret{}:                   namespaceSelector,
 			},
 		}),
@@ -301,6 +302,11 @@ func enableWebhook(mgr manager.Manager, validate config.Validate, namespace stri
 
 	if err := (&metallbv1beta1.BGPAdvertisement{}).SetupWebhookWithManager(mgr); err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "BGPAdvertisement")
+		return err
+	}
+
+	if err := (&metallbv1beta1.Community{}).SetupWebhookWithManager(mgr); err != nil {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "Community")
 		return err
 	}
 

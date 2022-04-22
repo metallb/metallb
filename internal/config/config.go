@@ -40,6 +40,7 @@ type ClusterResources struct {
 	BGPAdvs            []metallbv1beta1.BGPAdvertisement `json:"bgpadvertisements"`
 	L2Advs             []metallbv1beta1.L2Advertisement  `json:"l2advertisements"`
 	LegacyAddressPools []metallbv1beta1.AddressPool      `json:"legacyaddresspools"`
+	Communities        []metallbv1beta1.Community        `json:"communities"`
 	PasswordSecrets    map[string]corev1.Secret          `json:"passwordsecrets"`
 	Nodes              []corev1.Node                     `json:"nodes"`
 }
@@ -207,21 +208,14 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 		cfg.Peers = append(cfg.Peers, peer)
 	}
 
-	communities := map[string]uint32{}
-	// TODO CRDs add a CRD for communities
-	/*
-		for n, v := range rawConfig.BGPCommunities {
-			c, err := ParseCommunity(v)
-			if err != nil {
-				return nil, fmt.Errorf("parsing community %q: %s", n, err)
-			}
-			communities[n] = c
-		}
-	*/
+	communities, err := communitiesFromCrs(resources.Communities)
+	if err != nil {
+		return nil, err
+	}
 
 	var allCIDRs []*net.IPNet
 	for _, p := range resources.Pools {
-		pool, err := addressPoolFromCR(p, communities)
+		pool, err := addressPoolFromCR(p)
 		if err != nil {
 			return nil, fmt.Errorf("parsing address pool %s: %s", p.Name, err)
 		}
@@ -306,7 +300,7 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 		}
 		pool, err := addressPoolFromLegacyCR(p, communities, allNodes)
 		if err != nil {
-			return nil, fmt.Errorf("parsing address pool %s: %s", p.Name, err)
+			return nil, errors.Wrapf(err, "parsing address pool %s", p.Name)
 		}
 
 		// Check that the pool isn't already defined
@@ -328,6 +322,23 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+func communitiesFromCrs(cs []metallbv1beta1.Community) (map[string]uint32, error) {
+	communities := map[string]uint32{}
+	for _, c := range cs {
+		for _, communityAlias := range c.Spec.Communities {
+			v, err := ParseCommunity(communityAlias.Value)
+			if err != nil {
+				return nil, fmt.Errorf("parsing community %q: %s", communityAlias.Name, err)
+			}
+			if _, ok := communities[communityAlias.Name]; ok {
+				return nil, fmt.Errorf("duplicate definition of community %q", communityAlias.Name)
+			}
+			communities[communityAlias.Name] = v
+		}
+	}
+	return communities, nil
 }
 
 func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secret) (*Peer, error) {
@@ -437,7 +448,7 @@ func passwordForPeer(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1
 	return password, nil
 }
 
-func addressPoolFromCR(p metallbv1beta1.IPAddressPool, bgpCommunities map[string]uint32) (*Pool, error) {
+func addressPoolFromCR(p metallbv1beta1.IPAddressPool) (*Pool, error) {
 	if p.Name == "" {
 		return nil, errors.New("missing pool name")
 	}
@@ -600,15 +611,11 @@ func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities m
 	}
 
 	for _, c := range crdAd.Spec.Communities {
-		if v, ok := communities[c]; ok {
-			ad.Communities[v] = true
-		} else {
-			v, err := ParseCommunity(c)
-			if err != nil {
-				return nil, fmt.Errorf("invalid community %q in BGP advertisement: %s", c, err)
-			}
-			ad.Communities[v] = true
+		v, err := getCommunityValue(c, communities)
+		if err != nil {
+			return nil, errors.Wrapf(err, "invalid community %q in BGP advertisement", c)
 		}
+		ad.Communities[v] = true
 	}
 
 	selected, err := selectedNodes(nodes, crdAd.Spec.NodeSelectors)
@@ -681,21 +688,35 @@ func bgpAdvertisementsFromLegacyCR(ads []metallbv1beta1.LegacyBgpAdvertisement, 
 		ad.LocalPref = crdAd.LocalPref
 
 		for _, c := range crdAd.Communities {
-			if v, ok := communities[c]; ok {
-				ad.Communities[v] = true
-			} else {
-				v, err := ParseCommunity(c)
-				if err != nil {
-					return nil, fmt.Errorf("invalid community %q in BGP advertisement: %s", c, err)
-				}
-				ad.Communities[v] = true
+			v, err := getCommunityValue(c, communities)
+			if err != nil {
+				return nil, errors.Wrapf(err, "invalid community %q in BGP advertisement", c)
 			}
+			ad.Communities[v] = true
 		}
-
 		ret = append(ret, ad)
 	}
 
 	return ret, nil
+}
+
+func getCommunityValue(community string, communities map[string]uint32) (uint32, error) {
+	if v, ok := communities[community]; ok {
+		return v, nil
+	}
+
+	v, err := ParseCommunity(community)
+	if errors.Is(err, invalidCommunityValue) {
+		return 0, err
+	}
+
+	// Return TransientError on invalidCommunityFormat, in case it refers
+	// a Community resource that doesn't exist yet.
+	if errors.Is(err, invalidCommunityFormat) {
+		return 0, TransientError{err.Error()}
+	}
+
+	return v, nil
 }
 
 func validateHoldTime(ht time.Duration) error {
@@ -727,18 +748,21 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 	return nil
 }
 
+var invalidCommunityValue = errors.New("invalid community value")
+var invalidCommunityFormat = errors.New("invalid community format")
+
 func ParseCommunity(c string) (uint32, error) {
 	fs := strings.Split(c, ":")
 	if len(fs) != 2 {
-		return 0, fmt.Errorf("invalid community string %q", c)
+		return 0, fmt.Errorf("%w: %s", invalidCommunityFormat, c)
 	}
 	a, err := strconv.ParseUint(fs[0], 10, 16)
 	if err != nil {
-		return 0, fmt.Errorf("invalid first section of community %q: %s", fs[0], err)
+		return 0, fmt.Errorf("%w: invalid first section of community %q: %s", invalidCommunityValue, fs[0], err)
 	}
 	b, err := strconv.ParseUint(fs[1], 10, 16)
 	if err != nil {
-		return 0, fmt.Errorf("invalid second section of community %q: %s", fs[1], err)
+		return 0, fmt.Errorf("%w: invalid second section of community %q: %s", invalidCommunityValue, fs[1], err)
 	}
 
 	return (uint32(a) << 16) + uint32(b), nil
