@@ -170,44 +170,68 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 		return nil, err
 	}
 
-	cfg := &Config{
-		Pools:       map[string]*Pool{},
-		BFDProfiles: map[string]*BFDProfile{},
+	cfg := &Config{}
+
+	cfg.BFDProfiles, err = bfdProfilesFor(resources)
+	if err != nil {
+		return nil, err
 	}
 
+	cfg.Peers, err = peersFor(resources, cfg.BFDProfiles)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg.Pools, err = poolsFor(resources)
+	if err != nil {
+		return nil, err
+	}
+
+	return cfg, nil
+}
+
+func bfdProfilesFor(resources ClusterResources) (map[string]*BFDProfile, error) {
+	res := make(map[string]*BFDProfile)
 	for i, bfd := range resources.BFDProfiles {
 		parsed, err := bfdProfileFromCR(bfd)
 		if err != nil {
 			return nil, fmt.Errorf("parsing bfd profile #%d: %s", i+1, err)
 		}
-		if _, ok := cfg.BFDProfiles[parsed.Name]; ok {
+		if _, ok := res[parsed.Name]; ok {
 			return nil, fmt.Errorf("found duplicate bfd profile name %s", parsed.Name)
 		}
-		cfg.BFDProfiles[bfd.Name] = parsed
+		res[bfd.Name] = parsed
 	}
+	return res, nil
+}
 
+func peersFor(resources ClusterResources, BFDProfiles map[string]*BFDProfile) ([]*Peer, error) {
+	var res []*Peer
 	for _, p := range resources.Peers {
 		peer, err := peerFromCR(p, resources.PasswordSecrets)
 		if err != nil {
 			return nil, errors.Wrapf(err, "parsing peer %s", p.Name)
 		}
 		if peer.BFDProfile != "" {
-			if _, ok := cfg.BFDProfiles[peer.BFDProfile]; !ok {
+			if _, ok := BFDProfiles[peer.BFDProfile]; !ok {
 				return nil, TransientError{fmt.Sprintf("peer %s referencing non existing bfd profile %s", p.Name, peer.BFDProfile)}
 			}
 		}
-		for _, ep := range cfg.Peers {
+		for _, ep := range res {
 			// TODO: Be smarter regarding conflicting peers. For example, two
 			// peers could have a different hold time but they'd still result
 			// in two BGP sessions between the speaker and the remote host.
 			if reflect.DeepEqual(peer, ep) {
 				return nil, fmt.Errorf("peer %s already exists", p.Name)
 			}
-
 		}
-		cfg.Peers = append(cfg.Peers, peer)
+		res = append(res, peer)
 	}
+	return res, nil
+}
 
+func poolsFor(resources ClusterResources) (map[string]*Pool, error) {
+	res := make(map[string]*Pool)
 	communities, err := communitiesFromCrs(resources.Communities)
 	if err != nil {
 		return nil, err
@@ -221,7 +245,7 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 		}
 
 		// Check that the pool isn't already defined
-		if cfg.Pools[p.Name] != nil {
+		if res[p.Name] != nil {
 			return nil, fmt.Errorf("duplicate definition of pool %q", p.Name)
 		}
 
@@ -235,10 +259,10 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 			allCIDRs = append(allCIDRs, cidr)
 		}
 
-		cfg.Pools[p.Name] = pool
+		res[p.Name] = pool
 	}
 
-	err = setL2AdvertisementsToPools(resources.Pools, resources.L2Advs, resources.Nodes, cfg.Pools)
+	err = setL2AdvertisementsToPools(resources.Pools, resources.L2Advs, resources.Nodes, res)
 	if err != nil {
 		return nil, err
 	}
@@ -248,7 +272,7 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 		return nil, err
 	}
 
-	err = setBGPAdvertisementsToPools(resources.Pools, resources.BGPAdvs, resources.Nodes, cfg.Pools, communities)
+	err = setBGPAdvertisementsToPools(resources.Pools, resources.BGPAdvs, resources.Nodes, res, communities)
 	if err != nil {
 		return nil, err
 	}
@@ -264,7 +288,7 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 		}
 
 		// Check that the pool isn't already defined
-		if cfg.Pools[p.Name] != nil {
+		if res[p.Name] != nil {
 			return nil, fmt.Errorf("duplicate definition of pool %q", p.Name)
 		}
 
@@ -278,10 +302,10 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 			allCIDRs = append(allCIDRs, cidr)
 		}
 
-		cfg.Pools[p.Name] = pool
+		res[p.Name] = pool
 	}
 
-	return cfg, nil
+	return res, nil
 }
 
 func communitiesFromCrs(cs []metallbv1beta1.Community) (map[string]uint32, error) {
