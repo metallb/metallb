@@ -37,6 +37,7 @@ type configFile struct {
 	BGPCommunities map[string]string `yaml:"bgp-communities"`
 	Pools          []addressPool     `yaml:"address-pools"`
 	BFDProfiles    []bfdProfile      `yaml:"bfd-profiles"`
+	BindInterfaces []string          `yaml:"bind-interfaces"`
 }
 
 type peer struct {
@@ -100,6 +101,8 @@ type Config struct {
 	Pools map[string]*Pool
 	// BFD profiles that can be used by peers.
 	BFDProfiles map[string]*BFDProfile
+	// Interfaces used to announce IP for layer2
+	BindInterfaces []string
 }
 
 // Proto holds the protocol we are speaking.
@@ -257,8 +260,9 @@ func Parse(bs []byte, validate Validate) (*Config, error) {
 	}
 
 	cfg := &Config{
-		Pools:       map[string]*Pool{},
-		BFDProfiles: map[string]*BFDProfile{},
+		Pools:          map[string]*Pool{},
+		BFDProfiles:    map[string]*BFDProfile{},
+		BindInterfaces: []string{},
 	}
 
 	for i, bfd := range raw.BFDProfiles {
@@ -326,6 +330,9 @@ func Parse(bs []byte, validate Validate) (*Config, error) {
 		}
 
 		cfg.Pools[p.Name] = pool
+	}
+	if len(raw.BindInterfaces) > 0 {
+		cfg.BindInterfaces = raw.BindInterfaces
 	}
 
 	return cfg, nil

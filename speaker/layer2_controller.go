@@ -33,7 +33,12 @@ type layer2Controller struct {
 	sList     SpeakerList
 }
 
-func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
+func (c *layer2Controller) SetConfig(l log.Logger, cfg *config.Config) error {
+	if !c.announcer.BindInterfacesNeedUpdate(cfg.BindInterfaces) {
+		return nil
+	}
+	c.announcer.SetBindInterfaces(cfg.BindInterfaces)
+	c.announcer.UpdateInterfaces()
 	return nil
 }
 

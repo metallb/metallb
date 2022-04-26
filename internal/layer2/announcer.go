@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-kit/kit/log"
 	"github.com/go-kit/kit/log/level"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // Announce is used to "announce" new IPs mapped to the node's MAC address.
@@ -19,10 +20,11 @@ type Announce struct {
 	logger log.Logger
 
 	sync.RWMutex
-	arps     map[int]*arpResponder
-	ndps     map[int]*ndpResponder
-	ips      map[string][]net.IP // svcName -> IPs
-	ipRefcnt map[string]int      // ip.String() -> number of uses
+	arps           map[int]*arpResponder
+	ndps           map[int]*ndpResponder
+	ips            map[string][]net.IP // svcName -> IPs
+	ipRefcnt       map[string]int      // ip.String() -> number of uses
+	bindInterfaces []string
 
 	// This channel can block - do not write to it while holding the mutex
 	// to avoid deadlocking.
@@ -32,12 +34,13 @@ type Announce struct {
 // New returns an initialized Announce.
 func New(l log.Logger) (*Announce, error) {
 	ret := &Announce{
-		logger:   l,
-		arps:     map[int]*arpResponder{},
-		ndps:     map[int]*ndpResponder{},
-		ips:      map[string][]net.IP{},
-		ipRefcnt: map[string]int{},
-		spamCh:   make(chan net.IP, 1024),
+		logger:         l,
+		arps:           map[int]*arpResponder{},
+		ndps:           map[int]*ndpResponder{},
+		ips:            map[string][]net.IP{},
+		ipRefcnt:       map[string]int{},
+		spamCh:         make(chan net.IP, 1024),
+		bindInterfaces: []string{},
 	}
 	go ret.interfaceScan()
 	go ret.spamLoop()
@@ -62,6 +65,7 @@ func (a *Announce) updateInterfaces() {
 	a.Lock()
 	defer a.Unlock()
 
+	bindIfSet := sets.NewString(a.bindInterfaces...)
 	keepARP, keepNDP := map[int]bool{}, map[int]bool{}
 	for _, intf := range ifs {
 		ifi := intf
@@ -70,6 +74,10 @@ func (a *Announce) updateInterfaces() {
 		if err != nil {
 			level.Error(l).Log("op", "getAddresses", "error", err, "msg", "couldn't get addresses for interface")
 			return
+		}
+
+		if len(ifi.Name) > 0 && !bindIfSet.Has(ifi.Name) {
+			continue
 		}
 
 		if ifi.Flags&net.FlagUp == 0 {
@@ -285,6 +293,22 @@ func (a *Announce) AnnounceName(name string) bool {
 	_, ok := a.ips[name]
 	return ok
 }
+
+// BindInterfacesNeedUpdate check the bindInterfaces has changed or not
+func (a *Announce) BindInterfacesNeedUpdate(ifnames []string) bool {
+	return !sets.NewString(a.bindInterfaces...).Equal(sets.NewString(ifnames...))
+}
+
+// SetBindInterfaces set bindInterfaces of Announce when ConfigMap update
+func (a *Announce) SetBindInterfaces(ifnames []string) {
+	a.bindInterfaces = ifnames
+}
+
+// UpdateInterfaces update ARP and NDP responder
+func (a *Announce) UpdateInterfaces() {
+	a.updateInterfaces()
+}
+
 
 // dropReason is the reason why a layer2 protocol packet was not
 // responded to.
