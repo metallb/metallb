@@ -7,6 +7,9 @@ metadata:
     {{- include "metallb.labels" . | nindent 4 }}
     app.kubernetes.io/component: controller
 spec:
+  {{- if .Values.controller.strategy }}
+  strategy: {{- toYaml .Values.controller.strategy | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "metallb.selectorLabels" . | nindent 6 }}
