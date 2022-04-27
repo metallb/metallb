@@ -53,11 +53,11 @@ type BGPAdvertisementSpec struct {
 	// A selector for the IPAddressPools which would get advertised via this advertisement.
 	// If no IPAddressPool is selected by this or by the list, the advertisement is applied to all the IPAddressPools.
 	// +optional
-	IPAddressPoolSelectors []metav1.LabelSelector `json:"ipAddressPoolSelectors,omitempty" yaml:"ipaddress-pool-selectors,omitempty"`
+	IPAddressPoolSelectors []metav1.LabelSelector `json:"ipAddressPoolSelectors,omitempty"`
 
 	// NodeSelectors allows to limit the nodes to announce as next hops for the LoadBalancer IP. When empty, all the nodes having  are announced as next hops.
 	// +optional
-	NodeSelectors []metav1.LabelSelector `json:"nodeSelectors,omitempty" yaml:"node-selectors,omitempty"`
+	NodeSelectors []metav1.LabelSelector `json:"nodeSelectors,omitempty"`
 
 	// Peers limits the bgppeer to advertise the ips of the selected pools to.
 	// When empty, the loadbalancer IP is announced to all the BGPPeers configured.
