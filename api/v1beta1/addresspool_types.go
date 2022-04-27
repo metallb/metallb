@@ -25,20 +25,20 @@ type LegacyBgpAdvertisement struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=32
 	// +optional
-	AggregationLength *int32 `json:"aggregationLength,omitempty" yaml:"aggregation-length,omitempty"`
+	AggregationLength *int32 `json:"aggregationLength,omitempty"`
 
 	// Optional, defaults to 128 (i.e. no aggregation) if not
 	// specified.
 	// +kubebuilder:default:=128
 	// +optional
-	AggregationLengthV6 *int32 `json:"aggregationLengthV6,omitempty" yaml:"aggregation-length-v6,omitempty"`
+	AggregationLengthV6 *int32 `json:"aggregationLengthV6,omitempty"`
 
 	// BGP LOCAL_PREF attribute which is used by BGP best path algorithm,
 	// Path with higher localpref is preferred over one with lower localpref.
-	LocalPref uint32 `json:"localPref,omitempty" yaml:"localpref,omitempty"`
+	LocalPref uint32 `json:"localPref,omitempty"`
 
 	// BGP communities to be associated with the given advertisement.
-	Communities []string `json:"communities,omitempty" yaml:"communities,omitempty"`
+	Communities []string `json:"communities,omitempty"`
 }
 
 // AddressPoolSpec defines the desired state of AddressPool.
@@ -68,7 +68,7 @@ type AddressPoolSpec struct {
 	// Drives how an IP allocated from this pool should
 	// translated into BGP announcements.
 	// +optional
-	BGPAdvertisements []LegacyBgpAdvertisement `json:"bgpAdvertisements,omitempty" yaml:"bgp-advertisements,omitempty"`
+	BGPAdvertisements []LegacyBgpAdvertisement `json:"bgpAdvertisements,omitempty"`
 }
 
 // AddressPoolStatus defines the observed state of AddressPool.
