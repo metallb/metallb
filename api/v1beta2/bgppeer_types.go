@@ -26,59 +26,59 @@ type BGPPeerSpec struct {
 	// AS number to use for the local end of the session.
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=65535
-	MyASN uint32 `json:"myASN" yaml:"my-asn"`
+	MyASN uint32 `json:"myASN"`
 
 	// AS number to expect from the remote end of the session.
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=65535
-	ASN uint32 `json:"peerASN" yaml:"peer-asn"`
+	ASN uint32 `json:"peerASN"`
 
 	// Address to dial when establishing the session.
-	Address string `json:"peerAddress" yaml:"peer-address"`
+	Address string `json:"peerAddress"`
 
 	// Source address to use when establishing the session.
 	// +optional
-	SrcAddress string `json:"sourceAddress,omitempty" yaml:"source-address,omitempty"`
+	SrcAddress string `json:"sourceAddress,omitempty"`
 
 	// Port to dial when establishing the session.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=16384
 	// +kubebuilder:default:=179
-	Port uint16 `json:"peerPort,omitempty" yaml:"peer-port,omitempty"`
+	Port uint16 `json:"peerPort,omitempty"`
 
 	// Requested BGP hold time, per RFC4271.
 	// +optional
-	HoldTime metav1.Duration `json:"holdTime,omitempty" yaml:"hold-time,omitempty"`
+	HoldTime metav1.Duration `json:"holdTime,omitempty"`
 
 	// Requested BGP keepalive time, per RFC4271.
 	// +optional
-	KeepaliveTime metav1.Duration `json:"keepaliveTime,omitempty" yaml:"keepalive-time,omitempty"`
+	KeepaliveTime metav1.Duration `json:"keepaliveTime,omitempty"`
 
 	// BGP router ID to advertise to the peer
 	// +optional
-	RouterID string `json:"routerID,omitempty" yaml:"router-id,omitempty"`
+	RouterID string `json:"routerID,omitempty"`
 
 	// Only connect to this peer on nodes that match one of these
 	// selectors.
 	// +optional
-	NodeSelectors []metav1.LabelSelector `json:"nodeSelectors,omitempty" yaml:"node-selectors,omitempty"`
+	NodeSelectors []metav1.LabelSelector `json:"nodeSelectors,omitempty"`
 
 	// Authentication password for routers enforcing TCP MD5 authenticated sessions
 	// +optional
-	Password string `json:"password,omitempty" yaml:"password,omitempty"`
+	Password string `json:"password,omitempty"`
 
 	// passwordSecret is name of the authentication secret for BGP Peer
 	// +optional
-	PasswordSecret v1.SecretReference `json:"passwordSecret,omitempty" yaml:"passwordSecret,omitempty"`
+	PasswordSecret v1.SecretReference `json:"passwordSecret,omitempty"`
 
 	// The name of the BFD Profile to be used for the BFD session associated to the BGP session. If not set, the BFD session won't be set up.
 	// +optional
-	BFDProfile string `json:"bfdProfile,omitempty" yaml:"bfdprofile,omitempty"`
+	BFDProfile string `json:"bfdProfile,omitempty"`
 
 	// To set if the BGPPeer is multi-hops away. Needed for FRR mode only.
 	// +optional
-	EBGPMultiHop bool `json:"ebgpMultiHop,omitempty" yaml:"ebgp-multihop,omitempty"`
+	EBGPMultiHop bool `json:"ebgpMultiHop,omitempty"`
 	// Add future BGP configuration here
 }
 

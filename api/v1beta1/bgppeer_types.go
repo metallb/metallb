@@ -21,18 +21,18 @@ import (
 )
 
 type MatchExpression struct {
-	Key      string `json:"key" yaml:"key"`
-	Operator string `json:"operator" yaml:"operator"`
+	Key      string `json:"key"`
+	Operator string `json:"operator"`
 	// +kubebuilder:validation:MinItems:=1
-	Values []string `json:"values" yaml:"values"`
+	Values []string `json:"values"`
 }
 
 type NodeSelector struct {
 	// +optional
-	MatchLabels map[string]string `json:"matchLabels,omitempty" yaml:"match-labels,omitempty"`
+	MatchLabels map[string]string `json:"matchLabels,omitempty"`
 
 	// +optional
-	MatchExpressions []MatchExpression `json:"matchExpressions,omitempty" yaml:"match-expressions,omitempty"`
+	MatchExpressions []MatchExpression `json:"matchExpressions,omitempty"`
 }
 
 // BGPPeerSpec defines the desired state of Peer.
@@ -40,51 +40,51 @@ type BGPPeerSpec struct {
 	// AS number to use for the local end of the session.
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=65535
-	MyASN uint32 `json:"myASN" yaml:"my-asn"`
+	MyASN uint32 `json:"myASN"`
 
 	// AS number to expect from the remote end of the session.
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=65535
-	ASN uint32 `json:"peerASN" yaml:"peer-asn"`
+	ASN uint32 `json:"peerASN"`
 
 	// Address to dial when establishing the session.
-	Address string `json:"peerAddress" yaml:"peer-address"`
+	Address string `json:"peerAddress"`
 
 	// Source address to use when establishing the session.
 	// +optional
-	SrcAddress string `json:"sourceAddress,omitempty" yaml:"source-address,omitempty"`
+	SrcAddress string `json:"sourceAddress,omitempty"`
 
 	// Port to dial when establishing the session.
 	// +optional
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=16384
-	Port uint16 `json:"peerPort,omitempty" yaml:"peer-port,omitempty"`
+	Port uint16 `json:"peerPort,omitempty"`
 
 	// Requested BGP hold time, per RFC4271.
 	// +optional
-	HoldTime metav1.Duration `json:"holdTime,omitempty" yaml:"hold-time,omitempty"`
+	HoldTime metav1.Duration `json:"holdTime,omitempty"`
 
 	// Requested BGP keepalive time, per RFC4271.
 	// +optional
-	KeepaliveTime metav1.Duration `json:"keepaliveTime,omitempty" yaml:"keepalive-time,omitempty"`
+	KeepaliveTime metav1.Duration `json:"keepaliveTime,omitempty"`
 
 	// BGP router ID to advertise to the peer
 	// +optional
-	RouterID string `json:"routerID,omitempty" yaml:"router-id,omitempty"`
+	RouterID string `json:"routerID,omitempty"`
 
 	// Only connect to this peer on nodes that match one of these
 	// selectors.
 	// +optional
-	NodeSelectors []NodeSelector `json:"nodeSelectors,omitempty" yaml:"node-selectors,omitempty"`
+	NodeSelectors []NodeSelector `json:"nodeSelectors,omitempty"`
 
 	// Authentication password for routers enforcing TCP MD5 authenticated sessions
 	// +optional
-	Password string `json:"password,omitempty" yaml:"password,omitempty"`
+	Password string `json:"password,omitempty"`
 
-	BFDProfile string `json:"bfdProfile,omitempty" yaml:"bfdprofile,omitempty"`
+	BFDProfile string `json:"bfdProfile,omitempty"`
 
 	// EBGP peer is multi-hops away
-	EBGPMultiHop bool `json:"ebgpMultiHop,omitempty" yaml:"ebgp-multihop,omitempty"`
+	EBGPMultiHop bool `json:"ebgpMultiHop,omitempty"`
 	// Add future BGP configuration here
 }
 
