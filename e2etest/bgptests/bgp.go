@@ -112,111 +112,84 @@ var _ = ginkgo.Describe("BGP", func() {
 		cs = f.ClientSet
 	})
 
-	table.DescribeTable("A service of protocol load balancer should work with", func(pairingIPFamily ipfamily.Family, setProtocoltest string, poolAddresses []string, tweak testservice.Tweak) {
-		var allNodes *corev1.NodeList
-		resources := metallbconfig.ClusterResources{
-			Pools: []metallbv1beta1.IPAddressPool{
-				{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "bgp-test",
-					},
-					Spec: metallbv1beta1.IPAddressPoolSpec{
-						Addresses: poolAddresses,
-					},
-				},
-			},
-		}
+	table.DescribeTable("A service of protocol load balancer should work with ETP=cluster", func(pairingIPFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
 
-		err := ConfigUpdater.Update(resources)
-		framework.ExpectNoError(err)
-
-		svc, jig := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
+		_, svc := setupBGPService(f, pairingIPFamily, poolAddresses, func(svc *corev1.Service) {
+			testservice.TrafficPolicyCluster(svc)
+			tweak(svc)
+		})
 		defer testservice.Delete(cs, svc)
 
-		for _, i := range svc.Status.LoadBalancer.Ingress {
-			ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
-			ingressIP := e2eservice.GetIngressPoint(&i)
-			err = config.ValidateIPInRange(resources.Pools, ingressIP)
-			framework.ExpectNoError(err)
-		}
-
-		resources.BGPAdvs = []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement}
-		resources.Peers = metallb.PeersForContainers(FRRContainers, pairingIPFamily)
+		allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+		framework.ExpectNoError(err)
+		validateDesiredLB(svc)
 
 		for _, c := range FRRContainers {
-			err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily)
-			framework.ExpectNoError(err)
-		}
-
-		err = ConfigUpdater.Update(resources)
-		framework.ExpectNoError(err)
-
-		for _, c := range FRRContainers {
-			validateFRRPeeredWithAllNodes(cs, c, pairingIPFamily)
-		}
-
-		allNodes, err = cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-		framework.ExpectNoError(err)
-
-		if setProtocoltest == "ExternalTrafficPolicyCluster" {
-
-			validateDesiredLB(svc)
-
-			for _, c := range FRRContainers {
-				validateService(cs, svc, allNodes.Items, c)
-			}
-		}
-
-		if setProtocoltest == "ExternalTrafficPolicyLocal" {
-			err = jig.Scale(2)
-			framework.ExpectNoError(err)
-
-			epNodes, err := jig.ListNodesWithEndpoint() // Only nodes with an endpoint should be advertising the IP
-			framework.ExpectNoError(err)
-
-			for _, c := range FRRContainers {
-				validateService(cs, svc, epNodes, c)
-			}
-		}
-
-		if setProtocoltest == "CheckSpeakerFRRPodRunning" {
-			for _, c := range FRRContainers {
-				frrIsPairedOnPods(cs, c, pairingIPFamily)
-			}
+			validateService(cs, svc, allNodes.Items, c)
 		}
 	},
-		table.Entry("IPV4 - ExternalTrafficPolicyCluster", ipfamily.IPv4, "ExternalTrafficPolicyCluster", []string{v4PoolAddresses}, testservice.TrafficPolicyCluster),
-		table.Entry("IPV4 - ExternalTrafficPolicyLocal", ipfamily.IPv4, "ExternalTrafficPolicyLocal", []string{v4PoolAddresses}, testservice.TrafficPolicyLocal),
-		table.Entry("IPV4 - FRR running in the speaker POD", ipfamily.IPv4, "CheckSpeakerFRRPodRunning", []string{v4PoolAddresses}, testservice.TrafficPolicyLocal),
-		table.Entry("IPV6 - ExternalTrafficPolicyCluster", ipfamily.IPv6, "ExternalTrafficPolicyCluster", []string{v6PoolAddresses}, testservice.TrafficPolicyCluster),
-		table.Entry("IPV6 - ExternalTrafficPolicyLocal", ipfamily.IPv6, "ExternalTrafficPolicyLocal", []string{v6PoolAddresses}, testservice.TrafficPolicyLocal),
-		table.Entry("IPV6 - FRR running in the speaker POD", ipfamily.IPv6, "CheckSpeakerFRRPodRunning", []string{v6PoolAddresses}, testservice.TrafficPolicyLocal),
-		table.Entry("DUALSTACK - ExternalTrafficPolicyCluster", ipfamily.DualStack, "ExternalTrafficPolicyCluster", []string{v4PoolAddresses, v6PoolAddresses},
+		table.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
+		table.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}, func(_ *corev1.Service) {}),
+		table.Entry("DUALSTACK", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
 			func(svc *corev1.Service) {
-				testservice.TrafficPolicyCluster(svc)
 				testservice.DualStack(svc)
 			}),
-		table.Entry("DUALSTACK - ExternalTrafficPolicyLocal", ipfamily.DualStack, "ExternalTrafficPolicyLocal", []string{v4PoolAddresses, v6PoolAddresses},
+		table.Entry("DUALSTACK - force V6 only", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
 			func(svc *corev1.Service) {
-				testservice.TrafficPolicyLocal(svc)
-				testservice.DualStack(svc)
-			}),
-		table.Entry("DUALSTACK - ExternalTrafficPolicyCluster - force V6 only", ipfamily.DualStack, "ExternalTrafficPolicyCluster", []string{v4PoolAddresses, v6PoolAddresses},
-			func(svc *corev1.Service) {
-				testservice.TrafficPolicyCluster(svc)
 				testservice.ForceV6(svc)
 			}),
-		table.Entry("IPV4 - ExternalTrafficPolicyCluster - request IPv4 via custom annotation", ipfamily.IPv4, "ExternalTrafficPolicyCluster", []string{v4PoolAddresses},
+		table.Entry("IPV4 - request IPv4 via custom annotation", ipfamily.IPv4, []string{v4PoolAddresses},
 			func(svc *corev1.Service) {
-				testservice.TrafficPolicyCluster(svc)
 				testservice.WithSpecificIPs(svc, "192.168.10.100")
 			}),
-		table.Entry("DUALSTACK - ExternalTrafficPolicyCluster - request Dual Stack via custom annotation", ipfamily.DualStack, "ExternalTrafficPolicyCluster", []string{v4PoolAddresses, v6PoolAddresses},
+		table.Entry("DUALSTACK - request Dual Stack via custom annotation", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
 			func(svc *corev1.Service) {
-				testservice.TrafficPolicyCluster(svc)
 				testservice.DualStack(svc)
 				testservice.WithSpecificIPs(svc, "192.168.10.100", "fc00:f853:ccd:e799::")
 			}),
+	)
+
+	table.DescribeTable("A service of protocol load balancer should work with ETP=local", func(pairingIPFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
+
+		jig, svc := setupBGPService(f, pairingIPFamily, poolAddresses, func(svc *corev1.Service) {
+			testservice.TrafficPolicyLocal(svc)
+			tweak(svc)
+		})
+		defer testservice.Delete(cs, svc)
+
+		validateDesiredLB(svc)
+
+		err := jig.Scale(2)
+		framework.ExpectNoError(err)
+
+		epNodes, err := jig.ListNodesWithEndpoint() // Only nodes with an endpoint should be advertising the IP
+		framework.ExpectNoError(err)
+
+		for _, c := range FRRContainers {
+			validateService(cs, svc, epNodes, c)
+		}
+	},
+		table.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
+		table.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}, func(_ *corev1.Service) {}),
+		table.Entry("DUALSTACK", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
+			func(svc *corev1.Service) {
+				testservice.DualStack(svc)
+			}),
+	)
+
+	table.DescribeTable("FRR must be deployed when enabled", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
+
+		_, svc := setupBGPService(f, pairingIPFamily, poolAddresses, func(svc *corev1.Service) {
+			testservice.TrafficPolicyCluster(svc)
+		})
+		defer testservice.Delete(cs, svc)
+		for _, c := range FRRContainers {
+			frrIsPairedOnPods(cs, c, pairingIPFamily)
+		}
+
+	},
+		table.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}),
+		table.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}),
 	)
 
 	table.DescribeTable("A load balancer service should work with overlapping IPs", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
@@ -1431,7 +1404,6 @@ var _ = ginkgo.Describe("BGP", func() {
 		defer testservice.Delete(cs, svc)
 
 		Consistently(checkRoutesInjected, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
-
 	},
 		table.Entry("IPV4", "192.168.10.0/24", "172.16.1.10/32", ipfamily.IPv4),
 		table.Entry("IPV6", "fc00:f853:0ccd:e799::/116", "fc00:f853:ccd:e800::1/128", ipfamily.IPv6),
