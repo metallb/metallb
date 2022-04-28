@@ -243,7 +243,6 @@ func (cs *Channel) Start(
 		return fmt.Errorf("must specify Channel.Source")
 	}
 
-	fmt.Println("FEDE start called")
 	// stop should have been injected before Start was called
 	if cs.stop == nil {
 		return fmt.Errorf("must call InjectStop on Channel before calling Start")
@@ -267,7 +266,6 @@ func (cs *Channel) Start(
 
 	go func() {
 		for evt := range dst {
-			fmt.Println("FEDE loop")
 			shouldHandle := true
 			for _, p := range prct {
 				if !p.Generic(evt) {
