@@ -26,9 +26,11 @@ import (
 
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
+	"go.universe.tf/metallb/e2etest/l2tests"
 	"go.universe.tf/metallb/e2etest/pkg/config"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
+	"go.universe.tf/metallb/e2etest/pkg/mac"
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	"go.universe.tf/metallb/e2etest/pkg/metrics"
 	"go.universe.tf/metallb/e2etest/pkg/service"
@@ -1538,7 +1540,67 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectEqual(peer.Spec.Port, uint16(179))
 		})
 	})
+	table.DescribeTable("A service of protocol load balancer should work with two protocols", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
+		_, svc := setupBGPService(f, pairingIPFamily, poolAddresses, func(svc *corev1.Service) {
+			testservice.TrafficPolicyCluster(svc)
+		})
+		defer testservice.Delete(cs, svc)
 
+		allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Checking the service is reacheable via BGP")
+		for _, c := range FRRContainers {
+			validateService(cs, svc, allNodes.Items, c)
+		}
+
+		checkServiceL2 := func() error {
+			for _, ip := range svc.Status.LoadBalancer.Ingress {
+				ingressIP := e2eservice.GetIngressPoint(&ip)
+				err := mac.RequestAddressResolution(ingressIP, executor.Host)
+				if err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+
+		ginkgo.By("Checking the service is not reacheable via L2")
+		Consistently(checkServiceL2, 3*time.Second, 1*time.Second).Should(Not(BeNil()))
+
+		ginkgo.By("Creating the l2 advertisement")
+		l2Advertisement := metallbv1beta1.L2Advertisement{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "l2adv",
+				Namespace: metallb.Namespace,
+			},
+		}
+
+		err = ConfigUpdater.Client().Create(context.Background(), &l2Advertisement)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Checking the service is reacheable via L2")
+		Eventually(func() error {
+			return testservice.ValidateL2(svc)
+		}, 2*time.Minute, 1*time.Second).Should(BeNil())
+
+		ginkgo.By("Checking the service is still reacheable via BGP")
+		for _, c := range FRRContainers {
+			validateService(cs, svc, allNodes.Items, c)
+		}
+
+		ginkgo.By("Deleting the l2 advertisement")
+		err = ConfigUpdater.Client().Delete(context.Background(), &l2Advertisement)
+		framework.ExpectNoError(err)
+
+		ginkgo.By("Checking the service is not reacheable via L2 anymore")
+		// We use arping here, because the client's cache may still be filled with the mac and the ip of the
+		// destination
+		Eventually(checkServiceL2, 5*time.Second, 1*time.Second).Should(Not(BeNil()))
+	},
+		table.Entry("IPV4", ipfamily.IPv4, []string{l2tests.IPV4ServiceRange}),
+		table.Entry("IPV6", ipfamily.IPv6, []string{l2tests.IPV6ServiceRange}),
+	)
 })
 
 // substringCount creates a Gomega transform function that
