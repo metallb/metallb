@@ -31,8 +31,13 @@ import (
 var _ = ginkgo.Describe("BGP Node Selector", func() {
 	var cs clientset.Interface
 	var f *framework.Framework
+	var nodeToLabel *v1.Node
 
 	ginkgo.AfterEach(func() {
+		if nodeToLabel != nil {
+			k8s.RemoveLabelFromNode(nodeToLabel.Name, "bgp-node-selector-test", cs)
+		}
+
 		if ginkgo.CurrentGinkgoTestDescription().Failed {
 			dumpBGPInfo(cs, f)
 		}
@@ -187,6 +192,73 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 		table.Entry("IPV4 - one on first, two on second", ipfamily.IPv4, "192.168.10.0/24", []int{0}, []int{0, 1}),
 		table.Entry("IPV4 - zero on first, two on second", ipfamily.IPv4, "192.168.10.0/24", []int{}, []int{0, 1}),
 		table.Entry("IPV6 - one on first, two on second", ipfamily.IPv6, "fc00:f853:0ccd:e799::/116", []int{0}, []int{1, 2}),
+	)
+
+	table.DescribeTable("One service, one advertisement with node selector, labeling node",
+		func(pairingIPFamily ipfamily.Family, address string) {
+			var allNodes *corev1.NodeList
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Setting advertisement with node selector (no matching nodes)")
+			resources := metallbconfig.ClusterResources{
+				Pools: []metallbv1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-pool",
+						},
+						Spec: metallbv1beta1.IPAddressPoolSpec{
+							Addresses: []string{address},
+						},
+					},
+				},
+				Peers: metallb.PeersForContainers(FRRContainers, pairingIPFamily),
+				BGPAdvs: []metallbv1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "test-adv",
+						},
+						Spec: metallbv1beta1.BGPAdvertisementSpec{
+							Communities:    []string{CommunityNoAdv},
+							IPAddressPools: []string{"test-pool"},
+							NodeSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"bgp-node-selector-test": "true",
+									},
+								},
+							},
+						},
+					},
+				},
+			}
+			for _, c := range FRRContainers {
+				err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily)
+				framework.ExpectNoError(err)
+			}
+
+			err = ConfigUpdater.Update(resources)
+			framework.ExpectNoError(err)
+
+			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
+			defer testservice.Delete(cs, svc)
+
+			ginkgo.By("Validating service IP not advertised")
+			checkServiceNotOnNodes(cs, svc, allNodes.Items, pairingIPFamily)
+
+			nodeToLabel = &allNodes.Items[0]
+			ginkgo.By(fmt.Sprintf("Adding advertisement label to node %s", nodeToLabel.Name))
+			k8s.AddLabelToNode(nodeToLabel.Name, "bgp-node-selector-test", "true", cs)
+
+			ginkgo.By(fmt.Sprintf("Validating service IP advertised by %s", nodeToLabel.Name))
+			checkServiceOnlyOnNodes(cs, svc, []v1.Node{*nodeToLabel}, pairingIPFamily)
+
+			ginkgo.By("Validating service IP not advertised by other nodes")
+			nodesNotSelected := nodesNotSelected(allNodes.Items, []int{0})
+			checkServiceNotOnNodes(cs, svc, nodesNotSelected, pairingIPFamily)
+		},
+		table.Entry("IPV4", ipfamily.IPv4, "192.168.10.0/24"),
+		table.Entry("IPV6", ipfamily.IPv6, "fc00:f853:0ccd:e799::/116"),
 	)
 
 	ginkgo.Context("Peer selector", func() {
