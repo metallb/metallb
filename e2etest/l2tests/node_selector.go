@@ -106,15 +106,16 @@ var _ = ginkgo.Describe("L2", func() {
 
 				err := ConfigUpdater.Update(resources)
 				framework.ExpectNoError(err)
-				gomega.Eventually(func() error {
-					return mac.RequestAddressResolution(ingressIP, executor.Host)
-				}, 30*time.Second, 1*time.Second).Should(gomega.Not(gomega.HaveOccurred()))
 
 				port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
 				hostport := net.JoinHostPort(ingressIP, port)
 				address := fmt.Sprintf("http://%s/", hostport)
 
 				gomega.Eventually(func() string {
+					err := mac.RequestAddressResolution(ingressIP, executor.Host)
+					if err != nil {
+						return err.Error()
+					}
 					err = wget.Do(address, executor.Host)
 					framework.ExpectNoError(err)
 					advNode, err := advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
@@ -181,9 +182,6 @@ var _ = ginkgo.Describe("L2", func() {
 
 			err = ConfigUpdater.Update(resources)
 			framework.ExpectNoError(err)
-			gomega.Eventually(func() error {
-				return mac.RequestAddressResolution(ingressIP, executor.Host)
-			}, 2*time.Minute, 1*time.Second).Should(gomega.Not(gomega.HaveOccurred()))
 
 			ginkgo.By("checking connectivity to its external VIP")
 			port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
@@ -191,6 +189,10 @@ var _ = ginkgo.Describe("L2", func() {
 			address := fmt.Sprintf("http://%s/", hostport)
 
 			gomega.Eventually(func() string {
+				err := mac.RequestAddressResolution(ingressIP, executor.Host)
+				if err != nil {
+					return err.Error()
+				}
 				err = wget.Do(address, executor.Host)
 				framework.ExpectNoError(err)
 
@@ -252,11 +254,12 @@ var _ = ginkgo.Describe("L2", func() {
 			k8s.AddLabelToNode(nodeToLabel.Name, "l2-node-selector-test", "true", cs)
 
 			ginkgo.By(fmt.Sprintf("Validating service IP advertised by %s", nodeToLabel.Name))
-			gomega.Eventually(func() error {
-				return mac.RequestAddressResolution(ingressIP, executor.Host)
-			}, 2*time.Minute, time.Second).Should(gomega.Not(gomega.HaveOccurred()))
 
 			gomega.Eventually(func() string {
+				err := mac.RequestAddressResolution(ingressIP, executor.Host)
+				if err != nil {
+					return err.Error()
+				}
 				err = wget.Do(address, executor.Host)
 				framework.ExpectNoError(err)
 				advNode, err := advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
