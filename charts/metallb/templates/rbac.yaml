@@ -15,24 +15,6 @@ rules:
 - apiGroups: [""]
   resources: ["events"]
   verbs: ["create", "patch"]
-- apiGroups: ["metallb.io"]
-  resources: ["addresspools"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["metallb.io"]
-  resources: ["bfdprofiles"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["metallb.io"]
-  resources: ["bgppeers"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["metallb.io"]
-  resources: ["l2advertisements"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["metallb.io"]
-  resources: ["bgpadvertisements"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["metallb.io"]
-  resources: ["ippools"]
-  verbs: ["get", "list", "watch"]
 {{- if .Values.psp.create }}
 - apiGroups: ["policy"]
   resources: ["podsecuritypolicies"]
@@ -56,6 +38,25 @@ rules:
 - apiGroups: [""]
   resources: ["events"]
   verbs: ["create", "patch"]
+{{- if .Values.psp.create }}
+- apiGroups: ["policy"]
+  resources: ["podsecuritypolicies"]
+  resourceNames: ["{{ template "metallb.fullname" . }}-speaker"]
+  verbs: ["use"]
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "metallb.fullname" . }}-pod-lister
+  labels: {{- include "metallb.labels" . | nindent 4 }}
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["list"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch"]
 - apiGroups: ["metallb.io"]
   resources: ["addresspools"]
   verbs: ["get", "list", "watch"]
@@ -72,36 +73,11 @@ rules:
   resources: ["bgpadvertisements"]
   verbs: ["get", "list", "watch"]
 - apiGroups: ["metallb.io"]
-  resources: ["ippools"]
+  resources: ["ipaddresspools"]
   verbs: ["get", "list", "watch"]
-{{- if .Values.psp.create }}
-- apiGroups: ["policy"]
-  resources: ["podsecuritypolicies"]
-  resourceNames: ["{{ template "metallb.fullname" . }}-speaker"]
-  verbs: ["use"]
-{{- end }}
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: {{ template "metallb.fullname" . }}-config-watcher
-  labels:
-    {{- include "metallb.labels" . | nindent 4 }}
-rules:
-- apiGroups: [""]
-  resources: ["configmaps"]
+- apiGroups: ["metallb.io"]
+  resources: ["communities"]
   verbs: ["get", "list", "watch"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: {{ include "metallb.fullname" . }}-pod-lister
-  labels: {{- include "metallb.labels" . | nindent 4 }}
-rules:
-- apiGroups: [""]
-  resources: ["pods"]
-  verbs: ["list"]
-{{- if .Values.speaker.memberlist.enabled }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -109,9 +85,10 @@ metadata:
   name: {{ include "metallb.fullname" . }}-controller
   labels: {{- include "metallb.labels" . | nindent 4 }}
 rules:
+{{- if .Values.speaker.memberlist.enabled }}
 - apiGroups: [""]
   resources: ["secrets"]
-  verbs: ["create"]
+  verbs: ["create", "get", "list", "watch"]
 - apiGroups: [""]
   resources: ["secrets"]
   resourceNames: [{{ include "metallb.secretName" . | quote }}]
@@ -121,6 +98,24 @@ rules:
   resourceNames: ["{{ template "metallb.fullname" . }}-controller"]
   verbs: ["get"]
 {{- end }}
+- apiGroups: ["metallb.io"]
+  resources: ["addresspools"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["metallb.io"]
+  resources: ["ipaddresspools"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["metallb.io"]
+  resources: ["bgppeers"]
+  verbs: ["get", "list"]
+- apiGroups: ["metallb.io"]
+  resources: ["bgpadvertisements"]
+  verbs: ["get", "list"]
+- apiGroups: ["metallb.io"]
+  resources: ["l2advertisements"]
+  verbs: ["get", "list"]
+- apiGroups: ["metallb.io"]
+  resources: ["communities"]
+  verbs: ["get", "list"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -164,7 +159,6 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ include "metallb.speaker.serviceAccountName" . }}
-{{- if .Values.speaker.memberlist.enabled }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -178,5 +172,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: {{ include "metallb.controller.serviceAccountName" . }}
-{{- end -}}
 {{- end -}}

@@ -59,16 +59,14 @@ kubectl apply -f - -n kube-system
 To install MetalLB, apply the manifest:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifests/namespace.yaml
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifests/metallb.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-native.yaml
 ```
 
 {{% notice note %}}
 If you want to deploy MetalLB using the [experimental FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions), apply the manifests:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifests/namespace.yaml
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/manifests/metallb-frr.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-frr.yaml
 ```
 
 Please do note that these manifests deploy MetalLB from the main development branch. We highly encourage cloud operators to deploy a stable released version of MetalLB on production environments!
@@ -98,38 +96,25 @@ You can install MetalLB with
 [Kustomize](https://github.com/kubernetes-sigs/kustomize) by pointing
 at the remote kustomization file.
 
-In the following example, we are deploying the v0.11.0 version of MetalLB :
+In the following example, we are deploying MetalLB with the native bgp implementation :
 
 ```yaml
 # kustomization.yml
 namespace: metallb-system
 
 resources:
-  - github.com/metallb/metallb/manifests?ref=v0.11.0
-  - configmap.yml 
+  - github.com/metallb/metallb/config/native?ref=main
 ```
 
-If you want to use a
-[configMapGenerator](https://github.com/kubernetes-sigs/kustomize/blob/master/examples/configGeneration.md)
-for config file, you want to tell Kustomize not to append a hash to
-the config map, as MetalLB is waiting for a config map named `config`
-(see
-<https://github.com/kubernetes-sigs/kustomize/blob/master/examples/generatorOptions.md>):
+
+In order to deploy the [experimental FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions):
 
 ```yaml
 # kustomization.yml
 namespace: metallb-system
 
 resources:
-  - github.com/metallb/metallb//manifests?ref=v0.11.0
-
-configMapGenerator:
-- name: config
-  files:
-    - configs/config
-
-generatorOptions:
- disableNameSuffixHash: true
+  - github.com/metallb/metallb/config/frr?ref=main
 ```
 
 ## Installation with Helm

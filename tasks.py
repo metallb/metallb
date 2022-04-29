@@ -6,6 +6,7 @@ import shutil
 import sys
 import yaml
 import tempfile
+import time
 try:
     from urllib.request import urlopen
 except ImportError:
@@ -252,6 +253,46 @@ def validate_kind_version():
     if delta < 0:
         raise Exit(message="kind version >= {} required".format(min_version))
 
+@task(help={
+    "version": "version of cert-manager to install."
+                "Default: v1.5.4",
+})
+def install_cert_manager(ctx, version="v1.5.4"):
+    res = run("kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/{}/cert-manager.yaml".format(version))
+    if not res.ok:
+        raise Exit(message="Failed to install cert-manager")
+    
+    # wait for cert-manager to be ready
+    attempts = 0
+    max_attempts = 60
+    cert_manager_ready = False
+    while not cert_manager_ready and attempts != max_attempts:
+        print("Waiting for cert-manager to be ready attempt: {}".format(attempts))
+        try:
+            res = run("kubectl apply -f config/certmanager/self-signed-cert.yaml")
+        except Exception as e:
+            print("Failed, retrying")
+            time.sleep(5)
+        else:
+            print("cert-manager is ready")
+            cert_manager_ready = True
+            res = run("kubectl delete -f config/certmanager/self-signed-cert.yaml")
+        attempts += 1
+    if not cert_manager_ready:
+        raise Exit(message="Timed out waiting for cert-manage to be ready")
+
+def generate_manifest(ctx, controller_gen="controller-gen", crd_options="crd:crdVersions=v1",
+        kustomize_cli="kustomize", bgp_type="native", output=None, enable_webhooks=False):
+    res = run("{} {} rbac:roleName=manager-role webhook paths=\"./api/...\" output:crd:artifacts:config=config/crd/bases".format(controller_gen, crd_options))
+    if not res.ok:
+        raise Exit(message="Failed to generate manifests")
+
+    webhook_flag = "-with-webhook" if enable_webhooks else ""
+
+    if output:
+        res = run("kubectl kustomize config/{}{} > {}".format(bgp_type, webhook_flag, output))
+        if not res.ok:
+            raise Exit(message="Failed to kustomize manifests")
 
 @task(help={
     "architecture": "CPU architecture of the local machine. Default 'amd64'.",
@@ -269,17 +310,19 @@ def validate_kind_version():
     "log_level": "Log level for the controller and the speaker."
                 "Default: info, Supported: 'all', 'debug', 'info', 'warn', 'error' or 'none'",
     "helm_install": "Optional install MetalLB via helm chart instead of manifests."
-                "Default: False."
+                "Default: False.",
+    "enable_webhooks": "Optional enable MetalLB webhooks."
+                "Default: False.",
 })
 def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_dir="",
         node_img=None, ip_family="ipv4", bgp_type="native", log_level="info",
-        helm_install=False):
+        helm_install=False, enable_webhooks=False):
     """Build and run MetalLB in a local Kind cluster.
 
     If the cluster specified by --name (default "kind") doesn't exist,
     it is created. Then, build MetalLB docker images from the
-    checkout, push them into kind, and deploy manifests/metallb.yaml
-    to run those images.
+    checkout, push them into kind, and deploy MetalLB through manifests
+    or helm to run those images.
     The optional node_img parameter will be used to determine the version of the cluster.
     """
 
@@ -319,23 +362,24 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
     run("kind load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
 
+    if enable_webhooks:
+        install_cert_manager(ctx)
+
     if helm_install:
         run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
                 "--set speaker.image.tag=dev-{} --set speaker.frr.enabled={} --set speaker.logLevel=debug "
-                "--set controller.logLevel=debug".format(architecture,
-                architecture, "true" if bgp_type == "frr" else "false"), echo=True)
+                "--set controller.logLevel=debug --set webhooks.enable={}".format(architecture,
+                architecture, "true" if bgp_type == "frr" else "false", "true" if enable_webhooks else "false"), echo=True)
     else:
         run("kubectl delete po -nmetallb-system --all", echo=True)
 
-        manifests_dir = os.getcwd() + "/manifests"
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Copy namespace manifest.
-            shutil.copy(manifests_dir + "/namespace.yaml", tmpdir)
+            manifest_file = tmpdir + "/metallb.yaml"
 
-            # FIXME: This is a hack to get the correct manifest file.
-            manifest_filename = "metallb-frr.yaml" if bgp_type == "frr" else "metallb.yaml"
-            # open file and replace the protocol with the one specified by the user
-            with open(manifests_dir + "/" + manifest_filename) as f:
+            generate_manifest(ctx, bgp_type=bgp_type, output=manifest_file, enable_webhooks=enable_webhooks)
+
+            # open file and replace the images with the newely built MetalLB docker images
+            with open(manifest_file) as f:
                 manifest = f.read()
             for image in binaries:
                 manifest = re.sub("image: quay.io/metallb/{}:.*".format(image),
@@ -343,12 +387,11 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
                 manifest = re.sub("--log-level=info", "--log-level={}".format(log_level), manifest)
             manifest.replace("--log-level=info", "--log-level=debug")
 
-            with open(tmpdir + "/metallb.yaml", "w") as f:
+            with open(manifest_file, "w") as f:
                 f.write(manifest)
                 f.flush()
 
-            run("kubectl apply -f {}/namespace.yaml".format(tmpdir), echo=True)
-            run("kubectl apply -f {}/metallb.yaml".format(tmpdir), echo=True)
+            run("kubectl apply -f {}".format(manifest_file), echo=True)
 
     with open("e2etest/manifests/mirror-server.yaml") as f:
         manifest = f.read()
@@ -550,6 +593,19 @@ def release(ctx, version, skip_release_notes=False):
         previous_version = "v{}.{}.{}".format(version.major, version.minor, version.patch-1)
     else:
         previous_version = "main"
+    bumprelease(ctx, version, previous_version)
+    
+    run("git commit -a -m 'Automated update for release v{}'".format(version), echo=True)
+    run("git tag v{} -m 'See the release notes for details:\n\nhttps://metallb.universe.tf/release-notes/#version-{}-{}-{}'".format(version, version.major, version.minor, version.patch), echo=True)
+    run("git checkout main", echo=True)
+
+@task(help={
+    "version": "version of MetalLB to release.",
+    "previous_version": "version of the previous release.",
+})
+def bumprelease(ctx, version, previous_version):
+    version = semver.parse_version_info(version)
+
     def _replace(pattern):
         oldpat = pattern.format(previous_version)
         newpat = pattern.format("v{}").format(version)
@@ -563,8 +619,8 @@ def release(ctx, version, skip_release_notes=False):
     run("perl -pi -e 's/MetalLB .*/MetalLB v{}/g' website/content/_header.md".format(version), echo=True)
 
     # Update the manifests with the new version
-    run("perl -pi -e 's,image: quay.io/metallb/speaker:.*,image: quay.io/metallb/speaker:v{},g' manifests/metallb.yaml".format(version), echo=True)
-    run("perl -pi -e 's,image: quay.io/metallb/controller:.*,image: quay.io/metallb/controller:v{},g' manifests/metallb.yaml".format(version), echo=True)
+    run("perl -pi -e 's,image: quay.io/metallb/speaker:.*,image: quay.io/metallb/speaker:v{},g' config/controllers/speaker.yaml".format(version), echo=True)
+    run("perl -pi -e 's,image: quay.io/metallb/controller:.*,image: quay.io/metallb/controller:v{},g' config/controllers/controller.yaml".format(version), echo=True)
 
     # Update the versions in the helm chart (version and appVersion are always the same)
     # helm chart versions follow Semantic Versioning, and thus exclude the leading 'v'
@@ -572,21 +628,20 @@ def release(ctx, version, skip_release_notes=False):
     run("perl -pi -e 's,^appVersion: .*,appVersion: v{},g' charts/metallb/Chart.yaml".format(version), echo=True)
     run("perl -pi -e 's,^Current chart version is: .*,Current chart version is: `{}`,g' charts/metallb/README.md".format(version), echo=True)
 
+    # Generate the manifests with the new version of the images
+    generatemanifests(ctx)
+
     # Update the version in kustomize instructions
     #
     # TODO: Check if kustomize instructions really need the version in the
     # website or if there is a simpler way. For now, though, we just replace the
     # only page that mentions the version on release.
-    run("perl -pi -e 's,github.com/metallb/metallb//manifests\?ref=.*,github.com/metallb/metallb//manifests\?ref=v{},g' website/content/installation/_index.md".format(version), echo=True)
+    run("sed -i 's/github.com\/metallb\/metallb\/config\/native?ref=main/github.com\/metallb\/metallb\/config\/native?ref={}/g' website/content/installation/_index.md".format(version))
+    run("sed -i 's/github.com\/metallb\/metallb\/config\/native?ref=main/github.com\/metallb\/metallb\/config\/frr?ref={}/g' website/content/installation/_index.md".format(version))
 
     # Update the version embedded in the binary
     run("perl -pi -e 's/version\s+=.*/version = \"{}\"/g' internal/version/version.go".format(version), echo=True)
     run("gofmt -w internal/version/version.go", echo=True)
-
-    run("git commit -a -m 'Automated update for release v{}'".format(version), echo=True)
-    run("git tag v{} -m 'See the release notes for details:\n\nhttps://metallb.universe.tf/release-notes/#version-{}-{}-{}'".format(version, version.major, version.minor, version.patch), echo=True)
-    run("git checkout main", echo=True)
-
 
 @task
 def test(ctx):
@@ -624,8 +679,8 @@ def lint(ctx, env="container"):
     convenient to install the golangci-lint binaries on the host. This can be
     achieved by running `inv lint --env host`.
     """
-    version = "1.39.0"
-    golangci_cmd = "golangci-lint run --timeout 5m0s ./..."
+    version = "1.45.2"
+    golangci_cmd = "golangci-lint run --timeout 10m0s ./..."
 
     if env == "container":
         run("docker run --rm -v $(git rev-parse --show-toplevel):/app -w /app golangci/golangci-lint:v{} {}".format(version, golangci_cmd), echo=True)
@@ -690,7 +745,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
         ips_for_containers_v6 = "--ips-for-containers-v6=" + ips
 
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "KUBECONFIG={} go test -timeout 1h {} {} --provider=local --kubeconfig={} --service-pod-port={} {} {} -ipv4-service-range={} -ipv6-service-range={} {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker), warn="True")
+            "KUBECONFIG={} go test -timeout 2h {} {} --provider=local --kubeconfig={} --service-pod-port={} {} {} -ipv4-service-range={} -ipv6-service-range={} {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker), warn="True")
 
     if export != None:
         run("kind export logs {}".format(export))
@@ -720,4 +775,34 @@ def verifylicense(ctx):
             print("{} is missing license".format(file))
     if no_license:
         raise Exit(message="#### Files with no license found.\n#### Please run ""inv bumplicense"" to add the license header")
- 
+
+@task
+def gomodtidy(ctx):
+    """Runs go mod tidy"""
+    res = run("go mod tidy", hide="out")
+    if not res.ok:
+        raise Exit(message="go mod tidy failed")
+
+@task(help={
+    "controller_gen": "KubeBuilder CLI."
+                    "Default: controller_gen (version v0.7.0).",
+    "kustomize_cli": "YAML files customization CLI."
+                    "Default: kustomize (version v4.4.0).",
+})  
+def generatemanifests(ctx, controller_gen="controller-gen", kustomize_cli="kustomize"):
+    """ Re-generates the all-in-one manifests under config/manifests"""
+    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="frr", output="config/manifests/metallb-frr.yaml")
+    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="native", output="config/manifests/metallb-native.yaml")
+    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="frr", enable_webhooks=True, output="config/manifests/metallb-frr-with-webhooks.yaml")
+    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="native", enable_webhooks=True, output="config/manifests/metallb-native-with-webhooks.yaml")
+
+@task(help={
+    "action": "The action to take to fix the uncommitted changes",
+    })
+def checkchanges(ctx, action="check uncommitted files"):
+    """Verifies no uncommitted files are available"""
+    res = run("git status --porcelain", hide="out")
+    if res.stdout != "":
+        print("{} must be committed".format(res))
+        raise Exit(message="#### Uncommitted files found, you may need to {} ####\n".format(action))
+

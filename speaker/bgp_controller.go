@@ -85,11 +85,13 @@ newPeers:
 			continue
 		}
 		level.Info(l).Log("event", "peerRemoved", "peer", p.cfg.Addr, "reason", "removedFromConfig", "msg", "peer deconfigured, closing BGP session")
+
 		if p.session != nil {
 			if err := p.session.Close(); err != nil {
 				level.Error(l).Log("op", "setConfig", "error", err, "peer", p.cfg.Addr, "msg", "failed to shut down BGP session")
 			}
 		}
+		level.Debug(l).Log("event", "peerRemoved", "peer", p.cfg.Addr, "reason", "removedFromConfig", "msg", "peer deconfigured, BGP session closed")
 	}
 
 	err := c.syncBFDProfiles(cfg.BFDProfiles)
@@ -124,8 +126,8 @@ func hasHealthyEndpoint(eps epslices.EpsOrSlices, filterNode func(*string) bool)
 	case epslices.Slices:
 		for _, slice := range eps.SlicesVal {
 			for _, ep := range slice.Endpoints {
-				node := ep.Topology["kubernetes.io/hostname"]
-				if filterNode(&node) {
+				node := ep.NodeName
+				if filterNode(node) {
 					continue
 				}
 				for _, addr := range ep.Addresses {
@@ -152,7 +154,11 @@ func hasHealthyEndpoint(eps epslices.EpsOrSlices, filterNode func(*string) bool)
 	return false
 }
 
-func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, svc *v1.Service, eps epslices.EpsOrSlices) string {
+func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, pool *config.Pool, svc *v1.Service, eps epslices.EpsOrSlices) string {
+	if !poolMatchesNodeBGP(pool, c.myNode) {
+		level.Debug(l).Log("event", "skipping should announce bgp", "service", name, "reason", "pool not matching my node")
+		return "notOwner"
+	}
 	// Should we advertise?
 	// Yes, if externalTrafficPolicy is
 	//  Cluster && any healthy endpoint exists
@@ -210,7 +216,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 			if p.cfg.RouterID != nil {
 				routerID = p.cfg.RouterID
 			}
-			s, err := c.sessionManager.NewSession(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.SrcAddr, p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.KeepaliveTime, p.cfg.Password, c.myNode, p.cfg.BFDProfile, p.cfg.EBGPMultiHop)
+			s, err := c.sessionManager.NewSession(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.SrcAddr, p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.KeepaliveTime, p.cfg.Password, c.myNode, p.cfg.BFDProfile, p.cfg.EBGPMultiHop, p.cfg.Name)
 			if err != nil {
 				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
 				errs++
@@ -245,6 +251,10 @@ func (c *bgpController) SetBalancer(l log.Logger, name string, lbIPs []net.IP, p
 	c.svcAds[name] = nil
 	for _, lbIP := range lbIPs {
 		for _, adCfg := range pool.BGPAdvertisements {
+			// skipping if this node is not enabled for this advertisement
+			if !adCfg.Nodes[c.myNode] {
+				continue
+			}
 			m := net.CIDRMask(adCfg.AggregationLength, 32)
 			if lbIP.To4() == nil {
 				m = net.CIDRMask(adCfg.AggregationLengthV6, 128)
@@ -255,6 +265,10 @@ func (c *bgpController) SetBalancer(l log.Logger, name string, lbIPs []net.IP, p
 					Mask: m,
 				},
 				LocalPref: adCfg.LocalPref,
+			}
+			if len(adCfg.Peers) > 0 {
+				ad.Peers = make([]string, 0, len(adCfg.Peers))
+				ad.Peers = append(ad.Peers, adCfg.Peers...)
 			}
 			for comm := range adCfg.Communities {
 				ad.Communities = append(ad.Communities, comm)
@@ -317,10 +331,6 @@ func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
 	return c.syncPeers(l)
 }
 
-func (c *bgpController) PoolEnabledForProtocol(pool *config.Pool) bool {
-	return len(pool.BGPAdvertisements) > 0
-}
-
 // Create a new 'bgp.SessionManager' of type 'bgpType'.
 var newBGP = func(bgpType bgpImplementation, l log.Logger, logLevel logging.Level) bgp.SessionManager {
 	switch bgpType {
@@ -331,4 +341,13 @@ var newBGP = func(bgpType bgpImplementation, l log.Logger, logLevel logging.Leve
 	default:
 		panic(fmt.Sprintf("unsupported BGP implementation type: %s", bgpType))
 	}
+}
+
+func poolMatchesNodeBGP(pool *config.Pool, node string) bool {
+	for _, adv := range pool.BGPAdvertisements {
+		if adv.Nodes[node] {
+			return true
+		}
+	}
+	return false
 }

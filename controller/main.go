@@ -23,7 +23,6 @@ import (
 
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/config"
-	metallbcfg "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/k8s/epslices"
@@ -44,7 +43,7 @@ type service interface {
 
 type controller struct {
 	client service
-	config *config.Config
+	pools  map[string]*config.Pool
 	ips    *allocator.Allocator
 }
 
@@ -60,7 +59,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		return controllers.SyncStateReprocessAll
 	}
 
-	if c.config == nil {
+	if c.pools == nil {
 		// Config hasn't been read, nothing we can do just yet.
 		level.Debug(l).Log("event", "noConfig", "msg", "not processing, still waiting for config")
 		return controllers.SyncStateSuccess
@@ -99,20 +98,20 @@ func (c *controller) deleteBalancer(l log.Logger, name string) {
 	}
 }
 
-func (c *controller) SetConfig(l log.Logger, cfg *config.Config) controllers.SyncState {
+func (c *controller) SetPools(l log.Logger, pools map[string]*config.Pool) controllers.SyncState {
 	level.Debug(l).Log("event", "startUpdate", "msg", "start of config update")
 	defer level.Debug(l).Log("event", "endUpdate", "msg", "end of config update")
 
-	if cfg == nil {
+	if pools == nil {
 		level.Error(l).Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
 		return controllers.SyncStateErrorNoRetry
 	}
 
-	if err := c.ips.SetPools(cfg.Pools); err != nil {
+	if err := c.ips.SetPools(pools); err != nil {
 		level.Error(l).Log("op", "setConfig", "error", err, "msg", "applying new configuration failed")
 		return controllers.SyncStateError
 	}
-	c.config = cfg
+	c.pools = pools
 	return controllers.SyncStateReprocessAll
 }
 
@@ -125,6 +124,7 @@ func main() {
 		logLevel        = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
 		disableEpSlices = flag.Bool("disable-epslices", false, "Disable the usage of EndpointSlices and default to Endpoints instead of relying on the autodiscovery mechanism")
 		enablePprof     = flag.Bool("enable-pprof", false, "Enable pprof profiling")
+		enableWebhook   = flag.Bool("enable-webhook", false, "Enable validation webhook")
 	)
 	flag.Parse()
 
@@ -149,6 +149,13 @@ func main() {
 		ips: allocator.New(),
 	}
 
+	bgpType, present := os.LookupEnv("METALLB_BGP_TYPE")
+	if !present {
+		bgpType = "native"
+	}
+
+	validation := config.ValidationFor(bgpType)
+
 	client, err := k8s.New(&k8s.Config{
 		ProcessName:     "metallb-controller",
 		MetricsPort:     *port,
@@ -159,9 +166,10 @@ func main() {
 		Namespace: *namespace,
 		Listener: k8s.Listener{
 			ServiceChanged: c.SetBalancer,
-			ConfigChanged:  c.SetConfig,
+			PoolChanged:    c.SetPools,
 		},
-		ValidateConfig: metallbcfg.DontValidate, // the controller is not aware of the mode, we defer the validation to the speaker
+		ValidateConfig: validation,
+		EnableWebhook:  *enableWebhook,
 	})
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create k8s client")

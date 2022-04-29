@@ -52,9 +52,9 @@ func TestValidate(t *testing.T) {
 		{
 			desc: "v6 address",
 			config: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{"2001:db8::/64"},
 						},
 					},

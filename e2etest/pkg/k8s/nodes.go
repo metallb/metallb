@@ -7,6 +7,7 @@ import (
 
 	"go.universe.tf/metallb/internal/ipfamily"
 	v1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func NodeIPsForFamily(nodes []v1.Node, family ipfamily.Family) []string {
@@ -22,4 +23,25 @@ func NodeIPsForFamily(nodes []v1.Node, family ipfamily.Family) []string {
 		}
 	}
 	return res
+}
+
+func SelectorsForNodes(nodes []v1.Node) []metav1.LabelSelector {
+	selectors := []metav1.LabelSelector{}
+	if len(nodes) == 0 {
+		return []metav1.LabelSelector{
+			{
+				MatchLabels: map[string]string{
+					"non": "existent",
+				},
+			},
+		}
+	}
+	for _, node := range nodes {
+		selectors = append(selectors, metav1.LabelSelector{
+			MatchLabels: map[string]string{
+				"kubernetes.io/hostname": node.GetLabels()["kubernetes.io/hostname"],
+			},
+		})
+	}
+	return selectors
 }

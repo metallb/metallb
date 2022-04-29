@@ -28,21 +28,21 @@ func BFDProfileWithDefaults(profile metallbv1beta1.BFDProfile, multiHop bool) me
 	return res
 }
 
-// IPPoolToLegacy converts the given IPPool to the legacy addresspool.
-func IPPoolToLegacy(ippool metallbv1beta1.IPPool, protocol config.Proto, bgpAdv []metallbv1beta1.BGPAdvertisement) metallbv1beta1.AddressPool {
+// IPAddressPoolToLegacy converts the given IPAddressPool to the legacy addresspool.
+func IPAddressPoolToLegacy(ipAddressPool metallbv1beta1.IPAddressPool, protocol config.Proto, bgpAdv []metallbv1beta1.BGPAdvertisement) metallbv1beta1.AddressPool {
 	res := metallbv1beta1.AddressPool{
 		ObjectMeta: v1.ObjectMeta{
-			Name: ippool.Name,
+			Name: ipAddressPool.Name,
 		},
 		Spec: metallbv1beta1.AddressPoolSpec{
 			Protocol:          string(protocol),
 			Addresses:         make([]string, 0),
-			AutoAssign:        ippool.Spec.AutoAssign,
-			AvoidBuggyIPs:     ippool.Spec.AvoidBuggyIPs,
+			AutoAssign:        ipAddressPool.Spec.AutoAssign,
+			AvoidBuggyIPs:     ipAddressPool.Spec.AvoidBuggyIPs,
 			BGPAdvertisements: make([]metallbv1beta1.LegacyBgpAdvertisement, 0),
 		},
 	}
-	res.Spec.Addresses = append(res.Spec.Addresses, ippool.Spec.Addresses...)
+	res.Spec.Addresses = append(res.Spec.Addresses, ipAddressPool.Spec.Addresses...)
 
 	for _, adv := range bgpAdv {
 		legacy := metallbv1beta1.LegacyBgpAdvertisement{

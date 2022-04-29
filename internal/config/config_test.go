@@ -11,6 +11,8 @@ import (
 	"go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/pointer"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -32,6 +34,16 @@ func ipnet(s string) *net.IPNet {
 }
 
 func TestParse(t *testing.T) {
+	testAdvName := "testAdv"
+	testPoolName := "testPool"
+	testPool := v1beta1.IPAddressPool{
+		ObjectMeta: v1.ObjectMeta{Name: testPoolName},
+		Spec: v1beta1.IPAddressPoolSpec{
+			Addresses: []string{
+				"10.20.0.0/16",
+			},
+		},
+	}
 	tests := []struct {
 		desc string
 		crs  ClusterResources
@@ -47,13 +59,13 @@ func TestParse(t *testing.T) {
 		},
 
 		{
-			// TODO CRD Add communities
-			//			bgp-communities:
-			//  bar: 64512:1234
 			desc: "config using all features",
 			crs: ClusterResources{
 				Peers: []v1beta2.BGPPeer{
 					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "peer1",
+						},
 						Spec: v1beta2.BGPPeerSpec{
 							MyASN:        42,
 							ASN:          142,
@@ -66,6 +78,9 @@ func TestParse(t *testing.T) {
 						},
 					},
 					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "peer2",
+						},
 						Spec: v1beta2.BGPPeerSpec{
 							MyASN:        100,
 							ASN:          200,
@@ -88,12 +103,12 @@ func TestParse(t *testing.T) {
 						},
 					},
 				},
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool1",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"10.20.0.0/16",
 								"10.50.0.0/24",
@@ -106,7 +121,7 @@ func TestParse(t *testing.T) {
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool2",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"30.0.0.0/8",
 							},
@@ -116,7 +131,7 @@ func TestParse(t *testing.T) {
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool3",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"40.0.0.0/25",
 								"40.0.0.150-40.0.0.200",
@@ -129,7 +144,7 @@ func TestParse(t *testing.T) {
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool4",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"2001:db8::/64",
 							},
@@ -144,8 +159,9 @@ func TestParse(t *testing.T) {
 						Spec: v1beta1.BGPAdvertisementSpec{
 							AggregationLength: pointer.Int32Ptr(32),
 							LocalPref:         uint32(100),
-							Communities:       []string{ /* TODO CRD Add communities"bar", */ "1234:2345"},
-							IPPools:           []string{"pool1"},
+							Communities:       []string{"bar"},
+							IPAddressPools:    []string{"pool1"},
+							Peers:             []string{"peer1"},
 						},
 					},
 					{
@@ -155,7 +171,7 @@ func TestParse(t *testing.T) {
 						Spec: v1beta1.BGPAdvertisementSpec{
 							AggregationLength:   pointer.Int32Ptr(24),
 							AggregationLengthV6: pointer.Int32Ptr(64),
-							IPPools:             []string{"pool1"},
+							IPAddressPools:      []string{"pool1"},
 						},
 					},
 					{
@@ -163,7 +179,7 @@ func TestParse(t *testing.T) {
 							Name: "adv3",
 						},
 						Spec: v1beta1.BGPAdvertisementSpec{
-							IPPools: []string{"pool2"},
+							IPAddressPools: []string{"pool2"},
 						},
 					},
 				},
@@ -173,7 +189,7 @@ func TestParse(t *testing.T) {
 							Name: "l2adv1",
 						},
 						Spec: v1beta1.L2AdvertisementSpec{
-							IPPools: []string{"pool3"},
+							IPAddressPools: []string{"pool3"},
 						},
 					},
 					{
@@ -182,10 +198,26 @@ func TestParse(t *testing.T) {
 						},
 					},
 				},
+				Communities: []v1beta1.Community{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "community",
+						},
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Name:  "bar",
+									Value: "64512:1234",
+								},
+							},
+						},
+					},
+				},
 			},
 			want: &Config{
 				Peers: []*Peer{
 					{
+						Name:          "peer1",
 						MyASN:         42,
 						ASN:           142,
 						Addr:          net.ParseIP("1.2.3.4"),
@@ -198,6 +230,7 @@ func TestParse(t *testing.T) {
 						EBGPMultiHop:  true,
 					},
 					{
+						Name:          "peer2",
 						MyASN:         100,
 						ASN:           200,
 						Addr:          net.ParseIP("2.3.4.5"),
@@ -218,17 +251,21 @@ func TestParse(t *testing.T) {
 								AggregationLengthV6: 128,
 								LocalPref:           100,
 								Communities: map[uint32]bool{
-									//0xfc0004d2: true,
-									0x04D20929: true,
+									0xfc0004d2: true,
 								},
+								Nodes: map[string]bool{},
+								Peers: []string{"peer1"},
 							},
 							{
 								AggregationLength:   24,
 								AggregationLengthV6: 64,
 								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
 							},
 						},
-						L2Advertisements: []*L2Advertisement{&L2Advertisement{}},
+						L2Advertisements: []*L2Advertisement{&L2Advertisement{
+							Nodes: map[string]bool{},
+						}},
 					},
 					"pool2": {
 						CIDR:       []*net.IPNet{ipnet("30.0.0.0/8")},
@@ -238,9 +275,12 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
 							},
 						},
-						L2Advertisements: []*L2Advertisement{&L2Advertisement{}},
+						L2Advertisements: []*L2Advertisement{&L2Advertisement{
+							Nodes: map[string]bool{},
+						}},
 					},
 					"pool3": {
 						CIDR: []*net.IPNet{
@@ -257,13 +297,17 @@ func TestParse(t *testing.T) {
 							ipnet("40.0.0.240/32"),
 							ipnet("40.0.0.250/32"),
 						},
-						L2Advertisements: []*L2Advertisement{&L2Advertisement{}},
-						AutoAssign:       true,
+						L2Advertisements: []*L2Advertisement{&L2Advertisement{
+							Nodes: map[string]bool{},
+						}},
+						AutoAssign: true,
 					},
 					"pool4": {
-						CIDR:             []*net.IPNet{ipnet("2001:db8::/64")},
-						L2Advertisements: []*L2Advertisement{&L2Advertisement{}},
-						AutoAssign:       true,
+						CIDR: []*net.IPNet{ipnet("2001:db8::/64")},
+						L2Advertisements: []*L2Advertisement{&L2Advertisement{
+							Nodes: map[string]bool{},
+						}},
+						AutoAssign: true,
 					},
 				},
 				BFDProfiles: map[string]*BFDProfile{},
@@ -520,7 +564,7 @@ func TestParse(t *testing.T) {
 		{
 			desc: "no pool name",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{},
 				},
 			},
@@ -528,10 +572,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "address pool with no address",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec:       v1beta1.IPPoolSpec{},
+						Spec:       v1beta1.IPAddressPoolSpec{},
 					},
 				},
 			},
@@ -539,7 +583,7 @@ func TestParse(t *testing.T) {
 		{
 			desc: "address pool with no protocol",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
 					},
@@ -549,10 +593,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "invalid pool CIDR",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"100.200.300.400/24",
 							},
@@ -564,10 +608,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "invalid pool CIDR prefix length",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"1.2.3.0/33",
 							},
@@ -579,10 +623,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "invalid pool CIDR, first address of the range is after the second",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"1.2.3.10-1.2.3.1",
 							},
@@ -594,10 +638,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "simple advertisement",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"1.2.3.0/24",
 							},
@@ -622,6 +666,7 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
 							},
 						},
 					},
@@ -632,10 +677,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "advertisement with default BGP settings",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"1.2.3.0/24",
 							},
@@ -660,6 +705,7 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
 							},
 						},
 					},
@@ -670,10 +716,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "bad aggregation length (too long)",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"1.2.3.10-1.2.3.1",
 							},
@@ -692,10 +738,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "bad aggregation length (incompatible with CIDR)",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"10.20.30.40/24",
 								"1.2.3.0/28",
@@ -715,10 +761,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "aggregation length by range",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"3.3.3.2-3.3.3.254",
 							},
@@ -757,6 +803,7 @@ func TestParse(t *testing.T) {
 								AggregationLength:   26,
 								AggregationLengthV6: 128,
 								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
 							},
 						},
 					},
@@ -767,10 +814,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "aggregation length by range, too wide",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"3.3.3.2-3.3.3.254",
 							},
@@ -787,13 +834,94 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			desc: "bad community literal (wrong format)",
+			desc: "bad community literal (wrong format) - in BGP adv",
 			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{testPool},
 				BGPAdvs: []v1beta1.BGPAdvertisement{
 					{
+						ObjectMeta: v1.ObjectMeta{Name: testAdvName},
 						Spec: v1beta1.BGPAdvertisementSpec{
-							Communities: []string{
-								"1234",
+							Communities:    []string{"1234"},
+							IPAddressPools: []string{testPoolName},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "bad community literal (asn part doesn't fit) - in BGP adv",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{testPool},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: testAdvName},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							Communities:    []string{"99999999:1"},
+							IPAddressPools: []string{testPoolName},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "bad community literal (community# part doesn't fit) - in BGP adv",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{testPool},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: testAdvName},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							Communities:    []string{"1:99999999"},
+							IPAddressPools: []string{testPoolName},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "bad community ref (unknown ref) - in BGP adv",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{testPool},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: testAdvName},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							Communities:    []string{"community"},
+							IPAddressPools: []string{testPoolName},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "duplicate community literal - in BGP adv",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{testPool},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: testAdvName},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							Communities:    []string{"1234:5678", "1234:5678"},
+							IPAddressPools: []string{testPoolName},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "bad community literal (wrong format) - in the community CR",
+			crs: ClusterResources{
+				Communities: []v1beta1.Community{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "community",
+						},
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Name:  "bar",
+									Value: "1234",
+								},
 							},
 						},
 					},
@@ -801,13 +929,19 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			desc: "bad community literal (asn part doesn't fit)",
+			desc: "bad community literal (asn part doesn't fit) - in the community CR",
 			crs: ClusterResources{
-				BGPAdvs: []v1beta1.BGPAdvertisement{
+				Communities: []v1beta1.Community{
 					{
-						Spec: v1beta1.BGPAdvertisementSpec{
-							Communities: []string{
-								"99999999:1",
+						ObjectMeta: v1.ObjectMeta{
+							Name: "community",
+						},
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Name:  "bar",
+									Value: "99999999:1",
+								},
 							},
 						},
 					},
@@ -815,13 +949,76 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			desc: "bad community literal (community# part doesn't fit)",
+			desc: "bad community literal (community# part doesn't fit) - in the community CR",
 			crs: ClusterResources{
-				BGPAdvs: []v1beta1.BGPAdvertisement{
+				Communities: []v1beta1.Community{
 					{
-						Spec: v1beta1.BGPAdvertisementSpec{
-							Communities: []string{
-								"1:99999999",
+						ObjectMeta: v1.ObjectMeta{
+							Name: "community",
+						},
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Name:  "bar",
+									Value: "1:99999999",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "duplicate communities definition (in 2 different crs)",
+			crs: ClusterResources{
+				Communities: []v1beta1.Community{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "community1",
+						},
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Name:  "bar",
+									Value: "1234:5678",
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "community2",
+						},
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Name:  "bar",
+									Value: "1234:5678",
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "duplicate communities definition (in the same cr)",
+			crs: ClusterResources{
+				Communities: []v1beta1.Community{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "community",
+						},
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Name:  "bar",
+									Value: "1234:5678",
+								},
+								{
+									Name:  "bar",
+									Value: "1234:5678",
+								},
 							},
 						},
 					},
@@ -831,18 +1028,18 @@ func TestParse(t *testing.T) {
 		{
 			desc: "duplicate pool definition",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec:       v1beta1.IPPoolSpec{},
+						Spec:       v1beta1.IPAddressPoolSpec{},
 					},
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool2"},
-						Spec:       v1beta1.IPPoolSpec{},
+						Spec:       v1beta1.IPAddressPoolSpec{},
 					},
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec:       v1beta1.IPPoolSpec{},
+						Spec:       v1beta1.IPAddressPoolSpec{},
 					},
 				},
 			},
@@ -850,10 +1047,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "duplicate CIDRs",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								" 10.0.0.0/8",
 							},
@@ -861,7 +1058,7 @@ func TestParse(t *testing.T) {
 					},
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool2"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								" 10.0.0.0/8",
 							},
@@ -873,10 +1070,10 @@ func TestParse(t *testing.T) {
 		{
 			desc: "overlapping CIDRs",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								" 10.0.0.0/8",
 							},
@@ -884,7 +1081,7 @@ func TestParse(t *testing.T) {
 					},
 					{
 						ObjectMeta: v1.ObjectMeta{Name: "pool2"},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"10.0.0.0/16",
 							},
@@ -906,12 +1103,12 @@ func TestParse(t *testing.T) {
 						},
 					},
 				},
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool1",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"1.2.3.0/24",
 							},
@@ -954,6 +1151,7 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
 							},
 						},
 					},
@@ -961,6 +1159,115 @@ func TestParse(t *testing.T) {
 				BFDProfiles: map[string]*BFDProfile{
 					"default": {
 						Name: "default",
+					},
+				},
+			},
+		},
+		{
+			desc: "BGP Peer with both password and secret ref set",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:    42,
+							ASN:      42,
+							Address:  "1.2.3.4",
+							Password: "nopass",
+							PasswordSecret: corev1.SecretReference{Name: "nosecret",
+								Namespace: "metallb-system"},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "BGP Peer with invalid secret type",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "1.2.3.4",
+							PasswordSecret: corev1.SecretReference{Name: "bgpsecret",
+								Namespace: "metallb-system"},
+						},
+					},
+				},
+				PasswordSecrets: map[string]corev1.Secret{
+					"bgpsecret": {Type: corev1.SecretTypeOpaque, ObjectMeta: v1.ObjectMeta{Name: "bgpsecret", Namespace: "metallb-system"}},
+				},
+			},
+		},
+		{
+			desc: "BGP Peer without password set in the secret",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "1.2.3.4",
+							PasswordSecret: corev1.SecretReference{Name: "bgpsecret",
+								Namespace: "metallb-system"},
+						},
+					},
+				},
+				PasswordSecrets: map[string]corev1.Secret{
+					"bgpsecret": {Type: corev1.SecretTypeBasicAuth, ObjectMeta: v1.ObjectMeta{Name: "bgpsecret", Namespace: "metallb-system"}},
+				},
+			},
+		},
+		{
+			desc: "BGP Peer with a valid secret",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Port:    179,
+							Address: "1.2.3.4",
+							PasswordSecret: corev1.SecretReference{Name: "bgpsecret",
+								Namespace: "metallb-system"},
+						},
+					},
+				},
+				PasswordSecrets: map[string]corev1.Secret{
+					"bgpsecret": {Type: corev1.SecretTypeBasicAuth, ObjectMeta: v1.ObjectMeta{Name: "bgpsecret", Namespace: "metallb-system"},
+						Data: map[string][]byte{"password": []byte([]byte("nopass"))}},
+				},
+			},
+			want: &Config{
+				Peers: []*Peer{
+					{
+						MyASN:         42,
+						ASN:           42,
+						Addr:          net.ParseIP("1.2.3.4"),
+						Port:          179,
+						HoldTime:      90 * time.Second,
+						KeepaliveTime: 30 * time.Second,
+						NodeSelectors: []labels.Selector{labels.Everything()},
+						BFDProfile:    "",
+						Password:      "nopass",
+					},
+				},
+				Pools:       map[string]*Pool{},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
+			desc: "BGP Peer with unavailable secret ref",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "1.2.3.4",
+							PasswordSecret: corev1.SecretReference{Name: "nosecret",
+								Namespace: "metallb-system"},
+						},
 					},
 				},
 			},
@@ -978,12 +1285,12 @@ func TestParse(t *testing.T) {
 						},
 					},
 				},
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool1",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"1.2.3.0/24",
 							},
@@ -1002,12 +1309,12 @@ func TestParse(t *testing.T) {
 		{
 			desc: "Multiple BFD Profiles with the same name",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool1",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"1.2.3.0/24",
 							},
@@ -1036,12 +1343,12 @@ func TestParse(t *testing.T) {
 		{
 			desc: "Session with nondefault BFD Profile",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool1",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"1.2.3.0/24",
 							},
@@ -1082,6 +1389,7 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
 							},
 						},
 					},
@@ -1149,12 +1457,12 @@ func TestParse(t *testing.T) {
 						},
 					},
 				},
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool1",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"10.20.0.0/16",
 								"10.50.0.0/24",
@@ -1210,7 +1518,7 @@ func TestParse(t *testing.T) {
 							AggregationLength: pointer.Int32Ptr(32),
 							LocalPref:         uint32(100),
 							Communities:       []string{"1234:2345"},
-							IPPools:           []string{"pool1"},
+							IPAddressPools:    []string{"pool1"},
 						},
 					},
 				},
@@ -1243,6 +1551,7 @@ func TestParse(t *testing.T) {
 								Communities: map[uint32]bool{
 									0x04D20929: true,
 								},
+								Nodes: map[string]bool{},
 							},
 						},
 					},
@@ -1257,13 +1566,16 @@ func TestParse(t *testing.T) {
 								Communities: map[uint32]bool{
 									0x04D20929: true,
 								},
+								Nodes: map[string]bool{},
 							},
 						},
 					},
 					"legacyl2pool1": {
-						CIDR:             []*net.IPNet{ipnet("10.21.0.0/16"), ipnet("10.51.0.0/24")},
-						AvoidBuggyIPs:    true,
-						L2Advertisements: []*L2Advertisement{{}},
+						CIDR:          []*net.IPNet{ipnet("10.21.0.0/16"), ipnet("10.51.0.0/24")},
+						AvoidBuggyIPs: true,
+						L2Advertisements: []*L2Advertisement{{
+							Nodes: map[string]bool{},
+						}},
 					},
 				},
 				BFDProfiles: map[string]*BFDProfile{},
@@ -1271,14 +1583,77 @@ func TestParse(t *testing.T) {
 		},
 
 		{
+			desc: "config legacy pool with bgp communities crd",
+			crs: ClusterResources{
+				LegacyAddressPools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "legacybgppool1",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Addresses: []string{
+								"10.40.0.0/16",
+								"10.60.0.0/24",
+							},
+							Protocol:      string(BGP),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
+							BGPAdvertisements: []v1beta1.LegacyBgpAdvertisement{
+								{
+									AggregationLength: pointer.Int32Ptr(32),
+									LocalPref:         uint32(100),
+									Communities:       []string{"bar"},
+								},
+							},
+						},
+					},
+				},
+				Communities: []v1beta1.Community{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "community",
+						},
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Name:  "bar",
+									Value: "64512:1234",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: map[string]*Pool{
+					"legacybgppool1": {
+						CIDR:          []*net.IPNet{ipnet("10.40.0.0/16"), ipnet("10.60.0.0/24")},
+						AvoidBuggyIPs: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           100,
+								Communities: map[uint32]bool{
+									0xfc0004d2: true,
+								},
+								Nodes: map[string]bool{},
+							},
+						},
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
 			desc: "config mixing legacy pools with IP pools with overlapping ips",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: v1.ObjectMeta{
 							Name: "pool1",
 						},
-						Spec: v1beta1.IPPoolSpec{
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"10.20.0.0/16",
 								"10.50.0.0/24",
@@ -1318,31 +1693,576 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
-		/* TODO Add communities CRD
 		{
-			desc: "Duplicate communities definition",
+			desc: "use ip pool selectors",
 			crs: ClusterResources{
-				Pools: []v1beta1.IPPool{
+				Pools: []v1beta1.IPAddressPool{
 					{
-						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPPoolSpec{
-							Protocol: "bgp",
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "pool1",
+							Labels: map[string]string{"test": "pool1"},
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
 							Addresses: []string{
 								"10.20.0.0/16",
 							},
-							BGPAdvertisements: []v1beta1.BgpAdvertisement{
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "pool2",
+							Labels: map[string]string{"test": "pool2"},
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"30.0.0.0/16",
+							},
+						},
+					},
+				},
+				L2Advs: []v1beta1.L2Advertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "l2adv1",
+						},
+						Spec: v1beta1.L2AdvertisementSpec{
+							IPAddressPoolSelectors: []metav1.LabelSelector{
 								{
-									AggregationLength: pointer.Int32Ptr(26),
+									MatchLabels: map[string]string{
+										"test": "pool1",
+									},
 								},
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv1",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength: pointer.Int32Ptr(32),
+							LocalPref:         uint32(100),
+							IPAddressPoolSelectors: []metav1.LabelSelector{
 								{
-									AggregationLength: pointer.Int32Ptr(26),
+									MatchLabels: map[string]string{
+										"test": "pool1",
+									},
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv2",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength: pointer.Int32Ptr(32),
+							LocalPref:         uint32(200),
+							IPAddressPoolSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"test": "pool2",
+									},
 								},
 							},
 						},
 					},
 				},
 			},
-		},*/
+			want: &Config{
+				Pools: map[string]*Pool{
+					"pool1": {
+						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
+						AutoAssign: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           100,
+								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
+							},
+						},
+						L2Advertisements: []*L2Advertisement{{
+							Nodes: map[string]bool{},
+						}},
+					},
+					"pool2": {
+						CIDR:       []*net.IPNet{ipnet("30.0.0.0/16")},
+						AutoAssign: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           200,
+								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
+							},
+						},
+						L2Advertisements: nil,
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
+			desc: "use non existent label for ip pool selectors",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "pool1",
+							Labels: map[string]string{"test": "pool1"},
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+							},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "pool2",
+							Labels: map[string]string{"test": "pool2"},
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"30.0.0.0/16",
+							},
+						},
+					},
+				},
+				L2Advs: []v1beta1.L2Advertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "l2adv1",
+						},
+						Spec: v1beta1.L2AdvertisementSpec{
+							IPAddressPoolSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"test": "do-not-select-pool",
+									},
+								},
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv1",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength: pointer.Int32Ptr(32),
+							LocalPref:         uint32(100),
+							IPAddressPoolSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"test": "do-not-select-pool",
+									},
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv2",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength: pointer.Int32Ptr(32),
+							LocalPref:         uint32(200),
+							IPAddressPoolSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"test": "do-not-select-pool",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: map[string]*Pool{
+					"pool1": {
+						CIDR:              []*net.IPNet{ipnet("10.20.0.0/16")},
+						AutoAssign:        true,
+						BGPAdvertisements: nil,
+						L2Advertisements:  nil,
+					},
+					"pool2": {
+						CIDR:              []*net.IPNet{ipnet("30.0.0.0/16")},
+						AutoAssign:        true,
+						BGPAdvertisements: nil,
+						L2Advertisements:  nil,
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
+			desc: "use node selectors",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+							},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool2",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"30.0.0.0/16",
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv1",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPools: []string{"pool1"},
+							NodeSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"second": "true",
+									},
+								},
+							},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv2",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPools: []string{"pool2"},
+							NodeSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"first": "true",
+									},
+								},
+							},
+						},
+					},
+				},
+				L2Advs: []v1beta1.L2Advertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "l2adv1",
+						},
+						Spec: v1beta1.L2AdvertisementSpec{
+							NodeSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"first": "true",
+									},
+								},
+							},
+							IPAddressPools: []string{"pool1"},
+						},
+					},
+				},
+				LegacyAddressPools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "legacyl2pool1",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Addresses: []string{
+								"10.21.0.0/16",
+								"10.51.0.0/24",
+							},
+							Protocol:      string(Layer2),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "legacybgppool1",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Addresses: []string{
+								"10.40.0.0/16",
+								"10.60.0.0/24",
+							},
+							Protocol:      string(BGP),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
+						},
+					},
+				},
+				Nodes: []corev1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "first",
+							Labels: map[string]string{
+								"first": "true",
+							},
+						},
+					}, {
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "second",
+							Labels: map[string]string{
+								"second": "true",
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: map[string]*Pool{
+					"legacybgppool1": {
+						CIDR:          []*net.IPNet{ipnet("10.40.0.0/16"), ipnet("10.60.0.0/24")},
+						AvoidBuggyIPs: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[uint32]bool{},
+								Nodes: map[string]bool{
+									"first":  true,
+									"second": true,
+								},
+							},
+						},
+					},
+
+					"legacyl2pool1": {
+						CIDR:          []*net.IPNet{ipnet("10.21.0.0/16"), ipnet("10.51.0.0/24")},
+						AvoidBuggyIPs: true,
+						L2Advertisements: []*L2Advertisement{{
+							Nodes: map[string]bool{
+								"first":  true,
+								"second": true,
+							},
+						}},
+					},
+
+					"pool1": {
+						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
+						AutoAssign: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{"second": true},
+							},
+						},
+						L2Advertisements: []*L2Advertisement{&L2Advertisement{
+							Nodes: map[string]bool{
+								"first": true,
+							},
+						}},
+					},
+					"pool2": {
+						CIDR:       []*net.IPNet{ipnet("30.0.0.0/16")},
+						AutoAssign: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{"first": true},
+							},
+						},
+						L2Advertisements: nil,
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
+			desc: "no nodes means all nodes",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv1",
+						},
+					},
+				},
+				L2Advs: []v1beta1.L2Advertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "l2adv1",
+						},
+					},
+				},
+				Nodes: []corev1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "first",
+							Labels: map[string]string{
+								"first": "true",
+							},
+						},
+					}, {
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "second",
+							Labels: map[string]string{
+								"second": "true",
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: map[string]*Pool{
+					"pool1": {
+						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
+						AutoAssign: true,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								Communities:         map[uint32]bool{},
+								Nodes: map[string]bool{
+									"first":  true,
+									"second": true,
+								},
+							},
+						},
+						L2Advertisements: []*L2Advertisement{&L2Advertisement{
+							Nodes: map[string]bool{
+								"first":  true,
+								"second": true,
+							},
+						}},
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
+			desc: "advertisement with peer selector",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"1.2.3.0/24",
+							},
+						},
+					},
+				},
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "peer1",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "1.2.3.4",
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv1",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength: pointer.Int32Ptr(32),
+							LocalPref:         uint32(100),
+							IPAddressPools:    []string{"pool1"},
+							Peers:             []string{"peer1"},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Peers: []*Peer{
+					{
+						Name:          "peer1",
+						MyASN:         42,
+						ASN:           42,
+						Addr:          net.ParseIP("1.2.3.4"),
+						HoldTime:      90 * time.Second,
+						KeepaliveTime: 30 * time.Second,
+						NodeSelectors: []labels.Selector{labels.Everything()},
+						EBGPMultiHop:  false,
+					},
+				},
+				Pools: map[string]*Pool{
+					"pool1": {
+						AutoAssign: true,
+						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           100,
+								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{},
+								Peers:               []string{"peer1"},
+							},
+						},
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
+			desc: "config legacy pool with invalid community",
+			crs: ClusterResources{
+				LegacyAddressPools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "legacybgppool1",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Addresses: []string{
+								"10.40.0.0/16",
+								"10.60.0.0/24",
+							},
+							Protocol:      string(BGP),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
+							BGPAdvertisements: []v1beta1.LegacyBgpAdvertisement{
+								{
+									AggregationLength: pointer.Int32Ptr(32),
+									LocalPref:         uint32(100),
+									Communities:       []string{"1234"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {

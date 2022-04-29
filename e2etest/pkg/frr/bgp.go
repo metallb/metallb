@@ -68,6 +68,20 @@ func Routes(exec executor.Executor) (map[string]bgpfrr.Route, map[string]bgpfrr.
 	return v4Routes, v6Routes, nil
 }
 
+func RoutesForFamily(exec executor.Executor, family ipfamily.Family) (map[string]bgpfrr.Route, error) {
+	v4, v6, err := Routes(exec)
+	if err != nil {
+		return nil, err
+	}
+	switch family {
+	case ipfamily.IPv4:
+		return v4, nil
+	case ipfamily.IPv6:
+		return v6, nil
+	}
+	return nil, fmt.Errorf("unsupported ipfamily %v", family)
+}
+
 // RoutesForCommunity returns informations about routes in the given executor related to the given community.
 func RoutesForCommunity(exec executor.Executor, community string, family ipfamily.Family) (map[string]bgpfrr.Route, error) {
 	res, err := exec.Exec("vtysh", "-c", fmt.Sprintf("show bgp %s community %s json", family, community))

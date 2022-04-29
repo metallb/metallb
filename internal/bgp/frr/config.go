@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"sort"
 	"strconv"
 	"syscall"
 	"text/template"
@@ -50,56 +49,30 @@ hostname {{.Hostname}}
 ip nht resolve-via-default
 ipv6 nht resolve-via-default
 
-{{- range $pc := .PrefixesV4ForCommunity }}
-{{- range $p := $pc.Prefixes }}
-ip prefix-list {{$pc.Community}}-v4prefixes permit {{$p}}
-{{- end}}
-{{- end}}
-{{- range $pc := .PrefixesV6ForCommunity }}
-{{- range $p := $pc.Prefixes }}
-ip prefix-list {{$pc.Community}}-v6prefixes permit {{$p}}
-{{- end}}
-{{- end}}
-{{- range $pl := .PrefixesV4ForLocalPref }}
-{{- range $p := $pl.Prefixes }}
-ip prefix-list {{$pl.LocalPreference}}-v4localpref-prefixes permit {{$p}}
-{{- end}}
-{{- end}}
-{{- range $pl := .PrefixesV6ForLocalPref }}
-{{- range $p := $pl.Prefixes }}
-ip prefix-list {{$pl.LocalPreference}}-v6localpref-prefixes permit {{$p}}
-{{- end}}
-{{- end}}
 {{- range .Routers }}
 {{- range $n := .Neighbors }}
 route-map {{$n.Addr}}-in deny 20
-{{/* NOTE: it's possible to have global routes only because all the neighbors
-receive the same advertisements. Once that changes, we'll need prefix lists per neighbor */}}
-{{- range $.PrefixesV4ForLocalPref }}
+{{- range $a := .Advertisements }}
+{{- if not (eq $a.LocalPref 0)}}
+{{frrIPFamily $n.IPFamily}} prefix-list {{localPrefPrefixList $n $a.LocalPref}} permit {{$a.Prefix}}
 route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
-  match ip address prefix-list {{.LocalPreference}}-v4localpref-prefixes
-  set local-preference {{.LocalPreference}}
+  match {{frrIPFamily $n.IPFamily}} address prefix-list {{localPrefPrefixList $n $a.LocalPref}}
+  set local-preference {{$a.LocalPref}}
   on-match next
 {{- end }}
-{{- range $.PrefixesV6ForLocalPref }}
+{{- range $c := $a.Communities }}
+{{frrIPFamily $n.IPFamily}} prefix-list {{communityPrefixList $n $c}} permit {{$a.Prefix}}
 route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
-  match ipv6 address prefix-list {{.LocalPreference}}-v6localpref-prefixes
-  set local-preference {{.LocalPreference}}
+  match {{frrIPFamily $n.IPFamily}} address prefix-list {{communityPrefixList $n $c}}
+  set community {{$c}} additive
   on-match next
 {{- end }}
-{{- range $.PrefixesV4ForCommunity }}
-route-map {{$n.Addr}}-out permit {{ counter $n.Addr }}
-  match ip address prefix-list {{.Community}}-v4prefixes
-  set community {{.Community}} additive
-  on-match next
+{{frrIPFamily $a.IPFamily}} prefix-list {{allowedPrefixList $n}} permit {{$a.Prefix}}
 {{- end }}
-{{- range $.PrefixesV6ForCommunity }}
-route-map {{$n.Addr}}-out permit {{ counter $n.Addr }}
-  match ipv6 address prefix-list {{.Community}}-v6prefixes
-  set community {{.Community}} additive
+route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
+  match {{frrIPFamily $n.IPFamily}} address prefix-list {{allowedPrefixList $n}}
   on-match next
-{{- end }}
-route-map {{$n.Addr}}-out permit {{ counter $n.Addr }}
+{{frrIPFamily $n.IPFamily}} prefix-list {{allowedPrefixList $n}} deny any
 {{- end }}
 {{- end }}
 
@@ -136,10 +109,12 @@ router bgp {{$r.MyASN}}
   address-family ipv4 unicast
     neighbor {{$n.Addr}} activate
     neighbor {{$n.Addr}} route-map {{$n.Addr}}-in in
+	neighbor {{$n.Addr}} route-map {{$n.Addr}}-out out
   exit-address-family
   address-family ipv6 unicast
     neighbor {{$n.Addr}} activate
     neighbor {{$n.Addr}} route-map {{$n.Addr}}-in in
+	neighbor {{$n.Addr}} route-map {{$n.Addr}}-out out
   exit-address-family
 {{- end}}
 {{- range .Advertisements }}
@@ -147,9 +122,7 @@ router bgp {{$r.MyASN}}
     neighbor {{$n.Addr}} activate
     neighbor {{$n.Addr}} route-map {{$n.Addr}}-in in
     network {{.Prefix}}
-    {{- if or (gt (len .Communities) 0) (ne .LocalPref 0) }}
     neighbor {{$n.Addr}} route-map {{$n.Addr}}-out out
-    {{- end}}
   exit-address-family
 {{- end}}
 {{end -}}
@@ -182,25 +155,11 @@ bfd
 {{ end }}
 {{ end }}`
 
-type communityPrefixes struct {
-	Community string
-	Prefixes  []string
-}
-
-type localPrefPrefixes struct {
-	LocalPreference uint32
-	Prefixes        []string
-}
-
 type frrConfig struct {
-	Loglevel               string
-	Hostname               string
-	Routers                map[string]*routerConfig
-	BFDProfiles            []BFDProfile
-	PrefixesV4ForCommunity []communityPrefixes // prefix-list to be associated to the community
-	PrefixesV6ForCommunity []communityPrefixes
-	PrefixesV4ForLocalPref []localPrefPrefixes // prefix-list to be associated to the aggregation length
-	PrefixesV6ForLocalPref []localPrefPrefixes // prefix-list to be associated to the aggregation length
+	Loglevel    string
+	Hostname    string
+	Routers     map[string]*routerConfig
+	BFDProfiles []BFDProfile
 }
 
 // TODO: having global prefix lists works only because we advertise all the addresses
@@ -224,6 +183,8 @@ type BFDProfile struct {
 }
 
 type neighborConfig struct {
+	IPFamily       ipfamily.Family
+	Name           string
 	ASN            uint32
 	Addr           string
 	SrcAddr        string
@@ -261,14 +222,31 @@ func templateConfig(data interface{}) (string, error) {
 	i := 0
 	currentCounterName := ""
 	t, err := template.New("FRR Config Template").Funcs(
-		template.FuncMap{"counter": func(counterName string) int {
-			if currentCounterName != counterName {
-				currentCounterName = counterName
-				i = 0
-			}
-			i++
-			return i
-		}}).Parse(configTemplate)
+		template.FuncMap{
+			"counter": func(counterName string) int {
+				if currentCounterName != counterName {
+					currentCounterName = counterName
+					i = 0
+				}
+				i++
+				return i
+			},
+			"frrIPFamily": func(ipFamily ipfamily.Family) string {
+				if ipFamily == "ipv6" {
+					return "ipv6"
+				}
+				return "ip"
+			},
+			"localPrefPrefixList": func(neighbor *neighborConfig, localPreference uint32) string {
+				return fmt.Sprintf("%s-%d-%s-localpref-prefixes", neighbor.Addr, localPreference, neighbor.IPFamily)
+			},
+			"communityPrefixList": func(neighbor *neighborConfig, community string) string {
+				return fmt.Sprintf("%s-%s-%s-community-prefixes", neighbor.Addr, community, neighbor.IPFamily)
+			},
+			"allowedPrefixList": func(neighbor *neighborConfig) string {
+				return fmt.Sprintf("%s-pl-%s", neighbor.Addr, neighbor.IPFamily)
+			},
+		}).Parse(configTemplate)
 	if err != nil {
 		return "", err
 	}
@@ -366,24 +344,4 @@ func debouncer(body func(config *frrConfig),
 			}
 		}
 	}()
-}
-
-type stringSet map[string]struct{}
-
-func newStringSet() stringSet {
-	return map[string]struct{}{}
-}
-
-func (s stringSet) Add(item string) {
-	s[item] = struct{}{}
-}
-
-// Elements returns the sorted slice of elements in the set.
-func (s stringSet) Elements() []string {
-	res := []string{}
-	for k := range s {
-		res = append(res, k)
-	}
-	sort.Strings(res)
-	return res
 }

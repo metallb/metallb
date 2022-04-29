@@ -23,22 +23,20 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/go-kit/kit/log"
+	"github.com/go-kit/kit/log/level"
+	"github.com/prometheus/client_golang/prometheus"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
+	metallbcfg "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/k8s/controllers"
-	v1 "k8s.io/api/core/v1"
-
-	metallbcfg "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	"go.universe.tf/metallb/internal/layer2"
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/speakerlist"
 	"go.universe.tf/metallb/internal/version"
-
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
-	"github.com/prometheus/client_golang/prometheus"
+	v1 "k8s.io/api/core/v1"
 )
 
 var announcing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -318,14 +316,7 @@ func (c *controller) handleService(l log.Logger,
 		return c.deleteBalancerProtocol(l, protocol, name, "internalError")
 	}
 
-	if !handler.PoolEnabledForProtocol(pool) {
-		if c.announced[protocol][name] {
-			return c.deleteBalancerProtocol(l, protocol, name, "protocol disabled")
-		}
-		return controllers.SyncStateSuccess
-	}
-
-	if deleteReason := handler.ShouldAnnounce(l, name, lbIPs, svc, eps); deleteReason != "" {
+	if deleteReason := handler.ShouldAnnounce(l, name, lbIPs, pool, svc, eps); deleteReason != "" {
 		return c.deleteBalancerProtocol(l, protocol, name, deleteReason)
 	}
 
@@ -477,11 +468,10 @@ func (c *controller) SetNode(l log.Logger, node *v1.Node) controllers.SyncState 
 // A Protocol can advertise an IP address.
 type Protocol interface {
 	SetConfig(log.Logger, *config.Config) error
-	ShouldAnnounce(log.Logger, string, []net.IP, *v1.Service, epslices.EpsOrSlices) string
+	ShouldAnnounce(log.Logger, string, []net.IP, *config.Pool, *v1.Service, epslices.EpsOrSlices) string
 	SetBalancer(log.Logger, string, []net.IP, *config.Pool) error
 	DeleteBalancer(log.Logger, string, string) error
 	SetNode(log.Logger, *v1.Node) error
-	PoolEnabledForProtocol(pool *config.Pool) bool
 }
 
 // Speakerlist represents a list of healthy speakers.

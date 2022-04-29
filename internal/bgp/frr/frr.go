@@ -32,6 +32,7 @@ type sessionManager struct {
 }
 
 type session struct {
+	name           string
 	myASN          uint32
 	routerID       net.IP // May be nil, meaning "derive from context"
 	myNode         string
@@ -117,10 +118,11 @@ func (s *session) Close() error {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime, keepaliveTime time.Duration, password, myNode, bfdProfile string, ebgpMultiHop bool) (bgp.Session, error) {
+func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime, keepaliveTime time.Duration, password, myNode, bfdProfile string, ebgpMultiHop bool, name string) (bgp.Session, error) {
 	sm.Lock()
 	defer sm.Unlock()
 	s := &session{
+		name:           name,
 		myASN:          myASN,
 		routerID:       routerID,
 		myNode:         myNode,
@@ -197,14 +199,10 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 	}
 
 	config := &frrConfig{
-		Hostname:               hostname,
-		Loglevel:               sm.logLevel,
-		Routers:                make(map[string]*routerConfig),
-		BFDProfiles:            sm.bfdProfiles,
-		PrefixesV4ForCommunity: make([]communityPrefixes, 0),
-		PrefixesV6ForCommunity: make([]communityPrefixes, 0),
-		PrefixesV4ForLocalPref: make([]localPrefPrefixes, 0),
-		PrefixesV6ForLocalPref: make([]localPrefPrefixes, 0),
+		Hostname:    hostname,
+		Loglevel:    sm.logLevel,
+		Routers:     make(map[string]*routerConfig),
+		BFDProfiles: sm.bfdProfiles,
 	}
 
 	// leave it for backward compatibility
@@ -212,11 +210,6 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 	if found {
 		config.Loglevel = frrLogLevel
 	}
-
-	prefixesV4ForCommunity := map[string]stringSet{}
-	prefixesV6ForCommunity := map[string]stringSet{}
-	prefixesV4ForLocalPref := map[uint32]stringSet{}
-	prefixesV6ForLocalPref := map[uint32]stringSet{}
 
 	for _, s := range sm.sessions {
 		var router *routerConfig
@@ -247,7 +240,10 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				return nil, err
 			}
 
+			family := ipfamily.ForAddress(net.ParseIP(host))
+
 			neighbor = &neighborConfig{
+				IPFamily:       family,
 				ASN:            s.asn,
 				Addr:           host,
 				Port:           uint16(portUint),
@@ -268,14 +264,21 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 		   duplicate prefixes and can, therefore, just add them to the
 		   'neighbor.Advertisements' list. */
 		for _, adv := range s.advertised {
+			if !adv.MatchesPeer(s.name) {
+				continue
+			}
+
 			family := ipfamily.ForAddress(adv.Prefix.IP)
+			if family != neighbor.IPFamily {
+				continue
+			}
+
 			communities := make([]string, 0)
 
 			// Convert community 32bits value to : format
 			for _, c := range adv.Communities {
 				community := metallbconfig.CommunityToString(c)
 				communities = append(communities, community)
-				addPrefixForCommunity(prefixesV4ForCommunity, prefixesV6ForCommunity, adv.Prefix.String(), family, community)
 			}
 			advConfig := advertisementConfig{
 				IPFamily:    family,
@@ -283,77 +286,12 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				Communities: communities,
 				LocalPref:   adv.LocalPref,
 			}
-			if adv.LocalPref != 0 {
-				addPrefixForLocalPref(prefixesV4ForLocalPref, prefixesV6ForLocalPref, adv.Prefix.String(), family, adv.LocalPref)
-			}
 
 			neighbor.Advertisements = append(neighbor.Advertisements, &advConfig)
 		}
 	}
 
-	// The maps must be converted in sorted slice to make the rendering stable
-	config.PrefixesV4ForCommunity = mapToCommunityPrefixes(prefixesV4ForCommunity)
-	config.PrefixesV6ForCommunity = mapToCommunityPrefixes(prefixesV6ForCommunity)
-	config.PrefixesV4ForLocalPref = mapToLocalPrefPrefixes(prefixesV4ForLocalPref)
-	config.PrefixesV6ForLocalPref = mapToLocalPrefPrefixes(prefixesV6ForLocalPref)
-
 	return config, nil
-}
-
-func addPrefixForLocalPref(prefixesV4, prefixesV6 map[uint32]stringSet, prefix string, family ipfamily.Family, localPref uint32) {
-	if family == ipfamily.IPv4 {
-		_, ok := prefixesV4[localPref]
-		if !ok {
-			prefixesV4[localPref] = newStringSet()
-		}
-		prefixesV4[localPref].Add(prefix)
-		return
-	}
-	_, ok := prefixesV6[localPref]
-	if !ok {
-		prefixesV6[localPref] = newStringSet()
-	}
-	prefixesV6[localPref].Add(prefix)
-}
-
-func addPrefixForCommunity(prefixesV4, prefixesV6 map[string]stringSet, prefix string, family ipfamily.Family, community string) {
-	if family == ipfamily.IPv4 {
-		_, ok := prefixesV4[community]
-		if !ok {
-			prefixesV4[community] = newStringSet()
-		}
-		prefixesV4[community].Add(prefix)
-		return
-
-	}
-	_, ok := prefixesV6[community]
-	if !ok {
-		prefixesV6[community] = newStringSet()
-	}
-	prefixesV6[community].Add(prefix)
-}
-
-func mapToLocalPrefPrefixes(m map[uint32]stringSet) []localPrefPrefixes {
-	res := make([]localPrefPrefixes, 0)
-
-	for k, v := range m {
-		res = append(res, localPrefPrefixes{LocalPreference: k, Prefixes: v.Elements()})
-	}
-	sort.Slice(res, func(i int, j int) bool {
-		return res[i].LocalPreference < res[j].LocalPreference
-	})
-	return res
-}
-
-func mapToCommunityPrefixes(m map[string]stringSet) []communityPrefixes {
-	res := make([]communityPrefixes, 0)
-	for k, v := range m {
-		res = append(res, communityPrefixes{Community: k, Prefixes: v.Elements()})
-	}
-	sort.Slice(res, func(i int, j int) bool {
-		return res[i].Community < res[j].Community
-	})
-	return res
 }
 
 var debounceTimeout = 500 * time.Millisecond

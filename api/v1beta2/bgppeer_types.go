@@ -17,6 +17,7 @@ limitations under the License.
 package v1beta2
 
 import (
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -67,6 +68,10 @@ type BGPPeerSpec struct {
 	// Authentication password for routers enforcing TCP MD5 authenticated sessions
 	// +optional
 	Password string `json:"password,omitempty" yaml:"password,omitempty"`
+
+	// passwordSecret is name of the authentication secret for BGP Peer
+	// +optional
+	PasswordSecret v1.SecretReference `json:"passwordSecret,omitempty" yaml:"passwordSecret,omitempty"`
 
 	BFDProfile string `json:"bfdProfile,omitempty" yaml:"bfdprofile,omitempty"`
 

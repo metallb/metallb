@@ -21,7 +21,7 @@ import (
 	"github.com/go-kit/kit/log"
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
@@ -106,7 +106,7 @@ type fakeBGPSessionManager struct {
 	gotAds map[string][]*bgp.Advertisement
 }
 
-func (f *fakeBGPSessionManager) NewSession(_ log.Logger, addr string, _ net.IP, _ uint32, _ net.IP, _ uint32, _ time.Duration, _ time.Duration, _, _, _ string, _ bool) (bgp.Session, error) {
+func (f *fakeBGPSessionManager) NewSession(_ log.Logger, addr string, _ net.IP, _ uint32, _ net.IP, _ uint32, _ time.Duration, _ time.Duration, _, _, _ string, _ bool, name string) (bgp.Session, error) {
 	f.Lock()
 	defer f.Unlock()
 
@@ -274,6 +274,7 @@ func TestBGPSpeaker(t *testing.T) {
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
 							},
 						},
 					},
@@ -583,10 +584,12 @@ func TestBGPSpeaker(t *testing.T) {
 								AggregationLength: 32,
 								LocalPref:         100,
 								Communities:       map[uint32]bool{1234: true, 2345: true},
+								Nodes:             map[string]bool{"pandora": true},
 							},
 							{
 								AggregationLength: 24,
 								LocalPref:         1000,
+								Nodes:             map[string]bool{"pandora": true},
 							},
 						},
 					},
@@ -631,6 +634,140 @@ func TestBGPSpeaker(t *testing.T) {
 			expectedCfgRet: controllers.SyncStateReprocessAll,
 			expectedLBRet:  controllers.SyncStateSuccess,
 		},
+		{
+			desc: "Multiple advertisement config, one only for my node",
+			config: &config.Config{
+				Peers: []*config.Peer{
+					{
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+				},
+				Pools: map[string]*config.Pool{
+					"default": {
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						BGPAdvertisements: []*config.BGPAdvertisement{
+							{
+								AggregationLength: 32,
+								LocalPref:         100,
+								Communities:       map[uint32]bool{1234: true, 2345: true},
+								Nodes:             map[string]bool{"pandora": true},
+							},
+							{
+								AggregationLength: 24,
+								LocalPref:         1000,
+								Nodes:             map[string]bool{"iris": true},
+							},
+						},
+					},
+				},
+			},
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: epslices.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: pointer.StrPtr("iris"),
+								},
+							},
+						},
+					},
+				},
+				Type: epslices.Eps,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					{
+						Prefix:      ipnet("10.20.30.1/32"),
+						LocalPref:   100,
+						Communities: []uint32{1234, 2345},
+					},
+				},
+			},
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
+		},
+
+		{
+			desc: "Multiple advertisement config, one with peer selector",
+			config: &config.Config{
+				Peers: []*config.Peer{
+					{
+						Name:          "peer1",
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+				},
+				Pools: map[string]*config.Pool{
+					"default": {
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						BGPAdvertisements: []*config.BGPAdvertisement{
+							{
+								AggregationLength: 32,
+								LocalPref:         100,
+								Communities:       map[uint32]bool{1234: true, 2345: true},
+								Peers:             []string{"peer1"},
+								Nodes:             map[string]bool{"pandora": true},
+							},
+							{
+								AggregationLength: 24,
+								LocalPref:         1000,
+								Nodes:             map[string]bool{"pandora": true},
+							},
+						},
+					},
+				},
+			},
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: epslices.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: pointer.StrPtr("iris"),
+								},
+							},
+						},
+					},
+				},
+				Type: epslices.Eps,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					{
+						Prefix:      ipnet("10.20.30.1/32"),
+						LocalPref:   100,
+						Communities: []uint32{1234, 2345},
+						Peers:       []string{"peer1"},
+					},
+					{
+						Prefix:    ipnet("10.20.30.0/24"),
+						LocalPref: 1000,
+					},
+				},
+			},
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
+		},
 
 		{
 			desc: "Multiple peers",
@@ -651,6 +788,7 @@ func TestBGPSpeaker(t *testing.T) {
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
 							},
 						},
 					},
@@ -865,6 +1003,7 @@ func TestBGPSpeaker(t *testing.T) {
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
 							},
 						},
 					},
@@ -979,9 +1118,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1008,6 +1145,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
 							},
 						},
 					},
@@ -1034,9 +1172,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "pandora",
-								},
+								NodeName: stringPtr("pandora"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1069,9 +1205,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1108,9 +1242,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1143,9 +1275,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1158,9 +1288,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.6",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "pandora",
-								},
+								NodeName: stringPtr("pandora"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1197,9 +1325,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1212,9 +1338,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.6",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "pandora",
-								},
+								NodeName: stringPtr("pandora"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(false),
 								},
@@ -1227,9 +1351,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.7",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1242,9 +1364,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.6",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "pandora",
-								},
+								NodeName: stringPtr("pandora"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1293,9 +1413,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(false),
 								},
@@ -1328,9 +1446,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1339,9 +1455,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.6",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "pandora",
-								},
+								NodeName: stringPtr("pandora"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(false),
 								},
@@ -1377,10 +1491,12 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								AggregationLength: 32,
 								LocalPref:         100,
 								Communities:       map[uint32]bool{1234: true, 2345: true},
+								Nodes:             map[string]bool{"pandora": true},
 							},
 							{
 								AggregationLength: 24,
 								LocalPref:         1000,
+								Nodes:             map[string]bool{"pandora": true},
 							},
 						},
 					},
@@ -1402,9 +1518,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1448,6 +1562,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
 							},
 						},
 					},
@@ -1469,9 +1584,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1512,9 +1625,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1556,9 +1667,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1606,9 +1715,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1672,6 +1779,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						BGPAdvertisements: []*config.BGPAdvertisement{
 							{
 								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
 							},
 						},
 					},
@@ -1693,9 +1801,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								Topology: map[string]string{
-									"kubernetes.io/hostname": "iris",
-								},
+								NodeName: stringPtr("iris"),
 								Conditions: discovery.EndpointConditions{
 									Ready: pointer.BoolPtr(true),
 								},
@@ -1766,6 +1872,7 @@ func TestNodeSelectors(t *testing.T) {
 			BGPAdvertisements: []*config.BGPAdvertisement{
 				{
 					AggregationLength: 32,
+					Nodes:             map[string]bool{"pandora": true},
 				},
 			},
 		},
