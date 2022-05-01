@@ -310,10 +310,6 @@
                 "enabled": {
                   "type": "boolean"
                 },
-                "logLevel": {
-                  "type": "string",
-                  "enum": [ "informational", "warning", "errors", "debugging" ]
-                },
                 "image": { "$ref": "#/definitions/component/properties/image" }
               },
               "required": [ "enabled" ]
