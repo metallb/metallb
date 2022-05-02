@@ -29,9 +29,25 @@ import (
 )
 
 var _ = ginkgo.Describe("L2", func() {
-	f := framework.NewDefaultFramework("l2")
 	var cs clientset.Interface
 	var nodeToLabel *v1.Node
+
+	var f *framework.Framework
+	ginkgo.AfterEach(func() {
+		if nodeToLabel != nil {
+			k8s.RemoveLabelFromNode(nodeToLabel.Name, "bgp-node-selector-test", cs)
+		}
+
+		if ginkgo.CurrentGinkgoTestDescription().Failed {
+			k8s.DumpInfo(Reporter, ginkgo.CurrentGinkgoTestDescription().TestText)
+		}
+
+		// Clean previous configuration.
+		err := ConfigUpdater.Clean()
+		framework.ExpectNoError(err)
+	})
+
+	f = framework.NewDefaultFramework("l2")
 
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
@@ -40,20 +56,6 @@ var _ = ginkgo.Describe("L2", func() {
 
 		err := ConfigUpdater.Clean()
 		framework.ExpectNoError(err)
-	})
-
-	ginkgo.AfterEach(func() {
-		if nodeToLabel != nil {
-			k8s.RemoveLabelFromNode(nodeToLabel.Name, "bgp-node-selector-test", cs)
-		}
-
-		// Clean previous configuration.
-		err := ConfigUpdater.Clean()
-		framework.ExpectNoError(err)
-
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
-			k8s.DescribeSvc(f.Namespace.Name)
-		}
 	})
 
 	ginkgo.Context("Node Selector", func() {

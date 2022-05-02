@@ -1688,8 +1688,6 @@ spec:
           value: /etc/frr_reloader/reloader.pid
         - name: METALLB_BGP_TYPE
           value: frr
-        - name: FRR_LOGGING_LEVEL
-          value: informational
         - name: METALLB_NODE_NAME
           valueFrom:
             fieldRef:

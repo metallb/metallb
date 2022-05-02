@@ -104,7 +104,6 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | speaker.tolerateMaster | bool | `true` |  |
 | speaker.tolerations | list | `[]` |  |
 | speaker.frr.enabled | bool | `true` |  |
-| speaker.frr.logLevel | string | `"informational"` | FRR process log level. Must be one of: `informational`, `warning`, `errors` or `debugging` |
 | speaker.frr.image.pullPolicy | string | `nil` |  |
 | speaker.frr.image.repository | string | `"frrouting/frr"` |  |
 | speaker.frr.image.tag | string | `v7.5.1` |  |

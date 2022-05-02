@@ -10,6 +10,7 @@ import (
 
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/api/v1beta2"
+	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	testservice "go.universe.tf/metallb/e2etest/pkg/service"
 	metallbconfig "go.universe.tf/metallb/internal/config"
@@ -33,7 +34,8 @@ var _ = ginkgo.Describe("BGP Peer Selector", func() {
 
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentGinkgoTestDescription().Failed {
-			dumpBGPInfo(cs, f)
+			dumpBGPInfo(ReportPath, ginkgo.CurrentGinkgoTestDescription().TestText, cs, f)
+			k8s.DumpInfo(Reporter, ginkgo.CurrentGinkgoTestDescription().TestText)
 		}
 	})
 
