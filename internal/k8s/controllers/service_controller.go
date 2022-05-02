@@ -40,12 +40,13 @@ import (
 
 type ServiceReconciler struct {
 	client.Client
-	Logger    log.Logger
-	Scheme    *runtime.Scheme
-	Namespace string
-	Handler   func(log.Logger, string, *v1.Service, epslices.EpsOrSlices) SyncState
-	Endpoints NeedEndPoints
-	Reload    chan event.GenericEvent
+	Logger            log.Logger
+	Scheme            *runtime.Scheme
+	Namespace         string
+	Handler           func(log.Logger, string, *v1.Service, epslices.EpsOrSlices) SyncState
+	Endpoints         NeedEndPoints
+	LoadBalancerClass string
+	Reload            chan event.GenericEvent
 }
 
 func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -65,6 +66,11 @@ func (r *ServiceReconciler) reconcileService(ctx context.Context, req ctrl.Reque
 	if err != nil {
 		level.Error(r.Logger).Log("controller", "ServiceReconciler", "message", "failed to get service", "service", req.NamespacedName, "error", err)
 		return ctrl.Result{}, err
+	}
+
+	if filterByLoadBalancerClass(service, r.LoadBalancerClass) {
+		level.Debug(r.Logger).Log("controller", "ServiceReconciler", "filtered service", req.NamespacedName)
+		return ctrl.Result{}, nil
 	}
 
 	epSlices, err := epsOrSlicesForServices(ctx, r, req.NamespacedName, r.Endpoints)
@@ -132,7 +138,6 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				})).
 			Watches(&source.Channel{Source: r.Reload}, &handler.EnqueueRequestForObject{}).
 			Complete(r)
-
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -151,4 +156,23 @@ func (r *ServiceReconciler) serviceFor(ctx context.Context, name types.Namespace
 		return nil, err
 	}
 	return &res, nil
+}
+
+func filterByLoadBalancerClass(service *v1.Service, loadBalancerClass string) bool {
+	// When receiving a delete, we can't make logic on the service so we
+	// rely on the application logic that will receive a delete on a service it
+	// did not handle and discard it.
+	if service == nil {
+		return false
+	}
+	if service.Spec.LoadBalancerClass == nil && loadBalancerClass != "" {
+		return true
+	}
+	if service.Spec.LoadBalancerClass == nil && loadBalancerClass == "" {
+		return false
+	}
+	if *service.Spec.LoadBalancerClass != loadBalancerClass {
+		return true
+	}
+	return false
 }
