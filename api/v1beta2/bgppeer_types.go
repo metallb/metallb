@@ -45,7 +45,6 @@ type BGPPeerSpec struct {
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=16384
 	// +kubebuilder:default:=179
-
 	Port uint16 `json:"peerPort,omitempty" yaml:"peer-port,omitempty"`
 
 	// Requested BGP hold time, per RFC4271.
@@ -73,9 +72,12 @@ type BGPPeerSpec struct {
 	// +optional
 	PasswordSecret v1.SecretReference `json:"passwordSecret,omitempty" yaml:"passwordSecret,omitempty"`
 
+	// The name of the BFD Profile to be used for the BFD session associated to the BGP session. If not set, the BFD session won't be set up.
+	// +optional
 	BFDProfile string `json:"bfdProfile,omitempty" yaml:"bfdprofile,omitempty"`
 
-	// EBGP peer is multi-hops away
+	// To set if the BGPPeer is multi-hops away. Needed for FRR mode only.
+	// +optional
 	EBGPMultiHop bool `json:"ebgpMultiHop,omitempty" yaml:"ebgp-multihop,omitempty"`
 	// Add future BGP configuration here
 }

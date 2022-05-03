@@ -21,9 +21,9 @@ import (
 )
 
 type CommunityAlias struct {
-	// Name or identifier for the community.
+	// The name of the alias for the community.
 	Name string `json:"name,omitempty"`
-	// BGP community value.
+	// The BGP community value corresponding to the given name.
 	Value string `json:"value,omitempty"`
 }
 
@@ -41,7 +41,8 @@ type CommunityStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// Community is the Schema for the communities API.
+// Community is a collection of aliases for communities.
+// Users can define named aliases to be used in the BGPPeer CRD.
 type Community struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

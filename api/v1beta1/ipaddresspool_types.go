@@ -51,7 +51,8 @@ type IPAddressPoolStatus struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion
 
-// IPAddressPool is the Schema for the IPAddressPools API.
+// IPAddressPool represents a pool of IP addresses that can be allocated
+// to LoadBalancer services.
 type IPAddressPool struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
