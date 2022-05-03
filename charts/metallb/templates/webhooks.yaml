@@ -2,11 +2,9 @@
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  name: {{ template "metallb.fullname" . }}-validating-webhook-configuration
+  name: validating-webhook-configuration
   labels:
     {{- include "metallb.labels" . | nindent 4 }}
-  annotations:
-    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ template "metallb.fullname" . }}-serving-cert
 webhooks:
 - admissionReviewVersions:
   - v1
@@ -141,27 +139,10 @@ spec:
   selector:
     app.kubernetes.io/component: controller
 ---
-apiVersion: cert-manager.io/v1
-kind: Certificate
+apiVersion: v1
+kind: Secret
 metadata:
-  name: {{ template "metallb.fullname" . }}-serving-cert
+  name: webhook-server-cert
   labels:
     {{- include "metallb.labels" . | nindent 4 }}
-spec:
-  dnsNames:
-  - {{ template "metallb.fullname" . }}-webhook-service.{{ .Release.Namespace }}.svc
-  - {{ template "metallb.fullname" . }}-webhook-service.{{ .Release.Namespace }}.svc.cluster.local
-  issuerRef:
-    kind: Issuer
-    name: {{ template "metallb.fullname" . }}-selfsigned-issuer
-  secretName: webhook-server-cert
----
-apiVersion: cert-manager.io/v1
-kind: Issuer
-metadata:
-  name: {{ template "metallb.fullname" . }}-selfsigned-issuer
-  labels:
-    {{- include "metallb.labels" . | nindent 4 }}
-spec:
-  selfSigned: {}
 {{- end -}}
