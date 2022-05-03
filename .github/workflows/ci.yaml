@@ -49,6 +49,8 @@ jobs:
           inv checkchanges --action="run inv gomodtidy"
           inv generatemanifests
           inv checkchanges --action="run inv generatemanifests"
+          inv generateapidocs
+          inv checkchanges --action="run inv generateapidocs"
 
   helm:
     runs-on: ubuntu-20.04
