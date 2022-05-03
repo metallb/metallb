@@ -50,6 +50,7 @@ spec:
         {{- end }}
         {{- if .Values.webhooks.enable }}
         - --enable-webhook
+        - --cert-service-name={{ template "metallb.fullname" . }}-webhook-service
         {{- end }}
         env:
         {{- if and .Values.speaker.enabled .Values.speaker.memberlist.enabled }}
