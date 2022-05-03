@@ -212,78 +212,87 @@ jobs:
         with:
           name: kind-logs-backward-compatible
           path: /tmp/kind_logs/
-#  e2e-use-operator:
-#    runs-on: ubuntu-20.04
-#    defaults:
-#      run:
-#        shell: bash
-#        working-directory: metallb
-#    strategy:
-#      fail-fast: false
-#    steps:
-#      - name: Cancel Previous Runs
-#        uses: styfle/cancel-workflow-action@0.9.1
-#        with:
-#          access_token: ${{ github.token }}
-#
-#      - name: Checkout Metal LB Operator
-#        uses: actions/checkout@v2
-#        with:
-#          repository: metallb/metallb-operator
-#          path: metallboperator
-#          ref: e84470bf3644e6444169abb65483bb1a60c957af
-#
-#      - uses: actions/setup-go@v2
-#        with:
-#          go-version: '1.17.1'
-#
-#      - name: Checkout MetalLB
-#        uses: actions/checkout@v2
-#        with:
-#          path: metallb
-#          fetch-depth: 0
-#
-#      - name: Install Dependencies
-#        run: |
-#          sudo apt-get update
-#          sudo apt-get install python3-pip arping ndisc6
-#          sudo pip3 install -r ./dev-env/requirements.txt
-#          GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
-#
-#      - name: Build MetalLB Images
-#        run: |
-#          inv build
-#
-#      - name: Create multi-node K8s Kind Cluster
-#        run: |
-#          cd ${GITHUB_WORKSPACE}/metallboperator
-#          ./hack/kind-multi-node-cluster-without-registry.sh
-#          kind load docker-image quay.io/metallb/speaker:dev-amd64
-#          kind load docker-image quay.io/metallb/controller:dev-amd64
-#          export KUBECONFIG=${HOME}/.kube/config
-#
-#      - name: Deploy Metal LB Operator
-#        run: |
-#          cd ${GITHUB_WORKSPACE}/metallboperator
-#          sed -i 's/quay.io\/metallb\/speaker:main/quay.io\/metallb\/speaker:dev-amd64/g' bin/metallb-operator-with-webhooks.yaml
-#          sed -i 's/quay.io\/metallb\/controller:main/quay.io\/metallb\/controller:dev-amd64/g' bin/metallb-operator-with-webhooks.yaml
-#          sed -i 's/native/frr/g' bin/metallb-operator-with-webhooks.yaml
-#          make deploy-cert-manager
-#          kubectl apply -f bin/metallb-operator-with-webhooks.yaml
-#
-#      - name: MetalLB E2E Tests with Operator Deployment
-#        run: |
-#          kubectl apply -f ${GITHUB_WORKSPACE}/metallboperator/config/samples/metallb.yaml
-#          sudo -E env "PATH=$PATH" inv e2etest --skip "IPV6|DUALSTACK" -e /tmp/kind_logs --use-operator
-#
-#      - name: Change permissions for kind logs
-#        if: ${{ failure() }}
-#        run: |
-#          sudo chmod -R o+r /tmp/kind_logs
-#
-#      - name: Archive kind logs
-#        if: ${{ failure() }}
-#        uses: actions/upload-artifact@v2
-#        with:
-#          name: kind_logs_use_operator
-#          path: /tmp/kind_logs
+
+  e2e-use-operator:
+    runs-on: ubuntu-20.04
+    defaults:
+      run:
+        shell: bash
+        working-directory: metallb
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Cancel Previous Runs
+        uses: styfle/cancel-workflow-action@0.9.1
+        with:
+          access_token: ${{ github.token }}
+
+      - name: Checkout Metal LB Operator
+        uses: actions/checkout@v2
+        with:
+          repository: metallb/metallb-operator
+          path: metallboperator
+          ref: f0a89e03bc4963ef021b02e858fe3ce78dcf6b41
+
+      - uses: actions/setup-go@v2
+        with:
+          go-version: '1.17.1'
+
+      - name: Checkout MetalLB
+        uses: actions/checkout@v2
+        with:
+          path: metallb
+          fetch-depth: 0
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install python3-pip arping ndisc6
+          sudo pip3 install -r ./dev-env/requirements.txt
+          GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
+
+      - name: Build MetalLB Images
+        run: |
+          inv build
+
+      - name: Create multi-node K8s Kind Cluster
+        run: |
+          cd ${GITHUB_WORKSPACE}/metallboperator
+          ./hack/kind-multi-node-cluster-without-registry.sh
+          kind load docker-image quay.io/metallb/speaker:dev-amd64
+          kind load docker-image quay.io/metallb/controller:dev-amd64
+          export KUBECONFIG=${HOME}/.kube/config
+
+      - name: Deploy Metal LB Operator
+        run: |
+          cd ${GITHUB_WORKSPACE}/metallboperator
+          sed -i 's/quay.io\/metallb\/speaker:main/quay.io\/metallb\/speaker:dev-amd64/g' bin/metallb-operator-with-webhooks.yaml
+          sed -i 's/quay.io\/metallb\/controller:main/quay.io\/metallb\/controller:dev-amd64/g' bin/metallb-operator-with-webhooks.yaml
+          sed -i 's/native/frr/g' bin/metallb-operator-with-webhooks.yaml
+          make deploy-cert-manager
+          kubectl apply -f bin/metallb-operator-with-webhooks.yaml
+
+      - name: MetalLB E2E Tests with Operator Deployment
+        run: |
+          cat <<EOF | kubectl apply -f -
+          apiVersion: metallb.io/v1beta1
+          kind: MetalLB
+          metadata:
+            name: metallb
+            namespace: metallb-system
+          spec:
+            logLevel: debug
+          EOF
+          sudo -E env "PATH=$PATH" inv e2etest --skip "IPV6|DUALSTACK" -e /tmp/kind_logs
+
+      - name: Change permissions for kind logs
+        if: ${{ failure() }}
+        run: |
+          sudo chmod -R o+r /tmp/kind_logs
+
+      - name: Archive kind logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v2
+        with:
+          name: kind_logs_use_operator
+          path: /tmp/kind_logs

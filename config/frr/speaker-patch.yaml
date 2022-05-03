@@ -111,11 +111,6 @@ spec:
               value: /etc/frr_reloader/reloader.pid
             - name: METALLB_BGP_TYPE
               value: frr
-            # FRR_LOGGING_LEVEL used to set logging level for all running frr processes.
-            # Possible settings are :-
-            #  informational, warning, errors and debugging.
-            - name: FRR_LOGGING_LEVEL
-              value: informational
           volumeMounts:
             - name: reloader
               mountPath: /etc/frr_reloader
