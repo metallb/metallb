@@ -15,7 +15,7 @@ import (
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	"go.universe.tf/metallb/internal/pointer"
 
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

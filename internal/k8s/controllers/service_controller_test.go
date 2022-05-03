@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	corev1 "k8s.io/api/core/v1"

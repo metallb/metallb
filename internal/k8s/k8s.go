@@ -25,8 +25,8 @@ import (
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	v1 "k8s.io/api/core/v1"

@@ -3,7 +3,7 @@
 package v1beta2
 
 import (
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 
 	"go.universe.tf/metallb/api/validate"
 	"sigs.k8s.io/controller-runtime/pkg/client"

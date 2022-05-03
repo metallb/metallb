@@ -8,7 +8,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
 	"github.com/mdlayher/arp"
 	"github.com/mdlayher/ethernet"
