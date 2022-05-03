@@ -18,7 +18,7 @@ import (
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/pointer"
 
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
