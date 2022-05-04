@@ -19,7 +19,8 @@ spec:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: IPAddressPool is the Schema for the IPAddressPools API.
+        description: IPAddressPool represents a pool of IP addresses that can be allocated
+          to LoadBalancer services.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation

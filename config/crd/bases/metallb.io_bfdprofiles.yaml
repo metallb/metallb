@@ -19,7 +19,8 @@ spec:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: BFDProfile is the Schema for the bfdprofiles API.
+        description: BFDProfile represents the settings of the bfd session that can
+          be optionally associated with a BGP session.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -37,30 +38,48 @@ spec:
             description: BFDProfileSpec defines the desired state of BFDProfile.
             properties:
               detectMultiplier:
+                description: Configures the detection multiplier to determine packet
+                  loss. The remote transmission interval will be multiplied by this
+                  value to determine the connection loss detection timer.
                 format: int32
                 maximum: 255
                 minimum: 2
                 type: integer
               echoInterval:
+                description: Configures the minimal echo receive transmission interval
+                  that this system is capable of handling in milliseconds. Defaults
+                  to 50ms
                 format: int32
                 maximum: 60000
                 minimum: 10
                 type: integer
               echoMode:
+                description: Enables or disables the echo transmission mode. This
+                  mode is disabled by default, and not supported on multi hops setups.
                 type: boolean
               minimumTtl:
+                description: 'For multi hop sessions only: configure the minimum expected
+                  TTL for an incoming BFD control packet.'
                 format: int32
                 maximum: 254
                 minimum: 1
                 type: integer
               passiveMode:
+                description: 'Mark session as passive: a passive session will not
+                  attempt to start the connection and will wait for control packets
+                  from peer before it begins replying.'
                 type: boolean
               receiveInterval:
+                description: The minimum interval that this system is capable of receiving
+                  control packets in milliseconds. Defaults to 300ms.
                 format: int32
                 maximum: 60000
                 minimum: 10
                 type: integer
               transmitInterval:
+                description: The minimum transmission interval (less jitter) that
+                  this system wants to use to send BFD control packets in milliseconds.
+                  Defaults to 300ms
                 format: int32
                 maximum: 60000
                 minimum: 10

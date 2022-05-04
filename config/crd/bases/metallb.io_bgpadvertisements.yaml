@@ -19,7 +19,8 @@ spec:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: BGPAdvertisement is the Schema for the bgpadvertisements API.
+        description: BGPAdvertisement allows to advertise the IPs coming from the
+          selected IPAddressPools via BGP, setting the parameters of the BGP Advertisement.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -39,24 +40,29 @@ spec:
               aggregationLength:
                 default: 32
                 description: The aggregation-length advertisement option lets you
-                  “roll up” the /32s into a larger prefix.
+                  “roll up” the /32s into a larger prefix. Defaults to 32. Works for
+                  IPv4 addresses.
                 format: int32
                 minimum: 1
                 type: integer
               aggregationLengthV6:
                 default: 128
-                description: Optional, defaults to 128 (i.e. no aggregation) if not
-                  specified.
+                description: The aggregation-length advertisement option lets you
+                  “roll up” the /128s into a larger prefix. Defaults to 128. Works
+                  for IPv6 addresses.
                 format: int32
                 type: integer
               communities:
-                description: BGP communities
+                description: The BGP communities to be associated with the announcement.
+                  Each item can be a community of the form 1234:1234 or the name of
+                  an alias defined in the Community CRD.
                 items:
                   type: string
                 type: array
               ipAddressPoolSelectors:
-                description: IPAddressPoolSelectors is a selector for the ipaddresspools
-                  which would get advertised via this advertisement.
+                description: A selector for the IPAddressPools which would get advertised
+                  via this advertisement. If no IPAddressPool is selected by this
+                  or by the list, the advertisement is applied to all the IPAddressPools.
                 items:
                   description: A label selector is a label query over a set of resources.
                     The result of matchLabels and matchExpressions are ANDed. An empty
@@ -106,20 +112,21 @@ spec:
                   type: object
                 type: array
               ipAddressPools:
-                description: IPAddressPools is the list of ipaddresspools to advertise
-                  via this advertisement.
+                description: The list of IPAddressPools to advertise via this advertisement,
+                  selected by name.
                 items:
                   type: string
                 type: array
               localPref:
-                description: BGP LOCAL_PREF attribute which is used by BGP best path
-                  algorithm, Path with higher localpref is preferred over one with
-                  lower localpref.
+                description: The BGP LOCAL_PREF attribute which is used by BGP best
+                  path algorithm, Path with higher localpref is preferred over one
+                  with lower localpref.
                 format: int32
                 type: integer
               nodeSelectors:
-                description: NodeSelectors is a selector on the node we should perform
-                  this advertisement from.
+                description: NodeSelectors allows to limit the nodes to announce as
+                  next hops for the LoadBalancer IP. When empty, all the nodes having  are
+                  announced as next hops.
                 items:
                   description: A label selector is a label query over a set of resources.
                     The result of matchLabels and matchExpressions are ANDed. An empty
@@ -169,8 +176,9 @@ spec:
                   type: object
                 type: array
               peers:
-                description: Peers are used to declare the intent of announcing the
-                  IPs of IPPools only to the Peers in this list.
+                description: Peers limits the bgppeer to advertise the ips of the
+                  selected pools to. When empty, the loadbalancer IP is announced
+                  to all the BGPPeers configured.
                 items:
                   type: string
                 type: array
