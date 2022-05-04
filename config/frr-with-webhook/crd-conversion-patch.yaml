@@ -11,7 +11,7 @@ spec:
       conversionReviewVersions: ["v1alpha1", "v1beta1"]
       clientConfig:
         # this is "\n" used as a placeholder, otherwise it will be rejected by the apiserver for being blank,
-        # but we're going to set it later using the cert-manager (or potentially a patch if not using cert-manager)
+        # but we're going to set it later using the cert-controller.
         caBundle: Cg==
         service:
           namespace: system
@@ -29,7 +29,7 @@ spec:
       conversionReviewVersions: ["v1beta1", "v1beta2"]
       clientConfig:
         # this is "\n" used as a placeholder, otherwise it will be rejected by the apiserver for being blank,
-        # but we're going to set it later using the cert-manager (or potentially a patch if not using cert-manager)
+        # but we're going to set it later using the cert-controller.
         caBundle: Cg==
         service:
           namespace: system-metallb
