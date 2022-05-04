@@ -39,7 +39,6 @@ prefer private disclosure, please email to all of the maintainers:
 
 - fpaoline@redhat.com
 - rbryant@redhat.com
-- rodrigoca@microsoft.com
 - jliebermann@microsoft.com
 
 We aim for initial response to vulnerability reports within 48
