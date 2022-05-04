@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	"go.universe.tf/metallb/internal/bgp"
 	metallbconfig "go.universe.tf/metallb/internal/config"
@@ -332,14 +332,14 @@ func validateReload(l log.Logger, prevReloadTimeStamp *string) {
 	bytes, err := os.ReadFile(statusFileName)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			_ = level.Error(l).Log("op", "reload-validate", "error", err, "cause", "readFile", "fileName", statusFileName)
+			level.Error(l).Log("op", "reload-validate", "error", err, "cause", "readFile", "fileName", statusFileName)
 		}
 		return
 	}
 
 	lastReloadStatus := strings.Fields(string(bytes))
 	if len(lastReloadStatus) != 2 {
-		_ = level.Error(l).Log("op", "reload-validate", "error", err, "cause", "Fields", "bytes", string(bytes))
+		level.Error(l).Log("op", "reload-validate", "error", err, "cause", "Fields", "bytes", string(bytes))
 		return
 	}
 
@@ -351,12 +351,12 @@ func validateReload(l log.Logger, prevReloadTimeStamp *string) {
 	*prevReloadTimeStamp = timeStamp
 
 	if strings.Compare(status, "failure") == 0 {
-		_ = level.Error(l).Log("op", "reload-validate", "error", fmt.Errorf("reload failure"),
+		level.Error(l).Log("op", "reload-validate", "error", fmt.Errorf("reload failure"),
 			"cause", "frr reload failed", "status", status)
 		return
 	}
 
-	_ = level.Info(l).Log("op", "reload-validate", "success", "reloaded config")
+	level.Info(l).Log("op", "reload-validate", "success", "reloaded config")
 }
 
 func configBFDProfileToFRR(p *metallbconfig.BFDProfile) *BFDProfile {

@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -57,14 +57,14 @@ func main() {
 		os.Exit(1)
 	}
 
-	_ = level.Info(logger).Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "goversion", version.GoString(), "msg", "FRR metrics exporter starting "+version.String())
+	level.Info(logger).Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "goversion", version.GoString(), "msg", "FRR metrics exporter starting "+version.String())
 
 	http.Handle(*metricsPath, metricsHandler(logger))
 	srv := &http.Server{Addr: fmt.Sprintf(":%d", *metricsPort)}
-	_ = level.Info(logger).Log("msg", "Starting exporter", "metricsPath", metricsPath, "port", metricsPort)
+	level.Info(logger).Log("msg", "Starting exporter", "metricsPath", metricsPath, "port", metricsPort)
 
 	if err := web.ListenAndServe(srv, *tlsConfigPath, logger); err != nil {
-		_ = level.Error(logger).Log("error", err)
+		level.Error(logger).Log("error", err)
 		os.Exit(1)
 	}
 }

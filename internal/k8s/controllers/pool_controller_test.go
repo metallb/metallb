@@ -20,7 +20,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1beta1 "go.universe.tf/metallb/api/v1beta1"
