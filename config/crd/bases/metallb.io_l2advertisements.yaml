@@ -19,7 +19,8 @@ spec:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: L2Advertisement is the Schema for the l2advertisements API.
+        description: L2Advertisement allows to advertise the LoadBalancer IPs provided
+          by the selected pools via L2.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -37,8 +38,9 @@ spec:
             description: L2AdvertisementSpec defines the desired state of L2Advertisement.
             properties:
               ipAddressPoolSelectors:
-                description: IPAddressPoolSelectors is a selector for the ipaddresspools
-                  which would get advertised via this advertisement.
+                description: A selector for the IPAddressPools which would get advertised
+                  via this advertisement. If no IPAddressPool is selected by this
+                  or by the list, the advertisement is applied to all the IPAddressPools.
                 items:
                   description: A label selector is a label query over a set of resources.
                     The result of matchLabels and matchExpressions are ANDed. An empty
@@ -88,14 +90,15 @@ spec:
                   type: object
                 type: array
               ipAddressPools:
-                description: IPAddressPools is the list of ipaddresspools to advertise
-                  via this advertisement.
+                description: The list of IPAddressPools to advertise via this advertisement,
+                  selected by name.
                 items:
                   type: string
                 type: array
               nodeSelectors:
-                description: NodeSelectors is a selector on the node we should perform
-                  this advertisement from.
+                description: NodeSelectors allows to limit the nodes to announce as
+                  next hops for the LoadBalancer IP. When empty, all the nodes having  are
+                  announced as next hops.
                 items:
                   description: A label selector is a label query over a set of resources.
                     The result of matchLabels and matchExpressions are ANDed. An empty

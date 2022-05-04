@@ -140,9 +140,13 @@ spec:
             description: BGPPeerSpec defines the desired state of Peer.
             properties:
               bfdProfile:
+                description: The name of the BFD Profile to be used for the BFD session
+                  associated to the BGP session. If not set, the BFD session won't
+                  be set up.
                 type: string
               ebgpMultiHop:
-                description: EBGP peer is multi-hops away
+                description: To set if the BGPPeer is multi-hops away. Needed for
+                  FRR mode only.
                 type: boolean
               holdTime:
                 description: Requested BGP hold time, per RFC4271.
@@ -235,6 +239,7 @@ spec:
                 type: string
               peerPort:
                 default: 179
+                description: Port to dial when establishing the session.
                 maximum: 16384
                 minimum: 0
                 type: integer
