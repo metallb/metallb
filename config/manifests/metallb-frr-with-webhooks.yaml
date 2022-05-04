@@ -118,10 +118,15 @@ spec:
     storage: false
     subresources:
       status: {}
-  - name: v1beta1
+  - deprecated: true
+    deprecationWarning: metallbio.io v1beta1 AddressPool is deprecated, consider using
+      IPAddressPool
+    name: v1beta1
     schema:
       openAPIV3Schema:
-        description: AddressPool is the Schema for the addresspools API.
+        description: AddressPool represents a pool of IP addresses that can be allocated
+          to LoadBalancer services. AddressPool is deprecated and being replaced by
+          IPAddressPool.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -157,8 +162,8 @@ spec:
                   to be used by a pool.
                 type: boolean
               bgpAdvertisements:
-                description: When an IP is allocated from this pool, how should it
-                  be translated into BGP announcements?
+                description: Drives how an IP allocated from this pool should translated
+                  into BGP announcements.
                 items:
                   properties:
                     aggregationLength:
@@ -175,7 +180,8 @@ spec:
                       format: int32
                       type: integer
                     communities:
-                      description: BGP communities
+                      description: BGP communities to be associated with the given
+                        advertisement.
                       items:
                         type: string
                       type: array
@@ -234,7 +240,8 @@ spec:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: BFDProfile is the Schema for the bfdprofiles API.
+        description: BFDProfile represents the settings of the bfd session that can
+          be optionally associated with a BGP session.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -252,30 +259,48 @@ spec:
             description: BFDProfileSpec defines the desired state of BFDProfile.
             properties:
               detectMultiplier:
+                description: Configures the detection multiplier to determine packet
+                  loss. The remote transmission interval will be multiplied by this
+                  value to determine the connection loss detection timer.
                 format: int32
                 maximum: 255
                 minimum: 2
                 type: integer
               echoInterval:
+                description: Configures the minimal echo receive transmission interval
+                  that this system is capable of handling in milliseconds. Defaults
+                  to 50ms
                 format: int32
                 maximum: 60000
                 minimum: 10
                 type: integer
               echoMode:
+                description: Enables or disables the echo transmission mode. This
+                  mode is disabled by default, and not supported on multi hops setups.
                 type: boolean
               minimumTtl:
+                description: 'For multi hop sessions only: configure the minimum expected
+                  TTL for an incoming BFD control packet.'
                 format: int32
                 maximum: 254
                 minimum: 1
                 type: integer
               passiveMode:
+                description: 'Mark session as passive: a passive session will not
+                  attempt to start the connection and will wait for control packets
+                  from peer before it begins replying.'
                 type: boolean
               receiveInterval:
+                description: The minimum interval that this system is capable of receiving
+                  control packets in milliseconds. Defaults to 300ms.
                 format: int32
                 maximum: 60000
                 minimum: 10
                 type: integer
               transmitInterval:
+                description: The minimum transmission interval (less jitter) that
+                  this system wants to use to send BFD control packets in milliseconds.
+                  Defaults to 300ms
                 format: int32
                 maximum: 60000
                 minimum: 10
@@ -315,7 +340,8 @@ spec:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: BGPAdvertisement is the Schema for the bgpadvertisements API.
+        description: BGPAdvertisement allows to advertise the IPs coming from the
+          selected IPAddressPools via BGP, setting the parameters of the BGP Advertisement.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -335,24 +361,29 @@ spec:
               aggregationLength:
                 default: 32
                 description: The aggregation-length advertisement option lets you
-                  “roll up” the /32s into a larger prefix.
+                  “roll up” the /32s into a larger prefix. Defaults to 32. Works for
+                  IPv4 addresses.
                 format: int32
                 minimum: 1
                 type: integer
               aggregationLengthV6:
                 default: 128
-                description: Optional, defaults to 128 (i.e. no aggregation) if not
-                  specified.
+                description: The aggregation-length advertisement option lets you
+                  “roll up” the /128s into a larger prefix. Defaults to 128. Works
+                  for IPv6 addresses.
                 format: int32
                 type: integer
               communities:
-                description: BGP communities
+                description: The BGP communities to be associated with the announcement.
+                  Each item can be a community of the form 1234:1234 or the name of
+                  an alias defined in the Community CRD.
                 items:
                   type: string
                 type: array
               ipAddressPoolSelectors:
-                description: IPAddressPoolSelectors is a selector for the ipaddresspools
-                  which would get advertised via this advertisement.
+                description: A selector for the IPAddressPools which would get advertised
+                  via this advertisement. If no IPAddressPool is selected by this
+                  or by the list, the advertisement is applied to all the IPAddressPools.
                 items:
                   description: A label selector is a label query over a set of resources.
                     The result of matchLabels and matchExpressions are ANDed. An empty
@@ -402,20 +433,21 @@ spec:
                   type: object
                 type: array
               ipAddressPools:
-                description: IPAddressPools is the list of ipaddresspools to advertise
-                  via this advertisement.
+                description: The list of IPAddressPools to advertise via this advertisement,
+                  selected by name.
                 items:
                   type: string
                 type: array
               localPref:
-                description: BGP LOCAL_PREF attribute which is used by BGP best path
-                  algorithm, Path with higher localpref is preferred over one with
-                  lower localpref.
+                description: The BGP LOCAL_PREF attribute which is used by BGP best
+                  path algorithm, Path with higher localpref is preferred over one
+                  with lower localpref.
                 format: int32
                 type: integer
               nodeSelectors:
-                description: NodeSelectors is a selector on the node we should perform
-                  this advertisement from.
+                description: NodeSelectors allows to limit the nodes to announce as
+                  next hops for the LoadBalancer IP. When empty, all the nodes having  are
+                  announced as next hops.
                 items:
                   description: A label selector is a label query over a set of resources.
                     The result of matchLabels and matchExpressions are ANDed. An empty
@@ -465,8 +497,9 @@ spec:
                   type: object
                 type: array
               peers:
-                description: Peers are used to declare the intent of announcing the
-                  IPs of IPPools only to the Peers in this list.
+                description: Peers limits the bgppeer to advertise the ips of the
+                  selected pools to. When empty, the loadbalancer IP is announced
+                  to all the BGPPeers configured.
                 items:
                   type: string
                 type: array
@@ -638,9 +671,13 @@ spec:
             description: BGPPeerSpec defines the desired state of Peer.
             properties:
               bfdProfile:
+                description: The name of the BFD Profile to be used for the BFD session
+                  associated to the BGP session. If not set, the BFD session won't
+                  be set up.
                 type: string
               ebgpMultiHop:
-                description: EBGP peer is multi-hops away
+                description: To set if the BGPPeer is multi-hops away. Needed for
+                  FRR mode only.
                 type: boolean
               holdTime:
                 description: Requested BGP hold time, per RFC4271.
@@ -733,6 +770,7 @@ spec:
                 type: string
               peerPort:
                 default: 179
+                description: Port to dial when establishing the session.
                 maximum: 16384
                 minimum: 0
                 type: integer
@@ -781,7 +819,8 @@ spec:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: Community is the Schema for the communities API.
+        description: Community is a collection of aliases for communities. Users can
+          define named aliases to be used in the BGPPeer CRD.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -802,10 +841,11 @@ spec:
                 items:
                   properties:
                     name:
-                      description: Name or identifier for the community.
+                      description: The name of the alias for the community.
                       type: string
                     value:
-                      description: BGP community value.
+                      description: The BGP community value corresponding to the given
+                        name.
                       type: string
                   type: object
                 type: array
@@ -844,7 +884,8 @@ spec:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: IPAddressPool is the Schema for the IPAddressPools API.
+        description: IPAddressPool represents a pool of IP addresses that can be allocated
+          to LoadBalancer services.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -918,7 +959,8 @@ spec:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: L2Advertisement is the Schema for the l2advertisements API.
+        description: L2Advertisement allows to advertise the LoadBalancer IPs provided
+          by the selected pools via L2.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -936,8 +978,9 @@ spec:
             description: L2AdvertisementSpec defines the desired state of L2Advertisement.
             properties:
               ipAddressPoolSelectors:
-                description: IPAddressPoolSelectors is a selector for the ipaddresspools
-                  which would get advertised via this advertisement.
+                description: A selector for the IPAddressPools which would get advertised
+                  via this advertisement. If no IPAddressPool is selected by this
+                  or by the list, the advertisement is applied to all the IPAddressPools.
                 items:
                   description: A label selector is a label query over a set of resources.
                     The result of matchLabels and matchExpressions are ANDed. An empty
@@ -987,14 +1030,15 @@ spec:
                   type: object
                 type: array
               ipAddressPools:
-                description: IPAddressPools is the list of ipaddresspools to advertise
-                  via this advertisement.
+                description: The list of IPAddressPools to advertise via this advertisement,
+                  selected by name.
                 items:
                   type: string
                 type: array
               nodeSelectors:
-                description: NodeSelectors is a selector on the node we should perform
-                  this advertisement from.
+                description: NodeSelectors allows to limit the nodes to announce as
+                  next hops for the LoadBalancer IP. When empty, all the nodes having  are
+                  announced as next hops.
                 items:
                   description: A label selector is a label query over a set of resources.
                     The result of matchLabels and matchExpressions are ANDed. An empty

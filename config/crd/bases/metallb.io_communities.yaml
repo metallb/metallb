@@ -19,7 +19,8 @@ spec:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: Community is the Schema for the communities API.
+        description: Community is a collection of aliases for communities. Users can
+          define named aliases to be used in the BGPPeer CRD.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -40,10 +41,11 @@ spec:
                 items:
                   properties:
                     name:
-                      description: Name or identifier for the community.
+                      description: The name of the alias for the community.
                       type: string
                     value:
-                      description: BGP community value.
+                      description: The BGP community value corresponding to the given
+                        name.
                       type: string
                   type: object
                 type: array
