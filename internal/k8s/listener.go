@@ -5,7 +5,7 @@ package k8s
 import (
 	"sync"
 
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/k8s/epslices"

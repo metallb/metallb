@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-kit/kit/log"
+	"github.com/go-kit/log"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/google/go-cmp/cmp"
 	api "github.com/osrg/gobgp/api"
