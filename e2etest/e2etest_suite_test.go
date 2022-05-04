@@ -49,6 +49,7 @@ var (
 	ipv6ForContainers string
 	useOperator       bool
 	reportPath        string
+	updater           testsconfig.Updater
 )
 
 // handleFlags sets up all flags and parses the command line.
@@ -130,7 +131,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	clientconfig, err := framework.LoadConfig()
 	framework.ExpectNoError(err)
 
-	updater, err := testsconfig.UpdaterForCRs(clientconfig, metallb.Namespace)
+	updater, err = testsconfig.UpdaterForCRs(clientconfig, metallb.Namespace)
 	framework.ExpectNoError(err)
 
 	reporter := k8s.InitReporter(framework.TestContext.KubeConfig, reportPath, metallb.Namespace)
@@ -149,5 +150,7 @@ var _ = ginkgo.AfterSuite(func() {
 	framework.ExpectNoError(err)
 
 	err = bgptests.InfraTearDown(bgptests.FRRContainers, cs)
+	framework.ExpectNoError(err)
+	err = updater.Clean()
 	framework.ExpectNoError(err)
 })
