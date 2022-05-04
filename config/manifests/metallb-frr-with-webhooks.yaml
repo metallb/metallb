@@ -7,7 +7,6 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    cert-manager.io/inject-ca-from: metallb-system/serving-cert
     controller-gen.kubebuilder.io/version: v0.7.0
   name: addresspools.metallb.io
 spec:
@@ -518,7 +517,6 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    cert-manager.io/inject-ca-from: metallb-system/serving-cert
     controller-gen.kubebuilder.io/version: v0.7.0
   name: bgppeers.metallb.io
 spec:
@@ -1202,8 +1200,11 @@ rules:
   - secrets
   verbs:
   - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - ""
@@ -1392,6 +1393,31 @@ rules:
   - podsecuritypolicies
   verbs:
   - use
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - validatingwebhookconfigurations
+  - mutatingwebhookconfigurations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apiextensions.k8s.io
+  resources:
+  - customresourcedefinitions
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -1592,6 +1618,12 @@ data:
 kind: ConfigMap
 metadata:
   name: frr-startup
+  namespace: metallb-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: webhook-server-cert
   namespace: metallb-system
 ---
 apiVersion: v1
@@ -1893,33 +1925,10 @@ spec:
       - emptyDir: {}
         name: metrics
 ---
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: serving-cert
-  namespace: metallb-system
-spec:
-  dnsNames:
-  - webhook-service.metallb-system.svc
-  - webhook-service.metallb-system.svc.cluster.local
-  issuerRef:
-    kind: Issuer
-    name: selfsigned-issuer
-  secretName: webhook-server-cert
----
-apiVersion: cert-manager.io/v1
-kind: Issuer
-metadata:
-  name: selfsigned-issuer
-  namespace: metallb-system
-spec:
-  selfSigned: {}
----
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
-  annotations:
-    cert-manager.io/inject-ca-from: metallb-system/serving-cert
+  creationTimestamp: null
   name: validating-webhook-configuration
 webhooks:
 - admissionReviewVersions:

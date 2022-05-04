@@ -3,32 +3,21 @@ kind: Kustomization
 resources:
 - ../native
 - ../webhook
-- ../certmanager
 
 patchesStrategicMerge:
 - controller-webhook-patch.yaml
-- webhookcainjection-patch.yaml
 - crd-conversion-patch.yaml
-- crdcainjection-patch.yaml
 
-# the following config is for teaching kustomize how to do var substitution
-# [CERTMANAGER] To enable cert-manager, uncomment all sections with 'CERTMANAGER' prefix.
+patchesJson6902:
+- target:
+    group: rbac.authorization.k8s.io
+    version: v1
+    kind: ClusterRole
+    name: metallb-system:controller
+  path: clusterrole-permissions-patch.yaml
+
+# the following config is for teaching kustomize how to do var substitution.
 vars:
-- fieldref:
-    fieldPath: metadata.namespace
-  name: CERTIFICATE_NAMESPACE
-  objref:
-    group: cert-manager.io
-    kind: Certificate
-    name: serving-cert
-    version: v1
-- fieldref: {}
-  name: CERTIFICATE_NAME
-  objref:
-    group: cert-manager.io
-    kind: Certificate
-    name: serving-cert
-    version: v1
 - fieldref:
     fieldPath: metadata.namespace
   name: SERVICE_NAMESPACE
