@@ -3,7 +3,11 @@
 package bgptests
 
 import (
+	"errors"
 	"fmt"
+	"os"
+	"path"
+	"strings"
 
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/frr"
@@ -13,15 +17,31 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-func dumpBGPInfo(cs clientset.Interface, f *framework.Framework) {
+func dumpBGPInfo(basePath, testName string, cs clientset.Interface, f *framework.Framework) {
+	testPath := path.Join(basePath, strings.Replace(testName, " ", "-", -1))
+	err := os.Mkdir(testPath, 0755)
+	if err != nil && !errors.Is(err, os.ErrExist) {
+		fmt.Fprintf(os.Stderr, "failed to create test dir: %v\n", err)
+		return
+	}
+
 	for _, c := range FRRContainers {
-		address := c.Ipv4
-		if address == "" {
-			address = c.Ipv6
-		}
-		peerAddr := address + fmt.Sprintf(":%d", c.RouterConfig.BGPPort)
 		dump, err := frr.RawDump(c, "/etc/frr/bgpd.conf", "/tmp/frr.log", "/etc/frr/daemons")
-		framework.Logf("External frr dump for %s:%s\n%s\nerrors:%v", c.Name, peerAddr, dump, err)
+		if err != nil {
+			framework.Logf("External frr dump for container %s failed %v", c.Name, err)
+			continue
+		}
+		f, err := logFileFor(testPath, fmt.Sprintf("frrdump-%s", c.Name))
+		if err != nil {
+			framework.Logf("External frr dump for container %s, failed to open file %v", c.Name, err)
+			continue
+		}
+		fmt.Fprintf(f, "Dumping information for %s, local addresses: ipv4 - %s, ipv6 - %s\n", c.Name, c.Ipv4, c.Ipv6)
+		_, err = fmt.Fprint(f, dump)
+		if err != nil {
+			framework.Logf("External frr dump for container %s, failed to write to file %v", c.Name, err)
+			continue
+		}
 	}
 
 	speakerPods, err := metallb.SpeakerPods(cs)
@@ -32,7 +52,30 @@ func dumpBGPInfo(cs clientset.Interface, f *framework.Framework) {
 		}
 		podExec := executor.ForPod(pod.Namespace, pod.Name, "frr")
 		dump, err := frr.RawDump(podExec, "/etc/frr/frr.conf", "/etc/frr/frr.log")
-		framework.Logf("External frr dump for pod %s\n%s %v", pod.Name, dump, err)
+		if err != nil {
+			framework.Logf("External frr dump for pod %s failed %v", pod.Name, err)
+			continue
+		}
+		f, err := logFileFor(testPath, fmt.Sprintf("frrdump-%s", pod.Name))
+		if err != nil {
+			framework.Logf("External frr dump for pod %s, failed to open file %v", pod.Name, err)
+			continue
+		}
+		fmt.Fprintf(f, "Dumping information for %s, local addresses: %s\n", pod.Name, pod.Status.PodIPs)
+		_, err = fmt.Fprint(f, dump)
+		if err != nil {
+			framework.Logf("External frr dump for pod %s, failed to write to file %v", pod.Name, err)
+			continue
+		}
 	}
 	k8s.DescribeSvc(f.Namespace.Name)
+}
+
+func logFileFor(base string, kind string) (*os.File, error) {
+	path := path.Join(base, kind) + ".log"
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
 }

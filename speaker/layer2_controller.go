@@ -20,8 +20,8 @@ import (
 	"net"
 	"sort"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	"go.universe.tf/metallb/internal/layer2"
@@ -67,10 +67,10 @@ func usableNodes(eps epslices.EpsOrSlices, speakers map[string]bool) []string {
 				if !epslices.IsConditionReady(ep.Conditions) {
 					continue
 				}
-				nodeName := ep.Topology["kubernetes.io/hostname"]
-				if nodeName == "" {
+				if ep.NodeName == nil {
 					continue
 				}
+				nodeName := *ep.NodeName
 				if speakers != nil {
 					if hasSpeaker := speakers[nodeName]; !hasSpeaker {
 						continue

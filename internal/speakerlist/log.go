@@ -6,8 +6,8 @@ import (
 	golog "log"
 	"regexp"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 )
 
 func newMemberlistLogger(l log.Logger) *golog.Logger {

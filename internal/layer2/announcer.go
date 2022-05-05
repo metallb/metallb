@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 )
 
 // Announce is used to "announce" new IPs mapped to the node's MAC address.
@@ -86,20 +86,18 @@ func (a *Announce) updateInterfaces() {
 				continue
 			}
 		}
-		if ifi.Flags&net.FlagBroadcast != 0 {
-			keepARP[ifi.Index] = true
-		}
 
 		for _, a := range addrs {
 			ipaddr, ok := a.(*net.IPNet)
 			if !ok {
 				continue
 			}
-			if ipaddr.IP.To4() != nil || !ipaddr.IP.IsLinkLocalUnicast() {
-				continue
+			if ipaddr.IP.To4() != nil && (ifi.Flags&net.FlagBroadcast) != 0 {
+				keepARP[ifi.Index] = true
 			}
-			keepNDP[ifi.Index] = true
-			break
+			if ipaddr.IP.IsLinkLocalUnicast() {
+				keepNDP[ifi.Index] = true
+			}
 		}
 
 		if keepARP[ifi.Index] && a.arps[ifi.Index] == nil {

@@ -30,8 +30,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	"github.com/pkg/errors"
 )
 
@@ -126,8 +126,8 @@ func hasHealthyEndpoint(eps epslices.EpsOrSlices, filterNode func(*string) bool)
 	case epslices.Slices:
 		for _, slice := range eps.SlicesVal {
 			for _, ep := range slice.Endpoints {
-				node := ep.Topology["kubernetes.io/hostname"]
-				if filterNode(&node) {
+				node := ep.NodeName
+				if filterNode(node) {
 					continue
 				}
 				for _, addr := range ep.Addresses {

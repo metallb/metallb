@@ -14,7 +14,6 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
 */
-// https://github.com/ovn-org/ovn-kubernetes/blob/a99cc892576be4f15caceca62a87557572e0a447/test/e2e/e2e_suite_test.go
 
 package e2e
 
@@ -33,6 +32,7 @@ import (
 	"go.universe.tf/metallb/e2etest/bgptests"
 	"go.universe.tf/metallb/e2etest/l2tests"
 	testsconfig "go.universe.tf/metallb/e2etest/pkg/config"
+	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	"go.universe.tf/metallb/e2etest/pkg/service"
 	"go.universe.tf/metallb/e2etest/webhookstests"
@@ -48,6 +48,8 @@ var (
 	ipv4ForContainers string
 	ipv6ForContainers string
 	useOperator       bool
+	reportPath        string
+	updater           testsconfig.Updater
 )
 
 // handleFlags sets up all flags and parses the command line.
@@ -71,6 +73,7 @@ func handleFlags() {
 	flag.StringVar(&l2tests.IPV4ServiceRange, "ipv4-service-range", "0", "a range of IPv4 addresses for MetalLB to use when running in layer2 mode")
 	flag.StringVar(&l2tests.IPV6ServiceRange, "ipv6-service-range", "0", "a range of IPv6 addresses for MetalLB to use when running in layer2 mode")
 	flag.BoolVar(&useOperator, "use-operator", false, "set this to true to run the tests using operator custom resources")
+	flag.StringVar(&reportPath, "report-path", "/tmp/report", "the path to be used to dump test failure information")
 	flag.Parse()
 }
 
@@ -128,12 +131,18 @@ var _ = ginkgo.BeforeSuite(func() {
 	clientconfig, err := framework.LoadConfig()
 	framework.ExpectNoError(err)
 
-	updater, err := testsconfig.UpdaterForCRs(clientconfig, metallb.Namespace)
+	updater, err = testsconfig.UpdaterForCRs(clientconfig, metallb.Namespace)
 	framework.ExpectNoError(err)
+
+	reporter := k8s.InitReporter(framework.TestContext.KubeConfig, reportPath, metallb.Namespace)
 
 	bgptests.ConfigUpdater = updater
 	l2tests.ConfigUpdater = updater
 	webhookstests.ConfigUpdater = updater
+	bgptests.Reporter = reporter
+	bgptests.ReportPath = reportPath
+	l2tests.Reporter = reporter
+	webhookstests.Reporter = reporter
 })
 
 var _ = ginkgo.AfterSuite(func() {
@@ -141,5 +150,7 @@ var _ = ginkgo.AfterSuite(func() {
 	framework.ExpectNoError(err)
 
 	err = bgptests.InfraTearDown(bgptests.FRRContainers, cs)
+	framework.ExpectNoError(err)
+	err = updater.Clean()
 	framework.ExpectNoError(err)
 })

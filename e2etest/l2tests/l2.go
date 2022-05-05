@@ -29,6 +29,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/extensions/table"
 	"github.com/onsi/gomega"
+	"github.com/openshift-kni/k8sreporter"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/e2etest/pkg/config"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
@@ -51,12 +52,13 @@ import (
 
 var (
 	ConfigUpdater    config.Updater
+	Reporter         *k8sreporter.KubernetesReporter
 	IPV4ServiceRange string
 	IPV6ServiceRange string
 )
 
 var _ = ginkgo.Describe("L2", func() {
-	f := framework.NewDefaultFramework("l2")
+	var f *framework.Framework
 	var loadBalancerCreateTimeout time.Duration
 	var cs clientset.Interface
 
@@ -66,6 +68,18 @@ var _ = ginkgo.Describe("L2", func() {
 		},
 	}
 
+	ginkgo.AfterEach(func() {
+		// Clean previous configuration.
+		err := ConfigUpdater.Clean()
+		framework.ExpectNoError(err)
+
+		if ginkgo.CurrentGinkgoTestDescription().Failed {
+			k8s.DumpInfo(Reporter, ginkgo.CurrentGinkgoTestDescription().TestText)
+		}
+	})
+
+	f = framework.NewDefaultFramework("l2")
+
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
 		loadBalancerCreateTimeout = e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
@@ -74,16 +88,6 @@ var _ = ginkgo.Describe("L2", func() {
 
 		err := ConfigUpdater.Clean()
 		framework.ExpectNoError(err)
-	})
-
-	ginkgo.AfterEach(func() {
-		// Clean previous configuration.
-		err := ConfigUpdater.Clean()
-		framework.ExpectNoError(err)
-
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
-			k8s.DescribeSvc(f.Namespace.Name)
-		}
 	})
 
 	ginkgo.Context("type=Loadbalancer", func() {
@@ -116,16 +120,11 @@ var _ = ginkgo.Describe("L2", func() {
 				framework.ExpectNoError(err)
 			}()
 
-			port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
-			ingressIP := e2eservice.GetIngressPoint(
-				&svc.Status.LoadBalancer.Ingress[0])
-
 			ginkgo.By("checking connectivity to its external VIP")
 
-			hostport := net.JoinHostPort(ingressIP, port)
-			address := fmt.Sprintf("http://%s/", hostport)
-			err := wget.Do(address, executor.Host)
-			framework.ExpectNoError(err)
+			gomega.Eventually(func() error {
+				return service.ValidateL2(svc)
+			}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
 		})
 
 		ginkgo.It("should work for ExternalTrafficPolicy=Local", func() {
@@ -199,7 +198,6 @@ var _ = ginkgo.Describe("L2", func() {
 				framework.ExpectNoError(err)
 			}()
 
-			port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
 			ingressIP := e2eservice.GetIngressPoint(
 				&svc.Status.LoadBalancer.Ingress[0])
 
@@ -209,10 +207,9 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("checking connectivity to its external VIP")
 
-			hostport := net.JoinHostPort(ingressIP, port)
-			address := fmt.Sprintf("http://%s/", hostport)
-			err = wget.Do(address, executor.Host)
-			framework.ExpectNoError(err)
+			gomega.Eventually(func() error {
+				return service.ValidateL2(svc)
+			}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
 		},
 			table.Entry("AddressPool defined by address range", func() []metallbv1beta1.IPAddressPool {
 				return []metallbv1beta1.IPAddressPool{
@@ -438,7 +435,6 @@ var _ = ginkgo.Describe("L2", func() {
 				return nil
 			}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
 
-			port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
 			ingressIP := e2eservice.GetIngressPoint(
 				&svc.Status.LoadBalancer.Ingress[0])
 
@@ -447,10 +443,10 @@ var _ = ginkgo.Describe("L2", func() {
 			}, 2*time.Minute, 1*time.Second).Should(gomega.Not(gomega.HaveOccurred()))
 
 			ginkgo.By("checking connectivity to its external VIP")
-			hostport := net.JoinHostPort(ingressIP, port)
-			address := fmt.Sprintf("http://%s/", hostport)
-			err = wget.Do(address, executor.Host)
-			framework.ExpectNoError(err)
+
+			gomega.Eventually(func() error {
+				return service.ValidateL2(svc)
+			}, 2*time.Minute, 1*time.Second).Should(gomega.Not(gomega.HaveOccurred()))
 
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
@@ -587,11 +583,9 @@ var _ = ginkgo.Describe("L2", func() {
 				framework.ExpectEqual(ip, servicesIngressIP[j])
 
 				ginkgo.By(fmt.Sprintf("checking connectivity of service %d to its external VIP", j+1))
-				port := strconv.Itoa(int(services[j].Spec.Ports[0].Port))
-				hostport := net.JoinHostPort(ip, port)
-				address := fmt.Sprintf("http://%s/", hostport)
-				err = wget.Do(address, executor.Host)
-				framework.ExpectNoError(err)
+				gomega.Eventually(func() error {
+					return service.ValidateL2(services[j])
+				}, 2*time.Minute, 1*time.Second).Should(gomega.Not(gomega.HaveOccurred()))
 			}
 		}
 	},

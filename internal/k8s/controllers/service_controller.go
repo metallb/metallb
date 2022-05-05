@@ -19,8 +19,8 @@ package controllers
 import (
 	"context"
 
-	"github.com/go-kit/kit/log"
-	"github.com/go-kit/kit/log/level"
+	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -28,7 +28,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 
-	discovery "k8s.io/api/discovery/v1beta1"
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"

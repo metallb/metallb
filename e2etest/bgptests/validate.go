@@ -193,6 +193,29 @@ func checkServiceOnlyOnNodes(cs clientset.Interface, svc *corev1.Service, expect
 	}
 }
 
+func checkServiceNotOnNodes(cs clientset.Interface, svc *corev1.Service, expectedNodes []corev1.Node, ipFamily ipfamily.Family) {
+	if len(expectedNodes) == 0 {
+		return
+	}
+	ip := svc.Status.LoadBalancer.Ingress[0].IP
+	nodeIps := k8s.NodeIPsForFamily(expectedNodes, ipFamily)
+
+	for _, c := range FRRContainers {
+		Eventually(func() bool {
+			routes, err := frr.RoutesForFamily(c, ipFamily)
+			framework.ExpectNoError(err)
+			for _, n := range routes[ip].NextHops {
+				for _, ip := range nodeIps {
+					if n.String() == ip {
+						return true
+					}
+				}
+			}
+			return false
+		}, time.Minute, time.Second).Should(BeFalse())
+	}
+}
+
 func checkCommunitiesOnlyOnNodes(cs clientset.Interface, svc *corev1.Service, community string, expectedNodes []corev1.Node, ipFamily ipfamily.Family) {
 	if len(expectedNodes) == 0 {
 		return
