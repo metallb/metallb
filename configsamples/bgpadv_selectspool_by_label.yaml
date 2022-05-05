@@ -1,0 +1,9 @@
+apiVersion: metallb.io/v1beta1
+kind: BGPAdvertisement
+metadata:
+  name: advertisement
+  namespace: metallb-system
+spec:
+  ipAddressPoolSelectors:
+  - matchLabels:
+      test: bgp-with-advertisement

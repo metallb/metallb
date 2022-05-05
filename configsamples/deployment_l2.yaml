@@ -1,3 +1,19 @@
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: example
+  namespace: metallb-system
+spec:
+  addresses:
+  - 192.168.10.0/24
+  - fc00:f853:0ccd:e799::/124
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: empty
+  namespace: metallb-system
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,7 +33,6 @@ spec:
         ports:
         - name: http
           containerPort: 80
-
 ---
 apiVersion: v1
 kind: Service
@@ -32,3 +47,4 @@ spec:
   selector:
     app: nginx
   type: LoadBalancer
+

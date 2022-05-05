@@ -1,0 +1,21 @@
+apiVersion: metallb.io/v1beta1
+kind: BGPAdvertisement
+metadata:
+  namespace: metallb-system
+  name: advertisement
+spec:
+  communities:
+  - NO_ADVERTISE
+  ipAddressPools:
+  - bgp-with-advertisement
+  localPref: 150
+---
+apiVersion: metallb.io/v1beta1
+kind: Community
+metadata:
+  name: community1
+  namespace: metallb-system
+spec:
+  communities:
+  - name: NO_ADVERTISE
+    value: 65535:65282
