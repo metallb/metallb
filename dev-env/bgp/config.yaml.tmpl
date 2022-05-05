@@ -1,19 +1,27 @@
-apiVersion: v1
-kind: ConfigMap
+apiVersion: metallb.io/v1beta2
+kind: BGPPeer
 metadata:
+  name: peer
   namespace: metallb-system
-  name: config
-data:
-  config: |
-    peers:
-      # NOTE: IP_PEER_ADDRESS will be substituted with the IP address
-      # assigned to the frr container.
-    - peer-address: IP_PEER_ADDRESS
-      peer-asn: 64512
-      my-asn: 64512
-    address-pools:
-    - name: dev-env-bgp
-      protocol: bgp
-      addresses:
-      - 192.168.10.0/24
-      - fc00:f853:0ccd:e799::/124
+spec:
+  myASN: 64512
+  peerASN: 64512
+  # NOTE: PEER_IP_ADDRESS will be substituted with the IP address
+  # assigned to the frr container.
+  peerAddress: PEER_IP_ADDRESS  
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: dev-env-bgp
+  namespace: metallb-system
+spec:
+  addresses:
+  - 192.168.10.0/24
+  - fc00:f853:0ccd:e799::/124
+---
+apiVersion: metallb.io/v1beta1
+kind: BGPAdvertisement
+metadata:
+  name: empty
+  namespace: metallb-system

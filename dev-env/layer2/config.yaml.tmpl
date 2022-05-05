@@ -1,13 +1,15 @@
-apiVersion: v1
-kind: ConfigMap
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
 metadata:
+  name: dev-env-l2
   namespace: metallb-system
-  name: config
-data:
-  config: |
-    address-pools:
-    - name: dev-env-layer2
-      protocol: layer2
-      addresses:
-      - SERVICE_V4_RANGE
-      - SERVICE_V6_RANGE
+spec:
+  addresses:
+  - SERVICE_V4_RANGE
+  - SERVICE_V6_RANGE
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: empty
+  namespace: metallb-system
