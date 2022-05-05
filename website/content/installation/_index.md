@@ -86,9 +86,7 @@ namespace. The components in the manifest are:
 
 The installation manifest does not include a configuration
 file. MetalLB's components will still start, but will remain idle
-until
-you
-[define and deploy a configmap]({{% relref "../configuration/_index.md" %}}).
+until you [start deploying resources]({{% relref "../configuration/_index.md" %}}).
 
 ## Installation with kustomize
 
@@ -105,7 +103,6 @@ namespace: metallb-system
 resources:
   - github.com/metallb/metallb/config/native?ref=main
 ```
-
 
 In order to deploy the [experimental FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions):
 
@@ -131,17 +128,6 @@ A values file may be specified on installation. This is recommended for providin
 
 ```bash
 helm install metallb metallb/metallb -f values.yaml
-```
-
-MetalLB configs are set in `values.yaml` under `configInLine`:
-
-```yaml
-configInline:
-  address-pools:
-   - name: default
-     protocol: layer2
-     addresses:
-     - 198.51.100.0/24
 ```
 
 {{% notice note %}}

@@ -51,6 +51,12 @@ MetalLB requires the following to function:
 - When using the L2 operating mode, traffic on port 7946 (TCP & UDP, other port can be configured) must be allowed between nodes, as required by
   [memberlist](https://github.com/hashicorp/memberlist).
 
+## Backward Compatibility
+
+Previous versions of MetalLB are configurable via a `configmap`. However, starting from the version
+`v0.13.0`, it will be possible to configure it only via CRs. A tool to convert old configmaps to CRs
+is provided TODO: add reference to the conversion instructions.
+
 ## Usage
 
 The [concepts]({{% relref "concepts/_index.md" %}}) section will give
