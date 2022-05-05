@@ -6,10 +6,11 @@ weight: 20
 ## The easy way
 
 As of Calico 3.18 (from early 2021), Calico now supports limited
-integration with MetalLB. Calico can be configured to announce
-LoadBalancer IPs itself via BGP. Simply run MetalLB *without* the
-speaker pods, and then configure the IP range(s) that you want Calico
-to announce.
+integration with MetalLB. Calico can be configured to announce the LoadBalancer IPs via BGP.
+Simply run MetalLB, apply an `IPAddressPool` *without* any `BGPAdvertisement` CR.
+When using MetalLB in this way, you can even remove the `Speaker` pods
+to save cluster resources, as the controller is the component in charge of
+assigning the IPs to the services.
 
 See the [official Calico docs](https://projectcalico.docs.tigera.io/networking/advertise-service-ips)
 for reference.
