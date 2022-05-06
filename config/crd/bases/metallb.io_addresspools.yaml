@@ -103,10 +103,15 @@ spec:
     storage: false
     subresources:
       status: {}
-  - name: v1beta1
+  - deprecated: true
+    deprecationWarning: metallbio.io v1beta1 AddressPool is deprecated, consider using
+      IPAddressPool
+    name: v1beta1
     schema:
       openAPIV3Schema:
-        description: AddressPool is the Schema for the addresspools API.
+        description: AddressPool represents a pool of IP addresses that can be allocated
+          to LoadBalancer services. AddressPool is deprecated and being replaced by
+          IPAddressPool.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -142,8 +147,8 @@ spec:
                   to be used by a pool.
                 type: boolean
               bgpAdvertisements:
-                description: When an IP is allocated from this pool, how should it
-                  be translated into BGP announcements?
+                description: Drives how an IP allocated from this pool should translated
+                  into BGP announcements.
                 items:
                   properties:
                     aggregationLength:
@@ -160,7 +165,8 @@ spec:
                       format: int32
                       type: integer
                     communities:
-                      description: BGP communities
+                      description: BGP communities to be associated with the given
+                        advertisement.
                       items:
                         type: string
                       type: array

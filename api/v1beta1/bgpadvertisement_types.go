@@ -25,36 +25,43 @@ import (
 
 // BGPAdvertisementSpec defines the desired state of BGPAdvertisement.
 type BGPAdvertisementSpec struct {
-	// The aggregation-length advertisement option lets you “roll up” the /32s into a larger prefix.
+	// The aggregation-length advertisement option lets you “roll up” the /32s into a larger prefix. Defaults to 32. Works for IPv4 addresses.
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=32
 	// +optional
 	AggregationLength *int32 `json:"aggregationLength,omitempty"`
 
-	// Optional, defaults to 128 (i.e. no aggregation) if not
-	// specified.
+	// The aggregation-length advertisement option lets you “roll up” the /128s into a larger prefix. Defaults to 128. Works for IPv6 addresses.
 	// +kubebuilder:default:=128
 	// +optional
 	AggregationLengthV6 *int32 `json:"aggregationLengthV6,omitempty"`
 
-	// BGP LOCAL_PREF attribute which is used by BGP best path algorithm,
+	// The BGP LOCAL_PREF attribute which is used by BGP best path algorithm,
 	// Path with higher localpref is preferred over one with lower localpref.
+	// +optional
 	LocalPref uint32 `json:"localPref,omitempty"`
 
-	// BGP communities
+	// The BGP communities to be associated with the announcement. Each item can be a
+	// community of the form 1234:1234 or the name of an alias defined in the Community CRD.
+	// +optional
 	Communities []string `json:"communities,omitempty"`
 
-	// IPAddressPools is the list of ipaddresspools to advertise via this advertisement.
+	// The list of IPAddressPools to advertise via this advertisement, selected by name.
+	// +optional
 	IPAddressPools []string `json:"ipAddressPools,omitempty"`
 
-	// IPAddressPoolSelectors is a selector for the ipaddresspools which would get advertised via this advertisement.
+	// A selector for the IPAddressPools which would get advertised via this advertisement.
+	// If no IPAddressPool is selected by this or by the list, the advertisement is applied to all the IPAddressPools.
+	// +optional
 	IPAddressPoolSelectors []metav1.LabelSelector `json:"ipAddressPoolSelectors,omitempty" yaml:"ipaddress-pool-selectors,omitempty"`
 
-	// NodeSelectors is a selector on the node we should perform this advertisement from.
+	// NodeSelectors allows to limit the nodes to announce as next hops for the LoadBalancer IP. When empty, all the nodes having  are announced as next hops.
+	// +optional
 	NodeSelectors []metav1.LabelSelector `json:"nodeSelectors,omitempty" yaml:"node-selectors,omitempty"`
 
-	// Peers are used to declare the intent of announcing the IPs of
-	// IPPools only to the Peers in this list.
+	// Peers limits the bgppeer to advertise the ips of the selected pools to.
+	// When empty, the loadbalancer IP is announced to all the BGPPeers configured.
+	// +optional
 	Peers []string `json:"peers,omitempty"`
 }
 
@@ -67,7 +74,9 @@ type BGPAdvertisementStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 
-// BGPAdvertisement is the Schema for the bgpadvertisements API.
+// BGPAdvertisement allows to advertise the IPs coming
+// from the selected IPAddressPools via BGP, setting the parameters of the
+// BGP Advertisement.
 type BGPAdvertisement struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`

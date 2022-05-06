@@ -804,6 +804,13 @@ def generatemanifests(ctx, controller_gen="controller-gen", kustomize_cli="kusto
     generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="frr", enable_webhooks=True, output="config/manifests/metallb-frr-with-webhooks.yaml")
     generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="native", enable_webhooks=True, output="config/manifests/metallb-native-with-webhooks.yaml")
 
+@task
+def generateapidocs(ctx):
+    """Generates the docs for the CRDs"""
+    run("go install github.com/ahmetb/gen-crd-api-reference-docs@3f29e6853552dcf08a8e846b1225f275ed0f3e3b")
+    run('gen-crd-api-reference-docs -config website/generatecrddoc/crdgen.json -template-dir website/generatecrddoc/template -api-dir "go.universe.tf/metallb/api" -out-file /tmp/generated_apidoc.html')
+    run("cat website/generatecrddoc/prefix.html /tmp/generated_apidoc.html > website/content/apis/_index.md")
+
 @task(help={
     "action": "The action to take to fix the uncommitted changes",
     })

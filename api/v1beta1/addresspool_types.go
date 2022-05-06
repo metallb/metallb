@@ -37,7 +37,7 @@ type LegacyBgpAdvertisement struct {
 	// Path with higher localpref is preferred over one with lower localpref.
 	LocalPref uint32 `json:"localPref,omitempty" yaml:"localpref,omitempty"`
 
-	// BGP communities
+	// BGP communities to be associated with the given advertisement.
 	Communities []string `json:"communities,omitempty" yaml:"communities,omitempty"`
 }
 
@@ -65,8 +65,8 @@ type AddressPoolSpec struct {
 	// +kubebuilder:default:=false
 	AvoidBuggyIPs bool `json:"avoidBuggyIPs,omitempty"`
 
-	// When an IP is allocated from this pool, how should it be
-	// translated into BGP announcements?
+	// Drives how an IP allocated from this pool should
+	// translated into BGP announcements.
 	// +optional
 	BGPAdvertisements []LegacyBgpAdvertisement `json:"bgpAdvertisements,omitempty" yaml:"bgp-advertisements,omitempty"`
 }
@@ -80,8 +80,11 @@ type AddressPoolStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion
+// +kubebuilder:deprecatedversion:warning="metallbio.io v1beta1 AddressPool is deprecated, consider using IPAddressPool"
 
-// AddressPool is the Schema for the addresspools API.
+// AddressPool represents a pool of IP addresses that can be allocated
+// to LoadBalancer services.
+// AddressPool is deprecated and being replaced by IPAddressPool.
 type AddressPool struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
