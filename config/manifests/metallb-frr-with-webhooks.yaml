@@ -1239,6 +1239,14 @@ rules:
 - apiGroups:
   - metallb.io
   resources:
+  - bfdprofiles
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
   - ipaddresspools
   verbs:
   - get
@@ -1953,6 +1961,25 @@ webhooks:
     - UPDATE
     resources:
     - addresspools
+  sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: metallb-system
+      path: /validate-metallb-io-v1beta1-bfdprofile
+  failurePolicy: Fail
+  name: bfdprofilevalidationwebhook.metallb.io
+  rules:
+  - apiGroups:
+    - metallb.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - DELETE
+    resources:
+    - bfdprofiles
   sideEffects: None
 - admissionReviewVersions:
   - v1
