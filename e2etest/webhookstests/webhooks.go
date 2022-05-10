@@ -19,8 +19,11 @@ limitations under the License.
 package webhookstests
 
 import (
+	"context"
+
 	"go.universe.tf/metallb/e2etest/pkg/config"
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
+	"go.universe.tf/metallb/e2etest/pkg/metallb"
 
 	"github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -32,6 +35,7 @@ import (
 	"go.universe.tf/metallb/internal/pointer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -331,6 +335,49 @@ var _ = ginkgo.Describe("Webhooks", func() {
 			err = ConfigUpdater.Update(resources)
 			framework.ExpectError(err)
 			Expect(err.Error()).To(ContainSubstring("duplicate definition of community"))
+		})
+	})
+
+	ginkgo.Context("For BFDProfile", func() {
+		testBFDProfile := metallbv1beta1.BFDProfile{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "bfdprofile-webhooks-test",
+				Namespace: metallb.Namespace,
+			},
+		}
+		testPeer := metallbv1beta2.BGPPeer{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "bgppeer-webhooks-test",
+				Namespace: metallb.Namespace,
+			},
+			Spec: metallbv1beta2.BGPPeerSpec{
+				BFDProfile: testBFDProfile.Name,
+				ASN:        1234,
+				MyASN:      1234,
+				Address:    "1.2.3.4",
+			},
+		}
+		ginkgo.It("Should produce an error when deleting a profile used by a BGPPeer", func() {
+			ginkgo.By("Creating BFDProfile and BGPPeer")
+			resources := metallbconfig.ClusterResources{
+				BFDProfiles: []metallbv1beta1.BFDProfile{testBFDProfile},
+				Peers:       []metallbv1beta2.BGPPeer{testPeer},
+			}
+			err := ConfigUpdater.Update(resources)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Deleting the profile used by BGPPeer")
+			err = ConfigUpdater.Client().Delete(context.TODO(), &testBFDProfile, &client.DeleteOptions{})
+			framework.ExpectError(err)
+			Expect(err.Error()).To(ContainSubstring("Failed to delete BFDProfile"))
+
+			ginkgo.By("Deleting the BGPPeer")
+			err = ConfigUpdater.Client().Delete(context.TODO(), &testPeer, &client.DeleteOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Deleting the profile not used by BGPPeer")
+			err = ConfigUpdater.Client().Delete(context.TODO(), &testBFDProfile, &client.DeleteOptions{})
+			framework.ExpectNoError(err)
 		})
 	})
 })
