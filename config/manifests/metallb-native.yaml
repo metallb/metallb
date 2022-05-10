@@ -1215,6 +1215,14 @@ rules:
 - apiGroups:
   - metallb.io
   resources:
+  - bfdprofiles
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - metallb.io
+  resources:
   - ipaddresspools
   verbs:
   - get
