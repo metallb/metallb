@@ -310,6 +310,11 @@ func enableWebhook(mgr manager.Manager, validate config.Validate, namespace stri
 		return err
 	}
 
+	if err := (&metallbv1beta1.BFDProfile{}).SetupWebhookWithManager(mgr); err != nil {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "BFDProfile")
+		return err
+	}
+
 	return nil
 }
 
