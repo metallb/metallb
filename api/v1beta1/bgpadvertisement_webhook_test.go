@@ -97,7 +97,7 @@ func TestValidateBGPAdvertisement(t *testing.T) {
 			},
 		},
 		{
-			desc: "Same, update",
+			desc: "Same, new",
 			bgpAdv: &BGPAdvertisement{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-bgpadv",
