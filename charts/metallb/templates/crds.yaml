@@ -224,6 +224,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.7.0
+  {{- if .Values.webhooks.enable }}
+    cert-manager.io/inject-ca-from: {{ .Release.Namespace }}/{{ template "metallb.fullname" . }}-serving-cert    
+  {{- end }}
   creationTimestamp: null
   name: bfdprofiles.metallb.io
 spec:
