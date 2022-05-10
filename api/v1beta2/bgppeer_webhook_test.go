@@ -22,8 +22,8 @@ func TestValidateBGPPeer(t *testing.T) {
 
 	Logger = log.NewNopLogger()
 
-	toRestore := getExistingBGPPeers
-	getExistingBGPPeers = func() (*BGPPeerList, error) {
+	toRestore := GetExistingBGPPeers
+	GetExistingBGPPeers = func() (*BGPPeerList, error) {
 		return &BGPPeerList{
 			Items: []BGPPeer{
 				bgpPeer,
@@ -32,7 +32,7 @@ func TestValidateBGPPeer(t *testing.T) {
 	}
 
 	defer func() {
-		getExistingBGPPeers = toRestore
+		GetExistingBGPPeers = toRestore
 	}()
 
 	tests := []struct {
