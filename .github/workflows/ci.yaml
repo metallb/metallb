@@ -3,10 +3,12 @@ name: CI
 on:
   push:
     branches:
-      - 'main'
+      - "main"
+      - "v**"
   pull_request:
     branches:
-      - 'main'
+      - "main"
+      - "v**"
   workflow_dispatch:
 
 jobs:
@@ -146,7 +148,8 @@ jobs:
         with:
           repository: metallb/metallb-operator
           path: metallboperator
-          ref: e84470bf3644e6444169abb65483bb1a60c957af
+          ref: v0.12
+          fetch-depth: 0
 
       - uses: actions/setup-go@v2
         with:
