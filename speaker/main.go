@@ -343,7 +343,7 @@ func (c *controller) deleteBalancer(l log.Logger, name, reason string) k8s.SyncS
 			"protocol": string(proto),
 			"service":  name,
 			"node":     c.myNode,
-			"ips":      ip.String(),
+			"ip":       ip.String(),
 		})
 	}
 	delete(c.announced, name)
