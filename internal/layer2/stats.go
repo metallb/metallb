@@ -56,3 +56,9 @@ func (m *metrics) SentResponse(addr string) {
 func (m *metrics) SentGratuitous(addr string) {
 	m.gratuitous.WithLabelValues(addr).Add(1)
 }
+
+func (m *metrics) DeleteLayer2Metrics(addr string) {
+	m.in.DeleteLabelValues(addr)
+	m.out.DeleteLabelValues(addr)
+	m.gratuitous.DeleteLabelValues(addr)
+}

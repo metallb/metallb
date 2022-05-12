@@ -272,8 +272,9 @@ func (a *Announce) DeleteBalancer(name string) {
 				level.Error(a.logger).Log("op", "unwatchMulticastGroup", "error", err, "ip", ip, "msg", "failed to unwatch NDP multicast group for IP")
 			}
 		}
+		// It's safe to unregister l2 metrics now as announced IP is already removed from a.ips.
+		stats.DeleteLayer2Metrics(ip.String())
 	}
-
 }
 
 // AnnounceName returns true when we have an announcement under name.
