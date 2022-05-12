@@ -128,6 +128,21 @@ func TestSingleEBGPSessionOneHop(t *testing.T) {
 	testCheckConfigFile(t)
 }
 
+func TestSingleIPv6EBGPSessionOneHop(t *testing.T) {
+	testSetup(t)
+
+	l := log.NewNopLogger()
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
+	defer close(sessionManager.reloadConfig)
+	session, err := sessionManager.NewSession(l, "[127:0:0::2]:179", net.ParseIP("10:1:1::254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", false, "test-peer")
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	testCheckConfigFile(t)
+}
+
 func TestSingleIBGPSession(t *testing.T) {
 	testSetup(t)
 
@@ -135,6 +150,21 @@ func TestSingleIBGPSession(t *testing.T) {
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 100, time.Second, time.Second, "password", "hostname", "", false, "test-peer")
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	testCheckConfigFile(t)
+}
+
+func TestSingleIPv6IBGPSession(t *testing.T) {
+	testSetup(t)
+
+	l := log.NewNopLogger()
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
+	defer close(sessionManager.reloadConfig)
+	session, err := sessionManager.NewSession(l, "[10:2:2::254]:179", net.ParseIP("10:1:1::254"), 100, net.ParseIP("10.1.1.254"), 100, time.Second, time.Second, "password", "hostname", "", false, "test-peer")
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -170,6 +200,26 @@ func TestTwoSessions(t *testing.T) {
 	}
 	defer session1.Close()
 	session2, err := sessionManager.NewSession(l, "10.4.4.255:179", net.ParseIP("10.3.3.254"), 300, net.ParseIP("10.3.3.254"), 400, time.Second, time.Second, "password", "hostname", "", true, "test-peer2")
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session2.Close()
+
+	testCheckConfigFile(t)
+}
+
+func TestTwoIPv6Sessions(t *testing.T) {
+	testSetup(t)
+
+	l := log.NewNopLogger()
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
+	defer close(sessionManager.reloadConfig)
+	session1, err := sessionManager.NewSession(l, "[10:2:2::254]:179", net.ParseIP("10:1:1::254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", false, "test-peer1")
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session1.Close()
+	session2, err := sessionManager.NewSession(l, "[10:4:4::255]:179", net.ParseIP("10:3:3::254"), 300, net.ParseIP("10.3.3.254"), 400, time.Second, time.Second, "password", "hostname", "", false, "test-peer2")
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}

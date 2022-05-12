@@ -1,0 +1,65 @@
+
+log file /etc/frr/frr.log informational
+log timestamp precision 3
+hostname dummyhostname
+ip nht resolve-via-default
+ipv6 nht resolve-via-default
+route-map 10:2:2::254-in deny 20
+route-map 10:2:2::254-out permit 1
+  match ipv6 address prefix-list 10:2:2::254-pl-ipv6
+  on-match next
+ipv6 prefix-list 10:2:2::254-pl-ipv6 deny any
+route-map 10:4:4::255-in deny 20
+route-map 10:4:4::255-out permit 1
+  match ipv6 address prefix-list 10:4:4::255-pl-ipv6
+  on-match next
+ipv6 prefix-list 10:4:4::255-pl-ipv6 deny any
+
+router bgp 100
+  no bgp ebgp-requires-policy
+  no bgp network import-check
+  no bgp default ipv4-unicast
+
+  bgp router-id 10.1.1.254
+
+  neighbor 10:2:2::254 remote-as 200
+  neighbor 10:2:2::254 port 179
+  neighbor 10:2:2::254 timers 1 1
+  neighbor 10:2:2::254 password password
+  neighbor 10:2:2::254 update-source 10:1:1::254
+  neighbor 10:2:2::254 disable-connected-check
+
+  address-family ipv4 unicast
+    neighbor 10:2:2::254 activate
+    neighbor 10:2:2::254 route-map 10:2:2::254-in in
+	neighbor 10:2:2::254 route-map 10:2:2::254-out out
+  exit-address-family
+  address-family ipv6 unicast
+    neighbor 10:2:2::254 activate
+    neighbor 10:2:2::254 route-map 10:2:2::254-in in
+	neighbor 10:2:2::254 route-map 10:2:2::254-out out
+  exit-address-family
+router bgp 300
+  no bgp ebgp-requires-policy
+  no bgp network import-check
+  no bgp default ipv4-unicast
+
+  bgp router-id 10.3.3.254
+
+  neighbor 10:4:4::255 remote-as 400
+  neighbor 10:4:4::255 port 179
+  neighbor 10:4:4::255 timers 1 1
+  neighbor 10:4:4::255 password password
+  neighbor 10:4:4::255 update-source 10:3:3::254
+  neighbor 10:4:4::255 disable-connected-check
+
+  address-family ipv4 unicast
+    neighbor 10:4:4::255 activate
+    neighbor 10:4:4::255 route-map 10:4:4::255-in in
+	neighbor 10:4:4::255 route-map 10:4:4::255-out out
+  exit-address-family
+  address-family ipv6 unicast
+    neighbor 10:4:4::255 activate
+    neighbor 10:4:4::255 route-map 10:4:4::255-in in
+	neighbor 10:4:4::255 route-map 10:4:4::255-out out
+  exit-address-family
