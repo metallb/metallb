@@ -252,7 +252,7 @@ func (a *Allocator) AllocateFromPool(svc string, serviceIPFamily ipfamily.Family
 			// Not the right ip-family
 			continue
 		}
-		ip := a.getIPFromCIDR(cidr, pool.AvoidBuggyIPs, svc, ports, sharingKey, backendKey)
+		ip := a.getIPFromCIDR(cidr, svc, ports, sharingKey, backendKey)
 		if ip != nil {
 			ips = append(ips, ip)
 			delete(ipfamilySel, cidrIPFamily)
@@ -327,28 +327,6 @@ func poolCount(p *config.Pool) int64 {
 			return math.MaxInt64
 		}
 		sz := int64(math.Pow(2, float64(b-o)))
-
-		cur := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})
-		firstIP := cur.First().IP
-		lastIP := cur.Last().IP
-
-		if p.AvoidBuggyIPs {
-			if o <= 24 {
-				// A pair of buggy IPs occur for each /24 present in the range.
-				buggies := int64(math.Pow(2, float64(24-o))) * 2
-				sz -= buggies
-			} else {
-				// Ranges smaller than /24 contain 1 buggy IP if they
-				// start/end on a /24 boundary, otherwise they contain
-				// none.
-				if ipConfusesBuggyFirmwares(firstIP) {
-					sz--
-				}
-				if ipConfusesBuggyFirmwares(lastIP) {
-					sz--
-				}
-			}
-		}
 		total += sz
 	}
 	return total
@@ -359,9 +337,6 @@ func poolFor(pools map[string]*config.Pool, ips []net.IP) string {
 	for pname, p := range pools {
 		cnt := 0
 		for _, ip := range ips {
-			if p.AvoidBuggyIPs && ipConfusesBuggyFirmwares(ip) {
-				continue
-			}
 			for _, cidr := range p.CIDR {
 				if cidr.Contains(ip) {
 					cnt++
@@ -376,28 +351,13 @@ func poolFor(pools map[string]*config.Pool, ips []net.IP) string {
 	return ""
 }
 
-// ipConfusesBuggyFirmwares returns true if ip is an IPv4 address ending in 0 or 255.
-//
-// Such addresses can confuse smurf protection on crappy CPE
-// firmwares, leading to packet drops.
-func ipConfusesBuggyFirmwares(ip net.IP) bool {
-	ip = ip.To4()
-	if ip == nil {
-		return false
-	}
-	return ip[3] == 0 || ip[3] == 255
-}
-
-func (a *Allocator) getIPFromCIDR(cidr *net.IPNet, avoidBuggyIPs bool, svc string, ports []Port, sharingKey, backendKey string) net.IP {
+func (a *Allocator) getIPFromCIDR(cidr *net.IPNet, svc string, ports []Port, sharingKey, backendKey string) net.IP {
 	sk := &key{
 		sharing: sharingKey,
 		backend: backendKey,
 	}
 	c := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})
 	for pos := c.First(); pos != nil; pos = c.Next() {
-		if avoidBuggyIPs && ipConfusesBuggyFirmwares(pos.IP) {
-			continue
-		}
 		if a.checkSharing(svc, pos.IP.String(), ports, sk) != nil {
 			continue
 		}
