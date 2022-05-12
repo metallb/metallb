@@ -68,39 +68,8 @@ func PoolCount(p metallbv1beta1.IPAddressPool) (int64, error) {
 				return math.MaxInt64, nil
 			}
 			sz := int64(math.Pow(2, float64(b-o)))
-
-			cur := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})
-			firstIP := cur.First().IP
-			lastIP := cur.Last().IP
-
-			if p.Spec.AvoidBuggyIPs {
-				if o <= 24 {
-					// A pair of buggy IPs occur for each /24 present in the range.
-					buggies := int64(math.Pow(2, float64(24-o))) * 2
-					sz -= buggies
-				} else {
-					// Ranges smaller than /24 contain 1 buggy IP if they
-					// start/end on a /24 boundary, otherwise they contain
-					// none.
-					if ipConfusesBuggyFirmwares(firstIP) {
-						sz--
-					}
-					if ipConfusesBuggyFirmwares(lastIP) {
-						sz--
-					}
-				}
-			}
-
 			total += sz
 		}
 	}
 	return total, nil
-}
-
-func ipConfusesBuggyFirmwares(ip net.IP) bool {
-	ip = ip.To4()
-	if ip == nil {
-		return false
-	}
-	return ip[3] == 0 || ip[3] == 255
 }

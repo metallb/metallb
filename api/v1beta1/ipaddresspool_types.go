@@ -33,12 +33,6 @@ type IPAddressPoolSpec struct {
 	// +optional
 	// +kubebuilder:default:=true
 	AutoAssign *bool `json:"autoAssign,omitempty"`
-
-	// AvoidBuggyIPs prevents addresses ending with .0 and .255
-	// to be used by a pool.
-	// +optional
-	// +kubebuilder:default:=false
-	AvoidBuggyIPs bool `json:"avoidBuggyIPs,omitempty"`
 }
 
 // IPAddressPoolStatus defines the observed state of IPAddressPool.
