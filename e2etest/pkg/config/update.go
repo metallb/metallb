@@ -131,12 +131,12 @@ func (o operatorUpdater) Clean() error {
 		return err
 	}
 
-	err = o.DeleteAllOf(context.Background(), &operatorv1beta1.BFDProfile{}, client.InNamespace(o.namespace))
+	err = o.DeleteAllOf(context.Background(), &operatorv1beta1.BGPPeer{}, client.InNamespace(o.namespace))
 	if err != nil {
 		return err
 	}
 
-	err = o.DeleteAllOf(context.Background(), &operatorv1beta1.BGPPeer{}, client.InNamespace(o.namespace))
+	err = o.DeleteAllOf(context.Background(), &operatorv1beta1.BFDProfile{}, client.InNamespace(o.namespace))
 	if err != nil {
 		return err
 	}
