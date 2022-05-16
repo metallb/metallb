@@ -221,6 +221,6 @@ speaker:
   frr:
     enabled: false
     image:
-      repository: quay.io/frrouting/frr
-      tag: stable_7.5
+      repository: frrouting/frr
+      tag: v7.5.1
       pullPolicy:
