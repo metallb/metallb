@@ -37,6 +37,12 @@ Release notes during beta will highlight any required changes to configuration
 when upgrading between versions, and give advance warning of removals planned
 for the following version.
 
+## Kubernetes compatibility
+
+The MetalLB maintainers aim to keep compatibility with the supported versions
+of Kubernetes. If a kubernetes version is not supported anymore, the compatibility is
+provided on best effort basis.
+
 ## Documentation
 
 Documentation exists, but hasn't been battle-tested by many readers
