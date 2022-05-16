@@ -1720,7 +1720,7 @@ spec:
         env:
         - name: TINI_SUBREAPER
           value: "true"
-        image: quay.io/frrouting/frr:stable_7.5
+        image: frrouting/frr:v7.5.1
         name: frr
         securityContext:
           capabilities:
@@ -1736,7 +1736,7 @@ spec:
           name: frr-conf
       - command:
         - /etc/frr_reloader/frr-reloader.sh
-        image: quay.io/frrouting/frr:stable_7.5
+        image: frrouting/frr:v7.5.1
         name: reloader
         volumeMounts:
         - mountPath: /var/run/frr
@@ -1749,7 +1749,7 @@ spec:
         - --metrics-port=7473
         command:
         - /etc/frr_metrics/frr-metrics
-        image: quay.io/frrouting/frr:stable_7.5
+        image: frrouting/frr:v7.5.1
         name: frr-metrics
         ports:
         - containerPort: 7473
@@ -1835,7 +1835,7 @@ spec:
         - /bin/sh
         - -c
         - cp -rLf /tmp/frr/* /etc/frr/
-        image: quay.io/frrouting/frr:stable_7.5
+        image: frrouting/frr:v7.5.1
         name: cp-frr-files
         securityContext:
           runAsGroup: 101
