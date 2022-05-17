@@ -74,7 +74,7 @@ type AddressPoolStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion
-// +kubebuilder:deprecatedversion:warning="metallbio.io v1beta1 AddressPool is deprecated, consider using IPAddressPool"
+// +kubebuilder:deprecatedversion:warning="metallb.io v1beta1 AddressPool is deprecated, consider using IPAddressPool"
 
 // AddressPool represents a pool of IP addresses that can be allocated
 // to LoadBalancer services.

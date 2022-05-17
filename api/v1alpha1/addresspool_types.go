@@ -73,7 +73,7 @@ type AddressPoolStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:deprecatedversion:warning="metallbio.io v1alpha1 AddressPool is deprecated"
+// +kubebuilder:deprecatedversion:warning="metallb.io v1alpha1 AddressPool is deprecated"
 
 // AddressPool is the Schema for the addresspools API.
 type AddressPool struct {
