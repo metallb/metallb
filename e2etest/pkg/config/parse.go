@@ -38,7 +38,6 @@ func IPAddressPoolToLegacy(ipAddressPool metallbv1beta1.IPAddressPool, protocol 
 			Protocol:          string(protocol),
 			Addresses:         make([]string, 0),
 			AutoAssign:        ipAddressPool.Spec.AutoAssign,
-			AvoidBuggyIPs:     ipAddressPool.Spec.AvoidBuggyIPs,
 			BGPAdvertisements: make([]metallbv1beta1.LegacyBgpAdvertisement, 0),
 		},
 	}
