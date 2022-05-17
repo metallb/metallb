@@ -188,7 +188,12 @@ jobs:
         run: |
           inv build
           inv dev-env -b frr --enable-webhooks
-
+      
+      # Patch the old e2etest to cleanup the resources in the correct order.
+      - name: Apply patch
+        run: |
+          patch metallb-v0.12.1/e2etest/pkg/config/update.go < e2etest/backwardcompatible/patchfile
+          
       - name: E2E
         run: |
           cat <<EOF | kubectl apply -f -
