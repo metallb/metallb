@@ -35,7 +35,7 @@ spec:
   {{- end }}
   versions:
   - deprecated: true
-    deprecationWarning: metallbio.io v1alpha1 AddressPool is deprecated
+    deprecationWarning: metallb.io v1alpha1 AddressPool is deprecated
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -122,7 +122,7 @@ spec:
     subresources:
       status: {}
   - deprecated: true
-    deprecationWarning: metallbio.io v1beta1 AddressPool is deprecated, consider using
+    deprecationWarning: metallb.io v1beta1 AddressPool is deprecated, consider using
       IPAddressPool
     name: v1beta1
     schema:
