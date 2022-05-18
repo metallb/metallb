@@ -1,4 +1,5 @@
 name: Publish
+
 on:
   push:
     branches:
@@ -6,6 +7,9 @@ on:
       - 'v.*'
     tags:
       - '.*'
+  pull_request:
+    branches:
+      - 'main'
 
 jobs:
   publish:
@@ -45,7 +49,7 @@ jobs:
 
       - name: Build ${{ matrix.image }} binary and image
         run: |
-          inv build --binaries=${{ matrix.image }} --registry=quay.io --repo=metallb --tag=${{ github.ref_name }} --architectures=${{ matrix.arch }}
+          inv build --binaries=${{ matrix.image }} --registry=quay.io --repo=metallb --tag=test --architectures=${{ matrix.arch }}
 
       - name: Login to Quay.io container registry
         uses: docker/login-action@v1
@@ -60,7 +64,7 @@ jobs:
         with:
           images: quay.io/metallb/${{ matrix.image }}
           tags: |
-            type=raw,value=${{ github.ref_name }}-${{ matrix.arch }}
+            type=raw,value=test-${{ matrix.arch }}
 
       - name: Build and push ${{ matrix.image }} image
         uses: docker/build-push-action@v2
