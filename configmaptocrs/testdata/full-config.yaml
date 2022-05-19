@@ -1,0 +1,58 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    peers:
+    - peer-address: 10.0.0.1
+      peer-asn: 64512
+      my-asn: 64512
+      peer-port: 179
+      source-address: 10.0.0.2
+      hold-time: 120s
+      keepalive-time: 30s
+      router-id: 1.2.3.4
+      password: "yourPassword"
+      bfd-profile: "bfdprofile1"
+      ebgp-multihop: false
+      node-selectors:
+      - match-labels:
+          kubernetes.io/hostname: prod-01
+        match-expressions:
+        - key: beta.kubernetes.io/arch
+          operator: In
+          values: [amd64, arm]
+    address-pools:
+    - name: my-ip-space
+      protocol: bgp
+      addresses:
+      - 192.168.10.0/24
+      - 192.168.0.150-192.168.0.200
+      avoid-buggy-ips: true
+      auto-assign: true
+      bgp-advertisements:
+      - aggregation-length: 32
+        aggregation-length-v6: 64
+        localpref: 100
+        communities:
+        - 64512:1
+        - no-export
+    - name: my-l2-space
+      protocol: l2
+      addresses:
+      - 192.168.11.0/24
+      - 192.168.1.150-192.168.1.200
+      avoid-buggy-ips: true
+    bgp-communities:
+      no-export: 65535:65281
+    bfd-profiles:
+    - name: bfdprofile1
+      receive-interval: 280
+      transmit-interval: 270
+      echo-interval: 62
+      echo-mode: false
+      passive-mode: false
+      minimum-ttl: 254
+      detect-multiplier: 200
