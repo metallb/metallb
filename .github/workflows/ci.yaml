@@ -12,7 +12,15 @@ on:
   workflow_dispatch:
 
 jobs:
-  unit-tests:
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - uses: wagoid/commitlint-github-action@v4
+
+  unit-tests-and-build:
     runs-on: ubuntu-20.04
     steps:
       - name: Cancel Previous Runs
@@ -52,6 +60,23 @@ jobs:
           inv generateapidocs
           inv checkchanges --action="run inv generateapidocs"
 
+      - name: Build and save MetalLB images
+        run: |
+          inv build --binaries all
+          docker save quay.io/metallb/speaker:dev-amd64 > speaker.tar
+          docker save quay.io/metallb/controller:dev-amd64 > controller.tar
+          docker save quay.io/metallb/mirror-server:dev-amd64 > mirror-server.tar
+
+      - name: Upload images
+        uses: actions/upload-artifact@v3
+        with:
+          name: metallb-images
+          retention-days: 1
+          path: |
+            speaker.tar
+            controller.tar
+            mirror-server.tar
+
   helm:
     runs-on: ubuntu-20.04
     steps:
@@ -88,6 +113,10 @@ jobs:
 
   e2e:
     runs-on: ubuntu-20.04
+    needs:
+      - unit-tests-and-build
+      - helm
+      - commitlint
     strategy:
       fail-fast: false
       matrix:
@@ -117,12 +146,24 @@ jobs:
           GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
           go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0
 
-      - name: Build MetalLB
+      - name: Download MetalLB images
+        uses: actions/download-artifact@v3
+        with:
+          name: metallb-images
+          path: metallb-images
+
+      - name: Load MetalLB images
+        working-directory: metallb-images
         run: |
-          inv build
+          docker load -i speaker.tar
+          docker load -i controller.tar
+          docker load -i mirror-server.tar
+
+      - name: Deploy MetalLB
+        run: |
           HELM_FLAGS=""
           if [ ${{ matrix.deployment }} = "helm" ]; then HELM_FLAGS="--helm-install"; fi
-          inv dev-env -i ${{ matrix.ip-family }} -b ${{ matrix.bgp-type }} -l all $HELM_FLAGS --enable-webhooks
+          inv dev-env -i ${{ matrix.ip-family }} -b ${{ matrix.bgp-type }} -l all $HELM_FLAGS --enable-webhooks --no-build-images
 
       - name: E2E
         run: |
@@ -154,6 +195,10 @@ jobs:
   # in operator mode. We run few significative tests that cover all the crds.
   backward_compatible:
     runs-on: ubuntu-20.04
+    needs:
+      - unit-tests-and-build
+      - helm
+      - commitlint
     steps:
       - name: Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.9.1
@@ -184,10 +229,22 @@ jobs:
           GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
           go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0
 
-      - name: Build MetalLB
+      - name: Download MetalLB images
+        uses: actions/download-artifact@v3
+        with:
+          name: metallb-images
+          path: metallb-images
+
+      - name: Load MetalLB images
+        working-directory: metallb-images
         run: |
-          inv build
-          inv dev-env -b frr --enable-webhooks
+          docker load -i speaker.tar
+          docker load -i controller.tar
+          docker load -i mirror-server.tar
+
+      - name: Deploy MetalLB
+        run: |
+          inv dev-env -b frr --enable-webhooks --no-build-images
       
       # Patch the old e2etest to cleanup the resources in the correct order.
       - name: Apply patch
@@ -222,6 +279,10 @@ jobs:
 
   e2e-use-operator:
     runs-on: ubuntu-20.04
+    needs:
+      - unit-tests-and-build
+      - helm
+      - commitlint
     defaults:
       run:
         shell: bash
@@ -258,9 +319,18 @@ jobs:
           sudo pip3 install -r ./dev-env/requirements.txt
           GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
 
-      - name: Build MetalLB Images
+      - name: Download MetalLB images
+        uses: actions/download-artifact@v3
+        with:
+          name: metallb-images
+          path: metallb-images
+
+      - name: Load MetalLB images
+        working-directory: metallb-images
         run: |
-          inv build
+          docker load -i speaker.tar
+          docker load -i controller.tar
+          docker load -i mirror-server.tar
 
       - name: Create multi-node K8s Kind Cluster
         run: |
