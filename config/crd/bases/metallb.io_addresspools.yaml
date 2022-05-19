@@ -17,7 +17,7 @@ spec:
   scope: Namespaced
   versions:
   - deprecated: true
-    deprecationWarning: metallbio.io v1alpha1 AddressPool is deprecated
+    deprecationWarning: metallb.io v1alpha1 AddressPool is deprecated
     name: v1alpha1
     schema:
       openAPIV3Schema:
@@ -103,10 +103,15 @@ spec:
     storage: false
     subresources:
       status: {}
-  - name: v1beta1
+  - deprecated: true
+    deprecationWarning: metallb.io v1beta1 AddressPool is deprecated, consider using
+      IPAddressPool
+    name: v1beta1
     schema:
       openAPIV3Schema:
-        description: AddressPool is the Schema for the addresspools API.
+        description: AddressPool represents a pool of IP addresses that can be allocated
+          to LoadBalancer services. AddressPool is deprecated and being replaced by
+          IPAddressPool.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -136,14 +141,9 @@ spec:
                 description: AutoAssign flag used to prevent MetallB from automatic
                   allocation for a pool.
                 type: boolean
-              avoidBuggyIPs:
-                default: false
-                description: AvoidBuggyIPs prevents addresses ending with .0 and .255
-                  to be used by a pool.
-                type: boolean
               bgpAdvertisements:
-                description: When an IP is allocated from this pool, how should it
-                  be translated into BGP announcements?
+                description: Drives how an IP allocated from this pool should translated
+                  into BGP announcements.
                 items:
                   properties:
                     aggregationLength:
@@ -160,7 +160,8 @@ spec:
                       format: int32
                       type: integer
                     communities:
-                      description: BGP communities
+                      description: BGP communities to be associated with the given
+                        advertisement.
                       items:
                         type: string
                       type: array

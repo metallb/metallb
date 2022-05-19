@@ -19,7 +19,8 @@ spec:
   - name: v1beta1
     schema:
       openAPIV3Schema:
-        description: IPAddressPool is the Schema for the IPAddressPools API.
+        description: IPAddressPool represents a pool of IP addresses that can be allocated
+          to LoadBalancer services.
         properties:
           apiVersion:
             description: 'APIVersion defines the versioned schema of this representation
@@ -48,11 +49,6 @@ spec:
                 default: true
                 description: AutoAssign flag used to prevent MetallB from automatic
                   allocation for a pool.
-                type: boolean
-              avoidBuggyIPs:
-                default: false
-                description: AvoidBuggyIPs prevents addresses ending with .0 and .255
-                  to be used by a pool.
                 type: boolean
             required:
             - addresses

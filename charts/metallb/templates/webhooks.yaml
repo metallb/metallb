@@ -108,6 +108,25 @@ webhooks:
     resources:
     - communities
   sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: {{ template "metallb.fullname" . }}-webhook-service
+      namespace: {{ .Release.Namespace }}
+      path: /validate-metallb-io-v1beta1-bfdprofile
+  failurePolicy: Fail
+  name: bfdprofileyvalidationwebhook.metallb.io
+  rules:
+  - apiGroups:
+    - metallb.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - DELETE
+    resources:
+    - bfdprofiles
+  sideEffects: None
 ---
 apiVersion: v1
 kind: Service

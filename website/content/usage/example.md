@@ -20,30 +20,72 @@ address pools, and set BGP attributes to control the visibility of
 each set of addresses:
 
 ```yaml
-# Rest of config omitted for brevity
-bgp-communities:
-  # Our datacenter routers understand a "VPN only" BGP community.
-  # Announcements tagged with this community will only be propagated
-  # through the corporate VPN tunnel back to developer offices.
-  vpn-only: 1234:1
-address-pools:
-- # Production services will go here. Public IPs are expensive, so we leased
-  # just 4 of them.
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
   name: production
-  protocol: bgp
+  namespace: metallb-system
+spec:
+  # Production services will go here. Public IPs are expensive, so we leased
+  # just 4 of them.
   addresses:
   - 42.176.25.64/30
+```
 
-- # On the other hand, the sandbox environment uses private IP space,
+```yaml
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: sandbox
+  namespace: metallb-system
+spec:
+  addresses:
+  # On the other hand, the sandbox environment uses private IP space,
   # which is free and plentiful. We give this address pool a ton of IPs,
   # so that developers can spin up as many sandboxes as they need.
-  name: sandbox
-  protocol: bgp
-  addresses:
   - 192.168.144.0/20
-  bgp-advertisements:
-  - communities:
+```
+
+Then we advertise them, and set BGP attributes to control the visibility of
+each set of addresses:
+
+```yaml
+apiVersion: metallb.io/v1beta1
+kind: BGPAdvertisement
+metadata:
+  name: external
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - production
+```
+
+```yaml
+apiVersion: metallb.io/v1beta1
+kind: BGPAdvertisement
+metadata:
+  name: local
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - sandbox
+  communities:
     - vpn-only
+```
+
+```yaml
+# Our datacenter routers understand a "VPN only" BGP community.
+# Announcements tagged with this community will only be propagated
+# through the corporate VPN tunnel back to developer offices.
+apiVersion: metallb.io/v1beta1
+kind: Community
+metadata:
+  name: communities
+  namespace: metallb-system
+spec:
+  communities:
+  - name: vpn-only
+    value: 1234:1
 ```
 
 In our Helm charts for sandboxes, we tag all services with the

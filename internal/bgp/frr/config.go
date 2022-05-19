@@ -102,6 +102,9 @@ router bgp {{$r.MyASN}}
 {{- if ne .BFDProfile ""}} 
   neighbor {{.Addr}} bfd profile {{.BFDProfile}}
 {{- end }}
+{{- if  mustDisableConnectedCheck .IPFamily $r.MyASN .ASN .EBGPMultiHop }}
+  neighbor {{.Addr}} disable-connected-check
+{{- end }}
 {{- end }}
 {{range $n := .Neighbors -}}
 {{/* no bgp default ipv4-unicast prevents peering if no address families are defined. We declare an ipv4 one for the peer to make the pairing happen */}}
@@ -245,6 +248,13 @@ func templateConfig(data interface{}) (string, error) {
 			},
 			"allowedPrefixList": func(neighbor *neighborConfig) string {
 				return fmt.Sprintf("%s-pl-%s", neighbor.Addr, neighbor.IPFamily)
+			},
+			"mustDisableConnectedCheck": func(ipFamily ipfamily.Family, myASN, asn uint32, eBGPMultiHop bool) bool {
+				// return true only for IPv6 eBGP sessions
+				if ipFamily == "ipv6" && myASN != asn && !eBGPMultiHop {
+					return true
+				}
+				return false
 			},
 		}).Parse(configTemplate)
 	if err != nil {

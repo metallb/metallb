@@ -67,7 +67,15 @@ func Init(lvl string) (log.Logger, error) {
 		return nil, err
 	}
 
-	return level.NewFilter(log.With(l, "ts", log.DefaultTimestampUTC, "caller", log.DefaultCaller), opt), nil
+	timeStampValuer := log.TimestampFormat(time.Now, time.RFC3339)
+	l = log.With(l, "ts", timeStampValuer)
+	l = level.NewFilter(l, opt)
+
+	// Note: caller must be added after everything else that decorates the
+	// logger (otherwise we get incorrect caller reference).
+	l = log.With(l, "caller", log.DefaultCaller)
+
+	return l, nil
 }
 
 func collectGlogs(f *os.File, logger log.Logger) {

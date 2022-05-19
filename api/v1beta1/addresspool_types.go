@@ -25,20 +25,20 @@ type LegacyBgpAdvertisement struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default:=32
 	// +optional
-	AggregationLength *int32 `json:"aggregationLength,omitempty" yaml:"aggregation-length,omitempty"`
+	AggregationLength *int32 `json:"aggregationLength,omitempty"`
 
 	// Optional, defaults to 128 (i.e. no aggregation) if not
 	// specified.
 	// +kubebuilder:default:=128
 	// +optional
-	AggregationLengthV6 *int32 `json:"aggregationLengthV6,omitempty" yaml:"aggregation-length-v6,omitempty"`
+	AggregationLengthV6 *int32 `json:"aggregationLengthV6,omitempty"`
 
 	// BGP LOCAL_PREF attribute which is used by BGP best path algorithm,
 	// Path with higher localpref is preferred over one with lower localpref.
-	LocalPref uint32 `json:"localPref,omitempty" yaml:"localpref,omitempty"`
+	LocalPref uint32 `json:"localPref,omitempty"`
 
-	// BGP communities
-	Communities []string `json:"communities,omitempty" yaml:"communities,omitempty"`
+	// BGP communities to be associated with the given advertisement.
+	Communities []string `json:"communities,omitempty"`
 }
 
 // AddressPoolSpec defines the desired state of AddressPool.
@@ -59,16 +59,10 @@ type AddressPoolSpec struct {
 	// +kubebuilder:default:=true
 	AutoAssign *bool `json:"autoAssign,omitempty"`
 
-	// AvoidBuggyIPs prevents addresses ending with .0 and .255
-	// to be used by a pool.
+	// Drives how an IP allocated from this pool should
+	// translated into BGP announcements.
 	// +optional
-	// +kubebuilder:default:=false
-	AvoidBuggyIPs bool `json:"avoidBuggyIPs,omitempty"`
-
-	// When an IP is allocated from this pool, how should it be
-	// translated into BGP announcements?
-	// +optional
-	BGPAdvertisements []LegacyBgpAdvertisement `json:"bgpAdvertisements,omitempty" yaml:"bgp-advertisements,omitempty"`
+	BGPAdvertisements []LegacyBgpAdvertisement `json:"bgpAdvertisements,omitempty"`
 }
 
 // AddressPoolStatus defines the observed state of AddressPool.
@@ -80,8 +74,11 @@ type AddressPoolStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion
+// +kubebuilder:deprecatedversion:warning="metallb.io v1beta1 AddressPool is deprecated, consider using IPAddressPool"
 
-// AddressPool is the Schema for the addresspools API.
+// AddressPool represents a pool of IP addresses that can be allocated
+// to LoadBalancer services.
+// AddressPool is deprecated and being replaced by IPAddressPool.
 type AddressPool struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
