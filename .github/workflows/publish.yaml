@@ -83,4 +83,4 @@ jobs:
           mkdir -p ./bin
           wget -qO- https://github.com/estesp/manifest-tool/releases/download/v2.0.3/binaries-manifest-tool-2.0.3.tar.gz | tar xvz -C ./bin
           mv ./bin/manifest-tool-linux-amd64 ./bin/manifest-tool && chmod +x ./bin/manifest-tool
-          sudo -E env "PATH=./bin:$PATH" inv push-multiarch --binaries=controller --binaries=speaker --registry=quay.io --repo=metallb --tag=${{ github.ref_name }}
+          sudo -E env "PATH=./bin:$PATH" inv push-multiarch --binaries=controller --binaries=speaker --binaries=configmaptocrs --registry=quay.io --repo=metallb --tag=${{ github.ref_name }}

@@ -17,7 +17,8 @@ from invoke.exceptions import Exit, UnexpectedExit
 
 all_binaries = set(["controller",
                     "speaker",
-                    "mirror-server"])
+                    "mirror-server",
+                    "configmaptocrs"])
 all_architectures = set(["amd64",
                          "arm",
                          "arm64",
@@ -53,6 +54,7 @@ def _check_binaries(binaries):
     if not out:
         out.add("controller")
         out.add("speaker")
+        out.add("configmaptocrs")
     return list(sorted(out))
 
 def _docker_build_cmd():
