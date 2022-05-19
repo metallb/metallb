@@ -1,18 +1,26 @@
 FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.11 AS builder
 WORKDIR /metallb
 
+COPY .git/ .git/
+
 ADD . /metallb
 
 WORKDIR /metallb/frr-metrics
 RUN CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -o ./frr-metrics
 
-
 WORKDIR /metallb/controller
-RUN CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -o ./controller
-
+RUN export SOURCE_GIT_COMMIT="${SOURCE_GIT_COMMIT:-$(git rev-parse --verify 'HEAD^{commit}')}" && \
+      export GIT_BRANCH="${GIT_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}" && \
+      CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -o ./controller \
+      -ldflags "-X go.universe.tf/metallb/internal/version.gitCommit=${SOURCE_GIT_COMMIT} \
+      -X go.universe.tf/metallb/internal/version.gitBranch=${GIT_BRANCH}"
 
 WORKDIR /metallb/speaker
-RUN CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -o ./speaker
+RUN export SOURCE_GIT_COMMIT="${SOURCE_GIT_COMMIT:-$(git rev-parse --verify 'HEAD^{commit}')}" && \
+      export GIT_BRANCH="${GIT_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}" && \
+      CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -o ./speaker \
+      -ldflags "-X go.universe.tf/metallb/internal/version.gitCommit=${SOURCE_GIT_COMMIT} \
+      -X go.universe.tf/metallb/internal/version.gitBranch=${GIT_BRANCH}"
 
 FROM registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.11
 COPY --from=builder /metallb/controller/controller /metallb/speaker/speaker \
