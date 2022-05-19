@@ -43,6 +43,7 @@ jobs:
       - run: mkdir -p ./bin
       - run: wget -O ./bin/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.3/manifest-tool-linux-amd64 && chmod +x ./bin/manifest-tool
       - run: PATH=./bin:$PATH inv push-multiarch --binaries=controller --binaries=speaker --registry=docker.io --repo=metallb --tag=${CIRCLE_BRANCH:-${CIRCLE_TAG}}
+      - run: PATH=./bin:$PATH inv push --binaries=generator --architectures=amd64 --registry=docker.io --repo=metallb --tag=${CIRCLE_BRANCH:-${CIRCLE_TAG}}
   publish-images-quay:
     docker:
       - image: cimg/go:1.17.1
@@ -58,6 +59,8 @@ jobs:
       - run: mkdir -p ./bin
       - run: wget -O ./bin/manifest-tool https://github.com/estesp/manifest-tool/releases/download/v1.0.3/manifest-tool-linux-amd64 && chmod +x ./bin/manifest-tool
       - run: PATH=./bin:$PATH inv push-multiarch --binaries=controller --binaries=speaker --registry=quay.io --repo=metallb --tag=${CIRCLE_BRANCH:-${CIRCLE_TAG}}
+      - run: PATH=./bin:$PATH inv push --binaries=generator --architectures=amd64 --registry=quay.io --repo=metallb --tag=${CIRCLE_BRANCH:-${CIRCLE_TAG}}
+
 workflows:
   version: 2
   test-and-publish:

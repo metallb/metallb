@@ -17,7 +17,8 @@ from invoke.exceptions import Exit, UnexpectedExit
 
 all_binaries = set(["controller",
                     "speaker",
-                    "mirror-server"])
+                    "mirror-server",
+                    "generator"])
 all_architectures = set(["amd64",
                          "arm",
                          "arm64",
