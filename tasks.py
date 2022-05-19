@@ -313,10 +313,12 @@ def generate_manifest(ctx, controller_gen="controller-gen", crd_options="crd:crd
                 "Default: False.",
     "enable_webhooks": "Optional enable MetalLB webhooks."
                 "Default: False.",
+    "build_images": "Optional build the images."
+                "Default: True.",
 })
 def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_dir="",
         node_img=None, ip_family="ipv4", bgp_type="native", log_level="info",
-        helm_install=False, enable_webhooks=False):
+        helm_install=False, enable_webhooks=False, build_images=True):
     """Build and run MetalLB in a local Kind cluster.
 
     If the cluster specified by --name (default "kind") doesn't exist,
@@ -357,7 +359,8 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
             run("kind create cluster --name={} --config={} {}".format(name, tmp.name, extra_options), pty=True, echo=True)
 
     binaries = ["controller", "speaker", "mirror-server"]
-    build(ctx, binaries, architectures=[architecture])
+    if build_images:
+        build(ctx, binaries, architectures=[architecture])
     run("kind load docker-image --name={} quay.io/metallb/controller:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
