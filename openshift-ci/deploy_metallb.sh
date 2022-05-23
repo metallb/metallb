@@ -34,6 +34,8 @@ kind: MetalLB
 metadata:
   name: metallb
   namespace: metallb-system
+spec:
+  logLevel: debug
 EOF
 
 oc adm policy add-scc-to-user privileged -n metallb-system -z speaker
