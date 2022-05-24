@@ -58,8 +58,12 @@ metadata:
   namespace: metallb-system
   name: config
 EOF
-rm -rf e2etest # we want to make sure we are not running current e2e by mistake
+
 git clone -b ${BACKWARD_COMPATIBLE_RELEASE} ${METALLB_REPO}
+# We need to invert the order as deleting a used bfd profile is not allowed.
+patch metallb/e2etest/pkg/config/update.go < e2etest/backwardcompatible/patchfile
+
+rm -rf e2etest # we want to make sure we are not running current e2e by mistake
 cd metallb
 FOCUS="\"L2.*should work for ExternalTrafficPolicy=Cluster\"\|\"BGP.*A service of protocol load balancer should work with.*IPV4 - ExternalTrafficPolicyCluster$\"\|\"BFD.*IPV4 - full params$\""
 inv e2etest --kubeconfig=$(readlink -f ../../../ocp/ostest/auth/kubeconfig) \
