@@ -296,7 +296,7 @@ jobs:
         with:
           repository: metallb/metallb-operator
           path: metallboperator
-          ref: f0a89e03bc4963ef021b02e858fe3ce78dcf6b41
+          ref: e444bb9c23df5bdb944bf138e67964fc8141aa31
 
       - uses: actions/setup-go@v2
         with:
