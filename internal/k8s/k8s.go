@@ -446,7 +446,7 @@ func (c *Client) PodIPs(namespace, labels string) ([]string, error) {
 func (c *Client) Run(stopCh <-chan struct{}) error {
 	ctx := ctrl.SetupSignalHandler()
 
-	level.Info(c.logger).Log("Starting Manager")
+	level.Info(c.logger).Log("op", "Run", "msg", "Starting Manager")
 	if err := c.mgr.Start(ctx); err != nil {
 		return err
 	}
