@@ -26,8 +26,8 @@ spec:
         # but we're going to set it later using the cert-controller.
         caBundle: Cg==
         service:
-          namespace: system
-          name: webhook-service
+          namespace: {{ .Release.Namespace }}
+          name: {{ template "metallb.fullname" . }}-webhook-service
           path: /convert
   {{- end }}
   versions:
@@ -539,8 +539,8 @@ spec:
         # but we're going to set it later using the cert-controller.
         caBundle: Cg==
         service:
-          namespace: system-metallb
-          name: webhook-service
+          namespace: {{ .Release.Namespace }}
+          name: {{ template "metallb.fullname" . }}-webhook-service
           path: /convert
   {{- end }}
   versions:
