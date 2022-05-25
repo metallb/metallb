@@ -5,5 +5,15 @@ FROM alpine:latest
 # just in case
 COPY --chmod=a+x configmaptocrs /configmaptocrs
 
+LABEL org.opencontainers.image.authors="metallb" \
+  org.opencontainers.image.url="https://github.com/metallb/metallb" \
+  org.opencontainers.image.documentation="https://metallb.universe.tf" \
+  org.opencontainers.image.source="https://github.com/metallb/metallb" \
+  org.opencontainers.image.vendor="metallb" \
+  org.opencontainers.image.licenses="Apache-2.0" \
+  org.opencontainers.image.description="Metallb Configmap to CRs converter" \
+  org.opencontainers.image.title="configmap to crs" \
+  org.opencontainers.image.base.name="docker.io/alpine:latest"
+
 ENTRYPOINT ["/configmaptocrs"]
 
