@@ -39,6 +39,9 @@ elif [ "${IP_STACK}" = "v4v6" ]; then
 fi
 echo "Skipping ${SKIP}"
 
+# Let's enforce failing when running the tests
+set -e
+
 pip3 install --user -r ./../dev-env/requirements.txt
 export PATH=${PATH}:${HOME}/.local/bin
 export CONTAINER_RUNTIME=podman
