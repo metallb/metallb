@@ -27,12 +27,14 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
+	"github.com/open-policy-agent/cert-controller/pkg/rotator"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
@@ -48,9 +50,18 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 )
 
+const (
+	caName         = "cert"
+	caOrganization = "metallb"
+)
+
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme                          = runtime.NewScheme()
+	setupLog                        = ctrl.Log.WithName("setup")
+	validatingWebhookName           = "validating-webhook-configuration"
+	addresspoolConvertingWebhookCRD = "addresspools.metallb.io"
+	bgppeerConvertingWebhookCRD     = "bgppeers.metallb.io"
+	webhookSecretName               = "webhook-server-cert"
 )
 
 func init() {
@@ -84,17 +95,20 @@ type Client struct {
 // Config specifies the configuration of the Kubernetes
 // client/watcher.
 type Config struct {
-	ProcessName     string
-	NodeName        string
-	MetricsHost     string
-	MetricsPort     int
-	EnablePprof     bool
-	ReadEndpoints   bool
-	Logger          log.Logger
-	DisableEpSlices bool
-	Namespace       string
-	ValidateConfig  config.Validate
-	EnableWebhook   bool
+	ProcessName         string
+	NodeName            string
+	MetricsHost         string
+	MetricsPort         int
+	EnablePprof         bool
+	ReadEndpoints       bool
+	Logger              log.Logger
+	DisableEpSlices     bool
+	Namespace           string
+	ValidateConfig      config.Validate
+	EnableWebhook       bool
+	DisableCertRotation bool
+	CertDir             string
+	CertServiceName     string
 	Listener
 }
 
@@ -244,11 +258,52 @@ func New(cfg *Config) (*Client, error) {
 	}
 
 	if cfg.EnableWebhook {
-		err := enableWebhook(mgr, cfg.ValidateConfig, cfg.Namespace, cfg.Logger)
-		if err != nil {
-			level.Error(c.logger).Log("error", err, "unable to create", "webhooks")
-			return nil, err
+		setupFinished := make(chan struct{})
+		if !cfg.DisableCertRotation {
+			webhooks := []rotator.WebhookInfo{
+				{
+					Name: validatingWebhookName,
+					Type: rotator.Validating,
+				},
+				{
+					Name: addresspoolConvertingWebhookCRD,
+					Type: rotator.CRDConversion,
+				},
+				{
+					Name: bgppeerConvertingWebhookCRD,
+					Type: rotator.CRDConversion,
+				},
+			}
+
+			level.Info(c.logger).Log("op", "startup", "action", "setting up cert rotation")
+			err := rotator.AddRotator(mgr, &rotator.CertRotator{
+				SecretKey: types.NamespacedName{
+					Namespace: cfg.Namespace,
+					Name:      webhookSecretName,
+				},
+				CertDir:        cfg.CertDir,
+				CAName:         caName,
+				CAOrganization: caOrganization,
+				DNSName:        fmt.Sprintf("%s.%s.svc", cfg.CertServiceName, cfg.Namespace),
+				IsReady:        setupFinished,
+				Webhooks:       webhooks,
+			})
+			if err != nil {
+				level.Error(c.logger).Log("error", err, "unable to set up", "cert rotation")
+				return nil, err
+			}
+		} else {
+			close(setupFinished)
 		}
+
+		go func() {
+			// Block until the setup (certificate generation) finishes.
+			<-setupFinished
+			err := enableWebhook(c.mgr, cfg.ValidateConfig, cfg.Namespace, cfg.Logger)
+			if err != nil {
+				level.Error(c.logger).Log("error", err, "unable to create", "webhooks")
+			}
+		}()
 	}
 
 	mux := http.NewServeMux()

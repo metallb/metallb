@@ -253,34 +253,6 @@ def validate_kind_version():
     if delta < 0:
         raise Exit(message="kind version >= {} required".format(min_version))
 
-@task(help={
-    "version": "version of cert-manager to install."
-                "Default: v1.5.4",
-})
-def install_cert_manager(ctx, version="v1.5.4"):
-    res = run("kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/{}/cert-manager.yaml".format(version))
-    if not res.ok:
-        raise Exit(message="Failed to install cert-manager")
-    
-    # wait for cert-manager to be ready
-    attempts = 0
-    max_attempts = 60
-    cert_manager_ready = False
-    while not cert_manager_ready and attempts != max_attempts:
-        print("Waiting for cert-manager to be ready attempt: {}".format(attempts))
-        try:
-            res = run("kubectl apply -f config/certmanager/self-signed-cert.yaml")
-        except Exception as e:
-            print("Failed, retrying")
-            time.sleep(5)
-        else:
-            print("cert-manager is ready")
-            cert_manager_ready = True
-            res = run("kubectl delete -f config/certmanager/self-signed-cert.yaml")
-        attempts += 1
-    if not cert_manager_ready:
-        raise Exit(message="Timed out waiting for cert-manage to be ready")
-
 def generate_manifest(ctx, controller_gen="controller-gen", crd_options="crd:crdVersions=v1",
         kustomize_cli="kustomize", bgp_type="native", output=None, enable_webhooks=False):
     res = run("{} {} rbac:roleName=manager-role webhook paths=\"./api/...\" output:crd:artifacts:config=config/crd/bases".format(controller_gen, crd_options))
@@ -364,9 +336,6 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
     run("kind load docker-image --name={} quay.io/metallb/controller:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
-
-    if enable_webhooks:
-        install_cert_manager(ctx)
 
     if helm_install:
         run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
