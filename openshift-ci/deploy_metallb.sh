@@ -38,6 +38,21 @@ spec:
   logLevel: debug
 EOF
 
+NAMESPACE="metallb-system"
+ATTEMPTS=0
+
+while [[ -z $(oc get endpoints -n $NAMESPACE webhook-service -o jsonpath="{.subsets[0].addresses}" 2>/dev/null) ]]; do
+  echo "still waiting for webhookservice endpoints"
+  sleep 10
+  (( ATTEMPTS++ ))
+  if [ $ATTEMPTS -eq 30 ]; then
+        echo "failed waiting for webhookservice endpoints"
+        exit 1
+  fi
+done
+echo "webhook endpoints avaliable"
+
+
 oc adm policy add-scc-to-user privileged -n metallb-system -z speaker
 
 sudo ip route add 192.168.10.0/24 dev ${BAREMETAL_NETWORK_NAME}

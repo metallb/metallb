@@ -39,6 +39,9 @@ elif [ "${IP_STACK}" = "v4v6" ]; then
 fi
 echo "Skipping ${SKIP}"
 
+# Let's enforce failing when running the tests
+set -e
+
 pip3 install --user -r ./../dev-env/requirements.txt
 export PATH=${PATH}:${HOME}/.local/bin
 export CONTAINER_RUNTIME=podman
@@ -61,7 +64,7 @@ EOF
 
 git clone -b ${BACKWARD_COMPATIBLE_RELEASE} ${METALLB_REPO}
 # We need to invert the order as deleting a used bfd profile is not allowed.
-patch metallb/e2etest/pkg/config/update.go < e2etest/backwardcompatible/patchfile
+patch metallb/e2etest/pkg/config/update.go < "$metallb_dir"/e2etest/backwardcompatible/patchfile
 
 rm -rf e2etest # we want to make sure we are not running current e2e by mistake
 cd metallb
