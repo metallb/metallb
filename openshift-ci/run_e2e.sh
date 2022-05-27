@@ -63,8 +63,10 @@ metadata:
 EOF
 
 git clone -b ${BACKWARD_COMPATIBLE_RELEASE} ${METALLB_REPO}
+
+metallb_root=$(dirname $metallb_dir )
 # We need to invert the order as deleting a used bfd profile is not allowed.
-patch metallb/e2etest/pkg/config/update.go < "$metallb_dir"/e2etest/backwardcompatible/patchfile
+patch metallb/e2etest/pkg/config/update.go < "$metallb_root"/e2etest/backwardcompatible/patchfile
 
 rm -rf e2etest # we want to make sure we are not running current e2e by mistake
 cd metallb
