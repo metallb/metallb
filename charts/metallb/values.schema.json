@@ -166,16 +166,6 @@
         }
       }
     },
-    "webhooks": {
-      "description": "webhooks configuration",
-      "type": "object",
-      "properties": {
-        "enable": {
-          "description": "Enables webhooks",
-          "type": "boolean"
-        }
-      }
-    },
     "psp": {
       "description": "PSP configuration",
       "type": "object",

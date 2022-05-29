@@ -48,10 +48,7 @@ spec:
         {{- with .Values.controller.logLevel }}
         - --log-level={{ . }}
         {{- end }}
-        {{- if .Values.webhooks.enable }}
-        - --enable-webhook
         - --cert-service-name={{ template "metallb.fullname" . }}-webhook-service
-        {{- end }}
         env:
         {{- if and .Values.speaker.enabled .Values.speaker.memberlist.enabled }}
         - name: METALLB_ML_SECRET_NAME
@@ -66,7 +63,6 @@ spec:
         ports:
         - name: monitoring
           containerPort: {{ .Values.prometheus.metricsPort }}
-        {{- if .Values.webhooks.enable }}
         - containerPort: 9443
           name: webhook-server
           protocol: TCP
@@ -74,7 +70,6 @@ spec:
         - mountPath: /tmp/k8s-webhook-server/serving-certs
           name: cert
           readOnly: true
-        {{- end }}
         {{- if .Values.controller.livenessProbe.enabled }}
         livenessProbe:
           httpGet:
@@ -123,11 +118,9 @@ spec:
       {{- with .Values.controller.priorityClassName }}
       priorityClassName: {{ . | quote }}
       {{- end }}
-      {{- if .Values.webhooks.enable }}
       volumes:
       - name: cert
         secret:
           defaultMode: 420
           secretName: webhook-server-cert
-      {{- end }}
 {{- end }}
