@@ -34,6 +34,9 @@ spec:
         ports:
         - containerPort: 7472
           name: monitoring
+        - containerPort: 9443
+          name: webhook-server
+          protocol: TCP
         livenessProbe:
           httpGet:
             path: /metrics
@@ -58,6 +61,10 @@ spec:
             drop:
             - all
           readOnlyRootFilesystem: true
+        volumeMounts:
+        - mountPath: /tmp/k8s-webhook-server/serving-certs
+          name: cert
+          readOnly: true
       nodeSelector:
         kubernetes.io/os: linux
       securityContext:
@@ -66,3 +73,8 @@ spec:
         fsGroup: 65534
       serviceAccountName: controller
       terminationGracePeriodSeconds: 0
+      volumes:
+      - name: cert
+        secret:
+          defaultMode: 420
+          secretName: webhook-server-cert
