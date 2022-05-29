@@ -124,7 +124,6 @@ func main() {
 		logLevel            = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
 		disableEpSlices     = flag.Bool("disable-epslices", false, "Disable the usage of EndpointSlices and default to Endpoints instead of relying on the autodiscovery mechanism")
 		enablePprof         = flag.Bool("enable-pprof", false, "Enable pprof profiling")
-		enableWebhook       = flag.Bool("enable-webhook", false, "Enable validation webhook")
 		disableCertRotation = flag.Bool("disable-cert-rotation", false, "disable automatic generation and rotation of webhook TLS certificates/keys")
 		certDir             = flag.String("cert-dir", "/tmp/k8s-webhook-server/serving-certs", "The directory where certs are stored")
 		certServiceName     = flag.String("cert-service-name", "webhook-service", "The service name used to generate the TLS cert's hostname")
@@ -172,7 +171,7 @@ func main() {
 			PoolChanged:    c.SetPools,
 		},
 		ValidateConfig:      validation,
-		EnableWebhook:       *enableWebhook,
+		EnableWebhook:       true,
 		DisableCertRotation: *disableCertRotation,
 		CertDir:             *certDir,
 		CertServiceName:     *certServiceName,
