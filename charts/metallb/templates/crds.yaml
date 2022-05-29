@@ -16,7 +16,6 @@ spec:
     plural: addresspools
     singular: addresspool
   scope: Namespaced
-{{- if .Values.webhooks.enable}}
   conversion:
     strategy: Webhook
     webhook:
@@ -29,7 +28,6 @@ spec:
           namespace: {{ .Release.Namespace }}
           name: {{ template "metallb.fullname" . }}-webhook-service
           path: /convert
-  {{- end }}
   versions:
   - deprecated: true
     deprecationWarning: metallb.io v1alpha1 AddressPool is deprecated
@@ -529,7 +527,6 @@ spec:
     plural: bgppeers
     singular: bgppeer
   scope: Namespaced
-  {{- if .Values.webhooks.enable }}
   conversion:
     strategy: Webhook
     webhook:
@@ -542,7 +539,6 @@ spec:
           namespace: {{ .Release.Namespace }}
           name: {{ template "metallb.fullname" . }}-webhook-service
           path: /convert
-  {{- end }}
   versions:
   - name: v1beta1
     schema:
