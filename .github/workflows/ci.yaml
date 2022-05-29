@@ -159,7 +159,7 @@ jobs:
         run: |
           HELM_FLAGS=""
           if [ ${{ matrix.deployment }} = "helm" ]; then HELM_FLAGS="--helm-install"; fi
-          inv dev-env -i ${{ matrix.ip-family }} -b ${{ matrix.bgp-type }} -l all $HELM_FLAGS --enable-webhooks --no-build-images
+          inv dev-env -i ${{ matrix.ip-family }} -b ${{ matrix.bgp-type }} -l all $HELM_FLAGS --no-build-images
 
       - name: E2E
         run: |
@@ -240,7 +240,7 @@ jobs:
 
       - name: Deploy MetalLB
         run: |
-          inv dev-env -b frr --enable-webhooks --no-build-images
+          inv dev-env -b frr --no-build-images
       
       # Patch the old e2etest to cleanup the resources in the correct order.
       - name: Apply patch
