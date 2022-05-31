@@ -92,6 +92,16 @@ jobs:
         with:
           args: ct lint
 
+      - name: Helm doc generate
+        uses: docker://jnorwood/helm-docs:v1.10.0
+
+      - name: Check if  docs are different
+        run: |
+          if [[ $(git status --porcelain | wc -l) -gt 0 ]]; then
+            echo "Please update the helm docs with the \"helm-docs\" command (https://github.com/norwoodj/helm-docs) or use \"inv helmdocs\""
+            exit 1
+          fi
+
       ## TODO: Can't pass flags to the conftest GHA in order to use --fail-on-warn
       ##       Should be fixed when https://github.com/instrumenta/conftest-action/issues/3
       ##       is resolved

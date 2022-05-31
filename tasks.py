@@ -660,6 +660,28 @@ def lint(ctx, env="container"):
 
 
 @task(help={
+    "env": "Specify in which environment to run helmdocs . Default 'container'. Supported: 'container','host'"
+})
+def helmdocs(ctx, env="container"):
+    """Run helm-docs.
+
+    By default, this will run a helm-docs docker image against the code.
+    However, in some environments (such as the MetalLB CI), it may be more
+    convenient to install the helm-docs binaries on the host. This can be
+    achieved by running `inv helmdocs --env host`.
+    """
+    version = "1.10.0"
+    cmd = "helm-docs"
+
+    if env == "container":
+        run("docker run --rm -v $(git rev-parse --show-toplevel):/app -w /app jnorwood/helm-docs:v{} {}".format(version, cmd), echo=True)
+    elif env == "host":
+        run(cmd)
+    else:
+        raise Exit(message="Unsupported helm-docs environment: {}". format(env))
+
+
+@task(help={
     "name": "name of the kind cluster to test (only kind uses).",
     "export": "where to export kind logs.",
     "kubeconfig": "kubeconfig location. By default, use the kubeconfig from kind.",
