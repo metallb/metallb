@@ -8,6 +8,10 @@ metadata:
     {{- if .Values.prometheus.prometheusRule.additionalLabels }}
 {{ toYaml .Values.prometheus.prometheusRule.additionalLabels | indent 4 }}
     {{- end }}
+  {{- if .Values.prometheus.prometheusRule.annotations }}
+  annotations:
+{{ toYaml .Values.prometheus.prometheusRule.annotations | indent 4 }}
+  {{- end }}
 spec:
   groups:
   - name: {{ template "metallb.fullname" . }}.rules
@@ -74,4 +78,4 @@ spec:
     {{- with .Values.prometheus.prometheusRule.extraAlerts }}
     {{- toYaml . | nindent 4 }}
     {{- end}}
-{{- end }} 
+{{- end }}
