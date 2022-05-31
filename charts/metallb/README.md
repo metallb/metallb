@@ -49,6 +49,7 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | prometheus.metricsPort | int | `7472` |  |
 | prometheus.namespace | string | `""` |  |
 | prometheus.podMonitor.additionalLabels | object | `{}` |  |
+| prometheus.podMonitor.annotations | object | `{}` |  |
 | prometheus.podMonitor.enabled | bool | `false` |  |
 | prometheus.podMonitor.interval | string | `nil` |  |
 | prometheus.podMonitor.jobLabel | string | `"app.kubernetes.io/name"` |  |
@@ -64,6 +65,7 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | prometheus.prometheusRule.addressPoolUsage.thresholds[1].percent | int | `85` |  |
 | prometheus.prometheusRule.addressPoolUsage.thresholds[2].labels.severity | string | `"alert"` |  |
 | prometheus.prometheusRule.addressPoolUsage.thresholds[2].percent | int | `95` |  |
+| prometheus.prometheusRule.annotations | object | `{}` |  |
 | prometheus.prometheusRule.bgpSessionDown.enabled | bool | `true` |  |
 | prometheus.prometheusRule.bgpSessionDown.labels.severity | string | `"alert"` |  |
 | prometheus.prometheusRule.configNotLoaded.enabled | bool | `true` |  |

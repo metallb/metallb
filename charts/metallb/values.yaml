@@ -48,6 +48,9 @@ prometheus:
     # optional additionnal labels for podMonitors
     additionalLabels: {}
 
+    # optional annotations for podMonitors
+    annotations: {}
+
     # Job label for scrape target
     jobLabel: "app.kubernetes.io/name"
 
@@ -77,6 +80,9 @@ prometheus:
 
     # optional additionnal labels for prometheusRules
     additionalLabels: {}
+
+    # optional annotations for prometheusRules
+    annotations: {}
 
     # MetalLBStaleConfig
     staleConfig:
