@@ -55,7 +55,14 @@ MetalLB requires the following to function:
 
 Previous versions of MetalLB are configurable via a `configmap`. However, starting from the version
 `v0.13.0`, it will be possible to configure it only via CRs. A tool to convert old configmaps to CRs
-is provided TODO: add reference to the conversion instructions.
+is provided as a container image under `quay.io/metallb/configmaptocrs`.
+
+In order to use the tool the container must be ran mapping the path with the source file `config.yaml` to `/var/input`,
+and it will generate a `resources.yaml` file containing the resources mapped to the yaml.
+
+```bash
+docker run -d -v $(pwd):/var/input quay.io/metallb/configmaptocrs -source config.yaml 
+```
 
 ## Usage
 
