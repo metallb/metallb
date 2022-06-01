@@ -19,7 +19,7 @@ runs:
         sudo apt-get update
         sudo apt-get install python3-pip arping ndisc6
         sudo pip3 install invoke semver pyyaml
-        GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
+        GO111MODULE="on" go get sigs.k8s.io/kind@v0.14.0
         go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0
 
     - name: Download MetalLB images
