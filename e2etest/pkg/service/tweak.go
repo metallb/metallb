@@ -5,6 +5,7 @@ package service
 import (
 	"strings"
 
+	"go.universe.tf/metallb/internal/pointer"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -44,5 +45,11 @@ func WithSpecificPool(poolName string) func(*corev1.Service) {
 		svc.Annotations = map[string]string{
 			"metallb.universe.tf/address-pool": poolName,
 		}
+	}
+}
+
+func WithLoadbalancerClass(loadBalancerClass string) func(*corev1.Service) {
+	return func(svc *corev1.Service) {
+		svc.Spec.LoadBalancerClass = pointer.StrPtr(loadBalancerClass)
 	}
 }
