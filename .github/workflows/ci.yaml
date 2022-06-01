@@ -9,6 +9,7 @@ on:
 
 env:
   METALLB_OPERATOR_SHA: e444bb9c23df5bdb944bf138e67964fc8141aa31
+  OLDEST_SUPPORTED_K8s: kindest/node:v1.22.9@sha256:8135260b959dfe320206eb36b3aeda9cffcb262f4b44cda6b33f7bb73f453105
 
 jobs:
   commitlint:
@@ -284,3 +285,33 @@ jobs:
         uses: ./.github/workflows/composite/collectlogs
         with:
           artifact-name: kind_logs_use_operator
+
+  oldest_k8s:
+    runs-on: ubuntu-20.04
+    needs:
+      - unit-tests-and-build
+      - helm
+      - commitlint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Setup
+        uses: ./.github/workflows/composite/setup
+
+      - name: Deploy MetalLB
+        run: |
+          inv dev-env -b frr --no-build-images --node-img $OLDEST_SUPPORTED_K8s
+             
+      - name: E2E
+        run: |
+          FOCUS="L2.*should work for ExternalTrafficPolicy=Cluster|BGP.*A service of protocol load balancer should work with.*IPV4 - ExternalTrafficPolicyCluster$|validate FRR running configuration"
+          sudo -E env "PATH=$PATH" inv e2etest --focus "$FOCUS" -e /tmp/kind_logs
+
+      - name: Collect Logs
+        if: ${{ failure() }}
+        uses: ./.github/workflows/composite/collectlogs
+        with:
+          artifact-name: kind-logs-oldest-k8s
