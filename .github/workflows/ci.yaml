@@ -11,12 +11,12 @@ jobs:
   commitlint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0
       - uses: wagoid/commitlint-github-action@v4
 
-  unit-tests-and-build:
+  unit-tests:
     runs-on: ubuntu-20.04
     steps:
       - name: Cancel Previous Runs
@@ -25,13 +25,12 @@ jobs:
           access_token: ${{ github.token }}
 
       - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
+        uses: actions/checkout@v3
 
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: "1.17.1"
+          go-version-file: "go.mod"
+          cache: true
 
       - name: Install Dependencies
         run: |
@@ -56,31 +55,42 @@ jobs:
           inv generateapidocs
           inv checkchanges --action="run inv generateapidocs"
 
-      - name: Build and save MetalLB images
-        run: |
-          inv build --binaries all
-          docker save quay.io/metallb/speaker:dev-amd64 > speaker.tar
-          docker save quay.io/metallb/controller:dev-amd64 > controller.tar
-          docker save quay.io/metallb/mirror-server:dev-amd64 > mirror-server.tar
+  build-test-images:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: true
+      matrix:
+        image: [speaker, controller, mirror-server, configmaptocrs]
+    steps:
+      - name: Code checkout
+        uses: actions/checkout@v3
+      - name: Setup docker buildx
+        uses: docker/setup-buildx-action@v2
 
-      - name: Upload images
+      - name: Build and export ${{ matrix.image }}
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          tags: quay.io/metallb/${{ matrix.image }}:dev-amd64
+          file: ${{matrix.image}}/Dockerfile
+          outputs: type=docker,dest=/tmp/${{ matrix.image }}.tar
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Upload ${{ matrix.image }} artifact
         uses: actions/upload-artifact@v3
         with:
-          name: metallb-images
           retention-days: 1
-          path: |
-            speaker.tar
-            controller.tar
-            mirror-server.tar
+          name: image-tar-${{ matrix.image }}
+          path: /tmp/${{ matrix.image }}.tar
 
   helm:
     runs-on: ubuntu-20.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
-          fetch-depth: "0"
-
+          # Required for chart-testing
+          fetch-depth: 0
       - name: Set up Helm
         uses: azure/setup-helm@v1
         with:
@@ -120,7 +130,8 @@ jobs:
   e2e:
     runs-on: ubuntu-20.04
     needs:
-      - unit-tests-and-build
+      - unit-tests
+      - build-test-images
       - helm
       - commitlint
     strategy:
@@ -131,9 +142,7 @@ jobs:
         deployment: [manifests, helm]
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
+        uses: actions/checkout@v3
 
       - name: Setup
         uses: ./.github/workflows/composite/setup
@@ -170,34 +179,34 @@ jobs:
   backward_compatible:
     runs-on: ubuntu-20.04
     needs:
-      - unit-tests-and-build
+      - unit-tests
+      - build-test-images
       - helm
       - commitlint
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
       - name: Setup
         uses: ./.github/workflows/composite/setup
 
-      - name: Deploy MetalLB
-        run: |
-          inv dev-env -b frr --no-build-images
-      
-      - name: Checkout previous
-        uses: actions/checkout@v2
+      - name: Checkout
+        uses: actions/checkout@v3
         with:
           fetch-depth: "0"
           path: metallb-v0.12.1
           ref: v0.12.1
-      
+
+      - name: Deploy MetalLB
+        run: |
+          inv dev-env -b frr --no-build-images
       # Patch the old e2etest to cleanup the resources in the correct order.
       - name: Apply patch
         run: |
           patch metallb-v0.12.1/e2etest/pkg/config/update.go < e2etest/backwardcompatible/patchfile
-          
+
       - name: E2E
         run: |
           cat <<EOF | kubectl apply -f -
@@ -210,7 +219,7 @@ jobs:
           rm -rf e2etest # we want to make sure we are not running current e2e by mistake
           cd metallb-v0.12.1
           FOCUS="L2.*should work for ExternalTrafficPolicy=Cluster|BGP.*A service of protocol load balancer should work with.*IPV4 - ExternalTrafficPolicyCluster$|validate FRR running configuration"
-          sudo -E env "PATH=$PATH" inv e2etest --use-operator --focus "$FOCUS" -e /tmp/kind_logs
+          sudo -E env "PATH=$PATH" inv e2etest --skip-docker --use-operator --focus "$FOCUS" -e /tmp/kind_logs
 
       - name: Collect Logs
         if: ${{ failure() }}
@@ -218,19 +227,17 @@ jobs:
         with:
           artifact-name: kind-logs-backward-compatible
 
-
   e2e-use-operator:
     runs-on: ubuntu-20.04
     needs:
-      - unit-tests-and-build
+      - unit-tests
+      - build-test-images
       - helm
       - commitlint
     defaults:
       run:
         shell: bash
 
-    strategy:
-      fail-fast: false
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -239,13 +246,19 @@ jobs:
 
       - name: Setup
         uses: ./.github/workflows/composite/setup
-      
+
       - name: Checkout Metal LB Operator
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: metallb/metallb-operator
           path: metallboperator
           ref: e0f17807883bfb64e0d58429ee3a5e4f200c9a9f
+
+      - name: Checkout MetalLB
+        uses: actions/checkout@v3
+        with:
+          path: metallb
+          fetch-depth: 0
 
       - name: Create multi-node K8s Kind Cluster
         run: |
@@ -285,7 +298,8 @@ jobs:
   oldest_k8s:
     runs-on: ubuntu-20.04
     needs:
-      - unit-tests-and-build
+      - unit-tests
+      - build-test-images
       - helm
       - commitlint
     steps:
@@ -300,7 +314,7 @@ jobs:
       - name: Deploy MetalLB
         run: |
           inv dev-env -b frr --no-build-images --node-img kindest/node:v1.22.9@sha256:8135260b959dfe320206eb36b3aeda9cffcb262f4b44cda6b33f7bb73f453105
-             
+
       - name: E2E
         run: |
           FOCUS="L2.*should work for ExternalTrafficPolicy=Cluster|BGP.*A service of protocol load balancer should work with.*IPV4 - ExternalTrafficPolicyCluster$|validate FRR running configuration"
