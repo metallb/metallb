@@ -1,9 +1,32 @@
-FROM alpine:latest
+# syntax=docker/dockerfile:1.2
 
-# When running as non root and building in an environment that `umask` masks out
-# '+x' for others, it won't be possible to execute. Make sure all can execute,
-# just in case
-COPY --chmod=a+x configmaptocrs /configmaptocrs
+FROM --platform=$BUILDPLATFORM docker.io/golang:1.17 AS builder
+ARG GIT_COMMIT=dev
+ARG GIT_BRANCH=dev
+WORKDIR $GOPATH/go.universe.tf/metallb
+
+# Cache the downloads
+COPY go.mod go.sum ./
+RUN go mod download
+
+# COPY internals
+COPY internal internal
+COPY api api
+
+# COPY configmaptocrs
+COPY configmaptocrs/*.go configmaptocrs/
+
+RUN --mount=type=cache,target=/root/.cache/go-build \
+  --mount=type=cache,target=/go/pkg \
+  CGO_ENABLED=0 GOARM=6 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+  go build -v -o /build/configmaptocrs \
+  -ldflags "-X 'go.universe.tf/metallb/internal/version.gitCommit=${GIT_COMMIT}' -X 'go.universe.tf/metallb/internal/version.gitBranch=${GIT_BRANCH}'" \
+  go.universe.tf/metallb/configmaptocrs
+
+FROM docker.io/alpine:latest
+
+COPY --from=builder /build/configmaptocrs /configmaptocrs
+COPY LICENSE /
 
 LABEL org.opencontainers.image.authors="metallb" \
   org.opencontainers.image.url="https://github.com/metallb/metallb" \
@@ -16,4 +39,3 @@ LABEL org.opencontainers.image.authors="metallb" \
   org.opencontainers.image.base.name="docker.io/alpine:latest"
 
 ENTRYPOINT ["/configmaptocrs"]
-

@@ -1,15 +1,44 @@
-FROM alpine:latest
+# syntax=docker/dockerfile:1.2
+
+FROM --platform=$BUILDPLATFORM docker.io/golang:1.17 AS builder
+ARG GIT_COMMIT=dev
+ARG GIT_BRANCH=dev
+WORKDIR $GOPATH/go.universe.tf/metallb
+
+# Cache the downloads
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy speaker
+COPY speaker/*.go speaker/
+# Copy frr-metrics
+COPY frr-metrics ./frr-metrics/
+# COPY internals
+COPY internal internal
+COPY api api
 
 
-# When running as non root and building in an environment that `umask` masks out
-# '+x' for others, it won't be possible to execute. Make sure all can execute,
-# just in case
+RUN --mount=type=cache,target=/root/.cache/go-build \
+  --mount=type=cache,target=/go/pkg \
+  # build frr metrics
+  CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=6 \
+  go build -v -o /build/frr-metrics \
+  -ldflags "-X 'go.universe.tf/metallb/internal/version.gitCommit=${GIT_COMMIT}' -X 'go.universe.tf/metallb/internal/version.gitBranch=${GIT_BRANCH}'" \
+  frr-metrics/exporter.go \
+  && \
+  # build speaker
+  CGO_ENABLED=0 GOARM=6 GOOS=$TARGETOS GOARCH=$TARGETARCH \
+  go build -v -o /build/speaker \
+  -ldflags "-X 'go.universe.tf/metallb/internal/version.gitCommit=${GIT_COMMIT}' -X 'go.universe.tf/metallb/internal/version.gitBranch=${GIT_BRANCH}'" \
+  go.universe.tf/metallb/speaker
 
-COPY --chmod=a+x frr-reloader.sh /frr-reloader.sh
-COPY frr-metrics /frr-metrics
-COPY --chmod=a+x speaker /speaker
+FROM docker.io/alpine:latest
 
 
+COPY --from=builder /build/speaker /speaker
+COPY --from=builder /build/frr-metrics /frr-metrics
+COPY frr-reloader/frr-reloader.sh /frr-reloader.sh
+COPY LICENSE /
 
 LABEL org.opencontainers.image.authors="metallb" \
   org.opencontainers.image.url="https://github.com/metallb/metallb" \
