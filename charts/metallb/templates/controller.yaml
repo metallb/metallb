@@ -49,6 +49,9 @@ spec:
         - --log-level={{ . }}
         {{- end }}
         - --cert-service-name={{ template "metallb.fullname" . }}-webhook-service
+        {{- if .Values.loadBalancerClass }}
+        - --lb-class={{ .Values.loadBalancerClass }}
+        {{- end }}
         env:
         {{- if and .Values.speaker.enabled .Values.speaker.memberlist.enabled }}
         - name: METALLB_ML_SECRET_NAME
