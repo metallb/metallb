@@ -7,10 +7,6 @@ on:
       - "v**"
   workflow_dispatch:
 
-env:
-  METALLB_OPERATOR_SHA: e444bb9c23df5bdb944bf138e67964fc8141aa31
-  OLDEST_SUPPORTED_K8s: kindest/node:v1.22.9@sha256:8135260b959dfe320206eb36b3aeda9cffcb262f4b44cda6b33f7bb73f453105
-
 jobs:
   commitlint:
     runs-on: ubuntu-latest
@@ -249,7 +245,7 @@ jobs:
         with:
           repository: metallb/metallb-operator
           path: metallboperator
-          ref: $METALLB_OPERATOR_SHA
+          ref: e444bb9c23df5bdb944bf138e67964fc8141aa31
 
       - name: Create multi-node K8s Kind Cluster
         run: |
@@ -303,7 +299,7 @@ jobs:
 
       - name: Deploy MetalLB
         run: |
-          inv dev-env -b frr --no-build-images --node-img $OLDEST_SUPPORTED_K8s
+          inv dev-env -b frr --no-build-images --node-img kindest/node:v1.22.9@sha256:8135260b959dfe320206eb36b3aeda9cffcb262f4b44cda6b33f7bb73f453105
              
       - name: E2E
         run: |

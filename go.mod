@@ -31,6 +31,7 @@ require (
 	k8s.io/client-go v0.24.0
 	k8s.io/klog v1.0.0
 	k8s.io/kubernetes v1.21.23
+	k8s.io/pod-security-admission v0.0.0
 	sigs.k8s.io/controller-runtime v0.11.2
 )
 
@@ -160,7 +161,6 @@ require (
 	k8s.io/kube-openapi v0.0.0-20220328201542-3ee0da9b0b42 // indirect
 	k8s.io/kubectl v0.0.0 // indirect
 	k8s.io/kubelet v0.0.0 // indirect
-	k8s.io/pod-security-admission v0.0.0 // indirect
 	k8s.io/utils v0.0.0-20220210201930-3a6ce19ff2f9 // indirect
 	sigs.k8s.io/apiserver-network-proxy/konnectivity-client v0.0.30 // indirect
 	sigs.k8s.io/json v0.0.0-20211208200746-9f7c6b3444d2 // indirect
