@@ -156,6 +156,9 @@
       "description": "MetalLB configuration",
       "type": "object"
     },
+    "loadBalancerClass": {
+      "type":"string"
+    },
     "rbac": {
       "description": "RBAC configuration",
       "type": "object",
