@@ -24,6 +24,7 @@ import (
 	frrcontainer "go.universe.tf/metallb/e2etest/pkg/frr/container"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = ginkgo.Describe("BGP Peer Selector", func() {
@@ -52,6 +53,7 @@ var _ = ginkgo.Describe("BGP Peer Selector", func() {
 	})
 
 	f = framework.NewDefaultFramework("bgp")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
