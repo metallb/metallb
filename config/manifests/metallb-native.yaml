@@ -1713,6 +1713,9 @@ spec:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
         operator: Exists
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/control-plane
+        operator: Exists
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
