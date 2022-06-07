@@ -53,6 +53,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 const (
@@ -109,6 +110,7 @@ var _ = ginkgo.Describe("BGP", func() {
 	})
 
 	f = framework.NewDefaultFramework("bgp")
+	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
