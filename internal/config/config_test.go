@@ -832,6 +832,61 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			desc: "duplicate ip address pools - in L2 adv",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{testPool},
+				L2Advs: []v1beta1.L2Advertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: testAdvName},
+						Spec: v1beta1.L2AdvertisementSpec{
+							IPAddressPools: []string{testPoolName, testPoolName},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "duplicate ip address pools - in BGP adv",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{testPool},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: testAdvName},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPools: []string{testPoolName, testPoolName},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "duplicate peers - in BGP adv",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{testPool},
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "peer1",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "1.2.3.4",
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: testAdvName},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPools: []string{testPoolName},
+							Peers:          []string{"peer1", "peer1"},
+						},
+					},
+				},
+			},
+		},
+		{
 			desc: "bad community literal (wrong format) - in BGP adv",
 			crs: ClusterResources{
 				Pools: []v1beta1.IPAddressPool{testPool},
@@ -1796,6 +1851,86 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			desc: "use duplicate ip pool selectors - in BGP adv",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "pool1",
+							Labels: map[string]string{"test": "pool1"},
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv1",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength: pointer.Int32Ptr(32),
+							LocalPref:         uint32(100),
+							IPAddressPoolSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"test": "pool1",
+									},
+								},
+								{
+									MatchLabels: map[string]string{
+										"test": "pool1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "use duplicate ip pool selectors - in L2 adv",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "pool1",
+							Labels: map[string]string{"test": "pool1"},
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+							},
+						},
+					},
+				},
+				L2Advs: []v1beta1.L2Advertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv1",
+						},
+						Spec: v1beta1.L2AdvertisementSpec{
+							IPAddressPoolSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"test": "pool1",
+									},
+								},
+								{
+									MatchLabels: map[string]string{
+										"test": "pool1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			desc: "use non existent label for ip pool selectors",
 			crs: ClusterResources{
 				Pools: []v1beta1.IPAddressPool{
@@ -2070,6 +2205,84 @@ func TestParse(t *testing.T) {
 					},
 				},
 				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
+			desc: "use duplicate node selectors",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv1",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPools: []string{"pool1"},
+							NodeSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"second": "true",
+									},
+								},
+								{
+									MatchLabels: map[string]string{
+										"second": "true",
+									},
+								},
+							},
+						},
+					},
+				},
+				L2Advs: []v1beta1.L2Advertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "l2adv1",
+						},
+						Spec: v1beta1.L2AdvertisementSpec{
+							NodeSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"first": "true",
+									},
+								},
+								{
+									MatchLabels: map[string]string{
+										"first": "true",
+									},
+								},
+							},
+							IPAddressPools: []string{"pool1"},
+						},
+					},
+				},
+				Nodes: []corev1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "first",
+							Labels: map[string]string{
+								"first": "true",
+							},
+						},
+					}, {
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "second",
+							Labels: map[string]string{
+								"second": "true",
+							},
+						},
+					},
+				},
 			},
 		},
 		{
