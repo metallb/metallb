@@ -17,7 +17,8 @@ from invoke.exceptions import Exit, UnexpectedExit
 
 all_binaries = set(["controller",
                     "speaker",
-                    "mirror-server"])
+                    "mirror-server",
+                    "configmaptocrs"])
 all_architectures = set(["amd64",
                          "arm",
                          "arm64",
@@ -53,6 +54,7 @@ def _check_binaries(binaries):
     if not out:
         out.add("controller")
         out.add("speaker")
+        out.add("configmaptocrs")
     return list(sorted(out))
 
 def _docker_build_cmd():
@@ -253,44 +255,14 @@ def validate_kind_version():
     if delta < 0:
         raise Exit(message="kind version >= {} required".format(min_version))
 
-@task(help={
-    "version": "version of cert-manager to install."
-                "Default: v1.5.4",
-})
-def install_cert_manager(ctx, version="v1.5.4"):
-    res = run("kubectl apply -f https://github.com/jetstack/cert-manager/releases/download/{}/cert-manager.yaml".format(version))
-    if not res.ok:
-        raise Exit(message="Failed to install cert-manager")
-    
-    # wait for cert-manager to be ready
-    attempts = 0
-    max_attempts = 60
-    cert_manager_ready = False
-    while not cert_manager_ready and attempts != max_attempts:
-        print("Waiting for cert-manager to be ready attempt: {}".format(attempts))
-        try:
-            res = run("kubectl apply -f config/certmanager/self-signed-cert.yaml")
-        except Exception as e:
-            print("Failed, retrying")
-            time.sleep(5)
-        else:
-            print("cert-manager is ready")
-            cert_manager_ready = True
-            res = run("kubectl delete -f config/certmanager/self-signed-cert.yaml")
-        attempts += 1
-    if not cert_manager_ready:
-        raise Exit(message="Timed out waiting for cert-manage to be ready")
-
 def generate_manifest(ctx, controller_gen="controller-gen", crd_options="crd:crdVersions=v1",
-        kustomize_cli="kustomize", bgp_type="native", output=None, enable_webhooks=False):
+        kustomize_cli="kustomize", bgp_type="native", output=None):
     res = run("{} {} rbac:roleName=manager-role webhook paths=\"./api/...\" output:crd:artifacts:config=config/crd/bases".format(controller_gen, crd_options))
     if not res.ok:
         raise Exit(message="Failed to generate manifests")
 
-    webhook_flag = "-with-webhook" if enable_webhooks else ""
-
     if output:
-        res = run("kubectl kustomize config/{}{} > {}".format(bgp_type, webhook_flag, output))
+        res = run("kubectl kustomize config/{} > {}".format(bgp_type, output))
         if not res.ok:
             raise Exit(message="Failed to kustomize manifests")
 
@@ -311,14 +283,12 @@ def generate_manifest(ctx, controller_gen="controller-gen", crd_options="crd:crd
                 "Default: info, Supported: 'all', 'debug', 'info', 'warn', 'error' or 'none'",
     "helm_install": "Optional install MetalLB via helm chart instead of manifests."
                 "Default: False.",
-    "enable_webhooks": "Optional enable MetalLB webhooks."
-                "Default: False.",
     "build_images": "Optional build the images."
                 "Default: True.",
 })
 def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_dir="",
         node_img=None, ip_family="ipv4", bgp_type="native", log_level="info",
-        helm_install=False, enable_webhooks=False, build_images=True):
+        helm_install=False, build_images=True):
     """Build and run MetalLB in a local Kind cluster.
 
     If the cluster specified by --name (default "kind") doesn't exist,
@@ -365,21 +335,18 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
     run("kind load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
 
-    if enable_webhooks:
-        install_cert_manager(ctx)
-
     if helm_install:
         run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
                 "--set speaker.image.tag=dev-{} --set speaker.frr.enabled={} --set speaker.logLevel=debug "
-                "--set controller.logLevel=debug --set webhooks.enable={}".format(architecture,
-                architecture, "true" if bgp_type == "frr" else "false", "true" if enable_webhooks else "false"), echo=True)
+                "--set controller.logLevel=debug".format(architecture, architecture, 
+                "true" if bgp_type == "frr" else "false"), echo=True)
     else:
         run("kubectl delete po -nmetallb-system --all", echo=True)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest_file = tmpdir + "/metallb.yaml"
 
-            generate_manifest(ctx, bgp_type=bgp_type, output=manifest_file, enable_webhooks=enable_webhooks)
+            generate_manifest(ctx, bgp_type=bgp_type, output=manifest_file)
 
             # open file and replace the images with the newely built MetalLB docker images
             with open(manifest_file) as f:
@@ -695,6 +662,28 @@ def lint(ctx, env="container"):
 
 
 @task(help={
+    "env": "Specify in which environment to run helmdocs . Default 'container'. Supported: 'container','host'"
+})
+def helmdocs(ctx, env="container"):
+    """Run helm-docs.
+
+    By default, this will run a helm-docs docker image against the code.
+    However, in some environments (such as the MetalLB CI), it may be more
+    convenient to install the helm-docs binaries on the host. This can be
+    achieved by running `inv helmdocs --env host`.
+    """
+    version = "1.10.0"
+    cmd = "helm-docs"
+
+    if env == "container":
+        run("docker run --rm -v $(git rev-parse --show-toplevel):/app -w /app jnorwood/helm-docs:v{} {}".format(version, cmd), echo=True)
+    elif env == "host":
+        run(cmd)
+    else:
+        raise Exit(message="Unsupported helm-docs environment: {}". format(env))
+
+
+@task(help={
     "name": "name of the kind cluster to test (only kind uses).",
     "export": "where to export kind logs.",
     "kubeconfig": "kubeconfig location. By default, use the kubeconfig from kind.",
@@ -804,8 +793,6 @@ def generatemanifests(ctx, controller_gen="controller-gen", kustomize_cli="kusto
     """ Re-generates the all-in-one manifests under config/manifests"""
     generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="frr", output="config/manifests/metallb-frr.yaml")
     generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="native", output="config/manifests/metallb-native.yaml")
-    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="frr", enable_webhooks=True, output="config/manifests/metallb-frr-with-webhooks.yaml")
-    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="native", enable_webhooks=True, output="config/manifests/metallb-native-with-webhooks.yaml")
 
 @task
 def generateapidocs(ctx):

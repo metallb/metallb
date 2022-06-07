@@ -92,6 +92,16 @@ jobs:
         with:
           args: ct lint
 
+      - name: Helm doc generate
+        uses: docker://jnorwood/helm-docs:v1.10.0
+
+      - name: Check if  docs are different
+        run: |
+          if [[ $(git status --porcelain | wc -l) -gt 0 ]]; then
+            echo "Please update the helm docs with the \"helm-docs\" command (https://github.com/norwoodj/helm-docs) or use \"inv helmdocs\""
+            exit 1
+          fi
+
       ## TODO: Can't pass flags to the conftest GHA in order to use --fail-on-warn
       ##       Should be fixed when https://github.com/instrumenta/conftest-action/issues/3
       ##       is resolved
@@ -120,46 +130,19 @@ jobs:
         bgp-type: [native, frr]
         deployment: [manifests, helm]
     steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.9.1
-        with:
-          access_token: ${{ github.token }}
-
       - name: Checkout
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-go@v2
-        with:
-          go-version: "1.17.1"
-
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install python3-pip arping ndisc6
-          sudo pip3 install invoke semver pyyaml
-          GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
-          go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0
-
-      - name: Download MetalLB images
-        uses: actions/download-artifact@v3
-        with:
-          name: metallb-images
-          path: metallb-images
-
-      - name: Load MetalLB images
-        working-directory: metallb-images
-        run: |
-          docker load -i speaker.tar
-          docker load -i controller.tar
-          docker load -i mirror-server.tar
+      - name: Setup
+        uses: ./.github/workflows/composite/setup
 
       - name: Deploy MetalLB
         run: |
           HELM_FLAGS=""
           if [ ${{ matrix.deployment }} = "helm" ]; then HELM_FLAGS="--helm-install"; fi
-          inv dev-env -i ${{ matrix.ip-family }} -b ${{ matrix.bgp-type }} -l all $HELM_FLAGS --enable-webhooks --no-build-images
+          inv dev-env -i ${{ matrix.ip-family }} -b ${{ matrix.bgp-type }} -l all $HELM_FLAGS --no-build-images
 
       - name: E2E
         run: |
@@ -175,17 +158,12 @@ jobs:
           echo "Skipping $SKIP"
           sudo -E env "PATH=$PATH" inv e2etest --skip $SKIP -e /tmp/kind_logs $HELM_FLAGS
 
-      - name: Log permissions
-        if: ${{ always() }}
-        run: |
-          sudo chmod -R o+r /tmp/kind_logs
-
-      - name: Upload logs
-        uses: actions/upload-artifact@v2
-        if: ${{ always() }}
+      - name: Collect Logs
+        if: ${{ failure() }}
+        uses: ./.github/workflows/composite/collectlogs
         with:
-          name: kind-logs-${{ matrix.ip-family }}-${{ matrix.bgp-type }}-${{ matrix.deployment}}
-          path: /tmp/kind_logs/
+          artifact-name: kind-logs-${{ matrix.ip-family }}-${{ matrix.bgp-type }}-${{ matrix.deployment}}
+
   # This lane checks if conversion webhooks work and if metallb is compatible with the CRDs
   # in the operator. We deploy a v4-frr lane, clone the v0.12.1 version of metallb and run CI
   # in operator mode. We run few significative tests that cover all the crds.
@@ -196,51 +174,24 @@ jobs:
       - helm
       - commitlint
     steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.9.1
-        with:
-          access_token: ${{ github.token }}
-
       - name: Checkout
         uses: actions/checkout@v2
         with:
           fetch-depth: 0
 
-      - name: Checkout
+      - name: Setup
+        uses: ./.github/workflows/composite/setup
+
+      - name: Deploy MetalLB
+        run: |
+          inv dev-env -b frr --no-build-images
+      
+      - name: Checkout previous
         uses: actions/checkout@v2
         with:
           fetch-depth: "0"
           path: metallb-v0.12.1
           ref: v0.12.1
-
-      - uses: actions/setup-go@v2
-        with:
-          go-version: "1.17.1"
-
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install python3-pip arping ndisc6
-          sudo pip3 install invoke semver pyyaml
-          GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
-          go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0
-
-      - name: Download MetalLB images
-        uses: actions/download-artifact@v3
-        with:
-          name: metallb-images
-          path: metallb-images
-
-      - name: Load MetalLB images
-        working-directory: metallb-images
-        run: |
-          docker load -i speaker.tar
-          docker load -i controller.tar
-          docker load -i mirror-server.tar
-
-      - name: Deploy MetalLB
-        run: |
-          inv dev-env -b frr --enable-webhooks --no-build-images
       
       # Patch the old e2etest to cleanup the resources in the correct order.
       - name: Apply patch
@@ -261,17 +212,12 @@ jobs:
           FOCUS="L2.*should work for ExternalTrafficPolicy=Cluster|BGP.*A service of protocol load balancer should work with.*IPV4 - ExternalTrafficPolicyCluster$|validate FRR running configuration"
           sudo -E env "PATH=$PATH" inv e2etest --use-operator --focus "$FOCUS" -e /tmp/kind_logs
 
-      - name: Log permissions
-        if: ${{ always() }}
-        run: |
-          sudo chmod -R o+r /tmp/kind_logs
-
-      - name: Upload logs
-        uses: actions/upload-artifact@v2
-        if: ${{ always() }}
+      - name: Collect Logs
+        if: ${{ failure() }}
+        uses: ./.github/workflows/composite/collectlogs
         with:
-          name: kind-logs-backward-compatible
-          path: /tmp/kind_logs/
+          artifact-name: kind-logs-backward-compatible
+
 
   e2e-use-operator:
     runs-on: ubuntu-20.04
@@ -286,47 +232,20 @@ jobs:
     strategy:
       fail-fast: false
     steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.9.1
+      - name: Checkout
+        uses: actions/checkout@v2
         with:
-          access_token: ${{ github.token }}
+          fetch-depth: 0
 
+      - name: Setup
+        uses: ./.github/workflows/composite/setup
+      
       - name: Checkout Metal LB Operator
         uses: actions/checkout@v2
         with:
           repository: metallb/metallb-operator
           path: metallboperator
           ref: e444bb9c23df5bdb944bf138e67964fc8141aa31
-
-      - uses: actions/setup-go@v2
-        with:
-          go-version: '1.17.1'
-
-      - name: Checkout MetalLB
-        uses: actions/checkout@v2
-        with:
-          path: metallb
-          fetch-depth: 0
-
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install python3-pip arping ndisc6
-          sudo pip3 install -r ./dev-env/requirements.txt
-          GO111MODULE="on" go get sigs.k8s.io/kind@v0.11.1
-
-      - name: Download MetalLB images
-        uses: actions/download-artifact@v3
-        with:
-          name: metallb-images
-          path: metallb-images
-
-      - name: Load MetalLB images
-        working-directory: metallb-images
-        run: |
-          docker load -i speaker.tar
-          docker load -i controller.tar
-          docker load -i mirror-server.tar
 
       - name: Create multi-node K8s Kind Cluster
         run: |
@@ -342,7 +261,6 @@ jobs:
           sed -i 's/quay.io\/metallb\/speaker:main/quay.io\/metallb\/speaker:dev-amd64/g' bin/metallb-operator-with-webhooks.yaml
           sed -i 's/quay.io\/metallb\/controller:main/quay.io\/metallb\/controller:dev-amd64/g' bin/metallb-operator-with-webhooks.yaml
           sed -i 's/native/frr/g' bin/metallb-operator-with-webhooks.yaml
-          make deploy-cert-manager
           kubectl apply -f bin/metallb-operator-with-webhooks.yaml
 
       - name: MetalLB E2E Tests with Operator Deployment
@@ -358,14 +276,38 @@ jobs:
           EOF
           sudo -E env "PATH=$PATH" inv e2etest --skip "IPV6|DUALSTACK" -e /tmp/kind_logs
 
-      - name: Change permissions for kind logs
+      - name: Collect Logs
         if: ${{ failure() }}
-        run: |
-          sudo chmod -R o+r /tmp/kind_logs
-
-      - name: Archive kind logs
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v2
+        uses: ./.github/workflows/composite/collectlogs
         with:
-          name: kind_logs_use_operator
-          path: /tmp/kind_logs
+          artifact-name: kind_logs_use_operator
+
+  oldest_k8s:
+    runs-on: ubuntu-20.04
+    needs:
+      - unit-tests-and-build
+      - helm
+      - commitlint
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Setup
+        uses: ./.github/workflows/composite/setup
+
+      - name: Deploy MetalLB
+        run: |
+          inv dev-env -b frr --no-build-images --node-img kindest/node:v1.22.9@sha256:8135260b959dfe320206eb36b3aeda9cffcb262f4b44cda6b33f7bb73f453105
+             
+      - name: E2E
+        run: |
+          FOCUS="L2.*should work for ExternalTrafficPolicy=Cluster|BGP.*A service of protocol load balancer should work with.*IPV4 - ExternalTrafficPolicyCluster$|validate FRR running configuration"
+          sudo -E env "PATH=$PATH" inv e2etest --focus "$FOCUS" -e /tmp/kind_logs
+
+      - name: Collect Logs
+        if: ${{ failure() }}
+        uses: ./.github/workflows/composite/collectlogs
+        with:
+          artifact-name: kind-logs-oldest-k8s

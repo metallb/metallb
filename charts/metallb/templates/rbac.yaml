@@ -21,6 +21,12 @@ rules:
   resourceNames: ["{{ template "metallb.fullname" . }}-controller"]
   verbs: ["use"]
 {{- end }}
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources: ["validatingwebhookconfigurations", "mutatingwebhookconfigurations"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -98,6 +104,9 @@ rules:
   resourceNames: ["{{ template "metallb.fullname" . }}-controller"]
   verbs: ["get"]
 {{- end }}
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
 - apiGroups: ["metallb.io"]
   resources: ["addresspools"]
   verbs: ["get", "list", "watch"]
