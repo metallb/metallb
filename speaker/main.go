@@ -171,6 +171,7 @@ func main() {
 
 	if err := client.Run(stopCh); err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to run k8s client")
+		os.Exit(1)
 	}
 }
 
