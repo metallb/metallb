@@ -208,6 +208,52 @@ spec:
 In this way, all the IPs coming from `first-pool` will be reacheable only via `NodeA`
 and `NodeB`.
 
+### Announcing the Service to a subset of peers
+
+By default, every service IP is advertised to all the connected peers. It is possible
+to limit the set of peers a service IP is advertised to. This is achieved by using
+the peers in the `BGPAdvertisement` CR.
+
+{{<mermaid align="center">}}
+graph TD
+    PoolA("PoolA<br>198.51.100.10/24")
+    style PoolA fill:orange
+
+    metalLB("MetalLB Speaker")-->|announces|PeerA
+    metalLB("MetalLB Speaker")-->|announces|PeerB
+    metalLB("MetalLB Speaker")-->|announces|PeerB
+    metalLB("MetalLB Speaker")-->|announces|PeerC
+
+    linkStyle 0 stroke-width:2px,fill:none,stroke:orange;
+    linkStyle 1 stroke-width:2px,fill:none,stroke:orange;
+    linkStyle 2 stroke-width:2px,fill:none,stroke:lightgreen;
+    linkStyle 3 stroke-width:2px,fill:none,stroke:lightgreen;
+
+    PoolB("PoolB<br>198.51.200.10/24")
+    style PoolB fill:lightgreen
+
+{{< /mermaid >}}
+
+In this example, a service IP from PoolA is announced only to PeerA and PeerB,
+while a service IP from PoolB is announced only to PeerB and PeerC.
+
+In order to limit the set of peers for a given advertisement, the peers must be set:
+
+```yaml
+apiVersion: metallb.io/v1beta1
+kind: BGPAdvertisement
+metadata:
+  name: example
+spec:
+  ipAddressPools:
+  - PoolA
+  peers:
+  - PeerA
+  - PeerB
+```
+
+In this way, all the IPs coming from `PoolA` will be advertised only to `PeerA` and `PeerB`.
+
 ### Configuring the BGP source address
 
 When a host has multiple network interfaces or multiple IP addresses
