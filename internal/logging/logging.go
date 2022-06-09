@@ -17,6 +17,8 @@ import (
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	"k8s.io/klog"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
 const (
@@ -74,6 +76,10 @@ func Init(lvl string) (log.Logger, error) {
 	// Note: caller must be added after everything else that decorates the
 	// logger (otherwise we get incorrect caller reference).
 	l = log.With(l, "caller", log.DefaultCaller)
+
+	// Setting a controller-runtime logger is required to
+	// get any log created by it.
+	ctrl.SetLogger(zap.New())
 
 	return l, nil
 }
