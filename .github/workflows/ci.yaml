@@ -228,7 +228,7 @@ jobs:
     defaults:
       run:
         shell: bash
-        working-directory: metallb
+
     strategy:
       fail-fast: false
     steps:
@@ -258,10 +258,10 @@ jobs:
       - name: Deploy Metal LB Operator
         run: |
           cd ${GITHUB_WORKSPACE}/metallboperator
-          sed -i 's/quay.io\/metallb\/speaker:main/quay.io\/metallb\/speaker:dev-amd64/g' bin/metallb-operator-with-webhooks.yaml
-          sed -i 's/quay.io\/metallb\/controller:main/quay.io\/metallb\/controller:dev-amd64/g' bin/metallb-operator-with-webhooks.yaml
-          sed -i 's/native/frr/g' bin/metallb-operator-with-webhooks.yaml
-          kubectl apply -f bin/metallb-operator-with-webhooks.yaml
+          sed -i 's/quay.io\/metallb\/speaker:main/quay.io\/metallb\/speaker:dev-amd64/g' bin/metallb-operator.yaml
+          sed -i 's/quay.io\/metallb\/controller:main/quay.io\/metallb\/controller:dev-amd64/g' bin/metallb-operator.yaml
+          sed -i 's/native/frr/g' bin/metallb-operator.yaml
+          kubectl apply -f bin/metallb-operator.yaml
 
       - name: MetalLB E2E Tests with Operator Deployment
         run: |
