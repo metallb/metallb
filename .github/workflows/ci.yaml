@@ -245,7 +245,7 @@ jobs:
         with:
           repository: metallb/metallb-operator
           path: metallboperator
-          ref: e48fa81670c63807f338bed9b38377d9d436d4d5
+          ref: 705b767ef27731b89c851fdb762d2cc00d5136e2
 
       - name: Create multi-node K8s Kind Cluster
         run: |
