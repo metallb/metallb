@@ -18,7 +18,9 @@ from invoke.exceptions import Exit, UnexpectedExit
 all_binaries = set(["controller",
                     "speaker",
                     "mirror-server",
-                    "configmaptocrs"])
+                    "configmaptocrs",
+                    "frr-metrics",
+                    "frr-reloader"])
 all_architectures = set(["amd64",
                          "arm",
                          "arm64",
@@ -334,12 +336,15 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
     run("kind load docker-image --name={} quay.io/metallb/controller:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
+    run("kind load docker-image --name={} quay.io/metallb/frr-metrics:dev-{}".format(name, architecture), echo=True)
+    run("kind load docker-image --name={} quay.io/metallb/frr-reloader:dev-{}".format(name, architecture), echo=True)
 
     if helm_install:
         run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
                 "--set speaker.image.tag=dev-{} --set speaker.frr.enabled={} --set speaker.logLevel=debug "
+                "--set speaker.frr.metrics.tag=dev-{} --set speaker.frr.reloader.tag=dev-{}"
                 "--set controller.logLevel=debug".format(architecture, architecture, 
-                "true" if bgp_type == "frr" else "false"), echo=True)
+                "true" if bgp_type == "frr" else "false"), architecture, architecture, echo=True)
     else:
         run("kubectl delete po -nmetallb-system --all", echo=True)
 
@@ -591,6 +596,9 @@ def bumprelease(ctx, version, previous_version):
     # Update the manifests with the new version
     run("perl -pi -e 's,image: quay.io/metallb/speaker:.*,image: quay.io/metallb/speaker:v{},g' config/controllers/speaker.yaml".format(version), echo=True)
     run("perl -pi -e 's,image: quay.io/metallb/controller:.*,image: quay.io/metallb/controller:v{},g' config/controllers/controller.yaml".format(version), echo=True)
+    run("perl -pi -e 's,image: quay.io/metallb/frr-metrics:.*,image: quay.io/metallb/frr-metrics:v{},g' config/controllers/speaker.yaml".format(version), echo=True)
+    run("perl -pi -e 's,image: quay.io/metallb/frr-reloader:.*,image: quay.io/metallb/frr-reloader:v{},g' config/controllers/speaker.yaml".format(version), echo=True)
+
 
     # Update the versions in the helm chart (version and appVersion are always the same)
     # helm chart versions follow Semantic Versioning, and thus exclude the leading 'v'
