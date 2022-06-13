@@ -84,14 +84,28 @@ func RoutesForFamily(exec executor.Executor, family ipfamily.Family) (map[string
 
 // RoutesForCommunity returns informations about routes in the given executor related to the given community.
 func RoutesForCommunity(exec executor.Executor, community string, family ipfamily.Family) (map[string]bgpfrr.Route, error) {
-	res, err := exec.Exec("vtysh", "-c", fmt.Sprintf("show bgp %s community %s json", family, community))
-	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to query routes")
+	families := []string{family.String()}
+	if family == ipfamily.DualStack {
+		families = []string{ipfamily.IPv4.String(), ipfamily.IPv6.String()}
 	}
-	routes, err := bgpfrr.ParseRoutes(res)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to parse routes %s", res)
+
+	routes := map[string]bgpfrr.Route{}
+	for _, f := range families {
+		res, err := exec.Exec("vtysh", "-c", fmt.Sprintf("show bgp %s community %s json", f, community))
+		if err != nil {
+			return nil, errors.Wrapf(err, "Failed to query routes for family %s community %s", f, community)
+		}
+
+		r, err := bgpfrr.ParseRoutes(res)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Failed to parse routes %s", res)
+		}
+
+		for k, v := range r {
+			routes[k] = v
+		}
 	}
+
 	return routes, nil
 }
 
