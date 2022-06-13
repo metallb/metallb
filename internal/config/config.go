@@ -611,6 +611,18 @@ func setBGPAdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, bgpAdvs
 }
 
 func l2AdvertisementFromCR(crdAd metallbv1beta1.L2Advertisement, nodes []corev1.Node) (*L2Advertisement, error) {
+	err := validateDuplicate(crdAd.Spec.IPAddressPools, "ipAddressPools")
+	if err != nil {
+		return nil, err
+	}
+	err = validateLabelSelectorDuplicate(crdAd.Spec.IPAddressPoolSelectors, "ipAddressPoolSelectors")
+	if err != nil {
+		return nil, err
+	}
+	err = validateLabelSelectorDuplicate(crdAd.Spec.NodeSelectors, "nodeSelectors")
+	if err != nil {
+		return nil, err
+	}
 	selected, err := selectedNodes(nodes, crdAd.Spec.NodeSelectors)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to parse node selector for %s", crdAd.Name)
@@ -621,7 +633,23 @@ func l2AdvertisementFromCR(crdAd metallbv1beta1.L2Advertisement, nodes []corev1.
 }
 
 func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities map[string]uint32, nodes []corev1.Node) (*BGPAdvertisement, error) {
-	err := validateDuplicateCommunities(crdAd.Spec.Communities)
+	err := validateDuplicate(crdAd.Spec.IPAddressPools, "ipAddressPools")
+	if err != nil {
+		return nil, err
+	}
+	err = validateDuplicate(crdAd.Spec.Communities, "community")
+	if err != nil {
+		return nil, err
+	}
+	err = validateDuplicate(crdAd.Spec.Peers, "peers")
+	if err != nil {
+		return nil, err
+	}
+	err = validateLabelSelectorDuplicate(crdAd.Spec.IPAddressPoolSelectors, "ipAddressPoolSelectors")
+	if err != nil {
+		return nil, err
+	}
+	err = validateLabelSelectorDuplicate(crdAd.Spec.NodeSelectors, "nodeSelectors")
 	if err != nil {
 		return nil, err
 	}
@@ -684,7 +712,7 @@ func bgpAdvertisementsFromLegacyCR(ads []metallbv1beta1.LegacyBgpAdvertisement, 
 
 	var ret []*BGPAdvertisement
 	for _, crdAd := range ads {
-		err := validateDuplicateCommunities(crdAd.Communities)
+		err := validateDuplicate(crdAd.Communities, "community")
 		if err != nil {
 			return nil, err
 		}
@@ -905,17 +933,6 @@ func validateDuplicateBGPAdvertisements(ads []metallbv1beta1.BGPAdvertisement) e
 	return nil
 }
 
-func validateDuplicateCommunities(communities []string) error {
-	for i := 0; i < len(communities); i++ {
-		for j := i + 1; j < len(communities); j++ {
-			if communities[i] == communities[j] {
-				return fmt.Errorf("duplicate definition of community %q", communities[i])
-			}
-		}
-	}
-	return nil
-}
-
 func containsAdvertisement(advs []*L2Advertisement, toCheck *L2Advertisement) bool {
 	for _, adv := range advs {
 		if reflect.DeepEqual(adv.Nodes, toCheck.Nodes) {
@@ -975,4 +992,26 @@ OUTER:
 		}
 	}
 	return ipPools, nil
+}
+
+func validateDuplicate(strSlice []string, sliceType string) error {
+	for i := 0; i < len(strSlice); i++ {
+		for j := i + 1; j < len(strSlice); j++ {
+			if strSlice[i] == strSlice[j] {
+				return fmt.Errorf("duplicate definition of %s %q", sliceType, strSlice[i])
+			}
+		}
+	}
+	return nil
+}
+
+func validateLabelSelectorDuplicate(labelSelectors []metav1.LabelSelector, labelSelectorType string) error {
+	for i := 0; i < len(labelSelectors); i++ {
+		for j := i + 1; j < len(labelSelectors); j++ {
+			if labelSelectors[i].String() == labelSelectors[j].String() {
+				return fmt.Errorf("duplicate definition of %s %q", labelSelectorType, labelSelectors[i])
+			}
+		}
+	}
+	return nil
 }
