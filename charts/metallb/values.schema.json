@@ -110,6 +110,9 @@
         "priorityClassName": {
           "type":"string"
         },
+        "runtimeClassName": {
+          "type":"string"
+        },
         "affinity": {
           "type": "object"
         },
@@ -289,9 +292,6 @@
                   "type": "integer"
                 }
               }
-            },
-            "runtimeClassName": {
-              "type": "string"
             },
             "secretName": {
               "type": "string"

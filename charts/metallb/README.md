@@ -36,6 +36,7 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | controller.readinessProbe.successThreshold | int | `1` |  |
 | controller.readinessProbe.timeoutSeconds | int | `1` |  |
 | controller.resources | object | `{}` |  |
+| controller.runtimeClassName | string | `""` |  |
 | controller.securityContext.fsGroup | int | `65534` |  |
 | controller.securityContext.runAsNonRoot | bool | `true` |  |
 | controller.securityContext.runAsUser | int | `65534` |  |
@@ -105,6 +106,7 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | speaker.readinessProbe.successThreshold | int | `1` |  |
 | speaker.readinessProbe.timeoutSeconds | int | `1` |  |
 | speaker.resources | object | `{}` |  |
+| speaker.runtimeClassName | string | `""` |  |
 | speaker.serviceAccount.annotations | object | `{}` |  |
 | speaker.serviceAccount.create | bool | `true` |  |
 | speaker.serviceAccount.name | string | `""` |  |
