@@ -222,3 +222,8 @@ speaker:
       repository: frrouting/frr
       tag: v7.5.1
       pullPolicy:
+    metrics:
+      enabled: true
+      repository: quay.io/metallb/frr-metrics
+      tag:
+      pullPolicy:

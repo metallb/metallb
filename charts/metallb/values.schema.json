@@ -303,7 +303,17 @@
                 "enabled": {
                   "type": "boolean"
                 },
-                "image": { "$ref": "#/definitions/component/properties/image" }
+                "image": { "$ref": "#/definitions/component/properties/image" },
+                "metrics" : {
+                  "type" : "object",
+                  "description": "Install FRR metrics sidecar",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "image": { "$ref": "#/definitions/component/properties/image" }
+                  }
+                }
               },
               "required": [ "enabled" ]
             }
