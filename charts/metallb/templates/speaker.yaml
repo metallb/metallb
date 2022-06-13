@@ -196,6 +196,9 @@ spec:
         {{- with .Values.speaker.logLevel }}
         - --log-level={{ . }}
         {{- end }}
+        {{- if .Values.loadBalancerClass }}
+        - --lb-class={{ .Values.loadBalancerClass }}
+        {{- end }}
         env:
         - name: METALLB_NODE_NAME
           valueFrom:

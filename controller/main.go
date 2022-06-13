@@ -127,6 +127,7 @@ func main() {
 		disableCertRotation = flag.Bool("disable-cert-rotation", false, "disable automatic generation and rotation of webhook TLS certificates/keys")
 		certDir             = flag.String("cert-dir", "/tmp/k8s-webhook-server/serving-certs", "The directory where certs are stored")
 		certServiceName     = flag.String("cert-service-name", "webhook-service", "The service name used to generate the TLS cert's hostname")
+		loadBalancerClass   = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
 	)
 	flag.Parse()
 
@@ -175,6 +176,7 @@ func main() {
 		DisableCertRotation: *disableCertRotation,
 		CertDir:             *certDir,
 		CertServiceName:     *certServiceName,
+		LoadBalancerClass:   *loadBalancerClass,
 	})
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create k8s client")
