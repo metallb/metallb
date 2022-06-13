@@ -26,7 +26,7 @@ spec:
         caBundle: Cg==
         service:
           namespace: {{ .Release.Namespace }}
-          name: {{ template "metallb.fullname" . }}-webhook-service
+          name: metallb-webhook-service
           path: /convert
   versions:
   - deprecated: true
@@ -537,7 +537,7 @@ spec:
         caBundle: Cg==
         service:
           namespace: {{ .Release.Namespace }}
-          name: {{ template "metallb.fullname" . }}-webhook-service
+          name: metallb-webhook-service
           path: /convert
   versions:
   - name: v1beta1

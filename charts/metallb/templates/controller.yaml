@@ -51,7 +51,7 @@ spec:
         {{- with .Values.controller.logLevel }}
         - --log-level={{ . }}
         {{- end }}
-        - --cert-service-name={{ template "metallb.fullname" . }}-webhook-service
+        - --cert-service-name=metallb-webhook-service
         {{- if .Values.loadBalancerClass }}
         - --lb-class={{ .Values.loadBalancerClass }}
         {{- end }}
