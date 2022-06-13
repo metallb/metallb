@@ -27,6 +27,9 @@ spec:
         {{- include "metallb.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: controller
     spec:
+      {{- with .Values.controller.runtimeClassName }}
+      runtimeClassName: {{ . | quote }}
+      {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
