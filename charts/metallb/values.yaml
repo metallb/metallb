@@ -42,7 +42,6 @@ prometheus:
 
   # Prometheus Operator PodMonitors
   podMonitor:
-
     # enable support for Prometheus Operator
     enabled: false
 
@@ -72,7 +71,6 @@ prometheus:
 
   # Prometheus Operator alertmanager alerts
   prometheusRule:
-
     # enable alertmanager alerts
     enabled: false
 
@@ -140,10 +138,11 @@ controller:
     # nobody
     runAsUser: 65534
     fsGroup: 65534
-  resources: {}
+  resources:
+    {}
     # limits:
-      # cpu: 100m
-      # memory: 100Mi
+    # cpu: 100m
+    # memory: 100Mi
   nodeSelector: {}
   tolerations: []
   priorityClassName: ""
@@ -189,10 +188,11 @@ speaker:
   ## By default secretName: {{ "metallb.fullname" }}-memberlist
   ##
   # secretName:
-  resources: {}
+  resources:
+    {}
     # limits:
-      # cpu: 100m
-      # memory: 100Mi
+    # cpu: 100m
+    # memory: 100Mi
   nodeSelector: {}
   tolerations: []
   priorityClassName: ""
@@ -224,6 +224,12 @@ speaker:
       pullPolicy:
     metrics:
       enabled: true
-      repository: quay.io/metallb/frr-metrics
-      tag:
-      pullPolicy:
+      image:
+        repository: quay.io/metallb/frr-metrics
+        tag:
+        pullPolicy:
+    reloader:
+      image:
+        repository: quay.io/metallb/frr-reloader
+        tag:
+        pullPolicy:

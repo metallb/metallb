@@ -169,13 +169,6 @@ spec:
               mountPath: /tmp/frr
             - name: frr-conf
               mountPath: /etc/frr
-        # Copies the reloader to the shared volume between the speaker and reloader.
-        - name: cp-reloader
-          image: {{ .Values.speaker.image.repository }}:{{ .Values.speaker.image.tag | default .Chart.AppVersion }}
-          command: ["/bin/sh", "-c", "cp -f /frr-reloader.sh /etc/frr_reloader/"]
-          volumeMounts:
-            - name: reloader
-              mountPath: /etc/frr_reloader
       shareProcessNamespace: true
       {{- end }}
       containers:
@@ -277,6 +270,9 @@ spec:
       {{- if .Values.speaker.frr.enabled }}
       - name: frr
         securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
           capabilities:
             add:
             - NET_ADMIN
@@ -309,12 +305,19 @@ spec:
               attempts=$(( $attempts + 1 ))
             done
             tail -f /etc/frr/frr.log
+      {{- with .Values.speaker.frr.reloader }}
       - name: reloader
-        image: {{ .Values.speaker.frr.image.repository }}:{{ .Values.speaker.frr.image.tag | default .Chart.AppVersion }}
-        {{- if .Values.speaker.frr.image.pullPolicy }}
-        imagePullPolicy: {{ .Values.speaker.frr.image.pullPolicy }}
+        image: {{ .image.repository }}:{{ .image.tag | default $.Chart.AppVersion }}
+        {{- if .image.pullPolicy }}
+        imagePullPolicy: {{ .image.pullPolicy }}
         {{- end }}
-        command: ["/etc/frr_reloader/frr-reloader.sh"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          capabilities:
+            drop:
+              - ALL
         volumeMounts:
           - name: frr-sockets
             mountPath: /var/run/frr
@@ -322,10 +325,18 @@ spec:
             mountPath: /etc/frr
           - name: reloader
             mountPath: /etc/frr_reloader
+      {{- end }}
       {{- if .Values.speaker.frr.metrics.enabled }}
       {{- with .Values.speaker.frr.metrics }}
       - name: frr-metrics
-        image: {{ .image.repository }}:{{ .image.tag | default .Chart.AppVersion }}
+        image: {{ .image.repository }}:{{ .image.tag | default $.Chart.AppVersion }}
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          capabilities:
+            drop:
+              - ALL
         args:
           - --metrics-port=7473
         ports:

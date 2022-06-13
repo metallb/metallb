@@ -312,6 +312,13 @@
                       "type": "boolean"
                     },
                     "image": { "$ref": "#/definitions/component/properties/image" }
+                  },
+                  "reloader": {
+                    "type": "object",
+                    "description": "FRR reloading image",
+                    "properties": {
+                      "image": {"$ref": "#/definitions/component/properties/image" }
+                    }
                   }
                 }
               },
