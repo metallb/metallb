@@ -83,6 +83,13 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | speaker.frr.image.pullPolicy | string | `nil` |  |
 | speaker.frr.image.repository | string | `"frrouting/frr"` |  |
 | speaker.frr.image.tag | string | `"v7.5.1"` |  |
+| speaker.frr.metrics.enabled | bool | `true` |  |
+| speaker.frr.metrics.image.pullPolicy | string | `nil` |  |
+| speaker.frr.metrics.image.repository | string | `"quay.io/metallb/frr-metrics"` |  |
+| speaker.frr.metrics.image.tag | string | `nil` |  |
+| speaker.frr.reloader.image.pullPolicy | string | `nil` |  |
+| speaker.frr.reloader.image.repository | string | `"quay.io/metallb/frr-reloader"` |  |
+| speaker.frr.reloader.image.tag | string | `nil` |  |
 | speaker.image.pullPolicy | string | `nil` |  |
 | speaker.image.repository | string | `"quay.io/metallb/speaker"` |  |
 | speaker.image.tag | string | `nil` |  |
