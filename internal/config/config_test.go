@@ -539,6 +539,38 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			desc: "duplicate values node selector match expression",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "peer",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:        100,
+							ASN:          200,
+							Address:      "2.3.4.5",
+							EBGPMultiHop: false,
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"foo": "bar",
+									},
+									MatchExpressions: []v1.LabelSelectorRequirement{
+										{
+											Key:      "bar",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"quux", "quux"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			desc: "duplicate peers",
 			crs: ClusterResources{
 				Peers: []v1beta2.BGPPeer{
@@ -1851,7 +1883,7 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			desc: "use duplicate ip pool selectors - in BGP adv",
+			desc: "use duplicate match labels in ip pool selectors - in BGP adv",
 			crs: ClusterResources{
 				Pools: []v1beta1.IPAddressPool{
 					{
@@ -1883,6 +1915,46 @@ func TestParse(t *testing.T) {
 								{
 									MatchLabels: map[string]string{
 										"test": "pool1",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "use duplicate match expression in ip pool selector - in BGP adv",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "pool1",
+							Labels: map[string]string{"test": "pool1"},
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv1",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength: pointer.Int32Ptr(32),
+							LocalPref:         uint32(100),
+							IPAddressPoolSelectors: []metav1.LabelSelector{
+								{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "test",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"pool1", "pool1"},
+										},
 									},
 								},
 							},
@@ -2208,7 +2280,7 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			desc: "use duplicate node selectors",
+			desc: "use duplicate match labels in node selectors",
 			crs: ClusterResources{
 				Pools: []v1beta1.IPAddressPool{
 					{
@@ -2259,6 +2331,87 @@ func TestParse(t *testing.T) {
 								{
 									MatchLabels: map[string]string{
 										"first": "true",
+									},
+								},
+							},
+							IPAddressPools: []string{"pool1"},
+						},
+					},
+				},
+				Nodes: []corev1.Node{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "first",
+							Labels: map[string]string{
+								"first": "true",
+							},
+						},
+					}, {
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "second",
+							Labels: map[string]string{
+								"second": "true",
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "use duplicate match expression values in node selector",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "adv1",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPools: []string{"pool1"},
+							NodeSelectors: []metav1.LabelSelector{
+								{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "kubernetes.io/hostname",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"first", "second"},
+										},
+										{
+											Key:      "kubernetes.io/hostname",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"second", "first"},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				L2Advs: []v1beta1.L2Advertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "l2adv1",
+						},
+						Spec: v1beta1.L2AdvertisementSpec{
+							NodeSelectors: []metav1.LabelSelector{
+								{
+									MatchExpressions: []metav1.LabelSelectorRequirement{
+										{
+											Key:      "kubernetes.io/hostname",
+											Operator: metav1.LabelSelectorOpIn,
+											Values:   []string{"first"},
+										},
 									},
 								},
 							},
