@@ -1,0 +1,3 @@
+manifests/
+bundle/
+bundleci.Dockerfile
