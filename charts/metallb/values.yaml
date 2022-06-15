@@ -5,6 +5,7 @@
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
+loadBalancerClass: ""
 
 # To configure MetalLB, you must specify ONE of the following two
 # options.

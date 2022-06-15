@@ -69,6 +69,11 @@ func (r *ServiceReconciler) reprocessAll(ctx context.Context, req ctrl.Request) 
 
 	retry := false
 	for _, service := range services.Items {
+		if filterByLoadBalancerClass(&service, r.LoadBalancerClass) {
+			level.Debug(r.Logger).Log("controller", "ServiceReconciler", "filtered service", req.NamespacedName)
+			continue
+		}
+
 		serviceName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
 		eps, err := epsOrSlicesForServices(ctx, r, serviceName, r.Endpoints)
 		if err != nil {

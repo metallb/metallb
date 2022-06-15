@@ -45,6 +45,7 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | controller.tolerations | list | `[]` |  |
 | fullnameOverride | string | `""` |  |
 | imagePullSecrets | list | `[]` |  |
+| loadBalancerClass | string | `""` |  |
 | nameOverride | string | `""` |  |
 | prometheus.metricsPort | int | `7472` |  |
 | prometheus.namespace | string | `""` |  |

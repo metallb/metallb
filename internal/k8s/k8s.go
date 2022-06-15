@@ -109,6 +109,7 @@ type Config struct {
 	DisableCertRotation bool
 	CertDir             string
 	CertServiceName     string
+	LoadBalancerClass   string
 	Listener
 }
 
@@ -245,12 +246,13 @@ func New(cfg *Config) (*Client, error) {
 
 	if cfg.ServiceChanged != nil {
 		if err = (&controllers.ServiceReconciler{
-			Client:    mgr.GetClient(),
-			Logger:    cfg.Logger,
-			Scheme:    mgr.GetScheme(),
-			Handler:   cfg.ServiceHandler,
-			Endpoints: needEndpoints,
-			Reload:    reloadChan,
+			Client:            mgr.GetClient(),
+			Logger:            cfg.Logger,
+			Scheme:            mgr.GetScheme(),
+			Handler:           cfg.ServiceHandler,
+			Endpoints:         needEndpoints,
+			Reload:            reloadChan,
+			LoadBalancerClass: cfg.LoadBalancerClass,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "service")
 			return nil, errors.Wrap(err, "failed to create service reconciler")
