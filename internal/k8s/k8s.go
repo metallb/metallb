@@ -126,9 +126,10 @@ func New(cfg *Config) (*Client, error) {
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:         scheme,
-		Port:           9443, // TODO port only with controller, for webhooks
-		LeaderElection: false,
+		Scheme:             scheme,
+		Port:               9443, // TODO port only with controller, for webhooks
+		LeaderElection:     false,
+		MetricsBindAddress: "0", // Disable metrics endpoint of controller manager
 		NewCache: cache.BuilderWithOptions(cache.Options{
 			SelectorsByObject: map[client.Object]cache.ObjectSelector{
 				&metallbv1beta1.AddressPool{}:      namespaceSelector,
