@@ -17,16 +17,106 @@ if [ ! -d ./metallb-operator ]; then
 	git checkout ${METALLB_OPERATOR_BRANCH}
 	cd -
 fi
-cd metallb-operator
 
-# install yq v4 for metallb deployment
-go install -mod='' github.com/mikefarah/yq/v4@v4.13.3
+rm -rf metallb-operator-deploy/manifests
+rm -rf metallb-operator-deploy/bundle
+rm metallb-operator-deploy/bundleci.Dockerfile
 
-yq e --inplace '.spec.template.spec.containers[0].env[] |= select (.name=="SPEAKER_IMAGE").value|="'${METALLB_IMAGE_BASE}':'${METALLB_IMAGE_TAG}'"' ${metallb_dir}/metallb-operator-deploy/controller_manager_patch.yaml
-yq e --inplace '.spec.template.spec.containers[0].env[] |= select (.name=="CONTROLLER_IMAGE").value|="'${METALLB_IMAGE_BASE}':'${METALLB_IMAGE_TAG}'"' ${metallb_dir}/metallb-operator-deploy/controller_manager_patch.yaml
-yq e --inplace '.spec.template.spec.containers[0].env[] |= select (.name=="FRR_IMAGE").value|="'${METALLB_IMAGE_BASE}':'${FRR_IMAGE_TAG}'"' ${metallb_dir}/metallb-operator-deploy/controller_manager_patch.yaml
+cp metallb-operator/bundleci.Dockerfile metallb-operator-deploy 
+cp -r metallb-operator/manifests/ metallb-operator-deploy/manifests 
+cp -r metallb-operator/bundle/ metallb-operator-deploy/bundle 
 
-PATH="${GOPATH}:${PATH}" ENABLE_OPERATOR_WEBHOOK=true KUSTOMIZE_DEPLOY_DIR="../metallb-operator-deploy" IMG="${METALLB_IMAGE_BASE}:${METALLB_OPERATOR_IMAGE_TAG}" make deploy
+cd metallb-operator-deploy
+
+find . -type f -name "*clusterserviceversion*.yaml" -exec sed -i 's/quay.io\/openshift\/origin-metallb:.*$/'${METALLB_IMAGE_BASE}':'${METALLB_IMAGE_TAG}'/g' {} +
+find . -type f -name "*clusterserviceversion*.yaml" -exec sed -i 's/quay.io\/openshift\/origin-metallb-frr:.*$/'${METALLB_IMAGE_BASE}':'${FRR_IMAGE_TAG}'/g' {} +
+find . -type f -name "*clusterserviceversion*.yaml" -exec sed -i 's/quay.io\/openshift\/origin-metallb-operator:.*$/'${METALLB_IMAGE_BASE}':'${METALLB_OPERATOR_IMAGE_TAG}'/g' {} +
+find . -type f -name "*clusterserviceversion*.yaml" -exec sed -r -i 's/name: metallb-operator\..*$/name: metallb-operator.v0.0.0/g' {} +
+
+cd -
+
+secret=$(oc -n openshift-marketplace get sa builder -oyaml | grep imagePullSecrets -A 1 | grep -o "builder-.*")
+
+buildindexpod="apiVersion: v1
+kind: Pod
+metadata:
+  name: buildindex
+  namespace: openshift-marketplace
+spec:
+  restartPolicy: Never
+  serviceAccountName: builder
+  containers:
+    - name: priv
+      image: quay.io/podman/stable
+      command:
+        - /bin/bash
+        - -c
+        - |
+          set -xe
+          sleep INF
+      securityContext:
+        privileged: true
+      volumeMounts:
+        - mountPath: /var/run/secrets/openshift.io/push
+          name: dockercfg
+          readOnly: true
+  volumes:
+    - name: dockercfg
+      defaultMode: 384
+      secret:
+        secretName: $secret
+"
+
+echo "$buildindexpod" | oc apply -f -
+
+success=0
+iterations=0
+sleep_time=10
+max_iterations=72 # results in 12 minutes timeout
+until [[ $success -eq 1 ]] || [[ $iterations -eq $max_iterations ]]
+do
+  run_status=$(oc -n openshift-marketplace get pod buildindex -o json | jq '.status.phase' | tr -d '"')
+   if [ "$run_status" == "Running" ]; then
+          success=1
+          break
+   fi
+   sleep $sleep_time
+done
+
+oc cp metallb-operator-deploy openshift-marketplace/buildindex:/tmp
+oc exec -n openshift-marketplace buildindex /tmp/metallb-operator-deploy/build_and_push_index.sh
+
+oc apply -f metallb-operator-deploy/install-resources.yaml
+
+# there is a race in the creation of the pod and the service account that prevents
+# the index image to be pulled. Here we check if the pod is not running and we kill it. 
+success=0
+iterations=0
+sleep_time=10
+max_iterations=72 # results in 12 minutes timeout
+until [[ $success -eq 1 ]] || [[ $iterations -eq $max_iterations ]]
+do
+  run_status=$(oc -n openshift-marketplace get pod | grep metallbindex | awk '{print $3}')
+   if [ "$run_status" == "Running" ]; then
+          success=1
+          break
+   elif [[ "$run_status" == *"Image"*  ]]; then
+       echo "pod in bad status try to recreate the image again status: $run_status"
+       pod_name=$(oc -n openshift-marketplace get pod | grep metallbindex | awk '{print $1}')
+       oc -n openshift-marketplace delete po $pod_name
+   fi
+
+   sleep $sleep_time
+done
+
+if [[ $success -eq 1 ]]; then
+  echo "[INFO] index image pod running"
+else
+  echo "[ERROR] index image pod failed to run"
+  exit 1
+fi
+
+./wait-for-csv.sh
 
 oc apply -f - <<EOF
 apiVersion: metallb.io/v1beta1
@@ -52,7 +142,5 @@ while [[ -z $(oc get endpoints -n $NAMESPACE webhook-service -o jsonpath="{.subs
 done
 echo "webhook endpoints avaliable"
 
-
-oc adm policy add-scc-to-user privileged -n metallb-system -z speaker
 
 sudo ip route add 192.168.10.0/24 dev ${BAREMETAL_NETWORK_NAME}
