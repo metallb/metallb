@@ -22,9 +22,6 @@ kind: OperatorGroup
 metadata:
   name: metallb-operator
   namespace: metallb-system
-spec:
-  targetNamespaces:
-    - metallb-system
 ---
 apiVersion: operators.coreos.com/v1alpha1
 kind: Subscription
