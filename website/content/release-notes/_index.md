@@ -3,6 +3,60 @@ title: Release Notes
 weight: 8
 ---
 
+## Version 0.13.0
+
+New Features:
+
+- CRD support! A long awaited feature, MetalLB is now configurable via CRs. 
+  On top of that, validating webhooks will ensure the validity of the configuration upfront, without needing to check the logs.
+  ([PR #1237](https://github.com/metallb/metallb/pull/1237), [PR #1245](https://github.com/metallb/metallb/pull/1245))
+  Please note that the ConfigMap configuration is not supported anymore. Check the "Changes in behaviour" section for more details.
+
+- It's now possible to choose to advertise addresses in L2 mode, BGP mode, both or just allocate the IP without advertising it.
+
+- Announcement node selector. It's possible to choose which nodes to advertise from the IPs coming from a given pool ([PR #1302](https://github.com/metallb/metallb/pull/1302))
+
+- BGPPeer selector. For any IP allocated from a given IPAddressPool, it is possible to choose the subset of BGPPeers
+  we want to advertise that IP to ([PR #1171](https://github.com/metallb/metallb/pull/1171)).
+
+- Kustomize configuration overlays. We now provide various overlays that implement different configuration degrees (as opposed to having)
+  one single manifest. ([PR #1254](https://github.com/metallb/metallb/pull/1254))
+
+- It's now possible to store BGP passwords as secrets (as an alternative to plain text passwords). ([PR #1264](https://github.com/metallb/metallb/pull/1264)).
+
+- LoadBalancerClass support: it's possible to have MetalLB listen only to services with the provided load balancer class to comply with [kubernetes loadbalancer class](https://kubernetes.io/docs/concepts/services-networking/service/#load-balancer-class). ([PR 1417](https://github.com/metallb/metallb/pull/1417)).
+
+Changes in behavior:
+
+- the biggest change is the introduction of CRDs and removing support for the configuration via ConfigMap. In order to ease the transition
+  to the new configuration, we provide a conversion tool from ConfigMap to resources (see the "Backward compatibility" section from [the main page](../_index.md)).
+
+- the internal architecture was radically changed in order to accomodate CRDs, so please do not hesitate to [file an issue](https://github.com/metallb/metallb/issues).
+
+- The `AvoidBuggyIPs` flag was removed in order to reduce the api surface a bit. The same result can be achieved using ranges of IPs instead of
+  the CIDR annotation.
+
+- The metallb images from dockerhub are **deprecated**. From this release, only the images on quay.io will be supported and updated. The official images can be found
+  [under the quay.io metallb organization](https://quay.io/organization/metallb).
+
+Bug Fixes:
+
+- When sharing IPs, fail instead of silently assign a new IP when a service is changed and becomes incompatible because of the sharing key ([PR #1230](https://github.com/metallb/metallb/pull/1230))
+
+- Restore compatibility with versions prior to 1.19 ([PR #1238](https://github.com/metallb/metallb/pull/1238))
+
+- Set BGP origin code in igp (Native mode) ([PR #1242](https://github.com/metallb/metallb/pull/1242))
+
+- Remove the endpoint slices deprecation log ([PR #1020](https://github.com/metallb/metallb/pull/1020))
+
+- L2: skip interfaces that do have an assigned IP ([PR #1347](https://github.com/metallb/metallb/pull/1347))
+
+- Logging: Avoid printing microseconds, fix the calling site for each log ([PR #1351](https://github.com/metallb/metallb/pull/1351))
+
+- IPV6 / FRR: fix single hop ebgp next hop tracking ([PR #1367](https://github.com/metallb/metallb/pull/1367))
+
+- Restore FRR to be pulled from dockerhub to support ARM ([PR #1258](https://github.com/metallb/metallb/pull/1258))
+
 ## Version 0.12.1
 
 Bug Fixes:
