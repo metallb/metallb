@@ -26,6 +26,8 @@ New Features:
 
 - LoadBalancerClass support: it's possible to have MetalLB listen only to services with the provided load balancer class to comply with [kubernetes loadbalancer class](https://kubernetes.io/docs/concepts/services-networking/service/#load-balancer-class). ([PR 1417](https://github.com/metallb/metallb/pull/1417)).
 
+- Added ability to specify `runtimeClassName` for each component in the helm chart. ([PR 1369](https://github.com/metallb/metallb/pull/1369))
+
 Changes in behavior:
 
 - the biggest change is the introduction of CRDs and removing support for the configuration via ConfigMap. In order to ease the transition
