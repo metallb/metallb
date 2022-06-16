@@ -25,6 +25,7 @@ import (
 	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
 	"go.universe.tf/metallb/internal/k8s/epslices"
+	"go.universe.tf/metallb/internal/pointer"
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -249,6 +250,59 @@ func TestServiceController(t *testing.T) {
 		if test.expectForceReloadCalled != calledForceReload {
 			t.Errorf("test %s failed: call force reload expected: %v, got: %v",
 				test.desc, test.expectForceReloadCalled, calledForceReload)
+		}
+	}
+}
+
+func TestLBClass(t *testing.T) {
+
+	tests := []struct {
+		desc           string
+		serviceLBClass *string
+		metallLBClass  string
+		shouldFilter   bool
+	}{
+		{
+			desc:           "Empty serviceclass, metallb default",
+			serviceLBClass: nil,
+			metallLBClass:  "",
+			shouldFilter:   false,
+		},
+		{
+			desc:           "Empty serviceclass, metallb specific",
+			serviceLBClass: nil,
+			metallLBClass:  "foo",
+			shouldFilter:   true,
+		},
+		{
+			desc:           "Set serviceclass, metallb default",
+			serviceLBClass: pointer.StrPtr("foo"),
+			metallLBClass:  "",
+			shouldFilter:   true,
+		},
+		{
+			desc:           "Set serviceclass, metallb different",
+			serviceLBClass: pointer.StrPtr("foo"),
+			metallLBClass:  "bar",
+			shouldFilter:   true,
+		},
+		{
+			desc:           "Set serviceclass, metallb same",
+			serviceLBClass: pointer.StrPtr("foo"),
+			metallLBClass:  "foo",
+			shouldFilter:   false,
+		},
+	}
+	for _, test := range tests {
+		svc := &corev1.Service{
+			Spec: corev1.ServiceSpec{
+				LoadBalancerClass: test.serviceLBClass,
+			},
+		}
+		filters := filterByLoadBalancerClass(svc, test.metallLBClass)
+		if filters != test.shouldFilter {
+			t.Errorf("test %s failed: expected filter: %v, got: %v",
+				test.desc, test.shouldFilter, filters)
 		}
 	}
 }

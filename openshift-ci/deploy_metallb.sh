@@ -28,9 +28,12 @@ cp -r metallb-operator/bundle/ metallb-operator-deploy/bundle
 
 cd metallb-operator-deploy
 
-find . -type f -name "*clusterserviceversion*.yaml" -exec sed -i 's/quay.io\/openshift\/origin-metallb:.*$/'${METALLB_IMAGE_BASE}':'${METALLB_IMAGE_TAG}'/g' {} +
-find . -type f -name "*clusterserviceversion*.yaml" -exec sed -i 's/quay.io\/openshift\/origin-metallb-frr:.*$/'${METALLB_IMAGE_BASE}':'${FRR_IMAGE_TAG}'/g' {} +
-find . -type f -name "*clusterserviceversion*.yaml" -exec sed -i 's/quay.io\/openshift\/origin-metallb-operator:.*$/'${METALLB_IMAGE_BASE}':'${METALLB_OPERATOR_IMAGE_TAG}'/g' {} +
+ESCAPED_METALLB_IMAGE=$(printf '%s\n' "${METALLB_IMAGE_BASE}:${METALLB_IMAGE_TAG}" | sed -e 's/[]\/$*.^[]/\\&/g');
+find . -type f -name "*clusterserviceversion*.yaml" -exec sed -i 's/quay.io\/openshift\/origin-metallb:.*$/'"$ESCAPED_METALLB_IMAGE"'/g' {} +
+ESCAPED_FRR_IMAGE=$(printf '%s\n' "${METALLB_IMAGE_BASE}:${FRR_IMAGE_TAG}" | sed -e 's/[]\/$*.^[]/\\&/g');
+find . -type f -name "*clusterserviceversion*.yaml" -exec sed -i 's/quay.io\/openshift\/origin-metallb-frr:.*$/'"$ESCAPED_FRR_IMAGE"'/g' {} +
+ESCAPED_OPERATOR_IMAGE=$(printf '%s\n' "${METALLB_IMAGE_BASE}:${METALLB_OPERATOR_IMAGE_TAG}" | sed -e 's/[]\/$*.^[]/\\&/g');
+find . -type f -name "*clusterserviceversion*.yaml" -exec sed -i 's/quay.io\/openshift\/origin-metallb-operator:.*$/'"$ESCAPED_OPERATOR_IMAGE"'/g' {} +
 find . -type f -name "*clusterserviceversion*.yaml" -exec sed -r -i 's/name: metallb-operator\..*$/name: metallb-operator.v0.0.0/g' {} +
 
 cd -

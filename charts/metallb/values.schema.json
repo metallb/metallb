@@ -156,22 +156,15 @@
       "description": "MetalLB configuration",
       "type": "object"
     },
+    "loadBalancerClass": {
+      "type":"string"
+    },
     "rbac": {
       "description": "RBAC configuration",
       "type": "object",
       "properties": {
         "create": {
           "description": "Enable RBAC",
-          "type": "boolean"
-        }
-      }
-    },
-    "webhooks": {
-      "description": "webhooks configuration",
-      "type": "object",
-      "properties": {
-        "enable": {
-          "description": "Enables webhooks",
           "type": "boolean"
         }
       }

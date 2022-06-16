@@ -5,6 +5,7 @@
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
+loadBalancerClass: ""
 
 # To configure MetalLB, you must specify ONE of the following two
 # options.
@@ -16,9 +17,6 @@ rbac:
 psp:
   # create specifies whether to install and use Pod Security Policies.
   create: true
-
-webhooks:
-  enable: false
 
 prometheus:
   # scrape annotations specifies whether to add Prometheus metric

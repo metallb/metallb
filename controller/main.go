@@ -117,14 +117,18 @@ func (c *controller) SetPools(l log.Logger, pools map[string]*config.Pool) contr
 
 func main() {
 	var (
-		port            = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
-		namespace       = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config / memberlist secret namespace")
-		mlSecret        = flag.String("ml-secret-name", os.Getenv("METALLB_ML_SECRET_NAME"), "name of the memberlist secret to create")
-		deployName      = flag.String("deployment", os.Getenv("METALLB_DEPLOYMENT"), "name of the MetalLB controller Deployment")
-		logLevel        = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
-		disableEpSlices = flag.Bool("disable-epslices", false, "Disable the usage of EndpointSlices and default to Endpoints instead of relying on the autodiscovery mechanism")
-		enablePprof     = flag.Bool("enable-pprof", false, "Enable pprof profiling")
-		enableWebhook   = flag.Bool("enable-webhook", false, "Enable validation webhook")
+		port                = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
+		namespace           = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config / memberlist secret namespace")
+		mlSecret            = flag.String("ml-secret-name", os.Getenv("METALLB_ML_SECRET_NAME"), "name of the memberlist secret to create")
+		deployName          = flag.String("deployment", os.Getenv("METALLB_DEPLOYMENT"), "name of the MetalLB controller Deployment")
+		logLevel            = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
+		disableEpSlices     = flag.Bool("disable-epslices", false, "Disable the usage of EndpointSlices and default to Endpoints instead of relying on the autodiscovery mechanism")
+		enablePprof         = flag.Bool("enable-pprof", false, "Enable pprof profiling")
+		disableCertRotation = flag.Bool("disable-cert-rotation", false, "disable automatic generation and rotation of webhook TLS certificates/keys")
+		certDir             = flag.String("cert-dir", "/tmp/k8s-webhook-server/serving-certs", "The directory where certs are stored")
+		certServiceName     = flag.String("cert-service-name", "webhook-service", "The service name used to generate the TLS cert's hostname")
+		loadBalancerClass   = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
+		webhookMode         = flag.String("webhook-mode", "enabled", "webhook mode: can be enabled, disabled or only webhook if we want the controller to act as webhook endpoint only")
 	)
 	flag.Parse()
 
@@ -156,7 +160,7 @@ func main() {
 
 	validation := config.ValidationFor(bgpType)
 
-	client, err := k8s.New(&k8s.Config{
+	cfg := &k8s.Config{
 		ProcessName:     "metallb-controller",
 		MetricsPort:     *port,
 		EnablePprof:     *enablePprof,
@@ -168,9 +172,25 @@ func main() {
 			ServiceChanged: c.SetBalancer,
 			PoolChanged:    c.SetPools,
 		},
-		ValidateConfig: validation,
-		EnableWebhook:  *enableWebhook,
-	})
+		ValidateConfig:      validation,
+		EnableWebhook:       true,
+		DisableCertRotation: *disableCertRotation,
+		CertDir:             *certDir,
+		CertServiceName:     *certServiceName,
+		LoadBalancerClass:   *loadBalancerClass,
+	}
+	switch *webhookMode {
+	case "enabled":
+	case "disabled":
+		cfg.EnableWebhook = false
+	case "onlywebhook":
+		cfg.Listener = k8s.Listener{}
+	default:
+		level.Error(logger).Log("op", "startup", "error", "invalid webhookmode value", "value", *webhookMode)
+		os.Exit(1)
+	}
+
+	client, err := k8s.New(cfg)
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create k8s client")
 		os.Exit(1)
@@ -187,5 +207,6 @@ func main() {
 	c.client = client
 	if err := client.Run(nil); err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to run k8s client")
+		os.Exit(1)
 	}
 }

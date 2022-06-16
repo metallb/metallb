@@ -196,6 +196,9 @@ spec:
         {{- with .Values.speaker.logLevel }}
         - --log-level={{ . }}
         {{- end }}
+        {{- if .Values.loadBalancerClass }}
+        - --lb-class={{ .Values.loadBalancerClass }}
+        {{- end }}
         env:
         - name: METALLB_NODE_NAME
           valueFrom:
@@ -357,6 +360,9 @@ spec:
       - key: node-role.kubernetes.io/master
         effect: NoSchedule
         operator: Exists
+      - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
+        operator: Exists        
       {{- end }}
       {{- with .Values.speaker.tolerations }}
         {{- toYaml . | nindent 6 }}
