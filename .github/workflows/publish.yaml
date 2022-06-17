@@ -75,7 +75,7 @@ jobs:
             quay.io/metallb/${{ matrix.image }}
           # generate Docker tags based on the following events/attributes
           tags: |
-            type=ref,event=push
+            type=ref,event=branch
             type=semver,pattern={{version}}
           labels: |
             org.opencontainers.image.title=${{ matrix.image }}
