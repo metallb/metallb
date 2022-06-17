@@ -153,6 +153,7 @@ controller:
   nodeSelector: {}
   tolerations: []
   priorityClassName: ""
+  runtimeClassName: ""
   affinity: {}
   podAnnotations: {}
   livenessProbe:
@@ -204,7 +205,7 @@ speaker:
   priorityClassName: ""
   affinity: {}
   ## Selects which runtime class will be used by the pod.
-  # runtimeClassName:
+  runtimeClassName: ""
   podAnnotations: {}
   livenessProbe:
     enabled: true

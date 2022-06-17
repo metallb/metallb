@@ -57,7 +57,7 @@ func (bfdProfile *BFDProfile) ValidateDelete() error {
 
 	for _, peer := range existingBGPPeers.Items {
 		if bfdProfile.Name == peer.Spec.BFDProfile {
-			return fmt.Errorf("Failed to delete BFDProfile %s, used by BGPPeer %s", bfdProfile.Name, peer.Spec.BFDProfile)
+			return fmt.Errorf("Failed to delete BFDProfile %s, used by BGPPeer %s", bfdProfile.Name, peer.Name)
 		}
 	}
 	return nil
