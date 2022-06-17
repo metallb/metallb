@@ -30,10 +30,6 @@ spec:
       {{- with .Values.controller.runtimeClassName }}
       runtimeClassName: {{ . | quote }}
       {{- end }}
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
       serviceAccountName: {{ template "metallb.controller.serviceAccountName" . }}
       terminationGracePeriodSeconds: 0
 {{- if .Values.controller.securityContext }}
@@ -42,7 +38,7 @@ spec:
 {{- end }}
       containers:
       - name: controller
-        image: {{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag | default .Chart.AppVersion }}
+        image: "{{ .Values.privateRegistry.registryUrl | default .Values.controller.image.registry }}/{{ .Values.controller.image.repository }}:{{ .Values.controller.image.tag | default .Chart.AppVersion }}"
         {{- if .Values.controller.image.pullPolicy }}
         imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
         {{- end }}

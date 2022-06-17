@@ -18,6 +18,13 @@ psp:
   # create specifies whether to install and use Pod Security Policies.
   create: true
 
+privateRegistry:
+  # set secret name
+  registrySecret: ~
+  registryUrl: ~
+  registryUser: ~
+  registryPasswd: ~
+
 prometheus:
   # scrape annotations specifies whether to add Prometheus metric
   # auto-collection annotations to pods. See
@@ -125,7 +132,8 @@ controller:
   # -- Controller log level. Must be one of: `all`, `debug`, `info`, `warn`, `error` or `none`
   logLevel: info
   image:
-    repository: quay.io/metallb/controller
+    registry: quay.io
+    repository: metallb/controller
     tag:
     pullPolicy:
   serviceAccount:
@@ -176,7 +184,8 @@ speaker:
     enabled: true
     mlBindPort: 7946
   image:
-    repository: quay.io/metallb/speaker
+    registry: quay.io
+    repository: metallb/speaker
     tag:
     pullPolicy:
   serviceAccount:
@@ -220,6 +229,7 @@ speaker:
   frr:
     enabled: false
     image:
+      registry: docker.io
       repository: frrouting/frr
       tag: v7.5.1
       pullPolicy:

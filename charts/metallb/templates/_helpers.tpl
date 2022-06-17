@@ -79,3 +79,10 @@ Create the name of the settings Secret to use.
 {{- define "metallb.secretName" -}}
     {{ default ( printf "%s-memberlist" (include "metallb.fullname" .)) .Values.speaker.secretName | trunc 63 | trimSuffix "-" }}
 {{- end -}}
+
+{{/*
+Create the json of the registry Secret to use.
+*/}}
+{{- define "metallb.registrySecret" }}
+{{- printf "{\"auths\": {\"%s\": {\"auth\": \"%s\"}}}" .Values.privateRegistry.registryUrl (printf "%s:%s" .Values.privateRegistry.registryUser .Values.privateRegistry.registryPasswd | b64enc) | b64enc }}
+{{- end }}
