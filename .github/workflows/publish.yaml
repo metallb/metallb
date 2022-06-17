@@ -2,10 +2,10 @@ name: Publish
 on:
   push:
     branches:
-      - 'main'
-      - 'v.*'
+      - "main"
+      - "v.*"
     tags:
-      - '.*'
+      - ".*"
 
 jobs:
   unit-tests:
@@ -17,13 +17,12 @@ jobs:
           access_token: ${{ github.token }}
 
       - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
+        uses: actions/checkout@v3
 
-      - uses: actions/setup-go@v2
+      - uses: actions/setup-go@v3
         with:
-          go-version: "1.17.1"
+          go-version-file: "go.mod"
+          cache: true
 
       - name: Install Dependencies
         run: |
@@ -48,39 +47,50 @@ jobs:
           inv generateapidocs
           inv checkchanges --action="run inv generateapidocs"
 
-  build-and-push:
-    needs: unit-tests
+  publish-images:
     runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: true
+      matrix:
+        image: [speaker, controller, configmaptocrs]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
 
-      - uses: actions/setup-go@v2
-        with:
-          go-version: "1.17.1"
+      - name: Setup docker buildx
+        uses: docker/setup-buildx-action@v2
 
-      - name: Install Dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install python3-pip arping ndisc6
-          sudo pip3 install invoke semver pyyaml
-          go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0
-
-      - name: Set up docker buildx
-        uses: docker/setup-buildx-action@v1
-
-      - name: Login to Quay.io container registry
-        uses: docker/login-action@v1
+      - name: Log into Quay
+        uses: docker/login-action@v2
         with:
           registry: quay.io
           username: ${{ secrets.QUAY_USER }}
           password: ${{ secrets.QUAY_PASSWORD }}
 
-      - name: Build and push MetalLB images
-        run: |
-          mkdir -p ./bin
-          wget -qO- https://github.com/estesp/manifest-tool/releases/download/v2.0.3/binaries-manifest-tool-2.0.3.tar.gz | tar xvz -C ./bin
-          mv ./bin/manifest-tool-linux-amd64 ./bin/manifest-tool && chmod +x ./bin/manifest-tool
-          sudo -E env "PATH=./bin:$PATH" inv push-multiarch --binaries=controller --binaries=speaker --binaries=configmaptocrs --registry=quay.io --repo=metallb --tag=${{ github.ref_name }}
+      - name: Docker meta ${{ matrix.image }}
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            quay.io/metallb/${{ matrix.image }}
+          # generate Docker tags based on the following events/attributes
+          tags: |
+            type=ref,event=push
+            type=semver,pattern={{version}}
+          labels: |
+            org.opencontainers.image.title=${{ matrix.image }}
+            org.opencontainers.image.description=${{ matrix.image }} for metallb, a network load-balancer implementation for Kubernetes using standard routing protocols
+
+      - name: Build and push ${{ matrix.image }}
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          file: ${{matrix.image}}/Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/s390x,linux/ppc64le,linux/arm/v7
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            GIT_BRANCH: ${{ github.ref_name }}
+            GIT_COMMIT: ${{ github.sha }}
