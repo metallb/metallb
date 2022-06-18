@@ -9,6 +9,10 @@ metadata:
     {{- if .Values.prometheus.podMonitor.additionalLabels }}
 {{ toYaml .Values.prometheus.podMonitor.additionalLabels | indent 4 }}
     {{- end }}
+  {{- if .Values.prometheus.podMonitor.annotations }}
+  annotations:
+{{ toYaml .Values.prometheus.podMonitor.annotations | indent 4 }}
+  {{- end }}
 spec:
   jobLabel: {{ .Values.prometheus.podMonitor.jobLabel | quote }}
   selector:
@@ -43,6 +47,10 @@ metadata:
     {{- if .Values.prometheus.podMonitor.additionalLabels }}
 {{ toYaml .Values.prometheus.podMonitor.additionalLabels | indent 4 }}
     {{- end }}
+  {{- if .Values.prometheus.podMonitor.annotations }}
+  annotations:
+{{ toYaml .Values.prometheus.podMonitor.annotations | indent 4 }}
+  {{- end }}
 spec:
   jobLabel: {{ .Values.prometheus.podMonitor.jobLabel | quote }}
   selector:

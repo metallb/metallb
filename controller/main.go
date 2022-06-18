@@ -128,6 +128,7 @@ func main() {
 		certDir             = flag.String("cert-dir", "/tmp/k8s-webhook-server/serving-certs", "The directory where certs are stored")
 		certServiceName     = flag.String("cert-service-name", "webhook-service", "The service name used to generate the TLS cert's hostname")
 		loadBalancerClass   = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
+		webhookMode         = flag.String("webhook-mode", "enabled", "webhook mode: can be enabled, disabled or only webhook if we want the controller to act as webhook endpoint only")
 	)
 	flag.Parse()
 
@@ -159,7 +160,7 @@ func main() {
 
 	validation := config.ValidationFor(bgpType)
 
-	client, err := k8s.New(&k8s.Config{
+	cfg := &k8s.Config{
 		ProcessName:     "metallb-controller",
 		MetricsPort:     *port,
 		EnablePprof:     *enablePprof,
@@ -177,7 +178,19 @@ func main() {
 		CertDir:             *certDir,
 		CertServiceName:     *certServiceName,
 		LoadBalancerClass:   *loadBalancerClass,
-	})
+	}
+	switch *webhookMode {
+	case "enabled":
+	case "disabled":
+		cfg.EnableWebhook = false
+	case "onlywebhook":
+		cfg.Listener = k8s.Listener{}
+	default:
+		level.Error(logger).Log("op", "startup", "error", "invalid webhookmode value", "value", *webhookMode)
+		os.Exit(1)
+	}
+
+	client, err := k8s.New(cfg)
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create k8s client")
 		os.Exit(1)

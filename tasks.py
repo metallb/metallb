@@ -135,53 +135,28 @@ def build(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag=
     binaries = _check_binaries(binaries)
     architectures = _check_architectures(architectures)
     docker_build_cmd = _docker_build_cmd()
-    _make_build_dirs()
 
     commit = run("git describe --dirty --always", hide=True).stdout.strip()
     branch = run("git rev-parse --abbrev-ref HEAD", hide=True).stdout.strip()
 
     for arch in architectures:
-        env = {
-            "CGO_ENABLED": "0",
-            "GOOS": "linux",
-            "GOARCH": arch,
-            "GOARM": "6",
-            "GO111MODULE": "on",
-        }
-        if "speaker" in binaries:
-            shutil.copy("frr-reloader/frr-reloader.sh","build/{arch}/speaker/".format(arch=arch))
-            run("go build -v -o build/{arch}/speaker/frr-metrics -ldflags "
-                "'-X go.universe.tf/metallb/internal/version.gitCommit={commit} "
-                "-X go.universe.tf/metallb/internal/version.gitBranch={branch}' "
-                "frr-metrics/exporter.go".format(
-                    arch=arch,
-                    commit=commit,
-                    branch=branch),
-                    env=env,
-                    echo=True,
-                )
 
         for bin in binaries:
-            run("go build -v -o build/{arch}/{bin}/{bin} -ldflags "
-                "'-X go.universe.tf/metallb/internal/version.gitCommit={commit} "
-                "-X go.universe.tf/metallb/internal/version.gitBranch={branch}' "
-                "go.universe.tf/metallb/{bin}".format(
-                    arch=arch,
-                    bin=bin,
-                    commit=commit,
-                    branch=branch),
-                env=env,
-                echo=True)
             run("{docker_build_cmd} "
                 "--platform linux/{arch} "
                 "-t {registry}/{repo}/{bin}:{tag}-{arch} "
-                "-f {bin}/Dockerfile build/{arch}/{bin}".format(
+                "-f {bin}/Dockerfile "
+                "--build-arg GIT_BRANCH=\"{branch}\" "
+                "--build-arg GIT_COMMIT=\"{commit}\" "
+                ".".format(
                     docker_build_cmd=docker_build_cmd,
                     registry=registry,
                     repo=repo,
                     bin=bin,
                     tag=tag,
-                    arch=arch),
+                    arch=arch,
+                    commit=commit,
+                    branch=branch),
                 echo=True)
 
 
