@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -365,6 +366,11 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 	src := net.ParseIP(p.Spec.SrcAddress)
 	if p.Spec.SrcAddress != "" && src == nil {
 		return nil, fmt.Errorf("invalid source IP %q", p.Spec.SrcAddress)
+	}
+
+	err = validateLabelSelectorDuplicate(p.Spec.NodeSelectors, "nodeSelectors")
+	if err != nil {
+		return nil, err
 	}
 
 	var nodeSels []labels.Selector
@@ -994,22 +1000,46 @@ OUTER:
 	return ipPools, nil
 }
 
-func validateDuplicate(strSlice []string, sliceType string) error {
-	for i := 0; i < len(strSlice); i++ {
-		for j := i + 1; j < len(strSlice); j++ {
-			if strSlice[i] == strSlice[j] {
-				return fmt.Errorf("duplicate definition of %s %q", sliceType, strSlice[i])
+func validateLabelSelectorDuplicate(labelSelectors []metav1.LabelSelector, labelSelectorType string) error {
+	for _, ls := range labelSelectors {
+		for _, me := range ls.MatchExpressions {
+			sort.Strings(me.Values)
+		}
+	}
+	for i := 0; i < len(labelSelectors); i++ {
+		err := validateLabelSelectorMatchExpressions(labelSelectors[i].MatchExpressions)
+		if err != nil {
+			return err
+		}
+		for j := i + 1; j < len(labelSelectors); j++ {
+			if labelSelectors[i].String() == labelSelectors[j].String() {
+				return fmt.Errorf("duplicate definition of %s %q", labelSelectorType, labelSelectors[i])
 			}
 		}
 	}
 	return nil
 }
 
-func validateLabelSelectorDuplicate(labelSelectors []metav1.LabelSelector, labelSelectorType string) error {
-	for i := 0; i < len(labelSelectors); i++ {
-		for j := i + 1; j < len(labelSelectors); j++ {
-			if labelSelectors[i].String() == labelSelectors[j].String() {
-				return fmt.Errorf("duplicate definition of %s %q", labelSelectorType, labelSelectors[i])
+func validateLabelSelectorMatchExpressions(matchExpressions []metav1.LabelSelectorRequirement) error {
+	for i := 0; i < len(matchExpressions); i++ {
+		err := validateDuplicate(matchExpressions[i].Values, "match expression value in label selector")
+		if err != nil {
+			return err
+		}
+		for j := i + 1; j < len(matchExpressions); j++ {
+			if matchExpressions[i].String() == matchExpressions[j].String() {
+				return fmt.Errorf("duplicate definition of %s %q", "match expressions", matchExpressions[i])
+			}
+		}
+	}
+	return nil
+}
+
+func validateDuplicate(strSlice []string, sliceType string) error {
+	for i := 0; i < len(strSlice); i++ {
+		for j := i + 1; j < len(strSlice); j++ {
+			if strSlice[i] == strSlice[j] {
+				return fmt.Errorf("duplicate definition of %s %q", sliceType, strSlice[i])
 			}
 		}
 	}
