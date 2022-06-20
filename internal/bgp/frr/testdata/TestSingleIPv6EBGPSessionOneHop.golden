@@ -6,8 +6,10 @@ ip nht resolve-via-default
 ipv6 nht resolve-via-default
 route-map 127:0:0::2-in deny 20
 route-map 127:0:0::2-out permit 1
+  match ip address prefix-list 127:0:0::2-pl-ipv6
+route-map 127:0:0::2-out permit 2
   match ipv6 address prefix-list 127:0:0::2-pl-ipv6
-  on-match next
+ip prefix-list 127:0:0::2-pl-ipv6 deny any
 ipv6 prefix-list 127:0:0::2-pl-ipv6 deny any
 
 router bgp 100
