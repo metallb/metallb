@@ -28,6 +28,9 @@ New Features:
 
 - Helm Charts: optional annotations for PodMonitors and PrometheusRules ([PR 1407](https://github.com/metallb/metallb/pull/1407))
 
+- Multiprotocol BGP support: it's possible to expose ipv4 addresses via a router connected via ipv6 and viceversa. It was already possible with FRR mode in the
+v0.12.x version, but now the feature is covered by tests too ([PR 1444](https://github.com/metallb/metallb/pull/1444)).
+
 Changes in behavior:
 
 - the biggest change is the introduction of CRDs and removing support for the configuration via ConfigMap. In order to ease the transition
