@@ -54,25 +54,27 @@ ipv6 nht resolve-via-default
 route-map {{$n.Addr}}-in deny 20
 {{- range $a := .Advertisements }}
 {{- if not (eq $a.LocalPref 0)}}
-{{frrIPFamily $n.IPFamily}} prefix-list {{localPrefPrefixList $n $a.LocalPref}} permit {{$a.Prefix}}
+{{frrIPFamily $a.IPFamily}} prefix-list {{localPrefPrefixList $n $a.LocalPref}} permit {{$a.Prefix}}
 route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
-  match {{frrIPFamily $n.IPFamily}} address prefix-list {{localPrefPrefixList $n $a.LocalPref}}
+  match {{frrIPFamily $a.IPFamily}} address prefix-list {{localPrefPrefixList $n $a.LocalPref}}
   set local-preference {{$a.LocalPref}}
   on-match next
 {{- end }}
 {{- range $c := $a.Communities }}
-{{frrIPFamily $n.IPFamily}} prefix-list {{communityPrefixList $n $c}} permit {{$a.Prefix}}
+{{frrIPFamily $a.IPFamily}} prefix-list {{communityPrefixList $n $c}} permit {{$a.Prefix}}
 route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
-  match {{frrIPFamily $n.IPFamily}} address prefix-list {{communityPrefixList $n $c}}
+  match {{frrIPFamily $a.IPFamily}} address prefix-list {{communityPrefixList $n $c}}
   set community {{$c}} additive
   on-match next
 {{- end }}
 {{frrIPFamily $a.IPFamily}} prefix-list {{allowedPrefixList $n}} permit {{$a.Prefix}}
 {{- end }}
 route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
-  match {{frrIPFamily $n.IPFamily}} address prefix-list {{allowedPrefixList $n}}
-  on-match next
-{{frrIPFamily $n.IPFamily}} prefix-list {{allowedPrefixList $n}} deny any
+  match ip address prefix-list {{allowedPrefixList $n}}
+route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
+  match ipv6 address prefix-list {{allowedPrefixList $n}}
+ip prefix-list {{allowedPrefixList $n}} deny any
+ipv6 prefix-list {{allowedPrefixList $n}} deny any
 {{- end }}
 {{- end }}
 
