@@ -50,6 +50,9 @@ jobs:
   publish-images:
     runs-on: ubuntu-20.04
     needs: [unit-tests]
+    permissions:
+      contents: read
+      id-token: write # needed for signing the images with GitHub OIDC Token
     strategy:
       fail-fast: true
       matrix:
@@ -57,6 +60,11 @@ jobs:
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@main
+        with:
+          cosign-release: "v1.9.0"
 
       - name: Code checkout
         uses: actions/checkout@v3
@@ -87,6 +95,7 @@ jobs:
 
       - name: Build and push ${{ matrix.image }}
         uses: docker/build-push-action@v3
+        id: build-and-push
         with:
           context: .
           tags: ${{ steps.meta.outputs.tags }}
@@ -99,7 +108,13 @@ jobs:
           build-args: |
             GIT_BRANCH: ${{ github.ref_name }}
             GIT_COMMIT: ${{ github.sha }}
-  
+
+      - name: Cosign sign tags
+        run: cosign sign ${TAGS}
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}@${{ steps.build-and-push.outputs.digest }}
+          COSIGN_EXPERIMENTAL: 1
+
   release-charts:
     needs: [publish-images]
     runs-on: ubuntu-latest
