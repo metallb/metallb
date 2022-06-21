@@ -116,6 +116,12 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 					testservice.TrafficPolicyCluster(svc)
 					testservice.DualStack(svc)
 				}),
+			table.Entry("DUALSTACK - via both, advertising ipv6 only",
+				ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
+					testservice.TrafficPolicyCluster(svc)
+					testservice.DualStack(svc)
+					testservice.ForceV6(svc)
+				}),
 		)
 
 		table.DescribeTable("should propagate the localpreference and the communities to both ipv4 and ipv6 addresses",
