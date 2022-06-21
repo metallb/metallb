@@ -14,7 +14,7 @@ verify that all its issues are closed. If there are open issues,
 you'll have to either resolve them, or bump to the next version.
 
 
-### Cherry-pick relevent commits
+### Cherry-pick relevant commits
 
 MetalLB uses release branches to track releases. Relevant commits should be cherry-picked onto the release branch.
 For example:
