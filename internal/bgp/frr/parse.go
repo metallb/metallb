@@ -186,6 +186,7 @@ func ParseRoutes(vtyshRes string) (map[string]Route, error) {
 		for _, n := range frrRoutes {
 			r.LocalPref = n.LocalPref
 			r.Origin = n.Origin
+		out:
 			for _, h := range n.Nexthops {
 				ip := net.ParseIP(h.IP)
 				if ip == nil {
@@ -193,6 +194,11 @@ func ParseRoutes(vtyshRes string) (map[string]Route, error) {
 				}
 				if ip.To4() == nil && h.Scope == "link-local" {
 					continue
+				}
+				for _, current := range r.NextHops {
+					if ip.Equal(current) {
+						continue out
+					}
 				}
 				r.NextHops = append(r.NextHops, ip)
 			}
