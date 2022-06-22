@@ -18,7 +18,7 @@ import (
 const (
 	multiHopNetwork = "multi-hop-net"
 	metalLBASN      = 64512
-	externalASN     = 64513
+	externalASN     = 4200000000
 )
 
 var (
