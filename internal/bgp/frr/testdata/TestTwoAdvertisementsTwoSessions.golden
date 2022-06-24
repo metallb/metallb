@@ -24,8 +24,10 @@ route-map 10.2.2.254-out permit 3
 ip prefix-list 10.2.2.254-pl-ipv4 permit 172.16.1.11/24
 route-map 10.2.2.254-out permit 4
   match ip address prefix-list 10.2.2.254-pl-ipv4
-  on-match next
+route-map 10.2.2.254-out permit 5
+  match ipv6 address prefix-list 10.2.2.254-pl-ipv4
 ip prefix-list 10.2.2.254-pl-ipv4 deny any
+ipv6 prefix-list 10.2.2.254-pl-ipv4 deny any
 route-map 10.2.2.255-in deny 20
 ip prefix-list 10.2.2.255-1111:2222-ipv4-community-prefixes permit 172.16.1.10/24
 route-map 10.2.2.255-out permit 1
@@ -46,8 +48,10 @@ route-map 10.2.2.255-out permit 3
 ip prefix-list 10.2.2.255-pl-ipv4 permit 172.16.1.11/24
 route-map 10.2.2.255-out permit 4
   match ip address prefix-list 10.2.2.255-pl-ipv4
-  on-match next
+route-map 10.2.2.255-out permit 5
+  match ipv6 address prefix-list 10.2.2.255-pl-ipv4
 ip prefix-list 10.2.2.255-pl-ipv4 deny any
+ipv6 prefix-list 10.2.2.255-pl-ipv4 deny any
 
 router bgp 100
   no bgp ebgp-requires-policy

@@ -15,6 +15,12 @@ func TrafficPolicyLocal(svc *corev1.Service) {
 	svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeLocal
 }
 
+func ForceV4(svc *corev1.Service) {
+	f := corev1.IPFamilyPolicySingleStack
+	svc.Spec.IPFamilyPolicy = &f
+	svc.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv4Protocol}
+}
+
 func ForceV6(svc *corev1.Service) {
 	f := corev1.IPFamilyPolicySingleStack
 	svc.Spec.IPFamilyPolicy = &f

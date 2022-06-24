@@ -47,9 +47,10 @@ func RoutesMatchNodes(nodes []v1.Node, route bgpfrr.Route, ipFamily ipfamily.Fam
 	for _, ip := range ips {
 		nodesIPs[ip] = struct{}{}
 	}
+
 	for _, h := range route.NextHops {
 		if _, ok := nodesIPs[h.String()]; !ok { // skipping neighbors that are not nodes
-			return fmt.Errorf("%s not found in nodes ips", h.String())
+			return fmt.Errorf("%s not found in nodes ips, %v", h.String(), nodesIPs)
 		}
 
 		delete(nodesIPs, h.String())
@@ -72,7 +73,7 @@ func BFDPeersMatchNodes(nodes []v1.Node, peers map[string]bgpfrr.BFDPeer, ipFami
 
 	for k := range peers {
 		if _, ok := nodesIPs[k]; !ok { // skipping neighbors that are not nodes
-			return fmt.Errorf("%s not found in nodes ips", k)
+			return fmt.Errorf("%s not found in nodes ips %v", k, nodesIPs)
 		}
 		delete(nodesIPs, k)
 	}

@@ -138,10 +138,6 @@ var _ = ginkgo.Describe("BGP", func() {
 			func(svc *corev1.Service) {
 				testservice.DualStack(svc)
 			}),
-		table.Entry("DUALSTACK - force V6 only", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
-			func(svc *corev1.Service) {
-				testservice.ForceV6(svc)
-			}),
 		table.Entry("IPV4 - request IPv4 via custom annotation", ipfamily.IPv4, []string{v4PoolAddresses},
 			func(svc *corev1.Service) {
 				testservice.WithSpecificIPs(svc, "192.168.10.100")

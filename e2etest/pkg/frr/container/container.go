@@ -44,6 +44,7 @@ type FRR struct {
 	Ipv4           string
 	Ipv6           string
 	Network        string
+	MultiProtocol  config.MultiProtocol
 }
 
 type Config struct {
@@ -121,7 +122,7 @@ func PairWithNodes(cs clientset.Interface, c *FRR, ipFamily ipfamily.Family, mod
 	for _, m := range modifiers {
 		m(&config)
 	}
-	bgpConfig, err := frrconfig.BGPPeersForAllNodes(cs, config.NeighborConfig, config.RouterConfig, ipFamily)
+	bgpConfig, err := frrconfig.BGPPeersForAllNodes(cs, config.NeighborConfig, config.RouterConfig, ipFamily, config.MultiProtocol)
 	if err != nil {
 		return err
 	}

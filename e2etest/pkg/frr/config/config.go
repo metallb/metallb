@@ -56,9 +56,9 @@ router bgp {{$ROUTERASN}}
   neighbor {{.Addr}} bfd
 {{- end -}}
 {{- end }}
-{{- if ne (len .V4Neighbors) 0}}
+{{- if ne (len .AcceptV4Neighbors) 0}}
   address-family ipv4 unicast
-{{range .V4Neighbors }}
+{{range .AcceptV4Neighbors }}
     neighbor {{.Addr}} next-hop-self
     neighbor {{.Addr}} activate
     {{- if .ToAdvertise}}
@@ -67,9 +67,9 @@ router bgp {{$ROUTERASN}}
 {{- end }}
   exit-address-family
 {{- end }}
-{{- if ne (len .V6Neighbors) 0}}
+{{- if ne (len .AcceptV6Neighbors) 0}}
   address-family ipv6 unicast
-{{range .V6Neighbors }}
+{{range .AcceptV6Neighbors }}
     neighbor {{.Addr}} next-hop-self
     neighbor {{.Addr}} activate
     neighbor {{.Addr}} route-map RMAP in
@@ -83,32 +83,38 @@ exit-address-family
 `
 
 type RouterConfig struct {
-	RouterID    string
-	ASN         uint32
-	Neighbors   []*NeighborConfig
-	V4Neighbors []*NeighborConfig
-	V6Neighbors []*NeighborConfig
-	BGPPort     uint16
-	Password    string
+	RouterID          string
+	ASN               uint32
+	Neighbors         []*NeighborConfig
+	AcceptV4Neighbors []*NeighborConfig
+	AcceptV6Neighbors []*NeighborConfig
+	BGPPort           uint16
+	Password          string
 }
 
 type NeighborConfig struct {
 	ASN         uint32
 	Addr        string
 	Password    string
-	IPFamily    ipfamily.Family
 	BFDEnabled  bool
 	ToAdvertise string
 	MultiHop    bool
 }
 
+type MultiProtocol bool
+
+const (
+	MultiProtocolDisabled MultiProtocol = false
+	MultiProtocolEnabled  MultiProtocol = true
+)
+
 // Set the IP of each node in the cluster in the BGP router configuration.
 // Each node will peer with the BGP router.
-func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterConfig, ipFamily ipfamily.Family) (string, error) {
+func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterConfig, ipFamily ipfamily.Family, multiProtocol MultiProtocol) (string, error) {
 	router := rc
 
-	router.V4Neighbors = make([]*NeighborConfig, 0)
-	router.V6Neighbors = make([]*NeighborConfig, 0)
+	router.AcceptV4Neighbors = make([]*NeighborConfig, 0)
+	router.AcceptV6Neighbors = make([]*NeighborConfig, 0)
 	router.Neighbors = make([]*NeighborConfig, 0)
 
 	nodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
@@ -120,12 +126,17 @@ func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterCon
 	for _, ip := range ips {
 		neighbor := nc
 		neighbor.Addr = ip
-		nc.IPFamily = ipfamily.ForAddress(net.ParseIP(ip))
 
-		if nc.IPFamily == ipfamily.IPv4 {
-			router.V4Neighbors = append(router.V4Neighbors, &neighbor)
-		} else {
-			router.V6Neighbors = append(router.V6Neighbors, &neighbor)
+		peerIPFamily := ipfamily.ForAddress(net.ParseIP(ip))
+
+		switch {
+		case multiProtocol == MultiProtocolEnabled: // in case of multiprotocol
+			router.AcceptV4Neighbors = append(router.AcceptV4Neighbors, &neighbor)
+			router.AcceptV6Neighbors = append(router.AcceptV6Neighbors, &neighbor)
+		case peerIPFamily == ipfamily.IPv4:
+			router.AcceptV4Neighbors = append(router.AcceptV4Neighbors, &neighbor)
+		case peerIPFamily == ipfamily.IPv6:
+			router.AcceptV6Neighbors = append(router.AcceptV6Neighbors, &neighbor)
 		}
 		router.Neighbors = append(router.Neighbors, &neighbor)
 	}
