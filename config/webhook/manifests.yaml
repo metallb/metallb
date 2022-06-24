@@ -125,3 +125,23 @@ webhooks:
     resources:
     - ipaddresspools
   sideEffects: None
+- admissionReviewVersions:
+  - v1
+  clientConfig:
+    service:
+      name: webhook-service
+      namespace: system
+      path: /validate-metallb-io-v1beta1-l2advertisement
+  failurePolicy: Fail
+  name: l2advertisementvalidationwebhook.metallb.io
+  rules:
+  - apiGroups:
+    - metallb.io
+    apiVersions:
+    - v1beta1
+    operations:
+    - CREATE
+    - UPDATE
+    resources:
+    - l2advertisements
+  sideEffects: None
