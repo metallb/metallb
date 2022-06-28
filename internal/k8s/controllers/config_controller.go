@@ -47,6 +47,7 @@ type ConfigReconciler struct {
 func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	level.Info(r.Logger).Log("controller", "ConfigReconciler", "start reconcile", req.NamespacedName.String())
 	defer level.Info(r.Logger).Log("controller", "ConfigReconciler", "end reconcile", req.NamespacedName.String())
+	updates.Inc()
 
 	var addressPools metallbv1beta1.AddressPoolList
 	if err := r.List(ctx, &addressPools, client.InNamespace(r.Namespace)); err != nil {
@@ -117,6 +118,7 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 
 	cfg, err := config.For(resources, r.ValidateConfig)
 	if err != nil {
+		configStale.Set(1)
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to parse the configuration", "error", err)
 		return ctrl.Result{}, nil
 	}
@@ -126,16 +128,20 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	res := r.Handler(r.Logger, cfg)
 	switch res {
 	case SyncStateError:
+		configStale.Set(1)
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, retry")
 		return ctrl.Result{}, retryError
 	case SyncStateReprocessAll:
 		level.Info(r.Logger).Log("controller", "ConfigReconciler", "event", "force service reload")
 		r.ForceReload()
 	case SyncStateErrorNoRetry:
+		configStale.Set(1)
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, no retry")
 		return ctrl.Result{}, nil
 	}
 
+	configLoaded.Set(1)
+	configStale.Set(0)
 	level.Info(r.Logger).Log("controller", "ConfigReconciler", "event", "config reloaded")
 	return ctrl.Result{}, nil
 }
