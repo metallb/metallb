@@ -569,9 +569,13 @@ def bumprelease(ctx, version, previous_version):
 
     # Update the versions in the helm chart (version and appVersion are always the same)
     # helm chart versions follow Semantic Versioning, and thus exclude the leading 'v'
-    run("perl -pi -e 's,^version: .*,version: {},g' charts/metallb/Chart.yaml".format(version), echo=True)
+    run("perl -pi -e 's,version: .*,version: {},g' charts/metallb/Chart.yaml".format(version), echo=True)
     run("perl -pi -e 's,^appVersion: .*,appVersion: v{},g' charts/metallb/Chart.yaml".format(version), echo=True)
+    run("perl -pi -e 's,^version: .*,version: {},g' charts/metallb/charts/crds/Chart.yaml".format(version), echo=True)
+    run("perl -pi -e 's,^appVersion: .*,appVersion: v{},g' charts/metallb/charts/crds/Chart.yaml".format(version), echo=True)
     run("perl -pi -e 's,^Current chart version is: .*,Current chart version is: `{}`,g' charts/metallb/README.md".format(version), echo=True)
+    run("helm dependency update charts/metallb", echo=True)
+    
 
     # Generate the manifests with the new version of the images
     generatemanifests(ctx)
