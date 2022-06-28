@@ -59,6 +59,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *ServiceReconciler) reconcileService(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	level.Info(r.Logger).Log("controller", "ServiceReconciler", "start reconcile", req.NamespacedName.String())
 	defer level.Info(r.Logger).Log("controller", "ServiceReconciler", "end reconcile", req.NamespacedName.String())
+	updates.Inc()
 
 	var service *v1.Service
 
@@ -87,6 +88,7 @@ func (r *ServiceReconciler) reconcileService(ctx context.Context, req ctrl.Reque
 	res := r.Handler(r.Logger, req.NamespacedName.String(), service, epSlices)
 	switch res {
 	case SyncStateError:
+		updateErrors.Inc()
 		level.Info(r.Logger).Log("controller", "ServiceReconciler", "name", req.NamespacedName.String(), "service", dumpResource(service), "endpoints", dumpResource(epSlices), "event", "failed to handle service")
 		return ctrl.Result{}, retryError
 	case SyncStateReprocessAll:
@@ -94,6 +96,7 @@ func (r *ServiceReconciler) reconcileService(ctx context.Context, req ctrl.Reque
 		r.forceReload()
 		return ctrl.Result{}, nil
 	case SyncStateErrorNoRetry:
+		updateErrors.Inc()
 		level.Error(r.Logger).Log("controller", "ServiceReconciler", "name", req.NamespacedName.String(), "service", dumpResource(service), "endpoints", dumpResource(epSlices), "event", "failed to handle service")
 		return ctrl.Result{}, nil
 	}
