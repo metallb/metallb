@@ -229,3 +229,6 @@ speaker:
       repository: frrouting/frr
       tag: v7.5.1
       pullPolicy:
+
+crds:
+  enabled: true

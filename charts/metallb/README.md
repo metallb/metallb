@@ -10,6 +10,12 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 
 * <https://github.com/metallb/metallb>
 
+## Requirements
+
+| Repository | Name | Version |
+|------------|------|---------|
+|  | crds | 0.0.0 |
+
 ## Values
 
 | Key | Type | Default | Description |
@@ -44,6 +50,7 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | controller.serviceAccount.create | bool | `true` |  |
 | controller.serviceAccount.name | string | `""` |  |
 | controller.tolerations | list | `[]` |  |
+| crds.enabled | bool | `true` |  |
 | fullnameOverride | string | `""` |  |
 | imagePullSecrets | list | `[]` |  |
 | loadBalancerClass | string | `""` |  |
