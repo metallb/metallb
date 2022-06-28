@@ -10,6 +10,12 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 
 * <https://github.com/metallb/metallb>
 
+## Requirements
+
+| Repository | Name | Version |
+|------------|------|---------|
+|  | crds | 0.0.0 |
+
 ## Values
 
 | Key | Type | Default | Description |
@@ -36,6 +42,7 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | controller.readinessProbe.successThreshold | int | `1` |  |
 | controller.readinessProbe.timeoutSeconds | int | `1` |  |
 | controller.resources | object | `{}` |  |
+| controller.runtimeClassName | string | `""` |  |
 | controller.securityContext.fsGroup | int | `65534` |  |
 | controller.securityContext.runAsNonRoot | bool | `true` |  |
 | controller.securityContext.runAsUser | int | `65534` |  |
@@ -43,12 +50,15 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | controller.serviceAccount.create | bool | `true` |  |
 | controller.serviceAccount.name | string | `""` |  |
 | controller.tolerations | list | `[]` |  |
+| crds.enabled | bool | `true` |  |
 | fullnameOverride | string | `""` |  |
 | imagePullSecrets | list | `[]` |  |
+| loadBalancerClass | string | `""` |  |
 | nameOverride | string | `""` |  |
 | prometheus.metricsPort | int | `7472` |  |
 | prometheus.namespace | string | `""` |  |
 | prometheus.podMonitor.additionalLabels | object | `{}` |  |
+| prometheus.podMonitor.annotations | object | `{}` |  |
 | prometheus.podMonitor.enabled | bool | `false` |  |
 | prometheus.podMonitor.interval | string | `nil` |  |
 | prometheus.podMonitor.jobLabel | string | `"app.kubernetes.io/name"` |  |
@@ -64,6 +74,7 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | prometheus.prometheusRule.addressPoolUsage.thresholds[1].percent | int | `85` |  |
 | prometheus.prometheusRule.addressPoolUsage.thresholds[2].labels.severity | string | `"alert"` |  |
 | prometheus.prometheusRule.addressPoolUsage.thresholds[2].percent | int | `95` |  |
+| prometheus.prometheusRule.annotations | object | `{}` |  |
 | prometheus.prometheusRule.bgpSessionDown.enabled | bool | `true` |  |
 | prometheus.prometheusRule.bgpSessionDown.labels.severity | string | `"alert"` |  |
 | prometheus.prometheusRule.configNotLoaded.enabled | bool | `true` |  |
@@ -104,6 +115,7 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | speaker.readinessProbe.successThreshold | int | `1` |  |
 | speaker.readinessProbe.timeoutSeconds | int | `1` |  |
 | speaker.resources | object | `{}` |  |
+| speaker.runtimeClassName | string | `""` |  |
 | speaker.serviceAccount.annotations | object | `{}` |  |
 | speaker.serviceAccount.create | bool | `true` |  |
 | speaker.serviceAccount.name | string | `""` |  |

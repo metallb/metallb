@@ -129,6 +129,7 @@ When the FRR mode is enabled, the following additional features are available:
 
 - BGP sessions with [BFD support](https://metallb.universe.tf/concepts/bgp/#limitations)
 - IPv6 Support for BGP and BFD
+- Multi Protocol BGP
 
 ### Limitations of the FRR Mode
 

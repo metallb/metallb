@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
+	metallbv1alpha1 "go.universe.tf/metallb/api/v1alpha1"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 
@@ -67,6 +68,7 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
+	utilruntime.Must(metallbv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(metallbv1beta1.AddToScheme(scheme))
 	utilruntime.Must(metallbv1beta2.AddToScheme(scheme))
 
@@ -109,6 +111,7 @@ type Config struct {
 	DisableCertRotation bool
 	CertDir             string
 	CertServiceName     string
+	LoadBalancerClass   string
 	Listener
 }
 
@@ -123,9 +126,10 @@ func New(cfg *Config) (*Client, error) {
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:         scheme,
-		Port:           9443, // TODO port only with controller, for webhooks
-		LeaderElection: false,
+		Scheme:             scheme,
+		Port:               9443, // TODO port only with controller, for webhooks
+		LeaderElection:     false,
+		MetricsBindAddress: "0", // Disable metrics endpoint of controller manager
 		NewCache: cache.BuilderWithOptions(cache.Options{
 			SelectorsByObject: map[client.Object]cache.ObjectSelector{
 				&metallbv1beta1.AddressPool{}:      namespaceSelector,
@@ -245,12 +249,13 @@ func New(cfg *Config) (*Client, error) {
 
 	if cfg.ServiceChanged != nil {
 		if err = (&controllers.ServiceReconciler{
-			Client:    mgr.GetClient(),
-			Logger:    cfg.Logger,
-			Scheme:    mgr.GetScheme(),
-			Handler:   cfg.ServiceHandler,
-			Endpoints: needEndpoints,
-			Reload:    reloadChan,
+			Client:            mgr.GetClient(),
+			Logger:            cfg.Logger,
+			Scheme:            mgr.GetScheme(),
+			Handler:           cfg.ServiceHandler,
+			Endpoints:         needEndpoints,
+			Reload:            reloadChan,
+			LoadBalancerClass: cfg.LoadBalancerClass,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "service")
 			return nil, errors.Wrap(err, "failed to create service reconciler")
@@ -357,6 +362,11 @@ func enableWebhook(mgr manager.Manager, validate config.Validate, namespace stri
 
 	if err := (&metallbv1beta1.BGPAdvertisement{}).SetupWebhookWithManager(mgr); err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "BGPAdvertisement")
+		return err
+	}
+
+	if err := (&metallbv1beta1.L2Advertisement{}).SetupWebhookWithManager(mgr); err != nil {
+		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "L2Advertisement")
 		return err
 	}
 

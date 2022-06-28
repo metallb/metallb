@@ -187,3 +187,11 @@ described above.
 Please take the known limitations for [layer2](https://metallb.universe.tf/concepts/layer2/#limitations)
 and [bgp](https://metallb.universe.tf/concepts/bgp/#limitations) into account when performing an
 upgrade.
+
+## Setting the LoadBalancer Class
+
+MetalLB supports [LoadBalancerClass](https://kubernetes.io/docs/concepts/services-networking/service/#load-balancer-class),
+which allows multiple load balancer implementations to co-exist. In order to set the loadbalancer class MetalLB should be listening
+for, the `--lb-class=<CLASS_NAME>` parameter must be provided to both the speaker and the controller.
+
+The helm charts support it via the `loadBalancerClass` parameter.

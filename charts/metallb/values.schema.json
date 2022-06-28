@@ -110,6 +110,9 @@
         "priorityClassName": {
           "type":"string"
         },
+        "runtimeClassName": {
+          "type":"string"
+        },
         "affinity": {
           "type": "object"
         },
@@ -155,6 +158,9 @@
     "configInLine": {
       "description": "MetalLB configuration",
       "type": "object"
+    },
+    "loadBalancerClass": {
+      "type":"string"
     },
     "rbac": {
       "description": "RBAC configuration",
@@ -286,9 +292,6 @@
                   "type": "integer"
                 }
               }
-            },
-            "runtimeClassName": {
-              "type": "string"
             },
             "secretName": {
               "type": "string"

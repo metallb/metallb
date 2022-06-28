@@ -5,6 +5,7 @@ package service
 import (
 	"strings"
 
+	"go.universe.tf/metallb/internal/pointer"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -12,6 +13,12 @@ type Tweak func(svc *corev1.Service)
 
 func TrafficPolicyLocal(svc *corev1.Service) {
 	svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeLocal
+}
+
+func ForceV4(svc *corev1.Service) {
+	f := corev1.IPFamilyPolicySingleStack
+	svc.Spec.IPFamilyPolicy = &f
+	svc.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv4Protocol}
 }
 
 func ForceV6(svc *corev1.Service) {
@@ -44,5 +51,11 @@ func WithSpecificPool(poolName string) func(*corev1.Service) {
 		svc.Annotations = map[string]string{
 			"metallb.universe.tf/address-pool": poolName,
 		}
+	}
+}
+
+func WithLoadbalancerClass(loadBalancerClass string) func(*corev1.Service) {
+	return func(svc *corev1.Service) {
+		svc.Spec.LoadBalancerClass = pointer.StrPtr(loadBalancerClass)
 	}
 }

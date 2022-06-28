@@ -269,9 +269,6 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			}
 
 			family := ipfamily.ForAddress(adv.Prefix.IP)
-			if family != neighbor.IPFamily {
-				continue
-			}
 
 			communities := make([]string, 0)
 
