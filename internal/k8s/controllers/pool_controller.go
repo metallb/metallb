@@ -44,6 +44,7 @@ type PoolReconciler struct {
 func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	level.Info(r.Logger).Log("controller", "PoolReconciler", "start reconcile", req.NamespacedName.String())
 	defer level.Info(r.Logger).Log("controller", "PoolReconciler", "end reconcile", req.NamespacedName.String())
+	updates.Inc()
 
 	var addressPools metallbv1beta1.AddressPoolList
 	if err := r.List(ctx, &addressPools, client.InNamespace(r.Namespace)); err != nil {
@@ -82,12 +83,14 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	res := r.Handler(r.Logger, cfg.Pools)
 	switch res {
 	case SyncStateError:
+		updateErrors.Inc()
 		level.Error(r.Logger).Log("controller", "PoolReconciler", "metallb CRs and Secrets", spew.Sdump(resources), "event", "reload failed, retry")
 		return ctrl.Result{}, retryError
 	case SyncStateReprocessAll:
 		level.Info(r.Logger).Log("controller", "PoolReconciler", "event", "force service reload")
 		r.ForceReload()
 	case SyncStateErrorNoRetry:
+		updateErrors.Inc()
 		level.Error(r.Logger).Log("controller", "PoolReconciler", "metallb CRs and Secrets", spew.Sdump(resources), "event", "reload failed, no retry")
 		return ctrl.Result{}, nil
 	}
