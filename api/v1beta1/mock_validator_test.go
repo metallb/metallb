@@ -11,6 +11,7 @@ type mockValidator struct {
 	pools          *AddressPoolList
 	ipAddressPools *IPAddressPoolList
 	bgpAdvs        *BGPAdvertisementList
+	l2Advs         *L2AdvertisementList
 	communities    *CommunityList
 	forceError     bool
 }
@@ -22,6 +23,8 @@ func (m *mockValidator) Validate(objects ...client.ObjectList) error {
 			m.pools = list
 		case *BGPAdvertisementList:
 			m.bgpAdvs = list
+		case *L2AdvertisementList:
+			m.l2Advs = list
 		case *IPAddressPoolList:
 			m.ipAddressPools = list
 		case *CommunityList:
