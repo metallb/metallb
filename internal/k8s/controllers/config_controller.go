@@ -129,6 +129,7 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	switch res {
 	case SyncStateError:
 		configStale.Set(1)
+		updateErrors.Inc()
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, retry")
 		return ctrl.Result{}, retryError
 	case SyncStateReprocessAll:
@@ -136,6 +137,7 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		r.ForceReload()
 	case SyncStateErrorNoRetry:
 		configStale.Set(1)
+		updateErrors.Inc()
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, no retry")
 		return ctrl.Result{}, nil
 	}
