@@ -384,7 +384,7 @@ var _ = ginkgo.Describe("BGP", func() {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(1, "metallb_bgp_updates_total", map[string]string{"peer": addr}, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_bgp_updates_total", map[string]string{"peer": addr}, speakerMetrics)
 						if err != nil {
 							return err
 						}
@@ -790,12 +790,12 @@ var _ = ginkgo.Describe("BGP", func() {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(1, "metallb_bfd_control_packet_input", map[string]string{"peer": peer.addr}, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_bfd_control_packet_input", map[string]string{"peer": peer.addr}, speakerMetrics)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(1, "metallb_bfd_control_packet_output", map[string]string{"peer": peer.addr}, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_bfd_control_packet_output", map[string]string{"peer": peer.addr}, speakerMetrics)
 						if err != nil {
 							return err
 						}
@@ -805,12 +805,12 @@ var _ = ginkgo.Describe("BGP", func() {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(1, "metallb_bfd_session_up_events", map[string]string{"peer": peer.addr}, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_bfd_session_up_events", map[string]string{"peer": peer.addr}, speakerMetrics)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(1, "metallb_bfd_zebra_notifications", map[string]string{"peer": peer.addr}, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_bfd_zebra_notifications", map[string]string{"peer": peer.addr}, speakerMetrics)
 						if err != nil {
 							return err
 						}
@@ -820,12 +820,12 @@ var _ = ginkgo.Describe("BGP", func() {
 							if peer.multihop {
 								echoVal = 0
 							}
-							err = metrics.ValidateCounterValue(echoVal, "metallb_bfd_echo_packet_input", map[string]string{"peer": peer.addr}, speakerMetrics)
+							err = metrics.ValidateCounterValue(metrics.GreaterThan(echoVal), "metallb_bfd_echo_packet_input", map[string]string{"peer": peer.addr}, speakerMetrics)
 							if err != nil {
 								return err
 							}
 
-							err = metrics.ValidateCounterValue(echoVal, "metallb_bfd_echo_packet_output", map[string]string{"peer": peer.addr}, speakerMetrics)
+							err = metrics.ValidateCounterValue(metrics.GreaterThan(echoVal), "metallb_bfd_echo_packet_output", map[string]string{"peer": peer.addr}, speakerMetrics)
 							if err != nil {
 								return err
 							}
@@ -859,7 +859,7 @@ var _ = ginkgo.Describe("BGP", func() {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(1, "metallb_bfd_session_down_events", map[string]string{"peer": peer.addr}, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_bfd_session_down_events", map[string]string{"peer": peer.addr}, speakerMetrics)
 						if err != nil {
 							return err
 						}
