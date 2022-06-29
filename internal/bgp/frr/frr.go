@@ -26,7 +26,7 @@ import (
 type sessionManager struct {
 	sessions     map[string]*session
 	bfdProfiles  []BFDProfile
-	reloadConfig chan *frrConfig
+	reloadConfig chan reloadEvent
 	logLevel     string
 	sync.Mutex
 }
@@ -92,7 +92,7 @@ func (s *session) Set(advs ...*bgp.Advertisement) error {
 		return err
 	}
 
-	s.sessionManager.reloadConfig <- config
+	s.sessionManager.reloadConfig <- reloadEvent{config: config}
 	return nil
 }
 
@@ -110,7 +110,7 @@ func (s *session) Close() error {
 		return err
 	}
 
-	s.sessionManager.reloadConfig <- frrConfig
+	s.sessionManager.reloadConfig <- reloadEvent{config: frrConfig}
 	return nil
 }
 
@@ -147,7 +147,7 @@ func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, 
 		return nil, err
 	}
 
-	sm.reloadConfig <- frrConfig
+	sm.reloadConfig <- reloadEvent{config: frrConfig}
 	return s, nil
 }
 
@@ -188,7 +188,7 @@ func (sm *sessionManager) SyncBFDProfiles(profiles map[string]*metallbconfig.BFD
 		return err
 	}
 
-	sm.reloadConfig <- frrConfig
+	sm.reloadConfig <- reloadEvent{config: frrConfig}
 	return nil
 }
 
@@ -298,7 +298,7 @@ func NewSessionManager(l log.Logger, logLevel logging.Level) *sessionManager {
 	res := &sessionManager{
 		sessions:     map[string]*session{},
 		bfdProfiles:  []BFDProfile{},
-		reloadConfig: make(chan *frrConfig),
+		reloadConfig: make(chan reloadEvent),
 		logLevel:     logLevelToFRR(logLevel),
 	}
 	reload := func(config *frrConfig) error {
@@ -307,26 +307,26 @@ func NewSessionManager(l log.Logger, logLevel logging.Level) *sessionManager {
 
 	debouncer(reload, res.reloadConfig, debounceTimeout, failureTimeout)
 
-	reloadValidator(l)
+	reloadValidator(l, res.reloadConfig)
 
 	return res
 }
 
-func reloadValidator(l log.Logger) {
+func reloadValidator(l log.Logger, reload chan<- reloadEvent) {
 	var tickerIntervals = 30 * time.Second
 	var prevReloadTimeStamp string
 
 	ticker := time.NewTicker(tickerIntervals)
 	go func() {
 		for range ticker.C {
-			validateReload(l, &prevReloadTimeStamp)
+			validateReload(l, &prevReloadTimeStamp, reload)
 		}
 	}()
 }
 
 const statusFileName = "/etc/frr_reloader/.status"
 
-func validateReload(l log.Logger, prevReloadTimeStamp *string) {
+func validateReload(l log.Logger, prevReloadTimeStamp *string, reload chan<- reloadEvent) {
 	bytes, err := os.ReadFile(statusFileName)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -351,6 +351,7 @@ func validateReload(l log.Logger, prevReloadTimeStamp *string) {
 	if strings.Compare(status, "failure") == 0 {
 		level.Error(l).Log("op", "reload-validate", "error", fmt.Errorf("reload failure"),
 			"cause", "frr reload failed", "status", status)
+		reload <- reloadEvent{useOld: true}
 		return
 	}
 
