@@ -305,7 +305,7 @@ var reloadConfig = func() error {
 // generateAndReloadConfigFile takes a 'struct frrConfig' and, using a template,
 // generates and writes a valid FRR configuration file. If this completes
 // successfully it will also force FRR to reload that configuration file.
-func generateAndReloadConfigFile(config *frrConfig, l log.Logger) {
+func generateAndReloadConfigFile(config *frrConfig, l log.Logger) error {
 	filename, found := os.LookupEnv("FRR_CONFIG_FILE")
 	if found {
 		configFileName = filename
@@ -314,27 +314,29 @@ func generateAndReloadConfigFile(config *frrConfig, l log.Logger) {
 	configString, err := templateConfig(config)
 	if err != nil {
 		level.Error(l).Log("op", "reload", "error", err, "cause", "template", "config", config)
-		return
+		return err
 	}
 	err = writeConfig(configString, configFileName)
 	if err != nil {
 		level.Error(l).Log("op", "reload", "error", err, "cause", "writeConfig", "config", config)
-		return
+		return err
 	}
 
 	err = reloadConfig()
 	if err != nil {
 		level.Error(l).Log("op", "reload", "error", err, "cause", "reload", "config", config)
-		return
+		return err
 	}
+	return nil
 }
 
 // debouncer takes a function that processes an frrConfig, a channel where
 // the update requests are sent, and squashes any requests coming in a given timeframe
 // as a single request.
-func debouncer(body func(config *frrConfig),
+func debouncer(body func(config *frrConfig) error,
 	reload <-chan *frrConfig,
-	reloadInterval time.Duration) {
+	reloadInterval time.Duration,
+	failureRetryInterval time.Duration) {
 	go func() {
 		var config *frrConfig
 		var timeOut <-chan time.Time
@@ -351,7 +353,12 @@ func debouncer(body func(config *frrConfig),
 					timerSet = true
 				}
 			case <-timeOut:
-				body(config)
+				err := body(config)
+				if err != nil {
+					timeOut = time.After(failureRetryInterval)
+					timerSet = true
+					continue
+				}
 				timerSet = false
 			}
 		}
