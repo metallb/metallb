@@ -717,6 +717,79 @@ var _ = ginkgo.Describe("BGP", func() {
 				}),
 		)
 
+		ginkgo.It("FRR metrics related to config should be exposed", func() {
+			controllerPod, err := metallb.ControllerPod(cs)
+			framework.ExpectNoError(err)
+
+			speakers, err := metallb.SpeakerPods(cs)
+			framework.ExpectNoError(err)
+			allPods := append(speakers, controllerPod)
+
+			bfdProfile := metallbv1beta1.BFDProfile{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bfd",
+				},
+			}
+
+			ginkgo.By("Creating an invalid configuration")
+
+			resources := metallbconfig.ClusterResources{
+				Pools: []metallbv1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "metrics-test",
+						},
+						Spec: metallbv1beta1.IPAddressPoolSpec{
+							Addresses: []string{v4PoolAddresses},
+						},
+					},
+				},
+				Peers:   metallb.WithBFD(metallb.PeersForContainers(FRRContainers, ipfamily.IPv4), "bfd"),
+				BGPAdvs: []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement},
+			}
+			err = ConfigUpdater.Update(resources)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("Checking the config stale metric on the speakers")
+			for _, pod := range speakers {
+				ginkgo.By(fmt.Sprintf("checking pod %s", pod.Name))
+				Eventually(func() error {
+					podMetrics, err := metrics.ForPod(controllerPod, pod, metallb.Namespace)
+					framework.ExpectNoError(err)
+					err = metrics.ValidateGaugeValue(1, "metallb_k8s_client_config_stale_bool", map[string]string{}, podMetrics)
+					if err != nil {
+						return err
+					}
+					return nil
+				}, 10*time.Second, 1*time.Second).ShouldNot(HaveOccurred(), "on pod", pod.Name)
+			}
+
+			resources.BFDProfiles = []metallbv1beta1.BFDProfile{bfdProfile}
+			err = ConfigUpdater.Update(resources)
+			framework.ExpectNoError(err)
+			for _, pod := range allPods {
+				ginkgo.By(fmt.Sprintf("checking pod %s", pod.Name))
+				Eventually(func() error {
+					podMetrics, err := metrics.ForPod(controllerPod, pod, metallb.Namespace)
+					framework.ExpectNoError(err)
+					err = metrics.ValidateGaugeValue(0, "metallb_k8s_client_config_stale_bool", map[string]string{}, podMetrics)
+					if err != nil {
+						return err
+					}
+					// we don't know how many events we are processing
+					err = metrics.ValidateCounterValue(metrics.GreaterThan(0), "metallb_k8s_client_updates_total", map[string]string{}, podMetrics)
+					if err != nil {
+						return err
+					}
+					err = metrics.ValidateGaugeValue(1, "metallb_k8s_client_config_loaded_bool", map[string]string{}, podMetrics)
+					if err != nil {
+						return err
+					}
+					return nil
+				}, 10*time.Second, 1*time.Second).ShouldNot(HaveOccurred(), "on pod", pod.Name)
+			}
+		})
+
 		table.DescribeTable("metrics", func(bfd metallbv1beta1.BFDProfile, pairingFamily ipfamily.Family, poolAddresses []string) {
 			resources := metallbconfig.ClusterResources{
 				Pools: []metallbv1beta1.IPAddressPool{
