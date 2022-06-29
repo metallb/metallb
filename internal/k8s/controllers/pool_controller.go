@@ -74,6 +74,7 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 	cfg, err := config.For(resources, r.ValidateConfig)
 	if err != nil {
+		configStale.Set(1)
 		level.Error(r.Logger).Log("controller", "PoolReconciler", "error", "failed to parse the configuration", "error", err)
 		return ctrl.Result{}, nil
 	}
@@ -84,6 +85,7 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	switch res {
 	case SyncStateError:
 		updateErrors.Inc()
+		configStale.Set(1)
 		level.Error(r.Logger).Log("controller", "PoolReconciler", "metallb CRs and Secrets", spew.Sdump(resources), "event", "reload failed, retry")
 		return ctrl.Result{}, retryError
 	case SyncStateReprocessAll:
@@ -91,10 +93,13 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		r.ForceReload()
 	case SyncStateErrorNoRetry:
 		updateErrors.Inc()
+		configStale.Set(1)
 		level.Error(r.Logger).Log("controller", "PoolReconciler", "metallb CRs and Secrets", spew.Sdump(resources), "event", "reload failed, no retry")
 		return ctrl.Result{}, nil
 	}
 
+	configLoaded.Set(1)
+	configStale.Set(0)
 	level.Info(r.Logger).Log("controller", "PoolReconciler", "event", "config reloaded")
 	return ctrl.Result{}, nil
 }
