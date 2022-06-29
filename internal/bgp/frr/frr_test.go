@@ -656,7 +656,7 @@ func TestLoggingConfiguration(t *testing.T) {
 		t.Fatalf("Error while creating configuration: %s", err)
 	}
 
-	sessionManager.reloadConfig <- config
+	sessionManager.reloadConfig <- reloadEvent{config: config}
 	testCheckConfigFile(t)
 }
 
@@ -672,7 +672,7 @@ func TestLoggingConfigurationDebug(t *testing.T) {
 		t.Fatalf("Error while creating configuration: %s", err)
 	}
 
-	sessionManager.reloadConfig <- config
+	sessionManager.reloadConfig <- reloadEvent{config: config}
 	testCheckConfigFile(t)
 }
 
@@ -692,6 +692,6 @@ func TestLoggingConfigurationOverrideByEnvironmentVar(t *testing.T) {
 		t.Fatalf("Error while creating configuration: %s", err)
 	}
 
-	sessionManager.reloadConfig <- config
+	sessionManager.reloadConfig <- reloadEvent{config: config}
 	testCheckConfigFile(t)
 }

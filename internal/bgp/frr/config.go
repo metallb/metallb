@@ -167,6 +167,11 @@ type frrConfig struct {
 	BFDProfiles []BFDProfile
 }
 
+type reloadEvent struct {
+	config *frrConfig
+	useOld bool
+}
+
 // TODO: having global prefix lists works only because we advertise all the addresses
 // to all the neighbors. Once this constraint is changed, we may need prefix-lists per neighbor.
 
@@ -334,7 +339,7 @@ func generateAndReloadConfigFile(config *frrConfig, l log.Logger) error {
 // the update requests are sent, and squashes any requests coming in a given timeframe
 // as a single request.
 func debouncer(body func(config *frrConfig) error,
-	reload <-chan *frrConfig,
+	reload <-chan reloadEvent,
 	reloadInterval time.Duration,
 	failureRetryInterval time.Duration) {
 	go func() {
@@ -347,7 +352,12 @@ func debouncer(body func(config *frrConfig) error,
 				if !ok { // the channel was closed
 					return
 				}
-				config = newCfg
+				if newCfg.useOld && config == nil {
+					continue // just ignore the event
+				}
+				if !newCfg.useOld {
+					config = newCfg.config
+				}
 				if !timerSet {
 					timeOut = time.After(reloadInterval)
 					timerSet = true
