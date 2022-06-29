@@ -292,6 +292,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 }
 
 var debounceTimeout = 500 * time.Millisecond
+var failureTimeout = time.Second * 5
 
 func NewSessionManager(l log.Logger, logLevel logging.Level) *sessionManager {
 	res := &sessionManager{
@@ -300,11 +301,11 @@ func NewSessionManager(l log.Logger, logLevel logging.Level) *sessionManager {
 		reloadConfig: make(chan *frrConfig),
 		logLevel:     logLevelToFRR(logLevel),
 	}
-	reload := func(config *frrConfig) {
-		generateAndReloadConfigFile(config, l)
+	reload := func(config *frrConfig) error {
+		return generateAndReloadConfigFile(config, l)
 	}
 
-	debouncer(reload, res.reloadConfig, debounceTimeout)
+	debouncer(reload, res.reloadConfig, debounceTimeout, failureTimeout)
 
 	reloadValidator(l)
 
