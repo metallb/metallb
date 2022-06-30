@@ -41,6 +41,7 @@ type NodeReconciler struct {
 func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	level.Info(r.Logger).Log("controller", "NodeReconciler", "start reconcile", req.NamespacedName.String())
 	defer level.Info(r.Logger).Log("controller", "NodeReconciler", "end reconcile", req.NamespacedName.String())
+	updates.Inc()
 
 	var n v1.Node
 	err := r.Get(ctx, req.NamespacedName, &n)
@@ -51,11 +52,13 @@ func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	res := r.Handler(r.Logger, &n)
 	switch res {
 	case SyncStateError:
+		updateErrors.Inc()
 		return ctrl.Result{}, retryError
 	case SyncStateReprocessAll:
 		level.Error(r.Logger).Log("controller", "NodeReconciler", "error", "unexpected result reprocess all")
 		return ctrl.Result{}, nil
 	case SyncStateErrorNoRetry:
+		updateErrors.Inc()
 		return ctrl.Result{}, nil
 	}
 	return ctrl.Result{}, nil

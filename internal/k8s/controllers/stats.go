@@ -1,6 +1,6 @@
 // SPDX-License-Identifier:Apache-2.0
 
-package k8s
+package controllers
 
 import "github.com/prometheus/client_golang/prometheus"
 
