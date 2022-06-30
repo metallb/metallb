@@ -333,9 +333,9 @@ spec:
         image: {{ .Values.speaker.frr.image.repository }}:{{ .Values.speaker.frr.image.tag | default .Chart.AppVersion }}
         command: ["/etc/frr_metrics/frr-metrics"]
         args:
-          - --metrics-port=7473
+          - --metrics-port={{ .Values.speaker.frr.metricsPort }}
         ports:
-          - containerPort: 7473
+          - containerPort: {{ .Values.speaker.frr.metricsPort }}
             name: monitoring
         volumeMounts:
           - name: frr-sockets
