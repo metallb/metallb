@@ -303,7 +303,8 @@
                 "enabled": {
                   "type": "boolean"
                 },
-                "image": { "$ref": "#/definitions/component/properties/image" }
+                "image": { "$ref": "#/definitions/component/properties/image" },
+                "metricsPort": { "type": "integer" }
               },
               "required": [ "enabled" ]
             }
