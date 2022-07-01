@@ -478,17 +478,17 @@ var _ = ginkgo.Describe("L2", func() {
 					return err
 				}
 
-				err = metrics.ValidateCounterValue(1, "metallb_layer2_requests_received", map[string]string{"ip": ingressIP}, speakerMetrics)
+				err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_layer2_requests_received", map[string]string{"ip": ingressIP}, speakerMetrics)
 				if err != nil {
 					return err
 				}
 
-				err = metrics.ValidateCounterValue(1, "metallb_layer2_responses_sent", map[string]string{"ip": ingressIP}, speakerMetrics)
+				err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_layer2_responses_sent", map[string]string{"ip": ingressIP}, speakerMetrics)
 				if err != nil {
 					return err
 				}
 
-				err = metrics.ValidateCounterValue(1, "metallb_layer2_gratuitous_sent", map[string]string{"ip": ingressIP}, speakerMetrics)
+				err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_layer2_gratuitous_sent", map[string]string{"ip": ingressIP}, speakerMetrics)
 				if err != nil {
 					return err
 				}
