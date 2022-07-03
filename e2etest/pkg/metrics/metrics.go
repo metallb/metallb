@@ -76,7 +76,7 @@ func ValidateGaugeValue(expectedValue int, metricName string, labels map[string]
 }
 
 // ValidateCounterValue checks that the value related to the given metric is at most the expectedMax value.
-func ValidateCounterValue(expectedMax int, metricName string, labels map[string]string, allMetrics []map[string]*dto.MetricFamily) error {
+func ValidateCounterValue(check func(int) error, metricName string, labels map[string]string, allMetrics []map[string]*dto.MetricFamily) error {
 	var err error
 	var value int
 	found := false
@@ -86,8 +86,9 @@ func ValidateCounterValue(expectedMax int, metricName string, labels map[string]
 			continue
 		}
 		found = true
-		if value < expectedMax {
-			return fmt.Errorf("invalid value %d for %s, expecting more than %d", value, metricName, expectedMax)
+		err := check(value)
+		if err != nil {
+			return fmt.Errorf("invalid value %d for %s, %w", value, metricName, err)
 		}
 	}
 
@@ -102,6 +103,15 @@ func CounterForLabels(metricName string, labels map[string]string, metrics map[s
 	return metricForLabels(metricName, labels, metrics, func(m *dto.Metric) int {
 		return int(m.GetCounter().GetValue())
 	})
+}
+
+func GreaterThan(min int) func(value int) error {
+	return func(value int) error {
+		if value < min {
+			return fmt.Errorf("value %d is less than %d", value, min)
+		}
+		return nil
+	}
 }
 
 func metricForLabels(metricName string, labels map[string]string, metrics map[string]*dto.MetricFamily, getValue func(m *dto.Metric) int) (int, error) {

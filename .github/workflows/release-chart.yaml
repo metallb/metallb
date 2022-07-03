@@ -20,7 +20,34 @@ jobs:
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
-      - name: Run chart-releaser
-        uses: helm/chart-releaser-action@v1.0.0
-        env:
-          CR_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+      - name: Chart releaser
+        run: |
+          # Download chart releaser
+          curl -sSLo cr.tar.gz "https://github.com/helm/chart-releaser/releases/download/v1.4.0/chart-releaser_1.4.0_linux_amd64.tar.gz"
+          tar -xzf cr.tar.gz
+          rm -f cr.tar.gz
+          repo=$(basename "$GITHUB_REPOSITORY")
+          owner=$(dirname "$GITHUB_REPOSITORY")
+          tag="${GITHUB_REF_NAME:1}"
+
+          exists=$(curl -s -H "Accept: application/vnd.github.v3+json" https://github.com/$GITHUB_REPOSITORY/releases/tag/$repo-chart-$tag -w %{http_code} -o /dev/null)
+          if [[ $exists != "200" ]]; then
+            echo "Creating release..."
+            # package chart
+            ./cr package charts/$repo
+            # upload chart to github releases
+            ./cr upload \
+                --owner "$owner" \
+                --git-repo "$repo" \
+                --release-name-template "{{ .Name }}-chart-{{ .Version }}" \
+                --token "${{ secrets.GITHUB_TOKEN }}"
+            # Update index and push to github pages
+            ./cr index \
+                --owner "$owner" \
+                --git-repo "$repo" \
+                --index-path index.yaml \
+                --release-name-template "{{ .Name }}-chart-{{ .Version }}" \
+                --push
+          else
+            echo "Release already exists"
+          fi
