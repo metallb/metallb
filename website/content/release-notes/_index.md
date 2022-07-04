@@ -7,7 +7,7 @@ weight: 8
 
 New Features:
 
-- CRD support! A long awaited feature, MetalLB is now configurable via CRs. 
+- CRD support! A long awaited feature, MetalLB is now configurable via CRs.
   On top of that, validating webhooks will ensure the validity of the configuration upfront, without needing to check the logs.
   ([PR #1237](https://github.com/metallb/metallb/pull/1237), [PR #1245](https://github.com/metallb/metallb/pull/1245))
   Please note that the ConfigMap configuration is not supported anymore. Check the "Changes in behaviour" section for more details.
@@ -61,6 +61,8 @@ Bug Fixes:
 - IPV6 / FRR: fix single hop ebgp next hop tracking ([PR #1367](https://github.com/metallb/metallb/pull/1367))
 
 - Restore FRR to be pulled from dockerhub to support ARM ([PR #1258](https://github.com/metallb/metallb/pull/1258))
+
+This release includes contributions from Andrea Panattoni, Carlos Goncalves, Federico Paolinelli, jay vyas, Joshua Carnes, liornoy, Mani Kanth, manu, Mateusz Gozdek, Mathieu Parent, Matt Layher, mkeppel@solvinity.com, Mohamed Mahmoud, Ori Braunshtein, Periyasamy Palanisamy, Rodrigo Campos, Sabina Aledort, Scott Laird, Stefan Coetzee, Tyler Auerbeck, zhoujiao. Thank you!
 
 ## Version 0.12.1
 
