@@ -62,6 +62,8 @@ Bug Fixes:
 
 - Restore FRR to be pulled from dockerhub to support ARM ([PR #1258](https://github.com/metallb/metallb/pull/1258))
 
+- A race condition happening when the speaker container was slower than the frr one was fixed ([PR 1463](https://github.com/metallb/metallb/pull/1463))
+
 This release includes contributions from Andrea Panattoni, Carlos Goncalves, Federico Paolinelli, jay vyas, Joshua Carnes, liornoy, Mani Kanth, manu, Mateusz Gozdek, Mathieu Parent, Matt Layher, mkeppel@solvinity.com, Mohamed Mahmoud, Ori Braunshtein, Periyasamy Palanisamy, Rodrigo Campos, Sabina Aledort, Scott Laird, Stefan Coetzee, Tyler Auerbeck, zhoujiao. Thank you!
 
 ## Version 0.12.1
