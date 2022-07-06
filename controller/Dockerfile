@@ -13,10 +13,22 @@ COPY controller/*.go .
 COPY internal internal
 COPY api api
 
+ARG TARGETARCH
+ARG TARGETOS
+ARG TARGETPLATFORM
+
+# Extract variant
+RUN case ${TARGETPLATFORM} in \
+  "linux/arm/v6") export VARIANT="6" ;; \
+  "linux/arm/v7") export VARIANT="7" ;; \
+  *) export VARIANT="" ;; \
+  esac
+
+# have to manually convert as building the different arms can cause issues
 # Cache builds directory for faster rebuild
 RUN --mount=type=cache,target=/root/.cache/go-build \
   --mount=type=cache,target=/go/pkg \
-  CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=6 \
+  CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=$VARIANT \
   go build -v -o /build/controller \
   -ldflags "-X 'go.universe.tf/metallb/internal/version.gitCommit=${GIT_COMMIT}' -X 'go.universe.tf/metallb/internal/version.gitBranch=${GIT_BRANCH}'"
 
