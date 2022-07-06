@@ -511,22 +511,22 @@ def release(ctx, version, skip_release_notes=False):
     if status != "":
         raise Exit(message="git checkout not clean, cannot release")
 
-    version = semver.parse_version_info(version)
-    is_patch_release = version.patch != 0
+    sem_version = semver.parse_version_info(version)
+    is_patch_release = sem_version.patch != 0
 
     # Check that we have release notes for the desired version.
     run("git checkout main", echo=True)
     if not skip_release_notes:
         with open("website/content/release-notes/_index.md") as release_notes:
-            if "## Version {}".format(version) not in release_notes.read():
-                raise Exit(message="no release notes for v{}".format(version))
+            if "## Version {}".format(sem_version) not in release_notes.read():
+                raise Exit(message="no release notes for v{}".format(sem_version))
 
     # Move HEAD to the correct release branch - either a new one, or
     # an existing one.
     if is_patch_release:
-        run("git checkout v{}.{}".format(version.major, version.minor), echo=True)
+        run("git checkout v{}.{}".format(sem_version.major, sem_version.minor), echo=True)
     else:
-        run("git checkout -b v{}.{}".format(version.major, version.minor), echo=True)
+        run("git checkout -b v{}.{}".format(sem_version.major, sem_version.minor), echo=True)
 
     # Copy over release notes from main.
     if not skip_release_notes:
@@ -535,13 +535,13 @@ def release(ctx, version, skip_release_notes=False):
     # Update links on the website to point to files at the version
     # we're creating.
     if is_patch_release:
-        previous_version = "v{}.{}.{}".format(version.major, version.minor, version.patch-1)
+        previous_version = "v{}.{}.{}".format(sem_version.major, sem_version.minor, sem_version.patch-1)
     else:
         previous_version = "main"
     bumprelease(ctx, version, previous_version)
     
-    run("git commit -a -m 'Automated update for release v{}'".format(version), echo=True)
-    run("git tag v{} -m 'See the release notes for details:\n\nhttps://metallb.universe.tf/release-notes/#version-{}-{}-{}'".format(version, version.major, version.minor, version.patch), echo=True)
+    run("git commit -a -m 'Automated update for release v{}'".format(sem_version), echo=True)
+    run("git tag v{} -m 'See the release notes for details:\n\nhttps://metallb.universe.tf/release-notes/#version-{}-{}-{}'".format(sem_version, sem_version.major, sem_version.minor, sem_version.patch), echo=True)
     run("git checkout main", echo=True)
 
 @task(help={
