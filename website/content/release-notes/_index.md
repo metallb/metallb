@@ -2,6 +2,14 @@
 title: Release Notes
 weight: 8
 ---
+## Version 0.13.3
+
+Bug Fixes:
+
+- Fix images on ARM broken in 0.13.2 ([PR 1478](https://github.com/metallb/metallb/pull/1478))
+- Fail the helm release if the deprecated configinline is provided ([PR 1485](https://github.com/metallb/metallb/pull/1485))
+- Helm charts give the permissions to watch communities. This will get rid of the `Failed to watch *v1beta1.Community` log error. ([PR 1487](https://github.com/metallb/metallb/pull/1487))
+- Helm charts: add the labelselectors to the webhook service. This solves webhook issues when multiple ([PR 1487](https://github.com/metallb/metallb/pull/1487))
 
 ## Version 0.13.2
 
