@@ -3,7 +3,7 @@ title: Release Notes
 weight: 8
 ---
 
-## Version 0.13.0
+## Version 0.13.2
 
 New Features:
 
@@ -34,7 +34,7 @@ v0.12.x version, but now the feature is covered by tests too ([PR 1444](https://
 Changes in behavior:
 
 - the biggest change is the introduction of CRDs and removing support for the configuration via ConfigMap. In order to ease the transition
-  to the new configuration, we provide a conversion tool from ConfigMap to resources (see the "Backward compatibility" section from [the main page](../_index.md)).
+  to the new configuration, we provide a conversion tool from ConfigMap to resources (see the "Backward compatibility" section from [the main page](https://metallb.universe.tf/#backward-compatibility)).
 
 - the internal architecture was radically changed in order to accomodate CRDs, so please do not hesitate to [file an issue](https://github.com/metallb/metallb/issues).
 
