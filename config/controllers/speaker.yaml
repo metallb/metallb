@@ -48,7 +48,7 @@ spec:
             secretKeyRef:
               name: memberlist
               key: secretkey
-        image: quay.io/metallb/speaker:v0.13.1
+        image: quay.io/metallb/speaker:v0.13.2
         name: speaker
         ports:
         - containerPort: 7472
