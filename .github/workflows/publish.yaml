@@ -79,7 +79,7 @@ jobs:
           # generate Docker tags based on the following events/attributes
           tags: |
             type=ref,event=branch
-            type=semver,pattern={{version}}
+            type=semver,pattern={{raw}}
           labels: |
             org.opencontainers.image.title=${{ matrix.image }}
             org.opencontainers.image.description=${{ matrix.image }} for metallb, a network load-balancer implementation for Kubernetes using standard routing protocols
