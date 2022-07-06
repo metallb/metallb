@@ -8,7 +8,7 @@ creating and deploying various resources into **the same namespace**
 (metallb-system) MetalLB is deployed into.
 
 There are various examples of the configuration CRs in
-[`configsamples`](https://raw.githubusercontent.com/metallb/metallb/v0.13.0/configsamples).
+[`configsamples`](https://raw.githubusercontent.com/metallb/metallb/v0.13.1/configsamples).
 
 Also, the API is [fully documented here](../apis/_index.md).
 
