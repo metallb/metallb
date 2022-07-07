@@ -135,6 +135,9 @@ addresspools: []
 #   addresses:
 #   - 42.176.25.64/30
 #   autoAssign: false
+#   nodeSelectors:
+#   - matchLabels:
+#       kubernetes.io/hostname: NodeA
 
 # controller contains configuration specific to the MetalLB cluster
 # controller.

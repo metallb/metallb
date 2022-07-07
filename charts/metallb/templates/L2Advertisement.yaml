@@ -10,6 +10,10 @@ metadata:
 spec:
   ipAddressPools:
   - {{ template "metallb.fullname" $global }}-{{ $pool.name }}
+  {{- if $pool.nodeSelectors }}
+  nodeSelectors:
+    {{- $pool.nodeSelectors | toYaml | nindent 2 }}
+  {{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
