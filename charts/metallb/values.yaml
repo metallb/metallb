@@ -124,6 +124,18 @@ prometheus:
 
     extraAlerts: []
 
+# -- IPAddressPools to be defined
+addresspools: []
+# addresspools:
+# - name: cheap
+#   protocol: layer2
+#   addresses:
+#   - 192.168.10.0/24
+# - name: expensive
+#   addresses:
+#   - 42.176.25.64/30
+#   autoAssign: false
+
 # controller contains configuration specific to the MetalLB cluster
 # controller.
 controller:

@@ -1,0 +1,16 @@
+{{ $global := . }}
+{{- if .Values.addresspools }}
+{{- range $pool := .Values.addresspools }}
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: {{ template "metallb.fullname" $global }}-{{ $pool.name }}
+spec:
+  addresses:
+  {{- $pool.addresses | toYaml | nindent 2 }}
+  {{- if $pool.autoAssign }}
+  autoAssign: {{ $pool.autoAssign }}
+  {{- end }}
+{{- end }}
+{{- end }}
