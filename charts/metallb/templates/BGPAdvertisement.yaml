@@ -1,0 +1,19 @@
+{{ $global := . }}
+{{- if .Values.addresspools }}
+{{- range $pool := .Values.addresspools }}
+{{- if eq .protocol "bgp" }}
+---
+apiVersion: metallb.io/v1beta1
+kind: BGPAdvertisement
+metadata:
+  name: {{ template "metallb.fullname" $global }}-{{ $pool.name }}
+spec:
+  ipAddressPools:
+  - {{ template "metallb.fullname" $global }}-{{ $pool.name }}
+  {{- if $pool.nodeSelectors }}
+  nodeSelectors:
+    {{- $pool.nodeSelectors | toYaml | nindent 2 }}
+  {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
