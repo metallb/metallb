@@ -1,0 +1,3 @@
+{{- if .Values.configInline }}
+{{- fail "Starting from v0.13.0 configInline is no longer supported. Please see https://metallb.universe.tf/#backward-compatibility" }}
+{{- end }}
