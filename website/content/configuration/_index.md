@@ -90,6 +90,7 @@ apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
 metadata:
   name: example
+  namespace: metallb-system
 ```
 
 Setting no `IPAddressPool` selector in an `L2Advertisement` instance is interpreted
@@ -104,6 +105,7 @@ apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
 metadata:
   name: example
+  namespace: metallb-system
 spec:
   ipAddressPools:
   - first-pool
@@ -164,6 +166,7 @@ apiVersion: metallb.io/v1beta1
 kind: BGPAdvertisement
 metadata:
   name: example
+  namespace: metallb-system
 ```
 
 Setting no `IPAddressPool` selector in a `BGPAdvertisement` instance is interpreted
@@ -178,6 +181,7 @@ apiVersion: metallb.io/v1beta1
 kind: BGPAdvertisement
 metadata:
   name: example
+  namespace: metallb-system
 spec:
   ipAddressPools:
   - first-pool
