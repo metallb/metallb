@@ -124,7 +124,7 @@ rules:
   verbs: ["get", "list"]
 - apiGroups: ["metallb.io"]
   resources: ["communities"]
-  verbs: ["get", "list"]
+  verbs: ["get", "list","watch"]
 - apiGroups: ["metallb.io"]
   resources: ["bfdprofiles"]
   verbs: ["get", "list","watch"]
