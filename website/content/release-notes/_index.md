@@ -2,6 +2,13 @@
 title: Release Notes
 weight: 8
 ---
+
+## Version 0.13.4
+
+Bug Fixes:
+
+- Change the validating webhook configuration name to metallb-webhook-configuration instead of validating-webhook-configuration ([PR 1497](https://github.com/metallb/metallb/pull/1497))
+
 ## Version 0.13.3
 
 Bug Fixes:
