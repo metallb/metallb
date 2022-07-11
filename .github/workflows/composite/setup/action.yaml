@@ -9,9 +9,10 @@ runs:
       with:
         access_token: ${{ github.token }}
 
-    - uses: actions/setup-go@v2
+    - uses: actions/setup-go@v3
       with:
-        go-version: "1.17.1"
+        go-version-file: "go.mod"
+        cache: true
 
     - name: Install Dependencies
       shell: bash
@@ -25,13 +26,13 @@ runs:
     - name: Download MetalLB images
       uses: actions/download-artifact@v3
       with:
-        name: metallb-images
         path: metallb-images
 
     - name: Load MetalLB images
       shell: bash
       working-directory: metallb-images
       run: |
-        docker load -i speaker.tar
-        docker load -i controller.tar
-        docker load -i mirror-server.tar
+        docker load -i image-tar-speaker/speaker.tar
+        docker load -i image-tar-controller/controller.tar
+        docker load -i image-tar-mirror-server/mirror-server.tar
+        docker load -i image-tar-configmaptocrs/configmaptocrs.tar

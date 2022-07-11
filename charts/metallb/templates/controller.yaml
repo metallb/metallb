@@ -27,6 +27,9 @@ spec:
         {{- include "metallb.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: controller
     spec:
+      {{- with .Values.controller.runtimeClassName }}
+      runtimeClassName: {{ . | quote }}
+      {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -48,7 +51,7 @@ spec:
         {{- with .Values.controller.logLevel }}
         - --log-level={{ . }}
         {{- end }}
-        - --cert-service-name={{ template "metallb.fullname" . }}-webhook-service
+        - --cert-service-name=metallb-webhook-service
         {{- if .Values.loadBalancerClass }}
         - --lb-class={{ .Values.loadBalancerClass }}
         {{- end }}

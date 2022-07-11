@@ -131,6 +131,21 @@ helm install metallb metallb/metallb -f values.yaml
 ```
 
 {{% notice note %}}
+The speaker pod requires elevated permission in order to perform its network functionalities.
+
+If you are using MetalLB with a kubernetes version that enforces [pod security admission](https://kubernetes.io/docs/concepts/security/pod-security-admission/) (which is beta in k8s
+1.23), the namespace MetalLB is deployed to must be labelled with:
+
+```yaml
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+```
+
+{{% /notice %}}
+
+{{% notice note %}}
 If you want to deploy MetalLB using the [experimental FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions), the following value must be set:
 
 ```yaml

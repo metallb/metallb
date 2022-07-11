@@ -135,53 +135,28 @@ def build(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag=
     binaries = _check_binaries(binaries)
     architectures = _check_architectures(architectures)
     docker_build_cmd = _docker_build_cmd()
-    _make_build_dirs()
 
     commit = run("git describe --dirty --always", hide=True).stdout.strip()
     branch = run("git rev-parse --abbrev-ref HEAD", hide=True).stdout.strip()
 
     for arch in architectures:
-        env = {
-            "CGO_ENABLED": "0",
-            "GOOS": "linux",
-            "GOARCH": arch,
-            "GOARM": "6",
-            "GO111MODULE": "on",
-        }
-        if "speaker" in binaries:
-            shutil.copy("frr-reloader/frr-reloader.sh","build/{arch}/speaker/".format(arch=arch))
-            run("go build -v -o build/{arch}/speaker/frr-metrics -ldflags "
-                "'-X go.universe.tf/metallb/internal/version.gitCommit={commit} "
-                "-X go.universe.tf/metallb/internal/version.gitBranch={branch}' "
-                "frr-metrics/exporter.go".format(
-                    arch=arch,
-                    commit=commit,
-                    branch=branch),
-                    env=env,
-                    echo=True,
-                )
 
         for bin in binaries:
-            run("go build -v -o build/{arch}/{bin}/{bin} -ldflags "
-                "'-X go.universe.tf/metallb/internal/version.gitCommit={commit} "
-                "-X go.universe.tf/metallb/internal/version.gitBranch={branch}' "
-                "go.universe.tf/metallb/{bin}".format(
-                    arch=arch,
-                    bin=bin,
-                    commit=commit,
-                    branch=branch),
-                env=env,
-                echo=True)
             run("{docker_build_cmd} "
                 "--platform linux/{arch} "
                 "-t {registry}/{repo}/{bin}:{tag}-{arch} "
-                "-f {bin}/Dockerfile build/{arch}/{bin}".format(
+                "-f {bin}/Dockerfile "
+                "--build-arg GIT_BRANCH=\"{branch}\" "
+                "--build-arg GIT_COMMIT=\"{commit}\" "
+                ".".format(
                     docker_build_cmd=docker_build_cmd,
                     registry=registry,
                     repo=repo,
                     bin=bin,
                     tag=tag,
-                    arch=arch),
+                    arch=arch,
+                    commit=commit,
+                    branch=branch),
                 echo=True)
 
 
@@ -536,22 +511,22 @@ def release(ctx, version, skip_release_notes=False):
     if status != "":
         raise Exit(message="git checkout not clean, cannot release")
 
-    version = semver.parse_version_info(version)
-    is_patch_release = version.patch != 0
+    sem_version = semver.parse_version_info(version)
+    is_patch_release = sem_version.patch != 0
 
     # Check that we have release notes for the desired version.
     run("git checkout main", echo=True)
     if not skip_release_notes:
         with open("website/content/release-notes/_index.md") as release_notes:
-            if "## Version {}".format(version) not in release_notes.read():
-                raise Exit(message="no release notes for v{}".format(version))
+            if "## Version {}".format(sem_version) not in release_notes.read():
+                raise Exit(message="no release notes for v{}".format(sem_version))
 
     # Move HEAD to the correct release branch - either a new one, or
     # an existing one.
     if is_patch_release:
-        run("git checkout v{}.{}".format(version.major, version.minor), echo=True)
+        run("git checkout v{}.{}".format(sem_version.major, sem_version.minor), echo=True)
     else:
-        run("git checkout -b v{}.{}".format(version.major, version.minor), echo=True)
+        run("git checkout -b v{}.{}".format(sem_version.major, sem_version.minor), echo=True)
 
     # Copy over release notes from main.
     if not skip_release_notes:
@@ -560,13 +535,13 @@ def release(ctx, version, skip_release_notes=False):
     # Update links on the website to point to files at the version
     # we're creating.
     if is_patch_release:
-        previous_version = "v{}.{}.{}".format(version.major, version.minor, version.patch-1)
+        previous_version = "v{}.{}.{}".format(sem_version.major, sem_version.minor, sem_version.patch-1)
     else:
         previous_version = "main"
     bumprelease(ctx, version, previous_version)
     
-    run("git commit -a -m 'Automated update for release v{}'".format(version), echo=True)
-    run("git tag v{} -m 'See the release notes for details:\n\nhttps://metallb.universe.tf/release-notes/#version-{}-{}-{}'".format(version, version.major, version.minor, version.patch), echo=True)
+    run("git commit -a -m 'Automated update for release v{}'".format(sem_version), echo=True)
+    run("git tag v{} -m 'See the release notes for details:\n\nhttps://metallb.universe.tf/release-notes/#version-{}-{}-{}'".format(sem_version, sem_version.major, sem_version.minor, sem_version.patch), echo=True)
     run("git checkout main", echo=True)
 
 @task(help={
@@ -594,9 +569,13 @@ def bumprelease(ctx, version, previous_version):
 
     # Update the versions in the helm chart (version and appVersion are always the same)
     # helm chart versions follow Semantic Versioning, and thus exclude the leading 'v'
-    run("perl -pi -e 's,^version: .*,version: {},g' charts/metallb/Chart.yaml".format(version), echo=True)
+    run("perl -pi -e 's,version: .*,version: {},g' charts/metallb/Chart.yaml".format(version), echo=True)
     run("perl -pi -e 's,^appVersion: .*,appVersion: v{},g' charts/metallb/Chart.yaml".format(version), echo=True)
+    run("perl -pi -e 's,^version: .*,version: {},g' charts/metallb/charts/crds/Chart.yaml".format(version), echo=True)
+    run("perl -pi -e 's,^appVersion: .*,appVersion: v{},g' charts/metallb/charts/crds/Chart.yaml".format(version), echo=True)
     run("perl -pi -e 's,^Current chart version is: .*,Current chart version is: `{}`,g' charts/metallb/README.md".format(version), echo=True)
+    run("helm dependency update charts/metallb", echo=True)
+    
 
     # Generate the manifests with the new version of the images
     generatemanifests(ctx)
@@ -606,8 +585,8 @@ def bumprelease(ctx, version, previous_version):
     # TODO: Check if kustomize instructions really need the version in the
     # website or if there is a simpler way. For now, though, we just replace the
     # only page that mentions the version on release.
-    run("sed -i 's/github.com\/metallb\/metallb\/config\/native?ref=main/github.com\/metallb\/metallb\/config\/native?ref={}/g' website/content/installation/_index.md".format(version))
-    run("sed -i 's/github.com\/metallb\/metallb\/config\/native?ref=main/github.com\/metallb\/metallb\/config\/frr?ref={}/g' website/content/installation/_index.md".format(version))
+    run("sed -i 's/github.com\/metallb\/metallb\/config\/native?ref=main/github.com\/metallb\/metallb\/config\/native?ref=v{}/g' website/content/installation/_index.md".format(version))
+    run("sed -i 's/github.com\/metallb\/metallb\/config\/native?ref=main/github.com\/metallb\/metallb\/config\/frr?ref=v{}/g' website/content/installation/_index.md".format(version))
 
     # Update the version embedded in the binary
     run("perl -pi -e 's/version\s+=.*/version = \"{}\"/g' internal/version/version.go".format(version), echo=True)
