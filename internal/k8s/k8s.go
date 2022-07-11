@@ -59,7 +59,7 @@ const (
 var (
 	scheme                          = runtime.NewScheme()
 	setupLog                        = ctrl.Log.WithName("setup")
-	validatingWebhookName           = "validating-webhook-configuration"
+	validatingWebhookName           = "metallb-webhook-configuration"
 	addresspoolConvertingWebhookCRD = "addresspools.metallb.io"
 	bgppeerConvertingWebhookCRD     = "bgppeers.metallb.io"
 	webhookSecretName               = "webhook-server-cert"
