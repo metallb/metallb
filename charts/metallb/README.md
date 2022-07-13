@@ -93,6 +93,7 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | speaker.frr.image.pullPolicy | string | `nil` |  |
 | speaker.frr.image.repository | string | `"frrouting/frr"` |  |
 | speaker.frr.image.tag | string | `"v7.5.1"` |  |
+| speaker.frr.metricsPort | int | `7473` |  |
 | speaker.image.pullPolicy | string | `nil` |  |
 | speaker.image.repository | string | `"quay.io/metallb/speaker"` |  |
 | speaker.image.tag | string | `nil` |  |

@@ -156,6 +156,7 @@ spec:
   - port: 443
     targetPort: 9443
   selector:
+    {{- include "metallb.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/component: controller
 ---
 apiVersion: v1
