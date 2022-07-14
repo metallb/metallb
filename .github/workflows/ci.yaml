@@ -137,7 +137,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ip-family: [ipv4, ipv6, dual]
+        ip-family: [ipv6]
         bgp-type: [native, frr]
         deployment: [manifests, helm]
         prometheus: [disabled, enabled]

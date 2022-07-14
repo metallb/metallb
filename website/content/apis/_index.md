@@ -621,6 +621,19 @@ If no IPAddressPool is selected by this or by the list, the advertisement is app
 <p>NodeSelectors allows to limit the nodes to announce as next hops for the LoadBalancer IP. When empty, all the nodes having  are announced as next hops.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>interfaces</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>A list of interfaces to announce from. The LB IP will be announced only from these interfaces.
+If the field is not set, we advertise from all the interfaces on the host.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
