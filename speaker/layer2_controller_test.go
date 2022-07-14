@@ -13,12 +13,14 @@ import (
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/k8s/epslices"
+	"go.universe.tf/metallb/internal/layer2"
 	"go.universe.tf/metallb/internal/pointer"
 
 	"github.com/go-kit/log"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type fakeSpeakerList struct {
@@ -2496,5 +2498,129 @@ func TestClusterPolicy(t *testing.T) {
 	}
 	if !c2Found {
 		t.Fatalf("All services assigned to speaker1")
+	}
+}
+
+func TestIPAdvertisementFor(t *testing.T) {
+	tests := []struct {
+		desc             string
+		ip               net.IP
+		localNode        string
+		l2Advertisements []*config.L2Advertisement
+		expect           layer2.IPAdvertisement
+	}{
+		{
+			desc:      "Not specify the IPPool related interfaces",
+			ip:        net.IP{192, 168, 10, 3},
+			localNode: "nodeA",
+			l2Advertisements: []*config.L2Advertisement{
+				{
+					Nodes: map[string]bool{
+						"nodeB": true,
+						"nodeA": true,
+					},
+					Interfaces:    []string{},
+					AllInterfaces: true,
+				},
+			},
+			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, true, sets.NewString()),
+		}, {
+			desc:      "LocalNode doesn't match L2Advertisement",
+			ip:        net.IP{192, 168, 10, 3},
+			localNode: "nodeA",
+			l2Advertisements: []*config.L2Advertisement{
+				{
+					Nodes: map[string]bool{
+						"nodeB": true,
+					},
+					Interfaces: []string{"eth0", "eth1"},
+				}, {
+					Nodes: map[string]bool{
+						"nodeA": false,
+						"nodeC": true,
+					},
+					Interfaces: []string{"eth3", "eth4"},
+				},
+			},
+			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, false, sets.NewString()),
+		}, {
+			desc:      "LocalNode only match one L2Advertisement",
+			ip:        net.ParseIP("2000:12"),
+			localNode: "nodeA",
+			l2Advertisements: []*config.L2Advertisement{
+				{
+					Nodes: map[string]bool{
+						"nodeB": true,
+						"nodeA": false,
+					},
+					Interfaces: []string{"eth0"},
+				}, {
+					Nodes: map[string]bool{
+						"nodeC": true,
+						"nodeA": true,
+					},
+					Interfaces: []string{"eth1", "eth2"},
+				},
+			},
+			expect: layer2.NewIPAdvertisement(net.ParseIP("2000:12"), false, sets.NewString("eth1", "eth2")),
+		}, {
+			desc:      "LocalNode match multi-L2Advertisement",
+			ip:        net.IP{192, 168, 10, 3},
+			localNode: "nodeA",
+			l2Advertisements: []*config.L2Advertisement{
+				{
+					Nodes: map[string]bool{
+						"nodeB": true,
+						"nodeA": true,
+					},
+					Interfaces: []string{"eth0", "eth1"},
+				}, {
+					Nodes: map[string]bool{
+						"nodeC": true,
+						"nodeA": true,
+					},
+					Interfaces: []string{"eth0", "eth2"},
+				}, {
+					Nodes: map[string]bool{
+						"nodeC": true,
+						"nodeD": true,
+					},
+					Interfaces: []string{"eth4", "eth3"},
+				},
+			},
+			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, false, sets.NewString("eth0", "eth1", "eth2")),
+		}, {
+			desc:      "LocalNode match multi-L2Advertisement, and one of them not specify interfaces",
+			ip:        net.IP{192, 168, 10, 3},
+			localNode: "nodeA",
+			l2Advertisements: []*config.L2Advertisement{
+				{
+					Nodes: map[string]bool{
+						"nodeB": true,
+						"nodeA": true,
+					},
+					Interfaces: []string{"eth0", "eth1"},
+				}, {
+					Nodes: map[string]bool{
+						"nodeC": true,
+						"nodeA": true,
+					},
+					AllInterfaces: true,
+				}, {
+					Nodes: map[string]bool{
+						"nodeC": true,
+						"nodeD": true,
+					},
+					Interfaces: []string{"eth4", "eth3"},
+				},
+			},
+			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, true, sets.NewString()),
+		},
+	}
+	for _, test := range tests {
+		r := ipAdvertisementFor(test.ip, test.localNode, test.l2Advertisements)
+		if !r.Equal(&test.expect) {
+			t.Errorf("%s: expect interfaces is %+v, but the result is %+v", test.desc, test.expect, r)
+		}
 	}
 }

@@ -26,6 +26,7 @@ import (
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	"go.universe.tf/metallb/internal/layer2"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type layer2Controller struct {
@@ -135,7 +136,8 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 
 func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIPs []net.IP, pool *config.Pool) error {
 	for _, lbIP := range lbIPs {
-		c.announcer.SetBalancer(name, lbIP)
+		ipAdv := ipAdvertisementFor(lbIP, c.myNode, pool.L2Advertisements)
+		c.announcer.SetBalancer(name, ipAdv)
 	}
 	return nil
 }
@@ -151,6 +153,20 @@ func (c *layer2Controller) DeleteBalancer(l log.Logger, name, reason string) err
 func (c *layer2Controller) SetNode(log.Logger, *v1.Node) error {
 	c.sList.Rejoin()
 	return nil
+}
+
+func ipAdvertisementFor(ip net.IP, localNode string, l2Advertisements []*config.L2Advertisement) layer2.IPAdvertisement {
+	ifs := sets.NewString()
+	for _, l2 := range l2Advertisements {
+		if matchNode := l2.Nodes[localNode]; !matchNode {
+			continue
+		}
+		if l2.AllInterfaces {
+			return layer2.NewIPAdvertisement(ip, true, sets.NewString())
+		}
+		ifs = ifs.Insert(l2.Interfaces...)
+	}
+	return layer2.NewIPAdvertisement(ip, false, ifs)
 }
 
 // nodesWithActiveSpeakers returns the list of nodes with active speakers.

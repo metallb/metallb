@@ -5,35 +5,49 @@ package layer2
 import (
 	"net"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func Test_SetBalancer_AddsToAnnouncedServices(t *testing.T) {
 	announce := &Announce{
-		ips:      map[string][]net.IP{},
+		ips:      map[string][]IPAdvertisement{},
 		ipRefcnt: map[string]int{},
-		spamCh:   make(chan net.IP, 1),
+		spamCh:   make(chan IPAdvertisement, 1),
 	}
 
 	services := []struct {
 		name string
-		ip   net.IP
+		adv  IPAdvertisement
 	}{
 		{
 			name: "foo",
-			ip:   net.IPv4(192, 168, 1, 20),
+			adv: IPAdvertisement{
+				ip:            net.IPv4(192, 168, 1, 20),
+				interfaces:    sets.NewString(),
+				allInterfaces: true,
+			},
 		},
 		{
 			name: "foo",
-			ip:   net.ParseIP("1000::1"),
+			adv: IPAdvertisement{
+				ip:            net.ParseIP("1000::1"),
+				interfaces:    sets.NewString("eth0"),
+				allInterfaces: true,
+			},
 		},
 		{
 			name: "bar",
-			ip:   net.IPv4(192, 168, 1, 20),
+			adv: IPAdvertisement{
+				ip:            net.IPv4(192, 168, 1, 20),
+				interfaces:    sets.NewString("eth1"),
+				allInterfaces: false,
+			},
 		},
 	}
 
 	for _, service := range services {
-		announce.SetBalancer(service.name, service.ip)
+		announce.SetBalancer(service.name, service.adv)
 		// We need to empty spamCh as spamLoop() is not started.
 		<-announce.spamCh
 
