@@ -264,7 +264,8 @@ func TestParse(t *testing.T) {
 							},
 						},
 						L2Advertisements: []*L2Advertisement{&L2Advertisement{
-							Nodes: map[string]bool{},
+							Nodes:         map[string]bool{},
+							AllInterfaces: true,
 						}},
 					},
 					"pool2": {
@@ -279,7 +280,8 @@ func TestParse(t *testing.T) {
 							},
 						},
 						L2Advertisements: []*L2Advertisement{&L2Advertisement{
-							Nodes: map[string]bool{},
+							Nodes:         map[string]bool{},
+							AllInterfaces: true,
 						}},
 					},
 					"pool3": {
@@ -298,14 +300,16 @@ func TestParse(t *testing.T) {
 							ipnet("40.0.0.250/32"),
 						},
 						L2Advertisements: []*L2Advertisement{&L2Advertisement{
-							Nodes: map[string]bool{},
+							Nodes:         map[string]bool{},
+							AllInterfaces: true,
 						}},
 						AutoAssign: true,
 					},
 					"pool4": {
 						CIDR: []*net.IPNet{ipnet("2001:db8::/64")},
 						L2Advertisements: []*L2Advertisement{&L2Advertisement{
-							Nodes: map[string]bool{},
+							Nodes:         map[string]bool{},
+							AllInterfaces: true,
 						}},
 						AutoAssign: true,
 					},
@@ -1657,7 +1661,8 @@ func TestParse(t *testing.T) {
 					"legacyl2pool1": {
 						CIDR: []*net.IPNet{ipnet("10.21.0.0/16"), ipnet("10.51.0.0/24")},
 						L2Advertisements: []*L2Advertisement{{
-							Nodes: map[string]bool{},
+							Nodes:         map[string]bool{},
+							AllInterfaces: true,
 						}},
 					},
 				},
@@ -1866,7 +1871,8 @@ func TestParse(t *testing.T) {
 							},
 						},
 						L2Advertisements: []*L2Advertisement{{
-							Nodes: map[string]bool{},
+							Nodes:         map[string]bool{},
+							AllInterfaces: true,
 						}},
 					},
 					"pool2": {
@@ -1882,6 +1888,55 @@ func TestParse(t *testing.T) {
 							},
 						},
 						L2Advertisements: nil,
+					},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
+			desc: "specify interfaces",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "pool1",
+							Labels: map[string]string{"test": "pool1"},
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+							},
+						},
+					},
+				},
+				L2Advs: []v1beta1.L2Advertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "l2adv1",
+						},
+						Spec: v1beta1.L2AdvertisementSpec{
+							IPAddressPoolSelectors: []metav1.LabelSelector{
+								{
+									MatchLabels: map[string]string{
+										"test": "pool1",
+									},
+								},
+							},
+							Interfaces: []string{"eth0"},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: map[string]*Pool{
+					"pool1": {
+						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
+						AutoAssign: true,
+						L2Advertisements: []*L2Advertisement{{
+							Nodes:         map[string]bool{},
+							AllInterfaces: false,
+							Interfaces:    []string{"eth0"},
+						}},
 					},
 				},
 				BFDProfiles: map[string]*BFDProfile{},
@@ -2247,6 +2302,7 @@ func TestParse(t *testing.T) {
 								"first":  true,
 								"second": true,
 							},
+							AllInterfaces: true,
 						}},
 					},
 
@@ -2265,6 +2321,7 @@ func TestParse(t *testing.T) {
 							Nodes: map[string]bool{
 								"first": true,
 							},
+							AllInterfaces: true,
 						}},
 					},
 					"pool2": {
@@ -2511,6 +2568,7 @@ func TestParse(t *testing.T) {
 								"first":  true,
 								"second": true,
 							},
+							AllInterfaces: true,
 						}},
 					},
 				},
@@ -2657,5 +2715,116 @@ func TestParse(t *testing.T) {
 				t.Errorf("%q: parse returned wrong result (-want, +got)\n%s", test.desc, diff)
 			}
 		})
+	}
+}
+
+func TestContainsAdvertisement(t *testing.T) {
+	tests := []struct {
+		desc    string
+		advs    []*L2Advertisement
+		toCheck *L2Advertisement
+		expect  bool
+	}{
+		{
+			desc: "Contain",
+			advs: []*L2Advertisement{
+				&L2Advertisement{
+					Nodes: map[string]bool{
+						"nodeA": true,
+						"nodeB": true,
+					},
+					Interfaces:    []string{"eth0", "eth1"},
+					AllInterfaces: false,
+				},
+				&L2Advertisement{
+					Nodes: map[string]bool{
+						"nodeB": true,
+					},
+					Interfaces:    []string{},
+					AllInterfaces: true,
+				},
+			},
+			toCheck: &L2Advertisement{
+				Nodes: map[string]bool{
+					"nodeB": true,
+					"nodeA": true,
+				},
+				Interfaces:    []string{"eth1", "eth0"},
+				AllInterfaces: false,
+			},
+			expect: true,
+		},
+		{
+			desc: "Not contain: Nodes don't equal",
+			advs: []*L2Advertisement{
+				&L2Advertisement{
+					Nodes: map[string]bool{
+						"nodeA": true,
+						"nodeB": true,
+					},
+					Interfaces:    []string{"eth0", "eth1"},
+					AllInterfaces: false,
+				},
+			},
+			toCheck: &L2Advertisement{
+				Nodes: map[string]bool{
+					"nodeB": true,
+					"nodeC": true,
+				},
+				Interfaces:    []string{"eth1", "eth0"},
+				AllInterfaces: false,
+			},
+			expect: false,
+		},
+		{
+			desc: "Not contain: Interfaces don't equal",
+			advs: []*L2Advertisement{
+				&L2Advertisement{
+					Nodes: map[string]bool{
+						"nodeA": true,
+						"nodeB": true,
+					},
+					Interfaces:    []string{"eth0", "eth1"},
+					AllInterfaces: false,
+				},
+			},
+			toCheck: &L2Advertisement{
+				Nodes: map[string]bool{
+					"nodeA": true,
+					"nodeB": true,
+				},
+				Interfaces:    []string{"eth1"},
+				AllInterfaces: false,
+			},
+			expect: false,
+		},
+		{
+			desc: "Not contain: AllInterfaces doesn't equal",
+			advs: []*L2Advertisement{
+				&L2Advertisement{
+					Nodes: map[string]bool{
+						"nodeA": true,
+						"nodeB": true,
+					},
+					Interfaces:    []string{"eth1"},
+					AllInterfaces: false,
+				},
+			},
+			toCheck: &L2Advertisement{
+				Nodes: map[string]bool{
+					"nodeA": true,
+					"nodeB": true,
+				},
+				Interfaces:    []string{"eth1"},
+				AllInterfaces: true,
+			},
+			expect: false,
+		},
+	}
+	for _, test := range tests {
+		result := containsAdvertisement(test.advs, test.toCheck)
+		if result != test.expect {
+			t.Errorf("%s: expect is %v, but result is %v", test.desc, test.expect, result)
+		}
 	}
 }
