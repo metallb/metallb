@@ -240,10 +240,6 @@ func parsePeer(p peer) (*v1beta2.BGPPeer, error) {
 	if err != nil {
 		return nil, err
 	}
-	keepaliveTime, err := parseKeepaliveTime(holdTime, p.KeepaliveTime)
-	if err != nil {
-		return nil, err
-	}
 
 	nodeSels := make([]metav1.LabelSelector, 0)
 	for _, sel := range p.NodeSelectors {
@@ -251,7 +247,7 @@ func parsePeer(p peer) (*v1beta2.BGPPeer, error) {
 		nodeSels = append(nodeSels, s)
 	}
 
-	return &v1beta2.BGPPeer{
+	res := &v1beta2.BGPPeer{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: resourcesNameSpace,
 		},
@@ -262,14 +258,22 @@ func parsePeer(p peer) (*v1beta2.BGPPeer, error) {
 			SrcAddress:    p.SrcAddr,
 			Port:          p.Port,
 			HoldTime:      metav1.Duration{Duration: holdTime},
-			KeepaliveTime: metav1.Duration{Duration: keepaliveTime},
 			RouterID:      p.RouterID,
 			NodeSelectors: nodeSels,
 			Password:      p.Password,
 			BFDProfile:    p.BFDProfile,
 			EBGPMultiHop:  p.EBGPMultiHop,
 		},
-	}, nil
+	}
+	if p.KeepaliveTime != "" {
+		keepaliveTime, err := parseKeepaliveTime(holdTime, p.KeepaliveTime)
+		if err != nil {
+			return nil, err
+		}
+		res.Spec.KeepaliveTime = metav1.Duration{Duration: keepaliveTime}
+	}
+
+	return res, nil
 }
 
 func parseNodeSelector(sel nodeSelector) metav1.LabelSelector {
@@ -307,10 +311,6 @@ func parseHoldTime(ht string) (time.Duration, error) {
 }
 
 func parseKeepaliveTime(ht time.Duration, ka string) (time.Duration, error) {
-	// If keepalive time not set lets use 1/3 of holdtime.
-	if ka == "" {
-		return ht / 3, nil
-	}
 	d, err := time.ParseDuration(ka)
 	if err != nil {
 		return 0, fmt.Errorf("invalid keepalive time %q: %s", ka, err)
