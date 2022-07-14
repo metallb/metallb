@@ -842,28 +842,6 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
-			desc: "aggregation length by range, too wide",
-			crs: ClusterResources{
-				Pools: []v1beta1.IPAddressPool{
-					{
-						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
-						Spec: v1beta1.IPAddressPoolSpec{
-							Addresses: []string{
-								"3.3.3.2-3.3.3.254",
-							},
-						},
-					},
-				},
-				BGPAdvs: []v1beta1.BGPAdvertisement{
-					{
-						Spec: v1beta1.BGPAdvertisementSpec{
-							AggregationLength: pointer.Int32Ptr(24),
-						},
-					},
-				},
-			},
-		},
-		{
 			desc: "duplicate ip address pools - in L2 adv",
 			crs: ClusterResources{
 				Pools: []v1beta1.IPAddressPool{testPool},

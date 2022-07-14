@@ -753,8 +753,12 @@ func bgpAdvertisementsFromLegacyCR(ads []metallbv1beta1.LegacyBgpAdvertisement, 
 				maxLength = ad.AggregationLengthV6
 			}
 
-			// in case of range format, we may have a set of cidrs associated to a given address.
-			// We reject if none of the cidrs are compatible with the aggregation length.
+			// we don't check in case of range formats, because we don't know if the originating range
+			// is a full range minus buggy ips.
+			if strings.Contains(addr, "-") {
+				continue
+			}
+
 			lowest := lowestMask(cidrs)
 			if maxLength < lowest {
 				return nil, fmt.Errorf("invalid aggregation length %d: prefix %d in "+
@@ -814,8 +818,12 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 			maxLength = adv.AggregationLengthV6
 		}
 
-		// in case of range format, we may have a set of cidrs associated to a given address.
-		// We reject if none of the cidrs are compatible with the aggregation length.
+		// we don't check in case of range formats, because we don't know if the originating range
+		// is a full range minus buggy ips.
+		if strings.Contains(addr, "-") {
+			continue
+		}
+
 		lowest := lowestMask(cidrs)
 		if maxLength < lowest {
 			return fmt.Errorf("invalid aggregation length %d: prefix %d in "+
