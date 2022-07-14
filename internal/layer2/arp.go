@@ -14,7 +14,7 @@ import (
 	"github.com/mdlayher/ethernet"
 )
 
-type announceFunc func(net.IP) dropReason
+type announceFunc func(net.IP, string) dropReason
 
 type arpResponder struct {
 	logger       log.Logger
@@ -97,7 +97,11 @@ func (a *arpResponder) processRequest() dropReason {
 	}
 
 	// Ignore ARP requests that the announcer tells us to ignore.
-	if reason := a.announce(pkt.TargetIP); reason != dropReasonNone {
+	reason := a.announce(pkt.TargetIP, a.intf)
+	if reason == dropReasonNotMatchInterface {
+		level.Debug(a.logger).Log("op", "arpRequestIgnore", "ip", pkt.TargetIP, "interface", a.intf, "reason", "notMatchInterface")
+	}
+	if reason != dropReasonNone {
 		return reason
 	}
 

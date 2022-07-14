@@ -30,8 +30,8 @@ import (
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type ClusterResources struct {
@@ -150,6 +150,10 @@ type BGPAdvertisement struct {
 type L2Advertisement struct {
 	// The map of nodes allowed for this advertisement
 	Nodes map[string]bool
+	// The interfaces in Nodes allowed for this advertisement
+	Interfaces []string
+	// AllInterfaces tells if all the interfaces are allowed for this advertisement
+	AllInterfaces bool
 }
 
 // BFDProfile describes a BFD profile to be applied to a set of peers.
@@ -500,7 +504,7 @@ func addressPoolFromLegacyCR(p metallbv1beta1.AddressPool, bgpCommunities map[st
 		if len(p.Spec.BGPAdvertisements) > 0 {
 			return nil, errors.New("cannot have bgp-advertisements configuration element in a layer2 address pool")
 		}
-		ret.L2Advertisements = []*L2Advertisement{{Nodes: allNodes}}
+		ret.L2Advertisements = []*L2Advertisement{{Nodes: allNodes, AllInterfaces: true}}
 	case BGP:
 		ads, err := bgpAdvertisementsFromLegacyCR(p.Spec.BGPAdvertisements, cidrsPerAddresses, bgpCommunities, allNodes)
 		if err != nil {
@@ -639,9 +643,14 @@ func l2AdvertisementFromCR(crdAd metallbv1beta1.L2Advertisement, nodes []corev1.
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to parse node selector for %s", crdAd.Name)
 	}
-	return &L2Advertisement{
-		Nodes: selected,
-	}, nil
+	l2 := &L2Advertisement{
+		Nodes:      selected,
+		Interfaces: crdAd.Spec.Interfaces,
+	}
+	if len(crdAd.Spec.Interfaces) == 0 {
+		l2.AllInterfaces = true
+	}
+	return l2, nil
 }
 
 func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities map[string]uint32, nodes []corev1.Node) (*BGPAdvertisement, error) {
@@ -947,9 +956,16 @@ func validateDuplicateBGPAdvertisements(ads []metallbv1beta1.BGPAdvertisement) e
 
 func containsAdvertisement(advs []*L2Advertisement, toCheck *L2Advertisement) bool {
 	for _, adv := range advs {
-		if reflect.DeepEqual(adv.Nodes, toCheck.Nodes) {
-			return true
+		if adv.AllInterfaces != toCheck.AllInterfaces {
+			continue
 		}
+		if !reflect.DeepEqual(adv.Nodes, toCheck.Nodes) {
+			continue
+		}
+		if !sets.NewString(adv.Interfaces...).Equal(sets.NewString(toCheck.Interfaces...)) {
+			continue
+		}
+		return true
 	}
 	return false
 }
