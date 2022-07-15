@@ -95,7 +95,7 @@ func (a *Announce) updateInterfaces() {
 			if ipaddr.IP.To4() != nil && (ifi.Flags&net.FlagBroadcast) != 0 {
 				keepARP[ifi.Index] = true
 			}
-			if ipaddr.IP.IsLinkLocalUnicast() {
+			if ipaddr.IP.To4() == nil && ipaddr.IP.IsLinkLocalUnicast() {
 				keepNDP[ifi.Index] = true
 			}
 		}
