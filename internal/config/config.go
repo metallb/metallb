@@ -107,7 +107,12 @@ type Pool struct {
 	// prefixes. config.Parse guarantees that these are
 	// non-overlapping, both within and between pools.
 	CIDR []*net.IPNet
-
+	// Some buggy consumer devices mistakenly drop IPv4 traffic for IP
+	// addresses ending in .0 or .255, due to poor implementations of
+	// smurf protection. This setting marks such addresses as
+	// unusable, for maximum compatibility with ancient parts of the
+	// internet.
+	AvoidBuggyIPs bool
 	// If false, prevents IP addresses to be automatically assigned
 	// from this pool.
 	AutoAssign bool
@@ -439,7 +444,8 @@ func addressPoolFromCR(p metallbv1beta1.IPAddressPool) (*Pool, error) {
 	}
 
 	ret := &Pool{
-		AutoAssign: true,
+		AvoidBuggyIPs: p.Spec.AvoidBuggyIPs,
+		AutoAssign:    true,
 	}
 
 	if p.Spec.AutoAssign != nil {
@@ -469,7 +475,8 @@ func addressPoolFromLegacyCR(p metallbv1beta1.AddressPool, bgpCommunities map[st
 	}
 
 	ret := &Pool{
-		AutoAssign: true,
+		AvoidBuggyIPs: p.Spec.AvoidBuggyIPs,
+		AutoAssign:    true,
 	}
 
 	if p.Spec.AutoAssign != nil {
