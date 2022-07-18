@@ -217,7 +217,9 @@ spec:
                 type: string
               passwordSecret:
                 description: passwordSecret is name of the authentication secret for
-                  BGP Peer
+                  BGP Peer. the secret must be of type "kubernetes.io/basic-auth",
+                  and created in the same namespace as the MetalLB deployment. The
+                  password is stored in the secret as the key "password".
                 properties:
                   name:
                     description: name is unique within a namespace to reference a
