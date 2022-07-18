@@ -113,7 +113,8 @@ func TestParse(t *testing.T) {
 								"10.20.0.0/16",
 								"10.50.0.0/24",
 							},
-							AutoAssign: pointer.BoolPtr(false),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
 						},
 					},
 					{
@@ -241,8 +242,9 @@ func TestParse(t *testing.T) {
 				},
 				Pools: map[string]*Pool{
 					"pool1": {
-						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
-						AutoAssign: false,
+						CIDR:          []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
+						AvoidBuggyIPs: true,
+						AutoAssign:    false,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								AggregationLength:   32,
@@ -1552,7 +1554,8 @@ func TestParse(t *testing.T) {
 								"10.20.0.0/16",
 								"10.50.0.0/24",
 							},
-							AutoAssign: pointer.BoolPtr(false),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
 						},
 					},
 				},
@@ -1566,8 +1569,9 @@ func TestParse(t *testing.T) {
 								"10.21.0.0/16",
 								"10.51.0.0/24",
 							},
-							Protocol:   string(Layer2),
-							AutoAssign: pointer.BoolPtr(false),
+							Protocol:      string(Layer2),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
 						},
 					},
 					{
@@ -1579,8 +1583,9 @@ func TestParse(t *testing.T) {
 								"10.40.0.0/16",
 								"10.60.0.0/24",
 							},
-							Protocol:   string(BGP),
-							AutoAssign: pointer.BoolPtr(false),
+							Protocol:      string(BGP),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
 							BGPAdvertisements: []v1beta1.LegacyBgpAdvertisement{
 								{
 									AggregationLength: pointer.Int32Ptr(32),
@@ -1622,8 +1627,9 @@ func TestParse(t *testing.T) {
 				},
 				Pools: map[string]*Pool{
 					"pool1": {
-						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
-						AutoAssign: false,
+						CIDR:          []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
+						AvoidBuggyIPs: true,
+						AutoAssign:    false,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								AggregationLength:   32,
@@ -1637,7 +1643,8 @@ func TestParse(t *testing.T) {
 						},
 					},
 					"legacybgppool1": {
-						CIDR: []*net.IPNet{ipnet("10.40.0.0/16"), ipnet("10.60.0.0/24")},
+						CIDR:          []*net.IPNet{ipnet("10.40.0.0/16"), ipnet("10.60.0.0/24")},
+						AvoidBuggyIPs: true,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								AggregationLength:   32,
@@ -1651,7 +1658,8 @@ func TestParse(t *testing.T) {
 						},
 					},
 					"legacyl2pool1": {
-						CIDR: []*net.IPNet{ipnet("10.21.0.0/16"), ipnet("10.51.0.0/24")},
+						CIDR:          []*net.IPNet{ipnet("10.21.0.0/16"), ipnet("10.51.0.0/24")},
+						AvoidBuggyIPs: true,
 						L2Advertisements: []*L2Advertisement{{
 							Nodes: map[string]bool{},
 						}},
@@ -1674,8 +1682,9 @@ func TestParse(t *testing.T) {
 								"10.40.0.0/16",
 								"10.60.0.0/24",
 							},
-							Protocol:   string(BGP),
-							AutoAssign: pointer.BoolPtr(false),
+							Protocol:      string(BGP),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
 							BGPAdvertisements: []v1beta1.LegacyBgpAdvertisement{
 								{
 									AggregationLength: pointer.Int32Ptr(32),
@@ -1705,7 +1714,8 @@ func TestParse(t *testing.T) {
 			want: &Config{
 				Pools: map[string]*Pool{
 					"legacybgppool1": {
-						CIDR: []*net.IPNet{ipnet("10.40.0.0/16"), ipnet("10.60.0.0/24")},
+						CIDR:          []*net.IPNet{ipnet("10.40.0.0/16"), ipnet("10.60.0.0/24")},
+						AvoidBuggyIPs: true,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								AggregationLength:   32,
@@ -1735,7 +1745,8 @@ func TestParse(t *testing.T) {
 								"10.20.0.0/16",
 								"10.50.0.0/24",
 							},
-							AutoAssign: pointer.BoolPtr(false),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
 						},
 					},
 				},
@@ -1749,8 +1760,9 @@ func TestParse(t *testing.T) {
 								"10.20.0.0/16",
 								"10.51.0.0/24",
 							},
-							Protocol:   string(Layer2),
-							AutoAssign: pointer.BoolPtr(false),
+							Protocol:      string(Layer2),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
 						},
 					},
 					{
@@ -2182,8 +2194,9 @@ func TestParse(t *testing.T) {
 								"10.21.0.0/16",
 								"10.51.0.0/24",
 							},
-							Protocol:   string(Layer2),
-							AutoAssign: pointer.BoolPtr(false),
+							Protocol:      string(Layer2),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
 						},
 					},
 					{
@@ -2195,8 +2208,9 @@ func TestParse(t *testing.T) {
 								"10.40.0.0/16",
 								"10.60.0.0/24",
 							},
-							Protocol:   string(BGP),
-							AutoAssign: pointer.BoolPtr(false),
+							Protocol:      string(BGP),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
 						},
 					},
 				},
@@ -2221,7 +2235,8 @@ func TestParse(t *testing.T) {
 			want: &Config{
 				Pools: map[string]*Pool{
 					"legacybgppool1": {
-						CIDR: []*net.IPNet{ipnet("10.40.0.0/16"), ipnet("10.60.0.0/24")},
+						CIDR:          []*net.IPNet{ipnet("10.40.0.0/16"), ipnet("10.60.0.0/24")},
+						AvoidBuggyIPs: true,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								AggregationLength:   32,
@@ -2236,7 +2251,8 @@ func TestParse(t *testing.T) {
 					},
 
 					"legacyl2pool1": {
-						CIDR: []*net.IPNet{ipnet("10.21.0.0/16"), ipnet("10.51.0.0/24")},
+						CIDR:          []*net.IPNet{ipnet("10.21.0.0/16"), ipnet("10.51.0.0/24")},
+						AvoidBuggyIPs: true,
 						L2Advertisements: []*L2Advertisement{{
 							Nodes: map[string]bool{
 								"first":  true,
@@ -2598,8 +2614,9 @@ func TestParse(t *testing.T) {
 								"10.40.0.0/16",
 								"10.60.0.0/24",
 							},
-							Protocol:   string(BGP),
-							AutoAssign: pointer.BoolPtr(false),
+							Protocol:      string(BGP),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
 							BGPAdvertisements: []v1beta1.LegacyBgpAdvertisement{
 								{
 									AggregationLength: pointer.Int32Ptr(32),

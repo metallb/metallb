@@ -27,7 +27,8 @@ func TestAssignment(t *testing.T) {
 			},
 		},
 		"test2": {
-			AutoAssign: true,
+			AvoidBuggyIPs: true,
+			AutoAssign:    true,
 			CIDR: []*net.IPNet{
 				ipnet("1.2.4.0/24"),
 				ipnet("1000::4:0/120"),
@@ -87,6 +88,18 @@ func TestAssignment(t *testing.T) {
 			desc: "s1 can now grab s2's former IP",
 			svc:  "s1",
 			ips:  []string{"1.2.3.5"},
+		},
+		{
+			desc:    "s3 cannot grab a 0 buggy IP",
+			svc:     "s3",
+			ips:     []string{"1.2.4.0"},
+			wantErr: true,
+		},
+		{
+			desc:    "s3 cannot grab a 255 buggy IP",
+			svc:     "s3",
+			ips:     []string{"1.2.4.255"},
+			wantErr: true,
 		},
 		{
 			desc: "s3 can grab another IP in that pool",
@@ -1100,12 +1113,14 @@ func TestBuggyIPs(t *testing.T) {
 			CIDR:       []*net.IPNet{ipnet("1.2.3.254/31")},
 		},
 		"test3": {
-			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.4.0/31")},
+			AvoidBuggyIPs: true,
+			AutoAssign:    true,
+			CIDR:          []*net.IPNet{ipnet("1.2.4.0/31")},
 		},
 		"test4": {
-			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.4.254/31")},
+			AvoidBuggyIPs: true,
+			AutoAssign:    true,
+			CIDR:          []*net.IPNet{ipnet("1.2.4.254/31")},
 		},
 	}); err != nil {
 		t.Fatalf("SetPools: %s", err)
@@ -1118,8 +1133,6 @@ func TestBuggyIPs(t *testing.T) {
 		"1.2.3.255": true,
 		"1.2.4.1":   true,
 		"1.2.4.254": true,
-		"1.2.4.255": true,
-		"1.2.4.0":   true,
 	}
 
 	tests := []struct {
@@ -1132,7 +1145,10 @@ func TestBuggyIPs(t *testing.T) {
 		{svc: "s4"},
 		{svc: "s5"},
 		{svc: "s6"},
-		{svc: "s7"},
+		{
+			svc:     "s7",
+			wantErr: true,
+		},
 	}
 
 	for i, test := range tests {
@@ -1299,6 +1315,18 @@ func TestConfigReload(t *testing.T) {
 				},
 			},
 			pool: "test2",
+		},
+		{
+			desc: "enable buggy IPs not allowed",
+			pools: map[string]*config.Pool{
+				"test2": {
+					AutoAssign:    true,
+					AvoidBuggyIPs: true,
+					CIDR:          []*net.IPNet{ipnet("1.2.3.0/31"), ipnet("1000::/127")},
+				},
+			},
+			pool:    "test2",
+			wantErr: true,
 		},
 	}
 
@@ -1517,9 +1545,18 @@ func TestPoolCount(t *testing.T) {
 			want: 384,
 		},
 		{
+			desc: "BGP /24 and /25, no buggy IPs",
+			pool: &config.Pool{
+				CIDR:          []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("2.3.4.128/25")},
+				AvoidBuggyIPs: true,
+			},
+			want: 381,
+		},
+		{
 			desc: "BGP a BIG ipv6 range",
 			pool: &config.Pool{
-				CIDR: []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("2.3.4.128/25"), ipnet("1000::/64")},
+				CIDR:          []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("2.3.4.128/25"), ipnet("1000::/64")},
+				AvoidBuggyIPs: true,
 			},
 			want: math.MaxInt64,
 		},
