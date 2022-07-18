@@ -475,8 +475,7 @@ func addressPoolFromLegacyCR(p metallbv1beta1.AddressPool, bgpCommunities map[st
 	}
 
 	ret := &Pool{
-		AvoidBuggyIPs: p.Spec.AvoidBuggyIPs,
-		AutoAssign:    true,
+		AutoAssign: true,
 	}
 
 	if p.Spec.AutoAssign != nil {
