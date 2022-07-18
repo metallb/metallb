@@ -59,6 +59,12 @@ type AddressPoolSpec struct {
 	// +kubebuilder:default:=true
 	AutoAssign *bool `json:"autoAssign,omitempty"`
 
+	// AvoidBuggyIPs prevents addresses ending with .0 and .255
+	// to be used by a pool.
+	// +optional
+	// +kubebuilder:default:=false
+	AvoidBuggyIPs bool `json:"avoidBuggyIPs,omitempty"`
+
 	// Drives how an IP allocated from this pool should
 	// translated into BGP announcements.
 	// +optional
