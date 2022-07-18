@@ -5,6 +5,10 @@ weight: 8
 
 ## Version 0.13.4
 
+New Features:
+
+- Use cosign to sign the images ([PR 1437](https://github.com/metallb/metallb/pull/1437))
+
 Bug Fixes:
 
 - Change the validating webhook configuration name to metallb-webhook-configuration instead of validating-webhook-configuration ([PR 1497](https://github.com/metallb/metallb/pull/1497))
