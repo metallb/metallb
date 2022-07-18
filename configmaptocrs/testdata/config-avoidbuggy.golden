@@ -7,8 +7,9 @@ metadata:
   namespace: metallb-system
 spec:
   addresses:
-  - 198.51.100.1-198.51.100.254
-  - fc00:f853:ccd:e799::1-fc00:f853:ccd:e799::e
+  - 198.51.100.0/24
+  - fc00:f853:0ccd:e799::/124
+  avoidBuggyIPs: true
 status: {}
 ---
 apiVersion: metallb.io/v1beta1
