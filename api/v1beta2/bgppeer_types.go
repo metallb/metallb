@@ -68,7 +68,10 @@ type BGPPeerSpec struct {
 	// +optional
 	Password string `json:"password,omitempty"`
 
-	// passwordSecret is name of the authentication secret for BGP Peer
+	// passwordSecret is name of the authentication secret for BGP Peer.
+	// the secret must be of type "kubernetes.io/basic-auth", and created in the
+	// same namespace as the MetalLB deployment. The password is stored in the
+	// secret as the key "password".
 	// +optional
 	PasswordSecret v1.SecretReference `json:"passwordSecret,omitempty"`
 
