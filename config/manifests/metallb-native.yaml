@@ -912,6 +912,11 @@ spec:
                 description: AutoAssign flag used to prevent MetallB from automatic
                   allocation for a pool.
                 type: boolean
+              avoidBuggyIPs:
+                default: false
+                description: AvoidBuggyIPs prevents addresses ending with .0 and .255
+                  to be used by a pool.
+                type: boolean
             required:
             - addresses
             type: object
@@ -1725,7 +1730,7 @@ apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
 metadata:
   creationTimestamp: null
-  name: validating-webhook-configuration
+  name: metallb-webhook-configuration
 webhooks:
 - admissionReviewVersions:
   - v1

@@ -51,9 +51,9 @@ to announce service IPs. Jump to:
 
 - [Layer 2 configuration](#layer-2-configuration)
 - [BGP configuration](#bgp-configuration)
-- [Advanced BGP configuration](./_advanced_bgp_configuration.md)
-- [Advanced L2 configuration](./_advanced_l2_configuration.md)
-- [Advanced IPAddressPool configuration](./_advanced_ipaddresspool_configuration.md)
+- [Advanced BGP configuration](./_advanced_bgp_configuration)
+- [Advanced L2 configuration](./_advanced_l2_configuration)
+- [Advanced IPAddressPool configuration](./_advanced_ipaddresspool_config/)
 
 Note: it is possible to announce the same service both via L2 and via BGP (see the relative
 [FAQ](../faq/_index.md)).
@@ -90,6 +90,7 @@ apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
 metadata:
   name: example
+  namespace: metallb-system
 ```
 
 Setting no `IPAddressPool` selector in an `L2Advertisement` instance is interpreted
@@ -104,6 +105,7 @@ apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
 metadata:
   name: example
+  namespace: metallb-system
 spec:
   ipAddressPools:
   - first-pool
@@ -164,6 +166,7 @@ apiVersion: metallb.io/v1beta1
 kind: BGPAdvertisement
 metadata:
   name: example
+  namespace: metallb-system
 ```
 
 Setting no `IPAddressPool` selector in a `BGPAdvertisement` instance is interpreted
@@ -178,6 +181,7 @@ apiVersion: metallb.io/v1beta1
 kind: BGPAdvertisement
 metadata:
   name: example
+  namespace: metallb-system
 spec:
   ipAddressPools:
   - first-pool

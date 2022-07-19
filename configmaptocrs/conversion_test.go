@@ -40,10 +40,6 @@ func TestGenerateResources(t *testing.T) {
 
 			err := generate(res, tc)
 
-			if strings.Contains(tc, "bad") && !strings.Contains(err.Error(), "not enough addresses") {
-				t.Fatalf("test %s failed, expecting error: %s", tc, err.Error())
-				return
-			}
 			if err != nil && !strings.Contains(tc, "bad") {
 				t.Fatalf("test %s failed to generate resources: %s", tc, err)
 			}
