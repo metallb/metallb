@@ -12,7 +12,7 @@ spec:
         # but we're going to set it later using the cert-controller.
         caBundle: Cg==
         service:
-          namespace: system
+          namespace: metallb-system
           name: webhook-service
           path: /convert
 ---
@@ -30,6 +30,6 @@ spec:
         # but we're going to set it later using the cert-controller.
         caBundle: Cg==
         service:
-          namespace: system-metallb
+          namespace: metallb-system
           name: webhook-service
           path: /convert

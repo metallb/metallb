@@ -5,6 +5,10 @@ weight: 8
 
 ## Version 0.13.4
 
+New Features:
+
+- Use cosign to sign the images ([PR 1437](https://github.com/metallb/metallb/pull/1437))
+
 Bug Fixes:
 
 - Change the validating webhook configuration name to metallb-webhook-configuration instead of validating-webhook-configuration ([PR 1497](https://github.com/metallb/metallb/pull/1497))
@@ -13,7 +17,10 @@ Bug Fixes:
 the service ([Issue 1511](https://github.com/metallb/metallb/issues/1511) [PR 1516](https://github.com/metallb/metallb/pull/1516))
 - Add the AvoidBuggyIPs flag to the IPAddressPool CRD. Converting a CIDR to a range comes with limitation related
 to setting the aggregation length and validating it. ([Issue 1495](https://github.com/metallb/metallb/issues/1495),
-[PR 1515](https://github.com/metallb/metallb/pull/1515)
+[PR 1515](https://github.com/metallb/metallb/pull/1515))
+- Add a valid pem format to the CRDs webhooks instead of the empty placeholder. ([Issue 1501](https://github.com/metallb/metallb/issues/1501),
+[Issue 1521](https://github.com/metallb/metallb/issues/1521),
+[PR 1522](https://github.com/metallb/metallb/pull/1522))
 
 ## Version 0.13.3
 
