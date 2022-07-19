@@ -12,7 +12,15 @@ New Features:
 Bug Fixes:
 
 - Change the validating webhook configuration name to metallb-webhook-configuration instead of validating-webhook-configuration ([PR 1497](https://github.com/metallb/metallb/pull/1497))
-- L2 mode not working with ipv4 only nodes ([Issue 1507](https://github.com/metallb/metallb/issues/1507) , [PR 1506](https://github.com/metallb/metallb/pull/1506))
+- L2 mode error with ipv4 only interfaces with linklocal addresses ([Issue 1507](https://github.com/metallb/metallb/issues/1507) , [PR 1506](https://github.com/metallb/metallb/pull/1506))
+- L2 Mode: get back to announce on interfaces with no IP assigned. Vlans with no IPs should be able to advertise
+the service ([Issue 1511](https://github.com/metallb/metallb/issues/1511) [PR 1516](https://github.com/metallb/metallb/pull/1516))
+- Add the AvoidBuggyIPs flag to the IPAddressPool CRD. Converting a CIDR to a range comes with limitation related
+to setting the aggregation length and validating it. ([Issue 1495](https://github.com/metallb/metallb/issues/1495),
+[PR 1515](https://github.com/metallb/metallb/pull/1515))
+- Add a valid pem format to the CRDs webhooks instead of the empty placeholder. ([Issue 1501](https://github.com/metallb/metallb/issues/1501),
+[Issue 1521](https://github.com/metallb/metallb/issues/1521),
+[PR 1522](https://github.com/metallb/metallb/pull/1522))
 
 ## Version 0.13.3
 

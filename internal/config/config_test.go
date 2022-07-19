@@ -113,7 +113,8 @@ func TestParse(t *testing.T) {
 								"10.20.0.0/16",
 								"10.50.0.0/24",
 							},
-							AutoAssign: pointer.BoolPtr(false),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
 						},
 					},
 					{
@@ -241,8 +242,9 @@ func TestParse(t *testing.T) {
 				},
 				Pools: map[string]*Pool{
 					"pool1": {
-						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
-						AutoAssign: false,
+						CIDR:          []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
+						AvoidBuggyIPs: true,
+						AutoAssign:    false,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								AggregationLength:   32,
@@ -1552,7 +1554,8 @@ func TestParse(t *testing.T) {
 								"10.20.0.0/16",
 								"10.50.0.0/24",
 							},
-							AutoAssign: pointer.BoolPtr(false),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
 						},
 					},
 				},
@@ -1622,8 +1625,9 @@ func TestParse(t *testing.T) {
 				},
 				Pools: map[string]*Pool{
 					"pool1": {
-						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
-						AutoAssign: false,
+						CIDR:          []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
+						AvoidBuggyIPs: true,
+						AutoAssign:    false,
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
 								AggregationLength:   32,
@@ -1735,7 +1739,8 @@ func TestParse(t *testing.T) {
 								"10.20.0.0/16",
 								"10.50.0.0/24",
 							},
-							AutoAssign: pointer.BoolPtr(false),
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
 						},
 					},
 				},

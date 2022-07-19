@@ -36,9 +36,10 @@ metadata:
   namespace: metallb-system
 spec:
   addresses:
-  - 192.168.10.1-192.168.10.254
+  - 192.168.10.0/24
   - 192.168.0.150-192.168.0.200
   autoAssign: true
+  avoidBuggyIPs: true
 status: {}
 ---
 apiVersion: metallb.io/v1beta1
@@ -49,8 +50,9 @@ metadata:
   namespace: metallb-system
 spec:
   addresses:
-  - 192.168.11.1-192.168.11.254
+  - 192.168.11.0/24
   - 192.168.1.150-192.168.1.200
+  avoidBuggyIPs: true
 status: {}
 ---
 apiVersion: metallb.io/v1beta1
