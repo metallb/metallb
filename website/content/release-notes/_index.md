@@ -22,6 +22,8 @@ to setting the aggregation length and validating it. ([Issue 1495](https://githu
 [Issue 1521](https://github.com/metallb/metallb/issues/1521),
 [PR 1522](https://github.com/metallb/metallb/pull/1522))
 
+This release includes contributions from cyclinder, Federico Paolinelli, Periyasamy Palanisamy, thank you!
+
 ## Version 0.13.3
 
 Bug Fixes:
@@ -30,6 +32,8 @@ Bug Fixes:
 - Fail the helm release if the deprecated configinline is provided ([PR 1485](https://github.com/metallb/metallb/pull/1485))
 - Helm charts give the permissions to watch communities. This will get rid of the `Failed to watch *v1beta1.Community` log error. ([PR 1487](https://github.com/metallb/metallb/pull/1487))
 - Helm charts: add the labelselectors to the webhook service. This solves webhook issues when multiple ([PR 1487](https://github.com/metallb/metallb/pull/1487))
+
+This release includes contributions from Federico Paolinelli, Joshua Carnes, Lalit Maganti, Philipp Born. Thank you!
 
 ## Version 0.13.2
 
