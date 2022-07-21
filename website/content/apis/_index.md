@@ -509,6 +509,19 @@ bool
 for a pool.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>avoidBuggyIPs</code><br/>
+<em>
+bool
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>AvoidBuggyIPs prevents addresses ending with .0 and .255
+to be used by a pool.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>

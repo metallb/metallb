@@ -8,13 +8,10 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"net"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/mikioh/ipaddr"
 	"go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/config"
@@ -325,48 +322,15 @@ func ipAddressPoolsFor(c *configFile) ([]v1beta1.IPAddressPool, error) {
 		var ap v1beta1.IPAddressPool
 		ap.Name = addresspool.Name
 		ap.Namespace = resourcesNameSpace
-		ap.Spec.Addresses = make([]string, 0)
-		for _, address := range addresspool.Addresses {
-			a, err := configRangeToPoolAddresses(address, addresspool.AvoidBuggyIPs)
-			if err != nil {
-				return nil, err
-			}
-			ap.Spec.Addresses = append(ap.Spec.Addresses, a)
+		ap.Spec.Addresses = make([]string, len(addresspool.Addresses))
+		copy(ap.Spec.Addresses, addresspool.Addresses)
+		if addresspool.AvoidBuggyIPs != nil {
+			ap.Spec.AvoidBuggyIPs = *addresspool.AvoidBuggyIPs
 		}
 		ap.Spec.AutoAssign = addresspool.AutoAssign
 		res[i] = ap
 	}
 	return res, nil
-}
-
-func configRangeToPoolAddresses(addresses string, avoidBuggyIPs *bool) (string, error) {
-	if avoidBuggyIPs == nil {
-		return addresses, nil
-	}
-	if !*avoidBuggyIPs {
-		return addresses, nil
-	}
-	if strings.Contains(addresses, "-") {
-		return addresses, nil
-	}
-	_, cidr, err := net.ParseCIDR(addresses)
-	if err != nil {
-		return "", err
-	}
-	c := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})
-	second := c.Next()
-	if second == nil {
-		return "", fmt.Errorf("not enough addresses")
-	}
-	err = c.Set(c.Last())
-	if err != nil {
-		return "", err
-	}
-	secondToLast := c.Prev()
-	if secondToLast == nil {
-		return "", fmt.Errorf("not enough addresses")
-	}
-	return fmt.Sprintf("%s-%s", second.IP.String(), secondToLast.IP.String()), nil
 }
 
 func bgpAdvertisementsFor(c *configFile) []v1beta1.BGPAdvertisement {
