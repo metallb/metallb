@@ -1,6 +1,6 @@
 dependencies:
 - name: crds
   repository: ""
-  version: 0.13.3
-digest: sha256:cc0eef59d88d6014f05a995057e71c430fc1e93b348cacd5e7f9ee53a85bc145
-generated: "2022-07-07T14:39:58.279306247+02:00"
+  version: 0.13.4
+digest: sha256:6fbc788274c6814410c3546888d4294ecac8f4aea1f61e25503bbb16f971ece4
+generated: "2022-07-21T14:35:42.980941375+02:00"
