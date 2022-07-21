@@ -585,8 +585,8 @@ def bumprelease(ctx, version, previous_version):
     # TODO: Check if kustomize instructions really need the version in the
     # website or if there is a simpler way. For now, though, we just replace the
     # only page that mentions the version on release.
-    run("sed -i 's/github.com\/metallb\/metallb\/config\/native?ref=main/github.com\/metallb\/metallb\/config\/native?ref=v{}/g' website/content/installation/_index.md".format(version))
-    run("sed -i 's/github.com\/metallb\/metallb\/config\/native?ref=main/github.com\/metallb\/metallb\/config\/frr?ref=v{}/g' website/content/installation/_index.md".format(version))
+    run("sed -i 's/github.com\/metallb\/metallb\/config\/native?ref=.*$/github.com\/metallb\/metallb\/config\/native?ref=v{}/g' website/content/installation/_index.md".format(version))
+    run("sed -i 's/github.com\/metallb\/metallb\/config\/frr?ref=.*$/github.com\/metallb\/metallb\/config\/frr?ref=v{}/g' website/content/installation/_index.md".format(version))
 
     # Update the version embedded in the binary
     run("perl -pi -e 's/version\s+=.*/version = \"{}\"/g' internal/version/version.go".format(version), echo=True)
