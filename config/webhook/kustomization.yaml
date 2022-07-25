@@ -6,9 +6,12 @@ resources:
 configurations:
 - kustomizeconfig.yaml
 
+namePrefix: metallb-
+
 patchesJson6902:
 - path: patches/patch_webhook_configuration.yaml
   target:
     version: v1
     kind: ValidatingWebhookConfiguration
     name: validating-webhook-configuration
+
