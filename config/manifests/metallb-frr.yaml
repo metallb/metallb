@@ -1634,13 +1634,13 @@ metadata:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: webhook-server-cert
+  name: metallb-webhook-server-cert
   namespace: metallb-system
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: webhook-service
+  name: metallb-webhook-service
   namespace: metallb-system
 spec:
   ports:
@@ -1731,7 +1731,7 @@ spec:
       - name: cert
         secret:
           defaultMode: 420
-          secretName: webhook-server-cert
+          secretName: metallb-webhook-server-cert
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -1948,7 +1948,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
+      name: metallb-webhook-service
       namespace: metallb-system
       path: /validate-metallb-io-v1beta2-bgppeer
   failurePolicy: Fail
@@ -1968,7 +1968,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
+      name: metallb-webhook-service
       namespace: metallb-system
       path: /validate-metallb-io-v1beta1-addresspool
   failurePolicy: Fail
@@ -1988,7 +1988,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
+      name: metallb-webhook-service
       namespace: metallb-system
       path: /validate-metallb-io-v1beta1-bfdprofile
   failurePolicy: Fail
@@ -2007,7 +2007,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
+      name: metallb-webhook-service
       namespace: metallb-system
       path: /validate-metallb-io-v1beta1-bgpadvertisement
   failurePolicy: Fail
@@ -2027,7 +2027,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
+      name: metallb-webhook-service
       namespace: metallb-system
       path: /validate-metallb-io-v1beta1-community
   failurePolicy: Fail
@@ -2047,7 +2047,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
+      name: metallb-webhook-service
       namespace: metallb-system
       path: /validate-metallb-io-v1beta1-ipaddresspool
   failurePolicy: Fail
@@ -2067,7 +2067,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
+      name: metallb-webhook-service
       namespace: metallb-system
       path: /validate-metallb-io-v1beta1-l2advertisement
   failurePolicy: Fail
