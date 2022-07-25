@@ -62,7 +62,7 @@ var (
 	validatingWebhookName           = "metallb-webhook-configuration"
 	addresspoolConvertingWebhookCRD = "addresspools.metallb.io"
 	bgppeerConvertingWebhookCRD     = "bgppeers.metallb.io"
-	webhookSecretName               = "webhook-server-cert"
+	webhookSecretName               = "metallb-webhook-server-cert"
 )
 
 func init() {
