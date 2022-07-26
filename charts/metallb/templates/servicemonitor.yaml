@@ -1,0 +1,184 @@
+{{- if .Values.prometheus.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ template "metallb.fullname" . }}-speaker-monitor
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: speaker
+    {{- if .Values.prometheus.serviceMonitor.speaker.additionalLabels }}
+{{ toYaml .Values.prometheus.serviceMonitor.speaker.additionalLabels | indent 4 }}
+    {{- end }}
+  {{- if .Values.prometheus.serviceMonitor.speaker.annotations }}
+  annotations:
+{{ toYaml .Values.prometheus.serviceMonitor.speaker.annotations | indent 4 }}
+  {{- end }}
+spec:
+  endpoints:
+    - port: {{ template "metrics.exposedportname" . }}
+      honorLabels: true
+      {{- if .Values.prometheus.serviceMonitor.interval }}
+      interval: {{ .Values.prometheus.serviceMonitor.interval }}
+      {{- end }}
+{{ if .Values.prometheus.secureMetricsPort }}
+      bearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+      scheme: "https"
+{{- if .Values.prometheus.serviceMonitor.speaker.tlsConfig }}
+      tlsConfig:
+{{ toYaml .Values.prometheus.serviceMonitor.speaker.tlsConfig | indent 8 }}      
+{{- end }}
+{{ end }}
+{{- if .Values.speaker.frr.enabled }}
+    - port: {{ template "metrics.exposedfrrportname" . }}
+      honorLabels: true
+{{ if .Values.speaker.frr.secureMetricsPort }}
+      {{- if .Values.prometheus.serviceMonitor.interval }}
+      interval: {{ .Values.prometheus.serviceMonitor.interval }}
+      {{- end }}
+      bearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+      scheme: "https"
+{{- if .Values.prometheus.serviceMonitor.speaker.tlsConfig }}
+      tlsConfig:
+{{ toYaml .Values.prometheus.serviceMonitor.speaker.tlsConfig | indent 8 }}      
+{{- end }}
+{{- end }}
+{{- end }}
+  jobLabel: {{ .Values.prometheus.serviceMonitor.jobLabel | quote }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  selector:
+    matchLabels:
+      name: {{ template "metallb.fullname" . }}-speaker-monitor-service
+{{- if .Values.prometheus.serviceMonitor.metricRelabelings }}
+  metricRelabelings:
+{{- toYaml .Values.prometheus.serviceMonitor.metricRelabelings | nindent 4 }}
+{{- end }}
+{{- if .Values.prometheus.serviceMonitor.relabelings }}
+  relabelings:
+{{- toYaml .Values.prometheus.serviceMonitor.relabelings | nindent 4 }}
+{{- end }}      
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/scrape: "true"
+  {{- if .Values.prometheus.serviceMonitor.speaker.annotations }}
+{{ toYaml .Values.prometheus.serviceMonitor.speaker.annotations | indent 4 }}
+  {{- end }}
+  labels:
+    name: {{ template "metallb.fullname" . }}-speaker-monitor-service
+  name: {{ template "metallb.fullname" . }}-speaker-monitor-service
+spec:
+  selector:
+      {{- include "metallb.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: speaker
+  clusterIP: None
+  ports:
+    - name: {{ template "metrics.exposedportname" . }}
+      port: {{ template "metrics.exposedport" . }}
+      targetPort: {{ template "metrics.exposedport" . }}
+{{- if .Values.speaker.frr.enabled }}
+    - name: {{ template "metrics.exposedfrrportname" . }}
+      port: {{ template "metrics.exposedfrrport" . }}
+      targetPort: {{ template "metrics.exposedfrrport" . }}
+{{- end }}
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ template "metallb.fullname" . }}-controller-monitor
+  labels:
+    {{- include "metallb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: speaker
+    {{- if .Values.prometheus.serviceMonitor.controller.additionalLabels }}
+{{ toYaml .Values.prometheus.serviceMonitor.controller.additionalLabels | indent 4 }}
+    {{- end }}
+  {{- if .Values.prometheus.serviceMonitor.controller.annotations }}
+  annotations:
+{{ toYaml .Values.prometheus.serviceMonitor.controller.annotations | indent 4 }}
+  {{- end }}
+spec:
+  endpoints:
+    - port: {{ template "metrics.exposedportname" . }}
+      {{- if .Values.prometheus.serviceMonitor.interval }}
+      interval: {{ .Values.prometheus.serviceMonitor.interval }}
+      {{- end }}
+      honorLabels: true
+{{ if .Values.prometheus.secureMetricsPort }}
+      bearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+      scheme: "https"
+{{- if .Values.prometheus.serviceMonitor.controller.tlsConfig }}
+      tlsConfig:
+{{ toYaml .Values.prometheus.serviceMonitor.controller.tlsConfig | indent 8 }}      
+{{- end }}
+{{- end }}
+  jobLabel: {{ .Values.prometheus.serviceMonitor.jobLabel | quote }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  selector:
+    matchLabels:
+      name: {{ template "metallb.fullname" . }}-controller-monitor-service
+{{- if .Values.prometheus.serviceMonitor.metricRelabelings }}
+  metricRelabelings:
+{{- toYaml .Values.prometheus.serviceMonitor.metricRelabelings | nindent 4 }}
+{{- end }}
+{{- if .Values.prometheus.serviceMonitor.relabelings }}
+  relabelings:
+{{- toYaml .Values.prometheus.serviceMonitor.relabelings | nindent 4 }}
+{{- end }}      
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/scrape: "true"
+  {{- if .Values.prometheus.serviceMonitor.controller.annotations }}
+{{ toYaml .Values.prometheus.serviceMonitor.controller.annotations | indent 4 }}
+  {{- end }}
+  labels:
+    name: {{ template "metallb.fullname" . }}-controller-monitor-service
+  name: {{ template "metallb.fullname" . }}-controller-monitor-service
+spec:
+  selector:
+      {{- include "metallb.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: controller
+  clusterIP: None
+  ports:
+    - name: {{ template "metrics.exposedportname" . }}
+      port: {{ template "metrics.exposedport" . }}
+      targetPort: {{ template "metrics.exposedport" . }}
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ template "metallb.fullname" . }}-prometheus
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ template "metallb.fullname" . }}-prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ template "metallb.fullname" . }}-prometheus
+subjects:
+  - kind: ServiceAccount
+    name: {{ required ".Values.prometheus.serviceAccount must be defined when .Values.prometheus.serviceMonitor.enabled == true" .Values.prometheus.serviceAccount }}
+    namespace: {{ required ".Values.prometheus.namespace must be defined when .Values.prometheus.serviceMonitor.enabled == true" .Values.prometheus.namespace }}
+{{ end }}

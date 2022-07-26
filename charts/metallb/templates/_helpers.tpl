@@ -79,3 +79,35 @@ Create the name of the settings Secret to use.
 {{- define "metallb.secretName" -}}
     {{ default ( printf "%s-memberlist" (include "metallb.fullname" .)) .Values.speaker.secretName | trunc 63 | trimSuffix "-" }}
 {{- end -}}
+
+{{- define "metrics.exposedportname" -}}
+{{- if .Values.prometheus.secureMetricsPort -}}
+"metricshttps"
+{{- else -}}
+"metrics"
+{{- end -}}
+{{- end -}}
+
+{{- define "metrics.exposedfrrportname" -}}
+{{- if .Values.speaker.frr.secureMetricsPort -}}
+"frrmetricshttps"
+{{- else -}}
+"frrmetrics"
+{{- end }}
+{{- end }}
+
+{{- define "metrics.exposedport" -}}
+{{- if .Values.prometheus.secureMetricsPort -}}
+{{ .Values.prometheus.secureMetricsPort }}
+{{- else -}}
+{{ .Values.prometheus.metricsPort }}
+{{- end -}}
+{{- end }}
+
+{{- define "metrics.exposedfrrport" -}}
+{{- if .Values.speaker.frr.secureMetricsPort -}}
+{{ .Values.speaker.frr.secureMetricsPort }}
+{{- else -}}
+{{ .Values.speaker.frr.metricsPort }}
+{{- end }}
+{{- end }}

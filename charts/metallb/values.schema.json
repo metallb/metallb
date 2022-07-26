@@ -188,14 +188,49 @@
       "properties": {
         "scrapeAnnotations": { "type": "boolean" },
         "metricsPort": { "type": "integer" },
+        "secureMetricsPort": { "type": "integer" },
         "serviceAccount": { "type": "string" },
         "namespace": { "type": "string" },
+        "rbacProxy": {
+          "description": "kube-rbac-proxy configuration",
+          "type": "object",
+          "properties": {
+            "repository": { "type": "string" },
+            "tag": { "type": "string" }
+          }
+        },
         "podMonitor": {
           "description": "Prometheus Operator PodMonitors",
           "type": "object",
           "properties": {
             "enabled": { "type": "boolean" },
             "additionalMonitors": { "type": "object" },
+            "jobLabel": { "type": "string" },
+            "interval": {
+              "anyOf": [
+                { "type": "integer" },
+                { "type": "null" }
+              ]
+            },
+            "metricRelabelings": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "relabelings": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "serviceMonitor": {
+          "description": "Prometheus Operator ServiceMonitors",
+          "type": "object",
+          "properties": {
+            "enabled": { "type": "boolean" },
             "jobLabel": { "type": "string" },
             "interval": {
               "anyOf": [
@@ -316,7 +351,8 @@
                   "type": "boolean"
                 },
                 "image": { "$ref": "#/definitions/component/properties/image" },
-                "metricsPort": { "type": "integer" }
+                "metricsPort": { "type": "integer" },
+                "secureMetricsPort": { "type": "integer" }
               },
               "required": [ "enabled" ]
             },
