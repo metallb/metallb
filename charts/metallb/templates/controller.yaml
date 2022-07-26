@@ -118,6 +118,34 @@ spec:
           capabilities:
             drop:
             - ALL
+      {{- if .Values.prometheus.secureMetricsPort }}
+      - name: kube-rbac-proxy
+        image: {{ .Values.prometheus.rbacProxy.repository }}:{{ .Values.prometheus.rbacProxy.tag }}
+        imagePullPolicy: IfNotPresent
+        args:
+          - --logtostderr
+          - --secure-listen-address=:{{ .Values.prometheus.secureMetricsPort }}
+          - --upstream=http://127.0.0.1:{{ .Values.prometheus.metricsPort }}/
+          - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
+        {{- if .Values.prometheus.controllerMetricsTLSSecret }}
+          - --tls-private-key-file=/etc/metrics/tls.key
+          - --tls-cert-file=/etc/metrics/tls.crt
+        {{- end }}
+        ports:
+          - containerPort: {{ .Values.prometheus.secureMetricsPort }}
+            name: metricshttps
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        {{- if .Values.prometheus.controllerMetricsTLSSecret }}
+        volumeMounts:
+          - name: metrics-certs
+            mountPath: /etc/metrics
+            readOnly: true
+        {{- end }}
+      {{ end }}
       nodeSelector:
         "kubernetes.io/os": linux
         {{- with .Values.controller.nodeSelector }}
@@ -139,4 +167,9 @@ spec:
         secret:
           defaultMode: 420
           secretName: webhook-server-cert
+      {{- if .Values.prometheus.controllerMetricsTLSSecret }}
+      - name: metrics-certs
+        secret:
+          secretName: {{ .Values.prometheus.controllerMetricsTLSSecret }}
+      {{- end }}
 {{- end }}

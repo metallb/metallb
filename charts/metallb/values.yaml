@@ -32,6 +32,20 @@ prometheus:
   # port both controller and speaker will listen on for metrics
   metricsPort: 7472
 
+  # if set, enables rbac proxy on the controller and speaker to expose
+  # the metrics via tls.
+  # secureMetricsPort: 9120
+
+  # the name of the secret to be mounted in the speaker pod
+  # to expose the metrics securely. If not present, a self signed
+  # certificate to be used.
+  speakerMetricsTLSSecret: ""
+
+  # the name of the secret to be mounted in the controller pod
+  # to expose the metrics securely. If not present, a self signed
+  # certificate to be used.
+  controllerMetricsTLSSecret: ""
+
   # the service account used by prometheus
   # required when .Values.prometheus.podMonitor.enabled == true
   serviceAccount: ""
@@ -40,9 +54,13 @@ prometheus:
   # required when .Values.prometheus.podMonitor.enabled == true
   namespace: ""
 
+  # the image to be used for the kuberbacproxy container
+  rbacProxy:
+    repository: gcr.io/kubebuilder/kube-rbac-proxy
+    tag: v0.12.0
+
   # Prometheus Operator PodMonitors
   podMonitor:
-
     # enable support for Prometheus Operator
     enabled: false
 
@@ -73,9 +91,55 @@ prometheus:
     #   replacement: $1
     #   action: replace
 
+  # Prometheus Operator ServiceMonitors. To be used as an alternative
+  # to podMonitor, supports secure metrics.
+  serviceMonitor:
+    # enable support for Prometheus Operator
+    enabled: false
+
+    speaker:
+      # optional additional labels for the speaker serviceMonitor
+      additionalLabels: {}
+      # optional additional annotations for the speaker serviceMonitor
+      annotations: {}
+      # optional tls configuration for the speaker serviceMonitor, in case
+      # secure metrics are enabled.
+      tlsConfig:
+        insecureSkipVerify: true
+
+    controller:
+      # optional additional labels for the controller serviceMonitor
+      additionalLabels: {}
+      # optional additional annotations for the controller serviceMonitor
+      annotations: {}
+      # optional tls configuration for the controller serviceMonitor, in case
+      # secure metrics are enabled.
+      tlsConfig:
+        insecureSkipVerify: true
+
+    # Job label for scrape target
+    jobLabel: "app.kubernetes.io/name"
+
+    # Scrape interval. If not set, the Prometheus default scrape interval is used.
+    interval:
+
+    # 	metric relabel configs to apply to samples before ingestion.
+    metricRelabelings: []
+    # - action: keep
+    #   regex: 'kube_(daemonset|deployment|pod|namespace|node|statefulset).+'
+    #   sourceLabels: [__name__]
+
+    # 	relabel configs to apply to samples before ingestion.
+    relabelings: []
+    # - sourceLabels: [__meta_kubernetes_pod_node_name]
+    #   separator: ;
+    #   regex: ^(.*)$
+    #   target_label: nodename
+    #   replacement: $1
+    #   action: replace
+
   # Prometheus Operator alertmanager alerts
   prometheusRule:
-
     # enable alertmanager alerts
     enabled: false
 
@@ -252,6 +316,10 @@ speaker:
       tag: v7.5.1
       pullPolicy:
     metricsPort: 7473
+
+    # if set, enables a rbac proxy sidecar container on the speaker to
+    # expose the frr metrics via tls.
+    # secureMetricsPort: 9121
 
 crds:
   enabled: true
