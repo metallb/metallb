@@ -146,8 +146,8 @@ spec:
       serviceAccountName: {{ template "metallb.speaker.serviceAccountName" . }}
       terminationGracePeriodSeconds: 0
       hostNetwork: true
-      {{- if .Values.speaker.frr.enabled }}
       volumes:
+      {{- if .Values.speaker.frr.enabled }}
         - name: frr-sockets
           emptyDir: {}
         - name: frr-startup
@@ -159,6 +159,11 @@ spec:
           emptyDir: {}
         - name: metrics
           emptyDir: {}
+      {{- if .Values.prometheus.speakerMetricsTLSSecret }}
+        - name: metrics-certs
+          secret:
+            secretName: {{ .Values.prometheus.speakerMetricsTLSSecret }}
+      {{- end }}
       initContainers:
         # Copies the initial config files with the right permissions to the shared volume.
         - name: cp-frr-files
@@ -352,6 +357,72 @@ spec:
           - name: metrics
             mountPath: /etc/frr_metrics
       {{- end }}
+      {{- if .Values.prometheus.secureMetricsPort }}
+      - name: kube-rbac-proxy
+        image: {{ .Values.prometheus.rbacProxy.repository }}:{{ .Values.prometheus.rbacProxy.tag }}
+        imagePullPolicy: IfNotPresent
+        args:
+          - --logtostderr
+          - --secure-listen-address=:{{ .Values.prometheus.secureMetricsPort }}
+          - --upstream=http://$(METALLB_HOST):{{ .Values.prometheus.metricsPort }}/
+          - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
+        {{- if .Values.prometheus.speakerMetricsTLSSecret }}
+          - --tls-private-key-file=/etc/metrics/tls.key
+          - --tls-cert-file=/etc/metrics/tls.crt
+        {{- end }}
+        ports:
+          - containerPort: {{ .Values.prometheus.secureMetricsPort }}
+            name: metricshttps
+        env:
+          - name: METALLB_HOST
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        {{- if .Values.prometheus.speakerMetricsTLSSecret }}
+        volumeMounts:
+          - name: metrics-certs
+            mountPath: /etc/metrics
+            readOnly: true
+        {{- end }}
+      {{ end }}
+      {{- if .Values.speaker.frr.secureMetricsPort }}
+      - name: kube-rbac-proxy-frr
+        image: {{ .Values.prometheus.rbacProxy.repository }}:{{ .Values.prometheus.rbacProxy.tag | default .Chart.AppVersion }}
+        imagePullPolicy: IfNotPresent
+        args:
+          - --logtostderr
+          - --secure-listen-address=:{{ .Values.speaker.frr.secureMetricsPort }}
+          - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
+          - --upstream=http://$(METALLB_HOST):{{ .Values.speaker.frr.metricsPort }}/
+        {{- if .Values.prometheus.speakerMetricsTLSSecret }}
+          - --tls-private-key-file=/etc/metrics/tls.key
+          - --tls-cert-file=/etc/metrics/tls.crt
+        {{- end }}
+        ports:
+          - containerPort: {{ .Values.speaker.frr.secureMetricsPort }}
+            name: metricshttps
+        env:
+          - name: METALLB_HOST
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+        resources:
+          requests:
+            cpu: 10m
+            memory: 20Mi
+        terminationMessagePolicy: FallbackToLogsOnError
+        {{- if .Values.prometheus.speakerMetricsTLSSecret }}
+        volumeMounts:
+          - name: metrics-certs
+            mountPath: /etc/metrics
+            readOnly: true
+        {{- end }}
+      {{ end }}
       nodeSelector:
         "kubernetes.io/os": linux
         {{- with .Values.speaker.nodeSelector }}
