@@ -11,6 +11,7 @@ import (
 )
 
 func TestValidateBGPAdvertisement(t *testing.T) {
+	MetalLBNamespace = MetalLBTestNameSpace
 	bgpAdv := BGPAdvertisement{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-bgpadv",
@@ -115,6 +116,18 @@ func TestValidateBGPAdvertisement(t *testing.T) {
 					},
 				},
 			},
+			failValidate: true,
+		},
+		{
+			desc: "Validation must fail if created in different namespace",
+			bgpAdv: &BGPAdvertisement{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-bgpadv1",
+					Namespace: "default",
+				},
+			},
+			isNew:        true,
+			expected:     nil,
 			failValidate: true,
 		},
 	}

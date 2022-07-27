@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-kit/log/level"
 	"github.com/pkg/errors"
@@ -41,6 +42,9 @@ var _ webhook.Validator = &IPAddressPool{}
 func (ipAddress *IPAddressPool) ValidateCreate() error {
 	level.Debug(Logger).Log("webhook", "ipaddresspool", "action", "create", "name", ipAddress.Name, "namespace", ipAddress.Namespace)
 
+	if ipAddress.Namespace != MetalLBNamespace {
+		return fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
+	}
 	existingIPAddressPoolList, err := getExistingIPAddressPools()
 	if err != nil {
 		return err

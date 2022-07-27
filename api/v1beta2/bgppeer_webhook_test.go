@@ -13,6 +13,7 @@ import (
 const testNamespace = "namespace"
 
 func TestValidateBGPPeer(t *testing.T) {
+	MetalLBNamespace = testNamespace
 	bgpPeer := BGPPeer{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-peer",
@@ -107,6 +108,18 @@ func TestValidateBGPPeer(t *testing.T) {
 					},
 				},
 			},
+			failValidate: true,
+		},
+		{
+			desc: "Validation must fail if created in different namespace",
+			bgpPeer: &BGPPeer{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-peer1",
+					Namespace: "default",
+				},
+			},
+			isNew:        true,
+			expected:     nil,
 			failValidate: true,
 		},
 	}
