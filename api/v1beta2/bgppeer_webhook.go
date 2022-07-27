@@ -18,6 +18,7 @@ package v1beta2
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-kit/log/level"
 	"github.com/pkg/errors"
@@ -41,6 +42,9 @@ var _ webhook.Validator = &BGPPeer{}
 func (bgpPeer *BGPPeer) ValidateCreate() error {
 	level.Debug(Logger).Log("webhook", "bgppeer", "action", "create", "name", bgpPeer.Name, "namespace", bgpPeer.Namespace)
 
+	if bgpPeer.Namespace != MetalLBNamespace {
+		return fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
+	}
 	existingBGPPeers, err := GetExistingBGPPeers()
 	if err != nil {
 		return err

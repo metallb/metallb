@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-kit/log/level"
 	"github.com/pkg/errors"
@@ -40,6 +41,10 @@ var _ webhook.Validator = &Community{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for Community.
 func (community *Community) ValidateCreate() error {
 	level.Debug(Logger).Log("webhook", "community", "action", "create", "name", community.Name, "namespace", community.Namespace)
+
+	if community.Namespace != MetalLBNamespace {
+		return fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
+	}
 
 	existingCommunityList, err := getExistingCommunities()
 	if err != nil {

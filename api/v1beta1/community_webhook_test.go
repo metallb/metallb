@@ -11,6 +11,7 @@ import (
 )
 
 func TestValidateCommunity(t *testing.T) {
+	MetalLBNamespace = MetalLBTestNameSpace
 	Logger = log.NewNopLogger()
 
 	toRestoreCommunities := getExistingCommunities
@@ -103,6 +104,18 @@ func TestValidateCommunity(t *testing.T) {
 				},
 			},
 			failValidate: true,
+		},
+		{
+			desc: "Validation must fail if created in different namespace",
+			commuinty: &Community{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-commuinty2",
+					Namespace: "default",
+				},
+			},
+			isNewCommunity: true,
+			expected:       nil,
+			failValidate:   true,
 		},
 	}
 	for _, test := range tests {
