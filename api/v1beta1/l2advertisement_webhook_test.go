@@ -11,6 +11,7 @@ import (
 )
 
 func TestValidateL2Advertisement(t *testing.T) {
+	MetalLBNamespace = MetalLBTestNameSpace
 	l2Adv := L2Advertisement{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-l2adv",
@@ -115,6 +116,18 @@ func TestValidateL2Advertisement(t *testing.T) {
 					},
 				},
 			},
+			failValidate: true,
+		},
+		{
+			desc: "Validation must fail if created in different namespace",
+			l2Adv: &L2Advertisement{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-l2adv1",
+					Namespace: "default",
+				},
+			},
+			isNew:        true,
+			expected:     nil,
 			failValidate: true,
 		},
 	}

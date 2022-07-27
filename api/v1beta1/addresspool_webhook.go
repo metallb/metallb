@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-kit/log/level"
 	"github.com/pkg/errors"
@@ -40,6 +41,10 @@ var _ webhook.Validator = &AddressPool{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for AddressPool.
 func (addressPool *AddressPool) ValidateCreate() error {
 	level.Debug(Logger).Log("webhook", "addressPool", "action", "create", "name", addressPool.Name, "namespace", addressPool.Namespace)
+
+	if addressPool.Namespace != MetalLBNamespace {
+		return fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
+	}
 
 	existingAddressPoolList, err := getExistingAddressPools()
 	if err != nil {
