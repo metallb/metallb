@@ -1,0 +1,18 @@
+- op: add
+  path: /rules/0
+  value:
+    apiGroups:
+      - authentication.k8s.io
+    resources:
+      - tokenreviews
+    verbs:
+      - create
+- op: add
+  path: /rules/0
+  value:
+    apiGroups:
+      - authorization.k8s.io
+    resources:
+      - subjectaccessreviews
+    verbs:
+      - create
