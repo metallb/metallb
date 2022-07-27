@@ -231,13 +231,16 @@ def validate_kind_version():
         raise Exit(message="kind version >= {} required".format(min_version))
 
 def generate_manifest(ctx, controller_gen="controller-gen", crd_options="crd:crdVersions=v1",
-        kustomize_cli="kustomize", bgp_type="native", output=None):
+        kustomize_cli="kustomize", bgp_type="native", output=None, with_prometheus=False):
     res = run("{} {} rbac:roleName=manager-role webhook paths=\"./api/...\" output:crd:artifacts:config=config/crd/bases".format(controller_gen, crd_options))
     if not res.ok:
         raise Exit(message="Failed to generate manifests")
 
     if output:
-        res = run("kubectl kustomize config/{} > {}".format(bgp_type, output))
+        layer=bgp_type
+        if with_prometheus:
+            layer = "prometheus-" + layer
+        res = run("kubectl kustomize config/{} > {}".format(layer, output))
         if not res.ok:
             raise Exit(message="Failed to kustomize manifests")
 
@@ -260,10 +263,12 @@ def generate_manifest(ctx, controller_gen="controller-gen", crd_options="crd:crd
                 "Default: False.",
     "build_images": "Optional build the images."
                 "Default: True.",
+    "with_prometheus": "Deploys the prometheus kubernetes stack"
+                "Default: False.",
 })
 def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_dir="",
         node_img=None, ip_family="ipv4", bgp_type="native", log_level="info",
-        helm_install=False, build_images=True):
+        helm_install=False, build_images=True, with_prometheus=False):
     """Build and run MetalLB in a local Kind cluster.
 
     If the cluster specified by --name (default "kind") doesn't exist,
@@ -310,18 +315,29 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
     run("kind load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
 
+    if with_prometheus:
+        print("Deploying prometheus")
+        deployprometheus(ctx)
+
     if helm_install:
+        prometheus_values=""
+        if with_prometheus:
+            prometheus_values=("--set prometheus.serviceMonitor.enabled=true "
+                               "--set prometheus.secureMetricsPort=9120 "
+                               "--set speaker.frr.secureMetricsPort=9121 "
+                               "--set prometheus.serviceAccount=prometheus-k8s "
+                               "--set prometheus.namespace=monitoring ")
         run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
                 "--set speaker.image.tag=dev-{} --set speaker.frr.enabled={} --set speaker.logLevel=debug "
-                "--set controller.logLevel=debug".format(architecture, architecture, 
-                "true" if bgp_type == "frr" else "false"), echo=True)
+                "--set controller.logLevel=debug {}".format(architecture, architecture, 
+                "true" if bgp_type == "frr" else "false", prometheus_values), echo=True)
     else:
         run("kubectl delete po -nmetallb-system --all", echo=True)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest_file = tmpdir + "/metallb.yaml"
 
-            generate_manifest(ctx, bgp_type=bgp_type, output=manifest_file)
+            generate_manifest(ctx, bgp_type=bgp_type, output=manifest_file, with_prometheus=with_prometheus)
 
             # open file and replace the images with the newely built MetalLB docker images
             with open(manifest_file) as f:
@@ -354,6 +370,7 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
         layer2_dev_env()
     else:
         print("Leaving MetalLB unconfigured")
+
 
 
 # Configure MetalLB in the dev-env for layer2 testing.
@@ -673,8 +690,9 @@ def helmdocs(ctx, env="container"):
     "skip": "the list of arguments to pass into as -ginkgo.skip",
     "ipv4_service_range": "a range of IPv4 addresses for MetalLB to use when running in layer2 mode.",
     "ipv6_service_range": "a range of IPv6 addresses for MetalLB to use when running in layer2 mode.",
+    "prometheus_namespace": "the namespace prometheus is deployed to, to validate metrics against prometheus.",
 })
-def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None):
+def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None, prometheus_namespace=""):
     """Run E2E tests against development cluster."""
     if skip_docker:
         opt_skip_docker = "--skip-docker"
@@ -719,12 +737,15 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
         report_path = export
     else:
         report_path = "/tmp/metallbreport{}".format(time.time())
+    
+    if prometheus_namespace != "":
+        prometheus_namespace = "--prometheus-namespace=" + prometheus_namespace
 
     print("Writing reports to {}".format(report_path))
     os.makedirs(report_path, exist_ok=True)
 
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "KUBECONFIG={} go test -timeout 2h {} {} --provider=local --kubeconfig={} --service-pod-port={} {} {} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker, report_path), warn="True")
+            "KUBECONFIG={} go test -timeout 2h {} {} --provider=local --kubeconfig={} --service-pod-port={} {} {} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace), warn="True")
 
     if export != None:
         run("kind export logs {}".format(export))
@@ -736,7 +757,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
 def bumplicense(ctx):
     """Bumps the license header on all go files that have it missing"""
 
-    res = run("find . -name '*.go'")
+    res = run("find . -name '*.go' | grep -v dev-env")
     for file in res.stdout.splitlines():
         res = run("grep -q License {}".format(file), warn=True)
         if not res.ok:
@@ -745,7 +766,7 @@ def bumplicense(ctx):
 @task
 def verifylicense(ctx):
     """Verifies all files have the corresponding license"""
-    res = run("find . -name '*.go'", hide="out")
+    res = run("find . -name '*.go' | grep -v dev-env", hide="out")
     no_license = False
     for file in res.stdout.splitlines():
         res = run("grep -q License {}".format(file), warn=True)
@@ -772,6 +793,8 @@ def generatemanifests(ctx, controller_gen="controller-gen", kustomize_cli="kusto
     """ Re-generates the all-in-one manifests under config/manifests"""
     generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="frr", output="config/manifests/metallb-frr.yaml")
     generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="native", output="config/manifests/metallb-native.yaml")
+    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="frr", with_prometheus=True, output="config/manifests/metallb-frr-prometheus.yaml")
+    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="native", with_prometheus=True, output="config/manifests/metallb-native-prometheus.yaml")
 
 @task
 def generateapidocs(ctx):
@@ -789,4 +812,13 @@ def checkchanges(ctx, action="check uncommitted files"):
     if res.stdout != "":
         print("{} must be committed".format(res))
         raise Exit(message="#### Uncommitted files found, you may need to {} ####\n".format(action))
+
+@task
+def deployprometheus(ctx):
+    """Deploys the prometheus operator under the namespace monitoring"""
+    run("kubectl apply --server-side -f dev-env/kube-prometheus/manifests/setup")
+    run("until kubectl get servicemonitors --all-namespaces ; do date; sleep 1; echo ""; done")
+    run("kubectl apply -f dev-env/kube-prometheus/manifests/")
+    print("Waiting for prometheus pods to be running")
+    run("kubectl -n monitoring wait --for=condition=Ready --all pods --timeout 300s")
 
