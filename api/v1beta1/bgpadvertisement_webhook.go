@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-kit/log/level"
 	"github.com/pkg/errors"
@@ -40,6 +41,10 @@ var _ webhook.Validator = &BGPAdvertisement{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for BGPAdvertisement.
 func (bgpAdv *BGPAdvertisement) ValidateCreate() error {
 	level.Debug(Logger).Log("webhook", "bgpadvertisement", "action", "create", "name", bgpAdv.Name, "namespace", bgpAdv.Namespace)
+
+	if bgpAdv.Namespace != MetalLBNamespace {
+		return fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
+	}
 
 	existingBGPAdvList, err := getExistingBGPAdvs()
 	if err != nil {

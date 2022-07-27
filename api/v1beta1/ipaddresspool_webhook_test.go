@@ -11,6 +11,7 @@ import (
 )
 
 func TestValidateIPAddressPool(t *testing.T) {
+	MetalLBNamespace = MetalLBTestNameSpace
 	ipAddressPool := IPAddressPool{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-ippool",
@@ -109,6 +110,18 @@ func TestValidateIPAddressPool(t *testing.T) {
 					},
 				},
 			},
+			failValidate: true,
+		},
+		{
+			desc: "Validation must fail if created in different namespace",
+			ipAddressPool: &IPAddressPool{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-ippool2",
+					Namespace: "default",
+				},
+			},
+			isNew:        true,
+			expected:     nil,
 			failValidate: true,
 		},
 	}

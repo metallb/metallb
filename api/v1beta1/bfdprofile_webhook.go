@@ -32,12 +32,18 @@ func (bfdProfile *BFDProfile) SetupWebhookWithManager(mgr ctrl.Manager) error {
 		Complete()
 }
 
-//+kubebuilder:webhook:verbs=delete,path=/validate-metallb-io-v1beta1-bfdprofile,mutating=false,failurePolicy=fail,groups=metallb.io,resources=bfdprofiles,versions=v1beta1,name=bfdprofilevalidationwebhook.metallb.io,sideEffects=None,admissionReviewVersions=v1
+//+kubebuilder:webhook:verbs=create;delete,path=/validate-metallb-io-v1beta1-bfdprofile,mutating=false,failurePolicy=fail,groups=metallb.io,resources=bfdprofiles,versions=v1beta1,name=bfdprofilevalidationwebhook.metallb.io,sideEffects=None,admissionReviewVersions=v1
 
 var _ webhook.Validator = &BFDProfile{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for BFDProfile.
 func (bfdProfile *BFDProfile) ValidateCreate() error {
+	level.Debug(Logger).Log("webhook", "bfdProfile", "action", "create", "name", bfdProfile.Name, "namespace", bfdProfile.Namespace)
+
+	if bfdProfile.Namespace != MetalLBNamespace {
+		return fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
+	}
+
 	return nil
 }
 

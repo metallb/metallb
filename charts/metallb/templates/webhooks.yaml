@@ -113,13 +113,14 @@ webhooks:
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta1-bfdprofile
   failurePolicy: Fail
-  name: bfdprofileyvalidationwebhook.metallb.io
+  name: bfdprofilevalidationwebhook.metallb.io
   rules:
   - apiGroups:
     - metallb.io
     apiVersions:
     - v1beta1
     operations:
+    - CREATE
     - DELETE
     resources:
     - bfdprofiles
