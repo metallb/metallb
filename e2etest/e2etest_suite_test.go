@@ -18,6 +18,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -37,6 +38,9 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/service"
 	"go.universe.tf/metallb/e2etest/webhookstests"
 	internalconfig "go.universe.tf/metallb/internal/config"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -50,6 +54,7 @@ var (
 	useOperator       bool
 	reportPath        string
 	updater           testsconfig.Updater
+	updaterOtherNS    testsconfig.Updater
 )
 
 // handleFlags sets up all flags and parses the command line.
@@ -134,11 +139,27 @@ var _ = ginkgo.BeforeSuite(func() {
 	updater, err = testsconfig.UpdaterForCRs(clientconfig, metallb.Namespace)
 	framework.ExpectNoError(err)
 
+	// for testing namespace validation, we need an existing namespace that's different from the
+	// metallb installation namespace
+	otherNamespace := fmt.Sprintf("%s-other", metallb.Namespace)
+	err = updater.Client().Create(context.Background(), &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: otherNamespace,
+		},
+	})
+	// ignore failure if namespace already exists, fail for any other errors
+	if err != nil && !errors.IsAlreadyExists(err) {
+		framework.ExpectNoError(err)
+	}
+	updaterOtherNS, err = testsconfig.UpdaterForCRs(clientconfig, otherNamespace)
+	framework.ExpectNoError(err)
+
 	reporter := k8s.InitReporter(framework.TestContext.KubeConfig, reportPath, metallb.Namespace)
 
 	bgptests.ConfigUpdater = updater
 	l2tests.ConfigUpdater = updater
 	webhookstests.ConfigUpdater = updater
+	webhookstests.ConfigUpdaterOtherNS = updaterOtherNS
 	bgptests.Reporter = reporter
 	bgptests.ReportPath = reportPath
 	l2tests.Reporter = reporter
@@ -153,4 +174,19 @@ var _ = ginkgo.AfterSuite(func() {
 	framework.ExpectNoError(err)
 	err = updater.Clean()
 	framework.ExpectNoError(err)
+
+	// delete the namespace created for testing namespace validation
+	nsSpec := v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: updaterOtherNS.Namespace(),
+		},
+	}
+	err = updaterOtherNS.Client().Delete(context.Background(), &nsSpec)
+	// ignore failure if namespace does not exist, fail for any other errors
+	if err != nil && !errors.IsNotFound(err) {
+		framework.ExpectNoError(err)
+	}
+	err = updaterOtherNS.Clean()
+	framework.ExpectNoError(err)
+
 })

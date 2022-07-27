@@ -19,6 +19,7 @@ type Updater interface {
 	Update(r config.ClusterResources) error
 	Clean() error
 	Client() client.Client
+	Namespace() string
 }
 
 type beta1Updater struct {
@@ -184,4 +185,8 @@ func (o beta1Updater) Clean() error {
 
 func (o beta1Updater) Client() client.Client {
 	return o.cli
+}
+
+func (o beta1Updater) Namespace() string {
+	return o.namespace
 }

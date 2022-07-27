@@ -20,12 +20,14 @@ package webhookstests
 
 import (
 	"context"
+	"fmt"
 
 	"go.universe.tf/metallb/e2etest/pkg/config"
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 
 	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/extensions/table"
 	. "github.com/onsi/gomega"
 	"github.com/openshift-kni/k8sreporter"
 
@@ -39,8 +41,9 @@ import (
 )
 
 var (
-	ConfigUpdater config.Updater
-	Reporter      *k8sreporter.KubernetesReporter
+	ConfigUpdater        config.Updater
+	ConfigUpdaterOtherNS config.Updater
+	Reporter             *k8sreporter.KubernetesReporter
 )
 
 var _ = ginkgo.Describe("Webhooks", func() {
@@ -381,3 +384,101 @@ var _ = ginkgo.Describe("Webhooks", func() {
 		})
 	})
 })
+
+var _ = table.DescribeTable("Webhooks namespace validation",
+	func(resources *metallbconfig.ClusterResources) {
+		err := ConfigUpdaterOtherNS.Update(*resources)
+		Expect(err).To(MatchError(ContainSubstring(fmt.Sprintf("resource must be created in %s namespace", metallb.Namespace))))
+	},
+	table.Entry("Should reject creating BFDProfile in a different namespace", &metallbconfig.ClusterResources{
+		BFDProfiles: []metallbv1beta1.BFDProfile{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "bfdprofile-webhooks-test",
+				},
+			},
+		},
+	}),
+	table.Entry("Should reject creating IPAddressPool in a different namespace", &metallbconfig.ClusterResources{
+		Pools: []metallbv1beta1.IPAddressPool{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "webhooks-test1",
+				},
+				Spec: metallbv1beta1.IPAddressPoolSpec{
+					Addresses: []string{
+						"1.1.1.1-1.1.1.100",
+					},
+				},
+			},
+		},
+	}),
+	table.Entry("Should reject creating Legacy AddressPool in a different namespace", &metallbconfig.ClusterResources{
+		LegacyAddressPools: []metallbv1beta1.AddressPool{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "webhooks-test1",
+				},
+				Spec: metallbv1beta1.AddressPoolSpec{
+					Addresses: []string{
+						"1.1.1.1-1.1.1.100",
+					},
+					Protocol: string(metallbconfig.Layer2),
+				},
+			},
+		},
+	}),
+	table.Entry("Should reject creating BGPPeer in a different namespace", &metallbconfig.ClusterResources{
+		Peers: []metallbv1beta2.BGPPeer{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "webhooks-test",
+				},
+				Spec: metallbv1beta2.BGPPeerSpec{
+					Address: "1.1.1",
+					ASN:     64500,
+					MyASN:   1000,
+				},
+			},
+		},
+	}),
+	table.Entry("Should reject creating BGPAdvertisement in a different namespace", &metallbconfig.ClusterResources{
+		BGPAdvs: []metallbv1beta1.BGPAdvertisement{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "adv-webhooks-test",
+				},
+				Spec: metallbv1beta1.BGPAdvertisementSpec{
+					AggregationLength: pointer.Int32Ptr(26),
+					IPAddressPools:    []string{"pool-webhooks-test"},
+				},
+			},
+		},
+	}),
+	table.Entry("Should reject creating L2Advertisement in a different namespace", &metallbconfig.ClusterResources{
+		L2Advs: []metallbv1beta1.L2Advertisement{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "l2adv-webhooks-test",
+				},
+			},
+		},
+	}),
+	table.Entry("Should reject creating Community in a different namespace", &metallbconfig.ClusterResources{
+		Communities: []metallbv1beta1.Community{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "community-webhooks-test",
+				},
+				Spec: metallbv1beta1.CommunitySpec{
+					Communities: []metallbv1beta1.CommunityAlias{
+						{
+							Name:  "test-community",
+							Value: "1234:1",
+						},
+					},
+				},
+			},
+		},
+	}),
+)
