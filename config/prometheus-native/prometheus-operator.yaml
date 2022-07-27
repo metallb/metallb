@@ -1,0 +1,115 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: speaker-monitor
+  namespace: metallb-system
+  labels:
+    component: speaker
+spec:
+  endpoints:
+    - port: metricshttps
+      interval: 30s
+      honorLabels: true
+      bearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+      scheme: "https"
+      tlsConfig:
+        insecureSkipVerify: true
+  jobLabel: "component"
+  namespaceSelector:
+    matchNames:
+      - metallb-system
+  selector:
+    matchLabels:
+      name: speaker-monitor-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/scrape: "true"
+  labels:
+    name: speaker-monitor-service
+  name: speaker-monitor-service
+spec:
+  selector:
+    component: speaker
+  clusterIP: None
+  ports:
+    - name: metricshttps
+      port: 9120
+      targetPort: 9120
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: controller-monitor
+  labels:
+    component: controller
+spec:
+  endpoints:
+    - port: metricshttps
+      interval: 30s
+      honorLabels: true
+      bearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token"
+      scheme: "https"
+      tlsConfig:
+        insecureSkipVerify: true
+  jobLabel: "component"
+  namespaceSelector:
+    matchNames:
+      - metallb-system
+  selector:
+    matchLabels:
+      name: controller-monitor-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    prometheus.io/scrape: "true"
+  labels:
+    name: controller-monitor-service
+  name: controller-monitor-service
+spec:
+  selector:
+    component: controller
+  clusterIP: None
+  ports:
+    - name: metricshttps
+      port: 9120
+      targetPort: 9120
+  sessionAffinity: None
+  type: ClusterIP
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus-k8s
+  namespace: metallb-system
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - services
+      - endpoints
+      - pods
+    verbs:
+      - get
+      - list
+      - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-k8s
+  namespace: metallb-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-k8s
+subjects:
+  - kind: ServiceAccount
+    name: prometheus-k8s
+    namespace: monitoring

@@ -1,0 +1,18 @@
+resources:
+  - ../frr
+  - prometheus-operator.yaml
+patchesStrategicMerge:
+  - rbac-proxy-patch.yaml
+namespace: metallb-system
+
+patchesJson6902:
+  - target:
+      group: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: metallb-system:controller
+    path: rbac-patch.yaml
+  - target:
+      group: rbac.authorization.k8s.io
+      kind: ClusterRole
+      name: metallb-system:speaker
+    path: rbac-patch.yaml
