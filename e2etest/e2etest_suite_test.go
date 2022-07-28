@@ -48,13 +48,14 @@ import (
 )
 
 var (
-	skipDockerCmd     bool
-	ipv4ForContainers string
-	ipv6ForContainers string
-	useOperator       bool
-	reportPath        string
-	updater           testsconfig.Updater
-	updaterOtherNS    testsconfig.Updater
+	skipDockerCmd       bool
+	ipv4ForContainers   string
+	ipv6ForContainers   string
+	useOperator         bool
+	reportPath          string
+	updater             testsconfig.Updater
+	updaterOtherNS      testsconfig.Updater
+	prometheusNamespace string
 )
 
 // handleFlags sets up all flags and parses the command line.
@@ -79,6 +80,7 @@ func handleFlags() {
 	flag.StringVar(&l2tests.IPV6ServiceRange, "ipv6-service-range", "0", "a range of IPv6 addresses for MetalLB to use when running in layer2 mode")
 	flag.BoolVar(&useOperator, "use-operator", false, "set this to true to run the tests using operator custom resources")
 	flag.StringVar(&reportPath, "report-path", "/tmp/report", "the path to be used to dump test failure information")
+	flag.StringVar(&prometheusNamespace, "prometheus-namespace", "monitoring", "the namespace prometheus is running in (if running)")
 	flag.Parse()
 }
 
@@ -164,6 +166,8 @@ var _ = ginkgo.BeforeSuite(func() {
 	bgptests.ReportPath = reportPath
 	l2tests.Reporter = reporter
 	webhookstests.Reporter = reporter
+	bgptests.PrometheusNamespace = prometheusNamespace
+	l2tests.PrometheusNamespace = prometheusNamespace
 })
 
 var _ = ginkgo.AfterSuite(func() {
