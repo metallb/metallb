@@ -52,10 +52,11 @@ import (
 )
 
 var (
-	ConfigUpdater    config.Updater
-	Reporter         *k8sreporter.KubernetesReporter
-	IPV4ServiceRange string
-	IPV6ServiceRange string
+	ConfigUpdater       config.Updater
+	Reporter            *k8sreporter.KubernetesReporter
+	IPV4ServiceRange    string
+	IPV6ServiceRange    string
+	PrometheusNamespace string
 )
 
 var _ = ginkgo.Describe("L2", func() {
@@ -358,6 +359,7 @@ var _ = ginkgo.Describe("L2", func() {
 	ginkgo.Context("metrics", func() {
 		var controllerPod *corev1.Pod
 		var speakerPods map[string]*corev1.Pod
+		var promPod *corev1.Pod
 
 		ginkgo.BeforeEach(func() {
 			var err error
@@ -372,6 +374,9 @@ var _ = ginkgo.Describe("L2", func() {
 				i := item
 				speakerPods[i.Spec.NodeName] = i
 			}
+
+			promPod, err = metrics.PrometheusPod(cs, PrometheusNamespace)
+			framework.ExpectNoError(err)
 		})
 
 		table.DescribeTable("should be exposed by the controller", func(ipFamily string) {
@@ -412,8 +417,16 @@ var _ = ginkgo.Describe("L2", func() {
 				if err != nil {
 					return err
 				}
+				err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_allocator_addresses_in_use_total{pool="%s"} == 0`, poolName), metrics.There)
+				if err != nil {
+					return err
+				}
+				err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_allocator_addresses_total{pool="%s"} == %d`, poolName, int(poolCount)), metrics.There)
+				if err != nil {
+					return err
+				}
 				return nil
-			}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
+			}, 2*time.Minute, 5*time.Second).Should(gomega.BeNil())
 
 			ginkgo.By("creating a service")
 			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", service.TrafficPolicyCluster)
@@ -434,8 +447,12 @@ var _ = ginkgo.Describe("L2", func() {
 				if err != nil {
 					return err
 				}
+				err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_allocator_addresses_in_use_total{pool="%s"} == 1`, poolName), metrics.There)
+				if err != nil {
+					return err
+				}
 				return nil
-			}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
+			}, 2*time.Minute, 5*time.Second).Should(gomega.BeNil())
 
 			ingressIP := e2eservice.GetIngressPoint(
 				&svc.Status.LoadBalancer.Ingress[0])
@@ -478,7 +495,19 @@ var _ = ginkgo.Describe("L2", func() {
 					return err
 				}
 
+				err = metrics.ValidateOnPrometheus(promPod,
+					fmt.Sprintf(`metallb_speaker_announced{node="%s",protocol="layer2",service="%s/%s"} == 1`,
+						advSpeaker.Spec.NodeName, f.Namespace.Name, svc.Name), metrics.There)
+				if err != nil {
+					return err
+				}
+
 				err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_layer2_requests_received", map[string]string{"ip": ingressIP}, speakerMetrics)
+				if err != nil {
+					return err
+				}
+				err = metrics.ValidateOnPrometheus(promPod,
+					fmt.Sprintf(`metallb_layer2_requests_received{ip="%s"} >= 1`, ingressIP), metrics.There)
 				if err != nil {
 					return err
 				}
@@ -487,14 +516,24 @@ var _ = ginkgo.Describe("L2", func() {
 				if err != nil {
 					return err
 				}
+				err = metrics.ValidateOnPrometheus(promPod,
+					fmt.Sprintf(`metallb_layer2_responses_sent{ip="%s"} >= 1`, ingressIP), metrics.There)
+				if err != nil {
+					return err
+				}
 
 				err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_layer2_gratuitous_sent", map[string]string{"ip": ingressIP}, speakerMetrics)
 				if err != nil {
 					return err
 				}
+				err = metrics.ValidateOnPrometheus(promPod,
+					fmt.Sprintf(`metallb_layer2_gratuitous_sent{ip="%s"} >= 1`, ingressIP), metrics.There)
+				if err != nil {
+					return err
+				}
 
 				return nil
-			}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
+			}, 2*time.Minute, 5*time.Second).Should(gomega.BeNil())
 
 			// Negative - validate that the other speakers don't publish layer2 metrics
 			delete(speakerPods, advSpeaker.Spec.NodeName)
@@ -505,6 +544,10 @@ var _ = ginkgo.Describe("L2", func() {
 
 				err = metrics.ValidateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": p.Spec.NodeName, "protocol": "layer2", "service": fmt.Sprintf("%s/%s", f.Namespace.Name, svc.Name)}, speakerMetrics)
 				framework.ExpectError(err, fmt.Sprintf("metallb_speaker_announced present in node: %s", p.Spec.NodeName))
+
+				err = metrics.ValidateOnPrometheus(promPod,
+					fmt.Sprintf(`metallb_speaker_announced{node="%s",protocol="layer2",service="%s/%s"} == 1`, p.Spec.NodeName, f.Namespace.Name, svc.Name), metrics.NotThere)
+				framework.ExpectNoError(err)
 			}
 
 			ginkgo.By("validating the speaker doesn't publish layer2 metrics after deleting the service")
@@ -521,9 +564,14 @@ var _ = ginkgo.Describe("L2", func() {
 				if err == nil {
 					return fmt.Errorf("metallb_speaker_announced present in node: %s", advSpeaker.Spec.NodeName)
 				}
+				err = metrics.ValidateOnPrometheus(promPod,
+					fmt.Sprintf(`metallb_speaker_announced{node="%s",protocol="layer2",service="%s/%s"} == 1`, advSpeaker.Spec.NodeName, f.Namespace.Name, svc.Name), metrics.NotThere)
+				if err != nil {
+					return err
+				}
 
 				return nil
-			}, 1*time.Minute, 1*time.Second).Should(gomega.BeNil())
+			}, time.Minute, 5*time.Second).Should(gomega.BeNil())
 		},
 			table.Entry("IPV4 - Checking service", "ipv4"),
 			table.Entry("IPV6 - Checking service", "ipv6"))
