@@ -140,6 +140,14 @@ jobs:
         ip-family: [ipv4, ipv6, dual]
         bgp-type: [native, frr]
         deployment: [manifests, helm]
+        prometheus: [disabled, enabled]
+        exclude:
+        - ip-family: ipv6
+          prometheus: disabled
+        - ip-family: dual
+          prometheus: disabled
+        - bgp-type: frr
+          prometheus: disabled
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -150,8 +158,11 @@ jobs:
       - name: Deploy MetalLB
         run: |
           HELM_FLAGS=""
+          PROMETHEUS_FLAGS=""
           if [ ${{ matrix.deployment }} = "helm" ]; then HELM_FLAGS="--helm-install"; fi
-          inv dev-env -i ${{ matrix.ip-family }} -b ${{ matrix.bgp-type }} -l all $HELM_FLAGS --no-build-images
+          if [ ${{ matrix.prometheus }} = "enabled" ]; then PROMETHEUS_FLAGS="--with-prometheus"; fi
+          
+          inv dev-env -i ${{ matrix.ip-family }} -b ${{ matrix.bgp-type }} -l all $HELM_FLAGS --no-build-images $PROMETHEUS_FLAGS
 
       - name: E2E
         run: |
@@ -164,6 +175,8 @@ jobs:
           if [ "${{ matrix.ip-family }}" == "dual" ]; then SKIP="$SKIP|IPV6"; fi
           if [ "${{ matrix.ip-family }}" == "ipv6" ]; then SKIP="$SKIP|IPV4|DUALSTACK"; fi
           if [ "${{ matrix.ip-family }}" == "ipv6" ] && [ ${{ matrix.bgp-type }} == "native" ]; then SKIP="$SKIP|BGP"; fi
+          if [ "${{ matrix.prometheus }}" == "disabled" ]; then SKIP="$SKIP|metrics"; fi
+
           echo "Skipping $SKIP"
           sudo -E env "PATH=$PATH" inv e2etest --skip $SKIP -e /tmp/kind_logs $HELM_FLAGS
 
@@ -276,6 +289,7 @@ jobs:
           sed -i 's/native/frr/g' bin/metallb-operator.yaml
           kubectl apply -f bin/metallb-operator.yaml
 
+
       - name: MetalLB E2E Tests with Operator Deployment
         run: |
           cat <<EOF | kubectl apply -f -
@@ -287,7 +301,7 @@ jobs:
           spec:
             logLevel: debug
           EOF
-          sudo -E env "PATH=$PATH" inv e2etest --skip "IPV6|DUALSTACK" -e /tmp/kind_logs
+          sudo -E env "PATH=$PATH" inv e2etest --skip "IPV6|DUALSTACK|metrics" -e /tmp/kind_logs
 
       - name: Collect Logs
         if: ${{ failure() }}
@@ -313,7 +327,7 @@ jobs:
 
       - name: Deploy MetalLB
         run: |
-          inv dev-env -b frr --no-build-images --node-img kindest/node:v1.22.9@sha256:8135260b959dfe320206eb36b3aeda9cffcb262f4b44cda6b33f7bb73f453105
+          inv dev-env -b frr --with-prometheus --no-build-images --node-img kindest/node:v1.22.9@sha256:8135260b959dfe320206eb36b3aeda9cffcb262f4b44cda6b33f7bb73f453105
 
       - name: E2E
         run: |
