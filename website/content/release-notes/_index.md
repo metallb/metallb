@@ -8,6 +8,12 @@ New Features:
 
 - Added namespace validation for custom resources ([PR 1523](https://github.com/metallb/metallb/pull/1523))
 
+## Version 0.13.5
+
+New Features:
+
+- Expose the prometheus metrics securely via kube-rbac-proxy ([PR 1545](https://github.com/metallb/metallb/pull/1545))
+
 ## Version 0.13.4
 
 New Features:
