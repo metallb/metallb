@@ -1763,6 +1763,9 @@ spec:
       component: controller
   template:
     metadata:
+      annotations:
+        prometheus.io/port: "7472"
+        prometheus.io/scrape: "true"
       labels:
         app: metallb
         component: controller
@@ -1867,6 +1870,7 @@ spec:
   template:
     metadata:
       annotations:
+        prometheus.io/port: "7472"
         prometheus.io/scrape: "true"
       labels:
         app: metallb
@@ -1915,7 +1919,7 @@ spec:
         name: kube-rbac-proxy-frr
         ports:
         - containerPort: 9121
-          name: frrmetricshttps
+          name: metricshttps
           protocol: TCP
         resources:
           limits:
@@ -1976,7 +1980,7 @@ spec:
         name: frr-metrics
         ports:
         - containerPort: 7473
-          name: frr-monitoring
+          name: monitoring
         volumeMounts:
         - mountPath: /var/run/frr
           name: frr-sockets
@@ -2227,6 +2231,7 @@ webhooks:
     apiVersions:
     - v1beta1
     operations:
+    - CREATE
     - DELETE
     resources:
     - bfdprofiles
