@@ -88,6 +88,11 @@ The installation manifest does not include a configuration
 file. MetalLB's components will still start, but will remain idle
 until you [start deploying resources]({{% relref "../configuration/_index.md" %}}).
 
+There are also two all-in-one manifests to allow the integration with prometheus. They assume that the
+prometheus operator is deployed in the `monitoring` namespace using the `prometheus-k8s`
+service account. It is suggested to use either the charts or kustomize if they
+need to be changed.
+
 ## Installation with kustomize
 
 You can install MetalLB with
