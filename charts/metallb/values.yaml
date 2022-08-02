@@ -134,6 +134,17 @@ controller:
     repository: quay.io/metallb/controller
     tag:
     pullPolicy:
+  ## @param controller.updateStrategy.type Metallb controller deployment strategy type.
+  ## ref: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
+  ## e.g:
+  ## strategy:
+  ##  type: RollingUpdate
+  ##  rollingUpdate:
+  ##    maxSurge: 25%
+  ##    maxUnavailable: 25%
+  ##
+  strategy:
+    type: RollingUpdate
   serviceAccount:
     # Specifies whether a ServiceAccount should be created
     create: true
@@ -185,6 +196,14 @@ speaker:
     repository: quay.io/metallb/speaker
     tag:
     pullPolicy:
+  ## @param speaker.updateStrategy.type Speaker daemonset strategy type
+  ## ref: https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/
+  ##
+  updateStrategy:
+    ## StrategyType
+    ## Can be set to RollingUpdate or OnDelete
+    ##
+    type: RollingUpdate
   serviceAccount:
     # Specifies whether a ServiceAccount should be created
     create: true

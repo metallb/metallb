@@ -111,6 +111,9 @@ metadata:
     {{- include "metallb.labels" . | nindent 4 }}
     app.kubernetes.io/component: speaker
 spec:
+  {{- if .Values.speaker.updateStrategy }}
+  updateStrategy: {{- toYaml .Values.speaker.updateStrategy | nindent 4 }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "metallb.selectorLabels" . | nindent 6 }}
