@@ -49,6 +49,10 @@ spec:
         {{- if .Values.controller.image.pullPolicy }}
         imagePullPolicy: {{ .Values.controller.image.pullPolicy }}
         {{- end }}
+        {{- if .Values.controller.command }}
+        command:
+          - {{ .Values.controller.command }}
+        {{- end }}
         args:
         - --port={{ .Values.prometheus.metricsPort }}
         {{- with .Values.controller.logLevel }}
