@@ -131,6 +131,7 @@ controller:
   # -- Controller log level. Must be one of: `all`, `debug`, `info`, `warn`, `error` or `none`
   logLevel: info
   # command: /controller
+  # webhookMode: enabled
   image:
     repository: quay.io/metallb/controller
     tag:

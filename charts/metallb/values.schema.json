@@ -345,6 +345,9 @@
           },
           "command" : {
             "type": "string"
+          },
+          "webhookMode" : {
+            "type": "string"
           }
         }
       }
