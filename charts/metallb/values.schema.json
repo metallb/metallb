@@ -318,6 +318,9 @@
                 "image": { "$ref": "#/definitions/component/properties/image" }
               },
               "required": [ "enabled" ]
+            },
+            "command" : {
+              "type": "string"
             }
           },
           "required": [ "tolerateMaster" ]
@@ -339,6 +342,9 @@
               }
             },
             "required": [ "type" ]
+          },
+          "command" : {
+            "type": "string"
           }
         }
       }

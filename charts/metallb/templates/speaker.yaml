@@ -194,6 +194,10 @@ spec:
         {{- if .Values.speaker.image.pullPolicy }}
         imagePullPolicy: {{ .Values.speaker.image.pullPolicy }}
         {{- end }}
+        {{- if .Values.speaker.command }}
+        command:
+          - {{ .Values.speaker.command }}
+        {{- end }}
         args:
         - --port={{ .Values.prometheus.metricsPort }}
         {{- with .Values.speaker.logLevel }}
