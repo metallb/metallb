@@ -355,6 +355,9 @@
                 "secureMetricsPort": { "type": "integer" }
               },
               "required": [ "enabled" ]
+            },
+            "command" : {
+              "type": "string"
             }
           },
           "required": [ "tolerateMaster" ]
@@ -376,6 +379,12 @@
               }
             },
             "required": [ "type" ]
+          },
+          "command" : {
+            "type": "string"
+          },
+          "webhookMode" : {
+            "type": "string"
           }
         }
       }
