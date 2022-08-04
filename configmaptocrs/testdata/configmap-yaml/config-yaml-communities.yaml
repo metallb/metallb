@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  namespace: metallb-system
+  name: config
+data:
+  config: |
+    bgp-communities:
+        no-export: 65535:65281
+        my-community: 1234:5678
