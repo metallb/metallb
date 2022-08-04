@@ -1,0 +1,17 @@
+bfd-profiles:
+- name: bfdprofile1
+  receive-interval: 280
+  transmit-interval: 270
+  echo-interval: 62
+  echo-mode: false
+  passive-mode: false
+  minimum-ttl: 254
+  detect-multiplier: 200
+- name: bfdprofile2
+  receive-interval: 150
+  transmit-interval: 150
+  echo-interval: 80
+  echo-mode: true
+  passive-mode: true
+  minimum-ttl: 150
+  detect-multiplier: 150

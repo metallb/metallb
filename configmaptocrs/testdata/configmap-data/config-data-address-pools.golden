@@ -3,13 +3,25 @@ apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
 metadata:
   creationTimestamp: null
-  name: my-ip-space
+  name: my-ip-space-bgp
   namespace: metallb-system
 spec:
   addresses:
   - 198.51.100.0/24
   - fc00:f853:0ccd:e799::/124
+  autoAssign: true
   avoidBuggyIPs: true
+status: {}
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  creationTimestamp: null
+  name: my-ip-space-l2
+  namespace: metallb-system
+spec:
+  addresses:
+  - 192.168.1.240/28
 status: {}
 ---
 apiVersion: metallb.io/v1beta1
@@ -20,6 +32,17 @@ metadata:
   namespace: metallb-system
 spec:
   ipAddressPools:
-  - my-ip-space
+  - my-ip-space-bgp
+status: {}
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  creationTimestamp: null
+  name: l2advertisement1
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - my-ip-space-l2
 status: {}
 ---
