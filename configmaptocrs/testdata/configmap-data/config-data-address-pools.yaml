@@ -1,0 +1,12 @@
+address-pools:
+- name: my-ip-space-bgp
+  protocol: bgp
+  addresses:
+  - 198.51.100.0/24
+  - fc00:f853:0ccd:e799::/124
+  avoid-buggy-ips: true
+  auto-assign: true
+- name: my-ip-space-l2
+  protocol: layer2
+  addresses:
+  - 192.168.1.240/28

@@ -17,9 +17,23 @@ import (
 
 var update = flag.Bool("update", false, "update .golden files")
 
-func TestGenerateResources(t *testing.T) {
+const (
+	testConfigMapSource  = false
+	testDataOnlySource   = true
+	configMapYAMLTestDir = "./testdata/configmap-yaml"
+	configMapDataTestDir = "./testdata/configmap-data"
+)
+
+func TestGenerateResourcesWithConfigMapDefinition(t *testing.T) {
+	testGenerate(t, configMapYAMLTestDir, testConfigMapSource)
+}
+func TestGenerateResourcesWithConfigData(t *testing.T) {
+	testGenerate(t, configMapDataTestDir, testDataOnlySource)
+}
+
+func testGenerate(t *testing.T, testDir string, testOnlyData bool) {
 	tests := []string{}
-	files, err := ioutil.ReadDir("./testdata")
+	files, err := ioutil.ReadDir(testDir)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -33,10 +47,10 @@ func TestGenerateResources(t *testing.T) {
 		t.Run(tc, func(t *testing.T) {
 			log.SetOutput(ioutil.Discard)
 
-			// Override the container's internal path.
-			inputDirPath = "testdata"
-
 			res := new(bytes.Buffer)
+			// Override the container's internal path.
+			inputDirPath = testDir
+			onlyData = &testOnlyData
 
 			err := generate(res, tc)
 
@@ -44,7 +58,7 @@ func TestGenerateResources(t *testing.T) {
 				t.Fatalf("test %s failed to generate resources: %s", tc, err)
 			}
 
-			goldenFile := filepath.Join("testdata", strings.TrimSuffix(tc, path.Ext(tc))+".golden")
+			goldenFile := filepath.Join(testDir, strings.TrimSuffix(tc, path.Ext(tc))+".golden")
 			if *update {
 				t.Log("update golden file")
 				if err := ioutil.WriteFile(goldenFile, res.Bytes(), 0644); err != nil {
