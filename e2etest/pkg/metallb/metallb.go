@@ -60,3 +60,17 @@ func ControllerPod(cs clientset.Interface) (*corev1.Pod, error) {
 	}
 	return &pods.Items[0], nil
 }
+
+// SpeakerPodInNode returns the speaker pod running in the given node.
+func SpeakerPodInNode(cs clientset.Interface, node string) (*corev1.Pod, error) {
+	speakerPods, err := SpeakerPods(cs)
+	if err != nil {
+		return nil, err
+	}
+	for _, pod := range speakerPods {
+		if pod.Spec.NodeName == node {
+			return pod, nil
+		}
+	}
+	return nil, errors.Errorf("no speaker pod run in the node %s", node)
+}

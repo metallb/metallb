@@ -24,6 +24,8 @@ all_architectures = set(["amd64",
                          "arm64",
                          "ppc64le",
                          "s390x"])
+default_network = "kind"
+extra_network = "network2"
 
 def _check_architectures(architectures):
     out = set()
@@ -92,16 +94,22 @@ def _is_podman():
     return 'podman' in os.path.realpath(shutil.which('docker'))
 
 
-# Get the list of subnets for the kind nework.
-def _get_network_subnets():
+def _is_network_exist(network):
+    try:
+        run("docker network inspect {network}".format(network=network))
+    except:
+        print("docker bridge {} doesn't exist".format(network))
+        return False
+    return True
+
+# Get the list of subnets for the nework.
+def _get_network_subnets(network):
     if _is_podman():
-        cmd = ('podman network inspect kind -f "'
-               '{{ range (index .plugins 0).ipam.ranges}}'
-               '{{ (index . 0).subnet }} {{end}}"')
+        cmd = ('podman network inspect {network} '.format(network=network) +
+        '-f "{{ range (index .plugins 0).ipam.ranges}}{{ (index . 0).subnet }} {{end}}"')
     else:
-        cmd = ('docker network inspect kind -f "'
-               '{{ range .IPAM.Config}}{{.Subnet}} {{end}}"'
-               )
+        cmd = ('docker network inspect {network} '.format(network=network) +
+        '-f "{{ range .IPAM.Config}}{{.Subnet}} {{end}}"')
     return run(cmd, echo=True).stdout.strip().split(' ')
 
 
@@ -133,6 +141,38 @@ def _get_subnets_allocated_ips():
 
     return sorted(v4_ips), sorted(v6_ips)
 
+def _add_nic_to_nodes(cluster_name):
+    nodes = run("kind get nodes --name {name}".format(name=cluster_name)).stdout.strip().split("\n")
+    run("docker network create --ipv6 --subnet {ipv6_subnet} -d bridge {bridge_name}".format(bridge_name=extra_network, ipv6_subnet="fc00:f853:ccd:e791::/64"))
+    for node in nodes:
+        run("docker network connect {bridge_name} {node}".format(bridge_name=extra_network, node=node))
+
+# Get the nics of kind cluster node
+def _get_node_nics(node):
+    default_nic = run('docker exec -i {container} ip r | grep default | cut -d " " -f 5'.format(container=node)).stdout.strip()
+    if not _is_network_exist(extra_network):
+        return default_nic
+    extra_subnets = _get_network_subnets(extra_network)
+    ip = ipaddress.ip_network(extra_subnets[0])
+    if ip.version == 4:
+        extra_nic = run('docker exec -i {container} ip r | grep {dst} | cut -d " " -f 3'.format(container=node, dst=extra_subnets[0])).stdout.strip()
+    else:
+        extra_nic = run('docker exec -i {container} ip -6 r | grep {dst} | cut -d " " -f 3'.format(container=node, dst=extra_subnets[0])).stdout.strip()
+    return default_nic + "," + extra_nic
+
+def _get_local_nics():
+    nics = []
+    for net in [default_network, extra_network]:
+        if not _is_network_exist(net):
+            continue
+        subnets = _get_network_subnets(net)
+        ip = ipaddress.ip_network(subnets[0])
+        if ip.version == 4:
+            nic = run('ip r | grep {dst} | cut -d " " -f 3'.format(dst=subnets[0])).stdout.strip()
+        else:
+            nic = run('ip -6 r | grep {dst} | cut -d " " -f 3'.format(dst=subnets[0])).stdout.strip()
+        nics.append(nic)
+    return ','.join(nics)
 
 @task(iterable=["binaries", "architectures"],
       help={
@@ -319,6 +359,7 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
             tmp.write(config)
             tmp.flush()
             run("kind create cluster --name={} --config={} {}".format(name, tmp.name, extra_options), pty=True, echo=True)
+        _add_nic_to_nodes(name)
 
     binaries = ["controller", "speaker", "mirror-server"]
     if build_images:
@@ -471,14 +512,12 @@ def bgp_dev_env(ip_family, frr_volume_dir):
     # Apply the MetalLB ConfigMap
     run_with_retry("kubectl apply -f %s/config.yaml" % dev_env_dir)
 
-
 def get_available_ips(ip_family=None):
     if ip_family is None or (ip_family != 4 and ip_family != 6):
         raise Exit(message="Please provide network version: 4 or 6.")
 
     v4, v6 = _get_subnets_allocated_ips()
-
-    for i in _get_network_subnets():
+    for i in _get_network_subnets(default_network):
         network = ipaddress.ip_network(i)
         if network.version == ip_family:
             used_list = v4 if ip_family == 4 else v6
@@ -530,6 +569,8 @@ def dev_env_cleanup(ctx, name="kind", frr_volume_dir=""):
     dev_env_dir = os.getcwd() + "/dev-env/layer2"
     run('rm -f "%s"/config.yaml' % dev_env_dir)
 
+    # cleanup extra bridge
+    run('docker network rm {bridge_name}'.format(bridge_name=extra_network))
 
 @task(help={
     "version": "version of MetalLB to release.",
@@ -704,8 +745,10 @@ def helmdocs(ctx, env="container"):
     "ipv4_service_range": "a range of IPv4 addresses for MetalLB to use when running in layer2 mode.",
     "ipv6_service_range": "a range of IPv6 addresses for MetalLB to use when running in layer2 mode.",
     "prometheus_namespace": "the namespace prometheus is deployed to, to validate metrics against prometheus.",
+    "node_nics": "a list of node's interfaces separated by comma, default is kind",
+    "local_nics": "a list of bridges related node's interfaces separated by comma, default is kind",
 })
-def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None, prometheus_namespace=""):
+def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None, prometheus_namespace="", node_nics="kind", local_nics="kind"):
     """Run E2E tests against development cluster."""
     if skip_docker:
         opt_skip_docker = "--skip-docker"
@@ -719,7 +762,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
     ginkgo_focus = ""
     if focus:
         ginkgo_focus = "--ginkgo.focus=\"" + focus + "\""
-    
+
     if kubeconfig is None:
         validate_kind_version()
         clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
@@ -731,10 +774,17 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
             raise Exit(message="Unable to find cluster named: {}".format(name))
     else:
         os.environ['KUBECONFIG'] = kubeconfig
-
+        
     namespaces = system_namespaces.replace(' ', '').split(',')
     for ns in namespaces:
         run("kubectl -n {} wait --for=condition=Ready --all pods --timeout 300s".format(ns), hide=True)
+
+    if node_nics == "kind":
+        nodes = run("kind get nodes --name {name}".format(name=name)).stdout.strip().split("\n")
+        node_nics = _get_node_nics(nodes[0])
+
+    if local_nics == "kind":
+        local_nics = _get_local_nics()
 
     ips_for_containers_v4 = ""
     if ipv4_service_range is None:
@@ -758,7 +808,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
     os.makedirs(report_path, exist_ok=True)
 
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "KUBECONFIG={} go test -timeout 3h {} {} --provider=local --kubeconfig={} --service-pod-port={} {} {} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace), warn="True")
+            "KUBECONFIG={} go test -timeout 3h {} {} --provider=local --kubeconfig={} --service-pod-port={} {} {} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace, node_nics, local_nics), warn="True")
 
     if export != None:
         run("kind export logs {}".format(export))
