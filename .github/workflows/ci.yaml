@@ -301,7 +301,7 @@ jobs:
           spec:
             logLevel: debug
           EOF
-          sudo -E env "PATH=$PATH" inv e2etest --skip "IPV6|DUALSTACK|metrics" -e /tmp/kind_logs
+          sudo -E env "PATH=$PATH" inv e2etest --skip "IPV6|DUALSTACK|metrics|L2-interface selector" -e /tmp/kind_logs
 
       - name: Collect Logs
         if: ${{ failure() }}

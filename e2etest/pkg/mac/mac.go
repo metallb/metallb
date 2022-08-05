@@ -129,6 +129,15 @@ func RequestAddressResolution(ip string, exc executor.Executor) error {
 		return err
 	}
 
+	return RequestAddressResolutionFromIface(ip, iface, exc)
+}
+
+// RequestAddressResolutionFromIface does an ARP/NS request for the given IP from the given interface.
+func RequestAddressResolutionFromIface(ip string, iface string, exec executor.Executor) error {
+	netIP := net.ParseIP(ip)
+	if netIP == nil {
+		return fmt.Errorf("failed to convert %s to net.IP", ip)
+	}
 	var cmd string
 	var args []string
 	if netIP.To4() != nil {
@@ -139,12 +148,45 @@ func RequestAddressResolution(ip string, exc executor.Executor) error {
 		args = []string{netIP.String(), iface}
 	}
 
-	out, err := exc.Exec(cmd, args...)
+	out, err := exec.Exec(cmd, args...)
 	if err != nil {
 		return errors.Wrapf(err, out)
 	}
 
 	return nil
+}
+
+// FlushIPNeigh flush the ip from ip neighbor table.
+func FlushIPNeigh(ip string, exec executor.Executor) error {
+	out, err := exec.Exec("ip", "neigh", "flush", "to", ip)
+	if err != nil {
+		return errors.Wrapf(err, out)
+	}
+	return nil
+}
+
+// GetIfaceMac returns the mac of the iface.
+func GetIfaceMac(iface string, exec executor.Executor) (net.HardwareAddr, error) {
+	out, err := exec.Exec("ifconfig")
+	if err != nil {
+		return nil, errors.Wrapf(err, out)
+	}
+
+	macRe := regexp.MustCompile("([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})")
+
+	res := strings.Split(string(out), "\n")
+	for _, line := range res {
+		cur := strings.Split(line, " ")
+		if cur[0] == iface {
+			m := macRe.FindString(line)
+			if m != "" {
+				mac, err := net.ParseMAC(m)
+				return mac, err
+			}
+		}
+	}
+
+	return nil, errors.Errorf("failed to find the mac of interface %s", iface)
 }
 
 // ifaceForIPNetwork returns the interface name that is in the same network as the IP.
