@@ -18,6 +18,7 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
@@ -37,6 +38,9 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/service"
 	"go.universe.tf/metallb/e2etest/webhookstests"
 	internalconfig "go.universe.tf/metallb/internal/config"
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -44,12 +48,14 @@ import (
 )
 
 var (
-	skipDockerCmd     bool
-	ipv4ForContainers string
-	ipv6ForContainers string
-	useOperator       bool
-	reportPath        string
-	updater           testsconfig.Updater
+	skipDockerCmd       bool
+	ipv4ForContainers   string
+	ipv6ForContainers   string
+	useOperator         bool
+	reportPath          string
+	updater             testsconfig.Updater
+	updaterOtherNS      testsconfig.Updater
+	prometheusNamespace string
 )
 
 // handleFlags sets up all flags and parses the command line.
@@ -74,6 +80,7 @@ func handleFlags() {
 	flag.StringVar(&l2tests.IPV6ServiceRange, "ipv6-service-range", "0", "a range of IPv6 addresses for MetalLB to use when running in layer2 mode")
 	flag.BoolVar(&useOperator, "use-operator", false, "set this to true to run the tests using operator custom resources")
 	flag.StringVar(&reportPath, "report-path", "/tmp/report", "the path to be used to dump test failure information")
+	flag.StringVar(&prometheusNamespace, "prometheus-namespace", "monitoring", "the namespace prometheus is running in (if running)")
 	flag.Parse()
 }
 
@@ -134,15 +141,33 @@ var _ = ginkgo.BeforeSuite(func() {
 	updater, err = testsconfig.UpdaterForCRs(clientconfig, metallb.Namespace)
 	framework.ExpectNoError(err)
 
+	// for testing namespace validation, we need an existing namespace that's different from the
+	// metallb installation namespace
+	otherNamespace := fmt.Sprintf("%s-other", metallb.Namespace)
+	err = updater.Client().Create(context.Background(), &v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: otherNamespace,
+		},
+	})
+	// ignore failure if namespace already exists, fail for any other errors
+	if err != nil && !errors.IsAlreadyExists(err) {
+		framework.ExpectNoError(err)
+	}
+	updaterOtherNS, err = testsconfig.UpdaterForCRs(clientconfig, otherNamespace)
+	framework.ExpectNoError(err)
+
 	reporter := k8s.InitReporter(framework.TestContext.KubeConfig, reportPath, metallb.Namespace)
 
 	bgptests.ConfigUpdater = updater
 	l2tests.ConfigUpdater = updater
 	webhookstests.ConfigUpdater = updater
+	webhookstests.ConfigUpdaterOtherNS = updaterOtherNS
 	bgptests.Reporter = reporter
 	bgptests.ReportPath = reportPath
 	l2tests.Reporter = reporter
 	webhookstests.Reporter = reporter
+	bgptests.PrometheusNamespace = prometheusNamespace
+	l2tests.PrometheusNamespace = prometheusNamespace
 })
 
 var _ = ginkgo.AfterSuite(func() {
@@ -153,4 +178,19 @@ var _ = ginkgo.AfterSuite(func() {
 	framework.ExpectNoError(err)
 	err = updater.Clean()
 	framework.ExpectNoError(err)
+
+	// delete the namespace created for testing namespace validation
+	nsSpec := v1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: updaterOtherNS.Namespace(),
+		},
+	}
+	err = updaterOtherNS.Client().Delete(context.Background(), &nsSpec)
+	// ignore failure if namespace does not exist, fail for any other errors
+	if err != nil && !errors.IsNotFound(err) {
+		framework.ExpectNoError(err)
+	}
+	err = updaterOtherNS.Clean()
+	framework.ExpectNoError(err)
+
 })

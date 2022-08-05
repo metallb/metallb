@@ -1,0 +1,70 @@
+# This patch inject a sidecar container which is a HTTP proxy for the
+# controller manager, it performs RBAC authorization against the Kubernetes API using SubjectAccessReviews.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: controller
+spec:
+  template:
+    spec:
+      containers:
+        - name: kube-rbac-proxy
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+          image: gcr.io/kubebuilder/kube-rbac-proxy:v0.12.0
+          args:
+            - "--secure-listen-address=0.0.0.0:9120"
+            - "--upstream=http://127.0.0.1:7472/"
+            - "--logtostderr=true"
+            - "--v=0"
+          ports:
+            - containerPort: 9120
+              protocol: TCP
+              name: metricshttps
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 5m
+              memory: 64Mi
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: speaker
+spec:
+  template:
+    spec:
+      containers:
+        - name: kube-rbac-proxy
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+          image: gcr.io/kubebuilder/kube-rbac-proxy:v0.12.0
+          args:
+            - "--secure-listen-address=0.0.0.0:9120"
+            - "--upstream=http://$(METALLB_HOST):7472/"
+            - "--logtostderr=true"
+            - "--v=0"
+          ports:
+            - containerPort: 9120
+              protocol: TCP
+              name: metricshttps
+          resources:
+            limits:
+              cpu: 500m
+              memory: 128Mi
+            requests:
+              cpu: 5m
+              memory: 64Mi
+          env:
+            - name: METALLB_HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP

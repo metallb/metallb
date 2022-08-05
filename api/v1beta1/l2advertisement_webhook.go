@@ -18,6 +18,7 @@ package v1beta1
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/go-kit/log/level"
 	"github.com/pkg/errors"
@@ -40,6 +41,10 @@ var _ webhook.Validator = &L2Advertisement{}
 // ValidateCreate implements webhook.Validator so a webhook will be registered for L2Advertisement.
 func (l2Adv *L2Advertisement) ValidateCreate() error {
 	level.Debug(Logger).Log("webhook", "l2advertisement", "action", "create", "name", l2Adv.Name, "namespace", l2Adv.Namespace)
+
+	if l2Adv.Namespace != MetalLBNamespace {
+		return fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
+	}
 
 	existingL2AdvList, err := getExistingL2Advs()
 	if err != nil {

@@ -11,15 +11,27 @@ import (
 
 	dto "github.com/prometheus/client_model/go"
 	"github.com/prometheus/common/expfmt"
+	"github.com/prometheus/common/model"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
+
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/pkg/errors"
 )
 
+type PrometheusResponse struct {
+	Status string                 `json:"status"`
+	Data   prometheusResponseData `json:"data"`
+}
+
+type prometheusResponseData struct {
+	ResultType string       `json:"resultType"`
+	Result     model.Vector `json:"result"`
+}
+
 // MetricsForPod returns the parsed metrics for the given pod, scraping them
 // from the source pod.
-func ForPod(source, target *corev1.Pod, namespace string) ([]map[string]*dto.MetricFamily, error) {
+func ForPod(controller, target *corev1.Pod, namespace string) ([]map[string]*dto.MetricFamily, error) {
 	ports := make([]int, 0)
 	allMetrics := make([]map[string]*dto.MetricFamily, 0)
 	for _, c := range target.Spec.Containers {
@@ -30,7 +42,7 @@ func ForPod(source, target *corev1.Pod, namespace string) ([]map[string]*dto.Met
 		}
 	}
 
-	podExecutor := executor.ForPod(namespace, source.Name, source.Spec.Containers[0].Name)
+	podExecutor := executor.ForPod(namespace, controller.Name, "controller")
 	for _, p := range ports {
 		metricsUrl := path.Join(net.JoinHostPort(target.Status.PodIP, strconv.Itoa(p)), "metrics")
 		metrics, err := podExecutor.Exec("wget", "-qO-", metricsUrl)
@@ -46,6 +58,13 @@ func ForPod(source, target *corev1.Pod, namespace string) ([]map[string]*dto.Met
 
 	return allMetrics, nil
 }
+
+type CheckType bool
+
+const (
+	NotThere CheckType = false
+	There    CheckType = true
+)
 
 // GaugeForLabels retrieves the value of the Gauge matching the given set of labels.
 func GaugeForLabels(metricName string, labels map[string]string, metrics map[string]*dto.MetricFamily) (int, error) {
