@@ -56,6 +56,8 @@ var (
 	updater             testsconfig.Updater
 	updaterOtherNS      testsconfig.Updater
 	prometheusNamespace string
+	nodeNics            string
+	localNics           string
 )
 
 // handleFlags sets up all flags and parses the command line.
@@ -78,6 +80,8 @@ func handleFlags() {
 	flag.StringVar(&ipv6ForContainers, "ips-for-containers-v6", "0", "a comma separated list of IPv6 addresses available for containers")
 	flag.StringVar(&l2tests.IPV4ServiceRange, "ipv4-service-range", "0", "a range of IPv4 addresses for MetalLB to use when running in layer2 mode")
 	flag.StringVar(&l2tests.IPV6ServiceRange, "ipv6-service-range", "0", "a range of IPv6 addresses for MetalLB to use when running in layer2 mode")
+	flag.StringVar(&nodeNics, "node-nics", "", "node's interfaces list separated by comma and used when running in interface selector")
+	flag.StringVar(&localNics, "local-nics", "", "local interfaces list separated by comma and used when running in interface selector")
 	flag.BoolVar(&useOperator, "use-operator", false, "set this to true to run the tests using operator custom resources")
 	flag.StringVar(&reportPath, "report-path", "/tmp/report", "the path to be used to dump test failure information")
 	flag.StringVar(&prometheusNamespace, "prometheus-namespace", "monitoring", "the namespace prometheus is running in (if running)")
@@ -168,6 +172,8 @@ var _ = ginkgo.BeforeSuite(func() {
 	webhookstests.Reporter = reporter
 	bgptests.PrometheusNamespace = prometheusNamespace
 	l2tests.PrometheusNamespace = prometheusNamespace
+	l2tests.NodeNics = strings.Split(nodeNics, ",")
+	l2tests.LocalNics = strings.Split(localNics, ",")
 })
 
 var _ = ginkgo.AfterSuite(func() {
