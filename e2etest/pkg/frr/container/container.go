@@ -103,12 +103,12 @@ func Create(c ...Config) ([]*FRR, error) {
 	return frrContainers, err
 }
 
-func Stop(containers []*FRR) error {
+func Delete(containers []*FRR) error {
 	g := new(errgroup.Group)
 	for _, c := range containers {
 		c := c
 		g.Go(func() error {
-			err := c.stop()
+			err := c.delete()
 			return err
 		})
 	}
@@ -134,19 +134,69 @@ func PairWithNodes(cs clientset.Interface, c *FRR, ipFamily ipfamily.Family, mod
 	return nil
 }
 
+// ConfigureExisting validates that the existing frr containers that correspond to the
+// given configurations are up and running, and returns the corresponding *FRRs.
+func ConfigureExisting(c ...Config) ([]*FRR, error) {
+	frrContainers := make([]*FRR, 0)
+	for _, cfg := range c {
+		err := containerIsRunning(cfg.Name)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to use an existing container %s. %w", cfg.Name, err)
+		}
+
+		frr, err := configureContainer(cfg, cfg.Name)
+		if err != nil {
+			return nil, fmt.Errorf("Failed to create container configurations for %s. %w", cfg.Name, err)
+		}
+
+		frrContainers = append(frrContainers, frr)
+	}
+
+	return frrContainers, nil
+}
+
 // start creates a new FRR container on the host and returns the corresponding *FRR.
 // A situation where a non-nil container and an error are returned is possible.
 func start(cfg Config) (*FRR, error) {
-	configDir, err := ioutil.TempDir("", "frr-conf")
+	testDirName, err := ioutil.TempDir("", "frr-conf")
+	if err != nil {
+		return nil, err
+	}
+	srcFiles := fmt.Sprintf("%s/.", frrConfigDir)
+	res, err := exec.Command("cp", "-r", srcFiles, testDirName).CombinedOutput()
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to copy FRR config directory. %s", string(res))
+	}
+
+	err = config.SetDaemonsConfig(testDirName, cfg.Router)
 	if err != nil {
 		return nil, err
 	}
 
-	err = startContainer(cfg, configDir)
+	volume := fmt.Sprintf("%s:%s", testDirName, frrMountPath)
+	args := []string{"run", "-d", "--privileged", "--network", cfg.Network, "--rm", "--ulimit", "core=-1", "--name", cfg.Name, "--volume", volume, frrImage}
+	if cfg.IPv4Address != "" {
+		args = append(args, "--ip", cfg.IPv4Address)
+	}
+	if cfg.IPv6Address != "" {
+		args = append(args, "--ip", cfg.IPv6Address)
+	}
+	out, err := exec.Command(executor.ContainerRuntime, args...).CombinedOutput()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "Failed to start %s container. %s", cfg.Name, out)
 	}
 
+	frr, err := configureContainer(cfg, testDirName)
+	if err != nil {
+		return frr, fmt.Errorf("Failed to create container configurations for %s. %w", cfg.Name, err)
+	}
+
+	return frr, nil
+}
+
+// configureContainer creates the corresponding *FRR for a given container.
+// A situation where a non-nil container and an error are returned is possible.
+func configureContainer(cfg Config, configDir string) (*FRR, error) {
 	exc := executor.ForContainer(cfg.Name)
 
 	frr := &FRR{
@@ -169,7 +219,7 @@ func start(cfg Config) (*FRR, error) {
 		frr.Ipv4 = cfg.HostIPv4
 		frr.Ipv6 = cfg.HostIPv6
 	} else {
-		err = frr.updateIPS()
+		err := frr.updateIPS()
 		if err != nil {
 			return frr, err
 		}
@@ -178,7 +228,7 @@ func start(cfg Config) (*FRR, error) {
 	// setting routerid after calculating ips
 	frr.RouterConfig.RouterID = frr.Ipv4
 
-	err = frr.updateVolumePermissions()
+	err := frr.updateVolumePermissions()
 	if err != nil {
 		return frr, err
 	}
@@ -186,37 +236,7 @@ func start(cfg Config) (*FRR, error) {
 	return frr, nil
 }
 
-// Run a BGP router in a container.
-func startContainer(cfg Config, testDirName string) error {
-	srcFiles := fmt.Sprintf("%s/.", frrConfigDir)
-	res, err := exec.Command("cp", "-r", srcFiles, testDirName).CombinedOutput()
-	if err != nil {
-		return errors.Wrapf(err, "Failed to copy FRR config directory. %s", string(res))
-	}
-
-	err = config.SetDaemonsConfig(testDirName, cfg.Router)
-	if err != nil {
-		return err
-	}
-
-	volume := fmt.Sprintf("%s:%s", testDirName, frrMountPath)
-	args := []string{"run", "-d", "--privileged", "--network", cfg.Network, "--rm", "--ulimit", "core=-1", "--name", cfg.Name, "--volume", volume, frrImage}
-	if cfg.IPv4Address != "" {
-		args = append(args, "--ip", cfg.IPv4Address)
-	}
-	if cfg.IPv6Address != "" {
-		args = append(args, "--ip", cfg.IPv6Address)
-	}
-	out, err := exec.Command(executor.ContainerRuntime, args...).CombinedOutput()
-	if err != nil {
-		return errors.Wrapf(err, "Failed to start %s container. %s", cfg.Name, out)
-	}
-
-	return nil
-}
-
 // Sets the IPv4 and IPv6 addresses of the *FRR.
-// todo: improve error handling, especially check that containerIPv4 and containerIPv6 are not empty
 func (c *FRR) updateIPS() (err error) {
 	containerIP, err := exec.Command(executor.ContainerRuntime, "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
 		c.Name).CombinedOutput()
@@ -259,7 +279,7 @@ func (c *FRR) UpdateBGPConfigFile(bgpConfig string) error {
 }
 
 // Delete the BGP router container configuration.
-func (c *FRR) stop() error {
+func (c *FRR) delete() error {
 	// Kill the BGP router container.
 	out, err := exec.Command(executor.ContainerRuntime, "kill", c.Name).CombinedOutput()
 	if err != nil {
@@ -335,4 +355,22 @@ func isPodman() bool {
 	dockerPath, _ := exec.LookPath("docker")
 	symLink, _ := os.Readlink(dockerPath)
 	return strings.Contains(symLink, "podman")
+}
+
+// containerIsRunning validates that the given container is up and running.
+func containerIsRunning(containerName string) error {
+	out, err := exec.Command(executor.ContainerRuntime, "ps", "--format", "{{.Status}}", "--filter", fmt.Sprintf("name=%s", containerName)).CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Failed to validate container %s is running. %w", containerName, err)
+	}
+
+	if len(out) == 0 {
+		return fmt.Errorf("Container %s doesn't exist.", containerName)
+	}
+
+	if string(out[:2]) != "Up" {
+		return fmt.Errorf("Container %s is not up. status is: %s", containerName, out)
+	}
+
+	return nil
 }
