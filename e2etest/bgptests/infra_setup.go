@@ -3,7 +3,9 @@
 package bgptests
 
 import (
+	"fmt"
 	"os"
+	"strings"
 
 	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
@@ -16,9 +18,10 @@ import (
 )
 
 const (
-	multiHopNetwork = "multi-hop-net"
-	metalLBASN      = 64512
-	externalASN     = 4200000000
+	multiHopNetwork      = "multi-hop-net"
+	metalLBASN           = 64512
+	externalASN          = 4200000000
+	nextHopContainerName = "ebgp-single-hop"
 )
 
 var (
@@ -46,7 +49,7 @@ func init() {
 
 // InfraSetup brings up the external container mimicking external routers, and set up the routing needed for
 // testing.
-func InfraSetup(ipv4Addresses, ipv6Addresses []string, cs *clientset.Clientset) ([]*frrcontainer.FRR, error) {
+func InfraSetup(ipv4Addresses, ipv6Addresses []string, externalContainers string, cs *clientset.Clientset) ([]*frrcontainer.FRR, error) {
 	/*
 		We have 2 ways in which we setup the containers for the tests:
 		1 - The user requested the containers to use the 'host' network
@@ -129,8 +132,34 @@ func InfraSetup(ipv4Addresses, ipv6Addresses []string, cs *clientset.Clientset) 
 
 	var res []*frrcontainer.FRR
 	var err error
-	if containersNetwork == "host" {
+	if externalContainers != "" {
+		err := validateContainersNames(externalContainers)
+		if err != nil {
+			return nil, err
+		}
+
+		configs, err := configsFor(externalContainers, ibgpSingleHopContainerConfig, ibgpMultiHopContainerConfig,
+			ebgpMultiHopContainerConfig, ebgpSingleHopContainerConfig)
+		if err != nil {
+			return nil, err
+		}
+
+		res, err = frrcontainer.ConfigureExisting(configs...)
+		if err != nil {
+			return nil, err
+		}
+
+		if containsMultiHop(res) {
+			err = multiHopSetUp(res, cs)
+			if err != nil {
+				return nil, err
+			}
+		}
+	} else if containersNetwork == "host" {
 		res, err = frrcontainer.Create(ibgpSingleHopContainerConfig)
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		Expect(len(ipv4Addresses)).Should(BeNumerically(">=", 2))
 		Expect(len(ipv6Addresses)).Should(BeNumerically(">=", 2))
@@ -153,56 +182,80 @@ func InfraSetup(ipv4Addresses, ipv6Addresses []string, cs *clientset.Clientset) 
 			return nil, err
 		}
 
-		out, err = executor.Host.Exec(executor.ContainerRuntime, "network", "connect",
-			multiHopNetwork, ebgpSingleHopContainerConfig.Name)
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to connect %s to %s: %s", ebgpSingleHopContainerConfig.Name, multiHopNetwork, out)
-		}
-
-		multiHopRoutes, err = container.Networks(ebgpSingleHopContainerConfig.Name)
+		err = multiHopSetUp(res, cs)
 		if err != nil {
 			return nil, err
 		}
-
-		for _, c := range res {
-			if c.Network == multiHopNetwork {
-				err = container.AddMultiHop(c, c.Network, containersNetwork, multiHopRoutes)
-				if err != nil {
-					return res, err
-				}
-			}
-		}
-		err = addMultiHopToNodes(cs)
-		if err != nil {
-			return nil, err
-		}
-
 	}
-	return res, err
+
+	return res, nil
 }
 
-// InfraTearDown tears down the containers and the routes needed for bgp testing.
-func InfraTearDown(containers []*frrcontainer.FRR, cs *clientset.Clientset) error {
-	err := frrcontainer.Stop(containers)
+// multiHopSetUp connects the ebgp-single-hop container to the multi-hop-net network,
+// and creates the required static routes between the multi-hop containers and the speaker pods.
+func multiHopSetUp(containers []*frrcontainer.FRR, cs *clientset.Clientset) error {
+	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "connect",
+		multiHopNetwork, nextHopContainerName)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to connect %s to %s: %s", nextHopContainerName, multiHopNetwork, out)
+	}
+
+	multiHopRoutes, err = container.Networks(nextHopContainerName)
 	if err != nil {
 		return err
 	}
 
-	if containersNetwork != "host" {
-		out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "rm", multiHopNetwork)
-		if err != nil {
-			return errors.Wrapf(err, "failed to remove %s: %s", multiHopNetwork, out)
-		}
-		speakerPods, err := metallb.SpeakerPods(cs)
-		if err != nil {
-			return err
-		}
-		for _, pod := range speakerPods {
-			nodeExec := executor.ForContainer(pod.Spec.NodeName)
-			err = container.DeleteMultiHop(nodeExec, containersNetwork, multiHopNetwork, multiHopRoutes)
+	for _, c := range containers {
+		if c.Network == multiHopNetwork {
+			err = container.AddMultiHop(c, c.Network, containersNetwork, multiHopRoutes)
 			if err != nil {
-				return err
+				return errors.Wrapf(err, "Failed to set up the multi-hop network for container %s", c.Name)
 			}
+		}
+	}
+	err = addMultiHopToNodes(cs)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to set up the multi-hop network")
+	}
+
+	return nil
+}
+
+// InfraTearDown tears down the containers and the routes needed for bgp testing.
+func InfraTearDown(containers []*frrcontainer.FRR, cs *clientset.Clientset) error {
+	err := frrcontainer.Delete(containers)
+	if err != nil {
+		return err
+	}
+
+	err = multiHopTearDown(cs)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func multiHopTearDown(cs *clientset.Clientset) error {
+	_, err := executor.Host.Exec(executor.ContainerRuntime, "network", "inspect", multiHopNetwork)
+	if err != nil {
+		// do nothing if the multi-hop network doesn't exist.
+		return nil
+	}
+
+	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "rm", multiHopNetwork)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to remove %s: %s", multiHopNetwork, out)
+	}
+	speakerPods, err := metallb.SpeakerPods(cs)
+	if err != nil {
+		return err
+	}
+	for _, pod := range speakerPods {
+		nodeExec := executor.ForContainer(pod.Spec.NodeName)
+		err = container.DeleteMultiHop(nodeExec, containersNetwork, multiHopNetwork, multiHopRoutes)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to delete multihop routes for pod %s", pod.ObjectMeta.Name)
 		}
 
 	}
@@ -230,4 +283,59 @@ func addMultiHopToNodes(cs *clientset.Clientset) error {
 		}
 	}
 	return nil
+}
+
+// validateContainersNames validates that the given string is a comma separated list of containers names.
+// The valid names are: ibgp-single-hop / ibgp-multi-hop / ebgp-single-hop / ebgp-multi-hop.
+func validateContainersNames(containerNames string) error {
+	if len(containerNames) == 0 {
+		return fmt.Errorf("Failed to validate containers names: got empty string")
+	}
+	validNames := map[string]bool{
+		"ibgp-single-hop": true,
+		"ibgp-multi-hop":  true,
+		"ebgp-single-hop": true,
+		"ebgp-multi-hop":  true,
+	}
+	names := strings.Split(containerNames, ",")
+	for _, n := range names {
+		v, ok := validNames[n]
+		if !ok {
+			return fmt.Errorf("Failed to validate container name: %s invalid name", n)
+		}
+		if !v {
+			return fmt.Errorf("Failed to validate container name: %s duplicate name", n)
+		}
+		validNames[n] = false
+	}
+
+	return nil
+}
+
+// configsFor returns the frr configs corresponding to the given comma separated list of containers names.
+func configsFor(containerNames string, frrContainersConfigs ...frrcontainer.Config) ([]frrcontainer.Config, error) {
+	var configs []frrcontainer.Config
+	names := strings.Split(containerNames, ",")
+	for _, n := range names {
+		for _, containerCfg := range frrContainersConfigs {
+			if n == containerCfg.Name {
+				configs = append(configs, containerCfg)
+				break
+			}
+		}
+	}
+
+	return configs, nil
+}
+
+// containsMultiHop returns true if the given containers list include a multi-hop container.
+func containsMultiHop(frrContainers []*frrcontainer.FRR) bool {
+	var multiHop = false
+	for _, frr := range frrContainers {
+		if strings.Contains(frr.Name, "multi-hop") {
+			multiHop = true
+		}
+	}
+
+	return multiHop
 }
