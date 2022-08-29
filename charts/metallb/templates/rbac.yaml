@@ -15,12 +15,6 @@ rules:
 - apiGroups: [""]
   resources: ["events"]
   verbs: ["create", "patch"]
-{{- if .Values.psp.create }}
-- apiGroups: ["policy"]
-  resources: ["podsecuritypolicies"]
-  resourceNames: ["{{ template "metallb.fullname" . }}-controller"]
-  verbs: ["use"]
-{{- end }}
 - apiGroups: ["admissionregistration.k8s.io"]
   resources: ["validatingwebhookconfigurations", "mutatingwebhookconfigurations"]
   verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
@@ -52,12 +46,6 @@ rules:
 - apiGroups: [""]
   resources: ["events"]
   verbs: ["create", "patch"]
-{{- if .Values.psp.create }}
-- apiGroups: ["policy"]
-  resources: ["podsecuritypolicies"]
-  resourceNames: ["{{ template "metallb.fullname" . }}-speaker"]
-  verbs: ["use"]
-{{- end }}
 {{- if .Values.prometheus.secureMetricsPort }}
 - apiGroups: ["authentication.k8s.io"]
   resources: ["tokenreviews"]
