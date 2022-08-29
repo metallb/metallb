@@ -3,4 +3,3 @@ kind: Kustomization
 resources:
   - speaker.yaml
   - controller.yaml
-  - psp.yaml
