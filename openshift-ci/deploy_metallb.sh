@@ -38,6 +38,8 @@ find . -type f -name "*clusterserviceversion*.yaml" -exec sed -r -i 's/name: met
 
 cd -
 
+oc label ns openshift-marketplace --overwrite pod-security.kubernetes.io/enforce=privileged
+
 secret=$(oc -n openshift-marketplace get sa builder -oyaml | grep imagePullSecrets -A 1 | grep -o "builder-.*")
 
 buildindexpod="apiVersion: v1
@@ -83,6 +85,7 @@ do
           success=1
           break
    fi
+   iterations=$((iterations+1))
    sleep $sleep_time
 done
 
@@ -108,7 +111,7 @@ do
        pod_name=$(oc -n openshift-marketplace get pod | grep metallbindex | awk '{print $1}')
        oc -n openshift-marketplace delete po $pod_name
    fi
-
+   iterations=$((iterations+1))
    sleep $sleep_time
 done
 
@@ -120,6 +123,8 @@ else
 fi
 
 ./wait-for-csv.sh
+
+oc label ns openshift-marketplace --overwrite pod-security.kubernetes.io/enforce=baseline
 
 oc apply -f - <<EOF
 apiVersion: metallb.io/v1beta1
