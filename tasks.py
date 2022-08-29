@@ -320,6 +320,7 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
         deployprometheus(ctx)
 
     if helm_install:
+        run("kubectl apply -f config/native/ns.yaml", echo=True)
         prometheus_values=""
         if with_prometheus:
             prometheus_values=("--set prometheus.serviceMonitor.enabled=true "
@@ -329,7 +330,7 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
                                "--set prometheus.namespace=monitoring ")
         run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
                 "--set speaker.image.tag=dev-{} --set speaker.frr.enabled={} --set speaker.logLevel=debug "
-                "--set controller.logLevel=debug {}".format(architecture, architecture, 
+                "--set controller.logLevel=debug {} --namespace metallb-system".format(architecture, architecture, 
                 "true" if bgp_type == "frr" else "false", prometheus_values), echo=True)
     else:
         run("kubectl delete po -nmetallb-system --all", echo=True)
