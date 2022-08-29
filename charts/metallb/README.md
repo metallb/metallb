@@ -101,7 +101,6 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | prometheus.serviceMonitor.speaker.annotations | object | `{}` |  |
 | prometheus.serviceMonitor.speaker.tlsConfig.insecureSkipVerify | bool | `true` |  |
 | prometheus.speakerMetricsTLSSecret | string | `""` |  |
-| psp.create | bool | `true` |  |
 | rbac.create | bool | `true` |  |
 | speaker.affinity | object | `{}` |  |
 | speaker.enabled | bool | `true` |  |
