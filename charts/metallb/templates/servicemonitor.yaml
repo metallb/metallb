@@ -164,6 +164,8 @@ rules:
       - ""
     resources:
       - pods
+      - services
+      - endpoints
     verbs:
       - get
       - list
