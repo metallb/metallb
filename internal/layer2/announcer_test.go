@@ -38,7 +38,13 @@ func Test_SetBalancer_AddsToAnnouncedServices(t *testing.T) {
 		<-announce.spamCh
 
 		if !announce.AnnounceName(service.name) {
-			t.Fatalf("service %v is not anounced", service.name)
+			t.Fatalf("service %v is not announced", service.name)
 		}
+	}
+	if len(announce.ips["foo"]) != 2 {
+		t.Fatalf("service foo has more than 2 ips: %d", len(announce.ips["foo"]))
+	}
+	if announce.ipRefcnt["192.168.1.20"] != 2 {
+		t.Fatalf("ip 192.168.1.20 has not 2 refcnt: %d", announce.ipRefcnt["192.168.1.20"])
 	}
 }
