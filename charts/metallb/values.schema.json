@@ -172,16 +172,6 @@
         }
       }
     },
-    "psp": {
-      "description": "PSP configuration",
-      "type": "object",
-      "properties": {
-        "create": {
-          "description": "Enable PSP",
-          "type": "boolean"
-        }
-      }
-    },
     "prometheus": {
       "description": "Prometheus monitoring config",
       "type": "object",
