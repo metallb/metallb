@@ -29,7 +29,7 @@ spec:
           value: memberlist
         - name: METALLB_DEPLOYMENT
           value: controller
-        image: quay.io/metallb/controller:v0.13.4
+        image: quay.io/metallb/controller:v0.13.5
         name: controller
         ports:
         - containerPort: 7472
