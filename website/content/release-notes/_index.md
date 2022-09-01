@@ -15,6 +15,9 @@ Bug Fixes:
 
 - Potential memory leak when receiving updates of the same service multiple times ([PR 1570](https://github.com/metallb/metallb/pull/1570))
 
+This release includes contributions from Federico Paolinelli, Jan Jansen, Magesh Dhasayyan. Thank you!
+
+
 ## Version 0.13.4
 
 New Features:
