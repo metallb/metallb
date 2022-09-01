@@ -7,12 +7,13 @@ weight: 8
 New Features:
 
 - Added namespace validation for custom resources ([PR 1523](https://github.com/metallb/metallb/pull/1523))
-
-## Version 0.13.5
-
-New Features:
-
+- Helm: added updateStrategy for controller and speakers ([PR 1340](https://github.com/metallb/metallb/pull/1340))
 - Expose the prometheus metrics securely via kube-rbac-proxy ([PR 1545](https://github.com/metallb/metallb/pull/1545))
+- Don't deploy pod security policy, not supported in k8s 1.25+ ([PR 1569](https://github.com/metallb/metallb/pull/1569))
+
+Bug Fixes:
+
+- Potential memory leak when receiving updates of the same service multiple times ([PR 1570](https://github.com/metallb/metallb/pull/1570))
 
 ## Version 0.13.4
 
