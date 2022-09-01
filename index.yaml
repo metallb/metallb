@@ -2,6 +2,26 @@ apiVersion: v1
 entries:
   metallb:
   - apiVersion: v2
+    appVersion: v0.13.5
+    created: "2022-09-01T10:43:03.394784054Z"
+    dependencies:
+    - condition: crds.enabled
+      name: crds
+      repository: ""
+      version: 0.13.5
+    description: A network load-balancer implementation for Kubernetes using standard
+      routing protocols
+    digest: 5c9d3d87a23f0ab0940816f0f504020d16d1e2ab4bd6a2a7dfcd84fe2243ffa3
+    home: https://metallb.universe.tf
+    icon: https://metallb.universe.tf/images/logo/metallb-white.png
+    name: metallb
+    sources:
+    - https://github.com/metallb/metallb
+    type: application
+    urls:
+    - https://github.com/metallb/metallb/releases/download/metallb-chart-0.13.5/metallb-0.13.5.tgz
+    version: 0.13.5
+  - apiVersion: v2
     appVersion: v0.13.4
     created: "2022-07-21T12:54:20.767964312Z"
     dependencies:
@@ -166,4 +186,4 @@ entries:
     urls:
     - https://github.com/metallb/metallb/releases/download/metallb-chart-0.10.0/metallb-0.10.0.tgz
     version: 0.10.0
-generated: "2022-07-21T12:54:20.768019613Z"
+generated: "2022-09-01T10:43:03.395100458Z"
