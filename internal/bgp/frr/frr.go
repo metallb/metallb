@@ -291,7 +291,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 	return config, nil
 }
 
-var debounceTimeout = 500 * time.Millisecond
+var debounceTimeout = 3 * time.Second
 var failureTimeout = time.Second * 5
 
 func NewSessionManager(l log.Logger, logLevel logging.Level) *sessionManager {
