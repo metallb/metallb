@@ -38,6 +38,7 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	"go.universe.tf/metallb/e2etest/pkg/metrics"
 	"go.universe.tf/metallb/e2etest/pkg/service"
+	"go.universe.tf/metallb/e2etest/pkg/udp"
 
 	"go.universe.tf/metallb/e2etest/pkg/wget"
 	internalconfig "go.universe.tf/metallb/internal/config"
@@ -181,6 +182,57 @@ var _ = ginkgo.Describe("L2", func() {
 			}, 5*time.Second, 1*time.Second).Should(gomega.BeNil())
 		})
 
+		ginkgo.It("IPV4 Should work with mixed protocol services", func() {
+
+			tcpPort := service.TestServicePort
+			udpPort := service.TestServicePort + 1
+			namespace := f.Namespace.Name
+
+			ginkgo.By("Creating a mixed protocol TCP / UDP service")
+			jig1 := e2eservice.NewTestJig(cs, namespace, "svca")
+			svc1, err := jig1.CreateLoadBalancerService(loadBalancerCreateTimeout, func(svc *corev1.Service) {
+				svc.Spec.Ports[0].TargetPort = intstr.FromInt(tcpPort)
+				svc.Spec.Ports[0].Port = int32(tcpPort)
+				svc.Spec.Ports[0].Name = "tcp"
+				svc.Spec.Ports = append(svc.Spec.Ports, corev1.ServicePort{
+					Protocol:   corev1.ProtocolUDP,
+					TargetPort: intstr.FromInt(udpPort),
+					Port:       int32(udpPort),
+					Name:       "udp",
+				})
+			})
+
+			framework.ExpectNoError(err)
+
+			defer func() {
+				err := cs.CoreV1().Services(svc1.Namespace).Delete(context.TODO(), svc1.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+			}()
+
+			framework.ExpectNoError(err)
+			_, err = jig1.Run(
+				func(rc *corev1.ReplicationController) {
+					rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", tcpPort), fmt.Sprintf("--udp-port=%d", udpPort)}
+					rc.Spec.Template.Spec.Containers[0].ReadinessProbe.HTTPGet.Port = intstr.FromInt(tcpPort)
+				})
+			framework.ExpectNoError(err)
+
+			ingressIP := e2eservice.GetIngressPoint(
+				&svc1.Status.LoadBalancer.Ingress[0])
+			hostport := net.JoinHostPort(ingressIP, strconv.Itoa(udpPort))
+
+			ginkgo.By(fmt.Sprintf("checking connectivity to its external VIP %s", hostport))
+			gomega.Eventually(func() error {
+				return udp.Check(hostport)
+			}, 2*time.Minute, 1*time.Second).Should(gomega.Not(gomega.HaveOccurred()))
+			framework.ExpectNoError(err)
+
+			ginkgo.By(fmt.Sprintf("checking connectivity to its external VIP %s", hostport))
+			hostport = net.JoinHostPort(ingressIP, strconv.Itoa(tcpPort))
+			address := fmt.Sprintf("http://%s/", hostport)
+			err = wget.Do(address, executor.Host)
+			framework.ExpectNoError(err)
+		})
 	})
 
 	ginkgo.Context("validate different AddressPools for type=Loadbalancer", func() {
