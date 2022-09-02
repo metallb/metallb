@@ -487,7 +487,7 @@ func UseEndpointSlices(kubeClient kubernetes.Interface) bool {
 		return false
 	}
 	// this is needed to check if ep slices are enabled on the cluster. In 1.17 the resources are there but disabled by default
-	if _, err := kubeClient.DiscoveryV1beta1().EndpointSlices("default").Get(context.Background(), "kubernetes", metav1.GetOptions{}); err != nil {
+	if _, err := kubeClient.DiscoveryV1().EndpointSlices("default").Get(context.Background(), "kubernetes", metav1.GetOptions{}); err != nil {
 		return false
 	}
 	return true
