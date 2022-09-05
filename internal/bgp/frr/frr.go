@@ -305,7 +305,7 @@ func NewSessionManager(l log.Logger, logLevel logging.Level) *sessionManager {
 		return generateAndReloadConfigFile(config, l)
 	}
 
-	debouncer(reload, res.reloadConfig, debounceTimeout, failureTimeout)
+	debouncer(reload, res.reloadConfig, debounceTimeout, failureTimeout, l)
 
 	reloadValidator(l, res.reloadConfig)
 
