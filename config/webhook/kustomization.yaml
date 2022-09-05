@@ -9,6 +9,7 @@ configurations:
 patchesJson6902:
 - path: patches/patch_webhook_configuration.yaml
   target:
+    group: admissionregistration.k8s.io
     version: v1
     kind: ValidatingWebhookConfiguration
     name: validating-webhook-configuration
