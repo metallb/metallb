@@ -259,10 +259,14 @@ func (a *Allocator) AllocateFromPool(svc string, serviceIPFamily ipfamily.Family
 		}
 	}
 
-	if len(ipfamilySel) > 0 {
-		// Woops, run out of IPs :( Fail.
+	// atleast one stack avaiable
+	if serviceIPFamily == ipfamily.DualStack && len(ipfamilySel) == 2 {
 		return nil, fmt.Errorf("no available IPs in pool %q for %s IPFamily", poolName, serviceIPFamily)
 	}
+	if serviceIPFamily != ipfamily.DualStack && len(ipfamilySel) != 0 {
+		return nil, fmt.Errorf("no available IPs in pool %q for %s IPFamily", poolName, serviceIPFamily)
+	}
+
 	err := a.Assign(svc, ips, ports, sharingKey, backendKey)
 	if err != nil {
 		return nil, err
