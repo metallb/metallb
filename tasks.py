@@ -67,6 +67,18 @@ def _docker_build_cmd():
                   "|| echo 'docker build'", hide=True).stdout.strip()
     return out
 
+def run_with_retry(cmd, tries=6, delay=2):
+  mtries, mdelay = tries, delay
+  while mtries > 1:
+    rv = run(cmd, warn="True").exited
+    if rv == 0:
+          return
+    print("Sleeping for {}s".format(mdelay))
+    time.sleep(mdelay)
+    mtries -= 1
+    mdelay *= 2 #exponential backoff
+  run(cmd)
+
 def _make_build_dirs():
     for arch in all_architectures:
         for binary in all_binaries:
@@ -457,7 +469,7 @@ def bgp_dev_env(ip_family, frr_volume_dir):
     with open("%s/config.yaml" % dev_env_dir, 'w') as f:
         f.write(mlb_config)
     # Apply the MetalLB ConfigMap
-    run("kubectl apply -f %s/config.yaml" % dev_env_dir)
+    run_with_retry("kubectl apply -f %s/config.yaml" % dev_env_dir)
 
 
 def get_available_ips(ip_family=None):
