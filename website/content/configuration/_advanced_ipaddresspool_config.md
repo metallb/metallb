@@ -14,7 +14,7 @@ with free addresses. This might end up using "expensive" addresses for
 services that don't require it.
 
 To prevent this behaviour you can disable automatic allocation for a pool
-by setting the `auto-assign` flag to `false`:
+by setting the `autoAssign` flag to `false`:
 
 ```yaml
 apiVersion: metallb.io/v1beta1

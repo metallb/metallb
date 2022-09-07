@@ -8,7 +8,7 @@ creating and deploying various resources into **the same namespace**
 (metallb-system) MetalLB is deployed into.
 
 There are various examples of the configuration CRs in
-[`configsamples`](https://raw.githubusercontent.com/metallb/metallb/main/configsamples).
+[`configsamples`](https://github.com/metallb/metallb/tree/main/configsamples).
 
 Also, the API is [fully documented here](../apis/_index.md).
 
@@ -51,9 +51,9 @@ to announce service IPs. Jump to:
 
 - [Layer 2 configuration](#layer-2-configuration)
 - [BGP configuration](#bgp-configuration)
-- [Advanced BGP configuration](./_advanced_bgp_configuration.md)
-- [Advanced L2 configuration](./_advanced_l2_configuration.md)
-- [Advanced IPAddressPool configuration](./_advanced_ipaddresspool_configuration.md)
+- [Advanced BGP configuration](./_advanced_bgp_configuration)
+- [Advanced L2 configuration](./_advanced_l2_configuration)
+- [Advanced IPAddressPool configuration](./_advanced_ipaddresspool_config/)
 
 Note: it is possible to announce the same service both via L2 and via BGP (see the relative
 [FAQ](../faq/_index.md)).

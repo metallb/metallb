@@ -15,6 +15,7 @@ const (
 )
 
 func TestValidateAddressPool(t *testing.T) {
+	MetalLBNamespace = MetalLBTestNameSpace
 	addressPool := AddressPool{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-addresspool",
@@ -114,6 +115,18 @@ func TestValidateAddressPool(t *testing.T) {
 				},
 			},
 			failValidate: true,
+		},
+		{
+			desc: "Validation must fail if created in different namespace",
+			addressPool: &AddressPool{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-addresspool2",
+					Namespace: "default",
+				},
+			},
+			isNewAddressPool: true,
+			expected:         nil,
+			failValidate:     true,
 		},
 	}
 

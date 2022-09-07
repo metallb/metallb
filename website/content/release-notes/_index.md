@@ -2,8 +2,24 @@
 title: Release Notes
 weight: 8
 ---
+## Version 0.13.5
+
+New Features:
+
+- Added namespace validation for custom resources ([PR 1523](https://github.com/metallb/metallb/pull/1523))
+- Helm: added updateStrategy for controller and speakers ([PR 1340](https://github.com/metallb/metallb/pull/1340))
+- Expose the prometheus metrics securely via kube-rbac-proxy ([PR 1545](https://github.com/metallb/metallb/pull/1545))
+- Don't deploy pod security policy, not supported in k8s 1.25+ ([PR 1569](https://github.com/metallb/metallb/pull/1569))
+
+Bug Fixes:
+
+- Potential memory leak when receiving updates of the same service multiple times ([PR 1570](https://github.com/metallb/metallb/pull/1570))
 
 ## Version 0.13.4
+
+New Features:
+
+- Use cosign to sign the images ([PR 1437](https://github.com/metallb/metallb/pull/1437))
 
 Bug Fixes:
 
@@ -13,7 +29,10 @@ Bug Fixes:
 the service ([Issue 1511](https://github.com/metallb/metallb/issues/1511) [PR 1516](https://github.com/metallb/metallb/pull/1516))
 - Add the AvoidBuggyIPs flag to the IPAddressPool CRD. Converting a CIDR to a range comes with limitation related
 to setting the aggregation length and validating it. ([Issue 1495](https://github.com/metallb/metallb/issues/1495),
-[PR 1515](https://github.com/metallb/metallb/pull/1515)
+[PR 1515](https://github.com/metallb/metallb/pull/1515))
+- Add a valid pem format to the CRDs webhooks instead of the empty placeholder. ([Issue 1501](https://github.com/metallb/metallb/issues/1501),
+[Issue 1521](https://github.com/metallb/metallb/issues/1521),
+[PR 1522](https://github.com/metallb/metallb/pull/1522))
 
 ## Version 0.13.3
 

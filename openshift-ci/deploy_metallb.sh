@@ -125,6 +125,7 @@ fi
 ./wait-for-csv.sh
 
 oc label ns openshift-marketplace --overwrite pod-security.kubernetes.io/enforce=baseline
+oc label ns metallb-system openshift.io/cluster-monitoring=true
 
 oc apply -f - <<EOF
 apiVersion: metallb.io/v1beta1
