@@ -9,23 +9,25 @@ cleanup() {
 reload_frr() {
   flock 200
   echo "Caught SIGHUP and acquired lock! Reloading FRR.."
+  SECONDS=0
+
   kill_sleep
 
   echo "Checking the configuration file syntax"
   if ! python3 /usr/lib/frr/frr-reload.py --test --stdout "$FILE_TO_RELOAD" ; then
-    echo "Syntax error spotted: aborting.."
+    echo "Syntax error spotted: aborting.. $SECONDS seconds"
     echo -n "$(date +%s) failure"  > "$STATUSFILE"
     return
   fi
 
   echo "Applying the configuration file"
   if ! python3 /usr/lib/frr/frr-reload.py --reload --overwrite --stdout "$FILE_TO_RELOAD" ; then
-    echo "Failed to fully apply configuration file"
+    echo "Failed to fully apply configuration file $SECONDS seconds"
     echo -n "$(date +%s) failure"  > "$STATUSFILE"
     return
   fi
   
-  echo "FRR reloaded successfully!"
+  echo "FRR reloaded successfully! $SECONDS seconds"
   echo -n "$(date +%s) success"  > "$STATUSFILE"
 } 200<"$LOCKFILE"
 
