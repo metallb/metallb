@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"reflect"
 	"strconv"
 	"syscall"
 	"text/template"
@@ -341,7 +342,8 @@ func generateAndReloadConfigFile(config *frrConfig, l log.Logger) error {
 func debouncer(body func(config *frrConfig) error,
 	reload <-chan reloadEvent,
 	reloadInterval time.Duration,
-	failureRetryInterval time.Duration) {
+	failureRetryInterval time.Duration,
+	l log.Logger) {
 	go func() {
 		var config *frrConfig
 		var timeOut <-chan time.Time
@@ -353,7 +355,12 @@ func debouncer(body func(config *frrConfig) error,
 					return
 				}
 				if newCfg.useOld && config == nil {
+					level.Debug(l).Log("op", "reload", "action", "ignore config", "reason", "nil config")
 					continue // just ignore the event
+				}
+				if !newCfg.useOld && reflect.DeepEqual(newCfg.config, config) {
+					level.Debug(l).Log("op", "reload", "action", "ignore config", "reason", "same config")
+					continue // config hasn't changed
 				}
 				if !newCfg.useOld {
 					config = newCfg.config

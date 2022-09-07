@@ -29,25 +29,45 @@ spec:
   peerAddress: 10.96.0.101
 status: {}
 ---
-apiVersion: metallb.io/v1beta1
-kind: IPAddressPool
+apiVersion: metallb.io/v1beta2
+kind: BGPPeer
 metadata:
   creationTimestamp: null
-  name: my-ip-space
+  name: peer3
   namespace: metallb-system
 spec:
-  addresses:
-  - 198.51.100.0/24
+  bfdProfile: bfdprofile1
+  holdTime: 2m0s
+  keepaliveTime: 30s
+  myASN: 64512
+  nodeSelectors:
+  - matchExpressions:
+    - key: beta.kubernetes.io/arch
+      operator: In
+      values:
+      - amd64
+      - arm
+    matchLabels:
+      kubernetes.io/hostname: prod-01
+  password: yourPassword
+  passwordSecret: {}
+  peerASN: 64512
+  peerAddress: 10.0.0.1
+  peerPort: 179
+  routerID: 1.2.3.4
+  sourceAddress: 10.0.0.2
 status: {}
 ---
 apiVersion: metallb.io/v1beta1
-kind: BGPAdvertisement
+kind: BFDProfile
 metadata:
   creationTimestamp: null
-  name: bgpadvertisement1
+  name: bfdprofile1
   namespace: metallb-system
 spec:
-  ipAddressPools:
-  - my-ip-space
+  echoMode: false
+  passiveMode: false
+  receiveInterval: 280
+  transmitInterval: 270
 status: {}
 ---

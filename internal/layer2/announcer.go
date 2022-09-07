@@ -227,14 +227,13 @@ func (a *Announce) SetBalancer(name string, ip net.IP) {
 
 	// Kubernetes may inform us that we should advertise this address multiple
 	// times, so just no-op any subsequent requests.
-	if ips, ok := a.ips[name]; ok {
-		for i, ip := range ips {
-			if ip.Equal(a.ips[name][i]) {
-				continue
+	if serviceIPs, ok := a.ips[name]; ok {
+		for _, serviceIP := range serviceIPs {
+			if serviceIP.Equal(ip) {
+				return
 			}
 		}
 	}
-
 	a.ips[name] = append(a.ips[name], ip)
 
 	a.ipRefcnt[ip.String()]++
