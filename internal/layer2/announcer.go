@@ -287,7 +287,7 @@ func (a *Announce) DeleteBalancer(name string) {
 		if a.ipRefcnt[cur.ip.String()] > 0 {
 			// Another service is still using this IP, don't touch any
 			// more things.
-			return
+			continue
 		}
 
 		for _, client := range a.ndps {
