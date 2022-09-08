@@ -11,15 +11,18 @@ convert the configmap into the new CRDs.
 
 The conversion tool is shipped as a container image under `quay.io/metallb/configmaptocrs`.
 
-Run the container, mapping the path with the source file `config.yaml` to `/var/input` inside the container:
+In order to use the tool, the following container must be run with the ConfigMap config.yaml mapped 
+into the /var/input folder. On success it will generate a resources.yaml file containing the new MetalLB CRD based config.
+This example assumes MetalLB was installed in the metallb-system namespace and the ConfigMap was named config:
 
 ```bash
-docker run -d -v $(pwd):/var/input quay.io/metallb/configmaptocrs -source config.yaml 
+kubectl get configmap -n metallb-system -o yaml config > config.yaml
+docker run -d -v $(pwd):/var/input quay.io/metallb/configmaptocrs
 ```
 
 ## Example
 
-For this MetalLB configmap in config.yaml:
+For this MetalLB configmap named config.yaml:
 
 ```yaml
 apiVersion: v1
@@ -92,3 +95,50 @@ status: {}
 ---
 
 ```
+
+## Running directly against a cluster
+
+Configmaptocrs tool can also run directly against a cluster,
+and print the CRs corresponding to the configmap deployed on
+the cluster to the standard output.
+```
+kubectl run configmaptocrs -n metallb-system --restart=Never -it --rm --image overriden --overrides '
+{
+  "spec": {
+    "containers": [
+      {
+        "name": "configmaptocrs",
+        "image": "quay.io/metallb/configmaptocrs",
+        "command": [
+          "/configmaptocrs",
+          "-source",
+          "config",
+          "-only-data",
+          "-stdout"
+        ],
+        "volumeMounts": [
+          {
+            "name": "config",
+            "mountPath": "/var/input"
+          }
+        ]
+      }
+    ],
+    "volumes": [
+      {
+        "name": "config",
+        "configMap": {
+          "name": "config"
+        }
+      }
+    ]
+  }
+}'
+```
+## Options of configmaptocrs:
+  ### -source string
+    name of the input file to convert (default "./config.yaml")
+  ### -only-data bool
+    set this to true if the input file is only the configMap data
+  ### -stdout bool
+    set this to true to output the crds to stdout
