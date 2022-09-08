@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"go.universe.tf/metallb/api/v1beta1"
@@ -235,11 +236,18 @@ func communitiesFor(cf *configFile) []v1beta1.Community {
 	}
 
 	communitiesAliases := make([]v1beta1.CommunityAlias, 0)
+	// in order to make the rendering stable, we must have a sorted list of communities.
+	sortedCommunities := make([]string, 0, len(cf.BGPCommunities))
 
-	for n, v := range cf.BGPCommunities {
+	for n, _ := range cf.BGPCommunities {
+		sortedCommunities = append(sortedCommunities, n)
+	}
+	sort.Strings(sortedCommunities)
+
+	for _, v := range sortedCommunities {
 		communityAlias := v1beta1.CommunityAlias{
-			Name:  n,
-			Value: v,
+			Name:  v,
+			Value: cf.BGPCommunities[v],
 		}
 		communitiesAliases = append(communitiesAliases, communityAlias)
 	}
