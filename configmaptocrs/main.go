@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 
 	"go.universe.tf/metallb/api/v1beta1"
@@ -235,11 +236,18 @@ func communitiesFor(cf *configFile) []v1beta1.Community {
 	}
 
 	communitiesAliases := make([]v1beta1.CommunityAlias, 0)
+	// in order to make the rendering stable, we must have a sorted list of communities.
+	sortedCommunities := make([]string, 0, len(cf.BGPCommunities))
 
-	for n, v := range cf.BGPCommunities {
+	for n, _ := range cf.BGPCommunities {
+		sortedCommunities = append(sortedCommunities, n)
+	}
+	sort.Strings(sortedCommunities)
+
+	for _, v := range sortedCommunities {
 		communityAlias := v1beta1.CommunityAlias{
-			Name:  n,
-			Value: v,
+			Name:  v,
+			Value: cf.BGPCommunities[v],
 		}
 		communitiesAliases = append(communitiesAliases, communityAlias)
 	}
@@ -275,10 +283,6 @@ func parsePeer(p peer) (*v1beta2.BGPPeer, error) {
 	if err != nil {
 		return nil, err
 	}
-	keepaliveTime, err := parseKeepaliveTime(holdTime, p.KeepaliveTime)
-	if err != nil {
-		return nil, err
-	}
 
 	nodeSels := make([]metav1.LabelSelector, 0)
 	for _, sel := range p.NodeSelectors {
@@ -286,7 +290,7 @@ func parsePeer(p peer) (*v1beta2.BGPPeer, error) {
 		nodeSels = append(nodeSels, s)
 	}
 
-	return &v1beta2.BGPPeer{
+	res := &v1beta2.BGPPeer{
 		ObjectMeta: metav1.ObjectMeta{
 			Namespace: resourcesNameSpace,
 		},
@@ -297,14 +301,22 @@ func parsePeer(p peer) (*v1beta2.BGPPeer, error) {
 			SrcAddress:    p.SrcAddr,
 			Port:          p.Port,
 			HoldTime:      metav1.Duration{Duration: holdTime},
-			KeepaliveTime: metav1.Duration{Duration: keepaliveTime},
 			RouterID:      p.RouterID,
 			NodeSelectors: nodeSels,
 			Password:      p.Password,
 			BFDProfile:    p.BFDProfile,
 			EBGPMultiHop:  p.EBGPMultiHop,
 		},
-	}, nil
+	}
+	if p.KeepaliveTime != "" {
+		keepaliveTime, err := parseKeepaliveTime(holdTime, p.KeepaliveTime)
+		if err != nil {
+			return nil, err
+		}
+		res.Spec.KeepaliveTime = metav1.Duration{Duration: keepaliveTime}
+	}
+
+	return res, nil
 }
 
 func parseNodeSelector(sel nodeSelector) metav1.LabelSelector {
@@ -342,10 +354,6 @@ func parseHoldTime(ht string) (time.Duration, error) {
 }
 
 func parseKeepaliveTime(ht time.Duration, ka string) (time.Duration, error) {
-	// If keepalive time not set lets use 1/3 of holdtime.
-	if ka == "" {
-		return ht / 3, nil
-	}
 	d, err := time.ParseDuration(ka)
 	if err != nil {
 		return 0, fmt.Errorf("invalid keepalive time %q: %s", ka, err)

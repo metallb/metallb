@@ -44,7 +44,7 @@ func TestARPResponder(t *testing.T) {
 		},
 		{
 			name: "shouldAnnounce denies request",
-			shouldAnnounce: func(ip net.IP) dropReason {
+			shouldAnnounce: func(ip net.IP, intf string) dropReason {
 				if net.IPv4(192, 168, 1, 20).Equal(ip) {
 					return dropReasonNone
 				}
@@ -55,7 +55,7 @@ func TestARPResponder(t *testing.T) {
 		{
 			name:   "shouldAnnounce allows request",
 			arpTgt: net.IPv4(192, 168, 1, 20),
-			shouldAnnounce: func(ip net.IP) dropReason {
+			shouldAnnounce: func(ip net.IP, intf string) dropReason {
 				if net.IPv4(192, 168, 1, 20).Equal(ip) {
 					return dropReasonNone
 				}
@@ -69,7 +69,7 @@ func TestARPResponder(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			shouldAnnounce := tt.shouldAnnounce
 			if shouldAnnounce == nil {
-				shouldAnnounce = func(net.IP) dropReason {
+				shouldAnnounce = func(net.IP, string) dropReason {
 					return dropReasonNone
 				}
 			}
