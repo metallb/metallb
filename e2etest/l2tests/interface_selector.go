@@ -4,6 +4,7 @@ package l2tests
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/onsi/ginkgo"
@@ -172,6 +173,55 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 					return mac.RequestAddressResolutionFromIface(ingressIP, LocalNics[i], executor.Host)
 				}, 10*time.Second, 1*time.Second).Should(gomega.Not(gomega.HaveOccurred()))
 			}
+		})
+
+		ginkgo.It("Specify not existing interfaces", func() {
+			resources := internalconfig.ClusterResources{
+				L2Advs: []metallbv1beta1.L2Advertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "with-interfaces",
+						},
+						Spec: metallbv1beta1.L2AdvertisementSpec{
+							Interfaces: []string{"foo"},
+						},
+					},
+				},
+			}
+			err := ConfigUpdater.Update(resources)
+			framework.ExpectNoError(err)
+
+			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "lb-service")
+			defer func() {
+				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+			}()
+
+			ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+			err = mac.FlushIPNeigh(ingressIP, executor.Host)
+			framework.ExpectNoError(err)
+
+			// check arp respond
+			for i := range LocalNics {
+				gomega.Consistently(func() error {
+					return mac.RequestAddressResolutionFromIface(ingressIP, LocalNics[i], executor.Host)
+				}, 10*time.Second, 1*time.Second).Should(gomega.HaveOccurred())
+			}
+
+			// check announceFailed event
+			gomega.Eventually(func() error {
+				events, err := cs.CoreV1().Events(svc.Namespace).List(context.Background(), metav1.ListOptions{FieldSelector: "reason=announceFailed"})
+				if err != nil {
+					return err
+				}
+
+				for _, e := range events.Items {
+					if e.InvolvedObject.Name == svc.Name {
+						return nil
+					}
+				}
+				return fmt.Errorf("service hasn't receive the \"announceFailed\" event")
+			}, 1*time.Minute, 1*time.Second).Should(gomega.BeNil())
 		})
 	})
 })
