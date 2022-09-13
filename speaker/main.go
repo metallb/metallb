@@ -323,7 +323,7 @@ func (c *controller) handleService(l log.Logger,
 		return c.deleteBalancerProtocol(l, protocol, name, deleteReason)
 	}
 
-	if err := handler.SetBalancer(l, name, lbIPs, pool); err != nil {
+	if err := handler.SetBalancer(l, name, lbIPs, pool, c.client, svc); err != nil {
 		level.Error(l).Log("op", "setBalancer", "error", err, "msg", "failed to announce service")
 		return controllers.SyncStateError
 	}
@@ -472,7 +472,7 @@ func (c *controller) SetNode(l log.Logger, node *v1.Node) controllers.SyncState 
 type Protocol interface {
 	SetConfig(log.Logger, *config.Config) error
 	ShouldAnnounce(log.Logger, string, []net.IP, *config.Pool, *v1.Service, epslices.EpsOrSlices) string
-	SetBalancer(log.Logger, string, []net.IP, *config.Pool) error
+	SetBalancer(log.Logger, string, []net.IP, *config.Pool, service, *v1.Service) error
 	DeleteBalancer(log.Logger, string, string) error
 	SetNode(log.Logger, *v1.Node) error
 }

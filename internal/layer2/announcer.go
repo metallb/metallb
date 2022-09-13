@@ -19,10 +19,11 @@ type Announce struct {
 	logger log.Logger
 
 	sync.RWMutex
-	arps     map[int]*arpResponder
-	ndps     map[int]*ndpResponder
-	ips      map[string][]IPAdvertisement // svcName -> IPAdvertisements
-	ipRefcnt map[string]int               // ip.String() -> number of uses
+	nodeInterfaces []string // current local interfaces' name list
+	arps           map[int]*arpResponder
+	ndps           map[int]*ndpResponder
+	ips            map[string][]IPAdvertisement // svcName -> IPAdvertisements
+	ipRefcnt       map[string]int               // ip.String() -> number of uses
 
 	// This channel can block - do not write to it while holding the mutex
 	// to avoid deadlocking.
@@ -32,12 +33,13 @@ type Announce struct {
 // New returns an initialized Announce.
 func New(l log.Logger) (*Announce, error) {
 	ret := &Announce{
-		logger:   l,
-		arps:     map[int]*arpResponder{},
-		ndps:     map[int]*ndpResponder{},
-		ips:      map[string][]IPAdvertisement{},
-		ipRefcnt: map[string]int{},
-		spamCh:   make(chan IPAdvertisement, 1024),
+		logger:         l,
+		nodeInterfaces: []string{},
+		arps:           map[int]*arpResponder{},
+		ndps:           map[int]*ndpResponder{},
+		ips:            map[string][]IPAdvertisement{},
+		ipRefcnt:       map[string]int{},
+		spamCh:         make(chan IPAdvertisement, 1024),
 	}
 	go ret.interfaceScan()
 	go ret.spamLoop()
@@ -63,8 +65,10 @@ func (a *Announce) updateInterfaces() {
 	defer a.Unlock()
 
 	keepARP, keepNDP := map[int]bool{}, map[int]bool{}
+	curIfs := make([]string, 0, len(ifs))
 	for _, intf := range ifs {
 		ifi := intf
+		curIfs = append(curIfs, ifi.Name)
 		l := log.With(a.logger, "interface", ifi.Name)
 		addrs, err := ifi.Addrs()
 		if err != nil {
@@ -121,6 +125,8 @@ func (a *Announce) updateInterfaces() {
 			level.Info(l).Log("event", "createNDPResponder", "msg", "created NDP responder for interface")
 		}
 	}
+
+	a.nodeInterfaces = curIfs
 
 	for i, client := range a.arps {
 		if !keepARP[i] {
@@ -304,6 +310,16 @@ func (a *Announce) AnnounceName(name string) bool {
 	defer a.RUnlock()
 	_, ok := a.ips[name]
 	return ok
+}
+
+// GetInterfaces returns current interfaces list.
+func (a *Announce) GetInterfaces() []string {
+	a.Lock()
+	defer a.Unlock()
+
+	localInterfaces := make([]string, len(a.nodeInterfaces))
+	copy(localInterfaces, a.nodeInterfaces)
+	return localInterfaces
 }
 
 // dropReason is the reason why a layer2 protocol packet was not

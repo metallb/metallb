@@ -179,7 +179,7 @@ func (m *MockProtocol) ShouldAnnounce(_ log.Logger, _ string, _ []net.IP, _ *con
 	return "no announce"
 }
 
-func (m *MockProtocol) SetBalancer(_ log.Logger, _ string, _ []net.IP, _ *config.Pool) error {
+func (m *MockProtocol) SetBalancer(_ log.Logger, _ string, _ []net.IP, _ *config.Pool, _ service, _ *v1.Service) error {
 	m.setBalancerCalled = true
 	return nil
 }
