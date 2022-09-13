@@ -26,10 +26,13 @@ import (
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
@@ -149,6 +152,23 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 }
 
 func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	p := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			newNodeObj, ok := e.ObjectNew.(*corev1.Node)
+			if !ok {
+				return true
+			}
+			oldNodeObj, ok := e.ObjectOld.(*corev1.Node)
+			if !ok {
+				return true
+			}
+			// If there is no changes in node labels, ignore event.
+			if labels.Equals(labels.Set(oldNodeObj.Labels), labels.Set(newNodeObj.Labels)) {
+				return false
+			}
+			return true
+		},
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metallbv1beta2.BGPPeer{}).
 		Watches(&source.Kind{Type: &metallbv1beta1.IPAddressPool{}}, &handler.EnqueueRequestForObject{}).
@@ -159,6 +179,7 @@ func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&source.Kind{Type: &metallbv1beta1.AddressPool{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &metallbv1beta1.Community{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForObject{}).
+		WithEventFilter(p).
 		Complete(r)
 }
 
