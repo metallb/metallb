@@ -666,9 +666,10 @@ def bumprelease(ctx, version, previous_version):
 @task
 def test(ctx):
     """Run unit tests."""
-    run("go test -short ./...")
-    run("go test -short -race ./...")
-
+    envtest_asset_dir = os.getcwd() + "/dev-env/unittest"
+    run("source {}/setup-envtest.sh; fetch_envtest_tools {}".format(envtest_asset_dir, envtest_asset_dir), echo=True)
+    run("source {}/setup-envtest.sh; setup_envtest_env {}; go test -short ./...".format(envtest_asset_dir, envtest_asset_dir), echo=True)
+    run("source {}/setup-envtest.sh; setup_envtest_env {}; go test -short -race ./...".format(envtest_asset_dir, envtest_asset_dir), echo=True)
 
 @task
 def checkpatch(ctx):
