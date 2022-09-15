@@ -10,7 +10,7 @@ creating and deploying various resources into **the same namespace**
 There are various examples of the configuration CRs in
 [`configsamples`](https://github.com/metallb/metallb/tree/main/configsamples).
 
-Also, the API is [fully documented here](../apis/_index.md).
+Also, the API is [fully documented here](../apis/).
 
 {{% notice note %}}
 If you installed MetalLB with Helm, you will need to change the
