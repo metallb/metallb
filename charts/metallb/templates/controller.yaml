@@ -100,7 +100,7 @@ spec:
         {{- if .Values.controller.readinessProbe.enabled }}
         readinessProbe:
           httpGet:
-            path: /
+            path: /validate-metallb-io-v1beta1-addresspool
             port: webhook-server
             scheme: HTTPS
           initialDelaySeconds: {{ .Values.controller.readinessProbe.initialDelaySeconds }}
