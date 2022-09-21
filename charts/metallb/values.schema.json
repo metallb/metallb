@@ -179,6 +179,7 @@
         "scrapeAnnotations": { "type": "boolean" },
         "metricsPort": { "type": "integer" },
         "secureMetricsPort": { "type": "integer" },
+        "rbacPrometheus": { "type": "boolean" },
         "serviceAccount": { "type": "string" },
         "namespace": { "type": "string" },
         "rbacProxy": {
