@@ -75,6 +75,7 @@ spec:
 {{- toYaml .Values.prometheus.podMonitor.relabelings | nindent 4 }}
 {{- end }}
 ---
+{{- if .Values.prometheus.rbacPrometheus }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -101,4 +102,5 @@ subjects:
   - kind: ServiceAccount
     name: {{ required ".Values.prometheus.serviceAccount must be defined when .Values.prometheus.podMonitor.enabled == true" .Values.prometheus.serviceAccount }}
     namespace: {{ required ".Values.prometheus.namespace must be defined when .Values.prometheus.podMonitor.enabled == true" .Values.prometheus.namespace }}
+{{- end }}
 {{- end }}

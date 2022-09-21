@@ -155,6 +155,7 @@ spec:
   sessionAffinity: None
   type: ClusterIP
 ---
+{{- if .Values.prometheus.rbacPrometheus }}
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -183,4 +184,5 @@ subjects:
   - kind: ServiceAccount
     name: {{ required ".Values.prometheus.serviceAccount must be defined when .Values.prometheus.serviceMonitor.enabled == true" .Values.prometheus.serviceAccount }}
     namespace: {{ required ".Values.prometheus.namespace must be defined when .Values.prometheus.serviceMonitor.enabled == true" .Values.prometheus.namespace }}
-{{ end }}
+{{- end }}
+{{- end }}
