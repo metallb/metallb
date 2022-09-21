@@ -386,7 +386,7 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
                 "--set controller.logLevel=debug {} --namespace metallb-system".format(architecture, architecture, 
                 "true" if bgp_type == "frr" else "false", prometheus_values), echo=True)
     else:
-        run("kubectl delete po -nmetallb-system --all", echo=True)
+        run("kubectl delete po -n metallb-system --all", echo=True)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest_file = tmpdir + "/metallb.yaml"
