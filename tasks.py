@@ -386,7 +386,7 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
                 "--set controller.logLevel=debug {} --namespace metallb-system".format(architecture, architecture, 
                 "true" if bgp_type == "frr" else "false", prometheus_values), echo=True)
     else:
-        run("kubectl delete po -nmetallb-system --all", echo=True)
+        run("kubectl delete po -n metallb-system --all", echo=True)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest_file = tmpdir + "/metallb.yaml"
@@ -666,9 +666,10 @@ def bumprelease(ctx, version, previous_version):
 @task
 def test(ctx):
     """Run unit tests."""
-    run("go test -short ./...")
-    run("go test -short -race ./...")
-
+    envtest_asset_dir = os.getcwd() + "/dev-env/unittest"
+    run("source {}/setup-envtest.sh; fetch_envtest_tools {}".format(envtest_asset_dir, envtest_asset_dir), echo=True)
+    run("source {}/setup-envtest.sh; setup_envtest_env {}; go test -short ./...".format(envtest_asset_dir, envtest_asset_dir), echo=True)
+    run("source {}/setup-envtest.sh; setup_envtest_env {}; go test -short -race ./...".format(envtest_asset_dir, envtest_asset_dir), echo=True)
 
 @task
 def checkpatch(ctx):
