@@ -34,5 +34,4 @@ runs:
       run: |
         docker load -i image-tar-speaker/speaker.tar
         docker load -i image-tar-controller/controller.tar
-        docker load -i image-tar-mirror-server/mirror-server.tar
         docker load -i image-tar-configmaptocrs/configmaptocrs.tar
