@@ -17,7 +17,6 @@ from invoke.exceptions import Exit, UnexpectedExit
 
 all_binaries = set(["controller",
                     "speaker",
-                    "mirror-server",
                     "configmaptocrs"])
 all_architectures = set(["amd64",
                          "arm",
@@ -361,12 +360,11 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
             run("kind create cluster --name={} --config={} {}".format(name, tmp.name, extra_options), pty=True, echo=True)
         _add_nic_to_nodes(name)
 
-    binaries = ["controller", "speaker", "mirror-server"]
+    binaries = ["controller", "speaker"]
     if build_images:
         build(ctx, binaries, architectures=[architecture])
     run("kind load docker-image --name={} quay.io/metallb/controller:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(name, architecture), echo=True)
-    run("kind load docker-image --name={} quay.io/metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
 
     if with_prometheus:
         print("Deploying prometheus")
@@ -407,14 +405,6 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
                 f.flush()
 
             run("kubectl apply -f {}".format(manifest_file), echo=True)
-
-    with open("e2etest/manifests/mirror-server.yaml") as f:
-        manifest = f.read()
-    manifest = manifest.replace(":main", ":dev-{}".format(architecture))
-    with tempfile.NamedTemporaryFile() as tmp:
-        tmp.write(manifest.encode("utf-8"))
-        tmp.flush()
-        run("kubectl apply -f {}".format(tmp.name), echo=True)
 
     if protocol == "bgp":
         print("Configuring MetalLB with a BGP test environment")
