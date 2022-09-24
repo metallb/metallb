@@ -60,7 +60,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        image: [speaker, controller, mirror-server, configmaptocrs]
+        image: [speaker, controller, configmaptocrs]
     steps:
       - name: Code checkout
         uses: actions/checkout@v3
