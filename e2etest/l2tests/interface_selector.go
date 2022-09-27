@@ -12,6 +12,7 @@ import (
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	internalconfig "go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -21,6 +22,7 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/mac"
+
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	"go.universe.tf/metallb/e2etest/pkg/service"
 )
@@ -222,6 +224,93 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 				}
 				return fmt.Errorf("service hasn't receive the \"announceFailed\" event")
 			}, 1*time.Minute, 1*time.Second).Should(gomega.BeNil())
+		})
+
+		ginkgo.It("Address pool connected with two L2 advertisements", func() {
+			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "lb-service")
+			defer func() {
+				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+			}()
+
+			ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+			resources := internalconfig.ClusterResources{}
+
+			for i := range NodeNics {
+				l2Adv := metallbv1beta1.L2Advertisement{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: fmt.Sprintf("with-interfaces-%d-l2adv", i),
+					},
+					Spec: metallbv1beta1.L2AdvertisementSpec{
+						IPAddressPools: []string{"l2-test"},
+						Interfaces:     []string{NodeNics[i]},
+					},
+				}
+				resources.L2Advs = append(resources.L2Advs, l2Adv)
+			}
+
+			err := mac.FlushIPNeigh(ingressIP, executor.Host)
+			framework.ExpectNoError(err)
+			err = ConfigUpdater.Update(resources)
+			framework.ExpectNoError(err)
+
+			for i := range LocalNics {
+				gomega.Eventually(func() error {
+					return mac.RequestAddressResolutionFromIface(ingressIP, LocalNics[i], executor.Host)
+				}, 10*time.Second, 1*time.Second).ShouldNot(gomega.HaveOccurred())
+			}
+		})
+
+		ginkgo.It("node selector", func() {
+			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "lb-service")
+			defer func() {
+				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+			}()
+
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+
+			framework.ExpectNoError(err)
+			for _, node := range allNodes.Items {
+				resources := internalconfig.ClusterResources{
+					L2Advs: []metallbv1beta1.L2Advertisement{
+						{
+							ObjectMeta: metav1.ObjectMeta{
+								Name: "with-interfaces",
+							},
+							Spec: metallbv1beta1.L2AdvertisementSpec{
+								Interfaces:    []string{NodeNics[0]},
+								NodeSelectors: k8s.SelectorsForNodes([]v1.Node{node}),
+							},
+						},
+					},
+				}
+
+				err = ConfigUpdater.Update(resources)
+				framework.ExpectNoError(err)
+
+				ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+				err := mac.FlushIPNeigh(ingressIP, executor.Host)
+				framework.ExpectNoError(err)
+
+				gomega.Eventually(func() string {
+					err := mac.RequestAddressResolutionFromIface(ingressIP, LocalNics[0], executor.Host)
+					if err != nil {
+						return err.Error()
+					}
+					err = service.ValidateL2(svc)
+					if err != nil {
+						return err.Error()
+					}
+
+					advNode, err := advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
+					if err != nil {
+						return err.Error()
+					}
+
+					return advNode.Name
+				}, 1*time.Minute, 1*time.Second).Should(gomega.Equal(node.Name))
+			}
 		})
 	})
 })
