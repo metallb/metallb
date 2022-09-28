@@ -42,6 +42,15 @@ func (i1 *IPAdvertisement) Equal(i2 *IPAdvertisement) bool {
 	return i1.interfaces.Equal(i2.interfaces)
 }
 
+func (i *IPAdvertisement) MatchInterfaces(intfs ...string) bool {
+	for _, intf := range intfs {
+		if i.matchInterface(intf) {
+			return true
+		}
+	}
+	return false
+}
+
 func (i *IPAdvertisement) matchInterface(intf string) bool {
 	if i == nil {
 		return false
