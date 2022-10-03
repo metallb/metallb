@@ -60,7 +60,7 @@ metadata:
   namespace: metallb-system
 spec:
   holdTime: 1m30s
-  keepaliveTime: 30s
+  keepaliveTime: 0s
   myASN: 64512
   passwordSecret: {}
   peerASN: 64512
@@ -93,7 +93,6 @@ spec:
   localPref: 100
 status: {}
 ---
-
 ```
 
 ## Running directly against a cluster
@@ -135,6 +134,7 @@ kubectl run configmaptocrs -n metallb-system --restart=Never -it --rm --image ov
   }
 }'
 ```
+
 ## Options of configmaptocrs:
   ### -source string
     name of the input file to convert (default "./config.yaml")

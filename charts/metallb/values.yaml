@@ -42,12 +42,15 @@ prometheus:
   # certificate to be used.
   controllerMetricsTLSSecret: ""
 
+  # prometheus doens't have the permission to scrape all namespaces so we give it permission to scrape metallb's one
+  rbacPrometheus: true
+
   # the service account used by prometheus
-  # required when .Values.prometheus.podMonitor.enabled == true
+  # required when " .Values.prometheus.rbacPrometheus == true " and " .Values.prometheus.podMonitor.enabled=true or prometheus.serviceMonitor.enabled=true "
   serviceAccount: ""
 
   # the namespace where prometheus is deployed
-  # required when .Values.prometheus.podMonitor.enabled == true
+  # required when " .Values.prometheus.rbacPrometheus == true " and " .Values.prometheus.podMonitor.enabled=true or prometheus.serviceMonitor.enabled=true "
   namespace: ""
 
   # the image to be used for the kuberbacproxy container

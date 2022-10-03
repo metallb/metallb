@@ -134,9 +134,16 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 	return "notOwner"
 }
 
-func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIPs []net.IP, pool *config.Pool) error {
+func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIPs []net.IP, pool *config.Pool, client service, svc *v1.Service) error {
+	ifs := c.announcer.GetInterfaces()
 	for _, lbIP := range lbIPs {
 		ipAdv := ipAdvertisementFor(lbIP, c.myNode, pool.L2Advertisements)
+		if !ipAdv.MatchInterfaces(ifs...) {
+			level.Warn(l).Log("op", "SetBalancer", "protocol", "layer2", "service", name, "IPAdvertisement", ipAdv,
+				"localIfs", ifs, "msg", "the specified interfaces used to announce LB IP don't exist")
+			client.Errorf(svc, "announceFailed", "the interfaces specified by LB IP %q doesn't exist in assigned node %q with protocol %q", lbIP.String(), c.myNode, config.Layer2)
+			continue
+		}
 		c.announcer.SetBalancer(name, ipAdv)
 	}
 	return nil

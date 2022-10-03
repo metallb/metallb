@@ -17,7 +17,6 @@ from invoke.exceptions import Exit, UnexpectedExit
 
 all_binaries = set(["controller",
                     "speaker",
-                    "mirror-server",
                     "configmaptocrs"])
 all_architectures = set(["amd64",
                          "arm",
@@ -361,12 +360,11 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
             run("kind create cluster --name={} --config={} {}".format(name, tmp.name, extra_options), pty=True, echo=True)
         _add_nic_to_nodes(name)
 
-    binaries = ["controller", "speaker", "mirror-server"]
+    binaries = ["controller", "speaker"]
     if build_images:
         build(ctx, binaries, architectures=[architecture])
     run("kind load docker-image --name={} quay.io/metallb/controller:dev-{}".format(name, architecture), echo=True)
     run("kind load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(name, architecture), echo=True)
-    run("kind load docker-image --name={} quay.io/metallb/mirror-server:dev-{}".format(name, architecture), echo=True)
 
     if with_prometheus:
         print("Deploying prometheus")
@@ -386,7 +384,7 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
                 "--set controller.logLevel=debug {} --namespace metallb-system".format(architecture, architecture, 
                 "true" if bgp_type == "frr" else "false", prometheus_values), echo=True)
     else:
-        run("kubectl delete po -nmetallb-system --all", echo=True)
+        run("kubectl delete po -n metallb-system --all", echo=True)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest_file = tmpdir + "/metallb.yaml"
@@ -407,14 +405,6 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
                 f.flush()
 
             run("kubectl apply -f {}".format(manifest_file), echo=True)
-
-    with open("e2etest/manifests/mirror-server.yaml") as f:
-        manifest = f.read()
-    manifest = manifest.replace(":main", ":dev-{}".format(architecture))
-    with tempfile.NamedTemporaryFile() as tmp:
-        tmp.write(manifest.encode("utf-8"))
-        tmp.flush()
-        run("kubectl apply -f {}".format(tmp.name), echo=True)
 
     if protocol == "bgp":
         print("Configuring MetalLB with a BGP test environment")
@@ -748,8 +738,9 @@ def helmdocs(ctx, env="container"):
     "prometheus_namespace": "the namespace prometheus is deployed to, to validate metrics against prometheus.",
     "node_nics": "a list of node's interfaces separated by comma, default is kind",
     "local_nics": "a list of bridges related node's interfaces separated by comma, default is kind",
+    "external_containers": "a comma separated list of external containers names to use for the test. (valid parameters are: ibgp-single-hop / ibgp-multi-hop / ebgp-single-hop / ebgp-multi-hop)",
 })
-def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None, prometheus_namespace="", node_nics="kind", local_nics="kind"):
+def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None, prometheus_namespace="", node_nics="kind", local_nics="kind", external_containers=""):
     """Run E2E tests against development cluster."""
     if skip_docker:
         opt_skip_docker = "--skip-docker"
@@ -808,8 +799,11 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
     print("Writing reports to {}".format(report_path))
     os.makedirs(report_path, exist_ok=True)
 
+    if external_containers != "":
+        external_containers = "--external-containers="+(external_containers)
+
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "KUBECONFIG={} go test -timeout 3h {} {} --provider=local --kubeconfig={} --service-pod-port={} {} {} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace, node_nics, local_nics), warn="True")
+            "KUBECONFIG={} go test -timeout 3h {} {} --provider=local --kubeconfig={} --service-pod-port={} {} {} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace, node_nics, local_nics, external_containers), warn="True")
 
     if export != None:
         run("kind export logs {}".format(export))

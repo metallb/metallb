@@ -85,6 +85,7 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | prometheus.prometheusRule.extraAlerts | list | `[]` |  |
 | prometheus.prometheusRule.staleConfig.enabled | bool | `true` |  |
 | prometheus.prometheusRule.staleConfig.labels.severity | string | `"warning"` |  |
+| prometheus.rbacPrometheus | bool | `true` |  |
 | prometheus.rbacProxy.repository | string | `"gcr.io/kubebuilder/kube-rbac-proxy"` |  |
 | prometheus.rbacProxy.tag | string | `"v0.12.0"` |  |
 | prometheus.scrapeAnnotations | bool | `false` |  |

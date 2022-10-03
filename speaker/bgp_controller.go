@@ -247,7 +247,7 @@ func (c *bgpController) syncBFDProfiles(profiles map[string]*config.BFDProfile) 
 	return c.sessionManager.SyncBFDProfiles(profiles)
 }
 
-func (c *bgpController) SetBalancer(l log.Logger, name string, lbIPs []net.IP, pool *config.Pool) error {
+func (c *bgpController) SetBalancer(l log.Logger, name string, lbIPs []net.IP, pool *config.Pool, _ service, _ *v1.Service) error {
 	c.svcAds[name] = nil
 	for _, lbIP := range lbIPs {
 		for _, adCfg := range pool.BGPAdvertisements {
