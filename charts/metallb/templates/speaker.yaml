@@ -370,6 +370,10 @@ spec:
             mountPath: /etc/frr
           - name: reloader
             mountPath: /etc/frr_reloader
+        {{- with .Values.speaker.reloader.resources }}
+        resources:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
       - name: frr-metrics
         image: {{ .Values.speaker.frr.image.repository }}:{{ .Values.speaker.frr.image.tag | default .Chart.AppVersion }}
         command: ["/etc/frr_metrics/frr-metrics"]
@@ -385,6 +389,10 @@ spec:
             mountPath: /etc/frr
           - name: metrics
             mountPath: /etc/frr_metrics
+        {{- with .Values.speaker.frrMetrics.resources }}
+        resources:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
       {{- end }}
       {{- if .Values.prometheus.secureMetricsPort }}
       - name: kube-rbac-proxy
