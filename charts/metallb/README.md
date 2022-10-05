@@ -54,6 +54,7 @@ Kubernetes: `>= 1.19.0-0`
 | controller.strategy.type | string | `"RollingUpdate"` |  |
 | controller.tolerations | list | `[]` |  |
 | crds.enabled | bool | `true` |  |
+| crds.validationFailurePolicy | string | `"Fail"` |  |
 | fullnameOverride | string | `""` |  |
 | imagePullSecrets | list | `[]` |  |
 | loadBalancerClass | string | `""` |  |

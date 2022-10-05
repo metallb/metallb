@@ -327,3 +327,4 @@ speaker:
 
 crds:
   enabled: true
+  validationFailurePolicy: Fail
