@@ -315,10 +315,17 @@ speaker:
       tag: v7.5.1
       pullPolicy:
     metricsPort: 7473
+    resources: {}
 
     # if set, enables a rbac proxy sidecar container on the speaker to
     # expose the frr metrics via tls.
     # secureMetricsPort: 9121
+
+  reloader:
+    resources: {}
+
+  frrMetrics:
+    resources: {}
 
 crds:
   enabled: true
