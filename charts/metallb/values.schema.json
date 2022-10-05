@@ -367,6 +367,21 @@
           "required": [ "tolerateMaster" ]
         }
       ]
+    },
+    "crds": {
+      "description": "CRD configuration",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Enable CRDs",
+          "type": "boolean"
+        },
+        "validationFailurePolicy": {
+          "description": "Failure policy to use with validating webhooks",
+          "type": "string",
+          "enum": [ "Ignore", "Fail" ]
+        }
+      }
     }
   },
   "controller": { 

@@ -52,6 +52,7 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 | controller.strategy.type | string | `"RollingUpdate"` |  |
 | controller.tolerations | list | `[]` |  |
 | crds.enabled | bool | `true` |  |
+| crds.validationFailurePolicy | string | `"Fail"` |  |
 | fullnameOverride | string | `""` |  |
 | imagePullSecrets | list | `[]` |  |
 | loadBalancerClass | string | `""` |  |
