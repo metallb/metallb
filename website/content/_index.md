@@ -54,7 +54,7 @@ MetalLB requires the following to function:
 ## Backward Compatibility
 
 Previous versions of MetalLB are configurable via a `configmap`. However, starting from the version
-`v0.13.0`, it will be possible to configure it only via CRs. [A tool to convert]({{% relref "configurations/migration_to_crds.md" %}}) old configmaps to CRs
+`v0.13.0`, it will be possible to configure it only via CRs. [A tool to convert]({{% relref "configuration/migration_to_crds.md" %}}) old configmaps to CRs
 is provided as a container image under `quay.io/metallb/configmaptocrs`.
 
 
