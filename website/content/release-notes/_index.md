@@ -2,6 +2,12 @@
 title: Release Notes
 weight: 8
 ---
+## Version 0.13.6
+
+New Features:
+
+- Layer2: Announce LB IPs from specific interfaces ([PR 1536](https://github.com/metallb/metallb/pull/1536))
+
 ## Version 0.13.5
 
 New Features:
