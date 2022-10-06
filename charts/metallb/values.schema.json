@@ -343,17 +343,45 @@
                 },
                 "image": { "$ref": "#/definitions/component/properties/image" },
                 "metricsPort": { "type": "integer" },
-                "secureMetricsPort": { "type": "integer" }
+                "secureMetricsPort": { "type": "integer" },
+                "resources:": { "type": "object" }
               },
               "required": [ "enabled" ]
             },
             "command" : {
               "type": "string"
+            },
+            "reloader": {
+              "type": "object",
+              "properties": {
+                "resources": { "type": "object" }
+              }
+            },
+            "frrMetrics": {
+              "type": "object",
+              "properties": {
+                "resources": { "type": "object" }
+              }
             }
           },
           "required": [ "tolerateMaster" ]
         }
       ]
+    },
+    "crds": {
+      "description": "CRD configuration",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Enable CRDs",
+          "type": "boolean"
+        },
+        "validationFailurePolicy": {
+          "description": "Failure policy to use with validating webhooks",
+          "type": "string",
+          "enum": [ "Ignore", "Fail" ]
+        }
+      }
     }
   },
   "controller": { 
