@@ -16,7 +16,21 @@ spec:
     singular: l2advertisement
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.ipAddressPools
+      name: IPAddressPools
+      type: string
+    - jsonPath: .spec.ipAddressPoolSelectors
+      name: IPAddressPool Selectors
+      type: string
+    - jsonPath: .spec.interfaces
+      name: Interfaces
+      type: string
+    - jsonPath: .spec.nodeSelectors
+      name: Node Selectors
+      priority: 10
+      type: string
+    name: v1beta1
     schema:
       openAPIV3Schema:
         description: L2Advertisement allows to advertise the LoadBalancer IPs provided
