@@ -49,6 +49,10 @@ type L2AdvertisementStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="IPAddressPools",type=string,JSONPath=`.spec.ipAddressPools`
+//+kubebuilder:printcolumn:name="IPAddressPool Selectors",type=string,JSONPath=`.spec.ipAddressPoolSelectors`
+//+kubebuilder:printcolumn:name="Interfaces",type=string,JSONPath=`.spec.interfaces`
+//+kubebuilder:printcolumn:name="Node Selectors",type=string,JSONPath=`.spec.nodeSelectors`,priority=10
 
 // L2Advertisement allows to advertise the LoadBalancer IPs provided
 // by the selected pools via L2.
