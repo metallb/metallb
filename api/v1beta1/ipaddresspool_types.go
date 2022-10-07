@@ -50,6 +50,9 @@ type IPAddressPoolStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion
+// +kubebuilder:printcolumn:name="Auto Assign",type=boolean,JSONPath=`.spec.autoAssign`
+// +kubebuilder:printcolumn:name="Avoid Buggy IPs",type=boolean,JSONPath=`.spec.avoidBuggyIPs`
+// +kubebuilder:printcolumn:name="Addresses",type=string,JSONPath=`.spec.addresses`
 
 // IPAddressPool represents a pool of IP addresses that can be allocated
 // to LoadBalancer services.

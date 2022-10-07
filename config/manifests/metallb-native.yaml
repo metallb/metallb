@@ -235,7 +235,20 @@ spec:
     singular: bfdprofile
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.passiveMode
+      name: Passive Mode
+      type: boolean
+    - jsonPath: .spec.transmitInterval
+      name: Transmit Interval
+      type: integer
+    - jsonPath: .spec.receiveInterval
+      name: Receive Interval
+      type: integer
+    - jsonPath: .spec.detectMultiplier
+      name: Multiplier
+      type: integer
+    name: v1beta1
     schema:
       openAPIV3Schema:
         description: BFDProfile represents the settings of the bfd session that can
@@ -335,7 +348,21 @@ spec:
     singular: bgpadvertisement
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.ipAddressPools
+      name: IPAddressPools
+      type: string
+    - jsonPath: .spec.ipAddressPoolSelectors
+      name: IPAddressPool Selectors
+      type: string
+    - jsonPath: .spec.peers
+      name: Peers
+      type: string
+    - jsonPath: .spec.nodeSelectors
+      name: Node Selectors
+      priority: 10
+      type: string
+    name: v1beta1
     schema:
       openAPIV3Schema:
         description: BGPAdvertisement allows to advertise the IPs coming from the
@@ -544,7 +571,20 @@ spec:
     singular: bgppeer
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.peerAddress
+      name: Address
+      type: string
+    - jsonPath: .spec.peerASN
+      name: ASN
+      type: string
+    - jsonPath: .spec.bfdProfile
+      name: BFD Profile
+      type: string
+    - jsonPath: .spec.ebgpMultiHop
+      name: Multi Hops
+      type: string
+    name: v1beta1
     schema:
       openAPIV3Schema:
         description: BGPPeer is the Schema for the peers API.
@@ -647,7 +687,20 @@ spec:
     storage: false
     subresources:
       status: {}
-  - name: v1beta2
+  - additionalPrinterColumns:
+    - jsonPath: .spec.peerAddress
+      name: Address
+      type: string
+    - jsonPath: .spec.peerASN
+      name: ASN
+      type: string
+    - jsonPath: .spec.bfdProfile
+      name: BFD Profile
+      type: string
+    - jsonPath: .spec.ebgpMultiHop
+      name: Multi Hops
+      type: string
+    name: v1beta2
     schema:
       openAPIV3Schema:
         description: BGPPeer is the Schema for the peers API.
@@ -880,7 +933,17 @@ spec:
     singular: ipaddresspool
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.autoAssign
+      name: Auto Assign
+      type: boolean
+    - jsonPath: .spec.avoidBuggyIPs
+      name: Avoid Buggy IPs
+      type: boolean
+    - jsonPath: .spec.addresses
+      name: Addresses
+      type: string
+    name: v1beta1
     schema:
       openAPIV3Schema:
         description: IPAddressPool represents a pool of IP addresses that can be allocated
@@ -955,7 +1018,21 @@ spec:
     singular: l2advertisement
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.ipAddressPools
+      name: IPAddressPools
+      type: string
+    - jsonPath: .spec.ipAddressPoolSelectors
+      name: IPAddressPool Selectors
+      type: string
+    - jsonPath: .spec.interfaces
+      name: Interfaces
+      type: string
+    - jsonPath: .spec.nodeSelectors
+      name: Node Selectors
+      priority: 10
+      type: string
+    name: v1beta1
     schema:
       openAPIV3Schema:
         description: L2Advertisement allows to advertise the LoadBalancer IPs provided
