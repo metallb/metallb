@@ -44,6 +44,7 @@ apiVersion: metallb.io/v1beta1
 kind: BGPAdvertisement
 metadata:
   name: local
+  namespace: metallb-system
 spec:
   ipAddressPools:
   - first-pool
@@ -58,6 +59,7 @@ apiVersion: metallb.io/v1beta1
 kind: BGPAdvertisement
 metadata:
   name: external
+  namespace: metallb-system
 spec:
   ipAddressPools:
   - first-pool
@@ -195,6 +197,7 @@ apiVersion: metallb.io/v1beta1
 kind: BGPAdvertisement
 metadata:
   name: example
+  namespace: metallb-system
 spec:
   ipAddressPools:
   - first-pool
@@ -244,6 +247,7 @@ apiVersion: metallb.io/v1beta1
 kind: BGPAdvertisement
 metadata:
   name: example
+  namespace: metallb-system
 spec:
   ipAddressPools:
   - PoolA
@@ -329,6 +333,7 @@ apiVersion: metallb.io/v1beta1
 kind: BGPAdvertisement
 metadata:
   name: local
+  namespace: metallb-system
 spec:
   ipAddressPools:
   - first-pool
