@@ -122,7 +122,7 @@ strategies you can employ:
 
 ## FRR Mode
 
-MetalLB provides an experimental mode using FRR as a backend for the BGP
+MetalLB provides a deployment mode that uses FRR as a backend for the BGP
 layer.
 
 When the FRR mode is enabled, the following additional features are available:

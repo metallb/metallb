@@ -63,7 +63,7 @@ kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/config/m
 ```
 
 {{% notice note %}}
-If you want to deploy MetalLB using the [experimental FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions), apply the manifests:
+If you want to deploy MetalLB using the [FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions), apply the manifests:
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-frr.yaml
@@ -109,7 +109,7 @@ resources:
   - github.com/metallb/metallb/config/native?ref=main
 ```
 
-In order to deploy the [experimental FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions):
+In order to deploy the [FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions):
 
 ```yaml
 # kustomization.yml
@@ -151,7 +151,7 @@ If you are using MetalLB with a kubernetes version that enforces [pod security a
 {{% /notice %}}
 
 {{% notice note %}}
-If you want to deploy MetalLB using the [experimental FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions), the following value must be set:
+If you want to deploy MetalLB using the [FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions), the following value must be set:
 
 ```yaml
 speaker:
@@ -166,7 +166,7 @@ speaker:
 The MetalLB Operator is available on OperatorHub at [operatorhub.io/operator/metallb-operator](https://operatorhub.io/operator/metallb-operator). It eases the deployment and life-cycle of MetalLB in a cluster and allows configuring MetalLB via CRDs.
 
 {{% notice note %}}
-If you want to deploy MetalLB using the [experimental FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions), you must edit the ClusterServiceVersion resource
+If you want to deploy MetalLB using the [FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions), you must edit the ClusterServiceVersion resource
 named `metallb-operator`:
 
 ```bash
