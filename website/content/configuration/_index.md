@@ -189,7 +189,7 @@ spec:
 
 ### Enabling BFD support for BGP sessions
 
-With the experimental FRR mode, BGP sessions can be backed up by BFD sessions in order to provide a quicker path failure detection than BGP alone provides.
+With the FRR mode, BGP sessions can be backed up by BFD sessions in order to provide a quicker path failure detection than BGP alone provides.
 
 In order to enable BFD, a BFD profile must be added and referenced by a given peer:
 
