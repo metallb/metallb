@@ -7,6 +7,22 @@ weight: 8
 New Features:
 
 - Layer2: Announce LB IPs from specific interfaces ([PR 1536](https://github.com/metallb/metallb/pull/1536))
+- Validate MetalLB supports mixed protocol services ([Issue 1050](https://github.com/metallb/metallb/issues/1050) [PR 1580](https://github.com/metallb/metallb/pull/1580))
+- ConfigMapToCRs tool: align docs to match how to use it within the cluster ([PR 1595](https://github.com/metallb/metallb/pull/1595))
+- End to end tests: allow using external containers to execute the tests against a real cluster ([PR 1604](https://github.com/metallb/metallb/pull/1604))
+- Helm: add an option to set resources for speaker sidecar containers ([PR 1622](https://github.com/metallb/metallb/pull/1622))
+- Helm: add an option to set the validating webhooks failure policy ([PR 1623](https://github.com/metallb/metallb/pull/1623))
+- Removed the "experimental" wording from FRR mode declaring it being stable but less battle tested ([PR 1636](https://github.com/metallb/metallb/pull/1636))
+
+Bug Fixes:
+
+- EndpointSlices detection: use discoveryv1 instead of v1beta1 ([PR 1579](https://github.com/metallb/metallb/pull/1579))
+- Memory leak in FRR mode in cases where the service is getting it's IP changed by an external entity ([Issue 1581](https://github.com/metallb/metallb/issues/1581) [PR 1583](https://github.com/metallb/metallb/pull/1583))
+- L2: if a service with multiple IPs has an IP that is used only by it, and another used by another service, the watch on the one used by it is not removed when deleting the service ([PR 1600](https://github.com/metallb/metallb/pull/1600))
+- Skip unnecessary node events that don't affect MetalLB ([Issue 1562](https://github.com/metallb/metallb/issues/1562) [PR 1607](https://github.com/metallb/metallb/pull/1607))
+- Readiness Probe: wait for the webhook to be ready so helm --wait can wait for the webhook to be ready. ([Issue 1610](https://github.com/metallb/metallb/issues/1610) [PR 1611](https://github.com/metallb/metallb/pull/1611))
+
+This release includes contributions from Attila Fabian, chinthiti, Christoph Mewes, cyclinder, danieled-it, David Jeffers, dependabot[bot], Federico Paolinelli, karampok, liornoy, Periyasamy Palanisamy, Peter Pan, witjem, xin.li, Xuebinqi, zhoujiao. Thank you!
 
 ## Version 0.13.5
 
@@ -20,6 +36,8 @@ New Features:
 Bug Fixes:
 
 - Potential memory leak when receiving updates of the same service multiple times ([PR 1570](https://github.com/metallb/metallb/pull/1570))
+
+This release includes contributions from Federico Paolinelli, Jan Jansen, Magesh Dhasayyan. Thank you!
 
 ## Version 0.13.4
 
@@ -40,6 +58,8 @@ to setting the aggregation length and validating it. ([Issue 1495](https://githu
 [Issue 1521](https://github.com/metallb/metallb/issues/1521),
 [PR 1522](https://github.com/metallb/metallb/pull/1522))
 
+This release includes contributions from cyclinder, Federico Paolinelli, Periyasamy Palanisamy. Thank you!
+
 ## Version 0.13.3
 
 Bug Fixes:
@@ -48,6 +68,8 @@ Bug Fixes:
 - Fail the helm release if the deprecated configinline is provided ([PR 1485](https://github.com/metallb/metallb/pull/1485))
 - Helm charts give the permissions to watch communities. This will get rid of the `Failed to watch *v1beta1.Community` log error. ([PR 1487](https://github.com/metallb/metallb/pull/1487))
 - Helm charts: add the labelselectors to the webhook service. This solves webhook issues when multiple ([PR 1487](https://github.com/metallb/metallb/pull/1487))
+
+This release includes contributions from Federico Paolinelli, Joshua Carnes, Lalit Maganti, Philipp Born. Thank you!
 
 ## Version 0.13.2
 
