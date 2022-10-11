@@ -158,7 +158,7 @@ information.
 ## IPv6 and dual stack services
 
 IPv6 and dual stack services are supported in L2 mode, and in BGP mode only
-via the experimental FRR mode.
+via the FRR mode.
 
 In order for MetalLB to allocate IPs to a dual stack service, there must be
 at least one address pool having both addresses of version v4 and v6.

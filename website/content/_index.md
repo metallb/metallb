@@ -57,7 +57,6 @@ Previous versions of MetalLB are configurable via a `configmap`. However, starti
 `v0.13.0`, it will be possible to configure it only via CRs. [A tool to convert]({{% relref "configuration/migration_to_crds.md" %}}) old configmaps to CRs
 is provided as a container image under `quay.io/metallb/configmaptocrs`.
 
-
 ## Usage
 
 The [concepts]({{% relref "concepts/_index.md" %}}) section will give
@@ -68,9 +67,11 @@ to deploy to a Kubernetes cluster, head to the
 
 ## FRR Mode
 
-MetalLB implements an experimental FRR Mode that uses an [FRR](https://frrouting.org/) container as the backend for handling BGP sessions. It provides features that are not available with the native BGP implementation, such as pairing BGP sessions with BFD sessions, and advertising IPV6 addresses.
+MetalLB implements a FRR Mode that uses an [FRR](https://frrouting.org/) container as the backend for handling BGP sessions. It provides features that are not available with the native BGP implementation, such as pairing BGP sessions with BFD sessions, and advertising IPV6 addresses.
 
-The FRR mode is considered to be experimental, please see the [installation](https://metallb.universe.tf/installation/) section for instructions on how to enable it.
+Despite being less battle tested than the native BGP implementation, the FRR mode is currently used by those users that require either BFD or IPV6, and it is the only supported method in the MetalLB version distributed with OpenShift. The long term plan is to make it the only BGP implementation available in MetalLB.
+
+Please see the [installation](https://metallb.universe.tf/installation/) section for instructions on how to enable it.
 
 ## Contributing
 
