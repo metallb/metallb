@@ -39,8 +39,10 @@ inv dev-env-cleanup
 
 * Go 1.15+
 * Python 3
+* Docker
 * [KIND - Kubernetes in Docker](https://kind.sigs.k8s.io/docs/user/quick-start/)
 * [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/)
+* [controller-gen](https://book.kubebuilder.io/reference/controller-gen.html)
 
 You may install the required python modules using the `requirements.txt` in this directory, with:
 
