@@ -220,6 +220,10 @@ func (c *controller) allocateIPs(key string, svc *v1.Service) ([]net.IP, error) 
 	return c.ips.Allocate(key, serviceIPFamily, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
 }
 
+func (c *controller) isServiceAllocated(key string) bool {
+	return c.ips.Pool(key) != ""
+}
+
 func getDesiredLbIPs(svc *v1.Service) ([]net.IP, ipfamily.Family, error) {
 	var desiredLbIPs []net.IP
 	desiredLbIPsStr := svc.Annotations[annotationLoadBalancerIPs]
