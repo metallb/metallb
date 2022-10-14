@@ -48,9 +48,8 @@ spec:
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /
-            port: webhook-server
-            scheme: HTTPS
+            path: /metrics
+            port: monitoring
           initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 1
