@@ -1726,7 +1726,7 @@ spec:
         readinessProbe:
           failureThreshold: 3
           httpGet:
-            path: /validate-metallb-io-v1beta1-addresspool
+            path: /
             port: webhook-server
             scheme: HTTPS
           initialDelaySeconds: 10
