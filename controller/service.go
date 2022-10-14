@@ -15,7 +15,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"reflect"
@@ -26,7 +25,6 @@ import (
 	"github.com/go-kit/log/level"
 	v1 "k8s.io/api/core/v1"
 
-	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/allocator/k8salloc"
 	"go.universe.tf/metallb/internal/ipfamily"
 )
@@ -98,13 +96,6 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		if err = c.ips.Assign(key, lbIPs, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 			level.Info(l).Log("event", "clearAssignment", "error", err, "msg", "current IP not allowed by config, clearing")
 			c.clearServiceState(key, svc)
-			// Check if we cannot assign IP because services were sharing IP using
-			// "allow-shared-ip" annotation and one of them changed so instead of allocating
-			// new service IP we fail.
-			if errors.Is(err, allocator.ErrCannotShareKey) {
-				c.client.Errorf(svc, "svcCannotShareKey", "current IP not allowed by config:%s", err)
-				return false
-			}
 			lbIPs = []net.IP{}
 		}
 
