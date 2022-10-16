@@ -16,7 +16,20 @@ spec:
     singular: bfdprofile
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.passiveMode
+      name: Passive Mode
+      type: boolean
+    - jsonPath: .spec.transmitInterval
+      name: Transmit Interval
+      type: integer
+    - jsonPath: .spec.receiveInterval
+      name: Receive Interval
+      type: integer
+    - jsonPath: .spec.detectMultiplier
+      name: Multiplier
+      type: integer
+    name: v1beta1
     schema:
       openAPIV3Schema:
         description: BFDProfile represents the settings of the bfd session that can
