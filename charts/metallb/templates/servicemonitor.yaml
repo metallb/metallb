@@ -17,9 +17,17 @@ spec:
   endpoints:
     - port: {{ template "metrics.exposedportname" . }}
       honorLabels: true
+      {{- if .Values.prometheus.serviceMonitor.metricRelabelings }}
+      metricRelabelings:
+      {{- toYaml .Values.prometheus.serviceMonitor.metricRelabelings | nindent 8 }}
+      {{- end -}}
+      {{- if .Values.prometheus.serviceMonitor.relabelings }}
+      relabelings:
+      {{- toYaml .Values.prometheus.serviceMonitor.relabelings | nindent 8 }}
+      {{- end }}
       {{- if .Values.prometheus.serviceMonitor.interval }}
       interval: {{ .Values.prometheus.serviceMonitor.interval }}
-      {{- end }}
+      {{- end -}}
 {{ if .Values.prometheus.secureMetricsPort }}
       bearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token"
       scheme: "https"
