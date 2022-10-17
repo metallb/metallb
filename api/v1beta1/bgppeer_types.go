@@ -96,6 +96,10 @@ type BGPPeerStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="Address",type=string,JSONPath=`.spec.peerAddress`
+//+kubebuilder:printcolumn:name="ASN",type=string,JSONPath=`.spec.peerASN`
+//+kubebuilder:printcolumn:name="BFD Profile",type=string,JSONPath=`.spec.bfdProfile`
+//+kubebuilder:printcolumn:name="Multi Hops",type=string,JSONPath=`.spec.ebgpMultiHop`
 
 // BGPPeer is the Schema for the peers API.
 type BGPPeer struct {

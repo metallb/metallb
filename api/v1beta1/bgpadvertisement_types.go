@@ -73,6 +73,10 @@ type BGPAdvertisementStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="IPAddressPools",type=string,JSONPath=`.spec.ipAddressPools`
+//+kubebuilder:printcolumn:name="IPAddressPool Selectors",type=string,JSONPath=`.spec.ipAddressPoolSelectors`
+//+kubebuilder:printcolumn:name="Peers",type=string,JSONPath=`.spec.peers`
+//+kubebuilder:printcolumn:name="Node Selectors",type=string,JSONPath=`.spec.nodeSelectors`,priority=10
 
 // BGPAdvertisement allows to advertise the IPs coming
 // from the selected IPAddressPools via BGP, setting the parameters of the
