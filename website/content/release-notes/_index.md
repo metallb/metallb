@@ -2,6 +2,21 @@
 title: Release Notes
 weight: 8
 ---
+## Version 0.13.7
+
+New Features:
+
+- CRDs: add additionalPrinterColumn configuration ([PR 1632](https://github.com/metallb/metallb/pull/1632))
+
+Bug Fixes:
+
+- Fix service monitor relabelings in Helm charts ([PR 1650](https://github.com/metallb/metallb/pull/1650))
+- Controller readiness probe: restore to metrics endpoint but wait until the webhook is ready to accept requests, remove
+  the "unable to process a request with an unknown content type" log
+   ([Issue 1644](https://github.com/metallb/metallb/issues/1644) [PR 1648](https://github.com/metallb/metallb/pull/1648)).
+
+This release includes contributions from Attila Fabian, Tyler Auerbeck, Federico Paolinelli. Thank you!
+
 ## Version 0.13.6
 
 New Features:
