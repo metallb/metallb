@@ -16,7 +16,20 @@ spec:
     singular: bgppeer
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.peerAddress
+      name: Address
+      type: string
+    - jsonPath: .spec.peerASN
+      name: ASN
+      type: string
+    - jsonPath: .spec.bfdProfile
+      name: BFD Profile
+      type: string
+    - jsonPath: .spec.ebgpMultiHop
+      name: Multi Hops
+      type: string
+    name: v1beta1
     schema:
       openAPIV3Schema:
         description: BGPPeer is the Schema for the peers API.
@@ -119,7 +132,20 @@ spec:
     storage: false
     subresources:
       status: {}
-  - name: v1beta2
+  - additionalPrinterColumns:
+    - jsonPath: .spec.peerAddress
+      name: Address
+      type: string
+    - jsonPath: .spec.peerASN
+      name: ASN
+      type: string
+    - jsonPath: .spec.bfdProfile
+      name: BFD Profile
+      type: string
+    - jsonPath: .spec.ebgpMultiHop
+      name: Multi Hops
+      type: string
+    name: v1beta2
     schema:
       openAPIV3Schema:
         description: BGPPeer is the Schema for the peers API.

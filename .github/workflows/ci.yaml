@@ -303,6 +303,7 @@ jobs:
           sed -i 's/quay.io\/metallb\/controller:main/quay.io\/metallb\/controller:dev-amd64/g' bin/metallb-operator.yaml
           sed -i 's/native/frr/g' bin/metallb-operator.yaml
           kubectl apply -f bin/metallb-operator.yaml
+          sleep 30s
 
 
       - name: MetalLB E2E Tests with Operator Deployment
