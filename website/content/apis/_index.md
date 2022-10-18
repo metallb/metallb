@@ -522,6 +522,26 @@ bool
 to be used by a pool.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>serviceAllocation</code><br/>
+<em>
+<a href="#metallb.io/v1beta1.ServiceAllocation">
+ServiceAllocation
+</a>
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>AllocateTo makes ip pool allocation to specific namespace and/or service.
+The controller will use the pool with lowest value of priority in case of
+multiple matches. A pool with no priority set will be used only if the
+pools with priority can&rsquo;t be used. If multiple matching IPAddressPools are
+available it will check for the availability of IPs sorting the matching
+IPAddressPools by priority, starting from the highest to the lowest. If
+multiple IPAddressPools have the same priority, choice will be random.</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
@@ -647,6 +667,71 @@ L2AdvertisementStatus
 </em>
 </td>
 <td>
+</td>
+</tr>
+</tbody>
+</table>
+<h3 id="metallb.io/v1beta1.ServiceAllocation">ServiceAllocation
+</h3>
+<div>
+<p>ServiceAllocation defines ip pool allocation to namespace and/or service.</p>
+</div>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>
+<code>priority</code><br/>
+<em>
+int
+</em>
+</td>
+<td>
+<p>Priority priority given for ip pool while ip allocation on a service.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespaces</code><br/>
+<em>
+[]string
+</em>
+</td>
+<td>
+<p>Namespaces list of namespace(s) on which ip pool can be attached.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>namespaceSelectors</code><br/>
+<em>
+<a href="https://v1-18.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#labelselector-v1-meta">
+[]Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>NamespaceSelectors list of label selectors to select namespace(s) for ip pool,
+an alternative to using namespace list.</p>
+</td>
+</tr>
+<tr>
+<td>
+<code>serviceSelectors</code><br/>
+<em>
+<a href="https://v1-18.docs.kubernetes.io/docs/reference/generated/kubernetes-api/v1.18/#labelselector-v1-meta">
+[]Kubernetes meta/v1.LabelSelector
+</a>
+</em>
+</td>
+<td>
+<p>ServiceSelectors list of label selector to select service(s) for which ip pool
+can be used for ip allocation.</p>
 </td>
 </tr>
 </tbody>
