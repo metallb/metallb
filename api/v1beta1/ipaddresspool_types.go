@@ -39,6 +39,30 @@ type IPAddressPoolSpec struct {
 	// +optional
 	// +kubebuilder:default:=false
 	AvoidBuggyIPs bool `json:"avoidBuggyIPs,omitempty"`
+
+	// AllocateTo makes ip pool allocation to specific namespace and/or service.
+	// The controller will use the pool with lowest value of priority in case of
+	// multiple matches. A pool with no priority set will be used only if the
+	// pools with priority can't be used. If multiple matching IPAddressPools are
+	// available it will check for the availability of IPs sorting the matching
+	// IPAddressPools by priority, starting from the highest to the lowest. If
+	// multiple IPAddressPools have the same priority, choice will be random.
+	// +optional
+	AllocateTo *ServiceAllocation `json:"serviceAllocation,omitempty"`
+}
+
+// ServiceAllocation defines ip pool allocation to namespace and/or service.
+type ServiceAllocation struct {
+	// Priority priority given for ip pool while ip allocation on a service.
+	Priority int `json:"priority,omitempty"`
+	// Namespaces list of namespace(s) on which ip pool can be attached.
+	Namespaces []string `json:"namespaces,omitempty"`
+	// NamespaceSelectors list of label selectors to select namespace(s) for ip pool,
+	// an alternative to using namespace list.
+	NamespaceSelectors []metav1.LabelSelector `json:"namespaceSelectors,omitempty"`
+	// ServiceSelectors list of label selector to select service(s) for which ip pool
+	// can be used for ip allocation.
+	ServiceSelectors []metav1.LabelSelector `json:"serviceSelectors,omitempty"`
 }
 
 // IPAddressPoolStatus defines the observed state of IPAddressPool.
