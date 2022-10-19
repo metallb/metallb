@@ -21,7 +21,7 @@ data:
       - match-labels:
           kubernetes.io/hostname: prod-01
         match-expressions:
-        - key: beta.kubernetes.io/arch
+        - key: kubernetes.io/arch
           operator: In
           values: [amd64, arm]
     address-pools:
