@@ -41,7 +41,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	var err error
 	// Not a LoadBalancer, early exit. It might have been a balancer
 	// in the past, so we still need to clear LB state.
-	if svc.Spec.Type != "LoadBalancer" {
+	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
 		level.Debug(l).Log("event", "clearAssignment", "reason", "notLoadBalancer", "msg", "not a LoadBalancer")
 		c.clearServiceState(key, svc)
 		// Early return, we explicitly do *not* want to reallocate
@@ -218,6 +218,10 @@ func (c *controller) allocateIPs(key string, svc *v1.Service) ([]net.IP, error) 
 
 	// Okay, in that case just bruteforce across all pools.
 	return c.ips.Allocate(key, serviceIPFamily, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
+}
+
+func (c *controller) isServiceAllocated(key string) bool {
+	return c.ips.Pool(key) != ""
 }
 
 func getDesiredLbIPs(svc *v1.Service) ([]net.IP, ipfamily.Family, error) {
