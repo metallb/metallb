@@ -1,6 +1,7 @@
 name: "Stalebot"
 
 on:
+  workflow_dispatch:
   schedule:
     - cron: "0 0 * * *"
 
@@ -18,13 +19,12 @@ jobs:
           This issue has been automatically marked as stale because it has been open 30 days
           with no activity. This issue will be closed in 10 days unless you do one of the following:
           - respond to this issue
-          - have one of these labels applied: `bug`,`good first issue`,`help wanted`,`hold`
- to remove the `lifecycle-stale` label: or comment or this issue will be closed in 10 days
+          - have one of these labels applied: `bug`,`good first issue`,`help wanted`,`hold`,`enhancement`,`documentation`,`question`
         stale-pr-message: |
           This PR has been automatically marked as stale because it has been open 30 days
           with no activity. This issue will be closed in 10 days unless you do one of the following:
           - respond or perform some activity on this PR
-          - have one of these labels applied: `hold` 
+          - have one of these labels applied: `hold`
         exempt-issue-labels: bug,good first issue,help wanted,hold,enhancement,documentation,question
         exempt-pr-labels:    hold
         exempt-all-milestones: true
@@ -32,8 +32,8 @@ jobs:
         days-before-close: 10
         delete-branch: true
         close-issue-message: |
-          This issue was automatically closed because of lack of activity after being marked stale in the 
+          This issue was automatically closed because of lack of activity after being marked stale in the
           past 10 days. If you feel this was done in error, please feel free to re-open this issue.
-        close-pr-message: | 
-          This PR was automatically closed because of lack of activity after being marked stale in the past 
+        close-pr-message: |
+          This PR was automatically closed because of lack of activity after being marked stale in the past
           10 days. If you feel this was done in error , please feel free to re-open this PR.
