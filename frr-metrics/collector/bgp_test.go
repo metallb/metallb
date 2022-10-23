@@ -16,37 +16,91 @@ var (
 	# HELP metallb_bgp_announced_prefixes_total Number of prefixes currently being advertised on the BGP session
 	# TYPE metallb_bgp_announced_prefixes_total gauge
 	metallb_bgp_announced_prefixes_total{peer="{{ .NeighborIP }}"} {{ .AnnouncedPrefixes }}
+	# HELP metallb_bgp_keepalives_received Number of BGP keepalive messages received
+	# TYPE metallb_bgp_keepalives_received counter
+	metallb_bgp_keepalives_received{peer="{{ .NeighborIP }}"} {{ .KeepalivesReceived }}
+	# HELP metallb_bgp_keepalives_sent Number of BGP keepalive messages sent
+	# TYPE metallb_bgp_keepalives_sent counter
+	metallb_bgp_keepalives_sent{peer="{{ .NeighborIP }}"} {{ .KeepalivesSent }}
+	# HELP metallb_bgp_notifications_sent Number of BGP notification messages sent
+	# TYPE metallb_bgp_notifications_sent counter
+	metallb_bgp_notifications_sent{peer="{{ .NeighborIP }}"} {{ .NotificationsSent }}
+	# HELP metallb_bgp_opens_received Number of BGP open messages received
+	# TYPE metallb_bgp_opens_received counter
+	metallb_bgp_opens_received{peer="{{ .NeighborIP }}"} {{ .OpensReceived }}
+	# HELP metallb_bgp_opens_sent Number of BGP open messages sent
+	# TYPE metallb_bgp_opens_sent counter
+	metallb_bgp_opens_sent{peer="{{ .NeighborIP }}"} {{ .OpensSent }}
+	# HELP metallb_bgp_route_refresh_sent Number of BGP route refresh messages sent
+	# TYPE metallb_bgp_route_refresh_sent counter
+	metallb_bgp_route_refresh_sent{peer="{{ .NeighborIP }}"} {{ .RouteRefreshSent }}
 	# HELP metallb_bgp_session_up BGP session state (1 is up, 0 is down)
 	# TYPE metallb_bgp_session_up gauge
 	metallb_bgp_session_up{peer="{{ .NeighborIP }}"} {{ .SessionUp }}
+	# HELP metallb_bgp_total_received Number of total BGP messages received
+	# TYPE metallb_bgp_total_received counter
+	metallb_bgp_total_received{peer="{{ .NeighborIP }}"} {{ .TotalReceived }}
+	# HELP metallb_bgp_total_sent Number of total BGP messages sent
+	# TYPE metallb_bgp_total_sent counter
+	metallb_bgp_total_sent{peer="{{ .NeighborIP }}"} {{ .TotalSent }}
 	# HELP metallb_bgp_updates_total Number of BGP UPDATE messages sent
 	# TYPE metallb_bgp_updates_total counter
 	metallb_bgp_updates_total{peer="{{ .NeighborIP }}"} {{ .UpdatesTotal }}
+	# HELP metallb_bgp_updates_total_received Number of BGP UPDATE messages received
+	# TYPE metallb_bgp_updates_total_received counter
+	metallb_bgp_updates_total_received{peer="{{ .NeighborIP }}"} {{ .UpdatesTotalReceived }}
 	`
 
 	tests = []struct {
-		desc              string
-		vtyshOutput       string
-		neighborIP        string
-		announcedPrefixes int
-		sessionUp         int
-		updatesTotal      int
+		desc                 string
+		vtyshOutput          string
+		neighborIP           string
+		announcedPrefixes    int
+		sessionUp            int
+		updatesTotal         int
+		updatesTotalReceived int
+		keepalivesSent       int
+		keepalivesReceived   int
+		opensSent            int
+		opensReceived        int
+		routeRefreshSent     int
+		notificationsSent    int
+		totalSent            int
+		totalReceived        int
 	}{
 		{
-			desc:              "Output contains only IPv4 advertisements",
-			vtyshOutput:       neighborsIPv4Only,
-			neighborIP:        "172.18.0.4:179",
-			announcedPrefixes: 3,
-			sessionUp:         1,
-			updatesTotal:      2,
+			desc:                 "Output contains only IPv4 advertisements",
+			vtyshOutput:          neighborsIPv4Only,
+			neighborIP:           "172.18.0.4:179",
+			announcedPrefixes:    3,
+			sessionUp:            1,
+			updatesTotal:         3,
+			updatesTotalReceived: 3,
+			keepalivesSent:       4,
+			keepalivesReceived:   4,
+			opensSent:            1,
+			opensReceived:        1,
+			routeRefreshSent:     5,
+			notificationsSent:    2,
+			totalSent:            15,
+			totalReceived:        15,
 		},
 		{
-			desc:              "Output contains mixed IPv4 and IPv6 advertisements",
-			vtyshOutput:       neighborsDual,
-			neighborIP:        "172.18.0.4:180",
-			announcedPrefixes: 6,
-			sessionUp:         1,
-			updatesTotal:      5,
+			desc:                 "Output contains mixed IPv4 and IPv6 advertisements",
+			vtyshOutput:          neighborsDual,
+			neighborIP:           "172.18.0.4:180",
+			announcedPrefixes:    6,
+			sessionUp:            1,
+			updatesTotal:         3,
+			updatesTotalReceived: 3,
+			keepalivesSent:       4,
+			keepalivesReceived:   4,
+			opensSent:            1,
+			opensReceived:        1,
+			routeRefreshSent:     5,
+			notificationsSent:    2,
+			totalSent:            15,
+			totalReceived:        15,
 		},
 	}
 	neighborsIPv4Only = `
@@ -122,18 +176,18 @@ var (
 			"depthOutq":0,
 			"opensSent":1,
 			"opensRecv":1,
-			"notificationsSent":0,
-			"notificationsRecv":0,
-			"updatesSent":2,
-			"updatesRecv":2,
-			"keepalivesSent":19,
-			"keepalivesRecv":19,
-			"routeRefreshSent":0,
-			"routeRefreshRecv":0,
+			"notificationsSent":2,
+			"notificationsRecv":2,
+			"updatesSent":3,
+			"updatesRecv":3,
+			"keepalivesSent":4,
+			"keepalivesRecv":4,
+			"routeRefreshSent":5,
+			"routeRefreshRecv":5,
 			"capabilitySent":0,
 			"capabilityRecv":0,
-			"totalSent":22,
-			"totalRecv":22
+			"totalSent":15,
+			"totalRecv":15
 		  },
 		  "minBtwnAdvertisementRunsTimerMsecs":0,
 		  "addressFamilyInfo":{
@@ -258,18 +312,18 @@ var (
 			"depthOutq":0,
 			"opensSent":1,
 			"opensRecv":1,
-			"notificationsSent":0,
-			"notificationsRecv":0,
-			"updatesSent":5,
-			"updatesRecv":5,
-			"keepalivesSent":19,
-			"keepalivesRecv":19,
-			"routeRefreshSent":0,
-			"routeRefreshRecv":0,
+			"notificationsSent":2,
+			"notificationsRecv":2,
+			"updatesSent":3,
+			"updatesRecv":3,
+			"keepalivesSent":4,
+			"keepalivesRecv":4,
+			"routeRefreshSent":5,
+			"routeRefreshRecv":5,
 			"capabilitySent":0,
 			"capabilityRecv":0,
-			"totalSent":25,
-			"totalRecv":25
+			"totalSent":15,
+			"totalRecv":15
 		  },
 		  "minBtwnAdvertisementRunsTimerMsecs":0,
 		  "addressFamilyInfo":{
@@ -325,10 +379,19 @@ func TestCollect(t *testing.T) {
 
 			var w bytes.Buffer
 			err = tmpl.Execute(&w, map[string]interface{}{
-				"NeighborIP":        tc.neighborIP,
-				"AnnouncedPrefixes": tc.announcedPrefixes,
-				"SessionUp":         tc.sessionUp,
-				"UpdatesTotal":      tc.updatesTotal,
+				"NeighborIP":           tc.neighborIP,
+				"AnnouncedPrefixes":    tc.announcedPrefixes,
+				"SessionUp":            tc.sessionUp,
+				"UpdatesTotal":         tc.updatesTotal,
+				"UpdatesTotalReceived": tc.updatesTotalReceived,
+				"KeepalivesReceived":   tc.keepalivesReceived,
+				"KeepalivesSent":       tc.keepalivesSent,
+				"NotificationsSent":    tc.notificationsSent,
+				"OpensReceived":        tc.opensReceived,
+				"OpensSent":            tc.opensSent,
+				"RouteRefreshSent":     tc.routeRefreshSent,
+				"TotalReceived":        tc.totalReceived,
+				"TotalSent":            tc.totalSent,
 			})
 
 			if err != nil {
