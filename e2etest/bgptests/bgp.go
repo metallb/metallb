@@ -272,6 +272,156 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 		})
 
+		table.DescribeTable("should collect BGP metrics in FRR mode", func(ipFamily ipfamily.Family, poolAddress string, addressTotal int) {
+			poolName := "bgp-test"
+
+			peerAddrToName := make(map[string]string)
+			for _, c := range FRRContainers {
+				address := c.Ipv4
+				if ipFamily == ipfamily.IPv6 {
+					address = c.Ipv6
+				}
+				peerAddr := address + fmt.Sprintf(":%d", c.RouterConfig.BGPPort)
+				peerAddrToName[peerAddr] = c.Name
+			}
+
+			resources := metallbconfig.ClusterResources{
+				Pools: []metallbv1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: poolName,
+						},
+						Spec: metallbv1beta1.IPAddressPoolSpec{
+							Addresses: []string{poolAddress},
+						},
+					},
+				},
+				Peers:   metallb.PeersForContainers(FRRContainers, ipFamily),
+				BGPAdvs: []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement},
+			}
+
+			for _, c := range FRRContainers {
+				err := frrcontainer.PairWithNodes(cs, c, ipFamily)
+				framework.ExpectNoError(err)
+			}
+
+			err := ConfigUpdater.Update(resources)
+			framework.ExpectNoError(err)
+
+			for _, c := range FRRContainers {
+				validateFRRPeeredWithAllNodes(cs, c, ipFamily)
+			}
+
+			ginkgo.By("creating a service")
+			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster) // Is a sleep required here?
+			defer testservice.Delete(cs, svc)
+
+			for _, speaker := range speakerPods {
+				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
+				Eventually(func() error {
+					speakerMetrics, err := metrics.ForPod(controllerPod, speaker, metallb.Namespace)
+					if err != nil {
+						return err
+					}
+					for addr := range peerAddrToName {
+						err = metrics.ValidateCounterValue(metrics.GreaterThan(0), "metallb_bgp_opens_sent", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_opens_sent{peer="%s"} >= 1`, addr), metrics.There)
+						if err != nil {
+							return err
+						}
+
+						err = metrics.ValidateCounterValue(metrics.GreaterThan(0), "metallb_bgp_opens_received", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_opens_received{peer="%s"} >= 1`, addr), metrics.There)
+						if err != nil {
+							return err
+						}
+
+						err = metrics.ValidateCounterValue(metrics.GreaterThan(0), "metallb_bgp_notifications_sent", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_notifications_sent{peer="%s"} >= 1`, addr), metrics.There)
+						if err != nil {
+							return err
+						}
+
+						err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_bgp_updates_total_received", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_updates_total_received{peer="%s"} >= 1`, addr), metrics.There)
+						if err != nil {
+							return err
+						}
+
+						err = metrics.ValidateCounterValue(metrics.GreaterThan(0), "metallb_bgp_keepalives_sent", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_keepalives_sent{peer="%s"} >= 1`, addr), metrics.There)
+						if err != nil {
+							return err
+						}
+
+						err = metrics.ValidateCounterValue(metrics.GreaterThan(0), "metallb_bgp_keepalives_received", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_keepalives_received{peer="%s"} >= 1`, addr), metrics.There)
+						if err != nil {
+							return err
+						}
+
+						err = metrics.ValidateCounterValue(metrics.GreaterThan(0), "metallb_bgp_route_refresh_sent", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_route_refresh_sent{peer="%s"} >= 1`, addr), metrics.There)
+						if err != nil {
+							return err
+						}
+
+						err = metrics.ValidateCounterValue(metrics.GreaterThan(0), "metallb_bgp_total_sent", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_total_sent{peer="%s"} >= 1`, addr), metrics.There)
+						if err != nil {
+							return err
+						}
+
+						err = metrics.ValidateCounterValue(metrics.GreaterThan(0), "metallb_bgp_total_received", map[string]string{"peer": addr}, speakerMetrics)
+						if err != nil {
+							return err
+						}
+
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_total_received{peer="%s"} >= 1`, addr), metrics.There)
+						if err != nil {
+							return err
+						}
+					}
+					return nil
+				}, 2*time.Minute, 1*time.Second).Should(BeNil())
+			}
+		},
+			table.Entry("IPV4 - Checking service", ipfamily.IPv4, v4PoolAddresses, 256),
+			table.Entry("IPV6 - Checking service", ipfamily.IPv6, v6PoolAddresses, 16),
+		)
+
 		table.DescribeTable("should be exposed by the controller", func(ipFamily ipfamily.Family, poolAddress string, addressTotal int) {
 			poolName := "bgp-test"
 
