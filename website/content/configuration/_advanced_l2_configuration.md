@@ -66,8 +66,8 @@ spec:
       kubernetes.io/hostname: NodeC
 ```
 
-In this way, all the IPs coming from `first-pool` will be reacheable only via `NodeA`
-and `NodeB`, and only one of those node will be choosen to expose the IP.
+In this way, all the IPs coming from `first-pool` will be reachable only via `NodeA`
+and `NodeB`, and only one of those node will be chosen to expose the IP.
 
 On the other hand, IPs coming from `second-pool` will be exposed always via `NodeC`.
 

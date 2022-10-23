@@ -15,14 +15,15 @@ them. Please
 [send us a patch]({{% relref "community/_index.md" %}}#contributing) if you
 have information on network addons that aren't listed!
 
-Network addon | Compatible
---------------|---------------
-Antrea        | Yes (Tested on version [1.4 and 1.5](https://github.com/jayunit100/k8sprototypes/tree/master/kind/metallb-antrea))
-Calico        | Mostly (see [known issues]({{% relref "configuration/calico.md" %}}))
-Canal         | Yes
-Cilium        | Yes
-Flannel       | Yes
-Kube-ovn      | Yes
-Kube-router   | Mostly (see [known issues]({{% relref "configuration/kube-router.md" %}}))
-Weave Net     | Mostly (see [known issues]({{% relref "configuration/weave.md" %}}))
+
+| Network addon | Compatible                                                                                                              |
+|---------------|-------------------------------------------------------------------------------------------------------------------------|
+| Antrea        | Yes (Tested on version [1.4 and 1.5](https://github.com/jayunit100/k8sprototypes/tree/master/kind/metallb-antrea))      |
+| Calico        | Mostly (see [known issues]({{% relref "configuration/calico.md" %}}))                                                   |
+| Canal         | Yes                                                                                                                     |
+| Cilium        | Yes                                                                                                                     |
+| Flannel       | Yes                                                                                                                     |
+| Kube-ovn      | Yes                                                                                                                     |
+| Kube-router   | Mostly (see [known issues]({{% relref "configuration/kube-router.md" %}}))                                              |
+| Weave Net     | Mostly (see [known issues]({{% relref "configuration/weave.md" %}}))                                                    |
 

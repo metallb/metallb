@@ -119,7 +119,7 @@ Changes in behavior:
 - the biggest change is the introduction of CRDs and removing support for the configuration via ConfigMap. In order to ease the transition
   to the new configuration, we provide a conversion tool from ConfigMap to resources (see the "Backward compatibility" section from [the main page](https://metallb.universe.tf/#backward-compatibility)).
 
-- the internal architecture was radically changed in order to accomodate CRDs, so please do not hesitate to [file an issue](https://github.com/metallb/metallb/issues).
+- the internal architecture was radically changed in order to accommodate CRDs, so please do not hesitate to [file an issue](https://github.com/metallb/metallb/issues).
 
 - The `AvoidBuggyIPs` flag was removed in order to reduce the api surface a bit. The same result can be achieved using ranges of IPs instead of
   the CIDR annotation.
