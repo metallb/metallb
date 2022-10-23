@@ -2,6 +2,17 @@ name: CI
 
 on:
   pull_request:
+    paths-ignore:
+      - 'configsamples/**'
+      - 'design/**'
+      - 'website/**'
+      - 'CODE_OF_CONDUCT.md'
+      - 'CODEOWNERS'
+      - 'CONTRIBUTING.md'
+      - 'DCO'
+      - 'LICENSE'
+      - 'netlify.toml'
+      - 'README.md'
     branches:
       - "main"
       - "v**"
@@ -15,21 +26,6 @@ jobs:
         with:
           fetch-depth: 0
       - uses: wagoid/commitlint-github-action@v4
-
-  validate-website-build:
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: true  # Fetch Hugo themes (true OR recursive)
-          fetch-depth: 0    # Fetch all history for .GitInfo and .Lastmod
-      - name: Setup Hugo
-        uses: peaceiris/actions-hugo@v2
-        with:
-          hugo-version: '0.91.2'
-      - name: Build
-        run: cd ./website && hugo
 
   unit-tests:
     runs-on: ubuntu-22.04
