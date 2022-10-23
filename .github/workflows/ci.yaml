@@ -2,6 +2,17 @@ name: CI
 
 on:
   pull_request:
+    paths-ignore:
+      - 'configsamples/**'
+      - 'design/**'
+      - 'website/**'
+      - 'CODE_OF_CONDUCT.md'
+      - 'CODEOWNERS'
+      - 'CONTRIBUTING.md'
+      - 'DCO'
+      - 'LICENSE'
+      - 'netlify.toml'
+      - 'README.md'
     branches:
       - "main"
       - "v**"
