@@ -628,6 +628,9 @@ def bumprelease(ctx, version, previous_version):
     run("perl -pi -e 's,image: quay.io/metallb/speaker:.*,image: quay.io/metallb/speaker:v{},g' config/controllers/speaker.yaml".format(version), echo=True)
     run("perl -pi -e 's,image: quay.io/metallb/controller:.*,image: quay.io/metallb/controller:v{},g' config/controllers/controller.yaml".format(version), echo=True)
 
+    # Update defaults in values.yaml
+    helmvalues(ctx, version)
+
     # Update the versions in the helm chart (version and appVersion are always the same)
     # helm chart versions follow Semantic Versioning, and thus exclude the leading 'v'
     run("perl -pi -e 's,version: .*,version: {},g' charts/metallb/Chart.yaml".format(version), echo=True)
@@ -722,7 +725,15 @@ def helmdocs(ctx, env="container"):
         run(cmd)
     else:
         raise Exit(message="Unsupported helm-docs environment: {}". format(env))
+@task
+def helmvalues(ctx,version):
+    """Updates metallb versions in values.yml to the latest release
 
+    This will updates the helm values.yml with the latest tagged release
+    for the controller and speaker images.
+    """
+    run("docker run --rm -v $(pwd):/workdir mikefarah/yq -i '.controller.image.tag = \"{}\"' charts/metallb/values.yaml".format(version))
+    run("docker run --rm -v $(pwd):/workdir mikefarah/yq -i '.speaker.image.tag = \"{}\"' charts/metallb/values.yaml".format(version))
 
 @task(help={
     "name": "name of the kind cluster to test (only kind uses).",

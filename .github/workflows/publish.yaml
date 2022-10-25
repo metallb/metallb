@@ -161,3 +161,30 @@ jobs:
           else
             echo "Release already exists"
           fi
+
+  update-helm-values:
+    runs-on: ubuntu-20.04
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Get latest release
+        run: |
+          echo "LATEST=$(git tag --sort=v:refname  --list 'v[0-9]*' | tail -1)" >> $GITHUB_ENV
+
+      - name: Ensure .controller.image.tag is set to latest release
+        uses: mikefarah/yq@master
+        with:
+          cmd: yq -i '.controller.image.tag = "${{ env.LATEST }}"' 'charts/metallb/values.yaml'
+
+      - name: Ensure .speaker.image.tag is set to latest release
+        uses: mikefarah/yq@master
+        with:
+          cmd: yq -i '.speaker.image.tag = "${{ env.LATEST }}"' 'charts/metallb/values.yaml'
+
+      - uses: stefanzweifel/git-auto-commit-action@v4
+        with:
+          commit_message: "Bump helm values to use latest release"
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "github-actions[bot]@users.noreply.github.com"
