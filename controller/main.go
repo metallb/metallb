@@ -70,12 +70,20 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 	// copy makes the code much easier to follow, and we have a GC for
 	// a reason.
 	svc := svcRo.DeepCopy()
+	successRes := controllers.SyncStateSuccess
+	wasAllocated := c.isServiceAllocated(name)
 	if !c.convergeBalancer(l, name, svc) {
 		return controllers.SyncStateError
 	}
+	if wasAllocated && !c.isServiceAllocated(name) { // convergeBalancer may deallocate our service and this means it did it.
+		// if the service was deallocated, it may have have left room
+		// for another one, so we reprocess
+		level.Info(l).Log("event", "serviceUpdated", "msg", "removed loadbalancer from service, services will be reprocessed")
+		successRes = controllers.SyncStateReprocessAll
+	}
 	if reflect.DeepEqual(svcRo, svc) {
 		level.Debug(l).Log("event", "noChange", "msg", "service converged, no change")
-		return controllers.SyncStateSuccess
+		return successRes
 	}
 
 	if !reflect.DeepEqual(svcRo.Status, svc.Status) {
@@ -88,8 +96,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		}
 	}
 	level.Info(l).Log("event", "serviceUpdated", "msg", "updated service object")
-
-	return controllers.SyncStateSuccess
+	return successRes
 }
 
 func (c *controller) deleteBalancer(l log.Logger, name string) {
