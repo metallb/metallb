@@ -7,8 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/extensions/table"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/e2etest/pkg/config"
@@ -31,7 +30,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 
 	var f *framework.Framework
 	ginkgo.AfterEach(func() {
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
+		if ginkgo.CurrentSpecReport().Failed() {
 			k8s.DumpInfo(Reporter, ginkgo.CurrentGinkgoTestDescription().TestText)
 		}
 
@@ -52,7 +51,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 	})
 
 	ginkgo.Context("IPV4 Assignment", func() {
-		table.DescribeTable("should remove the ip from a service assign it to a free one when", func(modify func(svc *v1.Service) error) {
+		ginkgo.DescribeTable("should remove the ip from a service assign it to a free one when", func(modify func(svc *v1.Service) error) {
 			ip, err := config.GetIPFromRangeByIndex(IPV4ServiceRange, 0)
 			framework.ExpectNoError(err)
 
@@ -110,13 +109,13 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 				return s.Status.LoadBalancer.Ingress[0].IP
 			}, time.Minute, 1*time.Second).Should(gomega.Equal(ip))
 		},
-			table.Entry("changing the service type to clusterIP",
+			ginkgo.Entry("changing the service type to clusterIP",
 				func(svc *v1.Service) error {
 					svc.Spec.Type = v1.ServiceTypeClusterIP
 					_, err := cs.CoreV1().Services(svc.Namespace).Update(context.Background(), svc, metav1.UpdateOptions{})
 					return err
 				}),
-			table.Entry("deleting the service",
+			ginkgo.Entry("deleting the service",
 				func(svc *v1.Service) error {
 					err := cs.CoreV1().Services(svc.Namespace).Delete(context.Background(), svc.Name, metav1.DeleteOptions{})
 					return err
