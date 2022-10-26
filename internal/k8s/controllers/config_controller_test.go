@@ -161,7 +161,7 @@ func TestNodeEvent(t *testing.T) {
 	g.Expect(err).To(BeNil())
 	err = v1beta2.AddToScheme(k8sscheme.Scheme)
 	g.Expect(err).To(BeNil())
-	m, err := manager.New(cfg, manager.Options{})
+	m, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0"})
 	g.Expect(err).To(BeNil())
 
 	var configUpdate int
