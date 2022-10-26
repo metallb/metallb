@@ -36,8 +36,7 @@ import (
 	metallbconfig "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/pointer"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/extensions/table"
+	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/openshift-kni/k8sreporter"
 
@@ -91,7 +90,7 @@ var _ = ginkgo.Describe("BGP", func() {
 	}
 
 	ginkgo.AfterEach(func() {
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
+		if ginkgo.CurrentSpecReport().Failed() {
 			dumpBGPInfo(ReportPath, ginkgo.CurrentGinkgoTestDescription().TestText, cs, f)
 			k8s.DumpInfo(Reporter, ginkgo.CurrentGinkgoTestDescription().TestText)
 		}
@@ -116,7 +115,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		cs = f.ClientSet
 	})
 
-	table.DescribeTable("A service of protocol load balancer should work with ETP=cluster", func(pairingIPFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
+	ginkgo.DescribeTable("A service of protocol load balancer should work with ETP=cluster", func(pairingIPFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
 
 		_, svc := setupBGPService(f, pairingIPFamily, poolAddresses, FRRContainers, func(svc *corev1.Service) {
 			testservice.TrafficPolicyCluster(svc)
@@ -132,24 +131,24 @@ var _ = ginkgo.Describe("BGP", func() {
 			validateService(cs, svc, allNodes.Items, c)
 		}
 	},
-		table.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
-		table.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}, func(_ *corev1.Service) {}),
-		table.Entry("DUALSTACK", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
+		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
+		ginkgo.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}, func(_ *corev1.Service) {}),
+		ginkgo.Entry("DUALSTACK", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
 			func(svc *corev1.Service) {
 				testservice.DualStack(svc)
 			}),
-		table.Entry("IPV4 - request IPv4 via custom annotation", ipfamily.IPv4, []string{v4PoolAddresses},
+		ginkgo.Entry("IPV4 - request IPv4 via custom annotation", ipfamily.IPv4, []string{v4PoolAddresses},
 			func(svc *corev1.Service) {
 				testservice.WithSpecificIPs(svc, "192.168.10.100")
 			}),
-		table.Entry("DUALSTACK - request Dual Stack via custom annotation", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
+		ginkgo.Entry("DUALSTACK - request Dual Stack via custom annotation", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
 			func(svc *corev1.Service) {
 				testservice.DualStack(svc)
 				testservice.WithSpecificIPs(svc, "192.168.10.100", "fc00:f853:ccd:e799::")
 			}),
 	)
 
-	table.DescribeTable("A service of protocol load balancer should work with ETP=local", func(pairingIPFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
+	ginkgo.DescribeTable("A service of protocol load balancer should work with ETP=local", func(pairingIPFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
 
 		jig, svc := setupBGPService(f, pairingIPFamily, poolAddresses, FRRContainers, func(svc *corev1.Service) {
 			testservice.TrafficPolicyLocal(svc)
@@ -169,15 +168,15 @@ var _ = ginkgo.Describe("BGP", func() {
 			validateService(cs, svc, epNodes, c)
 		}
 	},
-		table.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
-		table.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}, func(_ *corev1.Service) {}),
-		table.Entry("DUALSTACK", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
+		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
+		ginkgo.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}, func(_ *corev1.Service) {}),
+		ginkgo.Entry("DUALSTACK", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
 			func(svc *corev1.Service) {
 				testservice.DualStack(svc)
 			}),
 	)
 
-	table.DescribeTable("FRR must be deployed when enabled", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
+	ginkgo.DescribeTable("FRR must be deployed when enabled", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
 
 		_, svc := setupBGPService(f, pairingIPFamily, poolAddresses, FRRContainers, func(svc *corev1.Service) {
 			testservice.TrafficPolicyCluster(svc)
@@ -188,11 +187,11 @@ var _ = ginkgo.Describe("BGP", func() {
 		}
 
 	},
-		table.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}),
-		table.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}),
+		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}),
+		ginkgo.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}),
 	)
 
-	table.DescribeTable("A load balancer service should work with overlapping IPs", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
+	ginkgo.DescribeTable("A load balancer service should work with overlapping IPs", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
 		var allNodes *corev1.NodeList
 		resources := metallbconfig.ClusterResources{
 			Pools: []metallbv1beta1.IPAddressPool{
@@ -252,8 +251,8 @@ var _ = ginkgo.Describe("BGP", func() {
 			validateService(cs, svc1, allNodes.Items, c)
 		}
 	},
-		table.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}),
-		table.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}),
+		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}),
+		ginkgo.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}),
 	)
 
 	ginkgo.Context("validate different AddressPools for type=Loadbalancer", func() {
@@ -263,7 +262,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 		})
 
-		table.DescribeTable("set different AddressPools ranges modes", func(addressPools []metallbv1beta1.IPAddressPool, pairingFamily ipfamily.Family, tweak testservice.Tweak) {
+		ginkgo.DescribeTable("set different AddressPools ranges modes", func(addressPools []metallbv1beta1.IPAddressPool, pairingFamily ipfamily.Family, tweak testservice.Tweak) {
 			resources := metallbconfig.ClusterResources{
 				Pools:   addressPools,
 				Peers:   metallb.PeersForContainers(FRRContainers, pairingFamily),
@@ -299,7 +298,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				validateService(cs, svc, allNodes.Items, c)
 			}
 		},
-			table.Entry("IPV4 - test AddressPool defined by address range", []metallbv1beta1.IPAddressPool{
+			ginkgo.Entry("IPV4 - test AddressPool defined by address range", []metallbv1beta1.IPAddressPool{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "bgp-test"},
 					Spec: metallbv1beta1.IPAddressPoolSpec{
@@ -309,7 +308,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					},
 				}}, ipfamily.IPv4, testservice.TrafficPolicyCluster,
 			),
-			table.Entry("IPV4 - test AddressPool defined by network prefix", []metallbv1beta1.IPAddressPool{
+			ginkgo.Entry("IPV4 - test AddressPool defined by network prefix", []metallbv1beta1.IPAddressPool{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "bgp-test"},
 					Spec: metallbv1beta1.IPAddressPoolSpec{
@@ -319,7 +318,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					},
 				}}, ipfamily.IPv4, testservice.TrafficPolicyCluster,
 			),
-			table.Entry("IPV6 - test AddressPool defined by address range", []metallbv1beta1.IPAddressPool{
+			ginkgo.Entry("IPV6 - test AddressPool defined by address range", []metallbv1beta1.IPAddressPool{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "bgp-test"},
 					Spec: metallbv1beta1.IPAddressPoolSpec{
@@ -329,7 +328,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					},
 				}}, ipfamily.IPv6, testservice.TrafficPolicyCluster,
 			),
-			table.Entry("IPV6 - test AddressPool defined by network prefix", []metallbv1beta1.IPAddressPool{
+			ginkgo.Entry("IPV6 - test AddressPool defined by network prefix", []metallbv1beta1.IPAddressPool{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "bgp-test"},
 					Spec: metallbv1beta1.IPAddressPoolSpec{
@@ -339,7 +338,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					},
 				}}, ipfamily.IPv6, testservice.TrafficPolicyCluster,
 			),
-			table.Entry("DUALSTACK - test AddressPool defined by address range", []metallbv1beta1.IPAddressPool{
+			ginkgo.Entry("DUALSTACK - test AddressPool defined by address range", []metallbv1beta1.IPAddressPool{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "bgp-test"},
 					Spec: metallbv1beta1.IPAddressPoolSpec{
@@ -350,7 +349,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					},
 				}}, ipfamily.DualStack, testservice.TrafficPolicyCluster,
 			),
-			table.Entry("DUALSTACK - test AddressPool defined by network prefix", []metallbv1beta1.IPAddressPool{
+			ginkgo.Entry("DUALSTACK - test AddressPool defined by network prefix", []metallbv1beta1.IPAddressPool{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "bgp-test"},
 					Spec: metallbv1beta1.IPAddressPoolSpec{
@@ -363,7 +362,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			),
 		)
 	})
-	table.DescribeTable("configure peers with routerid and validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
+	ginkgo.DescribeTable("configure peers with routerid and validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
 		ginkgo.By("configure peer")
 
 		resources := metallbconfig.ClusterResources{
@@ -387,10 +386,10 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 		}
 	},
-		table.Entry("IPV4", ipfamily.IPv4),
-		table.Entry("IPV6", ipfamily.IPv6))
+		ginkgo.Entry("IPV4", ipfamily.IPv4),
+		ginkgo.Entry("IPV6", ipfamily.IPv6))
 
-	table.DescribeTable("validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
+	ginkgo.DescribeTable("validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
 		ginkgo.By("configure peer")
 
 		resources := metallbconfig.ClusterResources{
@@ -418,11 +417,11 @@ var _ = ginkgo.Describe("BGP", func() {
 			validateFRRPeeredWithAllNodes(cs, c, ipFamily)
 		}
 	},
-		table.Entry("IPV4 with Secret Ref set for BGPPeer CR", ipfamily.IPv4),
-		table.Entry("IPV6 with Secret Ref set for BGPPeer CR", ipfamily.IPv6))
+		ginkgo.Entry("IPV4 with Secret Ref set for BGPPeer CR", ipfamily.IPv4),
+		ginkgo.Entry("IPV6 with Secret Ref set for BGPPeer CR", ipfamily.IPv6))
 
 	ginkgo.Context("BFD", func() {
-		table.DescribeTable("should work with the given bfd profile", func(bfd metallbv1beta1.BFDProfile, pairingFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
+		ginkgo.DescribeTable("should work with the given bfd profile", func(bfd metallbv1beta1.BFDProfile, pairingFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
 			resources := metallbconfig.ClusterResources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
@@ -485,13 +484,13 @@ var _ = ginkgo.Describe("BGP", func() {
 			}, 4*time.Minute, 1*time.Second).Should(BeNil())
 
 		},
-			table.Entry("IPV4 - default",
+			ginkgo.Entry("IPV4 - default",
 				metallbv1beta1.BFDProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "bar",
 					},
 				}, ipfamily.IPv4, []string{v4PoolAddresses}, testservice.TrafficPolicyCluster),
-			table.Entry("IPV4 - full params",
+			ginkgo.Entry("IPV4 - full params",
 				metallbv1beta1.BFDProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "full1",
@@ -505,7 +504,7 @@ var _ = ginkgo.Describe("BGP", func() {
 						MinimumTTL:       pointer.Uint32Ptr(254),
 					},
 				}, ipfamily.IPv4, []string{v4PoolAddresses}, testservice.TrafficPolicyCluster),
-			table.Entry("IPV4 - echo mode enabled",
+			ginkgo.Entry("IPV4 - echo mode enabled",
 				metallbv1beta1.BFDProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "echo",
@@ -519,13 +518,13 @@ var _ = ginkgo.Describe("BGP", func() {
 						MinimumTTL:       pointer.Uint32Ptr(254),
 					},
 				}, ipfamily.IPv4, []string{v4PoolAddresses}, testservice.TrafficPolicyCluster),
-			table.Entry("IPV6 - default",
+			ginkgo.Entry("IPV6 - default",
 				metallbv1beta1.BFDProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "bar",
 					},
 				}, ipfamily.IPv6, []string{v6PoolAddresses}, testservice.TrafficPolicyCluster),
-			table.Entry("IPV6 - full params",
+			ginkgo.Entry("IPV6 - full params",
 				metallbv1beta1.BFDProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "full1",
@@ -539,7 +538,7 @@ var _ = ginkgo.Describe("BGP", func() {
 						MinimumTTL:       pointer.Uint32Ptr(254),
 					},
 				}, ipfamily.IPv6, []string{v6PoolAddresses}, testservice.TrafficPolicyCluster),
-			table.Entry("IPV6 - echo mode enabled",
+			ginkgo.Entry("IPV6 - echo mode enabled",
 				metallbv1beta1.BFDProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "echo",
@@ -553,7 +552,7 @@ var _ = ginkgo.Describe("BGP", func() {
 						MinimumTTL:       pointer.Uint32Ptr(254),
 					},
 				}, ipfamily.IPv6, []string{v6PoolAddresses}, testservice.TrafficPolicyCluster),
-			table.Entry("DUALSTACK - full params",
+			ginkgo.Entry("DUALSTACK - full params",
 				metallbv1beta1.BFDProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "full1",
@@ -574,7 +573,7 @@ var _ = ginkgo.Describe("BGP", func() {
 	})
 
 	ginkgo.Context("validate configuration changes", func() {
-		table.DescribeTable("should work after subsequent configuration updates", func(addressRange string, ipFamily ipfamily.Family) {
+		ginkgo.DescribeTable("should work after subsequent configuration updates", func(addressRange string, ipFamily ipfamily.Family) {
 			var services []*corev1.Service
 			var servicesIngressIP []string
 			var pools []metallbv1beta1.IPAddressPool
@@ -644,10 +643,10 @@ var _ = ginkgo.Describe("BGP", func() {
 				}
 			}
 		},
-			table.Entry("IPV4", "192.168.10.0/24", ipfamily.IPv4),
-			table.Entry("IPV6", "fc00:f853:0ccd:e799::/116", ipfamily.IPv6))
+			ginkgo.Entry("IPV4", "192.168.10.0/24", ipfamily.IPv4),
+			ginkgo.Entry("IPV6", "fc00:f853:0ccd:e799::/116", ipfamily.IPv6))
 
-		table.DescribeTable("configure peers one by one and validate FRR paired with nodes", func(ipFamily ipfamily.Family) {
+		ginkgo.DescribeTable("configure peers one by one and validate FRR paired with nodes", func(ipFamily ipfamily.Family) {
 			for i, c := range FRRContainers {
 				ginkgo.By(fmt.Sprintf("configure FRR peer [%s]", c.Name))
 
@@ -664,10 +663,10 @@ var _ = ginkgo.Describe("BGP", func() {
 				validateFRRPeeredWithAllNodes(cs, FRRContainers[i], ipFamily)
 			}
 		},
-			table.Entry("IPV4", ipfamily.IPv4),
-			table.Entry("IPV6", ipfamily.IPv6))
+			ginkgo.Entry("IPV4", ipfamily.IPv4),
+			ginkgo.Entry("IPV6", ipfamily.IPv6))
 
-		table.DescribeTable("configure bgp advertisement and verify it gets propagated",
+		ginkgo.DescribeTable("configure bgp advertisement and verify it gets propagated",
 			func(rangeWithAdvertisement string, rangeWithoutAdvertisement string, advertisement metallbv1beta1.BGPAdvertisement, legacy bool,
 				ipFamily ipfamily.Family, communities []metallbv1beta1.Community) {
 				emptyAdvertisement := metallbv1beta1.BGPAdvertisement{
@@ -809,7 +808,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				}
 
 			},
-			table.Entry("IPV4 - community and localpref",
+			ginkgo.Entry("IPV4 - community and localpref",
 				"192.168.10.0/24",
 				"192.168.16.0/24",
 				metallbv1beta1.BGPAdvertisement{
@@ -823,7 +822,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				false,
 				ipfamily.IPv4,
 				[]metallbv1beta1.Community{}),
-			table.Entry("IPV4 - localpref",
+			ginkgo.Entry("IPV4 - localpref",
 				"192.168.10.0/24",
 				"192.168.16.0/24",
 				metallbv1beta1.BGPAdvertisement{
@@ -836,7 +835,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				false,
 				ipfamily.IPv4,
 				[]metallbv1beta1.Community{}),
-			table.Entry("IPV4 - community",
+			ginkgo.Entry("IPV4 - community",
 				"192.168.10.0/24",
 				"192.168.16.0/24",
 				metallbv1beta1.BGPAdvertisement{
@@ -849,7 +848,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				false,
 				ipfamily.IPv4,
 				[]metallbv1beta1.Community{}),
-			table.Entry("IPV4 - community from CRD",
+			ginkgo.Entry("IPV4 - community from CRD",
 				"192.168.10.0/24",
 				"192.168.16.0/24",
 				metallbv1beta1.BGPAdvertisement{
@@ -863,7 +862,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				false,
 				ipfamily.IPv4,
 				[]metallbv1beta1.Community{noAdvCommunity}),
-			table.Entry("IPV4 - community and localpref - legacy",
+			ginkgo.Entry("IPV4 - community and localpref - legacy",
 				"192.168.10.0/24",
 				"192.168.16.0/24",
 				metallbv1beta1.BGPAdvertisement{
@@ -877,7 +876,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				true,
 				ipfamily.IPv4,
 				[]metallbv1beta1.Community{}),
-			table.Entry("IPV4 - community from CRD - legacy",
+			ginkgo.Entry("IPV4 - community from CRD - legacy",
 				"192.168.10.0/24",
 				"192.168.16.0/24",
 				metallbv1beta1.BGPAdvertisement{
@@ -890,7 +889,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				true,
 				ipfamily.IPv4,
 				[]metallbv1beta1.Community{noAdvCommunity}),
-			table.Entry("IPV4 - localpref - legacy",
+			ginkgo.Entry("IPV4 - localpref - legacy",
 				"192.168.10.0/24",
 				"192.168.16.0/24",
 				metallbv1beta1.BGPAdvertisement{
@@ -903,7 +902,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				true,
 				ipfamily.IPv4,
 				[]metallbv1beta1.Community{}),
-			table.Entry("IPV4 - ip pool selector",
+			ginkgo.Entry("IPV4 - ip pool selector",
 				"192.168.10.0/24",
 				"192.168.16.0/24",
 				metallbv1beta1.BGPAdvertisement{
@@ -923,7 +922,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				false,
 				ipfamily.IPv4,
 				[]metallbv1beta1.Community{}),
-			table.Entry("IPV6 - community and localpref",
+			ginkgo.Entry("IPV6 - community and localpref",
 				"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
 				"fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26",
 				metallbv1beta1.BGPAdvertisement{
@@ -937,7 +936,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				false,
 				ipfamily.IPv6,
 				[]metallbv1beta1.Community{}),
-			table.Entry("IPV6 - community",
+			ginkgo.Entry("IPV6 - community",
 				"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
 				"fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26",
 				metallbv1beta1.BGPAdvertisement{
@@ -950,7 +949,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				false,
 				ipfamily.IPv6,
 				[]metallbv1beta1.Community{}),
-			table.Entry("IPV6 - community from CRD",
+			ginkgo.Entry("IPV6 - community from CRD",
 				"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
 				"fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26",
 				metallbv1beta1.BGPAdvertisement{
@@ -963,7 +962,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				false,
 				ipfamily.IPv6,
 				[]metallbv1beta1.Community{noAdvCommunity}),
-			table.Entry("IPV6 - community from CRD - legacy",
+			ginkgo.Entry("IPV6 - community from CRD - legacy",
 				"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
 				"fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26",
 				metallbv1beta1.BGPAdvertisement{
@@ -976,7 +975,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				true,
 				ipfamily.IPv6,
 				[]metallbv1beta1.Community{noAdvCommunity}),
-			table.Entry("IPV6 - localpref",
+			ginkgo.Entry("IPV6 - localpref",
 				"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
 				"fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26",
 				metallbv1beta1.BGPAdvertisement{
@@ -992,7 +991,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 	})
 
-	table.DescribeTable("MetalLB FRR rejects any routes advertised by any neighbor", func(addressesRange, toInject string, pairingIPFamily ipfamily.Family) {
+	ginkgo.DescribeTable("MetalLB FRR rejects any routes advertised by any neighbor", func(addressesRange, toInject string, pairingIPFamily ipfamily.Family) {
 		resources := metallbconfig.ClusterResources{
 			Pools: []metallbv1beta1.IPAddressPool{
 				{
@@ -1053,8 +1052,8 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		Consistently(checkRoutesInjected, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
 	},
-		table.Entry("IPV4", "192.168.10.0/24", "172.16.1.10/32", ipfamily.IPv4),
-		table.Entry("IPV6", "fc00:f853:0ccd:e799::/116", "fc00:f853:ccd:e800::1/128", ipfamily.IPv6),
+		ginkgo.Entry("IPV4", "192.168.10.0/24", "172.16.1.10/32", ipfamily.IPv4),
+		ginkgo.Entry("IPV6", "fc00:f853:0ccd:e799::/116", "fc00:f853:ccd:e800::1/128", ipfamily.IPv6),
 	)
 
 	ginkgo.Context("FRR validate reload feedback", func() {
@@ -1186,7 +1185,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectEqual(peer.Spec.Port, uint16(179))
 		})
 	})
-	table.DescribeTable("A service of protocol load balancer should work with two protocols", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
+	ginkgo.DescribeTable("A service of protocol load balancer should work with two protocols", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
 		_, svc := setupBGPService(f, pairingIPFamily, poolAddresses, FRRContainers, func(svc *corev1.Service) {
 			testservice.TrafficPolicyCluster(svc)
 		})
@@ -1244,8 +1243,8 @@ var _ = ginkgo.Describe("BGP", func() {
 		// destination
 		Eventually(checkServiceL2, 5*time.Second, 1*time.Second).Should(Not(BeNil()))
 	},
-		table.Entry("IPV4", ipfamily.IPv4, []string{l2tests.IPV4ServiceRange}),
-		table.Entry("IPV6", ipfamily.IPv6, []string{l2tests.IPV6ServiceRange}),
+		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{l2tests.IPV4ServiceRange}),
+		ginkgo.Entry("IPV6", ipfamily.IPv6, []string{l2tests.IPV6ServiceRange}),
 	)
 })
 
