@@ -26,9 +26,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/config"
-	"github.com/onsi/ginkgo/reporters"
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/ginkgo/v2/reporters"
 	"github.com/onsi/gomega"
 	"go.universe.tf/metallb/e2etest/bgptests"
 	"go.universe.tf/metallb/e2etest/l2tests"
@@ -121,7 +120,7 @@ func TestE2E(t *testing.T) {
 		if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
 			klog.Errorf("Failed creating report directory: %v", err)
 		} else {
-			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
+			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, ginkgo.GinkgoParallelProcess()))))
 		}
 	}
 	gomega.RegisterFailHandler(framework.Fail)

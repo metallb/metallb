@@ -17,8 +17,7 @@ import (
 	metallbconfig "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/ipfamily"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/extensions/table"
+	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	frrconfig "go.universe.tf/metallb/e2etest/pkg/frr/config"
@@ -42,7 +41,7 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 	}
 
 	ginkgo.AfterEach(func() {
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
+		if ginkgo.CurrentSpecReport().Failed() {
 			dumpBGPInfo(ReportPath, ginkgo.CurrentGinkgoTestDescription().TestText, cs, f)
 			k8s.DumpInfo(Reporter, ginkgo.CurrentGinkgoTestDescription().TestText)
 		}
@@ -68,7 +67,7 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 	})
 
 	ginkgo.Context("Multiprotocol", func() {
-		table.DescribeTable("should advertise both ipv4 and ipv6 addresses with", func(pairingFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
+		ginkgo.DescribeTable("should advertise both ipv4 and ipv6 addresses with", func(pairingFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
 			resources := metallbconfig.ClusterResources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
@@ -106,23 +105,23 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 				validateService(cs, svc, allNodes.Items, c)
 			}
 		},
-			table.Entry("DUALSTACK - via ipv4",
+			ginkgo.Entry("DUALSTACK - via ipv4",
 				ipfamily.IPv4, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
 					testservice.TrafficPolicyCluster(svc)
 					testservice.DualStack(svc)
 				}),
-			table.Entry("DUALSTACK - via ipv6",
+			ginkgo.Entry("DUALSTACK - via ipv6",
 				ipfamily.IPv6, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
 					testservice.TrafficPolicyCluster(svc)
 					testservice.DualStack(svc)
 				}),
-			table.Entry("DUALSTACK - via both, advertising ipv6 only",
+			ginkgo.Entry("DUALSTACK - via both, advertising ipv6 only",
 				ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
 					testservice.TrafficPolicyCluster(svc)
 					testservice.DualStack(svc)
 					testservice.ForceV6(svc)
 				}),
-			table.Entry("DUALSTACK - via both, advertising ipv4 only",
+			ginkgo.Entry("DUALSTACK - via both, advertising ipv4 only",
 				ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
 					testservice.TrafficPolicyCluster(svc)
 					testservice.DualStack(svc)
@@ -130,7 +129,7 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 				}),
 		)
 
-		table.DescribeTable("should propagate the localpreference and the communities to both ipv4 and ipv6 addresses",
+		ginkgo.DescribeTable("should propagate the localpreference and the communities to both ipv4 and ipv6 addresses",
 			func(ipFamily ipfamily.Family) {
 				emptyAdvertisement := metallbv1beta1.BGPAdvertisement{
 					ObjectMeta: metav1.ObjectMeta{
@@ -219,9 +218,9 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 					}
 				}
 			},
-			table.Entry("with DUALSTACK via ipv4",
+			ginkgo.Entry("with DUALSTACK via ipv4",
 				ipfamily.IPv4),
-			table.Entry("with DUALSTACK via ipv6",
+			ginkgo.Entry("with DUALSTACK via ipv6",
 				ipfamily.IPv6),
 		)
 	})

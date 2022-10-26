@@ -26,8 +26,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/extensions/table"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/openshift-kni/k8sreporter"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
@@ -76,7 +75,7 @@ var _ = ginkgo.Describe("L2", func() {
 		err := ConfigUpdater.Clean()
 		framework.ExpectNoError(err)
 
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
+		if ginkgo.CurrentSpecReport().Failed() {
 			k8s.DumpInfo(Reporter, ginkgo.CurrentGinkgoTestDescription().TestText)
 		}
 	})
@@ -237,7 +236,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 	ginkgo.Context("validate different AddressPools for type=Loadbalancer", func() {
 
-		table.DescribeTable("set different AddressPools ranges modes", func(getAddressPools func() []metallbv1beta1.IPAddressPool) {
+		ginkgo.DescribeTable("set different AddressPools ranges modes", func(getAddressPools func() []metallbv1beta1.IPAddressPool) {
 			resources := internalconfig.ClusterResources{
 				Pools:  getAddressPools(),
 				L2Advs: []metallbv1beta1.L2Advertisement{emptyL2Advertisement},
@@ -266,7 +265,7 @@ var _ = ginkgo.Describe("L2", func() {
 				return service.ValidateL2(svc)
 			}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
 		},
-			table.Entry("AddressPool defined by address range", func() []metallbv1beta1.IPAddressPool {
+			ginkgo.Entry("AddressPool defined by address range", func() []metallbv1beta1.IPAddressPool {
 				return []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -280,7 +279,7 @@ var _ = ginkgo.Describe("L2", func() {
 					},
 				}
 			}),
-			table.Entry("AddressPool defined by network prefix",
+			ginkgo.Entry("AddressPool defined by network prefix",
 
 				func() []metallbv1beta1.IPAddressPool {
 					var ipv4AddressesByCIDR []string
@@ -311,7 +310,7 @@ var _ = ginkgo.Describe("L2", func() {
 		)
 	})
 
-	table.DescribeTable("different services sharing the same ip should advertise from the same node", func(ipRange *string) {
+	ginkgo.DescribeTable("different services sharing the same ip should advertise from the same node", func(ipRange *string) {
 		resources := internalconfig.ClusterResources{
 			Pools: []metallbv1beta1.IPAddressPool{
 				{
@@ -405,8 +404,8 @@ var _ = ginkgo.Describe("L2", func() {
 		}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())
 
 	},
-		table.Entry("IPV4", &IPV4ServiceRange),
-		table.Entry("IPV6", &IPV6ServiceRange))
+		ginkgo.Entry("IPV4", &IPV4ServiceRange),
+		ginkgo.Entry("IPV6", &IPV6ServiceRange))
 
 	ginkgo.Context("metrics", func() {
 		var controllerPod *corev1.Pod
@@ -431,7 +430,7 @@ var _ = ginkgo.Describe("L2", func() {
 			framework.ExpectNoError(err)
 		})
 
-		table.DescribeTable("should be exposed by the controller", func(ipFamily string) {
+		ginkgo.DescribeTable("should be exposed by the controller", func(ipFamily string) {
 			poolName := "l2-metrics-test"
 			resources := internalconfig.ClusterResources{
 				Pools: []metallbv1beta1.IPAddressPool{
@@ -625,11 +624,11 @@ var _ = ginkgo.Describe("L2", func() {
 				return nil
 			}, time.Minute, 5*time.Second).Should(gomega.BeNil())
 		},
-			table.Entry("IPV4 - Checking service", "ipv4"),
-			table.Entry("IPV6 - Checking service", "ipv6"))
+			ginkgo.Entry("IPV4 - Checking service", "ipv4"),
+			ginkgo.Entry("IPV6 - Checking service", "ipv6"))
 	})
 
-	table.DescribeTable("validate requesting a specific address pool for Loadbalancer service", func(ipRange *string) {
+	ginkgo.DescribeTable("validate requesting a specific address pool for Loadbalancer service", func(ipRange *string) {
 		var services []*corev1.Service
 		var servicesIngressIP []string
 		var pools []metallbv1beta1.IPAddressPool
@@ -695,8 +694,8 @@ var _ = ginkgo.Describe("L2", func() {
 			}
 		}
 	},
-		table.Entry("IPV4", &IPV4ServiceRange),
-		table.Entry("IPV6", &IPV6ServiceRange))
+		ginkgo.Entry("IPV4", &IPV4ServiceRange),
+		ginkgo.Entry("IPV6", &IPV6ServiceRange))
 })
 
 // TODO: The tests find the announcing node in multiple ways (MAC/Events).

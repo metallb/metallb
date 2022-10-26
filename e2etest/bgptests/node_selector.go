@@ -17,8 +17,7 @@ import (
 	"go.universe.tf/metallb/internal/ipfamily"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/extensions/table"
+	"github.com/onsi/ginkgo/v2"
 
 	frrconfig "go.universe.tf/metallb/e2etest/pkg/frr/config"
 	frrcontainer "go.universe.tf/metallb/e2etest/pkg/frr/container"
@@ -39,7 +38,7 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 			k8s.RemoveLabelFromNode(nodeToLabel.Name, "bgp-node-selector-test", cs)
 		}
 
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
+		if ginkgo.CurrentSpecReport().Failed() {
 			dumpBGPInfo(ReportPath, ginkgo.CurrentGinkgoTestDescription().TestText, cs, f)
 			k8s.DumpInfo(Reporter, ginkgo.CurrentGinkgoTestDescription().TestText)
 		}
@@ -64,7 +63,7 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 		cs = f.ClientSet
 	})
 
-	table.DescribeTable("Two services, two distinct advertisements with different node selectors",
+	ginkgo.DescribeTable("Two services, two distinct advertisements with different node selectors",
 		func(pairingIPFamily ipfamily.Family, addresses []string, nodesForFirstPool, nodesForSecondPool []int) {
 			var allNodes *corev1.NodeList
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
@@ -128,14 +127,14 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 			checkServiceOnlyOnNodes(cs, firstService, expectedNodesForFirstPool, pairingIPFamily)
 			checkServiceOnlyOnNodes(cs, secondService, expectedNodesForSecondPool, pairingIPFamily)
 		},
-		table.Entry("IPV4 - two on first, two on second", ipfamily.IPv4, []string{"192.168.10.0/24", "192.168.16.0/24"}, []int{0, 1}, []int{0, 1}),
-		table.Entry("IPV4 - one on first, two on second", ipfamily.IPv4, []string{"192.168.10.0/24", "192.168.16.0/24"}, []int{0}, []int{0, 1}),
-		table.Entry("IPV4 - zero on first, two on second", ipfamily.IPv4, []string{"192.168.10.0/24", "192.168.16.0/24"}, []int{}, []int{0, 1}),
-		table.Entry("IPV6 - one on first, two on second", ipfamily.IPv6, []string{"fc00:f853:0ccd:e799::/116", "fc00:f853:0ccd:e800::/116"}, []int{0}, []int{1, 2}),
+		ginkgo.Entry("IPV4 - two on first, two on second", ipfamily.IPv4, []string{"192.168.10.0/24", "192.168.16.0/24"}, []int{0, 1}, []int{0, 1}),
+		ginkgo.Entry("IPV4 - one on first, two on second", ipfamily.IPv4, []string{"192.168.10.0/24", "192.168.16.0/24"}, []int{0}, []int{0, 1}),
+		ginkgo.Entry("IPV4 - zero on first, two on second", ipfamily.IPv4, []string{"192.168.10.0/24", "192.168.16.0/24"}, []int{}, []int{0, 1}),
+		ginkgo.Entry("IPV6 - one on first, two on second", ipfamily.IPv6, []string{"fc00:f853:0ccd:e799::/116", "fc00:f853:0ccd:e800::/116"}, []int{0}, []int{1, 2}),
 	)
 
 	// this test is marked FFR only because of https://github.com/metallb/metallb/issues/1315
-	table.DescribeTable("Single service, two advertisement with different node selectors FRR", func(pairingIPFamily ipfamily.Family, address string, nodesForFirstAdv, nodesForSecondAdv []int) {
+	ginkgo.DescribeTable("Single service, two advertisement with different node selectors FRR", func(pairingIPFamily ipfamily.Family, address string, nodesForFirstAdv, nodesForSecondAdv []int) {
 		var allNodes *corev1.NodeList
 		allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
@@ -191,13 +190,13 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 		checkCommunitiesOnlyOnNodes(cs, svc, CommunityNoAdv, expectedNodesForFirstAdv, pairingIPFamily)
 		checkCommunitiesOnlyOnNodes(cs, svc, CommunityGracefulShut, expectedNodesForSecondAdv, pairingIPFamily)
 	},
-		table.Entry("IPV4 - two on first, two on second", ipfamily.IPv4, "192.168.10.0/24", []int{0, 1}, []int{0, 1}),
-		table.Entry("IPV4 - one on first, two on second", ipfamily.IPv4, "192.168.10.0/24", []int{0}, []int{0, 1}),
-		table.Entry("IPV4 - zero on first, two on second", ipfamily.IPv4, "192.168.10.0/24", []int{}, []int{0, 1}),
-		table.Entry("IPV6 - one on first, two on second", ipfamily.IPv6, "fc00:f853:0ccd:e799::/116", []int{0}, []int{1, 2}),
+		ginkgo.Entry("IPV4 - two on first, two on second", ipfamily.IPv4, "192.168.10.0/24", []int{0, 1}, []int{0, 1}),
+		ginkgo.Entry("IPV4 - one on first, two on second", ipfamily.IPv4, "192.168.10.0/24", []int{0}, []int{0, 1}),
+		ginkgo.Entry("IPV4 - zero on first, two on second", ipfamily.IPv4, "192.168.10.0/24", []int{}, []int{0, 1}),
+		ginkgo.Entry("IPV6 - one on first, two on second", ipfamily.IPv6, "fc00:f853:0ccd:e799::/116", []int{0}, []int{1, 2}),
 	)
 
-	table.DescribeTable("One service, one advertisement with node selector, labeling node",
+	ginkgo.DescribeTable("One service, one advertisement with node selector, labeling node",
 		func(pairingIPFamily ipfamily.Family, address string) {
 			var allNodes *corev1.NodeList
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
@@ -260,14 +259,14 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 			nodesNotSelected := nodesNotSelected(allNodes.Items, []int{0})
 			checkServiceNotOnNodes(cs, svc, nodesNotSelected, pairingIPFamily)
 		},
-		table.Entry("IPV4", ipfamily.IPv4, "192.168.10.0/24"),
-		table.Entry("IPV6", ipfamily.IPv6, "fc00:f853:0ccd:e799::/116"),
+		ginkgo.Entry("IPV4", ipfamily.IPv4, "192.168.10.0/24"),
+		ginkgo.Entry("IPV6", ipfamily.IPv6, "fc00:f853:0ccd:e799::/116"),
 	)
 
 	ginkgo.Context("Peer selector", func() {
 		// nodeForPeers is a map between container index and the indexes of the nodes we want to peer it with.
 		// we cant use strings to avoid making assumptions on the names of the containers / nodes.
-		table.DescribeTable("IPV4 Should work with a limited set of nodes", func(nodesForPeers map[int][]int) {
+		ginkgo.DescribeTable("IPV4 Should work with a limited set of nodes", func(nodesForPeers map[int][]int) {
 			var allNodes *corev1.NodeList
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
@@ -315,16 +314,16 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 			}
 
 		},
-			table.Entry("First to one, second to two", map[int][]int{
+			ginkgo.Entry("First to one, second to two", map[int][]int{
 				0: []int{0},
 				1: []int{1, 2},
 			}),
-			table.Entry("First to one, second to one, third to three", map[int][]int{
+			ginkgo.Entry("First to one, second to one, third to three", map[int][]int{
 				0: []int{0},
 				1: []int{1},
 				2: []int{0, 1, 2},
 			}),
-			table.Entry("First to one, second to one, third to same as first", map[int][]int{
+			ginkgo.Entry("First to one, second to one, third to same as first", map[int][]int{
 				0: []int{0},
 				1: []int{1},
 				2: []int{0},
