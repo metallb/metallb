@@ -9,7 +9,7 @@ on:
 
 jobs:
   unit-tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.9.1
@@ -48,7 +48,7 @@ jobs:
           inv checkchanges --action="run inv generateapidocs"
 
   publish-images:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs: [unit-tests]
     permissions:
       contents: read
@@ -117,7 +117,7 @@ jobs:
 
   release-charts:
     needs: [publish-images]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v2
