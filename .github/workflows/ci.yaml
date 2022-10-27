@@ -9,7 +9,7 @@ on:
 
 jobs:
   commitlint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
         with:
@@ -17,7 +17,7 @@ jobs:
       - uses: wagoid/commitlint-github-action@v4
 
   unit-tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.9.1
@@ -56,7 +56,7 @@ jobs:
           inv checkchanges --action="run inv generateapidocs"
 
   build-test-images:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: true
       matrix:
@@ -84,7 +84,7 @@ jobs:
           path: /tmp/${{ matrix.image }}.tar
 
   helm:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -128,7 +128,7 @@ jobs:
           helm conftest charts/metallb/ -p charts/metallb/policy/ --fail-on-warn
 
   e2e:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs:
       - unit-tests
       - build-test-images
@@ -190,7 +190,7 @@ jobs:
   # in the operator. We deploy a v4-frr lane, clone the v0.12.1 version of metallb and run CI
   # in operator mode. We run few significative tests that cover all the crds.
   backward_compatible:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs:
       - unit-tests
       - build-test-images
@@ -241,7 +241,7 @@ jobs:
           artifact-name: kind-logs-backward-compatible
 
   e2e-use-operator:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs:
       - unit-tests
       - build-test-images
@@ -310,7 +310,7 @@ jobs:
           artifact-name: kind_logs_use_operator
 
   oldest_k8s:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs:
       - unit-tests
       - build-test-images
