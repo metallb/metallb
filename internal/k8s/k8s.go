@@ -95,21 +95,22 @@ type Client struct {
 // Config specifies the configuration of the Kubernetes
 // client/watcher.
 type Config struct {
-	ProcessName         string
-	NodeName            string
-	MetricsHost         string
-	MetricsPort         int
-	EnablePprof         bool
-	ReadEndpoints       bool
-	Logger              log.Logger
-	DisableEpSlices     bool
-	Namespace           string
-	ValidateConfig      config.Validate
-	EnableWebhook       bool
-	DisableCertRotation bool
-	CertDir             string
-	CertServiceName     string
-	LoadBalancerClass   string
+	ProcessName           string
+	ControllerMetricsPort string
+	NodeName              string
+	MetricsHost           string
+	MetricsPort           int
+	EnablePprof           bool
+	ReadEndpoints         bool
+	Logger                log.Logger
+	DisableEpSlices       bool
+	Namespace             string
+	ValidateConfig        config.Validate
+	EnableWebhook         bool
+	DisableCertRotation   bool
+	CertDir               string
+	CertServiceName       string
+	LoadBalancerClass     string
 	Listener
 }
 
@@ -117,6 +118,7 @@ type Config struct {
 //
 // The client uses processName to identify itself to the cluster
 // (e.g. when logging events).
+//
 //nolint:godot
 func New(cfg *Config) (*Client, error) {
 	namespaceSelector := cache.ObjectSelector{
@@ -127,7 +129,7 @@ func New(cfg *Config) (*Client, error) {
 		Scheme:             scheme,
 		Port:               9443, // TODO port only with controller, for webhooks
 		LeaderElection:     false,
-		MetricsBindAddress: "0", // Disable metrics endpoint of controller manager
+		MetricsBindAddress: cfg.ControllerMetricsPort, // Disable metrics endpoint of controller manager
 		NewCache: cache.BuilderWithOptions(cache.Options{
 			SelectorsByObject: map[client.Object]cache.ObjectSelector{
 				&metallbv1beta1.AddressPool{}:      namespaceSelector,
