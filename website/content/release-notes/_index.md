@@ -2,6 +2,21 @@
 title: Release Notes
 weight: 8
 ---
+## Version 0.13.7
+
+New Features:
+
+- CRDs: add additionalPrinterColumn configuration ([PR 1632](https://github.com/metallb/metallb/pull/1632))
+
+Bug Fixes:
+
+- Fix service monitor relabelings in Helm charts ([PR 1650](https://github.com/metallb/metallb/pull/1650))
+- Controller readiness probe: restore to metrics endpoint but wait until the webhook is ready to accept requests, remove
+  the "unable to process a request with an unknown content type" log
+   ([Issue 1644](https://github.com/metallb/metallb/issues/1644) [PR 1648](https://github.com/metallb/metallb/pull/1648)).
+
+This release includes contributions from Attila Fabian, Tyler Auerbeck, Federico Paolinelli. Thank you!
+
 ## Version 0.13.6
 
 New Features:
@@ -104,7 +119,7 @@ Changes in behavior:
 - the biggest change is the introduction of CRDs and removing support for the configuration via ConfigMap. In order to ease the transition
   to the new configuration, we provide a conversion tool from ConfigMap to resources (see the "Backward compatibility" section from [the main page](https://metallb.universe.tf/#backward-compatibility)).
 
-- the internal architecture was radically changed in order to accomodate CRDs, so please do not hesitate to [file an issue](https://github.com/metallb/metallb/issues).
+- the internal architecture was radically changed in order to accommodate CRDs, so please do not hesitate to [file an issue](https://github.com/metallb/metallb/issues).
 
 - The `AvoidBuggyIPs` flag was removed in order to reduce the api surface a bit. The same result can be achieved using ranges of IPs instead of
   the CIDR annotation.

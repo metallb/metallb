@@ -15,7 +15,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"reflect"
@@ -26,7 +25,6 @@ import (
 	"github.com/go-kit/log/level"
 	v1 "k8s.io/api/core/v1"
 
-	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/allocator/k8salloc"
 	"go.universe.tf/metallb/internal/ipfamily"
 )
@@ -41,7 +39,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	var err error
 	// Not a LoadBalancer, early exit. It might have been a balancer
 	// in the past, so we still need to clear LB state.
-	if svc.Spec.Type != "LoadBalancer" {
+	if svc.Spec.Type != v1.ServiceTypeLoadBalancer {
 		level.Debug(l).Log("event", "clearAssignment", "reason", "notLoadBalancer", "msg", "not a LoadBalancer")
 		c.clearServiceState(key, svc)
 		// Early return, we explicitly do *not* want to reallocate
@@ -98,13 +96,6 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		if err = c.ips.Assign(key, lbIPs, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 			level.Info(l).Log("event", "clearAssignment", "error", err, "msg", "current IP not allowed by config, clearing")
 			c.clearServiceState(key, svc)
-			// Check if we cannot assign IP because services were sharing IP using
-			// "allow-shared-ip" annotation and one of them changed so instead of allocating
-			// new service IP we fail.
-			if errors.Is(err, allocator.ErrCannotShareKey) {
-				c.client.Errorf(svc, "svcCannotShareKey", "current IP not allowed by config:%s", err)
-				return false
-			}
 			lbIPs = []net.IP{}
 		}
 
@@ -218,6 +209,10 @@ func (c *controller) allocateIPs(key string, svc *v1.Service) ([]net.IP, error) 
 
 	// Okay, in that case just bruteforce across all pools.
 	return c.ips.Allocate(key, serviceIPFamily, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
+}
+
+func (c *controller) isServiceAllocated(key string) bool {
+	return c.ips.Pool(key) != ""
 }
 
 func getDesiredLbIPs(svc *v1.Service) ([]net.IP, ipfamily.Family, error) {
