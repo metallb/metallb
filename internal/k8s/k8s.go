@@ -354,7 +354,7 @@ func (c *Client) CreateMlSecret(namespace, controllerDeploymentName, secretName 
 		},
 		metav1.CreateOptions{})
 	if err == nil {
-		level.Info(c.logger).Log("op", "CreateMlSecret", "msg", "secret succesfully created")
+		level.Info(c.logger).Log("op", "CreateMlSecret", "msg", "secret successfully created")
 	}
 	return err
 }
