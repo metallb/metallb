@@ -59,6 +59,8 @@ Kubernetes: `>= 1.14.0-0`
 | imagePullSecrets | list | `[]` |  |
 | loadBalancerClass | string | `""` |  |
 | nameOverride | string | `""` |  |
+| prometheus.controllerMetrics.enabled | bool | `false` |  |
+| prometheus.controllerMetrics.port | string | `":7473"` |  |
 | prometheus.controllerMetricsTLSSecret | string | `""` |  |
 | prometheus.metricsPort | int | `7472` |  |
 | prometheus.namespace | string | `""` |  |

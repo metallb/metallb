@@ -37,6 +37,13 @@ prometheus:
   # certificate to be used.
   speakerMetricsTLSSecret: ""
 
+  controllerMetrics:
+    # if set, enables exposing metrics from the controller runtime
+    enabled: false
+    # the port to bind for exposing controller metrics. Should either be 0 (disabled) or follow
+    # the pattern of :<port>
+    port: ":7473"
+
   # the name of the secret to be mounted in the controller pod
   # to expose the metrics securely. If not present, a self signed
   # certificate to be used.

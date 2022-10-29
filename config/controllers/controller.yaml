@@ -29,6 +29,8 @@ spec:
           value: memberlist
         - name: METALLB_DEPLOYMENT
           value: controller
+        - name: METALLB_CONTROLLER_METRICS_PORT
+          value: "0"
         image: quay.io/metallb/controller:main
         name: controller
         ports:
