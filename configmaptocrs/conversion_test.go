@@ -5,8 +5,9 @@ package main
 import (
 	"bytes"
 	"flag"
-	"io/ioutil"
+	"io"
 	"log"
+	"os"
 	"path"
 	"path/filepath"
 	"strings"
@@ -33,7 +34,7 @@ func TestGenerateResourcesWithConfigData(t *testing.T) {
 
 func testGenerate(t *testing.T, testDir string, testOnlyData bool) {
 	tests := []string{}
-	files, err := ioutil.ReadDir(testDir)
+	files, err := os.ReadDir(testDir)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -45,7 +46,7 @@ func testGenerate(t *testing.T, testDir string, testOnlyData bool) {
 
 	for _, tc := range tests {
 		t.Run(tc, func(t *testing.T) {
-			log.SetOutput(ioutil.Discard)
+			log.SetOutput(io.Discard)
 
 			res := new(bytes.Buffer)
 			// Override the container's internal path.
@@ -61,12 +62,12 @@ func testGenerate(t *testing.T, testDir string, testOnlyData bool) {
 			goldenFile := filepath.Join(testDir, strings.TrimSuffix(tc, path.Ext(tc))+".golden")
 			if *update {
 				t.Log("update golden file")
-				if err := ioutil.WriteFile(goldenFile, res.Bytes(), 0644); err != nil {
+				if err := os.WriteFile(goldenFile, res.Bytes(), 0644); err != nil {
 					t.Fatalf("test %s failed to update golden file: %s", tc, err)
 				}
 			}
 
-			expected, err := ioutil.ReadFile(goldenFile)
+			expected, err := os.ReadFile(goldenFile)
 			if err != nil {
 				t.Fatalf("test %s failed reading .golden file: %s", tc, err)
 			}

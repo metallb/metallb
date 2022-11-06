@@ -4,8 +4,8 @@ package native
 
 import (
 	"bytes"
-	"io/ioutil"
 	"net"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -37,7 +37,7 @@ func TestPcapInterop(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, m := range ms {
-		bs, err := ioutil.ReadFile(m)
+		bs, err := os.ReadFile(m)
 		if err != nil {
 			t.Fatalf("read %q: %s", m, err)
 		}

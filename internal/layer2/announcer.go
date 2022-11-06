@@ -3,7 +3,6 @@
 package layer2
 
 import (
-	"io/ioutil"
 	"net"
 	"os"
 	"strconv"
@@ -82,7 +81,7 @@ func (a *Announce) updateInterfaces() {
 		if _, err = os.Stat("/sys/class/net/" + ifi.Name + "/master"); !os.IsNotExist(err) {
 			continue
 		}
-		f, err := ioutil.ReadFile("/sys/class/net/" + ifi.Name + "/flags")
+		f, err := os.ReadFile("/sys/class/net/" + ifi.Name + "/flags")
 		if err == nil {
 			flags, _ := strconv.ParseUint(string(f)[:len(string(f))-1], 0, 32)
 			// NOARP flag

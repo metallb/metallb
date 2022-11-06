@@ -5,7 +5,6 @@ package frr
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strconv"
@@ -278,7 +277,7 @@ func templateConfig(data interface{}) (string, error) {
 // writeConfigFile writes the FRR configuration file (represented as a string)
 // to 'filename'.
 func writeConfig(config string, filename string) error {
-	return ioutil.WriteFile(filename, []byte(config), 0644)
+	return os.WriteFile(filename, []byte(config), 0644)
 }
 
 // reloadConfig requests that FRR reloads the configuration file. This is

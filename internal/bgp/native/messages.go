@@ -7,7 +7,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"time"
 
@@ -279,7 +278,7 @@ func readCapabilities(r io.Reader, ret *openResult) error {
 		default:
 			// TODO: only ignore capabilities that we know are fine to
 			// ignore.
-			if _, err := io.Copy(ioutil.Discard, &lr); err != nil {
+			if _, err := io.Copy(io.Discard, &lr); err != nil {
 				return err
 			}
 		}
