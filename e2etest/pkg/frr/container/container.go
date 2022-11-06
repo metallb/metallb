@@ -4,7 +4,6 @@ package container
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -158,7 +157,7 @@ func ConfigureExisting(c ...Config) ([]*FRR, error) {
 // start creates a new FRR container on the host and returns the corresponding *FRR.
 // A situation where a non-nil container and an error are returned is possible.
 func start(cfg Config) (*FRR, error) {
-	testDirName, err := ioutil.TempDir("", "frr-conf")
+	testDirName, err := os.MkdirTemp("", "frr-conf")
 	if err != nil {
 		return nil, err
 	}
