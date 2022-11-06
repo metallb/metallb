@@ -6,7 +6,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -111,7 +110,7 @@ func readConfig(origin string) ([]byte, error) {
 	}
 	defer f.Close()
 
-	raw, err := ioutil.ReadAll(f)
+	raw, err := io.ReadAll(f)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %v", origin, err)
 	}
