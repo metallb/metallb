@@ -58,11 +58,11 @@ func TestLoadBalancerCreation(t *testing.T) {
 	}
 
 	cfg := &config.Config{
-		Pools: map[string]*config.Pool{
+		Pools: &config.Pools{ByName: map[string]*config.Pool{
 			"default": {
 				CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 			},
-		},
+		}},
 	}
 
 	state := c.SetConfig(logger, cfg)

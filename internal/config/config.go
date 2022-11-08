@@ -44,6 +44,7 @@ type ClusterResources struct {
 	Communities        []metallbv1beta1.Community        `json:"communities"`
 	PasswordSecrets    map[string]corev1.Secret          `json:"passwordsecrets"`
 	Nodes              []corev1.Node                     `json:"nodes"`
+	Namespaces         []corev1.Namespace                `json:"namespaces"`
 }
 
 // Config is a parsed MetalLB configuration.
@@ -51,9 +52,19 @@ type Config struct {
 	// Routers that MetalLB should peer with.
 	Peers []*Peer
 	// Address pools from which to allocate load balancer IPs.
-	Pools map[string]*Pool
+	Pools *Pools
 	// BFD profiles that can be used by peers.
 	BFDProfiles map[string]*BFDProfile
+}
+
+// Pools contains address pools and its namespace/service specific allocations.
+type Pools struct {
+	// ByName a map containing all configured pools.
+	ByName map[string]*Pool
+	// ByNamespace contains pool names pinned to specific namespace.
+	ByNamespace map[string][]string
+	// ByServiceSelector contains pool names which has service selection labels.
+	ByServiceSelector []string
 }
 
 // Proto holds the protocol we are speaking.
@@ -105,6 +116,8 @@ type Peer struct {
 
 // Pool is the configuration of an IP address pool.
 type Pool struct {
+	// Pool Name
+	Name string
 	// The addresses that are part of this pool, expressed as CIDR
 	// prefixes. config.Parse guarantees that these are
 	// non-overlapping, both within and between pools.
@@ -126,6 +139,19 @@ type Pool struct {
 	L2Advertisements []*L2Advertisement
 
 	cidrsPerAddresses map[string][]*net.IPNet
+
+	ServiceAllocations *ServiceAllocation
+}
+
+// ServiceAllocation makes ip pool allocation to specific namespace and/or service.
+type ServiceAllocation struct {
+	// The priority of ip pool for a given service allocation.
+	Priority int
+	// Set of namespaces on which ip pool can be attached.
+	Namespaces sets.String
+	// Service selectors to select service for which ip pool can be used
+	// for ip allocation.
+	ServiceSelectors []labels.Selector
 }
 
 // BGPAdvertisement describes one translation from an IP address to a BGP advertisement.
@@ -168,6 +194,10 @@ type BFDProfile struct {
 	EchoMode         bool
 	PassiveMode      bool
 	MinimumTTL       *uint32
+}
+
+func (p *Pools) IsEmpty(pool string) bool {
+	return p.ByName[pool] == nil
 }
 
 // Parse loads and validates a Config from bs.
@@ -237,8 +267,8 @@ func peersFor(resources ClusterResources, BFDProfiles map[string]*BFDProfile) ([
 	return res, nil
 }
 
-func poolsFor(resources ClusterResources) (map[string]*Pool, error) {
-	res := make(map[string]*Pool)
+func poolsFor(resources ClusterResources) (*Pools, error) {
+	pools := make(map[string]*Pool)
 	communities, err := communitiesFromCrs(resources.Communities)
 	if err != nil {
 		return nil, err
@@ -246,13 +276,13 @@ func poolsFor(resources ClusterResources) (map[string]*Pool, error) {
 
 	var allCIDRs []*net.IPNet
 	for _, p := range resources.Pools {
-		pool, err := addressPoolFromCR(p)
+		pool, err := addressPoolFromCR(p, resources.Namespaces)
 		if err != nil {
 			return nil, fmt.Errorf("parsing address pool %s: %s", p.Name, err)
 		}
 
 		// Check that the pool isn't already defined
-		if res[p.Name] != nil {
+		if pools[p.Name] != nil {
 			return nil, fmt.Errorf("duplicate definition of pool %q", p.Name)
 		}
 
@@ -266,10 +296,10 @@ func poolsFor(resources ClusterResources) (map[string]*Pool, error) {
 			allCIDRs = append(allCIDRs, cidr)
 		}
 
-		res[p.Name] = pool
+		pools[p.Name] = pool
 	}
 
-	err = setL2AdvertisementsToPools(resources.Pools, resources.L2Advs, resources.Nodes, res)
+	err = setL2AdvertisementsToPools(resources.Pools, resources.L2Advs, resources.Nodes, pools)
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +309,7 @@ func poolsFor(resources ClusterResources) (map[string]*Pool, error) {
 		return nil, err
 	}
 
-	err = setBGPAdvertisementsToPools(resources.Pools, resources.BGPAdvs, resources.Nodes, res, communities)
+	err = setBGPAdvertisementsToPools(resources.Pools, resources.BGPAdvs, resources.Nodes, pools, communities)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +325,7 @@ func poolsFor(resources ClusterResources) (map[string]*Pool, error) {
 		}
 
 		// Check that the pool isn't already defined
-		if res[p.Name] != nil {
+		if pools[p.Name] != nil {
 			return nil, fmt.Errorf("duplicate definition of pool %q", p.Name)
 		}
 
@@ -309,10 +339,10 @@ func poolsFor(resources ClusterResources) (map[string]*Pool, error) {
 			allCIDRs = append(allCIDRs, cidr)
 		}
 
-		res[p.Name] = pool
+		pools[p.Name] = pool
 	}
-
-	return res, nil
+	return &Pools{ByName: pools, ByNamespace: poolsByNamespace(pools),
+		ByServiceSelector: poolsByServiceSelector(pools)}, nil
 }
 
 func communitiesFromCrs(cs []metallbv1beta1.Community) (map[string]uint32, error) {
@@ -446,12 +476,13 @@ func passwordForPeer(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1
 	return password, nil
 }
 
-func addressPoolFromCR(p metallbv1beta1.IPAddressPool) (*Pool, error) {
+func addressPoolFromCR(p metallbv1beta1.IPAddressPool, namespaces []corev1.Namespace) (*Pool, error) {
 	if p.Name == "" {
 		return nil, errors.New("missing pool name")
 	}
 
 	ret := &Pool{
+		Name:          p.Name,
 		AvoidBuggyIPs: p.Spec.AvoidBuggyIPs,
 		AutoAssign:    true,
 	}
@@ -474,7 +505,69 @@ func addressPoolFromCR(p metallbv1beta1.IPAddressPool) (*Pool, error) {
 		ret.cidrsPerAddresses[cidr] = nets
 	}
 
+	serviceAllocations, err := addressPoolServiceAllocationsFromCR(p, namespaces)
+	if err != nil {
+		return nil, err
+	}
+	ret.ServiceAllocations = serviceAllocations
+
 	return ret, nil
+}
+
+func addressPoolServiceAllocationsFromCR(p metallbv1beta1.IPAddressPool, namespaces []corev1.Namespace) (*ServiceAllocation, error) {
+	if p.Spec.AllocateTo == nil {
+		return nil, nil
+	}
+	serviceAllocations := &ServiceAllocation{Priority: p.Spec.AllocateTo.Priority,
+		Namespaces: sets.NewString(p.Spec.AllocateTo.Namespaces...)}
+	for i := range p.Spec.AllocateTo.NamespaceSelectors {
+		l, err := metav1.LabelSelectorAsSelector(&p.Spec.AllocateTo.NamespaceSelectors[i])
+		if err != nil {
+			return nil, errors.Wrapf(err, "invalid namespace label selector %v in ip pool %s", &p.Spec.AllocateTo.NamespaceSelectors[i], p.Name)
+		}
+		for _, ns := range namespaces {
+			nsLabels := labels.Set(ns.Labels)
+			if l.Matches(nsLabels) {
+				serviceAllocations.Namespaces.Insert(ns.Name)
+			}
+		}
+	}
+	for i := range p.Spec.AllocateTo.ServiceSelectors {
+		l, err := metav1.LabelSelectorAsSelector(&p.Spec.AllocateTo.ServiceSelectors[i])
+		if err != nil {
+			return nil, errors.Wrapf(err, "invalid service label selector %v in ip pool %s", p.Spec.AllocateTo.ServiceSelectors[i], p.Name)
+		}
+		serviceAllocations.ServiceSelectors = append(serviceAllocations.ServiceSelectors, l)
+	}
+	return serviceAllocations, nil
+}
+
+func poolsByNamespace(pools map[string]*Pool) map[string][]string {
+	var poolsForNamespace map[string][]string
+	for _, pool := range pools {
+		if pool.ServiceAllocations == nil {
+			continue
+		}
+		if poolsForNamespace == nil && len(pool.ServiceAllocations.Namespaces) > 0 {
+			poolsForNamespace = make(map[string][]string)
+		}
+		for namespace := range pool.ServiceAllocations.Namespaces {
+			poolsForNamespace[namespace] = append(poolsForNamespace[namespace], pool.Name)
+		}
+	}
+	return poolsForNamespace
+}
+
+func poolsByServiceSelector(pools map[string]*Pool) []string {
+	var poolsByServiceSelector []string
+	for _, pool := range pools {
+		if pool.ServiceAllocations == nil || len(pool.ServiceAllocations.ServiceSelectors) == 0 {
+			continue
+		}
+		poolsByServiceSelector = append(poolsByServiceSelector, pool.Name)
+	}
+	sort.Strings(poolsByServiceSelector)
+	return poolsByServiceSelector
 }
 
 func addressPoolFromLegacyCR(p metallbv1beta1.AddressPool, bgpCommunities map[string]uint32, allNodes map[string]bool) (*Pool, error) {
@@ -483,6 +576,7 @@ func addressPoolFromLegacyCR(p metallbv1beta1.AddressPool, bgpCommunities map[st
 	}
 
 	ret := &Pool{
+		Name:       p.Name,
 		AutoAssign: true,
 	}
 

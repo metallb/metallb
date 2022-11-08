@@ -23,10 +23,13 @@ import (
 	"github.com/go-kit/log/level"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/internal/config"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
@@ -35,7 +38,7 @@ type PoolReconciler struct {
 	Logger         log.Logger
 	Scheme         *runtime.Scheme
 	Namespace      string
-	Handler        func(log.Logger, map[string]*config.Pool) SyncState
+	Handler        func(log.Logger, *config.Pools) SyncState
 	ValidateConfig config.Validate
 	ForceReload    func()
 }
@@ -63,10 +66,17 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, err
 	}
 
+	var namespaces corev1.NamespaceList
+	if err := r.List(ctx, &namespaces); err != nil {
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "message", "failed to get namespaces", "error", err)
+		return ctrl.Result{}, err
+	}
+
 	resources := config.ClusterResources{
 		Pools:              ipAddressPools.Items,
 		LegacyAddressPools: addressPools.Items,
 		Communities:        communities.Items,
+		Namespaces:         namespaces.Items,
 	}
 
 	level.Debug(r.Logger).Log("controller", "PoolReconciler", "metallb CRs", dumpClusterResources(&resources))
@@ -104,9 +114,16 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 }
 
 func (r *PoolReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	p := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return filterNodeEvent(e) && filterNamespaceEvent(e)
+		},
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metallbv1beta1.IPAddressPool{}).
 		Watches(&source.Kind{Type: &metallbv1beta1.AddressPool{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &metallbv1beta1.Community{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&source.Kind{Type: &corev1.Namespace{}}, &handler.EnqueueRequestForObject{}).
+		WithEventFilter(p).
 		Complete(r)
 }

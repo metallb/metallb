@@ -295,11 +295,11 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 	}
 
 	l = log.With(l, "pool", poolName)
-	pool := c.config.Pools[poolName]
-	if pool == nil {
+	if c.config.Pools == nil || c.config.Pools.ByName[poolName] == nil {
 		level.Error(l).Log("bug", "true", "msg", "internal error: allocated IP has no matching address pool")
 		return c.deleteBalancer(l, name, "internalError")
 	}
+	pool := c.config.Pools.ByName[poolName]
 
 	if svcIPs, ok := c.svcIPs[name]; ok && !compareIPs(lbIPs, svcIPs) {
 		if st := c.deleteBalancer(l, name, "loadBalancerIPChanged"); st == controllers.SyncStateError {
@@ -402,8 +402,11 @@ func (c *controller) deleteBalancerProtocol(l log.Logger, protocol config.Proto,
 	return controllers.SyncStateSuccess
 }
 
-func poolFor(pools map[string]*config.Pool, ips []net.IP) string {
-	for pname, p := range pools {
+func poolFor(pools *config.Pools, ips []net.IP) string {
+	if pools == nil {
+		return ""
+	}
+	for pname, p := range pools.ByName {
 		cnt := 0
 		for _, ip := range ips {
 			for _, cidr := range p.CIDR {

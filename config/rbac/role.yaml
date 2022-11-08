@@ -9,6 +9,7 @@ rules:
       - ""
     resources:
       - services
+      - namespaces
     verbs:
       - get
       - list
@@ -96,6 +97,7 @@ rules:
       - services
       - endpoints
       - nodes
+      - namespaces
     verbs:
       - get
       - list
