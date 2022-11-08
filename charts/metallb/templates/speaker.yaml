@@ -143,8 +143,16 @@ spec:
       serviceAccountName: {{ template "metallb.speaker.serviceAccountName" . }}
       terminationGracePeriodSeconds: 0
       hostNetwork: true
-      {{- if .Values.speaker.frr.enabled }}
+      {{- if or .Values.speaker.frr.enabled .Values.speaker.memberlist.enabled }}
       volumes:
+        {{- if .Values.speaker.memberlist.enabled }}
+        - name: memberlist
+          secret:
+            secretName: {{ include "metallb.secretName" . }}
+            defaultMode: 420
+        {{- end }}
+      {{- end }}
+        {{- if .Values.speaker.frr.enabled }}
         - name: frr-sockets
           emptyDir: {}
         - name: frr-startup
@@ -215,11 +223,8 @@ spec:
           value: "app.kubernetes.io/name={{ include "metallb.name" . }},app.kubernetes.io/component=speaker"
         - name: METALLB_ML_BIND_PORT
           value: "{{ .Values.speaker.memberlist.mlBindPort }}"
-        - name: METALLB_ML_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: {{ include "metallb.secretName" . }}
-              key: secretkey
+        - name: METALLB_ML_SECRET_KEY_PATH
+          value: "{{ .Values.speaker.memberlist.mlSecretKeyPath }}"
         {{- end }}
         {{- if .Values.speaker.frr.enabled }}
         - name: FRR_CONFIG_FILE
@@ -276,12 +281,15 @@ spec:
             - ALL
             add:
             - NET_RAW
-        {{- if .Values.speaker.frr.enabled }}
+        {{- if or .Values.speaker.frr.enabled .Values.speaker.memberlist.enabled }}
         volumeMounts:
+          {{- if .Values.speaker.memberlist.enabled }}
+          - name: memberlist 
+            mountPath: {{ .Values.speaker.memberlist.mlSecretKeyPath }}
+          {{- end }}
+          {{- if .Values.speaker.frr.enabled }}
           - name: reloader
             mountPath: /etc/frr_reloader
-         {{- end }}
-      {{- if .Values.speaker.frr.enabled }}
       - name: frr
         securityContext:
           capabilities:
