@@ -17,6 +17,8 @@ import (
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func diffService(a, b *v1.Service) string {
@@ -57,6 +59,14 @@ func statusAssigned(ips []string) v1.ServiceStatus {
 			Ingress: lbIngressIPs,
 		},
 	}
+}
+
+func selector(s string) labels.Selector {
+	ret, err := labels.Parse(s)
+	if err != nil {
+		panic(err)
+	}
+	return ret
 }
 
 // testK8S implements service by recording what the controller wants
@@ -112,27 +122,68 @@ func TestControllerMutation(t *testing.T) {
 		ips:    allocator.New(),
 		client: k,
 	}
-	pools := map[string]*config.Pool{
+	pools := &config.Pools{ByName: map[string]*config.Pool{
 		"pool1": {
+			Name:       "pool1",
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
 		},
 		"pool2": {
+			Name:       "pool2",
 			AutoAssign: false,
 			CIDR:       []*net.IPNet{ipnet("3.4.5.6/32")},
 		},
 		"pool3": {
+			Name:       "pool3",
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1000::/127")},
 		},
 		"pool4": {
+			Name:       "pool4",
 			AutoAssign: false,
 			CIDR:       []*net.IPNet{ipnet("2000::1/128")},
 		},
 		"pool5": {
+			Name:       "pool5",
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.3.0/31"), ipnet("1000::/127")},
 		},
+		"pool6": {
+			Name:       "pool6",
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("7.8.9.0/31")},
+			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.NewString("test-ns1"),
+				Priority: 10},
+		},
+		"pool7": {
+			Name:       "pool7",
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("10.11.12.0/31")},
+			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.NewString("test-ns1"),
+				Priority: 11},
+		},
+		"pool8": {
+			Name:       "pool8",
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("13.14.15.0/31")},
+			ServiceAllocations: &config.ServiceAllocation{ServiceSelectors: []labels.Selector{selector("team=metallb")},
+				Priority: 9},
+		},
+		"pool9": {
+			Name:               "pool9",
+			AutoAssign:         true,
+			CIDR:               []*net.IPNet{ipnet("16.17.18.0/31")},
+			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.NewString("test-ns2")},
+		},
+		"pool10": {
+			Name:       "pool10",
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("19.20.21.0/31")},
+			ServiceAllocations: &config.ServiceAllocation{ServiceSelectors: []labels.Selector{selector("team=metallb")},
+				Priority: 8},
+		},
+	}, ByNamespace: map[string][]string{"test-ns1": {"pool6", "pool7"}, "test-ns2": {"pool9"}},
+		ByServiceSelector: []string{"pool8", "pool10"},
 	}
 
 	l := log.NewNopLogger()
@@ -728,6 +779,72 @@ func TestControllerMutation(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			desc: "request IP for service from namespace specific ip pool",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns1",
+				},
+				Spec: v1.ServiceSpec{
+					Type:       "LoadBalancer",
+					ClusterIPs: []string{"1.2.3.4"},
+				},
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns1",
+				},
+				Spec: v1.ServiceSpec{
+					Type:       "LoadBalancer",
+					ClusterIPs: []string{"1.2.3.4"},
+				},
+				Status: statusAssigned([]string{"7.8.9.0"}),
+			},
+		},
+		{
+			desc: "request IP for service from no priority namespace specific ip pool",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns2",
+				},
+				Spec: v1.ServiceSpec{
+					Type:       "LoadBalancer",
+					ClusterIPs: []string{"1.2.3.4"},
+				},
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns2",
+				},
+				Spec: v1.ServiceSpec{
+					Type:       "LoadBalancer",
+					ClusterIPs: []string{"1.2.3.4"},
+				},
+				Status: statusAssigned([]string{"16.17.18.0"}),
+			},
+		},
+		{
+			desc: "request IP for service from service label specific ip pool",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"team": "metallb"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:       "LoadBalancer",
+					ClusterIPs: []string{"1.2.3.4"},
+				},
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{"team": "metallb"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:       "LoadBalancer",
+					ClusterIPs: []string{"1.2.3.4"},
+				},
+				Status: statusAssigned([]string{"19.20.21.0"}),
+			},
+		},
 	}
 
 	for i := 0; i < 100; i++ {
@@ -810,7 +927,7 @@ func TestControllerConfig(t *testing.T) {
 	// Set an empty config. Balancer should still not do anything to
 	// our unallocated service, and return an error to force a
 	// retry after sync is complete.
-	if c.SetPools(l, map[string]*config.Pool{}) == controllers.SyncStateError {
+	if c.SetPools(l, &config.Pools{ByName: map[string]*config.Pool{}}) == controllers.SyncStateError {
 		t.Fatalf("SetPools with empty config failed")
 	}
 
@@ -823,12 +940,13 @@ func TestControllerConfig(t *testing.T) {
 	}
 
 	// Set a config with some IPs. Still no allocation, not synced.
-	pools := map[string]*config.Pool{
+	pools := &config.Pools{ByName: map[string]*config.Pool{
 		"default": {
+			Name:       "default",
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
 		},
-	}
+	}}
 	if c.SetPools(l, pools) == controllers.SyncStateError {
 		t.Fatalf("SetPools failed")
 	}
@@ -854,7 +972,7 @@ func TestControllerConfig(t *testing.T) {
 	}
 
 	// Now that an IP is allocated, removing the IP pool is not allowed.
-	if c.SetPools(l, map[string]*config.Pool{}) != controllers.SyncStateError {
+	if c.SetPools(l, &config.Pools{ByName: map[string]*config.Pool{}}) != controllers.SyncStateError {
 		t.Fatalf("SetPools that deletes allocated IPs was accepted")
 	}
 
@@ -872,12 +990,13 @@ func TestDeleteRecyclesIP(t *testing.T) {
 	}
 
 	l := log.NewNopLogger()
-	pools := map[string]*config.Pool{
+	pools := &config.Pools{ByName: map[string]*config.Pool{
 		"default": {
+			Name:       "default",
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.3.0/32")},
 		},
-	}
+	}}
 	if c.SetPools(l, pools) == controllers.SyncStateError {
 		t.Fatal("SetPools failed")
 	}
@@ -962,7 +1081,7 @@ func TestControllerDualStackConfig(t *testing.T) {
 	// Set an empty config. Balancer should still not do anything to
 	// our unallocated service, and return an error to force a
 	// retry after sync is complete.
-	if c.SetPools(l, map[string]*config.Pool{}) == controllers.SyncStateError {
+	if c.SetPools(l, &config.Pools{ByName: map[string]*config.Pool{}}) == controllers.SyncStateError {
 		t.Fatalf("SetPools with empty config failed")
 	}
 
@@ -975,12 +1094,13 @@ func TestControllerDualStackConfig(t *testing.T) {
 	}
 
 	// Set a config with some IPs. Still no allocation, not synced.
-	pools := map[string]*config.Pool{
+	pools := &config.Pools{ByName: map[string]*config.Pool{
 		"default": {
+			Name:       "default",
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("1000::1/127")},
 		},
-	}
+	}}
 
 	if c.SetPools(l, pools) == controllers.SyncStateError {
 		t.Fatalf("SetPools failed")
@@ -1007,7 +1127,7 @@ func TestControllerDualStackConfig(t *testing.T) {
 	}
 
 	// Now that an IP is allocated, removing the IP pool is not allowed.
-	if c.SetPools(l, map[string]*config.Pool{}) != controllers.SyncStateError {
+	if c.SetPools(l, &config.Pools{ByName: map[string]*config.Pool{}}) != controllers.SyncStateError {
 		t.Fatalf("SetPools that deletes allocated IPs was accepted")
 	}
 

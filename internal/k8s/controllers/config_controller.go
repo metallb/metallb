@@ -104,6 +104,12 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
+	var namespaces corev1.NamespaceList
+	if err := r.List(ctx, &namespaces); err != nil {
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "message", "failed to get namespaces", "error", err)
+		return ctrl.Result{}, err
+	}
+
 	resources := config.ClusterResources{
 		Pools:              ipAddressPools.Items,
 		Peers:              bgpPeers.Items,
@@ -114,6 +120,7 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		Communities:        communities.Items,
 		PasswordSecrets:    secrets,
 		Nodes:              nodes.Items,
+		Namespaces:         namespaces.Items,
 	}
 
 	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources))
@@ -153,19 +160,7 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	p := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			newNodeObj, ok := e.ObjectNew.(*corev1.Node)
-			if !ok {
-				return true
-			}
-			oldNodeObj, ok := e.ObjectOld.(*corev1.Node)
-			if !ok {
-				return true
-			}
-			// If there is no changes in node labels, ignore event.
-			if labels.Equals(labels.Set(oldNodeObj.Labels), labels.Set(newNodeObj.Labels)) {
-				return false
-			}
-			return true
+			return filterNodeEvent(e) && filterNamespaceEvent(e)
 		},
 	}
 	return ctrl.NewControllerManagedBy(mgr).
@@ -178,8 +173,40 @@ func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&source.Kind{Type: &metallbv1beta1.AddressPool{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &metallbv1beta1.Community{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&source.Kind{Type: &corev1.Namespace{}}, &handler.EnqueueRequestForObject{}).
 		WithEventFilter(p).
 		Complete(r)
+}
+
+func filterNodeEvent(e event.UpdateEvent) bool {
+	newNodeObj, ok := e.ObjectNew.(*corev1.Node)
+	if !ok {
+		return true
+	}
+	oldNodeObj, ok := e.ObjectOld.(*corev1.Node)
+	if !ok {
+		return true
+	}
+	if labels.Equals(labels.Set(oldNodeObj.Labels), labels.Set(newNodeObj.Labels)) {
+		return false
+	}
+	return true
+}
+
+func filterNamespaceEvent(e event.UpdateEvent) bool {
+	newNamespaceObj, ok := e.ObjectNew.(*corev1.Namespace)
+	if !ok {
+		return true
+	}
+	oldNamespaceObj, ok := e.ObjectOld.(*corev1.Namespace)
+	if !ok {
+		return true
+	}
+	// If there is no changes in namespace labels, ignore event.
+	if labels.Equals(labels.Set(oldNamespaceObj.Labels), labels.Set(newNamespaceObj.Labels)) {
+		return false
+	}
+	return true
 }
 
 func (r *ConfigReconciler) getSecrets(ctx context.Context) (map[string]corev1.Secret, error) {
