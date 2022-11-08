@@ -127,6 +127,7 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.logLevel | string | `"info"` | Speaker log level. Must be one of: `all`, `debug`, `info`, `warn`, `error` or `none` |
 | speaker.memberlist.enabled | bool | `true` |  |
 | speaker.memberlist.mlBindPort | int | `7946` |  |
+| speaker.memberlist.mlSecretKeyPath | string | `"/etc/ml_secret_key"` |  |
 | speaker.nodeSelector | object | `{}` |  |
 | speaker.podAnnotations | object | `{}` |  |
 | speaker.priorityClassName | string | `""` |  |
