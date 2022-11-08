@@ -258,6 +258,7 @@ speaker:
   memberlist:
     enabled: true
     mlBindPort: 7946
+    mlSecretKeyPath: "/etc/ml_secret_key"
   image:
     repository: quay.io/metallb/speaker
     tag:
