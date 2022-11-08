@@ -267,7 +267,7 @@ func TestBGPSpeaker(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -277,7 +277,7 @@ func TestBGPSpeaker(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -575,7 +575,7 @@ func TestBGPSpeaker(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -592,7 +592,7 @@ func TestBGPSpeaker(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			balancer: "test1",
 			svc: &v1.Service{
@@ -642,7 +642,7 @@ func TestBGPSpeaker(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -659,7 +659,7 @@ func TestBGPSpeaker(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			balancer: "test1",
 			svc: &v1.Service{
@@ -707,7 +707,7 @@ func TestBGPSpeaker(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -725,7 +725,7 @@ func TestBGPSpeaker(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			balancer: "test1",
 			svc: &v1.Service{
@@ -781,7 +781,7 @@ func TestBGPSpeaker(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -791,7 +791,7 @@ func TestBGPSpeaker(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			balancer: "test1",
 			svc: &v1.Service{
@@ -996,7 +996,7 @@ func TestBGPSpeaker(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -1006,7 +1006,7 @@ func TestBGPSpeaker(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			balancer: "test2",
 			svc: &v1.Service{
@@ -1138,7 +1138,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -1148,7 +1148,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -1482,7 +1482,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -1499,7 +1499,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			balancer: "test1",
 			svc: &v1.Service{
@@ -1555,7 +1555,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -1565,7 +1565,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			balancer: "test1",
 			svc: &v1.Service{
@@ -1772,7 +1772,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -1782,7 +1782,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			balancer: "test2",
 			svc: &v1.Service{
@@ -1897,7 +1897,7 @@ func TestNodeSelectors(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: pools,
+				Pools: &config.Pools{ByName: pools},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -1919,7 +1919,7 @@ func TestNodeSelectors(t *testing.T) {
 						},
 					},
 				},
-				Pools: pools,
+				Pools: &config.Pools{ByName: pools},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -1970,7 +1970,7 @@ func TestNodeSelectors(t *testing.T) {
 						},
 					},
 				},
-				Pools: pools,
+				Pools: &config.Pools{ByName: pools},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -2009,7 +2009,7 @@ func TestNodeSelectors(t *testing.T) {
 						},
 					},
 				},
-				Pools: pools,
+				Pools: &config.Pools{ByName: pools},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
