@@ -97,7 +97,7 @@ func TestPoolController(t *testing.T) {
 
 		cmpOpt := cmpopts.IgnoreUnexported(metallbcfg.Pool{})
 
-		mockHandler := func(l log.Logger, pools map[string]*config.Pool) SyncState {
+		mockHandler := func(l log.Logger, pools *config.Pools) SyncState {
 			if !cmp.Equal(expectedCfg.Pools, pools, cmpOpt) {
 				t.Errorf("test %s failed, handler called with unexpected config: %s", test.desc, cmp.Diff(expectedCfg.Pools, pools, cmpOpt))
 			}

@@ -195,6 +195,18 @@ func TestNodeEvent(t *testing.T) {
 		g.Expect(err).To(BeNil())
 	}()
 
+	// count for update on namespace events
+	var initialConfigUpdateCount int
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		time.Sleep(5 * time.Second)
+		mutex.Lock()
+		initialConfigUpdateCount = configUpdate
+		mutex.Unlock()
+	}()
+	wg.Wait()
 	// test new node event.
 	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
@@ -208,7 +220,7 @@ func TestNodeEvent(t *testing.T) {
 		mutex.Lock()
 		defer mutex.Unlock()
 		return configUpdate
-	}, 5*time.Second, 200*time.Millisecond).Should(Equal(1))
+	}, 5*time.Second, 200*time.Millisecond).Should(Equal(initialConfigUpdateCount + 1))
 	g.Eventually(func() int {
 		mutex.Lock()
 		defer mutex.Unlock()
@@ -234,7 +246,7 @@ func TestNodeEvent(t *testing.T) {
 		mutex.Lock()
 		defer mutex.Unlock()
 		return configUpdate
-	}, 5*time.Second, 200*time.Millisecond).Should(Equal(1))
+	}, 5*time.Second, 200*time.Millisecond).Should(Equal(initialConfigUpdateCount + 1))
 	g.Eventually(func() int {
 		mutex.Lock()
 		defer mutex.Unlock()
@@ -260,7 +272,7 @@ func TestNodeEvent(t *testing.T) {
 		mutex.Lock()
 		defer mutex.Unlock()
 		return configUpdate
-	}, 5*time.Second, 200*time.Millisecond).Should(Equal(2))
+	}, 5*time.Second, 200*time.Millisecond).Should(Equal(initialConfigUpdateCount + 2))
 	g.Eventually(func() int {
 		mutex.Lock()
 		defer mutex.Unlock()
