@@ -1987,11 +1987,8 @@ spec:
               fieldPath: status.podIP
         - name: METALLB_ML_LABELS
           value: app=metallb,component=speaker
-        - name: METALLB_ML_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              key: secretkey
-              name: memberlist
+        - name: METALLB_ML_SECRET_KEY_PATH
+          value: /etc/ml_secret_key
         image: quay.io/metallb/speaker:main
         livenessProbe:
           failureThreshold: 3
@@ -2031,6 +2028,9 @@ spec:
         volumeMounts:
         - mountPath: /etc/frr_reloader
           name: reloader
+        - mountPath: /etc/ml_secret_key
+          name: memberlist
+          readOnly: true
       hostNetwork: true
       initContainers:
       - command:
@@ -2089,6 +2089,10 @@ spec:
         name: reloader
       - emptyDir: {}
         name: metrics
+      - name: memberlist
+        secret:
+          defaultMode: 420
+          secretName: memberlist
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration
