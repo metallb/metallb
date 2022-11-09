@@ -19,6 +19,8 @@ import (
 
 const (
 	multiHopNetwork      = "multi-hop-net"
+	vrfNetwork           = "vrf-net"
+	vrfName              = "red"
 	metalLBASN           = 64512
 	externalASN          = 4200000000
 	nextHopContainerName = "ebgp-single-hop"
@@ -30,6 +32,7 @@ var (
 	hostIPv6          string
 	multiHopRoutes    map[string]container.NetworkSettings
 	FRRContainers     []*frrcontainer.FRR
+	VRFFRRContainers  []*frrcontainer.FRR
 )
 
 func init() {
@@ -49,7 +52,7 @@ func init() {
 
 // InfraSetup brings up the external container mimicking external routers, and set up the routing needed for
 // testing.
-func InfraSetup(ipv4Addresses, ipv6Addresses []string, externalContainers string, cs *clientset.Clientset) ([]*frrcontainer.FRR, error) {
+func InfraSetup(ipv4Addresses, ipv6Addresses []string, externalContainers string, cs *clientset.Clientset) ([]*frrcontainer.FRR, []*frrcontainer.FRR, error) {
 	/*
 		We have 2 ways in which we setup the containers for the tests:
 		1 - The user requested the containers to use the 'host' network
@@ -130,65 +133,90 @@ func InfraSetup(ipv4Addresses, ipv6Addresses []string, externalContainers string
 		},
 	}
 
-	var res []*frrcontainer.FRR
-	var err error
+	ebgpSingleHopContainerVRFConfig := frrcontainer.Config{
+		Name:    "ebgp-vrf-single-hop",
+		Network: vrfNetwork,
+		Neighbor: frrconfig.NeighborConfig{
+			ASN:      metalLBASN,
+			MultiHop: false,
+		},
+		Router: frrconfig.RouterConfig{
+			ASN:     externalASN,
+			BGPPort: 179,
+			VRF:     vrfName,
+		},
+	}
+
 	if externalContainers != "" {
 		err := validateContainersNames(externalContainers)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		configs, err := configsFor(externalContainers, ibgpSingleHopContainerConfig, ibgpMultiHopContainerConfig,
-			ebgpMultiHopContainerConfig, ebgpSingleHopContainerConfig)
+			ebgpMultiHopContainerConfig, ebgpSingleHopContainerConfig, ebgpSingleHopContainerVRFConfig)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
-		res, err = frrcontainer.ConfigureExisting(configs...)
+		res, err := frrcontainer.ConfigureExisting(configs...)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		if containsMultiHop(res) {
 			err = multiHopSetUp(res, cs)
 			if err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
-	} else if containersNetwork == "host" {
-		res, err = frrcontainer.Create(ibgpSingleHopContainerConfig)
+		return res, []*frrcontainer.FRR{}, nil
+	}
+	if containersNetwork == "host" {
+		res, err := frrcontainer.Create(ibgpSingleHopContainerConfig)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-	} else {
-		Expect(len(ipv4Addresses)).Should(BeNumerically(">=", 2))
-		Expect(len(ipv6Addresses)).Should(BeNumerically(">=", 2))
-
-		ibgpSingleHopContainerConfig.IPv4Address = ipv4Addresses[0]
-		ibgpSingleHopContainerConfig.IPv6Address = ipv6Addresses[0]
-		ebgpSingleHopContainerConfig.IPv4Address = ipv4Addresses[1]
-		ebgpSingleHopContainerConfig.IPv6Address = ipv6Addresses[1]
-
-		var out string
-		out, err = executor.Host.Exec(executor.ContainerRuntime, "network", "create", multiHopNetwork, "--ipv6",
-			"--driver=bridge", "--subnet=172.30.0.0/16", "--subnet=fc00:f853:ccd:e798::/64")
-		if err != nil {
-			return nil, errors.Wrapf(err, "failed to create %s: %s", multiHopNetwork, out)
-		}
-
-		res, err = frrcontainer.Create(ibgpSingleHopContainerConfig, ibgpMultiHopContainerConfig,
-			ebgpMultiHopContainerConfig, ebgpSingleHopContainerConfig)
-		if err != nil {
-			return nil, err
-		}
-
-		err = multiHopSetUp(res, cs)
-		if err != nil {
-			return nil, err
-		}
+		return res, []*frrcontainer.FRR{}, nil
 	}
 
-	return res, nil
+	Expect(len(ipv4Addresses)).Should(BeNumerically(">=", 2))
+	Expect(len(ipv6Addresses)).Should(BeNumerically(">=", 2))
+
+	ibgpSingleHopContainerConfig.IPv4Address = ipv4Addresses[0]
+	ibgpSingleHopContainerConfig.IPv6Address = ipv6Addresses[0]
+	ebgpSingleHopContainerConfig.IPv4Address = ipv4Addresses[1]
+	ebgpSingleHopContainerConfig.IPv6Address = ipv6Addresses[1]
+
+	var out string
+	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "create", multiHopNetwork, "--ipv6",
+		"--driver=bridge", "--subnet=172.30.0.0/16", "--subnet=fc00:f853:ccd:e798::/64")
+	if err != nil && !strings.Contains(out, "already exists") {
+		return nil, nil, errors.Wrapf(err, "failed to create %s: %s", multiHopNetwork, out)
+	}
+
+	out, err = executor.Host.Exec(executor.ContainerRuntime, "network", "create", vrfNetwork, "--ipv6",
+		"--driver=bridge", "--subnet=172.31.0.0/16", "--subnet=fc00:f853:ccd:e799::/64")
+	if err != nil && !strings.Contains(out, "already exists") {
+		return nil, nil, errors.Wrapf(err, "failed to create %s: %s", vrfNetwork, out)
+	}
+
+	containers, err := frrcontainer.Create(ibgpSingleHopContainerConfig, ibgpMultiHopContainerConfig,
+		ebgpMultiHopContainerConfig, ebgpSingleHopContainerConfig)
+	if err != nil {
+		return nil, nil, err
+	}
+	vrfContainers, err := frrcontainer.Create(ebgpSingleHopContainerVRFConfig)
+
+	err = multiHopSetUp(containers, cs)
+	if err != nil {
+		return nil, nil, err
+	}
+	err = vrfSetup(cs)
+	if err != nil {
+		return nil, nil, err
+	}
+	return containers, vrfContainers, nil
 }
 
 // multiHopSetUp connects the ebgp-single-hop container to the multi-hop-net network,
@@ -221,14 +249,38 @@ func multiHopSetUp(containers []*frrcontainer.FRR, cs *clientset.Clientset) erro
 	return nil
 }
 
+func vrfSetup(cs *clientset.Clientset) error {
+	speakerPods, err := metallb.SpeakerPods(cs)
+	if err != nil {
+		return err
+	}
+	for _, pod := range speakerPods {
+		err := addContainerToNetwork(pod.Spec.NodeName, vrfNetwork)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to connect %s to %s", pod.Spec.NodeName, vrfNetwork)
+		}
+
+		err = container.SetupVRFForNetwork(pod.Spec.NodeName, vrfNetwork, vrfName)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // InfraTearDown tears down the containers and the routes needed for bgp testing.
-func InfraTearDown(containers []*frrcontainer.FRR, cs *clientset.Clientset) error {
+func InfraTearDown(cs *clientset.Clientset, containers []*frrcontainer.FRR) error {
 	err := frrcontainer.Delete(containers)
 	if err != nil {
 		return err
 	}
 
 	err = multiHopTearDown(cs)
+	if err != nil {
+		return err
+	}
+
+	err = vrfTeardown(cs)
 	if err != nil {
 		return err
 	}
@@ -260,6 +312,31 @@ func multiHopTearDown(cs *clientset.Clientset) error {
 
 	}
 
+	return nil
+}
+
+func vrfTeardown(cs *clientset.Clientset) error {
+	_, err := executor.Host.Exec(executor.ContainerRuntime, "network", "inspect", vrfNetwork)
+	if err != nil {
+		return nil
+	}
+
+	speakerPods, err := metallb.SpeakerPods(cs)
+	if err != nil {
+		return err
+	}
+
+	for _, pod := range speakerPods {
+		err := removeContainerFromNetwork(pod.Spec.NodeName, vrfNetwork)
+		if err != nil {
+			return err
+		}
+	}
+
+	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "rm", vrfNetwork)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to remove %s: %s", multiHopNetwork, out)
+	}
 	return nil
 }
 
@@ -338,4 +415,38 @@ func containsMultiHop(frrContainers []*frrcontainer.FRR) bool {
 	}
 
 	return multiHop
+}
+
+func addContainerToNetwork(containerName, network string) error {
+	networks, err := container.Networks(containerName)
+	if err != nil {
+		return err
+	}
+	if _, ok := networks[network]; ok {
+		return nil
+	}
+
+	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "connect",
+		network, containerName)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to connect %s to %s: %s", containerName, network, out)
+	}
+	return nil
+}
+
+func removeContainerFromNetwork(containerName, network string) error {
+	networks, err := container.Networks(containerName)
+	if err != nil {
+		return err
+	}
+	if _, ok := networks[network]; !ok {
+		return nil
+	}
+
+	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "disconnect",
+		network, containerName)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to disconnect %s from %s: %s", containerName, network, out)
+	}
+	return nil
 }
