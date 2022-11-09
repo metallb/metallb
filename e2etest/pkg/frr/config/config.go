@@ -90,6 +90,7 @@ type RouterConfig struct {
 	AcceptV6Neighbors []*NeighborConfig
 	BGPPort           uint16
 	Password          string
+	VRF               string
 }
 
 type NeighborConfig struct {

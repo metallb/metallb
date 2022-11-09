@@ -137,7 +137,7 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	v4Addresses := strings.Split(ipv4ForContainers, ",")
 	v6Addresses := strings.Split(ipv6ForContainers, ",")
-	bgptests.FRRContainers, err = bgptests.InfraSetup(v4Addresses, v6Addresses, external_containers, cs)
+	bgptests.FRRContainers, bgptests.VRFFRRContainers, err = bgptests.InfraSetup(v4Addresses, v6Addresses, external_containers, cs)
 	framework.ExpectNoError(err)
 
 	clientconfig, err := framework.LoadConfig()
@@ -181,7 +181,8 @@ var _ = ginkgo.AfterSuite(func() {
 	cs, err := framework.LoadClientset()
 	framework.ExpectNoError(err)
 
-	err = bgptests.InfraTearDown(bgptests.FRRContainers, cs)
+	toTearDown := append(bgptests.FRRContainers, bgptests.VRFFRRContainers...)
+	err = bgptests.InfraTearDown(cs, toTearDown)
 	framework.ExpectNoError(err)
 	err = updater.Clean()
 	framework.ExpectNoError(err)
