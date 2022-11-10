@@ -64,7 +64,7 @@ func DeleteMultiHop(exec executor.Executor, execnet, tonet string, ref map[strin
 // and:
 // - finds the interface corresponding to the docker network inside the container
 // - creates a vrf named after vrfName if it does not exist
-// - associates the interface listed above to the vrf
+// - associates the interface listed above to the vrf.
 func SetupVRFForNetwork(containerName, vrfNetwork, vrfName string) error {
 	containerNetworks, err := Networks(containerName)
 	if err != nil {
