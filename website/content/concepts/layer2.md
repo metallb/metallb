@@ -98,5 +98,5 @@ On the flip side, because MetalLB relies on
 [memberlist](https://github.com/hashicorp/memberlist) for cluster membership
 information, it cannot interoperate with third-party VRRP-aware routers and
 infrastructure. This is working as intended: MetalLB is specifically designed
-to provide load balancing and failover _within_ a Kubernetes cluster, and in
+to provide load balancing and failover by utilizing resources _within_ a Kubernetes cluster, and in
 that scenario interoperability with third-party LB software is out of scope.
