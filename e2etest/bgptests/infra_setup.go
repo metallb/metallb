@@ -222,10 +222,9 @@ func InfraSetup(ipv4Addresses, ipv6Addresses []string, externalContainers string
 // multiHopSetUp connects the ebgp-single-hop container to the multi-hop-net network,
 // and creates the required static routes between the multi-hop containers and the speaker pods.
 func multiHopSetUp(containers []*frrcontainer.FRR, cs *clientset.Clientset) error {
-	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "connect",
-		multiHopNetwork, nextHopContainerName)
+	err := addContainerToNetwork(nextHopContainerName, multiHopNetwork)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to connect %s to %s: %s", nextHopContainerName, multiHopNetwork, out)
+		return errors.Wrapf(err, "Failed to connect %s to %s", nextHopContainerName, multiHopNetwork)
 	}
 
 	multiHopRoutes, err = container.Networks(nextHopContainerName)
@@ -428,6 +427,9 @@ func addContainerToNetwork(containerName, network string) error {
 
 	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "connect",
 		network, containerName)
+	if err != nil && !strings.Contains(out, "already exists") {
+		return nil
+	}
 	if err != nil {
 		return errors.Wrapf(err, "Failed to connect %s to %s: %s", containerName, network, out)
 	}
