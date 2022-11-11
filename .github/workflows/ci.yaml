@@ -175,6 +175,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Install kernel modules
+        run: |
+          sudo apt-get update
+          sudo apt-get install linux-modules-extra-$(uname -r)
+
       - name: Setup
         uses: ./.github/workflows/composite/setup
 
@@ -275,6 +280,11 @@ jobs:
         shell: bash
 
     steps:
+      - name: Install kernel modules
+        run: |
+          sudo apt-get update
+          sudo apt-get install linux-modules-extra-$(uname -r)
+
       - name: Checkout
         uses: actions/checkout@v2
         with:
@@ -341,6 +351,11 @@ jobs:
       - helm
       - commitlint
     steps:
+      - name: Install kernel modules
+        run: |
+          sudo apt-get update
+          sudo apt-get install linux-modules-extra-$(uname -r)
+
       - name: Checkout
         uses: actions/checkout@v2
         with:
