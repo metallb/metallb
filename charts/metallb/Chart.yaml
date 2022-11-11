@@ -20,6 +20,11 @@ dependencies:
 # pipeline. Library charts do not define any templates and therefore cannot be deployed.
 type: application
 
+# The optional kubeVersion field can define semver constraints on supported Kubernetes versions.
+# Helm will validate the version constraints when installing the chart and fail if the cluster
+# runs an unsupported Kubernetes version.
+kubeVersion: ">= 1.14.0-0"
+
 # This is the chart version. This version number should be incremented each time you make changes
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
