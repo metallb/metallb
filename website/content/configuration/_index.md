@@ -187,6 +187,11 @@ spec:
   - first-pool
 ```
 
+{{% notice note %}}
+Note that no routes will be advertised until a deployed service uses an IP address in the designated `IPAddressPool.spec.addresses` range/prefix. 
+{{% /notice %}}
+
+
 ### Enabling BFD support for BGP sessions
 
 With the FRR mode, BGP sessions can be backed up by BFD sessions in order to provide a quicker path failure detection than BGP alone provides.
