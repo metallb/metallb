@@ -30,8 +30,9 @@ import (
 )
 
 const (
-	annotationAddressPool     = "metallb.universe.tf/address-pool"
-	annotationLoadBalancerIPs = "metallb.universe.tf/loadBalancerIPs"
+	annotationAddressPool        = "metallb.universe.tf/address-pool"
+	annotationLoadBalancerIPs    = "metallb.universe.tf/loadBalancerIPs"
+	annotationIPAllocateFromPool = "metallb.universe.tf/ip-allocated-from-pool"
 )
 
 func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service) bool {
@@ -161,6 +162,10 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		lbIngressIPs = append(lbIngressIPs, v1.LoadBalancerIngress{IP: lbIP.String()})
 	}
 	svc.Status.LoadBalancer.Ingress = lbIngressIPs
+	if svc.Annotations == nil {
+		svc.Annotations = make(map[string]string)
+	}
+	svc.Annotations[annotationIPAllocateFromPool] = pool
 	return true
 }
 
@@ -168,6 +173,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 // this controller.
 func (c *controller) clearServiceState(key string, svc *v1.Service) {
 	c.ips.Unassign(key)
+	delete(svc.Annotations, annotationIPAllocateFromPool)
 	svc.Status.LoadBalancer = v1.LoadBalancerStatus{}
 }
 

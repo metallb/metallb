@@ -86,16 +86,24 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		return successRes
 	}
 
+	toWrite := svcRo.DeepCopy()
 	if !reflect.DeepEqual(svcRo.Status, svc.Status) {
-		var st v1.ServiceStatus
-		st, svc = svc.Status, svcRo.DeepCopy()
-		svc.Status = st
+		toWrite.Status = svc.Status
+	}
+
+	if !reflect.DeepEqual(svcRo.Annotations, svc.Annotations) {
+		toWrite.Annotations = svc.Annotations
+	}
+
+	if !reflect.DeepEqual(toWrite, svcRo) {
 		if err := c.client.UpdateStatus(svc); err != nil {
-			level.Error(l).Log("op", "updateServiceStatus", "error", err, "msg", "failed to update service status")
+			level.Error(l).Log("op", "updateServiceStatus", "error", err, "msg", "failed to update service")
 			return controllers.SyncStateError
 		}
+		level.Info(l).Log("event", "serviceUpdated", "msg", "updated service object")
 	}
-	level.Info(l).Log("event", "serviceUpdated", "msg", "updated service object")
+
+	level.Info(l).Log("event", "serviceUpdated", "msg", "service is not updated")
 	return successRes
 }
 
