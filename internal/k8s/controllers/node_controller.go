@@ -69,6 +69,15 @@ func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 func (r *NodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	p := predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return r.filter(e.Object)
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return r.filter(e.Object)
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			return r.filter(e.Object)
+		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			newNodeObj, ok := e.ObjectNew.(*corev1.Node)
 			if !ok {
@@ -84,11 +93,20 @@ func (r *NodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			if labels.Equals(labels.Set(oldNodeObj.Labels), labels.Set(newNodeObj.Labels)) {
 				return false
 			}
-			return oldNodeObj.Name == newNodeObj.Name && newNodeObj.Name == newNodeObj.Name
+			return newNodeObj.Name == newNodeObj.Name
 		},
 	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.Node{}).
 		WithEventFilter(p).
 		Complete(r)
+}
+
+func (r *NodeReconciler) filter(obj client.Object) bool {
+	node, ok := obj.(*v1.Node)
+	if !ok {
+		level.Error(r.Logger).Log("controller", "NodeReconciler", "error", "object is not node", "name", obj.GetName())
+		return false
+	}
+	return node.Name == r.NodeName
 }
