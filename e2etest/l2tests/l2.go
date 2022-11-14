@@ -676,10 +676,14 @@ var _ = ginkgo.Describe("L2", func() {
 			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool}, ingressIP)
 			framework.ExpectNoError(err)
 
+			ginkgo.By("validate annotating a service with the pool used to provide its IP")
+			framework.ExpectEqual(svc.Annotations["metallb.universe.tf/ip-allocated-from-pool"], pool.Name)
+
 			services = append(services, svc)
 			servicesIngressIP = append(servicesIngressIP, ingressIP)
 
 			for j := 0; j <= i; j++ {
+
 				ginkgo.By(fmt.Sprintf("validate service %d IP didn't change", j+1))
 				ip := e2eservice.GetIngressPoint(&services[j].Status.LoadBalancer.Ingress[0])
 				framework.ExpectEqual(ip, servicesIngressIP[j])
