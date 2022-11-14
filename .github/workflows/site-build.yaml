@@ -5,6 +5,7 @@ on:
     paths:
       - 'website/**'
       - 'netlify.toml'
+      - 'api/**'
     branches:
       - "main"
       - "v**"
@@ -22,6 +23,17 @@ jobs:
 
       - uses: wagoid/commitlint-github-action@v4
       
+      - uses: actions/setup-go@v3
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install python3-pip
+          sudo pip3 install invoke semver pyyaml
+
       - name: Setup Hugo
         uses: peaceiris/actions-hugo@v2
         with:
@@ -29,3 +41,8 @@ jobs:
 
       - name: Build
         run: cd ./website && hugo
+
+      - name: Check api docs
+        run: |
+          inv generateapidocs
+          inv checkchanges --action="run inv generateapidocs"
