@@ -197,8 +197,8 @@ func TestBFDCollect(t *testing.T) {
 
 			l := log.NewNopLogger()
 			collector := NewBFD(l)
-			collector.frrCli = func(args ...string) (string, error) {
-				if args[0] == "show bfd peers json" {
+			collector.frrCli = func(args string) (string, error) {
+				if args == "show bfd peers json" {
 					return test.vtyshPeersOutput, nil
 				}
 				return test.vtyshPeersCountersOutput, nil
