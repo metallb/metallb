@@ -8,6 +8,7 @@ import (
 	stdlog "log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -60,7 +61,10 @@ func main() {
 	level.Info(logger).Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "goversion", version.GoString(), "msg", "FRR metrics exporter starting "+version.String())
 
 	http.Handle(*metricsPath, metricsHandler(logger))
-	srv := &http.Server{Addr: fmt.Sprintf(":%d", *metricsPort)}
+	srv := &http.Server{
+		Addr:        fmt.Sprintf(":%d", *metricsPort),
+		ReadTimeout: 3 * time.Second,
+	}
 	level.Info(logger).Log("msg", "Starting exporter", "metricsPath", metricsPath, "port", metricsPort)
 
 	if err := web.ListenAndServe(srv, *tlsConfigPath, logger); err != nil {
