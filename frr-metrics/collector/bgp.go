@@ -101,7 +101,7 @@ var (
 
 type bgp struct {
 	Log    log.Logger
-	frrCli func(args ...string) (string, error)
+	frrCli func(args string) (string, error)
 }
 
 func NewBGP(l log.Logger) *bgp {
@@ -157,7 +157,7 @@ func updateNeighborsMetrics(ch chan<- prometheus.Metric, neighbors []*bgpfrr.Nei
 	}
 }
 
-func getBGPNeighbors(frrCli func(args ...string) (string, error)) ([]*bgpfrr.Neighbor, error) {
+func getBGPNeighbors(frrCli func(args string) (string, error)) ([]*bgpfrr.Neighbor, error) {
 	res, err := frrCli("show bgp neighbors json")
 	if err != nil {
 		return nil, err

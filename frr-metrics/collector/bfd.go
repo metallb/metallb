@@ -86,7 +86,7 @@ var (
 
 type bfd struct {
 	Log    log.Logger
-	frrCli func(args ...string) (string, error)
+	frrCli func(args string) (string, error)
 }
 
 func NewBFD(l log.Logger) *bfd {
@@ -146,7 +146,7 @@ func updatePeersCountersMetrics(ch chan<- prometheus.Metric, peersCounters []bfd
 	}
 }
 
-func getBFDPeers(frrCli func(args ...string) (string, error)) (map[string]bgpfrr.BFDPeer, error) {
+func getBFDPeers(frrCli func(args string) (string, error)) (map[string]bgpfrr.BFDPeer, error) {
 	res, err := frrCli("show bfd peers json")
 	if err != nil {
 		return nil, err
@@ -155,7 +155,7 @@ func getBFDPeers(frrCli func(args ...string) (string, error)) (map[string]bgpfrr
 	return bgpfrr.ParseBFDPeers(res)
 }
 
-func getBFDPeersCounters(frrCli func(args ...string) (string, error)) ([]bfdPeerCounters, error) {
+func getBFDPeersCounters(frrCli func(args string) (string, error)) ([]bfdPeerCounters, error) {
 	res, err := frrCli("show bfd peers counters json")
 	if err != nil {
 		return nil, err

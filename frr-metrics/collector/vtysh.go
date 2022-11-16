@@ -6,8 +6,7 @@ import (
 	"os/exec"
 )
 
-func runVtysh(args ...string) (string, error) {
-	newArgs := append([]string{"-c"}, args...)
-	out, err := exec.Command("/usr/bin/vtysh", newArgs...).CombinedOutput()
+func runVtysh(args string) (string, error) {
+	out, err := exec.Command("/usr/bin/vtysh", "-c", args).CombinedOutput()
 	return string(out), err
 }
