@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
+	"github.com/pkg/errors"
 	"go.universe.tf/metallb/internal/ipfamily"
 )
 
@@ -27,7 +28,116 @@ var reloaderPidFileName = "/etc/frr_reloader/reloader.pid"
 // It may be necessary to arrange this into multiple nested templates
 // (https://pkg.go.dev/text/template#hdr-Nested_template_definitions), this
 // should also be considered.
+
 const configTemplate = `
+{{- define "localpreffilter" -}}
+{{frrIPFamily .advertisement.IPFamily}} prefix-list {{localPrefPrefixList .neighbor .advertisement.LocalPref}} permit {{.advertisement.Prefix}}
+route-map {{.neighbor.Addr}}-out permit {{counter .neighbor.Addr}}
+  match {{frrIPFamily .advertisement.IPFamily}} address prefix-list {{localPrefPrefixList .neighbor .advertisement.LocalPref}}
+  set local-preference {{.advertisement.LocalPref}}
+  on-match next
+{{- end -}}
+
+{{- define "communityfilter" -}}
+{{frrIPFamily .advertisement.IPFamily}} prefix-list {{communityPrefixList .neighbor .community}} permit {{.advertisement.Prefix}}
+route-map {{.neighbor.Addr}}-out permit {{counter .neighbor.Addr}}
+  match {{frrIPFamily .advertisement.IPFamily}} address prefix-list {{communityPrefixList .neighbor .community}}
+  set community {{.community}} additive
+  on-match next
+{{- end -}}
+
+{{- /* The prefixes are per router in FRR, but MetalLB api allows to associate a given BGPAdvertisement to a service IP,
+     and a given advertisement contains both the properties of the announcement (i.e. community) and the list of peers
+     we may want to advertise to. Because of this, for each neighbor we must opt-in and allow the advertisement, and
+     deny all the others.*/ -}}
+{{- define "neighborfilters" -}}
+
+route-map {{.neighbor.Addr}}-in deny 20
+{{- range $a := .neighbor.Advertisements }}
+{{/* Advertisements for which we must enable set the local pref */}}
+{{- if not (eq $a.LocalPref 0)}}
+{{template "localpreffilter" dict "advertisement" $a "neighbor" $.neighbor}}
+{{- end -}}
+
+{{/* Advertisements for which we must enable the community property */}}
+{{- range $c := $a.Communities }}
+{{template "communityfilter" dict "advertisement" $a "neighbor" $.neighbor "community" $c}}
+{{- end }}
+{{/* this advertisement is allowed to the specific neighbor  */}}
+{{frrIPFamily $a.IPFamily}} prefix-list {{allowedPrefixList $.neighbor}} permit {{$a.Prefix}}
+{{- end }}
+
+route-map {{$.neighbor.Addr}}-out permit {{counter $.neighbor.Addr}}
+  match ip address prefix-list {{allowedPrefixList $.neighbor}}
+route-map {{$.neighbor.Addr}}-out permit {{counter $.neighbor.Addr}}
+  match ipv6 address prefix-list {{allowedPrefixList $.neighbor}}
+
+ip prefix-list {{allowedPrefixList $.neighbor }} deny any
+ipv6 prefix-list {{allowedPrefixList $.neighbor}} deny any
+{{- end -}}
+
+{{- define "neighborsession"}}
+  neighbor {{.neighbor.Addr}} remote-as {{.neighbor.ASN}}
+  {{- if .neighbor.EBGPMultiHop }}
+  neighbor {{.neighbor.Addr}} ebgp-multihop
+  {{- end }}
+  {{ if .neighbor.Port -}}
+  neighbor {{.neighbor.Addr}} port {{.neighbor.Port}}
+  {{- end }}
+  neighbor {{.neighbor.Addr}} timers {{.neighbor.KeepaliveTime}} {{.neighbor.HoldTime}}
+  {{ if .neighbor.Password -}}
+  neighbor {{.neighbor.Addr}} password {{.neighbor.Password}}
+  {{- end }}
+  {{ if .neighbor.SrcAddr -}}
+  neighbor {{.neighbor.Addr}} update-source {{.neighbor.SrcAddr}}
+  {{- end }}
+{{- if ne .neighbor.BFDProfile ""}}
+  neighbor {{.neighbor.Addr}} bfd profile {{.neighbor.BFDProfile}}
+{{- end }}
+{{- if  mustDisableConnectedCheck .neighbor.IPFamily .routerASN .neighbor.ASN .neighbor.EBGPMultiHop }}
+  neighbor {{.neighbor.Addr}} disable-connected-check
+{{- end }}
+{{- end -}}
+
+{{- define "neighborenableipfamily"}}
+{{/* no bgp default ipv4-unicast prevents peering if no address families are defined. We declare an ipv4 one for the peer to make the pairing happen */}}
+  address-family ipv4 unicast
+    neighbor {{.Addr}} activate
+    neighbor {{.Addr}} route-map {{.Addr}}-in in
+    neighbor {{.Addr}} route-map {{.Addr}}-out out
+  exit-address-family
+  address-family ipv6 unicast
+    neighbor {{.Addr}} activate
+    neighbor {{.Addr}} route-map {{.Addr}}-in in
+    neighbor {{.Addr}} route-map {{.Addr}}-out out
+  exit-address-family
+{{- end -}}
+
+{{- define "bfdprofile" }}
+  profile {{.profile.Name}}
+    {{ if .profile.ReceiveInterval -}}
+    receive-interval {{.profile.ReceiveInterval}}
+    {{end -}}
+    {{ if .profile.TransmitInterval -}}
+    transmit-interval {{.profile.TransmitInterval}}
+    {{end -}}
+    {{ if .profile.DetectMultiplier -}}
+    detect-multiplier {{.profile.DetectMultiplier}}
+    {{end -}}
+    {{ if .profile.EchoMode -}}
+    echo-mode
+    {{end -}}
+    {{ if .profile.EchoInterval -}}
+    echo-interval {{.profile.EchoInterval}}
+    {{end -}}
+    {{ if .profile.PassiveMode -}}
+    passive-mode
+    {{end -}}
+    {{ if .profile.MinimumTTL -}}
+    minimum-ttl {{ .profile.MinimumTTL }}
+    {{end -}}
+{{- end -}}
+
 log file /etc/frr/frr.log {{.Loglevel}}
 log timestamp precision 3
 {{- if eq .Loglevel "debugging" }}
@@ -50,31 +160,8 @@ ip nht resolve-via-default
 ipv6 nht resolve-via-default
 
 {{- range .Routers }}
-{{- range $n := .Neighbors }}
-route-map {{$n.Addr}}-in deny 20
-{{- range $a := .Advertisements }}
-{{- if not (eq $a.LocalPref 0)}}
-{{frrIPFamily $a.IPFamily}} prefix-list {{localPrefPrefixList $n $a.LocalPref}} permit {{$a.Prefix}}
-route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
-  match {{frrIPFamily $a.IPFamily}} address prefix-list {{localPrefPrefixList $n $a.LocalPref}}
-  set local-preference {{$a.LocalPref}}
-  on-match next
-{{- end }}
-{{- range $c := $a.Communities }}
-{{frrIPFamily $a.IPFamily}} prefix-list {{communityPrefixList $n $c}} permit {{$a.Prefix}}
-route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
-  match {{frrIPFamily $a.IPFamily}} address prefix-list {{communityPrefixList $n $c}}
-  set community {{$c}} additive
-  on-match next
-{{- end }}
-{{frrIPFamily $a.IPFamily}} prefix-list {{allowedPrefixList $n}} permit {{$a.Prefix}}
-{{- end }}
-route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
-  match ip address prefix-list {{allowedPrefixList $n}}
-route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
-  match ipv6 address prefix-list {{allowedPrefixList $n}}
-ip prefix-list {{allowedPrefixList $n}} deny any
-ipv6 prefix-list {{allowedPrefixList $n}} deny any
+{{- range .Neighbors }}
+{{template "neighborfilters" dict "neighbor" .}}
 {{- end }}
 {{- end }}
 
@@ -86,79 +173,37 @@ router bgp {{$r.MyASN}}
 {{ if $r.RouterId }}
   bgp router-id {{$r.RouterId}}
 {{- end }}
-{{range .Neighbors }}
-  neighbor {{.Addr}} remote-as {{.ASN}}
-  {{- if .EBGPMultiHop }}
-  neighbor {{.Addr}} ebgp-multihop
-  {{- end }}
-  {{ if .Port -}}
-  neighbor {{.Addr}} port {{.Port}}
-  {{- end }}
-  neighbor {{.Addr}} timers {{.KeepaliveTime}} {{.HoldTime}}
-  {{ if .Password -}}
-  neighbor {{.Addr}} password {{.Password}}
-  {{- end }}
-  {{ if .SrcAddr -}}
-  neighbor {{.Addr}} update-source {{.SrcAddr}}
-  {{- end }}
-{{- if ne .BFDProfile ""}} 
-  neighbor {{.Addr}} bfd profile {{.BFDProfile}}
+
+{{- range .Neighbors }}
+{{- template "neighborsession" dict "neighbor" . "routerASN" $r.MyASN -}}
 {{- end }}
-{{- if  mustDisableConnectedCheck .IPFamily $r.MyASN .ASN .EBGPMultiHop }}
-  neighbor {{.Addr}} disable-connected-check
-{{- end }}
-{{- end }}
-{{range $n := .Neighbors -}}
-{{/* no bgp default ipv4-unicast prevents peering if no address families are defined. We declare an ipv4 one for the peer to make the pairing happen */}}
-{{- if eq (len .Advertisements) 0}}
-  address-family ipv4 unicast
-    neighbor {{$n.Addr}} activate
-    neighbor {{$n.Addr}} route-map {{$n.Addr}}-in in
-	neighbor {{$n.Addr}} route-map {{$n.Addr}}-out out
-  exit-address-family
-  address-family ipv6 unicast
-    neighbor {{$n.Addr}} activate
-    neighbor {{$n.Addr}} route-map {{$n.Addr}}-in in
-	neighbor {{$n.Addr}} route-map {{$n.Addr}}-out out
-  exit-address-family
-{{- end}}
-{{- range .Advertisements }}
-  address-family {{.IPFamily.String}} unicast
-    neighbor {{$n.Addr}} activate
-    neighbor {{$n.Addr}} route-map {{$n.Addr}}-in in
-    network {{.Prefix}}
-    neighbor {{$n.Addr}} route-map {{$n.Addr}}-out out
-  exit-address-family
-{{- end}}
+
+{{- range $n := .Neighbors -}}
+{{- template "neighborenableipfamily" . -}}
 {{end -}}
+
+{{- if gt (len .IPV4Prefixes) 0}}
+  address-family ipv4 unicast
+{{- range .IPV4Prefixes }}
+    network {{.}}
+{{- end}}
+  exit-address-family
+{{end }}
+
+{{- if gt (len .IPV6Prefixes) 0}}
+  address-family ipv6 unicast
+{{- range .IPV6Prefixes }}
+    network {{.}}
+{{- end}}
+  exit-address-family
+{{end }}
 {{end }}
 {{- if gt (len .BFDProfiles) 0}}
 bfd
 {{- range .BFDProfiles }}
-  profile {{.Name}}
-    {{ if .ReceiveInterval -}}
-    receive-interval {{.ReceiveInterval}}
-    {{end -}}
-    {{ if .TransmitInterval -}}
-    transmit-interval {{.TransmitInterval}}
-    {{end -}}
-    {{ if .DetectMultiplier -}}
-    detect-multiplier {{.DetectMultiplier}}
-    {{end -}}
-    {{ if .EchoMode -}}
-    echo-mode
-    {{end -}}
-    {{ if .EchoInterval -}}
-    echo-interval {{.EchoInterval}}
-    {{end -}}
-    {{ if .PassiveMode -}}
-    passive-mode
-    {{end -}}
-    {{ if .MinimumTTL -}}
-    minimum-ttl {{ .MinimumTTL }}
-    {{end -}}
-{{ end }}
-{{ end }}`
+{{- template "bfdprofile" dict "profile" . -}}
+{{- end }}
+{{- end }}`
 
 type frrConfig struct {
 	Loglevel    string
@@ -176,9 +221,12 @@ type reloadEvent struct {
 // to all the neighbors. Once this constraint is changed, we may need prefix-lists per neighbor.
 
 type routerConfig struct {
-	MyASN     uint32
-	RouterId  string
-	Neighbors map[string]*neighborConfig
+	MyASN        uint32
+	RouterId     string
+	Neighbors    map[string]*neighborConfig
+	VRF          string
+	IPV4Prefixes []string
+	IPV6Prefixes []string
 }
 
 type BFDProfile struct {
@@ -262,6 +310,20 @@ func templateConfig(data interface{}) (string, error) {
 					return true
 				}
 				return false
+			},
+			"dict": func(values ...interface{}) (map[string]interface{}, error) {
+				if len(values)%2 != 0 {
+					return nil, errors.New("invalid dict call, expecting even number of args")
+				}
+				dict := make(map[string]interface{}, len(values)/2)
+				for i := 0; i < len(values); i += 2 {
+					key, ok := values[i].(string)
+					if !ok {
+						return nil, fmt.Errorf("dict keys must be strings, got %v %T", values[i], values[i])
+					}
+					dict[key] = values[i+1]
+				}
+				return dict, nil
 			},
 		}).Parse(configTemplate)
 	if err != nil {

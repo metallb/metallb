@@ -216,6 +216,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 		var neighbor *neighborConfig
 		var exist bool
 
+		routerAnnouncements := make(map[string]struct{}, 0)
 		routerName := routerName(s.routerID.String(), s.myASN)
 		if router, exist = config.Routers[routerName]; !exist {
 			router = &routerConfig{
@@ -277,15 +278,30 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				community := metallbconfig.CommunityToString(c)
 				communities = append(communities, community)
 			}
+
+			prefix := adv.Prefix.String()
 			advConfig := advertisementConfig{
 				IPFamily:    family,
-				Prefix:      adv.Prefix.String(),
+				Prefix:      prefix,
 				Communities: communities,
 				LocalPref:   adv.LocalPref,
 			}
 
 			neighbor.Advertisements = append(neighbor.Advertisements, &advConfig)
+			if _, ok := routerAnnouncements[prefix]; !ok {
+				switch family {
+				case ipfamily.IPv4:
+					router.IPV4Prefixes = append(router.IPV4Prefixes, prefix)
+				case ipfamily.IPv6:
+					router.IPV6Prefixes = append(router.IPV6Prefixes, prefix)
+				}
+				routerAnnouncements[prefix] = struct{}{}
+			}
 		}
+		// This is required to make the rendering stable, because it depends on the order the neighbor
+		// are iterated and that's a map.
+		sort.Strings(router.IPV4Prefixes)
+		sort.Strings(router.IPV6Prefixes)
 	}
 
 	return config, nil
