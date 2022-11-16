@@ -384,6 +384,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 
 	var nodeSels []labels.Selector
 	for _, s := range p.Spec.NodeSelectors {
+		s := s // so we can use &s
 		labelSelector, err := metav1.LabelSelectorAsSelector(&s)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Failed to convert peer %s node selector", p.Name)
@@ -973,6 +974,7 @@ func containsAdvertisement(advs []*L2Advertisement, toCheck *L2Advertisement) bo
 func selectedNodes(nodes []corev1.Node, selectors []metav1.LabelSelector) (map[string]bool, error) {
 	labelSelectors := []labels.Selector{}
 	for _, selector := range selectors {
+		selector := selector // so we can use &selector
 		l, err := metav1.LabelSelectorAsSelector(&selector)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Invalid label selector %v", selector)
@@ -1002,6 +1004,7 @@ OUTER:
 func selectedPools(pools []metallbv1beta1.IPAddressPool, selectors []metav1.LabelSelector) ([]string, error) {
 	labelSelectors := []labels.Selector{}
 	for _, selector := range selectors {
+		selector := selector // so we can use &selector
 		l, err := metav1.LabelSelectorAsSelector(&selector)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Invalid label selector %v", selector)
