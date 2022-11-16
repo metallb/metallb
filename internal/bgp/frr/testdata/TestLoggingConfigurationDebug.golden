@@ -1,4 +1,3 @@
-
 log file /etc/frr/frr.log debugging
 log timestamp precision 3
 debug zebra events
