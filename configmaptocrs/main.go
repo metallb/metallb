@@ -56,7 +56,11 @@ func main() {
 			log.Fatalf("failed to create output file: %s", err)
 		}
 	}
-	defer f.Close()
+	defer func() {
+		if tmpErr := f.Close(); tmpErr != nil {
+			err = tmpErr
+		}
+	}()
 
 	err = generate(f, *source)
 	if err != nil {
@@ -114,7 +118,11 @@ func readConfig(origin string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %s: %v", fp, err)
 	}
-	defer f.Close()
+	defer func() {
+		if tmpErr := f.Close(); tmpErr != nil {
+			err = tmpErr
+		}
+	}()
 
 	raw, err := io.ReadAll(f)
 	if err != nil {
