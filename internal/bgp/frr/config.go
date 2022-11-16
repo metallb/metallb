@@ -159,7 +159,7 @@ func templateConfig(data interface{}) (string, error) {
 // writeConfigFile writes the FRR configuration file (represented as a string)
 // to 'filename'.
 func writeConfig(config string, filename string) error {
-	return os.WriteFile(filename, []byte(config), 0644)
+	return os.WriteFile(filename, []byte(config), 0600)
 }
 
 // reloadConfig requests that FRR reloads the configuration file. This is
