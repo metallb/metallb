@@ -29,7 +29,7 @@ jobs:
       - name: Run Gosec Security Scanner
         uses: securego/gosec@master
         with:
-          args: -exclude-dir e2etest ./...
+          args: -exclude-dir e2etest -severity medium ./...
 
   commitlint:
     runs-on: ubuntu-22.04
