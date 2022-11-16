@@ -63,7 +63,7 @@ var (
 	validatingWebhookName           = "metallb-webhook-configuration"
 	addresspoolConvertingWebhookCRD = "addresspools.metallb.io"
 	bgppeerConvertingWebhookCRD     = "bgppeers.metallb.io"
-	webhookSecretName               = "webhook-server-cert"
+	webhookSecretName               = "webhook-server-cert" //#nosec G101
 )
 
 func init() {
@@ -120,6 +120,7 @@ type Config struct {
 //
 // The client uses processName to identify itself to the cluster
 // (e.g. when logging events).
+//
 //nolint:godot
 func New(cfg *Config) (*Client, error) {
 	namespaceSelector := cache.ObjectSelector{
