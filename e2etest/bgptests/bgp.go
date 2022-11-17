@@ -344,16 +344,6 @@ var _ = ginkgo.Describe("BGP", func() {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterThan(0), "metallb_bgp_notifications_sent", map[string]string{"peer": addr}, speakerMetrics)
-						if err != nil {
-							return err
-						}
-
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_notifications_sent{peer="%s"} >= 1`, addr), metrics.There)
-						if err != nil {
-							return err
-						}
-
 						err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_bgp_updates_total_received", map[string]string{"peer": addr}, speakerMetrics)
 						if err != nil {
 							return err
