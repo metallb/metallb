@@ -1,0 +1,45 @@
+{{- define "localpreffilter" -}}
+{{frrIPFamily .advertisement.IPFamily}} prefix-list {{localPrefPrefixList .neighbor .advertisement.LocalPref}} permit {{.advertisement.Prefix}}
+route-map {{.neighbor.Addr}}-out permit {{counter .neighbor.Addr}}
+  match {{frrIPFamily .advertisement.IPFamily}} address prefix-list {{localPrefPrefixList .neighbor .advertisement.LocalPref}}
+  set local-preference {{.advertisement.LocalPref}}
+  on-match next
+{{- end -}}
+
+{{- define "communityfilter" -}}
+{{frrIPFamily .advertisement.IPFamily}} prefix-list {{communityPrefixList .neighbor .community}} permit {{.advertisement.Prefix}}
+route-map {{.neighbor.Addr}}-out permit {{counter .neighbor.Addr}}
+  match {{frrIPFamily .advertisement.IPFamily}} address prefix-list {{communityPrefixList .neighbor .community}}
+  set community {{.community}} additive
+  on-match next
+{{- end -}}
+
+{{- /* The prefixes are per router in FRR, but MetalLB api allows to associate a given BGPAdvertisement to a service IP,
+     and a given advertisement contains both the properties of the announcement (i.e. community) and the list of peers
+     we may want to advertise to. Because of this, for each neighbor we must opt-in and allow the advertisement, and
+     deny all the others.*/ -}}
+{{- define "neighborfilters" -}}
+
+route-map {{.neighbor.Addr}}-in deny 20
+{{- range $a := .neighbor.Advertisements }}
+{{/* Advertisements for which we must enable set the local pref */}}
+{{- if not (eq $a.LocalPref 0)}}
+{{template "localpreffilter" dict "advertisement" $a "neighbor" $.neighbor}}
+{{- end -}}
+
+{{/* Advertisements for which we must enable the community property */}}
+{{- range $c := $a.Communities }}
+{{template "communityfilter" dict "advertisement" $a "neighbor" $.neighbor "community" $c}}
+{{- end }}
+{{/* this advertisement is allowed to the specific neighbor  */}}
+{{frrIPFamily $a.IPFamily}} prefix-list {{allowedPrefixList $.neighbor}} permit {{$a.Prefix}}
+{{- end }}
+
+route-map {{$.neighbor.Addr}}-out permit {{counter $.neighbor.Addr}}
+  match ip address prefix-list {{allowedPrefixList $.neighbor}}
+route-map {{$.neighbor.Addr}}-out permit {{counter $.neighbor.Addr}}
+  match ipv6 address prefix-list {{allowedPrefixList $.neighbor}}
+
+ip prefix-list {{allowedPrefixList $.neighbor }} deny any
+ipv6 prefix-list {{allowedPrefixList $.neighbor}} deny any
+{{- end -}}
