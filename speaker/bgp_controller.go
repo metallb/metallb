@@ -216,7 +216,23 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 			if p.cfg.RouterID != nil {
 				routerID = p.cfg.RouterID
 			}
-			s, err := c.sessionManager.NewSession(c.logger, net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))), p.cfg.SrcAddr, p.cfg.MyASN, routerID, p.cfg.ASN, p.cfg.HoldTime, p.cfg.KeepaliveTime, p.cfg.Password, c.myNode, p.cfg.BFDProfile, p.cfg.EBGPMultiHop, p.cfg.Name)
+			s, err := c.sessionManager.NewSession(c.logger,
+				bgp.SessionParameters{
+					PeerAddress:   net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))),
+					SourceAddress: p.cfg.SrcAddr,
+					MyASN:         p.cfg.MyASN,
+					RouterID:      routerID,
+					PeerASN:       p.cfg.ASN,
+					HoldTime:      p.cfg.HoldTime,
+					KeepAliveTime: p.cfg.KeepaliveTime,
+					Password:      p.cfg.Password,
+					CurrentNode:   c.myNode,
+					BFDProfile:    p.cfg.BFDProfile,
+					EBGPMultiHop:  p.cfg.EBGPMultiHop,
+					SessionName:   p.cfg.Name,
+				},
+			)
+
 			if err != nil {
 				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
 				errs++
