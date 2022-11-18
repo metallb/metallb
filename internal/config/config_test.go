@@ -75,6 +75,7 @@ func TestParse(t *testing.T) {
 							RouterID:     "10.20.30.40",
 							SrcAddress:   "10.20.30.40",
 							EBGPMultiHop: true,
+							VRFName:      "foo",
 						},
 					},
 					{
@@ -228,6 +229,7 @@ func TestParse(t *testing.T) {
 						RouterID:      net.ParseIP("10.20.30.40"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  true,
+						VRF:           "foo",
 					},
 					{
 						Name:          "peer2",

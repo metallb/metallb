@@ -72,6 +72,7 @@ type SessionParameters struct {
 	CurrentNode   string
 	BFDProfile    string
 	EBGPMultiHop  bool
+	VRFName       string
 	SessionName   string
 }
 type SessionManager interface {
