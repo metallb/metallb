@@ -60,7 +60,21 @@ type Session interface {
 	Set(advs ...*Advertisement) error
 }
 
+type SessionParameters struct {
+	PeerAddress   string
+	SourceAddress net.IP
+	MyASN         uint32
+	RouterID      net.IP
+	PeerASN       uint32
+	HoldTime      time.Duration
+	KeepAliveTime time.Duration
+	Password      string
+	CurrentNode   string
+	BFDProfile    string
+	EBGPMultiHop  bool
+	SessionName   string
+}
 type SessionManager interface {
-	NewSession(logger log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, hold, keepalive time.Duration, password, myNode, bfdProfile string, ebgpMultiHop bool, name string) (Session, error)
+	NewSession(logger log.Logger, args SessionParameters) (Session, error)
 	SyncBFDProfiles(profiles map[string]*config.BFDProfile) error
 }

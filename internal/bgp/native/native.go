@@ -28,18 +28,10 @@ var errClosed = errors.New("session closed")
 
 // session represents one BGP session to an external router.
 type session struct {
-	name             string
-	myASN            uint32
-	routerID         net.IP // May be nil, meaning "derive from context"
-	myNode           string
-	addr             string
-	srcAddr          net.IP
-	asn              uint32
+	bgp.SessionParameters
 	peerFBASNSupport bool
-	holdTime         time.Duration
-	keepaliveTime    time.Duration
-	logger           log.Logger
-	password         string
+
+	logger log.Logger
 
 	newHoldTime chan bool
 	backoff     backoff
@@ -66,28 +58,19 @@ func NewSessionManager(l log.Logger) *sessionManager {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime, keepaliveTime time.Duration, password, myNode, bfdProfile string, ebgpMultiHop bool, name string) (bgp.Session, error) {
+func (sm *sessionManager) NewSession(l log.Logger, args bgp.SessionParameters) (bgp.Session, error) {
 	ret := &session{
-		name:          name,
-		addr:          addr,
-		srcAddr:       srcAddr,
-		myASN:         myASN,
-		routerID:      routerID.To4(),
-		myNode:        myNode,
-		asn:           asn,
-		holdTime:      holdTime,
-		keepaliveTime: keepaliveTime,
-		logger:        log.With(l, "peer", addr, "localASN", myASN, "peerASN", asn),
-		newHoldTime:   make(chan bool, 1),
-		advertised:    map[string]*bgp.Advertisement{},
-		password:      password,
+		SessionParameters: args,
+		logger:            log.With(l, "peer", args.PeerAddress, "localASN", args.MyASN, "peerASN", args.PeerASN),
+		newHoldTime:       make(chan bool, 1),
+		advertised:        map[string]*bgp.Advertisement{},
 	}
 	ret.cond = sync.NewCond(&ret.mu)
 	go ret.sendKeepalives()
 	go ret.run()
 
-	stats.sessionUp.WithLabelValues(ret.addr).Set(0)
-	stats.prefixes.WithLabelValues(ret.addr).Set(0)
+	stats.sessionUp.WithLabelValues(ret.PeerAddress).Set(0)
+	stats.prefixes.WithLabelValues(ret.PeerAddress).Set(0)
 
 	return ret, nil
 }
@@ -98,7 +81,7 @@ func (sm *sessionManager) SyncBFDProfiles(profiles map[string]*config.BFDProfile
 
 // run tries to stay connected to the peer, and pumps route updates to it.
 func (s *session) run() {
-	defer stats.DeleteSession(s.addr)
+	defer stats.DeleteSession(s.PeerAddress)
 	for {
 		if err := s.connect(); err != nil {
 			if err == errClosed {
@@ -109,7 +92,7 @@ func (s *session) run() {
 			time.Sleep(backoff)
 			continue
 		}
-		stats.SessionUp(s.addr)
+		stats.SessionUp(s.PeerAddress)
 		s.backoff.Reset()
 
 		level.Info(s.logger).Log("event", "sessionUp", "msg", "BGP session established")
@@ -117,7 +100,7 @@ func (s *session) run() {
 		if !s.sendUpdates() {
 			return
 		}
-		stats.SessionDown(s.addr)
+		stats.SessionDown(s.PeerAddress)
 		level.Warn(s.logger).Log("event", "sessionDown", "msg", "BGP session down")
 	}
 }
@@ -135,7 +118,7 @@ func (s *session) sendUpdates() bool {
 		return true
 	}
 
-	ibgp := s.myASN == s.asn
+	ibgp := s.MyASN == s.PeerASN
 	fbasn := s.peerFBASNSupport
 
 	if s.new != nil {
@@ -143,14 +126,14 @@ func (s *session) sendUpdates() bool {
 	}
 
 	for c, adv := range s.advertised {
-		if err := sendUpdate(s.conn, s.myASN, ibgp, fbasn, s.nextHop, adv); err != nil {
+		if err := sendUpdate(s.conn, s.MyASN, ibgp, fbasn, s.nextHop, adv); err != nil {
 			s.abort()
 			level.Error(s.logger).Log("op", "sendUpdate", "ip", c, "error", err, "msg", "failed to send BGP update")
 			return true
 		}
-		stats.UpdateSent(s.addr)
+		stats.UpdateSent(s.PeerAddress)
 	}
-	stats.AdvertisedPrefixes(s.addr, len(s.advertised))
+	stats.AdvertisedPrefixes(s.PeerAddress, len(s.advertised))
 
 	for {
 		for s.new == nil && s.conn != nil {
@@ -176,12 +159,12 @@ func (s *session) sendUpdates() bool {
 				continue
 			}
 
-			if err := sendUpdate(s.conn, s.myASN, ibgp, fbasn, s.nextHop, adv); err != nil {
+			if err := sendUpdate(s.conn, s.MyASN, ibgp, fbasn, s.nextHop, adv); err != nil {
 				s.abort()
 				level.Error(s.logger).Log("op", "sendUpdate", "prefix", c, "error", err, "msg", "failed to send BGP update")
 				return true
 			}
-			stats.UpdateSent(s.addr)
+			stats.UpdateSent(s.PeerAddress)
 		}
 
 		wdr := []*net.IPNet{}
@@ -198,10 +181,10 @@ func (s *session) sendUpdates() bool {
 				}
 				return true
 			}
-			stats.UpdateSent(s.addr)
+			stats.UpdateSent(s.PeerAddress)
 		}
 		s.advertised, s.new = s.new, nil
-		stats.AdvertisedPrefixes(s.addr, len(s.advertised))
+		stats.AdvertisedPrefixes(s.PeerAddress, len(s.advertised))
 	}
 }
 
@@ -218,47 +201,47 @@ func (s *session) connect() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	deadline, _ := ctx.Deadline()
-	conn, err := dialMD5(ctx, s.addr, s.srcAddr, s.password)
+	conn, err := dialMD5(ctx, s.PeerAddress, s.SourceAddress, s.Password)
 	if err != nil {
-		return fmt.Errorf("dial %q: %s", s.addr, err)
+		return fmt.Errorf("dial %q: %s", s.PeerAddress, err)
 	}
 
 	if err = conn.SetDeadline(deadline); err != nil {
 		conn.Close()
-		return fmt.Errorf("setting deadline on conn to %q: %s", s.addr, err)
+		return fmt.Errorf("setting deadline on conn to %q: %s", s.PeerAddress, err)
 	}
 
 	addr, ok := conn.LocalAddr().(*net.TCPAddr)
 	if !ok {
 		conn.Close()
-		return fmt.Errorf("getting local addr for default nexthop to %q: %s", s.addr, err)
+		return fmt.Errorf("getting local addr for default nexthop to %q: %s", s.PeerAddress, err)
 	}
 	s.nextHop = addr.IP
 
-	routerID := s.routerID
+	routerID := s.RouterID
 	if routerID == nil {
-		routerID, err = getRouterID(s.nextHop, s.myNode)
+		routerID, err = getRouterID(s.nextHop, s.CurrentNode)
 		if err != nil {
 			return err
 		}
 	}
 
-	if err = sendOpen(conn, s.myASN, routerID, s.holdTime); err != nil {
+	if err = sendOpen(conn, s.MyASN, routerID, s.HoldTime); err != nil {
 		conn.Close()
-		return fmt.Errorf("send OPEN to %q: %s", s.addr, err)
+		return fmt.Errorf("send OPEN to %q: %s", s.PeerAddress, err)
 	}
 
 	op, err := readOpen(conn)
 	if err != nil {
 		conn.Close()
-		return fmt.Errorf("read OPEN from %q: %s", s.addr, err)
+		return fmt.Errorf("read OPEN from %q: %s", s.PeerAddress, err)
 	}
-	if op.asn != s.asn {
+	if op.asn != s.PeerASN {
 		conn.Close()
-		return fmt.Errorf("unexpected peer ASN %d, want %d", op.asn, s.asn)
+		return fmt.Errorf("unexpected peer ASN %d, want %d", op.asn, s.PeerASN)
 	}
 	s.peerFBASNSupport = op.fbasn
-	if s.myASN > 65536 && !s.peerFBASNSupport {
+	if s.MyASN > 65536 && !s.peerFBASNSupport {
 		conn.Close()
 		return fmt.Errorf("peer does not support 4-byte ASNs")
 	}
@@ -266,7 +249,7 @@ func (s *session) connect() error {
 	// BGP session is established, clear the connect timeout deadline.
 	if err := conn.SetDeadline(time.Time{}); err != nil {
 		conn.Close()
-		return fmt.Errorf("clearing deadline on conn to %q: %s", s.addr, err)
+		return fmt.Errorf("clearing deadline on conn to %q: %s", s.PeerAddress, err)
 	}
 
 	// Consume BGP messages until the connection closes.
@@ -275,11 +258,11 @@ func (s *session) connect() error {
 	// Send one keepalive to say that yes, we accept the OPEN.
 	if err := sendKeepalive(conn); err != nil {
 		conn.Close()
-		return fmt.Errorf("accepting peer OPEN from %q: %s", s.addr, err)
+		return fmt.Errorf("accepting peer OPEN from %q: %s", s.PeerAddress, err)
 	}
 
 	// Set up regular keepalives from now on.
-	s.actualHoldTime = s.holdTime
+	s.actualHoldTime = s.HoldTime
 	if op.holdTime < s.actualHoldTime {
 		s.actualHoldTime = op.holdTime
 	}
@@ -396,7 +379,7 @@ func (s *session) sendKeepalive() error {
 	if err := sendKeepalive(s.conn); err != nil {
 		s.abort()
 		level.Error(s.logger).Log("op", "sendKeepalive", "error", err, "msg", "failed to send keepalive")
-		return fmt.Errorf("sending keepalive to %q: %s", s.addr, err)
+		return fmt.Errorf("sending keepalive to %q: %s", s.PeerAddress, err)
 	}
 	return nil
 }
@@ -463,7 +446,7 @@ func (s *session) Set(advs ...*bgp.Advertisement) error {
 
 	newAdvs := map[string]*bgp.Advertisement{}
 	for _, adv := range advs {
-		if !adv.MatchesPeer(s.name) {
+		if !adv.MatchesPeer(s.SessionName) {
 			continue
 		}
 		err := validate(adv)
@@ -474,7 +457,7 @@ func (s *session) Set(advs ...*bgp.Advertisement) error {
 	}
 
 	s.new = newAdvs
-	stats.PendingPrefixes(s.addr, len(s.new))
+	stats.PendingPrefixes(s.PeerAddress, len(s.new))
 	s.cond.Broadcast()
 
 	return nil
@@ -486,13 +469,13 @@ func (s *session) abort() {
 	if s.conn != nil {
 		s.conn.Close()
 		s.conn = nil
-		stats.SessionDown(s.addr)
+		stats.SessionDown(s.PeerAddress)
 	}
 	// Next time we retry the connection, we can just skip straight to
 	// the desired end state.
 	if s.new != nil {
 		s.advertised, s.new = s.new, nil
-		stats.PendingPrefixes(s.addr, len(s.advertised))
+		stats.PendingPrefixes(s.PeerAddress, len(s.advertised))
 	}
 	s.cond.Broadcast()
 }
