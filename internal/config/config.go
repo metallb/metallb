@@ -98,6 +98,8 @@ type Peer struct {
 	BFDProfile string
 	// Optional ebgp peer is multi-hops away.
 	EBGPMultiHop bool
+	// Optional name of the vrf to establish the session from
+	VRF string
 	// TODO: more BGP session settings
 }
 
