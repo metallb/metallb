@@ -82,6 +82,11 @@ type BGPPeerSpec struct {
 	// To set if the BGPPeer is multi-hops away. Needed for FRR mode only.
 	// +optional
 	EBGPMultiHop bool `json:"ebgpMultiHop,omitempty"`
+
+	// To set if we want to peer with the BGPPeer using an interface belonging to
+	// a host vrf
+	// +optional
+	VRFName string `json:"vrf,omitempty"`
 	// Add future BGP configuration here
 }
 
