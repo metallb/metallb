@@ -230,6 +230,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 					BFDProfile:    p.cfg.BFDProfile,
 					EBGPMultiHop:  p.cfg.EBGPMultiHop,
 					SessionName:   p.cfg.Name,
+					VRFName:       p.cfg.VRF,
 				},
 			)
 
