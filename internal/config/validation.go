@@ -30,6 +30,9 @@ func DiscardFRROnly(c ClusterResources) error {
 		if p.Spec.KeepaliveTime.Duration != 0 {
 			return fmt.Errorf("peer %s has keepalive-time set on native bgp mode", p.Spec.Address)
 		}
+		if p.Spec.VRFName != "" {
+			return fmt.Errorf("peer %s has vrf set on native bgp mode", p.Spec.Address)
+		}
 	}
 	if len(c.BFDProfiles) > 0 {
 		return errors.New("bfd profiles section set")
