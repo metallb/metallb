@@ -60,7 +60,7 @@ func (s *session) Set(advs ...*bgp.Advertisement) error {
 	defer s.sessionManager.Unlock()
 	sessionName := sessionName(s.SourceAddress.String(), s.MyASN, s.PeerAddress, s.PeerASN)
 	if _, found := s.sessionManager.sessions[sessionName]; !found {
-		return fmt.Errorf("session not established before advertisement")
+		return fmt.Errorf("session %s not established before advertisement", sessionName)
 	}
 
 	newAdvs := []*bgp.Advertisement{}
