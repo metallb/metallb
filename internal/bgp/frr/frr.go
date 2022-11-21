@@ -204,13 +204,14 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 		var exist bool
 		var rout *router
 
-		routerName := routerName(s.RouterID.String(), s.MyASN)
+		routerName := routerName(s.RouterID.String(), s.MyASN, s.VRFName)
 		if rout, exist = routers[routerName]; !exist {
 			rout = &router{
 				myASN:        s.MyASN,
 				neighbors:    make(map[string]*neighborConfig),
 				ipV4Prefixes: make(map[string]string),
 				ipV6Prefixes: make(map[string]string),
+				vrf:          s.VRFName,
 			}
 			if s.RouterID != nil {
 				rout.routerID = s.RouterID.String()
@@ -218,7 +219,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			routers[routerName] = rout
 		}
 
-		neighborName := neighborName(s.PeerAddress, s.PeerASN)
+		neighborName := neighborName(s.PeerAddress, s.PeerASN, s.VRFName)
 		if neighbor, exist = rout.neighbors[neighborName]; !exist {
 			host, port, err := net.SplitHostPort(s.PeerAddress)
 			if err != nil {
@@ -243,6 +244,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				Advertisements: make([]*advertisementConfig, 0),
 				BFDProfile:     s.BFDProfile,
 				EBGPMultiHop:   s.EBGPMultiHop,
+				VRFName:        s.VRFName,
 			}
 			if s.SourceAddress != nil {
 				neighbor.SrcAddr = s.SourceAddress.String()
