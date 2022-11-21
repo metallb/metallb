@@ -104,7 +104,19 @@ func TestSingleEBGPSessionMultiHop(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer")
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer"})
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -119,7 +131,20 @@ func TestSingleEBGPSessionOneHop(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "127.0.0.2:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", false, "test-peer")
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "127.0.0.2:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  false,
+			SessionName:   "test-peer"})
+
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -134,7 +159,20 @@ func TestSingleIPv6EBGPSessionOneHop(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "[127:0:0::2]:179", net.ParseIP("10:1:1::254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", false, "test-peer")
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "[127:0:0::2]:179",
+			SourceAddress: net.ParseIP("10:1:1::254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  false,
+			SessionName:   "test-peer"})
+
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -149,7 +187,20 @@ func TestSingleIBGPSession(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 100, time.Second, time.Second, "password", "hostname", "", false, "test-peer")
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       100,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  false,
+			SessionName:   "test-peer"})
+
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -164,7 +215,19 @@ func TestSingleIPv6IBGPSession(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "[10:2:2::254]:179", net.ParseIP("10:1:1::254"), 100, net.ParseIP("10.1.1.254"), 100, time.Second, time.Second, "password", "hostname", "", false, "test-peer")
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "[10:2:2::254]:179",
+			SourceAddress: net.ParseIP("10:1:1::254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       100,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  false,
+			SessionName:   "test-peer"})
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -180,7 +243,20 @@ func TestSingleSessionClose(t *testing.T) {
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
 
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer")
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer"})
+
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -194,12 +270,38 @@ func TestTwoSessions(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session1, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer1")
+	session1, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer1"})
+
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
 	defer session1.Close()
-	session2, err := sessionManager.NewSession(l, "10.4.4.255:179", net.ParseIP("10.3.3.254"), 300, net.ParseIP("10.3.3.254"), 400, time.Second, time.Second, "password", "hostname", "", true, "test-peer2")
+	session2, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.4.4.255:179",
+			SourceAddress: net.ParseIP("10.3.3.254"),
+			MyASN:         300,
+			RouterID:      net.ParseIP("10.3.3.254"),
+			PeerASN:       400,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer2"})
+
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -214,17 +316,42 @@ func TestTwoIPv6Sessions(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session1, err := sessionManager.NewSession(l, "[10:2:2::254]:179", net.ParseIP("10:1:1::254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", false, "test-peer1")
+
+	session1, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "[10:2:2::254]:179",
+			SourceAddress: net.ParseIP("10:1:1::254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  false,
+			SessionName:   "test-peer1"})
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
 	defer session1.Close()
-	session2, err := sessionManager.NewSession(l, "[10:4:4::255]:179", net.ParseIP("10:3:3::254"), 300, net.ParseIP("10.3.3.254"), 400, time.Second, time.Second, "password", "hostname", "", false, "test-peer2")
+	session2, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "[10:4:4::255]:179",
+			SourceAddress: net.ParseIP("10:3:3::254"),
+			MyASN:         300,
+			RouterID:      net.ParseIP("10.3.3.254"),
+			PeerASN:       400,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  false,
+			SessionName:   "test-peer2"})
+
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
 	defer session2.Close()
-
 	testCheckConfigFile(t)
 }
 
@@ -234,12 +361,37 @@ func TestTwoSessionsDuplicate(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session1, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer1")
+	session1, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer1"})
+
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
 	defer session1.Close()
-	session2, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer2")
+	session2, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer2"})
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -254,12 +406,38 @@ func TestTwoSessionsDuplicateRouter(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session1, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer1")
+
+	session1, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer1"})
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
 	defer session1.Close()
-	session2, err := sessionManager.NewSession(l, "10.4.4.255:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 400, time.Second, time.Second, "password", "hostname", "", true, "test-peer2")
+	session2, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.4.4.255:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       400,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer2"})
+
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -274,7 +452,19 @@ func TestSingleAdvertisement(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer")
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer"})
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -309,7 +499,20 @@ func TestSingleAdvertisementNoRouterID(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, nil, 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer")
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      nil,
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer"})
+
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -338,7 +541,20 @@ func TestSingleAdvertisementInvalidNoPort(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer")
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer"})
+
 	if err == nil {
 		session.Close()
 		t.Fatalf("Should not be able to create session")
@@ -353,7 +569,20 @@ func TestSingleAdvertisementStop(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer")
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer"})
+
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -387,7 +616,19 @@ func TestSingleAdvertisementChange(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer")
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer"})
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -430,7 +671,20 @@ func TestSingleAdvertisementWithPeerSelector(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer")
+
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer"})
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -466,7 +720,19 @@ func TestSingleAdvertisementNonExistingPeer(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer")
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer"})
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -502,7 +768,19 @@ func TestTwoAdvertisements(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer")
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer"})
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -543,13 +821,37 @@ func TestTwoAdvertisementsTwoSessions(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer")
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer"})
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
 	defer session.Close()
 
-	session1, err := sessionManager.NewSession(l, "10.2.2.255:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer1")
+	session1, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.255:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer1"})
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
@@ -596,13 +898,37 @@ func TestTwoAdvertisementsTwoSessionsOneWithPeerSelector(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := NewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer")
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer"})
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
 	defer session.Close()
 
-	session1, err := sessionManager.NewSession(l, "10.2.2.255:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, time.Second, "password", "hostname", "", true, "test-peer1")
+	session1, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.255:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer1"})
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}
