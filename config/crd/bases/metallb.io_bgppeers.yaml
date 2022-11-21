@@ -277,6 +277,10 @@ spec:
               sourceAddress:
                 description: Source address to use when establishing the session.
                 type: string
+              vrf:
+                description: To set if we want to peer with the BGPPeer using an interface
+                  belonging to a host vrf
+                type: string
             required:
             - myASN
             - peerASN
