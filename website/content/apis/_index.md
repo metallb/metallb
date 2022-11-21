@@ -947,6 +947,19 @@ bool
 <p>To set if the BGPPeer is multi-hops away. Needed for FRR mode only.</p>
 </td>
 </tr>
+<tr>
+<td>
+<code>vrf</code><br/>
+<em>
+string
+</em>
+</td>
+<td>
+<em>(Optional)</em>
+<p>To set if we want to peer with the BGPPeer using an interface belonging to
+a host vrf</p>
+</td>
+</tr>
 </table>
 </td>
 </tr>
