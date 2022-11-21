@@ -1,6 +1,6 @@
 {{- define "localpreffilter" -}}
 {{frrIPFamily .advertisement.IPFamily}} prefix-list {{localPrefPrefixList .neighbor .advertisement.LocalPref}} permit {{.advertisement.Prefix}}
-route-map {{.neighbor.Addr}}-out permit {{counter .neighbor.Addr}}
+route-map {{.neighbor.ID}}-out permit {{counter .neighbor.ID}}
   match {{frrIPFamily .advertisement.IPFamily}} address prefix-list {{localPrefPrefixList .neighbor .advertisement.LocalPref}}
   set local-preference {{.advertisement.LocalPref}}
   on-match next
@@ -8,7 +8,7 @@ route-map {{.neighbor.Addr}}-out permit {{counter .neighbor.Addr}}
 
 {{- define "communityfilter" -}}
 {{frrIPFamily .advertisement.IPFamily}} prefix-list {{communityPrefixList .neighbor .community}} permit {{.advertisement.Prefix}}
-route-map {{.neighbor.Addr}}-out permit {{counter .neighbor.Addr}}
+route-map {{.neighbor.ID}}-out permit {{counter .neighbor.ID}}
   match {{frrIPFamily .advertisement.IPFamily}} address prefix-list {{communityPrefixList .neighbor .community}}
   set community {{.community}} additive
   on-match next
@@ -20,7 +20,7 @@ route-map {{.neighbor.Addr}}-out permit {{counter .neighbor.Addr}}
      deny all the others.*/ -}}
 {{- define "neighborfilters" -}}
 
-route-map {{.neighbor.Addr}}-in deny 20
+route-map {{.neighbor.ID}}-in deny 20
 {{- range $a := .neighbor.Advertisements }}
 {{/* Advertisements for which we must enable set the local pref */}}
 {{- if not (eq $a.LocalPref 0)}}
@@ -35,9 +35,9 @@ route-map {{.neighbor.Addr}}-in deny 20
 {{frrIPFamily $a.IPFamily}} prefix-list {{allowedPrefixList $.neighbor}} permit {{$a.Prefix}}
 {{- end }}
 
-route-map {{$.neighbor.Addr}}-out permit {{counter $.neighbor.Addr}}
+route-map {{$.neighbor.ID}}-out permit {{counter $.neighbor.ID}}
   match ip address prefix-list {{allowedPrefixList $.neighbor}}
-route-map {{$.neighbor.Addr}}-out permit {{counter $.neighbor.Addr}}
+route-map {{$.neighbor.ID}}-out permit {{counter $.neighbor.ID}}
   match ipv6 address prefix-list {{allowedPrefixList $.neighbor}}
 
 ip prefix-list {{allowedPrefixList $.neighbor }} deny any
