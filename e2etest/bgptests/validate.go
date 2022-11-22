@@ -41,7 +41,7 @@ func validateFRRNotPeeredWithNodes(cs clientset.Interface, nodes []corev1.Node, 
 		Eventually(func() error {
 			neighbors, err := frr.NeighborsInfo(c)
 			framework.ExpectNoError(err)
-			err = frr.NeighborsMatchNodes([]corev1.Node{node}, neighbors, ipFamily)
+			err = frr.NeighborsMatchNodes([]corev1.Node{node}, neighbors, ipFamily, c.RouterConfig.VRF)
 			return err
 		}, 4*time.Minute, 1*time.Second).Should(MatchError(ContainSubstring("not established")))
 	}
@@ -52,7 +52,7 @@ func validateFRRPeeredWithNodes(cs clientset.Interface, nodes []corev1.Node, c *
 	Eventually(func() error {
 		neighbors, err := frr.NeighborsInfo(c)
 		framework.ExpectNoError(err)
-		err = frr.NeighborsMatchNodes(nodes, neighbors, ipFamily)
+		err = frr.NeighborsMatchNodes(nodes, neighbors, ipFamily, c.RouterConfig.VRF)
 		return err
 	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
@@ -74,12 +74,17 @@ func validateServiceNoWait(cs clientset.Interface, svc *corev1.Service, nodes []
 	for _, ip := range svc.Status.LoadBalancer.Ingress {
 
 		ingressIP := e2eservice.GetIngressPoint(&ip)
-		hostport := net.JoinHostPort(ingressIP, port)
-		address := fmt.Sprintf("http://%s/", hostport)
 
-		err := wget.Do(address, c)
-		if err != nil {
-			return err
+		// TODO: in case of VRF there's currently no host wiring to the service.
+		// We only validate the routes are propagated correctly but
+		// we don't try to hit the service.
+		if c.RouterConfig.VRF == "" {
+			hostport := net.JoinHostPort(ingressIP, port)
+			address := fmt.Sprintf("http://%s/", hostport)
+			err := wget.Do(address, c)
+			if err != nil {
+				return err
+			}
 		}
 
 		frrRoutesV4, frrRoutesV6, err := frr.Routes(c)
@@ -99,7 +104,7 @@ func validateServiceNoWait(cs clientset.Interface, svc *corev1.Service, nodes []
 			return fmt.Errorf("route for %s not set with igp origin", ingressIP)
 		}
 
-		err = frr.RoutesMatchNodes(nodes, frrRoutes, serviceIPFamily)
+		err = frr.RoutesMatchNodes(nodes, frrRoutes, serviceIPFamily, c.RouterConfig.VRF)
 		if err != nil {
 			return err
 		}
@@ -107,7 +112,7 @@ func validateServiceNoWait(cs clientset.Interface, svc *corev1.Service, nodes []
 		// The BGP routes will not match the nodes if static routes were added.
 		if !(c.Network == multiHopNetwork) {
 			advertised := routes.ForIP(ingressIP, c)
-			err = routes.MatchNodes(nodes, advertised, serviceIPFamily)
+			err = routes.MatchNodes(nodes, advertised, serviceIPFamily, c.RouterConfig.VRF)
 			if err != nil {
 				return err
 			}
@@ -169,9 +174,10 @@ func checkServiceOnlyOnNodes(cs clientset.Interface, svc *corev1.Service, expect
 		return
 	}
 	ip := svc.Status.LoadBalancer.Ingress[0].IP
-	nodeIps := k8s.NodeIPsForFamily(expectedNodes, ipFamily)
 
 	for _, c := range FRRContainers {
+		nodeIps, err := k8s.NodeIPsForFamily(expectedNodes, ipFamily, c.RouterConfig.VRF)
+		framework.ExpectNoError(err)
 		validateService(cs, svc, expectedNodes, c)
 		Eventually(func() error {
 			routes, err := frr.RoutesForFamily(c, ipFamily)
@@ -198,9 +204,10 @@ func checkServiceNotOnNodes(cs clientset.Interface, svc *corev1.Service, expecte
 		return
 	}
 	ip := svc.Status.LoadBalancer.Ingress[0].IP
-	nodeIps := k8s.NodeIPsForFamily(expectedNodes, ipFamily)
 
 	for _, c := range FRRContainers {
+		nodeIps, err := k8s.NodeIPsForFamily(expectedNodes, ipFamily, c.RouterConfig.VRF)
+		framework.ExpectNoError(err)
 		Eventually(func() bool {
 			routes, err := frr.RoutesForFamily(c, ipFamily)
 			framework.ExpectNoError(err)
@@ -221,9 +228,11 @@ func checkCommunitiesOnlyOnNodes(cs clientset.Interface, svc *corev1.Service, co
 		return
 	}
 	ip := svc.Status.LoadBalancer.Ingress[0].IP
-	nodeIps := k8s.NodeIPsForFamily(expectedNodes, ipFamily)
 
 	for _, c := range FRRContainers {
+		nodeIps, err := k8s.NodeIPsForFamily(expectedNodes, ipFamily, c.RouterConfig.VRF)
+		framework.ExpectNoError(err)
+
 		Eventually(func() error {
 			routes, err := frr.RoutesForCommunity(c, community, ipFamily)
 			if len(routes[ip].NextHops) != len(nodeIps) {
