@@ -70,13 +70,13 @@ func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 func (r *NodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	p := predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
-			return r.filter(e.Object)
+			return r.filterOtherNodes(e.Object)
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
-			return r.filter(e.Object)
+			return r.filterOtherNodes(e.Object)
 		},
 		GenericFunc: func(e event.GenericEvent) bool {
-			return r.filter(e.Object)
+			return r.filterOtherNodes(e.Object)
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			newNodeObj, ok := e.ObjectNew.(*corev1.Node)
@@ -102,7 +102,7 @@ func (r *NodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *NodeReconciler) filter(obj client.Object) bool {
+func (r *NodeReconciler) filterOtherNodes(obj client.Object) bool {
 	node, ok := obj.(*v1.Node)
 	if !ok {
 		level.Error(r.Logger).Log("controller", "NodeReconciler", "error", "object is not node", "name", obj.GetName())
