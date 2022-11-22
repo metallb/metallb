@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"go.universe.tf/metallb/e2etest/pkg/executor"
+	"go.universe.tf/metallb/e2etest/pkg/netdev"
 	"go.universe.tf/metallb/e2etest/pkg/routes"
 )
 
@@ -76,17 +77,17 @@ func SetupVRFForNetwork(containerName, vrfNetwork, vrfName string) error {
 	}
 	exec := executor.ForContainer(containerName)
 	// Get the interface beloning to the given network
-	interfaceInVRFNetwork, err := routes.InterfaceForAddress(exec, r.IPAddress, r.GlobalIPv6Address)
+	interfaceInVRFNetwork, err := netdev.ForAddress(exec, r.IPAddress, r.GlobalIPv6Address)
 	if err != nil {
 		return fmt.Errorf("interface with IPs %s , %s belonging to network %s not found in container %s: %w", r.IPAddress, r.GlobalIPv6Address, vrfNetwork, containerName, err)
 	}
 
-	err = routes.CreateVRF(exec, vrfName)
+	err = netdev.CreateVRF(exec, vrfName)
 	if err != nil {
 		return err
 	}
 
-	err = routes.AddInterfaceToVRF(exec, interfaceInVRFNetwork, vrfName, r.GlobalIPv6Address)
+	err = netdev.AddToVRF(exec, interfaceInVRFNetwork, vrfName, r.GlobalIPv6Address)
 	if err != nil {
 		return fmt.Errorf("failed to add %s to vrf %s in container %s, %w", interfaceInVRFNetwork, vrfName, containerName, err)
 	}

@@ -17,7 +17,7 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 )
 
-func setupBGPService(f *framework.Framework, pairingIPFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) (*e2eservice.TestJig, *corev1.Service) {
+func setupBGPService(f *framework.Framework, pairingIPFamily ipfamily.Family, poolAddresses []string, peers []*frrcontainer.FRR, tweak testservice.Tweak) (*e2eservice.TestJig, *corev1.Service) {
 	cs := f.ClientSet
 	resources := metallbconfig.ClusterResources{
 		Pools: []metallbv1beta1.IPAddressPool{
@@ -48,9 +48,9 @@ func setupBGPService(f *framework.Framework, pairingIPFamily ipfamily.Family, po
 	resources.BGPAdvs = []metallbv1beta1.BGPAdvertisement{
 		{ObjectMeta: metav1.ObjectMeta{Name: "empty"}},
 	}
-	resources.Peers = metallb.PeersForContainers(FRRContainers, pairingIPFamily)
+	resources.Peers = metallb.PeersForContainers(peers, pairingIPFamily)
 
-	for _, c := range FRRContainers {
+	for _, c := range peers {
 		err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily)
 		framework.ExpectNoError(err)
 	}
@@ -58,7 +58,7 @@ func setupBGPService(f *framework.Framework, pairingIPFamily ipfamily.Family, po
 	err = ConfigUpdater.Update(resources)
 	framework.ExpectNoError(err)
 
-	for _, c := range FRRContainers {
+	for _, c := range peers {
 		validateFRRPeeredWithAllNodes(cs, c, pairingIPFamily)
 	}
 	return jig, svc

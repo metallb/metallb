@@ -119,7 +119,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 	table.DescribeTable("A service of protocol load balancer should work with ETP=cluster", func(pairingIPFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
 
-		_, svc := setupBGPService(f, pairingIPFamily, poolAddresses, func(svc *corev1.Service) {
+		_, svc := setupBGPService(f, pairingIPFamily, poolAddresses, FRRContainers, func(svc *corev1.Service) {
 			testservice.TrafficPolicyCluster(svc)
 			tweak(svc)
 		})
@@ -152,7 +152,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 	table.DescribeTable("A service of protocol load balancer should work with ETP=local", func(pairingIPFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
 
-		jig, svc := setupBGPService(f, pairingIPFamily, poolAddresses, func(svc *corev1.Service) {
+		jig, svc := setupBGPService(f, pairingIPFamily, poolAddresses, FRRContainers, func(svc *corev1.Service) {
 			testservice.TrafficPolicyLocal(svc)
 			tweak(svc)
 		})
@@ -180,7 +180,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 	table.DescribeTable("FRR must be deployed when enabled", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
 
-		_, svc := setupBGPService(f, pairingIPFamily, poolAddresses, func(svc *corev1.Service) {
+		_, svc := setupBGPService(f, pairingIPFamily, poolAddresses, FRRContainers, func(svc *corev1.Service) {
 			testservice.TrafficPolicyCluster(svc)
 		})
 		defer testservice.Delete(cs, svc)
@@ -789,7 +789,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					if err != nil {
 						return err
 					}
-					err = frr.BFDPeersMatchNodes(allNodes.Items, bfdPeers, pairingFamily)
+					err = frr.BFDPeersMatchNodes(allNodes.Items, bfdPeers, pairingFamily, c.RouterConfig.VRF)
 					if err != nil {
 						return err
 					}
@@ -1848,7 +1848,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		})
 	})
 	table.DescribeTable("A service of protocol load balancer should work with two protocols", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
-		_, svc := setupBGPService(f, pairingIPFamily, poolAddresses, func(svc *corev1.Service) {
+		_, svc := setupBGPService(f, pairingIPFamily, poolAddresses, FRRContainers, func(svc *corev1.Service) {
 			testservice.TrafficPolicyCluster(svc)
 		})
 		defer testservice.Delete(cs, svc)

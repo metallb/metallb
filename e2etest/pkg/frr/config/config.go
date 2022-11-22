@@ -123,7 +123,10 @@ func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterCon
 		return "", errors.Wrapf(err, "Failed to get cluster nodes")
 	}
 
-	ips := k8s.NodeIPsForFamily(nodes.Items, ipFamily)
+	ips, err := k8s.NodeIPsForFamily(nodes.Items, ipFamily, rc.VRF)
+	if err != nil {
+		return "", err
+	}
 	for _, ip := range ips {
 		neighbor := nc
 		neighbor.Addr = ip

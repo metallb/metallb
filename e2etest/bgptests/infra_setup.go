@@ -387,6 +387,20 @@ func vrfContainersConfig() map[string]frrcontainer.Config {
 			VRF:     vrfName,
 		},
 	}
+	res["ibgp-vrf-single-hop"] = frrcontainer.Config{
+		Name:    "ibgp-vrf-single-hop",
+		Network: vrfNetwork,
+		Neighbor: frrconfig.NeighborConfig{
+			ASN:      metalLBASN,
+			MultiHop: false,
+		},
+		Router: frrconfig.RouterConfig{
+			ASN:     metalLBASN,
+			BGPPort: 179,
+			VRF:     vrfName,
+		},
+	}
+
 	return res
 }
 
