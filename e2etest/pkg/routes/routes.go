@@ -70,10 +70,13 @@ func ForIP(target string, exec executor.Executor) []net.IP {
 
 // MatchNodes tells whether the given list of destination ips
 // matches the expected list of nodes.
-func MatchNodes(nodes []v1.Node, ips []net.IP, ipFamily ipfamily.Family) error {
+func MatchNodes(nodes []v1.Node, ips []net.IP, ipFamily ipfamily.Family, vrfName string) error {
 	nodesIPs := map[string]struct{}{}
 
-	ii := k8s.NodeIPsForFamily(nodes, ipFamily)
+	ii, err := k8s.NodeIPsForFamily(nodes, ipFamily, vrfName)
+	if err != nil {
+		return err
+	}
 	for _, ip := range ii {
 		nodesIPs[ip] = struct{}{}
 	}

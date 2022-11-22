@@ -16,10 +16,13 @@ import (
 // frr instance. We only care about established connections, as the
 // frr instance may be configured with more nodes than are currently
 // paired.
-func NeighborsMatchNodes(nodes []v1.Node, neighbors []*bgpfrr.Neighbor, ipFamily ipfamily.Family) error {
+func NeighborsMatchNodes(nodes []v1.Node, neighbors []*bgpfrr.Neighbor, ipFamily ipfamily.Family, vrfName string) error {
 	nodesIPs := map[string]struct{}{}
 
-	ips := k8s.NodeIPsForFamily(nodes, ipFamily)
+	ips, err := k8s.NodeIPsForFamily(nodes, ipFamily, vrfName)
+	if err != nil {
+		return err
+	}
 	for _, ip := range ips {
 		nodesIPs[ip] = struct{}{}
 	}
@@ -40,10 +43,13 @@ func NeighborsMatchNodes(nodes []v1.Node, neighbors []*bgpfrr.Neighbor, ipFamily
 
 // RoutesMatchNodes tells if ALL the given nodes are exposed as
 // destinations for the given address.
-func RoutesMatchNodes(nodes []v1.Node, route bgpfrr.Route, ipFamily ipfamily.Family) error {
+func RoutesMatchNodes(nodes []v1.Node, route bgpfrr.Route, ipFamily ipfamily.Family, vrfName string) error {
 	nodesIPs := map[string]struct{}{}
 
-	ips := k8s.NodeIPsForFamily(nodes, ipFamily)
+	ips, err := k8s.NodeIPsForFamily(nodes, ipFamily, vrfName)
+	if err != nil {
+		return err
+	}
 	for _, ip := range ips {
 		nodesIPs[ip] = struct{}{}
 	}
@@ -61,9 +67,12 @@ func RoutesMatchNodes(nodes []v1.Node, route bgpfrr.Route, ipFamily ipfamily.Fam
 	return nil
 }
 
-func BFDPeersMatchNodes(nodes []v1.Node, peers map[string]bgpfrr.BFDPeer, ipFamily ipfamily.Family) error {
+func BFDPeersMatchNodes(nodes []v1.Node, peers map[string]bgpfrr.BFDPeer, ipFamily ipfamily.Family, vrfName string) error {
 	nodesIPs := map[string]struct{}{}
-	ips := k8s.NodeIPsForFamily(nodes, ipFamily)
+	ips, err := k8s.NodeIPsForFamily(nodes, ipFamily, vrfName)
+	if err != nil {
+		return err
+	}
 	for _, ip := range ips {
 		nodesIPs[ip] = struct{}{}
 		if _, ok := peers[ip]; !ok {

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier:Apache-2.0
 
-package routes
+package netdev
 
 import (
 	"encoding/json"
@@ -10,7 +10,7 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 )
 
-type InterfaceAddress struct {
+type interfaceAddress struct {
 	Ifname   string `json:"ifname"`
 	AddrInfo []struct {
 		Family    string `json:"family"`
@@ -20,10 +20,10 @@ type InterfaceAddress struct {
 	} `json:"addr_info"`
 }
 
-func InterfaceForAddress(exec executor.Executor, ipv4Address, ipv6Address string) (string, error) {
+func ForAddress(exec executor.Executor, ipv4Address, ipv6Address string) (string, error) {
 	jsonAddr, err := exec.Exec("ip", "-j", "a")
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("failed to retrieve addresses %w :%s", err, jsonAddr)
 	}
 	res, err := findInterfaceWithAddresses(jsonAddr, ipv4Address, ipv6Address)
 	if err != nil {
@@ -32,20 +32,20 @@ func InterfaceForAddress(exec executor.Executor, ipv4Address, ipv6Address string
 	return res, nil
 }
 
-type InterfaceLink struct {
+type Link struct {
 	Ifname string `json:"ifname"`
 	Master string `json:"master"`
 }
 
-type InterfaceNotFoundErr struct {
+type NotFoundErr struct {
 	interfaceName string
 }
 
-func (e *InterfaceNotFoundErr) Error() string {
+func (e *NotFoundErr) Error() string {
 	return fmt.Sprintf("interface %s not found", e.interfaceName)
 }
 
-func InterfaceExists(exec executor.Executor, intf string) error {
+func Exists(exec executor.Executor, intf string) error {
 	interfaces, err := ipLink(exec)
 	if err != nil {
 		return err
@@ -55,16 +55,16 @@ func InterfaceExists(exec executor.Executor, intf string) error {
 			return nil
 		}
 	}
-	return &InterfaceNotFoundErr{interfaceName: intf}
+	return &NotFoundErr{interfaceName: intf}
 }
 
 func CreateVRF(exec executor.Executor, vrfName string) error {
-	err := InterfaceExists(exec, vrfName)
+	err := Exists(exec, vrfName)
 	// The interface is already there, not doing anything
 	if err == nil {
 		return nil
 	}
-	var notFound *InterfaceNotFoundErr
+	var notFound *NotFoundErr
 	if err != nil && !errors.As(err, &notFound) {
 		return err
 	}
@@ -80,7 +80,7 @@ func CreateVRF(exec executor.Executor, vrfName string) error {
 	return nil
 }
 
-func AddInterfaceToVRF(exec executor.Executor, intf, vrf, ipv6Address string) error {
+func AddToVRF(exec executor.Executor, intf, vrf, ipv6Address string) error {
 	links, err := ipLink(exec)
 	if err != nil {
 		return err
@@ -108,8 +108,65 @@ func AddInterfaceToVRF(exec executor.Executor, intf, vrf, ipv6Address string) er
 	return nil
 }
 
+// This assumes a custom network layout where a single interface is added
+// inside a given VRF. The function returns error if more than one interface
+// is found.
+func WithMaster(exec executor.Executor, master string) (string, error) {
+	links, err := ipLink(exec)
+	if err != nil {
+		return "", err
+	}
+	res := ""
+	for _, l := range links {
+		if l.Master == master && res != "" {
+			return "", fmt.Errorf("multiple interfaces with master %s found: %s, %s", master, l.Master, res)
+		}
+		if l.Master == master {
+			res = l.Ifname
+		}
+	}
+	if res == "" {
+		return "", &NotFoundErr{interfaceName: res}
+	}
+
+	return res, nil
+}
+
+type Addresses struct {
+	InterfaceName string
+	IPV4Address   string
+	IPV6Address   string
+}
+
+func AddressesForDevice(exec executor.Executor, dev string) (*Addresses, error) {
+	jsonIPOutput, err := exec.Exec("ip", "-j", "addr", "show", "dev", dev)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve interface address %s, %w :%s", dev, err, jsonIPOutput)
+	}
+
+	var intf []interfaceAddress
+	err = json.Unmarshal([]byte(jsonIPOutput), &intf)
+	if err != nil {
+		return nil, err
+	}
+	if len(intf) != 1 {
+		return nil, fmt.Errorf("expected one single interface for %s, got %d", dev, len(intf))
+	}
+	res := Addresses{InterfaceName: dev}
+	for _, addr := range intf[0].AddrInfo {
+		if addr.Family == "inet6" && addr.Scope == "global" {
+			res.IPV6Address = addr.Local
+		}
+		if addr.Family == "inet" && addr.Scope == "global" {
+			res.IPV4Address = addr.Local
+		}
+	}
+
+	return &res, nil
+}
+
 func findInterfaceWithAddresses(jsonIPOutput string, ipv4Address, ipv6Address string) (string, error) {
-	var interfaces []InterfaceAddress
+	var interfaces []interfaceAddress
 	err := json.Unmarshal([]byte(jsonIPOutput), &interfaces)
 	if err != nil {
 		return "", err
@@ -138,12 +195,12 @@ func findInterfaceWithAddresses(jsonIPOutput string, ipv4Address, ipv6Address st
 	return "", fmt.Errorf("could not find interface on with ipv4 address %s and ipv6 address %s", ipv4Address, ipv6Address)
 }
 
-func ipLink(exec executor.Executor) ([]InterfaceLink, error) {
+func ipLink(exec executor.Executor) ([]Link, error) {
 	links, err := exec.Exec("ip", "-j", "l")
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to find links %w :%s", err, links)
 	}
-	var interfaces []InterfaceLink
+	var interfaces []Link
 	err = json.Unmarshal([]byte(links), &interfaces)
 	if err != nil {
 		return nil, err
