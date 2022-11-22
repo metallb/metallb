@@ -93,7 +93,7 @@ func (r *NodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 			if labels.Equals(labels.Set(oldNodeObj.Labels), labels.Set(newNodeObj.Labels)) {
 				return false
 			}
-			return newNodeObj.Name == newNodeObj.Name
+			return r.filterOtherNodes(newNodeObj)
 		},
 	}
 	return ctrl.NewControllerManagedBy(mgr).
