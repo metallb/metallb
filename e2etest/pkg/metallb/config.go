@@ -53,6 +53,7 @@ func PeersForContainers(containers []*frrcontainer.FRR, ipFamily ipfamily.Family
 					Password:     c.RouterConfig.Password,
 					HoldTime:     metav1.Duration{Duration: holdTime},
 					EBGPMultiHop: ebgpMultihop,
+					VRFName:      c.RouterConfig.VRF,
 				}}
 			for _, f := range tweak {
 				f(&peer)
