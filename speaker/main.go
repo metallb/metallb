@@ -20,6 +20,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/go-kit/log"
@@ -66,7 +67,7 @@ func main() {
 		mlBindAddr        = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
 		mlBindPort        = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
 		mlLabels          = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
-		mlSecret          = flag.String("ml-secret-key", os.Getenv("METALLB_ML_SECRET_KEY"), "Secret key for MemberList (fast dead node detection)")
+		mlSecretKeyPath   = flag.String("ml-secret-key-path", os.Getenv("METALLB_ML_SECRET_KEY_PATH"), "Path to where the MembeList's secret key is mounted")
 		myNode            = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
 		port              = flag.Int("port", 7472, "HTTP listening port")
 		logLevel          = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
@@ -116,7 +117,18 @@ func main() {
 	}()
 	defer level.Info(logger).Log("op", "shutdown", "msg", "done")
 
-	sList, err := speakerlist.New(logger, *myNode, *mlBindAddr, *mlBindPort, *mlSecret, *namespace, *mlLabels, stopCh)
+	var mlSecret string
+
+	if *mlSecretKeyPath != "" {
+		mlSecretBytes, err := os.ReadFile(filepath.Join(*mlSecretKeyPath, k8s.MLSecretKeyName))
+		if err != nil {
+			level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to read memberlist secret key file")
+			os.Exit(1)
+		}
+		mlSecret = string(mlSecretBytes)
+	}
+
+	sList, err := speakerlist.New(logger, *myNode, *mlBindAddr, *mlBindPort, mlSecret, *namespace, *mlLabels, stopCh)
 	if err != nil {
 		os.Exit(1)
 	}
