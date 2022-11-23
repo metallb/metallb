@@ -12,6 +12,8 @@ A network load-balancer implementation for Kubernetes using standard routing pro
 
 ## Requirements
 
+Kubernetes: `>= 1.14.0-0`
+
 | Repository | Name | Version |
 |------------|------|---------|
 |  | crds | 0.0.0 |

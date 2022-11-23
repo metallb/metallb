@@ -208,7 +208,7 @@ spec:
       kubernetes.io/hostname: NodeB
 ```
 
-In this way, all the IPs coming from `first-pool` will be reacheable only via `NodeA`
+In this way, all the IPs coming from `first-pool` will be reachable only via `NodeA`
 and `NodeB`.
 
 ### Announcing the Service to a subset of peers
