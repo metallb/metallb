@@ -50,8 +50,9 @@ import (
 )
 
 const (
-	caName         = "cert"
-	caOrganization = "metallb"
+	caName          = "cert"
+	caOrganization  = "metallb"
+	MLSecretKeyName = "secretkey"
 )
 
 var (
@@ -350,7 +351,7 @@ func (c *Client) CreateMlSecret(namespace, controllerDeploymentName, secretName 
 					UID:  d.UID,
 				}},
 			},
-			Data: map[string][]byte{"secretkey": secretB64},
+			Data: map[string][]byte{MLSecretKeyName: secretB64},
 		},
 		metav1.CreateOptions{})
 	if err == nil {
