@@ -29,7 +29,7 @@ var (
 type frrConfig struct {
 	Loglevel    string
 	Hostname    string
-	Routers     map[string]*routerConfig
+	Routers     []*routerConfig
 	BFDProfiles []BFDProfile
 }
 
@@ -43,8 +43,8 @@ type reloadEvent struct {
 
 type routerConfig struct {
 	MyASN        uint32
-	RouterId     string
-	Neighbors    map[string]*neighborConfig
+	RouterID     string
+	Neighbors    []*neighborConfig
 	VRF          string
 	IPV4Prefixes []string
 	IPV6Prefixes []string
