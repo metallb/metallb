@@ -35,3 +35,4 @@ router bgp 100
     neighbor 10.2.2.254 route-map 10.2.2.254-in in
     neighbor 10.2.2.254 route-map 10.2.2.254-out out
   exit-address-family
+

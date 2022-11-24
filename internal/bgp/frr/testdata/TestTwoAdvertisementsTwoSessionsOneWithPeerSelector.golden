@@ -99,6 +99,6 @@ router bgp 100
   address-family ipv4 unicast
     network 172.16.1.10/24
     network 172.16.1.11/24
-    network 172.16.1.11/24
   exit-address-family
+
 

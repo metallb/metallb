@@ -129,7 +129,7 @@ func TestDebounceSameConfig(t *testing.T) {
 	debouncer(dummyUpdate, reload, timer, failureTimer, log.NewNopLogger())
 	reload <- reloadEvent{config: &frrConfig{Hostname: "1"}}
 	reload <- reloadEvent{config: &frrConfig{Hostname: "2"}}
-	reload <- reloadEvent{config: &frrConfig{Hostname: "3", Routers: map[string]*routerConfig{"foo": {MyASN: 23}}}}
+	reload <- reloadEvent{config: &frrConfig{Hostname: "3", Routers: []*routerConfig{{MyASN: 23}}}}
 	if len(result) != 0 {
 		t.Fatal("received update before time")
 	}
@@ -142,8 +142,8 @@ func TestDebounceSameConfig(t *testing.T) {
 		t.Fatal("Config was not updated")
 	}
 
-	reload <- reloadEvent{config: &frrConfig{Hostname: "3", Routers: map[string]*routerConfig{"foo": {MyASN: 23}}}}
-	reload <- reloadEvent{config: &frrConfig{Hostname: "3", Routers: map[string]*routerConfig{"foo": {MyASN: 23}}}}
+	reload <- reloadEvent{config: &frrConfig{Hostname: "3", Routers: []*routerConfig{{MyASN: 23}}}}
+	reload <- reloadEvent{config: &frrConfig{Hostname: "3", Routers: []*routerConfig{{MyASN: 23}}}}
 
 	time.Sleep(3 * timer)
 	if len(result) != 0 {

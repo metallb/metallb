@@ -35,3 +35,4 @@ router bgp 100
     neighbor 127.0.0.2 route-map 127.0.0.2-in in
     neighbor 127.0.0.2 route-map 127.0.0.2-out out
   exit-address-family
+
