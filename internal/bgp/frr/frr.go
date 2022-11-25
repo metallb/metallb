@@ -201,9 +201,19 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 	config := &frrConfig{
 		Hostname:    hostname,
 		Loglevel:    sm.logLevel,
-		Routers:     make(map[string]*routerConfig),
 		BFDProfiles: sm.bfdProfiles,
 	}
+
+	type router struct {
+		myASN        uint32
+		routerID     string
+		neighbors    map[string]*neighborConfig
+		vrf          string
+		ipV4Prefixes map[string]string
+		ipV6Prefixes map[string]string
+	}
+
+	routers := make(map[string]*router)
 
 	// leave it for backward compatibility
 	frrLogLevel, found := os.LookupEnv("FRR_LOGGING_LEVEL")
@@ -212,24 +222,26 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 	}
 
 	for _, s := range sm.sessions {
-		var router *routerConfig
 		var neighbor *neighborConfig
 		var exist bool
+		var rout *router
 
 		routerName := routerName(s.routerID.String(), s.myASN)
-		if router, exist = config.Routers[routerName]; !exist {
-			router = &routerConfig{
-				MyASN:     s.myASN,
-				Neighbors: make(map[string]*neighborConfig),
+		if rout, exist = routers[routerName]; !exist {
+			rout = &router{
+				myASN:        s.myASN,
+				neighbors:    make(map[string]*neighborConfig),
+				ipV4Prefixes: make(map[string]string),
+				ipV6Prefixes: make(map[string]string),
 			}
 			if s.routerID != nil {
-				router.RouterId = s.routerID.String()
+				rout.routerID = s.routerID.String()
 			}
-			config.Routers[routerName] = router
+			routers[routerName] = rout
 		}
 
 		neighborName := neighborName(s.addr, s.asn)
-		if neighbor, exist = router.Neighbors[neighborName]; !exist {
+		if neighbor, exist = rout.neighbors[neighborName]; !exist {
 			host, port, err := net.SplitHostPort(s.addr)
 			if err != nil {
 				return nil, err
@@ -257,7 +269,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			if s.srcAddr != nil {
 				neighbor.SrcAddr = s.srcAddr.String()
 			}
-			router.Neighbors[neighborName] = neighbor
+			rout.neighbors[neighborName] = neighbor
 		}
 
 		/* As 'session.advertised' is a map, we can be sure there are no
@@ -277,17 +289,36 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				community := metallbconfig.CommunityToString(c)
 				communities = append(communities, community)
 			}
+
+			prefix := adv.Prefix.String()
 			advConfig := advertisementConfig{
 				IPFamily:    family,
-				Prefix:      adv.Prefix.String(),
+				Prefix:      prefix,
 				Communities: communities,
 				LocalPref:   adv.LocalPref,
 			}
 
 			neighbor.Advertisements = append(neighbor.Advertisements, &advConfig)
+			switch family {
+			case ipfamily.IPv4:
+				rout.ipV4Prefixes[prefix] = prefix
+			case ipfamily.IPv6:
+				rout.ipV6Prefixes[prefix] = prefix
+			}
 		}
 	}
 
+	for _, r := range sortMap(routers) {
+		toAdd := &routerConfig{
+			MyASN:        r.myASN,
+			RouterID:     r.routerID,
+			VRF:          r.vrf,
+			Neighbors:    sortMap(r.neighbors),
+			IPV4Prefixes: sortMap(r.ipV4Prefixes),
+			IPV6Prefixes: sortMap(r.ipV6Prefixes),
+		}
+		config.Routers = append(config.Routers, toAdd)
+	}
 	return config, nil
 }
 
@@ -388,4 +419,17 @@ func logLevelToFRR(level logging.Level) string {
 	}
 
 	return "informational"
+}
+
+func sortMap[T any](toSort map[string]T) []T {
+	keys := make([]string, 0)
+	for k := range toSort {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	res := make([]T, 0)
+	for _, k := range keys {
+		res = append(res, toSort[k])
+	}
+	return res
 }

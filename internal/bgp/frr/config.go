@@ -4,8 +4,8 @@ package frr
 
 import (
 	"bytes"
+	"embed"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 	"strconv"
@@ -15,156 +15,21 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
+	"github.com/pkg/errors"
 	"go.universe.tf/metallb/internal/ipfamily"
 )
 
-var configFileName = "/etc/frr_reloader/frr.conf"
-var reloaderPidFileName = "/etc/frr_reloader/reloader.pid"
-
-// TODO: We will probably need to update this template when we start to
-// integrate with FRR. The current template is a reasonable first pass
-// and we can improve it in later commits.
-//
-// It may be necessary to arrange this into multiple nested templates
-// (https://pkg.go.dev/text/template#hdr-Nested_template_definitions), this
-// should also be considered.
-const configTemplate = `
-log file /etc/frr/frr.log {{.Loglevel}}
-log timestamp precision 3
-{{- if eq .Loglevel "debugging" }}
-debug zebra events
-debug zebra nht
-debug zebra kernel
-debug zebra rib
-debug zebra nexthop
-debug bgp neighbor-events
-debug bgp updates
-debug bgp keepalives
-debug bgp nht
-debug bgp zebra
-debug bfd network
-debug bfd peer
-debug bfd zebra
-{{- end }}
-hostname {{.Hostname}}
-ip nht resolve-via-default
-ipv6 nht resolve-via-default
-
-{{- range .Routers }}
-{{- range $n := .Neighbors }}
-route-map {{$n.Addr}}-in deny 20
-{{- range $a := .Advertisements }}
-{{- if not (eq $a.LocalPref 0)}}
-{{frrIPFamily $a.IPFamily}} prefix-list {{localPrefPrefixList $n $a.LocalPref}} permit {{$a.Prefix}}
-route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
-  match {{frrIPFamily $a.IPFamily}} address prefix-list {{localPrefPrefixList $n $a.LocalPref}}
-  set local-preference {{$a.LocalPref}}
-  on-match next
-{{- end }}
-{{- range $c := $a.Communities }}
-{{frrIPFamily $a.IPFamily}} prefix-list {{communityPrefixList $n $c}} permit {{$a.Prefix}}
-route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
-  match {{frrIPFamily $a.IPFamily}} address prefix-list {{communityPrefixList $n $c}}
-  set community {{$c}} additive
-  on-match next
-{{- end }}
-{{frrIPFamily $a.IPFamily}} prefix-list {{allowedPrefixList $n}} permit {{$a.Prefix}}
-{{- end }}
-route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
-  match ip address prefix-list {{allowedPrefixList $n}}
-route-map {{$n.Addr}}-out permit {{counter $n.Addr}}
-  match ipv6 address prefix-list {{allowedPrefixList $n}}
-ip prefix-list {{allowedPrefixList $n}} deny any
-ipv6 prefix-list {{allowedPrefixList $n}} deny any
-{{- end }}
-{{- end }}
-
-{{range $r := .Routers -}}
-router bgp {{$r.MyASN}}
-  no bgp ebgp-requires-policy
-  no bgp network import-check
-  no bgp default ipv4-unicast
-{{ if $r.RouterId }}
-  bgp router-id {{$r.RouterId}}
-{{- end }}
-{{range .Neighbors }}
-  neighbor {{.Addr}} remote-as {{.ASN}}
-  {{- if .EBGPMultiHop }}
-  neighbor {{.Addr}} ebgp-multihop
-  {{- end }}
-  {{ if .Port -}}
-  neighbor {{.Addr}} port {{.Port}}
-  {{- end }}
-  neighbor {{.Addr}} timers {{.KeepaliveTime}} {{.HoldTime}}
-  {{ if .Password -}}
-  neighbor {{.Addr}} password {{.Password}}
-  {{- end }}
-  {{ if .SrcAddr -}}
-  neighbor {{.Addr}} update-source {{.SrcAddr}}
-  {{- end }}
-{{- if ne .BFDProfile ""}} 
-  neighbor {{.Addr}} bfd profile {{.BFDProfile}}
-{{- end }}
-{{- if  mustDisableConnectedCheck .IPFamily $r.MyASN .ASN .EBGPMultiHop }}
-  neighbor {{.Addr}} disable-connected-check
-{{- end }}
-{{- end }}
-{{range $n := .Neighbors -}}
-{{/* no bgp default ipv4-unicast prevents peering if no address families are defined. We declare an ipv4 one for the peer to make the pairing happen */}}
-{{- if eq (len .Advertisements) 0}}
-  address-family ipv4 unicast
-    neighbor {{$n.Addr}} activate
-    neighbor {{$n.Addr}} route-map {{$n.Addr}}-in in
-	neighbor {{$n.Addr}} route-map {{$n.Addr}}-out out
-  exit-address-family
-  address-family ipv6 unicast
-    neighbor {{$n.Addr}} activate
-    neighbor {{$n.Addr}} route-map {{$n.Addr}}-in in
-	neighbor {{$n.Addr}} route-map {{$n.Addr}}-out out
-  exit-address-family
-{{- end}}
-{{- range .Advertisements }}
-  address-family {{.IPFamily.String}} unicast
-    neighbor {{$n.Addr}} activate
-    neighbor {{$n.Addr}} route-map {{$n.Addr}}-in in
-    network {{.Prefix}}
-    neighbor {{$n.Addr}} route-map {{$n.Addr}}-out out
-  exit-address-family
-{{- end}}
-{{end -}}
-{{end }}
-{{- if gt (len .BFDProfiles) 0}}
-bfd
-{{- range .BFDProfiles }}
-  profile {{.Name}}
-    {{ if .ReceiveInterval -}}
-    receive-interval {{.ReceiveInterval}}
-    {{end -}}
-    {{ if .TransmitInterval -}}
-    transmit-interval {{.TransmitInterval}}
-    {{end -}}
-    {{ if .DetectMultiplier -}}
-    detect-multiplier {{.DetectMultiplier}}
-    {{end -}}
-    {{ if .EchoMode -}}
-    echo-mode
-    {{end -}}
-    {{ if .EchoInterval -}}
-    echo-interval {{.EchoInterval}}
-    {{end -}}
-    {{ if .PassiveMode -}}
-    passive-mode
-    {{end -}}
-    {{ if .MinimumTTL -}}
-    minimum-ttl {{ .MinimumTTL }}
-    {{end -}}
-{{ end }}
-{{ end }}`
+var (
+	configFileName      = "/etc/frr_reloader/frr.conf"
+	reloaderPidFileName = "/etc/frr_reloader/reloader.pid"
+	//go:embed templates/* templates/*
+	templates embed.FS
+)
 
 type frrConfig struct {
 	Loglevel    string
 	Hostname    string
-	Routers     map[string]*routerConfig
+	Routers     []*routerConfig
 	BFDProfiles []BFDProfile
 }
 
@@ -177,9 +42,12 @@ type reloadEvent struct {
 // to all the neighbors. Once this constraint is changed, we may need prefix-lists per neighbor.
 
 type routerConfig struct {
-	MyASN     uint32
-	RouterId  string
-	Neighbors map[string]*neighborConfig
+	MyASN        uint32
+	RouterID     string
+	Neighbors    []*neighborConfig
+	VRF          string
+	IPV4Prefixes []string
+	IPV6Prefixes []string
 }
 
 type BFDProfile struct {
@@ -232,7 +100,7 @@ func neighborName(peerAddr string, ASN uint32) string {
 func templateConfig(data interface{}) (string, error) {
 	i := 0
 	currentCounterName := ""
-	t, err := template.New("FRR Config Template").Funcs(
+	t, err := template.New("frr.tmpl").Funcs(
 		template.FuncMap{
 			"counter": func(counterName string) int {
 				if currentCounterName != counterName {
@@ -264,21 +132,34 @@ func templateConfig(data interface{}) (string, error) {
 				}
 				return false
 			},
-		}).Parse(configTemplate)
+			"dict": func(values ...interface{}) (map[string]interface{}, error) {
+				if len(values)%2 != 0 {
+					return nil, errors.New("invalid dict call, expecting even number of args")
+				}
+				dict := make(map[string]interface{}, len(values)/2)
+				for i := 0; i < len(values); i += 2 {
+					key, ok := values[i].(string)
+					if !ok {
+						return nil, fmt.Errorf("dict keys must be strings, got %v %T", values[i], values[i])
+					}
+					dict[key] = values[i+1]
+				}
+				return dict, nil
+			},
+		}).ParseFS(templates, "templates/*")
 	if err != nil {
 		return "", err
 	}
 
 	var b bytes.Buffer
 	err = t.Execute(&b, data)
-
 	return b.String(), err
 }
 
 // writeConfigFile writes the FRR configuration file (represented as a string)
 // to 'filename'.
 func writeConfig(config string, filename string) error {
-	return ioutil.WriteFile(filename, []byte(config), 0644)
+	return os.WriteFile(filename, []byte(config), 0644)
 }
 
 // reloadConfig requests that FRR reloads the configuration file. This is

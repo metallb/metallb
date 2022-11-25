@@ -1,4 +1,3 @@
-
 log file /etc/frr/frr.log debugging
 log timestamp precision 3
 debug zebra events
@@ -17,4 +16,5 @@ debug bfd zebra
 hostname dummyhostname
 ip nht resolve-via-default
 ipv6 nht resolve-via-default
+
 

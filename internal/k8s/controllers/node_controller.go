@@ -22,10 +22,13 @@ import (
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
@@ -65,18 +68,45 @@ func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 }
 
 func (r *NodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	p := predicate.NewPredicateFuncs(
-		func(obj client.Object) bool {
-			node, ok := obj.(*v1.Node)
+	p := predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return r.filterOtherNodes(e.Object)
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return r.filterOtherNodes(e.Object)
+		},
+		GenericFunc: func(e event.GenericEvent) bool {
+			return r.filterOtherNodes(e.Object)
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			newNodeObj, ok := e.ObjectNew.(*corev1.Node)
 			if !ok {
-				level.Error(r.Logger).Log("controller", "NodeReconciler", "error", "object is not node", "name", obj.GetName())
+				level.Error(r.Logger).Log("controller", "NodeReconciler", "error", "new object is not node", "name", newNodeObj.GetName())
+				return true
+			}
+			oldNodeObj, ok := e.ObjectOld.(*corev1.Node)
+			if !ok {
+				level.Error(r.Logger).Log("controller", "NodeReconciler", "error", "old object is not node", "name", oldNodeObj.GetName())
+				return true
+			}
+			// If there is no changes in node labels, ignore event.
+			if labels.Equals(labels.Set(oldNodeObj.Labels), labels.Set(newNodeObj.Labels)) {
 				return false
 			}
-			return node.Name == r.NodeName
-		})
-
+			return r.filterOtherNodes(newNodeObj)
+		},
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.Node{}).
 		WithEventFilter(p).
 		Complete(r)
+}
+
+func (r *NodeReconciler) filterOtherNodes(obj client.Object) bool {
+	node, ok := obj.(*v1.Node)
+	if !ok {
+		level.Error(r.Logger).Log("controller", "NodeReconciler", "error", "object is not node", "name", obj.GetName())
+		return false
+	}
+	return node.Name == r.NodeName
 }
