@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
@@ -126,7 +125,7 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
-	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "rendered config", spew.Sdump(cfg))
+	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "rendered config", dumpConfig(cfg))
 
 	res := r.Handler(r.Logger, cfg)
 	switch res {
