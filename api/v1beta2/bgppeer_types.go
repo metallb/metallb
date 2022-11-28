@@ -120,3 +120,5 @@ type BGPPeerList struct {
 func init() {
 	SchemeBuilder.Register(&BGPPeer{}, &BGPPeerList{})
 }
+
+// blablabla this won't change the docs
