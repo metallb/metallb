@@ -109,7 +109,7 @@ func (a *Announce) updateInterfaces() {
 			resp, err := newARPResponder(a.logger, &ifi, a.shouldAnnounce)
 			if err != nil {
 				level.Error(l).Log("op", "createARPResponder", "error", err, "msg", "failed to create ARP responder")
-				return
+				continue
 			}
 			a.arps[ifi.Index] = resp
 			level.Info(l).Log("event", "createARPResponder", "msg", "created ARP responder for interface")
@@ -118,7 +118,7 @@ func (a *Announce) updateInterfaces() {
 			resp, err := newNDPResponder(a.logger, &ifi, a.shouldAnnounce)
 			if err != nil {
 				level.Error(l).Log("op", "createNDPResponder", "error", err, "msg", "failed to create NDP responder")
-				return
+				continue
 			}
 			a.ndps[ifi.Index] = resp
 			level.Info(l).Log("event", "createNDPResponder", "msg", "created NDP responder for interface")
