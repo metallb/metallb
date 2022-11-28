@@ -43,6 +43,9 @@ func (i1 *IPAdvertisement) Equal(i2 *IPAdvertisement) bool {
 }
 
 func (i *IPAdvertisement) MatchInterfaces(intfs ...string) bool {
+	if i.allInterfaces {
+		return true
+	}
 	for _, intf := range intfs {
 		if i.matchInterface(intf) {
 			return true
