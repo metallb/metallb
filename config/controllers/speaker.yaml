@@ -43,11 +43,8 @@ spec:
         #  value: "7946"
         - name: METALLB_ML_LABELS
           value: "app=metallb,component=speaker"
-        - name: METALLB_ML_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: memberlist
-              key: secretkey
+        - name: METALLB_ML_SECRET_KEY_PATH
+          value: "/etc/ml_secret_key"
         image: quay.io/metallb/speaker:main
         name: speaker
         ports:
@@ -84,6 +81,10 @@ spec:
             drop:
             - ALL
           readOnlyRootFilesystem: true
+        volumeMounts:
+        - mountPath: /etc/ml_secret_key
+          name: memberlist
+          readOnly: true
       hostNetwork: true
       nodeSelector:
         kubernetes.io/os: linux
@@ -96,3 +97,8 @@ spec:
       - effect: NoSchedule
         key: node-role.kubernetes.io/control-plane
         operator: Exists 
+      volumes:
+      - name: memberlist 
+        secret: 
+          secretName: memberlist
+          defaultMode: 420
