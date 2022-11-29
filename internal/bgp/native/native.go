@@ -601,7 +601,11 @@ func dialMD5(ctx context.Context, addr string, srcAddr net.IP, password string) 
 	// Note that the above os.NewFile() doesn't play with the
 	// refcount.
 	fi := os.NewFile(uintptr(fd), "")
-	defer fi.Close()
+	defer func() {
+		if tmpErr := fi.Close(); tmpErr != nil {
+			err = tmpErr
+		}
+	}()
 
 	if password != "" {
 		sig := buildTCPMD5Sig(raddr.IP, password)

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -61,7 +62,7 @@ var (
 	validatingWebhookName           = "metallb-webhook-configuration"
 	addresspoolConvertingWebhookCRD = "addresspools.metallb.io"
 	bgppeerConvertingWebhookCRD     = "bgppeers.metallb.io"
-	webhookSecretName               = "webhook-server-cert"
+	webhookSecretName               = "webhook-server-cert" //#nosec G101
 )
 
 func init() {
@@ -118,6 +119,7 @@ type Config struct {
 //
 // The client uses processName to identify itself to the cluster
 // (e.g. when logging events).
+//
 //nolint:godot
 func New(cfg *Config) (*Client, error) {
 	namespaceSelector := cache.ObjectSelector{
@@ -284,7 +286,13 @@ func New(cfg *Config) (*Client, error) {
 			mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
 		}
 
-		err := http.ListenAndServe(net.JoinHostPort(cfg.MetricsHost, fmt.Sprint(cfg.MetricsPort)), mux)
+		server := &http.Server{
+			Addr:              net.JoinHostPort(cfg.MetricsHost, fmt.Sprint(cfg.MetricsPort)),
+			Handler:           mux,
+			ReadHeaderTimeout: 3 * time.Second,
+		}
+
+		err := server.ListenAndServe()
 		if err != nil {
 			level.Error(l).Log("op", "listenAndServe", "err", err, "msg", "cannot listen and serve", "host", cfg.MetricsHost, "port", cfg.MetricsPort)
 		}
