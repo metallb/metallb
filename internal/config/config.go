@@ -98,6 +98,8 @@ type Peer struct {
 	BFDProfile string
 	// Optional ebgp peer is multi-hops away.
 	EBGPMultiHop bool
+	// Optional name of the vrf to establish the session from
+	VRF string
 	// TODO: more BGP session settings
 }
 
@@ -414,6 +416,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		Password:      password,
 		BFDProfile:    p.Spec.BFDProfile,
 		EBGPMultiHop:  p.Spec.EBGPMultiHop,
+		VRF:           p.Spec.VRFName,
 	}, nil
 }
 

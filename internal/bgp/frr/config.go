@@ -74,6 +74,14 @@ type neighborConfig struct {
 	Advertisements []*advertisementConfig
 	BFDProfile     string
 	EBGPMultiHop   bool
+	VRFName        string
+}
+
+func (n *neighborConfig) ID() string {
+	if n.VRFName == "" {
+		return n.Addr
+	}
+	return fmt.Sprintf("%s-%s", n.Addr, n.VRFName)
 }
 
 type advertisementConfig struct {
@@ -85,14 +93,14 @@ type advertisementConfig struct {
 
 // routerName() defines the format of the key of the "Routers" map in the
 // frrConfig struct.
-func routerName(srcAddr string, myASN uint32) string {
-	return fmt.Sprintf("%d@%s", myASN, srcAddr)
+func routerName(srcAddr string, myASN uint32, vrfName string) string {
+	return fmt.Sprintf("%d@%s@%s", myASN, srcAddr, vrfName)
 }
 
 // neighborName() defines the format of key of the 'Neighbors' map in the
 // routerConfig struct.
-func neighborName(peerAddr string, ASN uint32) string {
-	return fmt.Sprintf("%d@%s", ASN, peerAddr)
+func neighborName(peerAddr string, ASN uint32, vrfName string) string {
+	return fmt.Sprintf("%d@%s@%s", ASN, peerAddr, vrfName)
 }
 
 // templateConfig uses the template library to template
@@ -117,13 +125,13 @@ func templateConfig(data interface{}) (string, error) {
 				return "ip"
 			},
 			"localPrefPrefixList": func(neighbor *neighborConfig, localPreference uint32) string {
-				return fmt.Sprintf("%s-%d-%s-localpref-prefixes", neighbor.Addr, localPreference, neighbor.IPFamily)
+				return fmt.Sprintf("%s-%d-%s-localpref-prefixes", neighbor.ID(), localPreference, neighbor.IPFamily)
 			},
 			"communityPrefixList": func(neighbor *neighborConfig, community string) string {
-				return fmt.Sprintf("%s-%s-%s-community-prefixes", neighbor.Addr, community, neighbor.IPFamily)
+				return fmt.Sprintf("%s-%s-%s-community-prefixes", neighbor.ID(), community, neighbor.IPFamily)
 			},
 			"allowedPrefixList": func(neighbor *neighborConfig) string {
-				return fmt.Sprintf("%s-pl-%s", neighbor.Addr, neighbor.IPFamily)
+				return fmt.Sprintf("%s-pl-%s", neighbor.ID(), neighbor.IPFamily)
 			},
 			"mustDisableConnectedCheck": func(ipFamily ipfamily.Family, myASN, asn uint32, eBGPMultiHop bool) bool {
 				// return true only for IPv6 eBGP sessions
