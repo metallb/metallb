@@ -400,7 +400,7 @@ func TestCollect(t *testing.T) {
 
 			l := log.NewNopLogger()
 			collector := NewBGP(l)
-			collector.frrCli = func(args ...string) (string, error) {
+			collector.frrCli = func(args string) (string, error) {
 				return tc.vtyshOutput, nil
 			}
 			buf := bytes.NewReader(w.Bytes())

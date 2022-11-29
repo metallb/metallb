@@ -19,13 +19,25 @@ on:
   workflow_dispatch:
 
 jobs:
+  static-security-analysis:
+    runs-on: ubuntu-22.04
+    env:
+      GO111MODULE: on
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v2
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          args: -exclude-dir e2etest -severity medium ./...
+
   commitlint:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - uses: wagoid/commitlint-github-action@v4
+      - uses: wagoid/commitlint-github-action@v5
 
   unit-tests:
     runs-on: ubuntu-22.04
