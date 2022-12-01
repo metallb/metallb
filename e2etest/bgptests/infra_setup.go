@@ -23,6 +23,7 @@ const (
 	vrfNetwork           = "vrf-net"
 	vrfName              = "red"
 	metalLBASN           = 64512
+	metalLBASNVRF        = 64513
 	externalASN          = 4200000000
 	nextHopContainerName = "ebgp-single-hop"
 )
@@ -378,7 +379,7 @@ func vrfContainersConfig() map[string]frrcontainer.Config {
 		Name:    "ebgp-vrf-single-hop",
 		Network: vrfNetwork,
 		Neighbor: frrconfig.NeighborConfig{
-			ASN:      metalLBASN,
+			ASN:      metalLBASNVRF,
 			MultiHop: false,
 		},
 		Router: frrconfig.RouterConfig{
@@ -391,11 +392,11 @@ func vrfContainersConfig() map[string]frrcontainer.Config {
 		Name:    "ibgp-vrf-single-hop",
 		Network: vrfNetwork,
 		Neighbor: frrconfig.NeighborConfig{
-			ASN:      metalLBASN,
+			ASN:      metalLBASNVRF,
 			MultiHop: false,
 		},
 		Router: frrconfig.RouterConfig{
-			ASN:     metalLBASN,
+			ASN:     metalLBASNVRF,
 			BGPPort: 179,
 			VRF:     vrfName,
 		},
