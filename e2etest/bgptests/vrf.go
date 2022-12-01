@@ -8,6 +8,7 @@ import (
 	"github.com/onsi/ginkgo"
 	"github.com/onsi/ginkgo/extensions/table"
 	frrconfig "go.universe.tf/metallb/e2etest/pkg/frr/config"
+	frrcontainer "go.universe.tf/metallb/e2etest/pkg/frr/container"
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	testservice "go.universe.tf/metallb/e2etest/pkg/service"
 	"go.universe.tf/metallb/internal/ipfamily"
@@ -21,6 +22,7 @@ import (
 var _ = ginkgo.Describe("VRF", func() {
 	var cs clientset.Interface
 	var f *framework.Framework
+	var containers []*frrcontainer.FRR
 
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentGinkgoTestDescription().Failed {
@@ -35,7 +37,8 @@ var _ = ginkgo.Describe("VRF", func() {
 		err := ConfigUpdater.Clean()
 		framework.ExpectNoError(err)
 
-		for _, c := range VRFFRRContainers {
+		containers = append(VRFFRRContainers, FRRContainers...)
+		for _, c := range containers {
 			err := c.UpdateBGPConfigFile(frrconfig.Empty)
 			framework.ExpectNoError(err)
 		}
@@ -49,7 +52,7 @@ var _ = ginkgo.Describe("VRF", func() {
 	})
 
 	table.DescribeTable("A service of protocol load balancer should work with ETP=cluster", func(pairingIPFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
-		_, svc := setupBGPService(f, pairingIPFamily, poolAddresses, VRFFRRContainers, func(svc *corev1.Service) {
+		_, svc := setupBGPService(f, pairingIPFamily, poolAddresses, containers, func(svc *corev1.Service) {
 			testservice.TrafficPolicyCluster(svc)
 			tweak(svc)
 		})
@@ -59,11 +62,11 @@ var _ = ginkgo.Describe("VRF", func() {
 		framework.ExpectNoError(err)
 		validateDesiredLB(svc)
 
-		for _, c := range VRFFRRContainers {
+		for _, c := range containers {
 			validateService(cs, svc, allNodes.Items, c)
 		}
 	},
-		table.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
+		table.FEntry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
 		table.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}, func(_ *corev1.Service) {}),
 		table.Entry("DUALSTACK", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
 			func(svc *corev1.Service) {
