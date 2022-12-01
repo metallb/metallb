@@ -251,6 +251,59 @@ func TestValidateFRR(t *testing.T) {
 			mustFail: true,
 		},
 		{
+			desc: "myAsn set, one different but with different vrf",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							MyASN:   123,
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.5",
+							MyASN:   123,
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.6",
+							MyASN:   124,
+							VRFName: "red",
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "myAsn set, two different but with different vrf",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							MyASN:   123,
+							VRFName: "red",
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.5",
+							MyASN:   123,
+							VRFName: "red",
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.6",
+							MyASN:   124,
+						},
+					},
+				},
+			},
+		},
+		{
 			desc: "duplicate bgp address",
 			config: ClusterResources{
 				Peers: []v1beta2.BGPPeer{
