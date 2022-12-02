@@ -12,7 +12,7 @@ RUN go mod download
 # Copy speaker
 COPY speaker/*.go speaker/
 # Copy frr-metrics
-COPY frr-metrics ./frr-metrics/
+COPY frr-tools/metrics ./frr-tools/metrics/
 # COPY internals
 COPY internal internal
 COPY api api
@@ -36,7 +36,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
   CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=$VARIANT \
   go build -v -o /build/frr-metrics \
   -ldflags "-X 'go.universe.tf/metallb/internal/version.gitCommit=${GIT_COMMIT}' -X 'go.universe.tf/metallb/internal/version.gitBranch=${GIT_BRANCH}'" \
-  frr-metrics/exporter.go \
+  frr-tools/metrics/exporter.go \
   && \
   # build speaker
   CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=$VARIANT \
@@ -49,7 +49,7 @@ FROM docker.io/alpine:latest
 
 COPY --from=builder /build/speaker /speaker
 COPY --from=builder /build/frr-metrics /frr-metrics
-COPY frr-reloader/frr-reloader.sh /frr-reloader.sh
+COPY frr-tools/reloader/frr-reloader.sh /frr-reloader.sh
 COPY LICENSE /
 
 LABEL org.opencontainers.image.authors="metallb" \
