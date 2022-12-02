@@ -50,6 +50,7 @@ FROM docker.io/alpine:latest
 COPY --from=builder /build/speaker /speaker
 COPY --from=builder /build/frr-metrics /frr-metrics
 COPY frr-tools/reloader/frr-reloader.sh /frr-reloader.sh
+COPY frr-tools/liveness/liveness.sh /liveness.sh
 COPY LICENSE /
 
 LABEL org.opencontainers.image.authors="metallb" \
