@@ -16,7 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/exporter-toolkit/web"
 
-	"go.universe.tf/metallb/frr-metrics/collector"
+	"go.universe.tf/metallb/frr-tools/metrics/collector"
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/version"
 )
