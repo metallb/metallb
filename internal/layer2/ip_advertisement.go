@@ -36,7 +36,7 @@ func (i1 *IPAdvertisement) Equal(i2 *IPAdvertisement) bool {
 	if i1.allInterfaces != i2.allInterfaces {
 		return false
 	}
-	if i1.allInterfaces == true {
+	if i1.allInterfaces {
 		return true
 	}
 	return i1.interfaces.Equal(i2.interfaces)
