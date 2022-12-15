@@ -224,6 +224,12 @@ func vrfSetup(cs *clientset.Clientset) error {
 		if err != nil {
 			return err
 		}
+		// this is required to allow frr to listen for udp connections
+		// in vrfs, in particular to allow bfd to work
+		err = enableL3masterDomains(pod.Spec.NodeName)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -539,6 +545,16 @@ func addContainerToNetwork(containerName, network string) error {
 	if err != nil {
 		return errors.Wrapf(err, "Failed to connect %s to %s: %s", containerName, network, out)
 	}
+	return nil
+}
+
+func enableL3masterDomains(container string) error {
+	nodeExec := executor.ForContainer(container)
+	_, err := nodeExec.Exec("sysctl", "net.ipv4.udp_l3mdev_accept=1")
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
