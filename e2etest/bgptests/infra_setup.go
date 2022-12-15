@@ -380,12 +380,14 @@ func vrfContainersConfig() map[string]frrcontainer.Config {
 		Network: vrfNetwork,
 		Neighbor: frrconfig.NeighborConfig{
 			ASN:      metalLBASNVRF,
+			Password: "vrf-test",
 			MultiHop: false,
 		},
 		Router: frrconfig.RouterConfig{
-			ASN:     externalASN,
-			BGPPort: 179,
-			VRF:     vrfName,
+			ASN:      externalASN,
+			Password: "vrf-test",
+			BGPPort:  179,
+			VRF:      vrfName,
 		},
 	}
 	res["ibgp-vrf-single-hop"] = frrcontainer.Config{
@@ -393,12 +395,14 @@ func vrfContainersConfig() map[string]frrcontainer.Config {
 		Network: vrfNetwork,
 		Neighbor: frrconfig.NeighborConfig{
 			ASN:      metalLBASNVRF,
+			Password: "vrf-test",
 			MultiHop: false,
 		},
 		Router: frrconfig.RouterConfig{
-			ASN:     metalLBASNVRF,
-			BGPPort: 179,
-			VRF:     vrfName,
+			ASN:      metalLBASNVRF,
+			BGPPort:  179,
+			Password: "vrf-test",
+			VRF:      vrfName,
 		},
 	}
 
