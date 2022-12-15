@@ -539,9 +539,7 @@ def dev_env_cleanup(ctx, name="kind", frr_volume_dir=""):
     clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
     if name in clusters:
         run("kind delete cluster --name={}".format(name), hide=True)
-    else:
-        raise Exit(message="Unable to find cluster named: {}".format(name))
-
+    
     run('for frr in $(docker ps -a -f name=frr --format {{.Names}}) ; do '
         '    docker rm -f $frr ; '
         'done', hide=True)
@@ -560,7 +558,8 @@ def dev_env_cleanup(ctx, name="kind", frr_volume_dir=""):
     run('rm -f "%s"/config.yaml' % dev_env_dir)
 
     # cleanup extra bridge
-    run('docker network rm {bridge_name}'.format(bridge_name=extra_network))
+    run('docker network rm {bridge_name}'.format(bridge_name=extra_network), warn=True)
+    run('docker network rm vrf-net', warn=True)
 
 @task(help={
     "version": "version of MetalLB to release.",
