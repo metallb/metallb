@@ -83,7 +83,7 @@ func WithRouterID(peers []metallbv1beta2.BGPPeer, routerID string) []metallbv1be
 func BGPPeerSecretReferences(containers []*frrcontainer.FRR) map[string]corev1.Secret {
 	secretMap := make(map[string]corev1.Secret)
 	for _, c := range containers {
-		name := GetBGPPeerSecretName(c.RouterConfig.ASN, c.RouterConfig.BGPPort)
+		name := GetBGPPeerSecretName(c.RouterConfig.ASN, c.RouterConfig.BGPPort, c.RouterConfig.VRF)
 		secretMap[name] = corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: name,
@@ -95,6 +95,9 @@ func BGPPeerSecretReferences(containers []*frrcontainer.FRR) map[string]corev1.S
 	return secretMap
 }
 
-func GetBGPPeerSecretName(asn uint32, port uint16) string {
-	return fmt.Sprintf("bgppeer-%d-%d-secret", asn, port)
+func GetBGPPeerSecretName(asn uint32, port uint16, vrf string) string {
+	if vrf != "" {
+		return fmt.Sprintf("%d-%d-%s-secret", asn, port, vrf)
+	}
+	return fmt.Sprintf("%d-%d-secret", asn, port)
 }

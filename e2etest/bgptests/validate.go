@@ -129,7 +129,11 @@ func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily ipf
 	Eventually(func() error {
 		addresses := n.AddressesForFamily(ipFamily)
 		for _, address := range addresses {
-			toParse, err := podExecutor.Exec("vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", address))
+			vrfSelector := ""
+			if n.RouterConfig.VRF != "" {
+				vrfSelector = fmt.Sprintf("vrf %s", n.RouterConfig.VRF)
+			}
+			toParse, err := podExecutor.Exec("vtysh", "-c", fmt.Sprintf("show bgp %s neighbor %s json", vrfSelector, address))
 			if err != nil {
 				return err
 			}
