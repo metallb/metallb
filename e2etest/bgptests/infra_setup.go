@@ -172,11 +172,6 @@ func InfraTearDown(cs *clientset.Clientset, containers []*frrcontainer.FRR) erro
 		return err
 	}
 
-	err = vrfTeardown(cs)
-	if err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -442,31 +437,6 @@ func multiHopTearDown(cs *clientset.Clientset) error {
 	return nil
 }
 
-func vrfTeardown(cs *clientset.Clientset) error {
-	_, err := executor.Host.Exec(executor.ContainerRuntime, "network", "inspect", vrfNetwork)
-	if err != nil {
-		return nil
-	}
-
-	speakerPods, err := metallb.SpeakerPods(cs)
-	if err != nil {
-		return err
-	}
-
-	for _, pod := range speakerPods {
-		err := removeContainerFromNetwork(pod.Spec.NodeName, vrfNetwork)
-		if err != nil {
-			return err
-		}
-	}
-
-	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "rm", vrfNetwork)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to remove %s: %s", multiHopNetwork, out)
-	}
-	return nil
-}
-
 // Allow the speaker nodes to reach the multi-hop network containers.
 func addMultiHopToNodes(cs *clientset.Clientset) error {
 	/*
@@ -555,22 +525,5 @@ func enableL3masterDomains(container string) error {
 		return err
 	}
 
-	return nil
-}
-
-func removeContainerFromNetwork(containerName, network string) error {
-	networks, err := container.Networks(containerName)
-	if err != nil {
-		return err
-	}
-	if _, ok := networks[network]; !ok {
-		return nil
-	}
-
-	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "disconnect",
-		network, containerName)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to disconnect %s from %s: %s", containerName, network, out)
-	}
 	return nil
 }
