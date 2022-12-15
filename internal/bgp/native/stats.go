@@ -12,7 +12,7 @@ type stat struct {
 var (
 	Namespace = "metallb"
 	Subsystem = "bgp"
-	Labels    = []string{"peer"}
+	Labels    = []string{"peer", "vrf"}
 
 	SessionUp = stat{
 		Name: "session_up",
