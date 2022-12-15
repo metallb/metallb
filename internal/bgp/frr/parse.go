@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"sort"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -13,6 +14,7 @@ import (
 
 type Neighbor struct {
 	Ip             net.IP
+	VRF            string
 	Connected      bool
 	LocalAS        string
 	RemoteAS       string
@@ -39,6 +41,7 @@ type FRRNeighbor struct {
 	BgpState          string       `json:"bgpState"`
 	PortForeign       int          `json:"portForeign"`
 	MsgStats          MessageStats `json:"messageStats"`
+	VRFName           string       `json:"vrf"`
 	AddressFamilyInfo map[string]struct {
 		SentPrefixCounter int `json:"sentPrefixCounter"`
 	} `json:"addressFamilyInfo"`
@@ -219,16 +222,25 @@ func ParseRoutes(vtyshRes string) (map[string]Route, error) {
 	return res, nil
 }
 
-func ParseBFDPeers(vtyshRes string) (map[string]BFDPeer, error) {
+func ParseBFDPeers(vtyshRes string) ([]BFDPeer, error) {
 	parseRes := []BFDPeer{}
 	err := json.Unmarshal([]byte(vtyshRes), &parseRes)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse vtysh response")
 	}
-	res := make(map[string]BFDPeer)
-	for _, p := range parseRes {
-		res[p.Peer] = p
+	return parseRes, nil
+}
 
+func ParseVRFs(vtyshRes string) ([]string, error) {
+	vrfs := map[string]interface{}{}
+	err := json.Unmarshal([]byte(vtyshRes), &vrfs)
+	if err != nil {
+		return nil, errors.Wrap(err, "parseVRFs: failed to parse vtysh response")
 	}
+	res := make([]string, 0)
+	for v := range vrfs {
+		res = append(res, v)
+	}
+	sort.Strings(res)
 	return res, nil
 }

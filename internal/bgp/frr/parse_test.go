@@ -694,14 +694,91 @@ func TestBFDPeers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to parse %s", err)
 	}
-	p, ok := peers["172.18.0.3"]
-	if !ok {
+	if len(peers) != 3 {
+		t.Fatal("Unexpected peer number", len(peers))
+	}
+	if peers[2].Peer != "172.18.0.3" {
 		t.Fatal("Peer not found")
 	}
-	if p.Status != "up" {
+	if peers[2].Status != "up" {
 		t.Fatal("wrong status")
 	}
-	if p.RemoteEchoInterval != 50 {
+	if peers[2].RemoteEchoInterval != 50 {
 		t.Fatal("wrong echo interval")
+	}
+}
+
+const vrfs = `{
+"default":{
+ "vrfId": 0,
+ "vrfName": "default",
+ "tableVersion": 1,
+ "routerId": "172.18.0.3",
+ "defaultLocPrf": 100,
+ "localAS": 64512,
+ "routes": { "192.168.10.0/32": [
+  {
+    "valid":true,
+    "bestpath":true,
+    "pathFrom":"external",
+    "prefix":"192.168.10.0",
+    "prefixLen":32,
+    "network":"192.168.10.0\/32",
+    "metric":0,
+    "weight":32768,
+    "peerId":"(unspec)",
+    "path":"",
+    "origin":"IGP",
+    "nexthops":[
+      {
+        "ip":"0.0.0.0",
+        "hostname":"kind-control-plane",
+        "afi":"ipv4",
+        "used":true
+      }
+    ]
+  }
+] }  }
+,
+"red":{
+ "vrfId": 5,
+ "vrfName": "red",
+ "tableVersion": 1,
+ "routerId": "172.31.0.4",
+ "defaultLocPrf": 100,
+ "localAS": 64512,
+ "routes": { "192.168.10.0/32": [
+  {
+    "valid":true,
+    "bestpath":true,
+    "pathFrom":"external",
+    "prefix":"192.168.10.0",
+    "prefixLen":32,
+    "network":"192.168.10.0\/32",
+    "metric":0,
+    "weight":32768,
+    "peerId":"(unspec)",
+    "path":"",
+    "origin":"IGP",
+    "nexthops":[
+      {
+        "ip":"0.0.0.0",
+        "hostname":"kind-control-plane",
+        "afi":"ipv4",
+        "used":true
+      }
+    ]
+  }
+] }  }
+}`
+
+func TestVRFs(t *testing.T) {
+	parsed, err := ParseVRFs(vrfs)
+	if err != nil {
+		t.Fatalf("Failed to parse %s", err)
+	}
+	expected := []string{"default", "red"}
+	if !cmp.Equal(parsed, expected) {
+		t.Fatalf("unexpected vrf list: %s", cmp.Diff(parsed, expected))
 	}
 }

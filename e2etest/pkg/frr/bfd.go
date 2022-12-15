@@ -11,13 +11,19 @@ import (
 // BFDPeers returns informations for the all the bfd peers in the given
 // executor.
 func BFDPeers(exec executor.Executor) (map[string]bgpfrr.BFDPeer, error) {
-	res, err := exec.Exec("vtysh", "-c", "show bfd peers json")
+	json, err := exec.Exec("vtysh", "-c", "show bfd peers json")
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to query neighbours")
 	}
-	peers, err := bgpfrr.ParseBFDPeers(res)
+	peers, err := bgpfrr.ParseBFDPeers(json)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to parse neighbours %s", res)
+		return nil, errors.Wrapf(err, "Failed to parse neighbours %s", json)
 	}
-	return peers, nil
+	// making a map out of the slice so it can
+	// accessed by peer
+	res := make(map[string]bgpfrr.BFDPeer)
+	for _, p := range peers {
+		res[p.Peer] = p
+	}
+	return res, nil
 }

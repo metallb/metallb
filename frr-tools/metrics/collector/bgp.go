@@ -135,34 +135,49 @@ func (c *bgp) Collect(ch chan<- prometheus.Metric) {
 	updateNeighborsMetrics(ch, neighbors)
 }
 
-func updateNeighborsMetrics(ch chan<- prometheus.Metric, neighbors []*bgpfrr.Neighbor) {
-	for _, n := range neighbors {
-		sessionUp := 1
-		if !n.Connected {
-			sessionUp = 0
-		}
-		peerLabel := fmt.Sprintf("%s:%d", n.Ip.String(), n.Port)
+func updateNeighborsMetrics(ch chan<- prometheus.Metric, neighbors map[string][]*bgpfrr.Neighbor) {
+	for vrf, nn := range neighbors {
+		for _, n := range nn {
+			sessionUp := 1
+			if !n.Connected {
+				sessionUp = 0
+			}
+			peerLabel := fmt.Sprintf("%s:%d", n.Ip.String(), n.Port)
 
-		ch <- prometheus.MustNewConstMetric(sessionUpDesc, prometheus.GaugeValue, float64(sessionUp), peerLabel)
-		ch <- prometheus.MustNewConstMetric(prefixesDesc, prometheus.GaugeValue, float64(n.PrefixSent), peerLabel)
-		ch <- prometheus.MustNewConstMetric(opensSentDesc, prometheus.CounterValue, float64(n.MsgStats.OpensSent), peerLabel)
-		ch <- prometheus.MustNewConstMetric(opensReceivedDesc, prometheus.CounterValue, float64(n.MsgStats.OpensReceived), peerLabel)
-		ch <- prometheus.MustNewConstMetric(notificationsSentDesc, prometheus.CounterValue, float64(n.MsgStats.NotificationsSent), peerLabel)
-		ch <- prometheus.MustNewConstMetric(updatesSentDesc, prometheus.CounterValue, float64(n.MsgStats.UpdatesSent), peerLabel)
-		ch <- prometheus.MustNewConstMetric(updatesReceivedDesc, prometheus.CounterValue, float64(n.MsgStats.UpdatesReceived), peerLabel)
-		ch <- prometheus.MustNewConstMetric(keepalivesSentDesc, prometheus.CounterValue, float64(n.MsgStats.KeepalivesSent), peerLabel)
-		ch <- prometheus.MustNewConstMetric(keepalivesReceivedDesc, prometheus.CounterValue, float64(n.MsgStats.KeepalivesReceived), peerLabel)
-		ch <- prometheus.MustNewConstMetric(routeRefreshSentedDesc, prometheus.CounterValue, float64(n.MsgStats.RouteRefreshSent), peerLabel)
-		ch <- prometheus.MustNewConstMetric(totalSentDesc, prometheus.CounterValue, float64(n.MsgStats.TotalSent), peerLabel)
-		ch <- prometheus.MustNewConstMetric(totalReceivedDesc, prometheus.CounterValue, float64(n.MsgStats.TotalReceived), peerLabel)
+			ch <- prometheus.MustNewConstMetric(sessionUpDesc, prometheus.GaugeValue, float64(sessionUp), peerLabel, vrf)
+			ch <- prometheus.MustNewConstMetric(prefixesDesc, prometheus.GaugeValue, float64(n.PrefixSent), peerLabel, vrf)
+			ch <- prometheus.MustNewConstMetric(opensSentDesc, prometheus.CounterValue, float64(n.MsgStats.OpensSent), peerLabel, vrf)
+			ch <- prometheus.MustNewConstMetric(opensReceivedDesc, prometheus.CounterValue, float64(n.MsgStats.OpensReceived), peerLabel, vrf)
+			ch <- prometheus.MustNewConstMetric(notificationsSentDesc, prometheus.CounterValue, float64(n.MsgStats.NotificationsSent), peerLabel, vrf)
+			ch <- prometheus.MustNewConstMetric(updatesSentDesc, prometheus.CounterValue, float64(n.MsgStats.UpdatesSent), peerLabel, vrf)
+			ch <- prometheus.MustNewConstMetric(updatesReceivedDesc, prometheus.CounterValue, float64(n.MsgStats.UpdatesReceived), peerLabel, vrf)
+			ch <- prometheus.MustNewConstMetric(keepalivesSentDesc, prometheus.CounterValue, float64(n.MsgStats.KeepalivesSent), peerLabel, vrf)
+			ch <- prometheus.MustNewConstMetric(keepalivesReceivedDesc, prometheus.CounterValue, float64(n.MsgStats.KeepalivesReceived), peerLabel, vrf)
+			ch <- prometheus.MustNewConstMetric(routeRefreshSentedDesc, prometheus.CounterValue, float64(n.MsgStats.RouteRefreshSent), peerLabel, vrf)
+			ch <- prometheus.MustNewConstMetric(totalSentDesc, prometheus.CounterValue, float64(n.MsgStats.TotalSent), peerLabel, vrf)
+			ch <- prometheus.MustNewConstMetric(totalReceivedDesc, prometheus.CounterValue, float64(n.MsgStats.TotalReceived), peerLabel, vrf)
+		}
 	}
 }
 
-func getBGPNeighbors(frrCli vtysh.Cli) ([]*bgpfrr.Neighbor, error) {
-	res, err := frrCli("show bgp neighbors json")
+func getBGPNeighbors(frrCli vtysh.Cli) (map[string][]*bgpfrr.Neighbor, error) {
+	vrfs, err := vtysh.VRFs(frrCli)
 	if err != nil {
 		return nil, err
 	}
+	neighbors := make(map[string][]*bgpfrr.Neighbor, 0)
+	for _, vrf := range vrfs {
+		res, err := frrCli(fmt.Sprintf("show bgp vrf %s neighbors json", vrf))
+		if err != nil {
+			return nil, err
+		}
 
-	return bgpfrr.ParseNeighbours(res)
+		neighborsPerVRF, err := bgpfrr.ParseNeighbours(res)
+		if err != nil {
+			return nil, err
+		}
+		neighbors[vrf] = neighborsPerVRF
+
+	}
+	return neighbors, nil
 }

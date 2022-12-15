@@ -15,46 +15,47 @@ var (
 	metricsTmpl = `
 	# HELP metallb_bgp_announced_prefixes_total Number of prefixes currently being advertised on the BGP session
 	# TYPE metallb_bgp_announced_prefixes_total gauge
-	metallb_bgp_announced_prefixes_total{peer="{{ .NeighborIP }}"} {{ .AnnouncedPrefixes }}
+	metallb_bgp_announced_prefixes_total{peer="{{ .NeighborIP }}", vrf="{{ .NeighborVRF }}"} {{ .AnnouncedPrefixes }}
 	# HELP metallb_bgp_keepalives_received Number of BGP keepalive messages received
 	# TYPE metallb_bgp_keepalives_received counter
-	metallb_bgp_keepalives_received{peer="{{ .NeighborIP }}"} {{ .KeepalivesReceived }}
+	metallb_bgp_keepalives_received{peer="{{ .NeighborIP }}", vrf="{{ .NeighborVRF }}"} {{ .KeepalivesReceived }}
 	# HELP metallb_bgp_keepalives_sent Number of BGP keepalive messages sent
 	# TYPE metallb_bgp_keepalives_sent counter
-	metallb_bgp_keepalives_sent{peer="{{ .NeighborIP }}"} {{ .KeepalivesSent }}
+	metallb_bgp_keepalives_sent{peer="{{ .NeighborIP }}", vrf="{{ .NeighborVRF }}"} {{ .KeepalivesSent }}
 	# HELP metallb_bgp_notifications_sent Number of BGP notification messages sent
 	# TYPE metallb_bgp_notifications_sent counter
-	metallb_bgp_notifications_sent{peer="{{ .NeighborIP }}"} {{ .NotificationsSent }}
+	metallb_bgp_notifications_sent{peer="{{ .NeighborIP }}", vrf="{{ .NeighborVRF }}"} {{ .NotificationsSent }}
 	# HELP metallb_bgp_opens_received Number of BGP open messages received
 	# TYPE metallb_bgp_opens_received counter
-	metallb_bgp_opens_received{peer="{{ .NeighborIP }}"} {{ .OpensReceived }}
+	metallb_bgp_opens_received{peer="{{ .NeighborIP }}", vrf="{{ .NeighborVRF }}"} {{ .OpensReceived }}
 	# HELP metallb_bgp_opens_sent Number of BGP open messages sent
 	# TYPE metallb_bgp_opens_sent counter
-	metallb_bgp_opens_sent{peer="{{ .NeighborIP }}"} {{ .OpensSent }}
+	metallb_bgp_opens_sent{peer="{{ .NeighborIP }}", vrf="{{ .NeighborVRF }}"} {{ .OpensSent }}
 	# HELP metallb_bgp_route_refresh_sent Number of BGP route refresh messages sent
 	# TYPE metallb_bgp_route_refresh_sent counter
-	metallb_bgp_route_refresh_sent{peer="{{ .NeighborIP }}"} {{ .RouteRefreshSent }}
+	metallb_bgp_route_refresh_sent{peer="{{ .NeighborIP }}", vrf="{{ .NeighborVRF }}"} {{ .RouteRefreshSent }}
 	# HELP metallb_bgp_session_up BGP session state (1 is up, 0 is down)
 	# TYPE metallb_bgp_session_up gauge
-	metallb_bgp_session_up{peer="{{ .NeighborIP }}"} {{ .SessionUp }}
+	metallb_bgp_session_up{peer="{{ .NeighborIP }}", vrf="{{ .NeighborVRF }}"} {{ .SessionUp }}
 	# HELP metallb_bgp_total_received Number of total BGP messages received
 	# TYPE metallb_bgp_total_received counter
-	metallb_bgp_total_received{peer="{{ .NeighborIP }}"} {{ .TotalReceived }}
+	metallb_bgp_total_received{peer="{{ .NeighborIP }}", vrf="{{ .NeighborVRF }}"} {{ .TotalReceived }}
 	# HELP metallb_bgp_total_sent Number of total BGP messages sent
 	# TYPE metallb_bgp_total_sent counter
-	metallb_bgp_total_sent{peer="{{ .NeighborIP }}"} {{ .TotalSent }}
+	metallb_bgp_total_sent{peer="{{ .NeighborIP }}", vrf="{{ .NeighborVRF }}"} {{ .TotalSent }}
 	# HELP metallb_bgp_updates_total Number of BGP UPDATE messages sent
 	# TYPE metallb_bgp_updates_total counter
-	metallb_bgp_updates_total{peer="{{ .NeighborIP }}"} {{ .UpdatesTotal }}
+	metallb_bgp_updates_total{peer="{{ .NeighborIP }}", vrf="{{ .NeighborVRF }}"} {{ .UpdatesTotal }}
 	# HELP metallb_bgp_updates_total_received Number of BGP UPDATE messages received
 	# TYPE metallb_bgp_updates_total_received counter
-	metallb_bgp_updates_total_received{peer="{{ .NeighborIP }}"} {{ .UpdatesTotalReceived }}
+	metallb_bgp_updates_total_received{peer="{{ .NeighborIP }}", vrf="{{ .NeighborVRF }}"} {{ .UpdatesTotalReceived }}
 	`
 
 	tests = []struct {
 		desc                 string
 		vtyshOutput          string
 		neighborIP           string
+		neighborVRF          string
 		announcedPrefixes    int
 		sessionUp            int
 		updatesTotal         int
@@ -72,6 +73,7 @@ var (
 			desc:                 "Output contains only IPv4 advertisements",
 			vtyshOutput:          neighborsIPv4Only,
 			neighborIP:           "172.18.0.4:179",
+			neighborVRF:          "default",
 			announcedPrefixes:    3,
 			sessionUp:            1,
 			updatesTotal:         3,
@@ -89,6 +91,7 @@ var (
 			desc:                 "Output contains mixed IPv4 and IPv6 advertisements",
 			vtyshOutput:          neighborsDual,
 			neighborIP:           "172.18.0.4:180",
+			neighborVRF:          "default",
 			announcedPrefixes:    6,
 			sessionUp:            1,
 			updatesTotal:         3,
@@ -367,6 +370,69 @@ var (
 		}
 	  }	  
 	`
+	vrfVtysh = `{
+		"default":{
+		 "vrfId": 0,
+		 "vrfName": "default",
+		 "tableVersion": 1,
+		 "routerId": "172.18.0.3",
+		 "defaultLocPrf": 100,
+		 "localAS": 64512,
+		 "routes": { "192.168.10.0/32": [
+		  {
+			"valid":true,
+			"bestpath":true,
+			"pathFrom":"external",
+			"prefix":"192.168.10.0",
+			"prefixLen":32,
+			"network":"192.168.10.0\/32",
+			"metric":0,
+			"weight":32768,
+			"peerId":"(unspec)",
+			"path":"",
+			"origin":"IGP",
+			"nexthops":[
+			  {
+				"ip":"0.0.0.0",
+				"hostname":"kind-control-plane",
+				"afi":"ipv4",
+				"used":true
+			  }
+			]
+		  }
+		] }  }
+		,
+		"red":{
+		 "vrfId": 5,
+		 "vrfName": "red",
+		 "tableVersion": 1,
+		 "routerId": "172.31.0.4",
+		 "defaultLocPrf": 100,
+		 "localAS": 64512,
+		 "routes": { "192.168.10.0/32": [
+		  {
+			"valid":true,
+			"bestpath":true,
+			"pathFrom":"external",
+			"prefix":"192.168.10.0",
+			"prefixLen":32,
+			"network":"192.168.10.0\/32",
+			"metric":0,
+			"weight":32768,
+			"peerId":"(unspec)",
+			"path":"",
+			"origin":"IGP",
+			"nexthops":[
+			  {
+				"ip":"0.0.0.0",
+				"hostname":"kind-control-plane",
+				"afi":"ipv4",
+				"used":true
+			  }
+			]
+		  }
+		] }  }
+		}`
 )
 
 func TestCollect(t *testing.T) {
@@ -380,6 +446,7 @@ func TestCollect(t *testing.T) {
 			var w bytes.Buffer
 			err = tmpl.Execute(&w, map[string]interface{}{
 				"NeighborIP":           tc.neighborIP,
+				"NeighborVRF":          tc.neighborVRF,
 				"AnnouncedPrefixes":    tc.announcedPrefixes,
 				"SessionUp":            tc.sessionUp,
 				"UpdatesTotal":         tc.updatesTotal,
@@ -400,8 +467,16 @@ func TestCollect(t *testing.T) {
 
 			l := log.NewNopLogger()
 			collector := NewBGP(l)
+			cmdOutput := map[string]string{
+				"show bgp vrf all json":               vrfVtysh,
+				"show bgp vrf default neighbors json": tc.vtyshOutput,
+			}
 			collector.frrCli = func(args string) (string, error) {
-				return tc.vtyshOutput, nil
+				res, ok := cmdOutput[args]
+				if !ok {
+					return "{}", nil
+				}
+				return res, nil
 			}
 			buf := bytes.NewReader(w.Bytes())
 			err = testutil.CollectAndCompare(collector, buf)

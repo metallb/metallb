@@ -15,28 +15,28 @@ var (
 	bfdMetricsTmpl = `
 	# HELP metallb_bfd_session_up BFD session state (1 is up, 0 is down)
 	# TYPE metallb_bfd_session_up gauge
-	metallb_bfd_session_up{peer="{{ .Peer }}"} {{ .SessionUp }}
+	metallb_bfd_session_up{peer="{{ .Peer }}", vrf="{{ .NeighborVRF }}"} {{ .SessionUp }}
 	# HELP metallb_bfd_control_packet_input Number of received BFD control packets
 	# TYPE metallb_bfd_control_packet_input counter
-	metallb_bfd_control_packet_input{peer="{{ .Peer }}"} {{ .ControlPacketInput }}
+	metallb_bfd_control_packet_input{peer="{{ .Peer }}", vrf="{{ .NeighborVRF }}"} {{ .ControlPacketInput }}
 	# HELP metallb_bfd_control_packet_output Number of sent BFD control packets
 	# TYPE metallb_bfd_control_packet_output counter
-	metallb_bfd_control_packet_output{peer="{{ .Peer }}"} {{ .ControlPacketOutput }}
+	metallb_bfd_control_packet_output{peer="{{ .Peer }}", vrf="{{ .NeighborVRF }}"} {{ .ControlPacketOutput }}
 	# HELP metallb_bfd_echo_packet_input Number of received BFD echo packets
 	# TYPE metallb_bfd_echo_packet_input counter
-	metallb_bfd_echo_packet_input{peer="{{ .Peer }}"} {{ .EchoPacketInput }}
+	metallb_bfd_echo_packet_input{peer="{{ .Peer }}", vrf="{{ .NeighborVRF }}"} {{ .EchoPacketInput }}
 	# HELP metallb_bfd_echo_packet_output Number of sent BFD echo packets
 	# TYPE metallb_bfd_echo_packet_output counter
-	metallb_bfd_echo_packet_output{peer="{{ .Peer }}"} {{ .EchoPacketOutput }}
+	metallb_bfd_echo_packet_output{peer="{{ .Peer }}", vrf="{{ .NeighborVRF }}"} {{ .EchoPacketOutput }}
 	# HELP metallb_bfd_session_down_events Number of BFD session down events
 	# TYPE metallb_bfd_session_down_events counter
-	metallb_bfd_session_down_events{peer="{{ .Peer }}"} {{ .SessionDownEvents }}
+	metallb_bfd_session_down_events{peer="{{ .Peer }}", vrf="{{ .NeighborVRF }}"} {{ .SessionDownEvents }}
 	# HELP metallb_bfd_session_up_events Number of BFD session up events
 	# TYPE metallb_bfd_session_up_events counter
-	metallb_bfd_session_up_events{peer="{{ .Peer }}"} {{ .SessionUpEvents }}
+	metallb_bfd_session_up_events{peer="{{ .Peer }}", vrf="{{ .NeighborVRF }}"} {{ .SessionUpEvents }}
 	# HELP metallb_bfd_zebra_notifications Number of BFD zebra notifications
 	# TYPE metallb_bfd_zebra_notifications counter
-	metallb_bfd_zebra_notifications{peer="{{ .Peer }}"} {{ .ZebraNotifications }}
+	metallb_bfd_zebra_notifications{peer="{{ .Peer }}", vrf="{{ .NeighborVRF }}"} {{ .ZebraNotifications }}
 	`
 
 	bfdTests = []struct {
@@ -44,6 +44,7 @@ var (
 		vtyshPeersOutput         string
 		vtyshPeersCountersOutput string
 		peer                     string
+		vrf                      string
 		sessionUp                int
 		controlPacketInput       int
 		controlPacketOutput      int
@@ -58,6 +59,7 @@ var (
 			vtyshPeersOutput:         peersIPv4,
 			vtyshPeersCountersOutput: peersCountersIPv4,
 			peer:                     "172.18.0.4",
+			vrf:                      "default",
 			sessionUp:                1,
 			controlPacketInput:       5,
 			controlPacketOutput:      5,
@@ -72,6 +74,7 @@ var (
 			vtyshPeersOutput:         peersIPv6,
 			vtyshPeersCountersOutput: peersCountersIPv6,
 			peer:                     "fc00:f853:ccd:e793::4",
+			vrf:                      "default",
 			sessionUp:                0,
 			controlPacketInput:       10,
 			controlPacketOutput:      10,
@@ -189,6 +192,7 @@ func TestBFDCollect(t *testing.T) {
 				"SessionUpEvents":     test.sessionUpEvents,
 				"SessionDownEvents":   test.sessionDownEvents,
 				"ZebraNotifications":  test.zebraNotifications,
+				"NeighborVRF":         "default",
 			})
 
 			if err != nil {
@@ -197,11 +201,19 @@ func TestBFDCollect(t *testing.T) {
 
 			l := log.NewNopLogger()
 			collector := NewBFD(l)
+			cmdOutput := map[string]string{
+				"show bgp vrf all json":                    vrfVtysh,
+				"show bfd vrf default peers json":          test.vtyshPeersOutput,
+				"show bfd vrf red peers json":              "[]",
+				"show bfd vrf default peers counters json": test.vtyshPeersCountersOutput,
+				"show bfd vrf red peers counters json":     "[]",
+			}
 			collector.frrCli = func(args string) (string, error) {
-				if args == "show bfd peers json" {
-					return test.vtyshPeersOutput, nil
+				res, ok := cmdOutput[args]
+				if !ok {
+					return "{}", nil
 				}
-				return test.vtyshPeersCountersOutput, nil
+				return res, nil
 			}
 			buf := bytes.NewReader(w.Bytes())
 			err = testutil.CollectAndCompare(collector, buf)
