@@ -60,6 +60,7 @@ var (
 	localNics           string
 	externalContainers  string
 	runOnHost           bool
+	bgpNativeMode       bool
 )
 
 // handleFlags sets up all flags and parses the command line.
@@ -88,6 +89,8 @@ func handleFlags() {
 	flag.StringVar(&reportPath, "report-path", "/tmp/report", "the path to be used to dump test failure information")
 	flag.StringVar(&prometheusNamespace, "prometheus-namespace", "monitoring", "the namespace prometheus is running in (if running)")
 	flag.StringVar(&externalContainers, "external-containers", "", "a comma separated list of external containers names to use for the test. (valid parameters are: ibgp-single-hop / ibgp-multi-hop / ebgp-single-hop / ebgp-multi-hop)")
+	flag.BoolVar(&bgpNativeMode, "bgp-native-mode", false, "says if we are testing against a deployment using bgp native mode")
+
 	flag.Parse()
 
 	if _, res := os.LookupEnv("RUN_FRR_CONTAINER_ON_HOST_NETWORK"); res {
@@ -153,8 +156,11 @@ var _ = ginkgo.BeforeSuite(func() {
 	default:
 		bgptests.FRRContainers, err = bgptests.KindnetContainersSetup(v4Addresses, v6Addresses, cs)
 		framework.ExpectNoError(err)
-		bgptests.VRFFRRContainers, err = bgptests.VRFContainersSetup(cs)
-		framework.ExpectNoError(err)
+		if !bgpNativeMode {
+			vrfFRRContainers, err := bgptests.VRFContainersSetup(cs)
+			framework.ExpectNoError(err)
+			bgptests.FRRContainers = append(bgptests.FRRContainers, vrfFRRContainers...)
+		}
 	}
 
 	clientconfig, err := framework.LoadConfig()

@@ -30,7 +30,6 @@ import (
 var _ = ginkgo.Describe("BGP metrics", func() {
 	var cs clientset.Interface
 	var f *framework.Framework
-	var FRRRouters []*frrcontainer.FRR
 
 	emptyBGPAdvertisement := metallbv1beta1.BGPAdvertisement{
 		ObjectMeta: metav1.ObjectMeta{
@@ -51,8 +50,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 		err := ConfigUpdater.Clean()
 		framework.ExpectNoError(err)
 
-		FRRRouters = append(VRFFRRContainers, FRRContainers...)
-		for _, c := range FRRRouters {
+		for _, c := range FRRContainers {
 			err := c.UpdateBGPConfigFile(frrconfig.Empty)
 			framework.ExpectNoError(err)
 		}
@@ -110,11 +108,11 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						},
 					},
 				},
-				Peers:   metallb.PeersForContainers(FRRRouters, ipFamily),
+				Peers:   metallb.PeersForContainers(FRRContainers, ipFamily),
 				BGPAdvs: []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement},
 			}
 
-			for _, c := range FRRRouters {
+			for _, c := range FRRContainers {
 				err := frrcontainer.PairWithNodes(cs, c, ipFamily)
 				framework.ExpectNoError(err)
 			}
@@ -122,7 +120,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 			err := ConfigUpdater.Update(resources)
 			framework.ExpectNoError(err)
 
-			for _, c := range FRRRouters {
+			for _, c := range FRRContainers {
 				validateFRRPeeredWithAllNodes(cs, c, ipFamily)
 			}
 
@@ -130,7 +128,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster) // Is a sleep required here?
 			defer testservice.Delete(cs, svc)
 
-			selectors := labelsForPeers(FRRRouters, ipFamily)
+			selectors := labelsForPeers(FRRContainers, ipFamily)
 
 			for _, speaker := range speakerPods {
 				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
@@ -232,7 +230,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 			poolName := "bgp-test"
 
 			peerAddrToName := make(map[string]string)
-			for _, c := range FRRRouters {
+			for _, c := range FRRContainers {
 				address := c.Ipv4
 				if ipFamily == ipfamily.IPv6 {
 					address = c.Ipv6
@@ -252,11 +250,11 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						},
 					},
 				},
-				Peers:   metallb.PeersForContainers(FRRRouters, ipFamily),
+				Peers:   metallb.PeersForContainers(FRRContainers, ipFamily),
 				BGPAdvs: []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement},
 			}
 
-			for _, c := range FRRRouters {
+			for _, c := range FRRContainers {
 				err := frrcontainer.PairWithNodes(cs, c, ipFamily)
 				framework.ExpectNoError(err)
 			}
@@ -264,7 +262,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 			err := ConfigUpdater.Update(resources)
 			framework.ExpectNoError(err)
 
-			for _, c := range FRRRouters {
+			for _, c := range FRRContainers {
 				validateFRRPeeredWithAllNodes(cs, c, ipFamily)
 			}
 
@@ -293,7 +291,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 				return nil
 			}, 2*time.Minute, 1*time.Second).Should(BeNil())
 
-			selectors := labelsForPeers(FRRRouters, ipFamily)
+			selectors := labelsForPeers(FRRContainers, ipFamily)
 
 			for _, speaker := range speakerPods {
 				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
@@ -407,7 +405,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					},
 				},
 			},
-			Peers:       metallb.WithBFD(metallb.PeersForContainers(FRRRouters, pairingFamily), bfd.Name),
+			Peers:       metallb.WithBFD(metallb.PeersForContainers(FRRContainers, pairingFamily), bfd.Name),
 			BGPAdvs:     []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement},
 			BFDProfiles: []metallbv1beta1.BFDProfile{bfd},
 		}
@@ -415,14 +413,14 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 		err := ConfigUpdater.Update(resources)
 		framework.ExpectNoError(err)
 
-		for _, c := range FRRRouters {
+		for _, c := range FRRContainers {
 			err := frrcontainer.PairWithNodes(cs, c, pairingFamily, func(container *frrcontainer.FRR) {
 				container.NeighborConfig.BFDEnabled = true
 			})
 			framework.ExpectNoError(err)
 		}
 
-		for _, c := range FRRRouters {
+		for _, c := range FRRContainers {
 			validateFRRPeeredWithAllNodes(cs, c, pairingFamily)
 		}
 
@@ -434,7 +432,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 		promPod, err := metrics.PrometheusPod(cs, PrometheusNamespace)
 		framework.ExpectNoError(err)
 
-		selectors := labelsForPeers(FRRRouters, pairingFamily)
+		selectors := labelsForPeers(FRRContainers, pairingFamily)
 
 		for _, speaker := range speakerPods {
 			ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
@@ -529,7 +527,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 		}
 
 		ginkgo.By("disabling BFD in external FRR containers")
-		for _, c := range FRRRouters {
+		for _, c := range FRRContainers {
 			err := frrcontainer.PairWithNodes(cs, c, pairingFamily, func(container *frrcontainer.FRR) {
 				container.NeighborConfig.BFDEnabled = false
 			})
@@ -652,7 +650,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					},
 				},
 			},
-			Peers:   metallb.WithBFD(metallb.PeersForContainers(FRRRouters, ipfamily.IPv4), "bfd"),
+			Peers:   metallb.WithBFD(metallb.PeersForContainers(FRRContainers, ipfamily.IPv4), "bfd"),
 			BGPAdvs: []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement},
 		}
 		err = ConfigUpdater.Update(resources)
