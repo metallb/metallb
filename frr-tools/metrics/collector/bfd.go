@@ -12,7 +12,7 @@ import (
 
 	"go.universe.tf/metallb/frr-tools/metrics/vtysh"
 	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
-	bgpstats "go.universe.tf/metallb/internal/bgp/native"
+	bgpmetrics "go.universe.tf/metallb/internal/bgp/metrics"
 )
 
 type bfdPeerCounters struct {
@@ -30,58 +30,58 @@ const subsystem = "bfd"
 
 var (
 	bfdSessionUpDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, subsystem, bgpstats.SessionUp.Name),
+		prometheus.BuildFQName(bgpmetrics.Namespace, subsystem, bgpmetrics.SessionUp.Name),
 		"BFD session state (1 is up, 0 is down)",
-		bgpstats.Labels,
+		labels,
 		nil,
 	)
 
 	controlPacketInputDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, subsystem, "control_packet_input"),
+		prometheus.BuildFQName(bgpmetrics.Namespace, subsystem, "control_packet_input"),
 		"Number of received BFD control packets",
-		bgpstats.Labels,
+		labels,
 		nil,
 	)
 
 	controlPacketOutputDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, subsystem, "control_packet_output"),
+		prometheus.BuildFQName(bgpmetrics.Namespace, subsystem, "control_packet_output"),
 		"Number of sent BFD control packets",
-		bgpstats.Labels,
+		labels,
 		nil,
 	)
 
 	echoPacketInputDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, subsystem, "echo_packet_input"),
+		prometheus.BuildFQName(bgpmetrics.Namespace, subsystem, "echo_packet_input"),
 		"Number of received BFD echo packets",
-		bgpstats.Labels,
+		labels,
 		nil,
 	)
 
 	echoPacketOutputDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, subsystem, "echo_packet_output"),
+		prometheus.BuildFQName(bgpmetrics.Namespace, subsystem, "echo_packet_output"),
 		"Number of sent BFD echo packets",
-		bgpstats.Labels,
+		labels,
 		nil,
 	)
 
 	sessionUpEventsDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, subsystem, "session_up_events"),
+		prometheus.BuildFQName(bgpmetrics.Namespace, subsystem, "session_up_events"),
 		"Number of BFD session up events",
-		bgpstats.Labels,
+		labels,
 		nil,
 	)
 
 	sessionDownEventsDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, subsystem, "session_down_events"),
+		prometheus.BuildFQName(bgpmetrics.Namespace, subsystem, "session_down_events"),
 		"Number of BFD session down events",
-		bgpstats.Labels,
+		labels,
 		nil,
 	)
 
 	zebraNotificationsDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, subsystem, "zebra_notifications"),
+		prometheus.BuildFQName(bgpmetrics.Namespace, subsystem, "zebra_notifications"),
 		"Number of BFD zebra notifications",
-		bgpstats.Labels,
+		labels,
 		nil,
 	)
 )
