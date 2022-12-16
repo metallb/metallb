@@ -2,62 +2,41 @@
 
 package native
 
-import "github.com/prometheus/client_golang/prometheus"
-
-type stat struct {
-	Name string
-	Help string
-}
-
-var (
-	Namespace = "metallb"
-	Subsystem = "bgp"
-	Labels    = []string{"peer", "vrf"}
-
-	SessionUp = stat{
-		Name: "session_up",
-		Help: "BGP session state (1 is up, 0 is down)",
-	}
-
-	UpdatesSent = stat{
-		Name: "updates_total",
-		Help: "Number of BGP UPDATE messages sent",
-	}
-
-	Prefixes = stat{
-		Name: "announced_prefixes_total",
-		Help: "Number of prefixes currently being advertised on the BGP session",
-	}
+import (
+	"github.com/prometheus/client_golang/prometheus"
+	bgpmetrics "go.universe.tf/metallb/internal/bgp/metrics"
 )
+
+var labels = []string{"peer"}
 
 var stats = metrics{
 	sessionUp: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Subsystem: Subsystem,
-		Name:      SessionUp.Name,
-		Help:      SessionUp.Help,
-	}, Labels),
+		Namespace: bgpmetrics.Namespace,
+		Subsystem: bgpmetrics.Subsystem,
+		Name:      bgpmetrics.SessionUp.Name,
+		Help:      bgpmetrics.SessionUp.Help,
+	}, labels),
 
 	updatesSent: prometheus.NewCounterVec(prometheus.CounterOpts{
-		Namespace: Namespace,
-		Subsystem: Subsystem,
-		Name:      UpdatesSent.Name,
-		Help:      UpdatesSent.Help,
-	}, Labels),
+		Namespace: bgpmetrics.Namespace,
+		Subsystem: bgpmetrics.Subsystem,
+		Name:      bgpmetrics.UpdatesSent.Name,
+		Help:      bgpmetrics.UpdatesSent.Help,
+	}, labels),
 
 	prefixes: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Subsystem: Subsystem,
-		Name:      Prefixes.Name,
-		Help:      Prefixes.Help,
-	}, Labels),
+		Namespace: bgpmetrics.Namespace,
+		Subsystem: bgpmetrics.Subsystem,
+		Name:      bgpmetrics.Prefixes.Name,
+		Help:      bgpmetrics.Prefixes.Help,
+	}, labels),
 
 	pendingPrefixes: prometheus.NewGaugeVec(prometheus.GaugeOpts{
-		Namespace: Namespace,
-		Subsystem: Subsystem,
+		Namespace: bgpmetrics.Namespace,
+		Subsystem: bgpmetrics.Subsystem,
 		Name:      "pending_prefixes_total",
 		Help:      "Number of prefixes that should be advertised on the BGP session",
-	}, Labels),
+	}, labels),
 }
 
 type metrics struct {

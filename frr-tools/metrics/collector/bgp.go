@@ -11,91 +11,93 @@ import (
 
 	"go.universe.tf/metallb/frr-tools/metrics/vtysh"
 	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
-	bgpstats "go.universe.tf/metallb/internal/bgp/native"
+	bgpmetrics "go.universe.tf/metallb/internal/bgp/metrics"
 )
+
+var labels = []string{"peer", "vrf"}
 
 var (
 	sessionUpDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, bgpstats.Subsystem, bgpstats.SessionUp.Name),
-		bgpstats.SessionUp.Help,
-		bgpstats.Labels,
+		prometheus.BuildFQName(bgpmetrics.Namespace, bgpmetrics.Subsystem, bgpmetrics.SessionUp.Name),
+		bgpmetrics.SessionUp.Help,
+		labels,
 		nil,
 	)
 
 	prefixesDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, bgpstats.Subsystem, bgpstats.Prefixes.Name),
-		bgpstats.Prefixes.Help,
-		bgpstats.Labels,
+		prometheus.BuildFQName(bgpmetrics.Namespace, bgpmetrics.Subsystem, bgpmetrics.Prefixes.Name),
+		bgpmetrics.Prefixes.Help,
+		labels,
 		nil,
 	)
 
 	opensSentDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, bgpstats.Subsystem, "opens_sent"),
+		prometheus.BuildFQName(bgpmetrics.Namespace, bgpmetrics.Subsystem, "opens_sent"),
 		"Number of BGP open messages sent",
-		bgpstats.Labels,
+		labels,
 		nil,
 	)
 
 	opensReceivedDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, bgpstats.Subsystem, "opens_received"),
+		prometheus.BuildFQName(bgpmetrics.Namespace, bgpmetrics.Subsystem, "opens_received"),
 		"Number of BGP open messages received",
-		bgpstats.Labels,
+		labels,
 		nil,
 	)
 
 	notificationsSentDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, bgpstats.Subsystem, "notifications_sent"),
+		prometheus.BuildFQName(bgpmetrics.Namespace, bgpmetrics.Subsystem, "notifications_sent"),
 		"Number of BGP notification messages sent",
-		bgpstats.Labels,
+		labels,
 		nil,
 	)
 
 	updatesSentDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, bgpstats.Subsystem, bgpstats.UpdatesSent.Name),
-		bgpstats.UpdatesSent.Help,
-		bgpstats.Labels,
+		prometheus.BuildFQName(bgpmetrics.Namespace, bgpmetrics.Subsystem, bgpmetrics.UpdatesSent.Name),
+		bgpmetrics.UpdatesSent.Help,
+		labels,
 		nil,
 	)
 
 	updatesReceivedDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, bgpstats.Subsystem, "updates_total_received"),
+		prometheus.BuildFQName(bgpmetrics.Namespace, bgpmetrics.Subsystem, "updates_total_received"),
 		"Number of BGP UPDATE messages received",
-		bgpstats.Labels,
+		labels,
 		nil,
 	)
 
 	keepalivesSentDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, bgpstats.Subsystem, "keepalives_sent"),
+		prometheus.BuildFQName(bgpmetrics.Namespace, bgpmetrics.Subsystem, "keepalives_sent"),
 		"Number of BGP keepalive messages sent",
-		bgpstats.Labels,
+		labels,
 		nil,
 	)
 
 	keepalivesReceivedDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, bgpstats.Subsystem, "keepalives_received"),
+		prometheus.BuildFQName(bgpmetrics.Namespace, bgpmetrics.Subsystem, "keepalives_received"),
 		"Number of BGP keepalive messages received",
-		bgpstats.Labels,
+		labels,
 		nil,
 	)
 
 	routeRefreshSentedDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, bgpstats.Subsystem, "route_refresh_sent"),
+		prometheus.BuildFQName(bgpmetrics.Namespace, bgpmetrics.Subsystem, "route_refresh_sent"),
 		"Number of BGP route refresh messages sent",
-		bgpstats.Labels,
+		labels,
 		nil,
 	)
 
 	totalSentDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, bgpstats.Subsystem, "total_sent"),
+		prometheus.BuildFQName(bgpmetrics.Namespace, bgpmetrics.Subsystem, "total_sent"),
 		"Number of total BGP messages sent",
-		bgpstats.Labels,
+		labels,
 		nil,
 	)
 
 	totalReceivedDesc = prometheus.NewDesc(
-		prometheus.BuildFQName(bgpstats.Namespace, bgpstats.Subsystem, "total_received"),
+		prometheus.BuildFQName(bgpmetrics.Namespace, bgpmetrics.Subsystem, "total_received"),
 		"Number of total BGP messages received",
-		bgpstats.Labels,
+		labels,
 		nil,
 	)
 )
@@ -106,7 +108,7 @@ type bgp struct {
 }
 
 func NewBGP(l log.Logger) *bgp {
-	log := log.With(l, "collector", bgpstats.Subsystem)
+	log := log.With(l, "collector", bgpmetrics.Subsystem)
 	return &bgp{Log: log, frrCli: vtysh.Run}
 }
 
