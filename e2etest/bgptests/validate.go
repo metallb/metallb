@@ -53,7 +53,10 @@ func validateFRRPeeredWithNodes(cs clientset.Interface, nodes []corev1.Node, c *
 		neighbors, err := frr.NeighborsInfo(c)
 		framework.ExpectNoError(err)
 		err = frr.NeighborsMatchNodes(nodes, neighbors, ipFamily, c.RouterConfig.VRF)
-		return err
+		if err != nil {
+			return fmt.Errorf("failed to match neighbors for %s, %w", c.Name, err)
+		}
+		return nil
 	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
 
