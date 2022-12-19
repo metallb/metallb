@@ -143,6 +143,9 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.serviceAccount.annotations | object | `{}` |  |
 | speaker.serviceAccount.create | bool | `true` |  |
 | speaker.serviceAccount.name | string | `""` |  |
+| speaker.startupProbe.enabled | bool | `true` |  |
+| speaker.startupProbe.failureThreshold | int | `30` |  |
+| speaker.startupProbe.periodSeconds | int | `5` |  |
 | speaker.tolerateMaster | bool | `true` |  |
 | speaker.tolerations | list | `[]` |  |
 | speaker.updateStrategy.type | string | `"RollingUpdate"` |  |
