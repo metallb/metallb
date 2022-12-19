@@ -2107,10 +2107,10 @@ spec:
           value: "true"
         image: frrouting/frr:v7.5.1
         livenessProbe:
-          exec:
-            command:
-            - /etc/frr_liveness/liveness.sh
           failureThreshold: 3
+          httpGet:
+            path: /livez
+            port: 7473
           periodSeconds: 5
         name: frr
         securityContext:
@@ -2121,18 +2121,16 @@ spec:
             - SYS_ADMIN
             - NET_BIND_SERVICE
         startupProbe:
-          exec:
-            command:
-            - /etc/frr_liveness/liveness.sh
           failureThreshold: 30
+          httpGet:
+            path: /livez
+            port: 7473
           periodSeconds: 5
         volumeMounts:
         - mountPath: /var/run/frr
           name: frr-sockets
         - mountPath: /etc/frr
           name: frr-conf
-        - mountPath: /etc/frr_liveness
-          name: frr-liveness
       - command:
         - /etc/frr_reloader/frr-reloader.sh
         image: frrouting/frr:v7.5.1
@@ -2256,15 +2254,6 @@ spec:
       - command:
         - /bin/sh
         - -c
-        - cp -f /liveness.sh /etc/frr_liveness/
-        image: quay.io/metallb/speaker:main
-        name: cp-liveness
-        volumeMounts:
-        - mountPath: /etc/frr_liveness
-          name: frr-liveness
-      - command:
-        - /bin/sh
-        - -c
         - cp -f /frr-metrics /etc/frr_metrics/
         image: quay.io/metallb/speaker:main
         name: cp-metrics
@@ -2295,8 +2284,6 @@ spec:
         name: reloader
       - emptyDir: {}
         name: metrics
-      - emptyDir: {}
-        name: frr-liveness
       - name: memberlist
         secret:
           defaultMode: 420
