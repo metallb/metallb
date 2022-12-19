@@ -9,6 +9,7 @@ import (
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.universe.tf/metallb/frr-tools/metrics/vtysh"
 	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
 	bgpstats "go.universe.tf/metallb/internal/bgp/native"
 )
@@ -101,12 +102,12 @@ var (
 
 type bgp struct {
 	Log    log.Logger
-	frrCli func(args string) (string, error)
+	frrCli vtysh.Cli
 }
 
 func NewBGP(l log.Logger) *bgp {
 	log := log.With(l, "collector", bgpstats.Subsystem)
-	return &bgp{Log: log, frrCli: runVtysh}
+	return &bgp{Log: log, frrCli: vtysh.Run}
 }
 
 func (c *bgp) Describe(ch chan<- *prometheus.Desc) {
@@ -157,7 +158,7 @@ func updateNeighborsMetrics(ch chan<- prometheus.Metric, neighbors []*bgpfrr.Nei
 	}
 }
 
-func getBGPNeighbors(frrCli func(args string) (string, error)) ([]*bgpfrr.Neighbor, error) {
+func getBGPNeighbors(frrCli vtysh.Cli) ([]*bgpfrr.Neighbor, error) {
 	res, err := frrCli("show bgp neighbors json")
 	if err != nil {
 		return nil, err

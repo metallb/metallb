@@ -165,8 +165,6 @@ spec:
           emptyDir: {}
         - name: metrics
           emptyDir: {}
-        - name: frr-liveness
-          emptyDir: {}
       {{- if .Values.prometheus.speakerMetricsTLSSecret }}
         - name: metrics-certs
           secret:
@@ -192,13 +190,6 @@ spec:
           volumeMounts:
             - name: reloader
               mountPath: /etc/frr_reloader
-        # Copies the liveness probe script to the shared volume between the speaker and reloader.
-        - name: cp-liveness
-          image: {{ .Values.speaker.image.repository }}:{{ .Values.speaker.image.tag | default .Chart.AppVersion }}
-          command: ["/bin/sh", "-c", "cp -f /liveness.sh /etc/frr_liveness/"]
-          volumeMounts:
-            - name: frr-liveness
-              mountPath: /etc/frr_liveness
         # Copies the metrics exporter
         - name: cp-metrics
           image: {{ .Values.speaker.image.repository }}:{{ .Values.speaker.image.tag | default .Chart.AppVersion }}
@@ -332,8 +323,6 @@ spec:
             mountPath: /var/run/frr
           - name: frr-conf
             mountPath: /etc/frr
-          - name: frr-liveness
-            mountPath: /etc/frr_liveness
         # The command is FRR's default entrypoint & waiting for the log file to appear and tailing it.
         # If the log file isn't created in 60 seconds the tail fails and the container is restarted.
         # This workaround is needed to have the frr logs as part of kubectl logs -c frr < speaker_pod_name >.
@@ -353,13 +342,15 @@ spec:
           {{- toYaml . | nindent 12 }}
         {{- end }}
         livenessProbe:
-          exec:
-            command: ["/etc/frr_liveness/liveness.sh"]
+          httpGet:
+            path: /livez
+            port: {{ .Values.speaker.frr.metricsPort }}
           periodSeconds: 5
           failureThreshold: 3
         startupProbe:
-          exec:
-            command: ["/etc/frr_liveness/liveness.sh"]
+          httpGet:
+            path: /livez
+            port: {{ .Values.speaker.frr.metricsPort }}
           failureThreshold: 30
           periodSeconds: 5
       - name: reloader

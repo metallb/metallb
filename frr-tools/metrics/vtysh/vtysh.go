@@ -1,12 +1,16 @@
 // SPDX-License-Identifier:Apache-2.0
 
-package collector
+package vtysh
 
 import (
 	"os/exec"
 )
 
-func runVtysh(args string) (string, error) {
+type Cli func(args string) (string, error)
+
+func Run(args string) (string, error) {
 	out, err := exec.Command("/usr/bin/vtysh", "-c", args).CombinedOutput()
 	return string(out), err
 }
+
+var _ Cli = Run

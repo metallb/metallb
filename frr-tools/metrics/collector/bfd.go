@@ -9,6 +9,7 @@ import (
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go.universe.tf/metallb/frr-tools/metrics/vtysh"
 	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
 	bgpstats "go.universe.tf/metallb/internal/bgp/native"
 )
@@ -86,12 +87,12 @@ var (
 
 type bfd struct {
 	Log    log.Logger
-	frrCli func(args string) (string, error)
+	frrCli vtysh.Cli
 }
 
 func NewBFD(l log.Logger) *bfd {
 	log := log.With(l, "collector", subsystem)
-	return &bfd{Log: log, frrCli: runVtysh}
+	return &bfd{Log: log, frrCli: vtysh.Run}
 }
 
 func (c *bfd) Describe(ch chan<- *prometheus.Desc) {
@@ -146,7 +147,7 @@ func updatePeersCountersMetrics(ch chan<- prometheus.Metric, peersCounters []bfd
 	}
 }
 
-func getBFDPeers(frrCli func(args string) (string, error)) (map[string]bgpfrr.BFDPeer, error) {
+func getBFDPeers(frrCli vtysh.Cli) (map[string]bgpfrr.BFDPeer, error) {
 	res, err := frrCli("show bfd peers json")
 	if err != nil {
 		return nil, err
@@ -155,7 +156,7 @@ func getBFDPeers(frrCli func(args string) (string, error)) (map[string]bgpfrr.BF
 	return bgpfrr.ParseBFDPeers(res)
 }
 
-func getBFDPeersCounters(frrCli func(args string) (string, error)) ([]bfdPeerCounters, error) {
+func getBFDPeersCounters(frrCli vtysh.Cli) ([]bfdPeerCounters, error) {
 	res, err := frrCli("show bfd peers counters json")
 	if err != nil {
 		return nil, err
