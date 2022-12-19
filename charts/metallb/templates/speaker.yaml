@@ -341,18 +341,22 @@ spec:
         resources:
           {{- toYaml . | nindent 12 }}
         {{- end }}
+        {{- if .Values.speaker.livenessProbe.enabled }}
         livenessProbe:
           httpGet:
             path: /livez
             port: {{ .Values.speaker.frr.metricsPort }}
-          periodSeconds: 5
-          failureThreshold: 3
+          periodSeconds: {{ .Values.speaker.livenessProbe.periodSeconds }}
+          failureThreshold: {{ .Values.speaker.livenessProbe.failureThreshold }}
+        {{- end }}
+        {{- if .Values.speaker.startupProbe.enabled }}
         startupProbe:
           httpGet:
             path: /livez
             port: {{ .Values.speaker.frr.metricsPort }}
-          failureThreshold: 30
-          periodSeconds: 5
+          failureThreshold: {{ .Values.speaker.startupProbe.failureThreshold }}
+          periodSeconds: {{ .Values.speaker.startupProbe.periodSeconds }}
+        {{- end }}
       - name: reloader
         image: {{ .Values.speaker.frr.image.repository }}:{{ .Values.speaker.frr.image.tag | default .Chart.AppVersion }}
         {{- if .Values.speaker.frr.image.pullPolicy }}
