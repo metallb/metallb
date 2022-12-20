@@ -58,7 +58,7 @@ func Exists(exec executor.Executor, intf string) error {
 	return &NotFoundErr{interfaceName: intf}
 }
 
-func CreateVRF(exec executor.Executor, vrfName string) error {
+func CreateVRF(exec executor.Executor, vrfName, routingTable string) error {
 	err := Exists(exec, vrfName)
 	// The interface is already there, not doing anything
 	if err == nil {
@@ -69,7 +69,7 @@ func CreateVRF(exec executor.Executor, vrfName string) error {
 		return err
 	}
 
-	out, err := exec.Exec("ip", "link", "add", vrfName, "type", "vrf", "table", "2")
+	out, err := exec.Exec("ip", "link", "add", vrfName, "type", "vrf", "table", routingTable)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create vrf %s : %s", vrfName, out)
 	}
