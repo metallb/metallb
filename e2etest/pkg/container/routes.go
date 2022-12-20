@@ -12,23 +12,22 @@ import (
 
 // Adds the routes that enable communication between execnet and tonet using the ref routes.
 // The ref routes should come from the container that is connected to both execnet and tonet.
-func AddMultiHop(exec executor.Executor, execnet, tonet string, ref map[string]NetworkSettings) error {
+func AddMultiHop(exec executor.Executor, execnet, tonet, routingTable string, ref map[string]NetworkSettings) error {
 	localNetGW, ok := ref[execnet]
 	if !ok {
 		return fmt.Errorf("network %s not found in %v", execnet, ref)
 	}
-
 	externalNet, ok := ref[tonet]
 	if !ok {
 		return fmt.Errorf("network %s not found in %v", tonet, ref)
 	}
 
-	err := routes.Add(exec, fmt.Sprintf("%s/%d", externalNet.IPAddress, externalNet.IPPrefixLen), localNetGW.IPAddress)
+	err := routes.Add(exec, fmt.Sprintf("%s/%d", externalNet.IPAddress, externalNet.IPPrefixLen), localNetGW.IPAddress, routingTable)
 	if err != nil {
 		return err
 	}
 
-	err = routes.Add(exec, fmt.Sprintf("%s/%d", externalNet.GlobalIPv6Address, externalNet.GlobalIPv6PrefixLen), localNetGW.GlobalIPv6Address)
+	err = routes.Add(exec, fmt.Sprintf("%s/%d", externalNet.GlobalIPv6Address, externalNet.GlobalIPv6PrefixLen), localNetGW.GlobalIPv6Address, routingTable)
 	if err != nil {
 		return err
 	}
@@ -37,7 +36,7 @@ func AddMultiHop(exec executor.Executor, execnet, tonet string, ref map[string]N
 }
 
 // Deletes the routes that enable communication between execnet and tonet using the ref routes.
-func DeleteMultiHop(exec executor.Executor, execnet, tonet string, ref map[string]NetworkSettings) error {
+func DeleteMultiHop(exec executor.Executor, execnet, tonet, routingTable string, ref map[string]NetworkSettings) error {
 	localNetGW, ok := ref[execnet]
 	if !ok {
 		return fmt.Errorf("network %s not found in %v", execnet, ref)
@@ -48,12 +47,12 @@ func DeleteMultiHop(exec executor.Executor, execnet, tonet string, ref map[strin
 		return fmt.Errorf("network %s not found in %v", tonet, ref)
 	}
 
-	err := routes.Delete(exec, fmt.Sprintf("%s/%d", externalNet.IPAddress, externalNet.IPPrefixLen), localNetGW.IPAddress)
+	err := routes.Delete(exec, fmt.Sprintf("%s/%d", externalNet.IPAddress, externalNet.IPPrefixLen), localNetGW.IPAddress, routingTable)
 	if err != nil {
 		return err
 	}
 
-	err = routes.Delete(exec, fmt.Sprintf("%s/%d", externalNet.GlobalIPv6Address, externalNet.GlobalIPv6PrefixLen), localNetGW.GlobalIPv6Address)
+	err = routes.Delete(exec, fmt.Sprintf("%s/%d", externalNet.GlobalIPv6Address, externalNet.GlobalIPv6PrefixLen), localNetGW.GlobalIPv6Address, routingTable)
 	if err != nil {
 		return err
 	}
@@ -66,7 +65,7 @@ func DeleteMultiHop(exec executor.Executor, execnet, tonet string, ref map[strin
 // - finds the interface corresponding to the docker network inside the container
 // - creates a vrf named after vrfName if it does not exist
 // - associates the interface listed above to the vrf.
-func SetupVRFForNetwork(containerName, vrfNetwork, vrfName string) error {
+func SetupVRFForNetwork(containerName, vrfNetwork, vrfName, vrfRoutingTable string) error {
 	containerNetworks, err := Networks(containerName)
 	if err != nil {
 		return err
@@ -82,7 +81,7 @@ func SetupVRFForNetwork(containerName, vrfNetwork, vrfName string) error {
 		return fmt.Errorf("interface with IPs %s , %s belonging to network %s not found in container %s: %w", r.IPAddress, r.GlobalIPv6Address, vrfNetwork, containerName, err)
 	}
 
-	err = netdev.CreateVRF(exec, vrfName)
+	err = netdev.CreateVRF(exec, vrfName, vrfRoutingTable)
 	if err != nil {
 		return err
 	}
