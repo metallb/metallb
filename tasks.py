@@ -544,6 +544,10 @@ def dev_env_cleanup(ctx, name="kind", frr_volume_dir=""):
         '    docker rm -f $frr ; '
         'done', hide=True)
 
+    run('for frr in $(docker ps -a -f name=vrf --format {{.Names}}) ; do '
+        '    docker rm -f $frr ; '
+        'done', hide=True)
+
     # cleanup bgp configs
     dev_env_dir = os.getcwd() + "/dev-env/bgp"
     if frr_volume_dir == "":
