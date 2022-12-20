@@ -204,9 +204,12 @@ var _ = ginkgo.AfterSuite(func() {
 	cs, err := framework.LoadClientset()
 	framework.ExpectNoError(err)
 
-	toTearDown := append(bgptests.FRRContainers, bgptests.VRFFRRContainers...)
-	err = bgptests.InfraTearDown(cs, toTearDown)
+	err = bgptests.InfraTearDown(cs)
 	framework.ExpectNoError(err)
+	if !bgpNativeMode {
+		err = bgptests.InfraTearDownVRF(cs)
+		framework.ExpectNoError(err)
+	}
 	err = updater.Clean()
 	framework.ExpectNoError(err)
 
