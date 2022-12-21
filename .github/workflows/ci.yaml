@@ -324,6 +324,17 @@ jobs:
           sed -i 's/native/frr/g' bin/metallb-operator.yaml
           kubectl apply -f bin/metallb-operator.yaml
 
+      - name: Ensure MetalLB operator is ready
+        run: |
+          COUNT=0
+          while [ "$(kubectl get pods -n metallb-system -l control-plane='controller-manager' -o jsonpath='{.items[*].status.containerStatuses[0].ready}')" != "true" ]; do
+            sleep 5
+            COUNT=$((COUNT+1))
+            if [[ $COUNT -gt 15 ]] ; then
+              exit 1;
+            fi
+            echo "Waiting for operator pod to be ready."
+          done
 
       - name: MetalLB E2E Tests with Operator Deployment
         run: |
