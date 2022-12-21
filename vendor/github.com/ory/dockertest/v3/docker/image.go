@@ -289,6 +289,7 @@ func (c *Client) PushImage(opts PushImageOptions, auth AuthConfiguration) error 
 type PullImageOptions struct {
 	Repository string `qs:"fromImage"`
 	Tag        string
+	Platform   string
 
 	// Only required for Docker Engine 1.9 or 1.10 w/ Remote API < 1.21
 	// and Docker Engine < 1.9

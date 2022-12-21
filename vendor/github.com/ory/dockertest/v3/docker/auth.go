@@ -27,6 +27,7 @@ type AuthConfiguration struct {
 	Password      string `json:"password,omitempty"`
 	Email         string `json:"email,omitempty"`
 	ServerAddress string `json:"serveraddress,omitempty"`
+	IdentityToken string `json:"identitytoken,omitempty"`
 }
 
 // AuthConfigurations represents authentication options to use for the
@@ -42,8 +43,9 @@ type AuthConfigurations119 map[string]AuthConfiguration
 // dockerConfig represents a registry authentation configuration from the
 // .dockercfg file.
 type dockerConfig struct {
-	Auth  string `json:"auth"`
-	Email string `json:"email"`
+	Auth          string `json:"auth"`
+	Email         string `json:"email"`
+	IdentityToken string `json:"identitytoken"`
 }
 
 // NewAuthConfigurationsFromFile returns AuthConfigurations from a path containing JSON
@@ -129,22 +131,26 @@ func authConfigs(confs map[string]dockerConfig) (*AuthConfigurations, error) {
 		Configs: make(map[string]AuthConfiguration),
 	}
 	for reg, conf := range confs {
-		if conf.Auth == "" {
-			continue
-		}
-		data, err := base64.StdEncoding.DecodeString(conf.Auth)
-		if err != nil {
-			return nil, err
-		}
-		userpass := strings.SplitN(string(data), ":", 2)
-		if len(userpass) != 2 {
-			return nil, ErrCannotParseDockercfg
-		}
-		c.Configs[reg] = AuthConfiguration{
-			Email:         conf.Email,
-			Username:      userpass[0],
-			Password:      userpass[1],
-			ServerAddress: reg,
+		switch {
+		case conf.IdentityToken != "":
+			c.Configs[reg] = AuthConfiguration{
+				IdentityToken: conf.IdentityToken,
+			}
+		case conf.Auth != "":
+			data, err := base64.StdEncoding.DecodeString(conf.Auth)
+			if err != nil {
+				return nil, err
+			}
+			userpass := strings.SplitN(string(data), ":", 2)
+			if len(userpass) != 2 {
+				return nil, ErrCannotParseDockercfg
+			}
+			c.Configs[reg] = AuthConfiguration{
+				Email:         conf.Email,
+				Username:      userpass[0],
+				Password:      userpass[1],
+				ServerAddress: reg,
+			}
 		}
 	}
 	return c, nil
