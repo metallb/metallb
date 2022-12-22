@@ -5,7 +5,7 @@ COPY .git/ .git/
 
 ADD . /metallb
 
-WORKDIR /metallb/frr-metrics
+WORKDIR /metallb/frr-tools/metrics
 RUN CGO_ENABLED=0 GO111MODULE=on go build -mod=vendor -o ./frr-metrics
 
 WORKDIR /metallb/controller
@@ -24,7 +24,7 @@ RUN export SOURCE_GIT_COMMIT="${SOURCE_GIT_COMMIT:-$(git rev-parse --verify 'HEA
 
 FROM registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.12
 COPY --from=builder /metallb/controller/controller /metallb/speaker/speaker \
-      /metallb/frr-reloader/frr-reloader.sh /metallb/frr-metrics/frr-metrics /
+      /metallb/frr-tools/reloader/frr-reloader.sh /metallb/frr-tools/metrics/frr-metrics /
 
 # When running as non root and building in an environment that `umask` masks out
 # '+x' for others, it won't be possible to execute. Make sure all can execute,
