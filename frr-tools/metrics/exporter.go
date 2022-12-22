@@ -24,9 +24,8 @@ import (
 )
 
 var (
-	metricsPort   = flag.Uint("metrics-port", 7473, "Port to listen on for web interface.")
-	metricsPath   = flag.String("metrics-path", "/metrics", "Path under which to expose metrics.")
-	tlsConfigPath = flag.String("tls-config-path", "", "[EXPERIMENTAL] Path to config yaml file that can enable TLS or authentication.")
+	metricsPort = flag.Uint("metrics-port", 7473, "Port to listen on for web interface.")
+	metricsPath = flag.String("metrics-path", "/metrics", "Path under which to expose metrics.")
 )
 
 func metricsHandler(logger log.Logger) http.Handler {
@@ -72,7 +71,9 @@ func main() {
 	}
 	level.Info(logger).Log("msg", "Starting exporter", "metricsPath", metricsPath, "port", metricsPort)
 
-	if err := web.ListenAndServe(srv, *tlsConfigPath, logger); err != nil {
+	if err := web.ListenAndServe(srv, &web.FlagConfig{
+		WebListenAddresses: &([]string{fmt.Sprintf(":%d", *metricsPort)}),
+	}, logger); err != nil {
 		level.Error(logger).Log("error", err)
 		os.Exit(1)
 	}
