@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"net"
+	"net/netip"
 	"sort"
 
 	"github.com/go-kit/log"
@@ -134,7 +135,7 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 	return "notOwner"
 }
 
-func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIPs []net.IP, pool *config.Pool, client service, svc *v1.Service) error {
+func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIPs []netip.Addr, pool *config.Pool, client service, svc *v1.Service) error {
 	ifs := c.announcer.GetInterfaces()
 	for _, lbIP := range lbIPs {
 		ipAdv := ipAdvertisementFor(lbIP, c.myNode, pool.L2Advertisements)
@@ -162,7 +163,7 @@ func (c *layer2Controller) SetNode(log.Logger, *v1.Node) error {
 	return nil
 }
 
-func ipAdvertisementFor(ip net.IP, localNode string, l2Advertisements []*config.L2Advertisement) layer2.IPAdvertisement {
+func ipAdvertisementFor(ip netip.Addr, localNode string, l2Advertisements []*config.L2Advertisement) layer2.IPAdvertisement {
 	ifs := sets.NewString()
 	for _, l2 := range l2Advertisements {
 		if matchNode := l2.Nodes[localNode]; !matchNode {

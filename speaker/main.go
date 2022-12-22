@@ -18,6 +18,7 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -485,8 +486,8 @@ func (c *controller) SetNode(l log.Logger, node *v1.Node) controllers.SyncState 
 // A Protocol can advertise an IP address.
 type Protocol interface {
 	SetConfig(log.Logger, *config.Config) error
-	ShouldAnnounce(log.Logger, string, []net.IP, *config.Pool, *v1.Service, epslices.EpsOrSlices) string
-	SetBalancer(log.Logger, string, []net.IP, *config.Pool, service, *v1.Service) error
+	ShouldAnnounce(log.Logger, string, []netip.Addr, *config.Pool, *v1.Service, epslices.EpsOrSlices) string
+	SetBalancer(log.Logger, string, []netip.Addr, *config.Pool, service, *v1.Service) error
 	DeleteBalancer(log.Logger, string, string) error
 	SetNode(log.Logger, *v1.Node) error
 }

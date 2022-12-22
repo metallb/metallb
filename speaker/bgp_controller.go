@@ -17,6 +17,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"net/netip"
 	"reflect"
 	"sort"
 	"strconv"
@@ -154,7 +155,7 @@ func hasHealthyEndpoint(eps epslices.EpsOrSlices, filterNode func(*string) bool)
 	return false
 }
 
-func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, pool *config.Pool, svc *v1.Service, eps epslices.EpsOrSlices) string {
+func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []netip.Addr, pool *config.Pool, svc *v1.Service, eps epslices.EpsOrSlices) string {
 	if !poolMatchesNodeBGP(pool, c.myNode) {
 		level.Debug(l).Log("event", "skipping should announce bgp", "service", name, "reason", "pool not matching my node")
 		return "notOwner"
@@ -264,7 +265,7 @@ func (c *bgpController) syncBFDProfiles(profiles map[string]*config.BFDProfile) 
 	return c.sessionManager.SyncBFDProfiles(profiles)
 }
 
-func (c *bgpController) SetBalancer(l log.Logger, name string, lbIPs []net.IP, pool *config.Pool, _ service, _ *v1.Service) error {
+func (c *bgpController) SetBalancer(l log.Logger, name string, lbIPs []netip.Addr, pool *config.Pool, _ service, _ *v1.Service) error {
 	c.svcAds[name] = nil
 	for _, lbIP := range lbIPs {
 		for _, adCfg := range pool.BGPAdvertisements {
@@ -272,15 +273,12 @@ func (c *bgpController) SetBalancer(l log.Logger, name string, lbIPs []net.IP, p
 			if !adCfg.Nodes[c.myNode] {
 				continue
 			}
-			m := net.CIDRMask(adCfg.AggregationLength, 32)
-			if lbIP.To4() == nil {
-				m = net.CIDRMask(adCfg.AggregationLengthV6, 128)
+			prefix := netip.PrefixFrom(lbIP, 32)
+			if lbIP.Is6() {
+				prefix = netip.PrefixFrom(lbIP, 128)
 			}
 			ad := &bgp.Advertisement{
-				Prefix: &net.IPNet{
-					IP:   lbIP.Mask(m),
-					Mask: m,
-				},
+				Prefix:    prefix,
 				LocalPref: adCfg.LocalPref,
 			}
 			if len(adCfg.Peers) > 0 {

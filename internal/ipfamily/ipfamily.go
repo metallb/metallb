@@ -5,6 +5,7 @@ package ipfamily // import "go.universe.tf/metallb/internal/ipfamily"
 import (
 	"fmt"
 	"net"
+	"net/netip"
 
 	v1 "k8s.io/api/core/v1"
 )
@@ -27,19 +28,25 @@ const (
 func ForAddresses(ips []string) (Family, error) {
 	switch len(ips) {
 	case 1:
-		ip := net.ParseIP(ips[0])
-		if ip.To4() != nil {
+		ip, err := netip.ParseAddr(ips[0])
+		if err != nil {
+			return Unknown, err
+		}
+		if ip.Is4() {
 			return IPv4, nil
 		} else {
 			return IPv6, nil
 		}
 	case 2:
-		ip1 := net.ParseIP(ips[0])
-		ip2 := net.ParseIP(ips[1])
-		if ip1 == nil || ip2 == nil {
-			return Unknown, fmt.Errorf("IPFamilyForAddresses: Invalid address %q", ips)
+		ip1, err := netip.ParseAddr(ips[0])
+		if err != nil {
+			return Unknown, err
 		}
-		if (ip1.To4() == nil) == (ip2.To4() == nil) {
+		ip2, err := netip.ParseAddr(ips[1])
+		if err != nil {
+			return Unknown, err
+		}
+		if (ip1.Is4()) == (ip2.Is4()) {
 			return Unknown, fmt.Errorf("IPFamilyForAddresses: same address family %q", ips)
 		}
 		return DualStack, nil
@@ -49,7 +56,7 @@ func ForAddresses(ips []string) (Family, error) {
 }
 
 // ForAddressesIPs returns the address family from a given list of addresses IPs.
-func ForAddressesIPs(ips []net.IP) (Family, error) {
+func ForAddressesIPs(ips []netip.Addr) (Family, error) {
 	ipsStrings := []string{}
 
 	for _, ip := range ips {
@@ -67,8 +74,8 @@ func ForCIDR(cidr *net.IPNet) Family {
 }
 
 // ForAddress returns the address family for a given address.
-func ForAddress(ip net.IP) Family {
-	if ip.To4() == nil {
+func ForAddress(ip netip.Addr) Family {
+	if ip.Is6() {
 		return IPv6
 	}
 	return IPv4

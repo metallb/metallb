@@ -3,7 +3,7 @@
 package layer2
 
 import (
-	"net"
+	"net/netip"
 	"testing"
 
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -23,7 +23,7 @@ func Test_SetBalancer_AddsToAnnouncedServices(t *testing.T) {
 		{
 			name: "foo",
 			adv: IPAdvertisement{
-				ip:            net.IPv4(192, 168, 1, 20),
+				ip:            netip.MustParseAddr("192.168.1.20"),
 				interfaces:    sets.NewString(),
 				allInterfaces: true,
 			},
@@ -31,7 +31,7 @@ func Test_SetBalancer_AddsToAnnouncedServices(t *testing.T) {
 		{
 			name: "foo",
 			adv: IPAdvertisement{
-				ip:            net.ParseIP("1000::1"),
+				ip:            netip.MustParseAddr("1000::1"),
 				interfaces:    sets.NewString("eth0"),
 				allInterfaces: true,
 			},
@@ -39,7 +39,7 @@ func Test_SetBalancer_AddsToAnnouncedServices(t *testing.T) {
 		{
 			name: "bar",
 			adv: IPAdvertisement{
-				ip:            net.IPv4(192, 168, 1, 20),
+				ip:            netip.MustParseAddr("192.168.1.20"),
 				interfaces:    sets.NewString("eth1"),
 				allInterfaces: false,
 			},

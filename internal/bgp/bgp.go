@@ -5,6 +5,7 @@ package bgp // import "go.universe.tf/metallb/internal/bgp"
 import (
 	"io"
 	"net"
+	"net/netip"
 	"reflect"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 // Advertisement represents one network path and its BGP attributes.
 type Advertisement struct {
 	// The prefix being advertised to the peer.
-	Prefix *net.IPNet
+	Prefix netip.Prefix
 	// The local preference of this route. Only propagated to IBGP
 	// peers (i.e. where the peer ASN matches the local ASN).
 	LocalPref uint32

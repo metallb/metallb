@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"net/netip"
 	"sort"
 	"strings"
 
@@ -47,7 +48,7 @@ type key struct {
 
 type alloc struct {
 	pool  string
-	ips   []net.IP
+	ips   []netip.Addr
 	ports []Port
 	key
 }
@@ -136,7 +137,7 @@ func (a *Allocator) assign(svc string, alloc *alloc) {
 
 // Assign assigns the requested ip to svc, if the assignment is
 // permissible by sharingKey and backendKey.
-func (a *Allocator) Assign(svc string, ips []net.IP, ports []Port, sharingKey, backendKey string) error {
+func (a *Allocator) Assign(svc string, ips []netip.Addr, ports []Port, sharingKey, backendKey string) error {
 	pool := poolFor(a.pools.ByName, ips)
 	if pool == "" {
 		return fmt.Errorf("%q is not allowed in config", ips)
@@ -215,7 +216,7 @@ func (a *Allocator) Unassign(svc string) bool {
 }
 
 // AllocateFromPool assigns an available IP from pool to service.
-func (a *Allocator) AllocateFromPool(svc string, serviceIPFamily ipfamily.Family, poolName string, ports []Port, sharingKey, backendKey string) ([]net.IP, error) {
+func (a *Allocator) AllocateFromPool(svc string, serviceIPFamily ipfamily.Family, poolName string, ports []Port, sharingKey, backendKey string) ([]netip.Addr, error) {
 	if alloc := a.allocated[svc]; alloc != nil {
 		// Handle the case where the svc has already been assigned an IP but from the wrong family.
 		// This "should-not-happen" since the "serviceIPFamily" is an immutable field in services.
@@ -237,7 +238,7 @@ func (a *Allocator) AllocateFromPool(svc string, serviceIPFamily ipfamily.Family
 		return nil, fmt.Errorf("unknown pool %q", poolName)
 	}
 
-	ips := []net.IP{}
+	ips := []netip.Addr{}
 	ipfamilySel := make(map[ipfamily.Family]bool)
 
 	switch serviceIPFamily {
@@ -404,7 +405,7 @@ func poolCount(p *config.Pool) int64 {
 }
 
 // poolFor returns the pool that owns the requested IPs, or "" if none.
-func poolFor(pools map[string]*config.Pool, ips []net.IP) string {
+func poolFor(pools map[string]*config.Pool, ips []netip.Addr) string {
 	for pname, p := range pools {
 		cnt := 0
 		for _, ip := range ips {
@@ -437,7 +438,7 @@ func ipConfusesBuggyFirmwares(ip net.IP) bool {
 	return ip[3] == 0 || ip[3] == 255
 }
 
-func (a *Allocator) getIPFromCIDR(cidr *net.IPNet, avoidBuggyIPs bool, svc string, ports []Port, sharingKey, backendKey string) net.IP {
+func (a *Allocator) getIPFromCIDR(cidr netip.Addr, avoidBuggyIPs bool, svc string, ports []Port, sharingKey, backendKey string) netip.Addr {
 	sk := &key{
 		sharing: sharingKey,
 		backend: backendKey,

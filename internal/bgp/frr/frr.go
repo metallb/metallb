@@ -5,6 +5,7 @@ package frr
 import (
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"sort"
 	"strconv"
@@ -230,8 +231,11 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			if err != nil {
 				return nil, err
 			}
-
-			family := ipfamily.ForAddress(net.ParseIP(host))
+			addr, err := netip.ParseAddr(host)
+			if err != nil {
+				return nil, err
+			}
+			family := ipfamily.ForAddress(addr)
 
 			neighbor = &neighborConfig{
 				IPFamily:       family,
@@ -260,7 +264,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				continue
 			}
 
-			family := ipfamily.ForAddress(adv.Prefix.IP)
+			family := ipfamily.ForAddress(adv.Prefix.Addr())
 
 			communities := make([]string, 0)
 

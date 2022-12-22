@@ -3,19 +3,19 @@
 package layer2
 
 import (
-	"net"
+	"net/netip"
 
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // IPAdvertisement is the advertisement Info about LB IP.
 type IPAdvertisement struct {
-	ip            net.IP
+	ip            netip.Addr
 	interfaces    sets.String
 	allInterfaces bool
 }
 
-func NewIPAdvertisement(ip net.IP, allInterfaces bool, interfaces sets.String) IPAdvertisement {
+func NewIPAdvertisement(ip netip.Addr, allInterfaces bool, interfaces sets.String) IPAdvertisement {
 	return IPAdvertisement{
 		ip:            ip,
 		interfaces:    interfaces,
@@ -30,7 +30,7 @@ func (i1 *IPAdvertisement) Equal(i2 *IPAdvertisement) bool {
 	if i1 == nil || i2 == nil {
 		return false
 	}
-	if !i1.ip.Equal(i2.ip) {
+	if i1.ip.Compare(i2.ip) != 0 {
 		return false
 	}
 	if i1.allInterfaces != i2.allInterfaces {

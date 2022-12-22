@@ -4,6 +4,7 @@ package layer2
 
 import (
 	"net"
+	"net/netip"
 	"os"
 	"strconv"
 	"sync"
@@ -200,7 +201,7 @@ func (a *Announce) gratuitous(adv IPAdvertisement) {
 		return
 	}
 
-	if ip.To4() != nil {
+	if ip.Is4() {
 		for _, client := range a.arps {
 			if !adv.matchInterface(client.intf) {
 				level.Debug(a.logger).Log("op", "gratuitousAnnounce", "skip interfaces", client.intf)
@@ -223,13 +224,13 @@ func (a *Announce) gratuitous(adv IPAdvertisement) {
 	}
 }
 
-func (a *Announce) shouldAnnounce(ip net.IP, intf string) dropReason {
+func (a *Announce) shouldAnnounce(ip netip.Addr, intf string) dropReason {
 	a.RLock()
 	defer a.RUnlock()
 	ipFound := false
 	for _, ipAdvertisements := range a.ips {
 		for _, i := range ipAdvertisements {
-			if i.ip.Equal(ip) {
+			if i.ip.Compare(ip) == 0 {
 				ipFound = true
 				if i.matchInterface(intf) {
 					return dropReasonNone
@@ -254,7 +255,7 @@ func (a *Announce) SetBalancer(name string, adv IPAdvertisement) {
 	// times, so just no-op any subsequent requests.
 	if ipAdvertisements, ok := a.ips[name]; ok {
 		for i := range ipAdvertisements {
-			if adv.ip.Equal(a.ips[name][i].ip) {
+			if adv.ip.Compare(a.ips[name][i].ip) == 0 {
 				a.ips[name][i] = adv // override in case the interface list changed
 				return
 			}

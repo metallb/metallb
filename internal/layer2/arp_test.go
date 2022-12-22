@@ -6,6 +6,7 @@ import (
 	"encoding"
 	"fmt"
 	"net"
+	"net/netip"
 	"testing"
 
 	"github.com/go-kit/log"
@@ -18,7 +19,7 @@ func TestARPResponder(t *testing.T) {
 	tests := []struct {
 		name           string
 		dstMAC         net.HardwareAddr
-		arpTgt         net.IP
+		arpTgt         netip.Addr
 		arpOp          arp.Operation
 		shouldAnnounce announceFunc
 		reason         dropReason
@@ -27,36 +28,41 @@ func TestARPResponder(t *testing.T) {
 			name:   "ARP reply",
 			arpOp:  arp.OperationReply,
 			reason: dropReasonARPReply,
+			arpTgt: netip.MustParseAddr("192.168.1.10"),
 		},
 		{
 			name:   "bad Ethernet destination",
 			dstMAC: net.HardwareAddr{6, 5, 4, 3, 2, 1},
 			reason: dropReasonEthernetDestination,
+			arpTgt: netip.MustParseAddr("192.168.1.10"),
 		},
 		{
 			name:   "OK (unicast)",
 			reason: dropReasonNone,
+			arpTgt: netip.MustParseAddr("192.168.1.10"),
 		},
 		{
 			name:   "OK (broadcast)",
 			dstMAC: ethernet.Broadcast,
 			reason: dropReasonNone,
+			arpTgt: netip.MustParseAddr("192.168.1.10"),
 		},
 		{
 			name: "shouldAnnounce denies request",
-			shouldAnnounce: func(ip net.IP, intf string) dropReason {
-				if net.IPv4(192, 168, 1, 20).Equal(ip) {
+			shouldAnnounce: func(ip netip.Addr, intf string) dropReason {
+				if netip.MustParseAddr("192.168.1.20").Compare(ip) == 0 {
 					return dropReasonNone
 				}
 				return dropReasonError
 			},
 			reason: dropReasonError,
+			arpTgt: netip.MustParseAddr("192.168.1.10"),
 		},
 		{
 			name:   "shouldAnnounce allows request",
-			arpTgt: net.IPv4(192, 168, 1, 20),
-			shouldAnnounce: func(ip net.IP, intf string) dropReason {
-				if net.IPv4(192, 168, 1, 20).Equal(ip) {
+			arpTgt: netip.MustParseAddr("192.168.1.20"),
+			shouldAnnounce: func(ip netip.Addr, intf string) dropReason {
+				if netip.MustParseAddr("192.168.1.20").Compare(ip) == 0 {
 					return dropReasonNone
 				}
 				return dropReasonError
@@ -69,7 +75,7 @@ func TestARPResponder(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			shouldAnnounce := tt.shouldAnnounce
 			if shouldAnnounce == nil {
-				shouldAnnounce = func(net.IP, string) dropReason {
+				shouldAnnounce = func(netip.Addr, string) dropReason {
 					return dropReasonNone
 				}
 			}
@@ -80,9 +86,7 @@ func TestARPResponder(t *testing.T) {
 			if tt.dstMAC == nil {
 				tt.dstMAC = a.hardwareAddr
 			}
-			if tt.arpTgt == nil {
-				tt.arpTgt = net.IPv4(192, 168, 1, 10)
-			}
+
 			if tt.arpOp == 0 {
 				tt.arpOp = arp.OperationRequest
 			}
@@ -92,7 +96,7 @@ func TestARPResponder(t *testing.T) {
 				Source:      net.HardwareAddr{1, 2, 3, 4, 5, 6},
 				EtherType:   ethernet.EtherTypeARP,
 			}
-			pkt, err := arp.NewPacket(tt.arpOp, eth.Source, net.IPv4(192, 168, 1, 1), tt.dstMAC, tt.arpTgt)
+			pkt, err := arp.NewPacket(tt.arpOp, eth.Source, netip.MustParseAddr("192.168.1.1"), tt.dstMAC, tt.arpTgt)
 			if err != nil {
 				t.Fatalf("failed to make ARP packet: %s", err)
 			}
