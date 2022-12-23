@@ -4,7 +4,6 @@ package container
 
 import (
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -59,11 +58,11 @@ type Config struct {
 }
 
 // Create creates a set of frr containers corresponding to the given configurations.
-func Create(c ...Config) ([]*FRR, error) {
+func Create(configs map[string]Config) ([]*FRR, error) {
 	m := sync.Mutex{}
 	frrContainers := make([]*FRR, 0)
 	g := new(errgroup.Group)
-	for _, conf := range c {
+	for _, conf := range configs {
 		conf := conf
 		g.Go(func() error {
 			toFind := map[string]bool{
@@ -136,7 +135,7 @@ func PairWithNodes(cs clientset.Interface, c *FRR, ipFamily ipfamily.Family, mod
 
 // ConfigureExisting validates that the existing frr containers that correspond to the
 // given configurations are up and running, and returns the corresponding *FRRs.
-func ConfigureExisting(c ...Config) ([]*FRR, error) {
+func ConfigureExisting(c map[string]Config) ([]*FRR, error) {
 	frrContainers := make([]*FRR, 0)
 	for _, cfg := range c {
 		err := containerIsRunning(cfg.Name)
@@ -158,7 +157,7 @@ func ConfigureExisting(c ...Config) ([]*FRR, error) {
 // start creates a new FRR container on the host and returns the corresponding *FRR.
 // A situation where a non-nil container and an error are returned is possible.
 func start(cfg Config) (*FRR, error) {
-	testDirName, err := ioutil.TempDir("", "frr-conf")
+	testDirName, err := os.MkdirTemp("", "frr-conf")
 	if err != nil {
 		return nil, err
 	}

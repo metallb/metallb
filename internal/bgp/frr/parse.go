@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"sort"
 	"strconv"
 
 	"github.com/pkg/errors"
@@ -13,13 +14,14 @@ import (
 
 type Neighbor struct {
 	Ip             net.IP
+	VRF            string
 	Connected      bool
 	LocalAS        string
 	RemoteAS       string
-	UpdatesSent    int
 	PrefixSent     int
 	Port           int
 	RemoteRouterID string
+	MsgStats       MessageStats
 }
 
 type Route struct {
@@ -32,18 +34,30 @@ type Route struct {
 const bgpConnected = "Established"
 
 type FRRNeighbor struct {
-	RemoteAs       int    `json:"remoteAs"`
-	LocalAs        int    `json:"localAs"`
-	RemoteRouterID string `json:"remoteRouterId"`
-	BgpVersion     int    `json:"bgpVersion"`
-	BgpState       string `json:"bgpState"`
-	PortForeign    int    `json:"portForeign"`
-	MessageStats   struct {
-		UpdatesSent int `json:"updatesSent"`
-	} `json:"messageStats"`
+	RemoteAs          int          `json:"remoteAs"`
+	LocalAs           int          `json:"localAs"`
+	RemoteRouterID    string       `json:"remoteRouterId"`
+	BgpVersion        int          `json:"bgpVersion"`
+	BgpState          string       `json:"bgpState"`
+	PortForeign       int          `json:"portForeign"`
+	MsgStats          MessageStats `json:"messageStats"`
+	VRFName           string       `json:"vrf"`
 	AddressFamilyInfo map[string]struct {
 		SentPrefixCounter int `json:"sentPrefixCounter"`
 	} `json:"addressFamilyInfo"`
+}
+
+type MessageStats struct {
+	OpensSent          int `json:"opensSent"`
+	OpensReceived      int `json:"opensRecv"`
+	NotificationsSent  int `json:"notificationsSent"`
+	UpdatesSent        int `json:"updatesSent"`
+	UpdatesReceived    int `json:"updatesRecv"`
+	KeepalivesSent     int `json:"keepalivesSent"`
+	KeepalivesReceived int `json:"keepalivesRecv"`
+	RouteRefreshSent   int `json:"routeRefreshSent"`
+	TotalSent          int `json:"totalSent"`
+	TotalReceived      int `json:"totalRecv"`
 }
 
 type IPInfo struct {
@@ -117,10 +131,10 @@ func ParseNeighbour(vtyshRes string) (*Neighbor, error) {
 			Connected:      connected,
 			LocalAS:        strconv.Itoa(n.LocalAs),
 			RemoteAS:       strconv.Itoa(n.RemoteAs),
-			UpdatesSent:    n.MessageStats.UpdatesSent,
 			PrefixSent:     prefixSent,
 			Port:           n.PortForeign,
 			RemoteRouterID: n.RemoteRouterID,
+			MsgStats:       n.MsgStats,
 		}, nil
 	}
 	return nil, errors.New("no peers were returned")
@@ -154,10 +168,10 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 			Connected:      connected,
 			LocalAS:        strconv.Itoa(n.LocalAs),
 			RemoteAS:       strconv.Itoa(n.RemoteAs),
-			UpdatesSent:    n.MessageStats.UpdatesSent,
 			PrefixSent:     prefixSent,
 			Port:           n.PortForeign,
 			RemoteRouterID: n.RemoteRouterID,
+			MsgStats:       n.MsgStats,
 		})
 	}
 	return res, nil
@@ -208,16 +222,25 @@ func ParseRoutes(vtyshRes string) (map[string]Route, error) {
 	return res, nil
 }
 
-func ParseBFDPeers(vtyshRes string) (map[string]BFDPeer, error) {
+func ParseBFDPeers(vtyshRes string) ([]BFDPeer, error) {
 	parseRes := []BFDPeer{}
 	err := json.Unmarshal([]byte(vtyshRes), &parseRes)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse vtysh response")
 	}
-	res := make(map[string]BFDPeer)
-	for _, p := range parseRes {
-		res[p.Peer] = p
+	return parseRes, nil
+}
 
+func ParseVRFs(vtyshRes string) ([]string, error) {
+	vrfs := map[string]interface{}{}
+	err := json.Unmarshal([]byte(vtyshRes), &vrfs)
+	if err != nil {
+		return nil, errors.Wrap(err, "parseVRFs: failed to parse vtysh response")
 	}
+	res := make([]string, 0)
+	for v := range vrfs {
+		res = append(res, v)
+	}
+	sort.Strings(res)
 	return res, nil
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/go-kit/log"
+	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/pointer"
@@ -121,7 +122,20 @@ func TestBFDWithSession(t *testing.T) {
 		t.Fatalf("Failed to sync bfd profiles %s", err)
 	}
 
-	session, err := sessionManager.NewSession(l, "10.2.2.254:179", net.ParseIP("10.1.1.254"), 100, net.ParseIP("10.1.1.254"), 200, time.Second, 2*time.Second, "password", "hostname", "foo", true, "test-peer")
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: 2 * time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer",
+			BFDProfile:    "foo"})
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
 	}

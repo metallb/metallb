@@ -74,6 +74,10 @@ type BFDProfileStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+//+kubebuilder:printcolumn:name="Passive Mode",type=boolean,JSONPath=`.spec.passiveMode`
+//+kubebuilder:printcolumn:name="Transmit Interval",type=integer,JSONPath=`.spec.transmitInterval`
+//+kubebuilder:printcolumn:name="Receive Interval",type=integer,JSONPath=`.spec.receiveInterval`
+//+kubebuilder:printcolumn:name="Multiplier",type=integer,JSONPath=`.spec.detectMultiplier`
 
 // BFDProfile represents the settings of the bfd session that can be
 // optionally associated with a BGP session.

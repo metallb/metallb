@@ -6,11 +6,12 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"go.universe.tf/metallb/api/v1beta1"
@@ -55,7 +56,11 @@ func main() {
 			log.Fatalf("failed to create output file: %s", err)
 		}
 	}
-	defer f.Close()
+	defer func() {
+		if tmpErr := f.Close(); tmpErr != nil {
+			err = tmpErr
+		}
+	}()
 
 	err = generate(f, *source)
 	if err != nil {
@@ -105,13 +110,21 @@ func generate(w io.Writer, origin string) error {
 
 func readConfig(origin string) ([]byte, error) {
 	fp := filepath.Join(inputDirPath, origin)
-	f, err := os.Open(fp)
+	fp = filepath.Clean(fp)
+	if !strings.HasPrefix(fp, path.Clean(inputDirPath)) {
+		return nil, fmt.Errorf("Unsafe path %s", origin)
+	}
+	f, err := os.Open(filepath.Clean(fp)) // Clean have to happen here to avoid https://github.com/securego/gosec/issues/893
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file %s: %v", fp, err)
 	}
-	defer f.Close()
+	defer func() {
+		if tmpErr := f.Close(); tmpErr != nil {
+			err = tmpErr
+		}
+	}()
 
-	raw, err := ioutil.ReadAll(f)
+	raw, err := io.ReadAll(f)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file %s: %v", origin, err)
 	}

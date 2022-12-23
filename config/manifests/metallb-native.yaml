@@ -235,7 +235,20 @@ spec:
     singular: bfdprofile
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.passiveMode
+      name: Passive Mode
+      type: boolean
+    - jsonPath: .spec.transmitInterval
+      name: Transmit Interval
+      type: integer
+    - jsonPath: .spec.receiveInterval
+      name: Receive Interval
+      type: integer
+    - jsonPath: .spec.detectMultiplier
+      name: Multiplier
+      type: integer
+    name: v1beta1
     schema:
       openAPIV3Schema:
         description: BFDProfile represents the settings of the bfd session that can
@@ -335,7 +348,21 @@ spec:
     singular: bgpadvertisement
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.ipAddressPools
+      name: IPAddressPools
+      type: string
+    - jsonPath: .spec.ipAddressPoolSelectors
+      name: IPAddressPool Selectors
+      type: string
+    - jsonPath: .spec.peers
+      name: Peers
+      type: string
+    - jsonPath: .spec.nodeSelectors
+      name: Node Selectors
+      priority: 10
+      type: string
+    name: v1beta1
     schema:
       openAPIV3Schema:
         description: BGPAdvertisement allows to advertise the IPs coming from the
@@ -544,7 +571,20 @@ spec:
     singular: bgppeer
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.peerAddress
+      name: Address
+      type: string
+    - jsonPath: .spec.peerASN
+      name: ASN
+      type: string
+    - jsonPath: .spec.bfdProfile
+      name: BFD Profile
+      type: string
+    - jsonPath: .spec.ebgpMultiHop
+      name: Multi Hops
+      type: string
+    name: v1beta1
     schema:
       openAPIV3Schema:
         description: BGPPeer is the Schema for the peers API.
@@ -647,7 +687,20 @@ spec:
     storage: false
     subresources:
       status: {}
-  - name: v1beta2
+  - additionalPrinterColumns:
+    - jsonPath: .spec.peerAddress
+      name: Address
+      type: string
+    - jsonPath: .spec.peerASN
+      name: ASN
+      type: string
+    - jsonPath: .spec.bfdProfile
+      name: BFD Profile
+      type: string
+    - jsonPath: .spec.ebgpMultiHop
+      name: Multi Hops
+      type: string
+    name: v1beta2
     schema:
       openAPIV3Schema:
         description: BGPPeer is the Schema for the peers API.
@@ -779,6 +832,10 @@ spec:
               sourceAddress:
                 description: Source address to use when establishing the session.
                 type: string
+              vrf:
+                description: To set if we want to peer with the BGPPeer using an interface
+                  belonging to a host vrf
+                type: string
             required:
             - myASN
             - peerASN
@@ -880,7 +937,17 @@ spec:
     singular: ipaddresspool
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.autoAssign
+      name: Auto Assign
+      type: boolean
+    - jsonPath: .spec.avoidBuggyIPs
+      name: Avoid Buggy IPs
+      type: boolean
+    - jsonPath: .spec.addresses
+      name: Addresses
+      type: string
+    name: v1beta1
     schema:
       openAPIV3Schema:
         description: IPAddressPool represents a pool of IP addresses that can be allocated
@@ -919,6 +986,130 @@ spec:
                 description: AvoidBuggyIPs prevents addresses ending with .0 and .255
                   to be used by a pool.
                 type: boolean
+              serviceAllocation:
+                description: AllocateTo makes ip pool allocation to specific namespace
+                  and/or service. The controller will use the pool with lowest value
+                  of priority in case of multiple matches. A pool with no priority
+                  set will be used only if the pools with priority can't be used.
+                  If multiple matching IPAddressPools are available it will check
+                  for the availability of IPs sorting the matching IPAddressPools
+                  by priority, starting from the highest to the lowest. If multiple
+                  IPAddressPools have the same priority, choice will be random.
+                properties:
+                  namespaceSelectors:
+                    description: NamespaceSelectors list of label selectors to select
+                      namespace(s) for ip pool, an alternative to using namespace
+                      list.
+                    items:
+                      description: A label selector is a label query over a set of
+                        resources. The result of matchLabels and matchExpressions
+                        are ANDed. An empty label selector matches all objects. A
+                        null label selector matches no objects.
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: A label selector requirement is a selector
+                              that contains values, a key, and an operator that relates
+                              the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: operator represents a key's relationship
+                                  to a set of values. Valid operators are In, NotIn,
+                                  Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: values is an array of string values.
+                                  If the operator is In or NotIn, the values array
+                                  must be non-empty. If the operator is Exists or
+                                  DoesNotExist, the values array must be empty. This
+                                  array is replaced during a strategic merge patch.
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: matchLabels is a map of {key,value} pairs.
+                            A single {key,value} in the matchLabels map is equivalent
+                            to an element of matchExpressions, whose key field is
+                            "key", the operator is "In", and the values array contains
+                            only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                    type: array
+                  namespaces:
+                    description: Namespaces list of namespace(s) on which ip pool
+                      can be attached.
+                    items:
+                      type: string
+                    type: array
+                  priority:
+                    description: Priority priority given for ip pool while ip allocation
+                      on a service.
+                    type: integer
+                  serviceSelectors:
+                    description: ServiceSelectors list of label selector to select
+                      service(s) for which ip pool can be used for ip allocation.
+                    items:
+                      description: A label selector is a label query over a set of
+                        resources. The result of matchLabels and matchExpressions
+                        are ANDed. An empty label selector matches all objects. A
+                        null label selector matches no objects.
+                      properties:
+                        matchExpressions:
+                          description: matchExpressions is a list of label selector
+                            requirements. The requirements are ANDed.
+                          items:
+                            description: A label selector requirement is a selector
+                              that contains values, a key, and an operator that relates
+                              the key and values.
+                            properties:
+                              key:
+                                description: key is the label key that the selector
+                                  applies to.
+                                type: string
+                              operator:
+                                description: operator represents a key's relationship
+                                  to a set of values. Valid operators are In, NotIn,
+                                  Exists and DoesNotExist.
+                                type: string
+                              values:
+                                description: values is an array of string values.
+                                  If the operator is In or NotIn, the values array
+                                  must be non-empty. If the operator is Exists or
+                                  DoesNotExist, the values array must be empty. This
+                                  array is replaced during a strategic merge patch.
+                                items:
+                                  type: string
+                                type: array
+                            required:
+                            - key
+                            - operator
+                            type: object
+                          type: array
+                        matchLabels:
+                          additionalProperties:
+                            type: string
+                          description: matchLabels is a map of {key,value} pairs.
+                            A single {key,value} in the matchLabels map is equivalent
+                            to an element of matchExpressions, whose key field is
+                            "key", the operator is "In", and the values array contains
+                            only "value". The requirements are ANDed.
+                          type: object
+                      type: object
+                    type: array
+                type: object
             required:
             - addresses
             type: object
@@ -955,7 +1146,21 @@ spec:
     singular: l2advertisement
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.ipAddressPools
+      name: IPAddressPools
+      type: string
+    - jsonPath: .spec.ipAddressPoolSelectors
+      name: IPAddressPool Selectors
+      type: string
+    - jsonPath: .spec.interfaces
+      name: Interfaces
+      type: string
+    - jsonPath: .spec.nodeSelectors
+      name: Node Selectors
+      priority: 10
+      type: string
+    name: v1beta1
     schema:
       openAPIV3Schema:
         description: L2Advertisement allows to advertise the LoadBalancer IPs provided
@@ -1307,6 +1512,7 @@ rules:
   - ""
   resources:
   - services
+  - namespaces
   verbs:
   - get
   - list
@@ -1334,9 +1540,38 @@ rules:
   - use
 - apiGroups:
   - admissionregistration.k8s.io
+  resourceNames:
+  - metallb-webhook-configuration
   resources:
   - validatingwebhookconfigurations
   - mutatingwebhookconfigurations
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - admissionregistration.k8s.io
+  resources:
+  - validatingwebhookconfigurations
+  - mutatingwebhookconfigurations
+  verbs:
+  - list
+- apiGroups:
+  - apiextensions.k8s.io
+  resourceNames:
+  - addresspools.metallb.io
+  - bfdprofiles.metallb.io
+  - bgpadvertisements.metallb.io
+  - bgppeers.metallb.io
+  - ipaddresspools.metallb.io
+  - l2advertisements.metallb.io
+  - communities.metallb.io
+  resources:
+  - customresourcedefinitions
   verbs:
   - create
   - delete
@@ -1350,13 +1585,7 @@ rules:
   resources:
   - customresourcedefinitions
   verbs:
-  - create
-  - delete
-  - get
   - list
-  - patch
-  - update
-  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -1371,6 +1600,7 @@ rules:
   - services
   - endpoints
   - nodes
+  - namespaces
   verbs:
   - get
   - list
@@ -1531,9 +1761,8 @@ spec:
         readinessProbe:
           failureThreshold: 3
           httpGet:
-            path: /validate-metallb-io-v1beta1-addresspool
-            port: webhook-server
-            scheme: HTTPS
+            path: /metrics
+            port: monitoring
           initialDelaySeconds: 10
           periodSeconds: 10
           successThreshold: 1

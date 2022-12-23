@@ -16,7 +16,21 @@ spec:
     singular: bgpadvertisement
   scope: Namespaced
   versions:
-  - name: v1beta1
+  - additionalPrinterColumns:
+    - jsonPath: .spec.ipAddressPools
+      name: IPAddressPools
+      type: string
+    - jsonPath: .spec.ipAddressPoolSelectors
+      name: IPAddressPool Selectors
+      type: string
+    - jsonPath: .spec.peers
+      name: Peers
+      type: string
+    - jsonPath: .spec.nodeSelectors
+      name: Node Selectors
+      priority: 10
+      type: string
+    name: v1beta1
     schema:
       openAPIV3Schema:
         description: BGPAdvertisement allows to advertise the IPs coming from the

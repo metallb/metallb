@@ -1,0 +1,24 @@
+{{- define "bfdprofile" }}
+  profile {{.profile.Name}}
+    {{ if .profile.ReceiveInterval -}}
+    receive-interval {{.profile.ReceiveInterval}}
+    {{end -}}
+    {{ if .profile.TransmitInterval -}}
+    transmit-interval {{.profile.TransmitInterval}}
+    {{end -}}
+    {{ if .profile.DetectMultiplier -}}
+    detect-multiplier {{.profile.DetectMultiplier}}
+    {{end -}}
+    {{ if .profile.EchoMode -}}
+    echo-mode
+    {{end -}}
+    {{ if .profile.EchoInterval -}}
+    echo-interval {{.profile.EchoInterval}}
+    {{end -}}
+    {{ if .profile.PassiveMode -}}
+    passive-mode
+    {{end -}}
+    {{ if .profile.MinimumTTL -}}
+    minimum-ttl {{ .profile.MinimumTTL }}
+    {{end -}}
+{{- end -}}

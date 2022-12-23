@@ -82,6 +82,11 @@ type BGPPeerSpec struct {
 	// To set if the BGPPeer is multi-hops away. Needed for FRR mode only.
 	// +optional
 	EBGPMultiHop bool `json:"ebgpMultiHop,omitempty"`
+
+	// To set if we want to peer with the BGPPeer using an interface belonging to
+	// a host vrf
+	// +optional
+	VRFName string `json:"vrf,omitempty"`
 	// Add future BGP configuration here
 }
 
@@ -94,6 +99,10 @@ type BGPPeerStatus struct {
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:storageversion
+//+kubebuilder:printcolumn:name="Address",type=string,JSONPath=`.spec.peerAddress`
+//+kubebuilder:printcolumn:name="ASN",type=string,JSONPath=`.spec.peerASN`
+//+kubebuilder:printcolumn:name="BFD Profile",type=string,JSONPath=`.spec.bfdProfile`
+//+kubebuilder:printcolumn:name="Multi Hops",type=string,JSONPath=`.spec.ebgpMultiHop`
 
 // BGPPeer is the Schema for the peers API.
 type BGPPeer struct {

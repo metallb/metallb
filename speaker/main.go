@@ -17,7 +17,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/signal"
@@ -94,7 +93,7 @@ func main() {
 	level.Info(logger).Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "goversion", version.GoString(), "msg", "MetalLB speaker starting "+version.String())
 
 	if *namespace == "" {
-		bs, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+		bs, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 		if err != nil {
 			level.Error(logger).Log("op", "startup", "msg", "Unable to get namespace from pod service account data, please specify --namespace or METALLB_NAMESPACE", "error", err)
 			os.Exit(1)
@@ -296,11 +295,11 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 	}
 
 	l = log.With(l, "pool", poolName)
-	pool := c.config.Pools[poolName]
-	if pool == nil {
+	if c.config.Pools == nil || c.config.Pools.ByName[poolName] == nil {
 		level.Error(l).Log("bug", "true", "msg", "internal error: allocated IP has no matching address pool")
 		return c.deleteBalancer(l, name, "internalError")
 	}
+	pool := c.config.Pools.ByName[poolName]
 
 	if svcIPs, ok := c.svcIPs[name]; ok && !compareIPs(lbIPs, svcIPs) {
 		if st := c.deleteBalancer(l, name, "loadBalancerIPChanged"); st == controllers.SyncStateError {
@@ -403,8 +402,11 @@ func (c *controller) deleteBalancerProtocol(l log.Logger, protocol config.Proto,
 	return controllers.SyncStateSuccess
 }
 
-func poolFor(pools map[string]*config.Pool, ips []net.IP) string {
-	for pname, p := range pools {
+func poolFor(pools *config.Pools, ips []net.IP) string {
+	if pools == nil {
+		return ""
+	}
+	for pname, p := range pools.ByName {
 		cnt := 0
 		for _, ip := range ips {
 			for _, cidr := range p.CIDR {

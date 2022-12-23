@@ -337,6 +337,26 @@ spec:
               attempts=$(( $attempts + 1 ))
             done
             tail -f /etc/frr/frr.log
+        {{- with .Values.speaker.frr.resources }}
+        resources:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
+        {{- if .Values.speaker.livenessProbe.enabled }}
+        livenessProbe:
+          httpGet:
+            path: /livez
+            port: {{ .Values.speaker.frr.metricsPort }}
+          periodSeconds: {{ .Values.speaker.livenessProbe.periodSeconds }}
+          failureThreshold: {{ .Values.speaker.livenessProbe.failureThreshold }}
+        {{- end }}
+        {{- if .Values.speaker.startupProbe.enabled }}
+        startupProbe:
+          httpGet:
+            path: /livez
+            port: {{ .Values.speaker.frr.metricsPort }}
+          failureThreshold: {{ .Values.speaker.startupProbe.failureThreshold }}
+          periodSeconds: {{ .Values.speaker.startupProbe.periodSeconds }}
+        {{- end }}
       - name: reloader
         image: {{ .Values.speaker.frr.image.repository }}:{{ .Values.speaker.frr.image.tag | default .Chart.AppVersion }}
         {{- if .Values.speaker.frr.image.pullPolicy }}
@@ -350,6 +370,10 @@ spec:
             mountPath: /etc/frr
           - name: reloader
             mountPath: /etc/frr_reloader
+        {{- with .Values.speaker.reloader.resources }}
+        resources:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
       - name: frr-metrics
         image: {{ .Values.speaker.frr.image.repository }}:{{ .Values.speaker.frr.image.tag | default .Chart.AppVersion }}
         command: ["/etc/frr_metrics/frr-metrics"]
@@ -365,6 +389,10 @@ spec:
             mountPath: /etc/frr
           - name: metrics
             mountPath: /etc/frr_metrics
+        {{- with .Values.speaker.frrMetrics.resources }}
+        resources:
+          {{- toYaml . | nindent 12 }}
+        {{- end }}
       {{- end }}
       {{- if .Values.prometheus.secureMetricsPort }}
       - name: kube-rbac-proxy

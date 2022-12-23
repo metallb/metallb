@@ -15,6 +15,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 func selector(s string) labels.Selector {
@@ -53,7 +54,7 @@ func TestParse(t *testing.T) {
 			desc: "empty config",
 			crs:  ClusterResources{},
 			want: &Config{
-				Pools:       map[string]*Pool{},
+				Pools:       &Pools{ByName: map[string]*Pool{}},
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
@@ -75,6 +76,7 @@ func TestParse(t *testing.T) {
 							RouterID:     "10.20.30.40",
 							SrcAddress:   "10.20.30.40",
 							EBGPMultiHop: true,
+							VRFName:      "foo",
 						},
 					},
 					{
@@ -228,6 +230,7 @@ func TestParse(t *testing.T) {
 						RouterID:      net.ParseIP("10.20.30.40"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  true,
+						VRF:           "foo",
 					},
 					{
 						Name:          "peer2",
@@ -240,8 +243,9 @@ func TestParse(t *testing.T) {
 						EBGPMultiHop:  false,
 					},
 				},
-				Pools: map[string]*Pool{
+				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
+						Name:          "pool1",
 						CIDR:          []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
 						AvoidBuggyIPs: true,
 						AutoAssign:    false,
@@ -269,6 +273,7 @@ func TestParse(t *testing.T) {
 						}},
 					},
 					"pool2": {
+						Name:       "pool2",
 						CIDR:       []*net.IPNet{ipnet("30.0.0.0/8")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
@@ -285,6 +290,7 @@ func TestParse(t *testing.T) {
 						}},
 					},
 					"pool3": {
+						Name: "pool3",
 						CIDR: []*net.IPNet{
 							ipnet("40.0.0.0/25"),
 							ipnet("40.0.0.150/31"),
@@ -306,6 +312,7 @@ func TestParse(t *testing.T) {
 						AutoAssign: true,
 					},
 					"pool4": {
+						Name: "pool4",
 						CIDR: []*net.IPNet{ipnet("2001:db8::/64")},
 						L2Advertisements: []*L2Advertisement{&L2Advertisement{
 							Nodes:         map[string]bool{},
@@ -313,7 +320,211 @@ func TestParse(t *testing.T) {
 						}},
 						AutoAssign: true,
 					},
+				}},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+
+		{
+			desc: "ip address pool with namespace selection",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+								"10.50.0.0/24",
+							},
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
+							AllocateTo: &v1beta1.ServiceAllocation{Priority: 1,
+								Namespaces: []string{"test-ns1"}},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool2",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"30.0.0.0/8",
+							},
+							AllocateTo: &v1beta1.ServiceAllocation{Priority: 2,
+								NamespaceSelectors: []v1.LabelSelector{{MatchLabels: map[string]string{"team": "metallb"}}}},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool3",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"40.0.0.0/8",
+							},
+							AllocateTo: &v1beta1.ServiceAllocation{Priority: 3,
+								NamespaceSelectors: []v1.LabelSelector{{MatchLabels: map[string]string{"team": "red"}}}},
+						},
+					},
 				},
+				Namespaces: []corev1.Namespace{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "test-ns1",
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "test-ns2",
+							Labels: map[string]string{"team": "metallb"},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:               "pool1",
+						CIDR:               []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
+						AvoidBuggyIPs:      true,
+						AutoAssign:         false,
+						ServiceAllocations: &ServiceAllocation{Priority: 1, Namespaces: sets.String{"test-ns1": {}}},
+					},
+					"pool2": {
+						Name:               "pool2",
+						CIDR:               []*net.IPNet{ipnet("30.0.0.0/8")},
+						AutoAssign:         true,
+						ServiceAllocations: &ServiceAllocation{Priority: 2, Namespaces: sets.String{"test-ns2": {}}},
+					},
+					"pool3": {
+						Name:               "pool3",
+						CIDR:               []*net.IPNet{ipnet("40.0.0.0/8")},
+						AutoAssign:         true,
+						ServiceAllocations: &ServiceAllocation{Priority: 3, Namespaces: sets.String{}},
+					},
+				},
+					ByNamespace: map[string][]string{"test-ns1": {"pool1"}, "test-ns2": {"pool2"}},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+
+		{
+			desc: "ip address pool with service selection",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"30.0.0.0/8",
+							},
+							AllocateTo: &v1beta1.ServiceAllocation{Priority: 2,
+								ServiceSelectors: []v1.LabelSelector{{MatchLabels: map[string]string{"team": "metallb"}}}},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool2",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"40.0.0.0/8",
+							},
+							AllocateTo: &v1beta1.ServiceAllocation{Priority: 3,
+								ServiceSelectors: []v1.LabelSelector{{MatchLabels: map[string]string{"team": "red"}}}},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:               "pool1",
+						CIDR:               []*net.IPNet{ipnet("30.0.0.0/8")},
+						AutoAssign:         true,
+						ServiceAllocations: &ServiceAllocation{Priority: 2, ServiceSelectors: []labels.Selector{selector("team=metallb")}},
+					},
+					"pool2": {
+						Name:               "pool2",
+						CIDR:               []*net.IPNet{ipnet("40.0.0.0/8")},
+						AutoAssign:         true,
+						ServiceAllocations: &ServiceAllocation{Priority: 3, ServiceSelectors: []labels.Selector{selector("team=red")}},
+					},
+				},
+					ByServiceSelector: []string{"pool1", "pool2"}},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+
+		{
+			desc: "ip address pool with namespace and service selection",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"30.0.0.0/8",
+							},
+							AllocateTo: &v1beta1.ServiceAllocation{Priority: 2,
+								Namespaces:       []string{"test-ns1"},
+								ServiceSelectors: []v1.LabelSelector{{MatchLabels: map[string]string{"testsvc-1": "1"}}}},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool2",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"40.0.0.0/8",
+							},
+							AllocateTo: &v1beta1.ServiceAllocation{Priority: 3,
+								NamespaceSelectors: []v1.LabelSelector{{MatchLabels: map[string]string{"team": "metallb"}}},
+								ServiceSelectors:   []v1.LabelSelector{{MatchLabels: map[string]string{"testsvc-2": "2"}}}},
+						},
+					},
+				},
+				Namespaces: []corev1.Namespace{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "test-ns1",
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "test-ns2",
+							Labels: map[string]string{"team": "metallb"},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:       "pool1",
+						CIDR:       []*net.IPNet{ipnet("30.0.0.0/8")},
+						AutoAssign: true,
+						ServiceAllocations: &ServiceAllocation{Priority: 2, Namespaces: sets.NewString("test-ns1"),
+							ServiceSelectors: []labels.Selector{selector("testsvc-1=1")}},
+					},
+					"pool2": {
+						Name:       "pool2",
+						CIDR:       []*net.IPNet{ipnet("40.0.0.0/8")},
+						AutoAssign: true,
+						ServiceAllocations: &ServiceAllocation{Priority: 3, Namespaces: sets.NewString("test-ns2"),
+							ServiceSelectors: []labels.Selector{selector("testsvc-2=2")}},
+					},
+				},
+					ByNamespace:       map[string][]string{"test-ns1": {"pool1"}, "test-ns2": {"pool2"}},
+					ByServiceSelector: []string{"pool1", "pool2"}},
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
@@ -343,7 +554,7 @@ func TestParse(t *testing.T) {
 						EBGPMultiHop:  false,
 					},
 				},
-				Pools:       map[string]*Pool{},
+				Pools:       &Pools{ByName: map[string]*Pool{}},
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
@@ -458,7 +669,7 @@ func TestParse(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools:       map[string]*Pool{},
+				Pools:       &Pools{ByName: map[string]*Pool{}},
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
@@ -693,8 +904,9 @@ func TestParse(t *testing.T) {
 				},
 			},
 			want: &Config{
-				Pools: map[string]*Pool{
+				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
+						Name:       "pool1",
 						AutoAssign: true,
 						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
@@ -706,7 +918,7 @@ func TestParse(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
@@ -732,8 +944,9 @@ func TestParse(t *testing.T) {
 				},
 			},
 			want: &Config{
-				Pools: map[string]*Pool{
+				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
+						Name:       "pool1",
 						AutoAssign: true,
 						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
@@ -745,7 +958,7 @@ func TestParse(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
@@ -816,8 +1029,9 @@ func TestParse(t *testing.T) {
 				},
 			},
 			want: &Config{
-				Pools: map[string]*Pool{
+				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
+						Name:       "pool1",
 						AutoAssign: true,
 						CIDR: []*net.IPNet{
 							ipnet("3.3.3.2/31"),
@@ -843,7 +1057,7 @@ func TestParse(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
@@ -1233,8 +1447,9 @@ func TestParse(t *testing.T) {
 						BFDProfile:    "default",
 					},
 				},
-				Pools: map[string]*Pool{
+				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
+						Name:       "pool1",
 						AutoAssign: true,
 						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
@@ -1246,7 +1461,7 @@ func TestParse(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 				BFDProfiles: map[string]*BFDProfile{
 					"default": {
 						Name: "default",
@@ -1343,7 +1558,7 @@ func TestParse(t *testing.T) {
 						Password:      "nopass",
 					},
 				},
-				Pools:       map[string]*Pool{},
+				Pools:       &Pools{ByName: map[string]*Pool{}},
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
@@ -1471,8 +1686,9 @@ func TestParse(t *testing.T) {
 				},
 			},
 			want: &Config{
-				Pools: map[string]*Pool{
+				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
+						Name:       "pool1",
 						AutoAssign: true,
 						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
@@ -1484,7 +1700,7 @@ func TestParse(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 				BFDProfiles: map[string]*BFDProfile{
 					"nondefault": {
 						Name:             "nondefault",
@@ -1627,8 +1843,9 @@ func TestParse(t *testing.T) {
 						EBGPMultiHop:  true,
 					},
 				},
-				Pools: map[string]*Pool{
+				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
+						Name:          "pool1",
 						CIDR:          []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
 						AvoidBuggyIPs: true,
 						AutoAssign:    false,
@@ -1645,6 +1862,7 @@ func TestParse(t *testing.T) {
 						},
 					},
 					"legacybgppool1": {
+						Name: "legacybgppool1",
 						CIDR: []*net.IPNet{ipnet("10.40.0.0/16"), ipnet("10.60.0.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -1659,13 +1877,14 @@ func TestParse(t *testing.T) {
 						},
 					},
 					"legacyl2pool1": {
+						Name: "legacyl2pool1",
 						CIDR: []*net.IPNet{ipnet("10.21.0.0/16"), ipnet("10.51.0.0/24")},
 						L2Advertisements: []*L2Advertisement{{
 							Nodes:         map[string]bool{},
 							AllInterfaces: true,
 						}},
 					},
-				},
+				}},
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
@@ -1712,8 +1931,9 @@ func TestParse(t *testing.T) {
 				},
 			},
 			want: &Config{
-				Pools: map[string]*Pool{
+				Pools: &Pools{ByName: map[string]*Pool{
 					"legacybgppool1": {
+						Name: "legacybgppool1",
 						CIDR: []*net.IPNet{ipnet("10.40.0.0/16"), ipnet("10.60.0.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -1727,7 +1947,7 @@ func TestParse(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
@@ -1857,8 +2077,9 @@ func TestParse(t *testing.T) {
 				},
 			},
 			want: &Config{
-				Pools: map[string]*Pool{
+				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
+						Name:       "pool1",
 						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
@@ -1876,6 +2097,7 @@ func TestParse(t *testing.T) {
 						}},
 					},
 					"pool2": {
+						Name:       "pool2",
 						CIDR:       []*net.IPNet{ipnet("30.0.0.0/16")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
@@ -1889,7 +2111,7 @@ func TestParse(t *testing.T) {
 						},
 						L2Advertisements: nil,
 					},
-				},
+				}},
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
@@ -1928,8 +2150,9 @@ func TestParse(t *testing.T) {
 				},
 			},
 			want: &Config{
-				Pools: map[string]*Pool{
+				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
+						Name:       "pool1",
 						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
 						AutoAssign: true,
 						L2Advertisements: []*L2Advertisement{{
@@ -1938,7 +2161,7 @@ func TestParse(t *testing.T) {
 							Interfaces:    []string{"eth0"},
 						}},
 					},
-				},
+				}},
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
@@ -2141,20 +2364,22 @@ func TestParse(t *testing.T) {
 				},
 			},
 			want: &Config{
-				Pools: map[string]*Pool{
+				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
+						Name:              "pool1",
 						CIDR:              []*net.IPNet{ipnet("10.20.0.0/16")},
 						AutoAssign:        true,
 						BGPAdvertisements: nil,
 						L2Advertisements:  nil,
 					},
 					"pool2": {
+						Name:              "pool2",
 						CIDR:              []*net.IPNet{ipnet("30.0.0.0/16")},
 						AutoAssign:        true,
 						BGPAdvertisements: nil,
 						L2Advertisements:  nil,
 					},
-				},
+				}},
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
@@ -2279,8 +2504,9 @@ func TestParse(t *testing.T) {
 				},
 			},
 			want: &Config{
-				Pools: map[string]*Pool{
+				Pools: &Pools{ByName: map[string]*Pool{
 					"legacybgppool1": {
+						Name: "legacybgppool1",
 						CIDR: []*net.IPNet{ipnet("10.40.0.0/16"), ipnet("10.60.0.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
 							{
@@ -2296,6 +2522,7 @@ func TestParse(t *testing.T) {
 					},
 
 					"legacyl2pool1": {
+						Name: "legacyl2pool1",
 						CIDR: []*net.IPNet{ipnet("10.21.0.0/16"), ipnet("10.51.0.0/24")},
 						L2Advertisements: []*L2Advertisement{{
 							Nodes: map[string]bool{
@@ -2307,6 +2534,7 @@ func TestParse(t *testing.T) {
 					},
 
 					"pool1": {
+						Name:       "pool1",
 						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
@@ -2325,6 +2553,7 @@ func TestParse(t *testing.T) {
 						}},
 					},
 					"pool2": {
+						Name:       "pool2",
 						CIDR:       []*net.IPNet{ipnet("30.0.0.0/16")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
@@ -2337,7 +2566,7 @@ func TestParse(t *testing.T) {
 						},
 						L2Advertisements: nil,
 					},
-				},
+				}},
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
@@ -2548,8 +2777,9 @@ func TestParse(t *testing.T) {
 				},
 			},
 			want: &Config{
-				Pools: map[string]*Pool{
+				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
+						Name:       "pool1",
 						CIDR:       []*net.IPNet{ipnet("10.20.0.0/16")},
 						AutoAssign: true,
 						BGPAdvertisements: []*BGPAdvertisement{
@@ -2571,7 +2801,7 @@ func TestParse(t *testing.T) {
 							AllInterfaces: true,
 						}},
 					},
-				},
+				}},
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
@@ -2629,8 +2859,9 @@ func TestParse(t *testing.T) {
 						EBGPMultiHop:  false,
 					},
 				},
-				Pools: map[string]*Pool{
+				Pools: &Pools{ByName: map[string]*Pool{
 					"pool1": {
+						Name:       "pool1",
 						AutoAssign: true,
 						CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
 						BGPAdvertisements: []*BGPAdvertisement{
@@ -2644,7 +2875,7 @@ func TestParse(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},

@@ -5,3 +5,4 @@ node_modules/
 .cover/
 vendor/
 cover.out
+.vscode

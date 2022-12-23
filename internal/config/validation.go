@@ -30,6 +30,9 @@ func DiscardFRROnly(c ClusterResources) error {
 		if p.Spec.KeepaliveTime.Duration != 0 {
 			return fmt.Errorf("peer %s has keepalive-time set on native bgp mode", p.Spec.Address)
 		}
+		if p.Spec.VRFName != "" {
+			return fmt.Errorf("peer %s has vrf set on native bgp mode", p.Spec.Address)
+		}
 	}
 	if len(c.BFDProfiles) > 0 {
 		return errors.New("bfd profiles section set")
@@ -66,20 +69,25 @@ func DontValidate(c ClusterResources) error {
 func DiscardNativeOnly(c ClusterResources) error {
 	if len(c.Peers) > 1 {
 		peerAddr := make(map[string]bool)
-		myAsn := c.Peers[0].Spec.MyASN
 		routerID := c.Peers[0].Spec.RouterID
 		peerAddr[c.Peers[0].Spec.Address] = true
 		for _, p := range c.Peers[1:] {
 			if p.Spec.RouterID != routerID {
 				return fmt.Errorf("peer %s has RouterID different from %s, in FRR mode all RouterID must be equal", p.Spec.RouterID, c.Peers[0].Spec.RouterID)
 			}
-			if p.Spec.MyASN != myAsn {
-				return fmt.Errorf("peer %s has myAsn different from %s, in FRR mode all myAsn must be equal", p.Spec.Address, c.Peers[0].Spec.Address)
-			}
 			if _, ok := peerAddr[p.Spec.Address]; ok {
 				return fmt.Errorf("peer %s already exists, FRR mode doesn't support duplicate BGPPeers", p.Spec.Address)
 			}
 			peerAddr[p.Spec.Address] = true
+		}
+	}
+	for _, p := range c.Peers {
+		for _, p1 := range c.Peers[1:] {
+			if p.Spec.MyASN != p1.Spec.MyASN &&
+				p.Spec.VRFName == p1.Spec.VRFName {
+				return fmt.Errorf("peer %s has myAsn different from %s, in FRR mode all myAsn must be equal for the same VRF", p.Spec.Address, p1.Spec.Address)
+			}
+
 		}
 	}
 	return nil

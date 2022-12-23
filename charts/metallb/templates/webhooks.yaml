@@ -12,7 +12,7 @@ webhooks:
       name: metallb-webhook-service
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta1-addresspool
-  failurePolicy: Fail
+  failurePolicy: {{ .Values.crds.validationFailurePolicy }}
   name: addresspoolvalidationwebhook.metallb.io
   rules:
   - apiGroups:
@@ -32,7 +32,7 @@ webhooks:
       name: metallb-webhook-service
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta2-bgppeer
-  failurePolicy: Fail
+  failurePolicy: {{ .Values.crds.validationFailurePolicy }}
   name: bgppeervalidationwebhook.metallb.io
   rules:
   - apiGroups:
@@ -52,7 +52,7 @@ webhooks:
       name: metallb-webhook-service
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta1-ipaddresspool
-  failurePolicy: Fail
+  failurePolicy: {{ .Values.crds.validationFailurePolicy }}
   name: ipaddresspoolvalidationwebhook.metallb.io
   rules:
   - apiGroups:
@@ -72,7 +72,7 @@ webhooks:
       name: metallb-webhook-service
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta1-bgpadvertisement
-  failurePolicy: Fail
+  failurePolicy: {{ .Values.crds.validationFailurePolicy }}
   name: bgpadvertisementvalidationwebhook.metallb.io
   rules:
   - apiGroups:
@@ -92,7 +92,7 @@ webhooks:
       name: metallb-webhook-service
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta1-community
-  failurePolicy: Fail
+  failurePolicy: {{ .Values.crds.validationFailurePolicy }}
   name: communityvalidationwebhook.metallb.io
   rules:
   - apiGroups:
@@ -112,7 +112,7 @@ webhooks:
       name: metallb-webhook-service
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta1-bfdprofile
-  failurePolicy: Fail
+  failurePolicy: {{ .Values.crds.validationFailurePolicy }}
   name: bfdprofilevalidationwebhook.metallb.io
   rules:
   - apiGroups:
@@ -132,7 +132,7 @@ webhooks:
       name: metallb-webhook-service
       namespace: {{ .Release.Namespace }}
       path: /validate-metallb-io-v1beta1-l2advertisement
-  failurePolicy: Fail
+  failurePolicy: {{ .Values.crds.validationFailurePolicy }}
   name: l2advertisementvalidationwebhook.metallb.io
   rules:
   - apiGroups:

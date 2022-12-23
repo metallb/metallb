@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/pprof"
 	"os"
+	"time"
 
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,14 +29,12 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
-	"github.com/open-policy-agent/cert-controller/pkg/rotator"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
-	"k8s.io/apimachinery/pkg/types"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/record"
@@ -63,7 +62,7 @@ var (
 	validatingWebhookName           = "metallb-webhook-configuration"
 	addresspoolConvertingWebhookCRD = "addresspools.metallb.io"
 	bgppeerConvertingWebhookCRD     = "bgppeers.metallb.io"
-	webhookSecretName               = "webhook-server-cert"
+	webhookSecretName               = "webhook-server-cert" //#nosec G101
 )
 
 func init() {
@@ -120,6 +119,7 @@ type Config struct {
 //
 // The client uses processName to identify itself to the cluster
 // (e.g. when logging events).
+//
 //nolint:godot
 func New(cfg *Config) (*Client, error) {
 	namespaceSelector := cache.ObjectSelector{
@@ -263,125 +263,54 @@ func New(cfg *Config) (*Client, error) {
 		}
 	}
 
-	if cfg.EnableWebhook {
-		setupFinished := make(chan struct{})
-		if !cfg.DisableCertRotation {
-			webhooks := []rotator.WebhookInfo{
-				{
-					Name: validatingWebhookName,
-					Type: rotator.Validating,
-				},
-				{
-					Name: addresspoolConvertingWebhookCRD,
-					Type: rotator.CRDConversion,
-				},
-				{
-					Name: bgppeerConvertingWebhookCRD,
-					Type: rotator.CRDConversion,
-				},
-			}
-
-			level.Info(c.logger).Log("op", "startup", "action", "setting up cert rotation")
-			err := rotator.AddRotator(mgr, &rotator.CertRotator{
-				SecretKey: types.NamespacedName{
-					Namespace: cfg.Namespace,
-					Name:      webhookSecretName,
-				},
-				CertDir:        cfg.CertDir,
-				CAName:         caName,
-				CAOrganization: caOrganization,
-				DNSName:        fmt.Sprintf("%s.%s.svc", cfg.CertServiceName, cfg.Namespace),
-				IsReady:        setupFinished,
-				Webhooks:       webhooks,
-			})
-			if err != nil {
-				level.Error(c.logger).Log("error", err, "unable to set up", "cert rotation")
-				return nil, err
-			}
-		} else {
-			close(setupFinished)
-		}
-
-		go func() {
-			// Block until the setup (certificate generation) finishes.
-			<-setupFinished
+	startListeners := make(chan struct{})
+	go func(l log.Logger) {
+		// We start the webhooks and the metric at the same time so the readiness probe will
+		// return success only when we are able to serve webhook requests.
+		<-startListeners
+		if cfg.EnableWebhook {
 			err := enableWebhook(c.mgr, cfg.ValidateConfig, cfg.Namespace, cfg.Logger)
 			if err != nil {
-				level.Error(c.logger).Log("error", err, "unable to create", "webhooks")
+				level.Error(l).Log("error", err, "unable to create", "webhooks")
 			}
-		}()
-	}
+		}
 
-	mux := http.NewServeMux()
-	mux.Handle("/metrics", promhttp.Handler())
+		mux := http.NewServeMux()
+		mux.Handle("/metrics", promhttp.Handler())
 
-	if cfg.EnablePprof {
-		mux.HandleFunc("/debug/pprof/", pprof.Index)
-		mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-		mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-		mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-		mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
-	}
+		if cfg.EnablePprof {
+			mux.HandleFunc("/debug/pprof/", pprof.Index)
+			mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+			mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+			mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+			mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+		}
 
-	go func(l log.Logger) {
-		err := http.ListenAndServe(net.JoinHostPort(cfg.MetricsHost, fmt.Sprint(cfg.MetricsPort)), mux)
+		server := &http.Server{
+			Addr:              net.JoinHostPort(cfg.MetricsHost, fmt.Sprint(cfg.MetricsPort)),
+			Handler:           mux,
+			ReadHeaderTimeout: 3 * time.Second,
+		}
+
+		err := server.ListenAndServe()
 		if err != nil {
 			level.Error(l).Log("op", "listenAndServe", "err", err, "msg", "cannot listen and serve", "host", cfg.MetricsHost, "port", cfg.MetricsPort)
 		}
 	}(c.logger)
 
+	// The cert rotator will notify when we can start the webhook
+	// and the metric endpoint
+	if cfg.EnableWebhook && !cfg.DisableCertRotation {
+		err = enableCertRotation(startListeners, cfg, mgr)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to enable cert rotation")
+		}
+	} else {
+		// otherwise we can go on and start them
+		close(startListeners)
+	}
+
 	return c, nil
-}
-
-func enableWebhook(mgr manager.Manager, validate config.Validate, namespace string, logger log.Logger) error {
-	level.Info(logger).Log("op", "startup", "action", "webhooks enabled")
-
-	// Used by all the webhooks
-	metallbv1beta1.MetalLBNamespace = namespace
-	metallbv1beta2.MetalLBNamespace = namespace
-	metallbv1beta1.Logger = logger
-	metallbv1beta2.Logger = logger
-	metallbv1beta1.WebhookClient = mgr.GetAPIReader()
-	metallbv1beta2.WebhookClient = mgr.GetAPIReader()
-	metallbv1beta1.Validator = config.NewValidator(validate)
-	metallbv1beta2.Validator = config.NewValidator(validate)
-
-	if err := (&metallbv1beta1.AddressPool{}).SetupWebhookWithManager(mgr); err != nil {
-		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "AddressPool")
-		return err
-	}
-
-	if err := (&metallbv1beta1.IPAddressPool{}).SetupWebhookWithManager(mgr); err != nil {
-		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "IPAddressPool")
-		return err
-	}
-
-	if err := (&metallbv1beta2.BGPPeer{}).SetupWebhookWithManager(mgr); err != nil {
-		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "BGPPeer v1beta2")
-		return err
-	}
-
-	if err := (&metallbv1beta1.BGPAdvertisement{}).SetupWebhookWithManager(mgr); err != nil {
-		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "BGPAdvertisement")
-		return err
-	}
-
-	if err := (&metallbv1beta1.L2Advertisement{}).SetupWebhookWithManager(mgr); err != nil {
-		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "L2Advertisement")
-		return err
-	}
-
-	if err := (&metallbv1beta1.Community{}).SetupWebhookWithManager(mgr); err != nil {
-		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "Community")
-		return err
-	}
-
-	if err := (&metallbv1beta1.BFDProfile{}).SetupWebhookWithManager(mgr); err != nil {
-		level.Error(logger).Log("op", "startup", "error", err, "msg", "unable to create webhook", "webhook", "BFDProfile")
-		return err
-	}
-
-	return nil
 }
 
 // CreateMlSecret create the memberlist secret.
@@ -434,7 +363,7 @@ func (c *Client) CreateMlSecret(namespace, controllerDeploymentName, secretName 
 		},
 		metav1.CreateOptions{})
 	if err == nil {
-		level.Info(c.logger).Log("op", "CreateMlSecret", "msg", "secret succesfully created")
+		level.Info(c.logger).Log("op", "CreateMlSecret", "msg", "secret successfully created")
 	}
 	return err
 }

@@ -8,7 +8,22 @@ import (
 	"net"
 	"sort"
 	"testing"
+
+	"github.com/google/go-cmp/cmp"
 )
+
+var expectedStats = MessageStats{
+	OpensSent:          1,
+	OpensReceived:      2,
+	NotificationsSent:  3,
+	UpdatesSent:        4,
+	UpdatesReceived:    5,
+	KeepalivesSent:     6,
+	KeepalivesReceived: 7,
+	RouteRefreshSent:   8,
+	TotalSent:          9,
+	TotalReceived:      10,
+}
 
 func TestNeighbour(t *testing.T) {
 	sample := `{
@@ -41,20 +56,20 @@ func TestNeighbour(t *testing.T) {
       "messageStats":{
         "depthInq":0,
         "depthOutq":0,
-        "opensSent":0,
-        "opensRecv":0,
-        "notificationsSent":0,
+        "opensSent":1,
+        "opensRecv":2,
+        "notificationsSent":3,
         "notificationsRecv":0,
-        "updatesSent":%d,
-        "updatesRecv":0,
-        "keepalivesSent":0,
-        "keepalivesRecv":0,
-        "routeRefreshSent":0,
+        "updatesSent":4,
+        "updatesRecv":5,
+        "keepalivesSent":6,
+        "keepalivesRecv":7,
+        "routeRefreshSent":8,
         "routeRefreshRecv":0,
         "capabilitySent":0,
         "capabilityRecv":0,
-        "totalSent":0,
-        "totalRecv":0
+        "totalSent":9,
+        "totalRecv":10
       },
       "minBtwnAdvertisementRunsTimerMsecs":0,
       "addressFamilyInfo":{
@@ -90,7 +105,6 @@ func TestNeighbour(t *testing.T) {
 		remoteAS       string
 		localAS        string
 		status         string
-		updatesSent    int
 		ipv4PrefixSent int
 		ipv6PrefixSent int
 		port           int
@@ -102,7 +116,6 @@ func TestNeighbour(t *testing.T) {
 			"64512",
 			"64512",
 			"Established",
-			1,
 			1,
 			0,
 			179,
@@ -116,7 +129,6 @@ func TestNeighbour(t *testing.T) {
 			"Active",
 			0,
 			0,
-			0,
 			180,
 			"",
 		},
@@ -128,7 +140,6 @@ func TestNeighbour(t *testing.T) {
 			"Established",
 			2,
 			1,
-			1,
 			181,
 			"",
 		},
@@ -136,7 +147,7 @@ func TestNeighbour(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			n, err := ParseNeighbour(fmt.Sprintf(sample, tt.neighborIP, tt.remoteAS, tt.localAS, tt.status, tt.updatesSent, tt.ipv4PrefixSent, tt.ipv6PrefixSent, tt.port))
+			n, err := ParseNeighbour(fmt.Sprintf(sample, tt.neighborIP, tt.remoteAS, tt.localAS, tt.status, tt.ipv4PrefixSent, tt.ipv6PrefixSent, tt.port))
 			if err != nil {
 				t.Fatal("Failed to parse ", err)
 			}
@@ -155,9 +166,6 @@ func TestNeighbour(t *testing.T) {
 			if tt.status != "Established" && n.Connected == true {
 				t.Fatal("Expected connected", false, "got", n.Connected)
 			}
-			if tt.updatesSent != n.UpdatesSent {
-				t.Fatal("Expected updates sent", tt.updatesSent, "got", n.UpdatesSent)
-			}
 			if tt.ipv4PrefixSent+tt.ipv6PrefixSent != n.PrefixSent {
 				t.Fatal("Expected prefix sent", tt.ipv4PrefixSent+tt.ipv6PrefixSent, "got", n.PrefixSent)
 			}
@@ -166,6 +174,9 @@ func TestNeighbour(t *testing.T) {
 			}
 			if n.RemoteRouterID != "0.0.0.0" {
 				t.Fatal("Expected remote routerid 0.0.0.0")
+			}
+			if !cmp.Equal(expectedStats, n.MsgStats) {
+				t.Fatal("unexpected BGP messages stats (-want +got)\n", cmp.Diff(expectedStats, n.MsgStats))
 			}
 		})
 	}
@@ -202,20 +213,20 @@ const threeNeighbours = `
     "messageStats":{
       "depthInq":0,
       "depthOutq":0,
-      "opensSent":0,
-      "opensRecv":0,
-      "notificationsSent":0,
+      "opensSent":1,
+      "opensRecv":2,
+      "notificationsSent":3,
       "notificationsRecv":0,
-      "updatesSent":0,
-      "updatesRecv":0,
-      "keepalivesSent":0,
-      "keepalivesRecv":0,
-      "routeRefreshSent":0,
+      "updatesSent":4,
+      "updatesRecv":5,
+      "keepalivesSent":6,
+      "keepalivesRecv":7,
+      "routeRefreshSent":8,
       "routeRefreshRecv":0,
       "capabilitySent":0,
       "capabilityRecv":0,
-      "totalSent":0,
-      "totalRecv":0
+      "totalSent":9,
+      "totalRecv":10
     },
     "minBtwnAdvertisementRunsTimerMsecs":0,
     "addressFamilyInfo":{
@@ -264,20 +275,20 @@ const threeNeighbours = `
     "messageStats":{
       "depthInq":0,
       "depthOutq":0,
-      "opensSent":0,
-      "opensRecv":0,
-      "notificationsSent":0,
+      "opensSent":1,
+      "opensRecv":2,
+      "notificationsSent":3,
       "notificationsRecv":0,
-      "updatesSent":0,
-      "updatesRecv":0,
-      "keepalivesSent":0,
-      "keepalivesRecv":0,
-      "routeRefreshSent":0,
+      "updatesSent":4,
+      "updatesRecv":5,
+      "keepalivesSent":6,
+      "keepalivesRecv":7,
+      "routeRefreshSent":8,
       "routeRefreshRecv":0,
       "capabilitySent":0,
       "capabilityRecv":0,
-      "totalSent":0,
-      "totalRecv":0
+      "totalSent":9,
+      "totalRecv":10
     },
     "minBtwnAdvertisementRunsTimerMsecs":0,
     "addressFamilyInfo":{
@@ -326,20 +337,20 @@ const threeNeighbours = `
     "messageStats":{
       "depthInq":0,
       "depthOutq":0,
-      "opensSent":0,
-      "opensRecv":0,
-      "notificationsSent":0,
+      "opensSent":1,
+      "opensRecv":2,
+      "notificationsSent":3,
       "notificationsRecv":0,
-      "updatesSent":0,
-      "updatesRecv":0,
-      "keepalivesSent":0,
-      "keepalivesRecv":0,
-      "routeRefreshSent":0,
+      "updatesSent":4,
+      "updatesRecv":5,
+      "keepalivesSent":6,
+      "keepalivesRecv":7,
+      "routeRefreshSent":8,
       "routeRefreshRecv":0,
       "capabilitySent":0,
       "capabilityRecv":0,
-      "totalSent":0,
-      "totalRecv":0
+      "totalSent":9,
+      "totalRecv":10
     },
     "minBtwnAdvertisementRunsTimerMsecs":0,
     "addressFamilyInfo":{
@@ -433,19 +444,19 @@ const threeNeighbours = `
       "depthInq":0,
       "depthOutq":0,
       "opensSent":1,
-      "opensRecv":1,
-      "notificationsSent":0,
+      "opensRecv":2,
+      "notificationsSent":3,
       "notificationsRecv":0,
-      "updatesSent":1,
-      "updatesRecv":0,
-      "keepalivesSent":1,
-      "keepalivesRecv":1,
-      "routeRefreshSent":0,
+      "updatesSent":4,
+      "updatesRecv":5,
+      "keepalivesSent":6,
+      "keepalivesRecv":7,
+      "routeRefreshSent":8,
       "routeRefreshRecv":0,
       "capabilitySent":0,
       "capabilityRecv":0,
-      "totalSent":3,
-      "totalRecv":2
+      "totalSent":9,
+      "totalRecv":10
     },
     "minBtwnAdvertisementRunsTimerMsecs":0,
     "addressFamilyInfo":{
@@ -499,6 +510,12 @@ func TestNeighbours(t *testing.T) {
 	}
 	if !nn[2].Ip.Equal(net.ParseIP("172.18.0.4")) {
 		t.Fatal("neighbour ip not matching")
+	}
+
+	for i, n := range nn {
+		if !cmp.Equal(expectedStats, n.MsgStats) {
+			t.Fatal("unexpected BGP messages stats for neightbor", i, "(-want +got)\n", cmp.Diff(expectedStats, n.MsgStats))
+		}
 	}
 }
 
@@ -677,14 +694,91 @@ func TestBFDPeers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to parse %s", err)
 	}
-	p, ok := peers["172.18.0.3"]
-	if !ok {
+	if len(peers) != 3 {
+		t.Fatal("Unexpected peer number", len(peers))
+	}
+	if peers[2].Peer != "172.18.0.3" {
 		t.Fatal("Peer not found")
 	}
-	if p.Status != "up" {
+	if peers[2].Status != "up" {
 		t.Fatal("wrong status")
 	}
-	if p.RemoteEchoInterval != 50 {
+	if peers[2].RemoteEchoInterval != 50 {
 		t.Fatal("wrong echo interval")
+	}
+}
+
+const vrfs = `{
+"default":{
+ "vrfId": 0,
+ "vrfName": "default",
+ "tableVersion": 1,
+ "routerId": "172.18.0.3",
+ "defaultLocPrf": 100,
+ "localAS": 64512,
+ "routes": { "192.168.10.0/32": [
+  {
+    "valid":true,
+    "bestpath":true,
+    "pathFrom":"external",
+    "prefix":"192.168.10.0",
+    "prefixLen":32,
+    "network":"192.168.10.0\/32",
+    "metric":0,
+    "weight":32768,
+    "peerId":"(unspec)",
+    "path":"",
+    "origin":"IGP",
+    "nexthops":[
+      {
+        "ip":"0.0.0.0",
+        "hostname":"kind-control-plane",
+        "afi":"ipv4",
+        "used":true
+      }
+    ]
+  }
+] }  }
+,
+"red":{
+ "vrfId": 5,
+ "vrfName": "red",
+ "tableVersion": 1,
+ "routerId": "172.31.0.4",
+ "defaultLocPrf": 100,
+ "localAS": 64512,
+ "routes": { "192.168.10.0/32": [
+  {
+    "valid":true,
+    "bestpath":true,
+    "pathFrom":"external",
+    "prefix":"192.168.10.0",
+    "prefixLen":32,
+    "network":"192.168.10.0\/32",
+    "metric":0,
+    "weight":32768,
+    "peerId":"(unspec)",
+    "path":"",
+    "origin":"IGP",
+    "nexthops":[
+      {
+        "ip":"0.0.0.0",
+        "hostname":"kind-control-plane",
+        "afi":"ipv4",
+        "used":true
+      }
+    ]
+  }
+] }  }
+}`
+
+func TestVRFs(t *testing.T) {
+	parsed, err := ParseVRFs(vrfs)
+	if err != nil {
+		t.Fatalf("Failed to parse %s", err)
+	}
+	expected := []string{"default", "red"}
+	if !cmp.Equal(parsed, expected) {
+		t.Fatalf("unexpected vrf list: %s", cmp.Diff(parsed, expected))
 	}
 }

@@ -307,6 +307,10 @@ speaker:
     periodSeconds: 10
     successThreshold: 1
     timeoutSeconds: 1
+  startupProbe:
+    enabled: true
+    failureThreshold: 30
+    periodSeconds: 5
   # frr contains configuration specific to the MetalLB FRR container,
   # for speaker running alongside FRR.
   frr:
@@ -316,10 +320,18 @@ speaker:
       tag: v7.5.1
       pullPolicy:
     metricsPort: 7473
+    resources: {}
 
     # if set, enables a rbac proxy sidecar container on the speaker to
     # expose the frr metrics via tls.
     # secureMetricsPort: 9121
 
+  reloader:
+    resources: {}
+
+  frrMetrics:
+    resources: {}
+
 crds:
   enabled: true
+  validationFailurePolicy: Fail

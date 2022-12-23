@@ -2,22 +2,45 @@ name: CI
 
 on:
   pull_request:
+    paths-ignore:
+      - 'configsamples/**'
+      - 'design/**'
+      - 'website/**'
+      - 'CODE_OF_CONDUCT.md'
+      - 'CODEOWNERS'
+      - 'CONTRIBUTING.md'
+      - 'DCO'
+      - 'LICENSE'
+      - 'netlify.toml'
+      - 'README.md'
     branches:
       - "main"
       - "v**"
   workflow_dispatch:
 
 jobs:
+  static-security-analysis:
+    runs-on: ubuntu-22.04
+    env:
+      GO111MODULE: on
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v2
+      - name: Run Gosec Security Scanner
+        uses: securego/gosec@master
+        with:
+          args: -exclude-dir e2etest -severity medium ./...
+
   commitlint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - uses: wagoid/commitlint-github-action@v4
+      - uses: wagoid/commitlint-github-action@v5
 
   unit-tests:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Cancel Previous Runs
         uses: styfle/cancel-workflow-action@0.9.1
@@ -56,7 +79,7 @@ jobs:
           inv checkchanges --action="run inv generateapidocs"
 
   build-test-images:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: true
       matrix:
@@ -84,7 +107,7 @@ jobs:
           path: /tmp/${{ matrix.image }}.tar
 
   helm:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v3
@@ -128,7 +151,7 @@ jobs:
           helm conftest charts/metallb/ -p charts/metallb/policy/ --fail-on-warn
 
   e2e:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs:
       - unit-tests
       - build-test-images
@@ -152,6 +175,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Install kernel modules
+        run: |
+          sudo apt-get update
+          sudo apt-get install linux-modules-extra-$(uname -r)
+
       - name: Setup
         uses: ./.github/workflows/composite/setup
 
@@ -170,7 +198,8 @@ jobs:
           echo '/etc/frr/core-%e.%p.%h.%t' | sudo tee /proc/sys/kernel/core_pattern
           if [ ${{ matrix.deployment }} = "helm" ]; then export SPEAKER_SELECTOR="app.kubernetes.io/component=speaker" && export CONTROLLER_SELECTOR="app.kubernetes.io/component=controller"; fi
           SKIP="none"
-          if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|BFD|DUALSTACK"; fi
+          NATIVE_BGP=""
+          if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|BFD|VRF|DUALSTACK"; NATIVE_BGP="--native-bgp"; fi
           if [ "${{ matrix.ip-family }}" == "ipv4" ]; then SKIP="$SKIP|IPV6|DUALSTACK"; fi
           if [ "${{ matrix.ip-family }}" == "dual" ]; then SKIP="$SKIP|IPV6"; fi
           if [ "${{ matrix.ip-family }}" == "ipv6" ]; then SKIP="$SKIP|IPV4|DUALSTACK"; fi
@@ -178,7 +207,8 @@ jobs:
           if [ "${{ matrix.prometheus }}" == "disabled" ]; then SKIP="$SKIP|metrics"; fi
 
           echo "Skipping $SKIP"
-          sudo -E env "PATH=$PATH" inv e2etest --skip $SKIP -e /tmp/kind_logs
+          echo "Native bgp mode $NATIVE_BGP"
+          sudo -E env "PATH=$PATH" inv e2etest --skip $SKIP $NATIVE_BGP -e /tmp/kind_logs
 
       - name: Collect Logs
         if: ${{ failure() }}
@@ -190,7 +220,7 @@ jobs:
   # in the operator. We deploy a v4-frr lane, clone the v0.12.1 version of metallb and run CI
   # in operator mode. We run few significative tests that cover all the crds.
   backward_compatible:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs:
       - unit-tests
       - build-test-images
@@ -241,7 +271,7 @@ jobs:
           artifact-name: kind-logs-backward-compatible
 
   e2e-use-operator:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs:
       - unit-tests
       - build-test-images
@@ -252,6 +282,11 @@ jobs:
         shell: bash
 
     steps:
+      - name: Install kernel modules
+        run: |
+          sudo apt-get update
+          sudo apt-get install linux-modules-extra-$(uname -r)
+
       - name: Checkout
         uses: actions/checkout@v2
         with:
@@ -310,13 +345,18 @@ jobs:
           artifact-name: kind_logs_use_operator
 
   oldest_k8s:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     needs:
       - unit-tests
       - build-test-images
       - helm
       - commitlint
     steps:
+      - name: Install kernel modules
+        run: |
+          sudo apt-get update
+          sudo apt-get install linux-modules-extra-$(uname -r)
+
       - name: Checkout
         uses: actions/checkout@v2
         with:

@@ -5,7 +5,6 @@ package frr
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -32,7 +31,7 @@ func TestMain(m *testing.M) {
 		log.Fatalf("failed to create dockertest pool %s", err)
 	}
 
-	frrDir, err = ioutil.TempDir("/tmp", "frr_integration")
+	frrDir, err = os.MkdirTemp("/tmp", "frr_integration")
 	if err != nil {
 		log.Fatalf("failed to create temp dir %s", err)
 	}

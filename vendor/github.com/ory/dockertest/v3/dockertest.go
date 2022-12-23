@@ -69,7 +69,11 @@ func (r *Resource) GetBoundIP(id string) string {
 		return ""
 	}
 
-	return m[0].HostIP
+	ip := m[0].HostIP
+	if ip == "0.0.0.0" || ip == "" {
+		return "localhost"
+	}
+	return ip
 }
 
 // GetHostPort returns a resource's published port with an address.
@@ -84,7 +88,7 @@ func (r *Resource) GetHostPort(portID string) string {
 	}
 
 	ip := m[0].HostIP
-	if ip == "0.0.0.0" {
+	if ip == "0.0.0.0" || ip == "" {
 		ip = "localhost"
 	}
 	return net.JoinHostPort(ip, m[0].HostPort)
@@ -302,6 +306,7 @@ type RunOptions struct {
 	Privileged   bool
 	User         string
 	Tty          bool
+	Platform     string
 }
 
 // BuildOptions is used to pass in optional parameters when building a container
@@ -403,6 +408,7 @@ func (d *Pool) RunWithOptions(opts *RunOptions, hcOpts ...func(*dc.HostConfig)) 
 		if err := d.Client.PullImage(dc.PullImageOptions{
 			Repository: repository,
 			Tag:        tag,
+			Platform:   opts.Platform,
 		}, opts.Auth); err != nil {
 			return nil, errors.Wrap(err, "")
 		}
@@ -600,6 +606,28 @@ func (d *Pool) CreateNetwork(name string, opts ...func(config *dc.CreateNetworkO
 		pool:    d,
 		Network: network,
 	}, nil
+}
+
+// NetworksByName returns a list of docker networks filtered by name
+func (d *Pool) NetworksByName(name string) ([]Network, error) {
+	networks, err := d.Client.ListNetworks()
+	if err != nil {
+		return nil, errors.Wrap(err, "")
+	}
+
+	var foundNetworks []Network
+	for idx := range networks {
+		if networks[idx].Name == name {
+			foundNetworks = append(foundNetworks,
+				Network{
+					pool:    d,
+					Network: &networks[idx],
+				},
+			)
+		}
+	}
+
+	return foundNetworks, nil
 }
 
 // RemoveNetwork disconnects containers and removes provided network.

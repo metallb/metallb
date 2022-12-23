@@ -32,21 +32,10 @@ type sessionManager struct {
 }
 
 type session struct {
-	name           string
-	myASN          uint32
-	routerID       net.IP // May be nil, meaning "derive from context"
-	myNode         string
-	addr           string
-	srcAddr        net.IP
-	asn            uint32
-	holdTime       time.Duration
-	keepaliveTime  time.Duration
-	logger         log.Logger
-	password       string
-	advertised     []*bgp.Advertisement
-	bfdProfile     string
-	ebgpMultiHop   bool
+	bgp.SessionParameters
 	sessionManager *sessionManager
+	advertised     []*bgp.Advertisement
+	logger         log.Logger
 }
 
 // Create a variable for os.Hostname() in order to make it easy to mock out
@@ -69,9 +58,9 @@ func validate(adv *bgp.Advertisement) error {
 func (s *session) Set(advs ...*bgp.Advertisement) error {
 	s.sessionManager.Lock()
 	defer s.sessionManager.Unlock()
-	sessionName := sessionName(s.srcAddr.String(), s.myASN, s.addr, s.asn)
+	sessionName := sessionName(s.SourceAddress.String(), s.MyASN, s.PeerAddress, s.PeerASN)
 	if _, found := s.sessionManager.sessions[sessionName]; !found {
-		return fmt.Errorf("session not established before advertisement")
+		return fmt.Errorf("session %s not established before advertisement", sessionName)
 	}
 
 	newAdvs := []*bgp.Advertisement{}
@@ -118,25 +107,14 @@ func (s *session) Close() error {
 //
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
-func (sm *sessionManager) NewSession(l log.Logger, addr string, srcAddr net.IP, myASN uint32, routerID net.IP, asn uint32, holdTime, keepaliveTime time.Duration, password, myNode, bfdProfile string, ebgpMultiHop bool, name string) (bgp.Session, error) {
+func (sm *sessionManager) NewSession(l log.Logger, args bgp.SessionParameters) (bgp.Session, error) {
 	sm.Lock()
 	defer sm.Unlock()
 	s := &session{
-		name:           name,
-		myASN:          myASN,
-		routerID:       routerID,
-		myNode:         myNode,
-		addr:           addr,
-		srcAddr:        srcAddr,
-		asn:            asn,
-		holdTime:       holdTime,
-		keepaliveTime:  keepaliveTime,
-		logger:         log.With(l, "peer", addr, "localASN", myASN, "peerASN", asn),
-		password:       password,
-		advertised:     []*bgp.Advertisement{},
-		sessionManager: sm,
-		bfdProfile:     bfdProfile,
-		ebgpMultiHop:   ebgpMultiHop,
+		logger:            log.With(l, "peer", args.PeerAddress, "localASN", args.MyASN, "peerASN", args.PeerASN),
+		advertised:        []*bgp.Advertisement{},
+		sessionManager:    sm,
+		SessionParameters: args,
 	}
 
 	_ = sm.addSession(s)
@@ -155,7 +133,7 @@ func (sm *sessionManager) addSession(s *session) error {
 	if s == nil {
 		return fmt.Errorf("invalid session")
 	}
-	sessionName := sessionName(s.srcAddr.String(), s.myASN, s.addr, s.asn)
+	sessionName := sessionName(s.SourceAddress.String(), s.MyASN, s.PeerAddress, s.PeerASN)
 	sm.sessions[sessionName] = s
 
 	return nil
@@ -165,7 +143,7 @@ func (sm *sessionManager) deleteSession(s *session) error {
 	if s == nil {
 		return fmt.Errorf("invalid session")
 	}
-	sessionName := sessionName(s.srcAddr.String(), s.myASN, s.addr, s.asn)
+	sessionName := sessionName(s.SourceAddress.String(), s.MyASN, s.PeerAddress, s.PeerASN)
 	delete(sm.sessions, sessionName)
 
 	return nil
@@ -201,9 +179,19 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 	config := &frrConfig{
 		Hostname:    hostname,
 		Loglevel:    sm.logLevel,
-		Routers:     make(map[string]*routerConfig),
 		BFDProfiles: sm.bfdProfiles,
 	}
+
+	type router struct {
+		myASN        uint32
+		routerID     string
+		neighbors    map[string]*neighborConfig
+		vrf          string
+		ipV4Prefixes map[string]string
+		ipV6Prefixes map[string]string
+	}
+
+	routers := make(map[string]*router)
 
 	// leave it for backward compatibility
 	frrLogLevel, found := os.LookupEnv("FRR_LOGGING_LEVEL")
@@ -212,25 +200,28 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 	}
 
 	for _, s := range sm.sessions {
-		var router *routerConfig
 		var neighbor *neighborConfig
 		var exist bool
+		var rout *router
 
-		routerName := routerName(s.routerID.String(), s.myASN)
-		if router, exist = config.Routers[routerName]; !exist {
-			router = &routerConfig{
-				MyASN:     s.myASN,
-				Neighbors: make(map[string]*neighborConfig),
+		routerName := routerName(s.RouterID.String(), s.MyASN, s.VRFName)
+		if rout, exist = routers[routerName]; !exist {
+			rout = &router{
+				myASN:        s.MyASN,
+				neighbors:    make(map[string]*neighborConfig),
+				ipV4Prefixes: make(map[string]string),
+				ipV6Prefixes: make(map[string]string),
+				vrf:          s.VRFName,
 			}
-			if s.routerID != nil {
-				router.RouterId = s.routerID.String()
+			if s.RouterID != nil {
+				rout.routerID = s.RouterID.String()
 			}
-			config.Routers[routerName] = router
+			routers[routerName] = rout
 		}
 
-		neighborName := neighborName(s.addr, s.asn)
-		if neighbor, exist = router.Neighbors[neighborName]; !exist {
-			host, port, err := net.SplitHostPort(s.addr)
+		neighborName := neighborName(s.PeerAddress, s.PeerASN, s.VRFName)
+		if neighbor, exist = rout.neighbors[neighborName]; !exist {
+			host, port, err := net.SplitHostPort(s.PeerAddress)
 			if err != nil {
 				return nil, err
 			}
@@ -244,27 +235,28 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 
 			neighbor = &neighborConfig{
 				IPFamily:       family,
-				ASN:            s.asn,
+				ASN:            s.PeerASN,
 				Addr:           host,
 				Port:           uint16(portUint),
-				HoldTime:       uint64(s.holdTime / time.Second),
-				KeepaliveTime:  uint64(s.keepaliveTime / time.Second),
-				Password:       s.password,
+				HoldTime:       uint64(s.HoldTime / time.Second),
+				KeepaliveTime:  uint64(s.KeepAliveTime / time.Second),
+				Password:       s.Password,
 				Advertisements: make([]*advertisementConfig, 0),
-				BFDProfile:     s.bfdProfile,
-				EBGPMultiHop:   s.ebgpMultiHop,
+				BFDProfile:     s.BFDProfile,
+				EBGPMultiHop:   s.EBGPMultiHop,
+				VRFName:        s.VRFName,
 			}
-			if s.srcAddr != nil {
-				neighbor.SrcAddr = s.srcAddr.String()
+			if s.SourceAddress != nil {
+				neighbor.SrcAddr = s.SourceAddress.String()
 			}
-			router.Neighbors[neighborName] = neighbor
+			rout.neighbors[neighborName] = neighbor
 		}
 
 		/* As 'session.advertised' is a map, we can be sure there are no
 		   duplicate prefixes and can, therefore, just add them to the
 		   'neighbor.Advertisements' list. */
 		for _, adv := range s.advertised {
-			if !adv.MatchesPeer(s.name) {
+			if !adv.MatchesPeer(s.SessionName) {
 				continue
 			}
 
@@ -277,17 +269,36 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				community := metallbconfig.CommunityToString(c)
 				communities = append(communities, community)
 			}
+
+			prefix := adv.Prefix.String()
 			advConfig := advertisementConfig{
 				IPFamily:    family,
-				Prefix:      adv.Prefix.String(),
+				Prefix:      prefix,
 				Communities: communities,
 				LocalPref:   adv.LocalPref,
 			}
 
 			neighbor.Advertisements = append(neighbor.Advertisements, &advConfig)
+			switch family {
+			case ipfamily.IPv4:
+				rout.ipV4Prefixes[prefix] = prefix
+			case ipfamily.IPv6:
+				rout.ipV6Prefixes[prefix] = prefix
+			}
 		}
 	}
 
+	for _, r := range sortMap(routers) {
+		toAdd := &routerConfig{
+			MyASN:        r.myASN,
+			RouterID:     r.routerID,
+			VRF:          r.vrf,
+			Neighbors:    sortMap(r.neighbors),
+			IPV4Prefixes: sortMap(r.ipV4Prefixes),
+			IPV6Prefixes: sortMap(r.ipV6Prefixes),
+		}
+		config.Routers = append(config.Routers, toAdd)
+	}
 	return config, nil
 }
 
@@ -388,4 +399,17 @@ func logLevelToFRR(level logging.Level) string {
 	}
 
 	return "informational"
+}
+
+func sortMap[T any](toSort map[string]T) []T {
+	keys := make([]string, 0)
+	for k := range toSort {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	res := make([]T, 0)
+	for _, k := range keys {
+		res = append(res, toSort[k])
+	}
+	return res
 }

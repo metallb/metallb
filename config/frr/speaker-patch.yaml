@@ -78,6 +78,18 @@ spec:
                 attempts=$(( $attempts + 1 ))
               done
               tail -f /etc/frr/frr.log
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: 7473
+            periodSeconds: 5
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: 7473
+            failureThreshold: 30
+            periodSeconds: 5
         - name: reloader
           image: frrouting/frr:v7.5.1
           command: ["/etc/frr_reloader/frr-reloader.sh"]

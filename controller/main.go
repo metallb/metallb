@@ -17,7 +17,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"reflect"
 
@@ -43,7 +42,7 @@ type service interface {
 
 type controller struct {
 	client service
-	pools  map[string]*config.Pool
+	pools  *config.Pools
 	ips    *allocator.Allocator
 }
 
@@ -59,7 +58,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		return controllers.SyncStateReprocessAll
 	}
 
-	if c.pools == nil {
+	if c.pools == nil || c.pools.ByName == nil {
 		// Config hasn't been read, nothing we can do just yet.
 		level.Debug(l).Log("event", "noConfig", "msg", "not processing, still waiting for config")
 		return controllers.SyncStateSuccess
@@ -86,16 +85,24 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		return successRes
 	}
 
+	toWrite := svcRo.DeepCopy()
 	if !reflect.DeepEqual(svcRo.Status, svc.Status) {
-		var st v1.ServiceStatus
-		st, svc = svc.Status, svcRo.DeepCopy()
-		svc.Status = st
+		toWrite.Status = svc.Status
+	}
+
+	if !reflect.DeepEqual(svcRo.Annotations, svc.Annotations) {
+		toWrite.Annotations = svc.Annotations
+	}
+
+	if !reflect.DeepEqual(toWrite, svcRo) {
 		if err := c.client.UpdateStatus(svc); err != nil {
-			level.Error(l).Log("op", "updateServiceStatus", "error", err, "msg", "failed to update service status")
+			level.Error(l).Log("op", "updateServiceStatus", "error", err, "msg", "failed to update service")
 			return controllers.SyncStateError
 		}
+		level.Info(l).Log("event", "serviceUpdated", "msg", "updated service object")
 	}
-	level.Info(l).Log("event", "serviceUpdated", "msg", "updated service object")
+
+	level.Info(l).Log("event", "serviceUpdated", "msg", "service is not updated")
 	return successRes
 }
 
@@ -105,11 +112,11 @@ func (c *controller) deleteBalancer(l log.Logger, name string) {
 	}
 }
 
-func (c *controller) SetPools(l log.Logger, pools map[string]*config.Pool) controllers.SyncState {
+func (c *controller) SetPools(l log.Logger, pools *config.Pools) controllers.SyncState {
 	level.Debug(l).Log("event", "startUpdate", "msg", "start of config update")
 	defer level.Debug(l).Log("event", "endUpdate", "msg", "end of config update")
 
-	if pools == nil {
+	if pools == nil || pools.ByName == nil {
 		level.Error(l).Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
 		return controllers.SyncStateErrorNoRetry
 	}
@@ -148,7 +155,7 @@ func main() {
 	level.Info(logger).Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "goversion", version.GoString(), "msg", "MetalLB controller starting "+version.String())
 
 	if *namespace == "" {
-		bs, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+		bs, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
 		if err != nil {
 			level.Error(logger).Log("op", "startup", "msg", "Unable to get namespace from pod service account data, please specify --namespace or METALLB_NAMESPACE", "error", err)
 			os.Exit(1)

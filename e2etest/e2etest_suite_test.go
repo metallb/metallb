@@ -58,7 +58,9 @@ var (
 	prometheusNamespace string
 	nodeNics            string
 	localNics           string
-	external_containers string
+	externalContainers  string
+	runOnHost           bool
+	bgpNativeMode       bool
 )
 
 // handleFlags sets up all flags and parses the command line.
@@ -86,8 +88,14 @@ func handleFlags() {
 	flag.BoolVar(&useOperator, "use-operator", false, "set this to true to run the tests using operator custom resources")
 	flag.StringVar(&reportPath, "report-path", "/tmp/report", "the path to be used to dump test failure information")
 	flag.StringVar(&prometheusNamespace, "prometheus-namespace", "monitoring", "the namespace prometheus is running in (if running)")
-	flag.StringVar(&external_containers, "external-containers", "", "a comma separated list of external containers names to use for the test. (valid parameters are: ibgp-single-hop / ibgp-multi-hop / ebgp-single-hop / ebgp-multi-hop)")
+	flag.StringVar(&externalContainers, "external-containers", "", "a comma separated list of external containers names to use for the test. (valid parameters are: ibgp-single-hop / ibgp-multi-hop / ebgp-single-hop / ebgp-multi-hop)")
+	flag.BoolVar(&bgpNativeMode, "bgp-native-mode", false, "says if we are testing against a deployment using bgp native mode")
+
 	flag.Parse()
+
+	if _, res := os.LookupEnv("RUN_FRR_CONTAINER_ON_HOST_NETWORK"); res {
+		runOnHost = true
+	}
 }
 
 func TestMain(m *testing.M) {
@@ -137,8 +145,23 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	v4Addresses := strings.Split(ipv4ForContainers, ",")
 	v6Addresses := strings.Split(ipv6ForContainers, ",")
-	bgptests.FRRContainers, err = bgptests.InfraSetup(v4Addresses, v6Addresses, external_containers, cs)
-	framework.ExpectNoError(err)
+
+	switch {
+	case externalContainers != "":
+		bgptests.FRRContainers, err = bgptests.ExternalContainersSetup(externalContainers, cs)
+		framework.ExpectNoError(err)
+	case runOnHost:
+		bgptests.FRRContainers, err = bgptests.HostContainerSetup()
+		framework.ExpectNoError(err)
+	default:
+		bgptests.FRRContainers, err = bgptests.KindnetContainersSetup(v4Addresses, v6Addresses, cs)
+		framework.ExpectNoError(err)
+		if !bgpNativeMode {
+			vrfFRRContainers, err := bgptests.VRFContainersSetup(cs)
+			framework.ExpectNoError(err)
+			bgptests.FRRContainers = append(bgptests.FRRContainers, vrfFRRContainers...)
+		}
+	}
 
 	clientconfig, err := framework.LoadConfig()
 	framework.ExpectNoError(err)
@@ -181,7 +204,8 @@ var _ = ginkgo.AfterSuite(func() {
 	cs, err := framework.LoadClientset()
 	framework.ExpectNoError(err)
 
-	err = bgptests.InfraTearDown(bgptests.FRRContainers, cs)
+	toTearDown := append(bgptests.FRRContainers, bgptests.VRFFRRContainers...)
+	err = bgptests.InfraTearDown(cs, toTearDown)
 	framework.ExpectNoError(err)
 	err = updater.Clean()
 	framework.ExpectNoError(err)
