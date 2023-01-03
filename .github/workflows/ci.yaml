@@ -198,7 +198,8 @@ jobs:
           echo '/etc/frr/core-%e.%p.%h.%t' | sudo tee /proc/sys/kernel/core_pattern
           if [ ${{ matrix.deployment }} = "helm" ]; then export SPEAKER_SELECTOR="app.kubernetes.io/component=speaker" && export CONTROLLER_SELECTOR="app.kubernetes.io/component=controller"; fi
           SKIP="none"
-          if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|BFD|VRF|DUALSTACK"; fi
+          NATIVE_BGP=""
+          if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|BFD|VRF|DUALSTACK"; NATIVE_BGP="--native-bgp"; fi
           if [ "${{ matrix.ip-family }}" == "ipv4" ]; then SKIP="$SKIP|IPV6|DUALSTACK"; fi
           if [ "${{ matrix.ip-family }}" == "dual" ]; then SKIP="$SKIP|IPV6"; fi
           if [ "${{ matrix.ip-family }}" == "ipv6" ]; then SKIP="$SKIP|IPV4|DUALSTACK"; fi
@@ -206,7 +207,8 @@ jobs:
           if [ "${{ matrix.prometheus }}" == "disabled" ]; then SKIP="$SKIP|metrics"; fi
 
           echo "Skipping $SKIP"
-          sudo -E env "PATH=$PATH" inv e2etest --skip $SKIP -e /tmp/kind_logs
+          echo "Native bgp mode $NATIVE_BGP"
+          sudo -E env "PATH=$PATH" inv e2etest --skip $SKIP $NATIVE_BGP -e /tmp/kind_logs
 
       - name: Collect Logs
         if: ${{ failure() }}
@@ -321,8 +323,18 @@ jobs:
           sed -i 's/quay.io\/metallb\/controller:main/quay.io\/metallb\/controller:dev-amd64/g' bin/metallb-operator.yaml
           sed -i 's/native/frr/g' bin/metallb-operator.yaml
           kubectl apply -f bin/metallb-operator.yaml
-          sleep 30s
 
+      - name: Ensure MetalLB operator is ready
+        run: |
+          COUNT=0
+          while [ "$(kubectl get pods -n metallb-system -l control-plane='controller-manager' -o jsonpath='{.items[*].status.containerStatuses[0].ready}')" != "true" ]; do
+            sleep 5
+            COUNT=$((COUNT+1))
+            if [[ $COUNT -gt 15 ]] ; then
+              exit 1;
+            fi
+            echo "Waiting for operator pod to be ready."
+          done
 
       - name: MetalLB E2E Tests with Operator Deployment
         run: |

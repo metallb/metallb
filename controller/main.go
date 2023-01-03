@@ -42,7 +42,7 @@ type service interface {
 
 type controller struct {
 	client service
-	pools  map[string]*config.Pool
+	pools  *config.Pools
 	ips    *allocator.Allocator
 }
 
@@ -58,7 +58,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		return controllers.SyncStateReprocessAll
 	}
 
-	if c.pools == nil {
+	if c.pools == nil || c.pools.ByName == nil {
 		// Config hasn't been read, nothing we can do just yet.
 		level.Debug(l).Log("event", "noConfig", "msg", "not processing, still waiting for config")
 		return controllers.SyncStateSuccess
@@ -112,11 +112,11 @@ func (c *controller) deleteBalancer(l log.Logger, name string) {
 	}
 }
 
-func (c *controller) SetPools(l log.Logger, pools map[string]*config.Pool) controllers.SyncState {
+func (c *controller) SetPools(l log.Logger, pools *config.Pools) controllers.SyncState {
 	level.Debug(l).Log("event", "startUpdate", "msg", "start of config update")
 	defer level.Debug(l).Log("event", "endUpdate", "msg", "end of config update")
 
-	if pools == nil {
+	if pools == nil || pools.ByName == nil {
 		level.Error(l).Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
 		return controllers.SyncStateErrorNoRetry
 	}

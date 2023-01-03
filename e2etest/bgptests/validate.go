@@ -53,7 +53,10 @@ func validateFRRPeeredWithNodes(cs clientset.Interface, nodes []corev1.Node, c *
 		neighbors, err := frr.NeighborsInfo(c)
 		framework.ExpectNoError(err)
 		err = frr.NeighborsMatchNodes(nodes, neighbors, ipFamily, c.RouterConfig.VRF)
-		return err
+		if err != nil {
+			return fmt.Errorf("failed to match neighbors for %s, %w", c.Name, err)
+		}
+		return nil
 	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
 
@@ -110,7 +113,8 @@ func validateServiceNoWait(cs clientset.Interface, svc *corev1.Service, nodes []
 		}
 
 		// The BGP routes will not match the nodes if static routes were added.
-		if !(c.Network == multiHopNetwork) {
+		if c.Network != defaultNextHopSettings.multiHopNetwork &&
+			c.Network != vrfNextHopSettings.multiHopNetwork {
 			advertised := routes.ForIP(ingressIP, c)
 			err = routes.MatchNodes(nodes, advertised, serviceIPFamily, c.RouterConfig.VRF)
 			if err != nil {
@@ -129,7 +133,11 @@ func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily ipf
 	Eventually(func() error {
 		addresses := n.AddressesForFamily(ipFamily)
 		for _, address := range addresses {
-			toParse, err := podExecutor.Exec("vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", address))
+			vrfSelector := ""
+			if n.RouterConfig.VRF != "" {
+				vrfSelector = fmt.Sprintf("vrf %s", n.RouterConfig.VRF)
+			}
+			toParse, err := podExecutor.Exec("vtysh", "-c", fmt.Sprintf("show bgp %s neighbor %s json", vrfSelector, address))
 			if err != nil {
 				return err
 			}
