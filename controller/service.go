@@ -94,7 +94,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	if len(lbIPs) != 0 {
 		// This assign is idempotent if the config is consistent,
 		// otherwise it'll fail and tell us why.
-		if err = c.ips.Assign(key, lbIPs, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
+		if err = c.ips.Assign(key, svc, lbIPs, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 			level.Info(l).Log("event", "clearAssignment", "error", err, "msg", "current IP not allowed by config, clearing")
 			c.clearServiceState(key, svc)
 			lbIPs = []net.IP{}
@@ -198,7 +198,7 @@ func (c *controller) allocateIPs(key string, svc *v1.Service) ([]net.IP, error) 
 		if serviceIPFamily != desiredLbIPFamily {
 			return nil, fmt.Errorf("requested loadBalancer IP(s) %q does not match the ipFamily of the service", desiredLbIPs)
 		}
-		if err := c.ips.Assign(key, desiredLbIPs, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
+		if err := c.ips.Assign(key, svc, desiredLbIPs, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 			return nil, err
 		}
 		return desiredLbIPs, nil
@@ -206,7 +206,7 @@ func (c *controller) allocateIPs(key string, svc *v1.Service) ([]net.IP, error) 
 	// Otherwise, did the user ask for a specific pool?
 	desiredPool := svc.Annotations[annotationAddressPool]
 	if desiredPool != "" {
-		ips, err := c.ips.AllocateFromPool(key, serviceIPFamily, desiredPool, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
+		ips, err := c.ips.AllocateFromPool(key, svc, serviceIPFamily, desiredPool, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
 		if err != nil {
 			return nil, err
 		}
