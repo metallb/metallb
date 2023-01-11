@@ -109,10 +109,40 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 	forPool := speakersForPool(c.sList.UsableSpeakers(), pool)
 	var nodes []string
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
+		level.Debug(l).Log("msg", "service has LOCAL external traffic policy")
 		nodes = usableNodes(eps, forPool)
 	} else {
 		nodes = nodesWithActiveSpeakers(forPool)
 	}
+
+	level.Debug(l).Log("msg", "node list after filtering", "nodes", nodes)
+
+	var prefNodeAvail bool
+	svcPrefNodeL2 := svc.Annotations["metallb.universe.tf/preferredNode"]
+	level.Info(l).Log("msg", "Read service metallb.universe.tf/preferredNode", "preferredNode", svcPrefNodeL2)
+
+	if svcPrefNodeL2 != "" {
+		prefNodeAvail = false
+		for _, node := range nodes {
+			if svcPrefNodeL2 == node {
+				prefNodeAvail = true
+			}
+		}
+
+		level.Debug(l).Log("msg", "check preferredNode in selected nodes", "prefNodeAvail", prefNodeAvail)
+
+		// Preferred Node is in selected nodes, select it as the L2 announcer.
+		if prefNodeAvail {
+			if svcPrefNodeL2 == c.myNode {
+				level.Debug(l).Log("msg", "currentNode is preferred, be the announcer")
+				return ""
+			} else {
+				level.Debug(l).Log("msg", "currentNode is not preferred, NOT be the announcer")
+				return "notPreferred"
+			}
+		}
+	}
+
 	// Using the first IP should work for both single and dual stack.
 	ipString := toAnnounce[0].String()
 	// Sort the slice by the hash of node + load balancer ips. This
@@ -125,12 +155,19 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 		return bytes.Compare(hi[:], hj[:]) < 0
 	})
 
+	if len(nodes) == 0 {
+		level.Info(l).Log("msg", "node list is empty, it might be because no active endpoint is available on this node and the external traffic policy is local")
+		return "emptyNodeList"
+	}
+
 	// Are we first in the list? If so, we win and should announce.
-	if len(nodes) > 0 && nodes[0] == c.myNode {
+	if nodes[0] == c.myNode {
+		level.Debug(l).Log("msg", "we won and should announce")
 		return ""
 	}
 
 	// Either not eligible, or lost the election entirely.
+	level.Debug(l).Log("msg", "we are not the winner and should NOT announce")
 	return "notOwner"
 }
 

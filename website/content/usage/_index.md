@@ -244,3 +244,30 @@ The second reason is much simpler: if you have more services than
 available IP addresses, and you can't or don't want to get more
 addresses, the only alternative is to colocate multiple services per
 IP address.
+
+## Preferred Node (Layer2)
+
+By default, the Layer2 leader node is elected automatically. In addition, MetalLB supports indicating a specific node as the leader during the election process.
+
+If you prefer one node to serve the Load Balancer IP, add the `metallb.universe.tf/preferredNode` annotation to your service,
+with the name of the node as the annotation value. For example:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  annotations:
+    metallb.universe.tf/preferredNode: NodeA
+spec:
+  ports:
+  - port: 80
+    targetPort: 80
+  selector:
+    app: nginx
+  type: LoadBalancer
+```
+
+It can also be used to perform manual leader switchover to other nodes.
+
+In case this preferred node is not available, the process will fall back to the default automatic election.

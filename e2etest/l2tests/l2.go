@@ -697,6 +697,102 @@ var _ = ginkgo.Describe("L2", func() {
 	},
 		table.Entry("IPV4", &IPV4ServiceRange),
 		table.Entry("IPV6", &IPV6ServiceRange))
+
+	ginkgo.It("validate preferredNode configuration works well", func() {
+		//table.DescribeTable("validate preferredNode configuration works well", func(ipRange *string) {
+		var preferredNode *corev1.Node
+
+		namespace := f.Namespace.Name
+
+		ginkgo.By("configure addresspool")
+
+		resources := internalconfig.ClusterResources{
+			Pools: []metallbv1beta1.IPAddressPool{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "l2-service-preferred-node",
+					},
+					Spec: metallbv1beta1.IPAddressPoolSpec{
+						Addresses: []string{
+							IPV4ServiceRange,
+							IPV6ServiceRange},
+					},
+				},
+			},
+			L2Advs: []metallbv1beta1.L2Advertisement{emptyL2Advertisement},
+		}
+
+		err := ConfigUpdater.Update(resources)
+		framework.ExpectNoError(err)
+
+		allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+		framework.ExpectNoError(err)
+
+		preferredNode = &allNodes.Items[0]
+
+		ginkgo.By(fmt.Sprintf("configure service with preferred node"))
+		svc, _ := service.CreateWithBackend(cs, namespace, fmt.Sprintf("preferred-node-service"),
+			func(svc *corev1.Service) {
+				svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeCluster
+				svc.Annotations = map[string]string{"metallb.universe.tf/preferredNode": preferredNode.Name}
+			})
+
+		defer func() {
+			err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+			framework.ExpectNoError(err)
+		}()
+
+		ginkgo.By(fmt.Sprintf("validate service IP was advertised by preferred node"))
+		ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+
+		port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
+		hostport := net.JoinHostPort(ingressIP, port)
+		address := fmt.Sprintf("http://%s/", hostport)
+
+		gomega.Eventually(func() string {
+			err := mac.RequestAddressResolution(ingressIP, executor.Host)
+			if err != nil {
+				return err.Error()
+			}
+			err = wget.Do(address, executor.Host)
+			framework.ExpectNoError(err)
+			advNode, err := advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
+			if err != nil {
+				return err.Error()
+			}
+			ginkgo.By(fmt.Sprintf("advertised node=%s, preferred node=%s", advNode.Name, preferredNode.Name))
+			return advNode.Name
+		}, 2*time.Minute, 1*time.Second).Should(gomega.Equal(preferredNode.Name))
+
+		preferredNode = &allNodes.Items[1]
+
+		ginkgo.By(fmt.Sprintf("configure service with new preferred node"))
+		svc.Annotations = map[string]string{"metallb.universe.tf/preferredNode": preferredNode.Name}
+		_, err = cs.CoreV1().Services(svc.Namespace).Update(context.Background(), svc, metav1.UpdateOptions{})
+		framework.ExpectNoError(err)
+
+		ginkgo.By(fmt.Sprintf("validate service IP was advertised by new preferred node"))
+		ingressIP = e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+
+		port = strconv.Itoa(int(svc.Spec.Ports[0].Port))
+		hostport = net.JoinHostPort(ingressIP, port)
+		address = fmt.Sprintf("http://%s/", hostport)
+
+		gomega.Eventually(func() string {
+			err := mac.RequestAddressResolution(ingressIP, executor.Host)
+			if err != nil {
+				return err.Error()
+			}
+			err = wget.Do(address, executor.Host)
+			framework.ExpectNoError(err)
+			advNode, err := advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
+			if err != nil {
+				return err.Error()
+			}
+			ginkgo.By(fmt.Sprintf("advertised node=%s, preferred node=%s", advNode.Name, preferredNode.Name))
+			return advNode.Name
+		}, 2*time.Minute, 1*time.Second).Should(gomega.Equal(preferredNode.Name))
+	})
 })
 
 // TODO: The tests find the announcing node in multiple ways (MAC/Events).
