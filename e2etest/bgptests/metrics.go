@@ -7,8 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/extensions/table"
+	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	frrconfig "go.universe.tf/metallb/e2etest/pkg/frr/config"
@@ -38,7 +37,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 	}
 
 	ginkgo.AfterEach(func() {
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
+		if ginkgo.CurrentSpecReport().Failed() {
 			dumpBGPInfo(ReportPath, ginkgo.CurrentGinkgoTestDescription().TestText, cs, f)
 			k8s.DumpInfo(Reporter, ginkgo.CurrentGinkgoTestDescription().TestText)
 		}
@@ -94,7 +93,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 			framework.ExpectNoError(err)
 		})
 
-		table.DescribeTable("should collect BGP metrics in FRR mode", func(ipFamily ipfamily.Family, poolAddress string, addressTotal int) {
+		ginkgo.DescribeTable("should collect BGP metrics in FRR mode", func(ipFamily ipfamily.Family, poolAddress string, addressTotal int) {
 			poolName := "bgp-test"
 
 			resources := metallbconfig.ClusterResources{
@@ -222,11 +221,11 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 				}, 2*time.Minute, 1*time.Second).Should(BeNil())
 			}
 		},
-			table.Entry("IPV4 - Checking service", ipfamily.IPv4, v4PoolAddresses, 256),
-			table.Entry("IPV6 - Checking service", ipfamily.IPv6, v6PoolAddresses, 16),
+			ginkgo.Entry("IPV4 - Checking service", ipfamily.IPv4, v4PoolAddresses, 256),
+			ginkgo.Entry("IPV6 - Checking service", ipfamily.IPv6, v6PoolAddresses, 16),
 		)
 
-		table.DescribeTable("should be exposed by the controller", func(ipFamily ipfamily.Family, poolAddress string, addressTotal int) {
+		ginkgo.DescribeTable("should be exposed by the controller", func(ipFamily ipfamily.Family, poolAddress string, addressTotal int) {
 			poolName := "bgp-test"
 
 			peerAddrToName := make(map[string]string)
@@ -389,11 +388,11 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 				}, 2*time.Minute, 1*time.Second).Should(BeNil())
 			}
 		},
-			table.Entry("IPV4 - Checking service", ipfamily.IPv4, v4PoolAddresses, 256),
-			table.Entry("IPV6 - Checking service", ipfamily.IPv6, v6PoolAddresses, 16))
+			ginkgo.Entry("IPV4 - Checking service", ipfamily.IPv4, v4PoolAddresses, 256),
+			ginkgo.Entry("IPV6 - Checking service", ipfamily.IPv6, v6PoolAddresses, 16))
 	})
 
-	table.DescribeTable("BFD metrics from FRR", func(bfd metallbv1beta1.BFDProfile, pairingFamily ipfamily.Family, poolAddresses []string) {
+	ginkgo.DescribeTable("BFD metrics from FRR", func(bfd metallbv1beta1.BFDProfile, pairingFamily ipfamily.Family, poolAddresses []string) {
 		resources := metallbconfig.ClusterResources{
 			Pools: []metallbv1beta1.IPAddressPool{
 				{
@@ -567,13 +566,13 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 			}, 2*time.Minute, 5*time.Second).Should(BeNil())
 		}
 	},
-		table.Entry("IPV4 - default",
+		ginkgo.Entry("IPV4 - default",
 			metallbv1beta1.BFDProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar",
 				},
 			}, ipfamily.IPv4, []string{v4PoolAddresses}),
-		table.Entry("IPV4 - echo mode enabled",
+		ginkgo.Entry("IPV4 - echo mode enabled",
 			metallbv1beta1.BFDProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "echo",
@@ -587,13 +586,13 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					MinimumTTL:       pointer.Uint32Ptr(254),
 				},
 			}, ipfamily.IPv4, []string{v4PoolAddresses}),
-		table.Entry("IPV6 - default",
+		ginkgo.Entry("IPV6 - default",
 			metallbv1beta1.BFDProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "bar",
 				},
 			}, ipfamily.IPv6, []string{v6PoolAddresses}),
-		table.Entry("IPV6 - echo mode enabled",
+		ginkgo.Entry("IPV6 - echo mode enabled",
 			metallbv1beta1.BFDProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "echo",
@@ -607,7 +606,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					MinimumTTL:       pointer.Uint32Ptr(254),
 				},
 			}, ipfamily.IPv6, []string{v6PoolAddresses}),
-		table.Entry("DUALSTACK - full params",
+		ginkgo.Entry("DUALSTACK - full params",
 			metallbv1beta1.BFDProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "full1",
