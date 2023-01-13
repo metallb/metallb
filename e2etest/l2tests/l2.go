@@ -699,7 +699,6 @@ var _ = ginkgo.Describe("L2", func() {
 		table.Entry("IPV6", &IPV6ServiceRange))
 
 	ginkgo.It("validate preferredNode configuration works well", func() {
-		//table.DescribeTable("validate preferredNode configuration works well", func(ipRange *string) {
 		var preferredNode *corev1.Node
 
 		namespace := f.Namespace.Name
@@ -730,7 +729,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 		preferredNode = &allNodes.Items[0]
 
-		ginkgo.By(fmt.Sprintf("configure service with preferred node"))
+		ginkgo.By("configure service with preferred node")
 		svc, _ := service.CreateWithBackend(cs, namespace, fmt.Sprintf("preferred-node-service"),
 			func(svc *corev1.Service) {
 				svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeCluster
@@ -742,7 +741,7 @@ var _ = ginkgo.Describe("L2", func() {
 			framework.ExpectNoError(err)
 		}()
 
-		ginkgo.By(fmt.Sprintf("validate service IP was advertised by preferred node"))
+		ginkgo.By("validate service IP was advertised by preferred node")
 		ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 
 		port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
@@ -766,12 +765,12 @@ var _ = ginkgo.Describe("L2", func() {
 
 		preferredNode = &allNodes.Items[1]
 
-		ginkgo.By(fmt.Sprintf("configure service with new preferred node"))
+		ginkgo.By("configure service with new preferred node")
 		svc.Annotations = map[string]string{"metallb.universe.tf/preferredNode": preferredNode.Name}
 		_, err = cs.CoreV1().Services(svc.Namespace).Update(context.Background(), svc, metav1.UpdateOptions{})
 		framework.ExpectNoError(err)
 
-		ginkgo.By(fmt.Sprintf("validate service IP was advertised by new preferred node"))
+		ginkgo.By("validate service IP was advertised by new preferred node")
 		ingressIP = e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 
 		port = strconv.Itoa(int(svc.Spec.Ports[0].Port))
