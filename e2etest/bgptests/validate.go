@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
@@ -113,7 +113,8 @@ func validateServiceNoWait(cs clientset.Interface, svc *corev1.Service, nodes []
 		}
 
 		// The BGP routes will not match the nodes if static routes were added.
-		if !(c.Network == multiHopNetwork) {
+		if c.Network != defaultNextHopSettings.multiHopNetwork &&
+			c.Network != vrfNextHopSettings.multiHopNetwork {
 			advertised := routes.ForIP(ingressIP, c)
 			err = routes.MatchNodes(nodes, advertised, serviceIPFamily, c.RouterConfig.VRF)
 			if err != nil {

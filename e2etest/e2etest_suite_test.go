@@ -22,13 +22,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path"
 	"strings"
 	"testing"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/config"
-	"github.com/onsi/ginkgo/reporters"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"go.universe.tf/metallb/e2etest/bgptests"
 	"go.universe.tf/metallb/e2etest/l2tests"
@@ -42,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 )
@@ -114,18 +110,9 @@ func TestE2E(t *testing.T) {
 	if testing.Short() {
 		return
 	}
-	// Run tests through the Ginkgo runner with output to console + JUnit for reporting
-	var r []ginkgo.Reporter
-	if framework.TestContext.ReportDir != "" {
-		klog.Infof("Saving reports to %s", framework.TestContext.ReportDir)
-		if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
-			klog.Errorf("Failed creating report directory: %v", err)
-		} else {
-			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
-		}
-	}
+
 	gomega.RegisterFailHandler(framework.Fail)
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "E2E Suite", r)
+	ginkgo.RunSpecs(t, "E2E Suite")
 }
 
 var _ = ginkgo.BeforeSuite(func() {
@@ -204,9 +191,12 @@ var _ = ginkgo.AfterSuite(func() {
 	cs, err := framework.LoadClientset()
 	framework.ExpectNoError(err)
 
-	toTearDown := append(bgptests.FRRContainers, bgptests.VRFFRRContainers...)
-	err = bgptests.InfraTearDown(cs, toTearDown)
+	err = bgptests.InfraTearDown(cs)
 	framework.ExpectNoError(err)
+	if !bgpNativeMode {
+		err = bgptests.InfraTearDownVRF(cs)
+		framework.ExpectNoError(err)
+	}
 	err = updater.Clean()
 	framework.ExpectNoError(err)
 

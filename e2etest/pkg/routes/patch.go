@@ -10,7 +10,7 @@ import (
 )
 
 // Add route to target via for the given Executor.
-func Add(exec executor.Executor, target, via string) error {
+func Add(exec executor.Executor, target, via, routingTable string) error {
 	_, dst, err := net.ParseCIDR(target)
 	if err != nil {
 		return err
@@ -19,10 +19,14 @@ func Add(exec executor.Executor, target, via string) error {
 	gw := net.ParseIP(via)
 
 	cmd := "ip"
-	args := []string{"route", "add", dst.String(), "via", gw.String()}
+	args := []string{"route", "add"}
 	if dst.IP.To4() == nil {
-		args = []string{"-6", "route", "add", dst.String(), "via", gw.String()}
+		args = []string{"-6", "route", "add"}
 	}
+	if routingTable != "" {
+		args = append(args, "table", routingTable)
+	}
+	args = append(args, dst.String(), "via", gw.String())
 	out, err := exec.Exec(cmd, args...)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to add route %s %s %s", cmd, args, out)
@@ -32,7 +36,7 @@ func Add(exec executor.Executor, target, via string) error {
 }
 
 // Delete route to target via for the given Executor.
-func Delete(exec executor.Executor, target, via string) error {
+func Delete(exec executor.Executor, target, via, routingTable string) error {
 	_, dst, err := net.ParseCIDR(target)
 	if err != nil {
 		return err
@@ -41,10 +45,14 @@ func Delete(exec executor.Executor, target, via string) error {
 	gw := net.ParseIP(via)
 
 	cmd := "ip"
-	args := []string{"route", "del", dst.String(), "via", gw.String()}
+	args := []string{"route", "del"}
 	if dst.IP.To4() == nil {
-		args = []string{"-6", "route", "del", dst.String(), "via", gw.String()}
+		args = []string{"-6", "route", "del"}
 	}
+	if routingTable != "" {
+		args = append(args, "table", routingTable)
+	}
+	args = append(args, dst.String(), "via", gw.String())
 	out, err := exec.Exec(cmd, args...)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to delete route %s", out)
