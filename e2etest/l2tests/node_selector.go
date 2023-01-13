@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
@@ -39,7 +39,7 @@ var _ = ginkgo.Describe("L2", func() {
 			k8s.RemoveLabelFromNode(nodeToLabel.Name, "bgp-node-selector-test", cs)
 		}
 
-		if ginkgo.CurrentGinkgoTestDescription().Failed {
+		if ginkgo.CurrentSpecReport().Failed() {
 			k8s.DumpInfo(Reporter, ginkgo.CurrentGinkgoTestDescription().TestText)
 		}
 
