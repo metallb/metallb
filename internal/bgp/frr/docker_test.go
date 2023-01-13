@@ -23,7 +23,7 @@ var (
 )
 
 const (
-	frrImageTag = "v7.5.1"
+	frrImageTag = "7.5.1"
 )
 
 func TestMain(m *testing.M) {
@@ -40,7 +40,7 @@ func TestMain(m *testing.M) {
 	containerHandle, err = pool.RunWithOptions(
 		&dockertest.RunOptions{
 			Name:       "frrtest",
-			Repository: "frrouting/frr",
+			Repository: "quay.io/frrouting/frr",
 			Tag:        frrImageTag,
 			Mounts:     []string{fmt.Sprintf("%s:/etc/tempfrr", frrDir)},
 		},
