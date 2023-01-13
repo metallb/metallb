@@ -237,5 +237,5 @@ speaker:
     logLevel: informational
     image:
       repository: quay.io/frrouting/frr
-      tag: stable_7.5
+      tag: 7.5.1
       pullPolicy:
