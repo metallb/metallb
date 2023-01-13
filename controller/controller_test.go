@@ -845,6 +845,24 @@ func TestControllerMutation(t *testing.T) {
 				Status: statusAssigned([]string{"19.20.21.0"}),
 			},
 		},
+		{
+			desc: "simple LoadBalancer, ips already assigned but can't determine family",
+			in: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:       "LoadBalancer",
+					ClusterIPs: []string{"1.2.3.4"},
+				},
+				Status: statusAssigned([]string{"1.2.3.0", "1.2.3.1", "1.2.3.2"}),
+			},
+			want: &v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"1.2.3.4"},
+					Type:       "LoadBalancer",
+				},
+				Status: statusAssigned([]string{"1.2.3.0"}),
+			},
+			wantErr: true,
+		},
 	}
 
 	for i := 0; i < 100; i++ {

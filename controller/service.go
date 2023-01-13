@@ -72,7 +72,6 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		if err != nil {
 			level.Error(l).Log("event", "clearAssignment", "reason", "nolbIPsIPFamily", "msg", "Failed to retrieve lbIPs family")
 			c.client.Errorf(svc, "nolbIPsIPFamily", "Failed to retrieve LBIPs IPFamily for %q: %s", lbIPs, err)
-			return true
 		}
 		clusterIPsIPFamily, err := ipfamily.ForService(svc)
 		if err != nil {
@@ -82,7 +81,8 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		}
 		// Clear the lbIP if it has a different ipFamily compared to the clusterIP.
 		// (this should not happen since the "ipFamily" of a service is immutable)
-		if lbIPsIPFamily != clusterIPsIPFamily {
+		if lbIPsIPFamily != clusterIPsIPFamily ||
+			lbIPsIPFamily == ipfamily.Unknown {
 			c.clearServiceState(key, svc)
 			lbIPs = []net.IP{}
 		}
