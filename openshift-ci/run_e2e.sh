@@ -44,6 +44,8 @@ echo "Skipping ${SKIP}"
 set -e
 
 pip3 install --user -r ./../dev-env/requirements.txt
+# Install ginkgo CLI.
+go install github.com/onsi/ginkgo/v2/ginkgo@v2.4.0
 export PATH=${PATH}:${HOME}/.local/bin
 export CONTAINER_RUNTIME=podman
 export RUN_FRR_CONTAINER_ON_HOST_NETWORK=true
