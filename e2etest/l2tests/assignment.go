@@ -152,7 +152,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 				ObjectMeta: metav1.ObjectMeta{Name: "test-ns-pool-3"},
 				Spec: metallbv1beta1.IPAddressPoolSpec{
 					Addresses: []string{
-						"192.168.20.0/32",
+						"192.168.20.0/24",
 					},
 				},
 			}
@@ -212,7 +212,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 				ObjectMeta: metav1.ObjectMeta{Name: "test-ns-label-pool-3"},
 				Spec: metallbv1beta1.IPAddressPoolSpec{
 					Addresses: []string{
-						"192.168.20.0/32",
+						"192.168.20.0/24",
 					},
 				},
 			}
@@ -274,7 +274,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 				ObjectMeta: metav1.ObjectMeta{Name: "test-svc-label-pool-3"},
 				Spec: metallbv1beta1.IPAddressPoolSpec{
 					Addresses: []string{
-						"192.168.20.0/32",
+						"192.168.20.0/24",
 					},
 				},
 			}
@@ -341,7 +341,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 				ObjectMeta: metav1.ObjectMeta{Name: "test-ns-svc-label-pool-3"},
 				Spec: metallbv1beta1.IPAddressPoolSpec{
 					Addresses: []string{
-						"192.168.20.0/32",
+						"192.168.20.0/24",
 					},
 				},
 			}
