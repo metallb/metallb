@@ -1,4 +1,32 @@
-## v1.21.1
+## 1.22.1
+
+## Fixes
+- When passed a context and no explicit timeout, Eventually will only timeout when the context is cancelled [e5105cf]
+- Allow StopTrying() to be wrapped [bf3cba9]
+
+## Maintenance
+- bump to ginkgo v2.3.0 [c5d5c39]
+
+## 1.22.0
+
+### Features
+
+Several improvements have been made to `Eventually` and `Consistently` in this and the most recent releases:
+
+- Eventually and Consistently can take a context.Context [65c01bc]
+  This enables integration with Ginkgo 2.3.0's interruptible nodes and node timeouts.
+- Eventually and Consistently that are passed a SpecContext can provide reports when an interrupt occurs [0d063c9]
+- Eventually/Consistently will forward an attached context to functions that ask for one [e2091c5]
+- Eventually/Consistently supports passing arguments to functions via WithArguments() [a2dc7c3]
+- Eventually and Consistently can now be stopped early with StopTrying(message) and StopTrying(message).Now() [52976bb]
+
+These improvements are all documented in [Gomega's docs](https://onsi.github.io/gomega/#making-asynchronous-assertions)
+
+## Fixes
+
+## Maintenance
+
+## 1.21.1
 
 ### Features
 - Eventually and Consistently that are passed a SpecContext can provide reports when an interrupt occurs [0d063c9]
