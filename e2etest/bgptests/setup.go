@@ -3,7 +3,7 @@
 package bgptests
 
 import (
-	"github.com/onsi/ginkgo"
+	"github.com/onsi/ginkgo/v2"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/e2etest/pkg/config"
 	frrcontainer "go.universe.tf/metallb/e2etest/pkg/frr/container"
