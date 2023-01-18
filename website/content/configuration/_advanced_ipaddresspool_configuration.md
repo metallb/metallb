@@ -56,5 +56,5 @@ misguided
 [smurf protection](https://en.wikipedia.org/wiki/Smurf_attack).
 
 If you encounter this issue with your users or networks, you can
-use a range of IPs of the form `192.168.10.1-192.168.10.254` to avoid
-problematic IPs.
+set the `AvoidBuggyIPs` flag of the IPAddressPool CR.
+By doing so, the `.0` and the `.255` addresses will be avoided.
