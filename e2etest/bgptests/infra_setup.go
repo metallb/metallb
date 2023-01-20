@@ -203,7 +203,7 @@ func InfraTearDownVRF(cs *clientset.Clientset) error {
 
 func infraTearDown(cs *clientset.Clientset, containers []*frrcontainer.FRR, nextHop nextHopSettings, filter func(*frrcontainer.FRR) bool) error {
 	multiHopRoutes, err := container.Networks(nextHop.nextHopContainerName)
-	if err != nil {
+	if err != nil && !strings.Contains(err.Error(), "No such object") {
 		return err
 	}
 
