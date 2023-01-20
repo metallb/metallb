@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"reflect"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -44,9 +45,14 @@ type ConfigReconciler struct {
 	ValidateConfig config.Validate
 	ForceReload    func()
 	BGPType        string
+	currentConfig  *config.Config
 }
 
 func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	return requestHandler(r, ctx, req)
+}
+
+var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	level.Info(r.Logger).Log("controller", "ConfigReconciler", "start reconcile", req.NamespacedName.String())
 	defer level.Info(r.Logger).Log("controller", "ConfigReconciler", "end reconcile", req.NamespacedName.String())
 	updates.Inc()
@@ -133,12 +139,22 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "rendered config", dumpConfig(cfg))
+	if r.currentConfig != nil && reflect.DeepEqual(r.currentConfig, cfg) {
+		level.Debug(r.Logger).Log("controller", "ConfigReconciler", "event", "configuration did not change, ignoring")
+		return ctrl.Result{}, nil
+	}
+
+	r.currentConfig = cfg
 
 	res := r.Handler(r.Logger, cfg)
 	switch res {
 	case SyncStateError:
 		configStale.Set(1)
 		updateErrors.Inc()
+		// if the configuration load failed, we reset the current config because this is gonna lead to a retry
+		// of the reconciliaton loop. If we don't reset, the retry will find the config identical and will exit,
+		// which is not what we want here.
+		r.currentConfig = nil
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, retry")
 		return ctrl.Result{}, retryError
 	case SyncStateReprocessAll:
