@@ -57,8 +57,8 @@ func (g *Gomega) Eventually(actual interface{}, intervals ...interface{}) types.
 }
 
 func (g *Gomega) EventuallyWithOffset(offset int, actual interface{}, args ...interface{}) types.AsyncAssertion {
-	timeoutInterval := g.DurationBundle.EventuallyTimeout
-	pollingInterval := g.DurationBundle.EventuallyPollingInterval
+	timeoutInterval := -time.Duration(1)
+	pollingInterval := -time.Duration(1)
 	intervals := []interface{}{}
 	var ctx context.Context
 	for _, arg := range args {
@@ -84,8 +84,8 @@ func (g *Gomega) Consistently(actual interface{}, intervals ...interface{}) type
 }
 
 func (g *Gomega) ConsistentlyWithOffset(offset int, actual interface{}, args ...interface{}) types.AsyncAssertion {
-	timeoutInterval := g.DurationBundle.ConsistentlyDuration
-	pollingInterval := g.DurationBundle.ConsistentlyPollingInterval
+	timeoutInterval := -time.Duration(1)
+	pollingInterval := -time.Duration(1)
 	intervals := []interface{}{}
 	var ctx context.Context
 	for _, arg := range args {

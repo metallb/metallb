@@ -74,6 +74,7 @@ type AsyncAssertion interface {
 	Within(timeout time.Duration) AsyncAssertion
 	ProbeEvery(interval time.Duration) AsyncAssertion
 	WithContext(ctx context.Context) AsyncAssertion
+	WithArguments(argsToForward ...interface{}) AsyncAssertion
 }
 
 // Assertions are returned by Ω and Expect and enable assertions against Gomega matchers
