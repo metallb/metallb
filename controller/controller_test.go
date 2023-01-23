@@ -198,7 +198,7 @@ func TestControllerMutation(t *testing.T) {
 	// In steady state, every input below should be equivalent to a
 	// pure function that reliably produces the same end state
 	// regardless of past controller state.
-	tests := []*struct {
+	tests := []struct {
 		desc    string
 		in      *v1.Service
 		want    *v1.Service
@@ -867,36 +867,36 @@ func TestControllerMutation(t *testing.T) {
 
 	for i := 0; i < 100; i++ {
 		for _, test := range tests {
-			t.Logf("Running case %q", test.desc)
-			k.reset()
+			t.Run(test.desc, func(t *testing.T) {
+				k.reset()
 
-			if c.SetBalancer(l, "test", test.in, epslices.EpsOrSlices{}) == controllers.SyncStateError {
-				t.Errorf("%q: SetBalancer returned error", test.desc)
-				continue
-			}
-			if test.wantErr != k.loggedWarning {
-				t.Errorf("%q: unexpected loggedWarning value, want %v, got %v", test.desc, test.wantErr, k.loggedWarning)
-			}
-
-			gotSvc := k.gotService(test.in)
-
-			switch {
-			case test.want == nil && gotSvc != nil:
-				t.Errorf("%q: unexpectedly mutated service (-in +out)\n%s", test.desc, diffService(test.in, gotSvc))
-			case test.want != nil && gotSvc == nil:
-				t.Errorf("%q: did not mutate service, wanted (-in +out)\n%s", test.desc, diffService(test.in, test.want))
-			case test.want != nil && gotSvc != nil:
-				if diff := diffService(test.want, gotSvc); diff != "" {
-					t.Errorf("%q: wrong service mutation (-want +got)\n%s", test.desc, diff)
+				if c.SetBalancer(l, "test", test.in, epslices.EpsOrSlices{}) == controllers.SyncStateError {
+					t.Fatalf("%q: SetBalancer returned error", test.desc)
 				}
-			}
-
-			if test.want != nil && len(test.want.Status.LoadBalancer.Ingress) > 0 {
-				ips := test.want.Status.LoadBalancer.Ingress
-				if len(ips) == 0 {
-					panic("bad wanted IP in loadbalancer status")
+				if test.wantErr != k.loggedWarning {
+					t.Errorf("%q: unexpected loggedWarning value, want %v, got %v", test.desc, test.wantErr, k.loggedWarning)
 				}
-			}
+
+				gotSvc := k.gotService(test.in)
+
+				switch {
+				case test.want == nil && gotSvc != nil:
+					t.Errorf("%q: unexpectedly mutated service (-in +out)\n%s", test.desc, diffService(test.in, gotSvc))
+				case test.want != nil && gotSvc == nil:
+					t.Errorf("%q: did not mutate service, wanted (-in +out)\n%s", test.desc, diffService(test.in, test.want))
+				case test.want != nil && gotSvc != nil:
+					if diff := diffService(test.want, gotSvc); diff != "" {
+						t.Errorf("%q: wrong service mutation (-want +got)\n%s", test.desc, diff)
+					}
+				}
+
+				if test.want != nil && len(test.want.Status.LoadBalancer.Ingress) > 0 {
+					ips := test.want.Status.LoadBalancer.Ingress
+					if len(ips) == 0 {
+						panic("bad wanted IP in loadbalancer status")
+					}
+				}
+			})
 		}
 
 		if t.Failed() {
