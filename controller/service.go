@@ -35,7 +35,7 @@ const (
 	annotationIPAllocateFromPool = "metallb.universe.tf/ip-allocated-from-pool"
 )
 
-func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service) bool {
+func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service) {
 	lbIPs := []net.IP{}
 	var err error
 	// Not a LoadBalancer, early exit. It might have been a balancer
@@ -45,7 +45,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		c.clearServiceState(key, svc)
 		// Early return, we explicitly do *not* want to reallocate
 		// an IP.
-		return true
+		return
 	}
 
 	// If the ClusterIPs is malformed or not set we can't determine the
@@ -53,7 +53,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	if len(svc.Spec.ClusterIPs) == 0 && svc.Spec.ClusterIP == "" {
 		level.Info(l).Log("event", "clearAssignment", "reason", "noClusterIPs", "msg", "No ClusterIPs")
 		c.clearServiceState(key, svc)
-		return true
+		return
 	}
 
 	// The assigned LB IP(s) is the end state of convergence. If there's
@@ -77,7 +77,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		if err != nil {
 			level.Error(l).Log("event", "clearAssignment", "reason", "noclusterIPsIPFamily", "msg", "Failed to retrieve clusterIPs family")
 			c.client.Errorf(svc, "noclusterIPsIPFamily", "Failed to retrieve ClusterIPs IPFamily for %q %s: %s", svc.Spec.ClusterIPs, svc.Spec.ClusterIP, err)
-			return true
+			return
 		}
 		// Clear the lbIP if it has a different ipFamily compared to the clusterIP.
 		// (this should not happen since the "ipFamily" of a service is immutable)
@@ -116,7 +116,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		if err != nil {
 			level.Error(l).Log("event", "loadbalancerIP", "error", err, "msg", "invalid requested loadbalancer IPs")
 			c.client.Errorf(svc, "LoadBalancerFailed", "invalid requested loadbalancer IPs: %s", err)
-			return true
+			return
 		}
 		if len(desiredLbIPs) > 0 && !isEqualIPs(lbIPs, desiredLbIPs) {
 			level.Info(l).Log("event", "clearAssignment", "reason", "differentIPRequested", "msg", "user requested a different IP than the one currently assigned")
@@ -134,7 +134,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 			// The outer controller loop will retry converging this
 			// service when another service gets deleted, so there's
 			// nothing to do here but wait to get called again later.
-			return true
+			return
 		}
 		level.Info(l).Log("event", "ipAllocated", "ip", lbIPs, "msg", "IP address assigned by controller")
 		c.client.Infof(svc, "IPAllocated", "Assigned IP %q", lbIPs)
@@ -144,7 +144,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		level.Error(l).Log("bug", "true", "msg", "internal error: failed to allocate an IP, but did not exit convergeService early!")
 		c.client.Errorf(svc, "InternalError", "didn't allocate an IP but also did not fail")
 		c.clearServiceState(key, svc)
-		return true
+		return
 	}
 
 	pool := c.ips.Pool(key)
@@ -152,7 +152,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		level.Error(l).Log("bug", "true", "ip", lbIPs, "msg", "internal error: allocated IP has no matching address pool")
 		c.client.Errorf(svc, "InternalError", "allocated an IP that has no pool")
 		c.clearServiceState(key, svc)
-		return true
+		return
 	}
 
 	// At this point, we have an IP selected somehow, all that remains
@@ -166,7 +166,6 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		svc.Annotations = make(map[string]string)
 	}
 	svc.Annotations[annotationIPAllocateFromPool] = pool
-	return true
 }
 
 // clearServiceState clears all fields that are actively managed by
