@@ -37,6 +37,7 @@ const (
 
 func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service) bool {
 	lbIPs := []net.IP{}
+	var lbHostnames []string
 	var err error
 	// Not a LoadBalancer, early exit. It might have been a balancer
 	// in the past, so we still need to clear LB state.
@@ -59,10 +60,15 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	// The assigned LB IP(s) is the end state of convergence. If there's
 	// none or a malformed one, nuke all controlled state so that we
 	// start converging from a clean slate.
+	// Store hostnames for further processing.
 	for i := range svc.Status.LoadBalancer.Ingress {
 		ip := svc.Status.LoadBalancer.Ingress[i].IP
+		hostname := svc.Status.LoadBalancer.Ingress[i].Hostname
 		if len(ip) != 0 {
 			lbIPs = append(lbIPs, net.ParseIP(ip))
+		}
+		if hostname != "" {
+			lbHostnames = append(lbHostnames, hostname)
 		}
 	}
 	if len(lbIPs) == 0 {
@@ -157,11 +163,16 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 
 	// At this point, we have an IP selected somehow, all that remains
 	// is to program the data plane.
-	lbIngressIPs := []v1.LoadBalancerIngress{}
+	ipHostname := getIPHostnameRelation(lbHostnames, lbIPs)
+	svc.Status.LoadBalancer = v1.LoadBalancerStatus{}
 	for _, lbIP := range lbIPs {
-		lbIngressIPs = append(lbIngressIPs, v1.LoadBalancerIngress{IP: lbIP.String()})
+		ip := lbIP.String()
+		svc.Status.LoadBalancer.Ingress = append(svc.Status.LoadBalancer.Ingress, v1.LoadBalancerIngress{
+			IP:       ip,
+			Hostname: ipHostname[ip],
+		})
 	}
-	svc.Status.LoadBalancer.Ingress = lbIngressIPs
+
 	if svc.Annotations == nil {
 		svc.Annotations = make(map[string]string)
 	}
@@ -265,4 +276,18 @@ func isEqualIPs(ipsA, ipsB []net.IP) bool {
 		return ipsB[i].String() < ipsB[j].String()
 	})
 	return reflect.DeepEqual(ipsA, ipsB)
+}
+
+// getIPHostnameRelation creates a map with the ips that have a hostname set externally.
+func getIPHostnameRelation(lbHostnames []string, lbIPs []net.IP) map[string]string {
+	ipHostname := make(map[string]string)
+	numIPs := len(lbIPs)
+	for i, hostname := range lbHostnames {
+		if i >= numIPs {
+			break
+		}
+		ipHostname[lbIPs[i].String()] = hostname
+	}
+
+	return ipHostname
 }

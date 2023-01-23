@@ -236,6 +236,82 @@ func TestControllerMutation(t *testing.T) {
 		},
 
 		{
+			desc: "simple LoadBalancer with a hostname ",
+			in: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:       "LoadBalancer",
+					ClusterIPs: []string{"1.2.3.4"},
+				},
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{
+							{
+								Hostname: "foo.bar.local",
+							},
+						},
+					},
+				},
+			},
+			want: &v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"1.2.3.4"},
+					Type:       "LoadBalancer",
+				},
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{
+							{
+								IP:       "1.2.3.0",
+								Hostname: "foo.bar.local",
+							},
+						},
+					},
+				},
+			},
+		},
+
+		{
+			desc: "simple LoadBalancer with a single IP and many hostnames ",
+			in: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:       "LoadBalancer",
+					ClusterIPs: []string{"1.2.3.4"},
+				},
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{
+							{
+								Hostname: "foo.bar.local",
+							},
+							{
+								Hostname: "foo.bar.local1",
+							},
+							{
+								Hostname: "foo.bar.local2",
+							},
+						},
+					},
+				},
+			},
+			want: &v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"1.2.3.4"},
+					Type:       "LoadBalancer",
+				},
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{
+							{
+								IP:       "1.2.3.0",
+								Hostname: "foo.bar.local",
+							},
+						},
+					},
+				},
+			},
+		},
+
+		{
 			desc: "request specific IP",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
@@ -476,7 +552,16 @@ func TestControllerMutation(t *testing.T) {
 					Type:       "LoadBalancer",
 					ClusterIPs: []string{"1.2.3.4"},
 				},
-				Status: statusAssigned([]string{"1.2.3.0"}),
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{
+							{
+								IP:       "1.2.3.0",
+								Hostname: "foo.bar.local",
+							},
+						},
+					},
+				},
 			},
 		},
 
@@ -761,7 +846,19 @@ func TestControllerMutation(t *testing.T) {
 					Type:       "LoadBalancer",
 					ClusterIPs: []string{"3000::1", "5.6.7.8"},
 				},
-				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
+				Status: v1.ServiceStatus{
+					LoadBalancer: v1.LoadBalancerStatus{
+						Ingress: []v1.LoadBalancerIngress{
+							{
+								IP:       "1.2.3.0",
+								Hostname: "foo.bar.local",
+							},
+							{
+								IP: "1000::",
+							},
+						},
+					},
+				},
 			},
 		},
 		{
