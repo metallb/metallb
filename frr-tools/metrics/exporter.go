@@ -14,7 +14,6 @@ import (
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/exporter-toolkit/web"
 
 	"go.universe.tf/metallb/frr-tools/metrics/collector"
 	"go.universe.tf/metallb/frr-tools/metrics/liveness"
@@ -24,9 +23,8 @@ import (
 )
 
 var (
-	metricsPort   = flag.Uint("metrics-port", 7473, "Port to listen on for web interface.")
-	metricsPath   = flag.String("metrics-path", "/metrics", "Path under which to expose metrics.")
-	tlsConfigPath = flag.String("tls-config-path", "", "[EXPERIMENTAL] Path to config yaml file that can enable TLS or authentication.")
+	metricsPort = flag.Uint("metrics-port", 7473, "Port to listen on for web interface.")
+	metricsPath = flag.String("metrics-path", "/metrics", "Path under which to expose metrics.")
 )
 
 func metricsHandler(logger log.Logger) http.Handler {
@@ -65,14 +63,15 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle(*metricsPath, metricsHandler(logger))
 	mux.Handle("/livez", liveness.Handler(vtysh.Run, logger))
+	level.Info(logger).Log("msg", "Starting exporter", "metricsPath", metricsPath, "port", metricsPort)
+
 	srv := &http.Server{
 		Addr:        fmt.Sprintf(":%d", *metricsPort),
 		ReadTimeout: 3 * time.Second,
 		Handler:     mux,
 	}
-	level.Info(logger).Log("msg", "Starting exporter", "metricsPath", metricsPath, "port", metricsPort)
 
-	if err := web.ListenAndServe(srv, *tlsConfigPath, logger); err != nil {
+	if err := srv.ListenAndServe(); err != nil {
 		level.Error(logger).Log("error", err)
 		os.Exit(1)
 	}
