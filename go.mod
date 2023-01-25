@@ -1,6 +1,6 @@
 module go.universe.tf/metallb
 
-go 1.18
+go 1.19
 
 require (
 	github.com/davecgh/go-spew v1.1.1
@@ -167,6 +167,7 @@ require (
 // the k8s.io/kubernetes module from the tests (via the "k8s.io/kubernetes/test/e2e/framework" package)
 // See https://github.com/kubernetes/kubernetes/issues/90358#issuecomment-617859364
 replace (
+	github.com/onsi/ginkgo/v2 => github.com/onsi/ginkgo/v2 v2.4.0
 	k8s.io/api => k8s.io/api v0.26.0
 	k8s.io/apiextensions-apiserver => k8s.io/apiextensions-apiserver v0.26.0
 	k8s.io/apimachinery => k8s.io/apimachinery v0.26.0
@@ -193,5 +194,4 @@ replace (
 	k8s.io/mount-utils => k8s.io/mount-utils v0.26.0
 	k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.26.0
 	k8s.io/sample-apiserver => k8s.io/sample-apiserver v0.26.0
-	github.com/onsi/ginkgo/v2 => github.com/onsi/ginkgo/v2 v2.4.0
 )
