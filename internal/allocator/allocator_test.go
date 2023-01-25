@@ -67,7 +67,7 @@ func TestAssignment(t *testing.T) {
 			Name:               "test3",
 			AvoidBuggyIPs:      true,
 			AutoAssign:         true,
-			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.NewString("test-ns1")},
+			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.New("test-ns1")},
 			CIDR: []*net.IPNet{
 				ipnet("1.2.5.0/24"),
 				ipnet("1000::5:0/120"),

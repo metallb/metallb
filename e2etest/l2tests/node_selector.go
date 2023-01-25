@@ -40,7 +40,7 @@ var _ = ginkgo.Describe("L2", func() {
 		}
 
 		if ginkgo.CurrentSpecReport().Failed() {
-			k8s.DumpInfo(Reporter, ginkgo.CurrentGinkgoTestDescription().TestText)
+			k8s.DumpInfo(Reporter, ginkgo.CurrentSpecReport().LeafNodeText)
 		}
 
 		// Clean previous configuration.

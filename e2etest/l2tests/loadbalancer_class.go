@@ -25,7 +25,7 @@ var _ = ginkgo.Describe("LoadBalancer class", func() {
 	var f *framework.Framework
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentSpecReport().Failed() {
-			k8s.DumpInfo(Reporter, ginkgo.CurrentGinkgoTestDescription().TestText)
+			k8s.DumpInfo(Reporter, ginkgo.CurrentSpecReport().LeafNodeText)
 		}
 
 		// Clean previous configuration.

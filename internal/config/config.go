@@ -148,7 +148,7 @@ type ServiceAllocation struct {
 	// The priority of ip pool for a given service allocation.
 	Priority int
 	// Set of namespaces on which ip pool can be attached.
-	Namespaces sets.String
+	Namespaces sets.Set[string]
 	// Service selectors to select service for which ip pool can be used
 	// for ip allocation.
 	ServiceSelectors []labels.Selector
@@ -519,7 +519,7 @@ func addressPoolServiceAllocationsFromCR(p metallbv1beta1.IPAddressPool, namespa
 		return nil, nil
 	}
 	serviceAllocations := &ServiceAllocation{Priority: p.Spec.AllocateTo.Priority,
-		Namespaces: sets.NewString(p.Spec.AllocateTo.Namespaces...)}
+		Namespaces: sets.New(p.Spec.AllocateTo.Namespaces...)}
 	for i := range p.Spec.AllocateTo.NamespaceSelectors {
 		l, err := metav1.LabelSelectorAsSelector(&p.Spec.AllocateTo.NamespaceSelectors[i])
 		if err != nil {
@@ -1060,7 +1060,7 @@ func containsAdvertisement(advs []*L2Advertisement, toCheck *L2Advertisement) bo
 		if !reflect.DeepEqual(adv.Nodes, toCheck.Nodes) {
 			continue
 		}
-		if !sets.NewString(adv.Interfaces...).Equal(sets.NewString(toCheck.Interfaces...)) {
+		if !sets.New(adv.Interfaces...).Equal(sets.New(toCheck.Interfaces...)) {
 			continue
 		}
 		return true

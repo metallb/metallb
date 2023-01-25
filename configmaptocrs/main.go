@@ -252,7 +252,7 @@ func communitiesFor(cf *configFile) []v1beta1.Community {
 	// in order to make the rendering stable, we must have a sorted list of communities.
 	sortedCommunities := make([]string, 0, len(cf.BGPCommunities))
 
-	for n, _ := range cf.BGPCommunities {
+	for n := range cf.BGPCommunities {
 		sortedCommunities = append(sortedCommunities, n)
 	}
 	sort.Strings(sortedCommunities)
