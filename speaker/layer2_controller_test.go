@@ -2523,7 +2523,7 @@ func TestIPAdvertisementFor(t *testing.T) {
 					AllInterfaces: true,
 				},
 			},
-			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, true, sets.NewString()),
+			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, true, sets.Set[string]{}),
 		}, {
 			desc:      "LocalNode doesn't match L2Advertisement",
 			ip:        net.IP{192, 168, 10, 3},
@@ -2542,7 +2542,7 @@ func TestIPAdvertisementFor(t *testing.T) {
 					Interfaces: []string{"eth3", "eth4"},
 				},
 			},
-			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, false, sets.NewString()),
+			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, false, sets.Set[string]{}),
 		}, {
 			desc:      "LocalNode only match one L2Advertisement",
 			ip:        net.ParseIP("2000:12"),
@@ -2562,7 +2562,7 @@ func TestIPAdvertisementFor(t *testing.T) {
 					Interfaces: []string{"eth1", "eth2"},
 				},
 			},
-			expect: layer2.NewIPAdvertisement(net.ParseIP("2000:12"), false, sets.NewString("eth1", "eth2")),
+			expect: layer2.NewIPAdvertisement(net.ParseIP("2000:12"), false, sets.New("eth1", "eth2")),
 		}, {
 			desc:      "LocalNode match multi-L2Advertisement",
 			ip:        net.IP{192, 168, 10, 3},
@@ -2588,7 +2588,7 @@ func TestIPAdvertisementFor(t *testing.T) {
 					Interfaces: []string{"eth4", "eth3"},
 				},
 			},
-			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, false, sets.NewString("eth0", "eth1", "eth2")),
+			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, false, sets.New("eth0", "eth1", "eth2")),
 		}, {
 			desc:      "LocalNode match multi-L2Advertisement, and one of them not specify interfaces",
 			ip:        net.IP{192, 168, 10, 3},
@@ -2614,7 +2614,7 @@ func TestIPAdvertisementFor(t *testing.T) {
 					Interfaces: []string{"eth4", "eth3"},
 				},
 			},
-			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, true, sets.NewString()),
+			expect: layer2.NewIPAdvertisement(net.IP{192, 168, 10, 3}, true, sets.Set[string]{}),
 		},
 	}
 	for _, test := range tests {
