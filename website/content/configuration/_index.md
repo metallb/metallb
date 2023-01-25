@@ -27,7 +27,7 @@ All the IPs allocated via `IPAddressPool`s contribute to the pool of IPs that Me
 uses to assign IPs to services.
 
 ```yaml
-apiVersion: metallb.io/v1beta1
+apiVersion: metallb.io/v1beta2
 kind: IPAddressPool
 metadata:
   name: first-pool
@@ -75,7 +75,7 @@ IPs from `192.168.1.240` to `192.168.1.250`, and configures Layer 2
 mode:
 
 ```yaml
-apiVersion: metallb.io/v1beta1
+apiVersion: metallb.io/v1beta2
 kind: IPAddressPool
 metadata:
   name: first-pool
@@ -86,7 +86,7 @@ spec:
 ```
 
 ```yaml
-apiVersion: metallb.io/v1beta1
+apiVersion: metallb.io/v1beta2
 kind: L2Advertisement
 metadata:
   name: example
@@ -101,7 +101,7 @@ advertised via L2, the list of `IPAddressPool`s we want to advertise the IPs fro
 must be declared (alternative, a label selector can be used).
 
 ```yaml
-apiVersion: metallb.io/v1beta1
+apiVersion: metallb.io/v1beta2
 kind: L2Advertisement
 metadata:
   name: example
@@ -146,7 +146,7 @@ spec:
 Given an `IPAddressPool` like:
 
 ```yaml
-apiVersion: metallb.io/v1beta1
+apiVersion: metallb.io/v1beta2
 kind: IPAddressPool
 metadata:
   name: first-pool
@@ -162,7 +162,7 @@ via BGP.
 This is done via the `BGPAdvertisement` CR.
 
 ```yaml
-apiVersion: metallb.io/v1beta1
+apiVersion: metallb.io/v1beta2
 kind: BGPAdvertisement
 metadata:
   name: example
@@ -177,7 +177,7 @@ advertised via BGP, the list of `ipAddressPool`s we want to advertise the IPs fr
 must be declared (alternative, a label selector can be used).
 
 ```yaml
-apiVersion: metallb.io/v1beta1
+apiVersion: metallb.io/v1beta2
 kind: BGPAdvertisement
 metadata:
   name: example
@@ -194,7 +194,7 @@ With the FRR mode, BGP sessions can be backed up by BFD sessions in order to pro
 In order to enable BFD, a BFD profile must be added and referenced by a given peer:
 
 ```yaml
-apiVersion: metallb.io/v1beta1
+apiVersion: metallb.io/v1beta2
 kind: BFDProfile
 metadata:
   name: testbfdprofile
