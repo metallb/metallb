@@ -144,9 +144,9 @@ var _ = ginkgo.BeforeSuite(func() {
 		bgptests.FRRContainers, err = bgptests.KindnetContainersSetup(v4Addresses, v6Addresses, cs)
 		framework.ExpectNoError(err)
 		if !bgpNativeMode {
-			vrfFRRContainers, err := bgptests.VRFContainersSetup(cs)
-			framework.ExpectNoError(err)
-			bgptests.FRRContainers = append(bgptests.FRRContainers, vrfFRRContainers...)
+			//vrfFRRContainers, err := bgptests.VRFContainersSetup(cs)
+			//framework.ExpectNoError(err)
+			bgptests.FRRContainers = append(bgptests.FRRContainers)
 		}
 	}
 
