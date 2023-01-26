@@ -320,6 +320,52 @@ func TestValidateFRR(t *testing.T) {
 				},
 			},
 			mustFail: true,
+		}, {
+			desc: "duplicate bgp address, different vrfs",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							VRFName: "red",
+						},
+					}, {
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							VRFName: "green",
+						},
+					},
+				},
+			},
+			mustFail: false,
+		}, {
+			desc: "duplicate bgp address, same vrf",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							VRFName: "red",
+						},
+					}, {
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							VRFName: "red",
+						},
+					},
+				},
+			},
+			mustFail: true,
 		},
 	}
 

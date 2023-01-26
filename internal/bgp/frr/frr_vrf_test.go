@@ -164,6 +164,49 @@ func TestTwoSessionsSameIPVRF(t *testing.T) {
 	testCheckConfigFile(t)
 }
 
+func TestTwoSessionsSameIPRouterIDASNVRF(t *testing.T) {
+	testSetup(t)
+
+	l := log.NewNopLogger()
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
+	defer close(sessionManager.reloadConfig)
+	session1, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			MyASN:         100,
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer1"})
+
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session1.Close()
+	session2, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			MyASN:         100,
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer2",
+			VRFName:       "red"})
+
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session2.Close()
+
+	testCheckConfigFile(t)
+}
+
 func TestSingleAdvertisementVRF(t *testing.T) {
 	testSetup(t)
 

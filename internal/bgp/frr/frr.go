@@ -44,8 +44,12 @@ var osHostname = os.Hostname
 
 // sessionName() defines the format of the key of the 'sessions' map in
 // the 'frrState' struct.
-func sessionName(myAddr string, myAsn uint32, addr string, asn uint32) string {
-	return fmt.Sprintf("%d@%s-%d@%s", asn, addr, myAsn, myAddr)
+func sessionName(s session) string {
+	baseName := fmt.Sprintf("%d@%s-%d@%s", s.PeerASN, s.PeerAddress, s.MyASN, s.SourceAddress)
+	if s.VRFName == "" {
+		return baseName
+	}
+	return baseName + "/" + s.VRFName
 }
 
 func validate(adv *bgp.Advertisement) error {
@@ -58,7 +62,7 @@ func validate(adv *bgp.Advertisement) error {
 func (s *session) Set(advs ...*bgp.Advertisement) error {
 	s.sessionManager.Lock()
 	defer s.sessionManager.Unlock()
-	sessionName := sessionName(s.SourceAddress.String(), s.MyASN, s.PeerAddress, s.PeerASN)
+	sessionName := sessionName(*s)
 	if _, found := s.sessionManager.sessions[sessionName]; !found {
 		return fmt.Errorf("session %s not established before advertisement", sessionName)
 	}
@@ -133,7 +137,7 @@ func (sm *sessionManager) addSession(s *session) error {
 	if s == nil {
 		return fmt.Errorf("invalid session")
 	}
-	sessionName := sessionName(s.SourceAddress.String(), s.MyASN, s.PeerAddress, s.PeerASN)
+	sessionName := sessionName(*s)
 	sm.sessions[sessionName] = s
 
 	return nil
@@ -143,7 +147,7 @@ func (sm *sessionManager) deleteSession(s *session) error {
 	if s == nil {
 		return fmt.Errorf("invalid session")
 	}
-	sessionName := sessionName(s.SourceAddress.String(), s.MyASN, s.PeerAddress, s.PeerASN)
+	sessionName := sessionName(*s)
 	delete(sm.sessions, sessionName)
 
 	return nil
