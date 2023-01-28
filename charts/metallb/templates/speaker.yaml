@@ -466,6 +466,7 @@ spec:
           {{- toYaml . | nindent 8 }}
         {{- end }}
       {{- with .Values.speaker.affinity }}
+      priorityClassName: system-cluster-critical
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
