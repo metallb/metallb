@@ -98,7 +98,7 @@ func (a *Announce) updateInterfaces() {
 			if !ok {
 				continue
 			}
-			if ipaddr.IP.To4() != nil || !ipaddr.IP.IsLinkLocalUnicast() {
+			if ipaddr.IP.To4() != nil || ipaddr.IP.IsLinkLocalUnicast() {
 				continue
 			}
 			keepNDP[ifi.Index] = true
