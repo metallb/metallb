@@ -483,7 +483,7 @@ def bgp_dev_env(ip_family, frr_volume_dir):
         '    docker rm -f $frr ; '
         'done', echo=True)
     run("docker run -d --privileged --network kind --rm --ulimit core=-1 --name frr --volume %s:/etc/frr "
-            "frrouting/frr:v7.5.1" % frr_volume_dir, echo=True)
+            "quay.io/frrouting/frr:7.5.1" % frr_volume_dir, echo=True)
 
     if ip_family == "ipv4":
         peer_address = run('docker inspect -f "{{ '
@@ -693,7 +693,7 @@ def lint(ctx, env="container"):
     convenient to install the golangci-lint binaries on the host. This can be
     achieved by running `inv lint --env host`.
     """
-    version = "1.45.2"
+    version = "1.50.1"
     golangci_cmd = "golangci-lint run --timeout 10m0s ./..."
 
     if env == "container":
@@ -734,8 +734,8 @@ def helmdocs(ctx, env="container"):
     "system_namespaces": "comma separated list of Kubernetes system namespaces",
     "service_pod_port": "port number that service pods open.",
     "skip_docker": "don't use docker command in BGP testing.",
-    "focus": "the list of arguments to pass into as -ginkgo.focus",
-    "skip": "the list of arguments to pass into as -ginkgo.skip",
+    "focus": "the list of arguments to pass into as -focus",
+    "skip": "the list of arguments to pass into as -skip",
     "ipv4_service_range": "a range of IPv4 addresses for MetalLB to use when running in layer2 mode.",
     "ipv6_service_range": "a range of IPv6 addresses for MetalLB to use when running in layer2 mode.",
     "prometheus_namespace": "the namespace prometheus is deployed to, to validate metrics against prometheus.",
@@ -753,11 +753,11 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
 
     ginkgo_skip = ""
     if skip:
-        ginkgo_skip = "--ginkgo.skip=\"" + skip + "\""
+        ginkgo_skip = "--skip=\"" + skip + "\""
 
     ginkgo_focus = ""
     if focus:
-        ginkgo_focus = "--ginkgo.focus=\"" + focus + "\""
+        ginkgo_focus = "--focus=\"" + focus + "\""
 
     if kubeconfig is None:
         validate_kind_version()
@@ -807,7 +807,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
         external_containers = "--external-containers="+(external_containers)
 
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "KUBECONFIG={} go test -timeout 3h {} {} --provider=local --kubeconfig={} --service-pod-port={} {} {} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {} -bgp-native-mode={}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace, node_nics, local_nics, external_containers, native_bgp), warn="True")
+            "KUBECONFIG={} ginkgo --timeout=3h {} {} -- --provider=local --kubeconfig={} --service-pod-port={} {} {} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {}  -bgp-native-mode={}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace, node_nics, local_nics, external_containers, native_bgp), warn="True")
 
     if export != None:
         run("kind export logs {}".format(export))

@@ -152,14 +152,14 @@ func TestControllerMutation(t *testing.T) {
 			Name:       "pool6",
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("7.8.9.0/31")},
-			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.NewString("test-ns1"),
+			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.New("test-ns1"),
 				Priority: 10},
 		},
 		"pool7": {
 			Name:       "pool7",
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("10.11.12.0/31")},
-			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.NewString("test-ns1"),
+			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.New("test-ns1"),
 				Priority: 11},
 		},
 		"pool8": {
@@ -173,7 +173,7 @@ func TestControllerMutation(t *testing.T) {
 			Name:               "pool9",
 			AutoAssign:         true,
 			CIDR:               []*net.IPNet{ipnet("16.17.18.0/31")},
-			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.NewString("test-ns2")},
+			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.New("test-ns2")},
 		},
 		"pool10": {
 			Name:       "pool10",
@@ -844,6 +844,24 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"19.20.21.0"}),
 			},
+		},
+		{
+			desc: "simple LoadBalancer, ips already assigned but can't determine family",
+			in: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:       "LoadBalancer",
+					ClusterIPs: []string{"1.2.3.4"},
+				},
+				Status: statusAssigned([]string{"1.2.3.0", "1.2.3.1", "1.2.3.2"}),
+			},
+			want: &v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"1.2.3.4"},
+					Type:       "LoadBalancer",
+				},
+				Status: statusAssigned([]string{"1.2.3.0"}),
+			},
+			wantErr: true,
 		},
 	}
 

@@ -56,6 +56,9 @@ func TestServiceController(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      testObjectName,
 				Namespace: testNamespace,
+				Labels: map[string]string{
+					discovery.LabelServiceName: testObjectName,
+				},
 			},
 		}
 	)
