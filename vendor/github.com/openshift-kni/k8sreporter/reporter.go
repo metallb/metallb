@@ -166,6 +166,13 @@ func (r *KubernetesReporter) logLogs(since time.Time, dirName string) {
 				fmt.Fprintf(f, "Dumping logs for pod %s-%s-%s\n", pod.Namespace, pod.Name, container.Name)
 				fmt.Fprintln(f, string(logs))
 			}
+
+			logs, err = r.clients.Pods(pod.Namespace).GetLogs(pod.Name, &v1.PodLogOptions{Container: container.Name, SinceTime: &logStart, Previous: true}).DoRaw(context.Background())
+			if err == nil {
+				fmt.Fprintf(f, fileSeparator)
+				fmt.Fprintf(f, "Dumping previous logs for pod %s-%s-%s\n", pod.Namespace, pod.Name, container.Name)
+				fmt.Fprintln(f, string(logs))
+			}
 		}
 
 	}
