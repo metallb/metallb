@@ -182,9 +182,7 @@ func (a *Allocator) Assign(svcKey string, svc *v1.Service, ips []net.IP, ports [
 		ports: make([]Port, len(ports)),
 		key:   *sk,
 	}
-	for i, port := range ports {
-		alloc.ports[i] = port
-	}
+	copy(alloc.ports, ports)
 	a.assign(svcKey, alloc)
 	return nil
 }
