@@ -15,7 +15,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.6.0
 	github.com/onsi/gomega v1.24.1
 	github.com/open-policy-agent/cert-controller v0.6.0
-	github.com/openshift-kni/k8sreporter v1.0.1
+	github.com/openshift-kni/k8sreporter v1.0.2
 	github.com/ory/dockertest/v3 v3.9.1
 	github.com/osrg/gobgp v2.0.0+incompatible
 	github.com/pkg/errors v0.9.1
