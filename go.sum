@@ -410,8 +410,8 @@ github.com/opencontainers/runc v1.1.4 h1:nRCz/8sKg6K6jgYAFLDlXzPeITBZJyX28DBVhWD
 github.com/opencontainers/runc v1.1.4/go.mod h1:1J5XiS+vdZ3wCyZybsuxXZWGrgSr8fFJHLXuG2PsnNg=
 github.com/opencontainers/runtime-spec v1.0.3-0.20210326190908-1c3f411f0417/go.mod h1:jwyrGlmzljRJv/Fgzds9SsS/C5hL+LL3ko9hs6T5lQ0=
 github.com/opencontainers/selinux v1.10.0/go.mod h1:2i0OySw99QjzBBQByd1Gr9gSjvuho1lHsJxIJ3gGbJI=
-github.com/openshift-kni/k8sreporter v1.0.1 h1:stQJkTG+TpP7jWzfKReKvaNiVpx2yQG59kh3/1+Htd4=
-github.com/openshift-kni/k8sreporter v1.0.1/go.mod h1:lMpnxHDJP/kaHy2M1cuNqBLHDJhq0qkAF7iPvbpCVVE=
+github.com/openshift-kni/k8sreporter v1.0.2 h1:qzcFYUScS/zSpenqcNl30BASmjHykuTAF4wVcFwSkjw=
+github.com/openshift-kni/k8sreporter v1.0.2/go.mod h1:lMpnxHDJP/kaHy2M1cuNqBLHDJhq0qkAF7iPvbpCVVE=
 github.com/openshift/api v0.0.0-20200827090112-c05698d102cf/go.mod h1:M3xexPhgM8DISzzRpuFUy+jfPjQPIcs9yqEYj17mXV8=
 github.com/openshift/api v0.0.0-20200829102639-8a3a835f1acf h1:KP/v5AGCaq1Sbe6QrlFGZM1fHBswiHuniMTC4/hgbVw=
 github.com/openshift/api v0.0.0-20200829102639-8a3a835f1acf/go.mod h1:M3xexPhgM8DISzzRpuFUy+jfPjQPIcs9yqEYj17mXV8=
