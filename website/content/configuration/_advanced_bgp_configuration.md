@@ -49,7 +49,7 @@ spec:
   ipAddressPools:
   - first-pool
   aggregationLength: 32
-  localpref: 100
+  localPref: 100
   communities:
   - 65535:65282
 ```
@@ -338,7 +338,7 @@ spec:
   ipAddressPools:
   - first-pool
   aggregationLength: 32
-  localpref: 100
+  localPref: 100
   communities:
   - vpn-only
 ```
