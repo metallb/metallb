@@ -24,7 +24,7 @@ func Test_SetBalancer_AddsToAnnouncedServices(t *testing.T) {
 			name: "foo",
 			adv: IPAdvertisement{
 				ip:            net.IPv4(192, 168, 1, 20),
-				interfaces:    sets.NewString(),
+				interfaces:    sets.Set[string]{},
 				allInterfaces: true,
 			},
 		},
@@ -32,7 +32,7 @@ func Test_SetBalancer_AddsToAnnouncedServices(t *testing.T) {
 			name: "foo",
 			adv: IPAdvertisement{
 				ip:            net.ParseIP("1000::1"),
-				interfaces:    sets.NewString("eth0"),
+				interfaces:    sets.New("eth0"),
 				allInterfaces: true,
 			},
 		},
@@ -40,7 +40,7 @@ func Test_SetBalancer_AddsToAnnouncedServices(t *testing.T) {
 			name: "bar",
 			adv: IPAdvertisement{
 				ip:            net.IPv4(192, 168, 1, 20),
-				interfaces:    sets.NewString("eth1"),
+				interfaces:    sets.New("eth1"),
 				allInterfaces: false,
 			},
 		},

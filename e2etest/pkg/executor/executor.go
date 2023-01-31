@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/exec"
 
-	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/kubernetes/test/e2e/framework/kubectl"
 )
 
 type Executor interface {
@@ -61,7 +61,7 @@ func ForPod(namespace, name, container string) *podExecutor {
 
 func (p *podExecutor) Exec(cmd string, args ...string) (string, error) {
 	fullArgs := append([]string{"exec", p.name, "-c", p.container, "--", cmd}, args...)
-	res, err := framework.RunKubectl(p.namespace, fullArgs...)
+	res, err := kubectl.RunKubectl(p.namespace, fullArgs...)
 	if err != nil {
 		return "", err
 	}
