@@ -200,13 +200,20 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 20, Namespaces: []string{f.Namespace.Name}},
 				},
 			}
+			testNs, err := cs.CoreV1().Namespaces().Get(context.Background(), f.Namespace.Name, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			testNs.Labels["foo1"] = "bar1"
+			testNs.Labels["foo2"] = "bar2"
+			_, err = cs.CoreV1().Namespaces().Update(context.Background(), testNs, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
 			namespaceLabelPoolWithHigherPriority := metallbv1beta1.IPAddressPool{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-ns-label-pool-2"},
 				Spec: metallbv1beta1.IPAddressPoolSpec{
 					Addresses: []string{
 						"192.168.10.0/32",
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 10, NamespaceSelectors: []metav1.LabelSelector{{MatchLabels: f.Namespace.Labels}}},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 10,
+						NamespaceSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"foo1": "bar1", "foo2": "bar2"}}}},
 				},
 			}
 			namespacePoolNoPriority := metallbv1beta1.IPAddressPool{
@@ -222,7 +229,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			resources := internalconfig.ClusterResources{
 				Pools: []metallbv1beta1.IPAddressPool{namespacePoolWithLowerPriority, namespaceLabelPoolWithHigherPriority, namespacePoolNoPriority},
 			}
-			err := ConfigUpdater.Update(resources)
+			err = ConfigUpdater.Update(resources)
 			framework.ExpectNoError(err)
 
 			svc1, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-label-pool-1")
