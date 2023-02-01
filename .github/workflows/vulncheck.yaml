@@ -1,0 +1,19 @@
+name: Vuln check
+on:
+  pull_request:
+    branches:
+      - "main"
+      - "v**"
+  schedule: 
+    - cron: '* * * * *'
+permissions: 
+  security-events: write
+  
+jobs:
+  vuln-check:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Golang Vulncheck
+        uses: Templum/govulncheck-action@v0.0.9
