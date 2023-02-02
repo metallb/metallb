@@ -202,20 +202,29 @@ func InfraTearDownVRF(cs *clientset.Clientset) error {
 }
 
 func infraTearDown(cs *clientset.Clientset, containers []*frrcontainer.FRR, nextHop nextHopSettings, filter func(*frrcontainer.FRR) bool) error {
-	multiHopRoutes, err := container.Networks(nextHop.nextHopContainerName)
-	if err != nil && !strings.Contains(err.Error(), "No such object") {
-		return err
-	}
-
 	filtered := make([]*frrcontainer.FRR, 0)
 	for _, c := range containers {
 		if filter(c) {
 			filtered = append(filtered, c)
 		}
 	}
+
+	multiHopRoutes := map[string]container.NetworkSettings{}
+	var err error
+	if containsMultiHop(filtered) {
+		multiHopRoutes, err = container.Networks(nextHop.nextHopContainerName)
+		if err != nil {
+			return err
+		}
+	}
+
 	err = frrcontainer.Delete(filtered)
 	if err != nil {
 		return err
+	}
+
+	if len(multiHopRoutes) == 0 {
+		return nil
 	}
 
 	err = multiHopTearDown(nextHop, multiHopRoutes, cs)
@@ -495,12 +504,6 @@ func vrfContainersConfig() map[string]frrcontainer.Config {
 }
 
 func multiHopTearDown(nextHop nextHopSettings, routes map[string]container.NetworkSettings, cs *clientset.Clientset) error {
-	_, err := executor.Host.Exec(executor.ContainerRuntime, "network", "inspect", nextHop.multiHopNetwork)
-	if err != nil {
-		// do nothing if the multi-hop network doesn't exist.
-		return nil
-	}
-
 	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "rm", nextHop.multiHopNetwork)
 	if err != nil {
 		return errors.Wrapf(err, "Failed to remove %s: %s", nextHop.multiHopNetwork, out)
