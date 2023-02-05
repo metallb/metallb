@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/strings/slices"
 )
 
 type ClusterResources struct {
@@ -973,7 +974,48 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 				"this pool is more specific than the aggregation length for addresses %s", adv.AggregationLength, lowest, addr)
 		}
 	}
+
+	// Verify that BGP ADVs set a unique local preference value per BGP update.
+	for _, bgpAdv := range pool.BGPAdvertisements {
+		if adv.LocalPref != bgpAdv.LocalPref {
+			if !advertisementsAreCompatible(adv, bgpAdv) {
+				return fmt.Errorf("invalid local preference %d: local preferernce %d was "+
+					"already set for the same type of BGP update. Check existing BGP advertisements "+
+					"with common pools and aggregation lengths", adv.LocalPref, bgpAdv.LocalPref)
+			}
+		}
+	}
+
 	return nil
+}
+
+func advertisementsAreCompatible(newAdv, adv *BGPAdvertisement) bool {
+	if adv.AggregationLength != newAdv.AggregationLength && adv.AggregationLengthV6 != newAdv.AggregationLengthV6 {
+		return true
+	}
+
+	// BGP ADVs with different set of BGP peers do not collide.
+	if len(newAdv.Peers) != 0 && len(adv.Peers) != 0 {
+		equalPeer := false
+		for _, peer := range newAdv.Peers {
+			if slices.Contains(adv.Peers, peer) {
+				equalPeer = true
+				break
+			}
+		}
+		if !equalPeer {
+			return true
+		}
+	}
+
+	// BGP ADVs with different set of nodes do not collide.
+	for node := range newAdv.Nodes {
+		if _, ok := adv.Nodes[node]; ok {
+			return false
+		}
+	}
+
+	return true
 }
 
 var invalidCommunityValue = errors.New("invalid community value")
