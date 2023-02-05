@@ -12,6 +12,7 @@ import (
 	"go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/pointer"
 	corev1 "k8s.io/api/core/v1"
+	v1core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -1115,6 +1116,307 @@ func TestParse(t *testing.T) {
 						},
 					},
 				},
+			},
+		},
+		{
+			desc: "different local pref - same peers and nodes",
+			crs: ClusterResources{
+				Nodes: []v1core.Node{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "node1",
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "node2",
+						},
+					},
+				},
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.30.40/24",
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							LocalPref: 100,
+						},
+					},
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							LocalPref: 200,
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "different local pref - different ipv4 aggregation length",
+			crs: ClusterResources{
+				Nodes: []v1core.Node{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "node1",
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "node2",
+						},
+					},
+				},
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.30.40/24",
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							LocalPref:         100,
+							AggregationLength: pointer.Int32Ptr(24),
+						},
+					},
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							LocalPref: 200,
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "different local pref - different aggregation lengths",
+			crs: ClusterResources{
+				Nodes: []v1core.Node{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "node1",
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "node2",
+						},
+					},
+				},
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.30.40/24",
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							LocalPref:           100,
+							AggregationLength:   pointer.Int32Ptr(24),
+							AggregationLengthV6: pointer.Int32Ptr(120),
+						},
+					},
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							LocalPref: 200,
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:       "pool1",
+						AutoAssign: true,
+						CIDR: []*net.IPNet{
+							ipnet("10.20.30.40/24"),
+						},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   24,
+								AggregationLengthV6: 120,
+								LocalPref:           100,
+								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{"node1": true, "node2": true},
+							},
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           200,
+								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{"node1": true, "node2": true},
+							},
+						},
+					},
+				}},
+				BFDProfiles: map[string]*BFDProfile{},
+				Peers:       map[string]*Peer{},
+			},
+		},
+		{
+			desc: "different local pref - same peers & different nodes",
+			crs: ClusterResources{
+				Nodes: []v1core.Node{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "node1",
+							Labels: map[string]string{"node": "node1"},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "node2",
+							Labels: map[string]string{"node": "node2"},
+						},
+					},
+				},
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.30.40/24",
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							LocalPref: 100,
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"node": "node1"},
+								},
+							},
+						},
+					},
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							LocalPref: 200,
+							NodeSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"node": "node2"},
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:       "pool1",
+						AutoAssign: true,
+						CIDR: []*net.IPNet{
+							ipnet("10.20.30.40/24"),
+						},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           100,
+								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{"node1": true},
+							},
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           200,
+								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{"node2": true},
+							},
+						},
+					},
+				}},
+				BFDProfiles: map[string]*BFDProfile{},
+				Peers:       map[string]*Peer{},
+			},
+		},
+		{
+			desc: "different local pref - different peers & same nodes",
+			crs: ClusterResources{
+				Nodes: []v1core.Node{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "node1",
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "node2",
+						},
+					},
+				},
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{Name: "pool1"},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.30.40/24",
+							},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							LocalPref: 100,
+							Peers:     []string{"peer1"},
+						},
+					},
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							LocalPref: 200,
+							Peers:     []string{"peer2"},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:       "pool1",
+						AutoAssign: true,
+						CIDR: []*net.IPNet{
+							ipnet("10.20.30.40/24"),
+						},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           100,
+								Peers:               []string{"peer1"},
+								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{"node1": true, "node2": true},
+							},
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           200,
+								Peers:               []string{"peer2"},
+								Communities:         map[uint32]bool{},
+								Nodes:               map[string]bool{"node1": true, "node2": true},
+							},
+						},
+					},
+				}},
+				BFDProfiles: map[string]*BFDProfile{},
+				Peers:       map[string]*Peer{},
 			},
 		},
 		{

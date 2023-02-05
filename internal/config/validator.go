@@ -9,6 +9,7 @@ import (
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	apivalidate "go.universe.tf/metallb/api/validate"
 
+	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -53,6 +54,8 @@ func (v *validator) Validate(resources ...client.ObjectList) error {
 			clusterResources.LegacyAddressPools = append(clusterResources.LegacyAddressPools, list.Items...)
 		case *metallbv1beta1.CommunityList:
 			clusterResources.Communities = append(clusterResources.Communities, list.Items...)
+		case *v1.NodeList:
+			clusterResources.Nodes = append(clusterResources.Nodes, list.Items...)
 		}
 	}
 	_, err := For(clusterResources, v.validate)
