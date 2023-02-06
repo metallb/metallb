@@ -15,7 +15,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.6.0
 	github.com/onsi/gomega v1.24.1
 	github.com/open-policy-agent/cert-controller v0.6.0
-	github.com/openshift-kni/k8sreporter v1.0.1
+	github.com/openshift-kni/k8sreporter v1.0.2
 	github.com/ory/dockertest/v3 v3.9.1
 	github.com/osrg/gobgp v2.0.0+incompatible
 	github.com/pkg/errors v0.9.1
@@ -182,6 +182,7 @@ replace (
 	k8s.io/controller-manager => k8s.io/controller-manager v0.26.0
 	k8s.io/cri-api => k8s.io/cri-api v0.26.0
 	k8s.io/csi-translation-lib => k8s.io/csi-translation-lib v0.26.0
+	k8s.io/dynamic-resource-allocation => k8s.io/dynamic-resource-allocation v0.26.0
 	k8s.io/kube-aggregator => k8s.io/kube-aggregator v0.26.0
 	k8s.io/kube-controller-manager => k8s.io/kube-controller-manager v0.26.0
 	k8s.io/kube-proxy => k8s.io/kube-proxy v0.26.0
