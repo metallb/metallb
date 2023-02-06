@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/pkg/errors"
+	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 )
 
 type Validate func(ClusterResources) error
@@ -70,15 +71,17 @@ func DiscardNativeOnly(c ClusterResources) error {
 	if len(c.Peers) > 1 {
 		peerAddr := make(map[string]bool)
 		routerID := c.Peers[0].Spec.RouterID
-		peerAddr[c.Peers[0].Spec.Address] = true
+		peer0 := peerAddressKey(c.Peers[0].Spec)
+		peerAddr[peer0] = true
 		for _, p := range c.Peers[1:] {
 			if p.Spec.RouterID != routerID {
 				return fmt.Errorf("peer %s has RouterID different from %s, in FRR mode all RouterID must be equal", p.Spec.RouterID, c.Peers[0].Spec.RouterID)
 			}
-			if _, ok := peerAddr[p.Spec.Address]; ok {
+			peerKey := peerAddressKey(p.Spec)
+			if _, ok := peerAddr[peerKey]; ok {
 				return fmt.Errorf("peer %s already exists, FRR mode doesn't support duplicate BGPPeers", p.Spec.Address)
 			}
-			peerAddr[p.Spec.Address] = true
+			peerAddr[peerKey] = true
 		}
 	}
 	for _, p := range c.Peers {
@@ -91,4 +94,8 @@ func DiscardNativeOnly(c ClusterResources) error {
 		}
 	}
 	return nil
+}
+
+func peerAddressKey(peer metallbv1beta2.BGPPeerSpec) string {
+	return fmt.Sprintf("%s-%s", peer.Address, peer.VRFName)
 }
