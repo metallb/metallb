@@ -3,8 +3,6 @@
 package v1beta1
 
 import (
-	"fmt"
-
 	"go.universe.tf/metallb/api/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/conversion"
@@ -24,11 +22,7 @@ func (src *BGPPeer) ConvertTo(dstRaw conversion.Hub) error {
 	dst.Spec.Password = src.Spec.Password
 	dst.Spec.BFDProfile = src.Spec.BFDProfile
 	dst.Spec.EBGPMultiHop = src.Spec.EBGPMultiHop
-	var err error
-	dst.Spec.NodeSelectors, err = parseNodeSelectors(src.Spec.NodeSelectors)
-	if err != nil {
-		return err
-	}
+	dst.Spec.NodeSelectors = parseNodeSelectors(src.Spec.NodeSelectors)
 	dst.ObjectMeta = src.ObjectMeta
 	return nil
 }
@@ -48,29 +42,21 @@ func (dst *BGPPeer) ConvertFrom(srcRaw conversion.Hub) error {
 	dst.Spec.Password = src.Spec.Password
 	dst.Spec.BFDProfile = src.Spec.BFDProfile
 	dst.Spec.EBGPMultiHop = src.Spec.EBGPMultiHop
-	var err error
-	dst.Spec.NodeSelectors, err = labelsToLegacySelector(src.Spec.NodeSelectors)
-	if err != nil {
-		return err
-	}
+	dst.Spec.NodeSelectors = labelsToLegacySelector(src.Spec.NodeSelectors)
 	return nil
 }
 
-func parseNodeSelectors(selectors []NodeSelector) ([]metav1.LabelSelector, error) {
+func parseNodeSelectors(selectors []NodeSelector) []metav1.LabelSelector {
 	var nodeSels []metav1.LabelSelector
 	for _, sel := range selectors {
-		nodeSel, err := parseNodeSelector(sel)
-		if err != nil {
-			return nil, fmt.Errorf("parsing node selector: %s", err)
-		}
-		nodeSels = append(nodeSels, nodeSel)
+		nodeSels = append(nodeSels, parseNodeSelector(sel))
 	}
-	return nodeSels, nil
+	return nodeSels
 }
 
-func parseNodeSelector(ns NodeSelector) (metav1.LabelSelector, error) {
+func parseNodeSelector(ns NodeSelector) metav1.LabelSelector {
 	if len(ns.MatchLabels)+len(ns.MatchExpressions) == 0 {
-		return metav1.LabelSelector{}, nil
+		return metav1.LabelSelector{}
 	}
 
 	sel := metav1.LabelSelector{
@@ -86,10 +72,10 @@ func parseNodeSelector(ns NodeSelector) (metav1.LabelSelector, error) {
 			Values:   req.Values,
 		})
 	}
-	return sel, nil
+	return sel
 }
 
-func labelsToLegacySelector(selectors []metav1.LabelSelector) ([]NodeSelector, error) {
+func labelsToLegacySelector(selectors []metav1.LabelSelector) []NodeSelector {
 	res := []NodeSelector{}
 	for _, sel := range selectors {
 		toAdd := NodeSelector{
@@ -110,5 +96,5 @@ func labelsToLegacySelector(selectors []metav1.LabelSelector) ([]NodeSelector, e
 		}
 		res = append(res, toAdd)
 	}
-	return res, nil
+	return res
 }
