@@ -50,8 +50,8 @@ have to disrupt the core MetalLB project.
   future based on contributions to the operator and at the approval of the
   current MetalLB maintainers.
 * Once the operator is functional, publish to operatorhub.io.
-* Document the use of the operator on the MetalLB web site.
-* Releases of metallb-operator would be independent from MetalLB.
+* Document the use of the operator on the MetalLB website.
+* Releases of metallb-operator would be independent of MetalLB.
 
 ## Alternatives
 

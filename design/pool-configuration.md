@@ -38,7 +38,7 @@ The new data model will be expressed in terms of kubernetes CRDs, deprecating th
 
 In the new data model, the following entities will be defined (more details on the implementation section):
 
-* `IPAddressPool`, responsible of the ip allocation to services
+* `IPAddressPool`, responsible for the ip allocation to services
 * `L2Advertisement`, describing the intention to advertise an IP coming from an `IPAddressPool` via L2
 * `BGPAdvertisement`, describing the intention to advertise a prefix coming from an `IPAddressPool` via BGP
 * `BGPPeer`, representing an external BGP peer willing to interact with MetalLB
@@ -117,7 +117,7 @@ in a multi tenant scenario.
 This, in combination with the other configuration degrees above, will provide a way to have per service (or per namespace) behavior
  (i.e. specifying the communities for a given service).
 
-The issues related to this arguments:
+The issues related to these arguments:
 
 * [Issue: Pool affinity for Namespace](https://github.com/metallb/metallb/issues/383)
 * [Issue: Feature request: addresses assignment outside of Service definition](https://github.com/metallb/metallb/issues/616)
@@ -146,7 +146,7 @@ of the API, until the old version is deprecated.
 
 ##### Service allocation
 
-When a user specifies both a pool to be allocated to a specific service and a pool with no selector, the service may unintentionally receive an IP from the pool which has no selector. We need to implement an easy to understand and deterministic behaviour (see design details below).
+When a user specifies both a pool to be allocated to a specific service and a pool with no selector, the service may unintentionally receive an IP from the pool which has no selector. We need to implement an easy-to-understand and deterministic behaviour (see design details below).
 
 ##### Non overlapping filters
 
@@ -184,7 +184,7 @@ those new changes must be applied.
 
 ### New data model
 
-Here we describe the new proposed data model in the form of Go structures, and non comprehensive sample CRDs.
+Here we describe the new proposed data model in the form of Go structures, and non-comprehensive sample CRDs.
 
 #### IPAddressPool
 
@@ -503,7 +503,7 @@ spec:
         tenant: foo
 ```
 
-The controller will use the pool with lowest value of priority in case of multiple matches. This is deterministic and will make the behaviour more clear to the users.
+The controller will use the pool with the lowest value of priority in case of multiple matches. This is deterministic and will make the behaviour clearer to the users.
 
 A pool with no priority set will be used only if the pools with priority can't be used.
 

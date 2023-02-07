@@ -2,7 +2,7 @@
 
 ## Summary
 
-The purpose of this enhancement is allow MetalLB to peer with external BGP peers
+The purpose of this enhancement is allowed MetalLB to peer with external BGP peers
 using interfaces belonging to [Linux VRFs](https://www.kernel.org/doc/html/latest/networking/vrf.html),
 and to announce traffic from within VRFs.
 
@@ -175,7 +175,7 @@ validating webhook logic in order to allow it.
 ### How to configure host networking
 
 The right combination of host routing through ip rules and iptables rules is
-strongly dependant on the CNI. Because of this reason, we don't think it is safe
+strongly dependent on the CNI. Because of this reason, we don't think it is safe
 to have a one size-fit all solution. What we will provide with this change is
 a sample script (and possibly a controller) that works for kindnet (in order
 to enable CI) and calico, with the idea of extending / validating it with the

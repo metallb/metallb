@@ -45,7 +45,7 @@ project](https://www.cncf.io/sandbox-projects/).
 
 The [Goals](#goals) section discusses some of the immediate changes we should
 expect, but some of the other services provided by the CNCF may be very
-beneficial to MetalLB in the future. The CNCF web site does a nice job
+beneficial to MetalLB in the future. The CNCF website does a nice job
 discussing what services they offer projects on the
 [Services for CNCF Projects](https://www.cncf.io/services-for-projects/) page.
 
@@ -61,7 +61,7 @@ discussing what services they offer projects on the
   assignment to the CNCF. See the CNCF [IP
   Policy](https://github.com/cncf/foundation/blob/master/charter.md#11-ip-policy).
 - (russellb) Work with CNCF on any other CNCF onboarding tasks required, such
-  as adding CNCF info to the web site footer.
+  as adding CNCF info to the website footer.
 
 ## Alternatives
 

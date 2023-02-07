@@ -14,7 +14,7 @@ information.
 
 Although the main branch has been relatively stable in the past, please be aware that it is the development branch.
 
-Consuming manifests from main may result in unstable / non backward compatible deployments. We strongly suggest consuming a stable branch, as
+Consuming manifests from main may result in unstable / non-backward compatible deployments. We strongly suggest consuming a stable branch, as
 described in the [official docs](https://metallb.universe.tf/installation/).
 
 # Contributing
