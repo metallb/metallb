@@ -431,8 +431,8 @@ func frrContainersConfigs(ipv4Addresses, ipv6Addresses []string) map[string]frrc
 			ASN:     externalASN,
 			BGPPort: 179,
 		},
-		IPv4Address: ipv4Addresses[0],
-		IPv6Address: ipv6Addresses[0],
+		IPv4Address: ipv4Addresses[1],
+		IPv6Address: ipv6Addresses[1],
 	}
 	return res
 }
