@@ -71,9 +71,8 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 	svc := svcRo.DeepCopy()
 	successRes := controllers.SyncStateSuccess
 	wasAllocated := c.isServiceAllocated(name)
-	if !c.convergeBalancer(l, name, svc) {
-		return controllers.SyncStateError
-	}
+	c.convergeBalancer(l, name, svc)
+
 	if wasAllocated && !c.isServiceAllocated(name) { // convergeBalancer may deallocate our service and this means it did it.
 		// if the service was deallocated, it may have have left room
 		// for another one, so we reprocess
