@@ -27,7 +27,7 @@ const (
 	// BGP configuration directory.
 	frrConfigDir = "config/frr"
 	// FRR routing image.
-	frrImage = "quay.io/frrouting/frr:7.5.1"
+	frrImage = "quay.io/frrouting/frr:8.4.2"
 	// Host network name.
 	hostNetwork = "host"
 	// FRR container mount destination path.
