@@ -99,6 +99,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 			return controllers.SyncStateError
 		}
 		level.Info(l).Log("event", "serviceUpdated", "msg", "updated service object")
+		return successRes
 	}
 
 	level.Info(l).Log("event", "serviceUpdated", "msg", "service is not updated")
