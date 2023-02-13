@@ -36,6 +36,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	k8sscheme "k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -144,6 +145,80 @@ func TestConfigController(t *testing.T) {
 	}
 }
 
+func TestSecretShouldntTrigger(t *testing.T) {
+	initObjects := objectsFromResources(configControllerValidResources)
+	fakeClient, err := newFakeClient(initObjects)
+	if err != nil {
+		t.Fatalf("test failed to create fake client: %v", err)
+	}
+
+	handlerCalled := false
+	mockHandler := func(l log.Logger, cfg *config.Config) SyncState {
+		handlerCalled = true
+		return SyncStateSuccess
+	}
+
+	r := &ConfigReconciler{
+		Client:         fakeClient,
+		Logger:         log.NewNopLogger(),
+		Scheme:         scheme,
+		Namespace:      testNamespace,
+		ValidateConfig: config.DontValidate,
+		Handler:        mockHandler,
+		ForceReload:    func() {},
+	}
+	req := reconcile.Request{
+		NamespacedName: types.NamespacedName{
+			Namespace: testNamespace,
+		},
+	}
+
+	_, err = r.Reconcile(context.TODO(), req)
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+	if !handlerCalled {
+		t.Fatalf("handler not called")
+	}
+	handlerCalled = false
+	err = fakeClient.Create(context.TODO(), &v1beta2.BGPPeer{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "peer2",
+			Namespace: testNamespace,
+		},
+		Spec: v1beta2.BGPPeerSpec{
+			MyASN:      42,
+			ASN:        142,
+			Address:    "1.2.3.4",
+			BFDProfile: "default",
+		},
+	})
+	if err != nil {
+		t.Fatalf("create failed on peer2: %v", err)
+	}
+	_, err = r.Reconcile(context.TODO(), req)
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+	if !handlerCalled {
+		t.Fatalf("handler not called")
+	}
+
+	handlerCalled = false
+	err = fakeClient.Create(context.TODO(), &corev1.Secret{Type: corev1.SecretTypeBasicAuth, ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: testNamespace},
+		Data: map[string][]byte{"password": []byte([]byte("nopass"))}})
+	if err != nil {
+		t.Fatalf("create failed on secret foo: %v", err)
+	}
+	_, err = r.Reconcile(context.TODO(), req)
+	if err != nil {
+		t.Fatalf("reconcile failed: %v", err)
+	}
+	if handlerCalled {
+		t.Fatalf("handler called")
+	}
+}
+
 func TestNodeEvent(t *testing.T) {
 	g := NewGomegaWithT(t)
 	testEnv := &envtest.Environment{
@@ -166,26 +241,22 @@ func TestNodeEvent(t *testing.T) {
 
 	var configUpdate int
 	var mutex sync.Mutex
-	mockHandler := func(l log.Logger, cfg *config.Config) SyncState {
+	oldRequestHandler := requestHandler
+	defer func() { requestHandler = oldRequestHandler }()
+
+	requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 		mutex.Lock()
 		defer mutex.Unlock()
 		configUpdate++
-		return SyncStateSuccess
+		return ctrl.Result{}, nil
 	}
-	var forceReload int
-	mockForceReload := func() {
-		mutex.Lock()
-		defer mutex.Unlock()
-		forceReload++
-	}
+
 	r := &ConfigReconciler{
 		Client:         m.GetClient(),
 		Logger:         log.NewNopLogger(),
 		Scheme:         scheme,
 		Namespace:      testNamespace,
 		ValidateConfig: config.DontValidate,
-		Handler:        mockHandler,
-		ForceReload:    mockForceReload,
 	}
 	err = r.SetupWithManager(m)
 	g.Expect(err).To(BeNil())
@@ -195,6 +266,18 @@ func TestNodeEvent(t *testing.T) {
 		g.Expect(err).To(BeNil())
 	}()
 
+	// count for update on namespace events
+	var initialConfigUpdateCount int
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		time.Sleep(5 * time.Second)
+		mutex.Lock()
+		initialConfigUpdateCount = configUpdate
+		mutex.Unlock()
+	}()
+	wg.Wait()
 	// test new node event.
 	node := &corev1.Node{
 		ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
@@ -208,12 +291,7 @@ func TestNodeEvent(t *testing.T) {
 		mutex.Lock()
 		defer mutex.Unlock()
 		return configUpdate
-	}, 5*time.Second, 200*time.Millisecond).Should(Equal(1))
-	g.Eventually(func() int {
-		mutex.Lock()
-		defer mutex.Unlock()
-		return forceReload
-	}, 5*time.Second, 200*time.Millisecond).Should(Equal(0))
+	}, 5*time.Second, 200*time.Millisecond).Should(Equal(initialConfigUpdateCount + 1))
 
 	// test update node event with no changes into node label.
 	g.Eventually(func() error {
@@ -234,12 +312,7 @@ func TestNodeEvent(t *testing.T) {
 		mutex.Lock()
 		defer mutex.Unlock()
 		return configUpdate
-	}, 5*time.Second, 200*time.Millisecond).Should(Equal(1))
-	g.Eventually(func() int {
-		mutex.Lock()
-		defer mutex.Unlock()
-		return forceReload
-	}, 5*time.Second, 200*time.Millisecond).Should(Equal(0))
+	}, 5*time.Second, 200*time.Millisecond).Should(Equal(initialConfigUpdateCount + 1))
 
 	// test update node event with changes into node label.
 	g.Eventually(func() error {
@@ -260,12 +333,8 @@ func TestNodeEvent(t *testing.T) {
 		mutex.Lock()
 		defer mutex.Unlock()
 		return configUpdate
-	}, 5*time.Second, 200*time.Millisecond).Should(Equal(2))
-	g.Eventually(func() int {
-		mutex.Lock()
-		defer mutex.Unlock()
-		return forceReload
-	}, 5*time.Second, 200*time.Millisecond).Should(Equal(0))
+	}, 5*time.Second, 200*time.Millisecond).Should(Equal(initialConfigUpdateCount + 2))
+
 }
 
 var (

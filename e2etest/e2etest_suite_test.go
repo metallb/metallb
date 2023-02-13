@@ -22,13 +22,10 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path"
 	"strings"
 	"testing"
 
-	"github.com/onsi/ginkgo"
-	"github.com/onsi/ginkgo/config"
-	"github.com/onsi/ginkgo/reporters"
+	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"go.universe.tf/metallb/e2etest/bgptests"
 	"go.universe.tf/metallb/e2etest/l2tests"
@@ -42,7 +39,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/klog"
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 )
@@ -58,7 +54,9 @@ var (
 	prometheusNamespace string
 	nodeNics            string
 	localNics           string
-	external_containers string
+	externalContainers  string
+	runOnHost           bool
+	bgpNativeMode       bool
 )
 
 // handleFlags sets up all flags and parses the command line.
@@ -86,8 +84,14 @@ func handleFlags() {
 	flag.BoolVar(&useOperator, "use-operator", false, "set this to true to run the tests using operator custom resources")
 	flag.StringVar(&reportPath, "report-path", "/tmp/report", "the path to be used to dump test failure information")
 	flag.StringVar(&prometheusNamespace, "prometheus-namespace", "monitoring", "the namespace prometheus is running in (if running)")
-	flag.StringVar(&external_containers, "external-containers", "", "a comma separated list of external containers names to use for the test. (valid parameters are: ibgp-single-hop / ibgp-multi-hop / ebgp-single-hop / ebgp-multi-hop)")
+	flag.StringVar(&externalContainers, "external-containers", "", "a comma separated list of external containers names to use for the test. (valid parameters are: ibgp-single-hop / ibgp-multi-hop / ebgp-single-hop / ebgp-multi-hop)")
+	flag.BoolVar(&bgpNativeMode, "bgp-native-mode", false, "says if we are testing against a deployment using bgp native mode")
+
 	flag.Parse()
+
+	if _, res := os.LookupEnv("RUN_FRR_CONTAINER_ON_HOST_NETWORK"); res {
+		runOnHost = true
+	}
 }
 
 func TestMain(m *testing.M) {
@@ -106,18 +110,9 @@ func TestE2E(t *testing.T) {
 	if testing.Short() {
 		return
 	}
-	// Run tests through the Ginkgo runner with output to console + JUnit for reporting
-	var r []ginkgo.Reporter
-	if framework.TestContext.ReportDir != "" {
-		klog.Infof("Saving reports to %s", framework.TestContext.ReportDir)
-		if err := os.MkdirAll(framework.TestContext.ReportDir, 0755); err != nil {
-			klog.Errorf("Failed creating report directory: %v", err)
-		} else {
-			r = append(r, reporters.NewJUnitReporter(path.Join(framework.TestContext.ReportDir, fmt.Sprintf("junit_%v%02d.xml", framework.TestContext.ReportPrefix, config.GinkgoConfig.ParallelNode))))
-		}
-	}
+
 	gomega.RegisterFailHandler(framework.Fail)
-	ginkgo.RunSpecsWithDefaultAndCustomReporters(t, "E2E Suite", r)
+	ginkgo.RunSpecs(t, "E2E Suite")
 }
 
 var _ = ginkgo.BeforeSuite(func() {
@@ -137,8 +132,23 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	v4Addresses := strings.Split(ipv4ForContainers, ",")
 	v6Addresses := strings.Split(ipv6ForContainers, ",")
-	bgptests.FRRContainers, err = bgptests.InfraSetup(v4Addresses, v6Addresses, external_containers, cs)
-	framework.ExpectNoError(err)
+
+	switch {
+	case externalContainers != "":
+		bgptests.FRRContainers, err = bgptests.ExternalContainersSetup(externalContainers, cs)
+		framework.ExpectNoError(err)
+	case runOnHost:
+		bgptests.FRRContainers, err = bgptests.HostContainerSetup()
+		framework.ExpectNoError(err)
+	default:
+		bgptests.FRRContainers, err = bgptests.KindnetContainersSetup(v4Addresses, v6Addresses, cs)
+		framework.ExpectNoError(err)
+		if !bgpNativeMode {
+			vrfFRRContainers, err := bgptests.VRFContainersSetup(cs)
+			framework.ExpectNoError(err)
+			bgptests.FRRContainers = append(bgptests.FRRContainers, vrfFRRContainers...)
+		}
+	}
 
 	clientconfig, err := framework.LoadConfig()
 	framework.ExpectNoError(err)
@@ -181,8 +191,12 @@ var _ = ginkgo.AfterSuite(func() {
 	cs, err := framework.LoadClientset()
 	framework.ExpectNoError(err)
 
-	err = bgptests.InfraTearDown(bgptests.FRRContainers, cs)
+	err = bgptests.InfraTearDown(cs)
 	framework.ExpectNoError(err)
+	if !bgpNativeMode {
+		err = bgptests.InfraTearDownVRF(cs)
+		framework.ExpectNoError(err)
+	}
 	err = updater.Clean()
 	framework.ExpectNoError(err)
 

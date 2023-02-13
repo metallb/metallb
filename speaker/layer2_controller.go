@@ -163,13 +163,13 @@ func (c *layer2Controller) SetNode(log.Logger, *v1.Node) error {
 }
 
 func ipAdvertisementFor(ip net.IP, localNode string, l2Advertisements []*config.L2Advertisement) layer2.IPAdvertisement {
-	ifs := sets.NewString()
+	ifs := sets.Set[string]{}
 	for _, l2 := range l2Advertisements {
 		if matchNode := l2.Nodes[localNode]; !matchNode {
 			continue
 		}
 		if l2.AllInterfaces {
-			return layer2.NewIPAdvertisement(ip, true, sets.NewString())
+			return layer2.NewIPAdvertisement(ip, true, sets.Set[string]{})
 		}
 		ifs = ifs.Insert(l2.Interfaces...)
 	}

@@ -251,6 +251,59 @@ func TestValidateFRR(t *testing.T) {
 			mustFail: true,
 		},
 		{
+			desc: "myAsn set, one different but with different vrf",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							MyASN:   123,
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.5",
+							MyASN:   123,
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.6",
+							MyASN:   124,
+							VRFName: "red",
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "myAsn set, two different but with different vrf",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							MyASN:   123,
+							VRFName: "red",
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.5",
+							MyASN:   123,
+							VRFName: "red",
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.6",
+							MyASN:   124,
+						},
+					},
+				},
+			},
+		},
+		{
 			desc: "duplicate bgp address",
 			config: ClusterResources{
 				Peers: []v1beta2.BGPPeer{
@@ -262,6 +315,52 @@ func TestValidateFRR(t *testing.T) {
 					{
 						Spec: v1beta2.BGPPeerSpec{
 							Address: "1.2.3.4",
+						},
+					},
+				},
+			},
+			mustFail: true,
+		}, {
+			desc: "duplicate bgp address, different vrfs",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							VRFName: "red",
+						},
+					}, {
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							VRFName: "green",
+						},
+					},
+				},
+			},
+			mustFail: false,
+		}, {
+			desc: "duplicate bgp address, same vrf",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							VRFName: "red",
+						},
+					}, {
+						Spec: v1beta2.BGPPeerSpec{
+							Address: "1.2.3.4",
+							VRFName: "red",
 						},
 					},
 				},
