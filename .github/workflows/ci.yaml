@@ -31,6 +31,11 @@ jobs:
         with:
           args: -exclude-dir e2etest -severity medium ./...
 
+      - name: Golang Vulncheck
+        uses: Templum/govulncheck-action@v0.0.9
+        with:
+          skip-upload: true
+
   commitlint:
     runs-on: ubuntu-22.04
     steps:
@@ -175,6 +180,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
+      - name: Install kernel modules
+        run: |
+          sudo apt-get update
+          sudo apt-get install linux-modules-extra-$(uname -r)
+
       - name: Setup
         uses: ./.github/workflows/composite/setup
 
@@ -193,7 +203,8 @@ jobs:
           echo '/etc/frr/core-%e.%p.%h.%t' | sudo tee /proc/sys/kernel/core_pattern
           if [ ${{ matrix.deployment }} = "helm" ]; then export SPEAKER_SELECTOR="app.kubernetes.io/component=speaker" && export CONTROLLER_SELECTOR="app.kubernetes.io/component=controller"; fi
           SKIP="none"
-          if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|BFD|DUALSTACK"; fi
+          NATIVE_BGP=""
+          if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|BFD|VRF|DUALSTACK"; NATIVE_BGP="--native-bgp"; fi
           if [ "${{ matrix.ip-family }}" == "ipv4" ]; then SKIP="$SKIP|IPV6|DUALSTACK"; fi
           if [ "${{ matrix.ip-family }}" == "dual" ]; then SKIP="$SKIP|IPV6"; fi
           if [ "${{ matrix.ip-family }}" == "ipv6" ]; then SKIP="$SKIP|IPV4|DUALSTACK"; fi
@@ -201,7 +212,8 @@ jobs:
           if [ "${{ matrix.prometheus }}" == "disabled" ]; then SKIP="$SKIP|metrics"; fi
 
           echo "Skipping $SKIP"
-          sudo -E env "PATH=$PATH" inv e2etest --skip $SKIP -e /tmp/kind_logs
+          echo "Native bgp mode $NATIVE_BGP"
+          sudo -E env "PATH=$PATH" inv e2etest --skip $SKIP $NATIVE_BGP -e /tmp/kind_logs
 
       - name: Collect Logs
         if: ${{ failure() }}
@@ -254,6 +266,7 @@ jobs:
           EOF
           rm -rf e2etest # we want to make sure we are not running current e2e by mistake
           cd metallb-v0.12.1
+          sed -i -e 's/quay.io\/frrouting\/frr:stable_7.5/quay.io\/frrouting\/frr:7.5.1/g' e2etest/pkg/frr/container/container.go # replace with frr image from dockerhub since it has official image.
           FOCUS="L2.*should work for ExternalTrafficPolicy=Cluster|BGP.*A service of protocol load balancer should work with.*IPV4 - ExternalTrafficPolicyCluster$|validate FRR running configuration"
           sudo -E env "PATH=$PATH" inv e2etest --skip-docker --use-operator --focus "$FOCUS" -e /tmp/kind_logs
 
@@ -275,6 +288,11 @@ jobs:
         shell: bash
 
     steps:
+      - name: Install kernel modules
+        run: |
+          sudo apt-get update
+          sudo apt-get install linux-modules-extra-$(uname -r)
+
       - name: Checkout
         uses: actions/checkout@v2
         with:
@@ -311,8 +329,18 @@ jobs:
           sed -i 's/quay.io\/metallb\/controller:main/quay.io\/metallb\/controller:dev-amd64/g' bin/metallb-operator.yaml
           sed -i 's/native/frr/g' bin/metallb-operator.yaml
           kubectl apply -f bin/metallb-operator.yaml
-          sleep 30s
 
+      - name: Ensure MetalLB operator is ready
+        run: |
+          COUNT=0
+          while [ "$(kubectl get pods -n metallb-system -l control-plane='controller-manager' -o jsonpath='{.items[*].status.containerStatuses[0].ready}')" != "true" ]; do
+            sleep 5
+            COUNT=$((COUNT+1))
+            if [[ $COUNT -gt 15 ]] ; then
+              exit 1;
+            fi
+            echo "Waiting for operator pod to be ready."
+          done
 
       - name: MetalLB E2E Tests with Operator Deployment
         run: |
@@ -341,6 +369,11 @@ jobs:
       - helm
       - commitlint
     steps:
+      - name: Install kernel modules
+        run: |
+          sudo apt-get update
+          sudo apt-get install linux-modules-extra-$(uname -r)
+
       - name: Checkout
         uses: actions/checkout@v2
         with:

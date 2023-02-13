@@ -19,15 +19,17 @@ package controllers
 import (
 	"context"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/internal/config"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
@@ -36,7 +38,7 @@ type PoolReconciler struct {
 	Logger         log.Logger
 	Scheme         *runtime.Scheme
 	Namespace      string
-	Handler        func(log.Logger, map[string]*config.Pool) SyncState
+	Handler        func(log.Logger, *config.Pools) SyncState
 	ValidateConfig config.Validate
 	ForceReload    func()
 }
@@ -64,13 +66,20 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, err
 	}
 
+	var namespaces corev1.NamespaceList
+	if err := r.List(ctx, &namespaces); err != nil {
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "message", "failed to get namespaces", "error", err)
+		return ctrl.Result{}, err
+	}
+
 	resources := config.ClusterResources{
 		Pools:              ipAddressPools.Items,
 		LegacyAddressPools: addressPools.Items,
 		Communities:        communities.Items,
+		Namespaces:         namespaces.Items,
 	}
 
-	level.Debug(r.Logger).Log("controller", "PoolReconciler", "metallb CRs", spew.Sdump(resources))
+	level.Debug(r.Logger).Log("controller", "PoolReconciler", "metallb CRs", dumpClusterResources(&resources))
 
 	cfg, err := config.For(resources, r.ValidateConfig)
 	if err != nil {
@@ -79,14 +88,14 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, nil
 	}
 
-	level.Debug(r.Logger).Log("controller", "PoolReconciler", "rendered config", spew.Sdump(cfg))
+	level.Debug(r.Logger).Log("controller", "PoolReconciler", "rendered config", dumpConfig(cfg))
 
 	res := r.Handler(r.Logger, cfg.Pools)
 	switch res {
 	case SyncStateError:
 		updateErrors.Inc()
 		configStale.Set(1)
-		level.Error(r.Logger).Log("controller", "PoolReconciler", "metallb CRs and Secrets", spew.Sdump(resources), "event", "reload failed, retry")
+		level.Error(r.Logger).Log("controller", "PoolReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, retry")
 		return ctrl.Result{}, retryError
 	case SyncStateReprocessAll:
 		level.Info(r.Logger).Log("controller", "PoolReconciler", "event", "force service reload")
@@ -94,7 +103,7 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	case SyncStateErrorNoRetry:
 		updateErrors.Inc()
 		configStale.Set(1)
-		level.Error(r.Logger).Log("controller", "PoolReconciler", "metallb CRs and Secrets", spew.Sdump(resources), "event", "reload failed, no retry")
+		level.Error(r.Logger).Log("controller", "PoolReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, no retry")
 		return ctrl.Result{}, nil
 	}
 
@@ -105,9 +114,16 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 }
 
 func (r *PoolReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	p := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return filterNodeEvent(e) && filterNamespaceEvent(e)
+		},
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metallbv1beta1.IPAddressPool{}).
 		Watches(&source.Kind{Type: &metallbv1beta1.AddressPool{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &metallbv1beta1.Community{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&source.Kind{Type: &corev1.Namespace{}}, &handler.EnqueueRequestForObject{}).
+		WithEventFilter(p).
 		Complete(r)
 }

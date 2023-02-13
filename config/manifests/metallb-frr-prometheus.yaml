@@ -832,6 +832,10 @@ spec:
               sourceAddress:
                 description: Source address to use when establishing the session.
                 type: string
+              vrf:
+                description: To set if we want to peer with the BGPPeer using an interface
+                  belonging to a host vrf
+                type: string
             required:
             - myASN
             - peerASN
@@ -1537,6 +1541,7 @@ rules:
   - ""
   resources:
   - services
+  - namespaces
   verbs:
   - get
   - list
@@ -1584,6 +1589,7 @@ rules:
   - mutatingwebhookconfigurations
   verbs:
   - list
+  - watch
 - apiGroups:
   - apiextensions.k8s.io
   resourceNames:
@@ -1610,6 +1616,7 @@ rules:
   - customresourcedefinitions
   verbs:
   - list
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -1636,6 +1643,7 @@ rules:
   - services
   - endpoints
   - nodes
+  - namespaces
   verbs:
   - get
   - list
@@ -2099,7 +2107,13 @@ spec:
         env:
         - name: TINI_SUBREAPER
           value: "true"
-        image: frrouting/frr:v7.5.1
+        image: quay.io/frrouting/frr:7.5.1
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /livez
+            port: 7473
+          periodSeconds: 5
         name: frr
         securityContext:
           capabilities:
@@ -2108,6 +2122,12 @@ spec:
             - NET_RAW
             - SYS_ADMIN
             - NET_BIND_SERVICE
+        startupProbe:
+          failureThreshold: 30
+          httpGet:
+            path: /livez
+            port: 7473
+          periodSeconds: 5
         volumeMounts:
         - mountPath: /var/run/frr
           name: frr-sockets
@@ -2115,7 +2135,7 @@ spec:
           name: frr-conf
       - command:
         - /etc/frr_reloader/frr-reloader.sh
-        image: frrouting/frr:v7.5.1
+        image: quay.io/frrouting/frr:7.5.1
         name: reloader
         volumeMounts:
         - mountPath: /var/run/frr
@@ -2128,7 +2148,7 @@ spec:
         - --metrics-port=7473
         command:
         - /etc/frr_metrics/frr-metrics
-        image: frrouting/frr:v7.5.1
+        image: quay.io/frrouting/frr:7.5.1
         name: frr-metrics
         ports:
         - containerPort: 7473
@@ -2214,7 +2234,7 @@ spec:
         - /bin/sh
         - -c
         - cp -rLf /tmp/frr/* /etc/frr/
-        image: frrouting/frr:v7.5.1
+        image: quay.io/frrouting/frr:7.5.1
         name: cp-frr-files
         securityContext:
           runAsGroup: 101

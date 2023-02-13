@@ -1,4 +1,7 @@
 #!/bin/bash
+
+set -o pipefail
+
 cleanup() {
   echo "Caught an exit signal.."
   clean_files
@@ -14,14 +17,14 @@ reload_frr() {
   kill_sleep
 
   echo "Checking the configuration file syntax"
-  if ! python3 /usr/lib/frr/frr-reload.py --test --stdout "$FILE_TO_RELOAD" ; then
+  if ! python3 /usr/lib/frr/frr-reload.py --test --stdout "$FILE_TO_RELOAD" 2>&1 | sed 's/password.*/password <retracted>/g'; then
     echo "Syntax error spotted: aborting.. $SECONDS seconds"
     echo -n "$(date +%s) failure"  > "$STATUSFILE"
     return
   fi
 
   echo "Applying the configuration file"
-  if ! python3 /usr/lib/frr/frr-reload.py --reload --overwrite --stdout "$FILE_TO_RELOAD" ; then
+  if ! python3 /usr/lib/frr/frr-reload.py --reload --overwrite --stdout "$FILE_TO_RELOAD" 2>&1 | sed 's/password.*/password <retracted>/g'; then
     echo "Failed to fully apply configuration file $SECONDS seconds"
     echo -n "$(date +%s) failure"  > "$STATUSFILE"
     return

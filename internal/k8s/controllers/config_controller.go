@@ -18,8 +18,8 @@ package controllers
 
 import (
 	"context"
+	"reflect"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
@@ -45,9 +45,14 @@ type ConfigReconciler struct {
 	ValidateConfig config.Validate
 	ForceReload    func()
 	BGPType        string
+	currentConfig  *config.Config
 }
 
 func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	return requestHandler(r, ctx, req)
+}
+
+var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	level.Info(r.Logger).Log("controller", "ConfigReconciler", "start reconcile", req.NamespacedName.String())
 	defer level.Info(r.Logger).Log("controller", "ConfigReconciler", "end reconcile", req.NamespacedName.String())
 	updates.Inc()
@@ -105,6 +110,12 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, err
 	}
 
+	var namespaces corev1.NamespaceList
+	if err := r.List(ctx, &namespaces); err != nil {
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "message", "failed to get namespaces", "error", err)
+		return ctrl.Result{}, err
+	}
+
 	resources := config.ClusterResources{
 		Pools:              ipAddressPools.Items,
 		Peers:              bgpPeers.Items,
@@ -115,6 +126,7 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		Communities:        communities.Items,
 		PasswordSecrets:    secrets,
 		Nodes:              nodes.Items,
+		Namespaces:         namespaces.Items,
 	}
 
 	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources))
@@ -126,13 +138,23 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 		return ctrl.Result{}, nil
 	}
 
-	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "rendered config", spew.Sdump(cfg))
+	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "rendered config", dumpConfig(cfg))
+	if r.currentConfig != nil && reflect.DeepEqual(r.currentConfig, cfg) {
+		level.Debug(r.Logger).Log("controller", "ConfigReconciler", "event", "configuration did not change, ignoring")
+		return ctrl.Result{}, nil
+	}
+
+	r.currentConfig = cfg
 
 	res := r.Handler(r.Logger, cfg)
 	switch res {
 	case SyncStateError:
 		configStale.Set(1)
 		updateErrors.Inc()
+		// if the configuration load failed, we reset the current config because this is gonna lead to a retry
+		// of the reconciliaton loop. If we don't reset, the retry will find the config identical and will exit,
+		// which is not what we want here.
+		r.currentConfig = nil
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, retry")
 		return ctrl.Result{}, retryError
 	case SyncStateReprocessAll:
@@ -154,19 +176,7 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	p := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			newNodeObj, ok := e.ObjectNew.(*corev1.Node)
-			if !ok {
-				return true
-			}
-			oldNodeObj, ok := e.ObjectOld.(*corev1.Node)
-			if !ok {
-				return true
-			}
-			// If there is no changes in node labels, ignore event.
-			if labels.Equals(labels.Set(oldNodeObj.Labels), labels.Set(newNodeObj.Labels)) {
-				return false
-			}
-			return true
+			return filterNodeEvent(e) && filterNamespaceEvent(e)
 		},
 	}
 	return ctrl.NewControllerManagedBy(mgr).
@@ -179,8 +189,40 @@ func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&source.Kind{Type: &metallbv1beta1.AddressPool{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &metallbv1beta1.Community{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&source.Kind{Type: &corev1.Namespace{}}, &handler.EnqueueRequestForObject{}).
 		WithEventFilter(p).
 		Complete(r)
+}
+
+func filterNodeEvent(e event.UpdateEvent) bool {
+	newNodeObj, ok := e.ObjectNew.(*corev1.Node)
+	if !ok {
+		return true
+	}
+	oldNodeObj, ok := e.ObjectOld.(*corev1.Node)
+	if !ok {
+		return true
+	}
+	if labels.Equals(labels.Set(oldNodeObj.Labels), labels.Set(newNodeObj.Labels)) {
+		return false
+	}
+	return true
+}
+
+func filterNamespaceEvent(e event.UpdateEvent) bool {
+	newNamespaceObj, ok := e.ObjectNew.(*corev1.Namespace)
+	if !ok {
+		return true
+	}
+	oldNamespaceObj, ok := e.ObjectOld.(*corev1.Namespace)
+	if !ok {
+		return true
+	}
+	// If there is no changes in namespace labels, ignore event.
+	if labels.Equals(labels.Set(oldNamespaceObj.Labels), labels.Set(newNamespaceObj.Labels)) {
+		return false
+	}
+	return true
 }
 
 func (r *ConfigReconciler) getSecrets(ctx context.Context) (map[string]corev1.Secret, error) {

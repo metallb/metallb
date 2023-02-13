@@ -832,6 +832,10 @@ spec:
               sourceAddress:
                 description: Source address to use when establishing the session.
                 type: string
+              vrf:
+                description: To set if we want to peer with the BGPPeer using an interface
+                  belonging to a host vrf
+                type: string
             required:
             - myASN
             - peerASN
@@ -1508,6 +1512,7 @@ rules:
   - ""
   resources:
   - services
+  - namespaces
   verbs:
   - get
   - list
@@ -1555,6 +1560,7 @@ rules:
   - mutatingwebhookconfigurations
   verbs:
   - list
+  - watch
 - apiGroups:
   - apiextensions.k8s.io
   resourceNames:
@@ -1581,6 +1587,7 @@ rules:
   - customresourcedefinitions
   verbs:
   - list
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -1595,6 +1602,7 @@ rules:
   - services
   - endpoints
   - nodes
+  - namespaces
   verbs:
   - get
   - list

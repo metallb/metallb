@@ -9,7 +9,6 @@ import (
 	"sort"
 	"sync"
 	"testing"
-	"time"
 
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
@@ -106,20 +105,20 @@ type fakeBGPSessionManager struct {
 	gotAds map[string][]*bgp.Advertisement
 }
 
-func (f *fakeBGPSessionManager) NewSession(_ log.Logger, addr string, _ net.IP, _ uint32, _ net.IP, _ uint32, _ time.Duration, _ time.Duration, _, _, _ string, _ bool, name string) (bgp.Session, error) {
+func (f *fakeBGPSessionManager) NewSession(_ log.Logger, args bgp.SessionParameters) (bgp.Session, error) {
 	f.Lock()
 	defer f.Unlock()
 
-	if _, ok := f.gotAds[addr]; ok {
-		f.t.Errorf("Tried to create already existing BGP session to %q", addr)
+	if _, ok := f.gotAds[args.PeerAddress]; ok {
+		f.t.Errorf("Tried to create already existing BGP session to %q", args.PeerAddress)
 		return nil, errors.New("invariant violation")
 	}
 	// Nil because we haven't programmed any routes for it yet, but
 	// the key now exists in the map.
-	f.gotAds[addr] = nil
+	f.gotAds[args.PeerAddress] = nil
 	return &fakeSession{
 		f:    f,
-		addr: addr,
+		addr: args.PeerAddress,
 	}, nil
 }
 
@@ -268,7 +267,7 @@ func TestBGPSpeaker(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -278,7 +277,7 @@ func TestBGPSpeaker(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -576,7 +575,7 @@ func TestBGPSpeaker(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -593,7 +592,7 @@ func TestBGPSpeaker(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			balancer: "test1",
 			svc: &v1.Service{
@@ -643,7 +642,7 @@ func TestBGPSpeaker(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -660,7 +659,7 @@ func TestBGPSpeaker(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			balancer: "test1",
 			svc: &v1.Service{
@@ -708,7 +707,7 @@ func TestBGPSpeaker(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -726,7 +725,7 @@ func TestBGPSpeaker(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			balancer: "test1",
 			svc: &v1.Service{
@@ -782,7 +781,7 @@ func TestBGPSpeaker(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -792,7 +791,7 @@ func TestBGPSpeaker(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			balancer: "test1",
 			svc: &v1.Service{
@@ -997,7 +996,7 @@ func TestBGPSpeaker(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -1007,7 +1006,7 @@ func TestBGPSpeaker(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			balancer: "test2",
 			svc: &v1.Service{
@@ -1139,7 +1138,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -1149,7 +1148,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -1483,7 +1482,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -1500,7 +1499,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			balancer: "test1",
 			svc: &v1.Service{
@@ -1556,7 +1555,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -1566,7 +1565,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			balancer: "test1",
 			svc: &v1.Service{
@@ -1773,7 +1772,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: map[string]*config.Pool{
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
 					"default": {
 						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
 						BGPAdvertisements: []*config.BGPAdvertisement{
@@ -1783,7 +1782,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							},
 						},
 					},
-				},
+				}},
 			},
 			balancer: "test2",
 			svc: &v1.Service{
@@ -1898,7 +1897,7 @@ func TestNodeSelectors(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
-				Pools: pools,
+				Pools: &config.Pools{ByName: pools},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -1920,7 +1919,7 @@ func TestNodeSelectors(t *testing.T) {
 						},
 					},
 				},
-				Pools: pools,
+				Pools: &config.Pools{ByName: pools},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -1971,7 +1970,7 @@ func TestNodeSelectors(t *testing.T) {
 						},
 					},
 				},
-				Pools: pools,
+				Pools: &config.Pools{ByName: pools},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
@@ -2010,7 +2009,7 @@ func TestNodeSelectors(t *testing.T) {
 						},
 					},
 				},
-				Pools: pools,
+				Pools: &config.Pools{ByName: pools},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,

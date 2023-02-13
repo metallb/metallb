@@ -11,11 +11,11 @@ import (
 // IPAdvertisement is the advertisement Info about LB IP.
 type IPAdvertisement struct {
 	ip            net.IP
-	interfaces    sets.String
+	interfaces    sets.Set[string]
 	allInterfaces bool
 }
 
-func NewIPAdvertisement(ip net.IP, allInterfaces bool, interfaces sets.String) IPAdvertisement {
+func NewIPAdvertisement(ip net.IP, allInterfaces bool, interfaces sets.Set[string]) IPAdvertisement {
 	return IPAdvertisement{
 		ip:            ip,
 		interfaces:    interfaces,
@@ -36,13 +36,16 @@ func (i1 *IPAdvertisement) Equal(i2 *IPAdvertisement) bool {
 	if i1.allInterfaces != i2.allInterfaces {
 		return false
 	}
-	if i1.allInterfaces == true {
+	if i1.allInterfaces {
 		return true
 	}
 	return i1.interfaces.Equal(i2.interfaces)
 }
 
 func (i *IPAdvertisement) MatchInterfaces(intfs ...string) bool {
+	if i.allInterfaces {
+		return true
+	}
 	for _, intf := range intfs {
 		if i.matchInterface(intf) {
 			return true

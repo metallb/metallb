@@ -111,8 +111,8 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.enabled | bool | `true` |  |
 | speaker.frr.enabled | bool | `false` |  |
 | speaker.frr.image.pullPolicy | string | `nil` |  |
-| speaker.frr.image.repository | string | `"frrouting/frr"` |  |
-| speaker.frr.image.tag | string | `"v7.5.1"` |  |
+| speaker.frr.image.repository | string | `"quay.io/frrouting/frr"` |  |
+| speaker.frr.image.tag | string | `"7.5.1"` |  |
 | speaker.frr.metricsPort | int | `7473` |  |
 | speaker.frr.resources | object | `{}` |  |
 | speaker.frrMetrics.resources | object | `{}` |  |
@@ -144,6 +144,9 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.serviceAccount.annotations | object | `{}` |  |
 | speaker.serviceAccount.create | bool | `true` |  |
 | speaker.serviceAccount.name | string | `""` |  |
+| speaker.startupProbe.enabled | bool | `true` |  |
+| speaker.startupProbe.failureThreshold | int | `30` |  |
+| speaker.startupProbe.periodSeconds | int | `5` |  |
 | speaker.tolerateMaster | bool | `true` |  |
 | speaker.tolerations | list | `[]` |  |
 | speaker.updateStrategy.type | string | `"RollingUpdate"` |  |
