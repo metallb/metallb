@@ -7,7 +7,6 @@ import (
 	"os"
 	"strings"
 
-	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"go.universe.tf/metallb/e2etest/pkg/container"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
@@ -123,11 +122,8 @@ func HostContainerSetup() ([]*frrcontainer.FRR, error) {
 	See `e2etest/README.md` for more details.
 */
 
-func KindnetContainersSetup(ipv4Addresses, ipv6Addresses []string, cs *clientset.Clientset) ([]*frrcontainer.FRR, error) {
-	Expect(len(ipv4Addresses)).Should(BeNumerically(">=", 2))
-	Expect(len(ipv6Addresses)).Should(BeNumerically(">=", 2))
-
-	configs := frrContainersConfigs(ipv4Addresses, ipv6Addresses)
+func KindnetContainersSetup(cs *clientset.Clientset) ([]*frrcontainer.FRR, error) {
+	configs := frrContainersConfigs()
 
 	var out string
 	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "create", defaultNextHopSettings.multiHopNetwork, "--ipv6",
@@ -368,7 +364,7 @@ func hostnetContainerConfig() map[string]frrcontainer.Config {
 	return res
 }
 
-func frrContainersConfigs(ipv4Addresses, ipv6Addresses []string) map[string]frrcontainer.Config {
+func frrContainersConfigs() map[string]frrcontainer.Config {
 	res := make(map[string]frrcontainer.Config)
 	res["ibgp-single-hop"] = frrcontainer.Config{
 		Name: "ibgp-single-hop",
@@ -382,11 +378,9 @@ func frrContainersConfigs(ipv4Addresses, ipv6Addresses []string) map[string]frrc
 			BGPPort:  179,
 			Password: "ibgp-test",
 		},
-		Network:     kindNetwork,
-		HostIPv4:    hostIPv4,
-		HostIPv6:    hostIPv6,
-		IPv4Address: ipv4Addresses[0],
-		IPv6Address: ipv6Addresses[0],
+		Network:  kindNetwork,
+		HostIPv4: hostIPv4,
+		HostIPv6: hostIPv6,
 	}
 	res["ibgp-multi-hop"] = frrcontainer.Config{
 		Name: "ibgp-multi-hop",
@@ -431,8 +425,6 @@ func frrContainersConfigs(ipv4Addresses, ipv6Addresses []string) map[string]frrc
 			ASN:     externalASN,
 			BGPPort: 179,
 		},
-		IPv4Address: ipv4Addresses[1],
-		IPv6Address: ipv6Addresses[1],
 	}
 	return res
 }
