@@ -342,3 +342,32 @@ spec:
   communities:
   - vpn-only
 ```
+
+### Peering and annoucing via a VRF
+
+It's possible to establish a BGP connection using interfaces having a [linux vrf](https://docs.kernel.org/networking/vrf.html)
+as master. In order to do so, the `vrf` field of the `BGPPeer` structure must be set:
+
+```yaml
+apiVersion: metallb.io/v1beta2
+kind: BGPPeer
+metadata:
+  name: example
+  namespace: metallb-system
+spec:
+  myASN: 64512
+  peerASN: 64512
+  peerAddress: 172.30.0.3
+  peerPort: 179
+  vrf: "red"
+```
+
+By setting a vrf, MetalLB will establish the bgp / bfd session using the interfaces
+having the given VRF as master, and announce the services through the interface the
+session is established from.
+
+{{% notice note %}}
+MetalLB will attract the traffic toward the interface in the VRF, but some setup on
+the host network is required in order to allow the traffic to reach the CNI.
+This falls outside of the responsabilities of MetalLB.
+{{% /notice %}}
