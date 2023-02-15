@@ -1169,7 +1169,7 @@ var _ = ginkgo.Describe("BGP", func() {
 						WithTransform(substringCount("\n profile fullbfdprofile1"), Equal(1)),
 						ContainSubstring("receive-interval 93"),
 						ContainSubstring("transmit-interval 95"),
-						ContainSubstring("echo-interval 97"),
+						MatchRegexp("echo.*interval 97"), // TODO: this is backward compatible to 7.5, let's remove it when we consolidate the frr version
 						ContainSubstring("minimum-ttl 253"),
 						ContainSubstring("passive-mode"),
 						ContainSubstring("echo-mode"),
