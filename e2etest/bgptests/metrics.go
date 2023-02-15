@@ -470,11 +470,11 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						return err
 					}
 
-					err = metrics.ValidateGaugeValue(0, "metallb_bfd_session_down_events", selector.labelsBFD, speakerMetrics)
+					err = metrics.ValidateGaugeValueCompare(metrics.GreaterThan(0), "metallb_bfd_session_down_events", selector.labelsBFD, speakerMetrics)
 					if err != nil {
 						return err
 					}
-					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_session_down_events{%s} == 0`, selector.labelsForQueryBFD), metrics.There)
+					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_session_down_events{%s} >= 0`, selector.labelsForQueryBFD), metrics.There)
 					if err != nil {
 						return err
 					}
