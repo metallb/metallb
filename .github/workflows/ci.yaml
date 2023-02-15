@@ -120,7 +120,7 @@ jobs:
           # Required for chart-testing
           fetch-depth: 0
       - name: Set up Helm
-        uses: azure/setup-helm@v1
+        uses: azure/setup-helm@v3
         with:
           version: v3.7.1
 
