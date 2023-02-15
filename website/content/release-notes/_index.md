@@ -2,6 +2,37 @@
 title: Release Notes
 weight: 8
 ---
+## Version 0.13.8
+
+New Features:
+
+- IPPool service allocation: it's now possible to allocate a given IPAddressPool to one or more namespaces
+and / or services ([PR 1693](https://github.com/metallb/metallb/pull/1693))
+- Annotate the service with the pool used to provide the IP ([PR 1637](https://github.com/metallb/metallb/pull/1637))
+- BGP via VRF support: in FRR mode is possible to establish a BGP session / announce via an interface that
+has a linux VRF as master (announcement only, the CNI must be vrf aware) [PR 1717](https://github.com/metallb/metallb/pull/1717)
+
+Bug Fixes:
+
+- Controller: reprocess the services when a service is deleted ([Issue 1586](https://github.com/metallb/metallb/issues/1586)
+[PR 1645](https://github.com/metallb/metallb/pull/1645))
+- Controller: avoid having incompatible services sharing the same ip after restart ([Issue 1591](https://github.com/metallb/metallb/issues/1591),
+[PR 1647](https://github.com/metallb/metallb/pull/1647))
+- Restrict the RBACS only to the CRDs and webhooks managed by MetalLB ([Issue 1641](https://github.com/metallb/metallb/issues/1641),
+[PR 1658](https://github.com/metallb/metallb/pull/1658), [PR 1786](https://github.com/metallb/metallb/pull/1786))
+- Skip unnecessary events when processing configuration instead of reprocessing them ([Issue 1639](https://github.com/metallb/metallb/issues/1639) and
+[Issue 1770](https://github.com/metallb/metallb/issues/1770), [PR 1666](https://github.com/metallb/metallb/pull/1666) and [PR 1791](https://github.com/metallb/metallb/pull/1791))
+- Helm: handle the addressPoolUsage.enabled flag ([Issue 1687](https://github.com/metallb/metallb/issues/1687), [PR 1688](https://github.com/metallb/metallb/pull/1688))
+- Consume the MemberList secret from a file instead of an env variable ([PR 1692](https://github.com/metallb/metallb/pull/1692))
+- Publishing a new service may cause the bgp session to flake (FRR mode only) ([Issue 1715](https://github.com/metallb/metallb/issues/1715), [PR 1714](https://github.com/metallb/metallb/pull/1714))
+- Hide bgp passwords from logs [PR 1721](https://github.com/metallb/metallb/pull/1721)
+- L2: avoid one failure on one interface to disable l2 [PR 1726](https://github.com/metallb/metallb/pull/1726), [Issue 1727](https://github.com/metallb/metallb/issues/1727))
+- FRR mode: add a liveness probe to the frr container so it can be restarted upon failures [PR 1732](https://github.com/metallb/metallb/pull/1732)
+- Delete the loadbalancers assigned to a service if they are not valid, instead of ignoring the service ([Issue 1431](https://github.com/metallb/metallb/issues/1431), [PR 1778](https://github.com/metallb/metallb/pull/1778))
+- Use the official FRR images from quay instead of dockerhub ([PR 1787](https://github.com/metallb/metallb/pull/1787))
+
+This release includes contributions from Attila Fabian, cyclinder, David Young, Federico Paolinelli, Felix Yan, giuliano, Johanan Liebermann, liornoy, Łukasz Żułnowski, Mitch Ross, mlguerrero12, Periyasamy Palanisamy, tgfree, Tyler Auerbeck, xin.li, yanggang, Yuval Kashtan. Thank you!
+
 ## Version 0.13.7
 
 New Features:
