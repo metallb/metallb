@@ -182,8 +182,22 @@ func TestControllerMutation(t *testing.T) {
 			ServiceAllocations: &config.ServiceAllocation{ServiceSelectors: []labels.Selector{selector("team=metallb")},
 				Priority: 8},
 		},
-	}, ByNamespace: map[string][]string{"test-ns1": {"pool6", "pool7"}, "test-ns2": {"pool9"}},
-		ByServiceSelector: []string{"pool8", "pool10"},
+		"pool11": {
+			Name:       "pool11",
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("22.23.24.0/31")},
+			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.New("test-ns1"),
+				ServiceSelectors: []labels.Selector{selector("team=metallb")}, Priority: 8},
+		},
+		"pool12": {
+			Name:       "pool12",
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("25.26.27.0/31")},
+			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.New("test-ns1"),
+				ServiceSelectors: []labels.Selector{selector("team=metallb")}, Priority: 5},
+		},
+	}, ByNamespace: map[string][]string{"test-ns1": {"pool6", "pool7", "pool11", "pool12"}, "test-ns2": {"pool9"}},
+		ByServiceSelector: []string{"pool8", "pool10", "pool11", "pool12"},
 	}
 
 	l := log.NewNopLogger()
@@ -843,6 +857,30 @@ func TestControllerMutation(t *testing.T) {
 					ClusterIPs: []string{"1.2.3.4"},
 				},
 				Status: statusAssigned([]string{"19.20.21.0"}),
+			},
+		},
+		{
+			desc: "request IP for service from ip pool having both namespace and service label",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns1",
+					Labels:    map[string]string{"team": "metallb"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:       "LoadBalancer",
+					ClusterIPs: []string{"1.2.3.4"},
+				},
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns1",
+					Labels:    map[string]string{"team": "metallb"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:       "LoadBalancer",
+					ClusterIPs: []string{"1.2.3.4"},
+				},
+				Status: statusAssigned([]string{"25.26.27.0"}),
 			},
 		},
 		{

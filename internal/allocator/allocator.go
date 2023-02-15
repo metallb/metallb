@@ -284,7 +284,7 @@ func (a *Allocator) Allocate(svcKey string, svc *v1.Service, serviceIPFamily ipf
 		}
 		return alloc.ips, nil
 	}
-	pinnedPools := a.sortedPoolsForService(svc)
+	pinnedPools := a.pinnedPoolsForService(svc)
 	for _, pool := range pinnedPools {
 		if ips, err := a.AllocateFromPool(svcKey, svc, serviceIPFamily, pool.Name, ports, sharingKey, backendKey); err == nil {
 			return ips, nil
@@ -305,44 +305,29 @@ func (a *Allocator) Allocate(svcKey string, svc *v1.Service, serviceIPFamily ipf
 // This method returns sorted ip pools which are allocatable for given service.
 // When ip pool is not set with priority, then just append it after sorted
 // priority ip pools.
-func (a *Allocator) sortedPoolsForService(svc *v1.Service) []*config.Pool {
-	var priorityPools, noPriorityPools []*config.Pool
+func (a *Allocator) pinnedPoolsForService(svc *v1.Service) []*config.Pool {
+	var pools []*config.Pool
 	if svc == nil {
-		return priorityPools
+		return pools
 	}
 	for _, nsPoolName := range a.pools.ByNamespace[svc.Namespace] {
 		if nsPool, ok := a.pools.ByName[nsPoolName]; ok {
-			if !nsPool.AutoAssign {
+			if !nsPool.AutoAssign || !a.isPoolCompatibleWithService(nsPool, svc) {
 				continue
 			}
-			if nsPool.ServiceAllocations.Priority > 0 {
-				priorityPools = append(priorityPools, nsPool)
-				continue
-			}
-			noPriorityPools = append(noPriorityPools, nsPool)
+			pools = append(pools, nsPool)
 		}
 	}
-	svcLabels := labels.Set(svc.Labels)
 	for _, svcPoolName := range a.pools.ByServiceSelector {
 		if svcPool, ok := a.pools.ByName[svcPoolName]; ok {
-			if !svcPool.AutoAssign {
+			if !svcPool.AutoAssign || !a.isPoolCompatibleWithService(svcPool, svc) {
 				continue
 			}
-			for _, svcSelector := range svcPool.ServiceAllocations.ServiceSelectors {
-				isMatch := svcSelector.Matches(svcLabels)
-				if isMatch && svcPool.ServiceAllocations.Priority > 0 {
-					priorityPools = append(priorityPools, svcPool)
-				} else if isMatch {
-					noPriorityPools = append(noPriorityPools, svcPool)
-				}
-			}
+			pools = append(pools, svcPool)
 		}
 	}
-	sort.Slice(priorityPools, func(i, j int) bool {
-		return priorityPools[i].ServiceAllocations.Priority <
-			priorityPools[j].ServiceAllocations.Priority
-	})
-	return append(priorityPools, noPriorityPools...)
+	sortPools(pools)
+	return pools
 }
 
 func (a *Allocator) isPoolCompatibleWithService(p *config.Pool, svc *v1.Service) bool {
@@ -372,6 +357,24 @@ func (a *Allocator) Pool(svc string) string {
 		}
 	}
 	return ""
+}
+
+func sortPools(pools []*config.Pool) {
+	// A lower value for pool priority equals a higher priority and sort
+	// pools from higher to low priority. when no priority (0) set on
+	// the pool, then that is considered as lowest priority.
+	sort.Slice(pools, func(i, j int) bool {
+		if pools[i].ServiceAllocations.Priority > 0 &&
+			pools[j].ServiceAllocations.Priority > 0 {
+			return pools[i].ServiceAllocations.Priority <
+				pools[j].ServiceAllocations.Priority
+		}
+		if pools[i].ServiceAllocations.Priority == 0 &&
+			pools[j].ServiceAllocations.Priority > 0 {
+			return false
+		}
+		return true
+	})
 }
 
 func sharingOK(existing, new *key) error {
