@@ -137,7 +137,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						return err
 					}
 					for _, selector := range selectors {
-						err = metrics.ValidateCounterValue(metrics.GreaterThan(0), "metallb_bgp_opens_sent", selector.labelsBGP, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), "metallb_bgp_opens_sent", selector.labelsBGP, speakerMetrics)
 						if err != nil {
 							return err
 						}
@@ -147,7 +147,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterThan(0), "metallb_bgp_opens_received", selector.labelsBGP, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), "metallb_bgp_opens_received", selector.labelsBGP, speakerMetrics)
 						if err != nil {
 							return err
 						}
@@ -157,7 +157,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_bgp_updates_total_received", selector.labelsBGP, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), "metallb_bgp_updates_total_received", selector.labelsBGP, speakerMetrics)
 						if err != nil {
 							return err
 						}
@@ -167,7 +167,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterThan(0), "metallb_bgp_keepalives_sent", selector.labelsBGP, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), "metallb_bgp_keepalives_sent", selector.labelsBGP, speakerMetrics)
 						if err != nil {
 							return err
 						}
@@ -177,7 +177,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterThan(0), "metallb_bgp_keepalives_received", selector.labelsBGP, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), "metallb_bgp_keepalives_received", selector.labelsBGP, speakerMetrics)
 						if err != nil {
 							return err
 						}
@@ -187,7 +187,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterThan(0), "metallb_bgp_route_refresh_sent", selector.labelsBGP, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), "metallb_bgp_route_refresh_sent", selector.labelsBGP, speakerMetrics)
 						if err != nil {
 							return err
 						}
@@ -197,7 +197,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterThan(0), "metallb_bgp_total_sent", selector.labelsBGP, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), "metallb_bgp_total_sent", selector.labelsBGP, speakerMetrics)
 						if err != nil {
 							return err
 						}
@@ -207,7 +207,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterThan(0), "metallb_bgp_total_received", selector.labelsBGP, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), "metallb_bgp_total_received", selector.labelsBGP, speakerMetrics)
 						if err != nil {
 							return err
 						}
@@ -370,7 +370,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_bgp_updates_total", map[string]string{"peer": addr}, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), "metallb_bgp_updates_total", map[string]string{"peer": addr}, speakerMetrics)
 						if err != nil {
 							return err
 						}
@@ -452,7 +452,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						return err
 					}
 
-					err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_bfd_control_packet_input", selector.labelsBFD, speakerMetrics)
+					err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), "metallb_bfd_control_packet_input", selector.labelsBFD, speakerMetrics)
 					if err != nil {
 						return err
 					}
@@ -461,7 +461,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						return err
 					}
 
-					err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_bfd_control_packet_output", selector.labelsBFD, speakerMetrics)
+					err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), "metallb_bfd_control_packet_output", selector.labelsBFD, speakerMetrics)
 					if err != nil {
 						return err
 					}
@@ -470,7 +470,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						return err
 					}
 
-					err = metrics.ValidateGaugeValueCompare(metrics.GreaterThan(0), "metallb_bfd_session_down_events", selector.labelsBFD, speakerMetrics)
+					err = metrics.ValidateGaugeValueCompare(metrics.GreaterOrEqualThan(0), "metallb_bfd_session_down_events", selector.labelsBFD, speakerMetrics)
 					if err != nil {
 						return err
 					}
@@ -479,7 +479,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						return err
 					}
 
-					err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_bfd_session_up_events", selector.labelsBFD, speakerMetrics)
+					err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), "metallb_bfd_session_up_events", selector.labelsBFD, speakerMetrics)
 					if err != nil {
 						return err
 					}
@@ -488,7 +488,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						return err
 					}
 
-					err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_bfd_zebra_notifications", selector.labelsBFD, speakerMetrics)
+					err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), "metallb_bfd_zebra_notifications", selector.labelsBFD, speakerMetrics)
 					if err != nil {
 						return err
 					}
@@ -502,7 +502,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						if selector.noEcho {
 							echoVal = 0
 						}
-						err = metrics.ValidateCounterValue(metrics.GreaterThan(echoVal), "metallb_bfd_echo_packet_input", selector.labelsBFD, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(echoVal), "metallb_bfd_echo_packet_input", selector.labelsBFD, speakerMetrics)
 						if err != nil {
 							return err
 						}
@@ -511,7 +511,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterThan(echoVal), "metallb_bfd_echo_packet_output", selector.labelsBFD, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(echoVal), "metallb_bfd_echo_packet_output", selector.labelsBFD, speakerMetrics)
 						if err != nil {
 							return err
 						}
@@ -553,7 +553,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						return err
 					}
 
-					err = metrics.ValidateCounterValue(metrics.GreaterThan(1), "metallb_bfd_session_down_events", selector.labelsBFD, speakerMetrics)
+					err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), "metallb_bfd_session_down_events", selector.labelsBFD, speakerMetrics)
 					if err != nil {
 						return err
 					}
@@ -693,7 +693,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					return err
 				}
 				// we don't know how many events we are processing
-				err = metrics.ValidateCounterValue(metrics.GreaterThan(0), "metallb_k8s_client_updates_total", map[string]string{}, podMetrics)
+				err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), "metallb_k8s_client_updates_total", map[string]string{}, podMetrics)
 				if err != nil {
 					return err
 				}

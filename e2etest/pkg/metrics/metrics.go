@@ -135,7 +135,7 @@ func CounterForLabels(metricName string, labels map[string]string, metrics map[s
 	})
 }
 
-func GreaterThan(min int) func(value int) error {
+func GreaterOrEqualThan(min int) func(value int) error {
 	return func(value int) error {
 		if value < min {
 			return fmt.Errorf("value %d is less than %d", value, min)
