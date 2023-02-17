@@ -83,6 +83,28 @@ func TestAssignment(t *testing.T) {
 				ipnet("1000::6:0/120"),
 			},
 		},
+		"test5": {
+			Name:          "test5",
+			AvoidBuggyIPs: true,
+			AutoAssign:    true,
+			ServiceAllocations: &config.ServiceAllocation{Priority: 20, Namespaces: sets.New("test-ns1"),
+				ServiceSelectors: []labels.Selector{selector("team=metallb")}},
+			CIDR: []*net.IPNet{
+				ipnet("1.2.7.0/24"),
+				ipnet("1000::7:0/120"),
+			},
+		},
+		"test6": {
+			Name:          "test6",
+			AvoidBuggyIPs: true,
+			AutoAssign:    true,
+			ServiceAllocations: &config.ServiceAllocation{Priority: 20, Namespaces: sets.New("test-ns2"),
+				ServiceSelectors: []labels.Selector{selector("foo=bar")}},
+			CIDR: []*net.IPNet{
+				ipnet("1.2.8.0/24"),
+				ipnet("1000::9:0/120"),
+			},
+		},
 	}}); err != nil {
 		t.Fatalf("SetPools: %s", err)
 	}
@@ -518,6 +540,75 @@ func TestAssignment(t *testing.T) {
 				},
 			},
 			ips:     []string{"1.2.6.10"},
+			wantErr: true,
+		},
+		{
+			desc:   "attempt to assign ip from pool pinned with namespace and service label",
+			svcKey: "s1",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns1",
+					Name:      "s1",
+					Labels:    map[string]string{"team": "metallb"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:     v1.ServiceTypeLoadBalancer,
+					Selector: map[string]string{"team": "metallb"},
+					Ports: []v1.ServicePort{
+						{
+							Protocol: v1.ProtocolTCP,
+							Port:     8080,
+						},
+					},
+				},
+			},
+			ips:     []string{"1.2.7.10"},
+			wantErr: false,
+		},
+		{
+			desc:   "attempt to assign ip from pool pinned with namespace and incompatible service label",
+			svcKey: "s1",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns2",
+					Name:      "s1",
+					Labels:    map[string]string{"team": "metallb"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:     v1.ServiceTypeLoadBalancer,
+					Selector: map[string]string{"team": "metallb"},
+					Ports: []v1.ServicePort{
+						{
+							Protocol: v1.ProtocolTCP,
+							Port:     8080,
+						},
+					},
+				},
+			},
+			ips:     []string{"1.2.8.10"},
+			wantErr: true,
+		},
+		{
+			desc:   "attempt to assign ip from pool pinned with service label and incompatible namespace",
+			svcKey: "s1",
+			svc: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "testns-not-exist",
+					Name:      "s1",
+					Labels:    map[string]string{"foo": "bar"},
+				},
+				Spec: v1.ServiceSpec{
+					Type:     v1.ServiceTypeLoadBalancer,
+					Selector: map[string]string{"foo": "bar"},
+					Ports: []v1.ServicePort{
+						{
+							Protocol: v1.ProtocolTCP,
+							Port:     8080,
+						},
+					},
+				},
+			},
+			ips:     []string{"1.2.8.10"},
 			wantErr: true,
 		},
 	}
