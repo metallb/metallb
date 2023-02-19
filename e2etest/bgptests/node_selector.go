@@ -315,18 +315,18 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 
 		},
 			ginkgo.Entry("First to one, second to two", map[int][]int{
-				0: []int{0},
-				1: []int{1, 2},
+				0: {0},
+				1: {1, 2},
 			}),
 			ginkgo.Entry("First to one, second to one, third to three", map[int][]int{
-				0: []int{0},
-				1: []int{1},
-				2: []int{0, 1, 2},
+				0: {0},
+				1: {1},
+				2: {0, 1, 2},
 			}),
 			ginkgo.Entry("First to one, second to one, third to same as first", map[int][]int{
-				0: []int{0},
-				1: []int{1},
-				2: []int{0},
+				0: {0},
+				1: {1},
+				2: {0},
 			}),
 		)
 	})

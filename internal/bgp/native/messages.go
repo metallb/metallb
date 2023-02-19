@@ -5,6 +5,7 @@ package native
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -220,7 +221,7 @@ func readOptions(r io.Reader, ret *openResult) error {
 			Len  uint8
 		}{}
 		if err := binary.Read(r, binary.BigEndian, &hdr); err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return nil
 			}
 			return err
@@ -249,7 +250,7 @@ func readCapabilities(r io.Reader, ret *openResult) error {
 			Len  uint8
 		}{}
 		if err := binary.Read(r, binary.BigEndian, &cap); err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				return nil
 			}
 			return err
