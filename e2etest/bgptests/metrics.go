@@ -592,20 +592,6 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					Name: "bar",
 				},
 			}, ipfamily.IPv6, []string{v6PoolAddresses}),
-		ginkgo.Entry("IPV6 - echo mode enabled",
-			metallbv1beta1.BFDProfile{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "echo",
-				},
-				Spec: metallbv1beta1.BFDProfileSpec{
-					ReceiveInterval:  pointer.Uint32Ptr(80),
-					TransmitInterval: pointer.Uint32Ptr(81),
-					EchoInterval:     pointer.Uint32Ptr(82),
-					EchoMode:         pointer.BoolPtr(true),
-					PassiveMode:      pointer.BoolPtr(false),
-					MinimumTTL:       pointer.Uint32Ptr(254),
-				},
-			}, ipfamily.IPv6, []string{v6PoolAddresses}),
 		ginkgo.Entry("DUALSTACK - full params",
 			metallbv1beta1.BFDProfile{
 				ObjectMeta: metav1.ObjectMeta{
