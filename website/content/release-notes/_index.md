@@ -2,6 +2,74 @@
 title: Release Notes
 weight: 8
 ---
+## Version 0.13.8
+
+New Features:
+
+- IPPool service allocation: it's now possible to allocate a given IPAddressPool to one or more namespaces
+and / or services ([PR 1693](https://github.com/metallb/metallb/pull/1693))
+- Annotate the service with the pool used to provide the IP ([PR 1637](https://github.com/metallb/metallb/pull/1637))
+- BGP via VRF support: in FRR mode is possible to establish a BGP session / announce via an interface that
+has a linux VRF as master (announcement only, the CNI must be vrf aware) [PR 1717](https://github.com/metallb/metallb/pull/1717)
+
+Bug Fixes:
+
+- Controller: reprocess the services when a service is deleted ([Issue 1586](https://github.com/metallb/metallb/issues/1586)
+[PR 1645](https://github.com/metallb/metallb/pull/1645))
+- Controller: avoid having incompatible services sharing the same ip after restart ([Issue 1591](https://github.com/metallb/metallb/issues/1591),
+[PR 1647](https://github.com/metallb/metallb/pull/1647))
+- Restrict the RBACS only to the CRDs and webhooks managed by MetalLB ([Issue 1641](https://github.com/metallb/metallb/issues/1641),
+[PR 1658](https://github.com/metallb/metallb/pull/1658), [PR 1786](https://github.com/metallb/metallb/pull/1786))
+- Skip unnecessary events when processing configuration instead of reprocessing them ([Issue 1639](https://github.com/metallb/metallb/issues/1639) and
+[Issue 1770](https://github.com/metallb/metallb/issues/1770), [PR 1666](https://github.com/metallb/metallb/pull/1666) and [PR 1791](https://github.com/metallb/metallb/pull/1791))
+- Helm: handle the addressPoolUsage.enabled flag ([Issue 1687](https://github.com/metallb/metallb/issues/1687), [PR 1688](https://github.com/metallb/metallb/pull/1688))
+- Consume the MemberList secret from a file instead of an env variable ([PR 1692](https://github.com/metallb/metallb/pull/1692))
+- Publishing a new service may cause the bgp session to flake (FRR mode only) ([Issue 1715](https://github.com/metallb/metallb/issues/1715), [PR 1714](https://github.com/metallb/metallb/pull/1714))
+- Hide bgp passwords from logs [PR 1721](https://github.com/metallb/metallb/pull/1721)
+- L2: avoid one failure on one interface to disable l2 [PR 1726](https://github.com/metallb/metallb/pull/1726), [Issue 1727](https://github.com/metallb/metallb/issues/1727))
+- FRR mode: add a liveness probe to the frr container so it can be restarted upon failures [PR 1732](https://github.com/metallb/metallb/pull/1732)
+- Delete the loadbalancers assigned to a service if they are not valid, instead of ignoring the service ([Issue 1431](https://github.com/metallb/metallb/issues/1431), [PR 1778](https://github.com/metallb/metallb/pull/1778))
+- Use the official FRR images from quay instead of dockerhub ([PR 1787](https://github.com/metallb/metallb/pull/1787))
+
+This release includes contributions from Attila Fabian, cyclinder, David Young, Federico Paolinelli, Felix Yan, giuliano, Johanan Liebermann, liornoy, Łukasz Żułnowski, Mitch Ross, mlguerrero12, Periyasamy Palanisamy, tgfree, Tyler Auerbeck, xin.li, yanggang, Yuval Kashtan. Thank you!
+
+## Version 0.13.7
+
+New Features:
+
+- CRDs: add additionalPrinterColumn configuration ([PR 1632](https://github.com/metallb/metallb/pull/1632))
+
+Bug Fixes:
+
+- Fix service monitor relabelings in Helm charts ([PR 1650](https://github.com/metallb/metallb/pull/1650))
+- Controller readiness probe: restore to metrics endpoint but wait until the webhook is ready to accept requests, remove
+  the "unable to process a request with an unknown content type" log
+   ([Issue 1644](https://github.com/metallb/metallb/issues/1644) [PR 1648](https://github.com/metallb/metallb/pull/1648)).
+
+This release includes contributions from Attila Fabian, Tyler Auerbeck, Federico Paolinelli. Thank you!
+
+## Version 0.13.6
+
+New Features:
+
+- Layer2: Announce LB IPs from specific interfaces ([PR 1536](https://github.com/metallb/metallb/pull/1536))
+- Validate MetalLB supports mixed protocol services ([Issue 1050](https://github.com/metallb/metallb/issues/1050) [PR 1580](https://github.com/metallb/metallb/pull/1580))
+- ConfigMapToCRs tool: align docs to match how to use it within the cluster ([PR 1595](https://github.com/metallb/metallb/pull/1595))
+- End to end tests: allow using external containers to execute the tests against a real cluster ([PR 1604](https://github.com/metallb/metallb/pull/1604))
+- Helm: add an option to set resources for speaker sidecar containers ([PR 1622](https://github.com/metallb/metallb/pull/1622))
+- Helm: add an option to set the validating webhooks failure policy ([PR 1623](https://github.com/metallb/metallb/pull/1623))
+- Removed the "experimental" wording from FRR mode declaring it being stable but less battle tested ([PR 1636](https://github.com/metallb/metallb/pull/1636))
+
+Bug Fixes:
+
+- EndpointSlices detection: use discoveryv1 instead of v1beta1 ([PR 1579](https://github.com/metallb/metallb/pull/1579))
+- Memory leak in FRR mode in cases where the service is getting it's IP changed by an external entity ([Issue 1581](https://github.com/metallb/metallb/issues/1581) [PR 1583](https://github.com/metallb/metallb/pull/1583))
+- L2: if a service with multiple IPs has an IP that is used only by it, and another used by another service, the watch on the one used by it is not removed when deleting the service ([PR 1600](https://github.com/metallb/metallb/pull/1600))
+- Skip unnecessary node events that don't affect MetalLB ([Issue 1562](https://github.com/metallb/metallb/issues/1562) [PR 1607](https://github.com/metallb/metallb/pull/1607))
+- Readiness Probe: wait for the webhook to be ready so helm --wait can wait for the webhook to be ready. ([Issue 1610](https://github.com/metallb/metallb/issues/1610) [PR 1611](https://github.com/metallb/metallb/pull/1611))
+
+This release includes contributions from Attila Fabian, chinthiti, Christoph Mewes, cyclinder, danieled-it, David Jeffers, dependabot[bot], Federico Paolinelli, karampok, liornoy, Periyasamy Palanisamy, Peter Pan, witjem, xin.li, Xuebinqi, zhoujiao. Thank you!
+
 ## Version 0.13.5
 
 New Features:
