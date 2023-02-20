@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
+	"go.universe.tf/metallb/internal/ipfamily"
 )
 
 type Validate func(ClusterResources) error
@@ -94,6 +95,52 @@ func DiscardNativeOnly(c ClusterResources) error {
 		}
 	}
 	return nil
+}
+
+// validateConfig is meant to validate all the inter-dependencies of a parsed configuration.
+// In this case, we ensure that bfd echo is not enabled on a v6 pool.
+func validateConfig(cfg *Config) error {
+	for _, p := range cfg.Pools.ByName {
+		containsV6 := false
+		for _, cidr := range p.CIDR {
+			if ipfamily.ForCIDR(cidr) == ipfamily.IPv6 {
+				containsV6 = true
+				break
+			}
+		}
+		if !containsV6 { // we only care about v6 advertisements
+			continue
+		}
+		for _, a := range p.BGPAdvertisements {
+			if len(a.Peers) == 0 { // all peers
+				for _, peer := range cfg.Peers {
+					if hasBFDEcho(peer, cfg.BFDProfiles) {
+						return fmt.Errorf("pool %s has bgpadvertisement %s which references peer %s which has bfd echo enabled, which is not possible", p.Name, a.Name, peer.Name)
+					}
+				}
+				continue
+			}
+			for _, peerName := range a.Peers {
+				if peer, ok := cfg.Peers[peerName]; ok {
+					if hasBFDEcho(peer, cfg.BFDProfiles) {
+						return fmt.Errorf("pool %s has bgpadvertisement %s which references peer %s which has bfd echo enabled, which is not possible", p.Name, a.Name, peer.Name)
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func hasBFDEcho(peer *Peer, bfdProfiles map[string]*BFDProfile) bool {
+	profile, ok := bfdProfiles[peer.BFDProfile]
+	if !ok {
+		return false
+	}
+	if profile.EchoMode {
+		return true
+	}
+	return false
 }
 
 func peerAddressKey(peer metallbv1beta2.BGPPeerSpec) string {
