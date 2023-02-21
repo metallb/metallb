@@ -270,7 +270,7 @@ func TestParse(t *testing.T) {
 								Nodes:               map[string]bool{},
 							},
 						},
-						L2Advertisements: []*L2Advertisement{&L2Advertisement{
+						L2Advertisements: []*L2Advertisement{{
 							Nodes:         map[string]bool{},
 							AllInterfaces: true,
 						}},
@@ -288,7 +288,7 @@ func TestParse(t *testing.T) {
 								Nodes:               map[string]bool{},
 							},
 						},
-						L2Advertisements: []*L2Advertisement{&L2Advertisement{
+						L2Advertisements: []*L2Advertisement{{
 							Nodes:         map[string]bool{},
 							AllInterfaces: true,
 						}},
@@ -309,7 +309,7 @@ func TestParse(t *testing.T) {
 							ipnet("40.0.0.240/32"),
 							ipnet("40.0.0.250/32"),
 						},
-						L2Advertisements: []*L2Advertisement{&L2Advertisement{
+						L2Advertisements: []*L2Advertisement{{
 							Nodes:         map[string]bool{},
 							AllInterfaces: true,
 						}},
@@ -318,7 +318,7 @@ func TestParse(t *testing.T) {
 					"pool4": {
 						Name: "pool4",
 						CIDR: []*net.IPNet{ipnet("2001:db8::/64")},
-						L2Advertisements: []*L2Advertisement{&L2Advertisement{
+						L2Advertisements: []*L2Advertisement{{
 							Nodes:         map[string]bool{},
 							AllInterfaces: true,
 						}},
@@ -2821,7 +2821,7 @@ func TestParse(t *testing.T) {
 								Nodes:               map[string]bool{"second": true},
 							},
 						},
-						L2Advertisements: []*L2Advertisement{&L2Advertisement{
+						L2Advertisements: []*L2Advertisement{{
 							Nodes: map[string]bool{
 								"first": true,
 							},
@@ -3072,7 +3072,7 @@ func TestParse(t *testing.T) {
 								},
 							},
 						},
-						L2Advertisements: []*L2Advertisement{&L2Advertisement{
+						L2Advertisements: []*L2Advertisement{{
 							Nodes: map[string]bool{
 								"first":  true,
 								"second": true,
@@ -3240,7 +3240,7 @@ func TestContainsAdvertisement(t *testing.T) {
 		{
 			desc: "Contain",
 			advs: []*L2Advertisement{
-				&L2Advertisement{
+				{
 					Nodes: map[string]bool{
 						"nodeA": true,
 						"nodeB": true,
@@ -3248,7 +3248,7 @@ func TestContainsAdvertisement(t *testing.T) {
 					Interfaces:    []string{"eth0", "eth1"},
 					AllInterfaces: false,
 				},
-				&L2Advertisement{
+				{
 					Nodes: map[string]bool{
 						"nodeB": true,
 					},
@@ -3269,7 +3269,7 @@ func TestContainsAdvertisement(t *testing.T) {
 		{
 			desc: "Not contain: Nodes don't equal",
 			advs: []*L2Advertisement{
-				&L2Advertisement{
+				{
 					Nodes: map[string]bool{
 						"nodeA": true,
 						"nodeB": true,
@@ -3291,7 +3291,7 @@ func TestContainsAdvertisement(t *testing.T) {
 		{
 			desc: "Not contain: Interfaces don't equal",
 			advs: []*L2Advertisement{
-				&L2Advertisement{
+				{
 					Nodes: map[string]bool{
 						"nodeA": true,
 						"nodeB": true,
@@ -3313,7 +3313,7 @@ func TestContainsAdvertisement(t *testing.T) {
 		{
 			desc: "Not contain: AllInterfaces doesn't equal",
 			advs: []*L2Advertisement{
-				&L2Advertisement{
+				{
 					Nodes: map[string]bool{
 						"nodeA": true,
 						"nodeB": true,
