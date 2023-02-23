@@ -524,8 +524,22 @@ func addressPoolServiceAllocationsFromCR(p metallbv1beta1.IPAddressPool, namespa
 	if p.Spec.AllocateTo == nil {
 		return nil, nil
 	}
-	serviceAllocations := &ServiceAllocation{Priority: p.Spec.AllocateTo.Priority,
-		Namespaces: sets.New(p.Spec.AllocateTo.Namespaces...)}
+	poolNamespaces := sets.Set[string]{}
+	for _, poolNs := range p.Spec.AllocateTo.Namespaces {
+		if poolNamespaces.Has(poolNs) {
+			return nil, errors.New("duplicate definition in namespaces field")
+		}
+		poolNamespaces.Insert(poolNs)
+	}
+	err := validateLabelSelectorDuplicate(p.Spec.AllocateTo.NamespaceSelectors, "namespaceSelectors")
+	if err != nil {
+		return nil, err
+	}
+	err = validateLabelSelectorDuplicate(p.Spec.AllocateTo.ServiceSelectors, "serviceSelectors")
+	if err != nil {
+		return nil, err
+	}
+	serviceAllocations := &ServiceAllocation{Priority: p.Spec.AllocateTo.Priority, Namespaces: poolNamespaces}
 	for i := range p.Spec.AllocateTo.NamespaceSelectors {
 		l, err := metav1.LabelSelectorAsSelector(&p.Spec.AllocateTo.NamespaceSelectors[i])
 		if err != nil {

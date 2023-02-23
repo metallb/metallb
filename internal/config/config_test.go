@@ -417,6 +417,70 @@ func TestParse(t *testing.T) {
 		},
 
 		{
+			desc: "ip address pool with duplicate namespace selection",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+								"10.50.0.0/24",
+							},
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
+							AllocateTo: &v1beta1.ServiceAllocation{Priority: 1,
+								Namespaces: []string{"test-ns1", "test-ns1"}},
+						},
+					},
+				},
+				Namespaces: []corev1.Namespace{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "test-ns1",
+						},
+					},
+				},
+			},
+		},
+
+		{
+			desc: "ip address pool with duplicate namespace selectors",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+								"10.50.0.0/24",
+							},
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
+							AllocateTo: &v1beta1.ServiceAllocation{
+								Priority: 1,
+								NamespaceSelectors: []v1.LabelSelector{{MatchLabels: map[string]string{"foo": "bar"}},
+									{MatchLabels: map[string]string{"foo": "bar"}}},
+							},
+						},
+					},
+				},
+				Namespaces: []corev1.Namespace{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "test-ns1",
+							Labels: map[string]string{"foo": "bar"},
+						},
+					},
+				},
+			},
+		},
+
+		{
 			desc: "ip address pool with service selection",
 			crs: ClusterResources{
 				Pools: []v1beta1.IPAddressPool{
@@ -464,6 +528,32 @@ func TestParse(t *testing.T) {
 					ByServiceSelector: []string{"pool1", "pool2"}},
 				BFDProfiles: map[string]*BFDProfile{},
 				Peers:       map[string]*Peer{},
+			},
+		},
+
+		{
+			desc: "ip address pool with duplicate service selection",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"30.0.0.0/8",
+							},
+							AllocateTo: &v1beta1.ServiceAllocation{Priority: 2,
+								ServiceSelectors: []v1.LabelSelector{{MatchExpressions: []metav1.LabelSelectorRequirement{
+									{
+										Key:      "foo",
+										Operator: metav1.LabelSelectorOpIn,
+										Values:   []string{"bar", "bar"},
+									},
+								}}}},
+						},
+					},
+				},
 			},
 		},
 
