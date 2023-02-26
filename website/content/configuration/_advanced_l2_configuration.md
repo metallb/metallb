@@ -89,7 +89,7 @@ spec:
   - eth1
 ```
 
-This `L2Advertisement` whill make MetalLB announce the Services associated to IPs from `third-pool` only from the interfaces `eth0` and `eth1` of all nodes.
+This `L2Advertisement` will make MetalLB announce the Services associated to IPs from `third-pool` only from the interfaces `eth0` and `eth1` of all nodes.
 
 The `interfaces` selector can also be used together with `nodeSelectors`. In this example, the IPs from `fourth-pool` will be announced only from `eth3` of `NodeA`:
 
