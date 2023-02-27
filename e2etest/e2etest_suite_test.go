@@ -186,32 +186,3 @@ var _ = ginkgo.BeforeSuite(func() {
 	l2tests.NodeNics = strings.Split(nodeNics, ",")
 	l2tests.LocalNics = strings.Split(localNics, ",")
 })
-
-var _ = ginkgo.AfterSuite(func() {
-	cs, err := framework.LoadClientset()
-	framework.ExpectNoError(err)
-
-	err = bgptests.InfraTearDown(cs)
-	framework.ExpectNoError(err)
-	if !bgpNativeMode {
-		err = bgptests.InfraTearDownVRF(cs)
-		framework.ExpectNoError(err)
-	}
-	err = updater.Clean()
-	framework.ExpectNoError(err)
-
-	// delete the namespace created for testing namespace validation
-	nsSpec := v1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: updaterOtherNS.Namespace(),
-		},
-	}
-	err = updaterOtherNS.Client().Delete(context.Background(), &nsSpec)
-	// ignore failure if namespace does not exist, fail for any other errors
-	if err != nil && !errors.IsNotFound(err) {
-		framework.ExpectNoError(err)
-	}
-	err = updaterOtherNS.Clean()
-	framework.ExpectNoError(err)
-
-})

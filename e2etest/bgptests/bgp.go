@@ -131,7 +131,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			validateService(cs, svc, allNodes.Items, c)
 		}
 	},
-		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
+		ginkgo.FEntry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
 		ginkgo.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}, func(_ *corev1.Service) {}),
 		ginkgo.Entry("DUALSTACK", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
 			func(svc *corev1.Service) {

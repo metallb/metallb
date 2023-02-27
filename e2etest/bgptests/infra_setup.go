@@ -189,52 +189,6 @@ func VRFContainersSetup(cs *clientset.Clientset) ([]*frrcontainer.FRR, error) {
 	return vrfContainers, nil
 }
 
-// InfraTearDown tears down the containers and the routes needed for bgp testing.
-func InfraTearDown(cs *clientset.Clientset) error {
-	return infraTearDown(cs, FRRContainers, defaultNextHopSettings, func(c *frrcontainer.FRR) bool {
-		return !isVRFContainer(c)
-	})
-}
-
-// InfraTearDown tears down the containers and the routes needed for bgp testing.
-func InfraTearDownVRF(cs *clientset.Clientset) error {
-	return infraTearDown(cs, FRRContainers, vrfNextHopSettings, isVRFContainer)
-}
-
-func infraTearDown(cs *clientset.Clientset, containers []*frrcontainer.FRR, nextHop nextHopSettings, filter func(*frrcontainer.FRR) bool) error {
-	filtered := make([]*frrcontainer.FRR, 0)
-	for _, c := range containers {
-		if filter(c) {
-			filtered = append(filtered, c)
-		}
-	}
-
-	multiHopRoutes := map[string]container.NetworkSettings{}
-	var err error
-	if containsMultiHop(filtered) {
-		multiHopRoutes, err = container.Networks(nextHop.nextHopContainerName)
-		if err != nil {
-			return err
-		}
-	}
-
-	err = frrcontainer.Delete(filtered)
-	if err != nil {
-		return err
-	}
-
-	if len(multiHopRoutes) == 0 {
-		return nil
-	}
-
-	err = multiHopTearDown(nextHop, multiHopRoutes, cs)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // multiHopSetUp prepares a multihop scenario taking nextHop settings, which include:
 // - a container that acts as next hop.
 // - the docker network the nodes are connected to (and expected to perform the next hop peering).
@@ -503,28 +457,6 @@ func vrfContainersConfig() map[string]frrcontainer.Config {
 	return res
 }
 
-func multiHopTearDown(nextHop nextHopSettings, routes map[string]container.NetworkSettings, cs *clientset.Clientset) error {
-	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "rm", nextHop.multiHopNetwork)
-	if err != nil {
-		return errors.Wrapf(err, "Failed to remove %s: %s", nextHop.multiHopNetwork, out)
-	}
-
-	speakerPods, err := metallb.SpeakerPods(cs)
-	if err != nil {
-		return err
-	}
-	for _, pod := range speakerPods {
-		nodeExec := executor.ForContainer(pod.Spec.NodeName)
-		err = container.DeleteMultiHop(nodeExec, nextHop.nodeNetwork, nextHop.multiHopNetwork, nextHop.nodeRoutingTable, routes)
-		if err != nil {
-			return errors.Wrapf(err, "Failed to delete multihop routes for pod %s", pod.ObjectMeta.Name)
-		}
-
-	}
-
-	return nil
-}
-
 // Allow the speaker nodes to reach the multi-hop network containers.
 func addMultiHopToNodes(cs *clientset.Clientset, targetNetwork, multiHopNetwork string, routingtable string, multiHopRoutes map[string]container.NetworkSettings) error {
 	/*
@@ -614,8 +546,4 @@ func enableL3masterDomains(container string) error {
 	}
 
 	return nil
-}
-
-func isVRFContainer(c *frrcontainer.FRR) bool {
-	return strings.Contains(c.Name, "vrf")
 }
