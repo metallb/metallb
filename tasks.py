@@ -25,6 +25,8 @@ all_architectures = set(["amd64",
                          "s390x"])
 default_network = "kind"
 extra_network = "network2"
+controller_gen_version = "v0.11.1"
+build_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build")
 
 def _check_architectures(architectures):
     out = set()
@@ -281,9 +283,9 @@ def validate_kind_version():
     if delta < 0:
         raise Exit(message="kind version >= {} required".format(min_version))
 
-def generate_manifest(ctx, controller_gen="controller-gen", crd_options="crd:crdVersions=v1",
-        kustomize_cli="kustomize", bgp_type="native", output=None, with_prometheus=False):
-    res = run("{} {} rbac:roleName=manager-role webhook paths=\"./api/...\" output:crd:artifacts:config=config/crd/bases".format(controller_gen, crd_options))
+def generate_manifest(ctx, crd_options="crd:crdVersions=v1", bgp_type="native", output=None, with_prometheus=False):
+    run("GOPATH={} go install sigs.k8s.io/controller-tools/cmd/controller-gen@{}".format(build_path, controller_gen_version))    
+    res = run("{}/bin/controller-gen {} rbac:roleName=manager-role webhook paths=\"./api/...\" output:crd:artifacts:config=config/crd/bases".format(build_path, crd_options))
     if not res.ok:
         raise Exit(message="Failed to generate manifests")
 
@@ -845,18 +847,13 @@ def gomodtidy(ctx):
     if not res.ok:
         raise Exit(message="go mod tidy failed")
 
-@task(help={
-    "controller_gen": "KubeBuilder CLI."
-                    "Default: controller_gen (version v0.7.0).",
-    "kustomize_cli": "YAML files customization CLI."
-                    "Default: kustomize (version v4.4.0).",
-})  
-def generatemanifests(ctx, controller_gen="controller-gen", kustomize_cli="kustomize"):
+@task 
+def generatemanifests(ctx):
     """ Re-generates the all-in-one manifests under config/manifests"""
-    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="frr", output="config/manifests/metallb-frr.yaml")
-    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="native", output="config/manifests/metallb-native.yaml")
-    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="frr", with_prometheus=True, output="config/manifests/metallb-frr-prometheus.yaml")
-    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="native", with_prometheus=True, output="config/manifests/metallb-native-prometheus.yaml")
+    generate_manifest(ctx, bgp_type="frr", output="config/manifests/metallb-frr.yaml")
+    generate_manifest(ctx, bgp_type="native", output="config/manifests/metallb-native.yaml")
+    generate_manifest(ctx, bgp_type="frr", with_prometheus=True, output="config/manifests/metallb-frr-prometheus.yaml")
+    generate_manifest(ctx, bgp_type="native", with_prometheus=True, output="config/manifests/metallb-native-prometheus.yaml")
 
 @task
 def generateapidocs(ctx):

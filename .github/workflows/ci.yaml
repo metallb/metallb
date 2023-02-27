@@ -65,7 +65,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install python3-pip arping ndisc6
           sudo pip3 install invoke semver pyyaml
-          go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0
 
       - name: Unit Tests
         run: |
