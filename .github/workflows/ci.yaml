@@ -275,6 +275,9 @@ jobs:
         with:
           artifact-name: kind-logs-backward-compatible
 
+      - name: tmate
+        uses: mxschmitt/action-tmate@v3
+
   e2e-use-operator:
     runs-on: ubuntu-22.04
     needs:
