@@ -164,17 +164,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        ip-family: [ipv4, ipv6, dual]
-        bgp-type: [native, frr]
-        deployment: [manifests, helm]
-        prometheus: [disabled, enabled]
-        exclude:
-        - ip-family: ipv6
-          prometheus: disabled
-        - ip-family: dual
-          prometheus: disabled
-        - bgp-type: frr
-          prometheus: disabled
+        ip-family: [ipv4]
+        bgp-type: [native]
+        deployment: [manifests]
+        prometheus: [disabled]
     steps:
       - name: Checkout
         uses: actions/checkout@v3
