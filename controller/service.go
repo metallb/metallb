@@ -96,6 +96,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		// otherwise it'll fail and tell us why.
 		if err = c.ips.Assign(key, svc, lbIPs, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 			level.Info(l).Log("event", "clearAssignment", "error", err, "msg", "current IP not allowed by config, clearing")
+			c.client.Infof(svc, "ClearAssignment", "current IP for %q not allowed by config, will attempt for new IP assignment: %s", key, err)
 			c.clearServiceState(key, svc)
 			lbIPs = []net.IP{}
 		}
