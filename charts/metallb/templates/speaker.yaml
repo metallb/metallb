@@ -413,7 +413,7 @@ spec:
       {{- if .Values.prometheus.secureMetricsPort }}
       - name: kube-rbac-proxy
         image: {{ .Values.prometheus.rbacProxy.repository }}:{{ .Values.prometheus.rbacProxy.tag }}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: {{ .Values.prometheus.rbacProxy.pullPolicy }}
         args:
           - --logtostderr
           - --secure-listen-address=:{{ .Values.prometheus.secureMetricsPort }}
@@ -446,7 +446,7 @@ spec:
       {{- if .Values.speaker.frr.secureMetricsPort }}
       - name: kube-rbac-proxy-frr
         image: {{ .Values.prometheus.rbacProxy.repository }}:{{ .Values.prometheus.rbacProxy.tag | default .Chart.AppVersion }}
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: {{ .Values.prometheus.rbacProxy.pullPolicy }}
         args:
           - --logtostderr
           - --secure-listen-address=:{{ .Values.speaker.frr.secureMetricsPort }}
