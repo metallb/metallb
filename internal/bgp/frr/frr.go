@@ -286,8 +286,10 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			switch family {
 			case ipfamily.IPv4:
 				rout.ipV4Prefixes[prefix] = prefix
+				neighbor.HasV4Advertisements = true
 			case ipfamily.IPv6:
 				rout.ipV6Prefixes[prefix] = prefix
+				neighbor.HasV6Advertisements = true
 			}
 		}
 	}

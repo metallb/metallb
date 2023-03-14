@@ -261,8 +261,8 @@ func TestBGPSpeaker(t *testing.T) {
 		{
 			desc: "One peer, no services",
 			config: &config.Config{
-				Peers: []*config.Peer{
-					{
+				Peers: map[string]*config.Peer{
+					"peer1": {
 						Addr:          net.ParseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
@@ -569,8 +569,8 @@ func TestBGPSpeaker(t *testing.T) {
 		{
 			desc: "Multiple advertisement config",
 			config: &config.Config{
-				Peers: []*config.Peer{
-					{
+				Peers: map[string]*config.Peer{
+					"peer1": {
 						Addr:          net.ParseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
@@ -636,8 +636,8 @@ func TestBGPSpeaker(t *testing.T) {
 		{
 			desc: "Multiple advertisement config, one only for my node",
 			config: &config.Config{
-				Peers: []*config.Peer{
-					{
+				Peers: map[string]*config.Peer{
+					"peer1": {
 						Addr:          net.ParseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
@@ -700,8 +700,8 @@ func TestBGPSpeaker(t *testing.T) {
 		{
 			desc: "Multiple advertisement config, one with peer selector",
 			config: &config.Config{
-				Peers: []*config.Peer{
-					{
+				Peers: map[string]*config.Peer{
+					"peer1": {
 						Name:          "peer1",
 						Addr:          net.ParseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
@@ -771,12 +771,12 @@ func TestBGPSpeaker(t *testing.T) {
 		{
 			desc: "Multiple peers",
 			config: &config.Config{
-				Peers: []*config.Peer{
-					{
+				Peers: map[string]*config.Peer{
+					"peer1": {
 						Addr:          net.ParseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
-					{
+					"peer2": {
 						Addr:          net.ParseIP("1.2.3.5"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
@@ -990,8 +990,8 @@ func TestBGPSpeaker(t *testing.T) {
 		{
 			desc: "Delete peer",
 			config: &config.Config{
-				Peers: []*config.Peer{
-					{
+				Peers: map[string]*config.Peer{
+					"peer1": {
 						Addr:          net.ParseIP("1.2.3.5"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
@@ -1132,8 +1132,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 		{
 			desc: "One peer, no services",
 			config: &config.Config{
-				Peers: []*config.Peer{
-					{
+				Peers: map[string]*config.Peer{
+					"peer1": {
 						Addr:          net.ParseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
@@ -1476,8 +1476,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 		{
 			desc: "Multiple advertisement config",
 			config: &config.Config{
-				Peers: []*config.Peer{
-					{
+				Peers: map[string]*config.Peer{
+					"peer1": {
 						Addr:          net.ParseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
@@ -1545,12 +1545,12 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 		{
 			desc: "Multiple peers",
 			config: &config.Config{
-				Peers: []*config.Peer{
-					{
+				Peers: map[string]*config.Peer{
+					"peer1": {
 						Addr:          net.ParseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
-					{
+					"peer2": {
 						Addr:          net.ParseIP("1.2.3.5"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
@@ -1766,8 +1766,8 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 		{
 			desc: "Delete peer",
 			config: &config.Config{
-				Peers: []*config.Peer{
-					{
+				Peers: map[string]*config.Peer{
+					"peer1": {
 						Addr:          net.ParseIP("1.2.3.5"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
@@ -1891,8 +1891,8 @@ func TestNodeSelectors(t *testing.T) {
 		{
 			desc: "One peer, default node selector, no node labels",
 			config: &config.Config{
-				Peers: []*config.Peer{
-					{
+				Peers: map[string]*config.Peer{
+					"peer1": {
 						Addr:          net.ParseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
@@ -1907,12 +1907,12 @@ func TestNodeSelectors(t *testing.T) {
 		{
 			desc: "Second peer, non-matching node selector",
 			config: &config.Config{
-				Peers: []*config.Peer{
-					{
+				Peers: map[string]*config.Peer{
+					"peer1": {
 						Addr:          net.ParseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
-					{
+					"peer2": {
 						Addr: net.ParseIP("2.3.4.5"),
 						NodeSelectors: []labels.Selector{
 							mustSelector("foo=bar"),
@@ -1958,12 +1958,12 @@ func TestNodeSelectors(t *testing.T) {
 		{
 			desc: "Change node selector so it matches again",
 			config: &config.Config{
-				Peers: []*config.Peer{
-					{
+				Peers: map[string]*config.Peer{
+					"peer1": {
 						Addr:          net.ParseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
-					{
+					"peer2": {
 						Addr: net.ParseIP("2.3.4.5"),
 						NodeSelectors: []labels.Selector{
 							mustSelector("foo in (bar, baz)"),
@@ -1996,12 +1996,12 @@ func TestNodeSelectors(t *testing.T) {
 		{
 			desc: "Multiple node selectors, only one matches",
 			config: &config.Config{
-				Peers: []*config.Peer{
-					{
+				Peers: map[string]*config.Peer{
+					"peer1": {
 						Addr:          net.ParseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
-					{
+					"peer2": {
 						Addr: net.ParseIP("2.3.4.5"),
 						NodeSelectors: []labels.Selector{
 							mustSelector("host=frontend"),
