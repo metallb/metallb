@@ -15,7 +15,6 @@ import (
 	"sync"
 	"syscall"
 	"time"
-	"unsafe"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -489,25 +488,6 @@ func (s *session) Close() error {
 	return nil
 }
 
-const (
-	// TCP MD5 Signature (RFC2385).
-	tcpMD5SIG = 14
-)
-
-// This  struct is defined at; linux-kernel: include/uapi/linux/tcp.h,
-// It  must be kept in sync with that definition, see current version:
-// https://github.com/torvalds/linux/blob/v4.16/include/uapi/linux/tcp.h#L253.
-
-//nolint:structcheck
-type tcpmd5sig struct {
-	ssFamily uint16
-	ss       [126]byte
-	pad1     uint16
-	keylen   uint16
-	pad2     uint32
-	key      [80]byte
-}
-
 // DialTCP does the part of creating a connection manually,  including setting the
 // proper TCP MD5 options when the password is not empty. Works by manupulating
 // the low level FD's, skipping the net.Conn API as it has not hooks to set
@@ -592,9 +572,8 @@ func dialMD5(ctx context.Context, addr string, srcAddr net.IP, password string) 
 
 	if password != "" {
 		sig := buildTCPMD5Sig(raddr.IP, password)
-		b := *(*[unsafe.Sizeof(sig)]byte)(unsafe.Pointer(&sig))
 		// Better way may be available in  Go 1.11, see go-review.googlesource.com/c/go/+/72810
-		if err = os.NewSyscallError("setsockopt", unix.SetsockoptString(fd, unix.IPPROTO_TCP, tcpMD5SIG, string(b[:]))); err != nil {
+		if err = os.NewSyscallError("setsockopt", unix.SetsockoptTCPMD5Sig(fd, unix.IPPROTO_TCP, unix.TCP_MD5SIG, sig)); err != nil {
 			return nil, err
 		}
 	}
@@ -665,20 +644,20 @@ func dialMD5(ctx context.Context, addr string, srcAddr net.IP, password string) 
 	}
 }
 
-func buildTCPMD5Sig(addr net.IP, key string) tcpmd5sig {
-	t := tcpmd5sig{}
+func buildTCPMD5Sig(addr net.IP, key string) *unix.TCPMD5Sig {
+	t := unix.TCPMD5Sig{}
 	if addr.To4() != nil {
-		t.ssFamily = unix.AF_INET
-		copy(t.ss[2:], addr.To4())
+		t.Addr.Family = unix.AF_INET
+		copy(t.Addr.Data[2:], addr.To4())
 	} else {
-		t.ssFamily = unix.AF_INET6
-		copy(t.ss[6:], addr.To16())
+		t.Addr.Family = unix.AF_INET6
+		copy(t.Addr.Data[6:], addr.To16())
 	}
 
-	t.keylen = uint16(len(key))
-	copy(t.key[0:], []byte(key))
+	t.Keylen = uint16(len(key))
+	copy(t.Key[0:], []byte(key))
 
-	return t
+	return &t
 }
 
 // localAddressExists returns true if the address addr exists on any of the
