@@ -208,10 +208,7 @@ func resourcesFor(cf *configFile) (config.ClusterResources, error) {
 		return config.ClusterResources{}, err
 	}
 
-	r.Pools, err = ipAddressPoolsFor(cf)
-	if err != nil {
-		return config.ClusterResources{}, err
-	}
+	r.Pools = ipAddressPoolsFor(cf)
 	r.BGPAdvs = bgpAdvertisementsFor(cf)
 	r.L2Advs = l2AdvertisementsFor(cf)
 
@@ -322,7 +319,7 @@ func parsePeer(p peer) (*v1beta2.BGPPeer, error) {
 		},
 	}
 	if p.KeepaliveTime != "" {
-		keepaliveTime, err := parseKeepaliveTime(holdTime, p.KeepaliveTime)
+		keepaliveTime, err := parseKeepaliveTime(p.KeepaliveTime)
 		if err != nil {
 			return nil, err
 		}
@@ -366,7 +363,7 @@ func parseHoldTime(ht string) (time.Duration, error) {
 	return rounded, nil
 }
 
-func parseKeepaliveTime(ht time.Duration, ka string) (time.Duration, error) {
+func parseKeepaliveTime(ka string) (time.Duration, error) {
 	d, err := time.ParseDuration(ka)
 	if err != nil {
 		return 0, fmt.Errorf("invalid keepalive time %q: %s", ka, err)
@@ -375,7 +372,7 @@ func parseKeepaliveTime(ht time.Duration, ka string) (time.Duration, error) {
 	return rounded, nil
 }
 
-func ipAddressPoolsFor(c *configFile) ([]v1beta1.IPAddressPool, error) {
+func ipAddressPoolsFor(c *configFile) []v1beta1.IPAddressPool {
 	res := make([]v1beta1.IPAddressPool, len(c.Pools))
 	for i, addresspool := range c.Pools {
 		var ap v1beta1.IPAddressPool
@@ -389,7 +386,7 @@ func ipAddressPoolsFor(c *configFile) ([]v1beta1.IPAddressPool, error) {
 		ap.Spec.AutoAssign = addresspool.AutoAssign
 		res[i] = ap
 	}
-	return res, nil
+	return res
 }
 
 func bgpAdvertisementsFor(c *configFile) []v1beta1.BGPAdvertisement {
