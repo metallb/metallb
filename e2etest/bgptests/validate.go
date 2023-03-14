@@ -163,8 +163,8 @@ func checkBFDConfigPropagated(nodeConfig metallbv1beta1.BFDProfile, peerConfig b
 	if peerConfig.RemoteTransmitInterval != int(*nodeConfig.Spec.TransmitInterval) {
 		return fmt.Errorf("RemoteTransmitInterval: expecting %d, got %d", *nodeConfig.Spec.TransmitInterval, peerConfig.RemoteTransmitInterval)
 	}
-	if peerConfig.RemoteEchoInterval != int(*nodeConfig.Spec.EchoInterval) {
-		return fmt.Errorf("EchoInterval: expecting %d, got %d", *nodeConfig.Spec.EchoInterval, peerConfig.RemoteEchoInterval)
+	if peerConfig.RemoteEchoReceiveInterval != int(*nodeConfig.Spec.EchoInterval) {
+		return fmt.Errorf("EchoInterval: expecting %d, got %d", *nodeConfig.Spec.EchoInterval, peerConfig.RemoteEchoReceiveInterval)
 	}
 	return nil
 }
