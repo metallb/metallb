@@ -3,6 +3,7 @@
 package layer2
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -104,7 +105,7 @@ func (n *ndpResponder) processRequest() dropReason {
 			return dropReasonClosed
 		default:
 		}
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return dropReasonClosed
 		}
 		return dropReasonError

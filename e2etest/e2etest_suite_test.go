@@ -45,8 +45,6 @@ import (
 
 var (
 	skipDockerCmd       bool
-	ipv4ForContainers   string
-	ipv6ForContainers   string
 	useOperator         bool
 	reportPath          string
 	updater             testsconfig.Updater
@@ -75,8 +73,6 @@ func handleFlags() {
 
 	flag.IntVar(&service.TestServicePort, "service-pod-port", 80, "port number that pod opens, default: 80")
 	flag.BoolVar(&skipDockerCmd, "skip-docker", false, "set this to true if the BGP daemon is running on the host instead of in a container")
-	flag.StringVar(&ipv4ForContainers, "ips-for-containers-v4", "0", "a comma separated list of IPv4 addresses available for containers")
-	flag.StringVar(&ipv6ForContainers, "ips-for-containers-v6", "0", "a comma separated list of IPv6 addresses available for containers")
 	flag.StringVar(&l2tests.IPV4ServiceRange, "ipv4-service-range", "0", "a range of IPv4 addresses for MetalLB to use when running in layer2 mode")
 	flag.StringVar(&l2tests.IPV6ServiceRange, "ipv6-service-range", "0", "a range of IPv6 addresses for MetalLB to use when running in layer2 mode")
 	flag.StringVar(&nodeNics, "node-nics", "", "node's interfaces list separated by comma and used when running in interface selector")
@@ -130,9 +126,6 @@ var _ = ginkgo.BeforeSuite(func() {
 	cs, err := framework.LoadClientset()
 	framework.ExpectNoError(err)
 
-	v4Addresses := strings.Split(ipv4ForContainers, ",")
-	v6Addresses := strings.Split(ipv6ForContainers, ",")
-
 	switch {
 	case externalContainers != "":
 		bgptests.FRRContainers, err = bgptests.ExternalContainersSetup(externalContainers, cs)
@@ -141,7 +134,7 @@ var _ = ginkgo.BeforeSuite(func() {
 		bgptests.FRRContainers, err = bgptests.HostContainerSetup()
 		framework.ExpectNoError(err)
 	default:
-		bgptests.FRRContainers, err = bgptests.KindnetContainersSetup(v4Addresses, v6Addresses, cs)
+		bgptests.FRRContainers, err = bgptests.KindnetContainersSetup(cs)
 		framework.ExpectNoError(err)
 		if !bgpNativeMode {
 			vrfFRRContainers, err := bgptests.VRFContainersSetup(cs)
