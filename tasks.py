@@ -25,6 +25,8 @@ all_architectures = set(["amd64",
                          "s390x"])
 default_network = "kind"
 extra_network = "network2"
+controller_gen_version = "v0.11.1"
+build_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build")
 
 def _check_architectures(architectures):
     out = set()
@@ -281,9 +283,9 @@ def validate_kind_version():
     if delta < 0:
         raise Exit(message="kind version >= {} required".format(min_version))
 
-def generate_manifest(ctx, controller_gen="controller-gen", crd_options="crd:crdVersions=v1",
-        kustomize_cli="kustomize", bgp_type="native", output=None, with_prometheus=False):
-    res = run("{} {} rbac:roleName=manager-role webhook paths=\"./api/...\" output:crd:artifacts:config=config/crd/bases".format(controller_gen, crd_options))
+def generate_manifest(ctx, crd_options="crd:crdVersions=v1", bgp_type="native", output=None, with_prometheus=False):
+    run("GOPATH={} go install sigs.k8s.io/controller-tools/cmd/controller-gen@{}".format(build_path, controller_gen_version))    
+    res = run("{}/bin/controller-gen {} rbac:roleName=manager-role webhook paths=\"./api/...\" output:crd:artifacts:config=config/crd/bases".format(build_path, crd_options))
     if not res.ok:
         raise Exit(message="Failed to generate manifests")
 
@@ -483,7 +485,7 @@ def bgp_dev_env(ip_family, frr_volume_dir):
         '    docker rm -f $frr ; '
         'done', echo=True)
     run("docker run -d --privileged --network kind --rm --ulimit core=-1 --name frr --volume %s:/etc/frr "
-            "quay.io/frrouting/frr:7.5.1" % frr_volume_dir, echo=True)
+            "quay.io/frrouting/frr:8.4.2" % frr_volume_dir, echo=True)
 
     if ip_family == "ipv4":
         peer_address = run('docker inspect -f "{{ '
@@ -513,20 +515,16 @@ def get_available_ips(ip_family=None):
             used_list = v4 if ip_family == 4 else v6
             last_used = ipaddress.ip_interface(used_list[-1])
 
-            for_containers = []
-            for i in range(2):
-                last_used = last_used + 1
-                for_containers.append(str(last_used))
-
-            # try to get 10 IP addresses after the last assigned node address in the kind network subnet
+            # try to get 10 IP addresses after the last assigned node address in the kind network subnet,
+            # plus we give room to thr frr single hop containers.
             # if failed, just quit (recreate kind cluster might solve the situation)
-            service_ip_range_start = last_used + 1
-            service_ip_range_end = last_used + 11
+            service_ip_range_start = last_used + 5
+            service_ip_range_end = last_used + 15
             if service_ip_range_start not in network:
                 raise Exit(message='network range %s is not in %s' % (service_ip_range_start, network))
             if service_ip_range_end not in network:
                 raise Exit(message='network range %s is not in %s' % (service_ip_range_end, network))
-            return '%s-%s' % (service_ip_range_start.ip, service_ip_range_end.ip), ','.join(for_containers)
+            return '%s-%s' % (service_ip_range_start.ip, service_ip_range_end.ip)
 
 @task(help={
     "name": "name of the kind cluster to delete.",
@@ -782,15 +780,11 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
     if local_nics == "kind":
         local_nics = _get_local_nics()
 
-    ips_for_containers_v4 = ""
     if ipv4_service_range is None:
-        ipv4_service_range, ips = get_available_ips(4)
-        ips_for_containers_v4 = "--ips-for-containers-v4=" + ips
+        ipv4_service_range = get_available_ips(4)
 
-    ips_for_containers_v6 = ""
     if ipv6_service_range is None:
-        ipv6_service_range, ips = get_available_ips(6)
-        ips_for_containers_v6 = "--ips-for-containers-v6=" + ips
+        ipv6_service_range = get_available_ips(6)
 
     if export != None:
         report_path = export
@@ -807,7 +801,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
         external_containers = "--external-containers="+(external_containers)
 
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "KUBECONFIG={} ginkgo --timeout=3h {} {} -- --provider=local --kubeconfig={} --service-pod-port={} {} {} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {}  -bgp-native-mode={}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ips_for_containers_v4, ips_for_containers_v6, ipv4_service_range, ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace, node_nics, local_nics, external_containers, native_bgp), warn="True")
+            "KUBECONFIG={} ginkgo --timeout=3h {} {} -- --provider=local --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {}  -bgp-native-mode={}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range, ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace, node_nics, local_nics, external_containers, native_bgp), warn="True")
 
     if export != None:
         run("kind export logs {}".format(export))
@@ -845,18 +839,13 @@ def gomodtidy(ctx):
     if not res.ok:
         raise Exit(message="go mod tidy failed")
 
-@task(help={
-    "controller_gen": "KubeBuilder CLI."
-                    "Default: controller_gen (version v0.7.0).",
-    "kustomize_cli": "YAML files customization CLI."
-                    "Default: kustomize (version v4.4.0).",
-})  
-def generatemanifests(ctx, controller_gen="controller-gen", kustomize_cli="kustomize"):
+@task 
+def generatemanifests(ctx):
     """ Re-generates the all-in-one manifests under config/manifests"""
-    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="frr", output="config/manifests/metallb-frr.yaml")
-    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="native", output="config/manifests/metallb-native.yaml")
-    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="frr", with_prometheus=True, output="config/manifests/metallb-frr-prometheus.yaml")
-    generate_manifest(ctx, controller_gen=controller_gen, kustomize_cli=kustomize_cli, bgp_type="native", with_prometheus=True, output="config/manifests/metallb-native-prometheus.yaml")
+    generate_manifest(ctx, bgp_type="frr", output="config/manifests/metallb-frr.yaml")
+    generate_manifest(ctx, bgp_type="native", output="config/manifests/metallb-native.yaml")
+    generate_manifest(ctx, bgp_type="frr", with_prometheus=True, output="config/manifests/metallb-frr-prometheus.yaml")
+    generate_manifest(ctx, bgp_type="native", with_prometheus=True, output="config/manifests/metallb-native-prometheus.yaml")
 
 @task
 def generateapidocs(ctx):
