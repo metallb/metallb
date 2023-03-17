@@ -970,6 +970,38 @@ func TestTwoAdvertisementsTwoSessionsOneWithPeerSelector(t *testing.T) {
 	testCheckConfigFile(t)
 }
 
+func TestSingleSessionExtras(t *testing.T) {
+	testSetup(t)
+
+	l := log.NewNopLogger()
+	sessionManager := NewSessionManager(l, logging.LevelInfo)
+	defer close(sessionManager.reloadConfig)
+	err := sessionManager.SyncExtraInfo("# hello")
+	if err != nil {
+		t.Fatalf("Could not sync extra info")
+	}
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "127.0.0.2:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  false,
+			SessionName:   "test-peer"})
+
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	testCheckConfigFile(t)
+}
+
 func TestLoggingConfiguration(t *testing.T) {
 	testSetup(t)
 
