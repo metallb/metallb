@@ -40,6 +40,12 @@ route-map {{$.neighbor.ID}}-out permit {{counter $.neighbor.ID}}
 route-map {{$.neighbor.ID}}-out permit {{counter $.neighbor.ID}}
   match ipv6 address prefix-list {{allowedPrefixList $.neighbor}}
 
+{{/* If the neighbor does not have an advertisement, we need to add a prefix to deny
+for when we have a prefix but a given peer is not selected for any prefixes */}}
+{{- if not .neighbor.HasV4Advertisements}}
 ip prefix-list {{allowedPrefixList $.neighbor }} deny any
+{{- end }}
+{{- if not .neighbor.HasV6Advertisements}}
 ipv6 prefix-list {{allowedPrefixList $.neighbor}} deny any
+{{- end -}}
 {{- end -}}

@@ -2,7 +2,7 @@
 title: Release Notes
 weight: 8
 ---
-## Version 0.13.8
+## Version 0.13.9
 
 New Features:
 

@@ -27,6 +27,7 @@ Kubernetes: `>= 1.19.0-0`
 | controller.image.pullPolicy | string | `nil` |  |
 | controller.image.repository | string | `"quay.io/metallb/controller"` |  |
 | controller.image.tag | string | `nil` |  |
+| controller.labels | object | `{}` |  |
 | controller.livenessProbe.enabled | bool | `true` |  |
 | controller.livenessProbe.failureThreshold | int | `3` |  |
 | controller.livenessProbe.initialDelaySeconds | int | `10` |  |
@@ -112,13 +113,14 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.frr.enabled | bool | `false` |  |
 | speaker.frr.image.pullPolicy | string | `nil` |  |
 | speaker.frr.image.repository | string | `"quay.io/frrouting/frr"` |  |
-| speaker.frr.image.tag | string | `"7.5.1"` |  |
+| speaker.frr.image.tag | string | `"8.4.2"` |  |
 | speaker.frr.metricsPort | int | `7473` |  |
 | speaker.frr.resources | object | `{}` |  |
 | speaker.frrMetrics.resources | object | `{}` |  |
 | speaker.image.pullPolicy | string | `nil` |  |
 | speaker.image.repository | string | `"quay.io/metallb/speaker"` |  |
 | speaker.image.tag | string | `nil` |  |
+| speaker.labels | object | `{}` |  |
 | speaker.livenessProbe.enabled | bool | `true` |  |
 | speaker.livenessProbe.failureThreshold | int | `3` |  |
 | speaker.livenessProbe.initialDelaySeconds | int | `10` |  |
