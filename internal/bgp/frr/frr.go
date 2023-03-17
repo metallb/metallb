@@ -26,6 +26,7 @@ import (
 type sessionManager struct {
 	sessions     map[string]*session
 	bfdProfiles  []BFDProfile
+	extraConfig  string
 	reloadConfig chan reloadEvent
 	logLevel     string
 	sync.Mutex
@@ -153,6 +154,19 @@ func (sm *sessionManager) deleteSession(s *session) error {
 	return nil
 }
 
+func (sm *sessionManager) SyncExtraInfo(extraInfo string) error {
+	sm.Lock()
+	defer sm.Unlock()
+	sm.extraConfig = extraInfo
+	frrConfig, err := sm.createConfig()
+	if err != nil {
+		return err
+	}
+
+	sm.reloadConfig <- reloadEvent{config: frrConfig}
+	return nil
+}
+
 func (sm *sessionManager) SyncBFDProfiles(profiles map[string]*metallbconfig.BFDProfile) error {
 	sm.Lock()
 	defer sm.Unlock()
@@ -184,6 +198,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 		Hostname:    hostname,
 		Loglevel:    sm.logLevel,
 		BFDProfiles: sm.bfdProfiles,
+		ExtraConfig: sm.extraConfig,
 	}
 
 	type router struct {
