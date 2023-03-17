@@ -64,3 +64,7 @@ bfd
 {{- template "bfdprofile" dict "profile" . -}}
 {{- end }}
 {{- end }}
+
+{{- if .ExtraConfig }}
+{{ .ExtraConfig }}
+{{- end }}
