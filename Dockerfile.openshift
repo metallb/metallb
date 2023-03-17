@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.18-openshift-4.12 AS builder
+FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.19-openshift-4.13 AS builder
 WORKDIR /metallb
 
 COPY .git/ .git/
@@ -22,7 +22,7 @@ RUN export SOURCE_GIT_COMMIT="${SOURCE_GIT_COMMIT:-$(git rev-parse --verify 'HEA
       -ldflags "-X go.universe.tf/metallb/internal/version.gitCommit=${SOURCE_GIT_COMMIT} \
       -X go.universe.tf/metallb/internal/version.gitBranch=${GIT_BRANCH}"
 
-FROM registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.12
+FROM registry.ci.openshift.org/ocp/builder:rhel-8-base-openshift-4.13
 COPY --from=builder /metallb/controller/controller /metallb/speaker/speaker \
       /metallb/frr-tools/reloader/frr-reloader.sh /metallb/frr-tools/metrics/frr-metrics /
 
