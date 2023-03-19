@@ -1,0 +1,22 @@
+{{- if .Values.speaker.excludeInterfaces.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: metallb-excludel2
+data:
+  excludel2.yaml: |
+    announcedInterfacesToExclude:
+    - docker.*
+    - cbr.*
+    - dummy.*
+    - virbr.*
+    - lxcbr.*
+    - veth.*
+    - lo
+    - ^cali.*
+    - ^tunl.*
+    - flannel.*
+    - kube-ipvs.*
+    - cni.*
+    - ^nodelocaldns.*
+{{- end }}

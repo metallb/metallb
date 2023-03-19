@@ -5,6 +5,7 @@ package layer2
 import (
 	"net"
 	"os"
+	"regexp"
 	"strconv"
 	"sync"
 	"time"
@@ -26,11 +27,12 @@ type Announce struct {
 
 	// This channel can block - do not write to it while holding the mutex
 	// to avoid deadlocking.
-	spamCh chan IPAdvertisement
+	spamCh        chan IPAdvertisement
+	excludeRegexp *regexp.Regexp
 }
 
 // New returns an initialized Announce.
-func New(l log.Logger) (*Announce, error) {
+func New(l log.Logger, excludeRegexp *regexp.Regexp) (*Announce, error) {
 	ret := &Announce{
 		logger:         l,
 		nodeInterfaces: []string{},
@@ -39,7 +41,9 @@ func New(l log.Logger) (*Announce, error) {
 		ips:            map[string][]IPAdvertisement{},
 		ipRefcnt:       map[string]int{},
 		spamCh:         make(chan IPAdvertisement, 1024),
+		excludeRegexp:  excludeRegexp,
 	}
+
 	go ret.interfaceScan()
 	go ret.spamLoop()
 
@@ -67,6 +71,12 @@ func (a *Announce) updateInterfaces() {
 	curIfs := make([]string, 0, len(ifs))
 	for _, intf := range ifs {
 		ifi := intf
+
+		if (a.excludeRegexp != nil) && a.excludeRegexp.MatchString(ifi.Name) {
+			level.Info(a.logger).Log("event", "announced interface to exclude", "interface", ifi.Name)
+			continue
+		}
+
 		curIfs = append(curIfs, ifi.Name)
 		l := log.With(a.logger, "interface", ifi.Name)
 		addrs, err := ifi.Addrs()

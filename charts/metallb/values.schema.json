@@ -322,6 +322,14 @@
                 }
               }
             },
+            "excludeInterfaces": {
+              "type": "object",
+              "properties": {
+                "enabled": {
+                  "type": "boolean"
+                }
+              }
+            },
             "updateStrategy": {
               "type": "object",
               "properties": {
