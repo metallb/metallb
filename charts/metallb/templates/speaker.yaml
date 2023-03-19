@@ -159,6 +159,12 @@ spec:
             secretName: {{ include "metallb.secretName" . }}
             defaultMode: 420
       {{- end }}
+      {{- if .Values.speaker.excludeInterfaces.enabled }}
+        - name: metallb-excludel2
+          configMap:
+            defaultMode: 256
+            name: metallb-excludel2
+      {{- end }}
       {{- if .Values.speaker.frr.enabled }}
         - name: frr-sockets
           emptyDir: {}
@@ -297,7 +303,7 @@ spec:
             - ALL
             add:
             - NET_RAW
-        {{- if or .Values.speaker.frr.enabled .Values.speaker.memberlist.enabled }}
+        {{- if or .Values.speaker.frr.enabled .Values.speaker.memberlist.enabled .Values.speaker.excludeInterfaces.enabled }}
         volumeMounts:
           {{- if .Values.speaker.memberlist.enabled }}
           - name: memberlist 
@@ -306,6 +312,10 @@ spec:
           {{- if .Values.speaker.frr.enabled }}
           - name: reloader
             mountPath: /etc/frr_reloader
+          {{- end }}
+          {{- if .Values.speaker.excludeInterfaces.enabled }}
+          - name: metallb-excludel2
+            mountPath: /etc/metallb
           {{- end }}
         {{- end }}
       {{- if .Values.speaker.frr.enabled }}
