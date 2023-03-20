@@ -400,8 +400,9 @@ github.com/onsi/gomega v1.22.1/go.mod h1:x6n7VNe4hw0vkyYUM4mjIXx3JbLiPaBPNgB7PRQ
 github.com/onsi/gomega v1.23.0/go.mod h1:Z/NWtiqwBrwUt4/2loMmHL63EDLnYHmVbuBpDr2vQAg=
 github.com/onsi/gomega v1.24.1 h1:KORJXNNTzJXzu4ScJWssJfJMnJ+2QJqhoQSRwNlze9E=
 github.com/onsi/gomega v1.24.1/go.mod h1:3AOiACssS3/MajrniINInwbfOOtfZvplPzuRSmvt1jM=
-github.com/open-policy-agent/cert-controller v0.6.0 h1:HBhe1kS0GTk5dRHdklwgJKoGIctWisueIYnIYJu65Q0=
-github.com/open-policy-agent/cert-controller v0.6.0/go.mod h1:uOQW+2tMU51vSxy1Yt162oVUTMdqLuotC0aObQxrh6k=
+github.com/open-policy-agent/cert-controller v0.7.0 h1:5ggZjSQJ1YgkT+ngNAGBGHaOYfGuYq97IrNldchCoHI=
+github.com/open-policy-agent/cert-controller v0.7.0/go.mod h1:Dkkdcr1BeSUig/62dYLqgvx3lIN0XtEikKTGW1lKSQo=
+github.com/open-policy-agent/frameworks/constraint v0.0.0-20230201235642-777dc99a6669 h1:vKt4PhZXBxYHeLujYraNVpkoILQ/NISiifzaq1DkMXk=
 github.com/opencontainers/go-digest v1.0.0 h1:apOUWs51W5PlhuyGyz9FCeeBIOUDA/6nW8Oi/yOhh5U=
 github.com/opencontainers/go-digest v1.0.0/go.mod h1:0JzlMkj0TRzQZfJkVvzbP0HBR3IKzErnv2BNG4W4MAM=
 github.com/opencontainers/image-spec v1.0.2 h1:9yCKha/T5XdGtO0q9Q9a6T5NUCsTn/DrBg0D7ufOcFM=
