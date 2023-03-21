@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/go-kit/log v0.2.1
-	github.com/golang/protobuf v1.5.2
+	github.com/golang/protobuf v1.5.3
 	github.com/google/go-cmp v0.5.9
 	github.com/hashicorp/memberlist v0.5.0
 	github.com/mdlayher/arp v0.0.0-20220221190821-c37aaafac7f9
