@@ -78,6 +78,13 @@ func (sm *sessionManager) SyncBFDProfiles(profiles map[string]*config.BFDProfile
 	return errors.New("bfd profiles not supported in native mode")
 }
 
+func (sm *sessionManager) SyncExtraInfo(extras string) error {
+	if extras != "" {
+		return errors.New("bgp extra info not supported in native mode")
+	}
+	return nil
+}
+
 // run tries to stay connected to the peer, and pumps route updates to it.
 func (s *session) run() {
 	defer stats.DeleteSession(s.PeerAddress)
