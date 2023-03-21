@@ -6,6 +6,9 @@ metadata:
   labels:
     {{- include "metallb.labels" . | nindent 4 }}
     app.kubernetes.io/component: controller
+    {{- range $key, $value := .Values.controller.labels }}
+    {{ $key }}: {{ $value | quote }}
+    {{- end }}
 spec:
   {{- if .Values.controller.strategy }}
   strategy: {{- toYaml .Values.controller.strategy | nindent 4 }}
@@ -29,6 +32,9 @@ spec:
       labels:
         {{- include "metallb.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: controller
+        {{- range $key, $value := .Values.controller.labels }}
+        {{ $key }}: {{ $value | quote }}
+        {{- end }}
     spec:
       {{- with .Values.controller.runtimeClassName }}
       runtimeClassName: {{ . | quote }}

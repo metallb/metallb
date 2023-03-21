@@ -98,6 +98,11 @@ newPeers:
 	if err != nil {
 		return errors.Wrap(err, "failed to sync bfd profiles")
 	}
+	err = c.sessionManager.SyncExtraInfo(cfg.BGPExtras)
+	if err != nil {
+		return errors.Wrap(err, "failed to sync extra info")
+	}
+
 	return c.syncPeers(l)
 }
 
