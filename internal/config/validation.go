@@ -91,7 +91,6 @@ func DiscardNativeOnly(c ClusterResources) error {
 				p.Spec.VRFName == p1.Spec.VRFName {
 				return fmt.Errorf("peer %s has myAsn different from %s, in FRR mode all myAsn must be equal for the same VRF", p.Spec.Address, p1.Spec.Address)
 			}
-
 		}
 	}
 	return nil

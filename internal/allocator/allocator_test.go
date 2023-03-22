@@ -1076,7 +1076,6 @@ func TestPoolAllocation(t *testing.T) {
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("%s: should have caused an error, but did not", test.desc)
-
 			}
 			continue
 		}
@@ -1536,7 +1535,6 @@ func TestBuggyIPs(t *testing.T) {
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("#%d should have caused an error, but did not", i+1)
-
 			}
 			continue
 		}
@@ -1549,7 +1547,6 @@ func TestBuggyIPs(t *testing.T) {
 			}
 		}
 	}
-
 }
 
 func TestConfigReload(t *testing.T) {

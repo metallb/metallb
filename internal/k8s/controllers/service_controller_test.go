@@ -258,7 +258,6 @@ func TestServiceController(t *testing.T) {
 }
 
 func TestLBClass(t *testing.T) {
-
 	tests := []struct {
 		desc           string
 		serviceLBClass *string

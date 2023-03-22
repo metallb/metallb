@@ -53,8 +53,6 @@ func TestLiveness(t *testing.T) {
 			if res.StatusCode != test.expectedStatusCode {
 				t.Errorf("status code %d different from expected %d", res.StatusCode, test.expectedStatusCode)
 			}
-
 		})
 	}
-
 }
