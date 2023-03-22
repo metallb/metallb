@@ -99,7 +99,7 @@ func (r *ServiceReconciler) reprocessAll(ctx context.Context, req ctrl.Request) 
 		// in case we want to retry, we return an error to trigger the exponential backoff mechanism so that
 		// this controller won't loop at full speed
 		level.Info(r.Logger).Log("controller", "ServiceReconciler - reprocessAll", "event", "force service reload")
-		return ctrl.Result{}, retryError
+		return ctrl.Result{}, errRetry
 	}
 	return ctrl.Result{}, nil
 }

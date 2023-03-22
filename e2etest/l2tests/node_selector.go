@@ -20,7 +20,6 @@ import (
 
 	internalconfig "go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
@@ -31,7 +30,7 @@ import (
 
 var _ = ginkgo.Describe("L2", func() {
 	var cs clientset.Interface
-	var nodeToLabel *v1.Node
+	var nodeToLabel *corev1.Node
 
 	var f *framework.Framework
 	ginkgo.AfterEach(func() {
@@ -99,7 +98,7 @@ var _ = ginkgo.Describe("L2", func() {
 						Name: "with-selector",
 					},
 					Spec: metallbv1beta1.L2AdvertisementSpec{
-						NodeSelectors: k8s.SelectorsForNodes([]v1.Node{node}),
+						NodeSelectors: k8s.SelectorsForNodes([]corev1.Node{node}),
 					},
 				}
 
@@ -170,7 +169,7 @@ var _ = ginkgo.Describe("L2", func() {
 						Name: "with-selector",
 					},
 					Spec: metallbv1beta1.L2AdvertisementSpec{
-						NodeSelectors: k8s.SelectorsForNodes([]v1.Node{allNodes.Items[1]}),
+						NodeSelectors: k8s.SelectorsForNodes([]corev1.Node{allNodes.Items[1]}),
 					},
 				}, {
 					ObjectMeta: metav1.ObjectMeta{

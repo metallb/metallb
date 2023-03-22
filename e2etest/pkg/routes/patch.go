@@ -55,7 +55,7 @@ func Delete(exec executor.Executor, target, via, routingTable string) error {
 	args = append(args, dst.String(), "via", gw.String())
 	out, err := exec.Exec(cmd, args...)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to delete route %s", out)
+		return errors.Wrapf(err, "failed to delete route %s", out)
 	}
 
 	return nil

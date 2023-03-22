@@ -30,7 +30,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
-	metallbcfg "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/k8s/epslices"
@@ -161,11 +160,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	var validateConfig metallbcfg.Validate
+	var validateConfig config.Validate
 	if bgpType == "native" {
-		validateConfig = metallbcfg.DiscardFRROnly
+		validateConfig = config.DiscardFRROnly
 	} else {
-		validateConfig = metallbcfg.DiscardNativeOnly
+		validateConfig = config.DiscardNativeOnly
 	}
 
 	client, err := k8s.New(&k8s.Config{

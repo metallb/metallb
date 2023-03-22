@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
@@ -49,11 +48,11 @@ func Delete(cs clientset.Interface, svc *corev1.Service) {
 	framework.ExpectNoError(err)
 }
 
-func tweakServicePort(svc *v1.Service, port int) {
+func tweakServicePort(svc *corev1.Service, port int) {
 	svc.Spec.Ports[0].TargetPort = intstr.FromInt(port)
 }
 
-func tweakRCPort(rc *v1.ReplicationController, port int) {
+func tweakRCPort(rc *corev1.ReplicationController, port int) {
 	rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", port), fmt.Sprintf("--udp-port=%d", port)}
 	rc.Spec.Template.Spec.Containers[0].ReadinessProbe.HTTPGet.Port = intstr.FromInt(port)
 }

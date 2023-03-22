@@ -260,7 +260,7 @@ func bfdProfilesFor(resources ClusterResources) (map[string]*BFDProfile, error) 
 }
 
 func peersFor(resources ClusterResources, BFDProfiles map[string]*BFDProfile) (map[string]*Peer, error) {
-	var res map[string]*Peer = make(map[string]*Peer)
+	var res = make(map[string]*Peer)
 	for _, p := range resources.Peers {
 		peer, err := peerFromCR(p, resources.PasswordSecrets)
 		if err != nil {
