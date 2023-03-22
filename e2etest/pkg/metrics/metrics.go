@@ -44,8 +44,8 @@ func ForPod(controller, target *corev1.Pod, namespace string) ([]map[string]*dto
 
 	podExecutor := executor.ForPod(namespace, controller.Name, "controller")
 	for _, p := range ports {
-		metricsUrl := path.Join(net.JoinHostPort(target.Status.PodIP, strconv.Itoa(p)), "metrics")
-		metrics, err := podExecutor.Exec("wget", "-qO-", metricsUrl)
+		metricsURL := path.Join(net.JoinHostPort(target.Status.PodIP, strconv.Itoa(p)), "metrics")
+		metrics, err := podExecutor.Exec("wget", "-qO-", metricsURL)
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to scrape metrics for %s", target.Name)
 		}

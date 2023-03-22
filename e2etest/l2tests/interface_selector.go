@@ -12,7 +12,6 @@ import (
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	internalconfig "go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -280,7 +279,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 							},
 							Spec: metallbv1beta1.L2AdvertisementSpec{
 								Interfaces:    []string{NodeNics[0]},
-								NodeSelectors: k8s.SelectorsForNodes([]v1.Node{node}),
+								NodeSelectors: k8s.SelectorsForNodes([]corev1.Node{node}),
 							},
 						},
 					},

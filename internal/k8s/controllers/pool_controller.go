@@ -96,7 +96,7 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		updateErrors.Inc()
 		configStale.Set(1)
 		level.Error(r.Logger).Log("controller", "PoolReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, retry")
-		return ctrl.Result{}, retryError
+		return ctrl.Result{}, errRetry
 	case SyncStateReprocessAll:
 		level.Info(r.Logger).Log("controller", "PoolReconciler", "event", "force service reload")
 		r.ForceReload()

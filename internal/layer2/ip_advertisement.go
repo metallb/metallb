@@ -23,23 +23,23 @@ func NewIPAdvertisement(ip net.IP, allInterfaces bool, interfaces sets.Set[strin
 	}
 }
 
-func (i1 *IPAdvertisement) Equal(i2 *IPAdvertisement) bool {
-	if i1 == nil && i2 == nil {
+func (i *IPAdvertisement) Equal(other *IPAdvertisement) bool {
+	if i == nil && other == nil {
 		return true
 	}
-	if i1 == nil || i2 == nil {
+	if i == nil || other == nil {
 		return false
 	}
-	if !i1.ip.Equal(i2.ip) {
+	if !i.ip.Equal(other.ip) {
 		return false
 	}
-	if i1.allInterfaces != i2.allInterfaces {
+	if i.allInterfaces != other.allInterfaces {
 		return false
 	}
-	if i1.allInterfaces {
+	if i.allInterfaces {
 		return true
 	}
-	return i1.interfaces.Equal(i2.interfaces)
+	return i.interfaces.Equal(other.interfaces)
 }
 
 func (i *IPAdvertisement) MatchInterfaces(intfs ...string) bool {

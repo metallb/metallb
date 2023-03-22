@@ -29,7 +29,7 @@ func init() {
 // (or in the current host) to reach the service ip.
 func ForIP(target string, exec executor.Executor) []net.IP {
 	dst := net.ParseIP(target)
-	framework.ExpectNotEqual(dst, nil, "Failed to convert", target, "to ip")
+	framework.ExpectNotEqual(dst, nil, "failed to convert", target, "to ip")
 
 	re := Ipv4Re
 	res, err := exec.Exec("ip", []string{"route", "show", target}...)
@@ -61,7 +61,7 @@ func ForIP(target string, exec executor.Executor) []net.IP {
 			continue
 		}
 		netIP := net.ParseIP(ip)
-		framework.ExpectNotEqual(netIP, nil, "Failed to convert", ip, "to ip")
+		framework.ExpectNotEqual(netIP, nil, "failed to convert", ip, "to ip")
 		routes = append(routes, netIP)
 	}
 

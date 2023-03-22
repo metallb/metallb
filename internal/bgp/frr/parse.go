@@ -13,7 +13,7 @@ import (
 )
 
 type Neighbor struct {
-	Ip             net.IP
+	IP             net.IP
 	VRF            string
 	Connected      bool
 	LocalAS        string
@@ -128,7 +128,7 @@ func ParseNeighbour(vtyshRes string) (*Neighbor, error) {
 			prefixSent += s.SentPrefixCounter
 		}
 		return &Neighbor{
-			Ip:             ip,
+			IP:             ip,
 			Connected:      connected,
 			LocalAS:        strconv.Itoa(n.LocalAs),
 			RemoteAS:       strconv.Itoa(n.RemoteAs),
@@ -165,7 +165,7 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 			prefixSent += s.SentPrefixCounter
 		}
 		res = append(res, &Neighbor{
-			Ip:             ip,
+			IP:             ip,
 			Connected:      connected,
 			LocalAS:        strconv.Itoa(n.LocalAs),
 			RemoteAS:       strconv.Itoa(n.RemoteAs),

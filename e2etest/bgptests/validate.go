@@ -154,16 +154,16 @@ func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily ipf
 
 func checkBFDConfigPropagated(nodeConfig metallbv1beta1.BFDProfile, peerConfig bgpfrr.BFDPeer) error {
 	if peerConfig.Status != "up" {
-		return fmt.Errorf("Peer status not up")
+		return fmt.Errorf("peer status not up")
 	}
 	if peerConfig.RemoteReceiveInterval != int(*nodeConfig.Spec.ReceiveInterval) {
-		return fmt.Errorf("RemoteReceiveInterval: expecting %d, got %d", *nodeConfig.Spec.ReceiveInterval, peerConfig.RemoteReceiveInterval)
+		return fmt.Errorf("remoteReceiveInterval: expecting %d, got %d", *nodeConfig.Spec.ReceiveInterval, peerConfig.RemoteReceiveInterval)
 	}
 	if peerConfig.RemoteTransmitInterval != int(*nodeConfig.Spec.TransmitInterval) {
-		return fmt.Errorf("RemoteTransmitInterval: expecting %d, got %d", *nodeConfig.Spec.TransmitInterval, peerConfig.RemoteTransmitInterval)
+		return fmt.Errorf("remoteTransmitInterval: expecting %d, got %d", *nodeConfig.Spec.TransmitInterval, peerConfig.RemoteTransmitInterval)
 	}
 	if peerConfig.RemoteEchoReceiveInterval != int(*nodeConfig.Spec.EchoInterval) {
-		return fmt.Errorf("EchoInterval: expecting %d, got %d", *nodeConfig.Spec.EchoInterval, peerConfig.RemoteEchoReceiveInterval)
+		return fmt.Errorf("echoInterval: expecting %d, got %d", *nodeConfig.Spec.EchoInterval, peerConfig.RemoteEchoReceiveInterval)
 	}
 	return nil
 }
@@ -199,7 +199,7 @@ func checkServiceOnlyOnNodes(svc *corev1.Service, expectedNodes []corev1.Node, i
 						continue OUTER
 					}
 				}
-				return fmt.Errorf("UnexpectedIP found %s, nodes %s in container %s for service %s", n.String(), nodeIps, c.Name, ip)
+				return fmt.Errorf("unexpectedIP found %s, nodes %s in container %s for service %s", n.String(), nodeIps, c.Name, ip)
 			}
 			return err
 		}, time.Minute, time.Second).Should(Not(HaveOccurred()))
@@ -253,7 +253,7 @@ func checkCommunitiesOnlyOnNodes(svc *corev1.Service, community string, expected
 						continue OUTER
 					}
 				}
-				return fmt.Errorf("UnexpectedIP found %s, nodes %s in container %s for service %s", n.String(), nodeIps, c.Name, ip)
+				return fmt.Errorf("unexpectedIP found %s, nodes %s in container %s for service %s", n.String(), nodeIps, c.Name, ip)
 			}
 			return err
 		}, 10*time.Minute, time.Second).Should(Not(HaveOccurred()))
@@ -264,7 +264,7 @@ func nodesForSelection(nodes []corev1.Node, selected []int) []corev1.Node {
 	selectedNodes := []corev1.Node{}
 	for _, i := range selected {
 		if i >= len(nodes) {
-			ginkgo.Skip("Not enough nodes")
+			ginkgo.Skip("not enough nodes")
 		}
 		selectedNodes = append(selectedNodes, nodes[i])
 	}

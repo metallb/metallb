@@ -238,7 +238,7 @@ func infraTearDown(cs *clientset.Clientset, containers []*frrcontainer.FRR, next
 func multiHopSetUp(containers []*frrcontainer.FRR, nextHop nextHopSettings, cs *clientset.Clientset) error {
 	err := addContainerToNetwork(nextHop.nextHopContainerName, nextHop.multiHopNetwork)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to connect %s to %s", nextHop.nextHopContainerName, nextHop.multiHopNetwork)
+		return errors.Wrapf(err, "failed to connect %s to %s", nextHop.nextHopContainerName, nextHop.multiHopNetwork)
 	}
 
 	multiHopRoutes, err := container.Networks(nextHop.nextHopContainerName)
@@ -250,13 +250,13 @@ func multiHopSetUp(containers []*frrcontainer.FRR, nextHop nextHopSettings, cs *
 		if c.Network == nextHop.multiHopNetwork {
 			err = container.AddMultiHop(c, c.Network, nextHop.nodeNetwork, defaultRoutingTable, multiHopRoutes)
 			if err != nil {
-				return errors.Wrapf(err, "Failed to set up the multi-hop network for container %s", c.Name)
+				return errors.Wrapf(err, "failed to set up the multi-hop network for container %s", c.Name)
 			}
 		}
 	}
 	err = addMultiHopToNodes(cs, nextHop.nodeNetwork, nextHop.multiHopNetwork, nextHop.nodeRoutingTable, multiHopRoutes)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to set up the multi-hop network")
+		return errors.Wrapf(err, "failed to set up the multi-hop network")
 	}
 
 	return nil
@@ -270,7 +270,7 @@ func vrfSetup(cs *clientset.Clientset) error {
 	for _, pod := range speakerPods {
 		err := addContainerToNetwork(pod.Spec.NodeName, vrfNetwork)
 		if err != nil {
-			return errors.Wrapf(err, "Failed to connect %s to %s", pod.Spec.NodeName, vrfNetwork)
+			return errors.Wrapf(err, "failed to connect %s to %s", pod.Spec.NodeName, vrfNetwork)
 		}
 
 		err = container.SetupVRFForNetwork(pod.Spec.NodeName, vrfNetwork, vrfName, vrfNextHopSettings.nodeRoutingTable)
@@ -491,7 +491,7 @@ func vrfContainersConfig() map[string]frrcontainer.Config {
 func multiHopTearDown(nextHop nextHopSettings, routes map[string]container.NetworkSettings, cs *clientset.Clientset) error {
 	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "rm", nextHop.multiHopNetwork)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to remove %s: %s", nextHop.multiHopNetwork, out)
+		return errors.Wrapf(err, "failed to remove %s: %s", nextHop.multiHopNetwork, out)
 	}
 
 	speakerPods, err := metallb.SpeakerPods(cs)
@@ -502,7 +502,7 @@ func multiHopTearDown(nextHop nextHopSettings, routes map[string]container.Netwo
 		nodeExec := executor.ForContainer(pod.Spec.NodeName)
 		err = container.DeleteMultiHop(nodeExec, nextHop.nodeNetwork, nextHop.multiHopNetwork, nextHop.nodeRoutingTable, routes)
 		if err != nil {
-			return errors.Wrapf(err, "Failed to delete multihop routes for pod %s", pod.ObjectMeta.Name)
+			return errors.Wrapf(err, "failed to delete multihop routes for pod %s", pod.ObjectMeta.Name)
 		}
 	}
 
@@ -535,7 +535,7 @@ func addMultiHopToNodes(cs *clientset.Clientset, targetNetwork, multiHopNetwork 
 // The valid names are: ibgp-single-hop / ibgp-multi-hop / ebgp-single-hop / ebgp-multi-hop.
 func validateContainersNames(containerNames string) error {
 	if len(containerNames) == 0 {
-		return fmt.Errorf("Failed to validate containers names: got empty string")
+		return fmt.Errorf("failed to validate containers names: got empty string")
 	}
 	validNames := map[string]bool{
 		"ibgp-single-hop": true,
@@ -547,10 +547,10 @@ func validateContainersNames(containerNames string) error {
 	for _, n := range names {
 		v, ok := validNames[n]
 		if !ok {
-			return fmt.Errorf("Failed to validate container name: %s invalid name", n)
+			return fmt.Errorf("failed to validate container name: %s invalid name", n)
 		}
 		if !v {
-			return fmt.Errorf("Failed to validate container name: %s duplicate name", n)
+			return fmt.Errorf("failed to validate container name: %s duplicate name", n)
 		}
 		validNames[n] = false
 	}
@@ -585,7 +585,7 @@ func addContainerToNetwork(containerName, network string) error {
 		return nil
 	}
 	if err != nil {
-		return errors.Wrapf(err, "Failed to connect %s to %s: %s", containerName, network, out)
+		return errors.Wrapf(err, "failed to connect %s to %s: %s", containerName, network, out)
 	}
 	return nil
 }

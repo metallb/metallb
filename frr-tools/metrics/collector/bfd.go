@@ -159,11 +159,11 @@ func getBFDPeers(frrCli vtysh.Cli) (map[string][]bgpfrr.BFDPeer, error) {
 	}
 	res := make(map[string][]bgpfrr.BFDPeer)
 	for _, vrf := range vrfs {
-		peersJson, err := frrCli(fmt.Sprintf("show bfd vrf %s peers json", vrf))
+		peersJSON, err := frrCli(fmt.Sprintf("show bfd vrf %s peers json", vrf))
 		if err != nil {
 			return nil, err
 		}
-		peers, err := bgpfrr.ParseBFDPeers(peersJson)
+		peers, err := bgpfrr.ParseBFDPeers(peersJSON)
 		if err != nil {
 			return nil, err
 		}
@@ -180,13 +180,13 @@ func getBFDPeersCounters(frrCli vtysh.Cli) (map[string][]bfdPeerCounters, error)
 
 	res := make(map[string][]bfdPeerCounters)
 	for _, vrf := range vrfs {
-		countersJson, err := frrCli(fmt.Sprintf("show bfd vrf %s peers counters json", vrf))
+		countersJSON, err := frrCli(fmt.Sprintf("show bfd vrf %s peers counters json", vrf))
 		if err != nil {
 			return nil, err
 		}
 
 		parseRes := []bfdPeerCounters{}
-		err = json.Unmarshal([]byte(countersJson), &parseRes)
+		err = json.Unmarshal([]byte(countersJSON), &parseRes)
 		if err != nil {
 			return nil, err
 		}
