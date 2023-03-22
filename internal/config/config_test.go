@@ -1962,7 +1962,7 @@ func TestParse(t *testing.T) {
 				},
 				PasswordSecrets: map[string]corev1.Secret{
 					"bgpsecret": {Type: corev1.SecretTypeBasicAuth, ObjectMeta: v1.ObjectMeta{Name: "bgpsecret", Namespace: "metallb-system"},
-						Data: map[string][]byte{"password": []byte([]byte("nopass"))}},
+						Data: map[string][]byte{"password": []byte("nopass")}},
 				},
 			},
 			want: &Config{

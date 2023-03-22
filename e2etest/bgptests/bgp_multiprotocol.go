@@ -102,7 +102,7 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 				validateFRRPeeredWithAllNodes(cs, c, pairingFamily)
 			}
 			for _, c := range FRRContainers {
-				validateService(cs, svc, allNodes.Items, c)
+				validateService(svc, allNodes.Items, c)
 			}
 		},
 			ginkgo.Entry("DUALSTACK - via ipv4",
@@ -191,7 +191,7 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 				framework.ExpectNoError(err)
 
 				for _, c := range FRRContainers {
-					validateService(cs, svc, allNodes.Items, c)
+					validateService(svc, allNodes.Items, c)
 					for _, ip := range svc.Status.LoadBalancer.Ingress {
 						ingressIP := e2eservice.GetIngressPoint(&ip)
 						Eventually(func() error {
