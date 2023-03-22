@@ -174,7 +174,7 @@ func GetIfaceMac(iface string, exec executor.Executor) (net.HardwareAddr, error)
 
 	macRe := regexp.MustCompile("([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})")
 
-	res := strings.Split(string(out), "\n")
+	res := strings.Split(out, "\n")
 	for _, line := range res {
 		cur := strings.Split(line, " ")
 		if cur[0] == iface {

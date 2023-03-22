@@ -328,14 +328,14 @@ func reloadFRRConfig(configFile string, exec executor.Executor) error {
 	cmd := fmt.Sprintf("python3 /usr/lib/frr/frr-reload.py --test --stdout %s/%s", frrMountPath, configFile)
 	out, err := exec.Exec("sh", "-c", cmd)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to check configuration file. %s", string(out))
+		return errors.Wrapf(err, "Failed to check configuration file. %s", out)
 	}
 
 	// Applying the configuration file.
 	cmd = fmt.Sprintf("python3 /usr/lib/frr/frr-reload.py --reload --overwrite --stdout %s/%s", frrMountPath, configFile)
 	out, err = exec.Exec("sh", "-c", cmd)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to apply configuration file. %s", string(out))
+		return errors.Wrapf(err, "Failed to apply configuration file. %s", out)
 	}
 
 	return nil

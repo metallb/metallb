@@ -206,7 +206,7 @@ func TestSecretShouldntTrigger(t *testing.T) {
 
 	handlerCalled = false
 	err = fakeClient.Create(context.TODO(), &corev1.Secret{Type: corev1.SecretTypeBasicAuth, ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: testNamespace},
-		Data: map[string][]byte{"password": []byte([]byte("nopass"))}})
+		Data: map[string][]byte{"password": []byte("nopass")}})
 	if err != nil {
 		t.Fatalf("create failed on secret foo: %v", err)
 	}
@@ -396,7 +396,7 @@ var (
 		},
 		PasswordSecrets: map[string]corev1.Secret{
 			"bgpsecret": {Type: corev1.SecretTypeBasicAuth, ObjectMeta: metav1.ObjectMeta{Name: "bgpsecret", Namespace: testNamespace},
-				Data: map[string][]byte{"password": []byte([]byte("nopass"))}},
+				Data: map[string][]byte{"password": []byte("nopass")}},
 		},
 		LegacyAddressPools: []v1beta1.AddressPool{
 			{

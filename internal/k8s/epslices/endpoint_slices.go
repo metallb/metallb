@@ -56,7 +56,7 @@ func SlicesServiceIndex(obj interface{}) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	return []string{string(serviceKey.String())}, nil
+	return []string{serviceKey.String()}, nil
 }
 
 func serviceNameForSlice(endpointSlice *discovery.EndpointSlice) (string, error) {

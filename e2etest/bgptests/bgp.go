@@ -128,7 +128,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		validateDesiredLB(svc)
 
 		for _, c := range FRRContainers {
-			validateService(cs, svc, allNodes.Items, c)
+			validateService(svc, allNodes.Items, c)
 		}
 	},
 		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
@@ -165,7 +165,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		framework.ExpectNoError(err)
 
 		for _, c := range FRRContainers {
-			validateService(cs, svc, epNodes, c)
+			validateService(svc, epNodes, c)
 		}
 	},
 		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
@@ -247,8 +247,8 @@ var _ = ginkgo.Describe("BGP", func() {
 		validateDesiredLB(svc1)
 
 		for _, c := range FRRContainers {
-			validateService(cs, svc, allNodes.Items, c)
-			validateService(cs, svc1, allNodes.Items, c)
+			validateService(svc, allNodes.Items, c)
+			validateService(svc1, allNodes.Items, c)
 		}
 	},
 		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}),
@@ -295,7 +295,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 
 			for _, c := range FRRContainers {
-				validateService(cs, svc, allNodes.Items, c)
+				validateService(svc, allNodes.Items, c)
 			}
 		},
 			ginkgo.Entry("IPV4 - test AddressPool defined by address range", []metallbv1beta1.IPAddressPool{
@@ -458,7 +458,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 
 			for _, c := range FRRContainers {
-				validateService(cs, svc, allNodes.Items, c)
+				validateService(svc, allNodes.Items, c)
 			}
 
 			Eventually(func() error {
@@ -624,7 +624,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 					ginkgo.By(fmt.Sprintf("checking connectivity of service %d to its external VIP", j+1))
 					for _, c := range FRRContainers {
-						validateService(cs, svc, allNodes.Items, c)
+						validateService(svc, allNodes.Items, c)
 					}
 				}
 			}
@@ -740,9 +740,9 @@ var _ = ginkgo.Describe("BGP", func() {
 				framework.ExpectNoError(err)
 
 				for _, c := range FRRContainers {
-					validateService(cs, svcAdvertisement, allNodes.Items, c)
-					validateService(cs, svcAdvertisement1, allNodes.Items, c)
-					validateService(cs, svcNoAdvertisement, allNodes.Items, c)
+					validateService(svcAdvertisement, allNodes.Items, c)
+					validateService(svcAdvertisement1, allNodes.Items, c)
+					validateService(svcNoAdvertisement, allNodes.Items, c)
 					Eventually(func() error {
 						for _, community := range advertisement.Spec.Communities {
 							// Get community value for test cases with Community CRD.
@@ -1210,7 +1210,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		ginkgo.By("Checking the service is reacheable via BGP")
 		for _, c := range FRRContainers {
-			validateService(cs, svc, allNodes.Items, c)
+			validateService(svc, allNodes.Items, c)
 		}
 
 		checkServiceL2 := func() error {
@@ -1245,7 +1245,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		ginkgo.By("Checking the service is still reacheable via BGP")
 		for _, c := range FRRContainers {
-			validateService(cs, svc, allNodes.Items, c)
+			validateService(svc, allNodes.Items, c)
 		}
 
 		ginkgo.By("Deleting the l2 advertisement")
