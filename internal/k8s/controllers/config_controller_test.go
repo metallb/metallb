@@ -227,17 +227,17 @@ func TestNodeEvent(t *testing.T) {
 		Scheme:                scheme,
 	}
 	cfg, err := testEnv.Start()
-	g.Expect(err).To(BeNil())
+	g.Expect(err).ToNot(HaveOccurred())
 	defer func() {
 		err = testEnv.Stop()
-		g.Expect(err).To(BeNil())
+		g.Expect(err).ToNot(HaveOccurred())
 	}()
 	err = v1beta1.AddToScheme(k8sscheme.Scheme)
-	g.Expect(err).To(BeNil())
+	g.Expect(err).ToNot(HaveOccurred())
 	err = v1beta2.AddToScheme(k8sscheme.Scheme)
-	g.Expect(err).To(BeNil())
+	g.Expect(err).ToNot(HaveOccurred())
 	m, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0"})
-	g.Expect(err).To(BeNil())
+	g.Expect(err).ToNot(HaveOccurred())
 
 	var configUpdate int
 	var mutex sync.Mutex
@@ -259,11 +259,11 @@ func TestNodeEvent(t *testing.T) {
 		ValidateConfig: config.DontValidate,
 	}
 	err = r.SetupWithManager(m)
-	g.Expect(err).To(BeNil())
+	g.Expect(err).ToNot(HaveOccurred())
 	ctx := context.Background()
 	go func() {
 		err = m.Start(ctx)
-		g.Expect(err).To(BeNil())
+		g.Expect(err).ToNot(HaveOccurred())
 	}()
 
 	// count for update on namespace events
@@ -286,7 +286,7 @@ func TestNodeEvent(t *testing.T) {
 	node.Labels = make(map[string]string)
 	node.Labels["test"] = "e2e"
 	err = m.GetClient().Create(ctx, node)
-	g.Expect(err).To(BeNil())
+	g.Expect(err).ToNot(HaveOccurred())
 	g.Eventually(func() int {
 		mutex.Lock()
 		defer mutex.Unlock()

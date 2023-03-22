@@ -3,6 +3,7 @@ linters:
   - godot
   - goimports
   - gofmt
+  - ginkgolinter
 linters-settings:
   errcheck:
     exclude: .golangci.exclude
