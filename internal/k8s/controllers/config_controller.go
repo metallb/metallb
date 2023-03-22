@@ -170,7 +170,7 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 		// which is not what we want here.
 		r.currentConfig = nil
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, retry")
-		return ctrl.Result{}, retryError
+		return ctrl.Result{}, errRetry
 	case SyncStateReprocessAll:
 		level.Info(r.Logger).Log("controller", "ConfigReconciler", "event", "force service reload")
 		r.ForceReload()

@@ -32,7 +32,6 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/mac"
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
-	"go.universe.tf/metallb/e2etest/pkg/service"
 	metallbconfig "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/pointer"
 
@@ -227,19 +226,19 @@ var _ = ginkgo.Describe("BGP", func() {
 		framework.ExpectNoError(err)
 
 		svc, _ := testservice.CreateWithBackendPort(cs, f.Namespace.Name, "first-service",
-			service.TestServicePort,
+			testservice.TestServicePort,
 			func(svc *corev1.Service) {
 				svc.Spec.LoadBalancerIP = serviceIP
 				svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
-				svc.Spec.Ports[0].Port = int32(service.TestServicePort)
+				svc.Spec.Ports[0].Port = int32(testservice.TestServicePort)
 			})
 		defer testservice.Delete(cs, svc)
 		svc1, _ := testservice.CreateWithBackendPort(cs, f.Namespace.Name, "second-service",
-			service.TestServicePort+1,
+			testservice.TestServicePort+1,
 			func(svc *corev1.Service) {
 				svc.Spec.LoadBalancerIP = serviceIP
 				svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
-				svc.Spec.Ports[0].Port = int32(service.TestServicePort + 1)
+				svc.Spec.Ports[0].Port = int32(testservice.TestServicePort + 1)
 			})
 		defer testservice.Delete(cs, svc1)
 
@@ -1030,7 +1029,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 					for _, route := range routes {
 						if route.Destination.String() == toInject {
-							return fmt.Errorf("Found %s in %s routes", toInject, pod.Name)
+							return fmt.Errorf("found %s in %s routes", toInject, pod.Name)
 						}
 					}
 				}

@@ -281,7 +281,7 @@ func (s *session) connect() error {
 	return nil
 }
 
-func hashRouterId(hostname string) (net.IP, error) {
+func hashRouterID(hostname string) (net.IP, error) {
 	buf := new(bytes.Buffer)
 	err := binary.Write(buf, binary.LittleEndian, crc32.ChecksumIEEE([]byte(hostname)))
 	if err != nil {
@@ -299,7 +299,7 @@ func getRouterID(addr net.IP, myNode string) (net.IP, error) {
 
 	ifaces, err := net.Interfaces()
 	if err != nil {
-		return hashRouterId(myNode)
+		return hashRouterID(myNode)
 	}
 	for _, i := range ifaces {
 		addrs, err := i.Addrs()
@@ -330,11 +330,11 @@ func getRouterID(addr net.IP, myNode string) (net.IP, error) {
 						return ip, nil
 					}
 				}
-				return hashRouterId(myNode)
+				return hashRouterID(myNode)
 			}
 		}
 	}
-	return hashRouterId(myNode)
+	return hashRouterID(myNode)
 }
 
 // sendKeepalives sends BGP KEEPALIVE packets at the negotiated rate
@@ -508,11 +508,11 @@ func dialMD5(ctx context.Context, addr string, srcAddr net.IP, password string) 
 	if srcAddr != nil {
 		ifs, err := net.Interfaces()
 		if err != nil {
-			return nil, fmt.Errorf("Querying local interfaces: %w", err)
+			return nil, fmt.Errorf("querying local interfaces: %w", err)
 		}
 
 		if !localAddressExists(ifs, srcAddr) {
-			return nil, fmt.Errorf("Address %q doesn't exist on this host", srcAddr)
+			return nil, fmt.Errorf("address %q doesn't exist on this host", srcAddr)
 		}
 
 		a = fmt.Sprintf("[%s]", srcAddr.String())
@@ -520,7 +520,7 @@ func dialMD5(ctx context.Context, addr string, srcAddr net.IP, password string) 
 
 	laddr, err := net.ResolveTCPAddr("tcp", fmt.Sprintf("%s:0", a))
 	if err != nil {
-		return nil, fmt.Errorf("Error resolving local address: %s ", err)
+		return nil, fmt.Errorf("error resolving local address: %s ", err)
 	}
 
 	raddr, err := net.ResolveTCPAddr("tcp", addr)

@@ -23,7 +23,6 @@ import (
 	"github.com/go-kit/log/level"
 
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -38,7 +37,7 @@ type NodeReconciler struct {
 	Scheme    *runtime.Scheme
 	NodeName  string
 	Namespace string
-	Handler   func(log.Logger, *v1.Node) SyncState
+	Handler   func(log.Logger, *corev1.Node) SyncState
 }
 
 func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -46,7 +45,7 @@ func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	defer level.Info(r.Logger).Log("controller", "NodeReconciler", "end reconcile", req.NamespacedName.String())
 	updates.Inc()
 
-	var n v1.Node
+	var n corev1.Node
 	err := r.Get(ctx, req.NamespacedName, &n)
 	if err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
@@ -56,7 +55,7 @@ func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	switch res {
 	case SyncStateError:
 		updateErrors.Inc()
-		return ctrl.Result{}, retryError
+		return ctrl.Result{}, errRetry
 	case SyncStateReprocessAll:
 		level.Error(r.Logger).Log("controller", "NodeReconciler", "error", "unexpected result reprocess all")
 		return ctrl.Result{}, nil
@@ -97,13 +96,13 @@ func (r *NodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		},
 	}
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&v1.Node{}).
+		For(&corev1.Node{}).
 		WithEventFilter(p).
 		Complete(r)
 }
 
 func (r *NodeReconciler) filterOtherNodes(obj client.Object) bool {
-	node, ok := obj.(*v1.Node)
+	node, ok := obj.(*corev1.Node)
 	if !ok {
 		level.Error(r.Logger).Log("controller", "NodeReconciler", "error", "object is not node", "name", obj.GetName())
 		return false

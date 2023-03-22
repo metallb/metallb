@@ -371,7 +371,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 			ginkgo.By("Deleting the profile used by BGPPeer")
 			err = ConfigUpdater.Client().Delete(context.TODO(), &testBFDProfile, &client.DeleteOptions{})
 			framework.ExpectError(err)
-			Expect(err.Error()).To(ContainSubstring("Failed to delete BFDProfile"))
+			Expect(err.Error()).To(ContainSubstring("failed to delete BFDProfile"))
 
 			ginkgo.By("Deleting the BGPPeer")
 			err = ConfigUpdater.Client().Delete(context.TODO(), &testPeer, &client.DeleteOptions{})

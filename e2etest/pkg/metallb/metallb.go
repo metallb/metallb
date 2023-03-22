@@ -34,10 +34,10 @@ func SpeakerPods(cs clientset.Interface) ([]*corev1.Pod, error) {
 		LabelSelector: speakerLabelgSelector,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to fetch speaker pods")
+		return nil, errors.Wrap(err, "failed to fetch speaker pods")
 	}
 	if len(speakers.Items) == 0 {
-		return nil, errors.New("No speaker pods found")
+		return nil, errors.New("no speaker pods found")
 	}
 	speakerPods := make([]*corev1.Pod, 0)
 	for _, item := range speakers.Items {
@@ -53,10 +53,10 @@ func ControllerPod(cs clientset.Interface) (*corev1.Pod, error) {
 		LabelSelector: ControllerLabelSelector,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to fetch controller pods")
+		return nil, errors.Wrap(err, "failed to fetch controller pods")
 	}
 	if len(pods.Items) != 1 {
-		return nil, fmt.Errorf("Expected one controller pod, found %d", len(pods.Items))
+		return nil, fmt.Errorf("expected one controller pod, found %d", len(pods.Items))
 	}
 	return &pods.Items[0], nil
 }

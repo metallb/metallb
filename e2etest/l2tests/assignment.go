@@ -15,8 +15,6 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/service"
 	internalconfig "go.universe.tf/metallb/internal/config"
 
-	testservice "go.universe.tf/metallb/e2etest/pkg/service"
-	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -83,7 +81,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			})
 			framework.ExpectNoError(err)
 			defer func() {
-				testservice.Delete(cs, svc1)
+				service.Delete(cs, svc1)
 			}()
 
 			gomega.Consistently(func() int {
@@ -164,13 +162,13 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			err := ConfigUpdater.Update(resources)
 			framework.ExpectNoError(err)
 
-			svc1, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-pool-1")
-			svc2, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-pool-2")
-			svc3, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-pool-3")
+			svc1, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-pool-1")
+			svc2, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-pool-2")
+			svc3, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-pool-3")
 			defer func() {
-				testservice.Delete(cs, svc1)
-				testservice.Delete(cs, svc2)
-				testservice.Delete(cs, svc3)
+				service.Delete(cs, svc1)
+				service.Delete(cs, svc2)
+				service.Delete(cs, svc3)
 			}()
 
 			// The createWithBackend method always wait for service to acquire an ingress IP, so
@@ -232,13 +230,13 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			err = ConfigUpdater.Update(resources)
 			framework.ExpectNoError(err)
 
-			svc1, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-label-pool-1")
-			svc2, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-label-pool-2")
-			svc3, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-label-pool-3")
+			svc1, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-label-pool-1")
+			svc2, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-label-pool-2")
+			svc3, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-label-pool-3")
 			defer func() {
-				testservice.Delete(cs, svc1)
-				testservice.Delete(cs, svc2)
-				testservice.Delete(cs, svc3)
+				service.Delete(cs, svc1)
+				service.Delete(cs, svc2)
+				service.Delete(cs, svc3)
 			}()
 
 			// The createWithBackend method always wait for service to acquire an ingress IP, so
@@ -295,19 +293,19 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			err := ConfigUpdater.Update(resources)
 			framework.ExpectNoError(err)
 
-			svcTweakWithLabel := func(svc *corev1.Service) {
+			svcTweakWithLabel := func(svc *v1.Service) {
 				if svc.Labels == nil {
 					svc.Labels = make(map[string]string)
 				}
 				svc.Labels["test"] = "e2e"
 			}
-			svc1, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "svc-test-svc-label-pool-1", svcTweakWithLabel)
-			svc2, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "svc-test-svc-label-pool-2", svcTweakWithLabel)
-			svc3, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "svc-test-svc-label-pool-3", svcTweakWithLabel)
+			svc1, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-svc-label-pool-1", svcTweakWithLabel)
+			svc2, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-svc-label-pool-2", svcTweakWithLabel)
+			svc3, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-svc-label-pool-3", svcTweakWithLabel)
 			defer func() {
-				testservice.Delete(cs, svc1)
-				testservice.Delete(cs, svc2)
-				testservice.Delete(cs, svc3)
+				service.Delete(cs, svc1)
+				service.Delete(cs, svc2)
+				service.Delete(cs, svc3)
 			}()
 
 			// The createWithBackend method always wait for service to acquire an ingress IP, so
@@ -363,19 +361,19 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			err := ConfigUpdater.Update(resources)
 			framework.ExpectNoError(err)
 
-			svcTweakWithLabel := func(svc *corev1.Service) {
+			svcTweakWithLabel := func(svc *v1.Service) {
 				if svc.Labels == nil {
 					svc.Labels = make(map[string]string)
 				}
 				svc.Labels["test"] = "e2e"
 			}
-			svc1, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "svc-ns-svc-label-pool-1", svcTweakWithLabel)
-			svc2, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "svc-ns-svc-label-pool-2", svcTweakWithLabel)
-			svc3, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "svc-ns-svc-label-pool-3", svcTweakWithLabel)
+			svc1, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-ns-svc-label-pool-1", svcTweakWithLabel)
+			svc2, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-ns-svc-label-pool-2", svcTweakWithLabel)
+			svc3, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-ns-svc-label-pool-3", svcTweakWithLabel)
 			defer func() {
-				testservice.Delete(cs, svc1)
-				testservice.Delete(cs, svc2)
-				testservice.Delete(cs, svc3)
+				service.Delete(cs, svc1)
+				service.Delete(cs, svc2)
+				service.Delete(cs, svc3)
 			}()
 
 			// The createWithBackend method always wait for service to acquire an ingress IP, so

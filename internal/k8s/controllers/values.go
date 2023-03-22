@@ -29,4 +29,4 @@ const (
 	EndpointSlices
 )
 
-var retryError = errors.New("event handling failed, retrying")
+var errRetry = errors.New("event handling failed, retrying")

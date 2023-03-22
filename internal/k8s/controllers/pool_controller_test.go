@@ -24,7 +24,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1beta1 "go.universe.tf/metallb/api/v1beta1"
-	"go.universe.tf/metallb/internal/config"
 	metallbcfg "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/pointer"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -90,14 +89,14 @@ func TestPoolController(t *testing.T) {
 			t.Fatalf("test %s failed to create fake client: %v", test.desc, err)
 		}
 
-		expectedCfg, err := config.For(resources, config.DontValidate)
+		expectedCfg, err := metallbcfg.For(resources, metallbcfg.DontValidate)
 		if err != nil && test.validResources {
 			t.Fatalf("test %s failed to create config, got unexpected error: %v", test.desc, err)
 		}
 
 		cmpOpt := cmpopts.IgnoreUnexported(metallbcfg.Pool{})
 
-		mockHandler := func(l log.Logger, pools *config.Pools) SyncState {
+		mockHandler := func(l log.Logger, pools *metallbcfg.Pools) SyncState {
 			if !cmp.Equal(expectedCfg.Pools, pools, cmpOpt) {
 				t.Errorf("test %s failed, handler called with unexpected config: %s", test.desc, cmp.Diff(expectedCfg.Pools, pools, cmpOpt))
 			}
@@ -112,7 +111,7 @@ func TestPoolController(t *testing.T) {
 			Logger:         log.NewNopLogger(),
 			Scheme:         scheme,
 			Namespace:      testNamespace,
-			ValidateConfig: config.DontValidate,
+			ValidateConfig: metallbcfg.DontValidate,
 			Handler:        mockHandler,
 			ForceReload:    mockForceReload,
 		}

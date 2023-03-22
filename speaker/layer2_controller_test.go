@@ -1160,14 +1160,14 @@ func TestShouldAnnounce(t *testing.T) {
 
 		for _, svc := range test.svcs {
 			lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
-			lbIP_s := lbIP.String()
-			response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "balancer", []net.IP{lbIP}, test.config.Pools.ByName["default"], svc, test.eps[lbIP_s])
-			response2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "balancer", []net.IP{lbIP}, test.config.Pools.ByName["default"], svc, test.eps[lbIP_s])
-			if response1 != test.c1ExpectedResult[lbIP_s] {
-				t.Errorf("%q: shouldAnnounce for controller 1 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIP_s, test.c1ExpectedResult[lbIP_s], response1)
+			lbIPStr := lbIP.String()
+			response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "balancer", []net.IP{lbIP}, test.config.Pools.ByName["default"], svc, test.eps[lbIPStr])
+			response2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "balancer", []net.IP{lbIP}, test.config.Pools.ByName["default"], svc, test.eps[lbIPStr])
+			if response1 != test.c1ExpectedResult[lbIPStr] {
+				t.Errorf("%q: shouldAnnounce for controller 1 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIPStr, test.c1ExpectedResult[lbIPStr], response1)
 			}
-			if response2 != test.c2ExpectedResult[lbIP_s] {
-				t.Errorf("%q: shouldAnnounce for controller 2 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIP_s, test.c2ExpectedResult[lbIP_s], response2)
+			if response2 != test.c2ExpectedResult[lbIPStr] {
+				t.Errorf("%q: shouldAnnounce for controller 2 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIPStr, test.c2ExpectedResult[lbIPStr], response2)
 			}
 		}
 	}
@@ -2095,14 +2095,14 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 
 		for _, svc := range test.svcs {
 			lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
-			lbIP_s := lbIP.String()
-			response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, test.config.Pools.ByName["default"], svc, test.eps[lbIP_s])
-			response2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, test.config.Pools.ByName["default"], svc, test.eps[lbIP_s])
-			if response1 != test.c1ExpectedResult[lbIP_s] {
-				t.Errorf("%q: shouldAnnounce for controller 1 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIP_s, test.c1ExpectedResult[lbIP_s], response1)
+			lbIPStr := lbIP.String()
+			response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, test.config.Pools.ByName["default"], svc, test.eps[lbIPStr])
+			response2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, test.config.Pools.ByName["default"], svc, test.eps[lbIPStr])
+			if response1 != test.c1ExpectedResult[lbIPStr] {
+				t.Errorf("%q: shouldAnnounce for controller 1 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIPStr, test.c1ExpectedResult[lbIPStr], response1)
 			}
-			if response2 != test.c2ExpectedResult[lbIP_s] {
-				t.Errorf("%q: shouldAnnounce for controller 2 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIP_s, test.c2ExpectedResult[lbIP_s], response2)
+			if response2 != test.c2ExpectedResult[lbIPStr] {
+				t.Errorf("%q: shouldAnnounce for controller 2 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIPStr, test.c2ExpectedResult[lbIPStr], response2)
 			}
 		}
 	}
@@ -2332,14 +2332,14 @@ func TestShouldAnnounceNodeSelector(t *testing.T) {
 		}
 
 		lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
-		lbIP_s := lbIP.String()
-		response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], &svc, test.eps[lbIP_s])
-		response2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], &svc, test.eps[lbIP_s])
-		if response1 != test.c1ExpectedResult[lbIP_s] {
-			t.Errorf("%q: shouldAnnounce for controller 1 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIP_s, test.c1ExpectedResult[lbIP_s], response1)
+		lbIPStr := lbIP.String()
+		response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], &svc, test.eps[lbIPStr])
+		response2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], &svc, test.eps[lbIPStr])
+		if response1 != test.c1ExpectedResult[lbIPStr] {
+			t.Errorf("%q: shouldAnnounce for controller 1 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIPStr, test.c1ExpectedResult[lbIPStr], response1)
 		}
-		if response2 != test.c2ExpectedResult[lbIP_s] {
-			t.Errorf("%q: shouldAnnounce for controller 2 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIP_s, test.c2ExpectedResult[lbIP_s], response2)
+		if response2 != test.c2ExpectedResult[lbIPStr] {
+			t.Errorf("%q: shouldAnnounce for controller 2 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIPStr, test.c2ExpectedResult[lbIPStr], response2)
 		}
 	}
 }

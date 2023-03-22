@@ -19,9 +19,9 @@ linters:
   #- misspell             #style - fixes required
   #- nakedret             #style - fixes required
   #- nolintlint
-  #- stylecheck           #style - fixes required
-  - unconvert            #style - fixes required
-  - unparam # still 1 fix
+  - stylecheck
+  - unconvert
+  - unparam              # still 1 fix
   - whitespace
 linters-settings:
   errcheck:
@@ -42,8 +42,16 @@ linters-settings:
     min-occurrences: 2
   misspell:
     locale: US
-  # lll:
-  #   line-length: 140
-  # funlen: 
-  #   lines: 100
-  #   statements: 50
+  stylecheck:
+    dot-import-whitelist:
+    - github.com/onsi/ginkgo
+    - github.com/onsi/gomega
+  gocritic:
+    disabled-checks:
+      - captLocal
+      - exitAfterDefer
+issues:
+  exclude-rules:
+    - path: '/api'
+    linters:
+      - stylecheck

@@ -112,7 +112,7 @@ func readConfig(origin string) ([]byte, error) {
 	fp := filepath.Join(inputDirPath, origin)
 	fp = filepath.Clean(fp)
 	if !strings.HasPrefix(fp, path.Clean(inputDirPath)) {
-		return nil, fmt.Errorf("Unsafe path %s", origin)
+		return nil, fmt.Errorf("unsafe path %s", origin)
 	}
 	f, err := os.Open(filepath.Clean(fp)) // Clean have to happen here to avoid https://github.com/securego/gosec/issues/893
 	if err != nil {
@@ -163,7 +163,7 @@ func getConfigMapData(raw []byte) ([]byte, error) {
 
 	data := []byte(cm.Data["config"])
 	if len(data) == 0 {
-		return nil, fmt.Errorf("bad ConfigMap. no data.")
+		return nil, fmt.Errorf("bad ConfigMap: no data")
 	}
 
 	return data, nil

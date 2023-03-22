@@ -31,7 +31,6 @@ import (
 	"github.com/go-kit/log/level"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -348,7 +347,7 @@ func (c *Client) CreateMlSecret(namespace, controllerDeploymentName, secretName 
 	// Create the K8S Secret object.
 	_, err = c.client.CoreV1().Secrets(namespace).Create(
 		context.TODO(),
-		&v1.Secret{
+		&corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: secretName,
 				OwnerReferences: []metav1.OwnerReference{{
@@ -397,19 +396,19 @@ func (c *Client) Run(stopCh <-chan struct{}) error {
 
 // UpdateStatus writes the protected "status" field of svc back into
 // the Kubernetes cluster.
-func (c *Client) UpdateStatus(svc *v1.Service) error {
+func (c *Client) UpdateStatus(svc *corev1.Service) error {
 	_, err := c.client.CoreV1().Services(svc.Namespace).UpdateStatus(context.TODO(), svc, metav1.UpdateOptions{})
 	return err
 }
 
 // Infof logs an informational event about svc to the Kubernetes cluster.
-func (c *Client) Infof(svc *v1.Service, kind, msg string, args ...interface{}) {
-	c.events.Eventf(svc, v1.EventTypeNormal, kind, msg, args...)
+func (c *Client) Infof(svc *corev1.Service, kind, msg string, args ...interface{}) {
+	c.events.Eventf(svc, corev1.EventTypeNormal, kind, msg, args...)
 }
 
 // Errorf logs an error event about svc to the Kubernetes cluster.
-func (c *Client) Errorf(svc *v1.Service, kind, msg string, args ...interface{}) {
-	c.events.Eventf(svc, v1.EventTypeWarning, kind, msg, args...)
+func (c *Client) Errorf(svc *corev1.Service, kind, msg string, args ...interface{}) {
+	c.events.Eventf(svc, corev1.EventTypeWarning, kind, msg, args...)
 }
 
 // UseEndpointSlices detect if Endpoints Slices are enabled in the cluster.

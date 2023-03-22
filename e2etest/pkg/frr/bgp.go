@@ -111,8 +111,8 @@ func RoutesForCommunity(exec executor.Executor, community string, family ipfamil
 
 // NeighborConnected tells if the neighbor in the given
 // json format is connected.
-func NeighborConnected(neighborJson string) (bool, error) {
-	n, err := bgpfrr.ParseNeighbour(neighborJson)
+func NeighborConnected(neighborJSON string) (bool, error) {
+	n, err := bgpfrr.ParseNeighbour(neighborJSON)
 	if err != nil {
 		return false, err
 	}

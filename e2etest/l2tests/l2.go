@@ -398,7 +398,7 @@ var _ = ginkgo.Describe("L2", func() {
 				return errors.New("service2 not announced")
 			}
 			if service1Announce != service2Announce {
-				return fmt.Errorf("Service announced from different nodes %s %s", service1Announce, service2Announce)
+				return fmt.Errorf("service announced from different nodes %s %s", service1Announce, service2Announce)
 			}
 			return nil
 		}, 2*time.Minute, 1*time.Second).Should(gomega.BeNil())

@@ -90,7 +90,7 @@ func (r *ServiceReconciler) reconcileService(ctx context.Context, req ctrl.Reque
 	case SyncStateError:
 		updateErrors.Inc()
 		level.Info(r.Logger).Log("controller", "ServiceReconciler", "name", req.NamespacedName.String(), "service", dumpResource(service), "endpoints", dumpResource(epSlices), "event", "failed to handle service")
-		return ctrl.Result{}, retryError
+		return ctrl.Result{}, errRetry
 	case SyncStateReprocessAll:
 		level.Info(r.Logger).Log("controller", "ServiceReconciler", "event", "force service reload")
 		r.forceReload()

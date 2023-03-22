@@ -30,7 +30,6 @@ import (
 	v1beta1 "go.universe.tf/metallb/api/v1beta1"
 	v1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/config"
-	metallbcfg "go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -87,7 +86,7 @@ func TestConfigController(t *testing.T) {
 		},
 	}
 	for _, test := range tests {
-		var resources metallbcfg.ClusterResources
+		var resources config.ClusterResources
 		if test.validResources {
 			resources = configControllerValidResources
 		} else {
@@ -105,7 +104,7 @@ func TestConfigController(t *testing.T) {
 			t.Fatalf("test %s failed to create config, got unexpected error: %v", test.desc, err)
 		}
 
-		cmpOpt := cmpopts.IgnoreUnexported(metallbcfg.Pool{})
+		cmpOpt := cmpopts.IgnoreUnexported(config.Pool{})
 
 		mockHandler := func(l log.Logger, cfg *config.Config) SyncState {
 			if !cmp.Equal(expectedCfg, cfg, cmpOpt) {
@@ -339,7 +338,7 @@ func TestNodeEvent(t *testing.T) {
 var (
 	testNamespace                  = "test-controller"
 	scheme                         = runtime.NewScheme()
-	configControllerValidResources = metallbcfg.ClusterResources{
+	configControllerValidResources = config.ClusterResources{
 		Peers: []v1beta2.BGPPeer{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -429,7 +428,7 @@ var (
 			},
 		},
 	}
-	configControllerInvalidResources = metallbcfg.ClusterResources{
+	configControllerInvalidResources = config.ClusterResources{
 		Peers: []v1beta2.BGPPeer{
 			{
 				ObjectMeta: metav1.ObjectMeta{

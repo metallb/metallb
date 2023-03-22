@@ -72,7 +72,7 @@ func SetupVRFForNetwork(containerName, vrfNetwork, vrfName, vrfRoutingTable stri
 	}
 	r, ok := containerNetworks[vrfNetwork]
 	if !ok {
-		return fmt.Errorf("Network %s not found in container %s", vrfNetwork, containerName)
+		return fmt.Errorf("network %s not found in container %s", vrfNetwork, containerName)
 	}
 	exec := executor.ForContainer(containerName)
 	// Get the interface beloning to the given network
