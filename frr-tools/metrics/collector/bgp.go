@@ -179,7 +179,6 @@ func getBGPNeighbors(frrCli vtysh.Cli) (map[string][]*bgpfrr.Neighbor, error) {
 			return nil, err
 		}
 		neighbors[vrf] = neighborsPerVRF
-
 	}
 	return neighbors, nil
 }

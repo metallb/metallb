@@ -75,7 +75,6 @@ func validateServiceNoWait(cs clientset.Interface, svc *corev1.Service, nodes []
 		framework.ExpectNotEqual(ip1.To4(), ip2.To4())
 	}
 	for _, ip := range svc.Status.LoadBalancer.Ingress {
-
 		ingressIP := e2eservice.GetIngressPoint(&ip)
 
 		// TODO: in case of VRF there's currently no host wiring to the service.

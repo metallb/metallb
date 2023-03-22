@@ -79,7 +79,6 @@ func objectsFromResources(r config.ClusterResources) []client.Object {
 
 	for _, bgpAdv := range r.BGPAdvs {
 		objects = append(objects, bgpAdv.DeepCopy())
-
 	}
 
 	for _, l2Adv := range r.L2Advs {

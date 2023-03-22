@@ -31,7 +31,6 @@ func testOsHostname() (string, error) {
 }
 
 func testCompareFiles(t *testing.T, configFile, goldenFile string) {
-
 	var lastError error
 
 	// Try comparing files multiple times because tests can generate more than one configuration

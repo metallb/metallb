@@ -484,6 +484,5 @@ func TestCollect(t *testing.T) {
 				t.Errorf("expected no error but got %s", err)
 			}
 		})
-
 	}
 }

@@ -102,7 +102,6 @@ func ValidateGaugeValueCompare(check func(int) error, metricName string, labels 
 		return fmt.Errorf("metric %s not found", metricName)
 	}
 	return nil
-
 }
 
 // ValidateCounterValue checks that the value related to the given metric is at most the expectedMax value.
