@@ -4,6 +4,23 @@ linters:
   - goimports
   - gofmt
   - ginkgolinter
+  #- dogsled              #style
+  #- dupl                 #style - fixes required
+  #- exportloopref        #bugs
+  #- exhaustive           #bugs  - fixes required
+  #- funlen               #style - fixes required
+  #- goconst              #stye  - fixes required
+  #- gocritic             #style - fixes required
+  #- gomnd                #style - fixes required
+  #- gosec                #bugs  - fixes required
+  #- lll                  #style - fixes required
+  #- misspell             #style - fixes required
+  #- nakedret             #style - fixes required
+  #- nolintlint
+  #- stylecheck           #style - fixes required
+  #- unconvert            #style - fixes required
+  #- unparam
+  - whitespace
 linters-settings:
   errcheck:
     exclude: .golangci.exclude
@@ -13,3 +30,18 @@ linters-settings:
     exclude:
     - 'SPDX-License-Identifier.*'
     - '\+groupName.*'
+  exhaustive:
+    ignore-enum-types: "syscall.Errno.+"
+    check:
+      - switch
+      - map
+  goconst:
+    min-len: 2
+    min-occurrences: 2
+  misspell:
+    locale: US
+  # lll:
+  #   line-length: 140
+  # funlen: 
+  #   lines: 100
+  #   statements: 50

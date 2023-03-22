@@ -334,7 +334,6 @@ func TestNodeEvent(t *testing.T) {
 		defer mutex.Unlock()
 		return configUpdate
 	}, 5*time.Second, 200*time.Millisecond).Should(Equal(initialConfigUpdateCount + 2))
-
 }
 
 var (

@@ -53,7 +53,6 @@ var (
 )
 
 func init() {
-
 	if ip := os.Getenv("PROVISIONING_HOST_EXTERNAL_IPV4"); len(ip) != 0 {
 		hostIPv4 = ip
 	}
@@ -505,7 +504,6 @@ func multiHopTearDown(nextHop nextHopSettings, routes map[string]container.Netwo
 		if err != nil {
 			return errors.Wrapf(err, "Failed to delete multihop routes for pod %s", pod.ObjectMeta.Name)
 		}
-
 	}
 
 	return nil

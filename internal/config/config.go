@@ -1172,10 +1172,8 @@ OUTER:
 				continue OUTER
 			}
 		}
-
 	}
 	return res, nil
-
 }
 
 func selectedPools(pools []metallbv1beta1.IPAddressPool, selectors []metav1.LabelSelector) ([]string, error) {
