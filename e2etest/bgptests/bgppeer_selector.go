@@ -145,12 +145,12 @@ var _ = ginkgo.Describe("BGP Peer Selector", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By(fmt.Sprintf("checking connectivity of service 1 to external frr container %s", frrContainerForAdv1.Name))
-			validateService(cs, svcAdvertisement1, allNodes.Items, frrContainerForAdv1)
+			validateService(svcAdvertisement1, allNodes.Items, frrContainerForAdv1)
 			ginkgo.By("checking service 1 not advertised to other frr containers")
 			validateServiceNotAdvertised(svcAdvertisement1, FRRContainers, frrContainerForAdv1.Name, ipFamily)
 
 			ginkgo.By(fmt.Sprintf("checking connectivity of service 2 to external frr container %s", frrContainerForAdv2.Name))
-			validateService(cs, svcAdvertisement2, allNodes.Items, frrContainerForAdv2)
+			validateService(svcAdvertisement2, allNodes.Items, frrContainerForAdv2)
 			ginkgo.By("checking service 2 not advertised to other frr containers")
 			validateServiceNotAdvertised(svcAdvertisement2, FRRContainers, frrContainerForAdv2.Name, ipFamily)
 
@@ -162,12 +162,12 @@ var _ = ginkgo.Describe("BGP Peer Selector", func() {
 
 			for _, c := range FRRContainers {
 				ginkgo.By(fmt.Sprintf("checking connectivity of service 1 to external frr container %s", c.Name))
-				validateService(cs, svcAdvertisement1, allNodes.Items, c)
+				validateService(svcAdvertisement1, allNodes.Items, c)
 			}
 
 			for _, c := range FRRContainers {
 				ginkgo.By(fmt.Sprintf("checking connectivity of service 2 to external frr container %s", c.Name))
-				validateService(cs, svcAdvertisement2, allNodes.Items, c)
+				validateService(svcAdvertisement2, allNodes.Items, c)
 			}
 		},
 		ginkgo.Entry("IPV4", []string{"192.168.10.0/24"},

@@ -1,3 +1,5 @@
+run:
+  issues-exit-code: 2
 linters:
   enable:
   - godot
@@ -18,8 +20,8 @@ linters:
   #- nakedret             #style - fixes required
   #- nolintlint
   #- stylecheck           #style - fixes required
-  #- unconvert            #style - fixes required
-  #- unparam
+  - unconvert            #style - fixes required
+  - unparam # still 1 fix
   - whitespace
 linters-settings:
   errcheck:

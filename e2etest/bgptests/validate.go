@@ -32,10 +32,10 @@ import (
 func validateFRRPeeredWithAllNodes(cs clientset.Interface, c *frrcontainer.FRR, ipFamily ipfamily.Family) {
 	allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	framework.ExpectNoError(err)
-	validateFRRPeeredWithNodes(cs, allNodes.Items, c, ipFamily)
+	validateFRRPeeredWithNodes(allNodes.Items, c, ipFamily)
 }
 
-func validateFRRNotPeeredWithNodes(cs clientset.Interface, nodes []corev1.Node, c *frrcontainer.FRR, ipFamily ipfamily.Family) {
+func validateFRRNotPeeredWithNodes(nodes []corev1.Node, c *frrcontainer.FRR, ipFamily ipfamily.Family) {
 	for _, node := range nodes {
 		ginkgo.By(fmt.Sprintf("checking node %s is not peered with the frr instance %s", node.Name, c.Name))
 		Eventually(func() error {
@@ -47,7 +47,7 @@ func validateFRRNotPeeredWithNodes(cs clientset.Interface, nodes []corev1.Node, 
 	}
 }
 
-func validateFRRPeeredWithNodes(cs clientset.Interface, nodes []corev1.Node, c *frrcontainer.FRR, ipFamily ipfamily.Family) {
+func validateFRRPeeredWithNodes(nodes []corev1.Node, c *frrcontainer.FRR, ipFamily ipfamily.Family) {
 	ginkgo.By(fmt.Sprintf("checking nodes are peered with the frr instance %s", c.Name))
 	Eventually(func() error {
 		neighbors, err := frr.NeighborsInfo(c)
@@ -60,13 +60,13 @@ func validateFRRPeeredWithNodes(cs clientset.Interface, nodes []corev1.Node, c *
 	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
 
-func validateService(cs clientset.Interface, svc *corev1.Service, nodes []corev1.Node, c *frrcontainer.FRR) {
+func validateService(svc *corev1.Service, nodes []corev1.Node, c *frrcontainer.FRR) {
 	Eventually(func() error {
-		return validateServiceNoWait(cs, svc, nodes, c)
+		return validateServiceNoWait(svc, nodes, c)
 	}, 4*time.Minute, 1*time.Second).Should(BeNil())
 }
 
-func validateServiceNoWait(cs clientset.Interface, svc *corev1.Service, nodes []corev1.Node, c *frrcontainer.FRR) error {
+func validateServiceNoWait(svc *corev1.Service, nodes []corev1.Node, c *frrcontainer.FRR) error {
 	port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
 
 	if len(svc.Status.LoadBalancer.Ingress) == 2 {
@@ -176,7 +176,7 @@ func validateDesiredLB(svc *corev1.Service) {
 	framework.ExpectEqual(desiredLbIPs, strings.Join(getIngressIPs(svc.Status.LoadBalancer.Ingress), ","))
 }
 
-func checkServiceOnlyOnNodes(cs clientset.Interface, svc *corev1.Service, expectedNodes []corev1.Node, ipFamily ipfamily.Family) {
+func checkServiceOnlyOnNodes(svc *corev1.Service, expectedNodes []corev1.Node, ipFamily ipfamily.Family) {
 	if len(expectedNodes) == 0 {
 		return
 	}
@@ -185,7 +185,7 @@ func checkServiceOnlyOnNodes(cs clientset.Interface, svc *corev1.Service, expect
 	for _, c := range FRRContainers {
 		nodeIps, err := k8s.NodeIPsForFamily(expectedNodes, ipFamily, c.RouterConfig.VRF)
 		framework.ExpectNoError(err)
-		validateService(cs, svc, expectedNodes, c)
+		validateService(svc, expectedNodes, c)
 		Eventually(func() error {
 			routes, err := frr.RoutesForFamily(c, ipFamily)
 			if len(routes[ip].NextHops) != len(nodeIps) {
@@ -206,7 +206,7 @@ func checkServiceOnlyOnNodes(cs clientset.Interface, svc *corev1.Service, expect
 	}
 }
 
-func checkServiceNotOnNodes(cs clientset.Interface, svc *corev1.Service, expectedNodes []corev1.Node, ipFamily ipfamily.Family) {
+func checkServiceNotOnNodes(svc *corev1.Service, expectedNodes []corev1.Node, ipFamily ipfamily.Family) {
 	if len(expectedNodes) == 0 {
 		return
 	}
@@ -230,7 +230,7 @@ func checkServiceNotOnNodes(cs clientset.Interface, svc *corev1.Service, expecte
 	}
 }
 
-func checkCommunitiesOnlyOnNodes(cs clientset.Interface, svc *corev1.Service, community string, expectedNodes []corev1.Node, ipFamily ipfamily.Family) {
+func checkCommunitiesOnlyOnNodes(svc *corev1.Service, community string, expectedNodes []corev1.Node, ipFamily ipfamily.Family) {
 	if len(expectedNodes) == 0 {
 		return
 	}
