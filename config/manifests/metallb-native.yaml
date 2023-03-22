@@ -1411,6 +1411,14 @@ rules:
   - list
   - watch
 - apiGroups:
+  - ""
+  resources:
+  - configmaps
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - metallb.io
   resources:
   - addresspools
@@ -1483,6 +1491,12 @@ rules:
   - get
   - list
   - watch
+- apiGroups:
+  - ""
+  resources:
+  - nodes
+  verbs:
+  - list
 - apiGroups:
   - ""
   resources:
@@ -1657,6 +1671,15 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: speaker
+  namespace: metallb-system
+---
+apiVersion: v1
+data:
+  excludel2.yaml: |
+    announcedInterfacesToExclude: ["docker.*", "cbr.*", "dummy.*", "virbr.*", "lxcbr.*", "veth.*", "lo", "^cali.*", "^tunl.*", "flannel.*", "kube-ipvs.*", "cni.*", "^nodelocaldns.*"]
+kind: ConfigMap
+metadata:
+  name: metallb-excludel2
   namespace: metallb-system
 ---
 apiVersion: v1
@@ -1842,6 +1865,9 @@ spec:
         - mountPath: /etc/ml_secret_key
           name: memberlist
           readOnly: true
+        - mountPath: /etc/metallb
+          name: metallb-excludel2
+          readOnly: true
       hostNetwork: true
       nodeSelector:
         kubernetes.io/os: linux
@@ -1859,6 +1885,10 @@ spec:
         secret:
           defaultMode: 420
           secretName: memberlist
+      - configMap:
+          defaultMode: 256
+          name: metallb-excludel2
+        name: metallb-excludel2
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration

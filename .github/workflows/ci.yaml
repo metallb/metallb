@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  merge_group:
   pull_request:
     paths-ignore:
       - 'configsamples/**'
@@ -55,7 +56,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
 
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v4
         with:
           go-version-file: "go.mod"
           cache: true
@@ -95,7 +96,7 @@ jobs:
         uses: docker/setup-buildx-action@v2
 
       - name: Build and export ${{ matrix.image }}
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v4
         with:
           context: .
           tags: quay.io/metallb/${{ matrix.image }}:dev-amd64
@@ -266,7 +267,7 @@ jobs:
           rm -rf e2etest # we want to make sure we are not running current e2e by mistake
           cd metallb-v0.12.1
           sed -i -e 's/quay.io\/frrouting\/frr:stable_7.5/quay.io\/frrouting\/frr:7.5.1/g' e2etest/pkg/frr/container/container.go # replace with frr image from dockerhub since it has official image.
-          FOCUS="L2.*should work for ExternalTrafficPolicy=Cluster|BGP.*A service of protocol load balancer should work with.*IPV4 - ExternalTrafficPolicyCluster$|validate FRR running configuration"
+          FOCUS="L2.*should work for ExternalTrafficPolicy=Cluster|BGP.*A service of protocol load balancer should work with.*IPV4 - ExternalTrafficPolicyCluster$|BGP.*should work with the given bfd profile.*IPV4 - default"
           sudo -E env "PATH=$PATH" inv e2etest --skip-docker --use-operator --focus "$FOCUS" -e /tmp/kind_logs
 
       - name: Collect Logs

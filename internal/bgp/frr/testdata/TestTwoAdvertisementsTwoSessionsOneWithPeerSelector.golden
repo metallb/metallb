@@ -31,7 +31,7 @@ route-map 10.2.2.254-out permit 4
 route-map 10.2.2.254-out permit 5
   match ipv6 address prefix-list 10.2.2.254-pl-ipv4
 
-ip prefix-list 10.2.2.254-pl-ipv4 deny any
+
 ipv6 prefix-list 10.2.2.254-pl-ipv4 deny any
 route-map 10.2.2.255-in deny 20
 
@@ -53,7 +53,7 @@ route-map 10.2.2.255-out permit 3
 route-map 10.2.2.255-out permit 4
   match ipv6 address prefix-list 10.2.2.255-pl-ipv4
 
-ip prefix-list 10.2.2.255-pl-ipv4 deny any
+
 ipv6 prefix-list 10.2.2.255-pl-ipv4 deny any
 
 router bgp 100

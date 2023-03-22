@@ -20,6 +20,7 @@ func dumpClusterResources(c *config.ClusterResources) string {
 		BGPAdvs:            c.BGPAdvs,
 		LegacyAddressPools: c.LegacyAddressPools,
 		Communities:        c.Communities,
+		BGPExtras:          c.BGPExtras,
 	}
 	withNoSecret.PasswordSecrets = make(map[string]corev1.Secret)
 	for k, s := range c.PasswordSecrets {
@@ -32,11 +33,11 @@ func dumpClusterResources(c *config.ClusterResources) string {
 
 func dumpConfig(cfg *config.Config) string {
 	toDump := *cfg
-	toDump.Peers = make([]*config.Peer, 0)
+	toDump.Peers = make(map[string]*config.Peer, 0)
 	for _, p := range cfg.Peers {
 		p1 := *p
 		p1.Password = "<retracted>"
-		toDump.Peers = append(toDump.Peers, &p1)
+		toDump.Peers[p.Name] = &p1
 	}
 	return spew.Sdump(toDump)
 }

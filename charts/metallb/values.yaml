@@ -233,6 +233,7 @@ controller:
   runtimeClassName: ""
   affinity: {}
   podAnnotations: {}
+  labels: {}
   livenessProbe:
     enabled: true
     failureThreshold: 3
@@ -260,6 +261,8 @@ speaker:
     enabled: true
     mlBindPort: 7946
     mlSecretKeyPath: "/etc/ml_secret_key"
+  excludeInterfaces:
+    enabled: true
   image:
     repository: quay.io/metallb/speaker
     tag:
@@ -294,6 +297,7 @@ speaker:
   ## Selects which runtime class will be used by the pod.
   runtimeClassName: ""
   podAnnotations: {}
+  labels: {}
   livenessProbe:
     enabled: true
     failureThreshold: 3
@@ -318,7 +322,7 @@ speaker:
     enabled: false
     image:
       repository: quay.io/frrouting/frr
-      tag: 7.5.1
+      tag: 8.4.2
       pullPolicy:
     metricsPort: 7473
     resources: {}

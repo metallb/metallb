@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/strings/slices"
 )
 
 type ClusterResources struct {
@@ -45,16 +46,19 @@ type ClusterResources struct {
 	PasswordSecrets    map[string]corev1.Secret          `json:"passwordsecrets"`
 	Nodes              []corev1.Node                     `json:"nodes"`
 	Namespaces         []corev1.Namespace                `json:"namespaces"`
+	BGPExtras          corev1.ConfigMap                  `json:"bgpextras"`
 }
 
 // Config is a parsed MetalLB configuration.
 type Config struct {
 	// Routers that MetalLB should peer with.
-	Peers []*Peer
+	Peers map[string]*Peer
 	// Address pools from which to allocate load balancer IPs.
 	Pools *Pools
 	// BFD profiles that can be used by peers.
 	BFDProfiles map[string]*BFDProfile
+	// Protocol dependent extra config. Currently used only by FRR
+	BGPExtras string
 }
 
 // Pools contains address pools and its namespace/service specific allocations.
@@ -75,6 +79,8 @@ const (
 	BGP    Proto = "bgp"
 	Layer2 Proto = "layer2"
 )
+
+const bgpExtrasField = "extras"
 
 var Protocols = []Proto{
 	BGP, Layer2,
@@ -156,6 +162,8 @@ type ServiceAllocation struct {
 
 // BGPAdvertisement describes one translation from an IP address to a BGP advertisement.
 type BGPAdvertisement struct {
+	// The name of the advertisement
+	Name string
 	// Roll up the IP address into a CIDR prefix of this
 	// length. Optional, defaults to 32 (i.e. no aggregation) if not
 	// specified.
@@ -224,6 +232,15 @@ func For(resources ClusterResources, validate Validate) (*Config, error) {
 		return nil, err
 	}
 
+	cfg.BGPExtras = bgpExtrasFor(resources)
+	if err != nil {
+		return nil, err
+	}
+
+	err = validateConfig(cfg)
+	if err != nil {
+		return nil, err
+	}
 	return cfg, nil
 }
 
@@ -242,8 +259,8 @@ func bfdProfilesFor(resources ClusterResources) (map[string]*BFDProfile, error) 
 	return res, nil
 }
 
-func peersFor(resources ClusterResources, BFDProfiles map[string]*BFDProfile) ([]*Peer, error) {
-	var res []*Peer
+func peersFor(resources ClusterResources, BFDProfiles map[string]*BFDProfile) (map[string]*Peer, error) {
+	var res map[string]*Peer = make(map[string]*Peer)
 	for _, p := range resources.Peers {
 		peer, err := peerFromCR(p, resources.PasswordSecrets)
 		if err != nil {
@@ -262,7 +279,7 @@ func peersFor(resources ClusterResources, BFDProfiles map[string]*BFDProfile) ([
 				return nil, fmt.Errorf("peer %s already exists", p.Name)
 			}
 		}
-		res = append(res, peer)
+		res[peer.Name] = peer
 	}
 	return res, nil
 }
@@ -343,6 +360,13 @@ func poolsFor(resources ClusterResources) (*Pools, error) {
 	}
 	return &Pools{ByName: pools, ByNamespace: poolsByNamespace(pools),
 		ByServiceSelector: poolsByServiceSelector(pools)}, nil
+}
+
+func bgpExtrasFor(resources ClusterResources) string {
+	if resources.BGPExtras.Data == nil {
+		return ""
+	}
+	return resources.BGPExtras.Data[bgpExtrasField]
 }
 
 func communitiesFromCrs(cs []metallbv1beta1.Community) (map[string]uint32, error) {
@@ -518,8 +542,22 @@ func addressPoolServiceAllocationsFromCR(p metallbv1beta1.IPAddressPool, namespa
 	if p.Spec.AllocateTo == nil {
 		return nil, nil
 	}
-	serviceAllocations := &ServiceAllocation{Priority: p.Spec.AllocateTo.Priority,
-		Namespaces: sets.New(p.Spec.AllocateTo.Namespaces...)}
+	poolNamespaces := sets.Set[string]{}
+	for _, poolNs := range p.Spec.AllocateTo.Namespaces {
+		if poolNamespaces.Has(poolNs) {
+			return nil, errors.New("duplicate definition in namespaces field")
+		}
+		poolNamespaces.Insert(poolNs)
+	}
+	err := validateLabelSelectorDuplicate(p.Spec.AllocateTo.NamespaceSelectors, "namespaceSelectors")
+	if err != nil {
+		return nil, err
+	}
+	err = validateLabelSelectorDuplicate(p.Spec.AllocateTo.ServiceSelectors, "serviceSelectors")
+	if err != nil {
+		return nil, err
+	}
+	serviceAllocations := &ServiceAllocation{Priority: p.Spec.AllocateTo.Priority, Namespaces: poolNamespaces}
 	for i := range p.Spec.AllocateTo.NamespaceSelectors {
 		l, err := metav1.LabelSelectorAsSelector(&p.Spec.AllocateTo.NamespaceSelectors[i])
 		if err != nil {
@@ -774,6 +812,7 @@ func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities m
 	}
 
 	ad := &BGPAdvertisement{
+		Name:                crdAd.Name,
 		AggregationLength:   32,
 		AggregationLengthV6: 128,
 		LocalPref:           0,
@@ -935,7 +974,48 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 				"this pool is more specific than the aggregation length for addresses %s", adv.AggregationLength, lowest, addr)
 		}
 	}
+
+	// Verify that BGP ADVs set a unique local preference value per BGP update.
+	for _, bgpAdv := range pool.BGPAdvertisements {
+		if adv.LocalPref != bgpAdv.LocalPref {
+			if !advertisementsAreCompatible(adv, bgpAdv) {
+				return fmt.Errorf("invalid local preference %d: local preferernce %d was "+
+					"already set for the same type of BGP update. Check existing BGP advertisements "+
+					"with common pools and aggregation lengths", adv.LocalPref, bgpAdv.LocalPref)
+			}
+		}
+	}
+
 	return nil
+}
+
+func advertisementsAreCompatible(newAdv, adv *BGPAdvertisement) bool {
+	if adv.AggregationLength != newAdv.AggregationLength && adv.AggregationLengthV6 != newAdv.AggregationLengthV6 {
+		return true
+	}
+
+	// BGP ADVs with different set of BGP peers do not collide.
+	if len(newAdv.Peers) != 0 && len(adv.Peers) != 0 {
+		equalPeer := false
+		for _, peer := range newAdv.Peers {
+			if slices.Contains(adv.Peers, peer) {
+				equalPeer = true
+				break
+			}
+		}
+		if !equalPeer {
+			return true
+		}
+	}
+
+	// BGP ADVs with different set of nodes do not collide.
+	for node := range newAdv.Nodes {
+		if _, ok := adv.Nodes[node]; ok {
+			return false
+		}
+	}
+
+	return true
 }
 
 var invalidCommunityValue = errors.New("invalid community value")

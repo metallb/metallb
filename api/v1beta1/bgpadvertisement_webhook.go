@@ -22,6 +22,7 @@ import (
 
 	"github.com/go-kit/log/level"
 	"github.com/pkg/errors"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -61,8 +62,13 @@ func (bgpAdv *BGPAdvertisement) ValidateCreate() error {
 		return err
 	}
 
+	nodes, err := getExistingNodes()
+	if err != nil {
+		return err
+	}
+
 	toValidate := bgpAdvListWithUpdate(existingBGPAdvList, bgpAdv)
-	err = Validator.Validate(toValidate, addressPools, ipAddressPools)
+	err = Validator.Validate(toValidate, addressPools, ipAddressPools, nodes)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "bgpadvertisement", "action", "create", "name", bgpAdv.Name, "namespace", bgpAdv.Namespace, "error", err)
 		return err
@@ -89,8 +95,13 @@ func (bgpAdv *BGPAdvertisement) ValidateUpdate(old runtime.Object) error {
 		return err
 	}
 
+	nodes, err := getExistingNodes()
+	if err != nil {
+		return err
+	}
+
 	toValidate := bgpAdvListWithUpdate(bgpAdvs, bgpAdv)
-	err = Validator.Validate(toValidate, addressPools, ipAddressPools)
+	err = Validator.Validate(toValidate, addressPools, ipAddressPools, nodes)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "bgpadvertisement", "action", "create", "name", bgpAdv.Name, "namespace", bgpAdv.Namespace, "error", err)
 		return err
@@ -110,6 +121,15 @@ var getExistingBGPAdvs = func() (*BGPAdvertisementList, error) {
 		return nil, errors.Wrapf(err, "Failed to get existing BGPAdvertisement objects")
 	}
 	return existingBGPAdvList, nil
+}
+
+var getExistingNodes = func() (*v1.NodeList, error) {
+	existingNodeList := &v1.NodeList{}
+	err := WebhookClient.List(context.Background(), existingNodeList)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to get existing Node objects")
+	}
+	return existingNodeList, nil
 }
 
 func bgpAdvListWithUpdate(existing *BGPAdvertisementList, toAdd *BGPAdvertisement) *BGPAdvertisementList {

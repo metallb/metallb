@@ -21,6 +21,8 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"syscall"
 
 	"github.com/go-kit/log"
@@ -37,6 +39,7 @@ import (
 	"go.universe.tf/metallb/internal/speakerlist"
 	"go.universe.tf/metallb/internal/version"
 	v1 "k8s.io/api/core/v1"
+	"sigs.k8s.io/yaml"
 )
 
 var announcing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -50,6 +53,10 @@ var announcing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 	"node",
 	"ip",
 })
+
+const (
+	excludeL2ConfigPath = "/etc/metallb/excludel2.yaml"
+)
 
 // Service offers methods to mutate a Kubernetes service object.
 type service interface {
@@ -133,13 +140,21 @@ func main() {
 		os.Exit(1)
 	}
 
+	var interfacesToExclude *regexp.Regexp
+	interfacesToExclude, err = parseAnnouncedInterfacesToExclude()
+	if err != nil {
+		level.Error(logger).Log("op", "startup", "msg", "failed to parse announcedInterfacesToExclude from configMap", "error", err)
+		os.Exit(1)
+	}
+
 	// Setup all clients and speakers, config decides what is being done runtime.
 	ctrl, err := newController(controllerConfig{
-		MyNode:   *myNode,
-		Logger:   logger,
-		LogLevel: logging.Level(*logLevel),
-		SList:    sList,
-		bgpType:  bgpImplementation(bgpType),
+		MyNode:                 *myNode,
+		Logger:                 logger,
+		LogLevel:               logging.Level(*logLevel),
+		SList:                  sList,
+		bgpType:                bgpImplementation(bgpType),
+		InterfaceExcludeRegexp: interfacesToExclude,
 	})
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create MetalLB controller")
@@ -212,8 +227,10 @@ type controllerConfig struct {
 
 	// For testing only, and will be removed in a future release.
 	// See: https://github.com/metallb/metallb/issues/152.
-	DisableLayer2      bool
-	SupportedProtocols []config.Proto
+	DisableLayer2                bool
+	SupportedProtocols           []config.Proto
+	AnnouncedInterfacesToExclude []string `yaml:"announcedInterfacesToExclude"`
+	InterfaceExcludeRegexp       *regexp.Regexp
 }
 
 func newController(cfg controllerConfig) (*controller, error) {
@@ -229,7 +246,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 	protocols := []config.Proto{config.BGP}
 
 	if !cfg.DisableLayer2 {
-		a, err := layer2.New(cfg.Logger)
+		a, err := layer2.New(cfg.Logger, cfg.InterfaceExcludeRegexp)
 		if err != nil {
 			return nil, fmt.Errorf("making layer2 announcer: %s", err)
 		}
@@ -441,6 +458,27 @@ func compareIPs(ips1, ips2 []net.IP) bool {
 		}
 	}
 	return true
+}
+
+func parseAnnouncedInterfacesToExclude() (*regexp.Regexp, error) {
+	configmapBytes, err := os.ReadFile(filepath.Clean(excludeL2ConfigPath))
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+
+	var conf controllerConfig
+	if err = yaml.Unmarshal(configmapBytes, &conf); err != nil {
+		return nil, err
+	}
+
+	var excludeRegexp *regexp.Regexp
+	if len(conf.AnnouncedInterfacesToExclude) > 0 {
+		excludeRegexp, err = regexp.Compile("(" + strings.Join(conf.AnnouncedInterfacesToExclude, ")|(") + ")")
+		if err != nil {
+			return nil, err
+		}
+	}
+	return excludeRegexp, nil
 }
 
 func (c *controller) SetConfig(l log.Logger, cfg *config.Config) controllers.SyncState {
