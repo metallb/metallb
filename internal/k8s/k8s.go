@@ -119,7 +119,6 @@ type Config struct {
 // The client uses processName to identify itself to the cluster
 // (e.g. when logging events).
 //
-//nolint:godot
 func New(cfg *Config) (*Client, error) {
 	namespaceSelector := cache.ObjectSelector{
 		Field: fields.ParseSelectorOrDie(fmt.Sprintf("metadata.namespace=%s", cfg.Namespace)),
