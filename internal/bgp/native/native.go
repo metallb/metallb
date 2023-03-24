@@ -49,7 +49,7 @@ type session struct {
 type sessionManager struct {
 }
 
-func NewSessionManager(l log.Logger) *sessionManager {
+func NewSessionManager(l log.Logger) bgp.SessionManager {
 	return &sessionManager{}
 }
 

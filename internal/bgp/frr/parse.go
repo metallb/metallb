@@ -101,7 +101,7 @@ type BFDPeer struct {
 }
 
 // parseNeighbour takes the result of a show bgp neighbor x.y.w.z
-// and parses the informations related to the neighbor.
+// and parses the informations related to the neighbour.
 func ParseNeighbour(vtyshRes string) (*Neighbor, error) {
 	res := map[string]FRRNeighbor{}
 	err := json.Unmarshal([]byte(vtyshRes), &res)

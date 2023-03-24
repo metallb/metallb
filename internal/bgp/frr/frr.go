@@ -326,7 +326,25 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 var debounceTimeout = 3 * time.Second
 var failureTimeout = time.Second * 5
 
-func NewSessionManager(l log.Logger, logLevel logging.Level) *sessionManager {
+func NewSessionManager(l log.Logger, logLevel logging.Level) bgp.SessionManager {
+	res := &sessionManager{
+		sessions:     map[string]*session{},
+		bfdProfiles:  []BFDProfile{},
+		reloadConfig: make(chan reloadEvent),
+		logLevel:     logLevelToFRR(logLevel),
+	}
+	reload := func(config *frrConfig) error {
+		return generateAndReloadConfigFile(config, l)
+	}
+
+	debouncer(reload, res.reloadConfig, debounceTimeout, failureTimeout, l)
+
+	reloadValidator(l, res.reloadConfig)
+
+	return res
+}
+
+func mockNewSessionManager(l log.Logger, logLevel logging.Level) *sessionManager {
 	res := &sessionManager{
 		sessions:     map[string]*session{},
 		bfdProfiles:  []BFDProfile{},

@@ -16,7 +16,7 @@ import (
 
 var logger = log.NewNopLogger()
 
-func NewController(l2Handler *MockProtocol, bgpHandler *MockProtocol, t *testing.T) *controller {
+func mockNewController(l2Handler *MockProtocol, bgpHandler *MockProtocol, t *testing.T) *controller {
 	ret := &controller{
 		myNode:  "nodeName",
 		bgpType: "frr",
@@ -44,7 +44,7 @@ func TestLoadBalancerCreation(t *testing.T) {
 		protocol:       config.BGP,
 		shouldAnnounce: true,
 	}
-	c := NewController(l2MockHandler, bgpMockHandler, t)
+	c := mockNewController(l2MockHandler, bgpMockHandler, t)
 
 	svc := &v1.Service{
 		ObjectMeta: metav1.ObjectMeta{

@@ -27,7 +27,7 @@ type beta1Updater struct {
 	namespace string
 }
 
-func UpdaterForCRs(r *rest.Config, ns string) (*beta1Updater, error) {
+func UpdaterForCRs(r *rest.Config, ns string) (Updater, error) {
 	myScheme := runtime.NewScheme()
 
 	if err := metallbv1beta1.AddToScheme(myScheme); err != nil {
