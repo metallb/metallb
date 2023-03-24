@@ -51,7 +51,7 @@ type podExecutor struct {
 	container string
 }
 
-func ForPod(namespace, name, container string) *podExecutor {
+func ForPod(namespace, name, container string) Executor {
 	return &podExecutor{
 		namespace: namespace,
 		name:      name,

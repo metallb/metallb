@@ -30,9 +30,8 @@ func ForAddresses(ips []string) (Family, error) {
 		ip := net.ParseIP(ips[0])
 		if ip.To4() != nil {
 			return IPv4, nil
-		} else {
-			return IPv6, nil
 		}
+		return IPv6, nil
 	case 2:
 		ip1 := net.ParseIP(ips[0])
 		ip2 := net.ParseIP(ips[1])

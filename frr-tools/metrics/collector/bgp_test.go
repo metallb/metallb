@@ -466,7 +466,7 @@ func TestCollect(t *testing.T) {
 			}
 
 			l := log.NewNopLogger()
-			collector := NewBGP(l)
+			collector := mocknewBGP(l)
 			cmdOutput := map[string]string{
 				"show bgp vrf all json":               vrfVtysh,
 				"show bgp vrf default neighbors json": tc.vtyshOutput,

@@ -39,7 +39,7 @@ func (m *mockValidator) Validate(objects ...client.ObjectList) error {
 	}
 
 	if m.forceError {
-		return errors.New("Error!")
+		return errors.New("error!")
 	}
 	return nil
 }
