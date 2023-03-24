@@ -1374,7 +1374,7 @@ func TestAllocation(t *testing.T) {
 			unassign: true,
 			ipFamily: ipfamily.IPv6,
 		},
-		//Dual-stack test cases
+		// Dual-stack test cases
 		{
 			desc:     "s1 gets dual-stack IPs",
 			svcKey:   "s1",

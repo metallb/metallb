@@ -1054,7 +1054,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				if c.RouterConfig.VRF != "" {
 					ruleName = fmt.Sprintf("%s-%s", ip, c.RouterConfig.VRF)
 				}
-				data = data + fmt.Sprintf("route-map %s-in permit 20\n", ruleName)
+				data += fmt.Sprintf("route-map %s-in permit 20\n", ruleName)
 			}
 			extraData := map[string]string{
 				"extras": data,
