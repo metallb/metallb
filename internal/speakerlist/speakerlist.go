@@ -255,7 +255,7 @@ func (sl *SpeakerList) mlJoin() {
 	if err != nil || nr != len(joinIPs) {
 		level.Error(sl.l).Log("op", "memberDiscovery", "msg", "partial join", "joined", nr, "expected", len(joinIPs), "error", err)
 	} else {
-		level.Info(sl.l).Log("op", "Member detection", "msg", "memberlist join succesfully", "number of other nodes", nr)
+		level.Info(sl.l).Log("op", "Member detection", "msg", "memberlist join successfully", "number of other nodes", nr)
 	}
 }
 

@@ -14,7 +14,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-// ValidateOnPrometheus checks the existance of the given metric directly on prometheus pods.
+// ValidateOnPrometheus checks the existence of the given metric directly on prometheus pods.
 func ValidateOnPrometheus(prometheusPod *corev1.Pod, query string, expected CheckType) error {
 	exec := executor.ForPod(prometheusPod.Namespace, prometheusPod.Name, prometheusPod.Spec.Containers[0].Name)
 	url := fmt.Sprintf("localhost:9090/api/v1/query?%s", (url.Values{"query": []string{query}}).Encode())
