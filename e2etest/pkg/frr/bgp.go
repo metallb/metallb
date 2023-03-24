@@ -129,43 +129,43 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 	if err != nil {
 		allerrs = errors.Wrapf(allerrs, "\nFailed exec show bgp neighbor: %v", err)
 	}
-	res = res + out
+	res += out
 
 	for _, file := range filesToDump {
-		res = res + fmt.Sprintf("####### Dumping file %s\n", file)
+		res += fmt.Sprintf("####### Dumping file %s\n", file)
 		// limiting the output to 500 lines:
 		out, err = exec.Exec("bash", "-c", fmt.Sprintf("cat %s | tail -n 500", file))
 		if err != nil {
 			allerrs = errors.Wrapf(allerrs, "\nFailed to cat file %s: %v", file, err)
 		}
-		res = res + out
+		res += out
 	}
 
-	res = res + "####### BGP Neighbors\n"
+	res += "####### BGP Neighbors\n"
 	out, err = exec.Exec("vtysh", "-c", "show bgp neighbor")
 	if err != nil {
 		allerrs = errors.Wrapf(allerrs, "\nFailed exec show bgp neighbor: %v", err)
 	}
-	res = res + out
+	res += out
 
-	res = res + "####### BFD Peers\n"
+	res += "####### BFD Peers\n"
 	out, err = exec.Exec("vtysh", "-c", "show bfd peer")
 	if err != nil {
 		allerrs = errors.Wrapf(allerrs, "\nFailed exec show bfd peer: %v", err)
 	}
-	res = res + out
+	res += out
 
-	res = res + "####### Check for any crashinfo files\n"
+	res += "####### Check for any crashinfo files\n"
 	if crashInfo, err := exec.Exec("bash", "-c", "ls /var/tmp/frr/bgpd.*/crashlog"); err == nil {
 		crashInfo = strings.TrimSuffix(crashInfo, "\n")
 		files := strings.Split(crashInfo, "\n")
 		for _, file := range files {
-			res = res + fmt.Sprintf("####### Dumping crash file %s\n", file)
+			res += fmt.Sprintf("####### Dumping crash file %s\n", file)
 			out, err = exec.Exec("bash", "-c", fmt.Sprintf("cat %s", file))
 			if err != nil {
 				allerrs = errors.Wrapf(allerrs, "\nFailed to cat bgpd crashinfo file %s: %v", file, err)
 			}
-			res = res + out
+			res += out
 		}
 	}
 

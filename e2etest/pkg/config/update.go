@@ -67,49 +67,49 @@ func (o beta1Updater) Update(r config.ClusterResources) error {
 	for _, pool := range r.Pools {
 		objects[key] = pool.DeepCopy()
 		oldValues[key] = pool.DeepCopy()
-		key = key + 1
+		key++
 	}
 
 	for _, secret := range r.PasswordSecrets {
 		objects[key] = secret.DeepCopy()
 		oldValues[key] = secret.DeepCopy()
-		key = key + 1
+		key++
 	}
 
 	for _, peer := range r.Peers {
 		objects[key] = peer.DeepCopy()
 		oldValues[key] = peer.DeepCopy()
-		key = key + 1
+		key++
 	}
 
 	for _, bfdProfile := range r.BFDProfiles {
 		objects[key] = bfdProfile.DeepCopy()
 		oldValues[key] = bfdProfile.DeepCopy()
-		key = key + 1
+		key++
 	}
 
 	for _, bgpAdv := range r.BGPAdvs {
 		objects[key] = bgpAdv.DeepCopy()
 		oldValues[key] = bgpAdv.DeepCopy()
-		key = key + 1
+		key++
 	}
 
 	for _, l2Adv := range r.L2Advs {
 		objects[key] = l2Adv.DeepCopy()
 		oldValues[key] = l2Adv.DeepCopy()
-		key = key + 1
+		key++
 	}
 
 	for _, legacyPool := range r.LegacyAddressPools {
 		objects[key] = legacyPool.DeepCopy()
 		oldValues[key] = legacyPool.DeepCopy()
-		key = key + 1
+		key++
 	}
 
 	for _, community := range r.Communities {
 		objects[key] = community.DeepCopy()
 		oldValues[key] = community.DeepCopy()
-		key = key + 1
+		key++
 	}
 
 	// Iterating over the map will return the items in a random order.

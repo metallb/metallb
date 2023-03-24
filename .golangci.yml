@@ -7,15 +7,13 @@ linters:
   - gofmt
   - ginkgolinter
   - dogsled
-  #- exportloopref        #bugs
-  #- goconst              #stye  - fixes required
-  - gocritic             #style - fixes required
-  #- gomnd                #style - fixes required
-  - misspell             #style - fixes required
+  - exportloopref
+  - gocritic
+  - misspell
   - nolintlint
   - stylecheck
   - unconvert
-  - unparam              # still 1 fix
+  - unparam
   - whitespace
 linters-settings:
   errcheck:
@@ -26,14 +24,6 @@ linters-settings:
     exclude:
     - 'SPDX-License-Identifier.*'
     - '\+groupName.*'
-  exhaustive:
-    ignore-enum-types: "syscall.Errno.+"
-    check:
-      - switch
-      - map
-  goconst:
-    min-len: 2
-    min-occurrences: 2
   misspell:
     locale: US
     ignore-words:
@@ -49,6 +39,6 @@ linters-settings:
       - exitAfterDefer
 issues:
   exclude-rules:
-    - path: '/api'
-    linters:
-      - stylecheck
+    - path: 'api'
+      linters:
+        - stylecheck

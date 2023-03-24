@@ -18,7 +18,7 @@ import (
 )
 
 func dumpBGPInfo(basePath, testName string, cs clientset.Interface, f *framework.Framework) {
-	testPath := path.Join(basePath, strings.Replace(testName, " ", "-", -1))
+	testPath := path.Join(basePath, strings.ReplaceAll(testName, " ", "-"))
 	err := os.Mkdir(testPath, 0755)
 	if err != nil && !errors.Is(err, os.ErrExist) {
 		fmt.Fprintf(os.Stderr, "failed to create test dir: %v\n", err)

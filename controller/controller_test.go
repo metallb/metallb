@@ -61,14 +61,6 @@ func statusAssigned(ips []string) v1.ServiceStatus {
 	}
 }
 
-func selector(s string) labels.Selector {
-	ret, err := labels.Parse(s)
-	if err != nil {
-		panic(err)
-	}
-	return ret
-}
-
 // testK8S implements service by recording what the controller wants
 // to do to k8s.
 type testK8S struct {
@@ -117,6 +109,10 @@ func (s *testK8S) gotService(in *v1.Service) *v1.Service {
 }
 
 func TestControllerMutation(t *testing.T) {
+	testSelector, err := labels.Parse("team=metallb")
+	if err != nil {
+		t.Fatalf("failed to parse test selector")
+	}
 	k := &testK8S{t: t}
 	c := &controller{
 		ips:    allocator.New(),
@@ -166,7 +162,7 @@ func TestControllerMutation(t *testing.T) {
 			Name:       "pool8",
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("13.14.15.0/31")},
-			ServiceAllocations: &config.ServiceAllocation{ServiceSelectors: []labels.Selector{selector("team=metallb")},
+			ServiceAllocations: &config.ServiceAllocation{ServiceSelectors: []labels.Selector{testSelector},
 				Priority: 9},
 		},
 		"pool9": {
@@ -179,7 +175,7 @@ func TestControllerMutation(t *testing.T) {
 			Name:       "pool10",
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("19.20.21.0/31")},
-			ServiceAllocations: &config.ServiceAllocation{ServiceSelectors: []labels.Selector{selector("team=metallb")},
+			ServiceAllocations: &config.ServiceAllocation{ServiceSelectors: []labels.Selector{testSelector},
 				Priority: 8},
 		},
 		"pool11": {
@@ -187,14 +183,14 @@ func TestControllerMutation(t *testing.T) {
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("22.23.24.0/31")},
 			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.New("test-ns1"),
-				ServiceSelectors: []labels.Selector{selector("team=metallb")}, Priority: 8},
+				ServiceSelectors: []labels.Selector{testSelector}, Priority: 8},
 		},
 		"pool12": {
 			Name:       "pool12",
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("25.26.27.0/31")},
 			ServiceAllocations: &config.ServiceAllocation{Namespaces: sets.New("test-ns1"),
-				ServiceSelectors: []labels.Selector{selector("team=metallb")}, Priority: 5},
+				ServiceSelectors: []labels.Selector{testSelector}, Priority: 5},
 		},
 	}, ByNamespace: map[string][]string{"test-ns1": {"pool6", "pool7", "pool11", "pool12"}, "test-ns2": {"pool9"}},
 		ByServiceSelector: []string{"pool8", "pool10", "pool11", "pool12"},

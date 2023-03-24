@@ -62,6 +62,6 @@ func InitReporter(kubeconfig, path, namespace string) *k8sreporter.KubernetesRep
 }
 
 func DumpInfo(reporter *k8sreporter.KubernetesReporter, testName string) {
-	testNameNoSpaces := strings.Replace(ginkgo.CurrentSpecReport().LeafNodeText, " ", "-", -1)
+	testNameNoSpaces := strings.ReplaceAll(ginkgo.CurrentSpecReport().LeafNodeText, " ", "-")
 	reporter.Dump(10*time.Minute, testNameNoSpaces)
 }
