@@ -12,9 +12,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-func PodLogsSinceTime(cs clientset.Interface, pod *corev1.Pod, SpeakerContainerName string, sinceTime *metav1.Time) (string, error) {
+func PodLogsSinceTime(cs clientset.Interface, pod *corev1.Pod, speakerContainerName string, sinceTime *metav1.Time) (string, error) {
 	podLogOpt := corev1.PodLogOptions{
-		Container: SpeakerContainerName,
+		Container: speakerContainerName,
 		SinceTime: sinceTime,
 	}
 	return PodLogs(cs, pod, podLogOpt)

@@ -87,7 +87,7 @@ func Init(lvl string) (log.Logger, error) {
 func collectGlogs(f *os.File, logger log.Logger) {
 	defer func() {
 		if err := f.Close(); err != nil {
-			//cant log here, as this is the logger
+			// cant log here, as this is the logger
 			errorString := fmt.Sprintf("Error closing file: %s", err)
 			panic(errorString)
 		}
