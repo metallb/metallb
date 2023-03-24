@@ -935,13 +935,13 @@ func getCommunityValue(community string, communities map[string]uint32) (uint32,
 	}
 
 	v, err := ParseCommunity(community)
-	if errors.Is(err, invalidCommunityValue) {
+	if errors.Is(err, errInvalidaCommunityValue) {
 		return 0, err
 	}
 
 	// Return TransientError on invalidCommunityFormat, in case it refers
 	// a Community resource that doesn't exist yet.
-	if errors.Is(err, invalidCommunityFormat) {
+	if errors.Is(err, errInvalidCommunityFormat) {
 		return 0, TransientError{err.Error()}
 	}
 
@@ -1018,21 +1018,21 @@ func advertisementsAreCompatible(newAdv, adv *BGPAdvertisement) bool {
 	return true
 }
 
-var invalidCommunityValue = errors.New("invalid community value")
-var invalidCommunityFormat = errors.New("invalid community format")
+var errInvalidaCommunityValue = errors.New("invalid community value")
+var errInvalidCommunityFormat = errors.New("invalid community format")
 
 func ParseCommunity(c string) (uint32, error) {
 	fs := strings.Split(c, ":")
 	if len(fs) != 2 {
-		return 0, fmt.Errorf("%w: %s", invalidCommunityFormat, c)
+		return 0, fmt.Errorf("%w: %s", errInvalidCommunityFormat, c)
 	}
 	a, err := strconv.ParseUint(fs[0], 10, 16)
 	if err != nil {
-		return 0, fmt.Errorf("%w: invalid first section of community %q: %s", invalidCommunityValue, fs[0], err)
+		return 0, fmt.Errorf("%w: invalid first section of community %q: %s", errInvalidaCommunityValue, fs[0], err)
 	}
 	b, err := strconv.ParseUint(fs[1], 10, 16)
 	if err != nil {
-		return 0, fmt.Errorf("%w: invalid second section of community %q: %s", invalidCommunityValue, fs[1], err)
+		return 0, fmt.Errorf("%w: invalid second section of community %q: %s", errInvalidaCommunityValue, fs[1], err)
 	}
 
 	return (uint32(a) << 16) + uint32(b), nil

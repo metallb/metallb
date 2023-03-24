@@ -15,6 +15,7 @@ linters:
   - unconvert
   - unparam
   - whitespace
+  - revive
 linters-settings:
   errcheck:
     exclude: .golangci.exclude
@@ -37,6 +38,12 @@ linters-settings:
     disabled-checks:
       - captLocal
       - exitAfterDefer
+  revive:
+    rules:
+    - name: receiver-naming
+      disabled: true
+    - name: dot-imports
+      disabled: true
 issues:
   exclude-rules:
     - path: 'api'

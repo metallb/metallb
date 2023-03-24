@@ -91,7 +91,12 @@ type bfd struct {
 	frrCli vtysh.Cli
 }
 
-func NewBFD(l log.Logger) *bfd {
+func NewBFD(l log.Logger) prometheus.Collector {
+	log := log.With(l, "collector", subsystem)
+	return &bfd{Log: log, frrCli: vtysh.Run}
+}
+
+func mockNewBFD(l log.Logger) *bfd {
 	log := log.With(l, "collector", subsystem)
 	return &bfd{Log: log, frrCli: vtysh.Run}
 }
