@@ -144,7 +144,7 @@ func KindnetContainersSetup(cs *clientset.Clientset) ([]*frrcontainer.FRR, error
 }
 
 /*
-	In order to test MetalLB's announcemnet via VRFs, we:
+	In order to test MetalLB's announcement via VRFs, we:
 
 	* create an additional "vrf-net" docker network
 	* for each node, create a vrf named "red" and move the interface in that vrf

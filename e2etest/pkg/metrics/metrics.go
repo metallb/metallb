@@ -73,7 +73,7 @@ func GaugeForLabels(metricName string, labels map[string]string, metrics map[str
 	})
 }
 
-// ValidateGaugeValue checks that the value corresponing to the given metric is the same as expected value.
+// ValidateGaugeValue checks that the value corresponding to the given metric is the same as expected value.
 func ValidateGaugeValue(expectedValue int, metricName string, labels map[string]string, allMetrics []map[string]*dto.MetricFamily) error {
 	return ValidateGaugeValueCompare(func(value int) error {
 		if value != expectedValue {
@@ -83,7 +83,7 @@ func ValidateGaugeValue(expectedValue int, metricName string, labels map[string]
 	}, metricName, labels, allMetrics)
 }
 
-// ValidateGaugeValueCompare checks that the value corresponing to the given metric against the given compare function.
+// ValidateGaugeValueCompare checks that the value corresponding to the given metric against the given compare function.
 func ValidateGaugeValueCompare(check func(int) error, metricName string, labels map[string]string, allMetrics []map[string]*dto.MetricFamily) error {
 	found := false
 	for _, m := range allMetrics {

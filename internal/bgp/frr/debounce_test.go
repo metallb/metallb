@@ -14,7 +14,7 @@ const timer = 10 * time.Millisecond
 const failureTimer = 10 * time.Millisecond
 
 func TestDebounce(t *testing.T) {
-	result := make(chan *frrConfig, 10) // buffered to accomodate spurious rewrites
+	result := make(chan *frrConfig, 10) // buffered to accommodate spurious rewrites
 	dummyUpdate := func(config *frrConfig) error {
 		result <- config
 		return nil
@@ -52,7 +52,7 @@ func TestDebounce(t *testing.T) {
 }
 
 func TestDebounceRetry(t *testing.T) {
-	result := make(chan *frrConfig, 10) // buffered to accomodate spurious rewrites
+	result := make(chan *frrConfig, 10) // buffered to accommodate spurious rewrites
 	count := 0
 	dummyUpdate := func(config *frrConfig) error {
 		count++
@@ -83,7 +83,7 @@ func TestDebounceRetry(t *testing.T) {
 }
 
 func TestDebounceReuseOld(t *testing.T) {
-	result := make(chan *frrConfig, 10) // buffered to accomodate spurious rewrites
+	result := make(chan *frrConfig, 10) // buffered to accommodate spurious rewrites
 	dummyUpdate := func(config *frrConfig) error {
 		result <- config
 		return nil
@@ -118,7 +118,7 @@ func TestDebounceReuseOld(t *testing.T) {
 }
 
 func TestDebounceSameConfig(t *testing.T) {
-	result := make(chan *frrConfig, 10) // buffered to accomodate spurious rewrites
+	result := make(chan *frrConfig, 10) // buffered to accommodate spurious rewrites
 	dummyUpdate := func(config *frrConfig) error {
 		result <- config
 		return nil

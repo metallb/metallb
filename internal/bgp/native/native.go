@@ -496,9 +496,9 @@ func (s *session) Close() error {
 }
 
 // DialTCP does the part of creating a connection manually,  including setting the
-// proper TCP MD5 options when the password is not empty. Works by manupulating
+// proper TCP MD5 options when the password is not empty. Works by manipulating
 // the low level FD's, skipping the net.Conn API as it has not hooks to set
-// the neccessary sockopts for TCP MD5.
+// the necessary sockopts for TCP MD5.
 func dialMD5(ctx context.Context, addr string, srcAddr net.IP, password string) (net.Conn, error) {
 	// If srcAddr exists on any of the local network interfaces, use it as the
 	// source address of the TCP socket. Otherwise, use the IPv6 unspecified
