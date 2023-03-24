@@ -6,18 +6,12 @@ linters:
   - goimports
   - gofmt
   - ginkgolinter
-  #- dogsled              #style
-  #- dupl                 #style - fixes required
+  - dogsled
   #- exportloopref        #bugs
-  #- exhaustive           #bugs  - fixes required
-  #- funlen               #style - fixes required
   #- goconst              #stye  - fixes required
-  #- gocritic             #style - fixes required
+  - gocritic             #style - fixes required
   #- gomnd                #style - fixes required
-  #- gosec                #bugs  - fixes required
-  #- lll                  #style - fixes required
-  #- misspell             #style - fixes required
-  #- nakedret             #style - fixes required
+  - misspell             #style - fixes required
   - nolintlint
   - stylecheck
   - unconvert
@@ -42,6 +36,9 @@ linters-settings:
     min-occurrences: 2
   misspell:
     locale: US
+    ignore-words:
+      - neighbours
+      - neighbour
   stylecheck:
     dot-import-whitelist:
     - github.com/onsi/ginkgo

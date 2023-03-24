@@ -177,7 +177,7 @@ All the BGP changes will happen from a "behavioural" point of view. Where needed
 The risk of not covering all possible cases / permutations is still there.
 
 That aside, this proposal covers the majority of the issues that were raised by the users (multiple times), and it won't prevent adding a finer level of configuration
-if the need ever arises. Moreover, providing a straightforward way to separate concerns will make it easier to accomodate new changes, and it will be more clear where
+if the need ever arises. Moreover, providing a straightforward way to separate concerns will make it easier to accommodate new changes, and it will be more clear where
 those new changes must be applied.
 
 ## Design Details
