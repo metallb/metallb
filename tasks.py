@@ -190,6 +190,20 @@ def build(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag=
     for arch in architectures:
 
         for bin in binaries:
+            try:
+                if _is_podman():
+                    command = "podman"
+                else:
+                    command = "docker"
+                run ("{command} image rm {registry}/{repo}/{bin}:{tag}-{arch}".format(
+                            command=command,
+                            registry=registry,
+                            repo=repo,
+                            bin=bin,
+                            tag=tag,
+                            arch=arch))
+            except:
+                pass
             run("{docker_build_cmd} "
                 "--platform linux/{arch} "
                 "-t {registry}/{repo}/{bin}:{tag}-{arch} "
