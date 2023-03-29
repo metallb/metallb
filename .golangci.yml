@@ -16,6 +16,8 @@ linters:
   - unparam
   - whitespace
   - revive
+  - unused
+  - wastedassign
 linters-settings:
   errcheck:
     exclude: .golangci.exclude
