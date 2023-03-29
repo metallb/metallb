@@ -16,7 +16,7 @@ const (
 
 func Do(address string, exc executor.Executor) error {
 	retrycnt := 0
-	code := 0
+	var code int
 	var err error
 
 	// Retry loop to handle wget NetworkFailure errors
