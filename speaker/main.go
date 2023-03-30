@@ -33,6 +33,7 @@ import (
 	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/k8s/epslices"
+	k8snodes "go.universe.tf/metallb/internal/k8s/nodes"
 	"go.universe.tf/metallb/internal/layer2"
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/speakerlist"
@@ -204,6 +205,7 @@ func main() {
 
 type controller struct {
 	myNode  string
+	nodes   map[string]*v1.Node
 	bgpType bgpImplementation
 
 	config *config.Config
@@ -267,6 +269,8 @@ func newController(cfg controllerConfig) (*controller, error) {
 	}
 	ret.announced[config.BGP] = map[string]bool{}
 	ret.announced[config.Layer2] = map[string]bool{}
+
+	ret.nodes = make(map[string]*v1.Node)
 
 	return ret, nil
 }
@@ -345,7 +349,7 @@ func (c *controller) handleService(l log.Logger,
 		return c.deleteBalancerProtocol(l, protocol, name, "internalError")
 	}
 
-	if deleteReason := handler.ShouldAnnounce(l, name, lbIPs, pool, svc, eps); deleteReason != "" {
+	if deleteReason := handler.ShouldAnnounce(l, name, lbIPs, pool, svc, eps, c.nodes); deleteReason != "" {
 		return c.deleteBalancerProtocol(l, protocol, name, deleteReason)
 	}
 
@@ -508,19 +512,31 @@ func (c *controller) SetConfig(l log.Logger, cfg *config.Config) controllers.Syn
 }
 
 func (c *controller) SetNode(l log.Logger, node *v1.Node) controllers.SyncState {
+	conditionChanged := isNetworkConditionChanged(c.myNode, c.nodes, node)
+	c.nodes[node.Name] = node
+
 	for proto, handler := range c.protocolHandlers {
 		if err := handler.SetNode(l, node); err != nil {
 			level.Error(l).Log("op", "setNode", "error", err, "protocol", proto, "msg", "failed to propagate node info to protocol handler")
 			return controllers.SyncStateError
 		}
 	}
+
+	if conditionChanged {
+		return controllers.SyncStateReprocessAll
+	}
+
 	return controllers.SyncStateSuccess
+}
+
+func isNetworkConditionChanged(nodeName string, oldNodes map[string]*v1.Node, newNode *v1.Node) bool {
+	return k8snodes.IsNetworkUnavailable(oldNodes[nodeName]) != k8snodes.IsNetworkUnavailable(newNode)
 }
 
 // A Protocol can advertise an IP address.
 type Protocol interface {
 	SetConfig(log.Logger, *config.Config) error
-	ShouldAnnounce(log.Logger, string, []net.IP, *config.Pool, *v1.Service, epslices.EpsOrSlices) string
+	ShouldAnnounce(log.Logger, string, []net.IP, *config.Pool, *v1.Service, epslices.EpsOrSlices, map[string]*v1.Node) string
 	SetBalancer(log.Logger, string, []net.IP, *config.Pool, service, *v1.Service) error
 	DeleteBalancer(log.Logger, string, string) error
 	SetNode(log.Logger, *v1.Node) error

@@ -26,6 +26,7 @@ import (
 	bgpnative "go.universe.tf/metallb/internal/bgp/native"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/epslices"
+	k8snodes "go.universe.tf/metallb/internal/k8s/nodes"
 	"go.universe.tf/metallb/internal/logging"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -159,10 +160,15 @@ func hasHealthyEndpoint(eps epslices.EpsOrSlices, filterNode func(*string) bool)
 	return false
 }
 
-func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, pool *config.Pool, svc *v1.Service, eps epslices.EpsOrSlices) string {
+func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, pool *config.Pool, svc *v1.Service, eps epslices.EpsOrSlices, nodes map[string]*v1.Node) string {
 	if !poolMatchesNodeBGP(pool, c.myNode) {
 		level.Debug(l).Log("event", "skipping should announce bgp", "service", name, "reason", "pool not matching my node")
 		return "notOwner"
+	}
+
+	if k8snodes.IsNetworkUnavailable(nodes[c.myNode]) {
+		level.Debug(l).Log("event", "skipping should announce bgp", "service", name, "reason", "speaker's node has NodeNetworkUnavailable condition")
+		return "nodeNetworkUnavailable"
 	}
 	// Should we advertise?
 	// Yes, if externalTrafficPolicy is
@@ -339,6 +345,9 @@ func (c *bgpController) DeleteBalancer(l log.Logger, name, reason string) error 
 }
 
 func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
+	if c.myNode != node.Name {
+		return nil
+	}
 	nodeLabels := node.Labels
 	if nodeLabels == nil {
 		nodeLabels = map[string]string{}
