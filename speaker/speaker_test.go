@@ -172,7 +172,7 @@ func (m *MockProtocol) SetConfig(l log.Logger, c *config.Config) error {
 	return nil
 }
 
-func (m *MockProtocol) ShouldAnnounce(_ log.Logger, _ string, _ []net.IP, _ *config.Pool, _ *v1.Service, _ epslices.EpsOrSlices) string {
+func (m *MockProtocol) ShouldAnnounce(_ log.Logger, _ string, _ []net.IP, _ *config.Pool, _ *v1.Service, _ epslices.EpsOrSlices, _ map[string]*v1.Node) string {
 	if m.shouldAnnounce {
 		return ""
 	}

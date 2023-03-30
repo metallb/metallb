@@ -1934,6 +1934,7 @@ func TestNodeSelectors(t *testing.T) {
 			desc: "Add node label that matches",
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
+					Name: "pandora",
 					Labels: map[string]string{
 						"foo": "bar",
 					},
@@ -1949,6 +1950,7 @@ func TestNodeSelectors(t *testing.T) {
 			desc: "Change node label so it no longer matches",
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
+					Name: "pandora",
 					Labels: map[string]string{
 						"foo": "baz",
 					},
@@ -1986,6 +1988,7 @@ func TestNodeSelectors(t *testing.T) {
 			desc: "Change node label back, still matches",
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
+					Name: "pandora",
 					Labels: map[string]string{
 						"foo": "bar",
 					},
@@ -2025,6 +2028,7 @@ func TestNodeSelectors(t *testing.T) {
 			desc: "Change node labels to match the other selector",
 			node: &v1.Node{
 				ObjectMeta: metav1.ObjectMeta{
+					Name: "pandora",
 					Labels: map[string]string{
 						"host": "frontend",
 					},
