@@ -48,34 +48,39 @@ func TestNodeController(t *testing.T) {
 		},
 	}
 	tests := []struct {
-		desc                 string
-		handlerRes           SyncState
-		expectReconcileFails bool
-		initObjects          []client.Object
+		desc                    string
+		handlerRes              SyncState
+		expectReconcileFails    bool
+		initObjects             []client.Object
+		expectForceReloadCalled bool
 	}{
 		{
-			desc:                 "handler returns SyncStateSuccess",
-			handlerRes:           SyncStateSuccess,
-			initObjects:          []client.Object{testNode},
-			expectReconcileFails: false,
+			desc:                    "handler returns SyncStateSuccess",
+			handlerRes:              SyncStateSuccess,
+			initObjects:             []client.Object{testNode},
+			expectReconcileFails:    false,
+			expectForceReloadCalled: false,
 		},
 		{
-			desc:                 "handler returns SyncStateError",
-			handlerRes:           SyncStateError,
-			initObjects:          []client.Object{testNode},
-			expectReconcileFails: true,
+			desc:                    "handler returns SyncStateError",
+			handlerRes:              SyncStateError,
+			initObjects:             []client.Object{testNode},
+			expectReconcileFails:    true,
+			expectForceReloadCalled: false,
 		},
 		{
-			desc:                 "handler returns SyncStateErrorNoRetry",
-			handlerRes:           SyncStateErrorNoRetry,
-			initObjects:          []client.Object{testNode},
-			expectReconcileFails: false,
+			desc:                    "handler returns SyncStateErrorNoRetry",
+			handlerRes:              SyncStateErrorNoRetry,
+			initObjects:             []client.Object{testNode},
+			expectReconcileFails:    false,
+			expectForceReloadCalled: false,
 		},
 		{
-			desc:                 "handler returns SyncStateReprocessAll",
-			handlerRes:           SyncStateReprocessAll,
-			initObjects:          []client.Object{testNode},
-			expectReconcileFails: false,
+			desc:                    "handler returns SyncStateReprocessAll",
+			handlerRes:              SyncStateReprocessAll,
+			initObjects:             []client.Object{testNode},
+			expectReconcileFails:    false,
+			expectForceReloadCalled: true,
 		},
 	}
 	for _, test := range tests {
@@ -92,13 +97,17 @@ func TestNodeController(t *testing.T) {
 			return test.handlerRes
 		}
 
+		calledForceReload := false
+		mockForceReload := func() { calledForceReload = true }
+
 		r := &NodeReconciler{
-			Client:    fakeClient,
-			Logger:    log.NewNopLogger(),
-			Scheme:    scheme,
-			NodeName:  testNodeName,
-			Namespace: testNamespace,
-			Handler:   mockHandler,
+			Client:      fakeClient,
+			Logger:      log.NewNopLogger(),
+			Scheme:      scheme,
+			NodeName:    testNodeName,
+			Namespace:   testNamespace,
+			Handler:     mockHandler,
+			ForceReload: mockForceReload,
 		}
 		req := reconcile.Request{
 			NamespacedName: types.NamespacedName{
@@ -113,6 +122,10 @@ func TestNodeController(t *testing.T) {
 		if test.expectReconcileFails != failedReconcile {
 			t.Errorf("test %s failed: fail reconcile expected: %v, got: %v. err: %v",
 				test.desc, test.expectReconcileFails, failedReconcile, err)
+		}
+
+		if test.expectForceReloadCalled != calledForceReload {
+			t.Errorf("test %s failed: call force reload expected: %v, got: %v", test.desc, test.expectForceReloadCalled, calledForceReload)
 		}
 	}
 }
