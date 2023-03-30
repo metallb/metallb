@@ -24,6 +24,7 @@ import (
 	"github.com/go-kit/log/level"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/epslices"
+	k8snodes "go.universe.tf/metallb/internal/k8s/nodes"
 	"go.universe.tf/metallb/internal/layer2"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -94,7 +95,7 @@ func usableNodes(eps epslices.EpsOrSlices, speakers map[string]bool) []string {
 	return ret
 }
 
-func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce []net.IP, pool *config.Pool, svc *v1.Service, eps epslices.EpsOrSlices) string {
+func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce []net.IP, pool *config.Pool, svc *v1.Service, eps epslices.EpsOrSlices, nodes map[string]*v1.Node) string {
 	if !activeEndpointExists(eps) { // no active endpoints, just return
 		level.Debug(l).Log("event", "shouldannounce", "protocol", "l2", "message", "failed no active endpoints", "service", name)
 		return "notOwner"
@@ -106,27 +107,29 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 	}
 
 	// we select the nodes with at least one matching l2 advertisement
-	forPool := speakersForPool(c.sList.UsableSpeakers(), pool)
-	var nodes []string
+	forPool := speakersForPool(c.sList.UsableSpeakers(), pool, nodes)
+	var availableNodes []string
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
-		nodes = usableNodes(eps, forPool)
+		availableNodes = usableNodes(eps, forPool)
 	} else {
-		nodes = nodesWithActiveSpeakers(forPool)
+		availableNodes = nodesWithActiveSpeakers(forPool)
 	}
+	level.Debug(l).Log("event", "shouldannounce", "protocol", "l2", "nodes", availableNodes, "service", name)
+
 	// Using the first IP should work for both single and dual stack.
 	ipString := toAnnounce[0].String()
 	// Sort the slice by the hash of node + load balancer ips. This
 	// produces an ordering of ready nodes that is unique to all the services
 	// with the same ip.
-	sort.Slice(nodes, func(i, j int) bool {
-		hi := sha256.Sum256([]byte(nodes[i] + "#" + ipString))
-		hj := sha256.Sum256([]byte(nodes[j] + "#" + ipString))
+	sort.Slice(availableNodes, func(i, j int) bool {
+		hi := sha256.Sum256([]byte(availableNodes[i] + "#" + ipString))
+		hj := sha256.Sum256([]byte(availableNodes[j] + "#" + ipString))
 
 		return bytes.Compare(hi[:], hj[:]) < 0
 	})
 
 	// Are we first in the list? If so, we win and should announce.
-	if len(nodes) > 0 && nodes[0] == c.myNode {
+	if len(availableNodes) > 0 && availableNodes[0] == c.myNode {
 		return ""
 	}
 
@@ -157,7 +160,10 @@ func (c *layer2Controller) DeleteBalancer(l log.Logger, name, reason string) err
 	return nil
 }
 
-func (c *layer2Controller) SetNode(log.Logger, *v1.Node) error {
+func (c *layer2Controller) SetNode(l log.Logger, n *v1.Node) error {
+	if c.myNode != n.Name {
+		return nil
+	}
 	c.sList.Rejoin()
 	return nil
 }
@@ -216,9 +222,12 @@ func poolMatchesNodeL2(pool *config.Pool, node string) bool {
 	return false
 }
 
-func speakersForPool(speakers map[string]bool, pool *config.Pool) map[string]bool {
+func speakersForPool(speakers map[string]bool, pool *config.Pool, nodes map[string]*v1.Node) map[string]bool {
 	res := map[string]bool{}
 	for s := range speakers {
+		if k8snodes.IsNetworkUnavailable(nodes[s]) {
+			continue
+		}
 		if poolMatchesNodeL2(pool, s) {
 			res[s] = true
 		}

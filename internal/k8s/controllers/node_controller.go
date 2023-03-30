@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"reflect"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -33,11 +34,12 @@ import (
 
 type NodeReconciler struct {
 	client.Client
-	Logger    log.Logger
-	Scheme    *runtime.Scheme
-	NodeName  string
-	Namespace string
-	Handler   func(log.Logger, *corev1.Node) SyncState
+	Logger      log.Logger
+	Scheme      *runtime.Scheme
+	NodeName    string
+	Namespace   string
+	Handler     func(log.Logger, *corev1.Node) SyncState
+	ForceReload func()
 }
 
 func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -57,7 +59,8 @@ func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		updateErrors.Inc()
 		return ctrl.Result{}, errRetry
 	case SyncStateReprocessAll:
-		level.Error(r.Logger).Log("controller", "NodeReconciler", "error", "unexpected result reprocess all")
+		level.Info(r.Logger).Log("controller", "NodeReconciler", "event", "force service reload")
+		r.ForceReload()
 		return ctrl.Result{}, nil
 	case SyncStateErrorNoRetry:
 		updateErrors.Inc()
@@ -68,15 +71,6 @@ func (r *NodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 func (r *NodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	p := predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
-			return r.filterOtherNodes(e.Object)
-		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			return r.filterOtherNodes(e.Object)
-		},
-		GenericFunc: func(e event.GenericEvent) bool {
-			return r.filterOtherNodes(e.Object)
-		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			newNodeObj, ok := e.ObjectNew.(*corev1.Node)
 			if !ok {
@@ -89,23 +83,15 @@ func (r *NodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return true
 			}
 			// If there is no changes in node labels, ignore event.
-			if labels.Equals(labels.Set(oldNodeObj.Labels), labels.Set(newNodeObj.Labels)) {
+			if labels.Equals(labels.Set(oldNodeObj.Labels), labels.Set(newNodeObj.Labels)) &&
+				reflect.DeepEqual(oldNodeObj.Status.Conditions, newNodeObj.Status.Conditions) {
 				return false
 			}
-			return r.filterOtherNodes(newNodeObj)
+			return true
 		},
 	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.Node{}).
 		WithEventFilter(p).
 		Complete(r)
-}
-
-func (r *NodeReconciler) filterOtherNodes(obj client.Object) bool {
-	node, ok := obj.(*corev1.Node)
-	if !ok {
-		level.Error(r.Logger).Log("controller", "NodeReconciler", "error", "object is not node", "name", obj.GetName())
-		return false
-	}
-	return node.Name == r.NodeName
 }
