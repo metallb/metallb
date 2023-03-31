@@ -977,10 +977,6 @@ var _ = ginkgo.Describe("BGP", func() {
 	})
 
 	ginkgo.Context("MetalLB FRR rejects", func() {
-		ginkgo.AfterEach(func() {
-			err := k8s.RemoveConfigmap(cs, "bgpextras", metallb.Namespace)
-			framework.ExpectNoError(err)
-		})
 		ginkgo.DescribeTable("any routes advertised by any neighbor", func(addressesRange, toInject string, pairingIPFamily ipfamily.Family) {
 			resources := metallbconfig.ClusterResources{
 				Pools: []metallbv1beta1.IPAddressPool{
@@ -999,50 +995,83 @@ var _ = ginkgo.Describe("BGP", func() {
 				BGPAdvs: []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement},
 			}
 
-			neighborAnnounce := func(frr *frrcontainer.FRR) {
-				frr.NeighborConfig.ToAdvertise = toInject
-			}
-
 			for _, c := range FRRContainers {
-				err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily, neighborAnnounce)
+				err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily, func(frr *frrcontainer.FRR) {
+					frr.NeighborConfig.ToAdvertise = toInject
+				})
 				framework.ExpectNoError(err)
 			}
 
-			err := ConfigUpdater.Update(resources)
+			speakerPods, err := metallb.SpeakerPods(cs)
+			framework.ExpectNoError(err)
+			checkRoute := func() error {
+				return checkRouteInjected(speakerPods, pairingIPFamily, toInject, "all")
+			}
+
+			err = ConfigUpdater.Update(resources)
 			framework.ExpectNoError(err)
 
 			for _, c := range FRRContainers {
 				validateFRRPeeredWithAllNodes(cs, c, pairingIPFamily)
 			}
+
+			Consistently(checkRoute, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
+			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb")
+			defer testservice.Delete(cs, svc)
+
+			Consistently(checkRoute, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
+		},
+			ginkgo.Entry("IPV4", "192.168.10.0/24", "172.16.1.1/32", ipfamily.IPv4),
+			ginkgo.Entry("IPV6", "fc00:f853:0ccd:e799::/116", "fc00:f853:ccd:e800::1/128", ipfamily.IPv6),
+		)
+	})
+
+	ginkgo.Context("MetalLB allows adding extra FRR configuration", func() {
+		type whenApply string
+		var before whenApply = "before"
+		var after whenApply = "after"
+		ginkgo.AfterEach(func() {
+			err := k8s.RemoveConfigmap(cs, "bgpextras", metallb.Namespace)
+			framework.ExpectNoError(err)
+		})
+		ginkgo.DescribeTable("to accept any routes advertised by any neighbor", func(addressesRange, toInject string, pairingIPFamily ipfamily.Family, when whenApply) {
+			resources := metallbconfig.ClusterResources{
+				Pools: []metallbv1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "rejectroutes",
+						},
+						Spec: metallbv1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								addressesRange,
+							},
+						},
+					},
+				},
+				Peers:   metallb.PeersForContainers(FRRContainers, pairingIPFamily),
+				BGPAdvs: []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement},
+			}
+
+			for i, c := range FRRContainers {
+				err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily, func(frr *frrcontainer.FRR) {
+					// We advertise a different route for each different container, to ensure all
+					// of them are able to advertise regardless of the configuration
+					frr.NeighborConfig.ToAdvertise = fmt.Sprintf(toInject, i+1)
+				})
+				framework.ExpectNoError(err)
+			}
+
 			speakerPods, err := metallb.SpeakerPods(cs)
 			framework.ExpectNoError(err)
-
-			checkRoutesInjected := func() error {
-				for _, pod := range speakerPods {
-					podExec := executor.ForPod(pod.Namespace, pod.Name, "frr")
-					routes, frrRoutesV6, err := frr.Routes(podExec)
-					framework.ExpectNoError(err)
-
-					if pairingIPFamily == ipfamily.IPv6 {
-						routes = frrRoutesV6
-					}
-
-					for _, route := range routes {
-						if route.Destination.String() == toInject {
-							return fmt.Errorf("found %s in %s routes", toInject, pod.Name)
-						}
+			checkRoutesAreInjected := func() error {
+				for i, c := range FRRContainers {
+					err := checkRouteInjected(speakerPods, pairingIPFamily, fmt.Sprintf(toInject, i+1), c.RouterConfig.VRF)
+					if err == nil {
+						return fmt.Errorf("route not injected from %s", c.Name)
 					}
 				}
 				return nil
 			}
-
-			Consistently(checkRoutesInjected, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
-			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb")
-			defer testservice.Delete(cs, svc)
-
-			Consistently(checkRoutesInjected, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
-
-			ginkgo.By("adding a custom configuration that allows incoming routes")
 
 			data := ""
 			for _, c := range FRRContainers {
@@ -1060,12 +1089,32 @@ var _ = ginkgo.Describe("BGP", func() {
 				"extras": data,
 			}
 
-			err = k8s.CreateConfigmap(cs, "bgpextras", metallb.Namespace, extraData)
+			if when == before {
+				ginkgo.By("Applying a configmap that allows incoming routes")
+
+				err = k8s.CreateConfigmap(cs, "bgpextras", metallb.Namespace, extraData)
+				framework.ExpectNoError(err)
+			}
+
+			ginkgo.By("Applying the FRR configuration")
+			err = ConfigUpdater.Update(resources)
 			framework.ExpectNoError(err)
-			Eventually(checkRoutesInjected, 30*time.Second, 1*time.Second).Should(HaveOccurred())
+
+			for _, c := range FRRContainers {
+				validateFRRPeeredWithAllNodes(cs, c, pairingIPFamily)
+			}
+
+			if when == after {
+				ginkgo.By("Applying a configmap that allows incoming routes")
+				err = k8s.CreateConfigmap(cs, "bgpextras", metallb.Namespace, extraData)
+				framework.ExpectNoError(err)
+			}
+			Eventually(checkRoutesAreInjected, time.Minute, 1*time.Second).Should(Not(HaveOccurred()))
 		},
-			ginkgo.Entry("IPV4", "192.168.10.0/24", "172.16.1.10/32", ipfamily.IPv4),
-			ginkgo.Entry("IPV6", "fc00:f853:0ccd:e799::/116", "fc00:f853:ccd:e800::1/128", ipfamily.IPv6),
+			ginkgo.Entry("IPV4 - before config", "192.168.10.0/24", "172.16.1.%d/32", ipfamily.IPv4, before),
+			ginkgo.Entry("IPV6 - before config", "fc00:f853:0ccd:e799::/116", "fc00:f853:ccd:e800::%d/128", ipfamily.IPv6, before),
+			ginkgo.Entry("IPV4 - after config", "192.168.10.0/24", "172.16.1.%d/32", ipfamily.IPv4, after),
+			ginkgo.Entry("IPV6 - after config", "fc00:f853:0ccd:e799::/116", "fc00:f853:ccd:e800::%d/128", ipfamily.IPv6, after),
 		)
 	})
 

@@ -49,7 +49,17 @@ func NeighborsInfo(exec executor.Executor) ([]*bgpfrr.Neighbor, error) {
 // Routes returns informations about routes in the given executor
 // first for ipv4 routes and then for ipv6 routes.
 func Routes(exec executor.Executor) (map[string]bgpfrr.Route, map[string]bgpfrr.Route, error) {
-	res, err := exec.Exec("vtysh", "-c", "show bgp ipv4 json")
+	return RoutesForVRF("", exec)
+}
+
+// RoutesForVRF returns informations about routes in the given executor
+// first for ipv4 routes and then for ipv6 routes for the given vrf.
+func RoutesForVRF(vrf string, exec executor.Executor) (map[string]bgpfrr.Route, map[string]bgpfrr.Route, error) {
+	cmd := "show bgp ipv4 json"
+	if vrf != "" {
+		cmd = fmt.Sprintf("show bgp vrf %s ipv4  json", vrf)
+	}
+	res, err := exec.Exec("vtysh", "-c", cmd)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "Failed to query routes")
 	}
@@ -57,7 +67,11 @@ func Routes(exec executor.Executor) (map[string]bgpfrr.Route, map[string]bgpfrr.
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "Failed to parse routes %s", res)
 	}
-	res, err = exec.Exec("vtysh", "-c", "show bgp ipv6 json")
+	cmd = "show bgp ipv6 json"
+	if vrf != "" {
+		cmd = fmt.Sprintf("show bgp vrf %s ipv6 json", vrf)
+	}
+	res, err = exec.Exec("vtysh", "-c", cmd)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "Failed to query routes")
 	}
