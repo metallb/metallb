@@ -349,3 +349,22 @@ func validateServiceNotInRoutesForCommunity(c *frrcontainer.FRR, community strin
 		return nil
 	}, 4*time.Minute, 1*time.Second).Should(MatchError(ContainSubstring("not in routes")))
 }
+
+func checkRouteInjected(pods []*corev1.Pod, pairingFamily ipfamily.Family, routeToCheck, vrf string) error {
+	for _, pod := range pods {
+		podExec := executor.ForPod(pod.Namespace, pod.Name, "frr")
+		routes, frrRoutesV6, err := frr.RoutesForVRF(vrf, podExec)
+		framework.ExpectNoError(err)
+
+		if pairingFamily == ipfamily.IPv6 {
+			routes = frrRoutesV6
+		}
+
+		for _, route := range routes {
+			if route.Destination.String() == routeToCheck {
+				return fmt.Errorf("found %s in %s routes", routeToCheck, pod.Name)
+			}
+		}
+	}
+	return nil
+}
