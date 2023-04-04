@@ -30,7 +30,8 @@ var (
 		"first-ns": "true",
 	}
 	secondNsLabels = map[string]string{
-		"second-ns": "true",
+		"second-ns":                    "true",
+		admissionapi.EnforceLevelLabel: string(admissionapi.LevelPrivileged),
 	}
 )
 
