@@ -45,3 +45,18 @@ func DeleteNamespace(cs clientset.Interface, name string) error {
 	})
 	return err
 }
+
+func ApplyLabelsToNamespace(cs clientset.Interface, name string, labels map[string]string) error {
+	ns, err := cs.CoreV1().Namespaces().Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		return err
+	}
+	if ns.Labels == nil {
+		ns.Labels = make(map[string]string)
+	}
+	for k, v := range labels {
+		ns.Labels[k] = v
+	}
+	_, err = cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
+	return err
+}

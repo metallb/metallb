@@ -61,8 +61,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Updating the first namespace labels")
-		f.Namespace.Labels = firstNsLabels
-		_, err = cs.CoreV1().Namespaces().Update(context.Background(), f.Namespace, metav1.UpdateOptions{})
+		err = k8s.ApplyLabelsToNamespace(cs, f.Namespace.Name, firstNsLabels)
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating a second namespace")
