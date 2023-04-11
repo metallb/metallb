@@ -13,13 +13,21 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-func CreateNamespace(cs clientset.Interface, name string, labels map[string]string) error {
-	_, err := cs.CoreV1().Namespaces().Create(context.Background(), &corev1.Namespace{
+func CreateNamespace(cs clientset.Interface, name string, labels map[string]string, options ...func(*corev1.Namespace)) error {
+	ns := &corev1.Namespace{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:   name,
-			Labels: labels,
+			Labels: make(map[string]string),
 		},
-	}, metav1.CreateOptions{})
+	}
+	for k, v := range labels {
+		ns.Labels[k] = v
+	}
+	for _, option := range options {
+		option(ns)
+	}
+
+	_, err := cs.CoreV1().Namespaces().Create(context.Background(), ns, metav1.CreateOptions{})
 	return err
 }
 
