@@ -30,8 +30,7 @@ var (
 		"first-ns": "true",
 	}
 	secondNsLabels = map[string]string{
-		"second-ns":                    "true",
-		admissionapi.EnforceLevelLabel: string(admissionapi.LevelPrivileged),
+		"second-ns": "true",
 	}
 )
 
@@ -66,7 +65,11 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Creating a second namespace")
-		err = k8s.CreateNamespace(cs, secondNamespace, secondNsLabels)
+
+		err = k8s.CreateNamespace(cs, secondNamespace, secondNsLabels, func(ns *v1.Namespace) {
+			// we also need to set the pod security policy for the namespace
+			ns.Labels[admissionapi.EnforceLevelLabel] = string(admissionapi.LevelPrivileged)
+		})
 		framework.ExpectNoError(err)
 
 	})
