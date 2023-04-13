@@ -232,6 +232,54 @@ var _ = ginkgo.Describe("L2", func() {
 			err = wget.Do(address, executor.Host)
 			framework.ExpectNoError(err)
 		})
+
+		ginkgo.It("should not be announced from a node with a NetworkUnavailable condition", func() {
+			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", service.TrafficPolicyCluster)
+			defer func() {
+				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+			}()
+
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("getting the advertising node")
+			ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+			n, err := advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
+			framework.ExpectNoError(err)
+			nodeToSet := n.Name
+
+			err = k8s.SetNodeCondition(cs, nodeToSet, corev1.NodeNetworkUnavailable, corev1.ConditionTrue)
+			framework.ExpectNoError(err)
+			defer func() {
+				err = k8s.SetNodeCondition(cs, nodeToSet, corev1.NodeNetworkUnavailable, corev1.ConditionFalse)
+				framework.ExpectNoError(err)
+			}()
+
+			ginkgo.By("validating the service is announced from a different node")
+			gomega.Eventually(func() string {
+				advNode, err := advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
+				if err != nil {
+					return err.Error()
+				}
+
+				return advNode.Name
+			}, time.Minute, time.Second).ShouldNot(gomega.Equal(nodeToSet))
+
+			ginkgo.By("setting the NetworkUnavailable condition back to false")
+			err = k8s.SetNodeCondition(cs, nodeToSet, corev1.NodeNetworkUnavailable, corev1.ConditionFalse)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("validating the service is announced back again from the previous node")
+			gomega.Eventually(func() string {
+				advNode, err := advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
+				if err != nil {
+					return err.Error()
+				}
+
+				return advNode.Name
+			}, time.Minute, time.Second).Should(gomega.Equal(nodeToSet))
+		})
 	})
 
 	ginkgo.Context("validate different AddressPools for type=Loadbalancer", func() {

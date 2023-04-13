@@ -4,11 +4,17 @@ package k8s
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"net"
+	"time"
 
+	"github.com/onsi/ginkgo/v2"
+	"github.com/onsi/gomega"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/netdev"
 	"go.universe.tf/metallb/internal/ipfamily"
+	"go.universe.tf/metallb/internal/k8s/nodes"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -90,4 +96,45 @@ func RemoveLabelFromNode(nodeName, key string, cs clientset.Interface) {
 	delete(nodeObject.Labels, key)
 	_, err = cs.CoreV1().Nodes().Update(context.Background(), nodeObject, metav1.UpdateOptions{})
 	framework.ExpectNoError(err)
+}
+
+// SetNodeCondition sets the node's condition to the desired status and validates that the change is applied.
+func SetNodeCondition(cs clientset.Interface, nodeName string, conditionType v1.NodeConditionType, status v1.ConditionStatus) error {
+	ginkgo.By(fmt.Sprintf("setting the %s condition to %s on node %s", conditionType, status, nodeName))
+
+	condition := v1.NodeCondition{
+		Type:               conditionType,
+		Status:             status,
+		Reason:             "Testing",
+		Message:            fmt.Sprintf("This condition is %s for testing", status),
+		LastTransitionTime: metav1.Now(),
+		LastHeartbeatTime:  metav1.Now(),
+	}
+
+	raw, err := json.Marshal(&[]v1.NodeCondition{condition})
+	if err != nil {
+		return fmt.Errorf("failed to set condition %s on node %s: %s", conditionType, nodeName, err)
+	}
+
+	gomega.Eventually(func() error {
+		patch := []byte(fmt.Sprintf(`{"status":{"conditions":%s}}`, raw))
+		_, err = cs.CoreV1().Nodes().PatchStatus(context.Background(), nodeName, patch)
+		if err != nil {
+			return fmt.Errorf("failed to set condition %s on node %s: %s", conditionType, nodeName, err)
+		}
+
+		n, err := cs.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to get node %s: %s", nodeName, err)
+		}
+
+		gotStatus := nodes.ConditionStatus(n, conditionType)
+		if status != gotStatus {
+			return fmt.Errorf("failed: got unexpected %s status on node %s", conditionType, nodeName)
+		}
+
+		return nil
+	}, time.Minute, 3*time.Second).ShouldNot(gomega.HaveOccurred())
+
+	return nil
 }
