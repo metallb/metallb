@@ -1,10 +1,50 @@
-FROM alpine:latest
+# syntax=docker/dockerfile:1.2
 
-ADD controller /controller
+FROM --platform=$BUILDPLATFORM docker.io/golang:1.19.5 AS builder
+ARG GIT_COMMIT=dev
+ARG GIT_BRANCH=dev
 
-# When running as non root and building in an environment that `umask` masks out
-# '+x' for others, it won't be possible to execute. Make sure all can execute,
-# just in case
-RUN chmod a+x /controller
+WORKDIR $GOPATH/go.universe.tf/metallb
+# Caching dependencies
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY controller/*.go .
+COPY internal internal
+COPY api api
+
+ARG TARGETARCH
+ARG TARGETOS
+ARG TARGETPLATFORM
+
+# Extract variant
+RUN case ${TARGETPLATFORM} in \
+  "linux/arm/v6") export VARIANT="6" ;; \
+  "linux/arm/v7") export VARIANT="7" ;; \
+  *) export VARIANT="" ;; \
+  esac
+
+# have to manually convert as building the different arms can cause issues
+# Cache builds directory for faster rebuild
+RUN --mount=type=cache,target=/root/.cache/go-build \
+  --mount=type=cache,target=/go/pkg \
+  CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH GOARM=$VARIANT \
+  go build -v -o /build/controller \
+  -ldflags "-X 'go.universe.tf/metallb/internal/version.gitCommit=${GIT_COMMIT}' -X 'go.universe.tf/metallb/internal/version.gitBranch=${GIT_BRANCH}'"
+
+FROM docker.io/alpine:latest
+
+COPY --from=builder /build/controller /controller
+COPY LICENSE /
+
+LABEL org.opencontainers.image.authors="metallb" \
+  org.opencontainers.image.url="https://github.com/metallb/metallb" \
+  org.opencontainers.image.documentation="https://metallb.universe.tf" \
+  org.opencontainers.image.source="https://github.com/metallb/metallb" \
+  org.opencontainers.image.vendor="metallb" \
+  org.opencontainers.image.licenses="Apache-2.0" \
+  org.opencontainers.image.description="Metallb Controller" \
+  org.opencontainers.image.title="controller" \
+  org.opencontainers.image.base.name="docker.io/alpine:latest"
 
 ENTRYPOINT ["/controller"]
