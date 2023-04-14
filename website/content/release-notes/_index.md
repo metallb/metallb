@@ -3,6 +3,12 @@ title: Release Notes
 weight: 8
 ---
 
+## Version v0.9.8
+
+Bugfixes:
+
+- No MetalLB code changes. Rebuild to include alpine and up to date go deps.
+
 ## Version 0.9.7
 
 Bugfixes:
