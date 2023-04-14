@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        image: [speaker, controller, configmaptocrs]
+        image: [speaker, controller]
     steps:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
