@@ -11,7 +11,6 @@ RUN go mod download
 
 COPY controller/*.go .
 COPY internal internal
-COPY api api
 
 ARG TARGETARCH
 ARG TARGETOS
