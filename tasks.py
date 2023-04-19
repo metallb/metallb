@@ -740,8 +740,9 @@ def helmdocs(ctx, env="container"):
     "local_nics": "a list of bridges related node's interfaces separated by comma, default is kind",
     "external_containers": "a comma separated list of external containers names to use for the test. (valid parameters are: ibgp-single-hop / ibgp-multi-hop / ebgp-single-hop / ebgp-multi-hop)",
     "native_bgp": "tells if the given cluster is deployed using native bgp mode ",
+    "external_frr_image": "overrides the image used for the external frr containers used in tests",
 })
-def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None, prometheus_namespace="", node_nics="kind", local_nics="kind", external_containers="", native_bgp=False,):
+def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None, prometheus_namespace="", node_nics="kind", local_nics="kind", external_containers="", native_bgp=False,external_frr_image=""):
     """Run E2E tests against development cluster."""
     _fetch_kubectl()
 
@@ -801,8 +802,10 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
     if external_containers != "":
         external_containers = "--external-containers="+(external_containers)
 
+    if external_frr_image != "":
+        external_frr_image = "--frr-image="+(external_frr_image)
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "KUBECONFIG={} ginkgo --timeout=3h {} {} -- --provider=local --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {}  -bgp-native-mode={}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range, ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace, node_nics, local_nics, external_containers, native_bgp), warn="True")
+            "KUBECONFIG={} ginkgo --timeout=3h {} {} -- --provider=local --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {}  -bgp-native-mode={} {}".format(kubeconfig, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range, ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace, node_nics, local_nics, external_containers, native_bgp, external_frr_image), warn="True")
 
     if export != None:
         run("kind export logs {}".format(export))
