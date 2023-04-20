@@ -7,8 +7,12 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
+
+	"go.universe.tf/metallb/internal/bgp"
+	"go.universe.tf/metallb/internal/bgp/community"
 )
 
 // Just test that sendOpen and readOpen can at least talk to each other.
@@ -91,6 +95,70 @@ func TestOpenFourByteASN(t *testing.T) {
 		}
 		if want, got := test.asn, open.asn; want != got {
 			t.Errorf("%d: OPEN ASN is %v, wanted %v", i, got, want)
+		}
+	}
+}
+
+// TestSendUpdate makes sure that sendUpdate fails if large communities are provided. The E2E tests take care of
+// testing further functionality. A decodeUpdate method would be needed for a more complete unit test.
+func TestSendUpdate(t *testing.T) {
+	tcs := map[string]struct {
+		asn         uint32
+		ibgp        bool
+		fbasn       bool
+		nextHop     net.IP
+		adv         *bgp.Advertisement
+		errorString string
+	}{
+		"send update with legacy communities should succeed": {
+			asn:     65000,
+			ibgp:    false,
+			fbasn:   false,
+			nextHop: net.ParseIP("192.168.123.10"),
+			adv: &bgp.Advertisement{
+				Prefix: func() *net.IPNet {
+					_, ipnet, _ := net.ParseCIDR("172.16.0.0/24")
+					return ipnet
+				}(),
+				LocalPref: 100,
+				Communities: func() []community.BGPCommunity {
+					c1, _ := community.New("0:1234")
+					c2, _ := community.New("0:2345")
+					return []community.BGPCommunity{c1, c2}
+				}(),
+				Peers: []string{},
+			},
+			errorString: "",
+		},
+		"send update with large communities should result in an error": {
+			asn:     65000,
+			ibgp:    false,
+			fbasn:   false,
+			nextHop: net.ParseIP("192.168.123.10"),
+			adv: &bgp.Advertisement{
+				Prefix: func() *net.IPNet {
+					_, ipnet, _ := net.ParseCIDR("172.16.0.0/24")
+					return ipnet
+				}(),
+				LocalPref: 100,
+				Communities: func() []community.BGPCommunity {
+					c1, _ := community.New("0:1234")
+					c2, _ := community.New("large:123:234:567")
+					return []community.BGPCommunity{c1, c2}
+				}(),
+				Peers: []string{},
+			},
+			errorString: "invalid community type for BGP native mode",
+		},
+	}
+	for d, tc := range tcs {
+		var b bytes.Buffer
+		err := sendUpdate(&b, tc.asn, tc.ibgp, tc.fbasn, tc.nextHop, tc.adv)
+		if tc.errorString == "" && err != nil {
+			t.Fatalf("%s(%s): send update, err: %q", t.Name(), d, err)
+		}
+		if tc.errorString != "" && (err == nil || !strings.Contains(err.Error(), tc.errorString)) {
+			t.Fatalf("%s(%s): send update expected to see error %q but got %q instead", t.Name(), d, tc.errorString, err)
 		}
 	}
 }

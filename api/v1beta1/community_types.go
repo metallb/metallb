@@ -23,7 +23,8 @@ import (
 type CommunityAlias struct {
 	// The name of the alias for the community.
 	Name string `json:"name,omitempty"`
-	// The BGP community value corresponding to the given name.
+	// The BGP community value corresponding to the given name. Can be a standard community of the form 1234:1234
+	// or a large community of the form large:1234:1234:1234.
 	Value string `json:"value,omitempty"`
 }
 

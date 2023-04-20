@@ -67,8 +67,9 @@ spec:
                 type: integer
               communities:
                 description: The BGP communities to be associated with the announcement.
-                  Each item can be a community of the form 1234:1234 or the name of
-                  an alias defined in the Community CRD.
+                  Each item can be a standard community of the form 1234:1234, a large
+                  community of the form large:1234:1234:1234 or the name of an alias
+                  defined in the Community CRD.
                 items:
                   type: string
                 type: array

@@ -7,6 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
+	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/ipfamily"
 )
 
@@ -39,11 +40,20 @@ func DiscardFRROnly(c ClusterResources) error {
 	if len(c.BFDProfiles) > 0 {
 		return errors.New("bfd profiles section set")
 	}
+	// Only IPv4 BGP advertisements are supported in native mode.
+	if err := findIPv6BGPAdvertisement(c); err != nil {
+		return err
+	}
+	// Only legacy type communities are supported in native mode.
+	return findNonLegacyCommunity(c)
+}
+
+// findIPv6BGPAdvertisement checks for IPv6 addresses. If it finds at least one IPv6 BGP advertisement, it will throw
+// and error as it's not supported in native mode.
+func findIPv6BGPAdvertisement(c ClusterResources) error {
 	if len(c.BGPAdvs) == 0 {
 		return nil
 	}
-	// we check for ipv6 addresses if we have at least one bgp advertisement, as it's
-	// not supported in native mode.
 	for _, p := range c.Pools {
 		for _, cidr := range p.Spec.Addresses {
 			nets, err := ParseCIDR(cidr)
@@ -54,6 +64,54 @@ func DiscardFRROnly(c ClusterResources) error {
 				if n.IP.To4() == nil {
 					return fmt.Errorf("pool %q has ipv6 CIDR %s, native bgp mode does not support ipv6", p.Name, n)
 				}
+			}
+		}
+	}
+	return nil
+}
+
+// findNonLegacyCommunity returns an error if it can find a non legacy community. If a community string can not be
+// parsed, the string will be ignored.
+func findNonLegacyCommunity(c ClusterResources) error {
+	for _, p := range c.LegacyAddressPools {
+		for _, adv := range p.Spec.BGPAdvertisements {
+			for _, cs := range adv.Communities {
+				c, err := community.New(cs)
+				if err != nil {
+					// Skip aliases.
+					continue
+				}
+				if !community.IsLegacy(c) {
+					return fmt.Errorf("native BGP mode only supports legacy communities, legacy address pool %q "+
+						"has non legacy community %q", p.Name, cs)
+				}
+			}
+		}
+	}
+	for _, adv := range c.BGPAdvs {
+		for _, cs := range adv.Spec.Communities {
+			c, err := community.New(cs)
+			if err != nil {
+				// Skip aliases.
+				continue
+			}
+			if !community.IsLegacy(c) {
+				return fmt.Errorf("native BGP mode only supports legacy communities, BGP advertisement %q "+
+					"has non legacy community %q", adv.Name, cs)
+			}
+		}
+	}
+	for _, co := range c.Communities {
+		for _, cs := range co.Spec.Communities {
+			c, err := community.New(cs.Value)
+			if err != nil {
+				// Skip it if we cannot parse it - the purpose of this very verification is not to make sure that
+				// a string can be parsed or not.
+				continue
+			}
+			if !community.IsLegacy(c) {
+				return fmt.Errorf("native BGP mode only supports legacy communities, BGP community CR %q "+
+					"has non legacy community %q", co.Name, cs)
 			}
 		}
 	}
