@@ -14,6 +14,14 @@ route-map {{.neighbor.ID}}-out permit {{counter .neighbor.ID}}
   on-match next
 {{- end -}}
 
+{{- define "largecommunityfilter" -}}
+{{frrIPFamily .advertisement.IPFamily}} prefix-list {{largeCommunityPrefixList .neighbor .largecommunity}} permit {{.advertisement.Prefix}}
+route-map {{.neighbor.ID}}-out permit {{counter .neighbor.ID}}
+  match {{frrIPFamily .advertisement.IPFamily}} address prefix-list {{largeCommunityPrefixList .neighbor .largecommunity}}
+  set large-community {{.largecommunity}} additive
+  on-match next
+{{- end -}}
+
 {{- /* The prefixes are per router in FRR, but MetalLB api allows to associate a given BGPAdvertisement to a service IP,
      and a given advertisement contains both the properties of the announcement (i.e. community) and the list of peers
      we may want to advertise to. Because of this, for each neighbor we must opt-in and allow the advertisement, and
@@ -30,6 +38,9 @@ route-map {{.neighbor.ID}}-in deny 20
 {{/* Advertisements for which we must enable the community property */}}
 {{- range $c := $a.Communities }}
 {{template "communityfilter" dict "advertisement" $a "neighbor" $.neighbor "community" $c}}
+{{- end }}
+{{- range $lc := $a.LargeCommunities }}
+{{template "largecommunityfilter" dict "advertisement" $a "neighbor" $.neighbor "largecommunity" $lc}}
 {{- end }}
 {{/* this advertisement is allowed to the specific neighbor  */}}
 {{frrIPFamily $a.IPFamily}} prefix-list {{allowedPrefixList $.neighbor}} permit {{$a.Prefix}}

@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 
+	"go.universe.tf/metallb/internal/bgp/community"
 	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
 	"go.universe.tf/metallb/internal/ipfamily"
 )
@@ -97,7 +98,17 @@ func RoutesForFamily(exec executor.Executor, family ipfamily.Family) (map[string
 }
 
 // RoutesForCommunity returns informations about routes in the given executor related to the given community.
-func RoutesForCommunity(exec executor.Executor, community string, family ipfamily.Family) (map[string]bgpfrr.Route, error) {
+func RoutesForCommunity(exec executor.Executor, communityString string, family ipfamily.Family) (map[string]bgpfrr.Route, error) {
+	// Parse c string to BGP c and determine if this is a legacy or large c.
+	c, err := community.New(communityString)
+	if err != nil {
+		return nil, err
+	}
+	communityType := "community"
+	if community.IsLarge(c) {
+		communityType = "large-community"
+	}
+
 	families := []string{family.String()}
 	if family == ipfamily.DualStack {
 		families = []string{ipfamily.IPv4.String(), ipfamily.IPv6.String()}
@@ -105,9 +116,9 @@ func RoutesForCommunity(exec executor.Executor, community string, family ipfamil
 
 	routes := map[string]bgpfrr.Route{}
 	for _, f := range families {
-		res, err := exec.Exec("vtysh", "-c", fmt.Sprintf("show bgp %s community %s json", f, community))
+		res, err := exec.Exec("vtysh", "-c", fmt.Sprintf("show bgp %s %s %s json", f, communityType, c))
 		if err != nil {
-			return nil, errors.Wrapf(err, "Failed to query routes for family %s community %s", f, community)
+			return nil, errors.Wrapf(err, "Failed to query routes for family %s %s %s", f, communityType, c)
 		}
 
 		r, err := bgpfrr.ParseRoutes(res)

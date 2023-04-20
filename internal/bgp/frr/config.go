@@ -88,10 +88,11 @@ func (n *neighborConfig) ID() string {
 }
 
 type advertisementConfig struct {
-	IPFamily    ipfamily.Family
-	Prefix      string
-	Communities []string
-	LocalPref   uint32
+	IPFamily         ipfamily.Family
+	Prefix           string
+	Communities      []string
+	LargeCommunities []string
+	LocalPref        uint32
 }
 
 // routerName() defines the format of the key of the "Routers" map in the
@@ -132,6 +133,9 @@ func templateConfig(data interface{}) (string, error) {
 			},
 			"communityPrefixList": func(neighbor *neighborConfig, community string) string {
 				return fmt.Sprintf("%s-%s-%s-community-prefixes", neighbor.ID(), community, neighbor.IPFamily)
+			},
+			"largeCommunityPrefixList": func(neighbor *neighborConfig, community string) string {
+				return fmt.Sprintf("%s-large:%s-%s-community-prefixes", neighbor.ID(), community, neighbor.IPFamily)
 			},
 			"allowedPrefixList": func(neighbor *neighborConfig) string {
 				return fmt.Sprintf("%s-pl-%s", neighbor.ID(), neighbor.IPFamily)

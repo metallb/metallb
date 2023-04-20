@@ -41,8 +41,9 @@ type BGPAdvertisementSpec struct {
 	// +optional
 	LocalPref uint32 `json:"localPref,omitempty"`
 
-	// The BGP communities to be associated with the announcement. Each item can be a
-	// community of the form 1234:1234 or the name of an alias defined in the Community CRD.
+	// The BGP communities to be associated with the announcement. Each item can be a standard community of the
+	// form 1234:1234, a large community of the form large:1234:1234:1234 or the name of an alias defined in the
+	// Community CRD.
 	// +optional
 	Communities []string `json:"communities,omitempty"`
 
