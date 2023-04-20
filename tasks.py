@@ -27,6 +27,8 @@ default_network = "kind"
 extra_network = "network2"
 controller_gen_version = "v0.11.1"
 build_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build")
+kubectl_path = os.path.join(build_path, "kubectl")
+kubectl_version = "v1.27.0"
 
 def _check_architectures(architectures):
     out = set()
@@ -81,13 +83,6 @@ def run_with_retry(cmd, tries=6, delay=2):
     mtries -= 1
     mdelay *= 2 #exponential backoff
   run(cmd)
-
-def _make_build_dirs():
-    for arch in all_architectures:
-        for binary in all_binaries:
-            dir = os.path.join("build", arch, binary)
-            if not os.path.exists(dir):
-                os.makedirs(dir, mode=0o750)
 
 
 # Returns true if docker is a symbolic link to podman.
@@ -293,7 +288,7 @@ def generate_manifest(ctx, crd_options="crd:crdVersions=v1", bgp_type="native", 
         layer=bgp_type
         if with_prometheus:
             layer = "prometheus-" + layer
-        res = run("kubectl kustomize config/{} > {}".format(layer, output))
+        res = run("{} kustomize config/{} > {}".format(kubectl_path, layer, output))
         if not res.ok:
             raise Exit(message="Failed to kustomize manifests")
 
@@ -373,7 +368,7 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
         deployprometheus(ctx)
 
     if helm_install:
-        run("kubectl apply -f config/native/ns.yaml", echo=True)
+        run("{} apply -f config/native/ns.yaml".format(kubectl_path), echo=True)
         prometheus_values=""
         if with_prometheus:
             prometheus_values=("--set prometheus.serviceMonitor.enabled=true "
@@ -386,7 +381,7 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
                 "--set controller.logLevel=debug {} --namespace metallb-system".format(architecture, architecture, 
                 "true" if bgp_type == "frr" else "false", prometheus_values), echo=True)
     else:
-        run("kubectl delete po -n metallb-system --all", echo=True)
+        run("{} delete po -n metallb-system --all".format(kubectl_path), echo=True)
 
         with tempfile.TemporaryDirectory() as tmpdir:
             manifest_file = tmpdir + "/metallb.yaml"
@@ -406,7 +401,7 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
                 f.write(manifest)
                 f.flush()
 
-            run("kubectl apply -f {}".format(manifest_file), echo=True)
+            run("{} apply -f {}".format(kubectl_path, manifest_file), echo=True)
 
     if protocol == "bgp":
         print("Configuring MetalLB with a BGP test environment")
@@ -432,7 +427,7 @@ def layer2_dev_env():
     with open("%s/config.yaml" % dev_env_dir, 'w') as f:
         f.write(layer2_config)
     # Apply the MetalLB ConfigMap
-    run("kubectl apply -f %s/config.yaml" % dev_env_dir)
+    run("{} apply -f {}/config.yaml".format(kubectl_path, dev_env_dir))
 
 # Configure MetalLB in the dev-env for BGP testing. Start an frr based BGP
 # router in a container and configure MetalLB to peer with it.
@@ -447,8 +442,8 @@ def bgp_dev_env(ip_family, frr_volume_dir):
     # We need the IPs for each Node in the cluster to place them in the BGP
     # router configuration file (bgpd.conf). Each Node will peer with this
     # router.
-    node_ips = run("kubectl get nodes -o jsonpath='{.items[*].status.addresses"
-            "[?(@.type==\"InternalIP\")].address}{\"\\n\"}'", echo=True)
+    node_ips = run("{} get nodes -o jsonpath='{.items[*].status.addresses"
+            "[?(@.type==\"InternalIP\")].address}{\"\\n\"}'".format(kubectl_path), echo=True)
     node_ips = node_ips.stdout.strip().split()
     if len(node_ips) != 3:
         raise Exit(message='Expected 3 nodes, got %d' % len(node_ips))
@@ -502,7 +497,7 @@ def bgp_dev_env(ip_family, frr_volume_dir):
     with open("%s/config.yaml" % dev_env_dir, 'w') as f:
         f.write(mlb_config)
     # Apply the MetalLB ConfigMap
-    run_with_retry("kubectl apply -f %s/config.yaml" % dev_env_dir)
+    run_with_retry("{} apply -f {}/config.yaml".format(kubectl_path, dev_env_dir))
 
 def get_available_ips(ip_family=None):
     if ip_family is None or (ip_family != 4 and ip_family != 6):
@@ -771,7 +766,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
         
     namespaces = system_namespaces.replace(' ', '').split(',')
     for ns in namespaces:
-        run("kubectl -n {} wait --for=condition=Ready --all pods --timeout 300s".format(ns), hide=True)
+        run("{} -n {} wait --for=condition=Ready --all pods --timeout 300s".format(kubectl_path, ns), hide=True)
 
     if node_nics == "kind":
         nodes = run("kind get nodes --name {name}".format(name=name)).stdout.strip().split("\n")
@@ -872,4 +867,22 @@ def deployprometheus(ctx):
     run("kubectl apply -f dev-env/kube-prometheus/manifests/")
     print("Waiting for prometheus pods to be running")
     run("kubectl -n monitoring wait --for=condition=Ready --all pods --timeout 300s")
+
+
+def _fetch_kubectl():
+    curl_command = "curl -o {} -LO https://dl.k8s.io/release/{}/bin/linux/amd64/kubectl".format(kubectl_path, kubectl_version)
+    if not os.path.exists(kubectl_path):
+        run(curl_command)
+        run("chmod +x {}".format(kubectl_path))
+        return
+    version = run("{} version --short".format(kubectl_path)).stdout
+    for line in version.splitlines():
+        if line.startswith("Client Version:"):
+            version = line.split(":")[1].strip()
+            if version == kubectl_version:
+                return
+    run(curl_command)
+    run("chmod +x {}".format(kubectl_path))
+
+_fetch_kubectl()
 
