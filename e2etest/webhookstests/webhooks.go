@@ -224,7 +224,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 	})
 
 	ginkgo.Context("For Community", func() {
-		ginkgo.It("Should reject a new invalid Community", func() {
+		ginkgo.DescribeTable("reject a new invalid Community", func(community, expectedError string) {
 			ginkgo.By("Creating invalid Community")
 			resources := metallbconfig.ClusterResources{
 				Communities: []metallbv1beta1.Community{
@@ -236,7 +236,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 							Communities: []metallbv1beta1.CommunityAlias{
 								{
 									Name:  "INVALID_COMMUNITY",
-									Value: "99999999:1",
+									Value: community,
 								},
 							},
 						},
@@ -245,10 +245,12 @@ var _ = ginkgo.Describe("Webhooks", func() {
 			}
 			err := ConfigUpdater.Update(resources)
 			framework.ExpectError(err)
-			Expect(err.Error()).To(ContainSubstring("invalid first section of community"))
-		})
+			Expect(err.Error()).To(ContainSubstring(expectedError))
+		},
+			ginkgo.Entry("in legacy format", "99999999:1", "invalid community value: invalid section"),
+			ginkgo.Entry("in large format", "lar:123:9999:123", "expected community to be of format large"))
 
-		ginkgo.It("Should reject an update to an invalid Community", func() {
+		ginkgo.DescribeTable("reject an update to an invalid Community", func(community, expectedError string) {
 			ginkgo.By("Creating Community")
 			resources := metallbconfig.ClusterResources{
 				Communities: []metallbv1beta1.Community{
@@ -267,16 +269,18 @@ var _ = ginkgo.Describe("Webhooks", func() {
 				Communities: []metallbv1beta1.CommunityAlias{
 					{
 						Name:  "INVALID_COMMUNITY",
-						Value: "99999999:1",
+						Value: community,
 					},
 				},
 			}
 			err = ConfigUpdater.Update(resources)
 			framework.ExpectError(err)
-			Expect(err.Error()).To(ContainSubstring("invalid first section of community"))
-		})
+			Expect(err.Error()).To(ContainSubstring(expectedError))
+		},
+			ginkgo.Entry("in legacy format", "99999999:1", "invalid community value: invalid section"),
+			ginkgo.Entry("in large format", "lar:123:9999:123", "expected community to be of format large"))
 
-		ginkgo.It("Should reject Community duplications", func() {
+		ginkgo.DescribeTable("reject Community duplications", func(community string) {
 			ginkgo.By("Creating duplicates in the same Community")
 			resources := metallbconfig.ClusterResources{
 				Communities: []metallbv1beta1.Community{
@@ -288,11 +292,11 @@ var _ = ginkgo.Describe("Webhooks", func() {
 							Communities: []metallbv1beta1.CommunityAlias{
 								{
 									Name:  "DUP_COMMUNITY",
-									Value: "1111:2222",
+									Value: community,
 								},
 								{
 									Name:  "DUP_COMMUNITY",
-									Value: "1111:2222",
+									Value: community,
 								},
 							},
 						},
@@ -314,7 +318,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 							Communities: []metallbv1beta1.CommunityAlias{
 								{
 									Name:  "DUP_COMMUNITY",
-									Value: "1111:2222",
+									Value: community,
 								},
 							},
 						},
@@ -327,7 +331,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 							Communities: []metallbv1beta1.CommunityAlias{
 								{
 									Name:  "DUP_COMMUNITY",
-									Value: "1111:2222",
+									Value: community,
 								},
 							},
 						},
@@ -337,7 +341,9 @@ var _ = ginkgo.Describe("Webhooks", func() {
 			err = ConfigUpdater.Update(resources)
 			framework.ExpectError(err)
 			Expect(err.Error()).To(ContainSubstring("duplicate definition of community"))
-		})
+		},
+			ginkgo.Entry("in legacy format", "1111:2222"),
+			ginkgo.Entry("FRR - in large format", "large:123:9999:123"))
 	})
 
 	ginkgo.Context("For BFDProfile", func() {

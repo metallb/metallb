@@ -15,7 +15,7 @@ import (
 
 	"github.com/go-kit/log"
 	"go.universe.tf/metallb/internal/bgp"
-	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/logging"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
@@ -473,11 +473,11 @@ func TestSingleAdvertisement(t *testing.T) {
 		IP:   net.ParseIP("172.16.1.10"),
 		Mask: classCMask,
 	}
-	communities := []uint32{}
-	community, _ := config.ParseCommunity("1111:2222")
-	communities = append(communities, community)
-	community, _ = config.ParseCommunity("3333:4444")
-	communities = append(communities, community)
+	communities := []community.BGPCommunity{}
+	community1, _ := community.New("1111:2222")
+	communities = append(communities, community1)
+	community2, _ := community.New("3333:4444")
+	communities = append(communities, community2)
 	adv := &bgp.Advertisement{
 		Prefix:      prefix,
 		Communities: communities,
@@ -693,11 +693,11 @@ func TestSingleAdvertisementWithPeerSelector(t *testing.T) {
 		IP:   net.ParseIP("172.16.1.10"),
 		Mask: classCMask,
 	}
-	communities := []uint32{}
-	community, _ := config.ParseCommunity("1111:2222")
-	communities = append(communities, community)
-	community, _ = config.ParseCommunity("3333:4444")
-	communities = append(communities, community)
+	communities := []community.BGPCommunity{}
+	community1, _ := community.New("1111:2222")
+	communities = append(communities, community1)
+	community2, _ := community.New("3333:4444")
+	communities = append(communities, community2)
 	adv := &bgp.Advertisement{
 		Prefix:      prefix,
 		Communities: communities,
@@ -741,11 +741,11 @@ func TestSingleAdvertisementNonExistingPeer(t *testing.T) {
 		IP:   net.ParseIP("172.16.1.10"),
 		Mask: classCMask,
 	}
-	communities := []uint32{}
-	community, _ := config.ParseCommunity("1111:2222")
-	communities = append(communities, community)
-	community, _ = config.ParseCommunity("3333:4444")
-	communities = append(communities, community)
+	communities := []community.BGPCommunity{}
+	community1, _ := community.New("1111:2222")
+	communities = append(communities, community1)
+	community2, _ := community.New("3333:4444")
+	communities = append(communities, community2)
 	adv := &bgp.Advertisement{
 		Prefix:      prefix,
 		Communities: communities,
@@ -789,8 +789,8 @@ func TestTwoAdvertisements(t *testing.T) {
 		IP:   net.ParseIP("172.16.1.10"),
 		Mask: classCMask,
 	}
-	communities := []uint32{}
-	community, _ := config.ParseCommunity("1111:2222")
+	communities := []community.BGPCommunity{}
+	community, _ := community.New("1111:2222")
 	communities = append(communities, community)
 	adv1 := &bgp.Advertisement{
 		Prefix:      prefix1,
@@ -860,8 +860,8 @@ func TestTwoAdvertisementsTwoSessions(t *testing.T) {
 		IP:   net.ParseIP("172.16.1.10"),
 		Mask: classCMask,
 	}
-	communities := []uint32{}
-	community, _ := config.ParseCommunity("1111:2222")
+	communities := []community.BGPCommunity{}
+	community, _ := community.New("1111:2222")
 	communities = append(communities, community)
 	adv1 := &bgp.Advertisement{
 		Prefix:      prefix1,
@@ -937,8 +937,8 @@ func TestTwoAdvertisementsTwoSessionsOneWithPeerSelector(t *testing.T) {
 		IP:   net.ParseIP("172.16.1.10"),
 		Mask: classCMask,
 	}
-	communities := []uint32{}
-	community, _ := config.ParseCommunity("1111:2222")
+	communities := []community.BGPCommunity{}
+	community, _ := community.New("1111:2222")
 	communities = append(communities, community)
 	adv1 := &bgp.Advertisement{
 		Prefix:      prefix1,
@@ -1050,5 +1050,54 @@ func TestLoggingConfigurationOverrideByEnvironmentVar(t *testing.T) {
 	}
 
 	sessionManager.reloadConfig <- reloadEvent{config: config}
+	testCheckConfigFile(t)
+}
+
+func TestLargeCommunities(t *testing.T) {
+	testSetup(t)
+
+	l := log.NewNopLogger()
+	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+	defer close(sessionManager.reloadConfig)
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer"})
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	prefix := &net.IPNet{
+		IP:   net.ParseIP("172.16.1.10"),
+		Mask: classCMask,
+	}
+	communities := []community.BGPCommunity{}
+	community1, _ := community.New("large:1111:2222:3333")
+	communities = append(communities, community1)
+	community2, _ := community.New("large:2222:3333:4444")
+	communities = append(communities, community2)
+	community3, _ := community.New("3333:4444")
+	communities = append(communities, community3)
+	adv := &bgp.Advertisement{
+		Prefix:      prefix,
+		Communities: communities,
+		LocalPref:   300,
+	}
+
+	err = session.Set(adv)
+	if err != nil {
+		t.Fatalf("Could not advertise prefix: %s", err)
+	}
+
 	testCheckConfigFile(t)
 }

@@ -846,6 +846,20 @@ var _ = ginkgo.Describe("BGP", func() {
 				false,
 				ipfamily.IPv4,
 				[]metallbv1beta1.Community{}),
+			ginkgo.Entry("FRR - IPV4 - large community and localpref",
+				"192.168.10.0/24",
+				"192.168.16.0/24",
+				metallbv1beta1.BGPAdvertisement{
+					ObjectMeta: metav1.ObjectMeta{Name: "advertisement"},
+					Spec: metallbv1beta1.BGPAdvertisementSpec{
+						Communities:    []string{"large:123:456:7890"},
+						LocalPref:      50,
+						IPAddressPools: []string{"bgp-with-advertisement"},
+					},
+				},
+				false,
+				ipfamily.IPv4,
+				[]metallbv1beta1.Community{}),
 			ginkgo.Entry("IPV4 - localpref",
 				"192.168.10.0/24",
 				"192.168.16.0/24",
@@ -1011,8 +1025,21 @@ var _ = ginkgo.Describe("BGP", func() {
 				},
 				false,
 				ipfamily.IPv6,
+				[]metallbv1beta1.Community{}),
+			ginkgo.Entry("FRR - IPV6 - large community and localpref",
+				"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
+				"fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26",
+				metallbv1beta1.BGPAdvertisement{
+					ObjectMeta: metav1.ObjectMeta{Name: "advertisement"},
+					Spec: metallbv1beta1.BGPAdvertisementSpec{
+						Communities:    []string{"large:123:456:7890"},
+						LocalPref:      50,
+						IPAddressPools: []string{"bgp-with-advertisement"},
+					},
+				},
+				false,
+				ipfamily.IPv6,
 				[]metallbv1beta1.Community{}))
-
 	})
 
 	ginkgo.Context("MetalLB FRR rejects", func() {

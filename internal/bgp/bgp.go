@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-kit/log"
+	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/config"
 )
 
@@ -20,7 +21,7 @@ type Advertisement struct {
 	// peers (i.e. where the peer ASN matches the local ASN).
 	LocalPref uint32
 	// BGP communities to attach to the path.
-	Communities []uint32
+	Communities []community.BGPCommunity
 	// Used to declare the intent of announcing IPs
 	// only to the BGPPeers in this list.
 	Peers []string

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"go.universe.tf/metallb/internal/bgp"
+	"go.universe.tf/metallb/internal/bgp/community"
 )
 
 func sendOpen(w io.Writer, asn uint32, routerID net.IP, holdTime time.Duration) error {
@@ -383,13 +384,24 @@ func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp, fbasn bool, nextHop net.
 	}
 
 	if len(adv.Communities) > 0 {
+		// Convert communities to legacy communities uint32 representation. Throw an error if any non legacy type
+		// communities were found.
+		var legacyCommunities []uint32
+		for _, c := range adv.Communities {
+			legacyCommunity, ok := c.(community.BGPCommunityLegacy)
+			if !ok {
+				return fmt.Errorf("invalid community type for BGP native mode, community %s is not a legacy BGP "+
+					"Community", c)
+			}
+			legacyCommunities = append(legacyCommunities, legacyCommunity.ToUint32())
+		}
 		b.Write([]byte{
 			0xc0, 8, // optional transitive, communities
 		})
-		if err := binary.Write(b, binary.BigEndian, uint8(len(adv.Communities)*4)); err != nil {
+		if err := binary.Write(b, binary.BigEndian, uint8(len(legacyCommunities)*4)); err != nil {
 			return err
 		}
-		for _, c := range adv.Communities {
+		for _, c := range legacyCommunities {
 			if err := binary.Write(b, binary.BigEndian, c); err != nil {
 				return err
 			}

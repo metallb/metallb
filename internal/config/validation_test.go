@@ -83,6 +83,53 @@ func TestValidate(t *testing.T) {
 			mustFail: true,
 		},
 		{
+			desc: "large BGP community inside legacy pool",
+			config: ClusterResources{
+				LegacyAddressPools: []v1beta1.AddressPool{
+					{
+						Spec: v1beta1.AddressPoolSpec{
+							BGPAdvertisements: []v1beta1.LegacyBgpAdvertisement{
+								{
+									Communities: []string{"large:123:456:789"},
+								},
+							},
+						},
+					},
+				},
+			},
+			mustFail: true,
+		},
+		{
+			desc: "large BGP community inside BGP Advertisement",
+			config: ClusterResources{
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						Spec: v1beta1.BGPAdvertisementSpec{
+							Communities: []string{"large:123:456:789"},
+						},
+					},
+				},
+			},
+			mustFail: true,
+		},
+		{
+			desc: "large BGP community inside Community CR",
+			config: ClusterResources{
+				Communities: []v1beta1.Community{
+					{
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Value: "large:123:456:789",
+								},
+							},
+						},
+					},
+				},
+			},
+			mustFail: true,
+		},
+		{
 			desc: "should pass",
 			config: ClusterResources{
 				Peers: []v1beta2.BGPPeer{

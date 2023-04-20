@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/api/v1beta2"
+	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/pointer"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -255,9 +256,12 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								LocalPref:           100,
-								Communities: map[uint32]bool{
-									0xfc0004d2: true,
-								},
+								Communities: func() map[community.BGPCommunity]bool {
+									c, _ := community.New("64512:1234")
+									return map[community.BGPCommunity]bool{
+										c: true,
+									}
+								}(),
 								Nodes: map[string]bool{},
 								Peers: []string{"peer1"},
 							},
@@ -265,7 +269,7 @@ func TestParse(t *testing.T) {
 								Name:                "adv2",
 								AggregationLength:   24,
 								AggregationLengthV6: 64,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{},
 							},
 						},
@@ -283,7 +287,7 @@ func TestParse(t *testing.T) {
 								Name:                "adv3",
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{},
 							},
 						},
@@ -1019,7 +1023,7 @@ func TestParse(t *testing.T) {
 								Name:                "adv3",
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{},
 							},
 						},
@@ -1061,7 +1065,7 @@ func TestParse(t *testing.T) {
 								Name:                "adv3",
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{},
 							},
 						},
@@ -1248,14 +1252,14 @@ func TestParse(t *testing.T) {
 								AggregationLength:   24,
 								AggregationLengthV6: 120,
 								LocalPref:           100,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{"node1": true, "node2": true},
 							},
 							{
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								LocalPref:           200,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{"node1": true, "node2": true},
 							},
 						},
@@ -1328,14 +1332,14 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								LocalPref:           100,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{"node1": true},
 							},
 							{
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								LocalPref:           200,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{"node2": true},
 							},
 						},
@@ -1399,7 +1403,7 @@ func TestParse(t *testing.T) {
 								AggregationLengthV6: 128,
 								LocalPref:           100,
 								Peers:               []string{"peer1"},
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{"node1": true, "node2": true},
 							},
 							{
@@ -1407,7 +1411,7 @@ func TestParse(t *testing.T) {
 								AggregationLengthV6: 128,
 								LocalPref:           200,
 								Peers:               []string{"peer2"},
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{"node1": true, "node2": true},
 							},
 						},
@@ -1462,7 +1466,7 @@ func TestParse(t *testing.T) {
 							{
 								AggregationLength:   26,
 								AggregationLengthV6: 128,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{},
 							},
 						},
@@ -1872,7 +1876,7 @@ func TestParse(t *testing.T) {
 								Name:                "adv3",
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{},
 							},
 						},
@@ -2116,7 +2120,7 @@ func TestParse(t *testing.T) {
 								Name:                "adv3",
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{},
 							},
 						},
@@ -2297,7 +2301,7 @@ func TestParse(t *testing.T) {
 								Name:                "adv",
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{},
 							},
 						},
@@ -2423,9 +2427,12 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								LocalPref:           100,
-								Communities: map[uint32]bool{
-									0x04D20929: true,
-								},
+								Communities: func() map[community.BGPCommunity]bool {
+									c, _ := community.New("1234:2345")
+									return map[community.BGPCommunity]bool{
+										c: true,
+									}
+								}(),
 								Nodes: map[string]bool{},
 							},
 						},
@@ -2438,9 +2445,12 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								LocalPref:           100,
-								Communities: map[uint32]bool{
-									0x04D20929: true,
-								},
+								Communities: func() map[community.BGPCommunity]bool {
+									c, _ := community.New("1234:2345")
+									return map[community.BGPCommunity]bool{
+										c: true,
+									}
+								}(),
 								Nodes: map[string]bool{},
 							},
 						},
@@ -2509,9 +2519,213 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								LocalPref:           100,
-								Communities: map[uint32]bool{
-									0xfc0004d2: true,
+								Communities: func() map[community.BGPCommunity]bool {
+									c, _ := community.New("64512:1234")
+									return map[community.BGPCommunity]bool{
+										c: true,
+									}
+								}(),
+								Nodes: map[string]bool{},
+							},
+						},
+					},
+				}},
+				BFDProfiles: map[string]*BFDProfile{},
+				Peers:       map[string]*Peer{},
+			},
+		},
+		{
+			desc: "config IPAddressPool with large communities CR",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "peer1",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:        42,
+							ASN:          142,
+							Address:      "1.2.3.4",
+							Port:         1179,
+							HoldTime:     metav1.Duration{Duration: 180 * time.Second},
+							RouterID:     "10.20.30.40",
+							SrcAddress:   "10.20.30.40",
+							EBGPMultiHop: true,
+							VRFName:      "foo",
+						},
+					},
+				},
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+								"10.50.0.0/24",
+							},
+							AvoidBuggyIPs: true,
+							AutoAssign:    pointer.BoolPtr(false),
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "adv1",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength: pointer.Int32Ptr(32),
+							LocalPref:         uint32(100),
+							Communities:       []string{"bar"},
+							IPAddressPools:    []string{"pool1"},
+							Peers:             []string{"peer1"},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "adv2",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							AggregationLength:   pointer.Int32Ptr(24),
+							AggregationLengthV6: pointer.Int32Ptr(64),
+							IPAddressPools:      []string{"pool1"},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "adv3",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPools: []string{"pool2"},
+						},
+					},
+				},
+				Communities: []v1beta1.Community{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "community",
+						},
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Name:  "bar",
+									Value: "large:123:64512:1234",
 								},
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Peers: map[string]*Peer{
+					"peer1": {
+						Name:          "peer1",
+						MyASN:         42,
+						ASN:           142,
+						Addr:          net.ParseIP("1.2.3.4"),
+						SrcAddr:       net.ParseIP("10.20.30.40"),
+						Port:          1179,
+						HoldTime:      180 * time.Second,
+						KeepaliveTime: 60 * time.Second,
+						RouterID:      net.ParseIP("10.20.30.40"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+						EBGPMultiHop:  true,
+						VRF:           "foo",
+					},
+				},
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:          "pool1",
+						CIDR:          []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
+						AvoidBuggyIPs: true,
+						AutoAssign:    false,
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								Name:                "adv1",
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           100,
+								Communities: func() map[community.BGPCommunity]bool {
+									c, _ := community.New("large:123:64512:1234")
+									return map[community.BGPCommunity]bool{
+										c: true,
+									}
+								}(),
+								Nodes: map[string]bool{},
+								Peers: []string{"peer1"},
+							},
+							{
+								Name:                "adv2",
+								AggregationLength:   24,
+								AggregationLengthV6: 64,
+								Communities:         map[community.BGPCommunity]bool{},
+								Nodes:               map[string]bool{},
+							},
+						},
+					},
+				}},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
+			desc: "config legacy pool with BGP Communities CR and large communities",
+			crs: ClusterResources{
+				LegacyAddressPools: []v1beta1.AddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "legacybgppool1",
+						},
+						Spec: v1beta1.AddressPoolSpec{
+							Addresses: []string{
+								"10.40.0.0/16",
+								"10.60.0.0/24",
+							},
+							Protocol:   string(BGP),
+							AutoAssign: pointer.BoolPtr(false),
+							BGPAdvertisements: []v1beta1.LegacyBgpAdvertisement{
+								{
+									AggregationLength: pointer.Int32Ptr(32),
+									LocalPref:         uint32(100),
+									Communities:       []string{"bar"},
+								},
+							},
+						},
+					},
+				},
+				Communities: []v1beta1.Community{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "community",
+						},
+						Spec: v1beta1.CommunitySpec{
+							Communities: []v1beta1.CommunityAlias{
+								{
+									Name:  "bar",
+									Value: "large:123:64512:1234",
+								},
+							},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"legacybgppool1": {
+						Name: "legacybgppool1",
+						CIDR: []*net.IPNet{ipnet("10.40.0.0/16"), ipnet("10.60.0.0/24")},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           100,
+								Communities: func() map[community.BGPCommunity]bool {
+									c, _ := community.New("large:123:64512:1234")
+									return map[community.BGPCommunity]bool{
+										c: true,
+									}
+								}(),
 								Nodes: map[string]bool{},
 							},
 						},
@@ -2658,7 +2872,7 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								LocalPref:           100,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{},
 							},
 						},
@@ -2677,7 +2891,7 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								LocalPref:           200,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{},
 							},
 						},
@@ -3087,7 +3301,7 @@ func TestParse(t *testing.T) {
 							{
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes: map[string]bool{
 									"first":  true,
 									"second": true,
@@ -3117,7 +3331,7 @@ func TestParse(t *testing.T) {
 								Name:                "adv1",
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{"second": true},
 							},
 						},
@@ -3137,7 +3351,7 @@ func TestParse(t *testing.T) {
 								Name:                "adv2",
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{"first": true},
 							},
 						},
@@ -3365,7 +3579,7 @@ func TestParse(t *testing.T) {
 								Name:                "adv1",
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes: map[string]bool{
 									"first":  true,
 									"second": true,
@@ -3450,7 +3664,7 @@ func TestParse(t *testing.T) {
 								AggregationLength:   32,
 								AggregationLengthV6: 128,
 								LocalPref:           100,
-								Communities:         map[uint32]bool{},
+								Communities:         map[community.BGPCommunity]bool{},
 								Nodes:               map[string]bool{},
 								Peers:               []string{"peer1"},
 							},
