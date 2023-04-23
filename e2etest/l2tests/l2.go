@@ -244,10 +244,16 @@ var _ = ginkgo.Describe("L2", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("getting the advertising node")
+			var nodeToSet string
 			ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
-			n, err := advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
-			framework.ExpectNoError(err)
-			nodeToSet := n.Name
+			gomega.Eventually(func() error {
+				n, err := advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
+				if err != nil {
+					return err
+				}
+				nodeToSet = n.Name
+				return nil
+			}, time.Minute, time.Second).ShouldNot(gomega.HaveOccurred())
 
 			err = k8s.SetNodeCondition(cs, nodeToSet, corev1.NodeNetworkUnavailable, corev1.ConditionTrue)
 			framework.ExpectNoError(err)
