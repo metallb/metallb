@@ -72,8 +72,8 @@ metadata:
   name: {{ template "metallb.fullname" . }}-speaker-monitor-service
 spec:
   selector:
-      {{- include "metallb.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: speaker
+    {{- include "metallb.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: speaker
   clusterIP: None
   ports:
     - name: {{ template "metrics.exposedportname" . }}
@@ -116,7 +116,7 @@ spec:
       interval: {{ .Values.prometheus.serviceMonitor.interval }}
       {{- end }}
       honorLabels: true
-{{ if .Values.prometheus.secureMetricsPort }}
+{{- if .Values.prometheus.secureMetricsPort }}
       bearerTokenFile: "/var/run/secrets/kubernetes.io/serviceaccount/token"
       scheme: "https"
 {{- if .Values.prometheus.serviceMonitor.controller.tlsConfig }}
@@ -145,8 +145,8 @@ metadata:
   name: {{ template "metallb.fullname" . }}-controller-monitor-service
 spec:
   selector:
-      {{- include "metallb.selectorLabels" . | nindent 6 }}
-      app.kubernetes.io/component: controller
+    {{- include "metallb.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: controller
   clusterIP: None
   ports:
     - name: {{ template "metrics.exposedportname" . }}
