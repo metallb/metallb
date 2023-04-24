@@ -446,8 +446,8 @@ def bgp_dev_env(ip_family, frr_volume_dir):
     # We need the IPs for each Node in the cluster to place them in the BGP
     # router configuration file (bgpd.conf). Each Node will peer with this
     # router.
-    node_ips = run("{} get nodes -o jsonpath='{.items[*].status.addresses"
-            "[?(@.type==\"InternalIP\")].address}{\"\\n\"}'".format(kubectl_path), echo=True)
+    node_ips = run("{} get nodes -o jsonpath='{{.items[*].status.addresses"
+                   "[?(@.type==\"InternalIP\")].address}}{{\"\\n\"}}'".format(kubectl_path), echo=True)
     node_ips = node_ips.stdout.strip().split()
     if len(node_ips) != 3:
         raise Exit(message='Expected 3 nodes, got %d' % len(node_ips))
