@@ -61,8 +61,8 @@ router bgp {{$ROUTERASN}}
 {{range .AcceptV4Neighbors }}
     neighbor {{.Addr}} next-hop-self
     neighbor {{.Addr}} activate
-    {{- if .ToAdvertise}}
-    network {{.ToAdvertise}}
+    {{range .ToAdvertise }}
+    network {{.}}
     {{- end }}
 {{- end }}
   exit-address-family
@@ -73,8 +73,8 @@ router bgp {{$ROUTERASN}}
     neighbor {{.Addr}} next-hop-self
     neighbor {{.Addr}} activate
     neighbor {{.Addr}} route-map RMAP in
-    {{- if .ToAdvertise}}
-    network {{.ToAdvertise}}
+    {{range .ToAdvertise }}
+    network {{.}}
     {{- end }}
 {{- end }}
 exit-address-family
@@ -98,7 +98,7 @@ type NeighborConfig struct {
 	Addr        string
 	Password    string
 	BFDEnabled  bool
-	ToAdvertise string
+	ToAdvertise []string
 	MultiHop    bool
 }
 
