@@ -1063,7 +1063,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 			for _, c := range FRRContainers {
 				err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily, func(frr *frrcontainer.FRR) {
-					frr.NeighborConfig.ToAdvertise = toInject
+					frr.NeighborConfig.ToAdvertise = []string{toInject}
 				})
 				framework.ExpectNoError(err)
 			}
@@ -1071,7 +1071,11 @@ var _ = ginkgo.Describe("BGP", func() {
 			speakerPods, err := metallb.SpeakerPods(cs)
 			framework.ExpectNoError(err)
 			checkRoute := func() error {
-				return checkRouteInjected(speakerPods, pairingIPFamily, toInject, "all")
+				isRouteInjected, where := isRouteInjected(speakerPods, pairingIPFamily, toInject, "all")
+				if isRouteInjected {
+					return fmt.Errorf("route %s injected in %s", toInject, where)
+				}
+				return nil
 			}
 
 			err = ConfigUpdater.Update(resources)
@@ -1118,11 +1122,16 @@ var _ = ginkgo.Describe("BGP", func() {
 				BGPAdvs: []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement},
 			}
 
+			toFilter := "172.16.2.1/32"
+			if pairingIPFamily == ipfamily.IPv6 {
+				toFilter = "fc00:f853:ccd:e801::2/128"
+			}
+
 			for i, c := range FRRContainers {
 				err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily, func(frr *frrcontainer.FRR) {
 					// We advertise a different route for each different container, to ensure all
 					// of them are able to advertise regardless of the configuration
-					frr.NeighborConfig.ToAdvertise = fmt.Sprintf(toInject, i+1)
+					frr.NeighborConfig.ToAdvertise = []string{fmt.Sprintf(toInject, i+1), toFilter}
 				})
 				framework.ExpectNoError(err)
 			}
@@ -1131,15 +1140,21 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 			checkRoutesAreInjected := func() error {
 				for i, c := range FRRContainers {
-					err := checkRouteInjected(speakerPods, pairingIPFamily, fmt.Sprintf(toInject, i+1), c.RouterConfig.VRF)
-					if err == nil {
+					injected, _ := isRouteInjected(speakerPods, pairingIPFamily, fmt.Sprintf(toInject, i+1), c.RouterConfig.VRF)
+					if !injected {
 						return fmt.Errorf("route not injected from %s", c.Name)
+					}
+					injected, podName := isRouteInjected(speakerPods, pairingIPFamily, toFilter, c.RouterConfig.VRF)
+					if injected {
+						return fmt.Errorf("failed to filter route injected from %s to %s", c.Name, podName)
 					}
 				}
 				return nil
 			}
 
 			data := ""
+			data += "ip prefix-list allowed permit 172.16.1.0/24 le 32\n"
+			data += "ipv6 prefix-list allowed permit fc00:f853:ccd:e800::/64 le 128\n"
 			for _, c := range FRRContainers {
 				ip := c.Ipv4
 				if pairingIPFamily == ipfamily.IPv6 {
@@ -1150,6 +1165,11 @@ var _ = ginkgo.Describe("BGP", func() {
 					ruleName = fmt.Sprintf("%s-%s", ip, c.RouterConfig.VRF)
 				}
 				data += fmt.Sprintf("route-map %s-in permit 20\n", ruleName)
+				if pairingIPFamily == ipfamily.IPv4 {
+					data += "  match ip address prefix-list allowed\n"
+				} else {
+					data += "  match ipv6 address prefix-list allowed\n"
+				}
 			}
 			extraData := map[string]string{
 				"extras": data,
