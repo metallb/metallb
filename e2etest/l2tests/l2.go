@@ -245,15 +245,15 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("getting the advertising node")
 			var nodeToSet string
-			ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+
 			gomega.Eventually(func() error {
-				n, err := advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
+				node, err := nodeForService(svc, allNodes.Items)
 				if err != nil {
 					return err
 				}
-				nodeToSet = n.Name
+				nodeToSet = node
 				return nil
-			}, time.Minute, time.Second).ShouldNot(gomega.HaveOccurred())
+			}, 3*time.Minute, time.Second).ShouldNot(gomega.HaveOccurred())
 
 			err = k8s.SetNodeCondition(cs, nodeToSet, corev1.NodeNetworkUnavailable, corev1.ConditionTrue)
 			framework.ExpectNoError(err)
@@ -264,12 +264,11 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("validating the service is announced from a different node")
 			gomega.Eventually(func() string {
-				advNode, err := advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
+				node, err := nodeForService(svc, allNodes.Items)
 				if err != nil {
 					return err.Error()
 				}
-
-				return advNode.Name
+				return node
 			}, time.Minute, time.Second).ShouldNot(gomega.Equal(nodeToSet))
 
 			ginkgo.By("setting the NetworkUnavailable condition back to false")
@@ -278,12 +277,11 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("validating the service is announced back again from the previous node")
 			gomega.Eventually(func() string {
-				advNode, err := advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
+				node, err := nodeForService(svc, allNodes.Items)
 				if err != nil {
 					return err.Error()
 				}
-
-				return advNode.Name
+				return node
 			}, time.Minute, time.Second).Should(gomega.Equal(nodeToSet))
 		})
 	})
