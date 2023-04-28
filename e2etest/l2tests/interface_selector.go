@@ -293,21 +293,11 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 				framework.ExpectNoError(err)
 
 				gomega.Eventually(func() string {
-					err := mac.RequestAddressResolutionFromIface(ingressIP, LocalNics[0], executor.Host)
+					node, err := nodeForService(svc, allNodes.Items)
 					if err != nil {
-						return err.Error()
+						return ""
 					}
-					err = service.ValidateL2(svc)
-					if err != nil {
-						return err.Error()
-					}
-
-					advNode, err := advertisingNodeFromMAC(allNodes.Items, ingressIP, executor.Host)
-					if err != nil {
-						return err.Error()
-					}
-
-					return advNode.Name
+					return node
 				}, 1*time.Minute, 1*time.Second).Should(gomega.Equal(node.Name))
 			}
 		})
