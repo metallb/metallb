@@ -239,6 +239,7 @@ var _ = ginkgo.Describe("L2", func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				framework.ExpectNoError(err)
 			}()
+			time.Sleep(time.Second)
 
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
@@ -247,11 +248,11 @@ var _ = ginkgo.Describe("L2", func() {
 			var nodeToSet string
 
 			gomega.Eventually(func() error {
-				node, err := nodeForService(svc, allNodes.Items)
+				node, err := k8s.GetSvcNode(cs, svc.Namespace, svc.Name, allNodes)
 				if err != nil {
 					return err
 				}
-				nodeToSet = node
+				nodeToSet = node.Name
 				return nil
 			}, 3*time.Minute, time.Second).ShouldNot(gomega.HaveOccurred())
 
@@ -261,14 +262,15 @@ var _ = ginkgo.Describe("L2", func() {
 				err = k8s.SetNodeCondition(cs, nodeToSet, corev1.NodeNetworkUnavailable, corev1.ConditionFalse)
 				framework.ExpectNoError(err)
 			}()
+			time.Sleep(time.Second)
 
 			ginkgo.By("validating the service is announced from a different node")
 			gomega.Eventually(func() string {
-				node, err := nodeForService(svc, allNodes.Items)
+				node, err := k8s.GetSvcNode(cs, svc.Namespace, svc.Name, allNodes)
 				if err != nil {
 					return err.Error()
 				}
-				return node
+				return node.Name
 			}, time.Minute, time.Second).ShouldNot(gomega.Equal(nodeToSet))
 
 			ginkgo.By("setting the NetworkUnavailable condition back to false")
@@ -277,11 +279,11 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("validating the service is announced back again from the previous node")
 			gomega.Eventually(func() string {
-				node, err := nodeForService(svc, allNodes.Items)
+				node, err := k8s.GetSvcNode(cs, svc.Namespace, svc.Name, allNodes)
 				if err != nil {
 					return err.Error()
 				}
-				return node
+				return node.Name
 			}, time.Minute, time.Second).Should(gomega.Equal(nodeToSet))
 		})
 	})
