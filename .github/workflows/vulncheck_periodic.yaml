@@ -13,5 +13,5 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Golang Vulncheck
-        uses: Templum/govulncheck-action@v0.10.0
+        uses: Templum/govulncheck-action@v0.10.1
 
