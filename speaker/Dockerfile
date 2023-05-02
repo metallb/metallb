@@ -45,7 +45,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
   go.universe.tf/metallb/speaker
 
 FROM docker.io/alpine:latest
-
+RUN apk add --no-cache tzdata
 
 COPY --from=builder /build/speaker /speaker
 COPY --from=builder /build/frr-metrics /frr-metrics
