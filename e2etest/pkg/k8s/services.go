@@ -5,6 +5,7 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -30,16 +31,21 @@ func GetSvcNode(cs clientset.Interface, svcNS string, svcName string, allNodes *
 		return nil, err
 	}
 
-	msg := ""
+	svcEvents := make([]corev1.Event, 0)
 	for _, e := range events.Items {
 		if e.InvolvedObject.Name == svcName {
-			msg = e.Message
-			break
+			svcEvents = append(svcEvents, e)
 		}
 	}
-	if msg == "" {
+	if len(svcEvents) == 0 {
 		return nil, errors.New("service doesn't be assigned node")
 	}
+
+	sort.Slice(svcEvents, func(i, j int) bool {
+		return svcEvents[i].LastTimestamp.After(svcEvents[j].LastTimestamp.Time)
+	})
+
+	msg := svcEvents[0].Message
 
 	for _, node := range allNodes.Items {
 		if strings.Contains(msg, "\""+node.Name+"\"") {
