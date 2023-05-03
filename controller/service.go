@@ -193,6 +193,8 @@ func (c *controller) allocateIPs(key string, svc *v1.Service) ([]net.IP, error) 
 		return nil, err
 	}
 
+	desiredPool := svc.Annotations[annotationAddressPool]
+
 	// If the user asked for a specific IPs, try that.
 	if len(desiredLbIPs) > 0 {
 		if serviceIPFamily != desiredLbIPFamily {
@@ -201,10 +203,17 @@ func (c *controller) allocateIPs(key string, svc *v1.Service) ([]net.IP, error) 
 		if err := c.ips.Assign(key, svc, desiredLbIPs, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 			return nil, err
 		}
+
+		// Verify that ip and address pool annotations are compatible.
+		if desiredPool != "" && c.ips.Pool(key) != desiredPool {
+			c.ips.Unassign(key)
+			return nil, fmt.Errorf("requested loadBalancer IP(s) %q is not compatible with requested address pool %s", desiredLbIPs, desiredPool)
+		}
+
 		return desiredLbIPs, nil
 	}
-	// Otherwise, did the user ask for a specific pool?
-	desiredPool := svc.Annotations[annotationAddressPool]
+
+	// Assign ip from requested address pool.
 	if desiredPool != "" {
 		ips, err := c.ips.AllocateFromPool(key, svc, serviceIPFamily, desiredPool, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
 		if err != nil {
