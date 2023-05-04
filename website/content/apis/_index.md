@@ -260,8 +260,9 @@ Path with higher localpref is preferred over one with lower localpref.</p>
 </td>
 <td>
 <em>(Optional)</em>
-<p>The BGP communities to be associated with the announcement. Each item can be a
-community of the form 1234:1234 or the name of an alias defined in the Community CRD.</p>
+<p>The BGP communities to be associated with the announcement. Each item can be a standard community of the
+form 1234:1234, a large community of the form large:1234:1234:1234 or the name of an alias defined in the
+Community CRD.</p>
 </td>
 </tr>
 <tr>
@@ -436,7 +437,8 @@ string
 </em>
 </td>
 <td>
-<p>The BGP community value corresponding to the given name.</p>
+<p>The BGP community value corresponding to the given name. Can be a standard community of the form 1234:1234
+or a large community of the form large:1234:1234:1234.</p>
 </td>
 </tr>
 </tbody>

@@ -25,8 +25,6 @@ import (
 const (
 	// BGP configuration directory.
 	frrConfigDir = "config/frr"
-	// FRR routing image.
-	frrImage = "quay.io/frrouting/frr:8.4.2"
 	// Host network name.
 	hostNetwork = "host"
 	// FRR container mount destination path.
@@ -47,6 +45,7 @@ type FRR struct {
 
 type Config struct {
 	Name     string
+	Image    string
 	Neighbor frrconfig.NeighborConfig
 	Router   frrconfig.RouterConfig
 	HostIPv4 string
@@ -170,7 +169,7 @@ func start(cfg Config) (*FRR, error) {
 	}
 
 	volume := fmt.Sprintf("%s:%s", testDirName, frrMountPath)
-	args := []string{"run", "-d", "--privileged", "--network", cfg.Network, "--rm", "--ulimit", "core=-1", "--name", cfg.Name, "--volume", volume, frrImage}
+	args := []string{"run", "-d", "--privileged", "--network", cfg.Network, "--rm", "--ulimit", "core=-1", "--name", cfg.Name, "--volume", volume, cfg.Image}
 	out, err := exec.Command(executor.ContainerRuntime, args...).CombinedOutput()
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to start %s container. %s", cfg.Name, out)

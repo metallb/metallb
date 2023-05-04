@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-kit/log"
 	"go.universe.tf/metallb/internal/bgp"
-	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/logging"
 )
 
@@ -236,11 +236,11 @@ func TestSingleAdvertisementVRF(t *testing.T) {
 		IP:   net.ParseIP("172.16.1.10"),
 		Mask: classCMask,
 	}
-	communities := []uint32{}
-	community, _ := config.ParseCommunity("1111:2222")
-	communities = append(communities, community)
-	community, _ = config.ParseCommunity("3333:4444")
-	communities = append(communities, community)
+	communities := []community.BGPCommunity{}
+	community1, _ := community.New("1111:2222")
+	communities = append(communities, community1)
+	community2, _ := community.New("3333:4444")
+	communities = append(communities, community2)
 	adv := &bgp.Advertisement{
 		Prefix:      prefix,
 		Communities: communities,
@@ -341,11 +341,11 @@ func TestSingleAdvertisementWithPeerSelectorVRF(t *testing.T) {
 		IP:   net.ParseIP("172.16.1.10"),
 		Mask: classCMask,
 	}
-	communities := []uint32{}
-	community, _ := config.ParseCommunity("1111:2222")
-	communities = append(communities, community)
-	community, _ = config.ParseCommunity("3333:4444")
-	communities = append(communities, community)
+	communities := []community.BGPCommunity{}
+	community1, _ := community.New("1111:2222")
+	communities = append(communities, community1)
+	community2, _ := community.New("3333:4444")
+	communities = append(communities, community2)
 	adv := &bgp.Advertisement{
 		Prefix:      prefix,
 		Communities: communities,
@@ -390,8 +390,8 @@ func TestTwoAdvertisementsVRF(t *testing.T) {
 		IP:   net.ParseIP("172.16.1.10"),
 		Mask: classCMask,
 	}
-	communities := []uint32{}
-	community, _ := config.ParseCommunity("1111:2222")
+	communities := []community.BGPCommunity{}
+	community, _ := community.New("1111:2222")
 	communities = append(communities, community)
 	adv1 := &bgp.Advertisement{
 		Prefix:      prefix1,
@@ -462,8 +462,8 @@ func TestTwoAdvertisementsTwoSessionsOneVRF(t *testing.T) {
 		IP:   net.ParseIP("172.16.1.10"),
 		Mask: classCMask,
 	}
-	communities := []uint32{}
-	community, _ := config.ParseCommunity("1111:2222")
+	communities := []community.BGPCommunity{}
+	community, _ := community.New("1111:2222")
 	communities = append(communities, community)
 	adv1 := &bgp.Advertisement{
 		Prefix:      prefix1,
@@ -541,8 +541,8 @@ func TestTwoAdvertisementsTwoSessionsOneWithPeerSelectorAndVRF(t *testing.T) {
 		IP:   net.ParseIP("172.16.1.10"),
 		Mask: classCMask,
 	}
-	communities := []uint32{}
-	community, _ := config.ParseCommunity("1111:2222")
+	communities := []community.BGPCommunity{}
+	community, _ := community.New("1111:2222")
 	communities = append(communities, community)
 	adv1 := &bgp.Advertisement{
 		Prefix:      prefix1,
@@ -622,8 +622,8 @@ func TestTwoAdvertisementsTwoSessionsVRFWithPeerSelector(t *testing.T) {
 		IP:   net.ParseIP("172.16.1.10"),
 		Mask: classCMask,
 	}
-	communities := []uint32{}
-	community, _ := config.ParseCommunity("1111:2222")
+	communities := []community.BGPCommunity{}
+	community, _ := community.New("1111:2222")
 	communities = append(communities, community)
 	adv1 := &bgp.Advertisement{
 		Prefix:      prefix1,

@@ -15,6 +15,7 @@ import (
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	"go.universe.tf/metallb/internal/bgp"
+	"go.universe.tf/metallb/internal/bgp/community"
 	metallbconfig "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/ipfamily"
 	"go.universe.tf/metallb/internal/logging"
@@ -282,19 +283,24 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			family := ipfamily.ForAddress(adv.Prefix.IP)
 
 			communities := make([]string, 0)
+			largeCommunities := make([]string, 0)
 
 			// Convert community 32bits value to : format
 			for _, c := range adv.Communities {
-				community := metallbconfig.CommunityToString(c)
-				communities = append(communities, community)
+				if community.IsLarge(c) {
+					largeCommunities = append(largeCommunities, c.String())
+					continue
+				}
+				communities = append(communities, c.String())
 			}
 
 			prefix := adv.Prefix.String()
 			advConfig := advertisementConfig{
-				IPFamily:    family,
-				Prefix:      prefix,
-				Communities: communities,
-				LocalPref:   adv.LocalPref,
+				IPFamily:         family,
+				Prefix:           prefix,
+				Communities:      communities,
+				LargeCommunities: largeCommunities,
+				LocalPref:        adv.LocalPref,
 			}
 
 			neighbor.Advertisements = append(neighbor.Advertisements, &advConfig)

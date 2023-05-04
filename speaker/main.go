@@ -512,7 +512,7 @@ func (c *controller) SetConfig(l log.Logger, cfg *config.Config) controllers.Syn
 }
 
 func (c *controller) SetNode(l log.Logger, node *v1.Node) controllers.SyncState {
-	conditionChanged := isNetworkConditionChanged(c.myNode, c.nodes, node)
+	conditionChanged := isNetworkConditionChanged(node.Name, c.nodes, node)
 	c.nodes[node.Name] = node
 
 	for proto, handler := range c.protocolHandlers {

@@ -98,8 +98,8 @@ func ExternalContainersSetup(externalContainers string, cs *clientset.Clientset)
 	return res, nil
 }
 
-func HostContainerSetup() ([]*frrcontainer.FRR, error) {
-	config := hostnetContainerConfig()
+func HostContainerSetup(image string) ([]*frrcontainer.FRR, error) {
+	config := hostnetContainerConfig(image)
 	res, err := frrcontainer.Create(config)
 	if err != nil {
 		return nil, err
@@ -121,8 +121,8 @@ func HostContainerSetup() ([]*frrcontainer.FRR, error) {
 	See `e2etest/README.md` for more details.
 */
 
-func KindnetContainersSetup(cs *clientset.Clientset) ([]*frrcontainer.FRR, error) {
-	configs := frrContainersConfigs()
+func KindnetContainersSetup(cs *clientset.Clientset, image string) ([]*frrcontainer.FRR, error) {
+	configs := frrContainersConfigs(image)
 
 	var out string
 	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "create", defaultNextHopSettings.multiHopNetwork, "--ipv6",
@@ -152,7 +152,7 @@ func KindnetContainersSetup(cs *clientset.Clientset) ([]*frrcontainer.FRR, error
 	* by doing so, the frr container is reacheable only from "inside" the vrf
 */
 
-func VRFContainersSetup(cs *clientset.Clientset) ([]*frrcontainer.FRR, error) {
+func VRFContainersSetup(cs *clientset.Clientset, image string) ([]*frrcontainer.FRR, error) {
 	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "create", vrfNetwork, "--ipv6",
 		"--driver=bridge", "--subnet=172.31.0.0/16", "--subnet=fc00:f853:ccd:e799::/64")
 	if err != nil && !strings.Contains(out, "already exists") {
@@ -165,7 +165,7 @@ func VRFContainersSetup(cs *clientset.Clientset) ([]*frrcontainer.FRR, error) {
 		return nil, errors.Wrapf(err, "failed to create %s: %s", vrfNextHopSettings.multiHopNetwork, out)
 	}
 
-	config := vrfContainersConfig()
+	config := vrfContainersConfig(image)
 
 	vrfContainers, err := frrcontainer.Create(config)
 	if err != nil {
@@ -336,10 +336,11 @@ func externalContainersConfigs() map[string]frrcontainer.Config {
 	return res
 }
 
-func hostnetContainerConfig() map[string]frrcontainer.Config {
+func hostnetContainerConfig(image string) map[string]frrcontainer.Config {
 	res := make(map[string]frrcontainer.Config)
 	res["ibgp-single-hop"] = frrcontainer.Config{
-		Name: "ibgp-single-hop",
+		Name:  "ibgp-single-hop",
+		Image: image,
 		Neighbor: frrconfig.NeighborConfig{
 			ASN:      metalLBASN,
 			Password: "ibgp-test",
@@ -357,10 +358,11 @@ func hostnetContainerConfig() map[string]frrcontainer.Config {
 	return res
 }
 
-func frrContainersConfigs() map[string]frrcontainer.Config {
+func frrContainersConfigs(image string) map[string]frrcontainer.Config {
 	res := make(map[string]frrcontainer.Config)
 	res["ibgp-single-hop"] = frrcontainer.Config{
-		Name: "ibgp-single-hop",
+		Name:  "ibgp-single-hop",
+		Image: image,
 		Neighbor: frrconfig.NeighborConfig{
 			ASN:      metalLBASN,
 			Password: "ibgp-test",
@@ -376,7 +378,8 @@ func frrContainersConfigs() map[string]frrcontainer.Config {
 		HostIPv6: hostIPv6,
 	}
 	res["ibgp-multi-hop"] = frrcontainer.Config{
-		Name: "ibgp-multi-hop",
+		Name:  "ibgp-multi-hop",
+		Image: image,
 		Neighbor: frrconfig.NeighborConfig{
 			ASN:      metalLBASN,
 			Password: "ibgp-test",
@@ -392,7 +395,8 @@ func frrContainersConfigs() map[string]frrcontainer.Config {
 		HostIPv6: hostIPv6,
 	}
 	res["ebgp-multi-hop"] = frrcontainer.Config{
-		Name: "ebgp-multi-hop",
+		Name:  "ebgp-multi-hop",
+		Image: image,
 		Neighbor: frrconfig.NeighborConfig{
 			ASN:      metalLBASN,
 			Password: "ebgp-test",
@@ -409,6 +413,7 @@ func frrContainersConfigs() map[string]frrcontainer.Config {
 	}
 	res["ebgp-single-hop"] = frrcontainer.Config{
 		Name:    "ebgp-single-hop",
+		Image:   image,
 		Network: kindNetwork,
 		Neighbor: frrconfig.NeighborConfig{
 			ASN:      metalLBASN,
@@ -422,10 +427,11 @@ func frrContainersConfigs() map[string]frrcontainer.Config {
 	return res
 }
 
-func vrfContainersConfig() map[string]frrcontainer.Config {
+func vrfContainersConfig(image string) map[string]frrcontainer.Config {
 	res := make(map[string]frrcontainer.Config)
 	res["ebgp-vrf-single-hop"] = frrcontainer.Config{
 		Name:    "ebgp-vrf-single-hop",
+		Image:   image,
 		Network: vrfNetwork,
 		Neighbor: frrconfig.NeighborConfig{
 			ASN:      metalLBASNVRF,
@@ -441,6 +447,7 @@ func vrfContainersConfig() map[string]frrcontainer.Config {
 	}
 	res["ibgp-vrf-single-hop"] = frrcontainer.Config{
 		Name:    "ibgp-vrf-single-hop",
+		Image:   image,
 		Network: vrfNetwork,
 		Neighbor: frrconfig.NeighborConfig{
 			ASN:      metalLBASNVRF,
@@ -455,7 +462,8 @@ func vrfContainersConfig() map[string]frrcontainer.Config {
 		},
 	}
 	res["ibgp-vrf-multi-hop"] = frrcontainer.Config{
-		Name: "ibgp-vrf-multi-hop",
+		Name:  "ibgp-vrf-multi-hop",
+		Image: image,
 		Neighbor: frrconfig.NeighborConfig{
 			ASN:      metalLBASNVRF,
 			Password: "ibgp-test",
@@ -470,7 +478,8 @@ func vrfContainersConfig() map[string]frrcontainer.Config {
 		Network: vrfNextHopSettings.multiHopNetwork,
 	}
 	res["ebgp-vrf-multi-hop"] = frrcontainer.Config{
-		Name: "ebgp-vrf-multi-hop",
+		Name:  "ebgp-vrf-multi-hop",
+		Image: image,
 		Neighbor: frrconfig.NeighborConfig{
 			ASN:      metalLBASNVRF,
 			Password: "ebgp-test",

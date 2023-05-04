@@ -321,6 +321,23 @@ func TestControllerMutation(t *testing.T) {
 		},
 
 		{
+			desc: "incompatible ip and address pool annotations",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						annotationLoadBalancerIPs: "1.2.3.1",
+						annotationAddressPool:     "pool2",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"1.2.3.4"},
+					Type:       "LoadBalancer",
+				},
+			},
+			wantErr: true,
+		},
+
+		{
 			desc: "request invalid IP via custom annotation",
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
@@ -377,7 +394,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"metallb.universe.tf/address-pool": "pool1",
+						annotationAddressPool: "pool1",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -388,7 +405,7 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"metallb.universe.tf/address-pool": "pool1",
+						annotationAddressPool: "pool1",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -404,7 +421,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"metallb.universe.tf/address-pool": "pool2",
+						annotationAddressPool: "pool2",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -416,7 +433,7 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"metallb.universe.tf/address-pool": "pool2",
+						annotationAddressPool: "pool2",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -432,7 +449,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"metallb.universe.tf/address-pool": "does-not-exist",
+						annotationAddressPool: "does-not-exist",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -673,7 +690,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"metallb.universe.tf/address-pool": "pool5",
+						annotationAddressPool: "pool5",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -684,7 +701,7 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						"metallb.universe.tf/address-pool": "pool5",
+						annotationAddressPool: "pool5",
 					},
 				},
 				Spec: v1.ServiceSpec{
