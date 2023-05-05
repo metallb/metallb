@@ -448,8 +448,24 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 				},
 			}
 
+			newLabels := make(map[string]string)
+			for key, value := range secondNsLabels {
+				newLabels[key] = value
+			}
+			newLabels["newLabel"] = "true"
+
+			secondNamespacePoolHigherPriority := metallbv1beta1.IPAddressPool{
+				ObjectMeta: metav1.ObjectMeta{Name: "second-ns-labels-higher-priority-ip-pool"},
+				Spec: metallbv1beta1.IPAddressPoolSpec{
+					Addresses: []string{
+						"192.168.50.0/32",
+					},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 5, NamespaceSelectors: []metav1.LabelSelector{{MatchLabels: newLabels}}},
+				},
+			}
+
 			resources := internalconfig.ClusterResources{
-				Pools: []metallbv1beta1.IPAddressPool{firstNamespacePool, secondNamespacePool, noNamespacePool},
+				Pools: []metallbv1beta1.IPAddressPool{firstNamespacePool, secondNamespacePool, secondNamespacePoolHigherPriority, noNamespacePool},
 			}
 			err := ConfigUpdater.Update(resources)
 			framework.ExpectNoError(err)
@@ -477,6 +493,24 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			ginkgo.By("validate LoadBalancer IP is allocated from default address pool")
 			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{noNamespacePool}, e2eservice.GetIngressPoint(
 				&svc3.Status.LoadBalancer.Ingress[0]))
+			framework.ExpectNoError(err)
+
+			ginkgo.By("updating second namespace labels to match higher priority pool")
+			ns, err := cs.CoreV1().Namespaces().Get(context.Background(), secondNamespace, metav1.GetOptions{})
+			framework.ExpectNoError(err)
+			ns.Labels = newLabels
+			_, err = cs.CoreV1().Namespaces().Update(context.Background(), ns, metav1.UpdateOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("creating a second svc that should get an ip from the higher priority pool")
+			svc4, _ := service.CreateWithBackend(cs, secondNamespace, "second-ns-service2")
+			defer func() {
+				service.Delete(cs, svc4)
+			}()
+
+			ginkgo.By("validate LoadBalancer IP is allocated from higher priority address pool")
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{secondNamespacePoolHigherPriority}, e2eservice.GetIngressPoint(
+				&svc4.Status.LoadBalancer.Ingress[0]))
 			framework.ExpectNoError(err)
 		})
 	})
