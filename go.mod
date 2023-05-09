@@ -22,9 +22,9 @@ require (
 	github.com/prometheus/common v0.42.0
 	golang.org/x/sync v0.1.0
 	golang.org/x/sys v0.7.0
-	k8s.io/api v0.26.1
+	k8s.io/api v0.26.4
 	k8s.io/apiextensions-apiserver v0.26.1
-	k8s.io/apimachinery v0.26.1
+	k8s.io/apimachinery v0.26.4
 	k8s.io/client-go v0.26.1
 	k8s.io/klog v1.0.0
 	k8s.io/kubernetes v1.26.1
@@ -34,6 +34,9 @@ require (
 	sigs.k8s.io/yaml v1.3.0
 )
 
+// pinning to specific versions is required because we are consuming
+// the k8s.io/kubernetes module from the tests (via the "k8s.io/kubernetes/test/e2e/framework" package)
+// See https://github.com/kubernetes/kubernetes/issues/90358#issuecomment-617859364
 require (
 	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
 	github.com/Microsoft/go-winio v0.5.2 // indirect
@@ -147,9 +150,6 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.3 // indirect
 )
 
-// pinning to specific versions is required because we are consuming
-// the k8s.io/kubernetes module from the tests (via the "k8s.io/kubernetes/test/e2e/framework" package)
-// See https://github.com/kubernetes/kubernetes/issues/90358#issuecomment-617859364
 replace (
 	github.com/onsi/ginkgo/v2 => github.com/onsi/ginkgo/v2 v2.4.0
 	k8s.io/api => k8s.io/api v0.26.0
@@ -157,7 +157,7 @@ replace (
 	k8s.io/apimachinery => k8s.io/apimachinery v0.26.0
 	k8s.io/apiserver => k8s.io/apiserver v0.26.0
 	k8s.io/cli-runtime => k8s.io/cli-runtime v0.26.0
-	k8s.io/client-go => k8s.io/client-go v0.26.0
+	k8s.io/client-go => k8s.io/client-go v0.26.4
 	k8s.io/cloud-provider => k8s.io/cloud-provider v0.26.0
 	k8s.io/cluster-bootstrap => k8s.io/cluster-bootstrap v0.26.0
 	k8s.io/code-generator => k8s.io/code-generator v0.26.0
