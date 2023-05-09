@@ -1,0 +1,10 @@
+apiVersion: audit.k8s.io/v1
+kind: Policy
+omitStages:
+  - "ResponseComplete"
+  - "ResponseStarted"
+rules:
+- level: Metadata
+  users:
+  - "system:serviceaccount:metallb-system:speaker"
+  - "system:serviceaccount:metallb-system:controller"

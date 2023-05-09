@@ -247,3 +247,14 @@ Commercial support is available at
 </body>
 </html>
 ```
+
+## Enabling the apiserver audit logs
+
+To enable the apiserver audit logs, to understand what are the impacts of the controller and the speakers over
+the apiserver, the `-t, --with-api-audit` flag must be passed to `inv dev-env`.
+
+When the audit logs are enabled, they can be inspected by running:
+
+```bash
+docker exec kind-control-plane cat /var/log/kubernetes/kube-apiserver-audit.log
+```
