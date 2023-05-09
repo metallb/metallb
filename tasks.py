@@ -328,10 +328,12 @@ def generate_manifest(ctx, crd_options="crd:crdVersions=v1", bgp_type="native", 
                 "Default: True.",
     "with_prometheus": "Deploys the prometheus kubernetes stack"
                 "Default: False.",
+    "with_api_audit": "Enables audit on the apiserver"
+                "Default: False.",
 })
 def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_dir="",
         node_img=None, ip_family="ipv4", bgp_type="native", log_level="info",
-        helm_install=False, build_images=True, with_prometheus=False):
+        helm_install=False, build_images=True, with_prometheus=False, with_api_audit=False):
     """Build and run MetalLB in a local Kind cluster.
 
     If the cluster specified by --name (default "kind") doesn't exist,
@@ -356,6 +358,29 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
             ],
         }
 
+        if with_api_audit:
+            config["nodes"][0]["kubeadmConfigPatches"] = [r"""kind: ClusterConfiguration
+apiServer:
+  # enable auditing flags on the API server
+  extraArgs:
+    audit-log-path: /var/log/kubernetes/kube-apiserver-audit.log
+    audit-policy-file: /etc/kubernetes/policies/audit-policy.yaml
+    # mount new files / directories on the control plane
+  extraVolumes:
+    - name: audit-policies
+      hostPath: /etc/kubernetes/policies
+      mountPath: /etc/kubernetes/policies
+      readOnly: true
+      pathType: "DirectoryOrCreate"
+    - name: "audit-logs"
+      hostPath: "/var/log/kubernetes"
+      mountPath: "/var/log/kubernetes"
+      readOnly: false
+      pathType: DirectoryOrCreate"""]
+            config["nodes"][0]["extraMounts"] = [{"hostPath": "./dev-env/audit-policy.yaml",
+                                        "containerPath": "/etc/kubernetes/policies/audit-policy.yaml",
+                                        "readOnly": True}]
+
         networking_config = {}
         if ip_family != "ipv4":
             networking_config["ipFamily"] = ip_family
@@ -367,6 +392,7 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
         if node_img != None:
             extra_options = "--image={}".format(node_img)
         config = yaml.dump(config).encode("utf-8")
+        
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(config)
             tmp.flush()
