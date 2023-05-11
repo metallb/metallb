@@ -319,7 +319,7 @@ speaker:
   # frr contains configuration specific to the MetalLB FRR container,
   # for speaker running alongside FRR.
   frr:
-    enabled: false
+    enabled: true
     image:
       repository: quay.io/frrouting/frr
       tag: 8.4.2
