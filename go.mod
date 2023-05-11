@@ -20,7 +20,7 @@ require (
 	github.com/prometheus/client_golang v1.15.0
 	github.com/prometheus/client_model v0.4.0
 	github.com/prometheus/common v0.42.0
-	golang.org/x/sync v0.1.0
+	golang.org/x/sync v0.2.0
 	golang.org/x/sys v0.7.0
 	k8s.io/api v0.26.4
 	k8s.io/apiextensions-apiserver v0.26.1
