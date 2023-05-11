@@ -111,7 +111,7 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.affinity | object | `{}` |  |
 | speaker.enabled | bool | `true` |  |
 | speaker.excludeInterfaces.enabled | bool | `true` |  |
-| speaker.frr.enabled | bool | `false` |  |
+| speaker.frr.enabled | bool | `true` |  |
 | speaker.frr.image.pullPolicy | string | `nil` |  |
 | speaker.frr.image.repository | string | `"quay.io/frrouting/frr"` |  |
 | speaker.frr.image.tag | string | `"8.4.2"` |  |
