@@ -123,7 +123,10 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 			secondService, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "second-lb", testservice.WithSpecificPool("second-pool"))
 			defer testservice.Delete(cs, secondService)
 
+			ginkgo.By(fmt.Sprintf("Checking service %s is announced only from expected nodes", firstService.Name))
 			checkServiceOnlyOnNodes(firstService, expectedNodesForFirstPool, pairingIPFamily)
+
+			ginkgo.By(fmt.Sprintf("Checking service %s is announced only from expected nodes", secondService.Name))
 			checkServiceOnlyOnNodes(secondService, expectedNodesForSecondPool, pairingIPFamily)
 		},
 		ginkgo.Entry("IPV4 - two on first, two on second", ipfamily.IPv4, []string{"192.168.10.0/24", "192.168.16.0/24"}, []int{0, 1}, []int{0, 1}),
