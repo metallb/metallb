@@ -20,7 +20,7 @@ runs:
         sudo apt-get update
         sudo apt-get install python3-pip arping ndisc6
         sudo pip3 install invoke semver pyyaml
-        GO111MODULE="on" go get sigs.k8s.io/kind@v0.15.0
+        GO111MODULE="on" go get sigs.k8s.io/kind@v0.19.0
         go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0
         go install github.com/onsi/ginkgo/v2/ginkgo@v2.4.0
 
