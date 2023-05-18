@@ -1242,7 +1242,7 @@ def deploy_prometheus(_ctx):
 def _fetch_kubectl():
     if not os.path.exists(BUILD_PATH):
         os.makedirs(BUILD_PATH, mode=0o750)
-    url = "https://dl.k8s.io/release/{kubectl_version}/bin/$(go env GOOS)/$(go env GOARCH)/kubectl"
+    url = f"https://dl.k8s.io/release/{KUBECTL_VERSION}/bin/$(go env GOOS)/$(go env GOARCH)/kubectl"
     curl_command = f"curl -o {KUBECTL_PATH} -LO {url}"
     if not os.path.exists(KUBECTL_PATH):
         run(curl_command)
