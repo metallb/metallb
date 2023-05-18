@@ -3,6 +3,7 @@
 package wget
 
 import (
+	"fmt"
 	"os/exec"
 
 	"go.universe.tf/metallb/e2etest/pkg/executor"
@@ -15,13 +16,16 @@ const (
 )
 
 func Do(address string, exc executor.Executor) error {
-	retrycnt := 0
-	var code int
-	var err error
+	var (
+		code     int
+		err      error
+		out      string
+		retrycnt = 0
+	)
 
 	// Retry loop to handle wget NetworkFailure errors
 	for {
-		_, err = exc.Exec("wget", "-O-", "-q", address, "-T", "60")
+		out, err = exc.Exec("wget", "-O-", "-q", address, "-T", "60")
 		if exitErr, ok := err.(*exec.ExitError); err != nil && ok {
 			code = exitErr.ExitCode()
 		} else {
@@ -34,5 +38,8 @@ func Do(address string, exc executor.Executor) error {
 			break
 		}
 	}
-	return err
+	if err != nil {
+		return fmt.Errorf("%w: %s", err, out)
+	}
+	return nil
 }

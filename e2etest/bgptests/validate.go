@@ -57,13 +57,14 @@ func validateFRRPeeredWithNodes(nodes []corev1.Node, c *frrcontainer.FRR, ipFami
 			return fmt.Errorf("failed to match neighbors for %s, %w", c.Name, err)
 		}
 		return nil
-	}, 4*time.Minute, 1*time.Second).Should(BeNil())
+	}, 4*time.Minute, 1*time.Second).Should(BeNil(), "timed out waiting to validate nodes peered with the frr instance")
 }
 
 func validateService(svc *corev1.Service, nodes []corev1.Node, c *frrcontainer.FRR) {
+	ginkgo.By(fmt.Sprintf("Validating service %s is announced to container: %s", svc.Name, c.Name))
 	Eventually(func() error {
 		return validateServiceNoWait(svc, nodes, c)
-	}, 4*time.Minute, 1*time.Second).Should(BeNil())
+	}, 4*time.Minute, 1*time.Second).ShouldNot(HaveOccurred(), "timed out waiting to validate service")
 }
 
 func validateServiceNoWait(svc *corev1.Service, nodes []corev1.Node, c *frrcontainer.FRR) error {
@@ -85,7 +86,7 @@ func validateServiceNoWait(svc *corev1.Service, nodes []corev1.Node, c *frrconta
 			address := fmt.Sprintf("http://%s/", hostport)
 			err := wget.Do(address, c)
 			if err != nil {
-				return err
+				return fmt.Errorf("failed to wget from %s to %s: %w", c.Name, address, err)
 			}
 		}
 
