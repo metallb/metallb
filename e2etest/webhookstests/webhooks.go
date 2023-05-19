@@ -32,8 +32,7 @@ import (
 
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
-	metallbconfig "go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/pointer"
+	"go.universe.tf/metallb/e2etest/pkg/pointer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -65,7 +64,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 	ginkgo.Context("For IPAddressPool", func() {
 		ginkgo.It("Should recognize overlapping addresses in two AddressPools", func() {
 			ginkgo.By("Creating first IPAddressPool")
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -113,7 +112,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 	ginkgo.Context("for Legacy AddressPool", func() {
 		ginkgo.It("Should recognize overlapping addresses in two AddressPools", func() {
 			ginkgo.By("Creating first AddrssPool")
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				LegacyAddressPools: []metallbv1beta1.AddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -123,7 +122,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 							Addresses: []string{
 								"1.1.1.1-1.1.1.100",
 							},
-							Protocol: string(metallbconfig.Layer2),
+							Protocol: string(config.L2),
 						},
 					},
 				},
@@ -141,7 +140,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 						Addresses: []string{
 							"1.1.1.15-1.1.1.20",
 						},
-						Protocol: string(metallbconfig.Layer2),
+						Protocol: string(config.L2),
 					},
 				},
 			)
@@ -165,7 +164,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 	ginkgo.Context("for BGPAdvertisement", func() {
 		ginkgo.It("Should recognize invalid AggregationLength", func() {
 			ginkgo.By("Creating AddressPool")
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -203,7 +202,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 	ginkgo.Context("For BGPPeer", func() {
 		ginkgo.It("Should reject invalid BGPPeer IP address", func() {
 			ginkgo.By("Creating BGPPeer")
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Peers: []metallbv1beta2.BGPPeer{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -226,7 +225,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 	ginkgo.Context("For Community", func() {
 		ginkgo.DescribeTable("reject a new invalid Community", func(community, expectedError string) {
 			ginkgo.By("Creating invalid Community")
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Communities: []metallbv1beta1.Community{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -252,7 +251,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 
 		ginkgo.DescribeTable("reject an update to an invalid Community", func(community, expectedError string) {
 			ginkgo.By("Creating Community")
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Communities: []metallbv1beta1.Community{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -282,7 +281,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 
 		ginkgo.DescribeTable("reject Community duplications", func(community string) {
 			ginkgo.By("Creating duplicates in the same Community")
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Communities: []metallbv1beta1.Community{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -308,7 +307,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 			Expect(err.Error()).To(ContainSubstring("duplicate definition of community"))
 
 			ginkgo.By("Creating duplicates across two different Communities")
-			resources = metallbconfig.ClusterResources{
+			resources = config.Resources{
 				Communities: []metallbv1beta1.Community{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -367,7 +366,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 		}
 		ginkgo.It("Should produce an error when deleting a profile used by a BGPPeer", func() {
 			ginkgo.By("Creating BFDProfile and BGPPeer")
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				BFDProfiles: []metallbv1beta1.BFDProfile{testBFDProfile},
 				Peers:       []metallbv1beta2.BGPPeer{testPeer},
 			}
@@ -391,11 +390,11 @@ var _ = ginkgo.Describe("Webhooks", func() {
 })
 
 var _ = ginkgo.DescribeTable("Webhooks namespace validation",
-	func(resources *metallbconfig.ClusterResources) {
+	func(resources *config.Resources) {
 		err := ConfigUpdaterOtherNS.Update(*resources)
 		Expect(err).To(MatchError(ContainSubstring(fmt.Sprintf("resource must be created in %s namespace", metallb.Namespace))))
 	},
-	ginkgo.Entry("Should reject creating BFDProfile in a different namespace", &metallbconfig.ClusterResources{
+	ginkgo.Entry("Should reject creating BFDProfile in a different namespace", &config.Resources{
 		BFDProfiles: []metallbv1beta1.BFDProfile{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -404,7 +403,7 @@ var _ = ginkgo.DescribeTable("Webhooks namespace validation",
 			},
 		},
 	}),
-	ginkgo.Entry("Should reject creating IPAddressPool in a different namespace", &metallbconfig.ClusterResources{
+	ginkgo.Entry("Should reject creating IPAddressPool in a different namespace", &config.Resources{
 		Pools: []metallbv1beta1.IPAddressPool{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -418,7 +417,7 @@ var _ = ginkgo.DescribeTable("Webhooks namespace validation",
 			},
 		},
 	}),
-	ginkgo.Entry("Should reject creating Legacy AddressPool in a different namespace", &metallbconfig.ClusterResources{
+	ginkgo.Entry("Should reject creating Legacy AddressPool in a different namespace", &config.Resources{
 		LegacyAddressPools: []metallbv1beta1.AddressPool{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -428,12 +427,12 @@ var _ = ginkgo.DescribeTable("Webhooks namespace validation",
 					Addresses: []string{
 						"1.1.1.1-1.1.1.100",
 					},
-					Protocol: string(metallbconfig.Layer2),
+					Protocol: string(config.L2),
 				},
 			},
 		},
 	}),
-	ginkgo.Entry("Should reject creating BGPPeer in a different namespace", &metallbconfig.ClusterResources{
+	ginkgo.Entry("Should reject creating BGPPeer in a different namespace", &config.Resources{
 		Peers: []metallbv1beta2.BGPPeer{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -447,7 +446,7 @@ var _ = ginkgo.DescribeTable("Webhooks namespace validation",
 			},
 		},
 	}),
-	ginkgo.Entry("Should reject creating BGPAdvertisement in a different namespace", &metallbconfig.ClusterResources{
+	ginkgo.Entry("Should reject creating BGPAdvertisement in a different namespace", &config.Resources{
 		BGPAdvs: []metallbv1beta1.BGPAdvertisement{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -460,7 +459,7 @@ var _ = ginkgo.DescribeTable("Webhooks namespace validation",
 			},
 		},
 	}),
-	ginkgo.Entry("Should reject creating L2Advertisement in a different namespace", &metallbconfig.ClusterResources{
+	ginkgo.Entry("Should reject creating L2Advertisement in a different namespace", &config.Resources{
 		L2Advs: []metallbv1beta1.L2Advertisement{
 			{
 				ObjectMeta: metav1.ObjectMeta{
@@ -469,7 +468,7 @@ var _ = ginkgo.DescribeTable("Webhooks namespace validation",
 			},
 		},
 	}),
-	ginkgo.Entry("Should reject creating Community in a different namespace", &metallbconfig.ClusterResources{
+	ginkgo.Entry("Should reject creating Community in a different namespace", &config.Resources{
 		Communities: []metallbv1beta1.Community{
 			{
 				ObjectMeta: metav1.ObjectMeta{

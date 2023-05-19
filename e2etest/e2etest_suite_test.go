@@ -30,11 +30,11 @@ import (
 	"go.universe.tf/metallb/e2etest/bgptests"
 	"go.universe.tf/metallb/e2etest/l2tests"
 	testsconfig "go.universe.tf/metallb/e2etest/pkg/config"
+	"go.universe.tf/metallb/e2etest/pkg/iprange"
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	"go.universe.tf/metallb/e2etest/pkg/service"
 	"go.universe.tf/metallb/e2etest/webhookstests"
-	internalconfig "go.universe.tf/metallb/internal/config"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -118,11 +118,11 @@ var _ = ginkgo.BeforeSuite(func() {
 	framework.ExpectNotEqual(framework.TestContext.KubeConfig, "", fmt.Sprintf("%s env var not set", clientcmd.RecommendedConfigPathEnvVar))
 
 	// Validate the IPv4 service range.
-	_, err := internalconfig.ParseCIDR(l2tests.IPV4ServiceRange)
+	_, err := iprange.Parse(l2tests.IPV4ServiceRange)
 	framework.ExpectNoError(err)
 
 	// Validate the IPv6 service range.
-	_, err = internalconfig.ParseCIDR(l2tests.IPV6ServiceRange)
+	_, err = iprange.Parse(l2tests.IPV6ServiceRange)
 	framework.ExpectNoError(err)
 
 	cs, err := framework.LoadClientset()

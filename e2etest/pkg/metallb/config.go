@@ -9,7 +9,7 @@ import (
 
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	frrcontainer "go.universe.tf/metallb/e2etest/pkg/frr/container"
-	"go.universe.tf/metallb/internal/ipfamily"
+	"go.universe.tf/metallb/e2etest/pkg/ipfamily"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )

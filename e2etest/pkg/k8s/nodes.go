@@ -12,9 +12,9 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
+	"go.universe.tf/metallb/e2etest/pkg/ipfamily"
 	"go.universe.tf/metallb/e2etest/pkg/netdev"
-	"go.universe.tf/metallb/internal/ipfamily"
-	"go.universe.tf/metallb/internal/k8s/nodes"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -128,7 +128,7 @@ func SetNodeCondition(cs clientset.Interface, nodeName string, conditionType v1.
 			return fmt.Errorf("failed to get node %s: %s", nodeName, err)
 		}
 
-		gotStatus := nodes.ConditionStatus(n, conditionType)
+		gotStatus := conditionStatus(n, conditionType)
 		if status != gotStatus {
 			return fmt.Errorf("failed: got unexpected %s status on node %s", conditionType, nodeName)
 		}
@@ -137,4 +137,18 @@ func SetNodeCondition(cs clientset.Interface, nodeName string, conditionType v1.
 	}, time.Minute, 3*time.Second).ShouldNot(gomega.HaveOccurred())
 
 	return nil
+}
+
+func conditionStatus(n *corev1.Node, ct corev1.NodeConditionType) corev1.ConditionStatus {
+	if n == nil {
+		return corev1.ConditionUnknown
+	}
+
+	for _, c := range n.Status.Conditions {
+		if c.Type == ct {
+			return c.Status
+		}
+	}
+
+	return corev1.ConditionUnknown
 }

@@ -10,7 +10,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
-	internalconfig "go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -18,6 +17,7 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	admissionapi "k8s.io/pod-security-admission/api"
 
+	"go.universe.tf/metallb/e2etest/pkg/config"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/mac"
@@ -64,7 +64,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 
 	ginkgo.Context("Interface Selector", func() {
 		ginkgo.BeforeEach(func() {
-			resources := internalconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -84,7 +84,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 		})
 
 		ginkgo.It("Validate the LB IP's mac", func() {
-			resources := internalconfig.ClusterResources{
+			resources := config.Resources{
 				L2Advs: []metallbv1beta1.L2Advertisement{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -148,7 +148,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 			ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 
 			for i := range NodeNics {
-				resources := internalconfig.ClusterResources{
+				resources := config.Resources{
 					L2Advs: []metallbv1beta1.L2Advertisement{
 						{
 							ObjectMeta: metav1.ObjectMeta{
@@ -177,7 +177,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 		})
 
 		ginkgo.It("Specify not existing interfaces", func() {
-			resources := internalconfig.ClusterResources{
+			resources := config.Resources{
 				L2Advs: []metallbv1beta1.L2Advertisement{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -233,7 +233,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 			}()
 
 			ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
-			resources := internalconfig.ClusterResources{}
+			resources := config.Resources{}
 
 			for i := range NodeNics {
 				l2Adv := metallbv1beta1.L2Advertisement{
@@ -271,7 +271,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 
 			framework.ExpectNoError(err)
 			for _, node := range allNodes.Items {
-				resources := internalconfig.ClusterResources{
+				resources := config.Resources{
 					L2Advs: []metallbv1beta1.L2Advertisement{
 						{
 							ObjectMeta: metav1.ObjectMeta{

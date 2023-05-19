@@ -32,6 +32,7 @@ import (
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/e2etest/pkg/config"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
+	"go.universe.tf/metallb/e2etest/pkg/iprange"
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/mac"
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
@@ -40,7 +41,6 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/udp"
 
 	"go.universe.tf/metallb/e2etest/pkg/wget"
-	internalconfig "go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
 	pkgerr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -95,7 +95,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 	ginkgo.Context("type=Loadbalancer", func() {
 		ginkgo.BeforeEach(func() {
-			resources := internalconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -289,7 +289,7 @@ var _ = ginkgo.Describe("L2", func() {
 	ginkgo.Context("validate different AddressPools for type=Loadbalancer", func() {
 
 		ginkgo.DescribeTable("set different AddressPools ranges modes", func(getAddressPools func() []metallbv1beta1.IPAddressPool) {
-			resources := internalconfig.ClusterResources{
+			resources := config.Resources{
 				Pools:  getAddressPools(),
 				L2Advs: []metallbv1beta1.L2Advertisement{emptyL2Advertisement},
 			}
@@ -337,13 +337,13 @@ var _ = ginkgo.Describe("L2", func() {
 					var ipv4AddressesByCIDR []string
 					var ipv6AddressesByCIDR []string
 
-					cidrs, err := internalconfig.ParseCIDR(IPV4ServiceRange)
+					cidrs, err := iprange.Parse(IPV4ServiceRange)
 					framework.ExpectNoError(err)
 					for _, cidr := range cidrs {
 						ipv4AddressesByCIDR = append(ipv4AddressesByCIDR, cidr.String())
 					}
 
-					cidrs, err = internalconfig.ParseCIDR(IPV6ServiceRange)
+					cidrs, err = iprange.Parse(IPV6ServiceRange)
 					framework.ExpectNoError(err)
 					for _, cidr := range cidrs {
 						ipv6AddressesByCIDR = append(ipv6AddressesByCIDR, cidr.String())
@@ -363,7 +363,7 @@ var _ = ginkgo.Describe("L2", func() {
 	})
 
 	ginkgo.DescribeTable("different services sharing the same ip should advertise from the same node", func(ipRange *string) {
-		resources := internalconfig.ClusterResources{
+		resources := config.Resources{
 			Pools: []metallbv1beta1.IPAddressPool{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -484,7 +484,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 		ginkgo.DescribeTable("should be exposed by the controller", func(ipFamily string) {
 			poolName := "l2-metrics-test"
-			resources := internalconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -702,7 +702,7 @@ var _ = ginkgo.Describe("L2", func() {
 			}
 			pools = append(pools, pool)
 
-			resources := internalconfig.ClusterResources{
+			resources := config.Resources{
 				Pools:  pools,
 				L2Advs: []metallbv1beta1.L2Advertisement{emptyL2Advertisement},
 			}

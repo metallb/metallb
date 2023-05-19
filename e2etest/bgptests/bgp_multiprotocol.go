@@ -10,12 +10,12 @@ import (
 	"time"
 
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	"go.universe.tf/metallb/e2etest/pkg/config"
 	"go.universe.tf/metallb/e2etest/pkg/frr"
+	"go.universe.tf/metallb/e2etest/pkg/ipfamily"
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	testservice "go.universe.tf/metallb/e2etest/pkg/service"
-	metallbconfig "go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/ipfamily"
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -68,7 +68,7 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 
 	ginkgo.Context("Multiprotocol", func() {
 		ginkgo.DescribeTable("should advertise both ipv4 and ipv6 addresses with", func(pairingFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -151,7 +151,7 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 					},
 				}
 
-				resources := metallbconfig.ClusterResources{
+				resources := config.Resources{
 					Peers: metallb.PeersForContainers(FRRContainers, ipFamily),
 					Pools: []metallbv1beta1.IPAddressPool{pool},
 					BGPAdvs: []metallbv1beta1.BGPAdvertisement{
