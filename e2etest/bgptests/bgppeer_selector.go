@@ -10,11 +10,11 @@ import (
 
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/api/v1beta2"
+	"go.universe.tf/metallb/e2etest/pkg/config"
+	"go.universe.tf/metallb/e2etest/pkg/ipfamily"
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	testservice "go.universe.tf/metallb/e2etest/pkg/service"
-	metallbconfig "go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/ipfamily"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
@@ -84,7 +84,7 @@ var _ = ginkgo.Describe("BGP Peer Selector", func() {
 				framework.ExpectNoError(err)
 			}
 
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Peers: metallb.PeersForContainers(FRRContainers, ipFamily),
 			}
 
@@ -192,7 +192,7 @@ var _ = ginkgo.Describe("BGP Peer Selector", func() {
 				framework.ExpectNoError(err)
 			}
 
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Peers: metallb.PeersForContainers(FRRContainers, ipFamily),
 			}
 

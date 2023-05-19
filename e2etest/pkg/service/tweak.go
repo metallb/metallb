@@ -5,7 +5,7 @@ package service
 import (
 	"strings"
 
-	"go.universe.tf/metallb/internal/pointer"
+	"go.universe.tf/metallb/e2etest/pkg/pointer"
 	corev1 "k8s.io/api/core/v1"
 )
 
