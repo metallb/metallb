@@ -10,15 +10,15 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	"go.universe.tf/metallb/e2etest/pkg/config"
 	frrconfig "go.universe.tf/metallb/e2etest/pkg/frr/config"
 	frrcontainer "go.universe.tf/metallb/e2etest/pkg/frr/container"
+	"go.universe.tf/metallb/e2etest/pkg/ipfamily"
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	"go.universe.tf/metallb/e2etest/pkg/metrics"
+	"go.universe.tf/metallb/e2etest/pkg/pointer"
 	testservice "go.universe.tf/metallb/e2etest/pkg/service"
-	metallbconfig "go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/ipfamily"
-	"go.universe.tf/metallb/internal/pointer"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -96,7 +96,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 		ginkgo.DescribeTable("should collect BGP metrics in FRR mode", func(ipFamily ipfamily.Family, poolAddress string, addressTotal int) {
 			poolName := "bgp-test"
 
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -238,7 +238,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 				peerAddrToName[peerAddr] = c.Name
 			}
 
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -393,7 +393,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 	})
 
 	ginkgo.DescribeTable("BFD metrics from FRR", func(bfd metallbv1beta1.BFDProfile, pairingFamily ipfamily.Family, poolAddresses []string) {
-		resources := metallbconfig.ClusterResources{
+		resources := config.Resources{
 			Pools: []metallbv1beta1.IPAddressPool{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -624,7 +624,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 
 		ginkgo.By("Creating an invalid configuration")
 
-		resources := metallbconfig.ClusterResources{
+		resources := config.Resources{
 			Pools: []metallbv1beta1.IPAddressPool{
 				{
 					ObjectMeta: metav1.ObjectMeta{

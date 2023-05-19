@@ -10,11 +10,11 @@ import (
 
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
+	"go.universe.tf/metallb/e2etest/pkg/config"
+	"go.universe.tf/metallb/e2etest/pkg/ipfamily"
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	testservice "go.universe.tf/metallb/e2etest/pkg/service"
-	metallbconfig "go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/ipfamily"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/onsi/ginkgo/v2"
@@ -71,7 +71,7 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 			expectedNodesForFirstPool := nodesForSelection(allNodes.Items, nodesForFirstPool)
 			expectedNodesForSecondPool := nodesForSelection(allNodes.Items, nodesForSecondPool)
 
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -144,7 +144,7 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 		expectedNodesForFirstAdv := nodesForSelection(allNodes.Items, nodesForFirstAdv)
 		expectedNodesForSecondAdv := nodesForSelection(allNodes.Items, nodesForSecondAdv)
 
-		resources := metallbconfig.ClusterResources{
+		resources := config.Resources{
 			Pools: []metallbv1beta1.IPAddressPool{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -205,7 +205,7 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Setting advertisement with node selector (no matching nodes)")
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -273,7 +273,7 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 			framework.ExpectNoError(err)
 
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{

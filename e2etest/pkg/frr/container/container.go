@@ -16,7 +16,7 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/frr"
 	frrconfig "go.universe.tf/metallb/e2etest/pkg/frr/config"
 	"go.universe.tf/metallb/e2etest/pkg/frr/consts"
-	"go.universe.tf/metallb/internal/ipfamily"
+	"go.universe.tf/metallb/e2etest/pkg/ipfamily"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"

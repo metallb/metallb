@@ -4,10 +4,12 @@ package config
 
 import (
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
-	"go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/pointer"
+	"go.universe.tf/metallb/e2etest/pkg/pointer"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+const BGP = "bgp"
+const L2 = "layer2"
 
 func BFDProfileWithDefaults(profile metallbv1beta1.BFDProfile, multiHop bool) metallbv1beta1.BFDProfile {
 	res := metallbv1beta1.BFDProfile{}
@@ -29,13 +31,13 @@ func BFDProfileWithDefaults(profile metallbv1beta1.BFDProfile, multiHop bool) me
 }
 
 // IPAddressPoolToLegacy converts the given IPAddressPool to the legacy addresspool.
-func IPAddressPoolToLegacy(ipAddressPool metallbv1beta1.IPAddressPool, protocol config.Proto, bgpAdv []metallbv1beta1.BGPAdvertisement) metallbv1beta1.AddressPool {
+func IPAddressPoolToLegacy(ipAddressPool metallbv1beta1.IPAddressPool, protocol string, bgpAdv []metallbv1beta1.BGPAdvertisement) metallbv1beta1.AddressPool {
 	res := metallbv1beta1.AddressPool{
 		ObjectMeta: v1.ObjectMeta{
 			Name: ipAddressPool.Name,
 		},
 		Spec: metallbv1beta1.AddressPoolSpec{
-			Protocol:          string(protocol),
+			Protocol:          protocol,
 			Addresses:         make([]string, 0),
 			AutoAssign:        ipAddressPool.Spec.AutoAssign,
 			BGPAdvertisements: make([]metallbv1beta1.LegacyBgpAdvertisement, 0),

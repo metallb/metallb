@@ -13,7 +13,6 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/config"
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/service"
-	internalconfig "go.universe.tf/metallb/internal/config"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -81,7 +80,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			ip, err := config.GetIPFromRangeByIndex(IPV4ServiceRange, 0)
 			framework.ExpectNoError(err)
 
-			resources := internalconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -183,7 +182,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 					AllocateTo: &metallbv1beta1.ServiceAllocation{Namespaces: []string{f.Namespace.Name}},
 				},
 			}
-			resources := internalconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{namespacePoolWithLowerPriority, namespacePoolWithHigherPriority, namespacePoolNoPriority},
 			}
 
@@ -252,7 +251,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 				},
 			}
 
-			resources := internalconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{namespacePoolWithLowerPriority, namespaceLabelPoolWithHigherPriority, namespacePoolNoPriority},
 			}
 			err = ConfigUpdater.Update(resources)
@@ -315,7 +314,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 				},
 			}
 
-			resources := internalconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{svcLabelPoolWithLowerPriority, svcLabelPoolWithHigherPriority, namespacePoolNoPriority},
 			}
 			err := ConfigUpdater.Update(resources)
@@ -383,7 +382,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 				},
 			}
 
-			resources := internalconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{namespacePoolWithLowerPriority, svcLabelPoolWithHigherPriority, namespacePoolNoPriority},
 			}
 			err := ConfigUpdater.Update(resources)
@@ -466,7 +465,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 				},
 			}
 
-			resources := internalconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{firstNamespacePool, secondNamespacePool, secondNamespacePoolHigherPriority, noNamespacePool},
 			}
 			err := ConfigUpdater.Update(resources)

@@ -10,12 +10,12 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	"go.universe.tf/metallb/e2etest/pkg/config"
 	"go.universe.tf/metallb/e2etest/pkg/executor"
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/mac"
 	"go.universe.tf/metallb/e2etest/pkg/service"
 
-	internalconfig "go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -58,7 +58,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 	ginkgo.Context("Node Selector", func() {
 		ginkgo.BeforeEach(func() {
-			resources := internalconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -97,7 +97,7 @@ var _ = ginkgo.Describe("L2", func() {
 				}
 
 				ginkgo.By(fmt.Sprintf("Assigning the advertisement to node %s", node.Name))
-				resources := internalconfig.ClusterResources{
+				resources := config.Resources{
 					L2Advs: []metallbv1beta1.L2Advertisement{l2Advertisement},
 				}
 
@@ -160,7 +160,7 @@ var _ = ginkgo.Describe("L2", func() {
 			}
 
 			ginkgo.By("Creating the l2 advertisements")
-			resources := internalconfig.ClusterResources{
+			resources := config.Resources{
 				L2Advs: l2Advertisements,
 			}
 
@@ -204,7 +204,7 @@ var _ = ginkgo.Describe("L2", func() {
 			}
 
 			ginkgo.By("Setting advertisement with node selector (no matching nodes)")
-			resources := internalconfig.ClusterResources{
+			resources := config.Resources{
 				L2Advs: []metallbv1beta1.L2Advertisement{l2Advertisement},
 			}
 

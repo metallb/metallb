@@ -7,10 +7,9 @@ import (
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/e2etest/pkg/config"
 	frrcontainer "go.universe.tf/metallb/e2etest/pkg/frr/container"
+	"go.universe.tf/metallb/e2etest/pkg/ipfamily"
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
 	testservice "go.universe.tf/metallb/e2etest/pkg/service"
-	metallbconfig "go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/ipfamily"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -19,7 +18,7 @@ import (
 
 func setupBGPService(f *framework.Framework, pairingIPFamily ipfamily.Family, poolAddresses []string, peers []*frrcontainer.FRR, tweak testservice.Tweak) (*e2eservice.TestJig, *corev1.Service) {
 	cs := f.ClientSet
-	resources := metallbconfig.ClusterResources{
+	resources := config.Resources{
 		Pools: []metallbv1beta1.IPAddressPool{
 			{
 				ObjectMeta: metav1.ObjectMeta{

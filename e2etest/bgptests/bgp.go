@@ -32,8 +32,7 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/k8s"
 	"go.universe.tf/metallb/e2etest/pkg/mac"
 	"go.universe.tf/metallb/e2etest/pkg/metallb"
-	metallbconfig "go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/pointer"
+	"go.universe.tf/metallb/e2etest/pkg/pointer"
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -42,8 +41,8 @@ import (
 	"go.universe.tf/metallb/e2etest/pkg/frr"
 	frrconfig "go.universe.tf/metallb/e2etest/pkg/frr/config"
 	frrcontainer "go.universe.tf/metallb/e2etest/pkg/frr/container"
+	"go.universe.tf/metallb/e2etest/pkg/ipfamily"
 	testservice "go.universe.tf/metallb/e2etest/pkg/service"
-	"go.universe.tf/metallb/internal/ipfamily"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -231,7 +230,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 	ginkgo.DescribeTable("A load balancer service should work with overlapping IPs", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
 		var allNodes *corev1.NodeList
-		resources := metallbconfig.ClusterResources{
+		resources := config.Resources{
 			Pools: []metallbv1beta1.IPAddressPool{
 				{
 					ObjectMeta: metav1.ObjectMeta{
@@ -301,7 +300,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		})
 
 		ginkgo.DescribeTable("set different AddressPools ranges modes", func(addressPools []metallbv1beta1.IPAddressPool, pairingFamily ipfamily.Family, tweak testservice.Tweak) {
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Pools:   addressPools,
 				Peers:   metallb.PeersForContainers(FRRContainers, pairingFamily),
 				BGPAdvs: []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement},
@@ -403,7 +402,7 @@ var _ = ginkgo.Describe("BGP", func() {
 	ginkgo.DescribeTable("configure peers with routerid and validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
 		ginkgo.By("configure peer")
 
-		resources := metallbconfig.ClusterResources{
+		resources := config.Resources{
 			Peers: metallb.WithRouterID(metallb.PeersForContainers(FRRContainers, ipFamily), "10.10.10.1"),
 		}
 
@@ -430,7 +429,7 @@ var _ = ginkgo.Describe("BGP", func() {
 	ginkgo.DescribeTable("validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
 		ginkgo.By("configure peer")
 
-		resources := metallbconfig.ClusterResources{
+		resources := config.Resources{
 			Peers: metallb.PeersForContainers(FRRContainers, ipFamily, func(p *metallbv1beta2.BGPPeer) {
 				p.Spec.PasswordSecret = corev1.SecretReference{Name: metallb.GetBGPPeerSecretName(p.Spec.ASN, p.Spec.Port, p.Spec.VRFName)}
 				p.Spec.Password = ""
@@ -460,7 +459,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 	ginkgo.Context("BFD", func() {
 		ginkgo.DescribeTable("should work with the given bfd profile", func(bfd metallbv1beta1.BFDProfile, pairingFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -622,7 +621,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				}
 				pools = append(pools, pool)
 
-				resources := metallbconfig.ClusterResources{
+				resources := config.Resources{
 					Pools:   pools,
 					Peers:   metallb.PeersForContainers(FRRContainers, ipFamily),
 					BGPAdvs: []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement},
@@ -674,7 +673,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			for i, c := range FRRContainers {
 				ginkgo.By(fmt.Sprintf("configure FRR peer [%s]", c.Name))
 
-				resources := metallbconfig.ClusterResources{
+				resources := config.Resources{
 					Peers:   metallb.PeersForContainers([]*frrcontainer.FRR{c}, ipFamily),
 					BGPAdvs: []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement},
 				}
@@ -720,7 +719,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					},
 				}
 
-				resources := metallbconfig.ClusterResources{
+				resources := config.Resources{
 					Peers:       metallb.PeersForContainers(FRRContainers, ipFamily),
 					Communities: communities,
 				}
@@ -731,8 +730,8 @@ var _ = ginkgo.Describe("BGP", func() {
 				} else {
 					resources.LegacyAddressPools = make([]metallbv1beta1.AddressPool, 0)
 					resources.LegacyAddressPools = []metallbv1beta1.AddressPool{
-						config.IPAddressPoolToLegacy(poolWithAdvertisement, metallbconfig.BGP, []metallbv1beta1.BGPAdvertisement{advertisement}),
-						config.IPAddressPoolToLegacy(poolWithoutAdvertisement, metallbconfig.BGP, []metallbv1beta1.BGPAdvertisement{}),
+						config.IPAddressPoolToLegacy(poolWithAdvertisement, config.BGP, []metallbv1beta1.BGPAdvertisement{advertisement}),
+						config.IPAddressPoolToLegacy(poolWithoutAdvertisement, config.BGP, []metallbv1beta1.BGPAdvertisement{}),
 					}
 				}
 
@@ -1044,7 +1043,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 	ginkgo.Context("MetalLB FRR rejects", func() {
 		ginkgo.DescribeTable("any routes advertised by any neighbor", func(addressesRange, toInject string, pairingIPFamily ipfamily.Family) {
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -1105,7 +1104,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 		})
 		ginkgo.DescribeTable("to accept any routes advertised by any neighbor", func(addressesRange, toInject string, pairingIPFamily ipfamily.Family, when whenApply) {
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -1206,7 +1205,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 	ginkgo.Context("FRR validate reload feedback", func() {
 		ginkgo.It("should update MetalLB config and log reload-validate success", func() {
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
@@ -1249,7 +1248,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 	ginkgo.Context("validate FRR running configuration", func() {
 		ginkgo.It("Full BFD profile", func() {
-			resources := metallbconfig.ClusterResources{
+			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
