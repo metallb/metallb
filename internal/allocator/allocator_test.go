@@ -45,7 +45,7 @@ func selector(s string) labels.Selector {
 
 func TestAssignment(t *testing.T) {
 	alloc := New()
-	if err := alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
+	alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
 		"test": {
 			Name:       "test",
 			AutoAssign: true,
@@ -105,9 +105,7 @@ func TestAssignment(t *testing.T) {
 				ipnet("1000::9:0/120"),
 			},
 		},
-	}}); err != nil {
-		t.Fatalf("SetPools: %s", err)
-	}
+	}})
 
 	tests := []struct {
 		desc       string
@@ -651,7 +649,7 @@ func TestPoolAllocation(t *testing.T) {
 	// This test only allocates from the "test" pool, so it will run
 	// out of IPs quickly even though there are tons available in
 	// other pools.
-	if err := alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
+	alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
 		"not_this_one": {
 			Name:       "not_this_one",
 			AutoAssign: true,
@@ -672,9 +670,7 @@ func TestPoolAllocation(t *testing.T) {
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("10.20.30.0/24"), ipnet("fc00::2:0/120")},
 		},
-	}}); err != nil {
-		t.Fatalf("SetPools: %s", err)
-	}
+	}})
 
 	validIP4s := map[string]bool{
 		"1.2.3.4":  true,
@@ -1103,7 +1099,7 @@ func TestPoolAllocation(t *testing.T) {
 
 func TestAllocation(t *testing.T) {
 	alloc := New()
-	if err := alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
+	alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
 		"test1": {
 			Name:       "test1",
 			AutoAssign: true,
@@ -1114,9 +1110,7 @@ func TestAllocation(t *testing.T) {
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.3.10/31"), ipnet("1000::10/127")},
 		},
-	}}); err != nil {
-		t.Fatalf("SetPools: %s", err)
-	}
+	}})
 
 	validIP4s := map[string]bool{
 		"1.2.3.4":  true,
@@ -1476,7 +1470,7 @@ func TestAllocation(t *testing.T) {
 
 func TestBuggyIPs(t *testing.T) {
 	alloc := New()
-	if err := alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
+	alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
 		"test": {
 			Name:       "test",
 			AutoAssign: true,
@@ -1499,9 +1493,7 @@ func TestBuggyIPs(t *testing.T) {
 			AutoAssign:    true,
 			CIDR:          []*net.IPNet{ipnet("1.2.4.254/31")},
 		},
-	}}); err != nil {
-		t.Fatalf("SetPools: %s", err)
-	}
+	}})
 
 	validIPs := map[string]bool{
 		"1.2.3.0":   true,
@@ -1549,198 +1541,9 @@ func TestBuggyIPs(t *testing.T) {
 	}
 }
 
-func TestConfigReload(t *testing.T) {
-	alloc := New()
-	if err := alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
-		"test": {
-			Name:       "test",
-			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.0/30"), ipnet("1000::/126")},
-		},
-	}}); err != nil {
-		t.Fatalf("SetPools: %s", err)
-	}
-	if err := alloc.Assign("s1", svc, []net.IP{net.ParseIP("1.2.3.0")}, nil, "", ""); err != nil {
-		t.Fatalf("Assign(s1, 1.2.3.0): %s", err)
-	}
-	if err := alloc.Assign("s2", svc, []net.IP{net.ParseIP("1000::")}, nil, "", ""); err != nil {
-		t.Fatalf("Assign(s2, 1000::): %s", err)
-	}
-	tests := []struct {
-		desc    string
-		pools   map[string]*config.Pool
-		wantErr bool
-		pool    string // Pool that 1.2.3.0 and 1000:: should be in
-	}{
-		{
-			desc: "set same config is no-op",
-			pools: map[string]*config.Pool{
-				"test": {
-					Name:       "test",
-					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.0/30"), ipnet("1000::/126")},
-				},
-			},
-			pool: "test",
-		},
-		{
-			desc: "expand pool",
-			pools: map[string]*config.Pool{
-				"test": {
-					Name:       "test",
-					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("1000::/120")},
-				},
-			},
-			pool: "test",
-		},
-		{
-			desc: "shrink pool",
-			pools: map[string]*config.Pool{
-				"test": {
-					Name:       "test",
-					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.0/30"), ipnet("1000::/126")},
-				},
-			},
-			pool: "test",
-		},
-		{
-			desc: "can't shrink further",
-			pools: map[string]*config.Pool{
-				"test": {
-					Name:       "test",
-					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.2/31"), ipnet("1000::0/126")},
-				},
-			},
-			pool:    "test",
-			wantErr: true,
-		},
-		{
-			desc: "can't shrink further ipv6",
-			pools: map[string]*config.Pool{
-				"test": {
-					Name:       "test",
-					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.0/30"), ipnet("1000::2/127")},
-				},
-			},
-			pool:    "test",
-			wantErr: true,
-		},
-		{
-			desc: "rename the pool",
-			pools: map[string]*config.Pool{
-				"test2": {
-					Name:       "test2",
-					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.0/30"), ipnet("1000::0/126")},
-				},
-			},
-			pool: "test2",
-		},
-		{
-			desc: "split pool",
-			pools: map[string]*config.Pool{
-				"test": {
-					Name:       "test",
-					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.0/31"), ipnet("1000::/127")},
-				},
-				"test2": {
-					Name:       "test2",
-					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.2/31"), ipnet("1000::2/127")},
-				},
-			},
-			pool: "test",
-		},
-		{
-			desc: "swap pool names",
-			pools: map[string]*config.Pool{
-				"test2": {
-					Name:       "test2",
-					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.0/31"), ipnet("1000::/127")},
-				},
-				"test": {
-					Name:       "test",
-					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.2/31"), ipnet("1000::2/127")},
-				},
-			},
-			pool: "test2",
-		},
-		{
-			desc: "delete used pool",
-			pools: map[string]*config.Pool{
-				"test": {
-					Name:       "test",
-					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.2/31"), ipnet("1000::/126")},
-				},
-			},
-			pool:    "test2",
-			wantErr: true,
-		},
-		{
-			desc: "delete used pool ipv6",
-			pools: map[string]*config.Pool{
-				"test": {
-					Name:       "test",
-					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.0/30"), ipnet("1000::2/127")},
-				},
-			},
-			pool:    "test2",
-			wantErr: true,
-		},
-		{
-			desc: "delete unused pool",
-			pools: map[string]*config.Pool{
-				"test2": {
-					Name:       "test2",
-					AutoAssign: true,
-					CIDR:       []*net.IPNet{ipnet("1.2.3.0/31"), ipnet("1000::/127")},
-				},
-			},
-			pool: "test2",
-		},
-		{
-			desc: "enable buggy IPs not allowed",
-			pools: map[string]*config.Pool{
-				"test2": {
-					Name:          "test2",
-					AutoAssign:    true,
-					AvoidBuggyIPs: true,
-					CIDR:          []*net.IPNet{ipnet("1.2.3.0/31"), ipnet("1000::/127")},
-				},
-			},
-			pool:    "test2",
-			wantErr: true,
-		},
-	}
-
-	for _, test := range tests {
-		err := alloc.SetPools(&config.Pools{ByName: test.pools})
-		if test.wantErr {
-			if err == nil {
-				t.Errorf("%q should have failed to SetPools, but succeeded", test.desc)
-			}
-		} else if err != nil {
-			t.Errorf("%q failed to SetPools: %s", test.desc, err)
-		}
-		gotPool := alloc.Pool("s1")
-		if gotPool != test.pool {
-			t.Errorf("%q: s1 is in wrong pool, want %q, got %q", test.desc, test.pool, gotPool)
-		}
-	}
-}
-
 func TestAutoAssign(t *testing.T) {
 	alloc := New()
-	if err := alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
+	alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
 		"test1": {
 			Name:       "test1",
 			AutoAssign: false,
@@ -1751,9 +1554,7 @@ func TestAutoAssign(t *testing.T) {
 			AutoAssign: true,
 			CIDR:       []*net.IPNet{ipnet("1.2.3.10/31"), ipnet("1000::10/127")},
 		},
-	}}); err != nil {
-		t.Fatalf("SetPools: %s", err)
-	}
+	}})
 
 	validIP4s := map[string]bool{
 		"1.2.3.4":  false,
@@ -1988,7 +1789,7 @@ func TestPoolCount(t *testing.T) {
 
 func TestPoolMetrics(t *testing.T) {
 	alloc := New()
-	if err := alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
+	alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
 		"test": {
 			Name:       "test",
 			AutoAssign: true,
@@ -1997,9 +1798,7 @@ func TestPoolMetrics(t *testing.T) {
 				ipnet("1000::4/126"),
 			},
 		},
-	}}); err != nil {
-		t.Fatalf("SetPools: %s", err)
-	}
+	}})
 
 	tests := []struct {
 		desc       string

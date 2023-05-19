@@ -1040,12 +1040,23 @@ func TestControllerConfig(t *testing.T) {
 		t.Errorf("SetBalancer produced unexpected mutation (-want +got)\n%s", diff)
 	}
 
-	// Now that an IP is allocated, removing the IP pool is not allowed.
-	if c.SetPools(l, &config.Pools{ByName: map[string]*config.Pool{}}) != controllers.SyncStateError {
-		t.Fatalf("SetPools that deletes allocated IPs was accepted")
+	// Removing the IP pool should be accepted even if the IP is allocated
+	// This triggers a reprocess all event to force the service to get a new IP
+	if c.SetPools(l, &config.Pools{ByName: map[string]*config.Pool{}}) != controllers.SyncStateReprocessAll {
+		t.Fatalf("SetPools that deletes allocated IPs was not accepted")
 	}
 
-	// Deleting the config also makes MetalLB sad.
+	// Balancer should clear the service. Not reprocess all because previous ip is not longer assignable.
+	if c.SetBalancer(l, "test", gotSvc, epslices.EpsOrSlices{}) != controllers.SyncStateErrorNoRetry {
+		t.Fatalf("SetBalancer failed")
+	}
+
+	gotSvc = k.gotService(gotSvc)
+	if diff := diffService(svc, gotSvc); diff != "" {
+		t.Errorf("SetBalancer produced unexpected mutation (-want +got)\n%s", diff)
+	}
+
+	// Deleting the config makes MetalLB sad.
 	if c.SetPools(l, nil) != controllers.SyncStateErrorNoRetry {
 		t.Fatalf("SetPools that deletes the config was accepted")
 	}
@@ -1097,7 +1108,7 @@ func TestDeleteRecyclesIP(t *testing.T) {
 		},
 	}
 	if c.SetBalancer(l, "test2", svc2, epslices.EpsOrSlices{}) == controllers.SyncStateError {
-		t.Fatal("SetBalancer svc2 failed")
+		t.Fatal("SetBalancer svc2 was supposed to fail with no retry")
 	}
 	if k.gotService(svc2) != nil {
 		t.Fatal("SetBalancer svc2 mutated svc2 even though it should not have allocated")
@@ -1121,7 +1132,7 @@ func TestDeleteRecyclesIP(t *testing.T) {
 		t.Fatal("svc2 didn't get an IP")
 	}
 }
-func TestControllerDualStackConfig(t *testing.T) {
+func TestControllerReassing(t *testing.T) {
 	k := &testK8S{t: t}
 	c := &controller{
 		ips:    allocator.New(),
@@ -1129,40 +1140,15 @@ func TestControllerDualStackConfig(t *testing.T) {
 	}
 
 	l := log.NewNopLogger()
+
 	svc := &v1.Service{
 		Spec: v1.ServiceSpec{
 			Type:       "LoadBalancer",
-			ClusterIPs: []string{"1.2.3.4", "1000::"},
+			ClusterIPs: []string{"1.2.3.4"},
 		},
 	}
-	if c.SetBalancer(l, "test", svc, epslices.EpsOrSlices{}) == controllers.SyncStateError {
-		t.Fatalf("SetBalancer failed")
-	}
 
-	gotSvc := k.gotService(svc)
-	if gotSvc != nil {
-		t.Errorf("SetBalancer with no configuration mutated service (-in +out)\n%s", diffService(svc, gotSvc))
-	}
-	if k.loggedWarning {
-		t.Error("SetBalancer with no configuration logged an error")
-	}
-
-	// Set an empty config. Balancer should still not do anything to
-	// our unallocated service, and return an error to force a
-	// retry after sync is complete.
-	if c.SetPools(l, &config.Pools{ByName: map[string]*config.Pool{}}) == controllers.SyncStateError {
-		t.Fatalf("SetPools with empty config failed")
-	}
-
-	gotSvc = k.gotService(svc)
-	if gotSvc != nil {
-		t.Errorf("unsynced SetBalancer mutated service (-in +out)\n%s", diffService(svc, gotSvc))
-	}
-	if k.loggedWarning {
-		t.Error("unsynced SetBalancer logged an error")
-	}
-
-	// Set a config with some IPs. Still no allocation, not synced.
+	// Set a config with some IPs.
 	pools := &config.Pools{ByName: map[string]*config.Pool{
 		"default": {
 			Name:       "default",
@@ -1171,37 +1157,73 @@ func TestControllerDualStackConfig(t *testing.T) {
 		},
 	}}
 
-	if c.SetPools(l, pools) == controllers.SyncStateError {
+	if c.SetPools(l, pools) != controllers.SyncStateReprocessAll {
 		t.Fatalf("SetPools failed")
 	}
 
-	gotSvc = k.gotService(svc)
-	if gotSvc != nil {
-		t.Errorf("unsynced SetBalancer mutated service (-in +out)\n%s", diffService(svc, gotSvc))
-	}
-	if k.loggedWarning {
-		t.Error("unsynced SetBalancer logged an error")
-	}
-
-	if c.SetBalancer(l, "test", svc, epslices.EpsOrSlices{}) == controllers.SyncStateError {
+	if c.SetBalancer(l, "test", svc, epslices.EpsOrSlices{}) != controllers.SyncStateSuccess {
 		t.Fatalf("SetBalancer failed")
 	}
 
-	gotSvc = k.gotService(svc)
+	gotSvc := k.gotService(svc)
 	wantSvc := new(v1.Service)
 	*wantSvc = *svc
-	wantSvc.Status = statusAssigned([]string{"1.2.3.0", "1000::"})
+	wantSvc.Status = statusAssigned([]string{"1.2.3.0"})
 	if diff := diffService(wantSvc, gotSvc); diff != "" {
 		t.Errorf("SetBalancer produced unexpected mutation (-want +got)\n%s", diff)
 	}
 
-	// Now that an IP is allocated, removing the IP pool is not allowed.
-	if c.SetPools(l, &config.Pools{ByName: map[string]*config.Pool{}}) != controllers.SyncStateError {
-		t.Fatalf("SetPools that deletes allocated IPs was accepted")
+	// Set a config with some 2 pools.
+	pools = &config.Pools{ByName: map[string]*config.Pool{
+		"default": {
+			Name:       "default",
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("1000::1/127")},
+		},
+		"second": {
+			Name:       "second",
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("4.5.6.0/24")},
+		},
+	}}
+
+	if c.SetPools(l, pools) == controllers.SyncStateError {
+		t.Fatalf("SetPools failed")
 	}
 
-	// Deleting the config also makes MetalLB sad.
-	if c.SetPools(l, nil) != controllers.SyncStateErrorNoRetry {
-		t.Fatalf("SetPools that deletes the config was accepted")
+	// Allocation shouldn't change.
+	if c.SetBalancer(l, "test", gotSvc, epslices.EpsOrSlices{}) != controllers.SyncStateSuccess {
+		t.Fatalf("SetBalancer failed")
+	}
+
+	k.reset()
+
+	if k.gotService(gotSvc) != nil {
+		t.Errorf("unsynced SetBalancer mutated service%s", gotSvc)
+	}
+
+	// Delete default pool.
+	pools = &config.Pools{ByName: map[string]*config.Pool{
+		"second": {
+			Name:       "second",
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("4.5.6.0/24")},
+		},
+	}}
+
+	if c.SetPools(l, pools) != controllers.SyncStateReprocessAll {
+		t.Fatalf("SetPools failed")
+	}
+
+	// It should get an IP from the second pool
+	if c.SetBalancer(l, "test", gotSvc, epslices.EpsOrSlices{}) != controllers.SyncStateSuccess {
+		t.Fatalf("SetBalancer failed")
+	}
+
+	gotSvc = k.gotService(svc)
+	*wantSvc = *svc
+	wantSvc.Status = statusAssigned([]string{"4.5.6.0"})
+	if diff := diffService(wantSvc, gotSvc); diff != "" {
+		t.Errorf("SetBalancer produced unexpected mutation (-want +got)\n%s", diff)
 	}
 }

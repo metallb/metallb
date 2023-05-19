@@ -66,18 +66,7 @@ func New() *Allocator {
 }
 
 // SetPools updates the set of address pools that the allocator owns.
-func (a *Allocator) SetPools(pools *config.Pools) error {
-	// All the fancy sharing stuff only influences how new allocations
-	// can be created. For changing the underlying configuration, the
-	// only question we have to answer is: can we fit all allocated
-	// IPs into address pools under the new configuration?
-	for svc, alloc := range a.allocated {
-		pool := poolFor(pools.ByName, alloc.ips)
-		if pool == nil {
-			return fmt.Errorf("new config not compatible with assigned IPs: service %q cannot own %q under new config", svc, alloc.ips)
-		}
-	}
-
+func (a *Allocator) SetPools(pools *config.Pools) {
 	for n := range a.pools.ByName {
 		if pools.ByName[n] == nil {
 			stats.poolCapacity.DeleteLabelValues(n)
@@ -88,28 +77,11 @@ func (a *Allocator) SetPools(pools *config.Pools) error {
 
 	a.pools = pools
 
-	// Need to rearrange existing pool mappings and counts
-	for svc, alloc := range a.allocated {
-		pool := poolFor(a.pools.ByName, alloc.ips)
-		if pool == nil {
-			return fmt.Errorf("can't retrieve new pool for assigned IPs: service %q cannot own %q under new config", svc, alloc.ips)
-		}
-		if pool.Name != alloc.pool {
-			a.Unassign(svc)
-			alloc.pool = pool.Name
-			// Use the internal assign, we know for a fact the IP is
-			// still usable.
-			a.assign(svc, alloc)
-		}
-	}
-
 	// Refresh or initiate stats
 	for n, p := range a.pools.ByName {
 		stats.poolCapacity.WithLabelValues(n).Set(float64(poolCount(p)))
 		stats.poolActive.WithLabelValues(n).Set(float64(len(a.poolIPsInUse[n])))
 	}
-
-	return nil
 }
 
 // assign unconditionally updates internal state to reflect svc's
@@ -353,6 +325,19 @@ func (a *Allocator) Pool(svc string) string {
 		return alloc.pool
 	}
 	return ""
+}
+
+// IPs returns the allocated IPs of a service.
+func (a *Allocator) IPs(svc string) []net.IP {
+	if alloc := a.allocated[svc]; alloc != nil {
+		return alloc.ips
+	}
+	return nil
+}
+
+// PoolForIP returns the pool structure associated with an IP.
+func (a *Allocator) PoolForIP(ips []net.IP) *config.Pool {
+	return poolFor(a.pools.ByName, ips)
 }
 
 func sortPools(pools []*config.Pool) {
