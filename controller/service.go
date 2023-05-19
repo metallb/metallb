@@ -51,6 +51,13 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		return nil
 	}
 
+	// Return if pools are empty.
+	if len(c.pools.ByName) == 0 {
+		level.Debug(l).Log("event", "clearAssignment", "reason", "noConfig", "msg", "pools are empty")
+		c.clearServiceState(key, svc)
+		return ErrConverge
+	}
+
 	// If the ClusterIPs is malformed or not set we can't determine the
 	// ipFamily to use.
 	if len(svc.Spec.ClusterIPs) == 0 && svc.Spec.ClusterIP == "" {
