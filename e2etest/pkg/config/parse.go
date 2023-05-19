@@ -4,7 +4,7 @@ package config
 
 import (
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
-	"go.universe.tf/metallb/e2etest/pkg/pointer"
+	"go.universe.tf/e2etest/pkg/pointer"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

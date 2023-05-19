@@ -11,9 +11,9 @@ import (
 	"text/template"
 
 	"github.com/pkg/errors"
-	consts "go.universe.tf/metallb/e2etest/pkg/frr/consts"
-	"go.universe.tf/metallb/e2etest/pkg/k8s"
-	"go.universe.tf/metallb/e2etest/pkg/ipfamily"
+	consts "go.universe.tf/e2etest/pkg/frr/consts"
+	"go.universe.tf/e2etest/pkg/k8s"
+	"go.universe.tf/e2etest/pkg/ipfamily"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )

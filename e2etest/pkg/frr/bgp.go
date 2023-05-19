@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"go.universe.tf/metallb/e2etest/pkg/executor"
+	"go.universe.tf/e2etest/pkg/executor"
 
-	"go.universe.tf/metallb/e2etest/pkg/ipfamily"
+	"go.universe.tf/e2etest/pkg/ipfamily"
 )
 
 // TODO: Leaving this package "test unaware" on purpose, since we may find it
