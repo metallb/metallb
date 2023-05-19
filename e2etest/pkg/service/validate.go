@@ -7,8 +7,8 @@ import (
 	"net"
 	"strconv"
 
-	"go.universe.tf/metallb/e2etest/pkg/executor"
-	"go.universe.tf/metallb/e2etest/pkg/wget"
+	"go.universe.tf/e2etest/pkg/executor"
+	"go.universe.tf/e2etest/pkg/wget"
 	corev1 "k8s.io/api/core/v1"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 )

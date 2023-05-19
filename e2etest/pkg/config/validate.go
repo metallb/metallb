@@ -10,7 +10,7 @@ import (
 	"github.com/mikioh/ipaddr"
 	"github.com/pkg/errors"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
-	"go.universe.tf/metallb/e2etest/pkg/iprange"
+	"go.universe.tf/e2etest/pkg/iprange"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 

@@ -5,9 +5,9 @@ package container
 import (
 	"fmt"
 
-	"go.universe.tf/metallb/e2etest/pkg/executor"
-	"go.universe.tf/metallb/e2etest/pkg/netdev"
-	"go.universe.tf/metallb/e2etest/pkg/routes"
+	"go.universe.tf/e2etest/pkg/executor"
+	"go.universe.tf/e2etest/pkg/netdev"
+	"go.universe.tf/e2etest/pkg/routes"
 )
 
 // Adds the routes that enable communication between execnet and tonet using the ref routes.

@@ -22,9 +22,9 @@ import (
 	"context"
 	"fmt"
 
-	"go.universe.tf/metallb/e2etest/pkg/config"
-	"go.universe.tf/metallb/e2etest/pkg/k8s"
-	"go.universe.tf/metallb/e2etest/pkg/metallb"
+	"go.universe.tf/e2etest/pkg/config"
+	"go.universe.tf/e2etest/pkg/k8s"
+	"go.universe.tf/e2etest/pkg/metallb"
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -32,7 +32,7 @@ import (
 
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
-	"go.universe.tf/metallb/e2etest/pkg/pointer"
+	"go.universe.tf/e2etest/pkg/pointer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"sigs.k8s.io/controller-runtime/pkg/client"

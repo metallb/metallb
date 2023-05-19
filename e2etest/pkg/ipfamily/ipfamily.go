@@ -1,6 +1,6 @@
 // SPDX-License-Identifier:Apache-2.0
 
-package ipfamily // import "go.universe.tf/metallb/e2etests/pkg/ipfamily"
+package ipfamily // import "go.universe.tf/e2etests/pkg/ipfamily"
 
 import (
 	"fmt"

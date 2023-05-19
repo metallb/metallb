@@ -17,13 +17,13 @@ import (
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	admissionapi "k8s.io/pod-security-admission/api"
 
-	"go.universe.tf/metallb/e2etest/pkg/config"
-	"go.universe.tf/metallb/e2etest/pkg/executor"
-	"go.universe.tf/metallb/e2etest/pkg/k8s"
-	"go.universe.tf/metallb/e2etest/pkg/mac"
+	"go.universe.tf/e2etest/pkg/config"
+	"go.universe.tf/e2etest/pkg/executor"
+	"go.universe.tf/e2etest/pkg/k8s"
+	"go.universe.tf/e2etest/pkg/mac"
 
-	"go.universe.tf/metallb/e2etest/pkg/metallb"
-	"go.universe.tf/metallb/e2etest/pkg/service"
+	"go.universe.tf/e2etest/pkg/metallb"
+	"go.universe.tf/e2etest/pkg/service"
 )
 
 var (
