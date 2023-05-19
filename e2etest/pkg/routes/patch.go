@@ -6,7 +6,7 @@ import (
 	"net"
 
 	"github.com/pkg/errors"
-	"go.universe.tf/metallb/e2etest/pkg/executor"
+	"go.universe.tf/e2etest/pkg/executor"
 )
 
 // Add route to target via for the given Executor.

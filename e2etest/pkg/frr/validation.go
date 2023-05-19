@@ -7,8 +7,8 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 
-	"go.universe.tf/metallb/e2etest/pkg/ipfamily"
-	"go.universe.tf/metallb/e2etest/pkg/k8s"
+	"go.universe.tf/e2etest/pkg/ipfamily"
+	"go.universe.tf/e2etest/pkg/k8s"
 )
 
 // NeighborsMatchNodes tells if ALL the given nodes are peered with the

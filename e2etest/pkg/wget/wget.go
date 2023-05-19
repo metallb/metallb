@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os/exec"
 
-	"go.universe.tf/metallb/e2etest/pkg/executor"
+	"go.universe.tf/e2etest/pkg/executor"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
 

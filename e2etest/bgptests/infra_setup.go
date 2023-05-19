@@ -8,11 +8,11 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"go.universe.tf/metallb/e2etest/pkg/container"
-	"go.universe.tf/metallb/e2etest/pkg/executor"
-	frrconfig "go.universe.tf/metallb/e2etest/pkg/frr/config"
-	frrcontainer "go.universe.tf/metallb/e2etest/pkg/frr/container"
-	"go.universe.tf/metallb/e2etest/pkg/metallb"
+	"go.universe.tf/e2etest/pkg/container"
+	"go.universe.tf/e2etest/pkg/executor"
+	frrconfig "go.universe.tf/e2etest/pkg/frr/config"
+	frrcontainer "go.universe.tf/e2etest/pkg/frr/container"
+	"go.universe.tf/e2etest/pkg/metallb"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
