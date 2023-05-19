@@ -51,11 +51,15 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 	defer level.Debug(l).Log("event", "endUpdate", "msg", "end of service update")
 
 	if svcRo == nil {
-		c.deleteBalancer(l, name)
-		// There might be other LBs stuck waiting for an IP, so when
-		// we delete a balancer we should reprocess all of them to
-		// check for newly feasible balancers.
-		return controllers.SyncStateReprocessAll
+		if c.isServiceAllocated(name) {
+			c.ips.Unassign(name)
+			level.Info(l).Log("event", "serviceDeleted", "msg", "service deleted")
+			// There might be other LBs stuck waiting for an IP, so when
+			// we delete a balancer we should reprocess all of them to
+			// check for newly feasible balancers.
+			return controllers.SyncStateReprocessAll
+		}
+		return controllers.SyncStateSuccess
 	}
 
 	if c.pools == nil || c.pools.ByName == nil {
@@ -104,12 +108,6 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 
 	level.Info(l).Log("event", "serviceUpdated", "msg", "service is not updated")
 	return successRes
-}
-
-func (c *controller) deleteBalancer(l log.Logger, name string) {
-	if c.ips.Unassign(name) {
-		level.Info(l).Log("event", "serviceDeleted", "msg", "service deleted")
-	}
 }
 
 func (c *controller) SetPools(l log.Logger, pools *config.Pools) controllers.SyncState {
