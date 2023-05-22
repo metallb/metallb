@@ -519,7 +519,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					}
 				}
 				return nil
-			}, 4*time.Minute, 1*time.Second).Should(BeNil())
+			}, 4*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
 
 		},
 			ginkgo.Entry("IPV4 - default",
@@ -828,7 +828,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 						}
 						return nil
-					}, 1*time.Minute, 1*time.Second).Should(BeNil())
+					}, 1*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
 				}
 
 			},
@@ -1195,7 +1195,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				err = k8s.CreateConfigmap(cs, "bgpextras", metallb.Namespace, extraData)
 				framework.ExpectNoError(err)
 			}
-			Eventually(checkRoutesAreInjected, time.Minute, 1*time.Second).Should(Not(HaveOccurred()))
+			Eventually(checkRoutesAreInjected, time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
 		},
 			ginkgo.Entry("IPV4 - before config", "192.168.10.0/24", "172.16.1.%d/32", ipfamily.IPv4, before),
 			ginkgo.Entry("IPV6 - before config", "fc00:f853:0ccd:e799::/116", "fc00:f853:ccd:e800::%d/128", ipfamily.IPv6, before),
@@ -1359,7 +1359,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		}
 
 		ginkgo.By("Checking the service is not reacheable via L2")
-		Consistently(checkServiceL2, 3*time.Second, 1*time.Second).Should(Not(BeNil()))
+		Consistently(checkServiceL2, 3*time.Second, 1*time.Second).Should(HaveOccurred())
 
 		ginkgo.By("Creating the l2 advertisement")
 		l2Advertisement := metallbv1beta1.L2Advertisement{
@@ -1375,7 +1375,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		ginkgo.By("Checking the service is reacheable via L2")
 		Eventually(func() error {
 			return testservice.ValidateL2(svc)
-		}, 2*time.Minute, 1*time.Second).Should(BeNil())
+		}, 2*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
 
 		ginkgo.By("Checking the service is still reacheable via BGP")
 		for _, c := range FRRContainers {
@@ -1389,7 +1389,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		ginkgo.By("Checking the service is not reacheable via L2 anymore")
 		// We use arping here, because the client's cache may still be filled with the mac and the ip of the
 		// destination
-		Eventually(checkServiceL2, 5*time.Second, 1*time.Second).Should(Not(BeNil()))
+		Eventually(checkServiceL2, 5*time.Second, 1*time.Second).Should(HaveOccurred())
 	},
 		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{l2tests.IPV4ServiceRange}),
 		ginkgo.Entry("IPV6", ipfamily.IPv6, []string{l2tests.IPV6ServiceRange}),
