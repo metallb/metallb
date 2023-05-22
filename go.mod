@@ -17,7 +17,7 @@ require (
 	github.com/openshift-kni/k8sreporter v1.0.2
 	github.com/ory/dockertest/v3 v3.10.0
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.15.0
+	github.com/prometheus/client_golang v1.15.1
 	github.com/prometheus/client_model v0.4.0
 	github.com/prometheus/common v0.42.0
 	golang.org/x/sync v0.2.0
