@@ -57,7 +57,7 @@ func validateFRRPeeredWithNodes(nodes []corev1.Node, c *frrcontainer.FRR, ipFami
 			return fmt.Errorf("failed to match neighbors for %s, %w", c.Name, err)
 		}
 		return nil
-	}, 4*time.Minute, 1*time.Second).Should(BeNil(), "timed out waiting to validate nodes peered with the frr instance")
+	}, 4*time.Minute, 1*time.Second).ShouldNot(HaveOccurred(), "timed out waiting to validate nodes peered with the frr instance")
 }
 
 func validateService(svc *corev1.Service, nodes []corev1.Node, c *frrcontainer.FRR) {
@@ -150,7 +150,7 @@ func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily ipf
 			}
 		}
 		return nil
-	}, 4*time.Minute, 1*time.Second).Should(BeNil())
+	}, 4*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
 }
 
 func checkBFDConfigPropagated(nodeConfig metallbv1beta1.BFDProfile, peerConfig bgpfrr.BFDPeer) error {
@@ -203,7 +203,7 @@ func checkServiceOnlyOnNodes(svc *corev1.Service, expectedNodes []corev1.Node, i
 				return fmt.Errorf("unexpectedIP found %s, nodes %s in container %s for service %s", n.String(), nodeIps, c.Name, ip)
 			}
 			return err
-		}, time.Minute, time.Second).Should(Not(HaveOccurred()))
+		}, time.Minute, time.Second).ShouldNot(HaveOccurred())
 	}
 }
 
@@ -257,7 +257,7 @@ func checkCommunitiesOnlyOnNodes(svc *corev1.Service, community string, expected
 				return fmt.Errorf("unexpectedIP found %s, nodes %s in container %s for service %s", n.String(), nodeIps, c.Name, ip)
 			}
 			return err
-		}, 10*time.Minute, time.Second).Should(Not(HaveOccurred()))
+		}, 10*time.Minute, time.Second).ShouldNot(HaveOccurred())
 	}
 }
 
@@ -332,7 +332,7 @@ func validateServiceInRoutesForCommunity(c *frrcontainer.FRR, community string, 
 			}
 		}
 		return nil
-	}, 4*time.Minute, 1*time.Second).Should(Not(HaveOccurred()))
+	}, 4*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
 }
 
 func validateServiceNotInRoutesForCommunity(c *frrcontainer.FRR, community string, family ipfamily.Family, svc *corev1.Service) {

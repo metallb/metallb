@@ -222,7 +222,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 					}
 				}
 				return fmt.Errorf("service hasn't receive the \"announceFailed\" event")
-			}, 1*time.Minute, 1*time.Second).Should(gomega.BeNil())
+			}, 1*time.Minute, 1*time.Second).ShouldNot(gomega.HaveOccurred())
 		})
 
 		ginkgo.It("Address pool connected with two L2 advertisements", func() {

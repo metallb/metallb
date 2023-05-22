@@ -306,7 +306,7 @@ func TestNodeEvent(t *testing.T) {
 			return err
 		}
 		return nil
-	}, 5*time.Second, 200*time.Millisecond).Should(BeNil())
+	}, 5*time.Second, 200*time.Millisecond).ShouldNot(HaveOccurred())
 	g.Eventually(func() int {
 		mutex.Lock()
 		defer mutex.Unlock()
@@ -327,7 +327,7 @@ func TestNodeEvent(t *testing.T) {
 			return err
 		}
 		return nil
-	}, 5*time.Second, 200*time.Millisecond).Should(BeNil())
+	}, 5*time.Second, 200*time.Millisecond).ShouldNot(HaveOccurred())
 	g.Eventually(func() int {
 		mutex.Lock()
 		defer mutex.Unlock()

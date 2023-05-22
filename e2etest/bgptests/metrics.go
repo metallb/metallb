@@ -218,7 +218,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						}
 					}
 					return nil
-				}, 2*time.Minute, 1*time.Second).Should(BeNil())
+				}, 2*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
 			}
 		},
 			ginkgo.Entry("IPV4 - Checking service", ipfamily.IPv4, v4PoolAddresses, 256),
@@ -288,7 +288,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					return err
 				}
 				return nil
-			}, 2*time.Minute, 1*time.Second).Should(BeNil())
+			}, 2*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
 
 			selectors := labelsForPeers(FRRContainers, ipFamily)
 
@@ -319,7 +319,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						}
 					}
 					return nil
-				}, 2*time.Minute, 1*time.Second).Should(BeNil())
+				}, 2*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
 			}
 
 			ginkgo.By("creating a service")
@@ -341,7 +341,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					return err
 				}
 				return nil
-			}, 2*time.Minute, 1*time.Second).Should(BeNil())
+			}, 2*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
 
 			for _, speaker := range speakerPods {
 				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
@@ -385,7 +385,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						return err
 					}
 					return nil
-				}, 2*time.Minute, 1*time.Second).Should(BeNil())
+				}, 2*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
 			}
 		},
 			ginkgo.Entry("IPV4 - Checking service", ipfamily.IPv4, v4PoolAddresses, 256),
@@ -522,7 +522,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					}
 				}
 				return nil
-			}, time.Minute, 5*time.Second).Should(BeNil())
+			}, time.Minute, 5*time.Second).ShouldNot(HaveOccurred())
 		}
 
 		ginkgo.By("disabling BFD in external FRR containers")
@@ -563,7 +563,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					}
 				}
 				return nil
-			}, 2*time.Minute, 5*time.Second).Should(BeNil())
+			}, 2*time.Minute, 5*time.Second).ShouldNot(HaveOccurred())
 		}
 	},
 		ginkgo.Entry("IPV4 - default",
