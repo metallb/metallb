@@ -350,10 +350,7 @@ func (a *Allocator) isPoolCompatibleWithService(p *config.Pool, svc *v1.Service)
 // service has no IP allocated, "" is returned.
 func (a *Allocator) Pool(svc string) string {
 	if alloc := a.allocated[svc]; alloc != nil {
-		pool := poolFor(a.pools.ByName, alloc.ips)
-		if pool != nil {
-			return pool.Name
-		}
+		return alloc.pool
 	}
 	return ""
 }
