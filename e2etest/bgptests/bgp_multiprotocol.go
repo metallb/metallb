@@ -214,7 +214,7 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 								}
 							}
 							return nil
-						}, 1*time.Minute, 1*time.Second).Should(BeNil())
+						}, 1*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
 					}
 				}
 			},
