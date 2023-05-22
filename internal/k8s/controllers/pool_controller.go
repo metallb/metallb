@@ -18,6 +18,7 @@ package controllers
 
 import (
 	"context"
+	"reflect"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -41,6 +42,7 @@ type PoolReconciler struct {
 	Handler        func(log.Logger, *config.Pools) SyncState
 	ValidateConfig config.Validate
 	ForceReload    func()
+	currentConfig  *config.Config
 }
 
 func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -89,6 +91,10 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	level.Debug(r.Logger).Log("controller", "PoolReconciler", "rendered config", dumpConfig(cfg))
+	if reflect.DeepEqual(r.currentConfig, cfg) {
+		level.Debug(r.Logger).Log("controller", "PoolReconciler", "event", "configuration did not change, ignoring")
+		return ctrl.Result{}, nil
+	}
 
 	res := r.Handler(r.Logger, cfg.Pools)
 	switch res {
@@ -106,6 +112,8 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		level.Error(r.Logger).Log("controller", "PoolReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources), "event", "reload failed, no retry")
 		return ctrl.Result{}, nil
 	}
+
+	r.currentConfig = cfg
 
 	configLoaded.Set(1)
 	configStale.Set(0)
