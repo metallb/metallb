@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Need help?
+    url: https://communityinviter.com/apps/kubernetes/community
+    about: Ask support on the \#metallb slack channel
+  - name: Not sure where to start?
+    url: https://metallb.universe.tf/
+    about: Read the MetalLB documentation
+  - name: Having problems with MetalLB?
+    url: https://metallb.universe.tf/troubleshooting/
+    about: Start from the troubleshooting guide
