@@ -1,0 +1,121 @@
+name:  Bug Report
+description: Report a bug
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for making this bug report.
+
+        Please be aware this is not the place to ask for troubleshooting. Unfortunately
+        troubleshooting LB issues in k8s takes a lot of time and effort
+        that we simply don't have. If your load-balancers aren't working,
+        please don't file an issue unless you have identified a _specific_
+        bug to fix. Otherwise, please ask for help in the `#metallb`
+        channel on the Kubernetes Slack
+
+        ---
+
+  - type: input
+    id: metallb-version
+    attributes:
+      label: MetalLB Version
+      description: |
+        [e.g. 0.13.9, 0.12.0]
+    validations:
+      required: true
+  - type: dropdown
+    id: deployment-method
+    attributes:
+      label: Deployment method
+      description: |
+        The method of deployment of MetalLB.
+      multiple: false
+      options:
+        - "Charts"
+        - "Manifests"
+        - "Operator"
+        - "Not relevant"
+    validations:
+      required: true
+  - type: input
+    id: main-cni
+    attributes:
+      label: Main CNI
+      description: |
+        The primary CNI used in the deployment (e.g. calico, cilium)
+    validations:
+      required: true
+  - type: input
+    id: kubernetes-version
+    attributes:
+      label: Kubernetes Version
+      description: |
+        The version of the cluster metallb is deployed to (e.g. 1.26.3)
+  - type: input
+    id: cluster-distribution
+    attributes:
+      label: Cluster Distribution
+      description: |
+        e.g. kind, rancher, openshift, k3s..
+
+  - type: textarea
+    id: bug-report
+    attributes:
+      label: Describe the bug
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+  - type: textarea
+    id: repro-steps
+    attributes:
+      label: To Reproduce
+      description: |
+        Make sure that if you follow these steps again yourself the bug happens again.
+        Steps to reproduce the behavior:
+      placeholder: |
+        1. Apply the following configuration
+        2. Create the service
+        3. The service does not get an IP assigned
+    validations:
+      required: true
+  - type: textarea
+    id: exp-behaviour
+    attributes:
+      label: Expected Behavior
+      description: A clear and concise description of what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: add-context
+    attributes:
+      label: Additional Context
+      description: Add any other context about the problem here.
+    validations:
+      required: true
+  - type: checkboxes
+    attributes:
+      label: I've read and agree with the following
+      options:
+        - label: I've checked all open and closed issues and my request is not there.
+          required: true
+        - label: I've checked all open and closed pull requests and my request is not there.
+          required: true
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: I've read and agree with the following
+      options:
+        - label: I've checked all open and closed issues and my issue is not there.
+          required: true
+        - label: This bug is reproducible when deploying MetalLB from the main branch
+          required: true
+        - label: I have read the [troubleshooting guide](https://metallb.universe.tf/troubleshooting/) and I am still not able to make it work
+          required: true
+        - label: I checked the logs and MetalLB is not discarding the configuration as not valid
+          required: true
+        - label: I enabled the debug logs, collected the information required from the cluster using the [collect script](https://raw.githubusercontent.com/metallb/metallb/main/troubleshooting/collect.sh) and will attach them to the issue
+          required: true
+        - label: I will provide the definition of my service and the related endpoint slices and attach them to this issue
+          required: true
