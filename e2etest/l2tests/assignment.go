@@ -61,8 +61,10 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 		framework.ExpectNoError(err)
 
 		ginkgo.By("Updating the first namespace labels")
-		err = k8s.ApplyLabelsToNamespace(cs, f.Namespace.Name, firstNsLabels)
-		framework.ExpectNoError(err)
+		gomega.Eventually(func() error {
+			err := k8s.ApplyLabelsToNamespace(cs, f.Namespace.Name, firstNsLabels)
+			return err
+		}, 30*time.Second, 1*time.Second).Should(gomega.Succeed())
 
 		ginkgo.By("Creating a second namespace")
 
