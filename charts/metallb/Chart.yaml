@@ -8,7 +8,7 @@ icon: https://metallb.universe.tf/images/logo/metallb-white.png
 dependencies:
 - name: crds
   condition: crds.enabled
-  version: 0.13.9
+  version: 0.13.10
 
 # A chart can be either an 'application' or a 'library' chart.
 #
@@ -29,10 +29,10 @@ kubeVersion: ">= 1.19.0-0"
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
 # NOTE: this value is updated by the metallb release process
-version: 0.13.9
+version: 0.13.10
 
 # This is the version number of the application being deployed. This version number should be
 # incremented each time you make changes to the application. Versions are not expected to
 # follow Semantic Versioning. They should reflect the version the application is using.
 # NOTE: this value is updated by the metallb release process
-appVersion: v0.13.9
+appVersion: v0.13.10
