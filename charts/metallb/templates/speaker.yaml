@@ -5,6 +5,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ template "metallb.fullname" . }}-frr-startup
+  namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "metallb.labels" . | nindent 4 }}
     app.kubernetes.io/component: speaker
@@ -107,6 +108,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: {{ template "metallb.fullname" . }}-speaker
+  namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "metallb.labels" . | nindent 4 }}
     app.kubernetes.io/component: speaker
