@@ -3,6 +3,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: {{ template "metallb.fullname" . }}-speaker-monitor
+  namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "metallb.labels" . | nindent 4 }}
     app.kubernetes.io/component: speaker
@@ -70,6 +71,7 @@ metadata:
   labels:
     name: {{ template "metallb.fullname" . }}-speaker-monitor-service
   name: {{ template "metallb.fullname" . }}-speaker-monitor-service
+  namespace: {{ .Release.Namespace | quote }}
 spec:
   selector:
     {{- include "metallb.selectorLabels" . | nindent 4 }}
@@ -91,6 +93,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: {{ template "metallb.fullname" . }}-controller-monitor
+  namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "metallb.labels" . | nindent 4 }}
     app.kubernetes.io/component: speaker
@@ -160,6 +163,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: {{ template "metallb.fullname" . }}-prometheus
+  namespace: {{ .Release.Namespace | quote }}
 rules:
   - apiGroups:
       - ""
@@ -176,6 +180,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: {{ template "metallb.fullname" . }}-prometheus
+  namespace: {{ .Release.Namespace | quote }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
