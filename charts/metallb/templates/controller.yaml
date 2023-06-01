@@ -3,6 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ template "metallb.fullname" . }}-controller
+  namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "metallb.labels" . | nindent 4 }}
     app.kubernetes.io/component: controller
