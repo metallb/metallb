@@ -22,20 +22,21 @@ import (
 	"context"
 	"fmt"
 
-	"go.universe.tf/e2etest/pkg/config"
-	"go.universe.tf/e2etest/pkg/k8s"
-	"go.universe.tf/e2etest/pkg/metallb"
-
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/openshift-kni/k8sreporter"
 
-	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
-	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
-	"go.universe.tf/e2etest/pkg/pointer"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"go.universe.tf/e2etest/pkg/config"
+	"go.universe.tf/e2etest/pkg/k8s"
+	"go.universe.tf/e2etest/pkg/metallb"
+	"go.universe.tf/e2etest/pkg/pointer"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 )
 
 var (
@@ -93,6 +94,9 @@ var _ = ginkgo.Describe("Webhooks", func() {
 				},
 			})
 			err = ConfigUpdater.Update(resources)
+			if apierrors.IsConflict(err) {
+				err = ConfigUpdater.Update(resources)
+			}
 			framework.ExpectError(err)
 			Expect(err.Error()).To(ContainSubstring("overlaps with already defined CIDR"))
 
@@ -104,6 +108,9 @@ var _ = ginkgo.Describe("Webhooks", func() {
 			ginkgo.By("Updating second IPAddressPool addresses to overlapping addresses defined by network prefix")
 			resources.Pools[1].Spec.Addresses = []string{"1.1.1.0/24"}
 			err = ConfigUpdater.Update(resources)
+			if apierrors.IsConflict(err) {
+				err = ConfigUpdater.Update(resources)
+			}
 			framework.ExpectError(err)
 			Expect(err.Error()).To(ContainSubstring("overlaps with already defined CIDR"))
 		})
@@ -194,6 +201,9 @@ var _ = ginkgo.Describe("Webhooks", func() {
 				},
 			}
 			err = ConfigUpdater.Update(resources)
+			if apierrors.IsConflict(err) {
+				err = ConfigUpdater.Update(resources)
+			}
 			framework.ExpectError(err)
 			Expect(err.Error()).To(ContainSubstring("invalid aggregation length 26: prefix 28 in this pool is more specific than the aggregation length for addresses 1.1.1.0/28"))
 		})

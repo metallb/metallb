@@ -20,6 +20,9 @@ import (
 	"os"
 	"reflect"
 
+	"sigs.k8s.io/controller-runtime/pkg/event"
+
+	"go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
@@ -41,9 +44,10 @@ type service interface {
 }
 
 type controller struct {
-	client service
-	pools  *config.Pools
-	ips    *allocator.Allocator
+	client        service
+	pools         *config.Pools
+	ips           *allocator.Allocator
+	onPoolChanged func(string)
 }
 
 func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ epslices.EpsOrSlices) controllers.SyncState {
@@ -51,12 +55,16 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 	defer level.Debug(l).Log("event", "endUpdate", "msg", "end of service update")
 
 	if svcRo == nil {
+		pool := c.ips.Pool(name)
 		if c.isServiceAllocated(name) {
 			c.ips.Unassign(name)
 			level.Info(l).Log("event", "serviceDeleted", "msg", "service deleted")
 			// There might be other LBs stuck waiting for an IP, so when
 			// we delete a balancer we should reprocess all of them to
 			// check for newly feasible balancers.
+
+			c.onPoolChanged(pool)
+
 			return controllers.SyncStateReprocessAll
 		}
 		return controllers.SyncStateSuccess
@@ -75,19 +83,36 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 	svc := svcRo.DeepCopy()
 	syncStateRes := controllers.SyncStateSuccess
 	wasAllocated := c.isServiceAllocated(name)
+
+	prevPool := c.ips.Pool(name)
+
 	if c.convergeBalancer(l, name, svc) != nil {
 		syncStateRes = controllers.SyncStateErrorNoRetry
 	}
 
-	if wasAllocated && !c.isServiceAllocated(name) { // convergeBalancer may deallocate our service and this means it did it.
-		// if the service was deallocated, it may have have left room
-		// for another one, so we reprocess
-		level.Info(l).Log("event", "serviceUpdated", "msg", "removed loadbalancer from service, services will be reprocessed")
-		syncStateRes = controllers.SyncStateReprocessAll
-	}
 	if reflect.DeepEqual(svcRo, svc) {
 		level.Debug(l).Log("event", "noChange", "msg", "service converged, no change")
 		return syncStateRes
+	}
+
+	newPool := c.ips.Pool(name)
+
+	// Generate pool status events.
+	if prevPool != newPool {
+		if prevPool != "" {
+			c.onPoolChanged(prevPool)
+		}
+		if newPool != "" {
+			c.onPoolChanged(newPool)
+		}
+	}
+
+	if wasAllocated && !c.isServiceAllocated(name) {
+		// convergeBalancer may deallocate our service and this means it did it.
+		// if the service was deallocated, it may have left room
+		// for another one, so we reprocess
+		level.Info(l).Log("event", "serviceUpdated", "msg", "removed loadbalancer from service, services will be reprocessed")
+		syncStateRes = controllers.SyncStateReprocessAll
 	}
 
 	toWrite := svcRo.DeepCopy()
@@ -126,7 +151,26 @@ func (c *controller) SetPools(l log.Logger, pools *config.Pools) controllers.Syn
 		return controllers.SyncStateError
 	}
 	c.pools = pools
+
+	for poolName := range c.pools.ByName {
+		c.onPoolChanged(poolName)
+	}
+
 	return controllers.SyncStateReprocessAll
+}
+
+func (c *controller) GetPoolStatus(pool string) (v1beta1.IPAddressPoolStatus, error) {
+	stats, err := c.ips.GetPoolStats(pool)
+	if err != nil {
+		return v1beta1.IPAddressPoolStatus{}, err
+	}
+
+	return v1beta1.IPAddressPoolStatus{
+		AvailableIPv4: stats.AvailableIPv4,
+		AvailableIPv6: stats.AvailableIPv6,
+		AssignedIPv4:  stats.AssignedIPv4,
+		AssignedIPv6:  stats.AssignedIPv6,
+	}, nil
 }
 
 func main() {
@@ -163,8 +207,13 @@ func main() {
 		*namespace = string(bs)
 	}
 
+	poolStatusChan := make(chan event.GenericEvent)
+
 	c := &controller{
 		ips: allocator.New(),
+		onPoolChanged: func(name string) {
+			poolStatusChan <- controllers.NewPoolStatusEvent(name, *namespace)
+		},
 	}
 
 	bgpType, present := os.LookupEnv("METALLB_BGP_TYPE")
@@ -185,7 +234,9 @@ func main() {
 		Listener: k8s.Listener{
 			ServiceChanged: c.SetBalancer,
 			PoolChanged:    c.SetPools,
+			StatusForPool:  c.GetPoolStatus,
 		},
+		PoolStatusChan:      poolStatusChan,
 		ValidateConfig:      validation,
 		EnableWebhook:       true,
 		DisableCertRotation: *disableCertRotation,

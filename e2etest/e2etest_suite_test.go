@@ -34,6 +34,7 @@ import (
 	"go.universe.tf/e2etest/pkg/k8s"
 	"go.universe.tf/e2etest/pkg/metallb"
 	"go.universe.tf/e2etest/pkg/service"
+	"go.universe.tf/e2etest/status"
 	"go.universe.tf/e2etest/webhookstests"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -171,11 +172,13 @@ var _ = ginkgo.BeforeSuite(func() {
 	bgptests.ConfigUpdater = updater
 	l2tests.ConfigUpdater = updater
 	webhookstests.ConfigUpdater = updater
+	status.ConfigUpdater = updater
 	webhookstests.ConfigUpdaterOtherNS = updaterOtherNS
 	bgptests.Reporter = reporter
 	bgptests.ReportPath = reportPath
 	l2tests.Reporter = reporter
 	webhookstests.Reporter = reporter
+	status.Reporter = reporter
 	bgptests.PrometheusNamespace = prometheusNamespace
 	l2tests.PrometheusNamespace = prometheusNamespace
 	l2tests.NodeNics = strings.Split(nodeNics, ",")

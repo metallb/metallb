@@ -67,8 +67,18 @@ type ServiceAllocation struct {
 
 // IPAddressPoolStatus defines the observed state of IPAddressPool.
 type IPAddressPoolStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// AssignedIPv4 indicates the number of assigned IPv4 addresses.
+	AssignedIPv4 int64 `json:"assignedIPv4"`
+
+	// AssignedIPv6 indicates the number of assigned IPv6 addresses.
+	AssignedIPv6 int64 `json:"assignedIPv6"`
+
+	// AvailableIPv4 indicates the number of available IPv4 addresses.
+	AvailableIPv4 int64 `json:"availableIPv4"`
+
+	// AvailableIPv6 indicates the number of assigned IPv6 addresses.
+	// This value does not change when the IP capacity is equal or greater than 2^62.
+	AvailableIPv6 int64 `json:"availableIPv6"`
 }
 
 // +kubebuilder:object:root=true

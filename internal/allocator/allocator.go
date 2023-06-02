@@ -105,7 +105,8 @@ func (a *Allocator) SetPools(pools *config.Pools) error {
 
 	// Refresh or initiate stats
 	for n, p := range a.pools.ByName {
-		stats.poolCapacity.WithLabelValues(n).Set(float64(poolCount(p)))
+		capacityIPv4, capacityIPv6 := poolCount(p)
+		stats.poolCapacity.WithLabelValues(n).Set(float64(capacityIPv4 + capacityIPv6))
 		stats.poolActive.WithLabelValues(n).Set(float64(len(a.poolIPsInUse[n])))
 	}
 
@@ -134,8 +135,52 @@ func (a *Allocator) assign(svc string, alloc *alloc) {
 		}
 		a.poolIPsInUse[alloc.pool][ip.String()]++
 	}
-	stats.poolCapacity.WithLabelValues(alloc.pool).Set(float64(poolCount(a.pools.ByName[alloc.pool])))
+
+	capacityIPv4, capacityIPv6 := poolCount(a.pools.ByName[alloc.pool])
+	stats.poolCapacity.WithLabelValues(alloc.pool).Set(float64(capacityIPv4 + capacityIPv6))
 	stats.poolActive.WithLabelValues(alloc.pool).Set(float64(len(a.poolIPsInUse[alloc.pool])))
+}
+
+// PoolStats contains the available and assigned IP addresses of the pool.
+type PoolStats struct {
+	AvailableIPv4 int64
+	AvailableIPv6 int64
+	AssignedIPv4  int64
+	AssignedIPv6  int64
+}
+
+// GetPoolStats gets the pool stats.
+func (a *Allocator) GetPoolStats(pool string) (PoolStats, error) {
+	if _, ok := a.pools.ByName[pool]; !ok {
+		return PoolStats{}, fmt.Errorf("pool not found")
+	}
+
+	// Total capacity.
+	capacityIPv4, capacityIPv6 := poolCount(a.pools.ByName[pool])
+
+	var assignedIPv4, assignedIPv6 int64
+	if ips, ok := a.poolIPsInUse[pool]; ok {
+		for ip := range ips {
+			if net.ParseIP(ip).To4() != nil {
+				assignedIPv4++
+			} else {
+				assignedIPv6++
+			}
+		}
+	}
+
+	// If the capacity of IPv6 is the maximum, then do not decrement the assigned IPs. Number of IPs might be bigger.
+	availableIPv6 := capacityIPv6
+	if capacityIPv6 != math.MaxInt64 {
+		availableIPv6 -= assignedIPv6
+	}
+
+	return PoolStats{
+		AvailableIPv4: capacityIPv4 - assignedIPv4,
+		AvailableIPv6: availableIPv6,
+		AssignedIPv4:  assignedIPv4,
+		AssignedIPv6:  assignedIPv6,
+	}, nil
 }
 
 // Assign assigns the requested ip to svc, if the assignment is
@@ -389,42 +434,49 @@ func sharingOK(existing, new *key) error {
 	return nil
 }
 
-// poolCount returns the number of addresses in the pool.
-func poolCount(p *config.Pool) int64 {
-	var total int64
+// poolCount returns the total number of IPv4 and IPv6 addresses in the pool.
+func poolCount(p *config.Pool) (int64, int64) {
+	var totalIPv4 int64
+	var totalIPv6 int64
+
 	for _, cidr := range p.CIDR {
 		o, b := cidr.Mask.Size()
-		if b-o >= 62 {
+		if b-o >= 62 || (cidr.IP.To4() == nil && totalIPv6 == math.MaxInt64) {
 			// An enormous ipv6 range is allocated which will never run out.
 			// Just return max to avoid any math errors.
-			return math.MaxInt64
+			totalIPv6 = math.MaxInt64
+			continue
 		}
 		sz := int64(math.Pow(2, float64(b-o)))
 
-		cur := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})
-		firstIP := cur.First().IP
-		lastIP := cur.Last().IP
+		if cidr.IP.To4() != nil {
+			cur := ipaddr.NewCursor([]ipaddr.Prefix{*ipaddr.NewPrefix(cidr)})
+			firstIP := cur.First().IP
+			lastIP := cur.Last().IP
 
-		if p.AvoidBuggyIPs {
-			if o <= 24 {
-				// A pair of buggy IPs occur for each /24 present in the range.
-				buggies := int64(math.Pow(2, float64(24-o))) * 2
-				sz -= buggies
-			} else {
-				// Ranges smaller than /24 contain 1 buggy IP if they
-				// start/end on a /24 boundary, otherwise they contain
-				// none.
-				if ipConfusesBuggyFirmwares(firstIP) {
-					sz--
-				}
-				if ipConfusesBuggyFirmwares(lastIP) {
-					sz--
+			if p.AvoidBuggyIPs {
+				if o <= 24 {
+					// A pair of buggy IPs occur for each /24 present in the range.
+					buggies := int64(math.Pow(2, float64(24-o))) * 2
+					sz -= buggies
+				} else {
+					// Ranges smaller than /24 contain 1 buggy IP if they
+					// start/end on a /24 boundary, otherwise they contain
+					// none.
+					if ipConfusesBuggyFirmwares(firstIP) {
+						sz--
+					}
+					if ipConfusesBuggyFirmwares(lastIP) {
+						sz--
+					}
 				}
 			}
+			totalIPv4 += sz
+		} else {
+			totalIPv6 += sz
 		}
-		total += sz
 	}
-	return total
+	return totalIPv4, totalIPv6
 }
 
 // poolFor returns the pool that owns the requested IPs, or "" if none.
@@ -503,4 +555,8 @@ func (a *Allocator) checkSharing(svc string, ip string, ports []Port, sk *key) e
 		}
 	}
 	return nil
+}
+
+func (a *Allocator) AllocatePool(svc, pool string) {
+	a.allocated[svc] = &alloc{pool: pool}
 }

@@ -3,6 +3,7 @@
 package allocator
 
 import (
+	"fmt"
 	"math"
 	"net"
 	"reflect"
@@ -1940,25 +1941,126 @@ func TestAutoAssign(t *testing.T) {
 	}
 }
 
-func TestPoolCount(t *testing.T) {
+func TestPoolStats(t *testing.T) {
+	numAssignedIPv4 := 10
+	numAssignedIPv6 := 10
+
 	tests := []struct {
 		desc string
 		pool *config.Pool
-		want int64
+		ipv4 bool
+		ipv6 bool
+		want PoolStats
+	}{
+		{
+			desc: "only ipv4 stats",
+			pool: &config.Pool{
+				Name: "pool",
+				CIDR: []*net.IPNet{ipnet("1.2.3.0/24")},
+			},
+			ipv4: true,
+			want: PoolStats{
+				AvailableIPv4: int64(256 - numAssignedIPv4),
+				AvailableIPv6: 0,
+				AssignedIPv4:  int64(numAssignedIPv4),
+				AssignedIPv6:  0,
+			},
+		},
+		{
+			desc: "only ipv6 stats",
+			pool: &config.Pool{
+				Name: "pool",
+				CIDR: []*net.IPNet{ipnet("2000::/120")},
+			},
+			ipv6: true,
+			want: PoolStats{
+				AvailableIPv4: 0,
+				AvailableIPv6: int64(256 - numAssignedIPv6),
+				AssignedIPv4:  0,
+				AssignedIPv6:  int64(numAssignedIPv6),
+			},
+		},
+		{
+			desc: "only ipv6 stats - max capacity",
+			pool: &config.Pool{
+				Name: "pool",
+				CIDR: []*net.IPNet{ipnet("2000::/64")},
+			},
+			ipv6: true,
+			want: PoolStats{
+				AvailableIPv4: 0,
+				AvailableIPv6: math.MaxInt64,
+				AssignedIPv4:  0,
+				AssignedIPv6:  int64(numAssignedIPv6),
+			},
+		},
+		{
+			desc: "dual stack stats",
+			pool: &config.Pool{
+				Name: "pool",
+				CIDR: []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("2000::/120")},
+			},
+			ipv4: true,
+			ipv6: true,
+			want: PoolStats{
+				AvailableIPv4: int64(256 - numAssignedIPv4),
+				AvailableIPv6: int64(256 - numAssignedIPv6),
+				AssignedIPv4:  int64(numAssignedIPv4),
+				AssignedIPv6:  int64(numAssignedIPv6),
+			},
+		},
+	}
+
+	for _, test := range tests {
+		test := test
+		t.Run(test.desc, func(t *testing.T) {
+			a := New()
+			err := a.SetPools(&config.Pools{ByName: map[string]*config.Pool{test.pool.Name: test.pool}})
+			if err != nil {
+				t.Fatalf("failed to set pools")
+			}
+
+			a.poolIPsInUse[test.pool.Name] = make(map[string]int)
+			if test.ipv4 {
+				for i := 0; i < numAssignedIPv4; i++ {
+					a.poolIPsInUse[test.pool.Name][fmt.Sprintf("1.2.3.%d", i)]++
+				}
+			}
+
+			if test.ipv6 {
+				for i := 0; i < numAssignedIPv6; i++ {
+					a.poolIPsInUse[test.pool.Name][fmt.Sprintf("2000::%d", i)]++
+				}
+			}
+
+			stats, _ := a.GetPoolStats(test.pool.Name)
+			if !reflect.DeepEqual(stats, test.want) {
+				t.Errorf("wrong pool stats, want %+v, got %+v", test.want, stats)
+			}
+		})
+	}
+}
+
+func TestPoolCount(t *testing.T) {
+	tests := []struct {
+		desc     string
+		pool     *config.Pool
+		wantIPv4 int64
+		wantIPv6 int64
 	}{
 		{
 			desc: "BGP /24",
 			pool: &config.Pool{
 				CIDR: []*net.IPNet{ipnet("1.2.3.0/24")},
 			},
-			want: 256,
+			wantIPv4: 256,
 		},
 		{
 			desc: "BGP /24 and /25",
 			pool: &config.Pool{
 				CIDR: []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("2.3.4.128/25")},
 			},
-			want: 384,
+			wantIPv4: 384,
 		},
 		{
 			desc: "BGP /24 and /25, no buggy IPs",
@@ -1966,7 +2068,7 @@ func TestPoolCount(t *testing.T) {
 				CIDR:          []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("2.3.4.128/25")},
 				AvoidBuggyIPs: true,
 			},
-			want: 381,
+			wantIPv4: 381,
 		},
 		{
 			desc: "BGP a BIG ipv6 range",
@@ -1974,14 +2076,23 @@ func TestPoolCount(t *testing.T) {
 				CIDR:          []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("2.3.4.128/25"), ipnet("1000::/64")},
 				AvoidBuggyIPs: true,
 			},
-			want: math.MaxInt64,
+			wantIPv4: 381,
+			wantIPv6: math.MaxInt64,
+		},
+		{
+			desc: "BGP a BIG ipv6 range and a /127",
+			pool: &config.Pool{
+				CIDR: []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("2000::/127"), ipnet("1000::/64")},
+			},
+			wantIPv4: 256,
+			wantIPv6: math.MaxInt64,
 		},
 	}
 
 	for _, test := range tests {
-		got := poolCount(test.pool)
-		if test.want != got {
-			t.Errorf("%q: wrong pool count, want %d, got %d", test.desc, test.want, got)
+		cIPv4, cIPv6 := poolCount(test.pool)
+		if test.wantIPv4 != cIPv4 || test.wantIPv6 != cIPv6 {
+			t.Errorf("%q: wrong pool count, want IPV4 %d, got %d - IPV4 %d, got %d", test.desc, test.wantIPv4, cIPv4, test.wantIPv6, cIPv6)
 		}
 	}
 }

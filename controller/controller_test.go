@@ -7,11 +7,7 @@ import (
 	"math/rand"
 	"net"
 	"testing"
-
-	"go.universe.tf/metallb/internal/allocator"
-	"go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/k8s/controllers"
-	"go.universe.tf/metallb/internal/k8s/epslices"
+	"time"
 
 	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
@@ -19,6 +15,11 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	"go.universe.tf/metallb/internal/allocator"
+	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/k8s/controllers"
+	"go.universe.tf/metallb/internal/k8s/epslices"
 )
 
 func diffService(a, b *v1.Service) string {
@@ -198,21 +199,40 @@ func TestControllerMutation(t *testing.T) {
 
 	l := log.NewNopLogger()
 
+	statusChan := make(chan struct{})
+	c.onPoolChanged = func(_ string) {
+		go func() {
+			statusChan <- struct{}{}
+		}()
+	}
+
+	readStatus := func() {
+		select {
+		case <-statusChan:
+			return
+		case <-time.After(time.Second):
+			t.Fatalf("failed to get status")
+		}
+	}
+
 	// For this test, we just set a static config and immediately sync
 	// the controller. The mutations around config setting and syncing
 	// are tested elsewhere.
 	if c.SetPools(l, pools) == controllers.SyncStateError {
 		t.Fatalf("SetPools failed")
 	}
+	readStatus()
 
 	// In steady state, every input below should be equivalent to a
 	// pure function that reliably produces the same end state
 	// regardless of past controller state.
 	tests := []struct {
-		desc    string
-		in      *v1.Service
-		want    *v1.Service
-		wantErr bool
+		desc          string
+		in            *v1.Service
+		prevPool      string
+		numReadStatus int
+		want          *v1.Service
+		wantErr       bool
 	}{
 		{
 			desc: "deleted balancer",
@@ -243,6 +263,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0"}),
 			},
+			numReadStatus: 1,
 		},
 
 		{
@@ -262,6 +283,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.1"}),
 			},
+			numReadStatus: 1,
 		},
 
 		{
@@ -289,6 +311,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.1"}),
 			},
+			numReadStatus: 1,
 		},
 
 		{
@@ -386,7 +409,8 @@ func TestControllerMutation(t *testing.T) {
 					ClusterIPs:     []string{"1.2.3.4"},
 				},
 			},
-			wantErr: true,
+			wantErr:       true,
+			numReadStatus: 1,
 		},
 
 		{
@@ -414,6 +438,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0"}),
 			},
+			numReadStatus: 1,
 		},
 
 		{
@@ -430,6 +455,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0"}),
 			},
+			prevPool: "poo1",
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -442,6 +468,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"3.4.5.6"}),
 			},
+			numReadStatus: 2,
 		},
 
 		{
@@ -476,6 +503,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0"}),
 			},
+			numReadStatus: 1,
 		},
 
 		{
@@ -505,6 +533,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0"}),
 			},
+			numReadStatus: 1,
 		},
 
 		{
@@ -516,12 +545,14 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0"}),
 			},
+			prevPool: "pool1",
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
 					Type:       "NodePort",
 					ClusterIPs: []string{"1.2.3.4"},
 				},
 			},
+			numReadStatus: 1,
 		},
 
 		{
@@ -541,6 +572,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"3.4.5.6"}),
 			},
+			numReadStatus: 1,
 		},
 
 		{
@@ -562,6 +594,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"3.4.5.6"}),
 			},
+			numReadStatus: 1,
 		},
 
 		{
@@ -639,6 +672,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1000::"}),
 			},
+			prevPool: "pool3",
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
 					Type:       "LoadBalancer",
@@ -646,6 +680,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0"}),
 			},
+			numReadStatus: 2,
 		},
 
 		{
@@ -657,6 +692,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0"}),
 			},
+			prevPool: "pool1",
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
 					Type:       "LoadBalancer",
@@ -664,6 +700,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1000::"}),
 			},
+			numReadStatus: 2,
 		},
 		// dual-stack test cases
 		{
@@ -684,6 +721,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
 			},
+			numReadStatus: 1,
 		},
 		{
 			desc: "request IPs from specific pool",
@@ -710,6 +748,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
 			},
+			numReadStatus: 1,
 		},
 		{
 			desc: "request specific loadbalancer IP with dual-stack",
@@ -762,6 +801,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
 			},
+			numReadStatus: 1,
 		},
 		{
 			desc: "request dual-stack loadbalancer with invalid ingress",
@@ -790,6 +830,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
 			},
+			numReadStatus: 1,
 		},
 		{
 			desc: "request dual-stack loadbalancer IPs via custom annotation in a single stack cluster",
@@ -827,6 +868,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"7.8.9.0"}),
 			},
+			numReadStatus: 1,
 		},
 		{
 			desc: "request IP for service from no priority namespace specific ip pool",
@@ -849,6 +891,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"16.17.18.0"}),
 			},
+			numReadStatus: 1,
 		},
 		{
 			desc: "request IP for service from service label specific ip pool",
@@ -871,6 +914,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"19.20.21.0"}),
 			},
+			numReadStatus: 1,
 		},
 		{
 			desc: "request IP for service from ip pool having both namespace and service label",
@@ -895,6 +939,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"25.26.27.0"}),
 			},
+			numReadStatus: 1,
 		},
 		{
 			desc: "simple LoadBalancer, ips already assigned but can't determine family",
@@ -905,6 +950,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0", "1.2.3.1", "1.2.3.2"}),
 			},
+			prevPool: "pool1",
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
 					ClusterIPs: []string{"1.2.3.4"},
@@ -921,9 +967,17 @@ func TestControllerMutation(t *testing.T) {
 			t.Run(test.desc, func(t *testing.T) {
 				k.reset()
 
+				if test.prevPool != "" {
+					c.ips.AllocatePool("test", test.prevPool)
+				}
+
 				if c.SetBalancer(l, "test", test.in, epslices.EpsOrSlices{}) == controllers.SyncStateError {
 					t.Fatalf("%q: SetBalancer returned error", test.desc)
 				}
+				for i := 0; i < test.numReadStatus; i++ {
+					readStatus()
+				}
+
 				if test.wantErr != k.loggedWarning {
 					t.Errorf("%q: unexpected loggedWarning value, want %v, got %v", test.desc, test.wantErr, k.loggedWarning)
 				}
@@ -970,6 +1024,22 @@ func TestControllerConfig(t *testing.T) {
 	c := &controller{
 		ips:    allocator.New(),
 		client: k,
+	}
+
+	statusChan := make(chan struct{})
+	c.onPoolChanged = func(_ string) {
+		go func() {
+			statusChan <- struct{}{}
+		}()
+	}
+
+	readStatus := func() {
+		select {
+		case <-statusChan:
+			return
+		case <-time.After(time.Second):
+			t.Fatalf("failed to get status")
+		}
 	}
 
 	// Create service that would need an IP allocation
@@ -1019,6 +1089,7 @@ func TestControllerConfig(t *testing.T) {
 	if c.SetPools(l, pools) == controllers.SyncStateError {
 		t.Fatalf("SetPools failed")
 	}
+	readStatus()
 
 	gotSvc = k.gotService(svc)
 	if gotSvc != nil {
@@ -1040,6 +1111,26 @@ func TestControllerConfig(t *testing.T) {
 		t.Errorf("SetBalancer produced unexpected mutation (-want +got)\n%s", diff)
 	}
 
+	// Set a second pool
+	pools = &config.Pools{ByName: map[string]*config.Pool{
+		"default": {
+			Name:       "default",
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
+		},
+		"new": {
+			Name:       "new",
+			AutoAssign: true,
+			CIDR:       []*net.IPNet{ipnet("1.2.5.0/24")},
+		},
+	}}
+	if c.SetPools(l, pools) == controllers.SyncStateError {
+		t.Fatalf("SetPools failed")
+	}
+	for i := 0; i < 2; i++ {
+		readStatus()
+	}
+
 	// Now that an IP is allocated, removing the IP pool is not allowed.
 	if c.SetPools(l, &config.Pools{ByName: map[string]*config.Pool{}}) != controllers.SyncStateError {
 		t.Fatalf("SetPools that deletes allocated IPs was accepted")
@@ -1058,6 +1149,22 @@ func TestDeleteRecyclesIP(t *testing.T) {
 		client: k,
 	}
 
+	statusChan := make(chan struct{})
+	c.onPoolChanged = func(_ string) {
+		go func() {
+			statusChan <- struct{}{}
+		}()
+	}
+
+	readStatus := func() {
+		select {
+		case <-statusChan:
+			return
+		case <-time.After(time.Second):
+			t.Fatalf("failed to get status")
+		}
+	}
+
 	l := log.NewNopLogger()
 	pools := &config.Pools{ByName: map[string]*config.Pool{
 		"default": {
@@ -1069,6 +1176,7 @@ func TestDeleteRecyclesIP(t *testing.T) {
 	if c.SetPools(l, pools) == controllers.SyncStateError {
 		t.Fatal("SetPools failed")
 	}
+	readStatus()
 
 	svc1 := &v1.Service{
 		Spec: v1.ServiceSpec{
@@ -1128,6 +1236,22 @@ func TestControllerDualStackConfig(t *testing.T) {
 		client: k,
 	}
 
+	statusChan := make(chan struct{})
+	c.onPoolChanged = func(_ string) {
+		go func() {
+			statusChan <- struct{}{}
+		}()
+	}
+
+	readStatus := func() {
+		select {
+		case <-statusChan:
+			return
+		case <-time.After(time.Second):
+			t.Fatalf("failed to get status")
+		}
+	}
+
 	l := log.NewNopLogger()
 	svc := &v1.Service{
 		Spec: v1.ServiceSpec{
@@ -1174,6 +1298,7 @@ func TestControllerDualStackConfig(t *testing.T) {
 	if c.SetPools(l, pools) == controllers.SyncStateError {
 		t.Fatalf("SetPools failed")
 	}
+	readStatus()
 
 	gotSvc = k.gotService(svc)
 	if gotSvc != nil {

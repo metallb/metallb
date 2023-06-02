@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/go-kit/log"
+	"go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/k8s/epslices"
@@ -18,6 +19,8 @@ type Listener struct {
 	ConfigChanged  func(log.Logger, *config.Config) controllers.SyncState
 	PoolChanged    func(log.Logger, *config.Pools) controllers.SyncState
 	NodeChanged    func(log.Logger, *v1.Node) controllers.SyncState
+
+	StatusForPool func(string) (v1beta1.IPAddressPoolStatus, error)
 }
 
 func (l *Listener) ServiceHandler(logger log.Logger, serviceName string, svc *v1.Service, endpointsOrSlices epslices.EpsOrSlices) controllers.SyncState {
@@ -42,4 +45,10 @@ func (l *Listener) PoolHandler(logger log.Logger, pools *config.Pools) controlle
 	l.Lock()
 	defer l.Unlock()
 	return l.PoolChanged(logger, pools)
+}
+
+func (l *Listener) GetStatusForPool(pool string) (v1beta1.IPAddressPoolStatus, error) {
+	l.Lock()
+	defer l.Unlock()
+	return l.StatusForPool(pool)
 }

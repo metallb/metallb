@@ -111,6 +111,7 @@ type Config struct {
 	CertDir             string
 	CertServiceName     string
 	LoadBalancerClass   string
+	PoolStatusChan      chan event.GenericEvent
 	Listener
 }
 
@@ -194,7 +195,17 @@ func New(cfg *Config) (*Client, error) {
 			ForceReload:    reload,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "config")
-			return nil, errors.Wrap(err, "failed to create config reconciler")
+			return nil, errors.Wrap(err, "failed to create pool reconciler")
+		}
+
+		if err = (&controllers.PoolStatusReconciler{
+			Client:            mgr.GetClient(),
+			Logger:            cfg.Logger,
+			GetStatusForPool:  cfg.GetStatusForPool,
+			PoolStatusChannel: cfg.PoolStatusChan,
+		}).SetupWithManager(mgr); err != nil {
+			level.Error(c.logger).Log("error", err, "unable to create controller", "config")
+			return nil, errors.Wrap(err, "failed to create pool status reconciler")
 		}
 	}
 
