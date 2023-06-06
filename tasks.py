@@ -294,7 +294,7 @@ def validate_kind_version():
 
 def generate_manifest(ctx, crd_options="crd:crdVersions=v1", bgp_type="native", output=None, with_prometheus=False):
     _fetch_kubectl()
-    run("GOPATH={} go install sigs.k8s.io/controller-tools/cmd/controller-gen@{}".format(build_path, controller_gen_version))    
+    run("GOPATH={} go install sigs.k8s.io/controller-tools/cmd/controller-gen@{}".format(build_path, controller_gen_version))
     res = run("{}/bin/controller-gen {} rbac:roleName=manager-role webhook paths=\"./api/...\" output:crd:artifacts:config=config/crd/bases".format(build_path, crd_options))
     if not res.ok:
         raise Exit(message="Failed to generate manifests")
@@ -392,7 +392,7 @@ apiServer:
         if node_img != None:
             extra_options = "--image={}".format(node_img)
         config = yaml.dump(config).encode("utf-8")
-        
+
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(config)
             tmp.flush()
@@ -420,7 +420,7 @@ apiServer:
                                "--set prometheus.namespace=monitoring ")
         run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
                 "--set speaker.image.tag=dev-{} --set speaker.frr.enabled={} --set speaker.logLevel=debug "
-                "--set controller.logLevel=debug {} --namespace metallb-system".format(architecture, architecture, 
+                "--set controller.logLevel=debug {} --namespace metallb-system".format(architecture, architecture,
                 "true" if bgp_type == "frr" else "false", prometheus_values), echo=True)
     else:
         run("{} delete po -n metallb-system --all".format(kubectl_path), echo=True)
@@ -576,7 +576,7 @@ def dev_env_cleanup(ctx, name="kind", frr_volume_dir=""):
     clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
     if name in clusters:
         run("kind delete cluster --name={}".format(name), hide=True)
-    
+
     run('for frr in $(docker ps -a -f name=frr --format {{.Names}}) ; do '
         '    docker rm -f $frr ; '
         'done', hide=True)
@@ -640,7 +640,7 @@ def release(ctx, version, skip_release_notes=False):
     else:
         previous_version = "main"
     bumprelease(ctx, version, previous_version)
-    
+
     run("git commit -a -m 'Automated update for release v{}'".format(sem_version), echo=True)
     run("git tag v{} -m 'See the release notes for details:\n\nhttps://metallb.universe.tf/release-notes/#version-{}-{}-{}'".format(sem_version, sem_version.major, sem_version.minor, sem_version.patch), echo=True)
     run("git checkout main", echo=True)
@@ -666,6 +666,7 @@ def bumprelease(ctx, version, previous_version):
 
     # Update the manifests with the new version
     run("perl -pi -e 's,image: quay.io/metallb/speaker:.*,image: quay.io/metallb/speaker:v{},g' config/controllers/speaker.yaml".format(version), echo=True)
+    run("perl -pi -e 's,image: quay.io/metallb/speaker:.*,image: quay.io/metallb/speaker:v{},g' config/frr/speaker-patch.yaml".format(version), echo=True)
     run("perl -pi -e 's,image: quay.io/metallb/controller:.*,image: quay.io/metallb/controller:v{},g' config/controllers/controller.yaml".format(version), echo=True)
 
     # Update the versions in the helm chart (version and appVersion are always the same)
@@ -676,7 +677,7 @@ def bumprelease(ctx, version, previous_version):
     run("perl -pi -e 's,^appVersion: .*,appVersion: v{},g' charts/metallb/charts/crds/Chart.yaml".format(version), echo=True)
     run("perl -pi -e 's,^Current chart version is: .*,Current chart version is: `{}`,g' charts/metallb/README.md".format(version), echo=True)
     run("helm dependency update charts/metallb", echo=True)
-    
+
 
     # Generate the manifests with the new version of the images
     generatemanifests(ctx)
@@ -692,6 +693,10 @@ def bumprelease(ctx, version, previous_version):
     # Update the version embedded in the binary
     run("perl -pi -e 's/version\s+=.*/version = \"{}\"/g' internal/version/version.go".format(version), echo=True)
     run("gofmt -w internal/version/version.go", echo=True)
+
+    res = run('grep ":main" config/manifests/*.yaml').stdout
+    if res:
+            raise Exit(message="ERROR: Found image still referring to the main tag")
 
 @task
 def test(ctx):
@@ -810,7 +815,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
             raise Exit(message="Unable to find cluster named: {}".format(name))
     else:
         os.environ['KUBECONFIG'] = kubeconfig
-        
+
     namespaces = system_namespaces.replace(' ', '').split(',')
     for ns in namespaces:
         run("{} -n {} wait --for=condition=Ready --all pods --timeout 300s".format(kubectl_path, ns), hide=True)
@@ -832,7 +837,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
         report_path = export
     else:
         report_path = "/tmp/metallbreport{}".format(time.time())
-    
+
     if prometheus_namespace != "":
         prometheus_namespace = "--prometheus-namespace=" + prometheus_namespace
 
@@ -862,7 +867,7 @@ def bumplicense(ctx):
         res = run("grep -q License {}".format(file), warn=True)
         if not res.ok:
             run(r"sed -i '1s/^/\/\/ SPDX-License-Identifier:Apache-2.0\n\n/' " + file)
- 
+
 @task
 def verifylicense(ctx):
     """Verifies all files have the corresponding license"""
@@ -883,7 +888,7 @@ def gomodtidy(ctx):
     if not res.ok:
         raise Exit(message="go mod tidy failed")
 
-@task 
+@task
 def generatemanifests(ctx):
     """ Re-generates the all-in-one manifests under config/manifests"""
     generate_manifest(ctx, bgp_type="frr", output="config/manifests/metallb-frr.yaml")
@@ -934,5 +939,3 @@ def _fetch_kubectl():
                 return
     run(curl_command)
     run("chmod +x {}".format(kubectl_path))
-
-
