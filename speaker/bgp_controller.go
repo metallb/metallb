@@ -268,10 +268,6 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 }
 
 func (c *bgpController) syncBFDProfiles(profiles map[string]*config.BFDProfile) error {
-	if len(profiles) == 0 {
-		return nil
-	}
-
 	return c.sessionManager.SyncBFDProfiles(profiles)
 }
 
