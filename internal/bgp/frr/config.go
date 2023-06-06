@@ -31,6 +31,7 @@ type frrConfig struct {
 	Hostname    string
 	Routers     []*routerConfig
 	BFDProfiles []BFDProfile
+	ExtraConfig string
 }
 
 type reloadEvent struct {

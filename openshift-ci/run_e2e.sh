@@ -24,7 +24,8 @@ sudo firewall-cmd --zone=libvirt --add-port=4784/udp
 # need to skip L2 metrics / node selector test because the pod that's running the tests is not 
 # same subnet of the cluster nodes, so the arp request that's done in the test won't work.
 # Also, skip l2 interface selector as it's not supported d/s currently.
-SKIP="L2 metrics|L2 Node Selector|L2-interface selector"
+# Skip route injection after setting up speaker. FRR is not refreshed.
+SKIP="L2 metrics|L2 Node Selector|L2-interface selector|MetalLB allows adding extra FRR configuration.*after"
 if [ "${IP_STACK}" = "v4" ]; then
 	SKIP="$SKIP|IPV6|DUALSTACK"
 	export PROVISIONING_HOST_EXTERNAL_IPV4=${PROVISIONING_HOST_EXTERNAL_IP}

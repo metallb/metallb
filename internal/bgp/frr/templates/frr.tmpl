@@ -58,6 +58,11 @@ router bgp {{$r.MyASN}}{{ if $r.VRF }} vrf {{$r.VRF}}{{end}}
   exit-address-family
 {{end }}
 {{end }}
+
+{{- if .ExtraConfig }}
+{{ .ExtraConfig }}
+{{- end }}
+
 {{- if gt (len .BFDProfiles) 0}}
 bfd
 {{- range .BFDProfiles }}

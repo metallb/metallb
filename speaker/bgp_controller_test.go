@@ -126,6 +126,10 @@ func (f *fakeBGPSessionManager) SyncBFDProfiles(profiles map[string]*config.BFDP
 	return nil
 }
 
+func (f *fakeBGPSessionManager) SyncExtraInfo(extra string) error {
+	return nil
+}
+
 func (f *fakeBGPSessionManager) Ads() map[string][]*bgp.Advertisement {
 	ret := map[string][]*bgp.Advertisement{}
 

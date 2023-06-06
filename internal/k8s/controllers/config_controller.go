@@ -26,6 +26,7 @@ import (
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -35,6 +36,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
+
+const bgpExtrasConfigName = "bgpextras"
 
 type ConfigReconciler struct {
 	client.Client
@@ -116,6 +119,13 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, err
 	}
 
+	var extrasMap corev1.ConfigMap
+	key := client.ObjectKey{Name: bgpExtrasConfigName, Namespace: r.Namespace}
+	if err := r.Get(ctx, key, &extrasMap); err != nil && !apierrors.IsNotFound(err) {
+		level.Error(r.Logger).Log("controller", "ConfigReconciler", "message", "failed to get the frr configmap", "error", err)
+		return ctrl.Result{}, err
+	}
+
 	resources := config.ClusterResources{
 		Pools:              ipAddressPools.Items,
 		Peers:              bgpPeers.Items,
@@ -127,6 +137,7 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 		PasswordSecrets:    secrets,
 		Nodes:              nodes.Items,
 		Namespaces:         namespaces.Items,
+		BGPExtras:          extrasMap,
 	}
 
 	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources))
@@ -138,6 +149,9 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 		return ctrl.Result{}, nil
 	}
 
+	if cfg.BGPExtras != "" {
+		level.Info(r.Logger).Log("controller", "ConfigReconciler", "warning message", "BGP Extras provided, please note that this configuration is not supported and used at your own risk")
+	}
 	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "rendered config", dumpConfig(cfg))
 	if r.currentConfig != nil && reflect.DeepEqual(r.currentConfig, cfg) {
 		level.Debug(r.Logger).Log("controller", "ConfigReconciler", "event", "configuration did not change, ignoring")
@@ -176,7 +190,7 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	p := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			return filterNodeEvent(e) && filterNamespaceEvent(e)
+			return filterNodeEvent(e) && filterNamespaceEvent(e) && filterConfigmapEvent(e)
 		},
 	}
 	return ctrl.NewControllerManagedBy(mgr).
@@ -190,6 +204,7 @@ func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&source.Kind{Type: &metallbv1beta1.Community{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForObject{}).
 		Watches(&source.Kind{Type: &corev1.Namespace{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForObject{}).
 		WithEventFilter(p).
 		Complete(r)
 }
@@ -220,6 +235,17 @@ func filterNamespaceEvent(e event.UpdateEvent) bool {
 	}
 	// If there is no changes in namespace labels, ignore event.
 	if labels.Equals(labels.Set(oldNamespaceObj.Labels), labels.Set(newNamespaceObj.Labels)) {
+		return false
+	}
+	return true
+}
+
+func filterConfigmapEvent(e event.UpdateEvent) bool {
+	cm, ok := e.ObjectNew.(*corev1.ConfigMap)
+	if !ok {
+		return true
+	}
+	if cm.Name != bgpExtrasConfigName {
 		return false
 	}
 	return true
