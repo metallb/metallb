@@ -1,3 +1,6 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
 resources:
 - manifests.yaml
 - service.yaml
@@ -6,9 +9,9 @@ resources:
 configurations:
 - kustomizeconfig.yaml
 
-patchesJson6902:
+patches:
 - path: patches/patch_webhook_configuration.yaml
   target:
-    version: v1
     kind: ValidatingWebhookConfiguration
     name: validating-webhook-configuration
+    version: v1
