@@ -78,6 +78,8 @@ jobs:
           inv verifylicense
           inv gomodtidy
           inv checkchanges --action="run inv gomodtidy"
+          inv golist
+          inv checkchanges --action="run inv golist"
           inv generatemanifests
           inv checkchanges --action="run inv generatemanifests"
           inv generateapidocs

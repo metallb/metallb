@@ -891,6 +891,13 @@ def gomodtidy(ctx):
         raise Exit(message="go mod tidy failed")
 
 @task
+def golist(ctx):
+    """Runs go list"""
+    res = run("go list -modfile=go.mod -m -mod=mod all", hide="out")
+    if not res.ok:
+        raise Exit(message="go list -modfile=go.mod -m -mod=mod all failed")
+
+@task
 def generatemanifests(ctx):
     """ Re-generates the all-in-one manifests under config/manifests"""
     generate_manifest(ctx, bgp_type="frr", output="config/manifests/metallb-frr.yaml")
