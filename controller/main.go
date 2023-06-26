@@ -81,6 +81,11 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		syncStateRes = controllers.SyncStateErrorNoRetry
 	}
 
+	if reflect.DeepEqual(svcRo, svc) {
+		level.Debug(l).Log("event", "noChange", "msg", "service converged, no change")
+		return syncStateRes
+	}
+
 	if len(prevIPs) != 0 && !c.isServiceAllocated(name) {
 		// Only reprocess all if the previous IP(s) are still contained within a pool.
 		if c.ips.PoolForIP(prevIPs) != nil {
@@ -90,10 +95,6 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 			level.Info(l).Log("event", "serviceUpdated", "msg", "removed loadbalancer from service, services will be reprocessed")
 			syncStateRes = controllers.SyncStateReprocessAll
 		}
-	}
-	if reflect.DeepEqual(svcRo, svc) {
-		level.Debug(l).Log("event", "noChange", "msg", "service converged, no change")
-		return syncStateRes
 	}
 
 	toWrite := svcRo.DeepCopy()
