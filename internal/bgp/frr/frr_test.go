@@ -5,6 +5,7 @@ package frr
 import (
 	"flag"
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
 	"os/exec"
@@ -81,6 +82,11 @@ func testSetup(t *testing.T) {
 }
 
 func testCheckConfigFile(t *testing.T) {
+	validateGoldenFile(t)
+	validateAgainstFRR(t)
+}
+
+func validateGoldenFile(t *testing.T) {
 	configFile, goldenFile := testGenerateFileNames(t)
 
 	if *update {
@@ -88,7 +94,10 @@ func testCheckConfigFile(t *testing.T) {
 	}
 
 	testCompareFiles(t, configFile, goldenFile)
+}
 
+func validateAgainstFRR(t *testing.T) {
+	configFile, _ := testGenerateFileNames(t)
 	if !strings.Contains(configFile, "Invalid") {
 		err := testFileIsValid(configFile)
 		if err != nil {
@@ -820,75 +829,97 @@ func TestTwoAdvertisementsTwoSessions(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
 	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254:179",
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer"})
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session.Close()
 
-	session1, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.255:179",
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer1"})
-	if err != nil {
-		t.Fatalf("Could not create session: %s", err)
-	}
-	defer session1.Close()
+	for i := 0; i < 100; i++ {
+		func() {
+			sessionsParameters := []bgp.SessionParameters{
+				{
+					PeerAddress:   "10.2.2.254:179",
+					SourceAddress: net.ParseIP("10.1.1.254"),
+					MyASN:         100,
+					RouterID:      net.ParseIP("10.1.1.254"),
+					PeerASN:       200,
+					HoldTime:      time.Second,
+					KeepAliveTime: time.Second,
+					Password:      "password",
+					CurrentNode:   "hostname",
+					EBGPMultiHop:  true,
+					SessionName:   "test-peer"},
+				{
+					PeerAddress:   "10.2.2.255:179",
+					SourceAddress: net.ParseIP("10.1.1.254"),
+					MyASN:         100,
+					RouterID:      net.ParseIP("10.1.1.254"),
+					PeerASN:       200,
+					HoldTime:      time.Second,
+					KeepAliveTime: time.Second,
+					Password:      "password",
+					CurrentNode:   "hostname",
+					EBGPMultiHop:  true,
+					SessionName:   "test-peer1"},
+			}
+			seed := time.Now().UnixNano()
+			rand.Seed(seed)
 
-	prefix1 := &net.IPNet{
-		IP:   net.ParseIP("172.16.1.10"),
-		Mask: classCMask,
-	}
-	communities := []community.BGPCommunity{}
-	community, _ := community.New("1111:2222")
-	communities = append(communities, community)
-	adv1 := &bgp.Advertisement{
-		Prefix:      prefix1,
-		Communities: communities,
-	}
+			rand.Shuffle(len(sessionsParameters), func(i, j int) {
+				sessionsParameters[i], sessionsParameters[j] = sessionsParameters[j], sessionsParameters[i]
+			})
 
-	prefix2 := &net.IPNet{
-		IP:   net.ParseIP("172.16.1.11"),
-		Mask: classCMask,
-	}
+			session, err := sessionManager.NewSession(l, sessionsParameters[0])
+			if err != nil {
+				t.Fatalf("Could not create session: %s", err)
+			}
+			defer session.Close()
 
-	adv2 := &bgp.Advertisement{
-		Prefix:      prefix2,
-		Communities: communities,
-		LocalPref:   2,
-	}
+			session1, err := sessionManager.NewSession(l, sessionsParameters[1])
+			if err != nil {
+				t.Fatalf("Could not create session: %s", err)
+			}
+			defer session1.Close()
 
-	err = session.Set(adv1, adv2)
-	if err != nil {
-		t.Fatalf("Could not advertise prefix: %s", err)
-	}
-	err = session1.Set(adv1, adv2)
-	if err != nil {
-		t.Fatalf("Could not advertise prefix: %s", err)
-	}
+			prefix1 := &net.IPNet{
+				IP:   net.ParseIP("172.16.1.10"),
+				Mask: classCMask,
+			}
+			communities := []community.BGPCommunity{}
+			community, _ := community.New("1111:2222")
+			communities = append(communities, community)
+			adv1 := &bgp.Advertisement{
+				Prefix:      prefix1,
+				Communities: communities,
+			}
 
-	testCheckConfigFile(t)
+			prefix2 := &net.IPNet{
+				IP:   net.ParseIP("172.16.1.11"),
+				Mask: classCMask,
+			}
+
+			adv2 := &bgp.Advertisement{
+				Prefix:      prefix2,
+				Communities: communities,
+				LocalPref:   2,
+			}
+			advs := []*bgp.Advertisement{adv1, adv2}
+			rand.Shuffle(len(advs), func(i, j int) {
+				advs[i], advs[j] = advs[j], advs[i]
+			})
+			err = session.Set(advs[0], advs[1])
+			if err != nil {
+				t.Fatalf("Could not advertise prefix: %s", err)
+			}
+
+			rand.Shuffle(len(advs), func(i, j int) {
+				advs[i], advs[j] = advs[j], advs[i]
+			})
+			err = session1.Set(advs[0], advs[1])
+			if err != nil {
+				t.Fatalf("Could not advertise prefix: %s", err)
+			}
+
+			validateGoldenFile(t)
+		}()
+	}
+	validateAgainstFRR(t)
 }
 
 func TestTwoAdvertisementsTwoSessionsOneWithPeerSelector(t *testing.T) {
