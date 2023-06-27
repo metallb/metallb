@@ -32,7 +32,7 @@ func Handler(frrCli vtysh.Cli, logger log.Logger) http.Handler {
 			delete(expected, d)
 		}
 		if len(expected) > 0 {
-			logger.Log("daemons not running. got: ", res, "missing: ", res)
+			logger.Log("daemons not running. got: ", res, "missing: ", expected)
 			http.NotFound(w, r)
 		}
 	})
