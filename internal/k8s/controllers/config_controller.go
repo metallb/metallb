@@ -142,7 +142,7 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 
 	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources))
 
-	cfg, err := config.For(resources, r.ValidateConfig)
+	cfg, err := toConfig(resources, r.ValidateConfig)
 	if err != nil {
 		configStale.Set(1)
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to parse the configuration", "error", err)
