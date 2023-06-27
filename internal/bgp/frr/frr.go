@@ -293,7 +293,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			advConfig := advertisementConfig{
 				IPFamily:    family,
 				Prefix:      prefix,
-				Communities: communities,
+				Communities: sort.StringSlice(communities),
 				LocalPref:   adv.LocalPref,
 			}
 
@@ -305,6 +305,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				rout.ipV6Prefixes[prefix] = prefix
 			}
 		}
+		sortAdvertiesements(neighbor.Advertisements)
 	}
 
 	for _, r := range sortMap(routers) {
@@ -431,4 +432,36 @@ func sortMap[T any](toSort map[string]T) []T {
 		res = append(res, toSort[k])
 	}
 	return res
+}
+
+func sortAdvertiesements(toSort []*advertisementConfig) {
+	sort.Slice(toSort, func(i, j int) bool {
+		if toSort[i].IPFamily != toSort[j].IPFamily {
+			return toSort[i].IPFamily < toSort[j].IPFamily
+		}
+		if toSort[i].Prefix != toSort[j].Prefix {
+			return toSort[i].Prefix < toSort[j].Prefix
+		}
+		if toSort[i].LocalPref != toSort[j].LocalPref {
+			return toSort[i].LocalPref < toSort[j].LocalPref
+		}
+		if len(toSort[i].Communities) != len(toSort[j].Communities) {
+			return len(toSort[i].Communities) < len(toSort[j].Communities)
+		}
+		for k := range toSort[i].Communities {
+			if toSort[i].Communities[k] != toSort[j].Communities[k] {
+				return toSort[i].Communities[k] < toSort[j].Communities[k]
+			}
+		}
+		if len(toSort[i].LargeCommunities) != len(toSort[j].LargeCommunities) {
+			return len(toSort[i].LargeCommunities) < len(toSort[j].LargeCommunities)
+		}
+
+		for k := range toSort[i].LargeCommunities {
+			if toSort[i].LargeCommunities[k] != toSort[j].LargeCommunities[k] {
+				return toSort[i].LargeCommunities[k] < toSort[j].LargeCommunities[k]
+			}
+		}
+		return false
+	})
 }
