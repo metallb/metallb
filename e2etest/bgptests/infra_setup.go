@@ -52,6 +52,13 @@ var (
 	}
 )
 
+type HostBGPMode string
+
+const (
+	EBGPMode HostBGPMode = "ebgp"
+	IBGPMode HostBGPMode = "ibgp"
+)
+
 func init() {
 	if ip := os.Getenv("PROVISIONING_HOST_EXTERNAL_IPV4"); len(ip) != 0 {
 		hostIPv4 = ip
@@ -98,8 +105,8 @@ func ExternalContainersSetup(externalContainers string, cs *clientset.Clientset)
 	return res, nil
 }
 
-func HostContainerSetup(image string) ([]*frrcontainer.FRR, error) {
-	config := hostnetContainerConfig(image)
+func HostContainerSetup(image string, bgpMode HostBGPMode) ([]*frrcontainer.FRR, error) {
+	config := hostnetContainerConfig(image, bgpMode)
 	res, err := frrcontainer.Create(config)
 	if err != nil {
 		return nil, err
@@ -336,26 +343,49 @@ func externalContainersConfigs() map[string]frrcontainer.Config {
 	return res
 }
 
-func hostnetContainerConfig(image string) map[string]frrcontainer.Config {
-	res := make(map[string]frrcontainer.Config)
-	res["ibgp-single-hop"] = frrcontainer.Config{
-		Name:  "ibgp-single-hop",
-		Image: image,
-		Neighbor: frrconfig.NeighborConfig{
-			ASN:      metalLBASN,
-			Password: "ibgp-test",
-			MultiHop: false,
-		},
-		Router: frrconfig.RouterConfig{
-			ASN:      metalLBASN,
-			BGPPort:  179,
-			Password: "ibgp-test",
-		},
-		Network:  "host",
-		HostIPv4: hostIPv4,
-		HostIPv6: hostIPv6,
+func hostnetContainerConfig(image string, bgpMode HostBGPMode) map[string]frrcontainer.Config {
+	switch bgpMode {
+	case IBGPMode:
+		return map[string]frrcontainer.Config{
+			"ibgp-single-hop": {
+				Name:  "ibgp-single-hop",
+				Image: image,
+				Neighbor: frrconfig.NeighborConfig{
+					ASN:      metalLBASN,
+					Password: "ibgp-test",
+					MultiHop: false,
+				},
+				Router: frrconfig.RouterConfig{
+					ASN:      metalLBASN,
+					BGPPort:  179,
+					Password: "ibgp-test",
+				},
+				Network:  "host",
+				HostIPv4: hostIPv4,
+				HostIPv6: hostIPv6,
+			},
+		}
+	case EBGPMode:
+		return map[string]frrcontainer.Config{
+			"ebgp-single-hop": {
+				Name:  "ebgp-single-hop",
+				Image: image,
+				Neighbor: frrconfig.NeighborConfig{
+					ASN:      metalLBASN,
+					MultiHop: false,
+				},
+				Router: frrconfig.RouterConfig{
+					ASN:     externalASN,
+					BGPPort: 179,
+				},
+				Network:  "host",
+				HostIPv4: hostIPv4,
+				HostIPv6: hostIPv6,
+			},
+		}
+	default:
+		return nil
 	}
-	return res
 }
 
 func frrContainersConfigs(image string) map[string]frrcontainer.Config {
