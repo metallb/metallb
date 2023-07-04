@@ -56,6 +56,7 @@ var (
 	runOnHost           bool
 	bgpNativeMode       bool
 	frrImage            string
+	hostContainerMode   string
 )
 
 // handleFlags sets up all flags and parses the command line.
@@ -84,6 +85,7 @@ func handleFlags() {
 	flag.StringVar(&externalContainers, "external-containers", "", "a comma separated list of external containers names to use for the test. (valid parameters are: ibgp-single-hop / ibgp-multi-hop / ebgp-single-hop / ebgp-multi-hop)")
 	flag.BoolVar(&bgpNativeMode, "bgp-native-mode", false, "says if we are testing against a deployment using bgp native mode")
 	flag.StringVar(&frrImage, "frr-image", "quay.io/frrouting/frr:8.4.2", "the image to use for the external frr containers")
+	flag.StringVar(&hostContainerMode, "host-bgp-mode", string(bgptests.IBGPMode), "tells whether to run the host container in ebgp or ibgp mode")
 
 	flag.Parse()
 
@@ -133,7 +135,11 @@ var _ = ginkgo.BeforeSuite(func() {
 		bgptests.FRRContainers, err = bgptests.ExternalContainersSetup(externalContainers, cs)
 		framework.ExpectNoError(err)
 	case runOnHost:
-		bgptests.FRRContainers, err = bgptests.HostContainerSetup(frrImage)
+		hostBGPMode := bgptests.HostBGPMode(hostContainerMode)
+		if hostBGPMode != bgptests.EBGPMode && hostBGPMode != bgptests.IBGPMode {
+			panic("host bgpmode " + hostContainerMode + " not supported")
+		}
+		bgptests.FRRContainers, err = bgptests.HostContainerSetup(frrImage, hostBGPMode)
 		framework.ExpectNoError(err)
 	default:
 		bgptests.FRRContainers, err = bgptests.KindnetContainersSetup(cs, frrImage)
