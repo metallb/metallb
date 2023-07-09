@@ -7,7 +7,6 @@ import (
 
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
-	"go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
@@ -15,8 +14,22 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+type Resources struct {
+	Pools              []metallbv1beta1.IPAddressPool    `json:"ipaddresspools"`
+	Peers              []metallbv1beta2.BGPPeer          `json:"bgppeers"`
+	BFDProfiles        []metallbv1beta1.BFDProfile       `json:"bfdprofiles"`
+	BGPAdvs            []metallbv1beta1.BGPAdvertisement `json:"bgpadvertisements"`
+	L2Advs             []metallbv1beta1.L2Advertisement  `json:"l2advertisements"`
+	LegacyAddressPools []metallbv1beta1.AddressPool      `json:"legacyaddresspools"`
+	Communities        []metallbv1beta1.Community        `json:"communities"`
+	PasswordSecrets    map[string]corev1.Secret          `json:"passwordsecrets"`
+	Nodes              []corev1.Node                     `json:"nodes"`
+	Namespaces         []corev1.Namespace                `json:"namespaces"`
+	BGPExtras          corev1.ConfigMap                  `json:"bgpextras"`
+}
+
 type Updater interface {
-	Update(r config.ClusterResources) error
+	Update(r Resources) error
 	Clean() error
 	Client() client.Client
 	Namespace() string
@@ -56,7 +69,7 @@ func UpdaterForCRs(r *rest.Config, ns string) (Updater, error) {
 	}, nil
 }
 
-func (o beta1Updater) Update(r config.ClusterResources) error {
+func (o beta1Updater) Update(r Resources) error {
 	// we fill a map of objects to keep the order we add the resources random, as
 	// it would happen by throwing a set of manifests against a cluster, hoping to
 	// find corner cases that we would not find by adding them always in the same

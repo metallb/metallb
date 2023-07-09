@@ -75,7 +75,10 @@ func (sm *sessionManager) NewSession(l log.Logger, args bgp.SessionParameters) (
 }
 
 func (sm *sessionManager) SyncBFDProfiles(profiles map[string]*config.BFDProfile) error {
-	return errors.New("bfd profiles not supported in native mode")
+	if len(profiles) > 0 {
+		return errors.New("bfd profiles not supported in native mode")
+	}
+	return nil
 }
 
 func (sm *sessionManager) SyncExtraInfo(extras string) error {

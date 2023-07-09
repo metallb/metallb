@@ -73,7 +73,7 @@ func (a *Announce) updateInterfaces() {
 		ifi := intf
 
 		if (a.excludeRegexp != nil) && a.excludeRegexp.MatchString(ifi.Name) {
-			level.Info(a.logger).Log("event", "announced interface to exclude", "interface", ifi.Name)
+			level.Debug(a.logger).Log("event", "announced interface to exclude", "interface", ifi.Name)
 			continue
 		}
 

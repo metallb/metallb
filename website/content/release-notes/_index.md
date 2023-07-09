@@ -2,6 +2,28 @@
 title: Release Notes
 weight: 8
 ---
+## Version 0.13.10
+
+New Features:
+
+- Bumped the FRR version used by MetalLB to 8.4.2 ([PR 1829](https://github.com/metallb/metallb/pull/1829))
+- Charts: enable additional controller / speaker labels ([PR 1797](https://github.com/metallb/metallb/pull/1797))
+- l2: exclude common virtual interfaces for announce services ([PR 1767](https://github.com/metallb/metallb/pull/1767))
+- FRR Mode: provide a way to append a piece of configuration ([PR 1863](https://github.com/metallb/metallb/pull/1863))
+- Local Preference validation across multiple advertisements ([PR 1820](https://github.com/metallb/metallb/pull/1820))
+- Charts: support rbacproxy custom pull policy ([PR 1851](https://github.com/metallb/metallb/pull/1851))
+- Add support for large communities ([PR 1898](https://github.com/metallb/metallb/pull/1898))
+- Optimization: on service delete reprocess the services only if the service had an IP assigned ([PR 1945](https://github.com/metallb/metallb/pull/1945))
+- Make the FRR mode the default one when deploying via charts ([PR 1931](https://github.com/metallb/metallb/pull/1931))
+
+Bug Fixes:
+
+- Charts: remove duplicate relabings and metricRelabelings for speaker ([PR 18030](https://github.com/metallb/metallb/pull/1830))
+- Respect NodeNetworkUnavailable ([PR 1759](https://github.com/metallb/metallb/pull/1759))
+- Verify LB ip and address pool annotations compatibility ([PR 1920](https://github.com/metallb/metallb/pull/1920))
+
+This release includes contributions from Andreas Karis, Chok Yip Lau, Chris Privitere, conblem, cyclinder, dependabot[bot], DerFels, Federico Paolinelli, Fish-pro, Guillaume SMAHA, liornoy, Marcelo Guerrero Viveros, Mathew Peterson, Periyasamy Palanisamy, Tobias Klauser, xin.li, yulng. Thank you!
+
 ## Version 0.13.9
 
 New Features:

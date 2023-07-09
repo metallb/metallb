@@ -5,7 +5,7 @@ package service
 import (
 	"fmt"
 
-	"go.universe.tf/metallb/e2etest/pkg/executor"
+	"go.universe.tf/e2etest/pkg/executor"
 )
 
 // Relies on the endpoint being an agnhost netexec pod.

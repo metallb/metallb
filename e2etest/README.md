@@ -24,6 +24,11 @@ Run only L2 test suite:
 inv e2etest --focus L2
 ```
 
+Run with additional ginkgo parameters for example:
+```
+inv e2etest --ginkgo-params="--until-it-fails -v"
+```
+
 The test suite will run the appropriate tests against the cluster.
 Be sure to cleanup any previously created development clusters using `inv dev-env-cleanup`.
 
