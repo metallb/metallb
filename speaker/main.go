@@ -275,6 +275,15 @@ func newController(cfg controllerConfig) (*controller, error) {
 	return ret, nil
 }
 
+func (c *controller) anyPoolMissing(pools []string) bool {
+	for _, pool := range pools {
+		if c.config.Pools.ByName[pool] == nil {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps epslices.EpsOrSlices) controllers.SyncState {
 	if svc == nil {
 		return c.deleteBalancer(l, name, "serviceDeleted")
@@ -308,18 +317,21 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 
 	l = log.With(l, "ips", lbIPs)
 
-	poolName := poolFor(c.config.Pools, lbIPs)
-	if poolName == "" {
+	groups := poolGroups(c.config.Pools, lbIPs)
+	if len(groups) == 0 {
 		level.Error(l).Log("op", "setBalancer", "error", "assigned IP not allowed by config", "msg", "IP allocated by controller not allowed by config")
 		return c.deleteBalancer(l, name, "ipNotAllowed")
 	}
+	var poolNames []string
+	for name := range groups {
+		poolNames = append(poolNames, name)
+	}
 
-	l = log.With(l, "pool", poolName)
-	if c.config.Pools == nil || c.config.Pools.ByName[poolName] == nil {
+	l = log.With(l, "pools", strings.Join(poolNames, ","))
+	if c.config.Pools == nil || c.anyPoolMissing(poolNames) {
 		level.Error(l).Log("bug", "true", "msg", "internal error: allocated IP has no matching address pool")
 		return c.deleteBalancer(l, name, "internalError")
 	}
-	pool := c.config.Pools.ByName[poolName]
 
 	if svcIPs, ok := c.svcIPs[name]; ok && !compareIPs(lbIPs, svcIPs) {
 		if st := c.deleteBalancer(l, name, "loadBalancerIPChanged"); st == controllers.SyncStateError {
@@ -327,9 +339,12 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 		}
 	}
 
-	for _, protocol := range c.protocols {
-		if st := c.handleService(l, name, lbIPs, svc, pool, eps, protocol); st == controllers.SyncStateError {
-			return st
+	for poolName, ips := range groups {
+		pool := c.config.Pools.ByName[poolName]
+		for _, protocol := range c.protocols {
+			if st := c.handleService(l, name, ips, svc, pool, eps, protocol); st == controllers.SyncStateError {
+				return st
+			}
 		}
 	}
 
@@ -421,25 +436,29 @@ func (c *controller) deleteBalancerProtocol(l log.Logger, protocol config.Proto,
 	return controllers.SyncStateSuccess
 }
 
-func poolFor(pools *config.Pools, ips []net.IP) string {
+func poolGroups(pools *config.Pools, ips []net.IP) map[string][]net.IP {
 	if pools == nil {
-		return ""
+		return nil
 	}
-	for pname, p := range pools.ByName {
-		cnt := 0
-		for _, ip := range ips {
-			for _, cidr := range p.CIDR {
-				if cidr.Contains(ip) {
-					cnt++
-					break
+	out := make(map[string][]net.IP)
+	for _, ip := range ips {
+		p := func() *config.Pool {
+			for _, p := range pools.ByName {
+				for _, cidr := range p.CIDR {
+					if cidr.Contains(ip) {
+						return p
+					}
 				}
 			}
-			if cnt == len(ips) {
-				return pname
-			}
+			return nil
+		}()
+		if p != nil {
+			out[p.Name] = append(out[p.Name], ip)
+		} else {
+			return nil
 		}
 	}
-	return ""
+	return out
 }
 
 func compareIPs(ips1, ips2 []net.IP) bool {
@@ -493,7 +512,7 @@ func (c *controller) SetConfig(l log.Logger, cfg *config.Config) controllers.Syn
 	}
 
 	for svc, ip := range c.svcIPs {
-		if pool := poolFor(cfg.Pools, ip); pool == "" {
+		if pool := poolGroups(cfg.Pools, ip); len(pool) == 0 {
 			level.Error(l).Log("op", "setConfig", "service", svc, "ip", ip, "error", "service has no configuration under new config", "msg", "new configuration rejected")
 			return controllers.SyncStateError
 		}

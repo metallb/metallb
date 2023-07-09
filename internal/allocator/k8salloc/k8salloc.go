@@ -28,6 +28,9 @@ func SharingKey(svc *v1.Service) string {
 // BackendKey extracts the backend key for a service.
 func BackendKey(svc *v1.Service) string {
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
+		if svc.Annotations["metallb.universe.tf/enforced-single-node"] == "yes" {
+			return ""
+		}
 		return labels.Set(svc.Spec.Selector).String()
 	}
 	// Cluster traffic policy can share services regardless of backends.

@@ -626,7 +626,7 @@ func TestAssignment(t *testing.T) {
 			t.Fatalf("invalid IPs %q in test %q", ips, test.desc)
 		}
 		alreadyHasIPs := reflect.DeepEqual(assigned(alloc, test.svcKey), test.ips)
-		err := alloc.Assign(test.svcKey, test.svc, ips, test.ports, test.sharingKey, test.backendKey)
+		err := alloc.Assign(test.svcKey, test.svc, ConvertIpsToAddrs(ips), test.ports, test.sharingKey, test.backendKey)
 		if test.wantErr {
 			if err == nil {
 				t.Errorf("%q should have caused an error, but did not", test.desc)
@@ -1560,10 +1560,10 @@ func TestConfigReload(t *testing.T) {
 	}}); err != nil {
 		t.Fatalf("SetPools: %s", err)
 	}
-	if err := alloc.Assign("s1", svc, []net.IP{net.ParseIP("1.2.3.0")}, nil, "", ""); err != nil {
+	if err := alloc.Assign("s1", svc, ConvertIpsToAddrs([]net.IP{net.ParseIP("1.2.3.0")}), nil, "", ""); err != nil {
 		t.Fatalf("Assign(s1, 1.2.3.0): %s", err)
 	}
-	if err := alloc.Assign("s2", svc, []net.IP{net.ParseIP("1000::")}, nil, "", ""); err != nil {
+	if err := alloc.Assign("s2", svc, ConvertIpsToAddrs([]net.IP{net.ParseIP("1000::")}), nil, "", ""); err != nil {
 		t.Fatalf("Assign(s2, 1000::): %s", err)
 	}
 	tests := []struct {
@@ -1731,8 +1731,8 @@ func TestConfigReload(t *testing.T) {
 		} else if err != nil {
 			t.Errorf("%q failed to SetPools: %s", test.desc, err)
 		}
-		gotPool := alloc.Pool("s1")
-		if gotPool != test.pool {
+		gotPool := alloc.PoolsUnique("s1")
+		if !reflect.DeepEqual(gotPool, []string{test.pool}) {
 			t.Errorf("%q: s1 is in wrong pool, want %q, got %q", test.desc, test.pool, gotPool)
 		}
 	}
@@ -2111,7 +2111,7 @@ func TestPoolMetrics(t *testing.T) {
 		if len(ips) == 0 {
 			t.Fatalf("invalid IP %q in test %q", test.ips, test.desc)
 		}
-		err := alloc.Assign(test.svcKey, test.svc, ips, test.ports, test.sharingKey, test.backendKey)
+		err := alloc.Assign(test.svcKey, test.svc, ConvertIpsToAddrs(ips), test.ports, test.sharingKey, test.backendKey)
 		if err != nil {
 			t.Errorf("%q: Assign(%q, %q): %v", test.desc, test.svcKey, test.ips, err)
 		}
@@ -2130,10 +2130,7 @@ func TestPoolMetrics(t *testing.T) {
 func assigned(a *Allocator, svc string) []string {
 	res := []string{}
 	if alloc := a.allocated[svc]; alloc != nil {
-		for _, ip := range alloc.ips {
-			if ip == nil {
-				return nil
-			}
+		for _, ip := range alloc.ips() {
 			res = append(res, ip.String())
 		}
 	}

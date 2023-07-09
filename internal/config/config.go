@@ -208,6 +208,15 @@ func (p *Pools) IsEmpty(pool string) bool {
 	return p.ByName[pool] == nil
 }
 
+func (p *Pools) IsAnyEmpty(pools []string) bool {
+	for _, pool := range pools {
+		if p.IsEmpty(pool) {
+			return true
+		}
+	}
+	return false
+}
+
 // Parse loads and validates a Config from bs.
 func For(resources ClusterResources, validate Validate) (*Config, error) {
 	err := validate(resources)

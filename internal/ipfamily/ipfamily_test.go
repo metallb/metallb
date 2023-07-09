@@ -25,15 +25,15 @@ func TestIPFamilyForAddresses(t *testing.T) {
 			family: IPv6,
 		},
 		{
-			desc:   "ipv4 and ipv6 addresse",
+			desc:   "ipv4 and ipv6 address",
 			ips:    []string{"1.2.3.4", "100::1"},
 			family: DualStack,
 		},
 		{
 			desc:    "dual stack with same address family",
 			ips:     []string{"1.2.3.4", "5.6.7.8"},
-			family:  Unknown,
-			wantErr: true,
+			family:  IPv4,
+			wantErr: false,
 		},
 		{
 			desc:    "dual stack with empty address",
@@ -42,10 +42,16 @@ func TestIPFamilyForAddresses(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			desc:    "more than 2 addresses",
-			ips:     []string{"1.1.1.1", "100::1", "2.2.2.2"},
+			desc:    "invalid address",
+			ips:     []string{"example.com"},
 			family:  Unknown,
 			wantErr: true,
+		},
+		{
+			desc:    "more than 2 addresses",
+			ips:     []string{"1.1.1.1", "100::1", "2.2.2.2"},
+			family:  DualStack,
+			wantErr: false,
 		},
 	}
 

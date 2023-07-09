@@ -25,6 +25,7 @@ import (
 	"github.com/go-kit/log/level"
 	v1 "k8s.io/api/core/v1"
 
+	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/allocator/k8salloc"
 	"go.universe.tf/metallb/internal/ipfamily"
 )
@@ -96,7 +97,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	if len(lbIPs) != 0 {
 		// This assign is idempotent if the config is consistent,
 		// otherwise it'll fail and tell us why.
-		if err = c.ips.Assign(key, svc, lbIPs, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
+		if err = c.ips.Assign(key, svc, allocator.ConvertIpsToAddrs(lbIPs), k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 			level.Info(l).Log("event", "clearAssignment", "error", err, "msg", "current IP not allowed by config, clearing")
 			c.client.Infof(svc, "ClearAssignment", "current IP for %q not allowed by config, will attempt for new IP assignment: %s", key, err)
 			c.clearServiceState(key, svc)
@@ -107,7 +108,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		// requested a different pool than the one that is currently
 		// allocated.
 		desiredPool := svc.Annotations[annotationAddressPool]
-		if len(lbIPs) != 0 && desiredPool != "" && c.ips.Pool(key) != desiredPool {
+		if len(lbIPs) != 0 && desiredPool != "" && !reflect.DeepEqual(c.ips.PoolsUnique(key), []string{desiredPool}) {
 			level.Info(l).Log("event", "clearAssignment", "reason", "differentPoolRequested", "msg", "user requested a different pool than the one currently assigned")
 			c.clearServiceState(key, svc)
 			lbIPs = []net.IP{}
@@ -150,8 +151,8 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		return ErrConverge
 	}
 
-	pool := c.ips.Pool(key)
-	if pool == "" || c.pools == nil || c.pools.IsEmpty(pool) {
+	pools := c.ips.PoolsUnique(key)
+	if len(pools) == 0 || c.pools == nil || c.pools.IsAnyEmpty(pools) {
 		level.Error(l).Log("bug", "true", "ip", lbIPs, "msg", "internal error: allocated IP has no matching address pool")
 		c.client.Errorf(svc, "InternalError", "allocated an IP that has no pool")
 		c.clearServiceState(key, svc)
@@ -168,7 +169,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	if svc.Annotations == nil {
 		svc.Annotations = make(map[string]string)
 	}
-	svc.Annotations[annotationIPAllocateFromPool] = pool
+	svc.Annotations[annotationIPAllocateFromPool] = strings.Join(pools, ",")
 
 	return nil
 }
@@ -204,12 +205,12 @@ func (c *controller) allocateIPs(key string, svc *v1.Service) ([]net.IP, error) 
 		if serviceIPFamily != desiredLbIPFamily {
 			return nil, fmt.Errorf("requested loadBalancer IP(s) %q does not match the ipFamily of the service", desiredLbIPs)
 		}
-		if err := c.ips.Assign(key, svc, desiredLbIPs, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
+		if err := c.ips.Assign(key, svc, allocator.ConvertIpsToAddrs(desiredLbIPs), k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 			return nil, err
 		}
 
 		// Verify that ip and address pool annotations are compatible.
-		if desiredPool != "" && c.ips.Pool(key) != desiredPool {
+		if desiredPool != "" && !reflect.DeepEqual(c.ips.PoolsUnique(key), []string{desiredPool}) {
 			c.ips.Unassign(key)
 			return nil, fmt.Errorf("requested loadBalancer IP(s) %q is not compatible with requested address pool %s", desiredLbIPs, desiredPool)
 		}
@@ -231,7 +232,8 @@ func (c *controller) allocateIPs(key string, svc *v1.Service) ([]net.IP, error) 
 }
 
 func (c *controller) isServiceAllocated(key string) bool {
-	return c.ips.Pool(key) != ""
+	pools := c.ips.Pools(key)
+	return pools != nil && len(*pools) > 0
 }
 
 func getDesiredLbIPs(svc *v1.Service) ([]net.IP, ipfamily.Family, error) {

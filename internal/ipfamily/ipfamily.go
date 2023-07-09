@@ -5,6 +5,7 @@ package ipfamily // import "go.universe.tf/metallb/internal/ipfamily"
 import (
 	"fmt"
 	"net"
+	"net/netip"
 
 	v1 "k8s.io/api/core/v1"
 )
@@ -25,26 +26,54 @@ const (
 
 // ForAddresses returns the address family given list of addresses strings.
 func ForAddresses(ips []string) (Family, error) {
-	switch len(ips) {
-	case 1:
-		ip := net.ParseIP(ips[0])
-		if ip.To4() != nil {
-			return IPv4, nil
-		}
-		return IPv6, nil
-	case 2:
-		ip1 := net.ParseIP(ips[0])
-		ip2 := net.ParseIP(ips[1])
-		if ip1 == nil || ip2 == nil {
-			return Unknown, fmt.Errorf("IPFamilyForAddresses: Invalid address %q", ips)
-		}
-		if (ip1.To4() == nil) == (ip2.To4() == nil) {
-			return Unknown, fmt.Errorf("IPFamilyForAddresses: same address family %q", ips)
-		}
-		return DualStack, nil
-	default:
-		return Unknown, fmt.Errorf("IPFamilyForAddresses: invalid ips length %d %q", len(ips), ips)
+	if len(ips) == 0 {
+		return Unknown, fmt.Errorf("IPFamilyForAddresses: no ips specified %d %q", len(ips), ips)
 	}
+	out := Unknown
+	for _, ip := range ips {
+		parsed := net.ParseIP(ip)
+		if parsed.To4() != nil {
+			if out == Unknown {
+				out = IPv4
+			} else if out == IPv6 {
+				return DualStack, nil
+			}
+		} else if parsed != nil {
+			if out == Unknown {
+				out = IPv6
+			} else if out == IPv4 {
+				return DualStack, nil
+			}
+		} else {
+			return Unknown, fmt.Errorf("IPFamilyForAddresses: Invalid address %q", ip)
+		}
+	}
+	return out, nil
+}
+
+func ForAddrs(ips []netip.Addr) (Family, error) {
+	if len(ips) == 0 {
+		return Unknown, fmt.Errorf("IPFamilyForAddrs: no ips specified %d %q", len(ips), ips)
+	}
+	out := Unknown
+	for _, ip := range ips {
+		if ip.Is4() || ip.Is4In6() {
+			if out == Unknown {
+				out = IPv4
+			} else if out == IPv6 {
+				return DualStack, nil
+			}
+		} else if ip.Is6() {
+			if out == Unknown {
+				out = IPv6
+			} else if out == IPv4 {
+				return DualStack, nil
+			}
+		} else {
+			return Unknown, fmt.Errorf("IPFamilyForAddrs: Invalid address %q", ip)
+		}
+	}
+	return out, nil
 }
 
 // ForAddressesIPs returns the address family from a given list of addresses IPs.
