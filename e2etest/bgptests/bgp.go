@@ -24,8 +24,6 @@ import (
 	"strings"
 	"time"
 
-	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
-	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/e2etest/l2tests"
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/executor"
@@ -33,6 +31,8 @@ import (
 	"go.universe.tf/e2etest/pkg/mac"
 	"go.universe.tf/e2etest/pkg/metallb"
 	"go.universe.tf/e2etest/pkg/pointer"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -1062,7 +1062,11 @@ var _ = ginkgo.Describe("BGP", func() {
 
 			for _, c := range FRRContainers {
 				err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily, func(frr *frrcontainer.FRR) {
-					frr.NeighborConfig.ToAdvertise = []string{toInject}
+					if pairingIPFamily == ipfamily.IPv4 {
+						frr.NeighborConfig.ToAdvertiseV4 = []string{toInject}
+					} else {
+						frr.NeighborConfig.ToAdvertiseV6 = []string{toInject}
+					}
 				})
 				framework.ExpectNoError(err)
 			}
@@ -1130,7 +1134,11 @@ var _ = ginkgo.Describe("BGP", func() {
 				err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily, func(frr *frrcontainer.FRR) {
 					// We advertise a different route for each different container, to ensure all
 					// of them are able to advertise regardless of the configuration
-					frr.NeighborConfig.ToAdvertise = []string{fmt.Sprintf(toInject, i+1), toFilter}
+					if pairingIPFamily == ipfamily.IPv4 {
+						frr.NeighborConfig.ToAdvertiseV4 = []string{fmt.Sprintf(toInject, i+1), toFilter}
+					} else {
+						frr.NeighborConfig.ToAdvertiseV6 = []string{fmt.Sprintf(toInject, i+1), toFilter}
+					}
 				})
 				framework.ExpectNoError(err)
 			}
