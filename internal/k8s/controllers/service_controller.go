@@ -47,6 +47,10 @@ type ServiceReconciler struct {
 	Endpoints         NeedEndPoints
 	LoadBalancerClass string
 	Reload            chan event.GenericEvent
+	// initialLoadPerformed is set after the first time we call reprocessAll.
+	// This is required because we want the first time we load the services to follow the assigned first, non assigned later order.
+	// This allows avoiding to have services with already assigned IP to get their IP stolen by other services.
+	initialLoadPerformed bool
 }
 
 func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
@@ -62,6 +66,11 @@ func (r *ServiceReconciler) reconcileService(ctx context.Context, req ctrl.Reque
 	updates.Inc()
 
 	var service *v1.Service
+
+	if !r.initialLoadPerformed {
+		level.Debug(r.Logger).Log("controller", "ServiceReconciler", "message", "filtered service, still waiting for the initial load to be performed")
+		return ctrl.Result{}, nil
+	}
 
 	service, err := r.serviceFor(ctx, req.NamespacedName)
 	if err != nil {
