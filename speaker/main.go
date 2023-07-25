@@ -68,6 +68,10 @@ type service interface {
 func main() {
 	prometheus.MustRegister(announcing)
 
+        logLevelDefault := os.Getenv("METALLB_SPEAKER_LOG_LEVEL")
+        if logLevelDefault == "" {
+                logLevelDefault = "info"
+        }
 	var (
 		namespace         = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
 		host              = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
@@ -77,7 +81,7 @@ func main() {
 		mlSecretKeyPath   = flag.String("ml-secret-key-path", os.Getenv("METALLB_ML_SECRET_KEY_PATH"), "Path to where the MembeList's secret key is mounted")
 		myNode            = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
 		port              = flag.Int("port", 7472, "HTTP listening port")
-		logLevel          = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
+		logLevel          = flag.String("log-level", logLevelDefault, fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
 		disableEpSlices   = flag.Bool("disable-epslices", false, "Disable the usage of EndpointSlices and default to Endpoints instead of relying on the autodiscovery mechanism")
 		enablePprof       = flag.Bool("enable-pprof", false, "Enable pprof profiling")
 		loadBalancerClass = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
