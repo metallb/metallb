@@ -53,7 +53,7 @@ to announce service IPs. Jump to:
 - [BGP configuration](#bgp-configuration)
 - [Advanced BGP configuration](./_advanced_bgp_configuration)
 - [Advanced L2 configuration](./_advanced_l2_configuration)
-- [Advanced IPAddressPool configuration](./_advanced_ipaddresspool_config/)
+- [Advanced IPAddressPool configuration](./_advanced_ipaddresspool_configuration)
 
 Note: it is possible to announce the same service both via L2 and via BGP (see the relative
 [FAQ](../faq/_index.md)).
