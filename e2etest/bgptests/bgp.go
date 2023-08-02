@@ -1235,6 +1235,9 @@ var _ = ginkgo.Describe("BGP", func() {
 			err := ConfigUpdater.Update(resources)
 			framework.ExpectNoError(err)
 
+			// Sleep to let the speaker time to reload the config and produce logs
+			time.Sleep(5 * time.Second)
+
 			speakerPods, err := metallb.SpeakerPods(cs)
 			framework.ExpectNoError(err)
 
