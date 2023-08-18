@@ -125,14 +125,14 @@ func (c *controller) SetPools(l log.Logger, pools *config.Pools) controllers.Syn
 	level.Debug(l).Log("event", "startUpdate", "msg", "start of config update")
 	defer level.Debug(l).Log("event", "endUpdate", "msg", "end of config update")
 
-	if pools == nil || pools.ByName == nil {
-		level.Error(l).Log("op", "setConfig", "error", "no MetalLB configuration in cluster", "msg", "configuration is missing, MetalLB will not function")
+	if pools == nil || len(pools.ByName) == 0 {
+		level.Error(l).Log("op", "setConfig", "error", fmt.Sprintf("%+v", pools), "msg", "configuration is missing, MetalLB will not function")
 		return controllers.SyncStateErrorNoRetry
 	}
 
 	c.ips.SetPools(pools)
 	c.pools = pools
-
+	level.Info(l).Log("op", "setConfig", "msg", "MetalLB configuration applied")
 	return controllers.SyncStateReprocessAll
 }
 
