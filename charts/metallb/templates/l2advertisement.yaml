@@ -1,0 +1,34 @@
+{{- if .Values.l2Advertisement }}
+---
+{{- range .Values.l2Advertisement }}
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: {{ template "metallb.fullname" $ }}-{{ .name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "metallb.labels" $ | nindent 4 }}
+spec:
+  {{- if .ipAddressPools }}
+  ipAddressPools:
+    {{- toYaml .ipAddressPools | nindent 4 }}
+  {{- end }}
+  {{- if .ipAddressPoolSelectors }}
+  ipAddressPoolSelectors:
+    {{- with .ipAddressPoolSelectors }}
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- end }}
+  {{- if .nodeSelectors }}
+  nodeSelectors:
+    {{- with .nodeSelectors }}
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- end }}
+  {{- if .interfaces }}
+  interfaces:
+    {{- toYaml .interfaces | nindent 4 }}
+  {{- end }}
+---
+{{- end }}
+{{- end }}

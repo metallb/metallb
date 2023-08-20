@@ -340,3 +340,26 @@ speaker:
 crds:
   enabled: true
   validationFailurePolicy: Fail
+
+# ipAddressPool to deploy with helm
+# https://metallb.org/apis/#metallb.io/v1beta1.IPAddressPool
+ipAddressPool: []
+#   - name: pool-name
+#     labels: {}                  # additionnal pool labels
+#     addresses: []
+#     autoAssign: true
+#     avoidBuggyIPs: false
+#     serviceAllocation:
+#       priority:
+#       namespaces: []
+#       namespaceSelectors: {}    # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta
+#       serviceSelectors: {}      # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta
+
+# l2Advertisement to deploy with helm
+# https://metallb.org/apis/#metallb.io/v1beta1.L2Advertisement
+l2Advertisement: []
+#   - name: advertisement-name
+#     ipAdressPools: []
+#     ipAddressPoolSelectors: {}  # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta
+#     nodeSelectors: {}           # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta
+#     interfaces: []
