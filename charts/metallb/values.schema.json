@@ -3,6 +3,122 @@
   "title": "Values",
   "type": "object",
   "definitions": {
+    "IPAddressPool": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "labels": {
+          "type": "object"
+        },
+        "addresses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "autoAssign": {
+          "type": "boolean"
+        },
+        "avoidBuggyIPs": {
+          "type": "boolean"
+        },
+        "serviceAllocation": {
+          "$ref": "#/definitions/ServiceAllocation"
+        }
+      },
+      "required": [
+        "name",
+        "addresses"
+      ],
+      "title": "IPAddressPool"
+    },
+    "L2Advertisement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "ipAdressPools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ipAddressPoolSelectors": {
+          "type": "object"
+        },
+        "nodeSelectors": {
+          "type": "object"
+        },
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "ipAdressPools"
+          ]
+        },
+        {
+          "required": [
+            "ipAddressPoolSelectors"
+          ]
+        }
+      ],
+      "title": "L2Advertisement"
+    },
+    "ServiceAllocation": {
+      "type": "object",
+      "properties": {
+        "priority": {
+          "type": "integer"
+        },
+        "namespaces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "namespaceSelectors": {
+          "type": "object"
+        },
+        "serviceSelectors": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "priority"
+      ],
+      "anyOf": [
+        {
+          "required": [
+            "namespaces"
+          ]
+        },
+        {
+          "required": [
+            "namespaceSelectors"
+          ]
+        },
+        {
+          "required": [
+            "serviceSelectors"
+          ]
+        }
+      ],
+      "title": "ServiceAllocation"
+    },
     "prometheusAlert": {
       "type": "object",
       "properties": {
@@ -393,6 +509,18 @@
           "enum": [ "Ignore", "Fail" ]
         }
       }
+    },
+    "ipAddressPool": {
+      "type": "array",
+      "items": {
+          "$ref": "#/definitions/IPAddressPool"
+      }
+    },
+    "l2Advertisement": {
+        "type": "array",
+        "items": {
+            "$ref": "#/definitions/L2Advertisement"
+        }
     }
   },
   "controller": { 
