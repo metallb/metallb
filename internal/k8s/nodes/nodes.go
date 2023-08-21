@@ -6,8 +6,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// ConditionStatus returns the status of the condition for a given node.
-func ConditionStatus(n *corev1.Node, ct corev1.NodeConditionType) corev1.ConditionStatus {
+// IsNetworkUnavailable returns true if the given node NodeNetworkUnavailable condition status is true.
+func IsNetworkUnavailable(n *corev1.Node) bool {
+	return conditionStatus(n, corev1.NodeNetworkUnavailable) == corev1.ConditionTrue
+}
+
+// conditionStatus returns the status of the condition for a given node.
+func conditionStatus(n *corev1.Node, ct corev1.NodeConditionType) corev1.ConditionStatus {
 	if n == nil {
 		return corev1.ConditionUnknown
 	}
@@ -19,9 +24,4 @@ func ConditionStatus(n *corev1.Node, ct corev1.NodeConditionType) corev1.Conditi
 	}
 
 	return corev1.ConditionUnknown
-}
-
-// IsNetworkUnavailable returns true if the given node NodeNetworkUnavailable condition status is true.
-func IsNetworkUnavailable(n *corev1.Node) bool {
-	return ConditionStatus(n, corev1.NodeNetworkUnavailable) == corev1.ConditionTrue
 }
