@@ -229,8 +229,8 @@ func bfdProfileFor(c *configFile) []v1beta1.BFDProfile {
 				TransmitInterval: bfd.TransmitInterval,
 				DetectMultiplier: bfd.DetectMultiplier,
 				EchoInterval:     bfd.EchoInterval,
-				EchoMode:         &bfd.EchoMode,
-				PassiveMode:      &bfd.PassiveMode,
+				EchoMode:         &c.BFDProfiles[i].EchoMode,
+				PassiveMode:      &c.BFDProfiles[i].PassiveMode,
 				MinimumTTL:       bfd.MinimumTTL,
 			},
 		}

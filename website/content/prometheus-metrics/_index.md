@@ -4,6 +4,13 @@ title: Prometheus Metrics
 
 MetalLB exposes different Prometheus metrics that are listed below.
 
+## MetalLB Allocator Addresses metrics
+
+| Name                                     | Description                              |
+| ---------------------------------------- | ---------------------------------------- |
+| metallb_allocator_addresses_in_use_total | Number of IP addresses in use, per pool  |
+| metallb_allocator_addresses_total        | Number of usable IP addresses, per pool  |
+
 ## MetalLB K8S client metrics
 
 | Name                                   | Description                                                                      |
