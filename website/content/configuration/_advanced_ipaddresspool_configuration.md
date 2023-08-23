@@ -90,7 +90,7 @@ objects by priority.
 It will first select the `IPAddressPool` with the lowest `priority` number
 (i.e., `priority=1` is the highest priority).
 If the `priority` field is unset or set to `0`, it will have the lowest
-priority (meaning that it will be the last pool to be used).
+priority (i.e., it will be the last pool to be used).
 If multiple `IPAddressPool` objects have the same priority, the choice will be
 random.
 
