@@ -84,14 +84,15 @@ matching with expression `key: app, operator: In, values: [bar]` created
 either in `namespace-a` or `namespace-b` or any namespace has a label
 `foo:bar`.
 
-Given a service, if multiple matching IPAddressPool are available MetalLB
-will check for the availability of IPs sorting the matching IPAddressPool
-by priority, starting from the highest to the lowest. A lower number for
-priority field equals a higher priority. If multiple IPAddressPool have
-the same priority, the choice will be random.
-When not specifying a priority / setting priority 0 is considered as lowest
-priority and will be used for assignment only if the pools with priority
-can't be used.
+If multiple `IPAddressPool` objects are available to a `Service`, MetalLB will
+check for the availability of IPs by sorting the matching `IPAddressPool`
+objects by priority.
+It will first select the `IPAddressPool` with the lowest `priority` number
+(i.e., `priority=1` is the highest priority).
+If the `priority` field is unset or set to `0`, it will have the lowest
+priority (meaning that it will be the last pool to be used).
+If multiple `IPAddressPool` objects have the same priority, the choice will be
+random.
 
 {{% notice note %}}
 When a service explicitly chooses an IPAddressPool via `metallb.universe.tf/address-pool`
