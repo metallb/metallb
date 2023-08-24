@@ -8,9 +8,9 @@ metadata:
 spec:
   detectMultiplier: 200
   echoInterval: 62
-  echoMode: true
+  echoMode: false
   minimumTtl: 254
-  passiveMode: true
+  passiveMode: false
   receiveInterval: 280
   transmitInterval: 270
 status: {}

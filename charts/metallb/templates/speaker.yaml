@@ -364,7 +364,10 @@ spec:
           httpGet:
             path: /livez
             port: {{ .Values.speaker.frr.metricsPort }}
+          initialDelaySeconds: {{ .Values.speaker.livenessProbe.initialDelaySeconds }}
           periodSeconds: {{ .Values.speaker.livenessProbe.periodSeconds }}
+          timeoutSeconds: {{ .Values.speaker.livenessProbe.timeoutSeconds }}
+          successThreshold: {{ .Values.speaker.livenessProbe.successThreshold }}
           failureThreshold: {{ .Values.speaker.livenessProbe.failureThreshold }}
         {{- end }}
         {{- if .Values.speaker.startupProbe.enabled }}
