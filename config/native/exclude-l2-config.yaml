@@ -5,4 +5,4 @@ metadata:
   namespace: metallb-system
 data:
   excludel2.yaml: |
-    announcedInterfacesToExclude: ["docker.*", "cbr.*", "dummy.*", "virbr.*", "lxcbr.*", "veth.*", "lo", "^cali.*", "^tunl.*", "flannel.*", "kube-ipvs.*", "cni.*", "^nodelocaldns.*"]
+    announcedInterfacesToExclude: ["^docker.*", "^cbr.*", "^dummy.*", "^virbr.*", "^lxcbr.*", "^veth.*", "^lo$", "^cali.*", "^tunl.*", "^flannel.*", "^kube-ipvs.*", "^cni.*", "^nodelocaldns.*"]
