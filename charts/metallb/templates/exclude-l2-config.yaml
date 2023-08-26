@@ -7,17 +7,17 @@ metadata:
 data:
   excludel2.yaml: |
     announcedInterfacesToExclude:
-    - docker.*
-    - cbr.*
-    - dummy.*
-    - virbr.*
-    - lxcbr.*
-    - veth.*
-    - lo
+    - ^docker.*
+    - ^cbr.*
+    - ^dummy.*
+    - ^virbr.*
+    - ^lxcbr.*
+    - ^veth.*
+    - ^lo$
     - ^cali.*
     - ^tunl.*
-    - flannel.*
-    - kube-ipvs.*
-    - cni.*
+    - ^flannel.*
+    - ^kube-ipvs.*
+    - ^cni.*
     - ^nodelocaldns.*
 {{- end }}
