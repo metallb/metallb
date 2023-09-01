@@ -67,6 +67,31 @@ about 10s), please [file a bug](https://github.com/metallb/metallb/issues/new)!
 We can help you investigate and determine if the issue is with the client, or a
 bug in MetalLB.
 
+## How the L2 leader election works
+
+The election of the "leader" (the node which is going to advertise the IP) of a
+given loadbalancer IP is stateless and works in the following way:
+
+- each speaker collects the list of the potential announcers of a given IP, taking
+into account active speakers, external traffic policy, active endpoints, node selectors and other things.
+- each speaker does the same computation: it gets a sorted list of a hash of "node+VIP" elements and
+announces the service if it is the first item of the list.
+
+This removes the need of having to keep memory of which speaker is in charge of
+announcing a given IP.
+
+### Adding or removing nodes
+
+Given the leader election algoritm described above, removing a node does not change the
+speaker announcing the VIP, while adding a node will change it only if it becomes the new
+first element of the list.
+
+### Brain split behaviour
+
+Given the stateless nature of the mechanism, if a speaker mistakenly detects a set of nodes as
+non active, it might calculate a different list, resulting in multiple (or no) speakers announcing the
+same VIP.
+
 ## Comparison to Keepalived
 
 MetalLB's layer2 mode has a lot of similarities to Keepalived, so if you're
