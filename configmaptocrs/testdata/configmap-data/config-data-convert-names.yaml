@@ -1,0 +1,29 @@
+address-pools:
+- name: 01-numbered-addresspool
+  protocol: bgp
+  addresses:
+  - 198.51.100.0/24
+  - fc00:f853:0ccd:e799::/124
+  avoid-buggy-ips: true
+  auto-assign: true
+- name: Capitalized-AddressPool
+  protocol: layer2
+  addresses:
+  - 192.168.1.240/28
+bfd-profiles:
+- name: underscored_bfd_profile
+  receive-interval: 280
+  transmit-interval: 270
+  echo-interval: 62
+  echo-mode: false
+  passive-mode: false
+  minimum-ttl: 254
+  detect-multiplier: 200
+- name: tooLongBFDProfileName01-tooLongBFDProfileName02-tooLongBFDProfileName03-tooLongBFDProfileName04
+  receive-interval: 150
+  transmit-interval: 150
+  echo-interval: 80
+  echo-mode: true
+  passive-mode: true
+  minimum-ttl: 150
+  detect-multiplier: 150
