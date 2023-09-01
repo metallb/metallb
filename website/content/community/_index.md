@@ -165,6 +165,8 @@ The following are our commit message guidelines:
 
 When adding a new feature, or modifying a current one, consider adding a new test
 to the test suite located in `/e2etest`.
+Each feature should come with enough unit test / end to end coverage to make
+us confident of the change.
 
 ## The website
 
