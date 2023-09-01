@@ -110,3 +110,22 @@ misguided
 If you encounter this issue with your users or networks, you can
 set the `AvoidBuggyIPs` flag of the IPAddressPool CR.
 By doing so, the `.0` and the `.255` addresses will be avoided.
+
+### Changing the IP of a service
+
+The current behaviour of MetalLB is to try to preserve the connectivity despite a change of
+configuration that might disrupt a service happens. For example, removing an IPAddressPool that
+contains IPs currently assigned to services.
+
+If that happens, instead of reallocating (if possible) a new IP to the service, the configuration change
+is marked as stale and MetalLB keeps running with the last valid configuration.
+
+In order to re-assign a new IP to the services, there are two options:
+
+- restarting the MetalLB's `controller` pod
+- deleting and re-creating the service
+
+{{% notice note %}}
+This behaviour is subject to change making MetalLB observe any state requested by the user, regardless
+of the fact that it may cause service disruptions or not.
+{{% /notice %}}
