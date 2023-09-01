@@ -93,6 +93,14 @@ prometheus operator is deployed in the `monitoring` namespace using the `prometh
 service account. It is suggested to use either the charts or kustomize if they
 need to be changed.
 
+{{% notice note %}}
+
+You may notice the "prometheus" variants of the manifests (for example `https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-native-prometheus.yaml`).
+Those manifests rely on a very specific way of deploying Prometheus via the [kube prometheus](https://github.com/prometheus-operator/kube-prometheus) repository, and
+are mainly used by our CI, but they might not be compatible to your Prometheus deployment.
+
+{{% /notice %}}
+
 ## Installation with kustomize
 
 You can install MetalLB with
