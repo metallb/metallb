@@ -131,6 +131,9 @@ When the FRR mode is enabled, the following additional features are available:
 - IPv6 Support for BGP and BFD
 - Multi Protocol BGP
 
+Please also note that with the current FRR version is not possible to peer within
+the same host, while with the native implementation allows it.
+
 ### Limitations of the FRR Mode
 
 Compared to the native implementation, the FRR mode has the following limitations:
