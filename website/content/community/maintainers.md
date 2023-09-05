@@ -10,7 +10,7 @@ MetalLB development and maintenance is led by a team of current maintainers.
 MetalLB maintainers are participants in the project with the ability to approve
 changes to the MetalLB code base. The current list of maintainers can be found
 in the [MetalLB CODEOWNERS
-file](https://github.com/metallb/metallb/blob/v0.13.10/CODEOWNERS).
+file](https://github.com/metallb/metallb/blob/v0.13.11/CODEOWNERS).
 
 ## Maintainer Expectations
 
