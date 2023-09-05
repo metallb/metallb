@@ -84,14 +84,15 @@ matching with expression `key: app, operator: In, values: [bar]` created
 either in `namespace-a` or `namespace-b` or any namespace has a label
 `foo:bar`.
 
-Given a service, if multiple matching IPAddressPool are available MetalLB
-will check for the availability of IPs sorting the matching IPAddressPool
-by priority, starting from the highest to the lowest. A lower number for
-priority field equals a higher priority. If multiple IPAddressPool have
-the same priority, the choice will be random.
-When not specifying a priority / setting priority 0 is considered as lowest
-priority and will be used for assignment only if the pools with priority
-can't be used.
+If multiple `IPAddressPool` objects are available to a `Service`, MetalLB will
+check for the availability of IPs by sorting the matching `IPAddressPool`
+objects by priority.
+It will first select the `IPAddressPool` with the lowest `priority` number
+(i.e., `priority=1` is the highest priority).
+If the `priority` field is unset or set to `0`, it will have the lowest
+priority (i.e., it will be the last pool to be used).
+If multiple `IPAddressPool` objects have the same priority, the choice will be
+random.
 
 {{% notice note %}}
 When a service explicitly chooses an IPAddressPool via `metallb.universe.tf/address-pool`
@@ -109,3 +110,22 @@ misguided
 If you encounter this issue with your users or networks, you can
 set the `AvoidBuggyIPs` flag of the IPAddressPool CR.
 By doing so, the `.0` and the `.255` addresses will be avoided.
+
+### Changing the IP of a service
+
+The current behaviour of MetalLB is to try to preserve the connectivity despite a change of
+configuration that might disrupt a service happens. For example, removing an IPAddressPool that
+contains IPs currently assigned to services.
+
+If that happens, instead of reallocating (if possible) a new IP to the service, the configuration change
+is marked as stale and MetalLB keeps running with the last valid configuration.
+
+In order to re-assign a new IP to the services, there are two options:
+
+- restarting the MetalLB's `controller` pod
+- deleting and re-creating the service
+
+{{% notice note %}}
+This behaviour is subject to change making MetalLB observe any state requested by the user, regardless
+of the fact that it may cause service disruptions or not.
+{{% /notice %}}

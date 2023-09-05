@@ -2,6 +2,29 @@
 title: Release Notes
 weight: 8
 ---
+
+## Version 0.13.11
+
+New features:
+
+- Add namespaces to resources generated using helm templates ([PR 1965](https://github.com/metallb/metallb/pull/1965), [Issue 1964](https://github.com/metallb/metallb/issues/1964))
+- Improve FRR liveness probes configurability in helm charts ([PR 2034](https://github.com/metallb/metallb/pull/2034), [Issue 1963](https://github.com/metallb/metallb/issues/1964)) to make MetalLB's FRR more tolerant to low resources deployments
+- Bump FRR to version to 8.5.2 [PR 2051](https://github.com/metallb/metallb/pull/2051)
+
+Bug Fixes:
+
+- Reprocess all the services only when a pool of IPs changes, and not every time the controller receives it ([PR 1951](https://github.com/metallb/metallb/pull/1951)
+)
+- Delete BFD profiles from the configuration when deleted from CRs ([PR 1973](https://github.com/metallb/metallb/pull/1973))
+- Fix kustomize v5 deprecations ([PR 1986](https://github.com/metallb/metallb/pull/1986), [Issue 1985](https://github.com/metallb/metallb/issues/1985))
+- Make the configuration conversion stable and avoid unnecessary FRR reloads ([PR 1990](https://github.com/metallb/metallb/pull/1990))
+- Change the "interface to exclude" log to debug to avoid spamming logs ([PR 1992](https://github.com/metallb/metallb/pull/1992))
+- Improve the regex excluding well known interfaces from L2 announcement ([PR 2058](https://github.com/metallb/metallb/pull/2058)), [Issue 2057](https://github.com/metallb/metallb/issues/2057)
+
+This release includes contributions from Andreas Lindhé, ankitm123, cyclinder, Federico Paolinelli, Joshua Cooper, Lior Noy, Marcelo Guerrero Viveros, Patryk Małek, Peter Grace, Rodrigo Campos, Sebastian-RG, Simon, Simon Smith.
+
+Thank you!
+
 ## Version 0.13.10
 
 New Features:

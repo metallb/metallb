@@ -84,7 +84,7 @@ func handleFlags() {
 	flag.StringVar(&prometheusNamespace, "prometheus-namespace", "monitoring", "the namespace prometheus is running in (if running)")
 	flag.StringVar(&externalContainers, "external-containers", "", "a comma separated list of external containers names to use for the test. (valid parameters are: ibgp-single-hop / ibgp-multi-hop / ebgp-single-hop / ebgp-multi-hop)")
 	flag.BoolVar(&bgpNativeMode, "bgp-native-mode", false, "says if we are testing against a deployment using bgp native mode")
-	flag.StringVar(&frrImage, "frr-image", "quay.io/frrouting/frr:8.4.2", "the image to use for the external frr containers")
+	flag.StringVar(&frrImage, "frr-image", "quay.io/frrouting/frr:8.5.2", "the image to use for the external frr containers")
 	flag.StringVar(&hostContainerMode, "host-bgp-mode", string(bgptests.IBGPMode), "tells whether to run the host container in ebgp or ibgp mode")
 
 	flag.Parse()
