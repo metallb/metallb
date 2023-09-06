@@ -504,3 +504,7 @@ func (a *Allocator) checkSharing(svc string, ip string, ports []Port, sk *key) e
 	}
 	return nil
 }
+
+func (a *Allocator) AllocatePool(svc, pool string) {
+	a.allocated[svc] = &alloc{pool: pool}
+}

@@ -209,13 +209,15 @@ func TestControllerMutation(t *testing.T) {
 	// pure function that reliably produces the same end state
 	// regardless of past controller state.
 	tests := []struct {
-		desc    string
-		in      *v1.Service
-		want    *v1.Service
-		wantErr bool
+		desc              string
+		in                *v1.Service
+		prevPool          string
+		want              *v1.Service
+		expectedSyncState controllers.SyncState
 	}{
 		{
-			desc: "deleted balancer",
+			desc:              "deleted balancer",
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 
 		{
@@ -226,6 +228,7 @@ func TestControllerMutation(t *testing.T) {
 					ClusterIPs: []string{"1.2.3.4"},
 				},
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 
 		{
@@ -243,6 +246,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 
 		{
@@ -262,6 +266,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.1"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 
 		{
@@ -289,6 +294,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.1"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 
 		{
@@ -305,7 +311,7 @@ func TestControllerMutation(t *testing.T) {
 					LoadBalancerIP: "1.2.3.2",
 				},
 			},
-			wantErr: true,
+			expectedSyncState: controllers.SyncStateErrorNoRetry,
 		},
 
 		{
@@ -317,7 +323,7 @@ func TestControllerMutation(t *testing.T) {
 					ClusterIPs:     []string{"1.2.3.4"},
 				},
 			},
-			wantErr: true,
+			expectedSyncState: controllers.SyncStateErrorNoRetry,
 		},
 
 		{
@@ -334,7 +340,7 @@ func TestControllerMutation(t *testing.T) {
 					Type:       "LoadBalancer",
 				},
 			},
-			wantErr: true,
+			expectedSyncState: controllers.SyncStateErrorNoRetry,
 		},
 
 		{
@@ -350,7 +356,7 @@ func TestControllerMutation(t *testing.T) {
 					Type:       "LoadBalancer",
 				},
 			},
-			wantErr: true,
+			expectedSyncState: controllers.SyncStateErrorNoRetry,
 		},
 
 		{
@@ -366,7 +372,7 @@ func TestControllerMutation(t *testing.T) {
 					Type:       "LoadBalancer",
 				},
 			},
-			wantErr: true,
+			expectedSyncState: controllers.SyncStateErrorNoRetry,
 		},
 
 		{
@@ -386,7 +392,7 @@ func TestControllerMutation(t *testing.T) {
 					ClusterIPs:     []string{"1.2.3.4"},
 				},
 			},
-			wantErr: true,
+			expectedSyncState: controllers.SyncStateErrorNoRetry,
 		},
 
 		{
@@ -414,6 +420,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 
 		{
@@ -430,6 +437,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0"}),
 			},
+			prevPool: "poo1",
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
@@ -442,6 +450,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"3.4.5.6"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 
 		{
@@ -457,7 +466,7 @@ func TestControllerMutation(t *testing.T) {
 					Type:       "LoadBalancer",
 				},
 			},
-			wantErr: true,
+			expectedSyncState: controllers.SyncStateErrorNoRetry,
 		},
 
 		{
@@ -476,6 +485,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 
 		{
@@ -505,6 +515,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 
 		{
@@ -516,12 +527,14 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0"}),
 			},
+			prevPool: "pool1",
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
 					Type:       "NodePort",
 					ClusterIPs: []string{"1.2.3.4"},
 				},
 			},
+			expectedSyncState: controllers.SyncStateReprocessAll,
 		},
 
 		{
@@ -541,6 +554,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"3.4.5.6"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 
 		{
@@ -562,6 +576,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"3.4.5.6"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 
 		{
@@ -571,7 +586,7 @@ func TestControllerMutation(t *testing.T) {
 					Type: "LoadBalancer",
 				},
 			},
-			wantErr: false,
+			expectedSyncState: controllers.SyncStateErrorNoRetry,
 		},
 
 		{
@@ -583,7 +598,7 @@ func TestControllerMutation(t *testing.T) {
 					ClusterIPs:     []string{"3000::1"},
 				},
 			},
-			wantErr: true,
+			expectedSyncState: controllers.SyncStateErrorNoRetry,
 		},
 
 		{
@@ -599,7 +614,7 @@ func TestControllerMutation(t *testing.T) {
 					Type:       "LoadBalancer",
 				},
 			},
-			wantErr: true,
+			expectedSyncState: controllers.SyncStateErrorNoRetry,
 		},
 
 		{
@@ -611,7 +626,7 @@ func TestControllerMutation(t *testing.T) {
 					ClusterIPs:     []string{"1.2.3.4"},
 				},
 			},
-			wantErr: true,
+			expectedSyncState: controllers.SyncStateErrorNoRetry,
 		},
 
 		{
@@ -627,7 +642,7 @@ func TestControllerMutation(t *testing.T) {
 					Type:       "LoadBalancer",
 				},
 			},
-			wantErr: true,
+			expectedSyncState: controllers.SyncStateErrorNoRetry,
 		},
 
 		{
@@ -639,6 +654,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1000::"}),
 			},
+			prevPool: "pool3",
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
 					Type:       "LoadBalancer",
@@ -646,6 +662,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 
 		{
@@ -657,6 +674,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0"}),
 			},
+			prevPool: "pool1",
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
 					Type:       "LoadBalancer",
@@ -664,10 +682,12 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1000::"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 		// dual-stack test cases
 		{
-			desc: "deleted balancer",
+			desc:              "deleted balancer",
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 		{
 			desc: "simple dual-stack LoadBalancer",
@@ -684,6 +704,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 		{
 			desc: "request IPs from specific pool",
@@ -710,6 +731,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 		{
 			desc: "request specific loadbalancer IP with dual-stack",
@@ -720,7 +742,7 @@ func TestControllerMutation(t *testing.T) {
 					LoadBalancerIP: "1.2.3.1",
 				},
 			},
-			wantErr: true,
+			expectedSyncState: controllers.SyncStateErrorNoRetry,
 		},
 		{
 			desc: "request specific loadbalancer IPv4 address via custom annotation for dual-stack config",
@@ -735,7 +757,7 @@ func TestControllerMutation(t *testing.T) {
 					Type:       "LoadBalancer",
 				},
 			},
-			wantErr: true,
+			expectedSyncState: controllers.SyncStateErrorNoRetry,
 		},
 		{
 			desc: "request dual-stack loadbalancer IPs via custom annotation",
@@ -762,6 +784,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 		{
 			desc: "request dual-stack loadbalancer with invalid ingress",
@@ -790,6 +813,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 		{
 			desc: "request dual-stack loadbalancer IPs via custom annotation in a single stack cluster",
@@ -804,7 +828,7 @@ func TestControllerMutation(t *testing.T) {
 					Type:      "LoadBalancer",
 				},
 			},
-			wantErr: true,
+			expectedSyncState: controllers.SyncStateErrorNoRetry,
 		},
 		{
 			desc: "request IP for service from namespace specific ip pool",
@@ -827,6 +851,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"7.8.9.0"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 		{
 			desc: "request IP for service from no priority namespace specific ip pool",
@@ -849,6 +874,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"16.17.18.0"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 		{
 			desc: "request IP for service from service label specific ip pool",
@@ -871,6 +897,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"19.20.21.0"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 		{
 			desc: "request IP for service from ip pool having both namespace and service label",
@@ -895,6 +922,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"25.26.27.0"}),
 			},
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 		{
 			desc: "simple LoadBalancer, ips already assigned but can't determine family",
@@ -912,7 +940,7 @@ func TestControllerMutation(t *testing.T) {
 				},
 				Status: statusAssigned([]string{"1.2.3.0"}),
 			},
-			wantErr: true,
+			expectedSyncState: controllers.SyncStateSuccess,
 		},
 	}
 
@@ -920,12 +948,15 @@ func TestControllerMutation(t *testing.T) {
 		for _, test := range tests {
 			t.Run(test.desc, func(t *testing.T) {
 				k.reset()
+				c.ips.Unassign("test")
 
-				if c.SetBalancer(l, "test", test.in, epslices.EpsOrSlices{}) == controllers.SyncStateError {
-					t.Fatalf("%q: SetBalancer returned error", test.desc)
+				if test.prevPool != "" {
+					c.ips.AllocatePool("test", test.prevPool)
 				}
-				if test.wantErr != k.loggedWarning {
-					t.Errorf("%q: unexpected loggedWarning value, want %v, got %v", test.desc, test.wantErr, k.loggedWarning)
+
+				syncState := c.SetBalancer(l, "test", test.in, epslices.EpsOrSlices{})
+				if syncState != test.expectedSyncState {
+					t.Fatalf("%q: SetBalancer returned error, want %d, got %d", test.desc, test.expectedSyncState, syncState)
 				}
 
 				gotSvc := k.gotService(test.in)
@@ -981,7 +1012,7 @@ func TestControllerConfig(t *testing.T) {
 			ClusterIPs: []string{"1.2.3.4"},
 		},
 	}
-	if c.SetBalancer(l, "test", svc, epslices.EpsOrSlices{}) == controllers.SyncStateError {
+	if c.SetBalancer(l, "test", svc, epslices.EpsOrSlices{}) != controllers.SyncStateSuccess {
 		t.Fatalf("SetBalancer failed")
 	}
 
@@ -996,7 +1027,7 @@ func TestControllerConfig(t *testing.T) {
 	// Set an empty config. Balancer should still not do anything to
 	// our unallocated service, and return an error to force a
 	// retry after sync is complete.
-	if c.SetPools(l, &config.Pools{ByName: map[string]*config.Pool{}}) == controllers.SyncStateError {
+	if c.SetPools(l, &config.Pools{ByName: map[string]*config.Pool{}}) != controllers.SyncStateReprocessAll {
 		t.Fatalf("SetPools with empty config failed")
 	}
 
@@ -1016,7 +1047,7 @@ func TestControllerConfig(t *testing.T) {
 			CIDR:       []*net.IPNet{ipnet("1.2.3.0/24")},
 		},
 	}}
-	if c.SetPools(l, pools) == controllers.SyncStateError {
+	if c.SetPools(l, pools) != controllers.SyncStateReprocessAll {
 		t.Fatalf("SetPools failed")
 	}
 
@@ -1028,7 +1059,7 @@ func TestControllerConfig(t *testing.T) {
 		t.Error("unsynced SetBalancer logged an error")
 	}
 
-	if c.SetBalancer(l, "test", svc, epslices.EpsOrSlices{}) == controllers.SyncStateError {
+	if c.SetBalancer(l, "test", svc, epslices.EpsOrSlices{}) != controllers.SyncStateSuccess {
 		t.Fatalf("SetBalancer failed")
 	}
 
@@ -1066,7 +1097,7 @@ func TestDeleteRecyclesIP(t *testing.T) {
 			CIDR:       []*net.IPNet{ipnet("1.2.3.0/32")},
 		},
 	}}
-	if c.SetPools(l, pools) == controllers.SyncStateError {
+	if c.SetPools(l, pools) != controllers.SyncStateReprocessAll {
 		t.Fatal("SetPools failed")
 	}
 
@@ -1076,7 +1107,7 @@ func TestDeleteRecyclesIP(t *testing.T) {
 			ClusterIPs: []string{"1.2.3.4"},
 		},
 	}
-	if c.SetBalancer(l, "test", svc1, epslices.EpsOrSlices{}) == controllers.SyncStateError {
+	if c.SetBalancer(l, "test", svc1, epslices.EpsOrSlices{}) != controllers.SyncStateSuccess {
 		t.Fatal("SetBalancer svc1 failed")
 	}
 	gotSvc := k.gotService(svc1)
@@ -1096,7 +1127,7 @@ func TestDeleteRecyclesIP(t *testing.T) {
 			ClusterIPs: []string{"1.2.3.4"},
 		},
 	}
-	if c.SetBalancer(l, "test2", svc2, epslices.EpsOrSlices{}) == controllers.SyncStateError {
+	if c.SetBalancer(l, "test2", svc2, epslices.EpsOrSlices{}) != controllers.SyncStateErrorNoRetry {
 		t.Fatal("SetBalancer svc2 failed")
 	}
 	if k.gotService(svc2) != nil {
@@ -1110,7 +1141,7 @@ func TestDeleteRecyclesIP(t *testing.T) {
 	}
 
 	// Setting svc2 should now allocate correctly.
-	if c.SetBalancer(l, "test2", svc2, epslices.EpsOrSlices{}) == controllers.SyncStateError {
+	if c.SetBalancer(l, "test2", svc2, epslices.EpsOrSlices{}) != controllers.SyncStateSuccess {
 		t.Fatal("SetBalancer svc2 failed")
 	}
 	gotSvc = k.gotService(svc2)
@@ -1135,7 +1166,7 @@ func TestControllerDualStackConfig(t *testing.T) {
 			ClusterIPs: []string{"1.2.3.4", "1000::"},
 		},
 	}
-	if c.SetBalancer(l, "test", svc, epslices.EpsOrSlices{}) == controllers.SyncStateError {
+	if c.SetBalancer(l, "test", svc, epslices.EpsOrSlices{}) != controllers.SyncStateSuccess {
 		t.Fatalf("SetBalancer failed")
 	}
 
@@ -1150,7 +1181,7 @@ func TestControllerDualStackConfig(t *testing.T) {
 	// Set an empty config. Balancer should still not do anything to
 	// our unallocated service, and return an error to force a
 	// retry after sync is complete.
-	if c.SetPools(l, &config.Pools{ByName: map[string]*config.Pool{}}) == controllers.SyncStateError {
+	if c.SetPools(l, &config.Pools{ByName: map[string]*config.Pool{}}) != controllers.SyncStateReprocessAll {
 		t.Fatalf("SetPools with empty config failed")
 	}
 
@@ -1171,7 +1202,7 @@ func TestControllerDualStackConfig(t *testing.T) {
 		},
 	}}
 
-	if c.SetPools(l, pools) == controllers.SyncStateError {
+	if c.SetPools(l, pools) != controllers.SyncStateReprocessAll {
 		t.Fatalf("SetPools failed")
 	}
 
@@ -1183,7 +1214,7 @@ func TestControllerDualStackConfig(t *testing.T) {
 		t.Error("unsynced SetBalancer logged an error")
 	}
 
-	if c.SetBalancer(l, "test", svc, epslices.EpsOrSlices{}) == controllers.SyncStateError {
+	if c.SetBalancer(l, "test", svc, epslices.EpsOrSlices{}) != controllers.SyncStateSuccess {
 		t.Fatalf("SetBalancer failed")
 	}
 
