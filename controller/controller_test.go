@@ -269,7 +269,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationLoadBalancerIPs: "1.2.3.1",
+						AnnotationLoadBalancerIPs: "1.2.3.1",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -280,7 +280,7 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationLoadBalancerIPs: "1.2.3.1",
+						AnnotationLoadBalancerIPs: "1.2.3.1",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -296,7 +296,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationLoadBalancerIPs: "1.2.3.1",
+						AnnotationLoadBalancerIPs: "1.2.3.1",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -325,8 +325,8 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationLoadBalancerIPs: "1.2.3.1",
-						annotationAddressPool:     "pool2",
+						AnnotationLoadBalancerIPs: "1.2.3.1",
+						AnnotationAddressPool:     "pool2",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -342,7 +342,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationLoadBalancerIPs: "please sir may I have an IP address thank you",
+						AnnotationLoadBalancerIPs: "please sir may I have an IP address thank you",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -358,7 +358,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationLoadBalancerIPs: "1.2.3.1,1.2.3.2",
+						AnnotationLoadBalancerIPs: "1.2.3.1,1.2.3.2",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -394,7 +394,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationAddressPool: "pool1",
+						AnnotationAddressPool: "pool1",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -405,7 +405,7 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationAddressPool: "pool1",
+						AnnotationAddressPool: "pool1",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -421,7 +421,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationAddressPool: "pool2",
+						AnnotationAddressPool: "pool2",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -433,7 +433,7 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationAddressPool: "pool2",
+						AnnotationAddressPool: "pool2",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -449,7 +449,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationAddressPool: "does-not-exist",
+						AnnotationAddressPool: "does-not-exist",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -591,7 +591,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationLoadBalancerIPs: "1.2.3.1",
+						AnnotationLoadBalancerIPs: "1.2.3.1",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -619,7 +619,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationLoadBalancerIPs: "1000::",
+						AnnotationLoadBalancerIPs: "1000::",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -690,7 +690,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationAddressPool: "pool5",
+						AnnotationAddressPool: "pool5",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -701,7 +701,7 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationAddressPool: "pool5",
+						AnnotationAddressPool: "pool5",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -727,7 +727,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationLoadBalancerIPs: "1.2.3.1",
+						AnnotationLoadBalancerIPs: "1.2.3.1",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -742,7 +742,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationLoadBalancerIPs: "1.2.3.0,1000::",
+						AnnotationLoadBalancerIPs: "1.2.3.0,1000::",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -753,7 +753,7 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationLoadBalancerIPs: "1.2.3.0,1000::",
+						AnnotationLoadBalancerIPs: "1.2.3.0,1000::",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -796,7 +796,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						annotationLoadBalancerIPs: "1.2.3.0,1000::",
+						AnnotationLoadBalancerIPs: "1.2.3.0,1000::",
 					},
 				},
 				Spec: v1.ServiceSpec{

@@ -30,9 +30,10 @@ import (
 )
 
 const (
-	annotationAddressPool        = "metallb.universe.tf/address-pool"
-	annotationLoadBalancerIPs    = "metallb.universe.tf/loadBalancerIPs"
-	annotationIPAllocateFromPool = "metallb.universe.tf/ip-allocated-from-pool"
+	AnnotationPrefix             = "metallb.universe.tf"
+	AnnotationAddressPool        = AnnotationPrefix + "/" + "address-pool"
+	AnnotationLoadBalancerIPs    = AnnotationPrefix + "/" + "loadBalancerIPs"
+	AnnotationIPAllocateFromPool = AnnotationPrefix + "/" + "ip-allocated-from-pool"
 )
 
 var ErrConverge = fmt.Errorf("failed to converge")
@@ -106,7 +107,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		// The user might also have changed the pool annotation, and
 		// requested a different pool than the one that is currently
 		// allocated.
-		desiredPool := svc.Annotations[annotationAddressPool]
+		desiredPool := svc.Annotations[AnnotationAddressPool]
 		if len(lbIPs) != 0 && desiredPool != "" && c.ips.Pool(key) != desiredPool {
 			level.Info(l).Log("event", "clearAssignment", "reason", "differentPoolRequested", "msg", "user requested a different pool than the one currently assigned")
 			c.clearServiceState(key, svc)
@@ -168,7 +169,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	if svc.Annotations == nil {
 		svc.Annotations = make(map[string]string)
 	}
-	svc.Annotations[annotationIPAllocateFromPool] = pool
+	svc.Annotations[AnnotationIPAllocateFromPool] = pool
 
 	return nil
 }
@@ -177,7 +178,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 // this controller.
 func (c *controller) clearServiceState(key string, svc *v1.Service) {
 	c.ips.Unassign(key)
-	delete(svc.Annotations, annotationIPAllocateFromPool)
+	delete(svc.Annotations, AnnotationIPAllocateFromPool)
 	svc.Status.LoadBalancer = v1.LoadBalancerStatus{}
 }
 
@@ -197,7 +198,7 @@ func (c *controller) allocateIPs(key string, svc *v1.Service) ([]net.IP, error) 
 		return nil, err
 	}
 
-	desiredPool := svc.Annotations[annotationAddressPool]
+	desiredPool := svc.Annotations[AnnotationAddressPool]
 
 	// If the user asked for a specific IPs, try that.
 	if len(desiredLbIPs) > 0 {
@@ -236,12 +237,12 @@ func (c *controller) isServiceAllocated(key string) bool {
 
 func getDesiredLbIPs(svc *v1.Service) ([]net.IP, ipfamily.Family, error) {
 	var desiredLbIPs []net.IP
-	desiredLbIPsStr := svc.Annotations[annotationLoadBalancerIPs]
+	desiredLbIPsStr := svc.Annotations[AnnotationLoadBalancerIPs]
 
 	if desiredLbIPsStr == "" && svc.Spec.LoadBalancerIP == "" {
 		return nil, "", nil
 	} else if desiredLbIPsStr != "" && svc.Spec.LoadBalancerIP != "" {
-		return nil, "", fmt.Errorf("service can not have both %s and svc.Spec.LoadBalancerIP", annotationLoadBalancerIPs)
+		return nil, "", fmt.Errorf("service can not have both %s and svc.Spec.LoadBalancerIP", AnnotationLoadBalancerIPs)
 	}
 
 	if desiredLbIPsStr != "" {
@@ -249,7 +250,7 @@ func getDesiredLbIPs(svc *v1.Service) ([]net.IP, ipfamily.Family, error) {
 		for _, desiredLbIPStr := range desiredLbIPsSlice {
 			desiredLbIP := net.ParseIP(strings.TrimSpace(desiredLbIPStr))
 			if desiredLbIP == nil {
-				return nil, "", fmt.Errorf("invalid %s: %q", annotationLoadBalancerIPs, desiredLbIPsStr)
+				return nil, "", fmt.Errorf("invalid %s: %q", AnnotationLoadBalancerIPs, desiredLbIPsStr)
 			}
 			desiredLbIPs = append(desiredLbIPs, desiredLbIP)
 		}
