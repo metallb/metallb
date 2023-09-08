@@ -114,6 +114,12 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 	} else {
 		availableNodes = nodesWithActiveSpeakers(forPool)
 	}
+
+	if len(availableNodes) == 0 {
+		level.Debug(l).Log("event", "skipping should announce l2", "service", name, "reason", "no available nodes")
+		return "notOwner"
+	}
+
 	level.Debug(l).Log("event", "shouldannounce", "protocol", "l2", "nodes", availableNodes, "service", name)
 
 	// Using the first IP should work for both single and dual stack.
