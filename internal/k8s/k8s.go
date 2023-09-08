@@ -61,7 +61,6 @@ var (
 	validatingWebhookName           = "metallb-webhook-configuration"
 	addresspoolConvertingWebhookCRD = "addresspools.metallb.io"
 	bgppeerConvertingWebhookCRD     = "bgppeers.metallb.io"
-	webhookSecretName               = "webhook-server-cert" //#nosec G101
 )
 
 func init() {
@@ -108,6 +107,7 @@ type Config struct {
 	ValidateConfig      config.Validate
 	EnableWebhook       bool
 	DisableCertRotation bool
+	WebhookSecretName   string
 	CertDir             string
 	CertServiceName     string
 	LoadBalancerClass   string

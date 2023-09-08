@@ -143,6 +143,7 @@ func main() {
 		certServiceName     = flag.String("cert-service-name", "webhook-service", "The service name used to generate the TLS cert's hostname")
 		loadBalancerClass   = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
 		webhookMode         = flag.String("webhook-mode", "enabled", "webhook mode: can be enabled, disabled or only webhook if we want the controller to act as webhook endpoint only")
+		webhookSecretName   = flag.String("webhook-secret", "webhook-server-cert", "webhook secret: the name of webhook secret, default is webhook-server-cert")
 	)
 	flag.Parse()
 
@@ -189,6 +190,7 @@ func main() {
 		ValidateConfig:      validation,
 		EnableWebhook:       true,
 		DisableCertRotation: *disableCertRotation,
+		WebhookSecretName:   *webhookSecretName,
 		CertDir:             *certDir,
 		CertServiceName:     *certServiceName,
 		LoadBalancerClass:   *loadBalancerClass,
