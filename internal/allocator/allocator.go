@@ -74,6 +74,7 @@ func (a *Allocator) SetPools(pools *config.Pools) error {
 	for svc, alloc := range a.allocated {
 		pool := poolFor(pools.ByName, alloc.ips)
 		if pool == nil {
+			a.Unassign(svc)
 			return fmt.Errorf("new config not compatible with assigned IPs: service %q cannot own %q under new config", svc, alloc.ips)
 		}
 	}
