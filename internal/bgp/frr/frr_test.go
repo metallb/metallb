@@ -436,7 +436,7 @@ func TestTwoSessionsDuplicateRouter(t *testing.T) {
 		bgp.SessionParameters{
 			PeerAddress:   "10.4.4.255:179",
 			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
+			MyASN:         700,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       400,
 			HoldTime:      time.Second,

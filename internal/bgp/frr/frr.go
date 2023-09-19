@@ -224,7 +224,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 		var exist bool
 		var rout *router
 
-		routerName := routerName(s.RouterID.String(), s.MyASN, s.VRFName)
+		routerName := routerName(s.RouterID.String(), s.VRFName)
 		if rout, exist = routers[routerName]; !exist {
 			rout = &router{
 				myASN:        s.MyASN,
@@ -256,6 +256,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			neighbor = &neighborConfig{
 				IPFamily:       family,
 				ASN:            s.PeerASN,
+				LocalASN:       s.MyASN,
 				Addr:           host,
 				Port:           uint16(portUint),
 				HoldTime:       uint64(s.HoldTime / time.Second),

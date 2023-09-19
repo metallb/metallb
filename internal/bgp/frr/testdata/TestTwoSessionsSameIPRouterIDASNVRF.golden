@@ -38,7 +38,6 @@ router bgp 100
   neighbor 10.2.2.254 port 179
   neighbor 10.2.2.254 timers 1 1
   neighbor 10.2.2.254 password password
-  
 
   address-family ipv4 unicast
     neighbor 10.2.2.254 activate
@@ -60,7 +59,6 @@ router bgp 100 vrf red
   neighbor 10.2.2.254 port 179
   neighbor 10.2.2.254 timers 1 1
   neighbor 10.2.2.254 password password
-  
 
   address-family ipv4 unicast
     neighbor 10.2.2.254 activate
