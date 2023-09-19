@@ -5,31 +5,37 @@ ip nht resolve-via-default
 ipv6 nht resolve-via-default
 route-map 10.2.2.254-in deny 20
 
-ip prefix-list 10.2.2.254-300-ipv4-localpref-prefixes permit 172.16.1.10/24
+
+ip prefix-list 10.2.2.254-300-ipv4-localpref-prefixes seq 1 permit 172.16.1.10/24
 route-map 10.2.2.254-out permit 1
   match ip address prefix-list 10.2.2.254-300-ipv4-localpref-prefixes
   set local-preference 300
   on-match next
-ip prefix-list 10.2.2.254-1111:2222-ipv4-community-prefixes permit 172.16.1.10/24
+
+ip prefix-list 10.2.2.254-1111:2222-ipv4-community-prefixes seq 1 permit 172.16.1.10/24
 route-map 10.2.2.254-out permit 2
   match ip address prefix-list 10.2.2.254-1111:2222-ipv4-community-prefixes
   set community 1111:2222 additive
   on-match next
-ip prefix-list 10.2.2.254-3333:4444-ipv4-community-prefixes permit 172.16.1.10/24
+
+ip prefix-list 10.2.2.254-3333:4444-ipv4-community-prefixes seq 1 permit 172.16.1.10/24
 route-map 10.2.2.254-out permit 3
   match ip address prefix-list 10.2.2.254-3333:4444-ipv4-community-prefixes
   set community 3333:4444 additive
   on-match next
 
-ip prefix-list 10.2.2.254-pl-ipv4 permit 172.16.1.10/24
+
+ ip prefix-list 10.2.2.254-pl-ipv4 seq 1 permit 172.16.1.10/24
+
+
+
+
+ipv6 prefix-list 10.2.2.254-pl-ipv4 seq 2 deny any
 
 route-map 10.2.2.254-out permit 4
   match ip address prefix-list 10.2.2.254-pl-ipv4
 route-map 10.2.2.254-out permit 5
   match ipv6 address prefix-list 10.2.2.254-pl-ipv4
-
-
-ipv6 prefix-list 10.2.2.254-pl-ipv4 deny any
 
 router bgp 100
   no bgp ebgp-requires-policy
