@@ -454,7 +454,7 @@ func TestTwoSessionsDuplicateRouter(t *testing.T) {
 	testCheckConfigFile(t)
 }
 
-func TestTwoSessionsWithSameRouterAndCustomASNs(t *testing.T) {
+func TestTwoSessionsWithPerSessionASN(t *testing.T) {
 	testSetup(t)
 
 	l := log.NewNopLogger()
