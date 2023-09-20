@@ -219,7 +219,16 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 		config.Loglevel = frrLogLevel
 	}
 
-	for _, s := range sm.sessions {
+	// to get the sessions in some predictable order, we need to sort the keys
+	// this is needed for testing purpose
+	var sessionKeys []string
+	for key := range sm.sessions {
+		sessionKeys = append(sessionKeys, key)
+	}
+	sort.Strings(sessionKeys)
+
+	for _, sKey := range sessionKeys {
+		s := sm.sessions[sKey]
 		var neighbor *neighborConfig
 		var exist bool
 		var rout *router
