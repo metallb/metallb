@@ -143,14 +143,6 @@ func DiscardNativeOnly(c ClusterResources) error {
 			peerAddr[peerKey] = true
 		}
 	}
-	for _, p := range c.Peers {
-		for _, p1 := range c.Peers[1:] {
-			if p.Spec.MyASN != p1.Spec.MyASN &&
-				p.Spec.VRFName == p1.Spec.VRFName {
-				return fmt.Errorf("peer %s has myAsn different from %s, in FRR mode all myAsn must be equal for the same VRF", p.Spec.Address, p1.Spec.Address)
-			}
-		}
-	}
 	return nil
 }
 
