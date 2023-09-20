@@ -436,6 +436,52 @@ func TestTwoSessionsDuplicateRouter(t *testing.T) {
 		bgp.SessionParameters{
 			PeerAddress:   "10.4.4.255:179",
 			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       400,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer2"})
+
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session2.Close()
+
+	testCheckConfigFile(t)
+}
+
+func TestTwoSessionsWithSameRouterAndCustomASNs(t *testing.T) {
+	testSetup(t)
+
+	l := log.NewNopLogger()
+	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+	defer close(sessionManager.reloadConfig)
+
+	session1, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer1"})
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session1.Close()
+	session2, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.4.4.255:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         700,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       400,
