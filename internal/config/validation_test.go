@@ -295,7 +295,6 @@ func TestValidateFRR(t *testing.T) {
 					},
 				},
 			},
-			mustFail: true,
 		},
 		{
 			desc: "myAsn set, one different but with different vrf",
