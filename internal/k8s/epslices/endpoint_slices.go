@@ -26,13 +26,16 @@ const (
 
 const SlicesServiceIndexName = "ServiceName"
 
-// IsConditionReady tells if the conditions represent a ready state, interpreting
-// nil ready as ready.
-func IsConditionReady(conditions discovery.EndpointConditions) bool {
-	if conditions.Ready == nil {
-		return true
+// IsConditionServing tells if the conditions represent a serving state, deferring
+// to ready state if serving == nil.
+func IsConditionServing(conditions discovery.EndpointConditions) bool {
+	if conditions.Serving == nil {
+		if conditions.Ready == nil {
+			return true
+		}
+		return *conditions.Ready
 	}
-	return *conditions.Ready
+	return *conditions.Serving
 }
 
 func ServiceKeyForSlice(endpointSlice *discovery.EndpointSlice) (types.NamespacedName, error) {

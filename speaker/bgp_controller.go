@@ -137,13 +137,13 @@ func hasHealthyEndpoint(eps epslices.EpsOrSlices, filterNode func(*string) bool)
 					continue
 				}
 				for _, addr := range ep.Addresses {
-					if _, ok := ready[addr]; !ok && epslices.IsConditionReady(ep.Conditions) {
+					if _, ok := ready[addr]; !ok && epslices.IsConditionServing(ep.Conditions) {
 						// Only set true if nothing else has expressed an
 						// opinion. This means that false will take precedence
 						// if there's any unready ports for a given endpoint.
 						ready[addr] = true
 					}
-					if !epslices.IsConditionReady(ep.Conditions) {
+					if !epslices.IsConditionServing(ep.Conditions) {
 						ready[addr] = false
 					}
 				}
