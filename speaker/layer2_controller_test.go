@@ -151,6 +151,11 @@ func TestUsableNodes(t *testing.T) {
 }
 
 func TestUsableNodesEPSlices(t *testing.T) {
+	b := &fakeBGP{
+		t: t,
+	}
+	newBGP = b.NewSessionManager
+
 	c, err := newController(controllerConfig{
 		MyNode: "iris1",
 		Logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
@@ -301,6 +306,40 @@ func TestUsableNodesEPSlices(t *testing.T) {
 			},
 			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1"},
+		},
+		{
+			desc: "Two endpoints, different hosts, not ready but serving",
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
+								},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready:   pointer.BoolPtr(false),
+									Serving: pointer.BoolPtr(true),
+								},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.15",
+								},
+								NodeName: stringPtr("iris2"),
+								Conditions: discovery.EndpointConditions{
+									Ready:   pointer.BoolPtr(false),
+									Serving: pointer.BoolPtr(true),
+								},
+							},
+						},
+					},
+				},
+				Type: epslices.Slices,
+			},
+			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
+			cExpectedResult: []string{"iris1", "iris2"},
 		},
 	}
 
@@ -1367,7 +1406,8 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 									},
 									NodeName: stringPtr("iris2"),
 									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
+										Ready:   pointer.BoolPtr(false),
+										Serving: pointer.BoolPtr(true),
 									},
 								},
 							},
