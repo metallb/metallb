@@ -12,7 +12,6 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/e2etest/pkg/executor"
 	"go.universe.tf/e2etest/pkg/frr"
 	frrcontainer "go.universe.tf/e2etest/pkg/frr/container"
@@ -21,6 +20,7 @@ import (
 	"go.universe.tf/e2etest/pkg/metallb"
 	"go.universe.tf/e2etest/pkg/routes"
 	"go.universe.tf/e2etest/pkg/wget"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -168,14 +168,6 @@ func checkBFDConfigPropagated(nodeConfig metallbv1beta1.BFDProfile, peerConfig f
 	return nil
 }
 
-func validateDesiredLB(svc *corev1.Service) {
-	desiredLbIPs := svc.Annotations["metallb.universe.tf/loadBalancerIPs"]
-	if desiredLbIPs == "" {
-		return
-	}
-	framework.ExpectEqual(desiredLbIPs, strings.Join(getIngressIPs(svc.Status.LoadBalancer.Ingress), ","))
-}
-
 func checkServiceOnlyOnNodes(svc *corev1.Service, expectedNodes []corev1.Node, ipFamily ipfamily.Family) {
 	if len(expectedNodes) == 0 {
 		return
@@ -284,14 +276,6 @@ OUTER:
 	}
 
 	return nonSelectedNodes
-}
-
-func getIngressIPs(ingresses []corev1.LoadBalancerIngress) []string {
-	var ips []string
-	for _, ingress := range ingresses {
-		ips = append(ips, ingress.IP)
-	}
-	return ips
 }
 
 func validateServiceNotAdvertised(svc *corev1.Service, frrContainers []*frrcontainer.FRR, advertised string, ipFamily ipfamily.Family) {

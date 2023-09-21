@@ -37,3 +37,23 @@ func PodLogs(cs clientset.Interface, pod *corev1.Pod, podLogOpts corev1.PodLogOp
 	str := buf.String()
 	return str, nil
 }
+
+// PodIsReady returns the given pod's PodReady condition.
+func PodIsReady(p *corev1.Pod) bool {
+	return podConditionStatus(p, corev1.PodReady) == corev1.ConditionTrue
+}
+
+// podConditionStatus returns the status of the condition for a given pod.
+func podConditionStatus(p *corev1.Pod, condition corev1.PodConditionType) corev1.ConditionStatus {
+	if p == nil {
+		return corev1.ConditionUnknown
+	}
+
+	for _, c := range p.Status.Conditions {
+		if c.Type == condition {
+			return c.Status
+		}
+	}
+
+	return corev1.ConditionUnknown
+}

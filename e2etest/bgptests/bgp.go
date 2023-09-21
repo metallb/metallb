@@ -123,7 +123,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
-		validateDesiredLB(svc)
+		testservice.ValidateDesiredLB(svc)
 
 		for _, c := range FRRContainers {
 			validateService(svc, allNodes.Items, c)
@@ -156,7 +156,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				testservice.TrafficPolicyCluster(svc)
 			})
 			defer testservice.Delete(cs, svc)
-			validateDesiredLB(svc)
+			testservice.ValidateDesiredLB(svc)
 
 			for _, c := range FRRContainers {
 				validateService(svc, allNodes.Items, c)
@@ -193,7 +193,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		})
 		defer testservice.Delete(cs, svc)
 
-		validateDesiredLB(svc)
+		testservice.ValidateDesiredLB(svc)
 
 		err := jig.Scale(2)
 		framework.ExpectNoError(err)
@@ -280,8 +280,8 @@ var _ = ginkgo.Describe("BGP", func() {
 			})
 		defer testservice.Delete(cs, svc1)
 
-		validateDesiredLB(svc)
-		validateDesiredLB(svc1)
+		testservice.ValidateDesiredLB(svc)
+		testservice.ValidateDesiredLB(svc1)
 
 		for _, c := range FRRContainers {
 			validateService(svc, allNodes.Items, c)
