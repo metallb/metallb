@@ -23,6 +23,7 @@ const (
 	defaultRoutingTable = ""
 	metalLBASN          = 64512
 	metalLBASNVRF       = 64513
+	metalLBASNVRF2      = 64514
 	externalASN         = 4200000000
 )
 
@@ -511,7 +512,7 @@ func vrfContainersConfig(image string) map[string]frrcontainer.Config {
 		Name:  "ebgp-vrf-multi-hop",
 		Image: image,
 		Neighbor: frrconfig.NeighborConfig{
-			ASN:      metalLBASNVRF,
+			ASN:      metalLBASNVRF2,
 			Password: "ebgp-test",
 			MultiHop: true,
 		},
