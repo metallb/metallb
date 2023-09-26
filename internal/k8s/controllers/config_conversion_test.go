@@ -222,7 +222,7 @@ func TestConversionIsStable(t *testing.T) {
 		t.Fatalf("conversion failed, err %v", err)
 	}
 	seed := time.Now().UnixNano()
-	rand.Seed(seed)
+	rand.New(rand.NewSource(seed))
 
 	// Here we check the stability of the conversion, by shuffling the
 	// order of the resources and checking that the output is the same.
