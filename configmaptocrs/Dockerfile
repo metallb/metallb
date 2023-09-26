@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.2
 
-FROM --platform=$BUILDPLATFORM docker.io/golang:1.19.5 AS builder
+FROM --platform=$BUILDPLATFORM docker.io/golang:1.20.8 AS builder
 ARG GIT_COMMIT=dev
 ARG GIT_BRANCH=dev
 WORKDIR $GOPATH/go.universe.tf/metallb
