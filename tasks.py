@@ -898,6 +898,14 @@ def generatemanifests(ctx):
     generate_manifest(ctx, bgp_type="frr", with_prometheus=True, output="config/manifests/metallb-frr-prometheus.yaml")
     generate_manifest(ctx, bgp_type="native", with_prometheus=True, output="config/manifests/metallb-native-prometheus.yaml")
 
+    _align_helm_crds(
+        source='config/manifests/metallb-frr.yaml',
+        output='charts/metallb/charts/crds/templates/crds.yaml')
+
+def _align_helm_crds(source, output):
+    run("""yq eval-all 'select(.kind == "CustomResourceDefinition")' {} > {}""".format(source, output))
+    run("sed -i 's/metallb-system/{{{{ .Release.Namespace }}}}/g' {}".format(output))
+
 @task
 def generateapidocs(ctx):
     """Generates the docs for the CRDs"""
