@@ -16,7 +16,7 @@ require (
 	github.com/ory/dockertest/v3 v3.10.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.15.1
-	golang.org/x/sys v0.8.0
+	golang.org/x/sys v0.13.0
 	k8s.io/api v0.26.4
 	k8s.io/apiextensions-apiserver v0.26.1
 	k8s.io/apimachinery v0.26.4
