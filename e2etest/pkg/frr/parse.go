@@ -13,15 +13,17 @@ import (
 )
 
 type Neighbor struct {
-	IP             net.IP
-	VRF            string
-	Connected      bool
-	LocalAS        string
-	RemoteAS       string
-	PrefixSent     int
-	Port           int
-	RemoteRouterID string
-	MsgStats       MessageStats
+	IP                      net.IP
+	VRF                     string
+	Connected               bool
+	LocalAS                 string
+	RemoteAS                string
+	PrefixSent              int
+	Port                    int
+	RemoteRouterID          string
+	MsgStats                MessageStats
+	ConfiguredHoldTime      int
+	ConfiguredKeepAliveTime int
 }
 
 type Route struct {
@@ -34,15 +36,17 @@ type Route struct {
 const bgpConnected = "Established"
 
 type FRRNeighbor struct {
-	RemoteAs          int          `json:"remoteAs"`
-	LocalAs           int          `json:"localAs"`
-	RemoteRouterID    string       `json:"remoteRouterId"`
-	BgpVersion        int          `json:"bgpVersion"`
-	BgpState          string       `json:"bgpState"`
-	PortForeign       int          `json:"portForeign"`
-	MsgStats          MessageStats `json:"messageStats"`
-	VRFName           string       `json:"vrf"`
-	AddressFamilyInfo map[string]struct {
+	RemoteAs                     int          `json:"remoteAs"`
+	LocalAs                      int          `json:"localAs"`
+	RemoteRouterID               string       `json:"remoteRouterId"`
+	BgpVersion                   int          `json:"bgpVersion"`
+	BgpState                     string       `json:"bgpState"`
+	PortForeign                  int          `json:"portForeign"`
+	MsgStats                     MessageStats `json:"messageStats"`
+	VRFName                      string       `json:"vrf"`
+	ConfiguredHoldTimeMSecs      int          `json:"bgpTimerConfiguredHoldTimeMsecs"`
+	ConfiguredKeepAliveTimeMSecs int          `json:"bgpTimerConfiguredKeepAliveIntervalMsecs"`
+	AddressFamilyInfo            map[string]struct {
 		SentPrefixCounter int `json:"sentPrefixCounter"`
 	} `json:"addressFamilyInfo"`
 }
@@ -128,14 +132,16 @@ func ParseNeighbour(vtyshRes string) (*Neighbor, error) {
 			prefixSent += s.SentPrefixCounter
 		}
 		return &Neighbor{
-			IP:             ip,
-			Connected:      connected,
-			LocalAS:        strconv.Itoa(n.LocalAs),
-			RemoteAS:       strconv.Itoa(n.RemoteAs),
-			PrefixSent:     prefixSent,
-			Port:           n.PortForeign,
-			RemoteRouterID: n.RemoteRouterID,
-			MsgStats:       n.MsgStats,
+			IP:                      ip,
+			Connected:               connected,
+			LocalAS:                 strconv.Itoa(n.LocalAs),
+			RemoteAS:                strconv.Itoa(n.RemoteAs),
+			PrefixSent:              prefixSent,
+			Port:                    n.PortForeign,
+			RemoteRouterID:          n.RemoteRouterID,
+			MsgStats:                n.MsgStats,
+			ConfiguredKeepAliveTime: n.ConfiguredKeepAliveTimeMSecs,
+			ConfiguredHoldTime:      n.ConfiguredHoldTimeMSecs,
 		}, nil
 	}
 	return nil, errors.New("no peers were returned")
@@ -165,14 +171,16 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 			prefixSent += s.SentPrefixCounter
 		}
 		res = append(res, &Neighbor{
-			IP:             ip,
-			Connected:      connected,
-			LocalAS:        strconv.Itoa(n.LocalAs),
-			RemoteAS:       strconv.Itoa(n.RemoteAs),
-			PrefixSent:     prefixSent,
-			Port:           n.PortForeign,
-			RemoteRouterID: n.RemoteRouterID,
-			MsgStats:       n.MsgStats,
+			IP:                      ip,
+			Connected:               connected,
+			LocalAS:                 strconv.Itoa(n.LocalAs),
+			RemoteAS:                strconv.Itoa(n.RemoteAs),
+			PrefixSent:              prefixSent,
+			Port:                    n.PortForeign,
+			RemoteRouterID:          n.RemoteRouterID,
+			MsgStats:                n.MsgStats,
+			ConfiguredKeepAliveTime: n.ConfiguredKeepAliveTimeMSecs,
+			ConfiguredHoldTime:      n.ConfiguredHoldTimeMSecs,
 		})
 	}
 	return res, nil
