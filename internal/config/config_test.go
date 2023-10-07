@@ -3854,3 +3854,9 @@ func TestContainsAdvertisement(t *testing.T) {
 		}
 	}
 }
+
+func FuzzParseCIDR(f *testing.F) {
+	f.Fuzz(func(t *testing.T, input string) {
+		_, _ = ParseCIDR(input)
+	})
+}

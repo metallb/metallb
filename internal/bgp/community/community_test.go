@@ -100,3 +100,14 @@ func TestBGPCommunityString(t *testing.T) {
 		}
 	}
 }
+
+func FuzzNew(f *testing.F) {
+	f.Add("0:1234")
+	f.Add("large:1:2:3")
+	f.Add("large:1235:0:0")
+	f.Add("large:12345:12345:12345")
+
+	f.Fuzz(func(t *testing.T, input string) {
+		_, _ = New(input)
+	})
+}
