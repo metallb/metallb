@@ -144,6 +144,7 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.reloader.resources | object | `{}` |  |
 | speaker.resources | object | `{}` |  |
 | speaker.runtimeClassName | string | `""` |  |
+| speaker.securityContext | object | `{}` |  |
 | speaker.serviceAccount.annotations | object | `{}` |  |
 | speaker.serviceAccount.create | bool | `true` |  |
 | speaker.serviceAccount.name | string | `""` |  |

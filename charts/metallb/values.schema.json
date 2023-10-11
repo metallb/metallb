@@ -342,6 +342,9 @@
             "runtimeClassName": {
               "type": "string"
             },
+            "securityContext": {
+              "type": "object"
+            },
             "secretName": {
               "type": "string"
             },

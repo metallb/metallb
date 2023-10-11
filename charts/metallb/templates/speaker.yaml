@@ -154,6 +154,10 @@ spec:
       serviceAccountName: {{ template "metallb.speaker.serviceAccountName" . }}
       terminationGracePeriodSeconds: 0
       hostNetwork: true
+      {{- if .Values.speaker.securityContext }}
+      securityContext:
+        {{- toYaml .Values.speaker.securityContext | nindent 8 }}
+      {{- end }}
       volumes:
       {{- if .Values.speaker.memberlist.enabled }}
         - name: memberlist
