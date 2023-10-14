@@ -88,13 +88,13 @@ website.
 
 ### Wait for the image repositories to update
 
-When you pushed, CircleCI kicked off a set of image builds for the new
+When you pushed, CI kicked off a set of image builds for the new
 tag. You need to wait for these images to be pushed live before
 continuing, because the manifests for the new release point to image
-tags that don't exist until CircleCI makes them exist.
+tags that don't exist until CI makes them exist.
 
 Check on Quay for a `vX.Y.Z` tag on each image, or check on
-CircleCI that the deploy has completed.
+CI that the deploy has completed.
 
 ### Repoint the live website
 
