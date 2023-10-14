@@ -19,6 +19,10 @@ on:
       - "v**"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   static-security-analysis:
     runs-on: ubuntu-22.04
@@ -48,11 +52,6 @@ jobs:
   unit-tests:
     runs-on: ubuntu-22.04
     steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.9.1
-        with:
-          access_token: ${{ github.token }}
-
       - name: Checkout
         uses: actions/checkout@v4
 
