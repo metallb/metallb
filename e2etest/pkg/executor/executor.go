@@ -60,7 +60,7 @@ func ForPod(namespace, name, container string) Executor {
 }
 
 func (p *podExecutor) Exec(cmd string, args ...string) (string, error) {
-	fullArgs := append([]string{"exec", p.name, "-c", p.container, "--", cmd}, args...)
+	fullArgs := append([]string{"debug", p.name, "-c", p.container, "--image=busybox", "--", cmd}, args...)
 	res, err := kubectl.RunKubectl(p.namespace, fullArgs...)
 	if err != nil {
 		return "", err
