@@ -317,6 +317,9 @@
                 "mlBindPort": {
                   "type": "integer"
                 },
+                "mlBindAddrOverride": {
+                  "type": "string"
+                },
                 "mlSecretKeyPath": {
                   "type": "string"
                 }
