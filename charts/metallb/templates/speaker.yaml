@@ -245,10 +245,15 @@ spec:
             fieldRef:
               fieldPath: status.hostIP
         {{- if .Values.speaker.memberlist.enabled }}
+        {{- if .Values.speaker.memberlist.mlBindAddrOverride }}
+        - name: METALLB_ML_BIND_ADDR
+          value: "{{ .Values.speaker.memberlist.mlBindAddrOverride }}"
+        {{ else }}
         - name: METALLB_ML_BIND_ADDR
           valueFrom:
             fieldRef:
               fieldPath: status.podIP
+        {{ end }}
         - name: METALLB_ML_LABELS
           value: "app.kubernetes.io/name={{ include "metallb.name" . }},app.kubernetes.io/component=speaker"
         - name: METALLB_ML_BIND_PORT
