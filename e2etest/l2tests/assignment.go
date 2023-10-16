@@ -101,11 +101,11 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			framework.ExpectNoError(err)
 
 			jig := e2eservice.NewTestJig(cs, f.Namespace.Name, "singleip")
-			svc, err := jig.CreateLoadBalancerService(10*time.Second, service.TrafficPolicyCluster)
+			svc, err := jig.CreateLoadBalancerService(context.TODO(), 10*time.Second, service.TrafficPolicyCluster)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Creating another service")
-			svc1, err := jig.CreateTCPService(func(svc *v1.Service) {
+			svc1, err := jig.CreateTCPService(context.TODO(), func(svc *v1.Service) {
 				svc.Spec.Type = v1.ServiceTypeLoadBalancer
 				svc.Name = "singleip1"
 			})
@@ -168,13 +168,13 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 
 			ginkgo.By("creating 4 LB services")
 			jig := e2eservice.NewTestJig(cs, f.Namespace.Name, "service-a")
-			serviceA, err := jig.CreateLoadBalancerService(30*time.Second, nil)
+			serviceA, err := jig.CreateLoadBalancerService(context.TODO(), 30*time.Second, nil)
 			framework.ExpectNoError(err)
 			defer service.Delete(cs, serviceA)
 			service.ValidateDesiredLB(serviceA)
 
 			jig = e2eservice.NewTestJig(cs, f.Namespace.Name, "service-b")
-			serviceB, err := jig.CreateLoadBalancerService(30*time.Second, nil)
+			serviceB, err := jig.CreateLoadBalancerService(context.TODO(), 30*time.Second, nil)
 			framework.ExpectNoError(err)
 			defer service.Delete(cs, serviceB)
 			service.ValidateDesiredLB(serviceB)

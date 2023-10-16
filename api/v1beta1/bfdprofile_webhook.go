@@ -24,6 +24,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 func (bfdProfile *BFDProfile) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -37,34 +38,34 @@ func (bfdProfile *BFDProfile) SetupWebhookWithManager(mgr ctrl.Manager) error {
 var _ webhook.Validator = &BFDProfile{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for BFDProfile.
-func (bfdProfile *BFDProfile) ValidateCreate() error {
+func (bfdProfile *BFDProfile) ValidateCreate() (admission.Warnings, error) {
 	level.Debug(Logger).Log("webhook", "bfdProfile", "action", "create", "name", bfdProfile.Name, "namespace", bfdProfile.Namespace)
 
 	if bfdProfile.Namespace != MetalLBNamespace {
-		return fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
+		return nil, fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
 	}
 
-	return nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for BFDProfile.
-func (bfdProfile *BFDProfile) ValidateUpdate(old runtime.Object) error {
-	return nil
+func (bfdProfile *BFDProfile) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for BFDProfile.
-func (bfdProfile *BFDProfile) ValidateDelete() error {
+func (bfdProfile *BFDProfile) ValidateDelete() (admission.Warnings, error) {
 	level.Debug(Logger).Log("webhook", "bfdprofile", "action", "delete", "name", bfdProfile.Name, "namespace", bfdProfile.Namespace)
 
 	existingBGPPeers, err := v1beta2.GetExistingBGPPeers()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, peer := range existingBGPPeers.Items {
 		if bfdProfile.Name == peer.Spec.BFDProfile {
-			return fmt.Errorf("failed to delete BFDProfile %s, used by BGPPeer %s", bfdProfile.Name, peer.Name)
+			return nil, fmt.Errorf("failed to delete BFDProfile %s, used by BGPPeer %s", bfdProfile.Name, peer.Name)
 		}
 	}
-	return nil
+	return nil, nil
 }

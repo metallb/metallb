@@ -9,12 +9,12 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/executor"
 	"go.universe.tf/e2etest/pkg/k8s"
 	"go.universe.tf/e2etest/pkg/mac"
 	"go.universe.tf/e2etest/pkg/service"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -118,8 +118,8 @@ var _ = ginkgo.Describe("L2", func() {
 			// ETP = local, pin the endpoint to node0, have two l2 advertisements, one for
 			// all and one for node1, check node0 is advertised.
 			jig := e2eservice.NewTestJig(cs, f.Namespace.Name, "svca")
-			loadBalancerCreateTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
-			svc, err := jig.CreateLoadBalancerService(loadBalancerCreateTimeout, func(svc *corev1.Service) {
+			loadBalancerCreateTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(context.TODO(), cs)
+			svc, err := jig.CreateLoadBalancerService(context.TODO(), loadBalancerCreateTimeout, func(svc *corev1.Service) {
 				svc.Spec.Ports[0].TargetPort = intstr.FromInt(service.TestServicePort)
 				svc.Spec.Ports[0].Port = int32(service.TestServicePort)
 				svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeLocal
@@ -136,7 +136,7 @@ var _ = ginkgo.Describe("L2", func() {
 			if len(allNodes.Items) < 2 {
 				ginkgo.Skip("Not enough nodes")
 			}
-			_, err = jig.Run(
+			_, err = jig.Run(context.TODO(),
 				func(rc *corev1.ReplicationController) {
 					rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", service.TestServicePort), fmt.Sprintf("--udp-port=%d", service.TestServicePort)}
 					rc.Spec.Template.Spec.Containers[0].ReadinessProbe.HTTPGet.Port = intstr.FromInt(service.TestServicePort)

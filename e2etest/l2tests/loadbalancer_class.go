@@ -3,14 +3,15 @@
 package l2tests
 
 import (
+	"context"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/k8s"
 	"go.universe.tf/e2etest/pkg/service"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -71,7 +72,7 @@ var _ = ginkgo.Describe("LoadBalancer class", func() {
 			framework.ExpectNoError(err)
 
 			jig := e2eservice.NewTestJig(cs, f.Namespace.Name, "lbclass")
-			svc, err := jig.CreateLoadBalancerService(10*time.Second, service.WithLoadbalancerClass("foo"))
+			svc, err := jig.CreateLoadBalancerService(context.TODO(), 10*time.Second, service.WithLoadbalancerClass("foo"))
 			gomega.Expect(err).Should(gomega.MatchError(gomega.ContainSubstring("timed out waiting for the condition")))
 			gomega.Expect(svc).To(gomega.BeNil())
 		})

@@ -133,9 +133,9 @@ func TestValidateIPAddressPool(t *testing.T) {
 		mock.forceError = test.failValidate
 
 		if test.isNew {
-			err = test.ipAddressPool.ValidateCreate()
+			_, err = test.ipAddressPool.ValidateCreate()
 		} else {
-			err = test.ipAddressPool.ValidateUpdate(nil)
+			_, err = test.ipAddressPool.ValidateUpdate(nil)
 		}
 		if test.failValidate && err == nil {
 			t.Fatalf("test %s failed, expecting error", test.desc)
