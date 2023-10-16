@@ -72,9 +72,9 @@ func TestValidateBFDProfile(t *testing.T) {
 		var err error
 		switch test.validateType {
 		case isNew:
-			err = test.bfdProfile.ValidateCreate()
+			_, err = test.bfdProfile.ValidateCreate()
 		case isDel:
-			err = test.bfdProfile.ValidateDelete()
+			_, err = test.bfdProfile.ValidateDelete()
 		}
 
 		if test.failValidate && err == nil {

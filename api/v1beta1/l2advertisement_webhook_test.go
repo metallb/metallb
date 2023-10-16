@@ -138,9 +138,9 @@ func TestValidateL2Advertisement(t *testing.T) {
 		mock.forceError = test.failValidate
 
 		if test.isNew {
-			err = test.l2Adv.ValidateCreate()
+			_, err = test.l2Adv.ValidateCreate()
 		} else {
-			err = test.l2Adv.ValidateUpdate(nil)
+			_, err = test.l2Adv.ValidateUpdate(nil)
 		}
 		if test.failValidate && err == nil {
 			t.Fatalf("test %s failed, expecting error", test.desc)

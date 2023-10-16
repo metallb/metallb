@@ -9,10 +9,10 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/k8s"
 	"go.universe.tf/e2etest/pkg/service"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -98,11 +98,11 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			framework.ExpectNoError(err)
 
 			jig := e2eservice.NewTestJig(cs, f.Namespace.Name, "singleip")
-			svc, err := jig.CreateLoadBalancerService(10*time.Second, service.TrafficPolicyCluster)
+			svc, err := jig.CreateLoadBalancerService(context.TODO(), 10*time.Second, service.TrafficPolicyCluster)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Creating another service")
-			svc1, err := jig.CreateTCPService(func(svc *v1.Service) {
+			svc1, err := jig.CreateTCPService(context.TODO(), func(svc *v1.Service) {
 				svc.Spec.Type = v1.ServiceTypeLoadBalancer
 				svc.Name = "singleip1"
 			})

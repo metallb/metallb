@@ -26,6 +26,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 func (ipAddress *IPAddressPool) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -39,55 +40,55 @@ func (ipAddress *IPAddressPool) SetupWebhookWithManager(mgr ctrl.Manager) error 
 var _ webhook.Validator = &IPAddressPool{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for IPAddressPool.
-func (ipAddress *IPAddressPool) ValidateCreate() error {
+func (ipAddress *IPAddressPool) ValidateCreate() (admission.Warnings, error) {
 	level.Debug(Logger).Log("webhook", "ipaddresspool", "action", "create", "name", ipAddress.Name, "namespace", ipAddress.Namespace)
 
 	if ipAddress.Namespace != MetalLBNamespace {
-		return fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
+		return nil, fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
 	}
 	existingIPAddressPoolList, err := getExistingIPAddressPools()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	existingAddressPoolList, err := getExistingAddressPools()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	toValidate := ipAddressListWithUpdate(existingIPAddressPoolList, ipAddress)
 	err = Validator.Validate(existingAddressPoolList, toValidate)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "ipAddress", "action", "create", "name", ipAddress.Name, "namespace", ipAddress.Namespace, "error", err)
-		return err
+		return nil, err
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for IPAddressPool.
-func (ipAddress *IPAddressPool) ValidateUpdate(old runtime.Object) error {
+func (ipAddress *IPAddressPool) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	level.Debug(Logger).Log("webhook", "ipaddresspool", "action", "update", "name", ipAddress.Name, "namespace", ipAddress.Namespace)
 	existingAddressPoolList, err := getExistingAddressPools()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	existingIPAddressPoolList, err := getExistingIPAddressPools()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	toValidate := ipAddressListWithUpdate(existingIPAddressPoolList, ipAddress)
 	err = Validator.Validate(existingAddressPoolList, toValidate)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "ipAddress", "action", "update", "name", ipAddress.Name, "namespace", ipAddress.Namespace, "error", err)
-		return err
+		return nil, err
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for IPAddressPool.
-func (ipAddress *IPAddressPool) ValidateDelete() error {
-	return nil
+func (ipAddress *IPAddressPool) ValidateDelete() (admission.Warnings, error) {
+	return nil, nil
 }
 
 var getExistingIPAddressPools = func() (*IPAddressPoolList, error) {
