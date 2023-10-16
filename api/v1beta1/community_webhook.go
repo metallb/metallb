@@ -26,6 +26,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 func (community *Community) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -39,48 +40,48 @@ func (community *Community) SetupWebhookWithManager(mgr ctrl.Manager) error {
 var _ webhook.Validator = &Community{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for Community.
-func (community *Community) ValidateCreate() error {
+func (community *Community) ValidateCreate() (admission.Warnings, error) {
 	level.Debug(Logger).Log("webhook", "community", "action", "create", "name", community.Name, "namespace", community.Namespace)
 
 	if community.Namespace != MetalLBNamespace {
-		return fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
+		return nil, fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
 	}
 
 	existingCommunityList, err := getExistingCommunities()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	communityList := communitylistWithUpdate(existingCommunityList, community)
 	err = Validator.Validate(communityList)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "community", "action", "create", "name", community.Name, "namespace", community.Namespace, "error", err)
-		return err
+		return nil, err
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for Community.
-func (community *Community) ValidateUpdate(old runtime.Object) error {
+func (community *Community) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	level.Debug(Logger).Log("webhook", "community", "action", "update", "name", community.Name, "namespace", community.Namespace)
 
 	existingCommunityList, err := getExistingCommunities()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	communityList := communitylistWithUpdate(existingCommunityList, community)
 	err = Validator.Validate(communityList)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "community", "action", "update", "name", community.Name, "namespace", community.Namespace, "error", err)
-		return err
+		return nil, err
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for Community.
-func (community *Community) ValidateDelete() error {
-	return nil
+func (community *Community) ValidateDelete() (admission.Warnings, error) {
+	return nil, nil
 }
 
 var getExistingCommunities = func() (*CommunityList, error) {

@@ -125,9 +125,9 @@ func TestValidateCommunity(t *testing.T) {
 		mock.forceError = test.failValidate
 
 		if test.isNewCommunity {
-			err = test.commuinty.ValidateCreate()
+			_, err = test.commuinty.ValidateCreate()
 		} else {
-			err = test.commuinty.ValidateUpdate(nil)
+			_, err = test.commuinty.ValidateUpdate(nil)
 		}
 		if test.failValidate && err == nil {
 			t.Fatalf("test %s failed, expecting error", test.desc)

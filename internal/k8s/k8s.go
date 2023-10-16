@@ -17,6 +17,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	metallbv1alpha1 "go.universe.tf/metallb/api/v1alpha1"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
@@ -119,17 +121,15 @@ type Config struct {
 // The client uses processName to identify itself to the cluster
 // (e.g. when logging events).
 func New(cfg *Config) (*Client, error) {
-	namespaceSelector := cache.ObjectSelector{
+	namespaceSelector := cache.ByObject{
 		Field: fields.ParseSelectorOrDie(fmt.Sprintf("metadata.namespace=%s", cfg.Namespace)),
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		Port:               9443, // TODO port only with controller, for webhooks
-		LeaderElection:     false,
-		MetricsBindAddress: "0", // Disable metrics endpoint of controller manager
-		NewCache: cache.BuilderWithOptions(cache.Options{
-			SelectorsByObject: map[client.Object]cache.ObjectSelector{
+		Scheme:         scheme,
+		LeaderElection: false,
+		Cache: cache.Options{
+			ByObject: map[client.Object]cache.ByObject{
 				&metallbv1beta1.AddressPool{}:      namespaceSelector,
 				&metallbv1beta1.BFDProfile{}:       namespaceSelector,
 				&metallbv1beta1.BGPAdvertisement{}: namespaceSelector,
@@ -141,7 +141,15 @@ func New(cfg *Config) (*Client, error) {
 				&corev1.Secret{}:                   namespaceSelector,
 				&corev1.ConfigMap{}:                namespaceSelector,
 			},
-		}),
+		},
+		WebhookServer: webhook.NewServer(
+			webhook.Options{
+				Port: 9443, // TODO port only with controller, for webhooks
+			},
+		),
+		Metrics: metricsserver.Options{
+			BindAddress: "0", // Disable metrics endpoint of controller manager
+		},
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")

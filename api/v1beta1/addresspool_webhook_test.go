@@ -137,9 +137,9 @@ func TestValidateAddressPool(t *testing.T) {
 		mock.forceError = test.failValidate
 
 		if test.isNewAddressPool {
-			err = test.addressPool.ValidateCreate()
+			_, err = test.addressPool.ValidateCreate()
 		} else {
-			err = test.addressPool.ValidateUpdate(nil)
+			_, err = test.addressPool.ValidateUpdate(nil)
 		}
 		if test.failValidate && err == nil {
 			t.Fatalf("test %s failed, expecting error", test.desc)

@@ -195,10 +195,10 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		testservice.ValidateDesiredLB(svc)
 
-		err := jig.Scale(2)
+		err := jig.Scale(context.TODO(), 2)
 		framework.ExpectNoError(err)
 
-		epNodes, err := jig.ListNodesWithEndpoint() // Only nodes with an endpoint should be advertising the IP
+		epNodes, err := jig.ListNodesWithEndpoint(context.TODO()) // Only nodes with an endpoint should be advertising the IP
 		framework.ExpectNoError(err)
 
 		for _, c := range FRRContainers {

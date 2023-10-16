@@ -26,6 +26,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 func (addressPool *AddressPool) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -39,56 +40,56 @@ func (addressPool *AddressPool) SetupWebhookWithManager(mgr ctrl.Manager) error 
 var _ webhook.Validator = &AddressPool{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for AddressPool.
-func (addressPool *AddressPool) ValidateCreate() error {
+func (addressPool *AddressPool) ValidateCreate() (admission.Warnings, error) {
 	level.Debug(Logger).Log("webhook", "addressPool", "action", "create", "name", addressPool.Name, "namespace", addressPool.Namespace)
 
 	if addressPool.Namespace != MetalLBNamespace {
-		return fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
+		return nil, fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
 	}
 
 	existingAddressPoolList, err := getExistingAddressPools()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	existingIPAddressPoolList, err := getExistingIPAddressPools()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	addressPoolList := listWithUpdate(existingAddressPoolList, addressPool)
 	err = Validator.Validate(addressPoolList, existingIPAddressPoolList)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "addressPool", "action", "create", "name", addressPool.Name, "namespace", addressPool.Namespace, "error", err)
-		return err
+		return nil, err
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for AddressPool.
-func (addressPool *AddressPool) ValidateUpdate(old runtime.Object) error {
+func (addressPool *AddressPool) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	level.Debug(Logger).Log("webhook", "addressPool", "action", "update", "name", addressPool.Name, "namespace", addressPool.Namespace)
 
 	existingAddressPoolList, err := getExistingAddressPools()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	existingIPAddressPoolList, err := getExistingIPAddressPools()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	addressPoolList := listWithUpdate(existingAddressPoolList, addressPool)
 	err = Validator.Validate(addressPoolList, existingIPAddressPoolList)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "addressPool", "action", "update", "name", addressPool.Name, "namespace", addressPool.Namespace, "error", err)
-		return err
+		return nil, err
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for AddressPool.
-func (addressPool *AddressPool) ValidateDelete() error {
-	return nil
+func (addressPool *AddressPool) ValidateDelete() (admission.Warnings, error) {
+	return nil, nil
 }
 
 var getExistingAddressPools = func() (*AddressPoolList, error) {

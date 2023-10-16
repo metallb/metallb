@@ -116,8 +116,8 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	if r.Endpoints == EndpointSlices {
 		return ctrl.NewControllerManagedBy(mgr).
 			For(&v1.Service{}).
-			Watches(&source.Kind{Type: &discovery.EndpointSlice{}},
-				handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []reconcile.Request {
+			Watches(&discovery.EndpointSlice{},
+				handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 					epSlice, ok := obj.(*discovery.EndpointSlice)
 					if !ok {
 						level.Error(r.Logger).Log("controller", "ServiceReconciler", "error", "received an object that is not epslice")
@@ -131,14 +131,14 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					level.Debug(r.Logger).Log("controller", "ServiceReconciler", "enqueueing", serviceName, "epslice", dumpResource(epSlice))
 					return []reconcile.Request{{NamespacedName: serviceName}}
 				})).
-			Watches(&source.Channel{Source: r.Reload}, &handler.EnqueueRequestForObject{}).
+			WatchesRawSource(&source.Channel{Source: r.Reload}, &handler.EnqueueRequestForObject{}).
 			Complete(r)
 	}
 	if r.Endpoints == Endpoints {
 		return ctrl.NewControllerManagedBy(mgr).
 			For(&v1.Service{}).
-			Watches(&source.Kind{Type: &v1.Endpoints{}},
-				handler.EnqueueRequestsFromMapFunc(func(obj client.Object) []reconcile.Request {
+			Watches(&v1.Endpoints{},
+				handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
 					endpoints, ok := obj.(*v1.Endpoints)
 					if !ok {
 						level.Error(r.Logger).Log("controller", "ServiceReconciler", "error", "received an object that is not an endpoint")
@@ -148,13 +148,13 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					level.Debug(r.Logger).Log("controller", "ServiceReconciler", "enqueueing", name, "endpoints", dumpResource(endpoints))
 					return []reconcile.Request{{NamespacedName: name}}
 				})).
-			Watches(&source.Channel{Source: r.Reload}, &handler.EnqueueRequestForObject{}).
+			WatchesRawSource(&source.Channel{Source: r.Reload}, &handler.EnqueueRequestForObject{}).
 			Complete(r)
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.Service{}).
-		Watches(&source.Channel{Source: r.Reload}, &handler.EnqueueRequestForObject{}).
+		WatchesRawSource(&source.Channel{Source: r.Reload}, &handler.EnqueueRequestForObject{}).
 		Complete(r)
 }
 

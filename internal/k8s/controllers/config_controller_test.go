@@ -38,6 +38,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -235,7 +236,7 @@ func TestNodeEvent(t *testing.T) {
 	g.Expect(err).ToNot(HaveOccurred())
 	err = v1beta2.AddToScheme(k8sscheme.Scheme)
 	g.Expect(err).ToNot(HaveOccurred())
-	m, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0"})
+	m, err := manager.New(cfg, manager.Options{Metrics: metricsserver.Options{BindAddress: "0"}})
 	g.Expect(err).ToNot(HaveOccurred())
 
 	var configUpdate int
