@@ -19,6 +19,10 @@ on:
       - "v**"
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   static-security-analysis:
     runs-on: ubuntu-22.04
@@ -26,7 +30,7 @@ jobs:
       GO111MODULE: on
     steps:
       - name: Checkout Source
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Run Gosec Security Scanner
         uses: securego/gosec@master
         with:
@@ -40,7 +44,7 @@ jobs:
   commitlint:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: wagoid/commitlint-github-action@v5
@@ -48,13 +52,8 @@ jobs:
   unit-tests:
     runs-on: ubuntu-22.04
     steps:
-      - name: Cancel Previous Runs
-        uses: styfle/cancel-workflow-action@0.9.1
-        with:
-          access_token: ${{ github.token }}
-
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - uses: actions/setup-go@v4
         with:
@@ -91,7 +90,7 @@ jobs:
         image: [speaker, controller, configmaptocrs]
     steps:
       - name: Code checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Setup docker buildx
         uses: docker/setup-buildx-action@v2
 
@@ -115,7 +114,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           # Required for chart-testing
           fetch-depth: 0
@@ -178,7 +177,7 @@ jobs:
           prometheus: disabled
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install kernel modules
         run: |
@@ -233,7 +232,7 @@ jobs:
       - commitlint
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -241,7 +240,7 @@ jobs:
         uses: ./.github/workflows/composite/setup
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: "0"
           path: metallb-v0.12.1
@@ -294,7 +293,7 @@ jobs:
           sudo apt-get install linux-modules-extra-$(uname -r)
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -302,14 +301,14 @@ jobs:
         uses: ./.github/workflows/composite/setup
 
       - name: Checkout Metal LB Operator
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: metallb/metallb-operator
           path: metallboperator
           ref: main
 
       - name: Checkout MetalLB
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: metallb
           fetch-depth: 0
@@ -375,7 +374,7 @@ jobs:
           sudo apt-get install linux-modules-extra-$(uname -r)
 
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 

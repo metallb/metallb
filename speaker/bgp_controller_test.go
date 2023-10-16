@@ -1506,6 +1506,44 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 		},
 
 		{
+			desc:     "Endpoint list contains serving but not ready endpoints",
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: epslices.EpsOrSlices{
+				SlicesVal: []discovery.EndpointSlice{
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
+								},
+								NodeName: stringPtr("iris"),
+								Conditions: discovery.EndpointConditions{
+									Ready:   pointer.BoolPtr(false),
+									Serving: pointer.BoolPtr(true),
+								},
+							},
+						},
+					},
+				},
+				Type: epslices.Slices,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
+			},
+		},
+
+		{
 			desc: "Multiple advertisement config",
 			config: &config.Config{
 				Peers: map[string]*config.Peer{

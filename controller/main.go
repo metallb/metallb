@@ -74,20 +74,27 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 	// a reason.
 	svc := svcRo.DeepCopy()
 	syncStateRes := controllers.SyncStateSuccess
-	wasAllocated := c.isServiceAllocated(name)
+
+	prevIPs := c.ips.IPs(name)
+
 	if c.convergeBalancer(l, name, svc) != nil {
 		syncStateRes = controllers.SyncStateErrorNoRetry
 	}
 
-	if wasAllocated && !c.isServiceAllocated(name) { // convergeBalancer may deallocate our service and this means it did it.
-		// if the service was deallocated, it may have have left room
-		// for another one, so we reprocess
-		level.Info(l).Log("event", "serviceUpdated", "msg", "removed loadbalancer from service, services will be reprocessed")
-		syncStateRes = controllers.SyncStateReprocessAll
-	}
 	if reflect.DeepEqual(svcRo, svc) {
 		level.Debug(l).Log("event", "noChange", "msg", "service converged, no change")
 		return syncStateRes
+	}
+
+	if len(prevIPs) != 0 && !c.isServiceAllocated(name) {
+		// Only reprocess all if the previous IP(s) are still contained within a pool.
+		if c.ips.PoolForIP(prevIPs) != nil {
+			// convergeBalancer may deallocate our service and this means it did it.
+			// if the service was deallocated, it may have left room
+			// for another one, so we reprocess
+			level.Info(l).Log("event", "serviceUpdated", "msg", "removed loadbalancer from service, services will be reprocessed")
+			syncStateRes = controllers.SyncStateReprocessAll
+		}
 	}
 
 	toWrite := svcRo.DeepCopy()
@@ -121,11 +128,9 @@ func (c *controller) SetPools(l log.Logger, pools *config.Pools) controllers.Syn
 		return controllers.SyncStateErrorNoRetry
 	}
 
-	if err := c.ips.SetPools(pools); err != nil {
-		level.Error(l).Log("op", "setConfig", "error", err, "msg", "applying new configuration failed")
-		return controllers.SyncStateError
-	}
+	c.ips.SetPools(pools)
 	c.pools = pools
+
 	return controllers.SyncStateReprocessAll
 }
 
@@ -143,6 +148,7 @@ func main() {
 		certServiceName     = flag.String("cert-service-name", "webhook-service", "The service name used to generate the TLS cert's hostname")
 		loadBalancerClass   = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
 		webhookMode         = flag.String("webhook-mode", "enabled", "webhook mode: can be enabled, disabled or only webhook if we want the controller to act as webhook endpoint only")
+		webhookSecretName   = flag.String("webhook-secret", "webhook-server-cert", "webhook secret: the name of webhook secret, default is webhook-server-cert")
 	)
 	flag.Parse()
 
@@ -189,6 +195,7 @@ func main() {
 		ValidateConfig:      validation,
 		EnableWebhook:       true,
 		DisableCertRotation: *disableCertRotation,
+		WebhookSecretName:   *webhookSecretName,
 		CertDir:             *certDir,
 		CertServiceName:     *certServiceName,
 		LoadBalancerClass:   *loadBalancerClass,

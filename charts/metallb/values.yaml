@@ -282,6 +282,7 @@ speaker:
     # true, a name is generated using the fullname template
     name: ""
     annotations: {}
+  securityContext: {}
   ## Defines a secret name for the controller to generate a memberlist encryption secret
   ## By default secretName: {{ "metallb.fullname" }}-memberlist
   ##

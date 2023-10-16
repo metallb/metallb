@@ -1,6 +1,6 @@
 module go.universe.tf/e2etest
 
-go 1.19
+go 1.20
 
 replace (
 	github.com/onsi/ginkgo/v2 => github.com/onsi/ginkgo/v2 v2.4.0

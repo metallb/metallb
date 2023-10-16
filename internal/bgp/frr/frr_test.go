@@ -859,7 +859,7 @@ func TestTwoAdvertisementsTwoSessions(t *testing.T) {
 					SessionName:   "test-peer1"},
 			}
 			seed := time.Now().UnixNano()
-			rand.Seed(seed)
+			rand.New(rand.NewSource(seed))
 
 			rand.Shuffle(len(sessionsParameters), func(i, j int) {
 				sessionsParameters[i], sessionsParameters[j] = sessionsParameters[j], sessionsParameters[i]
