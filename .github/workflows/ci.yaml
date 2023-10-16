@@ -92,7 +92,7 @@ jobs:
       - name: Code checkout
         uses: actions/checkout@v4
       - name: Setup docker buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Build and export ${{ matrix.image }}
         uses: docker/build-push-action@v4
