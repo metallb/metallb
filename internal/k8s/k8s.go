@@ -5,6 +5,7 @@ package k8s // import "go.universe.tf/metallb/internal/k8s"
 import (
 	"context"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/base64"
 	"fmt"
 	"net"
@@ -113,6 +114,7 @@ type Config struct {
 	CertDir             string
 	CertServiceName     string
 	LoadBalancerClass   string
+	WebhookWithHTTP2    bool
 	Listener
 }
 
@@ -142,11 +144,7 @@ func New(cfg *Config) (*Client, error) {
 				&corev1.ConfigMap{}:                namespaceSelector,
 			},
 		},
-		WebhookServer: webhook.NewServer(
-			webhook.Options{
-				Port: 9443, // TODO port only with controller, for webhooks
-			},
-		),
+		WebhookServer: webhookServer(9443, cfg.WebhookWithHTTP2),
 		Metrics: metricsserver.Options{
 			BindAddress: "0", // Disable metrics endpoint of controller manager
 		},
@@ -428,4 +426,21 @@ func UseEndpointSlices(kubeClient kubernetes.Interface) bool {
 		return false
 	}
 	return true
+}
+
+func webhookServer(port int, withHTTP2 bool) webhook.Server {
+	disableHTTP2 := func(c *tls.Config) {
+		if withHTTP2 {
+			return
+		}
+		c.NextProtos = []string{"http/1.1"}
+	}
+
+	webhookServerOptions := webhook.Options{
+		TLSOpts: []func(config *tls.Config){disableHTTP2},
+		Port:    port,
+	}
+
+	res := webhook.NewServer(webhookServerOptions)
+	return res
 }

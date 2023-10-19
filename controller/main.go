@@ -149,6 +149,7 @@ func main() {
 		loadBalancerClass   = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
 		webhookMode         = flag.String("webhook-mode", "enabled", "webhook mode: can be enabled, disabled or only webhook if we want the controller to act as webhook endpoint only")
 		webhookSecretName   = flag.String("webhook-secret", "webhook-server-cert", "webhook secret: the name of webhook secret, default is webhook-server-cert")
+		webhookHTTP2        = flag.Bool("webhook-http2", false, "enables http2 for the webhook endpoint")
 	)
 	flag.Parse()
 
@@ -194,6 +195,7 @@ func main() {
 		},
 		ValidateConfig:      validation,
 		EnableWebhook:       true,
+		WebhookWithHTTP2:    *webhookHTTP2,
 		DisableCertRotation: *disableCertRotation,
 		WebhookSecretName:   *webhookSecretName,
 		CertDir:             *certDir,
