@@ -202,9 +202,11 @@ func main() {
 	}
 	switch *webhookMode {
 	case "enabled":
+		cfg.EnableWebhook = true
 	case "disabled":
 		cfg.EnableWebhook = false
 	case "onlywebhook":
+		cfg.EnableWebhook = true
 		cfg.Listener = k8s.Listener{}
 	default:
 		level.Error(logger).Log("op", "startup", "error", "invalid webhookmode value", "value", *webhookMode)
