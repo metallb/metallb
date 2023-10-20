@@ -59,14 +59,14 @@ kubectl apply -f - -n kube-system
 To install MetalLB, apply the manifest:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.11/config/manifests/metallb-native.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.12/config/manifests/metallb-native.yaml
 ```
 
 {{% notice note %}}
 If you want to deploy MetalLB using the [FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions), apply the manifests:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.11/config/manifests/metallb-frr.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.12/config/manifests/metallb-frr.yaml
 ```
 
 Please do note that these manifests deploy MetalLB from the main development branch. We highly encourage cloud operators to deploy a stable released version of MetalLB on production environments!
@@ -114,7 +114,7 @@ In the following example, we are deploying MetalLB with the native bgp implement
 namespace: metallb-system
 
 resources:
-  - github.com/metallb/metallb/config/native?ref=v0.13.11
+  - github.com/metallb/metallb/config/native?ref=v0.13.12
 ```
 
 In order to deploy the [FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions):
@@ -124,7 +124,7 @@ In order to deploy the [FRR mode](https://metallb.universe.tf/configuration/#ena
 namespace: metallb-system
 
 resources:
-  - github.com/metallb/metallb/config/frr?ref=v0.13.11
+  - github.com/metallb/metallb/config/frr?ref=v0.13.12
 ```
 
 ## Installation with Helm

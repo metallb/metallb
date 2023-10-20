@@ -1,5 +1,5 @@
 ---
 ---
 <img align="left" src="/images/logo/metallb-white.png" width="25%"></img>
-MetalLB v0.13.11
+MetalLB v0.13.12
 <p style="clear: both"></p>
