@@ -3,6 +3,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"flag"
 	"fmt"
 	stdlog "log"
@@ -25,6 +26,7 @@ import (
 var (
 	metricsPort = flag.Uint("metrics-port", 7473, "Port to listen on for web interface.")
 	metricsPath = flag.String("metrics-path", "/metrics", "Path under which to expose metrics.")
+	withHTTP2   = flag.Bool("with-http2", false, "Enables http2 support on the metrics endpoint")
 )
 
 func metricsHandler(logger log.Logger) http.Handler {
@@ -66,9 +68,14 @@ func main() {
 	level.Info(logger).Log("msg", "Starting exporter", "metricsPath", metricsPath, "port", metricsPort)
 
 	srv := &http.Server{
-		Addr:        fmt.Sprintf(":%d", *metricsPort),
-		ReadTimeout: 3 * time.Second,
-		Handler:     mux,
+		Addr:         fmt.Sprintf(":%d", *metricsPort),
+		ReadTimeout:  3 * time.Second,
+		Handler:      mux,
+		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
+	}
+
+	if *withHTTP2 {
+		srv.TLSNextProto = nil
 	}
 
 	if err := srv.ListenAndServe(); err != nil {

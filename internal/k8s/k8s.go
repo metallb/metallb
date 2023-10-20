@@ -295,6 +295,10 @@ func New(cfg *Config) (*Client, error) {
 			Addr:              net.JoinHostPort(cfg.MetricsHost, fmt.Sprint(cfg.MetricsPort)),
 			Handler:           mux,
 			ReadHeaderTimeout: 3 * time.Second,
+			TLSNextProto:      make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
+		}
+		if cfg.WebhookWithHTTP2 {
+			server.TLSNextProto = nil
 		}
 
 		err := server.ListenAndServe()
