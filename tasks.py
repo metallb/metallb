@@ -1,12 +1,16 @@
 import ipaddress
 import os
-import semver
 import re
 import shutil
 import sys
-import yaml
 import tempfile
 import time
+from functools import cache
+from typing import Optional
+
+import semver
+import yaml
+
 try:
     from urllib.request import urlopen
 except ImportError:
@@ -14,6 +18,8 @@ except ImportError:
 
 from invoke import run, task
 from invoke.exceptions import Exit, UnexpectedExit
+
+LICENSE_PATH = os.path.join("dev-env", "deepcopy_header.txt")
 
 all_binaries = set(["controller",
                     "speaker",
@@ -28,7 +34,9 @@ extra_network = "network2"
 controller_gen_version = "v0.11.1"
 build_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build")
 kubectl_path = os.path.join(build_path, "kubectl")
+controller_gen_path = os.path.join(build_path, "bin", "controller-gen")
 kubectl_version = "v1.27.0"
+
 
 def _check_architectures(architectures):
     out = set()
@@ -44,6 +52,7 @@ def _check_architectures(architectures):
     if not out:
         out.add("amd64")
     return list(sorted(out))
+
 
 def _check_binaries(binaries):
     out = set()
@@ -62,6 +71,7 @@ def _check_binaries(binaries):
         out.add("configmaptocrs")
     return list(sorted(out))
 
+
 def _docker_build_cmd():
     cmd = os.getenv('DOCKER_BUILD_CMD')
     if cmd:
@@ -72,17 +82,18 @@ def _docker_build_cmd():
                   "|| echo 'docker build'", hide=True).stdout.strip()
     return out
 
+
 def run_with_retry(cmd, tries=6, delay=2):
-  mtries, mdelay = tries, delay
-  while mtries > 1:
-    rv = run(cmd, warn="True").exited
-    if rv == 0:
-          return
-    print("Sleeping for {}s".format(mdelay))
-    time.sleep(mdelay)
-    mtries -= 1
-    mdelay *= 2 #exponential backoff
-  run(cmd)
+    mtries, mdelay = tries, delay
+    while mtries > 1:
+        rv = run(cmd, warn="True").exited
+        if rv == 0:
+            return
+        print("Sleeping for {}s".format(mdelay))
+        time.sleep(mdelay)
+        mtries -= 1
+        mdelay *= 2  # exponential backoff
+    run(cmd)
 
 
 # Returns true if docker is a symbolic link to podman.
@@ -98,14 +109,15 @@ def _is_network_exist(network):
         return False
     return True
 
+
 # Get the list of subnets for the nework.
 def _get_network_subnets(network):
     if _is_podman():
         cmd = ('podman network inspect {network} '.format(network=network) +
-        '-f "{{ range .Subnets }}{{.Subnet}} {{end}}"')
+               '-f "{{ range .Subnets }}{{.Subnet}} {{end}}"')
     else:
         cmd = ('docker network inspect {network} '.format(network=network) +
-        '-f "{{ range .IPAM.Config}}{{.Subnet}} {{end}}"')
+               '-f "{{ range .IPAM.Config}}{{.Subnet}} {{end}}"')
     return run(cmd, echo=True).stdout.strip().split(' ')
 
 
@@ -137,6 +149,7 @@ def _get_subnets_allocated_ips():
 
     return sorted(v4_ips), sorted(v6_ips)
 
+
 def _add_nic_to_nodes(cluster_name):
     nodes = run("kind get nodes --name {name}".format(name=cluster_name)).stdout.strip().split("\n")
     if not _is_network_exist(extra_network):
@@ -144,18 +157,25 @@ def _add_nic_to_nodes(cluster_name):
     for node in nodes:
         run("docker network connect {bridge_name} {node}".format(bridge_name=extra_network, node=node))
 
+
 # Get the nics of kind cluster node
 def _get_node_nics(node):
-    default_nic = run('docker exec -i {container} ip r | grep default | cut -d " " -f 5'.format(container=node)).stdout.strip()
+    default_nic = run(
+        'docker exec -i {container} ip r | grep default | cut -d " " -f 5'.format(container=node)).stdout.strip()
     if not _is_network_exist(extra_network):
         return default_nic
     extra_subnets = _get_network_subnets(extra_network)
     ip = ipaddress.ip_network(extra_subnets[0])
     if ip.version == 4:
-        extra_nic = run('docker exec -i {container} ip r | grep {dst} | cut -d " " -f 3'.format(container=node, dst=extra_subnets[0])).stdout.strip()
+        extra_nic = run('docker exec -i {container} ip r | grep {dst} | cut -d " " -f 3'.format(container=node,
+                                                                                                dst=extra_subnets[
+                                                                                                    0])).stdout.strip()
     else:
-        extra_nic = run('docker exec -i {container} ip -6 r | grep {dst} | cut -d " " -f 3'.format(container=node, dst=extra_subnets[0])).stdout.strip()
+        extra_nic = run('docker exec -i {container} ip -6 r | grep {dst} | cut -d " " -f 3'.format(container=node,
+                                                                                                   dst=extra_subnets[
+                                                                                                       0])).stdout.strip()
     return default_nic + "," + extra_nic
+
 
 def _get_local_nics():
     nics = []
@@ -171,10 +191,12 @@ def _get_local_nics():
         nics.append(nic)
     return ','.join(nics)
 
+
 @task(iterable=["binaries", "architectures"],
       help={
           "binaries": "binaries to build. One or more of {}, or 'all'".format(", ".join(sorted(all_binaries))),
-          "architectures": "architectures to build. One or more of {}, or 'all'".format(", ".join(sorted(all_architectures))),
+          "architectures": "architectures to build. One or more of {}, or 'all'".format(
+              ", ".join(sorted(all_architectures))),
           "registry": "Docker registry under which to tag the images. Default 'quay.io'.",
           "repo": "Docker repository under which to tag the images. Default 'metallb'.",
           "tag": "Docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'.",
@@ -196,13 +218,13 @@ def build(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag=
                     command = "podman"
                 else:
                     command = "docker"
-                run ("{command} image rm {registry}/{repo}/{bin}:{tag}-{arch}".format(
-                            command=command,
-                            registry=registry,
-                            repo=repo,
-                            bin=bin,
-                            tag=tag,
-                            arch=arch))
+                run("{command} image rm {registry}/{repo}/{bin}:{tag}-{arch}".format(
+                    command=command,
+                    registry=registry,
+                    repo=repo,
+                    bin=bin,
+                    tag=tag,
+                    arch=arch))
             except:
                 pass
             run("{docker_build_cmd} "
@@ -212,21 +234,22 @@ def build(ctx, binaries, architectures, registry="quay.io", repo="metallb", tag=
                 "--build-arg GIT_BRANCH=\"{branch}\" "
                 "--build-arg GIT_COMMIT=\"{commit}\" "
                 ".".format(
-                    docker_build_cmd=docker_build_cmd,
-                    registry=registry,
-                    repo=repo,
-                    bin=bin,
-                    tag=tag,
-                    arch=arch,
-                    commit=commit,
-                    branch=branch),
+                docker_build_cmd=docker_build_cmd,
+                registry=registry,
+                repo=repo,
+                bin=bin,
+                tag=tag,
+                arch=arch,
+                commit=commit,
+                branch=branch),
                 echo=True)
 
 
 @task(iterable=["binaries", "architectures"],
       help={
           "binaries": "binaries to build. One or more of {}, or 'all'".format(", ".join(sorted(all_binaries))),
-          "architectures": "architectures to build. One or more of {}, or 'all'".format(", ".join(sorted(all_architectures))),
+          "architectures": "architectures to build. One or more of {}, or 'all'".format(
+              ", ".join(sorted(all_architectures))),
           "registry": "Docker registry under which to tag the images. Default 'quay.io'.",
           "repo": "Docker repository under which to tag the images. Default 'metallb'.",
           "tag": "Docker image tag prefix to use. Actual tag will be <tag>-<arch>. Default 'dev'.",
@@ -267,11 +290,11 @@ def push_multiarch(ctx, binaries, registry="quay.io", repo="metallb", tag="dev")
             "--platforms {platforms} "
             "--template {registry}/{repo}/{bin}:{tag}-ARCH "
             "--target {registry}/{repo}/{bin}:{tag}".format(
-                platforms=platforms,
-                registry=registry,
-                repo=repo,
-                bin=bin,
-                tag=tag),
+            platforms=platforms,
+            registry=registry,
+            repo=repo,
+            bin=bin,
+            tag=tag),
             echo=True)
 
 
@@ -293,20 +316,24 @@ def validate_kind_version():
     if delta < 0:
         raise Exit(message="kind version >= {} required".format(min_version))
 
+
 def generate_manifest(ctx, crd_options="crd:crdVersions=v1", bgp_type="native", output=None, with_prometheus=False):
-    _fetch_kubectl()
-    run("GOBIN={}/bin/ GOPATH={} go install sigs.k8s.io/controller-tools/cmd/controller-gen@{}".format(build_path, build_path, controller_gen_version), echo=True)
-    res = run("{}/bin/controller-gen {} rbac:roleName=manager-role webhook paths=\"./api/...\" output:crd:artifacts:config=config/crd/bases".format(build_path, crd_options), echo=True)
+    fetch_kubectl()
+    fetch_controller_gen()
+    res = run(
+        "{}/bin/controller-gen {} rbac:roleName=manager-role webhook paths=\"./api/...\" output:crd:artifacts:config=config/crd/bases".format(
+            build_path, crd_options), echo=True)
     if not res.ok:
         raise Exit(message="Failed to generate manifests")
 
     if output:
-        layer=bgp_type
+        layer = bgp_type
         if with_prometheus:
             layer = "prometheus-" + layer
         res = run("{} kustomize config/{} > {}".format(kubectl_path, layer, output))
         if not res.ok:
             raise Exit(message="Failed to kustomize manifests")
+
 
 @task(help={
     "architecture": "CPU architecture of the local machine. Default 'amd64'.",
@@ -322,19 +349,19 @@ def generate_manifest(ctx, crd_options="crd:crdVersions=v1", bgp_type="native", 
     "frr_volume_dir": "FRR router config directory to be mounted inside frr container. "
                       "Default: ./dev-env/bgp/frr-volume",
     "log_level": "Log level for the controller and the speaker."
-                "Default: info, Supported: 'all', 'debug', 'info', 'warn', 'error' or 'none'",
+                 "Default: info, Supported: 'all', 'debug', 'info', 'warn', 'error' or 'none'",
     "helm_install": "Optional install MetalLB via helm chart instead of manifests."
-                "Default: False.",
+                    "Default: False.",
     "build_images": "Optional build the images."
-                "Default: True.",
+                    "Default: True.",
     "with_prometheus": "Deploys the prometheus kubernetes stack"
-                "Default: False.",
+                       "Default: False.",
     "with_api_audit": "Enables audit on the apiserver"
-                "Default: False.",
+                      "Default: False.",
 })
 def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_dir="",
-        node_img=None, ip_family="ipv4", bgp_type="frr", log_level="info",
-        helm_install=False, build_images=True, with_prometheus=False, with_api_audit=False):
+            node_img=None, ip_family="ipv4", bgp_type="frr", log_level="info",
+            helm_install=False, build_images=True, with_prometheus=False, with_api_audit=False):
     """Build and run MetalLB in a local Kind cluster.
 
     If the cluster specified by --name (default "kind") doesn't exist,
@@ -344,7 +371,7 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
     The optional node_img parameter will be used to determine the version of the cluster.
     """
 
-    _fetch_kubectl()
+    fetch_kubectl()
     validate_kind_version()
 
     clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
@@ -356,7 +383,7 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
             "nodes": [{"role": "control-plane"},
                       {"role": "worker"},
                       {"role": "worker"},
-            ],
+                      ],
         }
 
         if with_api_audit:
@@ -379,8 +406,8 @@ apiServer:
       readOnly: false
       pathType: DirectoryOrCreate"""]
             config["nodes"][0]["extraMounts"] = [{"hostPath": "./dev-env/audit-policy.yaml",
-                                        "containerPath": "/etc/kubernetes/policies/audit-policy.yaml",
-                                        "readOnly": True}]
+                                                  "containerPath": "/etc/kubernetes/policies/audit-policy.yaml",
+                                                  "readOnly": True}]
 
         networking_config = {}
         if ip_family != "ipv4":
@@ -397,7 +424,8 @@ apiServer:
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(config)
             tmp.flush()
-            run("kind create cluster --name={} --config={} {}".format(name, tmp.name, extra_options), pty=True, echo=True)
+            run("kind create cluster --name={} --config={} {}".format(name, tmp.name, extra_options), pty=True,
+                echo=True)
         _add_nic_to_nodes(name)
 
     binaries = ["controller", "speaker"]
@@ -412,34 +440,36 @@ apiServer:
 
     if helm_install:
         run("{} apply -f config/native/ns.yaml".format(kubectl_path), echo=True)
-        prometheus_values=""
+        prometheus_values = ""
         if with_prometheus:
-            prometheus_values=("--set prometheus.serviceMonitor.enabled=true "
-                               "--set prometheus.secureMetricsPort=9120 "
-                               "--set speaker.frr.secureMetricsPort=9121 "
-                               "--set prometheus.serviceAccount=prometheus-k8s "
-                               "--set prometheus.namespace=monitoring ")
-        frr_values=""
+            prometheus_values = ("--set prometheus.serviceMonitor.enabled=true "
+                                 "--set prometheus.secureMetricsPort=9120 "
+                                 "--set speaker.frr.secureMetricsPort=9121 "
+                                 "--set prometheus.serviceAccount=prometheus-k8s "
+                                 "--set prometheus.namespace=monitoring ")
+        frr_values = ""
         if bgp_type == "frr":
-            frr_values="--set speaker.frr.enabled=true "
+            frr_values = "--set speaker.frr.enabled=true "
         if bgp_type == "frr-k8s":
-            frr_values="--set frrk8s.enabled=true --set speaker.frr.enabled=false --set frr-k8s.prometheus.serviceMonitor.enabled=false "
+            frr_values = "--set frrk8s.enabled=true --set speaker.frr.enabled=false --set frr-k8s.prometheus.serviceMonitor.enabled=false "
             if with_prometheus:
-                frr_values=("--set frrk8s.enabled=true --set speaker.frr.enabled=false --set frr-k8s.prometheus.serviceMonitor.enabled=true "
-                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[0].sourceLabels=\{__name__\} "
-                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[0].regex=\"frrk8s_bgp_(.*)\" "
-                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[0].targetLabel=\"__name__\" "
-                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[0].replacement=\"metallb_bgp_\$1\" "
-                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].sourceLabels=\{__name__\} "
-                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].regex=\"frrk8s_bfd_(.*)\" "
-                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].targetLabel=\"__name__\" "
-                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].replacement=\"metallb_bfd_\$1\" "
-                           )
+                frr_values = (
+                    "--set frrk8s.enabled=true --set speaker.frr.enabled=false --set frr-k8s.prometheus.serviceMonitor.enabled=true "
+                    "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[0].sourceLabels=\{__name__\} "
+                    "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[0].regex=\"frrk8s_bgp_(.*)\" "
+                    "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[0].targetLabel=\"__name__\" "
+                    "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[0].replacement=\"metallb_bgp_\$1\" "
+                    "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].sourceLabels=\{__name__\} "
+                    "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].regex=\"frrk8s_bfd_(.*)\" "
+                    "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].targetLabel=\"__name__\" "
+                    "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].replacement=\"metallb_bfd_\$1\" "
+                )
 
         run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
-                "--set speaker.image.tag=dev-{} --set speaker.logLevel=debug "
-                "--set controller.logLevel=debug {} {}  --namespace metallb-system".format(architecture, architecture,
-                prometheus_values, frr_values), echo=True)
+            "--set speaker.image.tag=dev-{} --set speaker.logLevel=debug "
+            "--set controller.logLevel=debug {} {}  --namespace metallb-system".format(architecture, architecture,
+                                                                                       prometheus_values, frr_values),
+            echo=True)
     else:
         run("{} delete po -n metallb-system --all".format(kubectl_path), echo=True)
 
@@ -453,7 +483,7 @@ apiServer:
                 manifest = f.read()
             for image in binaries:
                 manifest = re.sub("image: quay.io/metallb/{}:.*".format(image),
-                            "image: quay.io/metallb/{}:dev-{}".format(image, architecture), manifest)
+                                  "image: quay.io/metallb/{}:dev-{}".format(image, architecture), manifest)
                 manifest = re.sub("--log-level=info", "--log-level={}".format(log_level), manifest)
             manifest.replace("--log-level=info", "--log-level=debug")
 
@@ -477,11 +507,10 @@ apiServer:
         print("Leaving MetalLB unconfigured")
 
 
-
 # Configure MetalLB in the dev-env for layer2 testing.
 # Identify the unused network address range from kind network and used it in configmap.
 def layer2_dev_env():
-    _fetch_kubectl()
+    fetch_kubectl()
     dev_env_dir = os.getcwd() + "/dev-env/layer2"
     with open("%s/config.yaml.tmpl" % dev_env_dir, 'r') as f:
         layer2_config = "# THIS FILE IS AUTOGENERATED\n" + f.read()
@@ -494,11 +523,12 @@ def layer2_dev_env():
     # Apply the MetalLB ConfigMap
     run("{} apply -f {}/config.yaml".format(kubectl_path, dev_env_dir))
 
+
 # Configure MetalLB in the dev-env for BGP testing. Start an frr based BGP
 # router in a container and configure MetalLB to peer with it.
 # See dev-env/bgp/README.md for some more information.
 def bgp_dev_env(ip_family, frr_volume_dir):
-    _fetch_kubectl()
+    fetch_kubectl()
     dev_env_dir = os.getcwd() + "/dev-env/bgp"
     if frr_volume_dir == "":
         frr_volume_dir = dev_env_dir + "/frr-volume"
@@ -523,7 +553,7 @@ def bgp_dev_env(ip_family, frr_volume_dir):
         pass
     except Exception as e:
         raise Exit(message='Failed to create frr-volume directory: %s'
-                   % str(e))
+                           % str(e))
 
     # These config files are static, so we copy them straight in.
     copy_files = ('zebra.conf', 'daemons', 'vtysh.conf')
@@ -546,14 +576,14 @@ def bgp_dev_env(ip_family, frr_volume_dir):
         '    docker rm -f $frr ; '
         'done', echo=True)
     run("docker run -d --privileged --network kind --rm --ulimit core=-1 --name frr --volume %s:/etc/frr "
-            "quay.io/frrouting/frr:8.5.2" % frr_volume_dir, echo=True)
+        "quay.io/frrouting/frr:8.5.2" % frr_volume_dir, echo=True)
 
     if ip_family == "ipv4":
         peer_address = run('docker inspect -f "{{ '
-            'range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" frr', echo=True)
+                           'range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" frr', echo=True)
     elif ip_family == "ipv6":
         peer_address = run('docker inspect -f "{{ '
-            'range .NetworkSettings.Networks}}{{.GlobalIPv6Address}}{{end}}" frr', echo=True)
+                           'range .NetworkSettings.Networks}}{{.GlobalIPv6Address}}{{end}}" frr', echo=True)
     else:
         raise Exit(message='Unsupported ip address family %s' % ip_family)
 
@@ -564,6 +594,7 @@ def bgp_dev_env(ip_family, frr_volume_dir):
         f.write(mlb_config)
     # Apply the MetalLB ConfigMap
     run_with_retry("{} apply -f {}/config.yaml".format(kubectl_path, dev_env_dir))
+
 
 def get_available_ips(ip_family=None):
     if ip_family is None or (ip_family != 4 and ip_family != 6):
@@ -586,6 +617,7 @@ def get_available_ips(ip_family=None):
             if service_ip_range_end not in network:
                 raise Exit(message='network range %s is not in %s' % (service_ip_range_end, network))
             return '%s-%s' % (service_ip_range_start.ip, service_ip_range_end.ip)
+
 
 @task(help={
     "name": "name of the kind cluster to delete.",
@@ -624,6 +656,7 @@ def dev_env_cleanup(ctx, name="kind", frr_volume_dir=""):
     run('docker network rm {bridge_name}'.format(bridge_name=extra_network), warn=True)
     run('docker network rm vrf-net', warn=True)
 
+
 @task(help={
     "version": "version of MetalLB to release.",
     "skip-release-notes": "make the release even if there are no release notes.",
@@ -658,14 +691,16 @@ def release(ctx, version, skip_release_notes=False):
     # Update links on the website to point to files at the version
     # we're creating.
     if is_patch_release:
-        previous_version = "v{}.{}.{}".format(sem_version.major, sem_version.minor, sem_version.patch-1)
+        previous_version = "v{}.{}.{}".format(sem_version.major, sem_version.minor, sem_version.patch - 1)
     else:
         previous_version = "main"
     bumprelease(ctx, version, previous_version)
 
     run("git commit -a -m 'Automated update for release v{}'".format(sem_version), echo=True)
-    run("git tag v{} -m 'See the release notes for details:\n\nhttps://metallb.universe.tf/release-notes/#version-{}-{}-{}'".format(sem_version, sem_version.major, sem_version.minor, sem_version.patch), echo=True)
+    run("git tag v{} -m 'See the release notes for details:\n\nhttps://metallb.universe.tf/release-notes/#version-{}-{}-{}'".format(
+        sem_version, sem_version.major, sem_version.minor, sem_version.patch), echo=True)
     run("git checkout main", echo=True)
+
 
 @task(help={
     "version": "version of MetalLB to release.",
@@ -679,6 +714,7 @@ def bumprelease(ctx, version, previous_version):
         newpat = pattern.format("v{}").format(version)
         run("perl -pi -e 's#{}#{}#g' website/content/*.md website/content/*/*.md".format(oldpat, newpat),
             echo=True)
+
     _replace("/metallb/metallb/{}")
     _replace("/metallb/metallb/tree/{}")
     _replace("/metallb/metallb/blob/{}")
@@ -687,9 +723,12 @@ def bumprelease(ctx, version, previous_version):
     run("perl -pi -e 's/MetalLB .*/MetalLB v{}/g' website/content/_header.md".format(version), echo=True)
 
     # Update the manifests with the new version
-    run("perl -pi -e 's,image: quay.io/metallb/speaker:.*,image: quay.io/metallb/speaker:v{},g' config/controllers/speaker.yaml".format(version), echo=True)
-    run("perl -pi -e 's,image: quay.io/metallb/speaker:.*,image: quay.io/metallb/speaker:v{},g' config/frr/speaker-patch.yaml".format(version), echo=True)
-    run("perl -pi -e 's,image: quay.io/metallb/controller:.*,image: quay.io/metallb/controller:v{},g' config/controllers/controller.yaml".format(version), echo=True)
+    run("perl -pi -e 's,image: quay.io/metallb/speaker:.*,image: quay.io/metallb/speaker:v{},g' config/controllers/speaker.yaml".format(
+        version), echo=True)
+    run("perl -pi -e 's,image: quay.io/metallb/speaker:.*,image: quay.io/metallb/speaker:v{},g' config/frr/speaker-patch.yaml".format(
+        version), echo=True)
+    run("perl -pi -e 's,image: quay.io/metallb/controller:.*,image: quay.io/metallb/controller:v{},g' config/controllers/controller.yaml".format(
+        version), echo=True)
 
     # Update the versions in the helm chart (version and appVersion are always the same)
     # helm chart versions follow Semantic Versioning, and thus exclude the leading 'v'
@@ -702,7 +741,6 @@ def bumprelease(ctx, version, previous_version):
     run(r"sed -i 's/^Current chart version is: .*/Current chart version is: `{}`/g' charts/metallb/README.md".format(version), echo=True)
     run("helm dependency update charts/metallb", echo=True)
 
-
     # Generate the manifests with the new version of the images
     generatemanifests(ctx)
 
@@ -711,8 +749,10 @@ def bumprelease(ctx, version, previous_version):
     # TODO: Check if kustomize instructions really need the version in the
     # website or if there is a simpler way. For now, though, we just replace the
     # only page that mentions the version on release.
-    run(r"sed -i 's/github.com\/metallb\/metallb\/config\/native?ref=.*$/github.com\/metallb\/metallb\/config\/native?ref=v{}/g' website/content/installation/_index.md".format(version))
-    run(r"sed -i 's/github.com\/metallb\/metallb\/config\/frr?ref=.*$/github.com\/metallb\/metallb\/config\/frr?ref=v{}/g' website/content/installation/_index.md".format(version))
+    run(r"sed -i 's/github.com\/metallb\/metallb\/config\/native?ref=.*$/github.com\/metallb\/metallb\/config\/native?ref=v{}/g' website/content/installation/_index.md".format(
+        version))
+    run(r"sed -i 's/github.com\/metallb\/metallb\/config\/frr?ref=.*$/github.com\/metallb\/metallb\/config\/frr?ref=v{}/g' website/content/installation/_index.md".format(
+        version))
 
     # Update the version embedded in the binary
     run(r"perl -pi -e 's/version\s+=.*/version = \"{}\"/g' internal/version/version.go".format(version), echo=True)
@@ -720,17 +760,21 @@ def bumprelease(ctx, version, previous_version):
 
     res = run('grep ":main" config/manifests/*.yaml', warn=True).stdout
     if res:
-            raise Exit(message="ERROR: Found image still referring to the main tag")
+        raise Exit(message="ERROR: Found image still referring to the main tag")
+
 
 @task
 def test(ctx):
     """Run unit tests."""
     envtest_asset_dir = os.getcwd() + "/dev-env/unittest"
-    k8s_version="1.27.1"
+    k8s_version = "1.27.1"
     run("{}/setup-envtest.sh {}".format(envtest_asset_dir, envtest_asset_dir), echo=True)
-    kubebuilder_assets=run("{}/bin/setup-envtest use {} --bin-dir {}/bin -p path".format(envtest_asset_dir,k8s_version, envtest_asset_dir)).stdout.strip()
+    kubebuilder_assets = run(
+        "{}/bin/setup-envtest use {} --bin-dir {}/bin -p path".format(envtest_asset_dir, k8s_version,
+                                                                      envtest_asset_dir)).stdout.strip()
     run("KUBEBUILDER_ASSETS={} go test -short ./...".format(kubebuilder_assets), echo=True)
     run("KUBEBUILDER_ASSETS={} go test -short -race ./...".format(kubebuilder_assets), echo=True)
+
 
 @task
 def checkpatch(ctx):
@@ -738,9 +782,9 @@ def checkpatch(ctx):
     # and look for any added lines with 2 spaces after a period.
     try:
         lines = run("git diff $(diff -u <(git rev-list --first-parent HEAD) "
-                                " <(git rev-list --first-parent origin/main) "
-                                " | sed -ne 's/^ //p' | head -1)..HEAD | "
-                                r" grep '+.*\.\  '")
+                    " <(git rev-list --first-parent origin/main) "
+                    " | sed -ne 's/^ //p' | head -1)..HEAD | "
+                    r" grep '+.*\.\  '")
 
         if len(lines.stdout.strip()) > 0:
             raise Exit(message="ERROR: Found changed lines with 2 spaces "
@@ -765,12 +809,14 @@ def lint(ctx, env="container"):
     golangci_cmd = "golangci-lint run --timeout 10m0s ./..."
 
     if env == "container":
-        run("docker run --rm -v $(git rev-parse --show-toplevel):/app -w /app golangci/golangci-lint:v{} {}".format(version, golangci_cmd), echo=True)
+        run("docker run --rm -v $(git rev-parse --show-toplevel):/app -w /app golangci/golangci-lint:v{} {}".format(
+            version, golangci_cmd), echo=True)
     elif env == "host":
-        run("curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v{}".format(version))
+        run("curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v{}".format(
+            version))
         run(golangci_cmd)
     else:
-        raise Exit(message="Unsupported linter environment: {}". format(env))
+        raise Exit(message="Unsupported linter environment: {}".format(env))
 
 
 @task(help={
@@ -788,11 +834,13 @@ def helmdocs(ctx, env="container"):
     cmd = "helm-docs"
 
     if env == "container":
-        run("docker run --rm -v $(git rev-parse --show-toplevel):/app -w /app jnorwood/helm-docs:v{} {}".format(version, cmd), echo=True)
+        run("docker run --rm -v $(git rev-parse --show-toplevel):/app -w /app jnorwood/helm-docs:v{} {}".format(version,
+                                                                                                                cmd),
+            echo=True)
     elif env == "host":
         run(cmd)
     else:
-        raise Exit(message="Unsupported helm-docs environment: {}". format(env))
+        raise Exit(message="Unsupported helm-docs environment: {}".format(env))
 
 
 @task(help={
@@ -816,9 +864,12 @@ def helmdocs(ctx, env="container"):
     "ginkgo_params": "additional ginkgo params to run the e2e tests with",
     "host_bgp_mode": "tells whether to run the host container in ebgp or ibgp mode",
 })
-def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None, prometheus_namespace="", node_nics="kind", local_nics="kind", external_containers="", bgp_mode="", with_vrf=False,external_frr_image="", ginkgo_params="", host_bgp_mode="ibgp"):
+def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system",
+            service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None,
+            prometheus_namespace="", node_nics="kind", local_nics="kind", external_containers="", bgp_mode="",
+            with_vrf=False, external_frr_image="", ginkgo_params="", host_bgp_mode="ibgp"):
     """Run E2E tests against development cluster."""
-    _fetch_kubectl()
+    fetch_kubectl()
 
     if skip_docker:
         opt_skip_docker = "--skip-docker"
@@ -874,12 +925,15 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
     os.makedirs(report_path, exist_ok=True)
 
     if external_containers != "":
-        external_containers = "--external-containers="+(external_containers)
+        external_containers = "--external-containers=" + (external_containers)
 
     if external_frr_image != "":
-        external_frr_image = "--frr-image="+(external_frr_image)
+        external_frr_image = "--frr-image=" + (external_frr_image)
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "KUBECONFIG={} ginkgo {} --timeout=3h {} {} -- --provider=local --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {} -bgp-mode={}  -with-vrf={} {} --host-bgp-mode={}".format(kubeconfig, ginkgo_params, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range, ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace, node_nics, local_nics, external_containers, bgp_mode, with_vrf, external_frr_image, host_bgp_mode), warn="True")
+                  "KUBECONFIG={} ginkgo {} --timeout=3h {} {} -- --provider=local --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {} -bgp-mode={}  -with-vrf={} {} --host-bgp-mode={}".format(
+        kubeconfig, ginkgo_params, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range,
+        ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace, node_nics, local_nics,
+        external_containers, bgp_mode, with_vrf, external_frr_image, host_bgp_mode), warn="True")
 
     if export != None:
         run("kind export logs {}".format(export))
@@ -889,7 +943,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
 
 @task
 def remove_lb_exclusion_from_nodes(ctx):
-    _fetch_kubectl()
+    fetch_kubectl()
     nodes = run("{} get nodes -o jsonpath={{.items[*].metadata.name}}".format(kubectl_path), hide=True).stdout.strip().split()
     for node in nodes:
         run("{} label nodes {} node.kubernetes.io/exclude-from-external-load-balancers-".format(kubectl_path,node), hide=True)
@@ -911,6 +965,7 @@ def bumplicense(ctx):
         if not res.ok:
             run(r"sed -i '1s/^/\/\/ SPDX-License-Identifier:Apache-2.0\n\n/' " + file)
 
+
 @task
 def verifylicense(ctx):
     """Verifies all files have the corresponding license"""
@@ -922,7 +977,9 @@ def verifylicense(ctx):
             no_license = True
             print("{} is missing license".format(file))
     if no_license:
-        raise Exit(message="#### Files with no license found.\n#### Please run ""inv bumplicense"" to add the license header")
+        raise Exit(
+            message="#### Files with no license found.\n#### Please run ""inv bumplicense"" to add the license header")
+
 
 @task
 def gomodtidy(ctx):
@@ -931,23 +988,37 @@ def gomodtidy(ctx):
     if not res.ok:
         raise Exit(message="go mod tidy failed")
 
+
 @task
 def generatemanifests(ctx):
     """ Re-generates the all-in-one manifests under config/manifests"""
     generate_manifest(ctx, bgp_type="frr", output="config/manifests/metallb-frr.yaml")
     generate_manifest(ctx, bgp_type="native", output="config/manifests/metallb-native.yaml")
     generate_manifest(ctx, bgp_type="frr", with_prometheus=True, output="config/manifests/metallb-frr-prometheus.yaml")
-    generate_manifest(ctx, bgp_type="native", with_prometheus=True, output="config/manifests/metallb-native-prometheus.yaml")
+    generate_manifest(ctx, bgp_type="native", with_prometheus=True,
+                      output="config/manifests/metallb-native-prometheus.yaml")
     generate_manifest(ctx, bgp_type="frr-k8s", output="config/manifests/metallb-frr-k8s.yaml")
-    generate_manifest(ctx, bgp_type="frr-k8s", with_prometheus=True,output="config/manifests/metallb-frr-k8s-prometheus.yaml")
+    generate_manifest(ctx, bgp_type="frr-k8s", with_prometheus=True,
+                      output="config/manifests/metallb-frr-k8s-prometheus.yaml")
+
+    generate_deepcopy()
 
     _align_helm_crds(
         source='config/manifests/metallb-frr.yaml',
         output='charts/metallb/charts/crds/templates/crds.yaml')
 
+
+def generate_deepcopy():
+    fetch_controller_gen()
+    res = run(f'{build_path}/bin/controller-gen object:headerFile="{LICENSE_PATH}" paths="./api/..."')
+    if not res.ok:
+        raise Exit(message="Failed to generate deepcopy functions")
+
+
 def _align_helm_crds(source, output):
     run("""yq eval-all 'select(.kind == "CustomResourceDefinition")' {} > {}""".format(source, output))
     run("sed -i 's/metallb-system/{{{{ .Release.Namespace }}}}/g' {}".format(output))
+
 
 @task
 def generateapidocs(ctx):
@@ -956,9 +1027,10 @@ def generateapidocs(ctx):
     run('crd-ref-docs --source-path=./api --config=website/generatecrddoc/crdgen.yaml --templates-dir=website/generatecrddoc/template --renderer markdown --output-path=/tmp/generated_apidoc.md')
     run("cat website/generatecrddoc/prefix.html /tmp/generated_apidoc.md > website/content/apis/_index.md")
 
+
 @task(help={
     "action": "The action to take to fix the uncommitted changes",
-    })
+})
 def checkchanges(ctx, action="check uncommitted files"):
     """Verifies no uncommitted files are available"""
     res = run("git status --porcelain", hide="out")
@@ -966,29 +1038,51 @@ def checkchanges(ctx, action="check uncommitted files"):
         print("{} must be committed".format(res))
         raise Exit(message="#### Uncommitted files found, you may need to {} ####\n".format(action))
 
+
 @task
 def deployprometheus(ctx):
     """Deploys the prometheus operator under the namespace monitoring"""
-    _fetch_kubectl()
+    fetch_kubectl()
     run("{} apply --server-side -f dev-env/kube-prometheus/manifests/setup".format(kubectl_path))
     run("until {} get servicemonitors --all-namespaces ; do date; sleep 1; echo ""; done".format(kubectl_path))
     run("{} apply -f dev-env/kube-prometheus/manifests/".format(kubectl_path))
     print("Waiting for prometheus pods to be running")
     run("{} -n monitoring wait --for=condition=Ready --all pods --timeout 300s".format(kubectl_path))
 
-def _fetch_kubectl():
+
+@cache
+def fetch_kubectl():
+    curl_command = "curl -o {} -LO https://dl.k8s.io/release/{}/bin/$(go env GOOS)/$(go env GOARCH)/kubectl".format(
+        kubectl_path, kubectl_version)
+    get_version_command = f"{kubectl_path} version --short"
+    fetch_dependency(kubectl_path, kubectl_version, curl_command, get_version_command, "Client Version:")
+
+
+@cache
+def fetch_controller_gen():
+    fetch_command = f"GOBIN={build_path}/bin/ GOPATH={build_path} go install sigs.k8s.io/controller-tools/cmd" \
+                    f"/controller-gen@{controller_gen_version}"
+    get_version_command = f"{controller_gen_path} --version"
+    fetch_dependency(controller_gen_path, controller_gen_version, fetch_command, get_version_command, "Version:")
+
+
+def fetch_dependency(path: str, version: str, fetch_command: str, get_version_command: str,
+                     version_prefix_in_output: str):
     if not os.path.exists(build_path):
         os.makedirs(build_path, mode=0o750)
-    curl_command = "curl -o {} -LO https://dl.k8s.io/release/{}/bin/$(go env GOOS)/$(go env GOARCH)/kubectl".format(kubectl_path, kubectl_version)
-    if not os.path.exists(kubectl_path):
-        run(curl_command)
-        run("chmod +x {}".format(kubectl_path))
+    if not os.path.exists(path):
+        run(fetch_command)
+        run("chmod +x {}".format(path))
         return
-    version = run("{} version --short".format(kubectl_path), warn=True, hide='both').stdout
+    current_version = get_command_version(get_version_command, version_prefix_in_output)
+    if current_version == version:
+        return
+    run(fetch_command)
+    run("chmod +x {}".format(path))
+
+
+def get_command_version(get_version_command: str, version_prefix: str) -> Optional[str]:
+    version = run(get_version_command, warn=True, hide='both').stdout
     for line in version.splitlines():
-        if line.startswith("Client Version:"):
-            version = line.split(":")[1].strip()
-            if version == kubectl_version:
-                return
-    run(curl_command)
-    run("chmod +x {}".format(kubectl_path))
+        if line.startswith(version_prefix):
+            return line.split(":")[1].strip()
