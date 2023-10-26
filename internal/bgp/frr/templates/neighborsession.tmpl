@@ -7,6 +7,9 @@
   neighbor {{.neighbor.Addr}} port {{.neighbor.Port}}
   {{- end }}
   neighbor {{.neighbor.Addr}} timers {{.neighbor.KeepaliveTime}} {{.neighbor.HoldTime}}
+  {{- if ne .neighbor.ConnectTime 0}}
+  neighbor {{.neighbor.Addr}} timers connect {{.neighbor.ConnectTime}}
+  {{- end }}
   {{ if .neighbor.Password -}}
   neighbor {{.neighbor.Addr}} password {{.neighbor.Password}}
   {{- end }}

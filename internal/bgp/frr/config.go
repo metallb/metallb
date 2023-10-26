@@ -71,6 +71,7 @@ type neighborConfig struct {
 	Port                uint16
 	HoldTime            uint64
 	KeepaliveTime       uint64
+	ConnectTime         uint64
 	Password            string
 	Advertisements      []*advertisementConfig
 	BFDProfile          string
