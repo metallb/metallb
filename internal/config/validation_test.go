@@ -9,6 +9,7 @@ import (
 	"go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/api/v1beta2"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/utils/ptr"
 )
 
 func TestValidate(t *testing.T) {
@@ -76,6 +77,19 @@ func TestValidate(t *testing.T) {
 					{
 						Spec: v1beta2.BGPPeerSpec{
 							KeepaliveTime: v1.Duration{Duration: time.Second},
+						},
+					},
+				},
+			},
+			mustFail: true,
+		},
+		{
+			desc: "connect time",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							ConnectTime: ptr.To(v1.Duration{Duration: time.Second}),
 						},
 					},
 				},
