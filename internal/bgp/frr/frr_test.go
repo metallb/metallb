@@ -23,6 +23,7 @@ import (
 	"go.universe.tf/metallb/internal/ipfamily"
 	"go.universe.tf/metallb/internal/logging"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/ptr"
 )
 
 const testData = "testdata/"
@@ -236,6 +237,7 @@ func TestSingleIPv6IBGPSession(t *testing.T) {
 			PeerASN:       100,
 			HoldTime:      time.Second,
 			KeepAliveTime: time.Second,
+			ConnectTime:   ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  false,
@@ -291,6 +293,7 @@ func TestTwoSessions(t *testing.T) {
 			PeerASN:       200,
 			HoldTime:      time.Second,
 			KeepAliveTime: time.Second,
+			ConnectTime:   ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  true,
@@ -309,6 +312,7 @@ func TestTwoSessions(t *testing.T) {
 			PeerASN:       400,
 			HoldTime:      time.Second,
 			KeepAliveTime: time.Second,
+			ConnectTime:   ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  true,
@@ -473,6 +477,7 @@ func TestSingleAdvertisement(t *testing.T) {
 			PeerASN:       200,
 			HoldTime:      time.Second,
 			KeepAliveTime: time.Second,
+			ConnectTime:   ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  true,
@@ -792,6 +797,7 @@ func TestTwoAdvertisementsTwoSessions(t *testing.T) {
 					PeerASN:       200,
 					HoldTime:      time.Second,
 					KeepAliveTime: time.Second,
+					ConnectTime:   ptr.To(time.Second),
 					Password:      "password",
 					CurrentNode:   "hostname",
 					EBGPMultiHop:  true,
@@ -804,6 +810,7 @@ func TestTwoAdvertisementsTwoSessions(t *testing.T) {
 					PeerASN:       200,
 					HoldTime:      time.Second,
 					KeepAliveTime: time.Second,
+					ConnectTime:   ptr.To(time.Second),
 					Password:      "password",
 					CurrentNode:   "hostname",
 					EBGPMultiHop:  true,
@@ -892,6 +899,7 @@ func TestSingleSessionExtras(t *testing.T) {
 			PeerASN:       200,
 			HoldTime:      time.Second,
 			KeepAliveTime: time.Second,
+			ConnectTime:   ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  false,
