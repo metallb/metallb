@@ -55,6 +55,12 @@ type BGPPeerSpec struct {
 	// +optional
 	KeepaliveTime metav1.Duration `json:"keepaliveTime,omitempty"`
 
+	// Requested BGP connect time, controls how long BGP waits between connection attempts to a neighbor.
+	// +kubebuilder:validation:XValidation:message="connect time should be between 1 seconds to 65535",rule="duration(self).getSeconds() >= 1 && duration(self).getSeconds() <= 65535"
+	// +kubebuilder:validation:XValidation:message="connect time should contain a whole number of seconds",rule="duration(self).getMilliseconds() % 1000 == 0"
+	// +optional
+	ConnectTime *metav1.Duration `json:"connectTime,omitempty"`
+
 	// BGP router ID to advertise to the peer
 	// +optional
 	RouterID string `json:"routerID,omitempty"`
