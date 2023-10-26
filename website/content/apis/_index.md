@@ -279,6 +279,7 @@ _Appears in:_
 | `peerPort` _integer_ | Port to dial when establishing the session. |
 | `holdTime` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#duration-v1-meta)_ | Requested BGP hold time, per RFC4271. |
 | `keepaliveTime` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#duration-v1-meta)_ | Requested BGP keepalive time, per RFC4271. |
+| `connectTime` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#duration-v1-meta)_ | Requested BGP connect time, controls how long BGP waits between connection attempts to a neighbor. |
 | `routerID` _string_ | BGP router ID to advertise to the peer |
 | `nodeSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | Only connect to this peer on nodes that match one of these selectors. |
 | `password` _string_ | Authentication password for routers enforcing TCP MD5 authenticated sessions |
