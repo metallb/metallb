@@ -3,6 +3,14 @@ title: Release Notes
 weight: 8
 ---
 
+## Version 0.13.12
+
+- Change the version of go used to compile the binaries
+- Disable http2 on the webhook listener
+- Bump the kubernetes dependencies
+
+This release includes contributions from Federico Paolinelli, Ori Braunshtein, Micha Nagel
+
 ## Version 0.13.11
 
 New features:

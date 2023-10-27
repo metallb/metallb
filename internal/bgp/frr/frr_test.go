@@ -3,6 +3,7 @@
 package frr
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -35,7 +36,7 @@ func testCompareFiles(t *testing.T, configFile, goldenFile string) {
 	var lastError error
 
 	// Try comparing files multiple times because tests can generate more than one configuration
-	err := wait.PollImmediate(10*time.Millisecond, 2*time.Second, func() (bool, error) {
+	err := wait.PollUntilContextTimeout(context.TODO(), 10*time.Millisecond, 2*time.Second, true, func(ctx context.Context) (bool, error) {
 		lastError = nil
 		cmd := exec.Command("diff", configFile, goldenFile)
 		output, err := cmd.Output()
@@ -859,7 +860,7 @@ func TestTwoAdvertisementsTwoSessions(t *testing.T) {
 					SessionName:   "test-peer1"},
 			}
 			seed := time.Now().UnixNano()
-			rand.Seed(seed)
+			rand.New(rand.NewSource(seed))
 
 			rand.Shuffle(len(sessionsParameters), func(i, j int) {
 				sessionsParameters[i], sessionsParameters[j] = sessionsParameters[j], sessionsParameters[i]

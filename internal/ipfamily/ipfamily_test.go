@@ -25,6 +25,12 @@ func TestIPFamilyForAddresses(t *testing.T) {
 			family: IPv6,
 		},
 		{
+			desc:    "one invalid address",
+			ips:     []string{"!.1.1.1"},
+			family:  Unknown,
+			wantErr: true,
+		},
+		{
 			desc:   "ipv4 and ipv6 addresse",
 			ips:    []string{"1.2.3.4", "100::1"},
 			family: DualStack,
@@ -38,6 +44,12 @@ func TestIPFamilyForAddresses(t *testing.T) {
 		{
 			desc:    "dual stack with empty address",
 			ips:     []string{"", ""},
+			family:  Unknown,
+			wantErr: true,
+		},
+		{
+			desc:    "dual stack with one invalid address",
+			ips:     []string{"!.1.1.1", "100::1"},
 			family:  Unknown,
 			wantErr: true,
 		},

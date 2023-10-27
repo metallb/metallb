@@ -5,6 +5,7 @@ package k8s // import "go.universe.tf/metallb/internal/k8s"
 import (
 	"context"
 	"crypto/rand"
+	"crypto/tls"
 	"encoding/base64"
 	"fmt"
 	"net"
@@ -17,6 +18,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	metallbv1alpha1 "go.universe.tf/metallb/api/v1alpha1"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
@@ -111,6 +114,7 @@ type Config struct {
 	CertDir             string
 	CertServiceName     string
 	LoadBalancerClass   string
+	WebhookWithHTTP2    bool
 	Listener
 }
 
@@ -119,17 +123,15 @@ type Config struct {
 // The client uses processName to identify itself to the cluster
 // (e.g. when logging events).
 func New(cfg *Config) (*Client, error) {
-	namespaceSelector := cache.ObjectSelector{
+	namespaceSelector := cache.ByObject{
 		Field: fields.ParseSelectorOrDie(fmt.Sprintf("metadata.namespace=%s", cfg.Namespace)),
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:             scheme,
-		Port:               9443, // TODO port only with controller, for webhooks
-		LeaderElection:     false,
-		MetricsBindAddress: "0", // Disable metrics endpoint of controller manager
-		NewCache: cache.BuilderWithOptions(cache.Options{
-			SelectorsByObject: map[client.Object]cache.ObjectSelector{
+		Scheme:         scheme,
+		LeaderElection: false,
+		Cache: cache.Options{
+			ByObject: map[client.Object]cache.ByObject{
 				&metallbv1beta1.AddressPool{}:      namespaceSelector,
 				&metallbv1beta1.BFDProfile{}:       namespaceSelector,
 				&metallbv1beta1.BGPAdvertisement{}: namespaceSelector,
@@ -141,7 +143,11 @@ func New(cfg *Config) (*Client, error) {
 				&corev1.Secret{}:                   namespaceSelector,
 				&corev1.ConfigMap{}:                namespaceSelector,
 			},
-		}),
+		},
+		WebhookServer: webhookServer(9443, cfg.WebhookWithHTTP2),
+		Metrics: metricsserver.Options{
+			BindAddress: "0", // Disable metrics endpoint of controller manager
+		},
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -420,4 +426,21 @@ func UseEndpointSlices(kubeClient kubernetes.Interface) bool {
 		return false
 	}
 	return true
+}
+
+func webhookServer(port int, withHTTP2 bool) webhook.Server {
+	disableHTTP2 := func(c *tls.Config) {
+		if withHTTP2 {
+			return
+		}
+		c.NextProtos = []string{"http/1.1"}
+	}
+
+	webhookServerOptions := webhook.Options{
+		TLSOpts: []func(config *tls.Config){disableHTTP2},
+		Port:    port,
+	}
+
+	res := webhook.NewServer(webhookServerOptions)
+	return res
 }

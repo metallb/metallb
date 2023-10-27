@@ -29,7 +29,6 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/openshift-kni/k8sreporter"
-	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/executor"
 	"go.universe.tf/e2etest/pkg/iprange"
@@ -39,6 +38,7 @@ import (
 	"go.universe.tf/e2etest/pkg/metrics"
 	"go.universe.tf/e2etest/pkg/service"
 	"go.universe.tf/e2etest/pkg/udp"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 
 	"go.universe.tf/e2etest/pkg/wget"
 	corev1 "k8s.io/api/core/v1"
@@ -85,7 +85,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
-		loadBalancerCreateTimeout = e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
+		loadBalancerCreateTimeout = e2eservice.GetServiceLoadBalancerCreationTimeout(context.TODO(), cs)
 
 		ginkgo.By("Clearing any previous configuration")
 
@@ -132,10 +132,10 @@ var _ = ginkgo.Describe("L2", func() {
 
 		ginkgo.It("should work for ExternalTrafficPolicy=Local", func() {
 			svc, jig := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", service.TrafficPolicyLocal)
-			err := jig.Scale(5)
+			err := jig.Scale(context.TODO(), 5)
 			framework.ExpectNoError(err)
 
-			epNodes, err := jig.ListNodesWithEndpoint() // Only nodes with an endpoint could be advertising the IP
+			epNodes, err := jig.ListNodesWithEndpoint(context.TODO()) // Only nodes with an endpoint could be advertising the IP
 			framework.ExpectNoError(err)
 
 			defer func() {
@@ -189,7 +189,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("Creating a mixed protocol TCP / UDP service")
 			jig1 := e2eservice.NewTestJig(cs, namespace, "svca")
-			svc1, err := jig1.CreateLoadBalancerService(loadBalancerCreateTimeout, func(svc *corev1.Service) {
+			svc1, err := jig1.CreateLoadBalancerService(context.TODO(), loadBalancerCreateTimeout, func(svc *corev1.Service) {
 				svc.Spec.Ports[0].TargetPort = intstr.FromInt(tcpPort)
 				svc.Spec.Ports[0].Port = int32(tcpPort)
 				svc.Spec.Ports[0].Name = "tcp"
@@ -209,7 +209,7 @@ var _ = ginkgo.Describe("L2", func() {
 			}()
 
 			framework.ExpectNoError(err)
-			_, err = jig1.Run(
+			_, err = jig1.Run(context.TODO(),
 				func(rc *corev1.ReplicationController) {
 					rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", tcpPort), fmt.Sprintf("--udp-port=%d", udpPort)}
 					rc.Spec.Template.Spec.Containers[0].ReadinessProbe.HTTPGet.Port = intstr.FromInt(tcpPort)
@@ -389,7 +389,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 		ip, err := config.GetIPFromRangeByIndex(*ipRange, 0)
 		framework.ExpectNoError(err)
-		svc1, err := jig1.CreateLoadBalancerService(loadBalancerCreateTimeout, func(svc *corev1.Service) {
+		svc1, err := jig1.CreateLoadBalancerService(context.TODO(), loadBalancerCreateTimeout, func(svc *corev1.Service) {
 			svc.Spec.Ports[0].TargetPort = intstr.FromInt(service.TestServicePort)
 			svc.Spec.Ports[0].Port = int32(service.TestServicePort)
 			svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
@@ -399,7 +399,7 @@ var _ = ginkgo.Describe("L2", func() {
 		framework.ExpectNoError(err)
 
 		jig2 := e2eservice.NewTestJig(cs, namespace, "svcb")
-		svc2, err := jig2.CreateLoadBalancerService(loadBalancerCreateTimeout, func(svc *corev1.Service) {
+		svc2, err := jig2.CreateLoadBalancerService(context.TODO(), loadBalancerCreateTimeout, func(svc *corev1.Service) {
 			svc.Spec.Ports[0].TargetPort = intstr.FromInt(service.TestServicePort + 1)
 			svc.Spec.Ports[0].Port = int32(service.TestServicePort + 1)
 			svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
@@ -415,14 +415,14 @@ var _ = ginkgo.Describe("L2", func() {
 
 		nodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 		framework.ExpectNoError(err)
-		_, err = jig1.Run(
+		_, err = jig1.Run(context.TODO(),
 			func(rc *corev1.ReplicationController) {
 				rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", service.TestServicePort), fmt.Sprintf("--udp-port=%d", service.TestServicePort)}
 				rc.Spec.Template.Spec.Containers[0].ReadinessProbe.HTTPGet.Port = intstr.FromInt(service.TestServicePort)
 				rc.Spec.Template.Spec.NodeName = nodes.Items[0].Name
 			})
 		framework.ExpectNoError(err)
-		_, err = jig2.Run(
+		_, err = jig2.Run(context.TODO(),
 			func(rc *corev1.ReplicationController) {
 				rc.Spec.Template.Spec.Containers[0].Args = []string{"netexec", fmt.Sprintf("--http-port=%d", service.TestServicePort+1), fmt.Sprintf("--udp-port=%d", service.TestServicePort+1)}
 				rc.Spec.Template.Spec.Containers[0].ReadinessProbe.HTTPGet.Port = intstr.FromInt(service.TestServicePort + 1)

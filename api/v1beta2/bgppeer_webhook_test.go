@@ -130,9 +130,9 @@ func TestValidateBGPPeer(t *testing.T) {
 		mock.forceError = test.failValidate
 
 		if test.isNew {
-			err = test.bgpPeer.ValidateCreate()
+			_, err = test.bgpPeer.ValidateCreate()
 		} else {
-			err = test.bgpPeer.ValidateUpdate(nil)
+			_, err = test.bgpPeer.ValidateUpdate(nil)
 		}
 		if test.failValidate && err == nil {
 			t.Fatalf("test %s failed, expecting error", test.desc)
