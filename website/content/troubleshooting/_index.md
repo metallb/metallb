@@ -148,6 +148,14 @@ in the logs of the speakers
 If the L2 interface selector is used but there are no compatible interfaces on the node elected, MetalLB will
 produce an event on the Service which should be visible when doing `kubectl describe svc <service-name>`.
 
+#### Using WiFi and can't reach the service?
+
+Some devices (such as Raspberry Pi) do not respond to ARP requests when using WiFi. This can lead to a situation where the service is initially reachable, but breaks shortly afterwards.
+At this stage attempting to arping will result in a timeout and the service will not be reachable.
+
+One workaround is to enable promiscuous mode on the interface: `sudo ifconfig <device> promisc`. For example: `sudo ifconfig wlan0 promisc`
+
+
 ### Checking if the BGP advertisement works
 
 In order to have MetalLB advertise via BGP, a **BGPAdvertisement instance must be created**.

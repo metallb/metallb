@@ -9,7 +9,6 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
-
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/k8s"
 	"go.universe.tf/e2etest/pkg/metallb"
@@ -23,6 +22,7 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const secondNamespace = "test-namespace"
@@ -101,11 +101,11 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			framework.ExpectNoError(err)
 
 			jig := e2eservice.NewTestJig(cs, f.Namespace.Name, "singleip")
-			svc, err := jig.CreateLoadBalancerService(10*time.Second, service.TrafficPolicyCluster)
+			svc, err := jig.CreateLoadBalancerService(context.TODO(), 10*time.Second, service.TrafficPolicyCluster)
 			framework.ExpectNoError(err)
 
 			ginkgo.By("Creating another service")
-			svc1, err := jig.CreateTCPService(func(svc *v1.Service) {
+			svc1, err := jig.CreateTCPService(context.TODO(), func(svc *v1.Service) {
 				svc.Spec.Type = v1.ServiceTypeLoadBalancer
 				svc.Name = "singleip1"
 			})
@@ -168,13 +168,13 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 
 			ginkgo.By("creating 4 LB services")
 			jig := e2eservice.NewTestJig(cs, f.Namespace.Name, "service-a")
-			serviceA, err := jig.CreateLoadBalancerService(30*time.Second, nil)
+			serviceA, err := jig.CreateLoadBalancerService(context.TODO(), 30*time.Second, nil)
 			framework.ExpectNoError(err)
 			defer service.Delete(cs, serviceA)
 			service.ValidateDesiredLB(serviceA)
 
 			jig = e2eservice.NewTestJig(cs, f.Namespace.Name, "service-b")
-			serviceB, err := jig.CreateLoadBalancerService(30*time.Second, nil)
+			serviceB, err := jig.CreateLoadBalancerService(context.TODO(), 30*time.Second, nil)
 			framework.ExpectNoError(err)
 			defer service.Delete(cs, serviceB)
 			service.ValidateDesiredLB(serviceB)
@@ -215,6 +215,95 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			for i := 0; i < numOfRestarts; i++ {
 				restartAndAssert()
 			}
+		})
+	})
+
+	ginkgo.Context("IPV4 removing pools", func() {
+		var pool1 metallbv1beta1.IPAddressPool
+		var pool2 metallbv1beta1.IPAddressPool
+
+		ginkgo.AfterEach(func() {
+			// Clean previous configuration.
+			err := ConfigUpdater.Clean()
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.BeforeEach(func() {
+			pool1 = metallbv1beta1.IPAddressPool{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ns-pool-1"},
+				Spec: metallbv1beta1.IPAddressPoolSpec{
+					Addresses: []string{
+						"192.168.5.0/32",
+					},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 20, Namespaces: []string{f.Namespace.Name}},
+				},
+			}
+			pool2 = metallbv1beta1.IPAddressPool{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ns-pool-2"},
+				Spec: metallbv1beta1.IPAddressPoolSpec{
+					Addresses: []string{
+						"192.168.10.0/32",
+					},
+				},
+			}
+
+			resources := config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{pool1, pool2},
+			}
+
+			err := ConfigUpdater.Update(resources)
+			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("removes all pools", func() {
+			svc1, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-pool-1")
+			defer func() {
+				service.Delete(cs, svc1)
+			}()
+
+			ginkgo.By("validate LoadBalancer IP is allocated from pool1")
+			err := config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool1}, e2eservice.GetIngressPoint(
+				&svc1.Status.LoadBalancer.Ingress[0]))
+			framework.ExpectNoError(err)
+
+			ginkgo.By("deleting all pools")
+			err = ConfigUpdater.Client().DeleteAllOf(context.Background(), &metallbv1beta1.IPAddressPool{}, client.InNamespace(ConfigUpdater.Namespace()))
+			framework.ExpectNoError(err)
+
+			ginkgo.By("validate LoadBalancer IP is removed from the svc")
+			gomega.Eventually(func() int {
+				s, err := cs.CoreV1().Services(svc1.Namespace).Get(context.Background(), svc1.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				return len(s.Status.LoadBalancer.Ingress)
+			}, time.Minute, 1*time.Second).Should(gomega.Equal(0))
+		})
+
+		ginkgo.It("reallocates svc after deleting a pool", func() {
+			svc1, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-pool-1")
+			defer func() {
+				service.Delete(cs, svc1)
+			}()
+
+			ginkgo.By("validate LoadBalancer IP is allocated from pool1")
+			err := config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool1}, e2eservice.GetIngressPoint(
+				&svc1.Status.LoadBalancer.Ingress[0]))
+			framework.ExpectNoError(err)
+
+			ginkgo.By("deleting pool 1")
+			p := &metallbv1beta1.IPAddressPool{}
+			err = ConfigUpdater.Client().Get(context.Background(), client.ObjectKey{Namespace: ConfigUpdater.Namespace(), Name: pool1.Name}, p)
+			framework.ExpectNoError(err)
+			err = ConfigUpdater.Client().Delete(context.Background(), p)
+			framework.ExpectNoError(err)
+
+			ginkgo.By("validate LoadBalancer IP is re-allocated from pool2")
+			gomega.Eventually(func() error {
+				svc1, err := cs.CoreV1().Services(svc1.Namespace).Get(context.Background(), svc1.Name, metav1.GetOptions{})
+				framework.ExpectNoError(err)
+				err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool2}, e2eservice.GetIngressPoint(
+					&svc1.Status.LoadBalancer.Ingress[0]))
+				return err
+			}, time.Minute, 1*time.Second).ShouldNot(gomega.HaveOccurred())
 		})
 	})
 

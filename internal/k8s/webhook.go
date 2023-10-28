@@ -43,6 +43,7 @@ func enableCertRotation(notifyFinished chan struct{}, cfg *Config, mgr manager.M
 		DNSName:        fmt.Sprintf("%s.%s.svc", cfg.CertServiceName, cfg.Namespace),
 		IsReady:        notifyFinished,
 		Webhooks:       webhooks,
+		FieldOwner:     "MetalLB",
 	})
 	if err != nil {
 		level.Error(cfg.Logger).Log("error", err, "unable to set up", "cert rotation")

@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 type PoolReconciler struct {
@@ -129,9 +128,9 @@ func (r *PoolReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metallbv1beta1.IPAddressPool{}).
-		Watches(&source.Kind{Type: &metallbv1beta1.AddressPool{}}, &handler.EnqueueRequestForObject{}).
-		Watches(&source.Kind{Type: &metallbv1beta1.Community{}}, &handler.EnqueueRequestForObject{}).
-		Watches(&source.Kind{Type: &corev1.Namespace{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&metallbv1beta1.AddressPool{}, &handler.EnqueueRequestForObject{}).
+		Watches(&metallbv1beta1.Community{}, &handler.EnqueueRequestForObject{}).
+		Watches(&corev1.Namespace{}, &handler.EnqueueRequestForObject{}).
 		WithEventFilter(p).
 		Complete(r)
 }

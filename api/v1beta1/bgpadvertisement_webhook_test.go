@@ -144,9 +144,9 @@ func TestValidateBGPAdvertisement(t *testing.T) {
 		mock.forceError = test.failValidate
 
 		if test.isNew {
-			err = test.bgpAdv.ValidateCreate()
+			_, err = test.bgpAdv.ValidateCreate()
 		} else {
-			err = test.bgpAdv.ValidateUpdate(nil)
+			_, err = test.bgpAdv.ValidateUpdate(nil)
 		}
 		if test.failValidate && err == nil {
 			t.Fatalf("test %s failed, expecting error", test.desc)

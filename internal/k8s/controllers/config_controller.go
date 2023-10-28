@@ -34,7 +34,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
-	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
 const bgpExtrasConfigName = "bgpextras"
@@ -195,16 +194,16 @@ func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metallbv1beta2.BGPPeer{}).
-		Watches(&source.Kind{Type: &metallbv1beta1.IPAddressPool{}}, &handler.EnqueueRequestForObject{}).
-		Watches(&source.Kind{Type: &corev1.Node{}}, &handler.EnqueueRequestForObject{}).
-		Watches(&source.Kind{Type: &metallbv1beta1.BGPAdvertisement{}}, &handler.EnqueueRequestForObject{}).
-		Watches(&source.Kind{Type: &metallbv1beta1.L2Advertisement{}}, &handler.EnqueueRequestForObject{}).
-		Watches(&source.Kind{Type: &metallbv1beta1.BFDProfile{}}, &handler.EnqueueRequestForObject{}).
-		Watches(&source.Kind{Type: &metallbv1beta1.AddressPool{}}, &handler.EnqueueRequestForObject{}).
-		Watches(&source.Kind{Type: &metallbv1beta1.Community{}}, &handler.EnqueueRequestForObject{}).
-		Watches(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForObject{}).
-		Watches(&source.Kind{Type: &corev1.Namespace{}}, &handler.EnqueueRequestForObject{}).
-		Watches(&source.Kind{Type: &corev1.ConfigMap{}}, &handler.EnqueueRequestForObject{}).
+		Watches(&metallbv1beta1.IPAddressPool{}, &handler.EnqueueRequestForObject{}).
+		Watches(&corev1.Node{}, &handler.EnqueueRequestForObject{}).
+		Watches(&metallbv1beta1.BGPAdvertisement{}, &handler.EnqueueRequestForObject{}).
+		Watches(&metallbv1beta1.L2Advertisement{}, &handler.EnqueueRequestForObject{}).
+		Watches(&metallbv1beta1.BFDProfile{}, &handler.EnqueueRequestForObject{}).
+		Watches(&metallbv1beta1.AddressPool{}, &handler.EnqueueRequestForObject{}).
+		Watches(&metallbv1beta1.Community{}, &handler.EnqueueRequestForObject{}).
+		Watches(&corev1.Secret{}, &handler.EnqueueRequestForObject{}).
+		Watches(&corev1.Namespace{}, &handler.EnqueueRequestForObject{}).
+		Watches(&corev1.ConfigMap{}, &handler.EnqueueRequestForObject{}).
 		WithEventFilter(p).
 		Complete(r)
 }

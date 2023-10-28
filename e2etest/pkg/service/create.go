@@ -25,8 +25,8 @@ func CreateWithBackendPort(cs clientset.Interface, namespace string, jigName str
 	var err error
 
 	jig := e2eservice.NewTestJig(cs, namespace, jigName)
-	timeout := e2eservice.GetServiceLoadBalancerCreationTimeout(cs)
-	svc, err = jig.CreateLoadBalancerService(timeout, func(svc *corev1.Service) {
+	timeout := e2eservice.GetServiceLoadBalancerCreationTimeout(context.TODO(), cs)
+	svc, err = jig.CreateLoadBalancerService(context.TODO(), timeout, func(svc *corev1.Service) {
 		tweakServicePort(svc, port)
 		for _, f := range tweak {
 			f(svc)
@@ -34,7 +34,7 @@ func CreateWithBackendPort(cs clientset.Interface, namespace string, jigName str
 	})
 
 	framework.ExpectNoError(err)
-	_, err = jig.Run(func(rc *corev1.ReplicationController) {
+	_, err = jig.Run(context.TODO(), func(rc *corev1.ReplicationController) {
 		if port != 0 {
 			tweakRCPort(rc, port)
 		}

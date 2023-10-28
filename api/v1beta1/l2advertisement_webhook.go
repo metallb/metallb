@@ -26,6 +26,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 func (l2Adv *L2Advertisement) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -39,68 +40,68 @@ func (l2Adv *L2Advertisement) SetupWebhookWithManager(mgr ctrl.Manager) error {
 var _ webhook.Validator = &L2Advertisement{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for L2Advertisement.
-func (l2Adv *L2Advertisement) ValidateCreate() error {
+func (l2Adv *L2Advertisement) ValidateCreate() (admission.Warnings, error) {
 	level.Debug(Logger).Log("webhook", "l2advertisement", "action", "create", "name", l2Adv.Name, "namespace", l2Adv.Namespace)
 
 	if l2Adv.Namespace != MetalLBNamespace {
-		return fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
+		return nil, fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
 	}
 
 	existingL2AdvList, err := getExistingL2Advs()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	addressPools, err := getExistingAddressPools()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	ipAddressPools, err := getExistingIPAddressPools()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	toValidate := l2AdvListWithUpdate(existingL2AdvList, l2Adv)
 	err = Validator.Validate(toValidate, addressPools, ipAddressPools)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "l2advertisement", "action", "create", "name", l2Adv.Name, "namespace", l2Adv.Namespace, "error", err)
-		return err
+		return nil, err
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for L2Advertisement.
-func (l2Adv *L2Advertisement) ValidateUpdate(old runtime.Object) error {
+func (l2Adv *L2Advertisement) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	level.Debug(Logger).Log("webhook", "l2advertisement", "action", "update", "name", l2Adv.Name, "namespace", l2Adv.Namespace)
 
 	l2Advs, err := getExistingL2Advs()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	addressPools, err := getExistingAddressPools()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	ipAddressPools, err := getExistingIPAddressPools()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	toValidate := l2AdvListWithUpdate(l2Advs, l2Adv)
 	err = Validator.Validate(toValidate, addressPools, ipAddressPools)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "l2advertisement", "action", "create", "name", l2Adv.Name, "namespace", l2Adv.Namespace, "error", err)
-		return err
+		return nil, err
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for L2Advertisement.
-func (l2Adv *L2Advertisement) ValidateDelete() error {
-	return nil
+func (l2Adv *L2Advertisement) ValidateDelete() (admission.Warnings, error) {
+	return nil, nil
 }
 
 var getExistingL2Advs = func() (*L2AdvertisementList, error) {

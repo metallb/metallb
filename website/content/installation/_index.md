@@ -188,6 +188,8 @@ and change the `BGP_TYPE` environment variable of the `manager` container to `fr
   value: frr
 ```
 
+{{% /notice %}}
+
 ## FRR daemons logging level
 
 The FRR daemons logging level are configured using the speaker `--log-level` argument following the below mapping:

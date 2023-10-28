@@ -27,6 +27,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 func (bgpAdv *BGPAdvertisement) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -40,78 +41,78 @@ func (bgpAdv *BGPAdvertisement) SetupWebhookWithManager(mgr ctrl.Manager) error 
 var _ webhook.Validator = &BGPAdvertisement{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for BGPAdvertisement.
-func (bgpAdv *BGPAdvertisement) ValidateCreate() error {
+func (bgpAdv *BGPAdvertisement) ValidateCreate() (admission.Warnings, error) {
 	level.Debug(Logger).Log("webhook", "bgpadvertisement", "action", "create", "name", bgpAdv.Name, "namespace", bgpAdv.Namespace)
 
 	if bgpAdv.Namespace != MetalLBNamespace {
-		return fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
+		return nil, fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
 	}
 
 	existingBGPAdvList, err := getExistingBGPAdvs()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	addressPools, err := getExistingAddressPools()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	ipAddressPools, err := getExistingIPAddressPools()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	nodes, err := getExistingNodes()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	toValidate := bgpAdvListWithUpdate(existingBGPAdvList, bgpAdv)
 	err = Validator.Validate(toValidate, addressPools, ipAddressPools, nodes)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "bgpadvertisement", "action", "create", "name", bgpAdv.Name, "namespace", bgpAdv.Namespace, "error", err)
-		return err
+		return nil, err
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for BGPAdvertisement.
-func (bgpAdv *BGPAdvertisement) ValidateUpdate(old runtime.Object) error {
+func (bgpAdv *BGPAdvertisement) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	level.Debug(Logger).Log("webhook", "bgpadvertisement", "action", "update", "name", bgpAdv.Name, "namespace", bgpAdv.Namespace)
 
 	bgpAdvs, err := getExistingBGPAdvs()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	addressPools, err := getExistingAddressPools()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	ipAddressPools, err := getExistingIPAddressPools()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	nodes, err := getExistingNodes()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	toValidate := bgpAdvListWithUpdate(bgpAdvs, bgpAdv)
 	err = Validator.Validate(toValidate, addressPools, ipAddressPools, nodes)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "bgpadvertisement", "action", "create", "name", bgpAdv.Name, "namespace", bgpAdv.Namespace, "error", err)
-		return err
+		return nil, err
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for BGPAdvertisement.
-func (bgpAdv *BGPAdvertisement) ValidateDelete() error {
-	return nil
+func (bgpAdv *BGPAdvertisement) ValidateDelete() (admission.Warnings, error) {
+	return nil, nil
 }
 
 var getExistingBGPAdvs = func() (*BGPAdvertisementList, error) {

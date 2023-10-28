@@ -26,6 +26,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	"sigs.k8s.io/controller-runtime/pkg/webhook/admission"
 )
 
 func (bgpPeer *BGPPeer) SetupWebhookWithManager(mgr ctrl.Manager) error {
@@ -39,47 +40,47 @@ func (bgpPeer *BGPPeer) SetupWebhookWithManager(mgr ctrl.Manager) error {
 var _ webhook.Validator = &BGPPeer{}
 
 // ValidateCreate implements webhook.Validator so a webhook will be registered for BGPPeer.
-func (bgpPeer *BGPPeer) ValidateCreate() error {
+func (bgpPeer *BGPPeer) ValidateCreate() (admission.Warnings, error) {
 	level.Debug(Logger).Log("webhook", "bgppeer", "action", "create", "name", bgpPeer.Name, "namespace", bgpPeer.Namespace)
 
 	if bgpPeer.Namespace != MetalLBNamespace {
-		return fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
+		return nil, fmt.Errorf("resource must be created in %s namespace", MetalLBNamespace)
 	}
 	existingBGPPeers, err := GetExistingBGPPeers()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	toValidate := bgpPeerListWithUpdate(existingBGPPeers, bgpPeer)
 	err = Validator.Validate(toValidate)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "bgppeer", "action", "create", "name", bgpPeer.Name, "namespace", bgpPeer.Namespace, "error", err)
-		return err
+		return nil, err
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateUpdate implements webhook.Validator so a webhook will be registered for AddressPool.
-func (bgpPeer *BGPPeer) ValidateUpdate(old runtime.Object) error {
+func (bgpPeer *BGPPeer) ValidateUpdate(old runtime.Object) (admission.Warnings, error) {
 	level.Debug(Logger).Log("webhook", "bgppeer", "action", "update", "name", bgpPeer.Name, "namespace", bgpPeer.Namespace)
 
 	existingBGPPeers, err := GetExistingBGPPeers()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	toValidate := bgpPeerListWithUpdate(existingBGPPeers, bgpPeer)
 	err = Validator.Validate(toValidate)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "bgppeer", "action", "update", "name", bgpPeer.Name, "namespace", bgpPeer.Namespace, "error", err)
-		return err
+		return nil, err
 	}
-	return nil
+	return nil, nil
 }
 
 // ValidateDelete implements webhook.Validator so a webhook will be registered for AddressPool.
-func (bgpPeer *BGPPeer) ValidateDelete() error {
-	return nil
+func (bgpPeer *BGPPeer) ValidateDelete() (admission.Warnings, error) {
+	return nil, nil
 }
 
 var GetExistingBGPPeers = func() (*BGPPeerList, error) {
