@@ -141,15 +141,22 @@ jobs:
 
           exists=$(curl -s -H "Accept: application/vnd.github.v3+json" https://github.com/$GITHUB_REPOSITORY/releases/tag/$repo-chart-$tag -w %{http_code} -o /dev/null)
           if [[ $exists != "200" ]]; then
-            echo "Creating release..."
-            # package chart
+            echo "Creating release for base chart..."
             ./cr package charts/$repo
-            # upload chart to github releases
             ./cr upload \
                 --owner "$owner" \
                 --git-repo "$repo" \
                 --release-name-template "{{ .Name }}-chart-{{ .Version }}" \
                 --token "${{ secrets.GITHUB_TOKEN }}"
+
+            echo "Creating release for CRD chart..."
+            ./cr package charts/$repo/charts/crds
+            ./cr upload \
+                --owner "$owner" \
+                --git-repo "$repo" \
+                --release-name-template "{{ .Name }}-chart-{{ .Version }}" \
+                --token "${{ secrets.GITHUB_TOKEN }}"
+
             # Update index and push to github pages
             ./cr index \
                 --owner "$owner" \

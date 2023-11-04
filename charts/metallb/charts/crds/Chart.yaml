@@ -1,5 +1,5 @@
 apiVersion: v2
-name: crds
+name: metallb-crds
 description: MetalLB CRDs
 home: https://metallb.universe.tf
 sources:

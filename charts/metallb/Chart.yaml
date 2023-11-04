@@ -6,7 +6,7 @@ sources:
   - https://github.com/metallb/metallb
 icon: https://metallb.universe.tf/images/logo/metallb-white.png
 dependencies:
-- name: crds
+- name: metallb-crds
   condition: crds.enabled
   version: 0.0.0
 
