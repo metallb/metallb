@@ -139,9 +139,10 @@ jobs:
           owner=$(dirname "$GITHUB_REPOSITORY")
           tag="${GITHUB_REF_NAME:1}"
 
-          exists=$(curl -s -H "Accept: application/vnd.github.v3+json" https://github.com/$GITHUB_REPOSITORY/releases/tag/$repo-chart-$tag -w %{http_code} -o /dev/null)
+          exists=$(curl -s -H "Accept: application/vnd.github.v3+json" https://github.com/$owner/$repo/releases/tag/$repo-chart-$tag -w %{http_code} -o /dev/null)
           if [[ $exists != "200" ]]; then
-            echo "Creating release for base chart..."
+
+            echo "Creating Github release for base chart..."
             ./cr package charts/$repo
             ./cr upload \
                 --owner "$owner" \
@@ -149,7 +150,7 @@ jobs:
                 --release-name-template "{{ .Name }}-chart-{{ .Version }}" \
                 --token "${{ secrets.GITHUB_TOKEN }}"
 
-            echo "Creating release for CRD chart..."
+            echo "Creating Github release for CRD chart..."
             ./cr package charts/$repo/charts/crds
             ./cr upload \
                 --owner "$owner" \
