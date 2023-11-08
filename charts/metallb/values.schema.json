@@ -319,6 +319,12 @@
             },
             "webhookMode" : {
               "type": "string"
+            },
+            "extraContainers": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
             }
           }
         }
@@ -403,6 +409,12 @@
               "type": "object",
               "properties": {
                 "resources": { "type": "object" }
+              }
+            },
+            "extraContainers": {
+              "type": "array",
+              "items": {
+                "type": "object"
               }
             }
           },

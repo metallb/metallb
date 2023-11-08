@@ -249,6 +249,8 @@ controller:
     successThreshold: 1
     timeoutSeconds: 1
 
+  extraContainers: []
+
 # speaker contains configuration specific to the MetalLB speaker
 # daemonset.
 speaker:
@@ -338,6 +340,8 @@ speaker:
 
   frrMetrics:
     resources: {}
+
+  extraContainers: []
 
 crds:
   enabled: true
