@@ -909,9 +909,9 @@ def _align_helm_crds(source, output):
 @task
 def generateapidocs(ctx):
     """Generates the docs for the CRDs"""
-    run("go install github.com/ahmetb/gen-crd-api-reference-docs@3f29e6853552dcf08a8e846b1225f275ed0f3e3b")
-    run('gen-crd-api-reference-docs -config website/generatecrddoc/crdgen.json -template-dir website/generatecrddoc/template -api-dir "go.universe.tf/metallb/api" -out-file /tmp/generated_apidoc.html')
-    run("cat website/generatecrddoc/prefix.html /tmp/generated_apidoc.html > website/content/apis/_index.md")
+    run("go install github.com/elastic/crd-ref-docs@v0.0.10")
+    run('crd-ref-docs --source-path=./api --config=website/generatecrddoc/crdgen.yaml --templates-dir=website/generatecrddoc/template --renderer markdown --output-path=/tmp/generated_apidoc.md')
+    run("cat website/generatecrddoc/prefix.html /tmp/generated_apidoc.md > website/content/apis/_index.md")
 
 @task(help={
     "action": "The action to take to fix the uncommitted changes",
