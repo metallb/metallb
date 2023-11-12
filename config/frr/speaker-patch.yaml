@@ -30,7 +30,7 @@ spec:
             runAsUser: 100
             runAsGroup: 101
           image: quay.io/frrouting/frr:8.5.2
-          command: ["/cp", "-rLf /tmp/frr/* /etc/frr/"]
+          command: ["/bin/sh", "-c", "cp -rLf /tmp/frr/* /etc/frr/"]
           volumeMounts:
             - name: frr-startup
               mountPath: /tmp/frr

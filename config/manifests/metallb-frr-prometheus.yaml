@@ -2227,8 +2227,9 @@ spec:
       hostNetwork: true
       initContainers:
       - command:
-        - /cp
-        - -rLf /tmp/frr/* /etc/frr/
+        - /bin/sh
+        - -c
+        - cp -rLf /tmp/frr/* /etc/frr/
         image: quay.io/frrouting/frr:8.5.2
         name: cp-frr-files
         securityContext:
