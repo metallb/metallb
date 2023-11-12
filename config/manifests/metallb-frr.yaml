@@ -2065,7 +2065,9 @@ spec:
           name: frr-conf
       - command:
         - /cp
-        - -f /frr-reloader.sh /etc/frr_reloader/
+        - -f
+        - /frr-reloader.sh
+        - /etc/frr_reloader/
         image: quay.io/metallb/speaker:main
         name: cp-reloader
         volumeMounts:
@@ -2073,7 +2075,9 @@ spec:
           name: reloader
       - command:
         - /cp
-        - -f /frr-metrics /etc/frr_metrics/
+        - -f
+        - /frr-metrics
+        - /etc/frr_metrics/
         image: quay.io/metallb/speaker:main
         name: cp-metrics
         volumeMounts:
