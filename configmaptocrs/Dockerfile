@@ -38,6 +38,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 
 FROM gcr.io/distroless/static:latest
 
+COPY --from=busybox:1.36-uclibc /bin/cp /cp
 COPY --from=builder /build/configmaptocrs /configmaptocrs
 COPY LICENSE /
 

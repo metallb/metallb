@@ -2050,9 +2050,8 @@ spec:
       hostNetwork: true
       initContainers:
       - command:
-        - /bin/sh
-        - -c
-        - cp -rLf /tmp/frr/* /etc/frr/
+        - /cp
+        - -rLf /tmp/frr/* /etc/frr/
         image: quay.io/frrouting/frr:8.5.2
         name: cp-frr-files
         securityContext:
@@ -2064,18 +2063,16 @@ spec:
         - mountPath: /etc/frr
           name: frr-conf
       - command:
-        - /bin/sh
-        - -c
-        - cp -f /frr-reloader.sh /etc/frr_reloader/
+        - /cp
+        - -f /frr-reloader.sh /etc/frr_reloader/
         image: quay.io/metallb/speaker:main
         name: cp-reloader
         volumeMounts:
         - mountPath: /etc/frr_reloader
           name: reloader
       - command:
-        - /bin/sh
-        - -c
-        - cp -f /frr-metrics /etc/frr_metrics/
+        - /cp
+        - -f /frr-metrics /etc/frr_metrics/
         image: quay.io/metallb/speaker:main
         name: cp-metrics
         volumeMounts:
