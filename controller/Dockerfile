@@ -32,7 +32,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
   go build -v -o /build/controller \
   -ldflags "-X 'go.universe.tf/metallb/internal/version.gitCommit=${GIT_COMMIT}' -X 'go.universe.tf/metallb/internal/version.gitBranch=${GIT_BRANCH}'"
 
-FROM docker.io/alpine:latest
+FROM gcr.io/distroless/static:latest
 
 COPY --from=builder /build/controller /controller
 COPY LICENSE /
@@ -45,6 +45,6 @@ LABEL org.opencontainers.image.authors="metallb" \
   org.opencontainers.image.licenses="Apache-2.0" \
   org.opencontainers.image.description="Metallb Controller" \
   org.opencontainers.image.title="controller" \
-  org.opencontainers.image.base.name="docker.io/alpine:latest"
+  org.opencontainers.image.base.name="gcr.io/distroless/static:latest"
 
 ENTRYPOINT ["/controller"]
