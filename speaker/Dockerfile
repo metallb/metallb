@@ -46,7 +46,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 
 FROM gcr.io/distroless/static:latest
 
-
+COPY --from=busybox:1.36-uclibc /bin/cp /cp
 COPY --from=builder /build/speaker /speaker
 COPY --from=builder /build/frr-metrics /frr-metrics
 COPY frr-tools/reloader/frr-reloader.sh /frr-reloader.sh
