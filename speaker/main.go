@@ -34,6 +34,7 @@ import (
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	k8snodes "go.universe.tf/metallb/internal/k8s/nodes"
+
 	"go.universe.tf/metallb/internal/layer2"
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/speakerlist"
@@ -150,6 +151,7 @@ func main() {
 	// Setup all clients and speakers, config decides what is being done runtime.
 	ctrl, err := newController(controllerConfig{
 		MyNode:                 *myNode,
+		Namespace:              *namespace,
 		Logger:                 logger,
 		LogLevel:               logging.Level(*logLevel),
 		SList:                  sList,
@@ -219,10 +221,11 @@ type controller struct {
 }
 
 type controllerConfig struct {
-	MyNode   string
-	Logger   log.Logger
-	LogLevel logging.Level
-	SList    SpeakerList
+	MyNode    string
+	Namespace string
+	Logger    log.Logger
+	LogLevel  logging.Level
+	SList     SpeakerList
 
 	bgpType bgpImplementation
 
@@ -241,7 +244,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 			myNode:         cfg.MyNode,
 			svcAds:         make(map[string][]*bgp.Advertisement),
 			bgpType:        cfg.bgpType,
-			sessionManager: newBGP(cfg.bgpType, cfg.Logger, cfg.LogLevel),
+			sessionManager: newBGP(cfg),
 		},
 	}
 	protocols := []config.Proto{config.BGP}
@@ -540,6 +543,7 @@ type Protocol interface {
 	SetBalancer(log.Logger, string, []net.IP, *config.Pool, service, *v1.Service) error
 	DeleteBalancer(log.Logger, string, string) error
 	SetNode(log.Logger, *v1.Node) error
+	SetEventCallback(func(interface{}))
 }
 
 // Speakerlist represents a list of healthy speakers.
