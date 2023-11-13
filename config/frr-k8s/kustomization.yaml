@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- https://github.com/metallb/frr-k8s/config/default/?timeout=120&ref=main
+- ../native
+patchesStrategicMerge:
+- speaker-patch.yaml
+- controller-patch.yaml
+patches:
+  - path: ignore-ns.yaml
+namespace: metallb-system
+images:
+- name: quay.io/metallb/frr-k8s
+  newTag: main
+patchesJson6902:
+  - target:
+      group: rbac.authorization.k8s.io
+      version: v1
+      kind: Role
+      name: pod-lister
+      namespace: metallb-system
+    path: role-patch.yaml

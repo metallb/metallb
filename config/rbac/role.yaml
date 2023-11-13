@@ -41,14 +41,14 @@ rules:
       - podsecuritypolicies
     verbs:
       - use
-  - apiGroups: 
+  - apiGroups:
       - admissionregistration.k8s.io
-    resources: 
+    resources:
       - validatingwebhookconfigurations
       - mutatingwebhookconfigurations
     resourceNames:
       - metallb-webhook-configuration
-    verbs: 
+    verbs:
       - create
       - delete
       - get

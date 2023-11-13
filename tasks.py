@@ -897,6 +897,7 @@ def generatemanifests(ctx):
     generate_manifest(ctx, bgp_type="native", output="config/manifests/metallb-native.yaml")
     generate_manifest(ctx, bgp_type="frr", with_prometheus=True, output="config/manifests/metallb-frr-prometheus.yaml")
     generate_manifest(ctx, bgp_type="native", with_prometheus=True, output="config/manifests/metallb-native-prometheus.yaml")
+    generate_manifest(ctx, bgp_type="frr-k8s", output="config/manifests/metallb-frr-k8s.yaml")
 
     _align_helm_crds(
         source='config/manifests/metallb-frr.yaml',
