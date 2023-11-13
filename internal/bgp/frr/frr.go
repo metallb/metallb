@@ -330,6 +330,8 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 	return config, nil
 }
 
+func (sm *sessionManager) SetEventCallback(func(interface{})) {}
+
 var debounceTimeout = 3 * time.Second
 var failureTimeout = time.Second * 5
 
