@@ -1,0 +1,383 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.11.3
+  creationTimestamp: null
+  name: frrconfigurations.frrk8s.metallb.io
+spec:
+  group: frrk8s.metallb.io
+  names:
+    kind: FRRConfiguration
+    listKind: FRRConfigurationList
+    plural: frrconfigurations
+    singular: frrconfiguration
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: FRRConfiguration is the Schema for the frrconfigurations API.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: FRRConfigurationSpec defines the desired state of FRRConfiguration.
+            properties:
+              bgp:
+                properties:
+                  bfdProfiles:
+                    description: The list of bfd profiles to be used when configuring
+                      the neighbors.
+                    items:
+                      properties:
+                        detectMultiplier:
+                          default: 3
+                          description: Configures the detection multiplier to determine
+                            packet loss. The remote transmission interval will be
+                            multiplied by this value to determine the connection loss
+                            detection timer.
+                          format: int32
+                          maximum: 255
+                          minimum: 2
+                          type: integer
+                        echoInterval:
+                          default: 50
+                          description: Configures the minimal echo receive transmission
+                            interval that this system is capable of handling in milliseconds.
+                            Defaults to 50ms
+                          format: int32
+                          maximum: 60000
+                          minimum: 10
+                          type: integer
+                        echoMode:
+                          description: Enables or disables the echo transmission mode.
+                            This mode is disabled by default, and not supported on
+                            multi hops setups.
+                          type: boolean
+                        minimumTtl:
+                          default: 254
+                          description: 'For multi hop sessions only: configure the
+                            minimum expected TTL for an incoming BFD control packet.'
+                          format: int32
+                          maximum: 254
+                          minimum: 1
+                          type: integer
+                        name:
+                          description: The name of the BFD Profile to be referenced
+                            in other parts of the configuration.
+                          type: string
+                        passiveMode:
+                          description: 'Mark session as passive: a passive session
+                            will not attempt to start the connection and will wait
+                            for control packets from peer before it begins replying.'
+                          type: boolean
+                        receiveInterval:
+                          default: 300
+                          description: The minimum interval that this system is capable
+                            of receiving control packets in milliseconds. Defaults
+                            to 300ms.
+                          format: int32
+                          maximum: 60000
+                          minimum: 10
+                          type: integer
+                        transmitInterval:
+                          default: 300
+                          description: The minimum transmission interval (less jitter)
+                            that this system wants to use to send BFD control packets
+                            in milliseconds. Defaults to 300ms
+                          format: int32
+                          maximum: 60000
+                          minimum: 10
+                          type: integer
+                      required:
+                      - name
+                      type: object
+                    type: array
+                  routers:
+                    description: The list of routers we want FRR to configure (one
+                      per VRF).
+                    items:
+                      description: Router represent a neighbor router we want FRR
+                        to connect to.
+                      properties:
+                        asn:
+                          description: AS number to use for the local end of the session.
+                          format: int32
+                          maximum: 4294967295
+                          minimum: 0
+                          type: integer
+                        id:
+                          description: BGP router ID
+                          type: string
+                        neighbors:
+                          description: The list of neighbors we want to establish
+                            BGP sessions with.
+                          items:
+                            properties:
+                              address:
+                                description: The IP address to establish the session
+                                  with.
+                                type: string
+                              asn:
+                                description: AS number to use for the local end of
+                                  the session.
+                                format: int32
+                                maximum: 4294967295
+                                minimum: 0
+                                type: integer
+                              bfdProfile:
+                                description: The name of the BFD Profile to be used
+                                  for the BFD session associated to the BGP session.
+                                  If not set, the BFD session won't be set up.
+                                type: string
+                              ebgpMultiHop:
+                                description: To set if the BGPPeer is multi-hops away.
+                                type: boolean
+                              holdTime:
+                                default: 90s
+                                description: Requested BGP hold time, per RFC4271.
+                                type: string
+                              keepaliveTime:
+                                default: 30s
+                                description: Requested BGP keepalive time, per RFC4271.
+                                type: string
+                              password:
+                                description: passwordSecret is name of the authentication
+                                  secret for the neighbor. the secret must be of type
+                                  "kubernetes.io/basic-auth", and created in the same
+                                  namespace as the frr-k8s daemon. The password is
+                                  stored in the secret as the key "password".
+                                properties:
+                                  name:
+                                    description: name is unique within a namespace
+                                      to reference a secret resource.
+                                    type: string
+                                  namespace:
+                                    description: namespace defines the space within
+                                      which the secret name must be unique.
+                                    type: string
+                                type: object
+                                x-kubernetes-map-type: atomic
+                              port:
+                                default: 179
+                                description: Port to dial when establishing the session.
+                                maximum: 16384
+                                minimum: 0
+                                type: integer
+                              toAdvertise:
+                                description: ToAdvertise represents the list of prefixes
+                                  to advertise to the given neighbor and the associated
+                                  properties.
+                                properties:
+                                  allowed:
+                                    description: Prefixes is the list of prefixes
+                                      allowed to be propagated to this neighbor. They
+                                      must match the prefixes defined in the router.
+                                    properties:
+                                      mode:
+                                        default: filtered
+                                        description: Mode is the mode to use when
+                                          handling the prefixes. When set to "filtered",
+                                          only the prefixes in the given list will
+                                          be allowed. When set to "all", all the prefixes
+                                          configured on the router will be allowed.
+                                        enum:
+                                        - all
+                                        - filtered
+                                        type: string
+                                      prefixes:
+                                        items:
+                                          type: string
+                                        type: array
+                                    type: object
+                                  withCommunity:
+                                    description: PrefixesWithCommunity is a list of
+                                      prefixes that are associated to a bgp community
+                                      when being advertised. The prefixes associated
+                                      to a given local pref must be in the prefixes
+                                      allowed to be advertised.
+                                    items:
+                                      properties:
+                                        community:
+                                          type: string
+                                        prefixes:
+                                          description: Prefixes is the list of prefixes
+                                            associated to the community.
+                                          format: cidr
+                                          items:
+                                            type: string
+                                          minItems: 1
+                                          type: array
+                                      type: object
+                                    type: array
+                                  withLocalPref:
+                                    description: PrefixesWithLocalPref is a list of
+                                      prefixes that are associated to a local preference
+                                      when being advertised. The prefixes associated
+                                      to a given local pref must be in the prefixes
+                                      allowed to be advertised.
+                                    items:
+                                      properties:
+                                        localPref:
+                                          format: int32
+                                          type: integer
+                                        prefixes:
+                                          description: Prefixes is the list of prefixes
+                                            associated to the local preference.
+                                          format: cidr
+                                          items:
+                                            type: string
+                                          minItems: 1
+                                          type: array
+                                      type: object
+                                    type: array
+                                type: object
+                              toReceive:
+                                description: Receive represents the list of prefixes
+                                  to receive from the given neighbor.
+                                properties:
+                                  allowed:
+                                    description: Prefixes is the list of prefixes
+                                      allowed to be received from this neighbor.
+                                    properties:
+                                      mode:
+                                        default: filtered
+                                        description: Mode is the mode to use when
+                                          handling the prefixes. When set to "filtered",
+                                          only the prefixes in the given list will
+                                          be allowed. When set to "all", all the prefixes
+                                          configured on the router will be allowed.
+                                        enum:
+                                        - all
+                                        - filtered
+                                        type: string
+                                      prefixes:
+                                        items:
+                                          properties:
+                                            ge:
+                                              description: The prefix length modifier.
+                                                This selector accepts any matching
+                                                prefix with length greater or equal
+                                                the given value.
+                                              format: int32
+                                              maximum: 128
+                                              minimum: 1
+                                              type: integer
+                                            le:
+                                              description: The prefix length modifier.
+                                                This selector accepts any matching
+                                                prefix with length less or equal the
+                                                given value.
+                                              format: int32
+                                              maximum: 128
+                                              minimum: 1
+                                              type: integer
+                                            prefix:
+                                              format: cidr
+                                              type: string
+                                          type: object
+                                        type: array
+                                    type: object
+                                type: object
+                            required:
+                            - address
+                            - asn
+                            type: object
+                          type: array
+                        prefixes:
+                          description: The list of prefixes we want to advertise from
+                            this router instance.
+                          items:
+                            type: string
+                          type: array
+                        vrf:
+                          description: The host VRF used to establish sessions from
+                            this router.
+                          type: string
+                      required:
+                      - asn
+                      type: object
+                    type: array
+                type: object
+              nodeSelector:
+                description: Limits the nodes that will attempt to apply this config.
+                  When specified, the configuration will be considered only on nodes
+                  whose labels match the specified selectors. When it is not specified
+                  all nodes will attempt to apply this config.
+                properties:
+                  matchExpressions:
+                    description: matchExpressions is a list of label selector requirements.
+                      The requirements are ANDed.
+                    items:
+                      description: A label selector requirement is a selector that
+                        contains values, a key, and an operator that relates the key
+                        and values.
+                      properties:
+                        key:
+                          description: key is the label key that the selector applies
+                            to.
+                          type: string
+                        operator:
+                          description: operator represents a key's relationship to
+                            a set of values. Valid operators are In, NotIn, Exists
+                            and DoesNotExist.
+                          type: string
+                        values:
+                          description: values is an array of string values. If the
+                            operator is In or NotIn, the values array must be non-empty.
+                            If the operator is Exists or DoesNotExist, the values
+                            array must be empty. This array is replaced during a strategic
+                            merge patch.
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - key
+                      - operator
+                      type: object
+                    type: array
+                  matchLabels:
+                    additionalProperties:
+                      type: string
+                    description: matchLabels is a map of {key,value} pairs. A single
+                      {key,value} in the matchLabels map is equivalent to an element
+                      of matchExpressions, whose key field is "key", the operator
+                      is "In", and the values array contains only "value". The requirements
+                      are ANDed.
+                    type: object
+                type: object
+                x-kubernetes-map-type: atomic
+              raw:
+                properties:
+                  priority:
+                    description: Sets the order with this configuration is appended
+                      to the bottom of the rendered configuration. A higher value
+                      means the raw config is appended later in the configuration
+                      file.
+                    type: integer
+                  rawConfig:
+                    description: A raw FRR configuration to be appended to the configuration
+                      rendered via the k8s api.
+                    type: string
+                type: object
+            type: object
+          status:
+            description: FRRConfigurationStatus defines the observed state of FRRConfiguration.
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
