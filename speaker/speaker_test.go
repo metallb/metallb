@@ -193,6 +193,8 @@ func (m *MockProtocol) SetNode(_ log.Logger, _ *v1.Node) error {
 	panic("not implemented") // TODO: Implement
 }
 
+func (m *MockProtocol) SetEventCallback(_ func(interface{})) {}
+
 func (m *MockProtocol) reset() {
 	m.deleteBalancerCalled = false
 	m.setBalancerCalled = false

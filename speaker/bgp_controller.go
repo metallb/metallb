@@ -23,6 +23,7 @@ import (
 
 	"go.universe.tf/metallb/internal/bgp"
 	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
+	bgpfrrk8s "go.universe.tf/metallb/internal/bgp/frrk8s"
 	bgpnative "go.universe.tf/metallb/internal/bgp/native"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/epslices"
@@ -40,6 +41,7 @@ type bgpImplementation string
 const (
 	bgpNative bgpImplementation = "native"
 	bgpFrr    bgpImplementation = "frr"
+	bgpFrrK8s bgpImplementation = "frr-k8s"
 )
 
 type peer struct {
@@ -271,6 +273,10 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 }
 
 func (c *bgpController) syncBFDProfiles(profiles map[string]*config.BFDProfile) error {
+	if len(profiles) == 0 {
+		return nil
+	}
+
 	return c.sessionManager.SyncBFDProfiles(profiles)
 }
 
@@ -368,6 +374,8 @@ var newBGP = func(cfg controllerConfig) bgp.SessionManager {
 		return bgpnative.NewSessionManager(cfg.Logger)
 	case bgpFrr:
 		return bgpfrr.NewSessionManager(cfg.Logger, cfg.LogLevel)
+	case bgpFrrK8s:
+		return bgpfrrk8s.NewSessionManager(cfg.Logger, cfg.MyNode, cfg.Namespace)
 	default:
 		panic(fmt.Sprintf("unsupported BGP implementation type: %s", cfg.bgpType))
 	}

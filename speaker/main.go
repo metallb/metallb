@@ -170,6 +170,10 @@ func main() {
 		validateConfig = config.DiscardNativeOnly
 	}
 
+	listenFRRK8s := false
+	if bgpType == string(bgpFrrK8s) {
+		listenFRRK8s = true
+	}
 	client, err := k8s.New(&k8s.Config{
 		ProcessName:     "metallb-speaker",
 		NodeName:        *myNode,
@@ -189,12 +193,14 @@ func main() {
 		},
 		ValidateConfig:    validateConfig,
 		LoadBalancerClass: *loadBalancerClass,
+		WithFRRK8s:        listenFRRK8s,
 	})
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create k8s client")
 		os.Exit(1)
 	}
 	ctrl.client = client
+	ctrl.protocolHandlers[config.BGP].SetEventCallback(client.BGPEventCallback)
 
 	sList.Start(client)
 	defer sList.Stop()
@@ -503,7 +509,8 @@ func (c *controller) SetConfig(l log.Logger, cfg *config.Config) controllers.Syn
 	}
 
 	for proto, handler := range c.protocolHandlers {
-		if err := handler.SetConfig(l, cfg); err != nil {
+		err := handler.SetConfig(l, cfg)
+		if err != nil {
 			level.Error(l).Log("op", "setConfig", "protocol", proto, "error", err, "msg", "applying new configuration to protocol handler failed")
 			return controllers.SyncStateErrorNoRetry
 		}

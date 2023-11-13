@@ -15,7 +15,6 @@ import (
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/k8s/epslices"
-	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/pointer"
 
 	"github.com/go-kit/log"
@@ -91,7 +90,7 @@ type fakeBGP struct {
 	sessionManager fakeBGPSessionManager
 }
 
-func (f *fakeBGP) NewSessionManager(_ bgpImplementation, _ log.Logger, _ logging.Level) bgp.SessionManager {
+func (f *fakeBGP) NewSessionManager(_ controllerConfig) bgp.SessionManager {
 	f.sessionManager.t = f.t
 	f.sessionManager.gotAds = make(map[string][]*bgp.Advertisement)
 
@@ -154,6 +153,8 @@ func (f *fakeBGPSessionManager) Ads() map[string][]*bgp.Advertisement {
 
 	return ret
 }
+
+func (f *fakeBGPSessionManager) SetEventCallback(_ func(interface{})) {}
 
 type fakeSession struct {
 	f    *fakeBGPSessionManager
