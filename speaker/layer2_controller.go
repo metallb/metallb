@@ -174,6 +174,10 @@ func (c *layer2Controller) SetNode(l log.Logger, n *v1.Node) error {
 	return nil
 }
 
+func (c *layer2Controller) SetEventCallback(callback func(interface{})) {
+	// Do nothing
+}
+
 func ipAdvertisementFor(ip net.IP, localNode string, l2Advertisements []*config.L2Advertisement) layer2.IPAdvertisement {
 	ifs := sets.Set[string]{}
 	for _, l2 := range l2Advertisements {

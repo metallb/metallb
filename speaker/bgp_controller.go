@@ -27,7 +27,6 @@ import (
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	k8snodes "go.universe.tf/metallb/internal/k8s/nodes"
-	"go.universe.tf/metallb/internal/logging"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -105,6 +104,10 @@ newPeers:
 	}
 
 	return c.syncPeers(l)
+}
+
+func (c *bgpController) SetEventCallback(callback func(interface{})) {
+	c.sessionManager.SetEventCallback(callback)
 }
 
 // hasHealthyEndpoint return true if this node has at least one healthy endpoint.
@@ -359,14 +362,14 @@ func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
 }
 
 // Create a new 'bgp.SessionManager' of type 'bgpType'.
-var newBGP = func(bgpType bgpImplementation, l log.Logger, logLevel logging.Level) bgp.SessionManager {
-	switch bgpType {
+var newBGP = func(cfg controllerConfig) bgp.SessionManager {
+	switch cfg.bgpType {
 	case bgpNative:
-		return bgpnative.NewSessionManager(l)
+		return bgpnative.NewSessionManager(cfg.Logger)
 	case bgpFrr:
-		return bgpfrr.NewSessionManager(l, logLevel)
+		return bgpfrr.NewSessionManager(cfg.Logger, cfg.LogLevel)
 	default:
-		panic(fmt.Sprintf("unsupported BGP implementation type: %s", bgpType))
+		panic(fmt.Sprintf("unsupported BGP implementation type: %s", cfg.bgpType))
 	}
 }
 
