@@ -1,0 +1,13 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  namespace: metallb-system
+  name: controller
+spec:
+  template:
+    spec:
+      containers:
+      - name: controller
+        env:
+        - name: METALLB_BGP_TYPE
+          value: frr-k8s
