@@ -173,7 +173,7 @@ func (sm *sessionManager) SyncBFDProfiles(profiles map[string]*metallbconfig.BFD
 	defer sm.Unlock()
 	sm.bfdProfiles = make([]BFDProfile, 0)
 	for _, p := range profiles {
-		frrProfile := configBFDProfileToFRR(p)
+		frrProfile := ConfigBFDProfileToFRR(p)
 		sm.bfdProfiles = append(sm.bfdProfiles, *frrProfile)
 	}
 	sort.Slice(sm.bfdProfiles, func(i, j int) bool {
@@ -224,7 +224,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 		var exist bool
 		var rout *router
 
-		routerName := routerName(s.RouterID.String(), s.MyASN, s.VRFName)
+		routerName := RouterName(s.RouterID.String(), s.MyASN, s.VRFName)
 		if rout, exist = routers[routerName]; !exist {
 			rout = &router{
 				myASN:        s.MyASN,
@@ -239,7 +239,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			routers[routerName] = rout
 		}
 
-		neighborName := neighborName(s.PeerAddress, s.PeerASN, s.VRFName)
+		neighborName := NeighborName(s.PeerAddress, s.PeerASN, s.VRFName)
 		if neighbor, exist = rout.neighbors[neighborName]; !exist {
 			host, port, err := net.SplitHostPort(s.PeerAddress)
 			if err != nil {
@@ -415,7 +415,7 @@ func validateReload(l log.Logger, prevReloadTimeStamp *string, reload chan<- rel
 	level.Info(l).Log("op", "reload-validate", "success", "reloaded config")
 }
 
-func configBFDProfileToFRR(p *metallbconfig.BFDProfile) *BFDProfile {
+func ConfigBFDProfileToFRR(p *metallbconfig.BFDProfile) *BFDProfile {
 	res := &BFDProfile{}
 	res.Name = p.Name
 	res.ReceiveInterval = p.ReceiveInterval
