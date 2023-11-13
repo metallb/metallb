@@ -1,0 +1,31 @@
+{
+    "metadata": {
+        "name": "metallb-testnodename",
+        "namespace": "testnamespace",
+        "creationTimestamp": null
+    },
+    "spec": {
+        "bgp": {
+            "routers": [],
+            "bfdProfiles": [
+                {
+                    "name": "foo",
+                    "receiveInterval": 60,
+                    "transmitInterval": 70,
+                    "detectMultiplier": 5,
+                    "echoInterval": 90,
+                    "echoMode": true,
+                    "passiveMode": true,
+                    "minimumTtl": 60
+                }
+            ]
+        },
+        "raw": {},
+        "nodeSelector": {
+            "matchLabels": {
+                "kubernetes.io/hostname": "testnodename"
+            }
+        }
+    },
+    "status": {}
+}

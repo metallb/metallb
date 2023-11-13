@@ -1,0 +1,19 @@
+{
+    "metadata": {
+        "name": "metallb-testnodename",
+        "namespace": "testnamespace",
+        "creationTimestamp": null
+    },
+    "spec": {
+        "bgp": {
+            "routers": []
+        },
+        "raw": {},
+        "nodeSelector": {
+            "matchLabels": {
+                "kubernetes.io/hostname": "testnodename"
+            }
+        }
+    },
+    "status": {}
+}

@@ -1,0 +1,40 @@
+{
+    "metadata": {
+        "name": "metallb-testnodename",
+        "namespace": "testnamespace",
+        "creationTimestamp": null
+    },
+    "spec": {
+        "bgp": {
+            "routers": [
+                {
+                    "asn": 100,
+                    "id": "10.1.1.254",
+                    "neighbors": [
+                        {
+                            "asn": 100,
+                            "address": "10.2.2.254",
+                            "port": 179,
+                            "password": {},
+                            "holdTime": "1s",
+                            "keepaliveTime": "1s",
+                            "toAdvertise": {
+                                "allowed": {}
+                            },
+                            "toReceive": {
+                                "allowed": {}
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        "raw": {},
+        "nodeSelector": {
+            "matchLabels": {
+                "kubernetes.io/hostname": "testnodename"
+            }
+        }
+    },
+    "status": {}
+}
