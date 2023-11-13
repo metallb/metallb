@@ -204,14 +204,14 @@ spec:
         # Copies the reloader to the shared volume between the speaker and reloader.
         - name: cp-reloader
           image: {{ .Values.speaker.image.repository }}:{{ .Values.speaker.image.tag | default .Chart.AppVersion }}
-          command: ["/bin/sh", "-c", "cp -f /frr-reloader.sh /etc/frr_reloader/"]
+          command: ["/cp", "-f", "/frr-reloader.sh", "/etc/frr_reloader/"]
           volumeMounts:
             - name: reloader
               mountPath: /etc/frr_reloader
         # Copies the metrics exporter
         - name: cp-metrics
           image: {{ .Values.speaker.image.repository }}:{{ .Values.speaker.image.tag | default .Chart.AppVersion }}
-          command: ["/bin/sh", "-c", "cp -f /frr-metrics /etc/frr_metrics/"]
+          command: ["/cp", "-f", "/frr-metrics" "/etc/frr_metrics/"]
           volumeMounts:
             - name: metrics
               mountPath: /etc/frr_metrics
