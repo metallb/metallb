@@ -80,4 +80,5 @@ type SessionManager interface {
 	NewSession(logger log.Logger, args SessionParameters) (Session, error)
 	SyncBFDProfiles(profiles map[string]*config.BFDProfile) error
 	SyncExtraInfo(extras string) error
+	SetEventCallback(func(interface{}))
 }
