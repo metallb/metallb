@@ -1554,6 +1554,27 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			desc: "duplicate spec - in BGP adv",
+			crs: ClusterResources{
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "adv1"},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPools: []string{testPoolName},
+							Peers:          []string{"peer1"},
+						},
+					},
+					{
+						ObjectMeta: metav1.ObjectMeta{Name: "adv2"},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPools: []string{testPoolName},
+							Peers:          []string{"peer1"},
+						},
+					},
+				},
+			},
+		},
+		{
 			desc: "bad community literal (wrong format) - in BGP adv",
 			crs: ClusterResources{
 				Pools: []v1beta1.IPAddressPool{testPool},

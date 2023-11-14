@@ -1109,7 +1109,7 @@ func bfdIntFromConfig(value *uint32, min, max uint32) (*uint32, error) {
 func validateDuplicateBGPAdvertisements(ads []metallbv1beta1.BGPAdvertisement) error {
 	for i := 0; i < len(ads); i++ {
 		for j := i + 1; j < len(ads); j++ {
-			if reflect.DeepEqual(ads[i], ads[j]) {
+			if reflect.DeepEqual(ads[i].Spec, ads[j].Spec) { // TODO: proper equal considering the slices order
 				return fmt.Errorf("duplicate definition of bgpadvertisements. advertisement %d and %d are equal", i+1, j+1)
 			}
 		}
