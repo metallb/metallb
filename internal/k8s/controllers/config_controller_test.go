@@ -189,7 +189,7 @@ func TestSecretShouldntTrigger(t *testing.T) {
 		Spec: v1beta2.BGPPeerSpec{
 			MyASN:      42,
 			ASN:        142,
-			Address:    "1.2.3.4",
+			Address:    "1.2.3.5",
 			BFDProfile: "default",
 		},
 	})

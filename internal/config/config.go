@@ -275,13 +275,22 @@ func peersFor(resources ClusterResources, BFDProfiles map[string]*BFDProfile) (m
 			// TODO: Be smarter regarding conflicting peers. For example, two
 			// peers could have a different hold time but they'd still result
 			// in two BGP sessions between the speaker and the remote host.
-			if reflect.DeepEqual(peer, ep) {
+			if peersEqual(peer, ep) {
 				return nil, fmt.Errorf("peer %s already exists", p.Name)
 			}
 		}
 		res[peer.Name] = peer
 	}
 	return res, nil
+}
+
+// peersEqual checks that the peers are deep equal without considering their name
+// because in general two custom resources can not share the same name.
+// TODO: this should be smarter.
+func peersEqual(p1, p2 *Peer) bool {
+	a, b := *p1, *p2
+	a.Name, b.Name = "", ""
+	return reflect.DeepEqual(a, b)
 }
 
 func poolsFor(resources ClusterResources) (*Pools, error) {
@@ -450,6 +459,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 	if len(nodeSels) == 0 {
 		nodeSels = []labels.Selector{labels.Everything()}
 	}
+	sort.Slice(nodeSels, func(i, j int) bool { return nodeSels[i].String() < nodeSels[j].String() })
 
 	password, err := passwordForPeer(p, passwordSecrets)
 	if err != nil {
