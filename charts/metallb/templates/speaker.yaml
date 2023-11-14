@@ -211,7 +211,7 @@ spec:
         # Copies the metrics exporter
         - name: cp-metrics
           image: {{ .Values.speaker.image.repository }}:{{ .Values.speaker.image.tag | default .Chart.AppVersion }}
-          command: ["/cp", "-f", "/frr-metrics" "/etc/frr_metrics/"]
+          command: ["/cp", "-f", "/frr-metrics", "/etc/frr_metrics/"]
           volumeMounts:
             - name: metrics
               mountPath: /etc/frr_metrics
