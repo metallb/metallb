@@ -297,6 +297,7 @@ func (c *bgpController) SetBalancer(l log.Logger, name string, lbIPs []net.IP, p
 			for comm := range adCfg.Communities {
 				ad.Communities = append(ad.Communities, comm)
 			}
+			sort.Strings(ad.Peers)
 			sort.Slice(ad.Communities, func(i, j int) bool { return ad.Communities[i].LessThan(ad.Communities[j]) })
 			c.svcAds[name] = append(c.svcAds[name], ad)
 		}
