@@ -299,6 +299,31 @@
       },
       "required": [ "podMonitor", "prometheusRule" ]
     },
+    "controller": { 
+      "allOf": [
+        { "$ref": "#/definitions/component" },
+        { "description": "MetalLB Controller",
+          "type": "object",
+          "properties": {
+            "strategy": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": [ "type" ]
+            },
+            "command" : {
+              "type": "string"
+            },
+            "webhookMode" : {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
     "speaker": { 
       "allOf": [
         { "$ref": "#/definitions/component" },
@@ -400,31 +425,6 @@
         }
       }
     }
-  },
-  "controller": { 
-    "allOf": [
-      { "$ref": "#/definitions/component" },
-      { "description": "MetalLB Controller",
-        "type": "object",
-        "properties": {
-          "strategy": {
-            "type": "object",
-            "properties": {
-              "type": {
-                "type": "string"
-              }
-            },
-            "required": [ "type" ]
-          },
-          "command" : {
-            "type": "string"
-          },
-          "webhookMode" : {
-            "type": "string"
-          }
-        }
-      }
-    ]
   },
   "required": [
     "controller",
