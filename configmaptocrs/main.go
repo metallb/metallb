@@ -183,29 +183,18 @@ func decodeConfigFile(raw []byte) (*configFile, error) {
 // the configmap, we append a 5 character hash to the end of the CRs to uniquely
 // identify them in case of possible collisions.
 func convertNamesToK8S(cf *configFile, configName string) {
-	var validName bool
-
-	r := regexp.MustCompile("^[a-z][-a-z0-9]{0,61}[a-z0-9]{1}$")
 
 	for i := 0; i < len(cf.Pools); i++ {
 		cf.Pools[i].Name = FormatToK8S(cf.Pools[i].Name, "Pool", configName)
 	}
 
 	for i := 0; i < len(cf.BFDProfiles); i++ {
-		validName = r.MatchString(cf.BFDProfiles[i].Name)
-		if validName {
-			continue
-		}
 		cf.BFDProfiles[i].Name = FormatToK8S(cf.BFDProfiles[i].Name, "BFDProfile", configName)
 
 	}
 
 	for i := 0; i < len(cf.Peers); i++ {
 		if len(cf.Peers[i].BFDProfile) == 0 {
-			continue
-		}
-		validName = r.MatchString(cf.Peers[i].BFDProfile)
-		if validName {
 			continue
 		}
 		cf.Peers[i].BFDProfile = FormatToK8S(cf.Peers[i].BFDProfile, "BFDProfile", configName)
