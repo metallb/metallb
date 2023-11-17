@@ -17,7 +17,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.17.0
 	golang.org/x/sys v0.14.0
-	k8s.io/api v0.28.3
+	k8s.io/api v0.28.4
 	k8s.io/apiextensions-apiserver v0.28.3
 	k8s.io/apimachinery v0.28.4
 	k8s.io/client-go v0.28.3
