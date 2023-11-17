@@ -20,6 +20,7 @@ import (
 	"os"
 	"reflect"
 
+	"go.universe.tf/metallb/configmaptocrs"
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
@@ -137,6 +138,7 @@ func (c *controller) SetPools(l log.Logger, pools *config.Pools) controllers.Syn
 func main() {
 	var (
 		port                = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
+		configmap           = flag.String("config", "config", "(Deprecated, migration only)Kubernetes ConfigMap containing MetalLB's configuration")
 		namespace           = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config / memberlist secret namespace")
 		mlSecret            = flag.String("ml-secret-name", os.Getenv("METALLB_ML_SECRET_NAME"), "name of the memberlist secret to create")
 		deployName          = flag.String("deployment", os.Getenv("METALLB_DEPLOYMENT"), "name of the MetalLB controller Deployment")
@@ -150,6 +152,7 @@ func main() {
 		webhookMode         = flag.String("webhook-mode", "enabled", "webhook mode: can be enabled, disabled or only webhook if we want the controller to act as webhook endpoint only")
 		webhookSecretName   = flag.String("webhook-secret", "webhook-server-cert", "webhook secret: the name of webhook secret, default is webhook-server-cert")
 		webhookHTTP2        = flag.Bool("webhook-http2", false, "enables http2 for the webhook endpoint")
+		runMigration        = flag.Bool("run-migration", false, "whether to run the migraion tooling on the cluster prior to starting the controller")
 	)
 	flag.Parse()
 
@@ -168,6 +171,13 @@ func main() {
 			os.Exit(1)
 		}
 		*namespace = string(bs)
+	}
+
+	if *runMigration {
+		if err := configmaptocrs.Migrate(*configmap, *namespace); err != nil {
+			level.Error(logger).Log("op", "migrate", "msg", "Unable to complete migration", "error", err)
+			os.Exit(1)
+		}
 	}
 
 	c := &controller{

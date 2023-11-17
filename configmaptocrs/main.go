@@ -1,8 +1,11 @@
 // SPDX-License-Identifier:Apache-2.0
 
-package main
+package configmaptocrs
 
 import (
+	"context"
+	"crypto/sha1"
+	"encoding/base32"
 	"flag"
 	"fmt"
 	"io"
@@ -18,14 +21,28 @@ import (
 	"go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/version"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
+	policyv1beta1 "k8s.io/api/policy/v1beta1"
+	rbacv1 "k8s.io/api/rbac/v1"
+	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/runtime/serializer/json"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/yaml"
+
+	metallbv1alpha1 "go.universe.tf/metallb/api/v1alpha1"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
+
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 )
 
 const (
@@ -35,38 +52,46 @@ const (
 )
 
 var (
-	resourcesNameSpace = "metallb-system"
+	resourcesNameSpace = "kube-system"
 	inputDirPath       = "/var/input"
 	source             = flag.String("source", "./config.yaml", "name of the configmap file to convert")
 	onlyData           = flag.Bool("only-data", false, "set this to true if the input file contains only the ConfigMap's data field")
 	stdout             = flag.Bool("stdout", false, "set this to true to write to stdout")
 )
 
-func main() {
-	var f *os.File
-	var err error
-	flag.Parse()
-	log.Printf("MetalLB generator starting. commit: %s branch: %s goversion: %s",
-		version.CommitHash(), version.Branch(), version.GoString())
+var (
+	scheme = runtime.NewScheme()
+)
 
-	if *stdout {
-		f = os.Stdout
-	} else {
-		f, err = os.Create(filepath.Join(inputDirPath, outputFileName))
-		if err != nil {
-			log.Fatalf("failed to create output file: %s", err)
-		}
-	}
-	defer func() {
-		if tmpErr := f.Close(); tmpErr != nil {
-			err = tmpErr
-		}
-	}()
+func init() {
+	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	err = generate(f, *source)
+	utilruntime.Must(metallbv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(metallbv1beta1.AddToScheme(scheme))
+	utilruntime.Must(metallbv1beta2.AddToScheme(scheme))
+
+	utilruntime.Must(corev1.AddToScheme(scheme))
+	utilruntime.Must(appsv1.AddToScheme(scheme))
+	utilruntime.Must(policyv1beta1.AddToScheme(scheme))
+	utilruntime.Must(rbacv1.AddToScheme(scheme))
+	utilruntime.Must(apiext.AddToScheme(scheme))
+	utilruntime.Must(discovery.AddToScheme(scheme))
+}
+
+func Migrate(name, namespace string) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+	resourcesNameSpace = namespace
+	cl, err := client.New(ctrl.GetConfigOrDie(), client.Options{
+		Scheme: scheme,
+	})
 	if err != nil {
-		log.Printf("failed to generate resources: %s", err)
+		return err
 	}
+	if err = runMigration(ctx, cl, name); err != nil {
+		return err
+	}
+	return nil
 }
 
 // generate gets a name of a metallb configmap file, converts it to
@@ -85,10 +110,7 @@ func generate(w io.Writer, origin string) error {
 	}
 
 	log.Println("Converting configmap resources to K8S-compliant names")
-	err = convertNamesToK8S(cf)
-	if err != nil {
-		return err
-	}
+	convertNamesToK8S(cf, "")
 
 	log.Println("Creating custom resources")
 	resources, err := resourcesFor(cf)
@@ -156,23 +178,17 @@ func decodeConfigFile(raw []byte) (*configFile, error) {
 	return cf, nil
 }
 
-// convertNamesToK8S gets a configFile object and converts all names
-// in it to names compatible with K8S resources, if necessary.
-func convertNamesToK8S(cf *configFile) error {
-	var err error
+// convertNamesToK8S gets a configFile object and converts all names in it to
+// names compatible with K8S resources, if necessary. If we provide the name of
+// the configmap, we append a 5 character hash to the end of the CRs to uniquely
+// identify them in case of possible collisions.
+func convertNamesToK8S(cf *configFile, configName string) {
 	var validName bool
 
 	r := regexp.MustCompile("^[a-z][-a-z0-9]{0,61}[a-z0-9]{1}$")
 
 	for i := 0; i < len(cf.Pools); i++ {
-		validName = r.MatchString(cf.Pools[i].Name)
-		if validName {
-			continue
-		}
-		cf.Pools[i].Name, err = formatToK8S(cf.Pools[i].Name, "IpAddressPool")
-		if err != nil {
-			return err
-		}
+		cf.Pools[i].Name = FormatToK8S(cf.Pools[i].Name, "Pool", configName)
 	}
 
 	for i := 0; i < len(cf.BFDProfiles); i++ {
@@ -180,10 +196,8 @@ func convertNamesToK8S(cf *configFile) error {
 		if validName {
 			continue
 		}
-		cf.BFDProfiles[i].Name, err = formatToK8S(cf.BFDProfiles[i].Name, "BFDProfile")
-		if err != nil {
-			return err
-		}
+		cf.BFDProfiles[i].Name = FormatToK8S(cf.BFDProfiles[i].Name, "BFDProfile", configName)
+
 	}
 
 	for i := 0; i < len(cf.Peers); i++ {
@@ -194,40 +208,8 @@ func convertNamesToK8S(cf *configFile) error {
 		if validName {
 			continue
 		}
-		cf.Peers[i].BFDProfile, err = formatToK8S(cf.Peers[i].BFDProfile, "BFDProfile")
-		if err != nil {
-			return err
-		}
+		cf.Peers[i].BFDProfile = FormatToK8S(cf.Peers[i].BFDProfile, "BFDProfile", configName)
 	}
-
-	return nil
-}
-
-func formatToK8S(name string, kind string) (string, error) {
-	var truncated string
-
-	if len(name) > 63 {
-		truncated = name[:63]
-	} else {
-		truncated = name
-	}
-
-	lowercase := strings.ToLower(truncated)
-	noUnderscore := strings.ReplaceAll(lowercase, "_", "-")
-
-	firstLetterRegex := regexp.MustCompile("[a-z]")
-	firstLetter := firstLetterRegex.FindStringIndex(noUnderscore)
-	if len(firstLetter) == 0 {
-		return "", fmt.Errorf("failed to make %s K8S compatible: %s", kind, name)
-	}
-	final := noUnderscore[firstLetter[0]:]
-
-	if strings.Compare(name, final) != 0 {
-		log.Printf("Changing %s name from: %s to: %s",
-			kind, name, final)
-	}
-
-	return final, nil
 }
 
 // getConfigMapData gets raw bytes representing a ConfigMap and returns the
@@ -514,7 +496,7 @@ func l2AdvertisementsFor(c *configFile) []v1beta1.L2Advertisement {
 		if addresspool.Protocol == Layer2 {
 			l2Adv := v1beta1.L2Advertisement{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      fmt.Sprintf("l2advertisement%d", index),
+					Name:      addresspool.Name,
 					Namespace: resourcesNameSpace,
 				},
 				Spec: v1beta1.L2AdvertisementSpec{
@@ -603,4 +585,124 @@ func initSchema() (*runtime.Scheme, error) {
 		return nil, err
 	}
 	return s, nil
+}
+
+func runMigration(ctx context.Context, cl client.Client, cmName string) error {
+	cm := &corev1.ConfigMap{}
+	cm.Name = cmName
+	cm.Namespace = resourcesNameSpace
+	err := cl.Get(ctx, client.ObjectKeyFromObject(cm), cm)
+	if err != nil {
+		return err
+	}
+
+	log.Println("migrating configmap", cm.Name)
+
+	cf := &configFile{}
+	err = yaml.Unmarshal([]byte(cm.Data["config"]), cf)
+	if err != nil {
+		return err
+	}
+	log.Println("Converting configmap resources to K8S-compliant names")
+	convertNamesToK8S(cf, cm.Name)
+	if err != nil {
+		return err
+	}
+
+	log.Println("Creating custom resources")
+	resources, err := resourcesFor(cf)
+	if err != nil {
+		return err
+	}
+
+	log.Println("Creating pools")
+	for _, pool := range resources.Pools {
+		log.Println("Creating custom pool", pool.Name)
+		if err := cl.Create(ctx, &pool); err != nil {
+			if !k8serrors.IsAlreadyExists(err) {
+				return err
+			}
+		}
+	}
+
+	log.Println("Creating l2 advertisements")
+	for _, l2advertisement := range resources.L2Advs {
+		log.Println("Creating custom l2", l2advertisement.Name)
+		if err := cl.Create(ctx, &l2advertisement); err != nil {
+			if !k8serrors.IsAlreadyExists(err) {
+				return err
+			}
+		}
+	}
+
+	log.Println("Creating bgp advertisements")
+	for _, bgpAdv := range resources.BGPAdvs {
+		log.Println("Creating custom bgpadv", bgpAdv.Name)
+		if err := cl.Create(ctx, &bgpAdv); err != nil {
+			if !k8serrors.IsAlreadyExists(err) {
+				return err
+			}
+		}
+	}
+
+	log.Println("Creating bfd profiles")
+	for _, bfdProfile := range resources.BFDProfiles {
+		log.Println("Creating custom bfd", bfdProfile.Name)
+		if err := cl.Create(ctx, &bfdProfile); err != nil {
+			if !k8serrors.IsAlreadyExists(err) {
+				return err
+			}
+		}
+	}
+
+	log.Println("Creating Communities")
+	for _, community := range resources.Communities {
+		log.Println("Creating custom community", community.Name)
+		if err := cl.Create(ctx, &community); err != nil {
+			if !k8serrors.IsAlreadyExists(err) {
+				return err
+			}
+		}
+	}
+
+	log.Println("Creating peers")
+	for _, peer := range resources.Peers {
+		log.Println("Creating custom l2", peer.Name)
+		if err := cl.Create(ctx, &peer); err != nil {
+			if !k8serrors.IsAlreadyExists(err) {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+func strip(in string) string {
+	reg, _ := regexp.Compile("[^a-zA-Z0-9-]+")
+	return reg.ReplaceAllString(in, "")
+}
+
+func FormatToK8S(name string, prefixIfNeeded string, appendHash string) string {
+	prefixIfNeeded = strings.ToLower(prefixIfNeeded)
+	lowercase := strings.ToLower(name)
+	noUnderscore := strings.ReplaceAll(lowercase, "_", "-")
+	noUnderscore = strip(noUnderscore)
+
+	firstLetterRegex := regexp.MustCompile("[a-z]")
+	firstLetter := firstLetterRegex.FindStringIndex(noUnderscore)
+	if len(firstLetter) == 0 {
+		noUnderscore = prefixIfNeeded + noUnderscore
+	} else {
+		noUnderscore = noUnderscore[firstLetter[0]:]
+	}
+	if len(noUnderscore) > 63 {
+		noUnderscore = noUnderscore[:63]
+	}
+	if appendHash != "" {
+		hash := sha1.New()
+		hash.Write([]byte(name + appendHash))
+		noUnderscore += "-" + strings.ToLower(base32.HexEncoding.EncodeToString(hash.Sum(nil))[:5])
+	}
+	return noUnderscore
 }
