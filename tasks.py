@@ -286,7 +286,7 @@ def validate_kind_version():
     except Exception as e:
         raise Exit(message="Could not determine kind version (is kind installed?)")
 
-    actual_version = re.search("v(\d*\.\d*\.\d*)", raw.stdout).group(1)
+    actual_version = re.search(r"v(\d*\.\d*\.\d*)", raw.stdout).group(1)
     delta = semver.compare(actual_version, min_version)
 
     if delta < 0:
@@ -687,11 +687,11 @@ def bumprelease(ctx, version, previous_version):
     # TODO: Check if kustomize instructions really need the version in the
     # website or if there is a simpler way. For now, though, we just replace the
     # only page that mentions the version on release.
-    run("sed -i 's/github.com\/metallb\/metallb\/config\/native?ref=.*$/github.com\/metallb\/metallb\/config\/native?ref=v{}/g' website/content/installation/_index.md".format(version))
-    run("sed -i 's/github.com\/metallb\/metallb\/config\/frr?ref=.*$/github.com\/metallb\/metallb\/config\/frr?ref=v{}/g' website/content/installation/_index.md".format(version))
+    run(r"sed -i 's/github.com\/metallb\/metallb\/config\/native?ref=.*$/github.com\/metallb\/metallb\/config\/native?ref=v{}/g' website/content/installation/_index.md".format(version))
+    run(r"sed -i 's/github.com\/metallb\/metallb\/config\/frr?ref=.*$/github.com\/metallb\/metallb\/config\/frr?ref=v{}/g' website/content/installation/_index.md".format(version))
 
     # Update the version embedded in the binary
-    run("perl -pi -e 's/version\s+=.*/version = \"{}\"/g' internal/version/version.go".format(version), echo=True)
+    run(r"perl -pi -e 's/version\s+=.*/version = \"{}\"/g' internal/version/version.go".format(version), echo=True)
     run("gofmt -w internal/version/version.go", echo=True)
 
     res = run('grep ":main" config/manifests/*.yaml', warn=True).stdout
@@ -714,7 +714,7 @@ def checkpatch(ctx):
         lines = run("git diff $(diff -u <(git rev-list --first-parent HEAD) "
                                 " <(git rev-list --first-parent origin/main) "
                                 " | sed -ne 's/^ //p' | head -1)..HEAD | "
-                                " grep '+.*\.\  '")
+                                r" grep '+.*\.\  '")
 
         if len(lines.stdout.strip()) > 0:
             raise Exit(message="ERROR: Found changed lines with 2 spaces "
