@@ -43,7 +43,7 @@ type SpeakerList struct {
 }
 
 // New creates a new SpeakerList and returns a pointer to it.
-func New(logger log.Logger, nodeName, bindAddr, bindPort, secret, namespace, labels string, stopCh chan struct{}) (*SpeakerList, error) {
+func New(logger log.Logger, nodeName, bindAddr, bindPort, secret, namespace, labels string, WANNetwork bool, stopCh chan struct{}) (*SpeakerList, error) {
 	sl := SpeakerList{
 		l:         logger,
 		stopCh:    stopCh,
@@ -57,6 +57,9 @@ func New(logger log.Logger, nodeName, bindAddr, bindPort, secret, namespace, lab
 	}
 
 	mconfig := memberlist.DefaultLANConfig()
+	if WANNetwork {
+		mconfig = memberlist.DefaultWANConfig()
+	}
 
 	// mconfig.Name MUST be equal to the spec.nodeName field of the speaker pod as we match it
 	// against the nodeName field of Endpoint objects inside usableNodes().
