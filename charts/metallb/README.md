@@ -24,6 +24,7 @@ Kubernetes: `>= 1.19.0-0`
 |-----|------|---------|-------------|
 | controller.affinity | object | `{}` |  |
 | controller.enabled | bool | `true` |  |
+| controller.extraContainers | list | `[]` |  |
 | controller.image.pullPolicy | string | `nil` |  |
 | controller.image.repository | string | `"quay.io/metallb/controller"` |  |
 | controller.image.tag | string | `nil` |  |
@@ -111,6 +112,7 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.affinity | object | `{}` |  |
 | speaker.enabled | bool | `true` |  |
 | speaker.excludeInterfaces.enabled | bool | `true` |  |
+| speaker.extraContainers | list | `[]` |  |
 | speaker.frr.enabled | bool | `true` |  |
 | speaker.frr.image.pullPolicy | string | `nil` |  |
 | speaker.frr.image.repository | string | `"quay.io/frrouting/frr"` |  |

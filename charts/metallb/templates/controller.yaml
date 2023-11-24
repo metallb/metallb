@@ -153,6 +153,9 @@ spec:
             readOnly: true
         {{- end }}
       {{ end }}
+      {{- if .Values.controller.extraContainers }}
+      {{- toYaml .Values.controller.extraContainers | nindent 6 }}
+      {{- end }}
       nodeSelector:
         "kubernetes.io/os": linux
         {{- with .Values.controller.nodeSelector }}
