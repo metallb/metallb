@@ -470,6 +470,7 @@ spec:
             readOnly: true
         {{- end }}
       {{ end }}
+      {{- if .Values.speaker.frr.enabled }}
       {{- if .Values.speaker.frr.secureMetricsPort }}
       - name: kube-rbac-proxy-frr
         image: {{ .Values.prometheus.rbacProxy.repository }}:{{ .Values.prometheus.rbacProxy.tag | default .Chart.AppVersion }}
@@ -485,7 +486,7 @@ spec:
         {{- end }}
         ports:
           - containerPort: {{ .Values.speaker.frr.secureMetricsPort }}
-            name: metricshttps
+            name: frrmetricshttps
         env:
           - name: METALLB_HOST
             valueFrom:
@@ -503,6 +504,7 @@ spec:
             readOnly: true
         {{- end }}
       {{ end }}
+      {{- end }}
       {{- if .Values.speaker.extraContainers }}
       {{- toYaml .Values.speaker.extraContainers | nindent 6 }}
       {{- end }}
