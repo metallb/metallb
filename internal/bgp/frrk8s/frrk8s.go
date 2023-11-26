@@ -16,6 +16,7 @@ import (
 	"github.com/go-kit/log/level"
 	frrv1beta1 "github.com/metallb/frr-k8s/api/v1beta1"
 	"go.universe.tf/metallb/internal/bgp"
+	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/bgp/frr"
 	metallbconfig "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/logging"
@@ -279,8 +280,11 @@ func (sm *sessionManager) updateConfig() error {
 			rout.prefixes[prefix] = prefix
 
 			for _, c := range adv.Communities {
-				community := c.String()
-				prefixesForCommunity[community] = append(prefixesForCommunity[community], prefix)
+				comm := c.String()
+				if community.IsLarge(c) {
+					comm = fmt.Sprintf("large:%s", c.String())
+				}
+				prefixesForCommunity[comm] = append(prefixesForCommunity[comm], prefix)
 			}
 			if adv.LocalPref != 0 {
 				prefixesForLocalPref[adv.LocalPref] = append(prefixesForLocalPref[adv.LocalPref], prefix)
