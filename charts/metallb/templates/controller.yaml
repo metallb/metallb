@@ -83,6 +83,10 @@ spec:
         - name: METALLB_BGP_TYPE
           value: frr
         {{- end }}
+        {{- if .Values.frrk8s.enabled }}
+        - name: METALLB_BGP_TYPE
+          value: frr-k8s
+        {{- end }}
         ports:
         - name: monitoring
           containerPort: {{ .Values.prometheus.metricsPort }}

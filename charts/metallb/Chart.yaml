@@ -9,6 +9,11 @@ dependencies:
 - name: crds
   condition: crds.enabled
   version: 0.0.0
+- name: frr-k8s
+  repository: https://metallb.github.io/frr-k8s
+  condition: frrk8s.enabled
+  version: 0.0.1
+
 
 # A chart can be either an 'application' or a 'library' chart.
 #

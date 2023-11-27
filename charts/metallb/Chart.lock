@@ -2,5 +2,8 @@ dependencies:
 - name: crds
   repository: ""
   version: 0.0.0
-digest: sha256:16cbbceffe2a6946ae7cbb20b5a8313267bc77f4669caba20fffb3ff64a773a6
-generated: "2022-06-16T12:53:45.808217735+03:00"
+- name: frr-k8s
+  repository: https://metallb.github.io/frr-k8s
+  version: 0.0.1
+digest: sha256:e374930cc86a4f659ef4389c9d8f4a577b57ee02878f2fa7311e38a85c90773d
+generated: "2023-11-27T14:33:49.426397817+01:00"
