@@ -172,8 +172,6 @@ jobs:
         - bgp-type: frr-k8s
           prometheus: enabled
         - bgp-type: frr-k8s
-          deployment: helm
-        - bgp-type: frr-k8s
           ip-family: dual
         - bgp-type: frr-k8s
           ip-family: ipv6
