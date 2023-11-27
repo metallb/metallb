@@ -418,10 +418,18 @@ apiServer:
                                "--set speaker.frr.secureMetricsPort=9121 "
                                "--set prometheus.serviceAccount=prometheus-k8s "
                                "--set prometheus.namespace=monitoring ")
+        frr_values=""
+        if bgp_type == "frr":
+            frr_values="--set speaker.frr.enabled=true "
+        if bgp_type == "frr-k8s":
+            frr_values="--set frrk8s.enabled=true --set speaker.frr.enabled=false --set frr-k8s.prometheus.serviceMonitor.enabled=false "
+            if with_prometheus:
+                frr_values="--set frrk8s.enabled=true --set speaker.frr.enabled=false --set frr-k8s.prometheus.serviceMonitor.enabled=true "
+
         run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
-                "--set speaker.image.tag=dev-{} --set speaker.frr.enabled={} --set speaker.logLevel=debug "
-                "--set controller.logLevel=debug {} --namespace metallb-system".format(architecture, architecture,
-                "true" if bgp_type == "frr" else "false", prometheus_values), echo=True)
+                "--set speaker.image.tag=dev-{} --set speaker.logLevel=debug "
+                "--set controller.logLevel=debug {} {}  --namespace metallb-system".format(architecture, architecture,
+                prometheus_values, frr_values), echo=True)
     else:
         run("{} delete po -n metallb-system --all".format(kubectl_path), echo=True)
 
