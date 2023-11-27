@@ -335,6 +335,7 @@ speaker:
     # expose the frr metrics via tls.
     # secureMetricsPort: 9121
 
+
   reloader:
     resources: {}
 
@@ -346,3 +347,12 @@ speaker:
 crds:
   enabled: true
   validationFailurePolicy: Fail
+
+# frrk8s contains the configuration related to using an frrk8s instance
+# (github.com/metallb/frr-k8s) as the backend for the BGP implementation.
+# This allows configuring additional frr parameters in combination to those
+# applied by MetalLB.
+frrk8s:
+  # if set, enables frrk8s as a backend. This is mutually exclusive to frr
+  # mode.
+  enabled: false

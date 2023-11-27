@@ -1,4 +1,10 @@
 {{- if .Values.speaker.frr.enabled }}
+{{- if .Values.frrk8s.enabled }}
+{{- fail "speaker.frr.enabled and frrk8s.enabled are mutually exclusive!" }}
+{{- end }}
+{{- end }}
+{{- if .Values.speaker.frr.enabled }}
+
 # FRR expects to have these files owned by frr:frr on startup.
 # Having them in a ConfigMap allows us to modify behaviors: for example enabling more daemons on startup.
 apiVersion: v1
@@ -268,6 +274,10 @@ spec:
           value: /etc/frr_reloader/reloader.pid
         - name: METALLB_BGP_TYPE
           value: frr
+        {{- end }}
+        {{- if .Values.frrk8s.enabled }}
+        - name: METALLB_BGP_TYPE
+          value: frr-k8s
         {{- end }}
         ports:
         - name: monitoring

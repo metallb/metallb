@@ -17,6 +17,7 @@ Kubernetes: `>= 1.19.0-0`
 | Repository | Name | Version |
 |------------|------|---------|
 |  | crds | 0.0.0 |
+| https://metallb.github.io/frr-k8s | frr-k8s | 0.0.1 |
 
 ## Values
 
@@ -57,6 +58,7 @@ Kubernetes: `>= 1.19.0-0`
 | controller.tolerations | list | `[]` |  |
 | crds.enabled | bool | `true` |  |
 | crds.validationFailurePolicy | string | `"Fail"` |  |
+| frrk8s.enabled | bool | `false` |  |
 | fullnameOverride | string | `""` |  |
 | imagePullSecrets | list | `[]` |  |
 | loadBalancerClass | string | `""` |  |
