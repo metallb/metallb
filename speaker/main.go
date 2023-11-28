@@ -34,6 +34,7 @@ import (
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	k8snodes "go.universe.tf/metallb/internal/k8s/nodes"
+
 	"go.universe.tf/metallb/internal/layer2"
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/speakerlist"
@@ -150,6 +151,7 @@ func main() {
 	// Setup all clients and speakers, config decides what is being done runtime.
 	ctrl, err := newController(controllerConfig{
 		MyNode:                 *myNode,
+		Namespace:              *namespace,
 		Logger:                 logger,
 		LogLevel:               logging.Level(*logLevel),
 		SList:                  sList,
@@ -168,6 +170,10 @@ func main() {
 		validateConfig = config.DiscardNativeOnly
 	}
 
+	listenFRRK8s := false
+	if bgpType == string(bgpFrrK8s) {
+		listenFRRK8s = true
+	}
 	client, err := k8s.New(&k8s.Config{
 		ProcessName:     "metallb-speaker",
 		NodeName:        *myNode,
@@ -187,12 +193,14 @@ func main() {
 		},
 		ValidateConfig:    validateConfig,
 		LoadBalancerClass: *loadBalancerClass,
+		WithFRRK8s:        listenFRRK8s,
 	})
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create k8s client")
 		os.Exit(1)
 	}
 	ctrl.client = client
+	ctrl.protocolHandlers[config.BGP].SetEventCallback(client.BGPEventCallback)
 
 	sList.Start(client)
 	defer sList.Stop()
@@ -219,10 +227,11 @@ type controller struct {
 }
 
 type controllerConfig struct {
-	MyNode   string
-	Logger   log.Logger
-	LogLevel logging.Level
-	SList    SpeakerList
+	MyNode    string
+	Namespace string
+	Logger    log.Logger
+	LogLevel  logging.Level
+	SList     SpeakerList
 
 	bgpType bgpImplementation
 
@@ -241,7 +250,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 			myNode:         cfg.MyNode,
 			svcAds:         make(map[string][]*bgp.Advertisement),
 			bgpType:        cfg.bgpType,
-			sessionManager: newBGP(cfg.bgpType, cfg.Logger, cfg.LogLevel),
+			sessionManager: newBGP(cfg),
 		},
 	}
 	protocols := []config.Proto{config.BGP}
@@ -500,7 +509,8 @@ func (c *controller) SetConfig(l log.Logger, cfg *config.Config) controllers.Syn
 	}
 
 	for proto, handler := range c.protocolHandlers {
-		if err := handler.SetConfig(l, cfg); err != nil {
+		err := handler.SetConfig(l, cfg)
+		if err != nil {
 			level.Error(l).Log("op", "setConfig", "protocol", proto, "error", err, "msg", "applying new configuration to protocol handler failed")
 			return controllers.SyncStateErrorNoRetry
 		}
@@ -540,6 +550,7 @@ type Protocol interface {
 	SetBalancer(log.Logger, string, []net.IP, *config.Pool, service, *v1.Service) error
 	DeleteBalancer(log.Logger, string, string) error
 	SetNode(log.Logger, *v1.Node) error
+	SetEventCallback(func(interface{}))
 }
 
 // Speakerlist represents a list of healthy speakers.

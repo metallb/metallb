@@ -23,11 +23,11 @@ import (
 
 	"go.universe.tf/metallb/internal/bgp"
 	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
+	bgpfrrk8s "go.universe.tf/metallb/internal/bgp/frrk8s"
 	bgpnative "go.universe.tf/metallb/internal/bgp/native"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	k8snodes "go.universe.tf/metallb/internal/k8s/nodes"
-	"go.universe.tf/metallb/internal/logging"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
@@ -41,6 +41,7 @@ type bgpImplementation string
 const (
 	bgpNative bgpImplementation = "native"
 	bgpFrr    bgpImplementation = "frr"
+	bgpFrrK8s bgpImplementation = "frr-k8s"
 )
 
 type peer struct {
@@ -105,6 +106,10 @@ newPeers:
 	}
 
 	return c.syncPeers(l)
+}
+
+func (c *bgpController) SetEventCallback(callback func(interface{})) {
+	c.sessionManager.SetEventCallback(callback)
 }
 
 // hasHealthyEndpoint return true if this node has at least one healthy endpoint.
@@ -268,6 +273,10 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 }
 
 func (c *bgpController) syncBFDProfiles(profiles map[string]*config.BFDProfile) error {
+	if len(profiles) == 0 {
+		return nil
+	}
+
 	return c.sessionManager.SyncBFDProfiles(profiles)
 }
 
@@ -359,14 +368,16 @@ func (c *bgpController) SetNode(l log.Logger, node *v1.Node) error {
 }
 
 // Create a new 'bgp.SessionManager' of type 'bgpType'.
-var newBGP = func(bgpType bgpImplementation, l log.Logger, logLevel logging.Level) bgp.SessionManager {
-	switch bgpType {
+var newBGP = func(cfg controllerConfig) bgp.SessionManager {
+	switch cfg.bgpType {
 	case bgpNative:
-		return bgpnative.NewSessionManager(l)
+		return bgpnative.NewSessionManager(cfg.Logger)
 	case bgpFrr:
-		return bgpfrr.NewSessionManager(l, logLevel)
+		return bgpfrr.NewSessionManager(cfg.Logger, cfg.LogLevel)
+	case bgpFrrK8s:
+		return bgpfrrk8s.NewSessionManager(cfg.Logger, cfg.MyNode, cfg.Namespace)
 	default:
-		panic(fmt.Sprintf("unsupported BGP implementation type: %s", bgpType))
+		panic(fmt.Sprintf("unsupported BGP implementation type: %s", cfg.bgpType))
 	}
 }
 

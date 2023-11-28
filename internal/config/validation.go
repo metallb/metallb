@@ -17,6 +17,8 @@ func ValidationFor(bgpImpl string) Validate {
 	switch bgpImpl {
 	case "frr":
 		return DiscardNativeOnly
+	case "frr-k8s":
+		return DiscardNativeOnly
 	case "native":
 		return DiscardFRROnly
 	}

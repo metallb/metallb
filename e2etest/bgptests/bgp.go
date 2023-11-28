@@ -130,6 +130,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		}
 	},
 		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
+		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
 		ginkgo.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}, func(_ *corev1.Service) {}),
 		ginkgo.Entry("DUALSTACK", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
 			func(svc *corev1.Service) {
@@ -1401,6 +1402,29 @@ var _ = ginkgo.Describe("BGP", func() {
 		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{l2tests.IPV4ServiceRange}),
 		ginkgo.Entry("IPV6", ipfamily.IPv6, []string{l2tests.IPV6ServiceRange}),
 	)
+
+	// TODO: extend all the other tests to make them work with frr-k8s and remove this
+	ginkgo.Context("IPV4 with FRRK8s", func() {
+		ginkgo.It("should work", func() {
+			var container *frrcontainer.FRR
+			for _, c := range FRRContainers { // currently testing ebgp-single-hop only because of no password support
+				if c.Name == "ebgp-single-hop" {
+					container = c
+					break
+				}
+			}
+
+			_, svc := setupBGPService(f, ipfamily.IPv4, []string{v4PoolAddresses}, []*frrcontainer.FRR{container}, func(svc *corev1.Service) {})
+			defer testservice.Delete(cs, svc)
+
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			framework.ExpectNoError(err)
+			testservice.ValidateDesiredLB(svc)
+
+			ginkgo.By(fmt.Sprintf("validating the service from %s", container.Name))
+			validateService(svc, allNodes.Items, container)
+		})
+	})
 })
 
 // substringCount creates a Gomega transform function that

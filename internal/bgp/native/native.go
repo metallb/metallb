@@ -88,6 +88,8 @@ func (sm *sessionManager) SyncExtraInfo(extras string) error {
 	return nil
 }
 
+func (sm *sessionManager) SetEventCallback(func(interface{})) {}
+
 // run tries to stay connected to the peer, and pumps route updates to it.
 func (s *session) run() {
 	defer stats.DeleteSession(s.PeerAddress)
