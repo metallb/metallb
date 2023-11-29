@@ -4,7 +4,7 @@ package main
 deny[msg] {
   input.kind == "DaemonSet"
   serviceAccountName := input.spec.template.spec.serviceAccountName
-  not serviceAccountName == "RELEASE-NAME-metallb-speaker"
+  not serviceAccountName == "release-name-metallb-speaker"
   msg = sprintf("speaker serviceAccountName '%s' does not match expected value", [serviceAccountName])
 }
 
