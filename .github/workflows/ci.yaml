@@ -146,6 +146,15 @@ jobs:
           helm repo add frrk8s https://metallb.github.io/frr-k8s
           ct lint --check-version-increment=false --validate-maintainers=false --target-branch ${{ github.event.repository.default_branch }}
 
+      - name: Check if deps are updated
+        run: |
+          helm repo add frrk8s https://metallb.github.io/frr-k8s
+          helm dependency update charts/metallb
+          if [[ $(git status --porcelain | wc -l) -gt 0 ]]; then
+            echo "Please update the helm dependencies with: helm dependency update charts/metallb"
+            exit 1
+          fi
+
       - name: Helm doc generate
         uses: docker://jnorwood/helm-docs:v1.10.0
 
