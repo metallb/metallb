@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"reflect"
 	"sort"
 	"strconv"
 	"sync"
@@ -15,6 +16,7 @@ import (
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/bgp/frr"
 	metallbconfig "go.universe.tf/metallb/internal/config"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -233,6 +235,11 @@ func (sm *sessionManager) updateConfig() error {
 			}
 			portUint16 := uint16(portUint)
 
+			password := ""
+			if reflect.DeepEqual(s.PasswordRef, corev1.SecretReference{}) {
+				password = s.Password
+			}
+
 			neighbor = frrv1beta1.Neighbor{
 				ASN:           s.PeerASN,
 				Address:       host,
@@ -248,7 +255,8 @@ func (sm *sessionManager) updateConfig() error {
 					PrefixesWithLocalPref: make([]frrv1beta1.LocalPrefPrefixes, 0),
 					PrefixesWithCommunity: make([]frrv1beta1.CommunityPrefixes, 0),
 				},
-				// TODO password
+				Password:       password,
+				PasswordSecret: s.PasswordRef,
 			}
 		}
 
