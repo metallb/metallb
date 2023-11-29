@@ -111,6 +111,8 @@ type Peer struct {
 	NodeSelectors []labels.Selector
 	// Authentication password for routers enforcing TCP MD5 authenticated sessions
 	Password string
+	// Optional reference to the secret that holds the password.
+	PasswordRef corev1.SecretReference
 	// The optional BFD profile to be used for this BGP session
 	BFDProfile string
 	// Optional ebgp peer is multi-hops away.
@@ -451,9 +453,16 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		nodeSels = []labels.Selector{labels.Everything()}
 	}
 
-	password, err := passwordForPeer(p, passwordSecrets)
-	if err != nil {
-		return nil, err
+	if p.Spec.Password != "" && p.Spec.PasswordSecret.Name != "" {
+		return nil, fmt.Errorf("can not have both password and secret ref set in peer config %q/%q", p.Namespace, p.Name)
+	}
+
+	password := p.Spec.Password
+	if p.Spec.PasswordSecret.Name != "" {
+		password, err = passwordFromSecretForPeer(p, passwordSecrets)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Failed to parse peer %s password secret", p.Name)
+		}
 	}
 
 	return &Peer{
@@ -468,36 +477,30 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		RouterID:      routerID,
 		NodeSelectors: nodeSels,
 		Password:      password,
+		PasswordRef:   p.Spec.PasswordSecret,
 		BFDProfile:    p.Spec.BFDProfile,
 		EBGPMultiHop:  p.Spec.EBGPMultiHop,
 		VRF:           p.Spec.VRFName,
 	}, nil
 }
 
-func passwordForPeer(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secret) (string, error) {
-	if p.Spec.Password != "" && p.Spec.PasswordSecret.Name != "" {
-		return "", fmt.Errorf("can not have both password and secret ref set in peer config %q/%q", p.Namespace,
-			p.Name)
+func passwordFromSecretForPeer(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secret) (string, error) {
+	secret, ok := passwordSecrets[p.Spec.PasswordSecret.Name]
+	if !ok {
+		return "", TransientError{Message: fmt.Sprintf("secret ref not found for peer config %q/%q", p.Namespace, p.Name)}
 	}
-	var password string
-	if p.Spec.Password != "" {
-		password = p.Spec.Password
-	} else if p.Spec.PasswordSecret.Name != "" {
-		secret, ok := passwordSecrets[p.Spec.PasswordSecret.Name]
-		if !ok {
-			return "", TransientError{Message: fmt.Sprintf("secret ref not found for peer config %q/%q", p.Namespace, p.Name)}
-		}
-		if secret.Type != corev1.SecretTypeBasicAuth {
-			return "", fmt.Errorf("secret type mismatch on %q/%q, type %q is expected ", secret.Namespace,
-				secret.Name, corev1.SecretTypeBasicAuth)
-		}
-		srcPass, ok := secret.Data["password"]
-		if !ok {
-			return "", fmt.Errorf("password not specified in the secret %q/%q", secret.Namespace, secret.Name)
-		}
-		password = string(srcPass)
+
+	if secret.Type != corev1.SecretTypeBasicAuth {
+		return "", fmt.Errorf("secret type mismatch on %q/%q, type %q is expected ", secret.Namespace,
+			secret.Name, corev1.SecretTypeBasicAuth)
 	}
-	return password, nil
+
+	srcPass, ok := secret.Data["password"]
+	if !ok {
+		return "", fmt.Errorf("password not specified in the secret %q/%q", secret.Namespace, secret.Name)
+	}
+
+	return string(srcPass), nil
 }
 
 func addressPoolFromCR(p metallbv1beta1.IPAddressPool, namespaces []corev1.Namespace) (*Pool, error) {

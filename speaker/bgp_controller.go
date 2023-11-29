@@ -242,6 +242,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 					HoldTime:      p.cfg.HoldTime,
 					KeepAliveTime: p.cfg.KeepaliveTime,
 					Password:      p.cfg.Password,
+					PasswordRef:   p.cfg.PasswordRef,
 					CurrentNode:   c.myNode,
 					BFDProfile:    p.cfg.BFDProfile,
 					EBGPMultiHop:  p.cfg.EBGPMultiHop,
