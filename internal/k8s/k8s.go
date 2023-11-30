@@ -47,7 +47,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	apiext "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
-
 	"k8s.io/apimachinery/pkg/runtime"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -112,6 +111,8 @@ type Config struct {
 	Namespace           string
 	ValidateConfig      config.Validate
 	EnableWebhook       bool
+	WebHookMinVersion   uint16
+	WebHookCipherSuites []uint16
 	DisableCertRotation bool
 	WebhookSecretName   string
 	CertDir             string
@@ -153,7 +154,7 @@ func New(cfg *Config) (*Client, error) {
 		Cache: cache.Options{
 			ByObject: objectsPerNamespace,
 		},
-		WebhookServer: webhookServer(9443, cfg.WebhookWithHTTP2),
+		WebhookServer: webhookServer(cfg),
 		Metrics: metricsserver.Options{
 			BindAddress: "0", // Disable metrics endpoint of controller manager
 		},
@@ -452,17 +453,22 @@ func UseEndpointSlices(kubeClient kubernetes.Interface) bool {
 	return true
 }
 
-func webhookServer(port int, withHTTP2 bool) webhook.Server {
+func webhookServer(cfg *Config) webhook.Server {
 	disableHTTP2 := func(c *tls.Config) {
-		if withHTTP2 {
+		if cfg.WebhookWithHTTP2 {
 			return
 		}
 		c.NextProtos = []string{"http/1.1"}
 	}
 
+	tlsSecurity := func(tlsConfig *tls.Config) {
+		tlsConfig.MinVersion = cfg.WebHookMinVersion
+		tlsConfig.CipherSuites = cfg.WebHookCipherSuites
+	}
+
 	webhookServerOptions := webhook.Options{
-		TLSOpts: []func(config *tls.Config){disableHTTP2},
-		Port:    port,
+		TLSOpts: []func(config *tls.Config){disableHTTP2, tlsSecurity},
+		Port:    9443,
 	}
 
 	res := webhook.NewServer(webhookServerOptions)
