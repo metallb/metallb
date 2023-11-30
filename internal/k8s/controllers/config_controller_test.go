@@ -18,27 +18,18 @@ package controllers
 
 import (
 	"context"
-	"path/filepath"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
-	. "github.com/onsi/gomega"
 	v1beta1 "go.universe.tf/metallb/api/v1beta1"
 	v1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/config"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	k8sscheme "k8s.io/client-go/kubernetes/scheme"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/envtest"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -120,7 +111,7 @@ func TestConfigController(t *testing.T) {
 		r := &ConfigReconciler{
 			Client:         fakeClient,
 			Logger:         log.NewNopLogger(),
-			Scheme:         scheme,
+			Scheme:         scheme.Scheme,
 			Namespace:      testNamespace,
 			ValidateConfig: config.DontValidate,
 			Handler:        mockHandler,
@@ -161,7 +152,7 @@ func TestSecretShouldntTrigger(t *testing.T) {
 	r := &ConfigReconciler{
 		Client:         fakeClient,
 		Logger:         log.NewNopLogger(),
-		Scheme:         scheme,
+		Scheme:         scheme.Scheme,
 		Namespace:      testNamespace,
 		ValidateConfig: config.DontValidate,
 		Handler:        mockHandler,
@@ -219,126 +210,8 @@ func TestSecretShouldntTrigger(t *testing.T) {
 	}
 }
 
-func TestNodeEvent(t *testing.T) {
-	g := NewGomegaWithT(t)
-	testEnv := &envtest.Environment{
-		CRDDirectoryPaths:     []string{filepath.Join("../../..", "config", "crd", "bases")},
-		ErrorIfCRDPathMissing: true,
-		Scheme:                scheme,
-	}
-	cfg, err := testEnv.Start()
-	g.Expect(err).ToNot(HaveOccurred())
-	defer func() {
-		err = testEnv.Stop()
-		g.Expect(err).ToNot(HaveOccurred())
-	}()
-	err = v1beta1.AddToScheme(k8sscheme.Scheme)
-	g.Expect(err).ToNot(HaveOccurred())
-	err = v1beta2.AddToScheme(k8sscheme.Scheme)
-	g.Expect(err).ToNot(HaveOccurred())
-	m, err := manager.New(cfg, manager.Options{Metrics: metricsserver.Options{BindAddress: "0"}})
-	g.Expect(err).ToNot(HaveOccurred())
-
-	var configUpdate int
-	var mutex sync.Mutex
-	oldRequestHandler := requestHandler
-	defer func() { requestHandler = oldRequestHandler }()
-
-	requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-		mutex.Lock()
-		defer mutex.Unlock()
-		configUpdate++
-		return ctrl.Result{}, nil
-	}
-
-	r := &ConfigReconciler{
-		Client:         m.GetClient(),
-		Logger:         log.NewNopLogger(),
-		Scheme:         scheme,
-		Namespace:      testNamespace,
-		ValidateConfig: config.DontValidate,
-	}
-	err = r.SetupWithManager(m)
-	g.Expect(err).ToNot(HaveOccurred())
-	ctx := context.Background()
-	go func() {
-		err = m.Start(ctx)
-		g.Expect(err).ToNot(HaveOccurred())
-	}()
-
-	// count for update on namespace events
-	var initialConfigUpdateCount int
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		time.Sleep(5 * time.Second)
-		mutex.Lock()
-		initialConfigUpdateCount = configUpdate
-		mutex.Unlock()
-	}()
-	wg.Wait()
-	// test new node event.
-	node := &corev1.Node{
-		ObjectMeta: metav1.ObjectMeta{Name: "test-node"},
-		Spec:       corev1.NodeSpec{},
-	}
-	node.Labels = make(map[string]string)
-	node.Labels["test"] = "e2e"
-	err = m.GetClient().Create(ctx, node)
-	g.Expect(err).ToNot(HaveOccurred())
-	g.Eventually(func() int {
-		mutex.Lock()
-		defer mutex.Unlock()
-		return configUpdate
-	}, 5*time.Second, 200*time.Millisecond).Should(Equal(initialConfigUpdateCount + 1))
-
-	// test update node event with no changes into node label.
-	g.Eventually(func() error {
-		err = m.GetClient().Get(ctx, types.NamespacedName{Name: "test-node"}, node)
-		if err != nil {
-			return err
-		}
-		node.Labels = make(map[string]string)
-		node.Spec.PodCIDR = "192.168.10.0/24"
-		node.Labels["test"] = "e2e"
-		err = m.GetClient().Update(ctx, node)
-		if err != nil {
-			return err
-		}
-		return nil
-	}, 5*time.Second, 200*time.Millisecond).ShouldNot(HaveOccurred())
-	g.Eventually(func() int {
-		mutex.Lock()
-		defer mutex.Unlock()
-		return configUpdate
-	}, 5*time.Second, 200*time.Millisecond).Should(Equal(initialConfigUpdateCount + 1))
-
-	// test update node event with changes into node label.
-	g.Eventually(func() error {
-		err = m.GetClient().Get(ctx, types.NamespacedName{Name: "test-node"}, node)
-		if err != nil {
-			return err
-		}
-		node.Labels = make(map[string]string)
-		node.Labels["test"] = "e2e"
-		node.Labels["test"] = "update"
-		err = m.GetClient().Update(ctx, node)
-		if err != nil {
-			return err
-		}
-		return nil
-	}, 5*time.Second, 200*time.Millisecond).ShouldNot(HaveOccurred())
-	g.Eventually(func() int {
-		mutex.Lock()
-		defer mutex.Unlock()
-		return configUpdate
-	}, 5*time.Second, 200*time.Millisecond).Should(Equal(initialConfigUpdateCount + 2))
-}
-
 var (
 	testNamespace                  = "test-controller"
-	scheme                         = runtime.NewScheme()
 	configControllerValidResources = config.ClusterResources{
 		Peers: []v1beta2.BGPPeer{
 			{

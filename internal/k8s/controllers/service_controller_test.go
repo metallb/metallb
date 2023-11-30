@@ -30,6 +30,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -242,7 +243,7 @@ func TestServiceController(t *testing.T) {
 		r := &ServiceReconciler{
 			Client:               fakeClient,
 			Logger:               log.NewNopLogger(),
-			Scheme:               scheme,
+			Scheme:               scheme.Scheme,
 			Namespace:            testNamespace,
 			Handler:              mockHandler,
 			Endpoints:            test.needEndPoints,
