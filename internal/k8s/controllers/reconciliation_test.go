@@ -6,6 +6,7 @@ import (
 	"context"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -42,6 +43,7 @@ var (
 	testEnv   *envtest.Environment
 	ctx       context.Context
 	cancel    context.CancelFunc
+	mgrDone   atomic.Bool
 
 	configRequestHandler = requestHandler
 	configMutex          sync.Mutex
@@ -148,6 +150,7 @@ var _ = BeforeSuite(func() {
 	ctx, cancel = context.WithCancel(context.TODO())
 
 	go func() {
+		defer func() { mgrDone.Store(true) }()
 		defer GinkgoRecover()
 		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred(), "failed to run manager")
@@ -176,6 +179,7 @@ var _ = AfterSuite(func() {
 	cancel()
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
+	Eventually(mgrDone.Load(), 5*time.Second, 200*time.Millisecond).Should(BeTrue())
 	requestHandler = configRequestHandler
 })
 
