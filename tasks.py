@@ -102,7 +102,7 @@ def _is_network_exist(network):
 def _get_network_subnets(network):
     if _is_podman():
         cmd = ('podman network inspect {network} '.format(network=network) +
-        '-f "{{ range (index .plugins 0).ipam.ranges}}{{ (index . 0).subnet }} {{end}}"')
+        '-f "{{ range .Subnets }}{{.Subnet}} {{end}}"')
     else:
         cmd = ('docker network inspect {network} '.format(network=network) +
         '-f "{{ range .IPAM.Config}}{{.Subnet}} {{end}}"')
