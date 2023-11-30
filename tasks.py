@@ -710,9 +710,11 @@ def bumprelease(ctx, version, previous_version):
 def test(ctx):
     """Run unit tests."""
     envtest_asset_dir = os.getcwd() + "/dev-env/unittest"
-    run("source {}/setup-envtest.sh; fetch_envtest_tools {}".format(envtest_asset_dir, envtest_asset_dir), echo=True)
-    run("source {}/setup-envtest.sh; setup_envtest_env {}; go test -short ./...".format(envtest_asset_dir, envtest_asset_dir), echo=True)
-    run("source {}/setup-envtest.sh; setup_envtest_env {}; go test -short -race ./...".format(envtest_asset_dir, envtest_asset_dir), echo=True)
+    k8s_version="1.27.1"
+    run("{}/setup-envtest.sh {}".format(envtest_asset_dir, envtest_asset_dir), echo=True)
+    kubebuilder_assets=run("{}/bin/setup-envtest use {} --bin-dir {}/bin -p path".format(envtest_asset_dir,k8s_version, envtest_asset_dir)).stdout.strip()
+    run("KUBEBUILDER_ASSETS={} go test -short ./...".format(kubebuilder_assets), echo=True)
+    run("KUBEBUILDER_ASSETS={} go test -short -race ./...".format(kubebuilder_assets), echo=True)
 
 @task
 def checkpatch(ctx):
