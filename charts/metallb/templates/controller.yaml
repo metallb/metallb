@@ -72,6 +72,12 @@ spec:
         {{- if .Values.controller.webhookMode }}
         - --webhook-mode={{ .Values.controller.webhookMode }}
         {{- end }}
+        {{- if .Values.controller.tlsMinVersion }}
+        - --tls-min-version={{ .Values.controller.tlsMinVersion }}
+        {{- end }}
+        {{- if .Values.controller.tlsCipherSuites }}
+        - --tls-cipher-suites={{ .Values.controller.tlsCipherSuites }}
+        {{- end }}
         env:
         {{- if and .Values.speaker.enabled .Values.speaker.memberlist.enabled }}
         - name: METALLB_ML_SECRET_NAME

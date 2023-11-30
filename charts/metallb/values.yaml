@@ -248,6 +248,8 @@ controller:
     periodSeconds: 10
     successThreshold: 1
     timeoutSeconds: 1
+  tlsMinVersion: "VersionTLS12"
+  tlsCipherSuites: ""
 
   extraContainers: []
 

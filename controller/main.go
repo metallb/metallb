@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"strings"
 
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/config"
@@ -31,6 +32,7 @@ import (
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	v1 "k8s.io/api/core/v1"
+	cliflag "k8s.io/component-base/cli/flag"
 )
 
 // Service offers methods to mutate a Kubernetes service object.
@@ -150,6 +152,10 @@ func main() {
 		webhookMode         = flag.String("webhook-mode", "enabled", "webhook mode: can be enabled, disabled or only webhook if we want the controller to act as webhook endpoint only")
 		webhookSecretName   = flag.String("webhook-secret", "webhook-server-cert", "webhook secret: the name of webhook secret, default is webhook-server-cert")
 		webhookHTTP2        = flag.Bool("webhook-http2", false, "enables http2 for the webhook endpoint")
+		tlsMinVersion       = flag.String("tls-min-version", "", "Minimum TLS version supported for the webhook server, Possible values: "+strings.Join(cliflag.TLSPossibleVersions(), ", "))
+		tlsCipherSuites     = flag.String("tls-cipher-suites", "TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,"+
+			"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,"+
+			"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,TLS_RSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_256_GCM_SHA384", "Comma-separated list of cipher suites for the webhook server")
 	)
 	flag.Parse()
 
@@ -160,6 +166,23 @@ func main() {
 	}
 
 	level.Info(logger).Log("version", version.Version(), "commit", version.CommitHash(), "branch", version.Branch(), "goversion", version.GoString(), "msg", "MetalLB controller starting "+version.String())
+
+	var webhookTLSMinVersion uint16
+	var webhookTLSCipherSuites []uint16
+	if *tlsMinVersion != "" {
+		webhookTLSMinVersion, err = cliflag.TLSVersion(*tlsMinVersion)
+		if err != nil {
+			level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to parse tlsMinVersion", "value", *tlsMinVersion)
+			os.Exit(1)
+		}
+	}
+	if *tlsCipherSuites != "" {
+		webhookTLSCipherSuites, err = cliflag.TLSCipherSuites(strings.Split(*tlsCipherSuites, ","))
+		if err != nil {
+			level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to parse tlsCipherSuites", "value", *tlsCipherSuites)
+			os.Exit(1)
+		}
+	}
 
 	if *namespace == "" {
 		bs, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
@@ -196,6 +219,8 @@ func main() {
 		ValidateConfig:      validation,
 		EnableWebhook:       true,
 		WebhookWithHTTP2:    *webhookHTTP2,
+		WebHookMinVersion:   webhookTLSMinVersion,
+		WebHookCipherSuites: webhookTLSCipherSuites,
 		DisableCertRotation: *disableCertRotation,
 		WebhookSecretName:   *webhookSecretName,
 		CertDir:             *certDir,
