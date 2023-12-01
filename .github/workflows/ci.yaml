@@ -41,6 +41,29 @@ jobs:
         with:
           skip-upload: true
 
+  check-changelog:
+    runs-on: ubuntu-22.04
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - name: Checkout Source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v40
+
+      - name: Check if release notes where changed
+        run: |
+          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
+            if [ "$file" = "website/content/release-notes/_index.md" ]; then
+              exit 0
+            fi
+          done
+          echo "Release notes must be changed"
+          exit 1
+
   commitlint:
     runs-on: ubuntu-22.04
     steps:
