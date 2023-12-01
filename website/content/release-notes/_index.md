@@ -3,6 +3,12 @@ title: Release Notes
 weight: 8
 ---
 
+## Next release
+
+Chores:
+
+- Enforce adding a release notes entry on each PR ([PR 2191](https://github.com/metallb/metallb/pull/2191))
+
 ## Version 0.13.12
 
 - Change the version of go used to compile the binaries
