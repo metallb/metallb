@@ -1057,11 +1057,17 @@ spec:
                                   time, per RFC4271. Defaults to 60s.
                                 type: string
                               password:
+                                description: Password to be used for establishing
+                                  the BGP session. Password and PasswordSecret are
+                                  mutually exclusive.
+                                type: string
+                              passwordSecret:
                                 description: PasswordSecret is name of the authentication
                                   secret for the neighbor. the secret must be of type
                                   "kubernetes.io/basic-auth", and created in the same
                                   namespace as the frr-k8s daemon. The password is
-                                  stored in the secret as the key "password".
+                                  stored in the secret as the key "password". Password
+                                  and PasswordSecret are mutually exclusive.
                                 properties:
                                   name:
                                     description: name is unique within a namespace
