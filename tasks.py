@@ -317,7 +317,7 @@ def generate_manifest(ctx, crd_options="crd:crdVersions=v1", bgp_type="native", 
     "ip_family": "Optional ipfamily of the cluster."
                  "Default: ipv4, supported families are 'ipv6' and 'dual'.",
     "bgp_type": "Type of BGP implementation to use."
-                "Supported: 'native' (default), 'frr'",
+                "Supported: 'frr' (default), 'native'",
     "frr_volume_dir": "FRR router config directory to be mounted inside frr container. "
                       "Default: ./dev-env/bgp/frr-volume",
     "log_level": "Log level for the controller and the speaker."
@@ -332,7 +332,7 @@ def generate_manifest(ctx, crd_options="crd:crdVersions=v1", bgp_type="native", 
                 "Default: False.",
 })
 def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_dir="",
-        node_img=None, ip_family="ipv4", bgp_type="native", log_level="info",
+        node_img=None, ip_family="ipv4", bgp_type="frr", log_level="info",
         helm_install=False, build_images=True, with_prometheus=False, with_api_audit=False):
     """Build and run MetalLB in a local Kind cluster.
 
