@@ -37,7 +37,6 @@ type session struct {
 	bgp.SessionParameters
 	sessionManager *sessionManager
 	advertised     []*bgp.Advertisement
-	logger         log.Logger
 }
 
 // Create a variable for os.Hostname() in order to make it easy to mock out
@@ -117,7 +116,6 @@ func (sm *sessionManager) NewSession(l log.Logger, args bgp.SessionParameters) (
 	sm.Lock()
 	defer sm.Unlock()
 	s := &session{
-		logger:            log.With(l, "peer", args.PeerAddress, "localASN", args.MyASN, "peerASN", args.PeerASN),
 		advertised:        []*bgp.Advertisement{},
 		sessionManager:    sm,
 		SessionParameters: args,
