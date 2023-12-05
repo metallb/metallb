@@ -27,6 +27,7 @@ import (
 
 	frrv1beta1 "github.com/metallb/frr-k8s/api/v1beta1"
 	frrk8s "go.universe.tf/metallb/internal/bgp/frrk8s"
+	"go.universe.tf/metallb/internal/logging"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,6 +64,7 @@ func NewFRRK8sConfigEvent() event.GenericEvent {
 type FRRK8sReconciler struct {
 	client.Client
 	Logger               log.Logger
+	LogLevel             logging.Level
 	Scheme               *runtime.Scheme
 	NodeName             string
 	Namespace            string
@@ -92,6 +94,7 @@ func (r *FRRK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	if reflect.DeepEqual(current.Spec, r.desiredConfiguration.Spec) {
+		level.Debug(r.Logger).Log("controller", "FRRK8sReconciler", "event", "not reconciling because of no change")
 		return ctrl.Result{}, nil
 	}
 
@@ -107,6 +110,14 @@ func (r *FRRK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	if err != nil {
 		level.Info(r.Logger).Log("controller", "FRRConfiguration", "event", "failed to create frr8s configuration")
 		return ctrl.Result{}, err
+	}
+
+	if r.LogLevel == logging.LevelDebug {
+		toDump, err := frrk8s.ConfigToDump(*r.desiredConfiguration)
+		if err != nil {
+			level.Error(r.Logger).Log("controller", "FRRConfiguration", "event", "failed to dump frr8s configuration", "error", err)
+		}
+		level.Debug(r.Logger).Log("controller", "FRRK8sReconciler", "event", "applied new configuration", "config", toDump)
 	}
 
 	return ctrl.Result{}, nil

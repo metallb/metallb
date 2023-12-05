@@ -3,6 +3,7 @@
 package frr
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -12,10 +13,12 @@ import (
 	"sync"
 
 	"github.com/go-kit/log"
+	"github.com/go-kit/log/level"
 	frrv1beta1 "github.com/metallb/frr-k8s/api/v1beta1"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/bgp/frr"
 	metallbconfig "go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/logging"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -26,8 +29,9 @@ type sessionManager struct {
 	targetNamespace string
 	nodeToConfigure string
 	sync.Mutex
-	desiredConfig         frrv1beta1.FRRConfiguration
 	configChangedCallback func(interface{})
+	logger                log.Logger
+	logLevel              logging.Level
 }
 
 func (sm *sessionManager) SetEventCallback(callback func(interface{})) {
@@ -319,10 +323,20 @@ func (sm *sessionManager) updateConfig() error {
 		return newConfig.Spec.BGP.BFDProfiles[i].Name < newConfig.Spec.BGP.BFDProfiles[j].Name
 	})
 
-	sm.desiredConfig = newConfig
-	toNotify := sm.desiredConfig.DeepCopy()
-	sm.configChangedCallback(*toNotify)
+	sm.configChangedCallback(newConfig)
+	if sm.logLevel == logging.LevelDebug {
+		sm.dumpConfig(newConfig)
+	}
+
 	return nil
+}
+
+func (sm *sessionManager) dumpConfig(config frrv1beta1.FRRConfiguration) {
+	toDump, err := ConfigToDump(config)
+	if err != nil {
+		level.Error(sm.logger).Log("component", "frrk8s", "event", "failed to dump config", "error", err)
+	}
+	level.Debug(sm.logger).Log("component", "frrk8s", "event", "sent new config to the controller", "config", toDump)
 }
 
 func toAdvertiseWithCommunity(prefixesForCommunity map[string][]string) []frrv1beta1.CommunityPrefixes {
@@ -349,11 +363,13 @@ func toAdvertiseWithLocalPref(prefixesForLocalPref map[uint32][]string) []frrv1b
 	return res
 }
 
-func NewSessionManager(l log.Logger, node, namespace string) bgp.SessionManager {
+func NewSessionManager(l log.Logger, logLevel logging.Level, node, namespace string) bgp.SessionManager {
 	res := &sessionManager{
 		sessions:        map[string]*session{},
 		nodeToConfigure: node,
 		targetNamespace: namespace,
+		logger:          l,
+		logLevel:        logLevel,
 	}
 
 	return res
@@ -374,4 +390,19 @@ func sortMap[T any](toSort map[string]T) []T {
 		res = append(res, toSort[k])
 	}
 	return res
+}
+
+func ConfigToDump(config frrv1beta1.FRRConfiguration) (string, error) {
+	toDump := config.DeepCopy()
+	for _, r := range toDump.Spec.BGP.Routers {
+		for i := range r.Neighbors {
+			r.Neighbors[i].Password = "<retracted>"
+		}
+	}
+
+	res, err := json.Marshal(toDump)
+	if err != nil {
+		return "", err
+	}
+	return string(res), nil
 }

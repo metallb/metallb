@@ -376,7 +376,7 @@ var newBGP = func(cfg controllerConfig) bgp.SessionManager {
 	case bgpFrr:
 		return bgpfrr.NewSessionManager(cfg.Logger, cfg.LogLevel)
 	case bgpFrrK8s:
-		return bgpfrrk8s.NewSessionManager(cfg.Logger, cfg.MyNode, cfg.Namespace)
+		return bgpfrrk8s.NewSessionManager(cfg.Logger, cfg.LogLevel, cfg.MyNode, cfg.Namespace)
 	default:
 		panic(fmt.Sprintf("unsupported BGP implementation type: %s", cfg.bgpType))
 	}
