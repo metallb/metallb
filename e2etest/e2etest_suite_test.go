@@ -56,9 +56,9 @@ var (
 	localNics           string
 	externalContainers  string
 	runOnHost           bool
-	bgpNativeMode       bool
 	frrImage            string
 	hostContainerMode   string
+	withVRF             bool
 )
 
 // handleFlags sets up all flags and parses the command line.
@@ -85,9 +85,9 @@ func handleFlags() {
 	flag.StringVar(&reportPath, "report-path", "/tmp/report", "the path to be used to dump test failure information")
 	flag.StringVar(&prometheusNamespace, "prometheus-namespace", "monitoring", "the namespace prometheus is running in (if running)")
 	flag.StringVar(&externalContainers, "external-containers", "", "a comma separated list of external containers names to use for the test. (valid parameters are: ibgp-single-hop / ibgp-multi-hop / ebgp-single-hop / ebgp-multi-hop)")
-	flag.BoolVar(&bgpNativeMode, "bgp-native-mode", false, "says if we are testing against a deployment using bgp native mode")
 	flag.StringVar(&frrImage, "frr-image", "quay.io/frrouting/frr:8.5.2", "the image to use for the external frr containers")
 	flag.StringVar(&hostContainerMode, "host-bgp-mode", string(bgptests.IBGPMode), "tells whether to run the host container in ebgp or ibgp mode")
+	flag.BoolVar(&withVRF, "with-vrf", false, "runs the tests against containers reacheable via linux vrfs. More coverage, but might not work depending on the OS")
 
 	flag.Parse()
 
@@ -147,7 +147,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	default:
 		bgptests.FRRContainers, err = bgptests.KindnetContainersSetup(cs, frrImage)
 		framework.ExpectNoError(err)
-		if !bgpNativeMode {
+		if withVRF {
 			vrfFRRContainers, err := bgptests.VRFContainersSetup(cs, frrImage)
 			framework.ExpectNoError(err)
 			bgptests.FRRContainers = append(bgptests.FRRContainers, vrfFRRContainers...)
@@ -197,7 +197,7 @@ var _ = ginkgo.AfterSuite(func() {
 
 	err = bgptests.InfraTearDown(cs)
 	framework.ExpectNoError(err)
-	if !bgpNativeMode {
+	if withVRF {
 		err = bgptests.InfraTearDownVRF(cs)
 		framework.ExpectNoError(err)
 	}
