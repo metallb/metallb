@@ -257,9 +257,9 @@ jobs:
           echo '/etc/frr/core-%e.%p.%h.%t' | sudo tee /proc/sys/kernel/core_pattern
           if [ ${{ matrix.deployment }} = "helm" ]; then export SPEAKER_SELECTOR="app.kubernetes.io/component=speaker" && export CONTROLLER_SELECTOR="app.kubernetes.io/component=controller"; fi
           SKIP="none"
-          NATIVE_BGP=""
+          WITH_VRF="--with-vrf"
           FOCUS=""
-          if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|BFD|VRF|DUALSTACK"; NATIVE_BGP="--native-bgp"; fi
+          if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|BFD|VRF|DUALSTACK"; WITH_VRF=""; fi
           if [ "${{ matrix.ip-family }}" == "ipv4" ]; then SKIP="$SKIP|IPV6|DUALSTACK"; fi
           if [ "${{ matrix.ip-family }}" == "dual" ]; then SKIP="$SKIP|IPV6"; fi
           if [ "${{ matrix.ip-family }}" == "ipv6" ]; then SKIP="$SKIP|IPV4|DUALSTACK"; fi
@@ -268,8 +268,8 @@ jobs:
           if [ "${{ matrix.bgp-type }}" == "frr-k8s" ]; then FOCUS="--focus="FRRK8s" "; fi # TODO remove when e2etests are adjusted
 
           echo "Skipping $SKIP"
-          echo "Native bgp mode $NATIVE_BGP"
-          sudo -E env "PATH=$PATH" inv e2etest $FOCUS --skip $SKIP $NATIVE_BGP -e /tmp/kind_logs
+          echo "With VRF $WITH_VRF"
+          sudo -E env "PATH=$PATH" inv e2etest $FOCUS --skip $SKIP $WITH_VRF -e /tmp/kind_logs
 
       - name: Collect Logs
         if: ${{ failure() }}
