@@ -41,6 +41,7 @@ import (
 	"go.universe.tf/e2etest/pkg/frr"
 	frrconfig "go.universe.tf/e2etest/pkg/frr/config"
 	frrcontainer "go.universe.tf/e2etest/pkg/frr/container"
+	frrprovider "go.universe.tf/e2etest/pkg/frr/provider"
 	"go.universe.tf/e2etest/pkg/ipfamily"
 	testservice "go.universe.tf/e2etest/pkg/service"
 	corev1 "k8s.io/api/core/v1"
@@ -62,6 +63,7 @@ const (
 
 var (
 	ConfigUpdater       config.Updater
+	FRRProvider         frrprovider.Provider
 	Reporter            *k8sreporter.KubernetesReporter
 	ReportPath          string
 	PrometheusNamespace string
@@ -1308,7 +1310,8 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 
 			for _, pod := range speakerPods {
-				podExecutor := executor.ForPod(pod.Namespace, pod.Name, "frr")
+				podExecutor, err := FRRProvider.FRRExecutorFor(pod.Namespace, pod.Name)
+				framework.ExpectNoError(err)
 
 				Eventually(func() string {
 					// We need to assert against the output of the command as a bare string, as
@@ -1402,23 +1405,6 @@ var _ = ginkgo.Describe("BGP", func() {
 		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{l2tests.IPV4ServiceRange}),
 		ginkgo.Entry("IPV6", ipfamily.IPv6, []string{l2tests.IPV6ServiceRange}),
 	)
-
-	// TODO: extend all the other tests to make them work with frr-k8s and remove this
-	ginkgo.Context("IPV4 with FRRK8s", func() {
-		ginkgo.It("should work", func() {
-			_, svc := setupBGPService(f, ipfamily.IPv4, []string{v4PoolAddresses}, FRRContainers, func(svc *corev1.Service) {})
-			defer testservice.Delete(cs, svc)
-
-			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
-			testservice.ValidateDesiredLB(svc)
-
-			for _, container := range FRRContainers {
-				ginkgo.By(fmt.Sprintf("validating the service from %s", container.Name))
-				validateService(svc, allNodes.Items, container)
-			}
-		})
-	})
 })
 
 // substringCount creates a Gomega transform function that

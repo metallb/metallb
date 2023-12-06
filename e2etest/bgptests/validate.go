@@ -12,7 +12,6 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"go.universe.tf/e2etest/pkg/executor"
 	"go.universe.tf/e2etest/pkg/frr"
 	frrcontainer "go.universe.tf/e2etest/pkg/frr/container"
 	"go.universe.tf/e2etest/pkg/ipfamily"
@@ -127,7 +126,8 @@ func validateServiceNoWait(svc *corev1.Service, nodes []corev1.Node, c *frrconta
 func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily ipfamily.Family) {
 	pods, err := metallb.SpeakerPods(cs)
 	framework.ExpectNoError(err)
-	podExecutor := executor.ForPod(metallb.Namespace, pods[0].Name, "frr")
+	podExecutor, err := FRRProvider.FRRExecutorFor(pods[0].Namespace, pods[0].Name)
+	framework.ExpectNoError(err)
 
 	Eventually(func() error {
 		addresses := n.AddressesForFamily(ipFamily)
@@ -338,7 +338,9 @@ func validateServiceNotInRoutesForCommunity(c *frrcontainer.FRR, community strin
 // returns the name of the first pod where it is found.
 func isRouteInjected(pods []*corev1.Pod, pairingFamily ipfamily.Family, routeToCheck, vrf string) (bool, string) {
 	for _, pod := range pods {
-		podExec := executor.ForPod(pod.Namespace, pod.Name, "frr")
+		podExec, err := FRRProvider.FRRExecutorFor(pod.Namespace, pod.Name)
+		framework.ExpectNoError(err)
+
 		routes, frrRoutesV6, err := frr.RoutesForVRF(vrf, podExec)
 		framework.ExpectNoError(err)
 

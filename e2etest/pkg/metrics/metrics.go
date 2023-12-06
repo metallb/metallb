@@ -31,21 +31,31 @@ type prometheusResponseData struct {
 
 // MetricsForPod returns the parsed metrics for the given pod, scraping them
 // from the source pod.
-func ForPod(controller, target *corev1.Pod, namespace string) ([]map[string]*dto.MetricFamily, error) {
+func ForPod(promPod, target *corev1.Pod, namespace string) ([]map[string]*dto.MetricFamily, error) {
 	ports := make([]int, 0)
 	allMetrics := make([]map[string]*dto.MetricFamily, 0)
 	for _, c := range target.Spec.Containers {
 		for _, p := range c.Ports {
-			if p.Name == "monitoring" {
+			if p.Name == "metricshttps" || p.Name == "frrmetricshttps" {
 				ports = append(ports, int(p.ContainerPort))
 			}
 		}
 	}
 
-	podExecutor := executor.ForPod(namespace, controller.Name, "controller")
+	podExecutor := executor.ForPod(promPod.Namespace, promPod.Name, "prometheus")
+
+	// We add a token header to the requests, without it kube-rbac-proxy returns Unauthorized.
+	token, err := podExecutor.Exec("cat", "/var/run/secrets/kubernetes.io/serviceaccount/token")
+	if err != nil {
+		return nil, err
+	}
+
 	for _, p := range ports {
-		metricsURL := path.Join(net.JoinHostPort(target.Status.PodIP, strconv.Itoa(p)), "metrics")
-		metrics, err := podExecutor.Exec("wget", "-qO-", metricsURL)
+		metricsPath := path.Join(net.JoinHostPort(target.Status.PodIP, strconv.Itoa(p)), "metrics")
+		metricsURL := fmt.Sprintf("https://%s", metricsPath)
+		metrics, err := podExecutor.Exec("wget",
+			"--no-check-certificate", "-qO-", metricsURL,
+			"--header", fmt.Sprintf("Authorization: Bearer %s", token))
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to scrape metrics for %s", target.Name)
 		}

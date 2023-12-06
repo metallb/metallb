@@ -9,7 +9,6 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/e2etest/pkg/config"
 	frrconfig "go.universe.tf/e2etest/pkg/frr/config"
 	frrcontainer "go.universe.tf/e2etest/pkg/frr/container"
@@ -19,6 +18,7 @@ import (
 	"go.universe.tf/e2etest/pkg/metrics"
 	"go.universe.tf/e2etest/pkg/pointer"
 	testservice "go.universe.tf/e2etest/pkg/service"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -132,87 +132,92 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 			for _, speaker := range speakerPods {
 				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
 				Eventually(func() error {
-					speakerMetrics, err := metrics.ForPod(controllerPod, speaker, metallb.Namespace)
+					metricsPod, metricsPrefix, err := FRRProvider.BGPMetricsPodFor(speaker.Namespace, speaker.Name)
+					if err != nil {
+						return err
+					}
+
+					speakerMetrics, err := metrics.ForPod(promPod, metricsPod, metallb.Namespace)
 					if err != nil {
 						return err
 					}
 					for _, selector := range selectors {
-						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), "metallb_bgp_opens_sent", selector.labelsBGP, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), fmt.Sprintf("%s_bgp_opens_sent", metricsPrefix), selector.labelsBGP, speakerMetrics)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_opens_sent{%s} >= 1`, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_opens_sent{%s} >= 1`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), "metallb_bgp_opens_received", selector.labelsBGP, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), fmt.Sprintf("%s_bgp_opens_received", metricsPrefix), selector.labelsBGP, speakerMetrics)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_opens_received{%s} >= 1`, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_opens_received{%s} >= 1`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), "metallb_bgp_updates_total_received", selector.labelsBGP, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), fmt.Sprintf("%s_bgp_updates_total_received", metricsPrefix), selector.labelsBGP, speakerMetrics)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_updates_total_received{%s} >= 1`, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_updates_total_received{%s} >= 1`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), "metallb_bgp_keepalives_sent", selector.labelsBGP, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), fmt.Sprintf("%s_bgp_keepalives_sent", metricsPrefix), selector.labelsBGP, speakerMetrics)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_keepalives_sent{%s} >= 1`, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_keepalives_sent{%s} >= 1`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), "metallb_bgp_keepalives_received", selector.labelsBGP, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), fmt.Sprintf("%s_bgp_keepalives_received", metricsPrefix), selector.labelsBGP, speakerMetrics)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_keepalives_received{%s} >= 1`, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_keepalives_received{%s} >= 1`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), "metallb_bgp_route_refresh_sent", selector.labelsBGP, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), fmt.Sprintf("%s_bgp_route_refresh_sent", metricsPrefix), selector.labelsBGP, speakerMetrics)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_route_refresh_sent{%s} >= 1`, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_route_refresh_sent{%s} >= 1`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), "metallb_bgp_total_sent", selector.labelsBGP, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), fmt.Sprintf("%s_bgp_total_sent", metricsPrefix), selector.labelsBGP, speakerMetrics)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_total_sent{%s} >= 1`, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_total_sent{%s} >= 1`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), "metallb_bgp_total_received", selector.labelsBGP, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(0), fmt.Sprintf("%s_bgp_total_received", metricsPrefix), selector.labelsBGP, speakerMetrics)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_total_received{%s} >= 1`, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_total_received{%s} >= 1`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -267,7 +272,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 
 			ginkgo.By("checking the metrics when no service is added")
 			Eventually(func() error {
-				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod, metallb.Namespace)
+				controllerMetrics, err := metrics.ForPod(promPod, controllerPod, metallb.Namespace)
 				if err != nil {
 					return err
 				}
@@ -292,28 +297,42 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 
 			selectors := labelsForPeers(FRRContainers, ipFamily)
 
+			// This is the only test where the same bgp metrics can be from either
+			// the speaker container or frr depending on the deployment's bgp mode.
+			bgpMetricsPodForSpeaker := func(p *corev1.Pod) (*corev1.Pod, string, error) {
+				if FRRProvider == nil {
+					return p, "metallb", nil
+				}
+				return FRRProvider.BGPMetricsPodFor(p.Namespace, p.Name)
+			}
+
 			for _, speaker := range speakerPods {
 				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
 
 				Eventually(func() error {
-					speakerMetrics, err := metrics.ForPod(controllerPod, speaker, metallb.Namespace)
+					metricsPod, metricsPrefix, err := bgpMetricsPodForSpeaker(speaker)
+					if err != nil {
+						return err
+					}
+
+					speakerMetrics, err := metrics.ForPod(promPod, metricsPod, metallb.Namespace)
 					if err != nil {
 						return err
 					}
 					for _, selector := range selectors {
-						err = metrics.ValidateGaugeValue(1, "metallb_bgp_session_up", selector.labelsBGP, speakerMetrics)
+						err = metrics.ValidateGaugeValue(1, fmt.Sprintf("%s_bgp_session_up", metricsPrefix), selector.labelsBGP, speakerMetrics)
 						if err != nil {
 							return err
 						}
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_session_up{%s} == 1`, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_session_up{%s} == 1`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
-						err = metrics.ValidateGaugeValue(0, "metallb_bgp_announced_prefixes_total", selector.labelsBGP, speakerMetrics)
+						err = metrics.ValidateGaugeValue(0, fmt.Sprintf("%s_bgp_announced_prefixes_total", metricsPrefix), selector.labelsBGP, speakerMetrics)
 						if err != nil {
 							return err
 						}
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_announced_prefixes_total{%s} == 0`, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_announced_prefixes_total{%s} == 0`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -328,7 +347,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 
 			ginkgo.By("checking the metrics when a service is added")
 			Eventually(func() error {
-				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod, metallb.Namespace)
+				controllerMetrics, err := metrics.ForPod(promPod, controllerPod, metallb.Namespace)
 				if err != nil {
 					return err
 				}
@@ -347,34 +366,45 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 				ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
 
 				Eventually(func() error {
-					speakerMetrics, err := metrics.ForPod(controllerPod, speaker, metallb.Namespace)
+					bgpMetricsPod, metricsPrefix, err := bgpMetricsPodForSpeaker(speaker)
 					if err != nil {
 						return err
 					}
+
+					bgpMetrics, err := metrics.ForPod(promPod, bgpMetricsPod, metallb.Namespace)
+					if err != nil {
+						return err
+					}
+
+					speakerMetrics, err := metrics.ForPod(promPod, speaker, metallb.Namespace)
+					if err != nil {
+						return err
+					}
+
 					for addr := range peerAddrToName {
-						err = metrics.ValidateGaugeValue(1, "metallb_bgp_session_up", map[string]string{"peer": addr}, speakerMetrics)
+						err = metrics.ValidateGaugeValue(1, fmt.Sprintf("%s_bgp_session_up", metricsPrefix), map[string]string{"peer": addr}, bgpMetrics)
 						if err != nil {
 							return err
 						}
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_session_up{peer="%s"} == 1`, addr), metrics.There)
-						if err != nil {
-							return err
-						}
-
-						err = metrics.ValidateGaugeValue(1, "metallb_bgp_announced_prefixes_total", map[string]string{"peer": addr}, speakerMetrics)
-						if err != nil {
-							return err
-						}
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_announced_prefixes_total{peer="%s"} == 1`, addr), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_session_up{peer="%s"} == 1`, metricsPrefix, addr), metrics.There)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), "metallb_bgp_updates_total", map[string]string{"peer": addr}, speakerMetrics)
+						err = metrics.ValidateGaugeValue(1, fmt.Sprintf("%s_bgp_announced_prefixes_total", metricsPrefix), map[string]string{"peer": addr}, bgpMetrics)
 						if err != nil {
 							return err
 						}
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_updates_total{peer="%s"} >= 1`, addr), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_announced_prefixes_total{peer="%s"} == 1`, metricsPrefix, addr), metrics.There)
+						if err != nil {
+							return err
+						}
+
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), fmt.Sprintf("%s_bgp_updates_total", metricsPrefix), map[string]string{"peer": addr}, bgpMetrics)
+						if err != nil {
+							return err
+						}
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_updates_total{peer="%s"} >= 1`, metricsPrefix, addr), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -424,8 +454,6 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 		}
 
 		ginkgo.By("checking metrics")
-		controllerPod, err := metallb.ControllerPod(cs)
-		framework.ExpectNoError(err)
 		speakerPods, err := metallb.SpeakerPods(cs)
 		framework.ExpectNoError(err)
 		promPod, err := metrics.PrometheusPod(cs, PrometheusNamespace)
@@ -437,62 +465,67 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 			ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
 
 			Eventually(func() error {
-				speakerMetrics, err := metrics.ForPod(controllerPod, speaker, metallb.Namespace)
+				metricsPod, metricsPrefix, err := FRRProvider.BGPMetricsPodFor(speaker.Namespace, speaker.Name)
+				if err != nil {
+					return err
+				}
+
+				speakerMetrics, err := metrics.ForPod(promPod, metricsPod, metallb.Namespace)
 				if err != nil {
 					return err
 				}
 
 				for _, selector := range selectors {
-					err = metrics.ValidateGaugeValue(1, "metallb_bfd_session_up", selector.labelsBFD, speakerMetrics)
+					err = metrics.ValidateGaugeValue(1, fmt.Sprintf("%s_bfd_session_up", metricsPrefix), selector.labelsBFD, speakerMetrics)
 					if err != nil {
 						return err
 					}
-					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_session_up{%s} == 1`, selector.labelsForQueryBFD), metrics.There)
-					if err != nil {
-						return err
-					}
-
-					err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), "metallb_bfd_control_packet_input", selector.labelsBFD, speakerMetrics)
-					if err != nil {
-						return err
-					}
-					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_control_packet_input{%s} >= 1`, selector.labelsForQueryBFD), metrics.There)
+					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_session_up{%s} == 1`, metricsPrefix, selector.labelsForQueryBFD), metrics.There)
 					if err != nil {
 						return err
 					}
 
-					err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), "metallb_bfd_control_packet_output", selector.labelsBFD, speakerMetrics)
+					err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), fmt.Sprintf("%s_bfd_control_packet_input", metricsPrefix), selector.labelsBFD, speakerMetrics)
 					if err != nil {
 						return err
 					}
-					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_control_packet_output{%s} >= 1`, selector.labelsForQueryBFD), metrics.There)
-					if err != nil {
-						return err
-					}
-
-					err = metrics.ValidateGaugeValueCompare(metrics.GreaterOrEqualThan(0), "metallb_bfd_session_down_events", selector.labelsBFD, speakerMetrics)
-					if err != nil {
-						return err
-					}
-					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_session_down_events{%s} >= 0`, selector.labelsForQueryBFD), metrics.There)
+					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_control_packet_input{%s} >= 1`, metricsPrefix, selector.labelsForQueryBFD), metrics.There)
 					if err != nil {
 						return err
 					}
 
-					err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), "metallb_bfd_session_up_events", selector.labelsBFD, speakerMetrics)
+					err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), fmt.Sprintf("%s_bfd_control_packet_output", metricsPrefix), selector.labelsBFD, speakerMetrics)
 					if err != nil {
 						return err
 					}
-					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_session_up_events{%s} >= 1`, selector.labelsForQueryBFD), metrics.There)
+					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_control_packet_output{%s} >= 1`, metricsPrefix, selector.labelsForQueryBFD), metrics.There)
 					if err != nil {
 						return err
 					}
 
-					err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), "metallb_bfd_zebra_notifications", selector.labelsBFD, speakerMetrics)
+					err = metrics.ValidateGaugeValueCompare(metrics.GreaterOrEqualThan(0), fmt.Sprintf("%s_bfd_session_down_events", metricsPrefix), selector.labelsBFD, speakerMetrics)
 					if err != nil {
 						return err
 					}
-					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_zebra_notifications{%s} >= 1`, selector.labelsForQueryBFD), metrics.There)
+					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_session_down_events{%s} >= 0`, metricsPrefix, selector.labelsForQueryBFD), metrics.There)
+					if err != nil {
+						return err
+					}
+
+					err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), fmt.Sprintf("%s_bfd_session_up_events", metricsPrefix), selector.labelsBFD, speakerMetrics)
+					if err != nil {
+						return err
+					}
+					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_session_up_events{%s} >= 1`, metricsPrefix, selector.labelsForQueryBFD), metrics.There)
+					if err != nil {
+						return err
+					}
+
+					err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), fmt.Sprintf("%s_bfd_zebra_notifications", metricsPrefix), selector.labelsBFD, speakerMetrics)
+					if err != nil {
+						return err
+					}
+					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_zebra_notifications{%s} >= 1`, metricsPrefix, selector.labelsForQueryBFD), metrics.There)
 					if err != nil {
 						return err
 					}
@@ -502,20 +535,20 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						if selector.noEcho {
 							echoVal = 0
 						}
-						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(echoVal), "metallb_bfd_echo_packet_input", selector.labelsBFD, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(echoVal), fmt.Sprintf("%s_bfd_echo_packet_input", metricsPrefix), selector.labelsBFD, speakerMetrics)
 						if err != nil {
 							return err
 						}
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_echo_packet_input{%s} >= %d`, selector.labelsForQueryBFD, echoVal), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_echo_packet_input{%s} >= %d`, metricsPrefix, selector.labelsForQueryBFD, echoVal), metrics.There)
 						if err != nil {
 							return err
 						}
 
-						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(echoVal), "metallb_bfd_echo_packet_output", selector.labelsBFD, speakerMetrics)
+						err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(echoVal), fmt.Sprintf("%s_bfd_echo_packet_output", metricsPrefix), selector.labelsBFD, speakerMetrics)
 						if err != nil {
 							return err
 						}
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_echo_packet_output{%s} >= %d`, selector.labelsForQueryBFD, echoVal), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_echo_packet_output{%s} >= %d`, metricsPrefix, selector.labelsForQueryBFD, echoVal), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -538,26 +571,31 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 			ginkgo.By(fmt.Sprintf("checking speaker %s", speaker.Name))
 
 			Eventually(func() error {
-				speakerMetrics, err := metrics.ForPod(controllerPod, speaker, metallb.Namespace)
+				metricsPod, metricsPrefix, err := FRRProvider.BGPMetricsPodFor(speaker.Namespace, speaker.Name)
+				if err != nil {
+					return err
+				}
+
+				speakerMetrics, err := metrics.ForPod(promPod, metricsPod, metallb.Namespace)
 				if err != nil {
 					return err
 				}
 
 				for _, selector := range selectors {
-					err = metrics.ValidateGaugeValue(0, "metallb_bfd_session_up", selector.labelsBFD, speakerMetrics)
+					err = metrics.ValidateGaugeValue(0, fmt.Sprintf("%s_bfd_session_up", metricsPrefix), selector.labelsBFD, speakerMetrics)
 					if err != nil {
 						return err
 					}
-					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_session_up{%s} == 0`, selector.labelsForQueryBFD), metrics.There)
+					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_session_up{%s} == 0`, metricsPrefix, selector.labelsForQueryBFD), metrics.There)
 					if err != nil {
 						return err
 					}
 
-					err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), "metallb_bfd_session_down_events", selector.labelsBFD, speakerMetrics)
+					err = metrics.ValidateCounterValue(metrics.GreaterOrEqualThan(1), fmt.Sprintf("%s_bfd_session_down_events", metricsPrefix), selector.labelsBFD, speakerMetrics)
 					if err != nil {
 						return err
 					}
-					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_session_down_events{%s} >= 1`, selector.labelsForQueryBFD), metrics.There)
+					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_session_down_events{%s} >= 1`, metricsPrefix, selector.labelsForQueryBFD), metrics.There)
 					if err != nil {
 						return err
 					}
@@ -648,7 +686,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 		for _, pod := range speakers {
 			ginkgo.By(fmt.Sprintf("checking pod %s", pod.Name))
 			Eventually(func() error {
-				podMetrics, err := metrics.ForPod(controllerPod, pod, metallb.Namespace)
+				podMetrics, err := metrics.ForPod(promPod, pod, metallb.Namespace)
 				framework.ExpectNoError(err)
 				err = metrics.ValidateGaugeValue(1, "metallb_k8s_client_config_stale_bool", map[string]string{}, podMetrics)
 				if err != nil {
@@ -668,7 +706,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 		for _, pod := range allPods {
 			ginkgo.By(fmt.Sprintf("checking pod %s", pod.Name))
 			Eventually(func() error {
-				podMetrics, err := metrics.ForPod(controllerPod, pod, metallb.Namespace)
+				podMetrics, err := metrics.ForPod(promPod, pod, metallb.Namespace)
 				framework.ExpectNoError(err)
 				err = metrics.ValidateGaugeValue(0, "metallb_k8s_client_config_stale_bool", map[string]string{}, podMetrics)
 				if err != nil {
