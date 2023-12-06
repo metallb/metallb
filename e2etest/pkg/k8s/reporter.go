@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	frrk8sv1beta1 "github.com/metallb/frr-k8s/api/v1beta1"
 	"github.com/onsi/ginkgo/v2"
 	"github.com/openshift-kni/k8sreporter"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
@@ -26,6 +27,11 @@ func InitReporter(kubeconfig, path, namespace string) *k8sreporter.KubernetesRep
 		if err != nil {
 			return err
 		}
+		err = frrk8sv1beta1.AddToScheme(s)
+		if err != nil {
+			return err
+		}
+
 		return nil
 	}
 
@@ -52,6 +58,8 @@ func InitReporter(kubeconfig, path, namespace string) *k8sreporter.KubernetesRep
 		{Cr: &metallbv1beta1.BFDProfileList{}},
 		{Cr: &metallbv1beta1.CommunityList{}},
 		{Cr: &corev1.ServiceList{}},
+		{Cr: &frrk8sv1beta1.FRRConfigurationList{}},
+		{Cr: &frrk8sv1beta1.FRRNodeStateList{}},
 	}
 
 	reporter, err := k8sreporter.New(kubeconfig, addToScheme, dumpNamespace, path, crds...)

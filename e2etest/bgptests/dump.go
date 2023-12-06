@@ -9,7 +9,6 @@ import (
 	"path"
 	"strings"
 
-	"go.universe.tf/e2etest/pkg/executor"
 	"go.universe.tf/e2etest/pkg/frr"
 	"go.universe.tf/e2etest/pkg/k8s"
 	"go.universe.tf/e2etest/pkg/metallb"
@@ -47,10 +46,12 @@ func dumpBGPInfo(basePath, testName string, cs clientset.Interface, f *framework
 	speakerPods, err := metallb.SpeakerPods(cs)
 	framework.ExpectNoError(err)
 	for _, pod := range speakerPods {
-		if len(pod.Spec.Containers) == 1 { // we dump only in case of frr
+		if FRRProvider == nil { // we dump only in case of frr / frr-k8s
 			break
 		}
-		podExec := executor.ForPod(pod.Namespace, pod.Name, "frr")
+		podExec, err := FRRProvider.FRRExecutorFor(pod.Namespace, pod.Name)
+		framework.ExpectNoError(err)
+
 		dump, err := frr.RawDump(podExec, "/etc/frr/frr.conf", "/etc/frr/frr.log")
 		if err != nil {
 			framework.Logf("External frr dump for pod %s failed %v", pod.Name, err)

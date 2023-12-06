@@ -269,7 +269,7 @@ jobs:
 
           echo "Skipping $SKIP"
           echo "With VRF $WITH_VRF"
-          sudo -E env "PATH=$PATH" inv e2etest $FOCUS --skip $SKIP $WITH_VRF -e /tmp/kind_logs
+          sudo -E env "PATH=$PATH" inv e2etest $FOCUS --skip $SKIP --bgp-mode ${{ matrix.bgp-type }} $WITH_VRF -e /tmp/kind_logs
 
       - name: Collect Logs
         if: ${{ failure() }}
@@ -409,7 +409,7 @@ jobs:
           spec:
             logLevel: debug
           EOF
-          sudo -E env "PATH=$PATH" inv e2etest --skip "IPV6|DUALSTACK|metrics|L2-interface selector" -e /tmp/kind_logs
+          sudo -E env "PATH=$PATH" inv e2etest --bgp-mode frr --skip "IPV6|DUALSTACK|metrics|L2-interface selector" -e /tmp/kind_logs
 
       - name: Collect Logs
         if: ${{ failure() }}
@@ -445,7 +445,7 @@ jobs:
       - name: E2E
         run: |
           FOCUS="L2.*should work for ExternalTrafficPolicy=Cluster|BGP.*A service of protocol load balancer should work with.*IPV4 - ExternalTrafficPolicyCluster$|validate FRR running configuration"
-          sudo -E env "PATH=$PATH" inv e2etest --focus "$FOCUS" -e /tmp/kind_logs
+          sudo -E env "PATH=$PATH" inv e2etest --bgp-mode frr --focus "$FOCUS" -e /tmp/kind_logs
 
       - name: Collect Logs
         if: ${{ failure() }}

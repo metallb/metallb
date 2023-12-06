@@ -101,3 +101,22 @@ func RestartController(cs clientset.Interface) {
 	})
 	framework.ExpectNoError(err)
 }
+
+// FRRK8SPods returns the set of pods related to FRR-K8s.
+func FRRK8SPods(cs clientset.Interface) ([]*corev1.Pod, error) {
+	pods, err := cs.CoreV1().Pods(Namespace).List(context.Background(), metav1.ListOptions{
+		LabelSelector: "app=frr-k8s",
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "Failed to fetch frr-k8s pods")
+	}
+	if len(pods.Items) == 0 {
+		return nil, errors.New("No frr-k8s pods found")
+	}
+	res := make([]*corev1.Pod, 0)
+	for _, item := range pods.Items {
+		i := item
+		res = append(res, &i)
+	}
+	return res, nil
+}
