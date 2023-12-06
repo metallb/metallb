@@ -218,12 +218,6 @@ jobs:
         deployment: [manifests, helm]
         prometheus: [disabled, enabled]
         exclude:
-        - bgp-type: frr-k8s
-          prometheus: enabled
-        - bgp-type: frr-k8s
-          ip-family: dual
-        - bgp-type: frr-k8s
-          ip-family: ipv6
         - ip-family: ipv6
           prometheus: disabled
         - ip-family: dual
@@ -259,13 +253,13 @@ jobs:
           SKIP="none"
           WITH_VRF="--with-vrf"
           FOCUS=""
-          if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|BFD|VRF|DUALSTACK"; WITH_VRF=""; fi
+          if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|FRR-MODE|BFD|VRF|DUALSTACK"; WITH_VRF=""; fi
           if [ "${{ matrix.ip-family }}" == "ipv4" ]; then SKIP="$SKIP|IPV6|DUALSTACK"; fi
           if [ "${{ matrix.ip-family }}" == "dual" ]; then SKIP="$SKIP|IPV6"; fi
           if [ "${{ matrix.ip-family }}" == "ipv6" ]; then SKIP="$SKIP|IPV4|DUALSTACK"; fi
           if [ "${{ matrix.ip-family }}" == "ipv6" ] && [ ${{ matrix.bgp-type }} == "native" ]; then SKIP="$SKIP|BGP"; fi
           if [ "${{ matrix.prometheus }}" == "disabled" ]; then SKIP="$SKIP|metrics"; fi
-          if [ "${{ matrix.bgp-type }}" == "frr-k8s" ]; then FOCUS="--focus="FRRK8s" "; fi # TODO remove when e2etests are adjusted
+          if [ "${{ matrix.bgp-type }}" == "frr-k8s" ]; then SKIP="$SKIP|FRR-MODE"; fi
 
           echo "Skipping $SKIP"
           echo "With VRF $WITH_VRF"

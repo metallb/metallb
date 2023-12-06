@@ -1102,7 +1102,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		)
 	})
 
-	ginkgo.Context("MetalLB allows adding extra FRR configuration", func() {
+	ginkgo.Context("FRR-MODE MetalLB allows adding extra FRR configuration", func() {
 		type whenApply string
 		var before whenApply = "before"
 		var after whenApply = "after"
@@ -1214,7 +1214,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		)
 	})
 
-	ginkgo.Context("FRR validate reload feedback", func() {
+	ginkgo.Context("FRR-MODE FRR validate reload feedback", func() {
 		ginkgo.It("should update MetalLB config and log reload-validate success", func() {
 			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
