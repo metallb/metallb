@@ -1980,6 +1980,10 @@ func TestParse(t *testing.T) {
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						BFDProfile:    "",
 						Password:      "nopass",
+						PasswordRef: corev1.SecretReference{
+							Name:      "bgpsecret",
+							Namespace: "metallb-system",
+						},
 					},
 				},
 				Pools:       &Pools{ByName: map[string]*Pool{}},

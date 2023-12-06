@@ -15,7 +15,8 @@
                             "asn": 200,
                             "address": "127.0.0.2",
                             "port": 179,
-                            "password": {},
+                            "password": "password",
+                            "passwordSecret": {},
                             "holdTime": "1s",
                             "keepaliveTime": "1s",
                             "toAdvertise": {

@@ -19,6 +19,7 @@ import (
 	frrv1beta1 "github.com/metallb/frr-k8s/api/v1beta1"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/bgp/community"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
 
@@ -292,10 +293,13 @@ func TestTwoSessions(t *testing.T) {
 			PeerASN:       400,
 			HoldTime:      time.Second,
 			KeepAliveTime: time.Second,
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer2"})
+			PasswordRef: corev1.SecretReference{
+				Name:      "test-secret",
+				Namespace: testNamespace,
+			},
+			CurrentNode:  "hostname",
+			EBGPMultiHop: true,
+			SessionName:  "test-peer2"})
 
 	if err != nil {
 		t.Fatalf("Could not create session: %s", err)
