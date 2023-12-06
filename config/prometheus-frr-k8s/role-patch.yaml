@@ -1,0 +1,13 @@
+- op: add
+  path: /rules/0
+  value:
+    apiGroups:
+      - frrk8s.metallb.io
+    resources:
+      - frrconfigurations
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
