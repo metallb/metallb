@@ -147,7 +147,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 							return err
 						}
 
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_opens_sent{%s} >= 1`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_opens_sent{%s} >= 1`, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -157,7 +157,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 							return err
 						}
 
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_opens_received{%s} >= 1`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_opens_received{%s} >= 1`, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -167,7 +167,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 							return err
 						}
 
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_updates_total_received{%s} >= 1`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_updates_total_received{%s} >= 1`, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -177,7 +177,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 							return err
 						}
 
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_keepalives_sent{%s} >= 1`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_keepalives_sent{%s} >= 1`, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -187,7 +187,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 							return err
 						}
 
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_keepalives_received{%s} >= 1`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_keepalives_received{%s} >= 1`, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -197,7 +197,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 							return err
 						}
 
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_route_refresh_sent{%s} >= 1`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_route_refresh_sent{%s} >= 1`, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -207,7 +207,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 							return err
 						}
 
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_total_sent{%s} >= 1`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_total_sent{%s} >= 1`, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -217,7 +217,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 							return err
 						}
 
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_total_received{%s} >= 1`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_total_received{%s} >= 1`, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -324,7 +324,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						if err != nil {
 							return err
 						}
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_session_up{%s} == 1`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_session_up{%s} == 1`, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -332,7 +332,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						if err != nil {
 							return err
 						}
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_announced_prefixes_total{%s} == 0`, metricsPrefix, selector.labelsForQueryBGP), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_announced_prefixes_total{%s} == 0`, selector.labelsForQueryBGP), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -386,7 +386,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						if err != nil {
 							return err
 						}
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_session_up{peer="%s"} == 1`, metricsPrefix, addr), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_session_up{peer="%s"} == 1`, addr), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -395,7 +395,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						if err != nil {
 							return err
 						}
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_announced_prefixes_total{peer="%s"} == 1`, metricsPrefix, addr), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_announced_prefixes_total{peer="%s"} == 1`, addr), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -404,7 +404,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						if err != nil {
 							return err
 						}
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bgp_updates_total{peer="%s"} >= 1`, metricsPrefix, addr), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bgp_updates_total{peer="%s"} >= 1`, addr), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -480,7 +480,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					if err != nil {
 						return err
 					}
-					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_session_up{%s} == 1`, metricsPrefix, selector.labelsForQueryBFD), metrics.There)
+					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_session_up{%s} == 1`, selector.labelsForQueryBFD), metrics.There)
 					if err != nil {
 						return err
 					}
@@ -489,7 +489,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					if err != nil {
 						return err
 					}
-					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_control_packet_input{%s} >= 1`, metricsPrefix, selector.labelsForQueryBFD), metrics.There)
+					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_control_packet_input{%s} >= 1`, selector.labelsForQueryBFD), metrics.There)
 					if err != nil {
 						return err
 					}
@@ -498,7 +498,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					if err != nil {
 						return err
 					}
-					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_control_packet_output{%s} >= 1`, metricsPrefix, selector.labelsForQueryBFD), metrics.There)
+					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_control_packet_output{%s} >= 1`, selector.labelsForQueryBFD), metrics.There)
 					if err != nil {
 						return err
 					}
@@ -507,7 +507,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					if err != nil {
 						return err
 					}
-					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_session_down_events{%s} >= 0`, metricsPrefix, selector.labelsForQueryBFD), metrics.There)
+					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_session_down_events{%s} >= 0`, selector.labelsForQueryBFD), metrics.There)
 					if err != nil {
 						return err
 					}
@@ -516,7 +516,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					if err != nil {
 						return err
 					}
-					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_session_up_events{%s} >= 1`, metricsPrefix, selector.labelsForQueryBFD), metrics.There)
+					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_session_up_events{%s} >= 1`, selector.labelsForQueryBFD), metrics.There)
 					if err != nil {
 						return err
 					}
@@ -525,7 +525,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					if err != nil {
 						return err
 					}
-					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_zebra_notifications{%s} >= 1`, metricsPrefix, selector.labelsForQueryBFD), metrics.There)
+					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_zebra_notifications{%s} >= 1`, selector.labelsForQueryBFD), metrics.There)
 					if err != nil {
 						return err
 					}
@@ -539,7 +539,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						if err != nil {
 							return err
 						}
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_echo_packet_input{%s} >= %d`, metricsPrefix, selector.labelsForQueryBFD, echoVal), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_echo_packet_input{%s} >= %d`, selector.labelsForQueryBFD, echoVal), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -548,7 +548,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 						if err != nil {
 							return err
 						}
-						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_echo_packet_output{%s} >= %d`, metricsPrefix, selector.labelsForQueryBFD, echoVal), metrics.There)
+						err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_echo_packet_output{%s} >= %d`, selector.labelsForQueryBFD, echoVal), metrics.There)
 						if err != nil {
 							return err
 						}
@@ -586,7 +586,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					if err != nil {
 						return err
 					}
-					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_session_up{%s} == 0`, metricsPrefix, selector.labelsForQueryBFD), metrics.There)
+					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_session_up{%s} == 0`, selector.labelsForQueryBFD), metrics.There)
 					if err != nil {
 						return err
 					}
@@ -595,7 +595,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					if err != nil {
 						return err
 					}
-					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`%s_bfd_session_down_events{%s} >= 1`, metricsPrefix, selector.labelsForQueryBFD), metrics.There)
+					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_bfd_session_down_events{%s} >= 1`, selector.labelsForQueryBFD), metrics.There)
 					if err != nil {
 						return err
 					}

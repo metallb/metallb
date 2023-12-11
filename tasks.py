@@ -424,7 +424,16 @@ apiServer:
         if bgp_type == "frr-k8s":
             frr_values="--set frrk8s.enabled=true --set speaker.frr.enabled=false --set frr-k8s.prometheus.serviceMonitor.enabled=false "
             if with_prometheus:
-                frr_values="--set frrk8s.enabled=true --set speaker.frr.enabled=false --set frr-k8s.prometheus.serviceMonitor.enabled=true "
+                frr_values=("--set frrk8s.enabled=true --set speaker.frr.enabled=false --set frr-k8s.prometheus.serviceMonitor.enabled=true "
+                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[0].sourceLabels=\{__name__\} "
+                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[0].regex=\"frrk8s_bgp_(.*)\" "
+                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[0].targetLabel=\"__name__\" "
+                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[0].replacement=\"metallb_bgp_\$1\" "
+                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].sourceLabels=\{__name__\} "
+                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].regex=\"frrk8s_bfd_(.*)\" "
+                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].targetLabel=\"__name__\" "
+                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].replacement=\"metallb_bfd_\$1\" "
+                           )
 
         run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
                 "--set speaker.image.tag=dev-{} --set speaker.logLevel=debug "

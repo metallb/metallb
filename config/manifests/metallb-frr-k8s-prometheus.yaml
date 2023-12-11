@@ -3279,6 +3279,17 @@ spec:
     tlsConfig:
       insecureSkipVerify: true
   - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    metricRelabelings:
+    - regex: frrk8s_bgp_(.*)
+      replacement: metallb_bgp_$1
+      sourceLabels:
+      - __name__
+      targetLabel: __name__
+    - regex: frrk8s_bfd_(.*)
+      replacement: metallb_bfd_$1
+      sourceLabels:
+      - __name__
+      targetLabel: __name__
     path: /metrics
     port: frrmetricshttps
     scheme: https

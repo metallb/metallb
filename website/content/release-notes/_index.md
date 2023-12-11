@@ -14,6 +14,7 @@ Chores:
 - Move webhooks out of API package ([PR 2193](https://github.com/metallb/metallb/pull/2193))
 - Support running the e2es on frr-k8s deployments ([PR 2180](https://github.com/metallb/metallb/pull/2180))
 - E2E: Receive prefixes using frr-k8s alongside MetalLB ([PR 2211](https://github.com/metallb/metallb/pull/2211))
+- CI/E2E: Relabel the frr metrics from frr-k8s to show as MetalLB's ([PR 2210](https://github.com/metallb/metallb/pull/2210))
 
 ## Version 0.13.12
 
