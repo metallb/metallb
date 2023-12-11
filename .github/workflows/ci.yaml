@@ -147,7 +147,7 @@ jobs:
         with:
           version: v3.12.1
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
           check-latest: true
