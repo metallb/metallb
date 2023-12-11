@@ -1,0 +1,14 @@
+- op: test
+  path: /spec/endpoints/1/port
+  value: frrmetricshttps
+- op: replace
+  path: /spec/endpoints/1/metricRelabelings
+  value:
+  - sourceLabels: [__name__]
+    regex: "frrk8s_bgp_(.*)"
+    targetLabel: "__name__"
+    replacement: "metallb_bgp_$1"
+  - sourceLabels: [__name__]
+    regex: "frrk8s_bfd_(.*)"
+    targetLabel: "__name__"
+    replacement: "metallb_bfd_$1"

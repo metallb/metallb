@@ -18,4 +18,10 @@ patches:
   - path: ignore-ns.yaml
   - path: ignore-prom-role.yaml
   - path: ignore-prom-rolebinding.yaml
+  - path: relabel-metrics.yaml
+    target:
+      group: monitoring.coreos.com
+      version: v1
+      kind: ServiceMonitor
+      name: frr-k8s-metrics-monitor
 namespace: metallb-system
