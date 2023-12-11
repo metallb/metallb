@@ -5,6 +5,7 @@ package config
 import (
 	"context"
 
+	frrk8sv1beta1 "github.com/metallb/frr-k8s/api/v1beta1"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	corev1 "k8s.io/api/core/v1"
@@ -52,6 +53,10 @@ func UpdaterForCRs(r *rest.Config, ns string) (Updater, error) {
 	}
 
 	if err := corev1.AddToScheme(myScheme); err != nil {
+		return nil, err
+	}
+
+	if err := frrk8sv1beta1.AddToScheme(myScheme); err != nil {
 		return nil, err
 	}
 
