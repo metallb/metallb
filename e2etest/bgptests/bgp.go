@@ -24,6 +24,10 @@ import (
 	"strings"
 	"time"
 
+	frrk8sv1beta1 "github.com/metallb/frr-k8s/api/v1beta1"
+	"github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/openshift-kni/k8sreporter"
 	"go.universe.tf/e2etest/l2tests"
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/executor"
@@ -33,10 +37,6 @@ import (
 	"go.universe.tf/e2etest/pkg/pointer"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
-
-	"github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/openshift-kni/k8sreporter"
 
 	"go.universe.tf/e2etest/pkg/frr"
 	frrconfig "go.universe.tf/e2etest/pkg/frr/config"
@@ -1102,7 +1102,10 @@ var _ = ginkgo.Describe("BGP", func() {
 		)
 	})
 
-	ginkgo.Context("FRR-MODE MetalLB allows adding extra FRR configuration", func() {
+	ginkgo.Context("MetalLB allows adding extra FRR configuration", func() {
+		type toApply string
+		var configmap toApply = "configmap"
+		var frrconfiguration toApply = "frrconfiguration"
 		type whenApply string
 		var before whenApply = "before"
 		var after whenApply = "after"
@@ -1110,22 +1113,9 @@ var _ = ginkgo.Describe("BGP", func() {
 			err := k8s.RemoveConfigmap(cs, "bgpextras", metallb.Namespace)
 			framework.ExpectNoError(err)
 		})
-		ginkgo.DescribeTable("to accept any routes advertised by any neighbor", func(addressesRange, toInject string, pairingIPFamily ipfamily.Family, when whenApply) {
+		ginkgo.DescribeTable("to accept any routes advertised by any neighbor", func(addressesRange, toInject string, pairingIPFamily ipfamily.Family, what toApply, when whenApply) {
 			resources := config.Resources{
-				Pools: []metallbv1beta1.IPAddressPool{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "rejectroutes",
-						},
-						Spec: metallbv1beta1.IPAddressPoolSpec{
-							Addresses: []string{
-								addressesRange,
-							},
-						},
-					},
-				},
-				Peers:   metallb.PeersForContainers(FRRContainers, pairingIPFamily),
-				BGPAdvs: []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement},
+				Peers: metallb.PeersForContainers(FRRContainers, pairingIPFamily),
 			}
 
 			toFilter := "172.16.2.1/32"
@@ -1162,34 +1152,102 @@ var _ = ginkgo.Describe("BGP", func() {
 				return nil
 			}
 
-			data := ""
-			data += "ip prefix-list allowed permit 172.16.1.0/24 le 32\n"
-			data += "ipv6 prefix-list allowed permit fc00:f853:ccd:e800::/64 le 128\n"
-			for _, c := range FRRContainers {
-				ip := c.Ipv4
-				if pairingIPFamily == ipfamily.IPv6 {
-					ip = c.Ipv6
+			applyConfigMap := func() {
+				data := ""
+				data += "ip prefix-list allowed permit 172.16.1.0/24 le 32\n"
+				data += "ipv6 prefix-list allowed permit fc00:f853:ccd:e800::/64 le 128\n"
+				for _, c := range FRRContainers {
+					ip := c.Ipv4
+					if pairingIPFamily == ipfamily.IPv6 {
+						ip = c.Ipv6
+					}
+					ruleName := ip
+					if c.RouterConfig.VRF != "" {
+						ruleName = fmt.Sprintf("%s-%s", ip, c.RouterConfig.VRF)
+					}
+					data += fmt.Sprintf("route-map %s-in permit 20\n", ruleName)
+					if pairingIPFamily == ipfamily.IPv4 {
+						data += "  match ip address prefix-list allowed\n"
+					} else {
+						data += "  match ipv6 address prefix-list allowed\n"
+					}
 				}
-				ruleName := ip
-				if c.RouterConfig.VRF != "" {
-					ruleName = fmt.Sprintf("%s-%s", ip, c.RouterConfig.VRF)
+				extraData := map[string]string{
+					"extras": data,
 				}
-				data += fmt.Sprintf("route-map %s-in permit 20\n", ruleName)
-				if pairingIPFamily == ipfamily.IPv4 {
-					data += "  match ip address prefix-list allowed\n"
-				} else {
-					data += "  match ipv6 address prefix-list allowed\n"
-				}
-			}
-			extraData := map[string]string{
-				"extras": data,
-			}
-
-			if when == before {
-				ginkgo.By("Applying a configmap that allows incoming routes")
 
 				err = k8s.CreateConfigmap(cs, "bgpextras", metallb.Namespace, extraData)
 				framework.ExpectNoError(err)
+			}
+
+			applyFRRConfiguration := func() {
+				config := frrk8sv1beta1.FRRConfiguration{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "receiveroutes",
+						Namespace: f.Namespace.Name,
+					},
+					Spec: frrk8sv1beta1.FRRConfigurationSpec{
+						BGP: frrk8sv1beta1.BGPConfig{
+							Routers: []frrk8sv1beta1.Router{},
+						},
+					},
+				}
+
+				routers := map[string]frrk8sv1beta1.Router{}
+				for _, p := range resources.Peers {
+					p := p
+					r := routers[p.Spec.VRFName]
+					r.ASN = p.Spec.MyASN
+					r.VRF = p.Spec.VRFName
+
+					keepAliveTime := p.Spec.KeepaliveTime
+					if keepAliveTime.Duration == 0 {
+						keepAliveTime.Duration = p.Spec.HoldTime.Duration / 3
+					}
+					r.Neighbors = append(r.Neighbors, frrk8sv1beta1.Neighbor{
+						ASN:           p.Spec.ASN,
+						Address:       p.Spec.Address,
+						Password:      p.Spec.Password,
+						Port:          &p.Spec.Port,
+						HoldTime:      &p.Spec.HoldTime,
+						KeepaliveTime: &keepAliveTime,
+						EBGPMultiHop:  p.Spec.EBGPMultiHop,
+						BFDProfile:    p.Spec.BFDProfile,
+						ToReceive: frrk8sv1beta1.Receive{
+							Allowed: frrk8sv1beta1.AllowedInPrefixes{
+								Mode: frrk8sv1beta1.AllowRestricted,
+								Prefixes: []frrk8sv1beta1.PrefixSelector{
+									{
+										Prefix: "172.16.1.0/24",
+										LE:     32,
+									},
+									{
+										Prefix: "fc00:f853:ccd:e800::/64",
+										LE:     128,
+									},
+								},
+							},
+						},
+					})
+					routers[p.Spec.VRFName] = r
+				}
+
+				for _, router := range routers {
+					config.Spec.BGP.Routers = append(config.Spec.BGP.Routers, router)
+				}
+
+				err := ConfigUpdater.Client().Create(context.Background(), &config)
+				framework.ExpectNoError(err)
+			}
+
+			apply := applyConfigMap
+			if what == frrconfiguration {
+				apply = applyFRRConfiguration
+			}
+
+			if when == before {
+				ginkgo.By("Applying the config that allows incoming routes")
+				apply()
 			}
 
 			ginkgo.By("Applying the FRR configuration")
@@ -1201,16 +1259,31 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 
 			if when == after {
-				ginkgo.By("Applying a configmap that allows incoming routes")
-				err = k8s.CreateConfigmap(cs, "bgpextras", metallb.Namespace, extraData)
-				framework.ExpectNoError(err)
+				ginkgo.By("Applying the config that allows incoming routes")
+				apply()
 			}
 			Eventually(checkRoutesAreInjected, time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
+
+			_, svc := setupBGPService(f, pairingIPFamily, []string{addressesRange}, FRRContainers, func(svc *corev1.Service) {})
+			defer testservice.Delete(cs, svc)
+
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			framework.ExpectNoError(err)
+			testservice.ValidateDesiredLB(svc)
+
+			for _, container := range FRRContainers {
+				ginkgo.By(fmt.Sprintf("validating the service from %s", container.Name))
+				validateService(svc, allNodes.Items, container)
+			}
 		},
-			ginkgo.Entry("IPV4 - before config", "192.168.10.0/24", "172.16.1.%d/32", ipfamily.IPv4, before),
-			ginkgo.Entry("IPV6 - before config", "fc00:f853:0ccd:e799::/116", "fc00:f853:ccd:e800::%d/128", ipfamily.IPv6, before),
-			ginkgo.Entry("IPV4 - after config", "192.168.10.0/24", "172.16.1.%d/32", ipfamily.IPv4, after),
-			ginkgo.Entry("IPV6 - after config", "fc00:f853:0ccd:e799::/116", "fc00:f853:ccd:e800::%d/128", ipfamily.IPv6, after),
+			ginkgo.Entry("FRR-MODE IPV4 - before config", "192.168.10.0/24", "172.16.1.%d/32", ipfamily.IPv4, configmap, before),
+			ginkgo.Entry("FRR-MODE IPV6 - before config", "fc00:f853:0ccd:e799::/116", "fc00:f853:ccd:e800::%d/128", ipfamily.IPv6, configmap, before),
+			ginkgo.Entry("FRR-MODE IPV4 - after config", "192.168.10.0/24", "172.16.1.%d/32", ipfamily.IPv4, configmap, after),
+			ginkgo.Entry("FRR-MODE IPV6 - after config", "fc00:f853:0ccd:e799::/116", "fc00:f853:ccd:e800::%d/128", ipfamily.IPv6, configmap, after),
+			ginkgo.Entry("FRRK8S-MODE IPV4 - before config", "192.168.10.0/24", "172.16.1.%d/32", ipfamily.IPv4, frrconfiguration, before),
+			ginkgo.Entry("FRRK8S-MODE IPV6 - before config", "fc00:f853:0ccd:e799::/116", "fc00:f853:ccd:e800::%d/128", ipfamily.IPv6, frrconfiguration, before),
+			ginkgo.Entry("FRRK8S-MODE IPV4 - after config", "192.168.10.0/24", "172.16.1.%d/32", ipfamily.IPv4, frrconfiguration, after),
+			ginkgo.Entry("FRRK8S-MODE IPV6 - after config", "fc00:f853:0ccd:e799::/116", "fc00:f853:ccd:e800::%d/128", ipfamily.IPv6, frrconfiguration, after),
 		)
 	})
 
