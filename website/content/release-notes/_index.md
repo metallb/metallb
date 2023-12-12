@@ -16,6 +16,7 @@ Chores:
 - E2E: Receive prefixes using frr-k8s alongside MetalLB ([PR 2211](https://github.com/metallb/metallb/pull/2211))
 - Images updated to Go 1.20.12 ([PR 2213](https://github.com/metallb/metallb/pull/2213))
 - CI/E2E: Relabel the frr metrics from frr-k8s to show as MetalLB's ([PR 2210](https://github.com/metallb/metallb/pull/2210))
+- Dev-env: change the default BGP mode to FRR ([PR 2196](https://github.com/metallb/metallb/pull/2196))
 
 ## Version 0.13.12
 
