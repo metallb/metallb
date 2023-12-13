@@ -1,12 +1,14 @@
 // SPDX-License-Identifier:Apache-2.0
 
-package v1beta1
+package webhookv1beta1
 
 import (
 	"testing"
 
 	"github.com/go-kit/log"
+	"go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/api/v1beta2"
+	"go.universe.tf/metallb/internal/k8s/webhooks/webhookv1beta2"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -14,8 +16,8 @@ import (
 func TestValidateBFDProfile(t *testing.T) {
 	MetalLBNamespace = MetalLBTestNameSpace
 	Logger = log.NewNopLogger()
-	toRestoreBGPPeers := v1beta2.GetExistingBGPPeers
-	v1beta2.GetExistingBGPPeers = func() (*v1beta2.BGPPeerList, error) {
+	toRestoreBGPPeers := webhookv1beta2.GetExistingBGPPeers
+	webhookv1beta2.GetExistingBGPPeers = func() (*v1beta2.BGPPeerList, error) {
 		return &v1beta2.BGPPeerList{
 			Items: []v1beta2.BGPPeer{
 				{
@@ -31,7 +33,7 @@ func TestValidateBFDProfile(t *testing.T) {
 		}, nil
 	}
 	defer func() {
-		v1beta2.GetExistingBGPPeers = toRestoreBGPPeers
+		webhookv1beta2.GetExistingBGPPeers = toRestoreBGPPeers
 	}()
 
 	const (
@@ -40,14 +42,14 @@ func TestValidateBFDProfile(t *testing.T) {
 	)
 	tests := []struct {
 		desc         string
-		bfdProfile   *BFDProfile
+		bfdProfile   *v1beta1.BFDProfile
 		validateType int
 		failValidate bool
 	}{
 		{
 			desc:         "Delete bfdprofile used by bgppeer",
 			validateType: isDel,
-			bfdProfile: &BFDProfile{
+			bfdProfile: &v1beta1.BFDProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bfdprofile",
 					Namespace: MetalLBTestNameSpace,
@@ -58,7 +60,7 @@ func TestValidateBFDProfile(t *testing.T) {
 		{
 			desc:         "Validation must fail if created in different namespace",
 			validateType: isNew,
-			bfdProfile: &BFDProfile{
+			bfdProfile: &v1beta1.BFDProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "bfdprofile1",
 					Namespace: "default",
@@ -72,9 +74,9 @@ func TestValidateBFDProfile(t *testing.T) {
 		var err error
 		switch test.validateType {
 		case isNew:
-			_, err = test.bfdProfile.ValidateCreate()
+			err = validateBFDCreate(test.bfdProfile)
 		case isDel:
-			_, err = test.bfdProfile.ValidateDelete()
+			err = validateBFDDelete(test.bfdProfile)
 		}
 
 		if test.failValidate && err == nil {

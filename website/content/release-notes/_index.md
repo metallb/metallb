@@ -11,6 +11,7 @@ Chores:
 - Dev-env: don't run tests against VRFs by default ([PR 2201](https://github.com/metallb/metallb/pull/2201), [ISSUE 2197](https://github.com/metallb/metallb/issues/2197))
 - Dev-env: improve docker build times ([PR 2205](https://github.com/metallb/metallb/pull/2205))
 - Add more frr-k8s related logs under debug loglevel ([PR 2199](https://github.com/metallb/metallb/pull/2199))
+- Move webhooks out of API package ([PR 2193](https://github.com/metallb/metallb/pull/2193))
 
 ## Version 0.13.12
 
