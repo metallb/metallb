@@ -1,14 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-- https://github.com/metallb/frr-k8s/config/prometheus/?timeout=120&ref=v0.0.3
+- https://github.com/metallb/frr-k8s/config/prometheus/?timeout=120&ref=v0.0.4
 - ../prometheus-native
 patchesStrategicMerge:
 - speaker-patch.yaml
 - controller-patch.yaml
-images:
-- name: quay.io/metallb/frr-k8s
-  newTag: main
 patchesJson6902:
   - target:
       group: rbac.authorization.k8s.io
