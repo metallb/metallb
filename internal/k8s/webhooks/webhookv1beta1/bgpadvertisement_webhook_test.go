@@ -1,19 +1,20 @@
 // SPDX-License-Identifier:Apache-2.0
 
-package v1beta1
+package webhookv1beta1
 
 import (
 	"testing"
 
 	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
+	"go.universe.tf/metallb/api/v1beta1"
 	v1core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestValidateBGPAdvertisement(t *testing.T) {
 	MetalLBNamespace = MetalLBTestNameSpace
-	bgpAdv := BGPAdvertisement{
+	bgpAdv := v1beta1.BGPAdvertisement{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "test-bgpadv",
 			Namespace: MetalLBTestNameSpace,
@@ -23,20 +24,20 @@ func TestValidateBGPAdvertisement(t *testing.T) {
 	Logger = log.NewNopLogger()
 
 	toRestore := getExistingBGPAdvs
-	getExistingBGPAdvs = func() (*BGPAdvertisementList, error) {
-		return &BGPAdvertisementList{
-			Items: []BGPAdvertisement{
+	getExistingBGPAdvs = func() (*v1beta1.BGPAdvertisementList, error) {
+		return &v1beta1.BGPAdvertisementList{
+			Items: []v1beta1.BGPAdvertisement{
 				bgpAdv,
 			},
 		}, nil
 	}
 	toRestoreAddresspools := getExistingAddressPools
-	getExistingAddressPools = func() (*AddressPoolList, error) {
-		return &AddressPoolList{}, nil
+	getExistingAddressPools = func() (*v1beta1.AddressPoolList, error) {
+		return &v1beta1.AddressPoolList{}, nil
 	}
 	toRestoreIPAddressPools := getExistingIPAddressPools
-	getExistingIPAddressPools = func() (*IPAddressPoolList, error) {
-		return &IPAddressPoolList{}, nil
+	getExistingIPAddressPools = func() (*v1beta1.IPAddressPoolList, error) {
+		return &v1beta1.IPAddressPoolList{}, nil
 	}
 	toRestoreNodes := getExistingNodes
 	getExistingNodes = func() (*v1core.NodeList, error) {
@@ -52,22 +53,22 @@ func TestValidateBGPAdvertisement(t *testing.T) {
 
 	tests := []struct {
 		desc         string
-		bgpAdv       *BGPAdvertisement
+		bgpAdv       *v1beta1.BGPAdvertisement
 		isNew        bool
 		failValidate bool
-		expected     *BGPAdvertisementList
+		expected     *v1beta1.BGPAdvertisementList
 	}{
 		{
 			desc: "Second Adv",
-			bgpAdv: &BGPAdvertisement{
+			bgpAdv: &v1beta1.BGPAdvertisement{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test",
 					Namespace: MetalLBTestNameSpace,
 				},
 			},
 			isNew: true,
-			expected: &BGPAdvertisementList{
-				Items: []BGPAdvertisement{
+			expected: &v1beta1.BGPAdvertisementList{
+				Items: []v1beta1.BGPAdvertisement{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "test-bgpadv",
@@ -85,15 +86,15 @@ func TestValidateBGPAdvertisement(t *testing.T) {
 		},
 		{
 			desc: "Same, update",
-			bgpAdv: &BGPAdvertisement{
+			bgpAdv: &v1beta1.BGPAdvertisement{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-bgpadv",
 					Namespace: MetalLBTestNameSpace,
 				},
 			},
 			isNew: false,
-			expected: &BGPAdvertisementList{
-				Items: []BGPAdvertisement{
+			expected: &v1beta1.BGPAdvertisementList{
+				Items: []v1beta1.BGPAdvertisement{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "test-bgpadv",
@@ -105,15 +106,15 @@ func TestValidateBGPAdvertisement(t *testing.T) {
 		},
 		{
 			desc: "Same, new",
-			bgpAdv: &BGPAdvertisement{
+			bgpAdv: &v1beta1.BGPAdvertisement{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-bgpadv",
 					Namespace: MetalLBTestNameSpace,
 				},
 			},
 			isNew: true,
-			expected: &BGPAdvertisementList{
-				Items: []BGPAdvertisement{
+			expected: &v1beta1.BGPAdvertisementList{
+				Items: []v1beta1.BGPAdvertisement{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "test-bgpadv",
@@ -126,7 +127,7 @@ func TestValidateBGPAdvertisement(t *testing.T) {
 		},
 		{
 			desc: "Validation must fail if created in different namespace",
-			bgpAdv: &BGPAdvertisement{
+			bgpAdv: &v1beta1.BGPAdvertisement{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-bgpadv1",
 					Namespace: "default",
@@ -144,9 +145,9 @@ func TestValidateBGPAdvertisement(t *testing.T) {
 		mock.forceError = test.failValidate
 
 		if test.isNew {
-			_, err = test.bgpAdv.ValidateCreate()
+			err = validateBGPAdvCreate(test.bgpAdv)
 		} else {
-			_, err = test.bgpAdv.ValidateUpdate(nil)
+			err = validateBGPAdvUpdate(test.bgpAdv, nil)
 		}
 		if test.failValidate && err == nil {
 			t.Fatalf("test %s failed, expecting error", test.desc)

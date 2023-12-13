@@ -1,19 +1,20 @@
 // SPDX-License-Identifier:Apache-2.0
 
-package v1beta1
+package webhookv1beta1
 
 import (
 	"github.com/pkg/errors"
+	"go.universe.tf/metallb/api/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type mockValidator struct {
-	pools          *AddressPoolList
-	ipAddressPools *IPAddressPoolList
-	bgpAdvs        *BGPAdvertisementList
-	l2Advs         *L2AdvertisementList
-	communities    *CommunityList
+	pools          *v1beta1.AddressPoolList
+	ipAddressPools *v1beta1.IPAddressPoolList
+	bgpAdvs        *v1beta1.BGPAdvertisementList
+	l2Advs         *v1beta1.L2AdvertisementList
+	communities    *v1beta1.CommunityList
 	nodes          *v1.NodeList
 	forceError     bool
 }
@@ -21,15 +22,15 @@ type mockValidator struct {
 func (m *mockValidator) Validate(objects ...client.ObjectList) error {
 	for _, obj := range objects { // assuming one object per type
 		switch list := obj.(type) {
-		case *AddressPoolList:
+		case *v1beta1.AddressPoolList:
 			m.pools = list
-		case *BGPAdvertisementList:
+		case *v1beta1.BGPAdvertisementList:
 			m.bgpAdvs = list
-		case *L2AdvertisementList:
+		case *v1beta1.L2AdvertisementList:
 			m.l2Advs = list
-		case *IPAddressPoolList:
+		case *v1beta1.IPAddressPoolList:
 			m.ipAddressPools = list
-		case *CommunityList:
+		case *v1beta1.CommunityList:
 			m.communities = list
 		case *v1.NodeList:
 			m.nodes = list
