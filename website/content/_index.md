@@ -9,7 +9,9 @@ metal [Kubernetes](https://kubernetes.io) clusters, using standard
 routing protocols.
 
 {{% notice note %}}
-MetalLB is a young project. You should treat it as a **beta** system.
+Despite the beta status of the project / API, MetalLB is known to be
+stable and reliable.
+
 The [project maturity]({{% relref "concepts/maturity.md" %}}) page
 explains what that implies.
 {{% /notice %}}
