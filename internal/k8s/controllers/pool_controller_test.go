@@ -28,6 +28,7 @@ import (
 	"go.universe.tf/metallb/internal/pointer"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
@@ -109,7 +110,7 @@ func TestPoolController(t *testing.T) {
 		r := &PoolReconciler{
 			Client:         fakeClient,
 			Logger:         log.NewNopLogger(),
-			Scheme:         scheme,
+			Scheme:         scheme.Scheme,
 			Namespace:      testNamespace,
 			ValidateConfig: metallbcfg.DontValidate,
 			Handler:        mockHandler,

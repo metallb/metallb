@@ -11,6 +11,7 @@ import (
 	"github.com/go-kit/log"
 	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/config"
+	v1 "k8s.io/api/core/v1"
 )
 
 // Advertisement represents one network path and its BGP attributes.
@@ -70,6 +71,7 @@ type SessionParameters struct {
 	HoldTime      time.Duration
 	KeepAliveTime time.Duration
 	Password      string
+	PasswordRef   v1.SecretReference
 	CurrentNode   string
 	BFDProfile    string
 	EBGPMultiHop  bool

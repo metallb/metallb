@@ -3,6 +3,19 @@ title: Release Notes
 weight: 8
 ---
 
+## Next release
+
+Chores:
+
+- Enforce adding a release notes entry on each PR ([PR 2191](https://github.com/metallb/metallb/pull/2191))
+- Dev-env: don't run tests against VRFs by default ([PR 2201](https://github.com/metallb/metallb/pull/2201), [ISSUE 2197](https://github.com/metallb/metallb/issues/2197))
+- Dev-env: improve docker build times ([PR 2205](https://github.com/metallb/metallb/pull/2205))
+- Add more frr-k8s related logs under debug loglevel ([PR 2199](https://github.com/metallb/metallb/pull/2199))
+- Move webhooks out of API package ([PR 2193](https://github.com/metallb/metallb/pull/2193))
+- Support running the e2es on frr-k8s deployments ([PR 2180](https://github.com/metallb/metallb/pull/2180))
+- E2E: Receive prefixes using frr-k8s alongside MetalLB ([PR 2211](https://github.com/metallb/metallb/pull/2211))
+- CI/E2E: Relabel the frr metrics from frr-k8s to show as MetalLB's ([PR 2210](https://github.com/metallb/metallb/pull/2210))
+
 ## Version 0.13.12
 
 - Change the version of go used to compile the binaries

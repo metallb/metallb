@@ -8,12 +8,12 @@ MetalLB is currently in *beta*.
 ## Adoption
 
 MetalLB is being used in several production and non-production clusters, by
-several people and companies. Based on the infrequency of bug reports, MetalLB
-appears to be robust in those deployments.
+several people and companies. It is bundled together with the major
+Kubernetes distributions for on premise deployments.
+Based on the infrequency of bug reports, MetalLB appears to be robust in those deployments.
 
-If you use it today, you are still an early adopter, compared to larger projects
-in the Kubernetes ecosystem. As such, you may encounter more issues than
-usual. Please file bugs! We want to hear from you and address pain points.
+In any case, no one is perfect and issues might happen.
+Please file bugs! We want to hear from you and address pain points.
 
 ## Test coverage
 

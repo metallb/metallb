@@ -510,7 +510,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("checking the metrics when no service is added")
 			gomega.Eventually(func() error {
-				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod, metallb.Namespace)
+				controllerMetrics, err := metrics.ForPod(promPod, controllerPod, metallb.Namespace)
 				if err != nil {
 					return err
 				}
@@ -544,7 +544,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("checking the metrics when a service is added")
 			gomega.Eventually(func() error {
-				controllerMetrics, err := metrics.ForPod(controllerPod, controllerPod, metallb.Namespace)
+				controllerMetrics, err := metrics.ForPod(promPod, controllerPod, metallb.Namespace)
 				if err != nil {
 					return err
 				}
@@ -590,7 +590,7 @@ var _ = ginkgo.Describe("L2", func() {
 					return fmt.Errorf("could not find speaker pod on announcing node %s", advNode.Name)
 				}
 
-				speakerMetrics, err := metrics.ForPod(controllerPod, advSpeaker, metallb.Namespace)
+				speakerMetrics, err := metrics.ForPod(promPod, advSpeaker, metallb.Namespace)
 				if err != nil {
 					return err
 				}
@@ -644,7 +644,7 @@ var _ = ginkgo.Describe("L2", func() {
 			delete(speakerPods, advSpeaker.Spec.NodeName)
 
 			for _, p := range speakerPods {
-				speakerMetrics, err := metrics.ForPod(controllerPod, p, metallb.Namespace)
+				speakerMetrics, err := metrics.ForPod(promPod, p, metallb.Namespace)
 				framework.ExpectNoError(err)
 
 				err = metrics.ValidateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": p.Spec.NodeName, "protocol": "layer2", "service": fmt.Sprintf("%s/%s", f.Namespace.Name, svc.Name)}, speakerMetrics)
@@ -660,7 +660,7 @@ var _ = ginkgo.Describe("L2", func() {
 			framework.ExpectNoError(err)
 
 			gomega.Eventually(func() error {
-				speakerMetrics, err := metrics.ForPod(controllerPod, advSpeaker, metallb.Namespace)
+				speakerMetrics, err := metrics.ForPod(promPod, advSpeaker, metallb.Namespace)
 				if err != nil {
 					return err
 				}

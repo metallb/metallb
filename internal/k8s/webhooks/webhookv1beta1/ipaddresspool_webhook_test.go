@@ -1,76 +1,71 @@
 // SPDX-License-Identifier:Apache-2.0
 
-package v1beta1
+package webhookv1beta1
 
 import (
 	"testing"
 
 	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
+	"go.universe.tf/metallb/api/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func TestValidateL2Advertisement(t *testing.T) {
+func TestValidateIPAddressPool(t *testing.T) {
 	MetalLBNamespace = MetalLBTestNameSpace
-	l2Adv := L2Advertisement{
+	ipAddressPool := v1beta1.IPAddressPool{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      "test-l2adv",
+			Name:      "test-ippool",
 			Namespace: MetalLBTestNameSpace,
 		},
 	}
-
 	Logger = log.NewNopLogger()
 
-	toRestore := getExistingL2Advs
-	getExistingL2Advs = func() (*L2AdvertisementList, error) {
-		return &L2AdvertisementList{
-			Items: []L2Advertisement{
-				l2Adv,
+	toRestoreAddresspools := getExistingAddressPools
+	getExistingAddressPools = func() (*v1beta1.AddressPoolList, error) {
+		return &v1beta1.AddressPoolList{}, nil
+	}
+	toRestoreIPAddressPools := getExistingIPAddressPools
+	getExistingIPAddressPools = func() (*v1beta1.IPAddressPoolList, error) {
+		return &v1beta1.IPAddressPoolList{
+			Items: []v1beta1.IPAddressPool{
+				ipAddressPool,
 			},
 		}, nil
 	}
-	toRestoreAddresspools := getExistingAddressPools
-	getExistingAddressPools = func() (*AddressPoolList, error) {
-		return &AddressPoolList{}, nil
-	}
-	toRestoreIPAddressPools := getExistingIPAddressPools
-	getExistingIPAddressPools = func() (*IPAddressPoolList, error) {
-		return &IPAddressPoolList{}, nil
-	}
 
 	defer func() {
-		getExistingL2Advs = toRestore
 		getExistingAddressPools = toRestoreAddresspools
 		getExistingIPAddressPools = toRestoreIPAddressPools
 	}()
 
 	tests := []struct {
-		desc         string
-		l2Adv        *L2Advertisement
-		isNew        bool
-		failValidate bool
-		expected     *L2AdvertisementList
+		desc          string
+		ipAddressPool *v1beta1.IPAddressPool
+		isNew         bool
+		failValidate  bool
+		expected      *v1beta1.IPAddressPoolList
 	}{
 		{
-			desc: "Second Adv",
-			l2Adv: &L2Advertisement{
+			desc: "Second IPAddressPool",
+			ipAddressPool: &v1beta1.IPAddressPool{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test",
+					Name:      "test-ippool1",
 					Namespace: MetalLBTestNameSpace,
 				},
 			},
 			isNew: true,
-			expected: &L2AdvertisementList{
-				Items: []L2Advertisement{
+			expected: &v1beta1.IPAddressPoolList{
+				Items: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "test-l2adv",
+							Name:      "test-ippool",
 							Namespace: MetalLBTestNameSpace,
 						},
 					},
 					{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "test",
+							Name:      "test-ippool1",
 							Namespace: MetalLBTestNameSpace,
 						},
 					},
@@ -78,19 +73,19 @@ func TestValidateL2Advertisement(t *testing.T) {
 			},
 		},
 		{
-			desc: "Same, update",
-			l2Adv: &L2Advertisement{
+			desc: "Same IPAddressPool, update",
+			ipAddressPool: &v1beta1.IPAddressPool{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-l2adv",
+					Name:      "test-ippool",
 					Namespace: MetalLBTestNameSpace,
 				},
 			},
 			isNew: false,
-			expected: &L2AdvertisementList{
-				Items: []L2Advertisement{
+			expected: &v1beta1.IPAddressPoolList{
+				Items: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "test-l2adv",
+							Name:      "test-ippool",
 							Namespace: MetalLBTestNameSpace,
 						},
 					},
@@ -98,19 +93,19 @@ func TestValidateL2Advertisement(t *testing.T) {
 			},
 		},
 		{
-			desc: "Same, new",
-			l2Adv: &L2Advertisement{
+			desc: "Validation fails",
+			ipAddressPool: &v1beta1.IPAddressPool{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-l2adv",
+					Name:      "test-ippool",
 					Namespace: MetalLBTestNameSpace,
 				},
 			},
-			isNew: true,
-			expected: &L2AdvertisementList{
-				Items: []L2Advertisement{
+			isNew: false,
+			expected: &v1beta1.IPAddressPoolList{
+				Items: []v1beta1.IPAddressPool{
 					{
 						ObjectMeta: metav1.ObjectMeta{
-							Name:      "test-l2adv",
+							Name:      "test-ippool",
 							Namespace: MetalLBTestNameSpace,
 						},
 					},
@@ -120,9 +115,9 @@ func TestValidateL2Advertisement(t *testing.T) {
 		},
 		{
 			desc: "Validation must fail if created in different namespace",
-			l2Adv: &L2Advertisement{
+			ipAddressPool: &v1beta1.IPAddressPool{
 				ObjectMeta: metav1.ObjectMeta{
-					Name:      "test-l2adv1",
+					Name:      "test-ippool2",
 					Namespace: "default",
 				},
 			},
@@ -131,6 +126,7 @@ func TestValidateL2Advertisement(t *testing.T) {
 			failValidate: true,
 		},
 	}
+
 	for _, test := range tests {
 		var err error
 		mock := &mockValidator{}
@@ -138,15 +134,15 @@ func TestValidateL2Advertisement(t *testing.T) {
 		mock.forceError = test.failValidate
 
 		if test.isNew {
-			_, err = test.l2Adv.ValidateCreate()
+			err = validateIPAddressPoolCreate(test.ipAddressPool)
 		} else {
-			_, err = test.l2Adv.ValidateUpdate(nil)
+			err = validateIPAddressPoolUpdate(test.ipAddressPool, nil)
 		}
 		if test.failValidate && err == nil {
 			t.Fatalf("test %s failed, expecting error", test.desc)
 		}
-		if !cmp.Equal(test.expected, mock.l2Advs) {
-			t.Fatalf("test %s failed, %s", test.desc, cmp.Diff(test.expected, mock.l2Advs))
+		if !cmp.Equal(test.expected, mock.ipAddressPools) {
+			t.Fatalf("test %s failed, %s", test.desc, cmp.Diff(test.expected, mock.ipAddressPools))
 		}
 	}
 }

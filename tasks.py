@@ -102,7 +102,7 @@ def _is_network_exist(network):
 def _get_network_subnets(network):
     if _is_podman():
         cmd = ('podman network inspect {network} '.format(network=network) +
-        '-f "{{ range (index .plugins 0).ipam.ranges}}{{ (index . 0).subnet }} {{end}}"')
+        '-f "{{ range .Subnets }}{{.Subnet}} {{end}}"')
     else:
         cmd = ('docker network inspect {network} '.format(network=network) +
         '-f "{{ range .IPAM.Config}}{{.Subnet}} {{end}}"')
@@ -418,10 +418,27 @@ apiServer:
                                "--set speaker.frr.secureMetricsPort=9121 "
                                "--set prometheus.serviceAccount=prometheus-k8s "
                                "--set prometheus.namespace=monitoring ")
+        frr_values=""
+        if bgp_type == "frr":
+            frr_values="--set speaker.frr.enabled=true "
+        if bgp_type == "frr-k8s":
+            frr_values="--set frrk8s.enabled=true --set speaker.frr.enabled=false --set frr-k8s.prometheus.serviceMonitor.enabled=false "
+            if with_prometheus:
+                frr_values=("--set frrk8s.enabled=true --set speaker.frr.enabled=false --set frr-k8s.prometheus.serviceMonitor.enabled=true "
+                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[0].sourceLabels=\{__name__\} "
+                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[0].regex=\"frrk8s_bgp_(.*)\" "
+                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[0].targetLabel=\"__name__\" "
+                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[0].replacement=\"metallb_bgp_\$1\" "
+                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].sourceLabels=\{__name__\} "
+                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].regex=\"frrk8s_bfd_(.*)\" "
+                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].targetLabel=\"__name__\" "
+                            "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].replacement=\"metallb_bfd_\$1\" "
+                           )
+
         run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
-                "--set speaker.image.tag=dev-{} --set speaker.frr.enabled={} --set speaker.logLevel=debug "
-                "--set controller.logLevel=debug {} --namespace metallb-system".format(architecture, architecture,
-                "true" if bgp_type == "frr" else "false", prometheus_values), echo=True)
+                "--set speaker.image.tag=dev-{} --set speaker.logLevel=debug "
+                "--set controller.logLevel=debug {} {}  --namespace metallb-system".format(architecture, architecture,
+                prometheus_values, frr_values), echo=True)
     else:
         run("{} delete po -n metallb-system --all".format(kubectl_path), echo=True)
 
@@ -702,9 +719,11 @@ def bumprelease(ctx, version, previous_version):
 def test(ctx):
     """Run unit tests."""
     envtest_asset_dir = os.getcwd() + "/dev-env/unittest"
-    run("source {}/setup-envtest.sh; fetch_envtest_tools {}".format(envtest_asset_dir, envtest_asset_dir), echo=True)
-    run("source {}/setup-envtest.sh; setup_envtest_env {}; go test -short ./...".format(envtest_asset_dir, envtest_asset_dir), echo=True)
-    run("source {}/setup-envtest.sh; setup_envtest_env {}; go test -short -race ./...".format(envtest_asset_dir, envtest_asset_dir), echo=True)
+    k8s_version="1.27.1"
+    run("{}/setup-envtest.sh {}".format(envtest_asset_dir, envtest_asset_dir), echo=True)
+    kubebuilder_assets=run("{}/bin/setup-envtest use {} --bin-dir {}/bin -p path".format(envtest_asset_dir,k8s_version, envtest_asset_dir)).stdout.strip()
+    run("KUBEBUILDER_ASSETS={} go test -short ./...".format(kubebuilder_assets), echo=True)
+    run("KUBEBUILDER_ASSETS={} go test -short -race ./...".format(kubebuilder_assets), echo=True)
 
 @task
 def checkpatch(ctx):
@@ -784,12 +803,13 @@ def helmdocs(ctx, env="container"):
     "node_nics": "a list of node's interfaces separated by comma, default is kind",
     "local_nics": "a list of bridges related node's interfaces separated by comma, default is kind",
     "external_containers": "a comma separated list of external containers names to use for the test. (valid parameters are: ibgp-single-hop / ibgp-multi-hop / ebgp-single-hop / ebgp-multi-hop)",
-    "native_bgp": "tells if the given cluster is deployed using native bgp mode ",
+    "with_vrf": "tells if we want to run the tests against containers reacheable via linux VRFs",
+    "bgp_mode": "tells what bgp mode the cluster is using. valid values are native, frr, frr-k8s.",
     "external_frr_image": "overrides the image used for the external frr containers used in tests",
     "ginkgo_params": "additional ginkgo params to run the e2e tests with",
-    "host_bgp_mode": "tells whether to run the host container in ebgp or ibgp mode"
+    "host_bgp_mode": "tells whether to run the host container in ebgp or ibgp mode",
 })
-def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None, prometheus_namespace="", node_nics="kind", local_nics="kind", external_containers="", native_bgp=False,external_frr_image="", ginkgo_params="", host_bgp_mode="ibgp"):
+def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system", service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None, prometheus_namespace="", node_nics="kind", local_nics="kind", external_containers="", bgp_mode="", with_vrf=False,external_frr_image="", ginkgo_params="", host_bgp_mode="ibgp"):
     """Run E2E tests against development cluster."""
     _fetch_kubectl()
 
@@ -852,7 +872,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
     if external_frr_image != "":
         external_frr_image = "--frr-image="+(external_frr_image)
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-            "KUBECONFIG={} ginkgo {} --timeout=3h {} {} -- --provider=local --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {}  -bgp-native-mode={} {} --host-bgp-mode={}".format(kubeconfig, ginkgo_params, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range, ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace, node_nics, local_nics, external_containers, native_bgp, external_frr_image, host_bgp_mode), warn="True")
+            "KUBECONFIG={} ginkgo {} --timeout=3h {} {} -- --provider=local --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {} -bgp-mode={}  -with-vrf={} {} --host-bgp-mode={}".format(kubeconfig, ginkgo_params, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range, ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace, node_nics, local_nics, external_containers, bgp_mode, with_vrf, external_frr_image, host_bgp_mode), warn="True")
 
     if export != None:
         run("kind export logs {}".format(export))
@@ -898,6 +918,7 @@ def generatemanifests(ctx):
     generate_manifest(ctx, bgp_type="frr", with_prometheus=True, output="config/manifests/metallb-frr-prometheus.yaml")
     generate_manifest(ctx, bgp_type="native", with_prometheus=True, output="config/manifests/metallb-native-prometheus.yaml")
     generate_manifest(ctx, bgp_type="frr-k8s", output="config/manifests/metallb-frr-k8s.yaml")
+    generate_manifest(ctx, bgp_type="frr-k8s", with_prometheus=True,output="config/manifests/metallb-frr-k8s-prometheus.yaml")
 
     _align_helm_crds(
         source='config/manifests/metallb-frr.yaml',

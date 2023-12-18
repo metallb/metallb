@@ -7,7 +7,7 @@ import (
 
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
-	apivalidate "go.universe.tf/metallb/api/validate"
+	apivalidate "go.universe.tf/metallb/internal/k8s/webhooks/validate"
 
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"

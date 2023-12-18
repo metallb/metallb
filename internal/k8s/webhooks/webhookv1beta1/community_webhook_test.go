@@ -1,12 +1,13 @@
 // SPDX-License-Identifier:Apache-2.0
 
-package v1beta1
+package webhookv1beta1
 
 import (
 	"testing"
 
 	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
+	"go.universe.tf/metallb/api/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -15,9 +16,9 @@ func TestValidateCommunity(t *testing.T) {
 	Logger = log.NewNopLogger()
 
 	toRestoreCommunities := getExistingCommunities
-	getExistingCommunities = func() (*CommunityList, error) {
-		return &CommunityList{
-			Items: []Community{
+	getExistingCommunities = func() (*v1beta1.CommunityList, error) {
+		return &v1beta1.CommunityList{
+			Items: []v1beta1.Community{
 				{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "test-commuinty1",
@@ -33,22 +34,22 @@ func TestValidateCommunity(t *testing.T) {
 
 	tests := []struct {
 		desc           string
-		commuinty      *Community
+		commuinty      *v1beta1.Community
 		isNewCommunity bool
 		failValidate   bool
-		expected       *CommunityList
+		expected       *v1beta1.CommunityList
 	}{
 		{
 			desc: "Second Community",
-			commuinty: &Community{
+			commuinty: &v1beta1.Community{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-community2",
 					Namespace: MetalLBTestNameSpace,
 				},
 			},
 			isNewCommunity: true,
-			expected: &CommunityList{
-				Items: []Community{
+			expected: &v1beta1.CommunityList{
+				Items: []v1beta1.Community{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "test-commuinty1",
@@ -66,15 +67,15 @@ func TestValidateCommunity(t *testing.T) {
 		},
 		{
 			desc: "Same Community, update",
-			commuinty: &Community{
+			commuinty: &v1beta1.Community{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-commuinty1",
 					Namespace: MetalLBTestNameSpace,
 				},
 			},
 			isNewCommunity: false,
-			expected: &CommunityList{
-				Items: []Community{
+			expected: &v1beta1.CommunityList{
+				Items: []v1beta1.Community{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "test-commuinty1",
@@ -86,15 +87,15 @@ func TestValidateCommunity(t *testing.T) {
 		},
 		{
 			desc: "Same community, new",
-			commuinty: &Community{
+			commuinty: &v1beta1.Community{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-commuinty1",
 					Namespace: MetalLBTestNameSpace,
 				},
 			},
 			isNewCommunity: true,
-			expected: &CommunityList{
-				Items: []Community{
+			expected: &v1beta1.CommunityList{
+				Items: []v1beta1.Community{
 					{
 						ObjectMeta: metav1.ObjectMeta{
 							Name:      "test-commuinty1",
@@ -107,7 +108,7 @@ func TestValidateCommunity(t *testing.T) {
 		},
 		{
 			desc: "Validation must fail if created in different namespace",
-			commuinty: &Community{
+			commuinty: &v1beta1.Community{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "test-commuinty2",
 					Namespace: "default",
@@ -125,9 +126,9 @@ func TestValidateCommunity(t *testing.T) {
 		mock.forceError = test.failValidate
 
 		if test.isNewCommunity {
-			_, err = test.commuinty.ValidateCreate()
+			err = validateCommunityCreate(test.commuinty)
 		} else {
-			_, err = test.commuinty.ValidateUpdate(nil)
+			err = validateCommunityUpdate(test.commuinty, nil)
 		}
 		if test.failValidate && err == nil {
 			t.Fatalf("test %s failed, expecting error", test.desc)

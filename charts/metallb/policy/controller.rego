@@ -4,7 +4,7 @@ package main
 deny[msg] {
   input.kind == "Deployment"
   serviceAccountName := input.spec.template.spec.serviceAccountName
-  not serviceAccountName == "RELEASE-NAME-metallb-controller"
+  not serviceAccountName == "release-name-metallb-controller"
   msg = sprintf("controller serviceAccountName '%s' does not match expected value", [serviceAccountName])
 }
 

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier:Apache-2.0
 
-package v1beta1
+package webhookv1beta1
 
 import (
 	"github.com/go-kit/log"
 
-	"go.universe.tf/metallb/api/validate"
+	"go.universe.tf/metallb/internal/k8s/webhooks/validate"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 

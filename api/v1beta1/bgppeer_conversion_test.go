@@ -12,6 +12,10 @@ import (
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	MetalLBTestNameSpace = "metallb-test-namespace"
+)
+
 func TestValidateBGPPeerConvertTo(t *testing.T) {
 	var err error
 	var resBGPPeer v1beta2.BGPPeer

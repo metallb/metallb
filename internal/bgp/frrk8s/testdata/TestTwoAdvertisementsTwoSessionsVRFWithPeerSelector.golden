@@ -16,7 +16,8 @@
                             "asn": 200,
                             "address": "10.2.2.255",
                             "port": 179,
-                            "password": {},
+                            "password": "password",
+                            "passwordSecret": {},
                             "holdTime": "1s",
                             "keepaliveTime": "1s",
                             "toAdvertise": {
@@ -60,7 +61,8 @@
                             "asn": 200,
                             "address": "10.2.2.254",
                             "port": 179,
-                            "password": {},
+                            "password": "password",
+                            "passwordSecret": {},
                             "holdTime": "1s",
                             "keepaliveTime": "1s",
                             "toAdvertise": {
