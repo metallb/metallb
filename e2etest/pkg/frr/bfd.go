@@ -10,7 +10,7 @@ import (
 // BFDPeers returns informations for the all the bfd peers in the given
 // executor.
 func BFDPeers(exec executor.Executor) (map[string]BFDPeer, error) {
-	json, err := exec.Exec("vtysh", "-c", "show bfd peers json")
+	json, err := exec.Debug("vtysh", "-c", "show bfd peers json")
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to query neighbours")
 	}

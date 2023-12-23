@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"go.universe.tf/e2etest/pkg/executor"
-	"go.universe.tf/e2etest/pkg/k8s"
 	"go.universe.tf/e2etest/pkg/ipfamily"
+	"go.universe.tf/e2etest/pkg/k8s"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 )
@@ -32,12 +32,12 @@ func ForIP(target string, exec executor.Executor) []net.IP {
 	framework.ExpectNotEqual(dst, nil, "failed to convert", target, "to ip")
 
 	re := Ipv4Re
-	res, err := exec.Exec("ip", []string{"route", "show", target}...)
+	res, err := exec.Debug("ip", []string{"route", "show", target}...)
 	framework.ExpectNoError(err)
 
 	if dst.To4() == nil { // assuming it's an ipv6 address
 		re = Ipv6Re
-		res, err = exec.Exec("ip", []string{"-6", "route", "show", target}...)
+		res, err = exec.Debug("ip", []string{"-6", "route", "show", target}...)
 	}
 	framework.ExpectNoError(err)
 

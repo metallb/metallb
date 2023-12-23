@@ -12,7 +12,7 @@ import (
 // Daemons returns informations for the all the neighbors in the given
 // executor.
 func Daemons(exec executor.Executor) ([]string, error) {
-	res, err := exec.Exec("vtysh", "-c", "show daemons")
+	res, err := exec.Debug("vtysh", "-c", "show daemons")
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to query neighbours")
 	}

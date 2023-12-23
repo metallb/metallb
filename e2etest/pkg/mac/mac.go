@@ -29,7 +29,7 @@ type ipIface struct {
 func ForIP(ip string, exec executor.Executor) (net.HardwareAddr, error) {
 	macRe := regexp.MustCompile("([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})")
 
-	res, err := exec.Exec("ip", []string{"neigh", "show", ip}...)
+	res, err := exec.Debug("ip", []string{"neigh", "show", ip}...)
 	if err != nil {
 		return nil, err
 	}
@@ -52,7 +52,7 @@ func ForIP(ip string, exec executor.Executor) (net.HardwareAddr, error) {
 
 // MatchNode returns the node with the given MAC address.
 func MatchNode(nodes []corev1.Node, mac net.HardwareAddr, exec executor.Executor) (*corev1.Node, error) {
-	res, err := exec.Exec("ip", []string{"neigh", "show"}...)
+	res, err := exec.Debug("ip", []string{"neigh", "show"}...)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +106,7 @@ func UpdateNodeCache(nodes []corev1.Node, exec executor.Executor) error {
 	for _, n := range nodes {
 		for _, a := range n.Status.Addresses {
 			if a.Type == corev1.NodeInternalIP {
-				_, err := exec.Exec("ping", []string{a.Address, "-c", "1"}...)
+				_, err := exec.Debug("ping", []string{a.Address, "-c", "1"}...)
 				if err != nil {
 					return err
 				}
@@ -148,7 +148,7 @@ func RequestAddressResolutionFromIface(ip string, iface string, exec executor.Ex
 		args = []string{netIP.String(), iface}
 	}
 
-	out, err := exec.Exec(cmd, args...)
+	out, err := exec.Debug(cmd, args...)
 	if err != nil {
 		return errors.Wrapf(err, out)
 	}
@@ -158,7 +158,7 @@ func RequestAddressResolutionFromIface(ip string, iface string, exec executor.Ex
 
 // FlushIPNeigh flush the ip from ip neighbor table.
 func FlushIPNeigh(ip string, exec executor.Executor) error {
-	out, err := exec.Exec("ip", "neigh", "flush", "to", ip)
+	out, err := exec.Debug("ip", "neigh", "flush", "to", ip)
 	if err != nil {
 		return errors.Wrapf(err, out)
 	}
@@ -167,7 +167,7 @@ func FlushIPNeigh(ip string, exec executor.Executor) error {
 
 // GetIfaceMac returns the mac of the iface.
 func GetIfaceMac(iface string, exec executor.Executor) (net.HardwareAddr, error) {
-	out, err := exec.Exec("ifconfig")
+	out, err := exec.Debug("ifconfig")
 	if err != nil {
 		return nil, errors.Wrapf(err, out)
 	}
@@ -192,7 +192,7 @@ func GetIfaceMac(iface string, exec executor.Executor) (net.HardwareAddr, error)
 // ifaceForIPNetwork returns the interface name that is in the same network as the IP.
 func ifaceForIPNetwork(ip net.IP, exec executor.Executor) (string, error) {
 	ifaces := []ipIface{}
-	res, err := exec.Exec("ip", "--json", "address", "show")
+	res, err := exec.Debug("ip", "--json", "address", "show")
 	if err != nil {
 		return "", errors.Wrapf(err, "Failed to list interfaces")
 	}

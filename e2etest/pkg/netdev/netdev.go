@@ -21,7 +21,7 @@ type interfaceAddress struct {
 }
 
 func ForAddress(exec executor.Executor, ipv4Address, ipv6Address string) (string, error) {
-	jsonAddr, err := exec.Exec("ip", "-j", "a")
+	jsonAddr, err := exec.Debug("ip", "-j", "a")
 	if err != nil {
 		return "", fmt.Errorf("failed to retrieve addresses %w :%s", err, jsonAddr)
 	}
@@ -69,11 +69,11 @@ func CreateVRF(exec executor.Executor, vrfName, routingTable string) error {
 		return err
 	}
 
-	out, err := exec.Exec("ip", "link", "add", vrfName, "type", "vrf", "table", routingTable)
+	out, err := exec.Debug("ip", "link", "add", vrfName, "type", "vrf", "table", routingTable)
 	if err != nil {
 		return errors.Wrapf(err, "failed to create vrf %s : %s", vrfName, out)
 	}
-	out, err = exec.Exec("ip", "link", "set", "dev", vrfName, "up")
+	out, err = exec.Debug("ip", "link", "set", "dev", vrfName, "up")
 	if err != nil {
 		return errors.Wrapf(err, "failed to set vrf %s up : %s", vrfName, out)
 	}
@@ -96,12 +96,12 @@ func AddToVRF(exec executor.Executor, intf, vrf, ipv6Address string) error {
 			return nil
 		}
 	}
-	out, err := exec.Exec("ip", "link", "set", "dev", intf, "master", vrf)
+	out, err := exec.Debug("ip", "link", "set", "dev", intf, "master", vrf)
 	if err != nil {
 		return errors.Wrapf(err, "failed to set master %s to %s : %s", vrf, intf, out)
 	}
 	// we need this because moving the interface to the vrf removes the v6 IP
-	out, err = exec.Exec("ip", "-6", "addr", "add", ipv6Address+"/64", "dev", intf)
+	out, err = exec.Debug("ip", "-6", "addr", "add", ipv6Address+"/64", "dev", intf)
 	if err != nil {
 		return errors.Wrapf(err, "failed to add %s to %s : %s", ipv6Address, intf, out)
 	}
@@ -139,7 +139,7 @@ type Addresses struct {
 }
 
 func AddressesForDevice(exec executor.Executor, dev string) (*Addresses, error) {
-	jsonIPOutput, err := exec.Exec("ip", "-j", "addr", "show", "dev", dev)
+	jsonIPOutput, err := exec.Debug("ip", "-j", "addr", "show", "dev", dev)
 	if err != nil {
 		return nil, fmt.Errorf("failed to retrieve interface address %s, %w :%s", dev, err, jsonIPOutput)
 	}
@@ -196,7 +196,7 @@ func findInterfaceWithAddresses(jsonIPOutput string, ipv4Address, ipv6Address st
 }
 
 func ipLink(exec executor.Executor) ([]Link, error) {
-	links, err := exec.Exec("ip", "-j", "l")
+	links, err := exec.Debug("ip", "-j", "l")
 	if err != nil {
 		return nil, fmt.Errorf("failed to find links %w :%s", err, links)
 	}

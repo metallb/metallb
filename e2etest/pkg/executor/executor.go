@@ -11,6 +11,7 @@ import (
 
 type Executor interface {
 	Exec(cmd string, args ...string) (string, error)
+	Debug(cmd string, args ...string) (string, error)
 }
 
 type hostExecutor struct{}
@@ -31,6 +32,10 @@ func (hostExecutor) Exec(cmd string, args ...string) (string, error) {
 	return string(out), err
 }
 
+func (h hostExecutor) Debug(cmd string, args ...string) (string, error) {
+	return h.Exec(cmd, args...)
+}
+
 func ForContainer(containerName string) Executor {
 	return &containerExecutor{container: containerName}
 }
@@ -43,6 +48,10 @@ func (e *containerExecutor) Exec(cmd string, args ...string) (string, error) {
 	newArgs := append([]string{"exec", e.container, cmd}, args...)
 	out, err := exec.Command(ContainerRuntime, newArgs...).CombinedOutput()
 	return string(out), err
+}
+
+func (e *containerExecutor) Debug(cmd string, args ...string) (string, error) {
+	return e.Exec(cmd, args...)
 }
 
 type podExecutor struct {
@@ -60,6 +69,15 @@ func ForPod(namespace, name, container string) Executor {
 }
 
 func (p *podExecutor) Exec(cmd string, args ...string) (string, error) {
+	fullArgs := append([]string{"exec", p.name, "-c", p.container, "--", cmd}, args...)
+	res, err := kubectl.RunKubectl(p.namespace, fullArgs...)
+	if err != nil {
+		return "", err
+	}
+	return res, nil
+}
+
+func (p *podExecutor) Debug(cmd string, args ...string) (string, error) {
 	fullArgs := append([]string{"debug", p.name, "--image=busybox", "--container=pod-executor-debugger", "--stdin", "--tty", "--", cmd}, args...)
 	res, err := kubectl.RunKubectl(p.namespace, fullArgs...)
 	if err != nil {

@@ -1389,7 +1389,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				Eventually(func() string {
 					// We need to assert against the output of the command as a bare string, as
 					// there is no json version of the command.
-					cfgStr, err := podExecutor.Exec("vtysh", "-c", "show running-config")
+					cfgStr, err := podExecutor.Debug("vtysh", "-c", "show running-config")
 					if err != nil {
 						return err.Error()
 					}

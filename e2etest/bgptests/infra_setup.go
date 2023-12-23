@@ -132,7 +132,7 @@ func KindnetContainersSetup(cs *clientset.Clientset, image string) ([]*frrcontai
 	configs := frrContainersConfigs(image)
 
 	var out string
-	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "create", defaultNextHopSettings.multiHopNetwork, "--ipv6",
+	out, err := executor.Host.Debug(executor.ContainerRuntime, "network", "create", defaultNextHopSettings.multiHopNetwork, "--ipv6",
 		"--driver=bridge", "--subnet=172.30.0.0/16", "--subnet=fc00:f853:ccd:e798::/64")
 	if err != nil && !strings.Contains(out, "already exists") {
 		return nil, errors.Wrapf(err, "failed to create %s: %s", defaultNextHopSettings.multiHopNetwork, out)
@@ -160,13 +160,13 @@ func KindnetContainersSetup(cs *clientset.Clientset, image string) ([]*frrcontai
 */
 
 func VRFContainersSetup(cs *clientset.Clientset, image string) ([]*frrcontainer.FRR, error) {
-	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "create", vrfNetwork, "--ipv6",
+	out, err := executor.Host.Debug(executor.ContainerRuntime, "network", "create", vrfNetwork, "--ipv6",
 		"--driver=bridge", "--subnet=172.31.0.0/16", "--subnet=fc00:f853:ccd:e799::/64")
 	if err != nil && !strings.Contains(out, "already exists") {
 		return nil, errors.Wrapf(err, "failed to create %s: %s", vrfNetwork, out)
 	}
 
-	out, err = executor.Host.Exec(executor.ContainerRuntime, "network", "create", vrfNextHopSettings.multiHopNetwork, "--ipv6",
+	out, err = executor.Host.Debug(executor.ContainerRuntime, "network", "create", vrfNextHopSettings.multiHopNetwork, "--ipv6",
 		"--driver=bridge", "--subnet=172.32.0.0/16", "--subnet=fc00:f853:ccd:e800::/64")
 	if err != nil && !strings.Contains(out, "already exists") {
 		return nil, errors.Wrapf(err, "failed to create %s: %s", vrfNextHopSettings.multiHopNetwork, out)
@@ -528,7 +528,7 @@ func vrfContainersConfig(image string) map[string]frrcontainer.Config {
 }
 
 func multiHopTearDown(nextHop nextHopSettings, routes map[string]container.NetworkSettings, cs *clientset.Clientset) error {
-	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "rm", nextHop.multiHopNetwork)
+	out, err := executor.Host.Debug(executor.ContainerRuntime, "network", "rm", nextHop.multiHopNetwork)
 	if err != nil {
 		return errors.Wrapf(err, "failed to remove %s: %s", nextHop.multiHopNetwork, out)
 	}
@@ -618,7 +618,7 @@ func addContainerToNetwork(containerName, network string) error {
 		return nil
 	}
 
-	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "connect",
+	out, err := executor.Host.Debug(executor.ContainerRuntime, "network", "connect",
 		network, containerName)
 	if err != nil && !strings.Contains(out, "already exists") {
 		return nil

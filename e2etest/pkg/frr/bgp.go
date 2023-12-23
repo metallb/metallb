@@ -19,7 +19,7 @@ import (
 // NeighborForContainer returns informations for the given neighbor in the given
 // executor.
 func NeighborInfo(neighborName string, exec executor.Executor) (*Neighbor, error) {
-	res, err := exec.Exec("vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", neighborName))
+	res, err := exec.Debug("vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", neighborName))
 
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to query neighbour %s", neighborName)
@@ -34,7 +34,7 @@ func NeighborInfo(neighborName string, exec executor.Executor) (*Neighbor, error
 // NeighborsForContainer returns informations for the all the neighbors in the given
 // executor.
 func NeighborsInfo(exec executor.Executor) ([]*Neighbor, error) {
-	res, err := exec.Exec("vtysh", "-c", "show bgp neighbor json")
+	res, err := exec.Debug("vtysh", "-c", "show bgp neighbor json")
 	if err != nil {
 		return nil, errors.Wrapf(err, "Failed to query neighbours")
 	}
@@ -58,7 +58,7 @@ func RoutesForVRF(vrf string, exec executor.Executor) (map[string]Route, map[str
 	if vrf != "" {
 		cmd = fmt.Sprintf("show bgp vrf %s ipv4  json", vrf)
 	}
-	res, err := exec.Exec("vtysh", "-c", cmd)
+	res, err := exec.Debug("vtysh", "-c", cmd)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "Failed to query routes")
 	}
@@ -70,7 +70,7 @@ func RoutesForVRF(vrf string, exec executor.Executor) (map[string]Route, map[str
 	if vrf != "" {
 		cmd = fmt.Sprintf("show bgp vrf %s ipv6 json", vrf)
 	}
-	res, err = exec.Exec("vtysh", "-c", cmd)
+	res, err = exec.Debug("vtysh", "-c", cmd)
 	if err != nil {
 		return nil, nil, errors.Wrapf(err, "Failed to query routes")
 	}
@@ -113,7 +113,7 @@ func RoutesForCommunity(exec executor.Executor, communityString string, family i
 
 	routes := map[string]Route{}
 	for _, f := range families {
-		res, err := exec.Exec("vtysh", "-c", fmt.Sprintf("show bgp %s %s %s json", f, communityType, communityString))
+		res, err := exec.Debug("vtysh", "-c", fmt.Sprintf("show bgp %s %s %s json", f, communityType, communityString))
 		if err != nil {
 			return nil, errors.Wrapf(err, "Failed to query routes for family %s %s %s", f, communityType, communityString)
 		}
@@ -147,7 +147,7 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 	allerrs := errors.New("")
 
 	res := "####### Show running config\n"
-	out, err := exec.Exec("vtysh", "-c", "show running-config")
+	out, err := exec.Debug("vtysh", "-c", "show running-config")
 	if err != nil {
 		allerrs = errors.Wrapf(allerrs, "\nFailed exec show bgp neighbor: %v", err)
 	}
@@ -156,7 +156,7 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 	for _, file := range filesToDump {
 		res += fmt.Sprintf("####### Dumping file %s\n", file)
 		// limiting the output to 500 lines:
-		out, err = exec.Exec("bash", "-c", fmt.Sprintf("cat %s | tail -n 500", file))
+		out, err = exec.Debug("bash", "-c", fmt.Sprintf("cat %s | tail -n 500", file))
 		if err != nil {
 			allerrs = errors.Wrapf(allerrs, "\nFailed to cat file %s: %v", file, err)
 		}
@@ -171,7 +171,7 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 	res += out
 
 	res += "####### BFD Peers\n"
-	out, err = exec.Exec("vtysh", "-c", "show bfd peer")
+	out, err = exec.Debug("vtysh", "-c", "show bfd peer")
 	if err != nil {
 		allerrs = errors.Wrapf(allerrs, "\nFailed exec show bfd peer: %v", err)
 	}
@@ -183,7 +183,7 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 		files := strings.Split(crashInfo, "\n")
 		for _, file := range files {
 			res += fmt.Sprintf("####### Dumping crash file %s\n", file)
-			out, err = exec.Exec("bash", "-c", fmt.Sprintf("cat %s", file))
+			out, err = exec.Debug("bash", "-c", fmt.Sprintf("cat %s", file))
 			if err != nil {
 				allerrs = errors.Wrapf(allerrs, "\nFailed to cat bgpd crashinfo file %s: %v", file, err)
 			}
@@ -200,7 +200,7 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 
 // ContainsCommunity check if the passed in community string exists in show bgp community.
 func ContainsCommunity(exec executor.Executor, community string) error {
-	res, err := exec.Exec("vtysh", "-c", "show bgp community-info")
+	res, err := exec.Debug("vtysh", "-c", "show bgp community-info")
 	if err != nil {
 		return err
 	}

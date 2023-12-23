@@ -484,7 +484,7 @@ var _ = ginkgo.Describe("L2", func() {
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.DescribeTable("should be exposed by the controller", func(ipFamily string) {
+		ginkgo.DescribeTable("AABBCC should be exposed by the controller", func(ipFamily string) {
 			poolName := "l2-metrics-test"
 			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
