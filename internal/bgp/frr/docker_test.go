@@ -54,7 +54,7 @@ func TestMain(m *testing.M) {
 		log.Fatalf("failed to move vtysh.conf to %s - %s - %s", frrDir, err, res)
 	}
 	buf := new(bytes.Buffer)
-	resCode, err := containerHandle.Debug([]string{"cp", "/etc/tempfrr/vtysh.conf", "/etc/frr/vtysh.conf"},
+	resCode, err := containerHandle.Exec([]string{"cp", "/etc/tempfrr/vtysh.conf", "/etc/frr/vtysh.conf"},
 		dockertest.ExecOptions{
 			StdErr: buf,
 		})
