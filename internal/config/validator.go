@@ -3,7 +3,7 @@
 package config
 
 import (
-	"errors"
+	"strings"
 
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
@@ -58,13 +58,43 @@ func (v *validator) Validate(resources ...client.ObjectList) error {
 			clusterResources.Nodes = append(clusterResources.Nodes, list.Items...)
 		}
 	}
+	clusterResources = resetTransientErrorsFields(clusterResources)
 	_, err := For(clusterResources, v.validate)
-	if errors.As(err, &TransientError{}) { // we do not want to make assumption on ordering in webhooks.
-		return nil
-	}
 	return err
 }
 
 func NewValidator(validate Validate) apivalidate.ClusterObjects {
 	return &validator{validate: validate}
+}
+
+// Returns the given ClusterResources without the fields that can cause a TransientError.
+// We use this so the webhooks do not make assumptions based on the ordering of objects.
+func resetTransientErrorsFields(clusterResources ClusterResources) ClusterResources {
+	for i := range clusterResources.Peers {
+		clusterResources.Peers[i].Spec.BFDProfile = ""
+		clusterResources.Peers[i].Spec.PasswordSecret = v1.SecretReference{}
+	}
+	for i, bgpAdv := range clusterResources.BGPAdvs {
+		var communities []string
+		for _, community := range bgpAdv.Spec.Communities {
+			// We want to pass only communities that are potentially explicit values.
+			if strings.Contains(community, ":") {
+				communities = append(communities, community)
+			}
+		}
+		clusterResources.BGPAdvs[i].Spec.Communities = communities
+	}
+	for i, legacyAddrPool := range clusterResources.LegacyAddressPools {
+		for j, bgpAdv := range legacyAddrPool.Spec.BGPAdvertisements {
+			var communities []string
+			for k := range bgpAdv.Communities {
+				// We want to pass only communities that are potentially explicit values.
+				if strings.Contains(bgpAdv.Communities[k], ":") {
+					communities = append(communities, bgpAdv.Communities[k])
+				}
+			}
+			clusterResources.LegacyAddressPools[i].Spec.BGPAdvertisements[j].Communities = communities
+		}
+	}
+	return clusterResources
 }
