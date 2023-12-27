@@ -30,11 +30,11 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/openshift-kni/k8sreporter"
 
-	"go.universe.tf/e2etest/pkg/pointer"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -136,7 +136,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 						Name: "adv-webhooks-test",
 					},
 					Spec: metallbv1beta1.BGPAdvertisementSpec{
-						AggregationLength: pointer.Int32Ptr(26),
+						AggregationLength: ptr.To(int32(26)),
 						IPAddressPools:    []string{"pool-webhooks-test"},
 					},
 				},
@@ -386,7 +386,7 @@ var _ = ginkgo.DescribeTable("Webhooks namespace validation",
 					Name: "adv-webhooks-test",
 				},
 				Spec: metallbv1beta1.BGPAdvertisementSpec{
-					AggregationLength: pointer.Int32Ptr(26),
+					AggregationLength: ptr.To(int32(26)),
 					IPAddressPools:    []string{"pool-webhooks-test"},
 				},
 			},

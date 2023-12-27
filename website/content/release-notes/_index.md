@@ -58,6 +58,7 @@ Bug Fixes:
 
 - FRR mode: FRR templates: provide a seqnum for the prefix lists ([PR 2075](https://github.com/metallb/metallb/pull/2075)
 - Webhooks: avoid transient errors ([PR 2202](https://github.com/metallb/metallb/pull/2202)), [ISSUE 2173](https://github.com/metallb/metallb/issues/2173))
+- Remove the pointer packages and utilize the 'ptr' utility package of Kubernetes ([PR 2223](https://github.com/metallb/metallb/pull/2223))
 
 This release includes contributions from Andreas Karis, Antonio Pitasi, Arjun Singh, AzraelSec, cong, cyclinder, Federico Paolinelli, Giovanni Toraldo, Ivan Kurnosov, Jonas Badstübner, Lior Noy, machinaexdeo, Marcelo Guerrero Viveros, Micah Nagel, Michael Aspinwall, Moritz Schlarb, Ori Braunshtein, Pavel Basov, Robin, shimritproj, Siyi.Yang, timm0e. Thanks!
 

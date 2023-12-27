@@ -5,8 +5,8 @@ package service
 import (
 	"strings"
 
-	"go.universe.tf/e2etest/pkg/pointer"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/utils/ptr"
 )
 
 type Tweak func(svc *corev1.Service)
@@ -56,6 +56,6 @@ func WithSpecificPool(poolName string) func(*corev1.Service) {
 
 func WithLoadbalancerClass(loadBalancerClass string) func(*corev1.Service) {
 	return func(svc *corev1.Service) {
-		svc.Spec.LoadBalancerClass = pointer.StrPtr(loadBalancerClass)
+		svc.Spec.LoadBalancerClass = ptr.To[string](loadBalancerClass)
 	}
 }

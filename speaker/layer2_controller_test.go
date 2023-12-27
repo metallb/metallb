@@ -13,13 +13,13 @@ import (
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/layer2"
-	"go.universe.tf/metallb/internal/pointer"
 
 	"github.com/go-kit/log"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 )
 
 type fakeSpeakerList struct {
@@ -80,9 +80,9 @@ func TestUsableNodesEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris1"),
+							NodeName: ptr.To("iris1"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -93,9 +93,9 @@ func TestUsableNodesEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.15",
 							},
-							NodeName: stringPtr("iris2"),
+							NodeName: ptr.To("iris2"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -113,18 +113,18 @@ func TestUsableNodesEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris1"),
+							NodeName: ptr.To("iris1"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 						{
 							Addresses: []string{
 								"2.3.4.15",
 							},
-							NodeName: stringPtr("iris2"),
+							NodeName: ptr.To("iris2"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -142,18 +142,18 @@ func TestUsableNodesEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris1"),
+							NodeName: ptr.To("iris1"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 						{
 							Addresses: []string{
 								"2.3.4.15",
 							},
-							NodeName: stringPtr("iris1"),
+							NodeName: ptr.To("iris1"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -172,18 +172,18 @@ func TestUsableNodesEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris1"),
+							NodeName: ptr.To("iris1"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 						{
 							Addresses: []string{
 								"2.3.4.15",
 							},
-							NodeName: stringPtr("iris1"),
+							NodeName: ptr.To("iris1"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(false),
+								Ready: ptr.To(false),
 							},
 						},
 					},
@@ -201,20 +201,20 @@ func TestUsableNodesEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris1"),
+							NodeName: ptr.To("iris1"),
 							Conditions: discovery.EndpointConditions{
-								Ready:   pointer.BoolPtr(false),
-								Serving: pointer.BoolPtr(true),
+								Ready:   ptr.To(false),
+								Serving: ptr.To(true),
 							},
 						},
 						{
 							Addresses: []string{
 								"2.3.4.15",
 							},
-							NodeName: stringPtr("iris2"),
+							NodeName: ptr.To("iris2"),
 							Conditions: discovery.EndpointConditions{
-								Ready:   pointer.BoolPtr(false),
-								Serving: pointer.BoolPtr(true),
+								Ready:   ptr.To(false),
+								Serving: ptr.To(true),
 							},
 						},
 					},
@@ -308,18 +308,18 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.15",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 						},
@@ -359,18 +359,18 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(false),
+									Ready: ptr.To(false),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.15",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(false),
+									Ready: ptr.To(false),
 								},
 							},
 						},
@@ -410,19 +410,19 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.15",
 								},
-								NodeName: stringPtr("iris2"),
+								NodeName: ptr.To("iris2"),
 								Conditions: discovery.EndpointConditions{
-									Ready:   pointer.BoolPtr(false),
-									Serving: pointer.BoolPtr(true),
+									Ready:   ptr.To(false),
+									Serving: ptr.To(true),
 								},
 							},
 						},
@@ -462,18 +462,18 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(false),
+									Ready: ptr.To(false),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.15",
 								},
-								NodeName: stringPtr("iris2"),
+								NodeName: ptr.To("iris2"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(false),
+									Ready: ptr.To(false),
 								},
 							},
 						},
@@ -513,18 +513,18 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.15",
 								},
-								NodeName: stringPtr("iris2"),
+								NodeName: ptr.To("iris2"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(false),
+									Ready: ptr.To(false),
 								},
 							},
 						},
@@ -571,18 +571,18 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.15",
 								},
-								NodeName: stringPtr("iris2"),
+								NodeName: ptr.To("iris2"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 						},
@@ -595,18 +595,18 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.25",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.35",
 								},
-								NodeName: stringPtr("iris2"),
+								NodeName: ptr.To("iris2"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 						},
@@ -655,18 +655,18 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.15",
 								},
-								NodeName: stringPtr("iris2"),
+								NodeName: ptr.To("iris2"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 						},
@@ -679,18 +679,18 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.25",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.35",
 								},
-								NodeName: stringPtr("iris2"),
+								NodeName: ptr.To("iris2"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(false),
+									Ready: ptr.To(false),
 								},
 							},
 						},
@@ -739,18 +739,18 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								NodeName: stringPtr("iris2"),
+								NodeName: ptr.To("iris2"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.15",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(false),
+									Ready: ptr.To(false),
 								},
 							},
 						},
@@ -763,18 +763,18 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.25",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.35",
 								},
-								NodeName: stringPtr("iris2"),
+								NodeName: ptr.To("iris2"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(false),
+									Ready: ptr.To(false),
 								},
 							},
 						},
@@ -816,18 +816,18 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.15",
 								},
-								NodeName: stringPtr("iris2"),
+								NodeName: ptr.To("iris2"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 						},
@@ -838,9 +838,9 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.25",
 								},
-								NodeName: stringPtr("iris2"),
+								NodeName: ptr.To("iris2"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 						},
@@ -880,27 +880,27 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.15",
 								},
-								NodeName: stringPtr("iris2"),
+								NodeName: ptr.To("iris2"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.25",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 						},
@@ -940,27 +940,27 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.15",
 								},
-								NodeName: stringPtr("iris2"),
+								NodeName: ptr.To("iris2"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.25",
 								},
-								NodeName: stringPtr("iris2"),
+								NodeName: ptr.To("iris2"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 						},
@@ -1000,27 +1000,27 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.15",
 								},
-								NodeName: stringPtr("iris2"),
+								NodeName: ptr.To("iris2"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.25",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(false),
+									Ready: ptr.To(false),
 								},
 							},
 						},
@@ -1060,27 +1060,27 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 								Addresses: []string{
 									"2.3.4.5",
 								},
-								NodeName: stringPtr("iris1"),
+								NodeName: ptr.To("iris1"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
+									Ready: ptr.To(true),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.15",
 								},
-								NodeName: stringPtr("iris2"),
+								NodeName: ptr.To("iris2"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(false),
+									Ready: ptr.To(false),
 								},
 							},
 							{
 								Addresses: []string{
 									"2.3.4.25",
 								},
-								NodeName: stringPtr("iris2"),
+								NodeName: ptr.To("iris2"),
 								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(false),
+									Ready: ptr.To(false),
 								},
 							},
 						},
@@ -1196,18 +1196,18 @@ func TestShouldAnnounceNodeSelector(t *testing.T) {
 						Addresses: []string{
 							"2.3.4.5",
 						},
-						NodeName: pointer.StrPtr("iris1"),
+						NodeName: ptr.To("iris1"),
 						Conditions: discovery.EndpointConditions{
-							Ready: pointer.BoolPtr(true),
+							Ready: ptr.To(true),
 						},
 					},
 					{
 						Addresses: []string{
 							"2.3.4.15",
 						},
-						NodeName: pointer.StrPtr("iris2"),
+						NodeName: ptr.To("iris2"),
 						Conditions: discovery.EndpointConditions{
-							Ready: pointer.BoolPtr(true),
+							Ready: ptr.To(true),
 						},
 					},
 				},
@@ -1224,9 +1224,9 @@ func TestShouldAnnounceNodeSelector(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: pointer.StrPtr(node),
+							NodeName: ptr.To(node),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -1352,10 +1352,6 @@ func TestShouldAnnounceNodeSelector(t *testing.T) {
 	}
 }
 
-func stringPtr(s string) *string {
-	return &s
-}
-
 func TestClusterPolicy(t *testing.T) {
 	fakeSL := &fakeSpeakerList{
 		speakers: map[string]bool{
@@ -1415,9 +1411,9 @@ func TestClusterPolicy(t *testing.T) {
 					Addresses: []string{
 						"2.3.4.5",
 					},
-					NodeName: stringPtr("iris1"),
+					NodeName: ptr.To("iris1"),
 					Conditions: discovery.EndpointConditions{
-						Ready: pointer.BoolPtr(true),
+						Ready: ptr.To(true),
 					},
 				},
 			},
@@ -1431,9 +1427,9 @@ func TestClusterPolicy(t *testing.T) {
 					Addresses: []string{
 						"2.3.4.5",
 					},
-					NodeName: stringPtr("iris2"),
+					NodeName: ptr.To("iris2"),
 					Conditions: discovery.EndpointConditions{
-						Ready: pointer.BoolPtr(true),
+						Ready: ptr.To(true),
 					},
 				},
 			},
