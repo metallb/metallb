@@ -14,7 +14,6 @@ import (
 	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/controllers"
-	"go.universe.tf/metallb/internal/pointer"
 
 	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
@@ -22,6 +21,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/utils/ptr"
 )
 
 func mustSelector(s string) labels.Selector {
@@ -248,9 +248,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris"),
+							NodeName: ptr.To("iris"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -299,9 +299,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("pandora"),
+							NodeName: ptr.To("pandora"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -329,9 +329,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris"),
+							NodeName: ptr.To("iris"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -363,9 +363,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris"),
+							NodeName: ptr.To("iris"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -393,9 +393,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris"),
+							NodeName: ptr.To("iris"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -406,9 +406,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.6",
 							},
-							NodeName: stringPtr("pandora"),
+							NodeName: ptr.To("pandora"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -440,9 +440,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris"),
+							NodeName: ptr.To("iris"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -453,9 +453,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.6",
 							},
-							NodeName: stringPtr("pandora"),
+							NodeName: ptr.To("pandora"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(false),
+								Ready: ptr.To(false),
 							},
 						},
 					},
@@ -466,9 +466,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.7",
 							},
-							NodeName: stringPtr("iris"),
+							NodeName: ptr.To("iris"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -479,9 +479,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.6",
 							},
-							NodeName: stringPtr("pandora"),
+							NodeName: ptr.To("pandora"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -525,9 +525,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris"),
+							NodeName: ptr.To("iris"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(false),
+								Ready: ptr.To(false),
 							},
 						},
 					},
@@ -555,18 +555,18 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris"),
+							NodeName: ptr.To("iris"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 						{
 							Addresses: []string{
 								"2.3.4.6",
 							},
-							NodeName: stringPtr("pandora"),
+							NodeName: ptr.To("pandora"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(false),
+								Ready: ptr.To(false),
 							},
 						},
 					},
@@ -598,10 +598,10 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris"),
+							NodeName: ptr.To("iris"),
 							Conditions: discovery.EndpointConditions{
-								Ready:   pointer.BoolPtr(false),
-								Serving: pointer.BoolPtr(true),
+								Ready:   ptr.To(false),
+								Serving: ptr.To(true),
 							},
 						},
 					},
@@ -663,9 +663,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris"),
+							NodeName: ptr.To("iris"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -737,9 +737,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris"),
+							NodeName: ptr.To("iris"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -809,9 +809,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris"),
+							NodeName: ptr.To("iris"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -878,9 +878,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris"),
+							NodeName: ptr.To("iris"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -916,9 +916,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris"),
+							NodeName: ptr.To("iris"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -955,9 +955,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris"),
+							NodeName: ptr.To("iris"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -1000,9 +1000,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris"),
+							NodeName: ptr.To("iris"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},
@@ -1083,9 +1083,9 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: stringPtr("iris"),
+							NodeName: ptr.To("iris"),
 							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
+								Ready: ptr.To(true),
 							},
 						},
 					},

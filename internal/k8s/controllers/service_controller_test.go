@@ -24,12 +24,13 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
-	"go.universe.tf/metallb/internal/pointer"
+
 	corev1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/ptr"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -284,19 +285,19 @@ func TestLBClass(t *testing.T) {
 		},
 		{
 			desc:           "Set serviceclass, metallb default",
-			serviceLBClass: pointer.StrPtr("foo"),
+			serviceLBClass: ptr.To[string]("foo"),
 			metallLBClass:  "",
 			shouldFilter:   true,
 		},
 		{
 			desc:           "Set serviceclass, metallb different",
-			serviceLBClass: pointer.StrPtr("foo"),
+			serviceLBClass: ptr.To[string]("foo"),
 			metallLBClass:  "bar",
 			shouldFilter:   true,
 		},
 		{
 			desc:           "Set serviceclass, metallb same",
-			serviceLBClass: pointer.StrPtr("foo"),
+			serviceLBClass: ptr.To[string]("foo"),
 			metallLBClass:  "foo",
 			shouldFilter:   false,
 		},

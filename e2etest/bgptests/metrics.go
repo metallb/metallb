@@ -16,7 +16,6 @@ import (
 	"go.universe.tf/e2etest/pkg/k8s"
 	"go.universe.tf/e2etest/pkg/metallb"
 	"go.universe.tf/e2etest/pkg/metrics"
-	"go.universe.tf/e2etest/pkg/pointer"
 	testservice "go.universe.tf/e2etest/pkg/service"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
@@ -24,6 +23,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
+	"k8s.io/utils/ptr"
 )
 
 var _ = ginkgo.Describe("BGP metrics", func() {
@@ -616,12 +616,12 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					Name: "echo",
 				},
 				Spec: metallbv1beta1.BFDProfileSpec{
-					ReceiveInterval:  pointer.Uint32Ptr(80),
-					TransmitInterval: pointer.Uint32Ptr(81),
-					EchoInterval:     pointer.Uint32Ptr(82),
-					EchoMode:         pointer.BoolPtr(true),
-					PassiveMode:      pointer.BoolPtr(false),
-					MinimumTTL:       pointer.Uint32Ptr(254),
+					ReceiveInterval:  ptr.To(uint32(80)),
+					TransmitInterval: ptr.To(uint32(81)),
+					EchoInterval:     ptr.To(uint32(82)),
+					EchoMode:         ptr.To(true),
+					PassiveMode:      ptr.To(false),
+					MinimumTTL:       ptr.To(uint32(254)),
 				},
 			}, ipfamily.IPv4, []string{v4PoolAddresses}),
 		ginkgo.Entry("IPV6 - default",
@@ -636,12 +636,12 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					Name: "full1",
 				},
 				Spec: metallbv1beta1.BFDProfileSpec{
-					ReceiveInterval:  pointer.Uint32Ptr(60),
-					TransmitInterval: pointer.Uint32Ptr(61),
-					EchoInterval:     pointer.Uint32Ptr(62),
-					EchoMode:         pointer.BoolPtr(false),
-					PassiveMode:      pointer.BoolPtr(false),
-					MinimumTTL:       pointer.Uint32Ptr(254),
+					ReceiveInterval:  ptr.To(uint32(60)),
+					TransmitInterval: ptr.To(uint32(61)),
+					EchoInterval:     ptr.To(uint32(62)),
+					EchoMode:         ptr.To(false),
+					PassiveMode:      ptr.To(false),
+					MinimumTTL:       ptr.To(uint32(254)),
 				},
 			}, ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses}),
 	)
