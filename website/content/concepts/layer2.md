@@ -82,7 +82,7 @@ announcing a given IP.
 
 ### Adding or removing nodes
 
-Given the leader election algoritm described above, removing a node does not change the
+Given the leader election algorithm described above, removing a node does not change the
 speaker announcing the VIP, while adding a node will change it only if it becomes the new
 first element of the list.
 
