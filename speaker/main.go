@@ -186,7 +186,8 @@ func main() {
 		EnablePprof:   *enablePprof,
 		ReadEndpoints: true,
 		Namespace:     *namespace,
-
+		LeaderElect:   false,
+		ResourceName:  "",
 		Listener: k8s.Listener{
 			ServiceChanged: ctrl.SetBalancer,
 			ConfigChanged:  ctrl.SetConfig,

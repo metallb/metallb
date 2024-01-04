@@ -120,6 +120,8 @@ type Config struct {
 	LoadBalancerClass   string
 	WebhookWithHTTP2    bool
 	WithFRRK8s          bool
+	LeaderElect         bool
+	ResourceName        string
 	Listener
 }
 
@@ -149,8 +151,10 @@ func New(cfg *Config) (*Client, error) {
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
-		Scheme:         scheme,
-		LeaderElection: false,
+		Scheme:                  scheme,
+		LeaderElection:          cfg.LeaderElect,
+		LeaderElectionID:        cfg.ResourceName,
+		LeaderElectionNamespace: cfg.Namespace,
 		Cache: cache.Options{
 			ByObject: objectsPerNamespace,
 		},

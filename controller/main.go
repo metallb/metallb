@@ -144,6 +144,8 @@ func main() {
 		deployName          = flag.String("deployment", os.Getenv("METALLB_DEPLOYMENT"), "name of the MetalLB controller Deployment")
 		logLevel            = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
 		disableEpSlices     = flag.Bool("disable-epslices", false, "Disable the usage of EndpointSlices and default to Endpoints instead of relying on the autodiscovery mechanism")
+		leaderElect         = flag.Bool("leader-elect", false, "Enable leader election")
+		resourceName        = flag.String("leader-elect-resource-name", "metallb-controller", "leader election resource name")
 		enablePprof         = flag.Bool("enable-pprof", false, "Enable pprof profiling")
 		disableCertRotation = flag.Bool("disable-cert-rotation", false, "disable automatic generation and rotation of webhook TLS certificates/keys")
 		certDir             = flag.String("cert-dir", "/tmp/k8s-webhook-server/serving-certs", "The directory where certs are stored")
@@ -210,8 +212,9 @@ func main() {
 		EnablePprof:     *enablePprof,
 		Logger:          logger,
 		DisableEpSlices: *disableEpSlices,
-
-		Namespace: *namespace,
+		LeaderElect:     *leaderElect,
+		ResourceName:    *resourceName,
+		Namespace:       *namespace,
 		Listener: k8s.Listener{
 			ServiceChanged: c.SetBalancer,
 			PoolChanged:    c.SetPools,
