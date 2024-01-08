@@ -238,6 +238,11 @@ func speakersForPool(speakers map[string]bool, pool *config.Pool, nodes map[stri
 		if k8snodes.IsNetworkUnavailable(nodes[s]) {
 			continue
 		}
+
+		if k8snodes.IsNodeExcludedFromBalancers(nodes[s]) {
+			continue
+		}
+
 		if poolMatchesNodeL2(pool, s) {
 			res[s] = true
 		}

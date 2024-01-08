@@ -524,6 +524,7 @@ func (c *controller) SetConfig(l log.Logger, cfg *config.Config) controllers.Syn
 
 func (c *controller) SetNode(l log.Logger, node *v1.Node) controllers.SyncState {
 	conditionChanged := isNetworkConditionChanged(node.Name, c.nodes, node)
+	labelNodeExcludeBalancersChanged := isLabelNodeExcludeBalancersChanged(node.Name, c.nodes, node)
 	c.nodes[node.Name] = node
 
 	for proto, handler := range c.protocolHandlers {
@@ -533,7 +534,7 @@ func (c *controller) SetNode(l log.Logger, node *v1.Node) controllers.SyncState 
 		}
 	}
 
-	if conditionChanged {
+	if conditionChanged || labelNodeExcludeBalancersChanged {
 		return controllers.SyncStateReprocessAll
 	}
 
@@ -542,6 +543,10 @@ func (c *controller) SetNode(l log.Logger, node *v1.Node) controllers.SyncState 
 
 func isNetworkConditionChanged(nodeName string, oldNodes map[string]*v1.Node, newNode *v1.Node) bool {
 	return k8snodes.IsNetworkUnavailable(oldNodes[nodeName]) != k8snodes.IsNetworkUnavailable(newNode)
+}
+
+func isLabelNodeExcludeBalancersChanged(nodeName string, oldNodes map[string]*v1.Node, newNode *v1.Node) bool {
+	return k8snodes.IsNodeExcludedFromBalancers(oldNodes[nodeName]) != k8snodes.IsNodeExcludedFromBalancers(newNode)
 }
 
 // A Protocol can advertise an IP address.
