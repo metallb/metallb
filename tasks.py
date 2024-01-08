@@ -842,8 +842,14 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
     for ns in namespaces:
         run("{} -n {} wait --for=condition=Ready --all pods --timeout 300s".format(kubectl_path, ns), hide=True)
 
+    """
+       the control-plane node will be labeled "node.kubernetes.io/exclude-from-external-load-balancers" by default 
+       when the cluster is created. and when https://github.com/metallb/metallb/pull/2073 was merged in, which will 
+       affect the currently e2e tests. In order to code minimal changes, we should remove the label here.
+    """
+    nodes = dont_exclude_from_lb(name)
+
     if node_nics == "kind":
-        nodes = run("kind get nodes --name {name}".format(name=name)).stdout.strip().split("\n")
         node_nics = _get_node_nics(nodes[0])
 
     if local_nics == "kind":
@@ -879,6 +885,13 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
 
     if testrun.failed:
         raise Exit(message="E2E tests failed", code=testrun.return_code)
+
+def dont_exclude_from_lb(name):
+    nodes = run("kind get nodes --name {name}".format(name=name)).stdout.strip().split("\n")
+    for node in nodes:
+        run("{} label nodes {} node.kubernetes.io/exclude-from-external-load-balancers-".format(kubectl_path,node), hide=True)
+    
+    return nodes
 
 @task
 def bumplicense(ctx):

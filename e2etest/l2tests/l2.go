@@ -286,6 +286,62 @@ var _ = ginkgo.Describe("L2", func() {
 				return node.Name
 			}, time.Minute, time.Second).Should(gomega.Equal(nodeToSet))
 		})
+
+		ginkgo.It("It should be work when adding NodeExcludeBalancers label to a node", func() {
+			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", service.TrafficPolicyCluster)
+			defer func() {
+				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+			}()
+
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			framework.ExpectNoError(err)
+
+			ginkgo.By("getting the advertising node")
+			var nodeToSet string
+
+			gomega.Eventually(func() error {
+				node, err := k8s.GetSvcNode(cs, svc.Namespace, svc.Name, allNodes)
+				if err != nil {
+					return err
+				}
+				nodeToSet = node.Name
+				return nil
+			}, time.Minute, time.Second).ShouldNot(gomega.HaveOccurred())
+
+			ginkgo.By("add the NodeExcludeBalancers label of the node")
+
+			// Adding a sleep for AddLabelToNode is to make sure that the lastTimeStep
+			// of the second nodeAssigned event is later than the first one, so that
+			// we can get the correct node name.
+			time.Sleep(time.Second)
+			k8s.AddLabelToNode(nodeToSet, corev1.LabelNodeExcludeBalancers, "", cs)
+			defer func() {
+				ginkgo.By("removing the NodeExcludeBalancers label of the node")
+				k8s.RemoveLabelFromNode(nodeToSet, corev1.LabelNodeExcludeBalancers, cs)
+			}()
+
+			ginkgo.By("validating the service is announced from a different node")
+			gomega.Eventually(func() string {
+				node, err := k8s.GetSvcNode(cs, svc.Namespace, svc.Name, allNodes)
+				if err != nil {
+					return err.Error()
+				}
+				return node.Name
+			}, time.Minute, time.Second).ShouldNot(gomega.Equal(nodeToSet))
+
+			ginkgo.By("removing the NodeExcludeBalancers label of the node")
+			k8s.RemoveLabelFromNode(nodeToSet, corev1.LabelNodeExcludeBalancers, cs)
+
+			ginkgo.By("validating the service is announced back again from the previous node")
+			gomega.Eventually(func() string {
+				node, err := k8s.GetSvcNode(cs, svc.Namespace, svc.Name, allNodes)
+				if err != nil {
+					return err.Error()
+				}
+				return node.Name
+			}, time.Minute, time.Second).Should(gomega.Equal(nodeToSet))
+		})
 	})
 
 	ginkgo.Context("validate different AddressPools for type=Loadbalancer", func() {

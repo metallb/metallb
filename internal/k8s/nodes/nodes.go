@@ -25,3 +25,15 @@ func conditionStatus(n *corev1.Node, ct corev1.NodeConditionType) corev1.Conditi
 
 	return corev1.ConditionUnknown
 }
+
+// IsNodeExcludedFromBalancers returns true if the given node has labeld node.kubernetes.io/exclude-from-external-load-balancers".
+func IsNodeExcludedFromBalancers(n *corev1.Node) bool {
+	if n == nil {
+		return false
+	}
+
+	if _, ok := n.Labels[corev1.LabelNodeExcludeBalancers]; ok {
+		return true
+	}
+	return false
+}
