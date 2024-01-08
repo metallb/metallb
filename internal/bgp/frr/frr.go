@@ -19,6 +19,7 @@ import (
 	metallbconfig "go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/ipfamily"
 	"go.universe.tf/metallb/internal/logging"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 // As the MetalLB controller should handle messages synchronously, there should
@@ -270,9 +271,6 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			rout.neighbors[neighborName] = neighbor
 		}
 
-		/* As 'session.advertised' is a map, we can be sure there are no
-		   duplicate prefixes and can, therefore, just add them to the
-		   'neighbor.Advertisements' list. */
 		for _, adv := range s.advertised {
 			if !adv.MatchesPeer(s.SessionName) {
 				continue
@@ -301,7 +299,11 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				LocalPref:        adv.LocalPref,
 			}
 
-			neighbor.Advertisements = append(neighbor.Advertisements, &advConfig)
+			neighbor.Advertisements, err = addToAdvertisements(neighbor.Advertisements, &advConfig)
+			if err != nil {
+				return nil, err
+			}
+
 			switch family {
 			case ipfamily.IPv4:
 				rout.ipV4Prefixes[prefix] = prefix
@@ -311,7 +313,6 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				neighbor.HasV6Advertisements = true
 			}
 		}
-		sortAdvertiesements(neighbor.Advertisements)
 	}
 
 	for _, r := range sortMap(routers) {
@@ -460,34 +461,50 @@ func sortMap[T any](toSort map[string]T) []T {
 	return res
 }
 
-func sortAdvertiesements(toSort []*advertisementConfig) {
-	sort.Slice(toSort, func(i, j int) bool {
-		if toSort[i].IPFamily != toSort[j].IPFamily {
-			return toSort[i].IPFamily < toSort[j].IPFamily
-		}
-		if toSort[i].Prefix != toSort[j].Prefix {
-			return toSort[i].Prefix < toSort[j].Prefix
-		}
-		if toSort[i].LocalPref != toSort[j].LocalPref {
-			return toSort[i].LocalPref < toSort[j].LocalPref
-		}
-		if len(toSort[i].Communities) != len(toSort[j].Communities) {
-			return len(toSort[i].Communities) < len(toSort[j].Communities)
-		}
-		for k := range toSort[i].Communities {
-			if toSort[i].Communities[k] != toSort[j].Communities[k] {
-				return toSort[i].Communities[k] < toSort[j].Communities[k]
-			}
-		}
-		if len(toSort[i].LargeCommunities) != len(toSort[j].LargeCommunities) {
-			return len(toSort[i].LargeCommunities) < len(toSort[j].LargeCommunities)
-		}
+func addToAdvertisements(current []*advertisementConfig, toAdd *advertisementConfig) ([]*advertisementConfig, error) {
+	i := sort.Search(len(current), func(i int) bool { return current[i].Prefix >= toAdd.Prefix })
+	if i == len(current) {
+		return append(current, toAdd), nil
+	}
 
-		for k := range toSort[i].LargeCommunities {
-			if toSort[i].LargeCommunities[k] != toSort[j].LargeCommunities[k] {
-				return toSort[i].LargeCommunities[k] < toSort[j].LargeCommunities[k]
-			}
+	if current[i].Prefix == toAdd.Prefix {
+		var err error
+		current[i], err = mergeAdvertisements(current[i], toAdd)
+		if err != nil {
+			return nil, err
 		}
-		return false
-	})
+		return current, nil
+	}
+	res := make([]*advertisementConfig, len(current)+1)
+	copy(res[:i], current[:i])
+	copy(res[i+1:], current[i:])
+	res[i] = toAdd
+	return res, nil
+}
+
+func mergeAdvertisements(adv1, adv2 *advertisementConfig) (*advertisementConfig, error) {
+	res := &advertisementConfig{}
+	if adv1.Prefix != adv2.Prefix {
+		return nil, fmt.Errorf("cannot merge advertisements with different prefixes: %s != %s", adv1.Prefix, adv2.Prefix)
+	}
+	if adv1.IPFamily != adv2.IPFamily {
+		return nil, fmt.Errorf("cannot merge advertisements with different ipfamilies: %s != %s", adv1.IPFamily, adv2.IPFamily)
+	}
+	if adv1.LocalPref != adv2.LocalPref {
+		return nil, fmt.Errorf("cannot merge advertisements with different local preferences: %d != %d", adv1.LocalPref, adv2.LocalPref)
+	}
+
+	res.Prefix = adv1.Prefix
+	res.IPFamily = adv1.IPFamily
+	res.LocalPref = adv1.LocalPref
+	res.Communities = mergeCommunities(adv1.Communities, adv2.Communities)
+	res.LargeCommunities = mergeCommunities(adv1.LargeCommunities, adv2.LargeCommunities)
+	return res, nil
+}
+
+func mergeCommunities(c1, c2 []string) []string {
+	communities := sets.New[string]()
+	communities.Insert(c1...)
+	communities.Insert(c2...)
+	return sets.List(communities)
 }
