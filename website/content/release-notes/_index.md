@@ -20,6 +20,8 @@ Chores:
 - Webhooks: avoid transient errors ([PR 2202](https://github.com/metallb/metallb/pull/2202)), [ISSUE 2173](https://github.com/metallb/metallb/issues/2173))
 - Dev-env: Override GOBIN for inv dev-env ([PR 2219](https://github.com/metallb/metallb/pull/2219))
 - Metrics: add ipv4/6 addresses_in_use_total and addresses_total ([PR 2151](https://github.com/metallb/metallb/pull/2151))
+- Squash the prefixes in FRR mode, avoiding duplicate prefixes in the FRR configuration ([PR 2234](https://github.com/metallb/metallb/pull/2234))
+
 
 ## Version 0.13.12
 
