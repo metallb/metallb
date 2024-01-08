@@ -272,10 +272,6 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 		}
 
 		for _, adv := range s.advertised {
-			if !adv.MatchesPeer(s.SessionName) {
-				continue
-			}
-
 			family := ipfamily.ForAddress(adv.Prefix.IP)
 
 			communities := make([]string, 0)
