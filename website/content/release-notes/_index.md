@@ -22,6 +22,7 @@ Chores:
 - Metrics: add ipv4/6 addresses_in_use_total and addresses_total ([PR 2151](https://github.com/metallb/metallb/pull/2151))
 - Squash the prefixes in FRR mode, avoiding duplicate prefixes in the FRR configuration ([PR 2234](https://github.com/metallb/metallb/pull/2234))
 
+- BGP: move the matching peer logic one level up ([PR 2233](https://github.com/metallb/metallb/pull/2233))
 
 ## Version 0.13.12
 
