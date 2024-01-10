@@ -3,15 +3,18 @@
 package config
 
 import (
+	"math/rand"
 	"net"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/pointer"
+	"go.universe.tf/metallb/internal/shuffler"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -3446,6 +3449,224 @@ func TestContainsAdvertisement(t *testing.T) {
 		if result != test.expect {
 			t.Errorf("%s: expect is %v, but result is %v", test.desc, test.expect, result)
 		}
+	}
+}
+
+func TestConversionIsStable(t *testing.T) {
+	toCheck := ClusterResources{
+		Peers: []v1beta2.BGPPeer{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "peer1",
+				},
+				Spec: v1beta2.BGPPeerSpec{
+					MyASN:        42,
+					ASN:          142,
+					Address:      "1.2.3.4",
+					Port:         1179,
+					HoldTime:     metav1.Duration{Duration: 180 * time.Second},
+					RouterID:     "10.20.30.40",
+					SrcAddress:   "10.20.30.40",
+					EBGPMultiHop: true,
+					VRFName:      "foo",
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "peer2",
+				},
+				Spec: v1beta2.BGPPeerSpec{
+					MyASN:        100,
+					ASN:          200,
+					Address:      "2.3.4.5",
+					EBGPMultiHop: false,
+					NodeSelectors: []metav1.LabelSelector{
+						{
+							MatchLabels: map[string]string{
+								"foo": "bar",
+							},
+							MatchExpressions: []metav1.LabelSelectorRequirement{
+								{
+									Key:      "bar",
+									Operator: "In",
+									Values:   []string{"quux"},
+								},
+							},
+						}, {
+							MatchLabels: map[string]string{
+								"foo1": "bar1",
+							},
+						},
+					},
+				},
+			},
+		},
+		Pools: []v1beta1.IPAddressPool{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pool1",
+				},
+				Spec: v1beta1.IPAddressPoolSpec{
+					Addresses: []string{
+						"10.20.0.0/16",
+						"10.50.0.0/24",
+						"10.56.0.0/24",
+					},
+					AvoidBuggyIPs: true,
+					AutoAssign:    pointer.BoolPtr(false),
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pool2",
+				},
+				Spec: v1beta1.IPAddressPoolSpec{
+					Addresses: []string{
+						"30.0.0.0/8",
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pool3",
+				},
+				Spec: v1beta1.IPAddressPoolSpec{
+					Addresses: []string{
+						"40.0.0.0/25",
+						"40.0.0.150-40.0.0.200",
+						"40.0.0.210 - 40.0.0.240",
+						"40.0.0.250 - 40.0.0.250",
+					},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pool4",
+				},
+				Spec: v1beta1.IPAddressPoolSpec{
+					Addresses: []string{
+						"2001:db8::/64",
+					},
+				},
+			},
+		},
+		BGPAdvs: []v1beta1.BGPAdvertisement{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "adv1",
+				},
+				Spec: v1beta1.BGPAdvertisementSpec{
+					AggregationLength: pointer.Int32Ptr(32),
+					LocalPref:         uint32(100),
+					Communities:       []string{"bar"},
+					IPAddressPools:    []string{"pool1", "pool2", "pool3"},
+					Peers:             []string{"peer1", "peer2"},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "adv2",
+				},
+				Spec: v1beta1.BGPAdvertisementSpec{
+					AggregationLength:   pointer.Int32Ptr(24),
+					AggregationLengthV6: pointer.Int32Ptr(64),
+					IPAddressPools:      []string{"pool1"},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "adv3",
+				},
+				Spec: v1beta1.BGPAdvertisementSpec{
+					IPAddressPools: []string{"pool2"},
+					Peers:          []string{"peer2", "peer3"},
+					Communities:    []string{"2000:2001", "2000:2002"},
+				},
+			}, {
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "adv4",
+				},
+				Spec: v1beta1.BGPAdvertisementSpec{
+					Communities: []string{"comm3", "comm4"},
+				},
+			},
+		},
+		L2Advs: []v1beta1.L2Advertisement{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "l2adv1",
+				},
+				Spec: v1beta1.L2AdvertisementSpec{
+					IPAddressPools: []string{"pool3"},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "l2adv2",
+				},
+				Spec: v1beta1.L2AdvertisementSpec{
+					Interfaces:     []string{"eth0", "eth1", "eth2"},
+					IPAddressPools: []string{"pool1", "pool3"},
+				},
+			},
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "l2adv3",
+				},
+				Spec: v1beta1.L2AdvertisementSpec{
+					Interfaces:     []string{"eth0", "eth2"},
+					IPAddressPools: []string{"pool1", "pool3"},
+				},
+			},
+		},
+		Communities: []v1beta1.Community{
+			{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "community",
+				},
+				Spec: v1beta1.CommunitySpec{
+					Communities: []v1beta1.CommunityAlias{
+						{
+							Name:  "bar",
+							Value: "64512:1234",
+						}, {
+							Name:  "bar1",
+							Value: "64512:1235",
+						},
+					},
+				},
+			}, {
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "community1",
+				},
+				Spec: v1beta1.CommunitySpec{
+					Communities: []v1beta1.CommunityAlias{
+						{
+							Name:  "comm3",
+							Value: "64512:1236",
+						}, {
+							Name:  "comm4",
+							Value: "64512:1237",
+						},
+					},
+				},
+			},
+		},
+	}
+	seed := time.Now().UnixNano()
+	rnd := rand.New(rand.NewSource(seed))
+	var prev *Config
+	for i := 0; i < 10; i++ {
+		shuffler.Shuffle(toCheck, rnd)
+		got, err := For(toCheck, DontValidate)
+		if err != nil {
+			t.Fail()
+		}
+		if prev != nil && cmp.Equal(*got, *prev, cmpopts.IgnoreUnexported(Pool{})) {
+			t.Fatalf("different iterations, seed %d: %s", seed, cmp.Diff(*got, *prev))
+		}
+
+		prev = got
 	}
 }
 
