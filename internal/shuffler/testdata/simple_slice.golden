@@ -1,0 +1,5 @@
+([]string) (len=3 cap=3) {
+ (string) (len=1) "a",
+ (string) (len=1) "c",
+ (string) (len=1) "b"
+}

@@ -1,0 +1,44 @@
+(shuffler.TestStruct2) {
+ A: (int) 1,
+ B: ([]string) (len=3 cap=3) {
+  (string) (len=1) "a",
+  (string) (len=1) "b",
+  (string) (len=1) "c"
+ },
+ C: ([]shuffler.TestStruct) (len=2 cap=2) {
+  (shuffler.TestStruct) {
+   A: (int) 2,
+   B: ([]string) (len=3 cap=3) {
+    (string) (len=1) "a",
+    (string) (len=1) "c",
+    (string) (len=1) "b"
+   }
+  },
+  (shuffler.TestStruct) {
+   A: (int) 1,
+   B: ([]string) (len=3 cap=3) {
+    (string) (len=1) "a",
+    (string) (len=1) "c",
+    (string) (len=1) "b"
+   }
+  }
+ },
+ D: ([]*shuffler.TestStruct) (len=2 cap=2) {
+  (*shuffler.TestStruct)({
+   A: (int) 2,
+   B: ([]string) (len=3 cap=3) {
+    (string) (len=1) "a",
+    (string) (len=1) "b",
+    (string) (len=1) "c"
+   }
+  }),
+  (*shuffler.TestStruct)({
+   A: (int) 1,
+   B: ([]string) (len=3 cap=3) {
+    (string) (len=1) "a",
+    (string) (len=1) "b",
+    (string) (len=1) "c"
+   }
+  })
+ }
+}
