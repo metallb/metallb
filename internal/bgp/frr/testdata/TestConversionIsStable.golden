@@ -1,0 +1,391 @@
+log file /etc/frr/frr.log 
+log timestamp precision 3
+hostname dummyhostname
+ip nht resolve-via-default
+ipv6 nht resolve-via-default
+route-map 10.2.2.254-in deny 20
+
+
+
+ ip prefix-list 10.2.2.254-pl-ipv4 seq 1 permit 172.16.1.10/24
+
+
+ip prefix-list 10.2.2.254-3333:4444-ipv4-community-prefixes seq 1 permit 172.16.1.11/24
+route-map 10.2.2.254-out permit 1
+  match ip address prefix-list 10.2.2.254-3333:4444-ipv4-community-prefixes
+  set community 3333:4444 additive
+  on-match next
+ip prefix-list 10.2.2.254-large:1111:2222:3333-ipv4-community-prefixes permit 172.16.1.11/24
+route-map 10.2.2.254-out permit 2
+  match ip address prefix-list 10.2.2.254-large:1111:2222:3333-ipv4-community-prefixes
+  set large-community 1111:2222:3333 additive
+  on-match next
+ip prefix-list 10.2.2.254-large:2222:3333:4444-ipv4-community-prefixes permit 172.16.1.11/24
+route-map 10.2.2.254-out permit 3
+  match ip address prefix-list 10.2.2.254-large:2222:3333:4444-ipv4-community-prefixes
+  set large-community 2222:3333:4444 additive
+  on-match next
+
+
+ ip prefix-list 10.2.2.254-pl-ipv4 seq 2 permit 172.16.1.11/24
+
+
+ip prefix-list 10.2.2.254-200-ipv4-localpref-prefixes seq 1 permit 172.16.1.12/24
+route-map 10.2.2.254-out permit 4
+  match ip address prefix-list 10.2.2.254-200-ipv4-localpref-prefixes
+  set local-preference 200
+  on-match next
+
+
+ ip prefix-list 10.2.2.254-pl-ipv4 seq 3 permit 172.16.1.12/24
+
+
+ip prefix-list 10.2.2.254-300-ipv4-localpref-prefixes seq 1 permit 172.16.1.13/24
+route-map 10.2.2.254-out permit 5
+  match ip address prefix-list 10.2.2.254-300-ipv4-localpref-prefixes
+  set local-preference 300
+  on-match next
+
+ip prefix-list 10.2.2.254-3333:4444-ipv4-community-prefixes seq 2 permit 172.16.1.13/24
+route-map 10.2.2.254-out permit 6
+  match ip address prefix-list 10.2.2.254-3333:4444-ipv4-community-prefixes
+  set community 3333:4444 additive
+  on-match next
+ip prefix-list 10.2.2.254-large:1111:2222:3333-ipv4-community-prefixes permit 172.16.1.13/24
+route-map 10.2.2.254-out permit 7
+  match ip address prefix-list 10.2.2.254-large:1111:2222:3333-ipv4-community-prefixes
+  set large-community 1111:2222:3333 additive
+  on-match next
+ip prefix-list 10.2.2.254-large:2222:3333:4444-ipv4-community-prefixes permit 172.16.1.13/24
+route-map 10.2.2.254-out permit 8
+  match ip address prefix-list 10.2.2.254-large:2222:3333:4444-ipv4-community-prefixes
+  set large-community 2222:3333:4444 additive
+  on-match next
+
+
+ ip prefix-list 10.2.2.254-pl-ipv4 seq 4 permit 172.16.1.13/24
+
+
+
+
+ipv6 prefix-list 10.2.2.254-pl-ipv4 seq 5 deny any
+
+route-map 10.2.2.254-out permit 9
+  match ip address prefix-list 10.2.2.254-pl-ipv4
+route-map 10.2.2.254-out permit 10
+  match ipv6 address prefix-list 10.2.2.254-pl-ipv4
+route-map 10.2.2.255-in deny 20
+
+
+
+ ip prefix-list 10.2.2.255-pl-ipv4 seq 1 permit 172.16.1.10/24
+
+
+ip prefix-list 10.2.2.255-3333:4444-ipv4-community-prefixes seq 1 permit 172.16.1.11/24
+route-map 10.2.2.255-out permit 1
+  match ip address prefix-list 10.2.2.255-3333:4444-ipv4-community-prefixes
+  set community 3333:4444 additive
+  on-match next
+ip prefix-list 10.2.2.255-large:1111:2222:3333-ipv4-community-prefixes permit 172.16.1.11/24
+route-map 10.2.2.255-out permit 2
+  match ip address prefix-list 10.2.2.255-large:1111:2222:3333-ipv4-community-prefixes
+  set large-community 1111:2222:3333 additive
+  on-match next
+ip prefix-list 10.2.2.255-large:2222:3333:4444-ipv4-community-prefixes permit 172.16.1.11/24
+route-map 10.2.2.255-out permit 3
+  match ip address prefix-list 10.2.2.255-large:2222:3333:4444-ipv4-community-prefixes
+  set large-community 2222:3333:4444 additive
+  on-match next
+
+
+ ip prefix-list 10.2.2.255-pl-ipv4 seq 2 permit 172.16.1.11/24
+
+
+ip prefix-list 10.2.2.255-200-ipv4-localpref-prefixes seq 1 permit 172.16.1.12/24
+route-map 10.2.2.255-out permit 4
+  match ip address prefix-list 10.2.2.255-200-ipv4-localpref-prefixes
+  set local-preference 200
+  on-match next
+
+
+ ip prefix-list 10.2.2.255-pl-ipv4 seq 3 permit 172.16.1.12/24
+
+
+ip prefix-list 10.2.2.255-300-ipv4-localpref-prefixes seq 1 permit 172.16.1.13/24
+route-map 10.2.2.255-out permit 5
+  match ip address prefix-list 10.2.2.255-300-ipv4-localpref-prefixes
+  set local-preference 300
+  on-match next
+
+ip prefix-list 10.2.2.255-3333:4444-ipv4-community-prefixes seq 2 permit 172.16.1.13/24
+route-map 10.2.2.255-out permit 6
+  match ip address prefix-list 10.2.2.255-3333:4444-ipv4-community-prefixes
+  set community 3333:4444 additive
+  on-match next
+ip prefix-list 10.2.2.255-large:1111:2222:3333-ipv4-community-prefixes permit 172.16.1.13/24
+route-map 10.2.2.255-out permit 7
+  match ip address prefix-list 10.2.2.255-large:1111:2222:3333-ipv4-community-prefixes
+  set large-community 1111:2222:3333 additive
+  on-match next
+ip prefix-list 10.2.2.255-large:2222:3333:4444-ipv4-community-prefixes permit 172.16.1.13/24
+route-map 10.2.2.255-out permit 8
+  match ip address prefix-list 10.2.2.255-large:2222:3333:4444-ipv4-community-prefixes
+  set large-community 2222:3333:4444 additive
+  on-match next
+
+
+ ip prefix-list 10.2.2.255-pl-ipv4 seq 4 permit 172.16.1.13/24
+
+
+
+
+ipv6 prefix-list 10.2.2.255-pl-ipv4 seq 5 deny any
+
+route-map 10.2.2.255-out permit 9
+  match ip address prefix-list 10.2.2.255-pl-ipv4
+route-map 10.2.2.255-out permit 10
+  match ipv6 address prefix-list 10.2.2.255-pl-ipv4
+route-map 10.2.2.238-red-in deny 20
+
+
+
+ ip prefix-list 10.2.2.238-red-pl-ipv4 seq 1 permit 172.16.1.10/24
+
+
+ip prefix-list 10.2.2.238-red-3333:4444-ipv4-community-prefixes seq 1 permit 172.16.1.11/24
+route-map 10.2.2.238-red-out permit 1
+  match ip address prefix-list 10.2.2.238-red-3333:4444-ipv4-community-prefixes
+  set community 3333:4444 additive
+  on-match next
+ip prefix-list 10.2.2.238-red-large:1111:2222:3333-ipv4-community-prefixes permit 172.16.1.11/24
+route-map 10.2.2.238-red-out permit 2
+  match ip address prefix-list 10.2.2.238-red-large:1111:2222:3333-ipv4-community-prefixes
+  set large-community 1111:2222:3333 additive
+  on-match next
+ip prefix-list 10.2.2.238-red-large:2222:3333:4444-ipv4-community-prefixes permit 172.16.1.11/24
+route-map 10.2.2.238-red-out permit 3
+  match ip address prefix-list 10.2.2.238-red-large:2222:3333:4444-ipv4-community-prefixes
+  set large-community 2222:3333:4444 additive
+  on-match next
+
+
+ ip prefix-list 10.2.2.238-red-pl-ipv4 seq 2 permit 172.16.1.11/24
+
+
+ip prefix-list 10.2.2.238-red-200-ipv4-localpref-prefixes seq 1 permit 172.16.1.12/24
+route-map 10.2.2.238-red-out permit 4
+  match ip address prefix-list 10.2.2.238-red-200-ipv4-localpref-prefixes
+  set local-preference 200
+  on-match next
+
+
+ ip prefix-list 10.2.2.238-red-pl-ipv4 seq 3 permit 172.16.1.12/24
+
+
+ip prefix-list 10.2.2.238-red-300-ipv4-localpref-prefixes seq 1 permit 172.16.1.13/24
+route-map 10.2.2.238-red-out permit 5
+  match ip address prefix-list 10.2.2.238-red-300-ipv4-localpref-prefixes
+  set local-preference 300
+  on-match next
+
+ip prefix-list 10.2.2.238-red-3333:4444-ipv4-community-prefixes seq 2 permit 172.16.1.13/24
+route-map 10.2.2.238-red-out permit 6
+  match ip address prefix-list 10.2.2.238-red-3333:4444-ipv4-community-prefixes
+  set community 3333:4444 additive
+  on-match next
+ip prefix-list 10.2.2.238-red-large:1111:2222:3333-ipv4-community-prefixes permit 172.16.1.13/24
+route-map 10.2.2.238-red-out permit 7
+  match ip address prefix-list 10.2.2.238-red-large:1111:2222:3333-ipv4-community-prefixes
+  set large-community 1111:2222:3333 additive
+  on-match next
+ip prefix-list 10.2.2.238-red-large:2222:3333:4444-ipv4-community-prefixes permit 172.16.1.13/24
+route-map 10.2.2.238-red-out permit 8
+  match ip address prefix-list 10.2.2.238-red-large:2222:3333:4444-ipv4-community-prefixes
+  set large-community 2222:3333:4444 additive
+  on-match next
+
+
+ ip prefix-list 10.2.2.238-red-pl-ipv4 seq 4 permit 172.16.1.13/24
+
+
+
+
+ipv6 prefix-list 10.2.2.238-red-pl-ipv4 seq 5 deny any
+
+route-map 10.2.2.238-red-out permit 9
+  match ip address prefix-list 10.2.2.238-red-pl-ipv4
+route-map 10.2.2.238-red-out permit 10
+  match ipv6 address prefix-list 10.2.2.238-red-pl-ipv4
+route-map 10.2.2.255-red-in deny 20
+
+
+
+ ip prefix-list 10.2.2.255-red-pl-ipv4 seq 1 permit 172.16.1.10/24
+
+
+ip prefix-list 10.2.2.255-red-3333:4444-ipv4-community-prefixes seq 1 permit 172.16.1.11/24
+route-map 10.2.2.255-red-out permit 1
+  match ip address prefix-list 10.2.2.255-red-3333:4444-ipv4-community-prefixes
+  set community 3333:4444 additive
+  on-match next
+ip prefix-list 10.2.2.255-red-large:1111:2222:3333-ipv4-community-prefixes permit 172.16.1.11/24
+route-map 10.2.2.255-red-out permit 2
+  match ip address prefix-list 10.2.2.255-red-large:1111:2222:3333-ipv4-community-prefixes
+  set large-community 1111:2222:3333 additive
+  on-match next
+ip prefix-list 10.2.2.255-red-large:2222:3333:4444-ipv4-community-prefixes permit 172.16.1.11/24
+route-map 10.2.2.255-red-out permit 3
+  match ip address prefix-list 10.2.2.255-red-large:2222:3333:4444-ipv4-community-prefixes
+  set large-community 2222:3333:4444 additive
+  on-match next
+
+
+ ip prefix-list 10.2.2.255-red-pl-ipv4 seq 2 permit 172.16.1.11/24
+
+
+ip prefix-list 10.2.2.255-red-200-ipv4-localpref-prefixes seq 1 permit 172.16.1.12/24
+route-map 10.2.2.255-red-out permit 4
+  match ip address prefix-list 10.2.2.255-red-200-ipv4-localpref-prefixes
+  set local-preference 200
+  on-match next
+
+
+ ip prefix-list 10.2.2.255-red-pl-ipv4 seq 3 permit 172.16.1.12/24
+
+
+ip prefix-list 10.2.2.255-red-300-ipv4-localpref-prefixes seq 1 permit 172.16.1.13/24
+route-map 10.2.2.255-red-out permit 5
+  match ip address prefix-list 10.2.2.255-red-300-ipv4-localpref-prefixes
+  set local-preference 300
+  on-match next
+
+ip prefix-list 10.2.2.255-red-3333:4444-ipv4-community-prefixes seq 2 permit 172.16.1.13/24
+route-map 10.2.2.255-red-out permit 6
+  match ip address prefix-list 10.2.2.255-red-3333:4444-ipv4-community-prefixes
+  set community 3333:4444 additive
+  on-match next
+ip prefix-list 10.2.2.255-red-large:1111:2222:3333-ipv4-community-prefixes permit 172.16.1.13/24
+route-map 10.2.2.255-red-out permit 7
+  match ip address prefix-list 10.2.2.255-red-large:1111:2222:3333-ipv4-community-prefixes
+  set large-community 1111:2222:3333 additive
+  on-match next
+ip prefix-list 10.2.2.255-red-large:2222:3333:4444-ipv4-community-prefixes permit 172.16.1.13/24
+route-map 10.2.2.255-red-out permit 8
+  match ip address prefix-list 10.2.2.255-red-large:2222:3333:4444-ipv4-community-prefixes
+  set large-community 2222:3333:4444 additive
+  on-match next
+
+
+ ip prefix-list 10.2.2.255-red-pl-ipv4 seq 4 permit 172.16.1.13/24
+
+
+
+
+ipv6 prefix-list 10.2.2.255-red-pl-ipv4 seq 5 deny any
+
+route-map 10.2.2.255-red-out permit 9
+  match ip address prefix-list 10.2.2.255-red-pl-ipv4
+route-map 10.2.2.255-red-out permit 10
+  match ipv6 address prefix-list 10.2.2.255-red-pl-ipv4
+
+router bgp 100
+  no bgp ebgp-requires-policy
+  no bgp network import-check
+  no bgp default ipv4-unicast
+
+  neighbor 10.2.2.254 remote-as 200
+  neighbor 10.2.2.254 ebgp-multihop
+  neighbor 10.2.2.254 port 179
+  neighbor 10.2.2.254 timers 1 1
+  neighbor 10.2.2.254 password password
+  
+  neighbor 10.2.2.255 remote-as 200
+  neighbor 10.2.2.255 ebgp-multihop
+  neighbor 10.2.2.255 port 179
+  neighbor 10.2.2.255 timers 1 1
+  neighbor 10.2.2.255 password password
+  
+
+  address-family ipv4 unicast
+    neighbor 10.2.2.254 activate
+    neighbor 10.2.2.254 route-map 10.2.2.254-in in
+    neighbor 10.2.2.254 route-map 10.2.2.254-out out
+  exit-address-family
+  address-family ipv6 unicast
+    neighbor 10.2.2.254 activate
+    neighbor 10.2.2.254 route-map 10.2.2.254-in in
+    neighbor 10.2.2.254 route-map 10.2.2.254-out out
+  exit-address-family
+
+  address-family ipv4 unicast
+    neighbor 10.2.2.255 activate
+    neighbor 10.2.2.255 route-map 10.2.2.255-in in
+    neighbor 10.2.2.255 route-map 10.2.2.255-out out
+  exit-address-family
+  address-family ipv6 unicast
+    neighbor 10.2.2.255 activate
+    neighbor 10.2.2.255 route-map 10.2.2.255-in in
+    neighbor 10.2.2.255 route-map 10.2.2.255-out out
+  exit-address-family
+  address-family ipv4 unicast
+    network 172.16.1.10/24
+    network 172.16.1.11/24
+    network 172.16.1.12/24
+    network 172.16.1.13/24
+  exit-address-family
+
+router bgp 100 vrf red
+  no bgp ebgp-requires-policy
+  no bgp network import-check
+  no bgp default ipv4-unicast
+
+  neighbor 10.2.2.238 remote-as 200
+  neighbor 10.2.2.238 ebgp-multihop
+  neighbor 10.2.2.238 port 179
+  neighbor 10.2.2.238 timers 1 1
+  neighbor 10.2.2.238 password password
+  
+  neighbor 10.2.2.238 bfd profile testprofile
+  neighbor 10.2.2.255 remote-as 200
+  neighbor 10.2.2.255 ebgp-multihop
+  neighbor 10.2.2.255 port 179
+  neighbor 10.2.2.255 timers 1 1
+  neighbor 10.2.2.255 password password
+  
+
+  address-family ipv4 unicast
+    neighbor 10.2.2.238 activate
+    neighbor 10.2.2.238 route-map 10.2.2.238-red-in in
+    neighbor 10.2.2.238 route-map 10.2.2.238-red-out out
+  exit-address-family
+  address-family ipv6 unicast
+    neighbor 10.2.2.238 activate
+    neighbor 10.2.2.238 route-map 10.2.2.238-red-in in
+    neighbor 10.2.2.238 route-map 10.2.2.238-red-out out
+  exit-address-family
+
+  address-family ipv4 unicast
+    neighbor 10.2.2.255 activate
+    neighbor 10.2.2.255 route-map 10.2.2.255-red-in in
+    neighbor 10.2.2.255 route-map 10.2.2.255-red-out out
+  exit-address-family
+  address-family ipv6 unicast
+    neighbor 10.2.2.255 activate
+    neighbor 10.2.2.255 route-map 10.2.2.255-red-in in
+    neighbor 10.2.2.255 route-map 10.2.2.255-red-out out
+  exit-address-family
+  address-family ipv4 unicast
+    network 172.16.1.10/24
+    network 172.16.1.11/24
+    network 172.16.1.12/24
+    network 172.16.1.13/24
+  exit-address-family
+
+
+bfd
+  profile bar
+    transmit-interval 70
+    
+  profile testprofile
+    receive-interval 60
+    

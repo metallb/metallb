@@ -1,0 +1,298 @@
+{
+    "metadata": {
+        "name": "metallb-testnodename",
+        "namespace": "testnamespace",
+        "creationTimestamp": null
+    },
+    "spec": {
+        "bgp": {
+            "routers": [
+                {
+                    "asn": 100,
+                    "neighbors": [
+                        {
+                            "asn": 200,
+                            "address": "10.2.2.254",
+                            "port": 179,
+                            "password": "password",
+                            "passwordSecret": {},
+                            "holdTime": "1s",
+                            "keepaliveTime": "1s",
+                            "ebgpMultiHop": true,
+                            "toAdvertise": {
+                                "allowed": {
+                                    "prefixes": [
+                                        "172.16.1.10/24",
+                                        "172.16.1.11/24",
+                                        "172.16.1.12/24",
+                                        "172.16.1.13/24"
+                                    ]
+                                },
+                                "withLocalPref": [
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.12/24"
+                                        ],
+                                        "localPref": 200
+                                    },
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.13/24"
+                                        ],
+                                        "localPref": 300
+                                    }
+                                ],
+                                "withCommunity": [
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.11/24",
+                                            "172.16.1.13/24"
+                                        ],
+                                        "community": "3333:4444"
+                                    },
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.11/24",
+                                            "172.16.1.13/24"
+                                        ],
+                                        "community": "large:1111:2222:3333"
+                                    },
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.11/24",
+                                            "172.16.1.13/24"
+                                        ],
+                                        "community": "large:2222:3333:4444"
+                                    }
+                                ]
+                            },
+                            "toReceive": {
+                                "allowed": {}
+                            }
+                        },
+                        {
+                            "asn": 200,
+                            "address": "10.2.2.255",
+                            "port": 179,
+                            "password": "password",
+                            "passwordSecret": {},
+                            "holdTime": "1s",
+                            "keepaliveTime": "1s",
+                            "ebgpMultiHop": true,
+                            "toAdvertise": {
+                                "allowed": {
+                                    "prefixes": [
+                                        "172.16.1.10/24",
+                                        "172.16.1.11/24",
+                                        "172.16.1.12/24",
+                                        "172.16.1.13/24"
+                                    ]
+                                },
+                                "withLocalPref": [
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.12/24"
+                                        ],
+                                        "localPref": 200
+                                    },
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.13/24"
+                                        ],
+                                        "localPref": 300
+                                    }
+                                ],
+                                "withCommunity": [
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.11/24",
+                                            "172.16.1.13/24"
+                                        ],
+                                        "community": "3333:4444"
+                                    },
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.11/24",
+                                            "172.16.1.13/24"
+                                        ],
+                                        "community": "large:1111:2222:3333"
+                                    },
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.11/24",
+                                            "172.16.1.13/24"
+                                        ],
+                                        "community": "large:2222:3333:4444"
+                                    }
+                                ]
+                            },
+                            "toReceive": {
+                                "allowed": {}
+                            }
+                        }
+                    ],
+                    "prefixes": [
+                        "172.16.1.10/24",
+                        "172.16.1.11/24",
+                        "172.16.1.12/24",
+                        "172.16.1.13/24"
+                    ]
+                },
+                {
+                    "asn": 100,
+                    "vrf": "red",
+                    "neighbors": [
+                        {
+                            "asn": 200,
+                            "address": "10.2.2.238",
+                            "port": 179,
+                            "password": "password",
+                            "passwordSecret": {},
+                            "holdTime": "1s",
+                            "keepaliveTime": "1s",
+                            "ebgpMultiHop": true,
+                            "bfdProfile": "testprofile",
+                            "toAdvertise": {
+                                "allowed": {
+                                    "prefixes": [
+                                        "172.16.1.10/24",
+                                        "172.16.1.11/24",
+                                        "172.16.1.12/24",
+                                        "172.16.1.13/24"
+                                    ]
+                                },
+                                "withLocalPref": [
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.12/24"
+                                        ],
+                                        "localPref": 200
+                                    },
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.13/24"
+                                        ],
+                                        "localPref": 300
+                                    }
+                                ],
+                                "withCommunity": [
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.11/24",
+                                            "172.16.1.13/24"
+                                        ],
+                                        "community": "3333:4444"
+                                    },
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.11/24",
+                                            "172.16.1.13/24"
+                                        ],
+                                        "community": "large:1111:2222:3333"
+                                    },
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.11/24",
+                                            "172.16.1.13/24"
+                                        ],
+                                        "community": "large:2222:3333:4444"
+                                    }
+                                ]
+                            },
+                            "toReceive": {
+                                "allowed": {}
+                            }
+                        },
+                        {
+                            "asn": 200,
+                            "address": "10.2.2.255",
+                            "port": 179,
+                            "password": "password",
+                            "passwordSecret": {},
+                            "holdTime": "1s",
+                            "keepaliveTime": "1s",
+                            "ebgpMultiHop": true,
+                            "toAdvertise": {
+                                "allowed": {
+                                    "prefixes": [
+                                        "172.16.1.10/24",
+                                        "172.16.1.11/24",
+                                        "172.16.1.12/24",
+                                        "172.16.1.13/24"
+                                    ]
+                                },
+                                "withLocalPref": [
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.12/24"
+                                        ],
+                                        "localPref": 200
+                                    },
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.13/24"
+                                        ],
+                                        "localPref": 300
+                                    }
+                                ],
+                                "withCommunity": [
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.11/24",
+                                            "172.16.1.13/24"
+                                        ],
+                                        "community": "3333:4444"
+                                    },
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.11/24",
+                                            "172.16.1.13/24"
+                                        ],
+                                        "community": "large:1111:2222:3333"
+                                    },
+                                    {
+                                        "prefixes": [
+                                            "172.16.1.11/24",
+                                            "172.16.1.13/24"
+                                        ],
+                                        "community": "large:2222:3333:4444"
+                                    }
+                                ]
+                            },
+                            "toReceive": {
+                                "allowed": {}
+                            }
+                        }
+                    ],
+                    "prefixes": [
+                        "172.16.1.10/24",
+                        "172.16.1.11/24",
+                        "172.16.1.12/24",
+                        "172.16.1.13/24"
+                    ]
+                }
+            ],
+            "bfdProfiles": [
+                {
+                    "name": "bar",
+                    "transmitInterval": 70,
+                    "echoMode": false,
+                    "passiveMode": false
+                },
+                {
+                    "name": "testprofile",
+                    "receiveInterval": 60,
+                    "echoMode": false,
+                    "passiveMode": false
+                }
+            ]
+        },
+        "raw": {},
+        "nodeSelector": {
+            "matchLabels": {
+                "kubernetes.io/hostname": "testnodename"
+            }
+        }
+    },
+    "status": {}
+}

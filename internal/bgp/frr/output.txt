@@ -1,0 +1,3020 @@
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=1 cap=1) {
+  (*frr.routerConfig)(0xc00014aa10)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=1 cap=1) {
+    (*frr.neighborConfig)(0xc00037a000)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) {
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) {
+ },
+ ExtraConfig: (string) ""
+}
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=1 cap=1) {
+  (*frr.routerConfig)(0xc00014a000)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc00037a180)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc00037a0c0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) {
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) {
+ },
+ ExtraConfig: (string) ""
+}
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc0002e8000)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000000180)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc0000000c0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) {
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc0002e8070)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=1 cap=1) {
+    (*frr.neighborConfig)(0xc000000240)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) {
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) {
+ },
+ ExtraConfig: (string) ""
+}
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc0002e80e0)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc0000003c0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000000300)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) {
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc0002e8150)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000000480)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000000540)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) {
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) {
+ },
+ ExtraConfig: (string) ""
+}
+FEDE created sessions
+FEDE sync BFD
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc0002e81c0)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000000a80)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000000600)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) {
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc0002e8230)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000000c00)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000000cc0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) {
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) (len=2 cap=2) {
+  (frr.BFDProfile) {
+   Name: (string) (len=3) "bar",
+   ReceiveInterval: (*uint32)(<nil>),
+   TransmitInterval: (*uint32)(0xc0004c3604)(70),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  },
+  (frr.BFDProfile) {
+   Name: (string) (len=11) "testprofile",
+   ReceiveInterval: (*uint32)(0xc0004c3600)(60),
+   TransmitInterval: (*uint32)(<nil>),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  }
+ },
+ ExtraConfig: (string) ""
+}
+FEDE advertise
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc0002e82a0)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000000d80)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000000fc0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057ad20)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.12/24",
+       Communities: ([]string) {
+       },
+       LargeCommunities: ([]string) {
+       },
+       LocalPref: (uint32) 200
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) (len=1 cap=1) {
+    (string) (len=14) "172.16.1.12/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc0002e8380)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000000e40)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000000f00)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) {
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) (len=2 cap=2) {
+  (frr.BFDProfile) {
+   Name: (string) (len=3) "bar",
+   ReceiveInterval: (*uint32)(<nil>),
+   TransmitInterval: (*uint32)(0xc0004c3604)(70),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  },
+  (frr.BFDProfile) {
+   Name: (string) (len=11) "testprofile",
+   ReceiveInterval: (*uint32)(0xc0004c3600)(60),
+   TransmitInterval: (*uint32)(<nil>),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  }
+ },
+ ExtraConfig: (string) ""
+}
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc0002e83f0)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000001080)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc0000012c0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057ae40)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.10/24",
+       Communities: ([]string) {
+       },
+       LargeCommunities: ([]string) {
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) (len=1 cap=1) {
+    (string) (len=14) "172.16.1.10/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc0002e8460)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000001140)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000001200)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) {
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) (len=2 cap=2) {
+  (frr.BFDProfile) {
+   Name: (string) (len=3) "bar",
+   ReceiveInterval: (*uint32)(<nil>),
+   TransmitInterval: (*uint32)(0xc0004c3604)(70),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  },
+  (frr.BFDProfile) {
+   Name: (string) (len=11) "testprofile",
+   ReceiveInterval: (*uint32)(0xc0004c3600)(60),
+   TransmitInterval: (*uint32)(<nil>),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  }
+ },
+ ExtraConfig: (string) ""
+}
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc0002e84d0)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc0000015c0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000001500)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057af60)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.13/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 300
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) (len=1 cap=1) {
+    (string) (len=14) "172.16.1.13/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc0002e8540)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000001380)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000001440)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) {
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) (len=2 cap=2) {
+  (frr.BFDProfile) {
+   Name: (string) (len=3) "bar",
+   ReceiveInterval: (*uint32)(<nil>),
+   TransmitInterval: (*uint32)(0xc0004c3604)(70),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  },
+  (frr.BFDProfile) {
+   Name: (string) (len=11) "testprofile",
+   ReceiveInterval: (*uint32)(0xc0004c3600)(60),
+   TransmitInterval: (*uint32)(<nil>),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  }
+ },
+ ExtraConfig: (string) ""
+}
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc0002e85b0)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000001740)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000001680)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057b080)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.11/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) (len=1 cap=1) {
+    (string) (len=14) "172.16.1.11/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc0002e8690)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000001800)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc0000018c0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) {
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) (len=2 cap=2) {
+  (frr.BFDProfile) {
+   Name: (string) (len=3) "bar",
+   ReceiveInterval: (*uint32)(<nil>),
+   TransmitInterval: (*uint32)(0xc0004c3604)(70),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  },
+  (frr.BFDProfile) {
+   Name: (string) (len=11) "testprofile",
+   ReceiveInterval: (*uint32)(0xc0004c3600)(60),
+   TransmitInterval: (*uint32)(<nil>),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  }
+ },
+ ExtraConfig: (string) ""
+}
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc0002e8700)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000001a40)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057b200)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.11/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000001980)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057b1a0)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.11/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) (len=1 cap=1) {
+    (string) (len=14) "172.16.1.11/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc0002e8770)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000001b00)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000001bc0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) {
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) (len=2 cap=2) {
+  (frr.BFDProfile) {
+   Name: (string) (len=3) "bar",
+   ReceiveInterval: (*uint32)(<nil>),
+   TransmitInterval: (*uint32)(0xc0004c3604)(70),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  },
+  (frr.BFDProfile) {
+   Name: (string) (len=11) "testprofile",
+   ReceiveInterval: (*uint32)(0xc0004c3600)(60),
+   TransmitInterval: (*uint32)(<nil>),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  }
+ },
+ ExtraConfig: (string) ""
+}
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc0002e87e0)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000001d40)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057b380)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.12/24",
+       Communities: ([]string) {
+       },
+       LargeCommunities: ([]string) {
+       },
+       LocalPref: (uint32) 200
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000001c80)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057b320)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.11/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) (len=2 cap=2) {
+    (string) (len=14) "172.16.1.11/24",
+    (string) (len=14) "172.16.1.12/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc0002e8850)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000001e00)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000001ec0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) {
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) (len=2 cap=2) {
+  (frr.BFDProfile) {
+   Name: (string) (len=3) "bar",
+   ReceiveInterval: (*uint32)(<nil>),
+   TransmitInterval: (*uint32)(0xc0004c3604)(70),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  },
+  (frr.BFDProfile) {
+   Name: (string) (len=11) "testprofile",
+   ReceiveInterval: (*uint32)(0xc0004c3600)(60),
+   TransmitInterval: (*uint32)(<nil>),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  }
+ },
+ ExtraConfig: (string) ""
+}
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc0002e88c0)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc0000320c0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057b500)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.10/24",
+       Communities: ([]string) {
+       },
+       LargeCommunities: ([]string) {
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000032000)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057b4a0)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.11/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) (len=2 cap=2) {
+    (string) (len=14) "172.16.1.10/24",
+    (string) (len=14) "172.16.1.11/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc0002e8930)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000032180)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000032240)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) {
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) (len=2 cap=2) {
+  (frr.BFDProfile) {
+   Name: (string) (len=3) "bar",
+   ReceiveInterval: (*uint32)(<nil>),
+   TransmitInterval: (*uint32)(0xc0004c3604)(70),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  },
+  (frr.BFDProfile) {
+   Name: (string) (len=11) "testprofile",
+   ReceiveInterval: (*uint32)(0xc0004c3600)(60),
+   TransmitInterval: (*uint32)(<nil>),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  }
+ },
+ ExtraConfig: (string) ""
+}
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc00014a000)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc0000323c0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057a0c0)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.13/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 300
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000032300)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057a060)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.11/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) (len=2 cap=2) {
+    (string) (len=14) "172.16.1.11/24",
+    (string) (len=14) "172.16.1.13/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc00014a070)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000032480)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000032540)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) {
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) (len=2 cap=2) {
+  (frr.BFDProfile) {
+   Name: (string) (len=3) "bar",
+   ReceiveInterval: (*uint32)(<nil>),
+   TransmitInterval: (*uint32)(0xc0004c3604)(70),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  },
+  (frr.BFDProfile) {
+   Name: (string) (len=11) "testprofile",
+   ReceiveInterval: (*uint32)(0xc0004c3600)(60),
+   TransmitInterval: (*uint32)(<nil>),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  }
+ },
+ ExtraConfig: (string) ""
+}
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc00014a0e0)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc0000326c0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057a240)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.13/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 300
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000032600)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057a1e0)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.11/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) (len=2 cap=2) {
+    (string) (len=14) "172.16.1.11/24",
+    (string) (len=14) "172.16.1.13/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc00014a150)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000032780)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057a2a0)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.11/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000032840)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) (len=1 cap=1) {
+    (string) (len=14) "172.16.1.11/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) (len=2 cap=2) {
+  (frr.BFDProfile) {
+   Name: (string) (len=3) "bar",
+   ReceiveInterval: (*uint32)(<nil>),
+   TransmitInterval: (*uint32)(0xc0004c3604)(70),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  },
+  (frr.BFDProfile) {
+   Name: (string) (len=11) "testprofile",
+   ReceiveInterval: (*uint32)(0xc0004c3600)(60),
+   TransmitInterval: (*uint32)(<nil>),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  }
+ },
+ ExtraConfig: (string) ""
+}
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc00014a1c0)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc0000329c0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057a420)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.13/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 300
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000032900)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057a3c0)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.11/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) (len=2 cap=2) {
+    (string) (len=14) "172.16.1.11/24",
+    (string) (len=14) "172.16.1.13/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc00014a230)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000032a80)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057a480)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.10/24",
+       Communities: ([]string) {
+       },
+       LargeCommunities: ([]string) {
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000032b40)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) (len=1 cap=1) {
+    (string) (len=14) "172.16.1.10/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) (len=2 cap=2) {
+  (frr.BFDProfile) {
+   Name: (string) (len=3) "bar",
+   ReceiveInterval: (*uint32)(<nil>),
+   TransmitInterval: (*uint32)(0xc0004c3604)(70),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  },
+  (frr.BFDProfile) {
+   Name: (string) (len=11) "testprofile",
+   ReceiveInterval: (*uint32)(0xc0004c3600)(60),
+   TransmitInterval: (*uint32)(<nil>),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  }
+ },
+ ExtraConfig: (string) ""
+}
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc00014a2a0)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000032e40)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057a660)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.13/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 300
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000032d80)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057a600)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.11/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) (len=2 cap=2) {
+    (string) (len=14) "172.16.1.11/24",
+    (string) (len=14) "172.16.1.13/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc00014a310)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000032c00)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057a5a0)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.13/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 300
+      })
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000032cc0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) (len=1 cap=1) {
+    (string) (len=14) "172.16.1.13/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) (len=2 cap=2) {
+  (frr.BFDProfile) {
+   Name: (string) (len=3) "bar",
+   ReceiveInterval: (*uint32)(<nil>),
+   TransmitInterval: (*uint32)(0xc0004c3604)(70),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  },
+  (frr.BFDProfile) {
+   Name: (string) (len=11) "testprofile",
+   ReceiveInterval: (*uint32)(0xc0004c3600)(60),
+   TransmitInterval: (*uint32)(<nil>),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  }
+ },
+ ExtraConfig: (string) ""
+}
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc00014a380)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000032fc0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057a7e0)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.13/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 300
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000032f00)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057a780)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.11/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) (len=2 cap=2) {
+    (string) (len=14) "172.16.1.11/24",
+    (string) (len=14) "172.16.1.13/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc00014a3f0)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000033080)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057a840)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.12/24",
+       Communities: ([]string) {
+       },
+       LargeCommunities: ([]string) {
+       },
+       LocalPref: (uint32) 200
+      })
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000033140)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) {
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) false,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) (len=1 cap=1) {
+    (string) (len=14) "172.16.1.12/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) (len=2 cap=2) {
+  (frr.BFDProfile) {
+   Name: (string) (len=3) "bar",
+   ReceiveInterval: (*uint32)(<nil>),
+   TransmitInterval: (*uint32)(0xc0004c3604)(70),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  },
+  (frr.BFDProfile) {
+   Name: (string) (len=11) "testprofile",
+   ReceiveInterval: (*uint32)(0xc0004c3600)(60),
+   TransmitInterval: (*uint32)(<nil>),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  }
+ },
+ ExtraConfig: (string) ""
+}
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc00014a460)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000033440)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057aa80)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.13/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 300
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000033380)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057aa20)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.11/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) (len=2 cap=2) {
+    (string) (len=14) "172.16.1.11/24",
+    (string) (len=14) "172.16.1.13/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc00014a4d0)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000033200)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057a960)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.12/24",
+       Communities: ([]string) {
+       },
+       LargeCommunities: ([]string) {
+       },
+       LocalPref: (uint32) 200
+      })
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc0000332c0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057a9c0)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.11/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) (len=2 cap=2) {
+    (string) (len=14) "172.16.1.11/24",
+    (string) (len=14) "172.16.1.12/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) (len=2 cap=2) {
+  (frr.BFDProfile) {
+   Name: (string) (len=3) "bar",
+   ReceiveInterval: (*uint32)(<nil>),
+   TransmitInterval: (*uint32)(0xc0004c3604)(70),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  },
+  (frr.BFDProfile) {
+   Name: (string) (len=11) "testprofile",
+   ReceiveInterval: (*uint32)(0xc0004c3600)(60),
+   TransmitInterval: (*uint32)(<nil>),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  }
+ },
+ ExtraConfig: (string) ""
+}
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc00014a540)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000033740)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057acc0)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.13/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 300
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000033680)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057ac60)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.11/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) (len=2 cap=2) {
+    (string) (len=14) "172.16.1.11/24",
+    (string) (len=14) "172.16.1.13/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc00014a5b0)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000033500)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057aba0)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.12/24",
+       Communities: ([]string) {
+       },
+       LargeCommunities: ([]string) {
+       },
+       LocalPref: (uint32) 200
+      })
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc0000335c0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057ac00)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.10/24",
+       Communities: ([]string) {
+       },
+       LargeCommunities: ([]string) {
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) (len=2 cap=2) {
+    (string) (len=14) "172.16.1.10/24",
+    (string) (len=14) "172.16.1.12/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) (len=2 cap=2) {
+  (frr.BFDProfile) {
+   Name: (string) (len=3) "bar",
+   ReceiveInterval: (*uint32)(<nil>),
+   TransmitInterval: (*uint32)(0xc0004c3604)(70),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  },
+  (frr.BFDProfile) {
+   Name: (string) (len=11) "testprofile",
+   ReceiveInterval: (*uint32)(0xc0004c3600)(60),
+   TransmitInterval: (*uint32)(<nil>),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  }
+ },
+ ExtraConfig: (string) ""
+}
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc00014a620)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000033980)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057aea0)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.13/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 300
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc0000338c0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057ae40)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.11/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) (len=2 cap=2) {
+    (string) (len=14) "172.16.1.11/24",
+    (string) (len=14) "172.16.1.13/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc00014a690)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000033a40)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057af00)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.12/24",
+       Communities: ([]string) {
+       },
+       LargeCommunities: ([]string) {
+       },
+       LocalPref: (uint32) 200
+      })
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000033800)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057ade0)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.12/24",
+       Communities: ([]string) {
+       },
+       LargeCommunities: ([]string) {
+       },
+       LocalPref: (uint32) 200
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) (len=1 cap=1) {
+    (string) (len=14) "172.16.1.12/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) (len=2 cap=2) {
+  (frr.BFDProfile) {
+   Name: (string) (len=3) "bar",
+   ReceiveInterval: (*uint32)(<nil>),
+   TransmitInterval: (*uint32)(0xc0004c3604)(70),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  },
+  (frr.BFDProfile) {
+   Name: (string) (len=11) "testprofile",
+   ReceiveInterval: (*uint32)(0xc0004c3600)(60),
+   TransmitInterval: (*uint32)(<nil>),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  }
+ },
+ ExtraConfig: (string) ""
+}
+FEDE adding config
+(frr.frrConfig) {
+ Loglevel: (string) (len=13) "informational",
+ Hostname: (string) (len=13) "dummyhostname",
+ Routers: ([]*frr.routerConfig) (len=2 cap=2) {
+  (*frr.routerConfig)(0xc00014a700)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000033bc0)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.254",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057b080)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.13/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 300
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000033b00)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057b020)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.11/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 0
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) "",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) "",
+   IPV4Prefixes: ([]string) (len=2 cap=2) {
+    (string) (len=14) "172.16.1.11/24",
+    (string) (len=14) "172.16.1.13/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  }),
+  (*frr.routerConfig)(0xc00014a7e0)({
+   MyASN: (uint32) 100,
+   RouterID: (string) "",
+   Neighbors: ([]*frr.neighborConfig) (len=2 cap=2) {
+    (*frr.neighborConfig)(0xc000033c80)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.238",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057b0e0)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.12/24",
+       Communities: ([]string) {
+       },
+       LargeCommunities: ([]string) {
+       },
+       LocalPref: (uint32) 200
+      })
+     },
+     BFDProfile: (string) (len=11) "testprofile",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    }),
+    (*frr.neighborConfig)(0xc000033d40)({
+     IPFamily: (ipfamily.Family) (len=4) ipv4,
+     Name: (string) "",
+     ASN: (uint32) 200,
+     Addr: (string) (len=10) "10.2.2.255",
+     SrcAddr: (string) "",
+     Port: (uint16) 179,
+     HoldTime: (uint64) 1,
+     KeepaliveTime: (uint64) 1,
+     Password: (string) (len=8) "password",
+     Advertisements: ([]*frr.advertisementConfig) (len=1 cap=1) {
+      (*frr.advertisementConfig)(0xc00057b140)({
+       IPFamily: (ipfamily.Family) (len=4) ipv4,
+       Prefix: (string) (len=14) "172.16.1.13/24",
+       Communities: ([]string) (len=1 cap=1) {
+        (string) (len=9) "3333:4444"
+       },
+       LargeCommunities: ([]string) (len=2 cap=2) {
+        (string) (len=14) "1111:2222:3333",
+        (string) (len=14) "2222:3333:4444"
+       },
+       LocalPref: (uint32) 300
+      })
+     },
+     BFDProfile: (string) "",
+     EBGPMultiHop: (bool) true,
+     VRFName: (string) (len=3) "red",
+     HasV4Advertisements: (bool) true,
+     HasV6Advertisements: (bool) false
+    })
+   },
+   VRF: (string) (len=3) "red",
+   IPV4Prefixes: ([]string) (len=2 cap=2) {
+    (string) (len=14) "172.16.1.12/24",
+    (string) (len=14) "172.16.1.13/24"
+   },
+   IPV6Prefixes: ([]string) {
+   }
+  })
+ },
+ BFDProfiles: ([]frr.BFDProfile) (len=2 cap=2) {
+  (frr.BFDProfile) {
+   Name: (string) (len=3) "bar",
+   ReceiveInterval: (*uint32)(<nil>),
+   TransmitInterval: (*uint32)(0xc0004c3604)(70),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  },
+  (frr.BFDProfile) {
+   Name: (string) (len=11) "testprofile",
+   ReceiveInterval: (*uint32)(0xc0004c3600)(60),
+   TransmitInterval: (*uint32)(<nil>),
+   DetectMultiplier: (*uint32)(<nil>),
+   EchoInterval: (*uint32)(<nil>),
+   EchoMode: (bool) false,
+   PassiveMode: (bool) false,
+   MinimumTTL: (*uint32)(<nil>)
+  }
+ },
+ ExtraConfig: (string) ""
+}
+FEDE check
+--- FAIL: TestConversionIsStable (5.13s)
+    frr_test.go:1149: using seed  1704985625219491222
+    frr_test.go:58: failed to compare configfiles testdata/TestConversionIsStable, testdata/TestConversionIsStable.golden using poll interval
+        last error: command /usr/bin/diff testdata/TestConversionIsStable testdata/TestConversionIsStable.golden returned error: exit status 1
+        1c1
+        < log file /etc/frr/frr.log informational
+        ---
+        > log file /etc/frr/frr.log 
+        9c9
+        < ip prefix-list 10.2.2.254-300-ipv4-localpref-prefixes seq 1 permit 172.16.1.13/24
+        ---
+        > ip prefix-list 10.2.2.254-3333:4444-ipv4-community-prefixes seq 1 permit 172.16.1.11/24
+        11,16d10
+        <   match ip address prefix-list 10.2.2.254-300-ipv4-localpref-prefixes
+        <   set local-preference 300
+        <   on-match next
+        < 
+        < ip prefix-list 10.2.2.254-3333:4444-ipv4-community-prefixes seq 1 permit 172.16.1.13/24
+        < route-map 10.2.2.254-out permit 2
+        20,21c14,15
+        < ip prefix-list 10.2.2.254-large:1111:2222:3333-ipv4-community-prefixes permit 172.16.1.13/24
+        < route-map 10.2.2.254-out permit 3
+        ---
+        > ip prefix-list 10.2.2.254-large:1111:2222:3333-ipv4-community-prefixes permit 172.16.1.11/24
+        > route-map 10.2.2.254-out permit 2
+        25,26c19,20
+        < ip prefix-list 10.2.2.254-large:2222:3333:4444-ipv4-community-prefixes permit 172.16.1.13/24
+        < route-map 10.2.2.254-out permit 4
+        ---
+        > ip prefix-list 10.2.2.254-large:2222:3333:4444-ipv4-community-prefixes permit 172.16.1.11/24
+        > route-map 10.2.2.254-out permit 3
+        32c26
+        <  ip prefix-list 10.2.2.254-pl-ipv4 seq 1 permit 172.16.1.13/24
+        ---
+        >  ip prefix-list 10.2.2.254-pl-ipv4 seq 1 permit 172.16.1.11/24
+        39c33
+        < route-map 10.2.2.254-out permit 5
+        ---
+        > route-map 10.2.2.254-out permit 4
+        41c35
+        < route-map 10.2.2.254-out permit 6
+        ---
+        > route-map 10.2.2.254-out permit 5
+        46,60d39
+        < ip prefix-list 10.2.2.255-3333:4444-ipv4-community-prefixes seq 1 permit 172.16.1.11/24
+        < route-map 10.2.2.255-out permit 1
+        <   match ip address prefix-list 10.2.2.255-3333:4444-ipv4-community-prefixes
+        <   set community 3333:4444 additive
+        <   on-match next
+        < ip prefix-list 10.2.2.255-large:1111:2222:3333-ipv4-community-prefixes permit 172.16.1.11/24
+        < route-map 10.2.2.255-out permit 2
+        <   match ip address prefix-list 10.2.2.255-large:1111:2222:3333-ipv4-community-prefixes
+        <   set large-community 1111:2222:3333 additive
+        <   on-match next
+        < ip prefix-list 10.2.2.255-large:2222:3333:4444-ipv4-community-prefixes permit 172.16.1.11/24
+        < route-map 10.2.2.255-out permit 3
+        <   match ip address prefix-list 10.2.2.255-large:2222:3333:4444-ipv4-community-prefixes
+        <   set large-community 2222:3333:4444 additive
+        <   on-match next
+        62,63c41
+        < 
+        <  ip prefix-list 10.2.2.255-pl-ipv4 seq 1 permit 172.16.1.11/24
+        ---
+        >  ip prefix-list 10.2.2.255-pl-ipv4 seq 1 permit 172.16.1.10/24
+        70c48
+        < route-map 10.2.2.255-out permit 4
+        ---
+        > route-map 10.2.2.255-out permit 1
+        72c50
+        < route-map 10.2.2.255-out permit 5
+        ---
+        > route-map 10.2.2.255-out permit 2
+        77,82d54
+        < ip prefix-list 10.2.2.238-red-200-ipv4-localpref-prefixes seq 1 permit 172.16.1.12/24
+        < route-map 10.2.2.238-red-out permit 1
+        <   match ip address prefix-list 10.2.2.238-red-200-ipv4-localpref-prefixes
+        <   set local-preference 200
+        <   on-match next
+        < 
+        84c56
+        <  ip prefix-list 10.2.2.238-red-pl-ipv4 seq 1 permit 172.16.1.12/24
+        ---
+        >  ip prefix-list 10.2.2.238-red-pl-ipv4 seq 1 permit 172.16.1.10/24
+        91c63
+        < route-map 10.2.2.238-red-out permit 2
+        ---
+        > route-map 10.2.2.238-red-out permit 1
+        93c65
+        < route-map 10.2.2.238-red-out permit 3
+        ---
+        > route-map 10.2.2.238-red-out permit 2
+        98c70
+        < ip prefix-list 10.2.2.255-red-300-ipv4-localpref-prefixes seq 1 permit 172.16.1.13/24
+        ---
+        > ip prefix-list 10.2.2.255-red-200-ipv4-localpref-prefixes seq 1 permit 172.16.1.12/24
+        100,117c72,73
+        <   match ip address prefix-list 10.2.2.255-red-300-ipv4-localpref-prefixes
+        <   set local-preference 300
+        <   on-match next
+        < 
+        < ip prefix-list 10.2.2.255-red-3333:4444-ipv4-community-prefixes seq 1 permit 172.16.1.13/24
+        < route-map 10.2.2.255-red-out permit 2
+        <   match ip address prefix-list 10.2.2.255-red-3333:4444-ipv4-community-prefixes
+        <   set community 3333:4444 additive
+        <   on-match next
+        < ip prefix-list 10.2.2.255-red-large:1111:2222:3333-ipv4-community-prefixes permit 172.16.1.13/24
+        < route-map 10.2.2.255-red-out permit 3
+        <   match ip address prefix-list 10.2.2.255-red-large:1111:2222:3333-ipv4-community-prefixes
+        <   set large-community 1111:2222:3333 additive
+        <   on-match next
+        < ip prefix-list 10.2.2.255-red-large:2222:3333:4444-ipv4-community-prefixes permit 172.16.1.13/24
+        < route-map 10.2.2.255-red-out permit 4
+        <   match ip address prefix-list 10.2.2.255-red-large:2222:3333:4444-ipv4-community-prefixes
+        <   set large-community 2222:3333:4444 additive
+        ---
+        >   match ip address prefix-list 10.2.2.255-red-200-ipv4-localpref-prefixes
+        >   set local-preference 200
+        121c77
+        <  ip prefix-list 10.2.2.255-red-pl-ipv4 seq 1 permit 172.16.1.13/24
+        ---
+        >  ip prefix-list 10.2.2.255-red-pl-ipv4 seq 1 permit 172.16.1.12/24
+        128c84
+        < route-map 10.2.2.255-red-out permit 5
+        ---
+        > route-map 10.2.2.255-red-out permit 2
+        130c86
+        < route-map 10.2.2.255-red-out permit 6
+        ---
+        > route-map 10.2.2.255-red-out permit 3
+        172a129
+        >     network 172.16.1.10/24
+        174d130
+        <     network 172.16.1.13/24
+        217a174
+        >     network 172.16.1.10/24
+        219d175
+        <     network 172.16.1.13/24
+FAIL
+exit status 1
+FAIL	go.universe.tf/metallb/internal/bgp/frr	6.095s

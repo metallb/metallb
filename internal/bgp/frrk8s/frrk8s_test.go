@@ -19,7 +19,10 @@ import (
 	frrv1beta1 "github.com/metallb/frr-k8s/api/v1beta1"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/bgp/community"
+	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/logging"
+	"go.universe.tf/metallb/internal/pointer"
+	"go.universe.tf/metallb/internal/shuffler"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 )
@@ -832,6 +835,136 @@ func TestLargeCommunities(t *testing.T) {
 	err = session.Set(adv)
 	if err != nil {
 		t.Fatalf("Could not advertise prefix: %s", err)
+	}
+
+	testCheckConfigFile(t)
+}
+
+func TestConversionIsStable(t *testing.T) {
+	l := log.NewNopLogger()
+	sessionManager := newTestSessionManager(t)
+
+	seed := time.Now().UnixNano()
+	rnd := rand.New(rand.NewSource(seed))
+	t.Log("using seed ", seed)
+
+	sessionsParams := []bgp.SessionParameters{
+		{
+			PeerAddress:   "10.2.2.254:179",
+			MyASN:         100,
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer",
+		}, {
+			PeerAddress:   "10.2.2.255:179",
+			MyASN:         100,
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer",
+		}, {
+			PeerAddress:   "10.2.2.255:179",
+			MyASN:         100,
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer",
+			VRFName:       "red",
+		},
+		{
+			PeerAddress:   "10.2.2.238:179",
+			MyASN:         100,
+			PeerASN:       200,
+			HoldTime:      time.Second,
+			KeepAliveTime: time.Second,
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer",
+			VRFName:       "red",
+			BFDProfile:    "testprofile",
+		},
+	}
+
+	shuffler.Shuffle(sessionsParams, rnd)
+	sessions := []bgp.Session{}
+	for _, s := range sessionsParams {
+		session, err := sessionManager.NewSession(l, s)
+		if err != nil {
+			t.Fatalf("Could not create session: %s", err)
+		}
+		sessions = append(sessions, session)
+		defer session.Close()
+	}
+
+	communities := []community.BGPCommunity{}
+	community1, _ := community.New("large:1111:2222:3333")
+	communities = append(communities, community1)
+	community2, _ := community.New("large:2222:3333:4444")
+	communities = append(communities, community2)
+	community3, _ := community.New("3333:4444")
+	communities = append(communities, community3)
+	advertisements := []*bgp.Advertisement{
+		{
+			Prefix: &net.IPNet{
+				IP:   net.ParseIP("172.16.1.10"),
+				Mask: classCMask,
+			},
+		}, {
+			Prefix: &net.IPNet{
+				IP:   net.ParseIP("172.16.1.11"),
+				Mask: classCMask,
+			},
+
+			Communities: communities,
+		}, {
+			Prefix: &net.IPNet{
+				IP:   net.ParseIP("172.16.1.12"),
+				Mask: classCMask,
+			},
+			LocalPref: 200,
+		}, {
+			Prefix: &net.IPNet{
+				IP:   net.ParseIP("172.16.1.13"),
+				Mask: classCMask,
+			},
+
+			Communities: communities,
+			LocalPref:   300,
+		},
+	}
+
+	pp := map[string]*config.BFDProfile{
+		"testprofile": {
+			Name:            "testprofile",
+			ReceiveInterval: pointer.Uint32Ptr(60),
+		},
+		"bar": {
+			Name:             "bar",
+			TransmitInterval: pointer.Uint32Ptr(70),
+		},
+	}
+	err := sessionManager.SyncBFDProfiles(pp)
+	if err != nil {
+		t.Fatalf("Failed to sync bfd profiles: %s", err)
+	}
+
+	for _, s := range sessions {
+		shuffler.Shuffle(advertisements, rnd)
+		err := s.Set(advertisements...)
+		if err != nil {
+			t.Fatalf("Could not advertise prefix: %s", err)
+		}
 	}
 
 	testCheckConfigFile(t)
