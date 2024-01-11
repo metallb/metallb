@@ -57,6 +57,8 @@ Bug Fixes:
 - Webhooks: avoid transient errors ([PR 2202](https://github.com/metallb/metallb/pull/2202)), [ISSUE 2173](https://github.com/metallb/metallb/issues/2173))
 
 This release includes contributions from Andreas Karis, Antonio Pitasi, Arjun Singh, AzraelSec, cong, cyclinder, Federico Paolinelli, Giovanni Toraldo, Ivan Kurnosov, Jonas Badstübner, Lior Noy, machinaexdeo, Marcelo Guerrero Viveros, Micah Nagel, Michael Aspinwall, Moritz Schlarb, Ori Braunshtein, Pavel Basov, Robin, shimritproj, Siyi.Yang, timm0e. Thanks!
+- Dev-env: Override GOBIN for inv dev-env ([PR 2219](https://github.com/metallb/metallb/pull/2219))
+- Tests: avoid conversion stability unit tests ([PR 2235](https://github.com/metallb/metallb/pull/2235))
 
 ## Version 0.13.12
 
