@@ -502,7 +502,7 @@ var _ = ginkgo.Describe("L2", func() {
 				L2Advs: []metallbv1beta1.L2Advertisement{emptyL2Advertisement},
 			}
 
-			poolCount, err := config.PoolCount(resources.Pools[0])
+			total, ipv4, ipv6, err := config.PoolCount(resources.Pools[0])
 			framework.ExpectNoError(err)
 
 			err = ConfigUpdater.Update(resources)
@@ -514,21 +514,38 @@ var _ = ginkgo.Describe("L2", func() {
 				if err != nil {
 					return err
 				}
-				err = metrics.ValidateGaugeValue(0, "metallb_allocator_addresses_in_use_total", map[string]string{"pool": poolName}, controllerMetrics)
-				if err != nil {
-					return err
+				cases := []struct {
+					name   string
+					expect int64
+				}{
+					{
+						"addresses_in_use_total", 0,
+					},
+					{
+						"addresses_total", total,
+					},
+					{
+						"ipv4_addresses_in_use_total", 0,
+					},
+					{
+						"ipv4_addresses_total", ipv4,
+					},
+					{
+						"ipv6_addresses_in_use_total", 0,
+					},
+					{
+						"ipv6_addresses_total", ipv6,
+					},
 				}
-				err = metrics.ValidateGaugeValue(int(poolCount), "metallb_allocator_addresses_total", map[string]string{"pool": poolName}, controllerMetrics)
-				if err != nil {
-					return err
-				}
-				err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_allocator_addresses_in_use_total{pool="%s"} == 0`, poolName), metrics.There)
-				if err != nil {
-					return err
-				}
-				err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_allocator_addresses_total{pool="%s"} == %d`, poolName, int(poolCount)), metrics.There)
-				if err != nil {
-					return err
+				for _, c := range cases {
+					err = metrics.ValidateGaugeValue(int(c.expect), "metallb_allocator_"+c.name, map[string]string{"pool": poolName}, controllerMetrics)
+					if err != nil {
+						return err
+					}
+					err = metrics.ValidateOnPrometheus(promPod, fmt.Sprintf(`metallb_allocator_%s{pool="%s"} == %d`, c.name, poolName, c.expect), metrics.There)
+					if err != nil {
+						return err
+					}
 				}
 				return nil
 			}, 2*time.Minute, 5*time.Second).ShouldNot(gomega.HaveOccurred())

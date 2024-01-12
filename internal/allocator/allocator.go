@@ -27,6 +27,8 @@ type Allocator struct {
 	portsInUse      map[string]map[Port]string // ip.String() -> Port -> svc
 	servicesOnIP    map[string]map[string]bool // ip.String() -> svc -> allocated?
 	poolIPsInUse    map[string]map[string]int  // poolName -> ip.String() -> number of users
+	poolIPV4InUse   map[string]map[string]int  // poolName -> ipv4.String() -> number of users
+	poolIPV6InUse   map[string]map[string]int  // poolName -> ipv6.String() -> number of users
 }
 
 // Port represents one port in use by a service.
@@ -62,6 +64,8 @@ func New() *Allocator {
 		portsInUse:      map[string]map[Port]string{},
 		servicesOnIP:    map[string]map[string]bool{},
 		poolIPsInUse:    map[string]map[string]int{},
+		poolIPV4InUse:   map[string]map[string]int{},
+		poolIPV6InUse:   map[string]map[string]int{},
 	}
 }
 
@@ -95,8 +99,13 @@ func (a *Allocator) SetPools(pools *config.Pools) {
 
 	// Refresh or initiate stats
 	for n, p := range a.pools.ByName {
-		stats.poolCapacity.WithLabelValues(n).Set(float64(poolCount(p)))
+		total, ipv4, ipv6 := poolCount(p)
+		stats.poolCapacity.WithLabelValues(n).Set(float64(total))
+		stats.ipv4PoolCapacity.WithLabelValues(n).Set(float64(ipv4))
+		stats.ipv6PoolCapacity.WithLabelValues(n).Set(float64(ipv6))
 		stats.poolActive.WithLabelValues(n).Set(float64(len(a.poolIPsInUse[n])))
+		stats.ipv4PoolActive.WithLabelValues(n).Set(float64(len(a.poolIPV4InUse[n])))
+		stats.ipv6PoolActive.WithLabelValues(n).Set(float64(len(a.poolIPV6InUse[n])))
 	}
 }
 
@@ -120,10 +129,27 @@ func (a *Allocator) assign(svc string, alloc *alloc) {
 		if a.poolIPsInUse[alloc.pool] == nil {
 			a.poolIPsInUse[alloc.pool] = map[string]int{}
 		}
+		if a.poolIPV4InUse[alloc.pool] == nil {
+			a.poolIPV4InUse[alloc.pool] = map[string]int{}
+		}
+		if a.poolIPV6InUse[alloc.pool] == nil {
+			a.poolIPV6InUse[alloc.pool] = map[string]int{}
+		}
+
 		a.poolIPsInUse[alloc.pool][ip.String()]++
+		if ip.To4() == nil {
+			a.poolIPV6InUse[alloc.pool][ip.String()]++
+		} else {
+			a.poolIPV4InUse[alloc.pool][ip.String()]++
+		}
 	}
-	stats.poolCapacity.WithLabelValues(alloc.pool).Set(float64(poolCount(a.pools.ByName[alloc.pool])))
+	total, ipv4, ipv6 := poolCount(a.pools.ByName[alloc.pool])
+	stats.poolCapacity.WithLabelValues(alloc.pool).Set(float64(total))
+	stats.ipv4PoolCapacity.WithLabelValues(alloc.pool).Set(float64(ipv4))
+	stats.ipv6PoolCapacity.WithLabelValues(alloc.pool).Set(float64(ipv6))
 	stats.poolActive.WithLabelValues(alloc.pool).Set(float64(len(a.poolIPsInUse[alloc.pool])))
+	stats.ipv4PoolActive.WithLabelValues(alloc.pool).Set(float64(len(a.poolIPV4InUse[alloc.pool])))
+	stats.ipv6PoolActive.WithLabelValues(alloc.pool).Set(float64(len(a.poolIPV6InUse[alloc.pool])))
 }
 
 // Assign assigns the requested ip to svc, if the assignment is
@@ -197,13 +223,26 @@ func (a *Allocator) Unassign(svc string) {
 			delete(a.sharingKeyForIP, ip.String())
 		}
 		a.poolIPsInUse[al.pool][ip.String()]--
+		if ip.To4() == nil {
+			a.poolIPV6InUse[al.pool][ip.String()]--
+		} else {
+			a.poolIPV4InUse[al.pool][ip.String()]--
+		}
+		// Explicitly delete unused IPs from the pool, so that len()
+		// is an accurate count of IPs in use.
 		if a.poolIPsInUse[al.pool][ip.String()] == 0 {
-			// Explicitly delete unused IPs from the pool, so that len()
-			// is an accurate count of IPs in use.
 			delete(a.poolIPsInUse[al.pool], ip.String())
+		}
+		if a.poolIPV4InUse[al.pool][ip.String()] == 0 {
+			delete(a.poolIPV4InUse[al.pool], ip.String())
+		}
+		if a.poolIPV6InUse[al.pool][ip.String()] == 0 {
+			delete(a.poolIPV6InUse[al.pool], ip.String())
 		}
 	}
 	stats.poolActive.WithLabelValues(al.pool).Set(float64(len(a.poolIPsInUse[al.pool])))
+	stats.ipv4PoolActive.WithLabelValues(al.pool).Set(float64(len(a.poolIPV4InUse[al.pool])))
+	stats.ipv6PoolActive.WithLabelValues(al.pool).Set(float64(len(a.poolIPV6InUse[al.pool])))
 }
 
 // AllocateFromPool assigns an available IP from pool to service.
@@ -391,14 +430,17 @@ func sharingOK(existing, new *key) error {
 }
 
 // poolCount returns the number of addresses in the pool.
-func poolCount(p *config.Pool) int64 {
+func poolCount(p *config.Pool) (int64, int64, int64) {
 	var total int64
+	var ipv4 int64
+	var ipv6 int64
 	for _, cidr := range p.CIDR {
 		o, b := cidr.Mask.Size()
 		if b-o >= 62 {
 			// An enormous ipv6 range is allocated which will never run out.
-			// Just return max to avoid any math errors.
-			return math.MaxInt64
+			total = math.MaxInt64
+			ipv6 = math.MaxInt64
+			continue
 		}
 		sz := int64(math.Pow(2, float64(b-o)))
 
@@ -424,8 +466,13 @@ func poolCount(p *config.Pool) int64 {
 			}
 		}
 		total += sz
+		if cidr.IP.To4() == nil {
+			ipv6 += sz
+		} else {
+			ipv4 += sz
+		}
 	}
-	return total
+	return total, ipv4, ipv6
 }
 
 // poolFor returns the pool that owns the requested IPs, or "" if none.
