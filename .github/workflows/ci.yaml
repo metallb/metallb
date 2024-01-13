@@ -52,7 +52,7 @@ jobs:
 
       - name: Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@v40
+        uses: tj-actions/changed-files@v41
 
       - name: Check if release notes where changed
         run: |
@@ -78,7 +78,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
         with:
           go-version-file: "go.mod"
           cache: true
@@ -147,7 +147,7 @@ jobs:
         with:
           version: v3.12.1
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.10'
           check-latest: true

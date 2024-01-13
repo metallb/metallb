@@ -294,8 +294,8 @@ def validate_kind_version():
 
 def generate_manifest(ctx, crd_options="crd:crdVersions=v1", bgp_type="native", output=None, with_prometheus=False):
     _fetch_kubectl()
-    run("GOPATH={} go install sigs.k8s.io/controller-tools/cmd/controller-gen@{}".format(build_path, controller_gen_version))
-    res = run("{}/bin/controller-gen {} rbac:roleName=manager-role webhook paths=\"./api/...\" output:crd:artifacts:config=config/crd/bases".format(build_path, crd_options))
+    run("GOBIN={}/bin/ GOPATH={} go install sigs.k8s.io/controller-tools/cmd/controller-gen@{}".format(build_path, build_path, controller_gen_version), echo=True)
+    res = run("{}/bin/controller-gen {} rbac:roleName=manager-role webhook paths=\"./api/...\" output:crd:artifacts:config=config/crd/bases".format(build_path, crd_options), echo=True)
     if not res.ok:
         raise Exit(message="Failed to generate manifests")
 
