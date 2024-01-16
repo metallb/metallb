@@ -1890,6 +1890,8 @@ func TestPoolCount(t *testing.T) {
 		desc string
 		pool *config.Pool
 		want int64
+		ipv4 int64
+		ipv6 int64
 	}{
 		{
 			desc: "BGP /24",
@@ -1897,6 +1899,8 @@ func TestPoolCount(t *testing.T) {
 				CIDR: []*net.IPNet{ipnet("1.2.3.0/24")},
 			},
 			want: 256,
+			ipv4: 256,
+			ipv6: 0,
 		},
 		{
 			desc: "BGP /24 and /25",
@@ -1904,6 +1908,8 @@ func TestPoolCount(t *testing.T) {
 				CIDR: []*net.IPNet{ipnet("1.2.3.0/24"), ipnet("2.3.4.128/25")},
 			},
 			want: 384,
+			ipv4: 384,
+			ipv6: 0,
 		},
 		{
 			desc: "BGP /24 and /25, no buggy IPs",
@@ -1912,6 +1918,8 @@ func TestPoolCount(t *testing.T) {
 				AvoidBuggyIPs: true,
 			},
 			want: 381,
+			ipv4: 381,
+			ipv6: 0,
 		},
 		{
 			desc: "BGP a BIG ipv6 range",
@@ -1920,13 +1928,31 @@ func TestPoolCount(t *testing.T) {
 				AvoidBuggyIPs: true,
 			},
 			want: math.MaxInt64,
+			ipv4: 381,
+			ipv6: math.MaxInt64,
+		},
+		{
+			desc: "ipv4 and ipv6 range",
+			pool: &config.Pool{
+				CIDR:          []*net.IPNet{ipnet("1.2.3.0/31"), ipnet("1000::/127")},
+				AvoidBuggyIPs: true,
+			},
+			want: 3,
+			ipv4: 1,
+			ipv6: 2,
 		},
 	}
 
 	for _, test := range tests {
-		got := poolCount(test.pool)
-		if test.want != got {
-			t.Errorf("%q: wrong pool count, want %d, got %d", test.desc, test.want, got)
+		total, ipv4, ipv6 := poolCount(test.pool)
+		if test.want != total {
+			t.Errorf("%q: wrong pool total count, want %d, got %d", test.desc, test.want, total)
+		}
+		if test.ipv4 != ipv4 {
+			t.Errorf("%q: wrong pool ipv4 count, want %d, got %d", test.desc, test.ipv4, ipv4)
+		}
+		if test.ipv6 != ipv6 {
+			t.Errorf("%q: wrong pool ipv6 count, want %d, got %d", test.desc, test.ipv6, ipv6)
 		}
 	}
 }

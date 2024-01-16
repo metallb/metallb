@@ -19,6 +19,7 @@ Chores:
 - Dev-env: change the default BGP mode to FRR ([PR 2196](https://github.com/metallb/metallb/pull/2196))
 - Webhooks: avoid transient errors ([PR 2202](https://github.com/metallb/metallb/pull/2202)), [ISSUE 2173](https://github.com/metallb/metallb/issues/2173))
 - Dev-env: Override GOBIN for inv dev-env ([PR 2219](https://github.com/metallb/metallb/pull/2219))
+- Metrics: add ipv4/6 addresses_in_use_total and addresses_total ([PR 2151](https://github.com/metallb/metallb/pull/2151))
 
 ## Version 0.13.12
 
