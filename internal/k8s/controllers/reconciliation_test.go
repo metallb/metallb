@@ -179,7 +179,7 @@ var _ = AfterSuite(func() {
 	cancel()
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
-	Eventually(mgrDone.Load(), 5*time.Second, 200*time.Millisecond).Should(BeTrue())
+	Eventually(mgrDone.Load, 5*time.Second, 200*time.Millisecond).Should(BeTrue())
 	requestHandler = configRequestHandler
 })
 
