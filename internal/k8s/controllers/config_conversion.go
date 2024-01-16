@@ -10,17 +10,16 @@ import (
 
 func toConfig(fromK8s config.ClusterResources, validate config.Validate) (*config.Config, error) {
 	resources := config.ClusterResources{
-		Pools:              sortedCopy(fromK8s.Pools),
-		Peers:              sortedCopy(fromK8s.Peers),
-		BFDProfiles:        sortedCopy(fromK8s.BFDProfiles),
-		L2Advs:             sortedCopy(fromK8s.L2Advs),
-		BGPAdvs:            sortedCopy(fromK8s.BGPAdvs),
-		LegacyAddressPools: sortedCopy(fromK8s.LegacyAddressPools),
-		Communities:        sortedCopy(fromK8s.Communities),
-		PasswordSecrets:    fromK8s.PasswordSecrets,
-		Nodes:              sortedCopy(fromK8s.Nodes),
-		Namespaces:         sortedCopy(fromK8s.Namespaces),
-		BGPExtras:          fromK8s.BGPExtras,
+		Pools:           sortedCopy(fromK8s.Pools),
+		Peers:           sortedCopy(fromK8s.Peers),
+		BFDProfiles:     sortedCopy(fromK8s.BFDProfiles),
+		L2Advs:          sortedCopy(fromK8s.L2Advs),
+		BGPAdvs:         sortedCopy(fromK8s.BGPAdvs),
+		Communities:     sortedCopy(fromK8s.Communities),
+		PasswordSecrets: fromK8s.PasswordSecrets,
+		Nodes:           sortedCopy(fromK8s.Nodes),
+		Namespaces:      sortedCopy(fromK8s.Namespaces),
+		BGPExtras:       fromK8s.BGPExtras,
 	}
 
 	cfg, err := config.For(resources, validate)

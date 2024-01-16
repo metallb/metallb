@@ -59,12 +59,6 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 	defer level.Info(r.Logger).Log("controller", "ConfigReconciler", "end reconcile", req.NamespacedName.String())
 	updates.Inc()
 
-	var addressPools metallbv1beta1.AddressPoolList
-	if err := r.List(ctx, &addressPools, client.InNamespace(r.Namespace)); err != nil {
-		level.Error(r.Logger).Log("controller", "ConfigReconciler", "message", "failed to get addresspools", "error", err)
-		return ctrl.Result{}, err
-	}
-
 	var ipAddressPools metallbv1beta1.IPAddressPoolList
 	if err := r.List(ctx, &ipAddressPools, client.InNamespace(r.Namespace)); err != nil {
 		level.Error(r.Logger).Log("controller", "ConfigReconciler", "error", "failed to get ipaddresspools", "error", err)
@@ -126,17 +120,16 @@ var requestHandler = func(r *ConfigReconciler, ctx context.Context, req ctrl.Req
 	}
 
 	resources := config.ClusterResources{
-		Pools:              ipAddressPools.Items,
-		Peers:              bgpPeers.Items,
-		BFDProfiles:        bfdProfiles.Items,
-		L2Advs:             l2Advertisements.Items,
-		BGPAdvs:            bgpAdvertisements.Items,
-		LegacyAddressPools: addressPools.Items,
-		Communities:        communities.Items,
-		PasswordSecrets:    secrets,
-		Nodes:              nodes.Items,
-		Namespaces:         namespaces.Items,
-		BGPExtras:          extrasMap,
+		Pools:           ipAddressPools.Items,
+		Peers:           bgpPeers.Items,
+		BFDProfiles:     bfdProfiles.Items,
+		L2Advs:          l2Advertisements.Items,
+		BGPAdvs:         bgpAdvertisements.Items,
+		Communities:     communities.Items,
+		PasswordSecrets: secrets,
+		Nodes:           nodes.Items,
+		Namespaces:      namespaces.Items,
+		BGPExtras:       extrasMap,
 	}
 
 	level.Debug(r.Logger).Log("controller", "ConfigReconciler", "metallb CRs and Secrets", dumpClusterResources(&resources))
@@ -199,7 +192,6 @@ func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&metallbv1beta1.BGPAdvertisement{}, &handler.EnqueueRequestForObject{}).
 		Watches(&metallbv1beta1.L2Advertisement{}, &handler.EnqueueRequestForObject{}).
 		Watches(&metallbv1beta1.BFDProfile{}, &handler.EnqueueRequestForObject{}).
-		Watches(&metallbv1beta1.AddressPool{}, &handler.EnqueueRequestForObject{}).
 		Watches(&metallbv1beta1.Community{}, &handler.EnqueueRequestForObject{}).
 		Watches(&corev1.Secret{}, &handler.EnqueueRequestForObject{}).
 		Watches(&corev1.Namespace{}, &handler.EnqueueRequestForObject{}).

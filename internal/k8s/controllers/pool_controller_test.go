@@ -25,7 +25,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	v1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbcfg "go.universe.tf/metallb/internal/config"
-	"go.universe.tf/metallb/internal/pointer"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -146,27 +145,6 @@ var (
 				Spec: v1beta1.IPAddressPoolSpec{
 					Addresses: []string{
 						"10.20.0.0/16",
-					},
-				},
-			},
-		},
-		LegacyAddressPools: []v1beta1.AddressPool{
-			{
-				ObjectMeta: v1.ObjectMeta{
-					Name:      "legacypool1",
-					Namespace: testNamespace,
-				},
-				Spec: v1beta1.AddressPoolSpec{
-					Addresses: []string{
-						"10.21.0.0/16",
-					},
-					Protocol: "bgp",
-					BGPAdvertisements: []v1beta1.LegacyBgpAdvertisement{
-						{
-							AggregationLength: pointer.Int32Ptr(32),
-							LocalPref:         uint32(100),
-							Communities:       []string{"bar"},
-						},
 					},
 				},
 			},

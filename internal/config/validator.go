@@ -30,13 +30,12 @@ type validator struct {
 
 func (v *validator) Validate(resources ...client.ObjectList) error {
 	clusterResources := ClusterResources{
-		Pools:              make([]metallbv1beta1.IPAddressPool, 0),
-		Peers:              make([]metallbv1beta2.BGPPeer, 0),
-		BFDProfiles:        make([]metallbv1beta1.BFDProfile, 0),
-		BGPAdvs:            make([]metallbv1beta1.BGPAdvertisement, 0),
-		L2Advs:             make([]metallbv1beta1.L2Advertisement, 0),
-		LegacyAddressPools: make([]metallbv1beta1.AddressPool, 0),
-		Communities:        make([]metallbv1beta1.Community, 0),
+		Pools:       make([]metallbv1beta1.IPAddressPool, 0),
+		Peers:       make([]metallbv1beta2.BGPPeer, 0),
+		BFDProfiles: make([]metallbv1beta1.BFDProfile, 0),
+		BGPAdvs:     make([]metallbv1beta1.BGPAdvertisement, 0),
+		L2Advs:      make([]metallbv1beta1.L2Advertisement, 0),
+		Communities: make([]metallbv1beta1.Community, 0),
 	}
 	for _, list := range resources {
 		switch list := list.(type) {
@@ -50,8 +49,6 @@ func (v *validator) Validate(resources ...client.ObjectList) error {
 			clusterResources.BGPAdvs = append(clusterResources.BGPAdvs, list.Items...)
 		case *metallbv1beta1.L2AdvertisementList:
 			clusterResources.L2Advs = append(clusterResources.L2Advs, list.Items...)
-		case *metallbv1beta1.AddressPoolList:
-			clusterResources.LegacyAddressPools = append(clusterResources.LegacyAddressPools, list.Items...)
 		case *metallbv1beta1.CommunityList:
 			clusterResources.Communities = append(clusterResources.Communities, list.Items...)
 		case *v1.NodeList:
@@ -83,18 +80,6 @@ func resetTransientErrorsFields(clusterResources ClusterResources) ClusterResour
 			}
 		}
 		clusterResources.BGPAdvs[i].Spec.Communities = communities
-	}
-	for i, legacyAddrPool := range clusterResources.LegacyAddressPools {
-		for j, bgpAdv := range legacyAddrPool.Spec.BGPAdvertisements {
-			var communities []string
-			for k := range bgpAdv.Communities {
-				// We want to pass only communities that are potentially explicit values.
-				if strings.Contains(bgpAdv.Communities[k], ":") {
-					communities = append(communities, bgpAdv.Communities[k])
-				}
-			}
-			clusterResources.LegacyAddressPools[i].Spec.BGPAdvertisements[j].Communities = communities
-		}
 	}
 	return clusterResources
 }

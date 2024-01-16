@@ -104,18 +104,13 @@ func validateL2AdvCreate(l2Adv *v1beta1.L2Advertisement) error {
 		return err
 	}
 
-	addressPools, err := getExistingAddressPools()
-	if err != nil {
-		return err
-	}
-
 	ipAddressPools, err := getExistingIPAddressPools()
 	if err != nil {
 		return err
 	}
 
 	toValidate := l2AdvListWithUpdate(existingL2AdvList, l2Adv)
-	err = Validator.Validate(toValidate, addressPools, ipAddressPools)
+	err = Validator.Validate(toValidate, ipAddressPools)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "v1beta1.L2Advertisement", "action", "create", "name", l2Adv.Name, "namespace", l2Adv.Namespace, "error", err)
 		return err
@@ -132,18 +127,13 @@ func validateL2AdvUpdate(l2Adv *v1beta1.L2Advertisement, _ *v1beta1.L2Advertisem
 		return err
 	}
 
-	addressPools, err := getExistingAddressPools()
-	if err != nil {
-		return err
-	}
-
 	ipAddressPools, err := getExistingIPAddressPools()
 	if err != nil {
 		return err
 	}
 
 	toValidate := l2AdvListWithUpdate(l2Advs, l2Adv)
-	err = Validator.Validate(toValidate, addressPools, ipAddressPools)
+	err = Validator.Validate(toValidate, ipAddressPools)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "v1beta1.L2Advertisement", "action", "create", "name", l2Adv.Name, "namespace", l2Adv.Namespace, "error", err)
 		return err

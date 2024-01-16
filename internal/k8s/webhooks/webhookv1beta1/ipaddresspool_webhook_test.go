@@ -21,10 +21,6 @@ func TestValidateIPAddressPool(t *testing.T) {
 	}
 	Logger = log.NewNopLogger()
 
-	toRestoreAddresspools := getExistingAddressPools
-	getExistingAddressPools = func() (*v1beta1.AddressPoolList, error) {
-		return &v1beta1.AddressPoolList{}, nil
-	}
 	toRestoreIPAddressPools := getExistingIPAddressPools
 	getExistingIPAddressPools = func() (*v1beta1.IPAddressPoolList, error) {
 		return &v1beta1.IPAddressPoolList{
@@ -35,7 +31,6 @@ func TestValidateIPAddressPool(t *testing.T) {
 	}
 
 	defer func() {
-		getExistingAddressPools = toRestoreAddresspools
 		getExistingIPAddressPools = toRestoreIPAddressPools
 	}()
 
