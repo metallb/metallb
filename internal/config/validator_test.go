@@ -84,22 +84,6 @@ func TestResetTransientErrorsFields(t *testing.T) {
 						},
 					},
 				},
-				LegacyAddressPools: []metallbv1beta1.AddressPool{
-					{
-						Spec: metallbv1beta1.AddressPoolSpec{
-							BGPAdvertisements: []metallbv1beta1.LegacyBgpAdvertisement{
-								{
-									Communities: []string{
-										"11111:11aaaa",
-										"larg:12345:12345:12345",
-										"alias",
-										"myCommunityAlias",
-									},
-								},
-							},
-						},
-					},
-				},
 			},
 			expected: ClusterResources{
 				Peers: []metallbv1beta2.BGPPeer{
@@ -131,20 +115,6 @@ func TestResetTransientErrorsFields(t *testing.T) {
 							Communities: []string{
 								"11111:11aaaa",
 								"larg:12345:12345:12345",
-							},
-						},
-					},
-				},
-				LegacyAddressPools: []metallbv1beta1.AddressPool{
-					{
-						Spec: metallbv1beta1.AddressPoolSpec{
-							BGPAdvertisements: []metallbv1beta1.LegacyBgpAdvertisement{
-								{
-									Communities: []string{
-										"11111:11aaaa",
-										"larg:12345:12345:12345",
-									},
-								},
 							},
 						},
 					},

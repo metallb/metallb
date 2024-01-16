@@ -104,11 +104,6 @@ func validateBGPAdvCreate(bgpAdv *v1beta1.BGPAdvertisement) error {
 		return err
 	}
 
-	addressPools, err := getExistingAddressPools()
-	if err != nil {
-		return err
-	}
-
 	ipAddressPools, err := getExistingIPAddressPools()
 	if err != nil {
 		return err
@@ -120,7 +115,7 @@ func validateBGPAdvCreate(bgpAdv *v1beta1.BGPAdvertisement) error {
 	}
 
 	toValidate := bgpAdvListWithUpdate(existingBGPAdvList, bgpAdv)
-	err = Validator.Validate(toValidate, addressPools, ipAddressPools, nodes)
+	err = Validator.Validate(toValidate, ipAddressPools, nodes)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "bgpadvertisement", "action", "create", "name", bgpAdv.Name, "namespace", bgpAdv.Namespace, "error", err)
 		return err
@@ -137,11 +132,6 @@ func validateBGPAdvUpdate(bgpAdv *v1beta1.BGPAdvertisement, _ *v1beta1.BGPAdvert
 		return err
 	}
 
-	addressPools, err := getExistingAddressPools()
-	if err != nil {
-		return err
-	}
-
 	ipAddressPools, err := getExistingIPAddressPools()
 	if err != nil {
 		return err
@@ -153,7 +143,7 @@ func validateBGPAdvUpdate(bgpAdv *v1beta1.BGPAdvertisement, _ *v1beta1.BGPAdvert
 	}
 
 	toValidate := bgpAdvListWithUpdate(bgpAdvs, bgpAdv)
-	err = Validator.Validate(toValidate, addressPools, ipAddressPools, nodes)
+	err = Validator.Validate(toValidate, ipAddressPools, nodes)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "bgpadvertisement", "action", "create", "name", bgpAdv.Name, "namespace", bgpAdv.Namespace, "error", err)
 		return err

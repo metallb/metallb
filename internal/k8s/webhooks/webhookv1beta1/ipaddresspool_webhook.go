@@ -103,12 +103,8 @@ func validateIPAddressPoolCreate(ipAddress *v1beta1.IPAddressPool) error {
 		return err
 	}
 
-	existingAddressPoolList, err := getExistingAddressPools()
-	if err != nil {
-		return err
-	}
 	toValidate := ipAddressListWithUpdate(existingIPAddressPoolList, ipAddress)
-	err = Validator.Validate(existingAddressPoolList, toValidate)
+	err = Validator.Validate(toValidate)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "ipAddress", "action", "create", "name", ipAddress.Name, "namespace", ipAddress.Namespace, "error", err)
 		return err
@@ -119,10 +115,6 @@ func validateIPAddressPoolCreate(ipAddress *v1beta1.IPAddressPool) error {
 // validateIPAddressPoolUpdate implements webhook.Validator so a webhook will be registered for IPAddressPool.
 func validateIPAddressPoolUpdate(ipAddress *v1beta1.IPAddressPool, _ *v1beta1.IPAddressPool) error {
 	level.Debug(Logger).Log("webhook", "ipaddresspool", "action", "update", "name", ipAddress.Name, "namespace", ipAddress.Namespace)
-	existingAddressPoolList, err := getExistingAddressPools()
-	if err != nil {
-		return err
-	}
 
 	existingIPAddressPoolList, err := getExistingIPAddressPools()
 	if err != nil {
@@ -130,7 +122,7 @@ func validateIPAddressPoolUpdate(ipAddress *v1beta1.IPAddressPool, _ *v1beta1.IP
 	}
 
 	toValidate := ipAddressListWithUpdate(existingIPAddressPoolList, ipAddress)
-	err = Validator.Validate(existingAddressPoolList, toValidate)
+	err = Validator.Validate(toValidate)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "ipAddress", "action", "update", "name", ipAddress.Name, "namespace", ipAddress.Namespace, "error", err)
 		return err

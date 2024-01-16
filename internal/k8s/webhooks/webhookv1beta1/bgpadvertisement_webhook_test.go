@@ -31,10 +31,6 @@ func TestValidateBGPAdvertisement(t *testing.T) {
 			},
 		}, nil
 	}
-	toRestoreAddresspools := getExistingAddressPools
-	getExistingAddressPools = func() (*v1beta1.AddressPoolList, error) {
-		return &v1beta1.AddressPoolList{}, nil
-	}
 	toRestoreIPAddressPools := getExistingIPAddressPools
 	getExistingIPAddressPools = func() (*v1beta1.IPAddressPoolList, error) {
 		return &v1beta1.IPAddressPoolList{}, nil
@@ -46,7 +42,6 @@ func TestValidateBGPAdvertisement(t *testing.T) {
 
 	defer func() {
 		getExistingBGPAdvs = toRestore
-		getExistingAddressPools = toRestoreAddresspools
 		getExistingIPAddressPools = toRestoreIPAddressPools
 		getExistingNodes = toRestoreNodes
 	}()

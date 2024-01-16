@@ -87,10 +87,6 @@ func objectsFromResources(r config.ClusterResources) []client.Object {
 		objects = append(objects, l2Adv.DeepCopy())
 	}
 
-	for _, legacyPool := range r.LegacyAddressPools {
-		objects = append(objects, legacyPool.DeepCopy())
-	}
-
 	for _, community := range r.Communities {
 		objects = append(objects, community.DeepCopy())
 	}

@@ -271,20 +271,6 @@ var (
 			"bgpsecret": {Type: corev1.SecretTypeBasicAuth, ObjectMeta: metav1.ObjectMeta{Name: "bgpsecret", Namespace: testNamespace},
 				Data: map[string][]byte{"password": []byte("nopass")}},
 		},
-		LegacyAddressPools: []v1beta1.AddressPool{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      "legacypool1",
-					Namespace: testNamespace,
-				},
-				Spec: v1beta1.AddressPoolSpec{
-					Addresses: []string{
-						"10.21.0.0/16",
-					},
-					Protocol: "bgp",
-				},
-			},
-		},
 		Communities: []v1beta1.Community{
 			{
 				ObjectMeta: metav1.ObjectMeta{

@@ -13,6 +13,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	MetalLBTestNameSpace = "metallb-test-namespace"
+)
+
 func TestValidateBFDProfile(t *testing.T) {
 	MetalLBNamespace = MetalLBTestNameSpace
 	Logger = log.NewNopLogger()

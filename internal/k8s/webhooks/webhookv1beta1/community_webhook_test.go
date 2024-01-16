@@ -134,7 +134,7 @@ func TestValidateCommunity(t *testing.T) {
 			t.Fatalf("test %s failed, expecting error", test.desc)
 		}
 		if !cmp.Equal(test.expected, mock.communities) {
-			t.Fatalf("test %s failed, %s", test.desc, cmp.Diff(test.expected, mock.pools))
+			t.Fatalf("test %s failed, %s", test.desc, cmp.Diff(test.expected, mock.communities))
 		}
 	}
 }

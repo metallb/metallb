@@ -75,21 +75,6 @@ func findIPv6BGPAdvertisement(c ClusterResources) error {
 // findNonLegacyCommunity returns an error if it can find a non legacy community. If a community string can not be
 // parsed, the string will be ignored.
 func findNonLegacyCommunity(c ClusterResources) error {
-	for _, p := range c.LegacyAddressPools {
-		for _, adv := range p.Spec.BGPAdvertisements {
-			for _, cs := range adv.Communities {
-				c, err := community.New(cs)
-				if err != nil {
-					// Skip aliases.
-					continue
-				}
-				if !community.IsLegacy(c) {
-					return fmt.Errorf("native BGP mode only supports legacy communities, legacy address pool %q "+
-						"has non legacy community %q", p.Name, cs)
-				}
-			}
-		}
-	}
 	for _, adv := range c.BGPAdvs {
 		for _, cs := range adv.Spec.Communities {
 			c, err := community.New(cs)
