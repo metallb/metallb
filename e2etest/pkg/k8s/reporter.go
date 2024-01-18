@@ -51,7 +51,6 @@ func InitReporter(kubeconfig, path, namespace string) *k8sreporter.KubernetesRep
 	// The list of CRDs we want to dump
 	crds := []k8sreporter.CRData{
 		{Cr: &metallbv1beta1.IPAddressPoolList{}},
-		{Cr: &metallbv1beta1.AddressPoolList{}},
 		{Cr: &metallbv1beta2.BGPPeerList{}},
 		{Cr: &metallbv1beta1.L2AdvertisementList{}},
 		{Cr: &metallbv1beta1.BGPAdvertisementList{}},

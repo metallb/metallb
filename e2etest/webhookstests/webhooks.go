@@ -30,9 +30,9 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/openshift-kni/k8sreporter"
 
+	"go.universe.tf/e2etest/pkg/pointer"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
-	"go.universe.tf/e2etest/pkg/pointer"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -103,58 +103,6 @@ var _ = ginkgo.Describe("Webhooks", func() {
 
 			ginkgo.By("Updating second IPAddressPool addresses to overlapping addresses defined by network prefix")
 			resources.Pools[1].Spec.Addresses = []string{"1.1.1.0/24"}
-			err = ConfigUpdater.Update(resources)
-			framework.ExpectError(err)
-			Expect(err.Error()).To(ContainSubstring("overlaps with already defined CIDR"))
-		})
-	})
-
-	ginkgo.Context("for Legacy AddressPool", func() {
-		ginkgo.It("Should recognize overlapping addresses in two AddressPools", func() {
-			ginkgo.By("Creating first AddrssPool")
-			resources := config.Resources{
-				LegacyAddressPools: []metallbv1beta1.AddressPool{
-					{
-						ObjectMeta: metav1.ObjectMeta{
-							Name: "webhooks-test1",
-						},
-						Spec: metallbv1beta1.AddressPoolSpec{
-							Addresses: []string{
-								"1.1.1.1-1.1.1.100",
-							},
-							Protocol: string(config.L2),
-						},
-					},
-				},
-			}
-			err := ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
-
-			ginkgo.By("Creating second AddressPool with overlapping addresses defined by address range")
-			resources.LegacyAddressPools = append(resources.LegacyAddressPools,
-				metallbv1beta1.AddressPool{
-					ObjectMeta: metav1.ObjectMeta{
-						Name: "webhooks-test2",
-					},
-					Spec: metallbv1beta1.AddressPoolSpec{
-						Addresses: []string{
-							"1.1.1.15-1.1.1.20",
-						},
-						Protocol: string(config.L2),
-					},
-				},
-			)
-			err = ConfigUpdater.Update(resources)
-			framework.ExpectError(err)
-			Expect(err.Error()).To(ContainSubstring("overlaps with already defined CIDR"))
-
-			ginkgo.By("Creating second valid AddressPool")
-			resources.LegacyAddressPools[1].Spec.Addresses = []string{"1.1.1.101-1.1.1.200"}
-			err = ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
-
-			ginkgo.By("Updating second AddressPool addresses to overlapping addresses defined by network prefix")
-			resources.LegacyAddressPools[1].Spec.Addresses = []string{"1.1.1.0/24"}
 			err = ConfigUpdater.Update(resources)
 			framework.ExpectError(err)
 			Expect(err.Error()).To(ContainSubstring("overlaps with already defined CIDR"))
@@ -413,21 +361,6 @@ var _ = ginkgo.DescribeTable("Webhooks namespace validation",
 					Addresses: []string{
 						"1.1.1.1-1.1.1.100",
 					},
-				},
-			},
-		},
-	}),
-	ginkgo.Entry("Should reject creating Legacy AddressPool in a different namespace", &config.Resources{
-		LegacyAddressPools: []metallbv1beta1.AddressPool{
-			{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "webhooks-test1",
-				},
-				Spec: metallbv1beta1.AddressPoolSpec{
-					Addresses: []string{
-						"1.1.1.1-1.1.1.100",
-					},
-					Protocol: string(config.L2),
 				},
 			},
 		},
