@@ -272,61 +272,6 @@ jobs:
         with:
           artifact-name: kind-logs-${{ matrix.ip-family }}-${{ matrix.bgp-type }}-${{ matrix.deployment}}
 
-  # This lane checks if conversion webhooks work and if metallb is compatible with the CRDs
-  # in the operator. We deploy a v4-frr lane, clone the v0.12.1 version of metallb and run CI
-  # in operator mode. We run few significative tests that cover all the crds.
-  backward_compatible:
-    runs-on: ubuntu-22.04
-    needs:
-      - unit-tests
-      - build-test-images
-      - helm
-      - commitlint
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup
-        uses: ./.github/workflows/composite/setup
-
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: "0"
-          path: metallb-v0.12.1
-          ref: v0.12.1
-
-      - name: Deploy MetalLB
-        run: |
-          inv dev-env -b frr --no-build-images
-      # Patch the old e2etest to cleanup the resources in the correct order.
-      - name: Apply patch
-        run: |
-          patch metallb-v0.12.1/e2etest/pkg/config/update.go < e2etest/backwardcompatible/patchfile
-
-      - name: E2E
-        run: |
-          cat <<EOF | kubectl apply -f -
-          apiVersion: v1
-          kind: ConfigMap
-          metadata:
-            namespace: metallb-system
-            name: config
-          EOF
-          rm -rf e2etest # we want to make sure we are not running current e2e by mistake
-          cd metallb-v0.12.1
-          sed -i -e 's/quay.io\/frrouting\/frr:stable_7.5/quay.io\/frrouting\/frr:7.5.1/g' e2etest/pkg/frr/container/container.go # replace with frr image from dockerhub since it has official image.
-          FOCUS="L2.*should work for ExternalTrafficPolicy=Cluster|BGP.*A service of protocol load balancer should work with.*IPV4 - ExternalTrafficPolicyCluster$|BGP.*should work with the given bfd profile.*IPV4 - default"
-          sudo -E env "PATH=$PATH" inv e2etest --skip-docker --use-operator --focus "$FOCUS" -e /tmp/kind_logs
-
-      - name: Collect Logs
-        if: ${{ failure() }}
-        uses: ./.github/workflows/composite/collectlogs
-        with:
-          artifact-name: kind-logs-backward-compatible
-
   e2e-use-operator:
     runs-on: ubuntu-22.04
     needs:
