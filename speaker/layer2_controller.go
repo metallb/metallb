@@ -27,6 +27,7 @@ import (
 	k8snodes "go.universe.tf/metallb/internal/k8s/nodes"
 	"go.universe.tf/metallb/internal/layer2"
 	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
 )
 
@@ -44,43 +45,24 @@ func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
 // endpoint on them.
 // The speakers parameter is a map containing all the nodes with active speakers.
 // If the speakers map is nil, it is ignored.
-func usableNodes(eps epslices.EpsOrSlices, speakers map[string]bool) []string {
+func usableNodes(eps []discovery.EndpointSlice, speakers map[string]bool) []string {
 	usable := map[string]bool{}
-	switch eps.Type {
-	case epslices.Eps:
-		for _, subset := range eps.EpVal.Subsets {
-			for _, ep := range subset.Addresses {
-				if ep.NodeName == nil {
+	for _, slice := range eps {
+		for _, ep := range slice.Endpoints {
+			if !epslices.IsConditionServing(ep.Conditions) {
+				continue
+			}
+			if ep.NodeName == nil {
+				continue
+			}
+			nodeName := *ep.NodeName
+			if speakers != nil {
+				if hasSpeaker := speakers[nodeName]; !hasSpeaker {
 					continue
-				}
-				if speakers != nil {
-					if hasSpeaker := speakers[*ep.NodeName]; !hasSpeaker {
-						continue
-					}
-				}
-				if _, ok := usable[*ep.NodeName]; !ok {
-					usable[*ep.NodeName] = true
 				}
 			}
-		}
-	case epslices.Slices:
-		for _, slice := range eps.SlicesVal {
-			for _, ep := range slice.Endpoints {
-				if !epslices.IsConditionServing(ep.Conditions) {
-					continue
-				}
-				if ep.NodeName == nil {
-					continue
-				}
-				nodeName := *ep.NodeName
-				if speakers != nil {
-					if hasSpeaker := speakers[nodeName]; !hasSpeaker {
-						continue
-					}
-				}
-				if _, ok := usable[nodeName]; !ok {
-					usable[nodeName] = true
-				}
+			if _, ok := usable[nodeName]; !ok {
+				usable[nodeName] = true
 			}
 		}
 	}
@@ -95,7 +77,7 @@ func usableNodes(eps epslices.EpsOrSlices, speakers map[string]bool) []string {
 	return ret
 }
 
-func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce []net.IP, pool *config.Pool, svc *v1.Service, eps epslices.EpsOrSlices, nodes map[string]*v1.Node) string {
+func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce []net.IP, pool *config.Pool, svc *v1.Service, eps []discovery.EndpointSlice, nodes map[string]*v1.Node) string {
 	if !activeEndpointExists(eps) { // no active endpoints, just return
 		level.Debug(l).Log("event", "shouldannounce", "protocol", "l2", "message", "failed no active endpoints", "service", name)
 		return "notOwner"
@@ -202,22 +184,13 @@ func nodesWithActiveSpeakers(speakers map[string]bool) []string {
 }
 
 // activeEndpointExists returns true if at least one endpoint is active.
-func activeEndpointExists(eps epslices.EpsOrSlices) bool {
-	switch eps.Type {
-	case epslices.Eps:
-		for _, subset := range eps.EpVal.Subsets {
-			if len(subset.Addresses) > 0 {
-				return true
+func activeEndpointExists(eps []discovery.EndpointSlice) bool {
+	for _, slice := range eps {
+		for _, ep := range slice.Endpoints {
+			if !epslices.IsConditionServing(ep.Conditions) {
+				continue
 			}
-		}
-	case epslices.Slices:
-		for _, slice := range eps.SlicesVal {
-			for _, ep := range slice.Endpoints {
-				if !epslices.IsConditionServing(ep.Conditions) {
-					continue
-				}
-				return true
-			}
+			return true
 		}
 	}
 	return false

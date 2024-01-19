@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -83,10 +84,15 @@ func (r *ServiceReconciler) reprocessAll(ctx context.Context, req ctrl.Request) 
 		}
 
 		serviceName := types.NamespacedName{Namespace: service.Namespace, Name: service.Name}
-		eps, err := epsOrSlicesForServices(ctx, r, serviceName, r.Endpoints)
-		if err != nil {
-			level.Error(r.Logger).Log("controller", "ServiceReconciler - reprocessAll", "message", "failed to get endpoints", "service", serviceName.String(), "error", err)
-			return ctrl.Result{}, err
+
+		eps := []discovery.EndpointSlice{}
+		if r.Endpoints {
+			var err error
+			eps, err = epSlicesForService(ctx, r, serviceName)
+			if err != nil {
+				level.Error(r.Logger).Log("controller", "ServiceReconciler - reprocessAll", "message", "failed to get endpoints", "service", serviceName.String(), "error", err)
+				return ctrl.Result{}, err
+			}
 		}
 
 		level.Debug(r.Logger).Log("controller", "ServiceReconciler - reprocessAll", "reprocessing service", dumpResource(service))

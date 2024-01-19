@@ -12,7 +12,6 @@ import (
 
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/controllers"
-	"go.universe.tf/metallb/internal/k8s/epslices"
 	"go.universe.tf/metallb/internal/layer2"
 	"go.universe.tf/metallb/internal/pointer"
 
@@ -48,108 +47,6 @@ func compareUseableNodesReturnedValue(a, b []string) bool {
 	return true
 }
 
-func TestUsableNodes(t *testing.T) {
-	c, err := newController(controllerConfig{
-		MyNode: "iris1",
-		Logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
-	})
-	if err != nil {
-		t.Fatalf("creating controller: %s", err)
-	}
-	c.client = &testK8S{t: t}
-
-	tests := []struct {
-		desc string
-
-		eps epslices.EpsOrSlices
-
-		usableSpeakers map[string]bool
-
-		cExpectedResult []string
-	}{
-		{
-			desc: "Two endpoints, different hosts",
-			eps: epslices.EpsOrSlices{
-				EpVal: &v1.Endpoints{
-					Subsets: []v1.EndpointSubset{
-						{
-							Addresses: []v1.EndpointAddress{
-								{
-									IP:       "2.3.4.5",
-									NodeName: pointer.StrPtr("iris1"),
-								},
-								{
-									IP:       "2.3.4.15",
-									NodeName: pointer.StrPtr("iris2"),
-								},
-							},
-						},
-					},
-				},
-				Type: epslices.Eps,
-			},
-			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
-			cExpectedResult: []string{"iris1", "iris2"},
-		}, {
-			desc: "Two endpoints, same host",
-			eps: epslices.EpsOrSlices{
-				EpVal: &v1.Endpoints{
-					Subsets: []v1.EndpointSubset{
-						{
-							Addresses: []v1.EndpointAddress{
-								{
-									IP:       "2.3.4.5",
-									NodeName: pointer.StrPtr("iris1"),
-								},
-								{
-									IP:       "2.3.4.15",
-									NodeName: pointer.StrPtr("iris1"),
-								},
-							},
-						},
-					},
-				},
-				Type: epslices.Eps,
-			},
-			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
-			cExpectedResult: []string{"iris1"},
-		}, {
-			desc: "Two endpoints, same host, one is not ready",
-			eps: epslices.EpsOrSlices{
-				EpVal: &v1.Endpoints{
-					Subsets: []v1.EndpointSubset{
-						{
-							Addresses: []v1.EndpointAddress{
-								{
-									IP:       "2.3.4.5",
-									NodeName: pointer.StrPtr("iris1"),
-								},
-							},
-							NotReadyAddresses: []v1.EndpointAddress{
-								{
-									IP:       "2.3.4.15",
-									NodeName: pointer.StrPtr("iris1"),
-								},
-							},
-						},
-					},
-				},
-				Type: epslices.Eps,
-			},
-			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
-			cExpectedResult: []string{"iris1"},
-		},
-	}
-
-	for _, test := range tests {
-		response := usableNodes(test.eps, test.usableSpeakers)
-		sort.Strings(response)
-		if !compareUseableNodesReturnedValue(response, test.cExpectedResult) {
-			t.Errorf("%q: shouldAnnounce for controller returned incorrect result, expected '%s', but received '%s'", test.desc, test.cExpectedResult, response)
-		}
-	}
-}
-
 func TestUsableNodesEPSlices(t *testing.T) {
 	b := &fakeBGP{
 		t: t,
@@ -168,7 +65,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 	tests := []struct {
 		desc string
 
-		eps epslices.EpsOrSlices
+		eps []discovery.EndpointSlice
 
 		usableSpeakers map[string]bool
 
@@ -176,100 +73,91 @@ func TestUsableNodesEPSlices(t *testing.T) {
 	}{
 		{
 			desc: "Two endpoints, different hosts, multi slice",
-			eps: epslices.EpsOrSlices{
-				SlicesVal: []discovery.EndpointSlice{
-					{
-						Endpoints: []discovery.Endpoint{
-							{
-								Addresses: []string{
-									"2.3.4.5",
-								},
-								NodeName: stringPtr("iris1"),
-								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
-								},
+			eps: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{
+								"2.3.4.5",
 							},
-						},
-					},
-					{
-						Endpoints: []discovery.Endpoint{
-							{
-								Addresses: []string{
-									"2.3.4.15",
-								},
-								NodeName: stringPtr("iris2"),
-								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
-								},
+							NodeName: stringPtr("iris1"),
+							Conditions: discovery.EndpointConditions{
+								Ready: pointer.BoolPtr(true),
 							},
 						},
 					},
 				},
-				Type: epslices.Slices,
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{
+								"2.3.4.15",
+							},
+							NodeName: stringPtr("iris2"),
+							Conditions: discovery.EndpointConditions{
+								Ready: pointer.BoolPtr(true),
+							},
+						},
+					},
+				},
 			},
 			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1", "iris2"},
 		},
 		{
 			desc: "Two endpoints, different hosts",
-			eps: epslices.EpsOrSlices{
-				SlicesVal: []discovery.EndpointSlice{
-					{
-						Endpoints: []discovery.Endpoint{
-							{
-								Addresses: []string{
-									"2.3.4.5",
-								},
-								NodeName: stringPtr("iris1"),
-								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
-								},
+			eps: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{
+								"2.3.4.5",
 							},
-							{
-								Addresses: []string{
-									"2.3.4.15",
-								},
-								NodeName: stringPtr("iris2"),
-								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
-								},
+							NodeName: stringPtr("iris1"),
+							Conditions: discovery.EndpointConditions{
+								Ready: pointer.BoolPtr(true),
+							},
+						},
+						{
+							Addresses: []string{
+								"2.3.4.15",
+							},
+							NodeName: stringPtr("iris2"),
+							Conditions: discovery.EndpointConditions{
+								Ready: pointer.BoolPtr(true),
 							},
 						},
 					},
 				},
-				Type: epslices.Slices,
 			},
 			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1", "iris2"},
 		},
 		{
 			desc: "Two endpoints, same host",
-			eps: epslices.EpsOrSlices{
-				SlicesVal: []discovery.EndpointSlice{
-					{
-						Endpoints: []discovery.Endpoint{
-							{
-								Addresses: []string{
-									"2.3.4.5",
-								},
-								NodeName: stringPtr("iris1"),
-								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
-								},
+			eps: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{
+								"2.3.4.5",
 							},
-							{
-								Addresses: []string{
-									"2.3.4.15",
-								},
-								NodeName: stringPtr("iris1"),
-								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
-								},
+							NodeName: stringPtr("iris1"),
+							Conditions: discovery.EndpointConditions{
+								Ready: pointer.BoolPtr(true),
+							},
+						},
+						{
+							Addresses: []string{
+								"2.3.4.15",
+							},
+							NodeName: stringPtr("iris1"),
+							Conditions: discovery.EndpointConditions{
+								Ready: pointer.BoolPtr(true),
 							},
 						},
 					},
 				},
-				Type: epslices.Slices,
 			},
 			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1"},
@@ -277,66 +165,60 @@ func TestUsableNodesEPSlices(t *testing.T) {
 
 		{
 			desc: "Two endpoints, same host, one is not ready",
-			eps: epslices.EpsOrSlices{
-				SlicesVal: []discovery.EndpointSlice{
-					{
-						Endpoints: []discovery.Endpoint{
-							{
-								Addresses: []string{
-									"2.3.4.5",
-								},
-								NodeName: stringPtr("iris1"),
-								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
-								},
+			eps: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{
+								"2.3.4.5",
 							},
-							{
-								Addresses: []string{
-									"2.3.4.15",
-								},
-								NodeName: stringPtr("iris1"),
-								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(false),
-								},
+							NodeName: stringPtr("iris1"),
+							Conditions: discovery.EndpointConditions{
+								Ready: pointer.BoolPtr(true),
+							},
+						},
+						{
+							Addresses: []string{
+								"2.3.4.15",
+							},
+							NodeName: stringPtr("iris1"),
+							Conditions: discovery.EndpointConditions{
+								Ready: pointer.BoolPtr(false),
 							},
 						},
 					},
 				},
-				Type: epslices.Slices,
 			},
 			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1"},
 		},
 		{
 			desc: "Two endpoints, different hosts, not ready but serving",
-			eps: epslices.EpsOrSlices{
-				SlicesVal: []discovery.EndpointSlice{
-					{
-						Endpoints: []discovery.Endpoint{
-							{
-								Addresses: []string{
-									"2.3.4.5",
-								},
-								NodeName: stringPtr("iris1"),
-								Conditions: discovery.EndpointConditions{
-									Ready:   pointer.BoolPtr(false),
-									Serving: pointer.BoolPtr(true),
-								},
+			eps: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{
+								"2.3.4.5",
 							},
-							{
-								Addresses: []string{
-									"2.3.4.15",
-								},
-								NodeName: stringPtr("iris2"),
-								Conditions: discovery.EndpointConditions{
-									Ready:   pointer.BoolPtr(false),
-									Serving: pointer.BoolPtr(true),
-								},
+							NodeName: stringPtr("iris1"),
+							Conditions: discovery.EndpointConditions{
+								Ready:   pointer.BoolPtr(false),
+								Serving: pointer.BoolPtr(true),
+							},
+						},
+						{
+							Addresses: []string{
+								"2.3.4.15",
+							},
+							NodeName: stringPtr("iris2"),
+							Conditions: discovery.EndpointConditions{
+								Ready:   pointer.BoolPtr(false),
+								Serving: pointer.BoolPtr(true),
 							},
 						},
 					},
 				},
-				Type: epslices.Slices,
 			},
 			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1", "iris2"},
@@ -348,866 +230,6 @@ func TestUsableNodesEPSlices(t *testing.T) {
 		sort.Strings(response)
 		if !compareUseableNodesReturnedValue(response, test.cExpectedResult) {
 			t.Errorf("%q: shouldAnnounce for controller returned incorrect result, expected '%s', but received '%s'", test.desc, test.cExpectedResult, response)
-		}
-	}
-}
-
-func TestShouldAnnounce(t *testing.T) {
-	fakeSL := &fakeSpeakerList{
-		speakers: map[string]bool{
-			"iris1": true,
-			"iris2": true,
-		},
-	}
-	c1, err := newController(controllerConfig{
-		MyNode: "iris1",
-		Logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
-		SList:  fakeSL,
-	})
-	if err != nil {
-		t.Fatalf("creating controller: %s", err)
-	}
-	c1.client = &testK8S{t: t}
-
-	c2, err := newController(controllerConfig{
-		MyNode: "iris2",
-		Logger: log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
-		SList:  fakeSL,
-	})
-	if err != nil {
-		t.Fatalf("creating controller: %s", err)
-	}
-	c2.client = &testK8S{t: t}
-	advertisementsForNode := []*config.L2Advertisement{
-		{
-			Nodes: map[string]bool{
-				"iris1": true,
-				"iris2": true,
-			},
-		},
-	}
-
-	tests := []struct {
-		desc string
-
-		balancer string
-		config   *config.Config
-		svcs     []*v1.Service
-		eps      map[string]epslices.EpsOrSlices
-
-		c1ExpectedResult map[string]string
-		c2ExpectedResult map[string]string
-	}{
-		{
-			desc:     "One service, two endpoints, one host, controller 1 should announce",
-			balancer: "test1",
-			config: &config.Config{
-				Pools: &config.Pools{ByName: map[string]*config.Pool{
-					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
-						L2Advertisements: advertisementsForNode,
-					},
-				}},
-			},
-			svcs: []*v1.Service{
-				{
-					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					},
-					Status: statusAssigned("10.20.30.1"),
-				},
-			},
-			eps: map[string]epslices.EpsOrSlices{
-				"10.20.30.1": {
-					EpVal: &v1.Endpoints{
-						Subsets: []v1.EndpointSubset{
-							{
-								Addresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.5",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-									{
-										IP:       "2.3.4.15",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-								},
-							},
-						},
-					},
-					Type: epslices.Eps,
-				},
-			},
-			c1ExpectedResult: map[string]string{
-				"10.20.30.1": "",
-			},
-			c2ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
-			},
-		},
-
-		{
-			desc:     "One service, two endpoints, one host, neither endpoint is ready, no controller should announce",
-			balancer: "test1",
-			config: &config.Config{
-				Pools: &config.Pools{ByName: map[string]*config.Pool{
-					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
-						L2Advertisements: advertisementsForNode,
-					},
-				}},
-			},
-			svcs: []*v1.Service{
-				{
-					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					},
-					Status: statusAssigned("10.20.30.1"),
-				},
-			},
-			eps: map[string]epslices.EpsOrSlices{
-				"10.20.30.1": {
-					EpVal: &v1.Endpoints{
-						Subsets: []v1.EndpointSubset{
-							{
-								NotReadyAddresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.5",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-									{
-										IP:       "2.3.4.15",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-								},
-							},
-						},
-					},
-					Type: epslices.Eps,
-				},
-			},
-			c1ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
-			},
-			c2ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
-			},
-		},
-		{
-			desc:     "One service, two endpoints across two hosts, controller2 should announce",
-			balancer: "test1",
-			config: &config.Config{
-				Pools: &config.Pools{ByName: map[string]*config.Pool{
-					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
-						L2Advertisements: advertisementsForNode,
-					},
-				}},
-			},
-			svcs: []*v1.Service{
-				{
-					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					},
-					Status: statusAssigned("10.20.30.1"),
-				},
-			},
-			eps: map[string]epslices.EpsOrSlices{
-				"10.20.30.1": {
-					EpVal: &v1.Endpoints{
-						Subsets: []v1.EndpointSubset{
-							{
-								Addresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.5",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-									{
-										IP:       "2.3.4.15",
-										NodeName: pointer.StrPtr("iris2"),
-									},
-								},
-							},
-						},
-					},
-					Type: epslices.Eps,
-				},
-			},
-			c1ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
-			},
-			c2ExpectedResult: map[string]string{
-				"10.20.30.1": "",
-			},
-		},
-		{
-			desc:     "One service, two endpoints across two hosts, advertisement only on node 1, controller1 should announce",
-			balancer: "test1",
-			config: &config.Config{
-				Pools: &config.Pools{ByName: map[string]*config.Pool{
-					"default": {
-						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
-						L2Advertisements: []*config.L2Advertisement{
-							{
-								Nodes: map[string]bool{
-									"iris1": true,
-								},
-							},
-						},
-					},
-				}},
-			},
-			svcs: []*v1.Service{
-				{
-					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					},
-					Status: statusAssigned("10.20.30.1"),
-				},
-			},
-			eps: map[string]epslices.EpsOrSlices{
-				"10.20.30.1": {
-					EpVal: &v1.Endpoints{
-						Subsets: []v1.EndpointSubset{
-							{
-								Addresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.5",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-									{
-										IP:       "2.3.4.15",
-										NodeName: pointer.StrPtr("iris2"),
-									},
-								},
-							},
-						},
-					},
-					Type: epslices.Eps,
-				},
-			},
-			c1ExpectedResult: map[string]string{
-				"10.20.30.1": "",
-			},
-			c2ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
-			},
-		}, {
-			desc: "One service, two endpoints across two hosts, neither endpoint is ready, no controllers should announce",
-			config: &config.Config{
-				Pools: &config.Pools{ByName: map[string]*config.Pool{
-					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
-						L2Advertisements: advertisementsForNode,
-					},
-				}},
-			},
-			svcs: []*v1.Service{
-				{
-					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					},
-					Status: statusAssigned("10.20.30.1"),
-				},
-			},
-			eps: map[string]epslices.EpsOrSlices{
-				"10.20.30.1": {
-					EpVal: &v1.Endpoints{
-						Subsets: []v1.EndpointSubset{
-							{
-								NotReadyAddresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.5",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-									{
-										IP:       "2.3.4.15",
-										NodeName: pointer.StrPtr("iris2"),
-									},
-								},
-							},
-						},
-					},
-					Type: epslices.Eps,
-				},
-			},
-			c1ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
-			},
-			c2ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
-			},
-		},
-		{
-			desc: "One service, two endpoints across two hosts, controller 2 is not ready, controller 1 should announce",
-			config: &config.Config{
-				Pools: &config.Pools{ByName: map[string]*config.Pool{
-					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
-						L2Advertisements: advertisementsForNode,
-					},
-				}},
-			},
-			svcs: []*v1.Service{
-				{
-					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					},
-					Status: statusAssigned("10.20.30.1"),
-				},
-			},
-			eps: map[string]epslices.EpsOrSlices{
-				"10.20.30.1": {
-					EpVal: &v1.Endpoints{
-						Subsets: []v1.EndpointSubset{
-							{
-								Addresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.5",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-								},
-								NotReadyAddresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.15",
-										NodeName: pointer.StrPtr("iris2"),
-									},
-								},
-							},
-						},
-					},
-					Type: epslices.Eps,
-				},
-			},
-			c1ExpectedResult: map[string]string{
-				"10.20.30.1": "",
-			},
-			c2ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
-			},
-		},
-		{
-			desc: "Two services each with two endpoints across across two hosts, controller 1 should announce the second, controller 2 the first",
-			config: &config.Config{
-				Pools: &config.Pools{ByName: map[string]*config.Pool{
-					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
-						L2Advertisements: advertisementsForNode,
-					},
-				}},
-			},
-			svcs: []*v1.Service{
-				{
-					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					},
-					Status: statusAssigned("10.20.30.1"),
-				},
-				{
-					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					},
-					Status: statusAssigned("10.20.30.2"),
-				},
-			},
-			eps: map[string]epslices.EpsOrSlices{
-				"10.20.30.1": {
-					EpVal: &v1.Endpoints{
-						Subsets: []v1.EndpointSubset{
-							{
-								Addresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.5",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-									{
-										IP:       "2.3.4.15",
-										NodeName: pointer.StrPtr("iris2"),
-									},
-								},
-							},
-						},
-					},
-					Type: epslices.Eps,
-				},
-				"10.20.30.2": {
-					EpVal: &v1.Endpoints{
-						Subsets: []v1.EndpointSubset{
-							{
-								Addresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.25",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-									{
-										IP:       "2.3.4.35",
-										NodeName: pointer.StrPtr("iris2"),
-									},
-								},
-							},
-						},
-					},
-					Type: epslices.Eps,
-				},
-			},
-			c1ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
-				"10.20.30.2": "",
-			},
-			c2ExpectedResult: map[string]string{
-				"10.20.30.1": "",
-				"10.20.30.2": "notOwner",
-			},
-		},
-		{
-			desc: "Two services each with two endpoints across across two hosts, one service has an endpoint not ready on controller 2, controller 2 should not announce for the service with the not ready endpoint",
-			config: &config.Config{
-				Pools: &config.Pools{ByName: map[string]*config.Pool{
-					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
-						L2Advertisements: advertisementsForNode,
-					},
-				}},
-			},
-			svcs: []*v1.Service{
-				{
-					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					},
-					Status: statusAssigned("10.20.30.1"),
-				},
-				{
-					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					},
-					Status: statusAssigned("10.20.30.2"),
-				},
-			},
-			eps: map[string]epslices.EpsOrSlices{
-				"10.20.30.1": {
-					EpVal: &v1.Endpoints{
-						Subsets: []v1.EndpointSubset{
-							{
-								Addresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.5",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-									{
-										IP:       "2.3.4.15",
-										NodeName: pointer.StrPtr("iris2"),
-									},
-								},
-							},
-						},
-					},
-					Type: epslices.Eps,
-				},
-				"10.20.30.2": {
-					EpVal: &v1.Endpoints{
-						Subsets: []v1.EndpointSubset{
-							{
-								Addresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.25",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-								},
-								NotReadyAddresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.35",
-										NodeName: pointer.StrPtr("iris2"),
-									},
-								},
-							},
-						},
-					},
-					Type: epslices.Eps,
-				},
-			},
-			c1ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
-				"10.20.30.2": "",
-			},
-			c2ExpectedResult: map[string]string{
-				"10.20.30.1": "",
-				"10.20.30.2": "notOwner",
-			},
-		},
-		{
-			desc: "Two services each with two endpoints across across two hosts, one service has an endpoint not ready on controller 1, the other service has an endpoint not ready on controller 2. Each controller should announce for the service with the ready endpoint on that controller",
-			config: &config.Config{
-				Pools: &config.Pools{ByName: map[string]*config.Pool{
-					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
-						L2Advertisements: advertisementsForNode,
-					},
-				}},
-			},
-			svcs: []*v1.Service{
-				{
-					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					},
-					Status: statusAssigned("10.20.30.1"),
-				},
-				{
-					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					},
-					Status: statusAssigned("10.20.30.2"),
-				},
-			},
-			eps: map[string]epslices.EpsOrSlices{
-				"10.20.30.1": {
-					EpVal: &v1.Endpoints{
-						Subsets: []v1.EndpointSubset{
-							{
-								Addresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.5",
-										NodeName: pointer.StrPtr("iris2"),
-									},
-								},
-								NotReadyAddresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.15",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-								},
-							},
-						},
-					},
-					Type: epslices.Eps,
-				},
-				"10.20.30.2": {
-					EpVal: &v1.Endpoints{
-						Subsets: []v1.EndpointSubset{
-							{
-								Addresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.25",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-								},
-								NotReadyAddresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.35",
-										NodeName: pointer.StrPtr("iris2"),
-									},
-								},
-							},
-						},
-					},
-					Type: epslices.Eps,
-				},
-			},
-			c1ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
-				"10.20.30.2": "",
-			},
-			c2ExpectedResult: map[string]string{
-				"10.20.30.1": "",
-				"10.20.30.2": "notOwner",
-			},
-		},
-		{
-			desc: "One service with three endpoints across across two hosts, controller 2 hosts two endpoints controller 2 should announce for the service",
-			config: &config.Config{
-				Pools: &config.Pools{ByName: map[string]*config.Pool{
-					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
-						L2Advertisements: advertisementsForNode,
-					},
-				}},
-			},
-			svcs: []*v1.Service{
-				{
-					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					},
-					Status: statusAssigned("10.20.30.1"),
-				},
-			},
-			eps: map[string]epslices.EpsOrSlices{
-				"10.20.30.1": {
-					EpVal: &v1.Endpoints{
-						Subsets: []v1.EndpointSubset{
-							{
-								Addresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.5",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-									{
-										IP:       "2.3.4.15",
-										NodeName: pointer.StrPtr("iris2"),
-									},
-									{
-										IP:       "2.3.4.25",
-										NodeName: pointer.StrPtr("iris2"),
-									},
-								},
-							},
-						},
-					},
-					Type: epslices.Eps,
-				},
-			},
-			c1ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
-			},
-			c2ExpectedResult: map[string]string{
-				"10.20.30.1": "",
-			},
-		},
-		{
-			desc: "One service with three endpoints across across two hosts, controller 1 hosts two endpoints controller 2 should announce for the service",
-			config: &config.Config{
-				Pools: &config.Pools{ByName: map[string]*config.Pool{
-					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
-						L2Advertisements: advertisementsForNode,
-					},
-				}},
-			},
-			svcs: []*v1.Service{
-				{
-					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					},
-					Status: statusAssigned("10.20.30.1"),
-				},
-			},
-			eps: map[string]epslices.EpsOrSlices{
-				"10.20.30.1": {
-					EpVal: &v1.Endpoints{
-						Subsets: []v1.EndpointSubset{
-							{
-								Addresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.5",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-									{
-										IP:       "2.3.4.15",
-										NodeName: pointer.StrPtr("iris2"),
-									},
-									{
-										IP:       "2.3.4.25",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-								},
-							},
-						},
-					},
-					Type: epslices.Eps,
-				},
-			},
-			c1ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
-			},
-			c2ExpectedResult: map[string]string{
-				"10.20.30.1": "",
-			},
-		},
-		{
-			desc: "One service with three endpoints across across two hosts, controller 2 hosts two endpoints, one of which is not ready, controller 1 should announce for the service",
-			config: &config.Config{
-				Pools: &config.Pools{ByName: map[string]*config.Pool{
-					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
-						L2Advertisements: advertisementsForNode,
-					},
-				}},
-			},
-			svcs: []*v1.Service{
-				{
-					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					},
-					Status: statusAssigned("10.20.30.1"),
-				},
-			},
-			eps: map[string]epslices.EpsOrSlices{
-				"10.20.30.1": {
-					EpVal: &v1.Endpoints{
-						Subsets: []v1.EndpointSubset{
-							{
-								Addresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.5",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-									{
-										IP:       "2.3.4.15",
-										NodeName: pointer.StrPtr("iris2"),
-									},
-								},
-								NotReadyAddresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.25",
-										NodeName: pointer.StrPtr("iris2"),
-									},
-								},
-							},
-						},
-					},
-					Type: epslices.Eps,
-				},
-			},
-			c1ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
-			},
-			c2ExpectedResult: map[string]string{
-				"10.20.30.1": "",
-			},
-		},
-		{
-			desc: "One service with three endpoints across across two hosts, controller 1 hosts two endpoints, one of which is not ready, controller 2 should announce for the service",
-			config: &config.Config{
-				Pools: &config.Pools{ByName: map[string]*config.Pool{
-					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
-						L2Advertisements: advertisementsForNode,
-					},
-				}},
-			},
-			svcs: []*v1.Service{
-				{
-					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					},
-					Status: statusAssigned("10.20.30.1"),
-				},
-			},
-			eps: map[string]epslices.EpsOrSlices{
-				"10.20.30.1": {
-					EpVal: &v1.Endpoints{
-						Subsets: []v1.EndpointSubset{
-							{
-								Addresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.5",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-									{
-										IP:       "2.3.4.15",
-										NodeName: pointer.StrPtr("iris2"),
-									},
-								},
-								NotReadyAddresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.25",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-								},
-							},
-						},
-					},
-					Type: epslices.Eps,
-				},
-			},
-			c1ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
-			},
-			c2ExpectedResult: map[string]string{
-				"10.20.30.1": "",
-			},
-		},
-		{
-			desc: "One service with three endpoints across across two hosts, controller 2 hosts two endpoints, both of which are not ready, controller 1 should announce for the service",
-			config: &config.Config{
-				Pools: &config.Pools{ByName: map[string]*config.Pool{
-					"default": {
-						CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
-						L2Advertisements: advertisementsForNode,
-					},
-				}},
-			},
-			svcs: []*v1.Service{
-				{
-					Spec: v1.ServiceSpec{
-						Type:                  "LoadBalancer",
-						ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
-					},
-					Status: statusAssigned("10.20.30.1"),
-				},
-			},
-			eps: map[string]epslices.EpsOrSlices{
-				"10.20.30.1": {
-					EpVal: &v1.Endpoints{
-						Subsets: []v1.EndpointSubset{
-							{
-								Addresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.5",
-										NodeName: pointer.StrPtr("iris1"),
-									},
-								},
-								NotReadyAddresses: []v1.EndpointAddress{
-									{
-										IP:       "2.3.4.15",
-										NodeName: pointer.StrPtr("iris2"),
-									},
-									{
-										IP:       "2.3.4.25",
-										NodeName: pointer.StrPtr("iris2"),
-									},
-								},
-							},
-						},
-					},
-					Type: epslices.Eps,
-				},
-			},
-			c1ExpectedResult: map[string]string{
-				"10.20.30.1": "",
-			},
-			c2ExpectedResult: map[string]string{
-				"10.20.30.1": "notOwner",
-			},
-		},
-	}
-
-	l := log.NewNopLogger()
-	for _, test := range tests {
-		if test.config != nil {
-			if c1.SetConfig(l, test.config) == controllers.SyncStateError {
-				t.Errorf("%q: SetConfig failed", test.desc)
-			}
-			if c2.SetConfig(l, test.config) == controllers.SyncStateError {
-				t.Errorf("%q: SetConfig failed", test.desc)
-			}
-		}
-
-		for _, svc := range test.svcs {
-			lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
-			lbIPStr := lbIP.String()
-			response1 := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l, "balancer", []net.IP{lbIP}, test.config.Pools.ByName["default"], svc, test.eps[lbIPStr], nil)
-			response2 := c2.protocolHandlers[config.Layer2].ShouldAnnounce(l, "balancer", []net.IP{lbIP}, test.config.Pools.ByName["default"], svc, test.eps[lbIPStr], nil)
-			if response1 != test.c1ExpectedResult[lbIPStr] {
-				t.Errorf("%q: shouldAnnounce for controller 1 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIPStr, test.c1ExpectedResult[lbIPStr], response1)
-			}
-			if response2 != test.c2ExpectedResult[lbIPStr] {
-				t.Errorf("%q: shouldAnnounce for controller 2 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIPStr, test.c2ExpectedResult[lbIPStr], response2)
-			}
 		}
 	}
 }
@@ -1253,7 +275,7 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 		balancer string
 		config   *config.Config
 		svcs     []*v1.Service
-		eps      map[string]epslices.EpsOrSlices
+		eps      map[string][]discovery.EndpointSlice
 
 		c1ExpectedResult map[string]string
 		c2ExpectedResult map[string]string
@@ -1278,33 +300,30 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]epslices.EpsOrSlices{
+			eps: map[string][]discovery.EndpointSlice{
 				"10.20.30.1": {
-					SlicesVal: []discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
 								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
+								},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.15",
+								},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
-					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1332,33 +351,30 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]epslices.EpsOrSlices{
+			eps: map[string][]discovery.EndpointSlice{
 				"10.20.30.1": {
-					SlicesVal: []discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(false),
-									},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
 								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(false),
-									},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(false),
+								},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.15",
+								},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(false),
 								},
 							},
 						},
 					},
-					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1386,34 +402,31 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]epslices.EpsOrSlices{
+			eps: map[string][]discovery.EndpointSlice{
 				"10.20.30.1": {
-					SlicesVal: []discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
 								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									NodeName: stringPtr("iris2"),
-									Conditions: discovery.EndpointConditions{
-										Ready:   pointer.BoolPtr(false),
-										Serving: pointer.BoolPtr(true),
-									},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
+								},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.15",
+								},
+								NodeName: stringPtr("iris2"),
+								Conditions: discovery.EndpointConditions{
+									Ready:   pointer.BoolPtr(false),
+									Serving: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
-					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1441,33 +454,30 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]epslices.EpsOrSlices{
+			eps: map[string][]discovery.EndpointSlice{
 				"10.20.30.1": {
-					SlicesVal: []discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(false),
-									},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
 								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									NodeName: stringPtr("iris2"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(false),
-									},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(false),
+								},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.15",
+								},
+								NodeName: stringPtr("iris2"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(false),
 								},
 							},
 						},
 					},
-					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1495,33 +505,30 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]epslices.EpsOrSlices{
+			eps: map[string][]discovery.EndpointSlice{
 				"10.20.30.1": {
-					SlicesVal: []discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
 								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									NodeName: stringPtr("iris2"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(false),
-									},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
+								},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.15",
+								},
+								NodeName: stringPtr("iris2"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(false),
 								},
 							},
 						},
 					},
-					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1556,60 +563,54 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.2"),
 				},
 			},
-			eps: map[string]epslices.EpsOrSlices{
+			eps: map[string][]discovery.EndpointSlice{
 				"10.20.30.1": {
-					SlicesVal: []discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
 								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									NodeName: stringPtr("iris2"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
+								},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.15",
+								},
+								NodeName: stringPtr("iris2"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
-					Type: epslices.Slices,
 				},
 				"10.20.30.2": {
-					SlicesVal: []discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.25",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.25",
 								},
-								{
-									Addresses: []string{
-										"2.3.4.35",
-									},
-									NodeName: stringPtr("iris2"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
+								},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.35",
+								},
+								NodeName: stringPtr("iris2"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
-					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1646,60 +647,54 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.2"),
 				},
 			},
-			eps: map[string]epslices.EpsOrSlices{
+			eps: map[string][]discovery.EndpointSlice{
 				"10.20.30.1": {
-					SlicesVal: []discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
 								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									NodeName: stringPtr("iris2"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
+								},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.15",
+								},
+								NodeName: stringPtr("iris2"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
-					Type: epslices.Slices,
 				},
 				"10.20.30.2": {
-					SlicesVal: []discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.25",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.25",
 								},
-								{
-									Addresses: []string{
-										"2.3.4.35",
-									},
-									NodeName: stringPtr("iris2"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(false),
-									},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
+								},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.35",
+								},
+								NodeName: stringPtr("iris2"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(false),
 								},
 							},
 						},
 					},
-					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1736,60 +731,54 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.2"),
 				},
 			},
-			eps: map[string]epslices.EpsOrSlices{
+			eps: map[string][]discovery.EndpointSlice{
 				"10.20.30.1": {
-					SlicesVal: []discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									NodeName: stringPtr("iris2"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
 								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(false),
-									},
+								NodeName: stringPtr("iris2"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
+								},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.15",
+								},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(false),
 								},
 							},
 						},
 					},
-					Type: epslices.Slices,
 				},
 				"10.20.30.2": {
-					SlicesVal: []discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.25",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.25",
 								},
-								{
-									Addresses: []string{
-										"2.3.4.35",
-									},
-									NodeName: stringPtr("iris2"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(false),
-									},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
+								},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.35",
+								},
+								NodeName: stringPtr("iris2"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(false),
 								},
 							},
 						},
 					},
-					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1819,46 +808,43 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]epslices.EpsOrSlices{
+			eps: map[string][]discovery.EndpointSlice{
 				"10.20.30.1": {
-					SlicesVal: []discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
 								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									NodeName: stringPtr("iris2"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
 								},
 							},
-						},
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.25",
-									},
-									NodeName: stringPtr("iris2"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+							{
+								Addresses: []string{
+									"2.3.4.15",
+								},
+								NodeName: stringPtr("iris2"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
-					Type: epslices.Slices,
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.25",
+								},
+								NodeName: stringPtr("iris2"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
+								},
+							},
+						},
+					},
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1886,42 +872,39 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]epslices.EpsOrSlices{
+			eps: map[string][]discovery.EndpointSlice{
 				"10.20.30.1": {
-					SlicesVal: []discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
 								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									NodeName: stringPtr("iris2"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
 								},
-								{
-									Addresses: []string{
-										"2.3.4.25",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.15",
+								},
+								NodeName: stringPtr("iris2"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
+								},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.25",
+								},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
-					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -1949,42 +932,39 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]epslices.EpsOrSlices{
+			eps: map[string][]discovery.EndpointSlice{
 				"10.20.30.1": {
-					SlicesVal: []discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
 								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									NodeName: stringPtr("iris2"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
 								},
-								{
-									Addresses: []string{
-										"2.3.4.25",
-									},
-									NodeName: stringPtr("iris2"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.15",
+								},
+								NodeName: stringPtr("iris2"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
+								},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.25",
+								},
+								NodeName: stringPtr("iris2"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
 								},
 							},
 						},
 					},
-					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -2012,42 +992,39 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]epslices.EpsOrSlices{
+			eps: map[string][]discovery.EndpointSlice{
 				"10.20.30.1": {
-					SlicesVal: []discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
 								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									NodeName: stringPtr("iris2"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
 								},
-								{
-									Addresses: []string{
-										"2.3.4.25",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(false),
-									},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.15",
+								},
+								NodeName: stringPtr("iris2"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
+								},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.25",
+								},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(false),
 								},
 							},
 						},
 					},
-					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -2075,42 +1052,39 @@ func TestShouldAnnounceEPSlices(t *testing.T) {
 					Status: statusAssigned("10.20.30.1"),
 				},
 			},
-			eps: map[string]epslices.EpsOrSlices{
+			eps: map[string][]discovery.EndpointSlice{
 				"10.20.30.1": {
-					SlicesVal: []discovery.EndpointSlice{
-						{
-							Endpoints: []discovery.Endpoint{
-								{
-									Addresses: []string{
-										"2.3.4.5",
-									},
-									NodeName: stringPtr("iris1"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(true),
-									},
+					{
+						Endpoints: []discovery.Endpoint{
+							{
+								Addresses: []string{
+									"2.3.4.5",
 								},
-								{
-									Addresses: []string{
-										"2.3.4.15",
-									},
-									NodeName: stringPtr("iris2"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(false),
-									},
+								NodeName: stringPtr("iris1"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(true),
 								},
-								{
-									Addresses: []string{
-										"2.3.4.25",
-									},
-									NodeName: stringPtr("iris2"),
-									Conditions: discovery.EndpointConditions{
-										Ready: pointer.BoolPtr(false),
-									},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.15",
+								},
+								NodeName: stringPtr("iris2"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(false),
+								},
+							},
+							{
+								Addresses: []string{
+									"2.3.4.25",
+								},
+								NodeName: stringPtr("iris2"),
+								Conditions: discovery.EndpointConditions{
+									Ready: pointer.BoolPtr(false),
 								},
 							},
 						},
 					},
-					Type: epslices.Slices,
 				},
 			},
 			c1ExpectedResult: map[string]string{
@@ -2214,55 +1188,49 @@ func TestShouldAnnounceNodeSelector(t *testing.T) {
 		},
 	}
 
-	epsOnBothNodes := map[string]epslices.EpsOrSlices{
+	epsOnBothNodes := map[string][]discovery.EndpointSlice{
 		"10.20.30.1": {
-			SlicesVal: []discovery.EndpointSlice{
+			{
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses: []string{
+							"2.3.4.5",
+						},
+						NodeName: pointer.StrPtr("iris1"),
+						Conditions: discovery.EndpointConditions{
+							Ready: pointer.BoolPtr(true),
+						},
+					},
+					{
+						Addresses: []string{
+							"2.3.4.15",
+						},
+						NodeName: pointer.StrPtr("iris2"),
+						Conditions: discovery.EndpointConditions{
+							Ready: pointer.BoolPtr(true),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	epsOn := func(node string) map[string][]discovery.EndpointSlice {
+		return map[string][]discovery.EndpointSlice{
+			"10.20.30.1": {
 				{
 					Endpoints: []discovery.Endpoint{
 						{
 							Addresses: []string{
 								"2.3.4.5",
 							},
-							NodeName: pointer.StrPtr("iris1"),
-							Conditions: discovery.EndpointConditions{
-								Ready: pointer.BoolPtr(true),
-							},
-						},
-						{
-							Addresses: []string{
-								"2.3.4.15",
-							},
-							NodeName: pointer.StrPtr("iris2"),
+							NodeName: pointer.StrPtr(node),
 							Conditions: discovery.EndpointConditions{
 								Ready: pointer.BoolPtr(true),
 							},
 						},
 					},
 				},
-			},
-			Type: epslices.Slices,
-		},
-	}
-
-	epsOn := func(node string) map[string]epslices.EpsOrSlices {
-		return map[string]epslices.EpsOrSlices{
-			"10.20.30.1": {
-				SlicesVal: []discovery.EndpointSlice{
-					{
-						Endpoints: []discovery.Endpoint{
-							{
-								Addresses: []string{
-									"2.3.4.5",
-								},
-								NodeName: pointer.StrPtr(node),
-								Conditions: discovery.EndpointConditions{
-									Ready: pointer.BoolPtr(true),
-								},
-							},
-						},
-					},
-				},
-				Type: epslices.Slices,
 			},
 		}
 	}
@@ -2272,7 +1240,7 @@ func TestShouldAnnounceNodeSelector(t *testing.T) {
 
 		balancer         string
 		L2Advertisements []*config.L2Advertisement
-		eps              map[string]epslices.EpsOrSlices
+		eps              map[string][]discovery.EndpointSlice
 		trafficPolicy    v1.ServiceExternalTrafficPolicyType
 		c1ExpectedResult map[string]string
 		c2ExpectedResult map[string]string
@@ -2440,41 +1408,36 @@ func TestClusterPolicy(t *testing.T) {
 		t.Errorf("SetConfig failed")
 	}
 
-	eps1 := epslices.EpsOrSlices{
-		SlicesVal: []discovery.EndpointSlice{
-			{
-				Endpoints: []discovery.Endpoint{
-					{
-						Addresses: []string{
-							"2.3.4.5",
-						},
-						NodeName: stringPtr("iris1"),
-						Conditions: discovery.EndpointConditions{
-							Ready: pointer.BoolPtr(true),
-						},
+	eps1 := []discovery.EndpointSlice{
+		{
+			Endpoints: []discovery.Endpoint{
+				{
+					Addresses: []string{
+						"2.3.4.5",
+					},
+					NodeName: stringPtr("iris1"),
+					Conditions: discovery.EndpointConditions{
+						Ready: pointer.BoolPtr(true),
 					},
 				},
 			},
 		},
-		Type: epslices.Slices,
 	}
-	eps2 := epslices.EpsOrSlices{
-		SlicesVal: []discovery.EndpointSlice{
-			{
-				Endpoints: []discovery.Endpoint{
-					{
-						Addresses: []string{
-							"2.3.4.5",
-						},
-						NodeName: stringPtr("iris2"),
-						Conditions: discovery.EndpointConditions{
-							Ready: pointer.BoolPtr(true),
-						},
+
+	eps2 := []discovery.EndpointSlice{
+		{
+			Endpoints: []discovery.Endpoint{
+				{
+					Addresses: []string{
+						"2.3.4.5",
+					},
+					NodeName: stringPtr("iris2"),
+					Conditions: discovery.EndpointConditions{
+						Ready: pointer.BoolPtr(true),
 					},
 				},
 			},
 		},
-		Type: epslices.Slices,
 	}
 	c1Found := false
 	c2Found := false

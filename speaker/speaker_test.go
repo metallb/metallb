@@ -9,8 +9,8 @@ import (
 	"github.com/go-kit/log"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/controllers"
-	"go.universe.tf/metallb/internal/k8s/epslices"
 	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -74,7 +74,7 @@ func TestLoadBalancerCreation(t *testing.T) {
 	state = c.SetBalancer(logger,
 		"testsvc",
 		svc,
-		epslices.EpsOrSlices{})
+		[]discovery.EndpointSlice{})
 	if state != controllers.SyncStateSuccess {
 		t.Fatalf("Set balancer failed")
 	}
@@ -102,7 +102,7 @@ func TestLoadBalancerCreation(t *testing.T) {
 	state = c.SetBalancer(logger,
 		"testsvc",
 		svc,
-		epslices.EpsOrSlices{})
+		[]discovery.EndpointSlice{})
 
 	if state != controllers.SyncStateSuccess {
 		t.Fatalf("Set balancer failed")
@@ -135,7 +135,7 @@ func TestLoadBalancerCreation(t *testing.T) {
 	state = c.SetBalancer(logger,
 		"testsvc",
 		svc,
-		epslices.EpsOrSlices{})
+		[]discovery.EndpointSlice{})
 	if state != controllers.SyncStateSuccess {
 		t.Fatalf("Set balancer failed")
 	}
@@ -172,7 +172,7 @@ func (m *MockProtocol) SetConfig(l log.Logger, c *config.Config) error {
 	return nil
 }
 
-func (m *MockProtocol) ShouldAnnounce(_ log.Logger, _ string, _ []net.IP, _ *config.Pool, _ *v1.Service, _ epslices.EpsOrSlices, _ map[string]*v1.Node) string {
+func (m *MockProtocol) ShouldAnnounce(_ log.Logger, _ string, _ []net.IP, _ *config.Pool, _ *v1.Service, _ []discovery.EndpointSlice, _ map[string]*v1.Node) string {
 	if m.shouldAnnounce {
 		return ""
 	}

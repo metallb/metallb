@@ -5,23 +5,8 @@ package epslices
 import (
 	"fmt"
 
-	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
-)
-
-type EpsOrSlices struct {
-	Type      EpsOrSliceType
-	EpVal     *v1.Endpoints
-	SlicesVal []discovery.EndpointSlice
-}
-
-type EpsOrSliceType int
-
-const (
-	Unknown EpsOrSliceType = iota
-	Eps
-	Slices
 )
 
 const SlicesServiceIndexName = "ServiceName"

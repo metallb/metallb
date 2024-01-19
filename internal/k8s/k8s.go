@@ -105,7 +105,6 @@ type Config struct {
 	EnablePprof         bool
 	ReadEndpoints       bool
 	Logger              log.Logger
-	DisableEpSlices     bool
 	Namespace           string
 	ValidateConfig      config.Validate
 	EnableWebhook       bool
@@ -240,20 +239,7 @@ func New(cfg *Config) (*Client, error) {
 		c.BGPEventCallback = frrk8sController.UpdateConfig
 	}
 
-	// use DisableEpSlices to skip the autodiscovery mechanism. Useful if EndpointSlices are enabled in the cluster but disabled in kube-proxy
-	useSlices := UseEndpointSlices(c.client) && !cfg.DisableEpSlices
-
-	var needEndpoints controllers.NeedEndPoints
-	switch {
-	case !cfg.ReadEndpoints:
-		needEndpoints = controllers.NoNeed
-	case useSlices:
-		needEndpoints = controllers.EndpointSlices
-	default:
-		needEndpoints = controllers.Endpoints
-	}
-
-	if needEndpoints == controllers.EndpointSlices {
+	if cfg.ReadEndpoints {
 		// Set a field indexer so we can retrieve all the endpoints for a given service.
 		if err := mgr.GetFieldIndexer().IndexField(context.Background(), &discovery.EndpointSlice{}, epslices.SlicesServiceIndexName, func(rawObj client.Object) []string {
 			epSlice, ok := rawObj.(*discovery.EndpointSlice)
@@ -281,7 +267,7 @@ func New(cfg *Config) (*Client, error) {
 			Logger:            cfg.Logger,
 			Scheme:            mgr.GetScheme(),
 			Handler:           cfg.ServiceHandler,
-			Endpoints:         needEndpoints,
+			Endpoints:         cfg.ReadEndpoints,
 			Reload:            reloadChan,
 			LoadBalancerClass: cfg.LoadBalancerClass,
 		}).SetupWithManager(mgr); err != nil {
@@ -436,18 +422,6 @@ func (c *Client) Infof(svc *corev1.Service, kind, msg string, args ...interface{
 // Errorf logs an error event about svc to the Kubernetes cluster.
 func (c *Client) Errorf(svc *corev1.Service, kind, msg string, args ...interface{}) {
 	c.events.Eventf(svc, corev1.EventTypeWarning, kind, msg, args...)
-}
-
-// UseEndpointSlices detect if Endpoints Slices are enabled in the cluster.
-func UseEndpointSlices(kubeClient kubernetes.Interface) bool {
-	if _, err := kubeClient.Discovery().ServerResourcesForGroupVersion(discovery.SchemeGroupVersion.String()); err != nil {
-		return false
-	}
-	// this is needed to check if ep slices are enabled on the cluster. In 1.17 the resources are there but disabled by default
-	if _, err := kubeClient.DiscoveryV1().EndpointSlices("default").Get(context.Background(), "kubernetes", metav1.GetOptions{}); err != nil {
-		return false
-	}
-	return true
 }
 
 func webhookServer(cfg *Config) webhook.Server {

@@ -9,6 +9,8 @@ New features:
 
 - Add a new experimental "FRR-K8s" based BGP backend ([PR 2162](https://github.com/metallb/metallb/pull/2162), ([PR 2183](https://github.com/metallb/metallb/pull/2183)) and others,  [Design proposal](https://github.com/metallb/metallb/blob/main/design/splitfrr-proposal.md): an instance of FRR can be shared between FRR and other actors, allowing multiple FRR configurations (as long as they don't conflict), via the [FRR-K8s](https://github.com/metallb/frr-k8s) API
 - Remove IP verification: don't stale the config if it removes / reassign an IP belonging to a service but honor the configuration ([PR 2097](https://github.com/metallb/metallb/pull/2097), [Issue 462](https://github.com/metallb/metallb/issues/462)
+- Drop the support for endpoints and rely on endpoint slices only ([Issue 2253](https://github.com/metallb/metallb/issues/2253), [PR 2254](https://github.com/metallb/metallb/pull/2254))
+**NOTE:** this will make MetalLB not compatible with clusters older than 1.21
 - Add support for speaker securityContext ([PR 2099](https://github.com/metallb/metallb/pull/2099))
 - Remove support for the legacy AddressPool API in favor of IPAddressPools.
 Being deprecated for a while we finally stop handling the legacy API and remove it,
