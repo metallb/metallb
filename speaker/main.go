@@ -32,7 +32,6 @@ import (
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/k8s/controllers"
-	"go.universe.tf/metallb/internal/k8s/epslices"
 	k8snodes "go.universe.tf/metallb/internal/k8s/nodes"
 
 	"go.universe.tf/metallb/internal/layer2"
@@ -40,6 +39,7 @@ import (
 	"go.universe.tf/metallb/internal/speakerlist"
 	"go.universe.tf/metallb/internal/version"
 	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	"sigs.k8s.io/yaml"
 )
 
@@ -80,7 +80,6 @@ func main() {
 		myNode            = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
 		port              = flag.Int("port", 7472, "HTTP listening port")
 		logLevel          = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
-		disableEpSlices   = flag.Bool("disable-epslices", false, "Disable the usage of EndpointSlices and default to Endpoints instead of relying on the autodiscovery mechanism")
 		enablePprof       = flag.Bool("enable-pprof", false, "Enable pprof profiling")
 		loadBalancerClass = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
 	)
@@ -176,10 +175,9 @@ func main() {
 		listenFRRK8s = true
 	}
 	client, err := k8s.New(&k8s.Config{
-		ProcessName:     "metallb-speaker",
-		NodeName:        *myNode,
-		Logger:          logger,
-		DisableEpSlices: *disableEpSlices,
+		ProcessName: "metallb-speaker",
+		NodeName:    *myNode,
+		Logger:      logger,
 
 		MetricsHost:   *host,
 		MetricsPort:   *port,
@@ -285,7 +283,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 	return ret, nil
 }
 
-func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps epslices.EpsOrSlices) controllers.SyncState {
+func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, epSlices []discovery.EndpointSlice) controllers.SyncState {
 	if svc == nil {
 		return c.deleteBalancer(l, name, "serviceDeleted")
 	}
@@ -338,7 +336,7 @@ func (c *controller) SetBalancer(l log.Logger, name string, svc *v1.Service, eps
 	}
 
 	for _, protocol := range c.protocols {
-		if st := c.handleService(l, name, lbIPs, svc, pool, eps, protocol); st == controllers.SyncStateError {
+		if st := c.handleService(l, name, lbIPs, svc, pool, epSlices, protocol); st == controllers.SyncStateError {
 			return st
 		}
 	}
@@ -350,7 +348,7 @@ func (c *controller) handleService(l log.Logger,
 	name string,
 	lbIPs []net.IP,
 	svc *v1.Service, pool *config.Pool,
-	eps epslices.EpsOrSlices,
+	eps []discovery.EndpointSlice,
 	protocol config.Proto) controllers.SyncState {
 	l = log.With(l, "protocol", protocol)
 	handler := c.protocolHandlers[protocol]
@@ -552,7 +550,7 @@ func isLabelNodeExcludeBalancersChanged(nodeName string, oldNodes map[string]*v1
 // A Protocol can advertise an IP address.
 type Protocol interface {
 	SetConfig(log.Logger, *config.Config) error
-	ShouldAnnounce(log.Logger, string, []net.IP, *config.Pool, *v1.Service, epslices.EpsOrSlices, map[string]*v1.Node) string
+	ShouldAnnounce(log.Logger, string, []net.IP, *config.Pool, *v1.Service, []discovery.EndpointSlice, map[string]*v1.Node) string
 	SetBalancer(log.Logger, string, []net.IP, *config.Pool, service, *v1.Service) error
 	DeleteBalancer(log.Logger, string, string) error
 	SetNode(log.Logger, *v1.Node) error

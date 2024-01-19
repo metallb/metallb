@@ -29,6 +29,7 @@ import (
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	k8snodes "go.universe.tf/metallb/internal/k8s/nodes"
 	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/labels"
 
 	"github.com/go-kit/log"
@@ -114,43 +115,23 @@ func (c *bgpController) SetEventCallback(callback func(interface{})) {
 
 // hasHealthyEndpoint return true if this node has at least one healthy endpoint.
 // It only checks nodes matching the given filterNode function.
-func hasHealthyEndpoint(eps epslices.EpsOrSlices, filterNode func(*string) bool) bool {
+func hasHealthyEndpoint(eps []discovery.EndpointSlice, filterNode func(*string) bool) bool {
 	ready := map[string]bool{}
-	switch eps.Type {
-	case epslices.Eps:
-		for _, subset := range eps.EpVal.Subsets {
-			for _, ep := range subset.Addresses {
-				if filterNode(ep.NodeName) {
-					continue
-				}
-				if _, ok := ready[ep.IP]; !ok {
+	for _, slice := range eps {
+		for _, ep := range slice.Endpoints {
+			node := ep.NodeName
+			if filterNode(node) {
+				continue
+			}
+			for _, addr := range ep.Addresses {
+				if _, ok := ready[addr]; !ok && epslices.IsConditionServing(ep.Conditions) {
 					// Only set true if nothing else has expressed an
 					// opinion. This means that false will take precedence
 					// if there's any unready ports for a given endpoint.
-					ready[ep.IP] = true
+					ready[addr] = true
 				}
-			}
-			for _, ep := range subset.NotReadyAddresses {
-				ready[ep.IP] = false
-			}
-		}
-	case epslices.Slices:
-		for _, slice := range eps.SlicesVal {
-			for _, ep := range slice.Endpoints {
-				node := ep.NodeName
-				if filterNode(node) {
-					continue
-				}
-				for _, addr := range ep.Addresses {
-					if _, ok := ready[addr]; !ok && epslices.IsConditionServing(ep.Conditions) {
-						// Only set true if nothing else has expressed an
-						// opinion. This means that false will take precedence
-						// if there's any unready ports for a given endpoint.
-						ready[addr] = true
-					}
-					if !epslices.IsConditionServing(ep.Conditions) {
-						ready[addr] = false
-					}
+				if !epslices.IsConditionServing(ep.Conditions) {
+					ready[addr] = false
 				}
 			}
 		}
@@ -165,7 +146,7 @@ func hasHealthyEndpoint(eps epslices.EpsOrSlices, filterNode func(*string) bool)
 	return false
 }
 
-func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, pool *config.Pool, svc *v1.Service, eps epslices.EpsOrSlices, nodes map[string]*v1.Node) string {
+func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, pool *config.Pool, svc *v1.Service, epSlices []discovery.EndpointSlice, nodes map[string]*v1.Node) string {
 	if !poolMatchesNodeBGP(pool, c.myNode) {
 		level.Debug(l).Log("event", "skipping should announce bgp", "service", name, "reason", "pool not matching my node")
 		return "notOwner"
@@ -193,9 +174,9 @@ func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, po
 		return false
 	}
 
-	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !hasHealthyEndpoint(eps, filterNode) {
+	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !hasHealthyEndpoint(epSlices, filterNode) {
 		return "noLocalEndpoints"
-	} else if !hasHealthyEndpoint(eps, func(toFilter *string) bool { return false }) {
+	} else if !hasHealthyEndpoint(epSlices, func(toFilter *string) bool { return false }) {
 		return "noEndpoints"
 	}
 	return ""

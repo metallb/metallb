@@ -43,8 +43,8 @@ type ServiceReconciler struct {
 	Logger            log.Logger
 	Scheme            *runtime.Scheme
 	Namespace         string
-	Handler           func(log.Logger, string, *v1.Service, epslices.EpsOrSlices) SyncState
-	Endpoints         NeedEndPoints
+	Handler           func(log.Logger, string, *v1.Service, []discovery.EndpointSlice) SyncState
+	Endpoints         bool
 	LoadBalancerClass string
 	Reload            chan event.GenericEvent
 	// initialLoadPerformed is set after the first time we call reprocessAll.
@@ -83,10 +83,13 @@ func (r *ServiceReconciler) reconcileService(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, nil
 	}
 
-	epSlices, err := epsOrSlicesForServices(ctx, r, req.NamespacedName, r.Endpoints)
-	if err != nil {
-		level.Error(r.Logger).Log("controller", "ServiceReconciler", "message", "failed to get endpoints", "service", req.NamespacedName, "error", err)
-		return ctrl.Result{}, err
+	epSlices := []discovery.EndpointSlice{}
+	if r.Endpoints {
+		epSlices, err = epSlicesForService(ctx, r, req.NamespacedName)
+		if err != nil {
+			level.Error(r.Logger).Log("controller", "ServiceReconciler", "message", "failed to get endpoints", "service", req.NamespacedName, "error", err)
+			return ctrl.Result{}, err
+		}
 	}
 	if service != nil {
 		level.Debug(r.Logger).Log("controller", "ServiceReconciler", "processing service", dumpResource(service))
@@ -113,7 +116,7 @@ func (r *ServiceReconciler) reconcileService(ctx context.Context, req ctrl.Reque
 }
 
 func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	if r.Endpoints == EndpointSlices {
+	if r.Endpoints {
 		return ctrl.NewControllerManagedBy(mgr).
 			For(&v1.Service{}).
 			Watches(&discovery.EndpointSlice{},
@@ -130,23 +133,6 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					}
 					level.Debug(r.Logger).Log("controller", "ServiceReconciler", "enqueueing", serviceName, "epslice", dumpResource(epSlice))
 					return []reconcile.Request{{NamespacedName: serviceName}}
-				})).
-			WatchesRawSource(&source.Channel{Source: r.Reload}, &handler.EnqueueRequestForObject{}).
-			Complete(r)
-	}
-	if r.Endpoints == Endpoints {
-		return ctrl.NewControllerManagedBy(mgr).
-			For(&v1.Service{}).
-			Watches(&v1.Endpoints{},
-				handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, obj client.Object) []reconcile.Request {
-					endpoints, ok := obj.(*v1.Endpoints)
-					if !ok {
-						level.Error(r.Logger).Log("controller", "ServiceReconciler", "error", "received an object that is not an endpoint")
-						return []reconcile.Request{}
-					}
-					name := types.NamespacedName{Name: endpoints.Name, Namespace: endpoints.Namespace}
-					level.Debug(r.Logger).Log("controller", "ServiceReconciler", "enqueueing", name, "endpoints", dumpResource(endpoints))
-					return []reconcile.Request{{NamespacedName: name}}
 				})).
 			WatchesRawSource(&source.Channel{Source: r.Reload}, &handler.EnqueueRequestForObject{}).
 			Complete(r)
