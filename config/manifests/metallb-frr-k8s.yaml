@@ -1343,11 +1343,6 @@ spec:
           status:
             description: FRRNodeStateStatus defines the observed state of FRRNodeState.
             properties:
-              desiredConfig:
-                description: DesiredConfig represents the desired FRR config, as the
-                  result of translating all of the `FRRConfiguration`s for the given
-                  node.
-                type: string
               lastConversionResult:
                 description: LastConversionResult is the status of the last translation
                   between the `FRRConfiguration`s resources and FRR's configuration,
@@ -2658,7 +2653,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/metallb/frr-k8s:v0.0.4
+        image: quay.io/metallb/frr-k8s:v0.0.8
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -2814,7 +2809,7 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/metallb/frr-k8s:v0.0.4
+        image: quay.io/metallb/frr-k8s:v0.0.8
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
@@ -2940,7 +2935,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-reloader.sh /etc/frr_reloader/
-        image: quay.io/metallb/frr-k8s:v0.0.4
+        image: quay.io/metallb/frr-k8s:v0.0.8
         name: cp-reloader
         volumeMounts:
         - mountPath: /etc/frr_reloader
@@ -2949,7 +2944,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-metrics /etc/frr_metrics/
-        image: quay.io/metallb/frr-k8s:v0.0.4
+        image: quay.io/metallb/frr-k8s:v0.0.8
         name: cp-metrics
         volumeMounts:
         - mountPath: /etc/frr_metrics
