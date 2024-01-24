@@ -21,7 +21,6 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	metallbv1alpha1 "go.universe.tf/metallb/api/v1alpha1"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 
@@ -69,7 +68,6 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(metallbv1alpha1.AddToScheme(scheme))
 	utilruntime.Must(metallbv1beta1.AddToScheme(scheme))
 	utilruntime.Must(metallbv1beta2.AddToScheme(scheme))
 
@@ -133,7 +131,6 @@ func New(cfg *Config) (*Client, error) {
 	}
 
 	objectsPerNamespace := map[client.Object]cache.ByObject{
-		&metallbv1beta1.AddressPool{}:      namespaceSelector,
 		&metallbv1beta1.BFDProfile{}:       namespaceSelector,
 		&metallbv1beta1.BGPAdvertisement{}: namespaceSelector,
 		&metallbv1beta1.BGPPeer{}:          namespaceSelector,

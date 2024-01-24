@@ -335,11 +335,25 @@ func (c *bgpController) updateAds() error {
 		if peer.session == nil {
 			continue
 		}
-		if err := peer.session.Set(allAds...); err != nil {
+		ads := adsForPeer(peer.cfg.Name, allAds)
+		if err := peer.session.Set(ads...); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func adsForPeer(peerName string, ads []*bgp.Advertisement) []*bgp.Advertisement {
+	res := []*bgp.Advertisement{}
+	for _, a := range ads {
+		if a.MatchesPeer(peerName) {
+			res = append(res, a)
+		}
+	}
+	if len(res) == 0 {
+		return nil
+	}
+	return res
 }
 
 func (c *bgpController) DeleteBalancer(l log.Logger, name, reason string) error {

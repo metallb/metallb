@@ -866,6 +866,134 @@ func TestBGPSpeaker(t *testing.T) {
 		},
 
 		{
+			desc: "Multiple peers, selector",
+			config: &config.Config{
+				Peers: map[string]*config.Peer{
+					"peer1": {
+						Addr:          net.ParseIP("1.2.3.4"),
+						Name:          "peer1",
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+					"peer2": {
+						Addr:          net.ParseIP("1.2.3.5"),
+						Name:          "peer2",
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+				},
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
+					"default": {
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						BGPAdvertisements: []*config.BGPAdvertisement{
+							{
+								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
+								Peers:             []string{"peer1"},
+							},
+						},
+					},
+				}},
+			},
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: epslices.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: pointer.StrPtr("iris"),
+								},
+							},
+						},
+					},
+				},
+				Type: epslices.Eps,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+						Peers:  []string{"peer1"},
+					},
+				},
+				"1.2.3.5:0": nil,
+			},
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
+		},
+
+		{
+			desc: "Multiple peers",
+			config: &config.Config{
+				Peers: map[string]*config.Peer{
+					"peer1": {
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+					"peer2": {
+						Addr:          net.ParseIP("1.2.3.5"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+				},
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
+					"default": {
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						BGPAdvertisements: []*config.BGPAdvertisement{
+							{
+								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
+							},
+						},
+					},
+				}},
+			},
+			balancer: "test1",
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: epslices.EpsOrSlices{
+				EpVal: &v1.Endpoints{
+					Subsets: []v1.EndpointSubset{
+						{
+							Addresses: []v1.EndpointAddress{
+								{
+									IP:       "2.3.4.5",
+									NodeName: pointer.StrPtr("iris"),
+								},
+							},
+						},
+					},
+				},
+				Type: epslices.Eps,
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
+				"1.2.3.5:0": {
+					{
+						Prefix: ipnet("10.20.30.1/32"),
+					},
+				},
+			},
+			expectedCfgRet: controllers.SyncStateReprocessAll,
+			expectedLBRet:  controllers.SyncStateSuccess,
+		},
+
+		{
 			desc:     "Second balancer, no ingress assigned",
 			balancer: "test2",
 			svc: &v1.Service{

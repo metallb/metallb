@@ -5,6 +5,10 @@ weight: 8
 
 ## Next release
 
+- Remove support for the legacy AddressPool API in favor of IPAddressPools.
+Being deprecated for a while we finally stop handling the legacy API and remove it,
+IPs can now be allocated to LoadBalancer Services only via IPAddressPool resources. ([PR 2252](https://github.com/metallb/metallb/pull/2252))
+
 Chores:
 
 - Enforce adding a release notes entry on each PR ([PR 2191](https://github.com/metallb/metallb/pull/2191))
@@ -20,6 +24,8 @@ Chores:
 - Webhooks: avoid transient errors ([PR 2202](https://github.com/metallb/metallb/pull/2202)), [ISSUE 2173](https://github.com/metallb/metallb/issues/2173))
 - Dev-env: Override GOBIN for inv dev-env ([PR 2219](https://github.com/metallb/metallb/pull/2219))
 - Metrics: add ipv4/6 addresses_in_use_total and addresses_total ([PR 2151](https://github.com/metallb/metallb/pull/2151))
+- Squash the prefixes in FRR mode, avoiding duplicate prefixes in the FRR configuration ([PR 2234](https://github.com/metallb/metallb/pull/2234))
+- BGP: move the matching peer logic one level up ([PR 2233](https://github.com/metallb/metallb/pull/2233))
 
 ## Version 0.13.12
 

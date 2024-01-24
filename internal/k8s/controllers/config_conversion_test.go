@@ -84,32 +84,6 @@ func TestConversionIsStable(t *testing.T) {
 			},
 		},
 	}
-	legacyAddressPools := []v1beta1.AddressPool{
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "legacypool1",
-				Namespace: testNamespace,
-			},
-			Spec: v1beta1.AddressPoolSpec{
-				Addresses: []string{
-					"10.21.0.0/16",
-				},
-				Protocol: "bgp",
-			},
-		},
-		{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      "legacypool2",
-				Namespace: testNamespace,
-			},
-			Spec: v1beta1.AddressPoolSpec{
-				Addresses: []string{
-					"10.22.0.0/16",
-				},
-				Protocol: "layer2",
-			},
-		},
-	}
 	bgpAdvs := []v1beta1.BGPAdvertisement{
 		{
 			ObjectMeta: metav1.ObjectMeta{
@@ -204,16 +178,15 @@ func TestConversionIsStable(t *testing.T) {
 	}
 
 	resources := config.ClusterResources{
-		Pools:              pools,
-		Peers:              peers,
-		BFDProfiles:        bfdProfiles,
-		L2Advs:             l2Advs,
-		BGPAdvs:            bgpAdvs,
-		LegacyAddressPools: legacyAddressPools,
-		Communities:        communities,
-		PasswordSecrets:    map[string]v1.Secret{},
-		Nodes:              nodes,
-		Namespaces:         namespaces,
+		Pools:           pools,
+		Peers:           peers,
+		BFDProfiles:     bfdProfiles,
+		L2Advs:          l2Advs,
+		BGPAdvs:         bgpAdvs,
+		Communities:     communities,
+		PasswordSecrets: map[string]v1.Secret{},
+		Nodes:           nodes,
+		Namespaces:      namespaces,
 	}
 
 	firstConfig, err := toConfig(resources, config.DontValidate)
@@ -233,7 +206,6 @@ func TestConversionIsStable(t *testing.T) {
 		shuffleObjects(resources.BGPAdvs)
 		shuffleObjects(resources.L2Advs)
 		shuffleObjects(resources.Communities)
-		shuffleObjects(resources.LegacyAddressPools)
 		shuffleObjects(resources.Nodes)
 		shuffleObjects(resources.Namespaces)
 

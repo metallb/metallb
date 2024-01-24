@@ -693,7 +693,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			ginkgo.Entry("IPV6", ipfamily.IPv6))
 
 		ginkgo.DescribeTable("configure bgp advertisement and verify it gets propagated",
-			func(rangeWithAdvertisement string, rangeWithoutAdvertisement string, advertisement metallbv1beta1.BGPAdvertisement, legacy bool,
+			func(rangeWithAdvertisement string, rangeWithoutAdvertisement string, advertisement metallbv1beta1.BGPAdvertisement,
 				ipFamily ipfamily.Family, communities []metallbv1beta1.Community) {
 				emptyAdvertisement := metallbv1beta1.BGPAdvertisement{
 					ObjectMeta: metav1.ObjectMeta{
@@ -727,16 +727,8 @@ var _ = ginkgo.Describe("BGP", func() {
 					Communities: communities,
 				}
 
-				if !legacy {
-					resources.Pools = []metallbv1beta1.IPAddressPool{poolWithAdvertisement, poolWithoutAdvertisement}
-					resources.BGPAdvs = []metallbv1beta1.BGPAdvertisement{emptyAdvertisement, advertisement}
-				} else {
-					resources.LegacyAddressPools = make([]metallbv1beta1.AddressPool, 0)
-					resources.LegacyAddressPools = []metallbv1beta1.AddressPool{
-						config.IPAddressPoolToLegacy(poolWithAdvertisement, config.BGP, []metallbv1beta1.BGPAdvertisement{advertisement}),
-						config.IPAddressPoolToLegacy(poolWithoutAdvertisement, config.BGP, []metallbv1beta1.BGPAdvertisement{}),
-					}
-				}
+				resources.Pools = []metallbv1beta1.IPAddressPool{poolWithAdvertisement, poolWithoutAdvertisement}
+				resources.BGPAdvs = []metallbv1beta1.BGPAdvertisement{emptyAdvertisement, advertisement}
 
 				for _, c := range FRRContainers {
 					err := frrcontainer.PairWithNodes(cs, c, ipFamily)
@@ -845,7 +837,6 @@ var _ = ginkgo.Describe("BGP", func() {
 						IPAddressPools: []string{"bgp-with-advertisement"},
 					},
 				},
-				false,
 				ipfamily.IPv4,
 				[]metallbv1beta1.Community{}),
 			ginkgo.Entry("FRR - IPV4 - large community and localpref",
@@ -859,7 +850,6 @@ var _ = ginkgo.Describe("BGP", func() {
 						IPAddressPools: []string{"bgp-with-advertisement"},
 					},
 				},
-				false,
 				ipfamily.IPv4,
 				[]metallbv1beta1.Community{}),
 			ginkgo.Entry("IPV4 - localpref",
@@ -872,7 +862,6 @@ var _ = ginkgo.Describe("BGP", func() {
 						IPAddressPools: []string{"bgp-with-advertisement"},
 					},
 				},
-				false,
 				ipfamily.IPv4,
 				[]metallbv1beta1.Community{}),
 			ginkgo.Entry("IPV4 - community",
@@ -885,7 +874,6 @@ var _ = ginkgo.Describe("BGP", func() {
 						IPAddressPools: []string{"bgp-with-advertisement"},
 					},
 				},
-				false,
 				ipfamily.IPv4,
 				[]metallbv1beta1.Community{}),
 			ginkgo.Entry("IPV4 - community from CRD",
@@ -899,49 +887,8 @@ var _ = ginkgo.Describe("BGP", func() {
 						IPAddressPools: []string{"bgp-with-advertisement"},
 					},
 				},
-				false,
 				ipfamily.IPv4,
 				[]metallbv1beta1.Community{noAdvCommunity}),
-			ginkgo.Entry("IPV4 - community and localpref - legacy",
-				"192.168.10.0/24",
-				"192.168.16.0/24",
-				metallbv1beta1.BGPAdvertisement{
-					ObjectMeta: metav1.ObjectMeta{Name: "advertisement"},
-					Spec: metallbv1beta1.BGPAdvertisementSpec{
-						Communities:    []string{CommunityNoAdv},
-						LocalPref:      50,
-						IPAddressPools: []string{"bgp-with-advertisement"},
-					},
-				},
-				true,
-				ipfamily.IPv4,
-				[]metallbv1beta1.Community{}),
-			ginkgo.Entry("IPV4 - community from CRD - legacy",
-				"192.168.10.0/24",
-				"192.168.16.0/24",
-				metallbv1beta1.BGPAdvertisement{
-					ObjectMeta: metav1.ObjectMeta{Name: "advertisement"},
-					Spec: metallbv1beta1.BGPAdvertisementSpec{
-						Communities:    []string{"NO_ADVERTISE"},
-						IPAddressPools: []string{"bgp-with-advertisement"},
-					},
-				},
-				true,
-				ipfamily.IPv4,
-				[]metallbv1beta1.Community{noAdvCommunity}),
-			ginkgo.Entry("IPV4 - localpref - legacy",
-				"192.168.10.0/24",
-				"192.168.16.0/24",
-				metallbv1beta1.BGPAdvertisement{
-					ObjectMeta: metav1.ObjectMeta{Name: "advertisement"},
-					Spec: metallbv1beta1.BGPAdvertisementSpec{
-						LocalPref:      50,
-						IPAddressPools: []string{"bgp-with-advertisement"},
-					},
-				},
-				true,
-				ipfamily.IPv4,
-				[]metallbv1beta1.Community{}),
 			ginkgo.Entry("IPV4 - ip pool selector",
 				"192.168.10.0/24",
 				"192.168.16.0/24",
@@ -959,7 +906,6 @@ var _ = ginkgo.Describe("BGP", func() {
 						},
 					},
 				},
-				false,
 				ipfamily.IPv4,
 				[]metallbv1beta1.Community{}),
 			ginkgo.Entry("IPV6 - community and localpref",
@@ -973,7 +919,6 @@ var _ = ginkgo.Describe("BGP", func() {
 						IPAddressPools: []string{"bgp-with-advertisement"},
 					},
 				},
-				false,
 				ipfamily.IPv6,
 				[]metallbv1beta1.Community{}),
 			ginkgo.Entry("IPV6 - community",
@@ -986,7 +931,6 @@ var _ = ginkgo.Describe("BGP", func() {
 						IPAddressPools: []string{"bgp-with-advertisement"},
 					},
 				},
-				false,
 				ipfamily.IPv6,
 				[]metallbv1beta1.Community{}),
 			ginkgo.Entry("IPV6 - community from CRD",
@@ -999,20 +943,6 @@ var _ = ginkgo.Describe("BGP", func() {
 						IPAddressPools: []string{"bgp-with-advertisement"},
 					},
 				},
-				false,
-				ipfamily.IPv6,
-				[]metallbv1beta1.Community{noAdvCommunity}),
-			ginkgo.Entry("IPV6 - community from CRD - legacy",
-				"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
-				"fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26",
-				metallbv1beta1.BGPAdvertisement{
-					ObjectMeta: metav1.ObjectMeta{Name: "advertisement"},
-					Spec: metallbv1beta1.BGPAdvertisementSpec{
-						Communities:    []string{"NO_ADVERTISE"},
-						IPAddressPools: []string{"bgp-with-advertisement"},
-					},
-				},
-				true,
 				ipfamily.IPv6,
 				[]metallbv1beta1.Community{noAdvCommunity}),
 			ginkgo.Entry("IPV6 - localpref",
@@ -1025,7 +955,6 @@ var _ = ginkgo.Describe("BGP", func() {
 						IPAddressPools: []string{"bgp-with-advertisement"},
 					},
 				},
-				false,
 				ipfamily.IPv6,
 				[]metallbv1beta1.Community{}),
 			ginkgo.Entry("FRR - IPV6 - large community and localpref",
@@ -1039,7 +968,6 @@ var _ = ginkgo.Describe("BGP", func() {
 						IPAddressPools: []string{"bgp-with-advertisement"},
 					},
 				},
-				false,
 				ipfamily.IPv6,
 				[]metallbv1beta1.Community{}))
 	})

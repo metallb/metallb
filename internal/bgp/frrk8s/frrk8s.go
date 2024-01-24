@@ -271,10 +271,6 @@ func (sm *sessionManager) updateConfig() error {
 		prefixesForCommunity := map[string][]string{}
 		prefixesForLocalPref := map[uint32][]string{}
 		for _, adv := range s.advertised {
-			if !adv.MatchesPeer(s.SessionName) {
-				continue
-			}
-
 			prefix := adv.Prefix.String()
 			neighbor.ToAdvertise.Allowed.Prefixes = append(neighbor.ToAdvertise.Allowed.Prefixes, prefix)
 			rout.prefixes[prefix] = prefix

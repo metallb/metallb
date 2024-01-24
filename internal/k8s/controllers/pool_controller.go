@@ -49,12 +49,6 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	defer level.Info(r.Logger).Log("controller", "PoolReconciler", "end reconcile", req.NamespacedName.String())
 	updates.Inc()
 
-	var addressPools metallbv1beta1.AddressPoolList
-	if err := r.List(ctx, &addressPools, client.InNamespace(r.Namespace)); err != nil {
-		level.Error(r.Logger).Log("controller", "PoolReconciler", "message", "failed to get addresspools", "error", err)
-		return ctrl.Result{}, err
-	}
-
 	var ipAddressPools metallbv1beta1.IPAddressPoolList
 	if err := r.List(ctx, &ipAddressPools, client.InNamespace(r.Namespace)); err != nil {
 		level.Error(r.Logger).Log("controller", "PoolReconciler", "message", "failed to get ipaddresspools", "error", err)
@@ -74,10 +68,9 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	resources := config.ClusterResources{
-		Pools:              ipAddressPools.Items,
-		LegacyAddressPools: addressPools.Items,
-		Communities:        communities.Items,
-		Namespaces:         namespaces.Items,
+		Pools:       ipAddressPools.Items,
+		Communities: communities.Items,
+		Namespaces:  namespaces.Items,
 	}
 
 	level.Debug(r.Logger).Log("controller", "PoolReconciler", "metallb CRs", dumpClusterResources(&resources))
@@ -128,7 +121,6 @@ func (r *PoolReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&metallbv1beta1.IPAddressPool{}).
-		Watches(&metallbv1beta1.AddressPool{}, &handler.EnqueueRequestForObject{}).
 		Watches(&metallbv1beta1.Community{}, &handler.EnqueueRequestForObject{}).
 		Watches(&corev1.Namespace{}, &handler.EnqueueRequestForObject{}).
 		WithEventFilter(p).

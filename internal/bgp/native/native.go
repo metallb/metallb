@@ -457,9 +457,6 @@ func (s *session) Set(advs ...*bgp.Advertisement) error {
 
 	newAdvs := map[string]*bgp.Advertisement{}
 	for _, adv := range advs {
-		if !adv.MatchesPeer(s.SessionName) {
-			continue
-		}
 		err := validate(adv)
 		if err != nil {
 			return err
