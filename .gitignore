@@ -8,3 +8,4 @@ dev-env/unittest/bin
 .cr-*
 
 .idea/
+*.swp
