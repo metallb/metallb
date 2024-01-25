@@ -3,30 +3,35 @@ title: Release Notes
 weight: 8
 ---
 
-## Next release
+## Version 0.14.0
 
+New features:
+
+- Add a new experimental "FRR-K8s" based BGP backend ([PR 2162](https://github.com/metallb/metallb/pull/2162), ([PR 2183](https://github.com/metallb/metallb/pull/2183)) and others,  [Design proposal](https://github.com/metallb/metallb/blob/main/design/splitfrr-proposal.md): an instance of FRR can be shared between FRR and other actors, allowing multiple FRR configurations (as long as they don't conflict), via the [FRR-K8s](https://github.com/metallb/frr-k8s) API
+- Remove IP verification: don't stale the config if it removes / reassign an IP belonging to a service but honor the configuration ([PR 2097](https://github.com/metallb/metallb/pull/2097), [Issue 462](https://github.com/metallb/metallb/issues/462)
+- Add support for speaker securityContext ([PR 2099](https://github.com/metallb/metallb/pull/2099))
 - Remove support for the legacy AddressPool API in favor of IPAddressPools.
 Being deprecated for a while we finally stop handling the legacy API and remove it,
-IPs can now be allocated to LoadBalancer Services only via IPAddressPool resources. ([PR 2252](https://github.com/metallb/metallb/pull/2252))
-
-Chores:
-
-- Enforce adding a release notes entry on each PR ([PR 2191](https://github.com/metallb/metallb/pull/2191))
-- Dev-env: don't run tests against VRFs by default ([PR 2201](https://github.com/metallb/metallb/pull/2201), [ISSUE 2197](https://github.com/metallb/metallb/issues/2197))
-- Dev-env: improve docker build times ([PR 2205](https://github.com/metallb/metallb/pull/2205))
-- Add more frr-k8s related logs under debug loglevel ([PR 2199](https://github.com/metallb/metallb/pull/2199))
-- Move webhooks out of API package ([PR 2193](https://github.com/metallb/metallb/pull/2193))
-- Support running the e2es on frr-k8s deployments ([PR 2180](https://github.com/metallb/metallb/pull/2180))
-- E2E: Receive prefixes using frr-k8s alongside MetalLB ([PR 2211](https://github.com/metallb/metallb/pull/2211))
-- Images updated to Go 1.20.12 ([PR 2213](https://github.com/metallb/metallb/pull/2213))
-- CI/E2E: Relabel the frr metrics from frr-k8s to show as MetalLB's ([PR 2210](https://github.com/metallb/metallb/pull/2210))
-- Dev-env: change the default BGP mode to FRR ([PR 2196](https://github.com/metallb/metallb/pull/2196))
-- Webhooks: avoid transient errors ([PR 2202](https://github.com/metallb/metallb/pull/2202)), [ISSUE 2173](https://github.com/metallb/metallb/issues/2173))
-- Dev-env: Override GOBIN for inv dev-env ([PR 2219](https://github.com/metallb/metallb/pull/2219))
-- Metrics: add ipv4/6 addresses_in_use_total and addresses_total ([PR 2151](https://github.com/metallb/metallb/pull/2151))
-- Squash the prefixes in FRR mode, avoiding duplicate prefixes in the FRR configuration ([PR 2234](https://github.com/metallb/metallb/pull/2234))
-- BGP: move the matching peer logic one level up ([PR 2233](https://github.com/metallb/metallb/pull/2233))
+ IPs can now be allocated to LoadBalancer Services only via IPAddressPool resources. ([PR 2252](https://github.com/metallb/metallb/pull/2252))
+- Make the controller preserve the state after reboot. This will allow existing services to keep their IP after restart of the
+controller ([PR 2004](https://github.com/metallb/metallb/pull/2004), [Issue 1984](https://github.com/metallb/metallb/issues/1984)
+- Use the "serving" field of endpoint slices ([PR 2088](https://github.com/metallb/metallb/pull/2088), [Issue 2074](https://github.com/metallb/metallb/issues/2074)
+- Make the webhook secret's name configurable ([PR 2070](https://github.com/metallb/metallb/pull/2070), [Issue 1993](https://github.com/metallb/metallb/issues/1993)
+- Allow custom bind address for memberlist ([PR 2121](https://github.com/metallb/metallb/pull/2121))
+- Add a fieldOwner to the CRDs caBundle field, to prevend CI / CD systems to reconciliate them ([PR 2122](https://github.com/metallb/metallb/pull/2122), [Issue 1681](https://github.com/metallb/metallb/issues/1681)
+- Use AES-256 for memberlist encryption ([PR 2140](https://github.com/metallb/metallb/pull/2140), [Issue 1982](https://github.com/metallb/metallb/issues/1982))
+- Add extraContainers to the speaker / controller pods ([PR 2152](https://github.com/metallb/metallb/pull/2152))
+- Speaker: Allow configuring MemberList timeouts for WAN environments ([PR 2178](https://github.com/metallb/metallb/pull/2178))
+- Allow tls-cipher-suites and tls-min-version via parameters, and set defaults ([PR 2083](https://github.com/metallb/metallb/pull/2083))
 - Implement NodeExcludeBalancers to exclude nodes as external loadbalancer ([PR 2073](https://github.com/metallb/metallb/pull/2073), [ISSUE 2021](https://github.com/metallb/metallb/issues/2021))
+- Metrics: add ipv4/6 addresses_in_use_total and addresses_total ([PR 2151](https://github.com/metallb/metallb/pull/2151))
+
+Bug Fixes:
+
+- FRR mode: FRR templates: provide a seqnum for the prefix lists ([PR 2075](https://github.com/metallb/metallb/pull/2075)
+- Webhooks: avoid transient errors ([PR 2202](https://github.com/metallb/metallb/pull/2202)), [ISSUE 2173](https://github.com/metallb/metallb/issues/2173))
+
+This release includes contributions from Andreas Karis, Antonio Pitasi, Arjun Singh, AzraelSec, cong, cyclinder, Federico Paolinelli, Giovanni Toraldo, Ivan Kurnosov, Jonas Badstübner, Lior Noy, machinaexdeo, Marcelo Guerrero Viveros, Micah Nagel, Michael Aspinwall, Moritz Schlarb, Ori Braunshtein, Pavel Basov, Robin, shimritproj, Siyi.Yang, timm0e. Thanks!
 
 ## Version 0.13.12
 
