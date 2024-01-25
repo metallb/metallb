@@ -139,7 +139,8 @@ def _get_subnets_allocated_ips():
 
 def _add_nic_to_nodes(cluster_name):
     nodes = run("kind get nodes --name {name}".format(name=cluster_name)).stdout.strip().split("\n")
-    run("docker network create --ipv6 --subnet {ipv6_subnet} -d bridge {bridge_name}".format(bridge_name=extra_network, ipv6_subnet="fc00:f853:ccd:e791::/64"))
+    if not _is_network_exist(extra_network):
+        run("docker network create --ipv6 --subnet {ipv6_subnet} -d bridge {bridge_name}".format(bridge_name=extra_network, ipv6_subnet="fc00:f853:ccd:e791::/64"))
     for node in nodes:
         run("docker network connect {bridge_name} {node}".format(bridge_name=extra_network, node=node))
 
