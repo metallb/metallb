@@ -326,6 +326,10 @@ jobs:
           sed -i 's/native/frr/g' bin/metallb-operator.yaml
           kubectl apply -f bin/metallb-operator.yaml
 
+      - name: Remove the exclude from external lb label from the master node
+        run: |
+          env "PATH=$PATH" inv remove-lb-exclusion-from-nodes
+
       - name: Ensure MetalLB operator is ready
         run: |
           COUNT=0
