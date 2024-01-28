@@ -44,6 +44,7 @@ controller ([PR 2004](https://github.com/metallb/metallb/pull/2004), [Issue 1984
 - Allow tls-cipher-suites and tls-min-version via parameters, and set defaults ([PR 2083](https://github.com/metallb/metallb/pull/2083))
 - Implement NodeExcludeBalancers to exclude nodes as external loadbalancer ([PR 2073](https://github.com/metallb/metallb/pull/2073), [ISSUE 2021](https://github.com/metallb/metallb/issues/2021))
 - Metrics: add ipv4/6 addresses_in_use_total and addresses_total ([PR 2151](https://github.com/metallb/metallb/pull/2151))
+- E2E: Verify autoAssign=False works([PR 2264](https://github.com/metallb/metallb/pull/2264),[ISSUE 2221](https://github.com/metallb/metallb/issues/2221))
 
 Bug Fixes:
 
