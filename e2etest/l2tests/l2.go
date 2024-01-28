@@ -755,7 +755,7 @@ var _ = ginkgo.Describe("L2", func() {
 			ginkgo.Entry("IPV6 - Checking service", "ipv6"))
 	})
 
-	ginkgo.DescribeTable("validate requesting a specific address pool for Loadbalancer service", func(ipRange *string) {
+	ginkgo.DescribeTable("validate requesting a specific address pool for Loadbalancer service", func(ipRange *string, autoAssign bool) {
 		var services []*corev1.Service
 		var servicesIngressIP []string
 		var pools []metallbv1beta1.IPAddressPool
@@ -773,6 +773,8 @@ var _ = ginkgo.Describe("L2", func() {
 				},
 				Spec: metallbv1beta1.IPAddressPoolSpec{
 					Addresses: []string{addressesRange},
+					AutoAssign: &autoAssign,
+
 				},
 			}
 			pools = append(pools, pool)
@@ -821,8 +823,10 @@ var _ = ginkgo.Describe("L2", func() {
 			}
 		}
 	},
-		ginkgo.Entry("IPV4", &IPV4ServiceRange),
-		ginkgo.Entry("IPV6", &IPV6ServiceRange))
+		ginkgo.Entry("IPV4", &IPV4ServiceRange, true),
+		ginkgo.Entry("IPV6", &IPV6ServiceRange, true),
+		ginkgo.Entry("IPV4", &IPV4ServiceRange, false),
+		ginkgo.Entry("IPV6", &IPV6ServiceRange, false))
 })
 
 // TODO: The tests find the announcing node in multiple ways (MAC/Events).
