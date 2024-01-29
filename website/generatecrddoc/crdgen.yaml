@@ -7,7 +7,6 @@ processor:
     - "NodeSelector"
     - "LegacyBgpAdvertisement"
     - "v1beta1.*BGPPeer"
-    - "v1beta1.AddressPool"
   # RE2 regular expressions describing type fields that should be excluded from the generated documentation.
   ignoreFields:
     - "status$"
