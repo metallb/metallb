@@ -1958,7 +1958,7 @@ spec:
           value: memberlist
         - name: METALLB_DEPLOYMENT
           value: controller
-        image: quay.io/metallb/controller:v0.14.0
+        image: quay.io/metallb/controller:v0.14.1
         livenessProbe:
           failureThreshold: 3
           httpGet:
@@ -2180,7 +2180,7 @@ spec:
           value: app=metallb,component=speaker
         - name: METALLB_ML_SECRET_KEY_PATH
           value: /etc/ml_secret_key
-        image: quay.io/metallb/speaker:v0.14.0
+        image: quay.io/metallb/speaker:v0.14.1
         livenessProbe:
           failureThreshold: 3
           httpGet:
@@ -2245,7 +2245,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-reloader.sh /etc/frr_reloader/
-        image: quay.io/metallb/speaker:v0.14.0
+        image: quay.io/metallb/speaker:v0.14.1
         name: cp-reloader
         volumeMounts:
         - mountPath: /etc/frr_reloader
@@ -2254,7 +2254,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-metrics /etc/frr_metrics/
-        image: quay.io/metallb/speaker:v0.14.0
+        image: quay.io/metallb/speaker:v0.14.1
         name: cp-metrics
         volumeMounts:
         - mountPath: /etc/frr_metrics
