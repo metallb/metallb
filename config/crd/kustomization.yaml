@@ -7,6 +7,7 @@ resources:
 - bases/metallb.io_bgpadvertisements.yaml
 - bases/metallb.io_l2advertisements.yaml
 - bases/metallb.io_communities.yaml
+- bases/metallb.io_servicel2statuses.yaml
 
 patches:
 - path: patches/crd-conversion-patch-bgppeers.yaml
