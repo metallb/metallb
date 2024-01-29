@@ -21,9 +21,9 @@ import (
 	"go.universe.tf/e2etest/pkg/executor"
 	"go.universe.tf/e2etest/pkg/k8s"
 	"go.universe.tf/e2etest/pkg/mac"
-
 	"go.universe.tf/e2etest/pkg/metallb"
 	"go.universe.tf/e2etest/pkg/service"
+	"go.universe.tf/e2etest/pkg/status"
 )
 
 var (
@@ -81,6 +81,61 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 
 			err := ConfigUpdater.Update(resources)
 			framework.ExpectNoError(err)
+		})
+
+		ginkgo.It("Validate ServiceL2Status interface", func() {
+			ginkgo.By("use the 1st interface for announcing")
+			resources := config.Resources{
+				L2Advs: []metallbv1beta1.L2Advertisement{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "with-interfaces",
+						},
+						Spec: metallbv1beta1.L2AdvertisementSpec{
+							Interfaces: []string{NodeNics[0]},
+						},
+					},
+				},
+			}
+			err := ConfigUpdater.Update(resources)
+			framework.ExpectNoError(err)
+
+			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "lb-service")
+			defer func() {
+				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+			}()
+
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			framework.ExpectNoError(err)
+
+			var l2Status *metallbv1beta1.ServiceL2Status
+			gomega.Eventually(func() error {
+				var ss []*metallbv1beta1.ServiceL2Status
+				if ss, err = status.GetSvcPossibleL2Status(ConfigUpdater.Client(), svc, allNodes); err == nil {
+					if len(ss) != 1 {
+						return fmt.Errorf("")
+					}
+					l2Status = ss[0]
+				}
+				return err
+			}, 2*time.Minute, 1*time.Second).ShouldNot(gomega.HaveOccurred())
+
+			gomega.Consistently(func() error {
+				l2Status, err = status.GetL2Status(ConfigUpdater.Client(), svc, l2Status.Status.Node)
+				if err != nil || len(l2Status.Status.Interfaces) == 0 {
+					return fmt.Errorf("")
+				}
+				return nil
+			}, 5*time.Second).ShouldNot(gomega.HaveOccurred())
+
+			gomega.Consistently(func() error {
+				l2Status, err = status.GetL2Status(ConfigUpdater.Client(), svc, l2Status.Status.Node)
+				if err != nil || l2Status.Status.Interfaces[0].Name != NodeNics[0] {
+					return fmt.Errorf("")
+				}
+				return nil
+			}, 5*time.Second)
 		})
 
 		ginkgo.It("Validate the LB IP's mac", func() {
