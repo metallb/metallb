@@ -117,6 +117,8 @@ type Config struct {
 	WebhookWithHTTP2    bool
 	WithFRRK8s          bool
 	Listener
+	Layer2StatusChan    <-chan event.GenericEvent
+	Layer2StatusFetcher controllers.StatusFetcher
 }
 
 // New connects to masterAddr, using kubeconfig to authenticate.
@@ -272,6 +274,19 @@ func New(cfg *Config) (*Client, error) {
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "service")
 			return nil, errors.Wrap(err, "failed to create service reconciler")
+		}
+	}
+
+	// metallb controller doesn't need this reconciler
+	if cfg.Layer2StatusChan != nil {
+		if err = (&controllers.Layer2StatusReconciler{
+			Client:        mgr.GetClient(),
+			Logger:        cfg.Logger,
+			NodeName:      cfg.NodeName,
+			ReconcileChan: cfg.Layer2StatusChan,
+			StatusFetcher: cfg.Layer2StatusFetcher,
+		}).SetupWithManager(mgr); err != nil {
+			level.Error(c.logger).Log("error", err, "unable to create controller", "layer2Status")
 		}
 	}
 
