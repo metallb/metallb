@@ -181,6 +181,8 @@ _Appears in:_
 | `serviceAllocation` _[ServiceAllocation](#serviceallocation)_ | AllocateTo makes ip pool allocation to specific namespace and/or service. The controller will use the pool with lowest value of priority in case of multiple matches. A pool with no priority set will be used only if the pools with priority can't be used. If multiple matching IPAddressPools are available it will check for the availability of IPs sorting the matching IPAddressPools by priority, starting from the highest to the lowest. If multiple IPAddressPools have the same priority, choice will be random. |
 
 
+
+
 #### L2Advertisement
 
 
@@ -231,6 +233,8 @@ _Appears in:_
 | `namespaces` _string array_ | Namespaces list of namespace(s) on which ip pool can be attached. |
 | `namespaceSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | NamespaceSelectors list of label selectors to select namespace(s) for ip pool, an alternative to using namespace list. |
 | `serviceSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | ServiceSelectors list of label selector to select service(s) for which ip pool can be used for ip allocation. |
+
+
 
 
 

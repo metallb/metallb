@@ -58,6 +58,9 @@ rules:
 - apiGroups: [""]
   resources: ["events"]
   verbs: ["create", "patch"]
+- apiGroups: ["metallb.io"]
+  resources: ["servicel2statuses","servicel2statuses/status"]
+  verbs: ["*"]
 {{- if .Values.prometheus.secureMetricsPort }}
 - apiGroups: ["authentication.k8s.io"]
   resources: ["tokenreviews"]
