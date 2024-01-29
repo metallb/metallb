@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // Announce is used to "announce" new IPs mapped to the node's MAC address.
@@ -319,6 +320,13 @@ func (a *Announce) AnnounceName(name string) bool {
 	defer a.RUnlock()
 	_, ok := a.ips[name]
 	return ok
+}
+
+// GetStatus expose adv status.
+func (a *Announce) GetStatus(meta types.NamespacedName) []IPAdvertisement {
+	a.RLock()
+	defer a.RUnlock()
+	return a.ips[meta.String()]
 }
 
 // GetInterfaces returns current interfaces list.

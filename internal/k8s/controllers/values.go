@@ -29,4 +29,9 @@ const (
 	EndpointSlices
 )
 
+const (
+	LabelAnnounceNode = "metallb.io/node"
+	LabelServiceName  = "metallb.io/service"
+)
+
 var errRetry = errors.New("event handling failed, retrying")
