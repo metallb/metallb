@@ -689,11 +689,12 @@ def bumprelease(ctx, version, previous_version):
 
     # Update the versions in the helm chart (version and appVersion are always the same)
     # helm chart versions follow Semantic Versioning, and thus exclude the leading 'v'
-    run("perl -pi -e 's,version: .*,version: {},g' charts/metallb/Chart.yaml".format(version), echo=True)
-    run("perl -pi -e 's,^appVersion: .*,appVersion: v{},g' charts/metallb/Chart.yaml".format(version), echo=True)
-    run("perl -pi -e 's,^version: .*,version: {},g' charts/metallb/charts/crds/Chart.yaml".format(version), echo=True)
-    run("perl -pi -e 's,^appVersion: .*,appVersion: v{},g' charts/metallb/charts/crds/Chart.yaml".format(version), echo=True)
-    run("perl -pi -e 's,^Current chart version is: .*,Current chart version is: `{}`,g' charts/metallb/README.md".format(version), echo=True)
+    # we change the version of the crd dependency only, ignoring the frr-k8s version that comes from main
+    run(r"sed -i '/condition: crds.enabled/{{N;s/version:.*/version: {}/;}}' charts/metallb/Chart.yaml".format(version), echo=True)
+    run(r"sed -i 's/^appVersion: .*/appVersion: v{}/g' charts/metallb/Chart.yaml".format(version), echo=True)
+    run(r"sed -i 's/^version: .*/version: {}/g' charts/metallb/charts/crds/Chart.yaml".format(version), echo=True)
+    run(r"sed -i 's/^appVersion: .*/appVersion: v{}/g' charts/metallb/charts/crds/Chart.yaml".format(version), echo=True)
+    run(r"sed -i 's/^Current chart version is: .*/Current chart version is: `{}`/g' charts/metallb/README.md".format(version), echo=True)
     run("helm dependency update charts/metallb", echo=True)
 
 
