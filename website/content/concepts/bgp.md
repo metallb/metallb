@@ -146,3 +146,18 @@ the advertisements (there can't be different advertisements with different myAsn
 
 - In case a eBGP Peer is multiple hops away from the nodes, the ebgp-multihop flag must be set
 to true.
+
+## FRR-K8s Mode
+
+In 0.14.0 we added an experimental FRR-K8s backend mode. [FRR-K8s](https://github.com/metallb/frr-k8s)
+is a Kubernetes wrapper to FRR with its own API.
+When running in FRR-K8s mode, MetalLB generates the FRR-K8s configuration instead of configuring directly FRR.
+
+Additional FRR-K8s configuration instances can be provided by the user, allowing to leverage the same
+FRR instance for purpouses that go beyond the advertisement of services provided by MetalLB while sharing
+the same BGP session.
+
+All the same features / limitations related to MetalLB in FRR mode can be applied to FRR-K8s mode.
+
+When deploying MetalLB in FRR-K8s mode, a FRR-K8s instance will be deployed on the same nodes where
+the MetalLB spekaer is deployed.
