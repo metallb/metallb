@@ -126,4 +126,4 @@ A Kubernetes client/watcher.
 
 New BGP sessions are established by calling newBGP() in the speaker's "main"
 package which calls bgp.New() which in turn returns a session interface. The session
-interface is the main interfae used to advertise prefixes.
+interface is the main interface used to advertise prefixes.
