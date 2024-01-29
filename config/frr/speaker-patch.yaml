@@ -38,14 +38,14 @@ spec:
               mountPath: /etc/frr
         # Copies the reloader to the shared volume between the speaker and reloader.
         - name: cp-reloader
-          image: quay.io/metallb/speaker:main
+          image: quay.io/metallb/speaker:v0.14.0
           command: ["/bin/sh", "-c", "cp -f /frr-reloader.sh /etc/frr_reloader/"]
           volumeMounts:
             - name: reloader
               mountPath: /etc/frr_reloader
         # Copies the metrics exporter
         - name: cp-metrics
-          image: quay.io/metallb/speaker:main
+          image: quay.io/metallb/speaker:v0.14.0
           command: ["/bin/sh", "-c", "cp -f /frr-metrics /etc/frr_metrics/"]
           volumeMounts:
             - name: metrics

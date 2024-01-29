@@ -273,7 +273,7 @@ be set manually.
 
 ### How to fetch the logs and the CRs
 
-A convenience script that fetches all the required information [can be found here](https://raw.githubusercontent.com/metallb/metallb/main/troubleshooting/collect.sh).
+A convenience script that fetches all the required information [can be found here](https://raw.githubusercontent.com/metallb/metallb/v0.14.0/troubleshooting/collect.sh).
 
 Additionally, the status of the service and of the endpoints must be provided:
 
