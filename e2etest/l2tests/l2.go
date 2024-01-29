@@ -29,18 +29,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	"github.com/onsi/gomega"
 	"github.com/openshift-kni/k8sreporter"
-	"go.universe.tf/e2etest/pkg/config"
-	"go.universe.tf/e2etest/pkg/executor"
-	"go.universe.tf/e2etest/pkg/iprange"
-	"go.universe.tf/e2etest/pkg/k8s"
-	"go.universe.tf/e2etest/pkg/mac"
-	"go.universe.tf/e2etest/pkg/metallb"
-	"go.universe.tf/e2etest/pkg/metrics"
-	"go.universe.tf/e2etest/pkg/service"
-	"go.universe.tf/e2etest/pkg/udp"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
-
-	"go.universe.tf/e2etest/pkg/wget"
 	corev1 "k8s.io/api/core/v1"
 	pkgerr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -49,6 +38,18 @@ import (
 	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	admissionapi "k8s.io/pod-security-admission/api"
+
+	"go.universe.tf/e2etest/pkg/config"
+	"go.universe.tf/e2etest/pkg/executor"
+	"go.universe.tf/e2etest/pkg/iprange"
+	"go.universe.tf/e2etest/pkg/k8s"
+	"go.universe.tf/e2etest/pkg/mac"
+	"go.universe.tf/e2etest/pkg/metallb"
+	"go.universe.tf/e2etest/pkg/metrics"
+	"go.universe.tf/e2etest/pkg/service"
+	"go.universe.tf/e2etest/pkg/status"
+	"go.universe.tf/e2etest/pkg/udp"
+	"go.universe.tf/e2etest/pkg/wget"
 )
 
 var (
@@ -128,6 +129,33 @@ var _ = ginkgo.Describe("L2", func() {
 			gomega.Eventually(func() error {
 				return service.ValidateL2(svc)
 			}, 2*time.Minute, 1*time.Second).ShouldNot(gomega.HaveOccurred())
+
+			ginkgo.By("checking correct serviceL2Status object is populated")
+
+			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			framework.ExpectNoError(err)
+
+			var l2Statuses []*metallbv1beta1.ServiceL2Status
+			gomega.Eventually(func() error {
+				var ss []*metallbv1beta1.ServiceL2Status
+				if ss, err = status.GetSvcPossibleL2Status(ConfigUpdater.Client(), svc, allNodes); err == nil {
+					l2Statuses = ss
+				}
+				return err
+			}, 2*time.Minute, 1*time.Second).ShouldNot(gomega.HaveOccurred())
+			gomega.Expect(l2Statuses).To(gomega.HaveLen(1))
+
+			ginkgo.By("validating the node in ServiceL2Status is the one who is announcing for the service")
+			l2Status := l2Statuses[0]
+			refreshL2StatusNodeFunc := func() string {
+				node, err := k8s.GetSvcNode(cs, svc.Namespace, svc.Name, allNodes)
+				if err != nil {
+					return err.Error()
+				}
+				return node.Name
+			}
+			gomega.Eventually(refreshL2StatusNodeFunc, time.Minute, time.Second).Should(gomega.Equal(l2Status.Status.Node))
+			gomega.Consistently(refreshL2StatusNodeFunc, 5*time.Second).Should(gomega.Equal(l2Status.Status.Node))
 		})
 
 		ginkgo.It("should work for ExternalTrafficPolicy=Local", func() {
