@@ -691,6 +691,7 @@ def bumprelease(ctx, version, previous_version):
     # helm chart versions follow Semantic Versioning, and thus exclude the leading 'v'
     # we change the version of the crd dependency only, ignoring the frr-k8s version that comes from main
     run(r"sed -i '/condition: crds.enabled/{{N;s/version:.*/version: {}/;}}' charts/metallb/Chart.yaml".format(version), echo=True)
+    run(r"sed -i '/MetalLB chart version/{{N;s/version:.*/version: {}/;}}' charts/metallb/Chart.yaml".format(version), echo=True)
     run(r"sed -i 's/^appVersion: .*/appVersion: v{}/g' charts/metallb/Chart.yaml".format(version), echo=True)
     run(r"sed -i 's/^version: .*/version: {}/g' charts/metallb/charts/crds/Chart.yaml".format(version), echo=True)
     run(r"sed -i 's/^appVersion: .*/appVersion: v{}/g' charts/metallb/charts/crds/Chart.yaml".format(version), echo=True)

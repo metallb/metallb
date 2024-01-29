@@ -34,6 +34,7 @@ kubeVersion: ">= 1.19.0-0"
 # to the chart and its templates, including the app version.
 # Versions are expected to follow Semantic Versioning (https://semver.org/)
 # NOTE: this value is updated by the metallb release process
+# MetalLB chart version
 version: 0.0.0
 
 # This is the version number of the application being deployed. This version number should be
