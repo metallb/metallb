@@ -140,6 +140,7 @@ jobs:
           tag="${GITHUB_REF_NAME:1}"
 
           exists=$(curl -s -H "Accept: application/vnd.github.v3+json" https://github.com/$GITHUB_REPOSITORY/releases/tag/$repo-chart-$tag -w %{http_code} -o /dev/null)
+          helm repo add frrk8s https://metallb.github.io/frr-k8s
           if [[ $exists != "200" ]]; then
             echo "Creating release..."
             # package chart
