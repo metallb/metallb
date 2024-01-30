@@ -237,6 +237,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 					EBGPMultiHop:  p.cfg.EBGPMultiHop,
 					SessionName:   p.cfg.Name,
 					VRFName:       p.cfg.VRF,
+					DisableMP:     p.cfg.DisableMP,
 				},
 			)
 
