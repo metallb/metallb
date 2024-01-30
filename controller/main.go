@@ -149,7 +149,7 @@ func main() {
 		certServiceName     = flag.String("cert-service-name", "metallb-webhook-service", "The service name used to generate the TLS cert's hostname")
 		loadBalancerClass   = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
 		webhookMode         = flag.String("webhook-mode", "enabled", "webhook mode: can be enabled, disabled or only webhook if we want the controller to act as webhook endpoint only")
-		webhookSecretName   = flag.String("webhook-secret", "webhook-server-cert", "webhook secret: the name of webhook secret, default is webhook-server-cert")
+		webhookSecretName   = flag.String("webhook-secret", "metallb-webhook-cert", "webhook secret: the name of webhook secret, default is metallb-webhook-cert")
 		webhookHTTP2        = flag.Bool("webhook-http2", false, "enables http2 for the webhook endpoint")
 		tlsMinVersion       = flag.String("tls-min-version", "", "Minimum TLS version supported for the webhook server, Possible values: "+strings.Join(cliflag.TLSPossibleVersions(), ", "))
 		tlsCipherSuites     = flag.String("tls-cipher-suites", "TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,"+
