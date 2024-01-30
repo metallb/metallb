@@ -31,26 +31,6 @@ webhooks:
     service:
       name: webhook-service
       namespace: system
-      path: /validate-metallb-io-v1beta1-addresspool
-  failurePolicy: Fail
-  name: addresspoolvalidationwebhook.metallb.io
-  rules:
-  - apiGroups:
-    - metallb.io
-    apiVersions:
-    - v1beta1
-    operations:
-    - CREATE
-    - UPDATE
-    resources:
-    - addresspools
-  sideEffects: None
-- admissionReviewVersions:
-  - v1
-  clientConfig:
-    service:
-      name: webhook-service
-      namespace: system
       path: /validate-metallb-io-v1beta1-bfdprofile
   failurePolicy: Fail
   name: bfdprofilevalidationwebhook.metallb.io
