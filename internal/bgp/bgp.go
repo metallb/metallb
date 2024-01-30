@@ -78,6 +78,7 @@ type SessionParameters struct {
 	EBGPMultiHop  bool
 	VRFName       string
 	SessionName   string
+	DisableMP     bool
 }
 type SessionManager interface {
 	NewSession(logger log.Logger, args SessionParameters) (Session, error)

@@ -121,6 +121,8 @@ type Peer struct {
 	EBGPMultiHop bool
 	// Optional name of the vrf to establish the session from
 	VRF string
+	// Option to disable MP BGP that will result in separation of IPv4 and IPv6 route exchanges into distinct BGP sessions.
+	DisableMP bool
 	// TODO: more BGP session settings
 }
 
@@ -462,6 +464,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		BFDProfile:    p.Spec.BFDProfile,
 		EBGPMultiHop:  p.Spec.EBGPMultiHop,
 		VRF:           p.Spec.VRFName,
+		DisableMP:     p.Spec.DisableMP,
 	}, nil
 }
 
