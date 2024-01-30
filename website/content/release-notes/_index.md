@@ -9,6 +9,11 @@ BugFixes:
 
 - Fix the non existing conversion webhook in the Helm CRDs ([PR 2269](https://github.com/metallb/metallb/pull/2269))
 - Remove dangling AddressPool leftovers ([PR 2272](https://github.com/metallb/metallb/pull/2272) [Issue 2270](https://github.com/metallb/metallb/issues/2270))
+## Next release
+
+Chores:
+
+- Add Helm to upgrade documentation ([PR 2268](https://github.com/metallb/metallb/pull/2268))
 
 ## Version 0.14.3
 
