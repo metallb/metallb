@@ -251,8 +251,9 @@ func (sm *sessionManager) updateConfig() error {
 				Port:          &portUint16,
 				HoldTime:      &metav1.Duration{Duration: s.HoldTime},
 				KeepaliveTime: &metav1.Duration{Duration: s.KeepAliveTime},
-				BFDProfile:    s.BFDProfile,
-				EBGPMultiHop:  s.EBGPMultiHop,
+				// TODO: Add Connect time
+				BFDProfile:   s.BFDProfile,
+				EBGPMultiHop: s.EBGPMultiHop,
 				ToAdvertise: frrv1beta1.Advertise{
 					Allowed: frrv1beta1.AllowedOutPrefixes{
 						Prefixes: make([]string, 0),
