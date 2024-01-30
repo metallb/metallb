@@ -285,6 +285,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				BFDProfile:     s.BFDProfile,
 				EBGPMultiHop:   s.EBGPMultiHop,
 				VRFName:        s.VRFName,
+				DisableMP:      s.DisableMP,
 			}
 			if s.SourceAddress != nil {
 				neighbor.SrcAddr = s.SourceAddress.String()
