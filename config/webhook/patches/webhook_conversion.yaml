@@ -1,24 +1,6 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: addresspools.metallb.io
-spec:
-  conversion:
-    strategy: Webhook
-    webhook:
-      conversionReviewVersions: ["v1alpha1", "v1beta1"]
-      clientConfig:
-        # this is "\n" used as a placeholder, otherwise it will be rejected by the apiserver for being blank,
-        # but we're going to set it later using the cert-controller.
-        caBundle: Cg==
-        service:
-          namespace: metallb-system
-          name: webhook-service
-          path: /convert
----
-apiVersion: apiextensions.k8s.io/v1
-kind: CustomResourceDefinition
-metadata:
   name: bgppeers.metallb.io
 spec:
   conversion:

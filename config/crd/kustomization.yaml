@@ -9,10 +9,6 @@ resources:
 - bases/metallb.io_communities.yaml
 
 patches:
-- path: patches/crd-conversion-patch-addresspools.yaml
-  target:
-    kind: CustomResourceDefinition
-    name: addresspools.metallb.io
 - path: patches/crd-conversion-patch-bgppeers.yaml
   target:
     kind: CustomResourceDefinition
