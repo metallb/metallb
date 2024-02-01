@@ -69,7 +69,6 @@ rules:
     resources:
       - customresourcedefinitions
     resourceNames:
-      - addresspools.metallb.io
       - bfdprofiles.metallb.io
       - bgpadvertisements.metallb.io
       - bgppeers.metallb.io
@@ -165,14 +164,6 @@ rules:
   - apiGroups:
       - metallb.io
     resources:
-      - addresspools
-    verbs:
-      - get
-      - list
-      - watch
-  - apiGroups:
-      - metallb.io
-    resources:
       - bfdprofiles
     verbs:
       - get
@@ -261,14 +252,6 @@ rules:
     verbs:
       - get
       - list
-  - apiGroups:
-      - metallb.io
-    resources:
-      - addresspools
-    verbs:
-      - get
-      - list
-      - watch
   - apiGroups:
       - metallb.io
     resources:

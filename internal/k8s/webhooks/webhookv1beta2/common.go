@@ -9,7 +9,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// log is for logging addresspool-webhook.
 var (
 	Logger           log.Logger
 	WebhookClient    client.Reader

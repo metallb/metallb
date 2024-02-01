@@ -58,11 +58,10 @@ const (
 )
 
 var (
-	scheme                          = runtime.NewScheme()
-	setupLog                        = ctrl.Log.WithName("setup")
-	validatingWebhookName           = "metallb-webhook-configuration"
-	addresspoolConvertingWebhookCRD = "addresspools.metallb.io"
-	bgppeerConvertingWebhookCRD     = "bgppeers.metallb.io"
+	scheme                      = runtime.NewScheme()
+	setupLog                    = ctrl.Log.WithName("setup")
+	validatingWebhookName       = "metallb-webhook-configuration"
+	bgppeerConvertingWebhookCRD = "bgppeers.metallb.io"
 )
 
 func init() {

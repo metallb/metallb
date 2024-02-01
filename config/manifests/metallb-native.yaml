@@ -1139,14 +1139,6 @@ rules:
 - apiGroups:
   - metallb.io
   resources:
-  - addresspools
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
   - bfdprofiles
   verbs:
   - get
@@ -1211,14 +1203,6 @@ rules:
   - ""
   resources:
   - configmaps
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - metallb.io
-  resources:
-  - addresspools
   verbs:
   - get
   - list
@@ -1341,7 +1325,6 @@ rules:
 - apiGroups:
   - apiextensions.k8s.io
   resourceNames:
-  - addresspools.metallb.io
   - bfdprofiles.metallb.io
   - bgpadvertisements.metallb.io
   - bgppeers.metallb.io

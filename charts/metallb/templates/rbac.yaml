@@ -27,7 +27,7 @@ rules:
   verbs: ["list", "watch"]
 - apiGroups: ["apiextensions.k8s.io"]
   resources: ["customresourcedefinitions"]
-  resourceNames: ["addresspools.metallb.io","bfdprofiles.metallb.io","bgpadvertisements.metallb.io",
+  resourceNames: ["bfdprofiles.metallb.io","bgpadvertisements.metallb.io",
     "bgppeers.metallb.io","ipaddresspools.metallb.io","l2advertisements.metallb.io","communities.metallb.io"]
   verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
 - apiGroups: ["apiextensions.k8s.io"]
@@ -84,9 +84,6 @@ rules:
   resources: ["configmaps"]
   verbs: ["get", "list", "watch"]
 - apiGroups: ["metallb.io"]
-  resources: ["addresspools"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["metallb.io"]
   resources: ["bfdprofiles"]
   verbs: ["get", "list", "watch"]
 - apiGroups: ["metallb.io"]
@@ -133,9 +130,6 @@ rules:
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
-- apiGroups: ["metallb.io"]
-  resources: ["addresspools"]
-  verbs: ["get", "list", "watch"]
 - apiGroups: ["metallb.io"]
   resources: ["ipaddresspools"]
   verbs: ["get", "list", "watch"]
