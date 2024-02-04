@@ -154,12 +154,12 @@ func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, po
 	}
 
 	if k8snodes.IsNetworkUnavailable(nodes[c.myNode]) {
-		level.Debug(l).Log("event", "skipping should announce bgp", "service", name, "reason", "speaker's node has NodeNetworkUnavailable condition")
+		level.Warn(l).Log("event", "skipping should announce bgp", "service", name, "reason", "speaker's node has NodeNetworkUnavailable condition")
 		return "nodeNetworkUnavailable"
 	}
 
 	if !c.ignoreExcludeLB && k8snodes.IsNodeExcludedFromBalancers(nodes[c.myNode]) {
-		level.Debug(l).Log("event", "skipping should announce bgp", "service", name, "reason", "speaker's node has labeled 'node.kubernetes.io/exclude-from-external-load-balancers'")
+		level.Warn(l).Log("event", "skipping should announce bgp", "service", name, "reason", "speaker's node has labeled 'node.kubernetes.io/exclude-from-external-load-balancers'")
 		return "nodeLabeledExcludeBalancers"
 	}
 
