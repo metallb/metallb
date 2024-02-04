@@ -9,7 +9,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
+      name: metallb-webhook-service
       namespace: system
       path: /validate-metallb-io-v1beta2-bgppeer
   failurePolicy: Fail
@@ -29,7 +29,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
+      name: metallb-webhook-service
       namespace: system
       path: /validate-metallb-io-v1beta1-bfdprofile
   failurePolicy: Fail
@@ -49,7 +49,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
+      name: metallb-webhook-service
       namespace: system
       path: /validate-metallb-io-v1beta1-bgpadvertisement
   failurePolicy: Fail
@@ -69,7 +69,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
+      name: metallb-webhook-service
       namespace: system
       path: /validate-metallb-io-v1beta1-community
   failurePolicy: Fail
@@ -89,7 +89,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
+      name: metallb-webhook-service
       namespace: system
       path: /validate-metallb-io-v1beta1-ipaddresspool
   failurePolicy: Fail
@@ -109,7 +109,7 @@ webhooks:
   - v1
   clientConfig:
     service:
-      name: webhook-service
+      name: metallb-webhook-service
       namespace: system
       path: /validate-metallb-io-v1beta1-l2advertisement
   failurePolicy: Fail

@@ -146,7 +146,7 @@ func main() {
 		enablePprof         = flag.Bool("enable-pprof", false, "Enable pprof profiling")
 		disableCertRotation = flag.Bool("disable-cert-rotation", false, "disable automatic generation and rotation of webhook TLS certificates/keys")
 		certDir             = flag.String("cert-dir", "/tmp/k8s-webhook-server/serving-certs", "The directory where certs are stored")
-		certServiceName     = flag.String("cert-service-name", "webhook-service", "The service name used to generate the TLS cert's hostname")
+		certServiceName     = flag.String("cert-service-name", "metallb-webhook-service", "The service name used to generate the TLS cert's hostname")
 		loadBalancerClass   = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
 		webhookMode         = flag.String("webhook-mode", "enabled", "webhook mode: can be enabled, disabled or only webhook if we want the controller to act as webhook endpoint only")
 		webhookSecretName   = flag.String("webhook-secret", "webhook-server-cert", "webhook secret: the name of webhook secret, default is webhook-server-cert")

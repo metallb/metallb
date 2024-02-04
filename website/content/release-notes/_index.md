@@ -3,6 +3,13 @@ title: Release Notes
 weight: 8
 ---
 
+## Version 0.14.4
+
+BugFixes:
+
+- Fix the non existing conversion webhook in the Helm CRDs ([PR 2269](https://github.com/metallb/metallb/pull/2269))
+- Remove dangling AddressPool leftovers ([PR 2272](https://github.com/metallb/metallb/pull/2272) [Issue 2270](https://github.com/metallb/metallb/issues/2270))
+
 ## Version 0.14.3
 
 New features:
