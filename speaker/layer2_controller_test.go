@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"sort"
-	"strings"
 	"testing"
 
 	"go.universe.tf/metallb/internal/config"
@@ -1261,7 +1260,7 @@ func TestShouldAnnounceNodeSelector(t *testing.T) {
 		{
 			desc:             "One service, etp local, endpoint on iris1, selector on both(split), c2 should announce",
 			balancer:         "test1",
-			eps:              epsOn("iris2"),
+			eps:              epsOn("iris1"),
 			L2Advertisements: advertisementSplit,
 			trafficPolicy:    v1.ServiceExternalTrafficPolicyTypeLocal,
 			c1ExpectedResult: map[string]string{
@@ -1313,10 +1312,6 @@ func TestShouldAnnounceNodeSelector(t *testing.T) {
 	}
 	l := log.NewNopLogger()
 	for _, test := range tests {
-		if !strings.Contains(test.desc, "ltp") {
-			continue
-		}
-
 		cfg := config.Config{
 			Pools: &config.Pools{ByName: map[string]*config.Pool{
 				"default": {
