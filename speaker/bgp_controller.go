@@ -228,6 +228,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 					PeerASN:       p.cfg.ASN,
 					HoldTime:      p.cfg.HoldTime,
 					KeepAliveTime: p.cfg.KeepaliveTime,
+					ConnectTime:   p.cfg.ConnectTime,
 					Password:      p.cfg.Password,
 					PasswordRef:   p.cfg.PasswordRef,
 					CurrentNode:   c.myNode,

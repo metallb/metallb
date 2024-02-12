@@ -23,10 +23,6 @@ func enableCertRotation(notifyFinished chan struct{}, cfg *Config, mgr manager.M
 			Type: rotator.Validating,
 		},
 		{
-			Name: addresspoolConvertingWebhookCRD,
-			Type: rotator.CRDConversion,
-		},
-		{
 			Name: bgppeerConvertingWebhookCRD,
 			Type: rotator.CRDConversion,
 		},

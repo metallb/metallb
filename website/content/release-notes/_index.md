@@ -3,6 +3,23 @@ title: Release Notes
 weight: 8
 ---
 
+## Version 0.14.4
+
+BugFixes:
+
+- Fix the non existing conversion webhook in the Helm CRDs ([PR 2269](https://github.com/metallb/metallb/pull/2269))
+- Remove dangling AddressPool leftovers ([PR 2272](https://github.com/metallb/metallb/pull/2272) [Issue 2270](https://github.com/metallb/metallb/issues/2270))
+
+## Version 0.14.3
+
+New features:
+
+- Add option to configure BGP connect time ([PR_2144](https://github.com/metallb/metallb/pull))
+
+BugFixes:
+
+- Do not deploy the deprecated AddressPool crds and webhooks. The code that was handling them was removed, it makes no sense to deploy them. ([PR 2267](https://github.com/metallb/metallb/pull/2267)).
+
 ## Version 0.14.2
 
 New features:

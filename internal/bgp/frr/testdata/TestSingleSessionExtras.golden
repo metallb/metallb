@@ -25,6 +25,7 @@ router bgp 100
   neighbor 127.0.0.2 remote-as 200
   neighbor 127.0.0.2 port 179
   neighbor 127.0.0.2 timers 1 1
+  neighbor 127.0.0.2 timers connect 1
   neighbor 127.0.0.2 password password
   neighbor 127.0.0.2 update-source 10.1.1.254
 
