@@ -299,7 +299,7 @@
       },
       "required": [ "podMonitor", "prometheusRule" ]
     },
-    "controller": { 
+    "controller": {
       "allOf": [
         { "$ref": "#/definitions/component" },
         { "description": "MetalLB Controller",
@@ -330,7 +330,7 @@
         }
       ]
     },
-    "speaker": { 
+    "speaker": {
       "allOf": [
         { "$ref": "#/definitions/component" },
         { "description": "MetalLB Speaker",
@@ -363,6 +363,9 @@
                   "type": "boolean"
                 }
               }
+            },
+            "ignoreExcludeLB": {
+              "type": "boolean"
             },
             "updateStrategy": {
               "type": "object",
