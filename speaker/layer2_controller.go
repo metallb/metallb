@@ -32,9 +32,10 @@ import (
 )
 
 type layer2Controller struct {
-	announcer *layer2.Announce
-	myNode    string
-	sList     SpeakerList
+	announcer       *layer2.Announce
+	myNode          string
+	ignoreExcludeLB bool
+	sList           SpeakerList
 }
 
 func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
@@ -89,7 +90,7 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 	}
 
 	// we select the nodes with at least one matching l2 advertisement
-	forPool := speakersForPool(c.sList.UsableSpeakers(), pool, nodes)
+	forPool := c.speakersForPool(pool, nodes)
 	var availableNodes []string
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
 		availableNodes = usableNodes(eps, forPool)
@@ -205,14 +206,14 @@ func poolMatchesNodeL2(pool *config.Pool, node string) bool {
 	return false
 }
 
-func speakersForPool(speakers map[string]bool, pool *config.Pool, nodes map[string]*v1.Node) map[string]bool {
+func (c *layer2Controller) speakersForPool(pool *config.Pool, nodes map[string]*v1.Node) map[string]bool {
 	res := map[string]bool{}
-	for s := range speakers {
+	for s := range c.sList.UsableSpeakers() {
 		if k8snodes.IsNetworkUnavailable(nodes[s]) {
 			continue
 		}
 
-		if k8snodes.IsNodeExcludedFromBalancers(nodes[s]) {
+		if !c.ignoreExcludeLB && k8snodes.IsNodeExcludedFromBalancers(nodes[s]) {
 			continue
 		}
 

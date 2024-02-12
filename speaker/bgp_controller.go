@@ -51,13 +51,14 @@ type peer struct {
 }
 
 type bgpController struct {
-	logger         log.Logger
-	myNode         string
-	nodeLabels     labels.Set
-	peers          []*peer
-	svcAds         map[string][]*bgp.Advertisement
-	bgpType        bgpImplementation
-	sessionManager bgp.SessionManager
+	logger          log.Logger
+	myNode          string
+	nodeLabels      labels.Set
+	peers           []*peer
+	svcAds          map[string][]*bgp.Advertisement
+	bgpType         bgpImplementation
+	sessionManager  bgp.SessionManager
+	ignoreExcludeLB bool
 }
 
 func (c *bgpController) SetConfig(l log.Logger, cfg *config.Config) error {
@@ -157,7 +158,7 @@ func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, po
 		return "nodeNetworkUnavailable"
 	}
 
-	if k8snodes.IsNodeExcludedFromBalancers(nodes[c.myNode]) {
+	if !c.ignoreExcludeLB && k8snodes.IsNodeExcludedFromBalancers(nodes[c.myNode]) {
 		level.Debug(l).Log("event", "skipping should announce bgp", "service", name, "reason", "speaker's node has labeled 'node.kubernetes.io/exclude-from-external-load-balancers'")
 		return "nodeLabeledExcludeBalancers"
 	}

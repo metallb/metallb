@@ -82,6 +82,7 @@ func main() {
 		logLevel          = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
 		enablePprof       = flag.Bool("enable-pprof", false, "Enable pprof profiling")
 		loadBalancerClass = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
+		ignoreLBExclude   = flag.Bool("ignore-exclude-lb", false, "ignore the exclude-from-external-load-balancers label")
 	)
 	flag.Parse()
 
@@ -157,6 +158,7 @@ func main() {
 		SList:                  sList,
 		bgpType:                bgpImplementation(bgpType),
 		InterfaceExcludeRegexp: interfacesToExclude,
+		IgnoreExcludeLB:        *ignoreLBExclude,
 	})
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create MetalLB controller")
@@ -240,16 +242,18 @@ type controllerConfig struct {
 	SupportedProtocols           []config.Proto
 	AnnouncedInterfacesToExclude []string `yaml:"announcedInterfacesToExclude"`
 	InterfaceExcludeRegexp       *regexp.Regexp
+	IgnoreExcludeLB              bool
 }
 
 func newController(cfg controllerConfig) (*controller, error) {
 	handlers := map[config.Proto]Protocol{
 		config.BGP: &bgpController{
-			logger:         cfg.Logger,
-			myNode:         cfg.MyNode,
-			svcAds:         make(map[string][]*bgp.Advertisement),
-			bgpType:        cfg.bgpType,
-			sessionManager: newBGP(cfg),
+			logger:          cfg.Logger,
+			myNode:          cfg.MyNode,
+			svcAds:          make(map[string][]*bgp.Advertisement),
+			bgpType:         cfg.bgpType,
+			sessionManager:  newBGP(cfg),
+			ignoreExcludeLB: cfg.IgnoreExcludeLB,
 		},
 	}
 	protocols := []config.Proto{config.BGP}
@@ -260,9 +264,10 @@ func newController(cfg controllerConfig) (*controller, error) {
 			return nil, fmt.Errorf("making layer2 announcer: %s", err)
 		}
 		handlers[config.Layer2] = &layer2Controller{
-			announcer: a,
-			myNode:    cfg.MyNode,
-			sList:     cfg.SList,
+			announcer:       a,
+			myNode:          cfg.MyNode,
+			sList:           cfg.SList,
+			ignoreExcludeLB: cfg.IgnoreExcludeLB,
 		}
 		protocols = append(protocols, config.Layer2)
 	}

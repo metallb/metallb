@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"sort"
 	"sync"
 	"testing"
@@ -1337,6 +1338,149 @@ func TestNodeSelectors(t *testing.T) {
 		sortAds(gotAds)
 		if diff := cmp.Diff(test.wantAds, gotAds); diff != "" {
 			t.Errorf("%q: unexpected advertisement state (-want +got)\n%s", test.desc, diff)
+		}
+	}
+}
+
+func TestShouldAnnounceExcludeLB(t *testing.T) {
+	epsOn := func(node string) map[string][]discovery.EndpointSlice {
+		return map[string][]discovery.EndpointSlice{
+			"10.20.30.1": {
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{
+								"2.3.4.5",
+							},
+							NodeName: ptr.To(node),
+							Conditions: discovery.EndpointConditions{
+								Ready: ptr.To(true),
+							},
+						},
+					},
+				},
+			},
+		}
+	}
+
+	tests := []struct {
+		desc string
+
+		balancer            string
+		eps                 map[string][]discovery.EndpointSlice
+		trafficPolicy       v1.ServiceExternalTrafficPolicyType
+		excludeFromLB       []string
+		ignoreExcludeFromLB bool
+		c1ExpectedResult    map[string]string
+		c2ExpectedResult    map[string]string
+	}{
+		{
+			desc:          "One service, endpoint on iris1, no selector, both excluded, both should not announce",
+			balancer:      "test1",
+			eps:           epsOn("iris1"),
+			trafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+			excludeFromLB: []string{"iris1", "iris2"},
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "nodeLabeledExcludeBalancers",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "nodeLabeledExcludeBalancers",
+			},
+		},
+		{
+			desc:          "One service, endpoint on iris1, no selector, etplocal, ignore excludelb, both should announce",
+			balancer:      "test1",
+			eps:           epsOn("iris1"),
+			trafficPolicy: v1.ServiceExternalTrafficPolicyTypeCluster,
+			excludeFromLB: []string{"iris1", "iris2"},
+			c1ExpectedResult: map[string]string{
+				"10.20.30.1": "",
+			},
+			c2ExpectedResult: map[string]string{
+				"10.20.30.1": "",
+			},
+			ignoreExcludeFromLB: true,
+		},
+	}
+	l := log.NewNopLogger()
+	for _, test := range tests {
+		cfg := config.Config{
+			Pools: &config.Pools{ByName: map[string]*config.Pool{
+				"default": {
+					CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+					BGPAdvertisements: []*config.BGPAdvertisement{{
+						Nodes: map[string]bool{
+							"iris1": true,
+							"iris2": true,
+						},
+					}},
+				},
+			}},
+		}
+		c1, err := newController(controllerConfig{
+			MyNode:          "iris1",
+			Logger:          log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+			bgpType:         bgpNative,
+			IgnoreExcludeLB: test.ignoreExcludeFromLB,
+		})
+		if err != nil {
+			t.Fatalf("creating controller: %s", err)
+		}
+		c1.client = &testK8S{t: t}
+
+		c2, err := newController(controllerConfig{
+			MyNode:          "iris2",
+			Logger:          log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+			bgpType:         bgpNative,
+			IgnoreExcludeLB: test.ignoreExcludeFromLB,
+		})
+		if err != nil {
+			t.Fatalf("creating controller: %s", err)
+		}
+		c2.client = &testK8S{t: t}
+
+		if c1.SetConfig(l, &cfg) == controllers.SyncStateError {
+			t.Errorf("%q: SetConfig failed", test.desc)
+		}
+		if c2.SetConfig(l, &cfg) == controllers.SyncStateError {
+			t.Errorf("%q: SetConfig failed", test.desc)
+		}
+		svc := v1.Service{
+			Spec: v1.ServiceSpec{
+				Type:                  "LoadBalancer",
+				ExternalTrafficPolicy: test.trafficPolicy,
+			},
+			Status: statusAssigned("10.20.30.1"),
+		}
+
+		lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
+		lbIPStr := lbIP.String()
+
+		nodes := map[string]*v1.Node{
+			"iris1": {
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "iris1",
+				},
+			},
+			"iris2": {
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "iris2",
+				},
+			},
+		}
+		for _, n := range test.excludeFromLB {
+			nodes[n].Labels = map[string]string{
+				v1.LabelNodeExcludeBalancers: "",
+			}
+		}
+
+		response1 := c1.protocolHandlers[config.BGP].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], &svc, test.eps[lbIPStr], nodes)
+		response2 := c2.protocolHandlers[config.BGP].ShouldAnnounce(l, "test1", []net.IP{lbIP}, cfg.Pools.ByName["default"], &svc, test.eps[lbIPStr], nodes)
+		if response1 != test.c1ExpectedResult[lbIPStr] {
+			t.Errorf("%q: shouldAnnounce for controller 1 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIPStr, test.c1ExpectedResult[lbIPStr], response1)
+		}
+		if response2 != test.c2ExpectedResult[lbIPStr] {
+			t.Errorf("%q: shouldAnnounce for controller 2 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIPStr, test.c2ExpectedResult[lbIPStr], response2)
 		}
 	}
 }
