@@ -244,6 +244,9 @@ spec:
         {{- if .Values.speaker.wanConfig }}
         - --ml-wan-config
         {{- end }}
+        {{- if .Values.speaker.ignoreExcludeLB}}
+        - --ignore-exclude-lb
+        {{- end }}
         env:
         - name: METALLB_NODE_NAME
           valueFrom:
@@ -330,7 +333,7 @@ spec:
         {{- if or .Values.speaker.frr.enabled .Values.speaker.memberlist.enabled .Values.speaker.excludeInterfaces.enabled }}
         volumeMounts:
           {{- if .Values.speaker.memberlist.enabled }}
-          - name: memberlist 
+          - name: memberlist
             mountPath: {{ .Values.speaker.memberlist.mlSecretKeyPath }}
           {{- end }}
           {{- if .Values.speaker.frr.enabled }}
@@ -525,7 +528,7 @@ spec:
         operator: Exists
       - key: node-role.kubernetes.io/control-plane
         effect: NoSchedule
-        operator: Exists        
+        operator: Exists
       {{- end }}
       {{- with .Values.speaker.tolerations }}
         {{- toYaml . | nindent 6 }}
