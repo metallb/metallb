@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
+	"go.uber.org/zap/zapcore"
 	"k8s.io/klog"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
@@ -79,7 +80,15 @@ func Init(lvl string) (log.Logger, error) {
 
 	// Setting a controller-runtime logger is required to
 	// get any log created by it.
-	ctrl.SetLogger(zap.New())
+	logEnabler, err := zapLogLevel(lvl)
+	if err != nil {
+		return nil, err
+	}
+	runtimeLogger := zap.New(func(o *zap.Options) {
+		o.Level = logEnabler
+		o.StacktraceLevel = logEnabler
+	})
+	ctrl.SetLogger(runtimeLogger)
 
 	return l, nil
 }
@@ -189,6 +198,25 @@ func parseLevel(lvl string) (level.Option, error) {
 		return level.AllowError(), nil
 	case LevelNone:
 		return level.AllowNone(), nil
+	}
+
+	return nil, fmt.Errorf("failed to parse log level: %s", lvl)
+}
+
+func zapLogLevel(lvl string) (zapcore.LevelEnabler, error) {
+	switch lvl {
+	case LevelAll:
+		return zapcore.DebugLevel, nil
+	case LevelDebug:
+		return zapcore.DebugLevel, nil
+	case LevelInfo:
+		return zapcore.InfoLevel, nil
+	case LevelWarn:
+		return zapcore.WarnLevel, nil
+	case LevelError:
+		return zapcore.ErrorLevel, nil
+	case LevelNone:
+		return zapcore.FatalLevel, nil
 	}
 
 	return nil, fmt.Errorf("failed to parse log level: %s", lvl)

@@ -20,6 +20,7 @@ BugFixes:
 Chores:
 
 - Add Helm to upgrade documentation ([PR 2268](https://github.com/metallb/metallb/pull/2268))
+- Propagate the loglevel to the controller runtime too ([PR ](https://github.com/metallb/metallb/pull/2281), [Issue 2161](https://github.com/metallb/metallb/issues/2161))
 
 ## Version 0.14.3
 

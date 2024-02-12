@@ -18,6 +18,7 @@ require (
 	github.com/ory/dockertest/v3 v3.10.0
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.17.0
+	go.uber.org/zap v1.25.0
 	golang.org/x/sys v0.16.0
 	k8s.io/api v0.28.4
 	k8s.io/apiextensions-apiserver v0.28.4
@@ -100,7 +101,6 @@ require (
 	gitlab.com/golang-commonmark/puny v0.0.0-20191124015043-9f83538fa04f // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	go.uber.org/zap v1.25.0 // indirect
 	golang.org/x/exp v0.0.0-20220722155223-a9213eeb770e // indirect
 	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/net v0.19.0 // indirect
