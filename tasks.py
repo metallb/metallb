@@ -531,7 +531,7 @@ def bgp_dev_env(ip_family, frr_volume_dir):
     fetch_kubectl()
     dev_env_dir = os.getcwd() + "/dev-env/bgp"
     if frr_volume_dir == "":
-        frr_volume_dir = dev_env_dir + "/frr-volume"
+        frr_volume_dir = run("mktemp -d").stdout.strip() + "/frr-volume"
 
     # TODO -- The IP address handling will need updates to add support for IPv6
 
@@ -546,8 +546,6 @@ def bgp_dev_env(ip_family, frr_volume_dir):
 
     # Create a new directory that will be used as the config volume for frr.
     try:
-        # sudo because past docker runs will have changed ownership of this dir
-        run('sudo rm -rf "%s"' % frr_volume_dir)
         os.mkdir(frr_volume_dir)
     except FileExistsError:
         pass
