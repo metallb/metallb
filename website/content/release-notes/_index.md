@@ -5,6 +5,10 @@ weight: 8
 
 ## Version 0.14.4
 
+New features:
+
+- Bump FRR to 9.0.2 ([PR 2282](https://github.com/metallb/metallb/pull/2282), [Issue 2256](https://github.com/metallb/metallb/issues/2256))
+
 BugFixes:
 
 - Fix the non existing conversion webhook in the Helm CRDs ([PR 2269](https://github.com/metallb/metallb/pull/2269))
