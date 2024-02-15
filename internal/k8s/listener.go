@@ -8,22 +8,22 @@ import (
 	"github.com/go-kit/log"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/controllers"
-	"go.universe.tf/metallb/internal/k8s/epslices"
 	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 )
 
 type Listener struct {
 	sync.Mutex
-	ServiceChanged func(log.Logger, string, *v1.Service, epslices.EpsOrSlices) controllers.SyncState
+	ServiceChanged func(log.Logger, string, *v1.Service, []discovery.EndpointSlice) controllers.SyncState
 	ConfigChanged  func(log.Logger, *config.Config) controllers.SyncState
 	PoolChanged    func(log.Logger, *config.Pools) controllers.SyncState
 	NodeChanged    func(log.Logger, *v1.Node) controllers.SyncState
 }
 
-func (l *Listener) ServiceHandler(logger log.Logger, serviceName string, svc *v1.Service, endpointsOrSlices epslices.EpsOrSlices) controllers.SyncState {
+func (l *Listener) ServiceHandler(logger log.Logger, serviceName string, svc *v1.Service, epSlices []discovery.EndpointSlice) controllers.SyncState {
 	l.Lock()
 	defer l.Unlock()
-	return l.ServiceChanged(logger, serviceName, svc, endpointsOrSlices)
+	return l.ServiceChanged(logger, serviceName, svc, epSlices)
 }
 
 func (l *Listener) ConfigHandler(logger log.Logger, config *config.Config) controllers.SyncState {

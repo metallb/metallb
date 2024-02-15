@@ -52,7 +52,7 @@ jobs:
 
       - name: Get changed files
         id: changed-files
-        uses: tj-actions/changed-files@v41
+        uses: tj-actions/changed-files@v42
 
       - name: Check if release notes where changed
         run: |
@@ -153,7 +153,7 @@ jobs:
           check-latest: true
 
       - name: Set up chart-testing
-        uses: helm/chart-testing-action@v2.6.0
+        uses: helm/chart-testing-action@v2.6.1
 
       - name: Run chart-testing (list-changed)
         id: list-changed
@@ -325,6 +325,10 @@ jobs:
           sed -i 's/quay.io\/metallb\/controller:main/quay.io\/metallb\/controller:dev-amd64/g' bin/metallb-operator.yaml
           sed -i 's/native/frr/g' bin/metallb-operator.yaml
           kubectl apply -f bin/metallb-operator.yaml
+
+      - name: Remove the exclude from external lb label from the master node
+        run: |
+          env "PATH=$PATH" inv remove-lb-exclusion-from-nodes
 
       - name: Ensure MetalLB operator is ready
         run: |

@@ -88,12 +88,14 @@ router bgp 100
   neighbor 10.2.2.254 ebgp-multihop
   neighbor 10.2.2.254 port 179
   neighbor 10.2.2.254 timers 1 1
+  neighbor 10.2.2.254 timers connect 1
   neighbor 10.2.2.254 password password
   neighbor 10.2.2.254 update-source 10.1.1.254
   neighbor 10.2.2.255 remote-as 200
   neighbor 10.2.2.255 ebgp-multihop
   neighbor 10.2.2.255 port 179
   neighbor 10.2.2.255 timers 1 1
+  neighbor 10.2.2.255 timers connect 1
   neighbor 10.2.2.255 password password
   neighbor 10.2.2.255 update-source 10.1.1.254
 

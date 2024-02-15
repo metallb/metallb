@@ -11,11 +11,11 @@ import (
 	"go.universe.tf/metallb/internal/allocator"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/controllers"
-	"go.universe.tf/metallb/internal/k8s/epslices"
 
 	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
 	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -921,7 +921,7 @@ func TestControllerMutation(t *testing.T) {
 			t.Run(test.desc, func(t *testing.T) {
 				k.reset()
 
-				if c.SetBalancer(l, "test", test.in, epslices.EpsOrSlices{}) == controllers.SyncStateError {
+				if c.SetBalancer(l, "test", test.in, []discovery.EndpointSlice{}) == controllers.SyncStateError {
 					t.Fatalf("%q: SetBalancer returned error", test.desc)
 				}
 				if test.wantErr != k.loggedWarning {
@@ -981,7 +981,7 @@ func TestControllerConfig(t *testing.T) {
 			ClusterIPs: []string{"1.2.3.4"},
 		},
 	}
-	if c.SetBalancer(l, "test", svc, epslices.EpsOrSlices{}) == controllers.SyncStateError {
+	if c.SetBalancer(l, "test", svc, []discovery.EndpointSlice{}) == controllers.SyncStateError {
 		t.Fatalf("SetBalancer failed")
 	}
 
@@ -1028,7 +1028,7 @@ func TestControllerConfig(t *testing.T) {
 		t.Error("unsynced SetBalancer logged an error")
 	}
 
-	if c.SetBalancer(l, "test", svc, epslices.EpsOrSlices{}) == controllers.SyncStateError {
+	if c.SetBalancer(l, "test", svc, []discovery.EndpointSlice{}) == controllers.SyncStateError {
 		t.Fatalf("SetBalancer failed")
 	}
 
@@ -1047,7 +1047,7 @@ func TestControllerConfig(t *testing.T) {
 	}
 
 	// Balancer should clear the service. Not reprocess all because previous ip is not longer assignable.
-	if c.SetBalancer(l, "test", gotSvc, epslices.EpsOrSlices{}) != controllers.SyncStateErrorNoRetry {
+	if c.SetBalancer(l, "test", gotSvc, []discovery.EndpointSlice{}) != controllers.SyncStateErrorNoRetry {
 		t.Fatalf("SetBalancer failed")
 	}
 
@@ -1087,7 +1087,7 @@ func TestDeleteRecyclesIP(t *testing.T) {
 			ClusterIPs: []string{"1.2.3.4"},
 		},
 	}
-	if c.SetBalancer(l, "test", svc1, epslices.EpsOrSlices{}) == controllers.SyncStateError {
+	if c.SetBalancer(l, "test", svc1, []discovery.EndpointSlice{}) == controllers.SyncStateError {
 		t.Fatal("SetBalancer svc1 failed")
 	}
 	gotSvc := k.gotService(svc1)
@@ -1107,7 +1107,7 @@ func TestDeleteRecyclesIP(t *testing.T) {
 			ClusterIPs: []string{"1.2.3.4"},
 		},
 	}
-	if c.SetBalancer(l, "test2", svc2, epslices.EpsOrSlices{}) == controllers.SyncStateError {
+	if c.SetBalancer(l, "test2", svc2, []discovery.EndpointSlice{}) == controllers.SyncStateError {
 		t.Fatal("SetBalancer svc2 was supposed to fail with no retry")
 	}
 	if k.gotService(svc2) != nil {
@@ -1116,12 +1116,12 @@ func TestDeleteRecyclesIP(t *testing.T) {
 	k.reset()
 
 	// Deleting the first LB should tell us to reprocess all services.
-	if c.SetBalancer(l, "test", nil, epslices.EpsOrSlices{}) != controllers.SyncStateReprocessAll {
+	if c.SetBalancer(l, "test", nil, []discovery.EndpointSlice{}) != controllers.SyncStateReprocessAll {
 		t.Fatal("SetBalancer with nil LB didn't tell us to reprocess all balancers")
 	}
 
 	// Setting svc2 should now allocate correctly.
-	if c.SetBalancer(l, "test2", svc2, epslices.EpsOrSlices{}) == controllers.SyncStateError {
+	if c.SetBalancer(l, "test2", svc2, []discovery.EndpointSlice{}) == controllers.SyncStateError {
 		t.Fatal("SetBalancer svc2 failed")
 	}
 	gotSvc = k.gotService(svc2)
@@ -1161,7 +1161,7 @@ func TestControllerReassign(t *testing.T) {
 		t.Fatalf("SetPools failed")
 	}
 
-	if c.SetBalancer(l, "test", svc, epslices.EpsOrSlices{}) != controllers.SyncStateSuccess {
+	if c.SetBalancer(l, "test", svc, []discovery.EndpointSlice{}) != controllers.SyncStateSuccess {
 		t.Fatalf("SetBalancer failed")
 	}
 
@@ -1192,7 +1192,7 @@ func TestControllerReassign(t *testing.T) {
 	}
 
 	// Allocation shouldn't change.
-	if c.SetBalancer(l, "test", gotSvc, epslices.EpsOrSlices{}) != controllers.SyncStateSuccess {
+	if c.SetBalancer(l, "test", gotSvc, []discovery.EndpointSlice{}) != controllers.SyncStateSuccess {
 		t.Fatalf("SetBalancer failed")
 	}
 
@@ -1216,7 +1216,7 @@ func TestControllerReassign(t *testing.T) {
 	}
 
 	// It should get an IP from the second pool
-	if c.SetBalancer(l, "test", gotSvc, epslices.EpsOrSlices{}) != controllers.SyncStateSuccess {
+	if c.SetBalancer(l, "test", gotSvc, []discovery.EndpointSlice{}) != controllers.SyncStateSuccess {
 		t.Fatalf("SetBalancer failed")
 	}
 
@@ -1242,7 +1242,7 @@ func TestControllerDualStackConfig(t *testing.T) {
 			ClusterIPs: []string{"1.2.3.4", "1000::"},
 		},
 	}
-	if c.SetBalancer(l, "test", svc, epslices.EpsOrSlices{}) == controllers.SyncStateError {
+	if c.SetBalancer(l, "test", svc, []discovery.EndpointSlice{}) == controllers.SyncStateError {
 		t.Fatalf("SetBalancer failed")
 	}
 
@@ -1290,7 +1290,7 @@ func TestControllerDualStackConfig(t *testing.T) {
 		t.Error("unsynced SetBalancer logged an error")
 	}
 
-	if c.SetBalancer(l, "test", svc, epslices.EpsOrSlices{}) == controllers.SyncStateError {
+	if c.SetBalancer(l, "test", svc, []discovery.EndpointSlice{}) == controllers.SyncStateError {
 		t.Fatalf("SetBalancer failed")
 	}
 

@@ -165,6 +165,11 @@ spec:
         {{- toYaml .Values.speaker.securityContext | nindent 8 }}
       {{- end }}
       volumes:
+      {{- if .Values.prometheus.speakerMetricsTLSSecret }}
+        - name: metrics-certs
+          secret:
+            secretName: {{ .Values.prometheus.speakerMetricsTLSSecret }}
+      {{- end }}
       {{- if .Values.speaker.memberlist.enabled }}
         - name: memberlist
           secret:
@@ -189,11 +194,6 @@ spec:
           emptyDir: {}
         - name: metrics
           emptyDir: {}
-      {{- if .Values.prometheus.speakerMetricsTLSSecret }}
-        - name: metrics-certs
-          secret:
-            secretName: {{ .Values.prometheus.speakerMetricsTLSSecret }}
-      {{- end }}
       initContainers:
         # Copies the initial config files with the right permissions to the shared volume.
         - name: cp-frr-files

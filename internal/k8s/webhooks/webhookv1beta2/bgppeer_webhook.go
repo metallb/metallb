@@ -111,7 +111,7 @@ func validatePeerCreate(bgpPeer *v1beta2.BGPPeer) error {
 	return nil
 }
 
-// validatePeerUpdate implements webhook.Validator so a webhook will be registered for AddressPool.
+// validatePeerUpdate implements webhook.Validator so a webhook will be registered for BGPPeer.
 func validatePeerUpdate(bgpPeer *v1beta2.BGPPeer, _ *v1beta2.BGPPeer) error {
 	level.Debug(Logger).Log("webhook", "bgppeer", "action", "update", "name", bgpPeer.Name, "namespace", bgpPeer.Namespace)
 
@@ -129,7 +129,7 @@ func validatePeerUpdate(bgpPeer *v1beta2.BGPPeer, _ *v1beta2.BGPPeer) error {
 	return nil
 }
 
-// validatePeerDelete implements webhook.Validator so a webhook will be registered for AddressPool.
+// validatePeerDelete implements webhook.Validator so a webhook will be registered for BGPPeer.
 func validatePeerDelete(bgpPeer *v1beta2.BGPPeer) error {
 	return nil
 }

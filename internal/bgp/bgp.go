@@ -70,6 +70,7 @@ type SessionParameters struct {
 	PeerASN       uint32
 	HoldTime      time.Duration
 	KeepAliveTime time.Duration
+	ConnectTime   *time.Duration
 	Password      string
 	PasswordRef   v1.SecretReference
 	CurrentNode   string

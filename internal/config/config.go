@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 	"k8s.io/utils/strings/slices"
 )
 
@@ -103,6 +104,8 @@ type Peer struct {
 	HoldTime time.Duration
 	// Requested BGP keepalive time, per RFC4271.
 	KeepaliveTime time.Duration
+	// Requested BGP connect time, controls how long BGP waits between connection attempts to a neighbor.
+	ConnectTime *time.Duration
 	// BGP router ID to advertise to the peer
 	RouterID net.IP
 	// Only connect to this peer on nodes that match one of these
@@ -437,6 +440,11 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		}
 	}
 
+	var connectTime *time.Duration
+	if p.Spec.ConnectTime != nil {
+		connectTime = ptr.To(p.Spec.ConnectTime.Duration)
+	}
+
 	return &Peer{
 		Name:          p.Name,
 		MyASN:         p.Spec.MyASN,
@@ -446,6 +454,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		Port:          p.Spec.Port,
 		HoldTime:      holdTime,
 		KeepaliveTime: keepaliveTime,
+		ConnectTime:   connectTime,
 		RouterID:      routerID,
 		NodeSelectors: nodeSels,
 		Password:      password,

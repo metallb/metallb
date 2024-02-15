@@ -24,6 +24,7 @@ type Neighbor struct {
 	MsgStats                MessageStats
 	ConfiguredHoldTime      int
 	ConfiguredKeepAliveTime int
+	ConfiguredConnectTime   int
 }
 
 type Route struct {
@@ -46,6 +47,7 @@ type FRRNeighbor struct {
 	VRFName                      string       `json:"vrf"`
 	ConfiguredHoldTimeMSecs      int          `json:"bgpTimerConfiguredHoldTimeMsecs"`
 	ConfiguredKeepAliveTimeMSecs int          `json:"bgpTimerConfiguredKeepAliveIntervalMsecs"`
+	ConnectRetryTimer            int          `json:"connectRetryTimer"`
 	AddressFamilyInfo            map[string]struct {
 		SentPrefixCounter int `json:"sentPrefixCounter"`
 	} `json:"addressFamilyInfo"`
@@ -181,6 +183,7 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 			MsgStats:                n.MsgStats,
 			ConfiguredKeepAliveTime: n.ConfiguredKeepAliveTimeMSecs,
 			ConfiguredHoldTime:      n.ConfiguredHoldTimeMSecs,
+			ConfiguredConnectTime:   n.ConnectRetryTimer,
 		})
 	}
 	return res, nil

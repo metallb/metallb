@@ -248,15 +248,7 @@ spec:
     app: dns
 ```
 
-[Kubernetes does not currently allow multiprotocol LoadBalancer services](https://github.com/kubernetes/kubernetes/issues/23880). This
-would normally make it impossible to run services like DNS, because
-they have to listen on both TCP and UDP. To work around this
-limitation of Kubernetes with MetalLB, create two services (one for
-TCP, one for UDP), both with the same pod selector. Then, give them
-the same sharing key and `spec.loadBalancerIP` to colocate the TCP and
-UDP serving ports on the same IP address.
-
-The second reason is much simpler: if you have more services than
+This might be useful in case you have more services than
 available IP addresses, and you can't or don't want to get more
 addresses, the only alternative is to colocate multiple services per
 IP address.

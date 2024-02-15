@@ -69,6 +69,12 @@ If you want to deploy MetalLB using the [FRR mode](https://metallb.universe.tf/c
 kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-frr.yaml
 ```
 
+If you want to deploy MetalLB using the [experimental FRR-K8s mode]({{% relref "concepts/bgp.md" %}}#frr-k8s-mode):
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/main/config/manifests/metallb-frr-k8s.yaml
+```
+
 Please do note that these manifests deploy MetalLB from the main development branch. We highly encourage cloud operators to deploy a stable released version of MetalLB on production environments!
 
 {{% /notice %}}
@@ -126,6 +132,17 @@ resources:
   - github.com/metallb/metallb/config/frr?ref=main
 ```
 
+In order to deploy the [experimental FRR-K8s mode]({{% relref "concepts/bgp.md" %}}#frr-k8s-mode):
+
+```yaml
+# kustomization.yml
+namespace: metallb-system
+
+resources:
+  - github.com/metallb/metallb/config/frr-k8s?ref=main
+```
+
+
 ## Installation with Helm
 
 You can install MetallLB with [Helm](https://helm.sh/)
@@ -168,6 +185,14 @@ speaker:
 
 {{% /notice %}}
 
+In order to deploy the [experimental FRR-K8s mode]({{% relref "concepts/bgp.md" %}}#frr-k8s-mode)
+the following value must be set:
+
+```yaml
+frrk8s:
+  enabled: true
+```
+
 ## Using the MetalLB Operator
 
 The MetalLB Operator is available on OperatorHub at [operatorhub.io/operator/metallb-operator](https://operatorhub.io/operator/metallb-operator). It eases the deployment and life-cycle of MetalLB in a cluster and allows configuring MetalLB via CRDs.
@@ -187,6 +212,14 @@ kubectl edit csv metallb-operator
 ```yaml
 - name: METALLB_BGP_TYPE
   value: frr
+```
+
+If you want to deploy MetalLB using the [experimental FRR-K8s mode]({{% relref "concepts/bgp.md" %}}#frr-k8s-mode)
+change the `BGP_TYPE` environment variable of the `manager` container to `frr-k8s`:
+
+```yaml
+- name: METALLB_BGP_TYPE
+  value: frr-k8s
 ```
 
 {{% /notice %}}
@@ -211,9 +244,15 @@ When upgrading MetalLB, always check the [release notes](https://metallb.univers
 to see the changes and required actions, if any. Pay special attention to the release notes when
 upgrading to newer major/minor releases.
 
-Unless specified otherwise in the release notes, upgrade MetalLB either using
-[plain manifests](#installation-by-manifest) or using [Kustomize](#installation-with-kustomize) as
-described above.
+Unless specified otherwise in the release notes, upgrade MetalLB using one of the
+methods described above:
+
+- [Plain manifests](#installation-by-manifest)
+- [Kustomize](#installation-with-kustomize)
+- [Helm](#installation-with-helm)
+
+When upgrading via Helm, note that the chart is designed to automatically upgrade the CRDs;
+there is no need to upgrade them manually.
 
 Please take the known limitations for [layer2](https://metallb.universe.tf/concepts/layer2/#limitations)
 and [bgp](https://metallb.universe.tf/concepts/bgp/#limitations) into account when performing an
