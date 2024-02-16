@@ -201,13 +201,26 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 		ExtraConfig: sm.extraConfig,
 	}
 
+	type neighborProperties struct {
+		// It has at least one advertisement with these communities
+		CommunitiesV4 sets.Set[string]
+		CommunitiesV6 sets.Set[string]
+		// It has at least one advertisement with these large communities
+		LargeCommunitiesV4 sets.Set[string]
+		LargeCommunitiesV6 sets.Set[string]
+		// It has at least one advertisement with these local preferences
+		LocalPrefsV4 sets.Set[uint32]
+		LocalPrefsV6 sets.Set[uint32]
+	}
+
 	type router struct {
-		myASN        uint32
-		routerID     string
-		neighbors    map[string]*neighborConfig
-		vrf          string
-		ipV4Prefixes map[string]string
-		ipV6Prefixes map[string]string
+		myASN               uint32
+		routerID            string
+		neighbors           map[string]*neighborConfig
+		neighborsProperties map[string]*neighborProperties
+		vrf                 string
+		ipV4Prefixes        map[string]string
+		ipV6Prefixes        map[string]string
 	}
 
 	routers := make(map[string]*router)
@@ -226,11 +239,12 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 		routerName := RouterName(s.RouterID.String(), s.MyASN, s.VRFName)
 		if rout, exist = routers[routerName]; !exist {
 			rout = &router{
-				myASN:        s.MyASN,
-				neighbors:    make(map[string]*neighborConfig),
-				ipV4Prefixes: make(map[string]string),
-				ipV6Prefixes: make(map[string]string),
-				vrf:          s.VRFName,
+				myASN:               s.MyASN,
+				neighbors:           make(map[string]*neighborConfig),
+				neighborsProperties: make(map[string]*neighborProperties),
+				ipV4Prefixes:        make(map[string]string),
+				ipV6Prefixes:        make(map[string]string),
+				vrf:                 s.VRFName,
 			}
 			if s.RouterID != nil {
 				rout.routerID = s.RouterID.String()
@@ -258,6 +272,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			}
 
 			neighbor = &neighborConfig{
+				Name:           neighborName,
 				IPFamily:       family,
 				ASN:            s.PeerASN,
 				Addr:           host,
@@ -275,7 +290,17 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				neighbor.SrcAddr = s.SourceAddress.String()
 			}
 			rout.neighbors[neighborName] = neighbor
+			rout.neighborsProperties[neighborName] = &neighborProperties{
+				CommunitiesV4:      sets.New[string](),
+				CommunitiesV6:      sets.New[string](),
+				LargeCommunitiesV4: sets.New[string](),
+				LargeCommunitiesV6: sets.New[string](),
+				LocalPrefsV4:       sets.New[uint32](),
+				LocalPrefsV6:       sets.New[uint32](),
+			}
 		}
+
+		properties := rout.neighborsProperties[neighborName]
 
 		for _, adv := range s.advertised {
 			family := ipfamily.ForAddress(adv.Prefix.IP)
@@ -287,9 +312,19 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			for _, c := range adv.Communities {
 				if community.IsLarge(c) {
 					largeCommunities = append(largeCommunities, c.String())
+					if family == ipfamily.IPv4 {
+						properties.LargeCommunitiesV4.Insert(c.String())
+						continue
+					}
+					properties.LargeCommunitiesV6.Insert(c.String())
 					continue
 				}
 				communities = append(communities, c.String())
+				if family == ipfamily.IPv4 {
+					properties.CommunitiesV4.Insert(c.String())
+					continue
+				}
+				properties.CommunitiesV6.Insert(c.String())
 			}
 
 			prefix := adv.Prefix.String()
@@ -299,6 +334,13 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				Communities:      sort.StringSlice(communities),
 				LargeCommunities: sort.StringSlice(largeCommunities),
 				LocalPref:        adv.LocalPref,
+			}
+			if adv.LocalPref != 0 {
+				if family == ipfamily.IPv4 {
+					properties.LocalPrefsV4.Insert(adv.LocalPref)
+				} else {
+					properties.LocalPrefsV6.Insert(adv.LocalPref)
+				}
 			}
 
 			neighbor.Advertisements, err = addToAdvertisements(neighbor.Advertisements, &advConfig)
@@ -326,6 +368,17 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			IPV4Prefixes: sortMap(r.ipV4Prefixes),
 			IPV6Prefixes: sortMap(r.ipV6Prefixes),
 		}
+		// Filling in the neighbor properties
+		for _, n := range toAdd.Neighbors {
+			properties := r.neighborsProperties[n.Name]
+			n.CommunitiesV4 = sets.List(properties.CommunitiesV4)
+			n.CommunitiesV6 = sets.List(properties.CommunitiesV6)
+			n.LargeCommunitiesV4 = sets.List(properties.LargeCommunitiesV4)
+			n.LargeCommunitiesV6 = sets.List(properties.LargeCommunitiesV6)
+			n.LocalPrefsV4 = sets.List(properties.LocalPrefsV4)
+			n.LocalPrefsV6 = sets.List(properties.LocalPrefsV6)
+		}
+
 		config.Routers = append(config.Routers, toAdd)
 	}
 	return config, nil

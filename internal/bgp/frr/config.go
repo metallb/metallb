@@ -79,6 +79,15 @@ type neighborConfig struct {
 	VRFName             string
 	HasV4Advertisements bool
 	HasV6Advertisements bool
+	// It has at least one advertisement with these communities
+	CommunitiesV4 []string
+	CommunitiesV6 []string
+	// It has at least one advertisement with these large communities
+	LargeCommunitiesV4 []string
+	LargeCommunitiesV6 []string
+	// It has at least one advertisement with these local preferences
+	LocalPrefsV4 []uint32
+	LocalPrefsV6 []uint32
 }
 
 func (n *neighborConfig) ID() string {
