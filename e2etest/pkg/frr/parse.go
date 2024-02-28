@@ -25,6 +25,7 @@ type Neighbor struct {
 	ConfiguredHoldTime      int
 	ConfiguredKeepAliveTime int
 	ConfiguredConnectTime   int
+	AddressFamilies         []string
 }
 
 type Route struct {
@@ -168,9 +169,12 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 		if n.BgpState != bgpConnected {
 			connected = false
 		}
+		var addressFamilies []string
 		prefixSent := 0
-		for _, s := range n.AddressFamilyInfo {
+		for family, s := range n.AddressFamilyInfo {
 			prefixSent += s.SentPrefixCounter
+			addressFamilies = append(addressFamilies, family)
+
 		}
 		res = append(res, &Neighbor{
 			IP:                      ip,
@@ -184,6 +188,7 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 			ConfiguredKeepAliveTime: n.ConfiguredKeepAliveTimeMSecs,
 			ConfiguredHoldTime:      n.ConfiguredHoldTimeMSecs,
 			ConfiguredConnectTime:   n.ConnectRetryTimer,
+			AddressFamilies:         addressFamilies,
 		})
 	}
 	return res, nil
