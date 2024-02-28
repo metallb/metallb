@@ -179,6 +179,11 @@ spec:
                     <= 65535
                 - message: connect time should contain a whole number of seconds
                   rule: duration(self).getMilliseconds() % 1000 == 0
+              disableMP:
+                default: false
+                description: To set if we want to disable MP BGP that will separate
+                  IPv4 and IPv6 route exchanges into distinct BGP sessions.
+                type: boolean
               ebgpMultiHop:
                 description: To set if the BGPPeer is multi-hops away. Needed for
                   FRR mode only.
