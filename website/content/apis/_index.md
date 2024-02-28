@@ -291,5 +291,6 @@ _Appears in:_
 | `bfdProfile` _string_ | The name of the BFD Profile to be used for the BFD session associated to the BGP session. If not set, the BFD session won't be set up. |
 | `ebgpMultiHop` _boolean_ | To set if the BGPPeer is multi-hops away. Needed for FRR mode only. |
 | `vrf` _string_ | To set if we want to peer with the BGPPeer using an interface belonging to a host vrf |
+| `disableMP` _boolean_ | To set if we want to disable MP BGP that will separate IPv4 and IPv6 route exchanges into distinct BGP sessions. |
 
 

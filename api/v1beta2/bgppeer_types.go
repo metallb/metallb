@@ -94,6 +94,11 @@ type BGPPeerSpec struct {
 	// +optional
 	VRFName string `json:"vrf,omitempty"`
 	// Add future BGP configuration here
+
+	// To set if we want to disable MP BGP that will separate IPv4 and IPv6 route exchanges into distinct BGP sessions.
+	// +optional
+	// +kubebuilder:default:=false
+	DisableMP bool `json:"disableMP,omitempty"`
 }
 
 // BGPPeerStatus defines the observed state of Peer.
