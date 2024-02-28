@@ -1379,6 +1379,43 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 
 		})
+		ginkgo.It("FRR-MODE BGP Peer disable MP BGP", func() {
+			resources := config.Resources{
+				Peers: metallb.PeersForContainers(FRRContainers, ipfamily.DualStack, func(p *metallbv1beta2.BGPPeer) {
+					p.Spec.DisableMP = true
+				}),
+			}
+
+			err := ConfigUpdater.Update(resources)
+			framework.ExpectNoError(err)
+
+			speakerPods, err := metallb.SpeakerPods(cs)
+			framework.ExpectNoError(err)
+
+			for _, pod := range speakerPods {
+				podExec, err := FRRProvider.FRRExecutorFor(pod.Namespace, pod.Name)
+				framework.ExpectNoError(err)
+				Eventually(func() error {
+					neighbors, err := frr.NeighborsInfo(podExec)
+					if err != nil {
+						return err
+					}
+					if len(neighbors) == 0 {
+						return fmt.Errorf("expected at least 1 neighbor, got %d", len(neighbors))
+					}
+					for _, neighbor := range neighbors {
+						neighborFamily := ipfamily.ForAddress(neighbor.IP)
+						for _, family := range neighbor.AddressFamilies {
+							if !strings.Contains(family, string(neighborFamily)) {
+								return fmt.Errorf("expected %s neigbour to contain only %s families but contains %s", neighbor.IP, neighborFamily, family)
+							}
+						}
+					}
+					return nil
+				}, 2*time.Minute, time.Second).ShouldNot(HaveOccurred())
+			}
+
+		})
 	})
 	ginkgo.DescribeTable("A service of protocol load balancer should work with two protocols", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
 		_, svc := setupBGPService(f, pairingIPFamily, poolAddresses, FRRContainers, func(svc *corev1.Service) {
