@@ -146,7 +146,7 @@ resources:
 
 ## Installation with Helm
 
-You can install MetallLB with [Helm](https://helm.sh/)
+You can install MetalLB with [Helm](https://helm.sh/)
 by using the Helm chart repository: `https://metallb.github.io/metallb`
 
 ```bash
