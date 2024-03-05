@@ -245,15 +245,20 @@ func (sm *sessionManager) updateConfig() error {
 				password = s.Password
 			}
 
+			var connectTime *metav1.Duration
+			if s.ConnectTime != nil {
+				connectTime = &metav1.Duration{Duration: *s.ConnectTime}
+			}
+
 			neighbor = frrv1beta1.Neighbor{
 				ASN:           s.PeerASN,
 				Address:       host,
 				Port:          &portUint16,
 				HoldTime:      &metav1.Duration{Duration: s.HoldTime},
 				KeepaliveTime: &metav1.Duration{Duration: s.KeepAliveTime},
-				// TODO: Add Connect time
-				BFDProfile:   s.BFDProfile,
-				EBGPMultiHop: s.EBGPMultiHop,
+				ConnectTime:   connectTime,
+				BFDProfile:    s.BFDProfile,
+				EBGPMultiHop:  s.EBGPMultiHop,
 				ToAdvertise: frrv1beta1.Advertise{
 					Allowed: frrv1beta1.AllowedOutPrefixes{
 						Prefixes: make([]string, 0),

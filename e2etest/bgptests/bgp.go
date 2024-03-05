@@ -1344,8 +1344,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			framework.ExpectNoError(err)
 			framework.ExpectEqual(peer.Spec.Port, uint16(179))
 		})
-		// Until BGP peer connect time feature is added to frrk8s test is set to FRR-MODE:
-		ginkgo.It("FRR-MODE BGP Peer connect time", func() {
+		ginkgo.It("BGP Peer connect time", func() {
 			connectTime := time.Second * 5
 			resources := config.Resources{
 				Peers: metallb.PeersForContainers(FRRContainers, ipfamily.IPv4, func(p *metallbv1beta2.BGPPeer) {

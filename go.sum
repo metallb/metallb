@@ -186,8 +186,8 @@ github.com/mdlayher/packet v1.0.0 h1:InhZJbdShQYt6XV2GPj5XHxChzOfhJJOMbvnGAmOfQ8
 github.com/mdlayher/packet v1.0.0/go.mod h1:eE7/ctqDhoiRhQ44ko5JZU2zxB88g+JH/6jmnjzPjOU=
 github.com/mdlayher/socket v0.2.1 h1:F2aaOwb53VsBE+ebRS9bLd7yPOfYUMC8lOODdCBDY6w=
 github.com/mdlayher/socket v0.2.1/go.mod h1:QLlNPkFR88mRUNQIzRBMfXxwKal8H7u1h3bL1CV+f0E=
-github.com/metallb/frr-k8s v0.0.8 h1:tz88RFD2pjvyntOSrKrOk+0b81enGxdTk2bit179iDE=
-github.com/metallb/frr-k8s v0.0.8/go.mod h1:Q2LGOGHD7kJiyjpUzh5FF31SH8Ab/1TYW0fthLgVfMI=
+github.com/metallb/frr-k8s v0.0.10 h1:kjR+B7xE4Weyor3ljyx5RujgCGXLHSfdoBiHUj/7v1o=
+github.com/metallb/frr-k8s v0.0.10/go.mod h1:Q2LGOGHD7kJiyjpUzh5FF31SH8Ab/1TYW0fthLgVfMI=
 github.com/miekg/dns v1.1.26/go.mod h1:bPDLeHnStXmXAq1m/Ch/hvfNHr14JKNPMBo3VZKjuso=
 github.com/miekg/dns v1.1.43 h1:JKfpVSCB84vrAmHzyrsxB5NAr5kLoMXZArPSw7Qlgyg=
 github.com/miekg/dns v1.1.43/go.mod h1:+evo5L0630/F6ca/Z9+GAqzhjGyn8/c+TBaOyfEl0V4=
