@@ -129,6 +129,15 @@ var _ = ginkgo.Describe("L2", func() {
 			gomega.Eventually(func() error {
 				return service.ValidateL2(svc)
 			}, 2*time.Minute, 1*time.Second).ShouldNot(gomega.HaveOccurred())
+		})
+
+		ginkgo.It("should expose the status as L2ServiceStatus", func() {
+			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", service.TrafficPolicyCluster)
+
+			defer func() {
+				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
+				framework.ExpectNoError(err)
+			}()
 
 			ginkgo.By("checking correct serviceL2Status object is populated")
 
@@ -800,9 +809,8 @@ var _ = ginkgo.Describe("L2", func() {
 					Name: fmt.Sprintf("test-addresspool%d", i+1),
 				},
 				Spec: metallbv1beta1.IPAddressPoolSpec{
-					Addresses: []string{addressesRange},
+					Addresses:  []string{addressesRange},
 					AutoAssign: &autoAssign,
-
 				},
 			}
 			pools = append(pools, pool)
