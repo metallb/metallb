@@ -83,7 +83,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 			framework.ExpectNoError(err)
 		})
 
-		ginkgo.It("Validate ServiceL2Status interface", func() {
+		ginkgo.It("Validate L2ServiceStatus interface", func() {
 			ginkgo.By("use the 1st interface for announcing")
 			resources := config.Resources{
 				L2Advs: []metallbv1beta1.L2Advertisement{
