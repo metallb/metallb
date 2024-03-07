@@ -85,6 +85,9 @@ func main() {
 		enablePprof       = flag.Bool("enable-pprof", false, "Enable pprof profiling")
 		loadBalancerClass = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
 		ignoreLBExclude   = flag.Bool("ignore-exclude-lb", false, "ignore the exclude-from-external-load-balancers label")
+		// TODO: we are hiding the feature behind a feature flag because of https://github.com/metallb/metallb/issues/2311
+		// This flag can be removed once the issue is fixed.
+		enableL2ServiceStatus = flag.Bool("enable-l2-service-status", false, "enables the experimental l2 service status feature")
 	)
 	flag.Parse()
 
@@ -162,6 +165,9 @@ func main() {
 		InterfaceExcludeRegexp: interfacesToExclude,
 		IgnoreExcludeLB:        *ignoreLBExclude,
 		Layer2StatusChange: func(namespacedName types.NamespacedName) {
+			if !*enableL2ServiceStatus {
+				return
+			}
 			statusNotifyChan <- controllers.NewL2StatusEvent(namespacedName.Namespace, namespacedName.Name)
 		},
 	})
@@ -201,6 +207,7 @@ func main() {
 		LoadBalancerClass: *loadBalancerClass,
 		WithFRRK8s:        listenFRRK8s,
 
+		EnableL2Status:      *enableL2ServiceStatus,
 		Layer2StatusChan:    statusNotifyChan,
 		Layer2StatusFetcher: ctrl.layer2StatusFetchFunc,
 	})

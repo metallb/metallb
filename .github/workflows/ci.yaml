@@ -227,7 +227,8 @@ jobs:
           HELM_FLAGS=""
           echo '/etc/frr/core-%e.%p.%h.%t' | sudo tee /proc/sys/kernel/core_pattern
           if [ ${{ matrix.deployment }} = "helm" ]; then export SPEAKER_SELECTOR="app.kubernetes.io/component=speaker" && export CONTROLLER_SELECTOR="app.kubernetes.io/component=controller"; fi
-          SKIP="none"
+          # TODO restore to NONE when https://github.com/metallb/metallb/issues/2311 is fixed
+          SKIP="L2ServiceStatus"
           WITH_VRF="--with-vrf"
           FOCUS=""
           if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|FRR-MODE|FRRK8S-MODE|BFD|VRF|DUALSTACK"; WITH_VRF=""; fi
@@ -330,7 +331,8 @@ jobs:
           spec:
             logLevel: debug
           EOF
-          sudo -E env "PATH=$PATH" inv e2etest --bgp-mode frr --skip "IPV6|DUALSTACK|metrics|L2-interface selector|FRRK8S-MODE" -e /tmp/kind_logs
+          # TOOD remove skipping L2ServiceStatus once https://github.com/metallb/metallb/issues/2311 is fixed
+          sudo -E env "PATH=$PATH" inv e2etest --bgp-mode frr --skip "IPV6|DUALSTACK|metrics|L2-interface selector|FRRK8S-MODE|L2ServiceStatus" -e /tmp/kind_logs
 
       - name: Collect Logs
         if: ${{ failure() }}
@@ -366,7 +368,7 @@ jobs:
       - name: E2E
         run: |
           FOCUS="L2.*should work for ExternalTrafficPolicy=Cluster|BGP.*A service of protocol load balancer should work with.*IPV4 - ExternalTrafficPolicyCluster$|validate FRR running configuration"
-          sudo -E env "PATH=$PATH" inv e2etest --bgp-mode frr --focus "$FOCUS" -e /tmp/kind_logs
+          sudo -E env "PATH=$PATH" inv e2etest --bgp-mode frr --focus "$FOCUS" --skip L2ServiceStatus -e /tmp/kind_logs
 
       - name: Collect Logs
         if: ${{ failure() }}
