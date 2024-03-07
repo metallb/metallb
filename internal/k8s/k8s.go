@@ -119,6 +119,7 @@ type Config struct {
 	Listener
 	Layer2StatusChan    <-chan event.GenericEvent
 	Layer2StatusFetcher controllers.StatusFetcher
+	EnableL2Status      bool
 }
 
 // New connects to masterAddr, using kubeconfig to authenticate.
@@ -278,7 +279,7 @@ func New(cfg *Config) (*Client, error) {
 	}
 
 	// metallb controller doesn't need this reconciler
-	if cfg.Layer2StatusChan != nil {
+	if cfg.EnableL2Status && cfg.Layer2StatusChan != nil {
 		if err = (&controllers.Layer2StatusReconciler{
 			Client:        mgr.GetClient(),
 			Logger:        cfg.Logger,
