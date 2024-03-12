@@ -860,12 +860,13 @@ def helmdocs(ctx, env="container"):
     "bgp_mode": "tells what bgp mode the cluster is using. valid values are native, frr, frr-k8s.",
     "external_frr_image": "overrides the image used for the external frr containers used in tests",
     "ginkgo_params": "additional ginkgo params to run the e2e tests with",
+    "junit_report": "export JUnit reports xml to file, default junit-report.xml",
     "host_bgp_mode": "tells whether to run the host container in ebgp or ibgp mode",
 })
 def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system",
             service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None,
             prometheus_namespace="", node_nics="kind", local_nics="kind", external_containers="", bgp_mode="",
-            with_vrf=False, external_frr_image="", ginkgo_params="", host_bgp_mode="ibgp"):
+            with_vrf=False, external_frr_image="", ginkgo_params="", junit_report="junit-report.xml", host_bgp_mode="ibgp"):
     """Run E2E tests against development cluster."""
     fetch_kubectl()
 
@@ -928,8 +929,8 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
     if external_frr_image != "":
         external_frr_image = "--frr-image=" + (external_frr_image)
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-                  "KUBECONFIG={} ginkgo {} --timeout=3h {} {} -- --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {} -bgp-mode={}  -with-vrf={} {} --host-bgp-mode={}".format(
-        kubeconfig, ginkgo_params, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range,
+                  "KUBECONFIG={} ginkgo {} --junit-report={} --timeout=3h {} {} -- --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {} -bgp-mode={}  -with-vrf={} {} --host-bgp-mode={}".format(
+        kubeconfig, ginkgo_params, junit_report, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range,
         ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace, node_nics, local_nics,
         external_containers, bgp_mode, with_vrf, external_frr_image, host_bgp_mode), warn="True")
 
