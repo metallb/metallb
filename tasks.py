@@ -31,7 +31,7 @@ all_architectures = set(["amd64",
                          "s390x"])
 default_network = "kind"
 extra_network = "network2"
-controller_gen_version = "v0.11.1"
+controller_gen_version = "v0.14.0"
 build_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build")
 kubectl_path = os.path.join(build_path, "kubectl")
 controller_gen_path = os.path.join(build_path, "bin", "controller-gen")

@@ -3,8 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.11.1
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: bfdprofiles.metallb.io
 spec:
   group: metallb.io
@@ -31,18 +30,24 @@ spec:
     name: v1beta1
     schema:
       openAPIV3Schema:
-        description: BFDProfile represents the settings of the bfd session that can
-          be optionally associated with a BGP session.
+        description: |-
+          BFDProfile represents the settings of the bfd session that can be
+          optionally associated with a BGP session.
         properties:
           apiVersion:
-            description: 'APIVersion defines the versioned schema of this representation
-              of an object. Servers should convert recognized schemas to the latest
-              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
             type: string
           kind:
-            description: 'Kind is a string value representing the REST resource this
-              object represents. Servers may infer this from the endpoint the client
-              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
             type: string
           metadata:
             type: object
@@ -50,48 +55,57 @@ spec:
             description: BFDProfileSpec defines the desired state of BFDProfile.
             properties:
               detectMultiplier:
-                description: Configures the detection multiplier to determine packet
-                  loss. The remote transmission interval will be multiplied by this
-                  value to determine the connection loss detection timer.
+                description: |-
+                  Configures the detection multiplier to determine
+                  packet loss. The remote transmission interval will be multiplied
+                  by this value to determine the connection loss detection timer.
                 format: int32
                 maximum: 255
                 minimum: 2
                 type: integer
               echoInterval:
-                description: Configures the minimal echo receive transmission interval
-                  that this system is capable of handling in milliseconds. Defaults
-                  to 50ms
+                description: |-
+                  Configures the minimal echo receive transmission
+                  interval that this system is capable of handling in milliseconds.
+                  Defaults to 50ms
                 format: int32
                 maximum: 60000
                 minimum: 10
                 type: integer
               echoMode:
-                description: Enables or disables the echo transmission mode. This
-                  mode is disabled by default, and not supported on multi hops setups.
+                description: |-
+                  Enables or disables the echo transmission mode.
+                  This mode is disabled by default, and not supported on multi
+                  hops setups.
                 type: boolean
               minimumTtl:
-                description: 'For multi hop sessions only: configure the minimum expected
-                  TTL for an incoming BFD control packet.'
+                description: |-
+                  For multi hop sessions only: configure the minimum
+                  expected TTL for an incoming BFD control packet.
                 format: int32
                 maximum: 254
                 minimum: 1
                 type: integer
               passiveMode:
-                description: 'Mark session as passive: a passive session will not
+                description: |-
+                  Mark session as passive: a passive session will not
                   attempt to start the connection and will wait for control packets
-                  from peer before it begins replying.'
+                  from peer before it begins replying.
                 type: boolean
               receiveInterval:
-                description: The minimum interval that this system is capable of receiving
-                  control packets in milliseconds. Defaults to 300ms.
+                description: |-
+                  The minimum interval that this system is capable of
+                  receiving control packets in milliseconds.
+                  Defaults to 300ms.
                 format: int32
                 maximum: 60000
                 minimum: 10
                 type: integer
               transmitInterval:
-                description: The minimum transmission interval (less jitter) that
-                  this system wants to use to send BFD control packets in milliseconds.
-                  Defaults to 300ms
+                description: |-
+                  The minimum transmission interval (less jitter)
+                  that this system wants to use to send BFD control packets in
+                  milliseconds. Defaults to 300ms
                 format: int32
                 maximum: 60000
                 minimum: 10
