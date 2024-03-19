@@ -2,8 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.11.1
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: bfdprofiles.metallb.io
 spec:
   group: metallb.io
@@ -30,13 +29,24 @@ spec:
       name: v1beta1
       schema:
         openAPIV3Schema:
-          description: BFDProfile represents the settings of the bfd session that can be optionally associated with a BGP session.
+          description: |-
+            BFDProfile represents the settings of the bfd session that can be
+            optionally associated with a BGP session.
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
               type: string
             metadata:
               type: object
@@ -44,37 +54,57 @@ spec:
               description: BFDProfileSpec defines the desired state of BFDProfile.
               properties:
                 detectMultiplier:
-                  description: Configures the detection multiplier to determine packet loss. The remote transmission interval will be multiplied by this value to determine the connection loss detection timer.
+                  description: |-
+                    Configures the detection multiplier to determine
+                    packet loss. The remote transmission interval will be multiplied
+                    by this value to determine the connection loss detection timer.
                   format: int32
                   maximum: 255
                   minimum: 2
                   type: integer
                 echoInterval:
-                  description: Configures the minimal echo receive transmission interval that this system is capable of handling in milliseconds. Defaults to 50ms
+                  description: |-
+                    Configures the minimal echo receive transmission
+                    interval that this system is capable of handling in milliseconds.
+                    Defaults to 50ms
                   format: int32
                   maximum: 60000
                   minimum: 10
                   type: integer
                 echoMode:
-                  description: Enables or disables the echo transmission mode. This mode is disabled by default, and not supported on multi hops setups.
+                  description: |-
+                    Enables or disables the echo transmission mode.
+                    This mode is disabled by default, and not supported on multi
+                    hops setups.
                   type: boolean
                 minimumTtl:
-                  description: 'For multi hop sessions only: configure the minimum expected TTL for an incoming BFD control packet.'
+                  description: |-
+                    For multi hop sessions only: configure the minimum
+                    expected TTL for an incoming BFD control packet.
                   format: int32
                   maximum: 254
                   minimum: 1
                   type: integer
                 passiveMode:
-                  description: 'Mark session as passive: a passive session will not attempt to start the connection and will wait for control packets from peer before it begins replying.'
+                  description: |-
+                    Mark session as passive: a passive session will not
+                    attempt to start the connection and will wait for control packets
+                    from peer before it begins replying.
                   type: boolean
                 receiveInterval:
-                  description: The minimum interval that this system is capable of receiving control packets in milliseconds. Defaults to 300ms.
+                  description: |-
+                    The minimum interval that this system is capable of
+                    receiving control packets in milliseconds.
+                    Defaults to 300ms.
                   format: int32
                   maximum: 60000
                   minimum: 10
                   type: integer
                 transmitInterval:
-                  description: The minimum transmission interval (less jitter) that this system wants to use to send BFD control packets in milliseconds. Defaults to 300ms
+                  description: |-
+                    The minimum transmission interval (less jitter)
+                    that this system wants to use to send BFD control packets in
+                    milliseconds. Defaults to 300ms
                   format: int32
                   maximum: 60000
                   minimum: 10
@@ -93,8 +123,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.11.1
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: bgpadvertisements.metallb.io
 spec:
   group: metallb.io
@@ -122,13 +151,25 @@ spec:
       name: v1beta1
       schema:
         openAPIV3Schema:
-          description: BGPAdvertisement allows to advertise the IPs coming from the selected IPAddressPools via BGP, setting the parameters of the BGP Advertisement.
+          description: |-
+            BGPAdvertisement allows to advertise the IPs coming
+            from the selected IPAddressPools via BGP, setting the parameters of the
+            BGP Advertisement.
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
               type: string
             metadata:
               type: object
@@ -147,28 +188,44 @@ spec:
                   format: int32
                   type: integer
                 communities:
-                  description: The BGP communities to be associated with the announcement. Each item can be a standard community of the form 1234:1234, a large community of the form large:1234:1234:1234 or the name of an alias defined in the Community CRD.
+                  description: |-
+                    The BGP communities to be associated with the announcement. Each item can be a standard community of the
+                    form 1234:1234, a large community of the form large:1234:1234:1234 or the name of an alias defined in the
+                    Community CRD.
                   items:
                     type: string
                   type: array
                 ipAddressPoolSelectors:
-                  description: A selector for the IPAddressPools which would get advertised via this advertisement. If no IPAddressPool is selected by this or by the list, the advertisement is applied to all the IPAddressPools.
+                  description: |-
+                    A selector for the IPAddressPools which would get advertised via this advertisement.
+                    If no IPAddressPool is selected by this or by the list, the advertisement is applied to all the IPAddressPools.
                   items:
-                    description: A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.
+                    description: |-
+                      A label selector is a label query over a set of resources. The result of matchLabels and
+                      matchExpressions are ANDed. An empty label selector matches all objects. A null
+                      label selector matches no objects.
                     properties:
                       matchExpressions:
                         description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                         items:
-                          description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+                          description: |-
+                            A label selector requirement is a selector that contains values, a key, and an operator that
+                            relates the key and values.
                           properties:
                             key:
                               description: key is the label key that the selector applies to.
                               type: string
                             operator:
-                              description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
+                              description: |-
+                                operator represents a key's relationship to a set of values.
+                                Valid operators are In, NotIn, Exists and DoesNotExist.
                               type: string
                             values:
-                              description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
+                              description: |-
+                                values is an array of string values. If the operator is In or NotIn,
+                                the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced during a strategic
+                                merge patch.
                               items:
                                 type: string
                               type: array
@@ -180,7 +237,10 @@ spec:
                       matchLabels:
                         additionalProperties:
                           type: string
-                        description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
+                        description: |-
+                          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                          map is equivalent to an element of matchExpressions, whose key field is "key", the
+                          operator is "In", and the values array contains only "value". The requirements are ANDed.
                         type: object
                     type: object
                     x-kubernetes-map-type: atomic
@@ -191,27 +251,40 @@ spec:
                     type: string
                   type: array
                 localPref:
-                  description: The BGP LOCAL_PREF attribute which is used by BGP best path algorithm, Path with higher localpref is preferred over one with lower localpref.
+                  description: |-
+                    The BGP LOCAL_PREF attribute which is used by BGP best path algorithm,
+                    Path with higher localpref is preferred over one with lower localpref.
                   format: int32
                   type: integer
                 nodeSelectors:
                   description: NodeSelectors allows to limit the nodes to announce as next hops for the LoadBalancer IP. When empty, all the nodes having  are announced as next hops.
                   items:
-                    description: A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.
+                    description: |-
+                      A label selector is a label query over a set of resources. The result of matchLabels and
+                      matchExpressions are ANDed. An empty label selector matches all objects. A null
+                      label selector matches no objects.
                     properties:
                       matchExpressions:
                         description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                         items:
-                          description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+                          description: |-
+                            A label selector requirement is a selector that contains values, a key, and an operator that
+                            relates the key and values.
                           properties:
                             key:
                               description: key is the label key that the selector applies to.
                               type: string
                             operator:
-                              description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
+                              description: |-
+                                operator represents a key's relationship to a set of values.
+                                Valid operators are In, NotIn, Exists and DoesNotExist.
                               type: string
                             values:
-                              description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
+                              description: |-
+                                values is an array of string values. If the operator is In or NotIn,
+                                the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced during a strategic
+                                merge patch.
                               items:
                                 type: string
                               type: array
@@ -223,13 +296,18 @@ spec:
                       matchLabels:
                         additionalProperties:
                           type: string
-                        description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
+                        description: |-
+                          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                          map is equivalent to an element of matchExpressions, whose key field is "key", the
+                          operator is "In", and the values array contains only "value". The requirements are ANDed.
                         type: object
                     type: object
                     x-kubernetes-map-type: atomic
                   type: array
                 peers:
-                  description: Peers limits the bgppeer to advertise the ips of the selected pools to. When empty, the loadbalancer IP is announced to all the BGPPeers configured.
+                  description: |-
+                    Peers limits the bgppeer to advertise the ips of the selected pools to.
+                    When empty, the loadbalancer IP is announced to all the BGPPeers configured.
                   items:
                     type: string
                   type: array
@@ -247,8 +325,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.11.1
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: bgppeers.metallb.io
 spec:
   conversion:
@@ -290,10 +367,19 @@ spec:
           description: BGPPeer is the Schema for the peers API.
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
               type: string
             metadata:
               type: object
@@ -318,7 +404,9 @@ spec:
                   minimum: 0
                   type: integer
                 nodeSelectors:
-                  description: Only connect to this peer on nodes that match one of these selectors.
+                  description: |-
+                    Only connect to this peer on nodes that match one of these
+                    selectors.
                   items:
                     properties:
                       matchExpressions:
@@ -400,10 +488,19 @@ spec:
           description: BGPPeer is the Schema for the peers API.
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
               type: string
             metadata:
               type: object
@@ -441,23 +538,36 @@ spec:
                   minimum: 0
                   type: integer
                 nodeSelectors:
-                  description: Only connect to this peer on nodes that match one of these selectors.
+                  description: |-
+                    Only connect to this peer on nodes that match one of these
+                    selectors.
                   items:
-                    description: A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.
+                    description: |-
+                      A label selector is a label query over a set of resources. The result of matchLabels and
+                      matchExpressions are ANDed. An empty label selector matches all objects. A null
+                      label selector matches no objects.
                     properties:
                       matchExpressions:
                         description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                         items:
-                          description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+                          description: |-
+                            A label selector requirement is a selector that contains values, a key, and an operator that
+                            relates the key and values.
                           properties:
                             key:
                               description: key is the label key that the selector applies to.
                               type: string
                             operator:
-                              description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
+                              description: |-
+                                operator represents a key's relationship to a set of values.
+                                Valid operators are In, NotIn, Exists and DoesNotExist.
                               type: string
                             values:
-                              description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
+                              description: |-
+                                values is an array of string values. If the operator is In or NotIn,
+                                the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced during a strategic
+                                merge patch.
                               items:
                                 type: string
                               type: array
@@ -469,7 +579,10 @@ spec:
                       matchLabels:
                         additionalProperties:
                           type: string
-                        description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
+                        description: |-
+                          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                          map is equivalent to an element of matchExpressions, whose key field is "key", the
+                          operator is "In", and the values array contains only "value". The requirements are ANDed.
                         type: object
                     type: object
                     x-kubernetes-map-type: atomic
@@ -478,7 +591,11 @@ spec:
                   description: Authentication password for routers enforcing TCP MD5 authenticated sessions
                   type: string
                 passwordSecret:
-                  description: passwordSecret is name of the authentication secret for BGP Peer. the secret must be of type "kubernetes.io/basic-auth", and created in the same namespace as the MetalLB deployment. The password is stored in the secret as the key "password".
+                  description: |-
+                    passwordSecret is name of the authentication secret for BGP Peer.
+                    the secret must be of type "kubernetes.io/basic-auth", and created in the
+                    same namespace as the MetalLB deployment. The password is stored in the
+                    secret as the key "password".
                   properties:
                     name:
                       description: name is unique within a namespace to reference a secret resource.
@@ -510,7 +627,9 @@ spec:
                   description: Source address to use when establishing the session.
                   type: string
                 vrf:
-                  description: To set if we want to peer with the BGPPeer using an interface belonging to a host vrf
+                  description: |-
+                    To set if we want to peer with the BGPPeer using an interface belonging to
+                    a host vrf
                   type: string
               required:
                 - myASN
@@ -530,8 +649,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.11.1
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: communities.metallb.io
 spec:
   group: metallb.io
@@ -545,13 +663,24 @@ spec:
     - name: v1beta1
       schema:
         openAPIV3Schema:
-          description: Community is a collection of aliases for communities. Users can define named aliases to be used in the BGPPeer CRD.
+          description: |-
+            Community is a collection of aliases for communities.
+            Users can define named aliases to be used in the BGPPeer CRD.
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
               type: string
             metadata:
               type: object
@@ -565,7 +694,9 @@ spec:
                         description: The name of the alias for the community.
                         type: string
                       value:
-                        description: The BGP community value corresponding to the given name. Can be a standard community of the form 1234:1234 or a large community of the form large:1234:1234:1234.
+                        description: |-
+                          The BGP community value corresponding to the given name. Can be a standard community of the form 1234:1234
+                          or a large community of the form large:1234:1234:1234.
                         type: string
                     type: object
                   type: array
@@ -583,8 +714,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.11.1
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: ipaddresspools.metallb.io
 spec:
   group: metallb.io
@@ -608,13 +738,24 @@ spec:
       name: v1beta1
       schema:
         openAPIV3Schema:
-          description: IPAddressPool represents a pool of IP addresses that can be allocated to LoadBalancer services.
+          description: |-
+            IPAddressPool represents a pool of IP addresses that can be allocated
+            to LoadBalancer services.
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
               type: string
             metadata:
               type: object
@@ -622,39 +763,67 @@ spec:
               description: IPAddressPoolSpec defines the desired state of IPAddressPool.
               properties:
                 addresses:
-                  description: A list of IP address ranges over which MetalLB has authority. You can list multiple ranges in a single pool, they will all share the same settings. Each range can be either a CIDR prefix, or an explicit start-end range of IPs.
+                  description: |-
+                    A list of IP address ranges over which MetalLB has authority.
+                    You can list multiple ranges in a single pool, they will all share the
+                    same settings. Each range can be either a CIDR prefix, or an explicit
+                    start-end range of IPs.
                   items:
                     type: string
                   type: array
                 autoAssign:
                   default: true
-                  description: AutoAssign flag used to prevent MetallB from automatic allocation for a pool.
+                  description: |-
+                    AutoAssign flag used to prevent MetallB from automatic allocation
+                    for a pool.
                   type: boolean
                 avoidBuggyIPs:
                   default: false
-                  description: AvoidBuggyIPs prevents addresses ending with .0 and .255 to be used by a pool.
+                  description: |-
+                    AvoidBuggyIPs prevents addresses ending with .0 and .255
+                    to be used by a pool.
                   type: boolean
                 serviceAllocation:
-                  description: AllocateTo makes ip pool allocation to specific namespace and/or service. The controller will use the pool with lowest value of priority in case of multiple matches. A pool with no priority set will be used only if the pools with priority can't be used. If multiple matching IPAddressPools are available it will check for the availability of IPs sorting the matching IPAddressPools by priority, starting from the highest to the lowest. If multiple IPAddressPools have the same priority, choice will be random.
+                  description: |-
+                    AllocateTo makes ip pool allocation to specific namespace and/or service.
+                    The controller will use the pool with lowest value of priority in case of
+                    multiple matches. A pool with no priority set will be used only if the
+                    pools with priority can't be used. If multiple matching IPAddressPools are
+                    available it will check for the availability of IPs sorting the matching
+                    IPAddressPools by priority, starting from the highest to the lowest. If
+                    multiple IPAddressPools have the same priority, choice will be random.
                   properties:
                     namespaceSelectors:
-                      description: NamespaceSelectors list of label selectors to select namespace(s) for ip pool, an alternative to using namespace list.
+                      description: |-
+                        NamespaceSelectors list of label selectors to select namespace(s) for ip pool,
+                        an alternative to using namespace list.
                       items:
-                        description: A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.
+                        description: |-
+                          A label selector is a label query over a set of resources. The result of matchLabels and
+                          matchExpressions are ANDed. An empty label selector matches all objects. A null
+                          label selector matches no objects.
                         properties:
                           matchExpressions:
                             description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                             items:
-                              description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+                              description: |-
+                                A label selector requirement is a selector that contains values, a key, and an operator that
+                                relates the key and values.
                               properties:
                                 key:
                                   description: key is the label key that the selector applies to.
                                   type: string
                                 operator:
-                                  description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
+                                  description: |-
+                                    operator represents a key's relationship to a set of values.
+                                    Valid operators are In, NotIn, Exists and DoesNotExist.
                                   type: string
                                 values:
-                                  description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
+                                  description: |-
+                                    values is an array of string values. If the operator is In or NotIn,
+                                    the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                    the values array must be empty. This array is replaced during a strategic
+                                    merge patch.
                                   items:
                                     type: string
                                   type: array
@@ -666,7 +835,10 @@ spec:
                           matchLabels:
                             additionalProperties:
                               type: string
-                            description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
+                            description: |-
+                              matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                              map is equivalent to an element of matchExpressions, whose key field is "key", the
+                              operator is "In", and the values array contains only "value". The requirements are ANDed.
                             type: object
                         type: object
                         x-kubernetes-map-type: atomic
@@ -680,23 +852,36 @@ spec:
                       description: Priority priority given for ip pool while ip allocation on a service.
                       type: integer
                     serviceSelectors:
-                      description: ServiceSelectors list of label selector to select service(s) for which ip pool can be used for ip allocation.
+                      description: |-
+                        ServiceSelectors list of label selector to select service(s) for which ip pool
+                        can be used for ip allocation.
                       items:
-                        description: A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.
+                        description: |-
+                          A label selector is a label query over a set of resources. The result of matchLabels and
+                          matchExpressions are ANDed. An empty label selector matches all objects. A null
+                          label selector matches no objects.
                         properties:
                           matchExpressions:
                             description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                             items:
-                              description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+                              description: |-
+                                A label selector requirement is a selector that contains values, a key, and an operator that
+                                relates the key and values.
                               properties:
                                 key:
                                   description: key is the label key that the selector applies to.
                                   type: string
                                 operator:
-                                  description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
+                                  description: |-
+                                    operator represents a key's relationship to a set of values.
+                                    Valid operators are In, NotIn, Exists and DoesNotExist.
                                   type: string
                                 values:
-                                  description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
+                                  description: |-
+                                    values is an array of string values. If the operator is In or NotIn,
+                                    the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                    the values array must be empty. This array is replaced during a strategic
+                                    merge patch.
                                   items:
                                     type: string
                                   type: array
@@ -708,7 +893,10 @@ spec:
                           matchLabels:
                             additionalProperties:
                               type: string
-                            description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
+                            description: |-
+                              matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                              map is equivalent to an element of matchExpressions, whose key field is "key", the
+                              operator is "In", and the values array contains only "value". The requirements are ANDed.
                             type: object
                         type: object
                         x-kubernetes-map-type: atomic
@@ -732,8 +920,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.11.1
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: l2advertisements.metallb.io
 spec:
   group: metallb.io
@@ -761,13 +948,24 @@ spec:
       name: v1beta1
       schema:
         openAPIV3Schema:
-          description: L2Advertisement allows to advertise the LoadBalancer IPs provided by the selected pools via L2.
+          description: |-
+            L2Advertisement allows to advertise the LoadBalancer IPs provided
+            by the selected pools via L2.
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
               type: string
             metadata:
               type: object
@@ -775,28 +973,43 @@ spec:
               description: L2AdvertisementSpec defines the desired state of L2Advertisement.
               properties:
                 interfaces:
-                  description: A list of interfaces to announce from. The LB IP will be announced only from these interfaces. If the field is not set, we advertise from all the interfaces on the host.
+                  description: |-
+                    A list of interfaces to announce from. The LB IP will be announced only from these interfaces.
+                    If the field is not set, we advertise from all the interfaces on the host.
                   items:
                     type: string
                   type: array
                 ipAddressPoolSelectors:
-                  description: A selector for the IPAddressPools which would get advertised via this advertisement. If no IPAddressPool is selected by this or by the list, the advertisement is applied to all the IPAddressPools.
+                  description: |-
+                    A selector for the IPAddressPools which would get advertised via this advertisement.
+                    If no IPAddressPool is selected by this or by the list, the advertisement is applied to all the IPAddressPools.
                   items:
-                    description: A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.
+                    description: |-
+                      A label selector is a label query over a set of resources. The result of matchLabels and
+                      matchExpressions are ANDed. An empty label selector matches all objects. A null
+                      label selector matches no objects.
                     properties:
                       matchExpressions:
                         description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                         items:
-                          description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+                          description: |-
+                            A label selector requirement is a selector that contains values, a key, and an operator that
+                            relates the key and values.
                           properties:
                             key:
                               description: key is the label key that the selector applies to.
                               type: string
                             operator:
-                              description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
+                              description: |-
+                                operator represents a key's relationship to a set of values.
+                                Valid operators are In, NotIn, Exists and DoesNotExist.
                               type: string
                             values:
-                              description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
+                              description: |-
+                                values is an array of string values. If the operator is In or NotIn,
+                                the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced during a strategic
+                                merge patch.
                               items:
                                 type: string
                               type: array
@@ -808,7 +1021,10 @@ spec:
                       matchLabels:
                         additionalProperties:
                           type: string
-                        description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
+                        description: |-
+                          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                          map is equivalent to an element of matchExpressions, whose key field is "key", the
+                          operator is "In", and the values array contains only "value". The requirements are ANDed.
                         type: object
                     type: object
                     x-kubernetes-map-type: atomic
@@ -821,21 +1037,32 @@ spec:
                 nodeSelectors:
                   description: NodeSelectors allows to limit the nodes to announce as next hops for the LoadBalancer IP. When empty, all the nodes having  are announced as next hops.
                   items:
-                    description: A label selector is a label query over a set of resources. The result of matchLabels and matchExpressions are ANDed. An empty label selector matches all objects. A null label selector matches no objects.
+                    description: |-
+                      A label selector is a label query over a set of resources. The result of matchLabels and
+                      matchExpressions are ANDed. An empty label selector matches all objects. A null
+                      label selector matches no objects.
                     properties:
                       matchExpressions:
                         description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
                         items:
-                          description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+                          description: |-
+                            A label selector requirement is a selector that contains values, a key, and an operator that
+                            relates the key and values.
                           properties:
                             key:
                               description: key is the label key that the selector applies to.
                               type: string
                             operator:
-                              description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
+                              description: |-
+                                operator represents a key's relationship to a set of values.
+                                Valid operators are In, NotIn, Exists and DoesNotExist.
                               type: string
                             values:
-                              description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
+                              description: |-
+                                values is an array of string values. If the operator is In or NotIn,
+                                the values array must be non-empty. If the operator is Exists or DoesNotExist,
+                                the values array must be empty. This array is replaced during a strategic
+                                merge patch.
                               items:
                                 type: string
                               type: array
@@ -847,7 +1074,10 @@ spec:
                       matchLabels:
                         additionalProperties:
                           type: string
-                        description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
+                        description: |-
+                          matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels
+                          map is equivalent to an element of matchExpressions, whose key field is "key", the
+                          operator is "In", and the values array contains only "value". The requirements are ANDed.
                         type: object
                     type: object
                     x-kubernetes-map-type: atomic
@@ -866,8 +1096,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.11.1
-  creationTimestamp: null
+    controller-gen.kubebuilder.io/version: v0.14.0
   name: servicel2statuses.metallb.io
 spec:
   group: metallb.io
@@ -888,10 +1117,19 @@ spec:
           description: ServiceL2Status reveals the actual traffic status of loadbalancer services in layer2 mode.
           properties:
             apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+              description: |-
+                APIVersion defines the versioned schema of this representation of an object.
+                Servers should convert recognized schemas to the latest internal value, and
+                may reject unrecognized values.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
               type: string
             kind:
-              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+              description: |-
+                Kind is a string value representing the REST resource this object represents.
+                Servers may infer this from the endpoint the client submits requests to.
+                Cannot be updated.
+                In CamelCase.
+                More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
               type: string
             metadata:
               type: object
