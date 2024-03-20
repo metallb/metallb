@@ -505,7 +505,7 @@ var _ = Describe("Layer2 Status Controller", func() {
 				toCheck := v1beta1.ServiceL2Status{}
 				err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: statusObjName, Namespace: testNamespace}, &toCheck)
 				return apierrors.IsNotFound(err)
-			}, 5*time.Second, 200*time.Millisecond).Should(Equal(true))
+			}, 5*time.Second, 200*time.Millisecond).Should(BeTrue())
 		})
 	})
 })
