@@ -15,6 +15,7 @@ import (
 	"go.universe.tf/e2etest/pkg/frr"
 	frrcontainer "go.universe.tf/e2etest/pkg/frr/container"
 	"go.universe.tf/e2etest/pkg/ipfamily"
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	"go.universe.tf/e2etest/pkg/k8s"
 	"go.universe.tf/e2etest/pkg/metallb"
 	"go.universe.tf/e2etest/pkg/routes"
@@ -23,8 +24,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
-	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 )
 
 func validateFRRPeeredWithAllNodes(cs clientset.Interface, c *frrcontainer.FRR, ipFamily ipfamily.Family) {
@@ -71,7 +70,7 @@ func validateServiceNoWait(svc *corev1.Service, nodes []corev1.Node, c *frrconta
 	if len(svc.Status.LoadBalancer.Ingress) == 2 {
 		ip1 := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
 		ip2 := net.ParseIP(svc.Status.LoadBalancer.Ingress[1].IP)
-		framework.ExpectNotEqual(ip1.To4(), ip2.To4())
+		Expect(ip1.To4()).NotTo(Equal(ip2.To4()))
 	}
 	for _, ip := range svc.Status.LoadBalancer.Ingress {
 		ingressIP := jigservice.GetIngressPoint(&ip)

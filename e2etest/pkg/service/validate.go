@@ -8,11 +8,12 @@ import (
 	"strconv"
 	"strings"
 
+	. "github.com/onsi/gomega"
+
 	"go.universe.tf/e2etest/pkg/executor"
 	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	"go.universe.tf/e2etest/pkg/wget"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 func ValidateL2(svc *corev1.Service) error {
@@ -33,7 +34,7 @@ func ValidateDesiredLB(svc *corev1.Service) {
 	if desiredLbIPs == "" {
 		return
 	}
-	framework.ExpectEqual(desiredLbIPs, strings.Join(getIngressIPs(svc.Status.LoadBalancer.Ingress), ","))
+	Expect(desiredLbIPs).To(Equal(strings.Join(getIngressIPs(svc.Status.LoadBalancer.Ingress), ",")))
 }
 
 // ValidateAssignedWith validates that the service is assigned with the given ip.

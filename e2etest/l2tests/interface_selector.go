@@ -9,13 +9,12 @@ import (
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
+	"go.universe.tf/e2etest/pkg/k8sclient"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
-	jigservice "go.universe.tf/e2etest/pkg/jigservice"
-	admissionapi "k8s.io/pod-security-admission/api"
 
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/executor"
@@ -34,7 +33,8 @@ var (
 var _ = ginkgo.Describe("L2-interface selector", func() {
 	var cs clientset.Interface
 
-	var f *framework.Framework
+	testNamespace := ""
+
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentSpecReport().Failed() {
 			k8s.DumpInfo(Reporter, ginkgo.CurrentSpecReport().LeafNodeText)
@@ -43,22 +43,23 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 		// Clean previous configuration.
 		err := ConfigUpdater.Clean()
 		Expect(err).NotTo(HaveOccurred())
+		err = k8s.DeleteNamespace(cs, testNamespace)
+		Expect(err).NotTo(HaveOccurred())
 	})
-
-	f = framework.NewDefaultFramework("l2")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
 
 	ginkgo.BeforeEach(func() {
 		if len(NodeNics) < 2 {
-			framework.Fail("Cluster nodes don't have multi-interfaces to test L2-interface selector")
+			ginkgo.Fail("Cluster nodes don't have multi-interfaces to test L2-interface selector")
 		}
 		if len(NodeNics) != len(LocalNics) {
-			framework.Fail("Local interfaces can't correspond to cluster node's interfaces")
+			ginkgo.Fail("Local interfaces can't correspond to cluster node's interfaces")
 		}
-		cs = f.ClientSet
 		ginkgo.By("Clearing any previous configuration")
 
 		err := ConfigUpdater.Clean()
+		Expect(err).NotTo(HaveOccurred())
+		cs = k8sclient.New()
+		testNamespace, err = k8s.CreateTestNamespace(cs, "l2interface")
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -100,7 +101,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 			err := ConfigUpdater.Update(resources)
 			Expect(err).NotTo(HaveOccurred())
 
-			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "lb-service")
+			svc, _ := service.CreateWithBackend(cs, testNamespace, "lb-service")
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
@@ -154,7 +155,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 			err := ConfigUpdater.Update(resources)
 			Expect(err).NotTo(HaveOccurred())
 
-			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "lb-service")
+			svc, _ := service.CreateWithBackend(cs, testNamespace, "lb-service")
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
@@ -194,7 +195,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 		})
 
 		ginkgo.It("Modify L2 interface", func() {
-			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "lb-service")
+			svc, _ := service.CreateWithBackend(cs, testNamespace, "lb-service")
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
@@ -247,7 +248,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 			err := ConfigUpdater.Update(resources)
 			Expect(err).NotTo(HaveOccurred())
 
-			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "lb-service")
+			svc, _ := service.CreateWithBackend(cs, testNamespace, "lb-service")
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
@@ -281,7 +282,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 		})
 
 		ginkgo.It("Address pool connected with two L2 advertisements", func() {
-			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "lb-service")
+			svc, _ := service.CreateWithBackend(cs, testNamespace, "lb-service")
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
@@ -316,7 +317,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 		})
 
 		ginkgo.It("node selector", func() {
-			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "lb-service")
+			svc, _ := service.CreateWithBackend(cs, testNamespace, "lb-service")
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())

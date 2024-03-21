@@ -31,7 +31,9 @@ import (
 	"go.universe.tf/e2etest/l2tests"
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/executor"
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	"go.universe.tf/e2etest/pkg/k8s"
+	"go.universe.tf/e2etest/pkg/k8sclient"
 	"go.universe.tf/e2etest/pkg/mac"
 	"go.universe.tf/e2etest/pkg/metallb"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
@@ -47,9 +49,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
-	jigservice "go.universe.tf/e2etest/pkg/jigservice"
-	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 )
 
@@ -71,7 +70,6 @@ var (
 
 var _ = ginkgo.Describe("BGP", func() {
 	var cs clientset.Interface
-	var f *framework.Framework
 	emptyBGPAdvertisement := metallbv1beta1.BGPAdvertisement{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "empty",
@@ -88,12 +86,15 @@ var _ = ginkgo.Describe("BGP", func() {
 			},
 		},
 	}
+	testNamespace := ""
 
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentSpecReport().Failed() {
-			dumpBGPInfo(ReportPath, ginkgo.CurrentSpecReport().LeafNodeText, cs, f)
+			dumpBGPInfo(ReportPath, ginkgo.CurrentSpecReport().LeafNodeText, cs, testNamespace)
 			k8s.DumpInfo(Reporter, ginkgo.CurrentSpecReport().LeafNodeText)
 		}
+		err := k8s.DeleteNamespace(cs, testNamespace)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	ginkgo.BeforeEach(func() {
@@ -106,18 +107,15 @@ var _ = ginkgo.Describe("BGP", func() {
 			err := c.UpdateBGPConfigFile(frrconfig.Empty)
 			Expect(err).NotTo(HaveOccurred())
 		}
-	})
 
-	f = framework.NewDefaultFramework("bgp")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-
-	ginkgo.BeforeEach(func() {
-		cs = f.ClientSet
+		cs = k8sclient.New()
+		testNamespace, err = k8s.CreateTestNamespace(cs, "bgp")
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	ginkgo.DescribeTable("A service of protocol load balancer should work with ETP=cluster", func(pairingIPFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
 
-		_, svc := setupBGPService(f, pairingIPFamily, poolAddresses, FRRContainers, func(svc *corev1.Service) {
+		_, svc := setupBGPService(cs, testNamespace, pairingIPFamily, poolAddresses, FRRContainers, func(svc *corev1.Service) {
 			testservice.TrafficPolicyCluster(svc)
 			tweak(svc)
 		})
@@ -155,7 +153,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			Expect(err).NotTo(HaveOccurred())
 			nodeToSet := allNodes.Items[0].Name
 
-			_, svc := setupBGPService(f, ipfamily.IPv4, []string{v4PoolAddresses}, FRRContainers, func(svc *corev1.Service) {
+			_, svc := setupBGPService(cs, testNamespace, ipfamily.IPv4, []string{v4PoolAddresses}, FRRContainers, func(svc *corev1.Service) {
 				testservice.TrafficPolicyCluster(svc)
 			})
 			defer testservice.Delete(cs, svc)
@@ -190,7 +188,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 	ginkgo.DescribeTable("A service of protocol load balancer should work with ETP=local", func(pairingIPFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
 
-		jig, svc := setupBGPService(f, pairingIPFamily, poolAddresses, FRRContainers, func(svc *corev1.Service) {
+		jig, svc := setupBGPService(cs, testNamespace, pairingIPFamily, poolAddresses, FRRContainers, func(svc *corev1.Service) {
 			testservice.TrafficPolicyLocal(svc)
 			tweak(svc)
 		})
@@ -218,7 +216,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 	ginkgo.DescribeTable("FRR must be deployed when enabled", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
 
-		_, svc := setupBGPService(f, pairingIPFamily, poolAddresses, FRRContainers, func(svc *corev1.Service) {
+		_, svc := setupBGPService(cs, testNamespace, pairingIPFamily, poolAddresses, FRRContainers, func(svc *corev1.Service) {
 			testservice.TrafficPolicyCluster(svc)
 		})
 		defer testservice.Delete(cs, svc)
@@ -266,7 +264,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		serviceIP, err := config.GetIPFromRangeByIndex(poolAddresses[0], 1)
 		Expect(err).NotTo(HaveOccurred())
 
-		svc, _ := testservice.CreateWithBackendPort(cs, f.Namespace.Name, "first-service",
+		svc, _ := testservice.CreateWithBackendPort(cs, testNamespace, "first-service",
 			testservice.TestServicePort,
 			func(svc *corev1.Service) {
 				svc.Spec.LoadBalancerIP = serviceIP
@@ -274,7 +272,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				svc.Spec.Ports[0].Port = int32(testservice.TestServicePort)
 			})
 		defer testservice.Delete(cs, svc)
-		svc1, _ := testservice.CreateWithBackendPort(cs, f.Namespace.Name, "second-service",
+		svc1, _ := testservice.CreateWithBackendPort(cs, testNamespace, "second-service",
 			testservice.TestServicePort+1,
 			func(svc *corev1.Service) {
 				svc.Spec.LoadBalancerIP = serviceIP
@@ -321,7 +319,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				validateFRRPeeredWithAllNodes(cs, c, pairingFamily)
 			}
 
-			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
+			svc, _ := testservice.CreateWithBackend(cs, testNamespace, "external-local-lb", tweak)
 			defer testservice.Delete(cs, svc)
 
 			for _, i := range svc.Status.LoadBalancer.Ingress {
@@ -422,7 +420,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			neighbors, err := frr.NeighborsInfo(c)
 			Expect(err).NotTo(HaveOccurred())
 			for _, n := range neighbors {
-				framework.ExpectEqual(n.RemoteRouterID, "10.10.10.1")
+				Expect(n.RemoteRouterID).To(Equal("10.10.10.1"))
 			}
 		}
 	},
@@ -487,7 +485,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}
 
-			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
+			svc, _ := testservice.CreateWithBackend(cs, testNamespace, "external-local-lb", tweak)
 			defer testservice.Delete(cs, svc)
 
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
@@ -643,7 +641,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				}
 
 				ginkgo.By(fmt.Sprintf("configure service number %d", i+1))
-				svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, fmt.Sprintf("svc%d", i+1), testservice.TrafficPolicyCluster, func(svc *corev1.Service) {
+				svc, _ := testservice.CreateWithBackend(cs, testNamespace, fmt.Sprintf("svc%d", i+1), testservice.TrafficPolicyCluster, func(svc *corev1.Service) {
 					svc.Annotations = map[string]string{"metallb.universe.tf/address-pool": fmt.Sprintf("test-addresspool%d", i+1)}
 				})
 				defer testservice.Delete(cs, svc)
@@ -660,7 +658,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				for j := 0; j <= i; j++ {
 					ginkgo.By(fmt.Sprintf("validate service %d IP didn't change", j+1))
 					ip := jigservice.GetIngressPoint(&services[j].Status.LoadBalancer.Ingress[0])
-					framework.ExpectEqual(ip, servicesIngressIP[j])
+					Expect(ip).To(Equal(servicesIngressIP[j]))
 
 					ginkgo.By(fmt.Sprintf("checking connectivity of service %d to its external VIP", j+1))
 					for _, c := range FRRContainers {
@@ -749,19 +747,19 @@ var _ = ginkgo.Describe("BGP", func() {
 				ipNoAdvertisement, err := config.GetIPFromRangeByIndex(rangeWithoutAdvertisement, 0)
 				Expect(err).NotTo(HaveOccurred())
 
-				svcAdvertisement, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "service-with-adv",
+				svcAdvertisement, _ := testservice.CreateWithBackend(cs, testNamespace, "service-with-adv",
 					func(s *corev1.Service) {
 						s.Spec.LoadBalancerIP = ipWithAdvertisement
 					},
 					testservice.TrafficPolicyCluster)
 				defer testservice.Delete(cs, svcAdvertisement)
-				svcAdvertisement1, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "service-with-adv1",
+				svcAdvertisement1, _ := testservice.CreateWithBackend(cs, testNamespace, "service-with-adv1",
 					func(s *corev1.Service) {
 						s.Spec.LoadBalancerIP = ipWithAdvertisement1
 					},
 					testservice.TrafficPolicyCluster)
 				defer testservice.Delete(cs, svcAdvertisement1)
-				svcNoAdvertisement, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "service-no-adv",
+				svcNoAdvertisement, _ := testservice.CreateWithBackend(cs, testNamespace, "service-no-adv",
 					func(s *corev1.Service) {
 						s.Spec.LoadBalancerIP = ipNoAdvertisement
 					},
@@ -1020,7 +1018,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 
 			Consistently(checkRoute, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
-			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb")
+			svc, _ := testservice.CreateWithBackend(cs, testNamespace, "external-local-lb")
 			defer testservice.Delete(cs, svc)
 
 			Consistently(checkRoute, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
@@ -1112,7 +1110,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				config := frrk8sv1beta1.FRRConfiguration{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      "receiveroutes",
-						Namespace: f.Namespace.Name,
+						Namespace: testNamespace,
 					},
 					Spec: frrk8sv1beta1.FRRConfigurationSpec{
 						BGP: frrk8sv1beta1.BGPConfig{
@@ -1192,7 +1190,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 			Eventually(checkRoutesAreInjected, time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
 
-			_, svc := setupBGPService(f, pairingIPFamily, []string{addressesRange}, FRRContainers, func(svc *corev1.Service) {})
+			_, svc := setupBGPService(cs, testNamespace, pairingIPFamily, []string{addressesRange}, FRRContainers, func(svc *corev1.Service) {})
 			defer testservice.Delete(cs, svc)
 
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
@@ -1342,7 +1340,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			peer := metallbv1beta2.BGPPeer{}
 			err = ConfigUpdater.Client().Get(context.Background(), types.NamespacedName{Name: "defaultport", Namespace: metallb.Namespace}, &peer)
 			Expect(err).NotTo(HaveOccurred())
-			framework.ExpectEqual(peer.Spec.Port, uint16(179))
+			Expect(peer.Spec.Port).To(Equal(uint16(179)))
 		})
 		ginkgo.It("BGP Peer connect time", func() {
 			connectTime := time.Second * 5
@@ -1417,7 +1415,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		})
 	})
 	ginkgo.DescribeTable("A service of protocol load balancer should work with two protocols", func(pairingIPFamily ipfamily.Family, poolAddresses []string) {
-		_, svc := setupBGPService(f, pairingIPFamily, poolAddresses, FRRContainers, func(svc *corev1.Service) {
+		_, svc := setupBGPService(cs, testNamespace, pairingIPFamily, poolAddresses, FRRContainers, func(svc *corev1.Service) {
 			testservice.TrafficPolicyCluster(svc)
 		})
 		defer testservice.Delete(cs, svc)

@@ -10,20 +10,20 @@ import (
 	. "github.com/onsi/gomega"
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/k8s"
+	"go.universe.tf/e2etest/pkg/k8sclient"
 	"go.universe.tf/e2etest/pkg/service"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 
 	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
-	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = ginkgo.Describe("LoadBalancer class", func() {
 	var cs clientset.Interface
 
-	var f *framework.Framework
+	testNamespace := ""
+
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentSpecReport().Failed() {
 			k8s.DumpInfo(Reporter, ginkgo.CurrentSpecReport().LeafNodeText)
@@ -32,16 +32,18 @@ var _ = ginkgo.Describe("LoadBalancer class", func() {
 		// Clean previous configuration.
 		err := ConfigUpdater.Clean()
 		Expect(err).NotTo(HaveOccurred())
+		err = k8s.DeleteNamespace(cs, testNamespace)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
-	f = framework.NewDefaultFramework("lbclass")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-
 	ginkgo.BeforeEach(func() {
-		cs = f.ClientSet
+		cs = k8sclient.New()
+		var err error
+		testNamespace, err = k8s.CreateTestNamespace(cs, "lbclass")
+		Expect(err).NotTo(HaveOccurred())
 
 		ginkgo.By("Clearing any previous configuration")
-		err := ConfigUpdater.Clean()
+		err = ConfigUpdater.Clean()
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -71,14 +73,10 @@ var _ = ginkgo.Describe("LoadBalancer class", func() {
 			err := ConfigUpdater.Update(resources)
 			Expect(err).NotTo(HaveOccurred())
 
-			jig := jigservice.NewTestJig(cs, f.Namespace.Name, "lbclass")
+			jig := jigservice.NewTestJig(cs, testNamespace, "lbclass")
 			svc, err := jig.CreateLoadBalancerServiceWithTimeout(context.TODO(), 10*time.Second, service.WithLoadbalancerClass("foo"))
-<<<<<<< Updated upstream
-			Expect(err).Should(MatchError(ContainSubstring("timed out waiting for the condition")))
-=======
 
 			Expect(err).Should(MatchError(ContainSubstring("timed out waiting for service \"lbclass\" to have a load balancer")))
->>>>>>> Stashed changes
 			Expect(svc).To(BeNil())
 		})
 	})

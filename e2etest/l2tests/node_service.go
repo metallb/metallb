@@ -8,12 +8,11 @@ import (
 	"strconv"
 
 	. "github.com/onsi/gomega"
-
 	"go.universe.tf/e2etest/pkg/executor"
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	"go.universe.tf/e2etest/pkg/mac"
 	"go.universe.tf/e2etest/pkg/wget"
 	corev1 "k8s.io/api/core/v1"
-	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 )
 
 func nodeForService(svc *corev1.Service, nodes []corev1.Node) (string, error) {

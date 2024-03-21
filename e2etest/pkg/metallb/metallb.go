@@ -15,7 +15,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 var (
@@ -58,7 +57,7 @@ func ControllerPod(cs clientset.Interface) (*corev1.Pod, error) {
 		LabelSelector: ControllerLabelSelector,
 	})
 	if err != nil {
-		framework.ExpectNoError(err, "failed to fetch controller pods")
+		Expect(err).NotTo(HaveOccurred(), "failed to fetch controller pods")
 	}
 	if len(pods.Items) != 1 {
 		return nil, fmt.Errorf("expected one controller pod, found %d", len(pods.Items))
