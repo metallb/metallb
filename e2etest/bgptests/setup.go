@@ -8,17 +8,16 @@ import (
 	"go.universe.tf/e2etest/pkg/config"
 	frrcontainer "go.universe.tf/e2etest/pkg/frr/container"
 	"go.universe.tf/e2etest/pkg/ipfamily"
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	"go.universe.tf/e2etest/pkg/metallb"
 	testservice "go.universe.tf/e2etest/pkg/service"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/kubernetes/test/e2e/framework"
-	jigservice "go.universe.tf/e2etest/pkg/jigservice"
+	clientset "k8s.io/client-go/kubernetes"
 )
 
-func setupBGPService(f *framework.Framework, pairingIPFamily ipfamily.Family, poolAddresses []string, peers []*frrcontainer.FRR, tweak testservice.Tweak) (*jigservice.TestJig, *corev1.Service) {
-	cs := f.ClientSet
+func setupBGPService(cs clientset.Interface, namespace string, pairingIPFamily ipfamily.Family, poolAddresses []string, peers []*frrcontainer.FRR, tweak testservice.Tweak) (*jigservice.TestJig, *corev1.Service) {
 	resources := config.Resources{
 		Pools: []metallbv1beta1.IPAddressPool{
 			{
@@ -35,7 +34,7 @@ func setupBGPService(f *framework.Framework, pairingIPFamily ipfamily.Family, po
 	err := ConfigUpdater.Update(resources)
 	Expect(err).NotTo(HaveOccurred())
 
-	svc, jig := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
+	svc, jig := testservice.CreateWithBackend(cs, namespace, "external-local-lb", tweak)
 
 	ginkgo.By("Checking the service gets an ip assigned")
 	for _, i := range svc.Status.LoadBalancer.Ingress {

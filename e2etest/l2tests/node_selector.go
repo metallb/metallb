@@ -12,6 +12,7 @@ import (
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/executor"
 	"go.universe.tf/e2etest/pkg/k8s"
+	"go.universe.tf/e2etest/pkg/k8sclient"
 	"go.universe.tf/e2etest/pkg/mac"
 	"go.universe.tf/e2etest/pkg/service"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
@@ -21,15 +22,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
-	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = ginkgo.Describe("L2", func() {
 	var cs clientset.Interface
 	var nodeToLabel *corev1.Node
+	testNamespace := ""
 
-	var f *framework.Framework
 	ginkgo.AfterEach(func() {
 		if nodeToLabel != nil {
 			k8s.RemoveLabelFromNode(nodeToLabel.Name, "bgp-node-selector-test", cs)
@@ -42,17 +41,19 @@ var _ = ginkgo.Describe("L2", func() {
 		// Clean previous configuration.
 		err := ConfigUpdater.Clean()
 		Expect(err).NotTo(HaveOccurred())
+		err = k8s.DeleteNamespace(cs, testNamespace)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
-	f = framework.NewDefaultFramework("l2")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-
 	ginkgo.BeforeEach(func() {
-		cs = f.ClientSet
+		cs = k8sclient.New()
+		var err error
+		testNamespace, err = k8s.CreateTestNamespace(cs, "l2sel")
+		Expect(err).NotTo(HaveOccurred())
 
 		ginkgo.By("Clearing any previous configuration")
 
-		err := ConfigUpdater.Clean()
+		err = ConfigUpdater.Clean()
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -78,7 +79,7 @@ var _ = ginkgo.Describe("L2", func() {
 		})
 
 		ginkgo.It("should work selecting one node", func() {
-			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", service.TrafficPolicyCluster)
+			svc, _ := service.CreateWithBackend(cs, testNamespace, "external-local-lb", service.TrafficPolicyCluster)
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
@@ -117,7 +118,7 @@ var _ = ginkgo.Describe("L2", func() {
 		ginkgo.It("should work with multiple node selectors", func() {
 			// ETP = local, pin the endpoint to node0, have two l2 advertisements, one for
 			// all and one for node1, check node0 is advertised.
-			jig := jigservice.NewTestJig(cs, f.Namespace.Name, "svca")
+			jig := jigservice.NewTestJig(cs, testNamespace, "svca")
 			svc, err := jig.CreateLoadBalancerService(context.TODO(), func(svc *corev1.Service) {
 				svc.Spec.Ports[0].TargetPort = intstr.FromInt(service.TestServicePort)
 				svc.Spec.Ports[0].Port = int32(service.TestServicePort)
@@ -178,7 +179,7 @@ var _ = ginkgo.Describe("L2", func() {
 		})
 
 		ginkgo.It("should work when adding nodes", func() {
-			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", service.TrafficPolicyCluster)
+			svc, _ := service.CreateWithBackend(cs, testNamespace, "external-local-lb", service.TrafficPolicyCluster)
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())

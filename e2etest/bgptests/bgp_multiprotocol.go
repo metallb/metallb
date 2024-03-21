@@ -9,30 +9,29 @@ import (
 	"strings"
 	"time"
 
-	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/frr"
 	"go.universe.tf/e2etest/pkg/ipfamily"
 	"go.universe.tf/e2etest/pkg/k8s"
+	"go.universe.tf/e2etest/pkg/k8sclient"
 	"go.universe.tf/e2etest/pkg/metallb"
 	testservice "go.universe.tf/e2etest/pkg/service"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
 	frrconfig "go.universe.tf/e2etest/pkg/frr/config"
 	frrcontainer "go.universe.tf/e2etest/pkg/frr/container"
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
-	jigservice "go.universe.tf/e2etest/pkg/jigservice"
-	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 	var cs clientset.Interface
-	var f *framework.Framework
+	testNamespace := ""
 
 	emptyBGPAdvertisement := metallbv1beta1.BGPAdvertisement{
 		ObjectMeta: metav1.ObjectMeta{
@@ -42,9 +41,11 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentSpecReport().Failed() {
-			dumpBGPInfo(ReportPath, ginkgo.CurrentSpecReport().LeafNodeText, cs, f)
+			dumpBGPInfo(ReportPath, ginkgo.CurrentSpecReport().LeafNodeText, cs, testNamespace)
 			k8s.DumpInfo(Reporter, ginkgo.CurrentSpecReport().LeafNodeText)
 		}
+		err := k8s.DeleteNamespace(cs, testNamespace)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	ginkgo.BeforeEach(func() {
@@ -57,13 +58,10 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 			err := c.UpdateBGPConfigFile(frrconfig.Empty)
 			Expect(err).NotTo(HaveOccurred())
 		}
-	})
 
-	f = framework.NewDefaultFramework("bgp")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-
-	ginkgo.BeforeEach(func() {
-		cs = f.ClientSet
+		cs = k8sclient.New()
+		testNamespace, err = k8s.CreateTestNamespace(cs, "bgp")
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	ginkgo.Context("Multiprotocol", func() {
@@ -92,7 +90,7 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}
 
-			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
+			svc, _ := testservice.CreateWithBackend(cs, testNamespace, "external-local-lb", tweak)
 			defer testservice.Delete(cs, svc)
 
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
@@ -181,7 +179,7 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 					validateFRRPeeredWithAllNodes(cs, c, ipFamily)
 				}
 
-				svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "service-with-adv",
+				svc, _ := testservice.CreateWithBackend(cs, testNamespace, "service-with-adv",
 					testservice.TrafficPolicyCluster,
 					testservice.DualStack)
 

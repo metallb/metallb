@@ -11,6 +11,7 @@ import (
 	. "github.com/onsi/gomega"
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/k8s"
+	"go.universe.tf/e2etest/pkg/k8sclient"
 	"go.universe.tf/e2etest/pkg/metallb"
 
 	"go.universe.tf/e2etest/pkg/service"
@@ -20,7 +21,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -39,7 +39,8 @@ var (
 var _ = ginkgo.Describe("IP Assignment", func() {
 	var cs clientset.Interface
 
-	var f *framework.Framework
+	testNamespace := ""
+
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentSpecReport().Failed() {
 			k8s.DumpInfo(Reporter, ginkgo.CurrentSpecReport().LeafNodeText)
@@ -50,21 +51,23 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 		Expect(err).NotTo(HaveOccurred())
 		err = k8s.DeleteNamespace(cs, secondNamespace)
 		Expect(err).NotTo(HaveOccurred())
+		err = k8s.DeleteNamespace(cs, testNamespace)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
-	f = framework.NewDefaultFramework("assignment")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-
 	ginkgo.BeforeEach(func() {
-		cs = f.ClientSet
+		cs = k8sclient.New()
+		var err error
+		testNamespace, err = k8s.CreateTestNamespace(cs, "assignement")
+		Expect(err).NotTo(HaveOccurred())
 
 		ginkgo.By("Clearing any previous configuration")
-		err := ConfigUpdater.Clean()
+		err = ConfigUpdater.Clean()
 		Expect(err).NotTo(HaveOccurred())
 
 		ginkgo.By("Updating the first namespace labels")
 		Eventually(func() error {
-			err := k8s.ApplyLabelsToNamespace(cs, f.Namespace.Name, firstNsLabels)
+			err := k8s.ApplyLabelsToNamespace(cs, testNamespace, firstNsLabels)
 			return err
 		}, 30*time.Second, 1*time.Second).Should(Succeed())
 
@@ -100,7 +103,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			err = ConfigUpdater.Update(resources)
 			Expect(err).NotTo(HaveOccurred())
 
-			jig := jigservice.NewTestJig(cs, f.Namespace.Name, "singleip")
+			jig := jigservice.NewTestJig(cs, testNamespace, "singleip")
 			svc, err := jig.CreateLoadBalancerService(context.TODO(), service.TrafficPolicyCluster)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -167,24 +170,24 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("creating 4 LB services")
-			jig := jigservice.NewTestJig(cs, f.Namespace.Name, "service-a")
+			jig := jigservice.NewTestJig(cs, testNamespace, "service-a")
 			serviceA, err := jig.CreateLoadBalancerService(context.TODO(), nil)
 			Expect(err).NotTo(HaveOccurred())
 			defer service.Delete(cs, serviceA)
 			service.ValidateDesiredLB(serviceA)
 
-			jig = jigservice.NewTestJig(cs, f.Namespace.Name, "service-b")
+			jig = jigservice.NewTestJig(cs, testNamespace, "service-b")
 			serviceB, err := jig.CreateLoadBalancerService(context.TODO(), nil)
 			Expect(err).NotTo(HaveOccurred())
 			defer service.Delete(cs, serviceB)
 			service.ValidateDesiredLB(serviceB)
 
-			jig = jigservice.NewTestJig(cs, f.Namespace.Name, "service-c")
+			jig = jigservice.NewTestJig(cs, testNamespace, "service-c")
 			serviceC, err := jig.CreateLoadBalancerServiceWaitForClusterIPOnly(nil)
 			Expect(err).NotTo(HaveOccurred())
 			defer service.Delete(cs, serviceC)
 
-			jig = jigservice.NewTestJig(cs, f.Namespace.Name, "service-d")
+			jig = jigservice.NewTestJig(cs, testNamespace, "service-d")
 			serviceD, err := jig.CreateLoadBalancerServiceWaitForClusterIPOnly(nil)
 			Expect(err).NotTo(HaveOccurred())
 			defer service.Delete(cs, serviceD)
@@ -235,7 +238,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 					Addresses: []string{
 						"192.168.5.0/32",
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 20, Namespaces: []string{f.Namespace.Name}},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 20, Namespaces: []string{testNamespace}},
 				},
 			}
 			pool2 = metallbv1beta1.IPAddressPool{
@@ -256,7 +259,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 		})
 
 		ginkgo.It("removes all pools", func() {
-			svc1, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-pool-1")
+			svc1, _ := service.CreateWithBackend(cs, testNamespace, "svc-test-ns-pool-1")
 			defer func() {
 				service.Delete(cs, svc1)
 			}()
@@ -279,7 +282,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 		})
 
 		ginkgo.It("reallocates svc after deleting a pool", func() {
-			svc1, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-pool-1")
+			svc1, _ := service.CreateWithBackend(cs, testNamespace, "svc-test-ns-pool-1")
 			defer func() {
 				service.Delete(cs, svc1)
 			}()
@@ -321,7 +324,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 					Addresses: []string{
 						"192.168.5.0/32",
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 20, Namespaces: []string{f.Namespace.Name}},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 20, Namespaces: []string{testNamespace}},
 				},
 			}
 			namespacePoolWithHigherPriority := metallbv1beta1.IPAddressPool{
@@ -330,16 +333,16 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 					Addresses: []string{
 						"192.168.10.0/32",
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 10, Namespaces: []string{f.Namespace.Name}},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 10, Namespaces: []string{testNamespace}},
 				},
 			}
 			namespacePoolNoPriority := metallbv1beta1.IPAddressPool{
-				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("ns-%s-ip-pool", f.Namespace.Name)},
+				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("ns-%s-ip-pool", testNamespace)},
 				Spec: metallbv1beta1.IPAddressPoolSpec{
 					Addresses: []string{
 						"192.168.20.0/32",
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Namespaces: []string{f.Namespace.Name}},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Namespaces: []string{testNamespace}},
 				},
 			}
 			resources := config.Resources{
@@ -349,9 +352,9 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			err := ConfigUpdater.Update(resources)
 			Expect(err).NotTo(HaveOccurred())
 
-			svc1, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-pool-1")
-			svc2, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-pool-2")
-			svc3, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-pool-3")
+			svc1, _ := service.CreateWithBackend(cs, testNamespace, "svc-test-ns-pool-1")
+			svc2, _ := service.CreateWithBackend(cs, testNamespace, "svc-test-ns-pool-2")
+			svc3, _ := service.CreateWithBackend(cs, testNamespace, "svc-test-ns-pool-3")
 			defer func() {
 				service.Delete(cs, svc1)
 				service.Delete(cs, svc2)
@@ -382,10 +385,10 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 					Addresses: []string{
 						"192.168.5.0/32",
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 20, Namespaces: []string{f.Namespace.Name}},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 20, Namespaces: []string{testNamespace}},
 				},
 			}
-			testNs, err := cs.CoreV1().Namespaces().Get(context.Background(), f.Namespace.Name, metav1.GetOptions{})
+			testNs, err := cs.CoreV1().Namespaces().Get(context.Background(), testNamespace, metav1.GetOptions{})
 			Expect(err).NotTo(HaveOccurred())
 			testNs.Labels["foo1"] = "bar1"
 			testNs.Labels["foo2"] = "bar2"
@@ -402,12 +405,12 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 				},
 			}
 			namespacePoolNoPriority := metallbv1beta1.IPAddressPool{
-				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("ns-%s-ip-pool", f.Namespace.Name)},
+				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("ns-%s-ip-pool", testNamespace)},
 				Spec: metallbv1beta1.IPAddressPoolSpec{
 					Addresses: []string{
 						"192.168.20.0/32",
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Namespaces: []string{f.Namespace.Name}},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Namespaces: []string{testNamespace}},
 				},
 			}
 
@@ -417,9 +420,9 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			err = ConfigUpdater.Update(resources)
 			Expect(err).NotTo(HaveOccurred())
 
-			svc1, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-label-pool-1")
-			svc2, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-label-pool-2")
-			svc3, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-ns-label-pool-3")
+			svc1, _ := service.CreateWithBackend(cs, testNamespace, "svc-test-ns-label-pool-1")
+			svc2, _ := service.CreateWithBackend(cs, testNamespace, "svc-test-ns-label-pool-2")
+			svc3, _ := service.CreateWithBackend(cs, testNamespace, "svc-test-ns-label-pool-3")
 			defer func() {
 				service.Delete(cs, svc1)
 				service.Delete(cs, svc2)
@@ -465,12 +468,12 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 				},
 			}
 			namespacePoolNoPriority := metallbv1beta1.IPAddressPool{
-				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("ns-%s-ip-pool", f.Namespace.Name)},
+				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("ns-%s-ip-pool", testNamespace)},
 				Spec: metallbv1beta1.IPAddressPoolSpec{
 					Addresses: []string{
 						"192.168.20.0/32",
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Namespaces: []string{f.Namespace.Name}},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Namespaces: []string{testNamespace}},
 				},
 			}
 
@@ -486,9 +489,9 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 				}
 				svc.Labels["test"] = "e2e"
 			}
-			svc1, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-svc-label-pool-1", svcTweakWithLabel)
-			svc2, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-svc-label-pool-2", svcTweakWithLabel)
-			svc3, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-test-svc-label-pool-3", svcTweakWithLabel)
+			svc1, _ := service.CreateWithBackend(cs, testNamespace, "svc-test-svc-label-pool-1", svcTweakWithLabel)
+			svc2, _ := service.CreateWithBackend(cs, testNamespace, "svc-test-svc-label-pool-2", svcTweakWithLabel)
+			svc3, _ := service.CreateWithBackend(cs, testNamespace, "svc-test-svc-label-pool-3", svcTweakWithLabel)
 			defer func() {
 				service.Delete(cs, svc1)
 				service.Delete(cs, svc2)
@@ -519,7 +522,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 					Addresses: []string{
 						"192.168.5.0/32",
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 20, Namespaces: []string{f.Namespace.Name}},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 20, Namespaces: []string{testNamespace}},
 				},
 			}
 			svcLabelPoolWithHigherPriority := metallbv1beta1.IPAddressPool{
@@ -533,12 +536,12 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 				},
 			}
 			namespacePoolNoPriority := metallbv1beta1.IPAddressPool{
-				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("ns-%s-ip-pool", f.Namespace.Name)},
+				ObjectMeta: metav1.ObjectMeta{Name: fmt.Sprintf("ns-%s-ip-pool", testNamespace)},
 				Spec: metallbv1beta1.IPAddressPoolSpec{
 					Addresses: []string{
 						"192.168.20.0/32",
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Namespaces: []string{f.Namespace.Name}},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Namespaces: []string{testNamespace}},
 				},
 			}
 
@@ -554,9 +557,9 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 				}
 				svc.Labels["test"] = "e2e"
 			}
-			svc1, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-ns-svc-label-pool-1", svcTweakWithLabel)
-			svc2, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-ns-svc-label-pool-2", svcTweakWithLabel)
-			svc3, _ := service.CreateWithBackend(cs, f.Namespace.Name, "svc-ns-svc-label-pool-3", svcTweakWithLabel)
+			svc1, _ := service.CreateWithBackend(cs, testNamespace, "svc-ns-svc-label-pool-1", svcTweakWithLabel)
+			svc2, _ := service.CreateWithBackend(cs, testNamespace, "svc-ns-svc-label-pool-2", svcTweakWithLabel)
+			svc3, _ := service.CreateWithBackend(cs, testNamespace, "svc-ns-svc-label-pool-3", svcTweakWithLabel)
 			defer func() {
 				service.Delete(cs, svc1)
 				service.Delete(cs, svc2)
@@ -632,8 +635,8 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			svc1, _ := service.CreateWithBackend(cs, secondNamespace, "second-ns-service")
-			svc2, _ := service.CreateWithBackend(cs, f.Namespace.Name, "default-ns-service")
-			svc3, _ := service.CreateWithBackend(cs, f.Namespace.Name, "default-ns-service2")
+			svc2, _ := service.CreateWithBackend(cs, testNamespace, "default-ns-service")
+			svc3, _ := service.CreateWithBackend(cs, testNamespace, "default-ns-service2")
 			defer func() {
 				service.Delete(cs, svc1)
 				service.Delete(cs, svc2)

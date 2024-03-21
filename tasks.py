@@ -928,7 +928,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
     if external_frr_image != "":
         external_frr_image = "--frr-image=" + (external_frr_image)
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-                  "KUBECONFIG={} ginkgo {} --timeout=3h {} {} -- --provider=local --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {} -bgp-mode={}  -with-vrf={} {} --host-bgp-mode={}".format(
+                  "KUBECONFIG={} ginkgo {} --timeout=3h {} {} -- --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {} -bgp-mode={}  -with-vrf={} {} --host-bgp-mode={}".format(
         kubeconfig, ginkgo_params, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range,
         ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace, node_nics, local_nics,
         external_containers, bgp_mode, with_vrf, external_frr_image, host_bgp_mode), warn="True")

@@ -12,13 +12,11 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.universe.tf/e2etest/pkg/frr"
-	"go.universe.tf/e2etest/pkg/k8s"
 	"go.universe.tf/e2etest/pkg/metallb"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
-func dumpBGPInfo(basePath, testName string, cs clientset.Interface, f *framework.Framework) {
+func dumpBGPInfo(basePath, testName string, cs clientset.Interface, namespace string) {
 	testPath := path.Join(basePath, strings.ReplaceAll(testName, " ", "-"))
 	err := os.Mkdir(testPath, 0755)
 	if err != nil && !errors.Is(err, os.ErrExist) {
@@ -71,7 +69,6 @@ func dumpBGPInfo(basePath, testName string, cs clientset.Interface, f *framework
 			continue
 		}
 	}
-	k8s.DescribeSvc(f.Namespace.Name)
 }
 
 func logFileFor(base string, kind string) (*os.File, error) {

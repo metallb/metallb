@@ -34,15 +34,13 @@ import (
 	frrprovider "go.universe.tf/e2etest/pkg/frr/provider"
 	"go.universe.tf/e2etest/pkg/iprange"
 	"go.universe.tf/e2etest/pkg/k8s"
+	"go.universe.tf/e2etest/pkg/k8sclient"
 	"go.universe.tf/e2etest/pkg/metallb"
 	"go.universe.tf/e2etest/pkg/service"
 	"go.universe.tf/e2etest/webhookstests"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/kubernetes/test/e2e/framework"
-	e2econfig "k8s.io/kubernetes/test/e2e/framework/config"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
@@ -66,18 +64,6 @@ var (
 
 // handleFlags sets up all flags and parses the command line.
 func handleFlags() {
-	e2econfig.CopyFlags(e2econfig.Flags, flag.CommandLine)
-	framework.RegisterCommonFlags(flag.CommandLine)
-	/*
-		Using framework.RegisterClusterFlags(flag.CommandLine) results in a panic:
-		"flag redefined: kubeconfig".
-		This happens because controller-runtime registers the kubeconfig flag as well.
-		To solve this we set the framework's kubeconfig directly via the KUBECONFIG env var
-		instead of letting it call the flag. Since we also use the provider flag it is handled manually.
-	*/
-	flag.StringVar(&framework.TestContext.Provider, "provider", "", "The name of the Kubernetes provider (gce, gke, local, skeleton (the fallback if not set), etc.)")
-	framework.TestContext.KubeConfig = os.Getenv(clientcmd.RecommendedConfigPathEnvVar)
-
 	flag.IntVar(&service.TestServicePort, "service-pod-port", 80, "port number that pod opens, default: 80")
 	flag.BoolVar(&skipDockerCmd, "skip-docker", false, "set this to true if the BGP daemon is running on the host instead of in a container")
 	flag.StringVar(&l2tests.IPV4ServiceRange, "ipv4-service-range", "0", "a range of IPv4 addresses for MetalLB to use when running in layer2 mode")
@@ -107,8 +93,6 @@ func TestMain(m *testing.M) {
 		return
 	}
 
-	framework.AfterReadingAllFlags(&framework.TestContext)
-
 	os.Exit(m.Run())
 }
 
@@ -116,15 +100,13 @@ func TestE2E(t *testing.T) {
 	if testing.Short() {
 		return
 	}
+	RegisterFailHandler(ginkgo.Fail)
 
-	RegisterFailHandler(framework.Fail)
 	ginkgo.RunSpecs(t, "E2E Suite")
 }
 
 var _ = ginkgo.BeforeSuite(func() {
 	log.SetLogger(zap.New(zap.WriteTo(ginkgo.GinkgoWriter), zap.UseDevMode(true)))
-	// Make sure the framework's kubeconfig is set.
-	framework.ExpectNotEqual(framework.TestContext.KubeConfig, "", fmt.Sprintf("%s env var not set", clientcmd.RecommendedConfigPathEnvVar))
 
 	// Validate the IPv4 service range.
 	_, err := iprange.Parse(l2tests.IPV4ServiceRange)
@@ -134,8 +116,7 @@ var _ = ginkgo.BeforeSuite(func() {
 	_, err = iprange.Parse(l2tests.IPV6ServiceRange)
 	Expect(err).NotTo(HaveOccurred())
 
-	cs, err := framework.LoadClientset()
-	Expect(err).NotTo(HaveOccurred())
+	cs := k8sclient.New()
 
 	switch {
 	case externalContainers != "":
@@ -158,8 +139,7 @@ var _ = ginkgo.BeforeSuite(func() {
 		}
 	}
 
-	clientconfig, err := framework.LoadConfig()
-	Expect(err).NotTo(HaveOccurred())
+	clientconfig := k8sclient.RestConfig()
 
 	updater, err = testsconfig.UpdaterForCRs(clientconfig, metallb.Namespace)
 	Expect(err).NotTo(HaveOccurred())
@@ -189,10 +169,15 @@ var _ = ginkgo.BeforeSuite(func() {
 		bgptests.FRRProvider, err = frrprovider.NewFRRK8SMode(clientconfig)
 		Expect(err).NotTo(HaveOccurred())
 	default:
-		framework.Fail(fmt.Sprintf("unsupported --bgp-mode %s - supported options are: native, frr, frr-k8s", bgpMode))
+		ginkgo.Fail(fmt.Sprintf("unsupported --bgp-mode %s - supported options are: native, frr, frr-k8s", bgpMode))
 	}
 
-	reporter := k8s.InitReporter(framework.TestContext.KubeConfig, reportPath, metallb.Namespace)
+	kubeconfig := os.Getenv("KUBECONFIG")
+	if kubeconfig == "" {
+		ginkgo.Fail("KUBECONFIG not set")
+	}
+
+	reporter := k8s.InitReporter(kubeconfig, reportPath, metallb.Namespace)
 
 	bgptests.ConfigUpdater = updater
 	l2tests.ConfigUpdater = updater
@@ -209,10 +194,9 @@ var _ = ginkgo.BeforeSuite(func() {
 })
 
 var _ = ginkgo.AfterSuite(func() {
-	cs, err := framework.LoadClientset()
-	Expect(err).NotTo(HaveOccurred())
+	cs := k8sclient.New()
 
-	err = bgptests.InfraTearDown(cs)
+	err := bgptests.InfraTearDown(cs)
 	Expect(err).NotTo(HaveOccurred())
 	if withVRF {
 		err = bgptests.InfraTearDownVRF(cs)

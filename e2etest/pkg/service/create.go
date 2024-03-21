@@ -14,7 +14,9 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-var TestServicePort = 80
+var (
+	TestServicePort = 80
+)
 
 func CreateWithBackend(cs clientset.Interface, namespace string, jigName string, tweak ...func(svc *corev1.Service)) (*corev1.Service, *jigservice.TestJig) {
 	return CreateWithBackendPort(cs, namespace, jigName, TestServicePort, tweak...)

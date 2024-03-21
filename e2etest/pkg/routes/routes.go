@@ -13,7 +13,6 @@ import (
 	"go.universe.tf/e2etest/pkg/ipfamily"
 	"go.universe.tf/e2etest/pkg/k8s"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 var (
@@ -30,7 +29,7 @@ func init() {
 // (or in the current host) to reach the service ip.
 func ForIP(target string, exec executor.Executor) []net.IP {
 	dst := net.ParseIP(target)
-	framework.ExpectNotEqual(dst, nil, "failed to convert", target, "to ip")
+	Expect(dst).NotTo(Equal(nil), "failed to convert", target, "to ip")
 
 	re := Ipv4Re
 	res, err := exec.Exec("ip", []string{"route", "show", target}...)
@@ -62,7 +61,8 @@ func ForIP(target string, exec executor.Executor) []net.IP {
 			continue
 		}
 		netIP := net.ParseIP(ip)
-		framework.ExpectNotEqual(netIP, nil, "failed to convert", ip, "to ip")
+		Expect(netIP).NotTo(Equal(nil), "failed to convert", target, "to ip")
+
 		routes = append(routes, netIP)
 	}
 

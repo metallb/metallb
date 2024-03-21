@@ -30,14 +30,13 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/openshift-kni/k8sreporter"
 	jigservice "go.universe.tf/e2etest/pkg/jigservice"
+	"go.universe.tf/e2etest/pkg/k8sclient"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	pkgerr "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
-	admissionapi "k8s.io/pod-security-admission/api"
 
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/executor"
@@ -61,8 +60,8 @@ var (
 )
 
 var _ = ginkgo.Describe("L2", func() {
-	var f *framework.Framework
 	var cs clientset.Interface
+	testNamespace := ""
 
 	emptyL2Advertisement := metallbv1beta1.L2Advertisement{
 		ObjectMeta: metav1.ObjectMeta{
@@ -78,18 +77,17 @@ var _ = ginkgo.Describe("L2", func() {
 		if ginkgo.CurrentSpecReport().Failed() {
 			k8s.DumpInfo(Reporter, ginkgo.CurrentSpecReport().LeafNodeText)
 		}
+		err = k8s.DeleteNamespace(cs, testNamespace)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
-	f = framework.NewDefaultFramework("l2")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-
 	ginkgo.BeforeEach(func() {
-		cs = f.ClientSet
-		loadBalancerCreateTimeout = 5 * time.Minute
-
 		ginkgo.By("Clearing any previous configuration")
 
 		err := ConfigUpdater.Clean()
+		Expect(err).NotTo(HaveOccurred())
+		cs = k8sclient.New()
+		testNamespace, err = k8s.CreateTestNamespace(cs, "l2")
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -116,7 +114,7 @@ var _ = ginkgo.Describe("L2", func() {
 		})
 
 		ginkgo.It("should work for ExternalTrafficPolicy=Cluster", func() {
-			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", service.TrafficPolicyCluster)
+			svc, _ := service.CreateWithBackend(cs, testNamespace, "external-local-lb", service.TrafficPolicyCluster)
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
@@ -131,7 +129,7 @@ var _ = ginkgo.Describe("L2", func() {
 		})
 
 		ginkgo.It("should expose the status as L2ServiceStatus", func() {
-			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", service.TrafficPolicyCluster)
+			svc, _ := service.CreateWithBackend(cs, testNamespace, "external-local-lb", service.TrafficPolicyCluster)
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
@@ -167,7 +165,7 @@ var _ = ginkgo.Describe("L2", func() {
 		})
 
 		ginkgo.It("should work for ExternalTrafficPolicy=Local", func() {
-			svc, jig := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", service.TrafficPolicyLocal)
+			svc, jig := service.CreateWithBackend(cs, testNamespace, "external-local-lb", service.TrafficPolicyLocal)
 			err := jig.Scale(context.TODO(), 5)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -203,7 +201,7 @@ var _ = ginkgo.Describe("L2", func() {
 					}
 
 					ginkgo.By(fmt.Sprintf("checking that pod %s is on node %s", name, advNode.Name))
-					pod, err := cs.CoreV1().Pods(f.Namespace.Name).Get(context.TODO(), name, metav1.GetOptions{})
+					pod, err := cs.CoreV1().Pods(testNamespace).Get(context.TODO(), name, metav1.GetOptions{})
 					if err != nil {
 						return err
 					}
@@ -221,7 +219,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 			tcpPort := service.TestServicePort
 			udpPort := service.TestServicePort + 1
-			namespace := f.Namespace.Name
+			namespace := testNamespace
 
 			ginkgo.By("Creating a mixed protocol TCP / UDP service")
 			jig1 := jigservice.NewTestJig(cs, namespace, "svca")
@@ -270,7 +268,7 @@ var _ = ginkgo.Describe("L2", func() {
 		})
 
 		ginkgo.It("should not be announced from a node with a NetworkUnavailable condition", func() {
-			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", service.TrafficPolicyCluster)
+			svc, _ := service.CreateWithBackend(cs, testNamespace, "external-local-lb", service.TrafficPolicyCluster)
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
@@ -324,7 +322,7 @@ var _ = ginkgo.Describe("L2", func() {
 		})
 
 		ginkgo.It("It should be work when adding NodeExcludeBalancers label to a node", func() {
-			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", service.TrafficPolicyCluster)
+			svc, _ := service.CreateWithBackend(cs, testNamespace, "external-local-lb", service.TrafficPolicyCluster)
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
@@ -391,7 +389,7 @@ var _ = ginkgo.Describe("L2", func() {
 			err := ConfigUpdater.Update(resources)
 			Expect(err).NotTo(HaveOccurred())
 
-			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", service.TrafficPolicyCluster)
+			svc, _ := service.CreateWithBackend(cs, testNamespace, "external-local-lb", service.TrafficPolicyCluster)
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
@@ -475,7 +473,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 		err := ConfigUpdater.Update(resources)
 		Expect(err).NotTo(HaveOccurred())
-		namespace := f.Namespace.Name
+		namespace := testNamespace
 
 		jig1 := jigservice.NewTestJig(cs, namespace, "svca")
 
@@ -643,7 +641,7 @@ var _ = ginkgo.Describe("L2", func() {
 			}, 2*time.Minute, 5*time.Second).ShouldNot(HaveOccurred())
 
 			ginkgo.By("creating a service")
-			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", service.TrafficPolicyCluster)
+			svc, _ := service.CreateWithBackend(cs, testNamespace, "external-local-lb", service.TrafficPolicyCluster)
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				if !pkgerr.IsNotFound(err) {
@@ -704,14 +702,14 @@ var _ = ginkgo.Describe("L2", func() {
 					return err
 				}
 
-				err = metrics.ValidateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": advSpeaker.Spec.NodeName, "protocol": "layer2", "service": fmt.Sprintf("%s/%s", f.Namespace.Name, svc.Name)}, speakerMetrics)
+				err = metrics.ValidateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": advSpeaker.Spec.NodeName, "protocol": "layer2", "service": fmt.Sprintf("%s/%s", testNamespace, svc.Name)}, speakerMetrics)
 				if err != nil {
 					return err
 				}
 
 				err = metrics.ValidateOnPrometheus(promPod,
 					fmt.Sprintf(`metallb_speaker_announced{node="%s",protocol="layer2",service="%s/%s"} == 1`,
-						advSpeaker.Spec.NodeName, f.Namespace.Name, svc.Name), metrics.There)
+						advSpeaker.Spec.NodeName, testNamespace, svc.Name), metrics.There)
 				if err != nil {
 					return err
 				}
@@ -756,11 +754,11 @@ var _ = ginkgo.Describe("L2", func() {
 				speakerMetrics, err := metrics.ForPod(promPod, p, metallb.Namespace)
 				Expect(err).NotTo(HaveOccurred())
 
-				err = metrics.ValidateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": p.Spec.NodeName, "protocol": "layer2", "service": fmt.Sprintf("%s/%s", f.Namespace.Name, svc.Name)}, speakerMetrics)
+				err = metrics.ValidateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": p.Spec.NodeName, "protocol": "layer2", "service": fmt.Sprintf("%s/%s", testNamespace, svc.Name)}, speakerMetrics)
 				Expect(err).To(HaveOccurred(), fmt.Sprintf("metallb_speaker_announced present in node: %s", p.Spec.NodeName))
 
 				err = metrics.ValidateOnPrometheus(promPod,
-					fmt.Sprintf(`metallb_speaker_announced{node="%s",protocol="layer2",service="%s/%s"} == 1`, p.Spec.NodeName, f.Namespace.Name, svc.Name), metrics.NotThere)
+					fmt.Sprintf(`metallb_speaker_announced{node="%s",protocol="layer2",service="%s/%s"} == 1`, p.Spec.NodeName, testNamespace, svc.Name), metrics.NotThere)
 				Expect(err).NotTo(HaveOccurred())
 			}
 
@@ -774,12 +772,12 @@ var _ = ginkgo.Describe("L2", func() {
 					return err
 				}
 
-				err = metrics.ValidateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": advSpeaker.Spec.NodeName, "protocol": "layer2", "service": fmt.Sprintf("%s/%s", f.Namespace.Name, svc.Name)}, speakerMetrics)
+				err = metrics.ValidateGaugeValue(1, "metallb_speaker_announced", map[string]string{"node": advSpeaker.Spec.NodeName, "protocol": "layer2", "service": fmt.Sprintf("%s/%s", testNamespace, svc.Name)}, speakerMetrics)
 				if err == nil {
 					return fmt.Errorf("metallb_speaker_announced present in node: %s", advSpeaker.Spec.NodeName)
 				}
 				err = metrics.ValidateOnPrometheus(promPod,
-					fmt.Sprintf(`metallb_speaker_announced{node="%s",protocol="layer2",service="%s/%s"} == 1`, advSpeaker.Spec.NodeName, f.Namespace.Name, svc.Name), metrics.NotThere)
+					fmt.Sprintf(`metallb_speaker_announced{node="%s",protocol="layer2",service="%s/%s"} == 1`, advSpeaker.Spec.NodeName, testNamespace, svc.Name), metrics.NotThere)
 				if err != nil {
 					return err
 				}
@@ -796,7 +794,7 @@ var _ = ginkgo.Describe("L2", func() {
 		var servicesIngressIP []string
 		var pools []metallbv1beta1.IPAddressPool
 
-		namespace := f.Namespace.Name
+		namespace := testNamespace
 
 		for i := 0; i < 2; i++ {
 			ginkgo.By(fmt.Sprintf("configure addresspool number %d", i+1))
@@ -840,7 +838,7 @@ var _ = ginkgo.Describe("L2", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("validate annotating a service with the pool used to provide its IP")
-			framework.ExpectEqual(svc.Annotations["metallb.universe.tf/ip-allocated-from-pool"], pool.Name)
+			Expect(svc.Annotations["metallb.universe.tf/ip-allocated-from-pool"]).To(Equal(pool.Name))
 
 			services = append(services, svc)
 			servicesIngressIP = append(servicesIngressIP, ingressIP)
@@ -849,7 +847,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 				ginkgo.By(fmt.Sprintf("validate service %d IP didn't change", j+1))
 				ip := jigservice.GetIngressPoint(&services[j].Status.LoadBalancer.Ingress[0])
-				framework.ExpectEqual(ip, servicesIngressIP[j])
+				Expect(ip).To(Equal(servicesIngressIP[j]))
 
 				ginkgo.By(fmt.Sprintf("checking connectivity of service %d to its external VIP", j+1))
 				Eventually(func() error {
