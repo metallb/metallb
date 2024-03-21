@@ -48,7 +48,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
 )
@@ -326,7 +326,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 			for _, i := range svc.Status.LoadBalancer.Ingress {
 				ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
-				ingressIP := e2eservice.GetIngressPoint(&i)
+				ingressIP := jigservice.GetIngressPoint(&i)
 				err = config.ValidateIPInRange(addressPools, ingressIP)
 				Expect(err).NotTo(HaveOccurred())
 			}
@@ -649,7 +649,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				defer testservice.Delete(cs, svc)
 
 				ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
-				ingressIP := e2eservice.GetIngressPoint(
+				ingressIP := jigservice.GetIngressPoint(
 					&svc.Status.LoadBalancer.Ingress[0])
 				err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool}, ingressIP)
 				Expect(err).NotTo(HaveOccurred())
@@ -659,7 +659,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 				for j := 0; j <= i; j++ {
 					ginkgo.By(fmt.Sprintf("validate service %d IP didn't change", j+1))
-					ip := e2eservice.GetIngressPoint(&services[j].Status.LoadBalancer.Ingress[0])
+					ip := jigservice.GetIngressPoint(&services[j].Status.LoadBalancer.Ingress[0])
 					framework.ExpectEqual(ip, servicesIngressIP[j])
 
 					ginkgo.By(fmt.Sprintf("checking connectivity of service %d to its external VIP", j+1))
@@ -1432,7 +1432,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 		checkServiceL2 := func() error {
 			for _, ip := range svc.Status.LoadBalancer.Ingress {
-				ingressIP := e2eservice.GetIngressPoint(&ip)
+				ingressIP := jigservice.GetIngressPoint(&ip)
 				err := mac.RequestAddressResolution(ingressIP, executor.Host)
 				if err != nil {
 					return err

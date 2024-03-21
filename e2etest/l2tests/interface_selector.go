@@ -14,7 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"go.universe.tf/e2etest/pkg/config"
@@ -172,7 +172,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 			selectorMac, err := mac.GetIfaceMac(NodeNics[0], executor.ForPod(speakerPod.Namespace, speakerPod.Name, "speaker"))
 			Expect(err).NotTo(HaveOccurred())
 
-			ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+			ingressIP := jigservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 			err = mac.FlushIPNeigh(ingressIP, executor.Host)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -200,7 +200,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}()
 
-			ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+			ingressIP := jigservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 
 			for i := range NodeNics {
 				resources := config.Resources{
@@ -253,7 +253,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}()
 
-			ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+			ingressIP := jigservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 			err = mac.FlushIPNeigh(ingressIP, executor.Host)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -287,7 +287,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}()
 
-			ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+			ingressIP := jigservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 			resources := config.Resources{}
 
 			for i := range NodeNics {
@@ -343,7 +343,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 				err = ConfigUpdater.Update(resources)
 				Expect(err).NotTo(HaveOccurred())
 
-				ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+				ingressIP := jigservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 				err := mac.FlushIPNeigh(ingressIP, executor.Host)
 				Expect(err).NotTo(HaveOccurred())
 

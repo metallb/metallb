@@ -16,11 +16,11 @@ import (
 	"go.universe.tf/e2etest/pkg/service"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -100,8 +100,8 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			err = ConfigUpdater.Update(resources)
 			Expect(err).NotTo(HaveOccurred())
 
-			jig := e2eservice.NewTestJig(cs, f.Namespace.Name, "singleip")
-			svc, err := jig.CreateLoadBalancerService(context.TODO(), 10*time.Second, service.TrafficPolicyCluster)
+			jig := jigservice.NewTestJig(cs, f.Namespace.Name, "singleip")
+			svc, err := jig.CreateLoadBalancerService(context.TODO(), service.TrafficPolicyCluster)
 			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("Creating another service")
@@ -167,24 +167,24 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("creating 4 LB services")
-			jig := e2eservice.NewTestJig(cs, f.Namespace.Name, "service-a")
-			serviceA, err := jig.CreateLoadBalancerService(context.TODO(), 30*time.Second, nil)
+			jig := jigservice.NewTestJig(cs, f.Namespace.Name, "service-a")
+			serviceA, err := jig.CreateLoadBalancerService(context.TODO(), nil)
 			Expect(err).NotTo(HaveOccurred())
 			defer service.Delete(cs, serviceA)
 			service.ValidateDesiredLB(serviceA)
 
-			jig = e2eservice.NewTestJig(cs, f.Namespace.Name, "service-b")
-			serviceB, err := jig.CreateLoadBalancerService(context.TODO(), 30*time.Second, nil)
+			jig = jigservice.NewTestJig(cs, f.Namespace.Name, "service-b")
+			serviceB, err := jig.CreateLoadBalancerService(context.TODO(), nil)
 			Expect(err).NotTo(HaveOccurred())
 			defer service.Delete(cs, serviceB)
 			service.ValidateDesiredLB(serviceB)
 
-			jig = e2eservice.NewTestJig(cs, f.Namespace.Name, "service-c")
+			jig = jigservice.NewTestJig(cs, f.Namespace.Name, "service-c")
 			serviceC, err := jig.CreateLoadBalancerServiceWaitForClusterIPOnly(nil)
 			Expect(err).NotTo(HaveOccurred())
 			defer service.Delete(cs, serviceC)
 
-			jig = e2eservice.NewTestJig(cs, f.Namespace.Name, "service-d")
+			jig = jigservice.NewTestJig(cs, f.Namespace.Name, "service-d")
 			serviceD, err := jig.CreateLoadBalancerServiceWaitForClusterIPOnly(nil)
 			Expect(err).NotTo(HaveOccurred())
 			defer service.Delete(cs, serviceD)
@@ -262,7 +262,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			}()
 
 			ginkgo.By("validate LoadBalancer IP is allocated from pool1")
-			err := config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool1}, e2eservice.GetIngressPoint(
+			err := config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool1}, jigservice.GetIngressPoint(
 				&svc1.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
 
@@ -285,7 +285,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			}()
 
 			ginkgo.By("validate LoadBalancer IP is allocated from pool1")
-			err := config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool1}, e2eservice.GetIngressPoint(
+			err := config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool1}, jigservice.GetIngressPoint(
 				&svc1.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
 
@@ -300,7 +300,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			Eventually(func() error {
 				svc1, err := cs.CoreV1().Services(svc1.Namespace).Get(context.Background(), svc1.Name, metav1.GetOptions{})
 				Expect(err).NotTo(HaveOccurred())
-				err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool2}, e2eservice.GetIngressPoint(
+				err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool2}, jigservice.GetIngressPoint(
 					&svc1.Status.LoadBalancer.Ingress[0]))
 				return err
 			}, time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
@@ -362,15 +362,15 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			// just validate service ingress ip address are assigned from appropriate ip
 			// address pool.
 			ginkgo.By("validate LoadBalancer IP is allocated from 1st higher priority address pool")
-			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespacePoolWithHigherPriority}, e2eservice.GetIngressPoint(
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespacePoolWithHigherPriority}, jigservice.GetIngressPoint(
 				&svc1.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
 			ginkgo.By("validate LoadBalancer IP is allocated from 2nd higher priority address pool")
-			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespacePoolWithLowerPriority}, e2eservice.GetIngressPoint(
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespacePoolWithLowerPriority}, jigservice.GetIngressPoint(
 				&svc2.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
 			ginkgo.By("validate LoadBalancer IP is allocated from default address pool")
-			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespacePoolNoPriority}, e2eservice.GetIngressPoint(
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespacePoolNoPriority}, jigservice.GetIngressPoint(
 				&svc3.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -430,15 +430,15 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			// just validate service ingress ip address are assigned from appropriate ip
 			// address pool.
 			ginkgo.By("validate LoadBalancer IP is allocated from 1st higher priority address pool")
-			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespaceLabelPoolWithHigherPriority}, e2eservice.GetIngressPoint(
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespaceLabelPoolWithHigherPriority}, jigservice.GetIngressPoint(
 				&svc1.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
 			ginkgo.By("validate LoadBalancer IP is allocated from 2nd higher priority address pool")
-			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespacePoolWithLowerPriority}, e2eservice.GetIngressPoint(
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespacePoolWithLowerPriority}, jigservice.GetIngressPoint(
 				&svc2.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
 			ginkgo.By("validate LoadBalancer IP is allocated from default address pool")
-			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespacePoolNoPriority}, e2eservice.GetIngressPoint(
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespacePoolNoPriority}, jigservice.GetIngressPoint(
 				&svc3.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -499,15 +499,15 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			// just validate service ingress ip address are assigned from appropriate ip
 			// address pool.
 			ginkgo.By("validate LoadBalancer IP is allocated from 1st higher priority address pool")
-			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{svcLabelPoolWithHigherPriority}, e2eservice.GetIngressPoint(
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{svcLabelPoolWithHigherPriority}, jigservice.GetIngressPoint(
 				&svc1.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
 			ginkgo.By("validate LoadBalancer IP is allocated from 2nd higher priority address pool")
-			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{svcLabelPoolWithLowerPriority}, e2eservice.GetIngressPoint(
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{svcLabelPoolWithLowerPriority}, jigservice.GetIngressPoint(
 				&svc2.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
 			ginkgo.By("validate LoadBalancer IP is allocated from default address pool")
-			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespacePoolNoPriority}, e2eservice.GetIngressPoint(
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespacePoolNoPriority}, jigservice.GetIngressPoint(
 				&svc3.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -567,15 +567,15 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			// just validate service ingress ip address are assigned from appropriate ip
 			// address pool.
 			ginkgo.By("validate LoadBalancer IP is allocated from 1st higher priority address pool")
-			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{svcLabelPoolWithHigherPriority}, e2eservice.GetIngressPoint(
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{svcLabelPoolWithHigherPriority}, jigservice.GetIngressPoint(
 				&svc1.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
 			ginkgo.By("validate LoadBalancer IP is allocated from 2nd higher priority address pool")
-			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespacePoolWithLowerPriority}, e2eservice.GetIngressPoint(
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespacePoolWithLowerPriority}, jigservice.GetIngressPoint(
 				&svc2.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
 			ginkgo.By("validate LoadBalancer IP is allocated from default address pool")
-			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespacePoolNoPriority}, e2eservice.GetIngressPoint(
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespacePoolNoPriority}, jigservice.GetIngressPoint(
 				&svc3.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
 		})
@@ -644,15 +644,15 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			// just validate service ingress ip address are assigned from appropriate ip
 			// address pool.
 			ginkgo.By("validate LoadBalancer IP is allocated from 1st higher priority address pool")
-			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{secondNamespacePool}, e2eservice.GetIngressPoint(
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{secondNamespacePool}, jigservice.GetIngressPoint(
 				&svc1.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
 			ginkgo.By("validate LoadBalancer IP is allocated from 2nd higher priority address pool")
-			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{firstNamespacePool}, e2eservice.GetIngressPoint(
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{firstNamespacePool}, jigservice.GetIngressPoint(
 				&svc2.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
 			ginkgo.By("validate LoadBalancer IP is allocated from default address pool")
-			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{noNamespacePool}, e2eservice.GetIngressPoint(
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{noNamespacePool}, jigservice.GetIngressPoint(
 				&svc3.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
 
@@ -670,7 +670,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			}()
 
 			ginkgo.By("validate LoadBalancer IP is allocated from higher priority address pool")
-			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{secondNamespacePoolHigherPriority}, e2eservice.GetIngressPoint(
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{secondNamespacePoolHigherPriority}, jigservice.GetIngressPoint(
 				&svc4.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
 		})

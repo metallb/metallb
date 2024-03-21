@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -193,7 +193,7 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 				for _, c := range FRRContainers {
 					validateService(svc, allNodes.Items, c)
 					for _, ip := range svc.Status.LoadBalancer.Ingress {
-						ingressIP := e2eservice.GetIngressPoint(&ip)
+						ingressIP := jigservice.GetIngressPoint(&ip)
 						Eventually(func() error {
 							addressFamily := ipfamily.ForAddress(net.ParseIP(ingressIP))
 							routes, err := frr.RoutesForCommunity(c, CommunityNoAdv, addressFamily)

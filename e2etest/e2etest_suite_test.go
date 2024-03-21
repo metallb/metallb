@@ -26,7 +26,7 @@ import (
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
-o	. "github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
 
 	"go.universe.tf/e2etest/bgptests"
 	"go.universe.tf/e2etest/l2tests"

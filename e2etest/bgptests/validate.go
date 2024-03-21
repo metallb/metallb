@@ -24,7 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 )
 
 func validateFRRPeeredWithAllNodes(cs clientset.Interface, c *frrcontainer.FRR, ipFamily ipfamily.Family) {
@@ -74,7 +74,7 @@ func validateServiceNoWait(svc *corev1.Service, nodes []corev1.Node, c *frrconta
 		framework.ExpectNotEqual(ip1.To4(), ip2.To4())
 	}
 	for _, ip := range svc.Status.LoadBalancer.Ingress {
-		ingressIP := e2eservice.GetIngressPoint(&ip)
+		ingressIP := jigservice.GetIngressPoint(&ip)
 
 		// TODO: in case of VRF there's currently no host wiring to the service.
 		// We only validate the routes are propagated correctly but
@@ -282,7 +282,7 @@ func validateServiceNotAdvertised(svc *corev1.Service, frrContainers []*frrconta
 	for _, c := range frrContainers {
 		if c.Name != advertised {
 			for _, ip := range svc.Status.LoadBalancer.Ingress {
-				ingressIP := e2eservice.GetIngressPoint(&ip)
+				ingressIP := jigservice.GetIngressPoint(&ip)
 
 				Eventually(func() bool {
 					frrRoutesV4, frrRoutesV6, err := frr.Routes(c)
@@ -309,7 +309,7 @@ func validateServiceInRoutesForCommunity(c *frrcontainer.FRR, community string, 
 			return err
 		}
 		for _, ip := range svc.Status.LoadBalancer.Ingress {
-			ingressIP := e2eservice.GetIngressPoint(&ip)
+			ingressIP := jigservice.GetIngressPoint(&ip)
 			if _, ok := routes[ingressIP]; !ok {
 				return fmt.Errorf("service IP %s not in routes", ingressIP)
 			}
@@ -325,7 +325,7 @@ func validateServiceNotInRoutesForCommunity(c *frrcontainer.FRR, community strin
 			return err
 		}
 		for _, ip := range svc.Status.LoadBalancer.Ingress {
-			ingressIP := e2eservice.GetIngressPoint(&ip)
+			ingressIP := jigservice.GetIngressPoint(&ip)
 			if _, ok := routes[ingressIP]; !ok {
 				return fmt.Errorf("service IP %s not in routes", ingressIP)
 			}
