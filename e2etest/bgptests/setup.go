@@ -14,10 +14,10 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 )
 
-func setupBGPService(f *framework.Framework, pairingIPFamily ipfamily.Family, poolAddresses []string, peers []*frrcontainer.FRR, tweak testservice.Tweak) (*e2eservice.TestJig, *corev1.Service) {
+func setupBGPService(f *framework.Framework, pairingIPFamily ipfamily.Family, poolAddresses []string, peers []*frrcontainer.FRR, tweak testservice.Tweak) (*jigservice.TestJig, *corev1.Service) {
 	cs := f.ClientSet
 	resources := config.Resources{
 		Pools: []metallbv1beta1.IPAddressPool{
@@ -40,7 +40,7 @@ func setupBGPService(f *framework.Framework, pairingIPFamily ipfamily.Family, po
 	ginkgo.By("Checking the service gets an ip assigned")
 	for _, i := range svc.Status.LoadBalancer.Ingress {
 		ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
-		ingressIP := e2eservice.GetIngressPoint(&i)
+		ingressIP := jigservice.GetIngressPoint(&i)
 		err = config.ValidateIPInRange(resources.Pools, ingressIP)
 		Expect(err).NotTo(HaveOccurred())
 	}

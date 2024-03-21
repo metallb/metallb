@@ -16,12 +16,12 @@ import (
 	"go.universe.tf/e2etest/pkg/service"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -117,9 +117,8 @@ var _ = ginkgo.Describe("L2", func() {
 		ginkgo.It("should work with multiple node selectors", func() {
 			// ETP = local, pin the endpoint to node0, have two l2 advertisements, one for
 			// all and one for node1, check node0 is advertised.
-			jig := e2eservice.NewTestJig(cs, f.Namespace.Name, "svca")
-			loadBalancerCreateTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(context.TODO(), cs)
-			svc, err := jig.CreateLoadBalancerService(context.TODO(), loadBalancerCreateTimeout, func(svc *corev1.Service) {
+			jig := jigservice.NewTestJig(cs, f.Namespace.Name, "svca")
+			svc, err := jig.CreateLoadBalancerService(context.TODO(), func(svc *corev1.Service) {
 				svc.Spec.Ports[0].TargetPort = intstr.FromInt(service.TestServicePort)
 				svc.Spec.Ports[0].Port = int32(service.TestServicePort)
 				svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeLocal
@@ -185,7 +184,7 @@ var _ = ginkgo.Describe("L2", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}()
 
-			ingressIP := e2eservice.GetIngressPoint(
+			ingressIP := jigservice.GetIngressPoint(
 				&svc.Status.LoadBalancer.Ingress[0])
 
 			l2Advertisement := metallbv1beta1.L2Advertisement{

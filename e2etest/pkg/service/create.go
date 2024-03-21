@@ -7,26 +7,25 @@ import (
 	"fmt"
 
 	. "github.com/onsi/gomega"
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
-	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 )
 
 var TestServicePort = 80
 
-func CreateWithBackend(cs clientset.Interface, namespace string, jigName string, tweak ...func(svc *corev1.Service)) (*corev1.Service, *e2eservice.TestJig) {
+func CreateWithBackend(cs clientset.Interface, namespace string, jigName string, tweak ...func(svc *corev1.Service)) (*corev1.Service, *jigservice.TestJig) {
 	return CreateWithBackendPort(cs, namespace, jigName, TestServicePort, tweak...)
 }
 
-func CreateWithBackendPort(cs clientset.Interface, namespace string, jigName string, port int, tweak ...func(svc *corev1.Service)) (*corev1.Service, *e2eservice.TestJig) {
+func CreateWithBackendPort(cs clientset.Interface, namespace string, jigName string, port int, tweak ...func(svc *corev1.Service)) (*corev1.Service, *jigservice.TestJig) {
 	var svc *corev1.Service
 	var err error
 
-	jig := e2eservice.NewTestJig(cs, namespace, jigName)
-	timeout := e2eservice.GetServiceLoadBalancerCreationTimeout(context.TODO(), cs)
-	svc, err = jig.CreateLoadBalancerService(context.TODO(), timeout, func(svc *corev1.Service) {
+	jig := jigservice.NewTestJig(cs, namespace, jigName)
+	svc, err = jig.CreateLoadBalancerService(context.TODO(), func(svc *corev1.Service) {
 		tweakServicePort(svc, port)
 		for _, f := range tweak {
 			f(svc)

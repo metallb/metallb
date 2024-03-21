@@ -13,10 +13,10 @@ import (
 	"go.universe.tf/e2etest/pkg/service"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	admissionapi "k8s.io/pod-security-admission/api"
 )
 
@@ -71,9 +71,14 @@ var _ = ginkgo.Describe("LoadBalancer class", func() {
 			err := ConfigUpdater.Update(resources)
 			Expect(err).NotTo(HaveOccurred())
 
-			jig := e2eservice.NewTestJig(cs, f.Namespace.Name, "lbclass")
-			svc, err := jig.CreateLoadBalancerService(context.TODO(), 10*time.Second, service.WithLoadbalancerClass("foo"))
+			jig := jigservice.NewTestJig(cs, f.Namespace.Name, "lbclass")
+			svc, err := jig.CreateLoadBalancerServiceWithTimeout(context.TODO(), 10*time.Second, service.WithLoadbalancerClass("foo"))
+<<<<<<< Updated upstream
 			Expect(err).Should(MatchError(ContainSubstring("timed out waiting for the condition")))
+=======
+
+			Expect(err).Should(MatchError(ContainSubstring("timed out waiting for service \"lbclass\" to have a load balancer")))
+>>>>>>> Stashed changes
 			Expect(svc).To(BeNil())
 		})
 	})

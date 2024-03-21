@@ -29,6 +29,7 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/openshift-kni/k8sreporter"
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	pkgerr "k8s.io/apimachinery/pkg/api/errors"
@@ -36,7 +37,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/kubernetes/test/e2e/framework"
-	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 	admissionapi "k8s.io/pod-security-admission/api"
 
 	"go.universe.tf/e2etest/pkg/config"
@@ -62,7 +62,6 @@ var (
 
 var _ = ginkgo.Describe("L2", func() {
 	var f *framework.Framework
-	var loadBalancerCreateTimeout time.Duration
 	var cs clientset.Interface
 
 	emptyL2Advertisement := metallbv1beta1.L2Advertisement{
@@ -86,7 +85,7 @@ var _ = ginkgo.Describe("L2", func() {
 
 	ginkgo.BeforeEach(func() {
 		cs = f.ClientSet
-		loadBalancerCreateTimeout = e2eservice.GetServiceLoadBalancerCreationTimeout(context.TODO(), cs)
+		loadBalancerCreateTimeout = 5 * time.Minute
 
 		ginkgo.By("Clearing any previous configuration")
 
@@ -181,7 +180,7 @@ var _ = ginkgo.Describe("L2", func() {
 			}()
 
 			port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
-			ingressIP := e2eservice.GetIngressPoint(
+			ingressIP := jigservice.GetIngressPoint(
 				&svc.Status.LoadBalancer.Ingress[0])
 			hostport := net.JoinHostPort(ingressIP, port)
 			address := fmt.Sprintf("http://%s/", hostport)
@@ -225,8 +224,8 @@ var _ = ginkgo.Describe("L2", func() {
 			namespace := f.Namespace.Name
 
 			ginkgo.By("Creating a mixed protocol TCP / UDP service")
-			jig1 := e2eservice.NewTestJig(cs, namespace, "svca")
-			svc1, err := jig1.CreateLoadBalancerService(context.TODO(), loadBalancerCreateTimeout, func(svc *corev1.Service) {
+			jig1 := jigservice.NewTestJig(cs, namespace, "svca")
+			svc1, err := jig1.CreateLoadBalancerService(context.TODO(), func(svc *corev1.Service) {
 				svc.Spec.Ports[0].TargetPort = intstr.FromInt(tcpPort)
 				svc.Spec.Ports[0].Port = int32(tcpPort)
 				svc.Spec.Ports[0].Name = "tcp"
@@ -253,7 +252,7 @@ var _ = ginkgo.Describe("L2", func() {
 				})
 			Expect(err).NotTo(HaveOccurred())
 
-			ingressIP := e2eservice.GetIngressPoint(
+			ingressIP := jigservice.GetIngressPoint(
 				&svc1.Status.LoadBalancer.Ingress[0])
 			hostport := net.JoinHostPort(ingressIP, strconv.Itoa(udpPort))
 
@@ -399,7 +398,7 @@ var _ = ginkgo.Describe("L2", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}()
 
-			ingressIP := e2eservice.GetIngressPoint(
+			ingressIP := jigservice.GetIngressPoint(
 				&svc.Status.LoadBalancer.Ingress[0])
 
 			ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
@@ -478,11 +477,11 @@ var _ = ginkgo.Describe("L2", func() {
 		Expect(err).NotTo(HaveOccurred())
 		namespace := f.Namespace.Name
 
-		jig1 := e2eservice.NewTestJig(cs, namespace, "svca")
+		jig1 := jigservice.NewTestJig(cs, namespace, "svca")
 
 		ip, err := config.GetIPFromRangeByIndex(*ipRange, 0)
 		Expect(err).NotTo(HaveOccurred())
-		svc1, err := jig1.CreateLoadBalancerService(context.TODO(), loadBalancerCreateTimeout, func(svc *corev1.Service) {
+		svc1, err := jig1.CreateLoadBalancerService(context.TODO(), func(svc *corev1.Service) {
 			svc.Spec.Ports[0].TargetPort = intstr.FromInt(service.TestServicePort)
 			svc.Spec.Ports[0].Port = int32(service.TestServicePort)
 			svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
@@ -491,8 +490,8 @@ var _ = ginkgo.Describe("L2", func() {
 
 		Expect(err).NotTo(HaveOccurred())
 
-		jig2 := e2eservice.NewTestJig(cs, namespace, "svcb")
-		svc2, err := jig2.CreateLoadBalancerService(context.TODO(), loadBalancerCreateTimeout, func(svc *corev1.Service) {
+		jig2 := jigservice.NewTestJig(cs, namespace, "svcb")
+		svc2, err := jig2.CreateLoadBalancerService(context.TODO(), func(svc *corev1.Service) {
 			svc.Spec.Ports[0].TargetPort = intstr.FromInt(service.TestServicePort + 1)
 			svc.Spec.Ports[0].Port = int32(service.TestServicePort + 1)
 			svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
@@ -669,7 +668,7 @@ var _ = ginkgo.Describe("L2", func() {
 				return nil
 			}, 2*time.Minute, 5*time.Second).ShouldNot(HaveOccurred())
 
-			ingressIP := e2eservice.GetIngressPoint(
+			ingressIP := jigservice.GetIngressPoint(
 				&svc.Status.LoadBalancer.Ingress[0])
 
 			Eventually(func() error {
@@ -836,7 +835,7 @@ var _ = ginkgo.Describe("L2", func() {
 			}()
 
 			ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
-			ingressIP := e2eservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
+			ingressIP := jigservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool}, ingressIP)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -849,7 +848,7 @@ var _ = ginkgo.Describe("L2", func() {
 			for j := 0; j <= i; j++ {
 
 				ginkgo.By(fmt.Sprintf("validate service %d IP didn't change", j+1))
-				ip := e2eservice.GetIngressPoint(&services[j].Status.LoadBalancer.Ingress[0])
+				ip := jigservice.GetIngressPoint(&services[j].Status.LoadBalancer.Ingress[0])
 				framework.ExpectEqual(ip, servicesIngressIP[j])
 
 				ginkgo.By(fmt.Sprintf("checking connectivity of service %d to its external VIP", j+1))
