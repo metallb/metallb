@@ -8,10 +8,10 @@ import (
 	"net"
 
 	"github.com/mikioh/ipaddr"
+	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"go.universe.tf/e2etest/pkg/iprange"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 func ValidateIPInRange(addressPools []metallbv1beta1.IPAddressPool, ip string) error {
@@ -19,7 +19,7 @@ func ValidateIPInRange(addressPools []metallbv1beta1.IPAddressPool, ip string) e
 	for _, addressPool := range addressPools {
 		for _, address := range addressPool.Spec.Addresses {
 			cidrs, err := iprange.Parse(address)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 			for _, cidr := range cidrs {
 				if cidr.Contains(input) {
 					return nil

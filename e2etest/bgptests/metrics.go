@@ -47,11 +47,11 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 		ginkgo.By("Clearing any previous configuration")
 
 		err := ConfigUpdater.Clean()
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 
 		for _, c := range FRRContainers {
 			err := c.UpdateBGPConfigFile(frrconfig.Empty)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 		}
 	})
 
@@ -86,11 +86,11 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 		ginkgo.BeforeEach(func() {
 			var err error
 			controllerPod, err = metallb.ControllerPod(cs)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 			speakerPods, err = metallb.SpeakerPods(cs)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 			promPod, err = metrics.PrometheusPod(cs, PrometheusNamespace)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		ginkgo.DescribeTable("should collect BGP metrics in FRR mode", func(ipFamily ipfamily.Family, poolAddress string, addressTotal int) {
@@ -113,11 +113,11 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 
 			for _, c := range FRRContainers {
 				err := frrcontainer.PairWithNodes(cs, c, ipFamily)
-				framework.ExpectNoError(err)
+				Expect(err).NotTo(HaveOccurred())
 			}
 
 			err := ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			for _, c := range FRRContainers {
 				validateFRRPeeredWithAllNodes(cs, c, ipFamily)
@@ -260,11 +260,11 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 
 			for _, c := range FRRContainers {
 				err := frrcontainer.PairWithNodes(cs, c, ipFamily)
-				framework.ExpectNoError(err)
+				Expect(err).NotTo(HaveOccurred())
 			}
 
 			err := ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			for _, c := range FRRContainers {
 				validateFRRPeeredWithAllNodes(cs, c, ipFamily)
@@ -440,13 +440,13 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 		}
 
 		err := ConfigUpdater.Update(resources)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 
 		for _, c := range FRRContainers {
 			err := frrcontainer.PairWithNodes(cs, c, pairingFamily, func(container *frrcontainer.FRR) {
 				container.NeighborConfig.BFDEnabled = true
 			})
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 		}
 
 		for _, c := range FRRContainers {
@@ -455,9 +455,9 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 
 		ginkgo.By("checking metrics")
 		speakerPods, err := metallb.SpeakerPods(cs)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 		promPod, err := metrics.PrometheusPod(cs, PrometheusNamespace)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 
 		selectors := labelsForPeers(FRRContainers, pairingFamily)
 
@@ -563,7 +563,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 			err := frrcontainer.PairWithNodes(cs, c, pairingFamily, func(container *frrcontainer.FRR) {
 				container.NeighborConfig.BFDEnabled = false
 			})
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 		}
 
 		ginkgo.By("validating session down metrics")
@@ -648,10 +648,10 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 
 	ginkgo.It("FRR metrics related to config should be exposed", func() {
 		controllerPod, err := metallb.ControllerPod(cs)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 
 		speakers, err := metallb.SpeakerPods(cs)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 		allPods := append(speakers, controllerPod)
 
 		bfdProfile := metallbv1beta1.BFDProfile{
@@ -677,17 +677,17 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 			BGPAdvs: []metallbv1beta1.BGPAdvertisement{emptyBGPAdvertisement},
 		}
 		err = ConfigUpdater.Update(resources)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 
 		promPod, err := metrics.PrometheusPod(cs, PrometheusNamespace)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 
 		ginkgo.By("Checking the config stale metric on the speakers")
 		for _, pod := range speakers {
 			ginkgo.By(fmt.Sprintf("checking pod %s", pod.Name))
 			Eventually(func() error {
 				podMetrics, err := metrics.ForPod(promPod, pod, metallb.Namespace)
-				framework.ExpectNoError(err)
+				Expect(err).NotTo(HaveOccurred())
 				err = metrics.ValidateGaugeValue(1, "metallb_k8s_client_config_stale_bool", map[string]string{}, podMetrics)
 				if err != nil {
 					return err
@@ -702,12 +702,12 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 
 		resources.BFDProfiles = []metallbv1beta1.BFDProfile{bfdProfile}
 		err = ConfigUpdater.Update(resources)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 		for _, pod := range allPods {
 			ginkgo.By(fmt.Sprintf("checking pod %s", pod.Name))
 			Eventually(func() error {
 				podMetrics, err := metrics.ForPod(promPod, pod, metallb.Namespace)
-				framework.ExpectNoError(err)
+				Expect(err).NotTo(HaveOccurred())
 				err = metrics.ValidateGaugeValue(0, "metallb_k8s_client_config_stale_bool", map[string]string{}, podMetrics)
 				if err != nil {
 					return err

@@ -4,12 +4,13 @@ package bgptests
 
 import (
 	"github.com/onsi/ginkgo/v2"
-	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	. "github.com/onsi/gomega"
 	"go.universe.tf/e2etest/pkg/config"
 	frrcontainer "go.universe.tf/e2etest/pkg/frr/container"
 	"go.universe.tf/e2etest/pkg/ipfamily"
 	"go.universe.tf/e2etest/pkg/metallb"
 	testservice "go.universe.tf/e2etest/pkg/service"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/kubernetes/test/e2e/framework"
@@ -32,7 +33,7 @@ func setupBGPService(f *framework.Framework, pairingIPFamily ipfamily.Family, po
 	}
 
 	err := ConfigUpdater.Update(resources)
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 	svc, jig := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
 
@@ -41,7 +42,7 @@ func setupBGPService(f *framework.Framework, pairingIPFamily ipfamily.Family, po
 		ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
 		ingressIP := e2eservice.GetIngressPoint(&i)
 		err = config.ValidateIPInRange(resources.Pools, ingressIP)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 	}
 
 	resources.BGPAdvs = []metallbv1beta1.BGPAdvertisement{
@@ -51,11 +52,11 @@ func setupBGPService(f *framework.Framework, pairingIPFamily ipfamily.Family, po
 
 	for _, c := range peers {
 		err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 	}
 
 	err = ConfigUpdater.Update(resources)
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 	for _, c := range peers {
 		validateFRRPeeredWithAllNodes(cs, c, pairingIPFamily)

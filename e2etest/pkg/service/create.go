@@ -6,11 +6,11 @@ import (
 	"context"
 	"fmt"
 
+	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
 	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 )
 
@@ -33,19 +33,19 @@ func CreateWithBackendPort(cs clientset.Interface, namespace string, jigName str
 		}
 	})
 
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 	_, err = jig.Run(context.TODO(), func(rc *corev1.ReplicationController) {
 		if port != 0 {
 			tweakRCPort(rc, port)
 		}
 	})
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 	return svc, jig
 }
 
 func Delete(cs clientset.Interface, svc *corev1.Service) {
 	err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 }
 
 func tweakServicePort(svc *corev1.Service, port int) {

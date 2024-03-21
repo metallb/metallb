@@ -48,7 +48,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 	ginkgo.BeforeEach(func() {
 		ginkgo.By("Clearing any previous configuration")
 		err := ConfigUpdater.Clean()
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	ginkgo.AfterEach(func() {
@@ -58,7 +58,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 
 		// Clean previous configuration.
 		err := ConfigUpdater.Clean()
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	ginkgo.Context("For IPAddressPool", func() {
@@ -79,7 +79,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 				},
 			}
 			err := ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("Creating second IPAddressPool with overlapping addresses defined by address range")
 			resources.Pools = append(resources.Pools, metallbv1beta1.IPAddressPool{
@@ -93,18 +93,18 @@ var _ = ginkgo.Describe("Webhooks", func() {
 				},
 			})
 			err = ConfigUpdater.Update(resources)
-			framework.ExpectError(err)
+			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("overlaps with already defined CIDR"))
 
 			ginkgo.By("Creating second valid IPAddressPool")
 			resources.Pools[1].Spec.Addresses = []string{"1.1.1.101-1.1.1.200"}
 			err = ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("Updating second IPAddressPool addresses to overlapping addresses defined by network prefix")
 			resources.Pools[1].Spec.Addresses = []string{"1.1.1.0/24"}
 			err = ConfigUpdater.Update(resources)
-			framework.ExpectError(err)
+			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("overlaps with already defined CIDR"))
 		})
 	})
@@ -127,7 +127,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 				},
 			}
 			err := ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("Creating BGPAdvertisement")
 			resources.BGPAdvs = []metallbv1beta1.BGPAdvertisement{
@@ -142,7 +142,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 				},
 			}
 			err = ConfigUpdater.Update(resources)
-			framework.ExpectError(err)
+			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("invalid aggregation length 26: prefix 28 in this pool is more specific than the aggregation length for addresses 1.1.1.0/28"))
 		})
 	})
@@ -165,7 +165,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 				},
 			}
 			err := ConfigUpdater.Update(resources)
-			framework.ExpectError(err)
+			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("invalid BGPPeer address"))
 		})
 	})
@@ -191,7 +191,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 				},
 			}
 			err := ConfigUpdater.Update(resources)
-			framework.ExpectError(err)
+			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring(expectedError))
 		},
 			ginkgo.Entry("in legacy format", "99999999:1", "invalid community value: invalid section"),
@@ -209,7 +209,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 				},
 			}
 			err := ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("Updating community")
 			resources.Communities[0].Spec = metallbv1beta1.CommunitySpec{
@@ -221,7 +221,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 				},
 			}
 			err = ConfigUpdater.Update(resources)
-			framework.ExpectError(err)
+			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring(expectedError))
 		},
 			ginkgo.Entry("in legacy format", "99999999:1", "invalid community value: invalid section"),
@@ -251,7 +251,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 				},
 			}
 			err := ConfigUpdater.Update(resources)
-			framework.ExpectError(err)
+			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("duplicate definition of community"))
 
 			ginkgo.By("Creating duplicates across two different Communities")
@@ -286,7 +286,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 				},
 			}
 			err = ConfigUpdater.Update(resources)
-			framework.ExpectError(err)
+			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("duplicate definition of community"))
 		},
 			ginkgo.Entry("in legacy format", "1111:2222"),
@@ -319,20 +319,20 @@ var _ = ginkgo.Describe("Webhooks", func() {
 				Peers:       []metallbv1beta2.BGPPeer{testPeer},
 			}
 			err := ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("Deleting the profile used by BGPPeer")
 			err = ConfigUpdater.Client().Delete(context.TODO(), &testBFDProfile, &client.DeleteOptions{})
-			framework.ExpectError(err)
+			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("failed to delete BFDProfile"))
 
 			ginkgo.By("Deleting the BGPPeer")
 			err = ConfigUpdater.Client().Delete(context.TODO(), &testPeer, &client.DeleteOptions{})
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("Deleting the profile not used by BGPPeer")
 			err = ConfigUpdater.Client().Delete(context.TODO(), &testBFDProfile, &client.DeleteOptions{})
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 		})
 	})
 })
