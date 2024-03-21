@@ -26,7 +26,8 @@ import (
 	"testing"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+o	. "github.com/onsi/gomega"
+
 	"go.universe.tf/e2etest/bgptests"
 	"go.universe.tf/e2etest/l2tests"
 	testsconfig "go.universe.tf/e2etest/pkg/config"
@@ -116,7 +117,7 @@ func TestE2E(t *testing.T) {
 		return
 	}
 
-	gomega.RegisterFailHandler(framework.Fail)
+	RegisterFailHandler(framework.Fail)
 	ginkgo.RunSpecs(t, "E2E Suite")
 }
 
@@ -127,41 +128,41 @@ var _ = ginkgo.BeforeSuite(func() {
 
 	// Validate the IPv4 service range.
 	_, err := iprange.Parse(l2tests.IPV4ServiceRange)
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 	// Validate the IPv6 service range.
 	_, err = iprange.Parse(l2tests.IPV6ServiceRange)
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 	cs, err := framework.LoadClientset()
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 	switch {
 	case externalContainers != "":
 		bgptests.FRRContainers, err = bgptests.ExternalContainersSetup(externalContainers, cs)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 	case runOnHost:
 		hostBGPMode := bgptests.HostBGPMode(hostContainerMode)
 		if hostBGPMode != bgptests.EBGPMode && hostBGPMode != bgptests.IBGPMode {
 			panic("host bgpmode " + hostContainerMode + " not supported")
 		}
 		bgptests.FRRContainers, err = bgptests.HostContainerSetup(frrImage, hostBGPMode)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 	default:
 		bgptests.FRRContainers, err = bgptests.KindnetContainersSetup(cs, frrImage)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 		if withVRF {
 			vrfFRRContainers, err := bgptests.VRFContainersSetup(cs, frrImage)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 			bgptests.FRRContainers = append(bgptests.FRRContainers, vrfFRRContainers...)
 		}
 	}
 
 	clientconfig, err := framework.LoadConfig()
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 	updater, err = testsconfig.UpdaterForCRs(clientconfig, metallb.Namespace)
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 	// for testing namespace validation, we need an existing namespace that's different from the
 	// metallb installation namespace
@@ -173,20 +174,20 @@ var _ = ginkgo.BeforeSuite(func() {
 	})
 	// ignore failure if namespace already exists, fail for any other errors
 	if err != nil && !errors.IsAlreadyExists(err) {
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 	}
 	updaterOtherNS, err = testsconfig.UpdaterForCRs(clientconfig, otherNamespace)
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 	switch bgpMode {
 	case "native":
 		bgptests.FRRProvider = nil
 	case "frr":
 		bgptests.FRRProvider, err = frrprovider.NewFRRMode(clientconfig)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 	case "frr-k8s":
 		bgptests.FRRProvider, err = frrprovider.NewFRRK8SMode(clientconfig)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 	default:
 		framework.Fail(fmt.Sprintf("unsupported --bgp-mode %s - supported options are: native, frr, frr-k8s", bgpMode))
 	}
@@ -209,16 +210,16 @@ var _ = ginkgo.BeforeSuite(func() {
 
 var _ = ginkgo.AfterSuite(func() {
 	cs, err := framework.LoadClientset()
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 	err = bgptests.InfraTearDown(cs)
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 	if withVRF {
 		err = bgptests.InfraTearDownVRF(cs)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 	}
 	err = updater.Clean()
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 	// delete the namespace created for testing namespace validation
 	nsSpec := v1.Namespace{
@@ -229,9 +230,9 @@ var _ = ginkgo.AfterSuite(func() {
 	err = updaterOtherNS.Client().Delete(context.Background(), &nsSpec)
 	// ignore failure if namespace does not exist, fail for any other errors
 	if err != nil && !errors.IsNotFound(err) {
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 	}
 	err = updaterOtherNS.Clean()
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 })

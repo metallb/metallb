@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/k8s"
 	"go.universe.tf/e2etest/pkg/service"
@@ -31,7 +31,7 @@ var _ = ginkgo.Describe("LoadBalancer class", func() {
 
 		// Clean previous configuration.
 		err := ConfigUpdater.Clean()
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	f = framework.NewDefaultFramework("lbclass")
@@ -42,7 +42,7 @@ var _ = ginkgo.Describe("LoadBalancer class", func() {
 
 		ginkgo.By("Clearing any previous configuration")
 		err := ConfigUpdater.Clean()
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	ginkgo.Context("A service with loadbalancer class", func() {
@@ -69,12 +69,12 @@ var _ = ginkgo.Describe("LoadBalancer class", func() {
 				},
 			}
 			err := ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			jig := e2eservice.NewTestJig(cs, f.Namespace.Name, "lbclass")
 			svc, err := jig.CreateLoadBalancerService(context.TODO(), 10*time.Second, service.WithLoadbalancerClass("foo"))
-			gomega.Expect(err).Should(gomega.MatchError(gomega.ContainSubstring("timed out waiting for the condition")))
-			gomega.Expect(svc).To(gomega.BeNil())
+			Expect(err).Should(MatchError(ContainSubstring("timed out waiting for the condition")))
+			Expect(svc).To(BeNil())
 		})
 	})
 })

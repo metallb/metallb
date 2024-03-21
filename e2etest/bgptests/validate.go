@@ -29,7 +29,7 @@ import (
 
 func validateFRRPeeredWithAllNodes(cs clientset.Interface, c *frrcontainer.FRR, ipFamily ipfamily.Family) {
 	allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 	validateFRRPeeredWithNodes(allNodes.Items, c, ipFamily)
 }
 
@@ -38,7 +38,7 @@ func validateFRRNotPeeredWithNodes(nodes []corev1.Node, c *frrcontainer.FRR, ipF
 		ginkgo.By(fmt.Sprintf("checking node %s is not peered with the frr instance %s", node.Name, c.Name))
 		Eventually(func() error {
 			neighbors, err := frr.NeighborsInfo(c)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 			err = frr.NeighborsMatchNodes([]corev1.Node{node}, neighbors, ipFamily, c.RouterConfig.VRF)
 			return err
 		}, 4*time.Minute, 1*time.Second).Should(MatchError(ContainSubstring("not established")))
@@ -49,7 +49,7 @@ func validateFRRPeeredWithNodes(nodes []corev1.Node, c *frrcontainer.FRR, ipFami
 	ginkgo.By(fmt.Sprintf("checking nodes are peered with the frr instance %s", c.Name))
 	Eventually(func() error {
 		neighbors, err := frr.NeighborsInfo(c)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 		err = frr.NeighborsMatchNodes(nodes, neighbors, ipFamily, c.RouterConfig.VRF)
 		if err != nil {
 			return fmt.Errorf("failed to match neighbors for %s, %w", c.Name, err)
@@ -125,9 +125,9 @@ func validateServiceNoWait(svc *corev1.Service, nodes []corev1.Node, c *frrconta
 
 func frrIsPairedOnPods(cs clientset.Interface, n *frrcontainer.FRR, ipFamily ipfamily.Family) {
 	pods, err := metallb.SpeakerPods(cs)
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 	podExecutor, err := FRRProvider.FRRExecutorFor(pods[0].Namespace, pods[0].Name)
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 	Eventually(func() error {
 		addresses := n.AddressesForFamily(ipFamily)
@@ -176,7 +176,7 @@ func checkServiceOnlyOnNodes(svc *corev1.Service, expectedNodes []corev1.Node, i
 
 	for _, c := range FRRContainers {
 		nodeIps, err := k8s.NodeIPsForFamily(expectedNodes, ipFamily, c.RouterConfig.VRF)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 		validateService(svc, expectedNodes, c)
 		Eventually(func() error {
 			routes, err := frr.RoutesForFamily(c, ipFamily)
@@ -206,10 +206,10 @@ func checkServiceNotOnNodes(svc *corev1.Service, expectedNodes []corev1.Node, ip
 
 	for _, c := range FRRContainers {
 		nodeIps, err := k8s.NodeIPsForFamily(expectedNodes, ipFamily, c.RouterConfig.VRF)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 		Eventually(func() bool {
 			routes, err := frr.RoutesForFamily(c, ipFamily)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 			for _, n := range routes[ip].NextHops {
 				for _, ip := range nodeIps {
 					if n.String() == ip {
@@ -230,7 +230,7 @@ func checkCommunitiesOnlyOnNodes(svc *corev1.Service, community string, expected
 
 	for _, c := range FRRContainers {
 		nodeIps, err := k8s.NodeIPsForFamily(expectedNodes, ipFamily, c.RouterConfig.VRF)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 
 		Eventually(func() error {
 			routes, err := frr.RoutesForCommunity(c, community, ipFamily)
@@ -287,7 +287,7 @@ func validateServiceNotAdvertised(svc *corev1.Service, frrContainers []*frrconta
 				Eventually(func() bool {
 					frrRoutesV4, frrRoutesV6, err := frr.Routes(c)
 					if err != nil {
-						framework.ExpectNoError(err)
+						Expect(err).NotTo(HaveOccurred())
 					}
 
 					_, ok := frrRoutesV4[ingressIP]
@@ -339,10 +339,10 @@ func validateServiceNotInRoutesForCommunity(c *frrcontainer.FRR, community strin
 func isRouteInjected(pods []*corev1.Pod, pairingFamily ipfamily.Family, routeToCheck, vrf string) (bool, string) {
 	for _, pod := range pods {
 		podExec, err := FRRProvider.FRRExecutorFor(pod.Namespace, pod.Name)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 
 		routes, frrRoutesV6, err := frr.RoutesForVRF(vrf, podExec)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 
 		if pairingFamily == ipfamily.IPv6 {
 			routes = frrRoutesV6
