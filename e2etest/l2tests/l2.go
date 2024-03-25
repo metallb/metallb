@@ -273,7 +273,6 @@ var _ = ginkgo.Describe("L2", func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
 				Expect(err).NotTo(HaveOccurred())
 			}()
-			time.Sleep(time.Second)
 
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
@@ -282,13 +281,13 @@ var _ = ginkgo.Describe("L2", func() {
 			var nodeToSet string
 
 			Eventually(func() error {
-				node, err := k8s.GetSvcNode(cs, svc.Namespace, svc.Name, allNodes)
+				var err error
+				nodeToSet, err = nodeForService(svc, allNodes.Items)
 				if err != nil {
 					return err
 				}
-				nodeToSet = node.Name
 				return nil
-			}, 3*time.Minute, time.Second).ShouldNot(HaveOccurred())
+			}, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
 
 			err = k8s.SetNodeCondition(cs, nodeToSet, corev1.NodeNetworkUnavailable, corev1.ConditionTrue)
 			Expect(err).NotTo(HaveOccurred())
@@ -296,15 +295,14 @@ var _ = ginkgo.Describe("L2", func() {
 				err = k8s.SetNodeCondition(cs, nodeToSet, corev1.NodeNetworkUnavailable, corev1.ConditionFalse)
 				Expect(err).NotTo(HaveOccurred())
 			}()
-			time.Sleep(time.Second)
 
 			ginkgo.By("validating the service is announced from a different node")
 			Eventually(func() string {
-				node, err := k8s.GetSvcNode(cs, svc.Namespace, svc.Name, allNodes)
+				node, err := nodeForService(svc, allNodes.Items)
 				if err != nil {
-					return err.Error()
+					return ""
 				}
-				return node.Name
+				return node
 			}, time.Minute, time.Second).ShouldNot(Equal(nodeToSet))
 
 			ginkgo.By("setting the NetworkUnavailable condition back to false")
@@ -313,11 +311,11 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("validating the service is announced back again from the previous node")
 			Eventually(func() string {
-				node, err := k8s.GetSvcNode(cs, svc.Namespace, svc.Name, allNodes)
+				node, err := nodeForService(svc, allNodes.Items)
 				if err != nil {
-					return err.Error()
+					return ""
 				}
-				return node.Name
+				return node
 			}, time.Minute, time.Second).Should(Equal(nodeToSet))
 		})
 
@@ -335,20 +333,16 @@ var _ = ginkgo.Describe("L2", func() {
 			var nodeToSet string
 
 			Eventually(func() error {
-				node, err := k8s.GetSvcNode(cs, svc.Namespace, svc.Name, allNodes)
+				var err error
+				nodeToSet, err = nodeForService(svc, allNodes.Items)
 				if err != nil {
 					return err
 				}
-				nodeToSet = node.Name
 				return nil
-			}, time.Minute, time.Second).ShouldNot(HaveOccurred())
+			}, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
 
 			ginkgo.By("add the NodeExcludeBalancers label of the node")
 
-			// Adding a sleep for AddLabelToNode is to make sure that the lastTimeStep
-			// of the second nodeAssigned event is later than the first one, so that
-			// we can get the correct node name.
-			time.Sleep(time.Second)
 			k8s.AddLabelToNode(nodeToSet, corev1.LabelNodeExcludeBalancers, "", cs)
 			defer func() {
 				ginkgo.By("removing the NodeExcludeBalancers label of the node")
@@ -357,11 +351,11 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("validating the service is announced from a different node")
 			Eventually(func() string {
-				node, err := k8s.GetSvcNode(cs, svc.Namespace, svc.Name, allNodes)
+				node, err := nodeForService(svc, allNodes.Items)
 				if err != nil {
-					return err.Error()
+					return ""
 				}
-				return node.Name
+				return node
 			}, time.Minute, time.Second).ShouldNot(Equal(nodeToSet))
 
 			ginkgo.By("removing the NodeExcludeBalancers label of the node")
@@ -369,11 +363,11 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("validating the service is announced back again from the previous node")
 			Eventually(func() string {
-				node, err := k8s.GetSvcNode(cs, svc.Namespace, svc.Name, allNodes)
+				node, err := nodeForService(svc, allNodes.Items)
 				if err != nil {
-					return err.Error()
+					return ""
 				}
-				return node.Name
+				return node
 			}, time.Minute, time.Second).Should(Equal(nodeToSet))
 		})
 	})
