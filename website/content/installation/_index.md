@@ -75,7 +75,7 @@ If you want to deploy MetalLB using the [experimental FRR-K8s mode]({{% relref "
 kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.3/config/manifests/metallb-frr-k8s.yaml
 ```
 
-Please do note that these manifests deploy MetalLB from the main development branch. We highly encourage cloud operators to deploy a stable released version of MetalLB on production environments!
+These manifests deploy MetalLB from a release branch. Indeed, we highly encourage cloud operators to deploy a stable released version of MetalLB (instead of manifests from the main branch) on production environments!
 
 {{% /notice %}}
 
