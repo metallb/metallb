@@ -7,11 +7,15 @@ weight: 8
 
 New features:
 
+- Add option to configure BGP connect time ([PR_2144](https://github.com/metallb/metallb/pull))
 - Bump FRR to 9.0.2 ([PR 2282](https://github.com/metallb/metallb/pull/2282), [Issue 2256](https://github.com/metallb/metallb/issues/2256))
-- Make the namse of webhook service and cert metallb specific to avoid name conflicts with other resources in the cluster. ([PR 2244](https://github.com/metallb/metallb/pull/2244), [Issue 2174](https://github.com/metallb/metallb/issues/2174)).
-New Features:
-
+- Make the name of webhook service and cert metallb specific to avoid name conflicts with other resources in the cluster. ([PR 2244](https://github.com/metallb/metallb/pull/2244), [Issue 2174](https://github.com/metallb/metallb/issues/2174)).
 - Provide a "ignore-exclude-lb" flag to ignore the `exclude-from-external-load-balancers` label ([PR 2280](https://github.com/metallb/metallb/pull/2280), [Issue 2274](https://github.com/metallb/metallb/issues/2274))
+- The log level of the logs for skipping the BGP announcement because of the 'node.kubernetes.io/exclude-from-external-load-balancer' label and the network unavailable condition are now warning instead of debug. (#2275, @clee)
+- The metallb-excludel2 configmap is not deployed from the Helm chart if the speaker is disabled. (#2298, @mustdiechik)
+- Add a field to the BGPPeer CRD to disable MP BGP for the given peer (#2306, @AlinaSecret)
+- Bump frr-k8s to 0.0.10 (#2306, @AlinaSecret)
+- Support BGP Connect time field in FRR-K8s mode (#2305, @AlinaSecret)
 
 BugFixes:
 
@@ -20,17 +24,12 @@ BugFixes:
 - Helm: fix the creation of the metrics-certs volume under the presence of the speakerMetricsTLSSecret value, regardless of FRR being enabled ([PR 2286](https://github.com/metallb/metallb/pull/2286))
 - Docs: remove outdated information about multiprotocol services ([PR 2228](https://github.com/metallb/metallb/pull/2228)).
 - FRR Config: generate the route-map for each local pref / community / large community only once ([PR 2292](https://github.com/metallb/metallb/pull/2292))
-
-Chores:
-
-- Add Helm to upgrade documentation ([PR 2268](https://github.com/metallb/metallb/pull/2268))
 - Propagate the loglevel to the controller runtime too ([PR ](https://github.com/metallb/metallb/pull/2281), [Issue 2161](https://github.com/metallb/metallb/issues/2161))
+- Expose the speaker metrics port only to localhost if kuberbacproxy is added, so metrics are exported as encrypted only. (#2315, @fedepaol)
+
+This release include contributions from Alina Sudakov, budimanjojo, Chris Lee, cyclinder, Federico Paolinelli, Fish-pro, Kyle Fazzari, Lior Noy, lwabish, Ori Braunshtein, renklus, Ruslan Khizhnyak, shimritproj, tico88612. Thanks!
 
 ## Version 0.14.3
-
-New features:
-
-- Add option to configure BGP connect time ([PR_2144](https://github.com/metallb/metallb/pull))
 
 BugFixes:
 
