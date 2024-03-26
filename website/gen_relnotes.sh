@@ -30,3 +30,7 @@ GOFLAGS=-mod=mod go run k8s.io/release/cmd/release-notes@v0.16.5 \
     --output $release_notes
 
 cat $release_notes
+
+
+echo "Contributors"
+git log --format="%aN" $(git merge-base $to $from)..$to | sort -u | tr '\n' ',' | sed -e 's/,/, /g'
