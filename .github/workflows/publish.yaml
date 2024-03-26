@@ -109,7 +109,7 @@ jobs:
             GIT_COMMIT: ${{ github.sha }}
 
       - name: Cosign sign tags
-        run: cosign sign ${TAGS}
+        run: cosign sign --yes ${TAGS}
         env:
           TAGS: ${{ steps.meta.outputs.tags }}@${{ steps.build-and-push.outputs.digest }}
           COSIGN_EXPERIMENTAL: 1
