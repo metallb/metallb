@@ -9,7 +9,7 @@ METALLB_NS="${METALLB_NS:-metallb-system}"
 OUTPUT="./report"
 
 function get_metallb_crs() {
-    declare -a METALLB_CRDS=("addresspools" "bgppeers" "bfdprofiles" "bgpAdvertisements" "ipaddresspools" "l2advertisements" "communities")
+    declare -a METALLB_CRDS=("bgppeers" "bfdprofiles" "bgpAdvertisements" "ipaddresspools" "l2advertisements" "communities")
     mkdir -p ${OUTPUT}/crds/
 
     for CRD in "${METALLB_CRDS[@]}"; do

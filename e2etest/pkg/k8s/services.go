@@ -4,7 +4,6 @@ package k8s
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"strings"
 
@@ -12,17 +11,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
-	"k8s.io/kubernetes/test/e2e/framework/kubectl"
 )
-
-// DescribeSvc logs the output of kubectl describe svc for the given namespace.
-func DescribeSvc(ns string) {
-	framework.Logf("\nOutput of kubectl describe svc:\n")
-	desc, _ := kubectl.RunKubectl(
-		ns, "describe", "svc", fmt.Sprintf("--namespace=%v", ns))
-	framework.Logf(desc)
-}
 
 // GetSvcNode returns the node that the LB Service announcing from.
 func GetSvcNode(cs clientset.Interface, svcNS string, svcName string, allNodes *corev1.NodeList) (*corev1.Node, error) {

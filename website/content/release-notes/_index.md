@@ -3,6 +3,32 @@ title: Release Notes
 weight: 8
 ---
 
+## Version 0.14.4
+
+New features:
+
+- Add option to configure BGP connect time ([PR_2144](https://github.com/metallb/metallb/pull))
+- Bump FRR to 9.0.2 ([PR 2282](https://github.com/metallb/metallb/pull/2282), [Issue 2256](https://github.com/metallb/metallb/issues/2256))
+- Make the name of webhook service and cert metallb specific to avoid name conflicts with other resources in the cluster. ([PR 2244](https://github.com/metallb/metallb/pull/2244), [Issue 2174](https://github.com/metallb/metallb/issues/2174)).
+- Provide a "ignore-exclude-lb" flag to ignore the `exclude-from-external-load-balancers` label ([PR 2280](https://github.com/metallb/metallb/pull/2280), [Issue 2274](https://github.com/metallb/metallb/issues/2274))
+- The log level of the logs for skipping the BGP announcement because of the 'node.kubernetes.io/exclude-from-external-load-balancer' label and the network unavailable condition are now warning instead of debug. (#2275, @clee)
+- The metallb-excludel2 configmap is not deployed from the Helm chart if the speaker is disabled. (#2298, @mustdiechik)
+- Add a field to the BGPPeer CRD to disable MP BGP for the given peer (#2306, @AlinaSecret)
+- Bump frr-k8s to 0.0.10 (#2306, @AlinaSecret)
+- Support BGP Connect time field in FRR-K8s mode (#2305, @AlinaSecret)
+
+BugFixes:
+
+- Fix the non existing conversion webhook in the Helm CRDs ([PR 2269](https://github.com/metallb/metallb/pull/2269))
+- Remove dangling AddressPool leftovers ([PR 2272](https://github.com/metallb/metallb/pull/2272) [Issue 2270](https://github.com/metallb/metallb/issues/2270))
+- Helm: fix the creation of the metrics-certs volume under the presence of the speakerMetricsTLSSecret value, regardless of FRR being enabled ([PR 2286](https://github.com/metallb/metallb/pull/2286))
+- Docs: remove outdated information about multiprotocol services ([PR 2228](https://github.com/metallb/metallb/pull/2228)).
+- FRR Config: generate the route-map for each local pref / community / large community only once ([PR 2292](https://github.com/metallb/metallb/pull/2292))
+- Propagate the loglevel to the controller runtime too ([PR ](https://github.com/metallb/metallb/pull/2281), [Issue 2161](https://github.com/metallb/metallb/issues/2161))
+- Expose the speaker metrics port only to localhost if kuberbacproxy is added, so metrics are exported as encrypted only. (#2315, @fedepaol)
+
+This release include contributions from Alina Sudakov, budimanjojo, Chris Lee, cyclinder, Federico Paolinelli, Fish-pro, Kyle Fazzari, Lior Noy, lwabish, Ori Braunshtein, renklus, Ruslan Khizhnyak, shimritproj, tico88612. Thanks!
+
 ## Version 0.14.3
 
 BugFixes:
@@ -33,11 +59,14 @@ controller ([PR 2004](https://github.com/metallb/metallb/pull/2004), [Issue 1984
 - Allow tls-cipher-suites and tls-min-version via parameters, and set defaults ([PR 2083](https://github.com/metallb/metallb/pull/2083))
 - Implement NodeExcludeBalancers to exclude nodes as external loadbalancer ([PR 2073](https://github.com/metallb/metallb/pull/2073), [ISSUE 2021](https://github.com/metallb/metallb/issues/2021))
 - Metrics: add ipv4/6 addresses_in_use_total and addresses_total ([PR 2151](https://github.com/metallb/metallb/pull/2151))
+- E2E: Verify autoAssign=False works([PR 2264](https://github.com/metallb/metallb/pull/2264),[ISSUE 2221](https://github.com/metallb/metallb/issues/2221))
+- Implement ServiceL2Status CRD to expose service announcing status in layer2 mode ([PR 2198](https://github.com/metallb/metallb/pull/2198))
 
 Bug Fixes:
 
 - FRR mode: FRR templates: provide a seqnum for the prefix lists ([PR 2075](https://github.com/metallb/metallb/pull/2075)
 - Webhooks: avoid transient errors ([PR 2202](https://github.com/metallb/metallb/pull/2202)), [ISSUE 2173](https://github.com/metallb/metallb/issues/2173))
+- Remove the pointer packages and utilize the 'ptr' utility package of Kubernetes ([PR 2223](https://github.com/metallb/metallb/pull/2223))
 
 This release includes contributions from Andreas Karis, Antonio Pitasi, Arjun Singh, AzraelSec, cong, cyclinder, Federico Paolinelli, Giovanni Toraldo, Ivan Kurnosov, Jonas Badstübner, Lior Noy, machinaexdeo, Marcelo Guerrero Viveros, Micah Nagel, Michael Aspinwall, Moritz Schlarb, Ori Braunshtein, Pavel Basov, Robin, shimritproj, Siyi.Yang, timm0e. Thanks!
 

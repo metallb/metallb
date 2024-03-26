@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
 	"go.universe.tf/e2etest/pkg/executor"
 	"go.universe.tf/e2etest/pkg/ipfamily"
 	"go.universe.tf/e2etest/pkg/netdev"
@@ -18,7 +18,6 @@ import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 func NodeIPsForFamily(nodes []v1.Node, family ipfamily.Family, vrfName string) ([]string, error) {
@@ -82,20 +81,20 @@ func SelectorsForNodes(nodes []v1.Node) []metav1.LabelSelector {
 
 func AddLabelToNode(nodeName, key, value string, cs clientset.Interface) {
 	nodeObject, err := cs.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 	nodeObject.Labels[key] = value
 	_, err = cs.CoreV1().Nodes().Update(context.Background(), nodeObject, metav1.UpdateOptions{})
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 }
 
 func RemoveLabelFromNode(nodeName, key string, cs clientset.Interface) {
 	nodeObject, err := cs.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 	delete(nodeObject.Labels, key)
 	_, err = cs.CoreV1().Nodes().Update(context.Background(), nodeObject, metav1.UpdateOptions{})
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 }
 
 // SetNodeCondition sets the node's condition to the desired status and validates that the change is applied.
@@ -116,7 +115,7 @@ func SetNodeCondition(cs clientset.Interface, nodeName string, conditionType v1.
 		return fmt.Errorf("failed to set condition %s on node %s: %s", conditionType, nodeName, err)
 	}
 
-	gomega.Eventually(func() error {
+	Eventually(func() error {
 		patch := []byte(fmt.Sprintf(`{"status":{"conditions":%s}}`, raw))
 		_, err = cs.CoreV1().Nodes().PatchStatus(context.Background(), nodeName, patch)
 		if err != nil {
@@ -134,7 +133,7 @@ func SetNodeCondition(cs clientset.Interface, nodeName string, conditionType v1.
 		}
 
 		return nil
-	}, time.Minute, 3*time.Second).ShouldNot(gomega.HaveOccurred())
+	}, time.Minute, 3*time.Second).ShouldNot(HaveOccurred())
 
 	return nil
 }

@@ -7,7 +7,7 @@ route-map 10.2.2.254-red-in deny 20
 
 
 
- ip prefix-list 10.2.2.254-red-pl-ipv4 seq 1 permit 172.16.1.11/24
+ip prefix-list 10.2.2.254-red-pl-ipv4 seq 1 permit 172.16.1.11/24
 
 
 

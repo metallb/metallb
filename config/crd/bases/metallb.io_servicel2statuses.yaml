@@ -1,0 +1,69 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: servicel2statuses.metallb.io
+spec:
+  group: metallb.io
+  names:
+    kind: ServiceL2Status
+    listKind: ServiceL2StatusList
+    plural: servicel2statuses
+    singular: servicel2status
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.node
+      name: Allocated Node
+      type: string
+    name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: ServiceL2Status reveals the actual traffic status of loadbalancer
+          services in layer2 mode.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: ServiceL2StatusSpec defines the desired state of ServiceL2Status.
+            type: object
+          status:
+            description: MetalLBServiceL2Status defines the observed state of ServiceL2Status.
+            properties:
+              interfaces:
+                description: Interfaces indicates the interfaces that receive the
+                  directed traffic
+                items:
+                  description: InterfaceInfo defines interface info of layer2 announcement.
+                  properties:
+                    name:
+                      description: Name the name of network interface card
+                      type: string
+                  type: object
+                type: array
+              node:
+                description: Node indicates the node that receives the directed traffic
+                type: string
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

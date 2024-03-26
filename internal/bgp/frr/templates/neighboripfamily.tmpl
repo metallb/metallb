@@ -1,13 +1,17 @@
 {{- define "neighborenableipfamily"}}
 {{/* no bgp default ipv4-unicast prevents peering if no address families are defined. We declare an ipv4 one for the peer to make the pairing happen */}}
+{{- if activateNeighborFor "ipv4" .IPFamily .DisableMP}}
   address-family ipv4 unicast
     neighbor {{.Addr}} activate
     neighbor {{.Addr}} route-map {{.ID}}-in in
     neighbor {{.Addr}} route-map {{.ID}}-out out
   exit-address-family
+{{- end -}}
+{{if activateNeighborFor "ipv6" .IPFamily .DisableMP}}
   address-family ipv6 unicast
     neighbor {{.Addr}} activate
     neighbor {{.Addr}} route-map {{.ID}}-in in
     neighbor {{.Addr}} route-map {{.ID}}-out out
   exit-address-family
+{{- end -}}
 {{- end -}}

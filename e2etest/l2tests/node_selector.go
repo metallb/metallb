@@ -8,28 +8,27 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/executor"
 	"go.universe.tf/e2etest/pkg/k8s"
+	"go.universe.tf/e2etest/pkg/k8sclient"
 	"go.universe.tf/e2etest/pkg/mac"
 	"go.universe.tf/e2etest/pkg/service"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
-	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
-	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = ginkgo.Describe("L2", func() {
 	var cs clientset.Interface
 	var nodeToLabel *corev1.Node
+	testNamespace := ""
 
-	var f *framework.Framework
 	ginkgo.AfterEach(func() {
 		if nodeToLabel != nil {
 			k8s.RemoveLabelFromNode(nodeToLabel.Name, "bgp-node-selector-test", cs)
@@ -41,19 +40,21 @@ var _ = ginkgo.Describe("L2", func() {
 
 		// Clean previous configuration.
 		err := ConfigUpdater.Clean()
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
+		err = k8s.DeleteNamespace(cs, testNamespace)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
-	f = framework.NewDefaultFramework("l2")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-
 	ginkgo.BeforeEach(func() {
-		cs = f.ClientSet
+		cs = k8sclient.New()
+		var err error
+		testNamespace, err = k8s.CreateTestNamespace(cs, "l2sel")
+		Expect(err).NotTo(HaveOccurred())
 
 		ginkgo.By("Clearing any previous configuration")
 
-		err := ConfigUpdater.Clean()
-		framework.ExpectNoError(err)
+		err = ConfigUpdater.Clean()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	ginkgo.Context("Node Selector", func() {
@@ -74,18 +75,18 @@ var _ = ginkgo.Describe("L2", func() {
 			}
 
 			err := ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 		})
 
 		ginkgo.It("should work selecting one node", func() {
-			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", service.TrafficPolicyCluster)
+			svc, _ := service.CreateWithBackend(cs, testNamespace, "external-local-lb", service.TrafficPolicyCluster)
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
+				Expect(err).NotTo(HaveOccurred())
 			}()
 
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 			for _, node := range allNodes.Items {
 				l2Advertisement := metallbv1beta1.L2Advertisement{
 					ObjectMeta: metav1.ObjectMeta{
@@ -102,37 +103,36 @@ var _ = ginkgo.Describe("L2", func() {
 				}
 
 				err := ConfigUpdater.Update(resources)
-				framework.ExpectNoError(err)
+				Expect(err).NotTo(HaveOccurred())
 
-				gomega.Eventually(func() string {
+				Eventually(func() string {
 					node, err := nodeForService(svc, allNodes.Items)
 					if err != nil {
 						return ""
 					}
 					return node
-				}, 30*time.Second, 1*time.Second).Should(gomega.Equal(node.Name))
+				}, 30*time.Second, 1*time.Second).Should(Equal(node.Name))
 			}
 		})
 
 		ginkgo.It("should work with multiple node selectors", func() {
 			// ETP = local, pin the endpoint to node0, have two l2 advertisements, one for
 			// all and one for node1, check node0 is advertised.
-			jig := e2eservice.NewTestJig(cs, f.Namespace.Name, "svca")
-			loadBalancerCreateTimeout := e2eservice.GetServiceLoadBalancerCreationTimeout(context.TODO(), cs)
-			svc, err := jig.CreateLoadBalancerService(context.TODO(), loadBalancerCreateTimeout, func(svc *corev1.Service) {
+			jig := jigservice.NewTestJig(cs, testNamespace, "svca")
+			svc, err := jig.CreateLoadBalancerService(context.TODO(), func(svc *corev1.Service) {
 				svc.Spec.Ports[0].TargetPort = intstr.FromInt(service.TestServicePort)
 				svc.Spec.Ports[0].Port = int32(service.TestServicePort)
 				svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeLocal
 			})
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
+				Expect(err).NotTo(HaveOccurred())
 			}()
 
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 			if len(allNodes.Items) < 2 {
 				ginkgo.Skip("Not enough nodes")
 			}
@@ -142,7 +142,7 @@ var _ = ginkgo.Describe("L2", func() {
 					rc.Spec.Template.Spec.Containers[0].ReadinessProbe.HTTPGet.Port = intstr.FromInt(service.TestServicePort)
 					rc.Spec.Template.Spec.NodeName = allNodes.Items[0].Name
 				})
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			l2Advertisements := []metallbv1beta1.L2Advertisement{
 				{
@@ -165,27 +165,27 @@ var _ = ginkgo.Describe("L2", func() {
 			}
 
 			err = ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("checking connectivity to its external VIP")
 
-			gomega.Eventually(func() string {
+			Eventually(func() string {
 				node, err := nodeForService(svc, allNodes.Items)
 				if err != nil {
 					return err.Error()
 				}
 				return node
-			}, 2*time.Minute, time.Second).Should(gomega.Equal(allNodes.Items[0].Name))
+			}, 2*time.Minute, time.Second).Should(Equal(allNodes.Items[0].Name))
 		})
 
 		ginkgo.It("should work when adding nodes", func() {
-			svc, _ := service.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", service.TrafficPolicyCluster)
+			svc, _ := service.CreateWithBackend(cs, testNamespace, "external-local-lb", service.TrafficPolicyCluster)
 			defer func() {
 				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-				framework.ExpectNoError(err)
+				Expect(err).NotTo(HaveOccurred())
 			}()
 
-			ingressIP := e2eservice.GetIngressPoint(
+			ingressIP := jigservice.GetIngressPoint(
 				&svc.Status.LoadBalancer.Ingress[0])
 
 			l2Advertisement := metallbv1beta1.L2Advertisement{
@@ -209,15 +209,15 @@ var _ = ginkgo.Describe("L2", func() {
 			}
 
 			err := ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("Validating service IP not advertised")
-			gomega.Eventually(func() error {
+			Eventually(func() error {
 				return mac.RequestAddressResolution(ingressIP, executor.Host)
-			}, 2*time.Minute, time.Second).Should(gomega.HaveOccurred())
+			}, 2*time.Minute, time.Second).Should(HaveOccurred())
 
 			nodeToLabel = &allNodes.Items[0]
 			ginkgo.By(fmt.Sprintf("Adding advertisement label to node %s", nodeToLabel.Name))
@@ -225,13 +225,13 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By(fmt.Sprintf("Validating service IP advertised by %s", nodeToLabel.Name))
 
-			gomega.Eventually(func() string {
+			Eventually(func() string {
 				node, err := nodeForService(svc, allNodes.Items)
 				if err != nil {
 					return err.Error()
 				}
 				return node
-			}, 2*time.Minute, time.Second).Should(gomega.Equal(nodeToLabel.Name))
+			}, 2*time.Minute, time.Second).Should(Equal(nodeToLabel.Name))
 		})
 	})
 })

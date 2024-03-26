@@ -70,6 +70,7 @@ type SessionParameters struct {
 	PeerASN       uint32
 	HoldTime      time.Duration
 	KeepAliveTime time.Duration
+	ConnectTime   *time.Duration
 	Password      string
 	PasswordRef   v1.SecretReference
 	CurrentNode   string
@@ -77,6 +78,7 @@ type SessionParameters struct {
 	EBGPMultiHop  bool
 	VRFName       string
 	SessionName   string
+	DisableMP     bool
 }
 type SessionManager interface {
 	NewSession(logger log.Logger, args SessionParameters) (Session, error)

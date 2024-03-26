@@ -8,29 +8,29 @@ import (
 	"fmt"
 	"strings"
 
-	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
-	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/ipfamily"
 	"go.universe.tf/e2etest/pkg/k8s"
+	"go.universe.tf/e2etest/pkg/k8sclient"
 	"go.universe.tf/e2etest/pkg/metallb"
 	testservice "go.universe.tf/e2etest/pkg/service"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	frrconfig "go.universe.tf/e2etest/pkg/frr/config"
 	frrcontainer "go.universe.tf/e2etest/pkg/frr/container"
 	corev1 "k8s.io/api/core/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
-	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = ginkgo.Describe("BGP Node Selector", func() {
 	var cs clientset.Interface
-	var f *framework.Framework
 	var nodeToLabel *corev1.Node
+	testNamespace := ""
 
 	ginkgo.AfterEach(func() {
 		if nodeToLabel != nil {
@@ -38,35 +38,33 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 		}
 
 		if ginkgo.CurrentSpecReport().Failed() {
-			dumpBGPInfo(ReportPath, ginkgo.CurrentSpecReport().LeafNodeText, cs, f)
+			dumpBGPInfo(ReportPath, ginkgo.CurrentSpecReport().LeafNodeText, cs, testNamespace)
 			k8s.DumpInfo(Reporter, ginkgo.CurrentSpecReport().LeafNodeText)
 		}
+		err := k8s.DeleteNamespace(cs, testNamespace)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	ginkgo.BeforeEach(func() {
 		ginkgo.By("Clearing any previous configuration")
 
 		err := ConfigUpdater.Clean()
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 
 		for _, c := range FRRContainers {
 			err := c.UpdateBGPConfigFile(frrconfig.Empty)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 		}
-	})
-
-	f = framework.NewDefaultFramework("bgp")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-
-	ginkgo.BeforeEach(func() {
-		cs = f.ClientSet
+		cs = k8sclient.New()
+		testNamespace, err = k8s.CreateTestNamespace(cs, "bgp")
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	ginkgo.DescribeTable("Two services, two distinct advertisements with different node selectors",
 		func(pairingIPFamily ipfamily.Family, addresses []string, nodesForFirstPool, nodesForSecondPool []int) {
 			var allNodes *corev1.NodeList
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			expectedNodesForFirstPool := nodesForSelection(allNodes.Items, nodesForFirstPool)
 			expectedNodesForSecondPool := nodesForSelection(allNodes.Items, nodesForSecondPool)
@@ -112,15 +110,15 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 			}
 			for _, c := range FRRContainers {
 				err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily)
-				framework.ExpectNoError(err)
+				Expect(err).NotTo(HaveOccurred())
 			}
 
 			err = ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
-			firstService, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "first-lb", testservice.WithSpecificPool("first-pool"))
+			firstService, _ := testservice.CreateWithBackend(cs, testNamespace, "first-lb", testservice.WithSpecificPool("first-pool"))
 			defer testservice.Delete(cs, firstService)
-			secondService, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "second-lb", testservice.WithSpecificPool("second-pool"))
+			secondService, _ := testservice.CreateWithBackend(cs, testNamespace, "second-lb", testservice.WithSpecificPool("second-pool"))
 			defer testservice.Delete(cs, secondService)
 
 			ginkgo.By(fmt.Sprintf("Checking service %s is announced only from expected nodes", firstService.Name))
@@ -139,7 +137,7 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 	ginkgo.DescribeTable("Single service, two advertisement with different node selectors FRR", func(pairingIPFamily ipfamily.Family, address string, nodesForFirstAdv, nodesForSecondAdv []int) {
 		var allNodes *corev1.NodeList
 		allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 
 		expectedNodesForFirstAdv := nodesForSelection(allNodes.Items, nodesForFirstAdv)
 		expectedNodesForSecondAdv := nodesForSelection(allNodes.Items, nodesForSecondAdv)
@@ -180,13 +178,13 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 		}
 		for _, c := range FRRContainers {
 			err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 		}
 
 		err = ConfigUpdater.Update(resources)
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 
-		svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "first-lb", testservice.TrafficPolicyCluster)
+		svc, _ := testservice.CreateWithBackend(cs, testNamespace, "first-lb", testservice.TrafficPolicyCluster)
 		defer testservice.Delete(cs, svc)
 
 		checkCommunitiesOnlyOnNodes(svc, CommunityNoAdv, expectedNodesForFirstAdv, pairingIPFamily)
@@ -202,7 +200,7 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 		func(pairingIPFamily ipfamily.Family, address string) {
 			var allNodes *corev1.NodeList
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("Setting advertisement with node selector (no matching nodes)")
 			resources := config.Resources{
@@ -238,13 +236,13 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 			}
 			for _, c := range FRRContainers {
 				err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily)
-				framework.ExpectNoError(err)
+				Expect(err).NotTo(HaveOccurred())
 			}
 
 			err = ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
-			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", testservice.TrafficPolicyCluster)
+			svc, _ := testservice.CreateWithBackend(cs, testNamespace, "external-local-lb", testservice.TrafficPolicyCluster)
 			defer testservice.Delete(cs, svc)
 
 			ginkgo.By("Validating service IP not advertised")
@@ -271,7 +269,7 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 		ginkgo.DescribeTable("IPV4 Should work with a limited set of nodes", func(nodesForPeers map[int][]int) {
 			var allNodes *corev1.NodeList
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			resources := config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{
@@ -301,11 +299,11 @@ var _ = ginkgo.Describe("BGP Node Selector", func() {
 					}),
 			}
 			err = ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			for _, c := range FRRContainers {
 				err := frrcontainer.PairWithNodes(cs, c, ipfamily.IPv4)
-				framework.ExpectNoError(err)
+				Expect(err).NotTo(HaveOccurred())
 			}
 
 			for i, c := range FRRContainers {

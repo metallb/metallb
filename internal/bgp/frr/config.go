@@ -71,6 +71,7 @@ type neighborConfig struct {
 	Port                uint16
 	HoldTime            uint64
 	KeepaliveTime       uint64
+	ConnectTime         uint64
 	Password            string
 	Advertisements      []*advertisementConfig
 	BFDProfile          string
@@ -78,6 +79,16 @@ type neighborConfig struct {
 	VRFName             string
 	HasV4Advertisements bool
 	HasV6Advertisements bool
+	// It has at least one advertisement with these communities
+	CommunitiesV4 []string
+	CommunitiesV6 []string
+	// It has at least one advertisement with these large communities
+	LargeCommunitiesV4 []string
+	LargeCommunitiesV6 []string
+	// It has at least one advertisement with these local preferences
+	LocalPrefsV4 []uint32
+	LocalPrefsV6 []uint32
+	DisableMP    bool
 }
 
 func (n *neighborConfig) ID() string {
@@ -124,6 +135,9 @@ func templateConfig(data interface{}) (string, error) {
 					return "ipv6"
 				}
 				return "ip"
+			},
+			"activateNeighborFor": func(ipFamily string, neighbourFamily ipfamily.Family, disableMP bool) bool {
+				return !disableMP || (disableMP && neighbourFamily.String() == ipFamily)
 			},
 			"localPrefPrefixList": func(neighbor *neighborConfig, localPreference uint32) string {
 				return fmt.Sprintf("%s-%d-%s-localpref-prefixes", neighbor.ID(), localPreference, neighbor.IPFamily)

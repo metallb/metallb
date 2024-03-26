@@ -8,13 +8,13 @@ import (
 	"os"
 	"time"
 
+	. "github.com/onsi/gomega"
 	"github.com/pkg/errors"
 	"go.universe.tf/e2etest/pkg/k8s"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 var (
@@ -57,7 +57,7 @@ func ControllerPod(cs clientset.Interface) (*corev1.Pod, error) {
 		LabelSelector: ControllerLabelSelector,
 	})
 	if err != nil {
-		framework.ExpectNoError(err, "failed to fetch controller pods")
+		Expect(err).NotTo(HaveOccurred(), "failed to fetch controller pods")
 	}
 	if len(pods.Items) != 1 {
 		return nil, fmt.Errorf("expected one controller pod, found %d", len(pods.Items))
@@ -82,10 +82,10 @@ func SpeakerPodInNode(cs clientset.Interface, node string) (*corev1.Pod, error) 
 // RestartController restarts metallb's controller pod and waits for it to be running and ready.
 func RestartController(cs clientset.Interface) {
 	controllerPod, err := ControllerPod(cs)
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 	err = cs.CoreV1().Pods(controllerPod.Namespace).Delete(context.TODO(), controllerPod.Name, metav1.DeleteOptions{})
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 	err = wait.PollImmediate(5*time.Second, 3*time.Minute, func() (bool, error) {
 		pod, err := ControllerPod(cs)
@@ -99,7 +99,7 @@ func RestartController(cs clientset.Interface) {
 
 		return isReady, nil
 	})
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 }
 
 // FRRK8SPods returns the set of pods related to FRR-K8s.

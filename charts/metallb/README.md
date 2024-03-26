@@ -17,7 +17,7 @@ Kubernetes: `>= 1.19.0-0`
 | Repository | Name | Version |
 |------------|------|---------|
 |  | crds | 0.0.0 |
-| https://metallb.github.io/frr-k8s | frr-k8s | 0.0.8 |
+| https://metallb.github.io/frr-k8s | frr-k8s | 0.0.10 |
 
 ## Values
 
@@ -120,10 +120,11 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.frr.enabled | bool | `true` |  |
 | speaker.frr.image.pullPolicy | string | `nil` |  |
 | speaker.frr.image.repository | string | `"quay.io/frrouting/frr"` |  |
-| speaker.frr.image.tag | string | `"8.5.2"` |  |
+| speaker.frr.image.tag | string | `"9.0.2"` |  |
 | speaker.frr.metricsPort | int | `7473` |  |
 | speaker.frr.resources | object | `{}` |  |
 | speaker.frrMetrics.resources | object | `{}` |  |
+| speaker.ignoreExcludeLB | bool | `false` |  |
 | speaker.image.pullPolicy | string | `nil` |  |
 | speaker.image.repository | string | `"quay.io/metallb/speaker"` |  |
 | speaker.image.tag | string | `nil` |  |

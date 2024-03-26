@@ -22,19 +22,24 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
+	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/cache"
+
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	k8snodes "go.universe.tf/metallb/internal/k8s/nodes"
 	"go.universe.tf/metallb/internal/layer2"
-	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1"
-	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 type layer2Controller struct {
-	announcer *layer2.Announce
-	myNode    string
-	sList     SpeakerList
+	announcer       *layer2.Announce
+	myNode          string
+	ignoreExcludeLB bool
+	sList           SpeakerList
+	onStatusChange  func(types.NamespacedName)
 }
 
 func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
@@ -89,7 +94,7 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 	}
 
 	// we select the nodes with at least one matching l2 advertisement
-	forPool := speakersForPool(c.sList.UsableSpeakers(), pool, nodes)
+	forPool := c.speakersForPool(pool, nodes)
 	var availableNodes []string
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
 		availableNodes = usableNodes(eps, forPool)
@@ -127,6 +132,7 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 
 func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIPs []net.IP, pool *config.Pool, client service, svc *v1.Service) error {
 	ifs := c.announcer.GetInterfaces()
+	updateStatus := false
 	for _, lbIP := range lbIPs {
 		ipAdv := ipAdvertisementFor(lbIP, c.myNode, pool.L2Advertisements)
 		if !ipAdv.MatchInterfaces(ifs...) {
@@ -136,6 +142,10 @@ func (c *layer2Controller) SetBalancer(l log.Logger, name string, lbIPs []net.IP
 			continue
 		}
 		c.announcer.SetBalancer(name, ipAdv)
+		updateStatus = true
+	}
+	if updateStatus {
+		c.onStatusChange(types.NamespacedName{Name: svc.Name, Namespace: svc.Namespace})
 	}
 	return nil
 }
@@ -145,6 +155,13 @@ func (c *layer2Controller) DeleteBalancer(l log.Logger, name, reason string) err
 		return nil
 	}
 	c.announcer.DeleteBalancer(name)
+
+	svcNamespace, svcName, err := cache.SplitMetaNamespaceKey(name)
+	if err != nil {
+		level.Warn(l).Log("op", "DeleteBalancer", "protocol", "layer2", "service", name, "msg", "failed to split key", "err", err)
+		return err
+	}
+	c.onStatusChange(types.NamespacedName{Name: svcName, Namespace: svcNamespace})
 	return nil
 }
 
@@ -205,14 +222,14 @@ func poolMatchesNodeL2(pool *config.Pool, node string) bool {
 	return false
 }
 
-func speakersForPool(speakers map[string]bool, pool *config.Pool, nodes map[string]*v1.Node) map[string]bool {
+func (c *layer2Controller) speakersForPool(pool *config.Pool, nodes map[string]*v1.Node) map[string]bool {
 	res := map[string]bool{}
-	for s := range speakers {
+	for s := range c.sList.UsableSpeakers() {
 		if k8snodes.IsNetworkUnavailable(nodes[s]) {
 			continue
 		}
 
-		if k8snodes.IsNodeExcludedFromBalancers(nodes[s]) {
+		if !c.ignoreExcludeLB && k8snodes.IsNodeExcludedFromBalancers(nodes[s]) {
 			continue
 		}
 

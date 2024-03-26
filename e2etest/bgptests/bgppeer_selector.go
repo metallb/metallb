@@ -8,55 +8,56 @@ import (
 	"fmt"
 	"strings"
 
-	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
-	"go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/ipfamily"
 	"go.universe.tf/e2etest/pkg/k8s"
+	"go.universe.tf/e2etest/pkg/k8sclient"
 	"go.universe.tf/e2etest/pkg/metallb"
 	testservice "go.universe.tf/e2etest/pkg/service"
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	"go.universe.tf/metallb/api/v1beta2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	frrconfig "go.universe.tf/e2etest/pkg/frr/config"
 	frrcontainer "go.universe.tf/e2etest/pkg/frr/container"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
-	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = ginkgo.Describe("BGP Peer Selector", func() {
 	var cs clientset.Interface
-	var f *framework.Framework
 	var frrContainerForAdv1 *frrcontainer.FRR
 	var frrContainerForAdv2 *frrcontainer.FRR
+	testNamespace := ""
 
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentSpecReport().Failed() {
-			dumpBGPInfo(ReportPath, ginkgo.CurrentSpecReport().LeafNodeText, cs, f)
+			dumpBGPInfo(ReportPath, ginkgo.CurrentSpecReport().LeafNodeText, cs, testNamespace)
 			k8s.DumpInfo(Reporter, ginkgo.CurrentSpecReport().LeafNodeText)
 		}
+		err := k8s.DeleteNamespace(cs, testNamespace)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	ginkgo.BeforeEach(func() {
 		ginkgo.By("Clearing any previous configuration")
 
 		err := ConfigUpdater.Clean()
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
 
 		for _, c := range FRRContainers {
 			err := c.UpdateBGPConfigFile(frrconfig.Empty)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 		}
+		cs = k8sclient.New()
+		testNamespace, err = k8s.CreateTestNamespace(cs, "bgp")
+		Expect(err).NotTo(HaveOccurred())
 	})
 
-	f = framework.NewDefaultFramework("bgp")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-
 	ginkgo.BeforeEach(func() {
-		cs = f.ClientSet
 		var frrContainersForAdvertisement []*frrcontainer.FRR
 		for _, c := range FRRContainers {
 			// Connectivity between a multi hop FRR container to a BGP peer is going through
@@ -81,7 +82,7 @@ var _ = ginkgo.Describe("BGP Peer Selector", func() {
 		func(addressRange1 []string, addressRange2 []string, ipFamily ipfamily.Family, tweak testservice.Tweak) {
 			for _, c := range FRRContainers {
 				err := frrcontainer.PairWithNodes(cs, c, ipFamily)
-				framework.ExpectNoError(err)
+				Expect(err).NotTo(HaveOccurred())
 			}
 
 			resources := config.Resources{
@@ -134,15 +135,15 @@ var _ = ginkgo.Describe("BGP Peer Selector", func() {
 			resources.BGPAdvs = []metallbv1beta1.BGPAdvertisement{bgpAdv1, bgpAdv2}
 
 			err := ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
-			svcAdvertisement1, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "first-lb", testservice.WithSpecificPool("test-addresspool1"), tweak)
+			svcAdvertisement1, _ := testservice.CreateWithBackend(cs, testNamespace, "first-lb", testservice.WithSpecificPool("test-addresspool1"), tweak)
 			defer testservice.Delete(cs, svcAdvertisement1)
-			svcAdvertisement2, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "second-lb", testservice.WithSpecificPool("test-addresspool2"), tweak)
+			svcAdvertisement2, _ := testservice.CreateWithBackend(cs, testNamespace, "second-lb", testservice.WithSpecificPool("test-addresspool2"), tweak)
 			defer testservice.Delete(cs, svcAdvertisement2)
 
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By(fmt.Sprintf("checking connectivity of service 1 to external frr container %s", frrContainerForAdv1.Name))
 			validateService(svcAdvertisement1, allNodes.Items, frrContainerForAdv1)
@@ -158,7 +159,7 @@ var _ = ginkgo.Describe("BGP Peer Selector", func() {
 			resources.BGPAdvs[0].Spec.Peers = nil
 			resources.BGPAdvs[1].Spec.Peers = nil
 			err = ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
 			for _, c := range FRRContainers {
 				ginkgo.By(fmt.Sprintf("checking connectivity of service 1 to external frr container %s", c.Name))
@@ -189,7 +190,7 @@ var _ = ginkgo.Describe("BGP Peer Selector", func() {
 		func(addressRange []string, ipFamily ipfamily.Family, tweak testservice.Tweak) {
 			for _, c := range FRRContainers {
 				err := frrcontainer.PairWithNodes(cs, c, ipFamily)
-				framework.ExpectNoError(err)
+				Expect(err).NotTo(HaveOccurred())
 			}
 
 			resources := config.Resources{
@@ -237,9 +238,9 @@ var _ = ginkgo.Describe("BGP Peer Selector", func() {
 			resources.BGPAdvs = []metallbv1beta1.BGPAdvertisement{bgpAdv1, bgpAdv2}
 
 			err := ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
-			svc, _ := testservice.CreateWithBackend(cs, f.Namespace.Name, "external-local-lb", tweak)
+			svc, _ := testservice.CreateWithBackend(cs, testNamespace, "external-local-lb", tweak)
 			defer testservice.Delete(cs, svc)
 
 			for _, c := range FRRContainers {

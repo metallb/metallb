@@ -144,7 +144,7 @@ spec:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: webhook-server-cert
+  name: metallb-webhook-cert
   namespace: {{ .Release.Namespace | quote }}
   labels:
     {{- include "metallb.labels" . | nindent 4 }}

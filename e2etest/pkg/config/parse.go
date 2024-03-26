@@ -3,8 +3,8 @@
 package config
 
 import (
-	"go.universe.tf/e2etest/pkg/pointer"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
+	"k8s.io/utils/ptr"
 )
 
 const BGP = "bgp"
@@ -22,8 +22,8 @@ func BFDProfileWithDefaults(profile metallbv1beta1.BFDProfile, multiHop bool) me
 	res.Spec.PassiveMode = profile.Spec.PassiveMode
 
 	if multiHop {
-		res.Spec.EchoMode = pointer.BoolPtr(false)
-		res.Spec.EchoInterval = pointer.Uint32Ptr(50)
+		res.Spec.EchoMode = ptr.To(false)
+		res.Spec.EchoInterval = ptr.To(uint32(50))
 	}
 
 	return res

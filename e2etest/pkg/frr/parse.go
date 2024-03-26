@@ -24,6 +24,8 @@ type Neighbor struct {
 	MsgStats                MessageStats
 	ConfiguredHoldTime      int
 	ConfiguredKeepAliveTime int
+	ConfiguredConnectTime   int
+	AddressFamilies         []string
 }
 
 type Route struct {
@@ -46,6 +48,7 @@ type FRRNeighbor struct {
 	VRFName                      string       `json:"vrf"`
 	ConfiguredHoldTimeMSecs      int          `json:"bgpTimerConfiguredHoldTimeMsecs"`
 	ConfiguredKeepAliveTimeMSecs int          `json:"bgpTimerConfiguredKeepAliveIntervalMsecs"`
+	ConnectRetryTimer            int          `json:"connectRetryTimer"`
 	AddressFamilyInfo            map[string]struct {
 		SentPrefixCounter int `json:"sentPrefixCounter"`
 	} `json:"addressFamilyInfo"`
@@ -166,9 +169,12 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 		if n.BgpState != bgpConnected {
 			connected = false
 		}
+		var addressFamilies []string
 		prefixSent := 0
-		for _, s := range n.AddressFamilyInfo {
+		for family, s := range n.AddressFamilyInfo {
 			prefixSent += s.SentPrefixCounter
+			addressFamilies = append(addressFamilies, family)
+
 		}
 		res = append(res, &Neighbor{
 			IP:                      ip,
@@ -181,6 +187,8 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 			MsgStats:                n.MsgStats,
 			ConfiguredKeepAliveTime: n.ConfiguredKeepAliveTimeMSecs,
 			ConfiguredHoldTime:      n.ConfiguredHoldTimeMSecs,
+			ConfiguredConnectTime:   n.ConnectRetryTimer,
+			AddressFamilies:         addressFamilies,
 		})
 	}
 	return res, nil

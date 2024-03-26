@@ -181,6 +181,8 @@ _Appears in:_
 | `serviceAllocation` _[ServiceAllocation](#serviceallocation)_ | AllocateTo makes ip pool allocation to specific namespace and/or service. The controller will use the pool with lowest value of priority in case of multiple matches. A pool with no priority set will be used only if the pools with priority can't be used. If multiple matching IPAddressPools are available it will check for the availability of IPs sorting the matching IPAddressPools by priority, starting from the highest to the lowest. If multiple IPAddressPools have the same priority, choice will be random. |
 
 
+
+
 #### L2Advertisement
 
 
@@ -234,6 +236,8 @@ _Appears in:_
 
 
 
+
+
 ## metallb.io/v1beta2
 
 
@@ -279,6 +283,7 @@ _Appears in:_
 | `peerPort` _integer_ | Port to dial when establishing the session. |
 | `holdTime` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#duration-v1-meta)_ | Requested BGP hold time, per RFC4271. |
 | `keepaliveTime` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#duration-v1-meta)_ | Requested BGP keepalive time, per RFC4271. |
+| `connectTime` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#duration-v1-meta)_ | Requested BGP connect time, controls how long BGP waits between connection attempts to a neighbor. |
 | `routerID` _string_ | BGP router ID to advertise to the peer |
 | `nodeSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | Only connect to this peer on nodes that match one of these selectors. |
 | `password` _string_ | Authentication password for routers enforcing TCP MD5 authenticated sessions |
@@ -286,5 +291,6 @@ _Appears in:_
 | `bfdProfile` _string_ | The name of the BFD Profile to be used for the BFD session associated to the BGP session. If not set, the BFD session won't be set up. |
 | `ebgpMultiHop` _boolean_ | To set if the BGPPeer is multi-hops away. Needed for FRR mode only. |
 | `vrf` _string_ | To set if we want to peer with the BGPPeer using an interface belonging to a host vrf |
+| `disableMP` _boolean_ | To set if we want to disable MP BGP that will separate IPv4 and IPv6 route exchanges into distinct BGP sessions. |
 
 

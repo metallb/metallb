@@ -11,11 +11,11 @@ import (
 	"go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/bgp/community"
-	"go.universe.tf/metallb/internal/pointer"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 )
 
 func selector(s string) labels.Selector {
@@ -74,6 +74,7 @@ func TestParse(t *testing.T) {
 							Address:      "1.2.3.4",
 							Port:         1179,
 							HoldTime:     metav1.Duration{Duration: 180 * time.Second},
+							ConnectTime:  ptr.To(metav1.Duration{Duration: time.Second}),
 							RouterID:     "10.20.30.40",
 							SrcAddress:   "10.20.30.40",
 							EBGPMultiHop: true,
@@ -89,6 +90,7 @@ func TestParse(t *testing.T) {
 							ASN:          200,
 							Address:      "2.3.4.5",
 							EBGPMultiHop: false,
+							ConnectTime:  ptr.To(metav1.Duration{Duration: time.Second}),
 							NodeSelectors: []metav1.LabelSelector{
 								{
 									MatchLabels: map[string]string{
@@ -117,7 +119,7 @@ func TestParse(t *testing.T) {
 								"10.50.0.0/24",
 							},
 							AvoidBuggyIPs: true,
-							AutoAssign:    pointer.BoolPtr(false),
+							AutoAssign:    ptr.To(false),
 						},
 					},
 					{
@@ -160,7 +162,7 @@ func TestParse(t *testing.T) {
 							Name: "adv1",
 						},
 						Spec: v1beta1.BGPAdvertisementSpec{
-							AggregationLength: pointer.Int32Ptr(32),
+							AggregationLength: ptr.To[int32](32),
 							LocalPref:         uint32(100),
 							Communities:       []string{"bar"},
 							IPAddressPools:    []string{"pool1"},
@@ -172,8 +174,8 @@ func TestParse(t *testing.T) {
 							Name: "adv2",
 						},
 						Spec: v1beta1.BGPAdvertisementSpec{
-							AggregationLength:   pointer.Int32Ptr(24),
-							AggregationLengthV6: pointer.Int32Ptr(64),
+							AggregationLength:   ptr.To[int32](24),
+							AggregationLengthV6: ptr.To[int32](64),
 							IPAddressPools:      []string{"pool1"},
 						},
 					},
@@ -228,6 +230,7 @@ func TestParse(t *testing.T) {
 						Port:          1179,
 						HoldTime:      180 * time.Second,
 						KeepaliveTime: 60 * time.Second,
+						ConnectTime:   ptr.To(time.Second),
 						RouterID:      net.ParseIP("10.20.30.40"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 						EBGPMultiHop:  true,
@@ -240,6 +243,7 @@ func TestParse(t *testing.T) {
 						Addr:          net.ParseIP("2.3.4.5"),
 						HoldTime:      90 * time.Second,
 						KeepaliveTime: 30 * time.Second,
+						ConnectTime:   ptr.To(time.Second),
 						NodeSelectors: []labels.Selector{selector("bar in (quux),foo=bar")},
 						EBGPMultiHop:  false,
 					},
@@ -346,7 +350,7 @@ func TestParse(t *testing.T) {
 								"10.50.0.0/24",
 							},
 							AvoidBuggyIPs: true,
-							AutoAssign:    pointer.BoolPtr(false),
+							AutoAssign:    ptr.To(false),
 							AllocateTo: &v1beta1.ServiceAllocation{Priority: 1,
 								Namespaces: []string{"test-ns1"}},
 						},
@@ -433,7 +437,7 @@ func TestParse(t *testing.T) {
 								"10.50.0.0/24",
 							},
 							AvoidBuggyIPs: true,
-							AutoAssign:    pointer.BoolPtr(false),
+							AutoAssign:    ptr.To(false),
 							AllocateTo: &v1beta1.ServiceAllocation{Priority: 1,
 								Namespaces: []string{"test-ns1", "test-ns1"}},
 						},
@@ -463,7 +467,7 @@ func TestParse(t *testing.T) {
 								"10.50.0.0/24",
 							},
 							AvoidBuggyIPs: true,
-							AutoAssign:    pointer.BoolPtr(false),
+							AutoAssign:    ptr.To(false),
 							AllocateTo: &v1beta1.ServiceAllocation{
 								Priority: 1,
 								NamespaceSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"foo": "bar"}},
@@ -1091,7 +1095,7 @@ func TestParse(t *testing.T) {
 				BGPAdvs: []v1beta1.BGPAdvertisement{
 					{
 						Spec: v1beta1.BGPAdvertisementSpec{
-							AggregationLength: pointer.Int32Ptr(34),
+							AggregationLength: ptr.To[int32](34),
 						},
 					},
 				},
@@ -1114,7 +1118,7 @@ func TestParse(t *testing.T) {
 				BGPAdvs: []v1beta1.BGPAdvertisement{
 					{
 						Spec: v1beta1.BGPAdvertisementSpec{
-							AggregationLength: pointer.Int32Ptr(26),
+							AggregationLength: ptr.To[int32](26),
 						},
 					},
 				},
@@ -1188,7 +1192,7 @@ func TestParse(t *testing.T) {
 					{
 						Spec: v1beta1.BGPAdvertisementSpec{
 							LocalPref:         100,
-							AggregationLength: pointer.Int32Ptr(24),
+							AggregationLength: ptr.To[int32](24),
 						},
 					},
 					{
@@ -1228,8 +1232,8 @@ func TestParse(t *testing.T) {
 					{
 						Spec: v1beta1.BGPAdvertisementSpec{
 							LocalPref:           100,
-							AggregationLength:   pointer.Int32Ptr(24),
-							AggregationLengthV6: pointer.Int32Ptr(120),
+							AggregationLength:   ptr.To[int32](24),
+							AggregationLengthV6: ptr.To[int32](120),
 						},
 					},
 					{
@@ -1437,7 +1441,7 @@ func TestParse(t *testing.T) {
 				BGPAdvs: []v1beta1.BGPAdvertisement{
 					{
 						Spec: v1beta1.BGPAdvertisementSpec{
-							AggregationLength: pointer.Int32Ptr(26),
+							AggregationLength: ptr.To[int32](26),
 						},
 					},
 				},
@@ -1492,7 +1496,7 @@ func TestParse(t *testing.T) {
 				BGPAdvs: []v1beta1.BGPAdvertisement{
 					{
 						Spec: v1beta1.BGPAdvertisementSpec{
-							AggregationLength: pointer.Int32Ptr(24),
+							AggregationLength: ptr.To[int32](24),
 						},
 					},
 				},
@@ -2095,13 +2099,13 @@ func TestParse(t *testing.T) {
 							Name: "nondefault",
 						},
 						Spec: v1beta1.BFDProfileSpec{
-							ReceiveInterval:  pointer.Uint32Ptr(50),
-							TransmitInterval: pointer.Uint32Ptr(51),
-							DetectMultiplier: pointer.Uint32Ptr(52),
-							EchoInterval:     pointer.Uint32Ptr(54),
-							EchoMode:         pointer.BoolPtr(true),
-							PassiveMode:      pointer.BoolPtr(true),
-							MinimumTTL:       pointer.Uint32Ptr(55),
+							ReceiveInterval:  ptr.To(uint32(50)),
+							TransmitInterval: ptr.To(uint32(51)),
+							DetectMultiplier: ptr.To(uint32(52)),
+							EchoInterval:     ptr.To(uint32(54)),
+							EchoMode:         ptr.To(true),
+							PassiveMode:      ptr.To(true),
+							MinimumTTL:       ptr.To(uint32(55)),
 						},
 					},
 				},
@@ -2133,11 +2137,11 @@ func TestParse(t *testing.T) {
 				BFDProfiles: map[string]*BFDProfile{
 					"nondefault": {
 						Name:             "nondefault",
-						ReceiveInterval:  pointer.Uint32Ptr(50),
-						DetectMultiplier: pointer.Uint32Ptr(52),
-						TransmitInterval: pointer.Uint32Ptr(51),
-						EchoInterval:     pointer.Uint32Ptr(54),
-						MinimumTTL:       pointer.Uint32Ptr(55),
+						ReceiveInterval:  ptr.To(uint32(50)),
+						DetectMultiplier: ptr.To(uint32(52)),
+						TransmitInterval: ptr.To(uint32(51)),
+						EchoInterval:     ptr.To(uint32(54)),
+						MinimumTTL:       ptr.To(uint32(55)),
 						EchoMode:         true,
 						PassiveMode:      true,
 					},
@@ -2155,7 +2159,7 @@ func TestParse(t *testing.T) {
 							Name: "default",
 						},
 						Spec: v1beta1.BFDProfileSpec{
-							ReceiveInterval: pointer.Uint32Ptr(2),
+							ReceiveInterval: ptr.To(uint32(2)),
 						},
 					},
 				},
@@ -2171,7 +2175,7 @@ func TestParse(t *testing.T) {
 							Name: "default",
 						},
 						Spec: v1beta1.BFDProfileSpec{
-							ReceiveInterval: pointer.Uint32Ptr(90000),
+							ReceiveInterval: ptr.To(uint32(90000)),
 						},
 					},
 				},
@@ -2198,13 +2202,13 @@ func TestParse(t *testing.T) {
 							Name: "nondefault",
 						},
 						Spec: v1beta1.BFDProfileSpec{
-							ReceiveInterval:  pointer.Uint32Ptr(50),
-							TransmitInterval: pointer.Uint32Ptr(51),
-							DetectMultiplier: pointer.Uint32Ptr(52),
-							EchoInterval:     pointer.Uint32Ptr(54),
-							EchoMode:         pointer.BoolPtr(true),
-							PassiveMode:      pointer.BoolPtr(true),
-							MinimumTTL:       pointer.Uint32Ptr(55),
+							ReceiveInterval:  ptr.To(uint32(50)),
+							TransmitInterval: ptr.To(uint32(51)),
+							DetectMultiplier: ptr.To(uint32(52)),
+							EchoInterval:     ptr.To(uint32(54)),
+							EchoMode:         ptr.To(true),
+							PassiveMode:      ptr.To(true),
+							MinimumTTL:       ptr.To(uint32(55)),
 						},
 					},
 				},
@@ -2256,7 +2260,7 @@ func TestParse(t *testing.T) {
 							Name: "with-echo",
 						},
 						Spec: v1beta1.BFDProfileSpec{
-							EchoMode: pointer.BoolPtr(true),
+							EchoMode: ptr.To(true),
 						},
 					},
 				},
@@ -2351,7 +2355,7 @@ func TestParse(t *testing.T) {
 								"10.50.0.0/24",
 							},
 							AvoidBuggyIPs: true,
-							AutoAssign:    pointer.BoolPtr(false),
+							AutoAssign:    ptr.To(false),
 						},
 					},
 				},
@@ -2361,7 +2365,7 @@ func TestParse(t *testing.T) {
 							Name: "adv1",
 						},
 						Spec: v1beta1.BGPAdvertisementSpec{
-							AggregationLength: pointer.Int32Ptr(32),
+							AggregationLength: ptr.To[int32](32),
 							LocalPref:         uint32(100),
 							Communities:       []string{"bar"},
 							IPAddressPools:    []string{"pool1"},
@@ -2373,8 +2377,8 @@ func TestParse(t *testing.T) {
 							Name: "adv2",
 						},
 						Spec: v1beta1.BGPAdvertisementSpec{
-							AggregationLength:   pointer.Int32Ptr(24),
-							AggregationLengthV6: pointer.Int32Ptr(64),
+							AggregationLength:   ptr.To[int32](24),
+							AggregationLengthV6: ptr.To[int32](64),
 							IPAddressPools:      []string{"pool1"},
 						},
 					},
@@ -2503,7 +2507,7 @@ func TestParse(t *testing.T) {
 							Name: "adv1",
 						},
 						Spec: v1beta1.BGPAdvertisementSpec{
-							AggregationLength: pointer.Int32Ptr(32),
+							AggregationLength: ptr.To[int32](32),
 							LocalPref:         uint32(100),
 							IPAddressPoolSelectors: []metav1.LabelSelector{
 								{
@@ -2519,7 +2523,7 @@ func TestParse(t *testing.T) {
 							Name: "adv2",
 						},
 						Spec: v1beta1.BGPAdvertisementSpec{
-							AggregationLength: pointer.Int32Ptr(32),
+							AggregationLength: ptr.To[int32](32),
 							LocalPref:         uint32(200),
 							IPAddressPoolSelectors: []metav1.LabelSelector{
 								{
@@ -2647,7 +2651,7 @@ func TestParse(t *testing.T) {
 							Name: "adv1",
 						},
 						Spec: v1beta1.BGPAdvertisementSpec{
-							AggregationLength: pointer.Int32Ptr(32),
+							AggregationLength: ptr.To[int32](32),
 							LocalPref:         uint32(100),
 							IPAddressPoolSelectors: []metav1.LabelSelector{
 								{
@@ -2688,7 +2692,7 @@ func TestParse(t *testing.T) {
 							Name: "adv1",
 						},
 						Spec: v1beta1.BGPAdvertisementSpec{
-							AggregationLength: pointer.Int32Ptr(32),
+							AggregationLength: ptr.To[int32](32),
 							LocalPref:         uint32(100),
 							IPAddressPoolSelectors: []metav1.LabelSelector{
 								{
@@ -2794,7 +2798,7 @@ func TestParse(t *testing.T) {
 							Name: "adv1",
 						},
 						Spec: v1beta1.BGPAdvertisementSpec{
-							AggregationLength: pointer.Int32Ptr(32),
+							AggregationLength: ptr.To[int32](32),
 							LocalPref:         uint32(100),
 							IPAddressPoolSelectors: []metav1.LabelSelector{
 								{
@@ -2810,7 +2814,7 @@ func TestParse(t *testing.T) {
 							Name: "adv2",
 						},
 						Spec: v1beta1.BGPAdvertisementSpec{
-							AggregationLength: pointer.Int32Ptr(32),
+							AggregationLength: ptr.To[int32](32),
 							LocalPref:         uint32(200),
 							IPAddressPoolSelectors: []metav1.LabelSelector{
 								{
@@ -3248,7 +3252,7 @@ func TestParse(t *testing.T) {
 							Name: "adv1",
 						},
 						Spec: v1beta1.BGPAdvertisementSpec{
-							AggregationLength: pointer.Int32Ptr(32),
+							AggregationLength: ptr.To[int32](32),
 							LocalPref:         uint32(100),
 							IPAddressPools:    []string{"pool1"},
 							Peers:             []string{"peer1"},

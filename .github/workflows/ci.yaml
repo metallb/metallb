@@ -41,29 +41,6 @@ jobs:
         with:
           skip-upload: true
 
-  check-changelog:
-    runs-on: ubuntu-22.04
-    if: github.actor != 'dependabot[bot]'
-    steps:
-      - name: Checkout Source
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Get changed files
-        id: changed-files
-        uses: tj-actions/changed-files@v41
-
-      - name: Check if release notes where changed
-        run: |
-          for file in ${{ steps.changed-files.outputs.all_changed_files }}; do
-            if [ "$file" = "website/content/release-notes/_index.md" ]; then
-              exit 0
-            fi
-          done
-          echo "Release notes must be changed"
-          exit 1
-
   commitlint:
     runs-on: ubuntu-22.04
     steps:
@@ -153,7 +130,7 @@ jobs:
           check-latest: true
 
       - name: Set up chart-testing
-        uses: helm/chart-testing-action@v2.6.0
+        uses: helm/chart-testing-action@v2.6.1
 
       - name: Run chart-testing (list-changed)
         id: list-changed
@@ -250,7 +227,8 @@ jobs:
           HELM_FLAGS=""
           echo '/etc/frr/core-%e.%p.%h.%t' | sudo tee /proc/sys/kernel/core_pattern
           if [ ${{ matrix.deployment }} = "helm" ]; then export SPEAKER_SELECTOR="app.kubernetes.io/component=speaker" && export CONTROLLER_SELECTOR="app.kubernetes.io/component=controller"; fi
-          SKIP="none"
+          # TODO restore to NONE when https://github.com/metallb/metallb/issues/2311 is fixed
+          SKIP="L2ServiceStatus"
           WITH_VRF="--with-vrf"
           FOCUS=""
           if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|FRR-MODE|FRRK8S-MODE|BFD|VRF|DUALSTACK"; WITH_VRF=""; fi
@@ -353,7 +331,8 @@ jobs:
           spec:
             logLevel: debug
           EOF
-          sudo -E env "PATH=$PATH" inv e2etest --bgp-mode frr --skip "IPV6|DUALSTACK|metrics|L2-interface selector|FRRK8S-MODE" -e /tmp/kind_logs
+          # TOOD remove skipping L2ServiceStatus once https://github.com/metallb/metallb/issues/2311 is fixed
+          sudo -E env "PATH=$PATH" inv e2etest --bgp-mode frr --skip "IPV6|DUALSTACK|metrics|L2-interface selector|FRRK8S-MODE|L2ServiceStatus" -e /tmp/kind_logs
 
       - name: Collect Logs
         if: ${{ failure() }}
@@ -389,7 +368,7 @@ jobs:
       - name: E2E
         run: |
           FOCUS="L2.*should work for ExternalTrafficPolicy=Cluster|BGP.*A service of protocol load balancer should work with.*IPV4 - ExternalTrafficPolicyCluster$|validate FRR running configuration"
-          sudo -E env "PATH=$PATH" inv e2etest --bgp-mode frr --focus "$FOCUS" -e /tmp/kind_logs
+          sudo -E env "PATH=$PATH" inv e2etest --bgp-mode frr --focus "$FOCUS" --skip L2ServiceStatus -e /tmp/kind_logs
 
       - name: Collect Logs
         if: ${{ failure() }}

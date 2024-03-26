@@ -87,6 +87,13 @@ A given speaker won't advertise the service if:
 - there are no L2Advertisements / BGPAdvertisements matching the speaker node (if node selectors are specified)
 - the Kubernetes API reports "network not available" on the speaker's node
 
+## MetalLB is not advertising my service from my control-plane nodes or from my single node cluster
+
+Make sure your nodes are not labeled with the
+[node.kubernetes.io/exclude-from-external-load-balancers](https://kubernetes.io/docs/reference/labels-annotations-taints/#node-kubernetes-io-exclude-from-external-load-balancers) label.
+MetalLB honors that label and won't announce any service from such nodes. One way to circumvent
+the issue is to provide the speakers with the `--ignore-exclude-lb` flag (either from Helm or via Kustomize).
+
 ## MetalLB says it advertises the service but reaching the service does not work
 
 ### Checking the L2 advertisement works

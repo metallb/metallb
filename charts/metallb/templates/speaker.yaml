@@ -165,6 +165,11 @@ spec:
         {{- toYaml .Values.speaker.securityContext | nindent 8 }}
       {{- end }}
       volumes:
+      {{- if .Values.prometheus.speakerMetricsTLSSecret }}
+        - name: metrics-certs
+          secret:
+            secretName: {{ .Values.prometheus.speakerMetricsTLSSecret }}
+      {{- end }}
       {{- if .Values.speaker.memberlist.enabled }}
         - name: memberlist
           secret:
@@ -189,11 +194,6 @@ spec:
           emptyDir: {}
         - name: metrics
           emptyDir: {}
-      {{- if .Values.prometheus.speakerMetricsTLSSecret }}
-        - name: metrics-certs
-          secret:
-            secretName: {{ .Values.prometheus.speakerMetricsTLSSecret }}
-      {{- end }}
       initContainers:
         # Copies the initial config files with the right permissions to the shared volume.
         - name: cp-frr-files
@@ -243,6 +243,12 @@ spec:
         {{- end }}
         {{- if .Values.speaker.wanConfig }}
         - --ml-wan-config
+        {{- end }}
+        {{- if .Values.speaker.ignoreExcludeLB}}
+        - --ignore-exclude-lb
+        {{- end }}
+        {{- if .Values.prometheus.secureMetricsPort }}
+        - --host=localhost
         {{- end }}
         env:
         - name: METALLB_NODE_NAME
@@ -296,6 +302,9 @@ spec:
         {{- if .Values.speaker.livenessProbe.enabled }}
         livenessProbe:
           httpGet:
+            {{- if .Values.prometheus.secureMetricsPort }}
+            host: localhost
+            {{- end }}
             path: /metrics
             port: monitoring
           initialDelaySeconds: {{ .Values.speaker.livenessProbe.initialDelaySeconds }}
@@ -307,6 +316,9 @@ spec:
         {{- if .Values.speaker.readinessProbe.enabled }}
         readinessProbe:
           httpGet:
+            {{- if .Values.prometheus.secureMetricsPort }}
+            host: localhost
+            {{- end }}
             path: /metrics
             port: monitoring
           initialDelaySeconds: {{ .Values.speaker.readinessProbe.initialDelaySeconds }}
@@ -330,7 +342,7 @@ spec:
         {{- if or .Values.speaker.frr.enabled .Values.speaker.memberlist.enabled .Values.speaker.excludeInterfaces.enabled }}
         volumeMounts:
           {{- if .Values.speaker.memberlist.enabled }}
-          - name: memberlist 
+          - name: memberlist
             mountPath: {{ .Values.speaker.memberlist.mlSecretKeyPath }}
           {{- end }}
           {{- if .Values.speaker.frr.enabled }}
@@ -384,7 +396,10 @@ spec:
         {{- if .Values.speaker.livenessProbe.enabled }}
         livenessProbe:
           httpGet:
-            path: /livez
+            {{- if .Values.prometheus.secureMetricsPort }}
+            host: localhost
+            {{- end }}
+            path: livez
             port: {{ .Values.speaker.frr.metricsPort }}
           initialDelaySeconds: {{ .Values.speaker.livenessProbe.initialDelaySeconds }}
           periodSeconds: {{ .Values.speaker.livenessProbe.periodSeconds }}
@@ -395,6 +410,9 @@ spec:
         {{- if .Values.speaker.startupProbe.enabled }}
         startupProbe:
           httpGet:
+            {{- if .Values.prometheus.secureMetricsPort }}
+            host: localhost
+            {{- end }}
             path: /livez
             port: {{ .Values.speaker.frr.metricsPort }}
           failureThreshold: {{ .Values.speaker.startupProbe.failureThreshold }}
@@ -422,6 +440,9 @@ spec:
         command: ["/etc/frr_metrics/frr-metrics"]
         args:
           - --metrics-port={{ .Values.speaker.frr.metricsPort }}
+          {{- if .Values.prometheus.secureMetricsPort }}
+          - --host=localhost
+          {{- end }}
         ports:
           - containerPort: {{ .Values.speaker.frr.metricsPort }}
             name: monitoring
@@ -444,7 +465,7 @@ spec:
         args:
           - --logtostderr
           - --secure-listen-address=:{{ .Values.prometheus.secureMetricsPort }}
-          - --upstream=http://$(METALLB_HOST):{{ .Values.prometheus.metricsPort }}/
+          - --upstream=http://localhost:{{ .Values.prometheus.metricsPort }}/
           - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
         {{- if .Values.prometheus.speakerMetricsTLSSecret }}
           - --tls-private-key-file=/etc/metrics/tls.key
@@ -453,11 +474,6 @@ spec:
         ports:
           - containerPort: {{ .Values.prometheus.secureMetricsPort }}
             name: metricshttps
-        env:
-          - name: METALLB_HOST
-            valueFrom:
-              fieldRef:
-                fieldPath: status.hostIP
         resources:
           requests:
             cpu: 10m
@@ -479,7 +495,7 @@ spec:
           - --logtostderr
           - --secure-listen-address=:{{ .Values.speaker.frr.secureMetricsPort }}
           - --tls-cipher-suites=TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_CBC_SHA256,TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA256
-          - --upstream=http://$(METALLB_HOST):{{ .Values.speaker.frr.metricsPort }}/
+          - --upstream=http://localhost:{{ .Values.speaker.frr.metricsPort }}/
         {{- if .Values.prometheus.speakerMetricsTLSSecret }}
           - --tls-private-key-file=/etc/metrics/tls.key
           - --tls-cert-file=/etc/metrics/tls.crt
@@ -525,7 +541,7 @@ spec:
         operator: Exists
       - key: node-role.kubernetes.io/control-plane
         effect: NoSchedule
-        operator: Exists        
+        operator: Exists
       {{- end }}
       {{- with .Values.speaker.tolerations }}
         {{- toYaml . | nindent 6 }}

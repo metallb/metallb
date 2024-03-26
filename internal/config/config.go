@@ -32,6 +32,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 	"k8s.io/utils/strings/slices"
 )
 
@@ -103,6 +104,8 @@ type Peer struct {
 	HoldTime time.Duration
 	// Requested BGP keepalive time, per RFC4271.
 	KeepaliveTime time.Duration
+	// Requested BGP connect time, controls how long BGP waits between connection attempts to a neighbor.
+	ConnectTime *time.Duration
 	// BGP router ID to advertise to the peer
 	RouterID net.IP
 	// Only connect to this peer on nodes that match one of these
@@ -118,6 +121,8 @@ type Peer struct {
 	EBGPMultiHop bool
 	// Optional name of the vrf to establish the session from
 	VRF string
+	// Option to disable MP BGP that will result in separation of IPv4 and IPv6 route exchanges into distinct BGP sessions.
+	DisableMP bool
 	// TODO: more BGP session settings
 }
 
@@ -437,6 +442,11 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		}
 	}
 
+	var connectTime *time.Duration
+	if p.Spec.ConnectTime != nil {
+		connectTime = ptr.To(p.Spec.ConnectTime.Duration)
+	}
+
 	return &Peer{
 		Name:          p.Name,
 		MyASN:         p.Spec.MyASN,
@@ -446,6 +456,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		Port:          p.Spec.Port,
 		HoldTime:      holdTime,
 		KeepaliveTime: keepaliveTime,
+		ConnectTime:   connectTime,
 		RouterID:      routerID,
 		NodeSelectors: nodeSels,
 		Password:      password,
@@ -453,6 +464,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		BFDProfile:    p.Spec.BFDProfile,
 		EBGPMultiHop:  p.Spec.EBGPMultiHop,
 		VRF:           p.Spec.VRFName,
+		DisableMP:     p.Spec.DisableMP,
 	}, nil
 }
 

@@ -23,6 +23,7 @@ import (
 )
 
 var (
+	metricsHost = flag.String("host", os.Getenv("METALLB_HOST"), "metrics HTTP host address")
 	metricsPort = flag.Uint("metrics-port", 7473, "Port to listen on for web interface.")
 	metricsPath = flag.String("metrics-path", "/metrics", "Path under which to expose metrics.")
 )
@@ -66,7 +67,7 @@ func main() {
 	level.Info(logger).Log("msg", "Starting exporter", "metricsPath", metricsPath, "port", metricsPort)
 
 	srv := &http.Server{
-		Addr:        fmt.Sprintf(":%d", *metricsPort),
+		Addr:        fmt.Sprintf("%s:%d", *metricsHost, *metricsPort),
 		ReadTimeout: 3 * time.Second,
 		Handler:     mux,
 	}

@@ -28,19 +28,21 @@ import (
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	"github.com/prometheus/client_golang/prometheus"
+	v1 "k8s.io/api/core/v1"
+	discovery "k8s.io/api/discovery/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/event"
+	"sigs.k8s.io/yaml"
+
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	k8snodes "go.universe.tf/metallb/internal/k8s/nodes"
-
 	"go.universe.tf/metallb/internal/layer2"
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/speakerlist"
 	"go.universe.tf/metallb/internal/version"
-	v1 "k8s.io/api/core/v1"
-	discovery "k8s.io/api/discovery/v1"
-	"sigs.k8s.io/yaml"
 )
 
 var announcing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -82,6 +84,10 @@ func main() {
 		logLevel          = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
 		enablePprof       = flag.Bool("enable-pprof", false, "Enable pprof profiling")
 		loadBalancerClass = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
+		ignoreLBExclude   = flag.Bool("ignore-exclude-lb", false, "ignore the exclude-from-external-load-balancers label")
+		// TODO: we are hiding the feature behind a feature flag because of https://github.com/metallb/metallb/issues/2311
+		// This flag can be removed once the issue is fixed.
+		enableL2ServiceStatus = flag.Bool("enable-l2-service-status", false, "enables the experimental l2 service status feature")
 	)
 	flag.Parse()
 
@@ -147,7 +153,7 @@ func main() {
 		level.Error(logger).Log("op", "startup", "msg", "failed to parse announcedInterfacesToExclude from configMap", "error", err)
 		os.Exit(1)
 	}
-
+	statusNotifyChan := make(chan event.GenericEvent)
 	// Setup all clients and speakers, config decides what is being done runtime.
 	ctrl, err := newController(controllerConfig{
 		MyNode:                 *myNode,
@@ -157,6 +163,13 @@ func main() {
 		SList:                  sList,
 		bgpType:                bgpImplementation(bgpType),
 		InterfaceExcludeRegexp: interfacesToExclude,
+		IgnoreExcludeLB:        *ignoreLBExclude,
+		Layer2StatusChange: func(namespacedName types.NamespacedName) {
+			if !*enableL2ServiceStatus {
+				return
+			}
+			statusNotifyChan <- controllers.NewL2StatusEvent(namespacedName.Namespace, namespacedName.Name)
+		},
 	})
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create MetalLB controller")
@@ -193,6 +206,10 @@ func main() {
 		ValidateConfig:    validateConfig,
 		LoadBalancerClass: *loadBalancerClass,
 		WithFRRK8s:        listenFRRK8s,
+
+		EnableL2Status:      *enableL2ServiceStatus,
+		Layer2StatusChan:    statusNotifyChan,
+		Layer2StatusFetcher: ctrl.layer2StatusFetchFunc,
 	})
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create k8s client")
@@ -223,6 +240,8 @@ type controller struct {
 	svcIPs           map[string][]net.IP              // service name -> assigned IPs
 
 	protocols []config.Proto
+
+	layer2StatusFetchFunc controllers.StatusFetcher
 }
 
 type controllerConfig struct {
@@ -240,40 +259,48 @@ type controllerConfig struct {
 	SupportedProtocols           []config.Proto
 	AnnouncedInterfacesToExclude []string `yaml:"announcedInterfacesToExclude"`
 	InterfaceExcludeRegexp       *regexp.Regexp
+	IgnoreExcludeLB              bool
+	Layer2StatusChange           func(types.NamespacedName)
 }
 
 func newController(cfg controllerConfig) (*controller, error) {
 	handlers := map[config.Proto]Protocol{
 		config.BGP: &bgpController{
-			logger:         cfg.Logger,
-			myNode:         cfg.MyNode,
-			svcAds:         make(map[string][]*bgp.Advertisement),
-			bgpType:        cfg.bgpType,
-			sessionManager: newBGP(cfg),
+			logger:          cfg.Logger,
+			myNode:          cfg.MyNode,
+			svcAds:          make(map[string][]*bgp.Advertisement),
+			bgpType:         cfg.bgpType,
+			sessionManager:  newBGP(cfg),
+			ignoreExcludeLB: cfg.IgnoreExcludeLB,
 		},
 	}
 	protocols := []config.Proto{config.BGP}
 
+	layer2StatusFetcher := func(types.NamespacedName) []layer2.IPAdvertisement { return nil }
 	if !cfg.DisableLayer2 {
 		a, err := layer2.New(cfg.Logger, cfg.InterfaceExcludeRegexp)
+		layer2StatusFetcher = a.GetStatus
 		if err != nil {
 			return nil, fmt.Errorf("making layer2 announcer: %s", err)
 		}
 		handlers[config.Layer2] = &layer2Controller{
-			announcer: a,
-			myNode:    cfg.MyNode,
-			sList:     cfg.SList,
+			announcer:       a,
+			myNode:          cfg.MyNode,
+			sList:           cfg.SList,
+			ignoreExcludeLB: cfg.IgnoreExcludeLB,
+			onStatusChange:  cfg.Layer2StatusChange,
 		}
 		protocols = append(protocols, config.Layer2)
 	}
 
 	ret := &controller{
-		myNode:           cfg.MyNode,
-		bgpType:          cfg.bgpType,
-		protocolHandlers: handlers,
-		announced:        map[config.Proto]map[string]bool{},
-		svcIPs:           map[string][]net.IP{},
-		protocols:        protocols,
+		myNode:                cfg.MyNode,
+		bgpType:               cfg.bgpType,
+		protocolHandlers:      handlers,
+		announced:             map[config.Proto]map[string]bool{},
+		svcIPs:                map[string][]net.IP{},
+		protocols:             protocols,
+		layer2StatusFetchFunc: layer2StatusFetcher,
 	}
 	ret.announced[config.BGP] = map[string]bool{}
 	ret.announced[config.Layer2] = map[string]bool{}

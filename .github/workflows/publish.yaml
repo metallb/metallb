@@ -63,7 +63,7 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@main
         with:
-          cosign-release: "v1.13.1"
+          cosign-release: "v2.2.3"
 
       - name: Code checkout
         uses: actions/checkout@v4
@@ -109,7 +109,7 @@ jobs:
             GIT_COMMIT: ${{ github.sha }}
 
       - name: Cosign sign tags
-        run: cosign sign ${TAGS}
+        run: cosign sign --yes ${TAGS}
         env:
           TAGS: ${{ steps.meta.outputs.tags }}@${{ steps.build-and-push.outputs.digest }}
           COSIGN_EXPERIMENTAL: 1

@@ -8,11 +8,11 @@ import (
 	"regexp"
 	"strings"
 
+	. "github.com/onsi/gomega"
 	"go.universe.tf/e2etest/pkg/executor"
-	"go.universe.tf/e2etest/pkg/k8s"
 	"go.universe.tf/e2etest/pkg/ipfamily"
+	"go.universe.tf/e2etest/pkg/k8s"
 	v1 "k8s.io/api/core/v1"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 var (
@@ -29,17 +29,17 @@ func init() {
 // (or in the current host) to reach the service ip.
 func ForIP(target string, exec executor.Executor) []net.IP {
 	dst := net.ParseIP(target)
-	framework.ExpectNotEqual(dst, nil, "failed to convert", target, "to ip")
+	Expect(dst).NotTo(Equal(nil), "failed to convert", target, "to ip")
 
 	re := Ipv4Re
 	res, err := exec.Exec("ip", []string{"route", "show", target}...)
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 	if dst.To4() == nil { // assuming it's an ipv6 address
 		re = Ipv6Re
 		res, err = exec.Exec("ip", []string{"-6", "route", "show", target}...)
 	}
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 
 	routes := make([]net.IP, 0)
 
@@ -61,7 +61,8 @@ func ForIP(target string, exec executor.Executor) []net.IP {
 			continue
 		}
 		netIP := net.ParseIP(ip)
-		framework.ExpectNotEqual(netIP, nil, "failed to convert", ip, "to ip")
+		Expect(netIP).NotTo(Equal(nil), "failed to convert", target, "to ip")
+
 		routes = append(routes, netIP)
 	}
 

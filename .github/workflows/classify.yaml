@@ -1,0 +1,66 @@
+name: Add Labels
+
+on:
+  pull_request_target:
+    types: [opened, edited]
+
+jobs:
+  add_labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: checkout
+        uses: actions/checkout@v2
+
+      - uses: actions-ecosystem/action-remove-labels@v1
+        with:
+          labels: |
+            kind/api-change
+            kind/bug
+            kind/cleanup
+            kind/deprecation
+            kind/design
+            kind/documentation
+            kind/failing
+            kind/feature
+            kind/flake
+            kind/regression
+
+      - uses: actions-ecosystem/action-regex-match@v2
+        id: regex-match
+        with:
+          text: ${{ github.event.pull_request.body }}
+          regex: '(?<!> )\/kind (\w+)'
+
+      - name: Check
+        run: |
+          if [[ ! "${{ steps.regex-match.outputs.group1 }}" =~ ^(api-change|bug|cleanup|deprecation|design|documentation|failing|feature|flake|regression)$ ]]; then
+            echo "kind must belong to
+                  - api-change \
+                  - bug \
+                  - cleanup \
+                  - deprecation \
+                  - design \
+                  - documentation \
+                  - failing \
+                  - feature \
+                  - flake \
+                  - regression \
+            please add /kind [type] to the body of the PR"
+            exit 1
+          fi
+      - uses: actions-ecosystem/action-add-labels@v1
+        with:
+          labels: kind/${{ steps.regex-match.outputs.group1 }}
+
+      - name: Check release notes were not deleted
+        uses: actions/github-script@v5
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            if (!pr.data.body.includes("```release-note")) {
+              throw new Error("Please don't cancel the ```release-note ``` section as it is used to build the release notes");
+            }

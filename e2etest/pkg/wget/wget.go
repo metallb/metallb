@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os/exec"
 
+	"github.com/onsi/ginkgo/v2"
 	"go.universe.tf/e2etest/pkg/executor"
-	"k8s.io/kubernetes/test/e2e/framework"
 )
 
 const (
@@ -32,7 +32,7 @@ func Do(address string, exc executor.Executor) error {
 			break
 		}
 		if retrycnt < retryLimit && code == NetworkFailure {
-			framework.Logf(" wget failed with code %d, err %s retrycnt %d\n", code, err, retrycnt)
+			ginkgo.GinkgoWriter.Printf(" wget failed with code %d, err %s retrycnt %d\n", code, err, retrycnt)
 			retrycnt++
 		} else {
 			break

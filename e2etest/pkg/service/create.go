@@ -6,46 +6,47 @@ import (
 	"context"
 	"fmt"
 
+	. "github.com/onsi/gomega"
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
-	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
 )
 
-var TestServicePort = 80
+var (
+	TestServicePort = 80
+)
 
-func CreateWithBackend(cs clientset.Interface, namespace string, jigName string, tweak ...func(svc *corev1.Service)) (*corev1.Service, *e2eservice.TestJig) {
+func CreateWithBackend(cs clientset.Interface, namespace string, jigName string, tweak ...func(svc *corev1.Service)) (*corev1.Service, *jigservice.TestJig) {
 	return CreateWithBackendPort(cs, namespace, jigName, TestServicePort, tweak...)
 }
 
-func CreateWithBackendPort(cs clientset.Interface, namespace string, jigName string, port int, tweak ...func(svc *corev1.Service)) (*corev1.Service, *e2eservice.TestJig) {
+func CreateWithBackendPort(cs clientset.Interface, namespace string, jigName string, port int, tweak ...func(svc *corev1.Service)) (*corev1.Service, *jigservice.TestJig) {
 	var svc *corev1.Service
 	var err error
 
-	jig := e2eservice.NewTestJig(cs, namespace, jigName)
-	timeout := e2eservice.GetServiceLoadBalancerCreationTimeout(context.TODO(), cs)
-	svc, err = jig.CreateLoadBalancerService(context.TODO(), timeout, func(svc *corev1.Service) {
+	jig := jigservice.NewTestJig(cs, namespace, jigName)
+	svc, err = jig.CreateLoadBalancerService(context.TODO(), func(svc *corev1.Service) {
 		tweakServicePort(svc, port)
 		for _, f := range tweak {
 			f(svc)
 		}
 	})
 
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 	_, err = jig.Run(context.TODO(), func(rc *corev1.ReplicationController) {
 		if port != 0 {
 			tweakRCPort(rc, port)
 		}
 	})
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 	return svc, jig
 }
 
 func Delete(cs clientset.Interface, svc *corev1.Service) {
 	err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-	framework.ExpectNoError(err)
+	Expect(err).NotTo(HaveOccurred())
 }
 
 func tweakServicePort(svc *corev1.Service, port int) {

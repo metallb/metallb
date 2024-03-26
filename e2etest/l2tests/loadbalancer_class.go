@@ -7,23 +7,23 @@ import (
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
-	"github.com/onsi/gomega"
+	. "github.com/onsi/gomega"
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/k8s"
+	"go.universe.tf/e2etest/pkg/k8sclient"
 	"go.universe.tf/e2etest/pkg/service"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 
+	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
-	"k8s.io/kubernetes/test/e2e/framework"
-	e2eservice "k8s.io/kubernetes/test/e2e/framework/service"
-	admissionapi "k8s.io/pod-security-admission/api"
 )
 
 var _ = ginkgo.Describe("LoadBalancer class", func() {
 	var cs clientset.Interface
 
-	var f *framework.Framework
+	testNamespace := ""
+
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentSpecReport().Failed() {
 			k8s.DumpInfo(Reporter, ginkgo.CurrentSpecReport().LeafNodeText)
@@ -31,18 +31,20 @@ var _ = ginkgo.Describe("LoadBalancer class", func() {
 
 		// Clean previous configuration.
 		err := ConfigUpdater.Clean()
-		framework.ExpectNoError(err)
+		Expect(err).NotTo(HaveOccurred())
+		err = k8s.DeleteNamespace(cs, testNamespace)
+		Expect(err).NotTo(HaveOccurred())
 	})
 
-	f = framework.NewDefaultFramework("lbclass")
-	f.NamespacePodSecurityEnforceLevel = admissionapi.LevelPrivileged
-
 	ginkgo.BeforeEach(func() {
-		cs = f.ClientSet
+		cs = k8sclient.New()
+		var err error
+		testNamespace, err = k8s.CreateTestNamespace(cs, "lbclass")
+		Expect(err).NotTo(HaveOccurred())
 
 		ginkgo.By("Clearing any previous configuration")
-		err := ConfigUpdater.Clean()
-		framework.ExpectNoError(err)
+		err = ConfigUpdater.Clean()
+		Expect(err).NotTo(HaveOccurred())
 	})
 
 	ginkgo.Context("A service with loadbalancer class", func() {
@@ -69,12 +71,13 @@ var _ = ginkgo.Describe("LoadBalancer class", func() {
 				},
 			}
 			err := ConfigUpdater.Update(resources)
-			framework.ExpectNoError(err)
+			Expect(err).NotTo(HaveOccurred())
 
-			jig := e2eservice.NewTestJig(cs, f.Namespace.Name, "lbclass")
-			svc, err := jig.CreateLoadBalancerService(context.TODO(), 10*time.Second, service.WithLoadbalancerClass("foo"))
-			gomega.Expect(err).Should(gomega.MatchError(gomega.ContainSubstring("timed out waiting for the condition")))
-			gomega.Expect(svc).To(gomega.BeNil())
+			jig := jigservice.NewTestJig(cs, testNamespace, "lbclass")
+			svc, err := jig.CreateLoadBalancerServiceWithTimeout(context.TODO(), 10*time.Second, service.WithLoadbalancerClass("foo"))
+
+			Expect(err).Should(MatchError(ContainSubstring("timed out waiting for service \"lbclass\" to have a load balancer")))
+			Expect(svc).To(BeNil())
 		})
 	})
 })

@@ -51,13 +51,14 @@ type peer struct {
 }
 
 type bgpController struct {
-	logger         log.Logger
-	myNode         string
-	nodeLabels     labels.Set
-	peers          []*peer
-	svcAds         map[string][]*bgp.Advertisement
-	bgpType        bgpImplementation
-	sessionManager bgp.SessionManager
+	logger          log.Logger
+	myNode          string
+	nodeLabels      labels.Set
+	peers           []*peer
+	svcAds          map[string][]*bgp.Advertisement
+	bgpType         bgpImplementation
+	sessionManager  bgp.SessionManager
+	ignoreExcludeLB bool
 }
 
 func (c *bgpController) SetConfig(l log.Logger, cfg *config.Config) error {
@@ -153,12 +154,12 @@ func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, po
 	}
 
 	if k8snodes.IsNetworkUnavailable(nodes[c.myNode]) {
-		level.Debug(l).Log("event", "skipping should announce bgp", "service", name, "reason", "speaker's node has NodeNetworkUnavailable condition")
+		level.Warn(l).Log("event", "skipping should announce bgp", "service", name, "reason", "speaker's node has NodeNetworkUnavailable condition")
 		return "nodeNetworkUnavailable"
 	}
 
-	if k8snodes.IsNodeExcludedFromBalancers(nodes[c.myNode]) {
-		level.Debug(l).Log("event", "skipping should announce bgp", "service", name, "reason", "speaker's node has labeled 'node.kubernetes.io/exclude-from-external-load-balancers'")
+	if !c.ignoreExcludeLB && k8snodes.IsNodeExcludedFromBalancers(nodes[c.myNode]) {
+		level.Warn(l).Log("event", "skipping should announce bgp", "service", name, "reason", "speaker's node has labeled 'node.kubernetes.io/exclude-from-external-load-balancers'")
 		return "nodeLabeledExcludeBalancers"
 	}
 
@@ -228,6 +229,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 					PeerASN:       p.cfg.ASN,
 					HoldTime:      p.cfg.HoldTime,
 					KeepAliveTime: p.cfg.KeepaliveTime,
+					ConnectTime:   p.cfg.ConnectTime,
 					Password:      p.cfg.Password,
 					PasswordRef:   p.cfg.PasswordRef,
 					CurrentNode:   c.myNode,
@@ -235,6 +237,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 					EBGPMultiHop:  p.cfg.EBGPMultiHop,
 					SessionName:   p.cfg.Name,
 					VRFName:       p.cfg.VRF,
+					DisableMP:     p.cfg.DisableMP,
 				},
 			)
 
