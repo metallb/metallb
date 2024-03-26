@@ -69,6 +69,8 @@ func TestUsableNodesEPSlices(t *testing.T) {
 		usableSpeakers map[string]bool
 
 		cExpectedResult []string
+
+		publishNotReadyAddresses bool
 	}{
 		{
 			desc: "Two endpoints, different hosts, multi slice",
@@ -222,10 +224,42 @@ func TestUsableNodesEPSlices(t *testing.T) {
 			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1", "iris2"},
 		},
+		{
+			desc:                     "Two endpoints, different hosts, ready but not serving and publishNotReadyAddresses is true",
+			publishNotReadyAddresses: true,
+			eps: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{
+								"2.3.4.5",
+							},
+							NodeName: ptr.To("iris1"),
+							Conditions: discovery.EndpointConditions{
+								Ready:   ptr.To(true),
+								Serving: ptr.To(true),
+							},
+						},
+						{
+							Addresses: []string{
+								"2.3.4.15",
+							},
+							NodeName: ptr.To("iris2"),
+							Conditions: discovery.EndpointConditions{
+								Ready:   ptr.To(true),
+								Serving: ptr.To(true),
+							},
+						},
+					},
+				},
+			},
+			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
+			cExpectedResult: []string{"iris1", "iris2"},
+		},
 	}
 
 	for _, test := range tests {
-		response := usableNodes(test.eps, test.usableSpeakers)
+		response := usableNodes(test.eps, test.usableSpeakers, test.publishNotReadyAddresses)
 		sort.Strings(response)
 		if !compareUseableNodesReturnedValue(response, test.cExpectedResult) {
 			t.Errorf("%q: shouldAnnounce for controller returned incorrect result, expected '%s', but received '%s'", test.desc, test.cExpectedResult, response)

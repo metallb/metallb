@@ -116,7 +116,7 @@ func (c *bgpController) SetEventCallback(callback func(interface{})) {
 
 // hasHealthyEndpoint return true if this node has at least one healthy endpoint.
 // It only checks nodes matching the given filterNode function.
-func hasHealthyEndpoint(eps []discovery.EndpointSlice, filterNode func(*string) bool) bool {
+func hasHealthyEndpoint(eps []discovery.EndpointSlice, publishNotReadyAddresses bool, filterNode func(*string) bool) bool {
 	ready := map[string]bool{}
 	for _, slice := range eps {
 		for _, ep := range slice.Endpoints {
@@ -125,13 +125,13 @@ func hasHealthyEndpoint(eps []discovery.EndpointSlice, filterNode func(*string) 
 				continue
 			}
 			for _, addr := range ep.Addresses {
-				if _, ok := ready[addr]; !ok && epslices.IsConditionServing(ep.Conditions) {
+				if _, ok := ready[addr]; !ok && epslices.IsConditionServing(ep.Conditions, publishNotReadyAddresses) {
 					// Only set true if nothing else has expressed an
 					// opinion. This means that false will take precedence
 					// if there's any unready ports for a given endpoint.
 					ready[addr] = true
 				}
-				if !epslices.IsConditionServing(ep.Conditions) {
+				if !epslices.IsConditionServing(ep.Conditions, publishNotReadyAddresses) {
 					ready[addr] = false
 				}
 			}
@@ -175,9 +175,9 @@ func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, po
 		return false
 	}
 
-	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !hasHealthyEndpoint(epSlices, filterNode) {
+	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !hasHealthyEndpoint(epSlices, svc.Spec.PublishNotReadyAddresses, filterNode) {
 		return "noLocalEndpoints"
-	} else if !hasHealthyEndpoint(epSlices, func(toFilter *string) bool { return false }) {
+	} else if !hasHealthyEndpoint(epSlices, svc.Spec.PublishNotReadyAddresses, func(toFilter *string) bool { return false }) {
 		return "noEndpoints"
 	}
 	return ""
