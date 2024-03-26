@@ -63,7 +63,7 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@main
         with:
-          cosign-release: "v1.13.1"
+          cosign-release: "v2.2.3"
 
       - name: Code checkout
         uses: actions/checkout@v4
