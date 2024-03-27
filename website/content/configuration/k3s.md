@@ -5,11 +5,10 @@ weight: 20
 
 ## Conflicts with K3s' own LoadBalancer implementation
 
-K3s come with its own service load balancer named Klipper. You need to disable it in order to run MetalLB.
+K3s comes with its own service load balancer named Klipper. You need to disable it or use [loadBalancerClass](https://metallb.universe.tf/installation/#setting-the-loadbalancer-class) in order to run MetalLB properly.
 To disable Klipper, run the server with the `--disable servicelb` option, as described in [K3s documentation](https://rancher.com/docs/k3s/latest/en/networking/).
 
-As an alternative to disabling Klipper-LB you can configure MetalLB to only recognizes services that have been configured with a specific `loadBalancerClass` attribute,
-as described by the [installation documentation](https://metallb.universe.tf/installation/#setting-the-loadbalancer-class).
+Alternatively, you can leverage loadBalancerClasses so MetalLB only recognizes services that explicitly ask for it.
 
 For example, if you run the MetalLB `controller` and `speaker` pods with `--lb-class=metallb.universe.tf/metallb-class`, you can then directly reference this class in your services:
 
@@ -39,7 +38,7 @@ The Traefik pods deployed by K3s tolerate the node-taint `CriticalAddonsOnly=tru
 While this is not an issue in most cases, you may run into issues when configuring your services with `externalTrafficPolicy: Local` 
 if your cluster's control-plane happens to be tainted with this specific taint.
 
-To make this work, you need to add a toleration to your `speaker` pods. 
+An option to make this work is adding the toleration to your `speaker` pods. 
 For example, when using Kustomize, you can add the toleration like this:
 
 ```yaml
@@ -47,7 +46,7 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - github.com/metallb/metallb/config/native?ref=<METALLB_VERSION>
+  - github.com/metallb/metallb/config/<BGP_MODE>?ref=<METALLB_VERSION>
 
 patches:
   - target:
