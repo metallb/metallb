@@ -13,8 +13,8 @@ const SlicesServiceIndexName = "ServiceName"
 
 // IsConditionServing tells if the conditions represent a serving state, deferring
 // to ready state if serving == nil.
-func IsConditionServing(conditions discovery.EndpointConditions) bool {
-	if conditions.Serving == nil {
+func IsConditionServing(conditions discovery.EndpointConditions, publishNotReadyAddresses bool) bool {
+	if conditions.Serving == nil || publishNotReadyAddresses {
 		if conditions.Ready == nil {
 			return true
 		}
