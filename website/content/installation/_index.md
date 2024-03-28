@@ -264,3 +264,20 @@ which allows multiple load balancer implementations to co-exist. In order to set
 for, the `--lb-class=<CLASS_NAME>` parameter must be provided to both the speaker and the controller.
 
 The helm charts support it via the `loadBalancerClass` parameter.
+
+For example, if you run the MetalLB with `--lb-class=metallb.universe.tf/metallb-class`, you can then directly reference this class in your services:
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingress-lb
+  annotations:
+    metallb.universe.tf/address-pool: ingress-ip-pool
+spec:
+  type: LoadBalancer
+  loadBalancerClass: metallb.universe.tf/metallb-class
+  ports:
+  - port: 443
+    targetPort: 8443
+```
