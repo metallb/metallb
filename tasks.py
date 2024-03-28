@@ -77,7 +77,7 @@ def _docker_build_cmd():
     if cmd:
         out = cmd
     else:
-        out = run("docker buildx ls >/dev/null"
+        out = run("docker buildx version >/dev/null"
                   "&& echo 'docker buildx build --load' "
                   "|| echo 'docker build'", hide=True).stdout.strip()
     return out
