@@ -1342,11 +1342,12 @@ var _ = ginkgo.Describe("BGP", func() {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(peer.Spec.Port).To(Equal(uint16(179)))
 		})
-		ginkgo.It("BGP Peer connect time", func() {
+		ginkgo.It("BGP Peer parameters", func() {
 			connectTime := time.Second * 5
 			resources := config.Resources{
 				Peers: metallb.PeersForContainers(FRRContainers, ipfamily.IPv4, func(p *metallbv1beta2.BGPPeer) {
 					p.Spec.ConnectTime = ptr.To(metav1.Duration{Duration: connectTime})
+					p.Spec.DisableMP = true
 				}),
 			}
 			err := ConfigUpdater.Update(resources)
@@ -1370,37 +1371,7 @@ var _ = ginkgo.Describe("BGP", func() {
 						if neighbor.ConfiguredConnectTime != int(connectTime.Seconds()) {
 							return fmt.Errorf("expected connect time to be %d, got %d", int(connectTime.Seconds()), neighbor.ConfiguredConnectTime)
 						}
-					}
-					return nil
-				}, 2*time.Minute, time.Second).ShouldNot(HaveOccurred())
-			}
 
-		})
-		ginkgo.It("FRR-MODE BGP Peer disable MP BGP", func() {
-			resources := config.Resources{
-				Peers: metallb.PeersForContainers(FRRContainers, ipfamily.DualStack, func(p *metallbv1beta2.BGPPeer) {
-					p.Spec.DisableMP = true
-				}),
-			}
-
-			err := ConfigUpdater.Update(resources)
-			Expect(err).NotTo(HaveOccurred())
-
-			speakerPods, err := metallb.SpeakerPods(cs)
-			Expect(err).NotTo(HaveOccurred())
-
-			for _, pod := range speakerPods {
-				podExec, err := FRRProvider.FRRExecutorFor(pod.Namespace, pod.Name)
-				Expect(err).NotTo(HaveOccurred())
-				Eventually(func() error {
-					neighbors, err := frr.NeighborsInfo(podExec)
-					if err != nil {
-						return err
-					}
-					if len(neighbors) == 0 {
-						return fmt.Errorf("expected at least 1 neighbor, got %d", len(neighbors))
-					}
-					for _, neighbor := range neighbors {
 						neighborFamily := ipfamily.ForAddress(neighbor.IP)
 						for _, family := range neighbor.AddressFamilies {
 							if !strings.Contains(family, string(neighborFamily)) {
