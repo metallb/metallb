@@ -23,7 +23,7 @@ jobs:
       - uses: wagoid/commitlint-github-action@v5
       
       - name: Setup Hugo
-        uses: peaceiris/actions-hugo@v2
+        uses: peaceiris/actions-hugo@v3
         with:
           hugo-version: '0.91.2'
 
