@@ -16,7 +16,7 @@ import (
 // useful for fetching informations from FRR (such as metrics) and we may need to move it
 // to metallb.
 
-// NeighborForContainer returns informations for the given neighbor in the given
+// NeighborInfo returns informations for the given neighbor in the given
 // executor.
 func NeighborInfo(neighborName string, exec executor.Executor) (*Neighbor, error) {
 	res, err := exec.Exec("vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", neighborName))
@@ -31,7 +31,7 @@ func NeighborInfo(neighborName string, exec executor.Executor) (*Neighbor, error
 	return neighbor, nil
 }
 
-// NeighborsForContainer returns informations for the all the neighbors in the given
+// NeighborsInfo returns informations for the all the neighbors in the given
 // executor.
 func NeighborsInfo(exec executor.Executor) ([]*Neighbor, error) {
 	res, err := exec.Exec("vtysh", "-c", "show bgp neighbor json")
