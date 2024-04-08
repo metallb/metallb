@@ -118,7 +118,7 @@ func validateL2AdvCreate(l2Adv *v1beta1.L2Advertisement) error {
 	return nil
 }
 
-// validateL2Update implements webhook.Validator so a webhook will be registered for v1beta1.L2Advertisement.
+// validateL2AdvUpdate implements webhook.Validator so a webhook will be registered for v1beta1.L2Advertisement.
 func validateL2AdvUpdate(l2Adv *v1beta1.L2Advertisement, _ *v1beta1.L2Advertisement) error {
 	level.Debug(Logger).Log("webhook", "v1beta1.L2Advertisement", "action", "update", "name", l2Adv.Name, "namespace", l2Adv.Namespace)
 

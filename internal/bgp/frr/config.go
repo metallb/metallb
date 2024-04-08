@@ -182,7 +182,7 @@ func templateConfig(data interface{}) (string, error) {
 	return b.String(), err
 }
 
-// writeConfigFile writes the FRR configuration file (represented as a string)
+// writeConfig writes the FRR configuration file (represented as a string)
 // to 'filename'.
 func writeConfig(config string, filename string) error {
 	return os.WriteFile(filename, []byte(config), 0600)
