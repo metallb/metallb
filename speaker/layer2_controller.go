@@ -54,7 +54,7 @@ func usableNodes(eps []discovery.EndpointSlice, speakers map[string]bool) []stri
 	usable := map[string]bool{}
 	for _, slice := range eps {
 		for _, ep := range slice.Endpoints {
-			if !epslices.IsConditionServing(ep.Conditions) {
+			if !epslices.EndpointCanServe(ep.Conditions) {
 				continue
 			}
 			if ep.NodeName == nil {
@@ -204,7 +204,7 @@ func nodesWithActiveSpeakers(speakers map[string]bool) []string {
 func activeEndpointExists(eps []discovery.EndpointSlice) bool {
 	for _, slice := range eps {
 		for _, ep := range slice.Endpoints {
-			if !epslices.IsConditionServing(ep.Conditions) {
+			if !epslices.EndpointCanServe(ep.Conditions) {
 				continue
 			}
 			return true
