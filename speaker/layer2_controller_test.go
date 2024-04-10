@@ -222,6 +222,37 @@ func TestUsableNodesEPSlices(t *testing.T) {
 			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
 			cExpectedResult: []string{"iris1", "iris2"},
 		},
+		{
+			desc: "Two endpoints, different hosts, ready but not serving",
+			eps: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{
+								"2.3.4.5",
+							},
+							NodeName: ptr.To("iris1"),
+							Conditions: discovery.EndpointConditions{
+								Ready:   ptr.To(true),
+								Serving: ptr.To(false),
+							},
+						},
+						{
+							Addresses: []string{
+								"2.3.4.15",
+							},
+							NodeName: ptr.To("iris2"),
+							Conditions: discovery.EndpointConditions{
+								Ready:   ptr.To(true),
+								Serving: ptr.To(false),
+							},
+						},
+					},
+				},
+			},
+			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
+			cExpectedResult: []string{"iris1", "iris2"},
+		},
 	}
 
 	for _, test := range tests {
