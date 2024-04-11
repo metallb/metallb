@@ -1,12 +1,12 @@
 # syntax=docker/dockerfile:1.2
 
-FROM --platform=$BUILDPLATFORM docker.io/golang:1.21.8 AS builder
+FROM --platform=$BUILDPLATFORM docker.io/golang:1.21.9 AS builder
 WORKDIR $GOPATH/go.universe.tf/metallb
 
 RUN --mount=type=cache,target=/go/pkg/mod/ \
-    --mount=type=bind,source=go.sum,target=go.sum \
-    --mount=type=bind,source=go.mod,target=go.mod \
-    go mod download -x
+  --mount=type=bind,source=go.sum,target=go.sum \
+  --mount=type=bind,source=go.mod,target=go.mod \
+  go mod download -x
 
 ARG GIT_COMMIT=dev
 ARG GIT_BRANCH=dev
