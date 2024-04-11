@@ -1,0 +1,43 @@
+:root {
+    --PRIMARY-color: rgba( 125, 201, 3, 1 ); /* brand primary color */
+    --SECONDARY-color: rgba( 108, 140, 227, 1 ); /* brand secondary color */
+    --ACCENT-color: rgb( 255, 102, 78, 1 ); /* brand accent color, used for search highlights */
+
+    --MAIN-TEXT-color: rgba( 224, 224, 224, 1 ); /* text color of content and h1 titles */
+    --MAIN-LINK-HOVER-color: rgba( 147, 176, 255, 1 ); /* hovered link color of content */
+    --MAIN-BG-color: rgba( 32, 32, 32, 1 ); /* background color of content */
+    --MAIN-TITLES-TEXT-color: rgba( 255, 255, 255, 1 ); /* text color of h2-h6 titles and transparent box titles */
+
+    --CODE-theme: relearn-dark; /* name of the chroma stylesheet file */
+    --CODE-BLOCK-color: rgba( 248, 248, 242, 1 ); /* fallback text color of block code; should be adjusted to your selected chroma style */
+    --CODE-BLOCK-BG-color: rgba( 43, 43, 43, 1 ); /* fallback background color of block code; should be adjusted to your selected chroma style */
+    --CODE-BLOCK-BORDER-color: rgba( 71, 71, 71, 1 ); /* border color of block code */
+    --CODE-INLINE-color: rgba( 130, 229, 80, 1 ); /* text color of inline code */
+    --CODE-INLINE-BG-color: rgba( 45, 45, 45, 1 ); /* background color of inline code */
+    --CODE-INLINE-BORDER-color: rgba( 70, 70, 70, 1 ); /* border color of inline code */
+
+    --BROWSER-theme: dark; /* name of the theme for browser scrollbars of the main section */
+    --MERMAID-theme: dark; /* name of the default Mermaid theme for this variant, can be overridden in hugo.toml */
+    --OPENAPI-theme: dark; /* name of the default OpenAPI theme for this variant, can be overridden in hugo.toml */
+    --OPENAPI-CODE-theme: obsidian; /* name of the default OpenAPI code theme for this variant, can be overridden in hugo.toml */
+
+    --MENU-HOME-LINK-color: rgba( 64, 64, 64, 1 ); /* home button color if configured */
+    --MENU-HOME-LINK-HOVER-color: rgba( 0, 0, 0, 1 ); /* hovered home button color if configured */
+
+    --MENU-SEARCH-color: rgba( 224, 224, 224, 1 ); /* text and icon color of search box */
+    --MENU-SEARCH-BG-color: rgba( 50, 50, 50, 1 ); /* background color of search box */
+    --MENU-SEARCH-BORDER-color: rgba( 224, 224, 224, 1 ); /* border color of search box */
+
+    --MENU-SECTIONS-BG-color: rgba( 43, 43, 43, 1 ); /* background of the menu; this is NOT just a color value but can be a complete CSS background definition including gradients, etc. */
+    --MENU-SECTIONS-LINK-color: rgba( 186, 186, 186, 1 ); /* link color of menu topics */
+    --MENU-SECTIONS-LINK-HOVER-color: rgba( 255, 255, 255, 1 ); /* hovered link color of menu topics */
+    --MENU-SECTIONS-ACTIVE-BG-color: rgba( 50, 50, 50, 1 ); /* background color of the active menu section */
+    --MENU-SECTION-ACTIVE-CATEGORY-color: rgba( 130, 229, 80, 1 ); /* text color of the displayed menu topic */
+    --MENU-SECTION-SEPARATOR-color: rgba( 96, 96, 96, 1 ); /* separator color between menu sections and menu footer */
+
+    --MENU-VISITED-color: rgba( 72, 106, 201, 1 ); /* icon color of visited menu topics if configured */
+
+    --BOX-CAPTION-color: rgba( 240, 240, 240, 1 ); /* text color of colored box titles */
+    --BOX-BG-color: rgba( 20, 20, 20, 1 ); /* background color of colored boxes */
+    --BOX-TEXT-color: rgba( 224, 224, 224, 1 ); /* text color of colored box content */
+}

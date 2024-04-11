@@ -1,0 +1,926 @@
+@media all and (-ms-high-contrast:none) {
+	/* ----------------------------------------------- */
+	/* turn off LTR support as it is dependend on CSS properties that aren't supported by IE11 */
+	html {
+		direction: ltr !important;
+	}
+	/* nucleus */
+	th {
+		text-align: left;
+	}
+	input[type="checkbox"], input[type="radio"] {
+		margin-right: 0.425rem;
+	}
+	blockquote {
+		padding-left: 0.85rem;
+	}
+	/* theme */
+	#R-sidebar {
+		left: 0;
+		min-width: 18.75rem;
+		max-width: 18.75rem;
+		width: 18.75rem;
+	}
+	#R-header {
+		border-right: 1px solid transparent;
+	}
+	.searchbox > :first-child {
+		left: .5rem;
+	}
+	.searchbox > :last-child {
+		right: .5rem;
+	}
+	.searchbox input {
+		padding-left: 1.8rem;
+		padding-right: 1.6rem;
+	}
+	#R-sidebar ul li.visited + span {
+		margin-right: 1rem;
+	}
+	#R-sidebar ul li .read-icon {
+		right: 1rem;
+	}
+	#R-sidebar .nav-title {
+		padding-left: 1rem;
+	}
+	#R-body {
+		margin-left: 18.75rem;
+		min-width: calc( 100% - 18.75rem );
+		max-width: calc( 100% - 18.75rem );
+		width: calc( 100% - 18.75rem );
+	 }
+	#R-body .flex-block-wrapper {
+		max-width: calc( 81.25rem - 18.75rem - 2 * 3.25rem );
+	}
+	body:not(.print) #R-body .narrow .flex-block-wrapper {
+		max-width: calc( 81.25rem - 18.75rem - 2 * 9.75rem );
+	}
+	/* we limit width if we have large screens */
+	@media screen and ( min-width: 81.25rem ){ /* #R-sidebar/width + ./max-width */
+		#R-body .flex-block-wrapper {
+			width: calc( 81.25rem - 18.75rem - 2 * 3.25rem );
+		}
+		body:not(.print) #R-body .narrow .flex-block-wrapper {
+			width: calc( 81.25rem - 18.75rem - 2 * 9.75rem );
+		}
+	}
+	h2, h3, h4, h5, h6 {
+		padding-right: 2rem;
+	}
+	blockquote {
+		border-left: .6rem solid rgba( 134, 134, 134, .4 );
+	}
+	blockquote cite {
+		text-align: right;
+	}
+	div.attachments .box-content {
+		padding-left: 1.75rem;
+	}
+	#R-body-inner ul.children-h2,
+	#R-body-inner ul.children-h3,
+	#R-body-inner ul.children-h4,
+	#R-body-inner ul.children-h5,
+	#R-body-inner ul.children-h6 {
+		/* if we display children with style=h2 but without a containerstyle
+		a ul will be used for structuring; we remove default indention for uls
+		in this case */
+		padding-left: 0;
+	}
+	code.copy-to-clipboard-code {
+		border-bottom-right-radius: 0;
+		border-top-right-radius: 0;
+		border-right-width: 0;
+	}
+	.topbar-wrapper > .topbar-area-start > .topbar-button > .topbar-control {
+		border-right: 1px solid rgba( 134, 134, 134, .333 );
+	}
+	.topbar-wrapper > .topbar-area-end > .topbar-button > .topbar-control {
+		border-left: 1px solid rgba( 134, 134, 134, .333 );
+	}
+	#R-body .topbar-sidebar-divider {
+		border-left-style: solid;
+		border-left-width: 1px;
+		margin-right: -1px;
+	}
+	html[dir="rtl"] .topbar-button-prev i,
+	html[dir="rtl"] .topbar-button-next i {
+		transform: scaleX(1);
+	}
+	.topbar-content {
+		left: 1rem;
+	}
+	@media screen and (max-width: 59.999rem) {
+		#R-sidebar {
+			min-width: 14.375rem;
+			max-width: 14.375rem;
+			width: 14.375rem;
+		}
+ 		#R-body {
+			margin-left: 14.375rem;
+			min-width: calc( 100% - 14.375rem );
+			max-width: calc( 100% - 14.375rem );
+			width: calc( 100% - 14.375rem );
+		}
+	}
+	@media screen and (max-width: 47.999rem) {
+		.mobile-support #R-sidebar {
+			left: -14.375rem;
+		}
+		.mobile-support #R-body {
+			margin-left: 0;
+		}
+		.mobile-support.sidebar-flyout #R-sidebar {
+			left: 0;
+		}
+		.mobile-support.sidebar-flyout #R-body {
+			margin-left: 14.375rem;
+		}
+	}
+	.copy-to-clipboard-button {
+		border-top-left-radius: 0;
+		border-top-right-radius: 2px;
+		border-bottom-right-radius: 2px;
+		border-bottom-left-radius: 0;
+	}
+	span > .copy-to-clipboard-button {
+		border-top-left-radius: 0;
+		border-top-right-radius: 2px;
+		border-bottom-right-radius: 2px;
+		border-bottom-left-radius: 0;
+	}
+	.disableInlineCopyToClipboard span > code.copy-to-clipboard-code {
+		border-top-right-radius: 2px;
+		border-bottom-right-radius: 2px;
+		border-right-width: 1px;
+	}
+	.expand > label {
+		left: 0;
+	}
+	.expand > .expand-content {
+		margin-left: 1rem;
+	}
+	html[dir="rtl"] .expand > .expand-label > i.fa-chevron-right {
+		transform: scaleX(1);
+	}
+	.headline i,
+	.footline i{
+		margin-left: .5rem;
+	}
+	.headline i:first-child,
+	.footline i:first-child{
+		margin-left: 0;
+	}
+	.anchor {
+		margin-left: .66em;
+	}
+	html[dir="rtl"] .menu-control i,
+	html[dir="rtl"] .menu-control span {
+		float: left;
+	}
+	.menu-control > button {
+		text-align: left;
+	}
+	.searchform input {
+		margin-right: .5rem;
+	}
+	.badge > .badge-title {
+		border-right: 0;
+		border-top-right-radius: 0;
+		border-bottom-right-radius: 0;
+	}
+	.badge.badge-with-title > .badge-content {
+		border-top-left-radius: 0;
+		border-bottom-left-radius: 0;
+	}
+	article ul > li:has(> input[type="checkbox"]) {
+		margin-left: -1rem;
+	}
+	/* tabs */
+	#R-body .tab-nav-button {
+		margin-left: .6rem;
+	}
+	#R-body .tab-content{
+		margin-top: -1px;
+	}
+	/* auto-complete */
+	.autocomplete-suggestions {
+		text-align: left;
+	}
+	.autocomplete-suggestion > .breadcrumbs {
+		margin-left: 1em;
+	}
+	.autocomplete-suggestion > .context {
+		margin-left: 1em;
+	}
+	/* menu */
+	#R-sidebar ul ul {
+		padding-left: 1rem;
+	}
+	#R-sidebar ul.collapsible-menu > li > label {
+		left: 0;
+		padding-left: .125rem;
+	}
+	html[dir="rtl"] #R-sidebar ul.collapsible-menu > li > label > i.fa-chevron-right {
+		transform: scaleX(1);
+	}
+
+	#R-header-topbar {
+		border-right-style: solid;
+		border-right-width: 1px;
+	}
+
+	#R-header-wrapper,
+	#R-homelinks,
+	#R-content-wrapper > * {
+		border-right-style: solid;
+		border-right-width: 1px;
+	}
+
+	/* ----------------------------------------------- */
+	/* set default colors as in variant.css for IE11 */
+	html {
+		color-scheme: only light;
+	}
+	body {
+		background-color: rgba( 255, 255, 255, 1 ); /* var(--MAIN-BG-color) */
+		color: rgba( 0, 0, 0, 1 ); /* var(--MAIN-TEXT-color) */
+		font-family: "Work Sans", "Helvetica", "Tahoma", "Geneva", "Arial", sans-serif; /* var(--MAIN-font) */
+	}
+
+	a,
+	.anchor,
+	.topbar-button button,
+	#R-searchresults .autocomplete-suggestion {
+		color: rgba( 72, 106, 201, 1 ); /* var(--MAIN-LINK-color) */
+	}
+
+	#R-body .topbar-sidebar-divider {
+		border-left-color: rgba( 125, 201, 3, 1 ); /* var(--MENU-TOPBAR-SEPARATOR-color) */
+	}
+	@media screen and (max-width: 47.999rem) {
+		#R-body .topbar-sidebar-divider {
+			border-left-color: transparent;
+		}
+	}
+
+	a:hover,
+	a:active,
+	a:focus,
+	.anchor:hover,
+	.anchor:active,
+	.anchor:focus,
+	.topbar-button button:hover,
+	.topbar-button button:active,
+	.topbar-button button:focus{
+		color: rgba( 32, 40, 145, 1 ); /* var(--MAIN-LINK-HOVER-color) */
+	}
+
+	#R-sidebar {
+		background: rgba( 40, 40, 40, 1 ); /* var(--MENU-SECTIONS-BG-color) */
+	}
+
+	#R-header-wrapper {
+		/* initially use section background to avoid flickering on load when a
+		non default variant is active */
+		background-color: rgba( 0, 0, 0, 0 ); /* var(--MENU-SECTIONS-BG-color) */
+		color: rgba( 224, 224, 224, 1 ); /* var(--MENU-SEARCH-color) */
+	}
+
+	.searchbox {
+		border-color: rgba( 224, 224, 224, 1 ); /* var(--MENU-SEARCH-BORDER-color) */
+		background-color: rgba( 50, 50, 50, 1 ); /* var(--MENU-SEARCH-BG-color) */
+	}
+
+	.searchbox input:-ms-input-placeholder {
+		color: rgba( 224, 224, 224, 1 ); /* var(--INTERNAL-MENU-SEARCH-color) */
+		opacity: .45;
+	}
+
+	#R-sidebar .searchbox > :first-child,
+	#R-sidebar .searchbox > :last-child {
+		color: rgba( 224, 224, 224, 1 ); /* var(--INTERNAL-MENU-SEARCH-color) */
+	}
+
+	.searchform input:-ms-input-placeholder {
+		color: rgba( 134, 134, 134, 1 );
+		opacity: .666;
+	}
+
+	#R-sidebar .collapsible-menu label,
+	#R-sidebar .menu-control,
+	#R-sidebar :is( a, span ) {
+		color: rgba( 186, 186, 186, 1 ); /* var(--MENU-SECTIONS-LINK-color) */
+	}
+
+	#R-sidebar select:hover,
+	#R-sidebar .collapsible-menu li:not(.active) > label:hover,
+	#R-sidebar .menu-control:hover,
+	#R-sidebar a:hover {
+		color: rgba( 255, 255, 255, 1 ); /* var(--MENU-SECTIONS-LINK-HOVER-color) */
+	}
+
+	#R-sidebar ul.enlarge > li.parent,
+	#R-sidebar ul.enlarge > li.active {
+		background-color: rgba( 0, 0, 0, .166 ); /* var(--MENU-SECTIONS-ACTIVE-BG-color) */
+	}
+
+	#R-sidebar li.active > label,
+	#R-sidebar li.active > a {
+		color: rgba( 68, 68, 68, 1 ); /* var(--MENU-SECTION-ACTIVE-CATEGORY-color) */
+	}
+
+	#R-sidebar li.active > a {
+		background-color: rgba( 255, 255, 255, 1 ); /* var(--MENU-SECTION-ACTIVE-CATEGORY-BG-color) */
+	}
+
+	#R-sidebar ul li > a .read-icon {
+		color: rgba( 72, 106, 201, 1 ); /* var(--MENU-VISITED-color) */
+	}
+
+	#R-sidebar .nav-title {
+		color: rgba( 186, 186, 186, 1 ); /* var(--MENU-SECTIONS-LINK-color) */
+	}
+
+	#R-content-wrapper hr {
+		border-color: rgba( 96, 96, 96, 1 ); /* var(--MENU-SECTION-SEPARATOR-color) */
+	}
+
+	#R-footer {
+		color: rgba( 186, 186, 186, 1 ); /* var(--MENU-SECTIONS-LINK-color) */
+	}
+
+	mark {
+		background-color: rgba( 255, 255, 0, 1 );
+	}
+
+	h1 {
+		color: rgba( 0, 0, 0, 1 ); /* var(--MAIN-TEXT-color) */
+		font-family: "Work Sans", "Helvetica", "Tahoma", "Geneva", "Arial", sans-serif; /* var(--MAIN-font) */
+	}
+
+	h2, h3, .article-subheading, h4, h5, h6 {
+		color: rgba( 16, 16, 16, 1 ); /* var(--MAIN-TITLES-TEXT-color) */
+		font-family: "Work Sans", "Helvetica", "Tahoma", "Geneva", "Arial", sans-serif; /* var(--MAIN-TITLES-TEXT-font) */
+	}
+
+	.expand > label {
+		color: rgba( 72, 106, 201, 1 ); /* var(--MAIN-LINK-color) */
+	}
+
+	.expand > label:hover,
+	.expand > label:active,
+	.expand > label:focus,
+	.expand > input:hover + label,
+	.expand > input:active + label,
+	.expand > input:focus + label{
+		color: rgba( 32, 40, 145, 1 ); /* var(--MAIN-LINK-HOVER-color) */
+	}
+
+	div.box {
+		background-color: rgba( 128, 128, 128, 1 ); /* var(--INTERNAL-BOX-NEUTRAL-color) */
+		border-color: rgba( 128, 128, 128, 1 ); /* var(--INTERNAL-BOX-NEUTRAL-color) */
+	}
+
+	div.box > .box-label {
+		color: rgba( 255, 255, 255, 1 ); /* var(--BOX-CAPTION-color) */
+	}
+
+	div.box > .box-content {
+		background-color: rgba( 255, 255, 255, .833 ); /* var(--BOX-BG-color) */
+		color: rgba( 16, 16, 16, 1 ); /* var(--BOX-TEXT-color) */
+	}
+
+	div.box.info {
+		background-color: rgba( 48, 117, 229, 1 ); /* var(--INTERNAL-BOX-INFO-color) */
+		border-color: rgba( 48, 117, 229, 1 ); /* var(--INTERNAL-BOX-INFO-color) */
+	}
+
+	div.box.info > .box-content {
+		color: rgba( 16, 16, 16, 1 ); /* var(--INTERNAL-BOX-INFO-TEXT-color) */
+	}
+
+	div.box.warning {
+		background-color: rgba( 224, 62, 62, 1 ); /* var(--INTERNAL-BOX-WARNING-color) */
+		border-color: rgba( 224, 62, 62, 1 ); /* var(--INTERNAL-BOX-WARNING-color) */
+	}
+
+	div.box.warning > .box-content {
+		color: rgba( 16, 16, 16, 1 ); /* var(--INTERNAL-BOX-WARNING-TEXT-color) */
+	}
+
+	div.box.note {
+		background-color: rgba( 237, 153, 9, 1 ); /* var(--INTERNAL-BOX-NOTE-color) */
+		border-color: rgba( 237, 153, 9, 1 ); /* var(--INTERNAL-BOX-NOTE-color) */
+	}
+
+	div.box.note > .box-content {
+		color: rgba( 16, 16, 16, 1 ); /* var(--INTERNAL-BOX-NOTE-TEXT-color) */
+	}
+
+	div.box.tip {
+		background-color: rgba( 42, 178, 24, 1 ); /* var(--INTERNAL-BOX-TIP-color) */
+		border-color: rgba( 42, 178, 24, 1 ); /* var(--INTERNAL-BOX-TIP-color) */
+	}
+
+	div.box.tip > .box-content {
+		color: rgba( 16, 16, 16, 1 ); /* var(--INTERNAL-BOX-TIP-TEXT-color) */
+	}
+
+	div.box.primary {
+		background-color: rgba( 125, 201, 3, 1 ); /* var(--INTERNAL-PRIMARY-color) */
+		border-color: rgba( 125, 201, 3, 1 ); /* var(--INTERNAL-PRIMARY-color) */
+	}
+
+	div.box.primary > .box-content {
+		color: rgba( 0, 0, 0, 1 ); /* var(--INTERNAL-MAIN-TEXT-color) */
+	}
+
+	div.box.secondary {
+		background-color: rgba( 72, 106, 201, 1 ); /* var(--INTERNAL-SECONDARY-color) */
+		border-color: rgba( 72, 106, 201, 1 ); /* var(--INTERNAL-SECONDARY-color) */
+	}
+
+	div.box.secondary > .box-content {
+		color: rgba( 0, 0, 0, 1 ); /* var(--INTERNAL-MAIN-TEXT-color) */
+	}
+
+	div.box.accent {
+		background-color: rgb( 255, 102, 78, 1 ); /* var(--INTERNAL-ACCENT-color) */
+		border-color: rgb( 255, 102, 78, 1 ); /* var(--INTERNAL-ACCENT-color) */
+	}
+
+	div.box.accent > .box-content {
+		color: rgba( 0, 0, 0, 1 ); /* var(--INTERNAL-MAIN-TEXT-color) */
+	}
+
+	div.box.blue {
+		background-color: rgba( 48, 117, 229, 1 ); /* var(--INTERNAL-BOX-BLUE-color) */
+		border-color: rgba( 48, 117, 229, 1 ); /* var(--INTERNAL-BOX-BLUE-color) */
+	}
+
+	div.box.blue > .box-content {
+		color: rgba( 16, 16, 16, 1 ); /* var(--INTERNAL-BOX-BLUE-TEXT-color) */
+	}
+
+	div.box.green {
+		background-color: rgba( 42, 178, 24, 1 ); /* var(--INTERNAL-BOX-GREEN-color) */
+		border-color: rgba( 42, 178, 24, 1 ); /* var(--INTERNAL-BOX-GREEN-color) */
+	}
+
+	div.box.green > .box-content {
+		color: rgba( 16, 16, 16, 1 ); /* var(--INTERNAL-BOX-GREEN-TEXT-color) */
+	}
+
+	div.box.grey {
+		background-color: rgba( 160, 160, 160, 1 ); /* var(--INTERNAL-BOX-GREY-color) */
+		border-color: rgba( 160, 160, 160, 1 ); /* var(--INTERNAL-BOX-GREY-color) */
+	}
+
+	div.box.grey > .box-content {
+		color: rgba( 16, 16, 16, 1 ); /* var(--INTERNAL-BOX-GREY-TEXT-color) */
+	}
+
+	div.box.orange {
+		background-color: rgba( 237, 153, 9, 1 ); /* var(--INTERNAL-BOX-ORANGE-color) */
+		border-color: rgba( 237, 153, 9, 1 ); /* var(--INTERNAL-BOX-ORANGE-color) */
+	}
+
+	div.box.orange > .box-content {
+		color: rgba( 16, 16, 16, 1 ); /* var(--INTERNAL-BOX-ORANGE-TEXT-color) */
+	}
+
+	div.box.red {
+		background-color: rgba( 224, 62, 62, 1 ); /* var(--INTERNAL-BOX-RED-color) */
+		border-color: rgba( 224, 62, 62, 1 ); /* var(--INTERNAL-BOX-RED-color) */
+	}
+
+	div.box.red > .box-content {
+		color: rgba( 16, 16, 16, 1 ); /* var(--INTERNAL-BOX-RED-TEXT-color) */
+	}
+
+	div.box.transparent {
+		background-color: transparent;
+		border-color: transparent;
+	}
+
+	div.box.transparent > .box-label {
+		color: rgba( 16, 16, 16, 1 ); /* var(--MAIN-TITLES-TEXT-color) */
+	}
+
+	div.box.transparent > .box-content {
+		background-color: transparent;
+		color: rgba( 0, 0, 0, 1 ); /* var(--MAIN-TEXT-color) */
+	}
+
+	code,
+	kbd,
+	pre:not(.mermaid),
+	samp {
+		font-family: "Consolas", menlo, monospace; /* var(--CODE-font) */
+	}
+
+	code {
+		background-color: rgba( 255, 250, 233, 1 ); /* var(--CODE-INLINE-BG-color) */
+		border-color: rgba( 248, 232, 200, 1 ); /* var(--CODE-INLINE-BORDER-color) */
+		color: rgba( 94, 94, 94, 1 ); /* var(--CODE-INLINE-color) */
+	}
+
+	pre:not(.mermaid) {
+		background-color: rgba( 250, 250, 250, 1 ); /* var(--CODE-BLOCK-BG-color) */
+		border-color: rgba( 216, 216, 216, 1 ); /* var(--CODE-BLOCK-BORDER-color) */
+		color: rgba( 39, 40, 34, 1 ); /* var(--CODE-BLOCK-color) */
+	}
+
+	div.highlight > div {
+		background-color: rgba( 250, 250, 250, 1 ); /* var(--CODE-BLOCK-BG-color) */
+		border-color: rgba( 216, 216, 216, 1 ); /* var(--CODE-BLOCK-BORDER-color) */
+	}
+
+	table {
+		background-color: rgba( 255, 255, 255, 1 ); /* var(--INTERNAL-MAIN-BG-color) */
+	}
+
+	.lightbox-back img{
+		background-color: rgba( 255, 255, 255, 1 ) /* var(--INTERNAL-MAIN-BG-color); */
+	}
+
+	#R-topbar {
+		background-color: rgba( 255, 255, 255, 1 ); /* var(--MAIN-BG-color) */
+	}
+
+	#R-body a[aria-disabled="true"],
+	#R-searchresults .autocomplete-suggestion > .context {
+		color: rgba( 0, 0, 0, 1 ); /* var(--MAIN-TEXT-color) - inherit is not processed correctly in Chrome */
+	}
+
+	#R-searchresults .autocomplete-suggestion > .breadcrumbs {
+		color: rgba( 125, 201, 3, 1 ); /* var(--PRIMARY-color) */
+	}
+
+	.copy-to-clipboard-button {
+		background-color: rgba( 255, 250, 233, 1 ); /* var(--CODE-INLINE-BG-color) */
+		border-color: rgba( 248, 232, 200, 1 ); /* var(--CODE-INLINE-BORDER-color) */
+		color: rgba( 94, 94, 94, 1 ); /* var(--CODE-INLINE-color) */
+		font-family: "Consolas", menlo, monospace; /* var(--CODE-font) */
+	}
+
+	.copy-to-clipboard-button:hover {
+		background-color: rgba( 94, 94, 94, 1 ); /* var(--CODE-INLINE-color) */
+		color: rgba( 255, 250, 233, 1 ); /* var(--CODE-INLINE-BG-color) */
+	}
+
+	div.highlight > div table + .copy-to-clipboard-button,
+	div.highlight pre:not(.mermaid) + .copy-to-clipboard-button,
+	pre:not(.mermaid) .copy-to-clipboard-button {
+		border-color: rgba( 216, 216, 216, 1 ); /* var(--CODE-BLOCK-BORDER-color) */
+		color: rgba( 72, 106, 201, 1 ); /* var(--MAIN-LINK-color) */
+	}
+
+	div.highlight > div table + .copy-to-clipboard-button:hover,
+	div.highlight pre:not(.mermaid) + .copy-to-clipboard-button:hover,
+	pre:not(.mermaid) .copy-to-clipboard-button:hover {
+		background-color: rgba( 72, 106, 201, 1 ); /* var(--MAIN-LINK-color) */
+		border-color: #486ac9; /* var(--MAIN-LINK-color) */
+		color: rgba( 250, 250, 250, 1 ); /* var(--CODE-BLOCK-BG-color) */
+	}
+
+	.svg-reset-button {
+		border-color: rgba( 216, 216, 216, 1 ); /* var(--CODE-BLOCK-BORDER-color) */
+		color: rgba( 72, 106, 201, 1 ); /* var(--MAIN-LINK-color) */
+	}
+	.svg-reset-button:hover {
+		background-color: rgba( 72, 106, 201, 1 ); /* var(--MAIN-LINK-color) */
+		border-color: #486ac9; /* var(--MAIN-LINK-color) */
+		color: rgba( 250, 250, 250, 1 ); /* var(--CODE-BLOCK-BG-color) */
+	}
+
+	#R-homelinks {
+		background-color: rgba( 125, 201, 3, 1 ); /* var(--MENU-HEADER-BORDER-color) */
+	}
+
+	#R-homelinks a {
+		color: rgba( 64, 64, 64, 1 ) /* var(--MENU-HOME-LINK-color) */
+	}
+
+	#R-homelinks a:hover {
+		color: rgba( 128, 128, 128, 1 ) /* var(--MENU-HOME-LINK-HOVER-color) */;
+	}
+
+	#R-homelinks hr {
+		border-color: rgba( 125, 201, 3, 1 ); /* var(--MENU-HEADER-SEPARATOR-color) */
+	}
+
+	.topbar-content {
+		background-color: rgba( 255, 255, 255, 1 ); /* var(--MAIN-BG-color) */
+	}
+
+	.btn {
+		background-color: rgba( 128, 128, 128, 1 ); /* var(--BOX-NEUTRAL-color) */
+	}
+
+	.btn > * {
+		border-color: rgba( 128, 128, 128, 1 ); /* var(--BOX-NEUTRAL-color) */
+		color: rgba( 255, 255, 255, 1 ); /* var(--BOX-CAPTION-color) */
+	}
+
+	.btn.interactive > *:hover,
+	.btn.interactive > *:active,
+	.btn.interactive > *:focus {
+		background-color: rgba( 255, 255, 255, .833 ); /* var(--BOX-BG-color) */
+		color: rgba( 16, 16, 16, 1 ); /* var(--BOX-NEUTRAL-TEXT-color) */
+	}
+
+	.btn.cstyle.info {
+		background-color: rgba( 48, 117, 229, 1 ); /* var(--BOX-INFO-color) */
+	}
+
+	.btn.cstyle.info > * {
+		border-color: rgba( 48, 117, 229, 1 ); /* var(--BOX-INFO-color) */
+	}
+
+	.btn.cstyle.note {
+		background-color: rgba( 237, 153, 9, 1 ); /* var(--BOX-NOTE-color) */
+	}
+
+	.btn.cstyle.note > * {
+		border-color: rgba( 237, 153, 9, 1 ); /* var(--BOX-NOTE-color) */
+	}
+
+	.btn.cstyle.tip {
+		background-color: rgba( 42, 178, 24, 1 ); /* var(--BOX-TIP-color) */
+	}
+
+	.btn.cstyle.tip > * {
+		border-color: rgba( 42, 178, 24, 1 ); /* var(--BOX-TIP-color) */
+	}
+
+	.btn.cstyle.warning {
+		background-color: rgba( 224, 62, 62, 1 ); /* var(--BOX-WARNING-color) */
+	}
+
+	.btn.cstyle.warning > * {
+		border-color: rgba( 224, 62, 62, 1 ); /* var(--BOX-WARNING-color) */
+	}
+
+	.btn.cstyle.primary {
+		background-color: rgba( 125, 201, 3, 1 ); /* var(--PRIMARY-color) */
+	}
+
+	.btn.cstyle.primary > * {
+		border-color: rgba( 125, 201, 3, 1 ); /* var(--PRIMARY-color) */
+	}
+
+	.btn.cstyle.secondary {
+		background-color: rgba( 72, 106, 201, 1 ); /* var(--SECONDARY-color) */
+	}
+
+	.btn.cstyle.secondary > * {
+		border-color: rgba( 72, 106, 201, 1 ); /* var(--SECONDARY-color) */
+	}
+
+	.btn.cstyle.accent {
+		background-color: rgb( 255, 102, 78, 1 ); /* var(--ACCENT-color) */
+	}
+
+	.btn.cstyle.accent > * {
+		border-color: rgb( 255, 102, 78, 1 ); /* var(--ACCENT-color) */
+	}
+
+	.btn.cstyle.blue {
+		background-color: rgba( 48, 117, 229, 1 ); /* var(--BOX-BLUE-color) */
+	}
+
+	.btn.cstyle.blue > * {
+		border-color: rgba( 48, 117, 229, 1 ); /* var(--BOX-BLUE-color) */
+	}
+
+	.btn.cstyle.green {
+		background-color: rgba( 42, 178, 24, 1 ); /* var(--BOX-GREEN-color) */
+	}
+
+	.btn.cstyle.green > * {
+		border-color: rgba( 42, 178, 24, 1 ); /* var(--BOX-GREEN-color) */
+	}
+
+	.btn.cstyle.grey {
+		background-color: rgba( 160, 160, 160, 1 ); /* var(--BOX-GREY-color) */
+	}
+
+	.btn.cstyle.grey > * {
+		border-color: rgba( 160, 160, 160, 1 ); /* var(--BOX-GREY-color) */
+	}
+
+	.btn.cstyle.orange {
+		background-color: rgba( 237, 153, 9, 1 ); /* var(--BOX-ORANGE-color) */
+	}
+
+	.btn.cstyle.orange > * {
+		border-color: rgba( 237, 153, 9, 1 ); /* var(--BOX-ORANGE-color) */
+	}
+
+	.btn.cstyle.red {
+		background-color: rgba( 224, 62, 62, 1 ); /* var(--BOX-RED-color) */
+	}
+
+	.btn.cstyle.red > * {
+		border-color: rgba( 224, 62, 62, 1 ); /* var(--BOX-RED-color) */
+	}
+
+	.btn.cstyle.transparent {
+		background-color: transparent;
+		color: rgba( 0, 0, 0, 1 ); /* var(--MAIN-TEXT-color) */
+	}
+
+	.btn.cstyle.interactive.transparent:hover,
+	.btn.cstyle.interactive.transparent:focus,
+	.btn.cstyle.interactive.transparent:active {
+		background-color: rgba( 128, 128, 128, 1 ); /* var(--BOX-NEUTRAL-color) */
+	}
+
+	.btn.cstyle.transparent > * {
+		color: rgba( 16, 16, 16, 1 ); /* var(--MAIN-TITLES-TEXT-color) */
+	}
+
+	#R-body .tags a.term-link {
+		background-color: rgba( 125, 201, 3, 1 ); /* var(--TAG-BG-color) */
+		color: rgba( 255, 255, 255, 1 ); /* var(--MAIN-BG-color) */
+		margin-right: 16px;
+	}
+
+	#R-body .tags a.term-link:before {
+		border-right-color: rgba( 125, 201, 3, 1 ); /* var(--TAG-BG-color) */
+	}
+
+	#R-body .tags a.term-link:after {
+		background: rgba( 255, 255, 255, 1 ); /* var(--MAIN-BG-color) */
+	}
+
+	.badge > * {
+		border-color: rgba( 16, 16, 16, 1 ); /* var(--BOX-TEXT-color) */
+	}
+
+	.badge > .badge-content {
+		background-color: rgba( 128, 128, 128, 1 ); /* var(--INTERNAL-BOX-NEUTRAL-color) */
+		color: rgba( 255, 255, 255, 1 ); /* var(--BOX-CAPTION-color) */
+	}
+
+	.badge.info > .badge-content {
+		background-color: rgba( 48, 117, 229, 1 ); /* var(--INTERNAL-BOX-INFO-color) */
+	}
+
+	.badge.warning > .badge-content {
+		background-color: rgba( 224, 62, 62, 1 ); /* var(--INTERNAL-BOX-WARNING-color) */
+	}
+
+	.badge.note > .badge-content {
+		background-color: rgba( 237, 153, 9, 1 ); /* var(--INTERNAL-BOX-NOTE-color) */
+	}
+
+	.badge.tip > .badge-content {
+		background-color: rgba( 42, 178, 24, 1 ); /* var(--INTERNAL-BOX-TIP-color) */
+	}
+
+	.badge.primary > .badge-content {
+		background-color: rgba( 125, 201, 3, 1 ); /* var(--INTERNAL-PRIMARY-color) */
+	}
+
+	.badge.secondary > .badge-content {
+		background-color: rgba( 72, 106, 201, 1 ); /* var(--INTERNAL-SECONDARY-color) */
+	}
+
+	.badge.accent > .badge-content {
+		background-color: rgb( 255, 102, 78, 1 ); /* var(--INTERNAL-ACCENT-color) */
+	}
+
+	.badge.blue > .badge-content {
+		background-color: rgba( 48, 117, 229, 1 ); /* var(--INTERNAL-BOX-BLUE-color) */
+	}
+
+	.badge.green > .badge-content {
+		background-color: rgba( 42, 178, 24, 1 ); /* var(--INTERNAL-BOX-GREEN-color) */
+	}
+
+	.badge.grey > .badge-content {
+		background-color: rgba( 160, 160, 160, 1 ); /* var(--INTERNAL-BOX-GREY-color) */
+	}
+
+	.badge.orange > .badge-content {
+		background-color: rgba( 237, 153, 9, 1 ); /* var(--INTERNAL-BOX-ORANGE-color) */
+	}
+
+	.badge.red > .badge-content {
+		background-color: rgba( 224, 62, 62, 1 ); /* var(--INTERNAL-BOX-RED-color) */
+	}
+
+	.badge.transparent > .badge-content {
+		background-color: transparent;
+		color: rgba( 16, 16, 16, 1 ); /* var(--MAIN-TITLES-TEXT-color) */
+	}
+
+	article ul > li > input[type="checkbox"] {
+		background-color: rgba( 255, 255, 255, 1 ); /* var(--INTERNAL-MAIN-BG-color); */
+		color: rgba( 0, 0, 0, 1 ); /* var(--INTERNAL-MAIN-TEXT-color) */
+	}
+
+	article ul > li > input[type="checkbox"]::before {
+		box-shadow: inset 1em 1em rgba( 125, 201, 3, 1 ); /* var(--INTERNAL-PRIMARY-color) */
+	}
+
+	/* no style support for tabs in IE11; all styled as default */
+	#R-body .tab-nav-button {
+		color: rgba( 0, 0, 0, 1 ); /* var(--INTERNAL-MAIN-TEXT-color) */
+	}
+
+	#R-body .tab-nav-button.active {
+		background-color: rgba( 255, 255, 255, 1 ); /* var(--VARIABLE-BOX-BG-color) */
+		border-bottom-color: rgba( 255, 255, 255, 1 ); /* var(--VARIABLE-BOX-BG-color) */
+		border-left-color: rgba( 134, 134, 134, .4 ); /* var(--VARIABLE-BOX-color) */
+		border-right-color: rgba( 134, 134, 134, .4 ); /* var(--VARIABLE-BOX-color) */
+		border-top-color: rgba( 134, 134, 134, .4 ); /* var(--VARIABLE-BOX-color) */
+		color: rgba( 16, 16, 16, 1 ); /* var(--VARIABLE-BOX-TEXT-color) */
+	}
+
+	#R-body .tab-nav-button.active > .tab-nav-text{
+		background-color: rgba( 255, 255, 255, 1 ); /* var(--VARIABLE-BOX-BG-color) */
+	}
+
+	#R-body .tab-nav-button > .tab-nav-text{
+		border-color: rgba( 134, 134, 134, .4 ); /* var(--VARIABLE-BOX-color) */
+	}
+
+	#R-body .tab-content{
+		background-color: rgba( 255, 255, 255, 1 ); /* var(--VARIABLE-BOX-BG-color) */
+		border-color: rgba( 134, 134, 134, .4 ); /* var(--VARIABLE-BOX-color) */
+	}
+
+	#R-body .tab-content-text{
+		background-color: rgba( 255, 255, 255, 1 ); /* var(--VARIABLE-BOX-BG-color) */
+		color: rgba( 16, 16, 16, 1 ); /* var(--VARIABLE-BOX-TEXT-color) */
+	}
+
+	#R-topbar {
+		border-bottom-color: transparent; /* var(--MAIN-TOPBAR-BORDER-color) */
+	}
+
+	#R-header-topbar {
+		border-bottom-color: transparent;
+		border-right-color: transparent; /* var(--MENU-TOPBAR-BORDER-color) */
+	}
+
+	#R-header-wrapper,
+	#R-homelinks,
+	#R-content-wrapper > * {
+		border-right-color: transparent; /* var(--MENU-BORDER-color) */
+	}
+
+	#R-sidebar ul.collapsible-menu li.active > a{
+		border-bottom-color: transparent; /* var(--MENU-BORDER-color) */
+		border-top-color: transparent; /* var(--MENU-BORDER-color) */
+		border-left-color: transparent; /* var(--MENU-BORDER-color) */
+		border-right-color: transparent; /* var(--MENU-SECTION-ACTIVE-CATEGORY-BORDER-color) */
+	}
+
+	/* ----------------------------------------------- */
+	/* set further styles to fix broken stuff in IE11 */
+
+	/* turn off animiation in IE because this causes the menu
+    to move in from the left on every page load */
+    .default-animation{
+        transition: none;
+    }
+
+    /* our silly dinosaur browser wants to have the real colors */
+    #R-header-wrapper {
+        background-color: rgba( 125, 201, 3, 1 ); /* var(--MENU-HEADER-BG-color) */
+        border-bottom-color: rgba( 125, 201, 3, 1 ); /* var(--MENU-HEADER-BORDER-color) */
+    }
+
+    /* clears the 'X' from Internet Explorer's search input */
+    input[type=search]::-ms-clear {  display: none; width : 0; height: 0; }
+    input[type=search]::-ms-reveal {  display: none; width : 0; height: 0; }
+
+    /* turn off variant selector as it uses modern stuff; don't change
+    order with block below */
+    .showVariantSwitch{
+        display: getamodernbrowser;
+    }
+    /* dumb IE11 doesn't understand initial, so we force a fallback here */
+    .showLangSwitch,
+    .showVisitedLinks,
+    .showFooter {
+        display: block;
+    }
+
+	.menu-control select::-ms-expand {
+		/* hide the triangle */
+		display: none;
+	}
+}
+
+@media print and (-ms-high-contrast:none) {
+	code.copy-to-clipboard-code {
+		border-top-right-radius: 2px;
+		border-bottom-right-radius: 2px;
+		border-right-width: 1px;
+	}
+}

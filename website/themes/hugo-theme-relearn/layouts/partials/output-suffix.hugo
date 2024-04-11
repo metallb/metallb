@@ -1,0 +1,8 @@
+{{- $format := partial "get-format.hugo" . }}
+{{- $ret := "html" }}
+{{- if $format }}
+  {{- range first 1 $format.MediaType.Suffixes }}
+	{{- $ret = . }}
+  {{- end }}
+{{- end }}
+{{- return $ret }}

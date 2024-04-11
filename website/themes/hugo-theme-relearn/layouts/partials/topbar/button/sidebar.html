@@ -1,0 +1,15 @@
+{{- $onwidths := cond (isset . "onwidths") .onwidths "show" }}
+{{- $onwidthm := cond (isset . "onwidthm") .onwidthm "hide" }}
+{{- $onwidthl := cond (isset . "onwidthl") .onwidthl "hide" }}
+{{- with .page }}
+	{{- partial "topbar/func/button.html" (dict
+		"page" .
+		"class" "topbar-button-sidebar"
+		"href" "javascript:toggleNav()"
+		"icon" "bars"
+		"onwidths" $onwidths
+		"onwidthm" $onwidthm
+		"onwidthl" $onwidthl
+		"hint" (printf "%s (CTRL+ALT+n)" (T "Navigation-toggle"))
+	)}}
+{{- end }}

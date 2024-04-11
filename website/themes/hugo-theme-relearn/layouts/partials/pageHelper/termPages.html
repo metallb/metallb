@@ -1,0 +1,8 @@
+{{- $pages := slice }}
+{{- range .Pages }}
+  {{- if and .Title .RelPermalink (or (ne (.Scratch.Get "relearnIsHiddenStem") true) (ne .Site.Params.disableTagHiddenPages true) ) }}
+    {{- $pages = $pages | append (dict "Title" .Title "Page" . )}}
+  {{- end }}
+{{- end }}
+{{- $pages = sort $pages ".Title" }}
+{{- return $pages }}

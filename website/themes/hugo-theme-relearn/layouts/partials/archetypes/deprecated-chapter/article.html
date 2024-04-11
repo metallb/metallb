@@ -1,0 +1,15 @@
+{{- $page := .page }}
+{{- $content := .content }}
+{{- with $page }}
+  {{- warnf "%q: DEPRECATED usage of old 'chapter' archetype found, remove 'chapter=true' and add 'archetype=\"chapter\"' to your frontmatter and remove the leading h3 and h1 headings; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#500" $page.File.Filename }}
+          <article class="chapter deprecated">
+            <header class="headline">
+              {{- partial "content-header.html" . }}
+            </header>
+
+{{ $content | safeHTML }}
+            <footer class="footline">
+              {{- partial "content-footer.html" . }}
+            </footer>
+          </article>
+{{- end }}

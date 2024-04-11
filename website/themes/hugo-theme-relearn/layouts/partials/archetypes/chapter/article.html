@@ -1,0 +1,16 @@
+{{- $page := .page }}
+{{- $content := .content }}
+{{- with $page }}
+          <article class="chapter">
+            <header class="headline">
+              {{- partial "content-header.html" . }}
+            </header>
+{{ partial "heading-pre.html" . }}<div class="article-subheading">{{ T "Chapter" .Params.Weight }}</div>
+{{ partial "heading.html" . }}{{ partial "heading-post.html" . }}
+
+{{ $content | safeHTML }}
+            <footer class="footline">
+              {{- partial "content-footer.html" . }}
+            </footer>
+          </article>
+{{- end }}

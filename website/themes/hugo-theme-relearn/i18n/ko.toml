@@ -1,0 +1,122 @@
+[Reading-direction]
+other = "ltr"
+
+[Search]
+other = "검색"
+
+[Search-placeholder]
+other = "검색어를 입력하세요"
+
+[Clear-search]
+other = "검색 지우기"
+
+[No-results-found]
+other = "\"{0}\"에 대한 결과가 없습니다."
+
+[N-results-found]
+other = "\"{0}\"에 대해 {1}개의 결과가 검색되었습니다."
+
+[Clear-History]
+other = "방문 기록 삭제"
+
+[Reset-view]
+other = "보기 재설정"
+
+[View-reset]
+other = "보기 초기화!"
+
+[Attachments-label]
+other = "첨부파일"
+
+[title-404]
+other = "위치 없음"
+
+[message-404]
+other = "존재하지 않는 페이지입니다."
+
+[Go-to-homepage]
+other = "메인화면"
+
+[Edit-this-page]
+other = "편집"
+
+[Print-this-chapter]
+other = "전체 장 인쇄"
+
+[More-action]
+other = "외부 링크"
+
+[Shortcuts-Title]
+other = "외부 링크"
+
+[Expand-title]
+other = "더 보기"
+
+[Navigation-toggle]
+other = "메뉴"
+
+[Toc-toggle]
+other = "목차"
+
+[Byte-symbol]
+other = "B"
+
+[Kilobyte-symbol]
+other = "KB"
+
+[Megabyte-symbol]
+other = "MB"
+
+[note]
+# code snippent 내의 comment(주석)과의 혼동 방지를 위해 위와 같이 번역합니다.
+other = "주"
+
+[info]
+# 예제 내용상 learn theme 참고 용도로 사용되어 위와 같이 번역합니다.
+other = "참고"
+
+[tip]
+# 우리말 순화어로 기록 가능하고, note, info와 의미상 좀 더 명확한 구분이 되어 아래처럼 기록합니다.
+other = "도움말"
+
+[warning]
+other = "주의"
+
+[Copy-to-clipboard]
+other = "클립보드에 복사"
+
+[Copied-to-clipboard]
+other = "클립보드에 복사됐습니다!"
+
+[Copy-link-to-clipboard]
+other = "링크를 클립보드에 복사"
+
+[Link-copied-to-clipboard]
+other = "클립보드에 링크가 복사됐습니다!"
+
+[Chapter]
+other = "{{.}}장"
+
+[Language]
+other = "언어"
+
+[Theme]
+other = "주제"
+
+[Submenu]
+other = "하위 메뉴 {{.}}"
+
+[Subsections]
+other = "{{.}}의 하위 섹션"
+
+[tags]
+other = "태그"
+
+[tag]
+other = "태그"
+
+[categories]
+other = "카테고리"
+
+[category]
+other = "카테고리"

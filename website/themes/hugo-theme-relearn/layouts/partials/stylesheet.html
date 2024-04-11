@@ -1,0 +1,60 @@
+  {{- $page := .page }}
+  {{- $outputFormat := .outputFormat }}
+  {{- if not $page }}
+    {{- $page = . }}
+    {{- $outputFormat = partial "output-format.hugo" $page }}
+  {{- end }}
+  {{- with $page }}
+    {{- $assetBusting := not .Site.Params.disableAssetsBusting }}
+    {{ "<!-- https://github.com/filamentgroup/loadCSS/blob/master/README.md#how-to-use -->" | safeHTML }}
+    <link href="{{"css/fontawesome-all.min.css" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet" media="print" onload="this.media='all';this.onload=null;"><noscript><link href="{{"css/fontawesome-all.min.css" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet"></noscript>
+    <link href="{{"css/nucleus.css" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet">
+    <link href="{{"css/auto-complete.css" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet" media="print" onload="this.media='all';this.onload=null;"><noscript><link href="{{"css/auto-complete.css" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet"></noscript>
+    <link href="{{"css/perfect-scrollbar.min.css" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet">
+    <link href="{{"css/fonts.css" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet" media="print" onload="this.media='all';this.onload=null;"><noscript><link href="{{"css/fonts.css" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet"></noscript>
+    <link href="{{"css/theme.css" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet">
+    {{- $themevariants := partialCached "get-theme-variants.hugo" . }}
+    {{- $themevariantmodifier := .Site.Params.themeVariantModifier | default "" }}
+    {{- with index $themevariants 0 }}
+    <link href="{{(printf "css/theme-%s%s.css" .identifier $themevariantmodifier) | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet" id="R-variant-style">
+    <link href="{{(printf "css/chroma-%s.css" .chroma) | safeHTML | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet" id="R-variant-chroma-style">
+    {{- end }}
+    <link href="{{"css/variant.css" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet">
+    <link href="{{"css/print.css" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet" media="print">
+    {{- $f := printf "/static/css/format-%s.css" $outputFormat }}
+    {{- if or (partialCached "fileExists.hugo" $f $f) (resources.Get (printf "/css/format-%s.css" $outputFormat)) }}
+    <link href="{{(printf "css/format-%s.css" $outputFormat) | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet">
+    {{- end }}
+    <link href="{{"css/ie.css" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="stylesheet">
+    <script src="{{"js/url.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script src="{{"js/variant.js" | relURL}}{{ if not .Site.Params.disableAssetsBusting }}?{{ now.Unix }}{{ end }}"></script>
+    <script>
+      window.relearn = window.relearn || {};
+      window.relearn.relBasePath='{{ partial "relBasePath.hugo" $page | safeJS }}';
+      window.relearn.relBaseUri='{{ partial "relBaseUri.hugo" $page | safeJS }}';
+      window.relearn.absBaseUri='{{ replaceRE "/*$" "" .Site.BaseURL | safeJS }}';
+    {{- with .Site.Home.OutputFormats.Get "json" }}
+      {{- warnf "%q: DEPRECATED usage of 'json' output format found, use 'search' instead; see https://mcshelby.github.io/hugo-theme-relearn/basics/customization#activate-search" $page.File.Filename }}
+      window.index_json_url={{ "index.json" | relLangURL }};
+    {{- end }}
+    {{- with .Site.Home.OutputFormats.Get "search" }}
+      window.index_js_url={{ "index.search.js" | relLangURL }};
+    {{- end }}
+      {{ "// variant stuff" | safeJS }}
+      window.relearn.themeVariantModifier='{{ $themevariantmodifier }}';
+      {{- $quotedthemevariants := slice }}
+      {{- range $themevariants }}
+        {{- $quotedthemevariants = $quotedthemevariants | append (printf "'%s'" .identifier) }}
+      {{- end }}
+      window.variants && variants.init( [ {{ delimit $quotedthemevariants ", " | safeJS }} ] );
+      {{ "// translations" | safeJS }}
+      {{ printf "window.T_Copy_to_clipboard = `%s`;" (T `Copy-to-clipboard`) | safeJS }}
+      {{ printf "window.T_Copied_to_clipboard = `%s`;" (T `Copied-to-clipboard`) | safeJS }}
+      {{ printf "window.T_Copy_link_to_clipboard = `%s`;" (T `Copy-link-to-clipboard`) | safeJS }}
+      {{ printf "window.T_Link_copied_to_clipboard = `%s`;" (T `Link-copied-to-clipboard`) | safeJS }}
+      {{ printf "window.T_Reset_view = `%s`;" (T `Reset-view`) | safeJS }}
+      {{ printf "window.T_View_reset = `%s`;" (T `View-reset`) | safeJS }}
+      {{ printf "window.T_No_results_found = `%s`;" (T "No-results-found") | safeJS }}
+      {{ printf "window.T_N_results_found = `%s`;" (T "N-results-found") | safeJS }}
+    </script>
+  {{- end }}

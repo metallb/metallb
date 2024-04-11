@@ -1,0 +1,33 @@
+{{- $_hugo_config := `{ "version": 1 }` }}
+{{- $color   := (.Get "color") }}
+{{- $content := .Inner }}
+{{- $icon    := (.Get "icon") }}
+{{- $name    := (.Get "name") }}
+{{- $style   := (.Get "style") }}
+{{- $title   := (.Get "title") }}
+{{- $tabs := slice }}
+{{- if and .Parent (.Parent.Scratch.Get "tabs") }}
+    {{- $tabs = .Parent.Scratch.Get "tabs" }}
+{{- end }}
+{{- $tabs = $tabs | append (dict
+    "color"   $color
+    "content" $content
+    "icon"    $icon
+    "name"    $name
+    "style"   $style
+    "title"   $title
+) }}
+{{- if .Parent }}
+    {{- $.Parent.Scratch.Set "tabs" $tabs }}
+{{- else }}
+    {{- $c:=""}}{{/* if no containing tabs shortcode is present, we display this tab as single */}}
+    {{- partial "shortcodes/tabs.html" (dict
+        "page"    .Page
+        "color"   ""
+        "content" $tabs
+        "groupid" ""
+        "icon"    ""
+        "style"   ""
+        "title"   ""
+    ) }}
+{{- end }}

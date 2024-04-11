@@ -1,0 +1,11 @@
+{{- $page := .page }}
+{{- if and (not $page) .context }}
+  {{- $page = .context }}
+  {{- warnf "%q: DEPRECATED parameter 'context' for shortcode 'swagger' found, use 'page' instead; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#5180" $page.File.Filename }}
+{{- end }}
+{{ warnf "%q: DEPRECATED shortcode `swagger` found, use `openapi` instead; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#5130" $page.File.Filename }}
+{{- partial "shortcodes/openapi.html" (dict
+  "page"    $page
+  "src"     .src
+  "id"      .id
+) }}

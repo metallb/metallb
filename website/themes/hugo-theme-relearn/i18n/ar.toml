@@ -1,0 +1,119 @@
+[Reading-direction]
+other = "rtl"
+
+[Search]
+other = "البحث"
+
+[Search-placeholder]
+other = "...البحث"
+
+[Clear-search]
+other = "مسح البحث"
+
+[No-results-found]
+other = "لم يتم العثور على نتائج لـ \"{0}\""
+
+[N-results-found]
+other = "تم العثور على {1} نتيجة لـ \"{0}\""
+
+[Clear-History]
+other = "مسح السجل"
+
+[Reset-view]
+other = "إعادة تعيين طريقة العرض"
+
+[View-reset]
+other = "عرض إعادة تعيين!"
+
+[Attachments-label]
+other = "مرفقات"
+
+[title-404]
+other = "غير محدد"
+
+[message-404]
+other = ".¯\\_(ツ)_/¯أوبس. يبدو أن هذه الصفحة غير موجودة"
+
+[Go-to-homepage]
+other = "الذهاب إلى الصفحة الرئيسية"
+
+[Edit-this-page]
+other = "حرر"
+
+[Print-this-chapter]
+other = "طباعة الفصل بأكمله"
+
+[More-action]
+other = "المزيد"
+
+[Shortcuts-Title]
+other = "المزيد"
+
+[Expand-title]
+other = "...قم بتوسيع"
+
+[Navigation-toggle]
+other = "قائمة"
+
+[Toc-toggle]
+other = "جدول المحتويات"
+
+[Byte-symbol]
+other = "B"
+
+[Kilobyte-symbol]
+other = "KB"
+
+[Megabyte-symbol]
+other = "MB"
+
+[note]
+other = "ملاحظه"
+
+[info]
+other = "معلومات"
+
+[tip]
+other = "بقشيش"
+
+[warning]
+other = "تحذير"
+
+[Copy-to-clipboard]
+other = "نسخ إلى الحافظة"
+
+[Copied-to-clipboard]
+other = "نسخت إلى الحافظة!"
+
+[Copy-link-to-clipboard]
+other = "نسخ الرابط إلى الحافظة"
+
+[Link-copied-to-clipboard]
+other = "رابط نسخت إلى الحافظة!"
+
+[Chapter]
+other = "{{.}} الفصل"
+
+[Language]
+other = "اللغة"
+
+[Theme]
+other = "موضوع"
+
+[Submenu]
+other = "{{.}} القائمة الفرعية"
+
+[Subsections]
+other = "{{.}} الأقسام الفرعية"
+
+[tags]
+other = "الكلمات الدالة"
+
+[tag]
+other = "كلمة رئيسية"
+
+[categories]
+other = "فئات"
+
+[category]
+other = "فئة"

@@ -1,0 +1,90 @@
+{{- $page := .page }}
+{{- if and (not $page) .context }}
+  {{- $page = .context }}
+  {{- warnf "%q: DEPRECATED parameter 'context' for shortcode 'children' found, use 'page' instead; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#5180" $page.File.Filename }}
+{{- end }}
+{{- $showhidden := .showhidden | default false }}
+{{- if eq (printf "%T" $showhidden) "string" }}
+	{{- $showhidden = (eq $showhidden "true") }}
+{{- end }}
+{{- $style := .style | default "li" }}
+{{- $depth := .depth | default 1 }}
+{{- $withDescription := .description | default false }}
+{{- if eq (printf "%T" $withDescription) "string" }}
+	{{- $withDescription = (eq $withDescription "true") }}
+{{- end }}
+{{- $sortTerm :=  .sort | lower }}
+{{- $containerstyle :=  .containerstyle | default "ul" }}
+{{- if( and (not (eq $style "li") ) (eq $containerstyle "ul" ) ) }}
+	{{- $containerstyle = "div" }}
+{{- end }}
+
+{{- with $page }}
+{{ (printf "<%s class=\"children children-%s children-sort-%s\">" $containerstyle $style $sortTerm)|safeHTML }}
+	{{- $pages := partial "pageHelper/pagesBy.html" (dict "page" . "hidden" true) }}
+	{{- template "childs" dict "menu" $pages "containerstyle" $containerstyle "style" $style "showhidden" $showhidden "count" 1 "depth" $depth "pages" .Site.Pages "description" $withDescription "sortTerm" $sortTerm "page" . }}
+{{ (printf "</%s>" $containerstyle)|safeHTML }}
+{{- end }}
+
+{{- define "childs" }}
+	{{ $page := .page }}
+	{{- range .menu }}
+		{{- $hidden := and (or (.Params.hidden) (eq .Title "")) (not $.showhidden) }}
+        {{- if not $hidden }}
+			{{- if not .IsHome }}
+				{{- if hasPrefix $.style "h" }}
+					{{- $num := sub ( int (trim $.style "h") ) 1 }}
+					{{- $numn := add $num $.count }}
+{{ (printf "<h%d>" $numn)|safeHTML }}{{ if .RelPermalink }}<a href="{{ partial "relLangPrettyUglyURL.hugo" (dict "to" .) }}">{{ .Title }}</a>{{ else }}<span>{{ .Title }}</span>{{ end }}{{ (printf "</h%d>" $numn)|safeHTML }}
+{{- if $.description }}
+	{{- if .Description -}}
+<p>{{ .Description }}</p>
+	{{- else -}}
+<p>{{ .Summary }}</p>
+	{{- end }}
+{{- end }}
+
+				{{- else if eq $.style "li" }}
+{{ (printf "<%s>" $.style)|safeHTML }}{{ if .RelPermalink }}<a href="{{ partial "relLangPrettyUglyURL.hugo" (dict "to" .) }}">{{ .Title }}</a>{{ else }}<span>{{ .Title }}</span>{{ end }}
+{{- if $.description }}
+	{{- if .Description -}}
+<p>{{ .Description }}</p>
+	{{- else -}}
+<p>{{ .Summary }}</p>
+	{{- end }}
+{{- end }}
+
+				{{- else }}
+{{ (printf "<%s>" $.style)|safeHTML }}{{ if .RelPermalink }}<a href="{{ partial "relLangPrettyUglyURL.hugo" (dict "to" .) }}">{{ .Title }}</a>{{ else }}<span>{{ .Title }}</span>{{ end }}{{ (printf "</%s>" $.style)|safeHTML }}
+{{- if $.description }}
+	{{- if .Description -}}
+<p>{{ .Description }}</p>
+	{{- else -}}
+<p>{{ .Summary }}</p>
+	{{- end }}
+{{- end }}
+
+				{{- end }}
+			{{- end }}
+			{{- if lt $.count $.depth }}
+
+				{{- if eq $.style "li" }}
+{{- (printf "<%s>" $.containerstyle)|safeHTML }}
+				{{- end }}
+
+				{{- $pages := partial "pageHelper/pagesBy.html" (dict "page" . "hidden" true) }}
+				{{- template "childs" dict "menu" $pages "containerstyle" $.containerstyle "style" $.style "showhidden" $.showhidden "count" (add $.count 1) "depth" $.depth "pages" $.pages "description" $.description "sortTerm" $.sortTerm "page" $page }}
+
+				{{- if eq $.style "li" }}
+{{- (printf "</%s>" $.containerstyle)|safeHTML }}
+				{{- end }}
+			{{- end }}
+
+			{{- if not .IsHome }}
+				{{- if eq $.style "li" }}
+{{- (printf "</%s>" $.style)|safeHTML -}}
+				{{- end }}
+			{{- end }}
+		{{- end }}
+	{{- end }}
+{{- end }}

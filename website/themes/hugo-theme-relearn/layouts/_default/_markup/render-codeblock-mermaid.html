@@ -1,0 +1,6 @@
+{{- partial "shortcodes/mermaid.html" (dict
+  "page"       .Page
+  "attributes" .Attributes
+  "content"    .Inner
+  "align"      (index .Attributes "align")
+) }}

@@ -1,0 +1,119 @@
+[Reading-direction]
+other = "ltr"
+
+[Search]
+other = "Hledat"
+
+[Search-placeholder]
+other = "Hledat..."
+
+[Clear-search]
+other = "Vymazat vyhledávání"
+
+[No-results-found]
+other = "Žádné výsledky pro \"{0}\""
+
+[N-results-found]
+other = "{1} výsledků pro \"{0}\""
+
+[Clear-History]
+other = "Vymazat historii"
+
+[Reset-view]
+other = "Obnovit zobrazení"
+
+[View-reset]
+other = "Resetovat zobrazení!"
+
+[Attachments-label]
+other = "Přílohy"
+
+[title-404]
+other = "Nelokalizované"
+
+[message-404]
+other = "Ups. Zdá se, že tato stránka neexistuje ¯\\_(ツ)_/¯."
+
+[Go-to-homepage]
+other = "Přejít na domovskou stránku"
+
+[Edit-this-page]
+other = "Upravit"
+
+[Print-this-chapter]
+other = "Vytisknout kapitolu"
+
+[More-action]
+other = "Více"
+
+[Shortcuts-Title]
+other = "Více"
+
+[Expand-title]
+other = "Rozbalit..."
+
+[Navigation-toggle]
+other = "Menu"
+
+[Toc-toggle]
+other = "Obsah"
+
+[Byte-symbol]
+other = "B"
+
+[Kilobyte-symbol]
+other = "KB"
+
+[Megabyte-symbol]
+other = "MB"
+
+[note]
+other = "Poznámka"
+
+[info]
+other = "Info"
+
+[tip]
+other = "Tip"
+
+[warning]
+other = "Varování"
+
+[Copy-to-clipboard]
+other = "Kopírovat"
+
+[Copied-to-clipboard]
+other = "Zkopírováno!"
+
+[Copy-link-to-clipboard]
+other = "Kopírovat odkaz"
+
+[Link-copied-to-clipboard]
+other = "Odkaz zkopírován!"
+
+[Chapter]
+other = "Kapitola {{.}}"
+
+[Language]
+other = "Jazyk"
+
+[Theme]
+other = "Motiv"
+
+[Submenu]
+other = "Podmenu {{.}}"
+
+[Subsections]
+other = "Podsekce {{.}}"
+
+[tags]
+other = "Klíčová Slova"
+
+[tag]
+other = "Klíčové Slovo"
+
+[categories]
+other = "Kategorie"
+
+[category]
+other = "Kategorie"

@@ -1,0 +1,5 @@
+{{- $page := .page }}
+{{- $content := .content }}
+{{- $outputFormat := .outputFormat }}
+{{- $page.Page.Store.Set (printf "%sIsNested" $outputFormat) false }}
+{{- partial "output-partial.hugo" (dict "base" "article" "page" $page "parameter" (dict "page" $page "content" $content "outputFormat" $outputFormat) "outputFormat" $outputFormat) }}

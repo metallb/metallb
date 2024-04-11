@@ -1,0 +1,32 @@
+    {{- $assetBusting := not .Site.Params.disableAssetsBusting }}
+    {{- $faviconMatch := false }}
+    {{- $svg := dict "ext" "svg" "type" "type=\"image/svg+xml\"" }}
+    {{- $png := dict "ext" "png" "type" "type=\"image/png\"" }}
+    {{- $ico := dict "ext" "ico" "type" "type=\"image/x-icon\" sizes=\"any\"" }}
+    {{- $faviconTypes := slice $svg $png $ico }}
+    {{- $faviconNames := slice "favicon" "logo" }}
+    {{- range $faviconNames }}
+      {{- $faviconName := . }}
+      {{- range $faviconTypes }}
+        {{- if fileExists (printf "/static/images/%s.%s" $faviconName .ext) }}
+          {{- $faviconMatch = true }}
+    <link href="{{ printf "images/%s.%s" $faviconName .ext | relURL }}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="icon" {{ .type | safeHTMLAttr }}>
+        {{- end }}
+        {{- $c:="" }}{{/*
+          Warning: IE and old browser versions do not support media queries necessary for the light & dark theme option.
+          If you have requirements to support IE and/or older browser versions, use one of the other options.
+          Reference: https://caniuse.com/css-media-interaction
+        */}}
+        {{- if (fileExists (printf "/static/images/%s-light.%s" $faviconName .ext)) }}
+          {{- $faviconMatch = true }}
+    <link href="{{ printf "images/%s-light.%s" $faviconName .ext | relURL }}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="icon" {{ .type | safeHTMLAttr }} media="(prefers-color-scheme: light)">
+        {{- end }}
+        {{- if (fileExists (printf "/static/images/%s-dark.%s" $faviconName .ext)) }}
+          {{- $faviconMatch = true }}
+    <link href="{{ printf "images/%s-dark.%s" $faviconName .ext | relURL }}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" rel="icon" {{ .type | safeHTMLAttr }} media="(prefers-color-scheme: dark)">
+        {{- end }}
+      {{- end }}
+      {{- if $faviconMatch }}
+        {{- break }}
+      {{- end }}
+    {{- end }}

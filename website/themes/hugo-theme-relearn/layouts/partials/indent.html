@@ -1,0 +1,3 @@
+{{- $content := .content }}
+{{- $indention := .indention }}
+{{- replaceRE "(\\r\\n|\\r|\\n)" (printf "$1%s" $indention) (replaceRE "^" $indention (trim $content " \n\r\t")) | safeHTML }}

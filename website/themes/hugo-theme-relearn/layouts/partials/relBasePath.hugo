@@ -1,0 +1,11 @@
+{{- /* generates an uphill path from the current page to the root of the site */}}
+{{- $subdir := strings.TrimSuffix (relLangURL "/") (relLangURL "") }}
+{{- $relBasePath := .RelPermalink }}
+{{- $relBasePath = replaceRE "/[^/]*$" "" $relBasePath }}
+{{- $relBasePath = strings.TrimPrefix $subdir $relBasePath }}
+{{- $relBasePath = replaceRE "/[^/]*" "/.." $relBasePath }}
+{{- $relBasePath = trim $relBasePath "/" }}
+{{- if not $relBasePath }}
+	{{- $relBasePath = "." }}
+{{- end }}
+{{- return $relBasePath }}

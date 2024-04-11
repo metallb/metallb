@@ -1,0 +1,36 @@
+name = "Relearn"
+license = "MIT"
+licenselink = "https://github.com/McShelby/hugo-theme-relearn/blob/main/LICENSE"
+description = "A theme for Hugo designed for documentation"
+homepage = "https://github.com/McShelby/hugo-theme-relearn"
+demosite = "https://mcshelby.github.io/hugo-theme-relearn"
+tags = ["dark", "dark mode", "docs", "light", "multilingual", "responsive"]
+features = ["badges", "breadcrumbs", "boxes", "buttons",
+  "categories", "chemical formulae", "customizable", "color variants",
+  "dark", "dark mode", "docs", "documentation",
+  "expand",
+  "favicon", "file inclusion", "file system support", "font awesome", "front matter cms",
+  "gfm",
+  "hidden pages",
+  "i18n", "icons", "ie11", "image resizing", "include", "internet explorer",
+  "light", "lightbox", "logo",
+  "math", "mathjax", "menu", "mermaid", "multilingual", "mobile",
+  "nested sections", "notice",
+  "oas", "offline usable", "openapi", "open graph",
+  "print", "printable",
+  "responsive", "rss", "rtl",
+  "search", "search page", "sidebar", "sitemap", "subtheme", "swagger", "swaggerui", "syntax highlighting",
+  "table of contents", "tab", "tabs", "tags", "taxonomy", "themeable", "themes", "toc", "topbar buttons", "twitter cards"]
+
+[module]
+  [module.hugoVersion]
+    min = "0.121.0"
+
+[author]
+  name = "Sören Weber"
+  homepage = "https://github.com/McShelby"
+
+[original]
+  author = "Mathieu Cornic"
+  homepage = "https://learn.netlify.app"
+  repo = "https://github.com/matcornic/hugo-theme-learn"

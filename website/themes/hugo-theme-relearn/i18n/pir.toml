@@ -1,0 +1,119 @@
+[Reading-direction]
+other = "ltr"
+
+[Search]
+other = "Searrrch"
+
+[Search-placeholder]
+other = "Searrrch..."
+
+[Clear-search]
+other = "Clearrr searrrch"
+
+[No-results-found]
+other = "No rrresults found fer \"{0}\""
+
+[N-results-found]
+other = "{1} rrresults found fer \"{0}\""
+
+[Clear-History]
+other = "Clearrr Historrry"
+
+[Reset-view]
+other = "Rrreset view"
+
+[View-reset]
+other = "View rrreset!"
+
+[Attachments-label]
+other = "Attachments"
+
+[title-404]
+other = "Not found"
+
+[message-404]
+other = "Woops. Looks like this plank doesn't exist ¯\\_(ツ)_/¯."
+
+[Go-to-homepage]
+other = "Go t' homeplank"
+
+[Edit-this-page]
+other = "Edit"
+
+[Print-this-chapter]
+other = "Prrrint whole chapterrr"
+
+[More-action]
+other = "Morrre"
+
+[Shortcuts-Title]
+other = "Morrre"
+
+[Expand-title]
+other = "Expand me..."
+
+[Navigation-toggle]
+other = "Menu"
+
+[Toc-toggle]
+other = "Table o' Contents"
+
+[Byte-symbol]
+other = "B"
+
+[Kilobyte-symbol]
+other = "KB"
+
+[Megabyte-symbol]
+other = "MB"
+
+[note]
+other = "Avast"
+
+[info]
+other = "Ahoi"
+
+[tip]
+other = "Smarrrt arrrse"
+
+[warning]
+other = "Arrr"
+
+[Copy-to-clipboard]
+other = "Copy t' clipboard"
+
+[Copied-to-clipboard]
+other = "Copied t' clipboard!"
+
+[Copy-link-to-clipboard]
+other = "Copy link t' clipboard"
+
+[Link-copied-to-clipboard]
+other = "Copied link t' clipboard!"
+
+[Chapter]
+other = "T' chapterrr {{.}}"
+
+[Language]
+other = "Language"
+
+[Theme]
+other = "Theme"
+
+[Submenu]
+other = "Submenu {{.}}"
+
+[Subsections]
+other = "Subsct'ns o' {{.}}"
+
+[tags]
+other = "Taks"
+
+[tag]
+other = "Tak"
+
+[categories]
+other = "Categorrries"
+
+[category]
+other = "Categorrry"

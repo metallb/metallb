@@ -1,0 +1,56 @@
+{{- $page := .page }}
+{{- $class := .class | default "" }}
+{{- $href := (trim .href " ") | default "" }}
+{{- $onempty := cond (isset . "onempty") .onempty "disable" }}
+{{- $onwidths := cond (isset . "onwidths") .onwidths "show" }}
+{{- $onwidthm := cond (isset . "onwidthm") .onwidthm "show" }}
+{{- $onwidthl := cond (isset . "onwidthl") .onwidthl "show" }}
+{{- $target := .target | default "" }}
+{{- $type := .type | default "" }}
+{{- $isDisabled := not $href }}
+{{- $isButton := false }}
+{{- if or (not $href) (strings.HasPrefix $href "javascript:") }}
+  {{- $isButton = true }}
+  {{- $href = substr $href (len "javascript:") }}
+  {{- if not $type }}
+    {{- $type = "button" }}
+  {{- end }}
+{{- else if and (eq (len $target) 0) (or (strings.HasPrefix $href "http://") (strings.HasPrefix $href "https://") ) }}
+  {{- $target = "_blank" }}
+  {{- if isset $page.Site.Params "externallinktarget" }}
+    {{- $target = $page.Site.Params.externalLinkTarget }}
+  {{- end }}
+{{- end }}
+{{- $title := (trim .title " ") | default "" }}
+{{- $hint := (trim .hint " ") | default "" }}
+{{- $icon := (trim .icon " ") | default "" }}
+{{- if and $icon (not (findRE ".*?\\bfa-\\w.*?" $icon)) }}
+  {{- $icon = printf "fa-fw fas fa-%s" $icon }}
+{{- end }}
+{{- $content := .content }}
+            <div class="topbar-button {{ $class }}" data-content-empty="{{ $onempty }}" data-width-s="{{ $onwidths }}" data-width-m="{{ $onwidthm }}" data-width-l="{{ $onwidthl }}">
+{{- if $isDisabled -}}
+              <span class="topbar-control">
+{{- else if $isButton -}}
+              <button class="topbar-control"{{ if $href }} onclick="{{ $href | safeJS }}"{{ end }}{{ if gt (len $type) 0 }} type="{{ $type }}"{{ end }} title="{{ $hint }}">
+{{- else -}}
+              <a class="topbar-control"{{ if $href }} href="{{ $href }}"{{ if gt (len $target) 0 }} target="{{ $target }}"{{ end }}{{ end }} title="{{ $hint }}">
+{{- end }}
+{{- if and $icon }}<i class="{{ $icon }}"></i>{{ end }}
+{{- if and $icon $title }} {{ end }}
+{{- if $title }}<span class="title">{{- $title | safeHTML }}</span>{{ end }}
+{{- if $isDisabled -}}
+              </span>
+{{- else if $isButton -}}
+              </button>
+{{- else -}}
+              </a>
+{{- end }}
+{{- if $content }}
+              <div class="topbar-content">
+                <div class="topbar-content-wrapper">
+                  {{- $content }}
+                </div>
+              </div>
+{{- end }}
+            </div>

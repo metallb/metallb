@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+{{- $format := partial "get-format.hugo" . }}
+{{- $outputFormat := partial "output-format.hugo" (dict "page" . "format" $format) }}
+{{- $basename := "index" }}
+{{- if eq $outputFormat "searchpage" }}
+  {{- $basename = partial "BaseName.hugo" $format.RelPermalink }}
+{{- end }}
+{{- if eq . .Site.Sites.First.Home }}
+  {{- $hugoVersion := "0.121.0" }}
+  {{- if lt hugo.Version $hugoVersion }}
+    {{- errorf "The Relearn theme requires Hugo %s or later" $hugoVersion }}
+  {{- end }}
+{{- end }}
+<html lang="{{ .Page.Language.LanguageCode | default "en" }}" dir="{{ .Page.Language.LanguageDirection | default (T "Reading-direction") | default "ltr" }}">
+  <head>
+    {{- partial "meta.html" . }}
+    {{- $page := . }}
+    {{- $link := "<link href=\"%s\" rel=\"%s\" type=\"%s\" title=\"%s\">" }}
+    {{- $title := partial "pageHelper/title.hugo" (dict "page" . "fullyQualified" true "reverse" true "format" $format "outputFormat" $outputFormat) }}
+    <title>{{ $title }}</title>
+
+    {{- if .IsTranslated -}}
+      {{- range $index, $trans := .AllTranslations }}
+        {{- if eq $index 0 }}
+    <link href="{{ partial "relLangPrettyUglyURL.hugo" (dict "to" . "abs" true "basename" $basename) }}" rel="alternate" hreflang="x-default">
+        {{- end }}
+    <link href="{{ partial "relLangPrettyUglyURL.hugo" (dict "to" . "abs" true "basename" $basename) }}" rel="alternate" hreflang="{{ .Language.LanguageCode }}">
+      {{- end }}
+    {{- end }}
+
+    {{- if not (and .Title (or (ne (.Scratch.Get "relearnIsHiddenStem") true) (ne .Site.Params.disableSeoHiddenPages true) ) ) }}
+    {{- else }}
+      {{- range .AlternativeOutputFormats }}
+        {{- if eq .Rel "canonical" }}
+    {{ (printf $link (partial "relLangPrettyUglyURL.hugo" (dict "to" . "abs" true "basename" $basename)) .Rel .MediaType.Type ($title | htmlEscape)) | safeHTML }}
+        {{- else if eq $outputFormat "searchpage" }}
+        {{- else if eq .Name "searchpage" }}
+        {{- else if and (ne .Name "json") (ne .Name "search") }}
+    {{ (printf $link (partial "relLangPrettyUglyURL.hugo" (dict "to" .)) .Rel .MediaType.Type ($title | htmlEscape)) | safeHTML }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+
+    {{- if and (ne .Site.Params.disableSeoHiddenPages true) (ne .Site.Params.disableSearchHiddenPages true) }}
+      {{- range .AlternativeOutputFormats }}
+        {{- if eq .Name "searchpage" }}
+        {{- else if eq .Name "json" }}
+    {{ (printf $link (.Permalink | relURL) .Rel .MediaType.Type ($title | htmlEscape)) | safeHTML }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+
+    {{- partialCached "favicon.html" . }}
+    {{- partial "stylesheet.html" (dict "page" . "outputFormat" $outputFormat) }}
+    {{- partial "dependencies.html" (dict "page" . "location" "header" "outputFormat" $outputFormat) }}
+    {{- partial "custom-header.html" . }}
+  </head>
+  <body class="mobile-support {{ $outputFormat }}{{- if .Site.Params.disableInlineCopyToClipBoard }} disableInlineCopyToClipboard{{ end }}{{- if .Site.Params.disableHoverBlockCopyToClipBoard }} disableHoverBlockCopyToClipBoard{{ end }}" data-url="{{ partial "relLangPrettyUglyURL.hugo" (dict "to" .) }}">
+    <div id="R-body" class="default-animation">
+      <div id="R-body-overlay"></div>
+      <nav id="R-topbar">
+        <div class="topbar-wrapper">
+          <div class="topbar-sidebar-divider"></div>
+          <div class="topbar-area topbar-area-start" data-area="start">
+            {{- partial "topbar/area/start.html" . }}
+          </div>
+          {{- $showBreadcrumb := (and (not .Params.disableBreadcrumb) (not .Site.Params.disableBreadcrumb)) }}
+          {{- if $showBreadcrumb }}
+          <ol class="topbar-breadcrumbs breadcrumbs highlightable" itemscope itemtype="http://schema.org/BreadcrumbList">
+            {{- partial "breadcrumbs.html" (dict "page" .) }}
+          </ol>
+          {{- else }}
+          <span class="topbar-breadcrumbs highlightable">
+            {{ .Title }}
+          </span>
+          {{- end }}
+          <div class="topbar-area topbar-area-end" data-area="end">
+            {{- partial "topbar/area/end.html" . }}
+          </div>
+        </div>
+      </nav>
+      {{- $hook := "styleclass" }}
+      <div id="R-main-overlay"></div>
+      <main id="R-body-inner" class="highlightable {{ partialCached "archetype.hugo" (dict "hook" $hook "page" . "parameter" . "outputFormat" $outputFormat) .RelPermalink $outputFormat $hook }}" tabindex="-1">
+        <div class="flex-block-wrapper">

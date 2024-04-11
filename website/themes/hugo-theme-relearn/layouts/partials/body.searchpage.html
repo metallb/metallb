@@ -1,0 +1,31 @@
+{{- $page := .page }}
+{{- $title := partial "pageHelper/title.hugo" (dict "page" .page) }}
+          <article class="default">
+            <header class="headline">
+            </header>
+            <h1 id="{{ $title | plainify | anchorize }}">{{ $title }}</h1>
+
+            <search>
+              <form action="javascript:triggerSearch()">
+                <div class="searchform">
+                  <label class="a11y-only" for="R-search-by-detail">{{ T "Search" }}</label>
+                  <input data-search-input id="R-search-by-detail" class="search-by" name="search-by" type="search" placeholder="{{ T "Search-placeholder" }}">
+                  {{- partial "shortcodes/button.html" (dict
+                    "page" $page
+                    "type" "submit"
+                    "style" "secondary"
+                    "icon" "search"
+                    "content" (T "Search")
+                  )}}
+                </div>
+              </form>
+            </search>
+            <div class="searchhint">
+            </div>
+            <hr>
+            <div id="R-searchresults">
+            </div>
+
+            <footer class="footline">
+            </footer>
+          </article>
