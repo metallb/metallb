@@ -1,0 +1,119 @@
+[Reading-direction]
+other = "ltr"
+
+[Search]
+other = "Keresés"
+
+[Search-placeholder]
+other = "Keresés..."
+
+[No-results-found]
+other = "Nincs találat a(z) \"{0}\" kifejezésre"
+
+[N-results-found]
+other = "{1} találat a(z) \"{0}\" kifejezésre"
+
+[Clear-History]
+other = "Előzmények törlése"
+
+[Reset-view]
+other = "Nézet visszaállítása"
+
+[View-reset]
+other = "Visszaállítás megtekintése!"
+
+[Clear-search]
+other = "Keresések törlése"
+
+[Attachments-label]
+other = "Csatolmányok"
+
+[title-404]
+other = "Az oldal nem található"
+
+[message-404]
+other = "Hoppá. Úgy tűnik, hogy ez az oldal nem létezik ¯\\_(ツ)_/¯."
+
+[Go-to-homepage]
+other = "Menj a kezdőlapra"
+
+[Edit-this-page]
+other = "Szerkesztés"
+
+[Print-this-chapter]
+other = "Teljes fejezet nyomtatása"
+
+[More-action]
+other = "Egyebek"
+
+[Shortcuts-Title]
+other = "Egyebek"
+
+[Expand-title]
+other = "Nyiss ki..."
+
+[Navigation-toggle]
+other = "Menü"
+
+[Toc-toggle]
+other = "Tartalomjegyzék"
+
+[Byte-symbol]
+other = "B"
+
+[Kilobyte-symbol]
+other = "KB"
+
+[Megabyte-symbol]
+other = "MB"
+
+[note]
+other = "Jegyzet"
+
+[info]
+other = "Infó"
+
+[tip]
+other = "Tipp"
+
+[warning]
+other = "Figyelem"
+
+[Copy-to-clipboard]
+other = "Vágólapra másolás"
+
+[Copied-to-clipboard]
+other = "Vágólapra másolva!"
+
+[Copy-link-to-clipboard]
+other = "Link vágólapra másolása"
+
+[Link-copied-to-clipboard]
+other = "Link vágólapra másolva!"
+
+[Chapter]
+other = "{{.}} fejezet"
+
+[Language]
+other = "Nyelv"
+
+[Theme]
+other = "Téma"
+
+[Submenu]
+other = "{{.}} almenü"
+
+[Subsections]
+other = "{{.}} alszekciói"
+
+[tags]
+other = "Címkék"
+
+[tag]
+other = "Címke"
+
+[categories]
+other = "Kategóriák"
+
+[category]
+other = "Kategória"

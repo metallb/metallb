@@ -1,0 +1,13 @@
+{{- $page := .page }}
+{{- $outputFormat := .outputFormat }}
+{{- $content := "" }}
+{{- $url := partial "relLangPrettyUglyURL.hugo" (dict "to" $page) }}
+{{- if $url }}
+	{{- $c:=""}}{{/* if we have a relative link in a print page, our print URL is one level to deep; so we are making it absolute to our page by prepending the page's permalink */}}
+	{{- $link_prefix := strings.TrimRight "/" $page.RelPermalink }}
+	{{- $content = partial "output-partial.hugo" (dict "base" "content" "page" $page "parameter" $page "outputFormat" $outputFormat) }}
+	{{- $content = replaceRE "((?:src|href)\\s*=(?:\\s*[\"']\\s*)?)(\\.[^\"'\\s>]*|[\\w]+[^\"'\\s>:]*)([\"'\\s>])" (printf "${1}%s/${2}${3}" $link_prefix) $content }}
+{{- end }}
+{{- if $page.Title }}
+	{{- partial "output-partial.hugo" (dict "base" "article" "page" $page "parameter" (dict "page" $page "content" $content "outputFormat" $outputFormat) "outputFormat" $outputFormat) }}
+{{- end }}

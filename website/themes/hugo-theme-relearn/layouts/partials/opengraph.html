@@ -1,0 +1,96 @@
+{{- /* based on Hugo 0.125.0 _internal/opengraph.html but with modified title */}}
+{{- $format := partial "get-format.hugo" . }}
+{{- $outputFormat := partial "output-format.hugo" (dict "page" . "format" $format) }}
+{{- $basename := "index" }}
+{{- if eq $outputFormat "searchpage" }}
+  {{- $basename = partial "BaseName.hugo" $format.RelPermalink }}
+{{- end }}
+    <meta property="og:url" content="{{ partial "relLangPrettyUglyURL.hugo" (dict "to" . "abs" true "basename" $basename) }}">
+
+{{- with or site.Title site.Params.title | plainify }}
+    <meta property="og:site_name" content="{{ . }}">
+{{- end }}
+    <meta property="og:title" content="{{ partial "pageHelper/title.hugo" (dict "page" . "fullyQualified" true "reverse" true "format" $format "outputFormat" $outputFormat) | plainify }}">
+
+{{- with or .Description .Summary site.Params.description | plainify }}
+    <meta property="og:description" content="{{ . }}">
+{{- end }}
+
+{{- with or .Params.locale site.Language.LanguageCode site.Language.Lang }}
+    <meta property="og:locale" content="{{ . }}">
+{{- end }}
+
+{{- if .IsPage }}
+    <meta property="og:type" content="article">
+  {{- with .FirstSection }}
+    <meta property="article:section" content="{{ partial "pageHelper/title.hugo" (dict "page" . "fullyQualified" true "reverse" true "format" $format "outputFormat" $outputFormat) | plainify }}">
+  {{- end }}
+  {{- $iso8601 := "2006-01-02T15:04:05-07:00" }}
+  {{- with .PublishDate }}
+    <meta property="article:published_time" {{ .Format $iso8601 | printf "content=%q" | safeHTMLAttr }}>
+  {{- end }}
+  {{- with .Lastmod }}
+    <meta property="article:modified_time" {{ .Format $iso8601 | printf "content=%q" | safeHTMLAttr }}>
+  {{- end }}
+  {{- range .GetTerms "tags" | first 6 }}
+    <meta property="article:tag" content="{{ .Page.Title | plainify }}">
+  {{- end }}
+{{- else }}
+    <meta property="og:type" content="website">
+{{- end }}
+
+{{- with partial "_funcs/get-page-images" . }}
+  {{- range . | first 6 }}
+    <meta property="og:image" content="{{ .Permalink }}">
+  {{- end }}
+{{- end }}
+
+{{- with .Params.audio }}
+  {{- range . | first 6  }}
+    <meta property="og:audio" content="{{ . | absURL }}">
+  {{- end }}
+{{- end }}
+
+{{- with .Params.videos }}
+  {{- range . | first 6 }}
+    <meta property="og:video" content="{{ . | absURL }}">
+  {{- end }}
+{{- end }}
+
+{{- range .GetTerms "series" }}
+  {{- range .Pages | first 7 }}
+    {{- if ne $ . }}
+    <meta property="og:see_also" content="{{ .Permalink }}">
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{- $facebookApp := "" }}
+{{- with site.Params.social }}
+  {{- if reflect.IsMap . }}
+    {{- with .facebook_app_id }}
+      {{- $facebookApp = . }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{- $facebookAdmin := "" }}
+{{- with site.Params.social.facebook_admin }}
+  {{- $facebookAdmin = . }}
+{{- else }}
+  {{- with site.Social.facebook_admin }}
+    {{- $facebookAdmin = . }}
+    {{- $hugoVersion := "0.120.0" }}
+    {{- if ge hugo.Version $hugoVersion }}
+      {{- warnf "The social key in site configuration is deprecated. Use params.social.facebook_admin instead." }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{- with $facebookApp }}
+    <meta property="fb:app_id" content="{{ . }}">
+{{- else }}
+  {{- with $facebookAdmin }}
+    <meta property="fb:admins" content="{{ . }}">
+  {{- end }}
+{{- end }}

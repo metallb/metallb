@@ -1,0 +1,105 @@
+{{- $page := .page }}
+{{- if and (not $page) .context }}
+  {{- $page = .context }}
+  {{- warnf "%q: DEPRECATED parameter 'context' for shortcode 'image' found, use 'page' instead; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#5180" $page.File.Filename }}
+{{- end }}
+{{- $url := .url }}
+{{- $title := .title }}
+{{- $alt := .alt }}
+{{- $effects := dict "border" false "lazy" true "lightbox" true "shadow" false }}
+{{- if $page.Site.Params.imageeffects }}
+  {{- $effects = merge $effects $page.Site.Params.imageeffects }}
+{{- end }}
+{{- if $page.Params.imageEffects }}
+  {{- $effects = merge $effects $page.Params.imageEffects }}
+{{- end }}
+{{- $height := "auto" }}
+{{- $width := "auto" }}
+{{- $attributes := .attributes | default dict }}
+{{- $dest_url := urls.Parse $url }}
+{{- $dest_path := $dest_url.Path }}
+{{- $image := "" }}
+{{- if not $dest_url.IsAbs }}
+  {{- with or
+    ($page.Resources.Get $dest_url.Path)
+    (resources.Get $dest_url.Path)
+  }}
+    {{- $image = . }}
+  {{- end }}
+  {{- with $image }}
+    {{- $url = $image.RelPermalink }}
+    {{- with $dest_url.RawQuery }}
+      {{- $url = printf "%s?%s" $url . }}
+    {{- end }}
+    {{- with $dest_url.Fragment }}
+      {{- $url = printf "%s#%s" $url . }}
+    {{- end }}
+  {{- else }}
+    {{- if eq $page.Site.Params.image.errorlevel "warning" }}
+      {{- warnf "%q: image '%s' is not a resource but linked anyways" $page.File.Filename .url }}
+    {{- else if eq $page.Site.Params.image.errorlevel "error" }}
+      {{- errorf "%q: image '%s' is not a resource" $page.File.Filename .url }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- if $dest_url.RawQuery }}
+  {{- if $dest_url.Query.Has "classes" }}
+    {{- $classes := slice | append (split ($dest_url.Query.Get "classes") ",") }}
+    {{- range $classes }}
+      {{- $k := . }}
+      {{- $v := true }}
+      {{- if strings.HasPrefix $k "no" }}
+        {{- $k := strings.TrimPrefix "no" $k }}
+        {{- $v := false }}
+      {{- end }}
+      {{- $effects = merge $effects (dict $k $v) }}
+    {{- end }}
+  {{- end }}
+  {{- if $dest_url.Query.Has "featherlight" }}
+    {{- warnf "%q: DEPRECATED usage of 'featherlight' image CSS class found, use 'lightbox' instead; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#5110" $page.File.Filename }}
+    {{- $effects = merge $effects (dict "lightbox" (ne ($dest_url.Query.Get "featherlight") "false")) }}
+  {{- end }}
+  {{- range $k, $v := $effects }}
+    {{- if $dest_url.Query.Has $k }}
+      {{- $effects = merge $effects (dict $k (ne ($dest_url.Query.Get $k) "false")) }}
+    {{- end }}
+  {{- end }}
+  {{- with $dest_url.Query.Get "height" }}
+    {{- $height = . }}
+  {{- end }}
+  {{- with $dest_url.Query.Get "width" }}
+    {{- $width = . }}
+  {{- end }}
+{{- end }}
+{{- $classes := slice }}
+{{- range $k, $v := $effects }}
+  {{- $c := printf "%s%s" (cond $v "" "no") $k }}
+  {{- $classes = $classes | append $c }}
+{{- end }}
+{{- $id := cond (or (eq .id nil) (eq .id "")) (partial "make-random-md5.hugo" $page) .id }}
+{{- $attributes = merge $attributes (dict "alt" $alt "src" $url "title" $title) }}
+{{- if $effects.lazy }}
+  {{- $attributes = merge $attributes (dict "loading" "lazy") }}
+{{- end }}
+{{- if $effects.lightbox -}}
+<a href="#R-image-{{ $id }}" class="lightbox-link">
+{{- end }}
+{{- $attributes_figure := merge $attributes (dict "class" (delimit (append (index $attributes "class" | default slice) "figure-image" $classes) " ")) }}
+{{- $attributes_figure = merge $attributes_figure (dict "style" (delimit (slice (index $attributes "style") (printf "height: %s; width: %s;" $height $width)) " ")) -}}
+<img
+  {{- range $k, $v := $attributes_figure }}
+    {{- if $v }}
+      {{- printf " %s=%q" $k $v | safeHTMLAttr }}
+    {{- end }}
+  {{- end }}>
+{{- if $effects.lightbox -}}
+</a>
+<a href="javascript:history.back();" class="lightbox-back" id="R-image-{{ $id }}">
+{{- $attributes_lightbox := merge $attributes (dict "class" (delimit (append (index $attributes "class" | default slice) "lightbox-image" $classes) " ")) -}}
+<img
+  {{- range $k, $v := $attributes_lightbox }}
+    {{- if $v }}
+      {{- printf " %s=%q" $k $v | safeHTMLAttr }}
+    {{- end }}
+  {{- end }}></a>
+{{- end }}

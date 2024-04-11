@@ -1,0 +1,45 @@
+{{- $page := .page }}
+{{- /* default sort order for the theme is historically by weight */}}
+{{- $by := .by }}
+{{- if eq $by "auto" }}
+	{{- $by = "" }}
+{{- end }}
+{{- $by = $by | default $page.Params.ordersectionsby | default $page.Site.Params.ordersectionsby | default "weight" }}
+{{- $hidden := .hidden }}
+
+{{- $pages := slice }}
+
+{{- if eq $by "weight" }}
+	{{- $pages = $page.Pages.ByWeight }}
+{{- else if or (eq $by "name") (eq $by "title") }}
+	{{- $pages = $page.Pages.ByTitle }}
+{{- else if eq $by "linktitle" }}
+	{{- $pages = $page.Pages.ByLinkTitle }}
+{{- else if eq $by "modifieddate" }}
+	{{- $pages = $page.Pages.Lastmod }}
+{{- else if eq $by "expirydate" }}
+	{{- $pages = $page.Pages.ByExpiryDate }}
+{{- else if eq $by "publishdate" }}
+	{{- $pages = $page.Pages.ByPublishDate }}
+{{- else if eq $by "date" }}
+	{{- $pages = $page.Pages.ByDate }}
+{{- else if eq $by "length" }}
+	{{- $pages = $page.Pages.ByLength }}
+{{- else if eq $by "default" }}
+	{{- $pages = $page.Pages }}
+{{- else }}
+	{{- warnf "%q: Unknown pages sort order '%s'" $page.File.Filename }}
+	{{- $pages = $page.Pages }}
+{{- end }}
+
+{{- if not $hidden }}
+	{{- $nonhiddenpages := slice }}
+	{{- range $page := $pages }}
+		{{- if not (partial "pageHelper/isHidden.html" $page) }}
+			{{- $nonhiddenpages := $nonhiddenpages | append $page }}
+		{{- end }}
+	{{- end }}
+	{{- $pages = $nonhiddenpages }}
+{{- end }}
+
+{{- return $pages }}

@@ -1,0 +1,20 @@
+
+    <meta charset="utf-8">
+    {{- $c:=""}}{{/* to avoid that user swiping to the left leaves a gap on the right side, we set minimum-scale, even if not advised to */}}
+    <meta name="viewport" content="height=device-height, width=device-width, initial-scale=1.0, minimum-scale=1.0">
+    {{- if (ne .Site.Params.disableGeneratorVersion true) }}
+        {{- $gen := hugo.Generator }}
+        {{- $gen = replaceRE "\\s*/>$" ">" $gen }}
+    {{ $gen | safeHTML }}
+        {{- $ver := partial "version.txt" }}
+        {{- $ver := printf "<meta name=\"generator\" content=\"%s %s\">" "Relearn" $ver }}
+    {{ $ver | safeHTML }}
+    {{- end }}
+    {{- if not (and .Title (or (ne (.Scratch.Get "relearnIsHiddenStem") true) (ne .Site.Params.disableSeoHiddenPages true) ) ) }}
+    <meta name="robots" content="noindex, nofollow, noarchive, noimageindex">
+    {{- end }}
+    <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ with .Site.Params.description }}{{ . }}{{ end }}{{ end }}">
+    {{- $authorName := partialCached "authorname.hugo" . }}
+    <meta name="author" content="{{ $authorName }}">
+    {{- partial "twitter_cards.html" . }}
+    {{- partial "opengraph.html" . }}

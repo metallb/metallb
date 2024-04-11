@@ -1,0 +1,119 @@
+[Reading-direction]
+other = "ltr"
+
+[Search]
+other = "Telusuri"
+
+[Search-placeholder]
+other = "Telusuri..."
+
+[Clear-search]
+other = "Hapus pencarian"
+
+[No-results-found]
+other = "Tidak ada hasil yang ditemukan untuk \"{0}\""
+
+[N-results-found]
+other = "Ditemukan {1} hasil untuk \"{0}\""
+
+[Clear-History]
+other = "Bersihkan Riwayat"
+
+[Reset-view]
+other = "Setel ulang tampilan"
+
+[View-reset]
+other = "Lihat ulang!"
+
+[Attachments-label]
+other = "Lampiran"
+
+[title-404]
+other = "Tidak terletak"
+
+[message-404]
+other = "Oops. Sepertinya halaman ini tidak ada ¯\\_(ツ)_/¯."
+
+[Go-to-homepage]
+other = "Ke halaman depan"
+
+[Edit-this-page]
+other = "Mengedit"
+
+[Print-this-chapter]
+other = "Mencetak seluruh bab"
+
+[More-action]
+other = "Lainnya"
+
+[Shortcuts-Title]
+other = "Lainnya"
+
+[Expand-title]
+other = "Bentangkan..."
+
+[Navigation-toggle]
+other = "Menu"
+
+[Toc-toggle]
+other = "Daftar isi"
+
+[Byte-symbol]
+other = "B"
+
+[Kilobyte-symbol]
+other = "KB"
+
+[Megabyte-symbol]
+other = "MB"
+
+[note]
+other = "Nota"
+
+[info]
+other = "Info"
+
+[tip]
+other = "Ujung"
+
+[warning]
+other = "Peringatan"
+
+[Copy-to-clipboard]
+other = "Salin ke clipboard"
+
+[Copied-to-clipboard]
+other = "Disalin ke clipboard!"
+
+[Copy-link-to-clipboard]
+other = "Salin link ke clipboard"
+
+[Link-copied-to-clipboard]
+other = "Link disalin ke clipboard!"
+
+[Chapter]
+other = "Bab {{.}}"
+
+[Language]
+other = "Bahasa"
+
+[Theme]
+other = "Tema"
+
+[Submenu]
+other = "Submenu {{.}}"
+
+[Subsections]
+other = "Subbagian {{.}}"
+
+[tags]
+other = "Tag"
+
+[tag]
+other = "Tag"
+
+[categories]
+other = "Kategori"
+
+[category]
+other = "Kategori"

@@ -1,0 +1,85 @@
+{
+    "$schema": "https://frontmatter.codes/frontmatter.schema.json",
+    "frontMatter.content.defaultSorting": "LastModifiedAsc",
+    "frontMatter.content.hideFm": false,
+    "frontMatter.content.pageFolders": [
+        {
+            "contentTypes": [
+                "default"
+            ],
+            "path": "[[workspace]]/exampleSite/content",
+            "title": "Docs"
+        }
+    ],
+    "frontMatter.content.publicFolder": "static",
+    "frontMatter.experimental": true,
+    "frontMatter.extends": [
+        "./vscode-frontmatter/snippets.en.json"
+    ],
+    "frontMatter.framework.id": "hugo",
+    "frontMatter.framework.startCommand": ".\\exampleSite\\hugo.exe server -p 1313 --bind 0.0.0.0 --navigateToChanged -s .\\exampleSite",
+    "frontMatter.git.commitMesage": "docs: changes via Front Matter editor",
+    "frontMatter.git.enabled": true,
+    "frontMatter.global.activeMode": "Editor",
+    "frontMatter.global.modes": [
+        {
+            "id": "Power",
+            "features": [
+                "dashboard.data.view",
+                "dashboard.snippets.manage",
+                "dashboard.snippets.view",
+                "dashboard.taxonomy.view",
+                "panel.actions",
+                "panel.contentType",
+                "panel.globalSettings",
+                "panel.metadata",
+                "panel.otherActions",
+                "panel.recentlyModified",
+                "panel.seo"
+            ]
+        },
+        {
+            "id": "Editor",
+            "features": [
+                "dashboard.snippets.view",
+                "dashboard.taxonomy.view",
+                "panel.actions",
+                "panel.metadata"
+            ]
+        }
+    ],
+    "frontMatter.preview.host": "http://localhost:1313",
+    "frontMatter.preview.pathName": "{{pathToken.relPath}}/",
+    "frontMatter.taxonomy.categories": [],
+    "frontMatter.taxonomy.contentTypes": [
+        {
+            "fields": [
+                {
+                    "name": "title",
+                    "title": "Titel",
+                    "type": "string"
+                },
+                {
+                    "default": " ",
+                    "name": "description",
+                    "title": "Description",
+                    "type": "string"
+                },
+                {
+                    "name": "weight",
+                    "title": "Weight",
+                    "type": "number"
+                },
+                {
+                    "name": "toc",
+                    "title": "Create TOC",
+                    "type": "boolean"
+                }
+            ],
+            "name": "default",
+            "pageBundle": true,
+            "previewPath": null
+        }
+    ],
+    "frontMatter.taxonomy.frontMatterType": "TOML"
+}

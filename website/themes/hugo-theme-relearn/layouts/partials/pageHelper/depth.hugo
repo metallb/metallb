@@ -1,0 +1,9 @@
+{{- /* https://discourse.gohugo.io/t/how-to-know-the-section-depth/37302/4 */ -}}
+{{- $page := .page }}
+{{- $depth := .depth | default 0 }}
+{{- with $page.Parent }}
+  {{- $depth = add $depth 1 }}
+  {{- partial "pageHelper/depth.hugo" (dict "page" . "depth" $depth) }}
+{{- else }}
+  {{- $depth }}
+{{- end }}

@@ -1,0 +1,15 @@
+{{- $page := .page }}
+{{- $content := .content }}
+{{- with $page }}
+  {{- warnf "%q: DEPRECATED usage of old 'home' archetype found, add 'archetype=\"home\"' to your frontmatter and remove the leading h1 heading; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#500" $page.File.Filename }}
+          <article class="home deprecated">
+            <header class="headline">
+              {{- partial "content-header.html" . }}
+            </header>
+
+{{ $content | safeHTML }}
+            <footer class="footline">
+              {{- partial "content-footer.html" . }}
+            </footer>
+          </article>
+{{- end }}

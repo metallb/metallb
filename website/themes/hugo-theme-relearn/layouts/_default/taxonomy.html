@@ -1,0 +1,33 @@
+{{- partialCached "page-meta.hugo" . .RelPermalink }}
+{{- partial "header.html" . }}
+          <article>
+            <header class="headline">
+            </header>
+{{- $page := . }}
+
+{{- $title := partial "pageHelper/title.hugo" (dict "page" .) }}
+<h1 id="{{ $title | plainify | anchorize }}">{{ $title }}</h1>
+{{- .Content }}
+{{- $lastCapital := "" }}
+{{- $pages := partialCached "partials/pageHelper/taxonomyPages.html" . . }}
+{{- range $pages }}
+  {{- $capital := substr .Title 0 1 | upper }}
+  {{- if ne $lastCapital $capital }}
+    {{- if ne $lastCapital "" }}
+</ul>
+    {{- end }}
+<h2 id="{{ $capital | plainify | anchorize }}">{{ $capital }}</h2>
+<ul class="columnize">
+  {{- end }}
+  {{- $c:=""}}{{/* display terms of a taxonomy */}}
+  <li><a href="{{ partial "relLangPrettyUglyURL.hugo" (dict "to" .Page) }}">{{ .Title }}</a> ({{ .Count }})</li>
+  {{- $lastCapital = $capital }}
+{{- end }}
+{{- if ne $lastCapital "" }}
+</ul>
+{{- end }}
+
+            <footer class="footline">
+            </footer>
+          </article>
+{{- partial "footer.html" . }}

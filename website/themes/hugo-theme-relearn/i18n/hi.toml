@@ -1,0 +1,119 @@
+[Reading-direction]
+other = "ltr"
+
+[Search]
+other = "खोजे"
+
+[Search-placeholder]
+other = "खोजे..."
+
+[Clear-search]
+other = "खोज साफ़ करें"
+
+[No-results-found]
+other = "\"{0}\" के लिए कोई परिणाम नहीं मिला"
+
+[N-results-found]
+other = "\"{0}\" के लिए {1} परिणाम मिले"
+
+[Clear-History]
+other = "इतिहास मिटाएँ"
+
+[Reset-view]
+other = "दृश्य रीसेट करें"
+
+[View-reset]
+other = "देखें रीसेट!"
+
+[Attachments-label]
+other = "संलग्नंक (अटैचमेंट)"
+
+[title-404]
+other = "अनवस्थित"
+
+[message-404]
+other = "यह पृष्ठ अभि अनुपलब्ध है!"
+
+[Go-to-homepage]
+other = "मुख्य पृष्ठ पर जाऐ"
+
+[Edit-this-page]
+other = "संपादन करना"
+
+[Print-this-chapter]
+other = "पूरा अध्याय मुद्रित करें"
+
+[More-action]
+other = "अधिक सामग्री दिखाएं"
+
+[Shortcuts-Title]
+other = "अधिक सामग्री दिखाएं"
+
+[Expand-title]
+other = "विस्तार करे..."
+
+[Navigation-toggle]
+other = "Menú"
+
+[Toc-toggle]
+other = "विषयसूची"
+
+[Byte-symbol]
+other = "B"
+
+[Kilobyte-symbol]
+other = "KB"
+
+[Megabyte-symbol]
+other = "MB"
+
+[note]
+other = "नोट"
+
+[info]
+other = "जानकारी"
+
+[tip]
+other = "नोक"
+
+[warning]
+other = "चेतावनी"
+
+[Copy-to-clipboard]
+other = "क्लिपबोर्ड पर प्रतिलिपि बनाएँ"
+
+[Copied-to-clipboard]
+other = "क्लिपबोर्ड पर कॉपी किया गया!"
+
+[Copy-link-to-clipboard]
+other = "क्लिपबोर्ड पर लिंक की प्रतिलिपि बनाएँ"
+
+[Link-copied-to-clipboard]
+other = "लिंक क्लिपबोर्ड के लिए प्रतिलिपि बनाई!"
+
+[Chapter]
+other = "अध्याय {{.}}"
+
+[Language]
+other = "भाषा"
+
+[Theme]
+other = "विषय"
+
+[Submenu]
+other = "सबमेनू {{.}}"
+
+[Subsections]
+other = "{{.}} के उपखंड"
+
+[tags]
+other = "टैग"
+
+[tag]
+other = "उपनाम"
+
+[categories]
+other = "श्रेणियाँ"
+
+[category]
+other = "वर्ग"

@@ -1,0 +1,119 @@
+[Reading-direction]
+other = "ltr"
+
+[Search]
+other = "Cerca"
+
+[Search-placeholder]
+other = "Cerca..."
+
+[Clear-search]
+other = "Cancella ricerca"
+
+[No-results-found]
+other = "Nessun risultato trovato per \"{0}\""
+
+[N-results-found]
+other = "{1} risultati trovati per \"{0}\""
+
+[Clear-History]
+other = "Reimposta storico"
+
+[Reset-view]
+other = "Azzeramento vista"
+
+[View-reset]
+other = "Vista azzerata!"
+
+[Attachments-label]
+other = "Allegati"
+
+[title-404]
+other = "Non localizzato"
+
+[message-404]
+other = "Oh no! Sembra che la pagina da te cercata non esista ¯\\_(ツ)_/¯."
+
+[Go-to-homepage]
+other = "Ritorna alla pagina iniziale"
+
+[Edit-this-page]
+other = "Modifica"
+
+[Print-this-chapter]
+other = "Stampa l'intero capitolo"
+
+[More-action]
+other = "Altro"
+
+[Shortcuts-Title]
+other = "Altro"
+
+[Expand-title]
+other = "Espandi..."
+
+[Navigation-toggle]
+other = "Menu"
+
+[Toc-toggle]
+other = "Indice"
+
+[Byte-symbol]
+other = "B"
+
+[Kilobyte-symbol]
+other = "KB"
+
+[Megabyte-symbol]
+other = "MB"
+
+[note]
+other = "Nota"
+
+[info]
+other = "Informazione"
+
+[tip]
+other = "Suggerimento"
+
+[warning]
+other = "Attenzione"
+
+[Copy-to-clipboard]
+other = "Copia nella clipboard"
+
+[Copied-to-clipboard]
+other = "Copia dalla clipboard!"
+
+[Copy-link-to-clipboard]
+other = "Copia collegamento in clipboard"
+
+[Link-copied-to-clipboard]
+other = "Collegamento copiato dalla clipboard!"
+
+[Chapter]
+other = "Capitolo {{.}}"
+
+[Language]
+other = "Lingua"
+
+[Theme]
+other = "Tema"
+
+[Submenu]
+other = "Sottomenu {{.}}"
+
+[Subsections]
+other = "Sottosezioni di {{.}}"
+
+[tags]
+other = "Tag"
+
+[tag]
+other = "Tag"
+
+[categories]
+other = "Categorie"
+
+[category]
+other = "Categoria"

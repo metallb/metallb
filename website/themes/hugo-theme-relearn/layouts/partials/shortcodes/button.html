@@ -1,0 +1,75 @@
+{{- $page := .page }}
+{{- if and (not $page) .context }}
+  {{- $page = .context }}
+  {{- warnf "%q: DEPRECATED parameter 'context' for shortcode 'button' found, use 'page' instead; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#5180" $page.File.Filename }}
+{{- end }}
+{{- $color := .color | default "" }}
+{{- $content := .content }}
+{{- $href := (trim .href " ") | default "" }}
+{{- $style := .style | default "default" }}
+{{- if and (not $color) (eq (len $color) 0) }}
+  {{- $style = .style | default "transparent" }}
+{{- end }}
+{{- $target := .target | default "" }}
+{{- $type := .type | default "" }}
+{{- $isButton := false }}
+{{- $isLink := false }}
+{{- if or $type (strings.HasPrefix $href "javascript:") }}
+  {{- $isButton = true }}
+  {{- $href = substr $href (len "javascript:") }}
+  {{- if not $type }}
+    {{- $type = "button" }}
+  {{- end }}
+{{- else if not $href }}
+{{- else if and (eq (len $target) 0) (or (strings.HasPrefix $href "http://") (strings.HasPrefix $href "https://") ) }}
+  {{- $isLink = true }}
+  {{- $target = "_blank" }}
+  {{- if isset $page.Site.Params "externallinktarget" }}
+    {{- $target = $page.Site.Params.externalLinkTarget }}
+  {{- end }}
+{{- else }}
+  {{- $isLink = true }}
+{{- end }}
+{{- $title := .title | default ($content) }}
+{{- if not $title }}
+  {{- if eq $style "info" }}{{ $title = $style | T }}{{ end }}
+  {{- if eq $style "warning" }}{{ $title = $style | T }}{{ end }}
+  {{- if eq $style "note" }}{{ $title = $style | T }}{{ end }}
+  {{- if eq $style "tip" }}{{ $title = $style | T }}{{ end }}
+{{- end }}
+{{- $title = trim $title " " }}
+{{- $icon := .icon | default "" }}
+{{- if and (not $icon) (eq (len $icon) 0) }}
+  {{- if eq $style "info" }}{{ $icon = default "info-circle" }}{{ end }}
+  {{- if eq $style "warning" }}{{ $icon = default "exclamation-triangle" }}{{ end }}
+  {{- if eq $style "note" }}{{ $icon = default "exclamation-circle" }}{{ end }}
+  {{- if eq $style "tip" }}{{ $icon = default "lightbulb" }}{{ end }}
+{{- end }}
+{{- $icon = trim $icon " " }}
+{{- if and $icon (not (findRE ".*?\\bfa-\\w.*?" $icon)) }}
+  {{- $icon = printf "fa-fw fas fa-%s" $icon }}
+{{- end }}
+{{- $iconposition := .iconposition | default "left" }}
+{{- with $page -}}
+<span class="btn cstyle {{ if or $isButton $isLink }}interactive {{ end }}{{ $style }}"{{ if $color }} style="--VARIABLE-BOX-color: {{ $color }};"{{ end }}>
+  {{- if $isButton -}}
+  <button onclick="{{ $href | safeJS }}"{{ if gt (len $type) 0 }} type="{{ $type }}"{{ end }}>
+  {{- else if $isLink -}}
+  <a href="{{ $href }}"{{ if gt (len $target) 0 }} target="{{ $target }}"{{ end }}>
+  {{- else -}}
+  <span>
+  {{- end }}
+  {{- if and $icon (eq $iconposition "left") }}<i class="{{ $icon }}"></i>{{ end }}
+  {{- if and $icon (eq $iconposition "left") $title }} {{ end }}
+  {{- if $title }}<span class="title">{{- $title | safeHTML }}</span>{{ end }}
+  {{- if and $icon (eq $iconposition "right") $title }} {{ end }}
+  {{- if and $icon (eq $iconposition "right") }}<i class="{{ $icon }}"></i>{{ end }}
+  {{- if $isButton -}}
+  </button>
+  {{- else if $isLink -}}
+  </a>
+  {{- else -}}
+  </span>
+  {{- end -}}
+</span>
+{{- end }}

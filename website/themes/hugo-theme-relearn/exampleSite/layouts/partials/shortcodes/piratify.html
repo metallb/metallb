@@ -1,0 +1,152 @@
+{{- $page := .page }}
+{{- if and (not $page) .context }}
+  {{- $page = .context }}
+  {{- warnf "%q: DEPRECATED parameter 'context' for shortcode 'piratify' found, use 'page' instead; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#5180" $page.File.Filename }}
+{{- end }}
+{{- $content := .content }}
+{{- $pagefield := cond (ne $content nil) nil (.pagefield | default "Content") }}
+{{- $writenotice := cond (ne .writenotice nil) .writenotice false }}
+{{- $langtrg := "pir" }}
+{{- $langsrc := cond (eq $page.Language.Lang $langtrg) (.langsrc | default "en") $page.Language.Lang }}
+{{- $baseURL := urls.Parse site.BaseURL }}
+{{- $baseURLpath := $baseURL.Path | default "/" }}
+{{- $l := $page.RelPermalink }}
+{{- $c := "" }}
+{{- $srcPage := "" }}
+{{- if ne $content nil }}
+	{{- $c = $content }}
+{{- else if eq $pagefield "Content" }}
+	{{- $c = $page.Content }}
+{{- else if eq $pagefield "TableOfContents" }}
+	{{- $c = $page.TableOfContents }}
+{{- end }}
+{{- range $page.AllTranslations }}
+	{{- if eq .Language.Lang $langsrc }}
+		{{- $l = .RelPermalink }}
+		{{- if ne $content nil }}
+			{{- $c = $content }}
+		{{- else if eq $pagefield "Content" }}
+			{{- $c = .Content }}
+			{{- $srcPage = . }}
+		{{- else if eq $pagefield "TableOfContents" }}
+			{{- $c = .TableOfContents }}
+		{{- end }}
+		{{- break }}
+	{{- end }}
+{{- end }}
+{{- if eq $page.Language.Lang $langtrg }}
+	{{- if $writenotice }}
+		{{- partial "shortcodes/notice.html" (dict
+			"page" $page
+			"content" "<p>Fello' pirrrates, grog made us dizzy! Be awarrre <b>some stuff may look weird</b> in this trrranslat'n. Like <b>Merrrmaids</b>, do'n <b>math or chemistrrry</b> and stuff.</p>\n"
+			"icon" "skull-crossbones"
+			"style" "warning"
+			"title" "Arrr! Pirrrates"
+		) }}
+	{{- end }}
+	{{- $words := dict
+		"Hugo" "Cap'n Hugo"
+		"Info" "Ahoi"
+		"Note" "Avast"
+		"Tip" "Smarrrt Arrrse"
+		"Warning" "Arrr"
+		"good" "bloody"
+		"shortcodes" "shorrrtcodes"
+		"Shortcodes" "Shorrrtcodes"
+		"Mermaid" "Merrrmaid"
+		"Markdown" "Marrrkdown"
+		"Markup" "Marrrkup"
+		"markup" "marrrkup"
+		"for" "fer"
+		"Your" "Yer"
+		"your" "yer"
+		"You" "Ye"
+		"you" "ye"
+		"the" "th'"
+		"The" "Th'"
+		"is" "be"
+		"Is" "Be"
+		"are" "be"
+		"Are" "Be"
+		"Of" "O'"
+		"of" "o'"
+		"To" "T'"
+		"to" "t'"
+		"in" "'n"
+		"With" "Wit'"
+		"with" "wit'"
+		"Where" "Whar'"
+		"where" "whar'"
+		"After" "Aft"
+		"And" "An'"
+		"and" "an'"
+		"Load" "Board"
+		"load" "board"
+		"Loaded" "Boarded"
+		"loaded" "boarded"
+		"Content" "Rrrambling"
+		"content" "rrrambling"
+		"icon" "ay'con"
+		"Icon" "Ay'con"
+		"icons" "ay'cons"
+		"Icons" "Ay'cons"
+		"syntax" "rules"
+		"Syntax" "Rules"
+		"Site" "Ship"
+		"site" "ship"
+		"Page" "Plank"
+		"page" "plank"
+		"Pages" "Planks"
+		"pages" "planks"
+		"Relearn" "Relearrrn"
+		"Learn" "Learrrn"
+	-}}
+	{{- $specials := dict
+		"(\\w)ing([\\s\\n<.,;?!:])" "'n"
+		"(\\w)ings([\\s\\n<.,;?!:])" "'ns"
+		"(\\w)tion([\\s\\n<.,;?!:])" "t'n"
+		"(\\w)tions([\\s\\n<.,;?!:])" "t'ns"
+		"(\\w)(?:[aeiou])ble([\\s\\n<.,;?!:])" "'ble"
+		"(\\w)(?:[aeiou])mize([\\s\\n<.,;?!:])" "'mize"
+		"(\\w)(?:[aeiou])mizes([\\s\\n<.,;?!:])" "'mizes"
+		"(\\w)(?:[aeiou])nize([\\s\\n<.,;?!:])" "'nize"
+		"(\\w)(?:[aeiou])nizes([\\s\\n<.,;?!:])" "'nizes"
+	-}}
+	{{- $links := slice
+		"href"
+	-}}
+	{{- $fix := dict
+		"warn'n" "warning"
+		"sect'n" "section"
+		"n Cap'n" "n"
+		"Avast right o' John" "Note right of John"
+	-}}
+	{{- range $from, $to := $words }}
+		{{- $c = replaceRE (printf "([\\s\\n>])%s([\\s\\n<.,;?!:])" $from) (printf "${1}%s${2}" $to) $c }}
+	{{- end }}
+	{{- range $from, $to := $specials }}
+		{{- $c = replaceRE $from (printf "${1}%s${2}" $to) $c }}
+	{{- end }}
+	{{- range $attr := $links }}
+		{{- $c = replaceRE (printf "\\b(%s)(=\"%s[^\"]*?\")" $attr $baseURLpath) "${1} data-piratify${2}" $c }}
+		{{- $m := findRESubmatch (printf "%s data-piratify=\"(%s)([^\"]*?)\"" $attr $baseURLpath) $c }}
+		{{- range $m }}
+			{{- $r := printf "%s=\"%s\"" $attr (index . 2) }}
+			{{- $u := urls.Parse (index . 2) }}
+			{{- if and (not $u.IsAbs) $u.Path }}
+				{{- $r = printf "%s=\"%s%s/%s\"" $attr $baseURLpath $langtrg (index . 2) }}
+			{{- end }}
+			{{- $c = replace $c (index . 0) $r }}
+		{{- end }}
+	{{- end }}
+	{{- range $from, $to := $fix }}
+		{{- $c = replace $c $from $to }}
+	{{- end }}
+	{{- if $srcPage }}
+		{{- range $page.Site.Params.relearn.dependencies }}
+			{{- $has := printf "has%s" .name }}
+			{{- $page.Store.Set $has (or ($page.Store.Get $has) ($srcPage.Store.Get $has)) }}
+		{{- end }}
+	{{- end }}
+{{- end }}
+{{ $c | safeHTML }}

@@ -1,0 +1,35 @@
+{{- $page := .page }}
+{{- if and (not $page) .context }}
+  {{- $page = .context }}
+  {{- warnf "%q: DEPRECATED parameter 'context' for shortcode 'notice' found, use 'page' instead; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#5180" $page.File.Filename }}
+{{- end }}
+{{- $color := .color | default "" }}
+{{- $content := .content }}
+{{- $style := .style | default "default" }}
+{{- $title := .title }}
+{{- if not $title }}
+  {{- if eq $style "info" }}{{ $title = $style | T }}{{ end }}
+  {{- if eq $style "warning" }}{{ $title = $style | T }}{{ end }}
+  {{- if eq $style "note" }}{{ $title = $style | T }}{{ end }}
+  {{- if eq $style "tip" }}{{ $title = $style | T }}{{ end }}
+{{- end }}
+{{- $title = trim $title " " }}
+{{- $icon := .icon | default "" }}
+{{- if and (not $icon) (eq (len $icon) 0) }}
+  {{- if eq $style "info" }}{{ $icon = default "info-circle" }}{{ end }}
+  {{- if eq $style "warning" }}{{ $icon = default "exclamation-triangle" }}{{ end }}
+  {{- if eq $style "note" }}{{ $icon = default "exclamation-circle" }}{{ end }}
+  {{- if eq $style "tip" }}{{ $icon = default "lightbulb" }}{{ end }}
+{{- end }}
+{{- $icon = trim $icon " " }}
+{{- if and $icon (not (findRE ".*?\\bfa-\\w.*?" $icon)) }}
+  {{- $icon = printf "fa-fw fas fa-%s" $icon }}
+{{- end }}
+{{- with $page }}
+<div class="box notices cstyle {{ $style }}"{{ if $color }} style="--VARIABLE-BOX-color: {{ $color }};"{{ end }}>
+  <div class="box-label">{{ if $icon }}<i class="{{ $icon }}"></i>{{ end }}{{ if and $icon $title }} {{ end }}{{ $title | .RenderString }}</div>
+  <div class="box-content">
+{{ if ne "<" (substr (strings.TrimLeft " \n\r\t" $content) 0 1) }}<p>{{ end }}<!-- we add a DOM element here if there is none to make collapsing marings work -->
+{{ $content | safeHTML }}</div><!-- no line break allowed here because of awkward behavior of Hugo 110 or this theme when tag shortcode is called standalone outside of tags shortcode ? -->
+</div>
+{{- end }}

@@ -1,0 +1,150 @@
+{{- $page := . }}
+{{- $mod := $page.Site.Params.themeVariantModifier | default "" }}
+{{- $autores := resources.Get "css/auto.css" }}
+{{- $printres := resources.Get "css/format-print.css" }}
+
+{{- /*
+Config run:
+- convert from old forms to slice of dicts
+- convert auto property to slice
+- add name property
+*/}}
+{{- $refthemevariants := slice | append "relearn-light" | append "relearn-dark" }}
+{{- $tempthemevariants := slice | append (.Site.Params.themeVariant | default "auto" ) }}
+{{- $themevariants := slice }}
+{{- range $tempthemevariant := $tempthemevariants }}
+  {{- $themevariant := $tempthemevariant }}
+  {{- if not (reflect.IsMap $themevariant) }}
+    {{- $themevariant = dict "identifier" $tempthemevariant }}
+  {{- end }}
+  {{- if not $themevariant.name }}
+    {{- $themevariant = collections.Merge $themevariant (dict "name" ($themevariant.identifier | humanize | strings.Title)) }}
+  {{- end }}
+  {{- if eq $themevariant.identifier "auto" }}
+    {{- $themevariant = collections.Merge $themevariant (dict "auto" ($themevariant.auto | default slice)) }}
+    {{- $refthemevariants = $refthemevariants | append $themevariant.auto }}
+  {{- end }}
+  {{- $themevariant = collections.Merge $themevariant (dict "config" true) }}
+  {{- $themevariants = $themevariants | append $themevariant }}
+{{- end }}
+
+{{- /*
+Ref run:
+- add non-configured but referenced variants
+*/}}
+{{- range $refthemevariant := $refthemevariants }}
+  {{- if not (index (collections.Where $themevariants "identifier" $refthemevariant) 0) }}
+    {{- $themevariant := (dict "identifier" $refthemevariant "name" ($refthemevariant | humanize | strings.Title) "config" false) }}
+    {{- $themevariants = $themevariants | append $themevariant }}
+  {{- end }}
+{{- end }}
+
+{{- /*
+Non-auto run
+- fix and regenerate theme css for advanced config mode
+- add chroma property from stylesheet
+*/}}
+{{- $tempthemevariants = $themevariants }}
+{{- $themevariants = slice }}
+{{- range $tempthemevariant := $tempthemevariants }}
+  {{- $themevariant := $tempthemevariant }}
+  {{- if not (collections.IsSet $themevariant "auto") }}
+    {{- $themevariant = partial "get-theme-details.html" (dict "themevariant" $themevariant "identifier" $themevariant.identifier "mod" $mod)}}
+  {{- end }}
+  {{- $themevariants = $themevariants | append $themevariant }}
+{{- end }}
+
+{{- /*
+Auto run
+- fill up auto property
+- fill up chroma property
+- generate theme and chroma css files from template
+*/}}
+{{- $tempthemevariants = $themevariants }}
+{{- $themevariants = slice }}
+{{- range $tempthemevariant := $tempthemevariants }}
+  {{- $themevariant := $tempthemevariant }}
+  {{- if collections.IsSet $themevariant "auto" }}
+    {{- $i := 0 }}
+    {{- if eq (int (len $themevariant.auto)) 0 }}
+      {{- range $tempthemevariants }}
+        {{- $i = add $i 1 }}
+        {{- if not (collections.IsSet . "auto") }}
+          {{- $themevariant = collections.Merge $themevariant (dict "auto" ($themevariant.auto | append .identifier)) }}
+          {{- break }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+    {{- if eq (int (len $themevariant.auto)) 0 }}
+      {{- $themevariant = collections.Merge $themevariant (dict "auto" ($themevariant.auto | append "relearn-light")) }}
+    {{- end }}
+    {{- if eq (int (len $themevariant.auto)) 1 }}
+      {{- $poppedthemevariants := last (sub (len $tempthemevariants) $i) $tempthemevariants }}
+      {{- range $poppedthemevariants }}
+        {{- if not (collections.IsSet . "auto") }}
+          {{- $themevariant = collections.Merge $themevariant (dict "auto" ($themevariant.auto | append .identifier)) }}
+          {{- break }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+    {{- if eq (int (len $themevariant.auto)) 1 }}
+      {{- $themevariant = collections.Merge $themevariant (dict "auto" ($themevariant.auto | append "relearn-dark")) }}
+    {{- end }}
+    {{- $themevariant = collections.Merge $themevariant (dict "auto" ($themevariant.auto | first 2)) }}
+    {{- $light := index $themevariant.auto 0 }};
+    {{- $dark := index $themevariant.auto 1 }};
+    {{- $cssres := $autores | resources.ExecuteAsTemplate (printf "css/theme-%s%s.css" $themevariant.identifier $mod) (dict "prefix" "theme" "suffix" $mod "light" $light "dark" $dark) }}
+    {{- /* the following code causes Hugo to generate our css file - although it is in comments */}}<!-- {{ $cssres.RelPermalink }} -->
+    {{- $themevariant = collections.Merge $themevariant (dict "chroma" $themevariant.identifier) }}
+    {{- $light = (index (collections.Where $tempthemevariants "identifier" $light) 0).chroma }}
+    {{- $dark = (index (collections.Where $tempthemevariants "identifier" $dark) 0).chroma }}
+    {{- $cssres = $autores | resources.ExecuteAsTemplate (printf "css/chroma-%s.css" $themevariant.chroma) (dict "prefix" "chroma" "suffix" "" "light" $light "dark" $dark) }}
+    {{- /* the following code causes Hugo to generate our css file - although it is in comments */}}<!-- {{ $cssres.RelPermalink }} -->
+  {{- end }}
+  {{- $themevariants = $themevariants | append $themevariant }}
+{{- end }}
+
+{{- $cssres := $printres | resources.ExecuteAsTemplate "css/format-print.css" (dict "themevariant" (index (collections.Where $themevariants "identifier" "relearn-light") 0) "mod" $mod) }}
+{{- /* the following code causes Hugo to generate our css file - although it is in comments */}}<!-- {{ $cssres.RelPermalink }} -->
+
+{{- return collections.Where $themevariants "config" true }}
+
+{{ define "partials/get-theme-details.html" }}
+  {{- $themevariant := .themevariant }}
+  {{- $identifier := .identifier }}
+  {{- $mod := .mod }}
+  {{- $themecontent := "" }}
+  {{- with resources.Get (printf "css/theme-%s.css" $identifier) }}
+    {{- $themecontent = .Content}}
+  {{- else }}
+    {{- if fileExists (printf "static/css/theme-%s.css" $identifier) }}
+      {{- $themecontent = readFile (printf "static/css/theme-%s.css" $identifier) }}
+    {{- else }}
+      {{- errorf "\"theme-%s.css\": file not found neither in \"static/css\" and \"assets/css\"" $identifier }}
+    {{- end }}
+  {{- end }}
+  {{- replaceRE (printf `([ \t]*@import\s+[^$]*?theme-[^.]*?)(?:%s)?(\.css)` (replace $mod "." "\\.")) (printf "${1}%s${2}" $mod) $themecontent }}
+  {{- $chroma := "" }}
+  {{- range findRESubmatch `[ \t]*--CODE-theme\s*:\s*([^;]*?)\s*;` $themecontent }}
+    {{- $chroma = index . 1 }}
+  {{- else }}
+    {{- range findRESubmatch `[ \t]*@import\s+[^$]*?chroma-([^.]*?)\.css` $themecontent }}
+      {{- $chroma = index . 1 }}
+      {{- warnf "\"theme-%s.css\": DEPRECATED use of @import for chroma stylesheet, instead use '--CODE-theme: %s;'" $identifier $chroma }}
+      {{- $themecontent = replaceRE `[ \t]*@import\s+[^$]*?chroma-[^.]*?\.css.*?\n` "" $themecontent }}
+    {{- else }}
+      {{- range findRESubmatch (printf `[ \t]*@import\s+[^$]*?theme-([^.]*?)%s\.css` (replace $mod "." "\\.")) $themecontent }}
+        {{- $subidentifier := index . 1 }}
+        {{- $themevariant = partial "get-theme-details.html" (dict "themevariant" $themevariant "identifier" $subidentifier "mod" $mod) }}
+        {{- $chroma = $themevariant.chroma }}
+      {{- else }}
+        {{- $chroma = "relearn-light" }}
+      {{- end }}
+    {{- end }}
+    {{- $themecontent = replaceRE `(:root\s*\{[ \t]*)(\s*)` (printf "${1}${2}--CODE-theme: %s;${2}" $chroma) $themecontent }}
+  {{- end }}
+  {{- $themevariant = collections.Merge $themevariant (dict "chroma" $chroma) }}
+  {{- $cssres := $themecontent | resources.FromString (printf "css/theme-%s%s.css" $identifier $mod) }}
+  {{- /* the following code causes Hugo to generate our css file - although it is in comments */}}<!-- {{ $cssres.RelPermalink }} -->
+  {{- return $themevariant }}
+{{- end }}

@@ -1,0 +1,27 @@
+{{- $hook := .hook }}
+{{- $page := .page }}
+{{- $parameter := .parameter }}
+{{- $outputFormat := .outputFormat }}
+{{- if not $outputFormat }}
+  {{- $outputFormat = partial "output-format.hugo" $page }}
+{{- end }}
+{{- $archetype := "default" }}
+{{- if not $page.File }}
+{{- else if $page.Params.archetype }}
+  {{- $archetype = $page.Params.archetype }}
+{{- else if $page.Params.chapter }}
+  {{- $archetype = "chapter" }}
+  {{- if findRE `(?s)<h1.*?>.*?</h1>` .Content }}
+    {{- $archetype = "deprecated-chapter" }}
+  {{- end }}
+{{- else if $page.IsHome }}
+  {{- $archetype = "home" }}
+  {{- if findRE `(?s)<h1.*?>.*?</h1>` .Content }}
+    {{- $archetype = "deprecated-home" }}
+  {{- end }}
+{{- end }}
+{{- $f := printf "/layouts/partials/archetypes/%s" $archetype }}
+{{- if not (partialCached "fileExists.hugo" $f $f) }}
+  {{- $archetype = "default" }}
+{{- end }}
+{{- partial "output-partial.hugo" (dict "base" (printf "archetypes/%s/%s" $archetype $hook) "page" $page "parameter" $parameter "outputFormat" $outputFormat) }}

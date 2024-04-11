@@ -1,0 +1,6 @@
+{{- $_hugo_config := `{ "version": 1 }` }}
+{{- partial "shortcodes/math.html" (dict
+  "page"    .Page
+  "content" .Inner
+  "align"   (.Get "align")
+) }}

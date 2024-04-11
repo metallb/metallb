@@ -1,0 +1,44 @@
+{{/*
+  https://discourse.gohugo.io/t/question-about-printf-v/22923/4
+
+  GetCurrentOutput
+  Retrieves the OuputFormat of the page, from a list of predefined outputs
+
+  @author @regisphilibert with modification by @McShelby
+
+  @context Page (.)
+
+  @access public
+
+  @return A String among the predefined list
+
+  @example - Go Template
+    {{ $currentOutputFormat := partial "func/GetCurrentOutput" . }}
+
+  @warning This partial cannot be cached.
+*/}}
+
+{{/*  We create a slice listing the concerned output formats */}}
+{{- $outputs := slice }}
+{{- range .OutputFormats }}
+	{{- $outputs = $outputs | append .Name }}
+{{- end }}
+{{- $alt := slice }}
+{{/* We range on the page's Alternative Output Formats which returns all output formats
+except the current one.  */}}
+{{- range .AlternativeOutputFormats }}
+{{/* If an output format matches one in the concerned list, we add it to our slice of outputs */}}
+  {{- if in $outputs .Name }}
+    {{- $alt = $alt | append .Name }}
+  {{- end }}
+{{- end }}
+{{- $current := "default" }}
+{{/* If any alternate output formats part of the "concerned" ones have been found, we range on them. */}}
+{{- range $outputs }}
+  {{/* If the output format is not listed as an "alternate", it means it is the current one.  */}}
+  {{- if not (in $alt .) }}
+    {{- $current = . }}
+  {{- end }}
+{{- end }}
+
+{{- return .OutputFormats.Get $current }}

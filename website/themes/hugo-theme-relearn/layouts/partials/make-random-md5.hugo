@@ -1,0 +1,13 @@
+{{- $page := . }}
+{{- if (ne $page.Site.Params.disableRandomIds true) }}
+	{{- $random := "" }}
+	{{- $set := split "012345abcdefghijklmnopqrstuvwxyz" "" }}
+	{{- range (seq 16) }}
+		{{- with ($set | shuffle | first 1) }}
+			{{- $random = printf "%s%s" $random  . }}
+		{{- end }}
+	{{- end }}
+	{{- md5 $random }}
+{{- else }}
+	{{- printf "00000000000000000000000000000000" }}
+{{- end }}

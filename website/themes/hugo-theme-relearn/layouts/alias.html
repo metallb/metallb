@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    {{- $url := .Permalink }}
+    {{- if site.BaseURL }}
+      {{- $url = replace .Permalink site.BaseURL "/" }}
+    {{- end }}
+    {{- $url = replace $url "//" "/" }}
+    {{- with site.Home.GetPage $url }}
+      {{- $c := "" }}{{/* if defaultContentLanguageInSubdir=false we are ending here for home page of the default language */}}
+      {{- $url = partial "relLangPrettyUglyURL.hugo" (dict "to" .) }}
+    {{- else }}
+      {{- $url_alt := replaceRE "^/[^/]*(/.*)" "${1}" $url }}
+      {{- with site.Home.GetPage $url_alt }}
+        {{- $c := "" }}{{/* if defaultContentLanguageInSubdir=true we are ending here for home page */}}
+        {{- $url = partial "relLangPrettyUglyURL.hugo" (dict "to" .) }}
+      {{- else }}
+        {{- $c := "" }}{{/* for regular aliases we are ending here with no original page found */}}
+        {{- $url = partial "relLangPrettyUglyURL.hugo" (dict "link" $url) }}
+      {{- end }}
+    {{- end }}
+    <meta charset="utf-8">
+    <meta name="robots" content="noindex">
+    <meta http-equiv="refresh" content="0; url={{ $url }}">
+    {{- $link := "<link href=\"%s\" rel=\"%s\" type=\"%s\" title=\"%s\">" }}
+    <title>{{ $url }}</title>
+
+    {{ (printf $link $url "canonical" "text/html" ($url | htmlEscape)) | safeHTML }}
+  </head>
+</html>

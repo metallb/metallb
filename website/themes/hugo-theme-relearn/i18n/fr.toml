@@ -1,0 +1,119 @@
+[Reading-direction]
+other = "ltr"
+
+[Search]
+other = "Rechercher"
+
+[Search-placeholder]
+other = "Rechercher..."
+
+[Clear-search]
+other = "Recherche claire"
+
+[No-results-found]
+other = "Aucun résultat trouvé pour \"{0}\""
+
+[N-results-found]
+other = "{1} résultats trouvés pour \"{0}\""
+
+[Clear-History]
+other = "Supprimer l'historique"
+
+[Reset-view]
+other = "Réinitialiser la vue"
+
+[View-reset]
+other = "Vue réinitialisée!"
+
+[Attachments-label]
+other = "Pièces jointes"
+
+[title-404]
+other = "Non localisé"
+
+[message-404]
+other = "Oups. On dirait que cette page n'existe pas ¯\\_(ツ)_/¯"
+
+[Go-to-homepage]
+other = "Vers la page d'accueil"
+
+[Edit-this-page]
+other = "Éditer"
+
+[Print-this-chapter]
+other = "Imprimer le chapitre entier"
+
+[More-action]
+other = "Aller plus loin"
+
+[Shortcuts-Title]
+other = "Aller plus loin"
+
+[Expand-title]
+other = "Déroulez-moi..."
+
+[Navigation-toggle]
+other = "Menu"
+
+[Toc-toggle]
+other = "Table des matières"
+
+[Byte-symbol]
+other = "o"
+
+[Kilobyte-symbol]
+other = "ko"
+
+[Megabyte-symbol]
+other = "Mo"
+
+[note]
+other = "Remarque"
+
+[info]
+other = "Information"
+
+[tip]
+other = "Astuce"
+
+[warning]
+other = "Avertissement"
+
+[Copy-to-clipboard]
+other = "Copier dans le presse-papiers"
+
+[Copied-to-clipboard]
+other = "Copié dans le presse-papiers!"
+
+[Copy-link-to-clipboard]
+other = "Copier le lien dans le presse-papiers"
+
+[Link-copied-to-clipboard]
+other = "Lien copié dans le presse-papiers!"
+
+[Chapter]
+other = "Chapitre {{.}}"
+
+[Language]
+other = "Langue"
+
+[Theme]
+other = "Thème"
+
+[Submenu]
+other = "Sous-menu {{.}}"
+
+[Subsections]
+other = "Sous-sections de {{.}}"
+
+[tags]
+other = "Mots-clés"
+
+[tag]
+other = "Mot-clé"
+
+[categories]
+other = "Catégories"
+
+[category]
+other = "Catégorie"

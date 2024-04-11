@@ -1,0 +1,17 @@
+{{- $page := .page }}
+{{- $location := .location }}
+{{- $outputFormat := .outputFormat | default (partial "output-format.hugo" $page) }}
+{{- range $k, $v := $page.Site.Params.relearn.dependencies }}
+	{{- $has := printf "has%s" $v.name }}
+	{{- $nestedhas := printf "nestedHas%s" $v.name }}
+    {{- $wants := or ($page.Page.Store.Get $has) (and ($page.Page.Store.Get (printf "%sIsNested" $outputFormat)) ($page.Page.Store.Get $nestedhas)) }}
+	{{- if and $wants }}
+		{{- if $v.location }}
+			{{- warnf "DEPRECATED parameter 'location' for dependency '%s' configured in your hugo.toml, query the 'location' parameter inside your dependency loader instead; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#5270" $k}}
+		{{- end }}
+		{{- if or (not $v.location) (eq $location $v.location) }}
+			{{- $dep := printf "dependencies/%s.html" $k }}
+			{{- partial $dep (dict "page" $page "location" $location) }}
+		{{- end }}
+	{{- end }}
+{{- end }}

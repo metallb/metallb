@@ -1,0 +1,17 @@
+{{- $base := .base }}
+{{- $page := .page }}
+{{- $parameter := .parameter }}
+{{- $outputFormat := .outputFormat }}
+{{- if not $outputFormat }}
+  {{- $outputFormat = partial "output-format.hugo" $page }}
+{{- end }}
+{{- $suffix := partialCached "output-suffix.hugo" $page $page.RelPermalink $outputFormat }}
+{{- $f := printf "/layouts/partials/%s.%s.%s" $base $outputFormat $suffix }}
+{{- if or (not $outputFormat) (not (partialCached "fileExists.hugo" $f $f)) }}
+  {{- $f = printf "/layouts/partials/%s.%s" $base $suffix }}
+  {{- if partialCached "fileExists.hugo" $f $f }}
+    {{- partial (printf "%s.%s" $base $suffix) $parameter }}
+  {{- end }}
+{{- else }}
+  {{- partial (printf "%s.%s.%s" $base $outputFormat $suffix) $parameter }}
+{{- end }}

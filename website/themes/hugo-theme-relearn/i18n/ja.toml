@@ -1,0 +1,119 @@
+[Reading-direction]
+other = "ltr"
+
+[Search]
+other = "検索"
+
+[Search-placeholder]
+other = "検索..."
+
+[Clear-search]
+other = "検索をクリア"
+
+[No-results-found]
+other = "\"{0}\" の結果が見つかりません"
+
+[N-results-found]
+other = "\"{0}\" で {1} 件の結果が見つかりました"
+
+[Clear-History]
+other = "履歴削除"
+
+[Reset-view]
+other = "ビューのリセット"
+
+[View-reset]
+other = "リセットを見る"
+
+[Attachments-label]
+other = "添付"
+
+[title-404]
+other = "未配置"
+
+[message-404]
+other = "おっと。ページが見当たりません。 ¯\\_(ツ)_/¯."
+
+[Go-to-homepage]
+other = "ホームページへ行く"
+
+[Edit-this-page]
+other = "編集"
+
+[Print-this-chapter]
+other = "章全体を印刷する"
+
+[More-action]
+other = "更に"
+
+[Shortcuts-Title]
+other = "更に"
+
+[Expand-title]
+other = "開く..."
+
+[Navigation-toggle]
+other = "メニュー"
+
+[Toc-toggle]
+other = "目次"
+
+[Byte-symbol]
+other = "B"
+
+[Kilobyte-symbol]
+other = "KB"
+
+[Megabyte-symbol]
+other = "MB"
+
+[note]
+other = "メモ"
+
+[info]
+other = "情報"
+
+[tip]
+other = "ヒント"
+
+[warning]
+other = "警告"
+
+[Copy-to-clipboard]
+other = "クリップボードにコピー"
+
+[Copied-to-clipboard]
+other = "クリップボードにコピー!"
+
+[Copy-link-to-clipboard]
+other = "リンクをクリップボードにコピー"
+
+[Link-copied-to-clipboard]
+other = "リンクをクリップボードにコピーしました!"
+
+[Chapter]
+other = "第{{.}}章"
+
+[Language]
+other = "言語"
+
+[Theme]
+other = "テーマ"
+
+[Submenu]
+other = "サブメニュー {{.}}"
+
+[Subsections]
+other = "{{.}}のサブセクション"
+
+[tags]
+other = "タグ"
+
+[tag]
+other = "タグ"
+
+[categories]
+other = "カテゴリー"
+
+[category]
+other = "カテゴリー"

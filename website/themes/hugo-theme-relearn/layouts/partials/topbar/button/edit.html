@@ -1,0 +1,33 @@
+{{- $onwidths := cond (isset . "onwidths") .onwidths "area-more" }}
+{{- $onwidthm := cond (isset . "onwidthm") .onwidthm "show" }}
+{{- $onwidthl := cond (isset . "onwidthl") .onwidthl "show" }}
+{{- with .page }}
+	{{- $format := partial "get-format.hugo" . }}
+	{{- $outputFormat := partial "output-format.hugo" (dict "page" . "format" $format) }}
+	{{- if and (eq $outputFormat "html") .File }}
+		{{- $filePath := printf "%s%s" (strings.TrimLeft "/" (replace .File.Dir "\\" "/")) .File.LogicalName }}
+		{{- $href := "" }}
+		{{- if .Site.Params.editURL }}
+			{{- $href = .Site.Params.editURL }}
+			{{- if not (strings.Contains $href "${FilePath}") }}
+				{{ $href = printf "%s%s" $href "${FilePath}" }}
+			{{- end }}
+		{{- end }}
+		{{- if isset .Params "editurl" }}
+			{{- $href = .Params.editURL }}
+		{{- end }}
+		{{- $href = strings.Replace $href "${FilePath}" $filePath }}
+		{{- if $href }}
+			{{- partial "topbar/func/button.html" (dict
+				"page" .
+				"class" "topbar-button-edit"
+				"href" $href
+				"icon" "pen"
+				"onwidths" $onwidths
+				"onwidthm" $onwidthm
+				"onwidthl" $onwidthl
+				"hint" (printf "%s (CTRL+ALT+w)" (T "Edit-this-page"))
+			)}}
+		{{- end }}
+	{{- end }}
+{{- end }}

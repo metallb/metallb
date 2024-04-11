@@ -1,0 +1,10 @@
+{{- $_hugo_config := `{ "version": 1 }` }}
+{{- partial "shortcodes/multiconfig.html" (dict
+  "page"        .Page
+  "content"     .Inner
+  "config"      (.Get "config")
+  "dataKey"     (.Get "dataKey")
+  "file"        (.Get "file")
+  "fm"          (.Get "fm")
+  "skipHeader"  (.Get "skipHeader")
+) }}

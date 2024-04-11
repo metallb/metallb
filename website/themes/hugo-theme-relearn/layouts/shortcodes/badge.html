@@ -1,0 +1,9 @@
+{{- $_hugo_config := `{ "version": 1 }` }}
+{{- partial "shortcodes/badge.html" (dict
+  "page"    .Page
+  "color"   (.Get "color")
+  "content" .Inner
+  "icon"    (.Get "icon")
+  "style"   (.Get "style")
+  "title"   (.Get "title")
+) }}

@@ -1,0 +1,2 @@
+{{- $ret := path.Base (strings.TrimSuffix (path.Ext .) .) }}
+{{- return $ret }}

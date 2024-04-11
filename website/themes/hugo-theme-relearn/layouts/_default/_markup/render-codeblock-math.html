@@ -1,0 +1,6 @@
+{{- partial "shortcodes/math.html" (dict
+  "page"       .Page
+  "attributes" .Attributes
+  "content"    .Inner
+  "align"      (index .Attributes "align")
+) }}

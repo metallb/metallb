@@ -1,0 +1,109 @@
+{{- $page := .page }}
+{{- if and (not $page) .context }}
+  {{- $page = .context }}
+  {{- warnf "%q: DEPRECATED parameter 'context' for shortcode 'highlight' found, use 'page' instead; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#5180" $page.File.Filename }}
+{{- end }}
+{{- $attributes := dict }}
+{{- $otherAttributes := dict }}
+{{- $content := "" }}
+{{- $options := dict }}
+{{- $otherOptions := dict }}
+{{- $type := "" }}
+{{- range $k, $v := . }}
+  {{- if eq $k "context" }}
+  {{- else if eq $k "page" }}
+  {{- else if eq $k "attributes" }}
+    {{- $attributes = $v }}
+  {{- else if eq $k "content" }}
+    {{- $content = trim $v "\n\r" }}
+  {{- else if eq $k "options" }}
+    {{- if eq (printf "%T" $v) "string" }}
+      {{- range (split $v ",") }}
+        {{- $pair := split . "=" }}
+        {{- $options = $options | merge (dict (index $pair 0) (index $pair 1)) }}
+      {{- end }}
+    {{- else }}
+      {{- $options = $v }}
+    {{- end }}
+  {{- else if eq $k "type" }}
+    {{- $type = $v }}
+  {{- else if eq $k "title" }}
+    {{- $otherAttributes = $otherAttributes | merge (dict $k $v) }}
+  {{- else if eq $k "wrap" }}
+    {{- $otherAttributes = $otherAttributes | merge (dict $k $v) }}
+  {{- else }}
+    {{- $otherOptions = $otherOptions | merge (dict $k $v) }}
+  {{- end }}
+{{- end }}
+
+{{- /* separate attributes from options */}}
+{{- $hl_inline := false }}
+{{- if and (isset $page.Params "markup") (isset $page.Params.markup "highlight") (isset $page.Params.markup.highlight "hl_inline") }}
+  {{- $hl_inline = $page.Params.markup.highlight.hl_inline }}
+{{- end }}
+{{- $options = $options | merge $otherOptions }}
+{{- $otherOptions := dict }}
+{{- range $k, $v := $options }}
+  {{- if eq $k "hl_inline" }}
+    {{- $hl_inline = $v }}
+    {{- $otherOptions = (dict $k $v) | merge $otherOptions }}
+  {{- else if eq $k "title" }}
+    {{- $otherAttributes = (dict $k $v) | merge $otherAttributes }}
+  {{- else if eq $k "wrap" }}
+    {{- $otherAttributes = (dict $k $v) | merge $otherAttributes }}
+  {{- else }}
+    {{- $otherOptions = (dict $k $v) | merge $otherOptions }}
+  {{- end }}
+{{- end }}
+{{- $options = $otherOptions }}
+
+{{- /* separate shortcode attributes from rest */}}
+{{- $title := "" }}
+{{- $wrap := true }}
+{{- if isset $page.Site.Params "highlightwrap" }}
+  {{- $wrap = $page.Site.Params.highlightWrap  }}
+{{- end }}
+{{- if isset $page.Params "highlightwrap" }}
+  {{- $wrap = $page.Params.highlightWrap }}
+{{- end }}
+{{- $attributes = $attributes | merge $otherAttributes }}
+{{- $otherAttributes := dict }}
+{{- range $k, $v := $attributes }}
+  {{- if eq $k "title" }}
+    {{- $title = $v }}
+  {{- else if eq $k "wrap" }}
+    {{- $wrap = $v }}
+  {{- else }}
+    {{- $otherAttributes = (dict $k $v) | merge $otherAttributes }}
+  {{- end }}
+{{- end }}
+{{- $attributes = $otherAttributes }}
+{{- if eq (printf "%T" $wrap) "string" }}
+  {{- $wrap = (eq $wrap "true") }}
+{{- end }}
+
+{{- /* enrich attributes */}}
+{{- $attributes = merge $attributes (dict "class" (delimit (append (index $attributes "class" | default slice) "highlight" slice) " ")) }}
+{{- if $wrap }}
+  {{- $attributes = merge $options (dict "class" (delimit (append (index $attributes "class" | default slice) "wrap-code" slice) " ")) }}
+{{- end }}
+
+{{- /* print da shtuff */}}
+{{- $div := slice }}
+{{- range $k, $v := $attributes }}
+  {{- if $v }}
+    {{- $div = $div | append (printf "%s=%q" $k $v | safeHTMLAttr) }}
+  {{- end }}
+{{- end }}
+{{- $content = highlight $content $type $options }}
+{{- $content = replaceRE "^([\\s\\n\\r]*)(<pre\\s+?[\\s\\S]*)$" "${1}<div class=\"highlight\">${2}</div>" $content }}
+{{- $content = replaceRE "(class=\")([^\"]*)\"" (printf "%s" (delimit $div " ")) $content 1 }}
+{{- if and $title (not $hl_inline) }}
+  {{- partial "shortcodes/tab.html" (dict
+    "page"  $page
+    "title" $title
+    "content" $content
+  )}}
+{{- else }}
+  {{- $content | safeHTML }}
+{{- end }}

@@ -1,0 +1,122 @@
+[Reading-direction]
+other = "ltr"
+
+[Search]
+other = "Tìm kiếm"
+
+[Search-placeholder]
+other = "Tìm kiếm..."
+
+[Clear-search]
+other = "Xóa tìm kiếm"
+
+[No-results-found]
+other = "Không tìm thấy kết quả nào cho \"{0}\""
+
+[N-results-found]
+other = "{1} kết quả được tìm thấy cho \"{0}\""
+
+[Clear-History]
+other = "Xóa lịch sử.."
+
+[Reset-view]
+other = "Đặt lại dạng xem"
+
+[View-reset]
+other = "Xem đặt lại!"
+
+[Attachments-label]
+other = "Tập tin đính kèm"
+
+[title-404]
+other = "Không xác định vị trí"
+
+[message-404]
+other = "Tiếc quá! Có vẻ như trang này không tồn tại ¯\\_(ツ)_/¯."
+
+[Go-to-homepage]
+other = "Đi đến trang chủ"
+
+[Edit-this-page]
+other = "Biên tập"
+
+[Print-this-chapter]
+other = "In toàn bộ chương"
+
+[More-action]
+other = "Nội dung khác"
+
+[Shortcuts-Title]
+other = "Nội dung khác"
+
+[Expand-title]
+other = "Mở rộng..."
+
+[Navigation-toggle]
+other = "Menu"
+
+[Toc-toggle]
+other = "Mục lục"
+
+[BinaryPrefix-kilobyte]
+other = "kb"
+
+[Byte-symbol]
+other = "B"
+
+[Kilobyte-symbol]
+other = "KB"
+
+[Megabyte-symbol]
+other = "MB"
+
+[note]
+other = "Ghi chú"
+
+[info]
+other = "Thông tin"
+
+[tip]
+other = "Mẹo vặt"
+
+[warning]
+other = "Cảnh báo"
+
+[Copy-to-clipboard]
+other = "Sao chép vào bảng tạm"
+
+[Copied-to-clipboard]
+other = "Sao chép vào bảng tạm!"
+
+[Copy-link-to-clipboard]
+other = "Sao chép nối kết vào bảng tạm"
+
+[Link-copied-to-clipboard]
+other = "Liên kết được sao chép vào bảng tạm!"
+
+[Chapter]
+other = "Chương {{.}}"
+
+[Language]
+other = "Ngôn ngữ"
+
+[Theme]
+other = "Đề tài"
+
+[Submenu]
+other = "Menu con {{.}}"
+
+[Subsections]
+other = "Tiểu mục của {{.}}"
+
+[tags]
+other = "Thẻ"
+
+[tag]
+other = "Nhãn"
+
+[categories]
+other = "Thể loại"
+
+[category]
+other = "Loại"
