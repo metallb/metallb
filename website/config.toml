@@ -3,7 +3,7 @@ languageCode = "en-us"
 DefaultContentLanguage = "en"
 
 title = "MetalLB, bare metal load-balancer for Kubernetes"
-theme = "docdock"
+theme = "hugo-theme-relearn"
 
 [params]
 	# General information
@@ -12,7 +12,10 @@ theme = "docdock"
     disableNavChevron = true
 
 [outputs]
-home = ["HTML", "RSS", "JSON"]
+home = ['html', 'rss', 'search', 'searchpage']
+
+[[params.themeVariant]]
+    identifier = 'blue'
 
 [[menu.shortcuts]]
 pre = "<hr>"
