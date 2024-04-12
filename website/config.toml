@@ -18,22 +18,21 @@ home = ['html', 'rss', 'search', 'searchpage']
     identifier = 'blue'
 
 [[menu.shortcuts]]
-pre = "<hr>"
-name = "<i class='fa fa-github'></i> GitHub repo"
+name = "<i class='fab fa-github'></i> GitHub repo"
 url = "https://github.com/metallb/metallb"
 weight = 10
 
 [[menu.shortcuts]]
-name = "<i class='fa fa-envelope-open-o'></i> Mailing list"
+name = "<i class='far fa-envelope-open'></i> Mailing list"
 url = "https://groups.google.com/forum/#!forum/metallb-users"
 weight = 20
 
 [[menu.shortcuts]]
-name = "<i class='fa fa-slack'></i> Slack"
+name = "<i class='fab fa-slack-hash'></i> Slack"
 url = "https://kubernetes.slack.com/messages/metallb"
 weight = 30
 
 [[menu.shortcuts]]
-name = "<i class='fa fa-copyright'></i> License"
+name = "<i class='far fa-copyright'></i> License"
 url = "https://github.com/metallb/metallb/blob/main/LICENSE"
 weight = 40
