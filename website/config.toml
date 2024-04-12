@@ -8,8 +8,9 @@ theme = "hugo-theme-relearn"
 [params]
 	# General information
     editURL = "https://github.com/metallb/metallb/edit/main/website/content/"
-	description = "MetalLB, bare metal load-balancer for Kubernetes"
-    disableNavChevron = true
+    description = "MetalLB, bare metal load-balancer for Kubernetes"
+    collapsibleMenu = true
+    landingPageName = "<i class='fa-fw fas fa-home'></i> MetalLB (latest version)"
 
 [outputs]
 home = ['html', 'rss', 'search', 'searchpage']
