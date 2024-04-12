@@ -2,8 +2,6 @@
 title: MetalLB
 ---
 
-# MetalLB
-
 MetalLB is a load-balancer implementation for bare
 metal [Kubernetes](https://kubernetes.io) clusters, using standard
 routing protocols.
@@ -87,4 +85,5 @@ to
 which will give us warm fuzzy feelings :).
 
 We are a [Cloud Native Computing Foundation](https://cncf.io/) sandbox project.
+
 ![cncf](/images/cncf-color.png)
