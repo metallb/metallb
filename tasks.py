@@ -32,10 +32,12 @@ all_architectures = set(["amd64",
 default_network = "kind"
 extra_network = "network2"
 controller_gen_version = "v0.14.0"
+kubectl_version = "v1.27.0"
+kustomize_version = "v5.4.0"
 build_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build")
 kubectl_path = os.path.join(build_path, "kubectl")
 controller_gen_path = os.path.join(build_path, "bin", "controller-gen")
-kubectl_version = "v1.27.0"
+kustomize_path = os.path.join(build_path, "bin", "kustomize")
 
 
 def _check_architectures(architectures):
@@ -319,6 +321,7 @@ def validate_kind_version():
 
 def generate_manifest(ctx, crd_options="crd:crdVersions=v1", bgp_type="native", output=None, with_prometheus=False):
     fetch_kubectl()
+    fetch_kustomize()
     fetch_controller_gen()
     res = run(
         "{}/bin/controller-gen {} rbac:roleName=manager-role webhook paths=\"./api/...\" output:crd:artifacts:config=config/crd/bases".format(
@@ -1064,6 +1067,15 @@ def fetch_controller_gen():
                     f"/controller-gen@{controller_gen_version}"
     get_version_command = f"{controller_gen_path} --version"
     fetch_dependency(controller_gen_path, controller_gen_version, fetch_command, get_version_command, "Version:")
+
+
+@cache
+def fetch_kustomize():
+    kustomize_zipfile = f"kustomize_{kustomize_version}_$(go env GOOS)_$(go env GOARCH).tar.gz"
+    curl_command = f"curl -L -o {kustomize_path}/{kustomize_zipfile} https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/{kustomize_version}/{kustomize_file}"
+    tar_command = f"tar xzf {kustomize_path}/{kustomize_zipfile} && -C {build_path}/bin && rm -rf {kustomize_path}"
+    get_version_command = f"{kustomize_path} version"
+    fetch_dependency(kustomize_path, kustomize_version, curl_command+tar_command, get_version_command, "Version:")
 
 
 def fetch_dependency(path: str, version: str, fetch_command: str, get_version_command: str,
