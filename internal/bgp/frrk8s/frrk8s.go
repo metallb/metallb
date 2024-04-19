@@ -268,6 +268,7 @@ func (sm *sessionManager) updateConfig() error {
 				},
 				Password:       password,
 				PasswordSecret: s.PasswordRef,
+				DisableMP:      s.DisableMP,
 			}
 		}
 

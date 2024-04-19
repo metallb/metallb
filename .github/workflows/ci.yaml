@@ -120,7 +120,7 @@ jobs:
           fetch-depth: 0
 
       - name: Set up Helm
-        uses: azure/setup-helm@v3
+        uses: azure/setup-helm@v4
         with:
           version: v3.12.1
 
@@ -250,6 +250,13 @@ jobs:
         with:
           artifact-name: kind-logs-${{ matrix.ip-family }}-${{ matrix.bgp-type }}-${{ matrix.deployment}}
 
+      - name: Publish JUnit Report
+        uses: mikepenz/action-junit-report@v4
+        if: success() || failure()
+        with:
+          annotate_only: true
+          report_paths: 'e2etest/junit-report.xml'
+
   e2e-use-operator:
     runs-on: ubuntu-22.04
     needs:
@@ -340,6 +347,14 @@ jobs:
         with:
           artifact-name: kind_logs_use_operator
 
+      - name: Publish JUnit Report
+        uses: mikepenz/action-junit-report@v4
+        if: success() || failure()
+        with:
+          annotate_only: true
+          report_paths: 'e2etest/junit-report.xml'
+
+
   oldest_k8s:
     runs-on: ubuntu-22.04
     needs:
@@ -375,3 +390,10 @@ jobs:
         uses: ./.github/workflows/composite/collectlogs
         with:
           artifact-name: kind-logs-oldest-k8s
+
+      - name: Publish JUnit Report
+        uses: mikepenz/action-junit-report@v4
+        if: success() || failure()
+        with:
+          annotate_only: true
+          report_paths: 'e2etest/junit-report.xml'
