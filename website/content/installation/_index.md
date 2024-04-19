@@ -59,20 +59,20 @@ kubectl apply -f - -n kube-system
 To install MetalLB, apply the manifest:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.4/config/manifests/metallb-native.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.5/config/manifests/metallb-native.yaml
 ```
 
 {{% notice note %}}
 If you want to deploy MetalLB using the [FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions), apply the manifests:
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.4/config/manifests/metallb-frr.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.5/config/manifests/metallb-frr.yaml
 ```
 
 If you want to deploy MetalLB using the [experimental FRR-K8s mode]({{% relref "concepts/bgp.md" %}}#frr-k8s-mode):
 
 ```bash
-kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.4/config/manifests/metallb-frr-k8s.yaml
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.14.5/config/manifests/metallb-frr-k8s.yaml
 ```
 
 Please do note that these manifests deploy MetalLB from the main development branch. We highly encourage cloud operators to deploy a stable released version of MetalLB on production environments!
@@ -101,7 +101,7 @@ need to be changed.
 
 {{% notice note %}}
 
-You may notice the "prometheus" variants of the manifests (for example `https://raw.githubusercontent.com/metallb/metallb/v0.14.4/config/manifests/metallb-native-prometheus.yaml`).
+You may notice the "prometheus" variants of the manifests (for example `https://raw.githubusercontent.com/metallb/metallb/v0.14.5/config/manifests/metallb-native-prometheus.yaml`).
 Those manifests rely on a very specific way of deploying Prometheus via the [kube prometheus](https://github.com/prometheus-operator/kube-prometheus) repository, and
 are mainly used by our CI, but they might not be compatible to your Prometheus deployment.
 
@@ -120,7 +120,7 @@ In the following example, we are deploying MetalLB with the native bgp implement
 namespace: metallb-system
 
 resources:
-  - github.com/metallb/metallb/config/native?ref=v0.14.4
+  - github.com/metallb/metallb/config/native?ref=v0.14.5
 ```
 
 In order to deploy the [FRR mode](https://metallb.universe.tf/configuration/#enabling-bfd-support-for-bgp-sessions):
@@ -130,7 +130,7 @@ In order to deploy the [FRR mode](https://metallb.universe.tf/configuration/#ena
 namespace: metallb-system
 
 resources:
-  - github.com/metallb/metallb/config/frr?ref=v0.14.4
+  - github.com/metallb/metallb/config/frr?ref=v0.14.5
 ```
 
 In order to deploy the [experimental FRR-K8s mode]({{% relref "concepts/bgp.md" %}}#frr-k8s-mode):
