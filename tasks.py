@@ -1072,7 +1072,7 @@ def fetch_controller_gen():
 @cache
 def fetch_kustomize():
     kustomize_zipfile = f"kustomize_{kustomize_version}_$(go env GOOS)_$(go env GOARCH).tar.gz"
-    curl_command = f"curl -L -o {kustomize_path}/{kustomize_zipfile} https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/{kustomize_version}/{kustomize_file}"
+    curl_command = f"curl -L -o {kustomize_path}/{kustomize_zipfile} https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/{kustomize_version}/{kustomize_zipfile}"
     tar_command = f"tar xzf {kustomize_path}/{kustomize_zipfile} && -C {build_path}/bin && rm -rf {kustomize_path}"
     get_version_command = f"{kustomize_path} version"
     fetch_dependency(kustomize_path, kustomize_version, curl_command+tar_command, get_version_command, "Version:")
