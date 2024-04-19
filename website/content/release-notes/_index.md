@@ -3,6 +3,19 @@ title: Release Notes
 weight: 8
 ---
 
+## Version 0.14.5
+
+New features:
+
+- Bump frr-k8s to 0.0.11 (#2357, @AlinaSecret)
+- Support BGP disableMP field in FRR-K8s mode (#2357, @AlinaSecret)
+
+BugFixes:
+
+- Fix the handling of readyness conditions of endpointslices: instead of looking at the serving condition first, we look at the ready condition. This allows metallb to respect the publishNotReadyAddresses field of the services. (#2337, @farodin91)
+
+This release include contributions from Adrian Vondendriesch, Alina Sudakov, clonefetch, Federico Paolinelli, Jan Jansen, lwabish, Micah Nagel, tico88612, tozastation. Thanks!
+
 ## Version 0.14.4
 
 New features:
