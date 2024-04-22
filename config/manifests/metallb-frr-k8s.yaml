@@ -1748,6 +1748,7 @@ rules:
   - secrets
   verbs:
   - list
+  - get
 - apiGroups:
   - apps
   resourceNames:
