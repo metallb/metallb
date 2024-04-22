@@ -394,7 +394,8 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 
 	// keepalive must be lower than holdtime
 	if keepaliveTime > holdTime {
-		return nil, fmt.Errorf("invalid keepaliveTime %q", p.Spec.KeepaliveTime)
+		return nil, fmt.Errorf("invalid keepaliveTime %q must be smaller than holdtime %q",
+			keepaliveTime, holdTime)
 	}
 
 	// Ideally we would set a default RouterID here, instead of having
