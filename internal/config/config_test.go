@@ -725,6 +725,36 @@ func TestParse(t *testing.T) {
 			},
 		},
 		{
+			desc: "invalid keepalivetime larger than default holdtime",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:         42,
+							ASN:           42,
+							Address:       "1.2.3.4",
+							KeepaliveTime: metav1.Duration{Duration: 91 * time.Second}},
+					},
+				},
+			},
+		},
+		{
+			desc: "invalid keepalivetime larger than holdtime",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:         42,
+							ASN:           42,
+							Address:       "1.2.3.4",
+							HoldTime:      metav1.Duration{Duration: 30 * time.Second},
+							KeepaliveTime: metav1.Duration{Duration: 90 * time.Second}},
+					},
+				},
+			},
+		},
+
+		{
 			desc: "invalid hold time (too short)",
 			crs: ClusterResources{
 				Peers: []v1beta2.BGPPeer{
