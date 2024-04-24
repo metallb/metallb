@@ -333,7 +333,7 @@ def generate_manifest(ctx, crd_options="crd:crdVersions=v1", bgp_type="native", 
         layer = bgp_type
         if with_prometheus:
             layer = "prometheus-" + layer
-        res = run("{} kustomize config/{} > {}".format(kubectl_path, layer, output))
+        res = run("{} build config/{} > {}".format(kustomize_path, layer, output))
         if not res.ok:
             raise Exit(message="Failed to kustomize manifests")
 
