@@ -278,6 +278,31 @@ func TestSingleSessionClose(t *testing.T) {
 	session.Close()
 	testCheckConfigFile(t)
 }
+
+func TestSingleSessionWithGracefulRestart(t *testing.T) {
+	testSetup(t)
+
+	l := log.NewNopLogger()
+	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+	defer close(sessionManager.reloadConfig)
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:     "10.2.2.254:179",
+			SourceAddress:   net.ParseIP("10.1.1.254"),
+			MyASN:           102,
+			RouterID:        net.ParseIP("10.1.1.254"),
+			PeerASN:         100,
+			GracefulRestart: true,
+			SessionName:     "test-peer"})
+
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	testCheckConfigFile(t)
+}
+
 func TestTwoSessions(t *testing.T) {
 	testSetup(t)
 

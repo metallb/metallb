@@ -76,6 +76,7 @@ type neighborConfig struct {
 	Password            string
 	Advertisements      []*advertisementConfig
 	BFDProfile          string
+	GracefulRestart     bool
 	EBGPMultiHop        bool
 	VRFName             string
 	HasV4Advertisements bool

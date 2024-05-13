@@ -16,10 +16,13 @@
   {{ if .neighbor.SrcAddr -}}
   neighbor {{.neighbor.Addr}} update-source {{.neighbor.SrcAddr}}
   {{- end }}
-{{- if ne .neighbor.BFDProfile ""}}
+  {{- if .neighbor.GracefulRestart }}
+  neighbor {{.neighbor.Addr}} graceful-restart
+  {{- end }}
+  {{- if ne .neighbor.BFDProfile "" }}
   neighbor {{.neighbor.Addr}} bfd profile {{.neighbor.BFDProfile}}
-{{- end }}
-{{- if  mustDisableConnectedCheck .neighbor.IPFamily .routerASN .neighbor.ASN .neighbor.EBGPMultiHop }}
+  {{- end }}
+  {{- if  mustDisableConnectedCheck .neighbor.IPFamily .routerASN .neighbor.ASN .neighbor.EBGPMultiHop }}
   neighbor {{.neighbor.Addr}} disable-connected-check
-{{- end }}
+  {{- end }}
 {{- end -}}

@@ -30,6 +30,7 @@ router bgp {{$r.MyASN}}{{ if $r.VRF }} vrf {{$r.VRF}}{{end}}
   no bgp ebgp-requires-policy
   no bgp network import-check
   no bgp default ipv4-unicast
+  bgp graceful-restart preserve-fw-state
 {{ if $r.RouterID }}
   bgp router-id {{$r.RouterID}}
 {{- end }}

@@ -272,20 +272,21 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			}
 
 			neighbor = &neighborConfig{
-				Name:           neighborName,
-				IPFamily:       family,
-				ASN:            s.PeerASN,
-				Addr:           host,
-				Port:           uint16(portUint),
-				HoldTime:       uint64(s.HoldTime / time.Second),
-				KeepaliveTime:  uint64(s.KeepAliveTime / time.Second),
-				ConnectTime:    connectTime,
-				Password:       s.Password,
-				Advertisements: make([]*advertisementConfig, 0),
-				BFDProfile:     s.BFDProfile,
-				EBGPMultiHop:   s.EBGPMultiHop,
-				VRFName:        s.VRFName,
-				DisableMP:      s.DisableMP,
+				Name:            neighborName,
+				IPFamily:        family,
+				ASN:             s.PeerASN,
+				Addr:            host,
+				Port:            uint16(portUint),
+				HoldTime:        uint64(s.HoldTime / time.Second),
+				KeepaliveTime:   uint64(s.KeepAliveTime / time.Second),
+				ConnectTime:     connectTime,
+				Password:        s.Password,
+				Advertisements:  make([]*advertisementConfig, 0),
+				BFDProfile:      s.BFDProfile,
+				GracefulRestart: s.GracefulRestart,
+				EBGPMultiHop:    s.EBGPMultiHop,
+				VRFName:         s.VRFName,
+				DisableMP:       s.DisableMP,
 			}
 			if s.SourceAddress != nil {
 				neighbor.SrcAddr = s.SourceAddress.String()

@@ -71,6 +71,19 @@ func TestValidate(t *testing.T) {
 			mustFail: true,
 		},
 		{
+			desc: "enable BGP GracefulRestart",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							EnableGracefulRestart: true,
+						},
+					},
+				},
+			},
+			mustFail: true,
+		},
+		{
 			desc: "disable BGP MP",
 			config: ClusterResources{
 				Peers: []v1beta2.BGPPeer{

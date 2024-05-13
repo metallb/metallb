@@ -32,6 +32,7 @@ router bgp 100
   no bgp ebgp-requires-policy
   no bgp network import-check
   no bgp default ipv4-unicast
+  bgp graceful-restart preserve-fw-state
 
   neighbor 10.2.2.254 remote-as 200
   neighbor 10.2.2.254 ebgp-multihop
@@ -54,6 +55,7 @@ router bgp 100 vrf red
   no bgp ebgp-requires-policy
   no bgp network import-check
   no bgp default ipv4-unicast
+  bgp graceful-restart preserve-fw-state
 
   neighbor 10.2.2.254 remote-as 200
   neighbor 10.2.2.254 ebgp-multihop

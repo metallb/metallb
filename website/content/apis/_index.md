@@ -289,6 +289,7 @@ _Appears in:_
 | `password` _string_ | Authentication password for routers enforcing TCP MD5 authenticated sessions |
 | `passwordSecret` _[SecretReference](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#secretreference-v1-core)_ | passwordSecret is name of the authentication secret for BGP Peer. the secret must be of type "kubernetes.io/basic-auth", and created in the same namespace as the MetalLB deployment. The password is stored in the secret as the key "password". |
 | `bfdProfile` _string_ | The name of the BFD Profile to be used for the BFD session associated to the BGP session. If not set, the BFD session won't be set up. |
+| `enableGracefulRestart` _boolean_ | EnableGracefulRestart allows BGP peer to continue to forward data packets along known routes while the routing protocol information is being restored. This field is immutable because it requires restart of the BGP session Supported for FRR mode only. |
 | `ebgpMultiHop` _boolean_ | To set if the BGPPeer is multi-hops away. Needed for FRR mode only. |
 | `vrf` _string_ | To set if we want to peer with the BGPPeer using an interface belonging to a host vrf |
 | `disableMP` _boolean_ | To set if we want to disable MP BGP that will separate IPv4 and IPv6 route exchanges into distinct BGP sessions. |

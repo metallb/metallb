@@ -42,6 +42,9 @@ func DiscardFRROnly(c ClusterResources) error {
 		if p.Spec.ConnectTime != nil {
 			return fmt.Errorf("peer %s has connect time set on native bgp mode", p.Spec.Address)
 		}
+		if p.Spec.EnableGracefulRestart {
+			return fmt.Errorf("peer %s has EnableGracefulRestart flag set on native bgp mode", p.Spec.Address)
+		}
 		if p.Spec.DisableMP {
 			return fmt.Errorf("peer %s has disable MP flag set on native bgp mode", p.Spec.Address)
 		}

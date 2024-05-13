@@ -119,6 +119,8 @@ type Peer struct {
 	PasswordRef corev1.SecretReference
 	// The optional BFD profile to be used for this BGP session
 	BFDProfile string
+	// Optional EnableGracefulRestart enable BGP graceful restart functionality at the peer level.
+	EnableGracefulRestart bool
 	// Optional ebgp peer is multi-hops away.
 	EBGPMultiHop bool
 	// Optional name of the vrf to establish the session from
@@ -451,23 +453,24 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 	}
 
 	return &Peer{
-		Name:          p.Name,
-		MyASN:         p.Spec.MyASN,
-		ASN:           p.Spec.ASN,
-		Addr:          ip,
-		SrcAddr:       src,
-		Port:          p.Spec.Port,
-		HoldTime:      holdTime,
-		KeepaliveTime: keepaliveTime,
-		ConnectTime:   connectTime,
-		RouterID:      routerID,
-		NodeSelectors: nodeSels,
-		Password:      password,
-		PasswordRef:   p.Spec.PasswordSecret,
-		BFDProfile:    p.Spec.BFDProfile,
-		EBGPMultiHop:  p.Spec.EBGPMultiHop,
-		VRF:           p.Spec.VRFName,
-		DisableMP:     p.Spec.DisableMP,
+		Name:                  p.Name,
+		MyASN:                 p.Spec.MyASN,
+		ASN:                   p.Spec.ASN,
+		Addr:                  ip,
+		SrcAddr:               src,
+		Port:                  p.Spec.Port,
+		HoldTime:              holdTime,
+		KeepaliveTime:         keepaliveTime,
+		ConnectTime:           connectTime,
+		RouterID:              routerID,
+		NodeSelectors:         nodeSels,
+		Password:              password,
+		PasswordRef:           p.Spec.PasswordSecret,
+		BFDProfile:            p.Spec.BFDProfile,
+		EnableGracefulRestart: p.Spec.EnableGracefulRestart,
+		EBGPMultiHop:          p.Spec.EBGPMultiHop,
+		VRF:                   p.Spec.VRFName,
+		DisableMP:             p.Spec.DisableMP,
 	}, nil
 }
 

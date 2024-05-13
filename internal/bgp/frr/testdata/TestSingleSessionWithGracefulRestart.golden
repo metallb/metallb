@@ -16,7 +16,7 @@ route-map 10.2.2.254-out permit 1
 route-map 10.2.2.254-out permit 2
   match ipv6 address prefix-list 10.2.2.254-pl-ipv4
 
-router bgp 100
+router bgp 102
   no bgp ebgp-requires-policy
   no bgp network import-check
   no bgp default ipv4-unicast
@@ -25,9 +25,10 @@ router bgp 100
   bgp router-id 10.1.1.254
   neighbor 10.2.2.254 remote-as 100
   neighbor 10.2.2.254 port 179
-  neighbor 10.2.2.254 timers 1 1
-  neighbor 10.2.2.254 password password
+  neighbor 10.2.2.254 timers 0 0
+  
   neighbor 10.2.2.254 update-source 10.1.1.254
+  neighbor 10.2.2.254 graceful-restart
 
   address-family ipv4 unicast
     neighbor 10.2.2.254 activate
