@@ -258,7 +258,8 @@ func (sm *sessionManager) updateConfig() error {
 				KeepaliveTime: &metav1.Duration{Duration: s.KeepAliveTime},
 				ConnectTime:   connectTime,
 				BFDProfile:    s.BFDProfile,
-				EBGPMultiHop:  s.EBGPMultiHop,
+				//Graceful:      s.GracefulRestart,
+				EBGPMultiHop: s.EBGPMultiHop,
 				ToAdvertise: frrv1beta1.Advertise{
 					Allowed: frrv1beta1.AllowedOutPrefixes{
 						Prefixes: make([]string, 0),
