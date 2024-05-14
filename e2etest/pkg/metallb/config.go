@@ -80,6 +80,14 @@ func WithRouterID(peers []metallbv1beta2.BGPPeer, routerID string) []metallbv1be
 	return peers
 }
 
+// WithGracefulRestart sets the GR to true to the peers.
+func WithGracefulRestart(peers []metallbv1beta2.BGPPeer) []metallbv1beta2.BGPPeer {
+	for i := range peers {
+		peers[i].Spec.EnableGracefulRestart = true
+	}
+	return peers
+}
+
 func BGPPeerSecretReferences(containers []*frrcontainer.FRR) map[string]corev1.Secret {
 	secretMap := make(map[string]corev1.Secret)
 	for _, c := range containers {

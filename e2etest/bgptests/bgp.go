@@ -427,6 +427,33 @@ var _ = ginkgo.Describe("BGP", func() {
 		ginkgo.Entry("IPV4", ipfamily.IPv4),
 		ginkgo.Entry("IPV6", ipfamily.IPv6))
 
+	ginkgo.DescribeTable("FRR-MODE configure peers with GracefulRestart and validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
+		ginkgo.By("configure peer")
+
+		resources := config.Resources{
+			Peers: metallb.WithGracefulRestart(metallb.PeersForContainers(FRRContainers, ipFamily)),
+		}
+
+		err := ConfigUpdater.Update(resources)
+		Expect(err).NotTo(HaveOccurred())
+
+		for _, c := range FRRContainers {
+			err = frrcontainer.PairWithNodes(cs, c, ipFamily)
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		for _, c := range FRRContainers {
+			validateFRRPeeredWithAllNodes(cs, c, ipFamily)
+			neighbors, err := frr.NeighborsInfo(c)
+			Expect(err).NotTo(HaveOccurred())
+			for _, n := range neighbors {
+				Expect(n.GRInfo.RemoteGrMode).To(Equal("Restart"))
+			}
+		}
+	},
+		ginkgo.Entry("IPV4", ipfamily.IPv4),
+		ginkgo.Entry("IPV6", ipfamily.IPv6))
+
 	ginkgo.DescribeTable("validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
 		ginkgo.By("configure peer")
 

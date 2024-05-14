@@ -21,6 +21,7 @@ type Neighbor struct {
 	PrefixSent              int
 	Port                    int
 	RemoteRouterID          string
+	GRInfo                  GracefulRestartInfo
 	MsgStats                MessageStats
 	ConfiguredHoldTime      int
 	ConfiguredKeepAliveTime int
@@ -38,20 +39,49 @@ type Route struct {
 const bgpConnected = "Established"
 
 type FRRNeighbor struct {
-	RemoteAs                     int          `json:"remoteAs"`
-	LocalAs                      int          `json:"localAs"`
-	RemoteRouterID               string       `json:"remoteRouterId"`
-	BgpVersion                   int          `json:"bgpVersion"`
-	BgpState                     string       `json:"bgpState"`
-	PortForeign                  int          `json:"portForeign"`
-	MsgStats                     MessageStats `json:"messageStats"`
-	VRFName                      string       `json:"vrf"`
-	ConfiguredHoldTimeMSecs      int          `json:"bgpTimerConfiguredHoldTimeMsecs"`
-	ConfiguredKeepAliveTimeMSecs int          `json:"bgpTimerConfiguredKeepAliveIntervalMsecs"`
-	ConnectRetryTimer            int          `json:"connectRetryTimer"`
+	RemoteAs                     int                 `json:"remoteAs"`
+	LocalAs                      int                 `json:"localAs"`
+	RemoteRouterID               string              `json:"remoteRouterId"`
+	BgpVersion                   int                 `json:"bgpVersion"`
+	BgpState                     string              `json:"bgpState"`
+	PortForeign                  int                 `json:"portForeign"`
+	MsgStats                     MessageStats        `json:"messageStats"`
+	GRInfo                       GracefulRestartInfo `json:"gracefulRestartInfo"`
+	VRFName                      string              `json:"vrf"`
+	ConfiguredHoldTimeMSecs      int                 `json:"bgpTimerConfiguredHoldTimeMsecs"`
+	ConfiguredKeepAliveTimeMSecs int                 `json:"bgpTimerConfiguredKeepAliveIntervalMsecs"`
+	ConnectRetryTimer            int                 `json:"connectRetryTimer"`
 	AddressFamilyInfo            map[string]struct {
 		SentPrefixCounter int `json:"sentPrefixCounter"`
 	} `json:"addressFamilyInfo"`
+}
+
+type GracefulRestartInfo struct {
+	EndOfRibSend struct {
+		Ipv4Unicast bool `json:"ipv4Unicast"`
+	} `json:"endOfRibSend"`
+	EndOfRibRecv struct {
+		Ipv4Unicast bool `json:"ipv4Unicast"`
+	} `json:"endOfRibRecv"`
+	LocalGrMode  string `json:"localGrMode"`
+	RemoteGrMode string `json:"remoteGrMode"`
+	RBit         bool   `json:"rBit"`
+	NBit         bool   `json:"nBit"`
+	Timers       struct {
+		ConfiguredRestartTimer int `json:"configuredRestartTimer"`
+		ReceivedRestartTimer   int `json:"receivedRestartTimer"`
+	} `json:"timers"`
+	Ipv4Unicast struct {
+		FBit           bool `json:"fBit"`
+		EndOfRibStatus struct {
+			EndOfRibSend            bool `json:"endOfRibSend"`
+			EndOfRibSentAfterUpdate bool `json:"endOfRibSentAfterUpdate"`
+			EndOfRibRecv            bool `json:"endOfRibRecv"`
+		} `json:"endOfRibStatus"`
+		Timers struct {
+			StalePathTimer int `json:"stalePathTimer"`
+		} `json:"timers"`
+	} `json:"ipv4Unicast"`
 }
 
 type MessageStats struct {
@@ -185,6 +215,7 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 			Port:                    n.PortForeign,
 			RemoteRouterID:          n.RemoteRouterID,
 			MsgStats:                n.MsgStats,
+			GRInfo:                  n.GRInfo,
 			ConfiguredKeepAliveTime: n.ConfiguredKeepAliveTimeMSecs,
 			ConfiguredHoldTime:      n.ConfiguredHoldTimeMSecs,
 			ConfiguredConnectTime:   n.ConnectRetryTimer,
