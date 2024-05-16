@@ -27,6 +27,7 @@ import (
 
 	"go.universe.tf/metallb/internal/allocator/k8salloc"
 	"go.universe.tf/metallb/internal/ipfamily"
+	k8snodes "go.universe.tf/metallb/internal/k8s/nodes"
 )
 
 const (
@@ -212,6 +213,16 @@ func (c *controller) allocateIPs(key string, svc *v1.Service) ([]net.IP, error) 
 		if serviceIPFamily != desiredLbIPFamily {
 			return nil, fmt.Errorf("requested loadBalancer IP(s) %q does not match the ipFamily of the service", desiredLbIPs)
 		}
+
+		nodes := []v1.Node{}
+		for _, node := range c.nodes {
+			nodes = append(nodes, *node)
+		}
+
+		nodeIPs := k8snodes.NodeIPsForFamily(nodes, serviceIPFamily)
+		if err = checkSvcIPsOverlapWithNodeIPs(desiredLbIPs, nodeIPs); err != nil {
+			return nil, err
+		}
 		if err := c.ips.Assign(key, svc, desiredLbIPs, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 			return nil, err
 		}
@@ -286,4 +297,15 @@ func isEqualIPs(ipsA, ipsB []net.IP) bool {
 		return ipsB[i].String() < ipsB[j].String()
 	})
 	return reflect.DeepEqual(ipsA, ipsB)
+}
+
+func checkSvcIPsOverlapWithNodeIPs(svcIPs []net.IP, nodeIPs []net.IP) error {
+	for _, nodeIP := range nodeIPs {
+		for _, svcIP := range svcIPs {
+			if svcIP.Equal(nodeIP) {
+				return fmt.Errorf("svc IP %q is the same as nodeIP %q", svcIP, nodeIP)
+			}
+		}
+	}
+	return nil
 }
