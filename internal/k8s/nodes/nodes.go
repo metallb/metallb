@@ -4,7 +4,9 @@ package nodes
 
 import (
 	"errors"
+	"net"
 
+	"go.universe.tf/metallb/internal/ipfamily"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -58,4 +60,21 @@ func IsNodeExcludedFromBalancers(n *corev1.Node) bool {
 		return true
 	}
 	return false
+}
+
+// NodeIPsForFamily returns all input node nodeIP based on ipfamily.
+func NodeIPsForFamily(nodes []corev1.Node, family ipfamily.Family) []net.IP {
+	var nodeIPs []net.IP
+	for _, n := range nodes {
+		for _, a := range n.Status.Addresses {
+			if a.Type == corev1.NodeInternalIP {
+				nodeIP := net.ParseIP(a.Address)
+				if family != ipfamily.DualStack && ipfamily.ForAddress(nodeIP) != family {
+					continue
+				}
+				nodeIPs = append(nodeIPs, nodeIP)
+			}
+		}
+	}
+	return nodeIPs
 }

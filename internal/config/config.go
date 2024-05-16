@@ -31,6 +31,8 @@ import (
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/bgp/community"
+	"go.universe.tf/metallb/internal/ipfamily"
+	k8snodes "go.universe.tf/metallb/internal/k8s/nodes"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -322,6 +324,13 @@ func poolsFor(resources ClusterResources) (*Pools, error) {
 			for _, m := range allCIDRs {
 				if cidrsOverlap(cidr, m) {
 					return nil, fmt.Errorf("CIDR %q in pool %q overlaps with already defined CIDR %q", cidr, p.Name, m)
+				}
+			}
+			// Check pool CIDR is not overlapping with Node IPs
+			nodeIps := k8snodes.NodeIPsForFamily(resources.Nodes, ipfamily.ForCIDR(cidr))
+			for _, nodeIP := range nodeIps {
+				if cidr.Contains(nodeIP) {
+					return nil, fmt.Errorf("pool cidr %q contains nodeIp %q", cidr, nodeIP)
 				}
 			}
 			allCIDRs = append(allCIDRs, cidr)
