@@ -8,6 +8,7 @@ import (
 	"github.com/go-kit/log"
 	"github.com/google/go-cmp/cmp"
 	"go.universe.tf/metallb/api/v1beta1"
+	v1core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -29,9 +30,14 @@ func TestValidateIPAddressPool(t *testing.T) {
 			},
 		}, nil
 	}
+	toRestoreNodes := getExistingNodes
+	getExistingNodes = func() (*v1core.NodeList, error) {
+		return &v1core.NodeList{}, nil
+	}
 
 	defer func() {
 		getExistingIPAddressPools = toRestoreIPAddressPools
+		getExistingNodes = toRestoreNodes
 	}()
 
 	tests := []struct {

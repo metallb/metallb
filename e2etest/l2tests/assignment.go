@@ -17,6 +17,7 @@ import (
 	"go.universe.tf/e2etest/pkg/service"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 
+	"go.universe.tf/e2etest/pkg/ipfamily"
 	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -676,6 +677,36 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{secondNamespacePoolHigherPriority}, jigservice.GetIngressPoint(
 				&svc4.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
+		})
+
+		ginkgo.It("reject a service with ips the same as nodeIps", func() {
+			nodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+			Expect(err).NotTo(HaveOccurred())
+			nodeIps, err := k8s.NodeIPsForFamily(nodes.Items, ipfamily.IPv4, "")
+			Expect(err).NotTo(HaveOccurred())
+
+			resources := config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "specificid-pool",
+						},
+						Spec: metallbv1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"192.168.60.0/32",
+							},
+						},
+					},
+				},
+			}
+			err1 := ConfigUpdater.Update(resources)
+			Expect(err1).NotTo(HaveOccurred())
+
+			jig := jigservice.NewTestJig(cs, testNamespace, "specificip")
+			_, err2 := jig.CreateLoadBalancerService(context.TODO(), func(svc *v1.Service) {
+				svc.Spec.LoadBalancerIP = nodeIps[0]
+			})
+			Expect(err2).To(HaveOccurred())
 		})
 	})
 })
