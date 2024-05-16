@@ -1,7 +1,7 @@
 # How to Contribute
 
 See the [contributing section of the
-website](https://metallb.universe.tf/community) for information.
+website](https://metallb.io/community) for information.
 
 ## Certificate of Origin
 
