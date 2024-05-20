@@ -45,6 +45,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 )
 
+// dummy change
 var (
 	skipDockerCmd       bool
 	useOperator         bool
