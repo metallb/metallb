@@ -31,6 +31,7 @@ import (
 	"go.universe.tf/e2etest/bgptests"
 	"go.universe.tf/e2etest/l2tests"
 	testsconfig "go.universe.tf/e2etest/pkg/config"
+	"go.universe.tf/e2etest/pkg/executor"
 	frrprovider "go.universe.tf/e2etest/pkg/frr/provider"
 	"go.universe.tf/e2etest/pkg/iprange"
 	"go.universe.tf/e2etest/pkg/k8s"
@@ -60,6 +61,7 @@ var (
 	frrImage            string
 	hostContainerMode   string
 	withVRF             bool
+	kubectlPath         string
 )
 
 // handleFlags sets up all flags and parses the command line.
@@ -78,6 +80,7 @@ func handleFlags() {
 	flag.StringVar(&hostContainerMode, "host-bgp-mode", string(bgptests.IBGPMode), "tells whether to run the host container in ebgp or ibgp mode")
 	flag.BoolVar(&withVRF, "with-vrf", false, "runs the tests against containers reacheable via linux vrfs. More coverage, but might not work depending on the OS")
 	flag.StringVar(&bgpMode, "bgp-mode", "", "says which bgp mode we are testing against. valid options are: native, frr, frr-k8s")
+	flag.StringVar(&executor.Kubectl, "kubectl", "kubectl", "the path for the kubectl binary")
 
 	flag.Parse()
 
