@@ -3,9 +3,12 @@
 package executor
 
 import (
+	"errors"
 	"os"
 	"os/exec"
 )
+
+var Kubectl string
 
 type Executor interface {
 	Exec(cmd string, args ...string) (string, error)
@@ -58,7 +61,10 @@ func ForPod(namespace, name, container string) Executor {
 }
 
 func (p *podExecutor) Exec(cmd string, args ...string) (string, error) {
+	if Kubectl == "" {
+		return "", errors.New("the kubectl parameter is not set")
+	}
 	fullargs := append([]string{"exec", p.name, "-n", p.namespace, "-c", p.container, "--", cmd}, args...)
-	out, err := exec.Command("kubectl", fullargs...).CombinedOutput()
+	out, err := exec.Command(Kubectl, fullargs...).CombinedOutput()
 	return string(out), err
 }
