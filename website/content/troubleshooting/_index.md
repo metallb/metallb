@@ -288,3 +288,11 @@ Additionally, the status of the service and of the endpoints must be provided:
 kubectl get endpointslices <my-service> -o yaml
 kubectl get svc <my_service> -o yaml
 ```
+
+### How to debug the speaker and the controller containers
+
+Due to the fact that both the speaker and the controller containers are based on a distroless image, an ephemeral container should be used to debug inside them: 
+
+```bash
+kubectl debug -it -n metallb-system -c <ephemeral container name> --target=speaker --image=<ephemeral image name> <speaker pod>
+```
