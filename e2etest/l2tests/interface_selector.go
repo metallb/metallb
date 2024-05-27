@@ -25,6 +25,8 @@ import (
 	"go.universe.tf/e2etest/pkg/status"
 )
 
+const agnostImage = "registry.k8s.io/e2e-test-images/agnhost:2.45"
+
 var (
 	NodeNics  []string
 	LocalNics []string
@@ -170,7 +172,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 			}, 1*time.Minute, 1*time.Second).Should(Not(HaveOccurred()))
 			speakerPod, err := metallb.SpeakerPodInNode(cs, svcNode.Name)
 			Expect(err).NotTo(HaveOccurred())
-			selectorMac, err := mac.GetIfaceMac(NodeNics[0], executor.ForPod(speakerPod.Namespace, speakerPod.Name, "speaker"))
+			selectorMac, err := mac.GetIfaceMac(NodeNics[0], executor.ForPodDebug(speakerPod.Namespace, speakerPod.Name, "speaker", agnostImage))
 			Expect(err).NotTo(HaveOccurred())
 
 			ingressIP := jigservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
