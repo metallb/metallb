@@ -10,7 +10,8 @@ import (
 	"os"
 	"text/template"
 
-	"github.com/pkg/errors"
+	"errors"
+
 	consts "go.universe.tf/e2etest/pkg/frr/consts"
 	"go.universe.tf/e2etest/pkg/ipfamily"
 	"go.universe.tf/e2etest/pkg/k8s"
@@ -121,7 +122,7 @@ func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterCon
 
 	nodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 	if err != nil {
-		return "", errors.Wrapf(err, "Failed to get cluster nodes")
+		return "", errors.Join(err, errors.New("Failed to get cluster nodes"))
 	}
 
 	ips, err := k8s.NodeIPsForFamily(nodes.Items, ipFamily, rc.VRF)
@@ -148,13 +149,13 @@ func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterCon
 
 	t, err := template.New("bgp Config Template").Parse(bgpConfigTemplate)
 	if err != nil {
-		return "", errors.Wrapf(err, "Failed to create bgp template")
+		return "", errors.Join(err, errors.New("Failed to create bgp template"))
 	}
 
 	var b bytes.Buffer
 	err = t.Execute(&b, router)
 	if err != nil {
-		return "", errors.Wrapf(err, "Failed to update bgp template")
+		return "", errors.Join(err, errors.New("Failed to update bgp template"))
 	}
 
 	return b.String(), nil
@@ -165,13 +166,13 @@ func SetBGPConfig(testDirName string, config string) error {
 	path := fmt.Sprintf("%s/%s", testDirName, consts.BGPConfigFile)
 	f, err := os.Create(path)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to open file %s", path)
+		return errors.Join(err, fmt.Errorf("Failed to open file %s", path))
 	}
 	defer f.Close()
 
 	_, err = f.WriteString(config)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to write to file %s", path)
+		return errors.Join(err, fmt.Errorf("Failed to write to file %s", path))
 	}
 	return nil
 }
@@ -181,12 +182,12 @@ func SetDaemonsConfig(testDirName string, rc RouterConfig) error {
 	path := fmt.Sprintf("%s/%s", testDirName, consts.DaemonsConfigFile)
 	tpl, err := template.ParseFiles(path)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to parse %s", path)
+		return errors.Join(err, fmt.Errorf("Failed to parse %s", path))
 	}
 
 	f, err := os.Create(path)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to open file %s", path)
+		return errors.Join(err, fmt.Errorf("Failed to open file %s", path))
 	}
 
 	defer f.Close()
@@ -201,7 +202,7 @@ func SetDaemonsConfig(testDirName string, rc RouterConfig) error {
 
 	err = tpl.Execute(f, info)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to update %s", path)
+		return errors.Join(err, fmt.Errorf("Failed to update %s", path))
 	}
 
 	return nil

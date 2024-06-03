@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"errors"
+
 	"github.com/go-kit/log/level"
-	"github.com/pkg/errors"
 	"go.universe.tf/metallb/api/v1beta1"
 	v1 "k8s.io/api/admission/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -150,7 +151,7 @@ var getExistingL2Advs = func() (*v1beta1.L2AdvertisementList, error) {
 	existingL2AdvList := &v1beta1.L2AdvertisementList{}
 	err := WebhookClient.List(context.Background(), existingL2AdvList, &client.ListOptions{Namespace: MetalLBNamespace})
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to get existing v1beta1.L2Advertisement objects")
+		return nil, errors.Join(err, errors.New("failed to get existing v1beta1.L2Advertisement objects"))
 	}
 	return existingL2AdvList, nil
 }

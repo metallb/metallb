@@ -29,10 +29,11 @@ import (
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
+	"errors"
+
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	frrv1beta1 "github.com/metallb/frr-k8s/api/v1beta1"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	discovery "k8s.io/api/discovery/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -193,7 +194,7 @@ func New(cfg *Config) (*Client, error) {
 			ForceReload:    reload,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "config")
-			return nil, errors.Wrap(err, "failed to create config reconciler")
+			return nil, errors.Join(err, errors.New("unable to create controller for config"))
 		}
 	}
 
@@ -208,7 +209,7 @@ func New(cfg *Config) (*Client, error) {
 			ForceReload:    reload,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "config")
-			return nil, errors.Wrap(err, "failed to create config reconciler")
+			return nil, errors.Join(err, errors.New("failed to create config reconciler"))
 		}
 	}
 
@@ -222,7 +223,7 @@ func New(cfg *Config) (*Client, error) {
 			ForceReload: reload,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "node")
-			return nil, errors.Wrap(err, "failed to create node reconciler")
+			return nil, errors.Join(err, errors.New("failed to create node reconciler"))
 		}
 	}
 
@@ -236,7 +237,7 @@ func New(cfg *Config) (*Client, error) {
 		}
 		if err := frrk8sController.SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "frrk8s")
-			return nil, errors.Wrap(err, "failed to create frrk8s reconciler")
+			return nil, errors.Join(err, errors.New("failed to create frrk8s reconciler"))
 		}
 		c.BGPEventCallback = frrk8sController.UpdateConfig
 	}
@@ -274,7 +275,7 @@ func New(cfg *Config) (*Client, error) {
 			LoadBalancerClass: cfg.LoadBalancerClass,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "service")
-			return nil, errors.Wrap(err, "failed to create service reconciler")
+			return nil, errors.Join(err, errors.New("failed to create service reconciler"))
 		}
 	}
 
@@ -331,7 +332,7 @@ func New(cfg *Config) (*Client, error) {
 	if cfg.EnableWebhook && !cfg.DisableCertRotation {
 		err = enableCertRotation(startListeners, cfg, mgr)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to enable cert rotation")
+			return nil, errors.Join(err, errors.New("failed to enable cert rotation"))
 		}
 	} else {
 		// otherwise we can go on and start them
