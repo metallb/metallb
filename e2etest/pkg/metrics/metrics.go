@@ -16,7 +16,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 
-	"github.com/pkg/errors"
+	"errors"
 )
 
 type PrometheusResponse struct {
@@ -57,7 +57,7 @@ func ForPod(promPod, target *corev1.Pod, namespace string) ([]map[string]*dto.Me
 			"--no-check-certificate", "-qO-", metricsURL,
 			"--header", fmt.Sprintf("Authorization: Bearer %s", token))
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to scrape metrics for %s", target.Name)
+			return nil, errors.Join(err, fmt.Errorf("failed to scrape metrics for %s", target.Name))
 		}
 		res, err := metricsFromString(metrics)
 		if err != nil {

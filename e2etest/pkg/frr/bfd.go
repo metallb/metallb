@@ -3,7 +3,9 @@
 package frr
 
 import (
-	"github.com/pkg/errors"
+	"errors"
+	"fmt"
+
 	"go.universe.tf/e2etest/pkg/executor"
 )
 
@@ -12,11 +14,11 @@ import (
 func BFDPeers(exec executor.Executor) (map[string]BFDPeer, error) {
 	json, err := exec.Exec("vtysh", "-c", "show bfd peers json")
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to query neighbours")
+		return nil, errors.Join(err, errors.New("Failed to query neighbours"))
 	}
 	peers, err := ParseBFDPeers(json)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to parse neighbours %s", json)
+		return nil, errors.Join(err, fmt.Errorf("Failed to parse neighbours %s", json))
 	}
 	// making a map out of the slice so it can
 	// accessed by peer

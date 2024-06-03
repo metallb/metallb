@@ -3,7 +3,8 @@
 package webhookv1beta1
 
 import (
-	"github.com/pkg/errors"
+	"errors"
+
 	"go.universe.tf/metallb/api/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
