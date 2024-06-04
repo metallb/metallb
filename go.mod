@@ -1,6 +1,7 @@
 module go.universe.tf/metallb
 
 go 1.21
+toolchain go1.22.3
 
 require (
 	github.com/davecgh/go-spew v1.1.1
@@ -19,9 +20,9 @@ require (
 	github.com/prometheus/client_golang v1.19.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/sys v0.19.0
-	k8s.io/api v0.29.4
+	k8s.io/api v0.30.1
 	k8s.io/apiextensions-apiserver v0.29.3
-	k8s.io/apimachinery v0.29.4
+	k8s.io/apimachinery v0.30.1
 	k8s.io/client-go v0.29.4
 	k8s.io/component-base v0.29.3
 	k8s.io/klog v1.0.0
