@@ -105,6 +105,9 @@ spec:
           command: ["/etc/frr_metrics/frr-metrics"]
           args:
             - --metrics-port=7473
+          env:
+            - name: VTYSH_HISTFILE
+              value: /dev/null
           ports:
             - containerPort: 7473
               name: monitoring

@@ -443,6 +443,9 @@ spec:
           {{- if .Values.prometheus.secureMetricsPort }}
           - --host=localhost
           {{- end }}
+        env:
+          - name: VTYSH_HISTFILE
+            value: /dev/null
         ports:
           - containerPort: {{ .Values.speaker.frr.metricsPort }}
             name: monitoring
