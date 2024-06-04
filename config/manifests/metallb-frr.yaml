@@ -1877,6 +1877,9 @@ spec:
         - --metrics-port=7473
         command:
         - /etc/frr_metrics/frr-metrics
+        env:
+        - name: VTYSH_HISTFILE
+          value: /dev/null
         image: quay.io/frrouting/frr:9.0.2
         name: frr-metrics
         ports:
