@@ -164,14 +164,12 @@ func VRFContainersSetup(cs *clientset.Clientset, image string) ([]*frrcontainer.
 	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "create", vrfNetwork, "--ipv6",
 		"--driver=bridge", "--subnet=172.31.0.0/16", "--subnet=fc00:f853:ccd:e799::/64")
 	if err != nil && !strings.Contains(out, "already exists") {
-		// return nil, errors.Wrapf(err, "failed to create %s: %s", vrfNetwork, out)
 		return nil, errors.Join(err, fmt.Errorf("failed to create %s: %s", vrfNetwork, out))
 	}
 
 	out, err = executor.Host.Exec(executor.ContainerRuntime, "network", "create", vrfNextHopSettings.multiHopNetwork, "--ipv6",
 		"--driver=bridge", "--subnet=172.32.0.0/16", "--subnet=fc00:f853:ccd:e800::/64")
 	if err != nil && !strings.Contains(out, "already exists") {
-		// return nil, errors.Wrapf(err, "failed to create %s: %s", vrfNextHopSettings.multiHopNetwork, out)
 		return nil, errors.Join(err, fmt.Errorf("failed to create %s: %s", vrfNextHopSettings.multiHopNetwork, out))
 	}
 

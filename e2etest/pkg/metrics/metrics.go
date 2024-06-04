@@ -183,7 +183,7 @@ func metricsFromString(metrics string) (map[string]*dto.MetricFamily, error) {
 	var parser expfmt.TextParser
 	mf, err := parser.TextToMetricFamilies(strings.NewReader(metrics))
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse metrics %s", metrics)
+		return nil, errors.Join(err, fmt.Errorf("failed to parse metrics %s", metrics))
 	}
 	return mf, nil
 }
