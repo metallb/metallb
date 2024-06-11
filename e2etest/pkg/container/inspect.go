@@ -4,8 +4,10 @@ package container
 
 import (
 	"encoding/json"
+	"fmt"
 
-	"github.com/pkg/errors"
+	"errors"
+
 	"go.universe.tf/e2etest/pkg/executor"
 )
 
@@ -22,12 +24,12 @@ func Networks(name string) (map[string]NetworkSettings, error) {
 	toParse := map[string]NetworkSettings{}
 	res, err := executor.Host.Exec(executor.ContainerRuntime, "inspect", "-f", "{{json .NetworkSettings.Networks}}", name)
 	if err != nil {
-		return toParse, errors.Wrapf(err, "Failed to inspect container %s %s", name, res)
+		return toParse, errors.Join(err, fmt.Errorf("Failed to inspect container %s %s", name, res))
 	}
 
 	err = json.Unmarshal([]byte(res), &toParse)
 	if err != nil {
-		return toParse, errors.Wrap(err, "failed to parse container inspect")
+		return toParse, errors.Join(err, errors.New("failed to parse container inspect"))
 	}
 
 	return toParse, nil

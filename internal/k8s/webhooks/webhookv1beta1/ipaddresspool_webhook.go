@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"errors"
+
 	"github.com/go-kit/log/level"
-	"github.com/pkg/errors"
 	"go.universe.tf/metallb/api/v1beta1"
 	v1 "k8s.io/api/admission/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -139,7 +140,7 @@ var getExistingIPAddressPools = func() (*v1beta1.IPAddressPoolList, error) {
 	existingIPAddressPoolList := &v1beta1.IPAddressPoolList{}
 	err := WebhookClient.List(context.Background(), existingIPAddressPoolList, &client.ListOptions{Namespace: MetalLBNamespace})
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to get existing IPAddressPool objects")
+		return nil, errors.Join(err, errors.New("failed to get existing IPAddressPool objects"))
 	}
 	return existingIPAddressPoolList, nil
 }

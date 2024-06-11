@@ -7,9 +7,10 @@ import (
 	"math"
 	"net"
 
+	"errors"
+
 	"github.com/mikioh/ipaddr"
 	. "github.com/onsi/gomega"
-	"github.com/pkg/errors"
 	"go.universe.tf/e2etest/pkg/iprange"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 )
@@ -33,7 +34,7 @@ func ValidateIPInRange(addressPools []metallbv1beta1.IPAddressPool, ip string) e
 func GetIPFromRangeByIndex(ipRange string, index int) (string, error) {
 	cidrs, err := iprange.Parse(ipRange)
 	if err != nil {
-		return "", errors.Wrapf(err, "Failed to parse CIDR while getting IP from range by index")
+		return "", errors.Join(err, errors.New("Failed to parse CIDR while getting IP from range by index"))
 	}
 
 	i := 0

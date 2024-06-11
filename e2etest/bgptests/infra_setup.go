@@ -7,7 +7,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pkg/errors"
+	"errors"
+
 	"go.universe.tf/e2etest/pkg/container"
 	"go.universe.tf/e2etest/pkg/executor"
 	frrconfig "go.universe.tf/e2etest/pkg/frr/config"
@@ -135,7 +136,7 @@ func KindnetContainersSetup(cs *clientset.Clientset, image string) ([]*frrcontai
 	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "create", defaultNextHopSettings.multiHopNetwork, "--ipv6",
 		"--driver=bridge", "--subnet=172.30.0.0/16", "--subnet=fc00:f853:ccd:e798::/64")
 	if err != nil && !strings.Contains(out, "already exists") {
-		return nil, errors.Wrapf(err, "failed to create %s: %s", defaultNextHopSettings.multiHopNetwork, out)
+		return nil, errors.Join(err, fmt.Errorf("failed to create %s: %s", defaultNextHopSettings.multiHopNetwork, out))
 	}
 
 	containers, err := frrcontainer.Create(configs)
@@ -163,13 +164,13 @@ func VRFContainersSetup(cs *clientset.Clientset, image string) ([]*frrcontainer.
 	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "create", vrfNetwork, "--ipv6",
 		"--driver=bridge", "--subnet=172.31.0.0/16", "--subnet=fc00:f853:ccd:e799::/64")
 	if err != nil && !strings.Contains(out, "already exists") {
-		return nil, errors.Wrapf(err, "failed to create %s: %s", vrfNetwork, out)
+		return nil, errors.Join(err, fmt.Errorf("failed to create %s: %s", vrfNetwork, out))
 	}
 
 	out, err = executor.Host.Exec(executor.ContainerRuntime, "network", "create", vrfNextHopSettings.multiHopNetwork, "--ipv6",
 		"--driver=bridge", "--subnet=172.32.0.0/16", "--subnet=fc00:f853:ccd:e800::/64")
 	if err != nil && !strings.Contains(out, "already exists") {
-		return nil, errors.Wrapf(err, "failed to create %s: %s", vrfNextHopSettings.multiHopNetwork, out)
+		return nil, errors.Join(err, fmt.Errorf("failed to create %s: %s", vrfNextHopSettings.multiHopNetwork, out))
 	}
 
 	config := vrfContainersConfig(image)
@@ -245,7 +246,7 @@ func infraTearDown(cs *clientset.Clientset, containers []*frrcontainer.FRR, next
 func multiHopSetUp(containers []*frrcontainer.FRR, nextHop nextHopSettings, cs *clientset.Clientset) error {
 	err := addContainerToNetwork(nextHop.nextHopContainerName, nextHop.multiHopNetwork)
 	if err != nil {
-		return errors.Wrapf(err, "failed to connect %s to %s", nextHop.nextHopContainerName, nextHop.multiHopNetwork)
+		return errors.Join(err, fmt.Errorf("failed to connect %s to %s", nextHop.nextHopContainerName, nextHop.multiHopNetwork))
 	}
 
 	multiHopRoutes, err := container.Networks(nextHop.nextHopContainerName)
@@ -257,13 +258,13 @@ func multiHopSetUp(containers []*frrcontainer.FRR, nextHop nextHopSettings, cs *
 		if c.Network == nextHop.multiHopNetwork {
 			err = container.AddMultiHop(c, c.Network, nextHop.nodeNetwork, defaultRoutingTable, multiHopRoutes)
 			if err != nil {
-				return errors.Wrapf(err, "failed to set up the multi-hop network for container %s", c.Name)
+				return errors.Join(err, fmt.Errorf("failed to set up the multi-hop network for container %s", c.Name))
 			}
 		}
 	}
 	err = addMultiHopToNodes(cs, nextHop.nodeNetwork, nextHop.multiHopNetwork, nextHop.nodeRoutingTable, multiHopRoutes)
 	if err != nil {
-		return errors.Wrapf(err, "failed to set up the multi-hop network")
+		return errors.Join(err, errors.New("failed to set up the multi-hop network"))
 	}
 
 	return nil
@@ -277,7 +278,7 @@ func vrfSetup(cs *clientset.Clientset) error {
 	for _, pod := range speakerPods {
 		err := addContainerToNetwork(pod.Spec.NodeName, vrfNetwork)
 		if err != nil {
-			return errors.Wrapf(err, "failed to connect %s to %s", pod.Spec.NodeName, vrfNetwork)
+			return errors.Join(err, fmt.Errorf("failed to connect %s to %s", pod.Spec.NodeName, vrfNetwork))
 		}
 
 		err = container.SetupVRFForNetwork(pod.Spec.NodeName, vrfNetwork, vrfName, vrfNextHopSettings.nodeRoutingTable)
@@ -530,7 +531,7 @@ func vrfContainersConfig(image string) map[string]frrcontainer.Config {
 func multiHopTearDown(nextHop nextHopSettings, routes map[string]container.NetworkSettings, cs *clientset.Clientset) error {
 	out, err := executor.Host.Exec(executor.ContainerRuntime, "network", "rm", nextHop.multiHopNetwork)
 	if err != nil {
-		return errors.Wrapf(err, "failed to remove %s: %s", nextHop.multiHopNetwork, out)
+		return errors.Join(err, fmt.Errorf("failed to remove %s: %s", nextHop.multiHopNetwork, out))
 	}
 
 	speakerPods, err := metallb.SpeakerPods(cs)
@@ -541,7 +542,7 @@ func multiHopTearDown(nextHop nextHopSettings, routes map[string]container.Netwo
 		nodeExec := executor.ForContainer(pod.Spec.NodeName)
 		err = container.DeleteMultiHop(nodeExec, nextHop.nodeNetwork, nextHop.multiHopNetwork, nextHop.nodeRoutingTable, routes)
 		if err != nil {
-			return errors.Wrapf(err, "failed to delete multihop routes for pod %s", pod.ObjectMeta.Name)
+			return errors.Join(err, fmt.Errorf("failed to delete multihop routes for pod %s", pod.ObjectMeta.Name))
 		}
 	}
 
@@ -624,7 +625,7 @@ func addContainerToNetwork(containerName, network string) error {
 		return nil
 	}
 	if err != nil {
-		return errors.Wrapf(err, "failed to connect %s to %s: %s", containerName, network, out)
+		return errors.Join(err, fmt.Errorf("failed to connect %s to %s: %s", containerName, network, out))
 	}
 	return nil
 }

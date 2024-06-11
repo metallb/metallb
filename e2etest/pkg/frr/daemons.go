@@ -5,7 +5,8 @@ package frr
 import (
 	"strings"
 
-	"github.com/pkg/errors"
+	"errors"
+
 	"go.universe.tf/e2etest/pkg/executor"
 )
 
@@ -14,7 +15,7 @@ import (
 func Daemons(exec executor.Executor) ([]string, error) {
 	res, err := exec.Exec("vtysh", "-c", "show daemons")
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to query neighbours")
+		return nil, errors.Join(err, errors.New("Failed to query neighbours"))
 	}
 	res = strings.TrimSuffix(res, "\n")
 	daemons := strings.Split(res, " ")

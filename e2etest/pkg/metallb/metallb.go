@@ -8,8 +8,9 @@ import (
 	"os"
 	"time"
 
+	"errors"
+
 	. "github.com/onsi/gomega"
-	"github.com/pkg/errors"
 	"go.universe.tf/e2etest/pkg/k8s"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,7 +39,7 @@ func SpeakerPods(cs clientset.Interface) ([]*corev1.Pod, error) {
 		LabelSelector: speakerLabelgSelector,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to fetch speaker pods")
+		return nil, errors.Join(err, errors.New("failed to fetch speaker pods"))
 	}
 	if len(speakers.Items) == 0 {
 		return nil, errors.New("no speaker pods found")
@@ -76,7 +77,7 @@ func SpeakerPodInNode(cs clientset.Interface, node string) (*corev1.Pod, error) 
 			return pod, nil
 		}
 	}
-	return nil, errors.Errorf("no speaker pod run in the node %s", node)
+	return nil, fmt.Errorf("no speaker pod run in the node %s", node)
 }
 
 // RestartController restarts metallb's controller pod and waits for it to be running and ready.
@@ -108,7 +109,7 @@ func FRRK8SPods(cs clientset.Interface) ([]*corev1.Pod, error) {
 		LabelSelector: "app=frr-k8s",
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to fetch frr-k8s pods")
+		return nil, errors.Join(err, errors.New("Failed to fetch frr-k8s pods"))
 	}
 	if len(pods.Items) == 0 {
 		return nil, errors.New("No frr-k8s pods found")
