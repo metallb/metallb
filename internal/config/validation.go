@@ -5,7 +5,8 @@ package config
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
+	"errors"
+
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/ipfamily"

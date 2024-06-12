@@ -65,7 +65,7 @@ and IPV6 addresses
 - if the service asks for a specific IP, an IPAddressPool providing that IP exists and its selectors
 are compatible with the service
 - if the service asks for a specific IP used also by other services, make sure that they respect the
-sharing properties described in the [official docs](https://metallb.universe.tf/usage/#ip-address-sharing).
+sharing properties described in the [official docs](https://metallb.io/usage/#ip-address-sharing).
 
 ## Troubleshooting service advertisements
 

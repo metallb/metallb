@@ -34,7 +34,8 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
-	"github.com/pkg/errors"
+
+	"errors"
 )
 
 type bgpImplementation string
@@ -100,11 +101,11 @@ newPeers:
 
 	err := c.syncBFDProfiles(cfg.BFDProfiles)
 	if err != nil {
-		return errors.Wrap(err, "failed to sync bfd profiles")
+		return errors.Join(err, errors.New("failed to sync bfd profiles"))
 	}
 	err = c.sessionManager.SyncExtraInfo(cfg.BGPExtras)
 	if err != nil {
-		return errors.Wrap(err, "failed to sync extra info")
+		return errors.Join(err, errors.New("failed to sync extra info"))
 	}
 
 	return c.syncPeers(l)

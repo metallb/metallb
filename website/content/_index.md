@@ -71,7 +71,7 @@ MetalLB implements a FRR Mode that uses an [FRR](https://frrouting.org/) contain
 
 Despite being less battle tested than the native BGP implementation, the FRR mode is currently used by those users that require either BFD or IPV6, and it is the only supported method in the MetalLB version distributed with OpenShift. The long term plan is to make it the only BGP implementation available in MetalLB.
 
-Please see the [installation](https://metallb.universe.tf/installation/) section for instructions on how to enable it.
+Please see the [installation](https://metallb.io/installation/) section for instructions on how to enable it.
 
 ## Contributing
 

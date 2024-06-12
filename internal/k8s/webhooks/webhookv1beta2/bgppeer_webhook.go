@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"errors"
+
 	"github.com/go-kit/log/level"
-	"github.com/pkg/errors"
 	"go.universe.tf/metallb/api/v1beta2"
 	v1 "k8s.io/api/admission/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -138,7 +139,7 @@ var GetExistingBGPPeers = func() (*v1beta2.BGPPeerList, error) {
 	existingBGPPeerslList := &v1beta2.BGPPeerList{}
 	err := WebhookClient.List(context.Background(), existingBGPPeerslList, &client.ListOptions{Namespace: MetalLBNamespace})
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to get existing BGPPeer objects")
+		return nil, errors.Join(err, errors.New("failed to get existing BGPPeer objects"))
 	}
 	return existingBGPPeerslList, nil
 }

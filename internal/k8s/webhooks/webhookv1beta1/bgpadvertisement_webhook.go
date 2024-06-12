@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"errors"
+
 	"github.com/go-kit/log/level"
-	"github.com/pkg/errors"
 	"go.universe.tf/metallb/api/v1beta1"
 	admissionv1 "k8s.io/api/admission/v1"
 	v1 "k8s.io/api/core/v1"
@@ -160,7 +161,7 @@ var getExistingBGPAdvs = func() (*v1beta1.BGPAdvertisementList, error) {
 	existingBGPAdvList := &v1beta1.BGPAdvertisementList{}
 	err := WebhookClient.List(context.Background(), existingBGPAdvList, &client.ListOptions{Namespace: MetalLBNamespace})
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to get existing BGPAdvertisement objects")
+		return nil, errors.Join(err, errors.New("failed to get existing BGPAdvertisement objects"))
 	}
 	return existingBGPAdvList, nil
 }
@@ -169,7 +170,7 @@ var getExistingNodes = func() (*v1.NodeList, error) {
 	existingNodeList := &v1.NodeList{}
 	err := WebhookClient.List(context.Background(), existingNodeList)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to get existing Node objects")
+		return nil, errors.Join(err, errors.New("failed to get existing Node objects"))
 	}
 	return existingNodeList, nil
 }

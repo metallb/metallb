@@ -68,7 +68,7 @@ bugfixes (e.g. security issues, long-term pain point resolved), point
 those out as well.
 
 Also update the documentation link so that the soon-to-be latest
-release's documentation link points to `metallb.universe.tf`, and the
+release's documentation link points to `metallb.io`, and the
 previous releases point to `vX-Y-Z--metallb.netlify.com`, which is the
 website pinned at that tagged release.
 
@@ -135,7 +135,7 @@ CI that the deploy has completed.
 Move the `live-website` branch to the newly created tag with `git
 branch -f live-website vX.Y.Z`, then force-push the branch with `git
 push -f origin live-website`. This will trigger Netlify to
-redeploy [metallb.universe.tf](https://metallb.universe.tf) with
+redeploy [metallb.io](https://metallb.io) with
 updated documentation for the new version.
 
 ### Update Slack
