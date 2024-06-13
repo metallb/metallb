@@ -415,7 +415,7 @@ func (j *TestJig) UpdateService(ctx context.Context, update func(*v1.Service)) (
 
 // WaitForLoadBalancer waits the given service to have a LoadBalancer, or returns an error after the given timeout
 func (j *TestJig) WaitForLoadBalancer(ctx context.Context, timeout time.Duration) (*v1.Service, error) {
-	ginkgo.GinkgoWriter.Printf("Waiting up to %v for service %q to have a LoadBalancer", timeout, j.Name)
+	ginkgo.GinkgoWriter.Printf("\tWaiting up to %v for service %q to have a LoadBalancer\n", timeout, j.Name)
 	service, err := j.waitForCondition(ctx, timeout, "have a load balancer", func(svc *v1.Service) bool {
 		return len(svc.Status.LoadBalancer.Ingress) > 0
 	})
@@ -550,7 +550,7 @@ func (j *TestJig) waitForPodsCreated(ctx context.Context, replicas int) ([]strin
 	timeout := 2 * time.Minute
 	// List the pods, making sure we observe all the replicas.
 	label := labels.SelectorFromSet(labels.Set(j.Labels))
-	ginkgo.GinkgoWriter.Printf("Waiting up to %v for %d pods to be created", timeout, replicas)
+	ginkgo.GinkgoWriter.Printf("\tWaiting up to %v for %d pods to be created\n", timeout, replicas)
 	for start := time.Now(); time.Since(start) < timeout && ctx.Err() == nil; time.Sleep(2 * time.Second) {
 		options := metav1.ListOptions{LabelSelector: label.String()}
 		pods, err := j.Client.CoreV1().Pods(j.Namespace).List(ctx, options)
@@ -566,10 +566,10 @@ func (j *TestJig) waitForPodsCreated(ctx context.Context, replicas int) ([]strin
 			found = append(found, pod.Name)
 		}
 		if len(found) == replicas {
-			ginkgo.GinkgoWriter.Printf("Found all %d pods", replicas)
+			ginkgo.GinkgoWriter.Printf("\t\tFound all %d pods\n", replicas)
 			return found, nil
 		}
-		ginkgo.GinkgoWriter.Printf("Found %d/%d pods - will retry", len(found), replicas)
+		ginkgo.GinkgoWriter.Printf("\t\tFound %d/%d pods - will retry\n", len(found), replicas)
 	}
 	return nil, fmt.Errorf("timeout waiting for %d pods to be created", replicas)
 }
