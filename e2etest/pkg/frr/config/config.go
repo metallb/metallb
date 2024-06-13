@@ -94,13 +94,14 @@ type RouterConfig struct {
 }
 
 type NeighborConfig struct {
-	ASN           uint32
-	Addr          string
-	Password      string
-	BFDEnabled    bool
-	ToAdvertiseV4 []string
-	ToAdvertiseV6 []string
-	MultiHop      bool
+	ASN             uint32
+	Addr            string
+	Password        string
+	BFDEnabled      bool
+	ToAdvertiseV4   []string
+	ToAdvertiseV6   []string
+	MultiHop        bool
+	GracefulRestart bool
 }
 
 type MultiProtocol bool
