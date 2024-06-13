@@ -25,7 +25,7 @@ func Do(address string, exc executor.Executor) error {
 
 	// Retry loop to handle wget NetworkFailure errors
 	for {
-		out, err = exc.Exec("wget", "-O-", "-q", address, "-T", "60")
+		out, err = exc.Exec("wget", "-O-", "-q", address, "-T", "5")
 		if exitErr, ok := err.(*exec.ExitError); err != nil && ok {
 			code = exitErr.ExitCode()
 		} else {

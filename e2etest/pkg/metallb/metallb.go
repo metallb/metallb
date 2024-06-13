@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	"errors"
@@ -31,6 +32,34 @@ func init() {
 	if v, ok := os.LookupEnv("SPEAKER_SELECTOR"); ok {
 		speakerLabelgSelector = v
 	}
+}
+
+func RestartSpeakerPods(cs clientset.Interface) error {
+	pods, err := SpeakerPods(cs)
+	if err != nil {
+		return err
+	}
+	oldNames := []string{}
+	for _, p := range pods {
+		oldNames = append(oldNames, p.Name)
+		err := cs.CoreV1().Pods(Namespace).Delete(context.Background(), p.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+	}
+
+	return wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 10*time.Second, false, func(context.Context) (bool, error) {
+		npods, err := SpeakerPods(cs)
+		if err != nil {
+			return false, err
+		}
+		for _, p := range npods {
+			if slices.Contains(oldNames, p.Name) {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
 }
 
 // SpeakerPods returns the set of pods running the speakers.

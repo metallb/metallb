@@ -4,6 +4,7 @@ package bgptests
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -25,6 +26,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
 )
+
+var ErrStaleRoute = errors.New("stale route")
 
 func validateFRRPeeredWithAllNodes(cs clientset.Interface, c *frrcontainer.FRR, ipFamily ipfamily.Family) {
 	allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
@@ -117,6 +120,21 @@ func validateServiceNoWait(svc *corev1.Service, nodes []corev1.Node, c *frrconta
 			if err != nil {
 				return err
 			}
+		}
+
+		var serr error
+		for k, v := range frrRoutesV4 {
+			if v.Stale {
+				serr = errors.Join(serr, errors.New(fmt.Sprintf("%s -%v", k, v)))
+			}
+		}
+		for k, v := range frrRoutesV6 {
+			if v.Stale {
+				serr = errors.Join(serr, errors.New(fmt.Sprintf("%s -%v", k, v)))
+			}
+		}
+		if serr != nil {
+			return errors.Join(ErrStaleRoute, serr)
 		}
 	}
 	return nil
