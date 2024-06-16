@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"go.universe.tf/metallb/internal/allocator"
+	"go.universe.tf/metallb/internal/allocator/k8salloc"
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s"
 	"go.universe.tf/metallb/internal/k8s/controllers"
@@ -76,6 +77,9 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 	// a reason.
 	svc := svcRo.DeepCopy()
 	syncStateRes := controllers.SyncStateSuccess
+	if k8salloc.SharingKey(svc) != "" {
+		syncStateRes = controllers.SyncStateReprocessAll
+	}
 
 	prevIPs := c.ips.IPs(name)
 
