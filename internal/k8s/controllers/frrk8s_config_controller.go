@@ -145,7 +145,7 @@ func (r *FRRK8sReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&frrv1beta1.FRRConfiguration{}).
-		WatchesRawSource(&source.Channel{Source: r.reconcileChan}, &handler.EnqueueRequestForObject{}).
+		WatchesRawSource(source.Channel(r.reconcileChan, &handler.EnqueueRequestForObject{})).
 		WithEventFilter(p).
 		Complete(r)
 }

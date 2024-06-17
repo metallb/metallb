@@ -112,7 +112,7 @@ func (r *Layer2StatusReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	})
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1beta1.ServiceL2Status{}).
-		WatchesRawSource(&source.Channel{Source: r.ReconcileChan}, handler.EnqueueRequestsFromMapFunc(
+		WatchesRawSource(source.Channel(r.ReconcileChan, handler.EnqueueRequestsFromMapFunc(
 			func(ctx context.Context, object client.Object) []reconcile.Request {
 				evt, ok := object.(*l2StatusEvent)
 				if !ok {
@@ -124,7 +124,7 @@ func (r *Layer2StatusReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				return []reconcile.Request{{NamespacedName: types.NamespacedName{
 					Name:      fmt.Sprintf("%s-%s", evt.Name, r.NodeName),
 					Namespace: evt.Namespace}}}
-			})).
+			}))).
 		WithEventFilter(p).
 		Complete(r)
 }

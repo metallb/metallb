@@ -134,13 +134,13 @@ func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 					level.Debug(r.Logger).Log("controller", "ServiceReconciler", "enqueueing", serviceName, "epslice", dumpResource(epSlice))
 					return []reconcile.Request{{NamespacedName: serviceName}}
 				})).
-			WatchesRawSource(&source.Channel{Source: r.Reload}, &handler.EnqueueRequestForObject{}).
+			WatchesRawSource(source.Channel(r.Reload, &handler.EnqueueRequestForObject{})).
 			Complete(r)
 	}
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&v1.Service{}).
-		WatchesRawSource(&source.Channel{Source: r.Reload}, &handler.EnqueueRequestForObject{}).
+		WatchesRawSource(source.Channel(r.Reload, &handler.EnqueueRequestForObject{})).
 		Complete(r)
 }
 
