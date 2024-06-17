@@ -310,6 +310,79 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 		})
 	})
 
+	ginkgo.FContext("A load balancer service with overlapping IPs", func() {
+		ginkgo.It("should update both services when one of them is updated", func() {
+			resources := config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "foo",
+						},
+						Spec: metallbv1beta1.IPAddressPoolSpec{
+							Addresses: []string{"192.168.10.0/24"},
+						},
+					},
+				},
+			}
+
+			err := ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+
+			serviceIP, err := config.GetIPFromRangeByIndex([]string{"192.168.10.0/24"}[0], 1)
+			Expect(err).NotTo(HaveOccurred())
+
+			svc, _ := service.CreateWithBackendPort(cs, testNamespace, "first-service",
+				service.TestServicePort,
+				func(svc *v1.Service) {
+					svc.Spec.LoadBalancerIP = serviceIP
+					svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
+					svc.Spec.Ports[0].Port = int32(service.TestServicePort)
+					svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
+				})
+			defer service.Delete(cs, svc)
+
+			svc1, _ := service.CreateWithBackendPort(cs, testNamespace, "second-service",
+				service.TestServicePort+1,
+				func(svc *v1.Service) {
+					svc.Spec.LoadBalancerIP = serviceIP
+					svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
+					svc.Spec.Ports[0].Port = int32(service.TestServicePort)
+					svc.Spec.Ports[0].Protocol = v1.ProtocolUDP
+					svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeCluster
+				})
+			defer service.Delete(cs, svc1)
+
+			Expect(svc.Status.LoadBalancer.Ingress[0].IP).To(Equal(serviceIP))
+			Expect(svc1.Status.LoadBalancer.Ingress[0].IP).To(Equal(serviceIP))
+
+			ginkgo.By("changing first-service ExternalTrafficPolicy to Local")
+			svc.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			_, err = cs.CoreV1().Services(testNamespace).Update(context.TODO(), svc, metav1.UpdateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			ginkgo.By("checking that the first-service ip is un-assigned")
+			Eventually(func() []v1.LoadBalancerIngress {
+				svc, err = cs.CoreV1().Services(testNamespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+				Expect(err).ToNot(HaveOccurred())
+
+				return svc.Status.LoadBalancer.Ingress
+			}, 10*time.Second, 1*time.Second).Should(BeEmpty())
+
+			ginkgo.By("changing second-service ExternalTrafficPolicy to Local")
+			svc1.Spec.ExternalTrafficPolicy = v1.ServiceExternalTrafficPolicyTypeLocal
+			_, err = cs.CoreV1().Services(testNamespace).Update(context.TODO(), svc1, metav1.UpdateOptions{})
+			Expect(err).NotTo(HaveOccurred())
+
+			ginkgo.By("checking that the first-service is assigned ip again.")
+			Eventually(func() []v1.LoadBalancerIngress {
+				svc, err = cs.CoreV1().Services(testNamespace).Get(context.TODO(), svc.Name, metav1.GetOptions{})
+				Expect(err).ToNot(HaveOccurred())
+
+				return svc.Status.LoadBalancer.Ingress
+			}, 10*time.Second, 1*time.Second).ShouldNot(BeEmpty())
+		})
+	})
+
 	ginkgo.Context("IPV4 - Validate service allocation in address pools", func() {
 		ginkgo.AfterEach(func() {
 			// Clean previous configuration.
