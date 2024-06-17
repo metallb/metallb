@@ -34,8 +34,10 @@ extra_network = "network2"
 controller_gen_version = "v0.14.0"
 build_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build")
 kubectl_path = os.path.join(build_path, "kubectl")
+kind_path = os.path.join(build_path, "kind")
 controller_gen_path = os.path.join(build_path, "bin", "controller-gen")
 kubectl_version = "v1.27.0"
+kind_version = "v0.23.0"
 
 
 def _check_architectures(architectures):
@@ -372,6 +374,7 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
     """
 
     fetch_kubectl()
+    fetch_kind()
     validate_kind_version()
 
     clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
@@ -424,15 +427,15 @@ apiServer:
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(config)
             tmp.flush()
-            run("kind create cluster --name={} --config={} {}".format(name, tmp.name, extra_options), pty=True,
+            run("{} create cluster --name={} --config={} {}".format(kind_path, name, tmp.name, extra_options), pty=True,
                 echo=True)
         _add_nic_to_nodes(name)
 
     binaries = ["controller", "speaker"]
     if build_images:
         build(ctx, binaries, architectures=[architecture])
-    run("kind load docker-image --name={} quay.io/metallb/controller:dev-{}".format(name, architecture), echo=True)
-    run("kind load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(name, architecture), echo=True)
+    run("{} load docker-image --name={} quay.io/metallb/controller:dev-{}".format(kind_path, name, architecture), echo=True)
+    run("{} load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(kind_path, name, architecture), echo=True)
 
     if with_prometheus:
         print("Deploying prometheus")
@@ -626,9 +629,11 @@ def get_available_ips(ip_family=None):
 def dev_env_cleanup(ctx, name="kind", frr_volume_dir=""):
     """Remove traces of the dev env."""
     validate_kind_version()
-    clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
+    fetch_kind()
+
+    clusters = run("{} get clusters".format(kind_path), hide=True).stdout.strip().splitlines()
     if name in clusters:
-        run("kind delete cluster --name={}".format(name), hide=True)
+        run("{} delete cluster --name={}".format(kind_path, name), hide=True)
 
     run('for frr in $(docker ps -a -f name=frr --format {{.Names}}) ; do '
         '    docker rm -f $frr ; '
@@ -870,6 +875,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
             with_vrf=False, external_frr_image="", ginkgo_params="", junit_report="junit-report.xml", host_bgp_mode="ibgp"):
     """Run E2E tests against development cluster."""
     fetch_kubectl()
+    fetch_kind()
 
     if skip_docker:
         opt_skip_docker = "--skip-docker"
@@ -886,11 +892,11 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
 
     if kubeconfig is None:
         validate_kind_version()
-        clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
+        clusters = run("{} get clusters".format(kind_path), hide=True).stdout.strip().splitlines()
         if name in clusters:
             kubeconfig_file = tempfile.NamedTemporaryFile()
             kubeconfig = kubeconfig_file.name
-            run("kind export kubeconfig --name={} --kubeconfig={}".format(name, kubeconfig), pty=True, echo=True)
+            run("{} export kubeconfig --name={} --kubeconfig={}".format(kind_path, name, kubeconfig), pty=True, echo=True)
         else:
             raise Exit(message="Unable to find cluster named: {}".format(name))
     else:
@@ -936,7 +942,7 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
         external_containers, bgp_mode, with_vrf, external_frr_image, host_bgp_mode, kubectl_path), warn="True")
 
     if export != None:
-        run("kind export logs {}".format(export))
+        run("{} export logs {}".format(kind_path, export))
 
     if testrun.failed:
         raise Exit(message="E2E tests failed", code=testrun.return_code)
@@ -1057,6 +1063,12 @@ def fetch_kubectl():
     get_version_command = f"{kubectl_path} version --short"
     fetch_dependency(kubectl_path, kubectl_version, curl_command, get_version_command, "Client Version:")
 
+@cache
+def fetch_kind():
+    curl_command = "curl -o {} -LO https://github.com/kubernetes-sigs/kind/releases/download/{}/kind-$(go env GOOS)-$(go env GOARCH)".format(
+        kind_path, kind_version)
+    get_version_command = f"{kind_path} version"
+    fetch_dependency(kind_path, kind_version, curl_command, get_version_command, "kind")
 
 @cache
 def fetch_controller_gen():
@@ -1085,4 +1097,6 @@ def get_command_version(get_version_command: str, version_prefix: str) -> Option
     version = run(get_version_command, warn=True, hide='both').stdout
     for line in version.splitlines():
         if line.startswith(version_prefix):
-            return line.split(":")[1].strip()
+            if ':' in line:
+                return line.split(":")[1].strip()
+            return line.split(" ")[1].strip()
