@@ -50,7 +50,7 @@ type CommunityValidator struct {
 	ClusterResourceNamespace string
 
 	client  client.Client
-	decoder *admission.Decoder
+	decoder admission.Decoder
 }
 
 // Handle handled incoming admission requests for Community objects.
