@@ -46,6 +46,7 @@ type controller struct {
 	client service
 	pools  *config.Pools
 	ips    *allocator.Allocator
+	nodes  map[string]*v1.Node
 }
 
 func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _ []discovery.EndpointSlice) controllers.SyncState {
@@ -136,6 +137,11 @@ func (c *controller) SetPools(l log.Logger, pools *config.Pools) controllers.Syn
 	return controllers.SyncStateReprocessAll
 }
 
+func (c *controller) SetNode(l log.Logger, node *v1.Node) controllers.SyncState {
+	c.nodes[node.Name] = node
+	return controllers.SyncStateSuccess
+}
+
 func main() {
 	var (
 		port                = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
@@ -193,7 +199,8 @@ func main() {
 	}
 
 	c := &controller{
-		ips: allocator.New(),
+		ips:   allocator.New(),
+		nodes: make(map[string]*v1.Node),
 	}
 
 	bgpType, present := os.LookupEnv("METALLB_BGP_TYPE")
@@ -213,6 +220,7 @@ func main() {
 		Listener: k8s.Listener{
 			ServiceChanged: c.SetBalancer,
 			PoolChanged:    c.SetPools,
+			NodeChanged:    c.SetNode,
 		},
 		ValidateConfig:      validation,
 		EnableWebhook:       true,
