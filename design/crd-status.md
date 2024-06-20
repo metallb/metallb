@@ -197,7 +197,7 @@ If BFD is not configured for a given `BGPPeer`, the exposed bfdStatus will be "N
 **A note about the implementation:** without entering to much into details,
 we will need to implement some sort of polling of the FRR status. Given the
 fact that this CR has no relation with the existing ones, a valid approach is
-to follow what was done for the [metrics exporter](https://github.com/metallb/metallb/blob/main/frr-metrics/exporter.go)
+to follow what was done for the [metrics exporter](https://github.com/metallb/metallb/blob/main/frr-tools/metrics/exporter.go)
 and have a different component (or even the exporter itself) polling FRR and filling
 the session status. The polling interval must be configurable and large enough to
 avoid impacts both on FRR and on the API.
