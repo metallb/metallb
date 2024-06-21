@@ -13,21 +13,30 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v2
 
+      - name: Get Latest Release Info
+        id: get_release
+        run: |
+          release_info=$(curl -s https://api.github.com/repos/McShelby/hugo-theme-relearn/releases/latest)
+          release_tag=$(echo "$release_info" | jq -r .tag_name)
+          release_notes=$(echo "$release_info" | jq -r .body)
+          echo "::set-output name=tag::${release_tag}"
+          echo "::set-output name=notes::${release_notes}"
+
       - name: Update Hugo Theme
         run: |
           cd themes
-          git clone https://github.com/McShelby/hugo-theme-relearn.git
-          cd hugo-theme-relearn
-          git fetch origin
-          git reset --hard origin/main
-          cd ../..
+          if [ -d "hugo-theme-relearn" ]; then
+            rm -rf hugo-theme-relearn
+          fi
+          git clone --branch ${{ steps.get_release.outputs.tag }} https://github.com/McShelby/hugo-theme-relearn.git
+          cd ..
           git add themes/hugo-theme-relearn
-          git commit -m "Update Hugo Theme to latest version" || exit 0
+          git commit -m "Update Hugo Theme to version ${{ steps.get_release.outputs.tag }}" || exit 0
 
       - name: Create Pull Request
         uses: peter-evans/create-pull-request@v3
         with:
-          commit-message: "Update Hugo Theme to latest version"
-          title: "Update Hugo Theme"
-          body: "This PR updates the Hugo theme to the latest version."
+          commit-message: "Update Hugo Theme to version ${{ steps.get_release.outputs.tag }}"
+          title: "Update Hugo Theme to version ${{ steps.get_release.outputs.tag }}"
+          body: "${{ steps.get_release.outputs.notes }}"
           branch: "update-hugo-theme"
