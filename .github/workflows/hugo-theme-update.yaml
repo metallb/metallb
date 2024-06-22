@@ -11,32 +11,79 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+        with:
+          path: repo
 
-      - name: Get Latest Release Info
-        id: get_release
+      - name: Checkout Hugo Theme
+        uses: actions/checkout@v3
+        with:
+          repository: McShelby/hugo-theme-relearn
+          path: hugo-theme-relearn
+          fetch-depth: 0
+
+      - name: Get current Hugo theme version
+        id: current-theme-version
+        run: |
+          echo "current_version=$(cd repo/themes/hugo-theme-relearn && git describe --tags --abbrev=0)" >> $GITHUB_OUTPUT
+
+      - name: Get latest release info
+        id: latest-release
         run: |
           release_info=$(curl -s https://api.github.com/repos/McShelby/hugo-theme-relearn/releases/latest)
           release_tag=$(echo "$release_info" | jq -r .tag_name)
           release_notes=$(echo "$release_info" | jq -r .body)
-          echo "::set-output name=tag::${release_tag}"
-          echo "::set-output name=notes::${release_notes}"
+          echo "release_tag=${release_tag}" >> $GITHUB_OUTPUT
+          echo "release_notes=${release_notes}" >> $GITHUB_OUTPUT
 
-      - name: Update Hugo Theme
+      - name: Check if there is a new release
+        id: check-release
         run: |
-          cd themes
-          if [ -d "hugo-theme-relearn" ]; then
-            rm -rf hugo-theme-relearn
+          if [ "${{ steps.current-theme-version.outputs.current_version }}" = "${{ steps.latest-release.outputs.release_tag }}" ]; then
+            echo "new_release=false" >> $GITHUB_OUTPUT
+          else
+            echo "new_release=true" >> $GITHUB_OUTPUT
           fi
-          git clone --branch ${{ steps.get_release.outputs.tag }} https://github.com/McShelby/hugo-theme-relearn.git
-          cd ..
-          git add themes/hugo-theme-relearn
-          git commit -m "Update Hugo Theme to version ${{ steps.get_release.outputs.tag }}" || exit 0
 
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v3
+      - name: Download latest release
+        if: steps.check-release.outputs.new_release == 'true'
+        run: |
+          curl -L https://github.com/McShelby/hugo-theme-relearn/archive/refs/tags/${{ steps.latest-release.outputs.release_tag }}.tar.gz | tar xz -C repo/themes/hugo-theme-relearn --strip-components=1
+
+      - name: Commit and push changes
+        if: steps.check-release.outputs.new_release == 'true'
+        run: |
+          cd repo
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add themes/hugo-theme-relearn
+          git commit -m "Update Hugo Theme to version ${{ steps.latest-release.outputs.release_tag }}"
+          git push origin HEAD:update-hugo-theme
+
+      - name: Generate GitHub App token
+        uses: tibdex/github-app-token@v1
+        id: generate-token
         with:
-          commit-message: "Update Hugo Theme to version ${{ steps.get_release.outputs.tag }}"
-          title: "Update Hugo Theme to version ${{ steps.get_release.outputs.tag }}"
-          body: "${{ steps.get_release.outputs.notes }}"
+          app_id: ${{ secrets.AUTO_BUMP_APP_ID }}
+          private_key: ${{ secrets.AUTO_BUMP_APP_PRIVATE_KEY }}
+
+      - name: Create pull request
+        if: steps.check-release.outputs.new_release == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ steps.generate-token.outputs.token }}
+          commit-message: |
+            Update Hugo Theme to version ${{ steps.latest-release.outputs.release_tag }}
+
+            This commit updates the Hugo theme:
+            from: ${{ steps.current-theme-version.outputs.current_version }}
+
+            to: ${{ steps.latest-release.outputs.release_tag }}
+          author: github-actions[bot] <noreply@github.com>
+          committer: github-actions[bot] <noreply@github.com>
+          signoff: true
+          title: "Update Hugo Theme to version ${{ steps.latest-release.outputs.release_tag }}"
+          body: "${{ steps.latest-release.outputs.release_notes }}"
           branch: "update-hugo-theme"
+          delete-branch: true
+          base: "main"
