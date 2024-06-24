@@ -152,6 +152,7 @@ rules:
       - pods
     verbs:
       - list
+      - get
   - apiGroups:
       - ""
     resources:

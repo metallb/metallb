@@ -288,6 +288,10 @@ spec:
         - name: METALLB_BGP_TYPE
           value: frr-k8s
         {{- end }}
+        - name: METALLB_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         ports:
         - name: monitoring
           containerPort: {{ .Values.prometheus.metricsPort }}

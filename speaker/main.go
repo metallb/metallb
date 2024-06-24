@@ -80,14 +80,12 @@ func main() {
 		mlSecretKeyPath   = flag.String("ml-secret-key-path", os.Getenv("METALLB_ML_SECRET_KEY_PATH"), "Path to where the MemberList's secret key is mounted")
 		mlWANConfig       = flag.Bool("ml-wan-config", false, "WAN network type for MemberList default config, bool")
 		myNode            = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
+		myPod             = flag.String("pod-name", os.Getenv("METALLB_POD_NAME"), "name of this MetalLB speaker pod")
 		port              = flag.Int("port", 7472, "HTTP listening port")
 		logLevel          = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
 		enablePprof       = flag.Bool("enable-pprof", false, "Enable pprof profiling")
 		loadBalancerClass = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
 		ignoreLBExclude   = flag.Bool("ignore-exclude-lb", false, "ignore the exclude-from-external-load-balancers label")
-		// TODO: we are hiding the feature behind a feature flag because of https://github.com/metallb/metallb/issues/2311
-		// This flag can be removed once the issue is fixed.
-		enableL2ServiceStatus = flag.Bool("enable-l2-service-status", false, "enables the experimental l2 service status feature")
 	)
 	flag.Parse()
 
@@ -165,9 +163,6 @@ func main() {
 		InterfaceExcludeRegexp: interfacesToExclude,
 		IgnoreExcludeLB:        *ignoreLBExclude,
 		Layer2StatusChange: func(namespacedName types.NamespacedName) {
-			if !*enableL2ServiceStatus {
-				return
-			}
 			statusNotifyChan <- controllers.NewL2StatusEvent(namespacedName.Namespace, namespacedName.Name)
 		},
 	})
@@ -190,6 +185,7 @@ func main() {
 	client, err := k8s.New(&k8s.Config{
 		ProcessName: "metallb-speaker",
 		NodeName:    *myNode,
+		PodName:     *myPod,
 		Logger:      logger,
 
 		MetricsHost:   *host,
@@ -207,7 +203,6 @@ func main() {
 		LoadBalancerClass: *loadBalancerClass,
 		WithFRRK8s:        listenFRRK8s,
 
-		EnableL2Status:      *enableL2ServiceStatus,
 		Layer2StatusChan:    statusNotifyChan,
 		Layer2StatusFetcher: ctrl.layer2StatusFetchFunc,
 	})

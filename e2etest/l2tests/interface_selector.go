@@ -109,36 +109,21 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 				Expect(err).NotTo(HaveOccurred())
 			}()
 
-			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
-			Expect(err).NotTo(HaveOccurred())
-
-			var l2Status *metallbv1beta1.ServiceL2Status
 			Eventually(func() error {
-				var ss []*metallbv1beta1.ServiceL2Status
-				if ss, err = status.GetSvcPossibleL2Status(ConfigUpdater.Client(), svc, allNodes); err == nil {
-					if len(ss) != 1 {
-						return fmt.Errorf("")
-					}
-					l2Status = ss[0]
-				}
+				_, err = status.L2ForService(ConfigUpdater.Client(), svc)
 				return err
 			}, 2*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
 
-			Consistently(func() error {
-				l2Status, err = status.GetL2Status(ConfigUpdater.Client(), svc, l2Status.Status.Node)
-				if err != nil || len(l2Status.Status.Interfaces) == 0 {
-					return fmt.Errorf("")
+			Consistently(func() string {
+				var s *metallbv1beta1.ServiceL2Status
+				if s, err = status.L2ForService(ConfigUpdater.Client(), svc); err != nil {
+					return err.Error()
 				}
-				return nil
-			}, 5*time.Second).ShouldNot(HaveOccurred())
-
-			Consistently(func() error {
-				l2Status, err = status.GetL2Status(ConfigUpdater.Client(), svc, l2Status.Status.Node)
-				if err != nil || l2Status.Status.Interfaces[0].Name != NodeNics[0] {
-					return fmt.Errorf("")
+				if len(s.Status.Interfaces) == 0 {
+					return fmt.Errorf("expect 1 Interface, got %d", len(s.Status.Interfaces)).Error()
 				}
-				return nil
-			}, 5*time.Second)
+				return s.Status.Interfaces[0].Name
+			}, 5*time.Second).Should(Equal(NodeNics[0]))
 		})
 
 		ginkgo.It("Validate the LB IP's mac", func() {
