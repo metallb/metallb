@@ -25,7 +25,15 @@ import (
 // MetalLBServiceL2Status defines the observed state of ServiceL2Status.
 type MetalLBServiceL2Status struct {
 	// Node indicates the node that receives the directed traffic
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Value is immutable"
 	Node string `json:"node,omitempty"`
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Value is immutable"
+	// ServiceName indicates the service this status represents
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Value is immutable"
+	ServiceName string `json:"serviceName,omitempty"`
+	// ServiceNamespace indicates the namespace of the service
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Value is immutable"
+	ServiceNamespace string `json:"serviceNamespace,omitempty"`
 	// Interfaces indicates the interfaces that receive the directed traffic
 	Interfaces []InterfaceInfo `json:"interfaces,omitempty"`
 }
@@ -40,6 +48,8 @@ type InterfaceInfo struct {
 // +kubebuilder:subresource:status
 // +kubebuilder:storageversion
 // +kubebuilder:printcolumn:name="Allocated Node",type=string,JSONPath=`.status.node`
+// +kubebuilder:printcolumn:name="Service Name",type=string,JSONPath=`.status.serviceName`
+// +kubebuilder:printcolumn:name="Service Namespace",type=string,JSONPath=`.status.serviceNamespace`
 
 // ServiceL2Status reveals the actual traffic status of loadbalancer services in layer2 mode.
 type ServiceL2Status struct {
