@@ -128,40 +128,47 @@ var _ = ginkgo.Describe("L2", func() {
 			}, 2*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
 		})
 
-		ginkgo.It("should expose the status as L2ServiceStatus", func() {
+		ginkgo.It("should process the status as L2ServiceStatus along with service", func() {
 			svc, _ := service.CreateWithBackend(cs, testNamespace, "external-local-lb", service.TrafficPolicyCluster)
-
-			defer func() {
-				err := cs.CoreV1().Services(svc.Namespace).Delete(context.TODO(), svc.Name, metav1.DeleteOptions{})
-				Expect(err).NotTo(HaveOccurred())
-			}()
-
 			ginkgo.By("checking correct serviceL2Status object is populated")
 
 			allNodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
 			Expect(err).NotTo(HaveOccurred())
 
-			var l2Statuses []*metallbv1beta1.ServiceL2Status
+			var l2Status *metallbv1beta1.ServiceL2Status
 			Eventually(func() error {
-				var ss []*metallbv1beta1.ServiceL2Status
-				if ss, err = status.GetSvcPossibleL2Status(ConfigUpdater.Client(), svc, allNodes); err == nil {
-					l2Statuses = ss
+				s, err := status.L2ForService(ConfigUpdater.Client(), svc)
+				if err != nil {
+					return err
 				}
-				return err
+				l2Status = s
+				return nil
 			}, 2*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
-			Expect(l2Statuses).To(HaveLen(1))
 
 			ginkgo.By("validating the node in ServiceL2Status is the one who is announcing for the service")
-			l2Status := l2Statuses[0]
-			refreshL2StatusNodeFunc := func() string {
+			var speakingNode string
+			Eventually(func() string {
 				node, err := k8s.GetSvcNode(cs, svc.Namespace, svc.Name, allNodes)
 				if err != nil {
 					return err.Error()
 				}
+				speakingNode = node.Name
 				return node.Name
-			}
-			Eventually(refreshL2StatusNodeFunc, time.Minute, time.Second).Should(Equal(l2Status.Status.Node))
-			Consistently(refreshL2StatusNodeFunc, 5*time.Second).Should(Equal(l2Status.Status.Node))
+			}, time.Minute, time.Second).Should(Equal(l2Status.Status.Node))
+			Consistently(func() string {
+				var s *metallbv1beta1.ServiceL2Status
+				if s, err = status.L2ForService(ConfigUpdater.Client(), svc); err != nil {
+					return err.Error()
+				}
+				return s.Status.Node
+			}, 5*time.Second).Should(Equal(speakingNode))
+
+			service.Delete(cs, svc)
+			ginkgo.By("validating the status object is deleted after the service is deleted")
+			Eventually(func() bool {
+				_, err = status.L2ForService(ConfigUpdater.Client(), svc)
+				return pkgerr.IsNotFound(err)
+			}, 2*time.Minute, 1*time.Second).Should(Equal(true))
 		})
 
 		ginkgo.It("should work for ExternalTrafficPolicy=Local", func() {
