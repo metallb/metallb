@@ -95,7 +95,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build and export ${{ matrix.image }}
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           tags: quay.io/metallb/${{ matrix.image }}:dev-amd64
