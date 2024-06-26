@@ -460,7 +460,8 @@ func poolCount(p *config.Pool) (int64, int64, int64) {
 				if ipConfusesBuggyFirmwares(firstIP) {
 					sz--
 				}
-				if ipConfusesBuggyFirmwares(lastIP) {
+
+				if !lastIP.Equal(firstIP) && ipConfusesBuggyFirmwares(lastIP) {
 					sz--
 				}
 			}
