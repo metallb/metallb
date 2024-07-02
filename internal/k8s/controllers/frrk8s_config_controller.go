@@ -67,7 +67,7 @@ type FRRK8sReconciler struct {
 	LogLevel             logging.Level
 	Scheme               *runtime.Scheme
 	NodeName             string
-	Namespace            string
+	FRRK8sNamespace      string
 	reconcileChan        chan event.GenericEvent
 	configChangedChan    chan struct{}
 	desiredConfiguration *frrv1beta1.FRRConfiguration
@@ -82,7 +82,7 @@ func (r *FRRK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	r.Lock()
 	defer r.Unlock()
 	if r.desiredConfiguration == nil {
-		config := &frrv1beta1.FRRConfiguration{ObjectMeta: metav1.ObjectMeta{Name: frrk8s.ConfigName(r.NodeName), Namespace: r.Namespace}}
+		config := &frrv1beta1.FRRConfiguration{ObjectMeta: metav1.ObjectMeta{Name: frrk8s.ConfigName(r.NodeName), Namespace: r.FRRK8sNamespace}}
 		err := r.Delete(ctx, config)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
@@ -137,7 +137,7 @@ func (r *FRRK8sReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		if config.Name != configName {
 			return false
 		}
-		if config.Namespace != r.Namespace {
+		if config.Namespace != r.FRRK8sNamespace {
 			return false
 		}
 		return true

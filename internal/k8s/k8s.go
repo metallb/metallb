@@ -118,6 +118,7 @@ type Config struct {
 	LoadBalancerClass   string
 	WebhookWithHTTP2    bool
 	WithFRRK8s          bool
+	FRRK8sNamespace     string
 	Listener
 	Layer2StatusChan    <-chan event.GenericEvent
 	Layer2StatusFetcher controllers.StatusFetcher
@@ -142,9 +143,6 @@ func New(cfg *Config) (*Client, error) {
 		&metallbv1beta1.Community{}:        namespaceSelector,
 		&corev1.Secret{}:                   namespaceSelector,
 		&corev1.ConfigMap{}:                namespaceSelector,
-	}
-	if cfg.WithFRRK8s {
-		objectsPerNamespace[&frrv1beta1.FRRConfiguration{}] = namespaceSelector
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -229,11 +227,11 @@ func New(cfg *Config) (*Client, error) {
 
 	if cfg.WithFRRK8s {
 		frrk8sController := controllers.FRRK8sReconciler{
-			Client:    mgr.GetClient(),
-			Logger:    cfg.Logger,
-			Scheme:    mgr.GetScheme(),
-			Namespace: cfg.Namespace,
-			NodeName:  cfg.NodeName,
+			Client:          mgr.GetClient(),
+			Logger:          cfg.Logger,
+			Scheme:          mgr.GetScheme(),
+			FRRK8sNamespace: cfg.FRRK8sNamespace,
+			NodeName:        cfg.NodeName,
 		}
 		if err := frrk8sController.SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "frrk8s")

@@ -240,9 +240,8 @@ func (sm *sessionManager) updateConfig() error {
 			}
 			portUint16 := uint16(portUint)
 
-			password := ""
-			if reflect.DeepEqual(s.PasswordRef, corev1.SecretReference{}) {
-				password = s.Password
+			if !reflect.DeepEqual(s.PasswordRef, corev1.SecretReference{}) && s.Password != "" {
+				return fmt.Errorf("invalid session with password and secret set: %s", sessionName(*s))
 			}
 
 			var connectTime *metav1.Duration
@@ -267,7 +266,7 @@ func (sm *sessionManager) updateConfig() error {
 					PrefixesWithLocalPref: make([]frrv1beta1.LocalPrefPrefixes, 0),
 					PrefixesWithCommunity: make([]frrv1beta1.CommunityPrefixes, 0),
 				},
-				Password:       password,
+				Password:       s.Password,
 				PasswordSecret: s.PasswordRef,
 				DisableMP:      s.DisableMP,
 			}

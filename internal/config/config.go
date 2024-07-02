@@ -115,6 +115,8 @@ type Peer struct {
 	NodeSelectors []labels.Selector
 	// Authentication password for routers enforcing TCP MD5 authenticated sessions
 	Password string
+	// The password set in the secret referenced by the secret reference, in clear text
+	SecretPassword string
 	// Optional reference to the secret that holds the password.
 	PasswordRef corev1.SecretReference
 	// The optional BFD profile to be used for this BGP session
@@ -439,9 +441,9 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		return nil, fmt.Errorf("can not have both password and secret ref set in peer config %q/%q", p.Namespace, p.Name)
 	}
 
-	password := p.Spec.Password
+	secretPassword := ""
 	if p.Spec.PasswordSecret.Name != "" {
-		password, err = passwordFromSecretForPeer(p, passwordSecrets)
+		secretPassword, err = passwordFromSecretForPeer(p, passwordSecrets)
 		if err != nil {
 			return nil, errors.Join(err, fmt.Errorf("failed to parse peer %s password secret", p.Name))
 		}
@@ -464,7 +466,8 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		ConnectTime:           connectTime,
 		RouterID:              routerID,
 		NodeSelectors:         nodeSels,
-		Password:              password,
+		SecretPassword:        secretPassword,
+		Password:              p.Spec.Password,
 		PasswordRef:           p.Spec.PasswordSecret,
 		BFDProfile:            p.Spec.BFDProfile,
 		EnableGracefulRestart: p.Spec.EnableGracefulRestart,

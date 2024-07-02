@@ -2008,16 +2008,16 @@ func TestParse(t *testing.T) {
 			want: &Config{
 				Peers: map[string]*Peer{
 					"peer1": {
-						Name:          "peer1",
-						MyASN:         42,
-						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
-						Port:          179,
-						HoldTime:      90 * time.Second,
-						KeepaliveTime: 30 * time.Second,
-						NodeSelectors: []labels.Selector{labels.Everything()},
-						BFDProfile:    "",
-						Password:      "nopass",
+						Name:           "peer1",
+						MyASN:          42,
+						ASN:            42,
+						Addr:           net.ParseIP("1.2.3.4"),
+						Port:           179,
+						HoldTime:       90 * time.Second,
+						KeepaliveTime:  30 * time.Second,
+						NodeSelectors:  []labels.Selector{labels.Everything()},
+						BFDProfile:     "",
+						SecretPassword: "nopass",
 						PasswordRef: corev1.SecretReference{
 							Name:      "bgpsecret",
 							Namespace: "metallb-system",

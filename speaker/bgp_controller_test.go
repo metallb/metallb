@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"reflect"
 	"sort"
 	"sync"
 	"testing"
@@ -1517,5 +1518,117 @@ func TestShouldAnnounceExcludeLB(t *testing.T) {
 		if response2 != test.c2ExpectedResult[lbIPStr] {
 			t.Errorf("%q: shouldAnnounce for controller 2 for service %s returned incorrect result, expected '%s', but received '%s'", test.desc, lbIPStr, test.c2ExpectedResult[lbIPStr], response2)
 		}
+	}
+}
+func TestPasswordForSession(t *testing.T) {
+	tests := []struct {
+		name           string
+		cfg            *config.Peer
+		bgpType        bgpImplementation
+		secretHandling SecretHandling
+		expectedPass   string
+		expectedRef    v1.SecretReference
+	}{
+		{
+			name: "Native BGP with plain text password",
+			cfg: &config.Peer{
+				Password: "password123",
+			},
+			bgpType:        bgpNative,
+			secretHandling: SecretPassThrough,
+			expectedPass:   "password123",
+			expectedRef:    v1.SecretReference{},
+		},
+		{
+			name: "FRR BGP with plain text password",
+			cfg: &config.Peer{
+				Password: "password123",
+			},
+			bgpType:        bgpFrr,
+			secretHandling: SecretPassThrough,
+			expectedPass:   "password123",
+			expectedRef:    v1.SecretReference{},
+		},
+		{
+			name: "FRR-K8s BGP with plain text password",
+			cfg: &config.Peer{
+				Password: "password123",
+			},
+			bgpType:        bgpFrrK8s,
+			secretHandling: SecretPassThrough,
+			expectedPass:   "password123",
+			expectedRef:    v1.SecretReference{},
+		},
+		{
+			name: "native BGP with secret password",
+			cfg: &config.Peer{
+				SecretPassword: "my-secret-password",
+				PasswordRef: v1.SecretReference{
+					Name:      "my-secret",
+					Namespace: "my-namespace",
+				},
+			},
+			bgpType:        bgpNative,
+			secretHandling: SecretConvert,
+			expectedPass:   "my-secret-password",
+			expectedRef:    v1.SecretReference{},
+		},
+		{
+			name: "frr BGP with secret password",
+			cfg: &config.Peer{
+				SecretPassword: "my-secret-password",
+				PasswordRef: v1.SecretReference{
+					Name:      "my-secret",
+					Namespace: "my-namespace",
+				},
+			},
+			bgpType:        bgpFrr,
+			secretHandling: SecretConvert,
+			expectedPass:   "my-secret-password",
+			expectedRef:    v1.SecretReference{},
+		},
+		{
+			name: "FRR-K8s BGP with secret password, convert",
+			cfg: &config.Peer{
+				SecretPassword: "my-secret-password",
+				PasswordRef: v1.SecretReference{
+					Name:      "my-secret",
+					Namespace: "my-namespace",
+				},
+			},
+			bgpType:        bgpFrrK8s,
+			secretHandling: SecretConvert,
+			expectedPass:   "my-secret-password",
+			expectedRef:    v1.SecretReference{},
+		},
+		{
+			name: "FRR-K8s BGP with secret password, passthrough",
+			cfg: &config.Peer{
+				SecretPassword: "my-secret-password",
+				PasswordRef: v1.SecretReference{
+					Name:      "my-secret",
+					Namespace: "my-namespace",
+				},
+			},
+			bgpType:        bgpFrrK8s,
+			secretHandling: SecretPassThrough,
+			expectedPass:   "",
+			expectedRef: v1.SecretReference{
+				Name:      "my-secret",
+				Namespace: "my-namespace",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pass, ref := passwordForSession(tt.cfg, tt.bgpType, tt.secretHandling)
+			if pass != tt.expectedPass {
+				t.Errorf("unexpected password, got: %s, want: %s", pass, tt.expectedPass)
+			}
+			if !reflect.DeepEqual(ref, tt.expectedRef) {
+				t.Errorf("unexpected secret reference, got: %+v, want: %+v", ref, tt.expectedRef)
+			}
+		})
 	}
 }
