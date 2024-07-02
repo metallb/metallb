@@ -10,10 +10,9 @@ patchesJson6902:
   - target:
       group: rbac.authorization.k8s.io
       version: v1
-      kind: Role
-      name: pod-lister
-      namespace: metallb-system
-    path: role-patch.yaml
+      kind: ClusterRole
+      name: metallb-system:speaker
+    path: clusterrole-patch.yaml
 patches:
   - path: ignore-ns.yaml
   - path: ignore-prom-role.yaml
