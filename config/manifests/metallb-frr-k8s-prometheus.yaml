@@ -1878,16 +1878,6 @@ metadata:
   namespace: metallb-system
 rules:
 - apiGroups:
-  - frrk8s.metallb.io
-  resources:
-  - frrconfigurations
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-- apiGroups:
   - ""
   resources:
   - pods
@@ -2207,6 +2197,16 @@ metadata:
     app: metallb
   name: metallb-system:speaker
 rules:
+- apiGroups:
+  - frrk8s.metallb.io
+  resources:
+  - frrconfigurations
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
 - apiGroups:
   - authorization.k8s.io
   resources:
