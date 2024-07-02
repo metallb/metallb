@@ -86,6 +86,7 @@ func main() {
 		enablePprof       = flag.Bool("enable-pprof", false, "Enable pprof profiling")
 		loadBalancerClass = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
 		ignoreLBExclude   = flag.Bool("ignore-exclude-lb", false, "ignore the exclude-from-external-load-balancers label")
+		frrK8sNamespace   = flag.String("frrk8s-namespace", os.Getenv("FRRK8S_NAMESPACE"), "the namespace frr-k8s is being deployed on")
 	)
 	flag.Parse()
 
@@ -152,10 +153,15 @@ func main() {
 		os.Exit(1)
 	}
 	statusNotifyChan := make(chan event.GenericEvent)
+
+	if *frrK8sNamespace == "" { // if not set, assuming it runs under metallb
+		frrK8sNamespace = namespace
+	}
 	// Setup all clients and speakers, config decides what is being done runtime.
 	ctrl, err := newController(controllerConfig{
 		MyNode:                 *myNode,
 		Namespace:              *namespace,
+		FRRK8sNamespace:        *frrK8sNamespace,
 		Logger:                 logger,
 		LogLevel:               logging.Level(*logLevel),
 		SList:                  sList,
@@ -202,6 +208,7 @@ func main() {
 		ValidateConfig:    validateConfig,
 		LoadBalancerClass: *loadBalancerClass,
 		WithFRRK8s:        listenFRRK8s,
+		FRRK8sNamespace:   *frrK8sNamespace,
 
 		Layer2StatusChan:    statusNotifyChan,
 		Layer2StatusFetcher: ctrl.layer2StatusFetchFunc,
@@ -240,11 +247,12 @@ type controller struct {
 }
 
 type controllerConfig struct {
-	MyNode    string
-	Namespace string
-	Logger    log.Logger
-	LogLevel  logging.Level
-	SList     SpeakerList
+	MyNode          string
+	Namespace       string
+	FRRK8sNamespace string
+	Logger          log.Logger
+	LogLevel        logging.Level
+	SList           SpeakerList
 
 	bgpType bgpImplementation
 
@@ -259,6 +267,13 @@ type controllerConfig struct {
 }
 
 func newController(cfg controllerConfig) (*controller, error) {
+	secretHandling := SecretPassThrough
+	// FrrK8s mode and frr-k8s deployed in a separate namespace, we don't have
+	// permissions to write secrets there.
+	if cfg.Namespace != cfg.FRRK8sNamespace && cfg.bgpType == bgpFrrK8s {
+		secretHandling = SecretConvert
+	}
+
 	handlers := map[config.Proto]Protocol{
 		config.BGP: &bgpController{
 			logger:          cfg.Logger,
@@ -267,6 +282,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 			bgpType:         cfg.bgpType,
 			sessionManager:  newBGP(cfg),
 			ignoreExcludeLB: cfg.IgnoreExcludeLB,
+			secretHandling:  secretHandling,
 		},
 	}
 	protocols := []config.Proto{config.BGP}

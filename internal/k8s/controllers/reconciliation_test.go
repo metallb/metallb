@@ -185,11 +185,11 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	frrk8sReconciler = &FRRK8sReconciler{
-		Client:    k8sManager.GetClient(),
-		Scheme:    k8sManager.GetScheme(),
-		Logger:    log.NewNopLogger(),
-		NodeName:  testNodeName,
-		Namespace: testNamespace,
+		Client:          k8sManager.GetClient(),
+		Scheme:          k8sManager.GetScheme(),
+		Logger:          log.NewNopLogger(),
+		NodeName:        testNodeName,
+		FRRK8sNamespace: testNamespace,
 	}
 	err = frrk8sReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
