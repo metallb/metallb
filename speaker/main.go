@@ -88,6 +88,7 @@ func main() {
 		// TODO: we are hiding the feature behind a feature flag because of https://github.com/metallb/metallb/issues/2311
 		// This flag can be removed once the issue is fixed.
 		enableL2ServiceStatus = flag.Bool("enable-l2-service-status", false, "enables the experimental l2 service status feature")
+		frrK8sNamespace       = flag.String("frrk8s-namespace", os.Getenv("METALLB_NAMESPACE"), "the namespace frr-k8s is being deployed on")
 	)
 	flag.Parse()
 
@@ -158,6 +159,7 @@ func main() {
 	ctrl, err := newController(controllerConfig{
 		MyNode:                 *myNode,
 		Namespace:              *namespace,
+		FRRK8sNamespace:        *frrK8sNamespace,
 		Logger:                 logger,
 		LogLevel:               logging.Level(*logLevel),
 		SList:                  sList,
@@ -245,11 +247,12 @@ type controller struct {
 }
 
 type controllerConfig struct {
-	MyNode    string
-	Namespace string
-	Logger    log.Logger
-	LogLevel  logging.Level
-	SList     SpeakerList
+	MyNode          string
+	Namespace       string
+	FRRK8sNamespace string
+	Logger          log.Logger
+	LogLevel        logging.Level
+	SList           SpeakerList
 
 	bgpType bgpImplementation
 
@@ -264,6 +267,13 @@ type controllerConfig struct {
 }
 
 func newController(cfg controllerConfig) (*controller, error) {
+	secretHandling := SecretPassThrough
+	// FrrK8s mode and frr-k8s deployed in a separate namespace, we don't have
+	// permissions to write secrets there.
+	if cfg.Namespace != cfg.FRRK8sNamespace && cfg.bgpType == bgpFrrK8s {
+		secretHandling = SecretConvert
+	}
+
 	handlers := map[config.Proto]Protocol{
 		config.BGP: &bgpController{
 			logger:          cfg.Logger,
@@ -272,6 +282,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 			bgpType:         cfg.bgpType,
 			sessionManager:  newBGP(cfg),
 			ignoreExcludeLB: cfg.IgnoreExcludeLB,
+			secretHandling:  secretHandling,
 		},
 	}
 	protocols := []config.Proto{config.BGP}

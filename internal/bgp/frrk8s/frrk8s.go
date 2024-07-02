@@ -33,6 +33,7 @@ type sessionManager struct {
 	configChangedCallback func(interface{})
 	logger                log.Logger
 	logLevel              logging.Level
+	convertSecrets        bool
 }
 
 func (sm *sessionManager) SetEventCallback(callback func(interface{})) {
