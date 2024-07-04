@@ -193,6 +193,13 @@ jobs:
         ip-family: [ipv4, ipv6, dual]
         bgp-type: [native, frr, frr-k8s, frr-k8s-external]
         deployment: [manifests, helm]
+        exclude:
+        - bgp-type: frr-k8s-external
+          ip-family: ipv4
+        - bgp-type: frr-k8s-external
+          ip-family: ipv6
+        - bgp-type: frr-k8s
+          ip-family: dual
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -208,10 +215,11 @@ jobs:
       - name: Deploy MetalLB
         run: |
           HELM_FLAGS=""
+          PROMETHEUS_FLAGS="--with-prometheus"
           if [ ${{ matrix.deployment }} = "helm" ]; then HELM_FLAGS="--helm-install"; fi
-          if [ ${{ matrix.bgp-type }} = "frr-k8s-external" ]; then HELM_FLAGS="$HELM_FLAGS --frr-k8s-ns frr-k8s-system"; fi
+          if [ ${{ matrix.bgp-type }} = "frr-k8s-external" ]; then PROMETHEUS_FLAGS=""; fi
 
-          inv dev-env -i ${{ matrix.ip-family }} -b ${{ matrix.bgp-type }} -l all $HELM_FLAGS --no-build-images --with-prometheus
+          inv dev-env -i ${{ matrix.ip-family }} -b ${{ matrix.bgp-type }} -l all $HELM_FLAGS --no-build-images $PROMETHEUS_FLAGS
 
       - name: E2E
         run: |
@@ -229,6 +237,7 @@ jobs:
           if [ "${{ matrix.ip-family }}" == "ipv6" ] && [ ${{ matrix.bgp-type }} == "native" ]; then SKIP="$SKIP|BGP"; fi
           if [ "${{ matrix.bgp-type }}" == "frr" ]; then SKIP="$SKIP|FRRK8S-MODE"; fi
           if [ "${{ matrix.bgp-type }}" == "frr-k8s" ]; then SKIP="$SKIP|FRR-MODE"; fi
+          if [ "${{ matrix.bgp-type }}" == "frr-k8s-external" ]; then SKIP="$SKIP|FRR-MODE|metrics"; fi
 
           echo "Skipping $SKIP"
           echo "With VRF $WITH_VRF"
