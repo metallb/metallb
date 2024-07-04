@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: speaker
+spec:
+  template:
+    metadata:
+      annotations:
+        prometheus.io/scrape: 'true'
+      labels:
+        app: metallb
+        component: speaker
+    spec:
+      containers:
+        - name: speaker
+          env:
+            - name: METALLB_BGP_TYPE
+              value: frr-k8s
+            - name: FRRK8S_NAMESPACE
+              value: frr-k8s-system
