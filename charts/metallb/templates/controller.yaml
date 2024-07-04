@@ -88,7 +88,7 @@ spec:
         - name: METALLB_BGP_TYPE
           value: frr
         {{- end }}
-        {{- if .Values.frrk8s.enabled }}
+        {{- if or .Values.frrk8s.enabled .Values.frrk8s.external }}
         - name: METALLB_BGP_TYPE
           value: frr-k8s
         {{- end }}

@@ -360,6 +360,7 @@ def generate_manifest(ctx, crd_options="crd:crdVersions=v1", bgp_type="native", 
                        "Default: False.",
     "with_api_audit": "Enables audit on the apiserver"
                       "Default: False.",
+
 })
 def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_dir="",
             node_img=None, ip_family="ipv4", bgp_type="frr", log_level="info",
@@ -441,6 +442,12 @@ apiServer:
         print("Deploying prometheus")
         deployprometheus(ctx)
 
+    frr_k8s_ns = "frr-k8s-system"
+    if bgp_type == "frr-k8s-external":
+        run("{} apply -f https://raw.githubusercontent.com/metallb/frr-k8s/v0.0.11/config/all-in-one/frr-k8s.yaml".format(kubectl_path), echo=True)
+        time.sleep(2)
+        run("{} -n {} wait --for=condition=Ready --all pods --timeout 300s".format(kubectl_path, frr_k8s_ns), echo=True)
+
     if helm_install:
         run("{} apply -f config/native/ns.yaml".format(kubectl_path), echo=True)
         prometheus_values = ""
@@ -451,6 +458,8 @@ apiServer:
                                  "--set prometheus.serviceAccount=prometheus-k8s "
                                  "--set prometheus.namespace=monitoring ")
         frr_values = ""
+
+
         if bgp_type == "frr":
             frr_values = "--set speaker.frr.enabled=true "
         if bgp_type == "frr-k8s":
@@ -467,6 +476,9 @@ apiServer:
                     "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].targetLabel=\"__name__\" "
                     "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].replacement=\"metallb_bfd_\\$1\" "
                 )
+
+        if bgp_type == "frr-k8s-external":
+           frr_values = "--set frrk8s.external=true --set frrk8s.namespace={} --set speaker.frr.enabled=false --set frr-k8s.prometheus.serviceMonitor.enabled=false ".format(frr_k8s_ns)
 
         run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
             "--set speaker.image.tag=dev-{} --set speaker.logLevel=debug "
