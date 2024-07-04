@@ -69,7 +69,7 @@ rules:
   resources: ["subjectaccessreviews"]
   verbs: ["create"]
 {{- end }}
-{{- if .Values.frrk8s.enabled }}
+{{- if or .Values.frrk8s.enabled .Values.frrk8s.external }}
 - apiGroups: ["frrk8s.metallb.io"]
   resources: ["frrconfigurations"]
   verbs: ["get", "list", "watch","create","update"]
