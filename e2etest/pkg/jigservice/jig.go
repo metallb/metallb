@@ -497,7 +497,6 @@ func (j *TestJig) newRCTemplate() *v1.ReplicationController {
 	return rc
 }
 
-// FEDE
 // Run creates a ReplicationController and Pod(s) and waits for the
 // Pod(s) to be running. Callers can provide a function to tweak the RC object
 // before it is created.
@@ -520,7 +519,6 @@ func (j *TestJig) Run(ctx context.Context, tweak func(rc *v1.ReplicationControll
 	return result, nil
 }
 
-// FEDE
 // Scale scales pods to the given replicas
 func (j *TestJig) Scale(ctx context.Context, replicas int) error {
 	rc := j.Name
