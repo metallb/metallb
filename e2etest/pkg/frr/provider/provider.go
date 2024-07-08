@@ -80,7 +80,7 @@ type frrk8sModeProvider struct {
 
 // NewFRRK8SMode returns a provider for a deployment using "frr-k8s" as its BGP mode.
 // In this mode the frr instance for a node is a sidecar container of the frr-k8s pod.
-func NewFRRK8SMode(r *rest.Config) (Provider, error) {
+func NewFRRK8SMode(r *rest.Config, namespace string) (Provider, error) {
 	cl, err := clientset.NewForConfig(r)
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func NewFRRK8SMode(r *rest.Config) (Provider, error) {
 		return nil, err
 	}
 
-	frrk8sPods, err := metallb.FRRK8SPods(cl)
+	frrk8sPods, err := metallb.FRRK8SPods(cl, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +123,7 @@ func (f frrk8sModeProvider) FRRExecutorFor(ns, name string) (executor.Executor, 
 		return nil, fmt.Errorf("speaker %s/%s does not have a matching frr-k8s", ns, name)
 	}
 
-	return executor.ForPod(ns, frrk8s.Name, "frr"), nil
+	return executor.ForPod(frrk8s.Namespace, frrk8s.Name, "frr"), nil
 }
 
 func (f frrk8sModeProvider) BGPMetricsPodFor(ns, name string) (*corev1.Pod, string, error) {
