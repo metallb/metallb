@@ -93,7 +93,7 @@ jobs:
             org.opencontainers.image.description=${{ matrix.image }} for metallb, a network load-balancer implementation for Kubernetes using standard routing protocols
 
       - name: Build and push ${{ matrix.image }}
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         id: build-and-push
         with:
           context: .
