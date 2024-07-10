@@ -18,10 +18,10 @@ package controllers
 
 import (
 	"context"
-	"reflect"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
+	k8snodes "go.universe.tf/metallb/internal/k8s/nodes"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
@@ -82,9 +82,9 @@ func (r *NodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				level.Error(r.Logger).Log("controller", "NodeReconciler", "error", "old object is not node", "name", oldNodeObj.GetName())
 				return true
 			}
-			// If there is no changes in node labels, ignore event.
+			// If there is no changes in node labels or conditions' network availability status, ignore event.
 			if labels.Equals(labels.Set(oldNodeObj.Labels), labels.Set(newNodeObj.Labels)) &&
-				reflect.DeepEqual(oldNodeObj.Status.Conditions, newNodeObj.Status.Conditions) {
+				k8snodes.IsNetworkUnavailable(oldNodeObj) == k8snodes.IsNetworkUnavailable(newNodeObj) {
 				return false
 			}
 			return true
