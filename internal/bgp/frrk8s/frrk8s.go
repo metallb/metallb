@@ -266,9 +266,12 @@ func (sm *sessionManager) updateConfig() error {
 					PrefixesWithLocalPref: make([]frrv1beta1.LocalPrefPrefixes, 0),
 					PrefixesWithCommunity: make([]frrv1beta1.CommunityPrefixes, 0),
 				},
-				Password:       s.Password,
-				PasswordSecret: s.PasswordRef,
-				DisableMP:      s.DisableMP,
+				Password: s.Password,
+				PasswordSecret: frrv1beta1.SecretReference{
+					Name:      s.PasswordRef.Name,
+					Namespace: s.PasswordRef.Namespace,
+				},
+				DisableMP: s.DisableMP,
 			}
 		}
 
