@@ -1665,6 +1665,12 @@ spec:
     - jsonPath: .status.node
       name: Allocated Node
       type: string
+    - jsonPath: .status.serviceName
+      name: Service Name
+      type: string
+    - jsonPath: .status.serviceNamespace
+      name: Service Namespace
+      type: string
     name: v1beta1
     schema:
       openAPIV3Schema:
@@ -1708,6 +1714,23 @@ spec:
               node:
                 description: Node indicates the node that receives the directed traffic
                 type: string
+                x-kubernetes-validations:
+                - message: Value is immutable
+                  rule: self == oldSelf
+              serviceName:
+                description: ServiceName indicates the service this status represents
+                type: string
+                x-kubernetes-validations:
+                - message: Value is immutable
+                  rule: self == oldSelf
+                - message: Value is immutable
+                  rule: self == oldSelf
+              serviceNamespace:
+                description: ServiceNamespace indicates the namespace of the service
+                type: string
+                x-kubernetes-validations:
+                - message: Value is immutable
+                  rule: self == oldSelf
             type: object
         type: object
     served: true
@@ -1855,21 +1878,12 @@ metadata:
   namespace: metallb-system
 rules:
 - apiGroups:
-  - frrk8s.metallb.io
-  resources:
-  - frrconfigurations
-  verbs:
-  - get
-  - list
-  - watch
-  - create
-  - update
-- apiGroups:
   - ""
   resources:
   - pods
   verbs:
   - list
+  - get
 - apiGroups:
   - ""
   resources:
@@ -2154,6 +2168,16 @@ metadata:
     app: metallb
   name: metallb-system:speaker
 rules:
+- apiGroups:
+  - frrk8s.metallb.io
+  resources:
+  - frrconfigurations
+  verbs:
+  - get
+  - list
+  - watch
+  - create
+  - update
 - apiGroups:
   - metallb.io
   resources:
@@ -2961,6 +2985,10 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: spec.nodeName
+        - name: METALLB_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         - name: METALLB_HOST
           valueFrom:
             fieldRef:

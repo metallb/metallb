@@ -360,6 +360,7 @@ def generate_manifest(ctx, crd_options="crd:crdVersions=v1", bgp_type="native", 
                        "Default: False.",
     "with_api_audit": "Enables audit on the apiserver"
                       "Default: False.",
+
 })
 def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_dir="",
             node_img=None, ip_family="ipv4", bgp_type="frr", log_level="info",
@@ -441,6 +442,12 @@ apiServer:
         print("Deploying prometheus")
         deployprometheus(ctx)
 
+    frr_k8s_ns = "frr-k8s-system"
+    if bgp_type == "frr-k8s-external":
+        run("{} apply -f https://raw.githubusercontent.com/metallb/frr-k8s/v0.0.11/config/all-in-one/frr-k8s.yaml".format(kubectl_path), echo=True)
+        time.sleep(2)
+        run("{} -n {} wait --for=condition=Ready --all pods --timeout 300s".format(kubectl_path, frr_k8s_ns), echo=True)
+
     if helm_install:
         run("{} apply -f config/native/ns.yaml".format(kubectl_path), echo=True)
         prometheus_values = ""
@@ -451,6 +458,8 @@ apiServer:
                                  "--set prometheus.serviceAccount=prometheus-k8s "
                                  "--set prometheus.namespace=monitoring ")
         frr_values = ""
+
+
         if bgp_type == "frr":
             frr_values = "--set speaker.frr.enabled=true "
         if bgp_type == "frr-k8s":
@@ -467,6 +476,9 @@ apiServer:
                     "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].targetLabel=\"__name__\" "
                     "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].replacement=\"metallb_bfd_\\$1\" "
                 )
+
+        if bgp_type == "frr-k8s-external":
+           frr_values = "--set frrk8s.external=true --set frrk8s.namespace={} --set speaker.frr.enabled=false --set frr-k8s.prometheus.serviceMonitor.enabled=false ".format(frr_k8s_ns)
 
         run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
             "--set speaker.image.tag=dev-{} --set speaker.logLevel=debug "
@@ -872,7 +884,7 @@ def helmdocs(ctx, env="container"):
 def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system",
             service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None,
             prometheus_namespace="", node_nics="kind", local_nics="kind", external_containers="", bgp_mode="",
-            with_vrf=False, external_frr_image="", ginkgo_params="", junit_report="junit-report.xml", host_bgp_mode="ibgp"):
+            with_vrf=False, external_frr_image="", ginkgo_params="", junit_report="junit-report.xml", host_bgp_mode="ibgp", frr_k8s_namespace=""):
     """Run E2E tests against development cluster."""
     fetch_kubectl()
     fetch_kind()
@@ -936,10 +948,10 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
     if external_frr_image != "":
         external_frr_image = "--frr-image=" + (external_frr_image)
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-                  "KUBECONFIG={} ginkgo {} --junit-report={} --timeout=3h {} {} -- --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {} -bgp-mode={} -with-vrf={} {} --host-bgp-mode={} --kubectl={}".format(
+                  "KUBECONFIG={} ginkgo {} --junit-report={} --timeout=3h {} {} -- --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {} -bgp-mode={} -with-vrf={} {} --host-bgp-mode={} --kubectl={} --frr-k8s-namespace={}".format(
         kubeconfig, ginkgo_params, junit_report, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range,
         ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace, node_nics, local_nics,
-        external_containers, bgp_mode, with_vrf, external_frr_image, host_bgp_mode, kubectl_path), warn="True")
+        external_containers, bgp_mode, with_vrf, external_frr_image, host_bgp_mode, kubectl_path, frr_k8s_namespace), warn="True")
 
     if export != None:
         run("{} export logs {}".format(kind_path, export))

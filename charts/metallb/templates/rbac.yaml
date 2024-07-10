@@ -69,6 +69,11 @@ rules:
   resources: ["subjectaccessreviews"]
   verbs: ["create"]
 {{- end }}
+{{- if or .Values.frrk8s.enabled .Values.frrk8s.external }}
+- apiGroups: ["frrk8s.metallb.io"]
+  resources: ["frrconfigurations"]
+  verbs: ["get", "list", "watch","create","update"]
+{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -79,7 +84,7 @@ metadata:
 rules:
 - apiGroups: [""]
   resources: ["pods"]
-  verbs: ["list"]
+  verbs: ["list", "get"]
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["get", "list", "watch"]
@@ -104,11 +109,6 @@ rules:
 - apiGroups: ["metallb.io"]
   resources: ["communities"]
   verbs: ["get", "list", "watch"]
-{{- if .Values.frrk8s.enabled }}
-- apiGroups: ["frrk8s.metallb.io"]
-  resources: ["frrconfigurations"]
-  verbs: ["get", "list", "watch","create","update"]
-{{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role

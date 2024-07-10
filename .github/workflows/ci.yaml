@@ -191,16 +191,15 @@ jobs:
       fail-fast: false
       matrix:
         ip-family: [ipv4, ipv6, dual]
-        bgp-type: [native, frr, frr-k8s]
+        bgp-type: [native, frr, frr-k8s, frr-k8s-external]
         deployment: [manifests, helm]
-        prometheus: [disabled, enabled]
         exclude:
-        - ip-family: ipv6
-          prometheus: disabled
-        - ip-family: dual
-          prometheus: disabled
-        - bgp-type: frr
-          prometheus: disabled
+        - bgp-type: frr-k8s-external
+          ip-family: ipv4
+        - bgp-type: frr-k8s-external
+          ip-family: ipv6
+        - bgp-type: frr-k8s
+          ip-family: dual
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -216,9 +215,9 @@ jobs:
       - name: Deploy MetalLB
         run: |
           HELM_FLAGS=""
-          PROMETHEUS_FLAGS=""
+          PROMETHEUS_FLAGS="--with-prometheus"
           if [ ${{ matrix.deployment }} = "helm" ]; then HELM_FLAGS="--helm-install"; fi
-          if [ ${{ matrix.prometheus }} = "enabled" ]; then PROMETHEUS_FLAGS="--with-prometheus"; fi
+          if [ ${{ matrix.bgp-type }} = "frr-k8s-external" ]; then PROMETHEUS_FLAGS=""; fi
 
           inv dev-env -i ${{ matrix.ip-family }} -b ${{ matrix.bgp-type }} -l all $HELM_FLAGS --no-build-images $PROMETHEUS_FLAGS
 
@@ -236,9 +235,9 @@ jobs:
           if [ "${{ matrix.ip-family }}" == "dual" ]; then SKIP="$SKIP|IPV6"; fi
           if [ "${{ matrix.ip-family }}" == "ipv6" ]; then SKIP="$SKIP|IPV4|DUALSTACK"; fi
           if [ "${{ matrix.ip-family }}" == "ipv6" ] && [ ${{ matrix.bgp-type }} == "native" ]; then SKIP="$SKIP|BGP"; fi
-          if [ "${{ matrix.prometheus }}" == "disabled" ]; then SKIP="$SKIP|metrics"; fi
           if [ "${{ matrix.bgp-type }}" == "frr" ]; then SKIP="$SKIP|FRRK8S-MODE"; fi
           if [ "${{ matrix.bgp-type }}" == "frr-k8s" ]; then SKIP="$SKIP|FRR-MODE"; fi
+          if [ "${{ matrix.bgp-type }}" == "frr-k8s-external" ]; then SKIP="$SKIP|FRR-MODE|metrics"; fi
 
           echo "Skipping $SKIP"
           echo "With VRF $WITH_VRF"

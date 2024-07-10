@@ -1,8 +1,13 @@
 {{- if .Values.speaker.frr.enabled }}
-{{- if .Values.frrk8s.enabled }}
-{{- fail "speaker.frr.enabled and frrk8s.enabled are mutually exclusive!" }}
+{{- if or .Values.frrk8s.enabled .Values.frrk8s.external }}
+{{- fail "speaker.frr.enabled and frrk8s.enabled / external are mutually exclusive!" }}
 {{- end }}
 {{- end }}
+
+{{- if and .Values.frrk8s.enabled .Values.frrk8s.external }}
+{{- fail "frrk8s.enabled frrk8s.external are mutually exclusive!" }}
+{{- end }}
+
 {{- if .Values.speaker.frr.enabled }}
 
 # FRR expects to have these files owned by frr:frr on startup.
@@ -250,6 +255,9 @@ spec:
         {{- if .Values.prometheus.secureMetricsPort }}
         - --host=localhost
         {{- end }}
+        {{- if .Values.frrk8s.external }}
+        - --frrk8s-namespace={{ required "namespace is required when frrk8s is external" .Values.frrk8s.namespace }}
+        {{- end }}
         env:
         - name: METALLB_NODE_NAME
           valueFrom:
@@ -284,10 +292,14 @@ spec:
         - name: METALLB_BGP_TYPE
           value: frr
         {{- end }}
-        {{- if .Values.frrk8s.enabled }}
+        {{- if or .Values.frrk8s.enabled .Values.frrk8s.external }}
         - name: METALLB_BGP_TYPE
           value: frr-k8s
         {{- end }}
+        - name: METALLB_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         ports:
         - name: monitoring
           containerPort: {{ .Values.prometheus.metricsPort }}

@@ -68,11 +68,13 @@ var (
 		defer layer2ServiceAdvLock.Unlock()
 		layer2ServiceAdvs = advs
 	}
+	speakerPod *corev1.Pod
 )
 
 const (
-	testNodeName    = "testnode"
-	testServiceName = "test-service"
+	testNodeName     = "testnode"
+	testServiceName  = "test-service"
+	speakerNamespace = "metallb-system"
 )
 
 func TestManager(t *testing.T) {
@@ -122,6 +124,35 @@ var _ = BeforeSuite(func() {
 	})
 	Expect(err).ToNot(HaveOccurred())
 
+	ctx, cancel = context.WithCancel(context.TODO())
+	// test service is located in testNamespace
+	// speaker pod is deployed in speakerNamespace
+	// the layer2 status crs are maintained in speakerNamespace
+	err = func(namespaces []string) error {
+		for _, namespace := range namespaces {
+			namespaceObj := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: namespace,
+				},
+			}
+			err := k8sClient.Create(ctx, namespaceObj)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}([]string{testNamespace, speakerNamespace})
+	Expect(err).ToNot(HaveOccurred())
+
+	speakerPod = &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "speaker", Namespace: speakerNamespace},
+		Spec: corev1.PodSpec{Containers: []corev1.Container{
+			{Name: "speaker", Image: "speaker"},
+		}},
+	}
+	err = k8sClient.Create(ctx, speakerPod)
+	Expect(err).ToNot(HaveOccurred())
+
 	mockHandler := func(l log.Logger, n *corev1.Node) SyncState {
 		nodeMutex.Lock()
 		defer nodeMutex.Unlock()
@@ -154,11 +185,11 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	frrk8sReconciler = &FRRK8sReconciler{
-		Client:    k8sManager.GetClient(),
-		Scheme:    k8sManager.GetScheme(),
-		Logger:    log.NewNopLogger(),
-		NodeName:  testNodeName,
-		Namespace: testNamespace,
+		Client:          k8sManager.GetClient(),
+		Scheme:          k8sManager.GetScheme(),
+		Logger:          log.NewNopLogger(),
+		NodeName:        testNodeName,
+		FRRK8sNamespace: testNamespace,
 	}
 	err = frrk8sReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
@@ -167,6 +198,8 @@ var _ = BeforeSuite(func() {
 		Client:        k8sManager.GetClient(),
 		Logger:        log.NewNopLogger(),
 		NodeName:      testNodeName,
+		Namespace:     speakerNamespace,
+		SpeakerPod:    speakerPod,
 		ReconcileChan: layer2StatusUpdateChan,
 		StatusFetcher: func(nn types.NamespacedName) []layer2.IPAdvertisement {
 			layer2ServiceAdvLock.Lock()
@@ -182,8 +215,6 @@ var _ = BeforeSuite(func() {
 	err = layer2StatusReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	ctx, cancel = context.WithCancel(context.TODO())
-
 	go func() {
 		defer func() { mgrDone.Store(true) }()
 		defer GinkgoRecover()
@@ -198,14 +229,6 @@ var _ = BeforeSuite(func() {
 		},
 	}
 	err = k8sClient.Create(ctx, node)
-	Expect(err).ToNot(HaveOccurred())
-
-	namespace := &corev1.Namespace{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: testNamespace,
-		},
-	}
-	err = k8sClient.Create(ctx, namespace)
 	Expect(err).ToNot(HaveOccurred())
 })
 
@@ -465,8 +488,34 @@ var _ = Describe("FRRK8S Controller", func() {
 var _ = Describe("Layer2 Status Controller", func() {
 	Context("SetupWithManager", func() {
 		It("Should Reconcile correctly", func() {
+			statusObjFetcherFunc := func() ([]v1beta1.ServiceL2Status, error) {
+				statusList := v1beta1.ServiceL2StatusList{}
+				err := k8sClient.List(context.TODO(), &statusList,
+					client.MatchingLabels{
+						LabelServiceName:      testServiceName,
+						LabelServiceNamespace: testNamespace,
+						LabelAnnounceNode:     testNodeName,
+					},
+				)
+				if err != nil {
+					return nil, err
+				}
+				return statusList.Items, nil
+			}
 
-			statusObjName := fmt.Sprintf("%s-%s", testServiceName, layer2StatusReconciler.NodeName)
+			statusResultCheckFunc := func(statuses []v1beta1.ServiceL2Status) error {
+				if len(statuses) != 1 {
+					return fmt.Errorf("expect 1 status object, but got %d", len(statuses))
+				}
+				if len(statuses[0].OwnerReferences) != 1 {
+					return fmt.Errorf("expect 1 owner reference, but got %d", len(statuses[0].OwnerReferences))
+				}
+				ownRef := statuses[0].OwnerReferences[0]
+				if ownRef.UID != speakerPod.UID {
+					return fmt.Errorf("owner reference is not speaker pod, expect owner reference uid %s, but got %s", speakerPod.UID, ownRef.UID)
+				}
+				return nil
+			}
 
 			// simulate some service is advertised
 			layer2ServiceAdvs = append(layer2ServiceAdvs,
@@ -474,12 +523,15 @@ var _ = Describe("Layer2 Status Controller", func() {
 			// notify reconciler to reconcile
 			layer2StatusUpdateChan <- NewL2StatusEvent(testNamespace, testServiceName)
 			Eventually(func() string {
-				toCheck := v1beta1.ServiceL2Status{}
-				err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: statusObjName, Namespace: testNamespace}, &toCheck)
+				statuses, err := statusObjFetcherFunc()
 				if err != nil {
-					return ""
+					return err.Error()
 				}
-				return toCheck.Status.Node
+				err = statusResultCheckFunc(statuses)
+				if err != nil {
+					return err.Error()
+				}
+				return statuses[0].Status.Node
 			}, 5*time.Second, 200*time.Millisecond).Should(Equal(testNodeName))
 
 			// simulate the service advertisement interface changed
@@ -489,12 +541,18 @@ var _ = Describe("Layer2 Status Controller", func() {
 			updateLayer2Advs([]layer2.IPAdvertisement{layer2.NewIPAdvertisement(net.IP("127.0.0.1"), false, interfaces)})
 			layer2StatusUpdateChan <- NewL2StatusEvent(testNamespace, testServiceName)
 			Eventually(func() string {
-				toCheck := v1beta1.ServiceL2Status{}
-				err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: statusObjName, Namespace: testNamespace}, &toCheck)
-				if err != nil || len(toCheck.Status.Interfaces) != 1 {
-					return ""
+				statuses, err := statusObjFetcherFunc()
+				if err != nil {
+					return err.Error()
 				}
-				return toCheck.Status.Interfaces[0].Name
+				err = statusResultCheckFunc(statuses)
+				if err != nil {
+					return err.Error()
+				}
+				if len(statuses[0].Status.Interfaces) == 0 {
+					return fmt.Errorf("status object has no interfaces").Error()
+				}
+				return statuses[0].Status.Interfaces[0].Name
 			}, 5*time.Second, 200*time.Millisecond).Should(Equal(newInterface))
 
 			// simulate the service is not advertised anymore
@@ -502,9 +560,11 @@ var _ = Describe("Layer2 Status Controller", func() {
 			// notify the reconciler again
 			layer2StatusUpdateChan <- NewL2StatusEvent(testNamespace, testServiceName)
 			Eventually(func() bool {
-				toCheck := v1beta1.ServiceL2Status{}
-				err := k8sClient.Get(context.TODO(), client.ObjectKey{Name: statusObjName, Namespace: testNamespace}, &toCheck)
-				return apierrors.IsNotFound(err)
+				statuses, err := statusObjFetcherFunc()
+				if err != nil {
+					return false
+				}
+				return len(statuses) == 0
 			}, 5*time.Second, 200*time.Millisecond).Should(BeTrue())
 		})
 	})

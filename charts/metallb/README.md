@@ -61,6 +61,8 @@ Kubernetes: `>= 1.19.0-0`
 | crds.enabled | bool | `true` |  |
 | crds.validationFailurePolicy | string | `"Fail"` |  |
 | frrk8s.enabled | bool | `false` |  |
+| frrk8s.external | bool | `false` |  |
+| frrk8s.namespace | string | `""` |  |
 | fullnameOverride | string | `""` |  |
 | imagePullSecrets | list | `[]` |  |
 | loadBalancerClass | string | `""` |  |
