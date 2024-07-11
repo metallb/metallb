@@ -13,7 +13,8 @@
     echo-mode
     {{end -}}
     {{ if .profile.EchoInterval -}}
-    echo-interval {{.profile.EchoInterval}}
+    echo receive-interval {{.profile.EchoInterval}}
+    echo transmit-interval {{.profile.EchoInterval}}
     {{end -}}
     {{ if .profile.PassiveMode -}}
     passive-mode
@@ -22,3 +23,4 @@
     minimum-ttl {{ .profile.MinimumTTL }}
     {{end -}}
 {{- end -}}
+
