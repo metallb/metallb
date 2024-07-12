@@ -15,7 +15,7 @@ import (
 // frr instance. We only care about established connections, as the
 // frr instance may be configured with more nodes than are currently
 // paired.
-func NeighborsMatchNodes(nodes []v1.Node, neighbors []*Neighbor, ipFamily ipfamily.Family, vrfName string) error {
+func NeighborsMatchNodes(nodes []v1.Node, neighbors NeighborsMap, ipFamily ipfamily.Family, vrfName string) error {
 	nodesIPs := map[string]struct{}{}
 
 	ips, err := k8s.NodeIPsForFamily(nodes, ipFamily, vrfName)

@@ -662,6 +662,33 @@ var _ = ginkgo.Describe("BGP", func() {
 				return nil
 			}, 4*time.Minute, 1*time.Second).ShouldNot(HaveOccurred())
 
+			ginkgo.By("checking the sessions don't flap when changing the configuration")
+
+			previousNeighbors := map[string]frr.NeighborsMap{}
+			for _, c := range FRRContainers {
+				neighbors, err := frr.NeighborsInfo(c)
+				Expect(err).NotTo(HaveOccurred())
+				previousNeighbors[c.Name] = neighbors
+			}
+			ginkgo.By("creating another the service")
+			svc1, _ := testservice.CreateWithBackend(cs, testNamespace, "external-local-lb1", tweak)
+			defer testservice.Delete(cs, svc1)
+
+			Consistently(func() error {
+				for _, c := range FRRContainers {
+					neighbors, err := frr.NeighborsInfo(c)
+					Expect(err).NotTo(HaveOccurred())
+					Expect(neighbors).To(HaveLen(len(previousNeighbors[c.Name])))
+
+					for _, n := range neighbors {
+						previousDropped := previousNeighbors[c.Name][n.IP.String()].ConnectionsDropped
+						if n.ConnectionsDropped > previousDropped {
+							return fmt.Errorf("increased connections dropped from %s to %s, previous: %d current %d", c.Name, n.IP.String(), previousDropped, n.ConnectionsDropped)
+						}
+					}
+				}
+				return nil
+			}, 10*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
 		},
 			ginkgo.Entry("IPV4 - default",
 				metallbv1beta1.BFDProfile{
