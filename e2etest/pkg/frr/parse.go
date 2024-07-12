@@ -27,6 +27,7 @@ type Neighbor struct {
 	ConfiguredKeepAliveTime int
 	ConfiguredConnectTime   int
 	AddressFamilies         []string
+	ConnectionsDropped      int
 }
 
 type Route struct {
@@ -55,6 +56,7 @@ type FRRNeighbor struct {
 	AddressFamilyInfo            map[string]struct {
 		SentPrefixCounter int `json:"sentPrefixCounter"`
 	} `json:"addressFamilyInfo"`
+	ConnectionsDropped int `json:"connectionsDropped"`
 }
 
 type GracefulRestartInfo struct {
@@ -177,6 +179,7 @@ func ParseNeighbour(vtyshRes string) (*Neighbor, error) {
 			MsgStats:                n.MsgStats,
 			ConfiguredKeepAliveTime: n.ConfiguredKeepAliveTimeMSecs,
 			ConfiguredHoldTime:      n.ConfiguredHoldTimeMSecs,
+			ConnectionsDropped:      n.ConnectionsDropped,
 		}, nil
 	}
 	return nil, errors.New("no peers were returned")
@@ -206,7 +209,6 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 		for family, s := range n.AddressFamilyInfo {
 			prefixSent += s.SentPrefixCounter
 			addressFamilies = append(addressFamilies, family)
-
 		}
 		res = append(res, &Neighbor{
 			IP:                      ip,
@@ -222,6 +224,7 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 			ConfiguredHoldTime:      n.ConfiguredHoldTimeMSecs,
 			ConfiguredConnectTime:   n.ConnectRetryTimer,
 			AddressFamilies:         addressFamilies,
+			ConnectionsDropped:      n.ConnectionsDropped,
 		})
 	}
 	return res, nil
