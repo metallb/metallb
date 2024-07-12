@@ -29,6 +29,7 @@ router bgp 100
   neighbor 10.2.2.254 timers 2 1
   neighbor 10.2.2.254 password password
   neighbor 10.2.2.254 update-source 10.1.1.254
+  neighbor 10.2.2.254 bfd
   neighbor 10.2.2.254 bfd profile foo
 
   address-family ipv4 unicast
