@@ -4,6 +4,6 @@ dependencies:
   version: 0.0.0
 - name: frr-k8s
   repository: https://metallb.github.io/frr-k8s
-  version: 0.0.12
-digest: sha256:1aef7673ae13757c9d87ff07c5fc543fe44b3142feec11fcf1c752242c5b681b
-generated: "2024-07-10T15:21:53.889865624+02:00"
+  version: 0.0.13
+digest: sha256:d96e9df41269f6532a0f588fbf7a507ec01829645e67f935a31e41dafbb4e665
+generated: "2024-07-15T16:42:22.231819736+02:00"
