@@ -49,7 +49,7 @@ spec:
           value: "app=metallb,component=speaker"
         - name: METALLB_ML_SECRET_KEY_PATH
           value: "/etc/ml_secret_key"
-        image: quay.io/metallb/speaker:v0.14.6
+        image: quay.io/metallb/speaker:v0.14.7
         name: speaker
         ports:
         - containerPort: 7472
