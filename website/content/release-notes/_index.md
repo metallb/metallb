@@ -3,6 +3,12 @@ title: Release Notes
 weight: 8
 ---
 
+## Version 0.14.7
+
+### Bug fixes
+
+- Fix the double immutable field validation in the ServiceL2Status CRD, which may make the validation of the CRD to fail. (#2461, @fedepaol)
+
 ## Version 0.14.6
 
 ### Feature

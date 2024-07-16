@@ -27,7 +27,6 @@ type MetalLBServiceL2Status struct {
 	// Node indicates the node that receives the directed traffic
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Value is immutable"
 	Node string `json:"node,omitempty"`
-	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Value is immutable"
 	// ServiceName indicates the service this status represents
 	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="Value is immutable"
 	ServiceName string `json:"serviceName,omitempty"`

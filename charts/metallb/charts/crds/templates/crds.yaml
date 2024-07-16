@@ -1191,8 +1191,6 @@ spec:
                   x-kubernetes-validations:
                     - message: Value is immutable
                       rule: self == oldSelf
-                    - message: Value is immutable
-                      rule: self == oldSelf
                 serviceNamespace:
                   description: ServiceNamespace indicates the namespace of the service
                   type: string
