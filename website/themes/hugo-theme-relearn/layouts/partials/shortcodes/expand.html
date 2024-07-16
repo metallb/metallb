@@ -1,0 +1,26 @@
+{{- $page := .page }}
+{{- if and (not $page) .context }}
+  {{- $page = .context }}
+  {{- warnf "%q: DEPRECATED parameter 'context' for shortcode 'expand' found, use 'page' instead; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#5180" $page.File.Filename }}
+{{- end }}
+{{- $content := .content }}
+{{- $title := .title | default (T "Expand-title") }}
+{{- $title = trim $title " " }}
+{{- $expanded := .open | default false }}
+{{- if eq (printf "%T" $expanded) "string" }}
+	{{- $expanded = (eq $expanded "true") }}
+{{- end }}
+{{- $id := cond (or (eq .id nil) (eq .id "")) (partial "make-random-md5.hugo" $page) .id }}
+{{- with $page }}
+<div class="expand">
+    <input type="checkbox" id="R-expand-{{ $id }}" aria-controls="R-expandcontent-{{ $id }}" {{ if $expanded }} checked{{ end }}>
+    <label class="expand-label" for="R-expand-{{ $id }}" >
+        <i class="fa-fw fas fa-chevron-down"></i>
+        <i class="fa-fw fas fa-chevron-right"></i>
+        {{ $title | .RenderString }}
+    </label>
+    <div id="R-expandcontent-{{ $id }}" class="expand-content">
+{{ if ne "<" (substr (strings.TrimLeft " \n\r\t" $content) 0 1) }}<p>{{ end }}<!-- we add a DOM element here if there is none to make collapsing marings work -->
+{{ $content | safeHTML }}</div><!-- no line break allowed here because of awkward behavior of Hugo 110 or this theme when tag shortcode is called standalone outside of tags shortcode ? -->
+</div>
+{{- end }}

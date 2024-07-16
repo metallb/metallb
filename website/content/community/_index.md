@@ -170,7 +170,7 @@ us confident of the change.
 
 ## The website
 
-The website at <https://metallb.universe.tf> is pinned to the latest
+The website at <https://metallb.io> is pinned to the latest
 released version, so that users who don't care about ongoing
 development see documentation that is consistent with the released
 code.

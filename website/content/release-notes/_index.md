@@ -3,6 +3,29 @@ title: Release Notes
 weight: 8
 ---
 
+## Version 0.14.6
+
+### Feature
+
+- Add graceful-restart support in frr mode (#2386, @karampok)
+- Add helm / configuration parameters to allow MetalLB to consume an frr-k8s instance running in a separate namespace. (#2444, @fedepaol)
+- The speaker and the controller containers are now based on a distroless image, reducing the attack surface (#2418, @minmzzhang)
+- Use frr 9.1.0 and frr-k8s 0.0.13. (#2450, #2456, @fedepaol)
+
+### Documentation
+
+- Upgrade Hugo to v0.124.1, Theme change to `Hugo Relearn Theme` (version: 5.27.0) (#2364, @tico88612)
+
+### Bug or Regression
+
+- Enable Layer2Service status, a crd to monitor the status of a service exposed via L2 (#2351, @lwabish)
+- Fix session flapping when adding / removing services and BFD is enabled. (#2454, @fedepaol)
+- Fix(chart,prometheusrules): alert not matching labels for e.g. speakers (#2453, @sebastiangaiser)
+- Limit processing the node events when label changes or when only the NetworkUnavailable condition changes, as opposed to processing when every condition (including heartbeats!) changes. (#2452, @shettyg)
+- Propagate the metallb labels to the speaker's service monitor service (#2390, @huseyinbabal)
+
+This release includes contributions from Ethan Leisinger, Federico Paolinelli, François Rigault, Guru Shetty, huseyinbabal, karampok, lwabish, Min Zhang, Sebastian Gaiser, tico88612, Tyler Auerbeck. Thanks!
+
 ## Version 0.14.5
 
 New features:
@@ -281,7 +304,7 @@ v0.12.x version, but now the feature is covered by tests too ([PR 1444](https://
 Changes in behavior:
 
 - the biggest change is the introduction of CRDs and removing support for the configuration via ConfigMap. In order to ease the transition
-  to the new configuration, we provide a conversion tool from ConfigMap to resources (see the "Backward compatibility" section from [the main page](https://metallb.universe.tf/#backward-compatibility)).
+  to the new configuration, we provide a conversion tool from ConfigMap to resources (see the "Backward compatibility" section from [the main page](https://metallb.io/#backward-compatibility)).
 
 - the internal architecture was radically changed in order to accommodate CRDs, so please do not hesitate to [file an issue](https://github.com/metallb/metallb/issues).
 
@@ -513,7 +536,7 @@ cabot, Tomofumi Hayashi, Tony Perez, and Yuan Liu. Thank you!
 
 ## Version 0.9.6
 
-[Documentation for this release](https://metallb.universe.tf)
+[Documentation for this release](https://metallb.io)
 
 Bugfixes:
 
@@ -701,9 +724,9 @@ New features:
   separate public and private interfaces.
 - The website has updated compatibility grids for both [Kubernetes
   network
-  addons](https://metallb.universe.tf/installation/network-addons/)
+  addons](https://metallb.io/installation/network-addons/)
   and [cloud
-  providers](https://metallb.universe.tf/installation/cloud/), listing
+  providers](https://metallb.io/installation/cloud/), listing
   known issues and configuration tips.
 - MetalLB now publishes a Kubernetes event to a service, indicating
   which nodes are announcing that service. This makes it much easier

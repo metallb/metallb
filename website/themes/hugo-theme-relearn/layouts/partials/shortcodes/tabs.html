@@ -1,0 +1,96 @@
+{{- $page := .page }}
+{{- if and (not $page) .context }}
+  {{- $page = .context }}
+  {{- warnf "%q: DEPRECATED parameter 'context' for shortcode 'tabs' found, use 'page' instead; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#5180" $page.File.Filename }}
+{{- end }}
+{{- $groupid := .groupid | default (partial "make-random-md5.hugo" $page) | plainify | anchorize }}
+{{- $color := .color }}
+{{- $style := .style }}
+{{- $title := .title }}
+{{- $icon := .icon }}
+{{- $tabs := slice }}
+{{- range $tab := (.content | default slice) }}
+  {{- if and (not $tab.title) $tab.name }}
+    {{- warnf "%q: DEPRECATED parameter 'name' for shortcode 'tab' found, use 'title' instead; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#5160" $page.File.Filename }}
+    {{- $tab = merge $tab (dict "title" .name) }}
+  {{- end }}
+  {{- with $tab }}
+    {{- $color := .color | default $color | default "" }}
+    {{- $style := .style | default $style | default (cond (ne $color "") "filled" "initial") }}
+    {{- $title := .title }}
+    {{- if not $title }}
+      {{- if eq $style "info" }}{{ $title = $style | T }}{{ end }}
+      {{- if eq $style "warning" }}{{ $title = $style | T }}{{ end }}
+      {{- if eq $style "note" }}{{ $title = $style | T }}{{ end }}
+      {{- if eq $style "tip" }}{{ $title = $style | T }}{{ end }}
+    {{- end }}
+    {{- $title = trim $title " " }}
+    {{- $icon := .icon | default "" }}
+    {{- if and (not $icon) (eq (len $icon) 0) }}
+      {{- if eq $style "info" }}{{ $icon = default "info-circle" }}{{ end }}
+      {{- if eq $style "warning" }}{{ $icon = default "exclamation-triangle" }}{{ end }}
+      {{- if eq $style "note" }}{{ $icon = default "exclamation-circle" }}{{ end }}
+      {{- if eq $style "tip" }}{{ $icon = default "lightbulb" }}{{ end }}
+    {{- end }}
+    {{- $icon = trim $icon " " }}
+    {{- if and $icon (not (findRE ".*?\\bfa-\\w.*?" $icon)) }}
+      {{- $icon = printf "fa-fw fas fa-%s" $icon }}
+    {{- end }}
+    {{- $tabs = $tabs | append (dict
+      "color"   $color
+      "content" .content
+      "icon"    $icon
+      "itemid"  (printf "%s%s" ($title | $page.RenderString | plainify | anchorize) ($icon | plainify | anchorize))
+      "style"   $style
+      "title"   $title
+    ) }}
+  {{- end }}
+{{- end }}
+{{- $color = .color | default "" }}
+{{- $style = .style | default (cond (ne $color "") "filled" "initial") }}
+{{- $title = .title }}
+{{- if not $title }}
+  {{- if eq $style "info" }}{{ $title = $style | T }}{{ end }}
+  {{- if eq $style "warning" }}{{ $title = $style | T }}{{ end }}
+  {{- if eq $style "note" }}{{ $title = $style | T }}{{ end }}
+  {{- if eq $style "tip" }}{{ $title = $style | T }}{{ end }}
+{{- end }}
+{{- $title = trim $title " " }}
+{{- $icon = .icon | default "" }}
+{{- if and (not $icon) (eq (len $icon) 0) }}
+  {{- if eq $style "info" }}{{ $icon = default "info-circle" }}{{ end }}
+  {{- if eq $style "warning" }}{{ $icon = default "exclamation-triangle" }}{{ end }}
+  {{- if eq $style "note" }}{{ $icon = default "exclamation-circle" }}{{ end }}
+  {{- if eq $style "tip" }}{{ $icon = default "lightbulb" }}{{ end }}
+{{- end }}
+{{- $icon = trim $icon " " }}
+{{- if and $icon (not (findRE ".*?\\bfa-\\w.*?" $icon)) }}
+  {{- $icon = printf "fa-fw fas fa-%s" $icon }}
+{{- end }}
+{{- with $page }}
+<div class="tab-panel" data-tab-group="{{ $groupid }}">
+  <div class="tab-nav">
+    <div class="tab-nav-title">{{ if $icon }}<i class="{{ $icon }}"></i>{{ end }}{{ if and $icon $title }} {{ end }}{{ $title | $page.RenderString }}{{ if (not $title) }}&#8203;{{ end }}</div>
+  {{- range $idx, $tab := $tabs }}
+    <button
+      data-tab-item="{{ .itemid }}"
+      class="tab-nav-button tab-panel-style cstyle {{ .style }}{{ cond (eq $idx 0) " active" ""}}"{{ if .color }} style="--VARIABLE-BOX-color: {{ .color }};"{{ end }}{{ if eq $idx 0 }} tabindex="-1"{{ end }}
+      onclick="switchTab('{{ $groupid }}','{{ .itemid }}')"
+    >
+      <span class="tab-nav-text">{{ if .icon }}<i class="{{ .icon }}"></i>{{ end }}{{ if and .icon .title }} {{ end }}{{ .title | $page.RenderString }}{{ if (not .title) }}&#8203;{{ end }}</span>
+    </button>
+  {{- end }}
+  </div>
+  <div class="tab-content-container">
+  {{- range $idx, $tab := $tabs }}
+    <div
+      data-tab-item="{{ .itemid }}"
+      class="tab-content tab-panel-style cstyle {{ .style }}{{ cond (eq $idx 0) " active" ""}}"{{ if .color }} style="--VARIABLE-BOX-color: {{ .color }};"{{ end }}>
+      <div class="tab-content-text">
+{{ if ne "<" (substr (strings.TrimLeft " \n\r\t" .content) 0 1) }}<p>{{ end }}<!-- we add a DOM element here if there is none to make collapsing marings work -->
+{{ .content | safeHTML }}</div><!-- no line break allowed here because of awkward behavior of Hugo 110 or this theme when tag shortcode is called standalone outside of tags shortcode ? -->
+    </div>
+  {{- end }}
+  </div>
+</div>
+{{- end }}

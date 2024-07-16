@@ -5,7 +5,8 @@ package config
 import (
 	"fmt"
 
-	"github.com/pkg/errors"
+	"errors"
+
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/ipfamily"
@@ -40,6 +41,9 @@ func DiscardFRROnly(c ClusterResources) error {
 		}
 		if p.Spec.ConnectTime != nil {
 			return fmt.Errorf("peer %s has connect time set on native bgp mode", p.Spec.Address)
+		}
+		if p.Spec.EnableGracefulRestart {
+			return fmt.Errorf("peer %s has EnableGracefulRestart flag set on native bgp mode", p.Spec.Address)
 		}
 		if p.Spec.DisableMP {
 			return fmt.Errorf("peer %s has disable MP flag set on native bgp mode", p.Spec.Address)

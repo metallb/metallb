@@ -3,9 +3,14 @@
 package executor
 
 import (
+	"errors"
 	"os"
 	"os/exec"
+
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 )
+
+var Kubectl string
 
 type Executor interface {
 	Exec(cmd string, args ...string) (string, error)
@@ -58,7 +63,41 @@ func ForPod(namespace, name, container string) Executor {
 }
 
 func (p *podExecutor) Exec(cmd string, args ...string) (string, error) {
+	if Kubectl == "" {
+		return "", errors.New("the kubectl parameter is not set")
+	}
 	fullargs := append([]string{"exec", p.name, "-n", p.namespace, "-c", p.container, "--", cmd}, args...)
-	out, err := exec.Command("kubectl", fullargs...).CombinedOutput()
+	out, err := exec.Command(Kubectl, fullargs...).CombinedOutput()
+	return string(out), err
+}
+
+// add ephemeral container to deal with distroless image
+type podDebugExecutor struct {
+	namespace string
+	name      string
+	container string
+	image     string
+}
+
+func ForPodDebug(namespace, name, container, image string) Executor {
+	return &podDebugExecutor{
+		namespace: namespace,
+		name:      name,
+		container: container,
+		image:     image,
+	}
+}
+
+func (pd *podDebugExecutor) Exec(cmd string, args ...string) (string, error) {
+	if Kubectl == "" {
+		return "", errors.New("the kubectl parameter is not set")
+	}
+
+	imageArg := "--image=" + pd.image
+	targetArg := "--target=" + pd.container
+	debuggerArg := pd.container + "-debugger-" + utilrand.String(5)
+
+	fullargs := append([]string{"debug", "-it", "-n", pd.namespace, "-c", debuggerArg, targetArg, imageArg, pd.name, "--", cmd}, args...)
+	out, err := exec.Command(Kubectl, fullargs...).CombinedOutput()
 	return string(out), err
 }

@@ -1,0 +1,119 @@
+[Reading-direction]
+other = "ltr"
+
+[Search]
+other = "Tafuta"
+
+[Search-placeholder]
+other = "Tafuta..."
+
+[Clear-search]
+other = "Futa utafutaji"
+
+[No-results-found]
+other = "Hakuna matokeo yaliyopatikana kwa \"{0}\""
+
+[N-results-found]
+other = "Matokeo {1} yamepatikana kwa \"{0}\""
+
+[Clear-History]
+other = "Futa Historia"
+
+[Reset-view]
+other = "Weka upya mwonekano"
+
+[View-reset]
+other = "Tazama kuweka upya!"
+
+[Attachments-label]
+other = "Viambatisho"
+
+[title-404]
+other = "Haipatikani"
+
+[message-404]
+other = "Lo! Inaonekana ukurasa huu haupo ¯\\_(ツ)_/¯."
+
+[Go-to-homepage]
+other = "Nenda kwenye ukurasa wa kwanza"
+
+[Edit-this-page]
+other = "Hariri"
+
+[Print-this-chapter]
+other = "Chapisha sura nzima"
+
+[More-action]
+other = "Zaidi"
+
+[Shortcuts-Title]
+other = "Zaidi"
+
+[Expand-title]
+other = "Nipanue..."
+
+[Navigation-toggle]
+other = "Menyu"
+
+[Toc-toggle]
+other = "Jedwali la Yaliyomo"
+
+[Byte-symbol]
+other = "B"
+
+[Kilobyte-symbol]
+other = "KB"
+
+[Megabyte-symbol]
+other = "MB"
+
+[note]
+other = "Kumbuka"
+
+[info]
+other = "Habari"
+
+[tip]
+other = "Kidokezo"
+
+[warning]
+other = "Onyo"
+
+[Copy-to-clipboard]
+other = "Nakili kwenye ubao wa kunakili"
+
+[Copied-to-clipboard]
+other = "Imenakiliwa kwenye ubao wa kunakili!"
+
+[Copy-link-to-clipboard]
+other = "Nakili kiungo kwenye ubao wa kunakili"
+
+[Link-copied-to-clipboard]
+other = "Imenakili kiungo kwenye ubao wa kunakili!"
+
+[Chapter]
+other = "Sura ya {{.}}"
+
+[Language]
+other = "Lugha"
+
+[Theme]
+other = "Mandhari"
+
+[Submenu]
+other = "Menyu ndogo {{.}}"
+
+[Subsections]
+other = "Vifungu vidogo vya {{.}}"
+
+[tags]
+other = "Tagi"
+
+[tag]
+other = "Tagi"
+
+[categories]
+other = "Kategoria"
+
+[category]
+other = "Kategoria"

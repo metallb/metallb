@@ -1,0 +1,20 @@
+{{- $onwidths := cond (isset . "onwidths") .onwidths "area-more" }}
+{{- $onwidthm := cond (isset . "onwidthm") .onwidthm "show" }}
+{{- $onwidthl := cond (isset . "onwidthl") .onwidthl "show" }}
+{{- with .page }}
+	{{- $format := partial "get-format.hugo" . }}
+	{{- $outputFormat := partial "output-format.hugo" (dict "page" . "format" $format) }}
+	{{- $printFormat := .OutputFormats.Get "print" }}
+	{{- if and (eq $outputFormat "html") $printFormat }}
+		{{- partial "topbar/func/button.html" (dict
+			"page" .
+			"class" "topbar-button-print"
+			"href" $printFormat.RelPermalink
+			"icon" "print"
+			"onwidths" $onwidths
+			"onwidthm" $onwidthm
+			"onwidthl" $onwidthl
+			"hint" (printf "%s (CTRL+ALT+p)" (T "Print-this-chapter"))
+		)}}
+	{{- end }}
+{{- end }}

@@ -1,0 +1,119 @@
+[Reading-direction]
+other = "ltr"
+
+[Search]
+other = "Szukaj"
+
+[Search-placeholder]
+other = "Szukaj..."
+
+[Clear-search]
+other = "Wyczyść wyszukiwanie"
+
+[No-results-found]
+other = "Nie znaleziono wyników dla \"{0}\""
+
+[N-results-found]
+other = "Znaleziono {1} wyników dla \"{0}\""
+
+[Clear-History]
+other = "Wyczyść historię"
+
+[Reset-view]
+other = "Resetowanie widoku"
+
+[View-reset]
+other = "Widok zresetowany!"
+
+[Attachments-label]
+other = "Załączniki"
+
+[title-404]
+other = "Niezlokalizowany"
+
+[message-404]
+other = "Ups. Wygląda na to, że strona nie istnieje ¯\\_(ツ)_/¯."
+
+[Go-to-homepage]
+other = "Idź do strony paczątkowej"
+
+[Edit-this-page]
+other = "Edycja"
+
+[Print-this-chapter]
+other = "Drukowanie całego rozdziału"
+
+[More-action]
+other = "Więcej"
+
+[Shortcuts-Title]
+other = "Więcej"
+
+[Expand-title]
+other = "Rozwiń mnie..."
+
+[Navigation-toggle]
+other = "Menu"
+
+[Toc-toggle]
+other = "Spis terści"
+
+[Byte-symbol]
+other = "B"
+
+[Kilobyte-symbol]
+other = "KB"
+
+[Megabyte-symbol]
+other = "MB"
+
+[note]
+other = "Uwaga"
+
+[info]
+other = "Info"
+
+[tip]
+other = "Porada"
+
+[warning]
+other = "Ostrzeżenie"
+
+[Copy-to-clipboard]
+other = "Kopiuj do schowaka"
+
+[Copied-to-clipboard]
+other = "Skopiowano do schowka!"
+
+[Copy-link-to-clipboard]
+other = "Kopiuj link do schowka"
+
+[Link-copied-to-clipboard]
+other = "Skopiowano link do schowka!"
+
+[Chapter]
+other = "Rozdział {{.}}"
+
+[Language]
+other = "Język"
+
+[Theme]
+other = "Kompozycja"
+
+[Submenu]
+other = "Podmenu {{.}}"
+
+[Subsections]
+other = "Podsekcje z {{.}}"
+
+[tags]
+other = "Tagi"
+
+[tag]
+other = "Tag"
+
+[categories]
+other = "Kategorie"
+
+[category]
+other = "Kategoria"

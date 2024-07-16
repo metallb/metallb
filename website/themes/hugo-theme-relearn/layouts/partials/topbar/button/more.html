@@ -1,0 +1,14 @@
+{{- $onempty := cond (isset . "onempty") .onempty "hide" }}
+{{- $onwidths := cond (isset . "onwidths") .onwidths "show" }}
+{{- $onwidthm := cond (isset . "onwidthm") .onwidthm "show" }}
+{{- $onwidthl := cond (isset . "onwidthl") .onwidthl "show" }}
+{{- partial "topbar/func/area-button.html" (dict
+	"page" .page
+	"area" "more"
+	"icon" "ellipsis-v"
+	"onempty" $onempty
+	"onwidths" $onwidths
+	"onwidthm" $onwidthm
+	"onwidthl" $onwidthl
+	"hint" (printf "%s" (T "More-action"))
+)}}

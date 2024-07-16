@@ -1,0 +1,74 @@
+
+{{- /*
+  Heavily modified from https://github.com/gohugoio/hugoDocs/blob/master/_vendor/github.com/gohugoio/gohugoioTheme/layouts/shortcodes/code-toggle.html
+
+  Renders syntax-highlighted configuration data in TOML, YAML and JSON formats.
+
+  @param {Page} [page] The page to render on.
+  @param {string} [content] Plain content to render.
+  @param {string} [config] The section of site.Data.docs.config to render.
+  @param {string} [dataKey] Only render specific section
+  @param {string} [file] The file name to display above the rendered code.
+  @param {bool} [fm=false] If true, render the code as front matter.
+  @param {bool} [skipHeader=false] If false, omit top level key(s) when rendering a section of site.Data.docs.config.
+
+  @returns {template.HTML}
+*/}}
+
+{{- /* Get parameters. */}}
+{{- $page := .page }}
+{{- $content := .content }}
+{{- $config := .config }}
+{{- $dataKey := .dataKey }}
+{{- $file := .file }}
+{{- $fm := false }}
+{{- if in (slice "false" false 0) .fm }}
+  {{- $fm = false }}
+{{- else if in (slice "true" true 1) .fm }}
+  {{- $fm = true }}
+{{- end }}
+{{- $skipHeader := false }}
+{{- if in (slice "false" false 0) .skipHeader }}
+  {{- $skipHeader = false }}
+{{- else if in (slice "true" true 1) .skipHeader }}
+  {{- $skipHeader = true }}
+{{- end }}
+
+{{- /* Define constants. */}}
+{{- $delimiters := dict "toml" "+++" "yaml" "---" }}
+{{- $langs := slice "toml" "yaml" "json" }}
+
+{{- /* Render. */}}
+{{- $code := "" }}
+{{- if $config }}
+  {{- $file = $file | default "hugo" }}
+  {{- $sections := (split $config ".") }}
+  {{- $configSection := index $page.Site.Data.docs.config $sections }}
+  {{- $code = dict $sections $configSection }}
+  {{- if $skipHeader }}
+    {{- $code = $configSection }}
+  {{- end }}
+{{- else if $dataKey }}
+  {{- $file = $file | default $dataKey }}
+  {{- $sections := (split $dataKey ".") }}
+  {{- $code = index $page.Site.Data.docs $sections }}
+{{- else }}
+  {{- $code = $content }}
+{{- end }}
+{{- $params := dict "page" $page "groupid" "config-code" }}
+{{- with $file }}
+  {{- $params = $params | merge (dict "title" (printf "%s%s" . (cond $fm "" "."))) }}
+{{- end }}
+{{- $contentparam := slice }}
+{{- range $langs }}
+  {{- /* Remove toml comments. */}}
+  {{- $hCode := $code | replaceRE `#.*(\r\n|\r|\n)?` "" }}
+  {{- $hCode = $hCode | transform.Remarshal . }}
+  {{- if and $fm (in (slice "toml" "yaml") .) }}
+    {{- $placeHolder := (index $delimiters .) }}
+    {{- $hCode = printf "%s\n%s%s\n" $placeHolder $hCode $placeHolder }}
+  {{- end }}
+  {{- $contentparam = $contentparam | append (dict "title" . "content" (printf "````%s\n%s````" . $hCode | $page.RenderString)) }}
+{{- end }}
+{{- $params = $params | merge (dict "content" $contentparam) }}
+{{- partial "shortcodes/tabs.html" $params }}

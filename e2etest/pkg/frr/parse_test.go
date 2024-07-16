@@ -88,8 +88,7 @@ func TestNeighbour(t *testing.T) {
           "sentPrefixCounter":%d
         }
       },
-      "connectionsEstablished":0,
-      "connectionsDropped":0,
+      "connectionsDropped":2,
       "lastResetTimerMsecs":253000,
       "lastResetDueTo":"Waiting for peer OPEN",
       "lastResetCode":32,
@@ -185,6 +184,9 @@ func TestNeighbour(t *testing.T) {
 			}
 			if n.ConfiguredKeepAliveTime != 30000 {
 				t.Fatal("unexpected configured keepalivetime time", n.ConfiguredKeepAliveTime)
+			}
+			if n.ConnectionsDropped != 2 {
+				t.Fatal("unexpected connections dropped", n.ConnectionsDropped)
 			}
 		})
 	}

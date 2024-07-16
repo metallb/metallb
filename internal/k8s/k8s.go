@@ -29,10 +29,11 @@ import (
 	"go.universe.tf/metallb/internal/k8s/epslices"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
+	"errors"
+
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
 	frrv1beta1 "github.com/metallb/frr-k8s/api/v1beta1"
-	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	discovery "k8s.io/api/discovery/v1"
 	policyv1beta1 "k8s.io/api/policy/v1beta1"
@@ -99,6 +100,7 @@ type Client struct {
 type Config struct {
 	ProcessName         string
 	NodeName            string
+	PodName             string
 	MetricsHost         string
 	MetricsPort         int
 	EnablePprof         bool
@@ -116,10 +118,10 @@ type Config struct {
 	LoadBalancerClass   string
 	WebhookWithHTTP2    bool
 	WithFRRK8s          bool
+	FRRK8sNamespace     string
 	Listener
 	Layer2StatusChan    <-chan event.GenericEvent
 	Layer2StatusFetcher controllers.StatusFetcher
-	EnableL2Status      bool
 }
 
 // New connects to masterAddr, using kubeconfig to authenticate.
@@ -141,9 +143,6 @@ func New(cfg *Config) (*Client, error) {
 		&metallbv1beta1.Community{}:        namespaceSelector,
 		&corev1.Secret{}:                   namespaceSelector,
 		&corev1.ConfigMap{}:                namespaceSelector,
-	}
-	if cfg.WithFRRK8s {
-		objectsPerNamespace[&frrv1beta1.FRRConfiguration{}] = namespaceSelector
 	}
 
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
@@ -193,7 +192,7 @@ func New(cfg *Config) (*Client, error) {
 			ForceReload:    reload,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "config")
-			return nil, errors.Wrap(err, "failed to create config reconciler")
+			return nil, errors.Join(err, errors.New("unable to create controller for config"))
 		}
 	}
 
@@ -208,7 +207,7 @@ func New(cfg *Config) (*Client, error) {
 			ForceReload:    reload,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "config")
-			return nil, errors.Wrap(err, "failed to create config reconciler")
+			return nil, errors.Join(err, errors.New("failed to create config reconciler"))
 		}
 	}
 
@@ -222,21 +221,21 @@ func New(cfg *Config) (*Client, error) {
 			ForceReload: reload,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "node")
-			return nil, errors.Wrap(err, "failed to create node reconciler")
+			return nil, errors.Join(err, errors.New("failed to create node reconciler"))
 		}
 	}
 
 	if cfg.WithFRRK8s {
 		frrk8sController := controllers.FRRK8sReconciler{
-			Client:    mgr.GetClient(),
-			Logger:    cfg.Logger,
-			Scheme:    mgr.GetScheme(),
-			Namespace: cfg.Namespace,
-			NodeName:  cfg.NodeName,
+			Client:          mgr.GetClient(),
+			Logger:          cfg.Logger,
+			Scheme:          mgr.GetScheme(),
+			FRRK8sNamespace: cfg.FRRK8sNamespace,
+			NodeName:        cfg.NodeName,
 		}
 		if err := frrk8sController.SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "frrk8s")
-			return nil, errors.Wrap(err, "failed to create frrk8s reconciler")
+			return nil, errors.Join(err, errors.New("failed to create frrk8s reconciler"))
 		}
 		c.BGPEventCallback = frrk8sController.UpdateConfig
 	}
@@ -274,16 +273,23 @@ func New(cfg *Config) (*Client, error) {
 			LoadBalancerClass: cfg.LoadBalancerClass,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "service")
-			return nil, errors.Wrap(err, "failed to create service reconciler")
+			return nil, errors.Join(err, errors.New("failed to create service reconciler"))
 		}
 	}
 
 	// metallb controller doesn't need this reconciler
-	if cfg.EnableL2Status && cfg.Layer2StatusChan != nil {
+	if cfg.Layer2StatusChan != nil {
+		selfPod, err := clientset.CoreV1().Pods(cfg.Namespace).Get(context.TODO(), cfg.PodName, metav1.GetOptions{})
+		if err != nil {
+			level.Error(c.logger).Log("unable to get speaker pod itself", err)
+			return nil, err
+		}
 		if err = (&controllers.Layer2StatusReconciler{
 			Client:        mgr.GetClient(),
 			Logger:        cfg.Logger,
 			NodeName:      cfg.NodeName,
+			Namespace:     cfg.Namespace,
+			SpeakerPod:    selfPod.DeepCopy(),
 			ReconcileChan: cfg.Layer2StatusChan,
 			StatusFetcher: cfg.Layer2StatusFetcher,
 		}).SetupWithManager(mgr); err != nil {
@@ -331,7 +337,7 @@ func New(cfg *Config) (*Client, error) {
 	if cfg.EnableWebhook && !cfg.DisableCertRotation {
 		err = enableCertRotation(startListeners, cfg, mgr)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to enable cert rotation")
+			return nil, errors.Join(err, errors.New("failed to enable cert rotation"))
 		}
 	} else {
 		// otherwise we can go on and start them

@@ -31,6 +31,7 @@ import (
 	"go.universe.tf/e2etest/bgptests"
 	"go.universe.tf/e2etest/l2tests"
 	testsconfig "go.universe.tf/e2etest/pkg/config"
+	"go.universe.tf/e2etest/pkg/executor"
 	frrprovider "go.universe.tf/e2etest/pkg/frr/provider"
 	"go.universe.tf/e2etest/pkg/iprange"
 	"go.universe.tf/e2etest/pkg/k8s"
@@ -60,6 +61,8 @@ var (
 	frrImage            string
 	hostContainerMode   string
 	withVRF             bool
+	kubectlPath         string
+	frrK8sNamespace     string
 )
 
 // handleFlags sets up all flags and parses the command line.
@@ -74,10 +77,12 @@ func handleFlags() {
 	flag.StringVar(&reportPath, "report-path", "/tmp/report", "the path to be used to dump test failure information")
 	flag.StringVar(&prometheusNamespace, "prometheus-namespace", "monitoring", "the namespace prometheus is running in (if running)")
 	flag.StringVar(&externalContainers, "external-containers", "", "a comma separated list of external containers names to use for the test. (valid parameters are: ibgp-single-hop / ibgp-multi-hop / ebgp-single-hop / ebgp-multi-hop)")
-	flag.StringVar(&frrImage, "frr-image", "quay.io/frrouting/frr:9.0.2", "the image to use for the external frr containers")
+	flag.StringVar(&frrImage, "frr-image", "quay.io/frrouting/frr:9.1.0", "the image to use for the external frr containers")
 	flag.StringVar(&hostContainerMode, "host-bgp-mode", string(bgptests.IBGPMode), "tells whether to run the host container in ebgp or ibgp mode")
 	flag.BoolVar(&withVRF, "with-vrf", false, "runs the tests against containers reacheable via linux vrfs. More coverage, but might not work depending on the OS")
-	flag.StringVar(&bgpMode, "bgp-mode", "", "says which bgp mode we are testing against. valid options are: native, frr, frr-k8s")
+	flag.StringVar(&bgpMode, "bgp-mode", "", "says which bgp mode we are testing against. valid options are: native, frr, frr-k8s, frr-k8s-external")
+	flag.StringVar(&frrK8sNamespace, "frr-k8s-namespace", metallb.Namespace, "the namespace frr-k8s is running in, defaults to metallb's")
+	flag.StringVar(&executor.Kubectl, "kubectl", "kubectl", "the path for the kubectl binary")
 
 	flag.Parse()
 
@@ -166,7 +171,9 @@ var _ = ginkgo.BeforeSuite(func() {
 		bgptests.FRRProvider, err = frrprovider.NewFRRMode(clientconfig)
 		Expect(err).NotTo(HaveOccurred())
 	case "frr-k8s":
-		bgptests.FRRProvider, err = frrprovider.NewFRRK8SMode(clientconfig)
+		fallthrough
+	case "frr-k8s-external":
+		bgptests.FRRProvider, err = frrprovider.NewFRRK8SMode(clientconfig, frrK8sNamespace)
 		Expect(err).NotTo(HaveOccurred())
 	default:
 		ginkgo.Fail(fmt.Sprintf("unsupported --bgp-mode %s - supported options are: native, frr, frr-k8s", bgpMode))
@@ -177,7 +184,7 @@ var _ = ginkgo.BeforeSuite(func() {
 		ginkgo.Fail("KUBECONFIG not set")
 	}
 
-	reporter := k8s.InitReporter(kubeconfig, reportPath, metallb.Namespace)
+	reporter := k8s.InitReporter(kubeconfig, reportPath, metallb.Namespace, frrK8sNamespace)
 
 	bgptests.ConfigUpdater = updater
 	l2tests.ConfigUpdater = updater

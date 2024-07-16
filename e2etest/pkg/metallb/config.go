@@ -36,6 +36,10 @@ func PeersForContainers(containers []*frrcontainer.FRR, ipFamily ipfamily.Family
 		if i > 0 {
 			holdTime = time.Duration(i) * 180 * time.Second
 		}
+		gracefulRestart := false
+		if c.NeighborConfig.GracefulRestart {
+			gracefulRestart = true
+		}
 		ebgpMultihop := false
 		if c.NeighborConfig.MultiHop && c.NeighborConfig.ASN != c.RouterConfig.ASN {
 			ebgpMultihop = true
@@ -46,14 +50,15 @@ func PeersForContainers(containers []*frrcontainer.FRR, ipFamily ipfamily.Family
 					Name: c.Name + fmt.Sprint(i), // Otherwise the peers will override
 				},
 				Spec: metallbv1beta2.BGPPeerSpec{
-					Address:      address,
-					ASN:          c.RouterConfig.ASN,
-					MyASN:        c.NeighborConfig.ASN,
-					Port:         c.RouterConfig.BGPPort,
-					Password:     c.RouterConfig.Password,
-					HoldTime:     metav1.Duration{Duration: holdTime},
-					EBGPMultiHop: ebgpMultihop,
-					VRFName:      c.RouterConfig.VRF,
+					Address:               address,
+					ASN:                   c.RouterConfig.ASN,
+					MyASN:                 c.NeighborConfig.ASN,
+					Port:                  c.RouterConfig.BGPPort,
+					Password:              c.RouterConfig.Password,
+					HoldTime:              metav1.Duration{Duration: holdTime},
+					EnableGracefulRestart: gracefulRestart,
+					EBGPMultiHop:          ebgpMultihop,
+					VRFName:               c.RouterConfig.VRF,
 				}}
 			for _, f := range tweak {
 				f(&peer)
@@ -76,6 +81,14 @@ func WithBFD(peers []metallbv1beta2.BGPPeer, bfdProfile string) []metallbv1beta2
 func WithRouterID(peers []metallbv1beta2.BGPPeer, routerID string) []metallbv1beta2.BGPPeer {
 	for i := range peers {
 		peers[i].Spec.RouterID = routerID
+	}
+	return peers
+}
+
+// WithGracefulRestart sets the GR to true to the peers.
+func WithGracefulRestart(peers []metallbv1beta2.BGPPeer) []metallbv1beta2.BGPPeer {
+	for i := range peers {
+		peers[i].Spec.EnableGracefulRestart = true
 	}
 	return peers
 }

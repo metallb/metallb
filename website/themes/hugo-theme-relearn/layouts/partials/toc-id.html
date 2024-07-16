@@ -1,0 +1,31 @@
+{{- if or (eq .Kind "taxonomy") (eq .Kind "term") }}
+  {{- $lastCapital := "" }}
+  {{- $pages := slice }}
+  {{- if eq .Kind "taxonomy" }}
+    {{- $pages = partialCached "partials/pageHelper/taxonomyPages.html" . . }}
+  {{- else if eq .Kind "term" }}
+    {{- $pages = partialCached "partials/pageHelper/termPages.html" . . }}
+  {{- end }}
+  {{- $toc_pages := "" }}
+  {{- range $pages }}
+    {{- $capital := substr .Title 0 1 | upper }}
+    {{- if ne $lastCapital $capital }}
+      {{- $toc_pages = printf "%s    <li><a href=\"#%s\">%s</a></li>\n" $toc_pages ($capital | plainify | anchorize) $capital }}
+    {{- end }}
+    {{- $lastCapital = $capital }}
+  {{- end }}
+  {{- $toc := trim (partial "toc.html" .) " \n\r\t" }}
+  {{- if and (not $toc) $toc_pages }}
+    {{- $toc = printf "<nav id=\"TableOfContents\"></nav>" }}
+  {{- end }}
+  {{- if and $toc $toc_pages }}
+    {{- $toc = replaceRE "^(<nav id=\"TableOfContents\">)[\\s]*" "${1}\n  <ul>\n" $toc }}
+    {{- $toc = replaceRE "^(<nav id=\"TableOfContents\">[\\s]*<ul>)[\\s]*<ul>[\\n\\r]*" "${1}\n" $toc }}
+    {{- $toc = replaceRE "[\\s]*(</nav>)$" "\n  </ul>\n${1}" $toc }}
+    {{- $toc = replaceRE "[ \\t]*</ul>[\\s]*(</ul>[\\s]*</nav>)$" "  ${1}" $toc }}
+    {{- $toc = replaceRE "([ \\t]*</ul>[\\s]*</nav>)$" (printf "%s${1}" $toc_pages) $toc }}
+  {{- end }}
+{{ $toc | safeHTML }}
+{{- else }}
+  {{- partial "toc.html" . }}
+{{- end }}

@@ -1,0 +1,50 @@
+        {{- $link := "" }}
+        {{- if or (.Site.Home.OutputFormats.Get "json") (.Site.Home.OutputFormats.Get "search") }}
+          {{- with .Site.Home.OutputFormats.Get "searchpage" }}
+            {{- $link = partial "relLangPrettyUglyURL.hugo" (dict "to" .) }}
+          {{- end }}
+        {{- end }}
+        <search>{{ if $link }}<form action="{{ $link }}" method="get">{{ end }}
+          <div class="searchbox default-animation">
+            {{ if $link }}<button class="search-detail" type="submit" title="{{ T "Search" }} (CTRL+ALT+f)">{{ end }}<i class="fas fa-search"{{ if not $link }} title="{{ T "Search" }} (CTRL+ALT+f)"{{ end }}></i>{{ if $link }}</button>{{ end }}
+            <label class="a11y-only" for="R-search-by">{{ T "Search" }}</label>
+            <input data-search-input id="R-search-by" name="search-by" class="search-by" type="search" placeholder="{{ T "Search-placeholder" }}">
+            <button class="search-clear" type="button" data-search-clear="" title="{{ T "Clear-search" }}"><i class="fas fa-times" title="{{ T "Clear-search" }}"></i></button>
+          </div>
+        {{ if $link }}</form>{{ end }}</search>
+        {{- $assetBusting := not .Site.Params.disableAssetsBusting }}
+        {{- $pageBaseLang := replaceRE "([a-z]+).*" "${1}" .Page.Language.LanguageCode }}
+        {{- $contentlangs := (union (slice | append (.Site.Params.additionalContentLanguage | default slice)) (slice $pageBaseLang)) }}
+        {{- $quotedcontentlangs := slice }}
+        {{- $missingcontentlangs := slice }}
+        {{- range $contentlangs }}
+          {{- $f := printf "/static/js/lunr/lunr.%s.min.js" . }}
+          {{- if partialCached "fileExists.hugo" $f $f }}
+            {{- $quotedcontentlangs = $quotedcontentlangs | append (printf "'%s'" .) }}
+          {{- else }}
+            {{- $missingcontentlangs = $missingcontentlangs | append . }}
+          {{- end }}
+        {{- end }}
+        {{- $contentlangs = $contentlangs | complement $missingcontentlangs }}
+        <script>
+          var contentLangs=[{{ delimit $quotedcontentlangs ", " | safeJS }}];
+        </script>
+        <script src="{{"js/auto-complete.js" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" defer></script>
+        <script src="{{"js/lunr/lunr.min.js" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" defer></script>
+        <script src="{{"js/lunr/lunr.stemmer.support.min.js" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" defer></script>
+        <script src="{{"js/lunr/lunr.multi.min.js" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" defer></script>
+        {{- $tinyseg := false }}
+        {{- $wordcut := false }}
+        {{- range $contentlangs }}
+          {{- if and (not $tinyseg) (or (eq . "ja")) }}
+            {{- $tinyseg = true }}
+        <script src="{{"js/lunr/tinyseg.js" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" defer></script>
+          {{- end }}
+          {{- if and (not $wordcut) (or (eq . "hi") (eq . "th")) }}
+            {{- $wordcut = true }}
+        <script src="{{"js/lunr/wordcut.js" | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" defer></script>
+          {{- end }}
+          {{- $file := (printf "js/lunr/lunr.%s.min.js" .) }}
+        <script src="{{ $file | relURL}}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" defer></script>
+        {{- end }}
+        <script src="{{ "js/search.js" | relURL }}{{ if $assetBusting }}?{{ now.Unix }}{{ end }}" defer></script>

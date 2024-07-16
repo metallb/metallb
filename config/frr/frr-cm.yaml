@@ -91,7 +91,7 @@ data:
   frr.conf: |+
     ! This file gets overriden the first time the speaker renders a config.
     ! So anything configured here is only temporary.
-    frr version 7.5.1
+    frr version 8.0
     frr defaults traditional
     hostname Router
     line vty

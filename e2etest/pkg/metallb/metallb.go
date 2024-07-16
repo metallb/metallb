@@ -6,10 +6,12 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
+	"errors"
+
 	. "github.com/onsi/gomega"
-	"github.com/pkg/errors"
 	"go.universe.tf/e2etest/pkg/k8s"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,13 +34,41 @@ func init() {
 	}
 }
 
+func RestartSpeakerPods(cs clientset.Interface) error {
+	pods, err := SpeakerPods(cs)
+	if err != nil {
+		return err
+	}
+	oldNames := []string{}
+	for _, p := range pods {
+		oldNames = append(oldNames, p.Name)
+		err := cs.CoreV1().Pods(Namespace).Delete(context.Background(), p.Name, metav1.DeleteOptions{})
+		if err != nil {
+			return err
+		}
+	}
+
+	return wait.PollUntilContextTimeout(context.Background(), 100*time.Millisecond, 10*time.Second, false, func(context.Context) (bool, error) {
+		npods, err := SpeakerPods(cs)
+		if err != nil {
+			return false, err
+		}
+		for _, p := range npods {
+			if slices.Contains(oldNames, p.Name) {
+				return false, nil
+			}
+		}
+		return true, nil
+	})
+}
+
 // SpeakerPods returns the set of pods running the speakers.
 func SpeakerPods(cs clientset.Interface) ([]*corev1.Pod, error) {
 	speakers, err := cs.CoreV1().Pods(Namespace).List(context.Background(), metav1.ListOptions{
 		LabelSelector: speakerLabelgSelector,
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to fetch speaker pods")
+		return nil, errors.Join(err, errors.New("failed to fetch speaker pods"))
 	}
 	if len(speakers.Items) == 0 {
 		return nil, errors.New("no speaker pods found")
@@ -76,7 +106,7 @@ func SpeakerPodInNode(cs clientset.Interface, node string) (*corev1.Pod, error) 
 			return pod, nil
 		}
 	}
-	return nil, errors.Errorf("no speaker pod run in the node %s", node)
+	return nil, fmt.Errorf("no speaker pod run in the node %s", node)
 }
 
 // RestartController restarts metallb's controller pod and waits for it to be running and ready.
@@ -103,12 +133,12 @@ func RestartController(cs clientset.Interface) {
 }
 
 // FRRK8SPods returns the set of pods related to FRR-K8s.
-func FRRK8SPods(cs clientset.Interface) ([]*corev1.Pod, error) {
-	pods, err := cs.CoreV1().Pods(Namespace).List(context.Background(), metav1.ListOptions{
+func FRRK8SPods(cs clientset.Interface, namespace string) ([]*corev1.Pod, error) {
+	pods, err := cs.CoreV1().Pods(namespace).List(context.Background(), metav1.ListOptions{
 		LabelSelector: "app=frr-k8s",
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to fetch frr-k8s pods")
+		return nil, errors.Join(err, errors.New("Failed to fetch frr-k8s pods"))
 	}
 	if len(pods.Items) == 0 {
 		return nil, errors.New("No frr-k8s pods found")

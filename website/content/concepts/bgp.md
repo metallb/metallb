@@ -127,7 +127,7 @@ layer.
 
 When the FRR mode is enabled, the following additional features are available:
 
-- BGP sessions with [BFD support](https://metallb.universe.tf/concepts/bgp/#limitations)
+- BGP sessions with [BFD support](https://metallb.io/concepts/bgp/#limitations)
 - IPv6 Support for BGP and BFD
 - Multi Protocol BGP
 
@@ -160,4 +160,4 @@ the same BGP session.
 All the same features / limitations related to MetalLB in FRR mode can be applied to FRR-K8s mode.
 
 When deploying MetalLB in FRR-K8s mode, a FRR-K8s instance will be deployed on the same nodes where
-the MetalLB spekaer is deployed.
+the MetalLB speaker is deployed.

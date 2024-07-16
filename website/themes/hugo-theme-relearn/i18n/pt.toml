@@ -1,0 +1,119 @@
+[Reading-direction]
+other = "ltr"
+
+[Search]
+other = "Procurar"
+
+[Search-placeholder]
+other = "Procurar..."
+
+[Clear-search]
+other = "Limpar pesquisa"
+
+[No-results-found]
+other = "Nenhum resultado encontrado para \"{0}\""
+
+[N-results-found]
+other = "{1} resultados encontrados para \"{0}\""
+
+[Clear-History]
+other = "Limpar Histórico"
+
+[Reset-view]
+other = "Repor vista"
+
+[View-reset]
+other = "Ver reposição!"
+
+[Attachments-label]
+other = "Anexos"
+
+[title-404]
+other = "Não localizado"
+
+[message-404]
+other = "Ops. Parece que a página não existe ¯\\_(ツ)_/¯."
+
+[Go-to-homepage]
+other = "Ir para o início"
+
+[Edit-this-page]
+other = "Editar"
+
+[Print-this-chapter]
+other = "Imprimir capítulo inteiro"
+
+[More-action]
+other = "Mais"
+
+[Shortcuts-Title]
+other = "Mais"
+
+[Expand-title]
+other = "Expandir..."
+
+[Navigation-toggle]
+other = "Menu"
+
+[Toc-toggle]
+other = "Índice"
+
+[Byte-symbol]
+other = "B"
+
+[Kilobyte-symbol]
+other = "KB"
+
+[Megabyte-symbol]
+other = "MB"
+
+[note]
+other = "Nota"
+
+[info]
+other = "Informação"
+
+[tip]
+other = "Dica"
+
+[warning]
+other = "Aviso"
+
+[Copy-to-clipboard]
+other = "Copiar para a área de transferência"
+
+[Copied-to-clipboard]
+other = "Copiado para a área de transferência!"
+
+[Copy-link-to-clipboard]
+other = "Link de cópia para a área de transferência"
+
+[Link-copied-to-clipboard]
+other = "Link copiado para a área de transferência!"
+
+[Chapter]
+other = "Capítulo {{.}}"
+
+[Language]
+other = "Idioma"
+
+[Theme]
+other = "Tema"
+
+[Submenu]
+other = "Submenu {{.}}"
+
+[Subsections]
+other = "Subsecções de {{.}}"
+
+[tags]
+other = "Etiquetas"
+
+[tag]
+other = "Etiqueta"
+
+[categories]
+other = "Categorias"
+
+[category]
+other = "Categoria"

@@ -1,0 +1,4 @@
+{{- $page := .page }}
+{{- $content := .content }}
+{{- $outputFormat := partial "output-format.hugo" .page }}
+{{- partial "nested-article.hugo" (dict "page" $page "outputFormat" $outputFormat) }}

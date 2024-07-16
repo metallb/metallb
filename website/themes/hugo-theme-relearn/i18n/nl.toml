@@ -1,0 +1,119 @@
+[Reading-direction]
+other = "ltr"
+
+[Search]
+other = "Zoeken"
+
+[Search-placeholder]
+other = "Zoeken..."
+
+[Clear-search]
+other = "Zoekopdracht wissen"
+
+[No-results-found]
+other = "Geen resultaten gevonden voor \"{0}\""
+
+[N-results-found]
+other = "{1} resultaten gevonden voor \"{0}\""
+
+[Clear-History]
+other = "Wis geschiedenis"
+
+[Reset-view]
+other = "Weergave opnieuw instellen"
+
+[View-reset]
+other = "Opnieuw instellen weergeven!"
+
+[Attachments-label]
+other = "Bijlagen"
+
+[title-404]
+other = "Niet gelokaliseerd"
+
+[message-404]
+other = "Blijkbaar bestaat deze pagina niet ¯\\_(ツ)_/¯."
+
+[Go-to-homepage]
+other = "Naar startpagina"
+
+[Edit-this-page]
+other = "Bewerken"
+
+[Print-this-chapter]
+other = "Het hele hoofdstuk afdrukken"
+
+[More-action]
+other = "Snelkoppelingen"
+
+[Shortcuts-Title]
+other = "Snelkoppelingen"
+
+[Expand-title]
+other = "Lees meer..."
+
+[Navigation-toggle]
+other = "Menu"
+
+[Toc-toggle]
+other = "Inhoudsopgave"
+
+[Byte-symbol]
+other = "B"
+
+[Kilobyte-symbol]
+other = "KB"
+
+[Megabyte-symbol]
+other = "MB"
+
+[note]
+other = "Notitie"
+
+[info]
+other = "Info"
+
+[tip]
+other = "Fooi"
+
+[warning]
+other = "Waarschuwing"
+
+[Copy-to-clipboard]
+other = "Naar klembord kopiëren"
+
+[Copied-to-clipboard]
+other = "Gekopieerd naar klembord!"
+
+[Copy-link-to-clipboard]
+other = "Link naar klembord kopiëren"
+
+[Link-copied-to-clipboard]
+other = "Link gekopieerd naar klembord!"
+
+[Chapter]
+other = "Hoofdstuk {{.}}"
+
+[Language]
+other = "Taal"
+
+[Theme]
+other = "Thema"
+
+[Submenu]
+other = "Submenu {{.}}"
+
+[Subsections]
+other = "Subsecties van {{.}}"
+
+[tags]
+other = "Tags"
+
+[tag]
+other = "Tag"
+
+[categories]
+other = "Categorieën"
+
+[category]
+other = "Categorie"

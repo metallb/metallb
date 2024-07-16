@@ -34,8 +34,10 @@ extra_network = "network2"
 controller_gen_version = "v0.14.0"
 build_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build")
 kubectl_path = os.path.join(build_path, "kubectl")
+kind_path = os.path.join(build_path, "kind")
 controller_gen_path = os.path.join(build_path, "bin", "controller-gen")
 kubectl_version = "v1.27.0"
+kind_version = "v0.23.0"
 
 
 def _check_architectures(architectures):
@@ -358,6 +360,7 @@ def generate_manifest(ctx, crd_options="crd:crdVersions=v1", bgp_type="native", 
                        "Default: False.",
     "with_api_audit": "Enables audit on the apiserver"
                       "Default: False.",
+
 })
 def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_dir="",
             node_img=None, ip_family="ipv4", bgp_type="frr", log_level="info",
@@ -372,6 +375,7 @@ def dev_env(ctx, architecture="amd64", name="kind", protocol=None, frr_volume_di
     """
 
     fetch_kubectl()
+    fetch_kind()
     validate_kind_version()
 
     clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
@@ -424,19 +428,25 @@ apiServer:
         with tempfile.NamedTemporaryFile() as tmp:
             tmp.write(config)
             tmp.flush()
-            run("kind create cluster --name={} --config={} {}".format(name, tmp.name, extra_options), pty=True,
+            run("{} create cluster --name={} --config={} {}".format(kind_path, name, tmp.name, extra_options), pty=True,
                 echo=True)
         _add_nic_to_nodes(name)
 
     binaries = ["controller", "speaker"]
     if build_images:
         build(ctx, binaries, architectures=[architecture])
-    run("kind load docker-image --name={} quay.io/metallb/controller:dev-{}".format(name, architecture), echo=True)
-    run("kind load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(name, architecture), echo=True)
+    run("{} load docker-image --name={} quay.io/metallb/controller:dev-{}".format(kind_path, name, architecture), echo=True)
+    run("{} load docker-image --name={} quay.io/metallb/speaker:dev-{}".format(kind_path, name, architecture), echo=True)
 
     if with_prometheus:
         print("Deploying prometheus")
         deployprometheus(ctx)
+
+    frr_k8s_ns = "frr-k8s-system"
+    if bgp_type == "frr-k8s-external":
+        run("{} apply -f https://raw.githubusercontent.com/metallb/frr-k8s/v0.0.13/config/all-in-one/frr-k8s.yaml".format(kubectl_path), echo=True)
+        time.sleep(2)
+        run("{} -n {} wait --for=condition=Ready --all pods --timeout 300s".format(kubectl_path, frr_k8s_ns), echo=True)
 
     if helm_install:
         run("{} apply -f config/native/ns.yaml".format(kubectl_path), echo=True)
@@ -448,6 +458,8 @@ apiServer:
                                  "--set prometheus.serviceAccount=prometheus-k8s "
                                  "--set prometheus.namespace=monitoring ")
         frr_values = ""
+
+
         if bgp_type == "frr":
             frr_values = "--set speaker.frr.enabled=true "
         if bgp_type == "frr-k8s":
@@ -464,6 +476,9 @@ apiServer:
                     "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].targetLabel=\"__name__\" "
                     "--set frr-k8s.prometheus.serviceMonitor.metricRelabelings[1].replacement=\"metallb_bfd_\\$1\" "
                 )
+
+        if bgp_type == "frr-k8s-external":
+           frr_values = "--set frrk8s.external=true --set frrk8s.namespace={} --set speaker.frr.enabled=false --set frr-k8s.prometheus.serviceMonitor.enabled=false ".format(frr_k8s_ns)
 
         run("helm install metallb charts/metallb/ --set controller.image.tag=dev-{} "
             "--set speaker.image.tag=dev-{} --set speaker.logLevel=debug "
@@ -575,7 +590,7 @@ def bgp_dev_env(ip_family, frr_volume_dir):
         '    docker rm -f $frr ; '
         'done', echo=True)
     run("docker run -d --privileged --network kind --rm --ulimit core=-1 --name frr --volume %s:/etc/frr "
-        "quay.io/frrouting/frr:9.0.2" % frr_volume_dir, echo=True)
+        "quay.io/frrouting/frr:9.1.0" % frr_volume_dir, echo=True)
 
     if ip_family == "ipv4":
         peer_address = run('docker inspect -f "{{ '
@@ -626,9 +641,11 @@ def get_available_ips(ip_family=None):
 def dev_env_cleanup(ctx, name="kind", frr_volume_dir=""):
     """Remove traces of the dev env."""
     validate_kind_version()
-    clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
+    fetch_kind()
+
+    clusters = run("{} get clusters".format(kind_path), hide=True).stdout.strip().splitlines()
     if name in clusters:
-        run("kind delete cluster --name={}".format(name), hide=True)
+        run("{} delete cluster --name={}".format(kind_path, name), hide=True)
 
     run('for frr in $(docker ps -a -f name=frr --format {{.Names}}) ; do '
         '    docker rm -f $frr ; '
@@ -804,7 +821,7 @@ def lint(ctx, env="container"):
     convenient to install the golangci-lint binaries on the host. This can be
     achieved by running `inv lint --env host`.
     """
-    version = "1.57.0"
+    version = "1.59.1"
     golangci_cmd = "golangci-lint run --timeout 10m0s ./..."
 
     if env == "container":
@@ -867,9 +884,10 @@ def helmdocs(ctx, env="container"):
 def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="kube-system,metallb-system",
             service_pod_port=80, skip_docker=False, focus="", skip="", ipv4_service_range=None, ipv6_service_range=None,
             prometheus_namespace="", node_nics="kind", local_nics="kind", external_containers="", bgp_mode="",
-            with_vrf=False, external_frr_image="", ginkgo_params="", junit_report="junit-report.xml", host_bgp_mode="ibgp"):
+            with_vrf=False, external_frr_image="", ginkgo_params="", junit_report="junit-report.xml", host_bgp_mode="ibgp", frr_k8s_namespace=""):
     """Run E2E tests against development cluster."""
     fetch_kubectl()
+    fetch_kind()
 
     if skip_docker:
         opt_skip_docker = "--skip-docker"
@@ -886,11 +904,11 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
 
     if kubeconfig is None:
         validate_kind_version()
-        clusters = run("kind get clusters", hide=True).stdout.strip().splitlines()
+        clusters = run("{} get clusters".format(kind_path), hide=True).stdout.strip().splitlines()
         if name in clusters:
             kubeconfig_file = tempfile.NamedTemporaryFile()
             kubeconfig = kubeconfig_file.name
-            run("kind export kubeconfig --name={} --kubeconfig={}".format(name, kubeconfig), pty=True, echo=True)
+            run("{} export kubeconfig --name={} --kubeconfig={}".format(kind_path, name, kubeconfig), pty=True, echo=True)
         else:
             raise Exit(message="Unable to find cluster named: {}".format(name))
     else:
@@ -930,13 +948,13 @@ def e2etest(ctx, name="kind", export=None, kubeconfig=None, system_namespaces="k
     if external_frr_image != "":
         external_frr_image = "--frr-image=" + (external_frr_image)
     testrun = run("cd `git rev-parse --show-toplevel`/e2etest &&"
-                  "KUBECONFIG={} ginkgo {} --junit-report={} --timeout=3h {} {} -- --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {} -bgp-mode={}  -with-vrf={} {} --host-bgp-mode={}".format(
+                  "KUBECONFIG={} ginkgo {} --junit-report={} --timeout=3h {} {} -- --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {} -bgp-mode={} -with-vrf={} {} --host-bgp-mode={} --kubectl={} --frr-k8s-namespace={}".format(
         kubeconfig, ginkgo_params, junit_report, ginkgo_focus, ginkgo_skip, kubeconfig, service_pod_port, ipv4_service_range,
         ipv6_service_range, opt_skip_docker, report_path, prometheus_namespace, node_nics, local_nics,
-        external_containers, bgp_mode, with_vrf, external_frr_image, host_bgp_mode), warn="True")
+        external_containers, bgp_mode, with_vrf, external_frr_image, host_bgp_mode, kubectl_path, frr_k8s_namespace), warn="True")
 
     if export != None:
-        run("kind export logs {}".format(export))
+        run("{} export logs {}".format(kind_path, export))
 
     if testrun.failed:
         raise Exit(message="E2E tests failed", code=testrun.return_code)
@@ -1023,7 +1041,7 @@ def _align_helm_crds(source, output):
 @task
 def generateapidocs(ctx):
     """Generates the docs for the CRDs"""
-    run("go install github.com/elastic/crd-ref-docs@v0.0.10")
+    run("go install github.com/elastic/crd-ref-docs@v0.0.12")
     run('crd-ref-docs --source-path=./api --config=website/generatecrddoc/crdgen.yaml --templates-dir=website/generatecrddoc/template --renderer markdown --output-path=/tmp/generated_apidoc.md')
     run("cat website/generatecrddoc/prefix.html /tmp/generated_apidoc.md > website/content/apis/_index.md")
 
@@ -1057,6 +1075,12 @@ def fetch_kubectl():
     get_version_command = f"{kubectl_path} version --short"
     fetch_dependency(kubectl_path, kubectl_version, curl_command, get_version_command, "Client Version:")
 
+@cache
+def fetch_kind():
+    curl_command = "curl -o {} -LO https://github.com/kubernetes-sigs/kind/releases/download/{}/kind-$(go env GOOS)-$(go env GOARCH)".format(
+        kind_path, kind_version)
+    get_version_command = f"{kind_path} version"
+    fetch_dependency(kind_path, kind_version, curl_command, get_version_command, "kind")
 
 @cache
 def fetch_controller_gen():
@@ -1085,4 +1109,6 @@ def get_command_version(get_version_command: str, version_prefix: str) -> Option
     version = run(get_version_command, warn=True, hide='both').stdout
     for line in version.splitlines():
         if line.startswith(version_prefix):
-            return line.split(":")[1].strip()
+            if ':' in line:
+                return line.split(":")[1].strip()
+            return line.split(" ")[1].strip()

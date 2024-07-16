@@ -34,7 +34,8 @@ import (
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
-	"github.com/pkg/errors"
+
+	"errors"
 )
 
 type bgpImplementation string
@@ -43,6 +44,15 @@ const (
 	bgpNative bgpImplementation = "native"
 	bgpFrr    bgpImplementation = "frr"
 	bgpFrrK8s bgpImplementation = "frr-k8s"
+)
+
+type SecretHandling int
+
+const (
+	// Writing the secret reference in the frr-k8s configuration.
+	SecretPassThrough SecretHandling = iota
+	// Convert the password contained in the secret to the plain text password field.
+	SecretConvert
 )
 
 type peer struct {
@@ -57,6 +67,7 @@ type bgpController struct {
 	peers           []*peer
 	svcAds          map[string][]*bgp.Advertisement
 	bgpType         bgpImplementation
+	secretHandling  SecretHandling
 	sessionManager  bgp.SessionManager
 	ignoreExcludeLB bool
 }
@@ -100,11 +111,11 @@ newPeers:
 
 	err := c.syncBFDProfiles(cfg.BFDProfiles)
 	if err != nil {
-		return errors.Wrap(err, "failed to sync bfd profiles")
+		return errors.Join(err, errors.New("failed to sync bfd profiles"))
 	}
 	err = c.sessionManager.SyncExtraInfo(cfg.BGPExtras)
 	if err != nil {
-		return errors.Wrap(err, "failed to sync extra info")
+		return errors.Join(err, errors.New("failed to sync extra info"))
 	}
 
 	return c.syncPeers(l)
@@ -220,26 +231,27 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 			if p.cfg.RouterID != nil {
 				routerID = p.cfg.RouterID
 			}
-			s, err := c.sessionManager.NewSession(c.logger,
-				bgp.SessionParameters{
-					PeerAddress:   net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))),
-					SourceAddress: p.cfg.SrcAddr,
-					MyASN:         p.cfg.MyASN,
-					RouterID:      routerID,
-					PeerASN:       p.cfg.ASN,
-					HoldTime:      p.cfg.HoldTime,
-					KeepAliveTime: p.cfg.KeepaliveTime,
-					ConnectTime:   p.cfg.ConnectTime,
-					Password:      p.cfg.Password,
-					PasswordRef:   p.cfg.PasswordRef,
-					CurrentNode:   c.myNode,
-					BFDProfile:    p.cfg.BFDProfile,
-					EBGPMultiHop:  p.cfg.EBGPMultiHop,
-					SessionName:   p.cfg.Name,
-					VRFName:       p.cfg.VRF,
-					DisableMP:     p.cfg.DisableMP,
-				},
-			)
+
+			sessionParams := bgp.SessionParameters{
+				PeerAddress:     net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))),
+				SourceAddress:   p.cfg.SrcAddr,
+				MyASN:           p.cfg.MyASN,
+				RouterID:        routerID,
+				PeerASN:         p.cfg.ASN,
+				HoldTime:        p.cfg.HoldTime,
+				KeepAliveTime:   p.cfg.KeepaliveTime,
+				ConnectTime:     p.cfg.ConnectTime,
+				CurrentNode:     c.myNode,
+				BFDProfile:      p.cfg.BFDProfile,
+				GracefulRestart: p.cfg.EnableGracefulRestart,
+				EBGPMultiHop:    p.cfg.EBGPMultiHop,
+				SessionName:     p.cfg.Name,
+				VRFName:         p.cfg.VRF,
+				DisableMP:       p.cfg.DisableMP,
+			}
+			sessionParams.Password, sessionParams.PasswordRef = passwordForSession(p.cfg, c.bgpType, c.secretHandling)
+
+			s, err := c.sessionManager.NewSession(c.logger, sessionParams)
 
 			if err != nil {
 				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
@@ -261,6 +273,30 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 		return fmt.Errorf("%d BGP sessions failed to start", errs)
 	}
 	return nil
+}
+
+func passwordForSession(cfg *config.Peer, bgpType bgpImplementation, secret SecretHandling) (string, v1.SecretReference) {
+	if cfg.SecretPassword != "" && cfg.Password != "" {
+		panic(fmt.Sprintf("non empty password and secret password for peer %s", cfg.Name))
+	}
+	plainTextPassword := cfg.Password
+	if cfg.SecretPassword != "" {
+		plainTextPassword = cfg.SecretPassword
+	}
+	switch bgpType {
+	case bgpNative:
+		return plainTextPassword, v1.SecretReference{}
+	case bgpFrr:
+		return plainTextPassword, v1.SecretReference{}
+	case bgpFrrK8s:
+		// in case of passthrough, we don't propagate the converted password,
+		// so it's either the password as plain text or the secret
+		if secret == SecretPassThrough {
+			return cfg.Password, cfg.PasswordRef
+		}
+		return plainTextPassword, v1.SecretReference{}
+	}
+	return "", v1.SecretReference{}
 }
 
 func (c *bgpController) syncBFDProfiles(profiles map[string]*config.BFDProfile) error {
@@ -380,7 +416,7 @@ var newBGP = func(cfg controllerConfig) bgp.SessionManager {
 	case bgpFrr:
 		return bgpfrr.NewSessionManager(cfg.Logger, cfg.LogLevel)
 	case bgpFrrK8s:
-		return bgpfrrk8s.NewSessionManager(cfg.Logger, cfg.LogLevel, cfg.MyNode, cfg.Namespace)
+		return bgpfrrk8s.NewSessionManager(cfg.Logger, cfg.LogLevel, cfg.MyNode, cfg.FRRK8sNamespace)
 	default:
 		panic(fmt.Sprintf("unsupported BGP implementation type: %s", cfg.bgpType))
 	}

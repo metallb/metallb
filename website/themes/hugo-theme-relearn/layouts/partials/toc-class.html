@@ -1,0 +1,3 @@
+{{- $toc_content := partial "toc-id.html" . }}
+{{- $toc_content = strings.Replace $toc_content "id=\"TableOfContents\"" "class=\"TableOfContents\"" 1 }}
+{{- $toc_content | safeHTML }}

@@ -69,16 +69,17 @@ func TestParse(t *testing.T) {
 							Name: "peer1",
 						},
 						Spec: v1beta2.BGPPeerSpec{
-							MyASN:        42,
-							ASN:          142,
-							Address:      "1.2.3.4",
-							Port:         1179,
-							HoldTime:     metav1.Duration{Duration: 180 * time.Second},
-							ConnectTime:  ptr.To(metav1.Duration{Duration: time.Second}),
-							RouterID:     "10.20.30.40",
-							SrcAddress:   "10.20.30.40",
-							EBGPMultiHop: true,
-							VRFName:      "foo",
+							MyASN:                 42,
+							ASN:                   142,
+							Address:               "1.2.3.4",
+							Port:                  1179,
+							HoldTime:              metav1.Duration{Duration: 180 * time.Second},
+							ConnectTime:           ptr.To(metav1.Duration{Duration: time.Second}),
+							RouterID:              "10.20.30.40",
+							SrcAddress:            "10.20.30.40",
+							EnableGracefulRestart: true,
+							EBGPMultiHop:          true,
+							VRFName:               "foo",
 						},
 					},
 					{
@@ -86,11 +87,12 @@ func TestParse(t *testing.T) {
 							Name: "peer2",
 						},
 						Spec: v1beta2.BGPPeerSpec{
-							MyASN:        100,
-							ASN:          200,
-							Address:      "2.3.4.5",
-							EBGPMultiHop: false,
-							ConnectTime:  ptr.To(metav1.Duration{Duration: time.Second}),
+							MyASN:                 100,
+							ASN:                   200,
+							Address:               "2.3.4.5",
+							EnableGracefulRestart: false,
+							EBGPMultiHop:          false,
+							ConnectTime:           ptr.To(metav1.Duration{Duration: time.Second}),
 							NodeSelectors: []metav1.LabelSelector{
 								{
 									MatchLabels: map[string]string{
@@ -222,30 +224,32 @@ func TestParse(t *testing.T) {
 			want: &Config{
 				Peers: map[string]*Peer{
 					"peer1": {
-						Name:          "peer1",
-						MyASN:         42,
-						ASN:           142,
-						Addr:          net.ParseIP("1.2.3.4"),
-						SrcAddr:       net.ParseIP("10.20.30.40"),
-						Port:          1179,
-						HoldTime:      180 * time.Second,
-						KeepaliveTime: 60 * time.Second,
-						ConnectTime:   ptr.To(time.Second),
-						RouterID:      net.ParseIP("10.20.30.40"),
-						NodeSelectors: []labels.Selector{labels.Everything()},
-						EBGPMultiHop:  true,
-						VRF:           "foo",
+						Name:                  "peer1",
+						MyASN:                 42,
+						ASN:                   142,
+						Addr:                  net.ParseIP("1.2.3.4"),
+						SrcAddr:               net.ParseIP("10.20.30.40"),
+						Port:                  1179,
+						HoldTime:              180 * time.Second,
+						KeepaliveTime:         60 * time.Second,
+						ConnectTime:           ptr.To(time.Second),
+						RouterID:              net.ParseIP("10.20.30.40"),
+						NodeSelectors:         []labels.Selector{labels.Everything()},
+						EnableGracefulRestart: true,
+						EBGPMultiHop:          true,
+						VRF:                   "foo",
 					},
 					"peer2": {
-						Name:          "peer2",
-						MyASN:         100,
-						ASN:           200,
-						Addr:          net.ParseIP("2.3.4.5"),
-						HoldTime:      90 * time.Second,
-						KeepaliveTime: 30 * time.Second,
-						ConnectTime:   ptr.To(time.Second),
-						NodeSelectors: []labels.Selector{selector("bar in (quux),foo=bar")},
-						EBGPMultiHop:  false,
+						Name:                  "peer2",
+						MyASN:                 100,
+						ASN:                   200,
+						Addr:                  net.ParseIP("2.3.4.5"),
+						HoldTime:              90 * time.Second,
+						KeepaliveTime:         30 * time.Second,
+						ConnectTime:           ptr.To(time.Second),
+						NodeSelectors:         []labels.Selector{selector("bar in (quux),foo=bar")},
+						EnableGracefulRestart: false,
+						EBGPMultiHop:          false,
 					},
 				},
 				Pools: &Pools{ByName: map[string]*Pool{
@@ -724,6 +728,36 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc: "invalid keepalivetime larger than default holdtime",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:         42,
+							ASN:           42,
+							Address:       "1.2.3.4",
+							KeepaliveTime: metav1.Duration{Duration: 91 * time.Second}},
+					},
+				},
+			},
+		},
+		{
+			desc: "invalid keepalivetime larger than holdtime",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:         42,
+							ASN:           42,
+							Address:       "1.2.3.4",
+							HoldTime:      metav1.Duration{Duration: 30 * time.Second},
+							KeepaliveTime: metav1.Duration{Duration: 90 * time.Second}},
+					},
+				},
+			},
+		},
+
 		{
 			desc: "invalid hold time (too short)",
 			crs: ClusterResources{
@@ -1974,16 +2008,16 @@ func TestParse(t *testing.T) {
 			want: &Config{
 				Peers: map[string]*Peer{
 					"peer1": {
-						Name:          "peer1",
-						MyASN:         42,
-						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
-						Port:          179,
-						HoldTime:      90 * time.Second,
-						KeepaliveTime: 30 * time.Second,
-						NodeSelectors: []labels.Selector{labels.Everything()},
-						BFDProfile:    "",
-						Password:      "nopass",
+						Name:           "peer1",
+						MyASN:          42,
+						ASN:            42,
+						Addr:           net.ParseIP("1.2.3.4"),
+						Port:           179,
+						HoldTime:       90 * time.Second,
+						KeepaliveTime:  30 * time.Second,
+						NodeSelectors:  []labels.Selector{labels.Everything()},
+						BFDProfile:     "",
+						SecretPassword: "nopass",
 						PasswordRef: corev1.SecretReference{
 							Name:      "bgpsecret",
 							Namespace: "metallb-system",

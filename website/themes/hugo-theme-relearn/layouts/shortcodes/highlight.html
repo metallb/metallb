@@ -1,0 +1,27 @@
+{{- $content := "" }}
+{{- $content = .InnerDeindent }}
+{{- $attributes := dict }}
+{{- $options := dict }}
+{{- $type := "" }}
+{{- range $k, $v := .Params }}
+  {{- if eq $k 0 }}
+    {{- $type = $v }}
+  {{- else if eq $k 1 }}
+    {{- $options = $v }}
+  {{- else if eq $k "type" }}
+    {{- $type = $v }}
+  {{- else if eq $k "title" }}
+    {{- $attributes = $attributes | merge (dict $k $v) }}
+  {{- else if eq $k "wrap" }}
+    {{- $attributes = $attributes | merge (dict $k $v) }}
+  {{- else }}
+    {{- $options = $options | merge (dict $k $v) }}
+  {{- end }}
+{{- end }}
+{{- partial "shortcodes/highlight.html" (dict
+  "page"       .Page
+  "attributes" $attributes
+  "content"    $content
+  "options"    $options
+  "type"       $type
+) }}

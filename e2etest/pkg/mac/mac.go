@@ -9,7 +9,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/pkg/errors"
+	"errors"
+
 	"go.universe.tf/e2etest/pkg/executor"
 	"go.universe.tf/e2etest/pkg/routes"
 
@@ -150,7 +151,7 @@ func RequestAddressResolutionFromIface(ip string, iface string, exec executor.Ex
 
 	out, err := exec.Exec(cmd, args...)
 	if err != nil {
-		return errors.Wrapf(err, out)
+		return errors.Join(err, errors.New(out))
 	}
 
 	return nil
@@ -160,7 +161,7 @@ func RequestAddressResolutionFromIface(ip string, iface string, exec executor.Ex
 func FlushIPNeigh(ip string, exec executor.Executor) error {
 	out, err := exec.Exec("ip", "neigh", "flush", "to", ip)
 	if err != nil {
-		return errors.Wrapf(err, out)
+		return errors.Join(err, errors.New(out))
 	}
 	return nil
 }
@@ -169,7 +170,7 @@ func FlushIPNeigh(ip string, exec executor.Executor) error {
 func GetIfaceMac(iface string, exec executor.Executor) (net.HardwareAddr, error) {
 	out, err := exec.Exec("ifconfig")
 	if err != nil {
-		return nil, errors.Wrapf(err, out)
+		return nil, errors.Join(err, errors.New(out))
 	}
 
 	macRe := regexp.MustCompile("([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})")
@@ -186,7 +187,7 @@ func GetIfaceMac(iface string, exec executor.Executor) (net.HardwareAddr, error)
 		}
 	}
 
-	return nil, errors.Errorf("failed to find the mac of interface %s", iface)
+	return nil, fmt.Errorf("failed to find the mac of interface %s", iface)
 }
 
 // ifaceForIPNetwork returns the interface name that is in the same network as the IP.
@@ -194,19 +195,19 @@ func ifaceForIPNetwork(ip net.IP, exec executor.Executor) (string, error) {
 	ifaces := []ipIface{}
 	res, err := exec.Exec("ip", "--json", "address", "show")
 	if err != nil {
-		return "", errors.Wrapf(err, "Failed to list interfaces")
+		return "", errors.Join(err, errors.New("Failed to list interfaces"))
 	}
 
 	err = json.Unmarshal([]byte(res), &ifaces)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to parse interfaces")
+		return "", errors.Join(err, errors.New("failed to parse interfaces"))
 	}
 
 	for _, intf := range ifaces {
 		for _, addr := range intf.AddrInfo {
 			_, ipnet, err := net.ParseCIDR(fmt.Sprintf("%s/%d", addr.Local, addr.Prefixlen))
 			if err != nil {
-				return "", errors.Wrap(err, fmt.Sprintf("failed to parse CIDR from interface %s %s", intf.Ifname, fmt.Sprintf("%s/%d", addr.Local, addr.Prefixlen)))
+				return "", errors.Join(err, fmt.Errorf("failed to parse CIDR from interface %s %s", intf.Ifname, fmt.Sprintf("%s/%d", addr.Local, addr.Prefixlen)))
 			}
 			if ipnet.Contains(ip) {
 				return intf.Ifname, nil

@@ -23,8 +23,10 @@ import (
 	"strings"
 	"time"
 
+	"errors"
+
 	"github.com/mikioh/ipaddr"
-	"github.com/pkg/errors"
+
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/bgp/community"
@@ -113,10 +115,14 @@ type Peer struct {
 	NodeSelectors []labels.Selector
 	// Authentication password for routers enforcing TCP MD5 authenticated sessions
 	Password string
+	// The password set in the secret referenced by the secret reference, in clear text
+	SecretPassword string
 	// Optional reference to the secret that holds the password.
 	PasswordRef corev1.SecretReference
 	// The optional BFD profile to be used for this BGP session
 	BFDProfile string
+	// Optional EnableGracefulRestart enable BGP graceful restart functionality at the peer level.
+	EnableGracefulRestart bool
 	// Optional ebgp peer is multi-hops away.
 	EBGPMultiHop bool
 	// Optional name of the vrf to establish the session from
@@ -270,7 +276,7 @@ func peersFor(resources ClusterResources, BFDProfiles map[string]*BFDProfile) (m
 	for _, p := range resources.Peers {
 		peer, err := peerFromCR(p, resources.PasswordSecrets)
 		if err != nil {
-			return nil, errors.Wrapf(err, "parsing peer %s", p.Name)
+			return nil, errors.Join(err, fmt.Errorf("parsing peer %s", p.Name))
 		}
 		if peer.BFDProfile != "" {
 			if _, ok := BFDProfiles[peer.BFDProfile]; !ok {
@@ -394,7 +400,8 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 
 	// keepalive must be lower than holdtime
 	if keepaliveTime > holdTime {
-		return nil, fmt.Errorf("invalid keepaliveTime %q", p.Spec.KeepaliveTime)
+		return nil, fmt.Errorf("invalid keepaliveTime %q must be smaller than holdtime %q",
+			keepaliveTime, holdTime)
 	}
 
 	// Ideally we would set a default RouterID here, instead of having
@@ -422,7 +429,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		s := s // so we can use &s
 		labelSelector, err := metav1.LabelSelectorAsSelector(&s)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Failed to convert peer %s node selector", p.Name)
+			return nil, errors.Join(err, fmt.Errorf("failed to convert peer %s node selector", p.Name))
 		}
 		nodeSels = append(nodeSels, labelSelector)
 	}
@@ -434,11 +441,11 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		return nil, fmt.Errorf("can not have both password and secret ref set in peer config %q/%q", p.Namespace, p.Name)
 	}
 
-	password := p.Spec.Password
+	secretPassword := ""
 	if p.Spec.PasswordSecret.Name != "" {
-		password, err = passwordFromSecretForPeer(p, passwordSecrets)
+		secretPassword, err = passwordFromSecretForPeer(p, passwordSecrets)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Failed to parse peer %s password secret", p.Name)
+			return nil, errors.Join(err, fmt.Errorf("failed to parse peer %s password secret", p.Name))
 		}
 	}
 
@@ -448,23 +455,25 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 	}
 
 	return &Peer{
-		Name:          p.Name,
-		MyASN:         p.Spec.MyASN,
-		ASN:           p.Spec.ASN,
-		Addr:          ip,
-		SrcAddr:       src,
-		Port:          p.Spec.Port,
-		HoldTime:      holdTime,
-		KeepaliveTime: keepaliveTime,
-		ConnectTime:   connectTime,
-		RouterID:      routerID,
-		NodeSelectors: nodeSels,
-		Password:      password,
-		PasswordRef:   p.Spec.PasswordSecret,
-		BFDProfile:    p.Spec.BFDProfile,
-		EBGPMultiHop:  p.Spec.EBGPMultiHop,
-		VRF:           p.Spec.VRFName,
-		DisableMP:     p.Spec.DisableMP,
+		Name:                  p.Name,
+		MyASN:                 p.Spec.MyASN,
+		ASN:                   p.Spec.ASN,
+		Addr:                  ip,
+		SrcAddr:               src,
+		Port:                  p.Spec.Port,
+		HoldTime:              holdTime,
+		KeepaliveTime:         keepaliveTime,
+		ConnectTime:           connectTime,
+		RouterID:              routerID,
+		NodeSelectors:         nodeSels,
+		SecretPassword:        secretPassword,
+		Password:              p.Spec.Password,
+		PasswordRef:           p.Spec.PasswordSecret,
+		BFDProfile:            p.Spec.BFDProfile,
+		EnableGracefulRestart: p.Spec.EnableGracefulRestart,
+		EBGPMultiHop:          p.Spec.EBGPMultiHop,
+		VRF:                   p.Spec.VRFName,
+		DisableMP:             p.Spec.DisableMP,
 	}, nil
 }
 
@@ -548,7 +557,7 @@ func addressPoolServiceAllocationsFromCR(p metallbv1beta1.IPAddressPool, namespa
 	for i := range p.Spec.AllocateTo.NamespaceSelectors {
 		l, err := metav1.LabelSelectorAsSelector(&p.Spec.AllocateTo.NamespaceSelectors[i])
 		if err != nil {
-			return nil, errors.Wrapf(err, "invalid namespace label selector %v in ip pool %s", &p.Spec.AllocateTo.NamespaceSelectors[i], p.Name)
+			return nil, errors.Join(err, fmt.Errorf("invalid namespace label selector %v in ip pool %s", &p.Spec.AllocateTo.NamespaceSelectors[i], p.Name))
 		}
 		for _, ns := range namespaces {
 			nsLabels := labels.Set(ns.Labels)
@@ -560,7 +569,7 @@ func addressPoolServiceAllocationsFromCR(p metallbv1beta1.IPAddressPool, namespa
 	for i := range p.Spec.AllocateTo.ServiceSelectors {
 		l, err := metav1.LabelSelectorAsSelector(&p.Spec.AllocateTo.ServiceSelectors[i])
 		if err != nil {
-			return nil, errors.Wrapf(err, "invalid service label selector %v in ip pool %s", p.Spec.AllocateTo.ServiceSelectors[i], p.Name)
+			return nil, errors.Join(err, fmt.Errorf("invalid service label selector %v in ip pool %s", p.Spec.AllocateTo.ServiceSelectors[i], p.Name))
 		}
 		serviceAllocations.ServiceSelectors = append(serviceAllocations.ServiceSelectors, l)
 	}
@@ -604,23 +613,23 @@ func bfdProfileFromCR(p metallbv1beta1.BFDProfile) (*BFDProfile, error) {
 	var err error
 	res.DetectMultiplier, err = bfdIntFromConfig(p.Spec.DetectMultiplier, 2, 255)
 	if err != nil {
-		return nil, errors.Wrap(err, "invalid detect multiplier value")
+		return nil, errors.Join(err, fmt.Errorf("invalid detect multiplier value"))
 	}
 	res.ReceiveInterval, err = bfdIntFromConfig(p.Spec.ReceiveInterval, 10, 60000)
 	if err != nil {
-		return nil, errors.Wrap(err, "invalid receive interval value")
+		return nil, errors.Join(err, fmt.Errorf("invalid receive interval value"))
 	}
 	res.TransmitInterval, err = bfdIntFromConfig(p.Spec.TransmitInterval, 10, 60000)
 	if err != nil {
-		return nil, errors.Wrap(err, "invalid transmit interval value")
+		return nil, errors.Join(err, fmt.Errorf("invalid transmit interval value"))
 	}
 	res.MinimumTTL, err = bfdIntFromConfig(p.Spec.MinimumTTL, 1, 254)
 	if err != nil {
-		return nil, errors.Wrap(err, "invalid minimum ttl value")
+		return nil, errors.Join(err, fmt.Errorf("invalid minimum ttl value"))
 	}
 	res.EchoInterval, err = bfdIntFromConfig(p.Spec.EchoInterval, 10, 60000)
 	if err != nil {
-		return nil, errors.Wrap(err, "invalid echo interval value")
+		return nil, errors.Join(err, fmt.Errorf("invalid echo interval value"))
 	}
 	if p.Spec.EchoMode != nil {
 		res.EchoMode = *p.Spec.EchoMode
@@ -713,7 +722,7 @@ func l2AdvertisementFromCR(crdAd metallbv1beta1.L2Advertisement, nodes []corev1.
 	}
 	selected, err := selectedNodes(nodes, crdAd.Spec.NodeSelectors)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to parse node selector for %s", crdAd.Name)
+		return nil, errors.Join(err, fmt.Errorf("failed to parse node selector for %s", crdAd.Name))
 	}
 	l2 := &L2Advertisement{
 		Nodes:      selected,
@@ -778,14 +787,14 @@ func bgpAdvertisementFromCR(crdAd metallbv1beta1.BGPAdvertisement, communities m
 	for _, c := range crdAd.Spec.Communities {
 		v, err := getCommunityValue(c, communities)
 		if err != nil {
-			return nil, errors.Wrapf(err, "invalid community %q in BGP advertisement", c)
+			return nil, errors.Join(err, fmt.Errorf("invalid community %q in BGP advertisement", c))
 		}
 		ad.Communities[v] = true
 	}
 
 	selected, err := selectedNodes(nodes, crdAd.Spec.NodeSelectors)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to parse node selector for ls %s", crdAd.Name)
+		return nil, errors.Join(err, fmt.Errorf("failed to parse node selector for %s", crdAd.Name))
 	}
 	ad.Nodes = selected
 	return ad, nil
@@ -991,7 +1000,7 @@ func selectedNodes(nodes []corev1.Node, selectors []metav1.LabelSelector) (map[s
 		selector := selector // so we can use &selector
 		l, err := metav1.LabelSelectorAsSelector(&selector)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Invalid label selector %v", selector)
+			return nil, errors.Join(err, fmt.Errorf("invalid label selector %v", selector))
 		}
 		labelSelectors = append(labelSelectors, l)
 	}
@@ -1019,7 +1028,7 @@ func selectedPools(pools []metallbv1beta1.IPAddressPool, selectors []metav1.Labe
 		selector := selector // so we can use &selector
 		l, err := metav1.LabelSelectorAsSelector(&selector)
 		if err != nil {
-			return nil, errors.Wrapf(err, "Invalid label selector %v", selector)
+			return nil, errors.Join(err, fmt.Errorf("invalid label selector %v", selector))
 		}
 		labelSelectors = append(labelSelectors, l)
 	}

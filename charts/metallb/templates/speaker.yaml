@@ -1,8 +1,13 @@
 {{- if .Values.speaker.frr.enabled }}
-{{- if .Values.frrk8s.enabled }}
-{{- fail "speaker.frr.enabled and frrk8s.enabled are mutually exclusive!" }}
+{{- if or .Values.frrk8s.enabled .Values.frrk8s.external }}
+{{- fail "speaker.frr.enabled and frrk8s.enabled / external are mutually exclusive!" }}
 {{- end }}
 {{- end }}
+
+{{- if and .Values.frrk8s.enabled .Values.frrk8s.external }}
+{{- fail "frrk8s.enabled frrk8s.external are mutually exclusive!" }}
+{{- end }}
+
 {{- if .Values.speaker.frr.enabled }}
 
 # FRR expects to have these files owned by frr:frr on startup.
@@ -102,7 +107,7 @@ data:
   frr.conf: |+
     ! This file gets overriden the first time the speaker renders a config.
     ! So anything configured here is only temporary.
-    frr version 7.5.1
+    frr version 8.0
     frr defaults traditional
     hostname Router
     line vty
@@ -210,14 +215,14 @@ spec:
         # Copies the reloader to the shared volume between the speaker and reloader.
         - name: cp-reloader
           image: {{ .Values.speaker.image.repository }}:{{ .Values.speaker.image.tag | default .Chart.AppVersion }}
-          command: ["/bin/sh", "-c", "cp -f /frr-reloader.sh /etc/frr_reloader/"]
+          command: ["/cp-tool","/frr-reloader.sh","/etc/frr_reloader/frr-reloader.sh"]
           volumeMounts:
             - name: reloader
               mountPath: /etc/frr_reloader
         # Copies the metrics exporter
         - name: cp-metrics
           image: {{ .Values.speaker.image.repository }}:{{ .Values.speaker.image.tag | default .Chart.AppVersion }}
-          command: ["/bin/sh", "-c", "cp -f /frr-metrics /etc/frr_metrics/"]
+          command: ["/cp-tool","/frr-metrics","/etc/frr_metrics/frr-metrics"]
           volumeMounts:
             - name: metrics
               mountPath: /etc/frr_metrics
@@ -249,6 +254,9 @@ spec:
         {{- end }}
         {{- if .Values.prometheus.secureMetricsPort }}
         - --host=localhost
+        {{- end }}
+        {{- if .Values.frrk8s.external }}
+        - --frrk8s-namespace={{ required "namespace is required when frrk8s is external" .Values.frrk8s.namespace }}
         {{- end }}
         env:
         - name: METALLB_NODE_NAME
@@ -284,10 +292,14 @@ spec:
         - name: METALLB_BGP_TYPE
           value: frr
         {{- end }}
-        {{- if .Values.frrk8s.enabled }}
+        {{- if or .Values.frrk8s.enabled .Values.frrk8s.external }}
         - name: METALLB_BGP_TYPE
           value: frr-k8s
         {{- end }}
+        - name: METALLB_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
         ports:
         - name: monitoring
           containerPort: {{ .Values.prometheus.metricsPort }}
@@ -443,6 +455,9 @@ spec:
           {{- if .Values.prometheus.secureMetricsPort }}
           - --host=localhost
           {{- end }}
+        env:
+          - name: VTYSH_HISTFILE
+            value: /dev/null
         ports:
           - containerPort: {{ .Values.speaker.frr.metricsPort }}
             name: monitoring

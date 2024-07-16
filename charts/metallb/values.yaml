@@ -331,7 +331,7 @@ speaker:
     enabled: true
     image:
       repository: quay.io/frrouting/frr
-      tag: 9.0.2
+      tag: 9.1.0
       pullPolicy:
     metricsPort: 7473
     resources: {}
@@ -361,3 +361,5 @@ frrk8s:
   # if set, enables frrk8s as a backend. This is mutually exclusive to frr
   # mode.
   enabled: false
+  external: false
+  namespace: ""

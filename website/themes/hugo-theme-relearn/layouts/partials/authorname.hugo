@@ -1,0 +1,20 @@
+{{- $authorName := "" }}
+{{- if .Site.Params.author }}
+  {{- if reflect.IsMap .Site.Params.author }}
+    {{- with .Site.Params.author.name }}
+      {{- $authorName = . }}
+    {{- end }}
+  {{- else }}
+    {{- warnf "DEPRECATED usage of 'params.author' config parameter found, replace it with `params.author.name` in your hugo.toml; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#5230" }}
+    {{- $authorName = .Site.Params.author }}
+  {{- end }}
+{{- else }}
+  {{- with .Site.Author.name }}
+    {{- $authorName = . }}
+    {{- $hugoVersion := "0.120.0" }}
+    {{- if ge hugo.Version $hugoVersion }}
+      {{- warnf "The author key in site configuration is deprecated. Use params.author.name instead." }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- return $authorName }}

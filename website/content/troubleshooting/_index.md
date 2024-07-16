@@ -65,7 +65,7 @@ and IPV6 addresses
 - if the service asks for a specific IP, an IPAddressPool providing that IP exists and its selectors
 are compatible with the service
 - if the service asks for a specific IP used also by other services, make sure that they respect the
-sharing properties described in the [official docs](https://metallb.universe.tf/usage/#ip-address-sharing).
+sharing properties described in the [official docs](https://metallb.io/usage/#ip-address-sharing).
 
 ## Troubleshooting service advertisements
 
@@ -287,4 +287,12 @@ Additionally, the status of the service and of the endpoints must be provided:
 ```bash
 kubectl get endpointslices <my-service> -o yaml
 kubectl get svc <my_service> -o yaml
+```
+
+### How to debug the speaker and the controller containers
+
+Due to the fact that both the speaker and the controller containers are based on a distroless image, an ephemeral container should be used to debug inside them: 
+
+```bash
+kubectl debug -it -n metallb-system -c <ephemeral container name> --target=speaker --image=<ephemeral image name> <speaker pod>
 ```

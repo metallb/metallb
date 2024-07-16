@@ -1,0 +1,28 @@
+{{- $area := .area }}
+{{- $icon := .icon }}
+{{- $hint := .hint }}
+{{- $title := .title }}
+{{- $onempty := cond (isset . "onempty") .onempty "disable" }}
+{{- $onwidths := cond (isset . "onwidths") .onwidths "show" }}
+{{- $onwidthm := cond (isset . "onwidthm") .onwidthm "show" }}
+{{- $onwidthl := cond (isset . "onwidthl") .onwidthl "show" }}
+{{- with .page }}
+	{{- $format := partial "get-format.hugo" . }}
+	{{- $outputFormat := partial "output-format.hugo" (dict "page" . "format" $format) }}
+	{{- if and (eq $outputFormat "html") }}
+		{{- $content := printf "\n                  <div class=\"topbar-area topbar-area-%s\" data-area=\"%s\">%s\n                  </div>" $area $area (partial (printf "topbar/area/%s.html" $area) .) | safeHTML }}
+		{{- partial "topbar/func/button.html" (dict
+			"page" .
+			"class" (printf "topbar-button-%s" $area)
+			"href" "javascript:toggleTopbarFlyout(this)"
+			"icon" $icon
+			"onempty" $onempty
+			"onwidths" $onwidths
+			"onwidthm" $onwidthm
+			"onwidthl" $onwidthl
+			"title" $title
+			"hint" $hint
+			"content" $content
+		)}}
+	{{- end }}
+{{- end }}

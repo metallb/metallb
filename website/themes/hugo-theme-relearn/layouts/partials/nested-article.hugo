@@ -1,0 +1,57 @@
+{{- $page := .page }}
+{{- $outputFormat := .outputFormat }}
+{{- $page.Page.Store.Set (printf "%sIsNested" $outputFormat) true }}
+{{- with $page }}
+  {{- $currentNode := . }}
+  {{- $pages := partial "pageHelper/pagesBy.html" (dict "page" . "hidden" true) }}
+  {{- template "section-print" dict "sect" . "currentnode" $currentNode "outputFormat" $outputFormat }}
+  {{- if $pages }}
+          <section>
+            <h1 class="a11y-only">{{ T "Subsections" .Title }}</h1>
+  {{- end }}
+  {{- range $pages }}
+    {{- template "section-tree-print" dict "sect" . "currentnode" $currentNode "outputFormat" $outputFormat }}
+  {{- end }}
+  {{- if $pages }}
+          </section>
+  {{- end }}
+{{- end }}
+{{- define "section-tree-print" }}
+  {{- $currentNode := .currentnode }}
+  {{- $outputFormat := .outputFormat }}
+  {{- $currentFileRelPermalink := .currentnode.RelPermalink }}
+  {{- with .sect }}
+    {{- $isSelf := eq .RelPermalink $currentFileRelPermalink }}
+    {{- $isAncestor := and (not $isSelf) (.IsAncestor $currentNode) }}
+    {{- $pages := partial "pageHelper/pagesBy.html" (dict "page" . "hidden" true) }}
+    {{- $relearnIsHiddenFrom := index ($currentNode.Scratch.Get "relearnIsHiddenFrom") .RelPermalink }}
+    {{- $hidden := and $relearnIsHiddenFrom (not $.showhidden) (not $isSelf) (not $isAncestor) }}
+    {{- if $hidden }}
+    {{- else }}
+      {{- template "section-print" dict "sect" . "currentnode" $currentNode "outputFormat" $outputFormat }}
+      {{- if $pages }}
+          <section>
+            <h1 class="a11y-only">{{ T "Subsections" .Title }}</h1>
+      {{- end }}
+      {{- range $pages }}
+        {{- template "section-tree-print" dict "sect" . "currentnode" $currentNode "outputFormat" $outputFormat }}
+      {{- end }}
+      {{- if $pages }}
+          </section>
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- define "section-print" }}
+  {{- $currentNode := .currentnode }}
+  {{- $outputFormat := .outputFormat }}
+  {{- with .sect }}
+    {{- $page := . }}
+    {{- partialCached "nested-content.hugo" (dict "page" $page "outputFormat" $outputFormat) $page.RelPermalink "outputFormat" $outputFormat }}
+    {{- range $page.Site.Params.relearn.dependencies }}
+      {{- $has := printf "has%s" .name }}
+      {{- $nestedhas := printf "nestedHas%s" .name }}
+      {{- $currentNode.Page.Store.Set $nestedhas (or ($currentNode.Page.Store.Get $nestedhas) ($page.Page.Store.Get $has)) }}
+      {{- end }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,59 @@
+:root {
+    --PRIMARY-color: rgba( 47, 129, 235, 1 ); /* brand primary color */
+    --SECONDARY-color: rgba( 47, 129, 235, 1 ); /* brand secondary color */
+
+    --MAIN-TOPBAR-BORDER-color: rgba( 71, 71, 71, 1 ); /* border color between topbar and content */
+    --MAIN-LINK-HOVER-color: rgb(112, 174, 245); /* hovered link color of content */
+    --MAIN-BG-color: rgba( 32, 32, 32, 1 ); /* background color of content */
+    --MAIN-TEXT-color: rgba( 224, 224, 224, 1 ); /* text color of content and h1 titles */
+    --MAIN-TITLES-TEXT-color: rgba( 255, 255, 255, 1 ); /* text color of h2-h6 titles and transparent box titles */
+
+    --CODE-theme: relearn-dark; /* name of the chroma stylesheet file */
+    --CODE-BLOCK-color: rgba( 248, 248, 242, 1 ); /* fallback text color of block code; should be adjusted to your selected chroma style */
+    --CODE-BLOCK-BG-color: rgba( 43, 43, 43, 1 ); /* fallback background color of block code; should be adjusted to your selected chroma style */
+    --CODE-BLOCK-BORDER-color: rgba( 71, 71, 71, 1 ); /* border color of block code */
+    --CODE-INLINE-color: rgba( 130, 229, 80, 1 ); /* text color of inline code */
+    --CODE-INLINE-BG-color: rgba( 45, 45, 45, 1 ); /* background color of inline code */
+    --CODE-INLINE-BORDER-color: rgba( 71, 71, 71, 1 ); /* border color of inline code */
+
+    --BROWSER-theme: dark; /* name of the theme for browser scrollbars of the main section */
+    --MERMAID-theme: dark; /* name of the default Mermaid theme for this variant, can be overridden in hugo.toml */
+    --OPENAPI-theme: dark; /* name of the default OpenAPI theme for this variant, can be overridden in hugo.toml */
+    --OPENAPI-CODE-theme: obsidian; /* name of the default OpenAPI code theme for this variant, can be overridden in hugo.toml */
+
+    --MENU-BORDER-color: rgba( 71, 71, 71, 1 ); /* border color between menu and content */
+    --MENU-TOPBAR-BORDER-color: rgba( 39, 39, 39, 1 ); /* separator color of vertical line between menu and topbar */
+    --MENU-TOPBAR-SEPARATOR-color: rgba( 71, 71, 71, 1 ); /* separator color of vertical line between menu and topbar */
+    --MENU-HEADER-BG-color: transparent; /* background color of menu header */
+    --MENU-HEADER-BORDER-color: transparent; /* border color between menu header and menu */
+    --MENU-HEADER-SEPARATOR-color: rgba( 71, 71, 71, .66 ); /* separator color between menu header and menu */
+
+    --MENU-HOME-LINK-color: rgba( 224, 224, 224, 1 ); /* home button color if configured */
+    --MENU-HOME-LINK-HOVER-color: rgba( 47, 129, 235, 1 ); /* hovered home button color if configured */
+
+    --MENU-SEARCH-color: rgba( 47, 129, 235, 1 ); /* text and icon color of search box */
+    --MENU-SEARCH-BG-color: rgba( 32, 32, 32, 1 ); /* background color of search box */
+    --MENU-SEARCH-BORDER-color: rgba( 71, 71, 71, .66 ); /* border color of search box */
+
+    --MENU-SECTIONS-BG-color: rgba( 39, 39, 39, 1 ); /* background of the menu; this is NOT just a color value but can be a complete CSS background definition including gradients, etc. */
+    --MENU-SECTIONS-ACTIVE-BG-color: transparent; /* background color of the active menu section */
+    --MENU-SECTIONS-LINK-color: rgba( 224, 224, 224, .75 ); /* link color of menu topics */
+    --MENU-SECTIONS-LINK-HOVER-color: rgba( 47, 129, 235, 1 ); /* hoverd link color of menu topics */
+    --MENU-SECTION-ACTIVE-CATEGORY-color: rgba( 47, 129, 235, 1 ); /* text color of the displayed menu topic */
+    --MENU-SECTION-ACTIVE-CATEGORY-BG-color: rgba( 32, 32, 32, 1 ); /* background color of the displayed menu topic */
+    --MENU-SECTION-SEPARATOR-color: rgba( 71, 71, 71, .66 ); /* separator color between menu sections and menu footer */
+
+    --BOX-CAPTION-color: rgba( 240, 240, 240, 1 ); /* text color of colored box titles */
+    --BOX-BG-color: rgba( 20, 20, 20, 1 ); /* background color of colored boxes */
+    --BOX-TEXT-color: rgba( 224, 224, 224, 1 ); /* text color of colored box content */
+
+    --BOX-GREY-color: rgba( 71, 71, 71, 1 ); /* background color of grey boxes */
+}
+
+body a#R-logo,
+body a#R-logo:hover,
+body #R-logo svg,
+body #R-logo svg * {
+    color: var(--MENU-HOME-LINK-color);
+    fill: var(--MENU-HOME-LINK-color) !important;
+}

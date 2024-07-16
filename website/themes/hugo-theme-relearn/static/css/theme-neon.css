@@ -1,0 +1,312 @@
+/* this variant does not work well if we use fallback styles for IE11 so better
+   ignore this variant in IE completely */
+@supports not (-ms-high-contrast:none) {
+
+:root {
+    --PRIMARY-color: rgba( 243, 0, 178, 1 ); /* brand primary color */
+    --SECONDARY-color: rgba( 28, 144, 243, 1 ); /* brand secondary color */
+    --ACCENT-color: rgba( 255, 255, 0, 1 ); /* brand accent color, used for search highlights */
+
+    --MAIN-TEXT-color: rgba( 224, 224, 224, 1 ); /* text color of content and h1 titles */
+    --MAIN-LINK-HOVER-color: rgba( 76, 171, 255, 1 ); /* hovered link color of content */
+    --MAIN-BG-color: rgba( 16, 16, 16, 1 ); /* background color of content */
+
+    /* optional overwrites for specific headers */
+    --MAIN-TITLES-TEXT-color: rgba( 243, 0, 178, 1 ); /* text color of h2-h6 titles and transparent box titles */
+    --MAIN-TITLES-H3-color: rgba( 0, 243, 211, 1 ); /* text color of h3-h6 titles */
+    --MAIN-TITLES-H4-color: rgba( 255, 255, 0, 1 ); /* text color of h4-h6 titles */
+
+    --CODE-theme: neon; /* name of the chroma stylesheet file */
+    --CODE-BLOCK-color: rgba( 248, 248, 242, 1 ); /* fallback text color of block code; should be adjusted to your selected chroma style */
+    --CODE-BLOCK-BG-color: rgba( 0, 0, 0, 1 ); /* fallback background color of block code; should be adjusted to your selected chroma style */
+    --CODE-INLINE-color: rgba( 130, 229, 80, 1 ); /* text color of inline code */
+    --CODE-INLINE-BG-color: rgba( 40, 42, 54, 1 ); /* background color of inline code */
+    --CODE-INLINE-BORDER-color: rgba( 70, 70, 70, 1 ); /* border color of inline code */
+
+    --BROWSER-theme: dark; /* name of the theme for browser scrollbars of the main section */
+    --MERMAID-theme: dark; /* name of the default Mermaid theme for this variant, can be overridden in hugo.toml */
+    --OPENAPI-theme: dark; /* name of the default OpenAPI theme for this variant, can be overridden in hugo.toml */
+    --OPENAPI-CODE-theme: tomorrow-night; /* name of the default OpenAPI code theme for this variant, can be overridden in hugo.toml */
+
+    --MENU-HEADER-BG-color: rgba( 0, 0, 0, 0 ); /* background color of menu header */
+
+    --MENU-HOME-LINK-color: rgba( 255, 255, 255, 1 ); /* home button color if configured */
+    --MENU-HOME-LINK-HOVER-color: rgba( 208, 208, 208, 1 ); /* hovered home button color if configured */
+
+    --MENU-SEARCH-color: rgba( 248, 248, 248, 1 ); /* text and icon color of search box */
+    --MENU-SEARCH-BG-color: rgba( 16, 16, 16, .6 ); /* background color of search box */
+    --MENU-SEARCH-BORDER-color: rgba( 232, 232, 232, 1 ); /* border color of search box */
+
+    --MENU-SECTIONS-BG-color: linear-gradient( 165deg, rgba( 243, 0, 178, .825 ) 0%, rgba( 28, 144, 243, .7 ) 65%, rgba( 0, 227, 211, .7 ) 100% ); /* background of the menu; this is NOT just a color value but can be a complete CSS background definition including gradients, etc. */
+    --MENU-SECTIONS-ACTIVE-BG-color: rgba( 0, 0, 0, .166 ); /* background color of the active menu section */
+    --MENU-SECTIONS-LINK-color: rgba( 255, 255, 255, 1 ); /* link color of menu topics */
+    --MENU-SECTIONS-LINK-HOVER-color: rgba( 208, 208, 208, 1 ); /* hovered link color of menu topics */
+    --MENU-SECTION-ACTIVE-CATEGORY-color: rgba( 86, 255, 232, 1 ); /* text color of the displayed menu topic */
+    --MENU-SECTION-SEPARATOR-color: rgba( 186, 186, 186, 1 ); /* separator color between menu sections and menu footer */
+
+    --MENU-VISITED-color: rgba( 51, 161, 255, 1 ); /* icon color of visited menu topics if configured */
+
+    /* base styling for boxes */
+    --BOX-CAPTION-color: rgba( 240, 240, 240, 1 ); /* text color of colored box titles */
+    --BOX-BG-color: rgba( 8, 8, 8, 1 ); /* background color of colored boxes */
+    --BOX-TEXT-color: initial; /* text color of colored box content */
+
+    /* optional base colors for colored boxes as in badges, buttons, notice, etc. shortcode */
+    --BOX-BLUE-color: rgba( 48, 117, 229, 1 ); /* background color of blue boxes */
+    --BOX-BLUE-TEXT-color: var( --BOX-BLUE-color ); /* text color of blue boxes */
+    --BOX-GREEN-color: rgba( 42, 178, 24, 1 ); /* background color of green boxes */
+    --BOX-GREEN-TEXT-color: var( --BOX-GREEN-color ); /* text color of green boxes */
+    --BOX-GREY-color: rgba( 128, 128, 128, 1 ); /* background color of grey boxes */
+    --BOX-GREY-TEXT-color: var( --BOX-GREY-color ); /* text color of grey boxes */
+    --BOX-ORANGE-color: rgba( 237, 153, 9, 1 ); /* background color of orange boxes */
+    --BOX-ORANGE-TEXT-color: var( --BOX-ORANGE-color ); /* text color of orange boxes */
+    --BOX-RED-color: rgba( 224, 62, 62, 1 ); /* background color of red boxes */
+    --BOX-RED-TEXT-color: var( --BOX-RED-color ); /* text color of red boxes */
+}
+
+body a#R-logo,
+body a#R-logo:hover,
+body #R-logo svg,
+body #R-logo svg * {
+    color: var(--INTERNAL-MENU-SEARCH-BORDER-color);
+    fill: var(--INTERNAL-MENU-SEARCH-BORDER-color) !important;
+}
+
+body a#R-logo{
+    text-shadow:
+        0 0  1px var(--INTERNAL-MENU-SEARCH-BORDER-color),
+        0 0  2px var(--INTERNAL-MENU-SEARCH-BORDER-color),
+        0 0  4px var(--INTERNAL-MENU-SEARCH-BORDER-color),
+        0 0  8px rgba( 128, 128, 128, 1 ),
+        0 0  4px var(--INTERNAL-MENU-SECTIONS-LINK-HOVER-color),
+        0 0  8px var(--INTERNAL-MENU-SECTIONS-LINK-HOVER-color);
+}
+
+body h1 {
+    color: rgba( 255, 255, 255, 1 );
+    text-shadow:
+        0 0  1px rgba( 255, 255, 255, 1 ),
+        0 0  2px rgba( 255, 255, 255, 1 ),
+        0 0  4px rgba( 255, 255, 255, 1 ),
+        0 0  8px rgba( 255, 255, 255, 1 ),
+        0 0  3px var(--INTERNAL-MAIN-TITLES-H1-color),
+        0 0  6px var(--INTERNAL-MAIN-TITLES-H1-color),
+        0 0  8px var(--INTERNAL-MAIN-TITLES-H1-color);
+}
+
+body h2 {
+    color: rgba( 255, 255, 255, 1 );
+    text-shadow:
+        0 0  1px rgba( 255, 255, 255, 1 ),
+        0 0  2px rgba( 255, 255, 255, 1 ),
+        0 0  8px rgba( 128, 128, 128, 1 ),
+        0 0  4px var(--INTERNAL-MAIN-TITLES-H2-color),
+        0 0  8px var(--INTERNAL-MAIN-TITLES-H2-color),
+        0 0 10px var(--INTERNAL-MAIN-TITLES-H2-color);
+}
+
+body h3, body .article-subheading {
+    color: rgba( 255, 255, 255, 1 );
+    text-shadow:
+        0 0  1px rgba( 255, 255, 255, 1 ),
+        0 0  2px rgba( 255, 255, 255, 1 ),
+        0 0  8px rgba( 128, 128, 128, 1 ),
+        0 0  4px var(--INTERNAL-MAIN-TITLES-H3-color),
+        0 0  8px var(--INTERNAL-MAIN-TITLES-H3-color),
+        0 0 10px var(--INTERNAL-MAIN-TITLES-H3-color);
+}
+
+body h4 {
+    color: rgba( 255, 255, 255, 1 );
+    text-shadow:
+        0 0  1px rgba( 255, 255, 255, 1 ),
+        0 0  2px rgba( 255, 255, 255, 1 ),
+        0 0  8px rgba( 128, 128, 128, 1 ),
+        0 0  4px var(--INTERNAL-MAIN-TITLES-H4-color),
+        0 0  8px var(--INTERNAL-MAIN-TITLES-H4-color),
+        0 0 10px var(--INTERNAL-MAIN-TITLES-H4-color);
+}
+
+body h5 {
+    color: rgba( 255, 255, 255, 1 );
+    text-shadow:
+        0 0  1px rgba( 255, 255, 255, 1 ),
+        0 0  3px rgba( 255, 255, 255, 1 ),
+        0 0  6px rgba( 128, 128, 128, 1 ),
+        0 0  4px var(--INTERNAL-MAIN-TITLES-H5-color),
+        0 0  8px var(--INTERNAL-MAIN-TITLES-H5-color);
+}
+
+body h6 {
+    color: rgba( 255, 255, 255, 1 );
+    text-shadow:
+        0 0  1px rgba( 255, 255, 255, 1 ),
+        0 0  2px rgba( 255, 255, 255, 1 ),
+        0 0  4px rgba( 128, 128, 128, 1 ),
+        0 0  4px var(--INTERNAL-MAIN-TITLES-H6-color),
+        0 0  8px var(--INTERNAL-MAIN-TITLES-H6-color);
+}
+
+.swagger-ui h4,
+.swagger-ui h5,
+.swagger-ui h6{
+    color: rgba( 255, 255, 255, 1 ) !important;
+}
+
+body #R-sidebar .searchbox button:hover{
+    color: rgba( 255, 255, 255, 1 );
+    text-shadow:
+        0 0  1px rgba( 255, 255, 255, 1 ),
+        0 0  2px rgba( 255, 255, 255, 1 ),
+        0 0  8px rgba( 128, 128, 128, 1 ),
+        0 0  4px var(--INTERNAL-MENU-SEARCH-color),
+        0 0  8px var(--INTERNAL-MENU-SEARCH-color);
+}
+
+body #R-sidebar select:hover,
+body #R-sidebar .collapsible-menu li:not(.active) > label:hover,
+body #R-sidebar .menu-control:hover,
+body #R-sidebar a:hover,
+body #R-prefooter button:hover {
+    color: rgba( 255, 255, 255, 1 );
+    text-shadow:
+        0 0  1px rgba( 255, 255, 255, 1 ),
+        0 0  2px rgba( 255, 255, 255, 1 ),
+        0 0  8px rgba( 128, 128, 128, 1 ),
+        0 0  4px var(--INTERNAL-MENU-SECTIONS-LINK-HOVER-color),
+        0 0  8px var(--INTERNAL-MENU-SECTIONS-LINK-HOVER-color);
+}
+
+body #R-sidebar li.active > label,
+body #R-sidebar li.active > :is( a, span ) {
+    color: rgba( 255, 255, 255, 1 );
+    text-shadow:
+        0 0  1px rgba( 255, 255, 255, 1 ),
+        0 0  2px rgba( 255, 255, 255, 1 ),
+        0 0  8px rgba( 128, 128, 128, 1 ),
+        0 0  4px var(--INTERNAL-MENU-SECTION-ACTIVE-CATEGORY-color),
+        0 0  8px var(--INTERNAL-MENU-SECTION-ACTIVE-CATEGORY-color);
+}
+
+body #R-homelinks a:hover {
+    color: rgba( 255, 255, 255, 1 );
+    text-shadow:
+        0 0  1px rgba( 255, 255, 255, 1 ),
+        0 0  2px rgba( 255, 255, 255, 1 ),
+        0 0  8px rgba( 128, 128, 128, 1 ),
+        0 0  4px var(--INTERNAL-MENU-HOME-LINK-HOVER-color),
+        0 0  8px var(--INTERNAL-MENU-HOME-LINK-HOVER-color);
+}
+
+body h1 a,
+body h2 a,
+body h3 a,
+body h4 a,
+body h5 a,
+body h6 a,
+body .anchor {
+    text-shadow: none;
+}
+
+body .badge,
+body .btn,
+body div.box {
+    box-shadow:
+        0 0  1px rgba( 255, 255, 255, 1 ),
+        0 0  2px rgba( 255, 255, 255, 1 ),
+        0 0  4px rgba( 128, 128, 128, 1 ),
+        0 0  4px var(--VARIABLE-BOX-color);
+}
+
+body .badge > .badge-content,
+body .btn,
+body .btn > *,
+body div.box > .box-label {
+    text-shadow:
+        0 0  1px rgba( 255, 255, 255, 1 ),
+        0 0  2px rgba( 255, 255, 255, 1 ),
+        0 0  4px rgba( 128, 128, 128, 1 ),
+        0 0  4px var(--VARIABLE-BOX-CAPTION-color);
+}
+
+body .tab-panel-cstyle:not(.transparent),
+body .badge.cstyle:not(.transparent),
+body .btn.cstyle {
+    --VARIABLE-BOX-TEXT-color: var(--VARIABLE-BOX-CAPTION-color);
+}
+
+body .badge.cstyle.transparent,
+body .btn.cstyle.transparent {
+    --VARIABLE-BOX-BG-color: var(--INTERNAL-BOX-BG-color);
+}
+
+body .btn.cstyle.transparent > * {
+    border-color: var(--VARIABLE-BOX-color);
+    color: var(--VARIABLE-BOX-CAPTION-color);
+}
+
+body .btn.cstyle.interactive.transparent > *:hover,
+body .btn.cstyle.interactive.transparent > *:active,
+body .btn.cstyle.interactive.transparent > *:focus {
+    background-color: var(--INTERNAL-MAIN-TITLES-TEXT-color);
+    color: var(--INTERNAL-MAIN-TEXT-color);
+}
+
+body .box.cstyle.transparent {
+    box-shadow: none;
+}
+
+@media print {
+    #R-body h1,
+    #R-body h2,
+    #R-body h3, #R-body .article-subheading,
+    #R-body h4,
+    #R-body h5,
+    #R-body h6 {
+        text-shadow: none;
+    }
+    #R-body .badge,
+    #R-body .badge > .badge-content,
+    #R-body .btn,
+    #R-body .btn > *,
+    #R-body div.box,
+    #R-body div.box > .box-label {
+        box-shadow: none;
+        text-shadow: none;
+    }
+    #R-body .badge.cstyle:not(.transparent),
+    #R-body .btn.cstyle {
+        --VARIABLE-BOX-TEXT-color: var(--INTERNAL-BOX-NEUTRAL-TEXT-color);
+    }
+}
+
+/* if we are in print chapter preview our @media statement from
+above will not apply, so we have to repeat it here */
+.print #R-body h1,
+.print #R-body h2,
+.print #R-body h3, .print #R-body .article-subheading,
+.print #R-body h4,
+.print #R-body h5,
+.print #R-body h6 {
+    text-shadow: none;
+}
+.print #R-body .badge,
+.print #R-body .badge > .badge-content,
+.print #R-body .btn,
+.print #R-body .btn > *,
+.print #R-body div.box,
+.print #R-body div.box > .box-label {
+    box-shadow: none;
+    text-shadow: none;
+}
+.print #R-body .badge.cstyle:not(.transparent),
+.print #R-body .btn.cstyle {
+    --VARIABLE-BOX-TEXT-color: var(--INTERNAL-BOX-NEUTRAL-TEXT-color);
+}
+
+#R-content-wrapper {
+    --ps-thumb-color: rgba( 208, 208, 208, 1 );
+    --ps-thumb-hover-color: rgba( 204, 204, 204, 1 );
+}
+
+}

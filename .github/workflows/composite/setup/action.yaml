@@ -4,7 +4,7 @@ description: "Install deps required for metallb CI"
 runs:
   using: "composite"
   steps:
-    - uses: actions/setup-go@v3
+    - uses: actions/setup-go@v5
       with:
         go-version-file: "go.mod"
         cache: true
@@ -17,10 +17,11 @@ runs:
         sudo pip3 install invoke semver pyyaml
         GO111MODULE="on" go get sigs.k8s.io/kind@v0.19.0
         go install sigs.k8s.io/controller-tools/cmd/controller-gen@v0.7.0
-        go install github.com/onsi/ginkgo/v2/ginkgo@v2.4.0
+        #NOTE: This pulls the ginkgo version that is pinned in go.mod
+        go install github.com/onsi/ginkgo/v2/ginkgo
 
     - name: Download MetalLB images
-      uses: actions/download-artifact@v3
+      uses: actions/download-artifact@v4
       with:
         path: metallb-images
 

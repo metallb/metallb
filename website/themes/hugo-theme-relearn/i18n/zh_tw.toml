@@ -1,0 +1,119 @@
+[Reading-direction]
+other = "ltr"
+
+[Search]
+other = "搜尋"
+
+[Search-placeholder]
+other = "搜尋..."
+
+[Clear-search]
+other = "清除搜索"
+
+[No-results-found]
+other = "找不到\"{0}\"的結果"
+
+[N-results-found]
+other = "為\"{0}\"找到 {1} 個結果"
+
+[Clear-History]
+other = "清除歷史紀錄"
+
+[Reset-view]
+other = "重置檢視"
+
+[View-reset]
+other = "查看重置！"
+
+[Attachments-label]
+other = "附件"
+
+[title-404]
+other = "未定位"
+
+[message-404]
+other = "這個網頁已經被刪除、移動或從未存在"
+
+[Go-to-homepage]
+other = "回到首頁"
+
+[Edit-this-page]
+other = "編輯網頁"
+
+[Print-this-chapter]
+other = "列印整章"
+
+[More-action]
+other = "更多"
+
+[Shortcuts-Title]
+other = "更多"
+
+[Expand-title]
+other = "展開"
+
+[Navigation-toggle]
+other = "導航"
+
+[Toc-toggle]
+other = "目錄"
+
+[Byte-symbol]
+other = "B"
+
+[Kilobyte-symbol]
+other = "KB"
+
+[Megabyte-symbol]
+other = "MB"
+
+[note]
+other = "註釋"
+
+[info]
+other = "資訊"
+
+[tip]
+other = "提示"
+
+[warning]
+other = "警告"
+
+[Copy-to-clipboard]
+other = "複製到剪貼板"
+
+[Copied-to-clipboard]
+other = "複製到剪貼簿！"
+
+[Copy-link-to-clipboard]
+other = "將連結複製到剪貼簿"
+
+[Link-copied-to-clipboard]
+other = "連結複製到剪貼簿！"
+
+[Chapter]
+other = "第{{.}}章"
+
+[Language]
+other = "語言"
+
+[Theme]
+other = "主題"
+
+[Submenu]
+other = "子功能表{{.}}"
+
+[Subsections]
+other = "{{.}} 的子部分"
+
+[tags]
+other = "標籤"
+
+[tag]
+other = "標籤"
+
+[categories]
+other = "類別"
+
+[category]
+other = "類別"

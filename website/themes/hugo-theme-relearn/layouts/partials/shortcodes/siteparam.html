@@ -1,0 +1,17 @@
+{{- $page := .page }}
+{{- if and (not $page) .context }}
+  {{- $page = .context }}
+  {{- warnf "%q: DEPRECATED parameter 'context' for shortcode 'siteparam' found, use 'page' instead; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#5180" $page.File.Filename }}
+{{- end }}
+{{- $paramNames := split .name "." }}
+{{- with $page }}
+{{- $params := .Site.Params }}
+{{- range $paramName := $paramNames }}
+    {{- with $params }}
+        {{- $params = index . (lower $paramName) }}
+    {{- end }}
+{{- end }}
+{{- with $params }}
+  {{- . }}
+{{- end }}
+{{- end }}

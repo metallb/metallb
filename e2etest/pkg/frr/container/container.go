@@ -11,7 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/pkg/errors"
+	"errors"
+
 	"go.universe.tf/e2etest/pkg/executor"
 	"go.universe.tf/e2etest/pkg/frr"
 	frrconfig "go.universe.tf/e2etest/pkg/frr/config"
@@ -87,7 +88,7 @@ func Create(configs map[string]Config) ([]*FRR, error) {
 				frrContainers = append(frrContainers, c)
 			}
 			if err != nil {
-				return errors.Wrapf(err, "failed to wait for daemons %v", toFind)
+				return errors.Join(err, fmt.Errorf("failed to wait for daemons %v", toFind))
 			}
 
 			return nil
@@ -160,7 +161,7 @@ func start(cfg Config) (*FRR, error) {
 	srcFiles := fmt.Sprintf("%s/.", frrConfigDir)
 	res, err := exec.Command("cp", "-r", srcFiles, testDirName).CombinedOutput()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to copy FRR config directory. %s", string(res))
+		return nil, errors.Join(err, fmt.Errorf("failed to copy FRR config directory. %s", string(res)))
 	}
 
 	err = frrconfig.SetDaemonsConfig(testDirName, cfg.Router)
@@ -172,7 +173,7 @@ func start(cfg Config) (*FRR, error) {
 	args := []string{"run", "-d", "--privileged", "--network", cfg.Network, "--rm", "--ulimit", "core=-1", "--name", cfg.Name, "--volume", volume, cfg.Image}
 	out, err := exec.Command(executor.ContainerRuntime, args...).CombinedOutput()
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to start %s container. %s", cfg.Name, out)
+		return nil, errors.Join(err, fmt.Errorf("failed to start %s container. %s", cfg.Name, out))
 	}
 
 	frr, err := configureContainer(cfg, testDirName)
@@ -230,7 +231,7 @@ func (c *FRR) updateIPS() (err error) {
 	containerIP, err := exec.Command(executor.ContainerRuntime, "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}",
 		c.Name).CombinedOutput()
 	if err != nil {
-		return errors.Wrapf(err, "failed to get FRR IPv4 address")
+		return errors.Join(err, errors.New("failed to get FRR IPv4 address"))
 	}
 
 	containerIPv4 := strings.TrimSuffix(string(containerIP), "\n")
@@ -238,13 +239,13 @@ func (c *FRR) updateIPS() (err error) {
 	containerIP, err = exec.Command(executor.ContainerRuntime, "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.GlobalIPv6Address}}{{end}}",
 		c.Name).CombinedOutput()
 	if err != nil {
-		return errors.Wrapf(err, "failed to get FRR IPv6 address")
+		return errors.Join(err, errors.New("failed to get FRR IPv6 address"))
 	}
 
 	containerIPv6 := strings.TrimSuffix(string(containerIP), "\n")
 
 	if containerIPv4 == "" && containerIPv6 == "" {
-		return errors.Errorf("failed to get FRR IP addresses")
+		return errors.New("failed to get FRR IP addresses")
 	}
 	c.Ipv4 = containerIPv4
 	c.Ipv6 = containerIPv6
@@ -256,12 +257,13 @@ func (c *FRR) updateIPS() (err error) {
 func (c *FRR) UpdateBGPConfigFile(bgpConfig string) error {
 	err := frrconfig.SetBGPConfig(c.configDir, bgpConfig)
 	if err != nil {
-		return errors.Wrapf(err, "failed to update BGP config file")
+		return errors.Join(err, errors.New("failed to update BGP config file"))
 	}
 
 	err = reloadFRRConfig(consts.BGPConfigFile, c)
 	if err != nil {
-		return errors.Wrapf(err, "failed to reload BGP config file")
+		return errors.Join(err, errors.New("failed to update BGP config file"))
+
 	}
 
 	return nil
@@ -272,12 +274,12 @@ func (c *FRR) delete() error {
 	// Kill the BGP router container.
 	out, err := exec.Command(executor.ContainerRuntime, "kill", c.Name).CombinedOutput()
 	if err != nil {
-		return errors.Wrapf(err, "failed to kill %s container. %s", c.Name, out)
+		return errors.Join(err, fmt.Errorf("failed to kill %s container. %s", c.Name, out))
 	}
 
 	err = os.RemoveAll(c.configDir)
 	if err != nil {
-		return errors.Wrapf(err, "failed to delete FRR config directory")
+		return errors.Join(err, errors.New("failed to delete FRR config directory"))
 	}
 
 	return nil
@@ -314,7 +316,7 @@ func (c *FRR) updateVolumePermissions() error {
 	cmd := fmt.Sprintf("chown -R %d:%d %s", uid, gid, frrMountPath)
 	out, err := exec.Command(executor.ContainerRuntime, "exec", c.Name, "sh", "-c", cmd).CombinedOutput()
 	if err != nil {
-		return errors.Wrapf(err, "failed to change %s container volume permissions. %s", c.Name, string(out))
+		return errors.Join(err, fmt.Errorf("failed to change %s container volume permissions. %s", c.Name, string(out)))
 	}
 
 	return nil
@@ -326,14 +328,14 @@ func reloadFRRConfig(configFile string, exec executor.Executor) error {
 	cmd := fmt.Sprintf("python3 /usr/lib/frr/frr-reload.py --test --stdout %s/%s", frrMountPath, configFile)
 	out, err := exec.Exec("sh", "-c", cmd)
 	if err != nil {
-		return errors.Wrapf(err, "failed to check configuration file. %s", out)
+		return errors.Join(err, fmt.Errorf("failed to check configuration file. %s", out))
 	}
 
 	// Applying the configuration file.
 	cmd = fmt.Sprintf("python3 /usr/lib/frr/frr-reload.py --reload --overwrite --stdout %s/%s", frrMountPath, configFile)
 	out, err = exec.Exec("sh", "-c", cmd)
 	if err != nil {
-		return errors.Wrapf(err, "failed to apply configuration file. %s", out)
+		return errors.Join(err, fmt.Errorf("failed to apply configuration file. %s", out))
 	}
 
 	return nil

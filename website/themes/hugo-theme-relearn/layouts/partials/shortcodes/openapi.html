@@ -1,0 +1,25 @@
+{{- $page := .page }}
+{{- if and (not $page) .context }}
+  {{- $page = .context }}
+  {{- warnf "%q: DEPRECATED parameter 'context' for shortcode 'openapi' found, use 'page' instead; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#5180" $page.File.Filename }}
+{{- end }}
+{{- $src := .src }}
+{{- $spec := "" }}
+{{- $id := cond (or (eq .id nil) (eq .id "")) (partial "make-random-md5.hugo" $page) .id }}
+{{- with $page }}
+{{- with or
+  (.Resources.Get $src)
+  (resources.Get $src)
+}}
+  {{- $spec = .Content }}
+{{- end }}
+<div class="sc-openapi-wrapper is-loading helper-loading-container">
+  <div
+    class="sc-openapi-container"
+    id="R-openapi-{{ $id }}"
+    data-openapi-url="{{ $src }}"
+    data-openapi-spec="{{ $spec | safeHTMLAttr }}"
+  ></div>
+</div>
+{{- .Store.Set "hasOpenApi" true }}
+{{- end }}

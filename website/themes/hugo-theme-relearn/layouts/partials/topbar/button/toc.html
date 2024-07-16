@@ -1,0 +1,29 @@
+{{- $onempty := cond (isset . "onempty") .onempty "hide" }}
+{{- $onwidths := cond (isset . "onwidths") .onwidths "show" }}
+{{- $onwidthm := cond (isset . "onwidthm") .onwidthm "show" }}
+{{- $onwidthl := cond (isset . "onwidthl") .onwidthl "show" }}
+{{- with .page }}
+	{{- $format := partial "get-format.hugo" . }}
+	{{- $outputFormat := partial "output-format.hugo" (dict "page" . "format" $format) }}
+	{{- $defaultDisableToc := .Site.Params.disableToc | default false }}
+	{{- $currentDisableToc := .Params.disableToc | default $defaultDisableToc }}
+	{{- if and (eq $outputFormat "html") (not $currentDisableToc) }}
+		{{- $content := partial "toc-class.html" . }}
+		{{- $hascontent := not (eq 0 (int (len (trim ($content | plainify) "\n\r\t ")))) }}
+		{{- if not $hascontent }}
+			{{- $content = " " }}
+		{{- end }}
+		{{- partial "topbar/func/button.html" (dict
+			"page" .
+			"class" "topbar-button-toc"
+			"href" "javascript:toggleTopbarFlyout(this)"
+			"icon" "list-alt"
+			"onempty" $onempty
+			"onwidths" $onwidths
+			"onwidthm" $onwidthm
+			"onwidthl" $onwidthl
+			"hint" (printf "%s (CTRL+ALT+t)" (T "Toc-toggle"))
+			"content" $content
+		)}}
+	{{- end }}
+{{- end }}

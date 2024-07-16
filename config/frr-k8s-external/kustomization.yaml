@@ -1,0 +1,15 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+- ../native
+patchesStrategicMerge:
+- speaker-patch.yaml
+- controller-patch.yaml
+namespace: metallb-system
+patchesJson6902:
+  - target:
+      group: rbac.authorization.k8s.io
+      version: v1
+      kind: ClusterRole
+      name: metallb-system:speaker
+    path: clusterrole-patch.yaml

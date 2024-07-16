@@ -22,7 +22,7 @@ type Provider interface {
 }
 
 type frrModeProvider struct {
-	speakers map[string]*corev1.Pod
+	cl *clientset.Clientset
 }
 
 // NewFRRMode returns a provider for a deployment using "frr" as its BGP mode.
@@ -33,7 +33,11 @@ func NewFRRMode(r *rest.Config) (Provider, error) {
 		return nil, err
 	}
 
-	speakerPods, err := metallb.SpeakerPods(cl)
+	return frrModeProvider{cl: cl}, nil
+}
+
+func (f frrModeProvider) FRRExecutorFor(ns, name string) (executor.Executor, error) {
+	speakerPods, err := metallb.SpeakerPods(f.cl)
 	if err != nil {
 		return nil, err
 	}
@@ -43,22 +47,28 @@ func NewFRRMode(r *rest.Config) (Provider, error) {
 		speakers[p.Name] = p
 	}
 
-	return frrModeProvider{speakers: speakers}, nil
-}
-
-func (f frrModeProvider) FRRExecutorFor(ns, name string) (executor.Executor, error) {
-	_, ok := f.speakers[name]
+	_, ok := speakers[name]
 	if !ok {
-		return nil, fmt.Errorf("speakers %s/%s not found in known speakers %v", ns, name, f.speakers)
+		return nil, fmt.Errorf("speakers %s/%s not found in known speakers %s", ns, name, speakers)
 	}
 
 	return executor.ForPod(ns, name, "frr"), nil
 }
 
 func (f frrModeProvider) BGPMetricsPodFor(ns, name string) (*corev1.Pod, string, error) {
-	p, ok := f.speakers[name]
+	speakerPods, err := metallb.SpeakerPods(f.cl)
+	if err != nil {
+		return nil, "", err
+	}
+
+	speakers := map[string]*corev1.Pod{}
+	for _, p := range speakerPods {
+		speakers[p.Name] = p
+	}
+
+	p, ok := speakers[name]
 	if !ok {
-		return nil, "", fmt.Errorf("speakers %s/%s not found in in known speakers %v", ns, name, f.speakers)
+		return nil, "", fmt.Errorf("speakers %s/%s not found in in known speakers %v", ns, name, speakers)
 	}
 
 	return p, "metallb", nil
@@ -70,7 +80,7 @@ type frrk8sModeProvider struct {
 
 // NewFRRK8SMode returns a provider for a deployment using "frr-k8s" as its BGP mode.
 // In this mode the frr instance for a node is a sidecar container of the frr-k8s pod.
-func NewFRRK8SMode(r *rest.Config) (Provider, error) {
+func NewFRRK8SMode(r *rest.Config, namespace string) (Provider, error) {
 	cl, err := clientset.NewForConfig(r)
 	if err != nil {
 		return nil, err
@@ -81,7 +91,7 @@ func NewFRRK8SMode(r *rest.Config) (Provider, error) {
 		return nil, err
 	}
 
-	frrk8sPods, err := metallb.FRRK8SPods(cl)
+	frrk8sPods, err := metallb.FRRK8SPods(cl, namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -113,7 +123,7 @@ func (f frrk8sModeProvider) FRRExecutorFor(ns, name string) (executor.Executor, 
 		return nil, fmt.Errorf("speaker %s/%s does not have a matching frr-k8s", ns, name)
 	}
 
-	return executor.ForPod(ns, frrk8s.Name, "frr"), nil
+	return executor.ForPod(frrk8s.Namespace, frrk8s.Name, "frr"), nil
 }
 
 func (f frrk8sModeProvider) BGPMetricsPodFor(ns, name string) (*corev1.Pod, string, error) {

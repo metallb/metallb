@@ -1,0 +1,13 @@
+{{- $page := . }}
+{{- $format := "" }}
+{{- if reflect.IsMap $page }}
+  {{- $format = $page.format }}
+  {{- $page = $page.page }}
+{{- else }}
+  {{- $format = partial "get-format.hugo" $page }}
+{{- end }}
+{{- $ret := "default" }}
+{{- if $format }}
+  {{ $ret = $format.Name | lower }}
+{{- end }}
+{{- return $ret }}

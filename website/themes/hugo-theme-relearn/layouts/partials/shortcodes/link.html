@@ -1,0 +1,147 @@
+{{- $page := .page }}
+{{- if and (not $page) .context }}
+  {{- $page = .context }}
+  {{- warnf "%q: DEPRECATED parameter 'context' for shortcode 'link' found, use 'page' instead; see https://mcshelby.github.io/hugo-theme-relearn/basics/migration#5180" $page.File.Filename }}
+{{- end }}
+{{- $url := .url }}
+{{- if strings.HasPrefix $url "HAHAHUGOSHORTCODE" }}
+  {{- warnf "%q: WARNING you must call the ref / relref shortcode with '%% %%' instead of '< >' to work correctly for the anchor target attribute" $page.File.Filename }}
+{{- end }}
+{{- $attributes := dict }}
+{{- $title := .title | default "" }}
+{{- $title = trim $title " " }}
+{{- $attributes = $attributes | merge (dict "title" $title) }}
+{{- $content := .content }}
+{{- $target := .target | default "" }}
+{{- $u := urls.Parse $url }}
+{{- $href := $u.String }}
+{{- $path := $u.Path }}
+{{- if $u.IsAbs }}
+  {{- $attributes = merge $attributes (dict "rel" "external") }}
+  {{- $target = "_blank" }}
+  {{- if isset $page.Site.Params "externallinktarget" }}
+    {{- $target = $page.Site.Params.externalLinkTarget }}
+  {{- end }}
+  {{- $attributes = $attributes | merge (dict "target" $target) }}
+{{- else }}
+  {{- $linkPage := "" }}
+  {{- if $path }}
+    {{- with or
+      ($page.Page.GetPage $path)
+      ($page.Page.GetPage (strings.TrimRight "/" $path))
+      ($page.Page.Resources.Get $path)
+      (and (ne $page.Page.BundleType "leaf") ($page.Page.CurrentSection.Resources.Get $path))
+      (resources.Get $path)
+    }}
+      {{- $linkPage = . }}
+    {{- else }}
+      {{- /* is it a link into another translation? */}}
+      {{- if strings.HasPrefix $path "/" }}
+        {{- range $page.AllTranslations }}
+          {{- $lang := .Language.Lang }}
+          {{- $prefix := printf "/%s" $lang }}
+          {{- $suffix := strings.TrimPrefix $prefix $path | default "/" }}
+          {{- /* with the second check we check if the prefix was finished;
+            eg. /pir/index.html vs. /pirate/index.html, were the latter is
+            an external address outside of this site */}}
+          {{- if and (strings.HasPrefix $path $prefix) (strings.HasPrefix $suffix "/") }}
+            {{- with or
+              (.GetPage $suffix)
+              (.GetPage (strings.TrimRight "/" $suffix))
+              (.Resources.Get $suffix)
+              (and (ne .BundleType "leaf") (.CurrentSection.Resources.Get $suffix))
+              (resources.Get $suffix)
+            }}
+              {{- $linkPage = . }}
+              {{- break }}
+            {{- end }}
+          {{- end }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+  {{- else }}
+    {{- $linkPage = $page.Page }}
+  {{- end }}
+  {{- with $linkPage }}
+    {{- $href = partial "relLangPrettyUglyURL.hugo" (dict "to" .) }}
+    {{- with $u.RawQuery }}
+      {{- $href = printf "%s?%s" $href . }}
+    {{- end }}
+    {{- with $u.Fragment }}
+      {{- $ctx := dict
+        "contentPath" $page.File.Filename
+        "errorLevel" $page.Site.Params.link.errorlevel
+        "page" $linkPage
+        "parsedURL" $u
+        "renderHookName" "link"
+      }}
+      {{- partial "inline/h-rh-l/validate-fragment.html" $ctx }}
+      {{- $href = printf "%s#%s" $href . }}
+    {{- end }}
+  {{- else }}
+    {{- if eq $page.Site.Params.link.errorlevel "warning" }}
+      {{- warnf "%q: link '%s' is not a page but linked anyways" $page.File.Filename $url }}
+    {{- else if eq $page.Site.Params.link.errorlevel "error" }}
+      {{- errorf "%q: link '%s' is not a page" $page.File.Filename $url }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- $attributes = $attributes | merge (dict "href" $href) -}}
+<a
+  {{- range $k, $v := $attributes }}
+    {{- if $v }}
+      {{- printf " %s=%q" $k $v | safeHTMLAttr }}
+    {{- end }}
+  {{- end }}>{{ $content | safeHTML }}</a>
+
+{{- define "partials/inline/h-rh-l/validate-fragment.html" }}
+  {{- /*
+  Validates the fragment portion of a link destination.
+
+  @context {string} contentPath The page containing the link.
+  @context {string} errorLevel The error level when unable to resolve destination; ignore (default), warning, or error.
+  @context {page} page The page corresponding to the link destination
+  @context {struct} parsedURL The link destination parsed by urls.Parse.
+  @context {string} renderHookName The name of the render hook.
+  */}}
+
+  {{- /* Initialize. */}}
+  {{- $contentPath := .contentPath }}
+  {{- $errorLevel := .errorLevel }}
+  {{- $p := .page }}
+  {{- $u := .parsedURL }}
+  {{- $renderHookName := .renderHookName }}
+
+  {{- /* Validate. */}}
+  {{- with $u.Fragment }}
+    {{- if $p.Fragments.Identifiers.Contains . }}
+      {{- if gt ($p.Fragments.Identifiers.Count .) 1 }}
+        {{- $msg := printf "%q: duplicate heading ID %q found" $contentPath . }}
+        {{- if eq $errorLevel "warning" }}
+          {{- warnf $msg }}
+        {{- else if eq $errorLevel "error" }}
+          {{- errorf $msg }}
+        {{- end }}
+      {{- end }}
+    {{- else }}
+      {{- /* Determine target path for warning and error message. */}}
+      {{- $targetPath := "" }}
+      {{- with $p.File }}
+        {{- $targetPath = .Path }}
+      {{- else }}
+        {{- $targetPath = .Path }}
+      {{- end }}
+      {{- /* Set common message. */}}
+      {{- $msg := printf "%q: heading ID %q not found in %q" $contentPath . $targetPath }}
+      {{- if eq $targetPath $contentPath }}
+        {{- $msg := printf "%q: heading ID %q not found" $contentPath . }}
+      {{- end }}
+      {{- /* Throw warning or error. */}}
+      {{- if eq $errorLevel "warning" }}
+        {{- warnf $msg }}
+      {{- else if eq $errorLevel "error" }}
+        {{- errorf $msg }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}

@@ -198,6 +198,16 @@ spec:
                 description: To set if the BGPPeer is multi-hops away. Needed for
                   FRR mode only.
                 type: boolean
+              enableGracefulRestart:
+                description: |-
+                  EnableGracefulRestart allows BGP peer to continue to forward data packets along
+                  known routes while the routing protocol information is being restored.
+                  This field is immutable because it requires restart of the BGP session
+                  Supported for FRR mode only.
+                type: boolean
+                x-kubernetes-validations:
+                - message: EnableGracefulRestart cannot be changed after creation
+                  rule: self == oldSelf
               holdTime:
                 description: Requested BGP hold time, per RFC4271.
                 type: string
@@ -246,11 +256,13 @@ spec:
                             items:
                               type: string
                             type: array
+                            x-kubernetes-list-type: atomic
                         required:
                         - key
                         - operator
                         type: object
                       type: array
+                      x-kubernetes-list-type: atomic
                     matchLabels:
                       additionalProperties:
                         type: string

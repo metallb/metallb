@@ -85,6 +85,14 @@ type BGPPeerSpec struct {
 	// +optional
 	BFDProfile string `json:"bfdProfile,omitempty"`
 
+	// EnableGracefulRestart allows BGP peer to continue to forward data packets along
+	// known routes while the routing protocol information is being restored.
+	// This field is immutable because it requires restart of the BGP session
+	// Supported for FRR mode only.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="self == oldSelf",message="EnableGracefulRestart cannot be changed after creation"
+	EnableGracefulRestart bool `json:"enableGracefulRestart,omitempty"`
+
 	// To set if the BGPPeer is multi-hops away. Needed for FRR mode only.
 	// +optional
 	EBGPMultiHop bool `json:"ebgpMultiHop,omitempty"`
