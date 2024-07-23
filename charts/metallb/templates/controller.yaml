@@ -84,7 +84,7 @@ spec:
         - name: METALLB_DEPLOYMENT
           value: {{ template "metallb.fullname" . }}-controller
         {{- end }}
-        {{- if .Values.speaker.frr.enabled }}
+        {{- if and .Values.speaker.enabled .Values.speaker.frr.enabled }}
         - name: METALLB_BGP_TYPE
           value: frr
         {{- end }}

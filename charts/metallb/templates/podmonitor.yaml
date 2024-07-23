@@ -36,6 +36,7 @@ spec:
     relabelings:
 {{- toYaml .Values.prometheus.podMonitor.relabelings | nindent 4 }}
 {{- end }}
+{{- if .Values.speaker.enabled }}
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
@@ -73,6 +74,7 @@ spec:
 {{- if .Values.prometheus.podMonitor.relabelings }}
     relabelings:
 {{- toYaml .Values.prometheus.podMonitor.relabelings | nindent 4 }}
+{{- end }}
 {{- end }}
 ---
 {{- if .Values.prometheus.rbacPrometheus }}
