@@ -3,6 +3,16 @@ title: Release Notes
 weight: 8
 ---
 
+## Version 0.14.8
+
+### Feature
+
+- Use frr-k8s 0.0.14. (#2467, @fedepaol)
+
+### Bug fixes
+
+- Fix the broken all-in-one/kustomize manifests from v0.14.7.
+
 ## Version 0.14.7
 
 ### Bug fixes

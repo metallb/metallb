@@ -444,7 +444,7 @@ apiServer:
 
     frr_k8s_ns = "frr-k8s-system"
     if bgp_type == "frr-k8s-external":
-        run("{} apply -f https://raw.githubusercontent.com/metallb/frr-k8s/v0.0.13/config/all-in-one/frr-k8s.yaml".format(kubectl_path), echo=True)
+        run("{} apply -f https://raw.githubusercontent.com/metallb/frr-k8s/v0.0.14/config/all-in-one/frr-k8s.yaml".format(kubectl_path), echo=True)
         time.sleep(2)
         run("{} -n {} wait --for=condition=Ready --all pods --timeout 300s".format(kubectl_path, frr_k8s_ns), echo=True)
 
