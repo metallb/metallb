@@ -285,7 +285,7 @@ var _ = ginkgo.Describe("L2", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("getting the advertising node")
-			var nodeToSet string
+			var nodeToSet *corev1.Node
 
 			Eventually(func() error {
 				var err error
@@ -296,10 +296,10 @@ var _ = ginkgo.Describe("L2", func() {
 				return nil
 			}, 30*time.Second, 1*time.Second).ShouldNot(HaveOccurred())
 
-			err = k8s.SetNodeCondition(cs, nodeToSet, corev1.NodeNetworkUnavailable, corev1.ConditionTrue)
+			err = k8s.SetNodeCondition(cs, nodeToSet.Name, corev1.NodeNetworkUnavailable, corev1.ConditionTrue)
 			Expect(err).NotTo(HaveOccurred())
 			defer func() {
-				err = k8s.SetNodeCondition(cs, nodeToSet, corev1.NodeNetworkUnavailable, corev1.ConditionFalse)
+				err = k8s.SetNodeCondition(cs, nodeToSet.Name, corev1.NodeNetworkUnavailable, corev1.ConditionFalse)
 				Expect(err).NotTo(HaveOccurred())
 			}()
 
@@ -309,11 +309,11 @@ var _ = ginkgo.Describe("L2", func() {
 				if err != nil {
 					return ""
 				}
-				return node
-			}, time.Minute, time.Second).ShouldNot(Equal(nodeToSet))
+				return node.Name
+			}, time.Minute, time.Second).ShouldNot(Equal(nodeToSet.Name))
 
 			ginkgo.By("setting the NetworkUnavailable condition back to false")
-			err = k8s.SetNodeCondition(cs, nodeToSet, corev1.NodeNetworkUnavailable, corev1.ConditionFalse)
+			err = k8s.SetNodeCondition(cs, nodeToSet.Name, corev1.NodeNetworkUnavailable, corev1.ConditionFalse)
 			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("validating the service is announced back again from the previous node")
@@ -322,8 +322,8 @@ var _ = ginkgo.Describe("L2", func() {
 				if err != nil {
 					return ""
 				}
-				return node
-			}, time.Minute, time.Second).Should(Equal(nodeToSet))
+				return node.Name
+			}, time.Minute, time.Second).Should(Equal(nodeToSet.Name))
 		})
 
 		ginkgo.It("It should be work when adding NodeExcludeBalancers label to a node", func() {
@@ -337,7 +337,7 @@ var _ = ginkgo.Describe("L2", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("getting the advertising node")
-			var nodeToSet string
+			var nodeToSet *corev1.Node
 
 			Eventually(func() error {
 				var err error
@@ -350,10 +350,10 @@ var _ = ginkgo.Describe("L2", func() {
 
 			ginkgo.By("add the NodeExcludeBalancers label of the node")
 
-			k8s.AddLabelToNode(nodeToSet, corev1.LabelNodeExcludeBalancers, "", cs)
+			k8s.AddLabelToNode(nodeToSet.Name, corev1.LabelNodeExcludeBalancers, "", cs)
 			defer func() {
 				ginkgo.By("removing the NodeExcludeBalancers label of the node")
-				k8s.RemoveLabelFromNode(nodeToSet, corev1.LabelNodeExcludeBalancers, cs)
+				k8s.RemoveLabelFromNode(nodeToSet.Name, corev1.LabelNodeExcludeBalancers, cs)
 			}()
 
 			ginkgo.By("validating the service is announced from a different node")
@@ -362,11 +362,11 @@ var _ = ginkgo.Describe("L2", func() {
 				if err != nil {
 					return ""
 				}
-				return node
-			}, time.Minute, time.Second).ShouldNot(Equal(nodeToSet))
+				return node.Name
+			}, time.Minute, time.Second).ShouldNot(Equal(nodeToSet.Name))
 
 			ginkgo.By("removing the NodeExcludeBalancers label of the node")
-			k8s.RemoveLabelFromNode(nodeToSet, corev1.LabelNodeExcludeBalancers, cs)
+			k8s.RemoveLabelFromNode(nodeToSet.Name, corev1.LabelNodeExcludeBalancers, cs)
 
 			ginkgo.By("validating the service is announced back again from the previous node")
 			Eventually(func() string {
@@ -374,8 +374,8 @@ var _ = ginkgo.Describe("L2", func() {
 				if err != nil {
 					return ""
 				}
-				return node
-			}, time.Minute, time.Second).Should(Equal(nodeToSet))
+				return node.Name
+			}, time.Minute, time.Second).Should(Equal(nodeToSet.Name))
 		})
 	})
 
