@@ -17,7 +17,9 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	clientset "k8s.io/client-go/kubernetes"
+	"k8s.io/kubectl/pkg/drain"
 )
 
 func NodeIPsForFamily(nodes []v1.Node, family ipfamily.Family, vrfName string) ([]string, error) {
@@ -150,4 +152,67 @@ func conditionStatus(n *corev1.Node, ct corev1.NodeConditionType) corev1.Conditi
 	}
 
 	return corev1.ConditionUnknown
+}
+
+func CordonNode(cs kubernetes.Interface, node *corev1.Node) error {
+	if cs == nil {
+		return fmt.Errorf("K8sClient not set")
+	}
+	if node == nil {
+		return fmt.Errorf("node not set")
+	}
+
+	helper := &drain.Helper{
+		Client:              cs,
+		Ctx:                 context.TODO(),
+		Force:               true,
+		GracePeriodSeconds:  -1,
+		IgnoreAllDaemonSets: true,
+	}
+	if err := drain.RunCordonOrUncordon(helper, node, true); err != nil {
+		return fmt.Errorf("error cordoning node: %v", err)
+	}
+	// if err := drain.RunNodeDrain(helper, node.Name); err != nil {
+	// 	return fmt.Errorf("error draining node: %v", err)
+	// }
+	return nil
+}
+
+func UnCordonNode(cs kubernetes.Interface, node *corev1.Node) error {
+	if cs == nil {
+		return fmt.Errorf("K8sClient not set")
+	}
+	if node == nil {
+		return fmt.Errorf("node not set")
+	}
+
+	helper := &drain.Helper{
+		Client:              cs,
+		Ctx:                 context.TODO(),
+		Force:               true,
+		GracePeriodSeconds:  -1,
+		IgnoreAllDaemonSets: true,
+	}
+	if err := drain.RunCordonOrUncordon(helper, node, false); err != nil {
+		return fmt.Errorf("error cordoning node: %v", err)
+	}
+	// if err := drain.RunNodeDrain(helper, node.Name); err != nil {
+	// 	return fmt.Errorf("error draining node: %v", err)
+	// }
+	return nil
+}
+
+func IsNodeCordoned(cs kubernetes.Interface, node *corev1.Node) (bool, error) {
+	if cs == nil {
+		return false, fmt.Errorf("K8sClient not set")
+	}
+	if node == nil {
+		return false, fmt.Errorf("node not set")
+	}
+
+	o, err := cs.CoreV1().Nodes().Get(context.Background(), node.Name, metav1.GetOptions{})
+	if err != nil {
+		return false, err
+	}
+	return o.Spec.Unschedulable, nil
 }
