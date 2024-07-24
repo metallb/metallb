@@ -82,6 +82,10 @@ func (r *NodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 				level.Error(r.Logger).Log("controller", "NodeReconciler", "error", "old object is not node", "name", oldNodeObj.GetName())
 				return true
 			}
+			if oldNodeObj.Spec.Unschedulable != newNodeObj.Spec.Unschedulable {
+				return true
+			}
+
 			// If there is no changes in node labels or conditions' network availability status, ignore event.
 			if labels.Equals(labels.Set(oldNodeObj.Labels), labels.Set(newNodeObj.Labels)) &&
 				k8snodes.IsNetworkUnavailable(oldNodeObj) == k8snodes.IsNetworkUnavailable(newNodeObj) {

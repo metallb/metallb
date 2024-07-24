@@ -3,8 +3,34 @@
 package nodes
 
 import (
+	"strings"
+
 	corev1 "k8s.io/api/core/v1"
 )
+
+func IsNodeAvailable(n *corev1.Node) (bool, string) {
+	ret := true
+	reason := []string{}
+
+	if IsNetworkUnavailable(n) {
+		ret = ret && false
+		reason = append(reason, "nodeNetworkUnavailable")
+	}
+
+	if IsNodeUnschedulable(n) {
+		ret = ret && false
+		reason = append(reason, "nodeUnschedulable")
+	}
+	return ret, strings.Join(reason, ",")
+}
+
+func IsNodeUnschedulable(n *corev1.Node) bool {
+	if n == nil {
+		return false
+	}
+
+	return n.Spec.Unschedulable
+}
 
 // IsNetworkUnavailable returns true if the given node NodeNetworkUnavailable condition status is true.
 func IsNetworkUnavailable(n *corev1.Node) bool {
