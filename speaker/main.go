@@ -559,6 +559,7 @@ func (c *controller) SetConfig(l log.Logger, cfg *config.Config) controllers.Syn
 }
 
 func (c *controller) SetNode(l log.Logger, node *v1.Node) controllers.SyncState {
+	schedulableConditionChanged := isNodeSchedulableChanged(node.Name, c.nodes, node)
 	conditionChanged := isNetworkConditionChanged(node.Name, c.nodes, node)
 	labelNodeExcludeBalancersChanged := isLabelNodeExcludeBalancersChanged(node.Name, c.nodes, node)
 	c.nodes[node.Name] = node
@@ -570,11 +571,15 @@ func (c *controller) SetNode(l log.Logger, node *v1.Node) controllers.SyncState 
 		}
 	}
 
-	if conditionChanged || labelNodeExcludeBalancersChanged {
+	if conditionChanged || labelNodeExcludeBalancersChanged || schedulableConditionChanged {
 		return controllers.SyncStateReprocessAll
 	}
 
 	return controllers.SyncStateSuccess
+}
+
+func isNodeSchedulableChanged(nodeName string, oldNodes map[string]*v1.Node, newNode *v1.Node) bool {
+	return k8snodes.IsNodeUnschedulable(oldNodes[nodeName]) != k8snodes.IsNodeUnschedulable(newNode)
 }
 
 func isNetworkConditionChanged(nodeName string, oldNodes map[string]*v1.Node, newNode *v1.Node) bool {

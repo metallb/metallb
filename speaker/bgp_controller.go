@@ -164,9 +164,9 @@ func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, po
 		return "notOwner"
 	}
 
-	if k8snodes.IsNetworkUnavailable(nodes[c.myNode]) {
-		level.Warn(l).Log("event", "skipping should announce bgp", "service", name, "reason", "speaker's node has NodeNetworkUnavailable condition")
-		return "nodeNetworkUnavailable"
+	if ok, reason := k8snodes.IsNodeAvailable(nodes[c.myNode]); !ok {
+		level.Warn(l).Log("event", "skipping should announce bgp", "service", name, "reason", reason)
+		return reason
 	}
 
 	if !c.ignoreExcludeLB && k8snodes.IsNodeExcludedFromBalancers(nodes[c.myNode]) {
