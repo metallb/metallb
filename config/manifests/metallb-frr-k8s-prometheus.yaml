@@ -2185,7 +2185,6 @@ rules:
   - metallb-webhook-configuration
   resources:
   - validatingwebhookconfigurations
-  - mutatingwebhookconfigurations
   verbs:
   - create
   - delete
@@ -2198,7 +2197,6 @@ rules:
   - admissionregistration.k8s.io
   resources:
   - validatingwebhookconfigurations
-  - mutatingwebhookconfigurations
   verbs:
   - list
   - watch
