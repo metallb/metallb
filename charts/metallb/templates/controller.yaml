@@ -68,6 +68,9 @@ spec:
         {{- if .Values.loadBalancerClass }}
         - --lb-class={{ .Values.loadBalancerClass }}
         {{- end }}
+        {{- if .Values.watchLoadBalancerWithoutClass }}
+        - --watch-lb-without-class
+        {{- end }}
         {{- if .Values.controller.webhookMode }}
         - --webhook-mode={{ .Values.controller.webhookMode }}
         {{- end }}

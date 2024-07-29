@@ -266,40 +266,53 @@ func TestServiceController(t *testing.T) {
 
 func TestLBClass(t *testing.T) {
 	tests := []struct {
-		desc           string
-		serviceLBClass *string
-		metallLBClass  string
-		shouldFilter   bool
+		desc            string
+		serviceLBClass  *string
+		metallLBClass   string
+		watchEmptyClass bool
+		shouldFilter    bool
 	}{
 		{
-			desc:           "Empty serviceclass, metallb default",
-			serviceLBClass: nil,
-			metallLBClass:  "",
-			shouldFilter:   false,
+			desc:            "Empty serviceclass, metallb default, watch empty class ignored",
+			serviceLBClass:  nil,
+			metallLBClass:   "",
+			watchEmptyClass: false,
+			shouldFilter:    false,
 		},
 		{
-			desc:           "Empty serviceclass, metallb specific",
-			serviceLBClass: nil,
-			metallLBClass:  "foo",
-			shouldFilter:   true,
+			desc:            "Empty serviceclass, metallb specific, watch empty class false",
+			serviceLBClass:  nil,
+			metallLBClass:   "foo",
+			watchEmptyClass: false,
+			shouldFilter:    true,
 		},
 		{
-			desc:           "Set serviceclass, metallb default",
-			serviceLBClass: ptr.To[string]("foo"),
-			metallLBClass:  "",
-			shouldFilter:   true,
+			desc:            "Empty serviceclass, metallb specific, watch empty class true",
+			serviceLBClass:  nil,
+			metallLBClass:   "foo",
+			watchEmptyClass: true,
+			shouldFilter:    false,
 		},
 		{
-			desc:           "Set serviceclass, metallb different",
-			serviceLBClass: ptr.To[string]("foo"),
-			metallLBClass:  "bar",
-			shouldFilter:   true,
+			desc:            "Set serviceclass, metallb default",
+			serviceLBClass:  ptr.To[string]("foo"),
+			metallLBClass:   "",
+			watchEmptyClass: false,
+			shouldFilter:    true,
 		},
 		{
-			desc:           "Set serviceclass, metallb same",
-			serviceLBClass: ptr.To[string]("foo"),
-			metallLBClass:  "foo",
-			shouldFilter:   false,
+			desc:            "Set serviceclass, metallb different",
+			serviceLBClass:  ptr.To[string]("foo"),
+			metallLBClass:   "bar",
+			watchEmptyClass: false,
+			shouldFilter:    true,
+		},
+		{
+			desc:            "Set serviceclass, metallb same",
+			serviceLBClass:  ptr.To[string]("foo"),
+			metallLBClass:   "foo",
+			watchEmptyClass: false,
+			shouldFilter:    false,
 		},
 	}
 	for _, test := range tests {
@@ -308,7 +321,7 @@ func TestLBClass(t *testing.T) {
 				LoadBalancerClass: test.serviceLBClass,
 			},
 		}
-		filters := filterByLoadBalancerClass(svc, test.metallLBClass)
+		filters := filterByLoadBalancerClass(svc, test.metallLBClass, test.watchEmptyClass)
 		if filters != test.shouldFilter {
 			t.Errorf("test %s failed: expected filter: %v, got: %v",
 				test.desc, test.shouldFilter, filters)

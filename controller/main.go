@@ -138,21 +138,22 @@ func (c *controller) SetPools(l log.Logger, pools *config.Pools) controllers.Syn
 
 func main() {
 	var (
-		port                = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
-		namespace           = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config / memberlist secret namespace")
-		mlSecret            = flag.String("ml-secret-name", os.Getenv("METALLB_ML_SECRET_NAME"), "name of the memberlist secret to create")
-		deployName          = flag.String("deployment", os.Getenv("METALLB_DEPLOYMENT"), "name of the MetalLB controller Deployment")
-		logLevel            = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
-		enablePprof         = flag.Bool("enable-pprof", false, "Enable pprof profiling")
-		disableCertRotation = flag.Bool("disable-cert-rotation", false, "disable automatic generation and rotation of webhook TLS certificates/keys")
-		certDir             = flag.String("cert-dir", "/tmp/k8s-webhook-server/serving-certs", "The directory where certs are stored")
-		certServiceName     = flag.String("cert-service-name", "metallb-webhook-service", "The service name used to generate the TLS cert's hostname")
-		loadBalancerClass   = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
-		webhookMode         = flag.String("webhook-mode", "enabled", "webhook mode: can be enabled, disabled or only webhook if we want the controller to act as webhook endpoint only")
-		webhookSecretName   = flag.String("webhook-secret", "metallb-webhook-cert", "webhook secret: the name of webhook secret, default is metallb-webhook-cert")
-		webhookHTTP2        = flag.Bool("webhook-http2", false, "enables http2 for the webhook endpoint")
-		tlsMinVersion       = flag.String("tls-min-version", "", "Minimum TLS version supported for the webhook server, Possible values: "+strings.Join(cliflag.TLSPossibleVersions(), ", "))
-		tlsCipherSuites     = flag.String("tls-cipher-suites", "TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,"+
+		port                          = flag.Int("port", 7472, "HTTP listening port for Prometheus metrics")
+		namespace                     = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config / memberlist secret namespace")
+		mlSecret                      = flag.String("ml-secret-name", os.Getenv("METALLB_ML_SECRET_NAME"), "name of the memberlist secret to create")
+		deployName                    = flag.String("deployment", os.Getenv("METALLB_DEPLOYMENT"), "name of the MetalLB controller Deployment")
+		logLevel                      = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
+		enablePprof                   = flag.Bool("enable-pprof", false, "Enable pprof profiling")
+		disableCertRotation           = flag.Bool("disable-cert-rotation", false, "disable automatic generation and rotation of webhook TLS certificates/keys")
+		certDir                       = flag.String("cert-dir", "/tmp/k8s-webhook-server/serving-certs", "The directory where certs are stored")
+		certServiceName               = flag.String("cert-service-name", "metallb-webhook-service", "The service name used to generate the TLS cert's hostname")
+		loadBalancerClass             = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
+		watchLoadBalancerWithoutClass = flag.Bool("watch-lb-without-class", false, "when load balancer class is enabled, metallb will also handle services that do not specify any spec.loadBalancerClass")
+		webhookMode                   = flag.String("webhook-mode", "enabled", "webhook mode: can be enabled, disabled or only webhook if we want the controller to act as webhook endpoint only")
+		webhookSecretName             = flag.String("webhook-secret", "metallb-webhook-cert", "webhook secret: the name of webhook secret, default is metallb-webhook-cert")
+		webhookHTTP2                  = flag.Bool("webhook-http2", false, "enables http2 for the webhook endpoint")
+		tlsMinVersion                 = flag.String("tls-min-version", "", "Minimum TLS version supported for the webhook server, Possible values: "+strings.Join(cliflag.TLSPossibleVersions(), ", "))
+		tlsCipherSuites               = flag.String("tls-cipher-suites", "TLS_AES_128_GCM_SHA256,TLS_AES_256_GCM_SHA384,TLS_CHACHA20_POLY1305_SHA256,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,"+
 			"TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256,"+
 			"TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,TLS_RSA_WITH_AES_128_GCM_SHA256,TLS_RSA_WITH_AES_256_GCM_SHA384", "Comma-separated list of cipher suites for the webhook server")
 	)
@@ -214,16 +215,17 @@ func main() {
 			ServiceChanged: c.SetBalancer,
 			PoolChanged:    c.SetPools,
 		},
-		ValidateConfig:      validation,
-		EnableWebhook:       true,
-		WebhookWithHTTP2:    *webhookHTTP2,
-		WebHookMinVersion:   webhookTLSMinVersion,
-		WebHookCipherSuites: webhookTLSCipherSuites,
-		DisableCertRotation: *disableCertRotation,
-		WebhookSecretName:   *webhookSecretName,
-		CertDir:             *certDir,
-		CertServiceName:     *certServiceName,
-		LoadBalancerClass:   *loadBalancerClass,
+		ValidateConfig:                validation,
+		EnableWebhook:                 true,
+		WebhookWithHTTP2:              *webhookHTTP2,
+		WebHookMinVersion:             webhookTLSMinVersion,
+		WebHookCipherSuites:           webhookTLSCipherSuites,
+		DisableCertRotation:           *disableCertRotation,
+		WebhookSecretName:             *webhookSecretName,
+		CertDir:                       *certDir,
+		CertServiceName:               *certServiceName,
+		LoadBalancerClass:             *loadBalancerClass,
+		WatchLoadBalancerWithoutClass: *watchLoadBalancerWithoutClass,
 	}
 	switch *webhookMode {
 	case "enabled":

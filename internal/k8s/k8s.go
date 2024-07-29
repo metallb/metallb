@@ -98,27 +98,28 @@ type Client struct {
 // Config specifies the configuration of the Kubernetes
 // client/watcher.
 type Config struct {
-	ProcessName         string
-	NodeName            string
-	PodName             string
-	MetricsHost         string
-	MetricsPort         int
-	EnablePprof         bool
-	ReadEndpoints       bool
-	Logger              log.Logger
-	Namespace           string
-	ValidateConfig      config.Validate
-	EnableWebhook       bool
-	WebHookMinVersion   uint16
-	WebHookCipherSuites []uint16
-	DisableCertRotation bool
-	WebhookSecretName   string
-	CertDir             string
-	CertServiceName     string
-	LoadBalancerClass   string
-	WebhookWithHTTP2    bool
-	WithFRRK8s          bool
-	FRRK8sNamespace     string
+	ProcessName                   string
+	NodeName                      string
+	PodName                       string
+	MetricsHost                   string
+	MetricsPort                   int
+	EnablePprof                   bool
+	ReadEndpoints                 bool
+	Logger                        log.Logger
+	Namespace                     string
+	ValidateConfig                config.Validate
+	EnableWebhook                 bool
+	WebHookMinVersion             uint16
+	WebHookCipherSuites           []uint16
+	DisableCertRotation           bool
+	WebhookSecretName             string
+	CertDir                       string
+	CertServiceName               string
+	LoadBalancerClass             string
+	WatchLoadBalancerWithoutClass bool
+	WebhookWithHTTP2              bool
+	WithFRRK8s                    bool
+	FRRK8sNamespace               string
 	Listener
 	Layer2StatusChan    <-chan event.GenericEvent
 	Layer2StatusFetcher controllers.StatusFetcher
@@ -264,13 +265,14 @@ func New(cfg *Config) (*Client, error) {
 
 	if cfg.ServiceChanged != nil {
 		if err = (&controllers.ServiceReconciler{
-			Client:            mgr.GetClient(),
-			Logger:            cfg.Logger,
-			Scheme:            mgr.GetScheme(),
-			Handler:           cfg.ServiceHandler,
-			Endpoints:         cfg.ReadEndpoints,
-			Reload:            reloadChan,
-			LoadBalancerClass: cfg.LoadBalancerClass,
+			Client:                        mgr.GetClient(),
+			Logger:                        cfg.Logger,
+			Scheme:                        mgr.GetScheme(),
+			Handler:                       cfg.ServiceHandler,
+			Endpoints:                     cfg.ReadEndpoints,
+			Reload:                        reloadChan,
+			LoadBalancerClass:             cfg.LoadBalancerClass,
+			WatchLoadBalancerWithoutClass: cfg.WatchLoadBalancerWithoutClass,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "service")
 			return nil, errors.Join(err, errors.New("failed to create service reconciler"))
