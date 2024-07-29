@@ -72,21 +72,22 @@ func main() {
 	prometheus.MustRegister(announcing)
 
 	var (
-		namespace         = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
-		host              = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
-		mlBindAddr        = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
-		mlBindPort        = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
-		mlLabels          = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
-		mlSecretKeyPath   = flag.String("ml-secret-key-path", os.Getenv("METALLB_ML_SECRET_KEY_PATH"), "Path to where the MemberList's secret key is mounted")
-		mlWANConfig       = flag.Bool("ml-wan-config", false, "WAN network type for MemberList default config, bool")
-		myNode            = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
-		myPod             = flag.String("pod-name", os.Getenv("METALLB_POD_NAME"), "name of this MetalLB speaker pod")
-		port              = flag.Int("port", 7472, "HTTP listening port")
-		logLevel          = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
-		enablePprof       = flag.Bool("enable-pprof", false, "Enable pprof profiling")
-		loadBalancerClass = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
-		ignoreLBExclude   = flag.Bool("ignore-exclude-lb", false, "ignore the exclude-from-external-load-balancers label")
-		frrK8sNamespace   = flag.String("frrk8s-namespace", os.Getenv("FRRK8S_NAMESPACE"), "the namespace frr-k8s is being deployed on")
+		namespace                     = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
+		host                          = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
+		mlBindAddr                    = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
+		mlBindPort                    = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
+		mlLabels                      = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
+		mlSecretKeyPath               = flag.String("ml-secret-key-path", os.Getenv("METALLB_ML_SECRET_KEY_PATH"), "Path to where the MemberList's secret key is mounted")
+		mlWANConfig                   = flag.Bool("ml-wan-config", false, "WAN network type for MemberList default config, bool")
+		myNode                        = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
+		myPod                         = flag.String("pod-name", os.Getenv("METALLB_POD_NAME"), "name of this MetalLB speaker pod")
+		port                          = flag.Int("port", 7472, "HTTP listening port")
+		logLevel                      = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
+		enablePprof                   = flag.Bool("enable-pprof", false, "Enable pprof profiling")
+		loadBalancerClass             = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
+		watchLoadBalancerWithoutClass = flag.Bool("watch-lb-without-class", false, "when load balancer class is enabled, metallb will also handle services that do not specify any spec.loadBalancerClass")
+		ignoreLBExclude               = flag.Bool("ignore-exclude-lb", false, "ignore the exclude-from-external-load-balancers label")
+		frrK8sNamespace               = flag.String("frrk8s-namespace", os.Getenv("FRRK8S_NAMESPACE"), "the namespace frr-k8s is being deployed on")
 	)
 	flag.Parse()
 
@@ -205,10 +206,11 @@ func main() {
 			ConfigChanged:  ctrl.SetConfig,
 			NodeChanged:    ctrl.SetNode,
 		},
-		ValidateConfig:    validateConfig,
-		LoadBalancerClass: *loadBalancerClass,
-		WithFRRK8s:        listenFRRK8s,
-		FRRK8sNamespace:   *frrK8sNamespace,
+		ValidateConfig:                validateConfig,
+		LoadBalancerClass:             *loadBalancerClass,
+		WatchLoadBalancerWithoutClass: *watchLoadBalancerWithoutClass,
+		WithFRRK8s:                    listenFRRK8s,
+		FRRK8sNamespace:               *frrK8sNamespace,
 
 		Layer2StatusChan:    statusNotifyChan,
 		Layer2StatusFetcher: ctrl.layer2StatusFetchFunc,

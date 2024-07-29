@@ -246,6 +246,9 @@ spec:
         {{- if .Values.loadBalancerClass }}
         - --lb-class={{ .Values.loadBalancerClass }}
         {{- end }}
+        {{- if .Values.watchLoadBalancerWithoutClass }}
+        - --watch-lb-without-class
+        {{- end }}
         {{- if .Values.speaker.wanConfig }}
         - --ml-wan-config
         {{- end }}

@@ -66,6 +66,7 @@ Kubernetes: `>= 1.19.0-0`
 | fullnameOverride | string | `""` |  |
 | imagePullSecrets | list | `[]` |  |
 | loadBalancerClass | string | `""` |  |
+| watchLoadBalancerWithoutClass | bool | `false` |  |
 | nameOverride | string | `""` |  |
 | prometheus.controllerMetricsTLSSecret | string | `""` |  |
 | prometheus.metricsPort | int | `7472` |  |

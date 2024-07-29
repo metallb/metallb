@@ -40,13 +40,14 @@ import (
 
 type ServiceReconciler struct {
 	client.Client
-	Logger            log.Logger
-	Scheme            *runtime.Scheme
-	Namespace         string
-	Handler           func(log.Logger, string, *v1.Service, []discovery.EndpointSlice) SyncState
-	Endpoints         bool
-	LoadBalancerClass string
-	Reload            chan event.GenericEvent
+	Logger                        log.Logger
+	Scheme                        *runtime.Scheme
+	Namespace                     string
+	Handler                       func(log.Logger, string, *v1.Service, []discovery.EndpointSlice) SyncState
+	Endpoints                     bool
+	LoadBalancerClass             string
+	WatchLoadBalancerWithoutClass bool
+	Reload                        chan event.GenericEvent
 	// initialLoadPerformed is set after the first time we call reprocessAll.
 	// This is required because we want the first time we load the services to follow the assigned first, non assigned later order.
 	// This allows avoiding to have services with already assigned IP to get their IP stolen by other services.
@@ -78,7 +79,7 @@ func (r *ServiceReconciler) reconcileService(ctx context.Context, req ctrl.Reque
 		return ctrl.Result{}, err
 	}
 
-	if filterByLoadBalancerClass(service, r.LoadBalancerClass) {
+	if filterByLoadBalancerClass(service, r.LoadBalancerClass, r.WatchLoadBalancerWithoutClass) {
 		level.Debug(r.Logger).Log("controller", "ServiceReconciler", "filtered service", req.NamespacedName)
 		return ctrl.Result{}, nil
 	}
@@ -156,7 +157,7 @@ func (r *ServiceReconciler) serviceFor(ctx context.Context, name types.Namespace
 	return &res, nil
 }
 
-func filterByLoadBalancerClass(service *v1.Service, loadBalancerClass string) bool {
+func filterByLoadBalancerClass(service *v1.Service, loadBalancerClass string, watchLoadBalancerWithoutClass bool) bool {
 	// When receiving a delete, we can't make logic on the service so we
 	// rely on the application logic that will receive a delete on a service it
 	// did not handle and discard it.
@@ -164,7 +165,7 @@ func filterByLoadBalancerClass(service *v1.Service, loadBalancerClass string) bo
 		return false
 	}
 	if service.Spec.LoadBalancerClass == nil && loadBalancerClass != "" {
-		return true
+		return !watchLoadBalancerWithoutClass
 	}
 	if service.Spec.LoadBalancerClass == nil && loadBalancerClass == "" {
 		return false

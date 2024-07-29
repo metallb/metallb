@@ -162,6 +162,9 @@
     "loadBalancerClass": {
       "type":"string"
     },
+    "watchLoadBalancerWithoutClass": {
+      "type": "boolean"
+    },
     "rbac": {
       "description": "RBAC configuration",
       "type": "object",
