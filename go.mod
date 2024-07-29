@@ -14,8 +14,8 @@ require (
 	github.com/mdlayher/ndp v0.0.0-20200602162440-17ab9e3e5567
 	github.com/metallb/frr-k8s v0.0.14
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
-	github.com/onsi/ginkgo/v2 v2.17.2
-	github.com/onsi/gomega v1.33.1
+	github.com/onsi/ginkgo/v2 v2.19.1
+	github.com/onsi/gomega v1.34.0
 	github.com/open-policy-agent/cert-controller v0.10.2-0.20240531181455-2649f121ab97
 	github.com/ory/dockertest/v3 v3.10.0
 	github.com/prometheus/client_golang v1.19.1
