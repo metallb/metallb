@@ -369,6 +369,7 @@ spec:
       {{- if .Values.speaker.frr.enabled }}
       - name: frr
         securityContext:
+          readOnlyRootFilesystem: true
           capabilities:
             add:
             - NET_ADMIN
@@ -431,6 +432,8 @@ spec:
           periodSeconds: {{ .Values.speaker.startupProbe.periodSeconds }}
         {{- end }}
       - name: reloader
+        securityContext:
+          readOnlyRootFilesystem: true
         image: {{ .Values.speaker.frr.image.repository }}:{{ .Values.speaker.frr.image.tag | default .Chart.AppVersion }}
         {{- if .Values.speaker.frr.image.pullPolicy }}
         imagePullPolicy: {{ .Values.speaker.frr.image.pullPolicy }}
@@ -448,6 +451,8 @@ spec:
           {{- toYaml . | nindent 12 }}
         {{- end }}
       - name: frr-metrics
+        securityContext:
+          readOnlyRootFilesystem: true
         image: {{ .Values.speaker.frr.image.repository }}:{{ .Values.speaker.frr.image.tag | default .Chart.AppVersion }}
         command: ["/etc/frr_metrics/frr-metrics"]
         args:
