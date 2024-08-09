@@ -363,3 +363,6 @@ frrk8s:
   enabled: false
   external: false
   namespace: ""
+
+webhooks:
+  enabled: true
