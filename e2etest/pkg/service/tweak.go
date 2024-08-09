@@ -42,14 +42,14 @@ func WithSpecificIPs(svc *corev1.Service, ips ...string) {
 		return
 	}
 	svc.Annotations = map[string]string{
-		"metallb.universe.tf/loadBalancerIPs": strings.Join(ips, ","),
+		"metallb.io/loadBalancerIPs": strings.Join(ips, ","),
 	}
 }
 
 func WithSpecificPool(poolName string) func(*corev1.Service) {
 	return func(svc *corev1.Service) {
 		svc.Annotations = map[string]string{
-			"metallb.universe.tf/address-pool": poolName,
+			"metallb.io/address-pool": poolName,
 		}
 	}
 }

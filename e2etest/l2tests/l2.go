@@ -483,7 +483,7 @@ var _ = ginkgo.Describe("L2", func() {
 		svc1, err := jig1.CreateLoadBalancerService(context.TODO(), func(svc *corev1.Service) {
 			svc.Spec.Ports[0].TargetPort = intstr.FromInt(service.TestServicePort)
 			svc.Spec.Ports[0].Port = int32(service.TestServicePort)
-			svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
+			svc.Annotations = map[string]string{"metallb.io/allow-shared-ip": "foo"}
 			svc.Spec.LoadBalancerIP = ip
 		})
 
@@ -493,7 +493,7 @@ var _ = ginkgo.Describe("L2", func() {
 		svc2, err := jig2.CreateLoadBalancerService(context.TODO(), func(svc *corev1.Service) {
 			svc.Spec.Ports[0].TargetPort = intstr.FromInt(service.TestServicePort + 1)
 			svc.Spec.Ports[0].Port = int32(service.TestServicePort + 1)
-			svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
+			svc.Annotations = map[string]string{"metallb.io/allow-shared-ip": "foo"}
 			svc.Spec.LoadBalancerIP = ip
 		})
 		Expect(err).NotTo(HaveOccurred())
@@ -825,7 +825,7 @@ var _ = ginkgo.Describe("L2", func() {
 			svc, _ := service.CreateWithBackend(cs, namespace, fmt.Sprintf("test-service%d", i+1),
 				func(svc *corev1.Service) {
 					svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeCluster
-					svc.Annotations = map[string]string{"metallb.universe.tf/address-pool": fmt.Sprintf("test-addresspool%d", i+1)}
+					svc.Annotations = map[string]string{"metallb.io/address-pool": fmt.Sprintf("test-addresspool%d", i+1)}
 				})
 
 			defer func() {
@@ -839,7 +839,7 @@ var _ = ginkgo.Describe("L2", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			ginkgo.By("validate annotating a service with the pool used to provide its IP")
-			Expect(svc.Annotations["metallb.universe.tf/ip-allocated-from-pool"]).To(Equal(pool.Name))
+			Expect(svc.Annotations["metallb.io/ip-allocated-from-pool"]).To(Equal(pool.Name))
 
 			services = append(services, svc)
 			servicesIngressIP = append(servicesIngressIP, ingressIP)
