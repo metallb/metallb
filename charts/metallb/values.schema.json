@@ -439,6 +439,16 @@
           "enum": [ "Ignore", "Fail" ]
         }
       }
+    },
+    "webhooks":  {
+      "description": "Webhook configuration",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Enable Webhooks",
+          "type": "boolean"
+        }
+      }
     }
   },
   "required": [
