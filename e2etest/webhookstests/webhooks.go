@@ -21,6 +21,7 @@ package webhookstests
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"go.universe.tf/e2etest/pkg/config"
 	"go.universe.tf/e2etest/pkg/k8s"
@@ -156,9 +157,10 @@ var _ = ginkgo.Describe("Webhooks", func() {
 							Name: "webhooks-test",
 						},
 						Spec: metallbv1beta2.BGPPeerSpec{
-							Address: "1.1.1",
-							ASN:     64500,
-							MyASN:   1000,
+							Address:  "1.1.1",
+							ASN:      64500,
+							MyASN:    1000,
+							HoldTime: metav1.Duration{Duration: 3 * time.Second},
 						},
 					},
 				},
@@ -309,6 +311,7 @@ var _ = ginkgo.Describe("Webhooks", func() {
 				ASN:        1234,
 				MyASN:      1234,
 				Address:    "1.2.3.4",
+				HoldTime:   metav1.Duration{Duration: 3 * time.Second},
 			},
 		}
 		ginkgo.It("Should produce an error when deleting a profile used by a BGPPeer", func() {
@@ -371,9 +374,10 @@ var _ = ginkgo.DescribeTable("Webhooks namespace validation",
 					Name: "webhooks-test",
 				},
 				Spec: metallbv1beta2.BGPPeerSpec{
-					Address: "1.1.1",
-					ASN:     64500,
-					MyASN:   1000,
+					Address:  "1.1.1",
+					ASN:      64500,
+					MyASN:    1000,
+					HoldTime: metav1.Duration{Duration: 3 * time.Second},
 				},
 			},
 		},

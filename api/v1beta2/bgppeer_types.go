@@ -48,6 +48,8 @@ type BGPPeerSpec struct {
 	Port uint16 `json:"peerPort,omitempty"`
 
 	// Requested BGP hold time, per RFC4271.
+	// +kubebuilder:validation:XValidation:message="hold time should be equal or more than 3 seconds",rule="duration(self).getSeconds() >= 3"
+	// +kubebuilder:default="90s"
 	// +optional
 	HoldTime metav1.Duration `json:"holdTime,omitempty"`
 

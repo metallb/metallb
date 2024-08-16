@@ -385,7 +385,13 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 	if ip == nil {
 		return nil, fmt.Errorf("invalid BGPPeer address %q", p.Spec.Address)
 	}
+
 	holdTime := p.Spec.HoldTime.Duration
+	// DISCUSS1: default value and validation can go away because
+	// it takes place directly in CRD, should we remove them?
+	// DISCUSS2: in RFC the value 0 is valid for holdtime and it means
+	//  BGP session will not expect any Keepalive messages, and it will not
+	//  maintain a session timeout due to inactivity. Do we want to handle it?
 	if holdTime == 0 {
 		holdTime = 90 * time.Second
 	}
@@ -394,13 +400,16 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		return nil, err
 	}
 	keepaliveTime := p.Spec.KeepaliveTime.Duration
+	// DISCUSS3: When the Keepalive timer is set to zero, it indicates that the
+	// BGP speaker (router) will not send Keepalive messages to its peer. Should
+	// we allow it? it might makes sense for BFD?
 	if keepaliveTime == 0 {
 		keepaliveTime = holdTime / 3
 	}
 
-	// keepalive must be lower than holdtime
-	if keepaliveTime > holdTime {
-		return nil, fmt.Errorf("invalid keepaliveTime %q must be smaller than holdtime %q",
+	// keepalive must be lower than 1/3 holdtime, otherwise FRR adapts it.
+	if keepaliveTime > holdTime/3 {
+		return nil, fmt.Errorf("invalid keepaliveTime %q must be smaller than 1/3 holdTime %q",
 			keepaliveTime, holdTime)
 	}
 
