@@ -437,6 +437,10 @@
           "description": "Failure policy to use with validating webhooks",
           "type": "string",
           "enum": [ "Ignore", "Fail" ]
+        },
+        "annotations": {
+          "description": "Additional annotations for CRDs",
+          "type": "object"
         }
       }
     }
