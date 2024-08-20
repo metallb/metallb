@@ -36,8 +36,8 @@ build_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build")
 kubectl_path = os.path.join(build_path, "kubectl")
 kind_path = os.path.join(build_path, "kind")
 controller_gen_path = os.path.join(build_path, "bin", "controller-gen")
-kubectl_version = "v1.27.0"
-kind_version = "v0.23.0"
+kubectl_version = "v1.31.0"
+kind_version = "v0.24.0"
 
 
 def _check_architectures(architectures):
