@@ -540,8 +540,12 @@ spec:
                     - message: EnableGracefulRestart cannot be changed after creation
                       rule: self == oldSelf
                 holdTime:
+                  default: 90s
                   description: Requested BGP hold time, per RFC4271.
                   type: string
+                  x-kubernetes-validations:
+                    - message: hold time should be equal or more than 3 seconds
+                      rule: duration(self).getSeconds() >= 3
                 keepaliveTime:
                   description: Requested BGP keepalive time, per RFC4271.
                   type: string
