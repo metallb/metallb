@@ -444,7 +444,7 @@ apiServer:
 
     frr_k8s_ns = "frr-k8s-system"
     if bgp_type == "frr-k8s-external":
-        run("{} apply -f https://raw.githubusercontent.com/metallb/frr-k8s/v0.0.14/config/all-in-one/frr-k8s.yaml".format(kubectl_path), echo=True)
+        run("{} apply -f https://raw.githubusercontent.com/metallb/frr-k8s/{}/config/all-in-one/frr-k8s.yaml".format(kubectl_path,get_frr_k8s_latest), echo=True)
         time.sleep(2)
         run("{} -n {} wait --for=condition=Ready --all pods --timeout 300s".format(kubectl_path, frr_k8s_ns), echo=True)
 
@@ -1104,7 +1104,6 @@ def fetch_dependency(path: str, version: str, fetch_command: str, get_version_co
     run(fetch_command)
     run("chmod +x {}".format(path))
 
-
 def get_command_version(get_version_command: str, version_prefix: str) -> Optional[str]:
     version = run(get_version_command, warn=True, hide='both').stdout
     for line in version.splitlines():
@@ -1112,3 +1111,33 @@ def get_command_version(get_version_command: str, version_prefix: str) -> Option
             if ':' in line:
                 return line.split(":")[1].strip()
             return line.split(" ")[1].strip()
+
+def get_frr_k8s_latest():
+    latest = run("curl -s -m 10 --connect-timeout 5 https://api.github.com/repos/metallb/metallb/releases/latest | yq .name")
+    if latest == "":
+        raise Exit(message="Failed to fetch latest frr k8s version")
+    return latest
+
+def check_frr_k8s_update():
+    latest = get_frr_k8s_latest()
+
+    res = run("go get github.com/metallb/frr-k8s@{}", hide="out").format(latest)
+    if not res.ok:
+        raise Exit(message="updating frr-k8s go package failed")
+
+    chart_update = run("yq -i -e '(.dependencies[] | select (.name == \"frr-k8s\"})).version = {}' Chart.yaml").format(latest)
+    if not chart_update.ok:
+        raise Exit(message="updating frr-k8s chart version failed")
+
+    chart_dep_update = run("helm dep up")
+    if not chart_dep_update.ok:
+        raise Exit(message="updating frr-k8s chart dependencies failed")
+
+    kustomize_update = run("yq -e -i '(.resources[] | select (. == \"https://github.com/metallb/frr-k8s/config/default/?timeout=120&ref=v*\")) = \"https://github.com/metallb/frr-k8s/config/default/?timeout=120&ref=v{}}\"' ./config/frr-k8s/kustomization.yaml").format(latest)
+    if  not kustomize_update.ok:
+        raise Exit(message="updating frr-k8s kustomize config failed")
+
+    kustomize_update = run("yq -e -i '(.resources[] | select (. == \"https://github.com/metallb/frr-k8s/config/default/?timeout=120&ref=v*\")) = \"https://github.com/metallb/frr-k8s/config/default/?timeout=120&ref=v{}}\"' ./config/prometheus-frr-k8s/kustomization.yaml").format(latest)
+    if  not kustomize_update.ok:
+        raise Exit(message="updating frr-k8s kustomize config failed")
+
