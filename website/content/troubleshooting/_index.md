@@ -246,6 +246,41 @@ in the BGPAdvertisement / L2Advertisement) and to limit the service's endpoints 
 By doing this, the path of the traffic will be clear and it will be easy to understand if the issue
 is caused only by a subset of the nodes or when the pod lives on a different node, for example.
 
+## MetalLB in L2 Mode - Frequent Connection Drops with Kube-IPVS
+
+Symptoms:
+    - Frequent disconnects
+    - A tcpdump between a client machine and the Kubernetes Node with MetalLB speaker shows TCP RSTs (if TCP is used)
+    - `arping` to an advertised IP shows responses from several Nodes (multiple MAC addresses)
+
+`Arping` output example (for 3 Nodes Kubernetes cluster):
+
+```bash
+$ arping 10.8.0.10 -c 1
+ARPING 10.8.0.10 from 10.8.0.20 br-ex
+Unicast reply from 10.8.0.10 [AA:BB:CC:DD:11:00]  0.979ms
+Unicast reply from 10.8.0.10 [AA:BB:CC:DD:11:01]  1.273ms
+Unicast reply from 10.8.0.10 [AA:BB:CC:DD:11:02]  1.308ms
+Unicast reply from 10.8.0.10 [AA:BB:CC:DD:11:00]  7.797ms
+Sent 1 probes (1 broadcast(s))
+Received 4 response(s)
+```
+
+A possible cause is the default Linux kernel behavior with regards to ARP protocol:
+the kernel sends ARP responses for any local IP address configured on any interface
+(see [IP sysctl: arp_ignore](https://www.kernel.org/doc/html/latest/networking/ip-sysctl.html)).
+
+Kube-IPVS Calico mode creates an interface `kube-ipvs0` which has all the Service IP
+addresses assigned to it.
+
+A possible solution is to change the Linux kernel ARP behavior:
+`sysctl net.ipv4.conf.all.arp_ignore=1` (and save it to sysctl.conf).
+The value `1` makes the kernel to reply to an ARP request only if an IP address is configured
+on the interface which received the ARP request.
+
+The result of this change is that only MetalLB speaker will react to ARP requests
+and only on a Node which is supposed to do so.
+
 ## Collecting information for a bug report
 
 If after following the suggestions of this guide, a MetalLB bug is the primary suspect, you need to file a
