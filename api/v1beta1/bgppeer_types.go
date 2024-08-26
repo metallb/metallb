@@ -100,6 +100,7 @@ type BGPPeerStatus struct {
 //+kubebuilder:printcolumn:name="ASN",type=string,JSONPath=`.spec.peerASN`
 //+kubebuilder:printcolumn:name="BFD Profile",type=string,JSONPath=`.spec.bfdProfile`
 //+kubebuilder:printcolumn:name="Multi Hops",type=string,JSONPath=`.spec.ebgpMultiHop`
+//+kubebuilder:deprecatedversion:warning="v1beta1 is deprecated, please use v1beta2"
 
 // BGPPeer is the Schema for the peers API.
 type BGPPeer struct {

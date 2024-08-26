@@ -27,6 +27,8 @@ spec:
     - jsonPath: .spec.ebgpMultiHop
       name: Multi Hops
       type: string
+    deprecated: true
+    deprecationWarning: v1beta1 is deprecated, please use v1beta2
     name: v1beta1
     schema:
       openAPIV3Schema:
