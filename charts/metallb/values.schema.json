@@ -433,6 +433,11 @@
           "description": "Enable CRDs",
           "type": "boolean"
         },
+        "conversionStrategy": {
+          "description": "Describes how to convert different versions of CR",
+          "type": "string",
+          "enum": [ "Webhook", "None" ]
+        },
         "validationFailurePolicy": {
           "description": "Failure policy to use with validating webhooks",
           "type": "string",
