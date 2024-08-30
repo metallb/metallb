@@ -1119,7 +1119,7 @@ def get_frr_k8s_latest():
     return latest
 
 @task
-def checkfrr(ctx):
+def checkfrrk8s(ctx):
     latest = get_frr_k8s_latest().stdout
 
     res = run("go get github.com/metallb/frr-k8s@{}".format(latest))
