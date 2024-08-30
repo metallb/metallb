@@ -15,7 +15,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-func nodeForService(svc *corev1.Service, nodes []corev1.Node) (string, error) {
+func nodeForService(svc *corev1.Service, nodes []corev1.Node) (*corev1.Node, error) {
 	ingressIP := jigservice.GetIngressPoint(&svc.Status.LoadBalancer.Ingress[0])
 
 	port := strconv.Itoa(int(svc.Spec.Ports[0].Port))
@@ -23,14 +23,14 @@ func nodeForService(svc *corev1.Service, nodes []corev1.Node) (string, error) {
 	address := fmt.Sprintf("http://%s/", hostport)
 	err := mac.RequestAddressResolution(ingressIP, executor.Host)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	err = wget.Do(address, executor.Host)
 	Expect(err).NotTo(HaveOccurred())
 	advNode, err := advertisingNodeFromMAC(nodes, ingressIP, executor.Host)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return advNode.Name, nil
+	return advNode, nil
 }

@@ -225,7 +225,7 @@ func poolMatchesNodeL2(pool *config.Pool, node string) bool {
 func (c *layer2Controller) speakersForPool(pool *config.Pool, nodes map[string]*v1.Node) map[string]bool {
 	res := map[string]bool{}
 	for s := range c.sList.UsableSpeakers() {
-		if k8snodes.IsNetworkUnavailable(nodes[s]) {
+		if err := k8snodes.IsNodeAvailable(nodes[s]); err != nil {
 			continue
 		}
 
