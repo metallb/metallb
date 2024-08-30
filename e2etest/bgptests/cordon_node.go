@@ -19,7 +19,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-var _ = ginkgo.Describe("Cordon Node", func() {
+var _ = ginkgo.Describe("BGP Cordon Node", func() {
 	var (
 		cs            clientset.Interface
 		testNamespace string

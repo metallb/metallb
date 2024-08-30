@@ -20,7 +20,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-var _ = ginkgo.Describe("Cordon Node", func() {
+var _ = ginkgo.Describe("L2 Cordon Node", func() {
 	emptyL2Advertisement := metallbv1beta1.L2Advertisement{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "empty",
