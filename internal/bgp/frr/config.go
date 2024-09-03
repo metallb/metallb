@@ -68,6 +68,7 @@ type neighborConfig struct {
 	Name                string
 	ASN                 uint32
 	Addr                string
+	Interface           string
 	SrcAddr             string
 	Port                uint16
 	HoldTime            uint64

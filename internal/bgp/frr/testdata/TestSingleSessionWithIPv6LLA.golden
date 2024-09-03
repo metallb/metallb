@@ -1,0 +1,44 @@
+log file /etc/frr/frr.log informational
+log timestamp precision 3
+hostname dummyhostname
+ip nht resolve-via-default
+ipv6 nht resolve-via-default
+route-map fe80::a876:4dff:fe77:408-in deny 20
+
+
+
+
+ip prefix-list fe80::a876:4dff:fe77:408-pl-ipv6 seq 1 deny any
+ipv6 prefix-list fe80::a876:4dff:fe77:408-pl-ipv6 seq 2 deny any
+
+route-map fe80::a876:4dff:fe77:408-out permit 1
+  match ip address prefix-list fe80::a876:4dff:fe77:408-pl-ipv6
+route-map fe80::a876:4dff:fe77:408-out permit 2
+  match ipv6 address prefix-list fe80::a876:4dff:fe77:408-pl-ipv6
+
+router bgp 102
+  no bgp ebgp-requires-policy
+  no bgp network import-check
+  no bgp default ipv4-unicast
+  bgp graceful-restart preserve-fw-state
+
+  bgp router-id 1.1.1.1
+  neighbor fe80::a876:4dff:fe77:408 remote-as 100
+  neighbor fe80::a876:4dff:fe77:408 port 179
+  neighbor fe80::a876:4dff:fe77:408 timers 0 0
+  
+  neighbor fe80::a876:4dff:fe77:408 update-source fe80::e767:4dba:fd83:45a9
+  neighbor fe80::a876:4dff:fe77:408 interface eth0
+  neighbor fe80::a876:4dff:fe77:408 disable-connected-check
+
+  address-family ipv4 unicast
+    neighbor fe80::a876:4dff:fe77:408 activate
+    neighbor fe80::a876:4dff:fe77:408 route-map fe80::a876:4dff:fe77:408-in in
+    neighbor fe80::a876:4dff:fe77:408 route-map fe80::a876:4dff:fe77:408-out out
+  exit-address-family
+  address-family ipv6 unicast
+    neighbor fe80::a876:4dff:fe77:408 activate
+    neighbor fe80::a876:4dff:fe77:408 route-map fe80::a876:4dff:fe77:408-in in
+    neighbor fe80::a876:4dff:fe77:408 route-map fe80::a876:4dff:fe77:408-out out
+  exit-address-family
+

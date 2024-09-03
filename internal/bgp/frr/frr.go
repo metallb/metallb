@@ -5,6 +5,7 @@ package frr
 import (
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"sort"
 	"strconv"
@@ -264,7 +265,8 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				return nil, err
 			}
 
-			family := ipfamily.ForAddress(net.ParseIP(host))
+			addr, _ := netip.ParseAddr(host)
+			family := ipfamily.ForAddress(net.IP(addr.AsSlice()))
 
 			var connectTime uint64
 			if s.ConnectTime != nil {
@@ -275,7 +277,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				Name:            neighborName,
 				IPFamily:        family,
 				ASN:             s.PeerASN,
-				Addr:            host,
+				Addr:            strings.Split(addr.String(), "%")[0],
 				Port:            uint16(portUint),
 				HoldTime:        uint64(s.HoldTime / time.Second),
 				KeepaliveTime:   uint64(s.KeepAliveTime / time.Second),
@@ -290,6 +292,9 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			}
 			if s.SourceAddress != nil {
 				neighbor.SrcAddr = s.SourceAddress.String()
+			}
+			if v := addr.Zone(); v != "" {
+				neighbor.Interface = v
 			}
 			rout.neighbors[neighborName] = neighbor
 			rout.neighborsProperties[neighborName] = &neighborProperties{

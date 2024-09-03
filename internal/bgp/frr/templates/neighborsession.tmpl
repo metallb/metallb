@@ -16,6 +16,9 @@
   {{ if .neighbor.SrcAddr -}}
   neighbor {{.neighbor.Addr}} update-source {{.neighbor.SrcAddr}}
   {{- end }}
+  {{- if .neighbor.Interface }}
+  neighbor {{.neighbor.Addr}} interface {{.neighbor.Interface}}
+  {{- end }}
   {{- if .neighbor.GracefulRestart }}
   neighbor {{.neighbor.Addr}} graceful-restart
   {{- end }}

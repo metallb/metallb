@@ -18,6 +18,7 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"net/netip"
 	"reflect"
 	"sort"
 	"strings"
@@ -97,7 +98,7 @@ type Peer struct {
 	// AS number to expect from the remote end of the session.
 	ASN uint32
 	// Address to dial when establishing the session.
-	Addr net.IP
+	Addr netip.Addr
 	// Source address to use when establishing the session.
 	SrcAddr net.IP
 	// Port to dial when establishing the session.
@@ -381,15 +382,24 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 	if p.Spec.ASN == p.Spec.MyASN && p.Spec.EBGPMultiHop {
 		return nil, errors.New("invalid ebgp-multihop parameter set for an ibgp peer")
 	}
-	ip := net.ParseIP(p.Spec.Address)
-	if ip == nil {
-		return nil, fmt.Errorf("invalid BGPPeer address %q", p.Spec.Address)
+
+	addr, err := netip.ParseAddr(p.Spec.Address)
+	if err != nil {
+		return nil, err
+	}
+	iface := addr.Zone()
+
+	if iface != "" && !addr.IsLinkLocalUnicast() {
+		return nil, fmt.Errorf("interface configured when not LLA BGPPeer address %q", p.Spec.Address)
+	}
+	if iface == "" && addr.IsLinkLocalUnicast() {
+		return nil, fmt.Errorf("interface empty when LLA BGPPeer address %q", p.Spec.Address)
 	}
 	holdTime := p.Spec.HoldTime.Duration
 	if holdTime == 0 {
 		holdTime = 90 * time.Second
 	}
-	err := validateHoldTime(holdTime)
+	err = validateHoldTime(holdTime)
 	if err != nil {
 		return nil, err
 	}
@@ -458,7 +468,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		Name:                  p.Name,
 		MyASN:                 p.Spec.MyASN,
 		ASN:                   p.Spec.ASN,
-		Addr:                  ip,
+		Addr:                  addr,
 		SrcAddr:               src,
 		Port:                  p.Spec.Port,
 		HoldTime:              holdTime,

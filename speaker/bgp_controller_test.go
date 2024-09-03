@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"reflect"
 	"sort"
@@ -25,6 +26,14 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/utils/ptr"
 )
+
+func parseIP(s string) netip.Addr {
+	a, err := netip.ParseAddr(s)
+	if err != nil {
+		panic(err)
+	}
+	return a
+}
 
 func mustSelector(s string) labels.Selector {
 	res, err := labels.Parse(s)
@@ -265,7 +274,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			config: &config.Config{
 				Peers: map[string]*config.Peer{
 					"peer1": {
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          parseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
@@ -658,7 +667,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			config: &config.Config{
 				Peers: map[string]*config.Peer{
 					"peer1": {
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          parseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
@@ -732,7 +741,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			config: &config.Config{
 				Peers: map[string]*config.Peer{
 					"peer1": {
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          parseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
@@ -803,7 +812,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				Peers: map[string]*config.Peer{
 					"peer1": {
 						Name:          "peer1",
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          parseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
@@ -880,11 +889,11 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			config: &config.Config{
 				Peers: map[string]*config.Peer{
 					"peer1": {
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          parseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 					"peer2": {
-						Addr:          net.ParseIP("1.2.3.5"),
+						Addr:          parseIP("1.2.3.5"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
@@ -1089,7 +1098,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			config: &config.Config{
 				Peers: map[string]*config.Peer{
 					"peer1": {
-						Addr:          net.ParseIP("1.2.3.5"),
+						Addr:          parseIP("1.2.3.5"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
@@ -1212,7 +1221,7 @@ func TestNodeSelectors(t *testing.T) {
 			config: &config.Config{
 				Peers: map[string]*config.Peer{
 					"peer1": {
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          parseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 				},
@@ -1228,11 +1237,11 @@ func TestNodeSelectors(t *testing.T) {
 			config: &config.Config{
 				Peers: map[string]*config.Peer{
 					"peer1": {
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          parseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 					"peer2": {
-						Addr: net.ParseIP("2.3.4.5"),
+						Addr: parseIP("2.3.4.5"),
 						NodeSelectors: []labels.Selector{
 							mustSelector("foo=bar"),
 						},
@@ -1281,11 +1290,11 @@ func TestNodeSelectors(t *testing.T) {
 			config: &config.Config{
 				Peers: map[string]*config.Peer{
 					"peer1": {
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          parseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 					"peer2": {
-						Addr: net.ParseIP("2.3.4.5"),
+						Addr: parseIP("2.3.4.5"),
 						NodeSelectors: []labels.Selector{
 							mustSelector("foo in (bar, baz)"),
 						},
@@ -1320,11 +1329,11 @@ func TestNodeSelectors(t *testing.T) {
 			config: &config.Config{
 				Peers: map[string]*config.Peer{
 					"peer1": {
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          parseIP("1.2.3.4"),
 						NodeSelectors: []labels.Selector{labels.Everything()},
 					},
 					"peer2": {
-						Addr: net.ParseIP("2.3.4.5"),
+						Addr: parseIP("2.3.4.5"),
 						NodeSelectors: []labels.Selector{
 							mustSelector("host=frontend"),
 							mustSelector("foo in (bar, baz)"),
