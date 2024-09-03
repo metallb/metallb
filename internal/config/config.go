@@ -385,7 +385,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 
 	addr, err := netip.ParseAddr(p.Spec.Address)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid BGPPeer address %q", p.Spec.Address)
 	}
 	iface := addr.Zone()
 

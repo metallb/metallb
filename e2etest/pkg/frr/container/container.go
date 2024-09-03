@@ -13,6 +13,7 @@ import (
 
 	"errors"
 
+	"github.com/tidwall/gjson"
 	"go.universe.tf/e2etest/pkg/executor"
 	"go.universe.tf/e2etest/pkg/frr"
 	frrconfig "go.universe.tf/e2etest/pkg/frr/config"
@@ -40,6 +41,7 @@ type FRR struct {
 	RouterConfig   frrconfig.RouterConfig
 	Ipv4           string
 	Ipv6           string
+	Ipv6LLA        string
 	Network        string
 	MultiProtocol  frrconfig.MultiProtocol
 }
@@ -69,6 +71,10 @@ func Create(configs map[string]Config) ([]*FRR, error) {
 				"bfdd":     true,
 			}
 			c, err := start(conf)
+			if err != nil {
+				return errors.Join(err, fmt.Errorf("failed to start  %v", conf))
+			}
+
 			if c != nil {
 				err = wait.PollImmediate(time.Second, 5*time.Minute, func() (bool, error) {
 					daemons, err := frr.Daemons(c)
@@ -249,6 +255,11 @@ func (c *FRR) updateIPS() (err error) {
 	}
 	c.Ipv4 = containerIPv4
 	c.Ipv6 = containerIPv6
+	out, err := c.Exec("ip", strings.Split(fmt.Sprintf("--json -6 a s eth0"), " ")...)
+	if err != nil {
+		return err
+	}
+	c.Ipv6LLA = gjson.Get(out, "#.addr_info.#(scope==\"link\").local").Array()[0].String()
 
 	return nil
 }
@@ -290,6 +301,8 @@ func (c *FRR) AddressesForFamily(ipFamily ipfamily.Family) []string {
 	switch ipFamily {
 	case ipfamily.IPv6:
 		addresses = []string{c.Ipv6}
+	case ipfamily.IPv6LLA:
+		addresses = []string{c.Ipv6LLA}
 	case ipfamily.DualStack:
 		addresses = []string{c.Ipv4, c.Ipv6}
 	}

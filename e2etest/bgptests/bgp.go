@@ -514,6 +514,44 @@ var _ = ginkgo.Describe("BGP", func() {
 			),
 		)
 	})
+
+	ginkgo.DescribeTable("FRR-MODE configure peers with LLA and validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
+		ginkgo.By("configure peer")
+		filtered := make([]*frrcontainer.FRR, 0)
+		for _, c := range FRRContainers {
+			if strings.Contains(c.Name, "multi-hop") {
+				continue
+			}
+			filtered = append(filtered, c)
+		}
+
+		f := func(p *metallbv1beta2.BGPPeer) {
+			p.Spec.Address += "%eth0"
+		}
+		resources := config.Resources{
+			Peers: metallb.PeersForContainers(filtered, ipFamily, f),
+		}
+
+		err := ConfigUpdater.Update(resources)
+		Expect(err).NotTo(HaveOccurred())
+
+		for _, c := range filtered {
+			err = frrcontainer.PairWithNodes(cs, c, ipFamily)
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		for _, c := range filtered {
+			validateFRRPeeredWithAllNodes(cs, c, ipFamily)
+			neighbors, err := frr.NeighborsInfo(c)
+			Expect(err).NotTo(HaveOccurred())
+			for _, n := range neighbors {
+				Expect(n.IP.IsLinkLocalUnicast()).To(BeTrue())
+				continue
+			}
+		}
+	},
+		ginkgo.Entry("IPV6", ipfamily.IPv6LLA))
+
 	ginkgo.DescribeTable("configure peers with routerid and validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
 		ginkgo.By("configure peer")
 

@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"os"
 	"text/template"
 
@@ -47,6 +48,9 @@ router bgp {{$ROUTERASN}}
   no bgp default ipv4-unicast
 {{range .Neighbors }}
   neighbor {{.Addr}} remote-as {{.ASN}}
+  {{ if .Interface -}}
+  neighbor {{.Addr}} interface {{.Interface}}
+  {{- end }}
   {{- if and (ne .ASN $ROUTERASN) (.MultiHop) }}
   neighbor {{.Addr}} ebgp-multihop
   {{- end }}
@@ -97,6 +101,7 @@ type RouterConfig struct {
 type NeighborConfig struct {
 	ASN             uint32
 	Addr            string
+	Interface       string
 	Password        string
 	BFDEnabled      bool
 	ToAdvertiseV4   []string
@@ -133,6 +138,13 @@ func BGPPeersForAllNodes(cs clientset.Interface, nc NeighborConfig, rc RouterCon
 	for _, ip := range ips {
 		neighbor := nc
 		neighbor.Addr = ip
+		i, err := netip.ParseAddr(ip)
+		if err != nil {
+			return "", err
+		}
+		if i.IsLinkLocalUnicast() {
+			neighbor.Interface = "eth0"
+		}
 
 		peerIPFamily := ipfamily.ForAddress(net.ParseIP(ip))
 
