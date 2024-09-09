@@ -1,4 +1,5 @@
 {{- if .Values.prometheus.serviceMonitor.enabled }}
+{{- if .Values.speaker.enabled }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
@@ -89,6 +90,7 @@ spec:
 {{- end }}
   sessionAffinity: None
   type: ClusterIP
+{{- end }}
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
