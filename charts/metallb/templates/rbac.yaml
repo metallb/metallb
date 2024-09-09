@@ -73,7 +73,7 @@ rules:
 {{- if or .Values.frrk8s.enabled .Values.frrk8s.external }}
 - apiGroups: ["frrk8s.metallb.io"]
   resources: ["frrconfigurations"]
-  verbs: ["get", "list", "watch","create","update"]
+  verbs: ["get", "list", "watch","create","update","delete"]
 {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1

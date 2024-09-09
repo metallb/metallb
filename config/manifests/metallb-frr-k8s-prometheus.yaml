@@ -2257,6 +2257,7 @@ rules:
   - watch
   - create
   - update
+  - delete
 - apiGroups:
   - authorization.k8s.io
   resources:
