@@ -81,6 +81,8 @@ jobs:
           inv checkchanges --action="run inv generatemanifests"
           inv generateapidocs
           inv checkchanges --action="run inv generateapidocs"
+          inv linttasks
+          inv checkchanges --action="run inv linttasks"
 
   build-test-images:
     runs-on: ubuntu-22.04
