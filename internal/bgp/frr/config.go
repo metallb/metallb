@@ -66,7 +66,7 @@ type BFDProfile struct {
 type neighborConfig struct {
 	IPFamily            ipfamily.Family
 	Name                string
-	ASN                 uint32
+	ASN                 string
 	Addr                string
 	SrcAddr             string
 	Port                uint16
@@ -116,8 +116,17 @@ func RouterName(srcAddr string, myASN uint32, vrfName string) string {
 
 // neighborName() defines the format of key of the 'Neighbors' map in the
 // routerConfig struct.
-func NeighborName(peerAddr string, ASN uint32, vrfName string) string {
-	return fmt.Sprintf("%d@%s@%s", ASN, peerAddr, vrfName)
+func NeighborName(peerAddr string, ASN uint32, dynamicASN string, vrfName string) string {
+	asn := asnFor(ASN, dynamicASN)
+	return fmt.Sprintf("%s@%s@%s", asn, peerAddr, vrfName)
+}
+
+func asnFor(ASN uint32, dynamicASN string) string {
+	asn := strconv.FormatUint(uint64(ASN), 10)
+	if dynamicASN != "" {
+		asn = dynamicASN
+	}
+	return asn
 }
 
 // templateConfig uses the template library to template
@@ -153,11 +162,33 @@ func templateConfig(data interface{}) (string, error) {
 			"allowedPrefixList": func(neighbor *neighborConfig) string {
 				return fmt.Sprintf("%s-pl-%s", neighbor.ID(), neighbor.IPFamily)
 			},
-			"mustDisableConnectedCheck": func(ipFamily ipfamily.Family, myASN, asn uint32, eBGPMultiHop bool) bool {
-				// return true only for IPv6 eBGP sessions
-				if ipFamily == "ipv6" && myASN != asn && !eBGPMultiHop {
+			"mustDisableConnectedCheck": func(ipFamily ipfamily.Family, myASN uint32, asn string, eBGPMultiHop bool) bool {
+				// return true only for non-multihop IPv6 eBGP sessions
+
+				if ipFamily != ipfamily.IPv6 {
+					return false
+				}
+
+				if eBGPMultiHop {
+					return false
+				}
+
+				// internal means we expect the session to be iBGP
+				if asn == "internal" {
+					return false
+				}
+
+				// external means we expect the session to be eBGP
+				if asn == "external" {
 					return true
 				}
+
+				// the peer's asn is not dynamic (it is a number),
+				// we check if it is different than ours for eBGP
+				if strconv.FormatUint(uint64(myASN), 10) != asn {
+					return true
+				}
+
 				return false
 			},
 			"dict": func(values ...interface{}) (map[string]interface{}, error) {

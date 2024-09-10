@@ -96,6 +96,8 @@ type Peer struct {
 	MyASN uint32
 	// AS number to expect from the remote end of the session.
 	ASN uint32
+	// Detect the AS number to use for the remote end of the session.
+	DynamicASN string
 	// Address to dial when establishing the session.
 	Addr net.IP
 	// Source address to use when establishing the session.
@@ -375,8 +377,14 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 	if p.Spec.MyASN == 0 {
 		return nil, errors.New("missing local ASN")
 	}
-	if p.Spec.ASN == 0 {
-		return nil, errors.New("missing peer ASN")
+	if p.Spec.ASN == 0 && p.Spec.DynamicASN == "" {
+		return nil, errors.New("missing peer ASN and dynamicASN")
+	}
+	if p.Spec.ASN != 0 && p.Spec.DynamicASN != "" {
+		return nil, errors.New("both peer ASN and dynamicASN specified")
+	}
+	if p.Spec.DynamicASN != "" && p.Spec.DynamicASN != metallbv1beta2.InternalASNMode && p.Spec.DynamicASN != metallbv1beta2.ExternalASNMode {
+		return nil, fmt.Errorf("invalid dynamicASN %s", p.Spec.DynamicASN)
 	}
 	if p.Spec.ASN == p.Spec.MyASN && p.Spec.EBGPMultiHop {
 		return nil, errors.New("invalid ebgp-multihop parameter set for an ibgp peer")
@@ -445,6 +453,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		Name:                  p.Name,
 		MyASN:                 p.Spec.MyASN,
 		ASN:                   p.Spec.ASN,
+		DynamicASN:            string(p.Spec.DynamicASN),
 		Addr:                  ip,
 		SrcAddr:               src,
 		Port:                  p.Spec.Port,

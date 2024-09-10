@@ -3439,6 +3439,66 @@ func TestParse(t *testing.T) {
 				BFDProfiles: map[string]*BFDProfile{},
 			},
 		},
+		{
+			desc: "peer with dynamic asn",
+			crs: ClusterResources{
+
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "peer1",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:      42,
+							DynamicASN: v1beta2.InternalASNMode,
+							Address:    "1.2.3.4",
+						},
+					},
+				},
+			},
+			want: &Config{
+				Peers: map[string]*Peer{
+					"peer1": {
+						Name:          "peer1",
+						MyASN:         42,
+						DynamicASN:    "internal",
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+						EBGPMultiHop:  false,
+					},
+				},
+				Pools:       &Pools{ByName: map[string]*Pool{}},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
+			desc: "peer without asn or dynamic asn",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:      42,
+							ASN:        0,
+							DynamicASN: "",
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "peer with both asn and dynamic asn",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:      42,
+							ASN:        42,
+							DynamicASN: v1beta2.InternalASNMode,
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
