@@ -102,10 +102,10 @@ protection entirely.
 
 ### MetalLB on Equinix Metal
 
-[Equinix Metal](https://metal.equinix.com) is an unusually "bare metal" cloud
+[Equinix Metal](https://deploy.equinix.com) is an unusually "bare metal" cloud
 platform, and supports using BGP to advertise and route floating IPs to
 machines. As such, MetalLB's BGP mode works great on Equinix Metal! There is
-even a [tutorial](https://github.com/packet-labs/kubernetes-bgp) written by the
+even a [tutorial](https://github.com/equinix-labs/terraform-metal-kubernetes-bgp) written by the
 folks at Equinix Metal, that use MetalLB to integrate Kubernetes load balancers
 with their BGP infrastructure.
 
