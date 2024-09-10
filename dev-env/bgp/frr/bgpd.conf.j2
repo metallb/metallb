@@ -19,9 +19,16 @@ router bgp 64512
   {% for node_ip in node_ip_by_family[ip_family] %}
   neighbor {{ node_ip }} activate
   neighbor {{ node_ip }} next-hop-self
+  {% if ip_family == "ipv6" %}
+  neighbor {{ node_ip }} route-map IPV6GLOBAL in
+  {% endif%}
  {% endfor %}
  exit-address-family
  {% endfor %}
+ {% if "ipv6" in ip_families %}
+ route-map IPV6GLOBAL permit 10
+ set ipv6 next-hop prefer-global
+ {% endif %}
 !
 !router bgp 7675
 ! bgp router-id 10.0.0.1
