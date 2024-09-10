@@ -1614,6 +1614,33 @@ var _ = ginkgo.Describe("BGP", func() {
 		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{l2tests.IPV4ServiceRange}),
 		ginkgo.Entry("IPV6", ipfamily.IPv6, []string{l2tests.IPV6ServiceRange}),
 	)
+	ginkgo.DescribeTable("FRR establishes connections with dynamic ASN ", func(pairingIPFamily ipfamily.Family) {
+		resources := config.Resources{
+			Peers: metallb.PeersForContainers(FRRContainers, pairingIPFamily, func(p *metallbv1beta2.BGPPeer) {
+				dynamicASN := metallbv1beta2.InternalASNMode
+				if p.Spec.ASN != p.Spec.MyASN {
+					dynamicASN = metallbv1beta2.ExternalASNMode
+				}
+				p.Spec.ASN = 0
+				p.Spec.DynamicASN = dynamicASN
+			}),
+		}
+
+		for _, c := range FRRContainers {
+			err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily)
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		err := ConfigUpdater.Update(resources)
+		Expect(err).NotTo(HaveOccurred())
+
+		for _, c := range FRRContainers {
+			validateFRRPeeredWithAllNodes(cs, c, pairingIPFamily)
+		}
+	},
+		ginkgo.Entry("IPV4", ipfamily.IPv4),
+		ginkgo.Entry("IPV6", ipfamily.IPv6),
+	)
 })
 
 // substringCount creates a Gomega transform function that
