@@ -901,3 +901,43 @@ func TestSingleSessionWithZeroTimers(t *testing.T) {
 
 	testCheckConfigFile(t)
 }
+
+func TestSingleSessionWithInternalASN(t *testing.T) {
+	sessionManager := newTestSessionManager(t)
+	l := log.NewNopLogger()
+
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress: "10.2.2.254:179",
+			MyASN:       100,
+			RouterID:    net.ParseIP("10.1.1.254"),
+			DynamicASN:  "internal",
+			CurrentNode: "hostname",
+			SessionName: "test-peer"})
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	testCheckConfigFile(t)
+}
+
+func TestSingleSessionWithExternalASN(t *testing.T) {
+	sessionManager := newTestSessionManager(t)
+	l := log.NewNopLogger()
+
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress: "10.2.2.254:179",
+			MyASN:       100,
+			RouterID:    net.ParseIP("10.1.1.254"),
+			DynamicASN:  "external",
+			CurrentNode: "hostname",
+			SessionName: "test-peer"})
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	testCheckConfigFile(t)
+}

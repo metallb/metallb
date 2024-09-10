@@ -227,7 +227,7 @@ func (sm *sessionManager) updateConfig() error {
 			routers[routerName] = rout
 		}
 
-		neighborName := frr.NeighborName(s.PeerAddress, s.PeerASN, s.VRFName)
+		neighborName := frr.NeighborName(s.PeerAddress, s.PeerASN, s.DynamicASN, s.VRFName)
 		if neighbor, exist = rout.neighbors[neighborName]; !exist {
 			host, port, err := net.SplitHostPort(s.PeerAddress)
 			if err != nil {
@@ -260,6 +260,7 @@ func (sm *sessionManager) updateConfig() error {
 
 			neighbor = frrv1beta1.Neighbor{
 				ASN:                   s.PeerASN,
+				DynamicASN:            frrv1beta1.DynamicASNMode(s.DynamicASN),
 				Address:               host,
 				Port:                  &portUint16,
 				HoldTime:              holdTime,
