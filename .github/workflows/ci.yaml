@@ -64,7 +64,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install python3-pip arping ndisc6
-          sudo pip3 install invoke semver pyyaml
+          sudo pip3 install -r dev-env/requirements.txt
 
       - name: Unit Tests
         run: |
