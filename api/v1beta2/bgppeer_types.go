@@ -29,9 +29,20 @@ type BGPPeerSpec struct {
 	MyASN uint32 `json:"myASN"`
 
 	// AS number to expect from the remote end of the session.
+	// ASN and DynamicASN are mutually exclusive and one of them must be specified.
 	// +kubebuilder:validation:Minimum=0
 	// +kubebuilder:validation:Maximum=4294967295
-	ASN uint32 `json:"peerASN"`
+	// +optional
+	ASN uint32 `json:"peerASN,omitempty"`
+
+	// DynamicASN detects the AS number to use for the remote end of the session
+	// without explicitly setting it via the ASN field. Limited to:
+	// internal - if the neighbor's ASN is different than MyASN connection is denied.
+	// external - if the neighbor's ASN is the same as MyASN the connection is denied.
+	// ASN and DynamicASN are mutually exclusive and one of them must be specified.
+	// +kubebuilder:validation:Enum=internal;external
+	// +optional
+	DynamicASN DynamicASNMode `json:"dynamicASN,omitempty"`
 
 	// Address to dial when establishing the session.
 	Address string `json:"peerAddress"`
@@ -144,3 +155,10 @@ type BGPPeerList struct {
 func init() {
 	SchemeBuilder.Register(&BGPPeer{}, &BGPPeerList{})
 }
+
+type DynamicASNMode string
+
+const (
+	InternalASNMode DynamicASNMode = "internal"
+	ExternalASNMode DynamicASNMode = "external"
+)
