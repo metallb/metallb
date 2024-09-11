@@ -27,16 +27,6 @@ func IntToUInt16(toConvert int) (uint16, error) {
 	return uint16(toConvert), nil
 }
 
-func IntToUInt32(toConvert int) (uint32, error) {
-	if toConvert < 0 {
-		return 0, fmt.Errorf("trying to convert negative value to uint32: %d", toConvert)
-	}
-	if toConvert > math.MaxUint32 {
-		return 0, fmt.Errorf("trying to convert value to uint32: %d, would overflow", toConvert)
-	}
-	return uint32(toConvert), nil
-}
-
 func Uint32ToInt16(toConvert uint32) (uint16, error) {
 	if toConvert > math.MaxUint16 {
 		return 0, fmt.Errorf("trying to convert value to uint16: %d, too high", toConvert)
