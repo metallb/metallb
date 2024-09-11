@@ -799,6 +799,12 @@ def linttasks(ctx):
 
 
 @task
+def linttasks(ctx):
+    """Formats tasks.py with "black" linter."""
+    run("black tasks.py")
+
+
+@task
 def checkpatch(ctx):
     # Generate a diff of all changes on this branch from origin/main
     # and look for any added lines with 2 spaces after a period.
