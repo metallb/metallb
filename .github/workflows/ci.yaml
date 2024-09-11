@@ -35,11 +35,11 @@ jobs:
         uses: securego/gosec@v2.21.2
         with:
           args: -exclude-dir e2etest -severity medium ./...
-
       - name: Golang Vulncheck
-        uses: Templum/govulncheck-action@v0.10.1
+        uses: golang/govulncheck-action@v1.0.3
         with:
-          skip-upload: true
+          go-version-file: go.mod
+
 
   commitlint:
     runs-on: ubuntu-22.04
