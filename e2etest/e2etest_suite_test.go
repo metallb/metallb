@@ -176,7 +176,7 @@ var _ = ginkgo.BeforeSuite(func() {
 		bgptests.FRRProvider, err = frrprovider.NewFRRK8SMode(clientconfig, frrK8sNamespace)
 		Expect(err).NotTo(HaveOccurred())
 	default:
-		ginkgo.Fail(fmt.Sprintf("unsupported --bgp-mode %s - supported options are: native, frr, frr-k8s", bgpMode))
+		ginkgo.Fail(fmt.Sprintf("unsupported --bgp-mode %s - supported options are: native, frr, frr-k8s, frr-k8s-external", bgpMode))
 	}
 
 	kubeconfig := os.Getenv("KUBECONFIG")

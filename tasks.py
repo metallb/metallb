@@ -430,7 +430,7 @@ def generate_manifest(
         "ip_family": "Optional ipfamily of the cluster."
         "Default: ipv4, supported families are 'ipv6' and 'dual'.",
         "bgp_type": "Type of BGP implementation to use."
-        "Supported: 'frr' (default), 'native'",
+        "Supported: 'frr' (default), 'native', 'frr-k8s', 'frr-k8s-external'",
         "frr_volume_dir": "FRR router config directory to be mounted inside frr container. "
         "Default: ./dev-env/bgp/frr-volume",
         "log_level": "Log level for the controller and the speaker."
