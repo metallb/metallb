@@ -63,14 +63,14 @@ func TestValidateBGPPeerConvertTo(t *testing.T) {
 			ASN:            142,
 			Address:        "1.2.3.4",
 			Port:           1179,
-			HoldTime:       v1.Duration{Duration: 180 * time.Second},
+			HoldTime:       &v1.Duration{Duration: 180 * time.Second},
 			RouterID:       "10.20.30.40",
 			SrcAddress:     "10.20.30.40",
 			EBGPMultiHop:   true,
 			Password:       "nopass",
 			PasswordSecret: corev1.SecretReference{},
 			BFDProfile:     "default",
-			KeepaliveTime:  v1.Duration{Duration: time.Second},
+			KeepaliveTime:  &v1.Duration{Duration: time.Second},
 			NodeSelectors: []v1.LabelSelector{
 				{
 					MatchLabels: map[string]string{
@@ -111,7 +111,7 @@ func TestValidateBGPPeerConvertFrom(t *testing.T) {
 			ASN:          142,
 			Address:      "1.2.3.4",
 			Port:         1179,
-			HoldTime:     v1.Duration{Duration: 180 * time.Second},
+			HoldTime:     &v1.Duration{Duration: 180 * time.Second},
 			RouterID:     "10.20.30.40",
 			SrcAddress:   "10.20.30.40",
 			EBGPMultiHop: true,
@@ -119,7 +119,7 @@ func TestValidateBGPPeerConvertFrom(t *testing.T) {
 			PasswordSecret: corev1.SecretReference{Name: "nosecret",
 				Namespace: "metallb-system"},
 			BFDProfile:    "default",
-			KeepaliveTime: v1.Duration{Duration: time.Second},
+			KeepaliveTime: &v1.Duration{Duration: time.Second},
 			NodeSelectors: []v1.LabelSelector{
 				{
 					MatchLabels: map[string]string{

@@ -16,8 +16,8 @@ func (src *BGPPeer) ConvertTo(dstRaw conversion.Hub) error {
 	dst.Spec.Address = src.Spec.Address
 	dst.Spec.SrcAddress = src.Spec.SrcAddress
 	dst.Spec.Port = src.Spec.Port
-	dst.Spec.HoldTime = src.Spec.HoldTime
-	dst.Spec.KeepaliveTime = src.Spec.KeepaliveTime
+	dst.Spec.HoldTime = &src.Spec.HoldTime
+	dst.Spec.KeepaliveTime = &src.Spec.KeepaliveTime
 	dst.Spec.RouterID = src.Spec.RouterID
 	dst.Spec.Password = src.Spec.Password
 	dst.Spec.BFDProfile = src.Spec.BFDProfile
@@ -30,14 +30,22 @@ func (src *BGPPeer) ConvertTo(dstRaw conversion.Hub) error {
 // ConvertFrom converts from the Hub version (v1beta2) to this version.
 func (dst *BGPPeer) ConvertFrom(srcRaw conversion.Hub) error {
 	src := srcRaw.(*v1beta2.BGPPeer)
+	var ht metav1.Duration
+	if src.Spec.HoldTime != nil {
+		ht = *src.Spec.HoldTime
+	}
+	var ka metav1.Duration
+	if src.Spec.KeepaliveTime != nil {
+		ka = *src.Spec.KeepaliveTime
+	}
 	dst.ObjectMeta = src.ObjectMeta
 	dst.Spec.MyASN = src.Spec.MyASN
 	dst.Spec.ASN = src.Spec.ASN
 	dst.Spec.Address = src.Spec.Address
 	dst.Spec.SrcAddress = src.Spec.SrcAddress
 	dst.Spec.Port = src.Spec.Port
-	dst.Spec.HoldTime = src.Spec.HoldTime
-	dst.Spec.KeepaliveTime = src.Spec.KeepaliveTime
+	dst.Spec.HoldTime = ht
+	dst.Spec.KeepaliveTime = ka
 	dst.Spec.RouterID = src.Spec.RouterID
 	dst.Spec.Password = src.Spec.Password
 	dst.Spec.BFDProfile = src.Spec.BFDProfile
