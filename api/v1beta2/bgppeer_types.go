@@ -49,11 +49,11 @@ type BGPPeerSpec struct {
 
 	// Requested BGP hold time, per RFC4271.
 	// +optional
-	HoldTime metav1.Duration `json:"holdTime,omitempty"`
+	HoldTime *metav1.Duration `json:"holdTime,omitempty"`
 
 	// Requested BGP keepalive time, per RFC4271.
 	// +optional
-	KeepaliveTime metav1.Duration `json:"keepaliveTime,omitempty"`
+	KeepaliveTime *metav1.Duration `json:"keepaliveTime,omitempty"`
 
 	// Requested BGP connect time, controls how long BGP waits between connection attempts to a neighbor.
 	// +kubebuilder:validation:XValidation:message="connect time should be between 1 seconds to 65535",rule="duration(self).getSeconds() >= 1 && duration(self).getSeconds() <= 65535"
