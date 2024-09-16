@@ -70,8 +70,8 @@ type neighborConfig struct {
 	Addr                string
 	SrcAddr             string
 	Port                uint16
-	HoldTime            int64
-	KeepaliveTime       int64
+	HoldTime            *int64
+	KeepaliveTime       *int64
 	ConnectTime         int64
 	Password            string
 	Advertisements      []*advertisementConfig

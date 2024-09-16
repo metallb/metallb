@@ -55,7 +55,7 @@ func PeersForContainers(containers []*frrcontainer.FRR, ipFamily ipfamily.Family
 					MyASN:                 c.NeighborConfig.ASN,
 					Port:                  c.RouterConfig.BGPPort,
 					Password:              c.RouterConfig.Password,
-					HoldTime:              metav1.Duration{Duration: holdTime},
+					HoldTime:              &metav1.Duration{Duration: holdTime},
 					EnableGracefulRestart: gracefulRestart,
 					EBGPMultiHop:          ebgpMultihop,
 					VRFName:               c.RouterConfig.VRF,

@@ -1295,16 +1295,16 @@ var _ = ginkgo.Describe("BGP", func() {
 					r.VRF = p.Spec.VRFName
 
 					keepAliveTime := p.Spec.KeepaliveTime
-					if keepAliveTime.Duration == 0 {
-						keepAliveTime.Duration = p.Spec.HoldTime.Duration / 3
+					if keepAliveTime == nil && p.Spec.HoldTime != nil {
+						keepAliveTime = &metav1.Duration{Duration: p.Spec.HoldTime.Duration / 3}
 					}
 					r.Neighbors = append(r.Neighbors, frrk8sv1beta1.Neighbor{
 						ASN:           p.Spec.ASN,
 						Address:       p.Spec.Address,
 						Password:      p.Spec.Password,
 						Port:          &p.Spec.Port,
-						HoldTime:      &p.Spec.HoldTime,
-						KeepaliveTime: &keepAliveTime,
+						HoldTime:      p.Spec.HoldTime,
+						KeepaliveTime: keepAliveTime,
 						EBGPMultiHop:  p.Spec.EBGPMultiHop,
 						BFDProfile:    p.Spec.BFDProfile,
 						ToReceive: frrk8sv1beta1.Receive{
@@ -1466,8 +1466,8 @@ var _ = ginkgo.Describe("BGP", func() {
 			})
 
 			for i := range resources.Peers {
-				resources.Peers[i].Spec.KeepaliveTime = metav1.Duration{Duration: 13 * time.Second}
-				resources.Peers[i].Spec.HoldTime = metav1.Duration{Duration: 57 * time.Second}
+				resources.Peers[i].Spec.KeepaliveTime = &metav1.Duration{Duration: 13 * time.Second}
+				resources.Peers[i].Spec.HoldTime = &metav1.Duration{Duration: 57 * time.Second}
 			}
 
 			err := ConfigUpdater.Update(resources)
