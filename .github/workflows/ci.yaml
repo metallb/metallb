@@ -64,7 +64,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install python3-pip arping ndisc6
-          sudo pip3 install invoke semver pyyaml
+          sudo pip3 install -r dev-env/requirements.txt
 
       - name: Unit Tests
         run: |
@@ -81,6 +81,8 @@ jobs:
           inv checkchanges --action="run inv generatemanifests"
           inv generateapidocs
           inv checkchanges --action="run inv generateapidocs"
+          inv linttasks
+          inv checkchanges --action="run inv linttasks"
 
   build-test-images:
     runs-on: ubuntu-22.04
