@@ -249,12 +249,21 @@ func (sm *sessionManager) updateConfig() error {
 				connectTime = &metav1.Duration{Duration: *s.ConnectTime}
 			}
 
+			var holdTime *metav1.Duration
+			var keepaliveTime *metav1.Duration
+			if s.HoldTime != nil {
+				holdTime = &metav1.Duration{Duration: *s.HoldTime}
+			}
+			if s.KeepAliveTime != nil {
+				keepaliveTime = &metav1.Duration{Duration: *s.KeepAliveTime}
+			}
+
 			neighbor = frrv1beta1.Neighbor{
 				ASN:                   s.PeerASN,
 				Address:               host,
 				Port:                  &portUint16,
-				HoldTime:              &metav1.Duration{Duration: s.HoldTime},
-				KeepaliveTime:         &metav1.Duration{Duration: s.KeepAliveTime},
+				HoldTime:              holdTime,
+				KeepaliveTime:         keepaliveTime,
 				ConnectTime:           connectTime,
 				BFDProfile:            s.BFDProfile,
 				EnableGracefulRestart: s.GracefulRestart,

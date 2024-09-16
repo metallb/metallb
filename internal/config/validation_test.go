@@ -102,7 +102,7 @@ func TestValidate(t *testing.T) {
 				Peers: []v1beta2.BGPPeer{
 					{
 						Spec: v1beta2.BGPPeerSpec{
-							KeepaliveTime: v1.Duration{Duration: time.Second},
+							KeepaliveTime: &v1.Duration{Duration: time.Second},
 						},
 					},
 				},

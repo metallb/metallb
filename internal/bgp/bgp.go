@@ -68,8 +68,8 @@ type SessionParameters struct {
 	MyASN           uint32
 	RouterID        net.IP
 	PeerASN         uint32
-	HoldTime        time.Duration
-	KeepAliveTime   time.Duration
+	HoldTime        *time.Duration
+	KeepAliveTime   *time.Duration
 	ConnectTime     *time.Duration
 	Password        string
 	PasswordRef     v1.SecretReference
