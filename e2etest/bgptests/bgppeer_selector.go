@@ -176,12 +176,12 @@ var _ = ginkgo.Describe("BGP Peer Selector", func() {
 		ginkgo.Entry("IPV6", []string{"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18"},
 			[]string{"fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26"}, ipfamily.IPv6, func(_ *corev1.Service) {}),
 		ginkgo.Entry("DUALSTACK", []string{"192.168.10.0/24", "fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18"},
-			[]string{"192.168.16.0/24", "fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26"}, ipfamily.DualStack,
+			[]string{"192.168.16.0/24", "fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26"}, ipfamily.RequiredDualStack,
 			func(svc *corev1.Service) {
-				testservice.DualStack(svc)
+				testservice.RequiredDualStack(svc)
 			}),
 		ginkgo.Entry("DUALSTACK - force V6 only", []string{"192.168.10.0/24", "fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18"},
-			[]string{"192.168.16.0/24", "fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26"}, ipfamily.DualStack,
+			[]string{"192.168.16.0/24", "fc00:f853:0ccd:e799::19-fc00:f853:0ccd:e799::26"}, ipfamily.RequiredDualStack,
 			func(svc *corev1.Service) {
 				testservice.ForceV6(svc)
 			}))
@@ -266,12 +266,12 @@ var _ = ginkgo.Describe("BGP Peer Selector", func() {
 		ginkgo.Entry("IPV4", []string{"192.168.10.0/24"}, ipfamily.IPv4, func(_ *corev1.Service) {}),
 		ginkgo.Entry("IPV6", []string{"fc00:f853:0ccd:e799::/116"}, ipfamily.IPv6, func(_ *corev1.Service) {}),
 		ginkgo.Entry("DUALSTACK", []string{"192.168.10.0/24", "fc00:f853:0ccd:e799::/116"},
-			ipfamily.DualStack,
+			ipfamily.RequiredDualStack,
 			func(svc *corev1.Service) {
-				testservice.DualStack(svc)
+				testservice.RequiredDualStack(svc)
 			}),
 		ginkgo.Entry("DUALSTACK - force V6 only", []string{"192.168.10.0/24", "fc00:f853:0ccd:e799::/116"},
-			ipfamily.DualStack,
+			ipfamily.RequiredDualStack,
 			func(svc *corev1.Service) {
 				testservice.ForceV6(svc)
 			}))

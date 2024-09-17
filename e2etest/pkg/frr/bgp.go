@@ -114,7 +114,7 @@ func RoutesForCommunity(exec executor.Executor, communityString string, family i
 	}
 
 	families := []string{family.String()}
-	if family == ipfamily.DualStack {
+	if family == ipfamily.RequiredDualStack {
 		families = []string{ipfamily.IPv4.String(), ipfamily.IPv6.String()}
 	}
 

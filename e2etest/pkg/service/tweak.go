@@ -33,6 +33,12 @@ func DualStack(svc *corev1.Service) {
 	svc.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol}
 }
 
+func RequiredDualStack(svc *corev1.Service) {
+	f := corev1.IPFamilyPolicyRequireDualStack
+	svc.Spec.IPFamilyPolicy = &f
+	svc.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol}
+}
+
 func TrafficPolicyCluster(svc *corev1.Service) {
 	svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyTypeCluster
 }
