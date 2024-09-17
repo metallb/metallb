@@ -279,6 +279,29 @@ func TestSingleSessionClose(t *testing.T) {
 	testCheckConfigFile(t)
 }
 
+func TestSingleSessionWithIPv6LLA(t *testing.T) {
+	testSetup(t)
+
+	l := log.NewNopLogger()
+	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
+	defer close(sessionManager.reloadConfig)
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "[fe80::a876:4dff:fe77:408%eth0]:179",
+			SourceAddress: net.ParseIP("fe80::e767:4dba:fd83:45a9"),
+			MyASN:         102,
+			RouterID:      net.ParseIP("1.1.1.1"),
+			PeerASN:       100,
+			SessionName:   "test-peer"})
+
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	testCheckConfigFile(t)
+}
+
 func TestSingleSessionWithGracefulRestart(t *testing.T) {
 	testSetup(t)
 

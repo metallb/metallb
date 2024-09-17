@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"github.com/tidwall/gjson"
 	"go.universe.tf/e2etest/pkg/executor"
 	"go.universe.tf/e2etest/pkg/ipfamily"
 	"go.universe.tf/e2etest/pkg/netdev"
@@ -49,6 +51,16 @@ func NodeIPsForFamily(nodes []v1.Node, family ipfamily.Family, vrfName string) (
 			}
 			continue
 		}
+
+		if family == ipfamily.IPv6LLA {
+			out, err := executor.ForContainer(n.Name).Exec("ip", strings.Split(fmt.Sprintf("--json -6 a s eth0"), " ")...)
+			if err != nil {
+				return nil, err
+			}
+			res = append(res, gjson.Get(out, "#.addr_info.#(scope==\"link\").local").Array()[0].String())
+			continue
+		}
+
 		for _, a := range n.Status.Addresses {
 			if a.Type == v1.NodeInternalIP {
 				if family != ipfamily.DualStack && ipfamily.ForAddress(net.ParseIP(a.Address)) != family {

@@ -19,6 +19,7 @@ func (f Family) String() string {
 const (
 	IPv4      Family = "ipv4"
 	IPv6      Family = "ipv6"
+	IPv6LLA   Family = "ipv6LLA"
 	DualStack Family = "dual"
 	Unknown   Family = "unknown"
 )

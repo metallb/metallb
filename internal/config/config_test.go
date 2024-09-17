@@ -4,10 +4,12 @@ package config
 
 import (
 	"net"
+	"net/netip"
 	"testing"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 	"go.universe.tf/metallb/api/v1beta1"
 	"go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/bgp/community"
@@ -17,6 +19,14 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 )
+
+func parseIP(s string) netip.Addr {
+	a, err := netip.ParseAddr(s)
+	if err != nil {
+		panic(err)
+	}
+	return a
+}
 
 func selector(s string) labels.Selector {
 	ret, err := labels.Parse(s)
@@ -227,7 +237,7 @@ func TestParse(t *testing.T) {
 						Name:                  "peer1",
 						MyASN:                 42,
 						ASN:                   142,
-						Addr:                  net.ParseIP("1.2.3.4"),
+						Addr:                  parseIP("1.2.3.4"),
 						SrcAddr:               net.ParseIP("10.20.30.40"),
 						Port:                  1179,
 						HoldTime:              180 * time.Second,
@@ -243,7 +253,7 @@ func TestParse(t *testing.T) {
 						Name:                  "peer2",
 						MyASN:                 100,
 						ASN:                   200,
-						Addr:                  net.ParseIP("2.3.4.5"),
+						Addr:                  parseIP("2.3.4.5"),
 						HoldTime:              90 * time.Second,
 						KeepaliveTime:         30 * time.Second,
 						ConnectTime:           ptr.To(time.Second),
@@ -660,7 +670,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          parseIP("1.2.3.4"),
 						HoldTime:      90 * time.Second,
 						KeepaliveTime: 30 * time.Second,
 						NodeSelectors: []labels.Selector{labels.Everything()},
@@ -681,6 +691,68 @@ func TestParse(t *testing.T) {
 							MyASN:   42,
 							ASN:     42,
 							Address: "1.2.3.400",
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "interface defined and ipv6 LLA",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "peer1",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "fe80::a876:4dff:fe77:408%eth0",
+						},
+					},
+				},
+			},
+			want: &Config{
+				Peers: map[string]*Peer{
+					"peer1": {
+						Name:          "peer1",
+						MyASN:         42,
+						ASN:           42,
+						Addr:          parseIP("fe80::a876:4dff:fe77:408%eth0"),
+						HoldTime:      90 * time.Second,
+						KeepaliveTime: 30 * time.Second,
+						NodeSelectors: []labels.Selector{labels.Everything()},
+						EBGPMultiHop:  false,
+					},
+				},
+				Pools:       &Pools{ByName: map[string]*Pool{}},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
+			desc: "interface empty and LLA peer address",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "fe80::a876:4dff:fe77:408",
+						},
+					},
+				},
+			},
+		},
+
+		{
+			desc: "interface defined and no LLA peer address",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:   42,
+							ASN:     42,
+							Address: "2041:0000:140F::875B:131B%eth0",
 						},
 					},
 				},
@@ -810,7 +882,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          parseIP("1.2.3.4"),
 						HoldTime:      90 * time.Second,
 						KeepaliveTime: 30 * time.Second,
 						NodeSelectors: []labels.Selector{labels.Everything()},
@@ -1897,7 +1969,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          parseIP("1.2.3.4"),
 						HoldTime:      90 * time.Second,
 						KeepaliveTime: 30 * time.Second,
 						NodeSelectors: []labels.Selector{labels.Everything()},
@@ -2011,7 +2083,7 @@ func TestParse(t *testing.T) {
 						Name:           "peer1",
 						MyASN:          42,
 						ASN:            42,
-						Addr:           net.ParseIP("1.2.3.4"),
+						Addr:           parseIP("1.2.3.4"),
 						Port:           179,
 						HoldTime:       90 * time.Second,
 						KeepaliveTime:  30 * time.Second,
@@ -2326,7 +2398,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           142,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          parseIP("1.2.3.4"),
 						Port:          1179,
 						HoldTime:      90 * time.Second,
 						KeepaliveTime: 30 * time.Second,
@@ -2447,7 +2519,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           142,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          parseIP("1.2.3.4"),
 						SrcAddr:       net.ParseIP("10.20.30.40"),
 						Port:          1179,
 						HoldTime:      180 * time.Second,
@@ -3300,7 +3372,7 @@ func TestParse(t *testing.T) {
 						Name:          "peer1",
 						MyASN:         42,
 						ASN:           42,
-						Addr:          net.ParseIP("1.2.3.4"),
+						Addr:          parseIP("1.2.3.4"),
 						HoldTime:      90 * time.Second,
 						KeepaliveTime: 30 * time.Second,
 						NodeSelectors: []labels.Selector{labels.Everything()},
@@ -3364,7 +3436,10 @@ func TestParse(t *testing.T) {
 				return true
 			})
 
-			if diff := cmp.Diff(test.want, got, selectorComparer, cidrPerAddressComparer, cmp.AllowUnexported(Pool{})); diff != "" {
+			// https://github.com/google/go-cmp/issues/339
+			o := cmpopts.EquateComparable(netip.Addr{}, netip.Prefix{})
+
+			if diff := cmp.Diff(test.want, got, selectorComparer, cidrPerAddressComparer, o, cmp.AllowUnexported(Pool{})); diff != "" {
 				t.Errorf("%q: parse returned wrong result (-want, +got)\n%s", test.desc, diff)
 			}
 		})
