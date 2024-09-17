@@ -26,7 +26,7 @@ all_binaries = set(["controller", "speaker", "configmaptocrs"])
 all_architectures = set(["amd64", "arm", "arm64", "ppc64le", "s390x"])
 default_network = "kind"
 extra_network = "network2"
-controller_gen_version = "v0.14.0"
+controller_gen_version = "v0.16.3"
 build_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build")
 kubectl_path = os.path.join(build_path, "kubectl")
 kind_path = os.path.join(build_path, "kind")
@@ -558,7 +558,7 @@ apiServer:
     frr_k8s_ns = "frr-k8s-system"
     if bgp_type == "frr-k8s-external":
         run(
-            "{} apply -f https://raw.githubusercontent.com/metallb/frr-k8s/v0.0.14/config/all-in-one/frr-k8s.yaml".format(
+            "{} apply -f https://raw.githubusercontent.com/metallb/frr-k8s/v0.0.15/config/all-in-one/frr-k8s.yaml".format(
                 kubectl_path
             ),
             echo=True,
