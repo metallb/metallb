@@ -17,10 +17,10 @@ func (f Family) String() string {
 }
 
 const (
-	IPv4      Family = "ipv4"
-	IPv6      Family = "ipv6"
-	DualStack Family = "dual"
-	Unknown   Family = "unknown"
+	IPv4             Family = "ipv4"
+	IPv6             Family = "ipv6"
+	RequireDualStack Family = "require-dual"
+	Unknown          Family = "unknown"
 )
 
 // ForAddresses returns the address family given list of addresses strings.
@@ -41,7 +41,7 @@ func ForAddresses(ips []string) (Family, error) {
 		if (ip1.To4() == nil) == (ip2.To4() == nil) {
 			return Unknown, fmt.Errorf("IPFamilyForAddresses: same address family %q", ips)
 		}
-		return DualStack, nil
+		return RequireDualStack, nil
 	default:
 		return Unknown, fmt.Errorf("IPFamilyForAddresses: invalid ips length %d %q", len(ips), ips)
 	}

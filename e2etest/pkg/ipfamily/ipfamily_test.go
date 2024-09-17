@@ -27,7 +27,7 @@ func TestIPFamilyForAddresses(t *testing.T) {
 		{
 			desc:   "ipv4 and ipv6 addresse",
 			ips:    []string{"1.2.3.4", "100::1"},
-			family: DualStack,
+			family: RequireDualStack,
 		},
 		{
 			desc:    "dual stack with same address family",
@@ -85,7 +85,7 @@ func TestIPFamilyForAddressesIPs(t *testing.T) {
 		{
 			desc:   "ipv4 and ipv6 addresse",
 			ips:    []net.IP{net.ParseIP("1.2.3.4"), net.ParseIP("100::1")},
-			family: DualStack,
+			family: RequireDualStack,
 		},
 		{
 			desc:    "dual stack with same address family",

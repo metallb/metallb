@@ -3,10 +3,9 @@
 package frr
 
 import (
+	"errors"
 	"fmt"
 	"strings"
-
-	"errors"
 
 	"go.universe.tf/e2etest/pkg/executor"
 
@@ -21,7 +20,6 @@ import (
 // executor.
 func NeighborInfo(neighborName string, exec executor.Executor) (*Neighbor, error) {
 	res, err := exec.Exec("vtysh", "-c", fmt.Sprintf("show bgp neighbor %s json", neighborName))
-
 	if err != nil {
 		return nil, errors.Join(err, fmt.Errorf("Failed to query neighbour %s", neighborName))
 	}
@@ -114,7 +112,7 @@ func RoutesForCommunity(exec executor.Executor, communityString string, family i
 	}
 
 	families := []string{family.String()}
-	if family == ipfamily.DualStack {
+	if family == ipfamily.RequireDualStack {
 		families = []string{ipfamily.IPv4.String(), ipfamily.IPv6.String()}
 	}
 

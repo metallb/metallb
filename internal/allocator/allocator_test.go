@@ -87,8 +87,10 @@ func TestAssignment(t *testing.T) {
 			Name:          "test5",
 			AvoidBuggyIPs: true,
 			AutoAssign:    true,
-			ServiceAllocations: &config.ServiceAllocation{Priority: 20, Namespaces: sets.New("test-ns1"),
-				ServiceSelectors: []labels.Selector{selector("team=metallb")}},
+			ServiceAllocations: &config.ServiceAllocation{
+				Priority: 20, Namespaces: sets.New("test-ns1"),
+				ServiceSelectors: []labels.Selector{selector("team=metallb")},
+			},
 			CIDR: []*net.IPNet{
 				ipnet("1.2.7.0/24"),
 				ipnet("1000::7:0/120"),
@@ -98,8 +100,10 @@ func TestAssignment(t *testing.T) {
 			Name:          "test6",
 			AvoidBuggyIPs: true,
 			AutoAssign:    true,
-			ServiceAllocations: &config.ServiceAllocation{Priority: 20, Namespaces: sets.New("test-ns2"),
-				ServiceSelectors: []labels.Selector{selector("foo=bar")}},
+			ServiceAllocations: &config.ServiceAllocation{
+				Priority: 20, Namespaces: sets.New("test-ns2"),
+				ServiceSelectors: []labels.Selector{selector("foo=bar")},
+			},
 			CIDR: []*net.IPNet{
 				ipnet("1.2.8.0/24"),
 				ipnet("1000::9:0/120"),
@@ -984,38 +988,38 @@ func TestPoolAllocation(t *testing.T) {
 			desc:     "s1 gets dual-stack IPs",
 			svcKey:   "s1",
 			svc:      svc,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			desc:     "s2 gets dual-stack IPs",
 			svcKey:   "s2",
 			svc:      svc,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			desc:     "s3 gets dual-stack IPs",
 			svcKey:   "s3",
 			svc:      svc,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			desc:     "s4 gets dual-stack IPs",
 			svcKey:   "s4",
 			svc:      svc,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			desc:     "s5 can't get dual-stack IPs",
 			svcKey:   "s5",
 			svc:      svc,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 			wantErr:  true,
 		},
 		{
 			desc:     "s6 can't get dual-stack IPs",
 			svcKey:   "s6",
 			svc:      svc,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 			wantErr:  true,
 		},
 		{
@@ -1023,19 +1027,19 @@ func TestPoolAllocation(t *testing.T) {
 			svcKey:   "s1",
 			svc:      svc,
 			unassign: true,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			desc:     "s5 can now grab s1's former dual-stack IPs",
 			svcKey:   "s5",
 			svc:      svc,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			desc:     "s6 still can't get dual-stack IPs",
 			svcKey:   "s6",
 			svc:      svc,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 			wantErr:  true,
 		},
 		{
@@ -1043,7 +1047,7 @@ func TestPoolAllocation(t *testing.T) {
 			svcKey:   "s5",
 			svc:      svc,
 			unassign: true,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			desc:       "s5 enables dual-stack IP sharing",
@@ -1051,7 +1055,7 @@ func TestPoolAllocation(t *testing.T) {
 			svc:        svc,
 			ports:      ports("tcp/80"),
 			sharingKey: "share",
-			ipFamily:   ipfamily.DualStack,
+			ipFamily:   ipfamily.RequireDualStack,
 		},
 		{
 			desc:       "s6 can get an dual-stack IPs now, with sharing",
@@ -1059,7 +1063,7 @@ func TestPoolAllocation(t *testing.T) {
 			svc:        svc,
 			ports:      ports("tcp/443"),
 			sharingKey: "share",
-			ipFamily:   ipfamily.DualStack,
+			ipFamily:   ipfamily.RequireDualStack,
 		},
 	}
 
@@ -1081,7 +1085,7 @@ func TestPoolAllocation(t *testing.T) {
 		validIPs := validIP4s
 		if test.ipFamily == ipfamily.IPv6 {
 			validIPs = validIP6s
-		} else if test.ipFamily == ipfamily.DualStack {
+		} else if test.ipFamily == ipfamily.RequireDualStack {
 			validIPs = validIPDualStacks
 		}
 		for _, ip := range ips {
@@ -1373,38 +1377,38 @@ func TestAllocation(t *testing.T) {
 			desc:     "s1 gets dual-stack IPs",
 			svcKey:   "s1",
 			svc:      svc,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			desc:     "s2 gets dual-stack IPs",
 			svcKey:   "s2",
 			svc:      svc,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			desc:     "s3 gets dual-stack IPs",
 			svcKey:   "s3",
 			svc:      svc,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			desc:     "s4 gets dual-stack IPs",
 			svcKey:   "s4",
 			svc:      svc,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			desc:     "s5 can't get dual-stack IPs",
 			svcKey:   "s5",
 			svc:      svc,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 			wantErr:  true,
 		},
 		{
 			desc:     "s6 can't get dual-stack IPs",
 			svcKey:   "s6",
 			svc:      svc,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 			wantErr:  true,
 		},
 		{
@@ -1419,13 +1423,13 @@ func TestAllocation(t *testing.T) {
 			svc:        svc,
 			ports:      ports("tcp/80"),
 			sharingKey: "share",
-			ipFamily:   ipfamily.DualStack,
+			ipFamily:   ipfamily.RequireDualStack,
 		},
 		{
 			desc:     "s6 still can't get dual-stack IPs",
 			svcKey:   "s6",
 			svc:      svc,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 			wantErr:  true,
 		},
 		{
@@ -1434,7 +1438,7 @@ func TestAllocation(t *testing.T) {
 			svc:        svc,
 			ports:      ports("tcp/443"),
 			sharingKey: "share",
-			ipFamily:   ipfamily.DualStack,
+			ipFamily:   ipfamily.RequireDualStack,
 		},
 	}
 
@@ -1457,7 +1461,7 @@ func TestAllocation(t *testing.T) {
 		validIPs := validIP4s
 		if test.ipFamily == ipfamily.IPv6 {
 			validIPs = validIP6s
-		} else if test.ipFamily == ipfamily.DualStack {
+		} else if test.ipFamily == ipfamily.RequireDualStack {
 			validIPs = validIPDualStacks
 		}
 		for _, ip := range ips {
@@ -1829,30 +1833,30 @@ func TestAutoAssign(t *testing.T) {
 		{
 			svcKey:   "s1",
 			svc:      svc,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			svcKey:   "s2",
 			svc:      svc,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			svcKey:   "s3",
 			svc:      svc,
 			wantErr:  true,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			svcKey:   "s4",
 			svc:      svc,
 			wantErr:  true,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			svcKey:   "s5",
 			svc:      svc,
 			wantErr:  true,
-			ipFamily: ipfamily.DualStack,
+			ipFamily: ipfamily.RequireDualStack,
 		},
 	}
 
@@ -1874,7 +1878,7 @@ func TestAutoAssign(t *testing.T) {
 		validIPs := validIP4s
 		if test.ipFamily == ipfamily.IPv6 {
 			validIPs = validIP6s
-		} else if test.ipFamily == ipfamily.DualStack {
+		} else if test.ipFamily == ipfamily.RequireDualStack {
 			validIPs = validIPDualStacks
 		}
 		for _, ip := range ips {

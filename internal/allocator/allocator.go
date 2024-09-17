@@ -272,7 +272,7 @@ func (a *Allocator) AllocateFromPool(svcKey string, svc *v1.Service, serviceIPFa
 	ipfamilySel := make(map[ipfamily.Family]bool)
 
 	switch serviceIPFamily {
-	case ipfamily.DualStack:
+	case ipfamily.RequireDualStack:
 		ipfamilySel[ipfamily.IPv4], ipfamilySel[ipfamily.IPv6] = true, true
 	default:
 		ipfamilySel[serviceIPFamily] = true

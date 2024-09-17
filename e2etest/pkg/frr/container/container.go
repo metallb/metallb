@@ -3,6 +3,7 @@
 package container
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -10,8 +11,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	"errors"
 
 	"go.universe.tf/e2etest/pkg/executor"
 	"go.universe.tf/e2etest/pkg/frr"
@@ -263,7 +262,6 @@ func (c *FRR) UpdateBGPConfigFile(bgpConfig string) error {
 	err = reloadFRRConfig(consts.BGPConfigFile, c)
 	if err != nil {
 		return errors.Join(err, errors.New("failed to update BGP config file"))
-
 	}
 
 	return nil
@@ -290,7 +288,7 @@ func (c *FRR) AddressesForFamily(ipFamily ipfamily.Family) []string {
 	switch ipFamily {
 	case ipfamily.IPv6:
 		addresses = []string{c.Ipv6}
-	case ipfamily.DualStack:
+	case ipfamily.RequireDualStack:
 		addresses = []string{c.Ipv4, c.Ipv6}
 	}
 	return addresses
