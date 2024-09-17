@@ -290,7 +290,7 @@ func (c *FRR) AddressesForFamily(ipFamily ipfamily.Family) []string {
 	switch ipFamily {
 	case ipfamily.IPv6:
 		addresses = []string{c.Ipv6}
-	case ipfamily.DualStack:
+	case ipfamily.RequiredDualStack:
 		addresses = []string{c.Ipv4, c.Ipv6}
 	}
 	return addresses

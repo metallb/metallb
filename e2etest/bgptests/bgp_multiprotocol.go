@@ -106,23 +106,23 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 			ginkgo.Entry("DUALSTACK - via ipv4",
 				ipfamily.IPv4, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
 					testservice.TrafficPolicyCluster(svc)
-					testservice.DualStack(svc)
+					testservice.RequiredDualStack(svc)
 				}),
 			ginkgo.Entry("DUALSTACK - via ipv6",
 				ipfamily.IPv6, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
 					testservice.TrafficPolicyCluster(svc)
-					testservice.DualStack(svc)
+					testservice.RequiredDualStack(svc)
 				}),
 			ginkgo.Entry("DUALSTACK - via both, advertising ipv6 only",
-				ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
+				ipfamily.RequiredDualStack, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
 					testservice.TrafficPolicyCluster(svc)
-					testservice.DualStack(svc)
+					testservice.RequiredDualStack(svc)
 					testservice.ForceV6(svc)
 				}),
 			ginkgo.Entry("DUALSTACK - via both, advertising ipv4 only",
-				ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
+				ipfamily.RequiredDualStack, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
 					testservice.TrafficPolicyCluster(svc)
-					testservice.DualStack(svc)
+					testservice.RequiredDualStack(svc)
 					testservice.ForceV4(svc)
 				}),
 		)
@@ -181,7 +181,7 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 
 				svc, _ := testservice.CreateWithBackend(cs, testNamespace, "service-with-adv",
 					testservice.TrafficPolicyCluster,
-					testservice.DualStack)
+					testservice.RequiredDualStack)
 
 				defer testservice.Delete(cs, svc)
 

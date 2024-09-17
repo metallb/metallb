@@ -43,7 +43,7 @@ func NodeIPsForFamily(nodes []v1.Node, family ipfamily.Family, vrfName string) (
 				res = append(res, addr.IPV4Address)
 			case ipfamily.IPv6:
 				res = append(res, addr.IPV6Address)
-			case ipfamily.DualStack:
+			case ipfamily.RequiredDualStack:
 				res = append(res, addr.IPV4Address)
 				res = append(res, addr.IPV6Address)
 			}
@@ -51,7 +51,7 @@ func NodeIPsForFamily(nodes []v1.Node, family ipfamily.Family, vrfName string) (
 		}
 		for _, a := range n.Status.Addresses {
 			if a.Type == v1.NodeInternalIP {
-				if family != ipfamily.DualStack && ipfamily.ForAddress(net.ParseIP(a.Address)) != family {
+				if family != ipfamily.RequiredDualStack && ipfamily.ForAddress(net.ParseIP(a.Address)) != family {
 					continue
 				}
 				res = append(res, a.Address)
