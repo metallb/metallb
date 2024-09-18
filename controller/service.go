@@ -78,15 +78,22 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	// none or a malformed one, nuke all controlled state so that we
 	// start converging from a clean slate.
 	for i := range svc.Status.LoadBalancer.Ingress {
-		ip := svc.Status.LoadBalancer.Ingress[i].IP
-		if len(ip) != 0 {
-			lbIPs = append(lbIPs, net.ParseIP(ip))
+		ipStr := svc.Status.LoadBalancer.Ingress[i].IP
+		if len(ipStr) != 0 {
+			ip := net.ParseIP(ipStr)
+			if ip != nil {
+				lbIPs = append(lbIPs, ip)
+			}
 		}
 	}
 	if len(lbIPs) == 0 {
 		c.clearServiceState(key, svc)
 	} else {
-		lbIPsIPFamily, err := ipfamily.ForAddressesIPs(lbIPs)
+		familyPolicy := v1.IPFamilyPolicySingleStack
+		if svc.Spec.IPFamilyPolicy != nil {
+			familyPolicy = *(svc.Spec.IPFamilyPolicy)
+		}
+		lbIPsIPFamily, err := ipfamily.ForAddressesIPs(lbIPs, familyPolicy)
 		if err != nil {
 			level.Error(l).Log("event", "clearAssignment", "reason", "nolbIPsIPFamily", "msg", "Failed to retrieve lbIPs family")
 			c.client.Errorf(svc, "nolbIPsIPFamily", "Failed to retrieve LBIPs IPFamily for %q: %s", lbIPs, err)
@@ -253,6 +260,10 @@ func (c *controller) isServiceAllocated(key string) bool {
 func getDesiredLbIPs(svc *v1.Service) ([]net.IP, ipfamily.Family, error) {
 	var desiredLbIPs []net.IP
 	desiredLbIPsStr := valueForAnnotation(svc.Annotations, AnnotationLoadBalancerIPs, DeprecatedAnnotationLoadBalancerIPs)
+	familyPolicy := v1.IPFamilyPolicySingleStack
+	if svc.Spec.IPFamilyPolicy != nil {
+		familyPolicy = *(svc.Spec.IPFamilyPolicy)
+	}
 
 	if desiredLbIPsStr == "" && svc.Spec.LoadBalancerIP == "" {
 		return nil, "", nil
@@ -269,7 +280,7 @@ func getDesiredLbIPs(svc *v1.Service) ([]net.IP, ipfamily.Family, error) {
 			}
 			desiredLbIPs = append(desiredLbIPs, desiredLbIP)
 		}
-		desiredLbIPFamily, err := ipfamily.ForAddressesIPs(desiredLbIPs)
+		desiredLbIPFamily, err := ipfamily.ForAddressesIPs(desiredLbIPs, familyPolicy)
 		if err != nil {
 			return nil, "", err
 		}
@@ -281,7 +292,10 @@ func getDesiredLbIPs(svc *v1.Service) ([]net.IP, ipfamily.Family, error) {
 		return nil, "", fmt.Errorf("invalid spec.loadBalancerIP %q", svc.Spec.LoadBalancerIP)
 	}
 	desiredLbIPs = append(desiredLbIPs, desiredLbIP)
-	desiredLbIPFamily := ipfamily.ForAddress(desiredLbIP)
+	desiredLbIPFamily, err := ipfamily.ForAddressesIPs(desiredLbIPs, familyPolicy)
+	if err != nil {
+		return nil, "", err
+	}
 
 	return desiredLbIPs, desiredLbIPFamily, nil
 }

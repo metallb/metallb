@@ -643,7 +643,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					PassiveMode:      ptr.To(false),
 					MinimumTTL:       ptr.To(uint32(254)),
 				},
-			}, ipfamily.RequiredDualStack, []string{v4PoolAddresses, v6PoolAddresses}),
+			}, ipfamily.RequireDualStack, []string{v4PoolAddresses, v6PoolAddresses}),
 	)
 
 	ginkgo.It("FRR metrics related to config should be exposed", func() {

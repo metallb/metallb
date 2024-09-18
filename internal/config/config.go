@@ -16,14 +16,13 @@ package config // import "go.universe.tf/metallb/internal/config"
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"net"
 	"reflect"
 	"sort"
 	"strings"
 	"time"
-
-	"errors"
 
 	"github.com/mikioh/ipaddr"
 
@@ -274,7 +273,7 @@ func bfdProfilesFor(resources ClusterResources) (map[string]*BFDProfile, error) 
 }
 
 func peersFor(resources ClusterResources, BFDProfiles map[string]*BFDProfile) (map[string]*Peer, error) {
-	var res = make(map[string]*Peer)
+	res := make(map[string]*Peer)
 	for _, p := range resources.Peers {
 		peer, err := peerFromCR(p, resources.PasswordSecrets)
 		if err != nil {
@@ -345,8 +344,10 @@ func poolsFor(resources ClusterResources) (*Pools, error) {
 		return nil, err
 	}
 
-	return &Pools{ByName: pools, ByNamespace: poolsByNamespace(pools),
-		ByServiceSelector: poolsByServiceSelector(pools)}, nil
+	return &Pools{
+		ByName: pools, ByNamespace: poolsByNamespace(pools),
+		ByServiceSelector: poolsByServiceSelector(pools),
+	}, nil
 }
 
 func bgpExtrasFor(resources ClusterResources) string {
@@ -638,7 +639,8 @@ func bfdProfileFromCR(p metallbv1beta1.BFDProfile) (*BFDProfile, error) {
 }
 
 func setL2AdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, l2Advs []metallbv1beta1.L2Advertisement,
-	nodes []corev1.Node, ipPoolMap map[string]*Pool) error {
+	nodes []corev1.Node, ipPoolMap map[string]*Pool,
+) error {
 	for _, l2Adv := range l2Advs {
 		adv, err := l2AdvertisementFromCR(l2Adv, nodes)
 		if err != nil {
@@ -669,7 +671,8 @@ func setL2AdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, l2Advs [
 }
 
 func setBGPAdvertisementsToPools(ipPools []metallbv1beta1.IPAddressPool, bgpAdvs []metallbv1beta1.BGPAdvertisement,
-	nodes []corev1.Node, ipPoolMap map[string]*Pool, communities map[string]community.BGPCommunity) error {
+	nodes []corev1.Node, ipPoolMap map[string]*Pool, communities map[string]community.BGPCommunity,
+) error {
 	for _, bgpAdv := range bgpAdvs {
 		adv, err := bgpAdvertisementFromCR(bgpAdv, communities, nodes)
 		if err != nil {
