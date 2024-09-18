@@ -19,7 +19,8 @@ func (f Family) String() string {
 const (
 	IPv4              Family = "ipv4"
 	IPv6              Family = "ipv6"
-	RequiredDualStack Family = "required-dual"
+	RequiredDualStack Family = "require-dual"
+	PreferDualStack	  Family = "prefer-dual"
 	Unknown           Family = "unknown"
 )
 
@@ -39,7 +40,7 @@ func ForAddresses(ips []string) (Family, error) {
 			return Unknown, fmt.Errorf("IPFamilyForAddresses: Invalid address %q", ips)
 		}
 		if (ip1.To4() == nil) == (ip2.To4() == nil) {
-			return Unknown, fmt.Errorf("IPFamilyForAddresses: same address family %q", ips)
+			return PreferDualStack, nil
 		}
 		return RequiredDualStack, nil
 	default:

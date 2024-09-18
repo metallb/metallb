@@ -292,6 +292,8 @@ func (c *FRR) AddressesForFamily(ipFamily ipfamily.Family) []string {
 		addresses = []string{c.Ipv6}
 	case ipfamily.RequiredDualStack:
 		addresses = []string{c.Ipv4, c.Ipv6}
+	case ipfamily.PreferDualStack:
+		addresses = []string{c.Ipv4, c.Ipv6}
 	}
 	return addresses
 }

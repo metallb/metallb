@@ -103,27 +103,48 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 				validateService(svc, allNodes.Items, c)
 			}
 		},
-			ginkgo.Entry("DUALSTACK - via ipv4",
+			ginkgo.Entry("REQUIRED-DUALSTACK - via ipv4",
 				ipfamily.IPv4, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
 					testservice.TrafficPolicyCluster(svc)
 					testservice.RequiredDualStack(svc)
 				}),
-			ginkgo.Entry("DUALSTACK - via ipv6",
+			ginkgo.Entry("REQUIRED-DUALSTACK - via ipv6",
 				ipfamily.IPv6, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
 					testservice.TrafficPolicyCluster(svc)
 					testservice.RequiredDualStack(svc)
 				}),
-			ginkgo.Entry("DUALSTACK - via both, advertising ipv6 only",
+			ginkgo.Entry("REQUIRED-DUALSTACK - via both, advertising ipv6 only",
 				ipfamily.RequiredDualStack, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
 					testservice.TrafficPolicyCluster(svc)
 					testservice.RequiredDualStack(svc)
 					testservice.ForceV6(svc)
 				}),
-			ginkgo.Entry("DUALSTACK - via both, advertising ipv4 only",
+			ginkgo.Entry("REQUIRED-DUALSTACK - via both, advertising ipv4 only",
 				ipfamily.RequiredDualStack, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
 					testservice.TrafficPolicyCluster(svc)
 					testservice.RequiredDualStack(svc)
 					testservice.ForceV4(svc)
+				}),
+			ginkgo.Entry("PREFER-DUALSTACK - via both, advertising ipv4 only",
+				ipfamily.PreferDualStack, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
+					testservice.TrafficPolicyCluster(svc)
+					testservice.PreferDualStackV4First(svc)
+					testservice.ForceV4(svc)
+				}),
+			ginkgo.Entry("PREFER-DUALSTACK - ipv4 first, ipv4 Preferred",
+				ipfamily.PreferDualStack, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
+					testservice.TrafficPolicyCluster(svc)
+					testservice.PreferDualStackV4First(svc)
+				}),
+			ginkgo.Entry("PREFER-DUALSTACK - ipv4 first, ipv6 Preferred",
+				ipfamily.PreferDualStack, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
+					testservice.TrafficPolicyCluster(svc)
+					testservice.PreferDualStackV6First(svc)
+				}),
+			ginkgo.Entry("PREFER-DUALSTACK - ipv6 first",
+				ipfamily.PreferDualStack, []string{v6PoolAddresses, v4PoolAddresses}, func(svc *corev1.Service) {
+					testservice.TrafficPolicyCluster(svc)
+					testservice.PreferDualStackV6First(svc)
 				}),
 		)
 

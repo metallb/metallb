@@ -31,15 +31,19 @@ func TestIPFamilyForAddresses(t *testing.T) {
 			wantErr: true,
 		},
 		{
-			desc:   "ipv4 and ipv6 addresse",
+			desc:   "ipv4 and ipv6 addresses",
 			ips:    []string{"1.2.3.4", "100::1"},
 			family: RequiredDualStack,
 		},
 		{
-			desc:    "dual stack with same address family",
-			ips:     []string{"1.2.3.4", "5.6.7.8"},
-			family:  Unknown,
-			wantErr: true,
+			desc:   "dual stack with both ipv4",
+			ips:    []string{"1.2.3.4", "5.6.7.8"},
+			family: PreferDualStack,
+		},
+		{
+			desc:   "dual stack with both ipv6",
+			ips:    []string{"100::1", "100::2"},
+			family: PreferDualStack,
 		},
 		{
 			desc:    "dual stack with empty address",
@@ -100,10 +104,9 @@ func TestIPFamilyForAddressesIPs(t *testing.T) {
 			family: RequiredDualStack,
 		},
 		{
-			desc:    "dual stack with same address family",
-			ips:     []net.IP{net.ParseIP("1.2.3.4"), net.ParseIP("5.6.7.8")},
-			family:  Unknown,
-			wantErr: true,
+			desc:   "dual stack with same address family",
+			ips:    []net.IP{net.ParseIP("1.2.3.4"), net.ParseIP("5.6.7.8")},
+			family: PreferDualStack,
 		},
 		{
 			desc:    "dual stack with empty address",
@@ -121,7 +124,7 @@ func TestIPFamilyForAddressesIPs(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.desc, func(t *testing.T) {
-			family, err := ForAddressesIPs(test.ips)
+			family, err := ForAddressesIPs(test.ips, test.family)
 			if test.wantErr && err == nil {
 				t.Fatalf("Expected error for %s", test.desc)
 			}

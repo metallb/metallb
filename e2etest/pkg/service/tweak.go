@@ -27,10 +27,16 @@ func ForceV6(svc *corev1.Service) {
 	svc.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv6Protocol}
 }
 
-func DualStack(svc *corev1.Service) {
-	f := corev1.IPFamilyPolicyRequireDualStack
+func PreferDualStackV4First(svc *corev1.Service) {
+	f := corev1.IPFamilyPolicyPreferDualStack
 	svc.Spec.IPFamilyPolicy = &f
 	svc.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv4Protocol, corev1.IPv6Protocol}
+}
+
+func PreferDualStackV6First(svc *corev1.Service) {
+	f := corev1.IPFamilyPolicyPreferDualStack
+	svc.Spec.IPFamilyPolicy = &f
+	svc.Spec.IPFamilies = []corev1.IPFamily{corev1.IPv6Protocol, corev1.IPv4Protocol}
 }
 
 func RequiredDualStack(svc *corev1.Service) {

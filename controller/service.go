@@ -86,7 +86,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	if len(lbIPs) == 0 {
 		c.clearServiceState(key, svc)
 	} else {
-		lbIPsIPFamily, err := ipfamily.ForAddressesIPs(lbIPs)
+		lbIPsIPFamily, err := ipfamily.ForAddressesIPs(lbIPs, svc.Spec.IPFamilyPolicy)
 		if err != nil {
 			level.Error(l).Log("event", "clearAssignment", "reason", "nolbIPsIPFamily", "msg", "Failed to retrieve lbIPs family")
 			c.client.Errorf(svc, "nolbIPsIPFamily", "Failed to retrieve LBIPs IPFamily for %q: %s", lbIPs, err)
@@ -269,7 +269,7 @@ func getDesiredLbIPs(svc *v1.Service) ([]net.IP, ipfamily.Family, error) {
 			}
 			desiredLbIPs = append(desiredLbIPs, desiredLbIP)
 		}
-		desiredLbIPFamily, err := ipfamily.ForAddressesIPs(desiredLbIPs)
+		desiredLbIPFamily, err := ipfamily.ForAddressesIPs(desiredLbIPs, svc.Spec.IPFamilyPolicy)
 		if err != nil {
 			return nil, "", err
 		}
