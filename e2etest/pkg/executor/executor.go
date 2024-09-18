@@ -3,7 +3,9 @@
 package executor
 
 import (
+	"bytes"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 
@@ -67,8 +69,15 @@ func (p *podExecutor) Exec(cmd string, args ...string) (string, error) {
 		return "", errors.New("the kubectl parameter is not set")
 	}
 	fullargs := append([]string{"exec", p.name, "-n", p.namespace, "-c", p.container, "--", cmd}, args...)
-	out, err := exec.Command(Kubectl, fullargs...).CombinedOutput()
-	return string(out), err
+
+	c := exec.Command(Kubectl, fullargs...)
+	var stdoutBuf, stderrBuf bytes.Buffer
+	c.Stdout = &stdoutBuf
+	c.Stderr = &stderrBuf
+	if err := c.Run(); err != nil {
+		return "", fmt.Errorf("kubectl exec failed: %w, stderr: %s", err, stderrBuf.String())
+	}
+	return stdoutBuf.String(), nil
 }
 
 // add ephemeral container to deal with distroless image
