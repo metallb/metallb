@@ -46,6 +46,88 @@ func compareUseableNodesReturnedValue(a, b []string) bool {
 	return true
 }
 
+func TestUsableNodesEPSlicesWithSpeakerlistDisabled(t *testing.T) {
+	// Create a speaker response with a null list as expected when speaker is disabled
+	fakeSL := &fakeSpeakerList{
+		speakers: nil,
+	}
+	c1, err := newController(controllerConfig{
+		MyNode:  "iris1",
+		Logger:  log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		SList:   fakeSL,
+		bgpType: bgpNative,
+	})
+	if err != nil {
+		t.Fatalf("creating controller: %s", err)
+	}
+	c1.client = &testK8S{t: t}
+	advertisementsForNode := []*config.L2Advertisement{
+		{
+			Nodes: map[string]bool{
+				"iris1": true,
+				"iris2": true,
+			},
+		},
+	}
+
+	conf := &config.Config{
+		Pools: &config.Pools{ByName: map[string]*config.Pool{
+			"default": {
+				CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+				L2Advertisements: advertisementsForNode,
+			},
+		}},
+	}
+
+	svc := &v1.Service{
+		Spec: v1.ServiceSpec{
+			Type:                  "LoadBalancer",
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+		},
+		Status: statusAssigned("10.20.30.1"),
+	}
+	eps := map[string][]discovery.EndpointSlice{
+		"10.20.30.1": {
+			{
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses: []string{
+							"2.3.4.5",
+						},
+						NodeName: ptr.To("iris1"),
+						Conditions: discovery.EndpointConditions{
+							Ready: ptr.To(true),
+						},
+					},
+					{
+						Addresses: []string{
+							"2.3.4.15",
+						},
+						NodeName: ptr.To("iris1"),
+						Conditions: discovery.EndpointConditions{
+							Ready: ptr.To(true),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
+	lbIPStr := lbIP.String()
+	l := log.NewNopLogger()
+	response := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l,
+		"test1",
+		[]net.IP{lbIP},
+		conf.Pools.ByName["default"],
+		svc,
+		eps[lbIPStr],
+		nil)
+	if response != "" {
+		t.Errorf("Expecting fallback when speakers list is not configured but got: %v", response)
+	}
+}
+
 func TestUsableNodesEPSlices(t *testing.T) {
 	b := &fakeBGP{
 		t: t,
