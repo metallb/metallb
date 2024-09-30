@@ -541,7 +541,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		ginkgo.Entry("IPV4", ipfamily.IPv4),
 		ginkgo.Entry("IPV6", ipfamily.IPv6))
 
-	ginkgo.DescribeTable("FRR-MODE configure peers with GracefulRestart and validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
+	ginkgo.DescribeTable("FRR configure peers with GracefulRestart and validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
 		ginkgo.By("configure peer")
 
 		resources := config.Resources{
