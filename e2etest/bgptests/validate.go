@@ -109,7 +109,7 @@ func validateServiceNoWait(svc *corev1.Service, nodes []corev1.Node, c *frrconta
 
 		err = frr.RoutesMatchNodes(nodes, frrRoutes, serviceIPFamily, c.RouterConfig.VRF)
 		if err != nil {
-			return err
+			return fmt.Errorf("peer: %s errored: %w", c.Name, err)
 		}
 
 		// The BGP routes will not match the nodes if static routes were added.
