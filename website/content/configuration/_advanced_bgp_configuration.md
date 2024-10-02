@@ -99,17 +99,17 @@ router, but not the routers in other racks.
 
 {{<mermaid align="center">}}
 graph BT
-    subgraph ""
+    subgraph " "
       metallbA("MetalLB<br>Speaker")
     end
-    subgraph ""
+    subgraph "  "
       metallbB("MetalLB<br>Speaker")
     end
 
-    subgraph ""
+    subgraph "   "
       metallbC("MetalLB<br>Speaker")
     end
-    subgraph ""
+    subgraph "    "
       metallbD("MetalLB<br>Speaker")
     end
 

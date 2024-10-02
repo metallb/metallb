@@ -382,7 +382,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			testservice.TestServicePort,
 			func(svc *corev1.Service) {
 				svc.Spec.LoadBalancerIP = serviceIP
-				svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
+				svc.Annotations = map[string]string{"metallb.io/allow-shared-ip": "foo"}
 				svc.Spec.Ports[0].Port = int32(testservice.TestServicePort)
 			})
 		defer testservice.Delete(cs, svc)
@@ -390,7 +390,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			testservice.TestServicePort+1,
 			func(svc *corev1.Service) {
 				svc.Spec.LoadBalancerIP = serviceIP
-				svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
+				svc.Annotations = map[string]string{"metallb.io/allow-shared-ip": "foo"}
 				svc.Spec.Ports[0].Port = int32(testservice.TestServicePort + 1)
 			})
 		defer testservice.Delete(cs, svc1)
@@ -810,7 +810,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 				ginkgo.By(fmt.Sprintf("configure service number %d", i+1))
 				svc, _ := testservice.CreateWithBackend(cs, testNamespace, fmt.Sprintf("svc%d", i+1), testservice.TrafficPolicyCluster, func(svc *corev1.Service) {
-					svc.Annotations = map[string]string{"metallb.universe.tf/address-pool": fmt.Sprintf("test-addresspool%d", i+1)}
+					svc.Annotations = map[string]string{"metallb.io/address-pool": fmt.Sprintf("test-addresspool%d", i+1)}
 				})
 				defer testservice.Delete(cs, svc)
 

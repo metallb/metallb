@@ -88,6 +88,17 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 		return syncStateRes
 	}
 
+	// Check for any deprecated annotations.
+	// Normally, we would check the svc object within convergeBalancer.
+	// However, generating an event every time the svc is processed would be very noisy.
+	// Therefore, we check for deprecated annotations only, if there is something to do.
+	for key := range svcRo.Annotations {
+		if strings.HasPrefix(key, DeprecatedAnnotationPrefix) {
+			level.Warn(l).Log("event", "deprecatedAnnotation", "annotation", key, "msg", "The used annotation is deprecated. Support might get removed in future versions")
+			c.client.Errorf(svcRo, "deprecatedAnnotation", "Service uses deprecated annotation %s", key)
+		}
+	}
+
 	if len(prevIPs) != 0 && !c.isServiceAllocated(name) {
 		// Only reprocess all if the previous IP(s) are still contained within a pool.
 		if c.ips.PoolForIP(prevIPs) != nil {

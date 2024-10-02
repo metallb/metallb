@@ -39,11 +39,11 @@ by BGP's conflict resolution algorithm.
 
 {{<mermaid align="center">}}
 graph BT
-    subgraph ""
+    subgraph "  "
       metallbA
       calicoA
     end
-    subgraph ""
+    subgraph " "
       metallbB
       calicoB
     end
@@ -72,20 +72,20 @@ MetalLB:
 
 {{<mermaid align="center">}}
 graph BT
-    subgraph ""
+    subgraph " "
       metallbA("MetalLB<br>Speaker")
       calicoA
     end
-    subgraph ""
+    subgraph "  "
       calicoB
       metallbB("MetalLB<br>Speaker")
     end
 
-    subgraph ""
+    subgraph "   "
       metallbC("MetalLB<br>Speaker")
       calicoC
     end
-    subgraph ""
+    subgraph "    "
       calicoD
       metallbD("MetalLB<br>Speaker")
     end
@@ -117,20 +117,20 @@ The alternative is to make MetalLB peer with the spine router(s):
 
 {{<mermaid align="center">}}
 graph BT
-    subgraph ""
+    subgraph " "
       metallbA("MetalLB<br>Speaker")
       calicoA
     end
-    subgraph ""
+    subgraph "  "
       calicoB
       metallbB("MetalLB<br>Speaker")
     end
 
-    subgraph ""
+    subgraph "   "
       metallbC("MetalLB<br>Speaker")
       calicoC
     end
-    subgraph ""
+    subgraph "    "
       calicoD
       metallbD("MetalLB<br>Speaker")
     end
@@ -169,12 +169,12 @@ externally facing services to run on those racks.
 
 {{<mermaid align="center">}}
 graph BT
-    subgraph ""
+    subgraph " "
       metallbA("MetalLB<br>Speaker")
       calicoA
     end
 
-    subgraph ""
+    subgraph "  "
       calicoB
     end
 
@@ -197,11 +197,11 @@ tables.
 
 {{<mermaid align="center">}}
 graph BT
-    subgraph ""
+    subgraph " "
       metallbA("MetalLB<br>Speaker")
       calicoA("Calico")
     end
-    subgraph ""
+    subgraph "  "
       calicoB("Calico")
       metallbB("MetalLB<br>Speaker")
     end
