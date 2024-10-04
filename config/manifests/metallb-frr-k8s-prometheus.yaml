@@ -12,6 +12,10 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.3
+    metallb-internal: |-
+      {{- with .Values.annotations }}
+      {{- toYaml . | nindent 4}}
+      {{- end }}
   name: bfdprofiles.metallb.io
 spec:
   group: metallb.io
@@ -133,6 +137,10 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.3
+    metallb-internal: |-
+      {{- with .Values.annotations }}
+      {{- toYaml . | nindent 4}}
+      {{- end }}
   name: bgpadvertisements.metallb.io
 spec:
   group: metallb.io
@@ -350,6 +358,10 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.3
+    metallb-internal: |-
+      {{- with .Values.annotations }}
+      {{- toYaml . | nindent 4}}
+      {{- end }}
   name: bgppeers.metallb.io
 spec:
   conversion:
@@ -700,6 +712,10 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.3
+    metallb-internal: |-
+      {{- with .Values.annotations }}
+      {{- toYaml . | nindent 4}}
+      {{- end }}
   name: communities.metallb.io
 spec:
   group: metallb.io
@@ -1303,6 +1319,10 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.3
+    metallb-internal: |-
+      {{- with .Values.annotations }}
+      {{- toYaml . | nindent 4}}
+      {{- end }}
   name: ipaddresspools.metallb.io
 spec:
   group: metallb.io
@@ -1519,6 +1539,10 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.3
+    metallb-internal: |-
+      {{- with .Values.annotations }}
+      {{- toYaml . | nindent 4}}
+      {{- end }}
   name: l2advertisements.metallb.io
 spec:
   group: metallb.io
@@ -1706,6 +1730,10 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.3
+    metallb-internal: |-
+      {{- with .Values.annotations }}
+      {{- toYaml . | nindent 4}}
+      {{- end }}
   name: servicel2statuses.metallb.io
 spec:
   group: metallb.io
