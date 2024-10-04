@@ -32,14 +32,14 @@ jobs:
       - name: Checkout Source
         uses: actions/checkout@v4
       - name: Run Gosec Security Scanner
-        uses: securego/gosec@master
+        uses: securego/gosec@v2.21.2
         with:
           args: -exclude-dir e2etest -severity medium ./...
-
       - name: Golang Vulncheck
-        uses: Templum/govulncheck-action@v0.10.1
+        uses: golang/govulncheck-action@v1.0.3
         with:
-          skip-upload: true
+          go-version-file: go.mod
+
 
   commitlint:
     runs-on: ubuntu-22.04
@@ -64,7 +64,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install python3-pip arping ndisc6
-          sudo pip3 install invoke semver pyyaml
+          sudo pip3 install -r dev-env/requirements.txt
 
       - name: Unit Tests
         run: |
@@ -81,6 +81,8 @@ jobs:
           inv checkchanges --action="run inv generatemanifests"
           inv generateapidocs
           inv checkchanges --action="run inv generateapidocs"
+          inv linttasks
+          inv checkchanges --action="run inv linttasks"
 
   build-test-images:
     runs-on: ubuntu-22.04

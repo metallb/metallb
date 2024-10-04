@@ -1,14 +1,15 @@
+{% for peer_address in peer_addresses %}
+---
 apiVersion: metallb.io/v1beta2
 kind: BGPPeer
 metadata:
-  name: peer
+  name: peer-{{ loop.index }}
   namespace: metallb-system
 spec:
   myASN: 64512
   peerASN: 64512
-  # NOTE: PEER_IP_ADDRESS will be substituted with the IP address
-  # assigned to the frr container.
-  peerAddress: PEER_IP_ADDRESS  
+  peerAddress: {{ peer_address }}
+{% endfor %} 
 ---
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool

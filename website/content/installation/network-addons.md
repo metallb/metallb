@@ -25,5 +25,4 @@ have information on network addons that aren't listed!
 | Flannel       | Yes                                                                                                                     |
 | Kube-ovn      | Yes                                                                                                                     |
 | Kube-router   | Mostly (see [known issues]({{% relref "configuration/kube-router.md" %}}))                                              |
-| Weave Net     | Mostly (see [known issues]({{% relref "configuration/weave.md" %}}))                                                    |
 

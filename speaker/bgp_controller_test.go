@@ -1196,10 +1196,11 @@ func TestNodeSelectors(t *testing.T) {
 	}
 
 	tests := []struct {
-		desc    string
-		config  *config.Config
-		node    *v1.Node
-		wantAds map[string][]*bgp.Advertisement
+		desc            string
+		config          *config.Config
+		node            *v1.Node
+		wantAds         map[string][]*bgp.Advertisement
+		wantReturnState controllers.SyncState
 	}{
 		{
 			desc:    "No config, no advertisements",
@@ -1353,6 +1354,59 @@ func TestNodeSelectors(t *testing.T) {
 				"2.3.4.5:0": nil,
 			},
 		},
+
+		{
+			desc: "Change node availability - Unschedulable becomes true",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pandora",
+					Labels: map[string]string{
+						"host": "frontend",
+					},
+				},
+				Spec: v1.NodeSpec{Unschedulable: true},
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+				"2.3.4.5:0": nil,
+			},
+			wantReturnState: controllers.SyncStateReprocessAll,
+		},
+
+		{
+			desc: "Change node availability - Unschedulable remains true",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pandora",
+					Labels: map[string]string{
+						"host": "frontend",
+					},
+				},
+				Spec: v1.NodeSpec{Unschedulable: true},
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+				"2.3.4.5:0": nil,
+			},
+		},
+
+		{
+			desc: "Change node availability - Unschedulable becomes false",
+			node: &v1.Node{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "pandora",
+					Labels: map[string]string{
+						"host": "frontend",
+					},
+				},
+				Spec: v1.NodeSpec{Unschedulable: false},
+			},
+			wantAds: map[string][]*bgp.Advertisement{
+				"1.2.3.4:0": nil,
+				"2.3.4.5:0": nil,
+			},
+			wantReturnState: controllers.SyncStateReprocessAll,
+		},
 	}
 
 	l := log.NewNopLogger()
@@ -1364,8 +1418,8 @@ func TestNodeSelectors(t *testing.T) {
 		}
 
 		if test.node != nil {
-			if c.SetNode(l, test.node) == controllers.SyncStateError {
-				t.Errorf("%q: SetNode failed", test.desc)
+			if r := c.SetNode(l, test.node); r != test.wantReturnState {
+				t.Fatalf("%q: SetNode returns wrong value, got: %+v, want: %+v", test.desc, test.wantReturnState, r)
 			}
 		}
 

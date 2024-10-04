@@ -2,3 +2,4 @@
 invoke
 semver
 PyYAML
+black

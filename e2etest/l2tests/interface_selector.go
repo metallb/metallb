@@ -340,7 +340,7 @@ var _ = ginkgo.Describe("L2-interface selector", func() {
 					if err != nil {
 						return ""
 					}
-					return node
+					return node.Name
 				}, 1*time.Minute, 1*time.Second).Should(Equal(node.Name))
 			}
 		})
