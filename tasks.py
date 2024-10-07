@@ -1468,6 +1468,8 @@ def _align_helm_crds(source, output):
         )
     )
     run("sed -i 's/metallb-system/{{{{ .Release.Namespace }}}}/g' {}".format(output))
+    run("sed -i 's/a-metallb-internal-start: metallb-conversion-start/{{{{- if eq (lower .Values.conversionStrategy) \"webhook\" }}}}/g' {}".format(output))
+    run("sed -i 's/z-metallb-internal-stop: metallb-conversion-stop/{{{{- else }}}}\\n    strategy: None\\n  {{{{- end }}}}/g' {}".format(output))
 
 
 @task
