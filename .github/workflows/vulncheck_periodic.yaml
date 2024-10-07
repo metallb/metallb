@@ -13,7 +13,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Golang Vulncheck
-        uses: golang/govulncheck-action@v1.0.3
+        uses: golang/govulncheck-action@v1.0.4
         with:
           go-version-file: go.mod
 
