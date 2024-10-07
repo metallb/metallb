@@ -559,8 +559,7 @@ func (c *controller) SetConfig(l log.Logger, cfg *config.Config) controllers.Syn
 }
 
 func (c *controller) SetNode(l log.Logger, node *v1.Node) controllers.SyncState {
-	conditionChanged := isNetworkConditionChanged(node.Name, c.nodes, node)
-	labelNodeExcludeBalancersChanged := isLabelNodeExcludeBalancersChanged(node.Name, c.nodes, node)
+	nodeAvailabilityChanged := isNodeAvailableChanged(c.nodes, node)
 	c.nodes[node.Name] = node
 
 	for proto, handler := range c.protocolHandlers {
@@ -570,19 +569,30 @@ func (c *controller) SetNode(l log.Logger, node *v1.Node) controllers.SyncState 
 		}
 	}
 
-	if conditionChanged || labelNodeExcludeBalancersChanged {
+	if nodeAvailabilityChanged {
 		return controllers.SyncStateReprocessAll
 	}
 
 	return controllers.SyncStateSuccess
 }
 
-func isNetworkConditionChanged(nodeName string, oldNodes map[string]*v1.Node, newNode *v1.Node) bool {
-	return k8snodes.IsNetworkUnavailable(oldNodes[nodeName]) != k8snodes.IsNetworkUnavailable(newNode)
-}
+func isNodeAvailableChanged(oldNodes map[string]*v1.Node, newNode *v1.Node) bool {
+	oldNode, exists := oldNodes[newNode.Name]
+	if !exists {
+		return false
+	}
 
-func isLabelNodeExcludeBalancersChanged(nodeName string, oldNodes map[string]*v1.Node, newNode *v1.Node) bool {
-	return k8snodes.IsNodeExcludedFromBalancers(oldNodes[nodeName]) != k8snodes.IsNodeExcludedFromBalancers(newNode)
+	if k8snodes.IsNodeUnschedulable(oldNode) != k8snodes.IsNodeUnschedulable(newNode) {
+		return true
+	}
+	if k8snodes.IsNetworkUnavailable(oldNode) != k8snodes.IsNetworkUnavailable(newNode) {
+		return true
+	}
+	if k8snodes.IsNodeExcludedFromBalancers(oldNode) != k8snodes.IsNodeExcludedFromBalancers(newNode) {
+		return true
+	}
+
+	return false
 }
 
 // A Protocol can advertise an IP address.

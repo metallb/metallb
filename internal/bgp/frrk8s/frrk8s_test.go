@@ -114,6 +114,30 @@ func newTestSessionManager(t *testing.T) bgp.SessionManager {
 	})
 	return sessionManager
 }
+func TestSingleEBGPSessionGracefullRestart(t *testing.T) {
+	sessionManager := newTestSessionManager(t)
+	l := log.NewNopLogger()
+
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:     "10.2.2.254:179",
+			SourceAddress:   net.ParseIP("10.1.1.254"),
+			MyASN:           100,
+			RouterID:        net.ParseIP("10.1.1.254"),
+			PeerASN:         200,
+			HoldTime:        time.Second,
+			KeepAliveTime:   time.Second,
+			Password:        "password",
+			CurrentNode:     "hostname",
+			GracefulRestart: true,
+			SessionName:     "test-peer"})
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	testCheckConfigFile(t)
+}
 
 func TestSingleEBGPSessionMultiHop(t *testing.T) {
 	sessionManager := newTestSessionManager(t)

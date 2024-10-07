@@ -250,15 +250,15 @@ func (sm *sessionManager) updateConfig() error {
 			}
 
 			neighbor = frrv1beta1.Neighbor{
-				ASN:           s.PeerASN,
-				Address:       host,
-				Port:          &portUint16,
-				HoldTime:      &metav1.Duration{Duration: s.HoldTime},
-				KeepaliveTime: &metav1.Duration{Duration: s.KeepAliveTime},
-				ConnectTime:   connectTime,
-				BFDProfile:    s.BFDProfile,
-				//Graceful:      s.GracefulRestart,
-				EBGPMultiHop: s.EBGPMultiHop,
+				ASN:                   s.PeerASN,
+				Address:               host,
+				Port:                  &portUint16,
+				HoldTime:              &metav1.Duration{Duration: s.HoldTime},
+				KeepaliveTime:         &metav1.Duration{Duration: s.KeepAliveTime},
+				ConnectTime:           connectTime,
+				BFDProfile:            s.BFDProfile,
+				EnableGracefulRestart: s.GracefulRestart,
+				EBGPMultiHop:          s.EBGPMultiHop,
 				ToAdvertise: frrv1beta1.Advertise{
 					Allowed: frrv1beta1.AllowedOutPrefixes{
 						Prefixes: make([]string, 0),

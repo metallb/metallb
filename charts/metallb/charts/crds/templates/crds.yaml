@@ -2,7 +2,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.3
   name: bfdprofiles.metallb.io
 spec:
   group: metallb.io
@@ -123,7 +123,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.3
   name: bgpadvertisements.metallb.io
 spec:
   group: metallb.io
@@ -329,7 +329,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.3
   name: bgppeers.metallb.io
 spec:
   conversion:
@@ -369,6 +369,8 @@ spec:
         - jsonPath: .spec.ebgpMultiHop
           name: Multi Hops
           type: string
+      deprecated: true
+      deprecationWarning: v1beta1 is deprecated, please use v1beta2
       name: v1beta1
       schema:
         openAPIV3Schema:
@@ -669,7 +671,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.3
   name: communities.metallb.io
 spec:
   group: metallb.io
@@ -734,7 +736,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.3
   name: ipaddresspools.metallb.io
 spec:
   group: metallb.io
@@ -944,7 +946,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.3
   name: l2advertisements.metallb.io
 spec:
   group: metallb.io
@@ -1124,7 +1126,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.16.3
   name: servicel2statuses.metallb.io
 spec:
   group: metallb.io

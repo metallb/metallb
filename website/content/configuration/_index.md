@@ -119,6 +119,10 @@ or more external BGP routers.
 In order to do so, an instance of `BGPPeer` must be created for each
 router we want metallb to connect to.
 
+{{% notice note %}}
+The BGPPeer v1beta1 version is deprecated. Please consider using v1beta2.
+{{% /notice %}}
+
 For a basic configuration featuring one BGP router and one IP address
 range, you need 4 pieces of information:
 

@@ -20,6 +20,7 @@ import (
 	"github.com/go-kit/log/level"
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/config"
+	"go.universe.tf/metallb/internal/safeconvert"
 	"golang.org/x/sys/unix"
 )
 
@@ -551,7 +552,10 @@ func dialMD5(ctx context.Context, addr string, srcAddr net.IP, password string) 
 			if errs != nil {
 				return nil, errs
 			}
-			zone = uint32(intf.Index)
+			zone, err = safeconvert.IntToUInt32(intf.Index)
+			if err != nil {
+				return nil, fmt.Errorf("invalid interface index %d", intf.Index)
+			}
 		}
 		lsockaddr := &unix.SockaddrInet6{ZoneId: zone}
 		copy(lsockaddr.Addr[:], laddr.IP.To16())
@@ -580,7 +584,10 @@ func dialMD5(ctx context.Context, addr string, srcAddr net.IP, password string) 
 	}()
 
 	if password != "" {
-		sig := buildTCPMD5Sig(raddr.IP, password)
+		sig, err := buildTCPMD5Sig(raddr.IP, password)
+		if err != nil {
+			return nil, err
+		}
 		// Better way may be available in  Go 1.11, see go-review.googlesource.com/c/go/+/72810
 		if err = os.NewSyscallError("setsockopt", unix.SetsockoptTCPMD5Sig(fd, unix.IPPROTO_TCP, unix.TCP_MD5SIG, sig)); err != nil {
 			return nil, err
@@ -615,7 +622,10 @@ func dialMD5(ctx context.Context, addr string, srcAddr net.IP, password string) 
 	events := make([]unix.EpollEvent, 1)
 
 	event.Events = syscall.EPOLLIN | syscall.EPOLLOUT | syscall.EPOLLPRI
-	event.Fd = int32(fd)
+	event.Fd, err = safeconvert.IntToInt32(fd)
+	if err != nil {
+		return nil, fmt.Errorf("invalid fd %w", err)
+	}
 	if err = unix.EpollCtl(epfd, syscall.EPOLL_CTL_ADD, fd, &event); err != nil {
 		return nil, err
 	}
@@ -635,7 +645,11 @@ func dialMD5(ctx context.Context, addr string, srcAddr net.IP, password string) 
 		if nevents == 0 {
 			return nil, fmt.Errorf("timeout")
 		}
-		if nevents > 1 || events[0].Fd != int32(fd) {
+		fdToCheck, err := safeconvert.IntToInt32(fd)
+		if err != nil {
+			return nil, fmt.Errorf("invalid fd %w", err)
+		}
+		if nevents > 1 || events[0].Fd != fdToCheck {
 			return nil, fmt.Errorf("unexpected epoll behavior")
 		}
 
@@ -653,7 +667,7 @@ func dialMD5(ctx context.Context, addr string, srcAddr net.IP, password string) 
 	}
 }
 
-func buildTCPMD5Sig(addr net.IP, key string) *unix.TCPMD5Sig {
+func buildTCPMD5Sig(addr net.IP, key string) (*unix.TCPMD5Sig, error) {
 	t := unix.TCPMD5Sig{}
 	if addr.To4() != nil {
 		t.Addr.Family = unix.AF_INET
@@ -663,10 +677,14 @@ func buildTCPMD5Sig(addr net.IP, key string) *unix.TCPMD5Sig {
 		copy(t.Addr.Data[6:], addr.To16())
 	}
 
-	t.Keylen = uint16(len(key))
+	var err error
+	t.Keylen, err = safeconvert.IntToUInt16(len(key))
+	if err != nil {
+		return nil, fmt.Errorf("invalid keyLen %w", err)
+	}
 	copy(t.Key[0:], []byte(key))
 
-	return &t
+	return &t, nil
 }
 
 // localAddressExists returns true if the address addr exists on any of the

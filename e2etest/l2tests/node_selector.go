@@ -110,7 +110,7 @@ var _ = ginkgo.Describe("L2", func() {
 					if err != nil {
 						return ""
 					}
-					return node
+					return node.Name
 				}, 30*time.Second, 1*time.Second).Should(Equal(node.Name))
 			}
 		})
@@ -174,7 +174,7 @@ var _ = ginkgo.Describe("L2", func() {
 				if err != nil {
 					return err.Error()
 				}
-				return node
+				return node.Name
 			}, 2*time.Minute, time.Second).Should(Equal(allNodes.Items[0].Name))
 		})
 
@@ -230,7 +230,7 @@ var _ = ginkgo.Describe("L2", func() {
 				if err != nil {
 					return err.Error()
 				}
-				return node
+				return node.Name
 			}, 2*time.Minute, time.Second).Should(Equal(nodeToLabel.Name))
 		})
 	})
