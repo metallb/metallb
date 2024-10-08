@@ -58,6 +58,7 @@ Kubernetes: `>= 1.19.0-0`
 | controller.tlsCipherSuites | string | `""` |  |
 | controller.tlsMinVersion | string | `"VersionTLS12"` |  |
 | controller.tolerations | list | `[]` |  |
+| crds.annotations | object | `{}` |  |
 | crds.enabled | bool | `true` |  |
 | crds.validationFailurePolicy | string | `"Fail"` |  |
 | frrk8s.enabled | bool | `false` |  |
