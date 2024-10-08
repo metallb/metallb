@@ -165,7 +165,7 @@ prometheus:
     addressPoolExhausted:
       enabled: true
       labels:
-        severity: alert
+        severity: critical
 
     addressPoolUsage:
       enabled: true
@@ -178,13 +178,13 @@ prometheus:
             severity: warning
         - percent: 95
           labels:
-            severity: alert
+            severity: critical
 
     # MetalLBBGPSessionDown
     bgpSessionDown:
       enabled: true
       labels:
-        severity: alert
+        severity: critical
 
     extraAlerts: []
 
