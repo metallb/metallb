@@ -214,7 +214,7 @@ var _ = ginkgo.Describe("BGP", func() {
 				}
 
 				return nil
-			}, 2*time.Minute, time.Second).ShouldNot(HaveOccurred(), "no downtime until speakers are ready")
+			}, 2*time.Minute, time.Second).ShouldNot(HaveOccurred(), "speakers are not ready after restart")
 
 			for _, c := range FRRContainers {
 				validateService(svc, allNodes.Items, c)
