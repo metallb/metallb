@@ -54,6 +54,14 @@ type alloc struct {
 	key
 }
 
+type allocationPriority int
+
+const (
+	PRIORITY_HIGH   allocationPriority = 0
+	PRIORITY_MEDIUM allocationPriority = 1
+	PRIORITY_LOW    allocationPriority = 2
+)
+
 // New returns an Allocator managing no pools.
 func New() *Allocator {
 	return &Allocator{
@@ -246,21 +254,30 @@ func (a *Allocator) Unassign(svc string) {
 }
 
 // AllocateFromPool assigns an available IP from pool to service.
-func (a *Allocator) AllocateFromPool(svcKey string, svc *v1.Service, serviceIPFamily ipfamily.Family, poolName string, ports []Port, sharingKey, backendKey string) ([]net.IP, error) {
+func (a *Allocator) AllocateFromPool(
+  svcKey string, 
+  svc *v1.Service,
+  serviceIPFamily ipfamily.Family,
+  poolName string,
+  ports []Port,
+  sharingKey,
+  backendKey string
+) ([]net.IP, allocationPriority, error) {
+
 	if alloc := a.allocated[svcKey]; alloc != nil {
 		// Handle the case where the svc has already been assigned an IP but from the wrong family.
 		// This "should-not-happen" since the "serviceIPFamily" is an immutable field in services.
-		allocIPsFamily, err := ipfamily.ForAddressesIPs(alloc.ips)
+		allocIPsFamily, err := ipfamily.ForAddressesIPs(alloc.ips, svc.Spec.IPFamilyPolicy)
 		if err != nil {
-			return nil, err
+			return nil, PRIORITY_LOW, err
 		}
 		if allocIPsFamily != serviceIPFamily {
-			return nil, fmt.Errorf("IP for wrong family assigned alloc %s service family %s", allocIPsFamily, serviceIPFamily)
+			return nil, PRIORITY_LOW, fmt.Errorf("IP for wrong family assigned alloc %s service family %s", allocIPsFamily, serviceIPFamily)
 		}
 		if err := a.Assign(svcKey, svc, alloc.ips, ports, sharingKey, backendKey); err != nil {
-			return nil, err
+			return nil, PRIORITY_LOW, err
 		}
-		return alloc.ips, nil
+		return alloc.ips, PRIORITY_HIGH, nil
 	}
 
 	pool := a.pools.ByName[poolName]
@@ -272,7 +289,9 @@ func (a *Allocator) AllocateFromPool(svcKey string, svc *v1.Service, serviceIPFa
 	ipfamilySel := make(map[ipfamily.Family]bool)
 
 	switch serviceIPFamily {
-	case ipfamily.DualStack:
+	case ipfamily.RequiredDualStack:
+		ipfamilySel[ipfamily.IPv4], ipfamilySel[ipfamily.IPv6] = true, true
+	case ipfamily.PreferDualStack:
 		ipfamilySel[ipfamily.IPv4], ipfamilySel[ipfamily.IPv6] = true, true
 	default:
 		ipfamilySel[serviceIPFamily] = true
@@ -290,20 +309,37 @@ func (a *Allocator) AllocateFromPool(svcKey string, svc *v1.Service, serviceIPFa
 			delete(ipfamilySel, cidrIPFamily)
 		}
 	}
+	
+	if len(ipfamilySel) == 0 {
+		return ips, PRIORITY_HIGH, nil
+	}
 
-	if len(ipfamilySel) > 0 {
+	if len(ipfamilySel) > 0 && serviceIPFamily != ipfamily.PreferDualStack {
 		// Woops, run out of IPs :( Fail.
-		return nil, fmt.Errorf("no available IPs in pool %q for %s IPFamily", poolName, serviceIPFamily)
+		return nil, PRIORITY_LOW, fmt.Errorf("no available IPs in pool %q for %s IPFamily", poolName, serviceIPFamily)
 	}
-	err := a.Assign(svcKey, svc, ips, ports, sharingKey, backendKey)
-	if err != nil {
-		return nil, err
+	if len(ipfamilySel) > 1 {
+    return nil, PRIORITY_LOW, fmt.Errorf("no available IPs in pool %q for %s IPFamily", poolName, serviceIPFamily)
+		// Woops, run out of IPs :( Fail.
 	}
-	return ips, nil
+
+  // If the pool is not dualstack, we put lower preference to it if it does not belong to the primary family
+	preferredFamily := svc.Spec.IPFamilies[0]
+	if _, ok := ipfamilySel[preferredFamily]; ok {
+		return ips, PRIORITY_LOW, nil
+	}
+
+	return ips, PRIORITY_MEDIUM, nil
 }
 
 // Allocate assigns any available and assignable IP to service.
-func (a *Allocator) Allocate(svcKey string, svc *v1.Service, serviceIPFamily ipfamily.Family, ports []Port, sharingKey, backendKey string) ([]net.IP, error) {
+func (a *Allocator) Allocate(
+  svcKey string,
+  svc *v1.Service,
+  serviceIPFamily ipfamily.Family,
+  ports []Port,
+  sharingKey, backendKey string
+) ([]net.IP, error) {
 	if alloc := a.allocated[svcKey]; alloc != nil {
 		if err := a.Assign(svcKey, svc, alloc.ips, ports, sharingKey, backendKey); err != nil {
 			return nil, err
@@ -316,12 +352,39 @@ func (a *Allocator) Allocate(svcKey string, svc *v1.Service, serviceIPFamily ipf
 			return ips, nil
 		}
 	}
+	ipPriorityMap := make(map[allocationPriority][][]net.IP)
 	for _, pool := range a.pools.ByName {
 		if !pool.AutoAssign || pool.ServiceAllocations != nil {
 			continue
 		}
-		if ips, err := a.AllocateFromPool(svcKey, svc, serviceIPFamily, pool.Name, ports, sharingKey, backendKey); err == nil {
-			return ips, nil
+		ips, priority, err := a.AllocateFromPool(svcKey, svc, serviceIPFamily, pool.Name, ports, sharingKey, backendKey)
+		if err != nil {
+			continue
+		}
+		if priority == PRIORITY_HIGH {
+			if err := a.Assign(svcKey, svc, ips, ports, sharingKey, backendKey); err == nil {
+				return ips, nil
+			}
+		}
+    // Store non-PRIORITY_HIGH ips and their priorities if in PreferDualStack
+    if serviceIPFamily != ipfamily.PreferDualStack {
+      continue
+    }
+    ipRanges, ok := ipPriorityMap[priority]
+    if !ok {
+      ipRanges = [][]net.IP
+    }
+    ipRanges = append(ipRanges, ips)
+		ipPriorityMap[priority] = ipRanges
+	}
+  // No PRIORITY_HIGH ips were assigned, proceed to pools in PRIORITY_MEDIUM, and then PRIORITY_LOW
+	for _, priority := range []allocationPriority{PRIORITY_MEDIUM, PRIORITY_LOW} {
+		if ipRanges, ok := ipPriorityMap[priority]; ok {
+      for _, ips := range ipRanges {
+        if err := a.Assign(svcKey, svc, ips, ports, sharingKey, backendKey); err == nil {
+          return ips, nil
+        }
+      }
 		}
 	}
 

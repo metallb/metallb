@@ -135,17 +135,17 @@ var _ = ginkgo.Describe("BGP", func() {
 	},
 		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
 		ginkgo.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}, func(_ *corev1.Service) {}),
-		ginkgo.Entry("DUALSTACK", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
+		ginkgo.Entry("REQUIRED DUALSTACK", ipfamily.RequiredDualStack, []string{v4PoolAddresses, v6PoolAddresses},
 			func(svc *corev1.Service) {
-				testservice.DualStack(svc)
+				testservice.RequiredDualStack(svc)
 			}),
 		ginkgo.Entry("IPV4 - request IPv4 via custom annotation", ipfamily.IPv4, []string{v4PoolAddresses},
 			func(svc *corev1.Service) {
 				testservice.WithSpecificIPs(svc, "192.168.10.100")
 			}),
-		ginkgo.Entry("DUALSTACK - request Dual Stack via custom annotation", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
+		ginkgo.Entry("REQUIRED DUALSTACK - request Dual Stack via custom annotation", ipfamily.RequiredDualStack, []string{v4PoolAddresses, v6PoolAddresses},
 			func(svc *corev1.Service) {
-				testservice.DualStack(svc)
+				testservice.RequiredDualStack(svc)
 				testservice.WithSpecificIPs(svc, "192.168.10.100", "fc00:f853:ccd:e799::")
 			}),
 	)
@@ -236,8 +236,8 @@ var _ = ginkgo.Describe("BGP", func() {
 			ginkgo.DescribeTable("dataplane should keep working", assertDuringSpeakerRestartWithGR,
 				ginkgo.Entry("FRR-MODE IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
 				ginkgo.Entry("FRR-MODE IPV6", ipfamily.IPv6, []string{v6PoolAddresses}, func(_ *corev1.Service) {}),
-				ginkgo.Entry("FRR-MODE DUALSTACK", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
-					func(svc *corev1.Service) { testservice.DualStack(svc) }),
+				ginkgo.Entry("FRR-MODE REQUIRED DUALSTACK", ipfamily.RequiredDualStack, []string{v4PoolAddresses, v6PoolAddresses},
+					func(svc *corev1.Service) { testservice.RequiredDualStack(svc) }),
 			)
 		})
 
@@ -255,8 +255,8 @@ var _ = ginkgo.Describe("BGP", func() {
 			ginkgo.DescribeTable("dataplane should have a downtime", assertDuringSpeakerRestartWithoutGR,
 				ginkgo.Entry("FRR-MODE IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
 				ginkgo.Entry("FRR-MODE IPV6", ipfamily.IPv6, []string{v6PoolAddresses}, func(_ *corev1.Service) {}),
-				ginkgo.Entry("FRR-MODE DUALSTACK", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
-					func(svc *corev1.Service) { testservice.DualStack(svc) }),
+				ginkgo.Entry("FRR-MODE REQUIRED DUALSTACK", ipfamily.RequiredDualStack, []string{v4PoolAddresses, v6PoolAddresses},
+					func(svc *corev1.Service) { testservice.RequiredDualStack(svc) }),
 			)
 		})
 	})
@@ -322,9 +322,9 @@ var _ = ginkgo.Describe("BGP", func() {
 	},
 		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
 		ginkgo.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}, func(_ *corev1.Service) {}),
-		ginkgo.Entry("DUALSTACK", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses},
+		ginkgo.Entry("REQUIRED DUALSTACK", ipfamily.RequiredDualStack, []string{v4PoolAddresses, v6PoolAddresses},
 			func(svc *corev1.Service) {
-				testservice.DualStack(svc)
+				testservice.RequiredDualStack(svc)
 			}),
 	)
 
@@ -490,7 +490,7 @@ var _ = ginkgo.Describe("BGP", func() {
 					},
 				}}, ipfamily.IPv6, testservice.TrafficPolicyCluster,
 			),
-			ginkgo.Entry("DUALSTACK - test AddressPool defined by address range", []metallbv1beta1.IPAddressPool{
+			ginkgo.Entry("REQUIRED DUALSTACK - test AddressPool defined by address range", []metallbv1beta1.IPAddressPool{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "bgp-test"},
 					Spec: metallbv1beta1.IPAddressPoolSpec{
@@ -499,9 +499,9 @@ var _ = ginkgo.Describe("BGP", func() {
 							"fc00:f853:0ccd:e799::0-fc00:f853:0ccd:e799::18",
 						},
 					},
-				}}, ipfamily.DualStack, testservice.TrafficPolicyCluster,
+				}}, ipfamily.RequiredDualStack, testservice.TrafficPolicyCluster,
 			),
-			ginkgo.Entry("DUALSTACK - test AddressPool defined by network prefix", []metallbv1beta1.IPAddressPool{
+			ginkgo.Entry("REQUIRED DUALSTACK - test AddressPool defined by network prefix", []metallbv1beta1.IPAddressPool{
 				{
 					ObjectMeta: metav1.ObjectMeta{Name: "bgp-test"},
 					Spec: metallbv1beta1.IPAddressPoolSpec{
@@ -510,7 +510,7 @@ var _ = ginkgo.Describe("BGP", func() {
 							"fc00:f853:0ccd:e799::/124",
 						},
 					},
-				}}, ipfamily.DualStack, testservice.TrafficPolicyCluster,
+				}}, ipfamily.RequiredDualStack, testservice.TrafficPolicyCluster,
 			),
 		)
 	})
@@ -744,7 +744,7 @@ var _ = ginkgo.Describe("BGP", func() {
 						MinimumTTL:       ptr.To(uint32(254)),
 					},
 				}, ipfamily.IPv6, []string{v6PoolAddresses}, testservice.TrafficPolicyCluster),
-			ginkgo.Entry("DUALSTACK - full params",
+			ginkgo.Entry("REQUIRED DUALSTACK - full params",
 				metallbv1beta1.BFDProfile{
 					ObjectMeta: metav1.ObjectMeta{
 						Name: "full1",
@@ -757,9 +757,9 @@ var _ = ginkgo.Describe("BGP", func() {
 						PassiveMode:      ptr.To(false),
 						MinimumTTL:       ptr.To(uint32(254)),
 					},
-				}, ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
+				}, ipfamily.RequiredDualStack, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
 					testservice.TrafficPolicyCluster(svc)
-					testservice.DualStack(svc)
+					testservice.RequiredDualStack(svc)
 				}),
 		)
 	})

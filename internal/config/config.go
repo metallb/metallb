@@ -152,7 +152,6 @@ type Pool struct {
 	// from this pool.
 	AutoAssign bool
 
-	// The list of BGPAdvertisements associated with this address pool.
 	BGPAdvertisements []*BGPAdvertisement
 
 	// The list of L2Advertisements associated with this address pool.
