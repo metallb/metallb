@@ -6,7 +6,9 @@
   {{ if .neighbor.Port -}}
   neighbor {{.neighbor.Addr}} port {{.neighbor.Port}}
   {{- end }}
+  {{- if and .neighbor.KeepaliveTime .neighbor.HoldTime }}
   neighbor {{.neighbor.Addr}} timers {{.neighbor.KeepaliveTime}} {{.neighbor.HoldTime}}
+  {{- end }}
   {{- if ne .neighbor.ConnectTime 0}}
   neighbor {{.neighbor.Addr}} timers connect {{.neighbor.ConnectTime}}
   {{- end }}

@@ -97,12 +97,25 @@ func TestValidate(t *testing.T) {
 			mustFail: true,
 		},
 		{
+			desc: "dynamic ASN",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							DynamicASN: "internal",
+						},
+					},
+				},
+			},
+			mustFail: true,
+		},
+		{
 			desc: "keepalive time",
 			config: ClusterResources{
 				Peers: []v1beta2.BGPPeer{
 					{
 						Spec: v1beta2.BGPPeerSpec{
-							KeepaliveTime: v1.Duration{Duration: time.Second},
+							KeepaliveTime: &v1.Duration{Duration: time.Second},
 						},
 					},
 				},

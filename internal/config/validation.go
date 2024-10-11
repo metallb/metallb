@@ -33,7 +33,7 @@ func DiscardFRROnly(c ClusterResources) error {
 		if p.Spec.BFDProfile != "" {
 			return fmt.Errorf("peer %s has bfd-profile set on native bgp mode", p.Spec.Address)
 		}
-		if p.Spec.KeepaliveTime.Duration != 0 {
+		if p.Spec.KeepaliveTime != nil && p.Spec.KeepaliveTime.Duration != 0 {
 			return fmt.Errorf("peer %s has keepalive-time set on native bgp mode", p.Spec.Address)
 		}
 		if p.Spec.VRFName != "" {
@@ -47,6 +47,9 @@ func DiscardFRROnly(c ClusterResources) error {
 		}
 		if p.Spec.DisableMP {
 			return fmt.Errorf("peer %s has disable MP flag set on native bgp mode", p.Spec.Address)
+		}
+		if p.Spec.DynamicASN != "" {
+			return fmt.Errorf("peer %s has dynamicASN set on native bgp mode", p.Spec.Address)
 		}
 	}
 	if len(c.BFDProfiles) > 0 {

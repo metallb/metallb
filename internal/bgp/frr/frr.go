@@ -252,7 +252,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			routers[routerName] = rout
 		}
 
-		neighborName := NeighborName(s.PeerAddress, s.PeerASN, s.VRFName)
+		neighborName := NeighborName(s.PeerAddress, s.PeerASN, s.DynamicASN, s.VRFName)
 		if neighbor, exist = rout.neighbors[neighborName]; !exist {
 			host, port, err := net.SplitHostPort(s.PeerAddress)
 			if err != nil {
@@ -271,14 +271,25 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				connectTime = int64(*s.ConnectTime / time.Second)
 			}
 
+			var holdTime *int64
+			var keepaliveTime *int64
+			if s.HoldTime != nil {
+				time := int64(*s.HoldTime / time.Second)
+				holdTime = &time
+			}
+			if s.KeepAliveTime != nil {
+				time := int64(*s.KeepAliveTime / time.Second)
+				keepaliveTime = &time
+			}
+
 			neighbor = &neighborConfig{
 				Name:            neighborName,
 				IPFamily:        family,
-				ASN:             s.PeerASN,
+				ASN:             asnFor(s.PeerASN, s.DynamicASN),
 				Addr:            host,
 				Port:            uint16(portUint),
-				HoldTime:        int64(s.HoldTime / time.Second),
-				KeepaliveTime:   int64(s.KeepAliveTime / time.Second),
+				HoldTime:        holdTime,
+				KeepaliveTime:   keepaliveTime,
 				ConnectTime:     connectTime,
 				Password:        s.Password,
 				Advertisements:  make([]*advertisementConfig, 0),

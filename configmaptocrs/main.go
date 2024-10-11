@@ -391,7 +391,7 @@ func parsePeer(p peer) (*v1beta2.BGPPeer, error) {
 			Address:       p.Addr,
 			SrcAddress:    p.SrcAddr,
 			Port:          p.Port,
-			HoldTime:      metav1.Duration{Duration: holdTime},
+			HoldTime:      &metav1.Duration{Duration: holdTime},
 			RouterID:      p.RouterID,
 			NodeSelectors: nodeSels,
 			Password:      p.Password,
@@ -404,7 +404,7 @@ func parsePeer(p peer) (*v1beta2.BGPPeer, error) {
 		if err != nil {
 			return nil, err
 		}
-		res.Spec.KeepaliveTime = metav1.Duration{Duration: keepaliveTime}
+		res.Spec.KeepaliveTime = &metav1.Duration{Duration: keepaliveTime}
 	}
 
 	return res, nil

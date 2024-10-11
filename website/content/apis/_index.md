@@ -283,7 +283,8 @@ _Appears in:_
 | Field | Description |
 | --- | --- |
 | `myASN` _integer_ | AS number to use for the local end of the session. |
-| `peerASN` _integer_ | AS number to expect from the remote end of the session. |
+| `peerASN` _integer_ | AS number to expect from the remote end of the session.<br />ASN and DynamicASN are mutually exclusive and one of them must be specified. |
+| `dynamicASN` _[DynamicASNMode](#dynamicasnmode)_ | DynamicASN detects the AS number to use for the remote end of the session<br />without explicitly setting it via the ASN field. Limited to:<br />internal - if the neighbor's ASN is different than MyASN connection is denied.<br />external - if the neighbor's ASN is the same as MyASN the connection is denied.<br />ASN and DynamicASN are mutually exclusive and one of them must be specified. |
 | `peerAddress` _string_ | Address to dial when establishing the session. |
 | `sourceAddress` _string_ | Source address to use when establishing the session. |
 | `peerPort` _integer_ | Port to dial when establishing the session. |
@@ -299,5 +300,16 @@ _Appears in:_
 | `ebgpMultiHop` _boolean_ | To set if the BGPPeer is multi-hops away. Needed for FRR mode only. |
 | `vrf` _string_ | To set if we want to peer with the BGPPeer using an interface belonging to<br />a host vrf |
 | `disableMP` _boolean_ | To set if we want to disable MP BGP that will separate IPv4 and IPv6 route exchanges into distinct BGP sessions. |
+
+
+#### DynamicASNMode
+
+_Underlying type:_ _string_
+
+
+
+_Appears in:_
+- [BGPPeerSpec](#bgppeerspec)
+
 
 
