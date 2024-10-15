@@ -1468,6 +1468,7 @@ def _align_helm_crds(source, output):
         )
     )
     run("sed -i 's/metallb-system/{{{{ .Release.Namespace }}}}/g' {}".format(output))
+    run("sed -i '/metallb-internal: |-/d' {}".format(output))
 
 
 @task
