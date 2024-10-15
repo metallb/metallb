@@ -131,10 +131,11 @@ metadata:
   name: example-advertisement10
   namespace: metallb-system
 spec:
-  ipaddresspools:
+  ipAddressPools:
   - pool1
-  nodeSelector:
-  - kubernetes.io/hostname: hostB
+  nodeSelectors:
+  - matchLabels:
+      kubernetes.io/hostname: hostB
   interfaces:
   - ens18
 ```
