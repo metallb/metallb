@@ -6,7 +6,7 @@ spec:
   template:
     metadata:
       annotations:
-        prometheus.io/scrape: 'true'
+        prometheus.io/scrape: "true"
       labels:
         app: metallb
         component: speaker
@@ -39,20 +39,26 @@ spec:
         # Copies the reloader to the shared volume between the speaker and reloader.
         - name: cp-reloader
           image: quay.io/metallb/speaker:main
-          command: ["/cp-tool","/frr-reloader.sh","/etc/frr_reloader/frr-reloader.sh"]
+          command:
+            [
+              "/cp-tool",
+              "/frr-reloader.sh",
+              "/etc/frr_reloader/frr-reloader.sh",
+            ]
           volumeMounts:
             - name: reloader
               mountPath: /etc/frr_reloader
         # Copies the metrics exporter
         - name: cp-metrics
           image: quay.io/metallb/speaker:main
-          command: ["/cp-tool","/frr-metrics","/etc/frr_metrics/frr-metrics"]
+          command: ["/cp-tool", "/frr-metrics", "/etc/frr_metrics/frr-metrics"]
           volumeMounts:
             - name: metrics
               mountPath: /etc/frr_metrics
       containers:
         - name: frr
           securityContext:
+            readOnlyRootFilesystem: true
             capabilities:
               add: ["NET_ADMIN", "NET_RAW", "SYS_ADMIN", "NET_BIND_SERVICE"]
           image: quay.io/frrouting/frr:9.1.0
@@ -93,6 +99,8 @@ spec:
         - name: reloader
           image: quay.io/frrouting/frr:9.1.0
           command: ["/etc/frr_reloader/frr-reloader.sh"]
+          securityContext:
+            readOnlyRootFilesystem: true
           volumeMounts:
             - name: frr-sockets
               mountPath: /var/run/frr
@@ -111,6 +119,8 @@ spec:
           ports:
             - containerPort: 7473
               name: monitoring
+          securityContext:
+            readOnlyRootFilesystem: true
           volumeMounts:
             - name: frr-sockets
               mountPath: /var/run/frr
