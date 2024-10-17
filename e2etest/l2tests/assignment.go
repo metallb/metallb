@@ -18,6 +18,7 @@ import (
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 
 	jigservice "go.universe.tf/e2etest/pkg/jigservice"
+	testservice "go.universe.tf/e2etest/pkg/service"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	clientset "k8s.io/client-go/kubernetes"
@@ -78,7 +79,6 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			ns.Labels[admissionapi.EnforceLevelLabel] = string(admissionapi.LevelPrivileged)
 		})
 		Expect(err).NotTo(HaveOccurred())
-
 	})
 
 	ginkgo.Context("IPV4 Assignment", func() {
@@ -400,8 +400,10 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 					Addresses: []string{
 						"192.168.10.0/32",
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 10,
-						NamespaceSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"foo1": "bar1", "foo2": "bar2"}}}},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{
+						Priority:           10,
+						NamespaceSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"foo1": "bar1", "foo2": "bar2"}}},
+					},
 				},
 			}
 			namespacePoolNoPriority := metallbv1beta1.IPAddressPool{
@@ -453,8 +455,10 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 					Addresses: []string{
 						"192.168.5.0/32",
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 20,
-						ServiceSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"test": "e2e"}}}},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{
+						Priority:         20,
+						ServiceSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"test": "e2e"}}},
+					},
 				},
 			}
 			svcLabelPoolWithHigherPriority := metallbv1beta1.IPAddressPool{
@@ -463,8 +467,10 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 					Addresses: []string{
 						"192.168.10.0/32",
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 10,
-						ServiceSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"test": "e2e"}}}},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{
+						Priority:         10,
+						ServiceSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"test": "e2e"}}},
+					},
 				},
 			}
 			namespacePoolNoPriority := metallbv1beta1.IPAddressPool{
@@ -531,8 +537,10 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 					Addresses: []string{
 						"192.168.10.0/32",
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 10,
-						ServiceSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"test": "e2e"}}}},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{
+						Priority:         10,
+						ServiceSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"test": "e2e"}}},
+					},
 				},
 			}
 			namespacePoolNoPriority := metallbv1beta1.IPAddressPool{
@@ -676,6 +684,39 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{secondNamespacePoolHigherPriority}, jigservice.GetIngressPoint(
 				&svc4.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+	ginkgo.Context("PreferDualStack - only 1 stack available", func() {
+		ginkgo.AfterEach(func() {
+			// Clean previous configuration.
+			err := ConfigUpdater.Clean()
+			Expect(err).NotTo(HaveOccurred())
+		})
+		const v4PoolAddresses = "192.168.10.0/24"
+		const v6PoolAddresses = "fc00:f853:0ccd:e799::/124"
+
+		ginkgo.It("", func() {
+			dualStackPool1 := metallbv1beta1.IPAddressPool{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ns-dualstack-pool"},
+				Spec: metallbv1beta1.IPAddressPoolSpec{
+					Addresses: []string{
+						v4PoolAddresses,
+					},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 20, Namespaces: []string{testNamespace}},
+				},
+			}
+			resources := config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{dualStackPool1},
+			}
+			err := ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+
+			svc1, _ := service.CreateWithBackend(cs, testNamespace, "svc-test-ns-pool-1")
+			testservice.PreferDualStackV4First(svc1)
+			defer func() {
+				service.Delete(cs, svc1)
+			}()
+			Expect(&svc1.Status.LoadBalancer.Ingress).To(HaveLen(1))
 		})
 	})
 })
