@@ -1,4 +1,4 @@
-log file /etc/frr/frr.log informational
+log file /etc/frr/frr.log 
 log timestamp precision 3
 hostname dummyhostname
 ip nht resolve-via-default
@@ -23,7 +23,7 @@ router bgp 102
   bgp graceful-restart preserve-fw-state
 
   bgp router-id 10.1.1.254
-  neighbor 10.2.2.254 remote-as 100
+  neighbor 10.2.2.254 remote-as internal
   neighbor 10.2.2.254 port 179
   
   neighbor 10.2.2.254 update-source 10.1.1.254

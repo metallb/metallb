@@ -30,7 +30,7 @@ func ValidateL2(svc *corev1.Service) error {
 }
 
 func ValidateDesiredLB(svc *corev1.Service) {
-	desiredLbIPs := svc.Annotations["metallb.universe.tf/loadBalancerIPs"]
+	desiredLbIPs := svc.Annotations["metallb.io/loadBalancerIPs"]
 	if desiredLbIPs == "" {
 		return
 	}
