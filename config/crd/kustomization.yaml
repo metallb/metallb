@@ -14,19 +14,3 @@ patches:
   target:
     kind: CustomResourceDefinition
     name: bgppeers.metallb.io
-# appends start and stop conversion markers for sed command to post-process
-# post-processing changes that into helm templates
-- patch: |-
-    - op: add
-      path: "/spec/conversion/a-metallb-internal-start"
-      value: metallb-conversion-start
-  target:
-    kind: CustomResourceDefinition
-    name: bgppeers.metallb.io
-- patch: |-
-    - op: add
-      path: "/spec/conversion/z-metallb-internal-stop"
-      value: metallb-conversion-stop
-  target:
-    kind: CustomResourceDefinition
-    name: bgppeers.metallb.io

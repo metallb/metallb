@@ -353,7 +353,6 @@ metadata:
   name: bgppeers.metallb.io
 spec:
   conversion:
-    a-metallb-internal-start: metallb-conversion-start
     strategy: Webhook
     webhook:
       clientConfig:
@@ -365,7 +364,6 @@ spec:
       conversionReviewVersions:
       - v1beta1
       - v1beta2
-    z-metallb-internal-stop: metallb-conversion-stop
   group: metallb.io
   names:
     kind: BGPPeer
