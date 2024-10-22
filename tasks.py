@@ -30,6 +30,7 @@ controller_gen_version = "v0.16.3"
 build_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build")
 kubectl_path = os.path.join(build_path, "kubectl")
 kind_path = os.path.join(build_path, "kind")
+ginkgo_path = os.path.join(build_path, "bin", "ginkgo")
 controller_gen_path = os.path.join(build_path, "bin", "controller-gen")
 kubectl_version = "v1.31.0"
 kind_version = "v0.24.0"
@@ -1228,6 +1229,7 @@ def e2etest(
     """Run E2E tests against development cluster."""
     fetch_kubectl()
     fetch_kind()
+    fetch_ginkgo()
 
     if skip_docker:
         opt_skip_docker = "--skip-docker"
@@ -1313,8 +1315,9 @@ def e2etest(
         external_frr_image = "--frr-image=" + (external_frr_image)
     testrun = run(
         "cd `git rev-parse --show-toplevel`/e2etest &&"
-        "KUBECONFIG={} ginkgo {} --junit-report={} --timeout=3h {} {} -- --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {} -bgp-mode={} -with-vrf={} {} --host-bgp-mode={} --kubectl={} --frr-k8s-namespace={}".format(
+        "KUBECONFIG={} {} {} --junit-report={} --timeout=3h {} {} -- --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {} -bgp-mode={} -with-vrf={} {} --host-bgp-mode={} --kubectl={} --frr-k8s-namespace={}".format(
             kubeconfig,
+            ginkgo_path,
             ginkgo_params,
             junit_report,
             ginkgo_focus,
@@ -1558,6 +1561,31 @@ def fetch_controller_gen():
         fetch_command,
         get_version_command,
         "Version:",
+    )
+
+
+@cache
+def fetch_ginkgo():
+    ginkgo_version = run(
+        "go list -m -f '{{.Version}}' github.com/onsi/ginkgo/v2",
+        warn=True,
+        hide="both",
+    ).stdout
+
+    print(ginkgo_version)
+    fetch_command = (
+        f"GOBIN={build_path}/bin/ GOPATH={build_path} go install github.com/onsi/ginkgo/v2/ginkgo@"
+        + ginkgo_version
+    )
+    print(fetch_command)
+    print(ginkgo_path)
+    get_version_command = f"{ginkgo_path} version"
+    fetch_dependency(
+        ginkgo_path,
+        ginkgo_version,
+        fetch_command,
+        get_version_command,
+        "Ginkgo Version ",
     )
 
 
