@@ -94,7 +94,7 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 	}
 
 	// we select the nodes with at least one matching l2 advertisement
-	forPool := c.speakersForPool(pool, nodes)
+	forPool := c.speakersForPool(l, name, pool, nodes)
 	var availableNodes []string
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
 		availableNodes = usableNodes(eps, forPool)
@@ -222,14 +222,16 @@ func poolMatchesNodeL2(pool *config.Pool, node string) bool {
 	return false
 }
 
-func (c *layer2Controller) speakersForPool(pool *config.Pool, nodes map[string]*v1.Node) map[string]bool {
+func (c *layer2Controller) speakersForPool(l log.Logger, name string, pool *config.Pool, nodes map[string]*v1.Node) map[string]bool {
 	res := map[string]bool{}
 	for s := range c.sList.UsableSpeakers() {
 		if err := k8snodes.IsNodeAvailable(nodes[s]); err != nil {
+			level.Debug(l).Log("event", "skipping should announce l2", "service", name, "reason", "speaker's node has NodeNetworkUnavailable condition")
 			continue
 		}
 
 		if !c.ignoreExcludeLB && k8snodes.IsNodeExcludedFromBalancers(nodes[s]) {
+			level.Debug(l).Log("event", "skipping should announce l2", "service", name, "reason", "speaker's node has labeled 'node.kubernetes.io/exclude-from-external-load-balancers'")
 			continue
 		}
 

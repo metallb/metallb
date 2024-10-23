@@ -1340,7 +1340,7 @@ def e2etest(
     )
 
     if export != None:
-        run("{} export logs {}".format(kind_path, export))
+        run("{} export logs {}".format(kind_path, export), warn=True)
 
     if testrun.failed:
         raise Exit(message="E2E tests failed", code=testrun.return_code)

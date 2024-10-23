@@ -96,6 +96,8 @@ type Peer struct {
 	MyASN uint32
 	// AS number to expect from the remote end of the session.
 	ASN uint32
+	// Detect the AS number to use for the remote end of the session.
+	DynamicASN string
 	// Address to dial when establishing the session.
 	Addr net.IP
 	// Source address to use when establishing the session.
@@ -103,9 +105,9 @@ type Peer struct {
 	// Port to dial when establishing the session.
 	Port uint16
 	// Requested BGP hold time, per RFC4271.
-	HoldTime time.Duration
+	HoldTime *time.Duration
 	// Requested BGP keepalive time, per RFC4271.
-	KeepaliveTime time.Duration
+	KeepaliveTime *time.Duration
 	// Requested BGP connect time, controls how long BGP waits between connection attempts to a neighbor.
 	ConnectTime *time.Duration
 	// BGP router ID to advertise to the peer
@@ -375,8 +377,14 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 	if p.Spec.MyASN == 0 {
 		return nil, errors.New("missing local ASN")
 	}
-	if p.Spec.ASN == 0 {
-		return nil, errors.New("missing peer ASN")
+	if p.Spec.ASN == 0 && p.Spec.DynamicASN == "" {
+		return nil, errors.New("missing peer ASN and dynamicASN")
+	}
+	if p.Spec.ASN != 0 && p.Spec.DynamicASN != "" {
+		return nil, errors.New("both peer ASN and dynamicASN specified")
+	}
+	if p.Spec.DynamicASN != "" && p.Spec.DynamicASN != metallbv1beta2.InternalASNMode && p.Spec.DynamicASN != metallbv1beta2.ExternalASNMode {
+		return nil, fmt.Errorf("invalid dynamicASN %s", p.Spec.DynamicASN)
 	}
 	if p.Spec.ASN == p.Spec.MyASN && p.Spec.EBGPMultiHop {
 		return nil, errors.New("invalid ebgp-multihop parameter set for an ibgp peer")
@@ -385,23 +393,10 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 	if ip == nil {
 		return nil, fmt.Errorf("invalid BGPPeer address %q", p.Spec.Address)
 	}
-	holdTime := p.Spec.HoldTime.Duration
-	if holdTime == 0 {
-		holdTime = 90 * time.Second
-	}
-	err := validateHoldTime(holdTime)
-	if err != nil {
-		return nil, err
-	}
-	keepaliveTime := p.Spec.KeepaliveTime.Duration
-	if keepaliveTime == 0 {
-		keepaliveTime = holdTime / 3
-	}
 
-	// keepalive must be lower than holdtime
-	if keepaliveTime > holdTime {
-		return nil, fmt.Errorf("invalid keepaliveTime %q must be smaller than holdtime %q",
-			keepaliveTime, holdTime)
+	holdTime, keepaliveTime, err := parseTimers(p.Spec.HoldTime, p.Spec.KeepaliveTime)
+	if err != nil {
+		return nil, fmt.Errorf("invalid BGPPeer timers: %w", err)
 	}
 
 	// Ideally we would set a default RouterID here, instead of having
@@ -458,6 +453,7 @@ func peerFromCR(p metallbv1beta2.BGPPeer, passwordSecrets map[string]corev1.Secr
 		Name:                  p.Name,
 		MyASN:                 p.Spec.MyASN,
 		ASN:                   p.Spec.ASN,
+		DynamicASN:            string(p.Spec.DynamicASN),
 		Addr:                  ip,
 		SrcAddr:               src,
 		Port:                  p.Spec.Port,
@@ -820,12 +816,36 @@ func getCommunityValue(communityString string, communities map[string]community.
 	return c, nil
 }
 
-func validateHoldTime(ht time.Duration) error {
-	rounded := time.Duration(int(ht.Seconds())) * time.Second
-	if rounded != 0 && rounded < 3*time.Second {
-		return fmt.Errorf("invalid hold time %q: must be 0 or >=3s", ht)
+func parseTimers(ht, ka *metav1.Duration) (*time.Duration, *time.Duration, error) {
+	if ht == nil && ka == nil {
+		return nil, nil, nil
 	}
-	return nil
+
+	var holdTime *time.Duration
+	var keepaliveTime *time.Duration
+	if ht != nil && ka != nil {
+		holdTime = &ht.Duration
+		keepaliveTime = &ka.Duration
+	}
+	if ht != nil && ka == nil {
+		holdTime = &ht.Duration
+		keepaliveTime = ptr.To(ht.Duration / 3)
+	}
+	if ht == nil && ka != nil {
+		holdTime = ptr.To(ka.Duration * 3)
+		keepaliveTime = &ka.Duration
+	}
+
+	rounded := time.Duration(int(holdTime.Seconds())) * time.Second
+	if rounded != 0 && rounded < 3*time.Second {
+		return nil, nil, fmt.Errorf("invalid hold time %q: must be 0 or >=3s", ht)
+	}
+
+	if *keepaliveTime > *holdTime {
+		return nil, nil, fmt.Errorf("invalid keepaliveTime %q, must be lower than holdTime %q", ka, ht)
+	}
+
+	return holdTime, keepaliveTime, nil
 }
 
 func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {

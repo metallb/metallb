@@ -238,6 +238,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 				MyASN:           p.cfg.MyASN,
 				RouterID:        routerID,
 				PeerASN:         p.cfg.ASN,
+				DynamicASN:      p.cfg.DynamicASN,
 				HoldTime:        p.cfg.HoldTime,
 				KeepAliveTime:   p.cfg.KeepaliveTime,
 				ConnectTime:     p.cfg.ConnectTime,
