@@ -1471,7 +1471,7 @@ def _align_helm_crds(source, output):
 
 
 def _add_crd_helm_templates(output):
-    tmpfile = "charts/metallb/charts/crds/templates/crdstmp.yaml"
+    tmpfile = "/tmp/crdstmp.yaml"
     run("sed -i 's/metallb-system/{{{{ .Release.Namespace }}}}/g' {}".format(output))
     run(
         """
