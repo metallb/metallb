@@ -1339,7 +1339,8 @@ def e2etest(
             kubectl_path,
             frr_k8s_namespace,
         ),
-        warn="True",
+        warn=True,
+        echo=True,
     )
 
     if export != None:
