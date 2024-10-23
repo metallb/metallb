@@ -31,8 +31,10 @@ build_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "build")
 kubectl_path = os.path.join(build_path, "kubectl")
 kind_path = os.path.join(build_path, "kind")
 controller_gen_path = os.path.join(build_path, "bin", "controller-gen")
+hugo_path = os.path.join(build_path, "hugo")
 kubectl_version = "v1.31.0"
 kind_version = "v0.24.0"
+hugo_version = "v0.124.1"
 
 
 def _check_architectures(architectures):
@@ -1177,6 +1179,18 @@ def helmdocs(ctx, env="container"):
         raise Exit(message="Unsupported helm-docs environment: {}".format(env))
 
 
+@task(help={
+    "port": "Specify the port that hugo binds to. Default 1313."
+})
+def previewsite(ctx, port=1313):
+    """Preview website content.
+    """
+    fetch_hugo()
+
+    cmd = "{} -s website -p {} serve".format(hugo_path, port)
+    run(cmd)
+
+
 @task(
     help={
         "name": "name of the kind cluster to test (only kind uses).",
@@ -1559,6 +1573,30 @@ def fetch_controller_gen():
         get_version_command,
         "Version:",
     )
+
+
+@cache
+def fetch_hugo():
+    res = run("go env GOOS", hide="out")
+    if not res.ok:
+        raise Exit(message="could not get os version")
+    os = res.stdout.rstrip()
+    res = run("go env GOARCH", hide="out")
+    if not res.ok:
+        raise Exit(message="could not get architecture")
+    architecture = res.stdout.rstrip()
+
+    # Darwin builds for hugo are platform independend
+    if os == "darwin":
+        architecture = "universal"
+
+    archive = "hugo_{}_{}-{}.tar.gz".format(hugo_version.removeprefix("v"), os, architecture)
+    # The Hugo binary cannot be downloaded directly. We need to extract the tar.gz.
+    curl_command = "curl -L https://github.com/gohugoio/hugo/releases/download/{}/{} | tar -zxv -C {} hugo".format(
+        hugo_version, archive, build_path)
+    # Hugo includes the checksum in its version string.
+    get_version_command = f"{hugo_path} version | cut -d- -f1"
+    fetch_dependency(hugo_path, hugo_version, curl_command, get_version_command, "hugo")
 
 
 def fetch_dependency(
