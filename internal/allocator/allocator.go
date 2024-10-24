@@ -54,6 +54,8 @@ type alloc struct {
 	key
 }
 
+type PoolIps map[ipfamily.Family]net.IP
+
 // New returns an Allocator managing no pools.
 func New() *Allocator {
 	return &Allocator{
@@ -245,12 +247,77 @@ func (a *Allocator) Unassign(svc string) {
 	stats.ipv6PoolActive.WithLabelValues(al.pool).Set(float64(len(a.poolIPV6InUse[al.pool])))
 }
 
+// getFreeIPsFromPool determines, with best effort, an ipv4 and an ipv6 available from the provided pool.
+func (a *Allocator) getFreeIPsFromPool(
+	pool *config.Pool,
+	svcKey string,
+	ports []Port,
+	sharingKey,
+	backendKey string,
+) PoolIps {
+	poolIps := make(PoolIps)
+	for _, cidr := range pool.CIDR {
+		cidrIPFamily := ipfamily.ForCIDR(cidr)
+		if _, ok := poolIps[cidrIPFamily]; ok {
+			continue
+		}
+		ip := a.getIPFromCIDR(cidr, pool.AvoidBuggyIPs, svcKey, ports, sharingKey, backendKey)
+		if ip != nil {
+			poolIps[cidrIPFamily] = ip
+		}
+	}
+	return poolIps
+}
+
+// SelectIPsForFamily returns a slice of IPs from the given poolIPs, which are suitable for the
+// given serviceIPFamily.
+func (a *Allocator) SelectIPsForFamily(
+	poolIps PoolIps,
+	serviceIPFamily ipfamily.Family,
+) ([]net.IP, error) {
+	if ip, ok := poolIps[serviceIPFamily]; ok {
+		return []net.IP{ip}, nil
+	}
+	ipv4, hasIPv4 := poolIps[ipfamily.IPv4]
+	ipv6, hasIPv6 := poolIps[ipfamily.IPv6]
+
+	switch serviceIPFamily {
+	case ipfamily.RequireDualStack:
+		if hasIPv4 && hasIPv6 {
+			return []net.IP{ipv4, ipv6}, nil
+		}
+	case ipfamily.PreferDualStack:
+		if hasIPv4 && hasIPv6 {
+			return []net.IP{ipv4, ipv6}, nil
+		}
+		if hasIPv4 {
+			return []net.IP{ipv4}, nil
+		}
+		if hasIPv6 {
+			return []net.IP{ipv6}, nil
+		}
+	}
+	return nil, fmt.Errorf("no available IPs in pool for %s IPFamily", serviceIPFamily)
+}
+
 // AllocateFromPool assigns an available IP from pool to service.
-func (a *Allocator) AllocateFromPool(svcKey string, svc *v1.Service, serviceIPFamily ipfamily.Family, poolName string, ports []Port, sharingKey, backendKey string) ([]net.IP, error) {
+func (a *Allocator) AllocateFromPool(
+	svcKey string,
+	svc *v1.Service,
+	serviceIPFamily ipfamily.Family,
+	poolName string,
+	ports []Port,
+	sharingKey,
+	backendKey string,
+) ([]net.IP, error) {
 	if alloc := a.allocated[svcKey]; alloc != nil {
 		// Handle the case where the svc has already been assigned an IP but from the wrong family.
 		// This "should-not-happen" since the "serviceIPFamily" is an immutable field in services.
-		allocIPsFamily, err := ipfamily.ForAddressesIPs(alloc.ips)
+		ipFamilyPolicy := v1.IPFamilyPolicySingleStack
+		if svc.Spec.IPFamilyPolicy != nil {
+			ipFamilyPolicy = *(svc.Spec.IPFamilyPolicy)
+		}
+		allocIPsFamily, err := ipfamily.ForAddressesIPs(alloc.ips, ipFamilyPolicy)
 		if err != nil {
 			return nil, err
 		}
@@ -262,48 +329,116 @@ func (a *Allocator) AllocateFromPool(svcKey string, svc *v1.Service, serviceIPFa
 		}
 		return alloc.ips, nil
 	}
+	return a.AllocateFromPoolForFamily(svcKey, svc, serviceIPFamily, poolName, ports, sharingKey, backendKey)
+}
 
+// AllocateFromPoolForFamily assigns an available IP from pool to service, with a specified ipfamily.
+func (a *Allocator) AllocateFromPoolForFamily(
+	svcKey string,
+	svc *v1.Service,
+	serviceIPFamily ipfamily.Family,
+	poolName string,
+	ports []Port,
+	sharingKey,
+	backendKey string,
+) ([]net.IP, error) {
 	pool := a.pools.ByName[poolName]
 	if pool == nil {
 		return nil, fmt.Errorf("unknown pool %q", poolName)
 	}
 
-	ips := []net.IP{}
-	ipfamilySel := make(map[ipfamily.Family]bool)
+	poolIps := a.getFreeIPsFromPool(pool, svcKey, ports, sharingKey, backendKey)
 
-	switch serviceIPFamily {
-	case ipfamily.RequireDualStack:
-		ipfamilySel[ipfamily.IPv4], ipfamilySel[ipfamily.IPv6] = true, true
-	default:
-		ipfamilySel[serviceIPFamily] = true
-	}
-
-	for _, cidr := range pool.CIDR {
-		cidrIPFamily := ipfamily.ForCIDR(cidr)
-		if _, ok := ipfamilySel[cidrIPFamily]; !ok {
-			// Not the right ip-family
-			continue
-		}
-		ip := a.getIPFromCIDR(cidr, pool.AvoidBuggyIPs, svcKey, ports, sharingKey, backendKey)
-		if ip != nil {
-			ips = append(ips, ip)
-			delete(ipfamilySel, cidrIPFamily)
-		}
-	}
-
-	if len(ipfamilySel) > 0 {
-		// Woops, run out of IPs :( Fail.
-		return nil, fmt.Errorf("no available IPs in pool %q for %s IPFamily", poolName, serviceIPFamily)
-	}
-	err := a.Assign(svcKey, svc, ips, ports, sharingKey, backendKey)
+	ips, err := a.SelectIPsForFamily(poolIps, serviceIPFamily)
 	if err != nil {
 		return nil, err
 	}
+
+	err = a.Assign(svcKey, svc, ips, ports, sharingKey, backendKey)
+	if err != nil {
+		return nil, err
+	}
+
 	return ips, nil
 }
 
+// SelectPoolIPsForService returns the PoolIps correspoding with the most suitable pool for a serviceIPFamily.
+func (a *Allocator) SelectPoolIPsForService(
+	pools []*config.Pool,
+	svcKey string,
+	svc *v1.Service,
+	serviceIPFamily ipfamily.Family,
+	ports []Port,
+	sharingKey, backendKey string,
+) (PoolIps, error) {
+	var primaryIPPoolCandidates, secondaryIPPoolCandidates []PoolIps
+	var primaryIPFamily, secondaryIPFamily ipfamily.Family
+	// If there's no specification of preferred ip family, ipv4 has higher priority.
+	if len(svc.Spec.IPFamilies) == 0 || svc.Spec.IPFamilies[0] == v1.IPv4Protocol {
+		primaryIPFamily = ipfamily.IPv4
+		secondaryIPFamily = ipfamily.IPv6
+	} else {
+		primaryIPFamily = ipfamily.IPv6
+		secondaryIPFamily = ipfamily.IPv4
+	}
+	for _, pool := range pools {
+		poolIps := a.getFreeIPsFromPool(pool, svcKey, ports, sharingKey, backendKey)
+		if _, ok := poolIps[serviceIPFamily]; ok {
+			return poolIps, nil
+		}
+
+		_, hasPrimaryIP := poolIps[primaryIPFamily]
+		_, hasSecondaryIP := poolIps[secondaryIPFamily]
+
+		if hasPrimaryIP && hasSecondaryIP {
+			return poolIps, nil
+		}
+
+		if serviceIPFamily != ipfamily.PreferDualStack {
+			continue
+		}
+		if hasPrimaryIP {
+			primaryIPPoolCandidates = append(primaryIPPoolCandidates, poolIps)
+		} else if hasSecondaryIP {
+			secondaryIPPoolCandidates = append(secondaryIPPoolCandidates, poolIps)
+		}
+	}
+	if len(primaryIPPoolCandidates) > 0 {
+		return primaryIPPoolCandidates[0], nil
+	} else if len(secondaryIPPoolCandidates) > 0 {
+		return secondaryIPPoolCandidates[0], nil
+	}
+	return nil, fmt.Errorf("no suitable pool for %s IPFamily", serviceIPFamily)
+}
+
+// AllocateBestPool picks the most suitable pool and tries to allocate its ips.
+func (a *Allocator) AllocateBestPool(
+	pools []*config.Pool,
+	svcKey string,
+	svc *v1.Service,
+	serviceIPFamily ipfamily.Family,
+	ports []Port,
+	sharingKey, backendKey string,
+) ([]net.IP, error) {
+	poolIps, err := a.SelectPoolIPsForService(pools, svcKey, svc, serviceIPFamily, ports, sharingKey, backendKey)
+	if err == nil {
+		if ips, err := a.SelectIPsForFamily(poolIps, serviceIPFamily); err == nil {
+			if assignErr := a.Assign(svcKey, svc, ips, ports, sharingKey, backendKey); assignErr == nil {
+				return ips, nil
+			}
+		}
+	}
+	return nil, errors.New("no available IPs")
+}
+
 // Allocate assigns any available and assignable IP to service.
-func (a *Allocator) Allocate(svcKey string, svc *v1.Service, serviceIPFamily ipfamily.Family, ports []Port, sharingKey, backendKey string) ([]net.IP, error) {
+func (a *Allocator) Allocate(
+	svcKey string,
+	svc *v1.Service,
+	serviceIPFamily ipfamily.Family,
+	ports []Port,
+	sharingKey, backendKey string,
+) ([]net.IP, error) {
 	if alloc := a.allocated[svcKey]; alloc != nil {
 		if err := a.Assign(svcKey, svc, alloc.ips, ports, sharingKey, backendKey); err != nil {
 			return nil, err
@@ -311,18 +446,20 @@ func (a *Allocator) Allocate(svcKey string, svc *v1.Service, serviceIPFamily ipf
 		return alloc.ips, nil
 	}
 	pinnedPools := a.pinnedPoolsForService(svc)
-	for _, pool := range pinnedPools {
-		if ips, err := a.AllocateFromPool(svcKey, svc, serviceIPFamily, pool.Name, ports, sharingKey, backendKey); err == nil {
-			return ips, nil
-		}
+	ips, err := a.AllocateBestPool(pinnedPools, svcKey, svc, serviceIPFamily, ports, sharingKey, backendKey)
+	if err == nil {
+		return ips, nil
 	}
+	allPools := []*config.Pool{}
 	for _, pool := range a.pools.ByName {
 		if !pool.AutoAssign || pool.ServiceAllocations != nil {
 			continue
 		}
-		if ips, err := a.AllocateFromPool(svcKey, svc, serviceIPFamily, pool.Name, ports, sharingKey, backendKey); err == nil {
-			return ips, nil
-		}
+		allPools = append(allPools, pool)
+	}
+	ips, err = a.AllocateBestPool(allPools, svcKey, svc, serviceIPFamily, ports, sharingKey, backendKey)
+	if err == nil {
+		return ips, nil
 	}
 
 	return nil, errors.New("no available IPs")

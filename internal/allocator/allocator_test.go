@@ -20,20 +20,39 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-var svc = &v1.Service{
-	ObjectMeta: metav1.ObjectMeta{
-		Name: "test-lb-service",
-	},
-	Spec: v1.ServiceSpec{
-		Type: v1.ServiceTypeLoadBalancer,
-		Ports: []v1.ServicePort{
-			{
-				Protocol: v1.ProtocolTCP,
-				Port:     8080,
+var (
+	ipFamilyPolicyRequireDualStack = v1.IPFamilyPolicyRequireDualStack
+	svc                            = &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-lb-service",
+		},
+		Spec: v1.ServiceSpec{
+			Type: v1.ServiceTypeLoadBalancer,
+			Ports: []v1.ServicePort{
+				{
+					Protocol: v1.ProtocolTCP,
+					Port:     8080,
+				},
 			},
 		},
-	},
-}
+	}
+
+	svcRequireDualStack = &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "test-lb-service-require-dualstack",
+		},
+		Spec: v1.ServiceSpec{
+			IPFamilyPolicy: &ipFamilyPolicyRequireDualStack,
+			Type:           v1.ServiceTypeLoadBalancer,
+			Ports: []v1.ServicePort{
+				{
+					Protocol: v1.ProtocolTCP,
+					Port:     8080,
+				},
+			},
+		},
+	}
+)
 
 func selector(s string) labels.Selector {
 	ret, err := labels.Parse(s)
@@ -987,72 +1006,72 @@ func TestPoolAllocation(t *testing.T) {
 		{
 			desc:     "s1 gets dual-stack IPs",
 			svcKey:   "s1",
-			svc:      svc,
+			svc:      svcRequireDualStack,
 			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			desc:     "s2 gets dual-stack IPs",
 			svcKey:   "s2",
-			svc:      svc,
+			svc:      svcRequireDualStack,
 			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			desc:     "s3 gets dual-stack IPs",
 			svcKey:   "s3",
-			svc:      svc,
+			svc:      svcRequireDualStack,
 			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			desc:     "s4 gets dual-stack IPs",
 			svcKey:   "s4",
-			svc:      svc,
+			svc:      svcRequireDualStack,
 			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			desc:     "s5 can't get dual-stack IPs",
 			svcKey:   "s5",
-			svc:      svc,
+			svc:      svcRequireDualStack,
 			ipFamily: ipfamily.RequireDualStack,
 			wantErr:  true,
 		},
 		{
 			desc:     "s6 can't get dual-stack IPs",
 			svcKey:   "s6",
-			svc:      svc,
+			svc:      svcRequireDualStack,
 			ipFamily: ipfamily.RequireDualStack,
 			wantErr:  true,
 		},
 		{
 			desc:     "s1 releases its dual-stack IPs",
 			svcKey:   "s1",
-			svc:      svc,
+			svc:      svcRequireDualStack,
 			unassign: true,
 			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			desc:     "s5 can now grab s1's former dual-stack IPs",
 			svcKey:   "s5",
-			svc:      svc,
+			svc:      svcRequireDualStack,
 			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			desc:     "s6 still can't get dual-stack IPs",
 			svcKey:   "s6",
-			svc:      svc,
+			svc:      svcRequireDualStack,
 			ipFamily: ipfamily.RequireDualStack,
 			wantErr:  true,
 		},
 		{
 			desc:     "s5 unassigns in prep for enabling dual-stack IPs sharing",
 			svcKey:   "s5",
-			svc:      svc,
+			svc:      svcRequireDualStack,
 			unassign: true,
 			ipFamily: ipfamily.RequireDualStack,
 		},
 		{
 			desc:       "s5 enables dual-stack IP sharing",
 			svcKey:     "s5",
-			svc:        svc,
+			svc:        svcRequireDualStack,
 			ports:      ports("tcp/80"),
 			sharingKey: "share",
 			ipFamily:   ipfamily.RequireDualStack,
@@ -1060,7 +1079,7 @@ func TestPoolAllocation(t *testing.T) {
 		{
 			desc:       "s6 can get an dual-stack IPs now, with sharing",
 			svcKey:     "s6",
-			svc:        svc,
+			svc:        svcRequireDualStack,
 			ports:      ports("tcp/443"),
 			sharingKey: "share",
 			ipFamily:   ipfamily.RequireDualStack,

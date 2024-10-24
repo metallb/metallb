@@ -78,15 +78,22 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	// none or a malformed one, nuke all controlled state so that we
 	// start converging from a clean slate.
 	for i := range svc.Status.LoadBalancer.Ingress {
-		ip := svc.Status.LoadBalancer.Ingress[i].IP
-		if len(ip) != 0 {
-			lbIPs = append(lbIPs, net.ParseIP(ip))
+		ipStr := svc.Status.LoadBalancer.Ingress[i].IP
+		if len(ipStr) != 0 {
+			ip := net.ParseIP(ipStr)
+			if ip != nil {
+				lbIPs = append(lbIPs, ip)
+			}
 		}
+	}
+	familyPolicy := v1.IPFamilyPolicySingleStack
+	if svc.Spec.IPFamilyPolicy != nil {
+		familyPolicy = *(svc.Spec.IPFamilyPolicy)
 	}
 	if len(lbIPs) == 0 {
 		c.clearServiceState(key, svc)
 	} else {
-		lbIPsIPFamily, err := ipfamily.ForAddressesIPs(lbIPs)
+		lbIPsIPFamily, err := ipfamily.ForAddressesIPs(lbIPs, familyPolicy)
 		if err != nil {
 			level.Error(l).Log("event", "clearAssignment", "reason", "nolbIPsIPFamily", "msg", "Failed to retrieve lbIPs family")
 			c.client.Errorf(svc, "nolbIPsIPFamily", "Failed to retrieve LBIPs IPFamily for %q: %s", lbIPs, err)
@@ -144,6 +151,24 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		}
 	}
 
+	// If svc currently has 1 ip and policy PreferDualStack, try assigning ip from the missing family and same pool
+	if len(lbIPs) == 1 && familyPolicy == v1.IPFamilyPolicyPreferDualStack {
+		level.Info(l).Log("event", "tryAssignAdditionalIP", "msg", "familyPolicy is PreferDualStack, trying to assign additional ip")
+		existingFamily := ipfamily.ForAddress(lbIPs[0])
+		additionalFamily := ipfamily.IPv4
+		if existingFamily == ipfamily.IPv4 {
+			additionalFamily = ipfamily.IPv6
+		}
+		currentPool := c.ips.Pool(key)
+		newIP, err := c.ips.AllocateFromPoolForFamily(key, svc, additionalFamily, currentPool, k8salloc.Ports(svc), SharingKey(svc), k8salloc.BackendKey(svc))
+		if err != nil {
+			c.client.Errorf(svc, "AdditionalAssignFailed", "invalid requested loadbalancer IP: %s", err)
+		} else {
+			lbIPs = append(lbIPs, newIP...)
+			level.Info(l).Log("event", "ipAllocated", "ip", newIP, "msg", "Additional IP address assigned by controller")
+			c.client.Infof(svc, "IPAllocated", "Assigned additional IP %q", newIP)
+		}
+	}
 	// If lbIP is still nil at this point, try to allocate.
 	if len(lbIPs) == 0 {
 		lbIPs, err = c.allocateIPs(key, svc)
@@ -253,6 +278,10 @@ func (c *controller) isServiceAllocated(key string) bool {
 func getDesiredLbIPs(svc *v1.Service) ([]net.IP, ipfamily.Family, error) {
 	var desiredLbIPs []net.IP
 	desiredLbIPsStr := valueForAnnotation(svc.Annotations, AnnotationLoadBalancerIPs, DeprecatedAnnotationLoadBalancerIPs)
+	familyPolicy := v1.IPFamilyPolicySingleStack
+	if svc.Spec.IPFamilyPolicy != nil {
+		familyPolicy = *(svc.Spec.IPFamilyPolicy)
+	}
 
 	if desiredLbIPsStr == "" && svc.Spec.LoadBalancerIP == "" {
 		return nil, "", nil
@@ -269,7 +298,7 @@ func getDesiredLbIPs(svc *v1.Service) ([]net.IP, ipfamily.Family, error) {
 			}
 			desiredLbIPs = append(desiredLbIPs, desiredLbIP)
 		}
-		desiredLbIPFamily, err := ipfamily.ForAddressesIPs(desiredLbIPs)
+		desiredLbIPFamily, err := ipfamily.ForAddressesIPs(desiredLbIPs, familyPolicy)
 		if err != nil {
 			return nil, "", err
 		}
@@ -281,7 +310,10 @@ func getDesiredLbIPs(svc *v1.Service) ([]net.IP, ipfamily.Family, error) {
 		return nil, "", fmt.Errorf("invalid spec.loadBalancerIP %q", svc.Spec.LoadBalancerIP)
 	}
 	desiredLbIPs = append(desiredLbIPs, desiredLbIP)
-	desiredLbIPFamily := ipfamily.ForAddress(desiredLbIP)
+	desiredLbIPFamily, err := ipfamily.ForAddressesIPs(desiredLbIPs, familyPolicy)
+	if err != nil {
+		return nil, "", err
+	}
 
 	return desiredLbIPs, desiredLbIPFamily, nil
 }
