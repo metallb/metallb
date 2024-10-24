@@ -630,7 +630,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					Name: "bar",
 				},
 			}, ipfamily.IPv6, []string{v6PoolAddresses}),
-		ginkgo.Entry("DUALSTACK - full params",
+		ginkgo.Entry("REQUIRE-DUALSTACK - full params",
 			metallbv1beta1.BFDProfile{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "full1",
@@ -643,7 +643,7 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					PassiveMode:      ptr.To(false),
 					MinimumTTL:       ptr.To(uint32(254)),
 				},
-			}, ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses}),
+			}, ipfamily.RequireDualStack, []string{v4PoolAddresses, v6PoolAddresses}),
 	)
 
 	ginkgo.It("FRR metrics related to config should be exposed", func() {
