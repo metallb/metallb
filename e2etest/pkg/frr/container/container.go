@@ -21,6 +21,8 @@ import (
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -28,6 +30,7 @@ const (
 	frrConfigDir = "config/frr"
 	// Host network name.
 	hostNetwork = "host"
+	noNetwork   = "none"
 	// FRR container mount destination path.
 	frrMountPath = "/etc/frr"
 )
@@ -69,7 +72,12 @@ func Create(configs map[string]Config) ([]*FRR, error) {
 				"bfdd":     true,
 			}
 			c, err := start(conf)
+			if err != nil {
+				return err
+			}
+
 			if c != nil {
+				// this wait needs refactor
 				err = wait.PollImmediate(time.Second, 5*time.Minute, func() (bool, error) {
 					daemons, err := frr.Daemons(c)
 					if err != nil {
@@ -198,7 +206,10 @@ func configureContainer(cfg Config, configDir string) (*FRR, error) {
 		Network:        cfg.Network,
 	}
 
-	if cfg.Network == hostNetwork {
+	switch cfg.Network {
+	case noNetwork:
+		frr.RouterConfig.RouterID = "1.1.1.1"
+	case hostNetwork:
 		if net.ParseIP(cfg.HostIPv4) == nil {
 			return nil, errors.New("Invalid hostIPv4")
 		}
@@ -208,15 +219,14 @@ func configureContainer(cfg Config, configDir string) (*FRR, error) {
 
 		frr.Ipv4 = cfg.HostIPv4
 		frr.Ipv6 = cfg.HostIPv6
-	} else {
-		err := frr.updateIPS()
-		if err != nil {
+
+		frr.RouterConfig.RouterID = frr.Ipv4
+	default:
+		if err := frr.updateIPS(); err != nil {
 			return frr, err
 		}
+		frr.RouterConfig.RouterID = frr.Ipv4
 	}
-
-	// setting routerid after calculating ips
-	frr.RouterConfig.RouterID = frr.Ipv4
 
 	err := frr.updateVolumePermissions()
 	if err != nil {
@@ -364,4 +374,31 @@ func containerIsRunning(containerName string) error {
 	}
 
 	return nil
+}
+
+func SetupP2PPeer(frrImage string, node corev1.Node) (*FRR, error) {
+	c := Config{
+		Name:    fmt.Sprintf("unnumbered-p2p-%d", time.Now().Unix()),
+		Image:   frrImage,
+		Network: "none",
+		Router: frrconfig.RouterConfig{
+			ASN:     650001,
+			BGPPort: 179,
+		},
+	}
+
+	peers, err := Create(map[string]Config{"peer": c})
+	if err != nil {
+		return nil, fmt.Errorf("create container failed - %w", err)
+	}
+
+	peer := peers[0]
+
+	if err := frrconfig.WirePeer(peer.Name, node); err != nil {
+		return nil, fmt.Errorf("wire the peer failed - %w", err)
+	}
+	if err := peer.UpdateBGPConfigFile(frrconfig.UnnumberedPeerFRRConfig); err != nil {
+		return nil, err
+	}
+	return peer, nil
 }

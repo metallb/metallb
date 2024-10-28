@@ -197,9 +197,9 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 	res := make([]*Neighbor, 0)
 	for k, n := range toParse {
 		ip := net.ParseIP(k)
-		if ip == nil {
-			return nil, fmt.Errorf("failed to parse %s as ip", ip)
-		}
+		// if ip == nil {
+		// 	return nil, fmt.Errorf("failed to parse %s as ip", ip)
+		// }
 		connected := true
 		if n.BgpState != bgpConnected {
 			connected = false
