@@ -78,7 +78,6 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			ns.Labels[admissionapi.EnforceLevelLabel] = string(admissionapi.LevelPrivileged)
 		})
 		Expect(err).NotTo(HaveOccurred())
-
 	})
 
 	ginkgo.Context("IPV4 Assignment", func() {
@@ -166,6 +165,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 					},
 				},
 			}
+			ginkgo.By("Updating the configuration with the initial pool")
 			err := ConfigUpdater.Update(resources)
 			Expect(err).NotTo(HaveOccurred())
 
@@ -264,7 +264,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 				service.Delete(cs, svc1)
 			}()
 
-			ginkgo.By("validate LoadBalancer IP is allocated from pool1")
+			ginkgo.By("Validating LoadBalancer IP is allocated from pool1")
 			err := config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool1}, jigservice.GetIngressPoint(
 				&svc1.Status.LoadBalancer.Ingress[0]))
 			Expect(err).NotTo(HaveOccurred())
@@ -400,8 +400,10 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 					Addresses: []string{
 						"192.168.10.0/32",
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 10,
-						NamespaceSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"foo1": "bar1", "foo2": "bar2"}}}},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{
+						Priority:           10,
+						NamespaceSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"foo1": "bar1", "foo2": "bar2"}}},
+					},
 				},
 			}
 			namespacePoolNoPriority := metallbv1beta1.IPAddressPool{
@@ -453,8 +455,10 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 					Addresses: []string{
 						"192.168.5.0/32",
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 20,
-						ServiceSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"test": "e2e"}}}},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{
+						Priority:         20,
+						ServiceSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"test": "e2e"}}},
+					},
 				},
 			}
 			svcLabelPoolWithHigherPriority := metallbv1beta1.IPAddressPool{
@@ -463,8 +467,10 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 					Addresses: []string{
 						"192.168.10.0/32",
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 10,
-						ServiceSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"test": "e2e"}}}},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{
+						Priority:         10,
+						ServiceSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"test": "e2e"}}},
+					},
 				},
 			}
 			namespacePoolNoPriority := metallbv1beta1.IPAddressPool{
@@ -531,8 +537,10 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 					Addresses: []string{
 						"192.168.10.0/32",
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 10,
-						ServiceSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"test": "e2e"}}}},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{
+						Priority:         10,
+						ServiceSelectors: []metav1.LabelSelector{{MatchLabels: map[string]string{"test": "e2e"}}},
+					},
 				},
 			}
 			namespacePoolNoPriority := metallbv1beta1.IPAddressPool{
@@ -675,6 +683,159 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			ginkgo.By("validate LoadBalancer IP is allocated from higher priority address pool")
 			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{secondNamespacePoolHigherPriority}, jigservice.GetIngressPoint(
 				&svc4.Status.LoadBalancer.Ingress[0]))
+			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+	ginkgo.Context("PREFER-DUALSTACK - only 1 stack available", func() {
+		const v4PoolAddresses = "192.168.10.100/32"
+		const v6PoolAddresses = "fc00:f853:0ccd:e799::/124"
+		const v4PoolAddresses2 = "192.168.11.100/32"
+		const v6PoolAddresses2 = "fc00:f853:0ccd:e800::/124"
+		IPFamilyPolicyPreferDualStack := v1.IPFamilyPolicyPreferDualStack
+		ginkgo.It("Should select dual-stack pool if available", func() {
+			poolv4 := metallbv1beta1.IPAddressPool{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ns-ipv4-pool"},
+				Spec: metallbv1beta1.IPAddressPoolSpec{
+					Addresses: []string{
+						v4PoolAddresses,
+					},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Namespaces: []string{testNamespace}},
+				},
+			}
+			poolv6 := metallbv1beta1.IPAddressPool{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ns-ipv6-pool"},
+				Spec: metallbv1beta1.IPAddressPoolSpec{
+					Addresses: []string{
+						v6PoolAddresses,
+					},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Namespaces: []string{testNamespace}},
+				},
+			}
+			poolDual := metallbv1beta1.IPAddressPool{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ns-dualstack-pool"},
+				Spec: metallbv1beta1.IPAddressPoolSpec{
+					Addresses: []string{
+						v4PoolAddresses2,
+						v6PoolAddresses2,
+					},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Namespaces: []string{testNamespace}},
+				},
+			}
+			resources := config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{poolv4, poolv6, poolDual},
+			}
+			err := ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+			ginkgo.By("Creating the service with PreferDualStack policy")
+			svc1, _ := service.CreateWithBackend(cs, testNamespace, "svc-test-ns-pool-1", func(svc *v1.Service) {
+				svc.Spec.IPFamilyPolicy = &IPFamilyPolicyPreferDualStack
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			ginkgo.By("Validating that 2 IPs are assigned to the service")
+			Eventually(func() int {
+				svc1, err = cs.CoreV1().Services(svc1.Namespace).Get(context.Background(), svc1.Name, metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				return len(svc1.Status.LoadBalancer.Ingress)
+			}, 5*time.Minute, 1*time.Second).Should(Equal(2))
+			ginkgo.By("validate LoadBalancer IPs are allocated from poolDual")
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{poolDual}, jigservice.GetIngressPoint(
+				&svc1.Status.LoadBalancer.Ingress[0]))
+			Expect(err).NotTo(HaveOccurred())
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{poolDual}, jigservice.GetIngressPoint(
+				&svc1.Status.LoadBalancer.Ingress[1]))
+			Expect(err).NotTo(HaveOccurred())
+		})
+		ginkgo.It("Should prefer primary ip family among single-stack pools", func() {
+			poolv4 := metallbv1beta1.IPAddressPool{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ns-ipv4-pool"},
+				Spec: metallbv1beta1.IPAddressPoolSpec{
+					Addresses: []string{
+						v4PoolAddresses,
+					},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Namespaces: []string{testNamespace}},
+				},
+			}
+			poolv6 := metallbv1beta1.IPAddressPool{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ns-ipv6-pool"},
+				Spec: metallbv1beta1.IPAddressPoolSpec{
+					Addresses: []string{
+						v6PoolAddresses,
+					},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Namespaces: []string{testNamespace}},
+				},
+			}
+			resources := config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{poolv4, poolv6},
+			}
+			err := ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+			ginkgo.By("Creating the service with PreferDualStack policy")
+			svc1, _ := service.CreateWithBackend(cs, testNamespace, "svc-test-ns-pool-2", func(svc *v1.Service) {
+				svc.Spec.IPFamilyPolicy = &IPFamilyPolicyPreferDualStack
+				svc.Spec.IPFamilies = []v1.IPFamily{v1.IPv6Protocol, v1.IPv4Protocol}
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			ginkgo.By("Validating that 1 IP is assigned to the service")
+			Eventually(func() int {
+				svc1, err = cs.CoreV1().Services(svc1.Namespace).Get(context.Background(), svc1.Name, metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				return len(svc1.Status.LoadBalancer.Ingress)
+			}, 5*time.Minute, 1*time.Second).Should(Equal(1))
+			ginkgo.By("validate LoadBalancer IP is allocated from ipv6 pool")
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{poolv6}, jigservice.GetIngressPoint(
+				&svc1.Status.LoadBalancer.Ingress[0]))
+			Expect(err).NotTo(HaveOccurred())
+		})
+		ginkgo.It("Additional ip should be assigned when the assigned 1-stack pool becomes dual-stack", func() {
+			pool1 := metallbv1beta1.IPAddressPool{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ns-dualstack-pool"},
+				Spec: metallbv1beta1.IPAddressPoolSpec{
+					Addresses: []string{
+						v4PoolAddresses,
+					},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Namespaces: []string{testNamespace}},
+				},
+			}
+			resources := config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{pool1},
+			}
+
+			err := ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+
+			ginkgo.By("Creating the service with PreferDualStack policy")
+			svc1, _ := service.CreateWithBackend(cs, testNamespace, "svc-test-ns-pool-3", func(svc *v1.Service) {
+				svc.Spec.IPFamilyPolicy = &IPFamilyPolicyPreferDualStack
+			})
+			Expect(err).NotTo(HaveOccurred())
+
+			ginkgo.By("Validating that 1 IP is assigned to the service")
+			Eventually(func() int {
+				svc1, err = cs.CoreV1().Services(svc1.Namespace).Get(context.Background(), svc1.Name, metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				return len(svc1.Status.LoadBalancer.Ingress)
+			}, 5*time.Minute, 1*time.Second).Should(Equal(1))
+			ginkgo.By("validate LoadBalancer IP is allocated from pool1")
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool1}, jigservice.GetIngressPoint(
+				&svc1.Status.LoadBalancer.Ingress[0]))
+			Expect(err).NotTo(HaveOccurred())
+			ginkgo.By("Updating pool1 to include both v4 and v6 addresses")
+			pool1.Spec.Addresses = []string{v4PoolAddresses, v6PoolAddresses}
+			err = ConfigUpdater.Update(config.Resources{Pools: []metallbv1beta1.IPAddressPool{pool1}})
+			Expect(err).NotTo(HaveOccurred())
+			time.Sleep(2 * time.Minute)
+
+			ginkgo.By("Validating that an additional IP is assigned to the service")
+			Eventually(func() int {
+				svc1, err = cs.CoreV1().Services(svc1.Namespace).Get(context.Background(), svc1.Name, metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				return len(svc1.Status.LoadBalancer.Ingress)
+			}, 5*time.Minute, 1*time.Second).Should(Equal(2))
+			ginkgo.By("validate second LoadBalancer IP is allocated from pool1")
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool1}, jigservice.GetIngressPoint(
+				&svc1.Status.LoadBalancer.Ingress[1]))
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})

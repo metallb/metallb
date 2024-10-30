@@ -125,6 +125,27 @@ var _ = ginkgo.Describe("BGP Multiprotocol", func() {
 					testservice.RequireDualStack(svc)
 					testservice.ForceV4(svc)
 				}),
+			ginkgo.Entry("PREFER-DUALSTACK - via both, advertising ipv4 only",
+				ipfamily.PreferDualStack, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
+					testservice.TrafficPolicyCluster(svc)
+					testservice.PreferDualStackV4First(svc)
+					testservice.ForceV4(svc)
+				}),
+			ginkgo.Entry("PREFER-DUALSTACK - ipv4 first, ipv4 Preferred",
+				ipfamily.PreferDualStack, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
+					testservice.TrafficPolicyCluster(svc)
+					testservice.PreferDualStackV4First(svc)
+				}),
+			ginkgo.Entry("PREFER-DUALSTACK - ipv4 first, ipv6 Preferred",
+				ipfamily.PreferDualStack, []string{v4PoolAddresses, v6PoolAddresses}, func(svc *corev1.Service) {
+					testservice.TrafficPolicyCluster(svc)
+					testservice.PreferDualStackV6First(svc)
+				}),
+			ginkgo.Entry("PREFER-DUALSTACK - ipv6 first",
+				ipfamily.PreferDualStack, []string{v6PoolAddresses, v4PoolAddresses}, func(svc *corev1.Service) {
+					testservice.TrafficPolicyCluster(svc)
+					testservice.PreferDualStackV6First(svc)
+				}),
 		)
 
 		ginkgo.DescribeTable("should propagate the localpreference and the communities to both ipv4 and ipv6 addresses",
