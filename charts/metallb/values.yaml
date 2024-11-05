@@ -270,6 +270,9 @@ speaker:
     enabled: true
   # ignore the exclude-from-external-loadbalancer label
   ignoreExcludeLB: false
+  # do not consider Not Ready but Is Serving endpoints as healthy
+  # ref: https://kubernetes.io/blog/2022/12/30/advancements-in-kubernetes-traffic-engineering/
+  ignoreServingEndpoints: false
 
   image:
     repository: quay.io/metallb/speaker

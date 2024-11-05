@@ -11,13 +11,13 @@ import (
 
 const SlicesServiceIndexName = "ServiceName"
 
-// EndpointCanServe tells if the conditions represent a ready state or serving state is ready.
-func EndpointCanServe(conditions discovery.EndpointConditions) bool {
+// EndpointCanServe tells if the conditions represent a state fit for serving the traffic.
+func EndpointCanServe(conditions discovery.EndpointConditions, ignoreServingEndpoints bool) bool {
 	if conditions.Ready == nil || *conditions.Ready {
 		return true
 	}
 	if conditions.Serving != nil && *conditions.Serving {
-		return true
+		return !ignoreServingEndpoints
 	}
 	return false
 }

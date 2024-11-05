@@ -249,8 +249,11 @@ spec:
         {{- if .Values.speaker.wanConfig }}
         - --ml-wan-config
         {{- end }}
-        {{- if .Values.speaker.ignoreExcludeLB}}
+        {{- if .Values.speaker.ignoreExcludeLB }}
         - --ignore-exclude-lb
+        {{- end }}
+        {{- if .Values.speaker.ignoreServingEndpoints }}
+        - --ignore-serving-ep
         {{- end }}
         {{- if .Values.prometheus.secureMetricsPort }}
         - --host=localhost

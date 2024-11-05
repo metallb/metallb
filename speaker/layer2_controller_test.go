@@ -68,6 +68,8 @@ func TestUsableNodesEPSlices(t *testing.T) {
 
 		usableSpeakers map[string]bool
 
+		ignoreServingEndpoints bool
+
 		cExpectedResult []string
 	}{
 		{
@@ -100,8 +102,9 @@ func TestUsableNodesEPSlices(t *testing.T) {
 					},
 				},
 			},
-			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
-			cExpectedResult: []string{"iris1", "iris2"},
+			ignoreServingEndpoints: false,
+			usableSpeakers:         map[string]bool{"iris1": true, "iris2": true},
+			cExpectedResult:        []string{"iris1", "iris2"},
 		},
 		{
 			desc: "Two endpoints, different hosts",
@@ -129,8 +132,9 @@ func TestUsableNodesEPSlices(t *testing.T) {
 					},
 				},
 			},
-			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
-			cExpectedResult: []string{"iris1", "iris2"},
+			ignoreServingEndpoints: false,
+			usableSpeakers:         map[string]bool{"iris1": true, "iris2": true},
+			cExpectedResult:        []string{"iris1", "iris2"},
 		},
 		{
 			desc: "Two endpoints, same host",
@@ -158,10 +162,10 @@ func TestUsableNodesEPSlices(t *testing.T) {
 					},
 				},
 			},
-			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
-			cExpectedResult: []string{"iris1"},
+			ignoreServingEndpoints: false,
+			usableSpeakers:         map[string]bool{"iris1": true, "iris2": true},
+			cExpectedResult:        []string{"iris1"},
 		},
-
 		{
 			desc: "Two endpoints, same host, one is not ready",
 			eps: []discovery.EndpointSlice{
@@ -188,8 +192,9 @@ func TestUsableNodesEPSlices(t *testing.T) {
 					},
 				},
 			},
-			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
-			cExpectedResult: []string{"iris1"},
+			ignoreServingEndpoints: false,
+			usableSpeakers:         map[string]bool{"iris1": true, "iris2": true},
+			cExpectedResult:        []string{"iris1"},
 		},
 		{
 			desc: "Two endpoints, different hosts, not ready but serving",
@@ -219,8 +224,9 @@ func TestUsableNodesEPSlices(t *testing.T) {
 					},
 				},
 			},
-			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
-			cExpectedResult: []string{"iris1", "iris2"},
+			ignoreServingEndpoints: false,
+			usableSpeakers:         map[string]bool{"iris1": true, "iris2": true},
+			cExpectedResult:        []string{"iris1", "iris2"},
 		},
 		{
 			desc: "Two endpoints, different hosts, ready but not serving",
@@ -250,13 +256,45 @@ func TestUsableNodesEPSlices(t *testing.T) {
 					},
 				},
 			},
-			usableSpeakers:  map[string]bool{"iris1": true, "iris2": true},
-			cExpectedResult: []string{"iris1", "iris2"},
+			ignoreServingEndpoints: false,
+			usableSpeakers:         map[string]bool{"iris1": true, "iris2": true},
+			cExpectedResult:        []string{"iris1", "iris2"},
+		},
+		{
+			desc: "Two endpoints, different hosts, one is not ready yet serving but ignoreServingEndpoints is true",
+			eps: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{
+								"2.3.4.5",
+							},
+							NodeName: ptr.To("iris1"),
+							Conditions: discovery.EndpointConditions{
+								Ready: ptr.To(true),
+							},
+						},
+						{
+							Addresses: []string{
+								"2.3.4.15",
+							},
+							NodeName: ptr.To("iris2"),
+							Conditions: discovery.EndpointConditions{
+								Ready:   ptr.To(false),
+								Serving: ptr.To(true),
+							},
+						},
+					},
+				},
+			},
+			ignoreServingEndpoints: true,
+			usableSpeakers:         map[string]bool{"iris1": true, "iris2": true},
+			cExpectedResult:        []string{"iris1"},
 		},
 	}
 
 	for _, test := range tests {
-		response := usableNodes(test.eps, test.usableSpeakers)
+		response := usableNodes(test.eps, test.usableSpeakers, test.ignoreServingEndpoints)
 		sort.Strings(response)
 		if !compareUseableNodesReturnedValue(response, test.cExpectedResult) {
 			t.Errorf("%q: shouldAnnounce for controller returned incorrect result, expected '%s', but received '%s'", test.desc, test.cExpectedResult, response)

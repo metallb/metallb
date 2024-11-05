@@ -72,21 +72,22 @@ func main() {
 	prometheus.MustRegister(announcing)
 
 	var (
-		namespace         = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
-		host              = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
-		mlBindAddr        = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
-		mlBindPort        = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
-		mlLabels          = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
-		mlSecretKeyPath   = flag.String("ml-secret-key-path", os.Getenv("METALLB_ML_SECRET_KEY_PATH"), "Path to where the MemberList's secret key is mounted")
-		mlWANConfig       = flag.Bool("ml-wan-config", false, "WAN network type for MemberList default config, bool")
-		myNode            = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
-		myPod             = flag.String("pod-name", os.Getenv("METALLB_POD_NAME"), "name of this MetalLB speaker pod")
-		port              = flag.Int("port", 7472, "HTTP listening port")
-		logLevel          = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
-		enablePprof       = flag.Bool("enable-pprof", false, "Enable pprof profiling")
-		loadBalancerClass = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
-		ignoreLBExclude   = flag.Bool("ignore-exclude-lb", false, "ignore the exclude-from-external-load-balancers label")
-		frrK8sNamespace   = flag.String("frrk8s-namespace", os.Getenv("FRRK8S_NAMESPACE"), "the namespace frr-k8s is being deployed on")
+		namespace              = flag.String("namespace", os.Getenv("METALLB_NAMESPACE"), "config file and speakers namespace")
+		host                   = flag.String("host", os.Getenv("METALLB_HOST"), "HTTP host address")
+		mlBindAddr             = flag.String("ml-bindaddr", os.Getenv("METALLB_ML_BIND_ADDR"), "Bind addr for MemberList (fast dead node detection)")
+		mlBindPort             = flag.String("ml-bindport", os.Getenv("METALLB_ML_BIND_PORT"), "Bind port for MemberList (fast dead node detection)")
+		mlLabels               = flag.String("ml-labels", os.Getenv("METALLB_ML_LABELS"), "Labels to match the speakers (for MemberList / fast dead node detection)")
+		mlSecretKeyPath        = flag.String("ml-secret-key-path", os.Getenv("METALLB_ML_SECRET_KEY_PATH"), "Path to where the MemberList's secret key is mounted")
+		mlWANConfig            = flag.Bool("ml-wan-config", false, "WAN network type for MemberList default config, bool")
+		myNode                 = flag.String("node-name", os.Getenv("METALLB_NODE_NAME"), "name of this Kubernetes node (spec.nodeName)")
+		myPod                  = flag.String("pod-name", os.Getenv("METALLB_POD_NAME"), "name of this MetalLB speaker pod")
+		port                   = flag.Int("port", 7472, "HTTP listening port")
+		logLevel               = flag.String("log-level", "info", fmt.Sprintf("log level. must be one of: [%s]", logging.Levels.String()))
+		enablePprof            = flag.Bool("enable-pprof", false, "Enable pprof profiling")
+		loadBalancerClass      = flag.String("lb-class", "", "load balancer class. When enabled, metallb will handle only services whose spec.loadBalancerClass matches the given lb class")
+		ignoreLBExclude        = flag.Bool("ignore-exclude-lb", false, "ignore the exclude-from-external-load-balancers label")
+		ignoreServingEndpoints = flag.Bool("ignore-serving-ep", false, "consider Not Ready but Is Serving endpoints as unhealthy")
+		frrK8sNamespace        = flag.String("frrk8s-namespace", os.Getenv("FRRK8S_NAMESPACE"), "the namespace frr-k8s is being deployed on")
 	)
 	flag.Parse()
 
@@ -168,6 +169,7 @@ func main() {
 		bgpType:                bgpImplementation(bgpType),
 		InterfaceExcludeRegexp: interfacesToExclude,
 		IgnoreExcludeLB:        *ignoreLBExclude,
+		IgnoreServingEndpoints: *ignoreServingEndpoints,
 		Layer2StatusChange: func(namespacedName types.NamespacedName) {
 			statusNotifyChan <- controllers.NewL2StatusEvent(namespacedName.Namespace, namespacedName.Name)
 		},
@@ -263,6 +265,7 @@ type controllerConfig struct {
 	AnnouncedInterfacesToExclude []string `yaml:"announcedInterfacesToExclude"`
 	InterfaceExcludeRegexp       *regexp.Regexp
 	IgnoreExcludeLB              bool
+	IgnoreServingEndpoints       bool
 	Layer2StatusChange           func(types.NamespacedName)
 }
 
@@ -276,13 +279,14 @@ func newController(cfg controllerConfig) (*controller, error) {
 
 	handlers := map[config.Proto]Protocol{
 		config.BGP: &bgpController{
-			logger:          cfg.Logger,
-			myNode:          cfg.MyNode,
-			svcAds:          make(map[string][]*bgp.Advertisement),
-			bgpType:         cfg.bgpType,
-			sessionManager:  newBGP(cfg),
-			ignoreExcludeLB: cfg.IgnoreExcludeLB,
-			secretHandling:  secretHandling,
+			logger:                 cfg.Logger,
+			myNode:                 cfg.MyNode,
+			svcAds:                 make(map[string][]*bgp.Advertisement),
+			bgpType:                cfg.bgpType,
+			sessionManager:         newBGP(cfg),
+			ignoreExcludeLB:        cfg.IgnoreExcludeLB,
+			ignoreServingEndpoints: cfg.IgnoreServingEndpoints,
+			secretHandling:         secretHandling,
 		},
 	}
 	protocols := []config.Proto{config.BGP}
@@ -295,11 +299,12 @@ func newController(cfg controllerConfig) (*controller, error) {
 			return nil, fmt.Errorf("making layer2 announcer: %s", err)
 		}
 		handlers[config.Layer2] = &layer2Controller{
-			announcer:       a,
-			myNode:          cfg.MyNode,
-			sList:           cfg.SList,
-			ignoreExcludeLB: cfg.IgnoreExcludeLB,
-			onStatusChange:  cfg.Layer2StatusChange,
+			announcer:              a,
+			myNode:                 cfg.MyNode,
+			sList:                  cfg.SList,
+			ignoreExcludeLB:        cfg.IgnoreExcludeLB,
+			ignoreServingEndpoints: cfg.IgnoreServingEndpoints,
+			onStatusChange:         cfg.Layer2StatusChange,
 		}
 		protocols = append(protocols, config.Layer2)
 	}

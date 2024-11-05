@@ -61,15 +61,16 @@ type peer struct {
 }
 
 type bgpController struct {
-	logger          log.Logger
-	myNode          string
-	nodeLabels      labels.Set
-	peers           []*peer
-	svcAds          map[string][]*bgp.Advertisement
-	bgpType         bgpImplementation
-	secretHandling  SecretHandling
-	sessionManager  bgp.SessionManager
-	ignoreExcludeLB bool
+	logger                 log.Logger
+	myNode                 string
+	nodeLabels             labels.Set
+	peers                  []*peer
+	svcAds                 map[string][]*bgp.Advertisement
+	bgpType                bgpImplementation
+	secretHandling         SecretHandling
+	sessionManager         bgp.SessionManager
+	ignoreExcludeLB        bool
+	ignoreServingEndpoints bool
 }
 
 func (c *bgpController) SetConfig(l log.Logger, cfg *config.Config) error {
@@ -127,7 +128,7 @@ func (c *bgpController) SetEventCallback(callback func(interface{})) {
 
 // hasHealthyEndpoint return true if this node has at least one healthy endpoint.
 // It only checks nodes matching the given filterNode function.
-func hasHealthyEndpoint(eps []discovery.EndpointSlice, filterNode func(*string) bool) bool {
+func hasHealthyEndpoint(eps []discovery.EndpointSlice, filterNode func(*string) bool, ignoreServingEndpoints bool) bool {
 	ready := map[string]bool{}
 	for _, slice := range eps {
 		for _, ep := range slice.Endpoints {
@@ -136,13 +137,13 @@ func hasHealthyEndpoint(eps []discovery.EndpointSlice, filterNode func(*string) 
 				continue
 			}
 			for _, addr := range ep.Addresses {
-				if _, ok := ready[addr]; !ok && epslices.EndpointCanServe(ep.Conditions) {
+				if _, ok := ready[addr]; !ok && epslices.EndpointCanServe(ep.Conditions, ignoreServingEndpoints) {
 					// Only set true if nothing else has expressed an
 					// opinion. This means that false will take precedence
 					// if there's any unready ports for a given endpoint.
 					ready[addr] = true
 				}
-				if !epslices.EndpointCanServe(ep.Conditions) {
+				if !epslices.EndpointCanServe(ep.Conditions, ignoreServingEndpoints) {
 					ready[addr] = false
 				}
 			}
@@ -186,9 +187,9 @@ func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, po
 		return false
 	}
 
-	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !hasHealthyEndpoint(epSlices, filterNode) {
+	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal && !hasHealthyEndpoint(epSlices, filterNode, c.ignoreServingEndpoints) {
 		return "noLocalEndpoints"
-	} else if !hasHealthyEndpoint(epSlices, func(toFilter *string) bool { return false }) {
+	} else if !hasHealthyEndpoint(epSlices, func(toFilter *string) bool { return false }, c.ignoreServingEndpoints) {
 		return "noEndpoints"
 	}
 	return ""
