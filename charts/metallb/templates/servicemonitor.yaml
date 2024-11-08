@@ -1,3 +1,7 @@
+{{- if and .Values.prometheus.serviceMonitor.enabled .Values.prometheus.podMonitor.enabled }}
+{{- fail "prometheus.serviceMonitor.enabled and prometheus.podMonitor.enabled cannot both be set" }}
+{{- end }}
+
 {{- if .Values.prometheus.serviceMonitor.enabled }}
 {{- if .Values.speaker.enabled }}
 apiVersion: monitoring.coreos.com/v1
