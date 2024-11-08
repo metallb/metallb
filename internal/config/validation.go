@@ -7,9 +7,12 @@ import (
 
 	"errors"
 
+	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 	"go.universe.tf/metallb/internal/bgp/community"
 	"go.universe.tf/metallb/internal/ipfamily"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 type Validate func(ClusterResources) error
@@ -69,7 +72,17 @@ func findIPv6BGPAdvertisement(c ClusterResources) error {
 	if len(c.BGPAdvs) == 0 {
 		return nil
 	}
+
+	bgpSelectors, err := poolSelectorsForBGP(c)
+	if err != nil {
+		return err
+	}
+
 	for _, p := range c.Pools {
+		if !bgpSelectors.matchesPool(p) {
+			continue
+		}
+
 		for _, cidr := range p.Spec.Addresses {
 			nets, err := ParseCIDR(cidr)
 			if err != nil {
@@ -202,4 +215,50 @@ func hasBFDEcho(peer *Peer, bfdProfiles map[string]*BFDProfile) bool {
 
 func peerAddressKey(peer metallbv1beta2.BGPPeerSpec) string {
 	return fmt.Sprintf("%s-%s", peer.Address, peer.VRFName)
+}
+
+type poolSelector struct {
+	byName   map[string]struct{}
+	byLabels []labels.Selector
+}
+
+func (s poolSelector) matchesPool(p metallbv1beta1.IPAddressPool) bool {
+	if len(s.byLabels) == 0 && len(s.byName) == 0 {
+		return true
+	}
+
+	if _, ok := s.byName[p.Name]; ok {
+		return true
+	}
+	for _, l := range s.byLabels {
+		if l.Matches(labels.Set(p.Labels)) {
+			return true
+		}
+	}
+	return false
+}
+
+func poolSelectorsForBGP(c ClusterResources) (poolSelector, error) {
+	selectedPools := make(map[string]struct{})
+	poolsSelectors := []labels.Selector{}
+	for _, adv := range c.BGPAdvs {
+		if len(adv.Spec.IPAddressPools) == 0 &&
+			len(adv.Spec.IPAddressPoolSelectors) == 0 {
+			return poolSelector{}, nil // no selectors, let's catch em all!
+		}
+		for _, p := range adv.Spec.IPAddressPools {
+			selectedPools[p] = struct{}{}
+		}
+		for _, selector := range adv.Spec.IPAddressPoolSelectors {
+			l, err := metav1.LabelSelectorAsSelector(&selector)
+			if err != nil {
+				return poolSelector{}, fmt.Errorf("invalid label selector %v", selector)
+			}
+			poolsSelectors = append(poolsSelectors, l)
+		}
+	}
+	return poolSelector{
+		byName:   selectedPools,
+		byLabels: poolsSelectors,
+	}, nil
 }
