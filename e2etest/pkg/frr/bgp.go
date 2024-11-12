@@ -88,6 +88,21 @@ func RoutesForVRF(vrf string, exec executor.Executor) (map[string]Route, map[str
 	return v4Routes, v6Routes, nil
 }
 
+func RoutesJoin(v4, v6 map[string]Route) map[string]Route {
+	ret := map[string]Route{}
+
+	for k, v := range v4 {
+		ret[k] = v
+	}
+
+	for k, v := range v6 {
+		ret[k] = v
+	}
+
+	return ret
+
+}
+
 func RoutesForFamily(exec executor.Executor, family ipfamily.Family) (map[string]Route, error) {
 	v4, v6, err := Routes(exec)
 	if err != nil {
@@ -152,9 +167,15 @@ func NeighborConnected(neighborJSON string) (bool, error) {
 // To be used for debugging in order to print the status of the frr instance.
 func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 	allerrs := errors.New("")
+	res := "####### Show version\n"
+	out, err := exec.Exec("vtysh", "-c", "show version")
+	if err != nil {
+		allerrs = errors.Join(allerrs, fmt.Errorf("\nFailed exec show version: %v", err))
+	}
+	res += out
 
-	res := "####### Show running config\n"
-	out, err := exec.Exec("vtysh", "-c", "show running-config")
+	res += "####### Show running config\n"
+	out, err = exec.Exec("vtysh", "-c", "show running-config")
 	if err != nil {
 		allerrs = errors.Join(allerrs, fmt.Errorf("\nFailed exec show bgp neighbor: %v", err))
 	}
@@ -196,6 +217,12 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 			}
 			res += out
 		}
+		res += "####### Network setup for host\n"
+		out, err = exec.Exec("bash", "-c", "ip link ; ip a s; ss -tuln")
+		if err != nil {
+			allerrs = errors.Join(allerrs, fmt.Errorf("\nFailed exec to print network setup: %v", err))
+		}
+		res += out
 	}
 
 	if allerrs.Error() == "" {
