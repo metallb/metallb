@@ -121,7 +121,7 @@ does. Unnumber case is disconnected from LLA support case.
 ### Design details
 
 To make unnumber BGP work, we need to modify the neighborsession
-as defined in the following template [neighborsession.tmpl](internal/bgp/frr/templates/neighborsession.tmpl)
+as defined in the following template [neighborsession.tmpl](../internal/bgp/frr/templates/neighborsession.tmpl)
 and make the following changes
 
 1. Every time there is FRR directive that uses the address, to use the
