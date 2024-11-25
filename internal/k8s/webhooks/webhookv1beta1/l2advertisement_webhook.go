@@ -54,7 +54,7 @@ type L2AdvertisementValidator struct {
 }
 
 // Handle handled incoming admission requests for L2Advertisement objects.
-func (v *L2AdvertisementValidator) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
+func (v *L2AdvertisementValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var advertisement v1beta1.L2Advertisement
 	var oldAdvertisement v1beta1.L2Advertisement
 	if req.Operation == v1.Delete {
