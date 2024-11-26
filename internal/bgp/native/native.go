@@ -220,7 +220,7 @@ func (s *session) connect() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	deadline, _ := ctx.Deadline()
-	conn, err := dialMD5(ctx, s.PeerAddress, s.SourceAddress, s.Password)
+	conn, err := dialMD5(ctx, fmt.Sprintf("%s:%d", s.PeerAddress, s.PeerPort), s.SourceAddress, s.Password)
 	if err != nil {
 		return fmt.Errorf("dial %q: %s", s.PeerAddress, err)
 	}

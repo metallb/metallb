@@ -4,6 +4,8 @@ go 1.22.0
 
 toolchain go1.22.7
 
+replace github.com/metallb/frr-k8s => github.com/karampok/frr-k8s v0.0.0-20241112112629-4d465b07016a
+
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
 	github.com/go-kit/log v0.2.1
