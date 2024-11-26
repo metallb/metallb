@@ -38,9 +38,11 @@ debug bgp nht
 debug bgp updates in
 debug bgp updates out
 debug bgp zebra
+debug bgp bfd
 debug bfd peer
 debug bfd zebra
 debug bfd network
+debug bfd distributed
 !
 ip nht resolve-via-default
 ipv6 nht resolve-via-default
@@ -57,13 +59,14 @@ router bgp {{$ROUTERASN}}
   no bgp default ipv4-unicast
 {{range .Neighbors }}
   neighbor {{.Addr}} remote-as {{.ASN}}
+  neighbor {{.Addr}} timers delayopen 30
   {{- if and (ne .ASN $ROUTERASN) (.MultiHop) }}
   neighbor {{.Addr}} ebgp-multihop
   {{- end }}
   {{ if .Password -}}
   neighbor {{.Addr}} password {{.Password}}
   {{- end }}
-{{- if .BFDEnabled }} 
+{{- if .BFDEnabled }}
   neighbor {{.Addr}} bfd
 {{- end -}}
 {{- end }}

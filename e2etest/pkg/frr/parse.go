@@ -22,6 +22,7 @@ type Neighbor struct {
 	Port                    int
 	RemoteRouterID          string
 	GRInfo                  GracefulRestartInfo
+	BFDInfo                 PeerBFDInfo
 	MsgStats                MessageStats
 	ConfiguredHoldTime      int
 	ConfiguredKeepAliveTime int
@@ -49,6 +50,7 @@ type FRRNeighbor struct {
 	PortForeign                  int                 `json:"portForeign"`
 	MsgStats                     MessageStats        `json:"messageStats"`
 	GRInfo                       GracefulRestartInfo `json:"gracefulRestartInfo"`
+	PeerBFDInfo                  PeerBFDInfo         `json:"peerBfdInfo"`
 	VRFName                      string              `json:"vrf"`
 	ConfiguredHoldTimeMSecs      int                 `json:"bgpTimerConfiguredHoldTimeMsecs"`
 	ConfiguredKeepAliveTimeMSecs int                 `json:"bgpTimerConfiguredKeepAliveIntervalMsecs"`
@@ -59,6 +61,14 @@ type FRRNeighbor struct {
 	ConnectionsDropped int `json:"connectionsDropped"`
 }
 
+type PeerBFDInfo struct {
+	Type             string `json:"type"`
+	DetectMultiplier int    `json:"detectMultiplier"`
+	RxMinInterval    int    `json:"rxMinInterval"`
+	TxMinInterval    int    `json:"txMinInterval"`
+	Status           string `json:"status"`
+	LastUpdate       string `json:"lastUpdate"`
+}
 type GracefulRestartInfo struct {
 	EndOfRibSend struct {
 		Ipv4Unicast bool `json:"ipv4Unicast"`
@@ -197,9 +207,9 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 	res := make([]*Neighbor, 0)
 	for k, n := range toParse {
 		ip := net.ParseIP(k)
-		if ip == nil {
-			return nil, fmt.Errorf("failed to parse %s as ip", ip)
-		}
+		// if ip == nil {
+		// 	return nil, fmt.Errorf("failed to parse %s as ip", ip)
+		// }
 		connected := true
 		if n.BgpState != bgpConnected {
 			connected = false
@@ -220,6 +230,7 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 			RemoteRouterID:          n.RemoteRouterID,
 			MsgStats:                n.MsgStats,
 			GRInfo:                  n.GRInfo,
+			BFDInfo:                 n.PeerBFDInfo,
 			ConfiguredKeepAliveTime: n.ConfiguredKeepAliveTimeMSecs,
 			ConfiguredHoldTime:      n.ConfiguredHoldTimeMSecs,
 			ConfiguredConnectTime:   n.ConnectRetryTimer,
