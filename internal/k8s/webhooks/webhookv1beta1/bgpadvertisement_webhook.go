@@ -55,7 +55,7 @@ type BGPAdvertisementValidator struct {
 }
 
 // Handle handled incoming admission requests for BGPAdvertisement objects.
-func (v *BGPAdvertisementValidator) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
+func (v *BGPAdvertisementValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var advertisement v1beta1.BGPAdvertisement
 	var oldAdvertisement v1beta1.BGPAdvertisement
 	if req.Operation == admissionv1.Delete {
