@@ -20,7 +20,7 @@ require (
 	github.com/ory/dockertest/v3 v3.10.0
 	github.com/prometheus/client_golang v1.19.1
 	go.uber.org/zap v1.27.0
-	golang.org/x/sys v0.26.0
+	golang.org/x/sys v0.27.0
 	k8s.io/api v0.31.3
 	k8s.io/apiextensions-apiserver v0.31.1
 	k8s.io/apimachinery v0.31.3
