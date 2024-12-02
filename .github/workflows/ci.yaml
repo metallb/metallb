@@ -228,8 +228,7 @@ jobs:
           HELM_FLAGS=""
           echo '/etc/frr/core-%e.%p.%h.%t' | sudo tee /proc/sys/kernel/core_pattern
           if [ ${{ matrix.deployment }} = "helm" ]; then export SPEAKER_SELECTOR="app.kubernetes.io/component=speaker" && export CONTROLLER_SELECTOR="app.kubernetes.io/component=controller"; fi
-          # TODO restore to NONE when https://github.com/metallb/metallb/issues/2311 is fixed
-          SKIP="L2ServiceStatus"
+          SKIP="none"
           WITH_VRF="--with-vrf"
           FOCUS=""
           if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|FRR-MODE|FRRK8S-MODE|BFD|VRF|DUALSTACK"; WITH_VRF=""; fi
@@ -339,8 +338,7 @@ jobs:
           spec:
             logLevel: debug
           EOF
-          # TOOD remove skipping L2ServiceStatus once https://github.com/metallb/metallb/issues/2311 is fixed
-          sudo -E env "PATH=$PATH" inv e2etest --bgp-mode frr --skip "IPV6|DUALSTACK|metrics|L2-interface selector|FRRK8S-MODE|L2ServiceStatus" -e /tmp/kind_logs
+          sudo -E env "PATH=$PATH" inv e2etest --bgp-mode frr --skip "IPV6|DUALSTACK|metrics|L2-interface selector|FRRK8S-MODE" -e /tmp/kind_logs
 
       - name: Collect Logs
         if: ${{ failure() }}
