@@ -14,3 +14,12 @@ patches:
   target:
     kind: CustomResourceDefinition
     name: bgppeers.metallb.io
+- patch: |-
+    - op: add
+      path: "/metadata/annotations/metallb-internal"
+      value: |
+        {{- with .Values.annotations }}
+        {{- toYaml . | nindent 4}}
+        {{- end }}
+  target:
+    kind: CustomResourceDefinition
