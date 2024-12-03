@@ -246,6 +246,29 @@ in the BGPAdvertisement / L2Advertisement) and to limit the service's endpoints 
 By doing this, the path of the traffic will be clear and it will be easy to understand if the issue
 is caused only by a subset of the nodes or when the pod lives on a different node, for example.
 
+#### MetalLB and asymmetric return path
+
+[Reverse path filtering](https://tldp.org/HOWTO/Adv-Routing-HOWTO/lartc.kernel.rpf.html) is a linux protection
+mechanism which causes packets that should not be coming from an interface to be dropped (i.e., there is no route to the ip of
+the client sending those packets through that interface).
+
+This is common with BGP (and less so with L2 mode) because MetalLB will advertise routes to the service but the nodes
+won't learn how to reach the client:
+
+- The client from a different subnet tries to reach the service exposed by MetalLB
+- The packets reach the node on an interface different from the default gateway
+- The node does not have a route back to the client through that interface
+
+Depending on the value of the `rp_filter` associated to the interface, the packets are dropped.
+
+There are several ways to solve this issue:
+
+- Add static routes to your node
+- Use the [frr-k8s variant](https://metallb.io/concepts/bgp/index.html#frr-k8s-mode) to let your fabric send those
+routes to the nodes
+- Use source based routing (or something that leverages that) to steer the reply traffic towards the right interface.
+This is the approach used by the [metallb node route agent](https://github.com/travisghansen/metallb-node-route-agent) (note that the project is not affiliated to metallb).
+
 ## Collecting information for a bug report
 
 If after following the suggestions of this guide, a MetalLB bug is the primary suspect, you need to file a
