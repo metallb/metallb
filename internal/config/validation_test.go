@@ -71,6 +71,104 @@ func TestValidate(t *testing.T) {
 			mustFail: true,
 		},
 		{
+			desc: "v6 address but pool not selected",
+			config: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "foo",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{"2001:db8::/64"},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "foo",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPools: []string{"bar"},
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "v6 address and selected",
+			config: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "foo",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{"2001:db8::/64"},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "bar",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPools: []string{"foo1"},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "bar",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPools: []string{"foo"},
+						},
+					},
+				},
+			},
+			mustFail: true,
+		},
+		{
+			desc: "v6 address and selected by labels",
+			config: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name:   "foo",
+							Labels: map[string]string{"key": "value"},
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{"2001:db8::/64"},
+						},
+					},
+				},
+				BGPAdvs: []v1beta1.BGPAdvertisement{
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "bar",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPools: []string{"foo1"},
+						},
+					},
+					{
+						ObjectMeta: v1.ObjectMeta{
+							Name: "bar",
+						},
+						Spec: v1beta1.BGPAdvertisementSpec{
+							IPAddressPoolSelectors: []v1.LabelSelector{
+								{
+									MatchLabels: map[string]string{"key": "value"},
+								},
+							},
+						},
+					},
+				},
+			},
+			mustFail: true,
+		},
+		{
 			desc: "enable BGP GracefulRestart",
 			config: ClusterResources{
 				Peers: []v1beta2.BGPPeer{
