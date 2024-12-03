@@ -20,6 +20,8 @@
   {{- end }}
   {{- if .neighbor.GracefulRestart }}
   neighbor {{.neighbor.Addr}} graceful-restart
+  {{ else }}
+  neighbor {{.neighbor.Addr}} graceful-restart-disable
   {{- end }}
   {{- if ne .neighbor.BFDProfile "" }}
   neighbor {{.neighbor.Addr}} bfd
