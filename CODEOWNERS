@@ -2,7 +2,7 @@
 # https://docs.github.com/en/github/creating-cloning-and-archiving-repositories/about-code-owners
 
 # The MetalLB maintainers team
-*   @fedepaol @russellb @gclawes @oribon
+*   @fedepaol @oribon
 
 # Emeritus Maintainers
 #
@@ -13,3 +13,5 @@
 # - daxmc99
 # - johananl
 # - rata
+# - russellb
+# - gclawes 
