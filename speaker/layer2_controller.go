@@ -35,11 +35,12 @@ import (
 )
 
 type layer2Controller struct {
-	announcer       *layer2.Announce
-	myNode          string
-	ignoreExcludeLB bool
-	sList           SpeakerList
-	onStatusChange  func(types.NamespacedName)
+	announcer              *layer2.Announce
+	myNode                 string
+	ignoreExcludeLB        bool
+	ignoreServingEndpoints bool
+	sList                  SpeakerList
+	onStatusChange         func(types.NamespacedName)
 }
 
 func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
@@ -50,11 +51,11 @@ func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
 // endpoint on them.
 // The speakers parameter is a map containing all the nodes with active speakers.
 // If the speakers map is nil, it is ignored.
-func usableNodes(eps []discovery.EndpointSlice, speakers map[string]bool) []string {
+func usableNodes(eps []discovery.EndpointSlice, speakers map[string]bool, ignoreServingEndpoints bool) []string {
 	usable := map[string]bool{}
 	for _, slice := range eps {
 		for _, ep := range slice.Endpoints {
-			if !epslices.EndpointCanServe(ep.Conditions) {
+			if !epslices.EndpointCanServe(ep.Conditions, ignoreServingEndpoints) {
 				continue
 			}
 			if ep.NodeName == nil {
@@ -83,7 +84,7 @@ func usableNodes(eps []discovery.EndpointSlice, speakers map[string]bool) []stri
 }
 
 func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce []net.IP, pool *config.Pool, svc *v1.Service, eps []discovery.EndpointSlice, nodes map[string]*v1.Node) string {
-	if !activeEndpointExists(eps) { // no active endpoints, just return
+	if !activeEndpointExists(eps, c.ignoreServingEndpoints) { // no active endpoints, just return
 		level.Debug(l).Log("event", "shouldannounce", "protocol", "l2", "message", "failed no active endpoints", "service", name)
 		return "notOwner"
 	}
@@ -97,7 +98,7 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 	forPool := c.speakersForPool(l, name, pool, nodes)
 	var availableNodes []string
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
-		availableNodes = usableNodes(eps, forPool)
+		availableNodes = usableNodes(eps, forPool, c.ignoreServingEndpoints)
 	} else {
 		availableNodes = nodesWithActiveSpeakers(forPool)
 	}
@@ -201,10 +202,10 @@ func nodesWithActiveSpeakers(speakers map[string]bool) []string {
 }
 
 // activeEndpointExists returns true if at least one endpoint is active.
-func activeEndpointExists(eps []discovery.EndpointSlice) bool {
+func activeEndpointExists(eps []discovery.EndpointSlice, ignoreServingEndpoints bool) bool {
 	for _, slice := range eps {
 		for _, ep := range slice.Endpoints {
-			if !epslices.EndpointCanServe(ep.Conditions) {
+			if !epslices.EndpointCanServe(ep.Conditions, ignoreServingEndpoints) {
 				continue
 			}
 			return true
