@@ -977,6 +977,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 				Expect(err).NotTo(HaveOccurred())
 				return len(svc1.Status.LoadBalancer.Ingress)
 			}, 5*time.Minute, 1*time.Second).Should(Equal(2))
+			originallyAssignedIps := getServiceIps(cs, svc1.Namespace, svc1.Name)
 			ginkgo.By("Validate LoadBalancer IPs are allocated from pool1")
 			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool1}, jigservice.GetIngressPoint(
 				&svc1.Status.LoadBalancer.Ingress[0]))
@@ -984,7 +985,13 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool1}, jigservice.GetIngressPoint(
 				&svc1.Status.LoadBalancer.Ingress[1]))
 			Expect(err).NotTo(HaveOccurred())
-			ginkgo.By("Updating current pool to exclude ipv4 address, and add a dualstack pool")
+			ginkgo.By("Updating current pool to have an additional dualstack pool")
+			resources = config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{pool1, poolDual},
+			}
+			err = ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+			ginkgo.By("Updating current pool to exclude ipv4 address")
 			pool1.Spec.Addresses = []string{v6PoolAddresses}
 			resources = config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{pool1, poolDual},
@@ -992,17 +999,19 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			err = ConfigUpdater.Update(resources)
 			Expect(err).NotTo(HaveOccurred())
 			ginkgo.By("Validate that the service still has 2 IPs assigned")
-			Eventually(func() int {
-				svc1, err = cs.CoreV1().Services(svc1.Namespace).Get(context.Background(), svc1.Name, metav1.GetOptions{})
-				Expect(err).NotTo(HaveOccurred())
-				return len(svc1.Status.LoadBalancer.Ingress)
-			}, 5*time.Minute, 1*time.Second).Should(Equal(2))
+			Eventually(func() []string {
+				newIps := getServiceIps(cs, svc1.Namespace, svc1.Name)
+				return newIps
+			}, 5*time.Minute, 1*time.Second).Should(And(
+				HaveLen(2),
+				Not(Equal(originallyAssignedIps)),
+			))
 			ginkgo.By("Validate LoadBalancer IPs are allocated from poolDual")
-			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{poolDual}, jigservice.GetIngressPoint(
-				&svc1.Status.LoadBalancer.Ingress[0]))
+			svcIPs := getServiceIps(cs, svc1.Namespace, svc1.Name)
+			Expect(svcIPs).To(HaveLen(2))
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{poolDual}, svcIPs[0])
 			Expect(err).NotTo(HaveOccurred())
-			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{poolDual}, jigservice.GetIngressPoint(
-				&svc1.Status.LoadBalancer.Ingress[1]))
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{poolDual}, svcIPs[1])
 			Expect(err).NotTo(HaveOccurred())
 		})
 	})
@@ -1017,4 +1026,17 @@ func updateServiceIPFamilyPolicy(cs clientset.Interface, namespace, serviceName 
 	svc.Spec.IPFamilyPolicy = policy
 	_, err = cs.CoreV1().Services(namespace).Update(context.TODO(), svc, metav1.UpdateOptions{})
 	return err
+}
+
+// getServiceIps returns the ips assigned to the given svc as a slice of strings.
+func getServiceIps(cs clientset.Interface, namespace, serviceName string) []string {
+	svc, err := cs.CoreV1().Services(namespace).Get(context.TODO(), serviceName, metav1.GetOptions{})
+	ips := []string{}
+	if err != nil {
+		return ips
+	}
+	for _, ingress := range svc.Status.LoadBalancer.Ingress {
+		ips = append(ips, ingress.IP)
+	}
+	return ips
 }
