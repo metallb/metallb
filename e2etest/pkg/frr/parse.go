@@ -22,12 +22,14 @@ type Neighbor struct {
 	Port                    int
 	RemoteRouterID          string
 	GRInfo                  GracefulRestartInfo
+	BFDInfo                 PeerBFDInfo
 	MsgStats                MessageStats
 	ConfiguredHoldTime      int
 	ConfiguredKeepAliveTime int
 	ConfiguredConnectTime   int
 	AddressFamilies         []string
 	ConnectionsDropped      int
+	HostForeign             string
 }
 
 type Route struct {
@@ -49,6 +51,7 @@ type FRRNeighbor struct {
 	PortForeign                  int                 `json:"portForeign"`
 	MsgStats                     MessageStats        `json:"messageStats"`
 	GRInfo                       GracefulRestartInfo `json:"gracefulRestartInfo"`
+	PeerBFDInfo                  PeerBFDInfo         `json:"peerBfdInfo"`
 	VRFName                      string              `json:"vrf"`
 	ConfiguredHoldTimeMSecs      int                 `json:"bgpTimerConfiguredHoldTimeMsecs"`
 	ConfiguredKeepAliveTimeMSecs int                 `json:"bgpTimerConfiguredKeepAliveIntervalMsecs"`
@@ -56,9 +59,18 @@ type FRRNeighbor struct {
 	AddressFamilyInfo            map[string]struct {
 		SentPrefixCounter int `json:"sentPrefixCounter"`
 	} `json:"addressFamilyInfo"`
-	ConnectionsDropped int `json:"connectionsDropped"`
+	ConnectionsDropped int    `json:"connectionsDropped"`
+	HostForeign        string `json:"hostForeign"`
 }
 
+type PeerBFDInfo struct {
+	Type             string `json:"type"`
+	DetectMultiplier int    `json:"detectMultiplier"`
+	RxMinInterval    int    `json:"rxMinInterval"`
+	TxMinInterval    int    `json:"txMinInterval"`
+	Status           string `json:"status"`
+	LastUpdate       string `json:"lastUpdate"`
+}
 type GracefulRestartInfo struct {
 	EndOfRibSend struct {
 		Ipv4Unicast bool `json:"ipv4Unicast"`
@@ -110,6 +122,7 @@ type FRRRoute struct {
 	PeerID    string `json:"peerId"`
 	LocalPref uint32 `json:"locPrf"`
 	Origin    string `json:"origin"`
+	PathFrom  string `json:"pathFrom"`
 	Nexthops  []struct {
 		IP    string `json:"ip"`
 		Scope string `json:"scope"`
@@ -180,6 +193,7 @@ func ParseNeighbour(vtyshRes string) (*Neighbor, error) {
 			ConfiguredKeepAliveTime: n.ConfiguredKeepAliveTimeMSecs,
 			ConfiguredHoldTime:      n.ConfiguredHoldTimeMSecs,
 			ConnectionsDropped:      n.ConnectionsDropped,
+			HostForeign:             n.HostForeign,
 		}, nil
 	}
 	return nil, errors.New("no peers were returned")
@@ -196,10 +210,9 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 
 	res := make([]*Neighbor, 0)
 	for k, n := range toParse {
+		// Note: in the unnumbered case, the k is the interface e.g. eth0 therefore
+		// ip will be nil, and the ip.String() will be "<nil".
 		ip := net.ParseIP(k)
-		if ip == nil {
-			return nil, fmt.Errorf("failed to parse %s as ip", ip)
-		}
 		connected := true
 		if n.BgpState != bgpConnected {
 			connected = false
@@ -220,11 +233,13 @@ func ParseNeighbours(vtyshRes string) ([]*Neighbor, error) {
 			RemoteRouterID:          n.RemoteRouterID,
 			MsgStats:                n.MsgStats,
 			GRInfo:                  n.GRInfo,
+			BFDInfo:                 n.PeerBFDInfo,
 			ConfiguredKeepAliveTime: n.ConfiguredKeepAliveTimeMSecs,
 			ConfiguredHoldTime:      n.ConfiguredHoldTimeMSecs,
 			ConfiguredConnectTime:   n.ConnectRetryTimer,
 			AddressFamilies:         addressFamilies,
 			ConnectionsDropped:      n.ConnectionsDropped,
+			HostForeign:             n.HostForeign,
 		})
 	}
 	return res, nil
