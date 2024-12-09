@@ -352,6 +352,7 @@ speaker:
 crds:
   enabled: true
   validationFailurePolicy: Fail
+  annotations: {}
 
 # frrk8s contains the configuration related to using an frrk8s instance
 # (github.com/metallb/frr-k8s) as the backend for the BGP implementation.
