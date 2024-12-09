@@ -129,3 +129,59 @@ In order to re-assign a new IP to the services, there are two options:
 This behaviour is subject to change making MetalLB observe any state requested by the user, regardless
 of the fact that it may cause service disruptions or not.
 {{% /notice %}}
+
+### PreferDualStack IP Family Policy
+
+MetalLB supports `PreferDualStack` ip policy, which allows services to prefer
+dual-stack IP allocations while gracefully falling back to single-stack if
+dual-stack is unavailable.
+
+Consider this service
+
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: my-app
+spec:
+  type: LoadBalancer
+  ipFamilyPolicy: PreferDualStack
+  ipFamilies:
+  - ipv6
+  - ipv4
+```
+
+Suppose that the advertisement is as followed:
+
+```yaml
+apiVersion: metallb.io/v1beta1
+kind: BGPAdvertisement
+metadata:
+  name: external
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - ipv4-pool
+  - ipv6-pool
+  - dualstack-pool
+```
+
+The above Service will be assigned 1 ipv4 and 1 ipv6 from the dualstack-pool.
+
+In case the `dualstack-pool` is not added to `ipAddressPools`, svc `my-app` will
+be assigned an ipv6 from the pool `ipv6-pool`, as ipv6 is the first ip family
+listed in the service's `spec.ipFamilies` field.
+
+In case the field `spec.ipFamilies` is empty, ipv4 will be preferred.
+
+Metallb's behaviours in svc with `PreferDualStack` family policy, in case of pool
+change:
+
+- If an svc was assigned with an ip from a single-stack pool, and the said pool is
+extended to be dualstack, the originally assigned ip will stay assigned, and
+the svc will be assigned an additional ip from the newly available stack.
+- If an svc was assigned with ips from a dual-stack pool, and the said pool
+becomes single-stack, the assigned ips are considered malfunctioning, both of
+them are cleared from the svc. Metallb will then perform a re-assign.
+- When an svc was assigned with an ip from a single-stack pool, and a dual-stack
+pool becomes available, the svc will keep its current pool.
