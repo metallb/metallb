@@ -367,6 +367,9 @@
             "ignoreExcludeLB": {
               "type": "boolean"
             },
+            "ignoreServingEndpoints": {
+              "type": "boolean"
+            },
             "updateStrategy": {
               "type": "object",
               "properties": {
