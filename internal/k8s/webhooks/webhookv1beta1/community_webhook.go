@@ -54,7 +54,7 @@ type CommunityValidator struct {
 }
 
 // Handle handled incoming admission requests for Community objects.
-func (v *CommunityValidator) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
+func (v *CommunityValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var community v1beta1.Community
 	var oldCommunity v1beta1.Community
 	if req.Operation == v1.Delete {
@@ -83,7 +83,6 @@ func (v *CommunityValidator) Handle(ctx context.Context, req admission.Request) 
 		if err != nil {
 			return admission.Denied(err.Error())
 		}
-		return
 	case v1.Delete:
 		err := validateCommunityDelete(&community)
 		if err != nil {

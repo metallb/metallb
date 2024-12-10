@@ -240,6 +240,9 @@ var _ = ginkgo.Describe("BGP metrics", func() {
 					address = c.Ipv6
 				}
 				peerAddr := address + fmt.Sprintf(":%d", c.RouterConfig.BGPPort)
+				if FRRProvider != nil && FRRProvider.FRRK8sBased() {
+					peerAddr = address
+				}
 				peerAddrToName[peerAddr] = c.Name
 			}
 
@@ -755,6 +758,9 @@ func labelsForPeers(peers []*frrcontainer.FRR, ipFamily ipfamily.Family) []peerP
 			address = c.Ipv6
 		}
 		peerAddr := address + fmt.Sprintf(":%d", c.RouterConfig.BGPPort)
+		if FRRProvider != nil && FRRProvider.FRRK8sBased() {
+			peerAddr = address
+		}
 
 		// Note: we deliberately don't add the vrf label in case of the default vrf to validate that
 		// it is still possible to list the metrics using only the peer label, which is what most users

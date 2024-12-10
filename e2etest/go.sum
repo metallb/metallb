@@ -120,8 +120,8 @@ github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de h1:9TO3cAIGXtEhn
 github.com/liggitt/tabwriter v0.0.0-20181228230101-89fcab3d43de/go.mod h1:zAbeS9B/r2mtpb6U+EI2rYA5OAXxsYw6wTamcNW+zcE=
 github.com/mailru/easyjson v0.7.7 h1:UGYAvKxe3sBsEDzO8ZeWOSlIQfWFlxbzLZe7hwFURr0=
 github.com/mailru/easyjson v0.7.7/go.mod h1:xzfreul335JAWq5oZzymOObrkdz5UnU4kGfJJLY9Nlc=
-github.com/metallb/frr-k8s v0.0.15 h1:6M3UGhovX1EFoaSGjrRD7djUAx3w2I+g81FH8OVtHkM=
-github.com/metallb/frr-k8s v0.0.15/go.mod h1:TjrGoAf+v00hYGlI8jUdyDxY5udMAOs2GWwrvLWnA4E=
+github.com/metallb/frr-k8s v0.0.16 h1:tlNIDW5wtBlKE7wUgXBs9GklyTCTFtdOGz8fvEl40vU=
+github.com/metallb/frr-k8s v0.0.16/go.mod h1:TjrGoAf+v00hYGlI8jUdyDxY5udMAOs2GWwrvLWnA4E=
 github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721 h1:RlZweED6sbSArvlE924+mUcZuXKLBHA35U7LN621Bws=
 github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721/go.mod h1:Ickgr2WtCLZ2MDGd4Gr0geeCH5HybhRJbonOgQpvSxc=
 github.com/mitchellh/go-wordwrap v1.0.1 h1:TLuKupo69TCn6TQSyGxwI1EblZZEsQ0vMlAFQflz0v0=

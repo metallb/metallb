@@ -195,6 +195,8 @@ func TestControllerMutation(t *testing.T) {
 	}, ByNamespace: map[string][]string{"test-ns1": {"pool6", "pool7", "pool11", "pool12"}, "test-ns2": {"pool9"}},
 		ByServiceSelector: []string{"pool8", "pool10", "pool11", "pool12"},
 	}
+	IPFamilyPolicyRequireDualStack := v1.IPFamilyPolicyRequireDualStack
+	IPFamilyPolicyPreferDualStack := v1.IPFamilyPolicyPreferDualStack
 
 	l := log.NewNopLogger()
 
@@ -673,14 +675,16 @@ func TestControllerMutation(t *testing.T) {
 			desc: "simple dual-stack LoadBalancer",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:       "LoadBalancer",
-					ClusterIPs: []string{"1.2.3.4", "3000::1"},
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4", "3000::1"},
+					IPFamilyPolicy: &IPFamilyPolicyRequireDualStack,
 				},
 			},
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
-					ClusterIPs: []string{"1.2.3.4", "3000::1"},
-					Type:       "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4", "3000::1"},
+					Type:           "LoadBalancer",
+					IPFamilyPolicy: &IPFamilyPolicyRequireDualStack,
 				},
 				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
 			},
@@ -694,8 +698,9 @@ func TestControllerMutation(t *testing.T) {
 					},
 				},
 				Spec: v1.ServiceSpec{
-					Type:       "LoadBalancer",
-					ClusterIPs: []string{"1.2.3.4", "3000::1"},
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4", "3000::1"},
+					IPFamilyPolicy: &IPFamilyPolicyRequireDualStack,
 				},
 			},
 			want: &v1.Service{
@@ -705,10 +710,138 @@ func TestControllerMutation(t *testing.T) {
 					},
 				},
 				Spec: v1.ServiceSpec{
-					Type:       "LoadBalancer",
-					ClusterIPs: []string{"1.2.3.4", "3000::1"},
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4", "3000::1"},
+					IPFamilyPolicy: &IPFamilyPolicyRequireDualStack,
 				},
 				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
+			},
+		},
+		{
+			desc: "simple dual-stack LoadBalancer with PreferDualStack policy",
+			in: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4", "3000::1"},
+					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
+				},
+			},
+			want: &v1.Service{
+				Spec: v1.ServiceSpec{
+					ClusterIPs:     []string{"1.2.3.4", "3000::1"},
+					Type:           "LoadBalancer",
+					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
+				},
+				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
+			},
+		},
+		{
+			// Pin to test-ns1 ns, which does not have any dual stack pool.
+			desc: "single-stack LoadBalancer with PreferDualStack policy",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns1",
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4"},
+					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
+				},
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Namespace: "test-ns1",
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIPs:     []string{"1.2.3.4"},
+					Type:           "LoadBalancer",
+					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
+				},
+				Status: statusAssigned([]string{"7.8.9.0"}),
+			},
+		},
+		{
+			desc: "request IPs from dualstack pool with PreferDualStack policy",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationAddressPool: "pool5",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4", "3000::1"},
+					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
+				},
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationAddressPool: "pool5",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4", "3000::1"},
+					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
+				},
+				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
+			},
+		},
+		{
+			desc: "request IP from single-stack ipv4 pool with PreferDualStack policy",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationAddressPool: "pool1",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4", "1000::"},
+					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
+				},
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationAddressPool: "pool1",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4", "1000::"},
+					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
+				},
+				Status: statusAssigned([]string{"1.2.3.0"}),
+			},
+		},
+		{
+			desc: "request IP from single-stack ipv6 pool with PreferDualStack policy",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationAddressPool: "pool3",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1000::1"},
+					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
+				},
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationAddressPool: "pool3",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1000::1"},
+					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
+				},
+				Status: statusAssigned([]string{"1000::"}),
 			},
 		},
 		{
@@ -746,8 +879,9 @@ func TestControllerMutation(t *testing.T) {
 					},
 				},
 				Spec: v1.ServiceSpec{
-					ClusterIPs: []string{"1.2.3.4", "3000::1"},
-					Type:       "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4", "3000::1"},
+					Type:           "LoadBalancer",
+					IPFamilyPolicy: &IPFamilyPolicyRequireDualStack,
 				},
 			},
 			want: &v1.Service{
@@ -757,8 +891,9 @@ func TestControllerMutation(t *testing.T) {
 					},
 				},
 				Spec: v1.ServiceSpec{
-					Type:       "LoadBalancer",
-					ClusterIPs: []string{"1.2.3.4", "3000::1"},
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4", "3000::1"},
+					IPFamilyPolicy: &IPFamilyPolicyRequireDualStack,
 				},
 				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
 			},
@@ -767,8 +902,9 @@ func TestControllerMutation(t *testing.T) {
 			desc: "request dual-stack loadbalancer with invalid ingress",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:       "LoadBalancer",
-					ClusterIPs: []string{"3000::1", "5.6.7.8"},
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"3000::1", "5.6.7.8"},
+					IPFamilyPolicy: &IPFamilyPolicyRequireDualStack,
 				},
 				Status: v1.ServiceStatus{
 					LoadBalancer: v1.LoadBalancerStatus{
@@ -785,8 +921,9 @@ func TestControllerMutation(t *testing.T) {
 			},
 			want: &v1.Service{
 				Spec: v1.ServiceSpec{
-					Type:       "LoadBalancer",
-					ClusterIPs: []string{"3000::1", "5.6.7.8"},
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"3000::1", "5.6.7.8"},
+					IPFamilyPolicy: &IPFamilyPolicyRequireDualStack,
 				},
 				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
 			},
@@ -1236,10 +1373,12 @@ func TestControllerDualStackConfig(t *testing.T) {
 	}
 
 	l := log.NewNopLogger()
+	IPFamilyPolicyRequireDualStack := v1.IPFamilyPolicyRequireDualStack
 	svc := &v1.Service{
 		Spec: v1.ServiceSpec{
-			Type:       "LoadBalancer",
-			ClusterIPs: []string{"1.2.3.4", "1000::"},
+			Type:           "LoadBalancer",
+			ClusterIPs:     []string{"1.2.3.4", "1000::"},
+			IPFamilyPolicy: &IPFamilyPolicyRequireDualStack,
 		},
 	}
 	if c.SetBalancer(l, "test", svc, []discovery.EndpointSlice{}) == controllers.SyncStateError {

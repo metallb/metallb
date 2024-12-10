@@ -54,7 +54,7 @@ type BGPPeerValidator struct {
 }
 
 // Handle handled incoming admission requests for BGPPeer objects.
-func (v *BGPPeerValidator) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
+func (v *BGPPeerValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var peer v1beta2.BGPPeer
 	var oldPeer v1beta2.BGPPeer
 	if req.Operation == v1.Delete {

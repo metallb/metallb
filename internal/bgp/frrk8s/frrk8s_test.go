@@ -506,6 +506,59 @@ func TestSingleAdvertisement(t *testing.T) {
 	testCheckConfigFile(t)
 }
 
+func TestTwoAdvertisementsWithSamePrefix(t *testing.T) {
+	l := log.NewNopLogger()
+	sessionManager := newTestSessionManager(t)
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer"})
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	prefix := &net.IPNet{
+		IP:   net.ParseIP("172.16.1.10"),
+		Mask: classCMask,
+	}
+	communities := []community.BGPCommunity{}
+	community1, _ := community.New("1111:2222")
+	communities = append(communities, community1)
+	community2, _ := community.New("3333:4444")
+	communities = append(communities, community2)
+	adv := &bgp.Advertisement{
+		Prefix:      prefix,
+		Communities: communities,
+		LocalPref:   300,
+		Peers:       []string{"peer1"},
+	}
+	adv2 := &bgp.Advertisement{
+		Prefix:      prefix,
+		Communities: communities,
+		LocalPref:   300,
+	}
+	advs := []*bgp.Advertisement{adv, adv2}
+	rand.Shuffle(len(advs), func(i, j int) {
+		advs[i], advs[j] = advs[j], advs[i]
+	})
+	err = session.Set(advs[0], advs[1])
+	if err != nil {
+		t.Fatalf("Could not advertise prefix: %s", err)
+	}
+
+	testCheckConfigFile(t)
+}
+
 func TestSingleAdvertisementNoRouterID(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := newTestSessionManager(t)

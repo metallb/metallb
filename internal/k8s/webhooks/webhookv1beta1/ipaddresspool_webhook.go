@@ -54,7 +54,7 @@ type IPAddressPoolValidator struct {
 }
 
 // Handle handled incoming admission requests for IPAddressPool objects.
-func (v *IPAddressPoolValidator) Handle(ctx context.Context, req admission.Request) (resp admission.Response) {
+func (v *IPAddressPoolValidator) Handle(ctx context.Context, req admission.Request) admission.Response {
 	var pool v1beta1.IPAddressPool
 	var oldPool v1beta1.IPAddressPool
 	if req.Operation == v1.Delete {

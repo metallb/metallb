@@ -8,7 +8,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/google/go-cmp v0.6.0
-	github.com/metallb/frr-k8s v0.0.15
+	github.com/metallb/frr-k8s v0.0.16
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/onsi/ginkgo/v2 v2.19.0
 	github.com/onsi/gomega v1.33.1
