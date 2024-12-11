@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -681,9 +682,9 @@ var _ = ginkgo.Describe("BGP", func() {
 					Expect(neighbors).To(HaveLen(len(previousNeighbors[c.Name])))
 
 					for _, n := range neighbors {
-						previousDropped := previousNeighbors[c.Name][n.IP.String()].ConnectionsDropped
+						previousDropped := previousNeighbors[c.Name][n.ID].ConnectionsDropped
 						if n.ConnectionsDropped > previousDropped {
-							return fmt.Errorf("increased connections dropped from %s to %s, previous: %d current %d", c.Name, n.IP.String(), previousDropped, n.ConnectionsDropped)
+							return fmt.Errorf("increased connections dropped from %s to %s, previous: %d current %d", c.Name, n.ID, previousDropped, n.ConnectionsDropped)
 						}
 					}
 				}
@@ -1540,10 +1541,10 @@ var _ = ginkgo.Describe("BGP", func() {
 							return fmt.Errorf("expected connect time to be %d, got %d", int(connectTime.Seconds()), neighbor.ConfiguredConnectTime)
 						}
 
-						neighborFamily := ipfamily.ForAddress(neighbor.IP)
+						neighborFamily := ipfamily.ForAddress(net.ParseIP(neighbor.ID))
 						for _, family := range neighbor.AddressFamilies {
 							if !strings.Contains(family, string(neighborFamily)) {
-								return fmt.Errorf("expected %s neigbour to contain only %s families but contains %s", neighbor.IP, neighborFamily, family)
+								return fmt.Errorf("expected %s neigbour to contain only %s families but contains %s", neighbor.ID, neighborFamily, family)
 							}
 						}
 					}

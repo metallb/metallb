@@ -38,9 +38,11 @@ debug bgp nht
 debug bgp updates in
 debug bgp updates out
 debug bgp zebra
+debug bgp bfd
 debug bfd peer
 debug bfd zebra
 debug bfd network
+debug bfd distributed
 !
 ip nht resolve-via-default
 ipv6 nht resolve-via-default
@@ -63,7 +65,7 @@ router bgp {{$ROUTERASN}}
   {{ if .Password -}}
   neighbor {{.Addr}} password {{.Password}}
   {{- end }}
-{{- if .BFDEnabled }} 
+{{- if .BFDEnabled }}
   neighbor {{.Addr}} bfd
 {{- end -}}
 {{- end }}

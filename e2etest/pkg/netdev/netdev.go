@@ -166,6 +166,27 @@ func AddressesForDevice(exec executor.Executor, dev string) (*Addresses, error) 
 	return &res, nil
 }
 
+func LinkLocalAddressForDevice(exec executor.Executor, dev string) (string, error) {
+	jsonIPOutput, err := exec.Exec("ip", "-j", "-6", "addr", "show", "dev", dev, "scope", "link")
+	if err != nil {
+		return "", fmt.Errorf("failed to retrieve interface address %s, %w :%s", dev, err, jsonIPOutput)
+	}
+
+	var intf []interfaceAddress
+	err = json.Unmarshal([]byte(jsonIPOutput), &intf)
+	if err != nil {
+		return "", err
+	}
+	if len(intf) != 1 {
+		return "", fmt.Errorf("expected one single interface for %s, got %d", dev, len(intf))
+	}
+	for _, addr := range intf[0].AddrInfo {
+		return addr.Local, nil
+	}
+
+	return "", nil
+}
+
 func findInterfaceWithAddresses(jsonIPOutput string, ipv4Address, ipv6Address string) (string, error) {
 	var interfaces []interfaceAddress
 	err := json.Unmarshal([]byte(jsonIPOutput), &interfaces)
