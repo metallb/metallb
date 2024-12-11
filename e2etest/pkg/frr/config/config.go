@@ -27,11 +27,21 @@ log file /tmp/frr.log debugging`
 const bgpConfigTemplate = `
 password zebra
 
-debug bgp updates
-debug bgp neighbor
+debug zebra events
+debug zebra kernel
+debug zebra rib
 debug zebra nht
+debug zebra nexthop
+debug bgp keepalives
+debug bgp neighbor-events
 debug bgp nht
+debug bgp updates in
+debug bgp updates out
+debug bgp zebra
 debug bfd peer
+debug bfd zebra
+debug bfd network
+!
 ip nht resolve-via-default
 ipv6 nht resolve-via-default
 

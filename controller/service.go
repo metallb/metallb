@@ -83,6 +83,12 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 			lbIPs = append(lbIPs, net.ParseIP(ip))
 		}
 	}
+
+	familyPolicy := v1.IPFamilyPolicySingleStack
+	if svc.Spec.IPFamilyPolicy != nil {
+		familyPolicy = *(svc.Spec.IPFamilyPolicy)
+	}
+
 	if len(lbIPs) == 0 {
 		c.clearServiceState(key, svc)
 	} else {
@@ -97,10 +103,10 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 			c.client.Errorf(svc, "noclusterIPsIPFamily", "Failed to retrieve ClusterIPs IPFamily for %q %s: %s", svc.Spec.ClusterIPs, svc.Spec.ClusterIP, err)
 			return ErrConverge
 		}
-		// Clear the lbIP if it has a different ipFamily compared to the clusterIP.
+
+		// if the lbIP family has changed from its supposed state, clear the lbIP.
 		// (this should not happen since the "ipFamily" of a service is immutable)
-		if lbIPsIPFamily != clusterIPsIPFamily ||
-			lbIPsIPFamily == ipfamily.Unknown {
+		if serviceFamilyChanged(lbIPsIPFamily, clusterIPsIPFamily, familyPolicy) {
 			c.clearServiceState(key, svc)
 			lbIPs = []net.IP{}
 		}
@@ -141,6 +147,22 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 			level.Info(l).Log("event", "clearAssignment", "reason", "differentIPRequested", "msg", "user requested a different IP than the one currently assigned")
 			c.clearServiceState(key, svc)
 			lbIPs = []net.IP{}
+		}
+	}
+
+	// If svc currently has 1 ip and policy PreferDualStack, try assigning ip from the missing family and same pool
+	if len(lbIPs) == 1 && familyPolicy == v1.IPFamilyPolicyPreferDualStack {
+		level.Info(l).Log("event", "tryAssignAdditionalIP", "msg", "familyPolicy is PreferDualStack, trying to assign additional ip")
+		currentPool := c.ips.Pool(key)
+		// Try assigning a new ip with the missing stack and from the same pool.
+		newIP, err := c.ips.AllocateFromPoolForAdditionalFamily(key, svc, lbIPs[0], currentPool, k8salloc.Ports(svc), SharingKey(svc), k8salloc.BackendKey(svc))
+		if err != nil {
+			c.client.Infof(svc, "AdditionalAssignFailed", "cannot assign additional IP in PreferDualStack: %s", err)
+		}
+		if newIP != nil {
+			lbIPs = append(lbIPs, newIP)
+			level.Info(l).Log("event", "ipAllocated", "ip", newIP, "msg", "Additional IP address assigned by controller")
+			c.client.Infof(svc, "IPAllocated", "Assigned additional IP %q", newIP)
 		}
 	}
 
@@ -187,6 +209,30 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	svc.Annotations[AnnotationIPAllocateFromPool] = pool
 
 	return nil
+}
+
+// serviceFamilyChanged determines if lbIP has different ipfamily
+// than what it's supposed to have.
+func serviceFamilyChanged(
+	lbIPsIPFamily, clusterIPsIPFamily ipfamily.Family,
+	familyPolicy v1.IPFamilyPolicy,
+) bool {
+	if lbIPsIPFamily == ipfamily.Unknown {
+		return true
+	}
+	// if lbIPsIPFamily is the same as clusterIPsIPFamily, it's
+	// the correct family.
+	if lbIPsIPFamily == clusterIPsIPFamily {
+		return false
+	}
+
+	// In case of PreferDualStack policy, difference is accepted.
+	if clusterIPsIPFamily == ipfamily.DualStack && familyPolicy == v1.IPFamilyPolicyPreferDualStack {
+		return false
+	}
+
+	// otherwise, it's a family change.
+	return true
 }
 
 // clearServiceState clears all fields that are actively managed by

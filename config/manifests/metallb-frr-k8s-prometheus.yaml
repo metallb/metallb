@@ -566,16 +566,27 @@ spec:
                 description: To set if we want to disable MP BGP that will separate
                   IPv4 and IPv6 route exchanges into distinct BGP sessions.
                 type: boolean
+              dynamicASN:
+                description: |-
+                  DynamicASN detects the AS number to use for the remote end of the session
+                  without explicitly setting it via the ASN field. Limited to:
+                  internal - if the neighbor's ASN is different than MyASN connection is denied.
+                  external - if the neighbor's ASN is the same as MyASN the connection is denied.
+                  ASN and DynamicASN are mutually exclusive and one of them must be specified.
+                enum:
+                - internal
+                - external
+                type: string
               ebgpMultiHop:
                 description: To set if the BGPPeer is multi-hops away. Needed for
                   FRR mode only.
                 type: boolean
               enableGracefulRestart:
                 description: |-
-                  EnableGracefulRestart allows BGP peer to continue to forward data packets along
-                  known routes while the routing protocol information is being restored.
-                  This field is immutable because it requires restart of the BGP session
-                  Supported for FRR mode only.
+                  EnableGracefulRestart allows BGP peer to continue to forward data packets
+                  along known routes while the routing protocol information is being
+                  restored. This field is immutable because it requires restart of the BGP
+                  session. Supported for FRR mode only.
                 type: boolean
                 x-kubernetes-validations:
                 - message: EnableGracefulRestart cannot be changed after creation
@@ -668,7 +679,9 @@ spec:
                 type: object
                 x-kubernetes-map-type: atomic
               peerASN:
-                description: AS number to expect from the remote end of the session.
+                description: |-
+                  AS number to expect from the remote end of the session.
+                  ASN and DynamicASN are mutually exclusive and one of them must be specified.
                 format: int32
                 maximum: 4294967295
                 minimum: 0
@@ -695,7 +708,6 @@ spec:
                 type: string
             required:
             - myASN
-            - peerASN
             - peerAddress
             type: object
           status:
@@ -2520,7 +2532,7 @@ data:
     #
     vtysh_enable=yes
     zebra_options="  -A 127.0.0.1 -s 90000000"
-    bgpd_options="   -A 127.0.0.1"
+    bgpd_options="   -A 127.0.0.1 -p 0"
     ospfd_options="  -A 127.0.0.1"
     ospf6d_options=" -A ::1"
     ripd_options="   -A 127.0.0.1"
@@ -2822,7 +2834,7 @@ spec:
         - --log-level=info
         - --webhook-mode=onlywebhook
         - --namespace=$(NAMESPACE)
-        - --health-probe-bind-address=:8081
+        - --metrics-bind-address=:7572
         command:
         - /frr-k8s
         env:
@@ -2830,19 +2842,22 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/metallb/frr-k8s:v0.0.15
+        image: quay.io/metallb/frr-k8s:v0.0.16
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
-            path: /healthz
-            port: 8081
+            path: /metrics
+            port: monitoring
           initialDelaySeconds: 15
           periodSeconds: 20
         name: frr-k8s-webhook-server
+        ports:
+        - containerPort: 7572
+          name: monitoring
         readinessProbe:
           httpGet:
-            path: /readyz
-            port: 8081
+            path: /metrics
+            port: monitoring
           initialDelaySeconds: 5
           periodSeconds: 10
         resources:
@@ -2966,7 +2981,6 @@ spec:
             drop:
             - ALL
       - args:
-        - --health-probe-bind-address=127.0.0.1:8081
         - --metrics-bind-address=127.0.0.1:7572
         - --node-name=$(NODE_NAME)
         - --namespace=$(NAMESPACE)
@@ -2986,13 +3000,13 @@ spec:
           valueFrom:
             fieldRef:
               fieldPath: metadata.namespace
-        image: quay.io/metallb/frr-k8s:v0.0.15
+        image: quay.io/metallb/frr-k8s:v0.0.16
         imagePullPolicy: IfNotPresent
         livenessProbe:
           httpGet:
             host: 127.0.0.1
-            path: /healthz
-            port: 8081
+            path: /metrics
+            port: monitoring
           initialDelaySeconds: 15
           periodSeconds: 20
         name: frr-k8s
@@ -3002,8 +3016,8 @@ spec:
         readinessProbe:
           httpGet:
             host: 127.0.0.1
-            path: /readyz
-            port: 8081
+            path: /metrics
+            port: monitoring
           initialDelaySeconds: 5
           periodSeconds: 10
         resources:
@@ -3112,7 +3126,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-reloader.sh /etc/frr_reloader/
-        image: quay.io/metallb/frr-k8s:v0.0.15
+        image: quay.io/metallb/frr-k8s:v0.0.16
         name: cp-reloader
         volumeMounts:
         - mountPath: /etc/frr_reloader
@@ -3121,7 +3135,7 @@ spec:
         - /bin/sh
         - -c
         - cp -f /frr-metrics /etc/frr_metrics/
-        image: quay.io/metallb/frr-k8s:v0.0.15
+        image: quay.io/metallb/frr-k8s:v0.0.16
         name: cp-metrics
         volumeMounts:
         - mountPath: /etc/frr_metrics

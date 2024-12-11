@@ -59,8 +59,15 @@ func NewSessionManager(l log.Logger) bgp.SessionManager {
 // The session will immediately try to connect and synchronize its
 // local state with the peer.
 func (sm *sessionManager) NewSession(l log.Logger, args bgp.SessionParameters) (bgp.Session, error) {
+	sessionsParams := args
+	// native mode does not support empty holdtime,
+	// we explicitly set it to 90s in this case.
+	if args.HoldTime == nil {
+		ht := 90 * time.Second
+		sessionsParams.HoldTime = &ht
+	}
 	ret := &session{
-		SessionParameters: args,
+		SessionParameters: sessionsParams,
 		logger:            log.With(l, "peer", args.PeerAddress, "localASN", args.MyASN, "peerASN", args.PeerASN),
 		newHoldTime:       make(chan bool, 1),
 		advertised:        map[string]*bgp.Advertisement{},
@@ -238,7 +245,7 @@ func (s *session) connect() error {
 		}
 	}
 
-	if err = sendOpen(conn, s.MyASN, routerID, s.HoldTime); err != nil {
+	if err = sendOpen(conn, s.MyASN, routerID, *s.HoldTime); err != nil {
 		conn.Close()
 		return fmt.Errorf("send OPEN to %q: %s", s.PeerAddress, err)
 	}
@@ -274,7 +281,7 @@ func (s *session) connect() error {
 	}
 
 	// Set up regular keepalives from now on.
-	s.actualHoldTime = s.HoldTime
+	s.actualHoldTime = *s.HoldTime
 	if op.holdTime < s.actualHoldTime {
 		s.actualHoldTime = op.holdTime
 	}
