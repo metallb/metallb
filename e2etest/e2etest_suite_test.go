@@ -47,7 +47,6 @@ import (
 )
 
 var (
-	skipDockerCmd       bool
 	useOperator         bool
 	reportPath          string
 	updater             testsconfig.Updater
@@ -68,7 +67,6 @@ var (
 // handleFlags sets up all flags and parses the command line.
 func handleFlags() {
 	flag.IntVar(&service.TestServicePort, "service-pod-port", 80, "port number that pod opens, default: 80")
-	flag.BoolVar(&skipDockerCmd, "skip-docker", false, "set this to true if the BGP daemon is running on the host instead of in a container")
 	flag.StringVar(&l2tests.IPV4ServiceRange, "ipv4-service-range", "0", "a range of IPv4 addresses for MetalLB to use when running in layer2 mode")
 	flag.StringVar(&l2tests.IPV6ServiceRange, "ipv6-service-range", "0", "a range of IPv6 addresses for MetalLB to use when running in layer2 mode")
 	flag.StringVar(&nodeNics, "node-nics", "", "node's interfaces list separated by comma and used when running in interface selector")

@@ -26,13 +26,13 @@ func NeighborsMatchNodes(nodes []v1.Node, neighbors NeighborsMap, ipFamily ipfam
 		nodesIPs[ip] = struct{}{}
 	}
 	for _, n := range neighbors {
-		if _, ok := nodesIPs[n.IP.String()]; !ok { // skipping neighbors that are not nodes
+		if _, ok := nodesIPs[n.ID]; !ok { // skipping neighbors that are not nodes
 			continue
 		}
 		if !n.Connected {
-			return fmt.Errorf("node %s BGP session not established", n.IP.String())
+			return fmt.Errorf("node %s BGP session not established", n.ID)
 		}
-		delete(nodesIPs, n.IP.String())
+		delete(nodesIPs, n.ID)
 	}
 	if len(nodesIPs) != 0 { // some leftover, meaning more nodes than neighbors
 		return fmt.Errorf("vrfName=%s ,nodeIPS=%v vs nextHops=%v\n", vrfName, ips, neighbors)

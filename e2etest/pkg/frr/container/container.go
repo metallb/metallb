@@ -13,11 +13,13 @@ import (
 
 	"errors"
 
+	"go.universe.tf/e2etest/pkg/container"
 	"go.universe.tf/e2etest/pkg/executor"
 	"go.universe.tf/e2etest/pkg/frr"
 	frrconfig "go.universe.tf/e2etest/pkg/frr/config"
 	"go.universe.tf/e2etest/pkg/frr/consts"
 	"go.universe.tf/e2etest/pkg/ipfamily"
+	"go.universe.tf/e2etest/pkg/netdev"
 	"golang.org/x/sync/errgroup"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
@@ -28,6 +30,7 @@ const (
 	frrConfigDir = "config/frr"
 	// Host network name.
 	hostNetwork = "host"
+	noNetwork   = "none"
 	// FRR container mount destination path.
 	frrMountPath = "/etc/frr"
 )
@@ -69,6 +72,10 @@ func Create(configs map[string]Config) ([]*FRR, error) {
 				"bfdd":     true,
 			}
 			c, err := start(conf)
+			if err != nil {
+				return err
+			}
+
 			if c != nil {
 				err = wait.PollImmediate(time.Second, 5*time.Minute, func() (bool, error) {
 					daemons, err := frr.Daemons(c)
@@ -198,7 +205,12 @@ func configureContainer(cfg Config, configDir string) (*FRR, error) {
 		Network:        cfg.Network,
 	}
 
-	if cfg.Network == hostNetwork {
+	switch cfg.Network {
+	case noNetwork:
+		// In Unnumbered scenario this will be replaced with LLA address of the nic
+		frr.Ipv4 = ""
+		frr.Ipv6 = ""
+	case hostNetwork:
 		if net.ParseIP(cfg.HostIPv4) == nil {
 			return nil, errors.New("Invalid hostIPv4")
 		}
@@ -208,15 +220,14 @@ func configureContainer(cfg Config, configDir string) (*FRR, error) {
 
 		frr.Ipv4 = cfg.HostIPv4
 		frr.Ipv6 = cfg.HostIPv6
-	} else {
-		err := frr.updateIPS()
-		if err != nil {
+
+		frr.RouterConfig.RouterID = frr.Ipv4
+	default:
+		if err := frr.updateIPS(); err != nil {
 			return frr, err
 		}
+		frr.RouterConfig.RouterID = frr.Ipv4
 	}
-
-	// setting routerid after calculating ips
-	frr.RouterConfig.RouterID = frr.Ipv4
 
 	err := frr.updateVolumePermissions()
 	if err != nil {
@@ -364,4 +375,37 @@ func containerIsRunning(containerName string) error {
 	}
 
 	return nil
+}
+
+func CreateP2PPeerFor(nodeContainer, dev, frrImage string) (*FRR, error) {
+	c := Config{
+		Name:    fmt.Sprintf("unnumbered-p2p-%s-%s", nodeContainer, dev),
+		Image:   frrImage,
+		Network: noNetwork,
+		Router: frrconfig.RouterConfig{
+			BGPPort: 179,
+		},
+	}
+
+	peers, err := Create(map[string]Config{"peer": c})
+	if err != nil {
+		return nil, fmt.Errorf("create container failed - %w", err)
+	}
+
+	peer := peers[0]
+
+	if err := container.WireContainers(peer.Name, nodeContainer, dev); err != nil {
+		return nil, fmt.Errorf("wire the peer failed - %w", err)
+	}
+	lla, err := netdev.LinkLocalAddressForDevice(peer, dev)
+	if err != nil {
+		return nil, err
+	}
+	// Note .Ipv4 to have LLA IPv6 is valid https://datatracker.ietf.org/doc/html/rfc8950
+	//	 $ ip route get 200.100.100.1
+	//       200.100.100.1 via inet6 fe80::2c5f:eff:fec4:cf7b dev net0
+	peer.Ipv4 = lla
+	peer.Ipv6 = lla
+
+	return peer, nil
 }
