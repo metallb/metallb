@@ -19,6 +19,9 @@ type Provider interface {
 	// BGPMetricsPodFor returns the pod object to be scraped for FRR BGP/BFD metrics corresponding
 	// to the given speaker. It also returns the metric prefix to expect when scraping the pod directly.
 	BGPMetricsPodFor(speakerNamespace, speakerName string) (pod *corev1.Pod, metricsPrefix string, err error)
+
+	// FRRK8sBased tells if the given provider is based on frrk8s
+	FRRK8sBased() bool
 }
 
 type frrModeProvider struct {
@@ -72,6 +75,10 @@ func (f frrModeProvider) BGPMetricsPodFor(ns, name string) (*corev1.Pod, string,
 	}
 
 	return p, "metallb", nil
+}
+
+func (f frrModeProvider) FRRK8sBased() bool {
+	return false
 }
 
 type frrk8sModeProvider struct {
@@ -133,4 +140,8 @@ func (f frrk8sModeProvider) BGPMetricsPodFor(ns, name string) (*corev1.Pod, stri
 	}
 
 	return p, "frrk8s", nil
+}
+
+func (f frrk8sModeProvider) FRRK8sBased() bool {
+	return true
 }

@@ -3,7 +3,10 @@
 package container
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/netip"
+	"strings"
 
 	"go.universe.tf/e2etest/pkg/executor"
 	"go.universe.tf/e2etest/pkg/netdev"
@@ -92,4 +95,127 @@ func SetupVRFForNetwork(containerName, vrfNetwork, vrfName, vrfRoutingTable stri
 	}
 
 	return nil
+}
+
+// WireContainers creates a point-to-point link between two containers.
+// The second argument will be the name of the interface which will be
+// common to both containers e.g. net0.
+func WireContainers(containerA, containerB, dev string) error {
+	netNSCntA, err := executor.Host.Exec(executor.ContainerRuntime,
+		"inspect", "-f", "{{ .NetworkSettings.SandboxKey }}", containerA)
+	if err != nil {
+		return fmt.Errorf("%s - %w", netNSCntA, err)
+	}
+	netNSCntA = strings.TrimSpace(netNSCntA)
+
+	netNSCntB, err := executor.Host.Exec(executor.ContainerRuntime,
+		"inspect", "-f", "{{ .NetworkSettings.SandboxKey }}", containerB)
+	if err != nil {
+		return fmt.Errorf("%s - %w", netNSCntB, err)
+	}
+	netNSCntB = strings.TrimSpace(netNSCntB)
+
+	if out, err := executor.Host.Exec("sudo", "ip", "link", "add", dev, "netns",
+		netNSCntA, "type", "veth", "peer", "name", dev); err != nil {
+		return fmt.Errorf("%s - %w", out, err)
+	}
+
+	if out, err := executor.Host.Exec("sudo", "ip", "link", "set", "dev", dev,
+		"netns", netNSCntB); err != nil {
+		return fmt.Errorf("%s - %w", out, err)
+	}
+
+	for _, c := range []executor.Executor{executor.ForContainer(containerA), executor.ForContainer(containerB)} {
+		if out, err := c.Exec("ip", "link", "set", "dev", dev, "up"); err != nil {
+			return fmt.Errorf("%s - %w", out, err)
+		}
+	}
+
+	return nil
+}
+
+// BGPRoutes executes `ip route show proto bgp` in the executor and returns all
+// routes filtered by device e.g. net0.  The return is map[destination CIDR]-> set[nextHops].
+func BGPRoutes(exc executor.Executor, dev string) (map[netip.Prefix]map[netip.Addr]struct{}, error) {
+	ret := make(map[netip.Prefix]map[netip.Addr]struct{})
+
+	type Nexthop struct {
+		Gateway string   `json:"gateway"`
+		Dev     string   `json:"dev"`
+		Weight  int      `json:"weight"`
+		Flags   []string `json:"flags"`
+	}
+
+	type IPRoute struct {
+		Dst      string    `json:"dst"`
+		Nexthops []Nexthop `json:"nexthops,omitempty"`
+		Gateway  string    `json:"gateway,omitempty"`
+		Via      *struct {
+			Family string `json:"family"`
+			Host   string `json:"host"`
+		} `json:"via,omitempty"`
+		Dev string `json:"dev"`
+	}
+
+	for _, proto := range []string{"-4", "-6"} {
+		out, err := exc.Exec("ip", proto, "--json", "route", "show", "proto", "bgp")
+		if err != nil {
+			return nil, fmt.Errorf("%s - %w", out, err)
+		}
+
+		var routes []IPRoute
+		err = json.Unmarshal([]byte(out), &routes)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse JSON output: %w", err)
+		}
+
+		for _, r := range routes {
+			dst, err := netip.ParsePrefix(r.Dst)
+			if err != nil {
+				return nil, fmt.Errorf("invalid prefix %s: %w", r.Dst, err)
+			}
+
+			nextHops := make(map[netip.Addr]struct{})
+			// this is for ipv4 single next-hop
+			if r.Via != nil {
+				addr, err := netip.ParseAddr(r.Via.Host)
+				if err != nil {
+					return nil, fmt.Errorf("invalid next-hop %s: %w", r.Via.Host, err)
+				}
+				if r.Dev == dev {
+					nextHops[addr] = struct{}{}
+				}
+			}
+
+			// this is for ipv4 multiple next-hops
+			for _, nh := range r.Nexthops {
+				addr, err := netip.ParseAddr(nh.Gateway)
+				if err != nil {
+					return nil, fmt.Errorf("invalid next-hop %s: %w", nh.Gateway, err)
+				}
+
+				if nh.Dev == dev {
+					nextHops[addr] = struct{}{}
+				}
+			}
+
+			// this is for ipv6
+			if r.Gateway != "" {
+				addr, err := netip.ParseAddr(r.Gateway)
+				if err != nil {
+					return nil, fmt.Errorf("invalid next-hop %s: %w", r.Gateway, err)
+				}
+				if r.Dev == dev {
+					nextHops[addr] = struct{}{}
+				}
+			}
+
+			if len(nextHops) == 0 {
+				continue
+			}
+			ret[dst] = nextHops
+		}
+	}
+
+	return ret, nil
 }

@@ -47,7 +47,7 @@ func NeighborsInfo(exec executor.Executor) (NeighborsMap, error) {
 	}
 	res := map[string]*Neighbor{}
 	for _, n := range neighbors {
-		res[n.IP.String()] = n
+		res[n.ID] = n
 	}
 	return res, nil
 }
@@ -152,9 +152,15 @@ func NeighborConnected(neighborJSON string) (bool, error) {
 // To be used for debugging in order to print the status of the frr instance.
 func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 	allerrs := errors.New("")
+	res := "####### Show version\n"
+	out, err := exec.Exec("vtysh", "-c", "show version")
+	if err != nil {
+		allerrs = errors.Join(allerrs, fmt.Errorf("\nFailed exec show version: %v", err))
+	}
+	res += out
 
-	res := "####### Show running config\n"
-	out, err := exec.Exec("vtysh", "-c", "show running-config")
+	res += "####### Show running config\n"
+	out, err = exec.Exec("vtysh", "-c", "show running-config")
 	if err != nil {
 		allerrs = errors.Join(allerrs, fmt.Errorf("\nFailed exec show bgp neighbor: %v", err))
 	}
@@ -174,6 +180,20 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 	out, err = exec.Exec("vtysh", "-c", "show bgp neighbor")
 	if err != nil {
 		allerrs = errors.Join(allerrs, fmt.Errorf("\nFailed exec show bgp neighbor: %v", err))
+	}
+	res += out
+
+	res += "####### Routes\n"
+	out, err = exec.Exec("vtysh", "-c", "show bgp ipv4 json")
+	if err != nil {
+		allerrs = errors.Join(allerrs, fmt.Errorf("\nFailed exec show bgp ipv4: %v", err))
+	}
+	res += out
+
+	res += "####### Routes\n"
+	out, err = exec.Exec("vtysh", "-c", "show bgp ipv6 json")
+	if err != nil {
+		allerrs = errors.Join(allerrs, fmt.Errorf("\nFailed exec show bgp ipv6: %v", err))
 	}
 	res += out
 
@@ -197,6 +217,13 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 			res += out
 		}
 	}
+
+	res += "####### Network setup for host\n"
+	out, err = exec.Exec("bash", "-c", "ip -6 route; ip -4 route")
+	if err != nil {
+		allerrs = errors.Join(allerrs, fmt.Errorf("\nFailed exec to print network setup: %v", err))
+	}
+	res += out
 
 	if allerrs.Error() == "" {
 		allerrs = nil
