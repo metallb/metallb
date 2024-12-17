@@ -2,6 +2,31 @@ apiVersion: v1
 entries:
   metallb:
   - apiVersion: v2
+    appVersion: v0.14.9
+    created: "2024-12-17T14:58:19.318337773Z"
+    dependencies:
+    - condition: crds.enabled
+      name: crds
+      repository: ""
+      version: 0.14.9
+    - condition: frrk8s.enabled
+      name: frr-k8s
+      repository: https://metallb.github.io/frr-k8s
+      version: 0.0.16
+    description: A network load-balancer implementation for Kubernetes using standard
+      routing protocols
+    digest: e808428c9047d0c218634bc0f7cc92b8545d4c207470b3b563cfcbb46ab31ae9
+    home: https://metallb.universe.tf
+    icon: https://metallb.universe.tf/images/logo/metallb-white.png
+    kubeVersion: '>= 1.19.0-0'
+    name: metallb
+    sources:
+    - https://github.com/metallb/metallb
+    type: application
+    urls:
+    - https://github.com/metallb/metallb/releases/download/metallb-chart-0.14.9/metallb-0.14.9.tgz
+    version: 0.14.9
+  - apiVersion: v2
     appVersion: v0.14.8
     created: "2024-07-23T12:42:11.214936411Z"
     dependencies:
@@ -510,4 +535,4 @@ entries:
     urls:
     - https://github.com/metallb/metallb/releases/download/metallb-chart-0.0.0/metallb-0.0.0.tgz
     version: 0.0.0
-generated: "2024-07-23T12:42:11.215377836Z"
+generated: "2024-12-17T14:58:19.31852376Z"
