@@ -12,6 +12,7 @@ import (
 
 	"go.universe.tf/metallb/internal/bgp"
 	"go.universe.tf/metallb/internal/bgp/community"
+	"go.universe.tf/metallb/internal/safeconvert"
 )
 
 func sendOpen(w io.Writer, asn uint32, routerID net.IP, holdTime time.Duration) error {
@@ -81,7 +82,13 @@ func sendOpen(w io.Writer, asn uint32, routerID net.IP, holdTime time.Duration) 
 		CapLen:  4,
 		ASN32:   asn,
 	}
-	msg.Len = uint16(binary.Size(msg))
+
+	var err error
+	msg.Len, err = safeconvert.IntToUInt16(binary.Size(msg))
+	if err != nil {
+		return fmt.Errorf("invalid message len %w", err)
+	}
+
 	if asn > 65535 {
 		msg.ASN16 = 23456
 	}
@@ -310,9 +317,19 @@ func sendUpdate(w io.Writer, asn uint32, ibgp, fbasn bool, nextHop net.IP, adv *
 	if err := encodePathAttrs(&b, asn, ibgp, fbasn, nextHop, adv); err != nil {
 		return err
 	}
-	binary.BigEndian.PutUint16(b.Bytes()[21:23], uint16(b.Len()-l))
+
+	toWrite, err := safeconvert.IntToUInt16(b.Len() - l)
+	if err != nil {
+		return err
+	}
+	binary.BigEndian.PutUint16(b.Bytes()[21:23], toWrite)
 	encodePrefixes(&b, []*net.IPNet{adv.Prefix})
-	binary.BigEndian.PutUint16(b.Bytes()[16:18], uint16(b.Len()))
+
+	toWrite, err = safeconvert.IntToUInt16(b.Len())
+	if err != nil {
+		return err
+	}
+	binary.BigEndian.PutUint16(b.Bytes()[16:18], toWrite)
 
 	if _, err := io.Copy(w, &b); err != nil {
 		return err
@@ -361,7 +378,11 @@ func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp, fbasn bool, nextHop net.
 				2, // AS_SEQUENCE
 				1, // len (in number of ASes)
 			})
-			if err := binary.Write(b, binary.BigEndian, uint16(asn)); err != nil {
+			asnToWrite, err := safeconvert.Uint32ToInt16(asn)
+			if err != nil {
+				return fmt.Errorf("invalid asn: %w", err)
+			}
+			if err := binary.Write(b, binary.BigEndian, asnToWrite); err != nil {
 				return err
 			}
 		}
@@ -398,7 +419,12 @@ func encodePathAttrs(b *bytes.Buffer, asn uint32, ibgp, fbasn bool, nextHop net.
 		b.Write([]byte{
 			0xc0, 8, // optional transitive, communities
 		})
-		if err := binary.Write(b, binary.BigEndian, uint8(len(legacyCommunities)*4)); err != nil {
+
+		toWrite, err := safeconvert.IntToUInt8(len(legacyCommunities) * 4)
+		if err != nil {
+			return fmt.Errorf("invalid size of legacy communities: %w", err)
+		}
+		if err := binary.Write(b, binary.BigEndian, toWrite); err != nil {
 			return err
 		}
 		for _, c := range legacyCommunities {
@@ -429,11 +455,20 @@ func sendWithdraw(w io.Writer, prefixes []*net.IPNet) error {
 	}
 	l := b.Len()
 	encodePrefixes(&b, prefixes)
-	binary.BigEndian.PutUint16(b.Bytes()[19:21], uint16(b.Len()-l))
+	toWrite, err := safeconvert.IntToUInt16(b.Len() - l)
+	if err != nil {
+		return fmt.Errorf("invalid buffer %w", err)
+	}
+	binary.BigEndian.PutUint16(b.Bytes()[19:21], toWrite)
 	if err := binary.Write(&b, binary.BigEndian, uint16(0)); err != nil {
 		return err
 	}
-	binary.BigEndian.PutUint16(b.Bytes()[16:18], uint16(b.Len()))
+
+	toWrite, err = safeconvert.IntToUInt16(b.Len())
+	if err != nil {
+		return fmt.Errorf("invalid buffer %w", err)
+	}
+	binary.BigEndian.PutUint16(b.Bytes()[16:18], toWrite)
 
 	if _, err := io.Copy(w, &b); err != nil {
 		return err

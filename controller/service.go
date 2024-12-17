@@ -30,10 +30,18 @@ import (
 )
 
 const (
-	AnnotationPrefix             = "metallb.universe.tf"
+	AnnotationPrefix             = "metallb.io"
 	AnnotationAddressPool        = AnnotationPrefix + "/" + "address-pool"
 	AnnotationLoadBalancerIPs    = AnnotationPrefix + "/" + "loadBalancerIPs"
 	AnnotationIPAllocateFromPool = AnnotationPrefix + "/" + "ip-allocated-from-pool"
+	AnnotationAllowSharedIP      = AnnotationPrefix + "/" + "allow-shared-ip"
+
+	// Deprecated Annotations. Used for backward compatibility.
+	DeprecatedAnnotationPrefix             = "metallb.universe.tf"
+	DeprecatedAnnotationAddressPool        = DeprecatedAnnotationPrefix + "/" + "address-pool"
+	DeprecatedAnnotationLoadBalancerIPs    = DeprecatedAnnotationPrefix + "/" + "loadBalancerIPs"
+	DeprecatedAnnotationIPAllocateFromPool = DeprecatedAnnotationPrefix + "/" + "ip-allocated-from-pool"
+	DeprecatedAnnotationAllowSharedIP      = DeprecatedAnnotationPrefix + "/" + "allow-shared-ip"
 )
 
 var ErrConverge = fmt.Errorf("failed to converge")
@@ -75,6 +83,12 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 			lbIPs = append(lbIPs, net.ParseIP(ip))
 		}
 	}
+
+	familyPolicy := v1.IPFamilyPolicySingleStack
+	if svc.Spec.IPFamilyPolicy != nil {
+		familyPolicy = *(svc.Spec.IPFamilyPolicy)
+	}
+
 	if len(lbIPs) == 0 {
 		c.clearServiceState(key, svc)
 	} else {
@@ -89,10 +103,10 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 			c.client.Errorf(svc, "noclusterIPsIPFamily", "Failed to retrieve ClusterIPs IPFamily for %q %s: %s", svc.Spec.ClusterIPs, svc.Spec.ClusterIP, err)
 			return ErrConverge
 		}
-		// Clear the lbIP if it has a different ipFamily compared to the clusterIP.
+
+		// if the lbIP family has changed from its supposed state, clear the lbIP.
 		// (this should not happen since the "ipFamily" of a service is immutable)
-		if lbIPsIPFamily != clusterIPsIPFamily ||
-			lbIPsIPFamily == ipfamily.Unknown {
+		if serviceFamilyChanged(lbIPsIPFamily, clusterIPsIPFamily, familyPolicy) {
 			c.clearServiceState(key, svc)
 			lbIPs = []net.IP{}
 		}
@@ -104,7 +118,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	if len(lbIPs) != 0 {
 		// This assign is idempotent if the config is consistent,
 		// otherwise it'll fail and tell us why.
-		if err = c.ips.Assign(key, svc, lbIPs, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
+		if err = c.ips.Assign(key, svc, lbIPs, k8salloc.Ports(svc), SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 			level.Info(l).Log("event", "clearAssignment", "error", err, "msg", "current IP not allowed by config, clearing")
 			c.client.Infof(svc, "ClearAssignment", "current IP for %q not allowed by config, will attempt for new IP assignment: %s", key, err)
 			c.clearServiceState(key, svc)
@@ -114,7 +128,7 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 		// The user might also have changed the pool annotation, and
 		// requested a different pool than the one that is currently
 		// allocated.
-		desiredPool := svc.Annotations[AnnotationAddressPool]
+		desiredPool := valueForAnnotation(svc.Annotations, AnnotationAddressPool, DeprecatedAnnotationAddressPool)
 		if len(lbIPs) != 0 && desiredPool != "" && c.ips.Pool(key) != desiredPool {
 			level.Info(l).Log("event", "clearAssignment", "reason", "differentPoolRequested", "msg", "user requested a different pool than the one currently assigned")
 			c.clearServiceState(key, svc)
@@ -133,6 +147,22 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 			level.Info(l).Log("event", "clearAssignment", "reason", "differentIPRequested", "msg", "user requested a different IP than the one currently assigned")
 			c.clearServiceState(key, svc)
 			lbIPs = []net.IP{}
+		}
+	}
+
+	// If svc currently has 1 ip and policy PreferDualStack, try assigning ip from the missing family and same pool
+	if len(lbIPs) == 1 && familyPolicy == v1.IPFamilyPolicyPreferDualStack {
+		level.Info(l).Log("event", "tryAssignAdditionalIP", "msg", "familyPolicy is PreferDualStack, trying to assign additional ip")
+		currentPool := c.ips.Pool(key)
+		// Try assigning a new ip with the missing stack and from the same pool.
+		newIP, err := c.ips.AllocateFromPoolForAdditionalFamily(key, svc, lbIPs[0], currentPool, k8salloc.Ports(svc), SharingKey(svc), k8salloc.BackendKey(svc))
+		if err != nil {
+			c.client.Infof(svc, "AdditionalAssignFailed", "cannot assign additional IP in PreferDualStack: %s", err)
+		}
+		if newIP != nil {
+			lbIPs = append(lbIPs, newIP)
+			level.Info(l).Log("event", "ipAllocated", "ip", newIP, "msg", "Additional IP address assigned by controller")
+			c.client.Infof(svc, "IPAllocated", "Assigned additional IP %q", newIP)
 		}
 	}
 
@@ -181,6 +211,30 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	return nil
 }
 
+// serviceFamilyChanged determines if lbIP has different ipfamily
+// than what it's supposed to have.
+func serviceFamilyChanged(
+	lbIPsIPFamily, clusterIPsIPFamily ipfamily.Family,
+	familyPolicy v1.IPFamilyPolicy,
+) bool {
+	if lbIPsIPFamily == ipfamily.Unknown {
+		return true
+	}
+	// if lbIPsIPFamily is the same as clusterIPsIPFamily, it's
+	// the correct family.
+	if lbIPsIPFamily == clusterIPsIPFamily {
+		return false
+	}
+
+	// In case of PreferDualStack policy, difference is accepted.
+	if clusterIPsIPFamily == ipfamily.DualStack && familyPolicy == v1.IPFamilyPolicyPreferDualStack {
+		return false
+	}
+
+	// otherwise, it's a family change.
+	return true
+}
+
 // clearServiceState clears all fields that are actively managed by
 // this controller.
 func (c *controller) clearServiceState(key string, svc *v1.Service) {
@@ -205,14 +259,14 @@ func (c *controller) allocateIPs(key string, svc *v1.Service) ([]net.IP, error) 
 		return nil, err
 	}
 
-	desiredPool := svc.Annotations[AnnotationAddressPool]
+	desiredPool := valueForAnnotation(svc.Annotations, AnnotationAddressPool, DeprecatedAnnotationAddressPool)
 
 	// If the user asked for a specific IPs, try that.
 	if len(desiredLbIPs) > 0 {
 		if serviceIPFamily != desiredLbIPFamily {
 			return nil, fmt.Errorf("requested loadBalancer IP(s) %q does not match the ipFamily of the service", desiredLbIPs)
 		}
-		if err := c.ips.Assign(key, svc, desiredLbIPs, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
+		if err := c.ips.Assign(key, svc, desiredLbIPs, k8salloc.Ports(svc), SharingKey(svc), k8salloc.BackendKey(svc)); err != nil {
 			return nil, err
 		}
 
@@ -227,7 +281,7 @@ func (c *controller) allocateIPs(key string, svc *v1.Service) ([]net.IP, error) 
 
 	// Assign ip from requested address pool.
 	if desiredPool != "" {
-		ips, err := c.ips.AllocateFromPool(key, svc, serviceIPFamily, desiredPool, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
+		ips, err := c.ips.AllocateFromPool(key, svc, serviceIPFamily, desiredPool, k8salloc.Ports(svc), SharingKey(svc), k8salloc.BackendKey(svc))
 		if err != nil {
 			return nil, err
 		}
@@ -235,7 +289,7 @@ func (c *controller) allocateIPs(key string, svc *v1.Service) ([]net.IP, error) 
 	}
 
 	// Okay, in that case just bruteforce across all pools.
-	return c.ips.Allocate(key, svc, serviceIPFamily, k8salloc.Ports(svc), k8salloc.SharingKey(svc), k8salloc.BackendKey(svc))
+	return c.ips.Allocate(key, svc, serviceIPFamily, k8salloc.Ports(svc), SharingKey(svc), k8salloc.BackendKey(svc))
 }
 
 func (c *controller) isServiceAllocated(key string) bool {
@@ -244,7 +298,7 @@ func (c *controller) isServiceAllocated(key string) bool {
 
 func getDesiredLbIPs(svc *v1.Service) ([]net.IP, ipfamily.Family, error) {
 	var desiredLbIPs []net.IP
-	desiredLbIPsStr := svc.Annotations[AnnotationLoadBalancerIPs]
+	desiredLbIPsStr := valueForAnnotation(svc.Annotations, AnnotationLoadBalancerIPs, DeprecatedAnnotationLoadBalancerIPs)
 
 	if desiredLbIPsStr == "" && svc.Spec.LoadBalancerIP == "" {
 		return nil, "", nil
@@ -286,4 +340,23 @@ func isEqualIPs(ipsA, ipsB []net.IP) bool {
 		return ipsB[i].String() < ipsB[j].String()
 	})
 	return reflect.DeepEqual(ipsA, ipsB)
+}
+
+// SharingKey extracts the sharing key for a service.
+func SharingKey(svc *v1.Service) string {
+	if _, ok := svc.Annotations[AnnotationAllowSharedIP]; ok {
+		return svc.Annotations[AnnotationAllowSharedIP]
+	}
+	return svc.Annotations[DeprecatedAnnotationAllowSharedIP]
+}
+
+func valueForAnnotation(annotations map[string]string, stableAnnotation string, deprecatedAnnotation string) string {
+	if value, ok := annotations[stableAnnotation]; ok {
+		return value
+	}
+	if value, ok := annotations[deprecatedAnnotation]; ok {
+		return value
+	}
+
+	return ""
 }

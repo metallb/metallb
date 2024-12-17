@@ -32,14 +32,14 @@ jobs:
       - name: Checkout Source
         uses: actions/checkout@v4
       - name: Run Gosec Security Scanner
-        uses: securego/gosec@master
+        uses: securego/gosec@v2.21.2
         with:
           args: -exclude-dir e2etest -severity medium ./...
-
       - name: Golang Vulncheck
-        uses: Templum/govulncheck-action@v0.10.1
+        uses: golang/govulncheck-action@v1.0.3
         with:
-          skip-upload: true
+          go-version-file: go.mod
+
 
   commitlint:
     runs-on: ubuntu-22.04
@@ -64,7 +64,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install python3-pip arping ndisc6
-          sudo pip3 install invoke semver pyyaml
+          sudo pip3 install -r dev-env/requirements.txt
 
       - name: Unit Tests
         run: |
@@ -81,6 +81,8 @@ jobs:
           inv checkchanges --action="run inv generatemanifests"
           inv generateapidocs
           inv checkchanges --action="run inv generateapidocs"
+          inv linttasks
+          inv checkchanges --action="run inv linttasks"
 
   build-test-images:
     runs-on: ubuntu-22.04
@@ -226,8 +228,7 @@ jobs:
           HELM_FLAGS=""
           echo '/etc/frr/core-%e.%p.%h.%t' | sudo tee /proc/sys/kernel/core_pattern
           if [ ${{ matrix.deployment }} = "helm" ]; then export SPEAKER_SELECTOR="app.kubernetes.io/component=speaker" && export CONTROLLER_SELECTOR="app.kubernetes.io/component=controller"; fi
-          # TODO restore to NONE when https://github.com/metallb/metallb/issues/2311 is fixed
-          SKIP="L2ServiceStatus"
+          SKIP="none"
           WITH_VRF="--with-vrf"
           FOCUS=""
           if [ "${{ matrix.bgp-type }}" == "native" ]; then SKIP="$SKIP|FRR|FRR-MODE|FRRK8S-MODE|BFD|VRF|DUALSTACK"; WITH_VRF=""; fi
@@ -250,7 +251,7 @@ jobs:
           artifact-name: kind-logs-${{ matrix.ip-family }}-${{ matrix.bgp-type }}-${{ matrix.deployment}}
 
       - name: Publish JUnit Report
-        uses: mikepenz/action-junit-report@v4
+        uses: mikepenz/action-junit-report@v5
         if: success() || failure()
         with:
           annotate_only: true
@@ -337,8 +338,7 @@ jobs:
           spec:
             logLevel: debug
           EOF
-          # TOOD remove skipping L2ServiceStatus once https://github.com/metallb/metallb/issues/2311 is fixed
-          sudo -E env "PATH=$PATH" inv e2etest --bgp-mode frr --skip "IPV6|DUALSTACK|metrics|L2-interface selector|FRRK8S-MODE|L2ServiceStatus" -e /tmp/kind_logs
+          sudo -E env "PATH=$PATH" inv e2etest --bgp-mode frr --skip "IPV6|DUALSTACK|metrics|L2-interface selector|FRRK8S-MODE" -e /tmp/kind_logs
 
       - name: Collect Logs
         if: ${{ failure() }}
@@ -347,7 +347,7 @@ jobs:
           artifact-name: kind_logs_use_operator
 
       - name: Publish JUnit Report
-        uses: mikepenz/action-junit-report@v4
+        uses: mikepenz/action-junit-report@v5
         if: success() || failure()
         with:
           annotate_only: true
@@ -391,7 +391,7 @@ jobs:
           artifact-name: kind-logs-oldest-k8s
 
       - name: Publish JUnit Report
-        uses: mikepenz/action-junit-report@v4
+        uses: mikepenz/action-junit-report@v5
         if: success() || failure()
         with:
           annotate_only: true

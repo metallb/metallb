@@ -99,17 +99,17 @@ router, but not the routers in other racks.
 
 {{<mermaid align="center">}}
 graph BT
-    subgraph ""
+    subgraph " "
       metallbA("MetalLB<br>Speaker")
     end
-    subgraph ""
+    subgraph "  "
       metallbB("MetalLB<br>Speaker")
     end
 
-    subgraph ""
+    subgraph "   "
       metallbC("MetalLB<br>Speaker")
     end
-    subgraph ""
+    subgraph "    "
       metallbD("MetalLB<br>Speaker")
     end
 
@@ -412,3 +412,34 @@ spec:
           allowed:
             mode: all
 ```
+### Graceful Restart
+
+BGP Graceful Restart (GR) functionality [(RFC-4724)](https://datatracker.ietf.org/doc/html/rfc4724) defines the mechanism
+that allows the BGP routers to continue to forward data packets along known
+routes while the routing protocol information is being restored. GR can be
+applied when the control plane is independent from the forwarding plane, which
+is the case for the most Kubernetes clusters. This feature was added to
+minimize network disruptions during upgrades.
+
+GR can be applied per BGP neighbor by setting the field `enableGracefulRestart`
+to true, note that this field is immutable. For example
+
+```yaml
+apiVersion: metallb.io/v1beta2
+kind: BGPPeer
+metadata:
+  name: example
+  namespace: metallb-system
+spec:
+  myASN: 64512
+  peerASN: 64512
+  peerAddress: 172.30.0.3
+  enableGracefulRestart: true
+```
+
+#### GR With BFD
+
+According to the [RFC-5881/BFD Shares Fate with the Control
+Plane](https://datatracker.ietf.org/doc/html/rfc5882#section-4.3.2), BFD and
+Graceful Restart can work together, but is implementation specific. It is up to
+vendor's recommendation and needs to be tested.

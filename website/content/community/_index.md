@@ -116,7 +116,7 @@ To develop MetalLB, you'll need a couple of pieces of software:
   running system
 - [kind](https://github.com/kubernetes-sigs/kind), a lightweight Kubernetes cluster running in Docker
 - [Kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/), the Kubernetes commandline interface
-- [Invoke](https://www.pyinvoke.org) to drive the build system
+- Install python dependencies with command `pip3 install -r dev-env/requirements.txt`
 
 >NOTE: The development environment was tested with **kind `v0.9.0`**. Older
 >versions may not work since there have been breaking changes between minor

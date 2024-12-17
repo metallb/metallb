@@ -38,7 +38,7 @@ You can report security issues in the github issue tracker. If you
 prefer private disclosure, please email to all of the maintainers:
 
 - fpaoline@redhat.com
-- rbryant@redhat.com
+- obraunsh@redhat.com
 
 We aim for initial response to vulnerability reports within 48
 hours. The timeline for fixes depends on the complexity of the issue.

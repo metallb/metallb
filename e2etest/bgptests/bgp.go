@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -382,7 +383,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			testservice.TestServicePort,
 			func(svc *corev1.Service) {
 				svc.Spec.LoadBalancerIP = serviceIP
-				svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
+				svc.Annotations = map[string]string{"metallb.io/allow-shared-ip": "foo"}
 				svc.Spec.Ports[0].Port = int32(testservice.TestServicePort)
 			})
 		defer testservice.Delete(cs, svc)
@@ -390,7 +391,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			testservice.TestServicePort+1,
 			func(svc *corev1.Service) {
 				svc.Spec.LoadBalancerIP = serviceIP
-				svc.Annotations = map[string]string{"metallb.universe.tf/allow-shared-ip": "foo"}
+				svc.Annotations = map[string]string{"metallb.io/allow-shared-ip": "foo"}
 				svc.Spec.Ports[0].Port = int32(testservice.TestServicePort + 1)
 			})
 		defer testservice.Delete(cs, svc1)
@@ -541,7 +542,7 @@ var _ = ginkgo.Describe("BGP", func() {
 		ginkgo.Entry("IPV4", ipfamily.IPv4),
 		ginkgo.Entry("IPV6", ipfamily.IPv6))
 
-	ginkgo.DescribeTable("FRR-MODE configure peers with GracefulRestart and validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
+	ginkgo.DescribeTable("FRR configure peers with GracefulRestart and validate external containers are paired with nodes", func(ipFamily ipfamily.Family) {
 		ginkgo.By("configure peer")
 
 		resources := config.Resources{
@@ -681,9 +682,9 @@ var _ = ginkgo.Describe("BGP", func() {
 					Expect(neighbors).To(HaveLen(len(previousNeighbors[c.Name])))
 
 					for _, n := range neighbors {
-						previousDropped := previousNeighbors[c.Name][n.IP.String()].ConnectionsDropped
+						previousDropped := previousNeighbors[c.Name][n.ID].ConnectionsDropped
 						if n.ConnectionsDropped > previousDropped {
-							return fmt.Errorf("increased connections dropped from %s to %s, previous: %d current %d", c.Name, n.IP.String(), previousDropped, n.ConnectionsDropped)
+							return fmt.Errorf("increased connections dropped from %s to %s, previous: %d current %d", c.Name, n.ID, previousDropped, n.ConnectionsDropped)
 						}
 					}
 				}
@@ -810,7 +811,7 @@ var _ = ginkgo.Describe("BGP", func() {
 
 				ginkgo.By(fmt.Sprintf("configure service number %d", i+1))
 				svc, _ := testservice.CreateWithBackend(cs, testNamespace, fmt.Sprintf("svc%d", i+1), testservice.TrafficPolicyCluster, func(svc *corev1.Service) {
-					svc.Annotations = map[string]string{"metallb.universe.tf/address-pool": fmt.Sprintf("test-addresspool%d", i+1)}
+					svc.Annotations = map[string]string{"metallb.io/address-pool": fmt.Sprintf("test-addresspool%d", i+1)}
 				})
 				defer testservice.Delete(cs, svc)
 
@@ -1295,16 +1296,16 @@ var _ = ginkgo.Describe("BGP", func() {
 					r.VRF = p.Spec.VRFName
 
 					keepAliveTime := p.Spec.KeepaliveTime
-					if keepAliveTime.Duration == 0 {
-						keepAliveTime.Duration = p.Spec.HoldTime.Duration / 3
+					if keepAliveTime == nil && p.Spec.HoldTime != nil {
+						keepAliveTime = &metav1.Duration{Duration: p.Spec.HoldTime.Duration / 3}
 					}
 					r.Neighbors = append(r.Neighbors, frrk8sv1beta1.Neighbor{
 						ASN:           p.Spec.ASN,
 						Address:       p.Spec.Address,
 						Password:      p.Spec.Password,
 						Port:          &p.Spec.Port,
-						HoldTime:      &p.Spec.HoldTime,
-						KeepaliveTime: &keepAliveTime,
+						HoldTime:      p.Spec.HoldTime,
+						KeepaliveTime: keepAliveTime,
 						EBGPMultiHop:  p.Spec.EBGPMultiHop,
 						BFDProfile:    p.Spec.BFDProfile,
 						ToReceive: frrk8sv1beta1.Receive{
@@ -1466,8 +1467,8 @@ var _ = ginkgo.Describe("BGP", func() {
 			})
 
 			for i := range resources.Peers {
-				resources.Peers[i].Spec.KeepaliveTime = metav1.Duration{Duration: 13 * time.Second}
-				resources.Peers[i].Spec.HoldTime = metav1.Duration{Duration: 57 * time.Second}
+				resources.Peers[i].Spec.KeepaliveTime = &metav1.Duration{Duration: 13 * time.Second}
+				resources.Peers[i].Spec.HoldTime = &metav1.Duration{Duration: 57 * time.Second}
 			}
 
 			err := ConfigUpdater.Update(resources)
@@ -1540,10 +1541,10 @@ var _ = ginkgo.Describe("BGP", func() {
 							return fmt.Errorf("expected connect time to be %d, got %d", int(connectTime.Seconds()), neighbor.ConfiguredConnectTime)
 						}
 
-						neighborFamily := ipfamily.ForAddress(neighbor.IP)
+						neighborFamily := ipfamily.ForAddress(net.ParseIP(neighbor.ID))
 						for _, family := range neighbor.AddressFamilies {
 							if !strings.Contains(family, string(neighborFamily)) {
-								return fmt.Errorf("expected %s neigbour to contain only %s families but contains %s", neighbor.IP, neighborFamily, family)
+								return fmt.Errorf("expected %s neigbour to contain only %s families but contains %s", neighbor.ID, neighborFamily, family)
 							}
 						}
 					}
@@ -1613,6 +1614,33 @@ var _ = ginkgo.Describe("BGP", func() {
 	},
 		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{l2tests.IPV4ServiceRange}),
 		ginkgo.Entry("IPV6", ipfamily.IPv6, []string{l2tests.IPV6ServiceRange}),
+	)
+	ginkgo.DescribeTable("FRR establishes connections with dynamic ASN ", func(pairingIPFamily ipfamily.Family) {
+		resources := config.Resources{
+			Peers: metallb.PeersForContainers(FRRContainers, pairingIPFamily, func(p *metallbv1beta2.BGPPeer) {
+				dynamicASN := metallbv1beta2.InternalASNMode
+				if p.Spec.ASN != p.Spec.MyASN {
+					dynamicASN = metallbv1beta2.ExternalASNMode
+				}
+				p.Spec.ASN = 0
+				p.Spec.DynamicASN = dynamicASN
+			}),
+		}
+
+		for _, c := range FRRContainers {
+			err := frrcontainer.PairWithNodes(cs, c, pairingIPFamily)
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		err := ConfigUpdater.Update(resources)
+		Expect(err).NotTo(HaveOccurred())
+
+		for _, c := range FRRContainers {
+			validateFRRPeeredWithAllNodes(cs, c, pairingIPFamily)
+		}
+	},
+		ginkgo.Entry("IPV4", ipfamily.IPv4),
+		ginkgo.Entry("IPV6", ipfamily.IPv6),
 	)
 })
 

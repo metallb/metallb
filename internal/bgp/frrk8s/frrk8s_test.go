@@ -22,6 +22,7 @@ import (
 	"go.universe.tf/metallb/internal/logging"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
+	"k8s.io/utils/ptr"
 )
 
 const testData = "testdata/"
@@ -114,6 +115,30 @@ func newTestSessionManager(t *testing.T) bgp.SessionManager {
 	})
 	return sessionManager
 }
+func TestSingleEBGPSessionGracefullRestart(t *testing.T) {
+	sessionManager := newTestSessionManager(t)
+	l := log.NewNopLogger()
+
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:     "10.2.2.254:179",
+			SourceAddress:   net.ParseIP("10.1.1.254"),
+			MyASN:           100,
+			RouterID:        net.ParseIP("10.1.1.254"),
+			PeerASN:         200,
+			HoldTime:        ptr.To(time.Second),
+			KeepAliveTime:   ptr.To(time.Second),
+			Password:        "password",
+			CurrentNode:     "hostname",
+			GracefulRestart: true,
+			SessionName:     "test-peer"})
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	testCheckConfigFile(t)
+}
 
 func TestSingleEBGPSessionMultiHop(t *testing.T) {
 	sessionManager := newTestSessionManager(t)
@@ -126,8 +151,8 @@ func TestSingleEBGPSessionMultiHop(t *testing.T) {
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       200,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  true,
@@ -150,8 +175,8 @@ func TestSingleEBGPSessionOneHop(t *testing.T) {
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       200,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  false,
@@ -175,8 +200,8 @@ func TestSingleIPv6EBGPSessionOneHop(t *testing.T) {
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       200,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  false,
@@ -200,8 +225,8 @@ func TestSingleIBGPSession(t *testing.T) {
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       100,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  false,
@@ -225,8 +250,8 @@ func TestSingleIPv6IBGPSession(t *testing.T) {
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       100,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  false,
@@ -250,8 +275,8 @@ func TestSingleSessionClose(t *testing.T) {
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       200,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  true,
@@ -274,8 +299,8 @@ func TestTwoSessions(t *testing.T) {
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       200,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  true,
@@ -292,8 +317,8 @@ func TestTwoSessions(t *testing.T) {
 			MyASN:         300,
 			RouterID:      net.ParseIP("10.3.3.254"),
 			PeerASN:       400,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			PasswordRef: corev1.SecretReference{
 				Name:      "test-secret",
 				Namespace: testNamespace,
@@ -321,8 +346,8 @@ func TestTwoIPv6Sessions(t *testing.T) {
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       200,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  false,
@@ -338,8 +363,8 @@ func TestTwoIPv6Sessions(t *testing.T) {
 			MyASN:         300,
 			RouterID:      net.ParseIP("10.3.3.254"),
 			PeerASN:       400,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  false,
@@ -362,8 +387,8 @@ func TestTwoSessionsDuplicate(t *testing.T) {
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       200,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  true,
@@ -380,8 +405,8 @@ func TestTwoSessionsDuplicate(t *testing.T) {
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       200,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  true,
@@ -405,8 +430,8 @@ func TestTwoSessionsDuplicateRouter(t *testing.T) {
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       200,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  true,
@@ -422,8 +447,8 @@ func TestTwoSessionsDuplicateRouter(t *testing.T) {
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       400,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  true,
@@ -447,8 +472,8 @@ func TestSingleAdvertisement(t *testing.T) {
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       200,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  true,
@@ -481,6 +506,59 @@ func TestSingleAdvertisement(t *testing.T) {
 	testCheckConfigFile(t)
 }
 
+func TestTwoAdvertisementsWithSamePrefix(t *testing.T) {
+	l := log.NewNopLogger()
+	sessionManager := newTestSessionManager(t)
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			SourceAddress: net.ParseIP("10.1.1.254"),
+			MyASN:         100,
+			RouterID:      net.ParseIP("10.1.1.254"),
+			PeerASN:       200,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
+			Password:      "password",
+			CurrentNode:   "hostname",
+			EBGPMultiHop:  true,
+			SessionName:   "test-peer"})
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	prefix := &net.IPNet{
+		IP:   net.ParseIP("172.16.1.10"),
+		Mask: classCMask,
+	}
+	communities := []community.BGPCommunity{}
+	community1, _ := community.New("1111:2222")
+	communities = append(communities, community1)
+	community2, _ := community.New("3333:4444")
+	communities = append(communities, community2)
+	adv := &bgp.Advertisement{
+		Prefix:      prefix,
+		Communities: communities,
+		LocalPref:   300,
+		Peers:       []string{"peer1"},
+	}
+	adv2 := &bgp.Advertisement{
+		Prefix:      prefix,
+		Communities: communities,
+		LocalPref:   300,
+	}
+	advs := []*bgp.Advertisement{adv, adv2}
+	rand.Shuffle(len(advs), func(i, j int) {
+		advs[i], advs[j] = advs[j], advs[i]
+	})
+	err = session.Set(advs[0], advs[1])
+	if err != nil {
+		t.Fatalf("Could not advertise prefix: %s", err)
+	}
+
+	testCheckConfigFile(t)
+}
+
 func TestSingleAdvertisementNoRouterID(t *testing.T) {
 	l := log.NewNopLogger()
 	sessionManager := newTestSessionManager(t)
@@ -491,8 +569,8 @@ func TestSingleAdvertisementNoRouterID(t *testing.T) {
 			MyASN:         100,
 			RouterID:      nil,
 			PeerASN:       200,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  true,
@@ -531,8 +609,8 @@ func TestSingleAdvertisementInvalidNoPort(t *testing.T) {
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       200,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  true,
@@ -557,8 +635,8 @@ func TestSingleAdvertisementStop(t *testing.T) {
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       200,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  true,
@@ -602,8 +680,8 @@ func TestSingleAdvertisementChange(t *testing.T) {
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       200,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  true,
@@ -655,8 +733,8 @@ func TestTwoAdvertisements(t *testing.T) {
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       200,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  true,
@@ -708,8 +786,8 @@ func TestTwoAdvertisementsTwoSessions(t *testing.T) {
 					MyASN:         100,
 					RouterID:      net.ParseIP("10.1.1.254"),
 					PeerASN:       200,
-					HoldTime:      time.Second,
-					KeepAliveTime: time.Second,
+					HoldTime:      ptr.To(time.Second),
+					KeepAliveTime: ptr.To(time.Second),
 					Password:      "password",
 					CurrentNode:   "hostname",
 					EBGPMultiHop:  true,
@@ -720,8 +798,8 @@ func TestTwoAdvertisementsTwoSessions(t *testing.T) {
 					MyASN:         100,
 					RouterID:      net.ParseIP("10.1.1.254"),
 					PeerASN:       200,
-					HoldTime:      time.Second,
-					KeepAliveTime: time.Second,
+					HoldTime:      ptr.To(time.Second),
+					KeepAliveTime: ptr.To(time.Second),
 					Password:      "password",
 					CurrentNode:   "hostname",
 					EBGPMultiHop:  true,
@@ -801,8 +879,8 @@ func TestLargeCommunities(t *testing.T) {
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
 			PeerASN:       200,
-			HoldTime:      time.Second,
-			KeepAliveTime: time.Second,
+			HoldTime:      ptr.To(time.Second),
+			KeepAliveTime: ptr.To(time.Second),
 			Password:      "password",
 			CurrentNode:   "hostname",
 			EBGPMultiHop:  true,
@@ -833,6 +911,86 @@ func TestLargeCommunities(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Could not advertise prefix: %s", err)
 	}
+
+	testCheckConfigFile(t)
+}
+
+func TestSingleSessionWithNoTimers(t *testing.T) {
+	l := log.NewNopLogger()
+	sessionManager := newTestSessionManager(t)
+
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress: "10.2.2.254:179",
+			MyASN:       102,
+			PeerASN:     100,
+			SessionName: "test-peer"})
+
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	testCheckConfigFile(t)
+}
+
+func TestSingleSessionWithZeroTimers(t *testing.T) {
+	l := log.NewNopLogger()
+	sessionManager := newTestSessionManager(t)
+
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress:   "10.2.2.254:179",
+			MyASN:         102,
+			HoldTime:      ptr.To(0 * time.Second),
+			KeepAliveTime: ptr.To(0 * time.Second),
+			PeerASN:       100,
+			SessionName:   "test-peer"})
+
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	testCheckConfigFile(t)
+}
+
+func TestSingleSessionWithInternalASN(t *testing.T) {
+	sessionManager := newTestSessionManager(t)
+	l := log.NewNopLogger()
+
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress: "10.2.2.254:179",
+			MyASN:       100,
+			RouterID:    net.ParseIP("10.1.1.254"),
+			DynamicASN:  "internal",
+			CurrentNode: "hostname",
+			SessionName: "test-peer"})
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
+
+	testCheckConfigFile(t)
+}
+
+func TestSingleSessionWithExternalASN(t *testing.T) {
+	sessionManager := newTestSessionManager(t)
+	l := log.NewNopLogger()
+
+	session, err := sessionManager.NewSession(l,
+		bgp.SessionParameters{
+			PeerAddress: "10.2.2.254:179",
+			MyASN:       100,
+			RouterID:    net.ParseIP("10.1.1.254"),
+			DynamicASN:  "external",
+			CurrentNode: "hostname",
+			SessionName: "test-peer"})
+	if err != nil {
+		t.Fatalf("Could not create session: %s", err)
+	}
+	defer session.Close()
 
 	testCheckConfigFile(t)
 }
