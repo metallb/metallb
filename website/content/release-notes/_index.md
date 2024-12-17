@@ -3,6 +3,34 @@ title: Release Notes
 weight: 8
 ---
 
+## Version 0.14.9
+
+### Features
+
+- Add DynamicASN field for a BGPPeer, which allows the speaker to detect the AS number to use without explicitly setting it. The new field is mutually exclusive with the existing PeerASN field, and one of them must be specified for any given BGPPeer. (#2552, @oribon)
+- Added support for `prefer-dual-stack` IPFamilyPolicy, allowing dual-stack IP assignment where available, while gracefully falling back to single-stack as needed. (#2587, @mquhuy)
+- Clear advertisement when speaker runs in a cordoned (unschedulable) node (#2470, @karampok)
+- The annotation prefix "metallb.universe.tf" is deprecated by now. Please use the new prefix "metallb.io". E.g.  "metallb.io/address-pool" instead of "metallb.universe.tf/address-pool". The old prefix is still supported. However, migrating to the new prefix is highly recommend. Future versions might remove this backwards compatibility. (#2495, @disco-stu)
+- Updates prometheus rules to utilize standard warning and critical alert levels
+
+### Bugs or Regression
+
+- Enforce mutual exclusion of podMonitor and serviceMonitor in the helm chart. (#2589, @fedepaol)
+- BGP native mode: narrow down the validation so that ipv6 pools are not valid only if there is a bgp advertisement referencing them. (#2593, @fedepaol)
+- Enable Graceful Restart for frr-k8s backend (#2550, @karampok)
+- Ffr-k8s: Make sure no duplicates prefix are passed to backend (#2580, @karampok)
+- Fix default BGPPeer hold/keepalive timers being incompatible with FRRConfigurations. We now delegate the defaults to FRR itself instead of hard-coding them, supporting 0 timers as well. (#2537, @oribon)
+- Fixed Community resources updates being denied without explanation. (#2608, @oribon)
+- Helm chart: Avoid speaker resources creation when speaker is disabled (#2466, @unai-ttxu)
+- Deprecation of BGPPeer v1beta1 in favor of v1beta2. (#2503, @fedepaol)
+
+### Documentation
+
+- DOC: Fixes example of L2Advertisement (#2564, @ppeereb1)
+- DOC: Fix the mermaid schemes for the Issues On Calico page (#2513, @thommelutten)
+
+This release includes contributions from Adrian Vondendriesch, dependabot[bot], Derek Nola, Enrique Llorente Pastora, Federico Paolinelli, Huy Mai, Joseph Shanak, karampok, Konstantinos Karampogias, Marco Cristofanilli, Micah Nagel, Ori Braunshtein, Paul Peereboom, Thomas, Tobias Klauser, Tyler Auerbeck, Unai Arrien
+
 ## Version 0.14.8
 
 ### Feature
