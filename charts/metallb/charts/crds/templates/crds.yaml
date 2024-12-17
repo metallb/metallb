@@ -333,6 +333,7 @@ metadata:
   name: bgppeers.metallb.io
 spec:
   conversion:
+  {{- if eq (lower .Values.conversionStrategy) "webhook" }}
     strategy: Webhook
     webhook:
       clientConfig:
@@ -344,6 +345,9 @@ spec:
       conversionReviewVersions:
         - v1beta1
         - v1beta2
+  {{- else }}
+    strategy: None
+  {{- end }}
   group: metallb.io
   names:
     kind: BGPPeer
