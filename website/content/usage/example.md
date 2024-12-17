@@ -89,7 +89,7 @@ spec:
 ```
 
 In our Helm charts for sandboxes, we tag all services with the
-annotation `metallb.universe.tf/address-pool: sandbox`. Now, whenever
+annotation `metallb.io/address-pool: sandbox`. Now, whenever
 developers spin up a sandbox, it'll come up on some IP address within
 192.168.144.0/20.
 
