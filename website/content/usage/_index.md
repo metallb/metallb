@@ -20,7 +20,7 @@ address, or if the address is already in use by another service,
 assignment will fail and MetalLB will log a warning event visible in
 `kubectl describe service <service name>`.
 
-MetalLB supports `spec.loadBalancerIP` and a custom `metallb.universe.tf/loadBalancerIPs`
+MetalLB supports `spec.loadBalancerIP` and a custom `metallb.io/loadBalancerIPs`
 annotation. The annotation also supports a comma separated list of IPs to be used in case of
 Dual Stack services.
 
@@ -32,7 +32,7 @@ kind: Service
 metadata:
   name: nginx
   annotations:
-    metallb.universe.tf/loadBalancerIPs: 192.168.1.100
+    metallb.io/loadBalancerIPs: 192.168.1.100
 spec:
   ports:
   - port: 80
@@ -45,7 +45,7 @@ spec:
 MetalLB also supports requesting a specific address pool, if you want
 a certain kind of address but don't care which one exactly. To request
 assignment from a specific pool, add the
-`metallb.universe.tf/address-pool` annotation to your service, with the
+`metallb.io/address-pool` annotation to your service, with the
 name of the address pool as the annotation value. For example:
 
 ```yaml
@@ -54,7 +54,7 @@ kind: Service
 metadata:
   name: nginx
   annotations:
-    metallb.universe.tf/address-pool: production-public-ips
+    metallb.io/address-pool: production-public-ips
 spec:
   ports:
   - port: 80
@@ -181,13 +181,13 @@ at least one address pool having both addresses of version v4 and v6.
 
 Note that in case of dual stack services, it is not possible to use
 `spec.loadBalancerIP` as it does not allow to request for multiple IPs,
-so the annotation `metallb.universe.tf/loadBalancerIPs` must be used.
+so the annotation `metallb.io/loadBalancerIPs` must be used.
 
 ## IP address sharing
 
 By default, Services do not share IP addresses. If you have a need to
 colocate services on a single IP, you can enable selective IP sharing
-by adding the `metallb.universe.tf/allow-shared-ip` annotation to
+by adding the `metallb.io/allow-shared-ip` annotation to
 services.
 
 The value of the annotation is a "sharing key." Services can share an
@@ -217,7 +217,7 @@ metadata:
   name: dns-service-tcp
   namespace: default
   annotations:
-    metallb.universe.tf/allow-shared-ip: "key-to-share-1.2.3.4"
+    metallb.io/allow-shared-ip: "key-to-share-1.2.3.4"
 spec:
   type: LoadBalancer
   loadBalancerIP: 1.2.3.4
@@ -235,7 +235,7 @@ metadata:
   name: dns-service-udp
   namespace: default
   annotations:
-    metallb.universe.tf/allow-shared-ip: "key-to-share-1.2.3.4"
+    metallb.io/allow-shared-ip: "key-to-share-1.2.3.4"
 spec:
   type: LoadBalancer
   loadBalancerIP: 1.2.3.4

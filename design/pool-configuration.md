@@ -107,7 +107,7 @@ On top of that, Calico suggests to deploy MetalLB without the speakers to levera
 
 Currently, the options to make sure a given service is using a specific IP from a specific pool are:
 
-* using the `metallb.universe.tf/address-pool` annotation on the service
+* using the `metallb.io/address-pool` annotation on the service
 * using the `auto-assign: false` parameter on the pool, and then statically assign the IP to a given service.
 
 From this point of view, we can enhance the allocation logic allowing users to reserve a given pool for a set of namespaces or for a set
