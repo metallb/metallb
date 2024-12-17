@@ -95,8 +95,8 @@ If multiple `IPAddressPool` objects have the same priority, the choice will be
 random.
 
 {{% notice note %}}
-When a service explicitly chooses an IPAddressPool via `metallb.universe.tf/address-pool`
-annotation or an IP address via `spec.loadBalancerIP` or `metallb.universe.tf/loadBalancerIPs`
+When a service explicitly chooses an IPAddressPool via `metallb.io/address-pool`
+annotation or an IP address via `spec.loadBalancerIP` or `metallb.io/loadBalancerIPs`
 annotation which doesn't match the service will stay in pending.
 {{% /notice %}}
 
