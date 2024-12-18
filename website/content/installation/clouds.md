@@ -90,15 +90,16 @@ After that, MetalLB should work normally.
 ### MetalLB on OpenStack
 
 You can run a Kubernetes cluster on OpenStack VMs, and use MetalLB as
-the load balancer. However you have to disable OpenStack's ARP
-spoofing protection if you want to use L2 mode. You must disable it on
-all the VMs that are running Kubernetes.
+the load balancer. By design, MetalLB's L2 mode looks like an ARP
+spoofing attempt to OpenStack, because we're announcing IP addresses
+that OpenStack doesn't know about. 
 
-By design, MetalLB's L2 mode looks like an ARP spoofing attempt to
-OpenStack, because we're announcing IP addresses that OpenStack
-doesn't know about. There's currently no way to make OpenStack
-cooperate with MetalLB here, so we have to turn off the spoofing
-protection entirely.
+You can  disable OpenStack's ARP spoofing protection if you want to
+use L2 mode. You must disable it on all the VMs that are running Kubernetes.
+
+The other option is to add the ip address that is in the pool as an 
+allowed address pair for the VM. Only those machines that have the ip
+added as an allowed address pair should be used for L2 broadcast.
 
 ### MetalLB on Equinix Metal
 
