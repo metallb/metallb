@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"reflect"
 	"sort"
 	"strconv"
@@ -48,10 +47,22 @@ type session struct {
 	logger         log.Logger
 }
 
-// sessionName() defines the format of the key of the 'sessions' map in
-// the 'frrState' struct.
+// sessionName() defines the format of a map key.
 func sessionName(s session) string {
-	baseName := fmt.Sprintf("%d@%s-%d@%s", s.PeerASN, s.PeerAddress, s.MyASN, s.SourceAddress)
+	f := func(ASN uint32, dynamicASN string) string {
+		asn := strconv.FormatUint(uint64(ASN), 10)
+		if dynamicASN != "" {
+			asn = dynamicASN
+		}
+		return asn
+	}
+	asn := f(s.PeerASN, s.DynamicASN)
+
+	peer := s.PeerAddress
+	if s.PeerInterface != "" {
+		peer = s.PeerInterface
+	}
+	baseName := fmt.Sprintf("%s@%s-%d@%s", asn, peer, s.MyASN, s.SourceAddress)
 	if s.VRFName == "" {
 		return baseName
 	}
@@ -227,23 +238,15 @@ func (sm *sessionManager) updateConfig() error {
 			routers[routerName] = rout
 		}
 
-		neighborName := frr.NeighborName(s.PeerAddress, s.PeerASN, s.DynamicASN, s.VRFName)
+		neighborName := sessionName(*s)
 		if neighbor, exist = rout.neighbors[neighborName]; !exist {
-			host, port, err := net.SplitHostPort(s.PeerAddress)
-			if err != nil {
-				return err
-			}
-
-			portUint, err := strconv.ParseUint(port, 10, 16)
-			if err != nil {
-				return err
-			}
-			portUint16 := uint16(portUint)
-
 			if !reflect.DeepEqual(s.PasswordRef, corev1.SecretReference{}) && s.Password != "" {
 				return fmt.Errorf("invalid session with password and secret set: %s", sessionName(*s))
 			}
 
+			if s.PeerPort == 0 {
+				return fmt.Errorf("peer port is not valid")
+			}
 			var connectTime *metav1.Duration
 			if s.ConnectTime != nil {
 				connectTime = &metav1.Duration{Duration: *s.ConnectTime}
@@ -259,10 +262,11 @@ func (sm *sessionManager) updateConfig() error {
 			}
 
 			neighbor = frrv1beta1.Neighbor{
+				Address:               s.PeerAddress,
+				Interface:             s.PeerInterface,
 				ASN:                   s.PeerASN,
 				DynamicASN:            frrv1beta1.DynamicASNMode(s.DynamicASN),
-				Address:               host,
-				Port:                  &portUint16,
+				Port:                  &s.PeerPort,
 				HoldTime:              holdTime,
 				KeepaliveTime:         keepaliveTime,
 				ConnectTime:           connectTime,
