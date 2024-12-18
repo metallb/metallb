@@ -19,7 +19,6 @@ import (
 	"net"
 	"reflect"
 	"sort"
-	"strconv"
 
 	"go.universe.tf/metallb/internal/bgp"
 	bgpfrr "go.universe.tf/metallb/internal/bgp/frr"
@@ -226,14 +225,20 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 		} else if p.session == nil && shouldRun {
 			// Session doesn't exist, but should be running. Create
 			// it.
-			level.Info(l).Log("event", "peerAdded", "peer", p.cfg.Addr, "msg", "peer configured, starting BGP session")
 			var routerID net.IP
 			if p.cfg.RouterID != nil {
 				routerID = p.cfg.RouterID
 			}
 
+			peerAddr := ""
+			if p.cfg.Addr != nil {
+				peerAddr = p.cfg.Addr.String()
+			}
+			level.Info(l).Log("event", "peerAdded", "peer", peerAddr+p.cfg.Iface, "msg", "peer configured, starting BGP session")
 			sessionParams := bgp.SessionParameters{
-				PeerAddress:     net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))),
+				PeerAddress:     peerAddr,
+				PeerPort:        p.cfg.Port,
+				PeerInterface:   p.cfg.Iface,
 				SourceAddress:   p.cfg.SrcAddr,
 				MyASN:           p.cfg.MyASN,
 				RouterID:        routerID,
