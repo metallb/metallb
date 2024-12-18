@@ -42,7 +42,7 @@ var _ = ginkgo.Describe("BGP Cordon Node", func() {
 
 	ginkgo.AfterEach(func() {
 		if ginkgo.CurrentSpecReport().Failed() {
-			dumpBGPInfo(ReportPath, ginkgo.CurrentSpecReport().LeafNodeText, cs, testNamespace)
+			dumpBGPInfo(ReportPath, ginkgo.CurrentSpecReport().LeafNodeText, cs, testNamespace, FRRContainers)
 			k8s.DumpInfo(Reporter, ginkgo.CurrentSpecReport().LeafNodeText)
 		}
 		err := k8s.DeleteNamespace(cs, testNamespace)

@@ -173,7 +173,14 @@ func BGPRoutes(exc executor.Executor, dev string) (map[netip.Prefix]map[netip.Ad
 		for _, r := range routes {
 			dst, err := netip.ParsePrefix(r.Dst)
 			if err != nil {
-				return nil, fmt.Errorf("invalid prefix %s: %w", r.Dst, err)
+				// `ip route` command does not print the prefix when /32 or /128
+				dst, err = netip.ParsePrefix(r.Dst + "/128")
+				if err != nil {
+					dst, err = netip.ParsePrefix(r.Dst + "/32")
+					if err != nil {
+						return nil, fmt.Errorf("invalid prefix %s: %w", r.Dst, err)
+					}
+				}
 			}
 
 			nextHops := make(map[netip.Addr]struct{})
