@@ -12,9 +12,38 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.universe.tf/e2etest/pkg/frr"
+	frrcontainer "go.universe.tf/e2etest/pkg/frr/container"
 	"go.universe.tf/e2etest/pkg/metallb"
 	clientset "k8s.io/client-go/kubernetes"
 )
+
+func dumpBGPPeers(basePath, testName string, containers []*frrcontainer.FRR) {
+	testPath := path.Join(basePath, strings.ReplaceAll(testName, " ", "-"))
+	err := os.Mkdir(testPath, 0755)
+	if err != nil && !errors.Is(err, os.ErrExist) {
+		fmt.Fprintf(os.Stderr, "failed to create test dir: %v\n", err)
+		return
+	}
+
+	for _, c := range containers {
+		dump, err := frr.RawDump(c, "/etc/frr/bgpd.conf", "/tmp/frr.log", "/etc/frr/daemons")
+		if err != nil {
+			ginkgo.GinkgoWriter.Printf("External frr dump for container %s failed %v", c.Name, err)
+			continue
+		}
+		f, err := logFileFor(testPath, fmt.Sprintf("frrdump-%s", c.Name))
+		if err != nil {
+			ginkgo.GinkgoWriter.Printf("External frr dump for container %s, failed to open file %v", c.Name, err)
+			continue
+		}
+		fmt.Fprintf(f, "Dumping information for %s, local addresses: ipv4 - %s, ipv6 - %s\n", c.Name, c.Ipv4, c.Ipv6)
+		_, err = fmt.Fprint(f, dump)
+		if err != nil {
+			ginkgo.GinkgoWriter.Printf("External frr dump for container %s, failed to write to file %v", c.Name, err)
+			continue
+		}
+	}
+}
 
 func dumpBGPInfo(basePath, testName string, cs clientset.Interface, namespace string) {
 	testPath := path.Join(basePath, strings.ReplaceAll(testName, " ", "-"))
