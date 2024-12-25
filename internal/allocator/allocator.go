@@ -73,9 +73,7 @@ func New() *Allocator {
 func (a *Allocator) SetPools(pools *config.Pools) {
 	for n := range a.pools.ByName {
 		if pools.ByName[n] == nil {
-			stats.poolCapacity.DeleteLabelValues(n)
-			stats.poolActive.DeleteLabelValues(n)
-			stats.poolAllocated.DeleteLabelValues(n)
+			deleteStatsFor(n)
 		}
 	}
 
@@ -239,6 +237,10 @@ func (a *Allocator) Unassign(svc string) {
 		if a.poolIPV6InUse[al.pool][ip.String()] == 0 {
 			delete(a.poolIPV6InUse[al.pool], ip.String())
 		}
+	}
+	if _, ok := a.pools.ByName[al.pool]; !ok {
+		deleteStatsFor(al.pool)
+		return
 	}
 	stats.poolActive.WithLabelValues(al.pool).Set(float64(len(a.poolIPsInUse[al.pool])))
 	stats.ipv4PoolActive.WithLabelValues(al.pool).Set(float64(len(a.poolIPV4InUse[al.pool])))
