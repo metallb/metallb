@@ -2239,6 +2239,16 @@ func TestPoolMetrics(t *testing.T) {
 			t.Errorf("%v; in-use %v. Expected %v", test.desc, value, test.ipsInUse)
 		}
 	}
+	ips := []net.IP{net.ParseIP("1.2.3.4")}
+	err := alloc.Assign("s1", svc, ips, []Port{}, "", "")
+	if err != nil {
+		t.Errorf("assign failed: %v", err)
+	}
+	alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{}})
+	val := ptu.ToFloat64(stats.poolActive.WithLabelValues("test")) // we actually expect the value to not be there, but since we can't access it this recreates it with 0
+	if val != 0 {
+		t.Errorf("expected value to be 0, got %v", val)
+	}
 }
 
 // Some helpers.
