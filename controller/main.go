@@ -27,6 +27,7 @@ import (
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/logging"
 	"go.universe.tf/metallb/internal/version"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 
 	"github.com/go-kit/log"
 	"github.com/go-kit/log/level"
@@ -203,8 +204,11 @@ func main() {
 		*namespace = string(bs)
 	}
 
+	poolStatusChan := make(chan event.GenericEvent)
 	c := &controller{
-		ips: allocator.New(),
+		ips: allocator.New(func(name string) {
+			poolStatusChan <- controllers.NewPoolStatusEvent(*namespace, name)
+		}),
 	}
 
 	bgpType, present := os.LookupEnv("METALLB_BGP_TYPE")
@@ -235,6 +239,8 @@ func main() {
 		CertDir:             *certDir,
 		CertServiceName:     *certServiceName,
 		LoadBalancerClass:   *loadBalancerClass,
+		PoolStatusChan:      poolStatusChan,
+		PoolCountersFetcher: c.ips.CountersForPool,
 	}
 	switch *webhookMode {
 	case "enabled":
