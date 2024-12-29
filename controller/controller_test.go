@@ -108,6 +108,8 @@ func (s *testK8S) gotService(in *v1.Service) *v1.Service {
 	return ret
 }
 
+func noopCallback(_ string) {}
+
 func TestControllerMutation(t *testing.T) {
 	testSelector, err := labels.Parse("team=metallb")
 	if err != nil {
@@ -115,7 +117,7 @@ func TestControllerMutation(t *testing.T) {
 	}
 	k := &testK8S{t: t}
 	c := &controller{
-		ips:    allocator.New(),
+		ips:    allocator.New(noopCallback),
 		client: k,
 	}
 	pools := &config.Pools{ByName: map[string]*config.Pool{
@@ -1105,7 +1107,7 @@ func TestControllerMutation(t *testing.T) {
 func TestControllerConfig(t *testing.T) {
 	k := &testK8S{t: t}
 	c := &controller{
-		ips:    allocator.New(),
+		ips:    allocator.New(noopCallback),
 		client: k,
 	}
 
@@ -1202,7 +1204,7 @@ func TestControllerConfig(t *testing.T) {
 func TestDeleteRecyclesIP(t *testing.T) {
 	k := &testK8S{t: t}
 	c := &controller{
-		ips:    allocator.New(),
+		ips:    allocator.New(noopCallback),
 		client: k,
 	}
 
@@ -1272,7 +1274,7 @@ func TestDeleteRecyclesIP(t *testing.T) {
 func TestControllerReassign(t *testing.T) {
 	k := &testK8S{t: t}
 	c := &controller{
-		ips:    allocator.New(),
+		ips:    allocator.New(noopCallback),
 		client: k,
 	}
 
@@ -1368,7 +1370,7 @@ func TestControllerReassign(t *testing.T) {
 func TestControllerDualStackConfig(t *testing.T) {
 	k := &testK8S{t: t}
 	c := &controller{
-		ips:    allocator.New(),
+		ips:    allocator.New(noopCallback),
 		client: k,
 	}
 

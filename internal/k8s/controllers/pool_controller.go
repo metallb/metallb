@@ -116,7 +116,7 @@ func (r *PoolReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 func (r *PoolReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	p := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			return filterNodeEvent(e) && filterNamespaceEvent(e)
+			return filterNodeEvent(e) && filterNamespaceEvent(e) && filterPoolStatusEvent(e)
 		},
 	}
 	return ctrl.NewControllerManagedBy(mgr).
@@ -125,4 +125,18 @@ func (r *PoolReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&corev1.Namespace{}, &handler.EnqueueRequestForObject{}).
 		WithEventFilter(p).
 		Complete(r)
+}
+
+func filterPoolStatusEvent(e event.UpdateEvent) bool {
+	_, ok := e.ObjectOld.(*metallbv1beta1.IPAddressPool)
+	if !ok {
+		return true
+	}
+
+	_, ok = e.ObjectNew.(*metallbv1beta1.IPAddressPool)
+	if !ok {
+		return true
+	}
+
+	return predicate.GenerationChangedPredicate{}.Update(e)
 }
