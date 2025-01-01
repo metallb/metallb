@@ -951,13 +951,12 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 		})
 		ginkgo.It("When current dualstack pool becomes single-stack, svc should pick another dualstack pool if possible", func() {
 			pool1 := metallbv1beta1.IPAddressPool{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-ns-dualstack-pool"},
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ns-dualstack-pool-to-edit"},
 				Spec: metallbv1beta1.IPAddressPoolSpec{
 					Addresses: []string{
 						v4PoolAddresses,
 						v6PoolAddresses,
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Namespaces: []string{testNamespace}},
 				},
 			}
 			resources := config.Resources{
@@ -987,13 +986,27 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool1}, jigservice.GetIngressPoint(
 				&svc1.Status.LoadBalancer.Ingress[1]))
 			Expect(err).NotTo(HaveOccurred())
-			ginkgo.By("Updating current pool to have an additional dualstack pool")
+			ginkgo.By("Adding a dualstack pool")
 			resources = config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{pool1, poolDual},
 			}
 			err = ConfigUpdater.Update(resources)
 			Expect(err).NotTo(HaveOccurred())
-			ginkgo.By("Updating current pool to exclude ipv4 address")
+			ginkgo.By("Verifying that the dualstack pool was loaded")
+			Eventually(func() error {
+				pool := metallbv1beta1.IPAddressPool{}
+				err := ConfigUpdater.Client().Get(context.TODO(), types.NamespacedName{Name: poolDual.Name, Namespace: ConfigUpdater.Namespace()}, &pool)
+				if err != nil {
+					return err
+				}
+
+				if pool.Status.AvailableIPv6 == 0 {
+					return fmt.Errorf("pool %s was not loaded, status is: %v", poolDual.Name, pool.Status)
+				}
+
+				return nil
+			}, 30*time.Second, 1*time.Second).Should(Not(HaveOccurred()))
+			ginkgo.By("Updating pool1 to exclude ipv4 address")
 			pool1.Spec.Addresses = []string{v6PoolAddresses}
 			resources = config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{pool1, poolDual},
@@ -1004,7 +1017,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			Eventually(func() []string {
 				newIps := getServiceIps(cs, svc1.Namespace, svc1.Name)
 				return newIps
-			}, 5*time.Minute, 1*time.Second).Should(And(
+			}, 30*time.Second, 1*time.Second).Should(And(
 				HaveLen(2),
 				Not(Equal(originallyAssignedIps)),
 			))
