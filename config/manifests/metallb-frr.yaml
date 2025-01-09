@@ -2028,7 +2028,7 @@ data:
     frr defaults traditional
     hostname Router
     line vty
-    log file /etc/frr/frr.log informational
+    log stdout informational
   vtysh.conf: |
     service integrated-vtysh-config
 kind: ConfigMap
@@ -2174,14 +2174,7 @@ spec:
       - command:
         - /bin/sh
         - -c
-        - |
-          /sbin/tini -- /usr/lib/frr/docker-start &
-          attempts=0
-          until [[ -f /etc/frr/frr.log || $attempts -eq 60 ]]; do
-            sleep 1
-            attempts=$(( $attempts + 1 ))
-          done
-          tail -f /etc/frr/frr.log
+        - /sbin/tini -- /usr/lib/frr/docker-start
         env:
         - name: TINI_SUBREAPER
           value: "true"
