@@ -53,7 +53,7 @@ func dumpBGPInfo(basePath, testName string, cs clientset.Interface, namespace st
 		podExec, err := FRRProvider.FRRExecutorFor(pod.Namespace, pod.Name)
 		Expect(err).NotTo(HaveOccurred())
 
-		dump, err := frr.RawDump(podExec, "/etc/frr/frr.conf", "/etc/frr/frr.log")
+		dump, err := frr.RawDump(podExec, "/etc/frr/frr.conf")
 		if err != nil {
 			ginkgo.GinkgoWriter.Printf("External frr dump for pod %s failed %v", pod.Name, err)
 			continue
