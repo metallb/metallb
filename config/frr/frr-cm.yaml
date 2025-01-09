@@ -95,4 +95,4 @@ data:
     frr defaults traditional
     hostname Router
     line vty
-    log file /etc/frr/frr.log informational
+    log stdout informational
