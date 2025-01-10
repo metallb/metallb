@@ -161,8 +161,8 @@ github.com/mdlayher/packet v1.0.0 h1:InhZJbdShQYt6XV2GPj5XHxChzOfhJJOMbvnGAmOfQ8
 github.com/mdlayher/packet v1.0.0/go.mod h1:eE7/ctqDhoiRhQ44ko5JZU2zxB88g+JH/6jmnjzPjOU=
 github.com/mdlayher/socket v0.2.1 h1:F2aaOwb53VsBE+ebRS9bLd7yPOfYUMC8lOODdCBDY6w=
 github.com/mdlayher/socket v0.2.1/go.mod h1:QLlNPkFR88mRUNQIzRBMfXxwKal8H7u1h3bL1CV+f0E=
-github.com/metallb/frr-k8s v0.0.16 h1:tlNIDW5wtBlKE7wUgXBs9GklyTCTFtdOGz8fvEl40vU=
-github.com/metallb/frr-k8s v0.0.16/go.mod h1:TjrGoAf+v00hYGlI8jUdyDxY5udMAOs2GWwrvLWnA4E=
+github.com/metallb/frr-k8s v0.0.17 h1:P8wUH6nLp5fTR/9F4QouJCTKFqUDN0v2Od/hGxVv044=
+github.com/metallb/frr-k8s v0.0.17/go.mod h1:gcOVS4IiQ7r6SRKc2HBgYll3Ku9SHEatxaqgNiuC/Tg=
 github.com/miekg/dns v1.1.43 h1:JKfpVSCB84vrAmHzyrsxB5NAr5kLoMXZArPSw7Qlgyg=
 github.com/miekg/dns v1.1.43/go.mod h1:+evo5L0630/F6ca/Z9+GAqzhjGyn8/c+TBaOyfEl0V4=
 github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721 h1:RlZweED6sbSArvlE924+mUcZuXKLBHA35U7LN621Bws=

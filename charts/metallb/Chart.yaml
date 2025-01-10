@@ -12,7 +12,7 @@ dependencies:
 - name: frr-k8s
   repository: https://metallb.github.io/frr-k8s
   condition: frrk8s.enabled
-  version: 0.0.16
+  version: 0.0.17
 
 
 # A chart can be either an 'application' or a 'library' chart.
