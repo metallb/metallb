@@ -1,7 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-- https://github.com/metallb/frr-k8s/config/prometheus/?timeout=120&ref=v0.0.16
+- https://github.com/metallb/frr-k8s/config/prometheus/?timeout=120&ref=v0.0.17
 - ../prometheus-native
 patchesStrategicMerge:
 - speaker-patch.yaml
