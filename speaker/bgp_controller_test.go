@@ -23,6 +23,7 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/utils/ptr"
 )
 
@@ -207,6 +208,7 @@ func (s *testK8S) Errorf(_ *v1.Service, evtType string, msg string, args ...inte
 	s.t.Logf("k8s Warning event %q: %s", evtType, fmt.Sprintf(msg, args...))
 	s.loggedWarning = true
 }
+func noopCallback(_ string) {}
 
 func TestBGPSpeakerEPSlices(t *testing.T) {
 	b := &fakeBGP{
@@ -214,9 +216,10 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 	}
 	newBGP = b.NewSessionManager
 	c, err := newController(controllerConfig{
-		MyNode:        "pandora",
-		DisableLayer2: true,
-		bgpType:       bgpNative,
+		MyNode:                "pandora",
+		DisableLayer2:         true,
+		bgpType:               bgpNative,
+		BGPAdsChangedCallback: noopCallback,
 	})
 	if err != nil {
 		t.Fatalf("creating controller: %s", err)
@@ -1174,9 +1177,10 @@ func TestNodeSelectors(t *testing.T) {
 	}
 	newBGP = b.NewSessionManager
 	c, err := newController(controllerConfig{
-		MyNode:        "pandora",
-		DisableLayer2: true,
-		bgpType:       bgpNative,
+		MyNode:                "pandora",
+		DisableLayer2:         true,
+		bgpType:               bgpNative,
+		BGPAdsChangedCallback: noopCallback,
 	})
 	if err != nil {
 		t.Fatalf("creating controller: %s", err)
@@ -1508,10 +1512,11 @@ func TestShouldAnnounceExcludeLB(t *testing.T) {
 			}},
 		}
 		c1, err := newController(controllerConfig{
-			MyNode:          "iris1",
-			Logger:          log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
-			bgpType:         bgpNative,
-			IgnoreExcludeLB: test.ignoreExcludeFromLB,
+			MyNode:                "iris1",
+			Logger:                log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+			bgpType:               bgpNative,
+			IgnoreExcludeLB:       test.ignoreExcludeFromLB,
+			BGPAdsChangedCallback: noopCallback,
 		})
 		if err != nil {
 			t.Fatalf("creating controller: %s", err)
@@ -1519,10 +1524,11 @@ func TestShouldAnnounceExcludeLB(t *testing.T) {
 		c1.client = &testK8S{t: t}
 
 		c2, err := newController(controllerConfig{
-			MyNode:          "iris2",
-			Logger:          log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
-			bgpType:         bgpNative,
-			IgnoreExcludeLB: test.ignoreExcludeFromLB,
+			MyNode:                "iris2",
+			Logger:                log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+			bgpType:               bgpNative,
+			IgnoreExcludeLB:       test.ignoreExcludeFromLB,
+			BGPAdsChangedCallback: noopCallback,
 		})
 		if err != nil {
 			t.Fatalf("creating controller: %s", err)
@@ -1684,5 +1690,306 @@ func TestPasswordForSession(t *testing.T) {
 				t.Errorf("unexpected secret reference, got: %+v, want: %+v", ref, tt.expectedRef)
 			}
 		})
+	}
+}
+
+func TestPeersForService(t *testing.T) {
+	callbackCounters := map[string]int{}
+	callback := func(key string) {
+		callbackCounters[key]++
+	}
+
+	b := &fakeBGP{
+		t: t,
+	}
+	newBGP = b.NewSessionManager
+	c, err := newController(controllerConfig{
+		MyNode:                "pandora",
+		DisableLayer2:         true,
+		bgpType:               bgpNative,
+		BGPAdsChangedCallback: callback,
+	})
+	if err != nil {
+		t.Fatalf("creating controller: %s", err)
+	}
+	c.client = &testK8S{t: t}
+
+	svc1Name, svc2Name := "test1", "test2"
+	peer1Name, peer2Name := "peer1", "peer2"
+	tests := []struct {
+		desc string
+
+		balancer              string
+		config                *config.Config
+		svc                   *v1.Service
+		eps                   []discovery.EndpointSlice
+		expectedPeers         map[string][]string // svc -> expected peers
+		expectedCallbacked    []string            // the services that should get callbacked
+		expectedNotCallbacked []string            // the services that should not get callbacked
+	}{
+		{
+			desc: "Set the config with 2 peers and 2 pools",
+			config: &config.Config{
+				Peers: map[string]*config.Peer{
+					peer1Name: {
+						Name:          peer1Name,
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+					peer2Name: {
+						Name:          peer2Name,
+						Addr:          net.ParseIP("1.2.3.5"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+				},
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
+					"pool1": {
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						BGPAdvertisements: []*config.BGPAdvertisement{
+							{
+								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
+							},
+						},
+					},
+					"pool2": {
+						CIDR: []*net.IPNet{ipnet("10.20.40.0/24")},
+						BGPAdvertisements: []*config.BGPAdvertisement{
+							{
+								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
+							},
+						},
+					},
+				}},
+			},
+			expectedPeers:         map[string][]string{svc1Name: {}, svc2Name: {}},
+			expectedCallbacked:    []string{},
+			expectedNotCallbacked: []string{svc1Name, svc2Name},
+		},
+		{
+			desc:     "Add first service",
+			balancer: svc1Name,
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{
+								"2.3.4.5",
+							},
+							NodeName: ptr.To("iris"),
+							Conditions: discovery.EndpointConditions{
+								Ready: ptr.To(true),
+							},
+						},
+					},
+				},
+			},
+			expectedPeers:         map[string][]string{svc1Name: {peer1Name, peer2Name}, svc2Name: {}},
+			expectedCallbacked:    []string{svc1Name},
+			expectedNotCallbacked: []string{svc2Name},
+		},
+		{
+			desc:     "Add second service",
+			balancer: svc2Name,
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.40.1"),
+			},
+			eps: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{
+								"2.3.4.5",
+							},
+							NodeName: ptr.To("iris"),
+							Conditions: discovery.EndpointConditions{
+								Ready: ptr.To(true),
+							},
+						},
+					},
+				},
+			},
+			expectedPeers:         map[string][]string{svc1Name: {peer1Name, peer2Name}, svc2Name: {peer1Name, peer2Name}},
+			expectedCallbacked:    []string{svc2Name},
+			expectedNotCallbacked: []string{svc1Name},
+		},
+		{
+			desc: "Advertise service 1 to peer1 only",
+			config: &config.Config{
+				Peers: map[string]*config.Peer{
+					peer1Name: {
+						Name:          peer1Name,
+						Addr:          net.ParseIP("1.2.3.4"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+					peer2Name: {
+						Name:          peer2Name,
+						Addr:          net.ParseIP("1.2.3.5"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+				},
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
+					"pool1": {
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						BGPAdvertisements: []*config.BGPAdvertisement{
+							{
+								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
+								Peers:             []string{peer1Name},
+							},
+						},
+					},
+					"pool2": {
+						CIDR: []*net.IPNet{ipnet("10.20.40.0/24")},
+						BGPAdvertisements: []*config.BGPAdvertisement{
+							{
+								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
+							},
+						},
+					},
+				}},
+			},
+			balancer: svc1Name,
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.30.1"),
+			},
+			eps: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{
+								"2.3.4.5",
+							},
+							NodeName: ptr.To("iris"),
+							Conditions: discovery.EndpointConditions{
+								Ready: ptr.To(true),
+							},
+						},
+					},
+				},
+			},
+			expectedPeers:         map[string][]string{svc1Name: {peer1Name}, svc2Name: {peer1Name, peer2Name}},
+			expectedCallbacked:    []string{svc1Name},
+			expectedNotCallbacked: []string{svc2Name},
+		},
+		{
+			desc:                  "Delete first service",
+			balancer:              svc1Name,
+			expectedPeers:         map[string][]string{svc1Name: {}, svc2Name: {peer1Name, peer2Name}},
+			expectedCallbacked:    []string{svc1Name},
+			expectedNotCallbacked: []string{svc2Name},
+		},
+		{
+			desc: "Delete first peer",
+			config: &config.Config{
+				Peers: map[string]*config.Peer{
+					peer2Name: {
+						Name:          peer2Name,
+						Addr:          net.ParseIP("1.2.3.5"),
+						NodeSelectors: []labels.Selector{labels.Everything()},
+					},
+				},
+				Pools: &config.Pools{ByName: map[string]*config.Pool{
+					"pool1": {
+						CIDR: []*net.IPNet{ipnet("10.20.30.0/24")},
+						BGPAdvertisements: []*config.BGPAdvertisement{
+							{
+								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
+								Peers:             []string{peer1Name},
+							},
+						},
+					},
+					"pool2": {
+						CIDR: []*net.IPNet{ipnet("10.20.40.0/24")},
+						BGPAdvertisements: []*config.BGPAdvertisement{
+							{
+								AggregationLength: 32,
+								Nodes:             map[string]bool{"pandora": true},
+							},
+						},
+					},
+				}},
+			},
+			balancer: svc2Name,
+			svc: &v1.Service{
+				Spec: v1.ServiceSpec{
+					Type:                  "LoadBalancer",
+					ExternalTrafficPolicy: "Cluster",
+				},
+				Status: statusAssigned("10.20.40.1"),
+			},
+			eps: []discovery.EndpointSlice{
+				{
+					Endpoints: []discovery.Endpoint{
+						{
+							Addresses: []string{
+								"2.3.4.5",
+							},
+							NodeName: ptr.To("iris"),
+							Conditions: discovery.EndpointConditions{
+								Ready: ptr.To(true),
+							},
+						},
+					},
+				},
+			},
+			expectedPeers:         map[string][]string{svc1Name: {}, svc2Name: {peer2Name}},
+			expectedCallbacked:    []string{svc2Name},
+			expectedNotCallbacked: []string{svc1Name},
+		},
+	}
+
+	l := log.NewNopLogger()
+	for _, test := range tests {
+		oldCallbackCounters := map[string]int{}
+		for k, v := range callbackCounters {
+			oldCallbackCounters[k] = v
+		}
+		if test.config != nil {
+			if c.SetConfig(l, test.config) == controllers.SyncStateError {
+				t.Errorf("%q: SetConfig failed", test.desc)
+			}
+		}
+		if test.balancer != "" {
+			if c.SetBalancer(l, test.balancer, test.svc, test.eps) == controllers.SyncStateError {
+				t.Errorf("%q: SetBalancer failed", test.desc)
+			}
+		}
+
+		for svc, wantPeers := range test.expectedPeers {
+			if diff := cmp.Diff(wantPeers, sets.List(c.bgpPeersFetcher(svc))); diff != "" {
+				t.Errorf("%q: unexpected peers for service %s (-want +got)\n%s", test.desc, svc, diff)
+			}
+		}
+
+		for _, svc := range test.expectedNotCallbacked {
+			if oldCallbackCounters[svc] != callbackCounters[svc] {
+				t.Errorf("%q: unexpected callback counters for service %s on NotCallbacked, want %v got %v", test.desc, svc, oldCallbackCounters[svc], callbackCounters[svc])
+			}
+		}
+
+		for _, svc := range test.expectedCallbacked {
+			if oldCallbackCounters[svc]+1 != callbackCounters[svc] {
+				t.Errorf("%q: unexpected callback counters for service %s on Callbacked, want %v got %v", test.desc, svc, oldCallbackCounters[svc]+1, callbackCounters[svc])
+			}
+		}
 	}
 }

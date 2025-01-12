@@ -121,7 +121,9 @@ type Config struct {
 	FRRK8sNamespace     string
 	Listener
 	Layer2StatusChan    <-chan event.GenericEvent
-	Layer2StatusFetcher controllers.StatusFetcher
+	Layer2StatusFetcher controllers.L2StatusFetcher
+	BGPStatusChan       <-chan event.GenericEvent
+	BGPPeersFetcher     controllers.PeersForService
 }
 
 // New connects to masterAddr, using kubeconfig to authenticate.
@@ -141,6 +143,7 @@ func New(cfg *Config) (*Client, error) {
 		&metallbv1beta1.L2Advertisement{}:  namespaceSelector,
 		&metallbv1beta2.BGPPeer{}:          namespaceSelector,
 		&metallbv1beta1.Community{}:        namespaceSelector,
+		&metallbv1beta1.ServiceBGPStatus{}: namespaceSelector,
 		&corev1.Secret{}:                   namespaceSelector,
 		&corev1.ConfigMap{}:                namespaceSelector,
 	}
@@ -292,6 +295,25 @@ func New(cfg *Config) (*Client, error) {
 			SpeakerPod:    selfPod.DeepCopy(),
 			ReconcileChan: cfg.Layer2StatusChan,
 			StatusFetcher: cfg.Layer2StatusFetcher,
+		}).SetupWithManager(mgr); err != nil {
+			level.Error(c.logger).Log("error", err, "unable to create controller", "layer2Status")
+		}
+	}
+
+	if cfg.BGPStatusChan != nil {
+		selfPod, err := clientset.CoreV1().Pods(cfg.Namespace).Get(context.TODO(), cfg.PodName, metav1.GetOptions{})
+		if err != nil {
+			level.Error(c.logger).Log("unable to get speaker pod itself", err)
+			return nil, err
+		}
+		if err = (&controllers.ServiceBGPStatusReconciler{
+			Client:        mgr.GetClient(),
+			Logger:        cfg.Logger,
+			NodeName:      cfg.NodeName,
+			Namespace:     cfg.Namespace,
+			SpeakerPod:    selfPod.DeepCopy(),
+			ReconcileChan: cfg.BGPStatusChan,
+			PeersFetcher:  cfg.BGPPeersFetcher,
 		}).SetupWithManager(mgr); err != nil {
 			level.Error(c.logger).Log("error", err, "unable to create controller", "layer2Status")
 		}
