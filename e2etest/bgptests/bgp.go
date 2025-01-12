@@ -26,6 +26,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
+
 	frrk8sv1beta1 "github.com/metallb/frr-k8s/api/v1beta1"
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -38,6 +40,7 @@ import (
 	"go.universe.tf/e2etest/pkg/k8sclient"
 	"go.universe.tf/e2etest/pkg/mac"
 	"go.universe.tf/e2etest/pkg/metallb"
+	"go.universe.tf/e2etest/pkg/status"
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
 
@@ -48,8 +51,10 @@ import (
 	"go.universe.tf/e2etest/pkg/ipfamily"
 	testservice "go.universe.tf/e2etest/pkg/service"
 	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	clientset "k8s.io/client-go/kubernetes"
 	"k8s.io/utils/ptr"
 )
@@ -599,6 +604,142 @@ var _ = ginkgo.Describe("BGP", func() {
 	},
 		ginkgo.Entry("IPV4 with Secret Ref set for BGPPeer CR", ipfamily.IPv4),
 		ginkgo.Entry("IPV6 with Secret Ref set for BGPPeer CR", ipfamily.IPv6))
+
+	ginkgo.DescribeTable("ServiceBGPStatus", func(ipFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
+		validateStatusesFor := func(nodes []string, peers sets.Set[string], svc *corev1.Service, expectNoResources bool) error {
+			for _, n := range nodes {
+				s, err := status.BGPForServiceAndNode(ConfigUpdater.Client(), svc, n)
+				if expectNoResources && !k8serrors.IsNotFound(err) {
+					return fmt.Errorf("expected status for node %s to not be there, got %v with err %w", n, s, err)
+				}
+				if expectNoResources && k8serrors.IsNotFound(err) {
+					continue
+				}
+				if err != nil {
+					return err
+				}
+				statusPeers := sets.New(s.Status.Peers...)
+				if !peers.Equal(statusPeers) {
+					return fmt.Errorf("expected status peers to be %v, got %v for node %s\n diff: %s", peers, s.Status.Peers, n, cmp.Diff(sets.List(peers), s.Status.Peers))
+				}
+			}
+			return nil
+		}
+
+		peers := metallb.PeersForContainers(FRRContainers, ipFamily)
+		peersNames := sets.Set[string]{}
+		for _, p := range peers {
+			peersNames.Insert(p.Name)
+		}
+
+		bgpAdv := metallbv1beta1.BGPAdvertisement{
+			ObjectMeta: metav1.ObjectMeta{Name: "empty", Namespace: ConfigUpdater.Namespace()},
+			Spec:       metallbv1beta1.BGPAdvertisementSpec{},
+		}
+
+		ginkgo.By("Creating the service advertised to all peers")
+		resources := config.Resources{
+			Pools: []metallbv1beta1.IPAddressPool{
+				{
+					ObjectMeta: metav1.ObjectMeta{
+						Name: "bgp-test",
+					},
+					Spec: metallbv1beta1.IPAddressPoolSpec{
+						Addresses: poolAddresses,
+					},
+				},
+			},
+			Peers:   peers,
+			BGPAdvs: []metallbv1beta1.BGPAdvertisement{bgpAdv},
+		}
+
+		err := ConfigUpdater.Update(resources)
+		Expect(err).NotTo(HaveOccurred())
+
+		svc, _ := testservice.CreateWithBackend(cs, testNamespace, "external-local-lb", func(svc *corev1.Service) {
+			testservice.TrafficPolicyCluster(svc)
+			tweak(svc)
+		})
+		svcDeleted := false
+		defer func() {
+			if !svcDeleted {
+				testservice.Delete(cs, svc)
+			}
+		}()
+
+		for _, i := range svc.Status.LoadBalancer.Ingress {
+			ginkgo.By("validate LoadBalancer IP is in the AddressPool range")
+			ingressIP := jigservice.GetIngressPoint(&i)
+			err = config.ValidateIPInRange(resources.Pools, ingressIP)
+			Expect(err).NotTo(HaveOccurred())
+		}
+
+		nodes, err := cs.CoreV1().Nodes().List(context.Background(), metav1.ListOptions{})
+		Expect(err).ToNot(HaveOccurred())
+		nodesNames := []string{}
+		for _, n := range nodes.Items {
+			nodesNames = append(nodesNames, n.Name)
+		}
+
+		ginkgo.By("Verifying all nodes create a status for the service")
+		Eventually(func() error {
+			return validateStatusesFor(nodesNames, peersNames, svc, false)
+		}, 2*time.Minute, 2*time.Second).ShouldNot(HaveOccurred())
+
+		ginkgo.By("Adding a dummy peer to the adv")
+		err = ConfigUpdater.Client().Get(context.TODO(), types.NamespacedName{Namespace: bgpAdv.Namespace, Name: bgpAdv.Name}, &bgpAdv)
+		Expect(err).ToNot(HaveOccurred())
+		bgpAdv.Spec.Peers = append(sets.List(peersNames), "dummy")
+		err = ConfigUpdater.Client().Update(context.TODO(), &bgpAdv)
+		Expect(err).ToNot(HaveOccurred())
+
+		Consistently(func() error {
+			return validateStatusesFor(nodesNames, peersNames, svc, false)
+		}, 5*time.Second, 1*time.Second).ShouldNot(HaveOccurred(), "expected status peers to be the same as before after adding a dummy peer")
+
+		ginkgo.By("Removing the first peer")
+		peer0 := peers[0]
+		peer0.Namespace = ConfigUpdater.Namespace()
+		err = ConfigUpdater.Client().Delete(context.TODO(), &peer0)
+		Expect(err).ToNot(HaveOccurred())
+		peersNames.Delete(peer0.Name)
+		Eventually(func() error {
+			return validateStatusesFor(nodesNames, peersNames, svc, peersNames.Len() == 0)
+		}, 2*time.Minute, 2*time.Second).ShouldNot(HaveOccurred())
+
+		ginkgo.By("Updating the node selector of the adv to not include the first node")
+		err = ConfigUpdater.Client().Get(context.TODO(), types.NamespacedName{Namespace: bgpAdv.Namespace, Name: bgpAdv.Name}, &bgpAdv)
+		Expect(err).ToNot(HaveOccurred())
+		bgpAdv.Spec.NodeSelectors = []metav1.LabelSelector{
+			{
+				MatchExpressions: []metav1.LabelSelectorRequirement{
+					{
+						Operator: "In",
+						Key:      "kubernetes.io/hostname",
+						Values:   nodesNames[1:],
+					},
+				}},
+		}
+		err = ConfigUpdater.Client().Update(context.TODO(), &bgpAdv)
+		Expect(err).ToNot(HaveOccurred())
+
+		Eventually(func() error {
+			return validateStatusesFor([]string{nodesNames[0]}, sets.Set[string]{}, svc, true)
+		}, 2*time.Minute, 2*time.Second).ShouldNot(HaveOccurred())
+		Eventually(func() error {
+			return validateStatusesFor(nodesNames[1:], peersNames, svc, peersNames.Len() == 0)
+		}, 2*time.Minute, 2*time.Second).ShouldNot(HaveOccurred())
+
+		ginkgo.By("Validating the the statuses are deleted after deleting the service")
+		testservice.Delete(cs, svc)
+		svcDeleted = true
+		Eventually(func() error {
+			return validateStatusesFor(nodesNames, sets.Set[string]{}, svc, true)
+		}, 2*time.Minute, 2*time.Second).ShouldNot(HaveOccurred())
+	},
+		ginkgo.Entry("IPV4", ipfamily.IPv4, []string{v4PoolAddresses}, func(_ *corev1.Service) {}),
+		ginkgo.Entry("IPV6", ipfamily.IPv6, []string{v6PoolAddresses}, func(_ *corev1.Service) {}),
+		ginkgo.Entry("DUALSTACK", ipfamily.DualStack, []string{v4PoolAddresses, v6PoolAddresses}, testservice.DualStack))
 
 	ginkgo.Context("BFD", func() {
 		ginkgo.DescribeTable("should work with the given bfd profile", func(bfd metallbv1beta1.BFDProfile, pairingFamily ipfamily.Family, poolAddresses []string, tweak testservice.Tweak) {
