@@ -19,6 +19,7 @@ description: MetalLB API reference documentation
 - [Community](#community)
 - [IPAddressPool](#ipaddresspool)
 - [L2Advertisement](#l2advertisement)
+- [ServiceL2Status](#servicel2status)
 
 
 
@@ -241,8 +242,29 @@ _Appears in:_
 | `serviceSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | ServiceSelectors list of label selector to select service(s) for which ip pool<br />can be used for ip allocation. |
 
 
+#### ServiceL2Status
 
+ServiceL2Status reveals the actual traffic status of loadbalancer services in layer2 mode
 
+| Field | Description |
+| --- | --- |
+| `apiVersion` _string_ | `metallb.io/v1beta1`
+| `kind` _string_ | `ServiceL2Status`
+| `kind` _string_ | Kind is a string value representing the REST resource this object represents.<br />Servers may infer this from the endpoint the client submits requests to.<br />Cannot be updated.<br />In CamelCase.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds |
+| `apiVersion` _string_ | APIVersion defines the versioned schema of this representation of an object.<br />Servers should convert recognized schemas to the latest internal value, and<br />may reject unrecognized values.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |
+| `status` _[ServiceL2StatusStatus](#ServiceL2StatusStatus)_ | MetalLBServiceL2Status defines the observed state of ServiceL2Status |
+
+#### ServiceL2StatusStatus
+
+MetalLBServiceL2Status defines the observed state of ServiceL2Status
+
+| Field | Description |
+| --- | --- |
+| `interfaces` _string_ | Interfaces indicates the interfaces that receive the directed traffic |
+| `serviceNamespace` _string_ | Namespaces list of namespace(s) on which ip pool can be attached. |
+| `node` _string_ | Node indicates the node that receives the directed traffic. |
+| `serviceName` _string__ | ServiceName indicates the service this status represents |
 
 ## metallb.io/v1beta2
 

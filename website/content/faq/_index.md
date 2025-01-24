@@ -74,3 +74,16 @@ metadata:
 ## Does MetalLB work on OpenStack?
 
 Yes but by default, OpenStack has anti-spoofing protection enabled which prevents the VMs from using any IP that wasn't configured for them in the OpenStack control plane, such as LoadBalancer IPs from MetalLB. See [openstack port set --allowed-address](https://docs.openstack.org/python-openstackclient/latest/cli/command-objects/port.html).
+
+
+## How to get status for ip allocation ?
+
+It's possible to get status for ip allocation with the cli `kubectl`. The status it's exposed by `servicel2statuses.metallb.io` CRD.
+
+```shell
+kubectl get servicel2statuses
+
+NAME       ALLOCATED NODE                     SERVICE NAME             SERVICE NAMESPACE
+l2-wq4qq   my-node-1                          my-lb-svc-1              namespace-1
+l2-zm67s   my-node-2                          my-lb-svc-2              namespace-2
+```
