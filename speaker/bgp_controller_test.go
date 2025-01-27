@@ -282,7 +282,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				}},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": nil,
+				"1.2.3.4": nil,
 			},
 		},
 		{
@@ -310,7 +310,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": nil,
+				"1.2.3.4": nil,
 			},
 		},
 
@@ -340,7 +340,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": {
+				"1.2.3.4": {
 					{
 						Prefix: ipnet("10.20.30.1/32"),
 					},
@@ -374,7 +374,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": nil,
+				"1.2.3.4": nil,
 			},
 		},
 
@@ -417,7 +417,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": {
+				"1.2.3.4": {
 					{
 						Prefix: ipnet("10.20.30.1/32"),
 					},
@@ -490,7 +490,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": nil,
+				"1.2.3.4": nil,
 			},
 		},
 
@@ -506,7 +506,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			},
 			eps: []discovery.EndpointSlice{},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": nil,
+				"1.2.3.4": nil,
 			},
 		},
 
@@ -536,7 +536,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": nil,
+				"1.2.3.4": nil,
 			},
 		},
 
@@ -575,7 +575,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": {
+				"1.2.3.4": {
 					{
 						Prefix: ipnet("10.20.30.1/32"),
 					},
@@ -610,7 +610,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": {
+				"1.2.3.4": {
 					{
 						Prefix: ipnet("10.20.30.1/32"),
 					},
@@ -645,7 +645,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": {
+				"1.2.3.4": {
 					{
 						Prefix: ipnet("10.20.30.1/32"),
 					},
@@ -709,7 +709,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": {
+				"1.2.3.4": {
 					{
 						Prefix:    ipnet("10.20.30.1/32"),
 						LocalPref: 100,
@@ -783,7 +783,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": {
+				"1.2.3.4": {
 					{
 						Prefix:    ipnet("10.20.30.1/32"),
 						LocalPref: 100,
@@ -856,7 +856,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			},
 
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": {
+				"1.2.3.4": {
 					{
 						Prefix:    ipnet("10.20.30.1/32"),
 						LocalPref: 100,
@@ -924,12 +924,12 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": {
+				"1.2.3.4": {
 					{
 						Prefix: ipnet("10.20.30.1/32"),
 					},
 				},
-				"1.2.3.5:0": {
+				"1.2.3.5": {
 					{
 						Prefix: ipnet("10.20.30.1/32"),
 					},
@@ -962,12 +962,12 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": {
+				"1.2.3.4": {
 					{
 						Prefix: ipnet("10.20.30.1/32"),
 					},
 				},
-				"1.2.3.5:0": {
+				"1.2.3.5": {
 					{
 						Prefix: ipnet("10.20.30.1/32"),
 					},
@@ -1001,7 +1001,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": {
+				"1.2.3.4": {
 					{
 						Prefix: ipnet("10.20.30.1/32"),
 					},
@@ -1009,7 +1009,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						Prefix: ipnet("10.20.30.5/32"),
 					},
 				},
-				"1.2.3.5:0": {
+				"1.2.3.5": {
 					{
 						Prefix: ipnet("10.20.30.1/32"),
 					},
@@ -1046,7 +1046,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": {
+				"1.2.3.4": {
 					// Prefixes duplicated because the dedupe happens
 					// inside the real BGP session.
 					{
@@ -1056,7 +1056,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 						Prefix: ipnet("10.20.30.1/32"),
 					},
 				},
-				"1.2.3.5:0": {
+				"1.2.3.5": {
 					{
 						Prefix: ipnet("10.20.30.1/32"),
 					},
@@ -1071,12 +1071,12 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			desc:     "Delete svc",
 			balancer: "test1",
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": {
+				"1.2.3.4": {
 					{
 						Prefix: ipnet("10.20.30.1/32"),
 					},
 				},
-				"1.2.3.5:0": {
+				"1.2.3.5": {
 					{
 						Prefix: ipnet("10.20.30.1/32"),
 					},
@@ -1129,7 +1129,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.5:0": {
+				"1.2.3.5": {
 					{
 						Prefix: ipnet("10.20.30.1/32"),
 					},
@@ -1141,7 +1141,7 @@ func TestBGPSpeakerEPSlices(t *testing.T) {
 			desc:     "Delete second svc",
 			balancer: "test2",
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.5:0": nil,
+				"1.2.3.5": nil,
 			},
 		},
 	}
@@ -1219,7 +1219,7 @@ func TestNodeSelectors(t *testing.T) {
 				Pools: &config.Pools{ByName: pools},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": nil,
+				"1.2.3.4": nil,
 			},
 		},
 
@@ -1241,7 +1241,7 @@ func TestNodeSelectors(t *testing.T) {
 				Pools: &config.Pools{ByName: pools},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": nil,
+				"1.2.3.4": nil,
 			},
 		},
 
@@ -1256,8 +1256,8 @@ func TestNodeSelectors(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": nil,
-				"2.3.4.5:0": nil,
+				"1.2.3.4": nil,
+				"2.3.4.5": nil,
 			},
 		},
 
@@ -1272,7 +1272,7 @@ func TestNodeSelectors(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": nil,
+				"1.2.3.4": nil,
 			},
 		},
 
@@ -1294,8 +1294,8 @@ func TestNodeSelectors(t *testing.T) {
 				Pools: &config.Pools{ByName: pools},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": nil,
-				"2.3.4.5:0": nil,
+				"1.2.3.4": nil,
+				"2.3.4.5": nil,
 			},
 		},
 
@@ -1310,8 +1310,8 @@ func TestNodeSelectors(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": nil,
-				"2.3.4.5:0": nil,
+				"1.2.3.4": nil,
+				"2.3.4.5": nil,
 			},
 		},
 
@@ -1334,8 +1334,8 @@ func TestNodeSelectors(t *testing.T) {
 				Pools: &config.Pools{ByName: pools},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": nil,
-				"2.3.4.5:0": nil,
+				"1.2.3.4": nil,
+				"2.3.4.5": nil,
 			},
 		},
 
@@ -1350,8 +1350,8 @@ func TestNodeSelectors(t *testing.T) {
 				},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": nil,
-				"2.3.4.5:0": nil,
+				"1.2.3.4": nil,
+				"2.3.4.5": nil,
 			},
 		},
 
@@ -1367,8 +1367,8 @@ func TestNodeSelectors(t *testing.T) {
 				Spec: v1.NodeSpec{Unschedulable: true},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": nil,
-				"2.3.4.5:0": nil,
+				"1.2.3.4": nil,
+				"2.3.4.5": nil,
 			},
 			wantReturnState: controllers.SyncStateReprocessAll,
 		},
@@ -1385,8 +1385,8 @@ func TestNodeSelectors(t *testing.T) {
 				Spec: v1.NodeSpec{Unschedulable: true},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": nil,
-				"2.3.4.5:0": nil,
+				"1.2.3.4": nil,
+				"2.3.4.5": nil,
 			},
 		},
 
@@ -1402,8 +1402,8 @@ func TestNodeSelectors(t *testing.T) {
 				Spec: v1.NodeSpec{Unschedulable: false},
 			},
 			wantAds: map[string][]*bgp.Advertisement{
-				"1.2.3.4:0": nil,
-				"2.3.4.5:0": nil,
+				"1.2.3.4": nil,
+				"2.3.4.5": nil,
 			},
 			wantReturnState: controllers.SyncStateReprocessAll,
 		},
