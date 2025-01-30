@@ -79,11 +79,29 @@ func SelectorsForNodes(nodes []v1.Node) []metav1.LabelSelector {
 	return selectors
 }
 
+func AddAnnotationToNode(nodeName, key, value string, cs clientset.Interface) {
+	nodeObject, err := cs.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
+	nodeObject.Annotations[key] = value
+	_, err = cs.CoreV1().Nodes().Update(context.Background(), nodeObject, metav1.UpdateOptions{})
+	Expect(err).NotTo(HaveOccurred())
+}
+
 func AddLabelToNode(nodeName, key, value string, cs clientset.Interface) {
 	nodeObject, err := cs.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
 	Expect(err).NotTo(HaveOccurred())
 
 	nodeObject.Labels[key] = value
+	_, err = cs.CoreV1().Nodes().Update(context.Background(), nodeObject, metav1.UpdateOptions{})
+	Expect(err).NotTo(HaveOccurred())
+}
+
+func RemoveAnnotationFromNode(nodeName, key string, cs clientset.Interface) {
+	nodeObject, err := cs.CoreV1().Nodes().Get(context.Background(), nodeName, metav1.GetOptions{})
+	Expect(err).NotTo(HaveOccurred())
+
+	delete(nodeObject.Annotations, key)
 	_, err = cs.CoreV1().Nodes().Update(context.Background(), nodeObject, metav1.UpdateOptions{})
 	Expect(err).NotTo(HaveOccurred())
 }
