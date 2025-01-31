@@ -1,0 +1,42 @@
+log file /etc/frr/frr.log 
+log timestamp precision 3
+hostname dummyhostname
+ip nht resolve-via-default
+ipv6 nht resolve-via-default
+route-map net0-in deny 20
+
+
+
+
+ip prefix-list net0-pl-dual seq 1 deny any
+ipv6 prefix-list net0-pl-dual seq 2 deny any
+
+route-map net0-out permit 1
+  match ip address prefix-list net0-pl-dual
+route-map net0-out permit 2
+  match ipv6 address prefix-list net0-pl-dual
+
+router bgp 102
+  no bgp ebgp-requires-policy
+  no bgp network import-check
+  no bgp default ipv4-unicast
+  bgp graceful-restart preserve-fw-state
+
+  bgp router-id 10.1.1.254
+  neighbor net0 interface remote-as external
+  neighbor net0 port 179
+  
+  neighbor net0 update-source 10.1.1.254
+  neighbor net0 graceful-restart
+
+  address-family ipv4 unicast
+    neighbor net0 activate
+    neighbor net0 route-map net0-in in
+    neighbor net0 route-map net0-out out
+  exit-address-family
+  address-family ipv6 unicast
+    neighbor net0 activate
+    neighbor net0 route-map net0-in in
+    neighbor net0 route-map net0-out out
+  exit-address-family
+

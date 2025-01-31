@@ -1,31 +1,40 @@
 {{- define "neighborsession"}}
+  {{- if ne .neighbor.Iface  ""}}
+  neighbor {{.neighbor.Iface }} interface remote-as {{.neighbor.ASN}}
+  {{- else }}
   neighbor {{.neighbor.Addr}} remote-as {{.neighbor.ASN}}
+  {{- end }}
+  {{- /* Unnummber BGP */}}
+  {{- $peer := .neighbor.Addr }}
+  {{- if ne .neighbor.Iface "" }}
+    {{- $peer = .neighbor.Iface }}
+  {{- end }}
   {{- if .neighbor.EBGPMultiHop }}
-  neighbor {{.neighbor.Addr}} ebgp-multihop
+  neighbor {{$peer}} ebgp-multihop
   {{- end }}
   {{ if .neighbor.Port -}}
-  neighbor {{.neighbor.Addr}} port {{.neighbor.Port}}
+  neighbor {{$peer}} port {{.neighbor.Port}}
   {{- end }}
   {{- if and .neighbor.KeepaliveTime .neighbor.HoldTime }}
-  neighbor {{.neighbor.Addr}} timers {{.neighbor.KeepaliveTime}} {{.neighbor.HoldTime}}
+  neighbor {{$peer}} timers {{.neighbor.KeepaliveTime}} {{.neighbor.HoldTime}}
   {{- end }}
   {{- if ne .neighbor.ConnectTime 0}}
-  neighbor {{.neighbor.Addr}} timers connect {{.neighbor.ConnectTime}}
+  neighbor {{$peer}} timers connect {{.neighbor.ConnectTime}}
   {{- end }}
   {{ if .neighbor.Password -}}
-  neighbor {{.neighbor.Addr}} password {{.neighbor.Password}}
+  neighbor {{$peer}} password {{.neighbor.Password}}
   {{- end }}
   {{ if .neighbor.SrcAddr -}}
-  neighbor {{.neighbor.Addr}} update-source {{.neighbor.SrcAddr}}
+  neighbor {{$peer}} update-source {{.neighbor.SrcAddr}}
   {{- end }}
   {{- if .neighbor.GracefulRestart }}
-  neighbor {{.neighbor.Addr}} graceful-restart
+  neighbor {{$peer}} graceful-restart
   {{- end }}
   {{- if ne .neighbor.BFDProfile "" }}
-  neighbor {{.neighbor.Addr}} bfd
-  neighbor {{.neighbor.Addr}} bfd profile {{.neighbor.BFDProfile}}
+  neighbor {{$peer}} bfd
+  neighbor {{$peer}} bfd profile {{.neighbor.BFDProfile}}
   {{- end }}
-  {{- if  mustDisableConnectedCheck .neighbor.IPFamily .routerASN .neighbor.ASN .neighbor.EBGPMultiHop }}
+  {{- if  mustDisableConnectedCheck .neighbor.IPFamily .routerASN .neighbor.ASN .neighbor.Iface .neighbor.EBGPMultiHop }}
   neighbor {{.neighbor.Addr}} disable-connected-check
   {{- end }}
 {{- end -}}
