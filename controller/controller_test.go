@@ -474,6 +474,63 @@ func TestControllerMutation(t *testing.T) {
 		},
 
 		{
+			desc: "deprecated annotation removed from service from older version",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						DeprecatedAnnotationIPAllocateFromPool: "pool1",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"1.2.3.4"},
+					Type:       "LoadBalancer",
+				},
+				Status: statusAssigned([]string{"1.2.3.0"}),
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool1",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"1.2.3.4"},
+					Type:       "LoadBalancer",
+				},
+				Status: statusAssigned([]string{"1.2.3.0"}),
+			},
+		},
+
+		{
+			desc: "deprecated annotation removed from service with new annotation",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool:           "pool1",
+						DeprecatedAnnotationIPAllocateFromPool: "pool1",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"1.2.3.4"},
+					Type:       "LoadBalancer",
+				},
+				Status: statusAssigned([]string{"1.2.3.0"}),
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool1",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					ClusterIPs: []string{"1.2.3.4"},
+					Type:       "LoadBalancer",
+				},
+				Status: statusAssigned([]string{"1.2.3.0"}),
+			},
+		},
+
+		{
 			desc: "invalid IP assigned",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
