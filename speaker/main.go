@@ -30,6 +30,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/yaml"
@@ -58,7 +59,8 @@ var announcing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 })
 
 const (
-	excludeL2ConfigPath = "/etc/metallb/excludel2.yaml"
+	excludeL2ConfigPath     = "/etc/metallb/excludel2.yaml"
+	excludeNodeMetadataPath = "/etc/metallb/excludeNodePattern.yaml"
 )
 
 // Service offers methods to mutate a Kubernetes service object.
@@ -146,6 +148,11 @@ func main() {
 		os.Exit(1)
 	}
 
+	excludeNode, err := parseExcludeNodePattern()
+	if err != nil {
+		level.Error(logger).Log("op", "startup", "msg", "failed to parse parseExcludeNodePattern", "error", err)
+		os.Exit(1)
+	}
 	var interfacesToExclude *regexp.Regexp
 	interfacesToExclude, err = parseAnnouncedInterfacesToExclude()
 	if err != nil {
@@ -167,6 +174,7 @@ func main() {
 		SList:                  sList,
 		bgpType:                bgpImplementation(bgpType),
 		InterfaceExcludeRegexp: interfacesToExclude,
+		ExcludeNodePattern:     excludeNode,
 		IgnoreExcludeLB:        *ignoreLBExclude,
 		Layer2StatusChange: func(namespacedName types.NamespacedName) {
 			statusNotifyChan <- controllers.NewL2StatusEvent(namespacedName.Namespace, namespacedName.Name)
@@ -262,8 +270,10 @@ type controllerConfig struct {
 	SupportedProtocols           []config.Proto
 	AnnouncedInterfacesToExclude []string `yaml:"announcedInterfacesToExclude"`
 	InterfaceExcludeRegexp       *regexp.Regexp
-	IgnoreExcludeLB              bool
-	Layer2StatusChange           func(types.NamespacedName)
+	// ExcludeNodePattern ...
+	ExcludeNodePattern *v1.Node
+	IgnoreExcludeLB    bool
+	Layer2StatusChange func(types.NamespacedName)
 }
 
 func newController(cfg controllerConfig) (*controller, error) {
@@ -276,13 +286,14 @@ func newController(cfg controllerConfig) (*controller, error) {
 
 	handlers := map[config.Proto]Protocol{
 		config.BGP: &bgpController{
-			logger:          cfg.Logger,
-			myNode:          cfg.MyNode,
-			svcAds:          make(map[string][]*bgp.Advertisement),
-			bgpType:         cfg.bgpType,
-			sessionManager:  newBGP(cfg),
-			ignoreExcludeLB: cfg.IgnoreExcludeLB,
-			secretHandling:  secretHandling,
+			logger:              cfg.Logger,
+			myNode:              cfg.MyNode,
+			svcAds:              make(map[string][]*bgp.Advertisement),
+			bgpType:             cfg.bgpType,
+			sessionManager:      newBGP(cfg),
+			excludeNodeMetadata: cfg.ExcludeNodePattern,
+			ignoreExcludeLB:     cfg.IgnoreExcludeLB,
+			secretHandling:      secretHandling,
 		},
 	}
 	protocols := []config.Proto{config.BGP}
@@ -508,6 +519,19 @@ func compareIPs(ips1, ips2 []net.IP) bool {
 	return true
 }
 
+func parseExcludeNodePattern() (*v1.Node, error) {
+	data, err := os.ReadFile(filepath.Clean(excludeNodeMetadataPath))
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+
+	var ret *v1.Node
+	if err := yaml.Unmarshal(data, &ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
 func parseAnnouncedInterfacesToExclude() (*regexp.Regexp, error) {
 	configmapBytes, err := os.ReadFile(filepath.Clean(excludeL2ConfigPath))
 	if err != nil && !os.IsNotExist(err) {
@@ -582,7 +606,10 @@ func isNodeAvailableChanged(oldNodes map[string]*v1.Node, newNode *v1.Node) bool
 		return false
 	}
 
-	if k8snodes.IsNodeUnschedulable(oldNode) != k8snodes.IsNodeUnschedulable(newNode) {
+	if !equality.Semantic.DeepEqual(oldNode.Labels, newNode.Labels) {
+		return true
+	}
+	if !equality.Semantic.DeepEqual(oldNode.Annotations, newNode.Annotations) {
 		return true
 	}
 	if k8snodes.IsNetworkUnavailable(oldNode) != k8snodes.IsNetworkUnavailable(newNode) {

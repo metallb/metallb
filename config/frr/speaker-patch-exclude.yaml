@@ -1,0 +1,19 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: speaker
+spec:
+  template:
+    spec:
+      containers:
+        - name: speaker
+          volumeMounts:
+            - mountPath: /etc/metallb
+              name: excludenodes
+              readOnly: true
+      volumes:
+        - name: excludenodes
+          configMap:
+            name: excludenodepatterns
+            optional: true

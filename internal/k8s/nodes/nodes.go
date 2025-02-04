@@ -9,23 +9,15 @@ import (
 )
 
 func IsNodeAvailable(n *corev1.Node) error {
-	if IsNodeUnschedulable(n) {
-		return errors.New("nodeUnschedulable")
-	}
+	// if IsNodeUnschedulable(n) {
+	// 	return errors.New("nodeUnschedulable")
+	// }
 
 	if IsNetworkUnavailable(n) {
 		return errors.New("nodeNetworkUnavailable")
 	}
 
 	return nil
-}
-
-func IsNodeUnschedulable(n *corev1.Node) bool {
-	if n == nil {
-		return false
-	}
-
-	return n.Spec.Unschedulable
 }
 
 // IsNetworkUnavailable returns true if the given node NodeNetworkUnavailable condition status is true.
@@ -46,6 +38,35 @@ func conditionStatus(n *corev1.Node, ct corev1.NodeConditionType) corev1.Conditi
 	}
 
 	return corev1.ConditionUnknown
+}
+
+func IsNodeExcludedFromBalancers2(n, pattern *corev1.Node) bool {
+	if n == nil || pattern == nil {
+		return false
+	}
+
+	// DISCUSS: exclude on Unschedulable
+
+	// DISCUSS: should do full match all labels exists or once a label exists
+	// exclude on Labels
+	for k, v := range pattern.Labels {
+		if nv, exists := n.Labels[k]; exists && nv == v {
+			return true
+		}
+	}
+
+	// DISCUSS: should do full match
+	// if annotation of pattern is subset of annotation of node, return true
+	for k, v := range pattern.Annotations {
+		if nv, exists := n.Annotations[k]; exists && nv == v {
+			return true
+		}
+	}
+
+	// DISCUSS exclude on taints? (no)
+	// DISCUSS exclude in conditions? (yes)
+
+	return false
 }
 
 // IsNodeExcludedFromBalancers returns true if the given node has labeld node.kubernetes.io/exclude-from-external-load-balancers".

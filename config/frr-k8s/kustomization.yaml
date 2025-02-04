@@ -5,6 +5,7 @@ resources:
 - ../native
 patchesStrategicMerge:
 - speaker-patch.yaml
+- speaker-patch-exclude.yaml
 - controller-patch.yaml
 patches:
   - path: ignore-ns.yaml

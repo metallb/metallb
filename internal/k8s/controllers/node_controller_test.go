@@ -183,20 +183,7 @@ func TestNodeReconcilerPredicate(t *testing.T) {
 					Spec: corev1.NodeSpec{Unschedulable: true},
 				},
 			},
-			expected: true,
-		},
-		"spec schedulable change and label change": {
-			event: event.UpdateEvent{
-				ObjectOld: &corev1.Node{
-					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"x": "y"}},
-					Spec:       corev1.NodeSpec{Unschedulable: false},
-				},
-				ObjectNew: &corev1.Node{
-					ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"x": "z"}},
-					Spec:       corev1.NodeSpec{Unschedulable: true},
-				},
-			},
-			expected: true,
+			expected: false,
 		},
 		"condition NodeNetworkUnavailable status change": {
 			event: event.UpdateEvent{
@@ -229,6 +216,17 @@ func TestNodeReconcilerPredicate(t *testing.T) {
 				},
 			},
 			expected: false,
+		},
+		"annotation changed": {
+			event: event.UpdateEvent{
+				ObjectOld: &corev1.Node{
+					ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"x": "y"}},
+				},
+				ObjectNew: &corev1.Node{
+					ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"z": "k"}},
+				},
+			},
+			expected: true,
 		},
 	}
 

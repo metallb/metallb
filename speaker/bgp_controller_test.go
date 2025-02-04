@@ -1274,6 +1274,7 @@ func TestNodeSelectors(t *testing.T) {
 			wantAds: map[string][]*bgp.Advertisement{
 				"1.2.3.4:0": nil,
 			},
+			wantReturnState: controllers.SyncStateReprocessAll,
 		},
 
 		{
@@ -1313,6 +1314,7 @@ func TestNodeSelectors(t *testing.T) {
 				"1.2.3.4:0": nil,
 				"2.3.4.5:0": nil,
 			},
+			wantReturnState: controllers.SyncStateReprocessAll,
 		},
 
 		{
@@ -1353,6 +1355,7 @@ func TestNodeSelectors(t *testing.T) {
 				"1.2.3.4:0": nil,
 				"2.3.4.5:0": nil,
 			},
+			wantReturnState: controllers.SyncStateReprocessAll,
 		},
 
 		{
@@ -1370,7 +1373,6 @@ func TestNodeSelectors(t *testing.T) {
 				"1.2.3.4:0": nil,
 				"2.3.4.5:0": nil,
 			},
-			wantReturnState: controllers.SyncStateReprocessAll,
 		},
 
 		{
@@ -1405,7 +1407,6 @@ func TestNodeSelectors(t *testing.T) {
 				"1.2.3.4:0": nil,
 				"2.3.4.5:0": nil,
 			},
-			wantReturnState: controllers.SyncStateReprocessAll,
 		},
 	}
 

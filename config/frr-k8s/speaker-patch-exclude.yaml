@@ -1,0 +1,54 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: speaker
+spec:
+  template:
+    spec:
+      containers:
+        - name: speaker
+          volumeMounts:
+            - mountPath: /etc/metallb
+              name: excludenodes
+              readOnly: true
+      volumes:
+        - name: excludenodes
+          configMap:
+            name: excludenodepatterns
+            optional: true
+# ---
+# apiVersion: v1
+# kind: ConfigMap
+# metadata:
+#   name: excludenodepatterns
+# data:
+#   excludeNodePattern.yaml: |-
+# The suggestion is to use the v1.Node struct
+# to hold a pattern on labels/annotations/conditions
+# that will be excluded == stop adv instantly
+#     - metadata:
+#         name: exclude-mc-reboot
+#         annotations:
+#           machineconfiguration.openshift.io/post-config-action: Rebooting
+#     - metadata:
+#         name: exclude-mc-reboot
+#         labels:
+#           node.kubernetes.io/exclude-from-external-load-balancers
+#     - metadata:
+#         name: network-unavailable
+#       spec:
+#         unschedulable: "True"
+#     - metadata:
+#         name: network-unavailable
+#       status:
+#         conditions:
+#         - type: NetworkUnavailable
+#           status: "True"
+#     - metadata:
+#         name: graceful-node-restart
+#       status:
+#         conditions:
+#         - type: Ready
+#           message: kubelet is posting ready status
+#           status: "False"

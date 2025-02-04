@@ -24,6 +24,7 @@ import (
 
 	k8snodes "go.universe.tf/metallb/internal/k8s/nodes"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -96,8 +97,8 @@ func NodeReconcilerPredicate() predicate.Predicate {
 			return false
 		},
 	}
-
-	nodeSpecSchedulableChanged := predicate.Funcs{
+	// TODO Graceful Shutdown
+	nodeAnnotationChanged := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			oldNode, ok := e.ObjectOld.(*corev1.Node)
 			if !ok {
@@ -109,11 +110,7 @@ func NodeReconcilerPredicate() predicate.Predicate {
 				return false
 			}
 
-			if oldNode.Spec.Unschedulable != newNode.Spec.Unschedulable {
-				return true
-			}
-
-			return false
+			return !equality.Semantic.DeepEqual(oldNode.Annotations, newNode.Annotations)
 		},
 	}
 
@@ -122,7 +119,7 @@ func NodeReconcilerPredicate() predicate.Predicate {
 		allowCreations,
 		predicate.Or(
 			nodeConditionNetworkAvailabilityStatusChanged,
-			nodeSpecSchedulableChanged,
+			nodeAnnotationChanged,
 			predicate.LabelChangedPredicate{},
 		),
 	)
