@@ -64,14 +64,15 @@ func statusAssigned(ips []string) v1.ServiceStatus {
 // testK8S implements service by recording what the controller wants
 // to do to k8s.
 type testK8S struct {
-	updateService       *v1.Service
-	updateServiceStatus *v1.ServiceStatus
-	loggedWarning       bool
-	t                   *testing.T
+	updateServiceObjectMeta *metav1.ObjectMeta
+	updateServiceStatus     *v1.ServiceStatus
+	loggedWarning           bool
+	t                       *testing.T
 }
 
 func (s *testK8S) UpdateStatus(svc *v1.Service) error {
 	s.updateServiceStatus = &svc.Status
+	s.updateServiceObjectMeta = &svc.ObjectMeta
 	return nil
 }
 
@@ -85,13 +86,13 @@ func (s *testK8S) Errorf(_ *v1.Service, evtType string, msg string, args ...inte
 }
 
 func (s *testK8S) reset() {
-	s.updateService = nil
 	s.updateServiceStatus = nil
+	s.updateServiceObjectMeta = nil
 	s.loggedWarning = false
 }
 
 func (s *testK8S) gotService(in *v1.Service) *v1.Service {
-	if s.updateService == nil && s.updateServiceStatus == nil {
+	if s.updateServiceStatus == nil && s.updateServiceObjectMeta == nil {
 		return nil
 	}
 
@@ -99,11 +100,11 @@ func (s *testK8S) gotService(in *v1.Service) *v1.Service {
 	if in != nil {
 		*ret = *in
 	}
-	if s.updateService != nil {
-		*ret = *s.updateService
-	}
 	if s.updateServiceStatus != nil {
 		ret.Status = *s.updateServiceStatus
+	}
+	if s.updateServiceObjectMeta != nil {
+		ret.ObjectMeta = *s.updateServiceObjectMeta
 	}
 	return ret
 }
@@ -236,6 +237,11 @@ func TestControllerMutation(t *testing.T) {
 				},
 			},
 			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool1",
+					},
+				},
 				Spec: v1.ServiceSpec{
 					ClusterIPs: []string{"1.2.3.4"},
 					Type:       "LoadBalancer",
@@ -254,6 +260,11 @@ func TestControllerMutation(t *testing.T) {
 				},
 			},
 			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool1",
+					},
+				},
 				Spec: v1.ServiceSpec{
 					ClusterIPs:     []string{"1.2.3.4"},
 					Type:           "LoadBalancer",
@@ -279,7 +290,8 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						AnnotationLoadBalancerIPs: "1.2.3.1",
+						AnnotationLoadBalancerIPs:    "1.2.3.1",
+						AnnotationIPAllocateFromPool: "pool1",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -404,7 +416,8 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						AnnotationAddressPool: "pool1",
+						AnnotationAddressPool:        "pool1",
+						AnnotationIPAllocateFromPool: "pool1",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -432,7 +445,8 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						AnnotationAddressPool: "pool2",
+						AnnotationAddressPool:        "pool2",
+						AnnotationIPAllocateFromPool: "pool2",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -469,6 +483,11 @@ func TestControllerMutation(t *testing.T) {
 				Status: statusAssigned([]string{"2.3.4.5"}),
 			},
 			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool1",
+					},
+				},
 				Spec: v1.ServiceSpec{
 					Type:       "LoadBalancer",
 					ClusterIPs: []string{"1.2.3.4"},
@@ -498,6 +517,11 @@ func TestControllerMutation(t *testing.T) {
 				},
 			},
 			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool1",
+					},
+				},
 				Spec: v1.ServiceSpec{
 					Type:       "LoadBalancer",
 					ClusterIPs: []string{"1.2.3.4"},
@@ -533,6 +557,11 @@ func TestControllerMutation(t *testing.T) {
 				},
 			},
 			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool2",
+					},
+				},
 				Spec: v1.ServiceSpec{
 					Type:           "LoadBalancer",
 					LoadBalancerIP: "3.4.5.6",
@@ -553,6 +582,11 @@ func TestControllerMutation(t *testing.T) {
 				},
 			},
 			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool2",
+					},
+				},
 				Spec: v1.ServiceSpec{
 					Type:                  "LoadBalancer",
 					LoadBalancerIP:        "3.4.5.6",
@@ -639,6 +673,11 @@ func TestControllerMutation(t *testing.T) {
 				Status: statusAssigned([]string{"1000::"}),
 			},
 			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool1",
+					},
+				},
 				Spec: v1.ServiceSpec{
 					Type:       "LoadBalancer",
 					ClusterIPs: []string{"1.2.3.4"},
@@ -657,6 +696,11 @@ func TestControllerMutation(t *testing.T) {
 				Status: statusAssigned([]string{"1.2.3.0"}),
 			},
 			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool1",
+					},
+				},
 				Spec: v1.ServiceSpec{
 					Type:       "LoadBalancer",
 					ClusterIPs: []string{"3000::1"},
@@ -678,6 +722,11 @@ func TestControllerMutation(t *testing.T) {
 				},
 			},
 			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool1",
+					},
+				},
 				Spec: v1.ServiceSpec{
 					ClusterIPs:     []string{"1.2.3.4", "3000::1"},
 					Type:           "LoadBalancer",
@@ -703,7 +752,8 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						AnnotationAddressPool: "pool5",
+						AnnotationAddressPool:        "pool5",
+						AnnotationIPAllocateFromPool: "pool5",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -724,6 +774,11 @@ func TestControllerMutation(t *testing.T) {
 				},
 			},
 			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool1",
+					},
+				},
 				Spec: v1.ServiceSpec{
 					ClusterIPs:     []string{"1.2.3.4", "3000::1"},
 					Type:           "LoadBalancer",
@@ -748,6 +803,9 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test-ns1",
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool6",
+					},
 				},
 				Spec: v1.ServiceSpec{
 					ClusterIPs:     []string{"1.2.3.4"},
@@ -762,7 +820,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						AnnotationAddressPool: "pool1",
+						AnnotationAddressPool: "pool5",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -774,7 +832,8 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						AnnotationAddressPool: "pool1",
+						AnnotationAddressPool:        "pool5",
+						AnnotationIPAllocateFromPool: "pool5",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -782,7 +841,7 @@ func TestControllerMutation(t *testing.T) {
 					ClusterIPs:     []string{"1.2.3.4", "3000::1"},
 					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
 				},
-				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
+				Status: statusAssigned([]string{"28.29.30.0", "4000::"}),
 			},
 		},
 		{
@@ -802,7 +861,8 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						AnnotationAddressPool: "pool2",
+						AnnotationAddressPool:        "pool2",
+						AnnotationIPAllocateFromPool: "pool2",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -830,7 +890,8 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						AnnotationAddressPool: "pool4",
+						AnnotationAddressPool:        "pool4",
+						AnnotationIPAllocateFromPool: "pool4",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -929,7 +990,8 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						AnnotationLoadBalancerIPs: "1.2.3.0,1000::",
+						AnnotationLoadBalancerIPs:    "1.2.3.0,1000::",
+						AnnotationIPAllocateFromPool: "pool1",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -962,6 +1024,11 @@ func TestControllerMutation(t *testing.T) {
 				},
 			},
 			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool1",
+					},
+				},
 				Spec: v1.ServiceSpec{
 					Type:           "LoadBalancer",
 					ClusterIPs:     []string{"3000::1", "5.6.7.8"},
@@ -999,6 +1066,9 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test-ns1",
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool6",
+					},
 				},
 				Spec: v1.ServiceSpec{
 					Type:       "LoadBalancer",
@@ -1021,6 +1091,9 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test-ns2",
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool9",
+					},
 				},
 				Spec: v1.ServiceSpec{
 					Type:       "LoadBalancer",
@@ -1043,6 +1116,9 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"team": "metallb"},
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool10",
+					},
 				},
 				Spec: v1.ServiceSpec{
 					Type:       "LoadBalancer",
@@ -1067,6 +1143,9 @@ func TestControllerMutation(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{
 					Namespace: "test-ns1",
 					Labels:    map[string]string{"team": "metallb"},
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool12",
+					},
 				},
 				Spec: v1.ServiceSpec{
 					Type:       "LoadBalancer",
@@ -1085,6 +1164,11 @@ func TestControllerMutation(t *testing.T) {
 				Status: statusAssigned([]string{"1.2.3.0", "1.2.3.1", "1.2.3.2"}),
 			},
 			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationIPAllocateFromPool: "pool1",
+					},
+				},
 				Spec: v1.ServiceSpec{
 					ClusterIPs: []string{"1.2.3.4"},
 					Type:       "LoadBalancer",
@@ -1155,6 +1239,9 @@ func TestControllerConfig(t *testing.T) {
 
 	l := log.NewNopLogger()
 	svc := &v1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Annotations: map[string]string{},
+		},
 		Spec: v1.ServiceSpec{
 			Type:       "LoadBalancer",
 			ClusterIPs: []string{"1.2.3.4"},
@@ -1215,6 +1302,9 @@ func TestControllerConfig(t *testing.T) {
 	wantSvc := new(v1.Service)
 	*wantSvc = *svc
 	wantSvc.Status = statusAssigned([]string{"1.2.3.0"})
+	wantSvc.ObjectMeta.Annotations = map[string]string{
+		AnnotationIPAllocateFromPool: "default",
+	}
 	if diff := diffService(wantSvc, gotSvc); diff != "" {
 		t.Errorf("SetBalancer produced unexpected mutation (-want +got)\n%s", diff)
 	}
@@ -1348,6 +1438,9 @@ func TestControllerReassign(t *testing.T) {
 	wantSvc := new(v1.Service)
 	*wantSvc = *svc
 	wantSvc.Status = statusAssigned([]string{"1.2.3.0"})
+	wantSvc.ObjectMeta.Annotations = map[string]string{
+		AnnotationIPAllocateFromPool: "default",
+	}
 	if diff := diffService(wantSvc, gotSvc); diff != "" {
 		t.Errorf("SetBalancer produced unexpected mutation (-want +got)\n%s", diff)
 	}
@@ -1402,6 +1495,9 @@ func TestControllerReassign(t *testing.T) {
 	gotSvc = k.gotService(svc)
 	*wantSvc = *svc
 	wantSvc.Status = statusAssigned([]string{"4.5.6.0"})
+	wantSvc.ObjectMeta.Annotations = map[string]string{
+		AnnotationIPAllocateFromPool: "second",
+	}
 	if diff := diffService(wantSvc, gotSvc); diff != "" {
 		t.Errorf("SetBalancer produced unexpected mutation (-want +got)\n%s", diff)
 	}
@@ -1479,6 +1575,9 @@ func TestControllerDualStackConfig(t *testing.T) {
 	wantSvc := new(v1.Service)
 	*wantSvc = *svc
 	wantSvc.Status = statusAssigned([]string{"1.2.3.0", "1000::"})
+	wantSvc.ObjectMeta.Annotations = map[string]string{
+		AnnotationIPAllocateFromPool: "default",
+	}
 	if diff := diffService(wantSvc, gotSvc); diff != "" {
 		t.Errorf("SetBalancer produced unexpected mutation (-want +got)\n%s", diff)
 	}
