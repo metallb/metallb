@@ -214,6 +214,9 @@ func (c *controller) convergeBalancer(l log.Logger, key string, svc *v1.Service)
 	}
 	svc.Annotations[AnnotationIPAllocateFromPool] = pool
 
+	// Remove deprecated annotation set by old MetalLB versions.
+	delete(svc.Annotations, DeprecatedAnnotationIPAllocateFromPool)
+
 	return nil
 }
 
