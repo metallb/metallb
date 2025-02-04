@@ -124,17 +124,12 @@ func TestControllerMutation(t *testing.T) {
 		"pool1": {
 			Name:       "pool1",
 			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.0/31")},
+			CIDR:       []*net.IPNet{ipnet("1.2.3.0/31"), ipnet("1000::/127")},
 		},
 		"pool2": {
 			Name:       "pool2",
 			AutoAssign: false,
 			CIDR:       []*net.IPNet{ipnet("3.4.5.6/32")},
-		},
-		"pool3": {
-			Name:       "pool3",
-			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1000::/127")},
 		},
 		"pool4": {
 			Name:       "pool4",
@@ -143,8 +138,8 @@ func TestControllerMutation(t *testing.T) {
 		},
 		"pool5": {
 			Name:       "pool5",
-			AutoAssign: true,
-			CIDR:       []*net.IPNet{ipnet("1.2.3.0/31"), ipnet("1000::/127")},
+			AutoAssign: false,
+			CIDR:       []*net.IPNet{ipnet("28.29.30.0/31"), ipnet("4000::/127")},
 		},
 		"pool6": {
 			Name:       "pool6",
@@ -716,7 +711,7 @@ func TestControllerMutation(t *testing.T) {
 					ClusterIPs:     []string{"1.2.3.4", "3000::1"},
 					IPFamilyPolicy: &IPFamilyPolicyRequireDualStack,
 				},
-				Status: statusAssigned([]string{"1.2.3.0", "1000::"}),
+				Status: statusAssigned([]string{"28.29.30.0", "4000::"}),
 			},
 		},
 		{
@@ -767,7 +762,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						AnnotationAddressPool: "pool5",
+						AnnotationAddressPool: "pool1",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -779,7 +774,7 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						AnnotationAddressPool: "pool5",
+						AnnotationAddressPool: "pool1",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -795,7 +790,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						AnnotationAddressPool: "pool1",
+						AnnotationAddressPool: "pool2",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -807,7 +802,7 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						AnnotationAddressPool: "pool1",
+						AnnotationAddressPool: "pool2",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -815,7 +810,7 @@ func TestControllerMutation(t *testing.T) {
 					ClusterIPs:     []string{"1.2.3.4", "1000::"},
 					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
 				},
-				Status: statusAssigned([]string{"1.2.3.0"}),
+				Status: statusAssigned([]string{"3.4.5.6"}),
 			},
 		},
 		{
@@ -823,7 +818,7 @@ func TestControllerMutation(t *testing.T) {
 			in: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						AnnotationAddressPool: "pool3",
+						AnnotationAddressPool: "pool4",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -835,7 +830,7 @@ func TestControllerMutation(t *testing.T) {
 			want: &v1.Service{
 				ObjectMeta: metav1.ObjectMeta{
 					Annotations: map[string]string{
-						AnnotationAddressPool: "pool3",
+						AnnotationAddressPool: "pool4",
 					},
 				},
 				Spec: v1.ServiceSpec{
@@ -843,7 +838,7 @@ func TestControllerMutation(t *testing.T) {
 					ClusterIPs:     []string{"1000::1"},
 					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
 				},
-				Status: statusAssigned([]string{"1000::"}),
+				Status: statusAssigned([]string{"2000::1"}),
 			},
 		},
 		{
