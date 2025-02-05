@@ -44,6 +44,9 @@ type session struct {
 	nextHop        net.IP
 	advertised     map[string]*bgp.Advertisement
 	new            map[string]*bgp.Advertisement
+
+	// label identifies this BGP session to be used for metrics
+	label string
 }
 
 // The 'Native' implementation does not require a session manager .
@@ -71,6 +74,7 @@ func (sm *sessionManager) NewSession(l log.Logger, args bgp.SessionParameters) (
 		logger:            log.With(l, "peer", args.PeerAddress, "localASN", args.MyASN, "peerASN", args.PeerASN),
 		newHoldTime:       make(chan bool, 1),
 		advertised:        map[string]*bgp.Advertisement{},
+		label:             fmt.Sprintf("%s:%d", args.PeerAddress, args.PeerPort),
 	}
 	ret.cond = sync.NewCond(&ret.mu)
 	go ret.sendKeepalives()
@@ -98,9 +102,13 @@ func (sm *sessionManager) SyncExtraInfo(extras string) error {
 
 func (sm *sessionManager) SetEventCallback(func(interface{})) {}
 
+func (s *session) PeerLabel() string {
+	return fmt.Sprintf("%s:%d", s.PeerAddress, s.PeerPort)
+}
+
 // run tries to stay connected to the peer, and pumps route updates to it.
 func (s *session) run() {
-	defer stats.DeleteSession(s.PeerAddress)
+	defer stats.DeleteSession(s.label)
 	for {
 		if err := s.connect(); err != nil {
 			if err == errClosed {
@@ -111,7 +119,7 @@ func (s *session) run() {
 			time.Sleep(backoff)
 			continue
 		}
-		stats.SessionUp(s.PeerAddress)
+		stats.SessionUp(s.label)
 		s.backoff.Reset()
 
 		level.Info(s.logger).Log("event", "sessionUp", "msg", "BGP session established")
@@ -119,7 +127,7 @@ func (s *session) run() {
 		if !s.sendUpdates() {
 			return
 		}
-		stats.SessionDown(s.PeerAddress)
+		stats.SessionDown(s.label)
 		level.Warn(s.logger).Log("event", "sessionDown", "msg", "BGP session down")
 	}
 }
@@ -150,9 +158,9 @@ func (s *session) sendUpdates() bool {
 			level.Error(s.logger).Log("op", "sendUpdate", "ip", c, "error", err, "msg", "failed to send BGP update")
 			return true
 		}
-		stats.UpdateSent(s.PeerAddress)
+		stats.UpdateSent(s.label)
 	}
-	stats.AdvertisedPrefixes(s.PeerAddress, len(s.advertised))
+	stats.AdvertisedPrefixes(s.label, len(s.advertised))
 
 	for {
 		for s.new == nil && s.conn != nil {
@@ -183,7 +191,7 @@ func (s *session) sendUpdates() bool {
 				level.Error(s.logger).Log("op", "sendUpdate", "prefix", c, "error", err, "msg", "failed to send BGP update")
 				return true
 			}
-			stats.UpdateSent(s.PeerAddress)
+			stats.UpdateSent(s.label)
 		}
 
 		wdr := []*net.IPNet{}
@@ -200,10 +208,10 @@ func (s *session) sendUpdates() bool {
 				}
 				return true
 			}
-			stats.UpdateSent(s.PeerAddress)
+			stats.UpdateSent(s.label)
 		}
 		s.advertised, s.new = s.new, nil
-		stats.AdvertisedPrefixes(s.PeerAddress, len(s.advertised))
+		stats.AdvertisedPrefixes(s.label, len(s.advertised))
 	}
 }
 
@@ -220,7 +228,7 @@ func (s *session) connect() error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	deadline, _ := ctx.Deadline()
-	conn, err := dialMD5(ctx, s.PeerAddress, s.SourceAddress, s.Password)
+	conn, err := dialMD5(ctx, fmt.Sprintf("%s:%d", s.PeerAddress, s.PeerPort), s.SourceAddress, s.Password)
 	if err != nil {
 		return fmt.Errorf("dial %q: %s", s.PeerAddress, err)
 	}
@@ -473,7 +481,8 @@ func (s *session) Set(advs ...*bgp.Advertisement) error {
 	}
 
 	s.new = newAdvs
-	stats.PendingPrefixes(s.PeerAddress, len(s.new))
+
+	stats.PendingPrefixes(s.label, len(s.new))
 	s.cond.Broadcast()
 
 	return nil
@@ -485,13 +494,14 @@ func (s *session) abort() {
 	if s.conn != nil {
 		s.conn.Close()
 		s.conn = nil
-		stats.SessionDown(s.PeerAddress)
+		stats.SessionDown(s.label)
 	}
 	// Next time we retry the connection, we can just skip straight to
 	// the desired end state.
 	if s.new != nil {
 		s.advertised, s.new = s.new, nil
-		stats.PendingPrefixes(s.PeerAddress, len(s.advertised))
+
+		stats.PendingPrefixes(s.label, len(s.advertised))
 	}
 	s.cond.Broadcast()
 }
