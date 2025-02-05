@@ -134,29 +134,79 @@ func WireContainers(containerA, containerB, dev string) error {
 	return nil
 }
 
+type Nexthop struct {
+	Gateway string `json:"gateway"`
+	Dev     string `json:"dev"`
+}
+
+type IPRoute struct {
+	Dst      string    `json:"dst"`
+	Nexthops []Nexthop `json:"nexthops,omitempty"`
+	Gateway  string    `json:"gateway,omitempty"`
+	Via      *struct {
+		Family string `json:"family"`
+		Host   string `json:"host"`
+	} `json:"via,omitempty"`
+	Dev string `json:"dev"`
+}
+
+func parseIPRouteOutput(r IPRoute, dev string) (netip.Prefix, map[netip.Addr]struct{}, error) {
+	dst, err := netip.ParsePrefix(r.Dst)
+	if err != nil {
+		// `ip route` command does not print the prefix when /32 or /128
+		addr, err := netip.ParseAddr(r.Dst)
+		if err != nil {
+			return netip.Prefix{}, nil, fmt.Errorf("invalid prefix %s: %w", r.Dst, err)
+		}
+		dst, err = netip.ParsePrefix(r.Dst + "/32")
+		if addr.Is6() {
+			dst, err = netip.ParsePrefix(r.Dst + "/128")
+		}
+	}
+
+	nextHops := make(map[netip.Addr]struct{})
+	// this is for ipv4 single next-hop
+	if r.Via != nil {
+		addr, err := netip.ParseAddr(r.Via.Host)
+		if err != nil {
+			return netip.Prefix{}, nil, fmt.Errorf("invalid next-hop %s: %w", r.Via.Host, err)
+		}
+		if dev == "" || r.Dev == dev {
+			nextHops[addr] = struct{}{}
+		}
+	}
+
+	// this is for ipv4 multiple next-hops
+	for _, nh := range r.Nexthops {
+		addr, err := netip.ParseAddr(nh.Gateway)
+		if err != nil {
+			return netip.Prefix{}, nil, fmt.Errorf("invalid next-hop %s: %w", nh.Gateway, err)
+		}
+
+		if dev == "" || nh.Dev == dev {
+			nextHops[addr] = struct{}{}
+		}
+	}
+
+	// this is for ipv6
+	if r.Gateway != "" {
+		addr, err := netip.ParseAddr(r.Gateway)
+		if err != nil {
+			return netip.Prefix{}, nil, fmt.Errorf("invalid next-hop %s: %w", r.Gateway, err)
+		}
+		if dev == "" || r.Dev == dev {
+			nextHops[addr] = struct{}{}
+		}
+	}
+
+	return dst, nextHops, nil
+}
+
 // BGPRoutes executes `ip route show proto bgp` in the executor and returns all
 // routes filtered by device name e.g. net0. If device name is the empty string
 // no filtering takes place. The return is map[destination CIDR]-> set[nextHops].
 func BGPRoutes(exc executor.Executor, dev string) (map[netip.Prefix]map[netip.Addr]struct{}, error) {
 	ret := make(map[netip.Prefix]map[netip.Addr]struct{})
-
-	type Nexthop struct {
-		Gateway string   `json:"gateway"`
-		Dev     string   `json:"dev"`
-		Weight  int      `json:"weight"`
-		Flags   []string `json:"flags"`
-	}
-
-	type IPRoute struct {
-		Dst      string    `json:"dst"`
-		Nexthops []Nexthop `json:"nexthops,omitempty"`
-		Gateway  string    `json:"gateway,omitempty"`
-		Via      *struct {
-			Family string `json:"family"`
-			Host   string `json:"host"`
-		} `json:"via,omitempty"`
-		Dev string `json:"dev"`
-	}
 
 	for _, proto := range []string{"-4", "-6"} {
 		out, err := exc.Exec("ip", proto, "--json", "route", "show", "proto", "bgp")
@@ -171,49 +221,15 @@ func BGPRoutes(exc executor.Executor, dev string) (map[netip.Prefix]map[netip.Ad
 		}
 
 		for _, r := range routes {
-			dst, err := netip.ParsePrefix(r.Dst)
+			dst, nextHops, err := parseIPRouteOutput(r, dev)
 			if err != nil {
-				return nil, fmt.Errorf("invalid prefix %s: %w", r.Dst, err)
-			}
-
-			nextHops := make(map[netip.Addr]struct{})
-			// this is for ipv4 single next-hop
-			if r.Via != nil {
-				addr, err := netip.ParseAddr(r.Via.Host)
-				if err != nil {
-					return nil, fmt.Errorf("invalid next-hop %s: %w", r.Via.Host, err)
-				}
-				if dev == "" || r.Dev == dev {
-					nextHops[addr] = struct{}{}
-				}
-			}
-
-			// this is for ipv4 multiple next-hops
-			for _, nh := range r.Nexthops {
-				addr, err := netip.ParseAddr(nh.Gateway)
-				if err != nil {
-					return nil, fmt.Errorf("invalid next-hop %s: %w", nh.Gateway, err)
-				}
-
-				if dev == "" || nh.Dev == dev {
-					nextHops[addr] = struct{}{}
-				}
-			}
-
-			// this is for ipv6
-			if r.Gateway != "" {
-				addr, err := netip.ParseAddr(r.Gateway)
-				if err != nil {
-					return nil, fmt.Errorf("invalid next-hop %s: %w", r.Gateway, err)
-				}
-				if dev == "" || r.Dev == dev {
-					nextHops[addr] = struct{}{}
-				}
+				return nil, err
 			}
 
 			if len(nextHops) == 0 {
 				continue
 			}
+
 			ret[dst] = nextHops
 		}
 	}
