@@ -53,13 +53,6 @@ func init() {
 	prometheus.MustRegister(stats.pendingPrefixes)
 }
 
-func (m *metrics) NewSession(addr string) {
-	m.sessionUp.WithLabelValues(addr).Set(0)
-	m.prefixes.WithLabelValues(addr).Set(0)
-	m.pendingPrefixes.WithLabelValues(addr).Set(0)
-	m.updatesSent.WithLabelValues(addr).Add(0) // just creates the metric
-}
-
 func (m *metrics) DeleteSession(addr string) {
 	m.sessionUp.DeleteLabelValues(addr)
 	m.prefixes.DeleteLabelValues(addr)

@@ -112,7 +112,8 @@ func TestBFDWithSession(t *testing.T) {
 
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254:179",
+			PeerAddress:   "10.2.2.254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),

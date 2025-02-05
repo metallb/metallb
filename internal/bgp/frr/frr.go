@@ -7,7 +7,6 @@ import (
 	"net"
 	"os"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -254,17 +253,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 
 		neighborName := NeighborName(s.PeerAddress, s.PeerASN, s.DynamicASN, s.VRFName)
 		if neighbor, exist = rout.neighbors[neighborName]; !exist {
-			host, port, err := net.SplitHostPort(s.PeerAddress)
-			if err != nil {
-				return nil, err
-			}
-
-			portUint, err := strconv.ParseUint(port, 10, 16)
-			if err != nil {
-				return nil, err
-			}
-
-			family := ipfamily.ForAddress(net.ParseIP(host))
+			family := ipfamily.ForAddress(net.ParseIP(s.PeerAddress))
 
 			var connectTime int64
 			if s.ConnectTime != nil {
@@ -286,8 +275,8 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				Name:            neighborName,
 				IPFamily:        family,
 				ASN:             asnFor(s.PeerASN, s.DynamicASN),
-				Addr:            host,
-				Port:            uint16(portUint),
+				Addr:            s.PeerAddress,
+				Port:            s.PeerPort,
 				HoldTime:        holdTime,
 				KeepaliveTime:   keepaliveTime,
 				ConnectTime:     connectTime,

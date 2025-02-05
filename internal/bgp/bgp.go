@@ -64,6 +64,8 @@ type Session interface {
 
 type SessionParameters struct {
 	PeerAddress     string
+	PeerPort        uint16
+	PeerInterface   string
 	SourceAddress   net.IP
 	MyASN           uint32
 	RouterID        net.IP

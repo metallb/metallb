@@ -19,7 +19,6 @@ import (
 	"net"
 	"reflect"
 	"sort"
-	"strconv"
 	"sync"
 
 	"github.com/go-kit/log"
@@ -59,6 +58,7 @@ const (
 type peer struct {
 	cfg     *config.Peer
 	session bgp.Session
+	id      string
 }
 
 type bgpController struct {
@@ -90,9 +90,15 @@ newPeers:
 				continue newPeers
 			}
 		}
+		id := p.Iface
+		if p.Addr != nil {
+			id = p.Addr.String()
+		}
+
 		// No existing peers match, create a new one.
 		newPeers = append(newPeers, &peer{
 			cfg: p,
+			id:  id,
 		})
 	}
 
@@ -103,14 +109,14 @@ newPeers:
 		if p == nil {
 			continue
 		}
-		level.Info(l).Log("event", "peerRemoved", "peer", p.cfg.Addr, "reason", "removedFromConfig", "msg", "peer deconfigured, closing BGP session")
+		level.Info(l).Log("event", "peerRemoved", "peer", p.id, "reason", "removedFromConfig", "msg", "peer deconfigured, closing BGP session")
 
 		if p.session != nil {
 			if err := p.session.Close(); err != nil {
-				level.Error(l).Log("op", "setConfig", "error", err, "peer", p.cfg.Addr, "msg", "failed to shut down BGP session")
+				level.Error(l).Log("op", "setConfig", "error", err, "peer", p.id, "msg", "failed to shut down BGP session")
 			}
 		}
-		level.Debug(l).Log("event", "peerRemoved", "peer", p.cfg.Addr, "reason", "removedFromConfig", "msg", "peer deconfigured, BGP session closed")
+		level.Debug(l).Log("event", "peerRemoved", "peer", p.id, "reason", "removedFromConfig", "msg", "peer deconfigured, BGP session closed")
 	}
 
 	err := c.syncBFDProfiles(cfg.BFDProfiles)
@@ -222,22 +228,28 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 		// Now, compare current state to intended state, and correct.
 		if p.session != nil && !shouldRun {
 			// Oops, session is running but shouldn't be. Shut it down.
-			level.Info(l).Log("event", "peerRemoved", "peer", p.cfg.Addr, "reason", "filteredByNodeSelector", "msg", "peer deconfigured, closing BGP session")
+			level.Info(l).Log("event", "peerRemoved", "peer", p.id, "reason", "filteredByNodeSelector", "msg", "peer deconfigured, closing BGP session")
 			if err := p.session.Close(); err != nil {
-				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to shut down BGP session")
+				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.id, "msg", "failed to shut down BGP session")
 			}
 			p.session = nil
 		} else if p.session == nil && shouldRun {
 			// Session doesn't exist, but should be running. Create
 			// it.
-			level.Info(l).Log("event", "peerAdded", "peer", p.cfg.Addr, "msg", "peer configured, starting BGP session")
+			level.Info(l).Log("event", "peerAdded", "peer", p.id, "msg", "peer configured, starting BGP session")
 			var routerID net.IP
 			if p.cfg.RouterID != nil {
 				routerID = p.cfg.RouterID
 			}
 
+			peerAddr := "" // we need because otherwise the value will "<nil>"
+			if p.cfg.Addr != nil {
+				peerAddr = p.cfg.Addr.String()
+			}
 			sessionParams := bgp.SessionParameters{
-				PeerAddress:     net.JoinHostPort(p.cfg.Addr.String(), strconv.Itoa(int(p.cfg.Port))),
+				PeerAddress:     peerAddr,
+				PeerPort:        p.cfg.Port,
+				PeerInterface:   p.cfg.Iface,
 				SourceAddress:   p.cfg.SrcAddr,
 				MyASN:           p.cfg.MyASN,
 				RouterID:        routerID,
@@ -259,7 +271,7 @@ func (c *bgpController) syncPeers(l log.Logger) error {
 			s, err := c.sessionManager.NewSession(c.logger, sessionParams)
 
 			if err != nil {
-				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.cfg.Addr, "msg", "failed to create BGP session")
+				level.Error(l).Log("op", "syncPeers", "error", err, "peer", p.id, "msg", "failed to create BGP session")
 				errs++
 			} else {
 				p.session = s
