@@ -288,6 +288,7 @@ _Appears in:_
 | `peerASN` _integer_ | AS number to expect from the remote end of the session.<br />ASN and DynamicASN are mutually exclusive and one of them must be specified. |
 | `dynamicASN` _[DynamicASNMode](#dynamicasnmode)_ | DynamicASN detects the AS number to use for the remote end of the session<br />without explicitly setting it via the ASN field. Limited to:<br />internal - if the neighbor's ASN is different than MyASN connection is denied.<br />external - if the neighbor's ASN is the same as MyASN the connection is denied.<br />ASN and DynamicASN are mutually exclusive and one of them must be specified. |
 | `peerAddress` _string_ | Address to dial when establishing the session. |
+| `interface` _string_ | Interface is the node interface over which the unnumbered BGP peering will<br />be established. No API validation takes place as that string value<br />represents an interface name on the host and if user provides an invalid<br />value, only the actual BGP session will not be established.<br />Address and Interface are mutually exclusive and one of them must be specified. |
 | `sourceAddress` _string_ | Source address to use when establishing the session. |
 | `peerPort` _integer_ | Port to dial when establishing the session. |
 | `holdTime` _[Duration](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#duration-v1-meta)_ | Requested BGP hold time, per RFC4271. |
