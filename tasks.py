@@ -32,8 +32,10 @@ kubectl_path = os.path.join(build_path, "kubectl")
 kind_path = os.path.join(build_path, "kind")
 ginkgo_path = os.path.join(build_path, "bin", "ginkgo")
 controller_gen_path = os.path.join(build_path, "bin", "controller-gen")
+yq_path = os.path.join(build_path, "bin", "yq")
 kubectl_version = "v1.31.0"
 kind_version = "v0.24.0"
+yq_version = "v4.45.1"
 
 
 def _check_architectures(architectures):
@@ -1466,10 +1468,9 @@ def generate_deepcopy():
 
 
 def _align_helm_crds(source, output):
+    fetch_yq()
     run(
-        """yq eval-all 'select(.kind == "CustomResourceDefinition")' {} > {}""".format(
-            source, output
-        )
+        f"""{yq_path} eval-all 'select(.kind == "CustomResourceDefinition")' {source} > {output}"""
     )
     run("sed -i 's/metallb-system/{{{{ .Release.Namespace }}}}/g' {}".format(output))
 
@@ -1587,6 +1588,22 @@ def fetch_ginkgo():
         fetch_command,
         get_version_command,
         "Ginkgo Version ",
+    )
+
+
+@cache
+def fetch_yq():
+    fetch_command = (
+        f"GOBIN={build_path}/bin/ GOPATH={build_path} go install github.com/mikefarah"
+        f"/yq/v4@{yq_version}"
+    )
+    get_version_command = f"{yq_path} --version"
+    fetch_dependency(
+        yq_path,
+        yq_version,
+        fetch_command,
+        get_version_command,
+        "yq (https://github.com/mikefarah/yq/) version ",
     )
 
 
