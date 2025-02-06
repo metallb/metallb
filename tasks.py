@@ -1530,7 +1530,7 @@ def fetch_kubectl():
     curl_command = "curl -o {} -LO https://dl.k8s.io/release/{}/bin/$(go env GOOS)/$(go env GOARCH)/kubectl".format(
         kubectl_path, kubectl_version
     )
-    get_version_command = f"{kubectl_path} version --short"
+    get_version_command = f"{kubectl_path} version"
     fetch_dependency(
         kubectl_path,
         kubectl_version,
