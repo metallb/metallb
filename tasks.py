@@ -1466,6 +1466,7 @@ def generate_deepcopy():
 
 
 def _align_helm_crds(source, output):
+    run("go install github.com/mikefarah/yq/v4@v4.45.1")
     run(
         """yq eval-all 'select(.kind == "CustomResourceDefinition")' {} > {}""".format(
             source, output
