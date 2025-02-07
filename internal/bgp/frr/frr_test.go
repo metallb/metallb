@@ -119,7 +119,8 @@ func TestSingleEBGPSessionMultiHop(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254:179",
+			PeerAddress:   "10.2.2.254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -146,7 +147,8 @@ func TestSingleEBGPSessionOneHop(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "127.0.0.2:179",
+			PeerAddress:   "127.0.0.2",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -174,7 +176,8 @@ func TestSingleIPv6EBGPSessionOneHop(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "[127:0:0::2]:179",
+			PeerAddress:   "127:0:0::2",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10:1:1::254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -202,7 +205,8 @@ func TestSingleIBGPSession(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254:179",
+			PeerAddress:   "10.2.2.254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -230,7 +234,8 @@ func TestSingleIPv6IBGPSession(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "[10:2:2::254]:179",
+			PeerAddress:   "10:2:2::254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10:1:1::254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -259,7 +264,8 @@ func TestSingleSessionClose(t *testing.T) {
 
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254:179",
+			PeerAddress:   "10.2.2.254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -287,7 +293,8 @@ func TestSingleSessionWithGracefulRestart(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:     "10.2.2.254:179",
+			PeerAddress:     "10.2.2.254",
+			PeerPort:        179,
 			SourceAddress:   net.ParseIP("10.1.1.254"),
 			MyASN:           102,
 			RouterID:        net.ParseIP("10.1.1.254"),
@@ -311,7 +318,8 @@ func TestTwoSessions(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session1, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254:179",
+			PeerAddress:   "10.2.2.254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -330,7 +338,8 @@ func TestTwoSessions(t *testing.T) {
 	defer session1.Close()
 	session2, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.4.4.255:179",
+			PeerAddress:   "10.4.4.255",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.3.3.254"),
 			MyASN:         300,
 			RouterID:      net.ParseIP("10.3.3.254"),
@@ -360,7 +369,8 @@ func TestTwoIPv6Sessions(t *testing.T) {
 
 	session1, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "[10:2:2::254]:179",
+			PeerAddress:   "10:2:2::254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10:1:1::254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -377,7 +387,8 @@ func TestTwoIPv6Sessions(t *testing.T) {
 	defer session1.Close()
 	session2, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "[10:4:4::255]:179",
+			PeerAddress:   "10:4:4::255",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10:3:3::254"),
 			MyASN:         300,
 			RouterID:      net.ParseIP("10.3.3.254"),
@@ -405,7 +416,8 @@ func TestIPv4AndIPv6SessionsDisableMP(t *testing.T) {
 
 	session1, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "[10:2:2::254]:179",
+			PeerAddress:   "10:2:2::254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10:1:1::254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -424,7 +436,8 @@ func TestIPv4AndIPv6SessionsDisableMP(t *testing.T) {
 	defer session1.Close()
 	session2, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.4.4.255:179",
+			PeerAddress:   "10.4.4.255",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.3.3.254"),
 			MyASN:         300,
 			RouterID:      net.ParseIP("10.3.3.254"),
@@ -452,7 +465,8 @@ func TestTwoSessionsDuplicate(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session1, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254:179",
+			PeerAddress:   "10.2.2.254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -470,7 +484,8 @@ func TestTwoSessionsDuplicate(t *testing.T) {
 	defer session1.Close()
 	session2, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254:179",
+			PeerAddress:   "10.2.2.254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -498,7 +513,8 @@ func TestTwoSessionsDuplicateRouter(t *testing.T) {
 
 	session1, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254:179",
+			PeerAddress:   "10.2.2.254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -515,7 +531,8 @@ func TestTwoSessionsDuplicateRouter(t *testing.T) {
 	defer session1.Close()
 	session2, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.4.4.255:179",
+			PeerAddress:   "10.4.4.255",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -543,7 +560,8 @@ func TestSingleAdvertisement(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254:179",
+			PeerAddress:   "10.2.2.254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -591,7 +609,8 @@ func TestSingleAdvertisementNoRouterID(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254:179",
+			PeerAddress:   "10.2.2.254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      nil,
@@ -625,34 +644,6 @@ func TestSingleAdvertisementNoRouterID(t *testing.T) {
 	testCheckConfigFile(t)
 }
 
-func TestSingleAdvertisementInvalidNoPort(t *testing.T) {
-	testSetup(t)
-
-	l := log.NewNopLogger()
-	sessionManager := mockNewSessionManager(l, logging.LevelInfo)
-	defer close(sessionManager.reloadConfig)
-	session, err := sessionManager.NewSession(l,
-		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254",
-			SourceAddress: net.ParseIP("10.1.1.254"),
-			MyASN:         100,
-			RouterID:      net.ParseIP("10.1.1.254"),
-			PeerASN:       200,
-			HoldTime:      ptr.To(time.Second),
-			KeepAliveTime: ptr.To(time.Second),
-			Password:      "password",
-			CurrentNode:   "hostname",
-			EBGPMultiHop:  true,
-			SessionName:   "test-peer"})
-
-	if err == nil {
-		session.Close()
-		t.Fatalf("Should not be able to create session")
-	}
-
-	// Not checking the file since this test won't create it
-}
-
 func TestSingleAdvertisementStop(t *testing.T) {
 	testSetup(t)
 
@@ -661,7 +652,8 @@ func TestSingleAdvertisementStop(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254:179",
+			PeerAddress:   "10.2.2.254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -708,7 +700,8 @@ func TestSingleAdvertisementChange(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254:179",
+			PeerAddress:   "10.2.2.254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -763,7 +756,8 @@ func TestTwoAdvertisements(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254:179",
+			PeerAddress:   "10.2.2.254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -816,7 +810,8 @@ func TestTwoAdvertisementsDuplicate(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254:179",
+			PeerAddress:   "10.2.2.254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -863,7 +858,8 @@ func TestTwoAdvertisementsTwoSessions(t *testing.T) {
 		func() {
 			sessionsParameters := []bgp.SessionParameters{
 				{
-					PeerAddress:   "10.2.2.254:179",
+					PeerAddress:   "10.2.2.254",
+					PeerPort:      179,
 					SourceAddress: net.ParseIP("10.1.1.254"),
 					MyASN:         100,
 					RouterID:      net.ParseIP("10.1.1.254"),
@@ -876,7 +872,8 @@ func TestTwoAdvertisementsTwoSessions(t *testing.T) {
 					EBGPMultiHop:  true,
 					SessionName:   "test-peer"},
 				{
-					PeerAddress:   "10.2.2.255:179",
+					PeerAddress:   "10.2.2.255",
+					PeerPort:      179,
 					SourceAddress: net.ParseIP("10.1.1.254"),
 					MyASN:         100,
 					RouterID:      net.ParseIP("10.1.1.254"),
@@ -965,7 +962,8 @@ func TestSingleSessionExtras(t *testing.T) {
 	}
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "127.0.0.2:179",
+			PeerAddress:   "127.0.0.2",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -1046,7 +1044,8 @@ func TestLargeCommunities(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254:179",
+			PeerAddress:   "10.2.2.254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -1095,7 +1094,8 @@ func TestManyAdvertisementsSameCommunity(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254:179",
+			PeerAddress:   "10.2.2.254",
+			PeerPort:      179,
 			SourceAddress: net.ParseIP("10.1.1.254"),
 			MyASN:         100,
 			RouterID:      net.ParseIP("10.1.1.254"),
@@ -1143,7 +1143,8 @@ func TestSingleSessionWithNoTimers(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress: "10.2.2.254:179",
+			PeerAddress: "10.2.2.254",
+			PeerPort:    179,
 			MyASN:       102,
 			PeerASN:     100,
 			SessionName: "test-peer"})
@@ -1164,7 +1165,8 @@ func TestSingleSessionWithZeroTimers(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:   "10.2.2.254:179",
+			PeerAddress:   "10.2.2.254",
+			PeerPort:      179,
 			MyASN:         102,
 			HoldTime:      ptr.To(0 * time.Second),
 			KeepAliveTime: ptr.To(0 * time.Second),
@@ -1366,7 +1368,8 @@ func TestSingleSessionWithInternalASN(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:     "10.2.2.254:179",
+			PeerAddress:     "10.2.2.254",
+			PeerPort:        179,
 			SourceAddress:   net.ParseIP("10.1.1.254"),
 			MyASN:           102,
 			RouterID:        net.ParseIP("10.1.1.254"),
@@ -1390,7 +1393,8 @@ func TestSingleSessionWithExternalASN(t *testing.T) {
 	defer close(sessionManager.reloadConfig)
 	session, err := sessionManager.NewSession(l,
 		bgp.SessionParameters{
-			PeerAddress:     "10.2.2.254:179",
+			PeerAddress:     "10.2.2.254",
+			PeerPort:        179,
 			SourceAddress:   net.ParseIP("10.1.1.254"),
 			MyASN:           102,
 			RouterID:        net.ParseIP("10.1.1.254"),
