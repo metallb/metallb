@@ -135,7 +135,8 @@ func WireContainers(containerA, containerB, dev string) error {
 }
 
 // BGPRoutes executes `ip route show proto bgp` in the executor and returns all
-// routes filtered by device e.g. net0.  The return is map[destination CIDR]-> set[nextHops].
+// routes filtered by device name e.g. net0. If device name is the empty string
+// no filtering takes place. The return is map[destination CIDR]-> set[nextHops].
 func BGPRoutes(exc executor.Executor, dev string) (map[netip.Prefix]map[netip.Addr]struct{}, error) {
 	ret := make(map[netip.Prefix]map[netip.Addr]struct{})
 
@@ -182,7 +183,7 @@ func BGPRoutes(exc executor.Executor, dev string) (map[netip.Prefix]map[netip.Ad
 				if err != nil {
 					return nil, fmt.Errorf("invalid next-hop %s: %w", r.Via.Host, err)
 				}
-				if r.Dev == dev {
+				if dev == "" || r.Dev == dev {
 					nextHops[addr] = struct{}{}
 				}
 			}
@@ -194,7 +195,7 @@ func BGPRoutes(exc executor.Executor, dev string) (map[netip.Prefix]map[netip.Ad
 					return nil, fmt.Errorf("invalid next-hop %s: %w", nh.Gateway, err)
 				}
 
-				if nh.Dev == dev {
+				if dev == "" || nh.Dev == dev {
 					nextHops[addr] = struct{}{}
 				}
 			}
@@ -205,7 +206,7 @@ func BGPRoutes(exc executor.Executor, dev string) (map[netip.Prefix]map[netip.Ad
 				if err != nil {
 					return nil, fmt.Errorf("invalid next-hop %s: %w", r.Gateway, err)
 				}
-				if r.Dev == dev {
+				if dev == "" || r.Dev == dev {
 					nextHops[addr] = struct{}{}
 				}
 			}
