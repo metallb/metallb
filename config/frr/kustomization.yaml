@@ -5,5 +5,6 @@ resources:
 - frr-cm.yaml
 patchesStrategicMerge:
 - speaker-patch.yaml
+- speaker-patch-exclude.yaml
 - controller-patch.yaml
 namespace: metallb-system

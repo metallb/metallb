@@ -1880,6 +1880,81 @@ spec:
         component: speaker
     spec:
       containers:
+      - args:
+        - --port=7472
+        - --log-level=info
+        env:
+        - name: FRR_CONFIG_FILE
+          value: /etc/frr_reloader/frr.conf
+        - name: FRR_RELOADER_PID_FILE
+          value: /etc/frr_reloader/reloader.pid
+        - name: METALLB_BGP_TYPE
+          value: frr
+        - name: METALLB_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: METALLB_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: METALLB_HOST
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
+        - name: METALLB_ML_BIND_ADDR
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: METALLB_ML_LABELS
+          value: app=metallb,component=speaker
+        - name: METALLB_ML_SECRET_KEY_PATH
+          value: /etc/ml_secret_key
+        image: quay.io/metallb/speaker:main
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /metrics
+            port: monitoring
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: speaker
+        ports:
+        - containerPort: 7472
+          name: monitoring
+        - containerPort: 7946
+          name: memberlist-tcp
+        - containerPort: 7946
+          name: memberlist-udp
+          protocol: UDP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /metrics
+            port: monitoring
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            add:
+            - NET_RAW
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - mountPath: /etc/metallb
+          name: excludenodes
+          readOnly: true
+        - mountPath: /etc/frr_reloader
+          name: reloader
+        - mountPath: /etc/ml_secret_key
+          name: memberlist
+          readOnly: true
       - command:
         - /bin/sh
         - -c
@@ -1950,81 +2025,6 @@ spec:
           name: frr-conf
         - mountPath: /etc/frr_metrics
           name: metrics
-      - args:
-        - --port=7472
-        - --log-level=info
-        env:
-        - name: FRR_CONFIG_FILE
-          value: /etc/frr_reloader/frr.conf
-        - name: FRR_RELOADER_PID_FILE
-          value: /etc/frr_reloader/reloader.pid
-        - name: METALLB_BGP_TYPE
-          value: frr
-        - name: METALLB_NODE_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: spec.nodeName
-        - name: METALLB_POD_NAME
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.name
-        - name: METALLB_HOST
-          valueFrom:
-            fieldRef:
-              fieldPath: status.hostIP
-        - name: METALLB_ML_BIND_ADDR
-          valueFrom:
-            fieldRef:
-              fieldPath: status.podIP
-        - name: METALLB_ML_LABELS
-          value: app=metallb,component=speaker
-        - name: METALLB_ML_SECRET_KEY_PATH
-          value: /etc/ml_secret_key
-        image: quay.io/metallb/speaker:main
-        livenessProbe:
-          failureThreshold: 3
-          httpGet:
-            path: /metrics
-            port: monitoring
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 1
-        name: speaker
-        ports:
-        - containerPort: 7472
-          name: monitoring
-        - containerPort: 7946
-          name: memberlist-tcp
-        - containerPort: 7946
-          name: memberlist-udp
-          protocol: UDP
-        readinessProbe:
-          failureThreshold: 3
-          httpGet:
-            path: /metrics
-            port: monitoring
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          successThreshold: 1
-          timeoutSeconds: 1
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            add:
-            - NET_RAW
-            drop:
-            - ALL
-          readOnlyRootFilesystem: true
-        volumeMounts:
-        - mountPath: /etc/frr_reloader
-          name: reloader
-        - mountPath: /etc/ml_secret_key
-          name: memberlist
-          readOnly: true
-        - mountPath: /etc/metallb
-          name: metallb-excludel2
-          readOnly: true
       hostNetwork: true
       initContainers:
       - command:
@@ -2072,6 +2072,10 @@ spec:
         key: node-role.kubernetes.io/control-plane
         operator: Exists
       volumes:
+      - configMap:
+          name: excludenodepatterns
+          optional: true
+        name: excludenodes
       - emptyDir: {}
         name: frr-sockets
       - configMap:

@@ -61,15 +61,16 @@ type peer struct {
 }
 
 type bgpController struct {
-	logger          log.Logger
-	myNode          string
-	nodeLabels      labels.Set
-	peers           []*peer
-	svcAds          map[string][]*bgp.Advertisement
-	bgpType         bgpImplementation
-	secretHandling  SecretHandling
-	sessionManager  bgp.SessionManager
-	ignoreExcludeLB bool
+	logger              log.Logger
+	myNode              string
+	nodeLabels          labels.Set
+	peers               []*peer
+	svcAds              map[string][]*bgp.Advertisement
+	bgpType             bgpImplementation
+	excludeNodeMetadata *v1.Node
+	secretHandling      SecretHandling
+	sessionManager      bgp.SessionManager
+	ignoreExcludeLB     bool
 }
 
 func (c *bgpController) SetConfig(l log.Logger, cfg *config.Config) error {
@@ -167,6 +168,11 @@ func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, po
 	if err := k8snodes.IsNodeAvailable(nodes[c.myNode]); err != nil {
 		level.Warn(l).Log("event", "skipping should announce bgp", "service", name, "reason", err)
 		return err.Error()
+	}
+
+	if k8snodes.IsNodeExcludedFromBalancers2(nodes[c.myNode], c.excludeNodeMetadata) {
+		level.Warn(l).Log("event", "skipping should announce bgp true", "service", name, "reason", fmt.Sprintf("%v", c.excludeNodeMetadata))
+		return "nodeMatchedExcludedPattern"
 	}
 
 	if !c.ignoreExcludeLB && k8snodes.IsNodeExcludedFromBalancers(nodes[c.myNode]) {

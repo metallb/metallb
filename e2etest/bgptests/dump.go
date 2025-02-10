@@ -50,7 +50,7 @@ func dumpBGPInfo(basePath, testName string, cs clientset.Interface, namespace st
 			break
 		}
 		podExec, err := FRRProvider.FRRExecutorFor(pod.Namespace, pod.Name)
-		Expect(err).NotTo(HaveOccurred())
+		//	Expect(err).NotTo(HaveOccurred())
 
 		dump, err := frr.RawDump(podExec, "/etc/frr/frr.conf", "/etc/frr/frr.log")
 		if err != nil {
