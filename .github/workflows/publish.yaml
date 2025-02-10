@@ -60,7 +60,7 @@ jobs:
         image: [speaker, controller, configmaptocrs]
     steps:
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3.2.0
+        uses: docker/setup-qemu-action@v3.4.0
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@main
