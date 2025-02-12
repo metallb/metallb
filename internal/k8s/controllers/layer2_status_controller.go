@@ -28,7 +28,7 @@ import (
 	"go.universe.tf/metallb/internal/layer2"
 )
 
-type StatusFetcher func(types.NamespacedName) []layer2.IPAdvertisement
+type L2StatusFetcher func(types.NamespacedName) []layer2.IPAdvertisement
 
 type l2StatusEvent struct {
 	metav1.TypeMeta
@@ -61,7 +61,7 @@ type Layer2StatusReconciler struct {
 	SpeakerPod    *v1.Pod
 	ReconcileChan <-chan event.GenericEvent
 	// fetch ipAdv object to get interface info
-	StatusFetcher StatusFetcher
+	StatusFetcher L2StatusFetcher
 }
 
 func (r *Layer2StatusReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
