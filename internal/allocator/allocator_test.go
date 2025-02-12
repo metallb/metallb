@@ -3,6 +3,7 @@
 package allocator
 
 import (
+	"fmt"
 	"math"
 	"net"
 	"reflect"
@@ -16,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
 
+	"github.com/google/go-cmp/cmp"
 	ptu "github.com/prometheus/client_golang/prometheus/testutil"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/utils/ptr"
@@ -76,8 +78,10 @@ func selector(s string) labels.Selector {
 	return ret
 }
 
+func noopCallback(_ string) {}
+
 func TestAssignment(t *testing.T) {
-	alloc := New()
+	alloc := New(noopCallback)
 	alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
 		"test": {
 			Name:       "test",
@@ -682,7 +686,7 @@ func TestAssignment(t *testing.T) {
 }
 
 func TestPoolAllocation(t *testing.T) {
-	alloc := New()
+	alloc := New(noopCallback)
 	// Majority of this test only allocates from the "test" pool,
 	// so it will run out of IPs quickly even though there are
 	// tons available in other pools.
@@ -1245,7 +1249,7 @@ func TestPoolAllocation(t *testing.T) {
 }
 
 func TestAllocation(t *testing.T) {
-	alloc := New()
+	alloc := New(noopCallback)
 	alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
 		"test1": {
 			Name:       "test1",
@@ -1616,7 +1620,7 @@ func TestAllocation(t *testing.T) {
 }
 
 func TestBuggyIPs(t *testing.T) {
-	alloc := New()
+	alloc := New(noopCallback)
 	alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
 		"test": {
 			Name:       "test",
@@ -1800,7 +1804,7 @@ func TestConfigReload(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		alloc := New()
+		alloc := New(noopCallback)
 		alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
 			"test": {
 				Name:       "test",
@@ -1833,7 +1837,7 @@ func TestConfigReload(t *testing.T) {
 }
 
 func TestAutoAssign(t *testing.T) {
-	alloc := New()
+	alloc := New(noopCallback)
 	alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
 		"test1": {
 			Name:       "test1",
@@ -2105,7 +2109,9 @@ func TestPoolCount(t *testing.T) {
 }
 
 func TestPoolMetrics(t *testing.T) {
-	alloc := New()
+	callbackCounter := 0
+	callback := func(_ string) { callbackCounter++ }
+	alloc := New(callback)
 	alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{
 		"test": {
 			Name:       "test",
@@ -2209,13 +2215,31 @@ func TestPoolMetrics(t *testing.T) {
 	if int(value) != 8 {
 		t.Errorf("stats.poolCapacity invalid %f. Expected 8", value)
 	}
+	counters := alloc.CountersForPool("test")
+	err := validateCounters(counters, 4, 4, 0, 0)
+	if err != nil {
+		t.Error(err)
+	}
+	expectedCallbackCounter := 1
+	if callbackCounter != expectedCallbackCounter {
+		t.Errorf("callbackCounter invalid %d. Expected %d", callbackCounter, expectedCallbackCounter)
+	}
 
 	for _, test := range tests {
+		expectedCallbackCounter++
 		if len(test.ips) == 0 {
 			alloc.Unassign(test.svcKey)
 			value := ptu.ToFloat64(stats.poolActive.WithLabelValues("test"))
 			if value != test.ipsInUse {
 				t.Errorf("%v; in-use %v. Expected %v", test.desc, value, test.ipsInUse)
+			}
+			counters = alloc.CountersForPool("test")
+			err = validateCounters(counters, 4-int64(test.ipsInUse), 4, int64(test.ipsInUse), 0)
+			if err != nil {
+				t.Error(err)
+			}
+			if callbackCounter != expectedCallbackCounter {
+				t.Errorf("callbackCounter invalid %d. Expected %d", callbackCounter, expectedCallbackCounter)
 			}
 			continue
 		}
@@ -2238,6 +2262,29 @@ func TestPoolMetrics(t *testing.T) {
 		if value != test.ipsInUse {
 			t.Errorf("%v; in-use %v. Expected %v", test.desc, value, test.ipsInUse)
 		}
+		counters = alloc.CountersForPool("test")
+		err = validateCounters(counters, 4-int64(test.ipsInUse), 4, int64(test.ipsInUse), 0)
+		if err != nil {
+			t.Error(err)
+		}
+		if callbackCounter != expectedCallbackCounter {
+			t.Errorf("callbackCounter invalid %d. Expected %d", callbackCounter, expectedCallbackCounter)
+		}
+	}
+	ips := []net.IP{net.ParseIP("1.2.3.4")}
+	err = alloc.Assign("s1", svc, ips, []Port{}, "", "")
+	if err != nil {
+		t.Errorf("assign failed: %v", err)
+	}
+	alloc.SetPools(&config.Pools{ByName: map[string]*config.Pool{}})
+	val := ptu.ToFloat64(stats.poolActive.WithLabelValues("test")) // we actually expect the value to not be there, but since we can't access it this recreates it with 0
+	if val != 0 {
+		t.Errorf("expected value to be 0, got %v", val)
+	}
+	counters = alloc.CountersForPool("test")
+	err = validateCounters(counters, 0, 0, 0, 0)
+	if err != nil {
+		t.Error(err)
 	}
 }
 
@@ -2295,4 +2342,18 @@ func compareIPs(ips1, ips2 []string) bool {
 		}
 	}
 	return true
+}
+
+//nolint:unparam
+func validateCounters(c PoolCounters, avIPv4, avIPv6, asIPv4, asIPv6 int64) error {
+	n := PoolCounters{
+		AvailableIPv4: avIPv4,
+		AvailableIPv6: avIPv6,
+		AssignedIPv4:  asIPv4,
+		AssignedIPv6:  asIPv6,
+	}
+	if !cmp.Equal(c, n) {
+		return fmt.Errorf("unexpected pool counters (-want +got):\n%s", cmp.Diff(n, c))
+	}
+	return nil
 }

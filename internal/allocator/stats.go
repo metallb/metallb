@@ -71,6 +71,16 @@ var stats = struct {
 	}),
 }
 
+func deleteStatsFor(pool string) {
+	stats.poolCapacity.DeleteLabelValues(pool)
+	stats.ipv4PoolCapacity.DeleteLabelValues(pool)
+	stats.ipv6PoolCapacity.DeleteLabelValues(pool)
+	stats.poolActive.DeleteLabelValues(pool)
+	stats.poolAllocated.DeleteLabelValues(pool)
+	stats.ipv4PoolActive.DeleteLabelValues(pool)
+	stats.ipv6PoolActive.DeleteLabelValues(pool)
+}
+
 func init() {
 	prometheus.MustRegister(stats.poolCapacity)
 	prometheus.MustRegister(stats.ipv4PoolCapacity)
