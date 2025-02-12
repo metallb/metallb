@@ -130,6 +130,13 @@ jobs:
           git config user.name "$GITHUB_ACTOR"
           git config user.email "$GITHUB_ACTOR@users.noreply.github.com"
 
+      - name: Log into Quay
+        uses: docker/login-action@v3.3.0
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USER }}
+          password: ${{ secrets.QUAY_PASSWORD }}
+
       - name: Chart releaser
         if: startsWith(github.ref, 'refs/tags/v') # we craft releases only for tags
         run: |
@@ -160,6 +167,8 @@ jobs:
                 --index-path index.yaml \
                 --release-name-template "{{ .Name }}-chart-{{ .Version }}" \
                 --push
+            # upload chart to quay
+            helm push .cr-release-packages/$repo oci://quay.io/metallb/chart
           else
             echo "Release already exists"
           fi
