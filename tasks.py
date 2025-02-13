@@ -1128,7 +1128,7 @@ def lint(ctx, env="container"):
     convenient to install the golangci-lint binaries on the host. This can be
     achieved by running `inv lint --env host`.
     """
-    version = "1.59.1"
+    version = "1.63.4"
     golangci_cmd = "golangci-lint run --timeout 10m0s ./..."
 
     if env == "container":
