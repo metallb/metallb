@@ -32,7 +32,7 @@ jobs:
       - name: Checkout Source
         uses: actions/checkout@v4
       - name: Run Gosec Security Scanner
-        uses: securego/gosec@v2.21.2
+        uses: securego/gosec@v2.22.0
         with:
           args: -exclude-dir e2etest -severity medium ./...
       - name: Golang Vulncheck
