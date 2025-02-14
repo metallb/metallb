@@ -5,6 +5,7 @@ package status
 import (
 	"context"
 	"fmt"
+
 	"go.universe.tf/e2etest/pkg/metallb"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -12,11 +13,6 @@ import (
 	"go.universe.tf/metallb/api/v1beta1"
 	v1 "k8s.io/api/core/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-const (
-	LabelServiceName      = "metallb.io/service-name"
-	LabelServiceNamespace = "metallb.io/service-namespace"
 )
 
 func L2ForService(cs client.Client, svc *v1.Service) (*v1beta1.ServiceL2Status, error) {

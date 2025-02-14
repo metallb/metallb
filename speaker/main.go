@@ -31,6 +31,8 @@ import (
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/cache"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/yaml"
 
@@ -152,11 +154,14 @@ func main() {
 		level.Error(logger).Log("op", "startup", "msg", "failed to parse announcedInterfacesToExclude from configMap", "error", err)
 		os.Exit(1)
 	}
-	statusNotifyChan := make(chan event.GenericEvent)
 
 	if *frrK8sNamespace == "" { // if not set, assuming it runs under metallb
 		frrK8sNamespace = namespace
 	}
+
+	l2StatusChan := make(chan event.GenericEvent)
+	bgpStatusChan := make(chan event.GenericEvent)
+
 	// Setup all clients and speakers, config decides what is being done runtime.
 	ctrl, err := newController(controllerConfig{
 		MyNode:                 *myNode,
@@ -169,7 +174,15 @@ func main() {
 		InterfaceExcludeRegexp: interfacesToExclude,
 		IgnoreExcludeLB:        *ignoreLBExclude,
 		Layer2StatusChange: func(namespacedName types.NamespacedName) {
-			statusNotifyChan <- controllers.NewL2StatusEvent(namespacedName.Namespace, namespacedName.Name)
+			l2StatusChan <- controllers.NewL2StatusEvent(namespacedName.Namespace, namespacedName.Name)
+		},
+		BGPAdsChangedCallback: func(key string) {
+			ns, name, err := cache.SplitMetaNamespaceKey(key)
+			if err != nil {
+				level.Debug(logger).Log("op", "bgpStatusEvent", "error", err, "msg", "failed to parse key as namespaced name", "key", key)
+				return
+			}
+			bgpStatusChan <- controllers.NewBGPStatusEvent(ns, name)
 		},
 	})
 	if err != nil {
@@ -210,8 +223,10 @@ func main() {
 		WithFRRK8s:        listenFRRK8s,
 		FRRK8sNamespace:   *frrK8sNamespace,
 
-		Layer2StatusChan:    statusNotifyChan,
+		Layer2StatusChan:    l2StatusChan,
 		Layer2StatusFetcher: ctrl.layer2StatusFetchFunc,
+		BGPStatusChan:       bgpStatusChan,
+		BGPPeersFetcher:     ctrl.bgpPeersFetcher,
 	})
 	if err != nil {
 		level.Error(logger).Log("op", "startup", "error", err, "msg", "failed to create k8s client")
@@ -243,7 +258,8 @@ type controller struct {
 
 	protocols []config.Proto
 
-	layer2StatusFetchFunc controllers.StatusFetcher
+	layer2StatusFetchFunc controllers.L2StatusFetcher
+	bgpPeersFetcher       controllers.PeersForService
 }
 
 type controllerConfig struct {
@@ -264,6 +280,7 @@ type controllerConfig struct {
 	InterfaceExcludeRegexp       *regexp.Regexp
 	IgnoreExcludeLB              bool
 	Layer2StatusChange           func(types.NamespacedName)
+	BGPAdsChangedCallback        func(string)
 }
 
 func newController(cfg controllerConfig) (*controller, error) {
@@ -274,16 +291,21 @@ func newController(cfg controllerConfig) (*controller, error) {
 		secretHandling = SecretConvert
 	}
 
+	bgpController := &bgpController{
+		logger:             cfg.Logger,
+		myNode:             cfg.MyNode,
+		svcAds:             make(map[string][]*bgp.Advertisement),
+		activeAds:          make(map[string]sets.Set[string]),
+		adsChangedCallback: cfg.BGPAdsChangedCallback,
+		bgpType:            cfg.bgpType,
+		sessionManager:     newBGP(cfg),
+		ignoreExcludeLB:    cfg.IgnoreExcludeLB,
+		secretHandling:     secretHandling,
+	}
+	bgpPeersFetcher := bgpController.PeersForService
+
 	handlers := map[config.Proto]Protocol{
-		config.BGP: &bgpController{
-			logger:          cfg.Logger,
-			myNode:          cfg.MyNode,
-			svcAds:          make(map[string][]*bgp.Advertisement),
-			bgpType:         cfg.bgpType,
-			sessionManager:  newBGP(cfg),
-			ignoreExcludeLB: cfg.IgnoreExcludeLB,
-			secretHandling:  secretHandling,
-		},
+		config.BGP: bgpController,
 	}
 	protocols := []config.Proto{config.BGP}
 
@@ -312,6 +334,7 @@ func newController(cfg controllerConfig) (*controller, error) {
 		svcIPs:                map[string][]net.IP{},
 		protocols:             protocols,
 		layer2StatusFetchFunc: layer2StatusFetcher,
+		bgpPeersFetcher:       bgpPeersFetcher,
 	}
 	ret.announced[config.BGP] = map[string]bool{}
 	ret.announced[config.Layer2] = map[string]bool{}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -69,6 +70,10 @@ var (
 		layer2ServiceAdvs = advs
 	}
 	speakerPod *corev1.Pod
+
+	bgpStatusReconcileChan = make(chan event.GenericEvent)
+	bgpAdvs                = map[string]sets.Set[string]{}
+	bgpAdvsMutex           = sync.Mutex{}
 )
 
 const (
@@ -213,6 +218,22 @@ var _ = BeforeSuite(func() {
 		},
 	}
 	err = layer2StatusReconciler.SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	bgpStatusReconciler := &ServiceBGPStatusReconciler{
+		Client:        k8sManager.GetClient(),
+		Logger:        log.NewNopLogger(),
+		NodeName:      testNodeName,
+		Namespace:     speakerNamespace,
+		SpeakerPod:    speakerPod,
+		ReconcileChan: bgpStatusReconcileChan,
+		PeersFetcher: func(key string) sets.Set[string] {
+			bgpAdvsMutex.Lock()
+			defer bgpAdvsMutex.Unlock()
+			return bgpAdvs[key]
+		},
+	}
+	err = bgpStatusReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	go func() {
@@ -566,6 +587,148 @@ var _ = Describe("Layer2 Status Controller", func() {
 				}
 				return len(statuses) == 0
 			}, 5*time.Second, 200*time.Millisecond).Should(BeTrue())
+		})
+	})
+})
+
+var _ = Describe("BGP Status Controller", func() {
+	Context("SetupWithManager", func() {
+		It("Should Reconcile correctly", func() {
+			serviceKey := types.NamespacedName{Namespace: testNamespace, Name: testServiceName}.String()
+			getStatus := func() (*v1beta1.ServiceBGPStatus, error) {
+				list := v1beta1.ServiceBGPStatusList{}
+				err := k8sClient.List(context.TODO(), &list)
+				if err != nil {
+					return nil, err
+				}
+
+				if len(list.Items) != 1 {
+					return nil, fmt.Errorf("expected 1 status, got %v", list.Items)
+				}
+
+				status := list.Items[0]
+				if len(status.OwnerReferences) != 1 {
+					return nil, fmt.Errorf("expected 1 owner reference, got %v", status.OwnerReferences)
+				}
+
+				ownerRef := status.OwnerReferences[0]
+				if ownerRef.UID != speakerPod.UID {
+					return nil, fmt.Errorf("owner reference is not speaker pod, got %v", ownerRef)
+				}
+
+				if status.Labels[LabelAnnounceNode] != testNodeName {
+					return nil, fmt.Errorf("labels do not match node, got %v", status.Labels)
+				}
+
+				if status.Status.Node != testNodeName {
+					return nil, fmt.Errorf("status does not match node, got %v", status.Status)
+				}
+
+				if status.Labels[LabelServiceNamespace] != testNamespace {
+					return nil, fmt.Errorf("labels do not match namespace, got %v", status.Labels)
+				}
+
+				if status.Status.ServiceNamespace != testNamespace {
+					return nil, fmt.Errorf("status does not match namespace, got %v", status.Status)
+				}
+
+				if status.Labels[LabelServiceName] != testServiceName {
+					return nil, fmt.Errorf("labels do not match service name, got %v", status.Labels)
+				}
+
+				if status.Status.ServiceName != testServiceName {
+					return nil, fmt.Errorf("status does not match service name, got %v", status.Status)
+				}
+
+				return &status, nil
+			}
+
+			bgpAdvsMutex.Lock()
+			bgpAdvs[serviceKey] = sets.New[string]("peer1")
+			bgpAdvsMutex.Unlock()
+			bgpStatusReconcileChan <- NewBGPStatusEvent(testNamespace, testServiceName)
+			expectedPeers := []string{"peer1"}
+			Eventually(func() error {
+				s, err := getStatus()
+				if err != nil {
+					return err
+				}
+
+				if !reflect.DeepEqual(expectedPeers, s.Status.Peers) {
+					return fmt.Errorf("expected peers to be %v, got %v", expectedPeers, s.Status.Peers)
+				}
+
+				return nil
+			}, 5*time.Second, 200*time.Millisecond).ShouldNot(HaveOccurred())
+
+			bgpAdvsMutex.Lock()
+			bgpAdvs[serviceKey] = sets.New[string]("peer1", "peer2")
+			bgpAdvsMutex.Unlock()
+			bgpStatusReconcileChan <- NewBGPStatusEvent(testNamespace, testServiceName)
+			expectedPeers = []string{"peer1", "peer2"}
+			Eventually(func() error {
+				s, err := getStatus()
+				if err != nil {
+					return err
+				}
+
+				if !reflect.DeepEqual(expectedPeers, s.Status.Peers) {
+					return fmt.Errorf("expected peers to be %v, got %v", expectedPeers, s.Status.Peers)
+				}
+
+				return nil
+			}, 5*time.Second, 200*time.Millisecond).ShouldNot(HaveOccurred())
+
+			// Manual updates should be reverted by the controller
+			status, err := getStatus()
+			Expect(err).ToNot(HaveOccurred())
+			status.Status.Peers = []string{"manual"}
+			err = k8sClient.Status().Update(context.TODO(), status)
+			Expect(err).To(Not(HaveOccurred()))
+			Eventually(func() error {
+				s, err := getStatus()
+				if err != nil {
+					return err
+				}
+
+				if !reflect.DeepEqual(expectedPeers, s.Status.Peers) {
+					return fmt.Errorf("expected peers to be %v, got %v", expectedPeers, s.Status.Peers)
+				}
+
+				return nil
+			}, 5*time.Second, 200*time.Millisecond).ShouldNot(HaveOccurred())
+
+			bgpAdvsMutex.Lock()
+			delete(bgpAdvs, serviceKey)
+			bgpAdvsMutex.Unlock()
+			bgpStatusReconcileChan <- NewBGPStatusEvent(testNamespace, testServiceName)
+			Eventually(func() error {
+				list := v1beta1.ServiceBGPStatusList{}
+				err := k8sClient.List(context.TODO(), &list)
+				if err != nil {
+					return err
+				}
+
+				if len(list.Items) != 0 {
+					return fmt.Errorf("expected no statuses, got %v", list.Items)
+				}
+
+				return nil
+			}, 5*time.Second, 200*time.Millisecond).ShouldNot(HaveOccurred())
+
+			Consistently(func() error {
+				list := v1beta1.ServiceBGPStatusList{}
+				err := k8sClient.List(context.TODO(), &list)
+				if err != nil {
+					return err
+				}
+
+				if len(list.Items) != 0 {
+					return fmt.Errorf("expected no statuses, got %v", list.Items)
+				}
+
+				return nil
+			}, 1*time.Second, 200*time.Millisecond).ShouldNot(HaveOccurred())
 		})
 	})
 })
