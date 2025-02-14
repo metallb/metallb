@@ -297,6 +297,13 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			ginkgo.By("checking the second service loses its ip")
 			checkLBIPGetsRemoved(svc1)
 
+			ginkgo.By("checking the first service keeps its ip")
+			Consistently(func() string {
+				toCheck, err := cs.CoreV1().Services(svc.Namespace).Get(context.Background(), svc.Name, metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				return toCheck.Status.LoadBalancer.Ingress[0].IP
+			}, 2*time.Minute, 1*time.Second).Should(Equal(ip))
+
 			ginkgo.By("changing etp policy of the first service to local")
 			jig.UpdateService(context.Background(), func(svc *corev1.Service) {
 				svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyLocal

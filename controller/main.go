@@ -79,9 +79,17 @@ func (c *controller) SetBalancer(l log.Logger, name string, svcRo *v1.Service, _
 	syncStateRes := controllers.SyncStateSuccess
 
 	prevIPs := c.ips.IPs(name)
+	prevAllocKey := c.ips.AllocationKey(name)
 
 	if c.convergeBalancer(l, name, svc) != nil {
 		syncStateRes = controllers.SyncStateErrorNoRetry
+	}
+
+	newAllocKey := c.ips.AllocationKey(name)
+
+	if prevAllocKey != newAllocKey {
+		level.Debug(l).Log("event", "allocation key changed", "msg", "allocation changed for shared service, reprocessing")
+		syncStateRes = controllers.SyncStateReprocessAll
 	}
 
 	if reflect.DeepEqual(svcRo, svc) {
