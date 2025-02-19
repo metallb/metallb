@@ -34,7 +34,7 @@ import (
 )
 
 var FRRImage string
-var _ = ginkgo.Describe("FRRK8S-MODE Unnumbered BGP", func() {
+var _ = ginkgo.Describe("FRR Unnumbered BGP", func() {
 	var (
 		testNamespace         string
 		nodeWithP2PConnection corev1.Node
