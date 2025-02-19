@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -46,7 +47,17 @@ var osHostname = os.Hostname
 // sessionName() defines the format of the key of the 'sessions' map in
 // the 'frrState' struct.
 func sessionName(s session) string {
-	baseName := fmt.Sprintf("%d@%s-%d@%s", s.PeerASN, s.PeerAddress, s.MyASN, s.SourceAddress)
+	asn := strconv.FormatUint(uint64(s.PeerASN), 10)
+	if s.DynamicASN != "" {
+		asn = s.DynamicASN
+	}
+
+	peer := s.PeerAddress
+	if s.PeerInterface != "" {
+		peer = s.PeerInterface
+	}
+
+	baseName := fmt.Sprintf("%s@%s-%d@%s", asn, peer, s.MyASN, s.SourceAddress)
 	if s.VRFName == "" {
 		return baseName
 	}
@@ -251,9 +262,13 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 			routers[routerName] = rout
 		}
 
-		neighborName := NeighborName(s.PeerAddress, s.PeerASN, s.DynamicASN, s.VRFName)
+		neighborName := NeighborName(s.PeerAddress, s.PeerInterface, s.PeerASN, s.DynamicASN, s.VRFName)
 		if neighbor, exist = rout.neighbors[neighborName]; !exist {
 			family := ipfamily.ForAddress(net.ParseIP(s.PeerAddress))
+
+			if s.PeerInterface != "" {
+				family = ipfamily.DualStack
+			}
 
 			var connectTime int64
 			if s.ConnectTime != nil {
@@ -276,6 +291,7 @@ func (sm *sessionManager) createConfig() (*frrConfig, error) {
 				IPFamily:        family,
 				ASN:             asnFor(s.PeerASN, s.DynamicASN),
 				Addr:            s.PeerAddress,
+				Iface:           s.PeerInterface,
 				Port:            s.PeerPort,
 				HoldTime:        holdTime,
 				KeepaliveTime:   keepaliveTime,
