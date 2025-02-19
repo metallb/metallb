@@ -68,6 +68,7 @@ type neighborConfig struct {
 	Name                string
 	ASN                 string
 	Addr                string
+	Iface               string
 	SrcAddr             string
 	Port                uint16
 	HoldTime            *int64
@@ -94,10 +95,15 @@ type neighborConfig struct {
 }
 
 func (n *neighborConfig) ID() string {
-	if n.VRFName == "" {
-		return n.Addr
+	id := n.Addr
+	if n.Iface != "" {
+		id = n.Iface
 	}
-	return fmt.Sprintf("%s-%s", n.Addr, n.VRFName)
+	vrf := ""
+	if n.VRFName != "" {
+		vrf = "-" + n.VRFName
+	}
+	return id + vrf
 }
 
 type advertisementConfig struct {
@@ -116,8 +122,11 @@ func RouterName(srcAddr string, myASN uint32, vrfName string) string {
 
 // neighborName() defines the format of key of the 'Neighbors' map in the
 // routerConfig struct.
-func NeighborName(peerAddr string, ASN uint32, dynamicASN string, vrfName string) string {
+func NeighborName(peerAddr, iface string, ASN uint32, dynamicASN string, vrfName string) string {
 	asn := asnFor(ASN, dynamicASN)
+	if peerAddr == "" {
+		return fmt.Sprintf("%s@%s@%s", asn, iface, vrfName)
+	}
 	return fmt.Sprintf("%s@%s@%s", asn, peerAddr, vrfName)
 }
 
@@ -162,7 +171,7 @@ func templateConfig(data interface{}) (string, error) {
 			"allowedPrefixList": func(neighbor *neighborConfig) string {
 				return fmt.Sprintf("%s-pl-%s", neighbor.ID(), neighbor.IPFamily)
 			},
-			"mustDisableConnectedCheck": func(ipFamily ipfamily.Family, myASN uint32, asn string, eBGPMultiHop bool) bool {
+			"mustDisableConnectedCheck": func(ipFamily ipfamily.Family, myASN uint32, asn, iface string, eBGPMultiHop bool) bool {
 				// return true only for non-multihop IPv6 eBGP sessions
 
 				if ipFamily != ipfamily.IPv6 {
@@ -171,6 +180,10 @@ func templateConfig(data interface{}) (string, error) {
 
 				if eBGPMultiHop {
 					return false
+				}
+
+				if iface != "" {
+					return true
 				}
 
 				// internal means we expect the session to be iBGP
