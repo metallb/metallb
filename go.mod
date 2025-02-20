@@ -14,7 +14,7 @@ require (
 	github.com/mikioh/ipaddr v0.0.0-20190404000644-d465c8ab6721
 	github.com/onsi/ginkgo/v2 v2.22.2
 	github.com/onsi/gomega v1.36.2
-	github.com/open-policy-agent/cert-controller v0.10.2-0.20240531181455-2649f121ab97
+	github.com/open-policy-agent/cert-controller v0.12.0
 	github.com/ory/dockertest/v3 v3.10.0
 	github.com/prometheus/client_golang v1.20.5
 	go.uber.org/zap v1.27.0
