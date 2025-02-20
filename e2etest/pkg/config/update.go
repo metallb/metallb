@@ -126,7 +126,7 @@ func (o beta1Updater) Update(r Resources) error {
 	// Iterating over the map will return the items in a random order.
 	for i, obj := range objects {
 		obj.SetNamespace(o.namespace)
-		_, err := controllerutil.CreateOrUpdate(context.Background(), o.cli, obj, func() error {
+		_, err := controllerutil.CreateOrPatch(context.Background(), o.cli, obj, func() error {
 			// the mutate function is expected to change the object when updating.
 			// we always override with the old version, and we change only the spec part.
 			switch toChange := obj.(type) {

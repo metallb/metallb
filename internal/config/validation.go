@@ -54,6 +54,9 @@ func DiscardFRROnly(c ClusterResources) error {
 		if p.Spec.DynamicASN != "" {
 			return fmt.Errorf("peer %s has dynamicASN set on native bgp mode", p.Spec.Address)
 		}
+		if p.Spec.Interface != "" {
+			return fmt.Errorf("peer %s has interface set on native bgp mode", p.Spec.Address)
+		}
 	}
 	if len(c.BFDProfiles) > 0 {
 		return errors.New("bfd profiles section set")

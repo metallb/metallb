@@ -12,11 +12,12 @@ import (
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.universe.tf/e2etest/pkg/frr"
+	frrcontainer "go.universe.tf/e2etest/pkg/frr/container"
 	"go.universe.tf/e2etest/pkg/metallb"
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-func dumpBGPInfo(basePath, testName string, cs clientset.Interface, namespace string) {
+func dumpBGPInfo(basePath, testName string, cs clientset.Interface, namespace string, extraContainers ...*frrcontainer.FRR) {
 	testPath := path.Join(basePath, strings.ReplaceAll(testName, " ", "-"))
 	err := os.Mkdir(testPath, 0755)
 	if err != nil && !errors.Is(err, os.ErrExist) {
@@ -24,7 +25,7 @@ func dumpBGPInfo(basePath, testName string, cs clientset.Interface, namespace st
 		return
 	}
 
-	for _, c := range FRRContainers {
+	for _, c := range append(FRRContainers, extraContainers...) {
 		dump, err := frr.RawDump(c, "/etc/frr/bgpd.conf", "/tmp/frr.log", "/etc/frr/daemons")
 		if err != nil {
 			ginkgo.GinkgoWriter.Printf("External frr dump for container %s failed %v", c.Name, err)

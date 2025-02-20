@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/go-cmp/cmp"
 	"github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.universe.tf/e2etest/pkg/config"
@@ -21,6 +22,7 @@ import (
 	jigservice "go.universe.tf/e2etest/pkg/jigservice"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	clientset "k8s.io/client-go/kubernetes"
 	admissionapi "k8s.io/pod-security-admission/api"
 	"k8s.io/utils/ptr"
@@ -949,13 +951,12 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 		})
 		ginkgo.It("When current dualstack pool becomes single-stack, svc should pick another dualstack pool if possible", func() {
 			pool1 := metallbv1beta1.IPAddressPool{
-				ObjectMeta: metav1.ObjectMeta{Name: "test-ns-dualstack-pool"},
+				ObjectMeta: metav1.ObjectMeta{Name: "test-ns-dualstack-pool-to-edit"},
 				Spec: metallbv1beta1.IPAddressPoolSpec{
 					Addresses: []string{
 						v4PoolAddresses,
 						v6PoolAddresses,
 					},
-					AllocateTo: &metallbv1beta1.ServiceAllocation{Namespaces: []string{testNamespace}},
 				},
 			}
 			resources := config.Resources{
@@ -985,13 +986,27 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{pool1}, jigservice.GetIngressPoint(
 				&svc1.Status.LoadBalancer.Ingress[1]))
 			Expect(err).NotTo(HaveOccurred())
-			ginkgo.By("Updating current pool to have an additional dualstack pool")
+			ginkgo.By("Adding a dualstack pool")
 			resources = config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{pool1, poolDual},
 			}
 			err = ConfigUpdater.Update(resources)
 			Expect(err).NotTo(HaveOccurred())
-			ginkgo.By("Updating current pool to exclude ipv4 address")
+			ginkgo.By("Verifying that the dualstack pool was loaded")
+			Eventually(func() error {
+				pool := metallbv1beta1.IPAddressPool{}
+				err := ConfigUpdater.Client().Get(context.TODO(), types.NamespacedName{Name: poolDual.Name, Namespace: ConfigUpdater.Namespace()}, &pool)
+				if err != nil {
+					return err
+				}
+
+				if pool.Status.AvailableIPv6 == 0 {
+					return fmt.Errorf("pool %s was not loaded, status is: %v", poolDual.Name, pool.Status)
+				}
+
+				return nil
+			}, 30*time.Second, 1*time.Second).Should(Not(HaveOccurred()))
+			ginkgo.By("Updating pool1 to exclude ipv4 address")
 			pool1.Spec.Addresses = []string{v6PoolAddresses}
 			resources = config.Resources{
 				Pools: []metallbv1beta1.IPAddressPool{pool1, poolDual},
@@ -1002,7 +1017,7 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			Eventually(func() []string {
 				newIps := getServiceIps(cs, svc1.Namespace, svc1.Name)
 				return newIps
-			}, 5*time.Minute, 1*time.Second).Should(And(
+			}, 30*time.Second, 1*time.Second).Should(And(
 				HaveLen(2),
 				Not(Equal(originallyAssignedIps)),
 			))
@@ -1013,6 +1028,102 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			Expect(err).NotTo(HaveOccurred())
 			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{poolDual}, svcIPs[1])
 			Expect(err).NotTo(HaveOccurred())
+		})
+	})
+
+	ginkgo.Context("Pool Status", func() {
+		ginkgo.It("DUALSTACK", func() {
+			testPool := metallbv1beta1.IPAddressPool{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "status-pool",
+					Namespace: metallb.Namespace,
+				},
+				Spec: metallbv1beta1.IPAddressPoolSpec{
+					Addresses: []string{
+						"192.168.10.0/30",
+						"fc00:f853:0ccd:e799::/126",
+					},
+				},
+			}
+			validateStatus := func(expected metallbv1beta1.IPAddressPoolStatus) {
+				Eventually(func() error {
+					p := metallbv1beta1.IPAddressPool{}
+					err := ConfigUpdater.Client().Get(context.Background(), types.NamespacedName{Name: testPool.Name, Namespace: testPool.Namespace}, &p)
+					if err != nil {
+						return err
+					}
+
+					if !cmp.Equal(p.Status, expected) {
+						return fmt.Errorf("pool does not have the expected status (-want +got)\n %v", cmp.Diff(expected, p.Status))
+					}
+
+					return nil
+				}, 30*time.Second, time.Second).ShouldNot(HaveOccurred())
+			}
+
+			ginkgo.By("Creating a Dualstack pool the status should be populated")
+			resources := config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{testPool},
+			}
+			err := ConfigUpdater.Update(resources)
+			Expect(err).ToNot(HaveOccurred())
+
+			expectedStatus := metallbv1beta1.IPAddressPoolStatus{
+				AvailableIPv4: 4,
+				AvailableIPv6: 4,
+				AssignedIPv4:  0,
+				AssignedIPv6:  0,
+			}
+			validateStatus(expectedStatus)
+
+			ginkgo.By("Creating a service the pool status should be updated")
+			svc1, _ := service.CreateWithBackend(cs, testNamespace, "status-svc", service.DualStack)
+
+			expectedStatus = metallbv1beta1.IPAddressPoolStatus{
+				AvailableIPv4: 3,
+				AvailableIPv6: 3,
+				AssignedIPv4:  1,
+				AssignedIPv6:  1,
+			}
+			validateStatus(expectedStatus)
+
+			ginkgo.By("Expanding the pool's addresses the status should be updated")
+			testPool.Spec.Addresses = []string{"192.168.10.0/29", "fc00:f853:0ccd:e799::/125"}
+			resources = config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{testPool},
+			}
+			err = ConfigUpdater.Update(resources)
+			Expect(err).ToNot(HaveOccurred())
+			expectedStatus = metallbv1beta1.IPAddressPoolStatus{
+				AvailableIPv4: 7,
+				AvailableIPv6: 7,
+				AssignedIPv4:  1,
+				AssignedIPv6:  1,
+			}
+			validateStatus(expectedStatus)
+
+			ginkgo.By("Deleting the service the status should be updated")
+			service.Delete(cs, svc1)
+			expectedStatus = metallbv1beta1.IPAddressPoolStatus{
+				AvailableIPv4: 8,
+				AvailableIPv6: 8,
+				AssignedIPv4:  0,
+				AssignedIPv6:  0,
+			}
+			validateStatus(expectedStatus)
+
+			ginkgo.By("Manually updating the status it should be reverted")
+			err = ConfigUpdater.Client().Get(context.Background(), types.NamespacedName{Name: testPool.Name, Namespace: testPool.Namespace}, &testPool)
+			Expect(err).ToNot(HaveOccurred())
+			testPool.Status = metallbv1beta1.IPAddressPoolStatus{
+				AvailableIPv4: 5,
+				AvailableIPv6: 5,
+				AssignedIPv4:  5,
+				AssignedIPv6:  5,
+			}
+			err = ConfigUpdater.Client().Status().Update(context.TODO(), &testPool)
+			Expect(err).ToNot(HaveOccurred())
+			validateStatus(expectedStatus)
 		})
 	})
 })

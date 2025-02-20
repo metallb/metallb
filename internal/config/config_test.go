@@ -3499,6 +3499,72 @@ func TestParse(t *testing.T) {
 				},
 			},
 		},
+		{
+			desc: "unnumbered peer without address with interface ok",
+			crs: ClusterResources{
+
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "peer1",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:      42,
+							DynamicASN: v1beta2.InternalASNMode,
+							Interface:  "net0",
+						},
+					},
+				},
+			},
+			want: &Config{
+				Peers: map[string]*Peer{
+					"peer1": {
+						Name:          "peer1",
+						Iface:         "net0",
+						MyASN:         42,
+						DynamicASN:    "internal",
+						NodeSelectors: []labels.Selector{labels.Everything()},
+						EBGPMultiHop:  false,
+					},
+				},
+				Pools:       &Pools{ByName: map[string]*Pool{}},
+				BFDProfiles: map[string]*BFDProfile{},
+			},
+		},
+		{
+			desc: "unnumbered peer without address without interface nok",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "invalid",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							MyASN:      42,
+							DynamicASN: "internal",
+						},
+					},
+				},
+			},
+		},
+		{
+			desc: "unnumbered peer with address with interface nok",
+			crs: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "invalid",
+						},
+						Spec: v1beta2.BGPPeerSpec{
+							Address:    "1.2.3.4",
+							Interface:  "net0",
+							MyASN:      42,
+							DynamicASN: "internal",
+						},
+					},
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {

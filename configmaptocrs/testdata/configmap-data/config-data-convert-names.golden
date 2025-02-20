@@ -11,7 +11,11 @@ spec:
   - fc00:f853:0ccd:e799::/124
   autoAssign: true
   avoidBuggyIPs: true
-status: {}
+status:
+  assignedIPv4: 0
+  assignedIPv6: 0
+  availableIPv4: 0
+  availableIPv6: 0
 ---
 apiVersion: metallb.io/v1beta1
 kind: IPAddressPool
@@ -22,7 +26,11 @@ metadata:
 spec:
   addresses:
   - 192.168.1.240/28
-status: {}
+status:
+  assignedIPv4: 0
+  assignedIPv6: 0
+  availableIPv4: 0
+  availableIPv6: 0
 ---
 apiVersion: metallb.io/v1beta1
 kind: BGPAdvertisement

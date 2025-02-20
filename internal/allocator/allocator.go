@@ -9,6 +9,7 @@ import (
 	"net"
 	"sort"
 	"strings"
+	"sync"
 
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/ipfamily"
@@ -29,6 +30,10 @@ type Allocator struct {
 	poolIPsInUse    map[string]map[string]int  // poolName -> ip.String() -> number of users
 	poolIPV4InUse   map[string]map[string]int  // poolName -> ipv4.String() -> number of users
 	poolIPV6InUse   map[string]map[string]int  // poolName -> ipv6.String() -> number of users
+
+	poolToCounters          map[string]PoolCounters // poolName -> Counters
+	countersMutex           sync.RWMutex
+	countersChangedCallback func(string)
 }
 
 // Port represents one port in use by a service.
@@ -54,30 +59,49 @@ type alloc struct {
 	key
 }
 
+type PoolCounters struct {
+	AssignedIPv4  int64
+	AssignedIPv6  int64
+	AvailableIPv4 int64
+	AvailableIPv6 int64
+}
+
 // New returns an Allocator managing no pools.
-func New() *Allocator {
+func New(countersCallback func(string)) *Allocator {
 	return &Allocator{
 		pools: &config.Pools{ByName: map[string]*config.Pool{}},
 
-		allocated:       map[string]*alloc{},
-		sharingKeyForIP: map[string]*key{},
-		portsInUse:      map[string]map[Port]string{},
-		servicesOnIP:    map[string]map[string]bool{},
-		poolIPsInUse:    map[string]map[string]int{},
-		poolIPV4InUse:   map[string]map[string]int{},
-		poolIPV6InUse:   map[string]map[string]int{},
+		allocated:               map[string]*alloc{},
+		sharingKeyForIP:         map[string]*key{},
+		portsInUse:              map[string]map[Port]string{},
+		servicesOnIP:            map[string]map[string]bool{},
+		poolIPsInUse:            map[string]map[string]int{},
+		poolIPV4InUse:           map[string]map[string]int{},
+		poolIPV6InUse:           map[string]map[string]int{},
+		poolToCounters:          map[string]PoolCounters{},
+		countersMutex:           sync.RWMutex{},
+		countersChangedCallback: countersCallback,
 	}
 }
 
 // SetPools updates the set of address pools that the allocator owns.
 func (a *Allocator) SetPools(pools *config.Pools) {
+	refreshPools := []string{}
+	defer func() {
+		for _, p := range refreshPools {
+			a.countersChangedCallback(p)
+		}
+	}()
+
+	a.countersMutex.Lock()
 	for n := range a.pools.ByName {
 		if pools.ByName[n] == nil {
-			stats.poolCapacity.DeleteLabelValues(n)
-			stats.poolActive.DeleteLabelValues(n)
-			stats.poolAllocated.DeleteLabelValues(n)
+			deleteStatsFor(n)
+			delete(a.poolToCounters, n)
+			refreshPools = append(refreshPools, n)
 		}
 	}
+	a.countersMutex.Unlock()
 
 	a.pools = pools
 
@@ -98,14 +122,9 @@ func (a *Allocator) SetPools(pools *config.Pools) {
 	}
 
 	// Refresh or initiate stats
-	for n, p := range a.pools.ByName {
-		total, ipv4, ipv6 := poolCount(p)
-		stats.poolCapacity.WithLabelValues(n).Set(float64(total))
-		stats.ipv4PoolCapacity.WithLabelValues(n).Set(float64(ipv4))
-		stats.ipv6PoolCapacity.WithLabelValues(n).Set(float64(ipv6))
-		stats.poolActive.WithLabelValues(n).Set(float64(len(a.poolIPsInUse[n])))
-		stats.ipv4PoolActive.WithLabelValues(n).Set(float64(len(a.poolIPV4InUse[n])))
-		stats.ipv6PoolActive.WithLabelValues(n).Set(float64(len(a.poolIPV6InUse[n])))
+	for _, p := range a.pools.ByName {
+		a.updatePoolStats(p)
+		refreshPools = append(refreshPools, p.Name)
 	}
 }
 
@@ -143,13 +162,8 @@ func (a *Allocator) assign(svc string, alloc *alloc) {
 			a.poolIPV4InUse[alloc.pool][ip.String()]++
 		}
 	}
-	total, ipv4, ipv6 := poolCount(a.pools.ByName[alloc.pool])
-	stats.poolCapacity.WithLabelValues(alloc.pool).Set(float64(total))
-	stats.ipv4PoolCapacity.WithLabelValues(alloc.pool).Set(float64(ipv4))
-	stats.ipv6PoolCapacity.WithLabelValues(alloc.pool).Set(float64(ipv6))
-	stats.poolActive.WithLabelValues(alloc.pool).Set(float64(len(a.poolIPsInUse[alloc.pool])))
-	stats.ipv4PoolActive.WithLabelValues(alloc.pool).Set(float64(len(a.poolIPV4InUse[alloc.pool])))
-	stats.ipv6PoolActive.WithLabelValues(alloc.pool).Set(float64(len(a.poolIPV6InUse[alloc.pool])))
+	a.updatePoolStats(a.pools.ByName[alloc.pool])
+	a.countersChangedCallback(alloc.pool)
 }
 
 // Assign assigns the requested ip to svc, if the assignment is
@@ -240,9 +254,14 @@ func (a *Allocator) Unassign(svc string) {
 			delete(a.poolIPV6InUse[al.pool], ip.String())
 		}
 	}
-	stats.poolActive.WithLabelValues(al.pool).Set(float64(len(a.poolIPsInUse[al.pool])))
-	stats.ipv4PoolActive.WithLabelValues(al.pool).Set(float64(len(a.poolIPV4InUse[al.pool])))
-	stats.ipv6PoolActive.WithLabelValues(al.pool).Set(float64(len(a.poolIPV6InUse[al.pool])))
+
+	if _, ok := a.pools.ByName[al.pool]; !ok {
+		deleteStatsFor(al.pool)
+		return
+	}
+
+	a.updatePoolStats(a.pools.ByName[al.pool])
+	a.countersChangedCallback(al.pool)
 }
 
 // getFreeIPsFromPool determines, with best effort, an ipv4 and an ipv6 available from the provided pool.
@@ -546,6 +565,12 @@ func (a *Allocator) PoolForIP(ips []net.IP) *config.Pool {
 	return poolFor(a.pools.ByName, ips)
 }
 
+func (a *Allocator) CountersForPool(name string) PoolCounters {
+	a.countersMutex.RLock()
+	defer a.countersMutex.RUnlock()
+	return a.poolToCounters[name]
+}
+
 func sortPools(pools []*config.Pool) {
 	// A lower value for pool priority equals a higher priority and sort
 	// pools from higher to low priority. when no priority (0) set on
@@ -711,4 +736,22 @@ func ipPolicyForService(svc *v1.Service) v1.IPFamilyPolicy {
 		serviceIPFamilyPolicy = *(svc.Spec.IPFamilyPolicy)
 	}
 	return serviceIPFamilyPolicy
+}
+
+func (a *Allocator) updatePoolStats(p *config.Pool) {
+	a.countersMutex.Lock()
+	defer a.countersMutex.Unlock()
+	total, ipv4, ipv6 := poolCount(p)
+	stats.poolCapacity.WithLabelValues(p.Name).Set(float64(total))
+	stats.ipv4PoolCapacity.WithLabelValues(p.Name).Set(float64(ipv4))
+	stats.ipv6PoolCapacity.WithLabelValues(p.Name).Set(float64(ipv6))
+	stats.poolActive.WithLabelValues(p.Name).Set(float64(len(a.poolIPsInUse[p.Name])))
+	stats.ipv4PoolActive.WithLabelValues(p.Name).Set(float64(len(a.poolIPV4InUse[p.Name])))
+	stats.ipv6PoolActive.WithLabelValues(p.Name).Set(float64(len(a.poolIPV6InUse[p.Name])))
+	a.poolToCounters[p.Name] = PoolCounters{
+		AvailableIPv4: ipv4 - int64(len(a.poolIPV4InUse[p.Name])),
+		AvailableIPv6: ipv6 - int64(len(a.poolIPV6InUse[p.Name])),
+		AssignedIPv4:  int64(len(a.poolIPV4InUse[p.Name])),
+		AssignedIPv6:  int64(len(a.poolIPV6InUse[p.Name])),
+	}
 }

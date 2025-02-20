@@ -133,6 +133,7 @@ var _ = ginkgo.BeforeSuite(func() {
 		bgptests.FRRContainers, err = bgptests.HostContainerSetup(frrImage, hostBGPMode)
 		Expect(err).NotTo(HaveOccurred())
 	default:
+		bgptests.FRRImage = frrImage
 		bgptests.FRRContainers, err = bgptests.KindnetContainersSetup(cs, frrImage)
 		Expect(err).NotTo(HaveOccurred())
 		if withVRF {
