@@ -12,6 +12,7 @@ import (
 	"go.universe.tf/metallb/internal/config"
 	"go.universe.tf/metallb/internal/k8s/controllers"
 	"go.universe.tf/metallb/internal/layer2"
+	"go.universe.tf/metallb/internal/speakerlist"
 
 	"github.com/go-kit/log"
 	v1 "k8s.io/api/core/v1"
@@ -25,8 +26,11 @@ type fakeSpeakerList struct {
 	speakers map[string]bool
 }
 
-func (sl *fakeSpeakerList) UsableSpeakers() map[string]bool {
-	return sl.speakers
+func (sl *fakeSpeakerList) UsableSpeakers() speakerlist.SpeakerListInfo {
+	return speakerlist.SpeakerListInfo{
+		Nodes:    sl.speakers,
+		Disabled: sl.speakers == nil,
+	}
 }
 
 func (sl *fakeSpeakerList) Rejoin() {}
@@ -44,6 +48,93 @@ func compareUseableNodesReturnedValue(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+func TestUsableNodesEPSlicesWithSpeakerlistDisabled(t *testing.T) {
+	// Create a speaker response with a null list as expected when speaker is disabled
+	fakeSL := &fakeSpeakerList{
+		speakers: nil,
+	}
+	c1, err := newController(controllerConfig{
+		MyNode:  "iris1",
+		Logger:  log.NewLogfmtLogger(log.NewSyncWriter(os.Stderr)),
+		SList:   fakeSL,
+		bgpType: bgpNative,
+	})
+	if err != nil {
+		t.Fatalf("creating controller: %s", err)
+	}
+	c1.client = &testK8S{t: t}
+	allNodes := map[string]*v1.Node{
+		"iris1": {},
+		"iris2": {},
+	}
+
+	advertisementsForNode := []*config.L2Advertisement{
+		{
+			Nodes: map[string]bool{
+				"iris1": true,
+				"iris2": true,
+			},
+		},
+	}
+
+	conf := &config.Config{
+		Pools: &config.Pools{ByName: map[string]*config.Pool{
+			"default": {
+				CIDR:             []*net.IPNet{ipnet("10.20.30.0/24")},
+				L2Advertisements: advertisementsForNode,
+			},
+		}},
+	}
+
+	svc := &v1.Service{
+		Spec: v1.ServiceSpec{
+			Type:                  "LoadBalancer",
+			ExternalTrafficPolicy: v1.ServiceExternalTrafficPolicyTypeLocal,
+		},
+		Status: statusAssigned("10.20.30.1"),
+	}
+	eps := map[string][]discovery.EndpointSlice{
+		"10.20.30.1": {
+			{
+				Endpoints: []discovery.Endpoint{
+					{
+						Addresses: []string{
+							"2.3.4.5",
+						},
+						NodeName: ptr.To("iris1"),
+						Conditions: discovery.EndpointConditions{
+							Ready: ptr.To(true),
+						},
+					},
+					{
+						Addresses: []string{
+							"2.3.4.15",
+						},
+						NodeName: ptr.To("iris1"),
+						Conditions: discovery.EndpointConditions{
+							Ready: ptr.To(true),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	lbIP := net.ParseIP(svc.Status.LoadBalancer.Ingress[0].IP)
+	lbIPStr := lbIP.String()
+	l := log.NewNopLogger()
+	response := c1.protocolHandlers[config.Layer2].ShouldAnnounce(l,
+		"test1",
+		[]net.IP{lbIP},
+		conf.Pools.ByName["default"],
+		svc,
+		eps[lbIPStr],
+		allNodes)
+	if response != "" {
+		t.Errorf("Expecting fallback when speakers list is not configured but got: %v", response)
+	}
 }
 
 func TestUsableNodesEPSlices(t *testing.T) {
@@ -256,7 +347,7 @@ func TestUsableNodesEPSlices(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		response := usableNodes(test.eps, test.usableSpeakers)
+		response := nodesWithEndpoint(test.eps, test.usableSpeakers)
 		sort.Strings(response)
 		if !compareUseableNodesReturnedValue(response, test.cExpectedResult) {
 			t.Errorf("%q: shouldAnnounce for controller returned incorrect result, expected '%s', but received '%s'", test.desc, test.cExpectedResult, response)

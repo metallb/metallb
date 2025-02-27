@@ -262,6 +262,7 @@ speaker:
   logLevel: info
   tolerateMaster: true
   memberlist:
+    # --  When enabled: false, the speaker pods must run on all nodes
     enabled: true
     mlBindPort: 7946
     mlBindAddrOverride: ""
