@@ -17,6 +17,7 @@ package main
 import (
 	"bytes"
 	"crypto/sha256"
+	"maps"
 	"net"
 	"sort"
 
@@ -46,11 +47,9 @@ func (c *layer2Controller) SetConfig(log.Logger, *config.Config) error {
 	return nil
 }
 
-// usableNodes returns all nodes that have at least one fully ready
-// endpoint on them.
-// The speakers parameter is a map containing all the nodes with active speakers.
-// If the speakers map is nil, it is ignored.
-func usableNodes(eps []discovery.EndpointSlice, speakers map[string]bool) []string {
+// nodesWithEndpoint returns all nodes that have at least one fully ready
+// endpoint on them and that have a speaker according to the speaker map param.
+func nodesWithEndpoint(eps []discovery.EndpointSlice, speakers map[string]bool) []string {
 	usable := map[string]bool{}
 	for _, slice := range eps {
 		for _, ep := range slice.Endpoints {
@@ -61,10 +60,8 @@ func usableNodes(eps []discovery.EndpointSlice, speakers map[string]bool) []stri
 				continue
 			}
 			nodeName := *ep.NodeName
-			if speakers != nil {
-				if hasSpeaker := speakers[nodeName]; !hasSpeaker {
-					continue
-				}
+			if hasSpeaker := speakers[nodeName]; !hasSpeaker {
+				continue
 			}
 			if _, ok := usable[nodeName]; !ok {
 				usable[nodeName] = true
@@ -93,13 +90,10 @@ func (c *layer2Controller) ShouldAnnounce(l log.Logger, name string, toAnnounce 
 		return "notOwner"
 	}
 
-	// we select the nodes with at least one matching l2 advertisement
-	forPool := c.speakersForPool(l, name, pool, nodes)
-	var availableNodes []string
+	speakerMap := c.speakersForPool(l, name, pool, nodes)
+	availableNodes := nodesWithActiveSpeakers(speakerMap)
 	if svc.Spec.ExternalTrafficPolicy == v1.ServiceExternalTrafficPolicyTypeLocal {
-		availableNodes = usableNodes(eps, forPool)
-	} else {
-		availableNodes = nodesWithActiveSpeakers(forPool)
+		availableNodes = nodesWithEndpoint(eps, speakerMap)
 	}
 
 	if len(availableNodes) == 0 {
@@ -223,8 +217,15 @@ func poolMatchesNodeL2(pool *config.Pool, node string) bool {
 }
 
 func (c *layer2Controller) speakersForPool(l log.Logger, name string, pool *config.Pool, nodes map[string]*v1.Node) map[string]bool {
+	sl := c.sList.UsableSpeakers()
+	eligibleNodes := maps.Keys(sl.Nodes)
+	if sl.Disabled {
+		// when memberlist is disabled we consider all nodes eligible under the assumption that
+		// there is a speaker pod running on all nodes.
+		eligibleNodes = maps.Keys(nodes)
+	}
 	res := map[string]bool{}
-	for s := range c.sList.UsableSpeakers() {
+	for s := range eligibleNodes {
 		if err := k8snodes.IsNodeAvailable(nodes[s]); err != nil {
 			level.Debug(l).Log("event", "skipping should announce l2", "service", name, "reason", "speaker's node has NodeNetworkUnavailable condition")
 			continue
