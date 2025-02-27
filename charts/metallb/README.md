@@ -138,7 +138,7 @@ Kubernetes: `>= 1.19.0-0`
 | speaker.livenessProbe.successThreshold | int | `1` |  |
 | speaker.livenessProbe.timeoutSeconds | int | `1` |  |
 | speaker.logLevel | string | `"info"` | Speaker log level. Must be one of: `all`, `debug`, `info`, `warn`, `error` or `none` |
-| speaker.memberlist.enabled | bool | `true` |  |
+| speaker.memberlist.enabled | bool | `true` | When enabled: false, the speaker pods must run on all nodes |
 | speaker.memberlist.mlBindAddrOverride | string | `""` |  |
 | speaker.memberlist.mlBindPort | int | `7946` |  |
 | speaker.memberlist.mlSecretKeyPath | string | `"/etc/ml_secret_key"` |  |

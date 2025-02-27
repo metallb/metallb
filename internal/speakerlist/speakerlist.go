@@ -25,6 +25,13 @@ import (
 	"github.com/hashicorp/memberlist"
 )
 
+// SpeakerListInfo contains information about available speaker nodes.
+type SpeakerListInfo struct {
+	Nodes map[string]bool
+	// Disabled true indicates that the memberlist protocol is off
+	Disabled bool
+}
+
 // SpeakerList represents a list of healthy speakers.
 type SpeakerList struct {
 	l         log.Logger
@@ -33,6 +40,7 @@ type SpeakerList struct {
 	namespace string
 	labels    string
 
+	disabled bool
 	// The following fields are nil when memberlist is disabled.
 	mlEventCh chan memberlist.NodeEvent
 	ml        *memberlist.Memberlist
@@ -53,6 +61,8 @@ func New(logger log.Logger, nodeName, bindAddr, bindPort, secret, namespace, lab
 
 	if labels == "" || bindAddr == "" {
 		level.Info(logger).Log("op", "startup", "msg", "not starting fast dead node detection (memberlist), need ml-bindaddr / ml-labels config")
+		level.Info(logger).Log("op", "startup", "msg", "when memberlist is disabled, the speaker pods must run on all nodes")
+		sl.disabled = true
 		return &sl, nil
 	}
 
@@ -278,15 +288,23 @@ func (sl *SpeakerList) Rejoin() {
 }
 
 // UsableSpeakers returns a map of usable speaker nodes.
-func (sl *SpeakerList) UsableSpeakers() map[string]bool {
+func (sl *SpeakerList) UsableSpeakers() SpeakerListInfo {
 	if sl.ml == nil {
-		return nil
+		return SpeakerListInfo{
+			Nodes:    nil,
+			Disabled: true,
+		}
 	}
+
 	activeNodes := map[string]bool{}
 	for _, n := range sl.ml.Members() {
 		activeNodes[n.Name] = true
 	}
-	return activeNodes
+
+	return SpeakerListInfo{
+		Nodes:    activeNodes,
+		Disabled: false,
+	}
 }
 
 // Stop stops the SpeakerList.

@@ -630,6 +630,6 @@ type Protocol interface {
 
 // Speakerlist represents a list of healthy speakers.
 type SpeakerList interface {
-	UsableSpeakers() map[string]bool
+	UsableSpeakers() speakerlist.SpeakerListInfo
 	Rejoin()
 }

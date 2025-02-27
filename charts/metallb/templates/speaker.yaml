@@ -8,6 +8,10 @@
 {{- fail "frrk8s.enabled frrk8s.external are mutually exclusive!" }}
 {{- end }}
 
+{{- if and (not .Values.speaker.memberlist.enabled) .Values.speaker.nodeSelector }}
+{{- fail "nodeSelector must be empty when memberlist is disabled" }}
+{{- end }}
+
 {{- if .Values.speaker.frr.enabled }}
 
 # FRR expects to have these files owned by frr:frr on startup.
