@@ -20,6 +20,7 @@ import (
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 
 	jigservice "go.universe.tf/e2etest/pkg/jigservice"
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -29,7 +30,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const secondNamespace = "test-namespace"
+const (
+	secondNamespace         = "test-namespace"
+	allowSharedIPAnnotation = "metallb.io" + "/" + "allow-shared-ip"
+)
 
 var (
 	firstNsLabels = map[string]string{
@@ -222,6 +226,106 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			for i := 0; i < numOfRestarts; i++ {
 				restartAndAssert()
 			}
+		})
+
+		ginkgo.It("should reconsider services when sharing the ip and conditions change", func() {
+			ip, err := config.GetIPFromRangeByIndex(IPV4ServiceRange, 0)
+			Expect(err).NotTo(HaveOccurred())
+
+			resources := config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "singleip-pool",
+						},
+						Spec: metallbv1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								fmt.Sprintf("%s/32", ip),
+							},
+						},
+					},
+				},
+			}
+			err = ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+
+			checkHasLBIP := func(svc *corev1.Service, ip string) {
+				Eventually(func() string {
+					s, err := cs.CoreV1().Services(svc.Namespace).Get(context.Background(), svc.Name, metav1.GetOptions{})
+					Expect(err).NotTo(HaveOccurred())
+					if len(s.Status.LoadBalancer.Ingress) == 0 {
+						return ""
+					}
+					return s.Status.LoadBalancer.Ingress[0].IP
+				}, time.Minute, 1*time.Second).Should(Equal(ip))
+			}
+
+			checkLBIPGetsRemoved := func(svc *corev1.Service) {
+				Eventually(func() int {
+					s, err := cs.CoreV1().Services(svc.Namespace).Get(context.Background(), svc.Name, metav1.GetOptions{})
+					Expect(err).NotTo(HaveOccurred())
+					return len(s.Status.LoadBalancer.Ingress)
+				}, time.Minute, 1*time.Second).Should(BeZero())
+			}
+
+			svc, jig := service.CreateWithBackendPort(cs, testNamespace, "changesharing", 80, func(svc *corev1.Service) {
+				service.TrafficPolicyCluster(svc)
+				svc.Annotations = map[string]string{allowSharedIPAnnotation: "share"}
+			})
+
+			ginkgo.By("Creating another service")
+			svc1, jig1 := service.CreateWithBackendPort(cs, testNamespace, "changesharing1", 81, func(svc *corev1.Service) {
+				service.TrafficPolicyCluster(svc)
+				svc.Annotations = map[string]string{allowSharedIPAnnotation: "share"}
+				svc.Spec.Selector = jig.Labels // assigning the same selector to the two services
+			})
+
+			Expect(err).NotTo(HaveOccurred())
+			defer func() {
+				service.Delete(cs, svc)
+				service.Delete(cs, svc1)
+			}()
+
+			checkHasLBIP(svc, ip)
+			checkHasLBIP(svc1, ip)
+
+			ginkgo.By("changing etp policy of the second service to local")
+			jig1.UpdateService(context.Background(), func(svc *corev1.Service) {
+				svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyLocal
+			})
+
+			ginkgo.By("checking the second service loses its ip")
+			checkLBIPGetsRemoved(svc1)
+
+			ginkgo.By("checking the first service keeps its ip")
+			Consistently(func() string {
+				toCheck, err := cs.CoreV1().Services(svc.Namespace).Get(context.Background(), svc.Name, metav1.GetOptions{})
+				Expect(err).NotTo(HaveOccurred())
+				return toCheck.Status.LoadBalancer.Ingress[0].IP
+			}, 2*time.Minute, 1*time.Second).Should(Equal(ip))
+
+			ginkgo.By("changing etp policy of the first service to local")
+			jig.UpdateService(context.Background(), func(svc *corev1.Service) {
+				svc.Spec.ExternalTrafficPolicy = corev1.ServiceExternalTrafficPolicyLocal
+			})
+
+			ginkgo.By("checking both services now got their ips")
+			checkHasLBIP(svc, ip)
+			checkHasLBIP(svc1, ip)
+
+			ginkgo.By("changing the selector of the first service")
+			jig.UpdateService(context.Background(), func(svc *corev1.Service) {
+				svc.Spec.Selector = map[string]string{"foo": "bar"}
+			})
+			ginkgo.By("checking the first service loses its ip")
+			checkLBIPGetsRemoved(svc)
+
+			ginkgo.By("aligning the selector of the second service")
+			jig1.UpdateService(context.Background(), func(svc *corev1.Service) {
+				svc.Spec.Selector = map[string]string{"foo": "bar"}
+			})
+			checkHasLBIP(svc, ip)
+			checkHasLBIP(svc1, ip)
 		})
 	})
 

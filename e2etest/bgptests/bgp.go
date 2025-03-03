@@ -389,7 +389,6 @@ var _ = ginkgo.Describe("BGP", func() {
 			func(svc *corev1.Service) {
 				svc.Spec.LoadBalancerIP = serviceIP
 				svc.Annotations = map[string]string{"metallb.io/allow-shared-ip": "foo"}
-				svc.Spec.Ports[0].Port = int32(testservice.TestServicePort)
 			})
 		defer testservice.Delete(cs, svc)
 		svc1, _ := testservice.CreateWithBackendPort(cs, testNamespace, "second-service",
@@ -397,7 +396,6 @@ var _ = ginkgo.Describe("BGP", func() {
 			func(svc *corev1.Service) {
 				svc.Spec.LoadBalancerIP = serviceIP
 				svc.Annotations = map[string]string{"metallb.io/allow-shared-ip": "foo"}
-				svc.Spec.Ports[0].Port = int32(testservice.TestServicePort + 1)
 			})
 		defer testservice.Delete(cs, svc1)
 
