@@ -1,5 +1,5 @@
 
-log file /etc/frr/frr.log informational
+log stdout informational
 log timestamp precision 3
 hostname dummyhostname
 ip nht resolve-via-default
