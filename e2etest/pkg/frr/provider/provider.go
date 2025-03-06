@@ -22,6 +22,8 @@ type Provider interface {
 
 	// FRRK8sBased tells if the given provider is based on frrk8s
 	FRRK8sBased() bool
+
+	Update() error
 }
 
 type frrModeProvider struct {
@@ -81,7 +83,13 @@ func (f frrModeProvider) FRRK8sBased() bool {
 	return false
 }
 
+func (f frrModeProvider) Update() error {
+	return nil
+}
+
 type frrk8sModeProvider struct {
+	cl                     *clientset.Clientset
+	ns                     string
 	frrk8sPodForSpeakerPod map[string]*corev1.Pod
 }
 
@@ -118,6 +126,8 @@ func NewFRRK8SMode(r *rest.Config, namespace string) (Provider, error) {
 	}
 
 	res := frrk8sModeProvider{
+		cl:                     cl,
+		ns:                     namespace,
 		frrk8sPodForSpeakerPod: frrK8SForSpeaker,
 	}
 
@@ -144,4 +154,32 @@ func (f frrk8sModeProvider) BGPMetricsPodFor(ns, name string) (*corev1.Pod, stri
 
 func (f frrk8sModeProvider) FRRK8sBased() bool {
 	return true
+}
+
+func (f frrk8sModeProvider) Update() error {
+	speakerPods, err := metallb.SpeakerPods(f.cl)
+	if err != nil {
+		return err
+	}
+
+	frrk8sPods, err := metallb.FRRK8SPods(f.cl, f.ns)
+	if err != nil {
+		return err
+	}
+
+	for _, s := range speakerPods {
+		found := false
+		for _, p := range frrk8sPods {
+			if s.Spec.NodeName == p.Spec.NodeName {
+				// TODO: atomic map
+				f.frrk8sPodForSpeakerPod[s.Name] = p
+				found = true
+			}
+		}
+		if !found {
+			return fmt.Errorf("speaker %s/%s on node %s does not have a matching frr-k8s", s.Namespace, s.Name, s.Spec.NodeName)
+		}
+	}
+
+	return nil
 }
