@@ -123,6 +123,7 @@ func NodeReconcilerPredicate() predicate.Predicate {
 		predicate.Or(
 			nodeConditionNetworkAvailabilityStatusChanged,
 			nodeSpecSchedulableChanged,
+			predicate.AnnotationChangedPredicate{},
 			predicate.LabelChangedPredicate{},
 		),
 	)
