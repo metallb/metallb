@@ -217,6 +217,17 @@ func TestNodeReconcilerPredicate(t *testing.T) {
 			},
 			expected: false,
 		},
+		"annotation changed": {
+			event: event.UpdateEvent{
+				ObjectOld: &corev1.Node{
+					ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"x": "y"}},
+				},
+				ObjectNew: &corev1.Node{
+					ObjectMeta: metav1.ObjectMeta{Annotations: map[string]string{"z": "k"}},
+				},
+			},
+			expected: true,
+		},
 	}
 
 	for name, test := range tests {
