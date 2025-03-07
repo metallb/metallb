@@ -15,6 +15,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"reflect"
@@ -34,8 +35,6 @@ import (
 	discovery "k8s.io/api/discovery/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/util/sets"
-
-	"errors"
 )
 
 type bgpImplementation string
@@ -62,18 +61,19 @@ type peer struct {
 }
 
 type bgpController struct {
-	logger             log.Logger
-	myNode             string
-	nodeLabels         labels.Set
-	peers              []*peer
-	svcAds             map[string][]*bgp.Advertisement
-	activeAds          map[string]sets.Set[string] // svc -> the peers it is advertised to
-	activeAdsMutex     sync.RWMutex
-	adsChangedCallback func(string)
-	bgpType            bgpImplementation
-	secretHandling     SecretHandling
-	sessionManager     bgp.SessionManager
-	ignoreExcludeLB    bool
+	logger              log.Logger
+	myNode              string
+	nodeLabels          labels.Set
+	peers               []*peer
+	svcAds              map[string][]*bgp.Advertisement
+	activeAds           map[string]sets.Set[string] // svc -> the peers it is advertised to
+	activeAdsMutex      sync.RWMutex
+	adsChangedCallback  func(string)
+	bgpType             bgpImplementation
+	secretHandling      SecretHandling
+	sessionManager      bgp.SessionManager
+	ignoreExcludeLB     bool
+	excludeNodeMetadata *NodeExclusionPattern
 }
 
 func (c *bgpController) SetConfig(l log.Logger, cfg *config.Config) error {
@@ -182,6 +182,11 @@ func (c *bgpController) ShouldAnnounce(l log.Logger, name string, _ []net.IP, po
 	if !c.ignoreExcludeLB && k8snodes.IsNodeExcludedFromBalancers(nodes[c.myNode]) {
 		level.Warn(l).Log("event", "skipping should announce bgp", "service", name, "reason", "speaker's node has labeled 'node.kubernetes.io/exclude-from-external-load-balancers'")
 		return "nodeLabeledExcludeBalancers"
+	}
+
+	if c.excludeNodeMetadata.Match(nodes[c.myNode]) {
+		level.Warn(l).Log("event", "skipping should announce bgp", "service", name, "reason", "matched node exclude pattern")
+		return "nodeMatchedExcludedPattern"
 	}
 
 	// Should we advertise?
