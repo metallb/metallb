@@ -30,6 +30,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	v1 "k8s.io/api/core/v1"
 	discovery "k8s.io/api/discovery/v1"
+	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
@@ -60,7 +61,8 @@ var announcing = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 })
 
 const (
-	excludeL2ConfigPath = "/etc/metallb/excludel2.yaml"
+	excludeL2ConfigPath     = "/etc/metallb/excludel2.yaml"
+	excludeNodeMetadataPath = "/etc/ml_exclude_node/pattern.yaml"
 )
 
 // Service offers methods to mutate a Kubernetes service object.
@@ -148,6 +150,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	nodesToExclude, err := parseExcludeNodePattern()
+	if err != nil {
+		level.Error(logger).Log("op", "startup", "msg", "failed to parse parseExcludeNodePattern", "error", err)
+		os.Exit(1)
+	}
+	level.Debug(logger).Log("op", "startup", "msg", "parseExcludeNodePattern", "pattern", fmt.Sprintf("[%+v]", nodesToExclude))
+
 	var interfacesToExclude *regexp.Regexp
 	interfacesToExclude, err = parseAnnouncedInterfacesToExclude()
 	if err != nil {
@@ -172,6 +181,7 @@ func main() {
 		SList:                  sList,
 		bgpType:                bgpImplementation(bgpType),
 		InterfaceExcludeRegexp: interfacesToExclude,
+		ExcludeNodePattern:     nodesToExclude,
 		IgnoreExcludeLB:        *ignoreLBExclude,
 		Layer2StatusChange: func(namespacedName types.NamespacedName) {
 			l2StatusChan <- controllers.NewL2StatusEvent(namespacedName.Namespace, namespacedName.Name)
@@ -278,6 +288,7 @@ type controllerConfig struct {
 	SupportedProtocols           []config.Proto
 	AnnouncedInterfacesToExclude []string `yaml:"announcedInterfacesToExclude"`
 	InterfaceExcludeRegexp       *regexp.Regexp
+	ExcludeNodePattern           *v1.Node
 	IgnoreExcludeLB              bool
 	Layer2StatusChange           func(types.NamespacedName)
 	BGPAdsChangedCallback        func(string)
@@ -292,15 +303,16 @@ func newController(cfg controllerConfig) (*controller, error) {
 	}
 
 	bgpController := &bgpController{
-		logger:             cfg.Logger,
-		myNode:             cfg.MyNode,
-		svcAds:             make(map[string][]*bgp.Advertisement),
-		activeAds:          make(map[string]sets.Set[string]),
-		adsChangedCallback: cfg.BGPAdsChangedCallback,
-		bgpType:            cfg.bgpType,
-		sessionManager:     newBGP(cfg),
-		ignoreExcludeLB:    cfg.IgnoreExcludeLB,
-		secretHandling:     secretHandling,
+		logger:              cfg.Logger,
+		myNode:              cfg.MyNode,
+		svcAds:              make(map[string][]*bgp.Advertisement),
+		activeAds:           make(map[string]sets.Set[string]),
+		adsChangedCallback:  cfg.BGPAdsChangedCallback,
+		bgpType:             cfg.bgpType,
+		sessionManager:      newBGP(cfg),
+		ignoreExcludeLB:     cfg.IgnoreExcludeLB,
+		secretHandling:      secretHandling,
+		excludeNodeMetadata: cfg.ExcludeNodePattern,
 	}
 	bgpPeersFetcher := bgpController.PeersForService
 
@@ -410,7 +422,8 @@ func (c *controller) handleService(l log.Logger,
 	lbIPs []net.IP,
 	svc *v1.Service, pool *config.Pool,
 	eps []discovery.EndpointSlice,
-	protocol config.Proto) controllers.SyncState {
+	protocol config.Proto,
+) controllers.SyncState {
 	l = log.With(l, "protocol", protocol)
 	handler := c.protocolHandlers[protocol]
 	if handler == nil {
@@ -531,6 +544,19 @@ func compareIPs(ips1, ips2 []net.IP) bool {
 	return true
 }
 
+func parseExcludeNodePattern() (*v1.Node, error) {
+	data, err := os.ReadFile(filepath.Clean(excludeNodeMetadataPath))
+	if err != nil && !os.IsNotExist(err) {
+		return nil, err
+	}
+
+	var ret *v1.Node
+	if err := yaml.Unmarshal(data, &ret); err != nil {
+		return nil, err
+	}
+	return ret, nil
+}
+
 func parseAnnouncedInterfacesToExclude() (*regexp.Regexp, error) {
 	configmapBytes, err := os.ReadFile(filepath.Clean(excludeL2ConfigPath))
 	if err != nil && !os.IsNotExist(err) {
@@ -605,7 +631,10 @@ func isNodeAvailableChanged(oldNodes map[string]*v1.Node, newNode *v1.Node) bool
 		return false
 	}
 
-	if k8snodes.IsNodeUnschedulable(oldNode) != k8snodes.IsNodeUnschedulable(newNode) {
+	if !equality.Semantic.DeepEqual(oldNode.Labels, newNode.Labels) {
+		return true
+	}
+	if !equality.Semantic.DeepEqual(oldNode.Annotations, newNode.Annotations) {
 		return true
 	}
 	if k8snodes.IsNetworkUnavailable(oldNode) != k8snodes.IsNetworkUnavailable(newNode) {

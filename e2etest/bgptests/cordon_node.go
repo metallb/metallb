@@ -19,7 +19,7 @@ import (
 	clientset "k8s.io/client-go/kubernetes"
 )
 
-var _ = ginkgo.Describe("BGP Cordon Node", func() {
+var _ = ginkgo.Describe("BGP CordonNode", func() {
 	var (
 		cs            clientset.Interface
 		testNamespace string
@@ -74,7 +74,6 @@ var _ = ginkgo.Describe("BGP Cordon Node", func() {
 		})
 
 		ginkgo.AfterEach(func() {
-
 			err := k8s.UnCordonNode(cs, &allNodes.Items[0])
 			Expect(err).NotTo(HaveOccurred())
 
@@ -85,11 +84,9 @@ var _ = ginkgo.Describe("BGP Cordon Node", func() {
 			testservice.Delete(cs, svc)
 		})
 
-		ginkgo.It("service should be announced only from expected nodes", func() {
-			checkServiceOnlyOnNodes(svc, allNodes.Items[1:], ipfamily.IPv4)
-			checkServiceNotOnNodes(svc, allNodes.Items[:1], ipfamily.IPv4)
+		ginkgo.It("service should be announced on all nodes", func() {
+			checkServiceOnlyOnNodes(svc, allNodes.Items, ipfamily.IPv4)
 		})
-
 	})
 })
 
