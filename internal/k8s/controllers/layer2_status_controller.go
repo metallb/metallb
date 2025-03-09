@@ -91,6 +91,23 @@ func (r *Layer2StatusReconciler) Reconcile(ctx context.Context, req ctrl.Request
 		return ctrl.Result{}, utilerrors.NewAggregate(errs)
 	}
 
+	deleteRedundantErrs := []error{}
+	if len(serviceL2statuses.Items) > 1 {
+		// We shouldn't get here, just in case the controller created redundant resources
+		for i := range serviceL2statuses.Items[1:] {
+			if serviceL2statuses.Items[i+1].Labels[LabelAnnounceNode] != r.NodeName {
+				continue
+			}
+			if err := r.Client.Delete(ctx, &serviceL2statuses.Items[i+1]); err != nil && !errors.IsNotFound(err) {
+				deleteRedundantErrs = append(deleteRedundantErrs, err)
+			}
+		}
+	}
+
+	if len(deleteRedundantErrs) > 0 {
+		return ctrl.Result{}, utilerrors.NewAggregate(deleteRedundantErrs)
+	}
+
 	// creating a brand new cr
 	var state = &v1beta1.ServiceL2Status{
 		ObjectMeta: metav1.ObjectMeta{
