@@ -145,8 +145,10 @@ func (r *Layer2StatusReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	if result == controllerutil.OperationResultCreated {
 		// According to https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/controller/controllerutil#CreateOrPatch
-		// If the object is created for the first time, we have to requeue it to ensure that the status is updated.
-		return ctrl.Result{Requeue: true}, nil
+		// If the object is created, we have to patch it again to ensure the status is created.
+		// This will happen when we reconcile the creation event.
+		level.Debug(r.Logger).Log("controller", "Layer2StatusReconciler", "created state", dumpResource(state))
+		return ctrl.Result{}, nil
 	}
 
 	level.Debug(r.Logger).Log("controller", "Layer2StatusReconciler", "updated state", dumpResource(state))
