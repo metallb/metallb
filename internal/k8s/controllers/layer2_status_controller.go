@@ -14,7 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	utilErrors "k8s.io/apimachinery/pkg/util/errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -81,17 +81,14 @@ func (r *Layer2StatusReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	var errs []error
 	if len(ipAdvS) == 0 {
 		for key, item := range serviceL2statuses.Items {
-			if item.Status.Node != r.NodeName {
+			if item.Labels[LabelAnnounceNode] != r.NodeName {
 				continue
 			}
 			if err := r.Client.Delete(ctx, &serviceL2statuses.Items[key]); err != nil && !errors.IsNotFound(err) {
 				errs = append(errs, err)
 			}
 		}
-		if len(errs) > 0 {
-			return ctrl.Result{}, utilErrors.NewAggregate(errs)
-		}
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, utilerrors.NewAggregate(errs)
 	}
 
 	// creating a brand new cr
