@@ -636,6 +636,44 @@ func TestParse(t *testing.T) {
 		},
 
 		{
+			desc: "ip address pool with only priority",
+			crs: ClusterResources{
+				Pools: []v1beta1.IPAddressPool{
+					{
+						ObjectMeta: metav1.ObjectMeta{
+							Name: "pool1",
+						},
+						Spec: v1beta1.IPAddressPoolSpec{
+							Addresses: []string{
+								"10.20.0.0/16",
+								"10.50.0.0/24",
+							},
+							AvoidBuggyIPs: true,
+							AutoAssign:    ptr.To(false),
+							AllocateTo:    &v1beta1.ServiceAllocation{Priority: 1},
+						},
+					},
+				},
+			},
+			want: &Config{
+				Pools: &Pools{
+					ByName: map[string]*Pool{
+						"pool1": {
+							Name:               "pool1",
+							CIDR:               []*net.IPNet{ipnet("10.20.0.0/16"), ipnet("10.50.0.0/24")},
+							AvoidBuggyIPs:      true,
+							AutoAssign:         false,
+							ServiceAllocations: &ServiceAllocation{Priority: 1, ServiceSelectors: []labels.Selector{labels.Everything()}},
+						},
+					},
+					ByServiceSelector: []string{"pool1"},
+				},
+				BFDProfiles: map[string]*BFDProfile{},
+				Peers:       map[string]*Peer{},
+			},
+		},
+
+		{
 			desc: "peer-only",
 			crs: ClusterResources{
 
