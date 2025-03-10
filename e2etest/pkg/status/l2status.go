@@ -34,5 +34,11 @@ func L2ForService(cs client.Client, svc *v1.Service) (*v1beta1.ServiceL2Status, 
 	if len(statuses) > 1 {
 		return nil, fmt.Errorf("got more than 1 serviceL2Status object: %d", len(statuses))
 	}
-	return &(statuses[0]), nil
+
+	s := statusList.Items[0]
+	if s.Status.Node == "" {
+		return nil, fmt.Errorf(".Status.Node not populated for service %s/%s, resource: %v", svc.Name, svc.Namespace, s)
+	}
+
+	return &s, nil
 }
