@@ -3,32 +3,11 @@
 package nodes
 
 import (
-	"errors"
 	"net"
 
 	"go.universe.tf/metallb/internal/ipfamily"
 	corev1 "k8s.io/api/core/v1"
 )
-
-func IsNodeAvailable(n *corev1.Node) error {
-	if IsNodeUnschedulable(n) {
-		return errors.New("nodeUnschedulable")
-	}
-
-	if IsNetworkUnavailable(n) {
-		return errors.New("nodeNetworkUnavailable")
-	}
-
-	return nil
-}
-
-func IsNodeUnschedulable(n *corev1.Node) bool {
-	if n == nil {
-		return false
-	}
-
-	return n.Spec.Unschedulable
-}
 
 // IsNetworkUnavailable returns true if the given node NodeNetworkUnavailable condition status is true.
 func IsNetworkUnavailable(n *corev1.Node) bool {
@@ -48,6 +27,27 @@ func conditionStatus(n *corev1.Node, ct corev1.NodeConditionType) corev1.Conditi
 	}
 
 	return corev1.ConditionUnknown
+}
+
+func MatchesExcludePattern(n, pattern *corev1.Node) bool {
+	if n == nil || pattern == nil {
+		return false
+	}
+
+	// Exclude on any label or annotation match
+	for k, v := range pattern.Labels {
+		if nv, exists := n.Labels[k]; exists && nv == v {
+			return true
+		}
+	}
+
+	for k, v := range pattern.Annotations {
+		if nv, exists := n.Annotations[k]; exists && nv == v {
+			return true
+		}
+	}
+
+	return false
 }
 
 // IsNodeExcludedFromBalancers returns true if the given node has labeld node.kubernetes.io/exclude-from-external-load-balancers".
