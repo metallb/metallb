@@ -50,6 +50,7 @@ func Delete(cs clientset.Interface, svc *corev1.Service) {
 }
 
 func tweakServicePort(svc *corev1.Service, port int) {
+	svc.Spec.Ports[0].Port = int32(port)
 	svc.Spec.Ports[0].TargetPort = intstr.FromInt(port)
 }
 
