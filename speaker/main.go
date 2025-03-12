@@ -605,9 +605,6 @@ func isNodeAvailableChanged(oldNodes map[string]*v1.Node, newNode *v1.Node) bool
 		return false
 	}
 
-	if k8snodes.IsNodeUnschedulable(oldNode) != k8snodes.IsNodeUnschedulable(newNode) {
-		return true
-	}
 	if k8snodes.IsNetworkUnavailable(oldNode) != k8snodes.IsNetworkUnavailable(newNode) {
 		return true
 	}
