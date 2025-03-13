@@ -560,6 +560,13 @@ func (a *Allocator) IPs(svc string) []net.IP {
 	return nil
 }
 
+func (a *Allocator) AllocationKey(svc string) string {
+	if alloc := a.allocated[svc]; alloc != nil {
+		return alloc.key.backend + alloc.key.sharing
+	}
+	return ""
+}
+
 // PoolForIP returns the pool structure associated with an IP.
 func (a *Allocator) PoolForIP(ips []net.IP) *config.Pool {
 	return poolFor(a.pools.ByName, ips)

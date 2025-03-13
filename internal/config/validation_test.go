@@ -561,6 +561,46 @@ func TestValidateFRR(t *testing.T) {
 			},
 			mustFail: true,
 		},
+		{
+			desc: "two peers with interface set different",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Interface: "eth0",
+							MyASN:     123,
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Interface: "eth1",
+							MyASN:     123,
+						},
+					},
+				},
+			},
+			mustFail: false,
+		},
+		{
+			desc: "two peers with interface set same",
+			config: ClusterResources{
+				Peers: []v1beta2.BGPPeer{
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Interface: "eth0",
+							MyASN:     123,
+						},
+					},
+					{
+						Spec: v1beta2.BGPPeerSpec{
+							Interface: "eth0",
+							MyASN:     123,
+						},
+					},
+				},
+			},
+			mustFail: true,
+		},
 	}
 
 	for _, test := range tests {
