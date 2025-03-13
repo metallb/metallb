@@ -14,7 +14,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	utilErrors "k8s.io/apimachinery/pkg/util/errors"
+	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -81,17 +81,31 @@ func (r *Layer2StatusReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	var errs []error
 	if len(ipAdvS) == 0 {
 		for key, item := range serviceL2statuses.Items {
-			if item.Status.Node != r.NodeName {
+			if item.Labels[LabelAnnounceNode] != r.NodeName {
 				continue
 			}
 			if err := r.Client.Delete(ctx, &serviceL2statuses.Items[key]); err != nil && !errors.IsNotFound(err) {
 				errs = append(errs, err)
 			}
 		}
-		if len(errs) > 0 {
-			return ctrl.Result{}, utilErrors.NewAggregate(errs)
+		return ctrl.Result{}, utilerrors.NewAggregate(errs)
+	}
+
+	deleteRedundantErrs := []error{}
+	if len(serviceL2statuses.Items) > 1 {
+		// We shouldn't get here, just in case the controller created redundant resources
+		for i := range serviceL2statuses.Items[1:] {
+			if serviceL2statuses.Items[i+1].Labels[LabelAnnounceNode] != r.NodeName {
+				continue
+			}
+			if err := r.Client.Delete(ctx, &serviceL2statuses.Items[i+1]); err != nil && !errors.IsNotFound(err) {
+				deleteRedundantErrs = append(deleteRedundantErrs, err)
+			}
 		}
-		return ctrl.Result{}, nil
+	}
+
+	if len(deleteRedundantErrs) > 0 {
+		return ctrl.Result{}, utilerrors.NewAggregate(deleteRedundantErrs)
 	}
 
 	// creating a brand new cr
@@ -131,8 +145,10 @@ func (r *Layer2StatusReconciler) Reconcile(ctx context.Context, req ctrl.Request
 	}
 	if result == controllerutil.OperationResultCreated {
 		// According to https://pkg.go.dev/sigs.k8s.io/controller-runtime/pkg/controller/controllerutil#CreateOrPatch
-		// If the object is created for the first time, we have to requeue it to ensure that the status is updated.
-		return ctrl.Result{Requeue: true}, nil
+		// If the object is created, we have to patch it again to ensure the status is created.
+		// This will happen when we reconcile the creation event.
+		level.Debug(r.Logger).Log("controller", "Layer2StatusReconciler", "created state", dumpResource(state))
+		return ctrl.Result{}, nil
 	}
 
 	level.Debug(r.Logger).Log("controller", "Layer2StatusReconciler", "updated state", dumpResource(state))
