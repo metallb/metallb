@@ -106,30 +106,19 @@ $ cat frr.log
 {{% /notice %}}
 
 
-### GR and Cordoned Node
+### GR when Drain and Reboot Node
 
-GR is orthogonal to any Kubernetes node admin [operation](https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/)
-and the expected behavior does not change. When admin drains/cordons a node from the cluster, the node will be
-labeled as Unschedulable. When that happens all routes towards that node will
-be removed as normal procedure\*. The BGP peering will remain because Daemonsets
-pods continue to run on Unschedulable nodes (`--ignore-daemonsets`). The BGP
-peer will not have anymore routes to the node, so UDP packets will be
-redirected to other nodes, existing TCP connections will break\*\*, but no new
-traffic will be blackholed. After all that, the node might be hard rebooted or removed,
-then the Daemonset pod will be removed, BGP will be properly terminated
-(TCP connection close), GR will start on the peer but no routes exists to be staled.
+When GR is enabled and a cluster admin drains a node, the BGP peering towards that
+node will remain because Daemonsets pods continue to run on Unschedulable nodes
+(`--ignore-daemonsets`). If there is service of traffic policy "Cluster", then that
+node might continue to forward traffic. If a node reboot/shutdown follows, then
+traffic will be blackholed until the GR timer (2min) will be expired in the peer
+and remove the route towards the stopped node.
+[info](https://github.com/metallb/metallb/issues/2677)
 
 \* If service is of traffic policy "Local", then the routes will be removed
-faster because any pod that is endpoint to the service will be removed from the node.
+because any pod that is endpoint to the service will be removed from the node.
 
-\*\* TCP connection could remain established if the service is of traffic
-policy "Cluster" and if Kubernetes primary CNI plugin implements consistent-hashing
-[[Cilium]](https://docs.cilium.io/en/stable/network/kubernetes/kubeproxy-free/#maglev-consistent-hashing).
-
-**Note:** when BGP peers are removed or added, rebalancing might take place due to
-the load balancing hashing mechanism of the external peer, e.g. client A
-that had a connection to node X can switch to node Y just because node Z was
-removed from the cluster.
 
 
 ### GR and BFD
