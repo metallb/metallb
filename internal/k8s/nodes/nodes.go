@@ -3,32 +3,11 @@
 package nodes
 
 import (
-	"errors"
 	"net"
 
 	"go.universe.tf/metallb/internal/ipfamily"
 	corev1 "k8s.io/api/core/v1"
 )
-
-func IsNodeAvailable(n *corev1.Node) error {
-	if IsNodeUnschedulable(n) {
-		return errors.New("nodeUnschedulable")
-	}
-
-	if IsNetworkUnavailable(n) {
-		return errors.New("nodeNetworkUnavailable")
-	}
-
-	return nil
-}
-
-func IsNodeUnschedulable(n *corev1.Node) bool {
-	if n == nil {
-		return false
-	}
-
-	return n.Spec.Unschedulable
-}
 
 // IsNetworkUnavailable returns true if the given node NodeNetworkUnavailable condition status is true.
 func IsNetworkUnavailable(n *corev1.Node) bool {
