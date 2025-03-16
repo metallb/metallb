@@ -565,6 +565,12 @@ func addressPoolServiceAllocationsFromCR(p metallbv1beta1.IPAddressPool, namespa
 		}
 		poolNamespaces.Insert(poolNs)
 	}
+	serviceAllocations := &ServiceAllocation{Priority: p.Spec.AllocateTo.Priority, Namespaces: poolNamespaces}
+	if len(poolNamespaces) == 0 && len(p.Spec.AllocateTo.NamespaceSelectors) == 0 && len(p.Spec.AllocateTo.ServiceSelectors) == 0 {
+		// If no specific namespaces or service selectors are set, match everything
+		serviceAllocations.ServiceSelectors = []labels.Selector{labels.Everything()}
+		return serviceAllocations, nil
+	}
 	err := validateLabelSelectorDuplicate(p.Spec.AllocateTo.NamespaceSelectors, "namespaceSelectors")
 	if err != nil {
 		return nil, err
@@ -572,12 +578,6 @@ func addressPoolServiceAllocationsFromCR(p metallbv1beta1.IPAddressPool, namespa
 	err = validateLabelSelectorDuplicate(p.Spec.AllocateTo.ServiceSelectors, "serviceSelectors")
 	if err != nil {
 		return nil, err
-	}
-	serviceAllocations := &ServiceAllocation{Priority: p.Spec.AllocateTo.Priority, Namespaces: poolNamespaces}
-	if len(poolNamespaces) == 0 && len(p.Spec.AllocateTo.NamespaceSelectors) == 0 && len(p.Spec.AllocateTo.ServiceSelectors) == 0 {
-		// If no specific namespaces or service selectors are set, match everything
-		serviceAllocations.ServiceSelectors = []labels.Selector{labels.Everything()}
-		return serviceAllocations, nil
 	}
 	for i := range p.Spec.AllocateTo.NamespaceSelectors {
 		l, err := metav1.LabelSelectorAsSelector(&p.Spec.AllocateTo.NamespaceSelectors[i])
