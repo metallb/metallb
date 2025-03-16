@@ -486,6 +486,52 @@ var _ = ginkgo.Describe("IP Assignment", func() {
 			Expect(err).NotTo(HaveOccurred())
 		})
 
+		ginkgo.It("with only priority", func() {
+			namespacePoolWithLowerPriority := metallbv1beta1.IPAddressPool{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-priority-pool-1"},
+				Spec: metallbv1beta1.IPAddressPoolSpec{
+					Addresses: []string{
+						"192.168.5.0/32",
+					},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 20},
+				},
+			}
+			namespacePoolWithHigherPriority := metallbv1beta1.IPAddressPool{
+				ObjectMeta: metav1.ObjectMeta{Name: "test-priority-pool-2"},
+				Spec: metallbv1beta1.IPAddressPoolSpec{
+					Addresses: []string{
+						"192.168.10.0/32",
+					},
+					AllocateTo: &metallbv1beta1.ServiceAllocation{Priority: 10},
+				},
+			}
+			resources := config.Resources{
+				Pools: []metallbv1beta1.IPAddressPool{namespacePoolWithLowerPriority, namespacePoolWithHigherPriority},
+			}
+
+			err := ConfigUpdater.Update(resources)
+			Expect(err).NotTo(HaveOccurred())
+
+			svc1, _ := service.CreateWithBackend(cs, testNamespace, "svc-test-priority-pool-1")
+			svc2, _ := service.CreateWithBackend(cs, testNamespace, "svc-test-priority-pool-2")
+			defer func() {
+				service.Delete(cs, svc1)
+				service.Delete(cs, svc2)
+			}()
+
+			// The createWithBackend method always wait for service to acquire an ingress IP, so
+			// just validate service ingress ip address are assigned from appropriate ip
+			// address pool.
+			ginkgo.By("validate LoadBalancer IP is allocated from 1st higher priority address pool")
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespacePoolWithHigherPriority}, jigservice.GetIngressPoint(
+				&svc1.Status.LoadBalancer.Ingress[0]))
+			Expect(err).NotTo(HaveOccurred())
+			ginkgo.By("validate LoadBalancer IP is allocated from 2nd higher priority address pool")
+			err = config.ValidateIPInRange([]metallbv1beta1.IPAddressPool{namespacePoolWithLowerPriority}, jigservice.GetIngressPoint(
+				&svc2.Status.LoadBalancer.Ingress[0]))
+			Expect(err).NotTo(HaveOccurred())
+		})
+
 		ginkgo.It("with namespace and namespace labels", func() {
 			namespacePoolWithLowerPriority := metallbv1beta1.IPAddressPool{
 				ObjectMeta: metav1.ObjectMeta{Name: "test-ns-label-pool-1"},
