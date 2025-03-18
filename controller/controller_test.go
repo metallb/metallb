@@ -847,6 +847,51 @@ func TestControllerMutation(t *testing.T) {
 			},
 		},
 		{
+			desc: "request IPs from dualstack pool with PreferDualStack policy but single stack clusterip",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationAddressPool: "pool5",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4"},
+					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
+				},
+			},
+			want: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationAddressPool: "pool5",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4"},
+					IPFamilyPolicy: &IPFamilyPolicyPreferDualStack,
+				},
+				Status: statusAssigned([]string{"1.2.3.0"}),
+			},
+		},
+		{
+			desc: "request IPs from dualstack pool with RequireDualStack policy but single stack clusterip",
+			in: &v1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Annotations: map[string]string{
+						AnnotationAddressPool: "pool5",
+					},
+				},
+				Spec: v1.ServiceSpec{
+					Type:           "LoadBalancer",
+					ClusterIPs:     []string{"1.2.3.4"},
+					IPFamilyPolicy: &IPFamilyPolicyRequireDualStack,
+				},
+			},
+			wantErr: true,
+		},
+
+		{
 			desc: "request specific loadbalancer IP with dual-stack",
 			in: &v1.Service{
 				Spec: v1.ServiceSpec{
