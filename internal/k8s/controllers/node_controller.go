@@ -97,32 +97,11 @@ func NodeReconcilerPredicate() predicate.Predicate {
 		},
 	}
 
-	nodeSpecSchedulableChanged := predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			oldNode, ok := e.ObjectOld.(*corev1.Node)
-			if !ok {
-				return false
-			}
-
-			newNode, ok := e.ObjectNew.(*corev1.Node)
-			if !ok {
-				return false
-			}
-
-			if oldNode.Spec.Unschedulable != newNode.Spec.Unschedulable {
-				return true
-			}
-
-			return false
-		},
-	}
-
 	return predicate.And(
 		allowDeletions,
 		allowCreations,
 		predicate.Or(
 			nodeConditionNetworkAvailabilityStatusChanged,
-			nodeSpecSchedulableChanged,
 			predicate.LabelChangedPredicate{},
 		),
 	)
