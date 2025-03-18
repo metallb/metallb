@@ -3,9 +3,8 @@
 package config
 
 import (
-	"fmt"
-
 	"errors"
+	"fmt"
 
 	metallbv1beta1 "go.universe.tf/metallb/api/v1beta1"
 	metallbv1beta2 "go.universe.tf/metallb/api/v1beta2"
@@ -146,17 +145,17 @@ func DiscardNativeOnly(c ClusterResources) error {
 	if len(c.Peers) > 1 {
 		peerAddr := make(map[string]bool)
 		routerID := c.Peers[0].Spec.RouterID
-		peer0 := peerAddressKey(c.Peers[0].Spec)
+		peer0 := peerIdentifier(c.Peers[0].Spec)
 		peerAddr[peer0] = true
 		for _, p := range c.Peers[1:] {
 			if p.Spec.RouterID != routerID {
 				return fmt.Errorf("peer %s has RouterID different from %s, in FRR mode all RouterID must be equal", p.Spec.RouterID, c.Peers[0].Spec.RouterID)
 			}
-			peerKey := peerAddressKey(p.Spec)
-			if _, ok := peerAddr[peerKey]; ok {
+			peerID := peerIdentifier(p.Spec)
+			if _, ok := peerAddr[peerID]; ok {
 				return fmt.Errorf("peer %s already exists, FRR mode doesn't support duplicate BGPPeers", p.Spec.Address)
 			}
-			peerAddr[peerKey] = true
+			peerAddr[peerID] = true
 		}
 	}
 	for _, p := range c.Peers {
@@ -216,8 +215,12 @@ func hasBFDEcho(peer *Peer, bfdProfiles map[string]*BFDProfile) bool {
 	return false
 }
 
-func peerAddressKey(peer metallbv1beta2.BGPPeerSpec) string {
-	return fmt.Sprintf("%s-%s", peer.Address, peer.VRFName)
+func peerIdentifier(peer metallbv1beta2.BGPPeerSpec) string {
+	id := peer.Address
+	if peer.Address == "" {
+		id = peer.Interface
+	}
+	return fmt.Sprintf("%s-%s", id, peer.VRFName)
 }
 
 type poolSelector struct {

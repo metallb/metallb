@@ -226,7 +226,7 @@ func (c *layer2Controller) speakersForPool(l log.Logger, name string, pool *conf
 	}
 	res := map[string]bool{}
 	for s := range eligibleNodes {
-		if err := k8snodes.IsNodeAvailable(nodes[s]); err != nil {
+		if k8snodes.IsNetworkUnavailable(nodes[s]) {
 			level.Debug(l).Log("event", "skipping should announce l2", "service", name, "reason", "speaker's node has NodeNetworkUnavailable condition")
 			continue
 		}
