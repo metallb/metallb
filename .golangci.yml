@@ -7,7 +7,7 @@ linters:
   - gofmt
   - ginkgolinter
   - dogsled
-  - exportloopref
+  - copyloopvar
   - gocritic
   - misspell
   - nolintlint
@@ -20,7 +20,8 @@ linters:
   - wastedassign
 linters-settings:
   errcheck:
-    exclude: .golangci.exclude
+    exclude-functions:
+      - (github.com/go-kit/log.Logger).Log
   godot:
     scope: toplevel
     capital: true

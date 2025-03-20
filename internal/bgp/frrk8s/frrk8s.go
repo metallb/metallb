@@ -325,7 +325,6 @@ func (sm *sessionManager) updateConfig() error {
 	}
 
 	for _, bfd := range sm.bfdProfiles {
-		bfd := bfd
 		toAdd := frrv1beta1.BFDProfile{
 			Name:             bfd.Name,
 			ReceiveInterval:  bfd.ReceiveInterval,
