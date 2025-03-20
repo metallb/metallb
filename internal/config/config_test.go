@@ -1393,7 +1393,37 @@ func TestParse(t *testing.T) {
 					},
 				},
 			},
+			want: &Config{
+				Pools: &Pools{ByName: map[string]*Pool{
+					"pool1": {
+						Name:       "pool1",
+						AutoAssign: true,
+						CIDR: []*net.IPNet{
+							ipnet("10.20.30.40/24"),
+						},
+						BGPAdvertisements: []*BGPAdvertisement{
+							{
+								AggregationLength:   24,
+								AggregationLengthV6: 128,
+								LocalPref:           100,
+								Communities:         map[community.BGPCommunity]bool{},
+								Nodes:               map[string]bool{"node1": true, "node2": true},
+							},
+							{
+								AggregationLength:   32,
+								AggregationLengthV6: 128,
+								LocalPref:           200,
+								Communities:         map[community.BGPCommunity]bool{},
+								Nodes:               map[string]bool{"node1": true, "node2": true},
+							},
+						},
+					},
+				}},
+				BFDProfiles: map[string]*BFDProfile{},
+				Peers:       map[string]*Peer{},
+			},
 		},
+
 		{
 			desc: "different local pref - different aggregation lengths",
 			crs: ClusterResources{
