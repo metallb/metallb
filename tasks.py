@@ -1317,7 +1317,7 @@ def e2etest(
         external_frr_image = "--frr-image=" + (external_frr_image)
     testrun = run(
         "cd `git rev-parse --show-toplevel`/e2etest &&"
-        "KUBECONFIG={} {} {} --junit-report={} --timeout=3h {} {} -- --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {} -bgp-mode={} -with-vrf={} {} --host-bgp-mode={} --kubectl={} --frr-k8s-namespace={}".format(
+        "KUBECONFIG={} {} {} --junit-report={} --timeout=3h --repeat 5 {} {} -- --kubeconfig={} --service-pod-port={} -ipv4-service-range={} -ipv6-service-range={} {} --report-path {} {} -node-nics {} -local-nics {} {} -bgp-mode={} -with-vrf={} {} --host-bgp-mode={} --kubectl={} --frr-k8s-namespace={}".format(
             kubeconfig,
             ginkgo_path,
             ginkgo_params,
