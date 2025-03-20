@@ -352,6 +352,7 @@ speaker:
 
 crds:
   enabled: true
+  conversionStrategy: Webhook
   validationFailurePolicy: Fail
 
 # frrk8s contains the configuration related to using an frrk8s instance
@@ -364,3 +365,6 @@ frrk8s:
   enabled: false
   external: false
   namespace: ""
+
+webhooks:
+  enabled: true

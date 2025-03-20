@@ -1456,6 +1456,7 @@ def generatemanifests(ctx):
         source="config/manifests/metallb-frr.yaml",
         output="charts/metallb/charts/crds/templates/crds.yaml",
     )
+    _add_crd_helm_templates(output="charts/metallb/charts/crds/templates/crds.yaml")
 
 
 def generate_deepcopy():
@@ -1472,7 +1473,43 @@ def _align_helm_crds(source, output):
     run(
         f"""{yq_path} eval-all 'select(.kind == "CustomResourceDefinition")' {source} > {output}"""
     )
+
+
+def _add_crd_helm_templates(output):
+    tmpfile = "/tmp/crdstmp.yaml"
     run("sed -i 's/metallb-system/{{{{ .Release.Namespace }}}}/g' {}".format(output))
+    run(
+        """
+    awk '
+    /^  name: bgppeers.metallb.io/ {{
+        found_name=1
+    }} 
+    found_name && /^  conversion:/ {{
+    print
+    print \"  {{{{- if eq (lower .Values.conversionStrategy) \\\"webhook\\\" }}}}\"
+    found_name=0
+    next
+    }} 
+    {{ print }}' {} > {}
+    """.format(
+            output, tmpfile
+        )
+    )
+    run(
+        """
+    awk '
+    /^  name: bgppeers.metallb.io/ {{
+      found_name = 1
+    }}
+    found_name && /^  group:/ {{
+      print \"  {{{{- else }}}}\\n    strategy: None\\n  {{{{- end }}}}\"
+      found_name = 0
+    }}
+    {{ print }}' {} > {}
+    """.format(
+            tmpfile, output
+        )
+    )
 
 
 @task
