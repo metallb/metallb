@@ -71,6 +71,29 @@ metadata:
   namespace: metallb-system
 ```
 
+## How can I understand which node advertises a given Service?
+In addition to logs, Kubernetes Events and Prometheus metrics, it is possible to understand the advertisement status via the ServiceL2Status and ServiceBGPStatus resources that the speakers manage, for example:
+```
+$ kubectl get servicel2statuses -n metallb-system
+NAME       ALLOCATED NODE       SERVICE NAME   SERVICE NAMESPACE
+l2-r8jwb   kind-worker2         service1       ns1
+l2-svkqj   kind-worker          service2       ns2
+
+$ kubectl get servicebgpstatuses -n metallb-system
+NAME        NODE                 SERVICE NAME   SERVICE NAMESPACE
+bgp-82jzt   kind-worker2         service4       ns4
+bgp-b8fmt   kind-worker2         service3       ns3
+bgp-bt56x   kind-worker          service4       ns4
+bgp-c64s2   kind-worker          service3       ns3
+```
+Each resource is labeled with "metallb.io/node", "metallb.io/service-name", "metallb.io/service-namespace", with the matching node / service name / service namespace respectively. This makes it easier to list the statuses related to a given combination, for example:
+```
+$ kubectl get servicebgpstatuses -n metallb-system -l metallb.io/service-name="service3",metallb.io/service-namespace="ns3",metallb.io/node=kind-worker
+NAME        NODE          SERVICE NAME   SERVICE NAMESPACE
+bgp-c64s2   kind-worker   service3       ns3
+```
+As the API docs mention, the ServiceBGPStatus resource only represents the intention of the node to advertise the Service to a set of peers, where the actual advertisements depend on the status of the corresponding BGP sessions. The status of a BGP session can be understood via metrics / logs, or in the case of [the FRR-k8s mode](https://metallb.io/concepts/bgp/index.html#frr-k8s-mode) via its BGPSessionState resource.
+
 ## Does MetalLB work on OpenStack?
 
 Yes but by default, OpenStack has anti-spoofing protection enabled which prevents the VMs from using any IP that wasn't configured for them in the OpenStack control plane, such as LoadBalancer IPs from MetalLB. See [openstack port set --allowed-address](https://docs.openstack.org/python-openstackclient/latest/cli/command-objects/port.html).

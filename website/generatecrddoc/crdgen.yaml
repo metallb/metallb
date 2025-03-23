@@ -2,14 +2,17 @@ processor:
   # RE2 regular expressions describing types that should be excluded from the generated documentation.
   ignoreTypes:
     - "List$"
-    - "Status$"
     - "MatchExpression"
     - "NodeSelector"
     - "LegacyBgpAdvertisement"
     - "v1beta1.*BGPPeer"
   # RE2 regular expressions describing type fields that should be excluded from the generated documentation.
   ignoreFields:
-    - "status$"
+    - "BFDProfile.status"
+    - "BGPAdvertisement.status"
+    - "L2Advertisement.status"
+    - "BGPPeer.status"
+    - "Community.status"
   ignoreGroupVersions:
     - "v1alpha1"
 
