@@ -8,6 +8,7 @@
 | Type | Name | Since | Website | Use-Case |
 |:-|:-|:-|:-|:-|
 | Vendor | Red Hat, Inc. | 2022 | [link](https://www.redhat.com) | MetalLB is distributed together with Red Hat's Openshift containers platform, as the supported implementation of LoadBalancer services on Bare Metal|
+| Vendor | SUSE | 2023 | [link](https://www.suse.com) | MetalLB is a core part of the SUSE Edge solution serving as a LoadBalancer on Bare Metal, as well as load balancing the Kubernetes API in highly available topologies |
 
 
 ### Adopter Types
