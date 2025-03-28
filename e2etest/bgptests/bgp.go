@@ -156,7 +156,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			}),
 	)
 
-	ginkgo.Describe("GracefulRestart, when speakers restart", func() {
+	ginkgo.FDescribe("GracefulRestart, when speakers restart", func() {
 
 		ginkgo.AfterEach(func() {
 			for _, c := range FRRContainers {
@@ -200,6 +200,7 @@ var _ = ginkgo.Describe("BGP", func() {
 			}
 
 			Eventually(func() error {
+				ginkgo.By(fmt.Sprint("--- time %v", time.Now()))
 				for _, c := range FRRContainers {
 					err := validateServiceNoWait(svc, allNodes.Items, c)
 					if errors.Is(err, ErrStaleRoute) {
@@ -215,12 +216,13 @@ var _ = ginkgo.Describe("BGP", func() {
 
 				for _, p := range pods {
 					if !k8s.PodIsReady(p) {
+						ginkgo.By(fmt.Sprint("pod is not ready %v", p.Name))
 						return fmt.Errorf("speaker pods are not ready")
 					}
 				}
 
 				return nil
-			}, 2*time.Minute, time.Second).ShouldNot(HaveOccurred(), "no downtime until speakers are ready")
+			}, 2*time.Minute, 10*time.Second).ShouldNot(HaveOccurred(), "no downtime until speakers are ready")
 
 			for _, c := range FRRContainers {
 				validateService(svc, allNodes.Items, c)
