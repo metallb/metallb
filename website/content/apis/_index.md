@@ -19,6 +19,8 @@ description: MetalLB API reference documentation
 - [Community](#community)
 - [IPAddressPool](#ipaddresspool)
 - [L2Advertisement](#l2advertisement)
+- [ServiceBGPStatus](#servicebgpstatus)
+- [ServiceL2Status](#servicel2status)
 
 
 
@@ -61,6 +63,8 @@ _Appears in:_
 | `minimumTtl` _integer_ | For multi hop sessions only: configure the minimum<br />expected TTL for an incoming BFD control packet. |
 
 
+
+
 #### BGPAdvertisement
 
 
@@ -100,6 +104,8 @@ _Appears in:_
 | `ipAddressPoolSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | A selector for the IPAddressPools which would get advertised via this advertisement.<br />If no IPAddressPool is selected by this or by the list, the advertisement is applied to all the IPAddressPools. |
 | `nodeSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | NodeSelectors allows to limit the nodes to announce as next hops for the LoadBalancer IP. When empty, all the nodes having  are announced as next hops. |
 | `peers` _string array_ | Peers limits the bgppeer to advertise the ips of the selected pools to.<br />When empty, the loadbalancer IP is announced to all the BGPPeers configured. |
+
+
 
 
 #### Community
@@ -150,6 +156,8 @@ _Appears in:_
 | `communities` _[CommunityAlias](#communityalias) array_ |  |
 
 
+
+
 #### IPAddressPool
 
 
@@ -167,6 +175,7 @@ to LoadBalancer services.
 | `apiVersion` _string_ | APIVersion defines the versioned schema of this representation of an object.<br />Servers should convert recognized schemas to the latest internal value, and<br />may reject unrecognized values.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources |
 | `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |
 | `spec` _[IPAddressPoolSpec](#ipaddresspoolspec)_ |  |
+| `status` _[IPAddressPoolStatus](#ipaddresspoolstatus)_ |  |
 
 
 #### IPAddressPoolSpec
@@ -186,6 +195,35 @@ _Appears in:_
 | `serviceAllocation` _[ServiceAllocation](#serviceallocation)_ | AllocateTo makes ip pool allocation to specific namespace and/or service.<br />The controller will use the pool with lowest value of priority in case of<br />multiple matches. A pool with no priority set will be used only if the<br />pools with priority can't be used. If multiple matching IPAddressPools are<br />available it will check for the availability of IPs sorting the matching<br />IPAddressPools by priority, starting from the highest to the lowest. If<br />multiple IPAddressPools have the same priority, choice will be random. |
 
 
+#### IPAddressPoolStatus
+
+
+
+IPAddressPoolStatus defines the observed state of IPAddressPool.
+
+_Appears in:_
+- [IPAddressPool](#ipaddresspool)
+
+| Field | Description |
+| --- | --- |
+| `assignedIPv4` _integer_ | AssignedIPv4 is the number of assigned IPv4 addresses. |
+| `assignedIPv6` _integer_ | AssignedIPv6 is the number of assigned IPv6 addresses. |
+| `availableIPv4` _integer_ | AvailableIPv4 is the number of available IPv4 addresses. |
+| `availableIPv6` _integer_ | AvailableIPv6 is the number of available IPv6 addresses. |
+
+
+#### InterfaceInfo
+
+
+
+InterfaceInfo defines interface info of layer2 announcement.
+
+_Appears in:_
+- [MetalLBServiceL2Status](#metallbservicel2status)
+
+| Field | Description |
+| --- | --- |
+| `name` _string_ | Name the name of network interface card |
 
 
 #### L2Advertisement
@@ -224,6 +262,42 @@ _Appears in:_
 | `interfaces` _string array_ | A list of interfaces to announce from. The LB IP will be announced only from these interfaces.<br />If the field is not set, we advertise from all the interfaces on the host. |
 
 
+
+
+#### MetalLBServiceBGPStatus
+
+
+
+MetalLBServiceBGPStatus defines the observed state of ServiceBGPStatus.
+
+_Appears in:_
+- [ServiceBGPStatus](#servicebgpstatus)
+
+| Field | Description |
+| --- | --- |
+| `node` _string_ | Node indicates the node announcing the service. |
+| `serviceName` _string_ | ServiceName indicates the service this status represents. |
+| `serviceNamespace` _string_ | ServiceNamespace indicates the namespace of the service. |
+| `peers` _string array_ | Peers indicate the BGP peers for which the service is configured to be advertised to.<br />The service being actually advertised to a given peer depends on the session state and is not indicated here. |
+
+
+#### MetalLBServiceL2Status
+
+
+
+MetalLBServiceL2Status defines the observed state of ServiceL2Status.
+
+_Appears in:_
+- [ServiceL2Status](#servicel2status)
+
+| Field | Description |
+| --- | --- |
+| `node` _string_ | Node indicates the node that receives the directed traffic |
+| `serviceName` _string_ | ServiceName indicates the service this status represents |
+| `serviceNamespace` _string_ | ServiceNamespace indicates the namespace of the service |
+| `interfaces` _[InterfaceInfo](#interfaceinfo) array_ | Interfaces indicates the interfaces that receive the directed traffic |
+
+
 #### ServiceAllocation
 
 
@@ -241,7 +315,63 @@ _Appears in:_
 | `serviceSelectors` _[LabelSelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#labelselector-v1-meta) array_ | ServiceSelectors list of label selector to select service(s) for which ip pool<br />can be used for ip allocation. |
 
 
+#### ServiceBGPStatus
 
+
+
+ServiceBGPStatus exposes the BGP peers a service is configured to be advertised to, per relevant node.
+
+
+
+| Field | Description |
+| --- | --- |
+| `apiVersion` _string_ | `metallb.io/v1beta1`
+| `kind` _string_ | `ServiceBGPStatus`
+| `kind` _string_ | Kind is a string value representing the REST resource this object represents.<br />Servers may infer this from the endpoint the client submits requests to.<br />Cannot be updated.<br />In CamelCase.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds |
+| `apiVersion` _string_ | APIVersion defines the versioned schema of this representation of an object.<br />Servers should convert recognized schemas to the latest internal value, and<br />may reject unrecognized values.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |
+| `spec` _[ServiceBGPStatusSpec](#servicebgpstatusspec)_ |  |
+| `status` _[MetalLBServiceBGPStatus](#metallbservicebgpstatus)_ |  |
+
+
+#### ServiceBGPStatusSpec
+
+
+
+ServiceBGPStatusSpec defines the desired state of ServiceBGPStatus.
+
+_Appears in:_
+- [ServiceBGPStatus](#servicebgpstatus)
+
+
+
+#### ServiceL2Status
+
+
+
+ServiceL2Status reveals the actual traffic status of loadbalancer services in layer2 mode.
+
+
+
+| Field | Description |
+| --- | --- |
+| `apiVersion` _string_ | `metallb.io/v1beta1`
+| `kind` _string_ | `ServiceL2Status`
+| `kind` _string_ | Kind is a string value representing the REST resource this object represents.<br />Servers may infer this from the endpoint the client submits requests to.<br />Cannot be updated.<br />In CamelCase.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds |
+| `apiVersion` _string_ | APIVersion defines the versioned schema of this representation of an object.<br />Servers should convert recognized schemas to the latest internal value, and<br />may reject unrecognized values.<br />More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources |
+| `metadata` _[ObjectMeta](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.27/#objectmeta-v1-meta)_ | Refer to Kubernetes API documentation for fields of `metadata`. |
+| `spec` _[ServiceL2StatusSpec](#servicel2statusspec)_ |  |
+| `status` _[MetalLBServiceL2Status](#metallbservicel2status)_ |  |
+
+
+#### ServiceL2StatusSpec
+
+
+
+ServiceL2StatusSpec defines the desired state of ServiceL2Status.
+
+_Appears in:_
+- [ServiceL2Status](#servicel2status)
 
 
 
@@ -303,6 +433,8 @@ _Appears in:_
 | `ebgpMultiHop` _boolean_ | To set if the BGPPeer is multi-hops away. Needed for FRR mode only. |
 | `vrf` _string_ | To set if we want to peer with the BGPPeer using an interface belonging to<br />a host vrf |
 | `disableMP` _boolean_ | To set if we want to disable MP BGP that will separate IPv4 and IPv6 route exchanges into distinct BGP sessions. |
+
+
 
 
 #### DynamicASNMode
