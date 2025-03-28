@@ -898,7 +898,7 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 	// Verify that BGP ADVs set a unique local preference value per BGP update.
 	for _, bgpAdv := range pool.BGPAdvertisements {
 		if adv.LocalPref != bgpAdv.LocalPref {
-			if !advertisementsAreCompatible(adv, bgpAdv) {
+			if !advertisementsAreCompatible(adv, bgpAdv, pool) {
 				return fmt.Errorf("invalid local preference %d: local preferernce %d was "+
 					"already set for the same type of BGP update. Check existing BGP advertisements "+
 					"with common pools and aggregation lengths", adv.LocalPref, bgpAdv.LocalPref)
@@ -909,8 +909,8 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 	return nil
 }
 
-func advertisementsAreCompatible(newAdv, adv *BGPAdvertisement) bool {
-	if adv.AggregationLength != newAdv.AggregationLength && adv.AggregationLengthV6 != newAdv.AggregationLengthV6 {
+func advertisementsAreCompatible(newAdv, adv *BGPAdvertisement, pool *Pool) bool {
+	if isAggrLengthDifferent(newAdv, adv, pool) {
 		return true
 	}
 
@@ -936,6 +936,37 @@ func advertisementsAreCompatible(newAdv, adv *BGPAdvertisement) bool {
 	}
 
 	return true
+}
+
+func isAggrLengthDifferent(newAdv, adv *BGPAdvertisement, pool *Pool) bool {
+	var hasV4, hasV6 bool
+	for _, cidrs := range pool.cidrsPerAddresses {
+		family := ipfamily.ForCIDR(cidrs[0])
+		if family == ipfamily.IPv4 {
+			hasV4 = true
+		}
+		if family == ipfamily.IPv6 {
+			hasV6 = true
+		}
+		if hasV4 && hasV6 {
+			break
+		}
+	}
+
+	if !hasV6 && !hasV4 { // compatible?!
+		return true
+	}
+	if adv.AggregationLength != newAdv.AggregationLength && !hasV6 {
+		return true
+	}
+	if adv.AggregationLengthV6 != newAdv.AggregationLengthV6 && !hasV4 {
+		return true
+	}
+	// has both, both must be different
+	if adv.AggregationLength != newAdv.AggregationLength && adv.AggregationLengthV6 != newAdv.AggregationLengthV6 {
+		return true
+	}
+	return false
 }
 
 func ParseCIDR(cidr string) ([]*net.IPNet, error) {
