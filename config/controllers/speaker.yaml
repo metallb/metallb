@@ -92,6 +92,9 @@ spec:
         - mountPath: /etc/metallb
           name: metallb-excludel2
           readOnly: true
+        - name: excludenodes
+          mountPath: /etc/ml_exclude_node
+          readOnly: true
       hostNetwork: true
       nodeSelector:
         kubernetes.io/os: linux
@@ -113,3 +116,7 @@ spec:
         configMap:
           defaultMode: 256
           name: metallb-excludel2
+      - name: excludenodes
+        configMap:
+          name: nodesexclusionpatterns
+          optional: true
