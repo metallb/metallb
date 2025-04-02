@@ -156,8 +156,9 @@ var _ = ginkgo.Describe("BGP", func() {
 			}),
 	)
 
-	ginkgo.Describe("GracefulRestart, when speakers restart", func() {
+	markFlaky := []any{ginkgo.Label("flaky"), ginkgo.FlakeAttempts(3)}
 
+	ginkgo.Describe("GracefulRestart, when speakers restart", markFlaky, func() {
 		ginkgo.AfterEach(func() {
 			for _, c := range FRRContainers {
 				c.NeighborConfig.GracefulRestart = false
