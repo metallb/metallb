@@ -1,6 +1,7 @@
 module go.universe.tf/metallb
 
 go 1.23.6
+toolchain go1.24.1
 
 require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc
@@ -21,7 +22,7 @@ require (
 	golang.org/x/sys v0.30.0
 	k8s.io/api v0.32.2
 	k8s.io/apiextensions-apiserver v0.32.1
-	k8s.io/apimachinery v0.32.2
+	k8s.io/apimachinery v0.32.3
 	k8s.io/client-go v0.32.2
 	k8s.io/component-base v0.32.2
 	k8s.io/klog v1.0.0
