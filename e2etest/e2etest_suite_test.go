@@ -224,5 +224,4 @@ var _ = ginkgo.AfterSuite(func() {
 	}
 	err = updaterOtherNS.Clean()
 	Expect(err).NotTo(HaveOccurred())
-
 })

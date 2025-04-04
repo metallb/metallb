@@ -3360,6 +3360,9 @@ spec:
         - mountPath: /etc/metallb
           name: metallb-excludel2
           readOnly: true
+        - mountPath: /etc/ml_exclude_node
+          name: excludenodes
+          readOnly: true
       - args:
         - --secure-listen-address=0.0.0.0:9120
         - --upstream=http://$(METALLB_HOST):7472/
@@ -3409,6 +3412,10 @@ spec:
           defaultMode: 256
           name: metallb-excludel2
         name: metallb-excludel2
+      - configMap:
+          name: nodesexclusionpatterns
+          optional: true
+        name: excludenodes
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor

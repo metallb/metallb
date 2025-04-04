@@ -191,6 +191,10 @@ spec:
             defaultMode: 256
             name: metallb-excludel2
       {{- end }}
+        - name: excludenodes
+          configMap:
+            name: nodesexclusionpatterns
+            optional: true
       {{- if .Values.speaker.frr.enabled }}
         - name: frr-sockets
           emptyDir: {}
@@ -369,6 +373,9 @@ spec:
           - name: metallb-excludel2
             mountPath: /etc/metallb
           {{- end }}
+          - name: excludenodes
+            mountPath: /etc/ml_exclude_node
+            readOnly: true
         {{- end }}
       {{- if .Values.speaker.frr.enabled }}
       - name: frr
