@@ -320,6 +320,9 @@
             "webhookMode" : {
               "type": "string"
             },
+            "webhookSecretName" : {
+              "type": "string"
+            },
             "extraContainers": {
               "type": "array",
               "items": {
