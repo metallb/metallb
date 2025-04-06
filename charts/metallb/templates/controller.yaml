@@ -188,7 +188,7 @@ spec:
       - name: cert
         secret:
           defaultMode: 420
-          secretName: metallb-webhook-cert
+          secretName: {{ .Values.controller.webhookSecretName | quote }}
       {{- if .Values.prometheus.controllerMetricsTLSSecret }}
       - name: metrics-certs
         secret:
