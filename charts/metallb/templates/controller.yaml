@@ -71,6 +71,9 @@ spec:
         {{- if .Values.controller.webhookMode }}
         - --webhook-mode={{ .Values.controller.webhookMode }}
         {{- end }}
+        {{- if .Values.controller.webhookSecretName }}
+        - --webhook-secret={{ .Values.controller.webhookSecretName }}
+        {{- end }}
         {{- if .Values.controller.tlsMinVersion }}
         - --tls-min-version={{ .Values.controller.tlsMinVersion }}
         {{- end }}
