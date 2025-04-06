@@ -196,6 +196,7 @@ controller:
   logLevel: info
   # command: /controller
   # webhookMode: enabled
+  # webhookSecretName: webhook-server-cert
   image:
     repository: quay.io/metallb/controller
     tag:
