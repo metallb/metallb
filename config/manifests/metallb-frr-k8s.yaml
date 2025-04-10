@@ -3037,7 +3037,7 @@ spec:
         env:
         - name: TINI_SUBREAPER
           value: "true"
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.3.0
         livenessProbe:
           failureThreshold: 3
           httpGet:
@@ -3070,7 +3070,7 @@ spec:
         - --metrics-bind-address=127.0.0.1
         command:
         - /etc/frr_metrics/frr-metrics
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.3.0
         name: frr-metrics
         ports:
         - containerPort: 7573
@@ -3084,7 +3084,7 @@ spec:
           name: metrics
       - command:
         - /etc/frr_reloader/frr-reloader.sh
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.3.0
         name: reloader
         volumeMounts:
         - mountPath: /var/run/frr
@@ -3099,7 +3099,7 @@ spec:
         - /bin/sh
         - -c
         - cp -rLf /tmp/frr/* /etc/frr/
-        image: quay.io/frrouting/frr:9.1.0
+        image: quay.io/frrouting/frr:10.3.0
         name: cp-frr-files
         securityContext:
           runAsGroup: 101
