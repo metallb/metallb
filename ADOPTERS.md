@@ -11,6 +11,7 @@
 | Vendor | Red Hat, Inc. | 2022 | [link](https://www.redhat.com) | MetalLB is distributed together with Red Hat's Openshift containers platform, as the supported implementation of LoadBalancer services on Bare Metal|
 | Vendor | SUSE | 2023 | [link](https://www.suse.com) | MetalLB is a core part of the SUSE Edge solution serving as a LoadBalancer on Bare Metal, as well as load balancing the Kubernetes API in highly available topologies |
 | Vendor | Nokia EDA | 2024 | [link](https://docs.eda.dev) | MetalLB implements the LoadBalancer controller role in the Nokia Event Driven Automation (EDA) product|
+| End-user | Kiratech S.p.A. | 2022 | [link](https://www.kiratech.it/) | MetalLB is the LoadBalancer reference technology in our training courses laboratories, which are [public and published under MIT license](https://github.com/kiratech/labs) |
 
 
 ### Adopter Types
