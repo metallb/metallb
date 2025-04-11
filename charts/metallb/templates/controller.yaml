@@ -71,6 +71,9 @@ spec:
         {{- if .Values.controller.webhookMode }}
         - --webhook-mode={{ .Values.controller.webhookMode }}
         {{- end }}
+        {{- if .Values.controller.webhookSecretName }}
+        - --webhook-secret={{ .Values.controller.webhookSecretName }}
+        {{- end }}
         {{- if .Values.controller.tlsMinVersion }}
         - --tls-min-version={{ .Values.controller.tlsMinVersion }}
         {{- end }}
@@ -185,7 +188,7 @@ spec:
       - name: cert
         secret:
           defaultMode: 420
-          secretName: metallb-webhook-cert
+          secretName: {{ .Values.controller.webhookSecretName | quote }}
       {{- if .Values.prometheus.controllerMetricsTLSSecret }}
       - name: metrics-certs
         secret:
