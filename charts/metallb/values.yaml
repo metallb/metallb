@@ -332,7 +332,7 @@ speaker:
     enabled: true
     image:
       repository: quay.io/frrouting/frr
-      tag: 9.1.0
+      tag: 10.3.0
       pullPolicy:
     metricsPort: 7473
     resources: {}
