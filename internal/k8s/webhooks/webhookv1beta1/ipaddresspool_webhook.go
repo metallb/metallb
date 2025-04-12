@@ -19,13 +19,18 @@ package webhookv1beta1
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
+	"slices"
 
 	"errors"
 
 	"github.com/go-kit/log/level"
 	"go.universe.tf/metallb/api/v1beta1"
+	"go.universe.tf/metallb/internal/config"
 	v1 "k8s.io/api/admission/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
@@ -115,6 +120,12 @@ func validateIPAddressPoolCreate(ipAddress *v1beta1.IPAddressPool) error {
 		level.Error(Logger).Log("webhook", "ipAddress", "action", "create", "name", ipAddress.Name, "namespace", ipAddress.Namespace, "error", err)
 		return err
 	}
+
+	err = validatePoolPerBGPAdv(ipAddress)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -138,6 +149,12 @@ func validateIPAddressPoolUpdate(ipAddress *v1beta1.IPAddressPool, _ *v1beta1.IP
 		level.Error(Logger).Log("webhook", "ipAddress", "action", "update", "name", ipAddress.Name, "namespace", ipAddress.Namespace, "error", err)
 		return err
 	}
+
+	err = validatePoolPerBGPAdv(ipAddress)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -165,4 +182,71 @@ func ipAddressListWithUpdate(existing *v1beta1.IPAddressPoolList, toAdd *v1beta1
 	}
 	res.Items = append(res.Items, *toAdd.DeepCopy())
 	return res
+}
+
+var getExistingBGPAdvertisements = func() (*v1beta1.BGPAdvertisementList, error) {
+	existingBGPAdvertisementList := &v1beta1.BGPAdvertisementList{}
+	err := WebhookClient.List(context.Background(), existingBGPAdvertisementList, &client.ListOptions{Namespace: MetalLBNamespace})
+	if err != nil {
+		return nil, errors.Join(err, errors.New("failed to get existing BGPAdvertisement objects"))
+	}
+	return existingBGPAdvertisementList, nil
+}
+
+func validatePoolPerBGPAdv(pool *v1beta1.IPAddressPool) error {
+	existingBGPAdvs, err := getExistingBGPAdvertisements()
+	if err != nil {
+		return fmt.Errorf("failed to get existing BGPAdvertisements: %w", err)
+	}
+
+	poolCIDRsPerAddress := make(map[string][]*net.IPNet)
+	for _, addr := range pool.Spec.Addresses {
+		cidrs, err := config.ParseCIDR(addr)
+		if err != nil {
+			return fmt.Errorf("invalid address %q in pool %s: %w", addr, pool.Name, err)
+		}
+		poolCIDRsPerAddress[addr] = cidrs
+	}
+
+	poolLabels := labels.Set(pool.Labels)
+
+	for _, adv := range existingBGPAdvs.Items {
+		referencesPool := slices.Contains(adv.Spec.IPAddressPools, pool.Name)
+
+		if !referencesPool {
+			for _, selector := range adv.Spec.IPAddressPoolSelectors {
+				labelSelector, err := metav1.LabelSelectorAsSelector(&selector)
+				if err != nil {
+					return fmt.Errorf("pool %s/%s validation failed: BGPAdvertisement %s/%s contains invalid ipAddressPoolSelector (%v): %w", pool.Namespace, pool.Name, adv.Namespace, adv.Name, selector, err)
+				}
+				if labelSelector.Matches(poolLabels) {
+					referencesPool = true
+					break
+				}
+			}
+		}
+
+		if !referencesPool {
+			continue
+		}
+
+		for addr, cidrs := range poolCIDRsPerAddress {
+			if len(cidrs) == 0 {
+				continue
+			}
+
+			maxLength := *adv.Spec.AggregationLength
+			if cidrs[0].IP.To4() == nil {
+				maxLength = *adv.Spec.AggregationLengthV6
+			}
+
+			lowestPoolMask := config.LowestMask(cidrs)
+
+			if int(maxLength) < lowestPoolMask {
+				return fmt.Errorf("pool %s address %s (prefix %d) is incompatible with BGPAdvertisement %s in namespace %s (aggregation length %d)", pool.Name, addr, lowestPoolMask, adv.Name, adv.Namespace, maxLength)
+			}
+		}
+	}
+
+	return nil
 }
