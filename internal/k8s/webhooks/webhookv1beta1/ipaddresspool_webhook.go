@@ -104,12 +104,18 @@ func validateIPAddressPoolCreate(ipAddress *v1beta1.IPAddressPool) error {
 		return err
 	}
 
+	existingBGPAdvertisementList, err := getExistingBGPAdvertisements()
+	if err != nil {
+		return err
+	}
+
 	toValidate := ipAddressListWithUpdate(existingIPAddressPoolList, ipAddress)
-	err = Validator.Validate(toValidate)
+	err = Validator.Validate(toValidate, existingBGPAdvertisementList)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "ipAddress", "action", "create", "name", ipAddress.Name, "namespace", ipAddress.Namespace, "error", err)
 		return err
 	}
+
 	return nil
 }
 
@@ -122,12 +128,18 @@ func validateIPAddressPoolUpdate(ipAddress *v1beta1.IPAddressPool, _ *v1beta1.IP
 		return err
 	}
 
+	existingBGPAdvertisementList, err := getExistingBGPAdvertisements()
+	if err != nil {
+		return err
+	}
+
 	toValidate := ipAddressListWithUpdate(existingIPAddressPoolList, ipAddress)
-	err = Validator.Validate(toValidate)
+	err = Validator.Validate(toValidate, existingBGPAdvertisementList)
 	if err != nil {
 		level.Error(Logger).Log("webhook", "ipAddress", "action", "update", "name", ipAddress.Name, "namespace", ipAddress.Namespace, "error", err)
 		return err
 	}
+
 	return nil
 }
 
@@ -155,4 +167,13 @@ func ipAddressListWithUpdate(existing *v1beta1.IPAddressPoolList, toAdd *v1beta1
 	}
 	res.Items = append(res.Items, *toAdd.DeepCopy())
 	return res
+}
+
+var getExistingBGPAdvertisements = func() (*v1beta1.BGPAdvertisementList, error) {
+	existingBGPAdvertisementList := &v1beta1.BGPAdvertisementList{}
+	err := WebhookClient.List(context.Background(), existingBGPAdvertisementList, &client.ListOptions{Namespace: MetalLBNamespace})
+	if err != nil {
+		return nil, errors.Join(err, errors.New("failed to get existing BGPAdvertisement objects"))
+	}
+	return existingBGPAdvertisementList, nil
 }

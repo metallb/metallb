@@ -30,8 +30,16 @@ func TestValidateIPAddressPool(t *testing.T) {
 		}, nil
 	}
 
+	toRestoreBGPAdvertisements := getExistingBGPAdvertisements
+	getExistingBGPAdvertisements = func() (*v1beta1.BGPAdvertisementList, error) {
+		return &v1beta1.BGPAdvertisementList{
+			Items: []v1beta1.BGPAdvertisement{},
+		}, nil
+	}
+
 	defer func() {
 		getExistingIPAddressPools = toRestoreIPAddressPools
+		getExistingBGPAdvertisements = toRestoreBGPAdvertisements
 	}()
 
 	tests := []struct {
