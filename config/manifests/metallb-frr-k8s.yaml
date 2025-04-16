@@ -3242,6 +3242,9 @@ spec:
         - mountPath: /etc/metallb
           name: metallb-excludel2
           readOnly: true
+        - mountPath: /etc/ml_exclude_node
+          name: excludenodes
+          readOnly: true
       hostNetwork: true
       nodeSelector:
         kubernetes.io/os: linux
@@ -3263,6 +3266,10 @@ spec:
           defaultMode: 256
           name: metallb-excludel2
         name: metallb-excludel2
+      - configMap:
+          name: nodesexclusionpatterns
+          optional: true
+        name: excludenodes
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingWebhookConfiguration

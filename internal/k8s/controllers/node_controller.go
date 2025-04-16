@@ -102,6 +102,7 @@ func NodeReconcilerPredicate() predicate.Predicate {
 		allowCreations,
 		predicate.Or(
 			nodeConditionNetworkAvailabilityStatusChanged,
+			predicate.AnnotationChangedPredicate{},
 			predicate.LabelChangedPredicate{},
 		),
 	)
