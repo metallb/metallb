@@ -74,6 +74,27 @@ type FRRK8sReconciler struct {
 	sync.Mutex
 }
 
+type onShutdownCleanup struct {
+	client.Client
+	logger         log.Logger
+	reconcilerLock *sync.Mutex
+	nodeName       string
+	namespace      string
+}
+
+func (c *onShutdownCleanup) Start(ctx context.Context) error {
+	<-ctx.Done() // Wait for manager to signal shutdown
+
+	// Ensure main reconciler is not processing anything, and since the context
+	// is already canceled it won't do anything from this point
+	c.reconcilerLock.Lock()
+	defer c.reconcilerLock.Unlock()
+
+	level.Info(c.logger).Log("controller", "FRRK8sReconciler cleanup triggered")
+	config := &frrv1beta1.FRRConfiguration{ObjectMeta: metav1.ObjectMeta{Name: frrk8s.ConfigName(c.nodeName), Namespace: c.namespace}}
+	return c.Delete(context.TODO(), config)
+}
+
 func (r *FRRK8sReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	level.Info(r.Logger).Log("controller", "FRRK8sReconciler", "start reconcile", req.NamespacedName.String())
 	defer level.Info(r.Logger).Log("controller", "FRRK8sReconciler", "end reconcile", req.NamespacedName.String())
@@ -143,11 +164,27 @@ func (r *FRRK8sReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		return true
 	})
 
-	return ctrl.NewControllerManagedBy(mgr).
+	if err := ctrl.NewControllerManagedBy(mgr).
 		For(&frrv1beta1.FRRConfiguration{}).
 		WatchesRawSource(source.Channel(r.reconcileChan, &handler.EnqueueRequestForObject{})).
 		WithEventFilter(p).
-		Complete(r)
+		Complete(r); err != nil {
+		return err
+	}
+
+	cleanup := &onShutdownCleanup{
+		Client:         r.Client,
+		logger:         r.Logger,
+		reconcilerLock: &r.Mutex,
+		nodeName:       r.NodeName,
+		namespace:      r.FRRK8sNamespace,
+	}
+
+	if err := mgr.Add(cleanup); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *FRRK8sReconciler) UpdateConfig(config interface{}) {

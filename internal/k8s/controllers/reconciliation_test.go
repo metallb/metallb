@@ -271,12 +271,24 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
-	By("tearing down the test environment")
+	By("verifying there is an existing FRRConfiguration") // so that the shutdown verification makes sense
+	existingConf := frrv1beta1.FRRConfiguration{}
+	err := k8sClient.Get(ctx, client.ObjectKey{Name: frrk8s.ConfigName(testNodeName), Namespace: testNamespace}, &existingConf)
+	Expect(err).ToNot(HaveOccurred())
+
+	By("stopping the manager by canceling the context it is using")
 	cancel()
-	err := testEnv.Stop()
-	Expect(err).NotTo(HaveOccurred())
 	Eventually(mgrDone.Load, 5*time.Second, 200*time.Millisecond).Should(BeTrue())
+
+	By("checking that the FRRConfiguration is gone after manager shutdown")
+	err = k8sClient.Get(context.TODO(), client.ObjectKey{Name: frrk8s.ConfigName(testNodeName), Namespace: testNamespace}, &existingConf)
+	Expect(apierrors.IsNotFound(err)).To(BeTrue(), fmt.Sprintf("expected err to be not found, got %v", err))
+
 	requestHandler = configRequestHandler
+
+	By("tearing down the test environment")
+	err = testEnv.Stop()
+	Expect(err).NotTo(HaveOccurred())
 })
 
 var _ = Describe("Config controller", func() {
