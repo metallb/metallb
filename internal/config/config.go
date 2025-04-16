@@ -888,7 +888,7 @@ func validateBGPAdvPerPool(adv *BGPAdvertisement, pool *Pool) error {
 
 		// in case of range format, we may have a set of cidrs associated to a given address.
 		// We reject if none of the cidrs are compatible with the aggregation length.
-		lowest := lowestMask(cidrs)
+		lowest := LowestMask(cidrs)
 		if maxLength < lowest {
 			return fmt.Errorf("invalid aggregation length %d: prefix %d in "+
 				"this pool is more specific than the aggregation length for addresses %s", adv.AggregationLength, lowest, addr)
@@ -1022,7 +1022,7 @@ func cidrContainsCIDR(outer, inner *net.IPNet) bool {
 	return false
 }
 
-func lowestMask(cidrs []*net.IPNet) int {
+func LowestMask(cidrs []*net.IPNet) int {
 	if len(cidrs) == 0 {
 		return 0
 	}
