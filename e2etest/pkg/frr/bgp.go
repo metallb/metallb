@@ -177,28 +177,28 @@ func RawDump(exec executor.Executor, filesToDump ...string) (string, error) {
 	}
 
 	res += "####### BGP Neighbors\n"
-	out, err = exec.Exec("vtysh", "-c", "show bgp neighbor")
+	out, err = exec.Exec("vtysh", "-c", "show bgp vrf all neighbor")
 	if err != nil {
 		allerrs = errors.Join(allerrs, fmt.Errorf("\nFailed exec show bgp neighbor: %v", err))
 	}
 	res += out
 
 	res += "####### Routes\n"
-	out, err = exec.Exec("vtysh", "-c", "show bgp ipv4 json")
+	out, err = exec.Exec("vtysh", "-c", "show bgp vrf all ipv4 json")
 	if err != nil {
 		allerrs = errors.Join(allerrs, fmt.Errorf("\nFailed exec show bgp ipv4: %v", err))
 	}
 	res += out
 
 	res += "####### Routes\n"
-	out, err = exec.Exec("vtysh", "-c", "show bgp ipv6 json")
+	out, err = exec.Exec("vtysh", "-c", "show bgp vrf all ipv6 json")
 	if err != nil {
 		allerrs = errors.Join(allerrs, fmt.Errorf("\nFailed exec show bgp ipv6: %v", err))
 	}
 	res += out
 
 	res += "####### BFD Peers\n"
-	out, err = exec.Exec("vtysh", "-c", "show bfd peer")
+	out, err = exec.Exec("vtysh", "-c", "show bfd vrf all peer")
 	if err != nil {
 		allerrs = errors.Join(allerrs, fmt.Errorf("\nFailed exec show bfd peer: %v", err))
 	}
