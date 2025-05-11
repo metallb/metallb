@@ -41,11 +41,12 @@ spec:
       {{- end }}
     {{- end }}
     {{- if .Values.prometheus.prometheusRule.addressPoolExhausted.enabled }}
+    {{ $exclude := .Values.prometheus.prometheusRule.addressPoolExhausted.excludePools }}
     - alert: MetalLBAddressPoolExhausted
       annotations:
         summary: {{`'Exhausted address pool on {{ $labels.pod }}'`}}
         description: {{`'{{ $labels.job }} - MetalLB {{ $labels.container }} on {{ $labels.pod }} has exhausted address pool {{ $labels.pool }} for > 1 minute'`}}
-      expr: metallb_allocator_addresses_in_use_total >= on(pool) metallb_allocator_addresses_total
+      expr: metallb_allocator_addresses_in_use_total{pool!~"{{ $exclude }}"} >= on(pool) metallb_allocator_addresses_total
       for: 1m
       {{- with .Values.prometheus.prometheusRule.addressPoolExhausted.labels }}
       labels:
@@ -54,12 +55,13 @@ spec:
     {{- end }}
 
     {{- if .Values.prometheus.prometheusRule.addressPoolUsage.enabled }}
+    {{ $exclude := .Values.prometheus.prometheusRule.addressPoolUsage.excludePools }}
     {{- range .Values.prometheus.prometheusRule.addressPoolUsage.thresholds }}
     - alert: MetalLBAddressPoolUsage{{ .percent }}Percent
       annotations:
         summary: {{`'Exhausted address pool on {{ $labels.pod }}'`}}
         message: {{`'{{ $labels.job }} - MetalLB {{ $labels.container }} on {{ $labels.pod }} has address pool {{ $labels.pool }} past `}}{{ .percent }}{{`% usage for > 1 minute'`}}
-      expr: ( metallb_allocator_addresses_in_use_total / on(pool) metallb_allocator_addresses_total ) * 100 > {{ .percent }}
+      expr: ( metallb_allocator_addresses_in_use_total{pool!~"{{ $exclude }}"} / on(pool) metallb_allocator_addresses_total ) * 100 > {{ .percent }}
       {{- with .labels }}
       labels:
         {{- toYaml . | nindent 8 }}
