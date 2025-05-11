@@ -166,6 +166,8 @@ prometheus:
       enabled: true
       labels:
         severity: critical
+      # Exclude the pools matching the regular expression from triggering the alert.
+      excludePools: ""
 
     addressPoolUsage:
       enabled: true
@@ -179,6 +181,8 @@ prometheus:
         - percent: 95
           labels:
             severity: critical
+      # Exclude the pools matching the regular expression from triggering the alert.
+      excludePools: ""
 
     # MetalLBBGPSessionDown
     bgpSessionDown:
